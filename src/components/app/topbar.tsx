@@ -51,12 +51,10 @@ function UserMenu({ session }: { session: SessionContext }) {
 
   return (
     <Dropdown
+      triggerLabel="Menu utilisateur"
+      triggerClassName="flex items-center gap-2.5 rounded-lg py-1 pr-1 pl-2 transition-colors hover:bg-surface-sunken"
       trigger={
-        <button
-          type="button"
-          className="flex items-center gap-2.5 rounded-lg py-1 pr-1 pl-2 transition-colors hover:bg-surface-sunken"
-          aria-label="Menu utilisateur"
-        >
+        <>
           <span className="hidden text-right sm:block">
             <span className="block text-[13px] leading-4 font-medium text-text-primary">
               {session.user.fullName}
@@ -71,7 +69,7 @@ function UserMenu({ session }: { session: SessionContext }) {
             imageUrl={session.user.avatarUrl}
             size="md"
           />
-        </button>
+        </>
       }
     >
       <div className="px-2.5 py-2">

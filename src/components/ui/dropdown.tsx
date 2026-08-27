@@ -1,28 +1,31 @@
 "use client";
 
-import {
-  cloneElement,
-  isValidElement,
-  useEffect,
-  useRef,
-  useState,
-  type ReactElement,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Menu déroulant. Le déclencheur est un élément React ordinaire, ce qui permet
- * de le composer depuis un composant serveur : le composant clone l'élément
- * pour y attacher l'ouverture et les attributs ARIA.
+ * Menu déroulant.
+ *
+ * Le bouton déclencheur est rendu PAR ce composant, et `trigger` n'en est que
+ * le contenu. Une version antérieure clonait un élément fourni par l'appelant
+ * pour y injecter `aria-expanded` et `aria-haspopup` : lorsque cet élément
+ * venait d'un composant serveur, le balisage envoyé par le serveur ne portait
+ * pas ces attributs alors que le client les ajoutait — d'où une erreur
+ * d'hydratation à chaque page authentifiée. Faire porter le bouton au
+ * composant client supprime la divergence par construction.
  */
 export function Dropdown({
   trigger,
+  triggerLabel,
+  triggerClassName,
   children,
   align = "end",
   className,
 }: {
+  /** Contenu du bouton déclencheur (inerte : ni gestionnaire, ni attribut ARIA). */
   trigger: ReactNode;
+  triggerLabel: string;
+  triggerClassName?: string;
   children: ReactNode;
   align?: "start" | "end";
   className?: string;
@@ -48,14 +51,6 @@ export function Dropdown({
     };
   }, [open]);
 
-  const triggerElement = isValidElement(trigger)
-    ? cloneElement(trigger as ReactElement<Record<string, unknown>>, {
-        onClick: () => setOpen((value) => !value),
-        "aria-expanded": open,
-        "aria-haspopup": "menu",
-      } as never)
-    : trigger;
-
   return (
     <div
       ref={containerRef}
@@ -66,7 +61,17 @@ export function Dropdown({
         if (open && target.closest("[data-dropdown-item]")) setOpen(false);
       }}
     >
-      {triggerElement}
+      <button
+        type="button"
+        className={triggerClassName}
+        aria-label={triggerLabel}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {trigger}
+      </button>
+
       {open && (
         <div
           className={cn(
