@@ -144,7 +144,8 @@ export function VerificationForm({
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
+      {/* La marge basse dégage le contenu de la barre d'action collante. */}
+      <div className="space-y-4 pb-24">
         {lines.map((line, index) => (
           <LineCard
             key={line.id}

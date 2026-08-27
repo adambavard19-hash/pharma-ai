@@ -154,7 +154,7 @@ export default async function AnalyticsPage({
         />
       </Grid>
 
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid items-start gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader
             title="Évolution"
@@ -194,7 +194,7 @@ export default async function AnalyticsPage({
         </Card>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="grid items-start gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader
             title="Produits les plus performants"

@@ -15,6 +15,7 @@ loadEnv({ path: ".env", quiet: true });
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type Prisma } from "../src/generated/prisma";
 import { DEMO_DRUGS } from "./seed-data/drugs";
+import { DEMO_DISCLAIMER, DOCUMENT_DISCLAIMERS } from "../src/core/documents/types";
 import { DEMO_PRODUCTS } from "./seed-data/products";
 import { hashPasswordSync } from "./seed-utils";
 
@@ -333,6 +334,10 @@ async function main() {
     users.push({ ...user, role: member.role });
   }
 
+  for (const user of users) {
+    PHARMACIST_NAMES[user.id] = `${user.firstName} ${user.lastName}`;
+  }
+
   const owner = users.find((u) => u.role === "OWNER")!;
   const pharmacists = users.filter((u) => u.role === "PHARMACIST");
   const technician = users.find((u) => u.role === "TECHNICIAN")!;
@@ -607,6 +612,9 @@ type SeedProduct = Awaited<ReturnType<typeof prisma.product.create>> & {
   stockItem: { quantity: number; alertThreshold: number } | null;
 };
 
+/** Nom complet par identifiant, pour signer les fiches patient générées. */
+const PHARMACIST_NAMES: Record<string, string> = {};
+
 const SCENARIOS = [
   {
     id: "antibio-amoxicilline",
@@ -717,7 +725,7 @@ async function seedHistory(context: {
   technician: { id: string };
   owner: { id: string };
 }) {
-  const { pharmacy, products, patients, pharmacists, technician } = context;
+  const { pharmacy, products, patients, pharmacists, technician, owner } = context;
   const bySlugName = new Map(products.map((p) => [p.imageUrl?.split("/").pop()?.replace(".svg", "") ?? "", p]));
 
   let prescriptionIndex = 0;
@@ -745,7 +753,10 @@ async function seedHistory(context: {
   for (const day of schedule) {
     const scenario = pick(SCENARIOS);
     const patient = pick(patients);
-    const pharmacist = pick(pharmacists);
+    // Les adjoints traitent la majorité des ordonnances ; la titulaire tient
+    // aussi le comptoir, plus ponctuellement — les statistiques d'équipe le
+    // reflètent.
+    const pharmacist = random() < 0.15 ? owner : pick(pharmacists);
     const createdAt = daysAgo(day, randomInt(9, 18), randomInt(0, 59));
 
     prescriptionIndex += 1;
@@ -933,17 +944,83 @@ async function seedHistory(context: {
     });
 
     if (outcome !== "REMOVED") {
+      // Le document reprend réellement le traitement et le conseil retenu :
+      // une fiche de démonstration vide ne montrerait rien du produit.
+      const pharmacistName = PHARMACIST_NAMES[pharmacist.id] ?? "Votre pharmacien";
+      const stockQuantity = product.stockItem?.quantity ?? 0;
+
       const documentContent = {
         version: 1,
         generatedAt: createdAt.toISOString(),
-        pharmacy: { name: "Pharmacie Saint-Michel", logoUrl: null, brandColor: "#0F766E", addressLine1: "12 rue des Remparts", postalCode: "69003", city: "Lyon", phone: "04 00 00 00 00", email: null },
-        pharmacist: { fullName: "Équipe Pharma.ai", roleLabel: "Pharmacien" },
-        patient: { firstName: patient.firstName, lastName: patient.lastName, reference: patient.reference },
-        prescription: { reference, prescriberName: scenario.prescriber, prescribedAt: createdAt.toISOString() },
-        treatment: [],
-        advice: [],
-        pharmacistNote: null,
-        disclaimers: [],
+        pharmacy: {
+          name: "Pharmacie Saint-Michel",
+          logoUrl: null,
+          brandColor: "#0F766E",
+          addressLine1: "12 rue des Remparts",
+          postalCode: "69003",
+          city: "Lyon",
+          phone: "04 00 00 00 00",
+          email: "contact@pharmacie-saint-michel.exemple.fr",
+        },
+        pharmacist: { fullName: pharmacistName, roleLabel: "Pharmacien" },
+        patient: {
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          reference: patient.reference,
+        },
+        prescription: {
+          reference,
+          prescriberName: scenario.prescriber,
+          prescribedAt: createdAt.toISOString(),
+        },
+        treatment: scenario.lines.map((line) => {
+          const knowledge = DEMO_DRUGS.find(
+            (entry) => entry.name.toLowerCase() === line.drug.toLowerCase(),
+          );
+          return {
+            drugName: line.drug,
+            dosage: line.dosage,
+            form: line.form,
+            posology: line.posology,
+            durationDays: line.duration,
+            instructions: line.instructions,
+            purpose: knowledge?.patientExplanation ?? null,
+            tips: knowledge?.intakeAdvice ? [knowledge.intakeAdvice] : [],
+            precautions: knowledge?.cautionPopulations.length
+              ? [`Vigilance particulière : ${knowledge.cautionPopulations.join(", ")}.`]
+              : [],
+            sourceLabel: knowledge
+              ? "Jeu de démonstration Pharma.ai demo-2026.1"
+              : "Information non disponible dans le référentiel connecté",
+            explanationUnavailable: !knowledge,
+          };
+        }),
+        advice: [
+          {
+            productName: product.name,
+            brand: product.brand,
+            imageUrl: product.imageUrl,
+            benefit: product.commercialClaims[0] ?? null,
+            personalReason:
+              product.commercialClaims[0] ??
+              "Conseil proposé par votre pharmacien dans le cadre de votre traitement.",
+            usage: product.description,
+            precautions: product.precautions,
+            priceCents: product.salePriceCents,
+            availability:
+              stockQuantity <= 0
+                ? "ON_ORDER"
+                : stockQuantity <= (product.stockItem?.alertThreshold ?? 0)
+                  ? "LOW_STOCK"
+                  : "IN_STOCK",
+            addedManually: false,
+          },
+        ],
+        pharmacistNote:
+          random() < 0.4
+            ? "N'hésitez pas à revenir me voir si vous avez la moindre question."
+            : null,
+        disclaimers: [DEMO_DISCLAIMER, ...DOCUMENT_DISCLAIMERS],
         isDemo: true,
       };
 

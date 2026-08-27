@@ -152,7 +152,7 @@ function PharmacySettings({
   };
 }) {
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid items-start gap-5 lg:grid-cols-2">
       <Card>
         <CardHeader
           title="Identité de l'officine"
@@ -322,7 +322,7 @@ function ComplianceSettings({ isDemo }: { isDemo: boolean }) {
         échéant, par un délégué à la protection des données.
       </Alert>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         {COMPLIANCE_ITEMS.map((item) => (
           <Card key={item.title}>
             <CardHeader
@@ -410,7 +410,7 @@ function SubscriptionSettings({
   const status = STATUS_LABELS[subscription.status] ?? { label: subscription.status, tone: "info" as const };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid items-start gap-5 lg:grid-cols-2">
       <Card>
         <CardHeader
           title={

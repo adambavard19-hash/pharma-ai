@@ -204,7 +204,7 @@ export default async function DashboardPage() {
         />
       </Grid>
 
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid items-start gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader
             title="Évolution du chiffre d'affaires"
@@ -256,7 +256,7 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid items-start gap-5 xl:grid-cols-3">
         <Card>
           <CardHeader
             title="Conseils les plus performants"

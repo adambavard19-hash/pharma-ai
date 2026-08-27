@@ -145,13 +145,11 @@ export function PatientDocument({
                       Comment le prendre
                     </p>
                     <p className="mt-0.5 text-[13.5px] leading-6 text-ink-800 dark:text-ink-100">
-                      {[
+                      {joinSentences([
                         item.posology,
-                        item.durationDays ? `Pendant ${item.durationDays} jours.` : null,
+                        item.durationDays ? `Pendant ${item.durationDays} jours` : null,
                         item.instructions,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
+                      ])}
                     </p>
                   </div>
                 )}
@@ -259,7 +257,7 @@ export function PatientDocument({
                     </p>
                   </div>
 
-                  {item.benefit && (
+                  {item.benefit && !item.personalReason.includes(item.benefit) && (
                     <p className="text-[13px] leading-5 text-ink-600 dark:text-ink-300">
                       {item.benefit}
                     </p>
@@ -326,6 +324,19 @@ export function PatientDocument({
       </footer>
     </article>
   );
+}
+
+/**
+ * Assemble des fragments en phrases correctement ponctuées.
+ * Les données saisies au comptoir se terminent rarement par un point ; les
+ * concaténer brutalement produirait « 1 application le soir Pendant 10 jours ».
+ */
+function joinSentences(parts: (string | null | undefined)[]): string {
+  return parts
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .map((part) => (/[.!?]$/.test(part) ? part : `${part}.`))
+    .join(" ");
 }
 
 function SectionTitle({

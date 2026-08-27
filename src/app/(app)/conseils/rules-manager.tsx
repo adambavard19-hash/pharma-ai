@@ -82,7 +82,7 @@ export function RulesManager({
         </Button>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         <RuleList
           title="Références privilégiées"
           icon={<Star className="size-4 text-brand-600 dark:text-brand-400" />}

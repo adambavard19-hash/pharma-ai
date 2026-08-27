@@ -209,7 +209,7 @@ export default async function PlatformAdminPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid items-start gap-5 lg:grid-cols-2">
           <Card>
             <CardHeader
               title="Consommation IA"
