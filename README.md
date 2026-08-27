@@ -1,0 +1,248 @@
+# Pharma.ai
+
+**Le copilote intelligent de l'officine.**
+
+Pharma.ai transforme la délivrance d'une ordonnance en parcours de conseil
+personnalisé : analyse assistée, vérification par un professionnel,
+recommandations justifiées et disponibles en stock, fiche patient premium, et
+mesure exacte du chiffre d'affaires additionnel généré.
+
+Le pharmacien reste systématiquement décisionnaire. Pharma.ai est un copilote,
+pas un prescripteur.
+
+---
+
+## ⚠️ À lire avant tout
+
+Cette version fonctionne sur un **jeu de données entièrement fictif** et avec
+des **fournisseurs simulés**. Concrètement :
+
+- L'extraction d'ordonnance **n'analyse aucune image** — elle restitue un
+  scénario fictif prédéfini, et l'interface l'indique explicitement.
+- Le référentiel médicamenteux livré est **fictif** (12 fiches marquées
+  `isDemoData`). **Un modèle de langage n'est pas une base médicamenteuse.**
+- Aucun service d'envoi n'est branché : l'application enregistre les envois
+  comme `SIMULATED` et n'affirme jamais qu'un message a été transmis.
+- Le socle de règles de conseil **n'a pas été validé par un pharmacien**.
+
+👉 **Ne pas utiliser avec des patients réels.** Les prérequis à une utilisation
+réelle sont listés dans [`docs/CONFORMITE.md`](docs/CONFORMITE.md).
+
+---
+
+## Démarrage rapide
+
+### Prérequis
+
+- Node.js 20 ou plus
+- PostgreSQL 15 ou plus
+
+### Installation
+
+```bash
+git clone <url-du-dépôt>
+cd pharma-ai
+npm install
+
+cp .env.example .env
+# Renseigner DATABASE_URL, puis générer les deux secrets :
+#   openssl rand -base64 48   → AUTH_SESSION_SECRET
+#   openssl rand -base64 32   → DATA_ENCRYPTION_KEY
+
+npm run setup      # migrations + génération du client + données de démonstration
+npm run dev
+```
+
+L'application est disponible sur <http://localhost:3000>.
+
+### Comptes de démonstration
+
+| Rôle | Identifiant | Mot de passe |
+|---|---|---|
+| Titulaire | `titulaire@pharma.ai` | `Demo2026!Pharma` |
+| Pharmacien | `pharmacien@pharma.ai` | `Demo2026!Pharma` |
+| Préparateur | `preparateur@pharma.ai` | `Demo2026!Pharma` |
+| Étudiante | `etudiante@pharma.ai` | `Demo2026!Pharma` |
+| Admin plateforme | `superadmin@pharma.ai` | `Demo2026!Pharma` — sur `/admin-connexion` |
+
+Chaque profil ouvre une interface différente : c'est le RBAC à l'œuvre.
+Le préparateur n'accède pas au profil de santé ; l'étudiante ne peut pas valider
+un conseil.
+
+---
+
+## Le parcours à dérouler
+
+Le jeu de démonstration laisse **une ordonnance en attente de vérification**,
+pour parcourir la chaîne complète en direct :
+
+1. **Vue d'ensemble** → l'activité de l'officine, dont le CA généré grâce à
+   Pharma.ai.
+2. **Nouvelle ordonnance** → choisir un scénario de démonstration (chacun
+   illustre un comportement précis du moteur).
+3. **Vérification** → chaque champ affiche sa confiance ; un champ illisible
+   reste **vide**, jamais deviné. Confirmer les lignes.
+4. **Conseils proposés** → accepter, modifier, remplacer, supprimer. Ouvrir
+   « Pourquoi ce produit ? » pour voir le score décomposé.
+5. **Fiche patient** → générer, imprimer, montrer le QR code, ouvrir la page
+   sécurisée.
+6. **Vente** → cocher ce que le patient a acheté ; les conseils non retenus sont
+   marqués comme tels.
+7. **Analytics** → le chiffre d'affaires additionnel se met à jour.
+
+Les scénarios disponibles illustrent chacun un point :
+
+| Scénario | Ce qu'il montre |
+|---|---|
+| Antibiothérapie | Conseil de tolérance digestive + posologie illisible |
+| Dermatologie | Accompagnement cutané d'un dermocorticoïde |
+| Cycline | Un conseil de **sécurité** prioritaire sur un conseil de confort |
+| Supplémentation martiale | Accompagnement du transit + dosage non lu |
+| Anti-inflammatoire | Confort gastrique |
+
+Testez aussi les **garde-fous** : le patient *Sophie Nguyen* est déclaré
+enceinte, *Marc Delaunay* en insuffisance rénale, *Camille Berthier* allergique
+à la pénicilline. Le moteur écarte les conseils concernés et affiche pourquoi.
+
+---
+
+## Ce qui distingue ce produit
+
+### La sécurité passe structurellement avant le commercial
+
+Le pipeline est un enchaînement de données, pas une convention :
+
+```
+SÉCURITÉ → COMPRÉHENSION → PERTINENCE → STOCK → SCORE → COMMERCIAL
+```
+
+L'étape « pertinence » ne reçoit **pas** le catalogue en paramètre : il est
+matériellement impossible qu'un prix influence la détermination de ce qui serait
+utile au patient. La dimension commerciale pèse **2 %** du score et ne peut que
+départager des références déjà jugées équivalentes.
+
+Trois tests vérifient cette garantie, dont celui-ci : une marge maximale ne
+renverse jamais un écart de pertinence.
+
+### Rien n'est inventé
+
+| Situation | Comportement |
+|---|---|
+| Champ d'ordonnance illisible | Reste **vide**, signalé, à saisir par un professionnel |
+| Médicament absent du référentiel | **Aucune explication produite** |
+| Donnée du jeu fictif | Signalée à chaque analyse |
+| Aucun service e-mail | « n'a **PAS** été transmis » |
+| Moteur vidéo absent | « bientôt disponible » — jamais une vidéo qui n'existe pas |
+
+### Le score est explicable
+
+Chaque recommandation conserve la décomposition de son score : dimension,
+valeur, poids, et le détail textuel qui l'a produite (« 24 unités en stock »,
+« allergie déclarée : arachide »). Pas de boîte noire pour le professionnel.
+
+### Tout est auditable
+
+Chaque analyse conserve la version du moteur, les fournisseurs utilisés, un
+instantané des entrées et la trace complète du pipeline. Chaque recommandation a
+son journal : proposée → acceptée → présentée → achetée, avec auteur et
+horodatage. La fiche patient est un instantané figé.
+
+---
+
+## Stack
+
+| Couche | Choix |
+|---|---|
+| Framework | Next.js 16 (App Router, Server Actions) |
+| Langage | TypeScript strict |
+| Interface | React 19 · Tailwind CSS v4 · système de design maison |
+| Base de données | PostgreSQL 16 |
+| ORM | Prisma 7 (adaptateur `pg`) |
+| Authentification | Sessions en base, scrypt, cookies `httpOnly` |
+| Graphiques | SVG rendus côté serveur, sans bibliothèque tierce |
+| Tests | Vitest |
+
+Les justifications de ces choix figurent dans
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) § 10.
+
+---
+
+## Structure
+
+```
+src/
+├── core/          Domaine PUR — ni Prisma, ni Next.js. Testable seul.
+│   ├── ai/        ports · providers · engines · pipeline
+│   ├── documents/ Contenu figé de la fiche patient
+│   └── analytics/ Périodes d'analyse
+├── server/        db · security · auth · rbac · audit · services · actions
+├── components/    ui · charts · app · document
+├── app/           Routes (App Router)
+├── config/        Environnement validé, constantes, navigation
+└── lib/           Formatage français, QR code, utilitaires
+```
+
+**Règle de dépendance** : `core/` n'importe que `core/` et `config/`.
+
+---
+
+## Commandes
+
+```bash
+npm run dev            # développement
+npm run build          # build de production
+npm run start          # serveur de production
+npm run typecheck      # TypeScript
+npm run lint           # ESLint
+npm test               # tests (44)
+
+npm run db:migrate     # créer et appliquer une migration
+npm run db:deploy      # appliquer les migrations (production)
+npm run db:seed        # (ré)installer le jeu de démonstration
+npm run db:reset       # réinitialiser complètement
+npm run db:studio      # explorateur de base
+
+npm run demo:parcours  # dérouler le parcours complet en ligne de commande
+npm run setup          # migrations + client + démonstration
+```
+
+`npm run demo:parcours` exécute la chaîne complète contre la base réelle et
+affiche la trace du pipeline étape par étape — utile pour vérifier le moteur
+sans passer par l'interface.
+
+---
+
+## Documentation
+
+| Document | Contenu |
+|---|---|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Choix retenus et **pourquoi**, découpage, isolation, moteur IA |
+| [`docs/CONFORMITE.md`](docs/CONFORMITE.md) | Ce qui est implémenté vs **ce qui reste à valider juridiquement** |
+| [`docs/RGPD.md`](docs/RGPD.md) | Synthèse opérationnelle : consentements, droits, conservation |
+| [`docs/SECURITE.md`](docs/SECURITE.md) | Mots de passe, sessions, chiffrement, isolation |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Ce qui est livré, ce qui bloque, les phases suivantes |
+
+---
+
+## Brancher un fournisseur réel
+
+Le moteur ne connaît que des interfaces. Pour brancher un OCR, un modèle ou une
+base médicamenteuse :
+
+1. Écrire un adaptateur dans `src/core/ai/providers/` implémentant le port
+   correspondant (`OCRProvider`, `AIProvider`, `DrugKnowledgeProvider`, …).
+2. Ajouter un `case` dans `src/server/ai/registry.ts`.
+3. Renseigner la variable d'environnement correspondante.
+
+**Aucune règle métier n'est touchée.** Le fournisseur déclare sa `capability`
+(`SIMULATED` ou `LIVE`) ; l'application affiche l'information à l'utilisateur et
+la consigne dans chaque analyse.
+
+---
+
+## Licence et responsabilité
+
+Pharma.ai est un outil d'assistance au conseil officinal. Il **ne prescrit
+pas**, ne pose aucun diagnostic, et ne se substitue à aucun avis médical ou
+pharmaceutique. La responsabilité professionnelle du conseil délivré au patient
+appartient au pharmacien.

@@ -1,0 +1,126 @@
+# Feuille de route Pharma.ai
+
+État au terme de la première phase de construction.
+
+---
+
+## Phase 1 — MVP fonctionnel ✅ *livré*
+
+L'objectif était qu'on puisse ouvrir l'application et comprendre immédiatement
+la vision, avec une architecture permettant d'en faire un vrai produit.
+
+| # | Élément | État |
+|---|---|---|
+| 1 | Architecture application (domaine pur / serveur / interface) | ✅ |
+| 2 | Authentification, sessions, RBAC par permissions | ✅ |
+| 3 | Officine fictive de démonstration (groupe + 2 officines) | ✅ |
+| 4 | Tableau de bord | ✅ |
+| 5 | Module patients (CRM + profil de santé chiffré + consentements) | ✅ |
+| 6 | Catalogue produits + import CSV | ✅ |
+| 7 | Stock temps réel + alertes + disponibilité inter-officines | ✅ |
+| 8 | Import d'ordonnance (photo / scan / image / PDF) | ✅ |
+| 9 | Écran de vérification avec confiance par champ | ✅ |
+| 10 | Moteur de recommandation — architecture propre, fournisseurs simulés | ✅ |
+| 11 | Copilote du pharmacien (accepter / modifier / remplacer / supprimer) | ✅ |
+| 12 | Fiche patient (écran, impression A4, page sécurisée + QR code) | ✅ |
+| 13 | Suivi des ventes complémentaires + attribution du CA | ✅ |
+| 14 | Analytics | ✅ |
+| 15 | Données de démonstration réalistes et fictives | ✅ |
+
+**En complément** : centre de notifications, recherche globale (⌘K), règles de
+conseil de l'officine, journal d'audit, console d'administration éditeur,
+modèle d'abonnement, 44 tests sur les fonctions critiques.
+
+---
+
+## Phase 2 — Prérequis à une utilisation réelle 🔴 *bloquant*
+
+Aucun de ces points n'est résolu par le code seul.
+
+| # | Élément | Nature |
+|---|---|---|
+| 1 | **Référentiel médicamenteux validé** — remplacer le jeu fictif | Licence + adaptateur |
+| 2 | **Validation du socle de règles par un pharmacien** | Métier |
+| 3 | **Hébergement agréé HDS** — base de données et fichiers | Contractuel |
+| 4 | **Analyse d'impact (AIPD)** | Juridique |
+| 5 | **Durées de conservation** arrêtées et purge automatisée | Juridique + code |
+| 6 | **Registre des traitements**, mentions d'information | Juridique |
+| 7 | **Revue de sécurité indépendante** | Externe |
+| 8 | Authentification à deux facteurs, limitation des tentatives | Code |
+| 9 | Sauvegardes et procédure de restauration testée | Exploitation |
+
+---
+
+## Phase 3 — Extraction réelle
+
+| Élément | Détail |
+|---|---|
+| Adaptateur OCR réel | Implémenter `OCRProvider` contre un moteur de vision. La confiance par champ doit être **réelle**, pas estimée. |
+| Ordonnance électronique | Format structuré → extraction fiable, sans OCR |
+| Extraction assistée par modèle | Encadrée : le modèle propose, l'écran de vérification reste obligatoire |
+| Suivi de la qualité | Taux de correction par champ → mesurer la fiabilité réelle du fournisseur |
+
+---
+
+## Phase 4 — Apprentissage propre à l'officine
+
+Les fondations existent (`PharmacyRule`, `RecommendationEvent`,
+`loadValidationHistory`).
+
+| Élément | Détail |
+|---|---|
+| Pondération par historique | Affiner la dimension `validationHistory` |
+| Suggestion de règles | « Vous retirez systématiquement X dans ce contexte — créer une règle ? » |
+| Analyse des motifs de refus | Exploiter `pharmacistNote` |
+| Garde-fou permanent | L'apprentissage **ne peut agir que sur la dimension commerciale**. Un test le vérifie. |
+
+---
+
+## Phase 5 — Intégrations officinales
+
+| Intégration | Préparation existante |
+|---|---|
+| Logiciel de gestion officinale | Services de stock conçus pour une synchronisation |
+| Caisse / encaissement | `Sale` et `SaleLine` prêts à recevoir une référence externe |
+| Catalogues fournisseurs | `ImportJob.kind` extensible |
+| Import Excel | Le parseur CSV constitue le premier niveau |
+| E-mail / SMS | Port `MessagingProvider` |
+
+---
+
+## Phase 6 — Expérience patient
+
+| Élément | État |
+|---|---|
+| Page sécurisée + QR code | ✅ livré |
+| Impression A4 premium | ✅ livré |
+| Envoi e-mail | Port prêt, **aucun fournisseur branché** |
+| Envoi SMS | Port prêt |
+| **Vidéo personnalisée** | Port `VideoProvider` prêt, moteur non développé. L'interface affiche « bientôt disponible » — jamais une vidéo qui n'existe pas. |
+
+---
+
+## Phase 7 — Plateforme et modèle économique
+
+| Élément | État |
+|---|---|
+| Modèle Plan / Subscription / statut / essai / limites | ✅ |
+| Console d'administration éditeur | ✅ |
+| Suivi de consommation IA (`AiUsageRecord`) | Table prête, alimentée dès qu'un fournisseur réel est branché |
+| Facturation | `externalCustomerId` prévu, **aucun prestataire branché** |
+| Application des limites de plan | À implémenter |
+| Métriques SaaS (rétention, expansion) | À implémenter |
+
+---
+
+## Ce qui ne changera pas
+
+Quelle que soit l'évolution du produit, trois garanties sont structurelles et
+protégées par des tests :
+
+1. **La sécurité passe avant la pertinence, qui passe avant le commercial.**
+   L'ordre du pipeline est un enchaînement de données, pas une convention.
+2. **Le pharmacien décide.** Aucun conseil n'atteint le patient sans validation
+   professionnelle explicite.
+3. **On ne simule jamais ce qui n'existe pas.** Une information absente reste
+   absente ; un envoi non effectué est signalé comme tel.

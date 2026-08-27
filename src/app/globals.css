@@ -1,0 +1,284 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   PHARMA.AI — SYSTÈME DE DESIGN
+   Identité : médicale, calme, précise. Beaucoup d'air, une hiérarchie nette,
+   une seule couleur d'accent forte réservée à l'action et à la valeur créée.
+   ========================================================================== */
+
+@theme {
+  /* --- Palette de marque : « teal clinique » ---------------------------- */
+  --color-brand-50: oklch(0.977 0.017 180);
+  --color-brand-100: oklch(0.947 0.038 180);
+  --color-brand-200: oklch(0.898 0.065 180);
+  --color-brand-300: oklch(0.828 0.086 180);
+  --color-brand-400: oklch(0.735 0.093 180);
+  --color-brand-500: oklch(0.652 0.089 181);
+  --color-brand-600: oklch(0.558 0.079 182);
+  --color-brand-700: oklch(0.468 0.067 183);
+  --color-brand-800: oklch(0.397 0.055 184);
+  --color-brand-900: oklch(0.348 0.045 185);
+  --color-brand-950: oklch(0.242 0.033 186);
+
+  /* --- Accent commercial : ambre chaud, réservé au CA additionnel -------- */
+  --color-accent-50: oklch(0.98 0.021 85);
+  --color-accent-100: oklch(0.954 0.048 88);
+  --color-accent-200: oklch(0.909 0.087 90);
+  --color-accent-300: oklch(0.856 0.124 90);
+  --color-accent-400: oklch(0.799 0.152 87);
+  --color-accent-500: oklch(0.746 0.157 82);
+  --color-accent-600: oklch(0.667 0.147 76);
+  --color-accent-700: oklch(0.554 0.124 71);
+  --color-accent-800: oklch(0.469 0.101 69);
+  --color-accent-900: oklch(0.408 0.085 68);
+
+  /* --- Neutres légèrement froids ---------------------------------------- */
+  --color-ink-50: oklch(0.984 0.003 240);
+  --color-ink-100: oklch(0.968 0.005 240);
+  --color-ink-200: oklch(0.929 0.008 240);
+  --color-ink-300: oklch(0.869 0.011 240);
+  --color-ink-400: oklch(0.704 0.015 244);
+  --color-ink-500: oklch(0.554 0.017 246);
+  --color-ink-600: oklch(0.446 0.017 248);
+  --color-ink-700: oklch(0.372 0.017 250);
+  --color-ink-800: oklch(0.279 0.016 252);
+  --color-ink-900: oklch(0.211 0.015 254);
+  --color-ink-950: oklch(0.134 0.014 256);
+
+  /* --- États ------------------------------------------------------------ */
+  --color-success-50: oklch(0.975 0.023 155);
+  --color-success-100: oklch(0.946 0.048 156);
+  --color-success-500: oklch(0.68 0.15 154);
+  --color-success-600: oklch(0.6 0.135 155);
+  --color-success-700: oklch(0.51 0.113 156);
+
+  --color-warning-50: oklch(0.978 0.026 85);
+  --color-warning-100: oklch(0.955 0.055 87);
+  --color-warning-500: oklch(0.79 0.16 78);
+  --color-warning-600: oklch(0.7 0.15 65);
+  --color-warning-700: oklch(0.58 0.13 55);
+
+  --color-danger-50: oklch(0.972 0.017 17);
+  --color-danger-100: oklch(0.94 0.033 18);
+  --color-danger-500: oklch(0.637 0.208 25);
+  --color-danger-600: oklch(0.577 0.213 27);
+  --color-danger-700: oklch(0.505 0.191 27);
+
+  --color-info-50: oklch(0.973 0.014 255);
+  --color-info-100: oklch(0.94 0.031 255);
+  --color-info-500: oklch(0.623 0.163 259);
+  --color-info-600: oklch(0.546 0.191 262);
+  --color-info-700: oklch(0.488 0.187 264);
+
+  /* --- Typographie ------------------------------------------------------ */
+  --font-sans:
+    "Inter var", "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+
+  /* --- Rayons ----------------------------------------------------------- */
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.125rem;
+  --radius-2xl: 1.5rem;
+
+  /* --- Ombres discrètes, superposées ------------------------------------ */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.04);
+  --shadow-lg: 0 12px 28px -6px rgb(15 23 42 / 0.10), 0 4px 10px -4px rgb(15 23 42 / 0.05);
+  --shadow-xl: 0 24px 48px -12px rgb(15 23 42 / 0.16);
+
+  --animate-fade-in: fade-in 0.25s ease-out;
+  --animate-slide-up: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shimmer: shimmer 1.6s linear infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+/* ==========================================================================
+   JETONS SÉMANTIQUES — clair par défaut, sombre via `.dark`
+   ========================================================================== */
+
+:root {
+  --surface-app: var(--color-ink-50);
+  --surface-card: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: var(--color-ink-100);
+  --surface-inverse: var(--color-ink-900);
+
+  --border-subtle: var(--color-ink-200);
+  --border-default: var(--color-ink-300);
+  --border-strong: var(--color-ink-400);
+
+  --text-primary: var(--color-ink-900);
+  --text-secondary: var(--color-ink-600);
+  --text-tertiary: var(--color-ink-500);
+  --text-inverse: #ffffff;
+
+  --focus-ring: var(--color-brand-500);
+
+  color-scheme: light;
+}
+
+.dark {
+  --surface-app: var(--color-ink-950);
+  --surface-card: var(--color-ink-900);
+  --surface-raised: var(--color-ink-800);
+  --surface-sunken: oklch(0.176 0.014 255);
+  --surface-inverse: var(--color-ink-100);
+
+  --border-subtle: oklch(0.29 0.015 252);
+  --border-default: oklch(0.35 0.016 251);
+  --border-strong: oklch(0.44 0.017 249);
+
+  --text-primary: var(--color-ink-100);
+  --text-secondary: var(--color-ink-400);
+  --text-tertiary: var(--color-ink-500);
+  --text-inverse: var(--color-ink-950);
+
+  --focus-ring: var(--color-brand-400);
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-surface-app: var(--surface-app);
+  --color-surface-card: var(--surface-card);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-inverse: var(--surface-inverse);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-inverse: var(--text-inverse);
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+* {
+  border-color: var(--border-subtle);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--surface-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Chiffres alignés dans les tableaux et les indicateurs. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* Barre de défilement fine et discrète. */
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-default) transparent;
+  }
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: var(--border-default);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--border-strong); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Lien d'évitement pour la navigation au clavier. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 999;
+}
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ==========================================================================
+   IMPRESSION — fiche patient A4 premium
+   ========================================================================== */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 10.5pt;
+  }
+
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+
+  .print-page-break { break-before: page; }
+  .print-avoid-break { break-inside: avoid; }
+
+  a[href]::after { content: ""; }
+
+  /* Les fonds de couleur doivent être conservés à l'impression. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+.print-only { display: none; }
