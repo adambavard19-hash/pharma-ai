@@ -1,19 +1,22 @@
 "use client";
 
 import { useActionState } from "react";
-import { AlertCircle, LogIn } from "lucide-react";
+import { AlertCircle, LogIn, Terminal } from "lucide-react";
 import { demoLoginAction, loginAction } from "@/server/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Alert } from "@/components/ui/feedback";
 import { ROLE_LABELS, type Role } from "@/server/rbac/permissions";
 import type { ActionResult } from "@/server/actions/types";
+import { INSTALL_HELP, type InstallState } from "@/core/install/types";
 
 export function LoginForm({
   demoAccounts,
+  install,
   initialError,
 }: {
   demoAccounts: { email: string; name: string; role: string }[];
+  install: InstallState;
   initialError: string | null;
 }) {
   const [state, formAction, pending] = useActionState<
@@ -23,6 +26,39 @@ export function LoginForm({
 
   const error = state && !state.ok ? state.error : null;
   const fieldErrors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
+
+  // Une installation incomplète est signalée AVANT la saisie : sans cela,
+  // l'utilisateur croit à un mauvais mot de passe alors que la base est vide.
+  if (install.status !== "READY") {
+    const help = INSTALL_HELP[install.status];
+    return (
+      <div className="space-y-5">
+        <Alert tone="warning" title={help.title}>
+          {help.body}
+          {install.status === "NO_DATABASE" && (
+            <p className="mt-1.5 font-mono text-[11.5px] break-words opacity-80">
+              {install.detail}
+            </p>
+          )}
+        </Alert>
+
+        <div className="space-y-2">
+          <p className="flex items-center gap-1.5 text-[12px] font-medium tracking-wide text-text-tertiary uppercase">
+            <Terminal className="size-3.5" />
+            À lancer dans le terminal
+          </p>
+          <pre className="overflow-x-auto rounded-lg border border-border-default bg-surface-sunken px-3.5 py-3 font-mono text-[12.5px] text-text-primary">
+            {help.command}
+          </pre>
+          <p className="text-[12.5px] leading-5 text-text-secondary">
+            Puis rechargez cette page. Pour un diagnostic complet de votre
+            installation, lancez{" "}
+            <code className="font-mono text-[12px]">npm run doctor</code>.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

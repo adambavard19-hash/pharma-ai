@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { prisma } from "@/server/db/client";
 import { isDemoMode } from "@/config/env";
+import { getInstallState } from "@/server/services/install-state";
 import { LoginForm } from "./login-form";
 import { PharmaWordmark } from "@/components/app/logo";
 import { ShieldCheck, Sparkles, Stethoscope } from "lucide-react";
@@ -32,9 +33,11 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   const demo = isDemoMode();
+  const install = await getInstallState();
 
-  const demoAccounts = demo
-    ? await prisma.user
+  const demoAccounts =
+    demo && install.status === "READY"
+      ? await prisma.user
         .findMany({
           where: {
             status: "ACTIVE",
@@ -50,7 +53,7 @@ export default async function LoginPage({
           take: 4,
         })
         .catch(() => [])
-    : [];
+      : [];
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1fr_minmax(0,52ch)]">
@@ -127,6 +130,7 @@ export default async function LoginPage({
               name: `${account.firstName} ${account.lastName}`,
               role: account.memberships[0]?.role ?? "VIEWER",
             }))}
+            install={install}
             initialError={
               params.erreur === "demo-indisponible"
                 ? "Le compte de démonstration n'est pas disponible. Lancez `npm run db:seed`."

@@ -50,10 +50,16 @@ cp .env.example .env
 #   openssl rand -base64 32   → DATA_ENCRYPTION_KEY
 
 npm run setup      # migrations + génération du client + données de démonstration
+npm run doctor     # vérifie que tout est en place
 npm run dev
 ```
 
 L'application est disponible sur <http://localhost:3000>.
+
+> **La connexion échoue ?** Lancez `npm run doctor`. Le diagnostic vérifie le
+> fichier `.env`, l'accès à PostgreSQL, l'application des migrations et la
+> présence des comptes — et affiche la commande exacte qui corrige le problème.
+> Voir [Dépannage](#dépannage) plus bas.
 
 ### Comptes de démonstration
 
@@ -68,6 +74,9 @@ L'application est disponible sur <http://localhost:3000>.
 Chaque profil ouvre une interface différente : c'est le RBAC à l'œuvre.
 Le préparateur n'accède pas au profil de santé ; l'étudiante ne peut pas valider
 un conseil.
+
+**Vous n'avez pas besoin de taper le mot de passe** : sur l'écran de connexion,
+les profils de démonstration sont cliquables. Un clic vous connecte.
 
 ---
 
@@ -209,6 +218,50 @@ npm run setup          # migrations + client + démonstration
 `npm run demo:parcours` exécute la chaîne complète contre la base réelle et
 affiche la trace du pipeline étape par étape — utile pour vérifier le moteur
 sans passer par l'interface.
+
+---
+
+## Dépannage
+
+Une seule commande diagnostique l'installation :
+
+```bash
+npm run doctor
+```
+
+Elle contrôle, dans l'ordre où les choses cassent en pratique :
+
+| Vérification | Si ça échoue |
+|---|---|
+| Fichier `.env` présent | `cp .env.example .env` |
+| `DATABASE_URL`, secrets renseignés | La commande `openssl` à lancer est affichée |
+| PostgreSQL joignable | La commande de démarrage selon votre système |
+| Migrations appliquées | `npm run db:deploy` |
+| Comptes présents | `npm run db:seed` |
+
+### « Identifiants incorrects » alors que le mot de passe est bon
+
+C'est presque toujours une base sans données. **L'écran de connexion vous le dit
+désormais lui-même** : au lieu du formulaire, il affiche la cause exacte — base
+vide, schéma absent ou PostgreSQL injoignable — avec la commande à lancer.
+
+Si le formulaire s'affiche normalement et que la connexion échoue, c'est bien le
+mot de passe : utilisez les boutons de profil, qui ne demandent aucune saisie.
+
+### Pas de PostgreSQL installé ?
+
+Le plus rapide est Docker :
+
+```bash
+docker run -d --name pharma-db \
+  -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
+```
+
+Puis dans `.env` :
+
+```
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres?schema=public"
+```
 
 ---
 

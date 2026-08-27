@@ -50,6 +50,23 @@ export async function loginAction(
   // Message identique dans tous les cas : ne pas révéler quels comptes existent.
   const genericError = "Identifiants incorrects.";
 
+  if (!user) {
+    // Une base sans aucun compte n'a rien à protéger : le message générique
+    // ferait croire à une erreur de saisie alors que l'installation est
+    // incomplète. On le dit, et on donne la commande qui corrige.
+    const totalUsers = await prisma.user.count({ where: { deletedAt: null } }).catch(() => -1);
+    if (totalUsers === 0) {
+      return fail(
+        "Aucun compte n'existe encore dans la base. Lancez `npm run db:seed` pour installer le jeu de démonstration, puis rechargez cette page.",
+      );
+    }
+    if (totalUsers < 0) {
+      return fail(
+        "La base de données n'est pas joignable. Vérifiez que PostgreSQL est démarré, puis lancez `npm run doctor`.",
+      );
+    }
+  }
+
   if (!user || !passwordValid || user.deletedAt) {
     await recordAudit({
       action: "auth.login_failed",
