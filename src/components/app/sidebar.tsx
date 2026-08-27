@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Menu, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { NAVIGATION } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import { PharmaWordmark } from "./logo";
 import { Button } from "@/components/ui/button";
+import { useMobileNav } from "./mobile-nav";
 
 export function Sidebar({
   permissions,
@@ -18,7 +18,7 @@ export function Sidebar({
   pharmacyName: string;
   canCreatePrescription: boolean;
 }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { open: mobileOpen, closeNav } = useMobileNav();
   const granted = new Set(permissions);
 
   const groups = NAVIGATION.map((group) => ({
@@ -28,19 +28,10 @@ export function Sidebar({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setMobileOpen(true)}
-        className="fixed top-3 left-3 z-30 rounded-lg border border-border-subtle bg-surface-card p-2 shadow-sm lg:hidden"
-        aria-label="Ouvrir la navigation"
-      >
-        <Menu className="size-5 text-text-secondary" />
-      </button>
-
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-ink-950/45 lg:hidden"
-          onClick={() => setMobileOpen(false)}
+          onClick={closeNav}
           aria-hidden="true"
         />
       )}
@@ -59,7 +50,7 @@ export function Sidebar({
           </Link>
           <button
             type="button"
-            onClick={() => setMobileOpen(false)}
+            onClick={closeNav}
             className="rounded-md p-1.5 text-text-tertiary lg:hidden"
             aria-label="Fermer la navigation"
           >
@@ -75,7 +66,7 @@ export function Sidebar({
               className="w-full justify-start shadow-sm"
               leadingIcon={<Plus className="size-[18px]" />}
             >
-              <Link href="/ordonnances/nouvelle" onClick={() => setMobileOpen(false)}>
+              <Link href="/ordonnances/nouvelle" onClick={closeNav}>
                 Nouvelle ordonnance
               </Link>
             </Button>
@@ -96,7 +87,7 @@ export function Sidebar({
                   href={item.href}
                   label={item.label}
                   icon={<item.icon className="size-[17px]" />}
-                  onNavigate={() => setMobileOpen(false)}
+                  onNavigate={closeNav}
                 />
               ))}
             </div>

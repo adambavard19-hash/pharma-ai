@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bell, LogOut, Settings, Store } from "lucide-react";
 import { GlobalSearch } from "./global-search";
+import { MobileNavTrigger } from "./mobile-nav";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,7 +22,9 @@ export function Topbar({
 }) {
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border-subtle bg-surface-card/85 px-4 backdrop-blur-md lg:px-6">
-      <div className="ml-10 flex-1 lg:ml-0">
+      <MobileNavTrigger />
+
+      <div className="min-w-0 flex-1">
         <GlobalSearch />
       </div>
 
