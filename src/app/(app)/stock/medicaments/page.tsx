@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { formatCents, formatDateTime } from "@/lib/format";
+import { formatCents, formatDate } from "@/lib/format";
 import { StockTabs } from "../stock-tabs";
 import { DrugScanField } from "./scan-field";
 import { DrugQuantityForm, RemoveDrugStockButton } from "./quantity-form";
@@ -157,9 +157,8 @@ export default async function DrugStockPage({
                       <TH>Médicament</TH>
                       <TH>Code CIP13</TH>
                       <TH>État</TH>
+                      <TH>Compté le</TH>
                       <TH numeric>En rayon</TH>
-                      <TH>Dernier comptage</TH>
-                      {canAdjust && <TH />}
                     </TR>
                   </THead>
                   <TBody>
@@ -171,7 +170,7 @@ export default async function DrugStockPage({
                               pour suspension buvable en sachet-dose (rapport… ) »).
                               Sans largeur maximale, cette colonne repousse toutes
                               les autres hors de l'écran. */}
-                          <div className="max-w-[22rem] min-w-0">
+                          <div className="max-w-[21rem] min-w-0">
                             <div className="font-medium text-wrap text-text-primary">
                               {result.specialtyName}
                             </div>
@@ -188,32 +187,34 @@ export default async function DrugStockPage({
                             {DRUG_STOCK_STATE_LABELS[result.state]}
                           </Badge>
                         </TD>
+                        <TD className="whitespace-nowrap text-text-secondary">
+                          {/* La date suffit : l'heure d'un comptage de stock
+                              n'apprend rien et coûte 45 px sur chaque ligne. */}
+                          {result.stock?.lastCountedAt
+                            ? formatDate(result.stock.lastCountedAt)
+                            : "—"}
+                        </TD>
                         <TD numeric className="tabular">
                           {canAdjust ? (
-                            <DrugQuantityForm
-                              cip13={result.cip13}
-                              quantity={result.stock?.quantity ?? 0}
-                              alertThreshold={result.stock?.alertThreshold ?? 0}
-                              location={result.stock?.location ?? null}
-                              compact
-                            />
+                            <div className="flex items-center justify-end gap-1">
+                              <DrugQuantityForm
+                                cip13={result.cip13}
+                                quantity={result.stock?.quantity ?? 0}
+                                alertThreshold={result.stock?.alertThreshold ?? 0}
+                                location={result.stock?.location ?? null}
+                                compact
+                              />
+                              {result.stock && (
+                                <RemoveDrugStockButton
+                                  id={result.stock.id}
+                                  label={result.specialtyName}
+                                />
+                              )}
+                            </div>
                           ) : (
                             (result.stock?.quantity ?? 0)
                           )}
                         </TD>
-                        <TD className="text-text-secondary">
-                          {result.stock?.lastCountedAt
-                            ? formatDateTime(result.stock.lastCountedAt)
-                            : "—"}
-                        </TD>
-                        {canAdjust && result.stock && (
-                          <TD>
-                            <RemoveDrugStockButton
-                              id={result.stock.id}
-                              label={result.specialtyName}
-                            />
-                          </TD>
-                        )}
                       </TR>
                     ))}
                   </TBody>

@@ -56,7 +56,7 @@ export function DrugQuantityForm({
       <input type="hidden" name="code" value={cip13} />
       <input type="hidden" name="alertThreshold" value={alertThreshold} />
       <input type="hidden" name="location" value={location ?? ""} />
-      <div className="w-24">
+      <div className={compact ? "w-16" : "w-24"}>
         <label htmlFor={`qty-${cip13}`} className="sr-only">
           Quantité en rayon
         </label>
@@ -72,15 +72,22 @@ export function DrugQuantityForm({
           className="tabular"
         />
       </div>
-      <Button
-        type="submit"
-        loading={pending}
-        variant={compact ? "outline" : "primary"}
-        size={compact ? "sm" : undefined}
-        leadingIcon={<Check className={compact ? "size-4" : "size-[18px]"} />}
-      >
-        Enregistrer
-      </Button>
+      {compact ? (
+        <Button
+          type="submit"
+          loading={pending}
+          variant="outline"
+          size="sm"
+          title="Enregistrer la quantité"
+          aria-label="Enregistrer la quantité"
+        >
+          <Check className="size-4" />
+        </Button>
+      ) : (
+        <Button type="submit" loading={pending} leadingIcon={<Check className="size-[18px]" />}>
+          Enregistrer
+        </Button>
+      )}
     </form>
   );
 }
