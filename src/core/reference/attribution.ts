@@ -36,9 +36,19 @@ export type ReferenceCounts = {
   substances: number;
 };
 
+/** Une tentative de synchronisation qui n'a pas abouti. */
+export type ReferenceImportFailure = { attemptedAt: string; error: string | null };
+
+/**
+ * `FAILED` ne décrit qu'un cas : aucun catalogue n'a jamais été chargé et la
+ * dernière tentative a échoué. Dès qu'un import a réussi une fois, l'état reste
+ * `READY`/`STALE` — un échec postérieur est signalé par `lastFailure` sans
+ * masquer le catalogue en place. Une synchronisation ratée n'efface rien, et
+ * l'écran ne doit pas laisser croire le contraire.
+ */
 export type ReferenceCatalogState =
   | { status: "NOT_IMPORTED" }
-  | { status: "FAILED"; attemptedAt: string; error: string | null }
+  | ({ status: "FAILED" } & ReferenceImportFailure)
   | {
       status: "READY" | "STALE";
       /** Date de mise à jour annoncée par la source, jamais celle de notre import. */
@@ -46,6 +56,8 @@ export type ReferenceCatalogState =
       importedAt: string;
       ageDays: number | null;
       counts: ReferenceCounts;
+      /** Tentative postérieure au dernier import réussi, si elle a échoué. */
+      lastFailure: ReferenceImportFailure | null;
     };
 
 const DAY_MS = 24 * 60 * 60 * 1000;

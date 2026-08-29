@@ -15,21 +15,33 @@ import {
  * quand datent-elles ?
  */
 export async function getReferenceCatalogState(): Promise<ReferenceCatalogState> {
-  const lastImport = await prisma.referenceImport.findFirst({
-    where: { isDryRun: false },
-    orderBy: { startedAt: "desc" },
-    select: {
-      status: true,
-      startedAt: true,
-      finishedAt: true,
-      sourceUpdatedAt: true,
-      error: true,
-    },
-  });
+  const select = {
+    status: true,
+    startedAt: true,
+    finishedAt: true,
+    sourceUpdatedAt: true,
+    error: true,
+  } as const;
+
+  // Deux lectures et non une : l'état du catalogue est celui du dernier import
+  // RÉUSSI. Un échec postérieur est une alerte à afficher, pas une raison de
+  // déclarer absent un catalogue qui est toujours là.
+  const [lastImport, lastSuccess] = await Promise.all([
+    prisma.referenceImport.findFirst({
+      where: { isDryRun: false },
+      orderBy: { startedAt: "desc" },
+      select,
+    }),
+    prisma.referenceImport.findFirst({
+      where: { isDryRun: false, status: "SUCCEEDED" },
+      orderBy: { startedAt: "desc" },
+      select,
+    }),
+  ]);
 
   if (!lastImport) return { status: "NOT_IMPORTED" };
 
-  if (lastImport.status !== "SUCCEEDED") {
+  if (!lastSuccess) {
     return {
       status: "FAILED",
       attemptedAt: lastImport.startedAt.toISOString(),
@@ -43,13 +55,17 @@ export async function getReferenceCatalogState(): Promise<ReferenceCatalogState>
     prisma.drugSubstance.count(),
   ]);
 
-  const ageDays = referenceAgeDays(lastImport.sourceUpdatedAt, new Date());
+  const ageDays = referenceAgeDays(lastSuccess.sourceUpdatedAt, new Date());
 
   return {
     status: isReferenceStale(ageDays) ? "STALE" : "READY",
-    sourceUpdatedAt: lastImport.sourceUpdatedAt?.toISOString() ?? null,
-    importedAt: (lastImport.finishedAt ?? lastImport.startedAt).toISOString(),
+    sourceUpdatedAt: lastSuccess.sourceUpdatedAt?.toISOString() ?? null,
+    importedAt: (lastSuccess.finishedAt ?? lastSuccess.startedAt).toISOString(),
     ageDays,
     counts: { specialties, presentations, substances },
+    lastFailure:
+      lastImport.status === "SUCCEEDED"
+        ? null
+        : { attemptedAt: lastImport.startedAt.toISOString(), error: lastImport.error },
   };
 }

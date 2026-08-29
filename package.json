@@ -19,7 +19,8 @@
     "db:studio": "prisma studio",
     "setup": "prisma migrate deploy && prisma generate && tsx prisma/seed.ts",
     "demo:parcours": "node --env-file=.env --conditions=react-server --import tsx scripts/e2e-demo.ts",
-    "demo:comptoir": "node --env-file=.env --import tsx scripts/mesure-comptoir.ts"
+    "demo:comptoir": "node --env-file=.env --import tsx scripts/mesure-comptoir.ts",
+    "bdpm:sync": "node --env-file=.env --conditions=react-server --import tsx scripts/bdpm-sync.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

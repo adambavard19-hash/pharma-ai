@@ -23,10 +23,21 @@ const ready = (overrides: Partial<LoadedState> = {}): LoadedState =>
     importedAt: "2026-08-15T09:00:00.000Z",
     ageDays: 14,
     counts: { specialties: 14442, presentations: 20083, substances: 3352 },
+    lastFailure: null,
     ...overrides,
   }) satisfies LoadedState;
 
 describe("mention de source", () => {
+  it("nomme toujours la source même si une resynchronisation a échoué depuis", () => {
+    // Un échec postérieur n'efface pas le catalogue en place : la mention doit
+    // continuer de désigner la version réellement chargée.
+    const mention = referenceAttribution(
+      ready({ lastFailure: { attemptedAt: "2026-08-20T10:00:00.000Z", error: "format modifié" } }),
+    );
+    expect(mention).toContain(BDPM_SOURCE.name);
+    expect(mention).toContain("1 août 2026");
+  });
+
   it("nomme la source et la date de mise à jour publiée", () => {
     const mention = referenceAttribution(ready());
     expect(mention).toContain(BDPM_SOURCE.name);

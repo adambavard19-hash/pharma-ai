@@ -238,8 +238,8 @@ function ReferenceCatalogCard({ state }: { state: ReferenceCatalogState }) {
             {state.status === "FAILED" ? (
               <>
                 Tentative du {formatDateTime(state.attemptedAt)}
-                {state.error ? ` — ${state.error}` : ""}. Le catalogue précédent, s&apos;il
-                existe, reste en place : une synchronisation ratée n&apos;efface rien.
+                {state.error ? ` — ${state.error}` : ""}. Aucun catalogue officiel n&apos;a encore
+                été chargé : l&apos;application reste sur son jeu de démonstration fictif.
               </>
             ) : (
               <>
@@ -249,12 +249,8 @@ function ReferenceCatalogCard({ state }: { state: ReferenceCatalogState }) {
             )}
           </Alert>
           <div className="space-y-1.5 text-[13px] leading-5 text-text-secondary">
-            <p>Pour charger le catalogue officiel :</p>
-            <pre className="overflow-x-auto rounded-lg border border-border-subtle bg-surface-sunken px-3.5 py-2.5 font-mono text-[12.5px] text-text-primary">
-              npm run bdpm:sync
-            </pre>
-            <p className="text-text-tertiary">
-              La commande télécharge les fichiers publiés sur{" "}
+            <p>
+              Téléchargez les fichiers publiés sur{" "}
               <a
                 href={BDPM_SOURCE.downloadUrl}
                 className="text-brand-700 hover:underline dark:text-brand-400"
@@ -262,8 +258,16 @@ function ReferenceCatalogCard({ state }: { state: ReferenceCatalogState }) {
                 rel="noreferrer"
               >
                 {BDPM_SOURCE.url.replace("https://", "")}
-              </a>{" "}
-              et les importe sans jamais toucher au stock des officines.
+              </a>
+              , puis lancez l&apos;import en reprenant la date de mise à jour affichée par le
+              site :
+            </p>
+            <pre className="overflow-x-auto rounded-lg border border-border-subtle bg-surface-sunken px-3.5 py-2.5 font-mono text-[12.5px] text-text-primary">
+              npm run bdpm:sync -- --from &lt;dossier&gt; --source-date AAAA-MM-JJ
+            </pre>
+            <p className="text-text-tertiary">
+              L&apos;import ne touche jamais au stock des officines : il alimente un catalogue
+              partagé que chaque stock référence sans le copier.
             </p>
           </div>
         </CardContent>
@@ -293,6 +297,15 @@ function ReferenceCatalogCard({ state }: { state: ReferenceCatalogState }) {
           <Alert tone="warning" title="Le référentiel a vieilli">
             La base officielle est mise à jour chaque mois et celle-ci date de {state.ageDays}{" "}
             jours. Relancez <code className="font-mono text-[12px]">npm run bdpm:sync</code>.
+          </Alert>
+        )}
+
+        {state.lastFailure && (
+          <Alert tone="danger" title="La dernière synchronisation a échoué">
+            Tentative du {formatDateTime(state.lastFailure.attemptedAt)}
+            {state.lastFailure.error ? ` — ${state.lastFailure.error}` : ""}. Les chiffres
+            ci-dessus sont ceux du dernier import réussi : une synchronisation ratée n&apos;efface
+            rien.
           </Alert>
         )}
 
