@@ -61,6 +61,32 @@ export type ExtractedPrescription = {
 
 // --- Référentiel médicamenteux --------------------------------------------
 
+/**
+ * Ce que la source officielle publie d'un médicament.
+ *
+ * Rien n'est rédigé ici : uniquement des faits, avec leur source et leur date.
+ * Ce bloc et la couche éditoriale de `DrugKnowledge` répondent à deux questions
+ * différentes — ce que le médicament EST, et ce que Pharma.ai en RACONTE — et ne
+ * doivent jamais être présentés comme une seule et même information.
+ */
+export type OfficialDrugFacts = {
+  /** Code Identifiant de Spécialité du catalogue national. */
+  cisCode: string;
+  /** Dénomination officielle, telle que publiée. */
+  name: string;
+  pharmaceuticalForm: string | null;
+  administrationRoutes: string[];
+  /** Substances actives telles que publiées. */
+  substances: string[];
+  /** « liste I », « stupéfiant »… tels que publiés. */
+  prescriptionConditions: string[];
+  marketed: boolean;
+  /** Nom de la source, à afficher partout où ces faits apparaissent. */
+  sourceName: string;
+  /** Date de mise à jour publiée par la source, jamais celle de notre import. */
+  sourceUpdatedAt: string | null;
+};
+
 export type DrugKnowledge = {
   id: string;
   name: string;

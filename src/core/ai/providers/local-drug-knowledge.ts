@@ -2,13 +2,20 @@ import type { DrugKnowledgeProvider, ProviderInfo } from "../ports";
 import type { DrugKnowledge } from "../types";
 
 /**
- * Fournisseur de référentiel médicamenteux adossé à la table `drug_references`.
+ * La couche ÉDITORIALE du référentiel : ce que Pharma.ai raconte d'un
+ * médicament — explication au patient, conseils de prise, classes
+ * d'interaction, populations à surveiller.
+ *
+ * Elle est distincte du catalogue national, qui dit ce qu'un médicament EST
+ * (composition, forme, conditions de délivrance) et le dit avec sa source et sa
+ * date. Les deux ne doivent jamais être présentées comme une seule information :
+ * l'une est publiée par l'ANSM, l'autre est rédigée ici.
  *
  * ⚠️ POINT CRITIQUE DU PRODUIT — le jeu livré est FICTIF (`isDemoData = true`).
- * Avant toute utilisation réelle, il doit être remplacé par un référentiel
- * pharmaceutique validé et tenu à jour (BDPM, base éditeur sous licence…).
- * Le moteur signale systématiquement les données de démonstration et refuse de
- * produire une explication pour un médicament absent du référentiel.
+ * Le catalogue national, lui, peut être réel : identifier correctement un
+ * médicament ne dit donc RIEN de ses interactions. Le moteur de sécurité
+ * signale explicitement chaque ligne identifiée mais non couverte, pour qu'une
+ * absence d'alerte ne se lise jamais comme une absence de risque.
  */
 
 export type DrugRecordLoader = () => Promise<DrugKnowledge[]>;
@@ -24,10 +31,10 @@ export class LocalDrugKnowledgeProvider implements DrugKnowledgeProvider {
   ) {
     this.info = {
       id: "local-demo",
-      label: options?.label ?? "Référentiel local (jeu de démonstration)",
+      label: options?.label ?? "Couche éditoriale (jeu de démonstration)",
       capability: options?.capability ?? "SIMULATED",
       description:
-        "Table `drug_references` de l'application. Le jeu livré est fictif et signalé comme tel ; il doit être remplacé par une base médicamenteuse validée avant toute mise en production.",
+        "Table `drug_references` : interactions, populations à surveiller, explication patient et conseils de prise. Distincte du catalogue national, qui fournit la composition et les conditions de délivrance. Le jeu livré est fictif et signalé comme tel ; il doit être remplacé par une base médicamenteuse validée avant toute mise en production.",
     };
   }
 

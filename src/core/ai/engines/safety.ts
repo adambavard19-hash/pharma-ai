@@ -3,6 +3,7 @@ import type {
   CatalogProduct,
   DrugKnowledge,
   ExtractedPrescriptionLine,
+  OfficialDrugFacts,
   PatientContext,
   SafetyFindingResult,
 } from "../types";
@@ -119,28 +120,70 @@ export function evaluateExtractionSafety(
 export function evaluateKnowledgeCoverage(
   lines: { drugName: string | null }[],
   knowledge: Map<string, DrugKnowledge | null>,
+  official?: Map<string, OfficialDrugFacts | null>,
 ): SafetyFindingResult[] {
   const findings: SafetyFindingResult[] = [];
 
   lines.forEach((line, index) => {
     if (!line.drugName) return;
-    const entry = knowledge.get(line.drugName.toLowerCase());
-    if (!entry) {
+    const key = line.drugName.toLowerCase();
+    const facts = official?.get(key) ?? null;
+    const advisory = knowledge.get(key) ?? null;
+    const subjectId = String(index);
+
+    if (!facts && !advisory) {
       findings.push({
         severity: "WARNING",
         code: "DRUG_NOT_IN_REFERENTIAL",
         message: `« ${line.drugName} » est absent du référentiel médicamenteux connecté. Aucune explication automatique n'est produite pour ce médicament.`,
         subjectType: "PRESCRIPTION_LINE",
-        subjectId: String(index),
+        subjectId,
         source: SOURCE,
       });
-    } else if (entry.isDemoData) {
+      return;
+    }
+
+    if (!facts) {
+      findings.push({
+        severity: "INFO",
+        code: "DRUG_NOT_IDENTIFIED",
+        message: `« ${line.drugName} » n'est pas rattaché au catalogue national : ni sa composition ni ses conditions de délivrance ne sont vérifiées.`,
+        subjectType: "PRESCRIPTION_LINE",
+        subjectId,
+        source: SOURCE,
+      });
+    }
+
+    // Le point qui compte le plus de tout ce fichier. Le catalogue national dit
+    // ce qu'est un médicament ; il ne dit RIEN de ses interactions. Une ligne
+    // parfaitement identifiée mais dépourvue de données d'interaction produit
+    // donc une analyse silencieuse — et un écran sans alerte se lit
+    // « rien à signaler », ce qui serait faux. On le dit explicitement.
+    // Une liste d'interactions vide ne dit PAS « aucune interaction connue » :
+    // elle dit « rien n'a été renseigné ». La couche éditoriale ne distingue
+    // pas les deux, et inventer cette distinction serait fabriquer une donnée.
+    // On le signale donc tel quel, plutôt que de laisser un écran muet passer
+    // pour une vérification.
+    const declaresInteractions = advisory !== null && advisory.interactionClasses.length > 0;
+
+    if (facts && !declaresInteractions) {
+      findings.push({
+        severity: "WARNING",
+        code: "DRUG_NO_INTERACTION_DATA",
+        message: `« ${facts.name} » est bien identifié, mais aucune interaction n'est renseignée pour ce médicament : impossible de distinguer « aucune interaction connue » de « donnée absente ». L'absence d'alerte ne vaut pas absence de risque.`,
+        subjectType: "PRESCRIPTION_LINE",
+        subjectId,
+        source: SOURCE,
+      });
+    }
+
+    if (advisory?.isDemoData) {
       findings.push({
         severity: "INFO",
         code: "DEMO_REFERENTIAL",
         message: `Les informations sur « ${line.drugName} » proviennent du jeu de démonstration fictif, non d'une base médicamenteuse validée.`,
         subjectType: "PRESCRIPTION_LINE",
-        subjectId: String(index),
+        subjectId,
         source: SOURCE,
       });
     }

@@ -25,11 +25,14 @@ export function SafetyZone({
   findings,
   blockedOpportunities,
   canAcknowledge,
+  stale,
 }: {
   analysisRunId: string | null;
   findings: SafetyFindingView[];
   blockedOpportunities: BlockedOpportunityView[];
   canAcknowledge: boolean;
+  /** Le rattachement au catalogue national a changé depuis cette analyse. */
+  stale: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -71,6 +74,18 @@ export function SafetyZone({
         title="Sécurité"
         tone={unacknowledged.length > 0 ? "danger" : "neutral"}
       />
+
+      {stale && (
+        <Card className="border-warning-400 bg-warning-50/50 dark:border-warning-700/50 dark:bg-warning-700/10">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-[13px] leading-5 text-warning-800 dark:text-warning-400">
+              Un médicament a été rattaché au catalogue national depuis cette analyse. Les
+              signaux ci-dessous datent d&apos;avant ce changement — relancez l&apos;analyse pour
+              les mettre à jour.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {unacknowledged.length > 0 ? (
         <Card className="border-danger-400 bg-danger-50/50 dark:border-danger-700/50 dark:bg-danger-700/10">

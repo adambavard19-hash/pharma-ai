@@ -6,8 +6,10 @@ import type {
   AnalysisResult,
   DrugKnowledge,
   ExtractedPrescriptionLine,
+  OfficialDrugFacts,
   TreatmentExplanationResult,
 } from "@/core/ai/types";
+import { BDPM_SOURCE } from "@/core/reference";
 import {
   getAIProvider,
   getDrugKnowledgeProvider,
@@ -19,6 +21,8 @@ import {
   loadValidationHistory,
 } from "./catalog";
 import { buildPatientContext } from "./patients";
+import { identifyPrescriptionLines, loadSpecialtyFacts } from "./drug-identification";
+import { getReferenceCatalogState } from "./reference";
 import { recordAudit } from "@/server/audit/log";
 import { createNotification } from "./notifications";
 import { ENGINE_VERSION } from "@/config/constants";
@@ -188,6 +192,11 @@ export async function analysePrescription(params: {
     .filter((name): name is string => Boolean(name));
   const knowledge = await knowledgeProvider.lookupMany(drugNames);
 
+  // Étape B bis : rattachement au catalogue national. Il précède l'analyse
+  // parce qu'il conditionne ce que le moteur de sécurité peut affirmer — et
+  // surtout ce qu'il doit reconnaître ne pas savoir.
+  const official = await loadOfficialFacts(prescription.id);
+
   // Étape C : explications, produites à partir du référentiel uniquement.
   const explanations: TreatmentExplanationResult[] = [];
   for (const line of prescription.lines) {
@@ -232,6 +241,7 @@ export async function analysePrescription(params: {
       confirmed: line.status === "CONFIRMED",
     })),
     knowledge,
+    official,
     patient,
     catalog,
     rules,
@@ -461,4 +471,57 @@ function rebuildExtractedLine(line: {
     quantity: field("quantity", line.quantity),
     instructions: field("instructions", line.instructions),
   };
+}
+
+
+/**
+ * Les faits officiels des lignes rattachées, indexés par le libellé de
+ * l'ordonnance — la même clé que la couche éditoriale, pour que le moteur
+ * puisse comparer les deux ligne à ligne.
+ *
+ * Une officine sans catalogue national importé obtient une table vide : le
+ * moteur de sécurité le signale alors sur chaque ligne, au lieu de laisser
+ * croire à une analyse complète.
+ */
+async function loadOfficialFacts(
+  prescriptionId: string,
+): Promise<Map<string, OfficialDrugFacts | null>> {
+  const [identifications, catalogState] = await Promise.all([
+    identifyPrescriptionLines(prescriptionId),
+    getReferenceCatalogState(),
+  ]);
+
+  const sourceUpdatedAt =
+    catalogState.status === "READY" || catalogState.status === "STALE"
+      ? catalogState.sourceUpdatedAt
+      : null;
+
+  const facts = await loadSpecialtyFacts(
+    identifications
+      .map((identification) => identification.specialtyId)
+      .filter((id): id is string => id !== null),
+  );
+
+  const map = new Map<string, OfficialDrugFacts | null>();
+  for (const identification of identifications) {
+    const specialty = identification.specialtyId ? facts.get(identification.specialtyId) : null;
+    map.set(
+      identification.drugName.toLowerCase(),
+      specialty
+        ? {
+            cisCode: specialty.cisCode,
+            name: specialty.name,
+            pharmaceuticalForm: specialty.pharmaceuticalForm,
+            administrationRoutes: specialty.administrationRoutes,
+            substances: specialty.substances,
+            prescriptionConditions: specialty.prescriptionConditions,
+            marketed: specialty.marketed,
+            sourceName: BDPM_SOURCE.name,
+            sourceUpdatedAt,
+          }
+        : null,
+    );
+  }
+
+  return map;
 }

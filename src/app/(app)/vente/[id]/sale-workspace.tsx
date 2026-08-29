@@ -48,6 +48,8 @@ export function SaleWorkspace({
   trace,
   permissions,
   simulatedExtraction,
+  catalogAttribution,
+  identificationChangedSinceAnalysis,
   hasSale,
 }: {
   prescription: {
@@ -74,6 +76,10 @@ export function SaleWorkspace({
   } | null;
   permissions: { verify: boolean; decide: boolean; sell: boolean };
   simulatedExtraction: boolean;
+  /** Mention de source du catalogue national, exigée par sa licence. */
+  catalogAttribution: string | null;
+  /** Un rattachement a été décidé après la dernière analyse. */
+  identificationChangedSinceAnalysis: boolean;
   hasSale: boolean;
 }) {
   const [lines, setLines] = useState(initialLines);
@@ -267,6 +273,7 @@ export function SaleWorkspace({
           onEdit={() => setForceEdit(true)}
           canEdit={permissions.verify}
           simulatedExtraction={simulatedExtraction}
+          catalogAttribution={catalogAttribution}
         />
 
         {!editing && analysing && (
@@ -287,6 +294,7 @@ export function SaleWorkspace({
               findings={findings}
               blockedOpportunities={blockedOpportunities}
               canAcknowledge={permissions.verify}
+              stale={identificationChangedSinceAnalysis}
             />
 
             <AdviceZone

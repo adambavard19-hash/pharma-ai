@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Badge } from "@/components/ui/badge";
 import { OCR_REVIEW_THRESHOLD } from "@/config/constants";
 import { cn } from "@/lib/utils";
+import { SpecialtyLink } from "./specialty-link";
 import type { SaleLineDraft } from "./types";
 
 /**
@@ -32,6 +33,7 @@ export function PrescriptionZone({
   onEdit,
   canEdit,
   simulatedExtraction,
+  catalogAttribution,
 }: {
   editing: boolean;
   lines: SaleLineDraft[];
@@ -46,8 +48,18 @@ export function PrescriptionZone({
   onEdit: () => void;
   canEdit: boolean;
   simulatedExtraction: boolean;
+  catalogAttribution: string | null;
 }) {
-  if (!editing) return <PrescriptionSummary lines={lines} onEdit={onEdit} canEdit={canEdit} />;
+  if (!editing) {
+    return (
+      <PrescriptionSummary
+        lines={lines}
+        onEdit={onEdit}
+        canEdit={canEdit}
+        catalogAttribution={catalogAttribution}
+      />
+    );
+  }
 
   const unreadableCount = lines.reduce((sum, line) => sum + line.unreadableFields.length, 0);
 
@@ -129,10 +141,12 @@ function PrescriptionSummary({
   lines,
   onEdit,
   canEdit,
+  catalogAttribution,
 }: {
   lines: SaleLineDraft[];
   onEdit: () => void;
   canEdit: boolean;
+  catalogAttribution: string | null;
 }) {
   const confirmed = lines.filter((line) => line.confirmed);
 
@@ -179,6 +193,15 @@ function PrescriptionSummary({
                     </span>
                   ) : null}
                 </p>
+                <SpecialtyLink
+                  lineId={line.id}
+                  official={line.official}
+                  identifiedBy={line.identifiedBy}
+                  candidates={line.candidates}
+                  refusal={line.identificationRefusal}
+                  attribution={catalogAttribution}
+                  canEdit={canEdit}
+                />
                 {line.explanationSource === "UNAVAILABLE" ? (
                   <p className="text-[12px] leading-4 text-warning-700 dark:text-warning-500">
                     Aucune information dans le référentiel connecté : aucune explication

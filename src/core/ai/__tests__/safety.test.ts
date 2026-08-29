@@ -7,7 +7,7 @@ import {
   hasBlockingFinding,
 } from "../engines/safety";
 import { detectAdviceOpportunities } from "../engines/advice";
-import { drug, patient, product } from "./fixtures";
+import { drug, officialFacts, patient, product } from "./fixtures";
 import type { ExtractedPrescriptionLine } from "../types";
 
 function line(
@@ -73,6 +73,57 @@ describe("moteur de sécurité — référentiel", () => {
       new Map(),
     );
     expect(findings.some((f) => f.code === "DRUG_NOT_IN_REFERENTIAL")).toBe(true);
+  });
+
+  it("dit qu'une ligne n'est pas rattachée au catalogue national", () => {
+    const findings = evaluateKnowledgeCoverage(
+      [{ drugName: "Amoxicilline" }],
+      new Map([["amoxicilline", drug({ interactionClasses: ["anticoagulants"] })]]),
+      new Map([["amoxicilline", null]]),
+    );
+    expect(findings.some((f) => f.code === "DRUG_NOT_IDENTIFIED")).toBe(true);
+  });
+
+  it("avertit qu'un médicament identifié n'a aucune interaction renseignée", () => {
+    // Le catalogue national dit ce qu'EST un médicament ; il ne dit rien de ses
+    // interactions. Sans ce signal, un écran sans alerte se lirait « rien à
+    // signaler » — ce qui serait faux.
+    const findings = evaluateKnowledgeCoverage(
+      [{ drugName: "Amoxicilline" }],
+      new Map([["amoxicilline", drug({ interactionClasses: [], cautionPopulations: [] })]]),
+      new Map([["amoxicilline", officialFacts()]]),
+    );
+    const finding = findings.find((f) => f.code === "DRUG_NO_INTERACTION_DATA");
+    expect(finding?.severity).toBe("WARNING");
+    expect(finding?.message).toContain("L'absence d'alerte ne vaut pas absence de risque");
+  });
+
+  it("avertit même quand d'autres données de vigilance existent", () => {
+    // Des populations à surveiller ne sont pas des interactions : renseigner
+    // les unes ne dit rien des autres.
+    const findings = evaluateKnowledgeCoverage(
+      [{ drugName: "Paracétamol" }],
+      new Map([
+        [
+          "paracétamol",
+          drug({
+            interactionClasses: [],
+            cautionPopulations: ["insuffisance hépatique"],
+          }),
+        ],
+      ]),
+      new Map([["paracétamol", officialFacts({ name: "DAFALGAN 1 g, comprimé pelliculé" })]]),
+    );
+    expect(findings.some((f) => f.code === "DRUG_NO_INTERACTION_DATA")).toBe(true);
+  });
+
+  it("se tait quand le médicament est identifié ET couvert", () => {
+    const findings = evaluateKnowledgeCoverage(
+      [{ drugName: "Amoxicilline" }],
+      new Map([["amoxicilline", drug({ interactionClasses: ["anticoagulants oraux"] })]]),
+      new Map([["amoxicilline", officialFacts()]]),
+    );
+    expect(findings).toHaveLength(0);
   });
 
   it("signale explicitement une donnée de démonstration", () => {

@@ -30,6 +30,7 @@ export type AuditAction =
   | "drug_stock.imported"
   | "prescription.created"
   | "prescription.verified"
+  | "prescription.line_identified"
   | "prescription.analyzed"
   | "prescription.safety_acknowledged"
   | "prescription.validated"

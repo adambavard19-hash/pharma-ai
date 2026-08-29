@@ -1,6 +1,7 @@
 import type {
   CatalogProduct,
   DrugKnowledge,
+  OfficialDrugFacts,
   PatientContext,
   PharmacyRuleInput,
 } from "../types";
@@ -76,6 +77,23 @@ export function rule(overrides: Partial<PharmacyRuleInput> = {}): PharmacyRuleIn
     category: null,
     context: {},
     weight: 1,
+    ...overrides,
+  };
+}
+
+export function officialFacts(
+  overrides: Partial<OfficialDrugFacts> = {},
+): OfficialDrugFacts {
+  return {
+    cisCode: "61266250",
+    name: "AMOXICILLINE ARROW 1 g, comprimé dispersible",
+    pharmaceuticalForm: "comprimé dispersible",
+    administrationRoutes: ["orale"],
+    substances: ["AMOXICILLINE"],
+    prescriptionConditions: ["liste I"],
+    marketed: true,
+    sourceName: "Base de données publique des médicaments",
+    sourceUpdatedAt: "2026-08-03T00:00:00.000Z",
     ...overrides,
   };
 }

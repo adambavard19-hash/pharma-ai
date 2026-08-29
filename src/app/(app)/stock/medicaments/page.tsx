@@ -12,6 +12,7 @@ import {
   type ScanOutcome,
 } from "@/server/services/drug-catalog";
 import { getReferenceCatalogState } from "@/server/services/reference";
+import { referenceAttribution } from "@/core/reference";
 import { DRUG_STOCK_STATE_LABELS } from "@/core/stock";
 import { PageHeader, Grid } from "@/components/ui/page";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -133,6 +134,13 @@ export default async function DrugStockPage({
               icon={<AlertTriangle className="size-4" />}
             />
           </Grid>
+
+          {/* La licence du catalogue national impose de mentionner la source et
+              sa date de mise à jour partout où ses données sont affichées :
+              cet écran montre des noms, des compositions et des prix publiés. */}
+          <p className="text-[12px] leading-4 text-text-tertiary">
+            {referenceAttribution(reference)}
+          </p>
 
           {stock.results.length === 0 ? (
             <EmptyState

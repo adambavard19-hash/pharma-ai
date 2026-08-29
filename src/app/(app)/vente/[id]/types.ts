@@ -7,6 +7,34 @@ import type { ScoreContribution } from "@/core/ai/types";
  * composants clients ne voient jamais un modèle de base de données.
  */
 
+/**
+ * Les faits officiels d'une ligne rattachée au catalogue national.
+ *
+ * Aucun texte rédigé ici : ce bloc ne contient que ce que la source publie. Il
+ * s'affiche à côté du libellé de l'ordonnance, jamais à sa place — le texte du
+ * prescripteur reste la référence de ce qui a été prescrit.
+ */
+export type OfficialLineFacts = {
+  cisCode: string;
+  name: string;
+  pharmaceuticalForm: string | null;
+  substances: string[];
+  prescriptionConditions: string[];
+  marketed: boolean;
+};
+
+/** Une spécialité proposée au pharmacien quand le rattachement a un doute. */
+export type SpecialtyProposal = {
+  id: string;
+  cisCode: string;
+  name: string;
+  pharmaceuticalForm: string | null;
+  substances: string[];
+  marketed: boolean;
+  score: number;
+  reasons: string[];
+};
+
 export type SaleLineDraft = {
   id: string;
   position: number;
@@ -24,6 +52,13 @@ export type SaleLineDraft = {
   /** Explication de traitement, disponible une fois l'analyse passée. */
   purpose: string | null;
   explanationSource: string | null;
+  /** Faits officiels, si la ligne a été rattachée au catalogue national. */
+  official: OfficialLineFacts | null;
+  identifiedBy: "AUTO" | "PHARMACIST" | "SCAN" | null;
+  /** Ce que le catalogue propose quand le rattachement n'a pas pu se faire seul. */
+  candidates: SpecialtyProposal[];
+  /** Pourquoi le rattachement automatique a été refusé, en clair. */
+  identificationRefusal: string | null;
 };
 
 export type SafetyFindingView = {

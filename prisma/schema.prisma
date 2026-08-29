@@ -739,6 +739,7 @@ model DrugSpecialty {
   prescriptionConditions DrugPrescriptionCondition[]
   genericMemberships     DrugGenericMember[]
   smrOpinions            DrugSmrOpinion[]
+  prescriptionLines      PrescriptionLine[]
 
   @@index([name])
   @@index([marketingStatus])
@@ -1098,6 +1099,17 @@ model Prescription {
   @@map("prescriptions")
 }
 
+/// Comment une ligne d'ordonnance a été rattachée au catalogue national.
+enum DrugIdentificationSource {
+  /// Rapprochement automatique sur le nom, accepté au-dessus du seuil ET sans
+  /// ambiguïté de substance.
+  AUTO
+  /// Choisi explicitement par un professionnel.
+  PHARMACIST
+  /// Lu au code-barres sur la boîte.
+  SCAN
+}
+
 enum LineStatus {
   EXTRACTED
   NEEDS_REVIEW
@@ -1112,14 +1124,24 @@ model PrescriptionLine {
   /// Texte brut tel que lu sur l'ordonnance — jamais réécrit par l'IA.
   rawText        String?
 
-  drugName        String?
-  drugReferenceId String?
-  dosage          String?
-  form            String?
-  posology        String?
-  durationDays    Int?
-  quantity        Int?
-  instructions    String?
+  drugName            String?
+  /// Couche ÉDITORIALE : ce que Pharma.ai raconte du médicament (explication
+  /// patient, conseils de prise). Rédigée, jamais officielle.
+  drugReferenceId     String?
+  /// Couche OFFICIELLE : la spécialité du catalogue national. Elle dit ce que
+  /// le médicament EST — substances, forme, conditions de délivrance — avec sa
+  /// source et sa date. Les deux ne doivent jamais être confondues.
+  drugSpecialtyId     String?
+  identifiedBy        DrugIdentificationSource?
+  /// Score du rapprochement automatique, conservé pour rendre la décision
+  /// auditable : on doit pouvoir dire POURQUOI cette ligne pointe là.
+  identificationScore Float?
+  dosage              String?
+  form                String?
+  posology            String?
+  durationDays        Int?
+  quantity            Int?
+  instructions        String?
 
   status           LineStatus @default(EXTRACTED)
   /// Confiance par champ : { drugName: 0.94, dosage: 0.41, ... }
@@ -1136,6 +1158,9 @@ model PrescriptionLine {
 
   prescription Prescription          @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
   explanation  TreatmentExplanation?
+  /// `SetNull` et non `Cascade` : une spécialité qui disparaîtrait du
+  /// catalogue ne doit pas emporter la ligne d'ordonnance qui la citait.
+  specialty    DrugSpecialty?        @relation(fields: [drugSpecialtyId], references: [id], onDelete: SetNull)
 
   @@unique([prescriptionId, position])
   @@map("prescription_lines")

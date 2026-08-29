@@ -11,6 +11,7 @@ import type {
   AnalysisResult,
   CatalogProduct,
   DrugKnowledge,
+  OfficialDrugFacts,
   PatientContext,
   PharmacyRuleInput,
   PipelineStageName,
@@ -46,6 +47,12 @@ export type PipelineInput = {
     confirmed: boolean;
   }[];
   knowledge: Map<string, DrugKnowledge | null>;
+  /**
+   * Faits officiels par nom de médicament, quand la ligne a été rattachée au
+   * catalogue national. Absent = aucun catalogue officiel connecté : le moteur
+   * de sécurité le dit alors explicitement plutôt que de se taire.
+   */
+  official?: Map<string, OfficialDrugFacts | null>;
   patient: PatientContext;
   catalog: CatalogProduct[];
   rules: PharmacyRuleInput[];
@@ -105,7 +112,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     "Contrôles de sécurité",
     input.lines.length,
     () => {
-      const coverage = evaluateKnowledgeCoverage(usableLines, input.knowledge);
+      const coverage = evaluateKnowledgeCoverage(usableLines, input.knowledge, input.official);
       const all = [...input.extractionFindings, ...coverage];
       const notes: string[] = [];
 

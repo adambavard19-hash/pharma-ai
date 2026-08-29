@@ -3,8 +3,13 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
+import { referenceAttribution } from "@/core/reference";
+import { getReferenceCatalogState } from "@/server/services/reference";
+import { proposeSpecialties } from "@/server/services/drug-identification";
+import { AUTO_ACCEPT_REFUSAL_MESSAGES, decideAutoAccept } from "@/core/reference";
 import { SaleWorkspace } from "./sale-workspace";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
+import type { SpecialtyProposal } from "./types";
 
 export const metadata: Metadata = { title: "Vente" };
 
@@ -24,7 +29,25 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
     where: { id },
     include: {
       patient: { select: { id: true, firstName: true, lastName: true, reference: true } },
-      lines: { orderBy: { position: "asc" }, include: { explanation: true } },
+      lines: {
+        orderBy: { position: "asc" },
+        include: {
+          explanation: true,
+          // Les faits officiels sont lus ici, avec la ligne : c'est la seule
+          // façon d'afficher la composition réelle à côté du texte du
+          // prescripteur sans un aller-retour de plus au comptoir.
+          specialty: {
+            select: {
+              cisCode: true,
+              name: true,
+              pharmaceuticalForm: true,
+              marketingStatus: true,
+              compositions: { where: { nature: "SA" }, select: { substanceLabel: true } },
+              prescriptionConditions: { select: { label: true } },
+            },
+          },
+        },
+      },
       recommendations: {
         orderBy: [{ totalScore: "desc" }],
         include: {
@@ -55,6 +78,52 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   });
 
   const run = prescription.analysisRuns[0] ?? null;
+
+  // Un rattachement décidé après l'analyse rend les signaux de sécurité
+  // périmés : ils parlent encore d'un médicament « non rattaché ». On le dit
+  // plutôt que de laisser lire un écran qui n'est plus à jour.
+  const identificationChangedSinceAnalysis = Boolean(
+    run &&
+      prescription.lines.some(
+        (line) => line.identifiedBy === "PHARMACIST" && line.updatedAt > run.startedAt,
+      ),
+  );
+
+  const catalogState = await getReferenceCatalogState();
+  const catalogLoaded = catalogState.status === "READY" || catalogState.status === "STALE";
+  const attribution = catalogLoaded ? referenceAttribution(catalogState) : null;
+
+  // Candidats proposés uniquement pour les lignes confirmées qui n'ont pas pu
+  // être rattachées seules : en pratique zéro à deux lignes par ordonnance.
+  const proposals = new Map<string, SpecialtyProposal[]>();
+  const refusals = new Map<string, string>();
+  if (catalogLoaded) {
+    for (const line of prescription.lines) {
+      if (line.status !== "CONFIRMED" || line.drugSpecialtyId || !line.drugName) continue;
+      const matches = await proposeSpecialties({
+        drugName: line.drugName,
+        dosage: line.dosage,
+        form: line.form,
+      });
+      // La raison du refus vient de la même fonction que la décision prise à
+      // l'analyse : l'écran ne peut pas raconter autre chose que le moteur.
+      const decision = decideAutoAccept(matches);
+      if (!decision.accepted) refusals.set(line.id, AUTO_ACCEPT_REFUSAL_MESSAGES[decision.reason]);
+      proposals.set(
+        line.id,
+        matches.map((match) => ({
+          id: match.candidate.id,
+          cisCode: match.candidate.cisCode,
+          name: match.candidate.name,
+          pharmaceuticalForm: match.candidate.pharmaceuticalForm,
+          substances: match.candidate.substances,
+          marketed: match.candidate.marketed,
+          score: match.score,
+          reasons: match.reasons,
+        })),
+      );
+    }
+  }
 
   return (
     <SaleWorkspace
@@ -87,7 +156,28 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         confirmed: line.status === "CONFIRMED",
         purpose: line.explanation?.purpose ?? null,
         explanationSource: line.explanation?.source ?? null,
+        official: line.specialty
+          ? {
+              cisCode: line.specialty.cisCode,
+              name: line.specialty.name,
+              pharmaceuticalForm: line.specialty.pharmaceuticalForm,
+              substances: [
+                ...new Set(line.specialty.compositions.map((item) => item.substanceLabel)),
+              ],
+              prescriptionConditions: line.specialty.prescriptionConditions.map(
+                (item) => item.label,
+              ),
+              marketed: line.specialty.marketingStatus === "Commercialisée",
+            }
+          : null,
+        identifiedBy: line.identifiedBy,
+        candidates: proposals.get(line.id) ?? [],
+        identificationRefusal: catalogLoaded
+          ? (refusals.get(line.id) ?? null)
+          : "Aucun catalogue officiel n'est chargé dans Pharma.ai.",
       }))}
+      catalogAttribution={attribution}
+      identificationChangedSinceAnalysis={identificationChangedSinceAnalysis}
       findings={
         run?.safetyFindings.map((finding) => ({
           id: finding.id,
