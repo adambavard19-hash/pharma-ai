@@ -14,7 +14,7 @@ import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { siblingPharmacyIds } from "@/server/db/tenant";
-import { stockStatus, STOCK_STATUS_LABELS } from "@/server/services/catalog";
+import { needsAttention, stockStatus, STOCK_STATUS_LABELS } from "@/server/services/catalog";
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
 import { PageHeader, Grid } from "@/components/ui/page";
 import { Card } from "@/components/ui/card";
@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, EmptyState, Progress } from "@/components/ui/feedback";
 import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { LinkTabs } from "@/components/ui/tabs";
+import { StockTabs } from "./stock-tabs";
 import { PatientSearchBar } from "../patients/search-bar";
 import { CategoryFilter } from "./category-filter";
 import { computeMargin, formatCents, formatDateTime, formatPercent } from "@/lib/format";
@@ -81,8 +81,15 @@ export default async function StockPage({
 
   const showCatalog = tab === "catalogue" && canSeeCatalog;
 
-  const [items, movements, movementCount, products, catalogTotal, categoryCounts] =
-    await Promise.all([
+  const [
+    items,
+    movements,
+    movementCount,
+    products,
+    catalogTotal,
+    categoryCounts,
+    drugStockCount,
+  ] = await Promise.all([
     prisma.stockItem.findMany({
       where: {
         pharmacyId: session.scope.pharmacyId,
@@ -136,6 +143,9 @@ export default async function StockPage({
           _count: true,
         })
       : Promise.resolve([]),
+    // Compté ici aussi pour que la barre d'onglets soit identique sur les deux
+    // écrans du stock, quel que soit celui qu'on regarde.
+    prisma.pharmacyDrugStock.count({ where: { pharmacyId: session.scope.pharmacyId } }),
   ]);
 
   // Disponibilité dans les autres officines du groupe, appariée par EAN.
@@ -155,9 +165,7 @@ export default async function StockPage({
   }
 
   const outOfStock = items.filter((item) => item.quantity <= 0);
-  const lowStock = items.filter(
-    (item) => item.quantity > 0 && item.quantity <= item.alertThreshold,
-  );
+  const lowStock = items.filter((item) => item.quantity > 0 && needsAttention(item));
   const inventoryValue = items.reduce(
     (sum, item) => sum + item.quantity * item.product.purchasePriceCents,
     0,
@@ -227,15 +235,14 @@ export default async function StockPage({
         </Alert>
       )}
 
-      <LinkTabs
-        items={[
-          { key: "alertes", label: "À surveiller", count: alerts.length },
-          { key: "tout", label: "Tout le stock", count: items.length },
-          ...(canSeeCatalog
-            ? [{ key: "catalogue", label: "Catalogue", count: catalogTotal }]
-            : []),
-          { key: "mouvements", label: "Mouvements", count: movementCount },
-        ]}
+      <StockTabs
+        counts={{
+          alerts: alerts.length,
+          items: items.length,
+          catalog: canSeeCatalog ? catalogTotal : null,
+          drugs: drugStockCount,
+          movements: movementCount,
+        }}
       />
 
       {tab === "mouvements" ? (

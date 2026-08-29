@@ -36,6 +36,7 @@ import {
   type SmrOpinionRow,
   type SpecialtyRow,
 } from "@/core/reference/bdpm";
+import { normalizeSearchText } from "@/core/reference/search";
 import { chunk } from "@/lib/utils";
 
 /** Lit un fichier de la source. Renvoie `null` si le fichier est absent. */
@@ -305,6 +306,10 @@ function sameDate(a: Date | null, b: Date | null): boolean {
 function specialtyPayload(row: SpecialtyRow) {
   return {
     name: row.name,
+    // Dérivée du nom officiel, jamais à sa place. Elle est incluse dans la
+    // charge utile comparée pour qu'une correction de la règle de
+    // normalisation soit rattrapée à la synchronisation suivante.
+    searchName: normalizeSearchText(row.name),
     pharmaceuticalForm: row.pharmaceuticalForm,
     administrationRoutes: row.administrationRoutes,
     authorizationStatus: row.authorizationStatus,
@@ -323,6 +328,7 @@ type ExistingSpecialty = ReturnType<typeof specialtyPayload> & { id: string; cis
 function specialtyChanged(existing: ExistingSpecialty, row: SpecialtyRow): boolean {
   return (
     existing.name !== row.name ||
+    existing.searchName !== normalizeSearchText(row.name) ||
     existing.pharmaceuticalForm !== row.pharmaceuticalForm ||
     !sameList(existing.administrationRoutes, row.administrationRoutes) ||
     existing.authorizationStatus !== row.authorizationStatus ||
@@ -348,6 +354,7 @@ async function writeSpecialties(
       id: true,
       cisCode: true,
       name: true,
+      searchName: true,
       pharmaceuticalForm: true,
       administrationRoutes: true,
       authorizationStatus: true,
@@ -563,23 +570,27 @@ async function writeSubstances(
     occurrences.set(row.substanceCode, labels);
   }
 
-  const wanted = new Map<string, { label: string; aliases: string[] }>();
+  const wanted = new Map<string, { label: string; searchLabel: string; aliases: string[] }>();
   for (const [code, labels] of occurrences) {
     // Égalité de fréquence tranchée par l'ordre alphabétique : le résultat de
     // l'import ne doit pas dépendre de l'ordre des lignes du fichier.
     const sorted = [...labels.entries()].sort(
       (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "fr"),
     );
-    wanted.set(code, { label: sorted[0][0], aliases: sorted.slice(1).map(([label]) => label) });
+    wanted.set(code, {
+      label: sorted[0][0],
+      searchLabel: normalizeSearchText(sorted[0][0]),
+      aliases: sorted.slice(1).map(([label]) => label),
+    });
   }
 
   const existing = await prisma.drugSubstance.findMany({
-    select: { id: true, code: true, label: true, aliases: true },
+    select: { id: true, code: true, label: true, searchLabel: true, aliases: true },
   });
   const byCode = new Map(existing.map((row) => [row.code, row]));
 
   const ids = new Map<string, string>();
-  const toCreate: { code: string; label: string; aliases: string[] }[] = [];
+  const toCreate: { code: string; label: string; searchLabel: string; aliases: string[] }[] = [];
   const seenIds: string[] = [];
 
   for (const [code, payload] of wanted) {
@@ -590,7 +601,11 @@ async function writeSubstances(
     }
     ids.set(code, current.id);
     seenIds.push(current.id);
-    if (current.label !== payload.label || !sameList(current.aliases, payload.aliases)) {
+    if (
+      current.label !== payload.label ||
+      current.searchLabel !== payload.searchLabel ||
+      !sameList(current.aliases, payload.aliases)
+    ) {
       await prisma.drugSubstance.update({ where: { id: current.id }, data: payload });
     }
   }
@@ -969,6 +984,7 @@ async function countDryRun(
       id: true,
       cisCode: true,
       name: true,
+      searchName: true,
       pharmaceuticalForm: true,
       administrationRoutes: true,
       authorizationStatus: true,

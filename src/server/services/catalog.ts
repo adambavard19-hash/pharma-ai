@@ -108,6 +108,47 @@ export async function loadValidationHistory(
   return history;
 }
 
+/**
+ * Une ligne « à surveiller » : en rupture, ou sous le seuil d'alerte.
+ *
+ * Deux écrans affichent ce compteur ; la règle est écrite ici pour qu'ils ne
+ * puissent pas donner deux nombres différents de la même chose.
+ */
+export function needsAttention(line: { quantity: number; alertThreshold: number }): boolean {
+  return line.quantity <= 0 || line.quantity <= line.alertThreshold;
+}
+
+export type StockOverviewCounts = {
+  alerts: number;
+  items: number;
+  catalog: number | null;
+  movements: number;
+};
+
+/** Les compteurs de la barre d'onglets du stock, pour l'écran qui ne les a pas déjà. */
+export async function stockOverviewCounts(
+  pharmacyId: string,
+  includeCatalog: boolean,
+): Promise<StockOverviewCounts> {
+  const [lines, movements, catalog] = await Promise.all([
+    prisma.stockItem.findMany({
+      where: { pharmacyId, product: { deletedAt: null, isActive: true } },
+      select: { quantity: true, alertThreshold: true },
+    }),
+    prisma.stockMovement.count({ where: { pharmacyId } }),
+    includeCatalog
+      ? prisma.product.count({ where: { pharmacyId, deletedAt: null } })
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    alerts: lines.filter(needsAttention).length,
+    items: lines.length,
+    catalog,
+    movements,
+  };
+}
+
 export type StockStatus = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
 
 export function stockStatus(quantity: number, threshold: number): StockStatus {

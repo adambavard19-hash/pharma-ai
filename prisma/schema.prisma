@@ -34,10 +34,10 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pharmacies    Pharmacy[]
-  users         User[]
-  subscription  Subscription?
-  aiUsage       AiUsageRecord[]
+  pharmacies   Pharmacy[]
+  users        User[]
+  subscription Subscription?
+  aiUsage      AiUsageRecord[]
 
   @@map("organizations")
 }
@@ -53,20 +53,20 @@ model Pharmacy {
   /// Numéro d'inscription à l'Ordre national des pharmaciens.
   orderNumber    String?
 
-  email       String?
-  phone       String?
+  email        String?
+  phone        String?
   addressLine1 String?
   addressLine2 String?
-  postalCode  String?
-  city        String?
-  country     String  @default("FR")
+  postalCode   String?
+  city         String?
+  country      String  @default("FR")
 
-  logoUrl     String?
-  brandColor  String  @default("#0F766E")
-  timezone    String  @default("Europe/Paris")
+  logoUrl    String?
+  brandColor String  @default("#0F766E")
+  timezone   String  @default("Europe/Paris")
 
   /// Paramètres officinaux (voir src/config/pharmacy-settings.ts pour le schéma Zod).
-  settings    Json    @default("{}")
+  settings Json @default("{}")
 
   /// Nombre de jours minimum entre deux suivis adressés au même patient.
   /// Appliqué côté serveur, jamais seulement à l'écran : l'objectif n'est pas
@@ -74,19 +74,20 @@ model Pharmacy {
   followUpMinIntervalDays Int @default(30)
 
   /// Marque le jeu de données de démonstration. Jamais vrai en production réelle.
-  isDemo      Boolean @default(false)
-  isActive    Boolean @default(true)
+  isDemo   Boolean @default(false)
+  isActive Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships     Membership[]
   patients        Patient[]
   reminders       Reminder[]
   products        Product[]
   stockItems      StockItem[]
   stockMovements  StockMovement[]
+  drugStocks      PharmacyDrugStock[]
   prescriptions   Prescription[]
   analysisRuns    AnalysisRun[]
   recommendations Recommendation[]
@@ -114,15 +115,15 @@ enum PlanCode {
 }
 
 model Plan {
-  id             String   @id @default(cuid())
-  code           PlanCode @unique
-  name           String
-  description    String
+  id                String   @id @default(cuid())
+  code              PlanCode @unique
+  name              String
+  description       String
   monthlyPriceCents Int
   /// Limites du plan : { maxPharmacies, maxUsers, maxPrescriptionsPerMonth, ... }
-  limits         Json     @default("{}")
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
+  limits            Json     @default("{}")
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
 
   subscriptions Subscription[]
 
@@ -138,19 +139,19 @@ enum SubscriptionStatus {
 }
 
 model Subscription {
-  id             String             @id @default(cuid())
-  organizationId String             @unique
-  planId         String
-  status         SubscriptionStatus @default(TRIALING)
-  seats          Int                @default(5)
-  trialEndsAt    DateTime?
-  currentPeriodStart DateTime       @default(now())
+  id                 String             @id @default(cuid())
+  organizationId     String             @unique
+  planId             String
+  status             SubscriptionStatus @default(TRIALING)
+  seats              Int                @default(5)
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime           @default(now())
   currentPeriodEnd   DateTime?
-  canceledAt     DateTime?
+  canceledAt         DateTime?
   /// Référence chez le prestataire de paiement (non connecté dans le MVP).
   externalCustomerId String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   plan         Plan         @relation(fields: [planId], references: [id])
@@ -163,11 +164,11 @@ model Subscription {
 // ===========================================================================
 
 enum UserRole {
-  OWNER       // Titulaire / administrateur
-  PHARMACIST  // Pharmacien adjoint
-  TECHNICIAN  // Préparateur
-  STUDENT     // Étudiant / stagiaire
-  VIEWER      // Consultation seule
+  OWNER // Titulaire / administrateur
+  PHARMACIST // Pharmacien adjoint
+  TECHNICIAN // Préparateur
+  STUDENT // Étudiant / stagiaire
+  VIEWER // Consultation seule
 }
 
 enum UserStatus {
@@ -194,37 +195,37 @@ model User {
   updatedAt      DateTime   @updatedAt
   deletedAt      DateTime?
 
-  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships     Membership[]
-  sessions        Session[]
-  prescriptions   Prescription[]    @relation("PrescriptionCreatedBy")
-  verifiedPrescriptions Prescription[] @relation("PrescriptionVerifiedBy")
+  organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships             Membership[]
+  sessions                Session[]
+  prescriptions           Prescription[]        @relation("PrescriptionCreatedBy")
+  verifiedPrescriptions   Prescription[]        @relation("PrescriptionVerifiedBy")
   recommendationDecisions Recommendation[]
-  recommendationEvents RecommendationEvent[]
-  documents       PatientDocument[]
-  sales           Sale[]
-  stockMovements  StockMovement[]
-  auditLogs       AuditLog[]
-  notifications   Notification[]
-  pharmacyRules   PharmacyRule[]
-  imports         ImportJob[]
+  recommendationEvents    RecommendationEvent[]
+  documents               PatientDocument[]
+  sales                   Sale[]
+  stockMovements          StockMovement[]
+  auditLogs               AuditLog[]
+  notifications           Notification[]
+  pharmacyRules           PharmacyRule[]
+  imports                 ImportJob[]
 
   @@index([organizationId])
   @@map("users")
 }
 
 model Membership {
-  id         String     @id @default(cuid())
-  userId     String
-  pharmacyId String
-  role       UserRole   @default(TECHNICIAN)
+  id                 String   @id @default(cuid())
+  userId             String
+  pharmacyId         String
+  role               UserRole @default(TECHNICIAN)
   /// Permissions accordées en plus du rôle (codes, cf. src/server/rbac/permissions.ts).
   grantedPermissions String[] @default([])
   /// Permissions retirées malgré le rôle.
   revokedPermissions String[] @default([])
-  isActive   Boolean    @default(true)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
@@ -235,15 +236,15 @@ model Membership {
 }
 
 model Session {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   /// SHA-256 du jeton de session. Le jeton en clair n'est jamais stocké.
-  tokenHash  String   @unique
+  tokenHash  String    @unique
   userId     String
   /// Officine active pour cette session (multi-officine d'un même groupe).
   pharmacyId String?
   expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  lastSeenAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
   revokedAt  DateTime?
   ipAddress  String?
   userAgent  String?
@@ -278,11 +279,11 @@ model PlatformAdmin {
 }
 
 model PlatformAdminSession {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
   adminId   String
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   revokedAt DateTime?
   ipAddress String?
 
@@ -299,15 +300,15 @@ enum IncidentSeverity {
 }
 
 model PlatformIncident {
-  id          String           @id @default(cuid())
+  id         String           @id @default(cuid())
   /// Optionnel : incident lié à une officine précise (jamais de donnée patient).
-  pharmacyId  String?
-  severity    IncidentSeverity @default(WARNING)
-  code        String
-  title       String
-  detail      String
-  resolvedAt  DateTime?
-  createdAt   DateTime         @default(now())
+  pharmacyId String?
+  severity   IncidentSeverity @default(WARNING)
+  code       String
+  title      String
+  detail     String
+  resolvedAt DateTime?
+  createdAt  DateTime         @default(now())
 
   @@index([createdAt])
   @@map("platform_incidents")
@@ -355,11 +356,11 @@ model Patient {
   birthDate  DateTime?
   sex        PatientSex @default(UNSPECIFIED)
 
-  email      String?
-  phone      String?
+  email        String?
+  phone        String?
   addressLine1 String?
-  postalCode String?
-  city       String?
+  postalCode   String?
+  city         String?
 
   /// Note commerciale, non médicale (préférences d'achat, langue...).
   commercialNotes String?
@@ -367,18 +368,18 @@ model Patient {
   /// Jeton de désinscription des suivis, porté par chaque message envoyé.
   /// Il ne donne accès à rien d'autre : il coupe les rappels, sans exposer la
   /// fiche ni toucher au dossier de soin, qui relève d'une autre obligation.
-  followUpOptOutToken String?  @unique
+  followUpOptOutToken String?   @unique
   followUpOptOutAt    DateTime?
 
-  isDemo     Boolean   @default(false)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  isDemo       Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   /// Suppression logique — la purge définitive est pilotée par la politique
   /// de conservation (voir docs/RGPD.md).
-  deletedAt   DateTime?
+  deletedAt    DateTime?
   anonymizedAt DateTime?
 
-  pharmacy      Pharmacy          @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  pharmacy      Pharmacy              @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   healthProfile PatientHealthProfile?
   consents      PatientConsent[]
   prescriptions Prescription[]
@@ -396,25 +397,25 @@ model Patient {
 /// Données de santé — table séparée, champs libres chiffrés au niveau applicatif
 /// (AES-256-GCM, cf. src/server/security/encryption.ts).
 model PatientHealthProfile {
-  id        String  @id @default(cuid())
-  patientId String  @unique
+  id                         String  @id @default(cuid())
+  patientId                  String  @unique
   /// Allergies déclarées (chiffré).
-  allergiesEncrypted String?
+  allergiesEncrypted         String?
   /// Pathologies chroniques déclarées (chiffré).
-  conditionsEncrypted String?
+  conditionsEncrypted        String?
   /// Traitements en cours hors ordonnance (chiffré).
   currentTreatmentsEncrypted String?
   /// Notes du pharmacien (chiffré).
-  notesEncrypted String?
+  notesEncrypted             String?
 
-  isPregnant      Boolean?
-  isBreastfeeding Boolean?
-  weightKg        Float?
-  heightCm        Float?
-  renalImpairment Boolean?
+  isPregnant        Boolean?
+  isBreastfeeding   Boolean?
+  weightKg          Float?
+  heightCm          Float?
+  renalImpairment   Boolean?
   hepaticImpairment Boolean?
 
-  updatedAt DateTime @updatedAt
+  updatedAt       DateTime @updatedAt
   updatedByUserId String?
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -423,9 +424,9 @@ model PatientHealthProfile {
 }
 
 enum ConsentType {
-  DATA_PROCESSING     // Traitement des données personnelles
-  HEALTH_DATA         // Traitement des données de santé
-  ADVICE_SHARING      // Réception de la fiche conseil
+  DATA_PROCESSING // Traitement des données personnelles
+  HEALTH_DATA // Traitement des données de santé
+  ADVICE_SHARING // Réception de la fiche conseil
   /// Réception des suivis de traitement. Volontairement distinct des
   /// consentements marketing : un suivi thérapeutique n'est pas une offre
   /// commerciale, et les confondre reviendrait soit à bloquer un suivi
@@ -436,18 +437,18 @@ enum ConsentType {
 }
 
 model PatientConsent {
-  id         String      @id @default(cuid())
-  patientId  String
-  type       ConsentType
-  granted    Boolean
-  grantedAt  DateTime?
-  revokedAt  DateTime?
+  id                String      @id @default(cuid())
+  patientId         String
+  type              ConsentType
+  granted           Boolean
+  grantedAt         DateTime?
+  revokedAt         DateTime?
   /// Comment le consentement a été recueilli (comptoir, formulaire, e-mail...).
-  collectionMethod String  @default("COUNTER")
+  collectionMethod  String      @default("COUNTER")
   collectedByUserId String?
   /// Version du texte d'information présenté au patient.
-  noticeVersion String   @default("v1")
-  createdAt  DateTime    @default(now())
+  noticeVersion     String      @default("v1")
+  createdAt         DateTime    @default(now())
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
@@ -519,23 +520,23 @@ model Product {
 
   /// Allégations commerciales autorisées, validées par l'officine.
   /// Elles seules peuvent être reprises dans la fiche patient.
-  commercialClaims String[] @default([])
+  commercialClaims  String[] @default([])
   /// Précautions d'emploi à afficher au pharmacien et, si pertinent, au patient.
-  precautions      String[] @default([])
+  precautions       String[] @default([])
   /// Mots-clés d'appariement utilisés par le moteur de recommandation.
-  matchingTags     String[] @default([])
+  matchingTags      String[] @default([])
   /// Contre-indications simples déclarées par l'officine (grossesse, enfant...).
   contraindications String[] @default([])
 
-  purchasePriceCents Int    @default(0)
-  salePriceCents     Int    @default(0)
+  purchasePriceCents Int   @default(0)
+  salePriceCents     Int   @default(0)
   /// Taux de TVA en points de pourcentage (ex. 5.5, 10, 20).
-  vatRate            Float  @default(20)
+  vatRate            Float @default(20)
 
-  isActive  Boolean  @default(true)
-  isDemo    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive  Boolean   @default(true)
+  isDemo    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   pharmacy        Pharmacy         @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
@@ -554,15 +555,15 @@ model Product {
 }
 
 model StockItem {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   pharmacyId     String
-  productId      String   @unique
-  quantity       Int      @default(0)
+  productId      String    @unique
+  quantity       Int       @default(0)
   /// Seuil déclenchant l'alerte « stock faible ».
-  alertThreshold Int      @default(5)
+  alertThreshold Int       @default(5)
   location       String?
   lastCountedAt  DateTime?
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime  @updatedAt
 
   pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -606,6 +607,7 @@ enum ImportKind {
   PRODUCTS
   PATIENTS
   STOCK
+  DRUG_STOCK
 }
 
 enum ImportStatus {
@@ -702,22 +704,27 @@ model DrugSpecialty {
   /// Code Identifiant de Spécialité. Clé naturelle, stable dans le temps.
   cisCode String @unique
 
-  name                String
-  pharmaceuticalForm  String?
+  name                 String
+  /// Le nom sans accents et en majuscules, pour la recherche au comptoir.
+  /// Dérivé de `name`, jamais substitué à lui : la valeur officielle reste
+  /// intacte juste à côté. Vide tant que l'import ne l'a pas rempli — la
+  /// recherche interroge alors `name` seul, sans jamais rien rendre de faux.
+  searchName           String   @default("")
+  pharmaceuticalForm   String?
   /// Voies d'administration. La source les sépare par « ; ».
   administrationRoutes String[] @default([])
 
-  authorizationStatus    String?
-  authorizationProcedure String?
+  authorizationStatus         String?
+  authorizationProcedure      String?
   /// « Commercialisée » / « Non commercialisée ».
-  marketingStatus        String?
-  authorizedAt           DateTime?
+  marketingStatus             String?
+  authorizedAt                DateTime?
   /// Statut BdM : « Warning disponibilité », « Alerte »… Vide le plus souvent.
-  bdmStatus              String?
+  bdmStatus                   String?
   europeanAuthorizationNumber String?
   /// Titulaires de l'AMM. Séparés par « ; » dans la source (rare).
-  holders                String[] @default([])
-  enhancedMonitoring     Boolean  @default(false)
+  holders                     String[]  @default([])
+  enhancedMonitoring          Boolean   @default(false)
 
   /// Dernière synchronisation ayant vu cette ligne dans le fichier source.
   lastSeenAt  DateTime  @default(now())
@@ -727,11 +734,11 @@ model DrugSpecialty {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  presentations         DrugPresentation[]
-  compositions          DrugComposition[]
+  presentations          DrugPresentation[]
+  compositions           DrugComposition[]
   prescriptionConditions DrugPrescriptionCondition[]
-  genericMemberships    DrugGenericMember[]
-  smrOpinions           DrugSmrOpinion[]
+  genericMemberships     DrugGenericMember[]
+  smrOpinions            DrugSmrOpinion[]
 
   @@index([name])
   @@index([marketingStatus])
@@ -743,18 +750,18 @@ model DrugSpecialty {
 /// `cip13` est le code-barres imprimé sur la boîte : scanner, c'est lire
 /// directement cette clé.
 model DrugPresentation {
-  id         String @id @default(cuid())
+  id          String @id @default(cuid())
   specialtyId String
   /// Code Identifiant de Présentation à 13 chiffres. Vérifié unique sur la
   /// base réelle, et toujours préfixé « 3400 » pour les médicaments français.
-  cip13      String @unique
-  cip7       String @unique
+  cip13       String @unique
+  cip7        String @unique
 
-  label                 String
-  administrativeStatus  String?
+  label                  String
+  administrativeStatus   String?
   /// « Déclaration de commercialisation », « Déclaration d'arrêt… »
-  marketingStatus       String?
-  marketingDeclaredAt   DateTime?
+  marketingStatus        String?
+  marketingDeclaredAt    DateTime?
   /// Agrément aux collectivités : « oui » / « non » dans la source.
   approvedForCommunities Boolean?
 
@@ -767,19 +774,23 @@ model DrugPresentation {
 
   /// Prix hors honoraire de dispensation, en centimes. Absent pour les
   /// présentations non remboursées — un tiers d'entre elles.
-  priceCents           Int?
+  priceCents          Int?
   /// Prix total (prix + honoraires), en centimes.
-  totalPriceCents      Int?
+  totalPriceCents     Int?
   /// Honoraire de dispensation, en centimes.
-  dispensingFeeCents   Int?
-  reimbursementNotice  String?
+  dispensingFeeCents  Int?
+  reimbursementNotice String?
 
   lastSeenAt  DateTime  @default(now())
   withdrawnAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  specialty DrugSpecialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+  specialty      DrugSpecialty       @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+  /// Les officines qui détiennent cette boîte. Le catalogue national ne sait
+  /// rien d'elles : c'est le stock qui référence la présentation, jamais
+  /// l'inverse.
+  pharmacyStocks PharmacyDrugStock[]
 
   @@index([specialtyId])
   @@index([marketingStatus])
@@ -795,12 +806,14 @@ model DrugPresentation {
 /// la source — chaque ligne de composition conserve la graphie exacte qu'elle
 /// portait.
 model DrugSubstance {
-  id    String @id @default(cuid())
-  code  String @unique
+  id          String   @id @default(cuid())
+  code        String   @unique
   /// Graphie la plus fréquente rencontrée dans le fichier.
-  label String
+  label       String
+  /// Le libellé sans accents et en majuscules, pour la recherche.
+  searchLabel String   @default("")
   /// Les autres graphies rencontrées pour ce même code.
-  aliases String[] @default([])
+  aliases     String[] @default([])
 
   lastSeenAt DateTime @default(now())
   createdAt  DateTime @default(now())
@@ -824,16 +837,16 @@ model DrugComposition {
   substanceId String
 
   /// Élément pharmaceutique décrit (« comprimé », « gélule »…).
-  element        String
+  element         String
   /// Graphie exacte de la substance sur cette ligne, telle qu'écrite par la
   /// source.
-  substanceLabel String
-  dosage         String?
+  substanceLabel  String
+  dosage          String?
   dosageReference String?
   /// « SA » ou « FT ».
-  nature         String
+  nature          String
   /// Numéro reliant une substance active à sa fraction thérapeutique.
-  linkNumber     String?
+  linkNumber      String?
 
   lastSeenAt DateTime @default(now())
   createdAt  DateTime @default(now())
@@ -925,6 +938,52 @@ model DrugSmrOpinion {
   @@map("drug_smr_opinions")
 }
 
+/// Comment une ligne est entrée dans le stock de l'officine.
+enum DrugStockSource {
+  /// Code-barres lu au comptoir.
+  SCAN
+  /// Import en masse d'une liste de codes.
+  IMPORT
+  /// Saisie à l'écran.
+  MANUAL
+}
+
+/// Ce qu'UNE officine détient du catalogue national.
+///
+/// C'est la seule table qui relie une pharmacie à un médicament, et elle ne
+/// contient AUCUNE donnée officielle recopiée : seulement une référence, une
+/// quantité et ce que l'officine en dit. Deux conséquences voulues :
+///
+///   • une resynchronisation mensuelle du catalogue national ne peut pas
+///     toucher au stock d'une officine — les deux ne partagent aucune colonne ;
+///   • une grosse pharmacie ne duplique pas 20 000 fiches produit : elle pose
+///     20 000 lignes de trois champs.
+///
+/// La quantité porte à elle seule la règle commerciale : une boîte à zéro est
+/// référencée mais pas détenue, donc jamais proposée comme recommandation.
+model PharmacyDrugStock {
+  id             String @id @default(cuid())
+  pharmacyId     String
+  presentationId String
+
+  quantity       Int             @default(0)
+  /// Seuil déclenchant l'alerte « stock faible ». 0 = pas d'alerte.
+  alertThreshold Int             @default(0)
+  location       String?
+  source         DrugStockSource @default(MANUAL)
+  lastCountedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pharmacy     Pharmacy         @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  presentation DrugPresentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+
+  @@unique([pharmacyId, presentationId])
+  @@index([pharmacyId, quantity])
+  @@map("pharmacy_drug_stocks")
+}
+
 // ===========================================================================
 // RÉFÉRENTIEL MÉDICAMENTEUX
 // Un LLM n'est PAS une base médicamenteuse. Cette table matérialise la source
@@ -933,18 +992,18 @@ model DrugSmrOpinion {
 // ===========================================================================
 
 model DrugReference {
-  id            String   @id @default(cuid())
+  id                 String   @id @default(cuid())
   /// Code CIS (base de données publique des médicaments) lorsqu'il existe.
-  cisCode        String?  @unique
-  name           String
+  cisCode            String?  @unique
+  name               String
   /// Dénomination commune internationale.
-  inn            String?
-  atcCode        String?
-  therapeuticClass String?
-  form           String?
-  strength       String?
+  inn                String?
+  atcCode            String?
+  therapeuticClass   String?
+  form               String?
+  strength           String?
   /// Effets indésirables fréquents à connaître au comptoir.
-  commonSideEffects String[] @default([])
+  commonSideEffects  String[] @default([])
   /// Classes/substances avec lesquelles une interaction est documentée.
   interactionClasses String[] @default([])
   /// Populations nécessitant une vigilance particulière.
@@ -1016,9 +1075,9 @@ model Prescription {
   verifiedAt       DateTime?
   validatedAt      DateTime?
 
-  isDemo    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isDemo    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
@@ -1047,27 +1106,27 @@ enum LineStatus {
 }
 
 model PrescriptionLine {
-  id             String     @id @default(cuid())
+  id             String  @id @default(cuid())
   prescriptionId String
   position       Int
   /// Texte brut tel que lu sur l'ordonnance — jamais réécrit par l'IA.
   rawText        String?
 
-  drugName    String?
+  drugName        String?
   drugReferenceId String?
-  dosage      String?
-  form        String?
-  posology    String?
-  durationDays Int?
-  quantity    Int?
-  instructions String?
+  dosage          String?
+  form            String?
+  posology        String?
+  durationDays    Int?
+  quantity        Int?
+  instructions    String?
 
-  status     LineStatus @default(EXTRACTED)
+  status           LineStatus @default(EXTRACTED)
   /// Confiance par champ : { drugName: 0.94, dosage: 0.41, ... }
   /// Toute valeur < seuil déclenche une vérification humaine explicite.
-  fieldConfidence Json    @default("{}")
+  fieldConfidence  Json       @default("{}")
   /// Champs que l'extraction n'a pas su lire — jamais inventés.
-  unreadableFields String[] @default([])
+  unreadableFields String[]   @default([])
 
   correctedByUserId String?
   correctedAt       DateTime?
@@ -1075,7 +1134,7 @@ model PrescriptionLine {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  prescription Prescription          @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
   explanation  TreatmentExplanation?
 
   @@unique([prescriptionId, position])
@@ -1111,16 +1170,16 @@ model AnalysisRun {
   blockedReasons String[]       @default([])
   isDemo         Boolean        @default(false)
 
-  startedAt  DateTime  @default(now())
-  finishedAt DateTime?
-  durationMs Int?
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  durationMs   Int?
   errorMessage String?
 
-  pharmacy      Pharmacy       @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  prescription  Prescription   @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
-  opportunities AdviceOpportunity[]
+  pharmacy        Pharmacy            @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  prescription    Prescription        @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  opportunities   AdviceOpportunity[]
   recommendations Recommendation[]
-  safetyFindings SafetyFinding[]
+  safetyFindings  SafetyFinding[]
 
   @@index([pharmacyId, startedAt])
   @@index([prescriptionId])
@@ -1128,10 +1187,10 @@ model AnalysisRun {
 }
 
 enum ExplanationSource {
-  REFERENTIAL      // Issue du référentiel médicamenteux branché
-  PROFESSIONAL     // Saisie/validée par le pharmacien
-  DEMO             // Jeu de démonstration fictif
-  UNAVAILABLE      // Information non disponible — rien n'est inventé
+  REFERENTIAL // Issue du référentiel médicamenteux branché
+  PROFESSIONAL // Saisie/validée par le pharmacien
+  DEMO // Jeu de démonstration fictif
+  UNAVAILABLE // Information non disponible — rien n'est inventé
 }
 
 model TreatmentExplanation {
@@ -1191,19 +1250,19 @@ model SafetyFinding {
 /// L'étape est volontairement séparée du catalogue : on détermine d'abord la
 /// pertinence, seulement ensuite ce que l'officine peut proposer.
 model AdviceOpportunity {
-  id            String          @id @default(cuid())
-  analysisRunId String
-  category      ProductCategory
-  title         String
+  id              String          @id @default(cuid())
+  analysisRunId   String
+  category        ProductCategory
+  title           String
   /// Pourquoi ce conseil est envisagé, en langage pharmacien.
-  rationale     String
+  rationale       String
   clinicalContext String?
-  safetyNotes   String[]        @default([])
+  safetyNotes     String[]        @default([])
   /// 0 → 100 : priorité clinique/conseil, indépendante de toute marge.
-  priority      Int             @default(50)
-  isBlocked     Boolean         @default(false)
-  blockReason   String?
-  createdAt     DateTime        @default(now())
+  priority        Int             @default(50)
+  isBlocked       Boolean         @default(false)
+  blockReason     String?
+  createdAt       DateTime        @default(now())
 
   analysisRun     AnalysisRun      @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
   recommendations Recommendation[]
@@ -1230,15 +1289,15 @@ enum RecommendationStatus {
 }
 
 model Recommendation {
-  id             String               @id @default(cuid())
+  id             String  @id @default(cuid())
   pharmacyId     String
   prescriptionId String
   analysisRunId  String?
   opportunityId  String?
   productId      String?
 
-  origin  RecommendationOrigin @default(AI)
-  status  RecommendationStatus @default(PROPOSED)
+  origin RecommendationOrigin @default(AI)
+  status RecommendationStatus @default(PROPOSED)
 
   /// Détail des dimensions de score (cf. src/core/ai/engines/scoring.ts).
   /// { relevance, safety, availability, patientFit, pharmacistPreference,
@@ -1257,8 +1316,8 @@ model Recommendation {
   counterScript String?
   precautions   String[] @default([])
 
-  quantity          Int     @default(1)
-  unitPriceCents    Int     @default(0)
+  quantity       Int @default(1)
+  unitPriceCents Int @default(0)
 
   decidedByUserId   String?
   decidedAt         DateTime?
@@ -1267,9 +1326,9 @@ model Recommendation {
   pharmacistNote    String?
 
   presentedAt DateTime?
-  isDemo      Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isDemo      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   pharmacy        Pharmacy           @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   prescription    Prescription       @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
@@ -1332,19 +1391,19 @@ enum PharmacyRuleType {
 /// elles ne peuvent jamais faire remonter une proposition écartée pour raison
 /// de sécurité.
 model PharmacyRule {
-  id         String           @id @default(cuid())
-  pharmacyId String
-  type       PharmacyRuleType
-  productId  String?
-  category   ProductCategory?
+  id              String           @id @default(cuid())
+  pharmacyId      String
+  type            PharmacyRuleType
+  productId       String?
+  category        ProductCategory?
   /// Contexte d'application : { drugClasses: [...], atcPrefixes: [...] }
-  context    Json             @default("{}")
-  note       String?
-  weight     Float            @default(1)
-  isActive   Boolean          @default(true)
+  context         Json             @default("{}")
+  note            String?
+  weight          Float            @default(1)
+  isActive        Boolean          @default(true)
   createdByUserId String?
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   pharmacy  Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -1359,31 +1418,31 @@ model PharmacyRule {
 // ===========================================================================
 
 model PatientDocument {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   pharmacyId     String
   patientId      String?
   prescriptionId String
-  version        Int      @default(1)
+  version        Int       @default(1)
   /// Instantané figé du contenu publié (voir src/core/documents/types.ts).
   contentJson    Json
   /// Jeton d'accès à la version numérique. Long, aléatoire, révocable.
-  accessToken    String   @unique
+  accessToken    String    @unique
   tokenExpiresAt DateTime
   revokedAt      DateTime?
 
   createdByUserId String?
   printedAt       DateTime?
-  viewCount       Int      @default(0)
+  viewCount       Int       @default(0)
   lastViewedAt    DateTime?
 
   isDemo    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pharmacy     Pharmacy     @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  patient      Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
-  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
-  createdBy    User?        @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  pharmacy     Pharmacy           @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  patient      Patient?           @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  prescription Prescription       @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  createdBy    User?              @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   deliveries   DocumentDelivery[]
 
   @@index([pharmacyId, createdAt])
@@ -1407,16 +1466,16 @@ enum DeliveryStatus {
 }
 
 model DocumentDelivery {
-  id         String          @id @default(cuid())
-  documentId String
-  channel    DeliveryChannel
-  status     DeliveryStatus  @default(SIMULATED)
+  id           String          @id @default(cuid())
+  documentId   String
+  channel      DeliveryChannel
+  status       DeliveryStatus  @default(SIMULATED)
   /// Destinataire masqué dans les journaux (ex. j***@exemple.fr).
   targetMasked String?
-  provider   String?
-  detail     String?
-  userId     String?
-  createdAt  DateTime        @default(now())
+  provider     String?
+  detail       String?
+  userId       String?
+  createdAt    DateTime        @default(now())
 
   document PatientDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
@@ -1519,10 +1578,10 @@ model Sale {
   reference      String
   channel        SaleChannel @default(COUNTER)
 
-  totalCents        Int @default(0)
-  totalMarginCents  Int @default(0)
+  totalCents            Int @default(0)
+  totalMarginCents      Int @default(0)
   /// Sous-total attribuable à une recommandation Pharma.ai.
-  attributedCents   Int @default(0)
+  attributedCents       Int @default(0)
   attributedMarginCents Int @default(0)
 
   userId    String?
@@ -1542,7 +1601,7 @@ model Sale {
 }
 
 model SaleLine {
-  id               String @id @default(cuid())
+  id               String  @id @default(cuid())
   saleId           String
   productId        String?
   /// Renseigné lorsque la vente découle d'une recommandation Pharma.ai.
@@ -1550,11 +1609,11 @@ model SaleLine {
   recommendationId String?
 
   label          String
-  quantity       Int   @default(1)
-  unitPriceCents Int   @default(0)
-  totalCents     Int   @default(0)
-  marginCents    Int   @default(0)
-  vatRate        Float @default(20)
+  quantity       Int    @default(1)
+  unitPriceCents Int    @default(0)
+  totalCents     Int    @default(0)
+  marginCents    Int    @default(0)
+  vatRate        Float  @default(20)
 
   sale           Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product        Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
@@ -1611,19 +1670,19 @@ model Notification {
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
-  pharmacyId String?
-  userId     String?
+  id              String   @id @default(cuid())
+  pharmacyId      String?
+  userId          String?
   /// Identifiant de l'administrateur plateforme le cas échéant.
   platformAdminId String?
-  action     String
-  entityType String
-  entityId   String?
+  action          String
+  entityType      String
+  entityId        String?
   /// Contexte non sensible. Les données de santé n'y figurent jamais en clair.
-  metadata   Json     @default("{}")
-  ipAddress  String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
+  metadata        Json     @default("{}")
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
 
   pharmacy Pharmacy? @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
   user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)

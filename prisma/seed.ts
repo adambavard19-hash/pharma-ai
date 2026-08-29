@@ -49,6 +49,10 @@ function daysAgo(days: number, hour = 10, minute = 0): Date {
 async function reset() {
   console.log("→ Réinitialisation du jeu de démonstration…");
   // L'ordre respecte les contraintes de clés étrangères.
+  // Le stock médicament de l'officine part avec le reste du jeu de démonstration.
+  // Le catalogue national, lui, n'est jamais touché : il n'appartient à aucune
+  // officine et sa resynchronisation est une opération séparée.
+  await prisma.pharmacyDrugStock.deleteMany();
   await prisma.reminder.deleteMany();
   await prisma.recommendationEvent.deleteMany();
   await prisma.saleLine.deleteMany();
@@ -143,6 +147,75 @@ async function seedDrugReferences() {
       },
     });
   }
+}
+
+/**
+ * Quelques médicaments de comptoir déclarés en stock pour l'officine de
+ * démonstration.
+ *
+ * Deux précautions, parce qu'il s'agit de vraies références :
+ *
+ *   • rien n'est créé si le catalogue national n'a pas été importé — le seed
+ *     ne fabrique pas de médicament, il déclare seulement des quantités sur ce
+ *     qui existe déjà ;
+ *   • ce sont les quantités qui sont fictives, pas les médicaments. L'officine
+ *     entière est marquée « démonstration », et l'application le dit à chaque
+ *     écran.
+ */
+const DEMO_DRUG_SEARCHES = [
+  "DOLIPRANE",
+  "ADVIL",
+  "SPASFON",
+  "SMECTA",
+  "IMODIUM",
+  "GAVISCON",
+  "AMOXICILLINE",
+  "VENTOLINE",
+  "LEVOTHYROX",
+  "KARDEGIC",
+];
+
+async function seedDrugStock(pharmacyId: string) {
+  const catalogSize = await prisma.drugPresentation.count();
+  if (catalogSize === 0) {
+    console.log(
+      "   catalogue national absent — aucun stock médicament créé. " +
+        "Lancez `npm run bdpm:sync -- --from <dossier>` puis relancez le seed.",
+    );
+    return;
+  }
+
+  let created = 0;
+  for (const [index, name] of DEMO_DRUG_SEARCHES.entries()) {
+    const presentation = await prisma.drugPresentation.findFirst({
+      where: {
+        withdrawnAt: null,
+        marketingStatus: "Déclaration de commercialisation",
+        specialty: { name: { startsWith: name } },
+      },
+      orderBy: { cip13: "asc" },
+      select: { id: true },
+    });
+    if (!presentation) continue;
+
+    await prisma.pharmacyDrugStock.upsert({
+      where: { pharmacyId_presentationId: { pharmacyId, presentationId: presentation.id } },
+      create: {
+        pharmacyId,
+        presentationId: presentation.id,
+        // Une référence volontairement à zéro : l'écran doit montrer la
+        // différence entre « je ne l'ai plus » et « je ne le référence pas ».
+        quantity: index === DEMO_DRUG_SEARCHES.length - 1 ? 0 : 6 + index * 3,
+        alertThreshold: 4,
+        source: "IMPORT",
+        lastCountedAt: new Date(),
+      },
+      update: {},
+    });
+    created += 1;
+  }
+
+  console.log(`   ${created} référence(s) déclarée(s) sur le catalogue national`);
 }
 
 const PATIENTS = [
@@ -544,6 +617,9 @@ async function main() {
 
   console.log("→ Ordonnances, analyses, conseils et ventes");
   await seedHistory({ pharmacy, products, patients, pharmacists, technician, owner });
+
+  console.log("→ Stock médicament");
+  await seedDrugStock(pharmacy.id);
 
   console.log("→ Suivis patients");
   await seedFollowUps({ pharmacy, pharmacists });

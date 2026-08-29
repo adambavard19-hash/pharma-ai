@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type {
+  ComponentPropsWithRef,
   InputHTMLAttributes,
   LabelHTMLAttributes,
   ReactNode,
@@ -77,7 +78,7 @@ export function Input({
   className,
   leadingIcon,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { leadingIcon?: ReactNode }) {
+}: ComponentPropsWithRef<"input"> & { leadingIcon?: ReactNode }) {
   if (leadingIcon) {
     return (
       <div className="relative">
