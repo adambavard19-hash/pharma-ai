@@ -104,7 +104,10 @@ ${BDPM_FILES.map((spec) => `  curl -fOR "${BDPM_SOURCE.url}/download/file/${spec
   L'option -R conserve la date de dernière modification annoncée par le serveur.${RESET}
 
 ${BOLD}2. Lancer l'import${RESET}
-  npm run bdpm:sync -- --from ~/Téléchargements/bdpm --source-date 2026-08-25
+  npm run bdpm:sync -- --from ~/bdpm --source-date 2026-08-25
+
+  ${DIM}Sur macOS, le dossier que le Finder affiche « Téléchargements » s'appelle
+  ~/Downloads sur le disque : c'est ce nom-là qu'attend le terminal.${RESET}
 
   Ajoutez ${BOLD}--dry-run${RESET} pour tout vérifier sans rien écrire.
 `);
