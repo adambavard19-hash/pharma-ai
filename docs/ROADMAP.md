@@ -33,7 +33,7 @@ modèle d'abonnement, 100 tests sur les fonctions critiques.
 
 ---
 
-## Refonte « copilote de comptoir » 🚧 *en cours*
+## Refonte « copilote de comptoir » ✅ *livrée*
 
 Le MVP savait tout faire, en onze entrées de menu et quatre écrans successifs :
 la carte d'un ERP, pas le travail d'un pharmacien qui reçoit une ordonnance et
@@ -51,12 +51,34 @@ la surface, plus l'ajout du suivi patient.
 | 3 | Accueil comptoir — un bouton, les chiffres en second plan | ✅ |
 | 4 | Suivis et rappels — modèle `Reminder`, consentement dédié, désinscription | ✅ |
 | 5 | Fusion Produits + Stocks, regroupement des Paramètres | ✅ |
-| 6 | Jeu de démonstration, documentation, mesure du parcours | à faire |
+| 6 | Jeu de démonstration, documentation, mesure du parcours | ✅ |
 
 **Règles tenues pendant toute la refonte** : retirer du menu n'est pas
 supprimer (aucune route cassée, aucune donnée perdue) ; chaque lot se termine
 sur une application qui compile, passe ses tests et reste utilisable ; aucun
 écran ne montre une fonctionnalité qui n'existe pas.
+
+**Résultat mesuré** — `npm run demo:comptoir`, build de production :
+
+| Étape | Durée |
+|---|---|
+| Accueil → écran de scan | 0,14 s |
+| Scan → ordonnance lue à l'écran | 0,26 s |
+| Vérification des lignes | 0,65 s |
+| Analyse → sécurité et conseils affichés | 0,24 s |
+| Conseil ajouté à la vente | 0,14 s |
+| Vente enregistrée → fin de vente | 0,15 s |
+| **Total** | **1,58 s** |
+
+Temps machine uniquement : la saisie et la conversation ne sont pas simulées.
+Sur un budget d'une minute, il reste 58 secondes pour le patient.
+
+La mesure a servi à quelque chose dès la première exécution : elle a révélé
+7,7 s au lieu de 1,6 s, dont **six secondes pendant lesquelles le bouton
+« Terminer la vente » ne répondait pas**. La confirmation affichée après
+l'analyse se plaçait exactement par-dessus, et interceptait les clics. Un défaut
+qu'aucun test unitaire n'aurait attrapé, et qu'un pharmacien aurait pris pour
+une application figée.
 
 ---
 

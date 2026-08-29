@@ -2,6 +2,8 @@ import { prisma } from "@/server/db/client";
 import { analysePrescription } from "@/server/services/analysis";
 import { generatePatientDocument } from "@/server/services/documents";
 import { recordSale } from "@/server/services/sales";
+import { scheduleReminder, sendReminder } from "@/server/services/followup";
+import { findTemplate, proposedDueDate } from "@/core/followup";
 import { formatCents } from "@/lib/format";
 
 /**
@@ -25,6 +27,8 @@ async function main() {
     organizationId: pharmacy.organizationId,
     userId: pharmacist.id,
   };
+
+  const startedAt = new Date();
 
   const prescription = await prisma.prescription.findFirstOrThrow({
     where: { pharmacyId: pharmacy.id, status: "NEEDS_VERIFICATION" },
@@ -156,14 +160,75 @@ async function main() {
   });
   console.log(`   Recommandation → ${finalState.status}`);
 
+  console.log("\n7. SUIVI PATIENT");
+  if (!prescription.patientId) {
+    console.log("   Ordonnance sans patient : aucun suivi possible.");
+  } else {
+    // Le consentement se recueille au comptoir. Sans lui, le rappel se
+    // programme mais ne peut pas partir — c'est exactement ce que le parcours
+    // doit montrer.
+    await prisma.patientConsent.upsert({
+      where: {
+        patientId_type: { patientId: prescription.patientId, type: "FOLLOW_UP_MESSAGE" },
+      },
+      create: {
+        patientId: prescription.patientId,
+        type: "FOLLOW_UP_MESSAGE",
+        granted: true,
+        grantedAt: new Date(),
+        collectedByUserId: pharmacist.id,
+      },
+      update: { granted: true, grantedAt: new Date(), revokedAt: null },
+    });
+
+    const template = findTemplate("course-end")!;
+    const durationDays = Math.max(
+      0,
+      ...prescription.lines.map((line) => line.durationDays ?? 0),
+    );
+    const dueAt = proposedDueDate(template, new Date(), durationDays);
+
+    const { reminderId } = await scheduleReminder({
+      scope,
+      patientId: prescription.patientId,
+      templateKey: template.key,
+      dueAt,
+      prescriptionId: prescription.id,
+      saleId: sale.saleId,
+      isDemo: true,
+    });
+    console.log(
+      `   Programmé : « ${template.label} » le ${dueAt.toLocaleDateString("fr-FR")} ` +
+        `(durée du traitement : ${durationDays || template.defaultDelayDays} j)`,
+    );
+
+    const outcome = await sendReminder({ scope, reminderId });
+    console.log(`   Envoi : ${outcome.status}`);
+    console.log(`   ${outcome.detail}`);
+
+    const sent = await prisma.reminder.findUniqueOrThrow({
+      where: { id: reminderId },
+      select: { targetMasked: true, sentByUserId: true },
+    });
+    console.log(
+      `   Destinataire journalisé : ${sent.targetMasked} · envoyé par un professionnel : ${
+        sent.sentByUserId ? "oui" : "non"
+      }`,
+    );
+  }
+
   const audit = await prisma.auditLog.findMany({
-    where: { pharmacyId: pharmacy.id, entityId: prescription.id },
+    where: { pharmacyId: pharmacy.id },
     orderBy: { createdAt: "asc" },
-    select: { action: true },
+    select: { action: true, createdAt: true },
   });
-  console.log(`\n7. AUDIT : ${audit.map((a) => a.action).join(" → ")}`);
+  const journeyActions = audit
+    .filter((entry) => entry.createdAt >= startedAt)
+    .map((entry) => entry.action);
+  console.log(`\n8. AUDIT : ${journeyActions.join(" → ")}`);
 
   console.log("\n✓ Parcours complet exécuté sur la base réelle.");
+  console.log("  Les trois piliers sont couverts : conseiller, vendre, faire revenir.");
 }
 
 main()

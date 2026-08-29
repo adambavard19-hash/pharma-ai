@@ -2,10 +2,22 @@
 
 **Le copilote intelligent de l'officine.**
 
-Pharma.ai transforme la délivrance d'une ordonnance en parcours de conseil
-personnalisé : analyse assistée, vérification par un professionnel,
-recommandations justifiées et disponibles en stock, fiche patient premium, et
-mesure exacte du chiffre d'affaires additionnel généré.
+Pharma.ai transforme chaque ordonnance en opportunités de conseil pertinentes,
+disponibles immédiatement dans votre stock, puis transforme chaque vente en
+relation patient.
+
+Trois choses, et rien d'autre :
+
+1. **Mieux conseiller** — scanner une ordonnance, voir trois conseils au
+   maximum, avec pour chacun le produit, pourquoi lui, le prix, le stock réel et
+   **la phrase à dire au patient**.
+2. **Vendre juste** — enregistrer la vente et attribuer le chiffre d'affaires à
+   ce qui en découle réellement, jamais au reste.
+3. **Faire revenir** — programmer un suivi adossé à un fait de la vente, le
+   retrouver dans une liste de travail datée, l'envoyer d'un clic.
+
+Le tout en moins d'une minute au comptoir — un chiffre vérifiable :
+`npm run demo:comptoir` le mesure dans un vrai navigateur.
 
 Le pharmacien reste systématiquement décisionnaire. Pharma.ai est un copilote,
 pas un prescripteur.
@@ -21,8 +33,9 @@ des **fournisseurs simulés**. Concrètement :
   scénario fictif prédéfini, et l'interface l'indique explicitement.
 - Le référentiel médicamenteux livré est **fictif** (12 fiches marquées
   `isDemoData`). **Un modèle de langage n'est pas une base médicamenteuse.**
-- Aucun service d'envoi n'est branché : l'application enregistre les envois
-  comme `SIMULATED` et n'affirme jamais qu'un message a été transmis.
+- Aucun service d'envoi n'est branché : l'application enregistre les envois —
+  fiche patient comme suivis — en `SIMULATED` et n'affirme jamais qu'un message
+  a été transmis.
 - Le socle de règles de conseil **n'a pas été validé par un pharmacien**.
 
 👉 **Ne pas utiliser avec des patients réels.** Les prérequis à une utilisation
@@ -82,22 +95,33 @@ les profils de démonstration sont cliquables. Un clic vous connecte.
 
 ## Le parcours à dérouler
 
+Cinq entrées dans le menu, et rien d'autre : **Nouvelle vente · Patients ·
+Stock · Suivis · Paramètres**. Tout le reste est rangé derrière, atteignable
+mais hors du chemin.
+
 Le jeu de démonstration laisse **une ordonnance en attente de vérification**,
 pour parcourir la chaîne complète en direct :
 
-1. **Vue d'ensemble** → l'activité de l'officine, dont le CA généré grâce à
-   Pharma.ai.
-2. **Nouvelle ordonnance** → choisir un scénario de démonstration (chacun
-   illustre un comportement précis du moteur).
-3. **Vérification** → chaque champ affiche sa confiance ; un champ illisible
-   reste **vide**, jamais deviné. Confirmer les lignes.
-4. **Conseils proposés** → accepter, modifier, remplacer, supprimer. Ouvrir
-   « Pourquoi ce produit ? » pour voir le score décomposé.
-5. **Fiche patient** → générer, imprimer, montrer le QR code, ouvrir la page
-   sécurisée.
-6. **Vente** → cocher ce que le patient a acheté ; les conseils non retenus sont
-   marqués comme tels.
-7. **Analytics** → le chiffre d'affaires additionnel se met à jour.
+1. **Accueil** → un seul bouton : *Nouveau patient · Scanner une ordonnance*.
+   Les chiffres sont en bas, en petit, et mènent à la page Performance.
+2. **Scanner** → choisir un scénario de démonstration (chacun illustre un
+   comportement précis du moteur).
+3. **L'écran de vente** → une seule page, trois zones, jamais quittée :
+   - *Le traitement* — chaque champ affiche sa confiance ; un champ illisible
+     reste **vide**, jamais deviné. Les lignes se corrigent sur place.
+   - *La sécurité* — elle parle avant les conseils. Une alerte portant sur le
+     traitement ferme la zone suivante jusqu'à acquittement.
+   - *Les conseils* — trois au maximum, chacun avec sa phrase à dire au patient
+     et trois décisions : **Proposé · Ajouter à la vente · Refusé**. Ouvrir
+     « Pourquoi ce produit ? » pour voir le score décomposé.
+4. **Terminer la vente** → le CA est attribué aux seules lignes issues d'un
+   conseil.
+5. **Fin de vente** → la fiche patient (imprimée, QR code, page sécurisée) et le
+   suivi à programmer.
+6. **Suivis** → le rappel réapparaît à échéance dans une liste de travail. Rien
+   ne part sans un clic ; chaque ligne affiche pourquoi elle n'est pas
+   envoyable, s'il y a lieu.
+7. **Performance** → le chiffre d'affaires additionnel se met à jour.
 
 Les scénarios disponibles illustrent chacun un point :
 
@@ -181,7 +205,8 @@ Les justifications de ces choix figurent dans
 ```
 src/
 ├── core/          Domaine PUR — ni Prisma, ni Next.js. Testable seul.
-│   ├── ai/        ports · providers · engines · pipeline
+│   ├── ai/        ports · providers · engines · pipeline · garde-fou comptoir
+│   ├── followup/  Gabarits de suivi figés · droit d'envoyer
 │   ├── documents/ Contenu figé de la fiche patient
 │   └── analytics/ Périodes d'analyse
 ├── server/        db · security · auth · rbac · audit · services · actions
@@ -203,7 +228,7 @@ npm run build          # build de production
 npm run start          # serveur de production
 npm run typecheck      # TypeScript
 npm run lint           # ESLint
-npm test               # tests (44)
+npm test               # tests (100)
 
 npm run db:migrate     # créer et appliquer une migration
 npm run db:deploy      # appliquer les migrations (production)
@@ -212,12 +237,19 @@ npm run db:reset       # réinitialiser complètement
 npm run db:studio      # explorateur de base
 
 npm run demo:parcours  # dérouler le parcours complet en ligne de commande
+npm run demo:comptoir  # mesurer le parcours comptoir dans un vrai navigateur
 npm run setup          # migrations + client + démonstration
 ```
 
-`npm run demo:parcours` exécute la chaîne complète contre la base réelle et
-affiche la trace du pipeline étape par étape — utile pour vérifier le moteur
-sans passer par l'interface.
+`npm run demo:parcours` exécute la chaîne complète contre la base réelle —
+extraction, vérification, analyse, conseil, fiche, vente, suivi — et affiche la
+trace du pipeline étape par étape, sans passer par l'interface.
+
+`npm run demo:comptoir` mesure le parcours du pharmacien dans un navigateur,
+étape par étape, et échoue si le budget d'une minute est dépassé. L'application
+doit tourner à côté (`npm run dev` ou `npm run start`). C'est ce script qui a
+mis au jour un défaut invisible autrement : une confirmation qui recouvrait le
+bouton « Terminer la vente » pendant six secondes.
 
 ---
 

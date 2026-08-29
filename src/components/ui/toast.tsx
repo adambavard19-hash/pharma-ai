@@ -18,6 +18,12 @@ const ToastContext = createContext<{
   push: (toast: Omit<Toast, "id">) => void;
 } | null>(null);
 
+/**
+ * Durée d'affichage. Assez longue pour être lue, assez courte pour ne pas
+ * s'attarder devant un patient qui attend.
+ */
+const TOAST_DURATION_MS = 4500;
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -29,7 +35,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (toast: Omit<Toast, "id">) => {
       const id = Date.now() + Math.random();
       setToasts((current) => [...current, { ...toast, id }]);
-      setTimeout(() => dismiss(id), 6000);
+      setTimeout(() => dismiss(id), TOAST_DURATION_MS);
     },
     [dismiss],
   );
@@ -53,8 +59,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
+      {/*
+        `bottom-24` dégage la barre d'action collante des écrans de vente : une
+        confirmation ne doit jamais recouvrir le bouton suivant. Et le conteneur
+        ne capte aucun clic — seule la croix de fermeture le fait — pour qu'un
+        clic mal placé atteigne quand même ce qu'il visait.
+      */}
       <div
-        className="pointer-events-none fixed right-4 bottom-4 z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
+        className="pointer-events-none fixed right-4 bottom-24 z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
         role="status"
         aria-live="polite"
       >
@@ -64,7 +76,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={toast.id}
               className={cn(
-                "pointer-events-auto flex gap-3 rounded-lg border border-border-subtle",
+                "flex gap-3 rounded-lg border border-border-subtle",
                 "bg-surface-card p-3.5 shadow-lg animate-[slide-up_0.25s_cubic-bezier(0.16,1,0.3,1)]",
               )}
             >
@@ -80,7 +92,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => dismiss(toast.id)}
-                className="-mt-1 -mr-1 h-fit rounded p-1 text-text-tertiary hover:text-text-primary"
+                className="pointer-events-auto -mt-1 -mr-1 h-fit rounded p-1 text-text-tertiary hover:text-text-primary"
                 aria-label="Fermer la notification"
               >
                 <X className="size-3.5" />
