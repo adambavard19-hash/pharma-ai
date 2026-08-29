@@ -178,7 +178,7 @@ export default async function AdvicePage({
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-text-tertiary">
                       <Link
-                        href={`/ordonnances/${recommendation.prescription.id}`}
+                        href={`/vente/${recommendation.prescription.id}`}
                         className="font-mono hover:underline"
                       >
                         {recommendation.prescription.reference}

@@ -250,7 +250,7 @@ export async function verifyPrescriptionAction(
     prescriptionId: prescription.id,
   });
 
-  revalidatePath(`/ordonnances/${prescription.id}`);
+  revalidatePath(`/vente/${prescription.id}`);
   revalidatePath("/ordonnances");
 
   return ok({ analysisRunId, recommendationCount: result.recommendations.length });
@@ -274,11 +274,57 @@ export async function reanalysePrescriptionAction(
     prescriptionId,
   });
 
-  revalidatePath(`/ordonnances/${prescriptionId}`);
+  revalidatePath(`/vente/${prescriptionId}`);
   return ok(
     { recommendationCount: result.recommendations.length },
     "Analyse relancée avec les données à jour.",
   );
+}
+
+/**
+ * Acquittement des alertes de sécurité bloquantes d'une analyse.
+ *
+ * Tant qu'une alerte BLOCKING n'est pas acquittée, l'écran de vente n'ouvre pas
+ * la zone des conseils : on ne vend rien par-dessus une alerte non lue. Cet
+ * acquittement est un acte professionnel — il est horodaté, signé et journalisé.
+ */
+export async function acknowledgeSafetyFindingsAction(
+  analysisRunId: string,
+): Promise<ActionResult<{ count: number }>> {
+  const session = await requirePermission(PERMISSIONS.PRESCRIPTION_VERIFY);
+
+  const run = await prisma.analysisRun.findUnique({
+    where: { id: analysisRunId },
+    select: { id: true, pharmacyId: true, prescriptionId: true },
+  });
+  if (!run || run.pharmacyId !== session.scope.pharmacyId) {
+    return fail("Analyse introuvable dans cette officine.");
+  }
+
+  const { count } = await prisma.safetyFinding.updateMany({
+    where: {
+      analysisRunId: run.id,
+      severity: "BLOCKING",
+      // Les alertes portant sur un produit ou une opportunité traduisent une
+      // exclusion déjà appliquée par le moteur : elles informent, elles
+      // n'arrêtent pas le comptoir et n'ont donc pas à être acquittées.
+      subjectType: { in: ["ANALYSIS", "PRESCRIPTION_LINE"] },
+      acknowledgedAt: null,
+    },
+    data: { acknowledgedAt: new Date(), acknowledgedByUserId: session.scope.userId },
+  });
+
+  await recordAudit({
+    action: "prescription.safety_acknowledged",
+    entityType: "AnalysisRun",
+    entityId: run.id,
+    pharmacyId: session.scope.pharmacyId,
+    userId: session.scope.userId,
+    metadata: { prescriptionId: run.prescriptionId, findings: count },
+  });
+
+  revalidatePath(`/vente/${run.prescriptionId}`);
+  return ok({ count }, "Points bloquants acquittés.");
 }
 
 export async function deletePrescriptionAction(

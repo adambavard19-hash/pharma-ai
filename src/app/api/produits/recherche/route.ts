@@ -17,7 +17,7 @@ export type ProductSearchResult = {
   claims: string[];
 };
 
-/** Recherche catalogue, utilisée par le copilote pour l'ajout manuel d'un conseil. */
+/** Recherche catalogue, utilisée par l'écran de vente pour ajouter un conseil. */
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session || !session.permissions.has(PERMISSIONS.PRODUCT_VIEW)) {

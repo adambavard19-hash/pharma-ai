@@ -190,7 +190,7 @@ export default async function PatientDetailPage({
                     return (
                       <li key={prescription.id}>
                         <Link
-                          href={`/ordonnances/${prescription.id}`}
+                          href={`/vente/${prescription.id}`}
                           className="-mx-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg px-2 py-3 transition-colors hover:bg-surface-sunken"
                         >
                           <span className="font-mono text-[12px] text-text-tertiary">

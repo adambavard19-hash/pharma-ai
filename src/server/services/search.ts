@@ -108,7 +108,7 @@ export async function globalSearch(
                 ? `${prescription.patient.firstName} ${prescription.patient.lastName.toUpperCase()}`
                 : "Patient non rattaché",
               badge: PRESCRIPTION_STATUS_SHORT[prescription.status] ?? null,
-              href: `/ordonnances/${prescription.id}`,
+              href: `/vente/${prescription.id}`,
             });
           }
         }),

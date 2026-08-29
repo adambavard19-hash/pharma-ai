@@ -74,7 +74,7 @@ export async function recordSaleAction(
 
     revalidatePath("/ventes");
     revalidatePath("/tableau-de-bord");
-    if (input.prescriptionId) revalidatePath(`/ordonnances/${input.prescriptionId}`);
+    if (input.prescriptionId) revalidatePath(`/vente/${input.prescriptionId}`);
 
     return ok(
       { saleId: result.saleId, attributedCents: result.attributedCents },

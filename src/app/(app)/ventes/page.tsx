@@ -104,7 +104,7 @@ export default async function SalesPage({
           <EmptyState
             icon={<Receipt className="size-5" />}
             title="Aucune vente sur cette période"
-            description="Les ventes complémentaires enregistrées depuis le copilote apparaîtront ici."
+            description="Les ventes complémentaires enregistrées au comptoir apparaîtront ici."
           />
         </Card>
       ) : (
@@ -141,7 +141,7 @@ export default async function SalesPage({
                   <TD>
                     {sale.prescription ? (
                       <Link
-                        href={`/ordonnances/${sale.prescription.id}`}
+                        href={`/vente/${sale.prescription.id}`}
                         className="font-mono text-[12px] hover:underline"
                       >
                         {sale.prescription.reference}

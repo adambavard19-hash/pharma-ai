@@ -31,7 +31,7 @@ export async function generateDocumentAction(
       pharmacistNote: parsed.data.pharmacistNote ?? null,
     });
 
-    revalidatePath(`/ordonnances/${parsed.data.prescriptionId}`);
+    revalidatePath(`/vente/${parsed.data.prescriptionId}/fin`);
     return ok(
       { documentId: result.documentId, url: result.url },
       "Fiche patient générée.",

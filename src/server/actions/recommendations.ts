@@ -93,8 +93,69 @@ export async function acceptRecommendationAction(
     auditAction: "recommendation.accepted",
   });
 
-  revalidatePath(`/ordonnances/${recommendation.prescriptionId}/copilote`);
+  revalidatePath(`/vente/${recommendation.prescriptionId}`);
   return ok(null, "Conseil accepté.");
+}
+
+/**
+ * « PROPOSÉ » — le pharmacien a présenté le conseil au patient.
+ *
+ * C'est la mesure honnête de la conversion : sans cette trace, un conseil que
+ * personne n'a formulé au comptoir compterait comme un refus du patient. On
+ * distingue donc ce qui n'a pas été dit de ce qui a été dit et refusé.
+ */
+export async function presentRecommendationAction(
+  recommendationId: string,
+): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_DECIDE);
+  const recommendation = await assertOwnedRecommendation(
+    recommendationId,
+    session.scope.pharmacyId,
+  );
+  if (!recommendation) return fail("Recommandation introuvable dans cette officine.");
+
+  await transition({
+    recommendationId,
+    pharmacyId: session.scope.pharmacyId,
+    userId: session.scope.userId,
+    status: "PRESENTED",
+    eventType: "PRESENTED_TO_PATIENT",
+    auditAction: "recommendation.presented",
+    data: { presentedAt: new Date().toISOString() },
+  });
+
+  revalidatePath(`/vente/${recommendation.prescriptionId}`);
+  return ok(null, "Conseil marqué comme proposé au patient.");
+}
+
+/**
+ * « REFUSÉ » — le patient n'a pas retenu le conseil.
+ *
+ * À distinguer de `removeRecommendationAction`, qui traduit le jugement du
+ * pharmacien (« cette proposition n'était pas pertinente »). Confondre les deux
+ * fausserait à la fois le taux de conversion et le retour donné au moteur.
+ */
+export async function declineRecommendationAction(
+  recommendationId: string,
+): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_DECIDE);
+  const recommendation = await assertOwnedRecommendation(
+    recommendationId,
+    session.scope.pharmacyId,
+  );
+  if (!recommendation) return fail("Recommandation introuvable dans cette officine.");
+
+  await transition({
+    recommendationId,
+    pharmacyId: session.scope.pharmacyId,
+    userId: session.scope.userId,
+    status: "DECLINED",
+    eventType: "DECLINED_BY_PATIENT",
+    auditAction: "recommendation.declined",
+  });
+
+  revalidatePath(`/vente/${recommendation.prescriptionId}`);
+  return ok(null, "Conseil marqué comme refusé par le patient.");
 }
 
 const modifySchema = z.object({
@@ -133,7 +194,7 @@ export async function modifyRecommendationAction(
     },
   });
 
-  revalidatePath(`/ordonnances/${recommendation.prescriptionId}/copilote`);
+  revalidatePath(`/vente/${recommendation.prescriptionId}`);
   return ok(null, "Conseil modifié.");
 }
 
@@ -192,7 +253,7 @@ export async function replaceRecommendationAction(
     },
   });
 
-  revalidatePath(`/ordonnances/${recommendation.prescriptionId}/copilote`);
+  revalidatePath(`/vente/${recommendation.prescriptionId}`);
   return ok(null, `Conseil remplacé par ${product.name}.`);
 }
 
@@ -225,7 +286,7 @@ export async function removeRecommendationAction(
     data: { reason: parsed.data.reason ?? null },
   });
 
-  revalidatePath(`/ordonnances/${recommendation.prescriptionId}/copilote`);
+  revalidatePath(`/vente/${recommendation.prescriptionId}`);
   return ok(null, "Conseil retiré.");
 }
 
@@ -312,7 +373,7 @@ export async function addManualRecommendationAction(
     metadata: { productId: product.id, prescriptionId: prescription.id },
   });
 
-  revalidatePath(`/ordonnances/${prescription.id}/copilote`);
+  revalidatePath(`/vente/${prescription.id}`);
   return ok({ recommendationId: recommendation.id }, `${product.name} ajouté.`);
 }
 

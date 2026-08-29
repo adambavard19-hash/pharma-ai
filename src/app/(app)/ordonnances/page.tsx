@@ -122,16 +122,16 @@ export default async function PrescriptionsPage({
                 const nextStep =
                   prescription.status === "NEEDS_VERIFICATION" ||
                   prescription.status === "DRAFT"
-                    ? { href: `/ordonnances/${prescription.id}/verification`, label: "Vérifier" }
+                    ? { href: `/vente/${prescription.id}`, label: "Vérifier" }
                     : prescription.status === "ANALYZED" || prescription.status === "VERIFIED"
-                      ? { href: `/ordonnances/${prescription.id}/copilote`, label: "Valider" }
-                      : { href: `/ordonnances/${prescription.id}`, label: "Ouvrir" };
+                      ? { href: `/vente/${prescription.id}`, label: "Valider" }
+                      : { href: `/vente/${prescription.id}`, label: "Ouvrir" };
 
                 return (
                   <TR key={prescription.id} interactive>
                     <TD className="font-mono text-[12px]">
                       <Link
-                        href={`/ordonnances/${prescription.id}`}
+                        href={`/vente/${prescription.id}`}
                         className="text-text-primary hover:underline"
                       >
                         {prescription.reference}

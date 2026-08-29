@@ -382,7 +382,7 @@ export default async function DashboardPage() {
                           <>
                             {" · "}
                             <Link
-                              href={`/ordonnances/${event.recommendation.prescription.id}`}
+                              href={`/vente/${event.recommendation.prescription.id}`}
                               className="hover:text-text-secondary hover:underline"
                             >
                               {event.recommendation.prescription.reference}

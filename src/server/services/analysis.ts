@@ -411,7 +411,7 @@ export async function analysePrescription(params: {
       severity: "WARNING",
       title: "Analyse impossible",
       body: `L'ordonnance ${prescription.reference} n'a pas pu être analysée : ${result.blockedReasons[0] ?? "aucune ligne confirmée"}.`,
-      linkUrl: `/ordonnances/${prescription.id}`,
+      linkUrl: `/vente/${prescription.id}`,
     });
   } else if (result.recommendations.length > 0) {
     await createNotification({
@@ -420,7 +420,7 @@ export async function analysePrescription(params: {
       severity: "INFO",
       title: "Conseils à valider",
       body: `${result.recommendations.length} conseil(s) proposé(s) pour l'ordonnance ${prescription.reference}.`,
-      linkUrl: `/ordonnances/${prescription.id}/copilote`,
+      linkUrl: `/vente/${prescription.id}`,
     });
   }
 

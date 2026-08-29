@@ -866,6 +866,13 @@ model SafetyFinding {
   source        String
   createdAt     DateTime       @default(now())
 
+  /// Acquittement professionnel. Tant qu'une alerte BLOCKING n'est pas
+  /// acquittée, l'écran de vente n'ouvre pas la zone des conseils : on ne vend
+  /// rien par-dessus une alerte non lue. L'horodatage et l'auteur sont
+  /// conservés — l'acquittement est un acte, pas un simple état d'affichage.
+  acknowledgedAt       DateTime?
+  acknowledgedByUserId String?
+
   analysisRun AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
 
   @@index([analysisRunId])
