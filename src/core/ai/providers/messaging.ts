@@ -31,4 +31,18 @@ export class NotConfiguredMessagingProvider implements MessagingProvider {
         "Le lien reste accessible via le QR code ou l'impression.",
     };
   }
+
+  async sendFollowUp(params: {
+    to: string;
+    subject: string;
+    body: string;
+  }): Promise<DeliveryOutcome> {
+    return {
+      status: "SIMULATED",
+      provider: this.info.id,
+      detail:
+        `Aucun service d'envoi n'est configuré. Le suivi destiné à ${params.to} n'a PAS été transmis. ` +
+        "Le rappel reste dans la liste de travail : il pourra être envoyé dès qu'un fournisseur sera branché.",
+    };
+  }
 }

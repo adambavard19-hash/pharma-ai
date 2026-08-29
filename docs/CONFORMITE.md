@@ -43,14 +43,18 @@ légale spécifique, hébergement agréé, analyse d'impact.
 
 ### Consentement
 
-- Cinq consentements distincts et indépendants : traitement des données
+- Six consentements distincts et indépendants : traitement des données
   personnelles, traitement des données de santé, réception de la fiche conseil,
-  communications e-mail, communications SMS.
+  réception des suivis de traitement, communications e-mail, communications SMS.
 - Chacun est **horodaté**, porte la méthode de recueil, l'auteur du recueil et
   la version du texte d'information présenté.
 - Chacun est **révocable** à tout moment depuis la fiche patient.
 - L'application **refuse** l'envoi de la fiche conseil sans consentement
   `ADVICE_SHARING` — le bouton est désactivé et le motif affiché.
+- Elle **refuse** de même tout suivi sans consentement `FOLLOW_UP_MESSAGE`, ou
+  après désinscription du patient. La règle est évaluée côté serveur au moment
+  de l'envoi, pas seulement à l'affichage de la liste : une désinscription
+  arrivée entre-temps est respectée.
 
 ### Droits des personnes
 
@@ -127,6 +131,25 @@ données **et** le stockage des fichiers d'ordonnance.
 - **Information des personnes** : mentions à rédiger et à faire valider.
 - **Sous-traitance** : contrats à établir avec chaque prestataire (hébergeur,
   fournisseur d'IA, service d'envoi).
+
+### 3.5 bis Messages de suivi patient — à faire valider
+
+Le module de suivi est construit et ses garde-fous sont appliqués par le code
+(consentement dédié, aucune donnée de santé dans le message, plafond de
+sollicitation, désinscription, envoi manuel signé). Cela ne rend pas la pratique
+conforme pour autant. Trois points relèvent d'un avis juridique :
+
+1. **Qualification du message.** Un suivi de traitement adressé par une officine
+   doit être qualifié au regard des règles encadrant la publicité relative aux
+   produits de santé et la prospection. La frontière entre accompagnement
+   thérapeutique et sollicitation commerciale doit être tranchée par écrit, et le
+   contenu des gabarits validé en conséquence.
+2. **Fournisseur d'envoi.** Aucun n'est branché à ce jour ; tout envoi est
+   journalisé `SIMULATED`. Le choix d'un prestataire suppose un contrat de
+   sous-traitance, un hébergement dans l'Union européenne et une analyse des
+   destinataires des journaux d'envoi.
+3. **Conservation.** La durée de vie des rappels envoyés et des traces d'envoi
+   doit être arrêtée avec le reste des durées (§ 4).
 
 ### 3.5 Transferts et fournisseurs d'IA
 

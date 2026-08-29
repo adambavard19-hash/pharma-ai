@@ -223,6 +223,26 @@ au pharmacien une accroche commerciale.
 la règle `digestive-tolerance-antibiotics` évalue la classe ATC, module la
 priorité selon l'âge, et se bloque en cas d'immunodépression déclarée.
 
+## 6 bis. Le suivi patient
+
+Le troisième pilier — faire revenir le patient — vit dans `src/core/followup`,
+au même titre que le moteur de conseil : une logique pure, testable, sans base
+ni framework.
+
+- **`templates.ts`** — les messages, figés dans le code. Ils ne reçoivent que
+  quatre variables : prénom, nom de l'officine, lien sécurisé, lien de
+  désinscription. Aucune donnée de santé ne peut donc entrer dans un message :
+  la contrainte est structurelle, pas déclarative, et des tests la vérifient.
+- **`eligibility.ts`** — le droit d'envoyer. Cinq conditions évaluées côté
+  serveur au moment de l'envoi : désinscription, consentement, contact, fiche à
+  partager, plafond de sollicitation. La liste de travail appelle la même
+  fonction pour afficher *pourquoi* une ligne n'est pas envoyable.
+
+Côté serveur, `services/followup.ts` orchestre ; il ne compose aucun texte.
+Un rappel est toujours adossé à un fait enregistré (`saleId`,
+`prescriptionId`) : c'est ce qui distingue un suivi d'un profilage. Et rien ne
+part sans clic — `sentByUserId` enregistre qui a envoyé.
+
 ### Le score est explicable
 
 Chaque recommandation conserve, dans `scoreBreakdown.explanation`, la liste

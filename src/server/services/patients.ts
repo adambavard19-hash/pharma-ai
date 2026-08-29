@@ -144,9 +144,14 @@ export async function recordInteraction(params: {
     | "DOCUMENT_GENERATED"
     | "DOCUMENT_VIEWED"
     | "SALE_RECORDED"
+    | "FOLLOW_UP_SCHEDULED"
+    | "FOLLOW_UP_SENT"
+    | "FOLLOW_UP_OPTED_OUT"
     | "NOTE";
   summary: string;
   metadata?: Record<string, unknown>;
+  /** L'action vient du patient lui-même (désinscription) : aucun auteur interne. */
+  byPatient?: boolean;
 }): Promise<void> {
   await prisma.patientInteraction.create({
     data: {
@@ -155,7 +160,9 @@ export async function recordInteraction(params: {
       type: params.type,
       summary: params.summary,
       metadata: (params.metadata ?? {}) as never,
-      userId: params.scope.userId,
+      // La désinscription est un acte du patient, pas d'un collaborateur :
+      // l'interaction est alors enregistrée sans auteur.
+      userId: params.byPatient ? null : params.scope.userId,
     },
   });
 }

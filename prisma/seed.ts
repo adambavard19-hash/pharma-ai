@@ -13,7 +13,7 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env", quiet: true });
 
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, type Prisma } from "../src/generated/prisma";
+import { PrismaClient, type Prisma, type ReminderReason } from "../src/generated/prisma";
 import { DEMO_DRUGS } from "./seed-data/drugs";
 import { DEMO_DISCLAIMER, DOCUMENT_DISCLAIMERS } from "../src/core/documents/types";
 import { DEMO_PRODUCTS } from "./seed-data/products";
@@ -49,6 +49,7 @@ function daysAgo(days: number, hour = 10, minute = 0): Date {
 async function reset() {
   console.log("→ Réinitialisation du jeu de démonstration…");
   // L'ordre respecte les contraintes de clés étrangères.
+  await prisma.reminder.deleteMany();
   await prisma.recommendationEvent.deleteMany();
   await prisma.saleLine.deleteMany();
   await prisma.sale.deleteMany();
@@ -479,6 +480,9 @@ async function main() {
 
     // Consentements : tous ne sont pas accordés, pour illustrer le garde-fou.
     const grantsAdvice = index % 5 !== 0;
+    // Le consentement au suivi est distinct et plus rare : c'est ce qui rend la
+    // liste de travail réaliste, avec des lignes non envoyables et leur motif.
+    const grantsFollowUp = index % 3 !== 0;
     await prisma.patientConsent.createMany({
       data: [
         {
@@ -502,6 +506,14 @@ async function main() {
           grantedAt: grantsAdvice ? patient.createdAt : null,
           revokedAt: grantsAdvice ? null : patient.createdAt,
           collectedByUserId: technician.id,
+        },
+        {
+          patientId: patient.id,
+          type: "FOLLOW_UP_MESSAGE",
+          granted: grantsFollowUp,
+          grantedAt: grantsFollowUp ? patient.createdAt : null,
+          revokedAt: grantsFollowUp ? null : patient.createdAt,
+          collectedByUserId: pharmacists[0].id,
         },
       ],
     });
@@ -532,6 +544,9 @@ async function main() {
 
   console.log("→ Ordonnances, analyses, conseils et ventes");
   await seedHistory({ pharmacy, products, patients, pharmacists, technician, owner });
+
+  console.log("→ Suivis patients");
+  await seedFollowUps({ pharmacy, pharmacists });
 
   console.log("→ Notifications");
   const lowStock = products.filter(
@@ -594,6 +609,7 @@ async function main() {
     ordonnances: await prisma.prescription.count(),
     recommandations: await prisma.recommendation.count(),
     ventes: await prisma.sale.count(),
+    suivis: await prisma.reminder.count(),
   };
 
   console.log("\n✓ Jeu de démonstration installé");
@@ -735,6 +751,84 @@ function counterScriptFor(
   return rule.counterScriptTemplate
     .replaceAll("{drug}", scenario.lines[0].drug)
     .replaceAll("{product}", productName);
+}
+
+/**
+ * Suivis de démonstration.
+ *
+ * On ne fabrique pas une liste parfaite : elle contient des lignes en retard,
+ * des lignes du jour, et des lignes non envoyables — consentement manquant,
+ * patient désinscrit, suivi trop récent. C'est ainsi que le pharmacien voit à
+ * quoi ressemblera vraiment sa journée, garde-fous compris.
+ */
+async function seedFollowUps(context: {
+  pharmacy: { id: string };
+  pharmacists: { id: string }[];
+}) {
+  const { pharmacy, pharmacists } = context;
+
+  // Un suivi n'a de sens que si une fiche existe : c'est elle que le lien ouvre.
+  const rawDocuments = await prisma.patientDocument.findMany({
+    where: { pharmacyId: pharmacy.id, patientId: { not: null } },
+    orderBy: { createdAt: "desc" },
+    take: 14,
+    select: { patientId: true, prescriptionId: true },
+    distinct: ["patientId"],
+  });
+  const documents = rawDocuments.flatMap((document) =>
+    document.patientId ? [{ ...document, patientId: document.patientId }] : [],
+  );
+
+  const PLAN: { templateKey: string; reason: ReminderReason; offsetDays: number }[] = [
+    { templateKey: "course-end", reason: "COURSE_END", offsetDays: -4 },
+    { templateKey: "tolerance-check", reason: "TOLERANCE_CHECK", offsetDays: -1 },
+    { templateKey: "course-end", reason: "COURSE_END", offsetDays: 0 },
+    { templateKey: "tolerance-check", reason: "TOLERANCE_CHECK", offsetDays: 0 },
+    { templateKey: "renewal", reason: "RENEWAL", offsetDays: 2 },
+    { templateKey: "course-end", reason: "COURSE_END", offsetDays: 5 },
+    { templateKey: "renewal", reason: "RENEWAL", offsetDays: 9 },
+  ];
+
+  for (const [index, document] of documents.entries()) {
+    const plan = PLAN[index % PLAN.length];
+    const dueAt = new Date();
+    dueAt.setDate(dueAt.getDate() + plan.offsetDays);
+    dueAt.setHours(9, 0, 0, 0);
+
+    // Quelques suivis déjà envoyés : ils arment le plafond anti-sollicitation
+    // sur ces patients, et la liste affiche alors le motif du blocage.
+    const alreadySent = index % 6 === 5;
+
+    await prisma.reminder.create({
+      data: {
+        pharmacyId: pharmacy.id,
+        patientId: document.patientId,
+        prescriptionId: document.prescriptionId,
+        reason: plan.reason,
+        templateKey: plan.templateKey,
+        dueAt: alreadySent ? daysAgo(6) : dueAt,
+        status: alreadySent ? "SENT" : "SCHEDULED",
+        sentAt: alreadySent ? daysAgo(6) : null,
+        sentByUserId: alreadySent ? pharmacists[0].id : null,
+        deliveryStatus: "SIMULATED",
+        detail: alreadySent
+          ? "Aucun service d'envoi n'est configuré : ce suivi n'a PAS été transmis."
+          : null,
+        createdByUserId: pharmacists[0].id,
+        isDemo: true,
+      },
+    });
+  }
+
+  // Un patient désinscrit, pour que le garde-fou soit visible dès la première
+  // ouverture de l'écran.
+  const optedOut = documents[1];
+  if (optedOut) {
+    await prisma.patient.update({
+      where: { id: optedOut.patientId },
+      data: { followUpOptOutAt: daysAgo(3), followUpOptOutToken: "demo-desinscription" },
+    });
+  }
 }
 
 async function seedHistory(context: {

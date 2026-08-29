@@ -54,6 +54,13 @@ export const PERMISSIONS = {
   DOCUMENT_GENERATE: "document:generate",
   DOCUMENT_SEND: "document:send",
 
+  // Suivi patient
+  FOLLOWUP_VIEW: "followup:view",
+  /// Programmer un rappel — adossé à une vente, jamais à un profil déduit.
+  FOLLOWUP_SCHEDULE: "followup:schedule",
+  /// Envoyer un suivi au patient. Aucun envoi n'est automatique.
+  FOLLOWUP_SEND: "followup:send",
+
   // Ventes
   SALE_VIEW: "sale:view",
   SALE_CREATE: "sale:create",
@@ -93,6 +100,9 @@ const PHARMACIST_PERMISSIONS: Permission[] = [
   PERMISSIONS.RECOMMENDATION_RULES_MANAGE,
   PERMISSIONS.DOCUMENT_GENERATE,
   PERMISSIONS.DOCUMENT_SEND,
+  PERMISSIONS.FOLLOWUP_VIEW,
+  PERMISSIONS.FOLLOWUP_SCHEDULE,
+  PERMISSIONS.FOLLOWUP_SEND,
   PERMISSIONS.SALE_VIEW,
   PERMISSIONS.SALE_CREATE,
   PERMISSIONS.ANALYTICS_VIEW,
@@ -110,6 +120,9 @@ const TECHNICIAN_PERMISSIONS: Permission[] = [
   PERMISSIONS.PRESCRIPTION_VIEW,
   PERMISSIONS.PRESCRIPTION_CREATE,
   PERMISSIONS.RECOMMENDATION_VIEW,
+  PERMISSIONS.FOLLOWUP_VIEW,
+  PERMISSIONS.FOLLOWUP_SCHEDULE,
+  PERMISSIONS.FOLLOWUP_SEND,
   PERMISSIONS.SALE_VIEW,
   PERMISSIONS.SALE_CREATE,
 ];
@@ -122,6 +135,7 @@ const STUDENT_PERMISSIONS: Permission[] = [
   PERMISSIONS.PRESCRIPTION_VIEW,
   PERMISSIONS.PRESCRIPTION_CREATE,
   PERMISSIONS.RECOMMENDATION_VIEW,
+  PERMISSIONS.FOLLOWUP_VIEW,
 ];
 
 const VIEWER_PERMISSIONS: Permission[] = [
@@ -183,6 +197,9 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [PERMISSIONS.RECOMMENDATION_RULES_MANAGE]: "Gérer les règles de conseil",
   [PERMISSIONS.DOCUMENT_GENERATE]: "Générer la fiche patient",
   [PERMISSIONS.DOCUMENT_SEND]: "Transmettre la fiche patient",
+  [PERMISSIONS.FOLLOWUP_VIEW]: "Voir les suivis à envoyer",
+  [PERMISSIONS.FOLLOWUP_SCHEDULE]: "Programmer un suivi patient",
+  [PERMISSIONS.FOLLOWUP_SEND]: "Envoyer un suivi au patient",
   [PERMISSIONS.SALE_VIEW]: "Voir les ventes",
   [PERMISSIONS.SALE_CREATE]: "Enregistrer une vente",
   [PERMISSIONS.ANALYTICS_VIEW]: "Voir les statistiques",

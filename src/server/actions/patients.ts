@@ -178,6 +178,7 @@ const consentSchema = z.object({
     "DATA_PROCESSING",
     "HEALTH_DATA",
     "ADVICE_SHARING",
+    "FOLLOW_UP_MESSAGE",
     "MARKETING_EMAIL",
     "MARKETING_SMS",
   ]),
@@ -227,6 +228,7 @@ export async function updateConsentAction(formData: FormData): Promise<ActionRes
   });
 
   revalidatePath(`/patients/${patientId}`);
+  revalidatePath("/suivis");
   return ok(null, granted ? "Consentement enregistré." : "Consentement retiré.");
 }
 

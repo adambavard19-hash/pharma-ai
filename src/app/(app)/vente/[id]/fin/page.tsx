@@ -11,6 +11,8 @@ import { PageHeader } from "@/components/ui/page";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { DocumentWorkspace } from "./document-workspace";
+import { FollowUpPanel } from "./follow-up-panel";
+import { FOLLOW_UP_TEMPLATES, findTemplate, proposedDueDate } from "@/core/followup";
 import type { DocumentContent } from "@/core/documents/types";
 
 export const metadata: Metadata = { title: "Fin de vente" };
@@ -32,9 +34,10 @@ export default async function DocumentPage({
           firstName: true,
           lastName: true,
           email: true,
+          followUpOptOutAt: true,
           consents: {
-            where: { type: "ADVICE_SHARING" },
-            select: { granted: true, revokedAt: true },
+            where: { type: { in: ["ADVICE_SHARING", "FOLLOW_UP_MESSAGE"] } },
+            select: { type: true, granted: true, revokedAt: true },
           },
         },
       },
@@ -43,6 +46,7 @@ export default async function DocumentPage({
         include: { product: { include: { stockItem: true } } },
         orderBy: { totalScore: "desc" },
       },
+      lines: { where: { status: "CONFIRMED" }, select: { durationDays: true } },
       documents: { orderBy: { createdAt: "desc" }, include: { deliveries: true } },
       sales: { select: { id: true, reference: true, attributedCents: true } },
     },
@@ -52,8 +56,39 @@ export default async function DocumentPage({
 
   const latestDocument = prescription.documents[0];
   const messaging = getMessagingProvider();
-  const consent = prescription.patient?.consents[0];
-  const hasAdviceConsent = Boolean(consent?.granted && !consent.revokedAt);
+  const consentOf = (type: string) => {
+    const consent = prescription.patient?.consents.find((c) => c.type === type);
+    return Boolean(consent?.granted && !consent.revokedAt);
+  };
+  const hasAdviceConsent = consentOf("ADVICE_SHARING");
+
+  // La fin de cure se calcule sur la durée réelle du traitement : proposer J+7
+  // sur une cure de trois mois n'aurait aucun sens.
+  const treatmentDurationDays = prescription.lines.reduce(
+    (max, line) => Math.max(max, line.durationDays ?? 0),
+    0,
+  );
+  const now = new Date();
+  const followUpOptions = FOLLOW_UP_TEMPLATES.filter(
+    (template) => template.key !== "custom" && template.key !== "seasonal",
+  ).map((template) => ({
+    templateKey: template.key,
+    label: template.label,
+    purpose: template.purpose,
+    dueAt: proposedDueDate(template, now, treatmentDurationDays).toISOString(),
+  }));
+
+  const scheduledReminders = prescription.patient
+    ? await prisma.reminder.findMany({
+        where: {
+          patientId: prescription.patient.id,
+          prescriptionId: prescription.id,
+          status: { in: ["SCHEDULED", "SNOOZED", "SENT"] },
+        },
+        orderBy: { dueAt: "asc" },
+        select: { templateKey: true, dueAt: true },
+      })
+    : [];
 
   return (
     <div className="space-y-6">
@@ -123,6 +158,21 @@ export default async function DocumentPage({
           reference: sale.reference,
           attributedCents: sale.attributedCents,
         }))}
+      />
+
+      <FollowUpPanel
+        patientId={prescription.patient?.id ?? null}
+        prescriptionId={prescription.id}
+        saleId={prescription.sales[0]?.id ?? null}
+        options={followUpOptions}
+        hasConsent={consentOf("FOLLOW_UP_MESSAGE")}
+        optedOut={Boolean(prescription.patient?.followUpOptOutAt)}
+        scheduled={scheduledReminders.map((reminder) => ({
+          templateLabel: findTemplate(reminder.templateKey)?.label ?? reminder.templateKey,
+          dueAt: reminder.dueAt.toISOString(),
+        }))}
+        canSchedule={session.permissions.has(PERMISSIONS.FOLLOWUP_SCHEDULE)}
+        canUpdateConsent={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
       />
     </div>
   );

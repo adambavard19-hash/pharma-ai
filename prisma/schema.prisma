@@ -68,6 +68,11 @@ model Pharmacy {
   /// Paramètres officinaux (voir src/config/pharmacy-settings.ts pour le schéma Zod).
   settings    Json    @default("{}")
 
+  /// Nombre de jours minimum entre deux suivis adressés au même patient.
+  /// Appliqué côté serveur, jamais seulement à l'écran : l'objectif n'est pas
+  /// de spammer le patient.
+  followUpMinIntervalDays Int @default(30)
+
   /// Marque le jeu de données de démonstration. Jamais vrai en production réelle.
   isDemo      Boolean @default(false)
   isActive    Boolean @default(true)
@@ -78,6 +83,7 @@ model Pharmacy {
   organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships     Membership[]
   patients        Patient[]
+  reminders       Reminder[]
   products        Product[]
   stockItems      StockItem[]
   stockMovements  StockMovement[]
@@ -358,6 +364,12 @@ model Patient {
   /// Note commerciale, non médicale (préférences d'achat, langue...).
   commercialNotes String?
 
+  /// Jeton de désinscription des suivis, porté par chaque message envoyé.
+  /// Il ne donne accès à rien d'autre : il coupe les rappels, sans exposer la
+  /// fiche ni toucher au dossier de soin, qui relève d'une autre obligation.
+  followUpOptOutToken String?  @unique
+  followUpOptOutAt    DateTime?
+
   isDemo     Boolean   @default(false)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -373,6 +385,7 @@ model Patient {
   documents     PatientDocument[]
   sales         Sale[]
   interactions  PatientInteraction[]
+  reminders     Reminder[]
 
   @@unique([pharmacyId, reference])
   @@index([pharmacyId, lastName])
@@ -413,6 +426,11 @@ enum ConsentType {
   DATA_PROCESSING     // Traitement des données personnelles
   HEALTH_DATA         // Traitement des données de santé
   ADVICE_SHARING      // Réception de la fiche conseil
+  /// Réception des suivis de traitement. Volontairement distinct des
+  /// consentements marketing : un suivi thérapeutique n'est pas une offre
+  /// commerciale, et les confondre reviendrait soit à bloquer un suivi
+  /// légitime, soit à faire passer de la promotion pour du soin.
+  FOLLOW_UP_MESSAGE
   MARKETING_EMAIL
   MARKETING_SMS
 }
@@ -443,6 +461,9 @@ enum InteractionType {
   DOCUMENT_GENERATED
   DOCUMENT_VIEWED
   SALE_RECORDED
+  FOLLOW_UP_SCHEDULED
+  FOLLOW_UP_SENT
+  FOLLOW_UP_OPTED_OUT
   NOTE
 }
 
@@ -1114,6 +1135,83 @@ model DocumentDelivery {
 
   @@index([documentId])
   @@map("document_deliveries")
+}
+
+// ===========================================================================
+// SUIVI PATIENT
+// ===========================================================================
+
+enum ReminderReason {
+  /// Fin de cure : on reprend contact quand le traitement se termine.
+  COURSE_END
+  /// Renouvellement d'un traitement chronique.
+  RENEWAL
+  /// Contrôle de tolérance en début de traitement.
+  TOLERANCE_CHECK
+  /// Rappel saisonnier adossé à un achat réel.
+  SEASONAL
+  CUSTOM
+}
+
+enum ReminderStatus {
+  SCHEDULED
+  SENT
+  SNOOZED
+  CANCELLED
+  DONE
+}
+
+/// Un suivi patient à envoyer.
+///
+/// Deux garanties tiennent dans ce modèle. D'abord, un rappel est TOUJOURS
+/// adossé à un fait enregistré — une vente, une ordonnance — jamais à un profil
+/// déduit ni à un score d'appétence : `saleId` / `prescriptionId` sont la trace
+/// de ce fait. Ensuite, rien ne part tout seul : un rappel arrive à échéance
+/// dans une liste de travail, et c'est un pharmacien qui l'envoie, ce que
+/// `sentByUserId` enregistre.
+///
+/// Le contenu du message ne vit pas ici : il est produit par un gabarit figé
+/// dans le code (src/core/followup/templates.ts), relu et versionné, plutôt que
+/// par un champ libre où une justification médicale pourrait être improvisée.
+model Reminder {
+  id         String @id @default(cuid())
+  pharmacyId String
+  patientId  String
+
+  /// Le fait générateur. Conservés comme références de traçabilité.
+  saleId           String?
+  prescriptionId   String?
+  recommendationId String?
+
+  reason      ReminderReason
+  /// Clé du gabarit de message (cf. src/core/followup/templates.ts).
+  templateKey String
+  dueAt       DateTime
+  status      ReminderStatus @default(SCHEDULED)
+
+  channel        DeliveryChannel @default(EMAIL)
+  deliveryStatus DeliveryStatus  @default(SIMULATED)
+  /// Destinataire masqué dans les journaux (ex. j***@exemple.fr).
+  targetMasked   String?
+  provider       String?
+  detail         String?
+
+  sentAt          DateTime?
+  sentByUserId    String?
+  createdByUserId String?
+  /// Note interne du pharmacien. Jamais transmise au patient.
+  note            String?
+
+  isDemo    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, status, dueAt])
+  @@index([patientId, dueAt])
+  @@map("reminders")
 }
 
 // ===========================================================================

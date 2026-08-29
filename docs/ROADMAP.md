@@ -29,7 +29,7 @@ la vision, avec une architecture permettant d'en faire un vrai produit.
 
 **En complément** : centre de notifications, recherche globale (⌘K), règles de
 conseil de l'officine, journal d'audit, console d'administration éditeur,
-modèle d'abonnement, 73 tests sur les fonctions critiques.
+modèle d'abonnement, 100 tests sur les fonctions critiques.
 
 ---
 
@@ -49,7 +49,7 @@ la surface, plus l'ajout du suivi patient.
 | 1 | Écran de vente unique — vérification, sécurité et conseils fusionnés | ✅ |
 | 2 | `counterScript` : la phrase à dire au patient, portée par la règle de conseil | ✅ |
 | 3 | Accueil comptoir — un bouton, les chiffres en second plan | ✅ |
-| 4 | Suivis et rappels — modèle `Reminder`, consentement dédié, désinscription | à faire |
+| 4 | Suivis et rappels — modèle `Reminder`, consentement dédié, désinscription | ✅ |
 | 5 | Fusion Produits + Stocks, regroupement des Paramètres | à faire |
 | 6 | Jeu de démonstration, documentation, mesure du parcours | à faire |
 

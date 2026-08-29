@@ -105,6 +105,17 @@ export interface MessagingProvider {
     pharmacyName: string;
     url: string;
   }): Promise<DeliveryOutcome>;
+  /**
+   * Envoi d'un suivi patient.
+   *
+   * Le sujet et le corps sont produits par un gabarit figé côté domaine : le
+   * fournisseur ne compose rien, il transporte.
+   */
+  sendFollowUp(params: {
+    to: string;
+    subject: string;
+    body: string;
+  }): Promise<DeliveryOutcome>;
 }
 
 // --- Génération vidéo (module futur) --------------------------------------

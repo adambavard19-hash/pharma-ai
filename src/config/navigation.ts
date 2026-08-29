@@ -69,7 +69,7 @@ export const NAVIGATION: NavItem[] = [
     href: "/suivis",
     label: "Suivis",
     icon: CalendarClock,
-    permission: PERMISSIONS.PATIENT_VIEW,
+    permission: PERMISSIONS.FOLLOWUP_VIEW,
     match: ["/suivis"],
     description: "Les patients à recontacter aujourd'hui",
   },

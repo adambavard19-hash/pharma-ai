@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Boxes, Euro, ScanLine, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarClock, Euro, ScanLine, Sparkles } from "lucide-react";
 import { requireSession } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { prisma } from "@/server/db/client";
 import { resolvePeriod } from "@/core/analytics/periods";
 import { getRecommendationFunnel, getRevenueSummary } from "@/server/services/analytics";
+import { countDueReminders } from "@/server/services/followup";
 import { formatCents, formatPercent, formatRelative } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,13 +37,13 @@ export default async function CounterHomePage() {
   const { scope } = session;
 
   const canSeeRevenue = session.permissions.has(PERMISSIONS.ANALYTICS_VIEW);
-  const canSeeStock = session.permissions.has(PERMISSIONS.STOCK_VIEW);
+  const canSeeFollowUps = session.permissions.has(PERMISSIONS.FOLLOWUP_VIEW);
   const canScan = session.permissions.has(PERMISSIONS.PRESCRIPTION_CREATE);
 
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
-  const [recent, openCount, week, funnel, outOfStock] = await Promise.all([
+  const [recent, openCount, week, funnel, dueReminders] = await Promise.all([
     prisma.prescription.findMany({
       where: { pharmacyId: scope.pharmacyId, deletedAt: null, createdAt: { gte: startOfDay } },
       orderBy: { updatedAt: "desc" },
@@ -66,15 +67,7 @@ export default async function CounterHomePage() {
     }),
     canSeeRevenue ? getRevenueSummary(scope, resolvePeriod("week")) : null,
     canSeeRevenue ? getRecommendationFunnel(scope, resolvePeriod("month")) : null,
-    canSeeStock
-      ? prisma.stockItem.count({
-          where: {
-            pharmacyId: scope.pharmacyId,
-            quantity: 0,
-            product: { isActive: true, deletedAt: null },
-          },
-        })
-      : null,
+    canSeeFollowUps ? countDueReminders(scope) : null,
   ]);
 
   return (
@@ -159,7 +152,7 @@ export default async function CounterHomePage() {
         </section>
       )}
 
-      {(canSeeRevenue || canSeeStock) && (
+      {(canSeeRevenue || canSeeFollowUps) && (
         <section className="grid gap-3 sm:grid-cols-3">
           {funnel && (
             <MiniStat
@@ -179,24 +172,18 @@ export default async function CounterHomePage() {
               detail="cette semaine, via Pharma.ai"
             />
           )}
-          {outOfStock !== null && (
+          {dueReminders !== null && (
             <MiniStat
-              href="/stocks"
-              icon={
-                outOfStock > 0 ? (
-                  <AlertTriangle className="size-4" />
-                ) : (
-                  <Boxes className="size-4" />
-                )
-              }
-              label="Ruptures"
-              value={String(outOfStock)}
+              href="/suivis"
+              icon={<CalendarClock className="size-4" />}
+              label="À rappeler"
+              value={String(dueReminders)}
               detail={
-                outOfStock > 0
-                  ? "références non conseillables aujourd'hui"
-                  : "tout le catalogue est conseillable"
+                dueReminders > 0
+                  ? "patients à recontacter aujourd'hui"
+                  : "aucun suivi à envoyer"
               }
-              tone={outOfStock > 0 ? "warning" : "neutral"}
+              tone={dueReminders > 0 ? "warning" : "neutral"}
             />
           )}
         </section>
