@@ -73,7 +73,8 @@ export async function recordSaleAction(
     }
 
     revalidatePath("/ventes");
-    revalidatePath("/tableau-de-bord");
+    revalidatePath("/");
+    revalidatePath("/performance");
     if (input.prescriptionId) revalidatePath(`/vente/${input.prescriptionId}`);
 
     return ok(

@@ -96,7 +96,7 @@ export const OFF_MENU_DESTINATIONS: {
   reachableFrom: string;
 }[] = [
   {
-    href: "/tableau-de-bord",
+    href: "/performance",
     label: "Performance de l'officine",
     reachableFrom: "les chiffres de l'accueil",
   },

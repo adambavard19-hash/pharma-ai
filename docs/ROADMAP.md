@@ -48,7 +48,7 @@ la surface, plus l'ajout du suivi patient.
 | 0 | Navigation à cinq entrées, plafond de 3 conseils, URL `/vente` posées, anciennes adresses redirigées | ✅ |
 | 1 | Écran de vente unique — vérification, sécurité et conseils fusionnés | ✅ |
 | 2 | `counterScript` : la phrase à dire au patient, portée par la règle de conseil | ✅ |
-| 3 | Accueil comptoir — un bouton, les chiffres en second plan | à faire |
+| 3 | Accueil comptoir — un bouton, les chiffres en second plan | ✅ |
 | 4 | Suivis et rappels — modèle `Reminder`, consentement dédié, désinscription | à faire |
 | 5 | Fusion Produits + Stocks, regroupement des Paramètres | à faire |
 | 6 | Jeu de démonstration, documentation, mesure du parcours | à faire |

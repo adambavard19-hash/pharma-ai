@@ -104,7 +104,7 @@ export async function loginAction(
     userId: user.id,
   });
 
-  redirect("/tableau-de-bord");
+  redirect("/");
 }
 
 export async function logoutAction(): Promise<void> {
@@ -137,7 +137,7 @@ export async function switchPharmacyAction(formData: FormData): Promise<void> {
     userId: session.user.id,
   });
 
-  redirect("/tableau-de-bord");
+  redirect("/");
 }
 
 /** Connexion rapide au compte de démonstration, uniquement si activé. */
@@ -174,5 +174,5 @@ export async function demoLoginAction(formData: FormData): Promise<void> {
     metadata: { mode: "demo" },
   });
 
-  redirect("/tableau-de-bord");
+  redirect("/");
 }
