@@ -129,7 +129,7 @@ export default async function PatientDetailPage({
         <div className="flex flex-wrap gap-2">
           {session.permissions.has(PERMISSIONS.PRESCRIPTION_CREATE) && (
             <Button asChild leadingIcon={<ClipboardList className="size-[18px]" />}>
-              <Link href={`/ordonnances/nouvelle?patient=${patient.id}`}>
+              <Link href={`/vente/nouvelle?patient=${patient.id}`}>
                 Nouvelle ordonnance
               </Link>
             </Button>

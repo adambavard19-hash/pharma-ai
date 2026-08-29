@@ -70,7 +70,7 @@ export default async function PrescriptionsPage({
         actions={
           session.permissions.has(PERMISSIONS.PRESCRIPTION_CREATE) ? (
             <Button asChild size="lg" leadingIcon={<Plus className="size-[18px]" />}>
-              <Link href="/ordonnances/nouvelle">Nouvelle ordonnance</Link>
+              <Link href="/vente/nouvelle">Nouvelle vente</Link>
             </Button>
           ) : null
         }
@@ -95,7 +95,7 @@ export default async function PrescriptionsPage({
             action={
               session.permissions.has(PERMISSIONS.PRESCRIPTION_CREATE) ? (
                 <Button asChild leadingIcon={<Plus className="size-4" />}>
-                  <Link href="/ordonnances/nouvelle">Nouvelle ordonnance</Link>
+                  <Link href="/vente/nouvelle">Nouvelle vente</Link>
                 </Button>
               ) : null
             }

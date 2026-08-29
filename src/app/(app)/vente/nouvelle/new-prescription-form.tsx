@@ -79,7 +79,7 @@ export function NewPrescriptionForm({
   const router = useRouter();
 
   useEffect(() => {
-    if (state?.ok) router.push(`/ordonnances/${state.data.prescriptionId}/verification`);
+    if (state?.ok) router.push(`/vente/${state.data.prescriptionId}`);
   }, [state, router]);
 
   const activeSource = SOURCES.find((item) => item.value === source)!;

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus, X } from "lucide-react";
-import { NAVIGATION } from "@/config/navigation";
+import { X } from "lucide-react";
+import { NAVIGATION, isNavItemActive, type NavItem } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import { PharmaWordmark } from "./logo";
 import { Button } from "@/components/ui/button";
@@ -12,19 +12,16 @@ import { useMobileNav } from "./mobile-nav";
 export function Sidebar({
   permissions,
   pharmacyName,
-  canCreatePrescription,
 }: {
   permissions: string[];
   pharmacyName: string;
-  canCreatePrescription: boolean;
 }) {
   const { open: mobileOpen, closeNav } = useMobileNav();
   const granted = new Set(permissions);
 
-  const groups = NAVIGATION.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => granted.has(item.permission)),
-  })).filter((group) => group.items.length > 0);
+  const items = NAVIGATION.filter((item) => granted.has(item.permission));
+  const primary = items.find((item) => item.primary);
+  const secondary = items.filter((item) => !item.primary);
 
   return (
     <>
@@ -45,7 +42,7 @@ export function Sidebar({
         aria-label="Navigation principale"
       >
         <div className="flex items-center justify-between px-4 py-4">
-          <Link href="/tableau-de-bord" className="min-w-0 rounded-md">
+          <Link href="/" className="min-w-0 rounded-md">
             <PharmaWordmark subtitle={pharmacyName} />
           </Link>
           <button
@@ -58,39 +55,24 @@ export function Sidebar({
           </button>
         </div>
 
-        {canCreatePrescription && (
-          <div className="px-3 pb-3">
+        {primary && (
+          <div className="px-3 pb-4">
             <Button
               asChild
               size="lg"
               className="w-full justify-start shadow-sm"
-              leadingIcon={<Plus className="size-[18px]" />}
+              leadingIcon={<primary.icon className="size-[18px]" />}
             >
-              <Link href="/ordonnances/nouvelle" onClick={closeNav}>
-                Nouvelle ordonnance
+              <Link href={primary.href} onClick={closeNav}>
+                {primary.label}
               </Link>
             </Button>
           </div>
         )}
 
-        <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 pb-4">
-          {groups.map((group) => (
-            <div key={group.id} className="space-y-0.5">
-              {group.label && (
-                <p className="px-2.5 pt-1 pb-1.5 text-[10.5px] font-semibold tracking-[0.06em] text-text-tertiary uppercase">
-                  {group.label}
-                </p>
-              )}
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  icon={<item.icon className="size-[17px]" />}
-                  onNavigate={closeNav}
-                />
-              ))}
-            </div>
+        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
+          {secondary.map((item) => (
+            <NavLink key={item.href} item={item} onNavigate={closeNav} />
           ))}
         </nav>
 
@@ -106,23 +88,14 @@ export function Sidebar({
   );
 }
 
-function NavLink({
-  href,
-  label,
-  icon,
-  onNavigate,
-}: {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-  onNavigate: () => void;
-}) {
+function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }) {
   const pathname = usePathname();
-  const isActive = pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = isNavItemActive(item, pathname);
+  const Icon = item.icon;
 
   return (
     <Link
-      href={href}
+      href={item.href}
       onClick={onNavigate}
       aria-current={isActive ? "page" : undefined}
       className={cn(
@@ -133,9 +106,9 @@ function NavLink({
       )}
     >
       <span className={cn(isActive ? "text-brand-600 dark:text-brand-400" : "text-text-tertiary")}>
-        {icon}
+        <Icon className="size-[17px]" />
       </span>
-      {label}
+      {item.label}
     </Link>
   );
 }

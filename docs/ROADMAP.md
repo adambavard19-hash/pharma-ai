@@ -29,7 +29,34 @@ la vision, avec une architecture permettant d'en faire un vrai produit.
 
 **En complément** : centre de notifications, recherche globale (⌘K), règles de
 conseil de l'officine, journal d'audit, console d'administration éditeur,
-modèle d'abonnement, 44 tests sur les fonctions critiques.
+modèle d'abonnement, 45 tests sur les fonctions critiques.
+
+---
+
+## Refonte « copilote de comptoir » 🚧 *en cours*
+
+Le MVP savait tout faire, en onze entrées de menu et quatre écrans successifs :
+la carte d'un ERP, pas le travail d'un pharmacien qui reçoit une ordonnance et
+dispose d'une minute. La refonte replie l'application derrière un seul geste —
+scanner — et ajoute le pilier qui manquait : le retour du patient.
+
+Le moteur, la base et la couche serveur ne sont pas repris ; ce qui change est
+la surface, plus l'ajout du suivi patient.
+
+| Lot | Contenu | État |
+|---|---|---|
+| 0 | Navigation à cinq entrées, plafond de 3 conseils, URL `/vente` posées, anciennes adresses redirigées | ✅ |
+| 1 | Écran de vente unique — vérification, sécurité et conseils fusionnés | à faire |
+| 2 | `counterScript` : la phrase à dire au patient, portée par la règle de conseil | à faire |
+| 3 | Accueil comptoir — un bouton, les chiffres en second plan | à faire |
+| 4 | Suivis et rappels — modèle `Reminder`, consentement dédié, désinscription | à faire |
+| 5 | Fusion Produits + Stocks, regroupement des Paramètres | à faire |
+| 6 | Jeu de démonstration, documentation, mesure du parcours | à faire |
+
+**Règles tenues pendant toute la refonte** : retirer du menu n'est pas
+supprimer (aucune route cassée, aucune donnée perdue) ; chaque lot se termine
+sur une application qui compile, passe ses tests et reste utilisable ; aucun
+écran ne montre une fonctionnalité qui n'existe pas.
 
 ---
 

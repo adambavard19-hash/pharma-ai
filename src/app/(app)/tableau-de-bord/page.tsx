@@ -110,7 +110,7 @@ export default async function DashboardPage() {
         actions={
           session.permissions.has(PERMISSIONS.PRESCRIPTION_CREATE) ? (
             <Button asChild size="lg" leadingIcon={<Plus className="size-[18px]" />}>
-              <Link href="/ordonnances/nouvelle">Nouvelle ordonnance</Link>
+              <Link href="/vente/nouvelle">Nouvelle vente</Link>
             </Button>
           ) : null
         }

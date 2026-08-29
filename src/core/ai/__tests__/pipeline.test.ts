@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAX_RECOMMENDATIONS_PER_PRESCRIPTION } from "@/config/constants";
 import { runAnalysisPipeline, type PipelineInput } from "../pipeline";
 import { drug, patient, product, rule } from "./fixtures";
 import type { DrugKnowledge, PipelineStageName } from "../types";
@@ -173,6 +174,21 @@ describe("pipeline — garde-fous", () => {
       buildInput({ catalog, maxRecommendations: 2 }),
     );
     expect(result.recommendations.length).toBeLessThanOrEqual(2);
+  });
+
+  /**
+   * Le plafond par défaut est une décision produit, pas un réglage : au
+   * comptoir, au-delà de trois propositions le pharmacien ne choisit plus, il
+   * survole. Le test empêche qu'on le desserre sans s'en apercevoir.
+   */
+  it("ne propose jamais plus de trois conseils par défaut", () => {
+    const catalog = Array.from({ length: 12 }, (_, index) =>
+      product({ id: `p${index}`, reference: `REF-${index}` }),
+    );
+    const result = runAnalysisPipeline(buildInput({ catalog }));
+
+    expect(MAX_RECOMMENDATIONS_PER_PRESCRIPTION).toBe(3);
+    expect(result.recommendations.length).toBeLessThanOrEqual(3);
   });
 });
 

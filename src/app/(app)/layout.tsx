@@ -6,7 +6,6 @@ import { Sidebar } from "@/components/app/sidebar";
 import { Topbar } from "@/components/app/topbar";
 import { DemoBanner } from "@/components/app/demo-banner";
 import { MobileNavProvider } from "@/components/app/mobile-nav";
-import { PERMISSIONS } from "@/server/rbac/permissions";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
@@ -25,7 +24,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <Sidebar
           permissions={[...session.permissions]}
           pharmacyName={session.pharmacy.name}
-          canCreatePrescription={session.permissions.has(PERMISSIONS.PRESCRIPTION_CREATE)}
         />
 
         <div className="lg:pl-[248px]">

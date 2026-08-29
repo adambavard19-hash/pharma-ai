@@ -30,8 +30,14 @@ export const OCR_REVIEW_THRESHOLD = 0.85;
 /** Score minimal pour qu'une recommandation soit proposée au pharmacien. */
 export const RECOMMENDATION_MIN_SCORE = 0.35;
 
-/** Nombre maximal de recommandations proposées pour une ordonnance. */
-export const MAX_RECOMMENDATIONS_PER_PRESCRIPTION = 6;
+/**
+ * Nombre maximal de recommandations proposées pour une ordonnance.
+ *
+ * Trois, et pas davantage : au comptoir, le pharmacien dispose de quelques
+ * secondes. Au-delà de trois propositions il ne choisit plus, il survole — et
+ * une liste survolée ne produit ni bon conseil ni vente pertinente.
+ */
+export const MAX_RECOMMENDATIONS_PER_PRESCRIPTION = 3;
 
 export const CURRENCY = "EUR";
 export const LOCALE = "fr-FR";
