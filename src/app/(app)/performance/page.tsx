@@ -284,7 +284,7 @@ export default async function PerformancePage() {
             description="Produits en rupture ou proches du seuil d'alerte."
             action={
               <Button asChild variant="ghost" size="sm">
-                <Link href="/stocks">Stocks</Link>
+                <Link href="/stock">Stock</Link>
               </Button>
             }
           />
@@ -302,7 +302,7 @@ export default async function PerformancePage() {
                   return (
                     <li key={item.id}>
                       <Link
-                        href={`/produits/${item.product.id}`}
+                        href={`/stock/${item.product.id}`}
                         className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-sunken"
                       >
                         <span className="min-w-0 flex-1">

@@ -483,7 +483,7 @@ export async function createPharmacyRuleAction(
     metadata: { type, productId, category },
   });
 
-  revalidatePath("/conseils");
+  revalidatePath("/parametres/regles");
   return ok(null, "Règle enregistrée. Elle s'appliquera aux prochaines analyses.");
 }
 
@@ -508,6 +508,6 @@ export async function deletePharmacyRuleAction(ruleId: string): Promise<ActionRe
     userId: session.scope.userId,
   });
 
-  revalidatePath("/conseils");
+  revalidatePath("/parametres/regles");
   return ok(null, "Règle supprimée.");
 }

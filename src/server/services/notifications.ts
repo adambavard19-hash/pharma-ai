@@ -104,7 +104,7 @@ export async function refreshStockNotifications(pharmacyId: string): Promise<voi
       body: isOut
         ? `${item.product.name} est en rupture. Il ne sera plus proposé en conseil.`
         : `${item.product.name} : ${item.quantity} unité(s) restante(s), seuil d'alerte à ${item.alertThreshold}.`,
-      linkUrl: `/produits/${item.productId}`,
+      linkUrl: `/stock/${item.productId}`,
       metadata: { productId: item.productId, quantity: item.quantity },
     });
   }

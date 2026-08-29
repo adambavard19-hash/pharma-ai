@@ -10,21 +10,45 @@ export type TabItem = {
   label: string;
   count?: number;
   icon?: ReactNode;
+  /**
+   * Onglet qui mène à une autre adresse plutôt qu'à un paramètre d'URL.
+   * Utile quand une section est assez lourde pour mériter sa propre route mais
+   * appartient visuellement au même écran.
+   */
+  href?: string;
 };
 
-/** Onglets pilotés par l'URL : l'état est partageable et survit au rechargement. */
+/**
+ * Onglets pilotés par l'URL : l'état est partageable et survit au rechargement.
+ *
+ * Un même jeu d'onglets peut mêler des vues d'une même page (paramètre `onglet`)
+ * et des sections qui vivent sur leur propre route (`href`) — d'où `basePath`,
+ * qui indique où ramènent les premières quand on se trouve sur les secondes.
+ */
 export function LinkTabs({
   items,
   paramName = "onglet",
+  basePath,
   className,
 }: {
   items: TabItem[];
   paramName?: string;
+  basePath?: string;
   className?: string;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const active = searchParams.get(paramName) ?? items[0]?.key;
+  const base = basePath ?? pathname;
+  const defaultKey = items.find((item) => !item.href)?.key;
+
+  const routed = items.find(
+    (item) => item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`)),
+  );
+  const active = routed
+    ? routed.key
+    : pathname === base
+      ? (searchParams.get(paramName) ?? defaultKey)
+      : defaultKey;
 
   return (
     <div
@@ -32,16 +56,17 @@ export function LinkTabs({
       role="tablist"
     >
       {items.map((item) => {
-        const params = new URLSearchParams(searchParams.toString());
-        if (item.key === items[0]?.key) params.delete(paramName);
+        const params = new URLSearchParams(routed ? "" : searchParams.toString());
+        if (item.key === defaultKey) params.delete(paramName);
         else params.set(paramName, item.key);
         const query = params.toString();
         const isActive = active === item.key;
+        const href = item.href ?? `${base}${query ? `?${query}` : ""}`;
 
         return (
           <Link
             key={item.key}
-            href={`${pathname}${query ? `?${query}` : ""}`}
+            href={href}
             scroll={false}
             role="tab"
             aria-selected={isActive}

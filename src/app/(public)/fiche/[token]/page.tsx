@@ -4,7 +4,6 @@ import { PatientDocument } from "@/components/document/patient-document";
 import { getDocumentByToken, recordDocumentView } from "@/server/services/documents";
 import type { DocumentContent } from "@/core/documents/types";
 import { PrintButton } from "./print-button";
-import { VideoPlaceholder } from "./video-placeholder";
 
 export const metadata: Metadata = {
   title: "Votre fiche conseil",
@@ -49,10 +48,6 @@ export default async function PublicDocumentPage({
 
         <div className="rounded-2xl bg-white p-6 shadow-lg sm:p-10 print:rounded-none print:p-0 print:shadow-none dark:bg-ink-900">
           <PatientDocument content={content} />
-        </div>
-
-        <div className="no-print mt-4">
-          <VideoPlaceholder />
         </div>
 
         <p className="no-print mt-6 text-center text-[11.5px] leading-5 text-text-tertiary">

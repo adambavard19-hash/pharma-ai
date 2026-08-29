@@ -147,7 +147,7 @@ export async function globalSearch(
               title: product.name,
               subtitle: product.brand ?? product.reference,
               badge: formatCents(product.salePriceCents),
-              href: `/produits/${product.id}`,
+              href: `/stock/${product.id}`,
             });
           }
         }),
@@ -180,7 +180,7 @@ export async function globalSearch(
               title: `${membership.user.firstName} ${membership.user.lastName}`,
               subtitle: membership.user.email,
               badge: null,
-              href: `/equipe#${membership.user.id}`,
+              href: `/parametres/equipe#${membership.user.id}`,
             });
           }
         }),

@@ -50,7 +50,7 @@ la surface, plus l'ajout du suivi patient.
 | 2 | `counterScript` : la phrase à dire au patient, portée par la règle de conseil | ✅ |
 | 3 | Accueil comptoir — un bouton, les chiffres en second plan | ✅ |
 | 4 | Suivis et rappels — modèle `Reminder`, consentement dédié, désinscription | ✅ |
-| 5 | Fusion Produits + Stocks, regroupement des Paramètres | à faire |
+| 5 | Fusion Produits + Stocks, regroupement des Paramètres | ✅ |
 | 6 | Jeu de démonstration, documentation, mesure du parcours | à faire |
 
 **Règles tenues pendant toute la refonte** : retirer du menu n'est pas

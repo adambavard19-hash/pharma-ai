@@ -121,8 +121,8 @@ export async function saveProductAction(
       userId: scope.userId,
     });
 
-    revalidatePath(`/produits/${input.id}`);
-    revalidatePath("/produits");
+    revalidatePath(`/stock/${input.id}`);
+    revalidatePath("/stock");
     return ok({ productId: input.id }, "Produit mis à jour.");
   }
 
@@ -165,7 +165,7 @@ export async function saveProductAction(
   });
 
   await refreshStockNotifications(scope.pharmacyId);
-  revalidatePath("/produits");
+  revalidatePath("/stock");
   return ok({ productId: product.id }, "Produit créé.");
 }
 
@@ -211,8 +211,8 @@ export async function adjustStockAction(
   });
 
   await refreshStockNotifications(session.scope.pharmacyId);
-  revalidatePath("/stocks");
-  revalidatePath(`/produits/${productId}`);
+  revalidatePath("/stock");
+  revalidatePath(`/stock/${productId}`);
   return ok(result, `Stock mis à jour : ${result.quantityAfter} unité(s).`);
 }
 
@@ -242,7 +242,7 @@ export async function deleteProductAction(productId: string): Promise<ActionResu
     metadata: { name: product.name },
   });
 
-  revalidatePath("/produits");
+  revalidatePath("/stock");
   return ok(null, "Produit retiré du catalogue.");
 }
 
@@ -386,7 +386,7 @@ export async function importProductsAction(
     severity: errors.length > 0 ? "WARNING" : "SUCCESS",
     title: "Import du catalogue terminé",
     body: `${created} création(s), ${updated} mise(s) à jour, ${errors.length} erreur(s) sur ${rows.length} ligne(s).`,
-    linkUrl: "/produits",
+    linkUrl: "/stock?onglet=catalogue",
   });
 
   await recordAudit({
@@ -399,7 +399,7 @@ export async function importProductsAction(
   });
 
   await refreshStockNotifications(scope.pharmacyId);
-  revalidatePath("/produits");
+  revalidatePath("/stock");
 
   return ok(
     { created, updated, errors: errors.length },

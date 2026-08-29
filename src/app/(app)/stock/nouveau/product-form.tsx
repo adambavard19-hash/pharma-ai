@@ -42,7 +42,7 @@ export function ProductForm({ product }: { product?: ProductInput }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (state?.ok) router.push(`/produits/${state.data.productId}`);
+    if (state?.ok) router.push(`/stock/${state.data.productId}`);
   }, [state, router]);
 
   const fieldErrors = state && !state.ok ? (state.fieldErrors ?? {}) : {};

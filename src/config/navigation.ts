@@ -58,11 +58,11 @@ export const NAVIGATION: NavItem[] = [
     description: "Fiches, historique et consentements",
   },
   {
-    href: "/stocks",
+    href: "/stock",
     label: "Stock",
     icon: Boxes,
     permission: PERMISSIONS.STOCK_VIEW,
-    match: ["/stocks", "/produits"],
+    match: ["/stock", "/stocks", "/produits"],
     description: "Ce qui est en rayon — et ce qui manque",
   },
   {
@@ -89,6 +89,9 @@ export const NAVIGATION: NavItem[] = [
  * Ils restent accessibles par un lien contextuel (un chiffre de l'accueil, la
  * cloche de la barre supérieure, une fiche patient). Les lister ici évite
  * qu'ils deviennent des pages orphelines que plus rien n'atteint.
+ *
+ * L'équipe et les règles de conseil n'y figurent pas : elles sont devenues des
+ * onglets de Paramètres, donc atteignables depuis le menu.
  */
 export const OFF_MENU_DESTINATIONS: {
   href: string;
@@ -103,8 +106,6 @@ export const OFF_MENU_DESTINATIONS: {
   { href: "/analytics", label: "Analytics détaillées", reachableFrom: "la page Performance" },
   { href: "/ventes", label: "Journal des ventes", reachableFrom: "la page Performance" },
   { href: "/ordonnances", label: "Historique des ordonnances", reachableFrom: "la fiche patient" },
-  { href: "/conseils", label: "Règles de conseil", reachableFrom: "Paramètres" },
-  { href: "/equipe", label: "Équipe et permissions", reachableFrom: "Paramètres" },
   { href: "/notifications", label: "Notifications", reachableFrom: "la cloche" },
 ];
 

@@ -22,7 +22,7 @@ import { PageHeader, DataItem } from "@/components/ui/page";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/feedback";
-import { LinkTabs } from "@/components/ui/tabs";
+import { SettingsTabs } from "./settings-tabs";
 import { formatCents, formatDate, formatDateTime } from "@/lib/format";
 import type { ProviderInfo } from "@/core/ai/ports";
 
@@ -62,19 +62,14 @@ export default async function SettingsPage({
     <div className="space-y-6">
       <PageHeader
         title="Paramètres"
-        description="Officine, moteur Pharma.ai, conformité et abonnement."
+        description="Officine, équipe, règles de conseil, moteur et conformité — tout ce qui se règle une fois, pas à chaque patient."
       />
 
-      <LinkTabs
-        items={[
-          { key: "officine", label: "Officine" },
-          { key: "moteur", label: "Moteur Pharma.ai" },
-          { key: "conformite", label: "Conformité" },
-          { key: "abonnement", label: "Abonnement" },
-          ...(session.permissions.has(PERMISSIONS.AUDIT_VIEW)
-            ? [{ key: "audit", label: "Journal d'audit", count: auditLogs.length }]
-            : []),
-        ]}
+      <SettingsTabs
+        canSeeTeam={session.permissions.has(PERMISSIONS.TEAM_VIEW)}
+        canSeeRules={session.permissions.has(PERMISSIONS.RECOMMENDATION_VIEW)}
+        canSeeAudit={session.permissions.has(PERMISSIONS.AUDIT_VIEW)}
+        auditCount={auditLogs.length}
       />
 
       {tab === "moteur" ? (
@@ -303,9 +298,10 @@ function EngineSettings({
           <p className="text-[13px] leading-6 text-text-secondary">
             Le port <code className="font-mono text-[12px]">VideoProvider</code> permettra de
             générer une courte vidéo reprenant le traitement et les conseils validés. Aucun
-            moteur n&apos;est branché aujourd&apos;hui : la fiche patient affiche « Vidéo
-            personnalisée — bientôt disponible », sans jamais laisser croire qu&apos;une vidéo
-            existe.
+            moteur n&apos;est branché aujourd&apos;hui, et la fiche patient n&apos;en dit donc
+            rien : annoncer « bientôt disponible » à un patient venu lire ses conseils
+            n&apos;aide personne. Le jour où un moteur sera branché, le bloc apparaîtra parce
+            qu&apos;il y aura une vidéo à montrer.
           </p>
         </CardContent>
       </Card>

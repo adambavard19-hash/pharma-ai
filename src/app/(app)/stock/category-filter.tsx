@@ -20,8 +20,8 @@ export function CategoryFilter({
     if (category) params.set("categorie", category);
     else params.delete("categorie");
     params.delete("page");
-    const query = params.toString();
-    return `/produits${query ? `?${query}` : ""}`;
+    params.set("onglet", "catalogue");
+    return `/stock?${params.toString()}`;
   };
 
   const visible = PRODUCT_CATEGORIES.filter((category) => (counts[category] ?? 0) > 0);
