@@ -223,6 +223,45 @@ au pharmacien une accroche commerciale.
 la règle `digestive-tolerance-antibiotics` évalue la classe ATC, module la
 priorité selon l'âge, et se bloque en cas d'immunodépression déclarée.
 
+## 5 bis. Le catalogue national des médicaments
+
+Neuf tables, partagées par toutes les officines, alimentées par la Base de
+Données Publique des Médicaments. Elles ne portent aucun `pharmacyId` : c'est
+volontaire, et c'est la clé de l'architecture.
+
+```
+DrugSpecialty            le CIS — une spécialité
+  ├─ DrugPresentation    le CIP13 — la boîte, et le code-barres
+  ├─ DrugComposition ─── DrugSubstance
+  ├─ DrugPrescriptionCondition
+  ├─ DrugGenericMember ── DrugGenericGroup
+  └─ DrugSmrOpinion
+ReferenceImport          le journal : source, date publiée, lignes traitées
+```
+
+**Le catalogue n'est jamais copié dans une officine.** Une pharmacie ne possède
+que des lignes de stock qui le référencent. Sans cette règle, une
+resynchronisation mensuelle risquerait d'écraser le stock de quelqu'un ; avec
+elle, c'est impossible.
+
+**Rien n'est jamais supprimé.** Une ligne qui disparaît de la source est marquée
+`withdrawnAt` : un stock d'officine ou une vente passée peut encore la citer.
+
+**Les valeurs officielles sont stockées telles quelles.** La source écrit aussi
+bien « 65% » que « 65 % » : les deux sont conservées à l'identique, et la valeur
+normalisée vit dans un champ distinct. Ne pas altérer les données est une
+obligation de la licence, pas une préférence.
+
+**La mention de source est produite par une seule fonction.**
+`src/core/reference/attribution.ts` compose la phrase qui nomme la source et sa
+date de mise à jour — celle publiée par la BDPM, jamais celle de notre import.
+Une mention recopiée d'écran en écran finirait par mentir.
+
+**Ce qui est rédigé par Pharma.ai vit ailleurs.** Explications destinées au
+patient, conseils de prise, effets à connaître au comptoir : la BDPM ne les
+publie pas. Ils constituent une couche éditoriale séparée, avec sa propre
+origine, qui ne doit jamais pouvoir passer pour de la donnée officielle.
+
 ## 6 bis. Le suivi patient
 
 Le troisième pilier — faire revenir le patient — vit dans `src/core/followup`,

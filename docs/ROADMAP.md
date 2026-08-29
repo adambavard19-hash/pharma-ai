@@ -29,7 +29,7 @@ la vision, avec une architecture permettant d'en faire un vrai produit.
 
 **En complément** : centre de notifications, recherche globale (⌘K), règles de
 conseil de l'officine, journal d'audit, console d'administration éditeur,
-modèle d'abonnement, 100 tests sur les fonctions critiques.
+modèle d'abonnement, 107 tests sur les fonctions critiques.
 
 ---
 
@@ -79,6 +79,38 @@ La mesure a servi à quelque chose dès la première exécution : elle a révél
 l'analyse se plaçait exactement par-dessus, et interceptait les clics. Un défaut
 qu'aucun test unitaire n'aurait attrapé, et qu'un pharmacien aurait pris pour
 une application figée.
+
+---
+
+## Référentiel médicamenteux réel (BDPM) 🚧 *en cours*
+
+Le MVP fonctionnait sur douze fiches médicamenteuses inventées. Elles sont
+remplacées par la **Base de Données Publique des Médicaments**, référentiel
+officiel des spécialités commercialisées en France.
+
+La règle qui structure tout : **le catalogue national n'est jamais copié dans
+une officine**. Une pharmacie ne possède que des lignes de stock qui le
+référencent — c'est ce qui permet à une resynchronisation mensuelle de ne jamais
+toucher au stock de qui que ce soit.
+
+| Lot | Contenu | État |
+|---|---|---|
+| A | Les neuf tables du catalogue national, migration additive, journal de synchronisation, mention de source | ✅ |
+| B | L'importateur BDPM : téléchargement, lecture ISO-8859-1, contrôle strict des colonnes, upsert idempotent | à faire |
+| C | Stock des médicaments, recherche unifiée, scan CIP13, import en masse, étape d'installation | à faire |
+| D | Identification des lignes d'ordonnance contre le catalogue, couche éditoriale séparée | à faire |
+
+**Ce qui reste séparé, définitivement** : le catalogue national (BDPM, jamais
+modifiable par une officine) et le catalogue officinal (`Product` — vitamines,
+probiotiques, dermocosmétique, créés par la pharmacie). Le moteur de conseil ne
+lit que le second : un médicament remboursé ne peut donc pas devenir une
+recommandation commerciale, non par convention mais par construction.
+
+**Licence** : la BDPM est réutilisable à condition de mentionner la source et sa
+date de mise à jour, de ne pas altérer les données et de ne suggérer aucun aval
+de l'ANSM, de la HAS ou de l'UNCAM. Ces obligations sont portées par une
+fonction unique et testée (`src/core/reference/attribution.ts`). **Aucune
+extraction de VIDAL** : base sous licence commerciale.
 
 ---
 

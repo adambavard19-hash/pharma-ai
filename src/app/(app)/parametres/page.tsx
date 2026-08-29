@@ -16,14 +16,20 @@ import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { getProviderSnapshot } from "@/server/ai/registry";
+import { getReferenceCatalogState } from "@/server/services/reference";
+import {
+  BDPM_SOURCE,
+  referenceAttribution,
+  type ReferenceCatalogState,
+} from "@/core/reference";
 import { isDemoMode } from "@/config/env";
 import { ENGINE_VERSION } from "@/config/constants";
-import { PageHeader, DataItem } from "@/components/ui/page";
+import { PageHeader, DataItem, Grid } from "@/components/ui/page";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/feedback";
 import { SettingsTabs } from "./settings-tabs";
-import { formatCents, formatDate, formatDateTime } from "@/lib/format";
+import { formatCents, formatDate, formatDateTime, formatNumber } from "@/lib/format";
 import type { ProviderInfo } from "@/core/ai/ports";
 
 export const metadata: Metadata = { title: "Paramètres" };
@@ -57,6 +63,7 @@ export default async function SettingsPage({
   ]);
 
   const providers = getProviderSnapshot();
+  const referenceState = await getReferenceCatalogState();
 
   return (
     <div className="space-y-6">
@@ -73,7 +80,7 @@ export default async function SettingsPage({
       />
 
       {tab === "moteur" ? (
-        <EngineSettings providers={providers} />
+        <EngineSettings providers={providers} reference={referenceState} />
       ) : tab === "conformite" ? (
         <ComplianceSettings isDemo={isDemoMode()} />
       ) : tab === "abonnement" ? (
@@ -201,8 +208,109 @@ function PharmacySettings({
   );
 }
 
+/**
+ * L'état du catalogue national des médicaments.
+ *
+ * Cette carte porte la mention de source et la date de mise à jour exigées par
+ * la licence BDPM. Tant qu'aucun import n'a eu lieu, elle le dit franchement
+ * plutôt que de laisser croire à un référentiel officiel absent.
+ */
+function ReferenceCatalogCard({ state }: { state: ReferenceCatalogState }) {
+  const attribution = referenceAttribution(state);
+
+  if (state.status === "NOT_IMPORTED" || state.status === "FAILED") {
+    return (
+      <Card>
+        <CardHeader
+          title="Catalogue national des médicaments"
+          description="Le référentiel officiel des spécialités commercialisées en France."
+          action={<Database className="size-[18px] text-text-tertiary" />}
+        />
+        <CardContent className="space-y-3">
+          <Alert
+            tone={state.status === "FAILED" ? "danger" : "warning"}
+            title={
+              state.status === "FAILED"
+                ? "La dernière synchronisation a échoué"
+                : "Aucun catalogue officiel n'est chargé"
+            }
+          >
+            {state.status === "FAILED" ? (
+              <>
+                Tentative du {formatDateTime(state.attemptedAt)}
+                {state.error ? ` — ${state.error}` : ""}. Le catalogue précédent, s&apos;il
+                existe, reste en place : une synchronisation ratée n&apos;efface rien.
+              </>
+            ) : (
+              <>
+                L&apos;application fonctionne sur son jeu de démonstration fictif, signalé comme
+                tel à chaque écran. Elle ne prétend pas disposer de données officielles.
+              </>
+            )}
+          </Alert>
+          <div className="space-y-1.5 text-[13px] leading-5 text-text-secondary">
+            <p>Pour charger le catalogue officiel :</p>
+            <pre className="overflow-x-auto rounded-lg border border-border-subtle bg-surface-sunken px-3.5 py-2.5 font-mono text-[12.5px] text-text-primary">
+              npm run bdpm:sync
+            </pre>
+            <p className="text-text-tertiary">
+              La commande télécharge les fichiers publiés sur{" "}
+              <a
+                href={BDPM_SOURCE.downloadUrl}
+                className="text-brand-700 hover:underline dark:text-brand-400"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {BDPM_SOURCE.url.replace("https://", "")}
+              </a>{" "}
+              et les importe sans jamais toucher au stock des officines.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Catalogue national des médicaments"
+        description="Partagé par toutes les officines. Le stock de chacune le référence sans le copier."
+        action={
+          <Badge tone={state.status === "STALE" ? "warning" : "success"}>
+            {state.status === "STALE" ? "À resynchroniser" : "À jour"}
+          </Badge>
+        }
+      />
+      <CardContent className="space-y-4">
+        <Grid cols={3}>
+          <DataItem label="Spécialités">{formatNumber(state.counts.specialties)}</DataItem>
+          <DataItem label="Présentations">{formatNumber(state.counts.presentations)}</DataItem>
+          <DataItem label="Substances">{formatNumber(state.counts.substances)}</DataItem>
+        </Grid>
+
+        {state.status === "STALE" && (
+          <Alert tone="warning" title="Le référentiel a vieilli">
+            La base officielle est mise à jour chaque mois et celle-ci date de {state.ageDays}{" "}
+            jours. Relancez <code className="font-mono text-[12px]">npm run bdpm:sync</code>.
+          </Alert>
+        )}
+
+        <p className="border-t border-border-subtle pt-3 text-[12.5px] leading-5 text-text-tertiary">
+          {attribution}
+          <br />
+          Importé dans Pharma.ai le {formatDateTime(state.importedAt)}. Données publiées par{" "}
+          {BDPM_SOURCE.publishersLabel} ; cette mention ne vaut aucune reconnaissance de
+          Pharma.ai par ces organismes.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function EngineSettings({
   providers,
+  reference,
 }: {
   providers: {
     ocr: ProviderInfo;
@@ -213,6 +321,7 @@ function EngineSettings({
     video: ProviderInfo;
     anySimulated: boolean;
   };
+  reference: ReferenceCatalogState;
 }) {
   const entries: { key: string; icon: typeof Cpu; label: string; info: ProviderInfo }[] = [
     { key: "ocr", icon: ScanLine, label: "Extraction d'ordonnance", info: providers.ocr },
@@ -225,6 +334,8 @@ function EngineSettings({
 
   return (
     <div className="space-y-5">
+      <ReferenceCatalogCard state={reference} />
+
       {providers.anySimulated && (
         <Alert tone="warning" title="Des maillons de la chaîne sont simulés">
           L&apos;application signale explicitement chaque fournisseur simulé. Aucun résultat

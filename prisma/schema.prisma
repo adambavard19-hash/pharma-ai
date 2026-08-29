@@ -639,6 +639,293 @@ model ImportJob {
 }
 
 // ===========================================================================
+// CATALOGUE NATIONAL DES MÉDICAMENTS — source : Base de Données Publique des
+// Médicaments (BDPM), base-donnees-publique.medicaments.gouv.fr
+//
+// Ces tables sont PARTAGÉES par toutes les officines et ne sont jamais copiées
+// dans une pharmacie : une officine ne possède que des lignes de stock qui les
+// référencent. C'est ce qui permet à une resynchronisation mensuelle de ne
+// jamais toucher au stock de qui que ce soit.
+//
+// Trois règles de la licence de réutilisation sont matérialisées ici :
+//   • les valeurs officielles sont stockées telles quelles, jamais réécrites ;
+//   • la date de mise à jour PUBLIÉE PAR LA SOURCE est conservée (et non la
+//     date de notre import), pour être affichée à côté de la source ;
+//   • rien n'est supprimé : ce qui disparaît d'un fichier est marqué retiré.
+//
+// Tout contenu rédigé par Pharma.ai (explication patient, conseil de prise…)
+// vit AILLEURS et porte sa propre origine : il ne doit jamais pouvoir passer
+// pour de la donnée officielle.
+// ===========================================================================
+
+enum ReferenceSource {
+  BDPM
+}
+
+enum ReferenceImportStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// Journal des synchronisations du catalogue national.
+///
+/// C'est cette table qui répond à « d'où vient cette information et de quand
+/// date-t-elle ? » — la licence BDPM impose de pouvoir l'afficher.
+model ReferenceImport {
+  id     String          @id @default(cuid())
+  source ReferenceSource @default(BDPM)
+
+  /// Date de mise à jour annoncée par la source. À ne pas confondre avec
+  /// `startedAt` : c'est celle-ci qui doit être affichée au pharmacien.
+  sourceUpdatedAt DateTime?
+  sourceUrl       String
+
+  startedAt  DateTime              @default(now())
+  finishedAt DateTime?
+  status     ReferenceImportStatus @default(RUNNING)
+
+  /// Une entrée par fichier traité : nom, lignes lues, créées, modifiées,
+  /// ignorées et le motif des lignes ignorées.
+  fileReports Json    @default("[]")
+  error       String?
+  /// Exécution à blanc : rien n'a été écrit dans le catalogue.
+  isDryRun    Boolean @default(false)
+
+  @@index([source, startedAt])
+  @@map("reference_imports")
+}
+
+/// Une spécialité pharmaceutique — fichier CIS_bdpm, 12 colonnes.
+model DrugSpecialty {
+  id      String @id @default(cuid())
+  /// Code Identifiant de Spécialité. Clé naturelle, stable dans le temps.
+  cisCode String @unique
+
+  name                String
+  pharmaceuticalForm  String?
+  /// Voies d'administration. La source les sépare par « ; ».
+  administrationRoutes String[] @default([])
+
+  authorizationStatus    String?
+  authorizationProcedure String?
+  /// « Commercialisée » / « Non commercialisée ».
+  marketingStatus        String?
+  authorizedAt           DateTime?
+  /// Statut BdM : « Warning disponibilité », « Alerte »… Vide le plus souvent.
+  bdmStatus              String?
+  europeanAuthorizationNumber String?
+  /// Titulaires de l'AMM. Séparés par « ; » dans la source (rare).
+  holders                String[] @default([])
+  enhancedMonitoring     Boolean  @default(false)
+
+  /// Dernière synchronisation ayant vu cette ligne dans le fichier source.
+  lastSeenAt  DateTime  @default(now())
+  /// Renseigné quand la ligne disparaît de la source. On ne supprime jamais :
+  /// un stock d'officine ou une vente passée peut encore la référencer.
+  withdrawnAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  presentations         DrugPresentation[]
+  compositions          DrugComposition[]
+  prescriptionConditions DrugPrescriptionCondition[]
+  genericMemberships    DrugGenericMember[]
+  smrOpinions           DrugSmrOpinion[]
+
+  @@index([name])
+  @@index([marketingStatus])
+  @@map("drug_specialties")
+}
+
+/// Une présentation — la boîte précise. Fichier CIS_CIP_bdpm, 13 colonnes.
+///
+/// `cip13` est le code-barres imprimé sur la boîte : scanner, c'est lire
+/// directement cette clé.
+model DrugPresentation {
+  id         String @id @default(cuid())
+  specialtyId String
+  /// Code Identifiant de Présentation à 13 chiffres. Vérifié unique sur la
+  /// base réelle, et toujours préfixé « 3400 » pour les médicaments français.
+  cip13      String @unique
+  cip7       String @unique
+
+  label                 String
+  administrativeStatus  String?
+  /// « Déclaration de commercialisation », « Déclaration d'arrêt… »
+  marketingStatus       String?
+  marketingDeclaredAt   DateTime?
+  /// Agrément aux collectivités : « oui » / « non » dans la source.
+  approvedForCommunities Boolean?
+
+  /// Taux de remboursement tel qu'écrit dans la source — elle contient aussi
+  /// bien « 65% » que « 65 % ». Conservé sans retouche.
+  reimbursementRateRaw String?
+  /// Le même taux en points de pourcentage, pour pouvoir filtrer. Dérivé,
+  /// jamais substitué à la valeur d'origine.
+  reimbursementRate    Int?
+
+  /// Prix hors honoraire de dispensation, en centimes. Absent pour les
+  /// présentations non remboursées — un tiers d'entre elles.
+  priceCents           Int?
+  /// Prix total (prix + honoraires), en centimes.
+  totalPriceCents      Int?
+  /// Honoraire de dispensation, en centimes.
+  dispensingFeeCents   Int?
+  reimbursementNotice  String?
+
+  lastSeenAt  DateTime  @default(now())
+  withdrawnAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  specialty DrugSpecialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@index([specialtyId])
+  @@index([marketingStatus])
+  @@map("drug_presentations")
+}
+
+/// Une substance, dédoublonnée par son code officiel.
+///
+/// La source écrit parfois la même substance de plusieurs façons
+/// (« RANITIDINE (CHLORHYDRATE DE) » et « CHLORHYDRATE DE RANITIDINE » portent
+/// le code 25783) : 562 codes sur 3 352 sont dans ce cas. On retient la
+/// graphie la plus fréquente comme libellé de référence, sans jamais corriger
+/// la source — chaque ligne de composition conserve la graphie exacte qu'elle
+/// portait.
+model DrugSubstance {
+  id    String @id @default(cuid())
+  code  String @unique
+  /// Graphie la plus fréquente rencontrée dans le fichier.
+  label String
+  /// Les autres graphies rencontrées pour ce même code.
+  aliases String[] @default([])
+
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  compositions DrugComposition[]
+
+  @@index([label])
+  @@map("drug_substances")
+}
+
+/// Composition qualitative et quantitative — fichier CIS_COMPO_bdpm.
+///
+/// `nature` vaut « SA » (substance active, le sel réellement présent) ou
+/// « FT » (fraction thérapeutique, la molécule active). Les deux lignes d'un
+/// même couple partagent `linkNumber` : c'est la FT qui intéresse le moteur de
+/// conseil, la SA qui figure sur la boîte.
+model DrugComposition {
+  id          String @id @default(cuid())
+  specialtyId String
+  substanceId String
+
+  /// Élément pharmaceutique décrit (« comprimé », « gélule »…).
+  element        String
+  /// Graphie exacte de la substance sur cette ligne, telle qu'écrite par la
+  /// source.
+  substanceLabel String
+  dosage         String?
+  dosageReference String?
+  /// « SA » ou « FT ».
+  nature         String
+  /// Numéro reliant une substance active à sa fraction thérapeutique.
+  linkNumber     String?
+
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  specialty DrugSpecialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+  substance DrugSubstance @relation(fields: [substanceId], references: [id], onDelete: Cascade)
+
+  @@unique([specialtyId, element, substanceId, nature, linkNumber])
+  @@index([substanceId])
+  @@map("drug_compositions")
+}
+
+/// Conditions de prescription et de délivrance — fichier CIS_CPD_bdpm.
+/// Une ligne par condition : « liste I », « stupéfiant », « réservé à… ».
+model DrugPrescriptionCondition {
+  id          String @id @default(cuid())
+  specialtyId String
+  label       String
+
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  specialty DrugSpecialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@unique([specialtyId, label])
+  @@index([label])
+  @@map("drug_prescription_conditions")
+}
+
+/// Un groupe générique — fichier CIS_GENER_bdpm.
+model DrugGenericGroup {
+  id         String @id @default(cuid())
+  /// Identifiant du groupe dans la source.
+  externalId String @unique
+  label      String
+
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  members DrugGenericMember[]
+
+  @@map("drug_generic_groups")
+}
+
+/// Appartenance d'une spécialité à un groupe générique.
+///
+/// `type` reprend la codification de la source : 0 princeps, 1 générique,
+/// 2 générique par complémentarité posologique, 4 substituable.
+model DrugGenericMember {
+  id          String @id @default(cuid())
+  groupId     String
+  specialtyId String
+  type        Int
+  sortOrder   Int?
+
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  group     DrugGenericGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  specialty DrugSpecialty    @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, specialtyId])
+  @@index([specialtyId])
+  @@map("drug_generic_members")
+}
+
+/// Avis de service médical rendu de la HAS — fichier CIS_HAS_SMR_bdpm.
+///
+/// Aucune clé naturelle unique : la source contient plusieurs avis pour un même
+/// couple (CIS, dossier, date). Les avis d'une spécialité sont donc remplacés
+/// en bloc à chaque synchronisation plutôt que rapprochés ligne à ligne.
+model DrugSmrOpinion {
+  id          String @id @default(cuid())
+  specialtyId String
+
+  hasDossierCode String?
+  evaluationType String?
+  opinionDate    DateTime?
+  /// « Important », « Modéré », « Faible », « Insuffisant »…
+  value          String?
+  label          String?
+
+  createdAt DateTime @default(now())
+
+  specialty DrugSpecialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@index([specialtyId])
+  @@map("drug_smr_opinions")
+}
+
+// ===========================================================================
 // RÉFÉRENTIEL MÉDICAMENTEUX
 // Un LLM n'est PAS une base médicamenteuse. Cette table matérialise la source
 // pharmaceutique branchée (BDPM, base éditeur...). Le jeu livré est FICTIF et
