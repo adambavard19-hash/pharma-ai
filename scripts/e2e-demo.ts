@@ -93,6 +93,9 @@ async function main() {
     data: { status: "ACCEPTED", decidedByUserId: pharmacist.id, decidedAt: new Date() },
   });
   console.log(`   Accepté : ${accepted.product?.name}`);
+  if (accepted.counterScript) {
+    console.log(`   À dire au patient : ${accepted.counterScript}`);
+  }
   for (const other of proposed.slice(1)) {
     await prisma.recommendation.update({
       where: { id: other.id },

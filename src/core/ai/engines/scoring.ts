@@ -318,6 +318,13 @@ export function scoreProductForOpportunity(params: {
     ? `${claim} — proposé dans le cadre de votre traitement.`
     : `Conseil proposé par votre pharmacien dans le cadre de votre traitement.`;
 
+  // La phrase de comptoir vient de la règle de conseil, jamais de l'argumentaire
+  // commercial du produit : seul le nom de la référence est inséré ici.
+  const counterScript = opportunity.counterScriptTemplate.replaceAll(
+    "{product}",
+    product.name,
+  );
+
   return {
     opportunityKey: opportunity.key,
     productId: product.id,
@@ -325,6 +332,7 @@ export function scoreProductForOpportunity(params: {
     breakdown,
     justification,
     patientReason,
+    counterScript,
     precautions: [...product.precautions, ...opportunity.safetyNotes],
     explanation,
   };

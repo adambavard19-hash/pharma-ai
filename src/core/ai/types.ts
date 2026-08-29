@@ -177,6 +177,11 @@ export type AdviceOpportunityResult = {
   category: ProductCategoryCode;
   title: string;
   rationale: string;
+  /**
+   * La phrase à dire au patient, `{drug}` déjà substitué. `{product}` ne l'est
+   * qu'au scoring : à ce stade le catalogue n'a pas été consulté.
+   */
+  counterScriptTemplate: string;
   clinicalContext: string | null;
   safetyNotes: string[];
   /** 0 → 100. Priorité clinique, strictement indépendante de toute marge. */
@@ -216,8 +221,10 @@ export type ScoredRecommendation = {
   breakdown: ScoreBreakdown;
   /** Explication technique destinée au pharmacien. */
   justification: string;
-  /** Formulation proposée au patient, à valider par le pharmacien. */
+  /** Formulation écrite sur la fiche remise au patient. */
   patientReason: string;
+  /** La phrase à dire au comptoir, issue de la règle de conseil. */
+  counterScript: string;
   precautions: string[];
   /** Contributions ordonnées, pour l'affichage « Pourquoi ce produit ? ». */
   explanation: ScoreContribution[];

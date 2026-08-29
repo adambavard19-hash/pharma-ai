@@ -77,6 +77,22 @@ export type AdviceRule = {
   excludeTags: string[];
   /** Explication en langage pharmacien. `{drug}` est remplacé. */
   rationaleTemplate: string;
+  /**
+   * La phrase à dire au patient, au comptoir. `{drug}` et `{product}` sont
+   * remplacés — le reste est écrit ici, relu, versionné.
+   *
+   * Elle n'est JAMAIS rédigée à la volée : c'est ce qui garantit qu'aucune
+   * justification médicale ne peut être inventée pour vendre davantage. Elle
+   * énonce un fait lié au traitement, propose, et ne promet rien. Une règle
+   * qui peut se déclencher sur un simple effet indésirable
+   * (`CLASS_OR_SIDE_EFFECT`) ne doit pas affirmer ce QU'EST le médicament ;
+   * un test le vérifie.
+   *
+   * `{drug}` est substitué à l'étape des opportunités, `{product}` seulement au
+   * scoring : l'étape qui juge de la pertinence ne voit toujours pas le
+   * catalogue.
+   */
+  counterScriptTemplate: string;
   clinicalContext: string;
   safetyNotes: string[];
   /** Renvoie une raison de blocage, ou `null` si la règle reste applicable. */
@@ -108,12 +124,15 @@ export const ADVICE_RULES: AdviceRule[] = [
     excludeTags: ["immunodépression"],
     rationaleTemplate:
       "Une antibiothérapie ({drug}) peut perturber la flore intestinale. Un accompagnement de la tolérance digestive peut être pertinent selon le patient et la durée du traitement.",
+    counterScriptTemplate:
+      "« {drug} est un antibiotique : la flore intestinale peut être perturbée pendant la cure. Si vous souhaitez l'accompagner, {product} se prend à distance de l'antibiotique, sur toute la durée du traitement. »",
     clinicalContext:
       "À apprécier au cas par cas : durée du traitement, antécédents digestifs, âge, état immunitaire.",
-    safetyNotes: [
-      "Déconseillé en cas d'immunodépression sévère.",
-      "Prise à distance de l'antibiotique — à préciser au patient.",
-    ],
+    // « Prise à distance de l'antibiotique » a quitté cette liste : la phrase de
+    // comptoir le dit désormais au patient. Le répéter ici l'afficherait trois
+    // fois sur la même carte — la précaution produit le mentionne aussi — et au
+    // comptoir une information répétée est une information survolée.
+    safetyNotes: ["Déconseillé en cas d'immunodépression sévère."],
     blockedFor: (patient) =>
       patient.chronicConditions.some((c) =>
         /immunod|leucémie|greffe|vih/i.test(c),
@@ -136,6 +155,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     excludeTags: [],
     rationaleTemplate:
       "{drug} est un anti-inflammatoire ; l'inconfort gastrique est un motif fréquent d'arrêt du traitement. Un rappel des règles de prise, éventuellement accompagné d'un conseil, peut améliorer l'observance.",
+    counterScriptTemplate:
+      "« {drug} est un anti-inflammatoire : prenez-le au milieu d'un repas, jamais à jeun. En cas de gêne, {product} peut aider au confort — cela ne remplace pas un protecteur gastrique prescrit, et une douleur qui dure doit être signalée à votre médecin. »",
     clinicalContext:
       "Vérifier l'existence d'une protection gastrique déjà prescrite avant tout conseil complémentaire.",
     safetyNotes: [
@@ -158,6 +179,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     excludeTags: ["parfum"],
     rationaleTemplate:
       "Un traitement dermatologique local ({drug}) s'accompagne souvent d'une sécheresse ou d'une sensibilité cutanée. Un soin émollient adapté peut soutenir la tolérance du traitement.",
+    counterScriptTemplate:
+      "« Ce traitement local ({drug}) assèche souvent la peau. {product} s'applique sur peau propre, à distance du traitement actif, pour limiter l'inconfort. »",
     clinicalContext:
       "Privilégier une formule sans parfum sur peau lésée. Application à distance du traitement actif.",
     safetyNotes: ["Ne pas appliquer sur une plaie ouverte sans avis."],
@@ -176,6 +199,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     excludeTags: [],
     rationaleTemplate:
       "Le contexte du traitement ({drug}) s'accompagne fréquemment d'une fatigue rapportée au comptoir. Un apport en magnésium peut être discuté si l'alimentation est insuffisante.",
+    counterScriptTemplate:
+      "« Ressentez-vous de la fatigue ou des crampes en ce moment ? Si c'est le cas, {product} peut être envisagé ; sinon ce n'est pas utile. »",
     clinicalContext:
       "Conseil pertinent uniquement si le patient exprime une fatigue ou des crampes. À ne pas proposer systématiquement.",
     safetyNotes: [
@@ -201,6 +226,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     excludeTags: [],
     rationaleTemplate:
       "Le traitement ({drug}) s'inscrit dans un contexte osseux. Le statut en vitamine D mérite d'être évoqué avec le patient.",
+    counterScriptTemplate:
+      "« Votre traitement ({drug}) concerne la santé osseuse. Votre vitamine D a-t-elle été contrôlée récemment ? Si aucune supplémentation n'est déjà prescrite, {product} est à évoquer avec votre médecin. »",
     clinicalContext:
       "Vérifier qu'une supplémentation n'est pas déjà prescrite avant tout conseil.",
     safetyNotes: ["Ne pas cumuler avec une supplémentation déjà en cours."],
@@ -221,6 +248,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     excludeTags: [],
     rationaleTemplate:
       "La sécheresse buccale figure parmi les effets fréquents de {drug}. Un conseil d'hygiène bucco-dentaire adapté peut améliorer le confort quotidien.",
+    counterScriptTemplate:
+      "« Avez-vous la bouche sèche depuis le début du traitement ? C'est un effet fréquent. {product} aide au confort au quotidien, en complément d'un brossage régulier. »",
     clinicalContext: "Conseil de confort ; à évoquer si le patient rapporte la gêne.",
     safetyNotes: [],
   },
@@ -238,6 +267,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     excludeTags: [],
     rationaleTemplate:
       "Une supplémentation martiale ({drug}) entraîne fréquemment une constipation. Un accompagnement du transit peut favoriser l'observance.",
+    counterScriptTemplate:
+      "« Le fer ({drug}) ralentit souvent le transit. Prenez-le à distance du thé et du café, qui gênent son absorption. Si le transit devient difficile, {product} peut vous accompagner. »",
     clinicalContext:
       "Rappeler la prise à distance du thé et du café, qui réduisent l'absorption du fer.",
     safetyNotes: ["Orienter vers le médecin en cas de douleurs abdominales."],
@@ -256,6 +287,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     excludeTags: [],
     rationaleTemplate:
       "{drug} est associé à un risque de photosensibilisation. Une protection solaire est un conseil de sécurité, pas un simple conseil de confort.",
+    counterScriptTemplate:
+      "« Attention : pendant tout le traitement, {drug} rend la peau plus sensible au soleil. Évitez l'exposition directe et couvrez les zones découvertes — {product} est une protection adaptée. »",
     clinicalContext:
       "Conseil prioritaire en période ensoleillée et pour toute exposition professionnelle.",
     safetyNotes: ["Rappeler d'éviter l'exposition directe pendant le traitement."],
@@ -336,6 +369,12 @@ export function detectAdviceOpportunities(params: {
       category: rule.category,
       title: rule.title,
       rationale: rule.rationaleTemplate.replace(
+        "{drug}",
+        triggers.map((t) => t.drugName).join(", "),
+      ),
+      // `{product}` reste en attente : à ce stade le catalogue n'a pas encore
+      // été consulté, et c'est précisément la garantie qu'on veut conserver.
+      counterScriptTemplate: rule.counterScriptTemplate.replaceAll(
         "{drug}",
         triggers.map((t) => t.drugName).join(", "),
       ),

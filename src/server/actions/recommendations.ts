@@ -27,10 +27,25 @@ async function assertOwnedRecommendation(recommendationId: string, pharmacyId: s
       prescriptionId: true,
       productId: true,
       status: true,
+      counterScript: true,
+      product: { select: { name: true } },
     },
   });
   if (!recommendation || recommendation.pharmacyId !== pharmacyId) return null;
   return recommendation;
+}
+
+/**
+ * Reporte le nom de la nouvelle référence dans la phrase de comptoir.
+ *
+ * On ne régénère pas la phrase depuis la règle : le pharmacien a pu la
+ * reformuler pour son patient, et sa formulation prime. Si l'ancien nom n'y
+ * figure plus — parce qu'il l'a réécrite — la phrase est laissée telle quelle
+ * plutôt que réécrite à sa place.
+ */
+function swapProductName(script: string, previous: string | null, next: string): string {
+  if (!previous || !script.includes(previous)) return script;
+  return script.replaceAll(previous, next);
 }
 
 async function transition(params: {
@@ -161,6 +176,12 @@ export async function declineRecommendationAction(
 const modifySchema = z.object({
   recommendationId: z.string().min(1),
   patientReason: z.string().trim().min(5, "La formulation patient est trop courte").max(400),
+  /**
+   * La phrase dite au comptoir. Elle vient par défaut du catalogue de règles ;
+   * le pharmacien peut la reformuler pour son patient, et c'est alors sa
+   * formulation qui est conservée — signée, horodatée.
+   */
+  counterScript: z.string().trim().max(600).optional(),
   quantity: z.coerce.number().int().min(1).max(20).default(1),
   note: z.string().trim().max(500).optional(),
 });
@@ -190,6 +211,7 @@ export async function modifyRecommendationAction(
     note: parsed.data.note ?? null,
     data: {
       patientReason: parsed.data.patientReason,
+      ...(parsed.data.counterScript ? { counterScript: parsed.data.counterScript } : {}),
       quantity: parsed.data.quantity,
     },
   });
@@ -249,6 +271,13 @@ export async function replaceRecommendationAction(
       patientReason:
         product.commercialClaims[0] ??
         "Conseil proposé par votre pharmacien dans le cadre de votre traitement.",
+      counterScript: recommendation.counterScript
+        ? swapProductName(
+            recommendation.counterScript,
+            recommendation.product?.name ?? null,
+            product.name,
+          )
+        : undefined,
       precautions: product.precautions,
     },
   });
@@ -343,6 +372,7 @@ export async function addManualRecommendationAction(
         scoreBreakdown: { manual: true } as never,
         justification: `Conseil ajouté manuellement par ${session.user.fullName}.`,
         patientReason: parsed.data.patientReason,
+        counterScript: parsed.data.patientReason,
         precautions: product.precautions,
         quantity: parsed.data.quantity,
         unitPriceCents: product.salePriceCents,

@@ -202,8 +202,22 @@ Chaque règle (`src/core/ai/engines/advice.ts`) déclare :
   une correspondance de classe. Un effet indésirable partagé — « troubles
   digestifs » est fréquent — ne suffit pas, sous peine de produire une
   affirmation fausse. Un test de régression le vérifie.
+- **`counterScriptTemplate`** — *la phrase à dire au patient*, écrite dans la
+  règle, relue et versionnée. Elle n'est jamais rédigée à la volée : c'est ce
+  qui garantit qu'aucune justification médicale ne peut être improvisée pour
+  vendre davantage. Deux substitutions seulement, et à deux moments distincts :
+  `{drug}` à l'étape des opportunités, `{product}` au scoring — l'étape qui juge
+  de la pertinence ne voit toujours pas le catalogue. Des tests vérifient
+  qu'aucune phrase ne promet d'effet thérapeutique et qu'une règle déclenchable
+  sur un simple effet indésirable n'affirme pas la classe du médicament.
 - **`blockedFor`** — condition patient qui bloque définitivement la règle.
 - **`safetyNotes`**, **`clinicalContext`** — ce qui est affiché au pharmacien.
+
+La phrase de comptoir et la fiche patient ne disent pas la même chose et ne
+viennent pas du même endroit : `counterScript` provient de la règle de conseil
+et se dit à l'oral ; `patientReason` provient de l'argumentaire du produit et
+s'écrit sur le document remis. Confondre les deux reviendrait à faire prononcer
+au pharmacien une accroche commerciale.
 
 **Aucune règle n'est mécanique.** « Antibiotique ⇒ probiotique » n'existe pas :
 la règle `digestive-tolerance-antibiotics` évalue la classe ATC, module la

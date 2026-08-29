@@ -940,8 +940,13 @@ model Recommendation {
 
   /// Justification destinée au pharmacien (technique, traçable).
   justification String
-  /// Formulation destinée au patient, validée par le pharmacien.
+  /// Formulation écrite sur la fiche remise au patient.
   patientReason String?
+  /// La phrase réellement affichée au pharmacien pour être dite au patient.
+  /// Elle provient du catalogue de règles de conseil, jamais d'une génération
+  /// libre. On la conserve avec la recommandation parce que c'est ce qui a été
+  /// dit au comptoir : il faut pouvoir le relire des mois plus tard.
+  counterScript String?
   precautions   String[] @default([])
 
   quantity          Int     @default(1)

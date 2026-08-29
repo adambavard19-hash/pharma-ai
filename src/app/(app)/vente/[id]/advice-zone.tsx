@@ -276,14 +276,14 @@ function AdviceCard({
           </div>
         </div>
 
-        {recommendation.patientReason && (
+        {(recommendation.counterScript ?? recommendation.patientReason) && (
           <p className="flex gap-2 rounded-lg bg-brand-50/70 px-3.5 py-2.5 text-[13.5px] leading-5 text-text-primary dark:bg-brand-950/60">
             <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-brand-600 dark:text-brand-400" />
             <span>
               <span className="mr-1 font-medium text-brand-800 dark:text-brand-300">
                 À dire au patient :
               </span>
-              {recommendation.patientReason}
+              {recommendation.counterScript ?? recommendation.patientReason}
             </span>
           </p>
         )}
@@ -411,6 +411,7 @@ function ModifyModal({
   recommendation: AdviceView;
 }) {
   const [patientReason, setPatientReason] = useState(recommendation.patientReason ?? "");
+  const [counterScript, setCounterScript] = useState(recommendation.counterScript ?? "");
   const [quantity, setQuantity] = useState(recommendation.quantity);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -423,6 +424,7 @@ function ModifyModal({
       const result = await modifyRecommendationAction({
         recommendationId: recommendation.id,
         patientReason,
+        counterScript: counterScript || undefined,
         quantity,
         note,
       });
@@ -456,14 +458,27 @@ function ModifyModal({
         {error && <Alert tone="danger">{error}</Alert>}
 
         <Field
-          label="À dire au patient"
+          label="À dire au patient, au comptoir"
+          htmlFor="counterScript"
+          hint="Reformulez si vous le souhaitez : votre version sera conservée, signée et horodatée."
+        >
+          <Textarea
+            id="counterScript"
+            rows={3}
+            value={counterScript}
+            onChange={(event) => setCounterScript(event.target.value)}
+          />
+        </Field>
+
+        <Field
+          label="Sur la fiche remise au patient"
           htmlFor="patientReason"
           required
-          hint="Formulation claire, sans promesse thérapeutique excessive."
+          hint="Formulation écrite, claire, sans promesse thérapeutique."
         >
           <Textarea
             id="patientReason"
-            rows={3}
+            rows={2}
             value={patientReason}
             onChange={(event) => setPatientReason(event.target.value)}
           />

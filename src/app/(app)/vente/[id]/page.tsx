@@ -117,6 +117,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           totalScore: recommendation.totalScore,
           justification: recommendation.justification,
           patientReason: recommendation.patientReason,
+          counterScript: recommendation.counterScript,
           precautions: recommendation.precautions,
           quantity: recommendation.quantity,
           unitPriceCents: recommendation.unitPriceCents,

@@ -43,7 +43,10 @@ export type AdviceView = {
   origin: string;
   totalScore: number;
   justification: string;
+  /** Ce qui sera écrit sur la fiche remise au patient. */
   patientReason: string | null;
+  /** Ce que le pharmacien dit au comptoir, issu de la règle de conseil. */
+  counterScript: string | null;
   precautions: string[];
   quantity: number;
   unitPriceCents: number;

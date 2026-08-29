@@ -17,6 +17,7 @@ import { PrismaClient, type Prisma } from "../src/generated/prisma";
 import { DEMO_DRUGS } from "./seed-data/drugs";
 import { DEMO_DISCLAIMER, DOCUMENT_DISCLAIMERS } from "../src/core/documents/types";
 import { DEMO_PRODUCTS } from "./seed-data/products";
+import { ADVICE_RULES } from "../src/core/ai/engines/advice";
 import { hashPasswordSync } from "./seed-utils";
 
 const prisma = new PrismaClient({
@@ -717,6 +718,25 @@ const SCENARIOS = [
   },
 ];
 
+/**
+ * Reconstitue la phrase de comptoir d'un scénario de démonstration.
+ *
+ * On la prend dans le catalogue de règles plutôt que de l'écrire ici : si une
+ * règle évolue, le jeu de démonstration suit, et on ne peut pas montrer au
+ * comptoir une phrase que le moteur ne produirait pas.
+ */
+function counterScriptFor(
+  scenario: { opportunity: { key: string }; lines: { drug: string }[] },
+  productName: string,
+): string | null {
+  const rule = ADVICE_RULES.find((candidate) => candidate.key === scenario.opportunity.key);
+  if (!rule) return null;
+
+  return rule.counterScriptTemplate
+    .replaceAll("{drug}", scenario.lines[0].drug)
+    .replaceAll("{product}", productName);
+}
+
 async function seedHistory(context: {
   pharmacy: { id: string };
   products: SeedProduct[];
@@ -889,6 +909,10 @@ async function seedHistory(context: {
         patientReason:
           product.commercialClaims[0] ??
           "Conseil proposé par votre pharmacien dans le cadre de votre traitement.",
+        // La phrase de comptoir est reconstruite depuis la règle réelle, avec
+        // les mêmes substitutions que le moteur : le jeu de démonstration montre
+        // exactement ce que le pharmacien lirait en production.
+        counterScript: counterScriptFor(scenario, product.name),
         precautions: product.precautions,
         quantity: 1,
         unitPriceCents: product.salePriceCents,

@@ -361,6 +361,7 @@ export async function analysePrescription(params: {
           totalScore: recommendation.totalScore,
           justification: recommendation.justification,
           patientReason: recommendation.patientReason,
+          counterScript: recommendation.counterScript,
           precautions: recommendation.precautions,
           unitPriceCents: product?.salePriceCents ?? 0,
           isDemo: prescription.isDemo,

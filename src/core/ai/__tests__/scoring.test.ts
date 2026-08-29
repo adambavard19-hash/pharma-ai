@@ -23,6 +23,7 @@ function opportunity(
     category: "PROBIOTIQUES",
     title: "Tolérance digestive pendant l'antibiothérapie",
     rationale: "…",
+    counterScriptTemplate: "« Amoxicilline est un antibiotique. {product} accompagne la cure. »",
     clinicalContext: null,
     safetyNotes: [],
     priority: 72,
