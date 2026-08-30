@@ -25,37 +25,140 @@ export class BdpmFormatError extends Error {
     readonly fileName: string,
     readonly lineNumber: number,
     message: string,
+    /** Contenu fautif, cité pour que l'erreur se diagnostique seule. */
+    readonly excerpt?: string,
   ) {
-    super(`${fileName}, ligne ${lineNumber} : ${message}`);
+    super(
+      `${fileName}, ligne ${lineNumber} : ${message}` +
+        (excerpt ? `\n  Contenu lu : ${quote(excerpt)}` : ""),
+    );
     this.name = "BdpmFormatError";
   }
 }
 
+/** Rend visibles les tabulations et les retours à la ligne du contenu cité. */
+function quote(text: string, limit = 200): string {
+  const visible = text
+    .replaceAll("\t", "⇥")
+    .replaceAll("\r", "␍")
+    .replaceAll("\n", "␊");
+  return `« ${visible.length > limit ? `${visible.slice(0, limit)}…` : visible} »`;
+}
+
+export type ParsedTable = {
+  rows: string[][];
+  /**
+   * Enregistrements reconstitués à partir de plusieurs lignes physiques.
+   * Journalisé et affiché : recoller en silence reviendrait à modifier la
+   * source sans le dire.
+   */
+  joinedRecords: number;
+  /** Quelques exemples de recollage, pour pouvoir vérifier qu'il est juste. */
+  joinedSamples: string[];
+};
+
+/** Nombre d'exemples conservés : de quoi juger, pas de quoi noyer le rapport. */
+const JOINED_SAMPLE_LIMIT = 3;
+
 /**
- * Découpe le contenu en lignes de colonnes, en vérifiant le format.
+ * Nombre maximal de lignes physiques recollées sur un même enregistrement.
+ *
+ * Un libellé qui se replie occupe deux lignes, exceptionnellement trois. Au-delà,
+ * ce n'est plus un repli : c'est un fichier dont la structure nous échappe, et
+ * le laisser s'engouffrer dans un seul enregistrement produirait une donnée
+ * fausse sans rien signaler. On s'arrête.
+ */
+const MAX_CONTINUATION_LINES = 4;
+
+/**
+ * Découpe le contenu en enregistrements, puis en colonnes, en vérifiant le
+ * format.
+ *
+ * Deux étapes, et l'ordre compte.
+ *
+ * 1. **Reconstituer les enregistrements.** Ces fichiers n'ont pas de
+ *    guillemets d'échappement : un libellé contenant un retour à la ligne se
+ *    répartit sur plusieurs lignes physiques. Une ligne qui ne commence pas
+ *    par une clé ne peut donc pas ouvrir un enregistrement — elle prolonge le
+ *    précédent, et le retour à la ligne qu'elle portait est conservé tel quel
+ *    dans le champ. Ce n'est pas une tolérance : c'est lire correctement la
+ *    frontière entre deux enregistrements avant de compter quoi que ce soit.
+ *
+ * 2. **Compter les colonnes, strictement.** Le contrôle reste entier : un
+ *    enregistrement dont le nombre de colonnes a changé arrête le fichier
+ *    entier. Un fichier auquel la source ajouterait une colonne échoue dès le
+ *    premier enregistrement, comme avant.
  *
  * Les fins de ligne ne sont pas homogènes dans la source : CIS_CIP_bdpm.txt
- * utilise LF seul quand les cinq autres fichiers utilisent CRLF. On retire
- * donc le retour chariot ligne par ligne, sans supposer lequel des deux.
+ * utilise LF seul quand les cinq autres utilisent CRLF. On retire donc le
+ * retour chariot ligne par ligne, sans supposer lequel des deux.
  */
-export function parseTable(content: string, spec: BdpmFileSpec): string[][] {
+export function parseTable(content: string, spec: BdpmFileSpec): ParsedTable {
   const rows: string[][] = [];
   const lines = content.split("\n");
+
+  // Phase 1 — reconstitution des enregistrements.
+  const records: { lineNumber: number; text: string; continuations: number }[] = [];
+  let joinedRecords = 0;
+  const joinedSamples: string[] = [];
 
   for (const [index, rawLine] of lines.entries()) {
     const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
     if (line.length === 0) continue;
 
-    const columns = line.split("\t");
     const lineNumber = index + 1;
+
+    if (spec.keyPattern.test(line)) {
+      records.push({ lineNumber, text: line, continuations: 0 });
+      continue;
+    }
+
+    const previous = records.at(-1);
+    if (!previous) {
+      throw new BdpmFormatError(
+        spec.fileName,
+        lineNumber,
+        `la première ligne exploitable ne commence pas par une clé (${String(spec.keyPattern)}). ` +
+          `Le fichier n'a pas le format attendu — vérifiez qu'il ne s'agit pas d'une page d'erreur téléchargée à la place du fichier.`,
+        line,
+      );
+    }
+
+    if (previous.continuations >= MAX_CONTINUATION_LINES) {
+      throw new BdpmFormatError(
+        spec.fileName,
+        lineNumber,
+        `${MAX_CONTINUATION_LINES + 1} lignes consécutives ne commencent pas par une clé ` +
+          `(${String(spec.keyPattern)}). Ce n'est plus un libellé replié : la structure du ` +
+          `fichier n'est pas celle attendue.`,
+        line,
+      );
+    }
+
+    // Le retour à la ligne appartient au libellé publié : on le conserve
+    // plutôt que de le remplacer par une espace, ce qui serait retoucher la
+    // source.
+    previous.text += `\n${line}`;
+    previous.continuations += 1;
+    joinedRecords += 1;
+    if (joinedSamples.length < JOINED_SAMPLE_LIMIT) {
+      joinedSamples.push(`ligne ${previous.lineNumber} : ${previous.text}`);
+    }
+  }
+
+  // Phase 2 — contrôle strict du nombre de colonnes, enregistrement par
+  // enregistrement.
+  for (const record of records) {
+    const columns = record.text.split("\t");
 
     if (columns.length === spec.columns + 1 && spec.allowsTrailingEmptyColumn) {
       // La colonne surnuméraire ne peut être qu'une fin de ligne tabulée.
       if (columns[spec.columns].trim().length > 0) {
         throw new BdpmFormatError(
           spec.fileName,
-          lineNumber,
+          record.lineNumber,
           `colonne surnuméraire non vide (${spec.columns + 1} colonnes attendues vides en fin de ligne)`,
+          record.text,
         );
       }
       columns.pop();
@@ -64,16 +167,17 @@ export function parseTable(content: string, spec: BdpmFileSpec): string[][] {
     if (columns.length !== spec.columns) {
       throw new BdpmFormatError(
         spec.fileName,
-        lineNumber,
+        record.lineNumber,
         `${columns.length} colonnes au lieu de ${spec.columns}. ` +
           `Le format de la source a changé : l'import s'arrête plutôt que de ranger les valeurs de travers.`,
+        record.text,
       );
     }
 
     rows.push(columns);
   }
 
-  return rows;
+  return { rows, joinedRecords, joinedSamples };
 }
 
 // ---------------------------------------------------------------------------

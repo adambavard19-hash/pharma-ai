@@ -184,7 +184,7 @@ async function main() {
 
     console.log(`\n${BOLD}Résultat${RESET}`);
     console.log(
-      `  ${"Fichier".padEnd(26)}${"lues".padStart(8)}${"créées".padStart(9)}${"modifiées".padStart(11)}${"inchangées".padStart(12)}${"ignorées".padStart(10)}`,
+      `  ${"Fichier".padEnd(26)}${"lignes".padStart(8)}${"créées".padStart(9)}${"modifiées".padStart(11)}${"inchangées".padStart(12)}${"ignorées".padStart(10)}${"recollées".padStart(11)}`,
     );
     for (const report of result.fileReports) {
       console.log(
@@ -193,11 +193,28 @@ async function main() {
           `${String(report.created).padStart(9)}` +
           `${String(report.updated).padStart(11)}` +
           `${String(report.unchanged).padStart(12)}` +
-          `${String(report.skipped).padStart(10)}`,
+          `${String(report.skipped).padStart(10)}` +
+          `${String(report.joinedRecords).padStart(11)}`,
       );
       for (const [reason, count] of Object.entries(report.skipReasons)) {
         console.log(`    ${DIM}${count} × ${reason}${RESET}`);
       }
+      // Un enregistrement recollé est une décision de lecture : elle doit être
+      // visible, et vérifiable sur pièces.
+      for (const sample of report.joinedSamples) {
+        console.log(
+          `    ${DIM}recollé — ${sample.replace(/\n/g, `${RESET}${BOLD}⏎${RESET}${DIM}`).slice(0, 220)}${RESET}`,
+        );
+      }
+    }
+
+    const joined = result.fileReports.reduce((sum, report) => sum + report.joinedRecords, 0);
+    if (joined > 0) {
+      console.log(
+        `\n${WARN} ${joined} ligne(s) recollée(s) : un libellé de la source contenait un retour\n` +
+          `  à la ligne. Le retour est conservé dans le champ, la source n'est pas retouchée.\n` +
+          `  ${DIM}Les exemples ci-dessus permettent de vérifier que le recollage est juste.${RESET}`,
+      );
     }
 
     if (result.missingFiles.length > 0) {

@@ -52,6 +52,14 @@ export type BdpmFileReport = {
   updated: number;
   /** Lignes retrouvées à l'identique. Un import sain en est presque entièrement fait. */
   unchanged: number;
+  /**
+   * Enregistrements reconstitués à partir de plusieurs lignes physiques — un
+   * libellé de la source contenait un retour à la ligne. Compté et montré :
+   * recoller en silence reviendrait à retoucher la source sans le dire.
+   */
+  joinedRecords: number;
+  /** Exemples de recollage, pour pouvoir vérifier qu'il est juste. */
+  joinedSamples: string[];
   /** Lignes lues mais non retenues, avec leur motif. */
   skipped: number;
   skipReasons: Record<string, number>;
@@ -101,6 +109,8 @@ function emptyReport(key: BdpmFileKey): BdpmFileReport {
     created: 0,
     updated: 0,
     unchanged: 0,
+    joinedRecords: 0,
+    joinedSamples: [],
     skipped: 0,
     skipReasons: {},
   };
@@ -202,7 +212,10 @@ export async function importBdpm(
 
     let rows: string[][];
     try {
-      rows = parseTable(decodeWindows1252(bytes), spec);
+      const table = parseTable(decodeWindows1252(bytes), spec);
+      rows = table.rows;
+      report.joinedRecords = table.joinedRecords;
+      report.joinedSamples = table.joinedSamples;
     } catch (error) {
       return fail(error instanceof Error ? error.message : String(error));
     }
@@ -216,7 +229,12 @@ export async function importBdpm(
       else target.push(built);
     }
 
-    log(`  ${spec.fileName.padEnd(24)} ${String(report.read).padStart(6)} lignes lues`);
+    log(
+      `  ${spec.fileName.padEnd(24)} ${String(report.read).padStart(6)} enregistrement(s)` +
+        (report.joinedRecords > 0
+          ? `  ${report.joinedRecords} ligne(s) recollée(s)`
+          : ""),
+    );
   }
 
   // Les fichiers rattachés référencent des spécialités par leur code CIS. La

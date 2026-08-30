@@ -28,12 +28,12 @@ const COMPOSITION_LINE = "60002283\tcomprimé\t42215\tANASTROZOLE\t1,00 mg\tun c
 describe("parseTable", () => {
   it("lit les deux styles de fin de ligne présents dans la source", () => {
     // Mesuré : CIS_CIP_bdpm.txt est en LF seul, les cinq autres en CRLF.
-    expect(parseTable(`${SPECIALTY_LINE}\n${SPECIALTY_LINE}\n`, SPECIALTIES)).toHaveLength(2);
-    expect(parseTable(`${SPECIALTY_LINE}\r\n${SPECIALTY_LINE}\r\n`, SPECIALTIES)).toHaveLength(2);
+    expect(parseTable(`${SPECIALTY_LINE}\n${SPECIALTY_LINE}\n`, SPECIALTIES).rows).toHaveLength(2);
+    expect(parseTable(`${SPECIALTY_LINE}\r\n${SPECIALTY_LINE}\r\n`, SPECIALTIES).rows).toHaveLength(2);
   });
 
   it("ne laisse pas le retour chariot dans la dernière colonne", () => {
-    const [row] = parseTable(`${SPECIALTY_LINE}\r\n`, SPECIALTIES);
+    const [row] = parseTable(`${SPECIALTY_LINE}\r\n`, SPECIALTIES).rows;
     expect(row.at(-1)).toBe("Non");
   });
 
@@ -44,15 +44,23 @@ describe("parseTable", () => {
     expect(() => parseTable("61266250\tA 313\n", SPECIALTIES)).toThrow(BdpmFormatError);
   });
 
-  it("nomme le fichier et la ligne en cause", () => {
-    expect(() => parseTable(`${SPECIALTY_LINE}\n61266250\n`, SPECIALTIES)).toThrow(
-      /CIS_bdpm\.txt, ligne 2/,
-    );
+  it("nomme le fichier et la ligne en cause, et cite le contenu lu", () => {
+    try {
+      parseTable(`${SPECIALTY_LINE}\n61266250\tA 313\n`, SPECIALTIES);
+      throw new Error("aurait dû échouer");
+    } catch (error) {
+      expect(error).toBeInstanceOf(BdpmFormatError);
+      // L'erreur doit se diagnostiquer seule : sans le contenu cité, il faut
+      // aller ouvrir un fichier de plusieurs mégaoctets pour comprendre.
+      expect((error as Error).message).toMatch(/CIS_bdpm\.txt, ligne 2/);
+      expect((error as Error).message).toContain("Contenu lu");
+      expect((error as Error).message).toContain("61266250⇥A 313");
+    }
   });
 
   it("tolère la tabulation de fin de ligne des fichiers qui en ont une", () => {
-    expect(parseTable(`${COMPOSITION_LINE}\t\r\n`, COMPOSITIONS)).toHaveLength(1);
-    expect(parseTable(`${COMPOSITION_LINE}\t\r\n`, COMPOSITIONS)[0]).toHaveLength(8);
+    expect(parseTable(`${COMPOSITION_LINE}\t\r\n`, COMPOSITIONS).rows).toHaveLength(1);
+    expect(parseTable(`${COMPOSITION_LINE}\t\r\n`, COMPOSITIONS).rows[0]).toHaveLength(8);
   });
 
   it("refuse une colonne surnuméraire qui, elle, porte une valeur", () => {
@@ -62,7 +70,63 @@ describe("parseTable", () => {
   });
 
   it("ignore les lignes vides sans les compter", () => {
-    expect(parseTable(`${SPECIALTY_LINE}\n\n${SPECIALTY_LINE}\n\n`, SPECIALTIES)).toHaveLength(2);
+    expect(parseTable(`${SPECIALTY_LINE}\n\n${SPECIALTY_LINE}\n\n`, SPECIALTIES).rows).toHaveLength(2);
+  });
+});
+
+describe("parseTable — enregistrements repliés sur plusieurs lignes", () => {
+  // La source n'échappe pas ses champs : un libellé contenant un retour à la
+  // ligne se répartit sur plusieurs lignes physiques. Compter les colonnes
+  // ligne à ligne échouait alors sur la seconde moitié, avec « 1 colonne au
+  // lieu de 2 » — le cas rencontré sur CIS_CPD_bdpm.txt.
+  const CPD = bdpmFileSpec("PRESCRIPTION_CONDITIONS");
+
+  it("reconstitue un libellé replié et conserve le retour à la ligne", () => {
+    const table = parseTable(
+      "60355340\tprescription réservée aux spécialistes\r\nen cardiologie\r\n60371024\tliste I\r\n",
+      CPD,
+    );
+    expect(table.rows).toHaveLength(2);
+    expect(table.rows[0]).toEqual([
+      "60355340",
+      "prescription réservée aux spécialistes\nen cardiologie",
+    ]);
+    expect(table.rows[1]).toEqual(["60371024", "liste I"]);
+  });
+
+  it("compte et donne à voir ce qu'il a recollé", () => {
+    // Recoller en silence reviendrait à retoucher la source sans le dire.
+    const table = parseTable("60355340\tdébut\r\nsuite\r\n", CPD);
+    expect(table.joinedRecords).toBe(1);
+    expect(table.joinedSamples[0]).toContain("ligne 1");
+    expect(table.joinedSamples[0]).toContain("suite");
+  });
+
+  it("garde le contrôle strict des colonnes après reconstitution", () => {
+    // Le point qui compte : reconstituer les enregistrements ne relâche rien.
+    // Une colonne ajoutée par la source arrête toujours le fichier entier.
+    expect(() => parseTable("60355340\tliste I\tnouveau champ\r\n", CPD)).toThrow(
+      /3 colonnes au lieu de 2/,
+    );
+    expect(() =>
+      parseTable("60355340\tprescription\r\nrepliée\tavec une colonne en trop\r\n", CPD),
+    ).toThrow(/3 colonnes au lieu de 2/);
+  });
+
+  it("refuse un fichier qui ne commence pas par une clé", () => {
+    // Le cas d'une page d'erreur HTML téléchargée à la place du fichier.
+    try {
+      parseTable("<!DOCTYPE html>\n<html><body>404</body></html>\n", CPD);
+      throw new Error("aurait dû échouer");
+    } catch (error) {
+      expect(error).toBeInstanceOf(BdpmFormatError);
+      expect((error as Error).message).toContain("page d'erreur");
+    }
+  });
+
+  it("refuse d'engouffrer un fichier entier dans un seul enregistrement", () => {
+    const content = ["60355340\tliste I", "a", "b", "c", "d", "e"].join("\r\n");
+    expect(() => parseTable(content, CPD)).toThrow(/n'est plus un libellé replié/);
   });
 });
 

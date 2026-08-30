@@ -35,9 +35,30 @@ export type BdpmFileSpec = {
    * surnuméraire À CONDITION qu'elle soit vide — jamais une colonne de plus.
    */
   allowsTrailingEmptyColumn: boolean;
+  /**
+   * Forme d'un DÉBUT d'enregistrement.
+   *
+   * Ces fichiers n'ont pas de guillemets d'échappement : un libellé qui
+   * contient un retour à la ligne se retrouve donc réparti sur plusieurs
+   * lignes physiques, et compter les colonnes ligne à ligne échoue sur la
+   * seconde moitié. La frontière entre deux enregistrements n'est pas « un
+   * retour à la ligne » mais « un retour à la ligne suivi d'une nouvelle
+   * clé ».
+   *
+   * Mesuré sur 98 834 lignes réelles des six fichiers : toutes commencent par
+   * des chiffres suivis d'une tabulation, sans une exception. Une ligne qui ne
+   * respecte pas cette forme ne peut donc pas ouvrir un enregistrement — elle
+   * prolonge le précédent.
+   */
+  keyPattern: RegExp;
   /** Sans ce fichier, l'import n'a pas de sens et s'arrête. */
   required: boolean;
 };
+
+/** Code CIS : toujours huit chiffres. Mesuré sur les cinq fichiers concernés. */
+const CIS_KEY = /^\d{8}\t/;
+/** Identifiant de groupe générique : de un à quatre chiffres. */
+const GROUP_KEY = /^\d{1,6}\t/;
 
 export const BDPM_FILES: readonly BdpmFileSpec[] = [
   {
@@ -46,6 +67,7 @@ export const BDPM_FILES: readonly BdpmFileSpec[] = [
     label: "Spécialités pharmaceutiques",
     columns: 12,
     allowsTrailingEmptyColumn: false,
+    keyPattern: CIS_KEY,
     required: true,
   },
   {
@@ -54,6 +76,7 @@ export const BDPM_FILES: readonly BdpmFileSpec[] = [
     label: "Présentations (boîtes, codes CIP)",
     columns: 13,
     allowsTrailingEmptyColumn: false,
+    keyPattern: CIS_KEY,
     required: true,
   },
   {
@@ -62,6 +85,7 @@ export const BDPM_FILES: readonly BdpmFileSpec[] = [
     label: "Compositions (substances actives)",
     columns: 8,
     allowsTrailingEmptyColumn: true,
+    keyPattern: CIS_KEY,
     required: true,
   },
   {
@@ -70,6 +94,7 @@ export const BDPM_FILES: readonly BdpmFileSpec[] = [
     label: "Conditions de prescription et de délivrance",
     columns: 2,
     allowsTrailingEmptyColumn: false,
+    keyPattern: CIS_KEY,
     required: false,
   },
   {
@@ -78,6 +103,7 @@ export const BDPM_FILES: readonly BdpmFileSpec[] = [
     label: "Groupes génériques",
     columns: 5,
     allowsTrailingEmptyColumn: true,
+    keyPattern: GROUP_KEY,
     required: false,
   },
   {
@@ -86,6 +112,7 @@ export const BDPM_FILES: readonly BdpmFileSpec[] = [
     label: "Avis de service médical rendu (HAS)",
     columns: 6,
     allowsTrailingEmptyColumn: true,
+    keyPattern: CIS_KEY,
     required: false,
   },
 ] as const;
