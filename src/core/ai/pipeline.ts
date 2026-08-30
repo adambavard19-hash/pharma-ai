@@ -1,4 +1,9 @@
-import { ENGINE_VERSION, MAX_RECOMMENDATIONS_PER_PRESCRIPTION, RECOMMENDATION_MIN_SCORE } from "@/config/constants";
+import {
+  ENGINE_VERSION,
+  MAX_RECOMMENDATIONS_PER_PRESCRIPTION,
+  RECOMMENDATION_MIN_RELEVANCE,
+  RECOMMENDATION_MIN_SCORE,
+} from "@/config/constants";
 import { detectAdviceOpportunities } from "./engines/advice";
 import { findCandidateProducts } from "./engines/matching";
 import {
@@ -183,6 +188,11 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     lineIndex: line.lineIndex,
     drugName: line.drugName as string,
     knowledge: input.knowledge.get((line.drugName as string).toLowerCase()) ?? null,
+    // Le nom officiel prend le pas sur le texte du prescripteur quand la ligne
+    // a été rattachée : il est vérifiable dans le catalogue national.
+    officialName: input.official?.get((line.drugName as string).toLowerCase())?.name ?? null,
+    officialSubstance:
+      input.official?.get((line.drugName as string).toLowerCase())?.substances[0] ?? null,
   }));
 
   const rawOpportunities = recorder.run(
@@ -216,7 +226,21 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     input.patient,
     knownDrugs,
   );
-  const productSafety = evaluateProductSafety(input.catalog, input.patient);
+  // Les substances de l'ordonnance, telles que publiées par le catalogue
+  // national. Elles servent à écarter un conseil qui doublerait une dose.
+  const prescribedSubstances = [
+    ...new Set(
+      usableLines.flatMap(
+        (line) => input.official?.get((line.drugName as string).toLowerCase())?.substances ?? [],
+      ),
+    ),
+  ];
+
+  const productSafety = evaluateProductSafety(
+    input.catalog,
+    input.patient,
+    prescribedSubstances,
+  );
 
   const allSafetyFindings = [
     ...safetyFindings,
@@ -299,7 +323,13 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
             history: input.history,
             blockedProductIds: productSafety.blockedProductIds,
           });
-          if (result && result.totalScore >= RECOMMENDATION_MIN_SCORE) {
+          // Deux seuils, et le second est le plus important : une proposition
+          // doit correspondre au besoin, pas seulement être inoffensive.
+          if (
+            result &&
+            result.totalScore >= RECOMMENDATION_MIN_SCORE &&
+            result.breakdown.relevance >= RECOMMENDATION_MIN_RELEVANCE
+          ) {
             results.push(result);
           }
         }
@@ -339,10 +369,16 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         const equivalents = list.filter(
           (item) => Math.abs(item.totalScore - best.totalScore) < 0.02,
         );
+        // Départage, dans cet ordre : d'abord ce que l'officine a réellement en
+        // rayon, ensuite seulement la dimension commerciale. La disponibilité
+        // n'a pas fait monter ces références — elles sont déjà jugées
+        // équivalentes — elle départage ce que la clinique n'a pas tranché.
         const chosen =
           equivalents.length > 1
             ? [...equivalents].sort(
-                (a, b) => b.breakdown.commercial - a.breakdown.commercial,
+                (a, b) =>
+                  b.breakdown.availability - a.breakdown.availability ||
+                  b.breakdown.commercial - a.breakdown.commercial,
               )[0]
             : best;
 

@@ -124,8 +124,31 @@ export type PatientContext = {
 
 // --- Catalogue -------------------------------------------------------------
 
+/**
+ * D'où vient une référence proposable.
+ *
+ * Les deux origines ne se mélangent jamais en base : le catalogue de l'officine
+ * porte ce que la pharmacie a créé et vend, le catalogue national porte ce que
+ * l'ANSM publie. Elles se rejoignent uniquement ici, le temps d'un classement.
+ */
+export type CatalogProductOrigin = "PHARMACY_CATALOG" | "NATIONAL_DRUG";
+
 export type CatalogProduct = {
   id: string;
+  origin: CatalogProductOrigin;
+  /** Présentation du catalogue national, si l'origine est officielle. */
+  presentationId: string | null;
+  /**
+   * Substances actives publiées. Vide pour un produit de parapharmacie, qui
+   * n'en déclare pas.
+   */
+  substances: string[];
+  /**
+   * Conditions de délivrance publiées : « liste I », « liste II »,
+   * « stupéfiant »… Une liste NON VIDE signifie que le médicament est soumis à
+   * prescription et ne peut donc jamais être proposé en vente additionnelle.
+   */
+  prescriptionConditions: string[];
   name: string;
   brand: string | null;
   category: ProductCategoryCode;
@@ -203,6 +226,8 @@ export type AdviceOpportunityResult = {
   category: ProductCategoryCode;
   title: string;
   rationale: string;
+  /** La même raison en une ligne, `{drug}` déjà substitué. */
+  shortReason: string;
   /**
    * La phrase à dire au patient, `{drug}` déjà substitué. `{product}` ne l'est
    * qu'au scoring : à ce stade le catalogue n'a pas été consulté.
@@ -247,6 +272,12 @@ export type ScoredRecommendation = {
   breakdown: ScoreBreakdown;
   /** Explication technique destinée au pharmacien. */
   justification: string;
+  /**
+   * La raison en une ligne, lisible au comptoir sans s'arrêter de parler.
+   * Format tenu : « pourquoi », pas « quoi ». La version longue reste dans
+   * `justification` pour la relecture a posteriori.
+   */
+  shortReason: string;
   /** Formulation écrite sur la fiche remise au patient. */
   patientReason: string;
   /** La phrase à dire au comptoir, issue de la règle de conseil. */
@@ -256,12 +287,27 @@ export type ScoredRecommendation = {
   explanation: ScoreContribution[];
 };
 
+/**
+ * Les dimensions qui pèsent réellement dans le score.
+ *
+ * `availability` en est volontairement absente : le stock ne rend pas un
+ * produit plus pertinent cliniquement. Il sert à écarter ce qui n'est pas
+ * délivrable et à départager des références déjà jugées équivalentes — jamais
+ * à faire remonter un produit moins adapté.
+ */
+export type ScoredDimension = Exclude<keyof ScoreBreakdown, "availability">;
+
 export type ScoreContribution = {
   dimension: keyof ScoreBreakdown;
   label: string;
   value: number;
   weight: number;
   detail: string;
+  /**
+   * `SCORE` : la dimension entre dans le total pondéré.
+   * `FILTRE` : elle écarte ou départage, sans jamais augmenter le total.
+   */
+  role: "SCORE" | "FILTRE";
 };
 
 // --- Trace du pipeline -----------------------------------------------------

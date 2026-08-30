@@ -281,15 +281,55 @@ export function evaluateOpportunitySafety(
 export function evaluateProductSafety(
   products: CatalogProduct[],
   patient: PatientContext,
+  /** Substances actives déjà présentes sur l'ordonnance, telles que publiées. */
+  prescribedSubstances: string[] = [],
 ): { findings: SafetyFindingResult[]; blockedProductIds: Set<string> } {
   const findings: SafetyFindingResult[] = [];
   const blockedProductIds = new Set<string>();
 
   const normalizedAllergies = patient.allergies.map((a) => a.trim().toLowerCase()).filter(Boolean);
+  const prescribed = new Set(
+    prescribedSubstances.map((substance) => substance.trim().toLowerCase()).filter(Boolean),
+  );
 
   for (const product of products) {
     if (!product.isActive) {
       blockedProductIds.add(product.id);
+      continue;
+    }
+
+    // Un médicament soumis à prescription ne se propose pas en vente
+    // additionnelle. Le filtre existe déjà au chargement du catalogue ; il est
+    // répété ici parce qu'une règle de cette portée ne doit pas dépendre d'un
+    // seul endroit du code.
+    if (product.prescriptionConditions.length > 0) {
+      blockedProductIds.add(product.id);
+      findings.push({
+        severity: "BLOCKING",
+        code: "PRESCRIPTION_REQUIRED",
+        message: `« ${product.name} » écarté : soumis à prescription (${product.prescriptionConditions.join(", ")}). Un médicament de liste ne se propose pas en conseil.`,
+        subjectType: "PRODUCT",
+        subjectId: product.id,
+        source: SOURCE,
+      });
+      continue;
+    }
+
+    // Proposer une substance déjà prescrite, c'est risquer un doublement de
+    // dose sans que personne ne l'ait décidé.
+    const duplicated = product.substances.find((substance) =>
+      prescribed.has(substance.trim().toLowerCase()),
+    );
+    if (duplicated) {
+      blockedProductIds.add(product.id);
+      findings.push({
+        severity: "BLOCKING",
+        code: "SUBSTANCE_ALREADY_PRESCRIBED",
+        message: `« ${product.name} » écarté : contient ${duplicated}, déjà présent sur l'ordonnance. Risque de doublement de dose.`,
+        subjectType: "PRODUCT",
+        subjectId: product.id,
+        source: SOURCE,
+      });
       continue;
     }
 

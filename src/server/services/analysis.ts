@@ -17,6 +17,7 @@ import {
 } from "@/server/ai/registry";
 import {
   loadCatalogSnapshot,
+  loadNationalDrugCandidates,
   loadPharmacyRules,
   loadValidationHistory,
 } from "./catalog";
@@ -180,12 +181,19 @@ export async function analysePrescription(params: {
   const aiProvider = getAIProvider();
   const knowledgeProvider = getDrugKnowledgeProvider();
 
-  const [patient, catalog, rules, history] = await Promise.all([
+  const [patient, pharmacyCatalog, nationalCandidates, rules, history] = await Promise.all([
     buildPatientContext(prescription.patientId),
     loadCatalogSnapshot(params.scope, { includeSiblingAvailability: true }),
+    // Les médicaments de l'officine susceptibles de répondre à une règle de
+    // conseil. Sélection bornée et filtrée en base : le comptoir n'attend pas.
+    loadNationalDrugCandidates(params.scope),
     loadPharmacyRules(params.scope),
     loadValidationHistory(params.scope),
   ]);
+
+  // Les deux origines se rejoignent ici, le temps d'un classement. Elles ne se
+  // mélangent jamais en base.
+  const catalog = [...pharmacyCatalog, ...nationalCandidates];
 
   const drugNames = prescription.lines
     .map((line) => line.drugName)
@@ -355,13 +363,18 @@ export async function analysePrescription(params: {
 
     for (const recommendation of result.recommendations) {
       const product = catalogById.get(recommendation.productId);
+      // Un candidat du catalogue national n'est pas un produit de l'officine :
+      // il se range dans l'autre colonne. Les deux liens ne sont jamais remplis
+      // ensemble.
+      const isNationalDrug = product?.origin === "NATIONAL_DRUG";
       const created = await tx.recommendation.create({
         data: {
           pharmacyId: params.scope.pharmacyId,
           prescriptionId: prescription.id,
           analysisRunId: run.id,
           opportunityId: opportunityIdByKey.get(recommendation.opportunityKey) ?? null,
-          productId: recommendation.productId,
+          productId: isNationalDrug ? null : recommendation.productId,
+          presentationId: isNationalDrug ? (product?.presentationId ?? null) : null,
           origin: "AI",
           status: "PROPOSED",
           scoreBreakdown: {
@@ -370,6 +383,7 @@ export async function analysePrescription(params: {
           } as never,
           totalScore: recommendation.totalScore,
           justification: recommendation.justification,
+          shortReason: recommendation.shortReason,
           patientReason: recommendation.patientReason,
           counterScript: recommendation.counterScript,
           precautions: recommendation.precautions,

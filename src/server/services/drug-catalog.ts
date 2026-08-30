@@ -371,3 +371,86 @@ export async function listDrugStock(options: DrugStockListOptions): Promise<{
     total,
   };
 }
+
+/**
+ * Ce que l'officine détient des médicaments PRESCRITS.
+ *
+ * C'est la question que le pharmacien se pose en premier — « est-ce que je
+ * l'ai ? » — et à laquelle Pharma.ai ne savait pas répondre : le catalogue
+ * national et le stock de l'officine existaient côte à côte sans se parler.
+ *
+ * La réponse porte sur la SPÉCIALITÉ, pas sur la boîte : une officine qui
+ * détient une autre présentation du même médicament peut délivrer. Les
+ * présentations réellement détenues sont rendues pour que le pharmacien voie
+ * laquelle.
+ */
+export type PrescribedAvailability = {
+  lineId: string;
+  state: DrugStockState | "UNKNOWN";
+  /** Quantité totale, toutes présentations de la spécialité confondues. */
+  quantity: number;
+  presentations: { cip13: string; label: string; quantity: number }[];
+};
+
+export async function loadPrescribedAvailability(
+  pharmacyId: string,
+  prescriptionId: string,
+): Promise<Map<string, PrescribedAvailability>> {
+  const lines = await prisma.prescriptionLine.findMany({
+    where: { prescriptionId },
+    select: { id: true, drugSpecialtyId: true },
+  });
+
+  const result = new Map<string, PrescribedAvailability>();
+  const specialtyIds = [
+    ...new Set(lines.map((line) => line.drugSpecialtyId).filter((id): id is string => id !== null)),
+  ];
+
+  for (const line of lines) {
+    result.set(line.id, {
+      lineId: line.id,
+      // Une ligne non rattachée n'est pas « hors stock » : on ne sait pas.
+      // Confondre les deux ferait croire à une rupture inexistante.
+      state: line.drugSpecialtyId ? "NOT_REFERENCED" : "UNKNOWN",
+      quantity: 0,
+      presentations: [],
+    });
+  }
+
+  if (specialtyIds.length === 0) return result;
+
+  const stocks = await prisma.pharmacyDrugStock.findMany({
+    where: { pharmacyId, presentation: { specialtyId: { in: specialtyIds } } },
+    select: {
+      quantity: true,
+      presentation: { select: { cip13: true, label: true, specialtyId: true } },
+    },
+  });
+
+  const bySpecialty = new Map<string, typeof stocks>();
+  for (const stock of stocks) {
+    const list = bySpecialty.get(stock.presentation.specialtyId) ?? [];
+    list.push(stock);
+    bySpecialty.set(stock.presentation.specialtyId, list);
+  }
+
+  for (const line of lines) {
+    if (!line.drugSpecialtyId) continue;
+    const held = bySpecialty.get(line.drugSpecialtyId) ?? [];
+    if (held.length === 0) continue;
+
+    const quantity = held.reduce((sum, stock) => sum + stock.quantity, 0);
+    result.set(line.id, {
+      lineId: line.id,
+      state: drugStockState({ quantity }),
+      quantity,
+      presentations: held.map((stock) => ({
+        cip13: stock.presentation.cip13,
+        label: stock.presentation.label,
+        quantity: stock.quantity,
+      })),
+    });
+  }
+
+  return result;
+}

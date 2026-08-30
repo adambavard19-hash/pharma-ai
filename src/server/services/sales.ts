@@ -146,6 +146,37 @@ export async function recordSale(params: {
       });
     }
 
+    // Ce qui n'a été ni accepté ni refusé au moment où la vente se termine est
+    // une proposition IGNORÉE. C'est un résultat à part entière : sans lui, on
+    // ne saurait pas distinguer « le pharmacien a dit non » de « le pharmacien
+    // ne l'a même pas regardée » quand viendra le moment de mesurer la qualité
+    // des recommandations. Aucun apprentissage automatique ici — seulement la
+    // trace qui le rendra possible plus tard.
+    // Une vente au comptoir sans ordonnance n'a rien à ignorer.
+    const ignored = params.prescriptionId
+      ? await tx.recommendation.findMany({
+          where: { prescriptionId: params.prescriptionId, status: "PROPOSED" },
+          select: { id: true },
+        })
+      : [];
+
+    if (ignored.length > 0) {
+      await tx.recommendation.updateMany({
+        where: { id: { in: ignored.map((item) => item.id) } },
+        data: { status: "IGNORED" },
+      });
+      for (const item of ignored) {
+        await tx.recommendationEvent.create({
+          data: {
+            recommendationId: item.id,
+            type: "IGNORED",
+            userId: params.scope.userId,
+            metadata: { saleId: created.id } as never,
+          },
+        });
+      }
+    }
+
     return created;
   });
 

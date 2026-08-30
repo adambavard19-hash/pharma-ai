@@ -3,6 +3,18 @@ import { prisma } from "@/server/db/client";
 import { siblingPharmacyIds, type TenantScope } from "@/server/db/tenant";
 import type { CatalogProduct, PharmacyRuleInput, ProductValidationHistory } from "@/core/ai/types";
 import { PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
+import { ADVICE_RULES } from "@/core/ai/engines/advice";
+import { normalizeSearchText } from "@/core/reference/search";
+
+/**
+ * Borne du nombre de lignes de stock médicament confrontées aux règles de
+ * conseil. Une officine peut en référencer des dizaines de milliers ; le
+ * comptoir dispose de secondes.
+ */
+const NATIONAL_CANDIDATE_LIMIT = 300;
+
+/** Borne de la résolution préalable des spécialités et substances concernées. */
+const SPECIALTY_MATCH_LIMIT = 4000;
 
 /**
  * Chargement du catalogue pour le moteur de recommandation.
@@ -41,6 +53,12 @@ export async function loadCatalogSnapshot(
 
   return products.map((product) => ({
     id: product.id,
+    origin: "PHARMACY_CATALOG" as const,
+    presentationId: null,
+    // Un produit de parapharmacie ne déclare ni substance ni condition de
+    // délivrance : ces deux champs n'ont de sens que pour un médicament.
+    substances: [],
+    prescriptionConditions: [],
     name: product.name,
     brand: product.brand,
     category: product.category,
@@ -61,6 +79,141 @@ export async function loadCatalogSnapshot(
     availableInSiblingPharmacy: product.ean ? siblingEans.has(product.ean) : false,
     isActive: product.isActive,
   }));
+}
+
+/**
+ * Les médicaments de l'officine susceptibles d'être conseillés.
+ *
+ * Trois précautions, chacune imposée par une contrainte du produit.
+ *
+ * 1. **On ne part jamais du stock.** Cette fonction ne cherche pas « quoi
+ *    vendre » : elle restreint le stock aux références qui pourraient répondre
+ *    à l'une des règles de conseil existantes. C'est le besoin, détecté plus
+ *    loin dans le pipeline, qui décidera si l'une d'elles est retenue — ou
+ *    aucune.
+ * 2. **On ne charge pas 20 000 lignes.** Une grosse officine peut référencer
+ *    tout le catalogue national. La sélection est donc filtrée en base sur les
+ *    termes des règles et bornée, pour tenir le budget de temps du comptoir.
+ * 3. **Rien de soumis à prescription.** Le filtre est appliqué ici ET dans le
+ *    moteur de sécurité : une règle de cette importance mérite deux verrous.
+ */
+export async function loadNationalDrugCandidates(
+  scope: TenantScope,
+): Promise<CatalogProduct[]> {
+  const terms = [
+    ...new Set(ADVICE_RULES.flatMap((rule) => rule.matchingTags).map(normalizeSearchText)),
+  ].filter((term) => term.length >= 4);
+
+  if (terms.length === 0) return [];
+
+  // Les spécialités concernées sont résolues AVANT d'interroger le stock.
+  // Mesuré : la même recherche exprimée en branches `OR` traversant la
+  // jointure stock → présentation → spécialité coûte 474 ms, contre 58 ms en
+  // deux passes indexées. Au comptoir, c'est un demi-battement de cœur gagné
+  // sur chaque analyse.
+  const [byName, substances] = await Promise.all([
+    prisma.drugSpecialty.findMany({
+      where: { withdrawnAt: null, OR: terms.map((term) => ({ searchName: { contains: term } })) },
+      select: { id: true },
+      take: SPECIALTY_MATCH_LIMIT,
+    }),
+    prisma.drugSubstance.findMany({
+      where: { OR: terms.map((term) => ({ searchLabel: { contains: term } })) },
+      select: { id: true },
+      take: SPECIALTY_MATCH_LIMIT,
+    }),
+  ]);
+
+  const bySubstance =
+    substances.length > 0
+      ? await prisma.drugComposition.findMany({
+          where: { substanceId: { in: substances.map((substance) => substance.id) } },
+          select: { specialtyId: true },
+          distinct: ["specialtyId"],
+          take: SPECIALTY_MATCH_LIMIT,
+        })
+      : [];
+
+  const specialtyIds = [
+    ...new Set([
+      ...byName.map((specialty) => specialty.id),
+      ...bySubstance.map((composition) => composition.specialtyId),
+    ]),
+  ];
+
+  if (specialtyIds.length === 0) return [];
+
+  const lines = await prisma.pharmacyDrugStock.findMany({
+    where: {
+      pharmacyId: scope.pharmacyId,
+      // Une boîte à zéro n'est pas candidate : Pharma.ai ne conseille pas ce
+      // qu'il ne peut pas délivrer aujourd'hui.
+      quantity: { gt: 0 },
+      presentation: { withdrawnAt: null, specialtyId: { in: specialtyIds } },
+    },
+    select: {
+      quantity: true,
+      alertThreshold: true,
+      presentation: {
+        select: {
+          id: true,
+          cip13: true,
+          label: true,
+          priceCents: true,
+          specialty: {
+            select: {
+              name: true,
+              pharmaceuticalForm: true,
+              compositions: { where: { nature: "SA" }, select: { substanceLabel: true } },
+              prescriptionConditions: { select: { label: true } },
+            },
+          },
+        },
+      },
+    },
+    take: NATIONAL_CANDIDATE_LIMIT,
+  });
+
+  return lines
+    .filter((line) => line.presentation.specialty.prescriptionConditions.length === 0)
+    .map((line) => {
+      const { presentation } = line;
+      const substances = [
+        ...new Set(presentation.specialty.compositions.map((c) => c.substanceLabel)),
+      ];
+      return {
+        id: `presentation:${presentation.id}`,
+        origin: "NATIONAL_DRUG" as const,
+        presentationId: presentation.id,
+        substances,
+        prescriptionConditions: [],
+        name: presentation.specialty.name,
+        brand: null,
+        // Le catalogue national ne classe pas les médicaments dans les
+        // catégories de l'officine. L'appariement se fera donc uniquement sur
+        // les termes, jamais sur une catégorie devinée.
+        category: "AUTRE" as const,
+        subCategory: presentation.specialty.pharmaceuticalForm,
+        reference: presentation.cip13,
+        ean: presentation.cip13,
+        imageUrl: null,
+        description: presentation.label,
+        // Aucune allégation commerciale : la source n'en publie pas, et en
+        // inventer une serait exactement ce que le produit s'interdit.
+        commercialClaims: [],
+        precautions: [],
+        matchingTags: [...substances, presentation.specialty.name],
+        contraindications: [],
+        salePriceCents: presentation.priceCents ?? 0,
+        // Prix d'achat inconnu : la dimension commerciale restera neutre.
+        purchasePriceCents: 0,
+        vatRate: 0,
+        stockQuantity: line.quantity,
+        alertThreshold: line.alertThreshold,
+        availableInSiblingPharmacy: false,
+        isActive: true,
+      };
+    });
 }
 
 export async function loadPharmacyRules(scope: TenantScope): Promise<PharmacyRuleInput[]> {

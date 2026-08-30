@@ -787,11 +787,12 @@ model DrugPresentation {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  specialty      DrugSpecialty       @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+  specialty       DrugSpecialty       @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
   /// Les officines qui détiennent cette boîte. Le catalogue national ne sait
   /// rien d'elles : c'est le stock qui référence la présentation, jamais
   /// l'inverse.
-  pharmacyStocks PharmacyDrugStock[]
+  pharmacyStocks  PharmacyDrugStock[]
+  recommendations Recommendation[]
 
   @@index([specialtyId])
   @@index([marketingStatus])
@@ -1311,6 +1312,11 @@ enum RecommendationStatus {
   PRESENTED
   PURCHASED
   DECLINED
+  /// Proposée, jamais tranchée, et la vente s'est terminée. C'est un résultat à
+  /// part entière : sans lui, on ne saurait pas distinguer « refusé » de
+  /// « même pas regardé » quand viendra le moment de mesurer la qualité des
+  /// recommandations.
+  IGNORED
 }
 
 model Recommendation {
@@ -1320,6 +1326,10 @@ model Recommendation {
   analysisRunId  String?
   opportunityId  String?
   productId      String?
+  /// Présentation du catalogue national, quand la recommandation porte sur un
+  /// médicament conseil plutôt que sur un produit du catalogue de l'officine.
+  /// Les deux liens sont facultatifs et mutuellement exclusifs en pratique.
+  presentationId String?
 
   origin RecommendationOrigin @default(AI)
   status RecommendationStatus @default(PROPOSED)
@@ -1332,6 +1342,9 @@ model Recommendation {
 
   /// Justification destinée au pharmacien (technique, traçable).
   justification String
+  /// La même chose en une ligne, lisible d'un coup d'œil au comptoir.
+  /// La version longue reste pour la relecture a posteriori.
+  shortReason   String?
   /// Formulation écrite sur la fiche remise au patient.
   patientReason String?
   /// La phrase réellement affichée au pharmacien pour être dite au patient.
@@ -1358,6 +1371,9 @@ model Recommendation {
   pharmacy        Pharmacy           @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   prescription    Prescription       @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
   analysisRun     AnalysisRun?       @relation(fields: [analysisRunId], references: [id], onDelete: SetNull)
+  /// `SetNull` : une présentation retirée du catalogue national ne doit pas
+  /// effacer la recommandation qui l'a citée — c'est une trace.
+  presentation    DrugPresentation?  @relation(fields: [presentationId], references: [id], onDelete: SetNull)
   opportunity     AdviceOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   product         Product?           @relation("RecommendationProduct", fields: [productId], references: [id], onDelete: SetNull)
   replacedProduct Product?           @relation("RecommendationReplacedProduct", fields: [replacedProductId], references: [id], onDelete: SetNull)
@@ -1383,6 +1399,8 @@ enum RecommendationEventType {
   PRESENTED_TO_PATIENT
   PURCHASED
   DECLINED_BY_PATIENT
+  /// La vente s'est terminée sans que le pharmacien tranche.
+  IGNORED
 }
 
 /// Journal complet du cycle de vie d'une recommandation : c'est cette table qui

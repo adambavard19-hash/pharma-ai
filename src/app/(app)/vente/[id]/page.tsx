@@ -6,6 +6,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { referenceAttribution } from "@/core/reference";
 import { getReferenceCatalogState } from "@/server/services/reference";
 import { proposeSpecialties } from "@/server/services/drug-identification";
+import { loadPrescribedAvailability } from "@/server/services/drug-catalog";
 import { AUTO_ACCEPT_REFUSAL_MESSAGES, decideAutoAccept } from "@/core/reference";
 import { SaleWorkspace } from "./sale-workspace";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
@@ -89,6 +90,10 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
       ),
   );
 
+  // Ce que l'officine détient des médicaments prescrits. Une seule requête,
+  // ciblée sur les spécialités rattachées.
+  const availability = await loadPrescribedAvailability(session.scope.pharmacyId, prescription.id);
+
   const catalogState = await getReferenceCatalogState();
   const catalogLoaded = catalogState.status === "READY" || catalogState.status === "STALE";
   const attribution = catalogLoaded ? referenceAttribution(catalogState) : null;
@@ -170,6 +175,10 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
               marketed: line.specialty.marketingStatus === "Commercialisée",
             }
           : null,
+        availability: (() => {
+          const held = availability.get(line.id);
+          return held ? { state: held.state, quantity: held.quantity } : null;
+        })(),
         identifiedBy: line.identifiedBy,
         candidates: proposals.get(line.id) ?? [],
         identificationRefusal: catalogLoaded

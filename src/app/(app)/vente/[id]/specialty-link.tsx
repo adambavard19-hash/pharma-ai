@@ -14,7 +14,15 @@ import { Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import type { SpecialtyCandidate } from "@/core/reference";
 import type { ActionResult } from "@/server/actions/types";
-import type { OfficialLineFacts, SpecialtyProposal } from "./types";
+import type { OfficialLineFacts, SaleLineDraft, SpecialtyProposal } from "./types";
+
+/** Ce que l'officine détient du médicament prescrit, dit en trois mots. */
+const AVAILABILITY_LABELS: Record<string, { label: string; tone: "success" | "warning" | "neutral" }> = {
+  IN_STOCK: { label: "En stock", tone: "success" },
+  REFERENCED_EMPTY: { label: "Épuisé", tone: "warning" },
+  NOT_REFERENCED: { label: "Hors stock", tone: "warning" },
+  UNKNOWN: { label: "Stock inconnu", tone: "neutral" },
+};
 
 /**
  * Le rattachement d'une ligne d'ordonnance au catalogue national.
@@ -30,6 +38,7 @@ import type { OfficialLineFacts, SpecialtyProposal } from "./types";
 export function SpecialtyLink({
   lineId,
   official,
+  availability,
   identifiedBy,
   candidates,
   refusal,
@@ -38,6 +47,7 @@ export function SpecialtyLink({
 }: {
   lineId: string;
   official: OfficialLineFacts | null;
+  availability: SaleLineDraft["availability"];
   identifiedBy: "AUTO" | "PHARMACIST" | "SCAN" | null;
   candidates: SpecialtyProposal[];
   refusal: string | null;
@@ -50,6 +60,7 @@ export function SpecialtyLink({
       <OfficialFacts
         lineId={lineId}
         official={official}
+        availability={availability}
         identifiedBy={identifiedBy}
         attribution={attribution}
         canEdit={canEdit}
@@ -63,12 +74,14 @@ export function SpecialtyLink({
 function OfficialFacts({
   lineId,
   official,
+  availability,
   identifiedBy,
   attribution,
   canEdit,
 }: {
   lineId: string;
   official: OfficialLineFacts;
+  availability: SaleLineDraft["availability"];
   identifiedBy: "AUTO" | "PHARMACIST" | "SCAN" | null;
   attribution: string | null;
   canEdit: boolean;
@@ -80,6 +93,12 @@ function OfficialFacts({
           <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-medium text-text-primary">
             <BookMarked className="size-3.5 shrink-0 text-text-tertiary" />
             {official.name}
+            {availability && (
+              <Badge tone={AVAILABILITY_LABELS[availability.state].tone}>
+                {AVAILABILITY_LABELS[availability.state].label}
+                {availability.state === "IN_STOCK" && ` · ${availability.quantity}`}
+              </Badge>
+            )}
             {identifiedBy === "PHARMACIST" && <Badge tone="success">Confirmé</Badge>}
             {!official.marketed && <Badge tone="warning">Commercialisation arrêtée</Badge>}
           </p>

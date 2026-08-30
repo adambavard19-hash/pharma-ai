@@ -6,6 +6,7 @@ import type {
   ProductValidationHistory,
   ScoreBreakdown,
   ScoreContribution,
+  ScoredDimension,
   ScoredRecommendation,
 } from "../types";
 
@@ -17,8 +18,14 @@ import type {
  * dimension, ce qui a joué et pourquoi.
  *
  * HIÉRARCHIE IMPOSÉE (cf. docs/ARCHITECTURE.md § Séparation médical/commercial) :
- *   sécurité > pertinence > adéquation patient > disponibilité >
+ *   sécurité > pertinence > adéquation patient >
  *   préférence de l'officine > commercial
+ *
+ * La DISPONIBILITÉ n'y figure plus. Elle ne dit rien de la valeur clinique d'un
+ * produit : avoir trente boîtes en réserve ne rend pas un conseil plus juste.
+ * Elle agit donc en amont — une référence indisponible n'est pas candidate — et
+ * en aval, pour départager des références déjà jugées équivalentes. Jamais
+ * entre les deux.
  *
  * Deux garde-fous rendent cette hiérarchie structurelle et non déclarative :
  *   1. `safety = 0` annule le score total (produit écarté, pas rétrogradé) ;
@@ -26,11 +33,10 @@ import type {
  *      ne peut jamais renverser un écart de pertinence — un test le vérifie.
  */
 
-export const SCORE_WEIGHTS: Record<keyof ScoreBreakdown, number> = {
-  relevance: 0.34,
-  safety: 0.22,
-  patientFit: 0.16,
-  availability: 0.14,
+export const SCORE_WEIGHTS: Record<ScoredDimension, number> = {
+  relevance: 0.4,
+  safety: 0.26,
+  patientFit: 0.2,
   pharmacistPreference: 0.08,
   validationHistory: 0.04,
   commercial: 0.02,
@@ -243,7 +249,7 @@ export function computeTotalScore(breakdown: ScoreBreakdown): number {
   // jamais être remonté par une autre dimension.
   if (breakdown.safety === 0 || breakdown.patientFit === 0) return 0;
 
-  const total = (Object.keys(SCORE_WEIGHTS) as (keyof ScoreBreakdown)[]).reduce(
+  const total = (Object.keys(SCORE_WEIGHTS) as ScoredDimension[]).reduce(
     (sum, key) => sum + breakdown[key] * SCORE_WEIGHTS[key],
     0,
   );
@@ -290,17 +296,29 @@ export function scoreProductForOpportunity(params: {
     commercial: commercial.detail,
   };
 
-  const explanation: ScoreContribution[] = (
-    Object.keys(SCORE_WEIGHTS) as (keyof ScoreBreakdown)[]
-  )
-    .map((dimension) => ({
-      dimension,
-      label: DIMENSION_LABELS[dimension],
-      value: breakdown[dimension],
-      weight: SCORE_WEIGHTS[dimension],
-      detail: contributions[dimension],
-    }))
-    .sort((a, b) => b.value * b.weight - a.value * a.weight);
+  const explanation: ScoreContribution[] = [
+    ...(Object.keys(SCORE_WEIGHTS) as ScoredDimension[])
+      .map((dimension) => ({
+        dimension,
+        label: DIMENSION_LABELS[dimension],
+        value: breakdown[dimension],
+        weight: SCORE_WEIGHTS[dimension],
+        detail: contributions[dimension],
+        role: "SCORE" as const,
+      }))
+      .sort((a, b) => b.value * b.weight - a.value * a.weight),
+    // La disponibilité ferme la liste, avec un poids nul : elle est montrée
+    // parce que le pharmacien doit la voir, pas parce qu'elle compte dans le
+    // classement.
+    {
+      dimension: "availability" as const,
+      label: DIMENSION_LABELS.availability,
+      value: breakdown.availability,
+      weight: 0,
+      detail: availability.detail,
+      role: "FILTRE" as const,
+    },
+  ];
 
   const totalScore = computeTotalScore(breakdown);
 
@@ -312,6 +330,11 @@ export function scoreProductForOpportunity(params: {
   ]
     .filter(Boolean)
     .join(" ");
+
+  // La raison courte vient de la règle de conseil, pas du produit : elle dit
+  // pourquoi ce conseil surgit pour CE traitement. Y glisser un argument
+  // commercial reviendrait à inventer une justification médicale pour vendre.
+  const shortReason = opportunity.shortReason;
 
   const claim = product.commercialClaims[0];
   const patientReason = claim
@@ -328,6 +351,7 @@ export function scoreProductForOpportunity(params: {
   return {
     opportunityKey: opportunity.key,
     productId: product.id,
+    shortReason,
     totalScore,
     breakdown,
     justification,

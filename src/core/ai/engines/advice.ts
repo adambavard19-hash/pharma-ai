@@ -78,6 +78,15 @@ export type AdviceRule = {
   /** Explication en langage pharmacien. `{drug}` est remplacé. */
   rationaleTemplate: string;
   /**
+   * La même raison en une ligne, lisible sans s'arrêter de parler au patient.
+   *
+   * Contrainte tenue : elle dit POURQUOI ce conseil surgit pour CE traitement,
+   * jamais ce que fait le produit — sans quoi ce serait un argumentaire. Un
+   * test vérifie qu'elle reste courte et qu'elle nomme le médicament
+   * déclencheur.
+   */
+  shortReasonTemplate: string;
+  /**
    * La phrase à dire au patient, au comptoir. `{drug}` et `{product}` sont
    * remplacés — le reste est écrit ici, relu, versionné.
    *
@@ -122,6 +131,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     basePriority: 72,
     matchingTags: ["probiotique", "flore intestinale", "tolérance digestive"],
     excludeTags: ["immunodépression"],
+    shortReasonTemplate:
+      "Antibiothérapie ({drug}) : la flore intestinale peut être perturbée pendant la cure.",
     rationaleTemplate:
       "Une antibiothérapie ({drug}) peut perturber la flore intestinale. Un accompagnement de la tolérance digestive peut être pertinent selon le patient et la durée du traitement.",
     counterScriptTemplate:
@@ -153,6 +164,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     basePriority: 64,
     matchingTags: ["confort gastrique", "estomac", "digestion"],
     excludeTags: [],
+    shortReasonTemplate:
+      "Anti-inflammatoire ({drug}) : l'inconfort gastrique fait souvent arrêter le traitement.",
     rationaleTemplate:
       "{drug} est un anti-inflammatoire ; l'inconfort gastrique est un motif fréquent d'arrêt du traitement. Un rappel des règles de prise, éventuellement accompagné d'un conseil, peut améliorer l'observance.",
     counterScriptTemplate:
@@ -177,6 +190,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     basePriority: 68,
     matchingTags: ["hydratation", "peau sensible", "émollient", "apaisant"],
     excludeTags: ["parfum"],
+    shortReasonTemplate:
+      "Traitement dermatologique local ({drug}) : sécheresse cutanée fréquente.",
     rationaleTemplate:
       "Un traitement dermatologique local ({drug}) s'accompagne souvent d'une sécheresse ou d'une sensibilité cutanée. Un soin émollient adapté peut soutenir la tolérance du traitement.",
     counterScriptTemplate:
@@ -197,6 +212,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     basePriority: 48,
     matchingTags: ["magnésium", "fatigue", "crampes", "vitamine b6"],
     excludeTags: [],
+    shortReasonTemplate:
+      "Fatigue fréquemment rapportée dans le contexte de {drug}.",
     rationaleTemplate:
       "Le contexte du traitement ({drug}) s'accompagne fréquemment d'une fatigue rapportée au comptoir. Un apport en magnésium peut être discuté si l'alimentation est insuffisante.",
     counterScriptTemplate:
@@ -224,6 +241,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     basePriority: 55,
     matchingTags: ["vitamine d", "os", "calcium"],
     excludeTags: [],
+    shortReasonTemplate:
+      "Contexte osseux ({drug}) : le statut en vitamine D mérite d'être évoqué.",
     rationaleTemplate:
       "Le traitement ({drug}) s'inscrit dans un contexte osseux. Le statut en vitamine D mérite d'être évoqué avec le patient.",
     counterScriptTemplate:
@@ -246,6 +265,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     basePriority: 44,
     matchingTags: ["bouche sèche", "salive", "hygiène bucco-dentaire"],
     excludeTags: [],
+    shortReasonTemplate:
+      "Sécheresse buccale : effet fréquent de {drug}.",
     rationaleTemplate:
       "La sécheresse buccale figure parmi les effets fréquents de {drug}. Un conseil d'hygiène bucco-dentaire adapté peut améliorer le confort quotidien.",
     counterScriptTemplate:
@@ -265,6 +286,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     basePriority: 58,
     matchingTags: ["transit", "fibres", "confort digestif"],
     excludeTags: [],
+    shortReasonTemplate:
+      "Supplémentation martiale ({drug}) : absorption et tolérance digestive à surveiller.",
     rationaleTemplate:
       "Une supplémentation martiale ({drug}) entraîne fréquemment une constipation. Un accompagnement du transit peut favoriser l'observance.",
     counterScriptTemplate:
@@ -285,6 +308,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     basePriority: 88,
     matchingTags: ["protection solaire", "spf", "photoprotection"],
     excludeTags: [],
+    shortReasonTemplate:
+      "{drug} photosensibilise : l'exposition au soleil demande une précaution.",
     rationaleTemplate:
       "{drug} est associé à un risque de photosensibilisation. Une protection solaire est un conseil de sécurité, pas un simple conseil de confort.",
     counterScriptTemplate:
@@ -302,14 +327,32 @@ const norm = (value: string) => value.toLowerCase().trim();
  * Aucun produit n'est consulté à ce stade — c'est volontaire.
  */
 export function detectAdviceOpportunities(params: {
-  drugs: { lineIndex: number; drugName: string; knowledge: DrugKnowledge | null }[];
+  drugs: {
+    lineIndex: number;
+    drugName: string;
+    knowledge: DrugKnowledge | null;
+    /**
+     * Nom officiel de la spécialité, quand la ligne a été rattachée au
+     * catalogue national. On le préfère au texte du prescripteur pour nommer
+     * le déclencheur : « AMODEX 1 g » est vérifiable, « Amoxicilline 1 g » est
+     * une transcription.
+     */
+    officialName?: string | null;
+    /**
+     * Substance active publiée. C'est elle qui nomme le déclencheur dans la
+     * raison courte : « AMOXICILLINE » se lit d'un coup d'œil au comptoir, là
+     * où « AMOXICILLINE ARROW 1 g, comprimé dispersible » fait une ligne à lui
+     * seul.
+     */
+    officialSubstance?: string | null;
+  }[];
   patient: PatientContext;
 }): AdviceOpportunityResult[] {
   const { drugs, patient } = params;
   const byKey = new Map<string, AdviceOpportunityResult>();
 
   for (const rule of ADVICE_RULES) {
-    const triggers: { lineIndex: number; drugName: string }[] = [];
+    const triggers: { lineIndex: number; drugName: string; shortLabel: string }[] = [];
     let matchStrength = 0;
 
     for (const drug of drugs) {
@@ -341,7 +384,11 @@ export function detectAdviceOpportunities(params: {
 
       if (!triggered) continue;
 
-      triggers.push({ lineIndex: drug.lineIndex, drugName: drug.drugName });
+      triggers.push({
+        lineIndex: drug.lineIndex,
+        drugName: drug.officialName || drug.drugName,
+        shortLabel: drug.officialSubstance || drug.officialName || drug.drugName,
+      });
       // Un code ATC est un signal plus fort qu'une correspondance textuelle.
       matchStrength = Math.max(
         matchStrength,
@@ -371,6 +418,10 @@ export function detectAdviceOpportunities(params: {
       rationale: rule.rationaleTemplate.replace(
         "{drug}",
         triggers.map((t) => t.drugName).join(", "),
+      ),
+      shortReason: rule.shortReasonTemplate.replaceAll(
+        "{drug}",
+        [...new Set(triggers.map((t) => t.shortLabel))].join(", "),
       ),
       // `{product}` reste en attente : à ce stade le catalogue n'a pas encore
       // été consulté, et c'est précisément la garantie qu'on veut conserver.

@@ -29,6 +29,10 @@ export function drug(overrides: Partial<DrugKnowledge> = {}): DrugKnowledge {
 export function product(overrides: Partial<CatalogProduct> = {}): CatalogProduct {
   return {
     id: "prod-1",
+    origin: "PHARMACY_CATALOG",
+    presentationId: null,
+    substances: [],
+    prescriptionConditions: [],
     name: "Flore Équilibre",
     brand: "Vitalys",
     category: "PROBIOTIQUES",

@@ -173,6 +173,11 @@ const DEMO_DRUG_SEARCHES = [
   "VENTOLINE",
   "LEVOTHYROX",
   "KARDEGIC",
+  // Deux médicaments conseil qui répondent à une règle du moteur : sans eux, le
+  // jeu de démonstration ne montrerait jamais qu'un médicament sans ordonnance
+  // peut être proposé en accompagnement.
+  "MAALOX",
+  "STRUCTOCAL",
 ];
 
 async function seedDrugStock(pharmacyId: string) {

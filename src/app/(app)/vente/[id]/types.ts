@@ -54,6 +54,14 @@ export type SaleLineDraft = {
   explanationSource: string | null;
   /** Faits officiels, si la ligne a été rattachée au catalogue national. */
   official: OfficialLineFacts | null;
+  /**
+   * Ce que l'officine détient de CE médicament. La première question du
+   * pharmacien, à laquelle Pharma.ai ne savait pas répondre jusqu'ici.
+   */
+  availability: {
+    state: "IN_STOCK" | "REFERENCED_EMPTY" | "NOT_REFERENCED" | "UNKNOWN";
+    quantity: number;
+  } | null;
   identifiedBy: "AUTO" | "PHARMACIST" | "SCAN" | null;
   /** Ce que le catalogue propose quand le rattachement n'a pas pu se faire seul. */
   candidates: SpecialtyProposal[];

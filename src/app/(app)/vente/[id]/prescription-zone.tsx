@@ -196,6 +196,7 @@ function PrescriptionSummary({
                 <SpecialtyLink
                   lineId={line.id}
                   official={line.official}
+                  availability={line.availability}
                   identifiedBy={line.identifiedBy}
                   candidates={line.candidates}
                   refusal={line.identificationRefusal}

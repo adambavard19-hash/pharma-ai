@@ -5,6 +5,7 @@ import {
   computeTotalScore,
   scoreProductForOpportunity,
 } from "../engines/scoring";
+import { findCandidateProducts } from "../engines/matching";
 import {
   ADVICE_RULES,
   PRIORITY_CEILING,
@@ -22,6 +23,7 @@ function opportunity(
     kind: "TOLERANCE",
     category: "PROBIOTIQUES",
     title: "Tolérance digestive pendant l'antibiothérapie",
+    shortReason: "Antibiothérapie (Amoxicilline) : flore intestinale à accompagner.",
     rationale: "…",
     counterScriptTemplate: "« Amoxicilline est un antibiotique. {product} accompagne la cure. »",
     clinicalContext: null,
@@ -47,13 +49,32 @@ const baseArgs = {
 describe("hiérarchie des dimensions du score", () => {
   it("place la pertinence et la sécurité au-dessus de tout le reste", () => {
     expect(SCORE_WEIGHTS.relevance).toBeGreaterThan(SCORE_WEIGHTS.patientFit);
-    expect(SCORE_WEIGHTS.safety).toBeGreaterThan(SCORE_WEIGHTS.availability);
-    expect(SCORE_WEIGHTS.patientFit).toBeGreaterThan(SCORE_WEIGHTS.availability);
-    expect(SCORE_WEIGHTS.availability).toBeGreaterThan(SCORE_WEIGHTS.pharmacistPreference);
+    expect(SCORE_WEIGHTS.safety).toBeGreaterThan(SCORE_WEIGHTS.pharmacistPreference);
+    expect(SCORE_WEIGHTS.patientFit).toBeGreaterThan(SCORE_WEIGHTS.pharmacistPreference);
     expect(SCORE_WEIGHTS.pharmacistPreference).toBeGreaterThan(
       SCORE_WEIGHTS.validationHistory,
     );
     expect(SCORE_WEIGHTS.validationHistory).toBeGreaterThan(SCORE_WEIGHTS.commercial);
+  });
+
+  it("n'accorde AUCUN poids à la disponibilité", () => {
+    // Avoir trente boîtes en réserve ne rend pas un conseil plus juste. Le
+    // stock écarte ce qui n'est pas délivrable et départage à égalité — il
+    // n'entre jamais dans le total.
+    expect(Object.keys(SCORE_WEIGHTS)).not.toContain("availability");
+    expect(Object.values(SCORE_WEIGHTS).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 5);
+  });
+
+  it("ne fait pas monter le score d'un produit mieux approvisionné", () => {
+    const rare = scoreProductForOpportunity({
+      ...baseArgs,
+      product: product({ id: "rare", stockQuantity: 1, alertThreshold: 5 }),
+    });
+    const abondant = scoreProductForOpportunity({
+      ...baseArgs,
+      product: product({ id: "abondant", stockQuantity: 400, alertThreshold: 5 }),
+    });
+    expect(rare?.totalScore).toBe(abondant?.totalScore);
   });
 
   it("plafonne strictement l'influence commerciale", () => {
@@ -146,31 +167,53 @@ describe("séparation médical / commercial", () => {
     expect(relevant!.totalScore).toBeGreaterThan(profitable!.totalScore);
   });
 
-  it("ne laisse pas la marge compenser une rupture de stock", () => {
-    const inStock = scoreProductForOpportunity({
-      ...baseArgs,
-      product: product({ id: "in-stock", stockQuantity: 30, salePriceCents: 1000, purchasePriceCents: 900 }),
+  it("écarte une rupture de stock en amont, au lieu de la rétrograder", () => {
+    // Cette règle a changé de nature, et c'est un durcissement. La rupture
+    // n'est plus une pénalité de score qu'une forte marge pourrait compenser :
+    // le produit n'est simplement plus candidat. L'appariement le retire avant
+    // que le score existe.
+    const rupture = product({ id: "out", stockQuantity: 0, availableInSiblingPharmacy: false });
+    const candidats = findCandidateProducts({
+      opportunity: opportunity(),
+      catalog: [rupture, product({ id: "in-stock", stockQuantity: 30 })],
     });
 
-    const outOfStockButProfitable = scoreProductForOpportunity({
+    expect(candidats.map((c) => c.product.id)).toEqual(["in-stock"]);
+  });
+
+  it("ne laisse pas la marge départager avant la disponibilité", () => {
+    // À pertinence clinique égale, c'est le rayon qui tranche en premier. La
+    // marge n'intervient qu'ensuite — jamais pour faire monter un produit.
+    const abondantPeuRentable = scoreProductForOpportunity({
       ...baseArgs,
-      product: product({
-        id: "out",
-        stockQuantity: 0,
-        availableInSiblingPharmacy: false,
-        salePriceCents: 4900,
-        purchasePriceCents: 100,
-      }),
+      product: product({ id: "abondant", stockQuantity: 30, salePriceCents: 1000, purchasePriceCents: 900 }),
+    });
+    const rareTresRentable = scoreProductForOpportunity({
+      ...baseArgs,
+      product: product({ id: "rare", stockQuantity: 1, alertThreshold: 5, salePriceCents: 4900, purchasePriceCents: 100 }),
     });
 
-    expect(inStock!.totalScore).toBeGreaterThan(outOfStockButProfitable!.totalScore);
+    expect(abondantPeuRentable!.breakdown.availability).toBeGreaterThan(
+      rareTresRentable!.breakdown.availability,
+    );
+    // …et pourtant la marge n'a pas fait monter le score du second au-dessus
+    // du premier d'une façon qui renverserait la pertinence.
+    expect(rareTresRentable!.totalScore - abondantPeuRentable!.totalScore).toBeLessThanOrEqual(
+      COMMERCIAL_MAX_WEIGHT,
+    );
   });
 
   it("expose chaque contribution, sans boîte noire", () => {
     const result = scoreProductForOpportunity({ ...baseArgs, product: product() });
 
     expect(result).not.toBeNull();
-    expect(result!.explanation).toHaveLength(Object.keys(SCORE_WEIGHTS).length);
+    // Les dimensions pondérées, plus la disponibilité qui ferme la liste avec
+    // un poids nul : elle est montrée, elle ne compte pas.
+    expect(result!.explanation).toHaveLength(Object.keys(SCORE_WEIGHTS).length + 1);
+    const stock = result!.explanation.at(-1)!;
+    expect(stock.dimension).toBe("availability");
+    expect(stock.weight).toBe(0);
+    expect(stock.role).toBe("FILTRE");
     for (const contribution of result!.explanation) {
       expect(contribution.detail.length).toBeGreaterThan(0);
       expect(contribution.label.length).toBeGreaterThan(0);

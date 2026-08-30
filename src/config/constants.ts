@@ -27,8 +27,29 @@ export const DOCUMENT_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 90; // 90 jours
  */
 export const OCR_REVIEW_THRESHOLD = 0.85;
 
-/** Score minimal pour qu'une recommandation soit proposée au pharmacien. */
-export const RECOMMENDATION_MIN_SCORE = 0.35;
+/**
+ * Score minimal pour qu'une recommandation soit proposée au pharmacien.
+ *
+ * Volontairement exigeant. Trois propositions sont un plafond, pas un objectif :
+ * mieux vaut une seule proposition que le pharmacien juge juste que trois dont
+ * il doit écarter deux. Une place laissée vide vaut mieux qu'une place remplie
+ * — c'est ce qui rend les propositions crédibles au comptoir.
+ */
+export const RECOMMENDATION_MIN_SCORE = 0.5;
+
+/**
+ * Pertinence minimale exigée d'une proposition.
+ *
+ * Le score total ne suffit pas : un produit inoffensif et bien noté en sécurité
+ * atteint 75 % sans correspondre à quoi que ce soit. Mesuré sur le catalogue de
+ * démonstration — « Pastilles gorge miel-citron » proposées pour un confort
+ * gastrique, uniquement parce que leur CATÉGORIE correspondait, sans une seule
+ * étiquette commune.
+ *
+ * Ce seuil exige donc une correspondance réelle, pas une parenté de rayon. Il
+ * vaut mieux ne rien proposer.
+ */
+export const RECOMMENDATION_MIN_RELEVANCE = 0.6;
 
 /**
  * Nombre maximal de recommandations proposées pour une ordonnance.
