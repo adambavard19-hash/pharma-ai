@@ -111,7 +111,8 @@ async function main() {
     await page.click('button:has-text("Confirmer et analyser")');
     await page.waitForSelector('h2:has-text("Conseils")', { timeout: 60_000 });
     await page.waitForLoadState("networkidle");
-    const advice = await page.locator('button:has-text("Ajouter à la vente")').count();
+    // Le cockpit ne propose plus qu'un verbe par carte : « Ajouter ».
+    const advice = await page.locator('button:has-text("Ajouter"):not(:has-text("un conseil"))').count();
     steps.push({
       label: "Analyse → sécurité et conseils affichés",
       ms: since(mark),
@@ -121,14 +122,19 @@ async function main() {
     // 5. Décision du pharmacien sur le conseil.
     if (advice > 0) {
       mark = Date.now();
-      await page.locator('button:has-text("Ajouter à la vente")').first().click();
+      await page.locator('button:has-text("Ajouter"):not(:has-text("un conseil"))').first().click();
       await page.waitForSelector('button:has-text("Dans la vente")', { timeout: 30_000 });
       steps.push({ label: "Conseil ajouté à la vente", ms: since(mark) });
     }
 
     // 6. Encaissement et passage à la fin de vente.
     mark = Date.now();
-    await page.locator('button:has-text("Terminer")').first().click();
+    // Panier vide, le comptoir « continue la délivrance » ; panier garni, il
+    // « termine la vente ». Les deux mènent à la fiche de fin.
+    await page
+      .locator('button:has-text("Terminer la vente"), button:has-text("Continuer la délivrance")')
+      .first()
+      .click();
     await page.waitForURL(/\/fin$/, { timeout: 60_000 });
     steps.push({
       label: advice > 0 ? "Vente enregistrée → fin de vente" : "Vente terminée sans conseil",

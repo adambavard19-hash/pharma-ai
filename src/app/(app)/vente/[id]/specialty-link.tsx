@@ -154,6 +154,14 @@ function DetachButton({ lineId }: { lineId: string }) {
   );
 }
 
+/**
+ * Nombre de candidats montrés d'emblée.
+ *
+ * Six propositions occupaient un tiers de l'écran de vente pour une décision
+ * qui se prend en regardant la boîte. Les suivantes restent à un clic.
+ */
+const VISIBLE_CANDIDATES = 3;
+
 function Unlinked({
   lineId,
   candidates,
@@ -166,6 +174,8 @@ function Unlinked({
   canEdit: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? candidates : candidates.slice(0, VISIBLE_CANDIDATES);
 
   return (
     <div className="mt-1.5 rounded-lg border border-warning-300 bg-warning-50/50 px-3 py-2 dark:border-warning-800 dark:bg-warning-950/30">
@@ -178,20 +188,34 @@ function Unlinked({
 
       {canEdit && (candidates.length > 0 || open) && (
         <div className="mt-2 space-y-1.5">
-          {candidates.map((candidate) => (
+          {visible.map((candidate) => (
             <AttachButton key={candidate.id} lineId={lineId} candidate={candidate} />
           ))}
+          {/* Les deux issues secondaires, sur une même rangée : « il y en a
+              d'autres » et « aucune ne convient ». Empilées, elles se
+              chevauchaient. */}
           {open ? (
             <FreeSearch lineId={lineId} />
           ) : (
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-brand-700 hover:underline dark:text-brand-400"
-            >
-              <Search className="size-3.5" />
-              Aucun ne correspond — chercher dans le catalogue
-            </button>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-0.5">
+              {!showAll && candidates.length > VISIBLE_CANDIDATES && (
+                <button
+                  type="button"
+                  onClick={() => setShowAll(true)}
+                  className="text-[12px] font-medium text-brand-700 hover:underline dark:text-brand-400"
+                >
+                  {candidates.length - VISIBLE_CANDIDATES} autre(s) spécialité(s)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-brand-700 hover:underline dark:text-brand-400"
+              >
+                <Search className="size-3.5" />
+                Aucune ne correspond — chercher
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -239,20 +263,21 @@ function AttachButton({
     <form action={formAction}>
       <input type="hidden" name="lineId" value={lineId} />
       <input type="hidden" name="specialtyId" value={candidate.id} />
+      {/* Une ligne par candidat : le nom porte la décision, la substance la
+          confirme. Sur deux lignes, six candidats occupaient un tiers de
+          l'écran de vente. */}
       <button
         type="submit"
         disabled={pending}
-        className="flex w-full items-start gap-2 rounded-md border border-border-subtle bg-surface-card px-2.5 py-1.5 text-left transition-colors hover:border-brand-400 disabled:opacity-60"
+        className="flex w-full items-center gap-2 rounded-md border border-border-subtle bg-surface-card px-2.5 py-1.5 text-left transition-colors hover:border-brand-400 disabled:opacity-60"
       >
-        <Check className="mt-0.5 size-3.5 shrink-0 text-brand-600" />
-        <span className="min-w-0">
-          <span className="block text-[12.5px] font-medium text-text-primary">
-            {candidate.name}
-          </span>
-          <span className="block text-[11.5px] text-text-tertiary">
-            {candidate.substances.join(", ") || "Composition non publiée"}
-            {!candidate.marketed && " · commercialisation arrêtée"}
-          </span>
+        <Check className="size-3.5 shrink-0 text-brand-600" />
+        <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-text-primary">
+          {candidate.name}
+        </span>
+        <span className="shrink-0 text-[11px] text-text-tertiary">
+          {candidate.substances[0] ?? "composition non publiée"}
+          {!candidate.marketed && " · arrêté"}
         </span>
       </button>
     </form>

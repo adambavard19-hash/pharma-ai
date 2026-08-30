@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import Image from "next/image";
 import {
-  Check,
   ChevronDown,
   Lock,
   MessageSquareQuote,
@@ -68,10 +67,13 @@ export function AdviceZone({
 
   return (
     <section className="space-y-3" aria-labelledby="zone-conseils">
+      {/* Tant que la sécurité n'est pas acquittée, le compteur reste muet : le
+          bandeau annonce « en attente », le titre ne doit pas déjà annoncer une
+          proposition tenue en réserve. */}
       <ZoneTitle
         id="zone-conseils"
         step={3}
-        title={available.length > 0 ? `Conseils (${available.length})` : "Conseils"}
+        title={!locked && available.length > 0 ? `Conseils (${available.length})` : "Conseils"}
       />
 
       {locked ? (
@@ -216,68 +218,66 @@ function AdviceCard({
 
   return (
     <Card className={cn(added && "border-brand-400 dark:border-brand-700")}>
-      <CardContent className="space-y-3.5 pt-5">
-        <div className="flex flex-wrap items-start gap-4">
+      <CardContent className="space-y-2.5 pt-4 pb-4">
+        <div className="flex items-start gap-3">
           {product?.imageUrl ? (
             <Image
               src={product.imageUrl}
               alt=""
-              width={72}
-              height={72}
-              className="size-[72px] shrink-0 rounded-lg object-cover"
+              width={44}
+              height={44}
+              className="size-11 shrink-0 rounded-lg object-cover"
             />
           ) : (
-            <span className="flex size-[72px] shrink-0 items-center justify-center rounded-lg bg-surface-sunken text-text-tertiary">
-              <Package className="size-5" />
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-surface-sunken text-text-tertiary">
+              <Package className="size-4" />
             </span>
           )}
 
-          <div className="min-w-[200px] flex-1 space-y-2">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <p className="text-[15.5px] font-semibold text-text-primary">
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              <p className="min-w-0 text-[14.5px] leading-5 font-semibold text-text-primary">
                 {product?.name ?? "Produit supprimé"}
                 {product?.brand && (
-                  <span className="ml-2 text-[12.5px] font-normal text-text-tertiary">
+                  <span className="ml-1.5 text-[12px] font-normal text-text-tertiary">
                     {product.brand}
                   </span>
                 )}
               </p>
-              <p className="flex items-center gap-2.5 text-[14px]">
+              <span className="ml-auto flex shrink-0 items-center gap-2 text-[13.5px]">
                 <span className="font-semibold tabular text-text-primary">
                   {formatCents(recommendation.unitPriceCents || (product?.salePriceCents ?? 0))}
                 </span>
                 <Badge tone={lowStock ? "warning" : "success"}>
                   {lowStock
                     ? `Plus que ${product?.quantity}`
-                    : `${product?.quantity ?? 0} en rayon`}
+                    : `${product?.quantity ?? 0} en stock`}
                 </Badge>
-              </p>
+              </span>
             </div>
 
-            {recommendation.opportunity && (
-              <p className="text-[13px] leading-5 text-text-secondary">
-                <span className="font-medium text-text-primary">Pourquoi — </span>
-                {recommendation.opportunity.rationale}
+            {/* La raison en une ligne, produite par la règle de conseil. Le
+                pharmacien doit comprendre POURQUOI sans ouvrir quoi que ce
+                soit ; la version longue est sous « Pourquoi ce produit ? ». */}
+            {(recommendation.shortReason ?? recommendation.opportunity?.rationale) && (
+              <p className="text-[12.5px] leading-[1.45] text-text-secondary">
+                {recommendation.shortReason ?? recommendation.opportunity?.rationale}
               </p>
             )}
 
             {recommendation.precautions.length > 0 && (
-              <ul className="space-y-0.5">
-                {recommendation.precautions.map((precaution) => (
-                  <li
-                    key={precaution}
-                    className="text-[12px] leading-4 text-warning-700 dark:text-warning-500"
-                  >
-                    ⚠ {precaution}
-                  </li>
-                ))}
-              </ul>
+              <p className="text-[11.5px] leading-4 text-warning-700 dark:text-warning-500">
+                ⚠ {recommendation.precautions.join(" · ")}
+              </p>
             )}
           </div>
         </div>
 
-        {(recommendation.counterScript ?? recommendation.patientReason) && (
-          <p className="flex gap-2 rounded-lg bg-brand-50/70 px-3.5 py-2.5 text-[13.5px] leading-5 text-text-primary dark:bg-brand-950/60">
+        {/* La phrase à dire n'apparaît qu'une fois la proposition retenue :
+            avant la décision elle n'aide pas, et trois scripts empilés
+            remplissent l'écran de texte que personne ne lit. */}
+        {added && (recommendation.counterScript ?? recommendation.patientReason) && (
+          <p className="flex gap-2 rounded-lg bg-brand-50/70 px-3 py-2 text-[13px] leading-5 text-text-primary dark:bg-brand-950/60">
             <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-brand-600 dark:text-brand-400" />
             <span>
               <span className="mr-1 font-medium text-brand-800 dark:text-brand-300">
@@ -292,36 +292,49 @@ function AdviceCard({
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
-              variant={presented ? "success" : "outline"}
-              loading={pending}
-              onClick={() => run(() => presentRecommendationAction(recommendation.id))}
-              leadingIcon={presented ? <Check className="size-4" /> : undefined}
-            >
-              Proposé
-            </Button>
-            <Button
-              size="sm"
               variant={added ? "primary" : "outline"}
               onClick={onToggleBasket}
               leadingIcon={<ShoppingBasket className="size-4" />}
             >
-              {added ? "Dans la vente" : "Ajouter à la vente"}
+              {added ? "Dans la vente" : "Ajouter"}
             </Button>
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               loading={pending}
-              onClick={() => run(() => declineRecommendationAction(recommendation.id))}
+              onClick={() =>
+                run(() =>
+                  removeRecommendationAction({
+                    recommendationId: recommendation.id,
+                    reason: "Écarté au comptoir sans être proposé au patient.",
+                  }),
+                )
+              }
               leadingIcon={<X className="size-4" />}
             >
-              Refusé
+              Ignorer
             </Button>
+            {presented && (
+              <Badge tone="success" className="self-center">
+                Proposé au patient
+              </Badge>
+            )}
           </div>
         )}
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border-subtle pt-3 text-[12px]">
           {canDecide && (
             <>
+              <SecondaryAction
+                onClick={() => run(() => presentRecommendationAction(recommendation.id))}
+              >
+                {presented ? "Déjà proposé" : "Proposé au patient"}
+              </SecondaryAction>
+              <SecondaryAction
+                onClick={() => run(() => declineRecommendationAction(recommendation.id))}
+              >
+                Refusé par le patient
+              </SecondaryAction>
               <SecondaryAction onClick={() => setReplaceOpen(true)}>
                 Changer de référence
               </SecondaryAction>

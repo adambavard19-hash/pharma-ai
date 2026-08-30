@@ -143,11 +143,24 @@ export function SafetyZone({
         </Card>
       ) : (
         <Card>
-          <CardContent className="flex items-center gap-2.5 py-3.5">
-            <ShieldCheck className="size-[18px] shrink-0 text-success-600 dark:text-success-500" />
-            <p className="text-[13.5px] text-text-secondary">
-              Aucune interaction ni contre-indication détectée sur les lignes confirmées.
-            </p>
+          {/* Un écran vert doit dire ce qui a été comparé, pas laisser croire
+              à une vérification qui n'a pas eu lieu. Le moteur confronte le
+              profil patient au traitement et aux conseils envisagés ; il ne
+              croise pas encore les médicaments prescrits entre eux. Tant que
+              ce croisement n'existe pas, l'écran le dit. */}
+          <CardContent className="flex items-start gap-2.5 py-3.5">
+            <ShieldCheck className="mt-px size-[18px] shrink-0 text-success-600 dark:text-success-500" />
+            <div className="space-y-1">
+              <p className="text-[13.5px] text-text-secondary">
+                Aucun signal sur les lignes confirmées.
+              </p>
+              <p className="text-[12.5px] leading-5 text-text-tertiary">
+                Pharma.ai a comparé le profil patient — allergies, grossesse et
+                allaitement, insuffisance rénale ou hépatique, âge — au traitement
+                et aux conseils envisagés. Les interactions entre les médicaments
+                prescrits ne sont pas encore analysées.
+              </p>
+            </div>
           </CardContent>
         </Card>
       )}

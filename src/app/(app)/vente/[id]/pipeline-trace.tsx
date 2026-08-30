@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ChevronRight } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { PipelineStageTrace } from "@/core/ai/types";
 
@@ -32,12 +33,20 @@ export function PipelineTrace({
 }) {
   const simulated = providers.simulated === true;
 
+  // Niveau 3 : la traçabilité se consulte, elle ne se lit pas au comptoir.
+  // Repliée par défaut, elle reste à un clic pour le pharmacien qui veut
+  // comprendre — ou pour un auditeur, des mois plus tard.
   return (
     <Card>
-      <CardHeader
-        title="Comment l'analyse s'est déroulée"
-        description={`Moteur v${engineVersion}${durationMs ? ` · ${durationMs} ms` : ""}`}
-      />
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-[12.5px] text-text-tertiary transition-colors hover:text-text-secondary">
+          <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
+          Comment l&apos;analyse s&apos;est déroulée
+          <span className="tabular">
+            — moteur v{engineVersion}
+            {durationMs ? ` · ${durationMs} ms` : ""}
+          </span>
+        </summary>
       <CardContent className="space-y-3 pt-0">
         {simulated && (
           <Badge tone="accent">Fournisseurs simulés — extraction et explications fictives</Badge>
@@ -74,6 +83,7 @@ export function PipelineTrace({
           la pertinence.
         </p>
       </CardContent>
+      </details>
     </Card>
   );
 }

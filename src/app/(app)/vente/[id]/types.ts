@@ -86,6 +86,11 @@ export type AdviceView = {
   origin: string;
   totalScore: number;
   justification: string;
+  /**
+   * La raison en une ligne, produite par la règle de conseil (lot A). C'est
+   * elle que lit le pharmacien au comptoir ; la version longue reste à un clic.
+   */
+  shortReason: string | null;
   /** Ce qui sera écrit sur la fiche remise au patient. */
   patientReason: string | null;
   /** Ce que le pharmacien dit au comptoir, issu de la règle de conseil. */
@@ -113,6 +118,19 @@ export type AdviceView = {
     alertThreshold: number;
     claims: string[];
   } | null;
+};
+
+/**
+ * Ce qui, dans le dossier du patient, a RÉELLEMENT pesé sur cette analyse.
+ *
+ * Pas la fiche patient : seulement les facteurs que le moteur a consommés. Une
+ * information sans incidence sur cette délivrance n'a pas à occuper l'écran du
+ * comptoir — elle reste à un clic, sur la fiche.
+ */
+export type PatientFactor = {
+  label: string;
+  /** `warning` : à surveiller · `neutral` : contexte simple. */
+  tone: "warning" | "neutral";
 };
 
 export type BlockedOpportunityView = {

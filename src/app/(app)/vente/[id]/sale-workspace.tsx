@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2, Sparkles, User } from "lucide-react";
+import { ArrowRight, FileText, Loader2, Sparkles, User } from "lucide-react";
 import { verifyPrescriptionAction } from "@/server/actions/prescriptions";
 import { acceptRecommendationAction } from "@/server/actions/recommendations";
 import { recordSaleAction } from "@/server/actions/sales";
@@ -19,10 +19,12 @@ import { SafetyZone } from "./safety-zone";
 import { AdviceZone } from "./advice-zone";
 import { PipelineTrace } from "./pipeline-trace";
 import { ReanalyseButton } from "./reanalyse-button";
-import { counterIsBlocked } from "@/core/ai/safety-gate";
+import { blocksCounter, counterIsBlocked } from "@/core/ai/safety-gate";
+import { SummaryBand, buildSummaryRows } from "./summary-band";
 import type {
   AdviceView,
   BlockedOpportunityView,
+  PatientFactor,
   SafetyFindingView,
   SaleLineDraft,
 } from "./types";
@@ -50,6 +52,7 @@ export function SaleWorkspace({
   simulatedExtraction,
   catalogAttribution,
   identificationChangedSinceAnalysis,
+  patientFactors,
   hasSale,
 }: {
   prescription: {
@@ -80,6 +83,8 @@ export function SaleWorkspace({
   catalogAttribution: string | null;
   /** Un rattachement a été décidé après la dernière analyse. */
   identificationChangedSinceAnalysis: boolean;
+  /** Ce qui, dans le dossier du patient, a réellement pesé sur cette analyse. */
+  patientFactors: PatientFactor[];
   hasSale: boolean;
 }) {
   const [lines, setLines] = useState(initialLines);
@@ -112,6 +117,41 @@ export function SaleWorkspace({
   const blocked = counterIsBlocked(findings);
   const confirmedCount = lines.filter((line) => line.confirmed).length;
   const status = PRESCRIPTION_STATUS[prescription.status];
+
+  // Les quatre chiffres du bandeau. Tous dérivés de ce que le moteur a produit :
+  // aucun n'est estimé, aucun n'est arrondi.
+  const summaryRows = useMemo(() => {
+    const confirmed = lines.filter((line) => line.confirmed);
+    const decided = new Set(["DECLINED", "REMOVED", "PURCHASED"]);
+    const openRecommendations = recommendations.filter(
+      (recommendation) =>
+        !decided.has(recommendation.status) &&
+        (!recommendation.product || recommendation.product.quantity > 0),
+    );
+
+    return buildSummaryRows({
+      blockingCount: findings.filter(blocksCounter).length,
+      attentionCount: findings.filter(
+        (finding) => finding.severity === "WARNING" || finding.severity === "CAUTION",
+      ).length,
+      lineCount: confirmed.length,
+      inStock: confirmed.filter((line) => line.availability?.state === "IN_STOCK").length,
+      // « À commander » réunit le référencé épuisé et le non référencé : dans les
+      // deux cas la boîte n'est pas là. L'état inconnu, lui, reste à part — ne
+      // pas savoir n'est pas une rupture.
+      missing: confirmed.filter(
+        (line) =>
+          line.availability?.state === "REFERENCED_EMPTY" ||
+          line.availability?.state === "NOT_REFERENCED",
+      ).length,
+      unknown: confirmed.filter(
+        (line) => !line.availability || line.availability.state === "UNKNOWN",
+      ).length,
+      explainedCount: confirmed.filter((line) => line.purpose !== null).length,
+      recommendationCount: openRecommendations.length,
+      locked: blocked,
+    });
+  }, [lines, findings, recommendations, blocked]);
 
   const basketTotal = useMemo(
     () =>
@@ -228,6 +268,9 @@ export function SaleWorkspace({
     });
   };
 
+  const alertFactors = patientFactors.filter((factor) => factor.tone === "warning");
+  const neutralFactors = patientFactors.filter((factor) => factor.tone !== "warning");
+
   return (
     <div className="mx-auto max-w-3xl">
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-5">
@@ -238,6 +281,12 @@ export function SaleWorkspace({
           <Badge tone={status.tone}>{status.label}</Badge>
         </div>
         <div className="flex items-center gap-3 text-[12.5px] text-text-tertiary">
+          {/* L'âge se lit à côté de la référence : il sert de repère permanent,
+              pas d'alerte. La ligne de badges reste réservée à ce qui doit
+              arrêter le regard. */}
+          {neutralFactors.map((factor) => (
+            <span key={factor.label}>{factor.label}</span>
+          ))}
           <span className="tabular">{prescription.reference}</span>
           {prescription.patientId && (
             <Link
@@ -251,6 +300,19 @@ export function SaleWorkspace({
         </div>
       </header>
 
+      {/* Ce qui, dans le dossier, a réellement pesé sur l'analyse et doit être
+          vu — allergies, grossesse, pathologies. Un patient sans particularité
+          n'occupe pas de ligne : le reste de la fiche est à un clic. */}
+      {alertFactors.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
+          {alertFactors.map((factor) => (
+            <Badge key={factor.label} tone="warning">
+              {factor.label}
+            </Badge>
+          ))}
+        </div>
+      )}
+
       {error && (
         <Alert tone="danger" className="mb-4">
           {error}
@@ -258,7 +320,11 @@ export function SaleWorkspace({
       )}
 
       {/* La marge basse dégage le contenu de la barre d'action collante. */}
-      <div className="space-y-7 pb-28">
+      <div className="space-y-6 pb-28">
+        {/* Le bandeau ouvre l'écran : c'est lui qu'on lit en deux secondes, et
+            il conduit aux zones plutôt que de les répéter. */}
+        {!editing && !analysing && <SummaryBand rows={summaryRows} />}
+
         <PrescriptionZone
           editing={editing}
           lines={lines}
@@ -305,6 +371,15 @@ export function SaleWorkspace({
               inBasket={(id) => basket.has(id)}
               onToggleBasket={toggleBasket}
             />
+
+            {/* Ce qui vient après la vente, annoncé sans être simulé. Aucun
+                envoi n'est branché : le lot C s'en chargera, et d'ici là
+                l'écran ne prétend rien. */}
+            <p className="flex items-center gap-2 text-[12.5px] text-text-tertiary">
+              <FileText className="size-3.5 shrink-0" />
+              Compte rendu patient — sera préparé à l&apos;étape suivante, à partir des
+              conseils que vous aurez validés.
+            </p>
 
             {trace && (
               <div className="space-y-3">
@@ -364,7 +439,7 @@ export function SaleWorkspace({
               disabled={basket.size > 0 && !permissions.sell}
               leadingIcon={pending ? undefined : <ArrowRight className="size-[18px]" />}
             >
-              {basket.size === 0 ? "Terminer sans vente" : "Terminer la vente"}
+              {basket.size === 0 ? "Continuer la délivrance" : "Terminer la vente"}
             </Button>
           </>
         )}

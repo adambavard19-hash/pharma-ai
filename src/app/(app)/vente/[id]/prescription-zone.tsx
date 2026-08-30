@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { AlertTriangle, Check, EyeOff, Pencil, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronRight, EyeOff, Pencil, X } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/field";
 import { Alert } from "@/components/ui/feedback";
@@ -171,56 +171,136 @@ function PrescriptionSummary({
       />
 
       <Card>
-        <CardContent className="pt-4 pb-4">
+        <CardContent className="pt-3 pb-3">
           <ul className="divide-y divide-border-subtle">
             {confirmed.map((line) => (
-              <li key={line.id} className="space-y-1 py-2.5 first:pt-0 last:pb-0">
-                <p className="text-[14px] font-medium text-text-primary">
-                  {line.drugName}
-                  {line.dosage && (
-                    <span className="font-normal text-text-secondary"> {line.dosage}</span>
-                  )}
-                  {line.posology && (
-                    <span className="font-normal text-text-secondary">
-                      {" "}
-                      — {line.posology}
-                    </span>
-                  )}
-                  {line.durationDays ? (
-                    <span className="font-normal text-text-tertiary">
-                      {" "}
-                      · {line.durationDays} j
-                    </span>
-                  ) : null}
-                </p>
-                <SpecialtyLink
-                  lineId={line.id}
-                  official={line.official}
-                  availability={line.availability}
-                  identifiedBy={line.identifiedBy}
-                  candidates={line.candidates}
-                  refusal={line.identificationRefusal}
-                  attribution={catalogAttribution}
-                  canEdit={canEdit}
-                />
-                {line.explanationSource === "UNAVAILABLE" ? (
-                  <p className="text-[12px] leading-4 text-warning-700 dark:text-warning-500">
-                    Aucune information dans le référentiel connecté : aucune explication
-                    n&apos;est produite pour ce médicament.
-                  </p>
-                ) : line.purpose ? (
-                  <p className="text-[12.5px] leading-5 text-text-tertiary">{line.purpose}</p>
-                ) : null}
-              </li>
+              <SummaryLine
+                key={line.id}
+                line={line}
+                canEdit={canEdit}
+                attribution={catalogAttribution}
+              />
             ))}
             {confirmed.length === 0 && (
               <li className="py-3 text-[13px] text-text-tertiary">Aucune ligne confirmée.</li>
             )}
           </ul>
+
+          {/* La licence du catalogue national impose de mentionner la source et
+              sa date partout où ses données sont affichées. Une fois pour la
+              carte entière : la répéter sous chaque ligne occupait quatre fois
+              la place pour la même phrase. */}
+          {catalogAttribution && confirmed.some((line) => line.official) && (
+            <p className="mt-3 border-t border-border-subtle pt-2.5 text-[11.5px] leading-4 text-text-tertiary">
+              {catalogAttribution}
+            </p>
+          )}
         </CardContent>
       </Card>
     </section>
   );
+}
+
+/**
+ * Une ligne d'ordonnance, en une ligne.
+ *
+ * Niveau 1 — ce qui est prescrit, et si l'officine l'a. Niveau 2 — la
+ * composition officielle, les conditions de délivrance et l'explication du
+ * traitement, à un clic. Un pharmacien qui délivre un traitement qu'il connaît
+ * n'a pas besoin de relire la composition à chaque fois ; celui qui a un doute
+ * l'ouvre.
+ *
+ * Exception : une ligne NON rattachée reste dépliée. Ce n'est pas un détail,
+ * c'est une action qui lui revient.
+ */
+function SummaryLine({
+  line,
+  canEdit,
+  attribution,
+}: {
+  line: SaleLineDraft;
+  canEdit: boolean;
+  attribution: string | null;
+}) {
+  // Quand la ligne est rattachée, l'explication vit dans le repli ci-dessous.
+  const hasDetail = Boolean(line.official);
+
+  return (
+    <li className="py-2 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <p className="min-w-0 flex-1 text-[13.5px] leading-5 text-text-primary">
+          <span className="font-medium">{line.drugName}</span>
+          {line.dosage && <span className="text-text-secondary"> {line.dosage}</span>}
+          {line.posology && <span className="text-text-secondary"> — {line.posology}</span>}
+          {line.durationDays ? (
+            <span className="text-text-tertiary"> · {line.durationDays} j</span>
+          ) : null}
+        </p>
+        <AvailabilityChip availability={line.availability} />
+      </div>
+
+      {line.official ? (
+        <details className="group mt-0.5">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[12px] leading-4 text-text-tertiary hover:text-text-secondary">
+            <ChevronRight className="size-3 shrink-0 transition-transform group-open:rotate-90" />
+            <span className="min-w-0 truncate">
+              {line.official.name}
+              {line.official.prescriptionConditions.length > 0 &&
+                ` · ${line.official.prescriptionConditions.join(", ")}`}
+            </span>
+          </summary>
+          <div className="mt-1.5 pl-[1.125rem]">
+            <SpecialtyLink
+              lineId={line.id}
+              official={line.official}
+              availability={line.availability}
+              identifiedBy={line.identifiedBy}
+              candidates={line.candidates}
+              refusal={line.identificationRefusal}
+              attribution={null}
+              canEdit={canEdit}
+            />
+            {line.purpose && (
+              <p className="mt-1.5 text-[12.5px] leading-5 text-text-secondary">{line.purpose}</p>
+            )}
+          </div>
+        </details>
+      ) : (
+        <SpecialtyLink
+          lineId={line.id}
+          official={line.official}
+          availability={line.availability}
+          identifiedBy={line.identifiedBy}
+          candidates={line.candidates}
+          refusal={line.identificationRefusal}
+          attribution={attribution}
+          canEdit={canEdit}
+        />
+      )}
+
+      {!hasDetail && line.explanationSource === "UNAVAILABLE" && (
+        <p className="mt-0.5 text-[12px] leading-4 text-warning-700 dark:text-warning-500">
+          Aucune information dans le référentiel connecté : aucune explication n&apos;est
+          produite pour ce médicament.
+        </p>
+      )}
+    </li>
+  );
+}
+
+/** L'état du stock, en trois mots et une couleur. */
+function AvailabilityChip({ availability }: { availability: SaleLineDraft["availability"] }) {
+  if (!availability) return null;
+
+  const { state, quantity } = availability;
+  if (state === "IN_STOCK") {
+    return <Badge tone="success">En stock · {quantity}</Badge>;
+  }
+  if (state === "REFERENCED_EMPTY") return <Badge tone="warning">Stock à zéro</Badge>;
+  if (state === "NOT_REFERENCED") return <Badge tone="warning">Hors stock</Badge>;
+  // UNKNOWN : la ligne n'est pas rattachée. Ne pas savoir n'est pas une
+  // rupture, et l'écran ne doit jamais laisser croire le contraire.
+  return <Badge tone="neutral">Disponibilité inconnue</Badge>;
 }
 
 export function ZoneTitle({

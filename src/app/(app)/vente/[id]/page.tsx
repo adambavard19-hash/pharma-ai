@@ -7,10 +7,11 @@ import { referenceAttribution } from "@/core/reference";
 import { getReferenceCatalogState } from "@/server/services/reference";
 import { proposeSpecialties } from "@/server/services/drug-identification";
 import { loadPrescribedAvailability } from "@/server/services/drug-catalog";
+import { buildPatientContext } from "@/server/services/patients";
 import { AUTO_ACCEPT_REFUSAL_MESSAGES, decideAutoAccept } from "@/core/reference";
 import { SaleWorkspace } from "./sale-workspace";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
-import type { SpecialtyProposal } from "./types";
+import type { PatientFactor, SpecialtyProposal } from "./types";
 
 export const metadata: Metadata = { title: "Vente" };
 
@@ -93,6 +94,31 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   // Ce que l'officine détient des médicaments prescrits. Une seule requête,
   // ciblée sur les spécialités rattachées.
   const availability = await loadPrescribedAvailability(session.scope.pharmacyId, prescription.id);
+
+  // Les facteurs patient qui ont RÉELLEMENT pesé sur l'analyse. Ils sont
+  // soumis à la permission de consultation des données de santé : le comptoir
+  // n'est pas une raison de contourner le contrôle d'accès.
+  const patientFactors: PatientFactor[] = [];
+  if (prescription.patientId && session.permissions.has(PERMISSIONS.PATIENT_HEALTH_VIEW)) {
+    const context = await buildPatientContext(prescription.patientId);
+    if (context.ageYears !== null) {
+      patientFactors.push({ label: `${context.ageYears} ans`, tone: "neutral" });
+    }
+    for (const allergy of context.allergies) {
+      patientFactors.push({ label: `Allergie : ${allergy}`, tone: "warning" });
+    }
+    if (context.isPregnant) patientFactors.push({ label: "Grossesse", tone: "warning" });
+    if (context.isBreastfeeding) patientFactors.push({ label: "Allaitement", tone: "warning" });
+    if (context.renalImpairment) {
+      patientFactors.push({ label: "Insuffisance rénale", tone: "warning" });
+    }
+    if (context.hepaticImpairment) {
+      patientFactors.push({ label: "Insuffisance hépatique", tone: "warning" });
+    }
+    for (const condition of context.chronicConditions) {
+      patientFactors.push({ label: condition, tone: "warning" });
+    }
+  }
 
   const catalogState = await getReferenceCatalogState();
   const catalogLoaded = catalogState.status === "READY" || catalogState.status === "STALE";
@@ -187,6 +213,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
       }))}
       catalogAttribution={attribution}
       identificationChangedSinceAnalysis={identificationChangedSinceAnalysis}
+      patientFactors={patientFactors}
       findings={
         run?.safetyFindings.map((finding) => ({
           id: finding.id,
@@ -215,6 +242,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           origin: recommendation.origin,
           totalScore: recommendation.totalScore,
           justification: recommendation.justification,
+          shortReason: recommendation.shortReason,
           patientReason: recommendation.patientReason,
           counterScript: recommendation.counterScript,
           precautions: recommendation.precautions,
