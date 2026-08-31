@@ -40,6 +40,10 @@ des **fournisseurs simulés**. Concrètement :
   prestataire est enregistré `FAILED` avec son motif, jamais en succès.
 - Aucun fournisseur **SMS** n'est branché : ce canal est refusé explicitement.
 - Le socle de règles de conseil **n'a pas été validé par un pharmacien**.
+- **Aucun référentiel d'interactions n'est livré.** Tant que l'officine n'en
+  charge pas un, l'application affiche « les interactions entre médicaments
+  prescrits ne sont pas analysées » — elle ne se contente pas de ne rien
+  trouver. Voir [`docs/INTERACTIONS.md`](docs/INTERACTIONS.md).
 
 👉 **Ne pas utiliser avec des patients réels.** Les prérequis à une utilisation
 réelle sont listés dans [`docs/CONFORMITE.md`](docs/CONFORMITE.md).

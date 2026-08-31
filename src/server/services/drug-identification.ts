@@ -97,7 +97,15 @@ export async function findSpecialtyCandidates(drugName: string): Promise<Special
       name: true,
       pharmaceuticalForm: true,
       marketingStatus: true,
-      compositions: { where: { nature: "SA" }, select: { substanceLabel: true } },
+      // SA = substance active telle que formulée (« AMOXICILLINE TRIHYDRATÉE »),
+      // FT = fraction thérapeutique (« AMOXICILLINE BASE »). Les deux sont
+      // officielles et désignent le même composant : les retenir toutes les
+      // deux donne au croisement d'interactions deux chances de rencontrer le
+      // vocabulaire du référentiel, sans rien interpréter.
+      compositions: {
+        where: { nature: { in: ["SA", "FT"] } },
+        select: { substanceLabel: true, nature: true },
+      },
     },
     // Ce qui est encore commercialisé d'abord : si la borne coupe, elle coupe
     // dans ce que l'officine ne peut plus commander.
@@ -238,7 +246,14 @@ export type SpecialtyFacts = {
   name: string;
   pharmaceuticalForm: string | null;
   administrationRoutes: string[];
+  /** Substances actives telles que formulées (SA) — ce qui s'affiche. */
   substances: string[];
+  /**
+   * SA + fraction thérapeutique (FT). Les deux graphies officielles du même
+   * composant, utilisées pour rencontrer le vocabulaire d'un référentiel
+   * d'interactions. Jamais affichées : elles feraient doublon à l'écran.
+   */
+  interactionSubstances: string[];
   prescriptionConditions: string[];
   marketed: boolean;
   withdrawn: boolean;
@@ -266,7 +281,15 @@ export async function loadSpecialtyFacts(
       administrationRoutes: true,
       marketingStatus: true,
       withdrawnAt: true,
-      compositions: { where: { nature: "SA" }, select: { substanceLabel: true } },
+      // SA = substance active telle que formulée (« AMOXICILLINE TRIHYDRATÉE »),
+      // FT = fraction thérapeutique (« AMOXICILLINE BASE »). Les deux sont
+      // officielles et désignent le même composant : les retenir toutes les
+      // deux donne au croisement d'interactions deux chances de rencontrer le
+      // vocabulaire du référentiel, sans rien interpréter.
+      compositions: {
+        where: { nature: { in: ["SA", "FT"] } },
+        select: { substanceLabel: true, nature: true },
+      },
       prescriptionConditions: { select: { label: true } },
     },
   });
@@ -280,7 +303,16 @@ export async function loadSpecialtyFacts(
         name: row.name,
         pharmaceuticalForm: row.pharmaceuticalForm,
         administrationRoutes: row.administrationRoutes,
-        substances: [...new Set(row.compositions.map((item) => item.substanceLabel))],
+        substances: [
+          ...new Set(
+            row.compositions
+              .filter((item) => item.nature === "SA")
+              .map((item) => item.substanceLabel),
+          ),
+        ],
+        interactionSubstances: [
+          ...new Set(row.compositions.map((item) => item.substanceLabel)),
+        ],
         prescriptionConditions: row.prescriptionConditions.map((item) => item.label),
         marketed: row.marketingStatus === MARKETED,
         withdrawn: row.withdrawnAt !== null,
@@ -310,7 +342,15 @@ export async function searchSpecialties(query: string, limit = 12): Promise<Spec
       name: true,
       pharmaceuticalForm: true,
       marketingStatus: true,
-      compositions: { where: { nature: "SA" }, select: { substanceLabel: true } },
+      // SA = substance active telle que formulée (« AMOXICILLINE TRIHYDRATÉE »),
+      // FT = fraction thérapeutique (« AMOXICILLINE BASE »). Les deux sont
+      // officielles et désignent le même composant : les retenir toutes les
+      // deux donne au croisement d'interactions deux chances de rencontrer le
+      // vocabulaire du référentiel, sans rien interpréter.
+      compositions: {
+        where: { nature: { in: ["SA", "FT"] } },
+        select: { substanceLabel: true, nature: true },
+      },
     },
     orderBy: [{ marketingStatus: "asc" }, { name: "asc" }],
     take: limit,

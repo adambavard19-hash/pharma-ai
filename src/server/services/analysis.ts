@@ -1,6 +1,11 @@
 import "server-only";
 import { prisma } from "@/server/db/client";
 import { runAnalysisPipeline } from "@/core/ai/pipeline";
+import {
+  loadInteractionCatalogState,
+  loadInteractionData,
+  substanceKey,
+} from "./interactions";
 import { evaluateExtractionSafety } from "@/core/ai/engines/safety";
 import type {
   AnalysisResult,
@@ -203,7 +208,16 @@ export async function analysePrescription(params: {
   // Étape B bis : rattachement au catalogue national. Il précède l'analyse
   // parce qu'il conditionne ce que le moteur de sécurité peut affirmer — et
   // surtout ce qu'il doit reconnaître ne pas savoir.
-  const official = await loadOfficialFacts(prescription.id);
+  const { facts: official, substancesByLine } = await loadOfficialFacts(prescription.id);
+
+  // Étape B ter : interactions. Le référentiel est fourni par l'officine ; en
+  // son absence, le moteur le dira au lieu de laisser un écran muet passer
+  // pour une vérification.
+  const interactionKeys = [...substancesByLine.values()].flat().map((s) => s.key);
+  const [interactionCatalog, interactionData] = await Promise.all([
+    loadInteractionCatalogState(),
+    loadInteractionData(interactionKeys),
+  ]);
 
   // Étape C : explications, produites à partir du référentiel uniquement.
   const explanations: TreatmentExplanationResult[] = [];
@@ -256,6 +270,12 @@ export async function analysePrescription(params: {
     history,
     explanations,
     extractionFindings,
+    interactions: {
+      substancesByLine,
+      rules: interactionData.rules,
+      classMembers: interactionData.classMembers,
+      catalog: interactionCatalog,
+    },
     usedSimulatedProviders:
       ocrProvider.info.capability === "SIMULATED" ||
       aiProvider.info.capability === "SIMULATED" ||
@@ -497,9 +517,11 @@ function rebuildExtractedLine(line: {
  * moteur de sécurité le signale alors sur chaque ligne, au lieu de laisser
  * croire à une analyse complète.
  */
-async function loadOfficialFacts(
-  prescriptionId: string,
-): Promise<Map<string, OfficialDrugFacts | null>> {
+async function loadOfficialFacts(prescriptionId: string): Promise<{
+  facts: Map<string, OfficialDrugFacts | null>;
+  /** Substances actives par position de ligne, pour le croisement d'interactions. */
+  substancesByLine: Map<number, { key: string; label: string }[]>;
+}> {
   const [identifications, catalogState] = await Promise.all([
     identifyPrescriptionLines(prescriptionId),
     getReferenceCatalogState(),
@@ -517,8 +539,18 @@ async function loadOfficialFacts(
   );
 
   const map = new Map<string, OfficialDrugFacts | null>();
+  const substancesByLine = new Map<number, { key: string; label: string }[]>();
   for (const identification of identifications) {
     const specialty = identification.specialtyId ? facts.get(identification.specialtyId) : null;
+    if (specialty) {
+      substancesByLine.set(
+        identification.position,
+        specialty.interactionSubstances.map((label) => ({
+          key: substanceKey(label),
+          label,
+        })),
+      );
+    }
     map.set(
       identification.drugName.toLowerCase(),
       specialty
@@ -537,5 +569,5 @@ async function loadOfficialFacts(
     );
   }
 
-  return map;
+  return { facts: map, substancesByLine };
 }

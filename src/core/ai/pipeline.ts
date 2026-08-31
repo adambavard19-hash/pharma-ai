@@ -12,6 +12,14 @@ import {
   evaluateProductSafety,
 } from "./engines/safety";
 import { scoreProductForOpportunity } from "./engines/scoring";
+import {
+  describeCoverage,
+  detectInteractions,
+  interactionFindings,
+  type InteractionCatalogState,
+  type InteractionClassMember,
+  type InteractionRule,
+} from "../interactions";
 import type {
   AnalysisResult,
   CatalogProduct,
@@ -66,6 +74,19 @@ export type PipelineInput = {
   explanations: TreatmentExplanationResult[];
   /** Signaux remontés par l'étape d'extraction. */
   extractionFindings: SafetyFindingResult[];
+  /**
+   * Tout ce qu'il faut pour croiser les médicaments prescrits entre eux.
+   *
+   * Absent = aucun référentiel d'interactions n'est chargé. Le moteur le DIT
+   * alors explicitement : il ne se contente pas de ne rien trouver.
+   */
+  interactions?: {
+    /** Substances actives par index de ligne, issues du catalogue national. */
+    substancesByLine: Map<number, { key: string; label: string }[]>;
+    rules: InteractionRule[];
+    classMembers: InteractionClassMember[];
+    catalog: InteractionCatalogState;
+  };
   usedSimulatedProviders: boolean;
   maxRecommendations?: number;
 };
@@ -101,6 +122,66 @@ function createRecorder(): StageRecorder {
   };
 }
 
+/**
+ * Croisement des médicaments prescrits entre eux.
+ *
+ * Renvoie aussi `covered` : vrai lorsqu'un référentiel a réellement servi. Ce
+ * booléen évite de répéter, ligne à ligne, un avertissement d'absence de
+ * données que la phrase de couverture dit déjà mieux — et une fois.
+ */
+function analyseInteractions(
+  usableLines: PipelineInput["lines"],
+  input: PipelineInput["interactions"],
+): { findings: SafetyFindingResult[]; notes: string[]; covered: boolean } {
+  if (!input) {
+    const coverage = describeCoverage({
+      catalog: { status: "NOT_LOADED" },
+      analysedCount: 0,
+      unanalysedCount: usableLines.length,
+    });
+    return {
+      findings: interactionFindings(
+        { matches: [], overlaps: [], analysedLineIds: [], unanalysedLineIds: [] },
+        coverage,
+      ),
+      notes: [coverage.headline],
+      covered: false,
+    };
+  }
+
+  const analysis = detectInteractions({
+    lines: usableLines.map((line) => ({
+      id: String(line.lineIndex),
+      label: line.drugName ?? `Ligne ${line.lineIndex + 1}`,
+      substances: input.substancesByLine.get(line.lineIndex) ?? [],
+    })),
+    rules: input.rules,
+    classMembers: input.classMembers,
+  });
+
+  const coverage = describeCoverage({
+    catalog: input.catalog,
+    analysedCount: analysis.analysedLineIds.length,
+    unanalysedCount: analysis.unanalysedLineIds.length,
+  });
+
+  const notes = [coverage.headline];
+  if (analysis.matches.length > 0) {
+    notes.push(`${analysis.matches.length} interaction(s) déclarée(s) par le référentiel.`);
+  }
+  if (analysis.overlaps.length > 0) {
+    notes.push(`${analysis.overlaps.length} redondance(s) de substance active.`);
+  }
+
+  return {
+    findings: interactionFindings(analysis, coverage),
+    notes,
+    // Une couverture ne vaut que si le référentiel a pu être confronté à
+    // quelque chose : chargé mais aucune ligne rattachée, il n'a rien couvert.
+    covered: coverage.loaded && analysis.analysedLineIds.length > 0,
+  };
+}
+
 export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
   const recorder = createRecorder();
   const blockedReasons: string[] = [];
@@ -117,9 +198,14 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     "Contrôles de sécurité",
     input.lines.length,
     () => {
-      const coverage = evaluateKnowledgeCoverage(usableLines, input.knowledge, input.official);
-      const all = [...input.extractionFindings, ...coverage];
-      const notes: string[] = [];
+      // Les interactions d'abord : c'est leur résultat qui décide si le
+      // moteur a le droit de se taire sur le sujet ligne à ligne.
+      const interaction = analyseInteractions(usableLines, input.interactions);
+      const coverage = evaluateKnowledgeCoverage(usableLines, input.knowledge, input.official, {
+        interactionsCovered: interaction.covered,
+      });
+      const all = [...input.extractionFindings, ...coverage, ...interaction.findings];
+      const notes: string[] = [...interaction.notes];
 
       const unconfirmed = input.lines.length - usableLines.length;
       if (unconfirmed > 0) {

@@ -1,0 +1,5 @@
+type_gauche	libelle_gauche	type_droit	libelle_droit	niveau	risque	conduite_a_tenir
+substance	Warfarine	substance	Miconazole	contre-indication	Exemple de couple contre-indiqué. Texte de démonstration, non clinique.	Exemple de conduite a tenir. Texte de demonstration.
+substance	Warfarine	classe	Antiagrégants plaquettaires	association déconseillée	Exemple de couple déconseillé passant par une classe. Texte de démonstration, non clinique.	
+substance	Amoxicilline	substance	Ibuprofène	précaution d'emploi	Exemple de précaution d'emploi. Texte de démonstration, non clinique.	Exemple de conduite à tenir. Texte de démonstration.
+substance	Fumarate de fer	substance	Amoxicilline	à prendre en compte	Exemple d'information à prendre en compte. Texte de démonstration, non clinique.	

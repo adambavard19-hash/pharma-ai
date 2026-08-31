@@ -121,6 +121,14 @@ export function evaluateKnowledgeCoverage(
   lines: { drugName: string | null }[],
   knowledge: Map<string, DrugKnowledge | null>,
   official?: Map<string, OfficialDrugFacts | null>,
+  options?: {
+    /**
+     * Vrai lorsqu'un référentiel d'interactions a réellement été confronté à
+     * l'ordonnance. L'avertissement ligne à ligne ci-dessous n'a alors plus
+     * lieu d'être : la phrase de couverture le dit une fois, et mieux.
+     */
+    interactionsCovered?: boolean;
+  },
 ): SafetyFindingResult[] {
   const findings: SafetyFindingResult[] = [];
 
@@ -166,7 +174,7 @@ export function evaluateKnowledgeCoverage(
     // pour une vérification.
     const declaresInteractions = advisory !== null && advisory.interactionClasses.length > 0;
 
-    if (facts && !declaresInteractions) {
+    if (facts && !declaresInteractions && !options?.interactionsCovered) {
       findings.push({
         severity: "WARNING",
         code: "DRUG_NO_INTERACTION_DATA",

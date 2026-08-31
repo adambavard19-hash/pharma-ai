@@ -131,8 +131,14 @@ export function SaleWorkspace({
 
     return buildSummaryRows({
       blockingCount: findings.filter(blocksCounter).length,
+      // La couverture du référentiel d'interactions n'est pas un point de
+      // vigilance de CETTE ordonnance : c'est une propriété de l'outil, dite
+      // en clair dans la zone sécurité. La compter ici afficherait un point
+      // d'attention permanent, que plus personne ne lirait au bout d'un jour.
       attentionCount: findings.filter(
-        (finding) => finding.severity === "WARNING" || finding.severity === "CAUTION",
+        (finding) =>
+          (finding.severity === "WARNING" || finding.severity === "CAUTION") &&
+          finding.code !== "INTERACTION_NO_REFERENTIAL",
       ).length,
       lineCount: confirmed.length,
       inStock: confirmed.filter((line) => line.availability?.state === "IN_STOCK").length,

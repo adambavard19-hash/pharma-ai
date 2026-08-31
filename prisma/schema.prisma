@@ -662,6 +662,8 @@ model ImportJob {
 
 enum ReferenceSource {
   BDPM
+  /// Référentiel d'interactions médicamenteuses, fourni par l'officine.
+  INTERACTIONS
 }
 
 enum ReferenceImportStatus {
@@ -696,6 +698,103 @@ model ReferenceImport {
 
   @@index([source, startedAt])
   @@map("reference_imports")
+}
+
+// ---------------------------------------------------------------------------
+// INTERACTIONS MÉDICAMENTEUSES
+//
+// Rien ici n'est produit par Pharma.ai. Chaque couple vient d'un référentiel
+// fourni par l'officine, avec son nom, sa version et sa date. Ce qui n'est pas
+// dans le fichier n'existe pas : aucune interaction n'est déduite, complétée
+// ni extrapolée d'une classe vers une autre.
+//
+// Conséquence assumée : tant qu'aucun référentiel n'est chargé, l'application
+// dit qu'elle n'analyse pas les interactions. Un écran muet ne vaut pas une
+// vérification.
+// ---------------------------------------------------------------------------
+
+/// Les quatre niveaux du thésaurus national, dans ses propres termes.
+enum InteractionSeverity {
+  /// Contre-indication — l'association ne doit pas être faite.
+  CONTRAINDICATION
+  /// Association déconseillée.
+  NOT_RECOMMENDED
+  /// Précaution d'emploi.
+  PRECAUTION
+  /// À prendre en compte.
+  TO_CONSIDER
+}
+
+/// Un côté d'un couple : soit une substance active, soit une classe.
+enum InteractionSideKind {
+  SUBSTANCE
+  CLASS
+}
+
+/// Un couple en interaction, tel que le référentiel le déclare.
+model DrugInteractionRule {
+  id String @id @default(cuid())
+
+  /// Libellés repris tels quels — ce sont eux qui s'affichent au pharmacien.
+  leftLabel  String
+  rightLabel String
+  /// Formes normalisées (sans accents, majuscules) servant à l'appariement.
+  /// Toujours rangées dans l'ordre lexicographique : un couple n'a qu'une
+  /// écriture, quel que soit l'ordre des lignes de l'ordonnance.
+  leftKey  String
+  rightKey String
+  leftKind  InteractionSideKind
+  rightKind InteractionSideKind
+
+  severity InteractionSeverity
+  /// Le risque, mot pour mot depuis la source. Jamais reformulé.
+  risk     String
+  /// La conduite à tenir, mot pour mot. Absente si la source ne la donne pas.
+  guidance String?
+
+  sourceName      String
+  sourceVersion   String
+  sourceUrl       String?
+  /// Date de la version du référentiel, jamais celle de notre import.
+  sourceUpdatedAt DateTime?
+
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([leftKey, rightKey, severity, sourceName])
+  @@index([leftKey])
+  @@index([rightKey])
+  @@map("drug_interaction_rules")
+}
+
+/// Appartenance d'une substance à une classe du référentiel.
+///
+/// Sans cette table, une règle exprimée au niveau d'une classe ne pourrait
+/// jamais être rapprochée d'une ordonnance, qui ne contient que des substances.
+model DrugInteractionClassMember {
+  id String @id @default(cuid())
+
+  classLabel     String
+  classKey       String
+  substanceLabel String
+  substanceKey   String
+
+  /// Vrai lorsque la ligne ne décrit pas une classe mais une CORRESPONDANCE de
+  /// vocabulaire : « AMOXICILLINE BASE » (catalogue national) désigne la même
+  /// chose que « amoxicilline » (référentiel d'interactions). Sans cette
+  /// déclaration, l'appariement strict raterait l'interaction — un faux négatif
+  /// dans une fonction de sécurité. Elle est fournie par l'officine, jamais
+  /// devinée.
+  isAlias Boolean @default(false)
+
+  sourceName String
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@unique([classKey, substanceKey, sourceName])
+  @@index([substanceKey])
+  @@map("drug_interaction_class_members")
 }
 
 /// Une spécialité pharmaceutique — fichier CIS_bdpm, 12 colonnes.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Ban, ChevronDown, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Ban, ChevronDown, Info, ShieldAlert, ShieldCheck } from "lucide-react";
 import { acknowledgeSafetyFindingsAction } from "@/server/actions/prescriptions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -51,9 +51,18 @@ export function SafetyZone({
       finding.severity === "BLOCKING" && !(COUNTER_BLOCKING_SUBJECTS as readonly string[]).includes(finding.subjectType),
   );
   const notable = findings.filter(
-    (finding) => finding.severity === "WARNING" || finding.severity === "CAUTION",
+    (finding) =>
+      (finding.severity === "WARNING" || finding.severity === "CAUTION") &&
+      finding.code !== "INTERACTION_NO_REFERENTIAL",
   );
-  const informational = findings.filter((finding) => finding.severity === "INFO");
+  const coverage = findings.find(
+    (finding) =>
+      finding.code === "INTERACTION_COVERAGE" || finding.code === "INTERACTION_NO_REFERENTIAL",
+  );
+  const isCoverage = (finding: SafetyFindingView) => finding === coverage;
+  const informational = findings.filter(
+    (finding) => finding.severity === "INFO" && !isCoverage(finding),
+  );
 
   const acknowledge = () => {
     if (!analysisRunId) return;
@@ -143,26 +152,36 @@ export function SafetyZone({
         </Card>
       ) : (
         <Card>
-          {/* Un écran vert doit dire ce qui a été comparé, pas laisser croire
-              à une vérification qui n'a pas eu lieu. Le moteur confronte le
-              profil patient au traitement et aux conseils envisagés ; il ne
-              croise pas encore les médicaments prescrits entre eux. Tant que
-              ce croisement n'existe pas, l'écran le dit. */}
+          {/* Un écran vert doit dire ce qui a été comparé, pas laisser croire à
+              une vérification qui n'a pas eu lieu. La phrase de couverture
+              vient du moteur : elle change selon qu'un référentiel
+              d'interactions est chargé, et selon le nombre de lignes qui ont pu
+              être confrontées. */}
           <CardContent className="flex items-start gap-2.5 py-3.5">
             <ShieldCheck className="mt-px size-[18px] shrink-0 text-success-600 dark:text-success-500" />
-            <div className="space-y-1">
-              <p className="text-[13.5px] text-text-secondary">
-                Aucun signal sur les lignes confirmées.
-              </p>
-              <p className="text-[12.5px] leading-5 text-text-tertiary">
-                Pharma.ai a comparé le profil patient — allergies, grossesse et
-                allaitement, insuffisance rénale ou hépatique, âge — au traitement
-                et aux conseils envisagés. Les interactions entre les médicaments
-                prescrits ne sont pas encore analysées.
-              </p>
-            </div>
+            <p className="text-[13.5px] text-text-secondary">
+              Aucun signal sur les lignes confirmées.
+            </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Ce qui a été croisé, et ce qui ne l'a pas été. Cette ligne ne se
+          replie jamais : sans elle, un écran sans alerte se lirait « rien à
+          signaler », ce qui n'est vrai que dans les limites du référentiel
+          chargé — et faux quand aucune ligne n'a pu être analysée. */}
+      {coverage && (
+        <p
+          className={cn(
+            "flex items-start gap-2 px-1 text-[12.5px] leading-5",
+            coverage.code === "INTERACTION_NO_REFERENTIAL"
+              ? "text-warning-700 dark:text-warning-500"
+              : "text-text-tertiary",
+          )}
+        >
+          <Info className="mt-0.5 size-3.5 shrink-0 opacity-70" />
+          <span>{coverage.message}</span>
+        </p>
       )}
 
       {(informational.length > 0 ||

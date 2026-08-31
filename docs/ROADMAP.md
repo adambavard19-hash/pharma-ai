@@ -179,6 +179,16 @@ Les fondations existent (`PharmacyRule`, `RecommendationEvent`,
 | Envoi SMS | Port prêt, **aucun fournisseur branché** — le canal est refusé explicitement |
 | **Vidéo personnalisée** | Port `VideoProvider` prêt, moteur non développé. L'interface affiche « bientôt disponible » — jamais une vidéo qui n'existe pas. |
 
+## Phase 7 — Interactions médicamenteuses
+
+| Élément | État |
+|---|---|
+| Modèle, importateur strict, CLI `interactions:sync` | ✅ livré |
+| Croisement des substances prescrites, classes, alias de vocabulaire | ✅ livré |
+| Redondance de substance active (sans référentiel) | ✅ livré |
+| Phrase de couverture — ce qui a été vérifié et ce qui ne l'a pas été | ✅ livré |
+| Référentiel lui-même | **Fourni par l'officine.** Aucun référentiel français n'est publié en format machine ; le thésaurus ANSM est un PDF, figé depuis septembre 2023. Voir `docs/INTERACTIONS.md`. |
+
 ---
 
 ## Phase 7 — Plateforme et modèle économique
