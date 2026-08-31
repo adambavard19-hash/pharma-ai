@@ -175,8 +175,8 @@ Les fondations existent (`PharmacyRule`, `RecommendationEvent`,
 |---|---|
 | Page sécurisée + QR code | ✅ livré |
 | Impression A4 premium | ✅ livré |
-| Envoi e-mail | Port prêt, **aucun fournisseur branché** |
-| Envoi SMS | Port prêt |
+| Envoi e-mail | ✅ livré — Resend (HTTPS) et SMTP. Sans configuration : `SIMULATED`, jamais un faux « envoyé » |
+| Envoi SMS | Port prêt, **aucun fournisseur branché** — le canal est refusé explicitement |
 | **Vidéo personnalisée** | Port `VideoProvider` prêt, moteur non développé. L'interface affiche « bientôt disponible » — jamais une vidéo qui n'existe pas. |
 
 ---

@@ -1,4 +1,4 @@
-import type { DeliveryOutcome, MessagingProvider, ProviderInfo } from "../ports";
+import type { DeliveryOutcome, MessagingProvider, OutgoingEmail, ProviderInfo } from "../ports";
 
 /**
  * Fournisseur de messagerie NON CONNECTÉ.
@@ -9,40 +9,32 @@ import type { DeliveryOutcome, MessagingProvider, ProviderInfo } from "../ports"
  * pharmacien, qui reste libre d'imprimer ou de montrer le QR code.
  */
 export class NotConfiguredMessagingProvider implements MessagingProvider {
-  readonly info: ProviderInfo = {
-    id: "none",
-    label: "Aucun service d'envoi configuré",
-    capability: "SIMULATED",
-    description:
-      "Aucun fournisseur e-mail ou SMS n'est branché. Les envois sont journalisés comme simulés : aucun message n'est réellement transmis.",
-  };
+  readonly info: ProviderInfo;
 
-  async sendDocumentLink(params: {
-    to: string;
-    patientName: string;
-    pharmacyName: string;
-    url: string;
-  }): Promise<DeliveryOutcome> {
-    return {
-      status: "SIMULATED",
-      provider: this.info.id,
-      detail:
-        `Aucun service d'envoi n'est configuré. Le message destiné à ${params.to} n'a PAS été transmis. ` +
-        "Le lien reste accessible via le QR code ou l'impression.",
+  /**
+   * @param reason Ce qui manque exactement, quand un fournisseur a bien été
+   *   demandé mais reste inutilisable. Le pharmacien doit pouvoir corriger sa
+   *   configuration sans lire le code.
+   */
+  constructor(private readonly reason: string | null = null) {
+    this.info = {
+      id: "none",
+      label: reason ? "Service d'envoi mal configuré" : "Aucun service d'envoi configuré",
+      capability: "SIMULATED",
+      description: reason
+        ? `Envoi impossible : ${reason} Les envois sont journalisés comme simulés : aucun message n'est réellement transmis.`
+        : "Aucun fournisseur e-mail n'est branché. Les envois sont journalisés comme simulés : aucun message n'est réellement transmis.",
     };
   }
 
-  async sendFollowUp(params: {
-    to: string;
-    subject: string;
-    body: string;
-  }): Promise<DeliveryOutcome> {
+  async sendEmail(message: OutgoingEmail): Promise<DeliveryOutcome> {
     return {
       status: "SIMULATED",
       provider: this.info.id,
       detail:
-        `Aucun service d'envoi n'est configuré. Le suivi destiné à ${params.to} n'a PAS été transmis. ` +
-        "Le rappel reste dans la liste de travail : il pourra être envoyé dès qu'un fournisseur sera branché.",
+        `Aucun service d'envoi n'est configuré${this.reason ? ` (${this.reason})` : ""}. ` +
+        `Le message destiné à ${message.to} n'a PAS été transmis. ` +
+        "Le lien reste accessible via le QR code ou l'impression.",
     };
   }
 }

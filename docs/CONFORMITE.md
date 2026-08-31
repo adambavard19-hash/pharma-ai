@@ -144,10 +144,14 @@ conforme pour autant. Trois points relèvent d'un avis juridique :
    produits de santé et la prospection. La frontière entre accompagnement
    thérapeutique et sollicitation commerciale doit être tranchée par écrit, et le
    contenu des gabarits validé en conséquence.
-2. **Fournisseur d'envoi.** Aucun n'est branché à ce jour ; tout envoi est
-   journalisé `SIMULATED`. Le choix d'un prestataire suppose un contrat de
-   sous-traitance, un hébergement dans l'Union européenne et une analyse des
-   destinataires des journaux d'envoi.
+2. **Fournisseur d'envoi.** Deux transporteurs sont implémentés — Resend et
+   SMTP — et l'envoi est réel dès que l'un est configuré ; sans configuration,
+   tout envoi reste journalisé `SIMULATED`. Le choix d'un prestataire suppose un
+   contrat de sous-traitance, un hébergement dans l'Union européenne et une
+   analyse des destinataires des journaux d'envoi. Le courriel de remise ne
+   transporte aucune donnée de santé : ni médicament, ni pathologie, ni conseil,
+   seulement un lien à jeton (`src/core/documents/email.ts`). L'envoi est refusé
+   côté serveur sans consentement `ADVICE_SHARING`.
 3. **Conservation.** La durée de vie des rappels envoyés et des traces d'envoi
    doit être arrêtée avec le reste des durées (§ 4).
 

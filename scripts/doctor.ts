@@ -113,6 +113,33 @@ async function main() {
     pass("DATA_ENCRYPTION_KEY renseigné");
   }
 
+  // Envoi de la fiche patient. Ne pas l'avoir configuré n'est PAS une erreur :
+  // l'officine peut très bien remettre la fiche imprimée ou par QR code. En
+  // revanche, une configuration à moitié faite doit se voir tout de suite,
+  // sinon le pharmacien croira envoyer alors que rien ne partira.
+  const emailProvider = process.env.EMAIL_PROVIDER ?? "none";
+  if (emailProvider === "none") {
+    pass(
+      "Envoi d'e-mails : aucun fournisseur",
+      "la fiche se remet par impression ou QR code",
+    );
+  } else {
+    const requis: Record<string, string[]> = {
+      resend: ["RESEND_API_KEY", "EMAIL_FROM"],
+      smtp: ["SMTP_HOST", "EMAIL_FROM"],
+    };
+    const absents = (requis[emailProvider] ?? []).filter((name) => !process.env[name]);
+    if (absents.length > 0) {
+      fail(
+        `EMAIL_PROVIDER="${emailProvider}" mais ${absents.join(" et ")} manque(nt)`,
+        "Service d'envoi incomplet",
+        `Renseignez ${absents.join(" et ")} dans .env, ou repassez EMAIL_PROVIDER="none".`,
+      );
+    } else {
+      pass(`Envoi d'e-mails : ${emailProvider}`, "configuration complète");
+    }
+  }
+
   if (problems.length > 0) {
     report();
     return;

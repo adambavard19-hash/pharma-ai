@@ -112,6 +112,7 @@ export default async function DocumentPage({
         prescriptionId={prescription.id}
         canSend={session.permissions.has(PERMISSIONS.DOCUMENT_SEND)}
         canRecordSale={session.permissions.has(PERMISSIONS.SALE_CREATE)}
+        canUpdateConsent={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
         patient={
           prescription.patient
             ? {
@@ -152,7 +153,11 @@ export default async function DocumentPage({
               }
             : null
         }
-        messagingConfigured={messaging.info.capability === "LIVE"}
+        messaging={{
+          configured: messaging.info.capability === "LIVE",
+          label: messaging.info.label,
+          description: messaging.info.description,
+        }}
         existingSales={prescription.sales.map((sale) => ({
           id: sale.id,
           reference: sale.reference,

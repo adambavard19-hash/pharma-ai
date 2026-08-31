@@ -97,25 +97,33 @@ export type DeliveryOutcome = {
   detail: string;
 };
 
+/**
+ * Un message prêt à partir.
+ *
+ * Sujet et corps sont produits par un gabarit figé côté domaine
+ * (`src/core/documents/email.ts`, `src/core/followup/templates.ts`). Le
+ * fournisseur ne compose rien, il transporte — c'est ce qui garantit que le
+ * texte reçu par le patient ne dépend pas du prestataire branché ce jour-là.
+ */
+export type OutgoingEmail = {
+  to: string;
+  subject: string;
+  /** Version texte : celle qui fait foi. */
+  text: string;
+  /** Version HTML facultative, strictement équivalente au texte. */
+  html?: string;
+};
+
 export interface MessagingProvider {
   readonly info: ProviderInfo;
-  sendDocumentLink(params: {
-    to: string;
-    patientName: string;
-    pharmacyName: string;
-    url: string;
-  }): Promise<DeliveryOutcome>;
   /**
-   * Envoi d'un suivi patient.
+   * Transmet un message déjà rédigé.
    *
-   * Le sujet et le corps sont produits par un gabarit figé côté domaine : le
-   * fournisseur ne compose rien, il transporte.
+   * Ne lève jamais : une panne du prestataire ne doit pas interrompre le
+   * comptoir. Un échec revient en `FAILED` avec le motif réel, jamais masqué
+   * derrière un succès.
    */
-  sendFollowUp(params: {
-    to: string;
-    subject: string;
-    body: string;
-  }): Promise<DeliveryOutcome>;
+  sendEmail(message: OutgoingEmail): Promise<DeliveryOutcome>;
 }
 
 // --- Génération vidéo (module futur) --------------------------------------

@@ -357,17 +357,22 @@ export async function sendReminder(params: {
     unsubscribeLink: buildOptOutUrl(optOutToken),
   };
 
-  const outcome = await getMessagingProvider().sendFollowUp({
+  const outcome = await getMessagingProvider().sendEmail({
     to: recipient,
     subject: template.subject(variables),
-    body: template.body(variables),
+    text: template.body(variables),
   });
+
+  // Un envoi refusé par le prestataire n'est pas un envoi. Le rappel reste
+  // programmé pour pouvoir être relancé une fois la cause corrigée, plutôt que
+  // de disparaître de la liste de travail en se disant « envoyé ».
+  const transmitted = outcome.status === "SENT";
 
   await prisma.reminder.update({
     where: { id: reminder.id },
     data: {
-      status: "SENT",
-      sentAt: new Date(),
+      status: outcome.status === "FAILED" ? "SCHEDULED" : "SENT",
+      sentAt: transmitted ? new Date() : null,
       sentByUserId: params.scope.userId,
       deliveryStatus: outcome.status,
       provider: outcome.provider,
@@ -383,7 +388,9 @@ export async function sendReminder(params: {
     summary:
       outcome.status === "SENT"
         ? `Suivi « ${template.label} » envoyé.`
-        : `Suivi « ${template.label} » — envoi SIMULÉ, aucun message n'a été transmis.`,
+        : outcome.status === "FAILED"
+          ? `Suivi « ${template.label} » — ÉCHEC d'envoi, aucun message n'a été transmis : ${outcome.detail}`
+          : `Suivi « ${template.label} » — envoi SIMULÉ, aucun message n'a été transmis.`,
     metadata: { reminderId: reminder.id, deliveryStatus: outcome.status },
   });
 

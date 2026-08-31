@@ -33,9 +33,12 @@ des **fournisseurs simulés**. Concrètement :
   scénario fictif prédéfini, et l'interface l'indique explicitement.
 - Le référentiel médicamenteux livré est **fictif** (12 fiches marquées
   `isDemoData`). **Un modèle de langage n'est pas une base médicamenteuse.**
-- Aucun service d'envoi n'est branché : l'application enregistre les envois —
-  fiche patient comme suivis — en `SIMULATED` et n'affirme jamais qu'un message
-  a été transmis.
+- L'envoi d'e-mails est **réel dès qu'un fournisseur est configuré**
+  (`EMAIL_PROVIDER="resend"` ou `"smtp"`). Tant qu'il ne l'est pas, l'application
+  enregistre les envois — fiche patient comme suivis — en `SIMULATED` et
+  n'affirme jamais qu'un message a été transmis. Un envoi refusé par le
+  prestataire est enregistré `FAILED` avec son motif, jamais en succès.
+- Aucun fournisseur **SMS** n'est branché : ce canal est refusé explicitement.
 - Le socle de règles de conseil **n'a pas été validé par un pharmacien**.
 
 👉 **Ne pas utiliser avec des patients réels.** Les prérequis à une utilisation
@@ -165,6 +168,7 @@ renverse jamais un écart de pertinence.
 | Médicament absent du référentiel | **Aucune explication produite** |
 | Donnée du jeu fictif | Signalée à chaque analyse |
 | Aucun service e-mail | « n'a **PAS** été transmis » |
+| Envoi refusé par le prestataire | « Échec — aucun message n'est parti » + motif |
 | Moteur vidéo absent | « bientôt disponible » — jamais une vidéo qui n'existe pas |
 
 ### Le score est explicable

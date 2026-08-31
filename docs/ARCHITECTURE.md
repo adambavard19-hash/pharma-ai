@@ -321,6 +321,8 @@ Règle produit appliquée systématiquement :
 | Médicament absent du référentiel | `source: UNAVAILABLE`, aucune explication produite |
 | Donnée du jeu de démonstration | `isDemoData: true` → signal `DEMO_REFERENTIAL` |
 | Aucun service e-mail configuré | `DeliveryStatus.SIMULATED` + message : « n'a PAS été transmis » |
+| Service e-mail configuré mais incomplet | `SIMULATED` + la variable manquante est nommée à l'écran |
+| Envoi refusé par le prestataire | `DeliveryStatus.FAILED` + motif réel, jamais un succès |
 | Moteur vidéo absent | « Vidéo personnalisée — bientôt disponible », statut `NOT_CONFIGURED` |
 | Champ d'ordonnance illisible | Champ laissé **vide**, jamais deviné |
 

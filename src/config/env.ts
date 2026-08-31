@@ -39,10 +39,23 @@ const envSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
 
+  // Envoi de la fiche patient et des suivis. « none » est un choix valide et
+  // assumé : l'officine remet alors la fiche par impression ou QR code, et
+  // l'application ne prétend jamais avoir envoyé quoi que ce soit.
   EMAIL_PROVIDER: z.enum(["none", "resend", "smtp"]).default("none"),
   SMS_PROVIDER: z.enum(["none", "twilio"]).default("none"),
+  /** Expéditeur affiché, ex. « Pharmacie X <contact@pharmacie-x.fr> ». */
   EMAIL_FROM: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().max(65535).optional(),
+  /** TLS implicite (port 465). Par défaut STARTTLS, qui reste chiffré. */
+  SMTP_SECURE: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof envSchema>;

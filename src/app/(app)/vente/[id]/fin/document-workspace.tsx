@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { deliverDocumentAction, generateDocumentAction } from "@/server/actions/documents";
+import { updateConsentAction } from "@/server/actions/patients";
 import { recordSaleAction } from "@/server/actions/sales";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -37,6 +38,16 @@ type AcceptedRecommendation = {
   stockQuantity: number;
 };
 
+/**
+ * État réel du service d'envoi, tel que le registre le rapporte. L'écran ne
+ * décide de rien : il répète ce qui est branché, ou ce qui manque.
+ */
+export type MessagingState = {
+  configured: boolean;
+  label: string;
+  description: string;
+};
+
 export function DocumentWorkspace({
   prescriptionId,
   patient,
@@ -44,7 +55,8 @@ export function DocumentWorkspace({
   existingDocument,
   canSend,
   canRecordSale,
-  messagingConfigured,
+  canUpdateConsent,
+  messaging,
   existingSales,
 }: {
   prescriptionId: string;
@@ -54,6 +66,7 @@ export function DocumentWorkspace({
     email: string | null;
     hasAdviceConsent: boolean;
   } | null;
+  canUpdateConsent: boolean;
   acceptedRecommendations: AcceptedRecommendation[];
   existingDocument: {
     id: string;
@@ -72,7 +85,7 @@ export function DocumentWorkspace({
   } | null;
   canSend: boolean;
   canRecordSale: boolean;
-  messagingConfigured: boolean;
+  messaging: MessagingState;
   existingSales: { id: string; reference: string; attributedCents: number }[];
 }) {
   const [note, setNote] = useState("");
@@ -184,7 +197,8 @@ export function DocumentWorkspace({
               url={existingDocument.url}
               patient={patient}
               canSend={canSend}
-              messagingConfigured={messagingConfigured}
+              canUpdateConsent={canUpdateConsent}
+              messaging={messaging}
               deliveries={existingDocument.deliveries}
             />
 
@@ -233,14 +247,21 @@ function DeliveryPanel({
   url,
   patient,
   canSend,
-  messagingConfigured,
+  canUpdateConsent,
+  messaging,
   deliveries,
 }: {
   documentId: string;
   url: string;
-  patient: { name: string; email: string | null; hasAdviceConsent: boolean } | null;
+  patient: {
+    id: string;
+    name: string;
+    email: string | null;
+    hasAdviceConsent: boolean;
+  } | null;
+  canUpdateConsent: boolean;
   canSend: boolean;
-  messagingConfigured: boolean;
+  messaging: MessagingState;
   deliveries: {
     id: string;
     channel: string;
@@ -251,8 +272,29 @@ function DeliveryPanel({
 }) {
   const [copied, setCopied] = useState(false);
   const [emailResult, setEmailResult] = useState<string | null>(null);
+  const [consentGranted, setConsentGranted] = useState(patient?.hasAdviceConsent ?? false);
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
+
+  // Le consentement se recueille au comptoir, oralement. Le consigner ici évite
+  // au pharmacien d'aller le chercher dans la fiche patient — mais il reste une
+  // déclaration horodatée et révocable, pas une case cochée d'avance.
+  const grantAdviceConsent = () => {
+    if (!patient) return;
+    startTransition(async () => {
+      const data = new FormData();
+      data.set("patientId", patient.id);
+      data.set("type", "ADVICE_SHARING");
+      data.set("granted", "true");
+      const result = await updateConsentAction(data);
+      if (result.ok) {
+        setConsentGranted(true);
+        push({ tone: "success", title: "Consentement enregistré." });
+      } else {
+        push({ tone: "error", title: result.error });
+      }
+    });
+  };
 
   const deliver = (channel: "EMAIL" | "PRINT" | "QR_CODE" | "LINK", target?: string) => {
     startTransition(async () => {
@@ -323,17 +365,33 @@ function DeliveryPanel({
 
         {canSend && (
           <div className="space-y-2 border-t border-border-subtle pt-4">
-            {!messagingConfigured && (
-              <Alert tone="warning" title="Aucun service d'envoi configuré">
-                L&apos;application n&apos;enverra AUCUN e-mail tant qu&apos;un fournisseur
-                n&apos;est pas branché. La tentative sera journalisée comme simulée.
+            {messaging.configured ? (
+              <p className="text-[11.5px] text-text-tertiary">
+                Envoi assuré par {messaging.label}.
+              </p>
+            ) : (
+              <Alert tone="warning" title={messaging.label}>
+                {messaging.description}
               </Alert>
             )}
 
-            {patient && !patient.hasAdviceConsent && (
+            {patient && !consentGranted && (
               <Alert tone="danger" title="Consentement manquant">
-                {patient.name} n&apos;a pas consenti à recevoir sa fiche conseil. L&apos;envoi
-                n&apos;est pas approprié tant que ce consentement n&apos;est pas recueilli.
+                {patient.name} n&apos;a pas consenti à recevoir sa fiche conseil. Le refus
+                d&apos;envoi est appliqué côté serveur : la fiche reste imprimable ou
+                consultable par QR code.
+                {canUpdateConsent && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      onClick={() => grantAdviceConsent()}
+                      className="font-medium underline underline-offset-2"
+                    >
+                      Le patient vient de l&apos;accepter au comptoir
+                    </button>
+                  </>
+                )}
               </Alert>
             )}
 
@@ -341,7 +399,7 @@ function DeliveryPanel({
               variant="outline"
               className="w-full"
               loading={pending}
-              disabled={!patient?.email || !patient.hasAdviceConsent}
+              disabled={!patient?.email || !consentGranted}
               onClick={() => deliver("EMAIL", patient?.email ?? undefined)}
               leadingIcon={<Mail className="size-4" />}
             >
@@ -369,15 +427,32 @@ function DeliveryPanel({
                   key={delivery.id}
                   className="flex flex-wrap items-center gap-x-2 text-[12px] text-text-secondary"
                 >
-                  <Badge tone={delivery.status === "SIMULATED" ? "warning" : "success"}>
+                  <Badge
+                    tone={
+                      delivery.status === "SENT"
+                        ? "success"
+                        : delivery.status === "FAILED"
+                          ? "danger"
+                          : "warning"
+                    }
+                  >
                     {CHANNEL_LABELS[delivery.channel] ?? delivery.channel}
                   </Badge>
                   <span className="text-text-tertiary">
                     {formatDateTime(delivery.createdAt)}
                   </span>
+                  {/* Un échec et une simulation ne se ressemblent pas : dans un
+                      cas le prestataire a refusé, dans l'autre il n'y en a
+                      aucun. Les confondre empêcherait de corriger. */}
+                  {delivery.status === "FAILED" && (
+                    <span className="w-full text-[11px] text-danger-700 dark:text-danger-400">
+                      Échec — aucun message n&apos;est parti.
+                      {delivery.detail ? ` ${delivery.detail}` : ""}
+                    </span>
+                  )}
                   {delivery.status === "SIMULATED" && (
                     <span className="w-full text-[11px] text-warning-700 dark:text-warning-500">
-                      Non transmis — aucun service configuré
+                      Non transmis — {delivery.detail ?? "aucun service configuré"}
                     </span>
                   )}
                 </li>

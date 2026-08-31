@@ -13,7 +13,7 @@ import type {
 import { LocalDrugKnowledgeProvider } from "@/core/ai/providers/local-drug-knowledge";
 import { LocalStorageProvider } from "@/core/ai/providers/local-storage";
 import { MockOCRProvider } from "@/core/ai/providers/mock-ocr";
-import { NotConfiguredMessagingProvider } from "@/core/ai/providers/messaging";
+import { chooseMessagingProvider } from "@/core/ai/providers/messaging-factory";
 import { RuleBasedAIProvider } from "@/core/ai/providers/rule-based-ai";
 import { UnavailableVideoProvider } from "@/core/ai/providers/video";
 import type { DrugKnowledge } from "@/core/ai/types";
@@ -97,9 +97,25 @@ export function getStorageProvider(): StorageProvider {
   return new LocalStorageProvider(env.STORAGE_LOCAL_PATH);
 }
 
+/**
+ * Choix du transporteur d'e-mails.
+ *
+ * La décision elle-même vit dans le domaine
+ * (`src/core/ai/providers/messaging-factory.ts`), où elle est testable sans
+ * base ni réseau. Le registre ne fait que lui passer la configuration.
+ */
 export function getMessagingProvider(): MessagingProvider {
-  // Aucun fournisseur réel n'est branché dans le MVP : voir `.env.example`.
-  return new NotConfiguredMessagingProvider();
+  const env = getEnv();
+  return chooseMessagingProvider({
+    provider: env.EMAIL_PROVIDER,
+    from: env.EMAIL_FROM,
+    resendApiKey: env.RESEND_API_KEY,
+    smtpHost: env.SMTP_HOST,
+    smtpPort: env.SMTP_PORT,
+    smtpSecure: env.SMTP_SECURE,
+    smtpUser: env.SMTP_USER,
+    smtpPassword: env.SMTP_PASSWORD,
+  });
 }
 
 export function getVideoProvider(): VideoProvider {

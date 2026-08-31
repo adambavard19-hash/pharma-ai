@@ -76,3 +76,10 @@ export const DOCUMENT_DISCLAIMERS = [
 
 export const DEMO_DISCLAIMER =
   "DOCUMENT DE DÉMONSTRATION — patient, ordonnance, produits et prix sont fictifs. Ce document ne constitue en aucun cas un conseil médical ou pharmaceutique.";
+
+/**
+ * Rappel systématique en pied de courriel : le patient doit savoir pourquoi il
+ * reçoit ce message et que rien de médical n'y transite.
+ */
+export const DOCUMENT_EMAIL_SIGNATURE_HINT =
+  "Vous recevez ce message parce que vous avez accepté que votre pharmacien vous transmette vos conseils. Il ne contient aucune information sur votre santé.";

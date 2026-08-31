@@ -6,6 +6,7 @@ import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { generatePatientDocument } from "@/server/services/documents";
+import { buildDocumentEmail } from "@/core/documents/email";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { maskEmail } from "@/server/security/tokens";
 import { recordAudit } from "@/server/audit/log";
@@ -53,10 +54,15 @@ const sendSchema = z.object({
 /**
  * Transmission de la fiche.
  *
- * IMPORTANT : tant qu'aucun fournisseur d'envoi n'est configuré, l'action
- * enregistre le statut `SIMULATED` et le message de retour indique clairement
- * qu'AUCUN message n'a été transmis. L'application ne prétend jamais avoir
- * envoyé un e-mail ou un SMS.
+ * Trois règles tiennent cette action.
+ *
+ * 1. Aucun envoi sans consentement. Le patient doit avoir accepté que ses
+ *    conseils lui soient transmis ; le contrôle est fait ICI, côté serveur, et
+ *    non par le simple masquage d'un bouton.
+ * 2. Le texte du message vient du domaine, jamais du prestataire.
+ * 3. L'écran ne dit « transmis » que si le prestataire l'a confirmé. Un échec
+ *    est enregistré comme tel, avec son motif réel ; l'absence de fournisseur
+ *    reste un envoi SIMULÉ, annoncé comme tel.
  */
 export async function deliverDocumentAction(
   payload: z.input<typeof sendSchema>,
@@ -72,12 +78,29 @@ export async function deliverDocumentAction(
     select: {
       id: true,
       pharmacyId: true,
+      prescriptionId: true,
       accessToken: true,
-      patient: { select: { firstName: true, lastName: true, email: true } },
+      tokenExpiresAt: true,
+      revokedAt: true,
+      isDemo: true,
+      patient: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+          consents: {
+            where: { type: "ADVICE_SHARING" },
+            select: { granted: true, revokedAt: true },
+          },
+        },
+      },
     },
   });
   if (!document || document.pharmacyId !== session.scope.pharmacyId) {
     return fail("Document introuvable dans cette officine.");
+  }
+  if (document.revokedAt) {
+    return fail("Cette fiche a été révoquée : son lien ne mène plus à rien.");
   }
 
   if (channel === "PRINT") {
@@ -120,19 +143,60 @@ export async function deliverDocumentAction(
     });
   }
 
-  const messaging = getMessagingProvider();
+  // Le SMS n'a aucun fournisseur : le dire franchement vaut mieux que
+  // d'envoyer un e-mail à un numéro de téléphone.
+  if (channel === "SMS") {
+    await prisma.documentDelivery.create({
+      data: {
+        documentId,
+        channel: "SMS",
+        status: "SIMULATED",
+        provider: "none",
+        detail:
+          "Aucun fournisseur SMS n'est branché dans Pharma.ai. Aucun message n'a été transmis.",
+        userId: session.scope.userId,
+      },
+    });
+    return fail(
+      "L'envoi par SMS n'est pas disponible : aucun fournisseur SMS n'est branché. Utilisez l'e-mail, le QR code ou l'impression.",
+    );
+  }
+
+  // À partir d'ici : canal e-mail.
+  const consent = document.patient?.consents[0];
+  if (!consent?.granted || consent.revokedAt) {
+    return fail(
+      "Le patient n'a pas accepté que ses conseils lui soient transmis. Recueillez son consentement avant tout envoi — la fiche reste imprimable ou consultable par QR code.",
+    );
+  }
+
   const recipient = target || document.patient?.email || "";
   if (!recipient) {
     return fail("Aucun destinataire renseigné pour ce patient.");
   }
 
-  const outcome = await messaging.sendDocumentLink({
-    to: recipient,
-    patientName: document.patient
-      ? `${document.patient.firstName} ${document.patient.lastName}`
-      : "Patient",
+  // Le téléphone n'est pas dans la session : c'est la seule information de
+  // l'officine que le message ajoute, et elle vaut d'être exacte.
+  const pharmacy = await prisma.pharmacy.findUnique({
+    where: { id: session.scope.pharmacyId },
+    select: { phone: true },
+  });
+
+  const message = buildDocumentEmail({
+    patientFirstName: document.patient?.firstName ?? "",
     pharmacyName: session.pharmacy.name,
+    pharmacyPhone: pharmacy?.phone ?? null,
     url: buildDocumentUrl(document.accessToken),
+    expiresAt: document.tokenExpiresAt,
+    isDemo: document.isDemo,
+  });
+
+  const messaging = getMessagingProvider();
+  const outcome = await messaging.sendEmail({
+    to: recipient,
+    subject: message.subject,
+    text: message.text,
+    html: message.html,
   });
 
   await prisma.documentDelivery.create({
@@ -142,7 +206,7 @@ export async function deliverDocumentAction(
       status: outcome.status,
       provider: outcome.provider,
       detail: outcome.detail,
-      targetMasked: recipient.includes("@") ? maskEmail(recipient) : recipient.slice(0, 4) + "***",
+      targetMasked: maskEmail(recipient),
       userId: session.scope.userId,
     },
   });
@@ -153,14 +217,20 @@ export async function deliverDocumentAction(
     entityId: documentId,
     pharmacyId: session.scope.pharmacyId,
     userId: session.scope.userId,
-    metadata: { channel, status: outcome.status },
+    metadata: { channel, status: outcome.status, provider: outcome.provider },
   });
+
+  revalidatePath(`/vente/${document.prescriptionId}/fin`);
 
   if (outcome.status === "SIMULATED") {
     return ok(
       { status: outcome.status, detail: outcome.detail },
       "Envoi NON effectué : aucun service de messagerie n'est configuré.",
     );
+  }
+
+  if (outcome.status === "FAILED") {
+    return fail(`Envoi ÉCHOUÉ, aucun message n'est parti. ${outcome.detail}`);
   }
 
   return ok({ status: outcome.status, detail: outcome.detail }, "Message transmis.");
