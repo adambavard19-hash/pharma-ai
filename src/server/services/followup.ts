@@ -283,7 +283,13 @@ export async function countDueReminders(scope: TenantScope): Promise<number> {
 export async function sendReminder(params: {
   scope: TenantScope;
   reminderId: string;
+  /**
+   * Envoi déclenché par la tâche planifiée, sans clic humain. La trace doit le
+   * dire : attribuer l'envoi à un utilisateur qui n'a rien fait serait faux.
+   */
+  automated?: boolean;
 }): Promise<{ status: string; detail: string }> {
+  const actorId = params.automated ? null : params.scope.userId;
   const reminder = await prisma.reminder.findUnique({
     where: { id: params.reminderId },
     include: {
@@ -363,17 +369,18 @@ export async function sendReminder(params: {
     text: template.body(variables),
   });
 
-  // Un envoi refusé par le prestataire n'est pas un envoi. Le rappel reste
-  // programmé pour pouvoir être relancé une fois la cause corrigée, plutôt que
-  // de disparaître de la liste de travail en se disant « envoyé ».
+  // Seul un envoi confirmé par le prestataire est un envoi. Un échec — comme
+  // une absence de fournisseur — laisse le rappel PROGRAMMÉ : il repartira
+  // quand la cause aura disparu, au lieu de quitter la liste de travail en se
+  // disant « envoyé » alors que rien n'est parti.
   const transmitted = outcome.status === "SENT";
 
   await prisma.reminder.update({
     where: { id: reminder.id },
     data: {
-      status: outcome.status === "FAILED" ? "SCHEDULED" : "SENT",
+      status: transmitted ? "SENT" : "SCHEDULED",
       sentAt: transmitted ? new Date() : null,
-      sentByUserId: params.scope.userId,
+      sentByUserId: actorId,
       deliveryStatus: outcome.status,
       provider: outcome.provider,
       detail: outcome.detail,
@@ -384,6 +391,7 @@ export async function sendReminder(params: {
   await recordInteraction({
     patientId: reminder.patientId,
     scope: params.scope,
+    automated: params.automated === true,
     type: "FOLLOW_UP_SENT",
     summary:
       outcome.status === "SENT"
@@ -399,10 +407,11 @@ export async function sendReminder(params: {
     entityType: "Reminder",
     entityId: reminder.id,
     pharmacyId: params.scope.pharmacyId,
-    userId: params.scope.userId,
+    userId: actorId,
     metadata: {
       templateKey: template.key,
       deliveryStatus: outcome.status,
+      automated: params.automated === true,
       target: maskEmail(recipient),
     },
   });

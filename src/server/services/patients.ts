@@ -152,6 +152,8 @@ export async function recordInteraction(params: {
   metadata?: Record<string, unknown>;
   /** L'action vient du patient lui-même (désinscription) : aucun auteur interne. */
   byPatient?: boolean;
+  /** L'action vient d'une tâche planifiée : personne n'a cliqué. */
+  automated?: boolean;
 }): Promise<void> {
   await prisma.patientInteraction.create({
     data: {
@@ -160,9 +162,10 @@ export async function recordInteraction(params: {
       type: params.type,
       summary: params.summary,
       metadata: (params.metadata ?? {}) as never,
-      // La désinscription est un acte du patient, pas d'un collaborateur :
-      // l'interaction est alors enregistrée sans auteur.
-      userId: params.byPatient ? null : params.scope.userId,
+      // Une désinscription est un acte du patient ; un envoi planifié n'a pas
+      // d'auteur du tout. Dans les deux cas, attribuer l'action à un
+      // collaborateur qui n'a rien fait serait faux.
+      userId: params.byPatient || params.automated ? null : params.scope.userId,
     },
   });
 }

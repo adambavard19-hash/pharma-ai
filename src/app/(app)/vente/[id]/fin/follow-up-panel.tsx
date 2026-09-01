@@ -20,6 +20,15 @@ export type FollowUpOption = {
 };
 
 /**
+ * Le rappel que le moteur propose d'office — ou le motif pour lequel il n'en
+ * propose aucun. Ne rien proposer est un résultat normal : un produit qui
+ * propose toujours quelque chose finit par proposer n'importe quoi.
+ */
+export type FollowUpSuggestionView =
+  | { suggested: true; templateKey: string; label: string; dueAt: string; reason: string }
+  | { suggested: false; reason: string };
+
+/**
  * Programmer le retour du patient, à la fin de la vente.
  *
  * Les échéances proposées découlent d'un fait de la vente — la durée réelle du
@@ -32,6 +41,7 @@ export function FollowUpPanel({
   prescriptionId,
   saleId,
   options,
+  suggestion,
   hasConsent,
   optedOut,
   scheduled,
@@ -42,13 +52,19 @@ export function FollowUpPanel({
   prescriptionId: string;
   saleId: string | null;
   options: FollowUpOption[];
+  suggestion: FollowUpSuggestionView;
   hasConsent: boolean;
   optedOut: boolean;
   scheduled: { templateLabel: string; dueAt: string }[];
   canSchedule: boolean;
   canUpdateConsent: boolean;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
+  // La proposition est retenue d'avance : au comptoir, choisir dans une liste
+  // est un travail qu'on peut éviter au pharmacien.
+  const [selected, setSelected] = useState<string | null>(
+    suggestion.suggested ? suggestion.templateKey : null,
+  );
+  const [showAll, setShowAll] = useState(false);
   const [consent, setConsent] = useState(hasConsent);
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
@@ -133,6 +149,27 @@ export function FollowUpPanel({
 
             {canSchedule && (
               <>
+                {/* Une phrase, une date, un bouton. Le reste est à un clic de
+                    plus, pour qui veut choisir autrement. */}
+                {suggestion.suggested ? (
+                  <p className="flex items-start gap-2 rounded-lg bg-surface-sunken px-3.5 py-3 text-[13.5px] leading-5 text-text-primary">
+                    <CalendarClock className="mt-0.5 size-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                    <span>
+                      <span className="font-medium">
+                        {suggestion.label} — {formatDate(suggestion.dueAt)}
+                      </span>
+                      <span className="mt-0.5 block text-[12.5px] leading-4 text-text-secondary">
+                        {suggestion.reason}
+                      </span>
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-[13px] leading-5 text-text-secondary">
+                    {suggestion.reason}
+                  </p>
+                )}
+
+                {(showAll || !suggestion.suggested) && (
                 <div className="grid gap-2">
                   {options.map((option) => (
                     <button
@@ -166,6 +203,17 @@ export function FollowUpPanel({
                     </button>
                   ))}
                 </div>
+                )}
+
+                {suggestion.suggested && !showAll && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAll(true)}
+                    className="text-left text-[12.5px] text-text-tertiary underline underline-offset-2 hover:text-text-secondary"
+                  >
+                    Choisir un autre rappel
+                  </button>
+                )}
 
                 {canUpdateConsent && (
                   <Checkbox
@@ -182,7 +230,9 @@ export function FollowUpPanel({
                   disabled={!selected}
                   leadingIcon={<CalendarClock className="size-[18px]" />}
                 >
-                  Programmer le suivi
+                  {suggestion.suggested && selected === suggestion.templateKey
+                    ? "Programmer ce rappel"
+                    : "Programmer le suivi"}
                 </Button>
 
                 {!consent && (

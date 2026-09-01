@@ -177,6 +177,7 @@ renverse jamais un écart de pertinence.
 | Donnée du jeu fictif | Signalée à chaque analyse |
 | Aucun service e-mail | « n'a **PAS** été transmis » |
 | Envoi refusé par le prestataire | « Échec — aucun message n'est parti » + motif |
+| Rappel non transmis (aucun service, refus, échec) | reste **programmé** — il ne quitte jamais la liste en se disant « envoyé » |
 | Moteur vidéo absent | « bientôt disponible » — jamais une vidéo qui n'existe pas |
 
 ### Le score est explicable
@@ -240,7 +241,11 @@ npm run build          # build de production
 npm run start          # serveur de production
 npm run typecheck      # TypeScript
 npm run lint           # ESLint
-npm test               # tests (100)
+npm test               # tests (326)
+
+npm run bdpm:sync           # charger le catalogue national des médicaments
+npm run interactions:sync   # charger un référentiel d'interactions
+npm run followup:run        # envoyer les rappels arrivés à échéance
 
 npm run db:migrate     # créer et appliquer une migration
 npm run db:deploy      # appliquer les migrations (production)
@@ -252,6 +257,21 @@ npm run demo:parcours  # dérouler le parcours complet en ligne de commande
 npm run demo:comptoir  # mesurer le parcours comptoir dans un vrai navigateur
 npm run setup          # migrations + client + démonstration
 ```
+
+`npm run followup:run` envoie les rappels dont l'échéance est passée. C'est
+cette commande, branchée sur une **tâche planifiée quotidienne** (cron, timer
+systemd, planificateur de l'hébergeur), qui rend vraie la phrase « le rappel
+part à la date prévue » :
+
+```cron
+# tous les jours à 9 h
+0 9 * * *  cd /chemin/vers/pharma-ai && npm run followup:run >> /var/log/pharma-followup.log 2>&1
+```
+
+`--dry-run` liste ce qui partirait sans rien envoyer. Les garde-fous sont
+revérifiés **au moment de l'envoi**, pas à celui de la programmation : une
+désinscription ou un consentement révoqué depuis coupe le message. Un rappel
+écarté n'est pas perdu — il reste programmé et repartira si la cause disparaît.
 
 `npm run demo:parcours` exécute la chaîne complète contre la base réelle —
 extraction, vérification, analyse, conseil, fiche, vente, suivi — et affiche la

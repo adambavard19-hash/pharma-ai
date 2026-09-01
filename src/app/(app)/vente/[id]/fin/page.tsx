@@ -12,7 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { DocumentWorkspace } from "./document-workspace";
 import { FollowUpPanel } from "./follow-up-panel";
-import { FOLLOW_UP_TEMPLATES, findTemplate, proposedDueDate } from "@/core/followup";
+import {
+  SUGGESTIBLE_TEMPLATES,
+  findTemplate,
+  proposedDueDate,
+  suggestFollowUp,
+} from "@/core/followup";
 import type { DocumentContent } from "@/core/documents/types";
 
 export const metadata: Metadata = { title: "Fin de vente" };
@@ -69,9 +74,7 @@ export default async function DocumentPage({
     0,
   );
   const now = new Date();
-  const followUpOptions = FOLLOW_UP_TEMPLATES.filter(
-    (template) => template.key !== "custom" && template.key !== "seasonal",
-  ).map((template) => ({
+  const followUpOptions = SUGGESTIBLE_TEMPLATES.map((template) => ({
     templateKey: template.key,
     label: template.label,
     purpose: template.purpose,
@@ -89,6 +92,28 @@ export default async function DocumentPage({
         select: { templateKey: true, dueAt: true },
       })
     : [];
+
+  // Le rappel proposé d'office. Il se déduit du traitement — durée réelle,
+  // caractère chronique — et jamais d'un profil d'appétence.
+  const scheduledKeys = scheduledReminders.map((reminder) => reminder.templateKey);
+  const outcome = suggestFollowUp({
+    treatmentDurationDays: treatmentDurationDays || null,
+    hasConsent: consentOf("FOLLOW_UP_MESSAGE"),
+    optedOut: Boolean(prescription.patient?.followUpOptOutAt),
+    hasContact: Boolean(prescription.patient?.email),
+    alreadyScheduled: scheduledKeys,
+    now,
+  });
+
+  const suggestion = outcome.suggested
+    ? {
+        suggested: true as const,
+        templateKey: outcome.suggestion.template.key,
+        label: outcome.suggestion.template.label,
+        dueAt: outcome.suggestion.dueAt.toISOString(),
+        reason: outcome.suggestion.reason,
+      }
+    : { suggested: false as const, reason: outcome.reason };
 
   return (
     <div className="space-y-6">
@@ -170,6 +195,7 @@ export default async function DocumentPage({
         prescriptionId={prescription.id}
         saleId={prescription.sales[0]?.id ?? null}
         options={followUpOptions}
+        suggestion={suggestion}
         hasConsent={consentOf("FOLLOW_UP_MESSAGE")}
         optedOut={Boolean(prescription.patient?.followUpOptOutAt)}
         scheduled={scheduledReminders.map((reminder) => ({

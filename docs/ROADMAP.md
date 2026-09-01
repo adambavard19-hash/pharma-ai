@@ -182,6 +182,18 @@ Les fondations existent (`PharmacyRule`, `RecommendationEvent`,
 | Envoi SMS | Port prêt, **aucun fournisseur branché** — le canal est refusé explicitement |
 | **Vidéo personnalisée** | Port `VideoProvider` prêt, moteur non développé. L'interface affiche « bientôt disponible » — jamais une vidéo qui n'existe pas. |
 
+## Phase 6 bis — Suivi patient proposé d'office
+
+| Élément | État |
+|---|---|
+| Rappel proposé d'office, en une phrase et un clic | ✅ livré — le gabarit et l'échéance se déduisent de la durée prescrite, jamais d'un profil |
+| Ne rien proposer quand rien ne le justifie | ✅ livré — pas de consentement, pas d'adresse, désinscription, rappel déjà programmé : le motif est affiché |
+| Envoi automatique à l'échéance | ✅ livré — `npm run followup:run`, à brancher sur une tâche planifiée quotidienne |
+| Garde-fous revérifiés au moment de l'envoi | ✅ livré — désinscription, consentement révoqué, plafond de fréquence |
+| Désinscription depuis l'e-mail | ✅ livré — coupe tout envoi ultérieur, vérifié de bout en bout |
+
+---
+
 ## Phase 7 — Interactions médicamenteuses
 
 | Élément | État |
