@@ -175,13 +175,23 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
 ];
 
 export class MockOCRProvider implements OCRProvider {
-  readonly info: ProviderInfo = {
-    id: "mock-ocr",
-    label: "OCR simulé (démonstration)",
-    capability: "SIMULATED",
-    description:
-      "Aucune image n'est analysée. Un scénario fictif prédéfini est restitué pour dérouler le parcours complet.",
-  };
+  readonly info: ProviderInfo;
+
+  /**
+   * @param reason Ce qui manque, quand une lecture réelle a été demandée mais
+   *   reste impossible. Le pharmacien doit pouvoir corriger sa configuration
+   *   sans lire le code — et savoir qu'aucune image n'est partie.
+   */
+  constructor(private readonly reason: string | null = null) {
+    this.info = {
+      id: "mock-ocr",
+      label: reason ? "Lecture réelle indisponible — extraction simulée" : "OCR simulé (démonstration)",
+      capability: "SIMULATED",
+      description: reason
+        ? `${reason} Un scénario fictif prédéfini est restitué à la place.`
+        : "Aucune image n'est analysée. Un scénario fictif prédéfini est restitué pour dérouler le parcours complet.",
+    };
+  }
 
   async extract(input: OcrInput): Promise<ExtractedPrescription> {
     const scenario =

@@ -84,6 +84,8 @@ export interface AIProvider {
 export interface StorageProvider {
   readonly info: ProviderInfo;
   put(key: string, data: Uint8Array, mimeType: string): Promise<{ key: string }>;
+  /** Contenu du fichier, ou `null` s'il est introuvable. */
+  read(key: string): Promise<Uint8Array | null>;
   getUrl(key: string): Promise<string | null>;
   delete(key: string): Promise<void>;
 }

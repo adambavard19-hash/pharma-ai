@@ -37,6 +37,10 @@ export class LocalStorageProvider implements StorageProvider {
     return { key };
   }
 
+  async read(key: string): Promise<Uint8Array | null> {
+    return readFile(this.resolve(key)).catch(() => null);
+  }
+
   async getUrl(key: string): Promise<string | null> {
     try {
       await readFile(this.resolve(key));

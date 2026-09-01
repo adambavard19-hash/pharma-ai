@@ -19,6 +19,7 @@ import {
   getAIProvider,
   getDrugKnowledgeProvider,
   getOCRProvider,
+  getStorageProvider,
 } from "@/server/ai/registry";
 import {
   loadCatalogSnapshot,
@@ -66,10 +67,19 @@ export async function extractPrescription(params: {
     data: { status: "EXTRACTING" },
   });
 
+  // L'image n'est lue depuis le stockage QUE si un lecteur réel est branché.
+  // Un fournisseur simulé n'a aucune raison de recevoir une donnée de santé,
+  // même en mémoire.
+  const bytes =
+    ocr.info.capability === "LIVE" && prescription.fileKey
+      ? ((await getStorageProvider().read(prescription.fileKey)) ?? undefined)
+      : undefined;
+
   const extracted = await ocr.extract({
     fileKey: prescription.fileKey,
     mimeType: prescription.fileMimeType,
     fileName: prescription.fileName,
+    bytes,
     demoScenarioId: params.demoScenarioId,
   });
 

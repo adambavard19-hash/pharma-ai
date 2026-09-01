@@ -24,6 +24,7 @@
     "interactions:sync": "node --env-file=.env --conditions=react-server --import tsx scripts/interactions-sync.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.122.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "7.10.0",
     "clsx": "^2.1.1",

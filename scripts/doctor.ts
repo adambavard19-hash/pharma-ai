@@ -140,6 +140,38 @@ async function main() {
     }
   }
 
+  // Lecture réelle des ordonnances. Ne pas l'activer est un choix valide — le
+  // mode démonstration déroule le parcours complet. En revanche, une
+  // configuration à moitié faite doit se voir : le pharmacien croirait lire de
+  // vraies ordonnances alors qu'un scénario fictif serait restitué.
+  const ocrProvider = process.env.OCR_PROVIDER ?? "mock";
+  if (ocrProvider === "mock") {
+    pass("Lecture d'ordonnance : simulée", "aucune image n'est transmise");
+  } else if (ocrProvider === "anthropic") {
+    const absents = [
+      process.env.ANTHROPIC_API_KEY ? null : "ANTHROPIC_API_KEY",
+      process.env.OCR_SEND_IMAGES_EXTERNALLY === "true"
+        ? null
+        : 'OCR_SEND_IMAGES_EXTERNALLY="true"',
+    ].filter(Boolean) as string[];
+    if (absents.length > 0) {
+      fail(
+        `OCR_PROVIDER="anthropic" mais ${absents.join(" et ")} manque(nt) — extraction simulée`,
+        "Lecture réelle demandée mais inactive",
+        `Renseignez ${absents.join(" et ")} dans .env, ou repassez OCR_PROVIDER="mock".\n     Rappel : une ordonnance photographiée est une donnée de santé (docs/EXTRACTION.md).`,
+      );
+    } else {
+      pass("Lecture d'ordonnance : réelle", `modèle ${process.env.OCR_MODEL ?? "claude-opus-5"}`);
+      warn("Les images d'ordonnance sont transmises à un tiers — vérifiez le contrat de sous-traitance.");
+    }
+  } else {
+    fail(
+      `OCR_PROVIDER="${ocrProvider}" n'est pas implémenté — extraction simulée`,
+      "Fournisseur OCR inconnu",
+      'Valeurs implémentées : "mock", "anthropic".',
+    );
+  }
+
   if (problems.length > 0) {
     report();
     return;

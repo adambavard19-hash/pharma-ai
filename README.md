@@ -29,8 +29,12 @@ pas un prescripteur.
 Cette version fonctionne sur un **jeu de données entièrement fictif** et avec
 des **fournisseurs simulés**. Concrètement :
 
-- L'extraction d'ordonnance **n'analyse aucune image** — elle restitue un
-  scénario fictif prédéfini, et l'interface l'indique explicitement.
+- L'extraction d'ordonnance **n'analyse aucune image par défaut** — elle
+  restitue un scénario fictif prédéfini, et l'interface l'indique
+  explicitement. La lecture réelle par modèle de vision existe mais exige
+  **trois conditions distinctes**, dont une autorisation explicite de
+  transmettre l'image à un tiers : une ordonnance photographiée est une donnée
+  de santé. Voir [`docs/EXTRACTION.md`](docs/EXTRACTION.md).
 - Le référentiel médicamenteux livré est **fictif** (12 fiches marquées
   `isDemoData`). **Un modèle de langage n'est pas une base médicamenteuse.**
 - L'envoi d'e-mails est **réel dès qu'un fournisseur est configuré**

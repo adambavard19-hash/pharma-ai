@@ -136,7 +136,10 @@ Aucun de ces points n'est résolu par le code seul.
 
 | Élément | Détail |
 |---|---|
-| Adaptateur OCR réel | Implémenter `OCRProvider` contre un moteur de vision. La confiance par champ doit être **réelle**, pas estimée. |
+| Adaptateur OCR réel | ✅ livré — `VisionOCRProvider`, modèle de vision, schéma strict, confiance par champ réellement issue du modèle. Activation soumise à trois conditions dont l'autorisation explicite de sortie de l'image (`docs/EXTRACTION.md`). |
+| Garantie « aucune valeur inventée » | ✅ livré — un champ sans citation du texte lu sur l'image est écarté ; validateur pur et testé hors ligne. |
+| Validation sur ordonnances réelles | **À faire par l'officine.** Dix photos réelles : tout champ inventé est un échec, un champ vide signalé est un succès. Impossible depuis l'environnement de développement (ni clé, ni images réelles). |
+| Hébergement HDS des images | **À trancher.** Le stockage livré est local, donc de développement. |
 | Ordonnance électronique | Format structuré → extraction fiable, sans OCR |
 | Extraction assistée par modèle | Encadrée : le modèle propose, l'écran de vérification reste obligatoire |
 | Suivi de la qualité | Taux de correction par champ → mesurer la fiabilité réelle du fournisseur |

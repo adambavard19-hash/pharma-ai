@@ -12,7 +12,7 @@ import type {
 } from "@/core/ai/ports";
 import { LocalDrugKnowledgeProvider } from "@/core/ai/providers/local-drug-knowledge";
 import { LocalStorageProvider } from "@/core/ai/providers/local-storage";
-import { MockOCRProvider } from "@/core/ai/providers/mock-ocr";
+import { chooseOCRProvider } from "@/core/ai/providers/ocr-factory";
 import { chooseMessagingProvider } from "@/core/ai/providers/messaging-factory";
 import { RuleBasedAIProvider } from "@/core/ai/providers/rule-based-ai";
 import { UnavailableVideoProvider } from "@/core/ai/providers/video";
@@ -31,20 +31,28 @@ import type { DrugKnowledge } from "@/core/ai/types";
 
 let drugProvider: LocalDrugKnowledgeProvider | null = null;
 
+/**
+ * Choix du lecteur d'ordonnance.
+ *
+ * La décision vit dans le domaine (`src/core/ai/providers/ocr-factory.ts`), où
+ * elle est testable sans base ni réseau : c'est la garantie qu'une ordonnance
+ * ne quitte pas l'officine sans autorisation explicite. Le registre ne fait que
+ * lui passer la configuration.
+ */
 export function getOCRProvider(): OCRProvider {
-  const { OCR_PROVIDER } = getEnv();
-  switch (OCR_PROVIDER) {
-    case "mock":
-      return new MockOCRProvider();
-    default:
-      // Un fournisseur déclaré mais non implémenté ne doit jamais dégrader
-      // silencieusement vers un résultat inventé : on retombe sur le simulé,
-      // qui s'annonce comme tel.
-      console.warn(
-        `[registry] Fournisseur OCR « ${OCR_PROVIDER} » non implémenté. Repli sur l'OCR simulé.`,
-      );
-      return new MockOCRProvider();
+  const env = getEnv();
+  const provider = chooseOCRProvider({
+    provider: env.OCR_PROVIDER,
+    apiKey: env.ANTHROPIC_API_KEY,
+    model: env.OCR_MODEL,
+    sendImagesExternally: env.OCR_SEND_IMAGES_EXTERNALLY,
+  });
+
+  if (env.OCR_PROVIDER !== "mock" && provider.info.capability === "SIMULATED") {
+    console.warn(`[registry] ${provider.info.description}`);
   }
+
+  return provider;
 }
 
 export function getAIProvider(): AIProvider {

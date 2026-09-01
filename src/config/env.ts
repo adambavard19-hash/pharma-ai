@@ -30,6 +30,23 @@ const envSchema = z.object({
   DRUG_KNOWLEDGE_PROVIDER: z.enum(["local-demo", "bdpm", "custom"]).default("local-demo"),
 
   ANTHROPIC_API_KEY: z.string().optional(),
+  /** Modèle de vision utilisé pour lire une ordonnance photographiée. */
+  OCR_MODEL: z.string().default("claude-opus-5"),
+  /**
+   * Autorisation EXPLICITE de transmettre l'image d'une ordonnance à un
+   * fournisseur tiers.
+   *
+   * Une ordonnance photographiée est une donnée de santé. Choisir un
+   * fournisseur ne suffit donc pas : il faut avoir tranché où va l'image et
+   * sous quel contrat. Tant que cette variable ne vaut pas « true », la
+   * lecture réelle reste désactivée et l'application le dit — plutôt que
+   * d'envoyer des ordonnances de patients parce qu'une variable
+   * d'environnement traînait.
+   */
+  OCR_SEND_IMAGES_EXTERNALLY: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
   OPENAI_API_KEY: z.string().optional(),
 
   STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
