@@ -199,7 +199,7 @@ function AdviceCard({
   const [modifyOpen, setModifyOpen] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
-  const [showExplanation, setShowExplanation] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const { push } = useToast();
 
   const product = recommendation.product;
@@ -258,7 +258,7 @@ function AdviceCard({
 
             {/* La raison en une ligne, produite par la règle de conseil. Le
                 pharmacien doit comprendre POURQUOI sans ouvrir quoi que ce
-                soit ; la version longue est sous « Pourquoi ce produit ? ». */}
+                soit ; la version longue est sous « Voir le détail ». */}
             {(recommendation.shortReason ?? recommendation.opportunity?.rationale) && (
               <p className="text-[12.5px] leading-[1.45] text-text-secondary">
                 {recommendation.shortReason ?? recommendation.opportunity?.rationale}
@@ -322,44 +322,22 @@ function AdviceCard({
           </div>
         )}
 
+        {/* Une seule porte vers le second rang. Les cinq gestes fins et
+            l'explication du score restaient dépliés en permanence sous chaque
+            conseil : trois conseils affichés, quinze liens à lire avant
+            d'atteindre le bouton suivant. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border-subtle pt-3 text-[12px]">
-          {canDecide && (
-            <>
-              <SecondaryAction
-                onClick={() => run(() => presentRecommendationAction(recommendation.id))}
-              >
-                {presented ? "Déjà proposé" : "Proposé au patient"}
-              </SecondaryAction>
-              <SecondaryAction
-                onClick={() => run(() => declineRecommendationAction(recommendation.id))}
-              >
-                Refusé par le patient
-              </SecondaryAction>
-              <SecondaryAction onClick={() => setReplaceOpen(true)}>
-                Changer de référence
-              </SecondaryAction>
-              <SecondaryAction onClick={() => setModifyOpen(true)}>
-                Ajuster la formulation
-              </SecondaryAction>
-              <SecondaryAction onClick={() => setRemoveOpen(true)}>
-                Retirer ce conseil
-              </SecondaryAction>
-            </>
-          )}
-          {recommendation.origin === "AI" && (
-            <button
-              type="button"
-              onClick={() => setShowExplanation((value) => !value)}
-              aria-expanded={showExplanation}
-              className="ml-auto flex items-center gap-1 text-text-tertiary transition-colors hover:text-text-secondary"
-            >
-              Pourquoi ce produit ? — pertinence{" "}
-              <span className="tabular">{Math.round(recommendation.totalScore * 100)} %</span>
-              <ChevronDown
-                className={cn("size-3.5 transition-transform", showExplanation && "rotate-180")}
-              />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setDetailOpen((value) => !value)}
+            aria-expanded={detailOpen}
+            className="flex items-center gap-1 text-text-tertiary transition-colors hover:text-text-secondary"
+          >
+            {detailOpen ? "Masquer le détail" : "Voir le détail"}
+            <ChevronDown
+              className={cn("size-3.5 transition-transform", detailOpen && "rotate-180")}
+            />
+          </button>
           {recommendation.origin === "MANUAL" && (
             <Badge tone="brand" className="ml-auto">
               Ajouté par le pharmacien
@@ -367,11 +345,54 @@ function AdviceCard({
           )}
         </div>
 
-        {showExplanation && (
-          <ScoreExplanation
-            contributions={recommendation.explanation}
-            justification={recommendation.justification}
-          />
+        {detailOpen && (
+          <div className="space-y-3">
+            {canDecide && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px]">
+                <SecondaryAction
+                  onClick={() => run(() => presentRecommendationAction(recommendation.id))}
+                >
+                  {presented ? "Déjà proposé" : "Proposé au patient"}
+                </SecondaryAction>
+                <SecondaryAction
+                  onClick={() => run(() => declineRecommendationAction(recommendation.id))}
+                >
+                  Refusé par le patient
+                </SecondaryAction>
+                <SecondaryAction onClick={() => setReplaceOpen(true)}>
+                  Changer de référence
+                </SecondaryAction>
+                <SecondaryAction onClick={() => setModifyOpen(true)}>
+                  Ajuster la formulation
+                </SecondaryAction>
+                <SecondaryAction onClick={() => setRemoveOpen(true)}>
+                  Retirer ce conseil
+                </SecondaryAction>
+              </div>
+            )}
+
+            {recommendation.origin === "AI" && (
+              <>
+                {/* Ce nombre est le score global du classement, somme pondérée
+                    des dimensions détaillées juste en dessous. Il était
+                    présenté comme une « pertinence », ce qu'il n'est pas : la
+                    pertinence n'en est qu'une composante. Le calcul est
+                    inchangé, l'intitulé est corrigé. */}
+                <p className="text-[12px] text-text-tertiary">
+                  Score global de classement :{" "}
+                  <span className="tabular">
+                    {Math.round(recommendation.totalScore * 100)} %
+                  </span>{" "}
+                  — somme pondérée des dimensions ci-dessous, dont la pertinence n&apos;est
+                  qu&apos;une composante.
+                </p>
+                <ScoreExplanation
+                  contributions={recommendation.explanation}
+                  justification={recommendation.justification}
+                />
+              </>
+            )}
+          </div>
         )}
       </CardContent>
 

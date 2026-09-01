@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
@@ -40,21 +40,24 @@ export default async function NewPrescriptionPage({
 
       <PageHeader
         title="Nouvelle vente"
-        description="Photographiez, scannez ou importez l'ordonnance. Vous vérifierez chaque élément extrait avant toute analyse."
+        description="Importez l'ordonnance. Vous vérifierez chaque élément extrait avant toute analyse."
       />
 
+      {/* Une limite réelle du moteur ne se replie jamais : sans cette phrase,
+          l'écran laisserait croire que le document déposé a été lu. Seul le
+          CHOIX du scénario a quitté le parcours, pas l'avertissement. */}
       {simulated && (
         <Alert tone="warning" title="Extraction simulée">
-          Aucun moteur d&apos;extraction réel n&apos;est branché sur cet environnement. Le fichier
-          que vous déposez est bien enregistré, mais il n&apos;est PAS analysé : un scénario
-          fictif prédéfini est restitué pour dérouler le parcours complet. Choisissez ci-dessous
-          celui que vous souhaitez tester.
+          Aucun moteur d&apos;extraction réel n&apos;est branché sur cet environnement. Le
+          fichier que vous déposez est bien enregistré, mais il n&apos;est PAS analysé : un
+          scénario fictif prédéfini est restitué pour dérouler le parcours complet.
         </Alert>
       )}
 
       <NewPrescriptionForm
         patients={patients}
         preselectedPatientId={params.patient ?? null}
+        simulated={simulated}
         scenarios={
           isDemoMode()
             ? DEMO_SCENARIOS.map((scenario) => ({
@@ -67,19 +70,20 @@ export default async function NewPrescriptionPage({
         }
       />
 
-      <div className="flex gap-3 rounded-xl border border-border-subtle bg-surface-card p-4">
-        <ShieldCheck className="mt-0.5 size-[18px] shrink-0 text-brand-600 dark:text-brand-400" />
-        <div className="space-y-1 text-[12.5px] leading-5 text-text-secondary">
-          <p className="font-medium text-text-primary">
-            Une ordonnance est une donnée de santé.
-          </p>
-          <p>
-            Le fichier importé est conservé pour la traçabilité de l&apos;analyse. En production,
-            il doit être hébergé chez un hébergeur agréé HDS, avec une durée de conservation
-            définie. Aucune donnée extraite n&apos;est exploitée avant votre vérification.
-          </p>
-        </div>
-      </div>
+      {/* Les mentions d'hébergement restent accessibles à tout moment, mais
+          hors du chemin : elles ne changent rien au geste du comptoir, et elles
+          occupaient un bloc permanent au-dessus du bouton d'import. */}
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[12px] text-text-tertiary transition-colors hover:text-text-secondary">
+          <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
+          Une ordonnance est une donnée de santé — hébergement et conservation
+        </summary>
+        <p className="mt-2 pl-[1.375rem] text-[12.5px] leading-5 text-text-secondary">
+          Le fichier importé est conservé pour la traçabilité de l&apos;analyse. En production,
+          il doit être hébergé chez un hébergeur agréé HDS, avec une durée de conservation
+          définie. Aucune donnée extraite n&apos;est exploitée avant votre vérification.
+        </p>
+      </details>
     </div>
   );
 }

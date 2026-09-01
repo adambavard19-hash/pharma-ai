@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/field";
 import { Alert } from "@/components/ui/feedback";
 import { Badge } from "@/components/ui/badge";
-import { OCR_REVIEW_THRESHOLD } from "@/config/constants";
+import { FIELD_READING_LABELS, fieldReading } from "@/core/extraction/reading";
 import { cn } from "@/lib/utils";
 import { SpecialtyLink } from "./specialty-link";
 import type { SaleLineDraft } from "./types";
@@ -346,8 +346,11 @@ function LineCard({
   onChange: (patch: Partial<SaleLineDraft>) => void;
 }) {
   const unreadable = new Set(line.unreadableFields);
-  const nameConfidence = line.confidence.drugName ?? 0;
-  const nameUncertain = nameConfidence > 0 && nameConfidence < OCR_REVIEW_THRESHOLD;
+  const nameUncertain =
+    fieldReading({
+      unreadable: unreadable.has("drugName"),
+      confidence: line.confidence.drugName,
+    }) === "TO_CHECK";
 
   return (
     <Card
@@ -387,35 +390,35 @@ function LineCard({
       />
       <CardContent className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
-          <FieldWithConfidence
+          <FieldWithReading
             label="Médicament"
             value={line.drugName}
             onChange={(value) => onChange({ drugName: value })}
-            confidence={nameConfidence}
+            confidence={line.confidence.drugName}
             unreadable={unreadable.has("drugName")}
             required
           />
-          <FieldWithConfidence
+          <FieldWithReading
             label="Dosage"
             value={line.dosage}
             onChange={(value) => onChange({ dosage: value })}
-            confidence={line.confidence.dosage ?? 0}
+            confidence={line.confidence.dosage}
             unreadable={unreadable.has("dosage")}
           />
-          <FieldWithConfidence
+          <FieldWithReading
             label="Forme"
             value={line.form}
             onChange={(value) => onChange({ form: value })}
-            confidence={line.confidence.form ?? 0}
+            confidence={line.confidence.form}
             unreadable={unreadable.has("form")}
           />
         </div>
 
-        <FieldWithConfidence
+        <FieldWithReading
           label="Posologie"
           value={line.posology}
           onChange={(value) => onChange({ posology: value })}
-          confidence={line.confidence.posology ?? 0}
+          confidence={line.confidence.posology}
           unreadable={unreadable.has("posology")}
         />
 
@@ -444,28 +447,95 @@ function LineCard({
               }
             />
           </Field>
-          <FieldWithConfidence
+          <FieldWithReading
             label="Instructions"
             value={line.instructions}
             onChange={(value) => onChange({ instructions: value })}
-            confidence={line.confidence.instructions ?? 0}
+            confidence={line.confidence.instructions}
             unreadable={unreadable.has("instructions")}
           />
         </div>
 
         {nameUncertain && (
           <Alert tone="warning" icon={<AlertTriangle className="size-[18px]" />}>
-            Le nom du médicament a été lu avec une confiance de{" "}
-            {Math.round(nameConfidence * 100)} %. Vérifiez-le sur l&apos;ordonnance avant de
-            confirmer.
+            Le nom du médicament n&apos;a pas été lu avec une certitude suffisante. Vérifiez-le
+            sur l&apos;ordonnance avant de confirmer.
           </Alert>
         )}
+
+        <ReadingScores line={line} />
       </CardContent>
     </Card>
   );
 }
 
-function FieldWithConfidence({
+/** Les champs mesurés par la lecture, dans l'ordre où ils s'affichent au-dessus. */
+const MEASURED_FIELDS = [
+  { key: "drugName", label: "Médicament" },
+  { key: "dosage", label: "Dosage" },
+  { key: "form", label: "Forme" },
+  { key: "posology", label: "Posologie" },
+  { key: "instructions", label: "Instructions" },
+] as const;
+
+/**
+ * Le détail technique de la lecture — replié.
+ *
+ * Les chiffres ne disparaissent pas du produit : ils quittent le parcours du
+ * comptoir. Un pharmacien qui veut comprendre pourquoi un champ est signalé
+ * les ouvre ; celui qui délivre n'a pas à les traverser pour atteindre le
+ * bouton « Confirmée ».
+ */
+function ReadingScores({ line }: { line: SaleLineDraft }) {
+  const unreadable = new Set(line.unreadableFields);
+  const rows = MEASURED_FIELDS.map((field) => ({
+    ...field,
+    confidence: line.confidence[field.key],
+    state: fieldReading({
+      unreadable: unreadable.has(field.key),
+      confidence: line.confidence[field.key],
+    }),
+  })).filter((row) => row.state !== "NO_SIGNAL");
+
+  if (rows.length === 0) return null;
+
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[12px] text-text-tertiary transition-colors hover:text-text-secondary">
+        <ChevronRight className="size-3 shrink-0 transition-transform group-open:rotate-90" />
+        Détail technique de la lecture
+      </summary>
+      <ul className="mt-1.5 space-y-1 pl-[1.125rem]">
+        {rows.map((row) => (
+          <li
+            key={row.key}
+            className="flex items-baseline justify-between gap-3 text-[11.5px] text-text-tertiary"
+          >
+            <span>{row.label}</span>
+            <span className="tabular">
+              {row.state === "UNREADABLE"
+                ? "aucune lecture retenue"
+                : `${Math.round((row.confidence ?? 0) * 100)} %`}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1.5 pl-[1.125rem] text-[11px] leading-4 text-text-tertiary">
+        Confiance annoncée par la lecture automatique. Elle ne vaut pas vérification : seule
+        votre confirmation de la ligne engage l&apos;analyse.
+      </p>
+    </details>
+  );
+}
+
+/**
+ * Un champ extrait, avec son état de lecture — pas son pourcentage.
+ *
+ * « Illisible », « À vérifier », « Lu » : trois mots qui disent quoi faire.
+ * Le chiffre qui les a produits est sous « Détail technique de la lecture »,
+ * au bas de la ligne.
+ */
+function FieldWithReading({
   label,
   value,
   onChange,
@@ -476,14 +546,15 @@ function FieldWithConfidence({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  confidence: number;
+  confidence: number | null | undefined;
   unreadable: boolean;
   required?: boolean;
 }) {
   // `useId` garantit un identifiant stable entre serveur et client — sans quoi
   // l'association label/champ casse à l'hydratation.
   const id = useId();
-  const uncertain = !unreadable && confidence > 0 && confidence < OCR_REVIEW_THRESHOLD;
+  const state = fieldReading({ unreadable, confidence });
+  const uncertain = state === "TO_CHECK";
 
   return (
     <div className="space-y-1.5">
@@ -496,14 +567,18 @@ function FieldWithConfidence({
             </span>
           )}
         </label>
-        {unreadable ? (
+        {state === "UNREADABLE" ? (
           <Badge tone="danger" icon={<EyeOff className="size-3" />}>
-            Illisible
+            {FIELD_READING_LABELS.UNREADABLE.label}
           </Badge>
-        ) : uncertain ? (
-          <Badge tone="warning">{Math.round(confidence * 100)} %</Badge>
-        ) : confidence > 0 ? (
-          <Badge tone="success">{Math.round(confidence * 100)} %</Badge>
+        ) : state === "TO_CHECK" ? (
+          <Badge tone="warning" title={FIELD_READING_LABELS.TO_CHECK.description}>
+            {FIELD_READING_LABELS.TO_CHECK.label}
+          </Badge>
+        ) : state === "READ" ? (
+          <Badge tone="success" title={FIELD_READING_LABELS.READ.description}>
+            {FIELD_READING_LABELS.READ.label}
+          </Badge>
         ) : null}
       </div>
       <Input
