@@ -303,6 +303,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         verify: session.permissions.has(PERMISSIONS.PRESCRIPTION_VERIFY),
         decide: session.permissions.has(PERMISSIONS.RECOMMENDATION_DECIDE),
         sell: session.permissions.has(PERMISSIONS.SALE_CREATE),
+        generateDocument: session.permissions.has(PERMISSIONS.DOCUMENT_GENERATE),
       }}
       simulatedExtraction={prescription.ocrProvider === "mock-ocr"}
       preconfirmed={preconfirmed}

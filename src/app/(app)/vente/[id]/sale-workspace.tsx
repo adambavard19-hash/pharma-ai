@@ -10,6 +10,7 @@ import {
 } from "@/server/actions/prescriptions";
 import { acceptRecommendationAction } from "@/server/actions/recommendations";
 import { recordSaleAction } from "@/server/actions/sales";
+import { generateDocumentAction } from "@/server/actions/documents";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,7 +82,7 @@ export function SaleWorkspace({
     durationMs: number | null;
     providers: Record<string, unknown>;
   } | null;
-  permissions: { verify: boolean; decide: boolean; sell: boolean };
+  permissions: { verify: boolean; decide: boolean; sell: boolean; generateDocument: boolean };
   simulatedExtraction: boolean;
   /**
    * Toutes les lignes ont été retenues par la lecture seule et l'analyse a déjà
@@ -278,27 +279,41 @@ export function SaleWorkspace({
         }
       }
 
-      if (lines.length === 0) {
-        router.push(`/vente/${prescription.id}/fin`);
-        return;
+      if (lines.length > 0) {
+        const result = await recordSaleAction({
+          prescriptionId: prescription.id,
+          patientId: patientId || null,
+          lines,
+        });
+
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+
+        push({
+          tone: "success",
+          title: "Vente enregistrée",
+          description: `${formatCents(result.data.attributedCents)} attribués à Pharma.ai.`,
+        });
       }
 
-      const result = await recordSaleAction({
-        prescriptionId: prescription.id,
-        patientId: patientId || null,
-        lines,
-      });
-
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      // La fiche est préparée ici, APRÈS la vente : c'est le seul instant où
+      // les conseils retenus sont arrêtés. Le pharmacien n'a plus à la demander
+      // sur l'écran suivant — il n'y arrivait de toute façon jamais pour dire
+      // non.
+      //
+      // Elle ne bloque rien. Une génération qui échoue, ou un compte sans le
+      // droit de générer, laisse simplement l'écran de fin proposer le geste
+      // manuel comme avant : mieux vaut un clic de plus qu'une fin de vente
+      // qui se referme sur une erreur.
+      if (permissions.generateDocument) {
+        const document = await generateDocumentAction({ prescriptionId: prescription.id });
+        if (!document.ok) {
+          console.error("[vente] fiche non préparée", document.error);
+        }
       }
 
-      push({
-        tone: "success",
-        title: "Vente enregistrée",
-        description: `${formatCents(result.data.attributedCents)} attribués à Pharma.ai.`,
-      });
       router.push(`/vente/${prescription.id}/fin`);
     });
   };

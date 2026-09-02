@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { buildDocumentUrl } from "@/server/services/documents";
+import { DOCUMENT_ADVICE_STATUSES, buildDocumentUrl } from "@/server/services/documents";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { PageHeader } from "@/components/ui/page";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,36 @@ export default async function DocumentPage({
   if (!prescription.verifiedAt) redirect(`/vente/${prescription.id}`);
 
   const latestDocument = prescription.documents[0];
+
+  /**
+   * La fiche est-elle encore à jour ?
+   *
+   * Elle est préparée au moment de la validation, quand les conseils retenus
+   * sont arrêtés. Un pharmacien peut ensuite retourner à l'écran de vente et en
+   * ajouter un : la fiche déjà publiée ne le contiendrait pas, et rien ne le
+   * dirait. C'est le seul risque que cette automatisation introduit, et il se
+   * referme ici — deux signaux, parce qu'un seul laisserait passer un cas.
+   */
+  const retainedAdvice = prescription.recommendations.filter(
+    (recommendation) =>
+      recommendation.product &&
+      (DOCUMENT_ADVICE_STATUSES as readonly string[]).includes(recommendation.status),
+  );
+  const documentAdvice = latestDocument
+    ? ((latestDocument.contentJson as unknown as DocumentContent).advice ?? [])
+    : [];
+  // La comparaison porte sur le CONTENU, pas sur un horodatage : la fiche est
+  // un instantané assumé — un prix qui bouge ne la périme pas — mais un conseil
+  // retenu après coup, si. Un simple changement de statut (retenu → acheté) ne
+  // doit donc pas déclencher une fausse alerte.
+  const documentProducts = new Set(documentAdvice.map((item) => item.productName));
+  const documentOutdated = Boolean(
+    latestDocument &&
+      (retainedAdvice.length !== documentAdvice.length ||
+        retainedAdvice.some(
+          (recommendation) => !documentProducts.has(recommendation.product?.name ?? ""),
+        )),
+  );
   const messaging = getMessagingProvider();
   const consentOf = (type: string) => {
     const consent = prescription.patient?.consents.find((c) => c.type === type);
@@ -133,8 +163,22 @@ export default async function DocumentPage({
 
       <PageHeader
         title="Fin de vente"
-        description={`${prescription.reference} — ce que le patient emporte : le rappel de son traitement et les seuls conseils que vous avez validés.`}
+        description={
+          latestDocument
+            ? `${prescription.reference} — la fiche est prête. Il reste à la remettre au patient.`
+            : `${prescription.reference} — ce que le patient emporte : le rappel de son traitement et les seuls conseils que vous avez validés.`
+        }
       />
+
+      {documentOutdated && (
+        <Alert tone="warning" title="Les conseils ont changé depuis cette fiche">
+          La fiche publiée contient {documentAdvice.length} conseil
+          {documentAdvice.length > 1 ? "s" : ""} ; {retainedAdvice.length}{" "}
+          {retainedAdvice.length > 1 ? "sont retenus" : "est retenu"} aujourd&apos;hui. Générez la
+          version {latestDocument.version + 1} avant de la remettre — celle-ci ne changera pas
+          toute seule.
+        </Alert>
+      )}
 
       {prescription.recommendations.length === 0 && !latestDocument && (
         <Alert tone="warning" title="Aucun conseil validé">
@@ -147,6 +191,7 @@ export default async function DocumentPage({
         prescriptionId={prescription.id}
         canSend={session.permissions.has(PERMISSIONS.DOCUMENT_SEND)}
         canRecordSale={session.permissions.has(PERMISSIONS.SALE_CREATE)}
+        outdated={documentOutdated}
         canUpdateConsent={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
         patient={
           prescription.patient
@@ -198,22 +243,23 @@ export default async function DocumentPage({
           reference: sale.reference,
           attributedCents: sale.attributedCents,
         }))}
-      />
-
-      <FollowUpPanel
-        patientId={prescription.patient?.id ?? null}
-        prescriptionId={prescription.id}
-        saleId={prescription.sales[0]?.id ?? null}
-        options={followUpOptions}
-        suggestion={suggestion}
-        hasConsent={consentOf("FOLLOW_UP_MESSAGE")}
-        optedOut={Boolean(prescription.patient?.followUpOptOutAt)}
-        scheduled={scheduledReminders.map((reminder) => ({
-          templateLabel: findTemplate(reminder.templateKey)?.label ?? reminder.templateKey,
-          dueAt: reminder.dueAt.toISOString(),
-        }))}
-        canSchedule={session.permissions.has(PERMISSIONS.FOLLOWUP_SCHEDULE)}
-        canUpdateConsent={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
+        aside={
+          <FollowUpPanel
+            patientId={prescription.patient?.id ?? null}
+            prescriptionId={prescription.id}
+            saleId={prescription.sales[0]?.id ?? null}
+            options={followUpOptions}
+            suggestion={suggestion}
+            hasConsent={consentOf("FOLLOW_UP_MESSAGE")}
+            optedOut={Boolean(prescription.patient?.followUpOptOutAt)}
+            scheduled={scheduledReminders.map((reminder) => ({
+              templateLabel: findTemplate(reminder.templateKey)?.label ?? reminder.templateKey,
+              dueAt: reminder.dueAt.toISOString(),
+            }))}
+            canSchedule={session.permissions.has(PERMISSIONS.FOLLOWUP_SCHEDULE)}
+            canUpdateConsent={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
+          />
+        }
       />
     </div>
   );

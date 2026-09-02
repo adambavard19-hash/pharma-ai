@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import Image from "next/image";
 import {
   Check,
@@ -55,9 +55,11 @@ export function DocumentWorkspace({
   existingDocument,
   canSend,
   canRecordSale,
+  outdated,
   canUpdateConsent,
   messaging,
   existingSales,
+  aside,
 }: {
   prescriptionId: string;
   patient: {
@@ -85,8 +87,12 @@ export function DocumentWorkspace({
   } | null;
   canSend: boolean;
   canRecordSale: boolean;
+  /** Les conseils retenus ont changé depuis la publication de la fiche. */
+  outdated: boolean;
   messaging: MessagingState;
   existingSales: { id: string; reference: string; attributedCents: number }[];
+  /** Ce qui vient après la remise — le rappel — dans la même colonne. */
+  aside?: ReactNode;
 }) {
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
@@ -191,21 +197,42 @@ export function DocumentWorkspace({
 
       <div className="space-y-5">
         {existingDocument && (
-          <>
-            <DeliveryPanel
-              documentId={existingDocument.id}
-              url={existingDocument.url}
-              patient={patient}
-              canSend={canSend}
-              canUpdateConsent={canUpdateConsent}
-              messaging={messaging}
-              deliveries={existingDocument.deliveries}
-            />
+          <DeliveryPanel
+            documentId={existingDocument.id}
+            url={existingDocument.url}
+            patient={patient}
+            canSend={canSend}
+            canUpdateConsent={canUpdateConsent}
+            messaging={messaging}
+            deliveries={existingDocument.deliveries}
+          />
+        )}
 
-            <Card>
+        {/* Le rappel se décide juste après la remise, dans la même colonne et
+            sans faire défiler : c'est le moment où le pharmacien pense encore à
+            ce patient. Sous la fiche, à deux écrans de là, il n'était proposé
+            qu'à ceux qui pensaient à descendre. Il s'affiche même sans fiche
+            publiée : un rappel ne dépend pas d'un document. */}
+        {aside}
+
+        {existingDocument && (
+          <>
+            {/* La fiche est préparée à la validation, sans mot du pharmacien :
+                il n'y a personne pour l'écrire au moment où le patient attend.
+                C'est ici qu'il s'ajoute — et c'est aussi ici qu'on répare une
+                fiche devenue incomplète. */}
+            <Card
+              className={cn(
+                outdated && "border-warning-400 dark:border-warning-700/60",
+              )}
+            >
               <CardHeader
-                title="Nouvelle version"
-                description="Régénérez la fiche après avoir modifié les conseils."
+                title={outdated ? "Fiche à regénérer" : "Ajouter un mot, ou regénérer"}
+                description={
+                  outdated
+                    ? "Les conseils retenus ont changé depuis la publication de cette fiche."
+                    : "La fiche publiée ne change plus. Un mot personnel, ou un conseil ajouté depuis, demande une nouvelle version."
+                }
               />
               <CardContent className="space-y-3">
                 <Textarea
@@ -216,7 +243,7 @@ export function DocumentWorkspace({
                   aria-label="Mot du pharmacien"
                 />
                 <Button
-                  variant="outline"
+                  variant={outdated ? "primary" : "outline"}
                   className="w-full"
                   loading={pending}
                   onClick={generate}

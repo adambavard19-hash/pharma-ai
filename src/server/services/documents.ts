@@ -20,12 +20,41 @@ export type DocumentAuthor = {
 };
 
 /**
+ * Les conseils qui figurent sur la fiche remise au patient.
+ *
+ * Cette liste ne retient que ce que le pharmacien a décidé : une proposition
+ * simplement suggérée par le moteur, retirée ou refusée par le patient
+ * n'atteint jamais la fiche.
+ *
+ * Deux statuts s'y sont ajoutés, et chacun réparait une perte réelle.
+ *
+ * `PURCHASED` — la vente marque comme achetés les conseils que le patient
+ * emporte. Sans lui, une fiche générée APRÈS l'encaissement ne mentionnait plus
+ * le produit que le patient tient dans la main. Depuis que la validation
+ * prépare la fiche, c'est le cas de toutes.
+ *
+ * `PRESENTED` — la génération elle-même fait passer les conseils retenus à ce
+ * statut. Sans lui, régénérer une version 2 — pour ajouter un mot du
+ * pharmacien, par exemple — produisait une fiche VIDE de tout conseil : ceux de
+ * la version 1 n'étaient plus sélectionnés. Un document remis au patient ne
+ * doit pas perdre son contenu parce qu'on y ajoute une phrase.
+ */
+export const DOCUMENT_ADVICE_STATUSES = [
+  "ACCEPTED",
+  "MODIFIED",
+  "REPLACED",
+  "PRESENTED",
+  "PURCHASED",
+] as const;
+
+/**
  * Génération de la fiche patient.
  *
- * Seules les recommandations ACCEPTÉES par le pharmacien y figurent. Une
- * proposition supprimée ou simplement suggérée par le moteur n'atteint jamais
- * le patient.
+ * Seules les recommandations décidées par le pharmacien y figurent
+ * (`DOCUMENT_ADVICE_STATUSES`). Une proposition supprimée ou simplement
+ * suggérée par le moteur n'atteint jamais le patient.
  */
+
 export async function generatePatientDocument(params: {
   session: DocumentAuthor;
   prescriptionId: string;
@@ -43,7 +72,7 @@ export async function generatePatientDocument(params: {
         include: { explanation: true },
       },
       recommendations: {
-        where: { status: { in: ["ACCEPTED", "MODIFIED", "REPLACED"] } },
+        where: { status: { in: [...DOCUMENT_ADVICE_STATUSES] } },
         include: {
           product: { include: { stockItem: true } },
         },
@@ -157,22 +186,32 @@ export async function generatePatientDocument(params: {
     });
 
     // Les conseils validés sont désormais présentés au patient.
-    const presentedIds = prescription.recommendations.map((r) => r.id);
-    if (presentedIds.length > 0) {
+    //
+    // Un conseil ACHETÉ garde son statut : « présenté » est en deçà d'« acheté »,
+    // et l'écraser effacerait la vente du taux de conversion. La trace, elle,
+    // est écrite pour tous — figurer sur la fiche remise est un fait, qu'il y
+    // ait eu achat ou non.
+    const onDocumentIds = prescription.recommendations.map((r) => r.id);
+    const toPresentIds = prescription.recommendations
+      .filter((r) => r.status !== "PURCHASED")
+      .map((r) => r.id);
+
+    if (toPresentIds.length > 0) {
       await tx.recommendation.updateMany({
-        where: { id: { in: presentedIds } },
+        where: { id: { in: toPresentIds } },
         data: { status: "PRESENTED", presentedAt: new Date() },
       });
-      for (const id of presentedIds) {
-        await tx.recommendationEvent.create({
-          data: {
-            recommendationId: id,
-            type: "PRESENTED_TO_PATIENT",
-            userId: scope.userId,
-            metadata: { documentId: created.id } as never,
-          },
-        });
-      }
+    }
+
+    for (const id of onDocumentIds) {
+      await tx.recommendationEvent.create({
+        data: {
+          recommendationId: id,
+          type: "PRESENTED_TO_PATIENT",
+          userId: scope.userId,
+          metadata: { documentId: created.id } as never,
+        },
+      });
     }
 
     await tx.prescription.update({
