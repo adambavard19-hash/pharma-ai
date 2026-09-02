@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Image from "next/image";
 import {
+  AlertTriangle,
   ChevronDown,
   Lock,
   MessageSquareQuote,
@@ -24,9 +25,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { Field, Input, Textarea } from "@/components/ui/field";
-import { Alert, EmptyState } from "@/components/ui/feedback";
+import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { formatCents } from "@/lib/format";
+import { counterSentence } from "@/core/advice/sentence";
 import { cn } from "@/lib/utils";
 import { ProductPicker } from "./product-picker";
 import { ScoreExplanation } from "./score-explanation";
@@ -111,13 +113,18 @@ export function AdviceZone({
             />
           ))}
 
+          {/* Un résultat normal, dit en une ligne. Un encadré de quatorze mots
+              avec une icône et deux phrases d'excuse transformait l'absence de
+              proposition en incident — alors que c'est souvent la bonne réponse,
+              et que le bouton « Ajouter un conseil » est juste en dessous. */}
           {available.length === 0 && (
             <Card>
-              <EmptyState
-                icon={<MessageSquareQuote className="size-5" />}
-                title="Aucun conseil à proposer"
-                description="Le moteur n'a identifié aucune opportunité pertinente et disponible en rayon pour ce traitement. Vous pouvez en ajouter un vous-même."
-              />
+              <CardContent className="flex items-center gap-2.5 py-3.5">
+                <MessageSquareQuote className="size-4 shrink-0 text-text-tertiary" />
+                <p className="text-[13.5px] text-text-secondary">
+                  Aucune recommandation complémentaire pertinente.
+                </p>
+              </CardContent>
             </Card>
           )}
 
@@ -213,6 +220,10 @@ function AdviceCard({
   const product = recommendation.product;
   const lowStock = product ? product.quantity > 0 && product.quantity <= product.alertThreshold : false;
   const presented = recommendation.status === "PRESENTED";
+  const reason = counterSentence({
+    shortReason: recommendation.shortReason,
+    rationale: recommendation.opportunity?.rationale,
+  });
 
   const run = (action: () => Promise<{ ok: boolean; error?: string; message?: string }>) => {
     startTransition(async () => {
@@ -252,6 +263,10 @@ function AdviceCard({
                   </span>
                 )}
               </p>
+              {/* Un état, pas une action : sa place est près du produit, non
+                  dans la rangée des boutons, qui ne doit contenir que les deux
+                  gestes du comptoir. */}
+              {presented && <Badge tone="neutral">Déjà proposé</Badge>}
               <span className="ml-auto flex shrink-0 items-center gap-2 text-[13.5px]">
                 <span className="font-semibold tabular text-text-primary">
                   {formatCents(recommendation.unitPriceCents || (product?.salePriceCents ?? 0))}
@@ -264,19 +279,35 @@ function AdviceCard({
               </span>
             </div>
 
-            {/* La raison en une ligne, produite par la règle de conseil. Le
-                pharmacien doit comprendre POURQUOI sans ouvrir quoi que ce
-                soit ; la version longue est sous « Voir le détail ». */}
-            {(recommendation.shortReason ?? recommendation.opportunity?.rationale) && (
+            {/* UNE phrase, produite par le moteur, choisie par une règle pure.
+                Le pharmacien doit comprendre POURQUOI sans rien ouvrir ; quand
+                le texte d'origine en disait plus, la carte le dit et renvoie au
+                détail plutôt que de laisser croire qu'elle a tout montré. */}
+            {reason && (
               <p className="text-[12.5px] leading-[1.45] text-text-secondary">
-                {recommendation.shortReason ?? recommendation.opportunity?.rationale}
+                {reason.sentence}
+                {reason.shortened && (
+                  <span className="text-text-tertiary"> — suite dans le détail</span>
+                )}
               </p>
             )}
 
+            {/* Une précaution par ligne. Trois précautions enfilées derrière des
+                points médians formaient un ruban que personne ne lisait — et
+                c'est précisément le texte qu'il faut lire. Jamais raccourcies,
+                jamais repliées. */}
             {recommendation.precautions.length > 0 && (
-              <p className="text-[11.5px] leading-4 text-warning-700 dark:text-warning-500">
-                ⚠ {recommendation.precautions.join(" · ")}
-              </p>
+              <ul className="space-y-0.5 pt-0.5">
+                {recommendation.precautions.map((precaution) => (
+                  <li
+                    key={precaution}
+                    className="flex gap-1.5 text-[12px] leading-4 text-warning-700 dark:text-warning-500"
+                  >
+                    <AlertTriangle className="mt-px size-3 shrink-0" />
+                    <span>{precaution}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>
@@ -322,11 +353,6 @@ function AdviceCard({
             >
               Ignorer
             </Button>
-            {presented && (
-              <Badge tone="success" className="self-center">
-                Proposé au patient
-              </Badge>
-            )}
           </div>
         )}
 
@@ -355,6 +381,14 @@ function AdviceCard({
 
         {detailOpen && (
           <div className="space-y-3">
+            {/* La suite du texte que la carte a dû couper. Elle vit ici, en
+                entier, tel que le moteur l'a produit. */}
+            {reason?.shortened && recommendation.opportunity?.rationale && (
+              <p className="text-[12.5px] leading-5 text-text-secondary">
+                {recommendation.opportunity.rationale}
+              </p>
+            )}
+
             {canDecide && (
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px]">
                 <SecondaryAction
