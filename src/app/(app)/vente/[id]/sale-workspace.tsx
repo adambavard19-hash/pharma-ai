@@ -173,8 +173,9 @@ export function SaleWorkspace({
       explainedCount: confirmed.filter((line) => line.purpose !== null).length,
       recommendationCount: openRecommendations.length,
       locked: blocked,
+      awaitingValidation: needsValidation,
     });
-  }, [lines, findings, recommendations, blocked]);
+  }, [lines, findings, recommendations, blocked, needsValidation]);
 
   const basketTotal = useMemo(
     () =>

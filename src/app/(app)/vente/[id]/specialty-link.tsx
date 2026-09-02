@@ -12,16 +12,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { stockTone } from "@/config/counter-tone";
 import type { SpecialtyCandidate } from "@/core/reference";
 import type { ActionResult } from "@/server/actions/types";
 import type { OfficialLineFacts, SaleLineDraft, SpecialtyProposal } from "./types";
 
-/** Ce que l'officine détient du médicament prescrit, dit en trois mots. */
-const AVAILABILITY_LABELS: Record<string, { label: string; tone: "success" | "warning" | "neutral" }> = {
-  IN_STOCK: { label: "En stock", tone: "success" },
-  REFERENCED_EMPTY: { label: "Épuisé", tone: "warning" },
-  NOT_REFERENCED: { label: "Hors stock", tone: "warning" },
-  UNKNOWN: { label: "Stock inconnu", tone: "neutral" },
+/**
+ * Ce que l'officine détient du médicament prescrit, dit en trois mots.
+ *
+ * Le libellé vit ici, la couleur vient de la règle du comptoir : deux tables
+ * qui décident chacune d'une couleur finissent par diverger, et c'est
+ * exactement le genre de divergence qu'un pharmacien paie.
+ */
+const AVAILABILITY_LABELS: Record<string, string> = {
+  IN_STOCK: "En stock",
+  REFERENCED_EMPTY: "Épuisé",
+  NOT_REFERENCED: "Hors stock",
+  UNKNOWN: "Stock inconnu",
 };
 
 /**
@@ -94,8 +101,8 @@ function OfficialFacts({
             <BookMarked className="size-3.5 shrink-0 text-text-tertiary" />
             {official.name}
             {availability && (
-              <Badge tone={AVAILABILITY_LABELS[availability.state].tone}>
-                {AVAILABILITY_LABELS[availability.state].label}
+              <Badge tone={stockTone(availability.state)}>
+                {AVAILABILITY_LABELS[availability.state] ?? AVAILABILITY_LABELS.UNKNOWN}
                 {availability.state === "IN_STOCK" && ` · ${availability.quantity}`}
               </Badge>
             )}

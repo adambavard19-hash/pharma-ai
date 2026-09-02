@@ -7,6 +7,7 @@ import { Field, Input, Select } from "@/components/ui/field";
 import { Alert } from "@/components/ui/feedback";
 import { Badge } from "@/components/ui/badge";
 import { FIELD_READING_LABELS, fieldReading } from "@/core/extraction/reading";
+import { stockTone } from "@/config/counter-tone";
 import { cn } from "@/lib/utils";
 import { SpecialtyLink } from "./specialty-link";
 import type { SaleLineDraft } from "./types";
@@ -343,19 +344,28 @@ function SummaryLine({
   );
 }
 
-/** L'état du stock, en trois mots et une couleur. */
+/** Ce que l'officine détient, en trois mots. */
+const AVAILABILITY_TEXT: Record<string, string> = {
+  IN_STOCK: "En stock",
+  REFERENCED_EMPTY: "Stock à zéro",
+  NOT_REFERENCED: "Hors stock",
+  // UNKNOWN : la ligne n'est pas rattachée. Ne pas savoir n'est pas une
+  // rupture, et l'écran ne doit jamais laisser croire le contraire — c'est la
+  // règle de couleur qui l'empêche, pas une vigilance de relecteur.
+  UNKNOWN: "Disponibilité inconnue",
+};
+
+/** L'état du stock, en trois mots et une couleur — celle de la règle. */
 function AvailabilityChip({ availability }: { availability: SaleLineDraft["availability"] }) {
   if (!availability) return null;
 
   const { state, quantity } = availability;
-  if (state === "IN_STOCK") {
-    return <Badge tone="success">En stock · {quantity}</Badge>;
-  }
-  if (state === "REFERENCED_EMPTY") return <Badge tone="warning">Stock à zéro</Badge>;
-  if (state === "NOT_REFERENCED") return <Badge tone="warning">Hors stock</Badge>;
-  // UNKNOWN : la ligne n'est pas rattachée. Ne pas savoir n'est pas une
-  // rupture, et l'écran ne doit jamais laisser croire le contraire.
-  return <Badge tone="neutral">Disponibilité inconnue</Badge>;
+  return (
+    <Badge tone={stockTone(state)}>
+      {AVAILABILITY_TEXT[state] ?? AVAILABILITY_TEXT.UNKNOWN}
+      {state === "IN_STOCK" && ` · ${quantity}`}
+    </Badge>
+  );
 }
 
 export function ZoneTitle({

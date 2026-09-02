@@ -1,28 +1,29 @@
 "use client";
 
-import { AlertTriangle, Check, Pill, ShieldAlert, ShieldCheck, ShoppingBag } from "lucide-react";
+import { AlertTriangle, Pill, ShieldAlert, ShieldCheck, ShoppingBag } from "lucide-react";
+import { adviceTone, safetySummaryTone, type CounterTone } from "@/config/counter-tone";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
 /**
- * Le bandeau de synthèse — les quatre choses à savoir, en deux secondes.
+ * Le bandeau de synthèse — les trois choses à savoir, en deux secondes.
  *
- * Il ne montre RIEN qu'on ne puisse retrouver plus bas. Sa seule fonction est
- * l'ordre de lecture : sécurité d'abord, puis ce qu'on délivre, puis ce qu'on
- * dit, puis ce qu'on peut proposer. Un pharmacien qui n'a que deux secondes
- * doit pouvoir s'arrêter ici.
+ * Trois lignes, une par zone de l'écran, dans l'ordre où elles se lisent :
+ * sécurité, traitement, conseils. Le bandeau est une table des matières, pas un
+ * résumé : il ne montre rien qu'on ne puisse retrouver plus bas, et chaque
+ * ligne conduit à sa zone.
  *
- * Une règle de couleur, la même partout dans l'écran :
- *   rouge   — action indispensable, jamais repliable ;
- *   orange  — à vérifier ;
- *   vert    — conseil ou accompagnement validable ;
- *   neutre  — information.
+ * Une quatrième ligne disait « 2 traitements expliqués ». Elle était toujours
+ * neutre, toujours satisfaite, et donc jamais lue. Ce qui mérite une seconde
+ * d'attention, c'est l'inverse : un traitement SANS explication. Il apparaît
+ * maintenant en précision de la ligne « Ordonnance », et seulement quand il
+ * existe.
  *
- * Aucun chiffre n'est décoratif : chacun vient du moteur. Quand il n'y a rien
- * à signaler, la ligne le dit — c'est une réponse, pas un vide.
+ * Les couleurs viennent toutes de `@/config/counter-tone` : aucun ton n'est
+ * décidé ici. Aucun chiffre n'est estimé — chacun vient du moteur.
  */
 
-export type SummaryTone = "danger" | "warning" | "success" | "neutral";
+export type SummaryTone = CounterTone;
 
 export type SummaryRow = {
   key: string;
@@ -35,6 +36,14 @@ export type SummaryRow = {
   tone: SummaryTone;
   /** Ancre de la zone correspondante : le bandeau y conduit, il ne la remplace pas. */
   href: string;
+  /**
+   * Le geste qui résout cette ligne, nommé.
+   *
+   * Une ligne rouge ou orange qui n'indique pas quoi faire laisse le pharmacien
+   * chercher. Elle n'apparaît que là où il y a réellement quelque chose à
+   * faire : sur une ligne neutre, un verbe serait du bruit.
+   */
+  action?: string;
 };
 
 const TONE_STYLES: Record<SummaryTone, { dot: string; value: string }> = {
@@ -58,7 +67,10 @@ const TONE_STYLES: Record<SummaryTone, { dot: string; value: string }> = {
 
 export function SummaryBand({ rows }: { rows: SummaryRow[] }) {
   return (
-    <nav aria-label="Synthèse de l'analyse" className="overflow-hidden rounded-xl border border-border-subtle bg-surface-card">
+    <nav
+      aria-label="Synthèse de l'analyse"
+      className="overflow-hidden rounded-xl border border-border-subtle bg-surface-card"
+    >
       <ul className="divide-y divide-border-subtle">
         {rows.map((row) => {
           const style = TONE_STYLES[row.tone];
@@ -86,6 +98,18 @@ export function SummaryBand({ rows }: { rows: SummaryRow[] }) {
                     <span className="ml-2 text-[12.5px] text-text-tertiary">{row.detail}</span>
                   )}
                 </span>
+                {row.action && (
+                  <span
+                    className={cn(
+                      "shrink-0 text-[12.5px] font-medium",
+                      row.tone === "danger"
+                        ? "text-danger-700 dark:text-danger-400"
+                        : "text-brand-700 dark:text-brand-400",
+                    )}
+                  >
+                    {row.action} →
+                  </span>
+                )}
               </a>
             </li>
           );
@@ -96,7 +120,7 @@ export function SummaryBand({ rows }: { rows: SummaryRow[] }) {
 }
 
 /**
- * Construit les quatre lignes à partir de ce que le moteur a réellement produit.
+ * Construit les trois lignes à partir de ce que le moteur a réellement produit.
  *
  * Aucun de ces chiffres n'est estimé. Quand une information n'existe pas — les
  * interactions, tant que leur source n'est pas branchée — la ligne ne la
@@ -112,47 +136,68 @@ export function buildSummaryRows(input: {
   explainedCount: number;
   recommendationCount: number;
   locked: boolean;
+  /** Les lignes ont été retenues par la lecture ; personne n'a encore validé. */
+  awaitingValidation: boolean;
 }): SummaryRow[] {
-  const stockDetails = [
+  const unexplained = Math.max(0, input.lineCount - input.explainedCount);
+
+  const treatmentDetails = [
     input.inStock > 0 ? `${input.inStock} en stock` : null,
     input.missing > 0 ? `${input.missing} à commander` : null,
     input.unknown > 0 ? `${input.unknown} non rattaché${input.unknown > 1 ? "s" : ""}` : null,
+    // L'exception, pas la règle : un traitement expliqué ne mérite pas d'être
+    // annoncé, un traitement sans explication si.
+    unexplained > 0 ? `${unexplained} sans explication` : null,
   ].filter(Boolean);
+
+  // La pré-confirmation a changé ce que « 2 médicaments » veut dire : ils ont
+  // pu être retenus par la lecture seule. Le bandeau doit le dire, sans quoi il
+  // affirmerait un traitement établi là où rien n'est encore signé.
+  const treatmentTone: SummaryTone =
+    input.awaitingValidation || input.missing > 0 || input.unknown > 0 ? "warning" : "neutral";
 
   return [
     {
       key: "securite",
-      icon: input.blockingCount > 0 ? ShieldAlert : input.attentionCount > 0 ? AlertTriangle : ShieldCheck,
+      icon:
+        input.blockingCount > 0
+          ? ShieldAlert
+          : input.attentionCount > 0
+            ? AlertTriangle
+            : ShieldCheck,
       label: "Sécurité",
       value:
         input.blockingCount > 0
           ? `${input.blockingCount} point${input.blockingCount > 1 ? "s" : ""} à vérifier`
           : input.attentionCount > 0
             ? `${input.attentionCount} point${input.attentionCount > 1 ? "s" : ""} de vigilance`
-            : "Aucun point de sécurité détecté",
+            : "Aucun signal sur les lignes retenues",
       detail: input.blockingCount > 0 ? "à acquitter avant tout conseil" : undefined,
-      tone: input.blockingCount > 0 ? "danger" : input.attentionCount > 0 ? "warning" : "success",
+      tone: safetySummaryTone(input),
       href: "#zone-securite",
+      action: input.blockingCount > 0 ? "Acquitter" : input.attentionCount > 0 ? "Lire" : undefined,
     },
     {
       key: "ordonnance",
       icon: Pill,
       label: "Ordonnance",
       value: `${input.lineCount} médicament${input.lineCount > 1 ? "s" : ""}`,
-      detail: stockDetails.length > 0 ? stockDetails.join(" · ") : undefined,
-      tone: input.missing > 0 ? "warning" : "neutral",
+      detail:
+        [
+          input.awaitingValidation ? "retenus par la lecture, non validés" : null,
+          treatmentDetails.length > 0 ? treatmentDetails.join(" · ") : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || undefined,
+      tone: treatmentTone,
       href: "#zone-traitement",
-    },
-    {
-      key: "conseil",
-      icon: Check,
-      label: "Conseil patient",
-      value:
-        input.explainedCount > 0
-          ? `${input.explainedCount} traitement${input.explainedCount > 1 ? "s" : ""} expliqué${input.explainedCount > 1 ? "s" : ""}`
-          : "Aucune explication disponible",
-      tone: "neutral",
-      href: "#zone-traitement",
+      action: input.awaitingValidation
+        ? "Relire"
+        : input.unknown > 0
+          ? "Rattacher"
+          : input.missing > 0
+            ? "Voir"
+            : undefined,
     },
     {
       key: "accompagnement",
@@ -163,8 +208,16 @@ export function buildSummaryRows(input: {
         : input.recommendationCount > 0
           ? `${input.recommendationCount} proposition${input.recommendationCount > 1 ? "s" : ""} pertinente${input.recommendationCount > 1 ? "s" : ""}`
           : "Aucune recommandation complémentaire pertinente",
-      tone: input.locked ? "warning" : input.recommendationCount > 0 ? "success" : "neutral",
-      href: "#zone-conseils",
+      tone: adviceTone(input),
+      // Zone fermée : le geste qui la rouvre est dans la sécurité, pas ici. La
+      // ligne conduit là où l'action se trouve, pas là où le problème
+      // s'affiche.
+      href: input.locked ? "#zone-securite" : "#zone-conseils",
+      action: input.locked
+        ? "Acquitter d'abord"
+        : input.recommendationCount > 0
+          ? "Décider"
+          : undefined,
     },
   ];
 }

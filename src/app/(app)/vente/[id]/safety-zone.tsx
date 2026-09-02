@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { SAFETY_SEVERITY } from "@/config/statuses";
+import { safetyTone } from "@/config/counter-tone";
 import { cn } from "@/lib/utils";
 import { ZoneTitle } from "./prescription-zone";
 import { COUNTER_BLOCKING_SUBJECTS, blocksCounter } from "@/core/ai/safety-gate";
@@ -138,7 +139,10 @@ export function SafetyZone({
                 const severity = SAFETY_SEVERITY[finding.severity];
                 return (
                   <li key={finding.id} className="flex items-start gap-2.5 py-2.5 first:pt-0 last:pb-0">
-                    <Badge tone={severity.tone} className="mt-0.5 shrink-0">
+                    {/* Le ton vient de la règle, pas du tableau des libellés :
+                        un jour où le moteur ajouterait une sévérité, elle
+                        n'hériterait pas d'une couleur par accident. */}
+                    <Badge tone={safetyTone(finding.severity)} className="mt-0.5 shrink-0">
                       {severity.label}
                     </Badge>
                     <p className="min-w-0 text-[13px] leading-5 text-text-secondary">
@@ -152,15 +156,17 @@ export function SafetyZone({
         </Card>
       ) : (
         <Card>
-          {/* Un écran vert doit dire ce qui a été comparé, pas laisser croire à
-              une vérification qui n'a pas eu lieu. La phrase de couverture
-              vient du moteur : elle change selon qu'un référentiel
-              d'interactions est chargé, et selon le nombre de lignes qui ont pu
-              être confrontées. */}
+          {/* Neutre, et non vert. Le vert dirait « rien à signaler », ce qui
+              n'est vrai que dans les limites de ce qui a été comparé — et la
+              phrase de couverture, juste en dessous, dit précisément quelles
+              sont ces limites : elle change selon qu'un référentiel
+              d'interactions est chargé et selon le nombre de lignes qui ont pu
+              être confrontées. Une carte verte posée au-dessus d'elle serait
+              une carte qui ment en couleur. */}
           <CardContent className="flex items-start gap-2.5 py-3.5">
-            <ShieldCheck className="mt-px size-[18px] shrink-0 text-success-600 dark:text-success-500" />
+            <ShieldCheck className="mt-px size-[18px] shrink-0 text-text-tertiary" />
             <p className="text-[13.5px] text-text-secondary">
-              Aucun signal sur les lignes confirmées.
+              Aucun signal sur les lignes retenues.
             </p>
           </CardContent>
         </Card>

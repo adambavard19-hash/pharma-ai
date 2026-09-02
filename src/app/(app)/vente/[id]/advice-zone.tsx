@@ -88,6 +88,14 @@ export function AdviceZone({
                 Une alerte bloquante est ouverte au-dessus. Acquittez-la pour ouvrir les
                 conseils : aucune vente ne se fait par-dessus une alerte non lue.
               </p>
+              {/* Le bloc porte le geste qui le résout. Sans ce lien, l'écran
+                  dit « acquittez » et laisse chercher où. */}
+              <a
+                href="#zone-securite"
+                className="inline-block pt-1 text-[13px] font-medium text-brand-700 hover:underline dark:text-brand-400"
+              >
+                Aller à l&apos;alerte à acquitter →
+              </a>
             </div>
           </CardContent>
         </Card>
