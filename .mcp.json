@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "navigateur": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--browser=chrome",
+        "--viewport-size=1440,950",
+        "--save-session",
+        "--output-dir=.live/navigateur"
+      ],
+      "env": {}
+    }
+  }
+}

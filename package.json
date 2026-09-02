@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "live": "node scripts/live.mjs",
+    "live:status": "node scripts/live.mjs status",
+    "live:stop": "node scripts/live.mjs stop",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",

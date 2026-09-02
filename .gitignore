@@ -45,3 +45,6 @@ yarn-error.log*
 
 # prisma generated client
 /src/generated
+
+# Mode LIVE : journal, pid et session du navigateur piloté
+.live/
