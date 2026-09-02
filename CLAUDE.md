@@ -49,6 +49,23 @@ Journal : `.live/dev.log`.
 **visible** : une fenêtre Chrome s'ouvre quand Claude l'utilise, et l'on voit
 les clics. C'est la même application, au même endroit — `localhost:3000`.
 
+Il pilote **Google Chrome installé sur la machine**, pas un navigateur
+embarqué : c'est le comportement par défaut de `@playwright/mcp`. Si Chrome
+manque, le serveur le dit et une commande suffit :
+
+```
+npx playwright install chrome
+```
+
+Sur une machine sans Chrome possible — un conteneur, une intégration continue —
+on surcharge localement, sans toucher au fichier partagé :
+
+```
+claude mcp add navigateur --scope local -- npx -y @playwright/mcp@latest \
+  --executable-path "$(ls -d /opt/pw-browsers/chromium-*/chrome-linux/chrome | head -1)" \
+  --no-sandbox --headless --viewport-size=1440,950 --output-dir=.live/navigateur
+```
+
 Comptes de démonstration : `pharmacien@pharma.ai`, `titulaire@pharma.ai`,
 `preparateur@pharma.ai` · mot de passe commun `Demo2026!Pharma`. Sur l'écran de
 connexion, les profils sont cliquables.
