@@ -81,6 +81,18 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
 
   const run = prescription.analysisRuns[0] ?? null;
 
+  // Le parcours allégé : chaque ligne a été retenue par la lecture seule,
+  // l'analyse a déjà tourné, et PERSONNE n'a encore validé. Les trois
+  // conditions comptent — `correctedByUserId` vide est ce qui distingue une
+  // ligne pré-confirmée d'une ligne qu'un pharmacien a corrigée puis confirmée.
+  const preconfirmed =
+    prescription.verifiedAt === null &&
+    run !== null &&
+    prescription.lines.length > 0 &&
+    prescription.lines.every(
+      (line) => line.status === "CONFIRMED" && line.correctedByUserId === null,
+    );
+
   // Un rattachement décidé après l'analyse rend les signaux de sécurité
   // périmés : ils parlent encore d'un médicament « non rattaché ». On le dit
   // plutôt que de laisser lire un écran qui n'est plus à jour.
@@ -293,6 +305,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         sell: session.permissions.has(PERMISSIONS.SALE_CREATE),
       }}
       simulatedExtraction={prescription.ocrProvider === "mock-ocr"}
+      preconfirmed={preconfirmed}
       hasSale={prescription.sales.length > 0}
     />
   );

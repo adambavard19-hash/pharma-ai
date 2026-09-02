@@ -4,7 +4,10 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, FileText, Loader2, Sparkles, User } from "lucide-react";
-import { verifyPrescriptionAction } from "@/server/actions/prescriptions";
+import {
+  validatePrescriptionAction,
+  verifyPrescriptionAction,
+} from "@/server/actions/prescriptions";
 import { acceptRecommendationAction } from "@/server/actions/recommendations";
 import { recordSaleAction } from "@/server/actions/sales";
 import { Button } from "@/components/ui/button";
@@ -50,6 +53,7 @@ export function SaleWorkspace({
   trace,
   permissions,
   simulatedExtraction,
+  preconfirmed,
   catalogAttribution,
   identificationChangedSinceAnalysis,
   patientFactors,
@@ -79,6 +83,12 @@ export function SaleWorkspace({
   } | null;
   permissions: { verify: boolean; decide: boolean; sell: boolean };
   simulatedExtraction: boolean;
+  /**
+   * Toutes les lignes ont été retenues par la lecture seule et l'analyse a déjà
+   * tourné — mais aucun pharmacien n'a encore validé. L'écran montre tout, et
+   * la barre du bas porte l'acte qui manque.
+   */
+  preconfirmed: boolean;
   /** Mention de source du catalogue national, exigée par sa licence. */
   catalogAttribution: string | null;
   /** Un rattachement a été décidé après la dernière analyse. */
@@ -111,8 +121,15 @@ export function SaleWorkspace({
   // La phase est dictée par le serveur, jamais par un état local optimiste :
   // tant que l'analyse n'est pas revenue, on reste sur la vérification plutôt
   // que d'afficher un « aucun conseil » qui serait faux.
-  const editing = forceEdit || !prescription.verifiedAt;
+  //
+  // Une ordonnance intégralement lue s'ouvre directement sur l'écran complet,
+  // sans passer par la saisie ligne à ligne : c'est tout l'objet de la
+  // pré-confirmation. Il reste un acte à poser — la validation — et il est dans
+  // la barre du bas.
+  const editing = forceEdit || (!prescription.verifiedAt && !preconfirmed);
   const analysing = pending && !editing;
+  /** L'ordonnance est affichée en entier mais n'engage encore personne. */
+  const needsValidation = !prescription.verifiedAt && !editing;
 
   const blocked = counterIsBlocked(findings);
   const confirmedCount = lines.filter((line) => line.confirmed).length;
@@ -248,12 +265,23 @@ export function SaleWorkspace({
       unitPriceCents: line.unitPriceCents,
     }));
 
-    if (lines.length === 0) {
-      router.push(`/vente/${prescription.id}/fin`);
-      return;
-    }
-
     startTransition(async () => {
+      // La validation passe AVANT l'enregistrement de la vente : une vente
+      // adossée à une ordonnance que personne n'a validée n'aurait pas de
+      // signataire. Si elle échoue, on s'arrête là.
+      if (needsValidation) {
+        const validated = await validatePrescriptionAction(prescription.id);
+        if (!validated.ok) {
+          setError(validated.error);
+          return;
+        }
+      }
+
+      if (lines.length === 0) {
+        router.push(`/vente/${prescription.id}/fin`);
+        return;
+      }
+
       const result = await recordSaleAction({
         prescriptionId: prescription.id,
         patientId: patientId || null,
@@ -345,6 +373,7 @@ export function SaleWorkspace({
           onEdit={() => setForceEdit(true)}
           canEdit={permissions.verify}
           simulatedExtraction={simulatedExtraction}
+          awaitingValidation={needsValidation}
           catalogAttribution={catalogAttribution}
         />
 
@@ -433,19 +462,30 @@ export function SaleWorkspace({
                   : `${basket.size} conseil${basket.size > 1 ? "s" : ""} · ${formatCents(basketTotal)}`}
               </p>
               <p className="text-[12px] text-text-tertiary">
-                {hasSale
-                  ? "Une vente est déjà enregistrée pour cette ordonnance."
-                  : "Le chiffre d'affaires n'est attribué qu'aux lignes issues d'un conseil."}
+                {needsValidation
+                  ? "Les lignes ont été retenues par la lecture. Votre validation les signe."
+                  : hasSale
+                    ? "Une vente est déjà enregistrée pour cette ordonnance."
+                    : "Le chiffre d'affaires n'est attribué qu'aux lignes issues d'un conseil."}
               </p>
             </div>
             <Button
               size="lg"
               onClick={finish}
               loading={pending}
-              disabled={basket.size > 0 && !permissions.sell}
+              disabled={
+                (basket.size > 0 && !permissions.sell) ||
+                (needsValidation && !permissions.verify)
+              }
               leadingIcon={pending ? undefined : <ArrowRight className="size-[18px]" />}
             >
-              {basket.size === 0 ? "Continuer la délivrance" : "Terminer la vente"}
+              {needsValidation
+                ? basket.size === 0
+                  ? "Valider et poursuivre"
+                  : "Valider et terminer la vente"
+                : basket.size === 0
+                  ? "Continuer la délivrance"
+                  : "Terminer la vente"}
             </Button>
           </>
         )}

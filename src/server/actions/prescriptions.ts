@@ -103,12 +103,14 @@ export async function createPrescriptionAction(
     },
   });
 
+  let allPreconfirmed = false;
   try {
-    await extractPrescription({
+    const extraction = await extractPrescription({
       scope,
       prescriptionId: prescription.id,
       demoScenarioId: demoScenarioId ?? undefined,
     });
+    allPreconfirmed = extraction.allPreconfirmed;
   } catch (error) {
     await prisma.prescription.update({
       where: { id: prescription.id },
@@ -118,6 +120,29 @@ export async function createPrescriptionAction(
     return fail(
       "L'extraction a échoué. L'ordonnance a été créée : les lignes peuvent être saisies manuellement.",
     );
+  }
+
+  // L'analyse démarre dès l'extraction terminée, et SEULEMENT quand toutes les
+  // lignes sont passées. Sur une ordonnance dont une ligne reste douteuse, elle
+  // porterait sur un traitement incomplet : le pharmacien va de toute façon
+  // corriger puis relancer, et une analyse partielle affichée entre-temps
+  // dirait quelque chose de faux.
+  //
+  // Elle ne signe rien : `verifiedAt` reste vide jusqu'à la validation par un
+  // pharmacien. Une analyse n'est pas une vérification.
+  if (allPreconfirmed) {
+    try {
+      await analysePrescription({ scope, prescriptionId: prescription.id });
+    } catch (error) {
+      // Une analyse anticipée qui échoue ne doit pas faire échouer l'import :
+      // l'ordonnance existe, ses lignes sont lues, l'écran de vérification
+      // reprend la main comme avant ce lot.
+      console.error("[prescriptions] analyse anticipée impossible", error);
+      await prisma.prescription.update({
+        where: { id: prescription.id },
+        data: { status: "NEEDS_VERIFICATION" },
+      });
+    }
   }
 
   if (patientId) {
@@ -254,6 +279,79 @@ export async function verifyPrescriptionAction(
   revalidatePath("/ordonnances");
 
   return ok({ analysisRunId, recommendationCount: result.recommendations.length });
+}
+
+/**
+ * La validation professionnelle d'une ordonnance déjà analysée.
+ *
+ * C'est l'acte que la pré-confirmation ne remplace PAS. Les lignes ont été
+ * retenues par la lecture, l'analyse a tourné, l'écran montre tout — mais tant
+ * que personne n'a validé, `verifiedAt` reste vide et l'ordonnance n'engage
+ * aucun professionnel.
+ *
+ * Elle ne relance pas l'analyse : celle-ci porte déjà sur ces lignes-là,
+ * inchangées. Une correction passe par « Corriger », qui repasse par
+ * `verifyPrescriptionAction` et relance le moteur.
+ */
+export async function validatePrescriptionAction(
+  prescriptionId: string,
+): Promise<ActionResult<{ verifiedAt: string }>> {
+  const session = await requirePermission(PERMISSIONS.PRESCRIPTION_VERIFY);
+  const scope = session.scope;
+
+  const prescription = await prisma.prescription.findUnique({
+    where: { id: prescriptionId },
+    select: {
+      id: true,
+      pharmacyId: true,
+      verifiedAt: true,
+      lines: { where: { status: "CONFIRMED" }, select: { id: true } },
+      analysisRuns: { select: { id: true }, take: 1 },
+    },
+  });
+  if (!prescription || prescription.pharmacyId !== scope.pharmacyId) {
+    return fail("Ordonnance introuvable dans cette officine.");
+  }
+
+  // Déjà validée : rien à refaire, et surtout pas réécrire la signature de
+  // quelqu'un d'autre.
+  if (prescription.verifiedAt) {
+    return ok({ verifiedAt: prescription.verifiedAt.toISOString() });
+  }
+
+  if (prescription.lines.length === 0) {
+    return fail(
+      "Aucune ligne retenue. Ouvrez « Corriger » pour vérifier l'ordonnance ligne par ligne.",
+    );
+  }
+
+  // Valider une ordonnance que le moteur n'a jamais analysée reviendrait à
+  // signer un écran vide.
+  if (prescription.analysisRuns.length === 0) {
+    return fail("Cette ordonnance n'a pas encore été analysée.");
+  }
+
+  const verifiedAt = new Date();
+  await prisma.prescription.update({
+    where: { id: prescription.id },
+    data: { verifiedByUserId: scope.userId, verifiedAt },
+  });
+
+  await recordAudit({
+    action: "prescription.verified",
+    entityType: "Prescription",
+    entityId: prescription.id,
+    pharmacyId: scope.pharmacyId,
+    userId: scope.userId,
+    // La trace distingue les deux chemins : ligne à ligne, ou validation d'un
+    // écran dont les lignes avaient été pré-confirmées par la lecture.
+    metadata: { path: "preconfirmed", confirmedLines: prescription.lines.length },
+  });
+
+  revalidatePath(`/vente/${prescription.id}`);
+  revalidatePath("/ordonnances");
+
+  return ok({ verifiedAt: verifiedAt.toISOString() }, "Ordonnance validée.");
 }
 
 export async function reanalysePrescriptionAction(

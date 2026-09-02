@@ -33,6 +33,8 @@ import { getReferenceCatalogState } from "./reference";
 import { recordAudit } from "@/server/audit/log";
 import { createNotification } from "./notifications";
 import { ENGINE_VERSION } from "@/config/constants";
+import { preconfirmEnabled } from "@/config/env";
+import { preconfirmPrescription } from "@/core/extraction/preconfirm";
 import type { TenantScope } from "@/server/db/tenant";
 
 /**
@@ -52,7 +54,15 @@ export async function extractPrescription(params: {
   scope: TenantScope;
   prescriptionId: string;
   demoScenarioId?: string;
-}): Promise<{ linesCreated: number; isSimulated: boolean; warnings: string[] }> {
+}): Promise<{
+  linesCreated: number;
+  isSimulated: boolean;
+  warnings: string[];
+  /** Lignes retenues sans intervention humaine, parce qu'intégralement lues. */
+  preconfirmedCount: number;
+  /** Toutes les lignes sont passées : le parcours allégé peut s'ouvrir. */
+  allPreconfirmed: boolean;
+}> {
   const prescription = await prisma.prescription.findUnique({
     where: { id: params.prescriptionId },
     select: { id: true, pharmacyId: true, fileKey: true, fileMimeType: true, fileName: true },
@@ -83,10 +93,27 @@ export async function extractPrescription(params: {
     demoScenarioId: params.demoScenarioId,
   });
 
+  // La pré-confirmation est décidée AVANT d'écrire, par une fonction pure du
+  // domaine. Le service ne fait que lui passer ce qui a été lu et appliquer son
+  // verdict : la règle qui allège un garde-fou ne doit pas vivre dans une
+  // couche que seule une base de données permettrait de tester.
+  const readouts = extracted.lines.map((line) => ({
+    drugName: line.drugName.value,
+    dosage: line.dosage.value,
+    form: line.form.value,
+    posology: line.posology.value,
+    durationDays: line.durationDays.value,
+    quantity: line.quantity.value,
+    instructions: line.instructions.value,
+    unreadableFields: collectUnreadable(line),
+    confidence: buildConfidenceMap(line) as Record<string, number | null | undefined>,
+  }));
+  const verdict = preconfirmPrescription(readouts, { enabled: preconfirmEnabled() });
+
   await prisma.$transaction(async (tx) => {
     await tx.prescriptionLine.deleteMany({ where: { prescriptionId: prescription.id } });
 
-    for (const line of extracted.lines) {
+    for (const [index, line] of extracted.lines.entries()) {
       await tx.prescriptionLine.create({
         data: {
           prescriptionId: prescription.id,
@@ -99,7 +126,10 @@ export async function extractPrescription(params: {
           durationDays: line.durationDays.value,
           quantity: line.quantity.value,
           instructions: line.instructions.value,
-          status: "NEEDS_REVIEW",
+          // CONFIRMED sans `correctedByUserId` : la ligne est retenue pour
+          // l'analyse, et la trace dit qu'aucun humain ne l'a touchée. Les deux
+          // informations sont vraies et ne doivent pas être confondues.
+          status: verdict.decisions[index]?.preconfirmed ? "CONFIRMED" : "NEEDS_REVIEW",
           fieldConfidence: buildConfidenceMap(line) as never,
           unreadableFields: collectUnreadable(line),
         },
@@ -131,6 +161,15 @@ export async function extractPrescription(params: {
       provider: extracted.providerId,
       simulated: extracted.isSimulated,
       lines: extracted.lines.length,
+      // La trace doit permettre de répondre, des mois plus tard, à « qui a
+      // retenu cette ligne ? ». Le motif de chaque refus y figure aussi : c'est
+      // ce qui rend la règle relisible sans rejouer l'extraction.
+      preconfirmedLines: verdict.preconfirmedCount,
+      preconfirmRefusals: verdict.decisions
+        .map((decision, index) =>
+          decision.preconfirmed ? null : `${index + 1}:${decision.reason}`,
+        )
+        .filter((entry): entry is string => entry !== null),
     },
   });
 
@@ -138,6 +177,8 @@ export async function extractPrescription(params: {
     linesCreated: extracted.lines.length,
     isSimulated: extracted.isSimulated,
     warnings: extracted.warnings,
+    preconfirmedCount: verdict.preconfirmedCount,
+    allPreconfirmed: verdict.allPreconfirmed,
   };
 }
 

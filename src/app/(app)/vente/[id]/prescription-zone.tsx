@@ -33,6 +33,7 @@ export function PrescriptionZone({
   onEdit,
   canEdit,
   simulatedExtraction,
+  awaitingValidation,
   catalogAttribution,
 }: {
   editing: boolean;
@@ -48,6 +49,8 @@ export function PrescriptionZone({
   onEdit: () => void;
   canEdit: boolean;
   simulatedExtraction: boolean;
+  /** Les lignes ont été retenues par la lecture ; personne n'a encore validé. */
+  awaitingValidation: boolean;
   catalogAttribution: string | null;
 }) {
   if (!editing) {
@@ -56,6 +59,8 @@ export function PrescriptionZone({
         lines={lines}
         onEdit={onEdit}
         canEdit={canEdit}
+        simulatedExtraction={simulatedExtraction}
+        awaitingValidation={awaitingValidation}
         catalogAttribution={catalogAttribution}
       />
     );
@@ -67,12 +72,7 @@ export function PrescriptionZone({
     <section className="space-y-3" aria-labelledby="zone-traitement">
       <ZoneTitle id="zone-traitement" step={1} title="Le traitement" />
 
-      {simulatedExtraction && (
-        <Alert tone="danger" title="Extraction simulée">
-          Aucune image n&apos;a été analysée. Le contenu ci-dessous est un scénario fictif de
-          démonstration : il ne correspond à aucune ordonnance réelle.
-        </Alert>
-      )}
+      <SimulatedExtractionAlert shown={simulatedExtraction} />
 
       <Alert tone="warning" title="Rien n'a été deviné">
         Un champ illisible reste vide et doit être saisi par un professionnel.
@@ -136,16 +136,38 @@ export function PrescriptionZone({
   );
 }
 
+/**
+ * L'avertissement d'extraction simulée.
+ *
+ * Il suit l'ordonnance dans les deux vues. Une ordonnance fictive peut
+ * désormais s'ouvrir directement sur l'écran complet, sans passer par la
+ * saisie : si cette phrase ne vivait que dans la vue d'édition, elle
+ * disparaîtrait précisément du chemin le plus court.
+ */
+function SimulatedExtractionAlert({ shown }: { shown: boolean }) {
+  if (!shown) return null;
+  return (
+    <Alert tone="danger" title="Extraction simulée">
+      Aucune image n&apos;a été analysée. Le contenu ci-dessous est un scénario fictif de
+      démonstration : il ne correspond à aucune ordonnance réelle.
+    </Alert>
+  );
+}
+
 /** Vue repliée : ce que le pharmacien a besoin de relire d'un coup d'œil. */
 function PrescriptionSummary({
   lines,
   onEdit,
   canEdit,
+  simulatedExtraction,
+  awaitingValidation,
   catalogAttribution,
 }: {
   lines: SaleLineDraft[];
   onEdit: () => void;
   canEdit: boolean;
+  simulatedExtraction: boolean;
+  awaitingValidation: boolean;
   catalogAttribution: string | null;
 }) {
   const confirmed = lines.filter((line) => line.confirmed);
@@ -170,6 +192,26 @@ function PrescriptionSummary({
         }
       />
 
+      <SimulatedExtractionAlert shown={simulatedExtraction} />
+
+      {/* Ce que la machine a fait, et ce qu'elle n'a pas fait. Un écran qui
+          affiche des lignes sans dire qui les a retenues laisserait croire
+          qu'un professionnel les a relues. Le texte lu sur l'ordonnance
+          s'affiche sous chaque ligne, pour que la relecture soit possible ici,
+          sans ouvrir « Corriger ». */}
+      {awaitingValidation && (
+        <Alert
+          tone="warning"
+          title={`${confirmed.length} ligne${confirmed.length > 1 ? "s" : ""} retenue${
+            confirmed.length > 1 ? "s" : ""
+          } par la lecture, pas encore validée${confirmed.length > 1 ? "s" : ""}`}
+        >
+          Chaque champ a été lu au-dessus du seuil de relecture : aucune case n&apos;était à
+          cocher. Aucun professionnel ne les a relues pour autant — c&apos;est votre validation,
+          en bas de l&apos;écran, qui en fait un acte signé.
+        </Alert>
+      )}
+
       <Card>
         <CardContent className="pt-3 pb-3">
           <ul className="divide-y divide-border-subtle">
@@ -178,6 +220,7 @@ function PrescriptionSummary({
                 key={line.id}
                 line={line}
                 canEdit={canEdit}
+                showRawText={awaitingValidation}
                 attribution={catalogAttribution}
               />
             ))}
@@ -216,10 +259,13 @@ function PrescriptionSummary({
 function SummaryLine({
   line,
   canEdit,
+  showRawText,
   attribution,
 }: {
   line: SaleLineDraft;
   canEdit: boolean;
+  /** Affiche le texte lu sur l'ordonnance, pour permettre la relecture ici. */
+  showRawText?: boolean;
   attribution: string | null;
 }) {
   // Quand la ligne est rattachée, l'explication vit dans le repli ci-dessous.
@@ -238,6 +284,15 @@ function SummaryLine({
         </p>
         <AvailabilityChip availability={line.availability} />
       </div>
+
+      {/* Le texte brut, jamais réécrit. C'est lui qu'on compare au papier — et
+          la seule chose qui rende la relecture possible sans rouvrir la
+          saisie. */}
+      {showRawText && line.rawText && (
+        <p className="mt-0.5 text-[12px] leading-4 text-text-tertiary">
+          Lu sur l&apos;ordonnance : «&nbsp;{line.rawText}&nbsp;»
+        </p>
+      )}
 
       {line.official ? (
         <details className="group mt-0.5">

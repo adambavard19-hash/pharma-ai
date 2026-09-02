@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
@@ -58,6 +58,16 @@ export default async function DocumentPage({
   });
 
   if (!prescription || prescription.pharmacyId !== session.scope.pharmacyId) notFound();
+
+  // Aucune fiche patient sans validation professionnelle.
+  //
+  // Le garde-fou est devenu nécessaire avec la pré-confirmation : une
+  // ordonnance intégralement lue a désormais des lignes CONFIRMED avant que
+  // quiconque ait validé. Sans ce contrôle, l'adresse `/fin` tapée à la main
+  // produirait un compte rendu remis au patient à partir de lignes que
+  // personne n'a signées. Le parcours normal valide juste avant d'arriver ici,
+  // ce détour ne se voit donc jamais.
+  if (!prescription.verifiedAt) redirect(`/vente/${prescription.id}`);
 
   const latestDocument = prescription.documents[0];
   const messaging = getMessagingProvider();
