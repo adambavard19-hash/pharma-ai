@@ -6,7 +6,7 @@ import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { declineRecommendations, recordSale } from "@/server/services/sales";
-import { isDemoMode } from "@/config/env";
+import { recordIsDemo } from "@/server/db/demo-scope";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 const saleSchema = z.object({
@@ -61,7 +61,7 @@ export async function recordSaleAction(
       prescriptionId: input.prescriptionId ?? null,
       lines: input.lines,
       note: input.note ?? null,
-      isDemo: isDemoMode(),
+      isDemo: recordIsDemo(session.pharmacy.isDemo),
     });
 
     if (input.declinedRecommendationIds.length > 0) {

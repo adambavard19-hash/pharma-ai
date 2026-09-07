@@ -3,44 +3,52 @@
 import { useState, useTransition } from "react";
 import Image from "next/image";
 import {
+  Check,
   ChevronDown,
   Lock,
-  MessageSquareQuote,
+  MoreHorizontal,
   Package,
   Plus,
-  ShoppingBasket,
+  RotateCcw,
+  Sparkles,
   X,
 } from "lucide-react";
 import {
   addManualRecommendationAction,
   declineRecommendationAction,
   modifyRecommendationAction,
-  presentRecommendationAction,
   removeRecommendationAction,
+  reopenRecommendationAction,
   replaceRecommendationAction,
 } from "@/server/actions/recommendations";
+import { answerOpportunityAction } from "@/server/actions/opportunities";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { Field, Input, Textarea } from "@/components/ui/field";
-import { Alert, EmptyState } from "@/components/ui/feedback";
+import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { formatCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ProductPicker } from "./product-picker";
 import { ScoreExplanation } from "./score-explanation";
-import { ZoneTitle } from "./prescription-zone";
 import type { AdviceView } from "./types";
 
+/** La note posée par le serveur quand le patient répond « non » à la question. */
+const NOT_NEEDED_NOTE = "Le patient n'a pas ce besoin.";
+
+/** Jamais plus de trois cartes ouvertes à la fois : le reste attend un clic. */
+const MAX_VISIBLE = 3;
+
 /**
- * Zone 3 — les conseils.
+ * Ce que Pharma.ai rappelle de proposer — l'écran le plus important du produit.
  *
- * Trois conseils au maximum, trois décisions au comptoir : PROPOSÉ (je l'ai dit
- * au patient), AJOUTÉ À LA VENTE, REFUSÉ (le patient n'a pas voulu). Les gestes
- * plus fins — changer de référence, ajuster la formulation, retirer une
- * proposition jugée non pertinente — restent disponibles, en second rang, pour
- * ne pas alourdir la décision principale.
+ * Trois grandes cartes au plus, lisibles debout, à un mètre : le produit, son
+ * prix et son stock, pourquoi on le propose, ce qu'on dit au patient, et deux
+ * cibles géantes de même poids — accepte, refuse. Quand le conseil ne se
+ * justifie pas par l'ordonnance seule, la carte pose d'abord SA question au
+ * patient ; le produit n'apparaît qu'après un « oui ». Tout ce qui est
+ * technique — score, référence, reformulation — vit derrière un seul bouton
+ * discret. Rien de tout cela n'est visible au comptoir.
  */
 export function AdviceZone({
   prescriptionId,
@@ -48,89 +56,122 @@ export function AdviceZone({
   canDecide,
   locked,
   inBasket,
-  onToggleBasket,
+  onAccept,
+  onCancelAccept,
 }: {
   prescriptionId: string;
   recommendations: AdviceView[];
   canDecide: boolean;
   locked: boolean;
   inBasket: (id: string) => boolean;
-  onToggleBasket: (recommendation: AdviceView) => void;
+  /** Le patient accepte : ajout à la délivrance + décision enregistrée. */
+  onAccept: (recommendation: AdviceView) => void;
+  /** Retour en arrière immédiat, avant que la vente ne soit close. */
+  onCancelAccept: (recommendation: AdviceView) => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const decided = new Set(["DECLINED", "REMOVED", "PURCHASED"]);
   const open = recommendations.filter((r) => !decided.has(r.status));
   const available = open.filter((r) => !r.product || r.product.quantity > 0);
   const unavailable = open.filter((r) => r.product && r.product.quantity <= 0);
   const closed = recommendations.filter((r) => decided.has(r.status));
+  const visible = showAll ? available : available.slice(0, MAX_VISIBLE);
+  const hidden = available.length - visible.length;
+
+  const pending = available.filter((r) => !inBasket(r.id)).length;
 
   return (
-    <section className="space-y-3" aria-labelledby="zone-conseils">
-      {/* Tant que la sécurité n'est pas acquittée, le compteur reste muet : le
-          bandeau annonce « en attente », le titre ne doit pas déjà annoncer une
-          proposition tenue en réserve. */}
-      <ZoneTitle
-        id="zone-conseils"
-        step={3}
-        title={!locked && available.length > 0 ? `Conseils (${available.length})` : "Conseils"}
-      />
+    <section className="space-y-4" aria-labelledby="zone-conseils">
+      <div className="flex items-end justify-between gap-3">
+        <h2 id="zone-conseils" className="flex items-center gap-2.5">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
+            <Sparkles className="size-[18px]" />
+          </span>
+          <span className="text-[17px] font-semibold tracking-[-0.01em] text-text-primary">
+            À proposer au patient
+          </span>
+        </h2>
+        {!locked && available.length > 0 && (
+          <span className="rounded-full bg-brand-50 px-3 py-1 text-[12.5px] font-medium text-brand-800 tabular dark:bg-brand-950 dark:text-brand-300">
+            {pending > 0 ? `${pending} à décider` : "Tout est décidé"}
+          </span>
+        )}
+      </div>
 
       {locked ? (
-        <Card className="border-dashed">
-          <CardContent className="flex items-start gap-3 py-5">
-            <Lock className="mt-0.5 size-[18px] shrink-0 text-text-tertiary" />
-            <div className="space-y-1">
-              <p className="text-[14px] font-medium text-text-primary">
-                Conseils en attente de la vérification de sécurité
-              </p>
-              <p className="text-[13px] leading-5 text-text-secondary">
-                Une alerte bloquante est ouverte au-dessus. Acquittez-la pour ouvrir les
-                conseils : aucune vente ne se fait par-dessus une alerte non lue.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-start gap-3 rounded-2xl border border-dashed border-border-default px-5 py-5">
+          <Lock className="mt-0.5 size-[18px] shrink-0 text-text-tertiary" />
+          <div className="space-y-1">
+            <p className="text-[14px] font-medium text-text-primary">
+              En attente de la vérification de sécurité
+            </p>
+            <p className="text-[13px] leading-5 text-text-secondary">
+              Une alerte bloquante est ouverte au-dessus. Acquittez-la pour ouvrir les
+              propositions : aucune vente ne se fait par-dessus une alerte non lue.
+            </p>
+          </div>
+        </div>
       ) : (
         <>
-          {available.map((recommendation) => (
+          {visible.map((recommendation) => (
             <AdviceCard
               key={recommendation.id}
               recommendation={recommendation}
               canDecide={canDecide}
-              added={inBasket(recommendation.id)}
-              onToggleBasket={() => onToggleBasket(recommendation)}
+              accepted={inBasket(recommendation.id)}
+              onAccept={() => onAccept(recommendation)}
+              onCancelAccept={() => onCancelAccept(recommendation)}
             />
           ))}
 
-          {available.length === 0 && (
-            <Card>
-              <EmptyState
-                icon={<MessageSquareQuote className="size-5" />}
-                title="Aucun conseil à proposer"
-                description="Le moteur n'a identifié aucune opportunité pertinente et disponible en rayon pour ce traitement. Vous pouvez en ajouter un vous-même."
-              />
-            </Card>
+          {hidden > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="w-full rounded-xl border border-dashed border-border-default py-3 text-[13.5px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+            >
+              Voir {hidden} autre{hidden > 1 ? "s" : ""} proposition{hidden > 1 ? "s" : ""}
+            </button>
+          )}
+
+          {available.length === 0 && closed.length > 0 && (
+            <p className="flex items-center gap-2 px-1 text-[14px] text-text-secondary">
+              <Check className="size-[18px] text-success-600 dark:text-success-500" />
+              Toutes les propositions ont été décidées avec le patient.
+            </p>
+          )}
+
+          {available.length === 0 && closed.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border-default px-5 py-5">
+              <p className="text-[14px] font-medium text-text-primary">
+                Rien à proposer pour ce traitement dans votre stock
+              </p>
+              <p className="mt-1 text-[13px] leading-5 text-text-secondary">
+                Aucun besoin complémentaire auquel votre rayon puisse répondre aujourd&apos;hui.
+                Vous pouvez ajouter un conseil vous-même.
+              </p>
+            </div>
           )}
 
           {unavailable.length > 0 && (
-            <Alert tone="neutral" title="Écartés faute de stock">
-              {unavailable.map((r) => r.product?.name).filter(Boolean).join(", ")} —
-              proposition retirée du comptoir : Pharma.ai ne conseille pas ce qu&apos;il ne peut
-              pas délivrer aujourd&apos;hui.
-            </Alert>
+            <p className="px-1 text-[12.5px] leading-5 text-text-tertiary">
+              Non proposé faute de stock :{" "}
+              {unavailable.map((r) => r.product?.name).filter(Boolean).join(", ")}.
+            </p>
           )}
 
           {canDecide && (
             <>
-              <Button
-                variant="outline"
-                className="w-full border-dashed"
+              <button
+                type="button"
                 onClick={() => setAddOpen(true)}
-                leadingIcon={<Plus className="size-[18px]" />}
+                className="flex items-center gap-1.5 px-1 text-[13px] text-text-tertiary underline-offset-2 transition-colors hover:text-text-secondary hover:underline"
               >
-                Ajouter un conseil
-              </Button>
+                <Plus className="size-4" />
+                Ajouter un conseil de mon choix
+              </button>
               <AddAdviceModal
                 open={addOpen}
                 onClose={() => setAddOpen(false)}
@@ -139,72 +180,321 @@ export function AdviceZone({
             </>
           )}
 
-          {closed.length > 0 && <ClosedList recommendations={closed} />}
+          {closed.length > 0 && <ClosedList recommendations={closed} canDecide={canDecide} />}
         </>
       )}
     </section>
   );
 }
 
-function ClosedList({ recommendations }: { recommendations: AdviceView[] }) {
-  const LABELS: Record<string, string> = {
-    PURCHASED: "Acheté",
-    DECLINED: "Refusé par le patient",
-    REMOVED: "Retiré",
+/**
+ * Ce qui a été tranché.
+ *
+ * Un conseil refusé reste visible, barré : le patient peut changer d'avis dans
+ * la même minute, et le collaborateur doit voir que son refus a bien été pris.
+ */
+function ClosedList({
+  recommendations,
+  canDecide,
+}: {
+  recommendations: AdviceView[];
+  canDecide: boolean;
+}) {
+  const label = (recommendation: AdviceView) => {
+    if (recommendation.status === "PURCHASED") return "Acheté";
+    if (recommendation.status === "DECLINED") return "Refusé par le patient";
+    if (recommendation.pharmacistNote === NOT_NEEDED_NOTE) return "Pas ce besoin";
+    return "Retiré du comptoir";
   };
 
   return (
     <ul className="space-y-1.5">
-      {recommendations.map((recommendation) => (
-        <li
-          key={recommendation.id}
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border-subtle bg-surface-sunken/50 px-3.5 py-2.5"
-        >
-          <span
-            className={cn(
-              "text-[13px]",
-              recommendation.status === "PURCHASED"
-                ? "font-medium text-text-primary"
-                : "text-text-secondary line-through",
-            )}
+      {recommendations.map((recommendation) => {
+        const notNeeded =
+          recommendation.status === "REMOVED" &&
+          recommendation.pharmacistNote === NOT_NEEDED_NOTE &&
+          recommendation.opportunity;
+        return (
+          <li
+            key={recommendation.id}
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-border-subtle bg-surface-sunken/50 px-4 py-2.5"
           >
-            {recommendation.product?.name ?? "Produit supprimé"}
-          </span>
-          <span className="text-[12px] text-text-tertiary">
-            {LABELS[recommendation.status] ?? recommendation.status}
-          </span>
-          {recommendation.pharmacistNote && (
-            <span className="text-[12px] text-text-tertiary">
-              « {recommendation.pharmacistNote} »
+            {recommendation.status === "PURCHASED" ? (
+              <Check className="size-4 shrink-0 text-success-600 dark:text-success-500" />
+            ) : (
+              <X className="size-4 shrink-0 text-text-tertiary" />
+            )}
+            <span
+              className={cn(
+                "text-[13.5px]",
+                recommendation.status === "PURCHASED"
+                  ? "font-medium text-text-primary"
+                  : "text-text-secondary line-through",
+              )}
+            >
+              {recommendation.product?.name ?? "Produit supprimé"}
             </span>
-          )}
-        </li>
-      ))}
+            <span className="text-[12px] text-text-tertiary">
+              {label(recommendation)}
+              {recommendation.decidedBy ? ` · ${recommendation.decidedBy}` : ""}
+            </span>
+            {recommendation.pharmacistNote && recommendation.pharmacistNote !== NOT_NEEDED_NOTE && (
+              <span className="text-[12px] text-text-tertiary">
+                « {recommendation.pharmacistNote} »
+              </span>
+            )}
+            {canDecide && recommendation.status === "DECLINED" && (
+              <ReopenButton recommendationId={recommendation.id} />
+            )}
+            {canDecide && notNeeded && (
+              <ReopenButton
+                recommendationId={recommendation.id}
+                opportunityId={recommendation.opportunity!.id}
+              />
+            )}
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+/** Rouvre un conseil refusé par erreur, ou un besoin finalement confirmé. */
+function ReopenButton({
+  recommendationId,
+  opportunityId,
+}: {
+  recommendationId: string;
+  opportunityId?: string;
+}) {
+  const [pending, startTransition] = useTransition();
+  const { push } = useToast();
+
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = opportunityId
+            ? await answerOpportunityAction({ opportunityId, answer: true })
+            : await reopenRecommendationAction(recommendationId);
+          if (!result.ok) push({ tone: "error", title: result.error });
+        })
+      }
+      className="ml-auto flex items-center gap-1 text-[12px] text-text-tertiary underline-offset-2 transition-colors hover:text-text-secondary hover:underline"
+    >
+      <RotateCcw className="size-3.5" />
+      Revenir
+    </button>
   );
 }
 
 function AdviceCard({
   recommendation,
   canDecide,
-  added,
-  onToggleBasket,
+  accepted,
+  onAccept,
+  onCancelAccept,
 }: {
   recommendation: AdviceView;
   canDecide: boolean;
-  added: boolean;
-  onToggleBasket: () => void;
+  accepted: boolean;
+  onAccept: () => void;
+  onCancelAccept: () => void;
+}) {
+  const opportunity = recommendation.opportunity;
+  // La réponse du patient, locale d'abord : la carte réagit au clic, le
+  // serveur confirme ensuite. Un « non » fait disparaître la carte ; le
+  // serveur la range alors parmi les décisions prises.
+  const [answer, setAnswer] = useState<boolean | null>(opportunity?.answer ?? null);
+  const [answering, startAnswer] = useTransition();
+  const { push } = useToast();
+
+  const askFirst = Boolean(opportunity?.requiresConfirmation && opportunity.question) && answer !== true;
+
+  const respond = (value: boolean) => {
+    if (!opportunity) return;
+    setAnswer(value);
+    startAnswer(async () => {
+      const result = await answerOpportunityAction({ opportunityId: opportunity.id, answer: value });
+      if (!result.ok) {
+        setAnswer(null);
+        push({ tone: "error", title: result.error });
+      }
+    });
+  };
+
+  if (askFirst && answer === false) {
+    return (
+      <p className="flex items-center gap-2 px-1 text-[13px] text-text-tertiary">
+        <X className="size-4" />
+        Pas ce besoin — proposition retirée.
+      </p>
+    );
+  }
+
+  if (askFirst) {
+    return (
+      <QuestionCard
+        recommendation={recommendation}
+        canDecide={canDecide}
+        pending={answering}
+        onYes={() => respond(true)}
+        onNo={() => respond(false)}
+      />
+    );
+  }
+
+  return (
+    <ProductCard
+      recommendation={recommendation}
+      canDecide={canDecide}
+      accepted={accepted}
+      confirmed={answer === true}
+      onAccept={onAccept}
+      onCancelAccept={onCancelAccept}
+    />
+  );
+}
+
+/** Le cadre commun des cartes : un liseré de couleur, une surface calme. */
+function CardFrame({
+  accent,
+  children,
+}: {
+  accent: "brand" | "success" | "question";
+  children: React.ReactNode;
+}) {
+  return (
+    <article
+      className={cn(
+        "overflow-hidden rounded-2xl border bg-surface-card shadow-[0_1px_2px_rgba(16,24,40,0.06),0_8px_24px_-12px_rgba(16,24,40,0.18)] transition-colors",
+        accent === "success"
+          ? "border-success-300 dark:border-success-800"
+          : accent === "question"
+            ? "border-brand-200 dark:border-brand-800"
+            : "border-border-subtle",
+      )}
+    >
+      <div
+        className={cn(
+          "h-1.5",
+          accent === "success"
+            ? "bg-success-500"
+            : accent === "question"
+              ? "bg-gradient-to-r from-brand-400 to-brand-600"
+              : "bg-gradient-to-r from-brand-600 to-brand-400",
+        )}
+      />
+      <div className="space-y-5 p-5 sm:p-6">{children}</div>
+    </article>
+  );
+}
+
+/**
+ * La question d'abord.
+ *
+ * Elle est écrite dans la règle de conseil, jamais formulée à la volée. Le
+ * produit n'est montré qu'en petit, pour que le pharmacien sache où mène un
+ * « oui » — pas pour le vendre avant d'avoir demandé.
+ */
+function QuestionCard({
+  recommendation,
+  canDecide,
+  pending,
+  onYes,
+  onNo,
+}: {
+  recommendation: AdviceView;
+  canDecide: boolean;
+  pending: boolean;
+  onYes: () => void;
+  onNo: () => void;
+}) {
+  const opportunity = recommendation.opportunity!;
+  const product = recommendation.product;
+  const price = recommendation.unitPriceCents || (product?.salePriceCents ?? 0);
+
+  return (
+    <CardFrame accent="question">
+      <div>
+        <p className="text-[11.5px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">
+          Une question au patient
+        </p>
+        <p className="mt-2 text-[24px] leading-8 font-semibold tracking-[-0.015em] text-text-primary">
+          {opportunity.question}
+        </p>
+        {product && (
+          <p className="mt-2 text-[13.5px] text-text-secondary">
+            Si oui, proposer <span className="font-medium text-text-primary">{product.name}</span> ·{" "}
+            <span className="tabular">{formatCents(price)}</span> · {product.quantity} en stock
+          </p>
+        )}
+      </div>
+
+      {canDecide && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DecisionButton
+            tone="accept"
+            icon={<Check className="size-7" strokeWidth={2.75} />}
+            label="Oui"
+            hint="Voir la proposition"
+            disabled={pending}
+            onClick={onYes}
+          />
+          <DecisionButton
+            tone="refuse"
+            icon={<X className="size-7" strokeWidth={2.75} />}
+            label="Non"
+            hint="Pas ce besoin"
+            disabled={pending}
+            onClick={onNo}
+          />
+        </div>
+      )}
+    </CardFrame>
+  );
+}
+
+function ProductCard({
+  recommendation,
+  canDecide,
+  accepted,
+  confirmed,
+  onAccept,
+  onCancelAccept,
+}: {
+  recommendation: AdviceView;
+  canDecide: boolean;
+  accepted: boolean;
+  /** Le patient vient de confirmer le besoin par la question. */
+  confirmed: boolean;
+  onAccept: () => void;
+  onCancelAccept: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [modifyOpen, setModifyOpen] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const { push } = useToast();
 
   const product = recommendation.product;
   const lowStock = product ? product.quantity > 0 && product.quantity <= product.alertThreshold : false;
-  const presented = recommendation.status === "PRESENTED";
+  const price = recommendation.unitPriceCents || (product?.salePriceCents ?? 0);
+
+  // Le pourquoi lu au comptoir vient de la règle : il dit le lien entre
+  // l'ordonnance et la proposition. Quand le patient vient de confirmer la
+  // gêne, c'est cette confirmation qu'on lit — pas l'hypothèse de départ.
+  const why =
+    ((confirmed || recommendation.opportunity?.answer === true) &&
+      recommendation.opportunity?.confirmedReason) ||
+    recommendation.shortReason ||
+    recommendation.opportunity?.rationale ||
+    null;
+  const script = recommendation.counterScript ?? recommendation.patientReason;
 
   const run = (action: () => Promise<{ ok: boolean; error?: string; message?: string }>) => {
     startTransition(async () => {
@@ -217,163 +507,147 @@ function AdviceCard({
   };
 
   return (
-    <Card className={cn(added && "border-brand-400 dark:border-brand-700")}>
-      <CardContent className="space-y-2.5 pt-4 pb-4">
-        <div className="flex items-start gap-3">
-          {product?.imageUrl ? (
-            <Image
-              src={product.imageUrl}
-              alt=""
-              width={44}
-              height={44}
-              className="size-11 shrink-0 rounded-lg object-cover"
-            />
-          ) : (
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-surface-sunken text-text-tertiary">
-              <Package className="size-4" />
+    <CardFrame accent={accepted ? "success" : "brand"}>
+      <div className="flex items-start gap-4">
+        {product?.imageUrl ? (
+          <Image
+            src={product.imageUrl}
+            alt=""
+            width={72}
+            height={72}
+            className="size-[72px] shrink-0 rounded-xl object-cover"
+          />
+        ) : (
+          <span className="flex size-[72px] shrink-0 items-center justify-center rounded-xl bg-surface-sunken text-text-tertiary">
+            <Package className="size-7" />
+          </span>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[22px] leading-7 font-semibold tracking-[-0.015em] text-text-primary">
+            {product?.name ?? "Produit supprimé"}
+          </p>
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span className="text-[26px] leading-7 font-semibold tabular text-text-primary">
+              {formatCents(price)}
             </span>
-          )}
-
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-              <p className="min-w-0 text-[14.5px] leading-5 font-semibold text-text-primary">
-                {product?.name ?? "Produit supprimé"}
-                {product?.brand && (
-                  <span className="ml-1.5 text-[12px] font-normal text-text-tertiary">
-                    {product.brand}
-                  </span>
-                )}
-              </p>
-              <span className="ml-auto flex shrink-0 items-center gap-2 text-[13.5px]">
-                <span className="font-semibold tabular text-text-primary">
-                  {formatCents(recommendation.unitPriceCents || (product?.salePriceCents ?? 0))}
-                </span>
-                <Badge tone={lowStock ? "warning" : "success"}>
-                  {lowStock
-                    ? `Plus que ${product?.quantity}`
-                    : `${product?.quantity ?? 0} en stock`}
-                </Badge>
-              </span>
-            </div>
-
-            {/* La raison en une ligne, produite par la règle de conseil. Le
-                pharmacien doit comprendre POURQUOI sans ouvrir quoi que ce
-                soit ; la version longue est sous « Pourquoi ce produit ? ». */}
-            {(recommendation.shortReason ?? recommendation.opportunity?.rationale) && (
-              <p className="text-[12.5px] leading-[1.45] text-text-secondary">
-                {recommendation.shortReason ?? recommendation.opportunity?.rationale}
-              </p>
-            )}
-
-            {recommendation.precautions.length > 0 && (
-              <p className="text-[11.5px] leading-4 text-warning-700 dark:text-warning-500">
-                ⚠ {recommendation.precautions.join(" · ")}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* La phrase à dire n'apparaît qu'une fois la proposition retenue :
-            avant la décision elle n'aide pas, et trois scripts empilés
-            remplissent l'écran de texte que personne ne lit. */}
-        {added && (recommendation.counterScript ?? recommendation.patientReason) && (
-          <p className="flex gap-2 rounded-lg bg-brand-50/70 px-3 py-2 text-[13px] leading-5 text-text-primary dark:bg-brand-950/60">
-            <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-brand-600 dark:text-brand-400" />
-            <span>
-              <span className="mr-1 font-medium text-brand-800 dark:text-brand-300">
-                À dire au patient :
-              </span>
-              {recommendation.counterScript ?? recommendation.patientReason}
+            <span
+              className={cn(
+                "rounded-full px-2.5 py-0.5 text-[12.5px] font-medium",
+                lowStock
+                  ? "bg-warning-100 text-warning-800 dark:bg-warning-900/40 dark:text-warning-400"
+                  : "bg-success-100 text-success-800 dark:bg-success-900/40 dark:text-success-300",
+              )}
+            >
+              {lowStock
+                ? `Plus que ${product?.quantity} en stock`
+                : `${product?.quantity ?? 0} en stock`}
             </span>
           </p>
-        )}
-
-        {canDecide && (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant={added ? "primary" : "outline"}
-              onClick={onToggleBasket}
-              leadingIcon={<ShoppingBasket className="size-4" />}
-            >
-              {added ? "Dans la vente" : "Ajouter"}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              loading={pending}
-              onClick={() =>
-                run(() =>
-                  removeRecommendationAction({
-                    recommendationId: recommendation.id,
-                    reason: "Écarté au comptoir sans être proposé au patient.",
-                  }),
-                )
-              }
-              leadingIcon={<X className="size-4" />}
-            >
-              Ignorer
-            </Button>
-            {presented && (
-              <Badge tone="success" className="self-center">
-                Proposé au patient
-              </Badge>
-            )}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border-subtle pt-3 text-[12px]">
-          {canDecide && (
-            <>
-              <SecondaryAction
-                onClick={() => run(() => presentRecommendationAction(recommendation.id))}
-              >
-                {presented ? "Déjà proposé" : "Proposé au patient"}
-              </SecondaryAction>
-              <SecondaryAction
-                onClick={() => run(() => declineRecommendationAction(recommendation.id))}
-              >
-                Refusé par le patient
-              </SecondaryAction>
-              <SecondaryAction onClick={() => setReplaceOpen(true)}>
-                Changer de référence
-              </SecondaryAction>
-              <SecondaryAction onClick={() => setModifyOpen(true)}>
-                Ajuster la formulation
-              </SecondaryAction>
-              <SecondaryAction onClick={() => setRemoveOpen(true)}>
-                Retirer ce conseil
-              </SecondaryAction>
-            </>
-          )}
-          {recommendation.origin === "AI" && (
-            <button
-              type="button"
-              onClick={() => setShowExplanation((value) => !value)}
-              aria-expanded={showExplanation}
-              className="ml-auto flex items-center gap-1 text-text-tertiary transition-colors hover:text-text-secondary"
-            >
-              Pourquoi ce produit ? — pertinence{" "}
-              <span className="tabular">{Math.round(recommendation.totalScore * 100)} %</span>
-              <ChevronDown
-                className={cn("size-3.5 transition-transform", showExplanation && "rotate-180")}
-              />
-            </button>
-          )}
-          {recommendation.origin === "MANUAL" && (
-            <Badge tone="brand" className="ml-auto">
-              Ajouté par le pharmacien
-            </Badge>
-          )}
         </div>
 
-        {showExplanation && (
-          <ScoreExplanation
-            contributions={recommendation.explanation}
-            justification={recommendation.justification}
-          />
+        {canDecide && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen((value) => !value)}
+            aria-expanded={moreOpen}
+            aria-label="Autres options"
+            className="shrink-0 rounded-lg p-1.5 text-text-tertiary transition-colors hover:bg-surface-sunken hover:text-text-secondary"
+          >
+            <MoreHorizontal className="size-5" />
+          </button>
         )}
-      </CardContent>
+      </div>
+
+      {why && (
+        <div className="rounded-xl bg-surface-sunken/70 px-4 py-3.5">
+          <p className="text-[11.5px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">
+            Pourquoi
+          </p>
+          <p className="mt-1 text-[16px] leading-[1.5] text-text-primary">{why}</p>
+        </div>
+      )}
+
+      {script && (
+        <div className="rounded-xl border border-brand-100 bg-brand-50/70 px-4 py-3.5 dark:border-brand-900 dark:bg-brand-950/50">
+          <p className="text-[11.5px] font-semibold tracking-[0.08em] text-brand-800 uppercase dark:text-brand-300">
+            À dire au patient
+          </p>
+          <p className="mt-1 text-[17px] leading-[1.5] text-text-primary">{script}</p>
+        </div>
+      )}
+
+      {recommendation.precautions.length > 0 && (
+        <p className="text-[12.5px] leading-5 text-warning-800 dark:text-warning-500">
+          ⚠ {recommendation.precautions.join(" · ")}
+        </p>
+      )}
+
+      {canDecide && !accepted && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DecisionButton
+            tone="accept"
+            icon={<Check className="size-7" strokeWidth={2.75} />}
+            label="Patient accepte"
+            hint="Ajouté à la délivrance"
+            disabled={pending}
+            onClick={onAccept}
+          />
+          <DecisionButton
+            tone="refuse"
+            icon={<X className="size-7" strokeWidth={2.75} />}
+            label="Patient refuse"
+            hint="Refus enregistré"
+            disabled={pending}
+            onClick={() => run(() => declineRecommendationAction(recommendation.id))}
+          />
+        </div>
+      )}
+
+      {canDecide && accepted && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-success-100/70 px-4 py-3.5 dark:bg-success-900/25">
+          <Check className="size-6 shrink-0 text-success-700 dark:text-success-400" strokeWidth={2.5} />
+          <p className="min-w-0 flex-1 text-[15px] font-semibold text-success-900 dark:text-success-200">
+            Ajouté à la délivrance
+          </p>
+          <button
+            type="button"
+            onClick={onCancelAccept}
+            className="text-[13px] text-success-800 underline underline-offset-2 dark:text-success-300"
+          >
+            Annuler
+          </button>
+        </div>
+      )}
+
+      {canDecide && moreOpen && (
+        <div className="space-y-2.5 border-t border-border-subtle pt-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px]">
+            <SecondaryAction onClick={() => setReplaceOpen(true)}>Changer de référence</SecondaryAction>
+            <SecondaryAction onClick={() => setModifyOpen(true)}>Ajuster la formulation</SecondaryAction>
+            <SecondaryAction onClick={() => setRemoveOpen(true)}>Retirer sans le proposer</SecondaryAction>
+            {recommendation.origin === "AI" && (
+              <button
+                type="button"
+                onClick={() => setShowExplanation((value) => !value)}
+                aria-expanded={showExplanation}
+                className="flex items-center gap-1 text-text-tertiary transition-colors hover:text-text-secondary"
+              >
+                Pourquoi ce produit ?
+                <ChevronDown
+                  className={cn("size-3.5 transition-transform", showExplanation && "rotate-180")}
+                />
+              </button>
+            )}
+          </div>
+          {showExplanation && (
+            <ScoreExplanation
+              contributions={recommendation.explanation}
+              justification={recommendation.justification}
+            />
+          )}
+        </div>
+      )}
 
       <ModifyModal
         open={modifyOpen}
@@ -392,7 +666,67 @@ function AdviceCard({
         recommendationId={recommendation.id}
         productName={product?.name ?? ""}
       />
-    </Card>
+    </CardFrame>
+  );
+}
+
+/**
+ * Les deux cibles de la décision.
+ *
+ * Même hauteur, même largeur, même graisse : le vert n'est pas plus gros que le
+ * gris. Un écran qui pousse au « oui » finirait par produire des acceptations
+ * de complaisance, donc des chiffres faux et des patients mal servis.
+ */
+function DecisionButton({
+  tone,
+  icon,
+  label,
+  hint,
+  disabled,
+  onClick,
+}: {
+  tone: "accept" | "refuse";
+  icon: React.ReactNode;
+  label: string;
+  hint: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex min-h-[112px] items-center gap-4 rounded-2xl border-2 px-6 py-5 text-left transition-all",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50",
+        tone === "accept"
+          ? "border-success-600 bg-success-600 text-white shadow-[0_8px_20px_-10px_rgba(22,163,74,0.8)] hover:bg-success-700 active:scale-[0.99] focus-visible:outline-success-600"
+          : "border-danger-300 bg-danger-50/50 text-danger-800 hover:border-danger-500 hover:bg-danger-100/70 active:scale-[0.99] focus-visible:outline-danger-500 dark:border-danger-800 dark:bg-danger-950/30 dark:text-danger-300 dark:hover:bg-danger-900/40",
+      )}
+    >
+      <span
+        className={cn(
+          "flex size-12 shrink-0 items-center justify-center rounded-full",
+          tone === "accept" ? "bg-white/20" : "bg-danger-100 dark:bg-danger-900/50",
+        )}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[21px] leading-6 font-semibold tracking-[-0.01em]">
+          {label}
+        </span>
+        <span
+          className={cn(
+            "mt-0.5 block text-[13px] leading-4",
+            tone === "accept" ? "text-white/80" : "text-danger-700/80 dark:text-danger-400",
+          )}
+        >
+          {hint}
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -613,8 +947,8 @@ function RemoveModal({
       <div className="space-y-4">
         <Alert tone="info">
           « Retirer » traduit votre jugement professionnel : la proposition n&apos;était pas
-          pertinente. Si le patient l&apos;a simplement déclinée, utilisez « Refusé » — les deux
-          ne mesurent pas la même chose.
+          pertinente. Si le patient l&apos;a simplement déclinée, utilisez « Patient refuse » —
+          les deux ne mesurent pas la même chose.
         </Alert>
 
         <div className="flex flex-wrap gap-1.5">

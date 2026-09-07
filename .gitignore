@@ -45,3 +45,6 @@ yarn-error.log*
 
 # prisma generated client
 /src/generated
+
+# Traces de la session navigateur pilotée (Playwright MCP)
+.playwright-mcp/

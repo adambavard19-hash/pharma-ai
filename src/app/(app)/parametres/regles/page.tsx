@@ -1,3 +1,4 @@
+import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Ban, Info, Sparkles, Star } from "lucide-react";
@@ -26,13 +27,13 @@ export default async function AdvicePage({
 }: {
   searchParams: Promise<{ vue?: string }>;
 }) {
-  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_VIEW);
+  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_RULES_MANAGE);
   const params = await searchParams;
   const tab = params.vue ?? "recommandations";
 
   const [recommendations, rules, products, statusCounts] = await Promise.all([
     prisma.recommendation.findMany({
-      where: { pharmacyId: session.scope.pharmacyId },
+      where: { pharmacyId: session.scope.pharmacyId, ...activityScope() },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {

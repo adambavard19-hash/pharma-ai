@@ -1,4 +1,5 @@
 import "server-only";
+import { activityScope } from "@/server/db/demo-scope";
 import { prisma } from "@/server/db/client";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import type { SessionContext } from "@/server/auth/session";
@@ -40,6 +41,7 @@ export async function globalSearch(
           where: {
             pharmacyId,
             deletedAt: null,
+            ...activityScope(),
             OR: [
               { firstName: contains },
               { lastName: contains },
@@ -80,6 +82,7 @@ export async function globalSearch(
           where: {
             pharmacyId,
             deletedAt: null,
+            ...activityScope(),
             OR: [
               { reference: contains },
               { prescriberName: contains },

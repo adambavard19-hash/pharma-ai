@@ -229,6 +229,55 @@ describe("autorisation de sortie de l'image", () => {
   it("le mode démonstration reste le défaut, sans avertissement inutile", () => {
     const provider = chooseOCRProvider({ provider: "mock" });
     expect(provider.info.capability).toBe("SIMULATED");
-    expect(provider.info.label).toBe("OCR simulé (démonstration)");
+    expect(provider.info.label).toBe("Lecture d'ordonnance non activée");
+  });
+});
+
+/**
+ * Le point le plus important de ce fichier.
+ *
+ * Sans lecteur branché, une ordonnance déposée doit ressortir VIDE. Le lecteur
+ * simulé rendait auparavant un scénario choisi d'après le nom du fichier : une
+ * vraie ordonnance en ressortait avec des médicaments qui n'y figuraient pas.
+ */
+describe("lecteur simulé : aucune ordonnance fabriquée", () => {
+  it("ne rend aucun médicament pour une image réelle", async () => {
+    const provider = chooseOCRProvider({ provider: "mock" });
+    const resultat = await provider.extract({
+      fileKey: null,
+      mimeType: "image/jpeg",
+      fileName: "ordonnance-de-madame-dupont.jpg",
+      bytes: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(resultat.lines).toHaveLength(0);
+    expect(resultat.patientName.value).toBeNull();
+    expect(resultat.prescriberName.value).toBeNull();
+    expect(resultat.warnings.join(" ")).toContain("Aucun lecteur d'ordonnance");
+  });
+
+  it("ne se laisse pas amorcer par le nom du fichier", async () => {
+    const provider = chooseOCRProvider({ provider: "mock" });
+    for (const nom of ["antibio-amoxicilline.jpg", "cycline-acne.png", "fer-anemie.pdf"]) {
+      const resultat = await provider.extract({
+        fileKey: null,
+        mimeType: "image/jpeg",
+        fileName: nom,
+        bytes: new Uint8Array([1]),
+      });
+      expect(resultat.lines).toHaveLength(0);
+    }
+  });
+
+  it("rend un scénario UNIQUEMENT si un test le cite par son identifiant", async () => {
+    const provider = chooseOCRProvider({ provider: "mock" });
+    const resultat = await provider.extract({
+      fileKey: null,
+      mimeType: "image/jpeg",
+      fileName: "peu-importe.jpg",
+      bytes: new Uint8Array([1]),
+      demoScenarioId: "antibio-amoxicilline",
+    });
+    expect(resultat.lines.length).toBeGreaterThan(0);
   });
 });

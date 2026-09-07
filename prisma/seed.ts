@@ -15,7 +15,7 @@ loadEnv({ path: ".env", quiet: true });
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type Prisma, type ReminderReason } from "../src/generated/prisma";
 import { DEMO_DRUGS } from "./seed-data/drugs";
-import { DEMO_DISCLAIMER, DOCUMENT_DISCLAIMERS } from "../src/core/documents/types";
+import { DOCUMENT_DISCLAIMERS } from "../src/core/documents/types";
 import { DEMO_PRODUCTS } from "./seed-data/products";
 import { ADVICE_RULES } from "../src/core/ai/engines/advice";
 import { hashPasswordSync } from "./seed-utils";
@@ -380,7 +380,7 @@ async function main() {
   const team = [
     { firstName: "Claire", lastName: "Dumont", email: "titulaire@pharma.ai", role: "OWNER" as const, rpps: "10000000001" },
     { firstName: "Hugo", lastName: "Lambert", email: "pharmacien@pharma.ai", role: "PHARMACIST" as const, rpps: "10000000002" },
-    { firstName: "Sarah", lastName: "Ould", email: "pharmacienne@pharma.ai", role: "PHARMACIST" as const, rpps: "10000000003" },
+    { firstName: "Sophie", lastName: "Ould", email: "pharmacienne@pharma.ai", role: "PHARMACIST" as const, rpps: "10000000003" },
     { firstName: "Yanis", lastName: "Costa", email: "preparateur@pharma.ai", role: "TECHNICIAN" as const, rpps: null },
     { firstName: "Emma", lastName: "Rivière", email: "etudiante@pharma.ai", role: "STUDENT" as const, rpps: null },
   ];
@@ -1219,7 +1219,7 @@ async function seedHistory(context: {
           random() < 0.4
             ? "N'hésitez pas à revenir me voir si vous avez la moindre question."
             : null,
-        disclaimers: [DEMO_DISCLAIMER, ...DOCUMENT_DISCLAIMERS],
+        disclaimers: DOCUMENT_DISCLAIMERS,
         isDemo: true,
       };
 

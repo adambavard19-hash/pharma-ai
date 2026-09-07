@@ -185,6 +185,21 @@ export function evaluateKnowledgeCoverage(
       });
     }
 
+    // Une classification IA n'est pas une fiche validée : elle a suffi à
+    // déclencher une règle, elle n'a vérifié aucune interaction. Le
+    // pharmacien doit le savoir — une fois, sur la ligne, sans alarme.
+    if (advisory?.origin === "AI_CLASSIFICATION") {
+      const facts = [advisory.inn, advisory.therapeuticClass].filter(Boolean).join(" · ");
+      findings.push({
+        severity: "INFO",
+        code: "DRUG_CLASSIFIED_BY_AI",
+        message: `« ${line.drugName} » classé par l'IA${facts ? ` : ${facts}` : ""} — classification à confirmer, aucune interaction vérifiée.`,
+        subjectType: "PRESCRIPTION_LINE",
+        subjectId,
+        source: SOURCE,
+      });
+    }
+
     if (advisory?.isDemoData) {
       findings.push({
         severity: "INFO",

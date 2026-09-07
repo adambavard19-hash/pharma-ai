@@ -1,3 +1,4 @@
+import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -78,7 +79,7 @@ export default async function PerformancePage() {
       take: 6,
     }),
     prisma.recommendationEvent.findMany({
-      where: { recommendation: { pharmacyId: scope.pharmacyId } },
+      where: { recommendation: { pharmacyId: scope.pharmacyId, ...activityScope() } },
       orderBy: { createdAt: "desc" },
       take: 8,
       include: {
@@ -95,6 +96,7 @@ export default async function PerformancePage() {
       where: {
         pharmacyId: scope.pharmacyId,
         deletedAt: null,
+        ...activityScope(),
         status: { in: ["NEEDS_VERIFICATION", "EXTRACTING", "DRAFT"] },
       },
     }),

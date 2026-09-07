@@ -14,7 +14,7 @@ import { LocalDrugKnowledgeProvider } from "@/core/ai/providers/local-drug-knowl
 import { LocalStorageProvider } from "@/core/ai/providers/local-storage";
 import { chooseOCRProvider } from "@/core/ai/providers/ocr-factory";
 import { chooseMessagingProvider } from "@/core/ai/providers/messaging-factory";
-import { RuleBasedAIProvider } from "@/core/ai/providers/rule-based-ai";
+import { chooseAIProvider } from "@/core/ai/providers/ai-factory";
 import { UnavailableVideoProvider } from "@/core/ai/providers/video";
 import type { DrugKnowledge } from "@/core/ai/types";
 
@@ -55,17 +55,28 @@ export function getOCRProvider(): OCRProvider {
   return provider;
 }
 
+/**
+ * Choix de l'intelligence de compréhension.
+ *
+ * Comme pour la lecture d'ordonnance, la décision vit dans le domaine
+ * (`src/core/ai/providers/ai-factory.ts`) : elle exige une clé ET
+ * l'autorisation explicite de transmettre des données d'ordonnance à un tiers.
+ * Le registre ne fait que lui passer la configuration.
+ */
 export function getAIProvider(): AIProvider {
-  const { AI_PROVIDER } = getEnv();
-  switch (AI_PROVIDER) {
-    case "mock":
-      return new RuleBasedAIProvider();
-    default:
-      console.warn(
-        `[registry] Fournisseur IA « ${AI_PROVIDER} » non implémenté. Repli sur la reformulation déterministe.`,
-      );
-      return new RuleBasedAIProvider();
+  const env = getEnv();
+  const provider = chooseAIProvider({
+    provider: env.AI_PROVIDER,
+    apiKey: env.ANTHROPIC_API_KEY,
+    model: env.AI_MODEL,
+    sendExternally: env.OCR_SEND_IMAGES_EXTERNALLY,
+  });
+
+  if (env.AI_PROVIDER !== "mock" && provider.info.capability === "SIMULATED") {
+    console.warn(`[registry] ${provider.info.description}`);
   }
+
+  return provider;
 }
 
 export function getDrugKnowledgeProvider(): DrugKnowledgeProvider {

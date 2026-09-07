@@ -1,6 +1,8 @@
 import "server-only";
+import { activityScope } from "@/server/db/demo-scope";
 import { prisma } from "@/server/db/client";
-import { DEMO_DISCLAIMER, DOCUMENT_DISCLAIMERS, type DocumentContent } from "@/core/documents/types";
+import { DOCUMENT_DISCLAIMERS, type DocumentContent } from "@/core/documents/types";
+import { readSchedule } from "@/core/posology";
 import { generateToken } from "@/server/security/tokens";
 import { DOCUMENT_TOKEN_TTL_MS } from "@/config/constants";
 import { recordAudit } from "@/server/audit/log";
@@ -43,7 +45,11 @@ export async function generatePatientDocument(params: {
         include: { explanation: true },
       },
       recommendations: {
-        where: { status: { in: ["ACCEPTED", "MODIFIED", "REPLACED"] } },
+        // Le plan est généré APRÈS l'enregistrement de la délivrance : les
+        // conseils que le patient a pris sont déjà passés à PURCHASED. Les
+        // omettre ici produirait un plan sans les produits qu'il tient dans
+        // la main. PRESENTED couvre la régénération d'une version ultérieure.
+        where: { status: { in: ["ACCEPTED", "MODIFIED", "REPLACED", "PRESENTED", "PURCHASED"] } },
         include: {
           product: { include: { stockItem: true } },
         },
@@ -96,6 +102,10 @@ export async function generatePatientDocument(params: {
           dosage: line.dosage,
           form: line.form,
           posology: line.posology,
+          // La répartition n'est reprise que si le pharmacien l'a confirmée.
+          // Sans elle, le plan reste sur la posologie écrite : un horaire non
+          // validé n'a rien à faire entre les mains d'un patient.
+          schedule: readSchedule(line.schedule),
           durationDays: line.durationDays,
           instructions: line.instructions,
           purpose: unavailable ? null : explanation.purpose,
@@ -130,9 +140,7 @@ export async function generatePatientDocument(params: {
         };
       }),
     pharmacistNote: params.pharmacistNote ?? null,
-    disclaimers: prescription.isDemo
-      ? [DEMO_DISCLAIMER, ...DOCUMENT_DISCLAIMERS]
-      : DOCUMENT_DISCLAIMERS,
+    disclaimers: DOCUMENT_DISCLAIMERS,
     isDemo: prescription.isDemo,
   };
 
@@ -156,8 +164,13 @@ export async function generatePatientDocument(params: {
       },
     });
 
-    // Les conseils validés sont désormais présentés au patient.
-    const presentedIds = prescription.recommendations.map((r) => r.id);
+    // Les conseils validés sont désormais présentés au patient. Un conseil
+    // déjà ACHETÉ n'est pas rétrogradé : « acheté » est un fait comptable, et
+    // l'écraser fausserait aussi bien l'attribution du CA que le taux
+    // d'acceptation du titulaire.
+    const presentedIds = prescription.recommendations
+      .filter((r) => r.status !== "PURCHASED")
+      .map((r) => r.id);
     if (presentedIds.length > 0) {
       await tx.recommendation.updateMany({
         where: { id: { in: presentedIds } },
@@ -249,7 +262,7 @@ export async function recordDocumentView(documentId: string): Promise<void> {
 
 export async function listDocuments(scope: TenantScope, limit = 30) {
   return prisma.patientDocument.findMany({
-    where: { pharmacyId: scope.pharmacyId },
+    where: { pharmacyId: scope.pharmacyId, ...activityScope() },
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {

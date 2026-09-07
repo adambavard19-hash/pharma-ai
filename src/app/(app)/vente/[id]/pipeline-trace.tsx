@@ -24,14 +24,11 @@ export function PipelineTrace({
   trace,
   engineVersion,
   durationMs,
-  providers,
 }: {
   trace: PipelineStageTrace[];
   engineVersion: string;
   durationMs: number | null;
-  providers: Record<string, unknown>;
 }) {
-  const simulated = providers.simulated === true;
 
   // Niveau 3 : la traçabilité se consulte, elle ne se lit pas au comptoir.
   // Repliée par défaut, elle reste à un clic pour le pharmacien qui veut
@@ -48,10 +45,6 @@ export function PipelineTrace({
           </span>
         </summary>
       <CardContent className="space-y-3 pt-0">
-        {simulated && (
-          <Badge tone="accent">Fournisseurs simulés — extraction et explications fictives</Badge>
-        )}
-
         <ol className="space-y-2.5">
           {trace.map((stage, index) => (
             <li key={`${stage.stage}-${index}`} className="flex gap-3">

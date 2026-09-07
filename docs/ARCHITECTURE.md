@@ -43,6 +43,18 @@ L'étape « pertinence » ne reçoit **pas** le catalogue en paramètre. Il est 
 matériellement impossible qu'un prix ou une marge influence la détermination de
 ce qui serait utile au patient.
 
+La compréhension du traitement par un modèle de langage obéit à la même
+séparation. Le modèle reçoit les lignes confirmées et l'âge/le sexe du patient ;
+il ne voit ni le catalogue, ni le stock, ni le nom du patient. Il ne peut
+produire que deux choses : une classification par ligne (substance, ATC,
+classe) et des **besoins** pris dans une liste fermée
+(`src/core/understanding/needs.ts`). Un besoin n'est pas un conseil : il
+déclenche une règle écrite (`needTriggers` dans `advice.ts`), qui pose sa
+question au patient, puis le stock et le moteur de sécurité décident. Tout ce
+que le modèle affirme passe par `validateUnderstanding` (seuils de confiance,
+code ATC contrôlé, clés inconnues écartées) et la trace de l'analyse consigne
+ce qui a été refusé.
+
 ### 1.2 Le score s'annule en cas de signal de sécurité
 
 `computeTotalScore` (`src/core/ai/engines/scoring.ts`) renvoie `0` dès que la
@@ -167,7 +179,7 @@ Le moteur métier ne connaît que des interfaces (`src/core/ai/ports/`) :
 | Port | Rôle | Implémentation actuelle |
 |---|---|---|
 | `OCRProvider` | Extraction d'ordonnance | `MockOCRProvider` — **simulé** |
-| `AIProvider` | Reformulation | `RuleBasedAIProvider` — déterministe |
+| `AIProvider` | Compréhension du traitement + reformulation | `AnthropicAIProvider` (classe les médicaments, identifie des besoins parmi une liste fermée — `src/core/understanding/`) ; repli `RuleBasedAIProvider` — déterministe |
 | `DrugKnowledgeProvider` | Référentiel médicamenteux | `LocalDrugKnowledgeProvider` — **jeu fictif** |
 | `StorageProvider` | Fichiers | `LocalStorageProvider` — développement |
 | `MessagingProvider` | E-mail / SMS | `NotConfiguredMessagingProvider` — **n'envoie rien** |

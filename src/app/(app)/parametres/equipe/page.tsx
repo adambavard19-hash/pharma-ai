@@ -26,7 +26,7 @@ import { initials } from "@/lib/utils";
 export const metadata: Metadata = { title: "Équipe" };
 
 export default async function TeamPage() {
-  const session = await requirePermission(PERMISSIONS.TEAM_VIEW);
+  const session = await requirePermission(PERMISSIONS.TEAM_MANAGE);
   const period = resolvePeriod("month");
 
   const [memberships, performance] = await Promise.all([

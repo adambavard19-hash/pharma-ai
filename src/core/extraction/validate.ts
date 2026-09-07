@@ -103,6 +103,15 @@ export type VisionValidationResult = {
   rejected: RejectedField[];
 };
 
+/** Un champ facultatif absent est non lu, sans rejet. */
+function optional<T>(
+  claim: ClaimedField | undefined,
+  accept: (claim: ClaimedField | undefined) => FieldOutcome<T>,
+): FieldOutcome<T> {
+  if (claim === undefined) return { field: unreadable(), rejection: null };
+  return accept(claim);
+}
+
 export function validateVisionExtraction(
   claimed: ClaimedPrescription,
   options: { providerId: string; model: string },
@@ -160,11 +169,13 @@ export function validateVisionExtraction(
       rawText,
       drugName: take("medicament", acceptText(line.medicament)),
       dosage: take("dosage", acceptText(line.dosage)),
-      form: take("forme", acceptText(line.forme)),
+      // Ces quatre champs sont facultatifs dans le schéma : omis, ils sont
+      // simplement non lus — ce n'est pas un écart à consigner.
+      form: take("forme", optional(line.forme, acceptText)),
       posology: take("posologie", acceptText(line.posologie)),
-      durationDays: take("duree_jours", acceptNumber(line.duree_jours)),
-      quantity: take("quantite", acceptNumber(line.quantite)),
-      instructions: take("instructions", acceptText(line.instructions)),
+      durationDays: take("duree_jours", optional(line.duree_jours, acceptNumber)),
+      quantity: take("quantite", optional(line.quantite, acceptNumber)),
+      instructions: take("instructions", optional(line.instructions, acceptText)),
     };
   });
 

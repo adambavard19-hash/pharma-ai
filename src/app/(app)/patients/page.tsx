@@ -1,3 +1,4 @@
+import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus, UserRound } from "lucide-react";
@@ -32,6 +33,7 @@ export default async function PatientsPage({
   const where = {
     pharmacyId: session.scope.pharmacyId,
     deletedAt: null,
+    ...activityScope(),
     ...(query
       ? {
           OR: [
@@ -121,7 +123,54 @@ export default async function PatientsPage({
         </Card>
       ) : (
         <>
-          <TableWrapper>
+          {/* Téléphone : une carte par patient. Le nom, le contact et la
+              dernière visite suffisent à retrouver quelqu'un au comptoir ; le
+              reste est sur sa fiche, à un doigt. */}
+          <ul className="space-y-2 md:hidden">
+            {patients.map((patient) => {
+              const consent = patient.consents[0];
+              const hasConsent = Boolean(consent?.granted && !consent.revokedAt);
+              return (
+                <li key={patient.id}>
+                  <Link
+                    href={`/patients/${patient.id}`}
+                    className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-card p-3.5 transition-colors hover:border-border-default"
+                  >
+                    <Avatar
+                      size="md"
+                      initials={initials(patient.firstName, patient.lastName)}
+                      name={`${patient.firstName} ${patient.lastName}`}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-medium text-text-primary">
+                        {patient.firstName} {patient.lastName.toUpperCase()}
+                      </span>
+                      <span className="block truncate text-[12px] text-text-tertiary">
+                        {patient.email ?? patient.phone ?? patient.reference}
+                      </span>
+                      <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-text-tertiary">
+                        <span>{formatAge(patient.birthDate)}</span>
+                        <span>·</span>
+                        <span>
+                          {patient._count.prescriptions} ordonnance
+                          {patient._count.prescriptions > 1 ? "s" : ""}
+                        </span>
+                        <span>·</span>
+                        <span>
+                          {patient.prescriptions[0]
+                            ? formatRelative(patient.prescriptions[0].createdAt)
+                            : formatDate(patient.createdAt)}
+                        </span>
+                      </span>
+                    </span>
+                    {!hasConsent && <Badge tone="neutral">Sans consentement</Badge>}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+
+          <TableWrapper className="hidden md:block">
             <Table>
               <THead>
                 <TR>

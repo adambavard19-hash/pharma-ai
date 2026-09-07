@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 import { prisma } from "@/server/db/client";
 import { generateToken, hashToken } from "@/server/security/tokens";
 import {
@@ -207,12 +207,20 @@ export async function requireSession(): Promise<SessionContext> {
   return session;
 }
 
-/** Session + permission obligatoires. */
+/**
+ * Session + permission obligatoires.
+ *
+ * Une permission manquante rend une vraie page 403 (`forbidden()`) et non une
+ * erreur : un collaborateur qui tombe sur une adresse réservée au titulaire
+ * doit lire « accès réservé », pas « une erreur est survenue ». La distinction
+ * n'est pas cosmétique — la seconde formulation envoie les gens appeler le
+ * support pour une situation parfaitement normale.
+ */
 export async function requirePermission(
   permission: Permission,
 ): Promise<SessionContext> {
   const session = await requireSession();
-  if (!session.permissions.has(permission)) throw new AuthorizationError(permission);
+  if (!session.permissions.has(permission)) forbidden();
   return session;
 }
 

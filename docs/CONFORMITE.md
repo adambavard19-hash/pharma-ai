@@ -106,8 +106,10 @@ l'adaptateur `DrugKnowledgeProvider` correspondant. Tant que ce n'est pas fait,
 
 ### 3.2 Validation professionnelle des règles de conseil
 
-Le socle de 8 règles (`src/core/ai/engines/advice.ts`) est structuré et
-documenté, mais **n'a pas été validé par un pharmacien**. Il doit l'être, et
+Le socle de 15 règles (`src/core/ai/engines/advice.ts`) et la taxonomie des
+13 besoins complémentaires (`src/core/understanding/needs.ts`), y compris les
+questions posées au patient, sont structurés et documentés, mais **n'ont pas
+été validés par un pharmacien**. Ils doivent l'être, et
 idéalement être adossé à des recommandations professionnelles référencées.
 
 ### 3.3 Hébergement de données de santé (HDS)

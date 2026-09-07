@@ -8,7 +8,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { nextReference } from "@/server/services/references";
 import { upsertHealthProfile } from "@/server/services/patients";
 import { recordAudit } from "@/server/audit/log";
-import { isDemoMode } from "@/config/env";
+import { recordIsDemo } from "@/server/db/demo-scope";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 const patientSchema = z.object({
@@ -83,7 +83,7 @@ export async function savePatientAction(
       ...data,
       pharmacyId: scope.pharmacyId,
       reference,
-      isDemo: isDemoMode(),
+      isDemo: recordIsDemo(session.pharmacy.isDemo),
     },
   });
 
@@ -184,6 +184,54 @@ const consentSchema = z.object({
   ]),
   granted: z.enum(["true", "false"]).transform((v) => v === "true"),
 });
+
+const emailSchema = z.object({
+  patientId: z.string().min(1),
+  email: z.string().trim().email("Adresse e-mail invalide"),
+});
+
+/**
+ * Renseigne l'adresse e-mail depuis le comptoir, sans quitter la fin de vente.
+ *
+ * C'est la réponse à un cas très concret : le plan est prêt, le patient est là,
+ * et il n'a pas d'adresse au dossier. Le faire passer par la fiche patient
+ * complète imposerait de ressaisir un formulaire entier pour un champ — donc,
+ * en pratique, de ne rien saisir du tout et d'imprimer par défaut.
+ */
+export async function setPatientEmailAction(
+  payload: z.input<typeof emailSchema>,
+): Promise<ActionResult<{ email: string }>> {
+  const session = await requirePermission(PERMISSIONS.PATIENT_UPDATE);
+  const parsed = emailSchema.safeParse(payload);
+  if (!parsed.success) {
+    return fail("Adresse e-mail invalide.", zodFieldErrors(parsed.error.issues));
+  }
+
+  const patient = await prisma.patient.findUnique({
+    where: { id: parsed.data.patientId },
+    select: { pharmacyId: true },
+  });
+  if (!patient || patient.pharmacyId !== session.scope.pharmacyId) {
+    return fail("Patient introuvable dans cette officine.");
+  }
+
+  await prisma.patient.update({
+    where: { id: parsed.data.patientId },
+    data: { email: parsed.data.email },
+  });
+
+  await recordAudit({
+    action: "patient.updated",
+    entityType: "Patient",
+    entityId: parsed.data.patientId,
+    pharmacyId: session.scope.pharmacyId,
+    userId: session.scope.userId,
+    metadata: { field: "email", source: "fin-de-vente" },
+  });
+
+  revalidatePath(`/patients/${parsed.data.patientId}`);
+  return ok({ email: parsed.data.email }, "Adresse e-mail enregistrée.");
+}
 
 export async function updateConsentAction(formData: FormData): Promise<ActionResult<null>> {
   const session = await requirePermission(PERMISSIONS.PATIENT_UPDATE);

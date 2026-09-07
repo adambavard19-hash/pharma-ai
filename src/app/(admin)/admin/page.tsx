@@ -10,12 +10,10 @@ import {
 } from "lucide-react";
 import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
-import { platformLogoutAction } from "@/server/actions/platform";
 import { PageHeader, Grid } from "@/components/ui/page";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatCents, formatDate, formatNumber, formatRelative } from "@/lib/format";
@@ -32,7 +30,7 @@ export const metadata: Metadata = { title: "Administration Pharma.ai" };
  * unitaire.
  */
 export default async function PlatformAdminPage() {
-  const session = await requirePlatformSession();
+  await requirePlatformSession();
 
   const [
     organizations,
@@ -96,33 +94,7 @@ export default async function PlatformAdminPage() {
   );
 
   return (
-    <div className="min-h-dvh bg-surface-app">
-      <header className="border-b border-border-subtle bg-surface-card">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-6 py-3.5">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-[15px] font-semibold text-white">
-              ✚
-            </span>
-            <div>
-              <p className="text-[14px] font-semibold text-text-primary">
-                Administration Pharma.ai
-              </p>
-              <p className="text-[11.5px] text-text-tertiary">Console éditeur</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="text-[13px] text-text-secondary">{session.admin.fullName}</span>
-            <form action={platformLogoutAction}>
-              <Button type="submit" variant="ghost" size="sm">
-                Se déconnecter
-              </Button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1400px] space-y-6 px-6 py-8">
+    <>
         <PageHeader
           title="Vue plateforme"
           description="Officines clientes, abonnements, usage et incidents."
@@ -347,7 +319,6 @@ export default async function PlatformAdminPage() {
             </ul>
           </CardContent>
         </Card>
-      </main>
-    </div>
+    </>
   );
 }

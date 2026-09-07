@@ -12,7 +12,7 @@ import {
   snoozeReminder,
 } from "@/server/services/followup";
 import { findTemplate, proposedDueDate } from "@/core/followup";
-import { isDemoMode } from "@/config/env";
+import { recordIsDemo } from "@/server/db/demo-scope";
 import { fail, ok, type ActionResult } from "./types";
 
 /**
@@ -63,7 +63,7 @@ export async function scheduleReminderAction(
       saleId: parsed.data.saleId ?? null,
       prescriptionId: parsed.data.prescriptionId ?? null,
       note: parsed.data.note ?? null,
-      isDemo: isDemoMode(),
+      isDemo: recordIsDemo(session.pharmacy.isDemo),
     });
 
     revalidatePath("/suivis");

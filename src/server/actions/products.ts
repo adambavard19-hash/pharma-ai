@@ -10,7 +10,7 @@ import { refreshStockNotifications, createNotification } from "@/server/services
 import { nextReference } from "@/server/services/references";
 import { recordAudit } from "@/server/audit/log";
 import { parseAmountToCents } from "@/lib/format";
-import { isDemoMode } from "@/config/env";
+import { recordIsDemo } from "@/server/db/demo-scope";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 import { PRODUCT_CATEGORIES } from "@/config/catalog";
 
@@ -143,7 +143,7 @@ export async function saveProductAction(
       pharmacyId: scope.pharmacyId,
       organizationId: scope.organizationId,
       reference,
-      isDemo: isDemoMode(),
+      isDemo: recordIsDemo(session.pharmacy.isDemo),
       stockItem: {
         create: {
           pharmacyId: scope.pharmacyId,
@@ -351,7 +351,7 @@ export async function importProductsAction(
             pharmacyId: scope.pharmacyId,
             organizationId: scope.organizationId,
             reference,
-            isDemo: isDemoMode(),
+            isDemo: recordIsDemo(session.pharmacy.isDemo),
             stockItem: {
               create: { pharmacyId: scope.pharmacyId, quantity, alertThreshold },
             },

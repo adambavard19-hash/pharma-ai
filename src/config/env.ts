@@ -20,9 +20,20 @@ const envSchema = z.object({
     .string()
     .min(16, "DATA_ENCRYPTION_KEY est requis (32 octets encodés en base64)"),
 
+  /**
+   * L'environnement d'exécution.
+   *
+   * `demo` : jeu de données fictif, comptes de démonstration, tout est
+   * marqué démo. `development` : le vrai parcours, sur une base de travail —
+   * ce qu'on y crée est réel. `production` : idem, sans aucun raccourci.
+   * Un enregistrement n'est marqué démo que dans l'environnement démo ou
+   * dans une officine elle-même de démonstration.
+   */
+  APP_ENV: z.enum(["demo", "development", "production"]).optional(),
+  /** Ancien interrupteur. Ne sert plus que de repli quand APP_ENV est absent. */
   DEMO_MODE: z
     .enum(["true", "false"])
-    .default("true")
+    .default("false")
     .transform((v) => v === "true"),
 
   AI_PROVIDER: z.enum(["mock", "anthropic", "openai"]).default("mock"),
@@ -32,6 +43,8 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   /** Modèle de vision utilisé pour lire une ordonnance photographiée. */
   OCR_MODEL: z.string().default("claude-opus-5"),
+  /** Modèle utilisé pour comprendre le traitement (classification, besoins). */
+  AI_MODEL: z.string().default("claude-opus-5"),
   /**
    * Autorisation EXPLICITE de transmettre l'image d'une ordonnance à un
    * fournisseur tiers.
@@ -96,7 +109,17 @@ export function getEnv(): ServerEnv {
   return cached;
 }
 
+export type AppEnvironment = "demo" | "development" | "production";
+
+/** L'environnement effectif, APP_ENV d'abord, l'ancien DEMO_MODE en repli. */
+export function appEnvironment(): AppEnvironment {
+  const env = getEnv();
+  if (env.APP_ENV) return env.APP_ENV;
+  if (env.DEMO_MODE) return "demo";
+  return env.NODE_ENV === "production" ? "production" : "development";
+}
+
 /** `true` lorsque l'application tourne sur le jeu de données de démonstration. */
 export function isDemoMode(): boolean {
-  return getEnv().DEMO_MODE;
+  return appEnvironment() === "demo";
 }

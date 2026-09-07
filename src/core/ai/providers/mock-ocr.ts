@@ -143,6 +143,46 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     ],
   },
   {
+    id: "cycline-ains-douleur",
+    label: "Cycline + anti-inflammatoire",
+    description:
+      "Ordonnance fictive : trois conseils distincts sur la même ordonnance — photoprotection (sécurité), tolérance digestive de l'antibiotique, confort gastrique de l'AINS.",
+    prescriberName: "Dr Marc Delaunay",
+    prescriberRpps: "10004445556",
+    lines: [
+      {
+        drugName: "Doxycycline",
+        dosage: "100 mg",
+        form: "Comprimé",
+        posology: "1 comprimé par jour",
+        durationDays: 10,
+        quantity: 10,
+        instructions: "Avec un grand verre d'eau, ne pas s'allonger après la prise",
+        nameConfidence: 0.95,
+      },
+      {
+        drugName: "Ibuprofène",
+        dosage: "400 mg",
+        form: "Comprimé",
+        posology: "1 comprimé 3 fois par jour",
+        durationDays: 5,
+        quantity: 20,
+        instructions: "Au cours des repas",
+        nameConfidence: 0.94,
+      },
+      {
+        drugName: "Paracétamol",
+        dosage: "1 g",
+        form: "Comprimé",
+        posology: "1 comprimé toutes les 6 heures si douleur",
+        durationDays: 5,
+        quantity: 16,
+        instructions: null,
+        nameConfidence: 0.96,
+      },
+    ],
+  },
+  {
     id: "ains-lombalgie",
     label: "Anti-inflammatoire — lombalgie",
     description:
@@ -185,19 +225,45 @@ export class MockOCRProvider implements OCRProvider {
   constructor(private readonly reason: string | null = null) {
     this.info = {
       id: "mock-ocr",
-      label: reason ? "Lecture réelle indisponible — extraction simulée" : "OCR simulé (démonstration)",
+      label: "Lecture d'ordonnance non activée",
       capability: "SIMULATED",
-      description: reason
-        ? `${reason} Un scénario fictif prédéfini est restitué à la place.`
-        : "Aucune image n'est analysée. Un scénario fictif prédéfini est restitué pour dérouler le parcours complet.",
+      description:
+        reason ??
+        "Aucun lecteur d'ordonnance n'est branché. Les images ne sont pas analysées et aucun médicament n'est produit.",
     };
   }
 
   async extract(input: OcrInput): Promise<ExtractedPrescription> {
-    const scenario =
-      DEMO_SCENARIOS.find((s) => s.id === input.demoScenarioId) ??
-      pickScenarioFromFileName(input.fileName) ??
-      DEMO_SCENARIOS[0];
+    // Sans scénario NOMMÉMENT demandé, ce lecteur ne rend RIEN.
+    //
+    // Il rendait auparavant un scénario par défaut, choisi d'après le nom du
+    // fichier. Conséquence : une ordonnance réelle déposée sans lecteur branché
+    // ressortait avec des médicaments qui n'y figuraient pas. Un logiciel
+    // d'officine ne peut pas se permettre ça — mieux vaut zéro ligne et un
+    // message clair qu'une ordonnance plausible et fausse.
+    //
+    // Les scénarios restent accessibles aux tests, qui les citent par leur
+    // identifiant. Aucun chemin de l'application ne le fait.
+    const scenario = input.demoScenarioId
+      ? DEMO_SCENARIOS.find((s) => s.id === input.demoScenarioId)
+      : undefined;
+
+    if (!scenario) {
+      return {
+        prescriberName: field<string>(null, 0, true),
+        prescriberRpps: field<string>(null, 0, true),
+        prescribedAt: field<string>(null, 0, true),
+        patientName: field<string>(null, 0, true),
+        lines: [],
+        overallConfidence: 0,
+        providerId: this.info.id,
+        isSimulated: true,
+        warnings: [
+          this.reason ??
+            "Aucun lecteur d'ordonnance n'est branché : l'image n'a pas été analysée.",
+        ],
+      };
+    }
 
     const lines: ExtractedPrescriptionLine[] = scenario.lines.map((line, index) => {
       const unreadable = new Set(line.unreadable ?? []);
@@ -262,14 +328,3 @@ export class MockOCRProvider implements OCRProvider {
   }
 }
 
-function pickScenarioFromFileName(fileName: string | null): DemoScenario | null {
-  if (!fileName) return null;
-  const lower = fileName.toLowerCase();
-  return (
-    DEMO_SCENARIOS.find((s) => lower.includes(s.id)) ??
-    DEMO_SCENARIOS.find((s) =>
-      s.lines.some((l) => lower.includes(l.drugName.toLowerCase().slice(0, 6))),
-    ) ??
-    null
-  );
-}

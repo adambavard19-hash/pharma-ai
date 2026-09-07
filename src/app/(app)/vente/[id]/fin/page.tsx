@@ -117,19 +117,26 @@ export default async function DocumentPage({
 
   return (
     <div className="space-y-6">
-      <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
-        <Link href={`/vente/${prescription.id}`}>Retour à la vente</Link>
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="no-print"
+        leadingIcon={<ArrowLeft className="size-4" />}
+      >
+        <Link href={`/vente/${prescription.id}`}>Retour à la délivrance</Link>
       </Button>
 
       <PageHeader
-        title="Fin de vente"
-        description={`${prescription.reference} — ce que le patient emporte : le rappel de son traitement et les seuls conseils que vous avez validés.`}
+        className="no-print"
+        title="Remettre le plan au patient"
+        description={`${prescription.reference} — préparé à partir des posologies que vous avez confirmées et des conseils que le patient a acceptés. Rien n'a été ressaisi.`}
       />
 
       {prescription.recommendations.length === 0 && !latestDocument && (
-        <Alert tone="warning" title="Aucun conseil validé">
-          La fiche peut être générée avec le seul rappel du traitement. Pour y faire figurer des
-          conseils, validez-les d&apos;abord sur l&apos;écran de vente.
+        <Alert tone="info" className="no-print" title="Aucun conseil accepté">
+          Le plan reprendra le traitement seul — posologies, durées et précautions. C&apos;est
+          déjà l&apos;essentiel de ce que le patient oublie en sortant.
         </Alert>
       )}
 
@@ -138,6 +145,7 @@ export default async function DocumentPage({
         canSend={session.permissions.has(PERMISSIONS.DOCUMENT_SEND)}
         canRecordSale={session.permissions.has(PERMISSIONS.SALE_CREATE)}
         canUpdateConsent={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
+        canUpdatePatient={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
         patient={
           prescription.patient
             ? {
@@ -190,7 +198,8 @@ export default async function DocumentPage({
         }))}
       />
 
-      <FollowUpPanel
+      <div className="no-print">
+        <FollowUpPanel
         patientId={prescription.patient?.id ?? null}
         prescriptionId={prescription.id}
         saleId={prescription.sales[0]?.id ?? null}
@@ -203,8 +212,9 @@ export default async function DocumentPage({
           dueAt: reminder.dueAt.toISOString(),
         }))}
         canSchedule={session.permissions.has(PERMISSIONS.FOLLOWUP_SCHEDULE)}
-        canUpdateConsent={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
-      />
+          canUpdateConsent={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
+        />
+      </div>
     </div>
   );
 }

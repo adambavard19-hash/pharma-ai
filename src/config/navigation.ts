@@ -1,9 +1,11 @@
 import {
   Boxes,
   CalendarClock,
+  LineChart,
   ScanLine,
   Settings,
   Users,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
@@ -11,10 +13,16 @@ import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 /**
  * La navigation de Pharma.ai.
  *
- * Cinq entrées, et rien d'autre. L'ancienne navigation décrivait les objets du
- * système (ordonnances, produits, stocks, ventes, analytics…) : c'était la carte
- * d'un ERP. Celle-ci décrit le travail du pharmacien au comptoir, dans l'ordre
- * où il le fait — il reçoit une ordonnance, il a une minute.
+ * Elle décrit le travail au comptoir, dans l'ordre où il se fait — on reçoit
+ * une ordonnance, on a une minute. L'ancienne navigation décrivait les objets
+ * du système (ordonnances, produits, stocks, ventes, analytics…) : c'était la
+ * carte d'un ERP.
+ *
+ * Elle se plie au rôle, et c'est une décision de produit autant que de droits :
+ * un collaborateur voit QUATRE entrées — vendre, patients, stock, suivis — et
+ * rien de la gestion. Le titulaire voit les mêmes, plus Pilotage, Équipe et
+ * Paramètres. Personne n'a à traverser des écrans qui ne le concernent pas
+ * pour atteindre le sien.
  *
  * Tout ce qui a quitté ce menu reste atteignable (cf. `OFF_MENU_DESTINATIONS`) :
  * retirer du menu n'est pas supprimer. Ce qui disparaît, c'est la charge
@@ -74,12 +82,36 @@ export const NAVIGATION: NavItem[] = [
     description: "Les patients à recontacter aujourd'hui",
   },
   {
+    href: "/equipe",
+    label: "Équipe",
+    icon: UsersRound,
+    // Gérer l'équipe est un acte de titulaire. Un pharmacien adjoint garde
+    // TEAM_VIEW ailleurs, mais n'a rien à faire dans cet écran au comptoir.
+    permission: PERMISSIONS.TEAM_MANAGE,
+    match: ["/equipe"],
+    description: "Comptes, accès et rôles de vos collaborateurs",
+  },
+  {
+    href: "/pilotage",
+    label: "Pilotage",
+    icon: LineChart,
+    // Permission de titulaire : un pharmacien au comptoir ne voit pas cette
+    // entrée, et l'écran de vente ne montre jamais ces chiffres. La séparation
+    // est le point : un conseil n'est pas un objectif commercial.
+    permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
+    match: ["/pilotage", "/performance", "/analytics", "/ventes"],
+    description: "Ce que les conseils ont produit, par collaborateur",
+  },
+  {
     href: "/parametres",
     label: "Paramètres",
     icon: Settings,
-    permission: PERMISSIONS.PHARMACY_VIEW,
-    match: ["/parametres", "/equipe", "/conseils"],
-    description: "Officine, équipe, règles de conseil, conformité",
+    // SETTINGS_MANAGE et non PHARMACY_VIEW : régler l'officine n'est pas
+    // consulter l'officine. Les réglages personnels d'un collaborateur vivent
+    // dans « Mon compte », depuis le menu utilisateur.
+    permission: PERMISSIONS.SETTINGS_MANAGE,
+    match: ["/parametres", "/conseils"],
+    description: "Officine, règles de conseil, conformité",
   },
 ];
 
@@ -101,10 +133,10 @@ export const OFF_MENU_DESTINATIONS: {
   {
     href: "/performance",
     label: "Performance de l'officine",
-    reachableFrom: "les chiffres de l'accueil",
+    reachableFrom: "l'espace Pilotage",
   },
-  { href: "/analytics", label: "Analytics détaillées", reachableFrom: "la page Performance" },
-  { href: "/ventes", label: "Journal des ventes", reachableFrom: "la page Performance" },
+  { href: "/analytics", label: "Analytics détaillées", reachableFrom: "l'espace Pilotage" },
+  { href: "/ventes", label: "Journal des ventes", reachableFrom: "l'espace Pilotage" },
   { href: "/ordonnances", label: "Historique des ordonnances", reachableFrom: "la fiche patient" },
   { href: "/notifications", label: "Notifications", reachableFrom: "la cloche" },
 ];

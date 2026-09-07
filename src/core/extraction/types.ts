@@ -30,11 +30,11 @@ export type ClaimedField = {
 export type ClaimedLine = {
   medicament: ClaimedField;
   dosage: ClaimedField;
-  forme: ClaimedField;
+  forme?: ClaimedField;
   posologie: ClaimedField;
-  duree_jours: ClaimedField;
-  quantite: ClaimedField;
-  instructions: ClaimedField;
+  duree_jours?: ClaimedField;
+  quantite?: ClaimedField;
+  instructions?: ClaimedField;
 };
 
 export type ClaimedPrescription = {

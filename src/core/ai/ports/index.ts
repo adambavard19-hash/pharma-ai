@@ -13,6 +13,7 @@ import type {
   PatientContext,
   TreatmentExplanationResult,
 } from "../types";
+import type { ClassificationRequest, ClassificationResult } from "../../understanding";
 
 export type ProviderCapability = "SIMULATED" | "LIVE";
 
@@ -77,6 +78,16 @@ export interface AIProvider {
   explainTreatment(request: ExplanationRequest): Promise<TreatmentExplanationResult>;
   /** Formule la raison affichée au patient pour un conseil déjà jugé pertinent. */
   writePatientReason(request: PatientReasonRequest): Promise<string>;
+  /**
+   * Classe chaque médicament : substance, code ATC, classe thérapeutique.
+   *
+   * `null` quand le fournisseur n'en est pas capable — le moteur continue
+   * alors sur la seule couche éditoriale, et la trace le dit. Le résultat ne
+   * contient jamais un produit ni une phrase pour le patient : le contexte et
+   * les besoins sont dérivés localement (`src/core/understanding/context.ts`),
+   * puis les règles de conseil, le stock et le moteur de sécurité décident.
+   */
+  classifyDrugs(request: ClassificationRequest): Promise<ClassificationResult | null>;
 }
 
 // --- Stockage de fichiers --------------------------------------------------

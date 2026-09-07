@@ -27,7 +27,10 @@ export function SettingsTabs({
         { key: "officine", label: "Officine" },
         ...(canSeeTeam ? [{ key: "equipe", label: "Équipe", href: "/parametres/equipe" }] : []),
         ...(canSeeRules
-          ? [{ key: "regles", label: "Règles de conseil", href: "/parametres/regles" }]
+          ? [
+              { key: "regles", label: "Règles de conseil", href: "/parametres/regles" },
+              { key: "regles-conseil", label: "Registre du moteur", href: "/parametres/regles-conseil" },
+            ]
           : []),
         { key: "moteur", label: "Moteur Pharma.ai" },
         { key: "conformite", label: "Conformité" },

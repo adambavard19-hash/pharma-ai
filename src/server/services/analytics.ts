@@ -1,4 +1,5 @@
 import "server-only";
+import { activityScope } from "@/server/db/demo-scope";
 import { prisma } from "@/server/db/client";
 import { dayRange, type PeriodRange } from "@/core/analytics/periods";
 import { percentChange } from "@/lib/utils";
@@ -36,6 +37,7 @@ export async function getRevenueSummary(
     prisma.sale.aggregate({
       where: {
         pharmacyId: scope.pharmacyId,
+        ...activityScope(),
         createdAt: { gte: period.start, lte: period.end },
       },
       _sum: {
@@ -48,6 +50,7 @@ export async function getRevenueSummary(
     prisma.sale.aggregate({
       where: {
         pharmacyId: scope.pharmacyId,
+        ...activityScope(),
         createdAt: { gte: period.previousStart, lt: period.previousEnd },
       },
       _sum: { totalCents: true, attributedCents: true },
@@ -55,6 +58,7 @@ export async function getRevenueSummary(
     prisma.sale.count({
       where: {
         pharmacyId: scope.pharmacyId,
+        ...activityScope(),
         createdAt: { gte: period.start, lte: period.end },
         attributedCents: { gt: 0 },
       },
@@ -101,6 +105,7 @@ export async function getRecommendationFunnel(
 ): Promise<RecommendationFunnel> {
   const where = {
     pharmacyId: scope.pharmacyId,
+    ...activityScope(),
     createdAt: { gte: period.start, lte: period.end },
   };
 
@@ -157,6 +162,7 @@ export async function getDailyRevenueSeries(
   const sales = await prisma.sale.findMany({
     where: {
       pharmacyId: scope.pharmacyId,
+      ...activityScope(),
       createdAt: { gte: period.start, lte: period.end },
     },
     select: { createdAt: true, totalCents: true, attributedCents: true },
@@ -205,6 +211,7 @@ export async function getProductPerformance(
     prisma.recommendation.findMany({
       where: {
         pharmacyId: scope.pharmacyId,
+        ...activityScope(),
         createdAt: { gte: period.start, lte: period.end },
         productId: { not: null },
       },
@@ -218,6 +225,7 @@ export async function getProductPerformance(
       where: {
         sale: {
           pharmacyId: scope.pharmacyId,
+          ...activityScope(),
           createdAt: { gte: period.start, lte: period.end },
         },
         recommendationId: { not: null },
@@ -353,13 +361,14 @@ export async function getTeamPerformance(
   const [prescriptions, decisions, sales] = await Promise.all([
     prisma.prescription.groupBy({
       by: ["createdByUserId"],
-      where: { pharmacyId: scope.pharmacyId, createdAt: window },
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window },
       _count: true,
     }),
     prisma.recommendation.groupBy({
       by: ["decidedByUserId", "status"],
       where: {
         pharmacyId: scope.pharmacyId,
+        ...activityScope(),
         createdAt: window,
         decidedByUserId: { not: null },
       },
@@ -367,7 +376,7 @@ export async function getTeamPerformance(
     }),
     prisma.sale.groupBy({
       by: ["userId"],
-      where: { pharmacyId: scope.pharmacyId, createdAt: window },
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window },
       _count: true,
       _sum: { attributedCents: true },
     }),
@@ -402,6 +411,164 @@ export async function getTeamPerformance(
     .sort((a, b) => b.attributedCents - a.attributedCents);
 }
 
+/**
+ * Ce qu'un conseil devient une fois la carte tranchée au comptoir.
+ *
+ * ACCEPTÉ regroupe tous les états postérieurs à un « oui » du patient : la
+ * recommandation a pu être ajustée, remplacée, imprimée sur la fiche puis
+ * achetée — elle reste un oui. REFUSÉ ne compte que le « non » explicite.
+ * RETIRÉ (jugement du pharmacien) et IGNORÉ (jamais tranché) n'entrent dans
+ * aucun des deux : les mélanger fabriquerait un taux flatteur ou injuste.
+ */
+const PATIENT_SAID_YES = new Set(["ACCEPTED", "MODIFIED", "REPLACED", "PRESENTED", "PURCHASED"]);
+const PATIENT_SAID_NO = new Set(["DECLINED"]);
+
+export type CounterScore = {
+  /** Conseils tranchés : acceptés + refusés. Le dénominateur du taux. */
+  decided: number;
+  accepted: number;
+  declined: number;
+  /** accepté / tranché. Zéro conseil tranché ⇒ null, pas 0 %. */
+  acceptanceRate: number | null;
+  /** CA additionnel : uniquement les lignes de vente issues d'un conseil. */
+  attributedCents: number;
+  /** Nombre de délivrances ayant généré du CA additionnel. */
+  attributedSalesCount: number;
+  /** Panier additionnel moyen. Null si aucune vente additionnelle. */
+  averageBasketCents: number | null;
+};
+
+export type CollaboratorScore = CounterScore & {
+  userId: string;
+  fullName: string;
+  initials: string;
+  role: string;
+};
+
+export type CounterPerformance = {
+  global: CounterScore & {
+    /** Conseils proposés par le moteur, tranchés ou non. */
+    proposed: number;
+    /** Proposés mais jamais tranchés au comptoir. */
+    undecided: number;
+  };
+  collaborators: CollaboratorScore[];
+};
+
+/**
+ * Le tableau du titulaire : ce que le comptoir a produit, au global et par
+ * collaborateur.
+ *
+ * ATTRIBUTION — deux rattachements distincts, tous deux nominatifs et posés à
+ * l'instant du geste, jamais reconstitués après coup :
+ *   • la décision du patient est attribuée à qui a tranché la carte
+ *     (`Recommendation.decidedByUserId`) ;
+ *   • le CA additionnel est attribué à qui a enregistré la délivrance
+ *     (`Sale.userId`), sur la colonne `attributedCents` calculée à la vente.
+ * Au comptoir c'est la même personne ; les garder séparés évite d'inventer une
+ * attribution le jour où ce ne sera plus le cas.
+ *
+ * ⚠️ Indicateurs nominatifs : information préalable des personnes, consultation
+ * des représentants du personnel, proportionnalité. Voir docs/RGPD.md.
+ */
+export async function getCounterPerformance(
+  scope: TenantScope,
+  period: PeriodRange,
+): Promise<CounterPerformance> {
+  const window = { gte: period.start, lte: period.end };
+
+  const [memberships, decisions, allStatuses, sales] = await Promise.all([
+    prisma.membership.findMany({
+      where: { pharmacyId: scope.pharmacyId, isActive: true },
+      select: {
+        role: true,
+        user: { select: { id: true, firstName: true, lastName: true } },
+      },
+    }),
+    prisma.recommendation.groupBy({
+      by: ["decidedByUserId", "status"],
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window, decidedByUserId: { not: null } },
+      _count: true,
+    }),
+    prisma.recommendation.groupBy({
+      by: ["status"],
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window },
+      _count: true,
+    }),
+    prisma.sale.groupBy({
+      by: ["userId"],
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window, attributedCents: { gt: 0 } },
+      _count: true,
+      _sum: { attributedCents: true },
+    }),
+  ]);
+
+  const score = (
+    rows: { status: string; _count: number }[],
+    revenue: { count: number; cents: number },
+  ): CounterScore => {
+    const accepted = rows
+      .filter((row) => PATIENT_SAID_YES.has(row.status))
+      .reduce((sum, row) => sum + row._count, 0);
+    const declined = rows
+      .filter((row) => PATIENT_SAID_NO.has(row.status))
+      .reduce((sum, row) => sum + row._count, 0);
+    const decided = accepted + declined;
+
+    return {
+      decided,
+      accepted,
+      declined,
+      acceptanceRate: decided > 0 ? accepted / decided : null,
+      attributedCents: revenue.cents,
+      attributedSalesCount: revenue.count,
+      averageBasketCents: revenue.count > 0 ? Math.round(revenue.cents / revenue.count) : null,
+    };
+  };
+
+  const globalRevenue = sales.reduce(
+    (totals, row) => ({
+      count: totals.count + row._count,
+      cents: totals.cents + (row._sum.attributedCents ?? 0),
+    }),
+    { count: 0, cents: 0 },
+  );
+
+  const proposed = allStatuses.reduce((sum, row) => sum + row._count, 0);
+  const globalScore = score(allStatuses, globalRevenue);
+
+  const collaborators = memberships
+    .map((membership): CollaboratorScore => {
+      const userId = membership.user.id;
+      const userSales = sales.find((row) => row.userId === userId);
+
+      return {
+        userId,
+        fullName: `${membership.user.firstName} ${membership.user.lastName}`,
+        initials:
+          `${membership.user.firstName.at(0) ?? ""}${membership.user.lastName.at(0) ?? ""}`.toUpperCase(),
+        role: membership.role,
+        ...score(
+          decisions.filter((row) => row.decidedByUserId === userId),
+          {
+            count: userSales?._count ?? 0,
+            cents: userSales?._sum.attributedCents ?? 0,
+          },
+        ),
+      };
+    })
+    .sort((a, b) => b.attributedCents - a.attributedCents || b.accepted - a.accepted);
+
+  return {
+    global: {
+      ...globalScore,
+      proposed,
+      undecided: proposed - globalScore.decided,
+    },
+    collaborators,
+  };
+}
+
 export type ActivitySummary = {
   prescriptionsAnalyzed: number;
   recommendationsGenerated: number;
@@ -422,24 +589,26 @@ export async function getActivitySummary(
       prisma.prescription.count({
         where: {
           pharmacyId: scope.pharmacyId,
+          ...activityScope(),
           createdAt: window,
           status: { in: ["ANALYZED", "VALIDATED", "DELIVERED"] },
         },
       }),
       prisma.recommendation.count({
-        where: { pharmacyId: scope.pharmacyId, createdAt: window },
+        where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window },
       }),
       prisma.patientDocument.count({
-        where: { pharmacyId: scope.pharmacyId, createdAt: window },
+        where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window },
       }),
       prisma.prescription.findMany({
-        where: { pharmacyId: scope.pharmacyId, createdAt: window, patientId: { not: null } },
+        where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window, patientId: { not: null } },
         select: { patientId: true },
         distinct: ["patientId"],
       }),
       prisma.sale.aggregate({
         where: {
           pharmacyId: scope.pharmacyId,
+          ...activityScope(),
           createdAt: window,
           attributedCents: { gt: 0 },
         },
@@ -479,6 +648,7 @@ export async function getDeclinedRecommendations(
   const rows = await prisma.recommendation.findMany({
     where: {
       pharmacyId: scope.pharmacyId,
+      ...activityScope(),
       createdAt: { gte: period.start, lte: period.end },
       status: { in: ["REMOVED", "DECLINED", "REPLACED"] },
     },

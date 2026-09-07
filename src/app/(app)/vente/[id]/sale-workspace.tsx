@@ -3,24 +3,32 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, FileText, Loader2, Sparkles, User } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Loader2, Sparkles, User } from "lucide-react";
 import { verifyPrescriptionAction } from "@/server/actions/prescriptions";
-import { acceptRecommendationAction } from "@/server/actions/recommendations";
+import {
+  acceptRecommendationAction,
+  reopenRecommendationAction,
+} from "@/server/actions/recommendations";
 import { recordSaleAction } from "@/server/actions/sales";
+import { generateDocumentAction } from "@/server/actions/documents";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { formatCents } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { PRESCRIPTION_STATUS } from "@/config/statuses";
-import { PrescriptionZone } from "./prescription-zone";
+import type { PatientOption } from "@/components/app/patient-picker";
+import { PrescriptionZone, TreatmentDetails, TreatmentLine } from "./prescription-zone";
 import { SafetyZone } from "./safety-zone";
 import { AdviceZone } from "./advice-zone";
+import { DeliveryZone, type DeliveryExtra } from "./delivery-zone";
 import { PipelineTrace } from "./pipeline-trace";
 import { ReanalyseButton } from "./reanalyse-button";
-import { blocksCounter, counterIsBlocked } from "@/core/ai/safety-gate";
-import { SummaryBand, buildSummaryRows } from "./summary-band";
+import { counterIsBlocked } from "@/core/ai/safety-gate";
+import { STAGE_LABELS, STAGE_ORDER, streamAnalysis } from "./analysis-stream";
+import type { AnalysisStage } from "@/server/services/analysis";
 import type {
   AdviceView,
   BlockedOpportunityView,
@@ -29,15 +37,33 @@ import type {
   SaleLineDraft,
 } from "./types";
 import type { PipelineStageTrace } from "@/core/ai/types";
+import type { ProductSearchResult } from "@/app/api/produits/recherche/route";
 
 type BasketLine = { productId: string; quantity: number; unitPriceCents: number };
 
 /**
- * L'écran de vente — les trois zones et la barre d'action, en une seule page.
+ * Une ligne lue avec un nom est à confirmer par défaut : le pharmacien exclut
+ * ce qu'il ne veut pas, il ne coche pas cinq fois ce qu'il vient de lire. Le
+ * geste professionnel reste explicite — c'est le bouton, unique, qui confirme
+ * l'ensemble.
+ */
+function withDefaultConfirmation(lines: SaleLineDraft[], alreadyVerified: boolean): SaleLineDraft[] {
+  if (alreadyVerified) return lines;
+  return lines.map((line) => ({
+    ...line,
+    confirmed: line.confirmed || Boolean(line.drugName.trim()),
+  }));
+}
+
+/**
+ * L'écran de vente.
  *
- * Le pharmacien ne change jamais d'écran entre le scan et l'encaissement : il
- * confirme l'ordonnance là où elle s'affiche, lit la sécurité juste en dessous,
- * tranche trois conseils, puis termine la vente. Une seule sortie, en bas.
+ * Un pharmacien, un patient devant lui, trente secondes. L'ordre de l'écran
+ * est celui de l'urgence : ce qu'il y a à proposer d'abord, ce qu'il faut
+ * vérifier ensuite, la délivrance, et tout le reste sous « Voir les détails ».
+ *
+ *   Ordonnance → l'IA comprend → Pharma.ai rappelle quoi proposer →
+ *   le patient accepte ou refuse → terminé.
  */
 export function SaleWorkspace({
   prescription,
@@ -48,8 +74,8 @@ export function SaleWorkspace({
   recommendations,
   analysisRunId,
   trace,
+  understanding,
   permissions,
-  simulatedExtraction,
   catalogAttribution,
   identificationChangedSinceAnalysis,
   patientFactors,
@@ -65,7 +91,7 @@ export function SaleWorkspace({
     prescriberName: string | null;
     prescribedAt: string | null;
   };
-  patients: { id: string; firstName: string; lastName: string; reference: string }[];
+  patients: PatientOption[];
   lines: SaleLineDraft[];
   findings: SafetyFindingView[];
   blockedOpportunities: BlockedOpportunityView[];
@@ -77,8 +103,9 @@ export function SaleWorkspace({
     durationMs: number | null;
     providers: Record<string, unknown>;
   } | null;
+  /** Le contexte thérapeutique compris par l'IA, s'il y en a un. */
+  understanding: { summary: string; confidence: number; providerId: string } | null;
   permissions: { verify: boolean; decide: boolean; sell: boolean };
-  simulatedExtraction: boolean;
   /** Mention de source du catalogue national, exigée par sa licence. */
   catalogAttribution: string | null;
   /** Un rattachement a été décidé après la dernière analyse. */
@@ -87,102 +114,81 @@ export function SaleWorkspace({
   patientFactors: PatientFactor[];
   hasSale: boolean;
 }) {
-  const [lines, setLines] = useState(initialLines);
+  const alreadyVerified = Boolean(prescription.verifiedAt);
+  const [lines, setLines] = useState(() => withDefaultConfirmation(initialLines, alreadyVerified));
   const [patientId, setPatientId] = useState(prescription.patientId ?? "");
   const [prescriberName, setPrescriberName] = useState(prescription.prescriberName ?? "");
   const [prescribedAt, setPrescribedAt] = useState(prescription.prescribedAt ?? "");
   const [forceEdit, setForceEdit] = useState(false);
-  const [basket, setBasket] = useState<Map<string, BasketLine>>(new Map());
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  // Une acceptation déjà enregistrée reste acceptée après un rechargement :
+  // la carte reflète le serveur, pas seulement le dernier clic.
+  const [basket, setBasket] = useState<Map<string, BasketLine>>(
+    () =>
+      new Map(
+        recommendations
+          .filter((r) => r.status === "ACCEPTED" && r.product)
+          .map((r) => [
+            r.id,
+            {
+              productId: r.product!.id,
+              quantity: r.quantity,
+              unitPriceCents: r.unitPriceCents || r.product!.salePriceCents,
+            },
+          ]),
+      ),
+  );
+  const [extras, setExtras] = useState<Map<string, DeliveryExtra>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // L'étape d'analyse en cours, telle que le serveur l'annonce. `null` hors
+  // analyse. C'est elle qui tient l'écran occupé — jamais un minuteur.
+  const [stage, setStage] = useState<AnalysisStage | null>(null);
   const router = useRouter();
   const { push } = useToast();
 
   // Les lignes sont éditées localement, mais l'analyse les enrichit côté
-  // serveur (explication de traitement). On resynchronise dès que le serveur
-  // renvoie une nouvelle version : sans cela, le résumé afficherait
-  // indéfiniment l'état d'avant l'analyse.
+  // serveur. On resynchronise dès que le serveur renvoie une nouvelle version.
   const [linesSource, setLinesSource] = useState(initialLines);
   if (linesSource !== initialLines) {
     setLinesSource(initialLines);
-    setLines(initialLines);
+    setLines(withDefaultConfirmation(initialLines, alreadyVerified));
   }
 
-  // La phase est dictée par le serveur, jamais par un état local optimiste :
-  // tant que l'analyse n'est pas revenue, on reste sur la vérification plutôt
-  // que d'afficher un « aucun conseil » qui serait faux.
-  const editing = forceEdit || !prescription.verifiedAt;
-  const analysing = pending && !editing;
+  // La phase est dictée par le serveur, jamais par un état local optimiste.
+  const analysing = stage !== null;
+  const editing = !analysing && (forceEdit || !prescription.verifiedAt);
 
   const blocked = counterIsBlocked(findings);
   const confirmedCount = lines.filter((line) => line.confirmed).length;
   const status = PRESCRIPTION_STATUS[prescription.status];
 
-  // Les quatre chiffres du bandeau. Tous dérivés de ce que le moteur a produit :
-  // aucun n'est estimé, aucun n'est arrondi.
-  const summaryRows = useMemo(() => {
-    const confirmed = lines.filter((line) => line.confirmed);
-    const decided = new Set(["DECLINED", "REMOVED", "PURCHASED"]);
-    const openRecommendations = recommendations.filter(
-      (recommendation) =>
-        !decided.has(recommendation.status) &&
-        (!recommendation.product || recommendation.product.quantity > 0),
-    );
-
-    return buildSummaryRows({
-      blockingCount: findings.filter(blocksCounter).length,
-      // La couverture du référentiel d'interactions n'est pas un point de
-      // vigilance de CETTE ordonnance : c'est une propriété de l'outil, dite
-      // en clair dans la zone sécurité. La compter ici afficherait un point
-      // d'attention permanent, que plus personne ne lirait au bout d'un jour.
-      attentionCount: findings.filter(
-        (finding) =>
-          (finding.severity === "WARNING" || finding.severity === "CAUTION") &&
-          finding.code !== "INTERACTION_NO_REFERENTIAL",
-      ).length,
-      lineCount: confirmed.length,
-      inStock: confirmed.filter((line) => line.availability?.state === "IN_STOCK").length,
-      // « À commander » réunit le référencé épuisé et le non référencé : dans les
-      // deux cas la boîte n'est pas là. L'état inconnu, lui, reste à part — ne
-      // pas savoir n'est pas une rupture.
-      missing: confirmed.filter(
-        (line) =>
-          line.availability?.state === "REFERENCED_EMPTY" ||
-          line.availability?.state === "NOT_REFERENCED",
-      ).length,
-      unknown: confirmed.filter(
-        (line) => !line.availability || line.availability.state === "UNKNOWN",
-      ).length,
-      explainedCount: confirmed.filter((line) => line.purpose !== null).length,
-      recommendationCount: openRecommendations.length,
-      locked: blocked,
-    });
-  }, [lines, findings, recommendations, blocked]);
-
-  const basketTotal = useMemo(
-    () =>
-      [...basket.values()].reduce(
-        (sum, line) => sum + line.unitPriceCents * line.quantity,
-        0,
-      ),
+  const adviceTotal = useMemo(
+    () => [...basket.values()].reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0),
     [basket],
   );
+  const extrasTotal = useMemo(
+    () => [...extras.values()].reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0),
+    [extras],
+  );
+  const basketTotal = adviceTotal + extrasTotal;
 
   const updateLine = (id: string, patch: Partial<SaleLineDraft>) =>
-    setLines((current) =>
-      current.map((line) => (line.id === id ? { ...line, ...patch } : line)),
-    );
+    setLines((current) => current.map((line) => (line.id === id ? { ...line, ...patch } : line)));
 
-  const toggleBasket = (recommendation: AdviceView) => {
+  /**
+   * Le patient accepte.
+   *
+   * Deux effets, immédiats et indissociables : le produit entre dans la
+   * délivrance et la décision est enregistrée nominativement — attribuée à la
+   * personne connectée, sans qu'elle ait rien à choisir.
+   */
+  const acceptAdvice = (recommendation: AdviceView) => {
     if (!recommendation.product) return;
     const product = recommendation.product;
 
     setBasket((current) => {
       const next = new Map(current);
-      if (next.has(recommendation.id)) {
-        next.delete(recommendation.id);
-        return next;
-      }
       next.set(recommendation.id, {
         productId: product.id,
         quantity: recommendation.quantity,
@@ -191,16 +197,60 @@ export function SaleWorkspace({
       return next;
     });
 
-    // Ajouter à la vente vaut validation professionnelle du conseil : on
-    // enregistre la décision côté serveur, sans attendre l'encaissement. C'est
-    // ce qui alimente le taux d'acceptation, distinct du taux d'achat.
-    if (!basket.has(recommendation.id) && recommendation.status === "PROPOSED") {
-      startTransition(async () => {
-        await acceptRecommendationAction(recommendation.id);
-      });
-    }
+    startTransition(async () => {
+      const result = await acceptRecommendationAction(recommendation.id);
+      if (!result.ok) {
+        setBasket((current) => {
+          const next = new Map(current);
+          next.delete(recommendation.id);
+          return next;
+        });
+        setError(result.error);
+      }
+    });
   };
 
+  const cancelAdvice = (recommendation: AdviceView) => {
+    setBasket((current) => {
+      const next = new Map(current);
+      next.delete(recommendation.id);
+      return next;
+    });
+    startTransition(async () => {
+      await reopenRecommendationAction(recommendation.id);
+    });
+  };
+
+  const addExtra = (product: ProductSearchResult) => {
+    setExtras((current) => {
+      const next = new Map(current);
+      const existing = next.get(product.id);
+      next.set(product.id, {
+        productId: product.id,
+        name: product.name,
+        brand: product.brand,
+        quantity: (existing?.quantity ?? 0) + 1,
+        unitPriceCents: product.salePriceCents,
+      });
+      return next;
+    });
+  };
+
+  const removeExtra = (productId: string) => {
+    setExtras((current) => {
+      const next = new Map(current);
+      next.delete(productId);
+      return next;
+    });
+  };
+
+  /**
+   * Confirmer, puis analyser en montrant chaque étape.
+   *
+   * La vérification est enregistrée d'un bloc — c'est l'acte professionnel.
+   * L'analyse, elle, arrive en flux : l'écran affiche l'étape que le serveur
+   * vient de commencer, et bascule sur les propositions dès la fin.
+   */
   const verify = () => {
     setError(null);
     startTransition(async () => {
@@ -209,16 +259,18 @@ export function SaleWorkspace({
         patientId: patientId || null,
         prescriberName,
         prescribedAt,
+        runAnalysis: false,
         lines: lines.map((line) => ({
           id: line.id,
           drugName: line.drugName,
           dosage: line.dosage,
           form: line.form,
           posology: line.posology,
+          schedule: line.schedule,
           durationDays: line.durationDays ?? undefined,
           quantity: line.quantity ?? undefined,
           instructions: line.instructions,
-          confirmed: line.confirmed,
+          confirmed: line.confirmed && line.drugName.trim() !== "",
         })),
       });
 
@@ -227,49 +279,68 @@ export function SaleWorkspace({
         return;
       }
 
-      push({
-        tone: "success",
-        title: "Ordonnance confirmée",
-        description: `${result.data.recommendationCount} conseil(s) proposé(s).`,
-      });
       setForceEdit(false);
-      // Pas de `router.refresh()` : la revalidation faite par l'action renvoie
-      // déjà les nouvelles données avec sa réponse. Mesuré — les conseils
-      // s'affichent en 0,25 s sans rafraîchissement explicite.
-    });
-  };
+      setStage("IDENTIFICATION");
+      const analysis = await streamAnalysis(prescription.id, setStage);
+      setStage(null);
 
-  const finish = () => {
-    setError(null);
-    const lines = [...basket.entries()].map(([recommendationId, line]) => ({
-      recommendationId,
-      productId: line.productId,
-      quantity: line.quantity,
-      unitPriceCents: line.unitPriceCents,
-    }));
-
-    if (lines.length === 0) {
-      router.push(`/vente/${prescription.id}/fin`);
-      return;
-    }
-
-    startTransition(async () => {
-      const result = await recordSaleAction({
-        prescriptionId: prescription.id,
-        patientId: patientId || null,
-        lines,
-      });
-
-      if (!result.ok) {
-        setError(result.error);
+      if (!analysis.ok) {
+        setError(analysis.error);
+        router.refresh();
         return;
       }
 
       push({
         tone: "success",
-        title: "Vente enregistrée",
-        description: `${formatCents(result.data.attributedCents)} attribués à Pharma.ai.`,
+        title: `Analyse terminée en ${(analysis.durationMs / 1000).toFixed(1)} s`,
+        description:
+          analysis.recommendationCount > 0
+            ? `${analysis.recommendationCount} opportunité${analysis.recommendationCount > 1 ? "s" : ""} à proposer.`
+            : "Aucune opportunité dans votre stock pour ce traitement.",
       });
+      router.refresh();
+    });
+  };
+
+  /**
+   * Fin de la délivrance : la vente est enregistrée, le plan patient est généré
+   * à partir des SEULES données validées, et l'écran de remise s'ouvre.
+   */
+  const finish = () => {
+    setError(null);
+    const saleLines = [
+      ...[...basket.entries()].map(([recommendationId, line]) => ({
+        recommendationId,
+        productId: line.productId,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPriceCents,
+      })),
+      // Sans `recommendationId` : ces lignes ne sont pas attribuées à Pharma.ai.
+      ...[...extras.values()].map((line) => ({
+        productId: line.productId,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPriceCents,
+      })),
+    ];
+
+    startTransition(async () => {
+      if (saleLines.length > 0) {
+        const sale = await recordSaleAction({
+          prescriptionId: prescription.id,
+          patientId: patientId || null,
+          lines: saleLines,
+        });
+        if (!sale.ok) {
+          setError(sale.error);
+          return;
+        }
+      }
+
+      const document = await generateDocumentAction({ prescriptionId: prescription.id });
+      if (!document.ok) {
+        push({ tone: "error", title: "Plan patient non généré", description: document.error });
+      }
+
       router.push(`/vente/${prescription.id}/fin`);
     });
   };
@@ -279,17 +350,14 @@ export function SaleWorkspace({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-5">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-4">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="text-xl leading-7 font-semibold tracking-[-0.015em] text-text-primary">
+          <h1 className="text-[22px] leading-7 font-semibold tracking-[-0.015em] text-text-primary uppercase">
             {prescription.patientName ?? "Patient non rattaché"}
           </h1>
           <Badge tone={status.tone}>{status.label}</Badge>
         </div>
         <div className="flex items-center gap-3 text-[12.5px] text-text-tertiary">
-          {/* L'âge se lit à côté de la référence : il sert de repère permanent,
-              pas d'alerte. La ligne de badges reste réservée à ce qui doit
-              arrêter le regard. */}
           {neutralFactors.map((factor) => (
             <span key={factor.label}>{factor.label}</span>
           ))}
@@ -306,9 +374,6 @@ export function SaleWorkspace({
         </div>
       </header>
 
-      {/* Ce qui, dans le dossier, a réellement pesé sur l'analyse et doit être
-          vu — allergies, grossesse, pathologies. Un patient sans particularité
-          n'occupe pas de ligne : le reste de la fiche est à un clic. */}
       {alertFactors.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-1.5">
           {alertFactors.map((factor) => (
@@ -325,49 +390,91 @@ export function SaleWorkspace({
         </Alert>
       )}
 
-      {/* La marge basse dégage le contenu de la barre d'action collante. */}
       <div className="space-y-6 pb-28">
-        {/* Le bandeau ouvre l'écran : c'est lui qu'on lit en deux secondes, et
-            il conduit aux zones plutôt que de les répéter. */}
-        {!editing && !analysing && <SummaryBand rows={summaryRows} />}
+        {editing && (
+          <PrescriptionZone
+            prescriptionId={prescription.id}
+            editing
+            lines={lines}
+            onLineChange={updateLine}
+            patients={patients}
+            patientId={patientId}
+            onPatientChange={setPatientId}
+            prescriberName={prescriberName}
+            onPrescriberChange={setPrescriberName}
+            prescribedAt={prescribedAt}
+            onPrescribedAtChange={setPrescribedAt}
+            onEdit={() => setForceEdit(true)}
+            canEdit={permissions.verify}
+            catalogAttribution={catalogAttribution}
+          />
+        )}
 
-        <PrescriptionZone
-          editing={editing}
-          lines={lines}
-          onLineChange={updateLine}
-          patients={patients}
-          patientId={patientId}
-          onPatientChange={setPatientId}
-          prescriberName={prescriberName}
-          onPrescriberChange={setPrescriberName}
-          prescribedAt={prescribedAt}
-          onPrescribedAtChange={setPrescribedAt}
-          onEdit={() => setForceEdit(true)}
-          canEdit={permissions.verify}
-          simulatedExtraction={simulatedExtraction}
-          catalogAttribution={catalogAttribution}
-        />
-
-        {!editing && analysing && (
+        {analysing && stage && (
           <Card>
-            <CardContent className="flex items-center gap-3 py-6">
-              <Loader2 className="size-[18px] shrink-0 animate-spin text-brand-600 dark:text-brand-400" />
-              <p className="text-[13.5px] text-text-secondary">
-                Analyse en cours — sécurité, puis conseils disponibles en rayon.
-              </p>
+            <CardContent className="py-5">
+              <ol className="space-y-2">
+                <li className="flex items-center gap-3 text-[14px] text-text-secondary">
+                  <Check className="size-[18px] shrink-0 text-success-600 dark:text-success-500" />
+                  Ordonnance confirmée
+                </li>
+                {STAGE_ORDER.filter((step) => step !== "PERSIST").map((step) => {
+                  const position = STAGE_ORDER.indexOf(step);
+                  const current = STAGE_ORDER.indexOf(stage);
+                  const done = position < current;
+                  const active = position === current || (step === "ENGINE" && stage === "PERSIST");
+                  return (
+                    <li
+                      key={step}
+                      className={cn(
+                        "flex items-center gap-3 text-[14px]",
+                        done
+                          ? "text-text-secondary"
+                          : active
+                            ? "font-medium text-text-primary"
+                            : "text-text-tertiary",
+                      )}
+                    >
+                      {done ? (
+                        <Check className="size-[18px] shrink-0 text-success-600 dark:text-success-500" />
+                      ) : active ? (
+                        <Loader2 className="size-[18px] shrink-0 animate-spin text-brand-600 dark:text-brand-400" />
+                      ) : (
+                        <span className="size-[18px] shrink-0" />
+                      )}
+                      {done ? STAGE_LABELS[step].replace("…", "") : STAGE_LABELS[step]}
+                    </li>
+                  );
+                })}
+              </ol>
             </CardContent>
           </Card>
         )}
 
         {!editing && !analysing && (
           <>
-            <SafetyZone
-              analysisRunId={analysisRunId}
-              findings={findings}
-              blockedOpportunities={blockedOpportunities}
-              canAcknowledge={permissions.verify}
-              stale={identificationChangedSinceAnalysis}
+            <TreatmentLine
+              lines={lines}
+              onEdit={() => setForceEdit(true)}
+              canEdit={permissions.verify}
+              onOpenDetails={() => {
+                setDetailsOpen(true);
+                setTimeout(() => document.getElementById("details")?.scrollIntoView({ behavior: "smooth" }), 50);
+              }}
             />
+
+            {/* Une alerte bloquante passe avant tout : rien ne se propose
+                par-dessus. Le reste de la sécurité, lui, vient après les
+                propositions — c'est là qu'on le lit sans qu'il barre l'écran. */}
+            {blocked && (
+              <SafetyZone
+                analysisRunId={analysisRunId}
+                findings={findings}
+                blockedOpportunities={blockedOpportunities}
+                canAcknowledge={permissions.verify}
+                stale={identificationChangedSinceAnalysis}
+              />
+            )}
 
             <AdviceZone
               prescriptionId={prescription.id}
@@ -375,77 +482,153 @@ export function SaleWorkspace({
               canDecide={permissions.decide}
               locked={blocked}
               inBasket={(id) => basket.has(id)}
-              onToggleBasket={toggleBasket}
+              onAccept={acceptAdvice}
+              onCancelAccept={cancelAdvice}
             />
 
-            {/* Ce qui vient après la vente, annoncé sans être simulé. Aucun
-                envoi n'est branché : le lot C s'en chargera, et d'ici là
-                l'écran ne prétend rien. */}
-            <p className="flex items-center gap-2 text-[12.5px] text-text-tertiary">
-              <FileText className="size-3.5 shrink-0" />
-              Compte rendu patient — sera préparé à l&apos;étape suivante, à partir des
-              conseils que vous aurez validés.
-            </p>
-
-            {trace && (
-              <div className="space-y-3">
-                <PipelineTrace
-                  trace={trace.stages}
-                  engineVersion={trace.engineVersion}
-                  durationMs={trace.durationMs}
-                  providers={trace.providers}
-                />
-                {permissions.verify && <ReanalyseButton prescriptionId={prescription.id} />}
-              </div>
+            {!blocked && (
+              <SafetyZone
+                analysisRunId={analysisRunId}
+                findings={findings}
+                blockedOpportunities={blockedOpportunities}
+                canAcknowledge={permissions.verify}
+                stale={identificationChangedSinceAnalysis}
+              />
             )}
+
+            <DeliveryZone
+              accepted={[...basket.entries()].map(([recommendationId, line]) => {
+                const recommendation = recommendations.find((r) => r.id === recommendationId);
+                return {
+                  id: recommendationId,
+                  name: recommendation?.product?.name ?? "Produit",
+                  quantity: line.quantity,
+                  unitPriceCents: line.unitPriceCents,
+                };
+              })}
+              extras={[...extras.values()]}
+              onAddExtra={addExtra}
+              onRemoveExtra={removeExtra}
+              canSell={permissions.sell}
+            />
+
+            <div id="details" className="rounded-xl border border-border-subtle">
+              <button
+                type="button"
+                onClick={() => setDetailsOpen((value) => !value)}
+                aria-expanded={detailsOpen}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[13.5px] text-text-secondary"
+              >
+                <span>{detailsOpen ? "Masquer les détails" : "Voir les détails"}</span>
+                <ChevronDown
+                  className={cn("size-4 shrink-0 text-text-tertiary transition-transform", detailsOpen && "rotate-180")}
+                />
+              </button>
+
+              {detailsOpen && (
+                <div className="space-y-5 border-t border-border-subtle px-4 py-4">
+                  {understanding && (
+                    <p className="flex items-start gap-2 text-[13px] leading-5 text-text-secondary">
+                      <Sparkles className="mt-0.5 size-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                      <span>
+                        <span className="font-medium text-text-primary">Contexte compris : </span>
+                        {understanding.summary}
+                        <span className="text-text-tertiary">
+                          {" "}
+                          — hypothèse du modèle, confiance {Math.round(understanding.confidence * 100)} %.
+                          Ce n&apos;est pas un diagnostic.
+                        </span>
+                      </span>
+                    </p>
+                  )}
+
+                  <TreatmentDetails
+                    lines={lines}
+                    onEdit={() => setForceEdit(true)}
+                    canEdit={permissions.verify}
+                    catalogAttribution={catalogAttribution}
+                  />
+
+                  {trace && (
+                    <div className="space-y-3">
+                      <PipelineTrace
+                        trace={trace.stages}
+                        engineVersion={trace.engineVersion}
+                        durationMs={trace.durationMs}
+                      />
+                      {permissions.verify && <ReanalyseButton prescriptionId={prescription.id} />}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
 
-      <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border-subtle bg-surface-card p-4 shadow-lg">
+      <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-surface-card p-3.5 shadow-lg sm:gap-4 sm:p-4">
         {editing ? (
           <>
             <div className="min-w-0">
               <p className="text-[13.5px] font-medium text-text-primary">
-                {confirmedCount} ligne{confirmedCount > 1 ? "s" : ""} confirmée
-                {confirmedCount > 1 ? "s" : ""} sur {lines.length}
+                {confirmedCount} médicament{confirmedCount > 1 ? "s" : ""} à confirmer
+                {lines.length > confirmedCount ? ` · ${lines.length - confirmedCount} exclu${lines.length - confirmedCount > 1 ? "s" : ""}` : ""}
               </p>
-              <p className="text-[12px] text-text-tertiary">
-                Seules les lignes confirmées alimentent l&apos;analyse et la fiche patient.
+              <p className="hidden text-[12px] text-text-tertiary sm:block">
+                Confirmer est votre acte professionnel : seules ces lignes alimentent l&apos;analyse.
               </p>
             </div>
             <Button
               size="lg"
+              className="w-full sm:w-auto"
               onClick={verify}
               loading={pending}
               disabled={confirmedCount === 0 || !permissions.verify}
               leadingIcon={pending ? undefined : <Sparkles className="size-[18px]" />}
             >
-              {pending ? "Analyse en cours…" : "Confirmer et analyser"}
+              {pending
+                ? "Analyse en cours…"
+                : confirmedCount > 1
+                  ? `Confirmer les ${confirmedCount} médicaments et analyser`
+                  : "Confirmer et analyser"}
             </Button>
           </>
         ) : (
           <>
             <div className="min-w-0">
               <p className="text-[13.5px] font-medium text-text-primary">
-                {basket.size === 0
-                  ? "Aucun conseil ajouté à la vente"
-                  : `${basket.size} conseil${basket.size > 1 ? "s" : ""} · ${formatCents(basketTotal)}`}
+                {basket.size + extras.size === 0
+                  ? "Rien à encaisser"
+                  : [
+                      basket.size > 0
+                        ? `${basket.size} vente${basket.size > 1 ? "s" : ""} additionnelle${basket.size > 1 ? "s" : ""}`
+                        : null,
+                      extras.size > 0
+                        ? `${extras.size} produit${extras.size > 1 ? "s" : ""} scanné${extras.size > 1 ? "s" : ""}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") + ` · ${formatCents(basketTotal)}`}
               </p>
-              <p className="text-[12px] text-text-tertiary">
+              <p className="hidden text-[12px] text-text-tertiary sm:block">
                 {hasSale
                   ? "Une vente est déjà enregistrée pour cette ordonnance."
-                  : "Le chiffre d'affaires n'est attribué qu'aux lignes issues d'un conseil."}
+                  : "Terminer enregistre la délivrance et prépare le plan du patient."}
               </p>
             </div>
             <Button
               size="lg"
+              className="w-full sm:w-auto"
               onClick={finish}
               loading={pending}
-              disabled={basket.size > 0 && !permissions.sell}
+              disabled={basket.size + extras.size > 0 && !permissions.sell}
               leadingIcon={pending ? undefined : <ArrowRight className="size-[18px]" />}
             >
-              {basket.size === 0 ? "Continuer la délivrance" : "Terminer la vente"}
+              {pending
+                ? "Préparation du plan…"
+                : basket.size + extras.size === 0
+                  ? "Terminer et préparer le plan"
+                  : "Terminer la vente et préparer le plan"}
             </Button>
           </>
         )}

@@ -55,9 +55,17 @@ async function transition(params: {
   status: RecommendationStatus;
   eventType: RecommendationEventType;
   auditAction: AuditAction;
+  /** Colonnes de la recommandation à mettre à jour en plus du statut. */
   data?: Record<string, unknown>;
+  /**
+   * Ce qui va dans l'historique et l'audit sans être une colonne — par
+   * exemple le statut précédent d'une réouverture. Le confondre avec `data`
+   * faisait échouer l'écriture : Prisma refuse une colonne inconnue.
+   */
+  metadata?: Record<string, unknown>;
   note?: string | null;
 }): Promise<void> {
+  const metadata = { ...(params.data ?? {}), ...(params.metadata ?? {}) };
   await prisma.$transaction(async (tx) => {
     await tx.recommendation.update({
       where: { id: params.recommendationId },
@@ -74,7 +82,7 @@ async function transition(params: {
         recommendationId: params.recommendationId,
         type: params.eventType,
         userId: params.userId,
-        metadata: (params.data ?? {}) as never,
+        metadata: metadata as never,
       },
     });
   });
@@ -85,7 +93,7 @@ async function transition(params: {
     entityId: params.recommendationId,
     pharmacyId: params.pharmacyId,
     userId: params.userId,
-    metadata: params.data,
+    metadata,
   });
 }
 
@@ -171,6 +179,44 @@ export async function declineRecommendationAction(
 
   revalidatePath(`/vente/${recommendation.prescriptionId}`);
   return ok(null, "Conseil marqué comme refusé par le patient.");
+}
+
+/**
+ * Rouvre un conseil refusé par erreur.
+ *
+ * Le comptoir va vite : un « ✕ » part parfois avant que le patient n'ait fini
+ * sa phrase. Plutôt que de laisser une mesure fausse dans les statistiques du
+ * titulaire, on autorise le retour en arrière — mais il laisse sa trace comme
+ * n'importe quelle autre décision. L'historique montrera un refus puis une
+ * réouverture, ce qui est la vérité de ce qui s'est passé.
+ */
+export async function reopenRecommendationAction(
+  recommendationId: string,
+): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_DECIDE);
+  const recommendation = await assertOwnedRecommendation(
+    recommendationId,
+    session.scope.pharmacyId,
+  );
+  if (!recommendation) return fail("Recommandation introuvable dans cette officine.");
+
+  // Un conseil déjà acheté est un fait comptable : il ne se rouvre pas.
+  if (recommendation.status === "PURCHASED") {
+    return fail("Ce conseil a déjà été acheté : il ne peut plus être rouvert.");
+  }
+
+  await transition({
+    recommendationId,
+    pharmacyId: session.scope.pharmacyId,
+    userId: session.scope.userId,
+    status: "PROPOSED",
+    eventType: "REOPENED",
+    auditAction: "recommendation.reopened",
+    metadata: { previousStatus: recommendation.status },
+  });
+
+  revalidatePath(`/vente/${recommendation.prescriptionId}`);
+  return ok(null, "Conseil rouvert.");
 }
 
 const modifySchema = z.object({
@@ -312,7 +358,7 @@ export async function removeRecommendationAction(
     eventType: "REMOVED",
     auditAction: "recommendation.removed",
     note: parsed.data.reason ?? null,
-    data: { reason: parsed.data.reason ?? null },
+    metadata: { reason: parsed.data.reason ?? null },
   });
 
   revalidatePath(`/vente/${recommendation.prescriptionId}`);

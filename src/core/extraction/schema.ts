@@ -10,7 +10,18 @@
  * contenir une posologie inventée. C'est `validateVisionExtraction` qui tranche.
  */
 
-/** Un champ : sa valeur, sa citation obligatoire, sa confiance. */
+/**
+ * Un champ : sa valeur, sa citation obligatoire, sa confiance.
+ *
+ * Un seul de ces trois est nullable, et c'est voulu. L'API refuse un schéma
+ * strict comptant plus de 16 propriétés à type union (`["string", "null"]`) :
+ * avec onze champs, en rendre trois nullables en faisait 33 et chaque appel
+ * échouait en 400 avant même de regarder l'image. `valeur` garde son null,
+ * seul cas où « rien » est une information (zone illisible ou absente). La
+ * citation vide et la confiance à 0 disent la même chose sans union, et le
+ * validateur les traite déjà ainsi : une citation vide écarte le champ, une
+ * confiance à 0 le marque à relire.
+ */
 const CHAMP = {
   type: "object",
   additionalProperties: false,
@@ -22,13 +33,13 @@ const CHAMP = {
         "La valeur normalisée, ou null si la zone est illisible ou absente de l'ordonnance.",
     },
     lu_tel_quel: {
-      type: ["string", "null"],
+      type: "string",
       description:
-        "Le texte EXACTEMENT tel qu'il apparaît sur l'image, sans correction ni complétion. null si rien n'a été lu. Obligatoire dès que « valeur » n'est pas null : un champ sans citation est écarté.",
+        "Le texte EXACTEMENT tel qu'il apparaît sur l'image, sans correction ni complétion. Chaîne vide si rien n'a été lu. Obligatoire dès que « valeur » n'est pas null : un champ sans citation est écarté.",
     },
     confiance: {
-      type: ["number", "null"],
-      description: "Confiance de lecture, entre 0 et 1.",
+      type: "number",
+      description: "Confiance de lecture, entre 0 et 1. Mets 0 si tu n'as rien lu.",
     },
   },
 } as const;
@@ -54,15 +65,12 @@ export const EXTRACTION_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: [
-          "medicament",
-          "dosage",
-          "forme",
-          "posologie",
-          "duree_jours",
-          "quantite",
-          "instructions",
-        ],
+        // Seuls le nom, le dosage et la posologie sont toujours renseignés.
+        // Forme, durée, quantité et instructions manquent sur la plupart des
+        // lignes : les faire émettre « à null » coûtait un tiers des jetons
+        // de sortie — mesuré, 1 716 contre 1 201 — donc quatre secondes au
+        // comptoir, pour ne rien dire. Un champ omis est un champ non lu.
+        required: ["medicament", "dosage", "posologie"],
         properties: {
           medicament: CHAMP,
           dosage: CHAMP,
@@ -101,6 +109,7 @@ Règles absolues :
 - N'ajoute aucun médicament qui ne figure pas sur l'image, même s'il semble manquer.
 - Une ligne dont le nom du médicament est illisible doit tout de même être renvoyée, avec « valeur » à null : le pharmacien la relira lui-même.
 - Ne corrige pas un nom de médicament vers celui qui te semble le plus proche. Recopie ce que tu lis.
+- Omets un champ de ligne (forme, duree_jours, quantite, instructions) quand il est absent de l'ordonnance, au lieu de le renseigner à null.
 
 Un champ vide est un résultat correct. Un champ inventé est une faute grave : il sera délivré au patient.`;
 

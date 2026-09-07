@@ -3,7 +3,11 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
-import { verifyPassword } from "@/server/security/password";
+import {
+  hashPassword,
+  validatePasswordStrength,
+  verifyPassword,
+} from "@/server/security/password";
 import {
   createSession,
   destroySession,
@@ -12,7 +16,7 @@ import {
   switchPharmacy,
 } from "@/server/auth/session";
 import { recordAudit } from "@/server/audit/log";
-import { fail, zodFieldErrors, type ActionResult } from "./types";
+import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Adresse e-mail invalide"),
@@ -175,4 +179,65 @@ export async function demoLoginAction(formData: FormData): Promise<void> {
   });
 
   redirect("/");
+}
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Mot de passe actuel requis"),
+  newPassword: z.string().min(1, "Nouveau mot de passe requis"),
+});
+
+/**
+ * Changement de son propre mot de passe.
+ *
+ * L'ancien mot de passe est exigé : sans lui, un poste laissé ouvert au
+ * comptoir suffirait à prendre le compte d'un collaborateur. Les autres
+ * sessions sont révoquées, la courante conservée.
+ */
+export async function changeOwnPasswordAction(
+  payload: z.input<typeof changePasswordSchema>,
+): Promise<ActionResult<null>> {
+  const session = await requireSession();
+  const parsed = changePasswordSchema.safeParse(payload);
+  if (!parsed.success) {
+    return fail("Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { passwordHash: true },
+  });
+  const valid = await verifyPassword(parsed.data.currentPassword, user?.passwordHash);
+  if (!valid) {
+    return fail("Mot de passe actuel incorrect.", {
+      currentPassword: "Mot de passe actuel incorrect.",
+    });
+  }
+
+  const weaknesses = validatePasswordStrength(parsed.data.newPassword);
+  if (weaknesses.length > 0) {
+    return fail(`Mot de passe trop faible : ${weaknesses.join(", ")}.`, {
+      newPassword: `Mot de passe trop faible : ${weaknesses.join(", ")}.`,
+    });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: session.user.id },
+      data: { passwordHash: await hashPassword(parsed.data.newPassword) },
+    });
+    await tx.session.updateMany({
+      where: { userId: session.user.id, revokedAt: null, id: { not: session.sessionId } },
+      data: { revokedAt: new Date() },
+    });
+  });
+
+  await recordAudit({
+    action: "auth.password_changed",
+    entityType: "User",
+    entityId: session.user.id,
+    pharmacyId: session.scope.pharmacyId,
+    userId: session.user.id,
+  });
+
+  return ok(null, "Mot de passe modifié.");
 }

@@ -1,4 +1,5 @@
 import type { ScoreContribution } from "@/core/ai/types";
+import type { PosologySchedule } from "@/core/posology";
 
 /**
  * Formes de données partagées par les trois zones de l'écran de vente.
@@ -43,6 +44,10 @@ export type SaleLineDraft = {
   dosage: string;
   form: string;
   posology: string;
+  /** Répartition des prises. `null` tant que rien n'a pu être lu ni saisi. */
+  schedule: PosologySchedule | null;
+  /** Vrai quand la répartition vient d'une fréquence, pas d'une lecture. */
+  scheduleInferred: boolean;
   durationDays: number | null;
   quantity: number | null;
   instructions: string;
@@ -102,11 +107,23 @@ export type AdviceView = {
   decidedBy: string | null;
   explanation: ScoreContribution[];
   opportunity: {
+    id: string;
     title: string;
     rationale: string;
     clinicalContext: string | null;
     priority: number;
     safetyNotes: string[];
+    /**
+     * La question à poser au patient avant de proposer, écrite dans la règle.
+     * Tant que `answer` est null, la carte pose la question et rien d'autre.
+     */
+    question: string | null;
+    requiresConfirmation: boolean;
+    answer: boolean | null;
+    /** Pourquoi le modèle a vu ce besoin ici — pour le pharmacien. */
+    aiJustification: string | null;
+    /** Le pourquoi une fois le besoin confirmé par le patient. */
+    confirmedReason: string | null;
   } | null;
   product: {
     id: string;

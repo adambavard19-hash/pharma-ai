@@ -37,7 +37,11 @@ export function Sidebar({
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col border-r border-border-subtle bg-surface-card",
           "transition-transform duration-250 lg:translate-x-0",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
+          // `invisible` et non `hidden` : la transition reste fluide, mais le
+          // tiroir fermé sort du parcours de tabulation et de l'arbre
+          // d'accessibilité. Sans cela, sur mobile, la première tabulation
+          // emmène dans un menu qu'on ne voit pas.
+          mobileOpen ? "translate-x-0" : "-translate-x-full invisible lg:visible",
         )}
         aria-label="Navigation principale"
       >

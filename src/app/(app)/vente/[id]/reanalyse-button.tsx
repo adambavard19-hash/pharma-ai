@@ -1,10 +1,12 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
-import { reanalysePrescriptionAction } from "@/server/actions/prescriptions";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { STAGE_LABELS, streamAnalysis } from "./analysis-stream";
+import type { AnalysisStage } from "@/server/services/analysis";
 
 /**
  * Relance l'analyse avec les données à jour (stock, règles, profil patient).
@@ -13,6 +15,8 @@ import { useToast } from "@/components/ui/toast";
  */
 export function ReanalyseButton({ prescriptionId }: { prescriptionId: string }) {
   const [pending, startTransition] = useTransition();
+  const [stage, setStage] = useState<AnalysisStage | null>(null);
+  const router = useRouter();
   const { push } = useToast();
 
   return (
@@ -22,20 +26,20 @@ export function ReanalyseButton({ prescriptionId }: { prescriptionId: string }) 
       leadingIcon={<RefreshCw className="size-[18px]" />}
       onClick={() =>
         startTransition(async () => {
-          const result = await reanalysePrescriptionAction(prescriptionId);
+          const result = await streamAnalysis(prescriptionId, setStage);
+          setStage(null);
           push({
             tone: result.ok ? "success" : "error",
-            title: result.ok
-              ? (result.message ?? "Analyse relancée")
-              : result.error,
+            title: result.ok ? "Analyse relancée" : result.error,
             description: result.ok
-              ? `${result.data.recommendationCount} conseil(s) proposé(s).`
+              ? `${result.recommendationCount} proposition(s) · ${(result.durationMs / 1000).toFixed(1)} s`
               : undefined,
           });
+          router.refresh();
         })
       }
     >
-      Relancer l&apos;analyse
+      {pending && stage ? STAGE_LABELS[stage] : "Relancer l'analyse"}
     </Button>
   );
 }

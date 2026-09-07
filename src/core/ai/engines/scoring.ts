@@ -336,10 +336,15 @@ export function scoreProductForOpportunity(params: {
   // commercial reviendrait à inventer une justification médicale pour vendre.
   const shortReason = opportunity.shortReason;
 
-  const claim = product.commercialClaims[0];
-  const patientReason = claim
-    ? `${claim} — proposé dans le cadre de votre traitement.`
-    : `Conseil proposé par votre pharmacien dans le cadre de votre traitement.`;
+  // Le pourquoi lu par le patient vient de la règle de conseil, comme la
+  // phrase de comptoir. L'argumentaire commercial du produit n'y entre pas :
+  // « proposé dans le cadre de votre traitement » collé derrière une accroche
+  // marketing n'explique rien — le patient a besoin du LIEN entre son
+  // ordonnance et ce qu'on lui propose, et c'est la règle qui le connaît.
+  const patientReason = opportunity.patientReasonTemplate.replaceAll(
+    "{product}",
+    product.name,
+  );
 
   // La phrase de comptoir vient de la règle de conseil, jamais de l'argumentaire
   // commercial du produit : seul le nom de la référence est inséré ici.

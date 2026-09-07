@@ -39,7 +39,7 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<{ onglet?: string }>;
 }) {
-  const session = await requirePermission(PERMISSIONS.PHARMACY_VIEW);
+  const session = await requirePermission(PERMISSIONS.SETTINGS_MANAGE);
   const params = await searchParams;
   const tab = params.onglet ?? "officine";
 

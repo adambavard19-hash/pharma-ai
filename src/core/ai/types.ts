@@ -103,6 +103,13 @@ export type DrugKnowledge = {
   sourceVersion: string;
   /** `true` tant que la donnée provient du jeu fictif de démonstration. */
   isDemoData: boolean;
+  /**
+   * D'où vient cette fiche. `AI_CLASSIFICATION` : le modèle a classé le
+   * médicament (substance, ATC, classe) faute de fiche éditoriale. Elle
+   * suffit à déclencher une règle de conseil ; elle ne porte ni explication
+   * patient ni interaction, et le moteur de sécurité le signale.
+   */
+  origin?: "EDITORIAL" | "AI_CLASSIFICATION";
 };
 
 // --- Contexte patient ------------------------------------------------------
@@ -233,6 +240,8 @@ export type AdviceOpportunityResult = {
    * qu'au scoring : à ce stade le catalogue n'a pas été consulté.
    */
   counterScriptTemplate: string;
+  /** Le pourquoi lu par le patient, `{drug}` substitué, `{product}` non. */
+  patientReasonTemplate: string;
   clinicalContext: string | null;
   safetyNotes: string[];
   /** 0 → 100. Priorité clinique, strictement indépendante de toute marge. */
@@ -244,6 +253,23 @@ export type AdviceOpportunityResult = {
   /** Contre-indications à écarter lors de l'appariement. */
   excludeTags: string[];
   triggeredBy: { lineIndex: number; drugName: string }[];
+  /**
+   * La question à poser au patient avant de proposer quoi que ce soit, écrite
+   * dans la règle — jamais formulée à la volée. `null` quand le conseil se
+   * justifie par le traitement seul.
+   */
+  question?: string | null;
+  /** Vrai quand la proposition attend la réponse du patient à `question`. */
+  requiresConfirmation?: boolean;
+  /** Le besoin identifié par la compréhension IA, s'il a déclenché la règle. */
+  needKey?: string | null;
+  /** Pourquoi le modèle a vu ce besoin ici — pour le pharmacien, jamais le patient. */
+  aiJustification?: string | null;
+  /** La règle qui a parlé, et sa version. */
+  ruleKey?: string;
+  ruleVersion?: string;
+  /** Le pourquoi une fois le besoin confirmé par le patient. */
+  confirmedReason?: string | null;
 };
 
 // --- Score (étape F) -------------------------------------------------------

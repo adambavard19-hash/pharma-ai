@@ -1,25 +1,32 @@
 "use client";
 
-import { useId } from "react";
-import { AlertTriangle, Check, ChevronRight, EyeOff, Pencil, X } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Field, Input, Select } from "@/components/ui/field";
-import { Alert } from "@/components/ui/feedback";
+import { useId, useState } from "react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Pencil, X } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Field, Input } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
-import { OCR_REVIEW_THRESHOLD } from "@/config/constants";
 import { cn } from "@/lib/utils";
+import { PatientPicker, type PatientOption } from "@/components/app/patient-picker";
+import { EMPTY_SCHEDULE, totalDailyDoses, unitsForDuration } from "@/core/posology";
+import { VISION_REVIEW_THRESHOLD } from "@/core/extraction";
+import { PosologyEditor } from "./posology-editor";
+import { AddLine } from "./add-line";
 import { SpecialtyLink } from "./specialty-link";
 import type { SaleLineDraft } from "./types";
 
 /**
- * Zone 1 — le traitement.
+ * Le traitement.
  *
- * La vérification ne mérite pas un écran : elle se fait ici, à l'endroit où les
- * lignes s'affichent. Une fois l'ordonnance confirmée, la zone se replie en un
- * résumé de trois lignes et le pharmacien passe aux conseils sans changer de
- * page. Un bouton « Corriger » la rouvre à tout moment.
+ * Avant l'analyse : une liste que l'on vérifie en quelques secondes — une
+ * ligne par médicament, une coche ou un point d'attention, et l'édition qui
+ * s'ouvre au clic. Pas cinq formulaires. Un seul bouton confirme l'ensemble.
+ *
+ * Après l'analyse : une ligne (`TreatmentLine`) et, sous « Voir les détails »,
+ * ce que le catalogue national en dit (`TreatmentDetails`). Le pharmacien
+ * qui délivre un traitement qu'il connaît n'a pas à relire la composition.
  */
 export function PrescriptionZone({
+  prescriptionId,
   editing,
   lines,
   onLineChange,
@@ -32,13 +39,13 @@ export function PrescriptionZone({
   onPrescribedAtChange,
   onEdit,
   canEdit,
-  simulatedExtraction,
   catalogAttribution,
 }: {
+  prescriptionId: string;
   editing: boolean;
   lines: SaleLineDraft[];
   onLineChange: (id: string, patch: Partial<SaleLineDraft>) => void;
-  patients: { id: string; firstName: string; lastName: string; reference: string }[];
+  patients: PatientOption[];
   patientId: string;
   onPatientChange: (value: string) => void;
   prescriberName: string;
@@ -47,12 +54,14 @@ export function PrescriptionZone({
   onPrescribedAtChange: (value: string) => void;
   onEdit: () => void;
   canEdit: boolean;
-  simulatedExtraction: boolean;
   catalogAttribution: string | null;
 }) {
+  const [openLine, setOpenLine] = useState<string | null>(null);
+  const [headerOpen, setHeaderOpen] = useState(!patientId);
+
   if (!editing) {
     return (
-      <PrescriptionSummary
+      <TreatmentDetails
         lines={lines}
         onEdit={onEdit}
         canEdit={canEdit}
@@ -61,83 +70,406 @@ export function PrescriptionZone({
     );
   }
 
-  const unreadableCount = lines.reduce((sum, line) => sum + line.unreadableFields.length, 0);
+  const detected = lines.length;
+  const issues = lines.filter((line) => lineIssues(line).length > 0).length;
+  const patient = patients.find((option) => option.id === patientId) ?? null;
 
   return (
     <section className="space-y-3" aria-labelledby="zone-traitement">
-      <ZoneTitle id="zone-traitement" step={1} title="Le traitement" />
-
-      {simulatedExtraction && (
-        <Alert tone="danger" title="Extraction simulée">
-          Aucune image n&apos;a été analysée. Le contenu ci-dessous est un scénario fictif de
-          démonstration : il ne correspond à aucune ordonnance réelle.
-        </Alert>
-      )}
-
-      <Alert tone="warning" title="Rien n'a été deviné">
-        Un champ illisible reste vide et doit être saisi par un professionnel.
-        {unreadableCount > 0 && (
-          <>
-            {" "}
-            <strong>
-              {unreadableCount} champ{unreadableCount > 1 ? "s" : ""} illisible
-              {unreadableCount > 1 ? "s" : ""}
-            </strong>{" "}
-            sur cette ordonnance.
-          </>
-        )}{" "}
-        Seules les lignes confirmées alimentent l&apos;analyse et la fiche patient.
-      </Alert>
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="zone-traitement" className="flex items-center gap-2 text-[15px] font-semibold text-text-primary">
+          {detected} médicament{detected > 1 ? "s" : ""} détecté{detected > 1 ? "s" : ""}
+          {issues === 0 ? (
+            <Check className="size-[18px] text-success-600 dark:text-success-500" />
+          ) : (
+            <span className="text-[12.5px] font-normal text-warning-700 dark:text-warning-500">
+              {issues} à confirmer
+            </span>
+          )}
+        </h2>
+        <p className="text-[12.5px] text-text-tertiary">Un clic sur une ligne pour la corriger</p>
+      </div>
 
       <Card>
-        <CardContent className="grid gap-4 pt-5 sm:grid-cols-3">
-          <Field label="Patient" htmlFor="patientId">
-            <Select
-              id="patientId"
-              value={patientId}
-              onChange={(event) => onPatientChange(event.target.value)}
-            >
-              <option value="">Aucun patient rattaché</option>
-              {patients.map((patient) => (
-                <option key={patient.id} value={patient.id}>
-                  {patient.lastName.toUpperCase()} {patient.firstName} — {patient.reference}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Prescripteur" htmlFor="prescriberName">
-            <Input
-              id="prescriberName"
-              value={prescriberName}
-              onChange={(event) => onPrescriberChange(event.target.value)}
-              placeholder="Dr …"
+        <ul className="divide-y divide-border-subtle">
+          {lines.map((line, index) => (
+            <CompactLine
+              key={line.id}
+              line={line}
+              index={index}
+              open={openLine === line.id}
+              onToggle={() => setOpenLine((current) => (current === line.id ? null : line.id))}
+              onChange={(patch) => onLineChange(line.id, patch)}
             />
-          </Field>
-          <Field label="Date de prescription" htmlFor="prescribedAt">
-            <Input
-              id="prescribedAt"
-              type="date"
-              value={prescribedAt}
-              onChange={(event) => onPrescribedAtChange(event.target.value)}
-            />
-          </Field>
-        </CardContent>
+          ))}
+          {lines.length === 0 && (
+            <li className="px-4 py-6 text-center text-[13.5px] text-text-secondary">
+              Aucun médicament sur cette délivrance. Ajoutez-les ci-dessous.
+            </li>
+          )}
+        </ul>
       </Card>
 
-      {lines.map((line, index) => (
-        <LineCard
-          key={line.id}
-          line={line}
-          index={index}
-          onChange={(patch) => onLineChange(line.id, patch)}
-        />
-      ))}
+      <AddLine prescriptionId={prescriptionId} />
+
+      {/* Prescripteur, date, patient : une ligne, qui s'ouvre si besoin. Le
+          patient non rattaché ouvre la ligne d'office — c'est une action. */}
+      <Card>
+        <CardContent className="py-3">
+          <button
+            type="button"
+            onClick={() => setHeaderOpen((value) => !value)}
+            aria-expanded={headerOpen}
+            className="flex w-full items-center gap-2 text-left text-[13px] text-text-secondary"
+          >
+            <span className="min-w-0 flex-1 truncate">
+              {[
+                patient ? `${patient.firstName} ${patient.lastName}` : "Patient non rattaché",
+                prescriberName || "Prescripteur non lu",
+                prescribedAt ? `le ${formatDateFr(prescribedAt)}` : "date non lue",
+              ].join(" · ")}
+            </span>
+            <span className="flex shrink-0 items-center gap-1 text-[12.5px] text-text-tertiary">
+              <Pencil className="size-3.5" />
+              Modifier
+            </span>
+          </button>
+          {headerOpen && (
+            <div className="mt-3 grid gap-4 sm:grid-cols-3">
+              <Field label="Patient" htmlFor="patientId">
+                <PatientPicker patients={patients} value={patientId} onChange={onPatientChange} />
+              </Field>
+              <Field label="Prescripteur" htmlFor="prescriberName">
+                <Input
+                  id="prescriberName"
+                  value={prescriberName}
+                  onChange={(event) => onPrescriberChange(event.target.value)}
+                  placeholder="Dr …"
+                />
+              </Field>
+              <Field label="Date de prescription" htmlFor="prescribedAt">
+                <Input
+                  id="prescribedAt"
+                  type="date"
+                  value={prescribedAt}
+                  onChange={(event) => onPrescribedAtChange(event.target.value)}
+                />
+              </Field>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </section>
   );
 }
 
-/** Vue repliée : ce que le pharmacien a besoin de relire d'un coup d'œil. */
-function PrescriptionSummary({
+/** Ce qui, sur une ligne, mérite un regard avant de confirmer. */
+export function lineIssues(line: SaleLineDraft): string[] {
+  const unreadable = new Set(line.unreadableFields);
+  const low = (field: string) => (line.confidence[field] ?? 1) < VISION_REVIEW_THRESHOLD;
+  const issues: string[] = [];
+
+  if (!line.drugName.trim()) issues.push("nom à saisir");
+  else if (unreadable.has("drugName") || low("drugName")) issues.push("nom à confirmer");
+
+  if (unreadable.has("dosage") && !line.dosage) issues.push("dosage à confirmer");
+  else if (line.dosage && low("dosage")) issues.push("dosage à confirmer");
+
+  if (!line.schedule && !line.posology) issues.push("posologie à saisir");
+  else if (line.posology && low("posology")) issues.push("posologie à confirmer");
+
+  return issues;
+}
+
+/** « Efferalgan 1 g · 3/j · 5 j · 2 boîtes » */
+function describeLine(line: SaleLineDraft): string {
+  const perDay = line.schedule ? totalDailyDoses(line.schedule) : 0;
+  return [
+    perDay > 0 ? `${perDay}/j` : line.posology || null,
+    line.durationDays ? `${line.durationDays} j` : null,
+    line.quantity ? `${line.quantity} boîte${line.quantity > 1 ? "s" : ""}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function CompactLine({
+  line,
+  index,
+  open,
+  onToggle,
+  onChange,
+}: {
+  line: SaleLineDraft;
+  index: number;
+  open: boolean;
+  onToggle: () => void;
+  onChange: (patch: Partial<SaleLineDraft>) => void;
+}) {
+  const issues = lineIssues(line);
+  const excluded = !line.confirmed;
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-label={`${line.drugName || `Ligne ${index + 1}`} — ${open ? "replier" : "corriger"}`}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-sunken/50"
+      >
+        <span
+          className={cn(
+            "flex size-7 shrink-0 items-center justify-center rounded-full",
+            excluded
+              ? "bg-surface-sunken text-text-tertiary"
+              : issues.length > 0
+                ? "bg-warning-100 text-warning-700 dark:bg-warning-900/40 dark:text-warning-400"
+                : "bg-success-100 text-success-700 dark:bg-success-900/40 dark:text-success-400",
+          )}
+        >
+          {excluded ? (
+            <X className="size-4" />
+          ) : issues.length > 0 ? (
+            <AlertTriangle className="size-4" />
+          ) : (
+            <Check className="size-4" strokeWidth={2.5} />
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span
+            className={cn(
+              "block truncate text-[15px] leading-5 text-text-primary",
+              excluded && "text-text-tertiary line-through",
+            )}
+          >
+            <span className="font-medium">{line.drugName || "Médicament à saisir"}</span>
+            {line.dosage && <span className="text-text-secondary"> {line.dosage}</span>}
+            {describeLine(line) && (
+              <span className="text-text-secondary"> · {describeLine(line)}</span>
+            )}
+          </span>
+          {issues.length > 0 && !excluded && (
+            <span className="block truncate text-[12.5px] text-warning-700 dark:text-warning-500">
+              {issues.join(" · ")}
+            </span>
+          )}
+          {excluded && (
+            <span className="block text-[12.5px] text-text-tertiary">Exclu de l&apos;analyse</span>
+          )}
+        </span>
+        <ChevronDown
+          className={cn("size-4 shrink-0 text-text-tertiary transition-transform", open && "rotate-180")}
+        />
+      </button>
+
+      {open && (
+        <div className="border-t border-border-subtle bg-surface-sunken/30 px-4 py-4">
+          <LineEditor line={line} onChange={onChange} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+function LineEditor({
+  line,
+  onChange,
+}: {
+  line: SaleLineDraft;
+  onChange: (patch: Partial<SaleLineDraft>) => void;
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const unreadable = new Set(line.unreadableFields);
+  const schedule = line.schedule ?? EMPTY_SCHEDULE;
+  const perDay = totalDailyDoses(schedule);
+  const suggestedUnits = unitsForDuration(schedule, line.durationDays);
+
+  return (
+    <div className="space-y-3.5">
+      <div className="grid gap-2 sm:grid-cols-[2fr_1fr]">
+        <CompactField
+          label="Médicament"
+          value={line.drugName}
+          onChange={(value) => onChange({ drugName: value })}
+          unreadable={unreadable.has("drugName")}
+        />
+        <CompactField
+          label="Dosage"
+          value={line.dosage}
+          onChange={(value) => onChange({ dosage: value })}
+          unreadable={unreadable.has("dosage")}
+        />
+      </div>
+
+      <PosologyEditor
+        schedule={schedule}
+        inferred={line.scheduleInferred}
+        onChange={(next) => onChange({ schedule: next, scheduleInferred: false })}
+      />
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="space-y-1">
+          <span className="block text-[11.5px] font-medium text-text-tertiary">Durée</span>
+          <span className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              min={0}
+              value={line.durationDays ?? ""}
+              onChange={(event) =>
+                onChange({ durationDays: event.target.value ? Number(event.target.value) : null })
+              }
+              className="w-[72px] text-center"
+              aria-label="Durée en jours"
+            />
+            <span className="text-[13px] text-text-secondary">jours</span>
+          </span>
+        </label>
+
+        <label className="space-y-1">
+          <span className="block text-[11.5px] font-medium text-text-tertiary">Quantité</span>
+          <Input
+            type="number"
+            min={0}
+            value={line.quantity ?? ""}
+            onChange={(event) =>
+              onChange({ quantity: event.target.value ? Number(event.target.value) : null })
+            }
+            className="w-[80px] text-center"
+            aria-label="Quantité délivrée"
+          />
+        </label>
+
+        {suggestedUnits !== null && line.quantity !== suggestedUnits && (
+          <button
+            type="button"
+            onClick={() => onChange({ quantity: suggestedUnits })}
+            className="mb-2 text-[12.5px] text-brand-700 underline underline-offset-2 dark:text-brand-400"
+          >
+            {suggestedUnits} pour la cure
+          </button>
+        )}
+
+        {perDay > 0 && (
+          <span className="mb-2 ml-auto text-[12.5px] text-text-tertiary tabular">
+            {perDay} / jour
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setDetailsOpen((value) => !value)}
+          aria-expanded={detailsOpen}
+          className="flex items-center gap-1 text-[12.5px] text-text-tertiary transition-colors hover:text-text-secondary"
+        >
+          Détails
+          <ChevronRight className={cn("size-3.5 transition-transform", detailsOpen && "rotate-90")} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ confirmed: !line.confirmed })}
+          className="text-[12.5px] text-text-tertiary underline-offset-2 hover:text-text-secondary hover:underline"
+        >
+          {line.confirmed ? "Exclure cette ligne de l'analyse" : "Réintégrer cette ligne"}
+        </button>
+      </div>
+
+      {detailsOpen && (
+        <div className="space-y-2.5">
+          {line.rawText && (
+            <p className="text-[12px] leading-4 text-text-tertiary">
+              Lu sur l&apos;ordonnance : « {line.rawText} »
+            </p>
+          )}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <CompactField
+              label="Forme"
+              value={line.form}
+              onChange={(value) => onChange({ form: value })}
+              unreadable={unreadable.has("form")}
+            />
+            <CompactField
+              label="Instructions"
+              value={line.instructions}
+              onChange={(value) => onChange({ instructions: value })}
+              unreadable={unreadable.has("instructions")}
+            />
+          </div>
+          <CompactField
+            label="Posologie écrite"
+            value={line.posology}
+            onChange={(value) => onChange({ posology: value })}
+            unreadable={unreadable.has("posology")}
+            hint="Utilisée telle quelle si aucune prise n'est renseignée ci-dessus."
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Après l'analyse : la ligne du traitement, à lire en un regard.
+ *
+ * « 5 médicaments détectés ✓ » puis les noms. Ce qui appelle une action du
+ * pharmacien — un médicament à rattacher au catalogue — est dit ici, en
+ * petit, et conduit aux détails.
+ */
+export function TreatmentLine({
+  lines,
+  onEdit,
+  canEdit,
+  onOpenDetails,
+}: {
+  lines: SaleLineDraft[];
+  onEdit: () => void;
+  canEdit: boolean;
+  onOpenDetails: () => void;
+}) {
+  const confirmed = lines.filter((line) => line.confirmed);
+  const unattached = confirmed.filter((line) => !line.official && line.candidates.length > 0);
+
+  return (
+    <section aria-labelledby="zone-traitement" className="space-y-1">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="zone-traitement" className="flex items-center gap-2 text-[15px] font-semibold text-text-primary">
+          {confirmed.length} médicament{confirmed.length > 1 ? "s" : ""} détecté
+          {confirmed.length > 1 ? "s" : ""}
+          <Check className="size-[18px] text-success-600 dark:text-success-500" strokeWidth={2.5} />
+        </h2>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px] font-medium text-brand-700 transition-colors hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950"
+          >
+            <Pencil className="size-3.5" />
+            Corriger
+          </button>
+        )}
+      </div>
+      <p className="text-[13.5px] leading-5 text-text-secondary">
+        {confirmed
+          .map((line) => [line.drugName, line.dosage].filter(Boolean).join(" "))
+          .join(" · ")}
+      </p>
+      {unattached.length > 0 && (
+        <button
+          type="button"
+          onClick={onOpenDetails}
+          className="text-[12.5px] text-warning-700 underline-offset-2 hover:underline dark:text-warning-500"
+        >
+          {unattached.length} à rattacher au catalogue national
+        </button>
+      )}
+    </section>
+  );
+}
+
+/** Ce que le catalogue national dit de chaque ligne — sous « Voir les détails ». */
+export function TreatmentDetails({
   lines,
   onEdit,
   canEdit,
@@ -151,45 +483,32 @@ function PrescriptionSummary({
   const confirmed = lines.filter((line) => line.confirmed);
 
   return (
-    <section className="space-y-3" aria-labelledby="zone-traitement">
-      <ZoneTitle
-        id="zone-traitement"
-        step={1}
-        title="Le traitement"
-        action={
-          canEdit ? (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px] font-medium text-brand-700 transition-colors hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950"
-            >
-              <Pencil className="size-3.5" />
-              Corriger
-            </button>
-          ) : undefined
-        }
-      />
+    <section className="space-y-3" aria-label="Détail du traitement">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[13px] font-semibold text-text-primary">Le traitement, en détail</h3>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-brand-700 hover:underline dark:text-brand-400"
+          >
+            <Pencil className="size-3.5" />
+            Corriger
+          </button>
+        )}
+      </div>
 
       <Card>
         <CardContent className="pt-3 pb-3">
           <ul className="divide-y divide-border-subtle">
             {confirmed.map((line) => (
-              <SummaryLine
-                key={line.id}
-                line={line}
-                canEdit={canEdit}
-                attribution={catalogAttribution}
-              />
+              <DetailLine key={line.id} line={line} canEdit={canEdit} attribution={catalogAttribution} />
             ))}
             {confirmed.length === 0 && (
               <li className="py-3 text-[13px] text-text-tertiary">Aucune ligne confirmée.</li>
             )}
           </ul>
 
-          {/* La licence du catalogue national impose de mentionner la source et
-              sa date partout où ses données sont affichées. Une fois pour la
-              carte entière : la répéter sous chaque ligne occupait quatre fois
-              la place pour la même phrase. */}
           {catalogAttribution && confirmed.some((line) => line.official) && (
             <p className="mt-3 border-t border-border-subtle pt-2.5 text-[11.5px] leading-4 text-text-tertiary">
               {catalogAttribution}
@@ -201,19 +520,7 @@ function PrescriptionSummary({
   );
 }
 
-/**
- * Une ligne d'ordonnance, en une ligne.
- *
- * Niveau 1 — ce qui est prescrit, et si l'officine l'a. Niveau 2 — la
- * composition officielle, les conditions de délivrance et l'explication du
- * traitement, à un clic. Un pharmacien qui délivre un traitement qu'il connaît
- * n'a pas besoin de relire la composition à chaque fois ; celui qui a un doute
- * l'ouvre.
- *
- * Exception : une ligne NON rattachée reste dépliée. Ce n'est pas un détail,
- * c'est une action qui lui revient.
- */
-function SummaryLine({
+function DetailLine({
   line,
   canEdit,
   attribution,
@@ -222,9 +529,6 @@ function SummaryLine({
   canEdit: boolean;
   attribution: string | null;
 }) {
-  // Quand la ligne est rattachée, l'explication vit dans le repli ci-dessous.
-  const hasDetail = Boolean(line.official);
-
   return (
     <li className="py-2 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -277,13 +581,6 @@ function SummaryLine({
           canEdit={canEdit}
         />
       )}
-
-      {!hasDetail && line.explanationSource === "UNAVAILABLE" && (
-        <p className="mt-0.5 text-[12px] leading-4 text-warning-700 dark:text-warning-500">
-          Aucune information dans le référentiel connecté : aucune explication n&apos;est
-          produite pour ce médicament.
-        </p>
-      )}
     </li>
   );
 }
@@ -298,8 +595,6 @@ function AvailabilityChip({ availability }: { availability: SaleLineDraft["avail
   }
   if (state === "REFERENCED_EMPTY") return <Badge tone="warning">Stock à zéro</Badge>;
   if (state === "NOT_REFERENCED") return <Badge tone="warning">Hors stock</Badge>;
-  // UNKNOWN : la ligne n'est pas rattachée. Ne pas savoir n'est pas une
-  // rupture, et l'écran ne doit jamais laisser croire le contraire.
   return <Badge tone="neutral">Disponibilité inconnue</Badge>;
 }
 
@@ -336,187 +631,47 @@ export function ZoneTitle({
   );
 }
 
-function LineCard({
-  line,
-  index,
-  onChange,
-}: {
-  line: SaleLineDraft;
-  index: number;
-  onChange: (patch: Partial<SaleLineDraft>) => void;
-}) {
-  const unreadable = new Set(line.unreadableFields);
-  const nameConfidence = line.confidence.drugName ?? 0;
-  const nameUncertain = nameConfidence > 0 && nameConfidence < OCR_REVIEW_THRESHOLD;
-
-  return (
-    <Card
-      className={cn(
-        "transition-colors",
-        line.confirmed
-          ? "border-success-500/40 bg-success-50/25 dark:bg-success-700/5"
-          : "border-border-default",
-      )}
-    >
-      <CardHeader
-        title={`Ligne ${index + 1}`}
-        description={line.rawText ? `Lu sur l'ordonnance : « ${line.rawText} »` : undefined}
-        action={
-          <button
-            type="button"
-            onClick={() => onChange({ confirmed: !line.confirmed })}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
-              line.confirmed
-                ? "bg-success-600 text-white hover:bg-success-700"
-                : "border border-border-default text-text-secondary hover:bg-surface-sunken",
-            )}
-            aria-pressed={line.confirmed}
-          >
-            {line.confirmed ? (
-              <>
-                <Check className="size-3.5" /> Confirmée
-              </>
-            ) : (
-              <>
-                <X className="size-3.5" /> À confirmer
-              </>
-            )}
-          </button>
-        }
-      />
-      <CardContent className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
-          <FieldWithConfidence
-            label="Médicament"
-            value={line.drugName}
-            onChange={(value) => onChange({ drugName: value })}
-            confidence={nameConfidence}
-            unreadable={unreadable.has("drugName")}
-            required
-          />
-          <FieldWithConfidence
-            label="Dosage"
-            value={line.dosage}
-            onChange={(value) => onChange({ dosage: value })}
-            confidence={line.confidence.dosage ?? 0}
-            unreadable={unreadable.has("dosage")}
-          />
-          <FieldWithConfidence
-            label="Forme"
-            value={line.form}
-            onChange={(value) => onChange({ form: value })}
-            confidence={line.confidence.form ?? 0}
-            unreadable={unreadable.has("form")}
-          />
-        </div>
-
-        <FieldWithConfidence
-          label="Posologie"
-          value={line.posology}
-          onChange={(value) => onChange({ posology: value })}
-          confidence={line.confidence.posology ?? 0}
-          unreadable={unreadable.has("posology")}
-        />
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Durée (jours)" htmlFor={`duration-${line.id}`}>
-            <Input
-              id={`duration-${line.id}`}
-              type="number"
-              min={0}
-              value={line.durationDays ?? ""}
-              onChange={(event) =>
-                onChange({
-                  durationDays: event.target.value ? Number(event.target.value) : null,
-                })
-              }
-            />
-          </Field>
-          <Field label="Quantité" htmlFor={`quantity-${line.id}`}>
-            <Input
-              id={`quantity-${line.id}`}
-              type="number"
-              min={0}
-              value={line.quantity ?? ""}
-              onChange={(event) =>
-                onChange({ quantity: event.target.value ? Number(event.target.value) : null })
-              }
-            />
-          </Field>
-          <FieldWithConfidence
-            label="Instructions"
-            value={line.instructions}
-            onChange={(value) => onChange({ instructions: value })}
-            confidence={line.confidence.instructions ?? 0}
-            unreadable={unreadable.has("instructions")}
-          />
-        </div>
-
-        {nameUncertain && (
-          <Alert tone="warning" icon={<AlertTriangle className="size-[18px]" />}>
-            Le nom du médicament a été lu avec une confiance de{" "}
-            {Math.round(nameConfidence * 100)} %. Vérifiez-le sur l&apos;ordonnance avant de
-            confirmer.
-          </Alert>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function FieldWithConfidence({
+/** Un champ court, étiquette au-dessus, sans bordure de section. */
+function CompactField({
   label,
   value,
   onChange,
-  confidence,
   unreadable,
-  required,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  confidence: number;
-  unreadable: boolean;
-  required?: boolean;
+  unreadable?: boolean;
+  hint?: string;
 }) {
-  // `useId` garantit un identifiant stable entre serveur et client — sans quoi
-  // l'association label/champ casse à l'hydratation.
   const id = useId();
-  const uncertain = !unreadable && confidence > 0 && confidence < OCR_REVIEW_THRESHOLD;
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor={id} className="text-[13px] font-medium text-text-primary">
-          {label}
-          {required && (
-            <span className="ml-0.5 text-danger-600" aria-hidden="true">
-              *
-            </span>
-          )}
-        </label>
-        {unreadable ? (
-          <Badge tone="danger" icon={<EyeOff className="size-3" />}>
-            Illisible
-          </Badge>
-        ) : uncertain ? (
-          <Badge tone="warning">{Math.round(confidence * 100)} %</Badge>
-        ) : confidence > 0 ? (
-          <Badge tone="success">{Math.round(confidence * 100)} %</Badge>
-        ) : null}
-      </div>
+    <div className="space-y-1">
+      <label
+        htmlFor={id}
+        className="flex items-center gap-1.5 text-[11.5px] font-medium text-text-tertiary"
+      >
+        {label}
+        {unreadable && (
+          <span className="text-warning-700 dark:text-warning-500">· non lu</span>
+        )}
+      </label>
       <Input
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        required={required}
-        placeholder={unreadable ? "Non lu — à saisir" : undefined}
-        className={cn(
-          unreadable && "border-danger-400 bg-danger-50/40 dark:bg-danger-700/10",
-          uncertain && "border-warning-400 bg-warning-50/40 dark:bg-warning-700/10",
-        )}
+        placeholder={unreadable ? "À saisir" : undefined}
+        className={cn(unreadable && !value && "border-warning-400")}
       />
+      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
     </div>
   );
+}
+
+/** « 2026-09-02 » → « 02/09/2026 ». */
+function formatDateFr(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : iso;
 }

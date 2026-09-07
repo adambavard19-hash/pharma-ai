@@ -1,3 +1,4 @@
+import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ClipboardList, Plus } from "lucide-react";
@@ -34,7 +35,7 @@ export default async function PrescriptionsPage({
   const tab = params.statut ?? params.onglet ?? "toutes";
   const filter = TAB_FILTERS[tab] ?? null;
 
-  const baseWhere = { pharmacyId: session.scope.pharmacyId, deletedAt: null };
+  const baseWhere = { pharmacyId: session.scope.pharmacyId, deletedAt: null, ...activityScope() };
 
   const [prescriptions, counts] = await Promise.all([
     prisma.prescription.findMany({

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/field";
 /** Recherche filtrante dans une liste, synchronisée avec l'URL. */
 export function PatientSearchBar({
   initialQuery,
-  placeholder = "Rechercher un patient (nom, référence, téléphone…)",
+  placeholder = "Rechercher un patient (nom, référence, e-mail, téléphone…)",
   basePath = "/patients",
 }: {
   initialQuery: string;

@@ -20,6 +20,7 @@ import {
   type InteractionClassMember,
   type InteractionRule,
 } from "../interactions";
+import type { TreatmentUnderstanding } from "../understanding";
 import type {
   AnalysisResult,
   CatalogProduct,
@@ -87,6 +88,13 @@ export type PipelineInput = {
     classMembers: InteractionClassMember[];
     catalog: InteractionCatalogState;
   };
+  /**
+   * La compréhension du traitement par l'`AIProvider` : classification des
+   * médicaments et besoins complémentaires, déjà validés par le domaine.
+   * Absent = fournisseur déterministe, le moteur travaille sur la seule
+   * couche éditoriale et la trace le dit.
+   */
+  understanding?: TreatmentUnderstanding | null;
   usedSimulatedProviders: boolean;
   maxRecommendations?: number;
 };
@@ -253,12 +261,29 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     usableLines.length,
     () => {
       const unavailable = input.explanations.filter((e) => e.source === "UNAVAILABLE");
-      const notes =
-        unavailable.length > 0
-          ? [
-              `${unavailable.length} médicament(s) sans information référencée : aucune explication n'a été produite.`,
-            ]
-          : [];
+      const notes: string[] = [];
+
+      const understanding = input.understanding;
+      if (understanding) {
+        notes.push(
+          `Compréhension par ${understanding.providerId} : ${understanding.drugs.length} médicament(s) classé(s), ${understanding.needs.length} besoin(s) complémentaire(s) identifié(s).`,
+        );
+        if (understanding.context.summary) notes.push(understanding.context.summary);
+        for (const need of understanding.needs) {
+          notes.push(`Besoin ${need.key} (${Math.round(need.confidence * 100)} %) : ${need.justification}`);
+        }
+        for (const warning of understanding.warnings) notes.push(`Écarté à la validation — ${warning}`);
+      } else {
+        notes.push(
+          "Aucune compréhension IA : fournisseur déterministe, seule la couche éditoriale alimente les règles.",
+        );
+      }
+
+      if (unavailable.length > 0) {
+        notes.push(
+          `${unavailable.length} médicament(s) sans information référencée : aucune explication n'a été produite.`,
+        );
+      }
       return {
         output: input.explanations,
         count: input.explanations.length,
@@ -289,6 +314,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       const detected = detectAdviceOpportunities({
         drugs: drugsForAdvice,
         patient: input.patient,
+        needs: input.understanding?.needs ?? [],
       });
       return {
         output: detected,

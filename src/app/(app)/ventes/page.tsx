@@ -1,3 +1,4 @@
+import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Receipt, Sparkles, TrendingUp, Users } from "lucide-react";
@@ -32,6 +33,7 @@ export default async function SalesPage({
     prisma.sale.findMany({
       where: {
         pharmacyId: session.scope.pharmacyId,
+        ...activityScope(),
         createdAt: { gte: period.start, lte: period.end },
       },
       orderBy: { createdAt: "desc" },

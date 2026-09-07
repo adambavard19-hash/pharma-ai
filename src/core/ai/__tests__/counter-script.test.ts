@@ -90,13 +90,21 @@ describe("phrase de comptoir — au bout de la chaîne", () => {
   });
 
   /**
-   * La phrase de comptoir vient de la règle de conseil ; l'argumentaire
-   * commercial du produit alimente la fiche patient, pas ce que le pharmacien
-   * affirme. Les confondre reviendrait à faire dire une accroche marketing.
+   * Ni la phrase prononcée au comptoir, ni le pourquoi lu par le patient ne
+   * reprennent l'accroche commerciale du produit : les deux viennent de la
+   * règle de conseil, qui seule connaît le lien entre l'ordonnance et le
+   * conseil. Laisser passer le marketing dans l'un ou l'autre reviendrait à
+   * habiller un argument de vente en justification médicale.
    */
-  it("ne reprend pas l'argumentaire commercial du produit", () => {
+  it("ne reprend l'argumentaire commercial du produit nulle part", () => {
     const claim = product().commercialClaims[0];
-    expect(scored.patientReason).toContain(claim);
     expect(scored.counterScript).not.toContain(claim);
+    expect(scored.patientReason).not.toContain(claim);
+  });
+
+  /** Le pourquoi patient doit nommer la référence et expliquer le lien. */
+  it("explique au patient le lien avec son traitement", () => {
+    expect(scored.patientReason).toContain("Flore Équilibre");
+    expect(scored.patientReason).not.toMatch(/\{[a-z]+\}/i);
   });
 });

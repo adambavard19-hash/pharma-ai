@@ -72,6 +72,14 @@ export class RuleBasedAIProvider implements AIProvider {
     };
   }
 
+  /**
+   * Aucune classification sans modèle. Le moteur travaille alors sur la
+   * seule couche éditoriale, et le dit.
+   */
+  async classifyDrugs(): Promise<null> {
+    return null;
+  }
+
   async writePatientReason(request: PatientReasonRequest): Promise<string> {
     const claim = request.productClaims[0];
     if (claim) {

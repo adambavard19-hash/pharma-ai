@@ -79,7 +79,6 @@ function UserMenu({ session }: { session: SessionContext }) {
         <p className="truncate text-[11.5px] text-text-tertiary">{session.user.email}</p>
         <div className="mt-1.5 flex flex-wrap gap-1">
           <Badge tone="brand">{session.roleLabel}</Badge>
-          {session.pharmacy.isDemo && <Badge tone="accent">Démo</Badge>}
         </div>
       </div>
 
@@ -112,8 +111,8 @@ function UserMenu({ session }: { session: SessionContext }) {
         </>
       )}
 
-      <Link href="/parametres" className="block">
-        <DropdownLink icon={<Settings className="size-4" />}>Paramètres</DropdownLink>
+      <Link href="/mon-compte" className="block">
+        <DropdownLink icon={<Settings className="size-4" />}>Mon compte</DropdownLink>
       </Link>
 
       <DropdownSeparator />

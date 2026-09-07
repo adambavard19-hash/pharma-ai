@@ -1,4 +1,5 @@
 import "server-only";
+import { activityScope } from "@/server/db/demo-scope";
 import { prisma } from "@/server/db/client";
 import { getEnv } from "@/config/env";
 import { generateToken, maskEmail } from "@/server/security/tokens";
@@ -154,6 +155,7 @@ export async function listReminders(
     prisma.reminder.findMany({
       where: {
         pharmacyId: scope.pharmacyId,
+        ...activityScope(),
         status: { in: ["SCHEDULED", "SNOOZED"] },
         dueAt: { lte: horizon },
       },

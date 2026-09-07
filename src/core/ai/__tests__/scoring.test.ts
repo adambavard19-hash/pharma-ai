@@ -26,6 +26,8 @@ function opportunity(
     shortReason: "Antibiothérapie (Amoxicilline) : flore intestinale à accompagner.",
     rationale: "…",
     counterScriptTemplate: "« Amoxicilline est un antibiotique. {product} accompagne la cure. »",
+    patientReasonTemplate:
+      "Votre antibiotique (Amoxicilline) peut déséquilibrer la flore de votre intestin. {product} l'accompagne.",
     clinicalContext: null,
     safetyNotes: [],
     priority: 72,

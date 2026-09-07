@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { prisma } from "@/server/db/client";
-import { isDemoMode } from "@/config/env";
 import { getInstallState } from "@/server/services/install-state";
 import { LoginForm } from "./login-form";
 import { PharmaWordmark } from "@/components/app/logo";
@@ -26,34 +24,8 @@ const HIGHLIGHTS = [
   },
 ];
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ erreur?: string }>;
-}) {
-  const params = await searchParams;
-  const demo = isDemoMode();
+export default async function LoginPage() {
   const install = await getInstallState();
-
-  const demoAccounts =
-    demo && install.status === "READY"
-      ? await prisma.user
-        .findMany({
-          where: {
-            status: "ACTIVE",
-            memberships: { some: { isActive: true, pharmacy: { isDemo: true } } },
-          },
-          select: {
-            email: true,
-            firstName: true,
-            lastName: true,
-            memberships: { select: { role: true }, take: 1 },
-          },
-          orderBy: { createdAt: "asc" },
-          take: 4,
-        })
-        .catch(() => [])
-      : [];
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1fr_minmax(0,52ch)]">
@@ -124,19 +96,7 @@ export default async function LoginPage({
             </p>
           </div>
 
-          <LoginForm
-            demoAccounts={demoAccounts.map((account) => ({
-              email: account.email,
-              name: `${account.firstName} ${account.lastName}`,
-              role: account.memberships[0]?.role ?? "VIEWER",
-            }))}
-            install={install}
-            initialError={
-              params.erreur === "demo-indisponible"
-                ? "Le compte de démonstration n'est pas disponible. Lancez `npm run db:seed`."
-                : null
-            }
-          />
+          <LoginForm install={install} initialError={null} />
         </div>
       </section>
     </main>

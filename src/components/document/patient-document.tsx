@@ -1,6 +1,7 @@
 import Image from "next/image";
-import { AlertTriangle, Info, Sparkles } from "lucide-react";
+import { AlertTriangle, Sparkles } from "lucide-react";
 import { formatCents, formatDateLong } from "@/lib/format";
+import { buildDailyPlan } from "@/core/posology";
 import type { DocumentContent } from "@/core/documents/types";
 
 /**
@@ -21,6 +22,11 @@ export function PatientDocument({
 }) {
   const generatedAt = new Date(content.generatedAt);
 
+  // Le plan de la journée ne reprend que les répartitions confirmées : un
+  // médicament sans prise validée garde sa ligne détaillée plus bas, avec la
+  // posologie écrite telle quelle.
+  const dailyPlan = buildDailyPlan(content.treatment);
+
   return (
     <article
       className={
@@ -29,18 +35,6 @@ export function PatientDocument({
           : "mx-auto w-full max-w-[860px]"
       }
     >
-      {content.isDemo && (
-        <div className="mb-6 rounded-xl border border-accent-300 bg-accent-50 px-4 py-3 print-avoid-break">
-          <p className="text-[12px] leading-5 font-semibold text-accent-900">
-            DOCUMENT DE DÉMONSTRATION
-          </p>
-          <p className="mt-0.5 text-[11.5px] leading-4 text-accent-800">
-            Patient, ordonnance, produits et prix sont entièrement fictifs. Ce document ne
-            constitue en aucun cas un conseil médical ou pharmaceutique.
-          </p>
-        </div>
-      )}
-
       <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 pb-6 print-avoid-break"
         style={{ borderColor: content.pharmacy.brandColor }}
       >
@@ -69,7 +63,7 @@ export function PatientDocument({
 
         <div className="text-right">
           <p className="text-[12px] text-ink-500 dark:text-ink-400">
-            Fiche d&apos;accompagnement
+            Votre plan de traitement
           </p>
           <p className="text-[12px] text-ink-500 dark:text-ink-400">
             {formatDateLong(generatedAt)}
@@ -87,18 +81,71 @@ export function PatientDocument({
             : "Votre accompagnement"}
         </h1>
         <p className="mt-2 max-w-2xl text-[14px] leading-6 text-ink-600 dark:text-ink-300">
-          Voici les informations sur votre traitement et les conseils que{" "}
-          {content.pharmacist.fullName} a retenus pour vous. Ce document complète votre
-          ordonnance : il ne la remplace pas.
+          Votre traitement, préparé avec {content.pharmacist.fullName}. Ce document complète
+          votre ordonnance, il ne la remplace pas.
         </p>
       </section>
+
+      {dailyPlan.length > 0 && (
+        <section className="mt-9 print-avoid-break">
+          <SectionTitle
+            color={content.pharmacy.brandColor}
+            eyebrow="Votre journée"
+            title="Quand prendre vos médicaments"
+          />
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {dailyPlan.map((section) => (
+              <div
+                key={section.moment}
+                className="rounded-xl border-2 p-4 print-avoid-break"
+                style={{ borderColor: `${content.pharmacy.brandColor}33` }}
+              >
+                <p
+                  className="text-[13px] font-bold tracking-wide uppercase"
+                  style={{ color: content.pharmacy.brandColor }}
+                >
+                  {section.label}
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {section.entries.map((entry, index) => (
+                    <li
+                      key={`${entry.drugName}-${index}`}
+                      className="flex items-baseline gap-2.5 text-[15px] leading-6 text-ink-900 dark:text-ink-50"
+                    >
+                      <span
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md text-[13px] font-bold text-white"
+                        style={{ backgroundColor: content.pharmacy.brandColor }}
+                        aria-hidden="true"
+                      >
+                        {entry.doses}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="font-medium">{entry.drugName}</span>
+                        {entry.dosage && (
+                          <span className="text-ink-600 dark:text-ink-300"> {entry.dosage}</span>
+                        )}
+                        <span className="text-ink-500 dark:text-ink-400">
+                          {" "}
+                          — {entry.doses} {entry.unit}
+                          {entry.doses > 1 ? "s" : ""}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {content.treatment.length > 0 && (
         <section className="mt-9">
           <SectionTitle
             color={content.pharmacy.brandColor}
             eyebrow="Votre traitement"
-            title="Ce que vous a prescrit votre médecin"
+            title="Le détail de chaque médicament"
           />
 
           <div className="mt-4 space-y-3">
@@ -124,15 +171,12 @@ export function PatientDocument({
                   )}
                 </div>
 
-                {item.purpose ? (
+                {/* Sans explication vérifiée, la ligne se tait : un plan
+                    patient n'est pas l'endroit où répéter cinq fois qu'une
+                    donnée manque. Le pharmacien l'a expliqué au comptoir. */}
+                {item.purpose && (
                   <p className="mt-2 text-[13.5px] leading-6 text-ink-700 dark:text-ink-200">
                     {item.purpose}
-                  </p>
-                ) : (
-                  <p className="mt-2 flex items-start gap-1.5 text-[12.5px] leading-5 text-ink-500 dark:text-ink-400">
-                    <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                    Aucune explication vérifiée n&apos;est disponible pour ce médicament.
-                    Demandez à votre pharmacien.
                   </p>
                 )}
 

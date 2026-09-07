@@ -1,3 +1,5 @@
+import type { PosologySchedule } from "@/core/posology";
+
 /**
  * Contenu figé d'une fiche patient.
  *
@@ -12,6 +14,12 @@ export type DocumentTreatmentItem = {
   dosage: string | null;
   form: string | null;
   posology: string | null;
+  /**
+   * Répartition confirmée par le pharmacien. `null` lorsqu'aucune prise n'a
+   * été renseignée : le plan affiche alors la posologie écrite telle quelle,
+   * sans reconstituer d'horaires que personne n'a validés.
+   */
+  schedule: PosologySchedule | null;
   durationDays: number | null;
   instructions: string | null;
   /** Explication vulgarisée, uniquement si une source fiable existe. */
@@ -73,9 +81,6 @@ export const DOCUMENT_DISCLAIMERS = [
   "Les conseils complémentaires proposés ne sont pas des médicaments prescrits. Ils sont facultatifs.",
   "En cas d'effet inhabituel, de doute ou d'aggravation, contactez votre pharmacien ou votre médecin.",
 ];
-
-export const DEMO_DISCLAIMER =
-  "DOCUMENT DE DÉMONSTRATION — patient, ordonnance, produits et prix sont fictifs. Ce document ne constitue en aucun cas un conseil médical ou pharmaceutique.";
 
 /**
  * Rappel systématique en pied de courriel : le patient doit savoir pourquoi il

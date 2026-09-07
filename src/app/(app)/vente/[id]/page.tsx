@@ -1,3 +1,4 @@
+import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/client";
@@ -9,6 +10,7 @@ import { proposeSpecialties } from "@/server/services/drug-identification";
 import { loadPrescribedAvailability } from "@/server/services/drug-catalog";
 import { buildPatientContext } from "@/server/services/patients";
 import { AUTO_ACCEPT_REFUSAL_MESSAGES, decideAutoAccept } from "@/core/reference";
+import { parsePosology, readSchedule } from "@/core/posology";
 import { SaleWorkspace } from "./sale-workspace";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
 import type { PatientFactor, SpecialtyProposal } from "./types";
@@ -73,9 +75,9 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   if (!prescription || prescription.pharmacyId !== session.scope.pharmacyId) notFound();
 
   const patients = await prisma.patient.findMany({
-    where: { pharmacyId: session.scope.pharmacyId, deletedAt: null },
+    where: { pharmacyId: session.scope.pharmacyId, deletedAt: null, ...activityScope() },
     orderBy: { lastName: "asc" },
-    select: { id: true, firstName: true, lastName: true, reference: true },
+    select: { id: true, firstName: true, lastName: true, reference: true, email: true },
     take: 300,
   });
 
@@ -171,7 +173,13 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         prescribedAt: prescription.prescribedAt?.toISOString().slice(0, 10) ?? null,
       }}
       patients={patients}
-      lines={prescription.lines.map((line) => ({
+      lines={prescription.lines.map((line) => {
+        // La colonne confirmée prime toujours sur une relecture du texte : une
+        // fois que le pharmacien a tranché, plus rien ne réinterprète.
+        const stored = readSchedule(line.schedule);
+        const parsed = stored ? null : parsePosology(line.posology);
+
+        return {
         id: line.id,
         position: line.position,
         rawText: line.rawText,
@@ -179,6 +187,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         dosage: line.dosage ?? "",
         form: line.form ?? "",
         posology: line.posology ?? "",
+        schedule: stored ?? parsed?.schedule ?? null,
+        scheduleInferred: stored ? false : (parsed?.inferred ?? false),
         durationDays: line.durationDays,
         quantity: line.quantity,
         instructions: line.instructions ?? "",
@@ -210,7 +220,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         identificationRefusal: catalogLoaded
           ? (refusals.get(line.id) ?? null)
           : "Aucun catalogue officiel n'est chargé dans Pharma.ai.",
-      }))}
+        };
+      })}
       catalogAttribution={attribution}
       identificationChangedSinceAnalysis={identificationChangedSinceAnalysis}
       patientFactors={patientFactors}
@@ -231,7 +242,17 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           blockReason: opportunity.blockReason,
         })) ?? []
       }
-      recommendations={prescription.recommendations.map((recommendation) => {
+      recommendations={[...prescription.recommendations]
+        // La priorité clinique de l'opportunité commande l'ordre des cartes ;
+        // le score ne départage qu'à priorité égale. Un conseil de sécurité
+        // ou de tolérance passe avant un conseil de confort, quel que soit le
+        // produit trouvé.
+        .sort(
+          (a, b) =>
+            (b.opportunity?.priority ?? 0) - (a.opportunity?.priority ?? 0) ||
+            b.totalScore - a.totalScore,
+        )
+        .map((recommendation) => {
         const breakdown = (recommendation.scoreBreakdown ?? {}) as Record<string, unknown> & {
           explanation?: ScoreContribution[];
         };
@@ -255,11 +276,17 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           explanation: Array.isArray(breakdown.explanation) ? breakdown.explanation : [],
           opportunity: recommendation.opportunity
             ? {
+                id: recommendation.opportunity.id,
                 title: recommendation.opportunity.title,
                 rationale: recommendation.opportunity.rationale,
                 clinicalContext: recommendation.opportunity.clinicalContext,
                 priority: recommendation.opportunity.priority,
                 safetyNotes: recommendation.opportunity.safetyNotes,
+                question: recommendation.opportunity.question,
+                requiresConfirmation: recommendation.opportunity.requiresConfirmation,
+                answer: recommendation.opportunity.answer,
+                aiJustification: recommendation.opportunity.aiJustification,
+                confirmedReason: recommendation.opportunity.confirmedReason,
               }
             : null,
           product: recommendation.product
@@ -287,12 +314,23 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
             }
           : null
       }
+      understanding={(() => {
+        const stored = run?.understanding as
+          | { providerId?: string; context?: { summary?: string; confidence?: number } }
+          | null
+          | undefined;
+        if (!stored?.context?.summary) return null;
+        return {
+          summary: stored.context.summary,
+          confidence: stored.context.confidence ?? 0,
+          providerId: stored.providerId ?? "",
+        };
+      })()}
       permissions={{
         verify: session.permissions.has(PERMISSIONS.PRESCRIPTION_VERIFY),
         decide: session.permissions.has(PERMISSIONS.RECOMMENDATION_DECIDE),
         sell: session.permissions.has(PERMISSIONS.SALE_CREATE),
       }}
-      simulatedExtraction={prescription.ocrProvider === "mock-ocr"}
       hasSale={prescription.sales.length > 0}
     />
   );

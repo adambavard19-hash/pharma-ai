@@ -1092,6 +1092,30 @@ model PharmacyDrugStock {
 // marqué comme tel (`isDemoData = true`).
 // ===========================================================================
 
+/// Classification d'un médicament par le modèle, mise en cache.
+///
+/// La substance, le code ATC et la classe d'un médicament ne changent pas
+/// d'une ordonnance à l'autre : une fois classé, un médicament ne repasse plus
+/// par le modèle. C'est ce qui rend l'analyse au comptoir locale et immédiate.
+/// La clé est le nom tel qu'écrit sur l'ordonnance, normalisé.
+model DrugClassification {
+  id                String    @id @default(cuid())
+  key               String    @unique
+  substance         String?
+  atcCode           String?
+  therapeuticClass  String?
+  commonSideEffects String[]  @default([])
+  confidence        Float
+  providerId        String
+  model             String
+  /// Renseigné lorsqu'un pharmacien a confirmé la classification.
+  validatedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("drug_classifications")
+}
+
 model DrugReference {
   id                 String   @id @default(cuid())
   /// Code CIS (base de données publique des médicaments) lorsqu'il existe.
@@ -1239,6 +1263,12 @@ model PrescriptionLine {
   dosage              String?
   form                String?
   posology            String?
+  /// Répartition des prises, telle que confirmée par le pharmacien :
+  /// { morning, noon, evening, bedtime, mealTiming, times }.
+  /// NULL tant qu'aucune saisie structurée n'a eu lieu — le plan patient
+  /// retombe alors sur le texte de la posologie plutôt que sur une
+  /// répartition devinée. Voir src/core/posology/.
+  schedule            Json?
   durationDays        Int?
   quantity            Int?
   instructions        String?
@@ -1293,6 +1323,9 @@ model AnalysisRun {
   traceJson      Json           @default("[]")
   /// Raisons ayant bloqué tout ou partie de l'analyse.
   blockedReasons String[]       @default([])
+  /// Ce que la compréhension IA a produit : contexte, classification par
+  /// ligne, besoins et écarts de validation. Relisible des mois plus tard.
+  understanding  Json?
   isDemo         Boolean        @default(false)
 
   startedAt    DateTime  @default(now())
@@ -1387,6 +1420,24 @@ model AdviceOpportunity {
   priority        Int             @default(50)
   isBlocked       Boolean         @default(false)
   blockReason     String?
+  /// Le besoin identifié par la compréhension IA qui a déclenché la règle.
+  needKey         String?
+  /// La question à poser au patient, écrite dans la règle de conseil.
+  question        String?
+  /// Vrai tant que la proposition attend la réponse du patient.
+  requiresConfirmation Boolean    @default(false)
+  /// La réponse du patient : oui, non, ou pas encore posée.
+  answer           Boolean?
+  answeredAt       DateTime?
+  answeredByUserId String?
+  /// Pourquoi le modèle a vu ce besoin ici — pour le pharmacien uniquement.
+  aiJustification  String?
+  /// La règle de conseil qui a produit l'opportunité, et sa version : on doit
+  /// pouvoir relire, des mois plus tard, quelle règle a parlé au comptoir.
+  ruleKey          String?
+  ruleVersion      String?
+  /// Le « pourquoi » une fois le besoin confirmé par le patient.
+  confirmedReason  String?
   createdAt       DateTime        @default(now())
 
   analysisRun     AnalysisRun      @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
@@ -1500,6 +1551,8 @@ enum RecommendationEventType {
   DECLINED_BY_PATIENT
   /// La vente s'est terminée sans que le pharmacien tranche.
   IGNORED
+  /// Refus repris au comptoir : le patient a changé d'avis dans la minute.
+  REOPENED
 }
 
 /// Journal complet du cycle de vie d'une recommandation : c'est cette table qui
