@@ -600,6 +600,8 @@ model StockMovement {
 
   @@index([pharmacyId, createdAt])
   @@index([productId, createdAt])
+  /// Une vente ne décompte un produit qu'une fois, quoi qu'il arrive au clic.
+  @@unique([saleId, productId])
   @@map("stock_movements")
 }
 
@@ -629,6 +631,13 @@ model ImportJob {
   errorRows   Int          @default(0)
   /// Détail ligne à ligne des erreurs rencontrées.
   errors      Json         @default("[]")
+  /// Correspondance colonnes du fichier → champs (nom, code, quantité, prix…).
+  mapping     Json?
+  /// Les lignes analysées, en attente de validation : rien n'est écrit en
+  /// stock avant que le titulaire ait vu l'aperçu et validé.
+  payload     Json?
+  /// Le résumé de l'aperçu : détectés, reconnus, à vérifier, non reconnus.
+  summary     Json?
   userId      String?
   createdAt   DateTime     @default(now())
   finishedAt  DateTime?
@@ -1070,6 +1079,9 @@ model PharmacyDrugStock {
   quantity       Int             @default(0)
   /// Seuil déclenchant l'alerte « stock faible ». 0 = pas d'alerte.
   alertThreshold Int             @default(0)
+  /// Prix de vente TTC pratiqué par CETTE officine, en centimes. Absent = le
+  /// prix public du catalogue national fait foi.
+  priceCents     Int?
   location       String?
   source         DrugStockSource @default(MANUAL)
   lastCountedAt  DateTime?

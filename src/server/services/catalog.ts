@@ -154,6 +154,7 @@ export async function loadNationalDrugCandidates(
     select: {
       quantity: true,
       alertThreshold: true,
+      priceCents: true,
       presentation: {
         select: {
           id: true,
@@ -204,7 +205,8 @@ export async function loadNationalDrugCandidates(
         precautions: [],
         matchingTags: [...substances, presentation.specialty.name],
         contraindications: [],
-        salePriceCents: presentation.priceCents ?? 0,
+        // Le prix de l'officine prime sur le prix public quand elle l'a fixé.
+        salePriceCents: line.priceCents ?? presentation.priceCents ?? 0,
         // Prix d'achat inconnu : la dimension commerciale restera neutre.
         purchasePriceCents: 0,
         vatRate: 0,
@@ -330,57 +332,79 @@ export async function applyStockMovement(params: {
   reason?: string | null;
   saleId?: string | null;
 }): Promise<{ quantityAfter: number }> {
-  return prisma.$transaction(async (tx) => {
-    const stockItem = await tx.stockItem.findUnique({
-      where: { productId: params.productId },
+  // Une vente ne décompte un produit qu'une seule fois. Double clic,
+  // rafraîchissement, deux collaborateurs : si le mouvement de cette vente
+  // pour ce produit existe déjà, on rend l'état courant sans rien réécrire.
+  if (params.saleId) {
+    const existing = await prisma.stockMovement.findUnique({
+      where: { saleId_productId: { saleId: params.saleId, productId: params.productId } },
+      select: { quantityAfter: true },
     });
+    if (existing) return { quantityAfter: existing.quantityAfter };
+  }
 
-    const product = await tx.product.findUnique({
-      where: { id: params.productId },
-      select: { pharmacyId: true },
-    });
-    if (!product || product.pharmacyId !== params.scope.pharmacyId) {
-      throw new Error("Produit introuvable dans cette officine.");
-    }
-
-    const current = stockItem?.quantity ?? 0;
-    const quantityAfter =
-      params.type === "INVENTORY"
-        ? params.quantityDelta
-        : Math.max(0, current + params.quantityDelta);
-
-    if (stockItem) {
-      await tx.stockItem.update({
-        where: { id: stockItem.id },
-        data: {
-          quantity: quantityAfter,
-          lastCountedAt: params.type === "INVENTORY" ? new Date() : undefined,
-        },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({
+        where: { id: params.productId },
+        select: { pharmacyId: true },
       });
-    } else {
-      await tx.stockItem.create({
+      if (!product || product.pharmacyId !== params.scope.pharmacyId) {
+        throw new Error("Produit introuvable dans cette officine.");
+      }
+
+      // La ligne de stock existe toujours avant le calcul : la mise à jour
+      // atomique ci-dessous ne peut pas se faire sur une ligne absente.
+      const item = await tx.stockItem.upsert({
+        where: { productId: params.productId },
+        create: { pharmacyId: params.scope.pharmacyId, productId: params.productId, quantity: 0 },
+        update: {},
+        select: { id: true, quantity: true },
+      });
+
+      // Le calcul se fait dans la base, pas en mémoire : deux ventes
+      // simultanées lisent et écrivent la même ligne sans se marcher dessus.
+      const [updated] =
+        params.type === "INVENTORY"
+          ? await tx.$queryRaw<{ quantity: number }[]>`
+              UPDATE "stock_items" SET "quantity" = ${params.quantityDelta}, "lastCountedAt" = NOW(), "updatedAt" = NOW()
+              WHERE "id" = ${item.id} RETURNING "quantity"`
+          : await tx.$queryRaw<{ quantity: number }[]>`
+              UPDATE "stock_items" SET "quantity" = GREATEST(0, "quantity" + ${params.quantityDelta}), "updatedAt" = NOW()
+              WHERE "id" = ${item.id} RETURNING "quantity"`;
+      const quantityAfter = updated.quantity;
+
+      await tx.stockMovement.create({
         data: {
           pharmacyId: params.scope.pharmacyId,
           productId: params.productId,
-          quantity: quantityAfter,
+          type: params.type,
+          quantityDelta: params.type === "INVENTORY" ? quantityAfter - item.quantity : params.quantityDelta,
+          quantityAfter,
+          reason: params.reason ?? null,
+          userId: params.scope.userId,
+          saleId: params.saleId ?? null,
         },
       });
-    }
 
-    await tx.stockMovement.create({
-      data: {
-        pharmacyId: params.scope.pharmacyId,
-        productId: params.productId,
-        type: params.type,
-        quantityDelta:
-          params.type === "INVENTORY" ? quantityAfter - current : params.quantityDelta,
-        quantityAfter,
-        reason: params.reason ?? null,
-        userId: params.scope.userId,
-        saleId: params.saleId ?? null,
-      },
+      return { quantityAfter };
     });
+  } catch (error) {
+    // Course perdue : un autre appel a enregistré ce même mouvement de vente
+    // entre notre vérification et notre écriture. La contrainte d'unicité a
+    // annulé la transaction — la quantité n'a donc PAS été décomptée deux
+    // fois. On rend l'état écrit par l'autre.
+    if (params.saleId && isUniqueViolation(error)) {
+      const existing = await prisma.stockMovement.findUnique({
+        where: { saleId_productId: { saleId: params.saleId, productId: params.productId } },
+        select: { quantityAfter: true },
+      });
+      if (existing) return { quantityAfter: existing.quantityAfter };
+    }
+    throw error;
+  }
+}
 
-    return { quantityAfter };
-  });
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: string }).code === "P2002";
 }

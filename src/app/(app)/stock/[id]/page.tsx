@@ -68,6 +68,7 @@ export default async function ProductDetailPage({
   const quantity = product.stockItem?.quantity ?? 0;
   const threshold = product.stockItem?.alertThreshold ?? 0;
   const status = stockStatus(quantity, threshold);
+  const canManage = session.permissions.has(PERMISSIONS.PRODUCT_MANAGE);
   const { marginCents, marginRate } = computeMargin(
     product.purchasePriceCents,
     product.salePriceCents,
@@ -76,7 +77,7 @@ export default async function ProductDetailPage({
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
-        <Link href="/stock?onglet=catalogue">Retour au stock</Link>
+        <Link href="/stock">Retour au stock</Link>
       </Button>
 
       <div className="flex flex-wrap items-start justify-between gap-5">
@@ -145,12 +146,21 @@ export default async function ProductDetailPage({
           sublabel={`TVA ${product.vatRate} %`}
           icon={<Package className="size-4" />}
         />
-        <StatCard
-          label="Marge unitaire"
-          value={formatCents(marginCents)}
-          sublabel={marginRate !== null ? formatPercent(marginRate) : "Non calculable"}
-          icon={<TrendingUp className="size-4" />}
-        />
+        {canManage ? (
+          <StatCard
+            label="Marge unitaire"
+            value={formatCents(marginCents)}
+            sublabel={marginRate !== null ? formatPercent(marginRate) : "Non calculable"}
+            icon={<TrendingUp className="size-4" />}
+          />
+        ) : (
+          <StatCard
+            label="Stock"
+            value={quantity}
+            sublabel={STOCK_STATUS_LABELS[status]}
+            icon={<TrendingUp className="size-4" />}
+          />
+        )}
         <StatCard
           label="Proposé en conseil"
           value={proposed}
@@ -214,7 +224,7 @@ export default async function ProductDetailPage({
           </Card>
 
           <Card>
-            <CardHeader title="Mouvements de stock" description="Historique des entrées et sorties." />
+            <CardHeader title="Historique" description="Chaque entrée et sortie, avec son motif et son auteur." />
             <CardContent className="px-0 pb-0">
               {product.stockMovements.length === 0 ? (
                 <p className="px-5 pb-5 text-[13px] text-text-tertiary">
@@ -292,9 +302,11 @@ export default async function ProductDetailPage({
                     ? formatDateTime(product.stockItem.lastCountedAt)
                     : "—"}
                 </DataItem>
-                <DataItem label="Prix d'achat">
-                  {formatCents(product.purchasePriceCents)}
-                </DataItem>
+                {canManage && (
+                  <DataItem label="Prix d'achat">
+                    {formatCents(product.purchasePriceCents)}
+                  </DataItem>
+                )}
               </dl>
 
               {session.permissions.has(PERMISSIONS.STOCK_ADJUST) && (

@@ -36,6 +36,30 @@ export async function recordSale(params: {
     throw new Error("Une vente doit comporter au moins une ligne.");
   }
 
+  // Un double clic sur « Terminer », un rafraîchissement, deux collaborateurs
+  // sur la même ordonnance : la vente qui porte déjà ces conseils est rendue
+  // telle quelle, sans seconde ligne ni second décompte.
+  const requestedRecommendationIds = params.lines
+    .map((line) => line.recommendationId)
+    .filter((id): id is string => Boolean(id))
+    .sort();
+  if (params.prescriptionId && requestedRecommendationIds.length > 0) {
+    const previous = await prisma.sale.findFirst({
+      where: {
+        pharmacyId: params.scope.pharmacyId,
+        prescriptionId: params.prescriptionId,
+        lines: { some: { recommendationId: { in: requestedRecommendationIds } } },
+      },
+      select: { id: true, totalCents: true, attributedCents: true, lines: { select: { recommendationId: true } } },
+    });
+    if (previous) {
+      const already = previous.lines.map((line) => line.recommendationId).filter(Boolean).sort();
+      if (requestedRecommendationIds.every((id) => already.includes(id))) {
+        return { saleId: previous.id, totalCents: previous.totalCents, attributedCents: previous.attributedCents };
+      }
+    }
+  }
+
   const productIds = params.lines.map((line) => line.productId);
   const products = await prisma.product.findMany({
     where: { id: { in: productIds }, pharmacyId: params.scope.pharmacyId },

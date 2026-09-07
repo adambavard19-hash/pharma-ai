@@ -42,8 +42,11 @@ export function findCandidateProducts(params: {
   for (const product of catalog) {
     if (!product.isActive) continue;
 
-    const available =
-      product.stockQuantity > 0 || product.availableInSiblingPharmacy;
+    // Une pharmacie, un stock. Qu'une officine sœur ait la référence en rayon
+    // est une information pour le pharmacien, jamais une raison de la
+    // proposer ici : le patient repart avec ce que CETTE officine peut lui
+    // remettre aujourd'hui.
+    const available = product.stockQuantity > 0;
     if (!available && !includeOutOfStock) continue;
 
     const productTokens = tokenize([

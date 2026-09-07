@@ -42,6 +42,8 @@ export type DrugStockLine = {
   id: string;
   quantity: number;
   alertThreshold: number;
+  /** Prix TTC pratiqué par l'officine ; `null` = prix public du catalogue. */
+  priceCents: number | null;
   location: string | null;
   lastCountedAt: Date | null;
 };
@@ -122,6 +124,7 @@ async function withStock(
       presentationId: true,
       quantity: true,
       alertThreshold: true,
+      priceCents: true,
       location: true,
       lastCountedAt: true,
     },
@@ -355,6 +358,7 @@ export async function listDrugStock(options: DrugStockListOptions): Promise<{
         id: true,
         quantity: true,
         alertThreshold: true,
+        priceCents: true,
         location: true,
         lastCountedAt: true,
         presentation: { select: presentationSelect },
