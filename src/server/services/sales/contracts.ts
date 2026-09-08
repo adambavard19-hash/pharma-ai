@@ -5,6 +5,8 @@ import { getMessagingProvider, getStorageProvider } from "@/server/ai/registry";
 import { getSignatureProvider } from "@/server/signature/registry";
 import { buildContractDocument, CONTRACT_TEMPLATE_KEY } from "@/core/contracts/template";
 import { renderContractPdf } from "@/core/contracts/pdf";
+import { signatureFieldPlacement } from "@/core/contracts/layout";
+import { PDFDocument } from "pdf-lib";
 import { buildContractEmail } from "@/core/platform/sales-emails";
 import { SignatureNotConfiguredError, type SignatureEvent, type SignatureStatus } from "@/core/signature";
 import { CONTRACT_STATUS_LABELS, prospectStatusForContract, type ContractStatusCode } from "@/core/sales/pipeline";
@@ -150,13 +152,15 @@ export async function sendContract(contractId: string, actor: SalesActor): Promi
       if (!pdf) return { ok: false, error: "Le PDF du contrat est introuvable dans le stockage." };
       const [pFirst, ...pRest] = contract.pharmacySignerName.split(/\s+/);
       const [cFirst, ...cRest] = contract.companySignerName.split(/\s+/);
+      // Les champs de signature vont dans les cases dessinées en bas de la dernière page.
+      const pageCount = (await PDFDocument.load(pdf, { updateMetadata: false })).getPageCount();
       const envelope = await signature.createEnvelope({
         reference: reference(contract.prospect.name, contract.version),
         title: "Contrat d'abonnement PharmaBoost",
         pdf,
         signers: [
-          { role: "PHARMACY", firstName: pFirst, lastName: pRest.join(" ") || pFirst, email: contract.pharmacySignerEmail, phone: contract.prospect.phone },
-          { role: "COMPANY", firstName: cFirst, lastName: cRest.join(" ") || cFirst, email: contract.companySignerEmail },
+          { role: "PHARMACY", firstName: pFirst, lastName: pRest.join(" ") || pFirst, email: contract.pharmacySignerEmail, phone: contract.prospect.phone, field: signatureFieldPlacement(0, 2, pageCount) },
+          { role: "COMPANY", firstName: cFirst, lastName: cRest.join(" ") || cFirst, email: contract.companySignerEmail, field: signatureFieldPlacement(1, 2, pageCount) },
         ],
         expiresAt,
       });
@@ -244,12 +248,36 @@ export async function applySignatureStatus(contractId: string, status: Signature
   }
 }
 
+/**
+ * Relit le statut chez le prestataire (quand un webhook a été manqué, ou pour
+ * vérifier). N'applique un changement que si le statut a bougé.
+ */
+export async function refreshContractSignatureStatus(contractId: string, actor: SalesActor): Promise<{ ok: true; status: SignatureStatus; changed: boolean } | { ok: false; error: string }> {
+  const contract = await prisma.contract.findUnique({ where: { id: contractId }, select: { status: true, providerEnvelopeId: true, signatureProvider: true } });
+  if (!contract) return { ok: false, error: "Contrat introuvable." };
+  if (!contract.providerEnvelopeId) return { ok: false, error: "Ce contrat n'a pas été envoyé à un prestataire de signature." };
+  const provider = getSignatureProvider();
+  if (provider.info.capability !== "LIVE" || provider.info.id !== contract.signatureProvider) return { ok: false, error: `Le prestataire « ${contract.signatureProvider} » n'est pas configuré actuellement.` };
+  let status: SignatureStatus;
+  try {
+    status = await provider.getStatus(contract.providerEnvelopeId);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Le prestataire n'a pas répondu." };
+  }
+  if (status === contract.status || contract.status === "FINALIZED") return { ok: true, status, changed: false };
+  await applySignatureStatus(contractId, status, actor, `statut relu chez ${provider.info.label}`);
+  return { ok: true, status, changed: true };
+}
+
 /** Notification d'un prestataire : retrouve le contrat par l'identifiant d'enveloppe. */
 export async function handleSignatureEvent(event: SignatureEvent): Promise<boolean> {
   const contract = await prisma.contract.findFirst({ where: { providerEnvelopeId: event.envelopeId }, select: { id: true, status: true } });
   if (!contract) return false;
-  if (contract.status === "FINALIZED" && event.status !== "FINALIZED") return true;
-  await applySignatureStatus(contract.id, event.status, { type: "SIGNER", label: "Prestataire de signature" }, event.reason ?? null);
+  if (contract.status === "FINALIZED") return true;
+  // Notification non authentifiée : seul l'état relu chez le prestataire fait foi.
+  const status = event.verified ? event.status : await getSignatureProvider().getStatus(event.envelopeId);
+  if (status === contract.status) return true;
+  await applySignatureStatus(contract.id, status, { type: "SIGNER", label: event.verified ? "Prestataire de signature" : "Prestataire de signature (statut relu)" }, event.reason ?? null);
   return true;
 }
 

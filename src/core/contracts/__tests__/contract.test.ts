@@ -38,3 +38,22 @@ describe("contrat d'abonnement", () => {
     expect(pdf.getTitle()).toBe("Contrat d'abonnement au service PharmaBoost");
   });
 });
+
+describe("géométrie des signatures", () => {
+  it("place les champs de signature dans les cases, sur la dernière page, en coordonnées depuis le haut", async () => {
+    const { signatureBoxes, signatureFieldPlacement, CONTRACT_PAGE } = await import("../layout");
+    const boxes = signatureBoxes(2);
+    expect(boxes).toHaveLength(2);
+    expect(boxes[1].x).toBeGreaterThan(boxes[0].x + boxes[0].width);
+    const field = signatureFieldPlacement(0, 2, 3);
+    expect(field.page).toBe(3);
+    expect(field.width).toBeGreaterThanOrEqual(24);
+    expect(field.height).toBeGreaterThanOrEqual(24);
+    expect(field.y + field.height).toBeLessThanOrEqual(CONTRACT_PAGE.height);
+    // La zone est bien à l'intérieur de la case : sous le texte, au-dessus du bas.
+    const box = boxes[0];
+    expect(CONTRACT_PAGE.height - field.y).toBeLessThan(box.top);
+    expect(CONTRACT_PAGE.height - (field.y + field.height)).toBeGreaterThan(box.bottom);
+    expect(() => signatureFieldPlacement(2, 2, 1)).toThrow(/hors du bloc/);
+  });
+});

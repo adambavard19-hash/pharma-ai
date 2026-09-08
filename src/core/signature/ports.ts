@@ -13,6 +13,12 @@ export type SignatureSigner = {
   lastName: string;
   email: string;
   phone?: string | null;
+  /**
+   * Où poser le champ de signature dans le document : page (à partir de 1),
+   * coordonnées en points depuis le coin supérieur gauche. Sans indication, le
+   * prestataire place le champ en bas de la première page.
+   */
+  field?: { page: number; x: number; y: number; width: number; height: number };
 };
 
 export type SignatureEnvelope = {
@@ -31,6 +37,11 @@ export type SignatureEvent = {
   /** Rôle concerné par l'événement, si le prestataire le précise. */
   role?: SignatureSigner["role"];
   reason?: string | null;
+  /**
+   * `true` si la notification a été authentifiée (signature HMAC). Sinon, le
+   * statut annoncé doit être confirmé auprès du prestataire avant d'être appliqué.
+   */
+  verified: boolean;
 };
 
 export type SignatureProviderInfo = {
@@ -47,8 +58,12 @@ export interface SignatureProvider {
   createEnvelope(input: { reference: string; title: string; pdf: Uint8Array; signers: SignatureSigner[]; expiresAt: Date }): Promise<SignatureEnvelope>;
   /** Lit l'état courant chez le prestataire. */
   getStatus(envelopeId: string): Promise<SignatureStatus>;
-  /** Traduit une notification (webhook) du prestataire ; `null` si elle ne nous concerne pas. */
-  parseWebhook(payload: unknown, headers: Record<string, string | null>): Promise<SignatureEvent | null>;
+  /**
+   * Traduit une notification (webhook) du prestataire ; `null` si elle ne nous
+   * concerne pas ou si elle n'est pas authentifiée. Reçoit le corps BRUT : la
+   * signature HMAC porte sur les octets envoyés, pas sur une re-sérialisation.
+   */
+  parseWebhook(rawBody: string, headers: Record<string, string | null>): Promise<SignatureEvent | null>;
   /** Le PDF signé, quand le prestataire le fournit. */
   downloadSigned(envelopeId: string): Promise<Uint8Array | null>;
 }

@@ -6,7 +6,8 @@ import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { createSalesRep, sendSalesInvitation, updateSalesRep } from "@/server/services/sales/reps";
 import { reassignProspect, setProspectBlocked, setProspectStatus, addProspectNote } from "@/server/services/sales/prospects";
-import { applySignatureStatus, sendContract, upsertCompanyProfile } from "@/server/services/sales/contracts";
+import { applySignatureStatus, refreshContractSignatureStatus, sendContract, upsertCompanyProfile } from "@/server/services/sales/contracts";
+import { CONTRACT_STATUS_LABELS } from "@/core/sales/pipeline";
 import { updateCommission } from "@/server/services/sales/commissions";
 import { createPharmacyFromProspect } from "@/server/services/sales/client-pharmacies";
 import { PROSPECT_STATUSES } from "@/core/sales/pipeline";
@@ -109,6 +110,16 @@ export async function recordOfflineSignatureAction(payload: { prospectId: string
   await applySignatureStatus(payload.contractId, payload.status, { type: "ADMIN", id: session.admin.id, label: session.admin.fullName }, `signature hors ligne — ${reason}`);
   revalidatePath(`/admin/dossiers/${payload.prospectId}`);
   return ok(null, "Statut du contrat enregistré.");
+}
+
+export async function refreshSignatureStatusAction(payload: { prospectId: string; contractId: string }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const contract = await prisma.contract.findUnique({ where: { id: payload.contractId }, select: { prospectId: true } });
+  if (!contract || contract.prospectId !== payload.prospectId) return fail("Contrat introuvable.");
+  const result = await refreshContractSignatureStatus(payload.contractId, { type: "ADMIN", id: session.admin.id, label: session.admin.fullName });
+  if (!result.ok) return fail(result.error);
+  revalidatePath(`/admin/dossiers/${payload.prospectId}`);
+  return ok(null, result.changed ? `Statut mis à jour : ${CONTRACT_STATUS_LABELS[result.status]}.` : `Statut inchangé chez le prestataire : ${CONTRACT_STATUS_LABELS[result.status]}.`);
 }
 
 export async function adminResendContractAction(payload: { prospectId: string; contractId: string }): Promise<ActionResult<null>> {

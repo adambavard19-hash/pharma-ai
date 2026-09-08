@@ -105,6 +105,11 @@ export function SalesActionsPanel({ prospect }: { prospect: { id: string; status
                   Nom du titulaire, e-mail, adresse et ville sont requis. <button type="button" className="font-medium underline underline-offset-2" onClick={() => setShowEdit(true)}>Compléter</button>
                 </Alert>
               )}
+              {prospect.ownerName && prospect.email && prospect.addressLine1 && prospect.city && !showEdit && !contract && (
+                <p className="text-[13px] text-text-secondary">
+                  Signataire : {prospect.ownerName} · {prospect.email}. <button type="button" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400" onClick={() => setShowEdit(true)}>Modifier les coordonnées</button>
+                </p>
+              )}
               {showEdit && (
                 <div className="grid gap-3 rounded-lg border border-border-subtle p-3 sm:grid-cols-2">
                   <Field label="Titulaire" htmlFor="e-owner" required><Input id="e-owner" value={edit.ownerName} onChange={(e) => setEdit({ ...edit, ownerName: e.target.value })} /></Field>

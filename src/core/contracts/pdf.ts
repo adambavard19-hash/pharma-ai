@@ -1,12 +1,13 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { ContractDocument } from "./template";
+import { CONTRACT_MARGIN, CONTRACT_PAGE, SIGNATURE_BLOCK, signatureBoxes } from "./layout";
 
 /**
  * Rendu PDF du contrat : pur JavaScript, sans navigateur — il fonctionne sur
  * un hébergement sans Chromium. A4, marges régulières, coupure de page propre.
  */
-const A4: [number, number] = [595.28, 841.89];
-const MARGIN = 56;
+const A4: [number, number] = [CONTRACT_PAGE.width, CONTRACT_PAGE.height];
+const MARGIN = CONTRACT_MARGIN;
 const LINE = 14;
 
 function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
@@ -83,21 +84,26 @@ export async function renderContractPdf(doc: ContractDocument, generatedAt = new
     y -= 6;
   }
 
-  // Signatures
-  ensure(120);
-  y -= 6;
-  text("Signatures", bold, 11, ink, 18);
-  const columnWidth = width / 2 - 10;
-  const top = y;
+  // Signatures : bloc à position fixe en bas de la dernière page (voir layout.ts),
+  // pour que le prestataire de signature sache où poser ses champs.
+  const boxes = signatureBoxes(doc.signatures.length);
+  const blockTop = (boxes[0]?.top ?? SIGNATURE_BLOCK.bottom + SIGNATURE_BLOCK.boxHeight) + 24;
+  if (y < blockTop + 12) {
+    footer(page, pageNumber);
+    page = pdf.addPage(A4);
+    pageNumber += 1;
+  }
+  page.drawText("Signatures", { x: MARGIN, y: blockTop - 8, size: 11, font: bold, color: ink });
   doc.signatures.forEach((signature, index) => {
-    const x = MARGIN + index * (columnWidth + 20);
-    page.drawRectangle({ x, y: top - 78, width: columnWidth, height: 78, borderColor: rgb(0.82, 0.84, 0.86), borderWidth: 0.8 });
-    page.drawText(sanitize(signature.label), { x: x + 10, y: top - 16, size: 9, font: bold, color: green });
-    page.drawText(sanitize(signature.name), { x: x + 10, y: top - 32, size: 10, font: regular, color: ink });
-    page.drawText(sanitize(signature.email), { x: x + 10, y: top - 46, size: 8.5, font: regular, color: grey });
-    page.drawText("Signature électronique horodatée", { x: x + 10, y: top - 66, size: 8, font: regular, color: grey });
+    const box = boxes[index];
+    const pad = SIGNATURE_BLOCK.padding;
+    page.drawRectangle({ x: box.x, y: box.bottom, width: box.width, height: box.height, borderColor: rgb(0.82, 0.84, 0.86), borderWidth: 0.8 });
+    page.drawText(sanitize(signature.label), { x: box.x + pad, y: box.top - 16, size: 9, font: bold, color: green });
+    page.drawText(sanitize(signature.name), { x: box.x + pad, y: box.top - 32, size: 10, font: regular, color: ink });
+    page.drawText(sanitize(signature.email), { x: box.x + pad, y: box.top - 46, size: 8.5, font: regular, color: grey });
+    page.drawLine({ start: { x: box.x + pad, y: box.top - SIGNATURE_BLOCK.textHeight }, end: { x: box.x + box.width - pad, y: box.top - SIGNATURE_BLOCK.textHeight }, thickness: 0.5, color: rgb(0.88, 0.9, 0.92) });
+    page.drawText("Signature électronique horodatée", { x: box.x + pad, y: box.bottom + 4, size: 7, font: regular, color: grey });
   });
-  y = top - 90;
   footer(page, pageNumber);
 
   return pdf.save();

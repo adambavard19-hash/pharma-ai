@@ -66,7 +66,7 @@ export class YousignSignatureProvider implements SignatureProvider {
           info: { first_name: signer.firstName, last_name: signer.lastName, email: signer.email, phone_number: signer.phone ?? undefined, locale: "fr" },
           signature_level: "electronic_signature",
           signature_authentication_mode: "no_otp",
-          fields: [{ document_id: document.id, type: "signature", page: -1, x: 60 + index * 260, y: 700, width: 180, height: 60 }],
+          fields: [{ document_id: document.id, type: "signature", ...(signer.field ?? { page: 1, x: 60 + index * 260, y: 700, width: 180, height: 60 }) }],
         }),
       });
       if (created.signature_link) signingUrls[signer.role] = created.signature_link;
@@ -76,22 +76,48 @@ export class YousignSignatureProvider implements SignatureProvider {
     return { envelopeId: request.id, signingUrls };
   }
 
+  /**
+   * L'état courant. Tant que la demande est en cours, on regarde les signataires
+   * un à un : le premier déclaré est la pharmacie, le second la société.
+   */
   async getStatus(envelopeId: string): Promise<SignatureStatus> {
-    const request = await this.call<{ status: string; signers?: { info?: { email?: string }; status?: string }[] }>(`/signature_requests/${envelopeId}`);
-    return mapYousignStatus(request.status);
+    const request = await this.call<{ status: string }>(`/signature_requests/${envelopeId}`);
+    const mapped = mapYousignStatus(request.status);
+    if (mapped !== "SENT") return mapped;
+    const signers = await this.call<{ status?: string }[] | { data?: { status?: string }[] }>(`/signature_requests/${envelopeId}/signers`).catch(() => []);
+    const list = Array.isArray(signers) ? signers : signers.data ?? [];
+    return mapYousignSigners(list.map((signer) => signer.status ?? ""));
   }
 
-  async parseWebhook(payload: unknown, headers: Record<string, string | null>): Promise<SignatureEvent | null> {
-    if (this.config.webhookSecret) {
-      const signature = headers["x-yousign-signature-256"];
-      if (!signature || !(await verifyHmac(this.config.webhookSecret, JSON.stringify(payload), signature))) return null;
+  /**
+   * Avec un secret de webhook, la notification est authentifiée par HMAC sur le
+   * corps brut et son contenu fait foi (`verified: true`). Sans secret, elle
+   * n'est qu'un signal (`verified: false`) : le service relit le statut chez
+   * Yousign, parce qu'une notification non authentifiée ne doit jamais
+   * finaliser un contrat.
+   */
+  async parseWebhook(rawBody: string, headers: Record<string, string | null>): Promise<SignatureEvent | null> {
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return null;
     }
     const event = payload as { event_name?: string; data?: { signature_request?: { id?: string; status?: string }; signer?: { info?: { email?: string } } }; event_time?: string };
     const envelopeId = event.data?.signature_request?.id;
     if (!envelopeId || !event.event_name) return null;
+    const occurredAt = event.event_time ? new Date(event.event_time) : new Date();
+
     const status = mapYousignEvent(event.event_name, event.data?.signature_request?.status);
     if (!status) return null;
-    return { envelopeId, status, occurredAt: event.event_time ? new Date(event.event_time) : new Date() };
+
+    if (this.config.webhookSecret) {
+      const signature = headers["x-yousign-signature-256"];
+      if (!signature || !(await verifyHmac(this.config.webhookSecret, rawBody, signature))) return null;
+      return { envelopeId, status, occurredAt, verified: true };
+    }
+    // Sans secret : l'événement n'est qu'un signal ; le statut sera relu chez Yousign.
+    return { envelopeId, status, occurredAt, verified: false };
   }
 
   async downloadSigned(envelopeId: string): Promise<Uint8Array | null> {
@@ -118,6 +144,15 @@ export function mapYousignStatus(status: string): SignatureStatus {
     default:
       return "SENT";
   }
+}
+
+/** Statuts des signataires dans l'ordre de déclaration (pharmacie, société), quand la demande est en cours. */
+export function mapYousignSigners(statuses: string[]): SignatureStatus {
+  const [pharmacy, company] = statuses;
+  if (pharmacy === "signed") return "SIGNED_PHARMACY";
+  if (company === "signed") return "SIGNED_COMPANY";
+  if (statuses.some((status) => status === "notified" || status === "processing")) return "SENT";
+  return "SENT";
 }
 
 export function mapYousignEvent(eventName: string, requestStatus?: string): SignatureStatus | null {

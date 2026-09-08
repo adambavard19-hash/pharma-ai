@@ -11,8 +11,14 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const provider = getSignatureProvider();
   if (provider.info.capability !== "LIVE") return NextResponse.json({ ignored: true, reason: "aucun prestataire configuré" }, { status: 202 });
-  const payload = await request.json().catch(() => null);
-  const event = await provider.parseWebhook(payload, { "x-yousign-signature-256": request.headers.get("x-yousign-signature-256") });
+  const rawBody = await request.text().catch(() => "");
+  let event;
+  try {
+    event = await provider.parseWebhook(rawBody, { "x-yousign-signature-256": request.headers.get("x-yousign-signature-256") });
+  } catch (error) {
+    // Le prestataire n'a pas pu confirmer : on répond en erreur pour qu'il réessaie.
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Vérification impossible." }, { status: 502 });
+  }
   if (!event) return NextResponse.json({ ignored: true }, { status: 202 });
   const applied = await handleSignatureEvent(event);
   return NextResponse.json({ applied });

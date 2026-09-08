@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Send, ShieldAlert } from "lucide-react";
-import { adminAddNoteAction, adminCreatePharmacyAction, adminResendContractAction, adminSetProspectStatusAction, reassignProspectAction, recordOfflineSignatureAction, setProspectBlockedAction, updateCommissionAction } from "@/server/actions/platform-sales";
+import { adminAddNoteAction, adminCreatePharmacyAction, adminResendContractAction, refreshSignatureStatusAction, adminSetProspectStatusAction, reassignProspectAction, recordOfflineSignatureAction, setProspectBlockedAction, updateCommissionAction } from "@/server/actions/platform-sales";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { COMMISSION_STATUS_LABELS, PROSPECT_STATUSES, PROSPECT_STATUS_LABELS } from "@/core/sales/pipeline";
 
 type Props = {
-  prospect: { id: string; status: string; blocked: boolean; salesRepId: string; pharmacyId: string | null; contracts: { id: string; version: number; status: string }[]; commissions: { id: string; amountCents: number; status: string; dueAt: string; note: string }[] };
+  prospect: { id: string; status: string; blocked: boolean; salesRepId: string; pharmacyId: string | null; contracts: { id: string; version: number; status: string; providerEnvelopeId: string | null }[]; commissions: { id: string; amountCents: number; status: string; dueAt: string; note: string }[] };
   reps: { id: string; firstName: string; lastName: string }[];
 };
 
@@ -63,6 +63,7 @@ export function AdminActionsPanel({ prospect, reps }: Props) {
               <div className="flex flex-wrap gap-2 sm:col-span-2">
                 <Button asChild variant="outline" size="sm"><a href={`/api/contrats/apercu/${contract.id}`} target="_blank" rel="noreferrer">Voir le PDF</a></Button>
                 <Button variant="outline" size="sm" loading={pending} leadingIcon={<Send className="size-4" />} onClick={() => run(() => adminResendContractAction({ prospectId: prospect.id, contractId: contract.id }))}>{contract.status === "DRAFT" ? "Envoyer au titulaire" : "Renvoyer le contrat"}</Button>
+                {contract.providerEnvelopeId && <Button variant="outline" size="sm" loading={pending} onClick={() => run(() => refreshSignatureStatusAction({ prospectId: prospect.id, contractId: contract.id }))}>Actualiser le statut de signature</Button>}
               </div>
               {contractOpen && (
                 <>
