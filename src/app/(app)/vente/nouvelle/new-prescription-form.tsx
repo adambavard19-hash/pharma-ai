@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, FileText, Keyboard, Loader2, Pill, ScanBarcode, Search, UserRound, X } from "lucide-react";
+import { ArrowRight, Camera, Check, FileText, Keyboard, Loader2, Pill, ScanBarcode, Search, UserRound, X } from "lucide-react";
 import { createPrescriptionAction } from "@/server/actions/prescriptions";
 import type {
   DepotOrdonnanceEvenement,
@@ -58,7 +58,7 @@ export function NewPrescriptionForm({
   const [uploading, setUploading] = useState(false);
   const [readingStage, setReadingStage] = useState<ReadingStage | null>(null);
 
-  const [mode, setMode] = useState<"IDLE" | "SAISIE">("IDLE");
+  const [mode, setMode] = useState<"IDLE" | "SAISIE" | "DOUCHETTE">("IDLE");
   const [sourceOuverte, setSourceOuverte] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -264,21 +264,31 @@ export function NewPrescriptionForm({
         </div>
       )}
 
-      {/* Les trois gestes. */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <BigAction
-          icon={<ScanBarcode className="size-7" />}
-          title="Scanner"
-          subtitle="Caméra ou douchette"
-          active={scannerOuvert}
-          onClick={() => setScannerOuvert(true)}
-        />
+      {/* Les quatre gestes, nommés par ce qu'ils sont. Une douchette n'est
+          pas une caméra : elle tape le code dans un champ, comme un clavier.
+          Les deux passent par la même recherche — c'est le champ qui change
+          de consigne, pas la mécanique. */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <BigAction
           icon={<Keyboard className="size-7" />}
-          title="Saisir"
-          subtitle="Nom ou code-barres"
+          title="Clavier"
+          subtitle="Nom du médicament"
           active={mode === "SAISIE"}
           onClick={() => setMode(mode === "SAISIE" ? "IDLE" : "SAISIE")}
+        />
+        <BigAction
+          icon={<ScanBarcode className="size-7" />}
+          title="Douchette"
+          subtitle="Code CIP de la boîte"
+          active={mode === "DOUCHETTE"}
+          onClick={() => setMode(mode === "DOUCHETTE" ? "IDLE" : "DOUCHETTE")}
+        />
+        <BigAction
+          icon={<Camera className="size-7" />}
+          title="Caméra"
+          subtitle="Scanner le code-barres"
+          active={scannerOuvert}
+          onClick={() => setScannerOuvert(true)}
         />
         <BigAction
           icon={<FileText className="size-7" />}
@@ -289,8 +299,9 @@ export function NewPrescriptionForm({
         />
       </div>
 
-      {mode === "SAISIE" && (
+      {(mode === "SAISIE" || mode === "DOUCHETTE") && (
         <DrugField
+          scanner={mode === "DOUCHETTE"}
           onAdd={(nom, forme) => {
             addLine(nom, forme);
             push({ tone: "success", title: `${nom} ajouté.` });
@@ -576,7 +587,7 @@ function BigAction({
  * et termine par « Entrée » : le champ ajoute alors le résultat unique sans
  * clic, ou le texte tel quel si le catalogue ne connaît pas le code.
  */
-function DrugField({ onAdd }: { onAdd: (drugName: string, form: string) => void }) {
+function DrugField({ onAdd, scanner = false }: { onAdd: (drugName: string, form: string) => void; scanner?: boolean }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DrugLookupResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -637,8 +648,9 @@ function DrugField({ onAdd }: { onAdd: (drugName: string, form: string) => void 
           value={query}
           autoFocus
           autoComplete="off"
-          placeholder="Scannez ou tapez un médicament"
-          aria-label="Scanner ou saisir un médicament"
+          placeholder={scanner ? "Passez la douchette sur la boîte (code CIP)" : "Tapez le nom du médicament"}
+          aria-label={scanner ? "Code CIP lu par la douchette" : "Saisir un médicament"}
+          inputMode={scanner ? "numeric" : "text"}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
             if (event.key !== "Enter") return;

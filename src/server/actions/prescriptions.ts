@@ -581,3 +581,105 @@ export async function deletePrescriptionAction(
   revalidatePath("/ordonnances");
   return ok(null, "Ordonnance supprimée.");
 }
+
+const lineDosageSchema = z.object({
+  lineId: z.string().min(1),
+  dosage: z.string().trim().min(1).max(40),
+});
+
+/**
+ * Préciser un dosage manquant, directement sur la ligne, après l'analyse.
+ *
+ * « bilastine » sans dosage ne peut pas être rattachée : le catalogue en
+ * connaît deux. Le pharmacien choisit parmi les dosages qui existent
+ * réellement ; la ligne est mise à jour, le rattachement et l'analyse sont
+ * rejoués aussitôt — sans repasser par la confirmation de toute l'ordonnance.
+ */
+export async function setLineDosageAction(
+  payload: z.input<typeof lineDosageSchema>,
+): Promise<ActionResult<{ lineId: string }>> {
+  const session = await requirePermission(PERMISSIONS.PRESCRIPTION_VERIFY);
+  const parsed = lineDosageSchema.safeParse(payload);
+  if (!parsed.success) return fail("Dosage invalide.");
+
+  const line = await prisma.prescriptionLine.findUnique({
+    where: { id: parsed.data.lineId },
+    select: { id: true, fieldConfidence: true, unreadableFields: true, prescription: { select: { id: true, pharmacyId: true, verifiedAt: true } } },
+  });
+  if (!line || line.prescription.pharmacyId !== session.scope.pharmacyId) return fail("Ligne introuvable.");
+
+  // Un dosage choisi par le pharmacien est une donnée sûre : il n'est plus
+  // « non lu » ni « à confirmer ».
+  const confidence = { ...((line.fieldConfidence ?? {}) as Record<string, number>), dosage: 1 };
+
+  await prisma.prescriptionLine.update({
+    where: { id: line.id },
+    data: {
+      dosage: parsed.data.dosage,
+      fieldConfidence: confidence as never,
+      unreadableFields: line.unreadableFields.filter((field) => field !== "dosage"),
+      // Un dosage saisi par le pharmacien est une lecture sûre — et un
+      // rattachement automatique antérieur, s'il existait, doit être rejoué.
+      drugSpecialtyId: null,
+      identifiedBy: null,
+      identificationScore: null,
+      correctedByUserId: session.scope.userId,
+      correctedAt: new Date(),
+    },
+  });
+
+  if (line.prescription.verifiedAt) {
+    try {
+      await analysePrescription({ scope: session.scope, prescriptionId: line.prescription.id });
+    } catch (error) {
+      revalidatePath(`/vente/${line.prescription.id}`);
+      return fail(error instanceof Error ? error.message : "L'analyse n'a pas pu être relancée.");
+    }
+  }
+
+  revalidatePath(`/vente/${line.prescription.id}`);
+  return ok({ lineId: line.id }, `Dosage précisé : ${parsed.data.dosage}.`);
+}
+
+const confirmReadingSchema = z.object({ lineId: z.string().min(1) });
+
+/**
+ * Confirmer qu'une lecture incertaine est juste, sur la ligne.
+ *
+ * L'acte est signé : la ligne garde qui l'a confirmée et quand, et les
+ * champs signalés « à confirmer » cessent de l'être. Aucune valeur n'est
+ * modifiée — c'est précisément le sens de « c'est bien ça ».
+ */
+export async function confirmLineReadingAction(
+  payload: z.input<typeof confirmReadingSchema>,
+): Promise<ActionResult<{ lineId: string }>> {
+  const session = await requirePermission(PERMISSIONS.PRESCRIPTION_VERIFY);
+  const parsed = confirmReadingSchema.safeParse(payload);
+  if (!parsed.success) return fail("Ligne manquante.");
+
+  const line = await prisma.prescriptionLine.findUnique({
+    where: { id: parsed.data.lineId },
+    select: { id: true, fieldConfidence: true, unreadableFields: true, prescription: { select: { id: true, pharmacyId: true } } },
+  });
+  if (!line || line.prescription.pharmacyId !== session.scope.pharmacyId) return fail("Ligne introuvable.");
+
+  const confidence = { ...((line.fieldConfidence ?? {}) as Record<string, number>) };
+  for (const key of Object.keys(confidence)) confidence[key] = 1;
+
+  await prisma.prescriptionLine.update({
+    where: { id: line.id },
+    data: { fieldConfidence: confidence as never, correctedByUserId: session.scope.userId, correctedAt: new Date() },
+  });
+
+  await recordAudit({
+    action: "prescription.verified",
+    entityType: "prescription_line",
+    entityId: line.id,
+    pharmacyId: session.scope.pharmacyId,
+    userId: session.scope.userId,
+    metadata: { confirmedReading: true },
+  });
+
+  revalidatePath(`/vente/${line.prescription.id}`);
+  return ok({ lineId: line.id }, "Lecture confirmée.");
+}

@@ -1,80 +1,93 @@
 import { describe, expect, it } from "vitest";
 import { buildDocumentEmail } from "../email";
+import type { DayPlanSummary } from "../compose";
 
 /**
- * Le courriel qui accompagne la fiche est la seule chose que Pharma.ai envoie
+ * Le courriel qui accompagne le plan est la seule chose que Pharma.ai envoie
  * hors de l'officine. Ces tests fixent ce qu'il a le droit de contenir.
  */
 
+const DAY_PLAN: DayPlanSummary[] = [
+  { moment: "morning", label: "Matin", icon: "☀️", count: 2 },
+  { moment: "noon", label: "Midi", icon: "🍽", count: 1 },
+  { moment: "evening", label: "Soir", icon: "🌙", count: 2 },
+];
+
 const BASE = {
-  patientFirstName: "Christine",
+  patientFirstName: "Adam",
   pharmacyName: "Pharmacie Saint-Michel",
   pharmacyPhone: "01 23 45 67 89",
+  brandColor: "#0F766E",
+  passageAt: new Date("2026-09-07T10:00:00Z"),
+  dayPlan: DAY_PLAN,
   url: "https://pharma.example/fiche/abc123",
+  printUrl: "https://pharma.example/fiche/abc123?imprimer=1",
   expiresAt: new Date("2026-09-30T12:00:00Z"),
   isDemo: false,
 };
 
-describe("courriel de remise de la fiche", () => {
-  it("ne transporte aucune donnée de santé", () => {
+describe("courriel du plan personnalisé", () => {
+  it("porte l'objet attendu, sans donnée de santé ni nom de famille", () => {
+    const message = buildDocumentEmail(BASE);
+    expect(message.subject).toBe("Votre plan personnalisé — Pharmacie Saint-Michel");
+    expect(message.subject).not.toMatch(/bavard/i);
+  });
+
+  it("ne transporte aucune donnée de santé : l'aperçu compte les prises, il ne nomme rien", () => {
     const message = buildDocumentEmail(BASE);
     const tout = `${message.subject}\n${message.text}\n${message.html}`.toLowerCase();
-
-    // Ni médicament, ni pathologie, ni conseil : seul le lien mène au contenu.
-    for (const interdit of ["amoxicilline", "ordonnance de", "probiotique", "traitement contre"]) {
+    for (const interdit of ["efferalgan", "rulid", "amoxicilline", "probiotique", "traitement contre", "atc", "score"]) {
       expect(tout).not.toContain(interdit);
     }
+    expect(message.text).toContain("Matin : 2 prises");
+    expect(message.text).toContain("Midi : 1 prise");
+    expect(message.text).toContain("Soir : 2 prises");
     expect(message.text).toContain("ne contient aucune information sur votre santé");
   });
 
-  it("garde un objet lisible sur un écran verrouillé", () => {
+  it("dit la pharmacie et le passage, jamais le logiciel", () => {
     const message = buildDocumentEmail(BASE);
-    expect(message.subject).toBe("Pharmacie Saint-Michel — votre fiche conseil");
-    // Pas de nom de famille dans l'objet ni dans le corps : le prénom suffit.
-    expect(message.subject).not.toMatch(/ANDRÉ/i);
+    expect(message.text).toContain("Bonjour Adam,");
+    expect(message.text).toContain(
+      "À la suite de votre passage à la Pharmacie Saint-Michel le 7 septembre 2026, vous trouverez votre plan personnalisé préparé avec votre pharmacien.",
+    );
+    expect(`${message.text}${message.html}`).not.toMatch(/pharma\.ai/i);
   });
 
-  it("donne le lien, sa date d'expiration et le rappel médical", () => {
+  it("offre le bouton « Consulter mon plan », le lien d'impression et l'expiration", () => {
     const message = buildDocumentEmail(BASE);
+    expect(message.html).toContain(">Consulter mon plan</a>");
+    expect(message.html).toContain(`href="${BASE.url}"`);
+    expect(message.html).toContain(">Télécharger / imprimer</a>");
     expect(message.text).toContain(BASE.url);
     expect(message.text).toContain("30 septembre 2026");
-    expect(message.text).toContain("ne remplace ni votre ordonnance");
-    expect(message.html).toContain(BASE.url);
+    expect(message.html).toContain('name="viewport"');
+    expect(message.html).toContain("max-width:560px");
   });
 
-  it("propose le téléphone de l'officine quand il est connu, et rien d'inventé sinon", () => {
-    expect(buildDocumentEmail(BASE).text).toContain("01 23 45 67 89");
-    const sansTelephone = buildDocumentEmail({ ...BASE, pharmacyPhone: null });
-    expect(sansTelephone.text).toContain("reste à votre disposition");
-    expect(sansTelephone.text).not.toMatch(/\d{2} \d{2} \d{2}/);
+  it("reprend la couleur de l'officine et se replie sur une couleur sûre sinon", () => {
+    expect(buildDocumentEmail(BASE).html).toContain("background:#0F766E");
+    expect(buildDocumentEmail({ ...BASE, brandColor: "url(javascript:x)" }).html).not.toContain("javascript");
   });
 
-  it("annonce une fiche de démonstration avant toute autre chose", () => {
+  it("omet l'aperçu quand aucune répartition n'est validée plutôt que d'en inventer une", () => {
+    const message = buildDocumentEmail({
+      ...BASE,
+      dayPlan: DAY_PLAN.map((moment) => ({ ...moment, count: 0 })),
+    });
+    expect(message.text).not.toContain("Votre traitement");
+    expect(message.html).not.toContain("Votre traitement");
+  });
+
+  it("échappe le HTML venant de l'officine", () => {
+    const message = buildDocumentEmail({ ...BASE, pharmacyName: "Pharmacie <Test> & Co" });
+    expect(message.html).toContain("Pharmacie &lt;Test&gt; &amp; Co");
+    expect(message.html).not.toContain("<Test>");
+  });
+
+  it("annonce d'abord la démonstration quand le plan est fictif", () => {
     const message = buildDocumentEmail({ ...BASE, isDemo: true });
     expect(message.text.startsWith("MESSAGE DE DÉMONSTRATION")).toBe(true);
     expect(message.html).toContain("MESSAGE DE DÉMONSTRATION");
-  });
-
-  it("échappe le HTML au lieu de le recopier", () => {
-    const message = buildDocumentEmail({
-      ...BASE,
-      pharmacyName: 'Pharmacie <script>alert("x")</script> & Fils',
-    });
-    expect(message.html).not.toContain("<script>");
-    expect(message.html).toContain("&lt;script&gt;");
-    expect(message.html).toContain("&amp; Fils");
-  });
-
-  it("dit la même chose en texte et en HTML", () => {
-    const message = buildDocumentEmail(BASE);
-    const htmlSansBalises = message.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-    for (const phrase of [
-      "votre pharmacien a préparé une fiche récapitulative",
-      "Ce lien est personnel",
-      "ne remplace ni votre ordonnance",
-    ]) {
-      expect(message.text).toContain(phrase);
-      expect(htmlSansBalises).toContain(phrase);
-    }
   });
 });

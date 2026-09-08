@@ -30,6 +30,12 @@ export type SpecialtyCandidate = {
   pharmaceuticalForm: string | null;
   /** Substances actives, telles que publiées. */
   substances: string[];
+  /**
+   * Codes officiels des substances, quand la source les donne. Deux graphies
+   * d'une même molécule (« AMOXICILLINE », « AMOXICILLINE TRIHYDRATÉE ») ont
+   * le même code : c'est lui qui dit si deux candidats sont le même médicament.
+   */
+  substanceCodes?: string[];
   /** Encore commercialisé selon la source. */
   marketed: boolean;
 };
@@ -81,19 +87,51 @@ export function tokenize(text: string): string[] {
 }
 
 /** Termes sans pouvoir discriminant : ils ne comptent ni pour ni contre. */
-const STOP_TOKENS = new Set(["DE", "DU", "LA", "LE", "ET", "A", "EN", "POUR", "PAR", "MG", "G", "ML"]);
+const STOP_TOKENS = new Set(["DE", "DU", "LA", "LE", "ET", "A", "EN", "POUR", "PAR", "MG", "G", "ML", "MCG", "UG", "µG", "UI"]);
 
 function meaningful(tokens: string[]): string[] {
   return tokens.filter((token) => !STOP_TOKENS.has(token));
 }
 
-/** Les termes qui portent un dosage : un nombre, ou un nombre et son unité. */
-function dosageSignature(tokens: string[]): string {
-  const numbers = tokens.filter((token) => /^\d+$/.test(token));
-  return [...new Set(numbers)].sort().join(" ");
+/**
+ * Les dosages d'un texte, ramenés à une unité commune.
+ *
+ * Une ordonnance écrit « 1 g » là où le catalogue écrit « 1000 mg » ; elle
+ * écrit « 0,5 g », « 500mg », « 1,5 mg/ml ». Comparer les nombres tels quels
+ * ferait échouer le rattachement d'EFFERALGAN 1 g — mesuré. On convertit donc
+ * les masses en milligrammes (g → ×1000, µg → ÷1000) et l'on garde les autres
+ * unités telles quelles. Un nombre sans unité reste un nombre : « RULID 150 »
+ * doit toujours rencontrer « RULID 150 mg ».
+ */
+export function strengthTokens(text: string): string[] {
+  const normalized = normalizeSearchText(text).replace(/(\d),(\d)/g, "$1.$2");
+  const out = new Set<string>();
+  const pattern = /(\d+(?:\.\d+)?)\s*(MG|G|MCG|µG|UG|ML|UI|%)?(?![A-Z])/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(normalized)) !== null) {
+    const value = Number(match[1]);
+    const unit = match[2] ?? "";
+    if (!Number.isFinite(value)) continue;
+    if (unit === "G") out.add(formatNumber(value * 1000));
+    else if (unit === "MCG" || unit === "UG" || unit === "µG") out.add(formatNumber(value / 1000));
+    else out.add(formatNumber(value));
+  }
+  return [...out];
+}
+
+function formatNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
+}
+
+/** Les termes qui portent un dosage, une fois les unités ramenées au milligramme. */
+function dosageSignature(text: string): string {
+  return [...new Set(strengthTokens(text))].sort().join(" ");
 }
 
 function substanceSignature(candidate: SpecialtyCandidate): string {
+  if (candidate.substanceCodes && candidate.substanceCodes.length > 0) {
+    return [...new Set(candidate.substanceCodes)].sort().join(" | ");
+  }
   return [...new Set(candidate.substances.map(normalizeSearchText))].sort().join(" | ");
 }
 
@@ -129,8 +167,10 @@ export function identifyDrug(
     ...new Set([...nameTokens, ...tokenize(query.dosage ?? ""), ...tokenize(query.form ?? "")]),
   ].filter((token) => !STOP_TOKENS.has(token));
 
-  const numbers = wanted.filter((token) => /^\d+$/.test(token));
-  const rest = wanted.filter((token) => token !== head && !/^\d+$/.test(token));
+  // Les dosages sont comparés en milligrammes, jamais en chiffres bruts :
+  // « 1 g » et « 1000 mg » sont le même médicament.
+  const numbers = strengthTokens(`${query.drugName} ${query.dosage ?? ""}`);
+  const rest = wanted.filter((token) => token !== head && !/^\d+(?:\.\d+)?$/.test(token));
 
   const matches: IdentificationMatch[] = [];
 
@@ -141,12 +181,18 @@ export function identifyDrug(
       ...tokenize(candidate.pharmaceuticalForm ?? ""),
       ...candidate.substances.flatMap(tokenize),
     ]);
+    const candidateStrengths = new Set(strengthTokens(candidate.name));
 
     const headFound = candidateTokens.has(head);
-    const matchedOn = nameTokensOf.has(head) ? ("NAME" as const) : ("SUBSTANCE" as const);
+    // « BILASTINE » est à la fois le nom d'un générique (« BILASTINE ARROW »)
+    // et celui de la molécule : une ordonnance qui l'écrit désigne la
+    // substance, pas une marque. Le mot est donc reconnu comme substance dès
+    // qu'il en est une — même s'il figure aussi dans le nom.
+    const substanceTokens = new Set(candidate.substances.flatMap(tokenize));
+    const matchedOn = nameTokensOf.has(head) && !substanceTokens.has(head) ? ("NAME" as const) : ("SUBSTANCE" as const);
     // Un dosage écrit sur l'ordonnance et absent de la spécialité est une
     // divergence, pas un détail : c'est le cas du 500 pris pour du 1000.
-    const dosageFound = numbers.filter((token) => candidateTokens.has(token));
+    const dosageFound = numbers.filter((token) => candidateStrengths.has(token));
     const restFound = rest.filter((token) => candidateTokens.has(token));
 
     const dosageRatio = numbers.length === 0 ? 1 : dosageFound.length / numbers.length;
@@ -225,9 +271,7 @@ export function decideAutoAccept(matches: IdentificationMatch[]): AutoAcceptDeci
     return { accepted: false, reason: "AMBIGUOUS_SUBSTANCE", candidates: contenders };
   }
 
-  const dosages = new Set(
-    contenders.map((match) => dosageSignature(tokenize(match.candidate.name))),
-  );
+  const dosages = new Set(contenders.map((match) => dosageSignature(match.candidate.name)));
   if (dosages.size > 1) {
     return { accepted: false, reason: "AMBIGUOUS_DOSAGE", candidates: contenders };
   }
@@ -243,4 +287,26 @@ export function decideAutoAccept(matches: IdentificationMatch[]): AutoAcceptDeci
   }
 
   return { accepted: true, match: best };
+}
+
+/**
+ * Le dosage tel qu'il est écrit dans un nom de spécialité : « 20 mg »,
+ * « 1,5 mg/ml », « 250 microgrammes/dose ». `null` si le nom n'en porte pas.
+ * Sert à demander au pharmacien la précision manquante — en lui montrant les
+ * dosages qui existent réellement, jamais une liste inventée.
+ */
+export function strengthLabel(specialtyName: string): string | null {
+  const match = /(\d+(?:[.,]\d+)?)\s*(mg\/ml|mg\/g|mg\/dose|microgrammes?\/dose|microgrammes?|mg|g|µg|ui|%)(?![a-z])/i.exec(specialtyName);
+  if (!match) return null;
+  return `${match[1]} ${match[2].toLowerCase()}`;
+}
+
+/** Les dosages distincts parmi des candidats, dans l'ordre croissant. */
+export function distinctStrengths(candidates: { name: string }[]): string[] {
+  const seen = new Map<string, string>();
+  for (const candidate of candidates) {
+    const label = strengthLabel(candidate.name);
+    if (label && !seen.has(label)) seen.set(label, label);
+  }
+  return [...seen.values()].sort((a, b) => parseFloat(a.replace(",", ".")) - parseFloat(b.replace(",", ".")));
 }

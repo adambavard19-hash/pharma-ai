@@ -146,6 +146,7 @@ export async function recordInteraction(params: {
     | "SALE_RECORDED"
     | "FOLLOW_UP_SCHEDULED"
     | "FOLLOW_UP_SENT"
+    | "FOLLOW_UP_ANSWERED"
     | "FOLLOW_UP_OPTED_OUT"
     | "NOTE";
   summary: string;

@@ -7,6 +7,7 @@ import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { buildDocumentUrl } from "@/server/services/documents";
 import { getMessagingProvider } from "@/server/ai/registry";
+import { resolvePublicBaseUrl } from "@/server/public-url";
 import { PageHeader } from "@/components/ui/page";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
@@ -61,6 +62,7 @@ export default async function DocumentPage({
 
   const latestDocument = prescription.documents[0];
   const messaging = getMessagingProvider();
+  const publicBase = resolvePublicBaseUrl();
   const consentOf = (type: string) => {
     const consent = prescription.patient?.consents.find((c) => c.type === type);
     return Boolean(consent?.granted && !consent.revokedAt);
@@ -186,6 +188,13 @@ export default async function DocumentPage({
               }
             : null
         }
+        history={prescription.documents.map((document) => ({
+          id: document.id,
+          version: document.version,
+          createdAt: document.createdAt.toISOString(),
+          revoked: Boolean(document.revokedAt),
+        }))}
+        publicReach={publicBase.reach}
         messaging={{
           configured: messaging.info.capability === "LIVE",
           label: messaging.info.label,

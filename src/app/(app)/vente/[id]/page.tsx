@@ -9,7 +9,7 @@ import { getReferenceCatalogState } from "@/server/services/reference";
 import { proposeSpecialties } from "@/server/services/drug-identification";
 import { loadPrescribedAvailability } from "@/server/services/drug-catalog";
 import { buildPatientContext } from "@/server/services/patients";
-import { AUTO_ACCEPT_REFUSAL_MESSAGES, decideAutoAccept } from "@/core/reference";
+import { AUTO_ACCEPT_REFUSAL_MESSAGES, decideAutoAccept, distinctStrengths } from "@/core/reference";
 import { parsePosology, readSchedule } from "@/core/posology";
 import { SaleWorkspace } from "./sale-workspace";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
@@ -130,9 +130,12 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   // être rattachées seules : en pratique zéro à deux lignes par ordonnance.
   const proposals = new Map<string, SpecialtyProposal[]>();
   const refusals = new Map<string, string>();
+  const strengthOptions = new Map<string, string[]>();
   if (catalogLoaded) {
     for (const line of prescription.lines) {
-      if (line.status !== "CONFIRMED" || line.drugSpecialtyId || !line.drugName) continue;
+      // Toutes les lignes nommées, même avant confirmation : c'est pendant la
+      // relecture que le pharmacien précise un dosage manquant.
+      if (line.drugSpecialtyId || !line.drugName || line.status === "REJECTED") continue;
       const matches = await proposeSpecialties({
         drugName: line.drugName,
         dosage: line.dosage,
@@ -142,6 +145,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
       // l'analyse : l'écran ne peut pas raconter autre chose que le moteur.
       const decision = decideAutoAccept(matches);
       if (!decision.accepted) refusals.set(line.id, AUTO_ACCEPT_REFUSAL_MESSAGES[decision.reason]);
+      if (!line.dosage) strengthOptions.set(line.id, distinctStrengths(matches.map((match) => match.candidate)));
       proposals.set(
         line.id,
         matches.map((match) => ({
@@ -220,6 +224,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         identificationRefusal: catalogLoaded
           ? (refusals.get(line.id) ?? null)
           : "Aucun catalogue officiel n'est chargé dans Pharma.ai.",
+        strengthOptions: strengthOptions.get(line.id) ?? [],
+        cisCode: line.specialty?.cisCode ?? null,
         };
       })}
       catalogAttribution={attribution}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { LogIn } from "lucide-react";
 import { platformLoginAction } from "@/server/actions/platform";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,12 @@ export function PlatformLoginForm() {
       >
         Se connecter
       </Button>
+
+      <p className="text-center text-[13px]">
+        <Link href="/admin-connexion/oubli" className="text-ink-400 underline underline-offset-2 hover:text-ink-200">
+          Mot de passe oublié ou premier accès
+        </Link>
+      </p>
     </form>
   );
 }

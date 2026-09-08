@@ -7,6 +7,7 @@ import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { recordAudit } from "@/server/audit/log";
 import { searchSpecialties } from "@/server/services/drug-identification";
+import { analysePrescription } from "@/server/services/analysis";
 import type { SpecialtyCandidate } from "@/core/reference";
 import { fail, ok, type ActionResult } from "./types";
 
@@ -68,8 +69,32 @@ export async function attachSpecialtyAction(
     metadata: { cisCode: specialty.cisCode },
   });
 
+  const refreshed = await refreshAnalysisIfAny(session.scope, line.prescription.id);
+
   revalidatePath(`/vente/${line.prescription.id}`);
-  return ok({ lineId: line.id }, `Ligne rattachée à « ${specialty.name} ».`);
+  return ok(
+    { lineId: line.id },
+    refreshed ? `Ligne rattachée à « ${specialty.name} » — analyse mise à jour.` : `Ligne rattachée à « ${specialty.name} ».`,
+  );
+}
+
+/**
+ * Une ligne rattachée après l'analyse rendait les signaux périmés, avec un
+ * bouton « relancer » à trouver. On relance ici, tout de suite : à cache
+ * chaud l'analyse tient en une fraction de seconde, et l'écran qui revient
+ * est juste. Sans analyse antérieure, il n'y a rien à rafraîchir.
+ */
+async function refreshAnalysisIfAny(scope: { pharmacyId: string; organizationId: string; userId: string }, prescriptionId: string): Promise<boolean> {
+  const previous = await prisma.analysisRun.findFirst({ where: { prescriptionId }, select: { id: true } });
+  if (!previous) return false;
+  try {
+    await analysePrescription({ scope, prescriptionId });
+    return true;
+  } catch {
+    // L'échec d'une ré-analyse ne doit pas annuler le rattachement, qui est
+    // la décision du pharmacien. L'écran signalera l'analyse périmée.
+    return false;
+  }
 }
 
 const detachSchema = z.object({ lineId: z.string().min(1) });
@@ -95,6 +120,8 @@ export async function detachSpecialtyAction(
     where: { id: line.id },
     data: { drugSpecialtyId: null, identifiedBy: null, identificationScore: null },
   });
+
+  await refreshAnalysisIfAny(session.scope, line.prescription.id);
 
   revalidatePath(`/vente/${line.prescription.id}`);
   return ok({ lineId: line.id }, "Rattachement retiré.");

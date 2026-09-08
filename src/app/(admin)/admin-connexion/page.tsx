@@ -5,9 +5,10 @@ import { PlatformLoginForm } from "./form";
 
 export const metadata: Metadata = { title: "Administration Pharma.ai" };
 
-export default async function PlatformLoginPage() {
+export default async function PlatformLoginPage({ searchParams }: { searchParams: Promise<{ defini?: string }> }) {
   const session = await getPlatformSession();
   if (session) redirect("/admin");
+  const { defini } = await searchParams;
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-ink-950 px-6 py-12">
@@ -25,6 +26,9 @@ export default async function PlatformLoginPage() {
           </p>
         </div>
 
+        {defini === "1" && (
+          <p className="rounded-lg bg-success-700/20 px-3.5 py-3 text-center text-[13.5px] text-success-300">Mot de passe enregistré. Connectez-vous.</p>
+        )}
         <PlatformLoginForm />
       </div>
     </main>

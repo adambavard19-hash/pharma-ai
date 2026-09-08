@@ -7,6 +7,8 @@ import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { generatePatientDocument } from "@/server/services/documents";
 import { buildDocumentEmail } from "@/core/documents/email";
+import { passageDate, summarizeDayPlan } from "@/core/documents/compose";
+import type { DocumentContent } from "@/core/documents/types";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { maskEmail } from "@/server/security/tokens";
 import { recordAudit } from "@/server/audit/log";
@@ -81,6 +83,7 @@ export async function deliverDocumentAction(
       prescriptionId: true,
       accessToken: true,
       tokenExpiresAt: true,
+      contentJson: true,
       revokedAt: true,
       isDemo: true,
       patient: {
@@ -179,14 +182,22 @@ export async function deliverDocumentAction(
   // l'officine que le message ajoute, et elle vaut d'être exacte.
   const pharmacy = await prisma.pharmacy.findUnique({
     where: { id: session.scope.pharmacyId },
-    select: { phone: true },
+    select: { phone: true, brandColor: true },
   });
 
+  // L'aperçu de l'e-mail vient de l'instantané remis au patient : il compte
+  // les prises par moment, il ne nomme aucun médicament.
+  const content = document.contentJson as unknown as DocumentContent;
+  const url = buildDocumentUrl(document.accessToken);
   const message = buildDocumentEmail({
     patientFirstName: document.patient?.firstName ?? "",
     pharmacyName: session.pharmacy.name,
     pharmacyPhone: pharmacy?.phone ?? null,
-    url: buildDocumentUrl(document.accessToken),
+    brandColor: pharmacy?.brandColor ?? null,
+    passageAt: passageDate(content),
+    dayPlan: summarizeDayPlan(content.treatment ?? []),
+    url,
+    printUrl: `${url}?imprimer=1`,
     expiresAt: document.tokenExpiresAt,
     isDemo: document.isDemo,
   });
@@ -194,6 +205,7 @@ export async function deliverDocumentAction(
   const messaging = getMessagingProvider();
   const outcome = await messaging.sendEmail({
     to: recipient,
+    fromName: session.pharmacy.name,
     subject: message.subject,
     text: message.text,
     html: message.html,

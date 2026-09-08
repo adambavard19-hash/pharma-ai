@@ -17,7 +17,11 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "12mb",
     },
   },
-  /* config options here */
+  /**
+   * Le générateur de PDF pilote un Chromium via Playwright : un paquet natif
+   * que le bundler ne doit pas tenter d'empaqueter.
+   */
+  serverExternalPackages: ["playwright", "playwright-core"],
 };
 
 export default nextConfig;

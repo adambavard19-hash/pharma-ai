@@ -22,6 +22,17 @@ export type DocumentTreatmentItem = {
   schedule: PosologySchedule | null;
   durationDays: number | null;
   instructions: string | null;
+  /**
+   * Le dosage du médicament AVEC son unité (« 150 mg », « 250 µg/dose »),
+   * pris dans le nom officiel de la spécialité rattachée ou dans un dosage
+   * écrit avec son unité. `null` quand on ne le sait pas : on n'affiche alors
+   * ni « 150 » ni rien qui puisse être lu comme une quantité à prendre.
+   */
+  strength?: string | null;
+  /** L'unité de prise (« comprimé », « bouffée »), déduite de la forme officielle ou lue. */
+  unit?: string;
+  /** Rythme non quotidien validé (« un jour sur deux »), sinon `null`. */
+  rhythm?: string | null;
   /** Explication vulgarisée, uniquement si une source fiable existe. */
   purpose: string | null;
   tips: string[];
@@ -67,8 +78,21 @@ export type DocumentContent = {
     prescriberName: string | null;
     prescribedAt: string | null;
   };
+  /**
+   * Date du passage à l'officine (dépôt de l'ordonnance). Absente des
+   * instantanés antérieurs : on retombe alors sur `generatedAt`.
+   */
+  passageAt?: string;
   treatment: DocumentTreatmentItem[];
   advice: DocumentAdviceItem[];
+  /**
+   * « À retenir » : uniquement des faits validés au comptoir — durée confirmée
+   * d'un traitement, consigne écrite par le pharmacien. Jamais une
+   * contre-indication ou une interaction générée. Vide = la zone n'apparaît pas.
+   */
+  keyPoints?: string[];
+  /** Suivi activé par l'officine pour ce passage : le patient sait quand on reprendra contact. */
+  followUp?: { label: string; dueAt: string } | null;
   /** Message libre du pharmacien, affiché en tête de la section conseils. */
   pharmacistNote: string | null;
   /** Mentions obligatoires affichées en pied de fiche. */

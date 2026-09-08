@@ -1,408 +1,349 @@
-import Image from "next/image";
-import { AlertTriangle, Sparkles } from "lucide-react";
-import { formatCents, formatDateLong } from "@/lib/format";
-import { buildDailyPlan } from "@/core/posology";
-import type { DocumentContent } from "@/core/documents/types";
+import { formatDate, formatDateLong } from "@/lib/format";
+import { MOMENT_LABELS } from "@/core/posology";
+import { displayName, doseLabel, passageDate, planRows, unscheduledTreatment } from "@/core/documents/compose";
+import type { DocumentContent, DocumentTreatmentItem } from "@/core/documents/types";
+import { QrCode } from "./qr-code";
+import { MomentIcon } from "./moment-icon";
 
 /**
- * Fiche patient.
+ * Le plan personnalisé du patient.
  *
- * Un seul rendu sert à trois usages : la prévisualisation par le pharmacien, la
- * page sécurisée consultée par le patient, et l'impression A4 — les règles
- * `@media print` du système de design font le reste. Le contenu vient d'un
- * instantané figé : ni le catalogue ni le stock ne peuvent le modifier après
- * remise au patient.
+ * Un seul rendu sert à trois usages : l'aperçu par le pharmacien, la page
+ * sécurisée consultée par le patient sur son téléphone, et le PDF / l'impression
+ * A4. Le contenu vient d'un instantané figé : ni le catalogue ni le stock ne
+ * peuvent le modifier après remise au patient.
+ *
+ * Ce que le patient ne voit jamais : score, code ATC, moteur, marge, vente
+ * additionnelle, conseils refusés, source technique.
+ *
+ * Ce que le document n'invente jamais : un horaire, une quantité ou un dosage
+ * absents de l'instantané sont dits « À confirmer avec votre pharmacien », pas
+ * déduits. Le dosage du médicament (« 150 mg ») et la quantité à prendre
+ * (« 1 comprimé ») sont toujours deux informations distinctes.
  */
 export function PatientDocument({
   content,
   variant = "screen",
+  qrUrl = null,
 }: {
   content: DocumentContent;
   variant?: "screen" | "print";
+  /** Lien sécurisé à encoder en QR code dans le pied du document (papier, PDF). */
+  qrUrl?: string | null;
 }) {
-  const generatedAt = new Date(content.generatedAt);
-
-  // Le plan de la journée ne reprend que les répartitions confirmées : un
-  // médicament sans prise validée garde sa ligne détaillée plus bas, avec la
-  // posologie écrite telle quelle.
-  const dailyPlan = buildDailyPlan(content.treatment);
+  const color = content.pharmacy.brandColor || "#0F766E";
+  const passage = passageDate(content);
+  const { rows, moments } = planRows(content.treatment);
+  const toConfirm = unscheduledTreatment(content.treatment);
+  const keyPoints = content.keyPoints ?? [];
+  const firstName = content.patient?.firstName;
+  const patientName = content.patient ? `${content.patient.firstName} ${content.patient.lastName.toUpperCase()}` : null;
+  const address = [content.pharmacy.addressLine1, [content.pharmacy.postalCode, content.pharmacy.city].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <article
-      className={
-        variant === "print"
-          ? "mx-auto w-full max-w-[210mm] bg-white text-ink-900"
-          : "mx-auto w-full max-w-[860px]"
-      }
+      className={"plan-document mx-auto w-full text-[#111827] " + (variant === "print" ? "max-w-[190mm]" : "max-w-[760px]")}
+      style={{ ["--plan-accent" as string]: color }}
     >
-      <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 pb-6 print-avoid-break"
-        style={{ borderColor: content.pharmacy.brandColor }}
-      >
-        <div className="space-y-1">
-          <p
-            className="text-[19px] leading-6 font-semibold tracking-[-0.01em]"
-            style={{ color: content.pharmacy.brandColor }}
-          >
+      {/* ---- En-tête compact ------------------------------------------- */}
+      <header className="print-avoid-break flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b-2 pb-4" style={{ borderColor: color }}>
+        <div className="min-w-0">
+          <p className="text-[17px] leading-6 font-bold tracking-[-0.01em]" style={{ color }}>
             {content.pharmacy.name}
           </p>
-          <p className="text-[12px] leading-5 text-ink-500 dark:text-ink-400">
-            {[
-              content.pharmacy.addressLine1,
-              [content.pharmacy.postalCode, content.pharmacy.city].filter(Boolean).join(" "),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-            {content.pharmacy.phone && (
-              <>
-                <br />
-                {content.pharmacy.phone}
-              </>
-            )}
-          </p>
+          {(address || content.pharmacy.phone) && (
+            <p className="mt-0.5 text-[12.5px] leading-[1.45] text-[#4b5563]">
+              {address}
+              {address && content.pharmacy.phone ? " · " : ""}
+              {content.pharmacy.phone}
+            </p>
+          )}
         </div>
-
-        <div className="text-right">
-          <p className="text-[12px] text-ink-500 dark:text-ink-400">
-            Votre plan de traitement
+        <div className="text-left sm:text-right">
+          <p className="text-[11px] font-bold tracking-[0.12em] uppercase" style={{ color }}>
+            Plan personnalisé
           </p>
-          <p className="text-[12px] text-ink-500 dark:text-ink-400">
-            {formatDateLong(generatedAt)}
-          </p>
-          <p className="mt-1 font-mono text-[11px] text-ink-400">
-            {content.prescription.reference}
-          </p>
+          {patientName && <p className="text-[15px] leading-5 font-semibold">{patientName}</p>}
+          <p className="text-[12.5px] text-[#4b5563]">Passage du {formatDateLong(passage)}</p>
         </div>
       </header>
 
-      <section className="mt-7 print-avoid-break">
-        <h1 className="text-[26px] leading-8 font-semibold tracking-[-0.02em] text-ink-900 dark:text-ink-50">
-          {content.patient
-            ? `Bonjour ${content.patient.firstName},`
-            : "Votre accompagnement"}
+      {content.isDemo && (
+        <p className="mt-3 inline-block rounded-md border border-[#f59e0b] px-2.5 py-1 text-[11.5px] font-semibold text-[#92400e]">
+          Document de démonstration — patient fictif
+        </p>
+      )}
+
+      {/* ---- Salutation --------------------------------------------------- */}
+      <section className="print-avoid-break mt-6">
+        <h1 className="text-[24px] leading-[1.2] font-bold tracking-[-0.02em] sm:text-[26px]">
+          Bonjour{firstName ? ` ${firstName}` : ""},
         </h1>
-        <p className="mt-2 max-w-2xl text-[14px] leading-6 text-ink-600 dark:text-ink-300">
-          Votre traitement, préparé avec {content.pharmacist.fullName}. Ce document complète
-          votre ordonnance, il ne la remplace pas.
+        <p className="mt-2 max-w-[60ch] text-[15.5px] leading-[1.6] text-[#374151]">
+          Voici le récapitulatif préparé avec votre pharmacien à la suite de votre passage du {formatDateLong(passage)}.
+          Gardez-le à portée de main : il vous dit quoi prendre, quand, et pendant combien de temps.
         </p>
       </section>
 
-      {dailyPlan.length > 0 && (
-        <section className="mt-9 print-avoid-break">
-          <SectionTitle
-            color={content.pharmacy.brandColor}
-            eyebrow="Votre journée"
-            title="Quand prendre vos médicaments"
-          />
+      {/* ---- Planning ----------------------------------------------------- */}
+      {rows.length > 0 && (
+        <section className="mt-7">
+          <SectionTitle color={color}>Votre traitement au quotidien</SectionTitle>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {dailyPlan.map((section) => (
-              <div
-                key={section.moment}
-                className="rounded-xl border-2 p-4 print-avoid-break"
-                style={{ borderColor: `${content.pharmacy.brandColor}33` }}
-              >
-                <p
-                  className="text-[13px] font-bold tracking-wide uppercase"
-                  style={{ color: content.pharmacy.brandColor }}
-                >
-                  {section.label}
-                </p>
-                <ul className="mt-2 space-y-2">
-                  {section.entries.map((entry, index) => (
-                    <li
-                      key={`${entry.drugName}-${index}`}
-                      className="flex items-baseline gap-2.5 text-[15px] leading-6 text-ink-900 dark:text-ink-50"
-                    >
-                      <span
-                        className="flex size-6 shrink-0 items-center justify-center rounded-md text-[13px] font-bold text-white"
-                        style={{ backgroundColor: content.pharmacy.brandColor }}
-                        aria-hidden="true"
-                      >
-                        {entry.doses}
+          {/* Tableau : écran large, papier, PDF. */}
+          <div className={"mt-3 overflow-hidden rounded-xl border border-[#d1d5db] " + (variant === "print" ? "block" : "hidden sm:block")}>
+            <table className="w-full border-collapse text-[14px]">
+              <thead>
+                <tr className="text-[#374151]" style={{ backgroundColor: tint(color, 0.9) }}>
+                  <th scope="col" className="px-3.5 py-2.5 text-left text-[12px] font-bold tracking-[0.06em] uppercase">
+                    Médicament
+                  </th>
+                  {moments.map((moment) => (
+                    <th key={moment} scope="col" className="px-2 py-2.5 text-center text-[12px] font-bold tracking-[0.06em] uppercase">
+                      <span className="inline-flex items-center gap-1.5">
+                        <MomentIcon moment={moment} className="size-4" color={color} />
+                        {MOMENT_LABELS[moment]}
                       </span>
-                      <span className="min-w-0">
-                        <span className="font-medium">{entry.drugName}</span>
-                        {entry.dosage && (
-                          <span className="text-ink-600 dark:text-ink-300"> {entry.dosage}</span>
-                        )}
-                        <span className="text-ink-500 dark:text-ink-400">
-                          {" "}
-                          — {entry.doses} {entry.unit}
-                          {entry.doses > 1 ? "s" : ""}
-                        </span>
-                      </span>
-                    </li>
+                    </th>
                   ))}
-                </ul>
-              </div>
-            ))}
+                  <th scope="col" className="px-3 py-2.5 text-right text-[12px] font-bold tracking-[0.06em] uppercase">
+                    Durée
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const { name, strength } = displayName(row.item);
+                  return (
+                    <tr key={row.item.drugName} className="print-avoid-break border-t border-[#e5e7eb] align-top">
+                      <th scope="row" className="px-3.5 py-3 text-left font-normal">
+                        <span className="block text-[15px] leading-5 font-semibold">{name}</span>
+                        {strength && <span className="block text-[12.5px] leading-4 text-[#4b5563]">{strength}</span>}
+                        {row.note && <span className="mt-0.5 block text-[12.5px] leading-4 text-[#6b7280]">{row.note}</span>}
+                      </th>
+                      {moments.map((moment) => (
+                        <td key={moment} className="px-2 py-3 text-center">
+                          {row.doses[moment] > 0 ? (
+                            <span className="inline-block rounded-lg px-2 py-1 text-[13.5px] leading-5 font-semibold" style={{ backgroundColor: tint(color, 0.9), color: "#111827" }}>
+                              {doseLabel(row.doses[moment], row.item.unit)}
+                            </span>
+                          ) : (
+                            <span className="text-[#9ca3af]" aria-label="Pas de prise">
+                              —
+                            </span>
+                          )}
+                        </td>
+                      ))}
+                      <td className="px-3 py-3 text-right text-[13.5px] whitespace-nowrap text-[#374151]">
+                        {row.item.durationDays ? `${row.item.durationDays} jour${row.item.durationDays > 1 ? "s" : ""}` : "selon l'ordonnance"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+
+          {/* Cartes : téléphone. */}
+          {variant !== "print" && (
+            <ul className="mt-3 space-y-2.5 sm:hidden">
+              {rows.map((row) => {
+                const { name, strength } = displayName(row.item);
+                return (
+                  <li key={row.item.drugName} className="rounded-xl border border-[#d1d5db] px-4 py-3.5">
+                    <p className="text-[16px] leading-5 font-semibold">
+                      {name}
+                      {strength && <span className="ml-1.5 text-[13px] font-normal text-[#4b5563]">{strength}</span>}
+                    </p>
+                    <ul className="mt-2.5 flex flex-wrap gap-1.5">
+                      {moments
+                        .filter((moment) => row.doses[moment] > 0)
+                        .map((moment) => (
+                          <li key={moment} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13.5px] font-medium" style={{ backgroundColor: tint(color, 0.9) }}>
+                            <MomentIcon moment={moment} className="size-4" color={color} />
+                            {MOMENT_LABELS[moment]} · {doseLabel(row.doses[moment], row.item.unit)}
+                          </li>
+                        ))}
+                    </ul>
+                    <p className="mt-2 text-[13px] leading-5 text-[#4b5563]">
+                      {row.item.durationDays ? `Pendant ${row.item.durationDays} jour${row.item.durationDays > 1 ? "s" : ""}` : "Durée : selon l'ordonnance"}
+                      {row.note ? ` · ${row.note}` : ""}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       )}
 
-      {content.treatment.length > 0 && (
-        <section className="mt-9">
-          <SectionTitle
-            color={content.pharmacy.brandColor}
-            eyebrow="Votre traitement"
-            title="Le détail de chaque médicament"
-          />
-
-          <div className="mt-4 space-y-3">
-            {content.treatment.map((item, index) => (
-              <div
-                key={`${item.drugName}-${index}`}
-                className="rounded-xl border border-ink-200 p-4 print-avoid-break dark:border-ink-800"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-3">
-                  <h3 className="text-[16px] font-semibold text-ink-900 dark:text-ink-50">
-                    {item.drugName}
-                    {item.dosage && (
-                      <span className="font-normal text-ink-600 dark:text-ink-300">
-                        {" "}
-                        {item.dosage}
-                      </span>
-                    )}
-                  </h3>
-                  {item.form && (
-                    <span className="text-[12px] text-ink-500 dark:text-ink-400">
-                      {item.form}
-                    </span>
-                  )}
-                </div>
-
-                {/* Sans explication vérifiée, la ligne se tait : un plan
-                    patient n'est pas l'endroit où répéter cinq fois qu'une
-                    donnée manque. Le pharmacien l'a expliqué au comptoir. */}
-                {item.purpose && (
-                  <p className="mt-2 text-[13.5px] leading-6 text-ink-700 dark:text-ink-200">
-                    {item.purpose}
-                  </p>
-                )}
-
-                {(item.posology || item.instructions || item.durationDays) && (
-                  <div
-                    className="mt-3 rounded-lg px-3.5 py-2.5"
-                    style={{ backgroundColor: `${content.pharmacy.brandColor}0f` }}
-                  >
-                    <p className="text-[11px] font-semibold tracking-wide text-ink-500 uppercase dark:text-ink-400">
-                      Comment le prendre
-                    </p>
-                    <p className="mt-0.5 text-[13.5px] leading-6 text-ink-800 dark:text-ink-100">
-                      {joinSentences([
-                        item.posology,
-                        item.durationDays ? `Pendant ${item.durationDays} jours` : null,
-                        item.instructions,
-                      ])}
-                    </p>
-                  </div>
-                )}
-
-                {item.tips.length > 0 && (
-                  <ul className="mt-3 space-y-1">
-                    {item.tips.map((tip) => (
-                      <li
-                        key={tip}
-                        className="flex gap-2 text-[13px] leading-5 text-ink-700 dark:text-ink-200"
-                      >
-                        <span aria-hidden="true">•</span>
-                        {tip}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {item.precautions.length > 0 && (
-                  <ul className="mt-3 space-y-1 rounded-lg bg-warning-50 px-3.5 py-2.5 dark:bg-warning-700/10">
-                    {item.precautions.map((precaution) => (
-                      <li
-                        key={precaution}
-                        className="flex gap-2 text-[12.5px] leading-5 text-warning-700 dark:text-warning-500"
-                      >
-                        <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                        {precaution}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
+      {/* ---- À confirmer / À retenir : côte à côte quand les deux existent — */}
+      <div className={toConfirm.length > 0 && keyPoints.length > 0 ? "grid gap-4 sm:grid-cols-2 print:grid-cols-2" : ""}>
+      {toConfirm.length > 0 && (
+        <section className="print-avoid-break mt-5 rounded-xl border border-dashed border-[#9ca3af] px-4 py-3.5">
+          <p className="text-[12px] font-bold tracking-[0.08em] text-[#4b5563] uppercase">À confirmer avec votre pharmacien</p>
+          <ul className="mt-1.5 space-y-1.5">
+            {toConfirm.map((item) => {
+              const { name, strength } = displayName(item);
+              return (
+                <li key={item.drugName} className="text-[15px] leading-6">
+                  <span className="font-semibold">{name}</span>
+                  {strength && <span className="text-[#4b5563]"> {strength}</span>}
+                  {item.posology && <span className="block text-[13.5px] leading-5 text-[#6b7280]">Sur l&apos;ordonnance : {item.posology}</span>}
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
 
-      {content.advice.length > 0 && (
-        <section className="mt-10">
-          <SectionTitle
-            color={content.pharmacy.brandColor}
-            eyebrow="Les conseils de votre pharmacien"
-            title={`${content.pharmacist.fullName} vous recommande`}
-          />
+      {/* ---- À retenir ---------------------------------------------------- */}
+      {keyPoints.length > 0 && (
+        <section className="print-avoid-break mt-5 rounded-xl px-5 py-4" style={{ backgroundColor: tint(color, 0.92) }}>
+          <SectionTitle color={color}>À retenir</SectionTitle>
+          <ul className="mt-2.5 space-y-2">
+            {keyPoints.map((point) => (
+              <li key={point} className="flex gap-2.5 text-[15px] leading-6">
+                <span aria-hidden="true" className="mt-[9px] size-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      </div>
 
+      {/* ---- Détails utiles (uniquement ce qui est validé) ----------------- */}
+      {content.treatment.some((item) => item.purpose || item.precautions.length > 0 || item.tips.length > 0 || item.instructions) && (
+        <section className="mt-7">
+          <SectionTitle color={color}>Bon à savoir sur vos médicaments</SectionTitle>
+          <ul className="mt-3 divide-y divide-[#e5e7eb]">
+            {content.treatment
+              .filter((item) => item.purpose || item.precautions.length > 0 || item.tips.length > 0 || item.instructions)
+              .map((item) => (
+                <TreatmentNote key={item.drugName} item={item} />
+              ))}
+          </ul>
+        </section>
+      )}
+
+      {/* ---- Conseils du pharmacien -------------------------------------- */}
+      {(content.advice.length > 0 || content.pharmacistNote) && (
+        <section className="mt-7">
+          <SectionTitle color={color}>Les conseils de votre pharmacien</SectionTitle>
           {content.pharmacistNote && (
-            <p className="mt-3 max-w-2xl text-[13.5px] leading-6 text-ink-600 italic dark:text-ink-300">
-              « {content.pharmacistNote} »
+            <p className="mt-3 border-l-[3px] pl-4 text-[15px] leading-[1.6] text-[#374151] italic" style={{ borderColor: color }}>
+              {content.pharmacistNote}
             </p>
           )}
-
-          <div className="mt-4 space-y-3">
-            {content.advice.map((item, index) => (
-              <div
-                key={`${item.productName}-${index}`}
-                className="flex flex-wrap gap-5 rounded-xl border border-ink-200 p-4 print-avoid-break dark:border-ink-800"
-              >
-                {item.imageUrl ? (
-                  <Image
-                    src={item.imageUrl}
-                    alt=""
-                    width={104}
-                    height={104}
-                    className="size-26 shrink-0 rounded-lg object-cover"
-                    style={{ width: 104, height: 104 }}
-                  />
-                ) : (
-                  <span
-                    className="flex size-26 shrink-0 items-center justify-center rounded-lg"
-                    style={{
-                      width: 104,
-                      height: 104,
-                      backgroundColor: `${content.pharmacy.brandColor}14`,
-                    }}
-                  >
-                    <Sparkles
-                      className="size-6"
-                      style={{ color: content.pharmacy.brandColor }}
-                      aria-hidden="true"
-                    />
-                  </span>
-                )}
-
-                <div className="min-w-[240px] flex-1 space-y-2">
-                  <div>
-                    {item.brand && (
-                      <p className="text-[11.5px] font-medium tracking-wide text-ink-500 uppercase dark:text-ink-400">
-                        {item.brand}
-                      </p>
-                    )}
-                    <h3 className="text-[16px] font-semibold text-ink-900 dark:text-ink-50">
-                      {item.productName}
-                    </h3>
-                  </div>
-
-                  <div
-                    className="rounded-lg px-3.5 py-2.5"
-                    style={{ backgroundColor: `${content.pharmacy.brandColor}0f` }}
-                  >
-                    <p className="text-[11px] font-semibold tracking-wide text-ink-500 uppercase dark:text-ink-400">
-                      Pourquoi votre pharmacien vous le conseille
-                    </p>
-                    <p className="mt-0.5 text-[13.5px] leading-6 text-ink-800 dark:text-ink-100">
-                      {item.personalReason}
-                    </p>
-                  </div>
-
-                  {item.benefit && !item.personalReason.includes(item.benefit) && (
-                    <p className="text-[13px] leading-5 text-ink-600 dark:text-ink-300">
-                      {item.benefit}
+          {content.advice.length > 0 && (
+            <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 print:grid-cols-1">
+              {content.advice.map((advice) => (
+                <li key={advice.productName} className="print-avoid-break rounded-xl border border-[#d1d5db] px-4 py-3.5">
+                  <p className="text-[15.5px] leading-5 font-semibold">{advice.productName}</p>
+                  <p className="mt-1.5 text-[14px] leading-[1.55] text-[#374151]">{advice.personalReason}</p>
+                  {advice.usage && (
+                    <p className="mt-1.5 text-[13px] leading-5 text-[#4b5563]">
+                      <span className="font-semibold">Comment l&apos;utiliser :</span> {advice.usage}
                     </p>
                   )}
-
-                  {item.usage && (
-                    <p className="text-[12.5px] leading-5 text-ink-500 dark:text-ink-400">
-                      {item.usage}
+                  {advice.precautions.length > 0 && (
+                    <p className="mt-1 text-[13px] leading-5 text-[#4b5563]">
+                      <span className="font-semibold">À savoir :</span> {advice.precautions.join(" ")}
                     </p>
                   )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
-                  {item.precautions.length > 0 && (
-                    <ul className="space-y-0.5">
-                      {item.precautions.map((precaution) => (
-                        <li
-                          key={precaution}
-                          className="text-[12px] leading-4 text-warning-700 dark:text-warning-500"
-                        >
-                          ⚠ {precaution}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="flex shrink-0 flex-col items-end justify-between gap-2 text-right">
-                  <p className="text-[18px] font-semibold tabular text-ink-900 dark:text-ink-50">
-                    {formatCents(item.priceCents)}
-                  </p>
-                  <p className="text-[11.5px] text-ink-500 dark:text-ink-400">
-                    {item.availability === "IN_STOCK"
-                      ? "Disponible en officine"
-                      : item.availability === "LOW_STOCK"
-                        ? "Derniers exemplaires"
-                        : "Sur commande"}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <p className="mt-4 text-[12px] leading-5 text-ink-500 dark:text-ink-400">
-            Ces conseils sont facultatifs. Ils ne sont pas prescrits par votre médecin et ne
-            remplacent aucun traitement. Parlez-en avec votre pharmacien.
+      {/* ---- Suivi ---------------------------------------------------------- */}
+      {content.followUp && (
+        <section className="print-avoid-break mt-7 flex items-start gap-3 rounded-xl border border-[#d1d5db] px-4 py-3.5">
+          <MomentIcon moment="followup" className="mt-0.5 size-5 shrink-0" color={color} />
+          <p className="text-[14.5px] leading-6 text-[#374151]">
+            <span className="font-semibold text-[#111827]">Votre suivi.</span> La {content.pharmacy.name} prendra de vos nouvelles vers le{" "}
+            {formatDate(content.followUp.dueAt)}. D&apos;ici là, n&apos;hésitez pas à passer ou à appeler si quelque chose vous gêne.
           </p>
         </section>
       )}
 
-      <footer className="mt-10 border-t border-ink-200 pt-5 print-avoid-break dark:border-ink-800">
-        <ul className="space-y-1.5">
-          {content.disclaimers.map((disclaimer) => (
-            <li
-              key={disclaimer}
-              className="text-[11.5px] leading-4 text-ink-500 dark:text-ink-400"
-            >
-              {disclaimer}
-            </li>
+      {/* ---- Pied ------------------------------------------------------------ */}
+      <footer className="print-avoid-break mt-8 border-t border-[#d1d5db] pt-5">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-bold" style={{ color }}>
+              {content.pharmacy.name}
+            </p>
+            {address && <p className="text-[13px] leading-5 text-[#374151]">{address}</p>}
+            {content.pharmacy.phone && (
+              <p className="mt-1 text-[15px] leading-6 font-semibold">
+                Une question ? {content.pharmacy.phone}
+              </p>
+            )}
+            {content.pharmacy.email && <p className="text-[13px] leading-5 text-[#374151]">{content.pharmacy.email}</p>}
+            <p className="mt-2 text-[12.5px] leading-5 text-[#6b7280]">
+              Plan préparé avec {content.pharmacist.fullName}, {content.pharmacist.roleLabel.toLowerCase()}.
+            </p>
+          </div>
+          {qrUrl && (
+            <div className="flex shrink-0 flex-col items-center gap-1.5">
+              <QrCode value={qrUrl} size={112} label="QR code : retrouvez ce plan sur votre téléphone" />
+              <p className="max-w-[140px] text-center text-[11px] leading-4 text-[#6b7280]">Ce plan sur votre téléphone</p>
+            </div>
+          )}
+        </div>
+        <ul className="mt-4 space-y-0.5 text-[11.5px] leading-[1.5] text-[#6b7280]">
+          {content.disclaimers.map((line) => (
+            <li key={line}>{line}</li>
           ))}
         </ul>
-        <p className="mt-4 text-[11px] text-ink-400">
-          Document établi par {content.pharmacy.name} le {formatDateLong(generatedAt)} · Fiche
-          générée avec Pharma.ai, outil d&apos;assistance au conseil officinal.
-        </p>
       </footer>
     </article>
   );
 }
 
-/**
- * Assemble des fragments en phrases correctement ponctuées.
- * Les données saisies au comptoir se terminent rarement par un point ; les
- * concaténer brutalement produirait « 1 application le soir Pendant 10 jours ».
- */
-function joinSentences(parts: (string | null | undefined)[]): string {
-  return parts
-    .map((part) => part?.trim())
-    .filter((part): part is string => Boolean(part))
-    .map((part) => (/[.!?]$/.test(part) ? part : `${part}.`))
-    .join(" ");
+function SectionTitle({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <h2 className="text-[12.5px] font-bold tracking-[0.1em] uppercase" style={{ color }}>
+      {children}
+    </h2>
+  );
 }
 
-function SectionTitle({
-  eyebrow,
-  title,
-  color,
-}: {
-  eyebrow: string;
-  title: string;
-  color: string;
-}) {
+function TreatmentNote({ item }: { item: DocumentTreatmentItem }) {
+  const { name, strength } = displayName(item);
   return (
-    <div className="space-y-1">
-      <p
-        className="text-[11.5px] font-semibold tracking-[0.08em] uppercase"
-        style={{ color }}
-      >
-        {eyebrow}
+    <li className="print-avoid-break py-3">
+      <p className="text-[15px] leading-5 font-semibold">
+        {name}
+        {strength && <span className="font-normal text-[#4b5563]"> {strength}</span>}
       </p>
-      <h2 className="text-[20px] leading-7 font-semibold tracking-[-0.01em] text-ink-900 dark:text-ink-50">
-        {title}
-      </h2>
-    </div>
+      {item.purpose && <p className="mt-1 text-[14px] leading-[1.55] text-[#374151]">{item.purpose}</p>}
+      {item.instructions && (
+        <p className="mt-1 text-[13.5px] leading-5 text-[#374151]">
+          <span className="font-semibold">Consigne :</span> {item.instructions}
+        </p>
+      )}
+      {item.tips.length > 0 && <p className="mt-1 text-[13.5px] leading-5 text-[#4b5563]">{item.tips.join(" ")}</p>}
+      {item.precautions.length > 0 && (
+        <p className="mt-1 text-[13.5px] leading-5 text-[#4b5563]">
+          <span className="font-semibold">Précaution :</span> {item.precautions.join(" ")}
+        </p>
+      )}
+    </li>
   );
+}
+
+/** Teinte claire de la couleur d'officine — lisible aussi en noir et blanc. */
+function tint(hex: string, amount: number): string {
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!match) return "#f3f4f6";
+  const [r, g, b] = [match[1], match[2], match[3]].map((part) => Number.parseInt(part, 16));
+  const mix = (c: number) => Math.round(c + (255 - c) * amount);
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
 }

@@ -57,3 +57,47 @@ export function decodeWindows1252(bytes: Uint8Array): string {
 
   return parts.join("");
 }
+
+/**
+ * Décode un fichier BDPM en devinant son encodage, fichier par fichier.
+ *
+ * La documentation annonce de l'ISO-8859-1 pour tous les fichiers. Mesuré sur
+ * la livraison du 3 août 2026 : CIS_CIP_bdpm.txt est en UTF-8 (20 884 « é »
+ * codés sur deux octets, aucun sur un seul), les cinq autres en windows-1252.
+ * Décoder ce fichier en windows-1252 produisait « polypropylÃ¨ne » sur chaque
+ * libellé de boîte. On teste donc l'UTF-8 strict d'abord : un fichier
+ * windows-1252 qui contient un seul accent n'est jamais de l'UTF-8 valide, la
+ * détection ne peut donc pas se tromper dans ce sens-là.
+ */
+export function decodeBdpmText(bytes: Uint8Array): { text: string; encoding: "utf-8" | "windows-1252" } {
+  if (looksLikeUtf8(bytes)) {
+    return { text: new TextDecoder("utf-8", { fatal: true }).decode(bytes), encoding: "utf-8" };
+  }
+  return { text: decodeWindows1252(bytes), encoding: "windows-1252" };
+}
+
+/** Vrai si les octets forment de l'UTF-8 valide ET contiennent au moins une séquence multi-octets. */
+export function looksLikeUtf8(bytes: Uint8Array): boolean {
+  let multibyte = false;
+  let i = 0;
+  while (i < bytes.length) {
+    const byte = bytes[i];
+    if (byte < 0x80) {
+      i += 1;
+      continue;
+    }
+    let length: number;
+    if (byte >= 0xc2 && byte <= 0xdf) length = 2;
+    else if (byte >= 0xe0 && byte <= 0xef) length = 3;
+    else if (byte >= 0xf0 && byte <= 0xf4) length = 4;
+    else return false;
+    if (i + length > bytes.length) return false;
+    for (let k = 1; k < length; k += 1) {
+      const cont = bytes[i + k];
+      if (cont < 0x80 || cont > 0xbf) return false;
+    }
+    multibyte = true;
+    i += length;
+  }
+  return multibyte;
+}

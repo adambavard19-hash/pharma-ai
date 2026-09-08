@@ -35,6 +35,12 @@ export type FollowUpVariables = {
   link: string;
   /** Lien de désinscription, fonctionnel sans compte. */
   unsubscribeLink: string;
+  /**
+   * Lien « Comment allez-vous ? », propre à ce suivi. Trois réponses fermées
+   * (cf. answers.ts) — la page ne pose aucune autre question. Absent quand le
+   * suivi ne se prête pas à un retour (rappel de renouvellement, saisonnier).
+   */
+  responseLink?: string | null;
 };
 
 export type FollowUpTemplate = {
@@ -48,10 +54,27 @@ export type FollowUpTemplate = {
   defaultDelayDays: number;
   subject: (variables: FollowUpVariables) => string;
   body: (variables: FollowUpVariables) => string;
+  /** Ce gabarit pose la question « Comment allez-vous ? » au patient. */
+  asksFeedback: boolean;
 };
 
+/** Le message d'ouverture, identique pour tous les gabarits : simple et humain. */
+export const followUpGreeting = (v: FollowUpVariables) =>
+  `Bonjour ${v.patientFirstName},\n\n` +
+  `La ${v.pharmacyName} prend de vos nouvelles à la suite de votre dernier passage.`;
+
+/** La question et ses trois réponses, en texte brut. Le HTML en fait des boutons. */
+export const feedbackBlock = (v: FollowUpVariables) =>
+  v.responseLink
+    ? `\n\nComment allez-vous depuis votre passage ?\n` +
+      `🙂 Ça va mieux : ${v.responseLink}?r=mieux\n` +
+      `😐 Pas vraiment de changement : ${v.responseLink}?r=pareil\n` +
+      `🙁 J'ai encore besoin d'un conseil : ${v.responseLink}?r=conseil`
+    : "";
+
 const signature = (v: FollowUpVariables) =>
-  `\n\nVotre pharmacie ${v.pharmacyName}\n\n` +
+  `\n\nVotre plan personnalisé reste consultable ici : ${v.link}\n\n` +
+  `À bientôt,\nL'équipe de la ${v.pharmacyName}\n\n` +
   `Ce message ne contient aucune information sur votre santé.\n` +
   `Pour ne plus recevoir de suivi : ${v.unsubscribeLink}`;
 
@@ -63,12 +86,13 @@ export const FOLLOW_UP_TEMPLATES: FollowUpTemplate[] = [
     purpose:
       "Vérifier que le traitement est bien supporté dans les premiers jours, quand l'arrêt prématuré est le plus fréquent.",
     defaultDelayDays: 3,
-    subject: (v) => `${v.pharmacyName} — comment se passent vos premiers jours ?`,
+    subject: (v) => `Comment allez-vous ? — ${v.pharmacyName}`,
+    asksFeedback: true,
     body: (v) =>
-      `Bonjour ${v.patientFirstName},\n\n` +
-      `Quelques jours après votre passage, votre pharmacien souhaite savoir si tout se passe bien.\n\n` +
-      `Vos conseils personnalisés restent disponibles ici : ${v.link}\n\n` +
-      `Si quelque chose vous gêne, n'hésitez pas à passer ou à nous appeler.` +
+      followUpGreeting(v) +
+      `\n\nQuelques jours ont passé : votre pharmacien souhaite savoir si tout se passe bien avec votre traitement.` +
+      feedbackBlock(v) +
+      `\n\nSi quelque chose vous gêne, n'hésitez pas à passer ou à nous appeler.` +
       signature(v),
   },
   {
@@ -78,11 +102,12 @@ export const FOLLOW_UP_TEMPLATES: FollowUpTemplate[] = [
     purpose:
       "Reprendre contact quand la cure se termine : c'est le moment où une question reste souvent sans réponse.",
     defaultDelayDays: 7,
-    subject: (v) => `${v.pharmacyName} — un point de fin de traitement`,
+    subject: (v) => `Comment allez-vous ? — ${v.pharmacyName}`,
+    asksFeedback: true,
     body: (v) =>
-      `Bonjour ${v.patientFirstName},\n\n` +
-      `Votre traitement arrive à son terme. Votre pharmacien reste disponible si vous avez une question.\n\n` +
-      `Vos conseils personnalisés sont toujours consultables ici : ${v.link}` +
+      followUpGreeting(v) +
+      `\n\nVotre traitement arrive à son terme. Votre pharmacien reste disponible si vous avez une question.` +
+      feedbackBlock(v) +
       signature(v),
   },
   {
@@ -92,11 +117,11 @@ export const FOLLOW_UP_TEMPLATES: FollowUpTemplate[] = [
     purpose:
       "Rappeler l'échéance d'un traitement au long cours, pour éviter une rupture de traitement entre deux ordonnances.",
     defaultDelayDays: 28,
-    subject: (v) => `${v.pharmacyName} — pensez à votre renouvellement`,
+    subject: (v) => `Pensez à votre renouvellement — ${v.pharmacyName}`,
+    asksFeedback: false,
     body: (v) =>
-      `Bonjour ${v.patientFirstName},\n\n` +
-      `Il est bientôt temps de renouveler votre traitement. Votre pharmacie se tient prête à vous accompagner.\n\n` +
-      `Vos conseils personnalisés : ${v.link}` +
+      followUpGreeting(v) +
+      `\n\nIl est bientôt temps de renouveler votre traitement. Votre pharmacie se tient prête à vous accompagner.` +
       signature(v),
   },
   {
@@ -106,11 +131,11 @@ export const FOLLOW_UP_TEMPLATES: FollowUpTemplate[] = [
     purpose:
       "Reprendre contact sur un besoin saisonnier déjà exprimé par le patient — jamais sur un besoin supposé.",
     defaultDelayDays: 180,
-    subject: (v) => `${v.pharmacyName} — c'est le moment d'y penser`,
+    subject: (v) => `C'est le moment d'y penser — ${v.pharmacyName}`,
+    asksFeedback: false,
     body: (v) =>
-      `Bonjour ${v.patientFirstName},\n\n` +
-      `La saison revient : votre pharmacien a préparé quelques conseils à votre attention.\n\n` +
-      `À consulter ici : ${v.link}` +
+      followUpGreeting(v) +
+      `\n\nLa saison revient : votre pharmacien a préparé quelques conseils à votre attention.` +
       signature(v),
   },
   {
@@ -119,11 +144,11 @@ export const FOLLOW_UP_TEMPLATES: FollowUpTemplate[] = [
     label: "Suivi personnalisé",
     purpose: "Un rappel décidé par le pharmacien, hors des cas prévus.",
     defaultDelayDays: 14,
-    subject: (v) => `${v.pharmacyName} — votre pharmacien vous recontacte`,
+    subject: (v) => `Votre pharmacien prend de vos nouvelles — ${v.pharmacyName}`,
+    asksFeedback: true,
     body: (v) =>
-      `Bonjour ${v.patientFirstName},\n\n` +
-      `Votre pharmacien a préparé un suivi personnalisé à votre attention.\n\n` +
-      `À consulter ici : ${v.link}` +
+      followUpGreeting(v) +
+      feedbackBlock(v) +
       signature(v),
   },
 ];

@@ -72,6 +72,14 @@ export type SaleLineDraft = {
   candidates: SpecialtyProposal[];
   /** Pourquoi le rattachement automatique a été refusé, en clair. */
   identificationRefusal: string | null;
+  /**
+   * Les dosages qui existent réellement pour ce nom dans le catalogue, quand
+   * la ligne n'en porte pas : c'est la question à poser au pharmacien, avec
+   * ses seules réponses possibles.
+   */
+  strengthOptions: string[];
+  /** Code CIS de la spécialité rattachée, pour ouvrir sa fiche. */
+  cisCode: string | null;
 };
 
 export type SafetyFindingView = {

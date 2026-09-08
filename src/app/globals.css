@@ -257,12 +257,12 @@ body {
 @media print {
   @page {
     size: A4;
-    margin: 14mm 14mm 16mm;
+    margin: 10mm 12mm 11mm;
   }
 
   html, body {
     background: #ffffff !important;
-    color: #0f172a !important;
+    color: #111827 !important;
     font-size: 10.5pt;
   }
 
@@ -279,6 +279,31 @@ body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
+  /* Le plan patient : une feuille, sans ombre ni coin arrondi, texte net.
+     Les tableaux ne se coupent jamais au milieu d'une ligne ; un en-tête de
+     tableau se répète en haut de chaque page si le traitement déborde. */
+  .plan-document {
+    max-width: none !important;
+    box-shadow: none !important;
+    font-size: 10pt;
+    line-height: 1.4;
+  }
+  .plan-document table { page-break-inside: auto; }
+  .plan-document thead { display: table-header-group; }
+  .plan-document tr { break-inside: avoid; page-break-inside: avoid; }
+  .plan-document h1 { font-size: 16pt; }
+  .plan-document h2 { font-size: 9pt; }
+  .plan-document header { padding-bottom: 2.5mm; }
+  .plan-document section { margin-top: 3.5mm; }
+  .plan-document section > p, .plan-document section > ul, .plan-document section > div { margin-top: 1.5mm; }
+  .plan-document td, .plan-document th { padding-top: 1.6mm; padding-bottom: 1.6mm; }
+  .plan-document footer { margin-top: 4mm; padding-top: 3mm; }
+  .plan-document footer ul { margin-top: 2mm; font-size: 7.5pt; line-height: 1.35; }
+  /* En noir et blanc, une bordure grise fine reste lisible ; un fond teinté
+     pâle ne l'est pas : on renforce les contours. */
+  .plan-document table, .plan-document th, .plan-document td { border-color: #9ca3af !important; }
+  .plan-document th, .plan-document td { border-bottom: 1px solid #d1d5db; }
 }
 
 .print-only { display: none; }

@@ -5,14 +5,16 @@ import Image from "next/image";
 import {
   Check,
   Copy,
-  FileText,
+  Download,
   Loader2,
   Mail,
   Printer,
-  QrCode as QrCodeIcon,
   Receipt,
+  RefreshCw,
+  Settings,
   Sparkles,
 } from "lucide-react";
+import Link from "next/link";
 import { deliverDocumentAction, generateDocumentAction } from "@/server/actions/documents";
 import { setPatientEmailAction, updateConsentAction } from "@/server/actions/patients";
 import { recordSaleAction } from "@/server/actions/sales";
@@ -77,9 +79,15 @@ export function DocumentWorkspace({
   canUpdatePatient,
   messaging,
   existingSales,
+  history,
+  publicReach,
 }: {
   prescriptionId: string;
   patient: PatientView | null;
+  /** Toutes les versions du plan, la plus récente d'abord. */
+  history: { id: string; version: number; createdAt: string; revoked: boolean }[];
+  /** Ce que vaut l'adresse du QR code depuis un téléphone. */
+  publicReach: "PUBLIC" | "LAN" | "LOCAL";
   canUpdateConsent: boolean;
   canUpdatePatient: boolean;
   acceptedRecommendations: AcceptedRecommendation[];
@@ -152,8 +160,8 @@ export function DocumentWorkspace({
             />
             {/* La zone imprimée. Tout le reste de l'écran porte `no-print` :
                 l'impression rend une feuille A4 propre, sans menu ni bouton. */}
-            <CardContent className="bg-white p-6 sm:p-8 dark:bg-ink-900">
-              <PatientDocument content={existingDocument.content} />
+            <CardContent className="bg-white p-5 sm:p-8">
+              <PatientDocument content={existingDocument.content} qrUrl={existingDocument.url} />
             </CardContent>
           </Card>
         ) : (
@@ -185,12 +193,13 @@ export function DocumentWorkspace({
               canUpdatePatient={canUpdatePatient}
               messaging={messaging}
               deliveries={existingDocument.deliveries}
+              publicReach={publicReach}
             />
 
             <Card>
               <CardHeader
-                title="Nouvelle version"
-                description="Régénérez le plan après avoir modifié les conseils."
+                title="Mettre à jour le plan"
+                description="Après une correction du traitement ou des conseils. L'ancienne version reste consultable par l'officine."
               />
               <CardContent className="space-y-3">
                 <Textarea
@@ -200,15 +209,24 @@ export function DocumentWorkspace({
                   placeholder="Mot du pharmacien (facultatif)"
                   aria-label="Mot du pharmacien"
                 />
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  loading={pending}
-                  onClick={generate}
-                  leadingIcon={<FileText className="size-4" />}
-                >
-                  Générer la version {existingDocument.version + 1}
+                <Button variant="outline" className="w-full" loading={pending} onClick={generate} leadingIcon={<RefreshCw className="size-4" />}>
+                  Mettre à jour le plan
                 </Button>
+                {history.length > 1 && (
+                  <details className="group">
+                    <summary className="cursor-pointer list-none text-[12px] text-text-tertiary hover:text-text-secondary">
+                      Historique — {history.length} versions
+                    </summary>
+                    <ul className="mt-1.5 space-y-0.5 text-[12px] text-text-tertiary">
+                      {history.map((version) => (
+                        <li key={version.id}>
+                          v{version.version} · {formatDateTime(version.createdAt)}
+                          {version.id === existingDocument.id ? " · en cours" : version.revoked ? " · révoquée" : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </CardContent>
             </Card>
           </>
@@ -236,6 +254,7 @@ function DeliveryPanel({
   canUpdatePatient,
   messaging,
   deliveries,
+  publicReach,
 }: {
   documentId: string;
   url: string;
@@ -244,13 +263,8 @@ function DeliveryPanel({
   canUpdatePatient: boolean;
   canSend: boolean;
   messaging: MessagingState;
-  deliveries: {
-    id: string;
-    channel: string;
-    status: string;
-    detail: string | null;
-    createdAt: string;
-  }[];
+  deliveries: { id: string; channel: string; status: string; detail: string | null; createdAt: string }[];
+  publicReach: "PUBLIC" | "LAN" | "LOCAL";
 }) {
   const [copied, setCopied] = useState(false);
   const [emailResult, setEmailResult] = useState<string | null>(null);
@@ -296,191 +310,139 @@ function DeliveryPanel({
     });
   };
 
+  // Imprimer ouvre le document seul, dans sa mise en page papier — jamais
+  // l'écran de l'application avec ses menus. L'aperçu avant impression est
+  // exactement la feuille qui sortira.
   const print = () => {
     deliver("PRINT");
-    window.print();
+    window.open(`${url}?imprimer=1`, "_blank", "noopener");
   };
 
-  // L'envoi n'est proposé que s'il peut réellement partir. Un bouton
-  // « Envoyer » qui n'envoie rien vaut moins que l'impression proposée
-  // franchement : au comptoir, le patient repart avec quelque chose.
   const canEmail = Boolean(email) && consentGranted && canSend && messaging.configured;
+  const emailBlockedReason = !email
+    ? null
+    : !messaging.configured
+      ? "L'envoi par e-mail n'est pas activé sur cette officine."
+      : !consentGranted
+        ? `${patient?.name ?? "Le patient"} n'a pas encore accepté de recevoir ses conseils par e-mail.`
+        : null;
 
   return (
     <Card>
-      <CardHeader
-        title="Remettre au patient"
-        description="Le plan est prêt. Un seul geste suffit."
-      />
+      <CardHeader title="Remettre au patient" description="Trois façons, au choix du patient. Chaque remise est journalisée." />
       <CardContent className="space-y-4">
-        {/* LE geste principal. Il change selon ce qu'on sait du patient : jamais
-            deux boutons pleins côte à côte, jamais de choix à arbitrer pendant
-            que quelqu'un attend au comptoir. */}
-        {canEmail ? (
+        <div className="grid gap-2">
           <Button
-            size="xl"
+            size="lg"
             className="w-full"
             loading={pending}
+            disabled={!canEmail}
             onClick={() => deliver("EMAIL", email ?? undefined)}
             leadingIcon={sent ? <Check className="size-5" /> : <Mail className="size-5" />}
           >
             {sent ? "Envoyé par e-mail" : "Envoyer par e-mail"}
           </Button>
-        ) : (
-          <Button
-            size="xl"
-            className="w-full"
-            onClick={print}
-            leadingIcon={<Printer className="size-5" />}
-          >
-            Imprimer le PDF A4
-          </Button>
-        )}
-
-        {email && canSend && (
-          <p className="text-center text-[12.5px] text-text-secondary">
-            {canEmail ? `Destinataire : ${email}` : email}
-          </p>
-        )}
-
-        {/* Pas d'adresse au dossier : le papier est déjà proposé au-dessus, et
-            l'adresse se saisit ici en un champ — pas dans la fiche patient. */}
-        {patient && !email && (
-          <NoEmailBlock
-            patientId={patient.id}
-            patientName={patient.name}
-            canUpdatePatient={canUpdatePatient}
-            onSaved={(value) => setEmail(value)}
-          />
-        )}
-
-        {!patient && (
-          <Alert tone="neutral" title="Ordonnance non rattachée">
-            Aucun patient n&apos;est rattaché à cette délivrance : le plan ne peut être
-            qu&apos;imprimé ou montré par QR code. Rattachez un patient pour l&apos;envoyer et
-            le retrouver plus tard dans son historique.
-          </Alert>
-        )}
-
-        {patient && email && canSend && messaging.configured && !consentGranted && (
-          <Alert tone="warning" title="Consentement manquant">
-            {patient.name} n&apos;a pas encore accepté de recevoir ses conseils par e-mail. Le
-            refus d&apos;envoi est appliqué côté serveur.
-            {canUpdateConsent && (
-              <>
-                {" "}
-                <button
-                  type="button"
-                  onClick={grantAdviceConsent}
-                  className="font-medium underline underline-offset-2"
-                >
-                  Le patient vient de l&apos;accepter au comptoir
-                </button>
-              </>
-            )}
-          </Alert>
-        )}
-
-        {/* Intégration absente : un état produit, discret, sans jargon. */}
-        {Boolean(email) && canSend && !messaging.configured && (
-          <p className="text-center text-[12px] text-text-tertiary">
-            Envoi par e-mail non activé sur cette officine.
-          </p>
-        )}
-
-        {emailResult && (
-          <p className="text-[11.5px] leading-4 text-warning-700 dark:text-warning-500">
-            {emailResult}
-          </p>
-        )}
-
-        <div className="space-y-2 border-t border-border-subtle pt-4">
-          <p className="text-[11.5px] font-medium tracking-wide text-text-tertiary uppercase">
-            Autres remises
-          </p>
-          <div className="grid gap-2">
-            {canEmail && (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={print}
-                leadingIcon={<Printer className="size-4" />}
-              >
-                Imprimer le PDF A4
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={async () => {
-                await navigator.clipboard.writeText(url).catch(() => undefined);
-                setCopied(true);
-                deliver("LINK");
-                setTimeout(() => setCopied(false), 2500);
-              }}
-              leadingIcon={copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-            >
-              {copied ? "Lien copié" : "Copier le lien sécurisé"}
+          <div className="grid grid-cols-2 gap-2">
+            <Button asChild variant="outline" size="lg" className="w-full" leadingIcon={<Download className="size-[18px]" />}>
+              <a href={`/api/documents/${documentId}/pdf`} download>
+                Télécharger le PDF
+              </a>
+            </Button>
+            <Button variant="outline" size="lg" className="w-full" onClick={print} leadingIcon={<Printer className="size-[18px]" />}>
+              Imprimer
             </Button>
           </div>
         </div>
 
-        <details className="group">
-          <summary className="cursor-pointer list-none text-[12.5px] text-text-tertiary transition-colors hover:text-text-secondary">
-            <span className="flex items-center gap-1.5">
-              <QrCodeIcon className="size-3.5" />
-              Montrer le QR code au patient
-            </span>
-          </summary>
-          <div className="mt-3 flex flex-col items-center gap-3 rounded-xl border border-border-subtle bg-white p-4 dark:bg-ink-100">
-            <QrCode value={url} size={168} />
-            <p className="text-center text-[11.5px] leading-4 text-ink-500">
-              Le patient scanne ce code pour retrouver son plan sur son téléphone.
-            </p>
-            <Button variant="ghost" size="sm" onClick={() => deliver("QR_CODE")}>
-              Noter « QR code montré »
-            </Button>
+        {email && canSend && canEmail && <p className="text-center text-[12.5px] text-text-secondary">Destinataire : {email}</p>}
+
+        {emailBlockedReason && (
+          <div className="rounded-lg bg-surface-sunken/70 px-3.5 py-2.5 text-[12.5px] leading-5 text-text-secondary">
+            {emailBlockedReason}{" "}
+            {!messaging.configured && (
+              <Link href="/parametres" className="inline-flex items-center gap-1 font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">
+                <Settings className="size-3.5" />
+                Activer l&apos;envoi par e-mail
+              </Link>
+            )}
+            {messaging.configured && !consentGranted && canUpdateConsent && (
+              <button type="button" onClick={grantAdviceConsent} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">
+                Le patient vient de l&apos;accepter au comptoir
+              </button>
+            )}
           </div>
-        </details>
+        )}
+
+        {patient && !email && (
+          <NoEmailBlock patientId={patient.id} patientName={patient.name} canUpdatePatient={canUpdatePatient} onSaved={(value) => setEmail(value)} />
+        )}
+
+        {!patient && (
+          <Alert tone="neutral" title="Ordonnance non rattachée">
+            Aucun patient n&apos;est rattaché à cette délivrance : le plan s&apos;imprime ou se montre par QR code. Rattachez un patient
+            pour l&apos;envoyer et le retrouver dans son historique.
+          </Alert>
+        )}
+
+        {emailResult && <p className="text-[11.5px] leading-4 text-warning-700 dark:text-warning-500">{emailResult}</p>}
+
+        {/* Le QR code, toujours visible et assez grand pour être scanné à bout
+            de bras par-dessus le comptoir. */}
+        <div className="space-y-2.5 border-t border-border-subtle pt-4">
+          <p className="text-[11.5px] font-medium tracking-wide text-text-tertiary uppercase">Sur le téléphone du patient</p>
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-border-subtle bg-white p-4">
+            <QrCode value={url} size={220} label="QR code du plan personnalisé" />
+            <p className="text-center text-[12px] leading-4 text-[#4b5563]">Le patient scanne ce code : son plan s&apos;ouvre, sans compte ni mot de passe.</p>
+            {publicReach === "LOCAL" && (
+              <Alert tone="warning" title="Ce QR code ne fonctionnera pas depuis un téléphone">
+                L&apos;adresse de l&apos;application est locale (localhost). Renseignez <code className="font-mono text-[11.5px]">PUBLIC_APP_URL</code> avec l&apos;adresse HTTPS
+                publique de l&apos;officine.
+              </Alert>
+            )}
+            {publicReach === "LAN" && (
+              <p className="text-center text-[11.5px] leading-4 text-warning-700 dark:text-warning-500">
+                Adresse du réseau local : lisible depuis un téléphone connecté au même Wi-Fi, en HTTP. Pour un accès depuis n&apos;importe où, renseignez{" "}
+                <code className="font-mono">PUBLIC_APP_URL</code> (HTTPS).
+              </p>
+            )}
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => deliver("QR_CODE")}>
+                Noter « QR code montré »
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(url).catch(() => undefined);
+                  setCopied(true);
+                  deliver("LINK");
+                  setTimeout(() => setCopied(false), 2500);
+                }}
+                leadingIcon={copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              >
+                {copied ? "Lien copié" : "Copier le lien"}
+              </Button>
+            </div>
+          </div>
+        </div>
 
         {deliveries.length > 0 && (
           <div className="space-y-1.5 border-t border-border-subtle pt-4">
-            <p className="text-[11.5px] font-medium tracking-wide text-text-tertiary uppercase">
-              Historique de remise
-            </p>
+            <p className="text-[11.5px] font-medium tracking-wide text-text-tertiary uppercase">Historique de remise</p>
             <ul className="space-y-1">
               {deliveries.map((delivery) => (
-                <li
-                  key={delivery.id}
-                  className="flex flex-wrap items-center gap-x-2 text-[12px] text-text-secondary"
-                >
-                  <Badge
-                    tone={
-                      delivery.status === "SENT"
-                        ? "success"
-                        : delivery.status === "FAILED"
-                          ? "danger"
-                          : "warning"
-                    }
-                  >
+                <li key={delivery.id} className="flex flex-wrap items-center gap-x-2 text-[12px] text-text-secondary">
+                  <Badge tone={delivery.status === "SENT" ? "success" : delivery.status === "FAILED" ? "danger" : "warning"}>
                     {CHANNEL_LABELS[delivery.channel] ?? delivery.channel}
                   </Badge>
-                  <span className="text-text-tertiary">
-                    {formatDateTime(delivery.createdAt)}
-                  </span>
-                  {/* Un échec et une simulation ne se ressemblent pas : dans un
-                      cas le prestataire a refusé, dans l'autre il n'y en a
-                      aucun. Les confondre empêcherait de corriger. */}
+                  <span className="text-text-tertiary">{formatDateTime(delivery.createdAt)}</span>
                   {delivery.status === "FAILED" && (
                     <span className="w-full text-[11px] text-danger-700 dark:text-danger-400">
-                      Échec — aucun message n&apos;est parti.
-                      {delivery.detail ? ` ${delivery.detail}` : ""}
+                      Échec — aucun message n&apos;est parti.{delivery.detail ? ` ${delivery.detail}` : ""}
                     </span>
                   )}
                   {delivery.status === "SIMULATED" && (
-                    <span className="w-full text-[11px] text-warning-700 dark:text-warning-500">
-                      Non transmis — {delivery.detail ?? "aucun service configuré"}
-                    </span>
+                    <span className="w-full text-[11px] text-warning-700 dark:text-warning-500">Non transmis — {delivery.detail ?? "aucun service configuré"}</span>
                   )}
                 </li>
               ))}

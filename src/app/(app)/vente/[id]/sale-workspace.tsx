@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, ChevronDown, Loader2, Sparkles, User } from "lucide-react";
+import { ArrowRight, Check, Loader2, Sparkles, User } from "lucide-react";
 import { verifyPrescriptionAction } from "@/server/actions/prescriptions";
 import {
   acceptRecommendationAction,
@@ -20,12 +20,12 @@ import { formatCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PRESCRIPTION_STATUS } from "@/config/statuses";
 import type { PatientOption } from "@/components/app/patient-picker";
-import { PrescriptionZone, TreatmentDetails, TreatmentLine } from "./prescription-zone";
+import { PrescriptionZone } from "./prescription-zone";
+import { TreatmentPanel } from "./treatment-panel";
+import { ChecksNote } from "./checks-note";
 import { SafetyZone } from "./safety-zone";
 import { AdviceZone } from "./advice-zone";
 import { DeliveryZone, type DeliveryExtra } from "./delivery-zone";
-import { PipelineTrace } from "./pipeline-trace";
-import { ReanalyseButton } from "./reanalyse-button";
 import { counterIsBlocked } from "@/core/ai/safety-gate";
 import { STAGE_LABELS, STAGE_ORDER, streamAnalysis } from "./analysis-stream";
 import type { AnalysisStage } from "@/server/services/analysis";
@@ -73,8 +73,6 @@ export function SaleWorkspace({
   blockedOpportunities,
   recommendations,
   analysisRunId,
-  trace,
-  understanding,
   permissions,
   catalogAttribution,
   identificationChangedSinceAnalysis,
@@ -120,7 +118,6 @@ export function SaleWorkspace({
   const [prescriberName, setPrescriberName] = useState(prescription.prescriberName ?? "");
   const [prescribedAt, setPrescribedAt] = useState(prescription.prescribedAt ?? "");
   const [forceEdit, setForceEdit] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   // Une acceptation déjà enregistrée reste acceptée après un rechargement :
   // la carte reflète le serveur, pas seulement le dernier clic.
   const [basket, setBasket] = useState<Map<string, BasketLine>>(
@@ -348,25 +345,59 @@ export function SaleWorkspace({
   const alertFactors = patientFactors.filter((factor) => factor.tone === "warning");
   const neutralFactors = patientFactors.filter((factor) => factor.tone !== "warning");
 
+  const analysisStage = analysing && stage && (
+    <Card>
+      <CardContent className="py-5">
+        <ol className="space-y-2">
+          <li className="flex items-center gap-3 text-[14px] text-text-secondary">
+            <Check className="size-[18px] shrink-0 text-success-600 dark:text-success-500" />
+            Ordonnance confirmée
+          </li>
+          {STAGE_ORDER.filter((step) => step !== "PERSIST").map((step) => {
+            const position = STAGE_ORDER.indexOf(step);
+            const current = STAGE_ORDER.indexOf(stage);
+            const done = position < current;
+            const active = position === current || (step === "ENGINE" && stage === "PERSIST");
+            return (
+              <li key={step} className={cn("flex items-center gap-3 text-[14px]", done ? "text-text-secondary" : active ? "font-medium text-text-primary" : "text-text-tertiary")}>
+                {done ? (
+                  <Check className="size-[18px] shrink-0 text-success-600 dark:text-success-500" />
+                ) : active ? (
+                  <Loader2 className="size-[18px] shrink-0 animate-spin text-brand-600 dark:text-brand-400" />
+                ) : (
+                  <span className="size-[18px] shrink-0" />
+                )}
+                {done ? STAGE_LABELS[step].replace("…", "") : STAGE_LABELS[step]}
+              </li>
+            );
+          })}
+        </ol>
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-6xl">
+      {/* ---- Le patient, en haut ------------------------------------------ */}
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-4">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="text-[22px] leading-7 font-semibold tracking-[-0.015em] text-text-primary uppercase">
             {prescription.patientName ?? "Patient non rattaché"}
           </h1>
           <Badge tone={status.tone}>{status.label}</Badge>
+          {alertFactors.map((factor) => (
+            <Badge key={factor.label} tone="warning">
+              {factor.label}
+            </Badge>
+          ))}
         </div>
-        <div className="flex items-center gap-3 text-[12.5px] text-text-tertiary">
+        <div className="flex flex-wrap items-center gap-3 text-[12.5px] text-text-tertiary">
           {neutralFactors.map((factor) => (
             <span key={factor.label}>{factor.label}</span>
           ))}
           <span className="tabular">{prescription.reference}</span>
           {prescription.patientId && (
-            <Link
-              href={`/patients/${prescription.patientId}`}
-              className="flex items-center gap-1 text-brand-700 hover:underline dark:text-brand-400"
-            >
+            <Link href={`/patients/${prescription.patientId}`} className="flex items-center gap-1 text-brand-700 hover:underline dark:text-brand-400">
               <User className="size-3.5" />
               Fiche patient
             </Link>
@@ -374,196 +405,76 @@ export function SaleWorkspace({
         </div>
       </header>
 
-      {alertFactors.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-1.5">
-          {alertFactors.map((factor) => (
-            <Badge key={factor.label} tone="warning">
-              {factor.label}
-            </Badge>
-          ))}
-        </div>
-      )}
-
       {error && (
         <Alert tone="danger" className="mb-4">
           {error}
         </Alert>
       )}
 
-      <div className="space-y-6 pb-28">
-        {editing && (
-          <PrescriptionZone
-            prescriptionId={prescription.id}
-            editing
-            lines={lines}
-            onLineChange={updateLine}
-            patients={patients}
-            patientId={patientId}
-            onPatientChange={setPatientId}
-            prescriberName={prescriberName}
-            onPrescriberChange={setPrescriberName}
-            prescribedAt={prescribedAt}
-            onPrescribedAtChange={setPrescribedAt}
-            onEdit={() => setForceEdit(true)}
-            canEdit={permissions.verify}
-            catalogAttribution={catalogAttribution}
-          />
-        )}
+      {/* Une alerte bloquante passe avant tout, sur toute la largeur : rien ne
+          se propose par-dessus. */}
+      {!editing && !analysing && blocked && (
+        <div className="mb-5">
+          <SafetyZone analysisRunId={analysisRunId} findings={findings} blockedOpportunities={blockedOpportunities} canAcknowledge={permissions.verify} stale={identificationChangedSinceAnalysis} />
+        </div>
+      )}
 
-        {analysing && stage && (
-          <Card>
-            <CardContent className="py-5">
-              <ol className="space-y-2">
-                <li className="flex items-center gap-3 text-[14px] text-text-secondary">
-                  <Check className="size-[18px] shrink-0 text-success-600 dark:text-success-500" />
-                  Ordonnance confirmée
-                </li>
-                {STAGE_ORDER.filter((step) => step !== "PERSIST").map((step) => {
-                  const position = STAGE_ORDER.indexOf(step);
-                  const current = STAGE_ORDER.indexOf(stage);
-                  const done = position < current;
-                  const active = position === current || (step === "ENGINE" && stage === "PERSIST");
-                  return (
-                    <li
-                      key={step}
-                      className={cn(
-                        "flex items-center gap-3 text-[14px]",
-                        done
-                          ? "text-text-secondary"
-                          : active
-                            ? "font-medium text-text-primary"
-                            : "text-text-tertiary",
-                      )}
-                    >
-                      {done ? (
-                        <Check className="size-[18px] shrink-0 text-success-600 dark:text-success-500" />
-                      ) : active ? (
-                        <Loader2 className="size-[18px] shrink-0 animate-spin text-brand-600 dark:text-brand-400" />
-                      ) : (
-                        <span className="size-[18px] shrink-0" />
-                      )}
-                      {done ? STAGE_LABELS[step].replace("…", "") : STAGE_LABELS[step]}
-                    </li>
-                  );
-                })}
-              </ol>
-            </CardContent>
-          </Card>
-        )}
-
-        {!editing && !analysing && (
-          <>
-            <TreatmentLine
+      {/* ---- Traitement à gauche, conseils à droite ------------------------ */}
+      <div className="grid items-start gap-6 pb-28 lg:grid-cols-2">
+        <div className="min-w-0 space-y-5">
+          {editing && (
+            <PrescriptionZone
+              prescriptionId={prescription.id}
+              editing
               lines={lines}
+              onLineChange={updateLine}
+              patients={patients}
+              patientId={patientId}
+              onPatientChange={setPatientId}
+              prescriberName={prescriberName}
+              onPrescriberChange={setPrescriberName}
+              prescribedAt={prescribedAt}
+              onPrescribedAtChange={setPrescribedAt}
               onEdit={() => setForceEdit(true)}
               canEdit={permissions.verify}
-              onOpenDetails={() => {
-                setDetailsOpen(true);
-                setTimeout(() => document.getElementById("details")?.scrollIntoView({ behavior: "smooth" }), 50);
-              }}
+              catalogAttribution={catalogAttribution}
             />
+          )}
 
-            {/* Une alerte bloquante passe avant tout : rien ne se propose
-                par-dessus. Le reste de la sécurité, lui, vient après les
-                propositions — c'est là qu'on le lit sans qu'il barre l'écran. */}
-            {blocked && (
-              <SafetyZone
-                analysisRunId={analysisRunId}
-                findings={findings}
-                blockedOpportunities={blockedOpportunities}
-                canAcknowledge={permissions.verify}
-                stale={identificationChangedSinceAnalysis}
-              />
-            )}
+          {analysisStage}
 
-            <AdviceZone
-              prescriptionId={prescription.id}
-              recommendations={recommendations}
-              canDecide={permissions.decide}
-              locked={blocked}
-              inBasket={(id) => basket.has(id)}
-              onAccept={acceptAdvice}
-              onCancelAccept={cancelAdvice}
-            />
+          {!editing && !analysing && (
+            <>
+              <TreatmentPanel lines={lines} canEdit={permissions.verify} onEdit={() => setForceEdit(true)} catalogAttribution={catalogAttribution} />
+              <ChecksNote findings={findings} blockedOpportunities={blockedOpportunities} stale={identificationChangedSinceAnalysis} prescriptionId={prescription.id} />
+            </>
+          )}
+        </div>
 
-            {!blocked && (
-              <SafetyZone
-                analysisRunId={analysisRunId}
-                findings={findings}
-                blockedOpportunities={blockedOpportunities}
-                canAcknowledge={permissions.verify}
-                stale={identificationChangedSinceAnalysis}
-              />
-            )}
-
-            <DeliveryZone
-              accepted={[...basket.entries()].map(([recommendationId, line]) => {
-                const recommendation = recommendations.find((r) => r.id === recommendationId);
-                return {
-                  id: recommendationId,
-                  name: recommendation?.product?.name ?? "Produit",
-                  quantity: line.quantity,
-                  unitPriceCents: line.unitPriceCents,
-                };
-              })}
-              extras={[...extras.values()]}
-              onAddExtra={addExtra}
-              onRemoveExtra={removeExtra}
-              canSell={permissions.sell}
-            />
-
-            <div id="details" className="rounded-xl border border-border-subtle">
-              <button
-                type="button"
-                onClick={() => setDetailsOpen((value) => !value)}
-                aria-expanded={detailsOpen}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[13.5px] text-text-secondary"
-              >
-                <span>{detailsOpen ? "Masquer les détails" : "Voir les détails"}</span>
-                <ChevronDown
-                  className={cn("size-4 shrink-0 text-text-tertiary transition-transform", detailsOpen && "rotate-180")}
-                />
-              </button>
-
-              {detailsOpen && (
-                <div className="space-y-5 border-t border-border-subtle px-4 py-4">
-                  {understanding && (
-                    <p className="flex items-start gap-2 text-[13px] leading-5 text-text-secondary">
-                      <Sparkles className="mt-0.5 size-4 shrink-0 text-brand-600 dark:text-brand-400" />
-                      <span>
-                        <span className="font-medium text-text-primary">Contexte compris : </span>
-                        {understanding.summary}
-                        <span className="text-text-tertiary">
-                          {" "}
-                          — hypothèse du modèle, confiance {Math.round(understanding.confidence * 100)} %.
-                          Ce n&apos;est pas un diagnostic.
-                        </span>
-                      </span>
-                    </p>
-                  )}
-
-                  <TreatmentDetails
-                    lines={lines}
-                    onEdit={() => setForceEdit(true)}
-                    canEdit={permissions.verify}
-                    catalogAttribution={catalogAttribution}
-                  />
-
-                  {trace && (
-                    <div className="space-y-3">
-                      <PipelineTrace
-                        trace={trace.stages}
-                        engineVersion={trace.engineVersion}
-                        durationMs={trace.durationMs}
-                      />
-                      {permissions.verify && <ReanalyseButton prescriptionId={prescription.id} />}
-                    </div>
-                  )}
-                </div>
-              )}
+        <div className="min-w-0 space-y-5">
+          {(editing || analysing) && (
+            <div className="rounded-2xl border border-dashed border-border-default px-5 py-6 text-[13.5px] leading-5 text-text-secondary">
+              <p className="font-medium text-text-primary">Les conseils à proposer apparaîtront ici</p>
+              <p className="mt-1">Après confirmation du traitement : au plus trois propositions, issues de votre stock, chacune avec son prix, sa raison et ce que vous dites au patient.</p>
             </div>
-          </>
-        )}
+          )}
+
+          {!editing && !analysing && (
+            <>
+              <AdviceZone prescriptionId={prescription.id} recommendations={recommendations} canDecide={permissions.decide} locked={blocked} inBasket={(id) => basket.has(id)} onAccept={acceptAdvice} onCancelAccept={cancelAdvice} />
+              <DeliveryZone
+                accepted={[...basket.entries()].map(([recommendationId, line]) => {
+                  const recommendation = recommendations.find((r) => r.id === recommendationId);
+                  return { id: recommendationId, name: recommendation?.product?.name ?? "Produit", quantity: line.quantity, unitPriceCents: line.unitPriceCents };
+                })}
+                extras={[...extras.values()]}
+                onAddExtra={addExtra}
+                onRemoveExtra={removeExtra}
+                canSell={permissions.sell}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-surface-card p-3.5 shadow-lg sm:gap-4 sm:p-4">
@@ -613,7 +524,7 @@ export function SaleWorkspace({
               <p className="hidden text-[12px] text-text-tertiary sm:block">
                 {hasSale
                   ? "Une vente est déjà enregistrée pour cette ordonnance."
-                  : "Terminer enregistre la délivrance et prépare le plan du patient."}
+                  : "Valider enregistre la délivrance et prépare le plan du patient."}
               </p>
             </div>
             <Button
@@ -626,9 +537,7 @@ export function SaleWorkspace({
             >
               {pending
                 ? "Préparation du plan…"
-                : basket.size + extras.size === 0
-                  ? "Terminer et préparer le plan"
-                  : "Terminer la vente et préparer le plan"}
+                : "Valider et préparer le plan patient"}
             </Button>
           </>
         )}

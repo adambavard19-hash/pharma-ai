@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  strengthTokens,
+  strengthLabel,
+  distinctStrengths,
   decideAutoAccept,
   identifyDrug,
   IDENTIFICATION_AUTO_SCORE,
@@ -192,5 +195,85 @@ describe("decideAutoAccept", () => {
   it("dit qu'il n'a rien trouvé plutôt que de rendre un candidat au hasard", () => {
     const decision = decideAutoAccept([]);
     expect(decision).toEqual({ accepted: false, reason: "NO_MATCH", candidates: [] });
+  });
+});
+
+describe("unités de dosage", () => {
+  const efferalgan = (name: string, form: string): SpecialtyCandidate => ({
+    id: name,
+    cisCode: name,
+    name,
+    pharmaceuticalForm: form,
+    substances: ["PARACÉTAMOL"],
+    marketed: true,
+  });
+  const catalogue = [
+    efferalgan("EFFERALGAN 1000 mg, comprimé effervescent", "comprimé effervescent(e)"),
+    efferalgan("EFFERALGAN 500 mg, comprimé", "comprimé"),
+    efferalgan("EFFERALGAN 150 mg, suppositoire", "suppositoire"),
+  ];
+
+  it("ramène les grammes aux milligrammes : « 1 g » rencontre « 1000 mg »", () => {
+    expect(strengthTokens("EFFERALGAN 1 g")).toEqual(["1000"]);
+    expect(strengthTokens("0,5 g")).toEqual(["500"]);
+    expect(strengthTokens("1,5 mg/ml")).toEqual(["1.5"]);
+    expect(strengthTokens("250 microgrammes/dose 250")).toEqual(["250"]);
+    expect(strengthTokens("RULID 150")).toEqual(["150"]);
+  });
+
+  it("rattache EFFERALGAN 1 g au 1000 mg, pas au 500 mg", () => {
+    const matches = identifyDrug({ drugName: "EFFERALGAN", dosage: "1 g" }, catalogue);
+    expect(matches[0].candidate.name).toBe("EFFERALGAN 1000 mg, comprimé effervescent");
+    const decision = decideAutoAccept(matches);
+    expect(decision.accepted).toBe(true);
+  });
+
+  it("refuse toujours un dosage divergent, même exprimé dans une autre unité", () => {
+    const matches = identifyDrug({ drugName: "EFFERALGAN", dosage: "0,5 g" }, catalogue);
+    expect(matches[0].candidate.name).toBe("EFFERALGAN 500 mg, comprimé");
+  });
+});
+
+describe("dosages proposés au pharmacien", () => {
+  it("extrait le dosage d'un nom de spécialité", () => {
+    expect(strengthLabel("BILASTINE ARROW 20 mg, comprimé")).toBe("20 mg");
+    expect(strengthLabel("TUSSIDANE 1,5 mg/ml, sirop")).toBe("1,5 mg/ml");
+    expect(strengthLabel("BECOTIDE 250 microgrammes/dose, solution pour inhalation")).toBe("250 microgrammes/dose");
+    expect(strengthLabel("DOLIPRANE, comprimé")).toBeNull();
+  });
+
+  it("liste les dosages distincts, triés, pour demander la précision manquante", () => {
+    expect(
+      distinctStrengths([
+        { name: "BILASTINE TEVA 20 mg, comprimé" },
+        { name: "BILASKA 10 mg, comprimé orodispersible" },
+        { name: "BILASTINE EG 20 mg, comprimé" },
+      ]),
+    ).toEqual(["10 mg", "20 mg"]);
+  });
+});
+
+describe("dénomination commune écrite comme un nom", () => {
+  const generic = (name: string): SpecialtyCandidate => ({
+    id: name,
+    cisCode: name,
+    name,
+    pharmaceuticalForm: "comprimé",
+    substances: ["BILASTINE"],
+    marketed: true,
+  });
+  const catalogue = [generic("BILASKA 20 mg, comprimé"), generic("BILASTINE ARROW 20 mg, comprimé"), generic("BILASTINE BIOGARAN 20 mg, comprimé")];
+
+  it("ne choisit jamais une marque à la place du prescripteur : « bilastine 20 mg » reste à choisir", () => {
+    const matches = identifyDrug({ drugName: "BILASTINE", dosage: "20 mg" }, catalogue);
+    expect(matches.every((m) => m.matchedOn === "SUBSTANCE")).toBe(true);
+    const decision = decideAutoAccept(matches);
+    expect(decision.accepted).toBe(false);
+    if (!decision.accepted) expect(decision.reason).toBe("SUBSTANCE_ONLY");
+  });
+
+  it("rattache seul quand une seule spécialité porte ce dosage", () => {
+    const decision = decideAutoAccept(identifyDrug({ drugName: "BILASTINE", dosage: "20 mg" }, [generic("BILASTINE ARROW 20 mg, comprimé")]));
+    expect(decision.accepted).toBe(true);
   });
 });

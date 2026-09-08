@@ -5,7 +5,9 @@ import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import {
+  answerFollowUp,
   cancelReminder,
+  markFollowUpHandled,
   optOutByToken,
   scheduleReminder,
   sendReminder,
@@ -153,4 +155,36 @@ export async function confirmOptOutAction(
 
   revalidatePath("/suivis");
   return ok(null, "Désinscription enregistrée.");
+}
+
+const answerSchema = z.object({
+  token: z.string().min(16).max(128),
+  answer: z.enum(["BETTER", "SAME", "NEED_ADVICE"]),
+});
+
+/**
+ * La réponse du patient à « Comment allez-vous ? ». Publique : aucun compte,
+ * seul le jeton propre au suivi l'autorise. Trois réponses fermées.
+ */
+export async function answerFollowUpAction(
+  payload: z.input<typeof answerSchema>,
+): Promise<ActionResult<{ pharmacyName: string; answered: string; alreadyAnswered: boolean }>> {
+  const parsed = answerSchema.safeParse(payload);
+  if (!parsed.success) return fail("Réponse invalide.");
+  const result = await answerFollowUp(parsed.data.token, parsed.data.answer);
+  if (!result) return fail("Ce lien n'est plus valide.");
+  return ok(result);
+}
+
+export async function markFollowUpHandledAction(
+  reminderId: string,
+): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.FOLLOWUP_SEND);
+  try {
+    await markFollowUpHandled({ scope: session.scope, reminderId });
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Action impossible.");
+  }
+  revalidatePath("/suivis");
+  return ok(null, "Demande de conseil traitée.");
 }

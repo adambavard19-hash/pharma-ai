@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { formatSender } from "./messaging-resend";
 import type { DeliveryOutcome, MessagingProvider, OutgoingEmail, ProviderInfo } from "../ports";
 
 /**
@@ -75,7 +76,7 @@ export class SmtpMessagingProvider implements MessagingProvider {
   async sendEmail(message: OutgoingEmail): Promise<DeliveryOutcome> {
     try {
       const result = await this.getTransport().sendMail({
-        from: this.config.from,
+        from: formatSender(this.config.from, message.fromName),
         to: message.to,
         subject: message.subject,
         text: message.text,

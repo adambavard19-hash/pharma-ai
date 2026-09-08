@@ -39,7 +39,7 @@ type SpecialtyRow = {
   name: string;
   pharmaceuticalForm: string | null;
   marketingStatus: string | null;
-  compositions: { substanceLabel: string }[];
+  compositions: { substanceLabel: string; substanceId?: string }[];
 };
 
 const MARKETED = "Commercialisée";
@@ -51,6 +51,7 @@ function toCandidate(row: SpecialtyRow): SpecialtyCandidate {
     name: row.name,
     pharmaceuticalForm: row.pharmaceuticalForm,
     substances: [...new Set(row.compositions.map((item) => item.substanceLabel))],
+    substanceCodes: [...new Set(row.compositions.map((item) => item.substanceId).filter((id): id is string => Boolean(id)))],
     marketed: row.marketingStatus === MARKETED,
   };
 }
@@ -104,7 +105,7 @@ export async function findSpecialtyCandidates(drugName: string): Promise<Special
       // vocabulaire du référentiel, sans rien interpréter.
       compositions: {
         where: { nature: { in: ["SA", "FT"] } },
-        select: { substanceLabel: true, nature: true },
+        select: { substanceLabel: true, nature: true, substanceId: true },
       },
     },
     // Ce qui est encore commercialisé d'abord : si la borne coupe, elle coupe
@@ -349,7 +350,7 @@ export async function searchSpecialties(query: string, limit = 12): Promise<Spec
       // vocabulaire du référentiel, sans rien interpréter.
       compositions: {
         where: { nature: { in: ["SA", "FT"] } },
-        select: { substanceLabel: true, nature: true },
+        select: { substanceLabel: true, nature: true, substanceId: true },
       },
     },
     orderBy: [{ marketingStatus: "asc" }, { name: "asc" }],

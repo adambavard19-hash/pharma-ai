@@ -20,7 +20,7 @@
 import type { PrismaClient } from "@/generated/prisma";
 import {
   BDPM_FILES,
-  decodeWindows1252,
+  decodeBdpmText,
   parseTable,
   toCompositionRow,
   toGenericMemberRow,
@@ -47,6 +47,8 @@ export type BdpmFileReport = {
   label: string;
   /** Lignes présentes dans le fichier. */
   read: number;
+  /** Encodage détecté à la lecture — la source en mélange deux sans le dire. */
+  encoding?: "utf-8" | "windows-1252";
   created: number;
   /** Lignes dont le contenu a réellement changé. */
   updated: number;
@@ -212,7 +214,9 @@ export async function importBdpm(
 
     let rows: string[][];
     try {
-      const table = parseTable(decodeWindows1252(bytes), spec);
+      const decoded = decodeBdpmText(bytes);
+      report.encoding = decoded.encoding;
+      const table = parseTable(decoded.text, spec);
       rows = table.rows;
       report.joinedRecords = table.joinedRecords;
       report.joinedSamples = table.joinedSamples;

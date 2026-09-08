@@ -1,17 +1,21 @@
 import "server-only";
 import { activityScope } from "@/server/db/demo-scope";
 import { prisma } from "@/server/db/client";
-import { getEnv } from "@/config/env";
+import { publicUrl } from "@/server/public-url";
 import { generateToken, maskEmail } from "@/server/security/tokens";
 import { recordAudit } from "@/server/audit/log";
 import { recordInteraction } from "./patients";
 import { buildDocumentUrl } from "./documents";
 import { getMessagingProvider } from "@/server/ai/registry";
 import {
+  buildFollowUpEmailHtml,
   evaluateSendEligibility,
+  findAnswer,
   findTemplate,
+  type FollowUpAnswerCode,
   type SendEligibility,
 } from "@/core/followup";
+import { createNotification } from "./notifications";
 import type { TenantScope } from "@/server/db/tenant";
 import type { ReminderReason } from "@/generated/prisma";
 
@@ -48,6 +52,9 @@ export type ReminderView = {
   /** Sujet et corps réellement composés, tels qu'ils partiraient. */
   preview: { subject: string; body: string } | null;
   eligibility: SendEligibility;
+  /** Réponse du patient au lien « Comment allez-vous ? », si elle est arrivée. */
+  answer: { code: FollowUpAnswerCode; label: string; emoji: string; at: Date } | null;
+  handledAt: Date | null;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -69,7 +76,19 @@ async function ensureOptOutToken(patientId: string): Promise<string> {
 }
 
 export function buildOptOutUrl(token: string): string {
-  return `${getEnv().APP_URL.replace(/\/$/, "")}/desinscription/${token}`;
+  return publicUrl(`/desinscription/${token}`);
+}
+
+/** Le lien « Comment allez-vous ? » : un jeton par suivi, sans compte. */
+export function buildResponseUrl(token: string): string {
+  return publicUrl(`/suivi/${token}`);
+}
+
+function answerView(reminder: { answer: string | null; answeredAt: Date | null }) {
+  const answer = findAnswer(reminder.answer);
+  return answer && reminder.answeredAt
+    ? { code: answer.code, label: answer.pharmacistLabel, emoji: answer.emoji, at: reminder.answeredAt }
+    : null;
 }
 
 /**
@@ -143,9 +162,20 @@ export async function scheduleReminder(params: {
  */
 export async function listReminders(
   scope: TenantScope,
-  options: { horizonDays?: number; limit?: number } = {},
+  options: {
+    horizonDays?: number;
+    limit?: number;
+    /**
+     * Inclure aussi les suivis envoyés ou terminés de ces derniers jours :
+     * la liste « Terminés » et les réponses des patients.
+     */
+    includeCompletedDays?: number;
+  } = {},
 ): Promise<ReminderView[]> {
   const horizon = new Date(Date.now() + (options.horizonDays ?? 7) * DAY_MS);
+  const completedSince = options.includeCompletedDays
+    ? new Date(Date.now() - options.includeCompletedDays * DAY_MS)
+    : null;
 
   const [pharmacy, reminders] = await Promise.all([
     prisma.pharmacy.findUniqueOrThrow({
@@ -156,11 +186,19 @@ export async function listReminders(
       where: {
         pharmacyId: scope.pharmacyId,
         ...activityScope(),
-        status: { in: ["SCHEDULED", "SNOOZED"] },
-        dueAt: { lte: horizon },
+        OR: [
+          { status: { in: ["SCHEDULED", "SNOOZED"] }, dueAt: { lte: horizon } },
+          ...(completedSince
+            ? [
+                { status: { in: ["SENT" as const, "DONE" as const] }, updatedAt: { gte: completedSince } },
+                // Une demande de conseil non traitée reste visible, quel que soit son âge.
+                { answer: "NEED_ADVICE" as const, handledAt: null },
+              ]
+            : []),
+        ],
       },
       orderBy: { dueAt: "asc" },
-      take: options.limit ?? 50,
+      take: options.limit ?? 80,
       include: {
         patient: {
           select: {
@@ -257,8 +295,29 @@ export async function listReminders(
       detail: reminder.detail,
       preview,
       eligibility,
+      answer: answerView(reminder),
+      handledAt: reminder.handledAt,
     };
   });
+}
+
+/** Les trois chiffres du tableau de bord des suivis. */
+export async function countFollowUpBoard(
+  scope: TenantScope,
+): Promise<{ today: number; upcoming: number; needAdvice: number }> {
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+  const base = { pharmacyId: scope.pharmacyId, ...activityScope() };
+  const [today, upcoming, needAdvice] = await Promise.all([
+    prisma.reminder.count({
+      where: { ...base, status: { in: ["SCHEDULED", "SNOOZED"] }, dueAt: { lte: endOfDay } },
+    }),
+    prisma.reminder.count({
+      where: { ...base, status: { in: ["SCHEDULED", "SNOOZED"] }, dueAt: { gt: endOfDay } },
+    }),
+    prisma.reminder.count({ where: { ...base, answer: "NEED_ADVICE", handledAt: null } }),
+  ]);
+  return { today, upcoming, needAdvice };
 }
 
 /** Nombre de suivis arrivés à échéance — le chiffre affiché sur l'accueil. */
@@ -327,7 +386,7 @@ export async function sendReminder(params: {
 
   const pharmacy = await prisma.pharmacy.findUniqueOrThrow({
     where: { id: params.scope.pharmacyId },
-    select: { name: true, followUpMinIntervalDays: true },
+    select: { name: true, brandColor: true, followUpMinIntervalDays: true },
   });
 
   const lastSent = await prisma.reminder.findFirst({
@@ -358,17 +417,28 @@ export async function sendReminder(params: {
   const recipient = reminder.patient.email as string;
   const optOutToken = await ensureOptOutToken(reminder.patientId);
 
+  // Le lien de réponse est propre à CE suivi : il ne permet que de répondre à
+  // la question posée, et ne mène à aucune donnée.
+  let responseToken = reminder.responseToken;
+  if (template.asksFeedback && !responseToken) {
+    responseToken = generateToken(24);
+    await prisma.reminder.update({ where: { id: reminder.id }, data: { responseToken } });
+  }
+
   const variables = {
     patientFirstName: reminder.patient.firstName,
     pharmacyName: pharmacy.name,
     link: buildDocumentUrl(documentToken as string),
     unsubscribeLink: buildOptOutUrl(optOutToken),
+    responseLink: template.asksFeedback && responseToken ? buildResponseUrl(responseToken) : null,
   };
 
   const outcome = await getMessagingProvider().sendEmail({
     to: recipient,
+    fromName: pharmacy.name,
     subject: template.subject(variables),
     text: template.body(variables),
+    html: buildFollowUpEmailHtml(template, variables, { brandColor: pharmacy.brandColor }),
   });
 
   // Seul un envoi confirmé par le prestataire est un envoi. Un échec — comme
@@ -481,6 +551,152 @@ export async function cancelReminder(params: {
     pharmacyId: params.scope.pharmacyId,
     userId: params.scope.userId,
     metadata: { reason: params.reason ?? null },
+  });
+}
+
+/**
+ * Consulte un lien « Comment allez-vous ? » SANS rien écrire.
+ *
+ * Même règle que la désinscription : un GET ne répond jamais à la place du
+ * patient, les aperçus de messagerie visitent les liens. La page affiche la
+ * question ; seul un POST enregistre la réponse.
+ */
+export async function peekFollowUpResponse(token: string): Promise<{
+  pharmacyName: string;
+  patientFirstName: string;
+  answered: FollowUpAnswerCode | null;
+} | null> {
+  if (!token || token.length < 16) return null;
+  const reminder = await prisma.reminder.findUnique({
+    where: { responseToken: token },
+    select: {
+      answer: true,
+      patient: { select: { firstName: true } },
+      pharmacy: { select: { name: true } },
+    },
+  });
+  if (!reminder) return null;
+  return {
+    pharmacyName: reminder.pharmacy.name,
+    patientFirstName: reminder.patient.firstName,
+    answered: (reminder.answer as FollowUpAnswerCode | null) ?? null,
+  };
+}
+
+/**
+ * Enregistre la réponse du patient à un suivi.
+ *
+ * Trois réponses fermées. La première réponse fait foi : un lien d'e-mail peut
+ * être cliqué deux fois, la seconde ne réécrit pas la première. Un besoin de
+ * conseil prévient l'équipe de l'officine — rien d'autre : ni diagnostic, ni
+ * modification de traitement.
+ */
+export async function answerFollowUp(
+  token: string,
+  code: FollowUpAnswerCode,
+): Promise<{ pharmacyName: string; answered: FollowUpAnswerCode; alreadyAnswered: boolean } | null> {
+  if (!token || token.length < 16) return null;
+  const answer = findAnswer(code);
+  if (!answer) return null;
+
+  const reminder = await prisma.reminder.findUnique({
+    where: { responseToken: token },
+    select: {
+      id: true,
+      pharmacyId: true,
+      patientId: true,
+      answer: true,
+      templateKey: true,
+      patient: { select: { firstName: true, lastName: true } },
+      pharmacy: { select: { name: true } },
+    },
+  });
+  if (!reminder) return null;
+  if (reminder.answer) {
+    return {
+      pharmacyName: reminder.pharmacy.name,
+      answered: reminder.answer as FollowUpAnswerCode,
+      alreadyAnswered: true,
+    };
+  }
+
+  const now = new Date();
+  await prisma.reminder.update({
+    where: { id: reminder.id },
+    data: {
+      answer: answer.code,
+      answeredAt: now,
+      // Un suivi auquel le patient a répondu est terminé, sauf s'il demande un
+      // conseil : il reste alors à traiter par l'équipe.
+      status: "DONE",
+    },
+  });
+
+  const scope: TenantScope = { pharmacyId: reminder.pharmacyId, organizationId: "", userId: "" };
+  const patientName = `${reminder.patient.firstName} ${reminder.patient.lastName.toUpperCase()}`;
+
+  await recordInteraction({
+    patientId: reminder.patientId,
+    scope,
+    byPatient: true,
+    type: "FOLLOW_UP_ANSWERED",
+    summary: `Réponse au suivi : ${answer.emoji} ${answer.label}.`,
+    metadata: { reminderId: reminder.id, answer: answer.code },
+  });
+
+  if (answer.code === "NEED_ADVICE") {
+    await createNotification({
+      pharmacyId: reminder.pharmacyId,
+      type: "FOLLOW_UP_RESPONSE",
+      severity: "WARNING",
+      title: `${patientName} a besoin d'un conseil`,
+      body: "Le patient a répondu à son suivi qu'il avait encore besoin d'un conseil. Reprenez contact avec lui.",
+      linkUrl: "/suivis",
+      metadata: { reminderId: reminder.id, patientId: reminder.patientId },
+    });
+  }
+
+  await recordAudit({
+    action: "reminder.answered",
+    entityType: "Reminder",
+    entityId: reminder.id,
+    pharmacyId: reminder.pharmacyId,
+    userId: null,
+    metadata: { answer: answer.code, templateKey: reminder.templateKey },
+  });
+
+  return { pharmacyName: reminder.pharmacy.name, answered: answer.code, alreadyAnswered: false };
+}
+
+/** Le pharmacien a repris contact : la demande de conseil quitte la liste. */
+export async function markFollowUpHandled(params: {
+  scope: TenantScope;
+  reminderId: string;
+}): Promise<void> {
+  const reminder = await prisma.reminder.findUnique({
+    where: { id: params.reminderId },
+    select: { id: true, pharmacyId: true, patientId: true },
+  });
+  if (!reminder || reminder.pharmacyId !== params.scope.pharmacyId) {
+    throw new Error("Suivi introuvable dans cette officine.");
+  }
+  await prisma.reminder.update({
+    where: { id: reminder.id },
+    data: { handledAt: new Date(), handledByUserId: params.scope.userId, status: "DONE" },
+  });
+  await recordInteraction({
+    patientId: reminder.patientId,
+    scope: params.scope,
+    type: "NOTE",
+    summary: "Demande de conseil traitée : contact repris avec le patient.",
+    metadata: { reminderId: reminder.id },
+  });
+  await recordAudit({
+    action: "reminder.handled",
+    entityType: "Reminder",
+    entityId: reminder.id,
+    pharmacyId: params.scope.pharmacyId,
+    userId: params.scope.userId,
   });
 }
 

@@ -492,15 +492,16 @@ export async function analysePrescription(params: {
 
     const catalogById = new Map(catalog.map((p) => [p.id, p]));
 
-    // Un produit déjà accepté, présenté ou acheté sur cette ordonnance ne
-    // revient pas en proposition : une relance ne doit pas dédoubler une
-    // décision prise au comptoir.
+    // Un produit déjà tranché sur cette ordonnance — accepté, acheté, mais
+    // aussi refusé par le patient, retiré par le pharmacien, ou laissé sans
+    // réponse à la clôture de la vente — ne revient pas en proposition : une
+    // relance ne doit ni dédoubler une carte ni re-proposer ce qui a été refusé.
     const alreadyDecided = new Set(
       (
         await tx.recommendation.findMany({
           where: {
             prescriptionId: prescription.id,
-            status: { in: ["ACCEPTED", "MODIFIED", "REPLACED", "PRESENTED", "PURCHASED"] },
+            status: { in: ["ACCEPTED", "MODIFIED", "REPLACED", "PRESENTED", "PURCHASED", "DECLINED", "REMOVED", "IGNORED"] },
             productId: { not: null },
           },
           select: { productId: true },

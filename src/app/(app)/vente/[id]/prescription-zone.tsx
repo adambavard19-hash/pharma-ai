@@ -302,6 +302,24 @@ function LineEditor({
         />
       </div>
 
+      {/* Le dosage manque : on propose ceux qui existent pour ce nom dans le
+          catalogue national — jamais une liste inventée. */}
+      {!line.dosage && line.strengthOptions.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-[12.5px] text-text-secondary">
+          <span>Dosages connus :</span>
+          {line.strengthOptions.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onChange({ dosage: option })}
+              className="rounded-md border border-border-default bg-surface-card px-2.5 py-1 font-medium text-text-primary transition-colors hover:border-brand-400"
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+
       <PosologyEditor
         schedule={schedule}
         inferred={line.scheduleInferred}

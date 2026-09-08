@@ -11,6 +11,13 @@ import { z } from "zod";
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL est requis"),
   APP_URL: z.string().url().default("http://localhost:3000"),
+  /**
+   * Adresse que les PATIENTS utilisent : celle du QR code, des e-mails et des
+   * liens de suivi. Doit être joignable depuis un téléphone, en HTTPS en
+   * production. Vide en développement : on retombe sur APP_URL, ou sur
+   * l'adresse du poste sur le réseau local quand APP_URL est « localhost ».
+   */
+  PUBLIC_APP_URL: z.string().url().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
   AUTH_SESSION_SECRET: z

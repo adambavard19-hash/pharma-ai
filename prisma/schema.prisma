@@ -273,6 +273,11 @@ model PlatformAdmin {
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
 
+  /// Lien « définir mon mot de passe » : seule l'empreinte du jeton est
+  /// conservée, à usage unique et à durée limitée.
+  passwordResetTokenHash String?   @unique
+  passwordResetExpiresAt DateTime?
+
   sessions PlatformAdminSession[]
 
   @@map("platform_admins")
@@ -464,8 +469,18 @@ enum InteractionType {
   SALE_RECORDED
   FOLLOW_UP_SCHEDULED
   FOLLOW_UP_SENT
+  FOLLOW_UP_ANSWERED
   FOLLOW_UP_OPTED_OUT
   NOTE
+}
+
+/// Ce que le patient répond à un suivi. Trois réponses fermées, aucun texte
+/// libre : un besoin de conseil ramène le patient vers son pharmacien, il ne
+/// déclenche ni diagnostic ni modification de traitement.
+enum FollowUpAnswer {
+  BETTER
+  SAME
+  NEED_ADVICE
 }
 
 model PatientInteraction {
@@ -1755,6 +1770,15 @@ model Reminder {
   /// Note interne du pharmacien. Jamais transmise au patient.
   note            String?
 
+  /// Jeton opaque du lien « Comment allez-vous ? » contenu dans le message.
+  /// Créé à l'envoi, propre à ce suivi : il ne donne accès à rien d'autre.
+  responseToken String?         @unique
+  answer        FollowUpAnswer?
+  answeredAt    DateTime?
+  /// Le pharmacien a traité la demande de conseil (rappel, passage au comptoir).
+  handledAt       DateTime?
+  handledByUserId String?
+
   isDemo    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1843,6 +1867,7 @@ enum NotificationType {
   DOCUMENT_NOT_DELIVERED
   IMPORT_COMPLETED
   IMPORT_FAILED
+  FOLLOW_UP_RESPONSE
   TEAM_EVENT
   SYSTEM
 }

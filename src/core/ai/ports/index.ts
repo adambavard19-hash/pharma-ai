@@ -120,6 +120,12 @@ export type DeliveryOutcome = {
  */
 export type OutgoingEmail = {
   to: string;
+  /**
+   * Nom d'expéditeur affiché au patient — celui de SON officine. L'adresse,
+   * elle, est fixée par la configuration : c'est elle qui est authentifiée
+   * auprès du prestataire.
+   */
+  fromName?: string;
   subject: string;
   /** Version texte : celle qui fait foi. */
   text: string;

@@ -2,12 +2,15 @@ import "server-only";
 import { activityScope } from "@/server/db/demo-scope";
 import { prisma } from "@/server/db/client";
 import { DOCUMENT_DISCLAIMERS, type DocumentContent } from "@/core/documents/types";
-import { readSchedule } from "@/core/posology";
+import { describeRhythm, readSchedule, unitFor } from "@/core/posology";
+import { strengthLabel } from "@/core/reference";
+import { findTemplate } from "@/core/followup";
+import { composeKeyPoints } from "@/core/documents/compose";
 import { generateToken } from "@/server/security/tokens";
 import { DOCUMENT_TOKEN_TTL_MS } from "@/config/constants";
 import { recordAudit } from "@/server/audit/log";
 import { recordInteraction } from "./patients";
-import { getEnv } from "@/config/env";
+import { publicUrl } from "@/server/public-url";
 import type { TenantScope } from "@/server/db/tenant";
 
 /**
@@ -15,6 +18,21 @@ import type { TenantScope } from "@/server/db/tenant";
  * signer le document. Dépendre du type `SessionContext` complet coupleraient ce
  * service au cycle de requête Next.js sans nécessité.
  */
+/**
+ * Le dosage à écrire sur le plan, ou rien.
+ *
+ * Le nom officiel fait foi (« RULID 150 mg, comprimé enrobé » → « 150 mg »).
+ * À défaut, un dosage lu n'est repris que s'il porte son unité : « 1 g » oui,
+ * « 150 » non — un nombre nu se lit comme une quantité à prendre, et c'est
+ * précisément la confusion qu'on a observée.
+ */
+export function resolveStrength(officialName: string | null, dosage: string | null): string | null {
+  const official = officialName ? strengthLabel(officialName) : null;
+  if (official) return official;
+  const written = dosage?.trim() ?? "";
+  return /\d\s*(mg|g|µg|mcg|ml|ui|%)(?![a-z])/i.test(written) ? written : null;
+}
+
 export type DocumentAuthor = {
   scope: TenantScope;
   user: { fullName: string };
@@ -42,8 +60,14 @@ export async function generatePatientDocument(params: {
       patient: { select: { id: true, firstName: true, lastName: true, reference: true } },
       lines: {
         orderBy: { position: "asc" },
-        include: { explanation: true },
+        include: {
+          explanation: true,
+          // Le dosage et la forme OFFICIELS, quand la ligne est rattachée : c'est
+          // ce qui permet d'écrire « RULID 150 mg · 1 comprimé » et non « 150 · 1 prise ».
+          specialty: { select: { name: true, pharmaceuticalForm: true } },
+        },
       },
+
       recommendations: {
         // Le plan est généré APRÈS l'enregistrement de la délivrance : les
         // conseils que le patient a pris sont déjà passés à PURCHASED. Les
@@ -64,6 +88,14 @@ export async function generatePatientDocument(params: {
 
   const pharmacy = await prisma.pharmacy.findUniqueOrThrow({
     where: { id: scope.pharmacyId },
+  });
+
+  // Le suivi activé pour ce passage, s'il y en a un : le patient sait quand
+  // sa pharmacie reprendra contact. Aucune relation Prisma : la clé suffit.
+  const nextReminder = await prisma.reminder.findFirst({
+    where: { prescriptionId: prescription.id, status: { in: ["SCHEDULED", "SNOOZED"] } },
+    orderBy: { dueAt: "asc" },
+    select: { templateKey: true, dueAt: true },
   });
 
   const content: DocumentContent = {
@@ -92,20 +124,26 @@ export async function generatePatientDocument(params: {
       prescriberName: prescription.prescriberName,
       prescribedAt: prescription.prescribedAt?.toISOString() ?? null,
     },
+    passageAt: prescription.createdAt.toISOString(),
     treatment: prescription.lines
       .filter((line) => line.status === "CONFIRMED" && line.drugName)
       .map((line) => {
         const explanation = line.explanation;
         const unavailable = !explanation || explanation.source === "UNAVAILABLE";
+        const schedule = readSchedule(line.schedule);
+        const form = line.specialty?.pharmaceuticalForm ?? line.form;
         return {
           drugName: line.drugName as string,
           dosage: line.dosage,
-          form: line.form,
+          form,
+          strength: resolveStrength(line.specialty?.name ?? null, line.dosage),
+          unit: unitFor(form),
+          rhythm: describeRhythm(schedule?.everyDays),
           posology: line.posology,
           // La répartition n'est reprise que si le pharmacien l'a confirmée.
           // Sans elle, le plan reste sur la posologie écrite : un horaire non
           // validé n'a rien à faire entre les mains d'un patient.
-          schedule: readSchedule(line.schedule),
+          schedule,
           durationDays: line.durationDays,
           instructions: line.instructions,
           purpose: unavailable ? null : explanation.purpose,
@@ -139,10 +177,15 @@ export async function generatePatientDocument(params: {
           addedManually: recommendation.origin === "MANUAL",
         };
       }),
+    keyPoints: [],
+    followUp: nextReminder
+      ? { label: findTemplate(nextReminder.templateKey)?.label ?? "Suivi", dueAt: nextReminder.dueAt.toISOString() }
+      : null,
     pharmacistNote: params.pharmacistNote ?? null,
     disclaimers: DOCUMENT_DISCLAIMERS,
     isDemo: prescription.isDemo,
   };
+  content.keyPoints = composeKeyPoints(content.treatment);
 
   const accessToken = generateToken(32);
   const previousVersion = await prisma.patientDocument.count({
@@ -228,7 +271,7 @@ export async function generatePatientDocument(params: {
 }
 
 export function buildDocumentUrl(accessToken: string): string {
-  return `${getEnv().APP_URL.replace(/\/$/, "")}/fiche/${accessToken}`;
+  return publicUrl(`/fiche/${accessToken}`);
 }
 
 export async function getDocumentByToken(token: string) {

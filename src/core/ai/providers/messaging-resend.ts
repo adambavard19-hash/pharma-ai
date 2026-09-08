@@ -52,7 +52,7 @@ export class ResendMessagingProvider implements MessagingProvider {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: this.config.from,
+          from: formatSender(this.config.from, message.fromName),
           to: [message.to],
           subject: message.subject,
           text: message.text,
@@ -91,6 +91,18 @@ export class ResendMessagingProvider implements MessagingProvider {
       clearTimeout(timeout);
     }
   }
+}
+
+/**
+ * « Pharmacie Saint-Michel <contact@exemple.fr> » : le patient voit sa
+ * pharmacie. L'adresse configurée peut déjà porter un nom ; on n'en garde que
+ * l'adresse, et le nom de l'officine prend la place.
+ */
+export function formatSender(configured: string, fromName?: string): string {
+  if (!fromName) return configured;
+  const address = /<([^>]+)>/.exec(configured)?.[1] ?? configured.trim();
+  const safeName = fromName.replace(/[<>"\r\n]/g, "").trim();
+  return safeName ? `${safeName} <${address}>` : configured;
 }
 
 function truncate(value: string, max = 300): string {

@@ -27,6 +27,12 @@ export type PosologySchedule = {
   mealTiming: MealTiming | null;
   /** Horaires précis confirmés (« 08:00 »), quand ils comptent vraiment. */
   times: string[];
+  /**
+   * Rythme non quotidien, en jours entre deux journées de prise : 2 = « un
+   * jour sur deux », 7 = « une fois par semaine ». Absent ou 1 = tous les
+   * jours. Lu sur l'ordonnance ou saisi, jamais déduit.
+   */
+  everyDays?: number;
 };
 
 export const EMPTY_SCHEDULE: PosologySchedule = {
@@ -37,6 +43,15 @@ export const EMPTY_SCHEDULE: PosologySchedule = {
   mealTiming: null,
   times: [],
 };
+
+/** « tous les 2 jours », « un jour sur deux », « une fois par semaine » → intervalle en jours. */
+export function describeRhythm(everyDays: number | undefined): string | null {
+  if (!everyDays || everyDays <= 1) return null;
+  if (everyDays === 7) return "une fois par semaine";
+  if (everyDays === 14) return "une semaine sur deux";
+  if (everyDays === 2) return "un jour sur deux";
+  return `tous les ${everyDays} jours`;
+}
 
 export const MOMENT_LABELS = {
   morning: "Matin",
@@ -85,11 +100,13 @@ export function parsePosology(text: string | null | undefined): ParsedPosology |
 
   const quantity = readQuantity(raw);
   const mealTiming = readMealTiming(raw);
+  const everyDays = readRhythm(raw);
+  const rhythm = everyDays ? { everyDays } : {};
 
   // 1. Les moments sont nommés — on lit, on ne déduit pas.
   const named = readNamedMoments(raw, quantity);
   if (named) {
-    return { schedule: { ...named, mealTiming, times: [] }, inferred: false };
+    return { schedule: { ...named, mealTiming, times: [], ...rhythm }, inferred: false };
   }
 
   // 2. Une fréquence seule : la répartition est une convention, annoncée
@@ -97,10 +114,45 @@ export function parsePosology(text: string | null | undefined): ParsedPosology |
   const perDay = readFrequency(raw);
   if (perDay !== null) {
     const spread = spreadOverDay(perDay, quantity);
-    if (spread) return { schedule: { ...spread, mealTiming, times: [] }, inferred: true };
+    if (spread) return { schedule: { ...spread, mealTiming, times: [], ...rhythm }, inferred: true };
+  }
+
+  // 3. Un rythme hebdomadaire sans autre précision : une prise, le matin par
+  //    convention, annoncée comme déduite.
+  if (everyDays && everyDays >= 7) {
+    return {
+      schedule: { morning: quantity, noon: 0, evening: 0, bedtime: 0, mealTiming, times: [], everyDays },
+      inferred: true,
+    };
   }
 
   return null;
+}
+
+/**
+ * « tous les 2 jours », « 1 jour sur 2 », « une fois par semaine »,
+ * « toutes les 2 semaines ». Rend `undefined` pour une prise quotidienne.
+ */
+function readRhythm(raw: string): number | undefined {
+  const everyDays = raw.match(/tous\s*les\s*(\d+)\s*(?:j|jours?)\b/);
+  if (everyDays) {
+    const n = Number(everyDays[1]);
+    return n >= 2 && n <= 31 ? n : undefined;
+  }
+  const oneOn = raw.match(/\b(?:1|un|une)\s*(?:j|jour)\s*sur\s*(\d+|deux|trois)\b/);
+  if (oneOn) {
+    const n = oneOn[1] === "deux" ? 2 : oneOn[1] === "trois" ? 3 : Number(oneOn[1]);
+    return n >= 2 && n <= 31 ? n : undefined;
+  }
+  const everyWeeks = raw.match(/toutes\s*les\s*(\d+)\s*semaines?/);
+  if (everyWeeks) {
+    const n = Number(everyWeeks[1]);
+    return n >= 1 && n <= 4 ? n * 7 : undefined;
+  }
+  if (/\b(?:1|une|un)\s*(?:fois|prise)?\s*(?:par|\/)\s*semaine\b|\bhebdomadaire\b|\bpar\s*semaine\b/.test(raw)) {
+    return 7;
+  }
+  return undefined;
 }
 
 /** Rend la posologie en une phrase courte, à partir de la répartition. */
@@ -116,7 +168,8 @@ export function formatSchedule(
   const meal = schedule.mealTiming ? `, ${MEAL_LABELS[schedule.mealTiming]}` : "";
   const total = totalDailyDoses(schedule);
   const plural = total > 1 ? "s" : "";
-  return `${parts.join(" · ")} — ${total} ${unit}${plural} par jour${meal}`;
+  const rhythm = describeRhythm(schedule.everyDays);
+  return `${parts.join(" · ")} — ${total} ${unit}${plural} ${rhythm ?? "par jour"}${meal}`;
 }
 
 /** Nombre d'unités à délivrer pour couvrir la durée prescrite. */
@@ -149,6 +202,8 @@ export function readSchedule(value: unknown): PosologySchedule | null {
       ? raw.times.filter((t): t is string => typeof t === "string").slice(0, 6)
       : [],
   };
+  const every = Number(raw.everyDays);
+  if (Number.isFinite(every) && every >= 2 && every <= 31) schedule.everyDays = Math.trunc(every);
   return hasDoses(schedule) || schedule.mealTiming || schedule.times.length > 0
     ? schedule
     : null;
