@@ -72,8 +72,16 @@ async function main() {
 
   try {
     const now = new Date();
+    // Les rappels de démonstration ne partent que dans l'environnement de
+    // démonstration : hors de lui, un patient fictif ne reçoit rien — même si
+    // son adresse est fictive elle aussi.
+    const demoAllowed = (process.env.APP_ENV ?? (process.env.DEMO_MODE === "true" ? "demo" : "development")) === "demo";
     const due = await prisma.reminder.findMany({
-      where: { status: { in: ["SCHEDULED", "SNOOZED"] }, dueAt: { lte: now } },
+      where: {
+        status: { in: ["SCHEDULED", "SNOOZED"] },
+        dueAt: { lte: now },
+        ...(demoAllowed ? {} : { isDemo: false }),
+      },
       orderBy: { dueAt: "asc" },
       take: parsed.limit,
       select: {
