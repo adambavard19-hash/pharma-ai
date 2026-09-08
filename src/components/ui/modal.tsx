@@ -28,6 +28,15 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  // `onClose` est presque toujours une fonction fléchée recréée à chaque rendu
+  // du parent. En faire une dépendance de l'effet ci-dessous relançait la
+  // logique de focus À CHAQUE FRAPPE dans un champ : le curseur repartait sur
+  // le premier champ et le texte saisi « disparaissait ». On la lit donc via
+  // une référence, et l'effet ne dépend que de l'ouverture.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -48,7 +57,7 @@ export function Modal({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -73,7 +82,7 @@ export function Modal({
       document.body.style.overflow = overflow;
       previouslyFocused.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
 
