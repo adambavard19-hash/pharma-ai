@@ -172,6 +172,21 @@ async function main() {
     );
   }
 
+  // Pré-confirmation des lignes intégralement lues. C'est le seul allègement
+  // d'un garde-fou de ce produit : il doit se voir dans le diagnostic, dans les
+  // deux positions, plutôt que de se découvrir au comptoir.
+  if ((process.env.PRECONFIRM_READ_LINES ?? "true") === "true") {
+    pass(
+      "Lignes intégralement lues : retenues sans être cochées",
+      "la validation de l'ordonnance reste un geste signé",
+    );
+  } else {
+    pass(
+      "Lignes intégralement lues : confirmation ligne par ligne",
+      'PRECONFIRM_READ_LINES="false"',
+    );
+  }
+
   if (problems.length > 0) {
     report();
     return;

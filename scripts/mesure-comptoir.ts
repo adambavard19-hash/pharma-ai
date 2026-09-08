@@ -12,6 +12,7 @@
  *   BASE_URL        adresse de l'application (défaut http://localhost:3000)
  *   DEMO_EMAIL      compte utilisé (défaut pharmacien@pharma.ai)
  *   CHROMIUM_PATH   binaire Chromium, si Playwright ne le trouve pas seul
+ *   DEMO_SCENARIO   scénario de démonstration à mesurer (fragment du libellé)
  */
 
 import { chromium, type Page } from "playwright";
@@ -19,6 +20,8 @@ import { chromium, type Page } from "playwright";
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
 const EMAIL = process.env.DEMO_EMAIL ?? "pharmacien@pharma.ai";
 const PASSWORD = process.env.DEMO_PASSWORD ?? "Demo2026!Pharma";
+/** Libellé (ou fragment) du scénario de démonstration à mesurer. */
+const SCENARIO = process.env.DEMO_SCENARIO ?? "";
 
 /** Budget de conception, en secondes, du scan à la fin de vente. */
 const BUDGET_SECONDS = 60;
@@ -89,6 +92,20 @@ async function main() {
     );
     if (patients.length === 0) throw new Error("Aucun patient : lancez `npm run db:seed`.");
     await page.selectOption('select[name="patientId"]', patients[0]);
+
+    // Le scénario de démonstration décide du chemin mesuré : celui par défaut
+    // comporte un champ illisible et passe par la vérification, un scénario
+    // intégralement lu arrive directement analysé. Mesurer les deux est le seul
+    // moyen de savoir ce que la pré-confirmation fait vraiment gagner.
+    if (SCENARIO) {
+      await page.locator("summary", { hasText: "Mode démo" }).first().click();
+      const choix = page.locator(`button:has-text("${SCENARIO}")`).first();
+      if ((await choix.count()) === 0) {
+        throw new Error(`Aucun scénario de démonstration ne correspond à « ${SCENARIO} ».`);
+      }
+      await choix.click();
+    }
+
     await page.click('button[type="submit"]');
     await page.waitForURL(
       (url) => /^\/vente\/[a-z0-9]+$/.test(url.pathname) && !url.pathname.endsWith("/nouvelle"),
@@ -97,20 +114,38 @@ async function main() {
     await page.waitForLoadState("networkidle");
     steps.push({ label: "Scan → ordonnance lue à l'écran", ms: since(mark) });
 
-    // 3. Confirmation des lignes.
-    mark = Date.now();
-    const confirmed = await confirmAllLines(page);
-    steps.push({
-      label: "Vérification des lignes",
-      ms: since(mark),
-      detail: `${confirmed} ligne(s)`,
-    });
+    // 3 et 4. Deux chemins possibles, et c'est voulu.
+    //
+    // Une ordonnance dont chaque champ a été lu au-dessus du seuil arrive
+    // directement analysée : il n'y a ni case à cocher ni bouton « Confirmer
+    // et analyser ». Une ordonnance comportant un champ illisible repasse par
+    // la vérification ligne à ligne. La mesure doit refléter le chemin
+    // réellement emprunté, pas celui qu'on espérait.
+    const aVerifier = await page.locator('button:has-text("Confirmer et analyser")').count();
 
-    // 4. Analyse : sécurité puis conseils, sans changer d'écran.
-    mark = Date.now();
-    await page.click('button:has-text("Confirmer et analyser")');
-    await page.waitForSelector('h2:has-text("Conseils")', { timeout: 60_000 });
-    await page.waitForLoadState("networkidle");
+    if (aVerifier > 0) {
+      mark = Date.now();
+      const clics = await confirmAllLines(page);
+      steps.push({
+        label: "Vérification des lignes",
+        ms: since(mark),
+        detail: `${clics} clic(s) — les autres lignes étaient déjà retenues`,
+      });
+
+      mark = Date.now();
+      await page.click('button:has-text("Confirmer et analyser")');
+      await page.waitForSelector('h2:has-text("Conseils")', { timeout: 60_000 });
+      await page.waitForLoadState("networkidle");
+    } else {
+      mark = Date.now();
+      await page.waitForSelector('h2:has-text("Conseils")', { timeout: 60_000 });
+      await page.waitForLoadState("networkidle");
+      steps.push({
+        label: "Lignes intégralement lues",
+        ms: 0,
+        detail: "aucune case à cocher",
+      });
+    }
     // Le cockpit ne propose plus qu'un verbe par carte : « Ajouter ».
     const advice = await page.locator('button:has-text("Ajouter"):not(:has-text("un conseil"))').count();
     steps.push({
@@ -130,9 +165,13 @@ async function main() {
     // 6. Encaissement et passage à la fin de vente.
     mark = Date.now();
     // Panier vide, le comptoir « continue la délivrance » ; panier garni, il
-    // « termine la vente ». Les deux mènent à la fiche de fin.
+    // « termine la vente ». Sur une ordonnance pré-confirmée, le même bouton
+    // porte d'abord la validation professionnelle — « Valider et … ». Les
+    // quatre libellés mènent à la fiche de fin.
     await page
-      .locator('button:has-text("Terminer la vente"), button:has-text("Continuer la délivrance")')
+      .locator(
+        'button:has-text("Terminer la vente"), button:has-text("Continuer la délivrance"), button:has-text("Valider et")',
+      )
       .first()
       .click();
     await page.waitForURL(/\/fin$/, { timeout: 60_000 });
@@ -184,13 +223,20 @@ async function main() {
 }
 
 /** Confirme chaque ligne extraite, comme le ferait le pharmacien. */
+/**
+ * Coche les lignes qui restent à confirmer, et renvoie le nombre de CLICS.
+ *
+ * Pas le nombre de lignes : les lignes intégralement lues arrivent déjà
+ * retenues. Compter les lignes masquerait exactement ce que ce lot a changé.
+ */
 async function confirmAllLines(page: Page): Promise<number> {
-  let guard = 0;
-  while ((await page.locator('button:has-text("À confirmer")').count()) > 0 && guard++ < 20) {
+  let clicks = 0;
+  while ((await page.locator('button:has-text("À confirmer")').count()) > 0 && clicks < 20) {
     await page.locator('button:has-text("À confirmer")').first().click();
+    clicks += 1;
     await page.waitForTimeout(80);
   }
-  return page.locator('button:has-text("Confirmée")').count();
+  return clicks;
 }
 
 main().catch((error) => {

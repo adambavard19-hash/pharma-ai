@@ -43,6 +43,23 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  /**
+   * Pré-confirmation des lignes intégralement lues.
+   *
+   * L'interrupteur du parcours allégé. Une ligne dont chaque champ renseigné a
+   * été lu au-dessus du seuil de relecture est retenue pour l'analyse sans que
+   * le pharmacien la coche ; la validation de l'ordonnance, elle, reste un
+   * geste explicite et signé.
+   *
+   * Le mettre à « false » ramène le parcours d'avant, ligne par ligne, sans
+   * migration ni déploiement particulier. C'est un allègement de garde-fou :
+   * une officine doit pouvoir revenir en arrière en une variable.
+   */
+  PRECONFIRM_READ_LINES: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+
   AI_PROVIDER: z.enum(["mock", "anthropic", "openai"]).default("mock"),
   OCR_PROVIDER: z.enum(["mock", "anthropic", "openai", "tesseract"]).default("mock"),
   DRUG_KNOWLEDGE_PROVIDER: z.enum(["local-demo", "bdpm", "custom"]).default("local-demo"),
@@ -129,4 +146,9 @@ export function appEnvironment(): AppEnvironment {
 /** `true` lorsque l'application tourne sur le jeu de données de démonstration. */
 export function isDemoMode(): boolean {
   return appEnvironment() === "demo";
+}
+
+/** `true` lorsque les lignes intégralement lues sont retenues sans être cochées. */
+export function preconfirmEnabled(): boolean {
+  return getEnv().PRECONFIRM_READ_LINES;
 }

@@ -47,8 +47,13 @@ export const CONSENT_LABELS: Record<string, { label: string; description: string
   },
 };
 
+/**
+ * Les tons suivent la règle de couleur du comptoir (`@/config/counter-tone`) :
+ * une information est neutre, jamais bleue. Une cinquième couleur dans l'écran
+ * de vente reviendrait à demander au pharmacien d'en apprendre une de plus.
+ */
 export const SAFETY_SEVERITY: Record<string, { label: string; tone: Tone }> = {
-  INFO: { label: "Information", tone: "info" },
+  INFO: { label: "Information", tone: "neutral" },
   CAUTION: { label: "À vérifier", tone: "warning" },
   WARNING: { label: "Vigilance", tone: "warning" },
   BLOCKING: { label: "Bloquant", tone: "danger" },
