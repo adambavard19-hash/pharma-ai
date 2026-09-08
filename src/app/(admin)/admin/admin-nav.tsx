@@ -6,6 +6,9 @@ import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/admin/pharmacies", label: "Officines clientes" },
+  { href: "/admin/pipeline", label: "Pipeline" },
+  { href: "/admin/commerciaux", label: "Commerciaux" },
+  { href: "/admin/societe", label: "Société" },
   { href: "/admin", label: "Vue plateforme" },
 ];
 

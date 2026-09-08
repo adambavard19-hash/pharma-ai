@@ -101,6 +101,9 @@ model Pharmacy {
   aiUsage         AiUsageRecord[]
 
   @@index([organizationId])
+  /// Le dossier commercial dont cette officine est issue, s'il y en a un.
+  prospect Prospect?
+
   @@map("pharmacies")
 }
 
@@ -1942,4 +1945,305 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([action, createdAt])
   @@map("audit_logs")
+}
+
+// ===========================================================================
+// EXTRANET COMMERCIAL — du prospect à l'officine activée
+// ===========================================================================
+
+enum SalesCommissionType {
+  FIXED
+  PERCENT
+  RECURRING
+}
+
+enum ProspectStatus {
+  PROSPECT
+  CONTACTED
+  INTERESTED
+  PROPOSAL_SENT
+  CONTRACT_SENT
+  CONTRACT_SIGNED
+  PHARMACY_CREATED
+  ACTIVATED
+  LOST
+}
+
+enum ContractStatus {
+  DRAFT
+  SENT
+  OPENED
+  SIGNED_PHARMACY
+  SIGNED_COMPANY
+  FINALIZED
+  REFUSED
+  EXPIRED
+}
+
+enum CommissionStatus {
+  FORECAST
+  EARNED
+  PAYABLE
+  PAID
+  CANCELLED
+}
+
+enum ProspectEventType {
+  CREATED
+  STATUS_CHANGED
+  NOTE
+  EMAIL_SENT
+  CONTRACT_GENERATED
+  CONTRACT_SENT
+  CONTRACT_OPENED
+  CONTRACT_SIGNED
+  CONTRACT_REFUSED
+  CONTRACT_EXPIRED
+  PHARMACY_CREATED
+  COMMISSION_CREATED
+  COMMISSION_UPDATED
+  COMMISSION_PAID
+  TASK_CREATED
+  TASK_DONE
+  ASSIGNED
+  BLOCKED
+  UNBLOCKED
+}
+
+enum ExtranetAudience {
+  SALES
+  ADMIN
+}
+
+/// Un commercial. Compte de la plateforme, distinct des utilisateurs
+/// d'officine : il n'obtient jamais de portée sur une officine et ne peut
+/// donc emprunter aucun chemin vers des données patients.
+model SalesRep {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String?
+  firstName    String
+  lastName     String
+  phone        String?
+  /// Zone commerciale libre : département, région, secteur ou ville.
+  zone         String?
+
+  commissionType  SalesCommissionType @default(FIXED)
+  /// FIXED et RECURRING : centimes. PERCENT : centièmes de pour cent (1250 = 12,50 %).
+  commissionValue Int                 @default(0)
+
+  isActive    Boolean   @default(true)
+  invitedAt   DateTime?
+  lastLoginAt DateTime?
+
+  passwordResetTokenHash String?   @unique
+  passwordResetExpiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions      SalesRepSession[]
+  prospects     Prospect[]
+  commissions   Commission[]
+  tasks         SalesTask[]
+  notifications ExtranetNotification[]
+
+  @@map("sales_reps")
+}
+
+model SalesRepSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  salesRepId String
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+  ipAddress  String?
+
+  salesRep SalesRep @relation(fields: [salesRepId], references: [id], onDelete: Cascade)
+
+  @@index([salesRepId])
+  @@map("sales_rep_sessions")
+}
+
+/// Un dossier commercial : une pharmacie, du premier contact à l'activation.
+model Prospect {
+  id           String  @id @default(cuid())
+  name         String
+  ownerName    String?
+  phone        String?
+  email        String?
+  addressLine1 String?
+  postalCode   String?
+  city         String?
+  finessNumber String?
+  siret        String?
+  outletCount  Int?
+
+  salesRepId String
+  status     ProspectStatus @default(PROSPECT)
+
+  lastContactAt   DateTime?
+  nextActionAt    DateTime?
+  nextActionLabel String?
+  /// Notes commerciales courantes (le détail horodaté vit dans les événements).
+  notes           String?
+  /// Conditions proposées : abonnement mensuel, en centimes.
+  monthlyPriceCents Int?
+
+  /// L'officine créée après signature. Un dossier, une officine.
+  pharmacyId String? @unique
+
+  blockedAt     DateTime?
+  blockedReason String?
+  lostReason    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  salesRep    SalesRep         @relation(fields: [salesRepId], references: [id])
+  pharmacy    Pharmacy?        @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+  events      ProspectEvent[]
+  contracts   Contract[]
+  commissions Commission[]
+  tasks       SalesTask[]
+
+  @@index([salesRepId, status])
+  @@index([status])
+  @@map("prospects")
+}
+
+/// L'historique d'un dossier : qui, quand, quoi. Jamais modifié, jamais effacé.
+model ProspectEvent {
+  id         String            @id @default(cuid())
+  prospectId String
+  type       ProspectEventType
+  summary    String
+  /// SALES · ADMIN · SYSTEM · SIGNER
+  actorType  String
+  actorId    String?
+  actorLabel String?
+  metadata   Json              @default("{}")
+  createdAt  DateTime          @default(now())
+
+  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId, createdAt])
+  @@map("prospect_events")
+}
+
+/// Une relance : « appeler vendredi », « renvoyer le contrat ».
+model SalesTask {
+  id         String    @id @default(cuid())
+  prospectId String
+  salesRepId String
+  label      String
+  dueAt      DateTime
+  doneAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  salesRep SalesRep @relation(fields: [salesRepId], references: [id], onDelete: Cascade)
+
+  @@index([salesRepId, dueAt])
+  @@map("sales_tasks")
+}
+
+/// Un contrat entre la société exploitante et la pharmacie. Le PDF est stocké
+/// via le fournisseur de stockage ; l'accès passe par un jeton dont seule
+/// l'empreinte est conservée.
+model Contract {
+  id          String         @id @default(cuid())
+  prospectId  String
+  version     Int
+  status      ContractStatus @default(DRAFT)
+  templateKey String
+  fileKey     String
+  accessTokenHash String     @unique
+
+  monthlyPriceCents Int
+  durationMonths    Int
+
+  pharmacySignerName  String
+  pharmacySignerEmail String
+  companySignerName   String
+  companySignerEmail  String
+
+  /// none · yousign · docusign · … ; « offline » = signature papier enregistrée par l'admin.
+  signatureProvider  String  @default("none")
+  providerEnvelopeId String?
+
+  sentAt            DateTime?
+  openedAt          DateTime?
+  pharmacySignedAt  DateTime?
+  companySignedAt   DateTime?
+  finalizedAt       DateTime?
+  refusedAt         DateTime?
+  refusalReason     String?
+  expiresAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId])
+  @@index([status])
+  @@map("contracts")
+}
+
+model Commission {
+  id         String              @id @default(cuid())
+  prospectId String
+  salesRepId String
+  type       SalesCommissionType
+  amountCents Int
+  status     CommissionStatus    @default(FORECAST)
+  dueAt      DateTime?
+  paidAt     DateTime?
+  note       String?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  salesRep SalesRep @relation(fields: [salesRepId], references: [id])
+
+  @@index([salesRepId, status])
+  @@map("commissions")
+}
+
+/// Notifications de l'extranet : pour un commercial, ou pour les administrateurs.
+model ExtranetNotification {
+  id         String               @id @default(cuid())
+  audience   ExtranetAudience
+  salesRepId String?
+  type       String
+  severity   NotificationSeverity @default(INFO)
+  title      String
+  body       String
+  linkUrl    String?
+  readAt     DateTime?
+  createdAt  DateTime             @default(now())
+
+  salesRep SalesRep? @relation(fields: [salesRepId], references: [id], onDelete: Cascade)
+
+  @@index([audience, salesRepId, readAt])
+  @@map("extranet_notifications")
+}
+
+/// La société exploitante, partie aux contrats. Une seule ligne.
+model CompanyProfile {
+  id                  String   @id @default("default")
+  legalName           String
+  legalForm           String?
+  addressLine1        String?
+  postalCode          String?
+  city                String?
+  siren               String?
+  representativeName  String
+  representativeTitle String?
+  representativeEmail String
+  updatedAt           DateTime @updatedAt
+
+  @@map("company_profile")
 }

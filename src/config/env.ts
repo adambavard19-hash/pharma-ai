@@ -105,6 +105,12 @@ const envSchema = z.object({
   // Envoi de la fiche patient et des suivis. « none » est un choix valide et
   // assumé : l'officine remet alors la fiche par impression ou QR code, et
   // l'application ne prétend jamais avoir envoyé quoi que ce soit.
+  /** Signature électronique des contrats : « none » tant qu'aucun prestataire n'est contractualisé. */
+  SIGNATURE_PROVIDER: z.enum(["none", "yousign"]).default("none"),
+  YOUSIGN_API_KEY: z.string().optional(),
+  YOUSIGN_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
+  YOUSIGN_WEBHOOK_SECRET: z.string().optional(),
+
   EMAIL_PROVIDER: z.enum(["none", "resend", "smtp"]).default("none"),
   SMS_PROVIDER: z.enum(["none", "twilio"]).default("none"),
   /** Expéditeur affiché, ex. « Pharmacie X <contact@pharmacie-x.fr> ». */

@@ -72,7 +72,22 @@ export type AuditAction =
   | "team.member_invited"
   | "team.member_updated"
   | "team.member_disabled"
-  | "settings.updated";
+  | "settings.updated"
+  | "sales.rep_created"
+  | "sales.rep_updated"
+  | "sales.rep_invited"
+  | "sales.prospect_created"
+  | "sales.prospect_updated"
+  | "sales.prospect_status_changed"
+  | "sales.prospect_reassigned"
+  | "sales.prospect_blocked"
+  | "sales.contract_generated"
+  | "sales.contract_sent"
+  | "sales.contract_signature_recorded"
+  | "sales.contract_event"
+  | "sales.pharmacy_created"
+  | "sales.commission_updated"
+  | "sales.company_profile_updated";
 
 export async function recordAudit(params: {
   action: AuditAction;
@@ -81,6 +96,8 @@ export async function recordAudit(params: {
   pharmacyId?: string | null;
   userId?: string | null;
   platformAdminId?: string | null;
+  /** Commercial à l'origine de l'action, pour l'extranet. */
+  salesRepId?: string | null;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   try {
@@ -94,7 +111,7 @@ export async function recordAudit(params: {
         pharmacyId: params.pharmacyId ?? null,
         userId: params.userId ?? null,
         platformAdminId: params.platformAdminId ?? null,
-        metadata: (params.metadata ?? {}) as never,
+        metadata: ({ ...(params.metadata ?? {}), ...(params.salesRepId ? { salesRepId: params.salesRepId } : {}) }) as never,
         ipAddress: meta.ipAddress,
         userAgent: meta.userAgent,
       },

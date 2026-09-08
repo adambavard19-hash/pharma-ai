@@ -17,6 +17,7 @@ export const ENGINE_VERSION = "1.0.0";
 export const SESSION_DURATION_MS = 1000 * 60 * 60 * 12; // 12 h
 export const SESSION_COOKIE_NAME = "pharma_session";
 export const PLATFORM_SESSION_COOKIE_NAME = "pharma_platform_session";
+export const SALES_SESSION_COOKIE_NAME = "pharma_sales_session";
 
 /** Durée de validité du lien sécurisé de la fiche patient. */
 export const DOCUMENT_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 90; // 90 jours

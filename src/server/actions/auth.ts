@@ -17,6 +17,7 @@ import {
 } from "@/server/auth/session";
 import { recordAudit } from "@/server/audit/log";
 import { sendUserPasswordLink, setUserPasswordByToken } from "@/server/services/user-password";
+import { markProspectActivatedForUser } from "@/server/services/sales/client-pharmacies";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 const loginSchema = z.object({
@@ -108,6 +109,9 @@ export async function loginAction(
     pharmacyId: membership.pharmacyId,
     userId: user.id,
   });
+
+  // Première connexion d'un titulaire issu d'un dossier commercial : l'officine passe « Activée ».
+  await markProspectActivatedForUser(user.id).catch(() => undefined);
 
   redirect("/");
 }
