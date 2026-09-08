@@ -267,6 +267,21 @@ model Session {
 // accès aux données patients par construction du modèle.
 // ===========================================================================
 
+/// Fichier stocké dans la base (ordonnance photographiée) quand aucun
+/// stockage objet n'est branché. Même isolation que le reste : la clé commence
+/// par l'identifiant de l'officine, et la lecture la vérifie.
+model StoredFile {
+  key        String   @id
+  pharmacyId String
+  mimeType   String
+  size       Int
+  data       Bytes
+  createdAt  DateTime @default(now())
+
+  @@index([pharmacyId])
+  @@map("stored_files")
+}
+
 model PlatformAdmin {
   id           String    @id @default(cuid())
   email        String    @unique

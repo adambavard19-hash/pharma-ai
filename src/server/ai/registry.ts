@@ -12,6 +12,9 @@ import type {
 } from "@/core/ai/ports";
 import { LocalDrugKnowledgeProvider } from "@/core/ai/providers/local-drug-knowledge";
 import { LocalStorageProvider } from "@/core/ai/providers/local-storage";
+import { S3StorageProvider } from "@/core/ai/providers/s3-storage";
+import { chooseStorageProvider } from "@/core/ai/providers/storage-choice";
+import { DatabaseStorageProvider } from "@/server/storage/database-storage";
 import { chooseOCRProvider } from "@/core/ai/providers/ocr-factory";
 import { chooseMessagingProvider } from "@/core/ai/providers/messaging-factory";
 import { chooseAIProvider } from "@/core/ai/providers/ai-factory";
@@ -111,9 +114,27 @@ export function invalidateDrugKnowledgeCache(): void {
   drugProvider?.invalidate();
 }
 
+/** Configuration de stockage impossible : dite telle quelle, jamais déguisée en panne. */
+export class StorageConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StorageConfigurationError";
+  }
+}
+
 export function getStorageProvider(): StorageProvider {
   const env = getEnv();
-  return new LocalStorageProvider(env.STORAGE_LOCAL_PATH);
+  const choice = chooseStorageProvider(env);
+  switch (choice.kind) {
+    case "database":
+      return new DatabaseStorageProvider();
+    case "s3":
+      return new S3StorageProvider(choice);
+    case "local":
+      return new LocalStorageProvider(choice.basePath);
+    case "misconfigured":
+      throw new StorageConfigurationError(choice.message);
+  }
 }
 
 /**

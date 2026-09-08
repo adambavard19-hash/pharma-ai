@@ -3,6 +3,7 @@ import { activityScope } from "@/server/db/demo-scope";
 import sharp from "sharp";
 import { prisma } from "@/server/db/client";
 import { getOCRProvider, getStorageProvider } from "@/server/ai/registry";
+import type { StorageProvider } from "@/core/ai/ports";
 import type { TenantScope } from "@/server/db/tenant";
 import type { ExtractedPrescription } from "@/core/ai/types";
 
@@ -56,7 +57,9 @@ export type PrescriptionUploadError =
   | { kind: "AUCUN_FICHIER" }
   | { kind: "TROP_LOURD"; sizeBytes: number }
   | { kind: "FORMAT_REFUSE"; mimeType: string }
-  | { kind: "STOCKAGE_INDISPONIBLE" };
+  | { kind: "STOCKAGE_INDISPONIBLE" }
+  /** La configuration du serveur interdit tout dépôt : le motif exact est transmis. */
+  | { kind: "STOCKAGE_NON_CONFIGURE"; reason: string };
 
 /** Message destiné au pharmacien. Aucun jargon, aucune trace technique. */
 export function uploadErrorMessage(error: PrescriptionUploadError): string {
@@ -68,7 +71,9 @@ export function uploadErrorMessage(error: PrescriptionUploadError): string {
     case "FORMAT_REFUSE":
       return "Format non pris en charge. Utilisez un PDF ou une photo (JPG, PNG, WEBP).";
     case "STOCKAGE_INDISPONIBLE":
-      return "L'ordonnance n'a pas pu être enregistrée. Réessayez.";
+      return "L'ordonnance n'a pas pu être enregistrée : le stockage n'a pas répondu. Réessayez dans un instant ; si cela persiste, prévenez l'éditeur.";
+    case "STOCKAGE_NON_CONFIGURE":
+      return `Dépôt impossible : ${error.reason}`;
   }
 }
 
@@ -106,9 +111,17 @@ export async function storePrescriptionFile(params: {
     .toString(36)
     .slice(2, 8)}.${extension}`;
 
+  let storage: StorageProvider;
+  try {
+    storage = getStorageProvider();
+  } catch (error) {
+    console.error("[ordonnances] stockage non configuré", error);
+    return { ok: false, error: { kind: "STOCKAGE_NON_CONFIGURE", reason: error instanceof Error ? error.message : "configuration invalide" } };
+  }
+
   try {
     const t = Date.now();
-    await getStorageProvider().put(fileKey, bytes, file.type);
+    await storage.put(fileKey, bytes, file.type);
     timings.stockage = Date.now() - t;
     onStage?.({ stage: "STORED" });
   } catch (error) {

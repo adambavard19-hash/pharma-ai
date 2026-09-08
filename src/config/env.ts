@@ -86,10 +86,19 @@ const envSchema = z.object({
     .transform((value) => value === "true"),
   OPENAI_API_KEY: z.string().optional(),
 
-  STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
+  /**
+   * Où vont les ordonnances photographiées (données de santé).
+   * `local` : dossier du poste, développement seulement — refusé en production.
+   * `database` : dans PostgreSQL, avec le reste des données de l'officine.
+   * `s3` : stockage objet compatible S3 (Scaleway, OVHcloud, AWS…), à
+   * privilégier pour un hébergement agréé HDS.
+   */
+  STORAGE_PROVIDER: z.enum(["local", "database", "s3"]).default("local"),
   STORAGE_LOCAL_PATH: z.string().default("./storage"),
   S3_BUCKET: z.string().optional(),
   S3_REGION: z.string().optional(),
+  /** Point d'accès pour un fournisseur compatible S3 hors AWS (ex. https://s3.fr-par.scw.cloud). */
+  S3_ENDPOINT: z.string().url().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
 

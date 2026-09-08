@@ -4,6 +4,10 @@ import { getSession } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { analysePrescription, type AnalysisStage } from "@/server/services/analysis";
 
+// Lecture d'ordonnance et analyse peuvent dépasser dix secondes : on le déclare
+// à l'hébergeur plutôt que de laisser la fonction être coupée en plein travail.
+export const maxDuration = 60;
+
 /**
  * L'analyse, étape par étape, en flux.
  *

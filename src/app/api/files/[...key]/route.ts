@@ -1,8 +1,7 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { getSession } from "@/server/auth/session";
-import { getEnv } from "@/config/env";
+import { getStorageProvider } from "@/server/ai/registry";
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -35,12 +34,13 @@ export async function GET(
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
-  const filePath = path.join(getEnv().STORAGE_LOCAL_PATH, relativeKey);
-
   try {
-    const data = await readFile(filePath);
-    const extension = path.extname(filePath).toLowerCase();
-    return new NextResponse(new Uint8Array(data), {
+    // Quel que soit le stockage branché (dossier, base, objet), la lecture
+    // passe ici : c'est l'unique porte, et elle a vérifié l'officine.
+    const data = await getStorageProvider().read(relativeKey);
+    if (!data) return NextResponse.json({ error: "Fichier introuvable" }, { status: 404 });
+    const extension = path.extname(relativeKey).toLowerCase();
+    return new NextResponse(Buffer.from(data), {
       headers: {
         "Content-Type": MIME_BY_EXTENSION[extension] ?? "application/octet-stream",
         "Cache-Control": "private, max-age=300",

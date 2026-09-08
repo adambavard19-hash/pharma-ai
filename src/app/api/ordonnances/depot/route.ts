@@ -9,6 +9,10 @@ import {
   type UploadStage,
 } from "@/server/services/prescription-upload";
 
+// Lecture d'ordonnance et analyse peuvent dépasser dix secondes : on le déclare
+// à l'hébergeur plutôt que de laisser la fonction être coupée en plein travail.
+export const maxDuration = 60;
+
 export type DepotOrdonnanceReponse =
   | { ok: true; data: PrescriptionUploadResult }
   | { ok: false; error: string };

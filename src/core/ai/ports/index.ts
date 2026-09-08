@@ -95,6 +95,8 @@ export interface AIProvider {
 export interface StorageProvider {
   readonly info: ProviderInfo;
   put(key: string, data: Uint8Array, mimeType: string): Promise<{ key: string }>;
+  /** Relit un fichier stocké ; `null` s'il n'existe pas. */
+  read(key: string): Promise<Uint8Array | null>;
   /** Contenu du fichier, ou `null` s'il est introuvable. */
   read(key: string): Promise<Uint8Array | null>;
   getUrl(key: string): Promise<string | null>;
