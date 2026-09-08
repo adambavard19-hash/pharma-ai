@@ -183,6 +183,10 @@ model User {
   organizationId String
   email          String     @unique
   passwordHash   String?
+  /// Lien « définir / réinitialiser mon mot de passe » : empreinte du jeton,
+  /// usage unique, durée limitée. Créé à l'accueil d'un titulaire ou sur demande.
+  passwordResetTokenHash String?   @unique
+  passwordResetExpiresAt DateTime?
   firstName      String
   lastName       String
   phone          String?

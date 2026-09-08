@@ -6,6 +6,7 @@ import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { hashPassword, validatePasswordStrength } from "@/server/security/password";
 import { recordAudit } from "@/server/audit/log";
+import { sendUserPasswordLink } from "@/server/services/user-password";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /**
@@ -146,19 +147,33 @@ export async function createClientPharmacyAction(
       data: { userId: owner.id, pharmacyId: created.id, role: "OWNER", isActive: true },
     });
 
-    return created;
+    return { created, ownerId: owner.id };
   });
 
   await recordAudit({
     action: "platform.pharmacy_created",
     entityType: "Pharmacy",
-    entityId: pharmacy.id,
+    entityId: pharmacy.created.id,
     platformAdminId: session.admin.id,
     metadata: { name: input.name, ownerEmail: input.ownerEmail },
   });
 
+  // Le titulaire reçoit un e-mail d'accueil avec un lien pour définir son
+  // mot de passe. Le mot de passe initial saisi par l'éditeur reste valable
+  // en attendant ; l'issue de l'envoi est dite telle quelle.
+  const welcome = await sendUserPasswordLink(pharmacy.ownerId, "welcome").catch((error: unknown) => ({
+    status: "FAILED",
+    detail: error instanceof Error ? error.message : "envoi impossible",
+    url: "",
+  }));
+
   revalidatePath("/admin/pharmacies");
-  return ok({ pharmacyId: pharmacy.id }, `${input.name} est prête. Le titulaire peut se connecter.`);
+  return ok(
+    { pharmacyId: pharmacy.created.id },
+    welcome.status === "SENT"
+      ? `${input.name} est prête. E-mail d'accueil envoyé à ${input.ownerEmail}.`
+      : `${input.name} est prête, mais l'e-mail d'accueil n'est pas parti (${welcome.detail}). Le titulaire peut se connecter avec le mot de passe initial.`,
+  );
 }
 
 const updateSchema = pharmacySchema.extend({ pharmacyId: z.string().min(1) });
@@ -295,7 +310,7 @@ export async function createPharmacyOwnerAction(
 
   const passwordHash = await hashPassword(input.password);
 
-  await prisma.$transaction(async (tx) => {
+  const ownerId = await prisma.$transaction(async (tx) => {
     const owner = await tx.user.create({
       data: {
         organizationId: pharmacy.organizationId,
@@ -309,6 +324,7 @@ export async function createPharmacyOwnerAction(
     await tx.membership.create({
       data: { userId: owner.id, pharmacyId: pharmacy.id, role: "OWNER", isActive: true },
     });
+    return owner.id;
   });
 
   await recordAudit({
@@ -319,6 +335,17 @@ export async function createPharmacyOwnerAction(
     metadata: { ownerEmail: input.email },
   });
 
+  const welcome = await sendUserPasswordLink(ownerId, "welcome").catch((error: unknown) => ({
+    status: "FAILED",
+    detail: error instanceof Error ? error.message : "envoi impossible",
+    url: "",
+  }));
+
   revalidatePath(`/admin/pharmacies/${pharmacy.id}`);
-  return ok(null, `${input.firstName} ${input.lastName} est titulaire de ${pharmacy.name}.`);
+  return ok(
+    null,
+    welcome.status === "SENT"
+      ? `${input.firstName} ${input.lastName} est titulaire de ${pharmacy.name}. E-mail d'accueil envoyé à ${input.email}.`
+      : `${input.firstName} ${input.lastName} est titulaire de ${pharmacy.name}, mais l'e-mail d'accueil n'est pas parti (${welcome.detail}).`,
+  );
 }

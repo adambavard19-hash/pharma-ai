@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { AlertCircle, LogIn, Terminal } from "lucide-react";
 import { loginAction } from "@/server/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -109,6 +110,12 @@ export function LoginForm({
         >
           Se connecter
         </Button>
+
+        <p className="text-center text-[13px]">
+          <Link href="/login/oubli" className="text-text-tertiary underline underline-offset-2 hover:text-text-secondary">
+            Mot de passe oublié ou premier accès
+          </Link>
+        </p>
       </form>
 
       <p className="text-center text-[12px] leading-5 text-text-tertiary">

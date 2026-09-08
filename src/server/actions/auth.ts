@@ -16,6 +16,7 @@ import {
   switchPharmacy,
 } from "@/server/auth/session";
 import { recordAudit } from "@/server/audit/log";
+import { sendUserPasswordLink, setUserPasswordByToken } from "@/server/services/user-password";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 const loginSchema = z.object({
@@ -240,4 +241,50 @@ export async function changeOwnPasswordAction(
   });
 
   return ok(null, "Mot de passe modifié.");
+}
+
+const requestLinkSchema = z.object({ email: z.string().trim().toLowerCase().email() });
+
+/**
+ * « Mot de passe oublié ». La réponse ne dit pas si le compte existe : elle
+ * est identique dans tous les cas, et le message ne part qu'à l'adresse du
+ * compte lui-même.
+ */
+export async function requestUserPasswordLinkAction(
+  _previous: ActionResult<null> | null,
+  formData: FormData,
+): Promise<ActionResult<null>> {
+  const parsed = requestLinkSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) return fail("Adresse e-mail invalide.");
+  const user = await prisma.user.findUnique({
+    where: { email: parsed.data.email },
+    select: { id: true, status: true, deletedAt: true },
+  });
+  if (user && user.status === "ACTIVE" && !user.deletedAt) {
+    await sendUserPasswordLink(user.id, "reset").catch(() => undefined);
+  }
+  return ok(null, "Si un compte existe pour cette adresse, un lien vient de lui être envoyé.");
+}
+
+const setPasswordSchema = z.object({
+  token: z.string().min(16),
+  password: z.string().min(1),
+  confirm: z.string().min(1),
+});
+
+/** Définir son mot de passe depuis le lien reçu par e-mail (accueil ou oubli). */
+export async function setUserPasswordAction(
+  _previous: ActionResult<null> | null,
+  formData: FormData,
+): Promise<ActionResult<null>> {
+  const parsed = setPasswordSchema.safeParse({
+    token: formData.get("token"),
+    password: formData.get("password"),
+    confirm: formData.get("confirm"),
+  });
+  if (!parsed.success) return fail("Formulaire incomplet.");
+  if (parsed.data.password !== parsed.data.confirm) return fail("Les deux mots de passe ne sont pas identiques.");
+  const result = await setUserPasswordByToken(parsed.data.token, parsed.data.password);
+  if (!result.ok) return fail(result.error);
+  redirect("/login?defini=1");
 }

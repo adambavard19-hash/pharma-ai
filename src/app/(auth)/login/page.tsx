@@ -3,6 +3,7 @@ import { getInstallState } from "@/server/services/install-state";
 import { LoginForm } from "./login-form";
 import { PharmaWordmark } from "@/components/app/logo";
 import { ShieldCheck, Sparkles, Stethoscope } from "lucide-react";
+import { Alert } from "@/components/ui/feedback";
 
 export const metadata: Metadata = { title: "Connexion" };
 
@@ -24,8 +25,8 @@ const HIGHLIGHTS = [
   },
 ];
 
-export default async function LoginPage() {
-  const install = await getInstallState();
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ defini?: string }> }) {
+  const [install, { defini }] = await Promise.all([getInstallState(), searchParams]);
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1fr_minmax(0,52ch)]">
@@ -95,6 +96,8 @@ export default async function LoginPage() {
               Accédez au comptoir, au catalogue et au pilotage de votre pharmacie.
             </p>
           </div>
+
+          {defini === "1" && <Alert tone="success">Mot de passe enregistré. Connectez-vous avec votre adresse e-mail et ce nouveau mot de passe.</Alert>}
 
           <LoginForm install={install} initialError={null} />
         </div>
