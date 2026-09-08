@@ -62,10 +62,17 @@ export class ResendMessagingProvider implements MessagingProvider {
       });
 
       if (response.ok) {
+        // L'identifiant Resend du message : c'est lui qui permet de retrouver
+        // le statut de livraison (remis, rebond, spam) dans le tableau de bord
+        // Resend, la clé d'envoi ne donnant pas accès à l'API de consultation.
+        const id = await response
+          .text()
+          .then((body) => (JSON.parse(body) as { id?: string }).id ?? null)
+          .catch(() => null);
         return {
           status: "SENT",
           provider: this.info.id,
-          detail: `Message transmis à Resend pour ${message.to}.`,
+          detail: `Message transmis à Resend pour ${message.to}${id ? ` (id ${id})` : ""}.`,
         };
       }
 
