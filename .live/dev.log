@@ -126,3 +126,26 @@ Unique constraint failed on the constraint: `products_pharmacyId_reference_key`
   └─ ƒ analyseStockImportAction({}) in 28ms src/server/actions/stock-import.ts
  POST /stock/import?retour=bienvenue 200 in 3.8s (next.js: 1.1ms, application-code: 3.8s)
   └─ ƒ commitStockImportAction({"createUnknownByDefault":true,"decisions":{},"jobId":"cmtu28oyp005uzoshvez4aeus"}) in 3787ms src/server/actions/stock-import.ts
+ GET /vente/nouvelle 200 in 104ms (next.js: 7ms, application-code: 97ms)
+[ordonnances] transfert reçu — 75819 octets en 1 ms.
+[ordonnances] image réduite pour lecture — 75819 → 63136 octets.
+[ordonnances] durées — stockage 2 ms, préparation 9 ms, lecture 12514 ms (total depuis réception 12523 ms).
+[ordonnances] lecture par anthropic:claude-opus-5 en 12524 ms — 4 ligne(s) rendue(s), 4 retenue(s), patient « M. Jean TESTEUR », confiance 0.98.
+ POST /api/ordonnances/depot 200 in 12.6s (next.js: 2ms, application-code: 12.5s)
+[classification] préchauffage — 4 nom(s), 3 déjà connu(s), 3416 ms (appel 3395 ms).
+ POST /vente/nouvelle 200 in 76ms (next.js: 1.3ms, application-code: 75ms)
+  └─ ƒ createPrescriptionAction(null, {}) in 27ms src/server/actions/prescriptions.ts
+ GET /vente/cmtu29oco008izoshfhmx186w 200 in 221ms (next.js: 3ms, application-code: 218ms)
+ GET /vente/cmtu29oco008izoshfhmx186w 200 in 206ms (next.js: 3ms, application-code: 203ms)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ POST /vente/cmtu29oco008izoshfhmx186w 200 in 174ms (next.js: 1.1ms, application-code: 173ms)
+  └─ ƒ verifyPrescriptionAction({"lines":["[Object]","[Object]","[Object]"],"patientId":null,"prescribedAt":"2026-09-08","...":"3 items not stringified"}) in 19ms src/server/actions/prescriptions.ts
+[analysis] ORD-0001 en 185 ms — chargement 157 ms, comprehension 12 ms, moteur 3 ms, enregistrement 13 ms — compréhension 4/4 en cache — 2 recommandation(s).
+ POST /api/ordonnances/cmtu29oco008izoshfhmx186w/analyse 200 in 217ms (next.js: 11ms, application-code: 205ms)
+ GET /vente/cmtu29oco008izoshfhmx186w 200 in 95ms (next.js: 2ms, application-code: 93ms)
+ POST /vente/cmtu29oco008izoshfhmx186w 200 in 144ms (next.js: 6ms, application-code: 138ms)
+  └─ ƒ answerOpportunityAction({"answer":"UNKNOWN","opportunityId":"cmtu29osx0091zoshaqxr8vcv"}) in 24ms src/server/actions/opportunities.ts
+ POST /vente/cmtu29oco008izoshfhmx186w 200 in 139ms (next.js: 7ms, application-code: 133ms)
+  └─ ƒ answerOpportunityAction({"answer":false,"opportunityId":"cmtu29osx0092zoshd15zexvf"}) in 17ms src/server/actions/opportunities.ts
+ GET /vente/cmtu29oco008izoshfhmx186w 200 in 121ms (next.js: 6ms, application-code: 116ms)
+ GET /vente/cmtu29oco008izoshfhmx186w 200 in 216ms (next.js: 5ms, application-code: 211ms)

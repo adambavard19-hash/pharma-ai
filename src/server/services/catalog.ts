@@ -27,8 +27,8 @@ export async function loadStockState(scope: TenantScope): Promise<{ configured: 
  */
 const NATIONAL_CANDIDATE_LIMIT = 300;
 
-/** Borne de la résolution préalable des spécialités et substances concernées. */
-const SPECIALTY_MATCH_LIMIT = 4000;
+/** Nombre de lignes de stock médicament lues pour y chercher des candidats. */
+const DRUG_STOCK_SCAN_LIMIT = 2000;
 
 /**
  * Chargement du catalogue pour le moteur de recommandation.
@@ -106,61 +106,24 @@ export async function loadCatalogSnapshot(
  *    loin dans le pipeline, qui décidera si l'une d'elles est retenue — ou
  *    aucune.
  * 2. **On ne charge pas 20 000 lignes.** Une grosse officine peut référencer
- *    tout le catalogue national. La sélection est donc filtrée en base sur les
- *    termes des règles et bornée, pour tenir le budget de temps du comptoir.
+ *    tout le catalogue national. La lecture est bornée (boîtes en rayon
+ *    d'abord) et seules les boîtes que le dictionnaire d'usage ou les mots des
+ *    règles relient à un conseil deviennent candidates.
  * 3. **Rien de soumis à prescription.** Le filtre est appliqué ici ET dans le
  *    moteur de sécurité : une règle de cette importance mérite deux verrous.
  */
 export async function loadNationalDrugCandidates(
   scope: TenantScope,
 ): Promise<CatalogProduct[]> {
-  const terms = [
-    ...new Set(ADVICE_RULES.flatMap((rule) => rule.matchingTags).map(normalizeSearchText)),
-  ].filter((term) => term.length >= 4);
-
-  if (terms.length === 0) return [];
-
-  // Les spécialités concernées sont résolues AVANT d'interroger le stock.
-  // Mesuré : la même recherche exprimée en branches `OR` traversant la
-  // jointure stock → présentation → spécialité coûte 474 ms, contre 58 ms en
-  // deux passes indexées. Au comptoir, c'est un demi-battement de cœur gagné
-  // sur chaque analyse.
-  const [byName, substances] = await Promise.all([
-    prisma.drugSpecialty.findMany({
-      where: { withdrawnAt: null, OR: terms.map((term) => ({ searchName: { contains: term } })) },
-      select: { id: true },
-      take: SPECIALTY_MATCH_LIMIT,
-    }),
-    prisma.drugSubstance.findMany({
-      where: { OR: terms.map((term) => ({ searchLabel: { contains: term } })) },
-      select: { id: true },
-      take: SPECIALTY_MATCH_LIMIT,
-    }),
-  ]);
-
-  const bySubstance =
-    substances.length > 0
-      ? await prisma.drugComposition.findMany({
-          where: { substanceId: { in: substances.map((substance) => substance.id) } },
-          select: { specialtyId: true },
-          distinct: ["specialtyId"],
-          take: SPECIALTY_MATCH_LIMIT,
-        })
-      : [];
-
-  const specialtyIds = [
-    ...new Set([
-      ...byName.map((specialty) => specialty.id),
-      ...bySubstance.map((composition) => composition.specialtyId),
-    ]),
-  ];
-
-  if (specialtyIds.length === 0) return [];
-
+  // Le stock médicament de l'officine est lu tel quel, boîtes en rayon
+  // d'abord, et c'est le dictionnaire d'usage qui dit lesquelles peuvent
+  // répondre à une règle de conseil. On ne présélectionne plus sur les mots
+  // des règles : « ULTRA-LEVURE » ne contient pas « probiotique », et c'était
+  // précisément ce qui empêchait un médicament conseil d'être proposé.
   const lines = await prisma.pharmacyDrugStock.findMany({
     where: {
       pharmacyId: scope.pharmacyId,
-      presentation: { withdrawnAt: null, specialtyId: { in: specialtyIds } },
+      presentation: { withdrawnAt: null },
     },
     select: {
       quantity: true,
@@ -187,27 +150,34 @@ export async function loadNationalDrugCandidates(
     // Les boîtes en rayon d'abord ; celles à zéro restent chargées pour que le
     // moteur puisse dire « adapté mais en rupture » — jamais les proposer.
     orderBy: { quantity: "desc" },
-    take: NATIONAL_CANDIDATE_LIMIT,
+    take: DRUG_STOCK_SCAN_LIMIT,
   });
 
-  return lines
-    .filter((line) => line.presentation.specialty.prescriptionConditions.length === 0)
-    .map((line) => {
-      const { presentation } = line;
-      const substances = [
-        ...new Set(presentation.specialty.compositions.map((c) => c.substanceLabel)),
-      ];
-      // Le catalogue national ne classe pas les médicaments dans les catégories
-      // de l'officine : c'est le dictionnaire d'usage (substances, forme, voie,
-      // nom) qui le fait, avec le même vocabulaire fermé que pour les produits.
-      const understood = classifyNationalDrug({
-        name: presentation.specialty.name,
-        substances,
-        form: presentation.specialty.pharmaceuticalForm,
-        routes: presentation.specialty.administrationRoutes,
-        label: presentation.label,
-      });
-      return {
+  const terms = [
+    ...new Set(ADVICE_RULES.flatMap((rule) => rule.matchingTags).map(normalizeSearchText)),
+  ].filter((term) => term.length >= 4);
+
+  const candidates: CatalogProduct[] = [];
+  for (const line of lines) {
+    if (line.presentation.specialty.prescriptionConditions.length > 0) continue;
+    const { presentation } = line;
+    const substances = [...new Set(presentation.specialty.compositions.map((c) => c.substanceLabel))];
+    // Le catalogue national ne classe pas les médicaments dans les catégories
+    // de l'officine : c'est le dictionnaire d'usage (substances, forme, voie,
+    // nom) qui le fait, avec le même vocabulaire fermé que pour les produits.
+    const understood = classifyNationalDrug({
+      name: presentation.specialty.name,
+      substances,
+      form: presentation.specialty.pharmaceuticalForm,
+      routes: presentation.specialty.administrationRoutes,
+      label: presentation.label,
+    });
+    const haystack = normalizeSearchText([presentation.specialty.name, ...substances].join(" "));
+    const termHit = terms.some((term) => haystack.includes(term));
+    // Une boîte que ni le dictionnaire ni les mots des règles ne relient à un
+    // conseil n'est pas candidate : elle n'encombre pas le moteur.
+    if (!understood?.tags.length && !termHit) continue;
+    candidates.push({
         id: `presentation:${presentation.id}`,
         origin: "NATIONAL_DRUG" as const,
         presentationId: presentation.id,
@@ -236,8 +206,10 @@ export async function loadNationalDrugCandidates(
         alertThreshold: line.alertThreshold,
         availableInSiblingPharmacy: false,
         isActive: true,
-      };
-    });
+      });
+    if (candidates.length >= NATIONAL_CANDIDATE_LIMIT) break;
+  }
+  return candidates;
 }
 
 export async function loadPharmacyRules(scope: TenantScope): Promise<PharmacyRuleInput[]> {
