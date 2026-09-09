@@ -3,7 +3,7 @@
  * Ce module ne doit contenir aucune valeur secrète.
  */
 
-export const APP_NAME = "Pharma.ai";
+export const APP_NAME = "PharmaBoost";
 export const APP_TAGLINE = "Le copilote intelligent de l'officine";
 
 /**

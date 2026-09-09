@@ -32,7 +32,7 @@ export function SettingsTabs({
               { key: "regles-conseil", label: "Registre du moteur", href: "/parametres/regles-conseil" },
             ]
           : []),
-        { key: "moteur", label: "Moteur Pharma.ai" },
+        { key: "moteur", label: "Moteur PharmaBoost" },
         { key: "conformite", label: "Conformité" },
         { key: "abonnement", label: "Abonnement" },
         ...(canSeeAudit

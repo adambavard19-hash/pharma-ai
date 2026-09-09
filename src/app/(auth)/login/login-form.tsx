@@ -119,7 +119,7 @@ export function LoginForm({
       </form>
 
       <p className="text-center text-[12px] leading-5 text-text-tertiary">
-        Pharma.ai traite des données personnelles et potentiellement des données de
+        PharmaBoost traite des données personnelles et potentiellement des données de
         santé. L&apos;accès est journalisé.
       </p>
     </div>

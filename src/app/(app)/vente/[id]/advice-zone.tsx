@@ -2,9 +2,12 @@
 
 import { useState, useTransition } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
+  HelpCircle,
   Lock,
   MoreHorizontal,
   Package,
@@ -32,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { ProductPicker } from "./product-picker";
 import { ScoreExplanation } from "./score-explanation";
 import type { AdviceView } from "./types";
+import { OUTCOME_MESSAGES, type EngineOutcome } from "@/core/ai/outcome";
 
 /** La note posée par le serveur quand le patient répond « non » à la question. */
 const NOT_NEEDED_NOTE = "Le patient n'a pas ce besoin.";
@@ -40,7 +44,7 @@ const NOT_NEEDED_NOTE = "Le patient n'a pas ce besoin.";
 const MAX_VISIBLE = 3;
 
 /**
- * Ce que Pharma.ai rappelle de proposer — l'écran le plus important du produit.
+ * Ce que PharmaBoost rappelle de proposer — l'écran le plus important du produit.
  *
  * Trois grandes cartes au plus, lisibles debout, à un mètre : le produit, son
  * prix et son stock, pourquoi on le propose, ce qu'on dit au patient, et deux
@@ -55,6 +59,8 @@ export function AdviceZone({
   recommendations,
   canDecide,
   locked,
+  outcome,
+  canImportStock,
   inBasket,
   onAccept,
   onCancelAccept,
@@ -63,6 +69,9 @@ export function AdviceZone({
   recommendations: AdviceView[];
   canDecide: boolean;
   locked: boolean;
+  /** Pourquoi il n'y a rien, quand il n'y a rien : c'est ce qui décide du message. */
+  outcome: EngineOutcome | null;
+  canImportStock: boolean;
   inBasket: (id: string) => boolean;
   /** Le patient accepte : ajout à la délivrance + décision enregistrée. */
   onAccept: (recommendation: AdviceView) => void;
@@ -144,15 +153,7 @@ export function AdviceZone({
           )}
 
           {available.length === 0 && closed.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-border-default px-5 py-5">
-              <p className="text-[14px] font-medium text-text-primary">
-                Rien à proposer pour ce traitement dans votre stock
-              </p>
-              <p className="mt-1 text-[13px] leading-5 text-text-secondary">
-                Aucun besoin complémentaire auquel votre rayon puisse répondre aujourd&apos;hui.
-                Vous pouvez ajouter un conseil vous-même.
-              </p>
-            </div>
+            <EmptyOutcome outcome={outcome} canImportStock={canImportStock} onAddAdvice={() => setAddOpen(true)} />
           )}
 
           {unavailable.length > 0 && (
@@ -307,13 +308,18 @@ function AdviceCard({
   // La réponse du patient, locale d'abord : la carte réagit au clic, le
   // serveur confirme ensuite. Un « non » fait disparaître la carte ; le
   // serveur la range alors parmi les décisions prises.
-  const [answer, setAnswer] = useState<boolean | null>(opportunity?.answer ?? null);
+  // « UNKNOWN » : la question a été posée, le patient ne savait pas. La
+  // proposition reste visible, à l'appréciation du pharmacien — jamais imposée.
+  const [answer, setAnswer] = useState<boolean | null | "UNKNOWN">(
+    opportunity?.answer ?? (opportunity?.answeredAt ? "UNKNOWN" : null),
+  );
   const [answering, startAnswer] = useTransition();
   const { push } = useToast();
 
-  const askFirst = Boolean(opportunity?.requiresConfirmation && opportunity.question) && answer !== true;
+  const askFirst =
+    Boolean(opportunity?.requiresConfirmation && opportunity.question) && answer !== true && answer !== "UNKNOWN";
 
-  const respond = (value: boolean) => {
+  const respond = (value: boolean | "UNKNOWN") => {
     if (!opportunity) return;
     setAnswer(value);
     startAnswer(async () => {
@@ -342,19 +348,80 @@ function AdviceCard({
         pending={answering}
         onYes={() => respond(true)}
         onNo={() => respond(false)}
+        onUnknown={() => respond("UNKNOWN")}
       />
     );
   }
 
   return (
-    <ProductCard
-      recommendation={recommendation}
-      canDecide={canDecide}
-      accepted={accepted}
-      confirmed={answer === true}
-      onAccept={onAccept}
-      onCancelAccept={onCancelAccept}
-    />
+    <div className="space-y-2">
+      {answer === "UNKNOWN" && opportunity?.question && (
+        <p className="flex items-center gap-2 px-1 text-[12.5px] text-text-tertiary">
+          <HelpCircle className="size-3.5" />
+          « {opportunity.question} » — le patient ne sait pas. À votre appréciation.
+        </p>
+      )}
+      <ProductCard
+        recommendation={recommendation}
+        canDecide={canDecide}
+        accepted={accepted}
+        confirmed={answer === true}
+        onAccept={onAccept}
+        onCancelAccept={onCancelAccept}
+      />
+    </div>
+  );
+}
+
+/**
+ * Quand il n'y a rien à proposer, dire pourquoi — et quoi faire.
+ *
+ * Un stock jamais importé, une rupture, un conseil écarté par sécurité et une
+ * ordonnance sans besoin sont quatre situations différentes. Le code d'issue
+ * vient du moteur ; ici on ne montre que sa traduction.
+ */
+function EmptyOutcome({
+  outcome,
+  canImportStock,
+  onAddAdvice,
+}: {
+  outcome: EngineOutcome | null;
+  canImportStock: boolean;
+  onAddAdvice: () => void;
+}) {
+  const key = outcome && outcome !== "PROPOSALS" && outcome !== "NEEDS_PATIENT_INFORMATION" ? outcome : "NO_RELEVANT_NEED";
+  const message = OUTCOME_MESSAGES[key];
+  const Icon = key === "STOCK_NOT_CONFIGURED" ? Package : key === "SAFETY_FILTERED" || key === "AI_UNAVAILABLE" || key === "ENGINE_ERROR" ? AlertTriangle : Check;
+
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border border-dashed px-5 py-5",
+        message.tone === "warning" ? "border-warning-300 bg-warning-50/40 dark:border-warning-800 dark:bg-warning-950/20" : "border-border-default",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <Icon className={cn("mt-0.5 size-[18px] shrink-0", message.tone === "warning" ? "text-warning-700 dark:text-warning-400" : "text-text-tertiary")} />
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-[14px] font-medium text-text-primary">{message.title}</p>
+          <p className="text-[13px] leading-5 text-text-secondary">{message.body}</p>
+        </div>
+      </div>
+      {(message.action === "IMPORT_STOCK" && canImportStock) || message.action === "ADD_ADVICE" ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {message.action === "IMPORT_STOCK" && canImportStock && (
+            <Button asChild leadingIcon={<Package className="size-[18px]" />}>
+              <Link href="/stock/import">Importer mon stock</Link>
+            </Button>
+          )}
+          {message.action === "ADD_ADVICE" && (
+            <Button variant="outline" size="sm" leadingIcon={<Plus className="size-4" />} onClick={onAddAdvice}>
+              Ajouter un conseil
+            </Button>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -405,12 +472,14 @@ function QuestionCard({
   pending,
   onYes,
   onNo,
+  onUnknown,
 }: {
   recommendation: AdviceView;
   canDecide: boolean;
   pending: boolean;
   onYes: () => void;
   onNo: () => void;
+  onUnknown: () => void;
 }) {
   const opportunity = recommendation.opportunity!;
   const product = recommendation.product;
@@ -451,6 +520,14 @@ function QuestionCard({
             disabled={pending}
             onClick={onNo}
           />
+          <button
+            type="button"
+            disabled={pending}
+            onClick={onUnknown}
+            className="sm:col-span-2 rounded-xl border border-dashed border-border-default py-2.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:opacity-60"
+          >
+            Ne sait pas — laisser la proposition à mon appréciation
+          </button>
         </div>
       )}
     </CardFrame>

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Marque Pharma.ai. Le symbole évoque une croix d'officine dont le quadrant
+ * Marque PharmaBoost. Le symbole évoque une croix d'officine dont le quadrant
  * supérieur droit est « augmenté » — l'assistance, pas la substitution.
  */
 export function PharmaLogo({
@@ -51,7 +51,7 @@ export function PharmaWordmark({
       <PharmaLogo size={size} />
       <div className="min-w-0">
         <p className="text-[15px] leading-5 font-semibold tracking-[-0.01em] text-text-primary">
-          Pharma<span className="text-brand-600 dark:text-brand-400">.ai</span>
+          Pharma<span className="text-brand-600 dark:text-brand-400">Boost</span>
         </p>
         {subtitle && (
           <p className="truncate text-[11.5px] leading-4 text-text-tertiary">{subtitle}</p>

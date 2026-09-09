@@ -12,7 +12,7 @@ import type { TenantScope } from "@/server/db/tenant";
  *
  * L'attribution se joue ici, une fois pour toutes : une ligne rattachée à une
  * `Recommendation` alimente `attributedCents`. C'est ce qui permet d'affirmer,
- * chiffres à l'appui, ce que Pharma.ai a réellement généré — et de ne jamais
+ * chiffres à l'appui, ce que PharmaBoost a réellement généré — et de ne jamais
  * s'attribuer une vente qui n'en découle pas.
  */
 

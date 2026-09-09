@@ -2,7 +2,7 @@ import type { DrugKnowledgeProvider, ProviderInfo } from "../ports";
 import type { DrugKnowledge } from "../types";
 
 /**
- * La couche ÉDITORIALE du référentiel : ce que Pharma.ai raconte d'un
+ * La couche ÉDITORIALE du référentiel : ce que PharmaBoost raconte d'un
  * médicament — explication au patient, conseils de prise, classes
  * d'interaction, populations à surveiller.
  *

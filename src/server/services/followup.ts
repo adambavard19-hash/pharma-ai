@@ -20,7 +20,7 @@ import type { TenantScope } from "@/server/db/tenant";
 import type { ReminderReason } from "@/generated/prisma";
 
 /**
- * Le suivi patient — troisième pilier de Pharma.ai.
+ * Le suivi patient — troisième pilier de PharmaBoost.
  *
  * Trois principes portés par ce service, et non par l'interface :
  *

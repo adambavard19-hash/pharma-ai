@@ -25,6 +25,7 @@ import {
 } from "@/server/ai/registry";
 import {
   loadCatalogSnapshot,
+  loadStockState,
   loadNationalDrugCandidates,
   loadPharmacyRules,
   loadValidationHistory,
@@ -251,7 +252,7 @@ export async function analysePrescription(params: {
   const knowledgeProvider = getDrugKnowledgeProvider();
 
   params.onStage?.("IDENTIFICATION");
-  const [patient, pharmacyCatalog, nationalCandidates, rules, history] = await Promise.all([
+  const [patient, pharmacyCatalog, nationalCandidates, rules, history, stockState] = await Promise.all([
     buildPatientContext(prescription.patientId),
     loadCatalogSnapshot(params.scope, { includeSiblingAvailability: true }),
     // Les médicaments de l'officine susceptibles de répondre à une règle de
@@ -259,6 +260,9 @@ export async function analysePrescription(params: {
     loadNationalDrugCandidates(params.scope),
     loadPharmacyRules(params.scope),
     loadValidationHistory(params.scope),
+    // Le stock est-il seulement configuré ? La réponse change ce que le
+    // comptoir affiche quand rien n'est proposé.
+    loadStockState(params.scope),
   ]);
 
   // Les deux origines se rejoignent ici, le temps d'un classement. Elles ne se
@@ -369,6 +373,13 @@ export async function analysePrescription(params: {
       ocrProvider.info.capability === "SIMULATED" ||
       aiProvider.info.capability === "SIMULATED" ||
       (knowledgeProvider.info.capability === "SIMULATED" && knowledgeFromEditorial),
+    stock: stockState,
+    // La compréhension a manqué si aucun modèle n'est branché, ou si l'appel a
+    // échoué : le moteur a tourné sur les seules règles, et l'issue le dira.
+    aiUnavailable:
+      aiProvider.info.capability !== "LIVE" ||
+      !understanding ||
+      understanding.warnings.some((warning) => warning.startsWith("Classification impossible")),
   });
 
   lap("moteur");
@@ -404,12 +415,14 @@ export async function analysePrescription(params: {
           lineCount: prescription.lines.length,
           confirmedLines: prescription.lines.filter((l) => l.status === "CONFIRMED").length,
           catalogSize: catalog.length,
+          stockReferenceCount: stockState.referenceCount,
           ruleCount: rules.length,
           patientContextAvailable: patient.patientId !== null,
           timings,
         } as never,
         traceJson: result.trace as never,
         blockedReasons: result.blockedReasons,
+        outcome: result.outcome,
         isDemo: prescription.isDemo,
         finishedAt: new Date(),
         durationMs: Date.now() - startedAt,

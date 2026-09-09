@@ -21,7 +21,8 @@ import { fail, ok, type ActionResult } from "./types";
 
 const answerSchema = z.object({
   opportunityId: z.string().min(1),
-  answer: z.boolean(),
+  /** `true` oui, `false` non, `"UNKNOWN"` le patient ne sait pas : la proposition reste, à l'appréciation du pharmacien. */
+  answer: z.union([z.boolean(), z.literal("UNKNOWN")]),
 });
 
 export async function answerOpportunityAction(
@@ -49,19 +50,34 @@ export async function answerOpportunityAction(
 
   const NOT_NEEDED = "Le patient n'a pas ce besoin.";
   const now = new Date();
+  const answer = parsed.data.answer;
 
   await prisma.$transaction(async (tx) => {
     await tx.adviceOpportunity.update({
       where: { id: opportunity.id },
       data: {
-        answer: parsed.data.answer,
+        // « Ne sait pas » : la question a été posée (answeredAt), sans réponse
+        // tranchée (answer null). La carte montre alors le produit, sans
+        // l'imposer.
+        answer: answer === "UNKNOWN" ? null : answer,
         answeredAt: now,
         answeredByUserId: session.scope.userId,
       },
     });
 
     for (const recommendation of opportunity.recommendations) {
-      if (!parsed.data.answer && recommendation.status === "PROPOSED") {
+      if (answer === "UNKNOWN") {
+        await tx.recommendationEvent.create({
+          data: {
+            recommendationId: recommendation.id,
+            type: "VIEWED",
+            userId: session.scope.userId,
+            metadata: { reason: "NEED_UNKNOWN", opportunityId: opportunity.id } as never,
+          },
+        });
+        continue;
+      }
+      if (!answer && recommendation.status === "PROPOSED") {
         // Le besoin n'existe pas : la proposition est retirée, avec son motif.
         await tx.recommendation.update({
           where: { id: recommendation.id },
@@ -86,7 +102,7 @@ export async function answerOpportunityAction(
       // seul motif revient tel quel. Un retrait décidé par le pharmacien pour
       // une autre raison, lui, ne bouge pas.
       if (
-        parsed.data.answer &&
+        answer === true &&
         recommendation.status === "REMOVED" &&
         recommendation.pharmacistNote === NOT_NEEDED
       ) {
@@ -117,9 +133,9 @@ export async function answerOpportunityAction(
     entityId: opportunity.id,
     pharmacyId: session.scope.pharmacyId,
     userId: session.scope.userId,
-    metadata: { answer: parsed.data.answer },
+    metadata: { answer },
   });
 
   revalidatePath(`/vente/${opportunity.analysisRun.prescriptionId}`);
-  return ok(null, parsed.data.answer ? "Besoin confirmé." : "Pas de besoin : proposition retirée.");
+  return ok(null, answer === "UNKNOWN" ? "Réponse inconnue : proposition laissée à votre appréciation." : answer ? "Besoin confirmé." : "Pas de besoin : proposition retirée.");
 }

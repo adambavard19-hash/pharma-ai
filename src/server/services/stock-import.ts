@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { prisma } from "@/server/db/client";
 import type { Prisma } from "@/generated/prisma";
 import { recordIsDemo } from "@/server/db/demo-scope";
-import { nextReference } from "./references";
+import { reserveReferences } from "./references";
 import { refreshStockNotifications, createNotification } from "./notifications";
 import { recordAudit } from "@/server/audit/log";
 import {
@@ -21,6 +21,8 @@ import {
   type RowDecision,
 } from "@/core/stock-import";
 import type { TenantScope } from "@/server/db/tenant";
+import { tagsFromName } from "@/core/stock-import/tags";
+import { classifyPharmacyProducts, type ClassificationRunSummary } from "./product-classification";
 
 /**
  * L'import du stock d'une officine, en deux temps.
@@ -253,6 +255,8 @@ export type ImportOutcome = {
   productsCreated: number;
   ignored: number;
   invalid: number;
+  /** Ce que le moteur a compris des produits créés : combien il pourra relier à un besoin. */
+  classification: ClassificationRunSummary | null;
 };
 
 /**
@@ -293,10 +297,7 @@ export async function commitStockImport(params: {
   // le compteur vit hors d'elle, et une transaction qui échoue ne doit pas
   // laisser des trous invisibles.
   const creations = plan.filter((item) => item.action === "CREATE");
-  const references: string[] = [];
-  for (let i = 0; i < creations.length; i += 1) {
-    references.push(await nextReference("product", params.scope.pharmacyId));
-  }
+  const references = await reserveReferences("product", params.scope.pharmacyId, creations.length);
 
   const outcome: ImportOutcome = {
     jobId: job.id,
@@ -305,7 +306,9 @@ export async function commitStockImport(params: {
     productsCreated: 0,
     ignored: plan.filter((item) => item.action === "IGNORE").length,
     invalid: plan.filter((item) => item.action === "INVALID").length,
+    classification: null,
   };
+  const createdProductIds: string[] = [];
 
   await prisma.$transaction(
     async (tx) => {
@@ -338,6 +341,8 @@ export async function commitStockImport(params: {
             data: {
               ...(row.salePriceCents !== null ? { salePriceCents: row.salePriceCents } : {}),
               ...(row.purchasePriceCents !== null ? { purchasePriceCents: row.purchasePriceCents } : {}),
+              ...(row.vatRate !== null ? { vatRate: row.vatRate } : {}),
+              ...(row.brand ? { brand: row.brand } : {}),
               ...(row.code && row.code.length === 13 ? { ean: row.code } : {}),
             },
           });
@@ -350,20 +355,24 @@ export async function commitStockImport(params: {
               pharmacyId: params.scope.pharmacyId,
               organizationId: params.scope.organizationId,
               name,
+              brand: row.brand,
+              // La catégorie et les étiquettes d'usage sont posées juste après
+              // l'écriture, par la classification (dictionnaire puis modèle).
               category: "AUTRE",
+              subCategory: row.categoryLabel,
               reference: references[creationIndex++],
               ean: row.code && row.code.length === 13 ? row.code : null,
               salePriceCents: row.salePriceCents ?? 0,
               purchasePriceCents: row.purchasePriceCents ?? 0,
-              // Les mots du nom servent d'étiquettes d'appariement : c'est ce
-              // qui permet au moteur de retrouver ce produit quand un besoin
-              // le désigne, sans que le titulaire ait à le décrire.
+              ...(row.vatRate !== null ? { vatRate: row.vatRate } : {}),
+              // Les mots du nom servent d'étiquettes de recherche en attendant.
               matchingTags: tagsFromName(name),
               isDemo: recordIsDemo(params.pharmacyIsDemo),
               stockItem: { create: { pharmacyId: params.scope.pharmacyId, quantity, alertThreshold: 5 } },
             },
             select: { id: true },
           });
+          createdProductIds.push(created.id);
           await tx.stockMovement.create({
             data: {
               pharmacyId: params.scope.pharmacyId,
@@ -393,9 +402,24 @@ export async function commitStockImport(params: {
           finishedAt: new Date(),
         },
       });
+
+      // Le stock est désormais synchronisé : c'est cette date que voit le
+      // titulaire (« Stock synchronisé aujourd'hui à… »).
+      await tx.pharmacy.update({ where: { id: params.scope.pharmacyId }, data: { stockSyncedAt: new Date() } });
     },
     { timeout: 120_000, maxWait: 10_000 },
   );
+
+  // Comprendre ce que l'officine vient d'importer, pour que le moteur puisse
+  // le proposer. Hors transaction : une classification qui échoue ne défait
+  // pas un import réussi — elle laisse des produits « à classer », visibles.
+  if (createdProductIds.length > 0) {
+    try {
+      outcome.classification = await classifyPharmacyProducts({ scope: params.scope, productIds: createdProductIds });
+    } catch (error) {
+      console.error(`[stock-import] classification des produits impossible : ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   await recordAudit({
     action: "product.imported",
@@ -447,6 +471,4 @@ async function inventoryInTx(
   });
 }
 
-export function tagsFromName(name: string): string[] {
-  return [...new Set(normalizeName(name).split(" ").filter((token) => token.length > 2))];
-}
+export { tagsFromName };

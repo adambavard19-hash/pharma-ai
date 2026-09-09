@@ -52,7 +52,7 @@ const SHORT_COURSE_MIN_DAYS = 3;
  * À partir de cette durée, l'échéance utile est le renouvellement.
  *
  * Le seuil porte sur la DURÉE PRESCRITE, qui est un fait lu sur l'ordonnance.
- * Pharma.ai ne déduit pas qu'un patient est « chronique » — ce serait un profil,
+ * PharmaBoost ne déduit pas qu'un patient est « chronique » — ce serait un profil,
  * et un rappel adossé à un profil n'est plus un suivi.
  */
 const LONG_COURSE_MIN_DAYS = 60;

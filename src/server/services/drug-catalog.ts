@@ -380,7 +380,7 @@ export async function listDrugStock(options: DrugStockListOptions): Promise<{
  * Ce que l'officine détient des médicaments PRESCRITS.
  *
  * C'est la question que le pharmacien se pose en premier — « est-ce que je
- * l'ai ? » — et à laquelle Pharma.ai ne savait pas répondre : le catalogue
+ * l'ai ? » — et à laquelle PharmaBoost ne savait pas répondre : le catalogue
  * national et le stock de l'officine existaient côte à côte sans se parler.
  *
  * La réponse porte sur la SPÉCIALITÉ, pas sur la boîte : une officine qui

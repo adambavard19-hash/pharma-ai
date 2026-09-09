@@ -10,7 +10,7 @@ import {
 } from "@/config/constants";
 
 /**
- * Session administrateur plateforme (éditeur de Pharma.ai).
+ * Session administrateur plateforme (éditeur de PharmaBoost).
  *
  * Volontairement SÉPARÉE de la session officine : un administrateur plateforme
  * n'obtient jamais de `TenantScope` et ne peut donc pas emprunter les chemins

@@ -17,6 +17,16 @@ import type {
 } from "../ports";
 import type { TreatmentExplanationResult } from "../types";
 import { RuleBasedAIProvider } from "./rule-based-ai";
+import {
+  PRODUCT_CLASSIFICATION_SCHEMA,
+  PRODUCT_CLASSIFICATION_SYSTEM_PROMPT,
+  PRODUCT_CLASSIFICATION_TOOL_NAME,
+  buildProductClassificationPrompt,
+  validateProductClassification,
+  type ClaimedProductClassification,
+  type ProductClassificationRequest,
+  type ProductClassificationResponse,
+} from "../../catalog/product-classification-schema";
 
 /**
  * La classification des médicaments par un modèle Anthropic.
@@ -83,6 +93,43 @@ export class AnthropicAIProvider implements AIProvider {
 
   writePatientReason(request: PatientReasonRequest): Promise<string> {
     return this.deterministic.writePatientReason(request);
+  }
+
+  async classifyProducts(request: ProductClassificationRequest): Promise<ProductClassificationResponse | null> {
+    if (request.products.length === 0) return null;
+
+    const startedAt = Date.now();
+    const response = await this.create({
+      model: this.config.model,
+      max_tokens: 80 * request.products.length + 200,
+      system: PRODUCT_CLASSIFICATION_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: buildProductClassificationPrompt(request) }],
+      tools: [
+        {
+          name: PRODUCT_CLASSIFICATION_TOOL_NAME,
+          description: "Enregistre la catégorie et les étiquettes d'usage de chaque produit.",
+          input_schema: PRODUCT_CLASSIFICATION_SCHEMA,
+          strict: true,
+        },
+      ],
+      tool_choice: { type: "tool", name: PRODUCT_CLASSIFICATION_TOOL_NAME },
+    });
+
+    const usage = {
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+      durationMs: Date.now() - startedAt,
+    };
+    const toolBlock = response.content.find((block) => block.type === "tool_use" && block.name === PRODUCT_CLASSIFICATION_TOOL_NAME);
+    if (!toolBlock || typeof toolBlock.input !== "object" || toolBlock.input === null) {
+      return { results: [], providerId: this.info.id, model: this.config.model, warnings: ["Le modèle n'a pas renseigné l'outil : aucun produit classé."], usage };
+    }
+    const { results, warnings } = validateProductClassification(toolBlock.input as ClaimedProductClassification, {
+      count: Math.max(...request.products.map((p) => p.index)) + 1,
+      providerId: this.info.id,
+      model: this.config.model,
+    });
+    return { results, providerId: this.info.id, model: this.config.model, warnings, usage };
   }
 
   async classifyDrugs(request: ClassificationRequest): Promise<ClassificationResult | null> {

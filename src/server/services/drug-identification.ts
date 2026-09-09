@@ -15,7 +15,7 @@ import {
  *
  * Le texte d'une ordonnance n'est pas une donnée : c'est une chaîne de
  * caractères. Tant qu'elle n'est pas rattachée à une spécialité connue,
- * Pharma.ai ne sait ni ce que contient le médicament, ni sous quelle forme il
+ * PharmaBoost ne sait ni ce que contient le médicament, ni sous quelle forme il
  * se présente, ni s'il relève d'une liste. Ce service fait ce rattachement — et
  * s'abstient de le faire dès qu'il y a un doute.
  */

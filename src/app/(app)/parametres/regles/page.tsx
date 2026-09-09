@@ -85,7 +85,7 @@ export default async function AdvicePage({
 
       <SectionHeader
         title="Règles de conseil"
-        description="Comment Pharma.ai identifie une opportunité, comment il la classe, et comment votre officine l'oriente."
+        description="Comment PharmaBoost identifie une opportunité, comment il la classe, et comment votre officine l'oriente."
       />
 
       <Grid cols={4}>

@@ -130,3 +130,34 @@ describe("rattachement", () => {
     });
   });
 });
+
+describe("colonnes supplémentaires : TVA, marque, catégorie", () => {
+  it("reconnaît les en-têtes d'un export officinal complet", async () => {
+    const { suggestMapping, parseVatRate, readRows } = await import("../index");
+    const mapping = suggestMapping(["Code produit", "Désignation", "Qte Stock", "PV TTC", "PA HT", "TVA", "Laboratoire", "Rayon"]);
+    expect(mapping).toEqual({
+      code: "Code produit",
+      name: "Désignation",
+      quantity: "Qte Stock",
+      salePrice: "PV TTC",
+      purchasePrice: "PA HT",
+      vatRate: "TVA",
+      brand: "Laboratoire",
+      category: "Rayon",
+    });
+    expect(parseVatRate("5,5 %")).toBe(5.5);
+    expect(parseVatRate(0.2)).toBe(20);
+    expect(parseVatRate("20")).toBe(20);
+    expect(parseVatRate("beaucoup")).toBeNull();
+
+    const rows = readRows([{ "Code produit": "3400934379444", Désignation: "ULTRA-LEVURE 100MG", "Qte Stock": "12", "PV TTC": "6,90", "PA HT": "4,10", TVA: "10", Laboratoire: "Biocodex", Rayon: "Digestion" }], mapping);
+    expect(rows[0]).toMatchObject({ code: "3400934379444", quantity: 12, salePriceCents: 690, purchasePriceCents: 410, vatRate: 10, brand: "Biocodex", categoryLabel: "Digestion" });
+  });
+
+  it("CIP13 seul + quantité suffisent quand la référence est identifiable", async () => {
+    const { suggestMapping, missingRequiredFields } = await import("../index");
+    const mapping = suggestMapping(["CIP13", "Quantité"]);
+    expect(mapping.code).toBe("CIP13");
+    expect(missingRequiredFields(mapping)).toEqual([]);
+  });
+});

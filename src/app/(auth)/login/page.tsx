@@ -45,7 +45,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             ✚
           </span>
           <p className="text-[17px] font-semibold tracking-[-0.01em]">
-            Pharma<span className="text-accent-300">.ai</span>
+            Pharma<span className="text-accent-300">Boost</span>
           </p>
         </div>
 
@@ -55,7 +55,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               Le copilote intelligent de l&apos;officine.
             </h1>
             <p className="text-[15px] leading-6 text-brand-100">
-              De l&apos;ordonnance au conseil personnalisé : Pharma.ai assiste votre
+              De l&apos;ordonnance au conseil personnalisé : PharmaBoost assiste votre
               équipe, structure l&apos;information remise au patient et mesure
               précisément ce que cela apporte à votre officine.
             </p>
@@ -77,7 +77,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </div>
 
         <p className="relative text-[12px] text-brand-300">
-          Pharma.ai est un outil d&apos;assistance. Il ne prescrit pas et ne se
+          PharmaBoost est un outil d&apos;assistance. Il ne prescrit pas et ne se
           substitue à aucun avis médical ou pharmaceutique.
         </p>
       </section>

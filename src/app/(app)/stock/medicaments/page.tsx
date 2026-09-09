@@ -93,7 +93,7 @@ export default async function DrugStockPage({
           Sans lui, aucun code-barres ne peut être reconnu : c&apos;est lui qui sait ce qu&apos;est
           la boîte que vous scannez. Chargez-le depuis{" "}
           <Link href="/parametres?onglet=moteur" className="underline">
-            Paramètres → Moteur Pharma.ai
+            Paramètres → Moteur PharmaBoost
           </Link>
           .
         </Alert>

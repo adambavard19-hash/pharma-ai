@@ -8,7 +8,7 @@
  * sert à l'analyse — jamais la seule devinette.
  */
 
-export type ImportField = "name" | "code" | "quantity" | "salePrice" | "purchasePrice";
+export type ImportField = "name" | "code" | "quantity" | "salePrice" | "purchasePrice" | "vatRate" | "brand" | "category";
 
 export type ColumnMapping = Partial<Record<ImportField, string>>;
 
@@ -18,17 +18,23 @@ export const FIELD_LABELS: Record<ImportField, string> = {
   quantity: "Quantité",
   salePrice: "Prix TTC",
   purchasePrice: "Prix d'achat",
+  vatRate: "TVA",
+  brand: "Marque / laboratoire",
+  category: "Catégorie / rayon",
 };
 
 /** Ce qui est indispensable pour importer une ligne. */
 export const REQUIRED_FIELDS: ImportField[] = ["quantity"];
 
 const HINTS: Record<ImportField, RegExp[]> = {
-  code: [/\bcip\b/i, /cip\s*13/i, /\bean\b/i, /code[\s_-]*barre/i, /^code$/i, /\bgtin\b/i, /^acl/i],
-  name: [/^nom/i, /d[ée]signation/i, /libell[ée]/i, /^produit/i, /^article/i, /^description/i, /^name$/i],
-  quantity: [/^qt[ée]/i, /quantit/i, /^stock/i, /^qty/i, /^quantity/i],
-  salePrice: [/prix.*ttc/i, /prix.*vente/i, /^pv/i, /^ttc/i, /^prix$/i, /^price/i, /vente/i],
-  purchasePrice: [/prix.*achat/i, /^pa\b/i, /^ht$/i, /achat/i, /^cost/i, /pamp/i],
+  code: [/\bcip\b/i, /cip\s*13/i, /cip\s*7/i, /\bean\b/i, /ean\s*13/i, /code[\s_-]*barre/i, /code[\s_-]*produit/i, /^code$/i, /\bgtin\b/i, /^acl/i, /gencod/i, /^ref(erence)?$/i],
+  name: [/^nom/i, /d[ée]signation/i, /libell[ée]/i, /^produit/i, /^article/i, /^description/i, /^name$/i, /^denomination/i],
+  quantity: [/^qt[ée]/i, /quantit/i, /^stock/i, /^qty/i, /^quantity/i, /en stock/i, /^qte/i],
+  salePrice: [/prix.*ttc/i, /prix.*vente/i, /^pv/i, /^ttc/i, /^prix$/i, /^price/i, /vente/i, /^pvc/i, /public/i],
+  purchasePrice: [/prix.*achat/i, /^pa\b/i, /^ht$/i, /achat/i, /^cost/i, /pamp/i, /^pa\s*ht/i],
+  vatRate: [/^tva/i, /taux.*tva/i, /\btva\b/i, /^vat/i],
+  brand: [/^marque/i, /laboratoire/i, /^labo/i, /fabricant/i, /^brand/i],
+  category: [/cat[ée]gorie/i, /^rayon/i, /^famille/i, /^classe/i, /^category/i],
 };
 
 export function normalizeHeader(value: string): string {
@@ -50,7 +56,7 @@ export function normalizeHeader(value: string): string {
 export function suggestMapping(headers: string[]): ColumnMapping {
   const mapping: ColumnMapping = {};
   const taken = new Set<string>();
-  const order: ImportField[] = ["code", "quantity", "purchasePrice", "salePrice", "name"];
+  const order: ImportField[] = ["code", "quantity", "purchasePrice", "vatRate", "salePrice", "name", "brand", "category"];
 
   for (const field of order) {
     const match = headers.find(

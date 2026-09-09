@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 /**
  * Indicateur clé. `emphasis="accent"` est réservé au chiffre d'affaires
- * généré grâce à Pharma.ai : c'est la métrique que le titulaire doit voir en
+ * généré grâce à PharmaBoost : c'est la métrique que le titulaire doit voir en
  * premier.
  */
 export function StatCard({

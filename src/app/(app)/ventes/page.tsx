@@ -69,7 +69,7 @@ export default async function SalesPage({
 
       <Grid cols={4}>
         <StatCard
-          label="CA généré grâce à Pharma.ai"
+          label="CA généré grâce à PharmaBoost"
           value={formatCents(summary.attributedCents)}
           sublabel={`marge ${formatCents(summary.attributedMarginCents)}`}
           delta={summary.attributedDelta}
@@ -119,7 +119,7 @@ export default async function SalesPage({
                 <TH>Produits</TH>
                 <TH>Ordonnance</TH>
                 <TH numeric>Total</TH>
-                <TH numeric>Dont Pharma.ai</TH>
+                <TH numeric>Dont PharmaBoost</TH>
                 <TH>Par</TH>
                 <TH>Date</TH>
               </TR>

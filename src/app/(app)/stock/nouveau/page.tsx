@@ -36,7 +36,7 @@ export default async function ProductFormPage({
 
       <PageHeader
         title={product ? "Modifier le produit" : "Nouveau produit"}
-        description="Les allégations et contre-indications renseignées ici encadrent ce que Pharma.ai peut proposer et afficher au patient."
+        description="Les allégations et contre-indications renseignées ici encadrent ce que PharmaBoost peut proposer et afficher au patient."
       />
 
       <Card>

@@ -1,7 +1,7 @@
 /**
  * Les interactions médicamenteuses.
  *
- * Règle unique et non négociable : Pharma.ai ne produit aucune interaction.
+ * Règle unique et non négociable : PharmaBoost ne produit aucune interaction.
  * Chaque couple vient d'un référentiel chargé par l'officine, avec son nom, sa
  * version et sa date. Ce qui n'est pas dans le fichier n'existe pas ici — rien
  * n'est déduit, complété, ni extrapolé.

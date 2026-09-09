@@ -1,5 +1,6 @@
 import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
+import { isEngineOutcome } from "@/core/ai/outcome";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
@@ -223,7 +224,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         candidates: proposals.get(line.id) ?? [],
         identificationRefusal: catalogLoaded
           ? (refusals.get(line.id) ?? null)
-          : "Aucun catalogue officiel n'est chargé dans Pharma.ai.",
+          : "Aucun catalogue officiel n'est chargé dans PharmaBoost.",
         strengthOptions: strengthOptions.get(line.id) ?? [],
         cisCode: line.specialty?.cisCode ?? null,
         };
@@ -291,6 +292,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                 question: recommendation.opportunity.question,
                 requiresConfirmation: recommendation.opportunity.requiresConfirmation,
                 answer: recommendation.opportunity.answer,
+                answeredAt: recommendation.opportunity.answeredAt?.toISOString() ?? null,
                 aiJustification: recommendation.opportunity.aiJustification,
                 confirmedReason: recommendation.opportunity.confirmedReason,
               }
@@ -338,6 +340,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         sell: session.permissions.has(PERMISSIONS.SALE_CREATE),
       }}
       hasSale={prescription.sales.length > 0}
+      outcome={isEngineOutcome(run?.outcome) ? run.outcome : null}
+      canImportStock={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
     />
   );
 }

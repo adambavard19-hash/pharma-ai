@@ -61,7 +61,7 @@ export async function createCollaboratorAction(
 
   // Une adresse déjà connue dans une AUTRE organisation ne dit rien de plus
   // qu'« indisponible » : confirmer son existence renseignerait sur la
-  // clientèle de Pharma.ai.
+  // clientèle de PharmaBoost.
   if (existing && existing.organizationId !== session.scope.organizationId) {
     return fail("Cette adresse e-mail n'est pas disponible.", {
       email: "Cette adresse e-mail n'est pas disponible.",

@@ -70,3 +70,38 @@ async function referenceExists(
       return (await prisma.product.count({ where: { pharmacyId, reference } })) > 0;
   }
 }
+
+/**
+ * Réserve `count` références distinctes d'un coup — pour un import qui crée
+ * des dizaines de produits avant qu'aucun ne soit écrit. Appeler
+ * `nextReference` en boucle rendrait la même référence à chaque fois, puisque
+ * le compteur ne bouge qu'à l'écriture.
+ */
+export async function reserveReferences(entity: Entity, pharmacyId: string, count: number): Promise<string[]> {
+  if (count <= 0) return [];
+  const prefix = PREFIXES[entity];
+  const existing = await (async () => {
+    switch (entity) {
+      case "patient":
+        return prisma.patient.findMany({ where: { pharmacyId }, select: { reference: true } });
+      case "prescription":
+        return prisma.prescription.findMany({ where: { pharmacyId }, select: { reference: true } });
+      case "sale":
+        return prisma.sale.findMany({ where: { pharmacyId }, select: { reference: true } });
+      case "product":
+        return prisma.product.findMany({ where: { pharmacyId }, select: { reference: true } });
+    }
+  })();
+  const taken = new Set(existing.map((row) => row.reference));
+  const reserved: string[] = [];
+  let sequence = existing.length + 1;
+  while (reserved.length < count) {
+    const candidate = `${prefix}-${String(sequence).padStart(4, "0")}`;
+    if (!taken.has(candidate)) {
+      reserved.push(candidate);
+      taken.add(candidate);
+    }
+    sequence += 1;
+  }
+  return reserved;
+}

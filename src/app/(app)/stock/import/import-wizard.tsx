@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { AlertTriangle, Check, FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import { AlertTriangle, Check, FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
 import {
   analyseStockImportAction,
   commitStockImportAction,
@@ -17,7 +17,7 @@ import { Select } from "@/components/ui/field";
 import { formatCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const FIELDS: ImportField[] = ["name", "code", "quantity", "salePrice", "purchasePrice"];
+const FIELDS: ImportField[] = ["code", "name", "quantity", "salePrice", "purchasePrice", "vatRate", "brand", "category"];
 
 const STATUS_LABELS: Record<ClassifiedRow["status"], string> = {
   MEDICAMENT: "Médicament reconnu",
@@ -35,17 +35,28 @@ const STATUS_LABELS: Record<ClassifiedRow["status"], string> = {
  * transaction. Aucune correspondance incertaine n'est validée en silence :
  * une ligne « à vérifier » sans décision est ignorée.
  */
-export function ImportWizard() {
+export function ImportWizard({ returnTo = "/stock" }: { returnTo?: string }) {
   const [fileName, setFileName] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
   const [decisions, setDecisions] = useState<Record<string, RowDecision>>({});
   const [createUnknown, setCreateUnknown] = useState(true);
+  const [showAnomalies, setShowAnomalies] = useState(false);
+  const [showColumns, setShowColumns] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const pickFile = (picked: File | null) => {
+    setFile(picked);
+    setFileName(picked?.name ?? null);
+  };
+
   const analyse = (formData: FormData) => {
     setError(null);
+    // Le fichier déposé par glisser-déposer n'est pas dans le champ : on le pose nous-mêmes.
+    if (file && !(formData.get("file") instanceof File && (formData.get("file") as File).size > 0)) formData.set("file", file);
     startTransition(async () => {
       const result = await analyseStockImportAction(formData);
       if (!result.ok) {
@@ -54,6 +65,8 @@ export function ImportWizard() {
       }
       setPreview(result.data);
       setDecisions({});
+      setShowAnomalies(false);
+      setShowColumns(result.data.missing.length > 0);
     });
   };
 
@@ -85,22 +98,44 @@ export function ImportWizard() {
   };
 
   if (outcome) {
+    const c = outcome.classification;
+    const understood = c ? c.fromCache + c.byHeuristic + c.byAi : 0;
     return (
       <Card>
-        <CardContent className="space-y-4 py-6">
-          <p className="flex items-center gap-2 text-[16px] font-semibold text-text-primary">
-            <Check className="size-5 text-success-600" />
-            Import terminé
-          </p>
+        <CardContent className="space-y-5 py-6">
+          <div>
+            <p className="text-[11.5px] font-semibold tracking-[0.08em] text-success-700 uppercase dark:text-success-400">Stock importé</p>
+            <p className="mt-1 flex items-center gap-2 text-[22px] font-semibold tracking-[-0.01em] text-text-primary">
+              <Check className="size-6 text-success-600" />
+              {outcome.drugsUpserted + outcome.productsUpdated + outcome.productsCreated} référence{outcome.drugsUpserted + outcome.productsUpdated + outcome.productsCreated > 1 ? "s" : ""} écrite{outcome.drugsUpserted + outcome.productsUpdated + outcome.productsCreated > 1 ? "s" : ""} dans votre stock
+            </p>
+          </div>
           <dl className="grid gap-3 sm:grid-cols-4">
-            <Stat label="Médicaments" value={outcome.drugsUpserted} />
-            <Stat label="Produits mis à jour" value={outcome.productsUpdated} />
-            <Stat label="Produits créés" value={outcome.productsCreated} />
-            <Stat label="Ignorés / invalides" value={`${outcome.ignored} / ${outcome.invalid}`} />
+            <Stat label="Médicaments (CIP)" value={outcome.drugsUpserted} tone="success" />
+            <Stat label="Produits mis à jour" value={outcome.productsUpdated} tone="success" />
+            <Stat label="Produits créés" value={outcome.productsCreated} tone="success" />
+            <Stat label="Ignorés / invalides" value={`${outcome.ignored} / ${outcome.invalid}`} tone={outcome.invalid > 0 ? "warning" : undefined} />
           </dl>
-          <Button asChild>
-            <Link href="/stock">Voir mon stock</Link>
-          </Button>
+          {c && c.considered > 0 && (
+            <div className="rounded-xl border border-border-subtle px-4 py-3 text-[13.5px]">
+              <p className="font-medium text-text-primary">
+                {understood} produit{understood > 1 ? "s" : ""} compris par le moteur sur {c.considered} créé{c.considered > 1 ? "s" : ""}
+                {c.byAi > 0 && ` (${c.byAi} avec l'aide du modèle)`}.
+              </p>
+              <p className="mt-0.5 text-text-secondary">
+                {c.withoutUsage > 0 && `${c.withoutUsage} rangé(s) sans usage de conseil identifié. `}
+                {c.unclassified > 0 && `${c.unclassified} restent à comprendre. `}
+                {c.remaining > 0 && `${c.remaining} n'ont pas encore été soumis au modèle : relancez depuis la page Stock. `}
+                {!c.aiAvailable && "Aucun modèle configuré : seul le dictionnaire a travaillé."}
+              </p>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link href={returnTo}>{returnTo.startsWith("/bienvenue") ? "Continuer l'accueil" : "Voir mon stock"}</Link>
+            </Button>
+            <Button variant="outline" onClick={() => { setOutcome(null); setPreview(null); pickFile(null); }}>Importer un autre fichier</Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -115,19 +150,28 @@ export function ImportWizard() {
             {error && <Alert tone="danger">{error}</Alert>}
             <label
               htmlFor="stock-file"
-              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border-default bg-surface-sunken/40 px-6 py-10 text-center transition-colors hover:border-brand-400 hover:bg-brand-50/40 dark:hover:bg-brand-950/30"
+              onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(false);
+                pickFile(event.dataTransfer.files?.[0] ?? null);
+              }}
+              className={cn(
+                "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
+                dragging ? "border-brand-500 bg-brand-50/60" : "border-border-default bg-surface-sunken/40 hover:border-brand-400 hover:bg-brand-50/40",
+              )}
             >
               <FileSpreadsheet className="size-7 text-text-tertiary" />
-              <span className="text-[13.5px] font-medium text-text-primary">{fileName ?? "Choisir un fichier CSV ou Excel"}</span>
-              <span className="text-[12px] text-text-tertiary">Colonnes attendues : nom, CIP/EAN, quantité, prix TTC, prix d&apos;achat (facultatif)</span>
+              <span className="text-[13.5px] font-medium text-text-primary">{fileName ?? "Glissez votre fichier ici, ou cliquez pour le choisir"}</span>
+              <span className="text-[12px] text-text-tertiary">CSV ou Excel. Colonnes reconnues : CIP/CIP13/EAN, désignation, quantité, prix de vente, prix d&apos;achat, TVA, marque, rayon.</span>
               <input
                 id="stock-file"
                 name="file"
                 type="file"
                 accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                required
                 className="sr-only"
-                onChange={(event) => setFileName(event.target.files?.[0]?.name ?? null)}
+                onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
               />
             </label>
             <Button type="submit" className="w-full" loading={pending} disabled={!fileName} leadingIcon={<Upload className="size-[18px]" />}>
@@ -140,14 +184,50 @@ export function ImportWizard() {
   }
 
   const { summary } = preview;
-  const attention = preview.rows.filter((row) => row.status !== "MEDICAMENT" && row.status !== "PRODUIT_EXISTANT" || row.issues.length > 0);
+  // Ce qui demande un regard : une piste à trancher, une ligne invalide, une
+  // anomalie signalée. Un produit simplement inconnu du catalogue national
+  // n'est pas une anomalie quand on a choisi de le créer : c'est de la
+  // parapharmacie, et c'est normal.
+  const attention = preview.rows.filter(
+    (row) => row.status === "A_VERIFIER" || row.status === "INVALIDE" || row.issues.length > 0 || (row.status === "NON_RECONNU" && !createUnknown),
+  );
+  const recognized = summary.medicaments + summary.existing + (createUnknown ? summary.unknown : 0);
+  const mappedCount = Object.values(preview.mapping).filter(Boolean).length;
 
   return (
     <div className="space-y-5">
       {error && <Alert tone="danger">{error}</Alert>}
 
-      <Card>
-        <CardHeader title="2. Les colonnes" description={`${preview.fileName} — dites à Pharma.ai quelle colonne contient quoi. La proposition vient des en-têtes ; corrigez si besoin.`} />
+      {preview.missing.length === 0 && (
+        <Card>
+          <CardContent className="space-y-5 py-6">
+            <div>
+              <p className="text-[11.5px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">Stock analysé</p>
+              <p className="mt-1 text-[22px] font-semibold tracking-[-0.01em] text-text-primary">{summary.detected} référence{summary.detected > 1 ? "s" : ""} détectée{summary.detected > 1 ? "s" : ""}</p>
+              <p className="mt-0.5 text-[13px] text-text-secondary">{preview.fileName} · {mappedCount} colonnes reconnues. Rien n&apos;est encore écrit dans votre stock.</p>
+            </div>
+            <ul className="grid gap-2 sm:grid-cols-3 text-[14px]">
+              <li className="flex items-center gap-2 rounded-xl border border-success-200 bg-success-50/40 px-3.5 py-3 dark:border-success-800 dark:bg-success-950/20"><Check className="size-4 text-success-600" /><span className="font-semibold tabular">{summary.medicaments + summary.existing}</span> reconnues{createUnknown && summary.unknown > 0 && <span className="text-[12px] text-text-tertiary">+ {summary.unknown} à créer</span>}</li>
+              <li className="flex items-center gap-2 rounded-xl border border-warning-200 bg-warning-50/40 px-3.5 py-3 dark:border-warning-800 dark:bg-warning-950/20"><AlertTriangle className="size-4 text-warning-700" /><span className="font-semibold tabular">{summary.toVerify}</span> à vérifier</li>
+              <li className="flex items-center gap-2 rounded-xl border border-border-subtle px-3.5 py-3"><X className="size-4 text-danger-600" /><span className="font-semibold tabular">{summary.invalid}</span> non exploitables{!createUnknown && summary.unknown > 0 && <span className="text-[12px] text-text-tertiary">+ {summary.unknown} non reconnues</span>}</li>
+            </ul>
+            <div className="flex flex-wrap items-center gap-2">
+              {attention.length > 0 && (
+                <Button variant="outline" onClick={() => setShowAnomalies((v) => !v)}>
+                  {showAnomalies ? "Masquer les anomalies" : `Corriger les anomalies (${attention.length})`}
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => setShowColumns((v) => !v)}>{showColumns ? "Masquer les colonnes" : "Vérifier les colonnes"}</Button>
+              <Button className="ml-auto" size="lg" onClick={commit} loading={pending} leadingIcon={pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-[18px]" />}>
+                Valider mon stock ({recognized} référence{recognized > 1 ? "s" : ""})
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {(showColumns || preview.missing.length > 0) && <Card>
+        <CardHeader title="Les colonnes" description={`${preview.fileName} — dites à PharmaBoost quelle colonne contient quoi. La proposition vient des en-têtes ; corrigez si besoin.`} />
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {FIELDS.map((field) => (
@@ -173,21 +253,13 @@ export function ImportWizard() {
             </Alert>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      {preview.missing.length === 0 && (
+      {preview.missing.length === 0 && showAnomalies && (
         <>
           <Card>
-            <CardHeader title="3. Aperçu avant validation" description="Rien n'est encore écrit dans votre stock." />
+            <CardHeader title="Anomalies à traiter" description="Seules les lignes qui demandent un regard. Les lignes reconnues n'apparaissent pas : elles n'ont pas besoin de vous." />
             <CardContent className="space-y-5">
-              <dl className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                <Stat label="Détectés" value={summary.detected} />
-                <Stat label="Médicaments" value={summary.medicaments} tone="success" />
-                <Stat label="Produits reconnus" value={summary.existing} tone="success" />
-                <Stat label="À vérifier" value={summary.toVerify} tone="warning" />
-                <Stat label="Non reconnus" value={summary.unknown} tone="warning" />
-                <Stat label="Invalides" value={summary.invalid} tone="danger" />
-              </dl>
 
               <label className="flex items-start gap-3 rounded-xl border border-border-subtle px-4 py-3 text-[13.5px]">
                 <input type="checkbox" checked={createUnknown} onChange={(event) => setCreateUnknown(event.target.checked)} className="mt-1 size-4" />
@@ -287,20 +359,18 @@ export function ImportWizard() {
             </CardContent>
           </Card>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-surface-card p-4">
-            <p className="text-[13.5px] text-text-secondary">
-              Tout s&apos;écrit en une fois. En cas d&apos;erreur, rien n&apos;est importé.
-            </p>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => { setPreview(null); setFileName(null); }} disabled={pending}>
-                Changer de fichier
-              </Button>
-              <Button onClick={commit} loading={pending} leadingIcon={pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-[18px]" />}>
-                Valider l&apos;import
-              </Button>
-            </div>
-          </div>
         </>
+      )}
+
+      {preview.missing.length === 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-surface-card p-4">
+          <p className="text-[13.5px] text-text-secondary">
+            Tout s&apos;écrit en une fois. En cas d&apos;erreur, rien n&apos;est importé.
+          </p>
+          <Button variant="ghost" onClick={() => { setPreview(null); pickFile(null); }} disabled={pending}>
+            Changer de fichier
+          </Button>
+        </div>
       )}
     </div>
   );

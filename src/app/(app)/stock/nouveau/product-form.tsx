@@ -134,7 +134,7 @@ export function ProductForm({ product }: { product?: ProductInput }) {
             Conseil et sécurité
           </h2>
           <p className="text-[12.5px] text-text-secondary">
-            Ces informations gouvernent ce que Pharma.ai peut proposer et écrire au patient.
+            Ces informations gouvernent ce que PharmaBoost peut proposer et écrire au patient.
             Une ligne par élément.
           </p>
         </div>

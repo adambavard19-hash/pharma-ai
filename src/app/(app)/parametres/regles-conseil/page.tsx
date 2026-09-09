@@ -31,7 +31,7 @@ export default async function AdviceRulesRegistryPage() {
     <div className="space-y-6">
       <PageHeader
         title="Règles du moteur de conseil"
-        description="Ce que Pharma.ai peut proposer au comptoir, règle par règle : déclencheur, proposition, justification, version et validation."
+        description="Ce que PharmaBoost peut proposer au comptoir, règle par règle : déclencheur, proposition, justification, version et validation."
       />
       <SettingsTabs
         canSeeTeam={session.permissions.has(PERMISSIONS.TEAM_MANAGE)}

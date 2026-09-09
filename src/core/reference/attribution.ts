@@ -17,7 +17,7 @@ export const BDPM_SOURCE = {
   downloadUrl: "https://base-donnees-publique.medicaments.gouv.fr/telechargement",
   /**
    * Publiée par l'ANSM, la HAS et l'UNCAM. On les nomme parce que c'est exact ;
-   * jamais d'une façon qui laisserait croire qu'ils cautionnent Pharma.ai.
+   * jamais d'une façon qui laisserait croire qu'ils cautionnent PharmaBoost.
    * Formulation figée : « l'HAS » serait fautif.
    */
   publishersLabel: "l'ANSM, la HAS et l'UNCAM",

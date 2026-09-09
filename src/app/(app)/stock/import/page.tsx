@@ -19,8 +19,10 @@ export const metadata: Metadata = { title: "Importer mon stock" };
  * Rien n'est écrit avant l'aperçu : le titulaire voit ce qui est reconnu, ce
  * qui demande une décision, ce qui est invalide, puis valide en une fois.
  */
-export default async function StockImportPage() {
+export default async function StockImportPage({ searchParams }: { searchParams: Promise<{ retour?: string }> }) {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  const { retour } = await searchParams;
+  const returnTo = retour === "bienvenue" ? "/bienvenue?etape=3" : "/stock";
 
   const jobs = await prisma.importJob.findMany({
     where: { pharmacyId: session.scope.pharmacyId, kind: { in: ["STOCK", "PRODUCTS"] }, status: { not: "PENDING" } },
@@ -32,15 +34,15 @@ export default async function StockImportPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
-        <Link href="/stock">Retour au stock</Link>
+        <Link href={retour === "bienvenue" ? "/bienvenue?etape=2" : "/stock"}>{retour === "bienvenue" ? "Retour à l'accueil" : "Retour au stock"}</Link>
       </Button>
 
       <PageHeader
         title="Importer mon stock"
-        description="Déposez l'export de votre logiciel (CSV ou Excel). Pharma.ai reconnaît les colonnes et les produits, vous vérifiez, puis vous validez."
+        description="Déposez l'export de votre logiciel (CSV ou Excel). PharmaBoost reconnaît les colonnes et les produits, vous vérifiez, puis vous validez."
       />
 
-      <ImportWizard />
+      <ImportWizard returnTo={returnTo} />
 
       {jobs.length > 0 && (
         <Card>

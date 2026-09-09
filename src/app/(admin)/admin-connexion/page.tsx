@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getPlatformSession } from "@/server/auth/platform-session";
 import { PlatformLoginForm } from "./form";
 
-export const metadata: Metadata = { title: "Administration Pharma.ai" };
+export const metadata: Metadata = { title: "Administration PharmaBoost" };
 
 export default async function PlatformLoginPage({ searchParams }: { searchParams: Promise<{ defini?: string }> }) {
   const session = await getPlatformSession();
@@ -18,7 +18,7 @@ export default async function PlatformLoginPage({ searchParams }: { searchParams
             ✚
           </span>
           <h1 className="text-[19px] font-semibold text-ink-50">
-            Administration Pharma.ai
+            Administration PharmaBoost
           </h1>
           <p className="text-[13px] leading-5 text-ink-400">
             Espace réservé à l&apos;éditeur du logiciel. Aucun accès aux données médicales des

@@ -17,29 +17,47 @@ export const metadata: Metadata = { title: "Officines clientes" };
 /**
  * Les officines clientes.
  *
- * Uniquement des faits de compte : nom, titulaire, effectif, statut, date de
- * signature. Aucune donnée d'exploitation — ni patients, ni ventes, ni stock.
+ * Uniquement des faits de compte et d'installation : titulaire, effectif,
+ * accueil terminé, stock importé (effectif et date, jamais le contenu), état du
+ * moteur, abonnement. Aucune donnée médicale.
  */
 export default async function ClientPharmaciesPage() {
   await requirePlatformSession();
 
-  const pharmacies = await prisma.pharmacy.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      city: true,
-      isActive: true,
-      createdAt: true,
-      memberships: {
-        where: { isActive: true },
-        select: {
-          role: true,
-          user: { select: { firstName: true, lastName: true, email: true } },
+  const [pharmacies, unclassifiedByPharmacy] = await Promise.all([
+    prisma.pharmacy.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        city: true,
+        isActive: true,
+        createdAt: true,
+        onboardingCompletedAt: true,
+        stockSyncedAt: true,
+        memberships: {
+          where: { isActive: true },
+          select: {
+            role: true,
+            user: { select: { firstName: true, lastName: true, email: true, lastLoginAt: true } },
+          },
         },
+        // Des comptes, jamais des données médicales : des effectifs et des dates.
+        _count: { select: { products: true, drugStocks: true, prescriptions: true, analysisRuns: true } },
+        analysisRuns: { orderBy: { startedAt: "desc" }, take: 1, select: { status: true, outcome: true, startedAt: true } },
+        organization: { select: { subscription: { select: { status: true, plan: { select: { name: true } } } } } },
       },
-    },
-  });
+    }),
+    prisma.product.groupBy({ by: ["pharmacyId"], where: { deletedAt: null, classifiedAt: null }, _count: true }),
+  ]);
+  const anomaliesOf = (pharmacyId: string) => unclassifiedByPharmacy.find((row) => row.pharmacyId === pharmacyId)?._count ?? 0;
+  const engineLabel = (run: { status: string; outcome: string | null } | undefined) => {
+    if (!run) return { label: "Jamais sollicité", tone: "neutral" as const };
+    if (run.status === "FAILED" || run.outcome === "ENGINE_ERROR") return { label: "En erreur", tone: "danger" as const };
+    if (run.outcome === "AI_UNAVAILABLE") return { label: "IA indisponible", tone: "warning" as const };
+    if (run.outcome === "STOCK_NOT_CONFIGURED") return { label: "Sans stock", tone: "warning" as const };
+    return { label: "Opérationnel", tone: "success" as const };
+  };
 
   return (
     <>
@@ -97,6 +115,13 @@ export default async function ClientPharmaciesPage() {
                     {collaborators.length} collaborateur{collaborators.length > 1 ? "s" : ""} ·
                     créée le {formatDate(pharmacy.createdAt)}
                   </p>
+                  <p className="mt-1.5 flex flex-wrap gap-1.5">
+                    <Badge tone={pharmacy.onboardingCompletedAt ? "success" : "warning"}>{pharmacy.onboardingCompletedAt ? "Accueil terminé" : "Accueil en cours"}</Badge>
+                    <Badge tone={pharmacy.stockSyncedAt ? "success" : "warning"}>
+                      {pharmacy.stockSyncedAt ? `${pharmacy._count.products + pharmacy._count.drugStocks} réf. · sync. ${formatDate(pharmacy.stockSyncedAt)}` : "Stock jamais importé"}
+                    </Badge>
+                    <Badge tone={engineLabel(pharmacy.analysisRuns[0]).tone}>Moteur : {engineLabel(pharmacy.analysisRuns[0]).label}</Badge>
+                  </p>
 
                   <div className="mt-3 flex items-center gap-2 border-t border-border-subtle pt-3">
                     <StatusToggle pharmacyId={pharmacy.id} isActive={pharmacy.isActive} />
@@ -119,16 +144,18 @@ export default async function ClientPharmaciesPage() {
               <TR>
                 <TH>Officine</TH>
                 <TH>Titulaire</TH>
-                <TH numeric>Collaborateurs</TH>
+                <TH numeric>Équipe</TH>
+                <TH>Accueil</TH>
+                <TH>Stock</TH>
+                <TH>Moteur</TH>
+                <TH>Abonnement</TH>
                 <TH>Statut</TH>
-                <TH>Créée le</TH>
                 <TH />
               </TR>
             </THead>
             <TBody>
               {pharmacies.map((pharmacy) => {
                 const owner = pharmacy.memberships.find((m) => m.role === "OWNER");
-                const collaborators = pharmacy.memberships.filter((m) => m.role !== "OWNER");
 
                 return (
                   <TR key={pharmacy.id}>
@@ -159,13 +186,57 @@ export default async function ClientPharmaciesPage() {
                         <Badge tone="warning">Aucun titulaire</Badge>
                       )}
                     </TD>
-                    <TD numeric>{collaborators.length}</TD>
+                    <TD numeric>{pharmacy.memberships.length}</TD>
+                    <TD>
+                      <Badge tone={pharmacy.onboardingCompletedAt ? "success" : "warning"}>
+                        {pharmacy.onboardingCompletedAt ? "Terminé" : "En cours"}
+                      </Badge>
+                    </TD>
+                    <TD>
+                      {pharmacy.stockSyncedAt ? (
+                        <>
+                          <span className="block text-[13px] text-text-primary tabular">
+                            {pharmacy._count.products + pharmacy._count.drugStocks} réf.
+                            {anomaliesOf(pharmacy.id) > 0 && (
+                              <span className="text-warning-700"> · {anomaliesOf(pharmacy.id)} à classer</span>
+                            )}
+                          </span>
+                          <span className="block text-[12px] text-text-tertiary">sync. {formatDate(pharmacy.stockSyncedAt)}</span>
+                        </>
+                      ) : (
+                        <Badge tone="warning">Jamais importé</Badge>
+                      )}
+                    </TD>
+                    <TD>
+                      {(() => {
+                        const engine = engineLabel(pharmacy.analysisRuns[0]);
+                        return (
+                          <>
+                            <Badge tone={engine.tone}>{engine.label}</Badge>
+                            <span className="mt-1 block text-[12px] text-text-tertiary">
+                              {pharmacy._count.analysisRuns} analyse{pharmacy._count.analysisRuns > 1 ? "s" : ""}
+                              {pharmacy.analysisRuns[0] && ` · ${formatDate(pharmacy.analysisRuns[0].startedAt)}`}
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </TD>
+                    <TD>
+                      {pharmacy.organization.subscription ? (
+                        <>
+                          <span className="block text-[13px] text-text-primary">{pharmacy.organization.subscription.plan.name}</span>
+                          <span className="block text-[12px] text-text-tertiary">{pharmacy.organization.subscription.status.toLowerCase()}</span>
+                        </>
+                      ) : (
+                        <span className="text-[12px] text-text-tertiary">—</span>
+                      )}
+                    </TD>
                     <TD>
                       <Badge tone={pharmacy.isActive ? "success" : "neutral"}>
                         {pharmacy.isActive ? "Active" : "Suspendue"}
                       </Badge>
+                      <span className="mt-1 block text-[12px] text-text-tertiary">créée le {formatDate(pharmacy.createdAt)}</span>
                     </TD>
-                    <TD>{formatDate(pharmacy.createdAt)}</TD>
                     <TD>
                       <span className="flex items-center justify-end gap-1">
                         <StatusToggle pharmacyId={pharmacy.id} isActive={pharmacy.isActive} />

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Boxes, Clock, PackageX, Plus, Upload } from "lucide-react";
+import { AlertTriangle, Boxes, Clock, History, PackageX, Plus, RefreshCw, Upload } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ClassifyProductsButton } from "./classify-button";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
@@ -41,7 +43,7 @@ export default async function StockPage({
   const canManage = session.permissions.has(PERMISSIONS.PRODUCT_MANAGE);
   const canImport = session.permissions.has(PERMISSIONS.PRODUCT_IMPORT);
 
-  const [products, drugLines, lastMovement, lastImport] = await Promise.all([
+  const [products, drugLines, lastMovement, lastImport, pharmacy, unclassified] = await Promise.all([
     prisma.product.findMany({
       where: {
         pharmacyId,
@@ -103,7 +105,13 @@ export default async function StockPage({
       orderBy: { finishedAt: "desc" },
       select: { finishedAt: true, fileName: true },
     }),
+    prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true } }),
+    // Les produits que le moteur ne sait pas encore relier à un besoin.
+    prisma.product.count({ where: { pharmacyId, deletedAt: null, classifiedAt: null } }),
   ]);
+  const syncedAt = pharmacy?.stockSyncedAt ?? lastImport?.finishedAt ?? null;
+  const zeroPrice = products.filter((product) => product.isActive && product.salePriceCents <= 0).length;
+  const anomalies = unclassified + zeroPrice;
 
   const rows: StockRow[] = [
     ...products.map((product) => ({
@@ -169,31 +177,61 @@ export default async function StockPage({
     <div className="space-y-6">
       <PageHeader
         title="Stock de mon officine"
-        description="Ce que vous avez réellement en rayon, en quelle quantité et à quel prix. Pharma.ai ne propose jamais un produit absent de cette liste."
+        description="Ce que vous avez réellement en rayon, en quelle quantité et à quel prix. PharmaBoost ne propose jamais un produit absent de cette liste."
         actions={
           <div className="flex flex-wrap gap-2">
             {canImport && (
-              <Button asChild variant="outline" leadingIcon={<Upload className="size-[18px]" />}>
-                <Link href="/stock/import">Importer mon stock</Link>
+              <Button asChild variant={syncedAt ? "outline" : "primary"} leadingIcon={<Upload className="size-[18px]" />}>
+                <Link href="/stock/import">{syncedAt ? "Mettre à jour mon stock" : "Importer mon stock"}</Link>
               </Button>
             )}
             {(canManage || canAdjust) && (
-              <Button asChild leadingIcon={<Plus className="size-[18px]" />}>
+              <Button asChild variant={syncedAt ? "primary" : "outline"} leadingIcon={<Plus className="size-[18px]" />}>
                 <Link href="/stock/ajouter">Ajouter un produit</Link>
               </Button>
             )}
+            <Button asChild variant="ghost" leadingIcon={<History className="size-[18px]" />}>
+              <Link href="/stock/historique">Historique</Link>
+            </Button>
           </div>
         }
       />
 
+      {/* L'état de synchronisation, en une ligne : c'est la première question
+          du titulaire, et c'est ce qui conditionne ce que le comptoir propose. */}
+      <div
+        className={cn(
+          "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-[13.5px]",
+          syncedAt ? "border-border-subtle bg-surface-card" : "border-warning-300 bg-warning-50/50 dark:border-warning-800 dark:bg-warning-950/20",
+        )}
+      >
+        <p className="flex items-center gap-2 text-text-primary">
+          {syncedAt ? <RefreshCw className="size-4 text-success-600" /> : <AlertTriangle className="size-4 text-warning-700 dark:text-warning-400" />}
+          {syncedAt ? (
+            <>
+              <span className="font-medium">Stock synchronisé le {formatDateTime(syncedAt)}</span>
+              <span className="text-text-tertiary">· {rows.length} référence{rows.length > 1 ? "s" : ""} · import de fichier</span>
+            </>
+          ) : (
+            <span className="font-medium">Stock jamais importé — le comptoir ne peut rien proposer de votre rayon.</span>
+          )}
+        </p>
+        {unclassified > 0 && canManage && <ClassifyProductsButton pending={unclassified} />}
+      </div>
+
       <Grid cols={4}>
-        <StatCard label="Produits en stock" value={counts.inStock} sublabel="disponibles au conseil" icon={<Boxes className="size-4" />} emphasis="brand" />
-        <StatCard label="Ruptures" value={counts.out} sublabel={counts.out > 0 ? "jamais proposés" : "aucune rupture"} icon={<PackageX className="size-4" />} />
-        <StatCard label="Stock faible" value={counts.low} sublabel="sous le seuil d'alerte" icon={<AlertTriangle className="size-4" />} />
+        <StatCard label="Références" value={rows.length} sublabel={`${counts.inStock} en stock`} icon={<Boxes className="size-4" />} emphasis="brand" />
+        <StatCard label="Ruptures" value={counts.out} sublabel={counts.out > 0 ? "jamais proposées" : "aucune rupture"} icon={<PackageX className="size-4" />} />
+        <StatCard
+          label="Anomalies"
+          value={anomalies}
+          sublabel={anomalies === 0 ? "rien à corriger" : [unclassified > 0 ? `${unclassified} à comprendre` : null, zeroPrice > 0 ? `${zeroPrice} sans prix` : null].filter(Boolean).join(" · ")}
+          icon={<AlertTriangle className="size-4" />}
+        />
         <StatCard
           label="Dernière mise à jour"
           value={lastUpdate ? formatDateTime(lastUpdate) : "—"}
-          sublabel={lastImport ? `Import : ${lastImport.fileName}` : "aucun import"}
+          sublabel={lastImport ? `Import : ${lastImport.fileName}` : counts.low > 0 ? `${counts.low} en stock faible` : "aucun import"}
           icon={<Clock className="size-4" />}
         />
       </Grid>

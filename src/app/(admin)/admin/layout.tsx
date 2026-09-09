@@ -25,7 +25,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             </span>
             <span>
               <span className="block text-[14px] leading-4 font-semibold text-text-primary">
-                Pharma.ai
+                PharmaBoost
               </span>
               <span className="block text-[11.5px] text-text-tertiary">Console éditeur</span>
             </span>

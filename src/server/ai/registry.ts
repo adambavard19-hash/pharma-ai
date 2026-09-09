@@ -173,7 +173,7 @@ export type ProviderSnapshot = {
   anySimulated: boolean;
 };
 
-/** État des fournisseurs, affiché dans Paramètres → Moteur Pharma.ai. */
+/** État des fournisseurs, affiché dans Paramètres → Moteur PharmaBoost. */
 export function getProviderSnapshot(): ProviderSnapshot {
   const infos = {
     ocr: getOCRProvider().info,

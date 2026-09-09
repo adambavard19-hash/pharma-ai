@@ -35,8 +35,30 @@ export type ImportRow = {
   quantity: number | null;
   salePriceCents: number | null;
   purchasePriceCents: number | null;
+  /** Taux de TVA en points (5.5, 10, 20), quand la colonne existe et se lit. */
+  vatRate: number | null;
+  brand: string | null;
+  /** La catégorie ou le rayon tel qu'écrit par le logiciel de l'officine. */
+  categoryLabel: string | null;
   issues: ImportIssue[];
 };
+
+/** « 5,5 », « 5.5 % », « 20% », 0.2 → 5.5 / 20. Illisible → null, sans anomalie : la TVA est facultative. */
+export function parseVatRate(raw: unknown): number | null {
+  if (raw === null || raw === undefined) return null;
+  let value: number;
+  if (typeof raw === "number") value = raw;
+  else {
+    const text = String(raw).replace(/[%\s]/g, "").replace(",", ".");
+    if (text === "") return null;
+    value = Number(text);
+  }
+  if (!Number.isFinite(value) || value < 0) return null;
+  // Un taux écrit en fraction (0.2) ou en points (20) : on ramène en points.
+  if (value > 0 && value < 1) value = value * 100;
+  if (value > 100) return null;
+  return Math.round(value * 100) / 100;
+}
 
 export function parseQuantity(raw: unknown): { value: number | null; issue: ImportIssue | null } {
   if (raw === null || raw === undefined) return { value: null, issue: "QUANTITE_INVALIDE" };
@@ -99,6 +121,11 @@ export function readRows(
     const purchase = mapping.purchasePrice
       ? parsePriceCents(record[mapping.purchasePrice])
       : { value: null, issue: null };
+    const text = (field: keyof ColumnMapping) => {
+      const column = mapping[field];
+      const raw = column ? record[column] : null;
+      return raw !== null && raw !== undefined ? String(raw).trim() || null : null;
+    };
 
     rows.push({
       line: index + 1,
@@ -107,6 +134,9 @@ export function readRows(
       quantity: quantity.value,
       salePriceCents: sale.value,
       purchasePriceCents: purchase.issue ? null : purchase.value,
+      vatRate: mapping.vatRate ? parseVatRate(record[mapping.vatRate]) : null,
+      brand: text("brand"),
+      categoryLabel: text("category"),
       issues,
     });
   });
@@ -135,6 +165,9 @@ export function mergeDuplicates(rows: ImportRow[]): ImportRow[] {
       if (!existing.issues.includes("DOUBLON")) existing.issues.push("DOUBLON");
       existing.salePriceCents = existing.salePriceCents ?? row.salePriceCents;
       existing.purchasePriceCents = existing.purchasePriceCents ?? row.purchasePriceCents;
+      existing.vatRate = existing.vatRate ?? row.vatRate;
+      existing.brand = existing.brand ?? row.brand;
+      existing.categoryLabel = existing.categoryLabel ?? row.categoryLabel;
       existing.name = existing.name ?? row.name;
       continue;
     }

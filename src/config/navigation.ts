@@ -11,7 +11,7 @@ import {
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 
 /**
- * La navigation de Pharma.ai.
+ * La navigation de PharmaBoost.
  *
  * Elle décrit le travail au comptoir, dans l'ordre où il se fait — on reçoit
  * une ordonnance, on a une minute. L'ancienne navigation décrivait les objets

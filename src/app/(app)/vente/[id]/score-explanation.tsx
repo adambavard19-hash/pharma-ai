@@ -2,7 +2,7 @@ import { Progress } from "@/components/ui/feedback";
 import type { ScoreContribution } from "@/core/ai/types";
 
 /**
- * « Pourquoi Pharma.ai me propose ce produit ? »
+ * « Pourquoi PharmaBoost me propose ce produit ? »
  *
  * Le score n'est pas une boîte noire : chaque dimension est affichée avec sa
  * valeur, son poids et le détail qui l'a produite. Le poids indique aussi

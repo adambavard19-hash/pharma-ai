@@ -1,0 +1,128 @@
+
+> pharma-ai@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://172.20.10.6:3000
+- Environments: .env.local, .env
+✓ Ready in 214ms
+✓ Running next.config.ts took 18ms
+- Experiments (use with caution):
+  ✓ authInterrupts
+  · serverActions
+
+ GET / 307 in 935ms (next.js: 598ms, application-code: 337ms)
+ GET /login 200 in 88ms (next.js: 22ms, application-code: 67ms)
+ GET /api/sante 200 in 261ms (next.js: 220ms, application-code: 41ms)
+ GET /bienvenue 200 in 683ms (next.js: 370ms, application-code: 313ms)
+ GET / 307 in 105ms (next.js: 9ms, application-code: 96ms)
+ GET /bienvenue 200 in 75ms (next.js: 3ms, application-code: 73ms)
+ GET /login 200 in 61ms (next.js: 18ms, application-code: 43ms)
+ POST /login 200 in 74ms (next.js: 1.5ms, application-code: 73ms)
+  └─ ƒ loginAction(null, {}) in 67ms src/server/actions/auth.ts
+ GET /mot-de-passe/YdZVRLqpr6JsG-Wx0KZAcua_PqHwHQ9BaLPQm79oeXw 200 in 385ms (next.js: 341ms, application-code: 44ms)
+ GET /login?defini=1 200 in 20ms (next.js: 1.1ms, application-code: 19ms)
+ POST /mot-de-passe/YdZVRLqpr6JsG-Wx0KZAcua_PqHwHQ9BaLPQm79oeXw 200 in 100ms (next.js: 4ms, application-code: 96ms)
+  └─ ƒ setUserPasswordAction(null, {}) in 69ms src/server/actions/auth.ts
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET / 307 in 41ms (next.js: 5ms, application-code: 36ms)
+ GET /login 200 in 40ms (next.js: 1.0ms, application-code: 39ms)
+ GET /login 200 in 53ms (next.js: 3ms, application-code: 50ms)
+ GET / 200 in 32ms (next.js: 0.9ms, application-code: 31ms)
+ POST /login 200 in 114ms (next.js: 1.3ms, application-code: 113ms)
+  └─ ƒ loginAction(null, {}) in 76ms src/server/actions/auth.ts
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET /bienvenue 200 in 46ms (next.js: 1.1ms, application-code: 44ms)
+ GET /bienvenue 200 in 48ms (next.js: 1.9ms, application-code: 46ms)
+ GET /bienvenue 200 in 46ms (next.js: 3ms, application-code: 43ms)
+ GET /bienvenue?etape=2 200 in 40ms (next.js: 3ms, application-code: 37ms)
+ GET /stock/import?retour=bienvenue 200 in 123ms (next.js: 22ms, application-code: 101ms)
+ POST /stock/import?retour=bienvenue 200 in 36ms (next.js: 1.1ms, application-code: 35ms)
+  └─ ƒ analyseStockImportAction({}) in 25ms src/server/actions/stock-import.ts
+prisma:error 
+Invalid `prisma.product.create()` invocation:
+
+
+Unique constraint failed on the constraint: `products_pharmacyId_reference_key`
+ POST /stock/import?retour=bienvenue 200 in 55ms (next.js: 1.1ms, application-code: 54ms)
+  └─ ƒ commitStockImportAction({"createUnknownByDefault":true,"decisions":{},"jobId":"cmttb2jeq0004zoshzco2y622"}) in 52ms src/server/actions/stock-import.ts
+ GET /stock/import?retour=bienvenue 200 in 81ms (next.js: 4ms, application-code: 77ms)
+ GET /stock/import?retour=bienvenue 200 in 92ms (next.js: 1.8ms, application-code: 91ms)
+ POST /stock/import?retour=bienvenue 200 in 25ms (next.js: 1.7ms, application-code: 24ms)
+  └─ ƒ analyseStockImportAction({}) in 17ms src/server/actions/stock-import.ts
+ POST /stock/import?retour=bienvenue 200 in 8.4s (next.js: 3ms, application-code: 8.4s)
+  └─ ƒ commitStockImportAction({"createUnknownByDefault":true,"decisions":{},"jobId":"cmttb53d9000bzosh1davs2mq"}) in 8394ms src/server/actions/stock-import.ts
+ GET /bienvenue?etape=3 200 in 123ms (next.js: 9ms, application-code: 114ms)
+ GET /bienvenue?etape=5 200 in 81ms (next.js: 1.1ms, application-code: 80ms)
+ GET /vente/nouvelle 200 in 66ms (next.js: 21ms, application-code: 44ms)
+ POST /bienvenue?etape=5 200 in 86ms (next.js: 1.9ms, application-code: 84ms)
+  └─ ƒ completeOnboardingAction() in 12ms src/server/actions/onboarding.ts
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET /vente/nouvelle 200 in 43ms (next.js: 3ms, application-code: 40ms)
+ GET /vente/nouvelle 200 in 98ms (next.js: 9ms, application-code: 89ms)
+[ordonnances] transfert reçu — 75819 octets en 1 ms.
+[ordonnances] image réduite pour lecture — 75819 → 63136 octets.
+[ordonnances] durées — stockage 2 ms, préparation 15 ms, lecture 13088 ms (total depuis réception 13103 ms).
+[ordonnances] lecture par anthropic:claude-opus-5 en 13104 ms — 4 ligne(s) rendue(s), 4 retenue(s), patient « M. Jean TESTEUR », confiance 0.96.
+ POST /api/ordonnances/depot 200 in 13.3s (next.js: 58ms, application-code: 13.2s)
+[classification] préchauffage — 4 nom(s), 0 déjà connu(s), 5532 ms (appel 5509 ms).
+ GET /login 200 in 293ms (next.js: 195ms, application-code: 98ms)
+ POST /vente/nouvelle 200 in 480ms (next.js: 52ms, application-code: 428ms)
+  └─ ƒ createPrescriptionAction(null, {}) in 8ms src/server/actions/prescriptions.ts
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET /login 200 in 58ms (next.js: 3ms, application-code: 56ms)
+ GET / 200 in 137ms (next.js: 98ms, application-code: 39ms)
+ POST /login 200 in 227ms (next.js: 1.2ms, application-code: 226ms)
+  └─ ƒ loginAction(null, {}) in 84ms src/server/actions/auth.ts
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET /vente/nouvelle 200 in 169ms (next.js: 1.6ms, application-code: 167ms)
+ GET /vente/nouvelle 200 in 188ms (next.js: 3ms, application-code: 185ms)
+ GET /vente/nouvelle 200 in 223ms (next.js: 2ms, application-code: 221ms)
+[ordonnances] transfert reçu — 75819 octets en 1 ms.
+[ordonnances] image réduite pour lecture — 75819 → 63136 octets.
+[ordonnances] durées — stockage 1 ms, préparation 32 ms, lecture 9738 ms (total depuis réception 9770 ms).
+[ordonnances] lecture par anthropic:claude-opus-5 en 9771 ms — 2 ligne(s) rendue(s), 2 retenue(s), patient « M. Jean TESTEUR », confiance 0.98.
+ POST /api/ordonnances/depot 200 in 9.8s (next.js: 3ms, application-code: 9.8s)
+[classification] préchauffage — 2 nom(s), 2 déjà connu(s), 5 ms.
+ GET /vente/nouvelle 200 in 43ms (next.js: 1.1ms, application-code: 42ms)
+ GET /vente/nouvelle 200 in 42ms (next.js: 1.1ms, application-code: 41ms)
+ POST /vente/nouvelle 200 in 96ms (next.js: 1.3ms, application-code: 95ms)
+  └─ ƒ createPrescriptionAction(null, {}) in 63ms src/server/actions/prescriptions.ts
+ GET /vente/cmtu25zs1004tzosh0xeracgi 200 in 333ms (next.js: 2ms, application-code: 331ms)
+ GET /vente/cmtu25zs1004tzosh0xeracgi 200 in 1441ms (next.js: 1085ms, application-code: 357ms)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ POST /vente/cmtu25zs1004tzosh0xeracgi 200 in 169ms (next.js: 3ms, application-code: 166ms)
+  └─ ƒ verifyPrescriptionAction({"lines":["[Object]","[Object]"],"patientId":null,"prescribedAt":"2026-09-08","...":"3 items not stringified"}) in 34ms src/server/actions/prescriptions.ts
+[analysis] ORD-0001 en 180 ms — chargement 138 ms, comprehension 1 ms, moteur 5 ms, enregistrement 36 ms — compréhension 2/2 en cache — 2 recommandation(s).
+ POST /api/ordonnances/cmtu25zs1004tzosh0xeracgi/analyse 200 in 941ms (next.js: 741ms, application-code: 200ms)
+ GET /vente/cmtu25zs1004tzosh0xeracgi 200 in 65ms (next.js: 3ms, application-code: 62ms)
+ POST /vente/cmtu25zs1004tzosh0xeracgi 200 in 114ms (next.js: 8ms, application-code: 106ms)
+  └─ ƒ acceptRecommendationAction("cmtu26o5v0058zoshnm0erppf") in 27ms src/server/actions/recommendations.ts
+ POST /vente/cmtu25zs1004tzosh0xeracgi 200 in 127ms (next.js: 4ms, application-code: 122ms)
+  └─ ƒ answerOpportunityAction({"answer":true,"opportunityId":"cmtu26o5d0055zosh6qplde7o"}) in 48ms src/server/actions/opportunities.ts
+ POST /vente/cmtu25zs1004tzosh0xeracgi 200 in 114ms (next.js: 5ms, application-code: 109ms)
+  └─ ƒ declineRecommendationAction("cmtu26o61005azoshybfamyam") in 33ms src/server/actions/recommendations.ts
+ POST /vente/cmtu25zs1004tzosh0xeracgi 200 in 146ms (next.js: 3ms, application-code: 142ms)
+  └─ ƒ recordSaleAction({"lines":["[Object]"],"patientId":null,"prescriptionId":"cmtu25zs1004tzosh0xeracgi"}) in 61ms src/server/actions/sales.ts
+ POST /vente/cmtu25zs1004tzosh0xeracgi 200 in 147ms (next.js: 0.9ms, application-code: 146ms)
+  └─ ƒ generateDocumentAction({"prescriptionId":"cmtu25zs1004tzosh0xeracgi"}) in 74ms src/server/actions/documents.ts
+ GET /vente/cmtu25zs1004tzosh0xeracgi/fin 200 in 982ms (next.js: 913ms, application-code: 69ms)
+ GET /vente/cmtu25zs1004tzosh0xeracgi/fin 200 in 75ms (next.js: 4ms, application-code: 72ms)
+ GET /mot-de-passe/jlz8JxaVYgNulvjtsA1Lc1mmhySMj_71vCDb0UFUtJA 200 in 47ms (next.js: 8ms, application-code: 39ms)
+ GET /login?defini=1 200 in 20ms (next.js: 2ms, application-code: 18ms)
+ POST /mot-de-passe/jlz8JxaVYgNulvjtsA1Lc1mmhySMj_71vCDb0UFUtJA 200 in 91ms (next.js: 2ms, application-code: 89ms)
+  └─ ƒ setUserPasswordAction(null, {}) in 62ms src/server/actions/auth.ts
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET /login 200 in 60ms (next.js: 3ms, application-code: 57ms)
+ GET / 200 in 35ms (next.js: 3ms, application-code: 32ms)
+ POST /login 200 in 109ms (next.js: 1.5ms, application-code: 107ms)
+  └─ ƒ loginAction(null, {}) in 68ms src/server/actions/auth.ts
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET /bienvenue 200 in 119ms (next.js: 3ms, application-code: 116ms)
+ GET /bienvenue 200 in 150ms (next.js: 9ms, application-code: 141ms)
+ GET /stock/import?retour=bienvenue 200 in 150ms (next.js: 5ms, application-code: 144ms)
+ POST /stock/import?retour=bienvenue 200 in 35ms (next.js: 1.3ms, application-code: 34ms)
+  └─ ƒ analyseStockImportAction({}) in 28ms src/server/actions/stock-import.ts
+ POST /stock/import?retour=bienvenue 200 in 3.8s (next.js: 1.1ms, application-code: 3.8s)
+  └─ ƒ commitStockImportAction({"createUnknownByDefault":true,"decisions":{},"jobId":"cmtu28oyp005uzoshvez4aeus"}) in 3787ms src/server/actions/stock-import.ts

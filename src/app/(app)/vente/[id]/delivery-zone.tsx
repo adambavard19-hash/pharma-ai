@@ -24,7 +24,7 @@ export type DeliveryExtra = {
  * Cette zone rassemble ce qui sortira de la caisse, et rien d'autre.
  *
  * La distinction faite ici est la même que celle qui tient tout le produit :
- * une ligne issue d'un conseil accepté est attribuée à Pharma.ai, une référence
+ * une ligne issue d'un conseil accepté est attribuée à PharmaBoost, une référence
  * simplement scannée ne l'est pas. On aurait pu tout compter et gonfler le
  * chiffre ; c'est précisément ce que l'outil s'interdit.
  */
@@ -71,7 +71,7 @@ export function DeliveryZone({
                       <span className="text-text-tertiary"> × {line.quantity}</span>
                     )}
                   </span>
-                  <Badge tone="brand">+ Vente additionnelle Pharma.ai</Badge>
+                  <Badge tone="brand">+ Vente additionnelle PharmaBoost</Badge>
                   <span className="shrink-0 text-[13.5px] font-medium tabular text-text-primary">
                     {formatCents(line.unitPriceCents * line.quantity)}
                   </span>
@@ -110,7 +110,7 @@ export function DeliveryZone({
             <p className="text-[11.5px] leading-4 text-text-tertiary">
               {formatCents(adviceTotal)} issus d&apos;un conseil accepté
               {extras.length > 0 && ` · ${formatCents(extrasTotal)} scannés hors conseil`}. Seul
-              le premier montant est attribué à Pharma.ai.
+              le premier montant est attribué à PharmaBoost.
             </p>
           )}
         </CardContent>

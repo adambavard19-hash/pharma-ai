@@ -47,7 +47,10 @@ export default async function ClientPharmacyPage({
       brandColor: true,
       isActive: true,
       createdAt: true,
-      organization: { select: { name: true } },
+      onboardingCompletedAt: true,
+      stockSyncedAt: true,
+      organization: { select: { name: true, subscription: { select: { status: true, plan: { select: { name: true } } } } } },
+      analysisRuns: { orderBy: { startedAt: "desc" }, take: 1, select: { status: true, outcome: true, startedAt: true } },
       memberships: {
         orderBy: [{ role: "asc" }, { createdAt: "asc" }],
         select: {
@@ -59,11 +62,13 @@ export default async function ClientPharmacyPage({
         },
       },
       // Compteurs seulement : aucun contenu de dossier n'est lu ici.
-      _count: { select: { patients: true, products: true, prescriptions: true } },
+      _count: { select: { patients: true, products: true, drugStocks: true, prescriptions: true, analysisRuns: true } },
     },
   });
 
   if (!pharmacy) notFound();
+  const unclassified = await prisma.product.count({ where: { pharmacyId: id, deletedAt: null, classifiedAt: null } });
+  const lastRun = pharmacy.analysisRuns[0];
 
   const owners = pharmacy.memberships.filter((m) => m.role === "OWNER");
   const collaborators = pharmacy.memberships.filter((m) => m.role !== "OWNER");
@@ -170,8 +175,22 @@ export default async function ClientPharmacyPage({
           <CardHeader title="Volumes" description="Des compteurs, jamais un contenu." />
           <CardContent className="space-y-3 pb-5">
             <Counter label="Patients au dossier" value={pharmacy._count.patients} />
-            <Counter label="Références au catalogue" value={pharmacy._count.products} />
+            <Counter label="Références au catalogue" value={pharmacy._count.products + pharmacy._count.drugStocks} />
             <Counter label="Ordonnances traitées" value={pharmacy._count.prescriptions} />
+            <Counter label="Analyses du moteur" value={pharmacy._count.analysisRuns} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader title="Installation" description="Accueil, stock, moteur, abonnement — des états, jamais un contenu." />
+          <CardContent className="space-y-2.5 pb-5 text-[13px]">
+            <DataItem label="Accueil du titulaire">{pharmacy.onboardingCompletedAt ? `terminé le ${formatDate(pharmacy.onboardingCompletedAt)}` : "en cours"}</DataItem>
+            <DataItem label="Stock importé">{pharmacy.stockSyncedAt ? `oui · synchronisé le ${formatDate(pharmacy.stockSyncedAt)}` : "non"}</DataItem>
+            <DataItem label="Anomalies de stock">{unclassified > 0 ? `${unclassified} produit(s) à classer` : "aucune"}</DataItem>
+            <DataItem label="Moteur de recommandation">
+              {!lastRun ? "jamais sollicité" : lastRun.status === "FAILED" || lastRun.outcome === "ENGINE_ERROR" ? `en erreur (${formatDate(lastRun.startedAt)})` : lastRun.outcome === "AI_UNAVAILABLE" ? "IA indisponible à la dernière analyse" : lastRun.outcome === "STOCK_NOT_CONFIGURED" ? "opérationnel, sans stock" : `opérationnel · dernière analyse le ${formatDate(lastRun.startedAt)}`}
+            </DataItem>
+            <DataItem label="Abonnement">{pharmacy.organization.subscription ? `${pharmacy.organization.subscription.plan.name} · ${pharmacy.organization.subscription.status.toLowerCase()}` : "non renseigné"}</DataItem>
           </CardContent>
         </Card>
       </div>

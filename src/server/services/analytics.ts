@@ -9,7 +9,7 @@ import type { TenantScope } from "@/server/db/tenant";
  * Calcul des indicateurs.
  *
  * ATTRIBUTION DU CHIFFRE D'AFFAIRES PHARMA.AI — définition retenue :
- * une ligne de vente est attribuée à Pharma.ai si et seulement si elle est
+ * une ligne de vente est attribuée à PharmaBoost si et seulement si elle est
  * rattachée à une `Recommendation`. La colonne `Sale.attributedCents` est
  * calculée à l'enregistrement de la vente à partir de ces lignes ; on ne
  * « déduit » jamais une attribution a posteriori. Les conseils ajoutés
@@ -154,7 +154,7 @@ export async function getRecommendationFunnel(
 
 export type DailyPoint = { label: string; value: number; secondaryValue: number };
 
-/** Série journalière : CA total et CA additionnel Pharma.ai. */
+/** Série journalière : CA total et CA additionnel PharmaBoost. */
 export async function getDailyRevenueSeries(
   scope: TenantScope,
   period: PeriodRange,
@@ -675,4 +675,36 @@ export async function getDeclinedRecommendations(
       ? `${row.decidedBy.firstName} ${row.decidedBy.lastName}`
       : null,
   }));
+}
+
+export type EngineOutcomeSummary = {
+  analyses: number;
+  withProposals: number;
+  /** Part des analyses ayant produit au moins une proposition. */
+  proposalRate: number;
+  byOutcome: Record<string, number>;
+};
+
+/**
+ * Ce que le moteur a répondu, analyse par analyse : proposé, rien de
+ * pertinent, stock non configuré, rupture… C'est le « taux de proposition »
+ * du titulaire, et la première explication quand il est bas.
+ */
+export async function getEngineOutcomeSummary(
+  scope: TenantScope,
+  period: PeriodRange,
+): Promise<EngineOutcomeSummary> {
+  const rows = await prisma.analysisRun.groupBy({
+    by: ["outcome"],
+    where: { pharmacyId: scope.pharmacyId, ...activityScope(), startedAt: { gte: period.start, lte: period.end } },
+    _count: true,
+  });
+  const byOutcome: Record<string, number> = {};
+  let analyses = 0;
+  for (const row of rows) {
+    byOutcome[row.outcome ?? "UNKNOWN"] = row._count;
+    analyses += row._count;
+  }
+  const withProposals = byOutcome.PROPOSALS ?? 0;
+  return { analyses, withProposals, proposalRate: analyses > 0 ? withProposals / analyses : 0, byOutcome };
 }

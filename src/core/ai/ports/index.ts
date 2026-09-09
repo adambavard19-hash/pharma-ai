@@ -1,5 +1,5 @@
 /**
- * Ports du moteur Pharma.ai (architecture hexagonale).
+ * Ports du moteur PharmaBoost (architecture hexagonale).
  *
  * Le moteur métier ne connaît QUE ces interfaces. Brancher un nouveau modèle,
  * un nouvel OCR ou une nouvelle base médicamenteuse consiste à écrire un
@@ -14,6 +14,7 @@ import type {
   TreatmentExplanationResult,
 } from "../types";
 import type { ClassificationRequest, ClassificationResult } from "../../understanding";
+import type { ProductClassificationRequest, ProductClassificationResponse } from "../../catalog/product-classification-schema";
 
 export type ProviderCapability = "SIMULATED" | "LIVE";
 
@@ -88,6 +89,13 @@ export interface AIProvider {
    * puis les règles de conseil, le stock et le moteur de sécurité décident.
    */
   classifyDrugs(request: ClassificationRequest): Promise<ClassificationResult | null>;
+  /**
+   * Range des PRODUITS de l'officine (noms de parapharmacie, dispositifs,
+   * médicaments de conseil) dans les catégories et le vocabulaire fermé des
+   * règles de conseil. Aucune donnée patient n'est transmise. `null` quand le
+   * fournisseur n'en est pas capable : le dictionnaire seul aura classé.
+   */
+  classifyProducts(request: ProductClassificationRequest): Promise<ProductClassificationResponse | null>;
 }
 
 // --- Stockage de fichiers --------------------------------------------------

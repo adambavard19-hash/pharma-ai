@@ -58,7 +58,7 @@ export function describeCoverage(input: {
       unanalysedCount,
       headline: "Les interactions entre médicaments prescrits ne sont pas analysées.",
       detail:
-        "Aucun référentiel d'interactions n'est chargé dans Pharma.ai. Seules les redondances de substance active sont détectées, à partir du catalogue national.",
+        "Aucun référentiel d'interactions n'est chargé dans PharmaBoost. Seules les redondances de substance active sont détectées, à partir du catalogue national.",
     };
   }
 

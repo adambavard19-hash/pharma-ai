@@ -80,6 +80,11 @@ export class RuleBasedAIProvider implements AIProvider {
     return null;
   }
 
+  /** Sans modèle, seul le dictionnaire range les produits. */
+  async classifyProducts(): Promise<null> {
+    return null;
+  }
+
   async writePatientReason(request: PatientReasonRequest): Promise<string> {
     const claim = request.productClaims[0];
     if (claim) {

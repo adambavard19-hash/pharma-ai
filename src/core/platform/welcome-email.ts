@@ -25,11 +25,11 @@ export function buildUserPasswordEmail(v: UserPasswordEmailVariables): { subject
   const until = formatDateTime(v.expiresAt);
   const welcome = v.kind === "welcome";
   const subject = welcome
-    ? `Bienvenue sur Pharma.ai${v.pharmacyName ? ` — ${v.pharmacyName}` : ""}`
-    : "Réinitialisez votre mot de passe — Pharma.ai";
+    ? `Bienvenue sur PharmaBoost${v.pharmacyName ? ` — ${v.pharmacyName}` : ""}`
+    : "Réinitialisez votre mot de passe — PharmaBoost";
   const intro = welcome
-    ? `Votre espace Pharma.ai${v.pharmacyName ? ` pour ${v.pharmacyName}` : ""} est prêt. Pour y accéder, définissez d'abord votre mot de passe :`
-    : "Vous avez demandé à réinitialiser votre mot de passe Pharma.ai. Choisissez-en un nouveau ici :";
+    ? `Votre espace PharmaBoost${v.pharmacyName ? ` pour ${v.pharmacyName}` : ""} est prêt. Pour y accéder, définissez d'abord votre mot de passe :`
+    : "Vous avez demandé à réinitialiser votre mot de passe PharmaBoost. Choisissez-en un nouveau ici :";
 
   const text = [
     `Bonjour ${v.firstName},`,
@@ -41,7 +41,7 @@ export function buildUserPasswordEmail(v: UserPasswordEmailVariables): { subject
     `Ensuite, connectez-vous ici : ${v.loginUrl}`,
     "",
     welcome
-      ? "Pharma.ai vous accompagne au comptoir : ordonnance lue, conseils issus de votre stock, plan remis au patient."
+      ? "PharmaBoost vous accompagne au comptoir : ordonnance lue, conseils issus de votre stock, plan remis au patient."
       : "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : rien ne sera modifié.",
     "",
     "L'équipe PharmaBoost",
@@ -53,7 +53,7 @@ export function buildUserPasswordEmail(v: UserPasswordEmailVariables): { subject
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f4;padding:24px 12px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:20px;overflow:hidden">
   <tr><td style="background:#0F766E;padding:22px 28px">
-    <div style="font-size:13px;line-height:18px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.8)">Pharma.ai</div>
+    <div style="font-size:13px;line-height:18px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.8)">PharmaBoost</div>
     <div style="font-size:22px;line-height:28px;font-weight:700;color:#ffffff;margin-top:4px">${welcome ? "Bienvenue" : "Votre mot de passe"}${v.pharmacyName ? ` · ${escapeHtml(v.pharmacyName)}` : ""}</div>
   </td></tr>
   <tr><td style="padding:26px 28px 0">

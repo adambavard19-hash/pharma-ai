@@ -156,7 +156,7 @@ export default async function DrugSheetPage({ params }: { params: Promise<{ cis:
       </Alert>
 
       <p className="text-[12px] leading-5 text-text-tertiary">
-        {referenceAttribution(state)} Dernière lecture de la source par Pharma.ai :{" "}
+        {referenceAttribution(state)} Dernière lecture de la source par PharmaBoost :{" "}
         {state.status === "READY" || state.status === "STALE" ? formatDate(state.importedAt) : "—"}. Page source : {BDPM_SOURCE.url}
       </p>
     </div>

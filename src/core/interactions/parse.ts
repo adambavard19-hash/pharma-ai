@@ -55,7 +55,7 @@ export const CLASS_COLUMNS = ["classe", "substance"] as const;
  * faux négatif dans une fonction de sécurité, c'est-à-dire le pire des échecs
  * possibles ici.
  *
- * Ces correspondances sont FOURNIES, jamais devinées. Pharma.ai ne décide pas
+ * Ces correspondances sont FOURNIES, jamais devinées. PharmaBoost ne décide pas
  * que deux libellés désignent la même substance : il ne fait qu'appliquer ce
  * que l'officine a déclaré.
  */
@@ -194,7 +194,7 @@ export function parseInteractionsFile(
       throw new InteractionFormatError(
         fileName,
         line.number,
-        "risque manquant. Pharma.ai n'affiche pas d'alerte dont il ne peut pas dire la raison.",
+        "risque manquant. PharmaBoost n'affiche pas d'alerte dont il ne peut pas dire la raison.",
         line.text,
       );
     }

@@ -3,7 +3,7 @@ import { buildDocumentEmail } from "../email";
 import type { DayPlanSummary } from "../compose";
 
 /**
- * Le courriel qui accompagne le plan est la seule chose que Pharma.ai envoie
+ * Le courriel qui accompagne le plan est la seule chose que PharmaBoost envoie
  * hors de l'officine. Ces tests fixent ce qu'il a le droit de contenir.
  */
 

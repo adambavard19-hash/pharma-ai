@@ -5,6 +5,7 @@
  * fournisseur d'IA. C'est ce qui permet de tester le moteur métier isolément
  * et de changer de modèle sans réécrire les règles.
  */
+import type { EngineOutcome } from "./outcome";
 
 export type ProductCategoryCode =
   | "PROBIOTIQUES"
@@ -66,7 +67,7 @@ export type ExtractedPrescription = {
  *
  * Rien n'est rédigé ici : uniquement des faits, avec leur source et leur date.
  * Ce bloc et la couche éditoriale de `DrugKnowledge` répondent à deux questions
- * différentes — ce que le médicament EST, et ce que Pharma.ai en RACONTE — et ne
+ * différentes — ce que le médicament EST, et ce que PharmaBoost en RACONTE — et ne
  * doivent jamais être présentés comme une seule et même information.
  */
 export type OfficialDrugFacts = {
@@ -361,6 +362,8 @@ export type PipelineStageTrace = {
 export type AnalysisResult = {
   engineVersion: string;
   status: "COMPLETED" | "PARTIAL" | "FAILED";
+  /** Pourquoi il y a — ou non — des propositions (src/core/ai/outcome.ts). */
+  outcome: EngineOutcome;
   safetyFindings: SafetyFindingResult[];
   explanations: TreatmentExplanationResult[];
   opportunities: AdviceOpportunityResult[];

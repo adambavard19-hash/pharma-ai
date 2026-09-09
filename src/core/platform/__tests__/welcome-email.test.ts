@@ -12,7 +12,7 @@ const base = {
 describe("e-mail d'accueil du titulaire", () => {
   it("souhaite la bienvenue, donne le lien et jamais le mot de passe", () => {
     const m = buildUserPasswordEmail({ ...base, kind: "welcome" });
-    expect(m.subject).toBe("Bienvenue sur Pharma.ai — Pharmacie 01");
+    expect(m.subject).toBe("Bienvenue sur PharmaBoost — Pharmacie 01");
     expect(m.text).toContain("Bonjour Adam,");
     expect(m.text).toContain(base.url);
     expect(m.text).toContain(base.loginUrl);
@@ -23,7 +23,7 @@ describe("e-mail d'accueil du titulaire", () => {
 
   it("propose la réinitialisation sans révéler l'existence du compte au-delà du destinataire", () => {
     const m = buildUserPasswordEmail({ ...base, kind: "reset", pharmacyName: null });
-    expect(m.subject).toBe("Réinitialisez votre mot de passe — Pharma.ai");
+    expect(m.subject).toBe("Réinitialisez votre mot de passe — PharmaBoost");
     expect(m.text).toContain("ignorez ce message");
   });
 });

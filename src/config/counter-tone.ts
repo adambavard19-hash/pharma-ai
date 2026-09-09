@@ -18,7 +18,7 @@
  *
  * 1. **L'absence de signal de sécurité n'est pas verte, elle est neutre.**
  *    Le vert dirait « rien à signaler », ce qui n'est vrai que dans les limites
- *    de ce qui a été comparé — et Pharma.ai peut tourner sans aucun référentiel
+ *    de ce qui a été comparé — et PharmaBoost peut tourner sans aucun référentiel
  *    d'interactions chargé. Un écran vert au-dessus d'une phrase qui dit « les
  *    interactions ne sont pas analysées » est un écran qui ment en couleur.
  *

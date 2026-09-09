@@ -76,7 +76,7 @@ export default async function AnalyticsPage({
     <div className="space-y-6">
       <PageHeader
         title="Analytics"
-        description="La valeur créée par Pharma.ai, mesurée sur des ventes réelles rattachées à des conseils validés."
+        description="La valeur créée par PharmaBoost, mesurée sur des ventes réelles rattachées à des conseils validés."
       />
 
       <LinkTabs
@@ -92,7 +92,7 @@ export default async function AnalyticsPage({
           <div className="space-y-1.5">
             <p className="flex items-center gap-2 text-[13px] font-medium text-accent-800 dark:text-accent-200">
               <Sparkles className="size-4" />
-              Chiffre d&apos;affaires généré grâce à Pharma.ai
+              Chiffre d&apos;affaires généré grâce à PharmaBoost
             </p>
             <p className="text-[42px] leading-[1.05] font-semibold tracking-[-0.03em] tabular text-accent-900 dark:text-accent-100">
               {formatCents(revenue.attributedCents)}
@@ -158,14 +158,14 @@ export default async function AnalyticsPage({
         <Card className="xl:col-span-2">
           <CardHeader
             title="Évolution"
-            description="Chiffre d'affaires total et part générée grâce à Pharma.ai."
+            description="Chiffre d'affaires total et part générée grâce à PharmaBoost."
           />
           <CardContent>
             <AreaChart
               data={series}
               formatValue={formatCentsCompact}
               primaryLabel="CA total"
-              secondaryLabel="CA généré grâce à Pharma.ai"
+              secondaryLabel="CA généré grâce à PharmaBoost"
               showSecondary
               height={260}
             />
@@ -333,7 +333,7 @@ export default async function AnalyticsPage({
                           : "—"
                       }
                     />
-                    <MiniStat label="CA Pharma.ai" value={formatCents(member.attributedCents)} />
+                    <MiniStat label="CA PharmaBoost" value={formatCents(member.attributedCents)} />
                   </dl>
                 </li>
               ))}

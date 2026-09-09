@@ -599,7 +599,7 @@ function SalePanel({
         push({
           tone: "success",
           title: "Vente enregistrée",
-          description: `${formatCents(result.data.attributedCents)} attribués à Pharma.ai.`,
+          description: `${formatCents(result.data.attributedCents)} attribués à PharmaBoost.`,
         });
         setSelected(new Set());
       } else {
@@ -622,7 +622,7 @@ function SalePanel({
           <Alert tone="success" title="Vente déjà enregistrée">
             {existingSales.map((sale) => (
               <p key={sale.id}>
-                {sale.reference} — {formatCents(sale.attributedCents)} attribués à Pharma.ai.
+                {sale.reference} — {formatCents(sale.attributedCents)} attribués à PharmaBoost.
               </p>
             ))}
           </Alert>

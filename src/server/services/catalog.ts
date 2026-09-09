@@ -5,6 +5,20 @@ import type { CatalogProduct, PharmacyRuleInput, ProductValidationHistory } from
 import { PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { normalizeSearchText } from "@/core/reference/search";
+import { classifyNationalDrug } from "@/core/catalog/product-vocabulary";
+
+/**
+ * Le stock est-il configuré ? Vrai dès qu'une référence existe — produit ou
+ * médicament, en rayon ou à zéro. C'est ce qui distingue « rien ne correspond »
+ * de « rien n'a jamais été importé ».
+ */
+export async function loadStockState(scope: TenantScope): Promise<{ configured: boolean; referenceCount: number }> {
+  const [products, drugs] = await Promise.all([
+    prisma.product.count({ where: { pharmacyId: scope.pharmacyId, deletedAt: null } }),
+    prisma.pharmacyDrugStock.count({ where: { pharmacyId: scope.pharmacyId } }),
+  ]);
+  return { configured: products + drugs > 0, referenceCount: products + drugs };
+}
 
 /**
  * Borne du nombre de lignes de stock médicament confrontées aux règles de
@@ -146,9 +160,6 @@ export async function loadNationalDrugCandidates(
   const lines = await prisma.pharmacyDrugStock.findMany({
     where: {
       pharmacyId: scope.pharmacyId,
-      // Une boîte à zéro n'est pas candidate : Pharma.ai ne conseille pas ce
-      // qu'il ne peut pas délivrer aujourd'hui.
-      quantity: { gt: 0 },
       presentation: { withdrawnAt: null, specialtyId: { in: specialtyIds } },
     },
     select: {
@@ -165,6 +176,7 @@ export async function loadNationalDrugCandidates(
             select: {
               name: true,
               pharmaceuticalForm: true,
+              administrationRoutes: true,
               compositions: { where: { nature: "SA" }, select: { substanceLabel: true } },
               prescriptionConditions: { select: { label: true } },
             },
@@ -172,6 +184,9 @@ export async function loadNationalDrugCandidates(
         },
       },
     },
+    // Les boîtes en rayon d'abord ; celles à zéro restent chargées pour que le
+    // moteur puisse dire « adapté mais en rupture » — jamais les proposer.
+    orderBy: { quantity: "desc" },
     take: NATIONAL_CANDIDATE_LIMIT,
   });
 
@@ -182,6 +197,16 @@ export async function loadNationalDrugCandidates(
       const substances = [
         ...new Set(presentation.specialty.compositions.map((c) => c.substanceLabel)),
       ];
+      // Le catalogue national ne classe pas les médicaments dans les catégories
+      // de l'officine : c'est le dictionnaire d'usage (substances, forme, voie,
+      // nom) qui le fait, avec le même vocabulaire fermé que pour les produits.
+      const understood = classifyNationalDrug({
+        name: presentation.specialty.name,
+        substances,
+        form: presentation.specialty.pharmaceuticalForm,
+        routes: presentation.specialty.administrationRoutes,
+        label: presentation.label,
+      });
       return {
         id: `presentation:${presentation.id}`,
         origin: "NATIONAL_DRUG" as const,
@@ -190,10 +215,7 @@ export async function loadNationalDrugCandidates(
         prescriptionConditions: [],
         name: presentation.specialty.name,
         brand: null,
-        // Le catalogue national ne classe pas les médicaments dans les
-        // catégories de l'officine. L'appariement se fera donc uniquement sur
-        // les termes, jamais sur une catégorie devinée.
-        category: "AUTRE" as const,
+        category: understood?.category ?? ("AUTRE" as const),
         subCategory: presentation.specialty.pharmaceuticalForm,
         reference: presentation.cip13,
         ean: presentation.cip13,
@@ -203,7 +225,7 @@ export async function loadNationalDrugCandidates(
         // inventer une serait exactement ce que le produit s'interdit.
         commercialClaims: [],
         precautions: [],
-        matchingTags: [...substances, presentation.specialty.name],
+        matchingTags: [...(understood?.tags ?? []), ...substances, presentation.specialty.name],
         contraindications: [],
         // Le prix de l'officine prime sur le prix public quand elle l'a fixé.
         salePriceCents: line.priceCents ?? presentation.priceCents ?? 0,

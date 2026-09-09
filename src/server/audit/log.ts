@@ -27,6 +27,8 @@ export type AuditAction =
   | "product.updated"
   | "product.deleted"
   | "product.imported"
+  | "pharmacy.updated"
+  | "pharmacy.onboarding_completed"
   | "stock.adjusted"
   | "drug_stock.adjusted"
   | "drug_stock.removed"

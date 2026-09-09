@@ -134,7 +134,7 @@ export default async function ProductDetailPage({
 
       {status === "OUT_OF_STOCK" && (
         <Alert tone="warning" title="Ce produit n'est plus proposé en conseil">
-          Une référence en rupture est écartée par le moteur : Pharma.ai ne propose jamais
+          Une référence en rupture est écartée par le moteur : PharmaBoost ne propose jamais
           un produit que l&apos;officine ne peut pas délivrer.
         </Alert>
       )}

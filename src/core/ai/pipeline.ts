@@ -21,6 +21,7 @@ import {
   type InteractionRule,
 } from "../interactions";
 import type { TreatmentUnderstanding } from "../understanding";
+import { deriveOutcome } from "./outcome";
 import type {
   AnalysisResult,
   CatalogProduct,
@@ -97,6 +98,14 @@ export type PipelineInput = {
   understanding?: TreatmentUnderstanding | null;
   usedSimulatedProviders: boolean;
   maxRecommendations?: number;
+  /**
+   * L'état du stock de l'officine, indépendamment des candidats chargés :
+   * `configured` est vrai dès qu'une référence existe, même à zéro. Absent, on
+   * se fie au catalogue reçu.
+   */
+  stock?: { configured: boolean; referenceCount: number };
+  /** La compréhension IA a manqué (fournisseur absent ou appel en échec). */
+  aiUnavailable?: boolean;
 };
 
 type StageRecorder = {
@@ -243,6 +252,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     return {
       engineVersion: ENGINE_VERSION,
       status: "FAILED",
+      outcome: "ENGINE_ERROR",
       safetyFindings,
       explanations: [],
       opportunities: [],
@@ -379,6 +389,12 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     blockedReasons.push(`${blocked.title} : ${blocked.blockReason}`);
   }
 
+  // Ce qui permettra de dire POURQUOI il n'y a rien, si c'est le cas. Le stock
+  // est « configuré » dès que l'officine possède une référence, en rayon ou à
+  // zéro : un rayon vide et un rayon jamais importé ne se traitent pas pareil.
+  const stockConfigured = input.stock?.configured ?? input.catalog.length > 0;
+  const matchingSignals = { inStockCandidates: 0, outOfStockCandidates: 0, safetyRemoved: 0 };
+
   // ---------------------------------------------------------------- ÉTAPE 5
   // APPARIEMENT STOCK — le catalogue n'entre en jeu qu'ici.
   const candidatesByOpportunity = recorder.run(
@@ -388,19 +404,31 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     () => {
       const map = new Map<string, CatalogProduct[]>();
       const notes: string[] = [];
+      const safeCatalog = input.catalog.filter((p) => !productSafety.blockedProductIds.has(p.id));
 
       for (const opportunity of eligibleOpportunities) {
-        const candidates = findCandidateProducts({
-          opportunity,
-          catalog: input.catalog.filter(
-            (p) => !productSafety.blockedProductIds.has(p.id),
-          ),
-        });
+        const candidates = findCandidateProducts({ opportunity, catalog: safeCatalog });
         if (candidates.length === 0) {
+          // Distinguer « rien ne correspond » de « ça correspond mais c'est à
+          // zéro » : ce n'est pas la même information pour le titulaire.
+          const outOfStock = findCandidateProducts({
+            opportunity,
+            catalog: safeCatalog,
+            includeOutOfStock: true,
+          }).filter((c) => c.product.stockQuantity <= 0);
+          matchingSignals.outOfStockCandidates += outOfStock.length;
           notes.push(
-            `« ${opportunity.title} » : aucune référence disponible dans le catalogue de l'officine.`,
+            outOfStock.length > 0
+              ? `« ${opportunity.title} » : ${outOfStock.length} référence(s) adaptée(s) mais en rupture (${outOfStock
+                  .slice(0, 3)
+                  .map((c) => c.product.name)
+                  .join(", ")}).`
+              : stockConfigured
+                ? `« ${opportunity.title} » : aucune référence de l'officine ne correspond à ce besoin.`
+                : `« ${opportunity.title} » : aucune référence — le stock de l'officine n'est pas configuré.`,
           );
         }
+        matchingSignals.inStockCandidates += candidates.length;
         map.set(
           opportunity.key,
           candidates.map((c) => c.product),
@@ -437,8 +465,10 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
           });
           // Deux seuils, et le second est le plus important : une proposition
           // doit correspondre au besoin, pas seulement être inoffensive.
-          if (
-            result &&
+          if (!result) {
+            // Sécurité produit, contexte patient ou exclusion de l'officine.
+            matchingSignals.safetyRemoved += 1;
+          } else if (
             result.totalScore >= RECOMMENDATION_MIN_SCORE &&
             result.breakdown.relevance >= RECOMMENDATION_MIN_RELEVANCE
           ) {
@@ -531,9 +561,22 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
 
   const hasPartial = recorder.trace.some((s) => s.status === "PARTIAL");
 
+  const outcome = deriveOutcome({
+    recommendationCount: recommendations.length,
+    opportunityCount: opportunities.length,
+    blockedOpportunityCount: opportunities.filter((o) => o.isBlocked).length,
+    stockConfigured,
+    inStockCandidateCount: matchingSignals.inStockCandidates,
+    outOfStockCandidateCount: matchingSignals.outOfStockCandidates,
+    safetyRemovedCount: matchingSignals.safetyRemoved,
+    aiUnavailable: input.aiUnavailable ?? false,
+    failed: false,
+  });
+
   return {
     engineVersion: ENGINE_VERSION,
     status: hasPartial ? "PARTIAL" : "COMPLETED",
+    outcome,
     safetyFindings: allSafetyFindings,
     explanations,
     opportunities,

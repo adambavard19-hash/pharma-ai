@@ -49,6 +49,6 @@ export function chooseOCRProvider(config: OcrConfig): OCRProvider {
   // Un fournisseur déclaré mais non implémenté ne dégrade jamais silencieusement
   // vers un résultat inventé : on retombe sur le simulé, qui s'annonce.
   return new MockOCRProvider(
-    `Le fournisseur « ${config.provider} » n'est pas implémenté dans Pharma.ai.`,
+    `Le fournisseur « ${config.provider} » n'est pas implémenté dans PharmaBoost.`,
   );
 }

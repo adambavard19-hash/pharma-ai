@@ -25,6 +25,7 @@ import { TreatmentPanel } from "./treatment-panel";
 import { ChecksNote } from "./checks-note";
 import { SafetyZone } from "./safety-zone";
 import { AdviceZone } from "./advice-zone";
+import type { EngineOutcome } from "@/core/ai/outcome";
 import { DeliveryZone, type DeliveryExtra } from "./delivery-zone";
 import { counterIsBlocked } from "@/core/ai/safety-gate";
 import { STAGE_LABELS, STAGE_ORDER, streamAnalysis } from "./analysis-stream";
@@ -62,7 +63,7 @@ function withDefaultConfirmation(lines: SaleLineDraft[], alreadyVerified: boolea
  * est celui de l'urgence : ce qu'il y a à proposer d'abord, ce qu'il faut
  * vérifier ensuite, la délivrance, et tout le reste sous « Voir les détails ».
  *
- *   Ordonnance → l'IA comprend → Pharma.ai rappelle quoi proposer →
+ *   Ordonnance → l'IA comprend → PharmaBoost rappelle quoi proposer →
  *   le patient accepte ou refuse → terminé.
  */
 export function SaleWorkspace({
@@ -78,6 +79,8 @@ export function SaleWorkspace({
   identificationChangedSinceAnalysis,
   patientFactors,
   hasSale,
+  outcome,
+  canImportStock,
 }: {
   prescription: {
     id: string;
@@ -111,6 +114,9 @@ export function SaleWorkspace({
   /** Ce qui, dans le dossier du patient, a réellement pesé sur cette analyse. */
   patientFactors: PatientFactor[];
   hasSale: boolean;
+  /** Pourquoi il y a — ou non — des propositions, d'après la dernière analyse. */
+  outcome: EngineOutcome | null;
+  canImportStock: boolean;
 }) {
   const alreadyVerified = Boolean(prescription.verifiedAt);
   const [lines, setLines] = useState(() => withDefaultConfirmation(initialLines, alreadyVerified));
@@ -312,7 +318,7 @@ export function SaleWorkspace({
         quantity: line.quantity,
         unitPriceCents: line.unitPriceCents,
       })),
-      // Sans `recommendationId` : ces lignes ne sont pas attribuées à Pharma.ai.
+      // Sans `recommendationId` : ces lignes ne sont pas attribuées à PharmaBoost.
       ...[...extras.values()].map((line) => ({
         productId: line.productId,
         quantity: line.quantity,
@@ -461,7 +467,7 @@ export function SaleWorkspace({
 
           {!editing && !analysing && (
             <>
-              <AdviceZone prescriptionId={prescription.id} recommendations={recommendations} canDecide={permissions.decide} locked={blocked} inBasket={(id) => basket.has(id)} onAccept={acceptAdvice} onCancelAccept={cancelAdvice} />
+              <AdviceZone prescriptionId={prescription.id} recommendations={recommendations} canDecide={permissions.decide} locked={blocked} outcome={outcome} canImportStock={canImportStock} inBasket={(id) => basket.has(id)} onAccept={acceptAdvice} onCancelAccept={cancelAdvice} />
               <DeliveryZone
                 accepted={[...basket.entries()].map(([recommendationId, line]) => {
                   const recommendation = recommendations.find((r) => r.id === recommendationId);

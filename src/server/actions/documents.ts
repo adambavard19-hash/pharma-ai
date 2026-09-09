@@ -156,7 +156,7 @@ export async function deliverDocumentAction(
         status: "SIMULATED",
         provider: "none",
         detail:
-          "Aucun fournisseur SMS n'est branché dans Pharma.ai. Aucun message n'a été transmis.",
+          "Aucun fournisseur SMS n'est branché dans PharmaBoost. Aucun message n'a été transmis.",
         userId: session.scope.userId,
       },
     });

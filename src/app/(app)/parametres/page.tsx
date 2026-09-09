@@ -312,9 +312,9 @@ function ReferenceCatalogCard({ state }: { state: ReferenceCatalogState }) {
         <p className="border-t border-border-subtle pt-3 text-[12.5px] leading-5 text-text-tertiary">
           {attribution}
           <br />
-          Importé dans Pharma.ai le {formatDateTime(state.importedAt)}. Données publiées par{" "}
+          Importé dans PharmaBoost le {formatDateTime(state.importedAt)}. Données publiées par{" "}
           {BDPM_SOURCE.publishersLabel} ; cette mention ne vaut aucune reconnaissance de
-          Pharma.ai par ces organismes.
+          PharmaBoost par ces organismes.
         </p>
       </CardContent>
     </Card>

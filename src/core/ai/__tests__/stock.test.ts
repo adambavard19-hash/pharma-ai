@@ -72,7 +72,7 @@ describe("le stock réel décide de ce qui est proposé", () => {
     const result = runAnalysisPipeline(input([spray({ stockQuantity: 0 })]));
     expect(result.recommendations).toEqual([]);
     expect(result.trace.find((s) => s.stage === "CATALOG_MATCHING")?.notes.join(" ")).toMatch(
-      /aucune référence disponible/,
+      /rupture|aucune référence/,
     );
   });
 

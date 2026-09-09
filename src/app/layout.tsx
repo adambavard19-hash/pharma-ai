@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     template: `%s · ${APP_NAME}`,
   },
   description:
-    "Pharma.ai transforme la délivrance d'une ordonnance en parcours de conseil personnalisé : analyse assistée, recommandations justifiées, fiche patient et mesure de la valeur créée. Le pharmacien reste décisionnaire.",
+    "PharmaBoost transforme la délivrance d'une ordonnance en parcours de conseil personnalisé : analyse assistée, recommandations justifiées, fiche patient et mesure de la valeur créée. Le pharmacien reste décisionnaire.",
   applicationName: APP_NAME,
   formatDetection: { telephone: false },
   robots: { index: false, follow: false },

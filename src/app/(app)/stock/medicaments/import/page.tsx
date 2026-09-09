@@ -46,7 +46,7 @@ export default async function DrugStockImportPage() {
         <Alert tone="warning" title="Le catalogue national n'est pas chargé">
           Aucun code ne peut être reconnu tant qu&apos;il ne l&apos;est pas. Chargez-le depuis{" "}
           <Link href="/parametres?onglet=moteur" className="underline">
-            Paramètres → Moteur Pharma.ai
+            Paramètres → Moteur PharmaBoost
           </Link>
           .
         </Alert>

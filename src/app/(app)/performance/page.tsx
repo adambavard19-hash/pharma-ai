@@ -108,7 +108,7 @@ export default async function PerformancePage() {
     <div className="space-y-7">
       <PageHeader
         title="Performance"
-        description={`${session.pharmacy.name}${session.pharmacy.city ? ` · ${session.pharmacy.city}` : ""} — l'activité de votre officine et ce que Pharma.ai y a réellement généré.`}
+        description={`${session.pharmacy.name}${session.pharmacy.city ? ` · ${session.pharmacy.city}` : ""} — l'activité de votre officine et ce que PharmaBoost y a réellement généré.`}
         breadcrumb={
           <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
             <Link href="/">Retour au comptoir</Link>
@@ -136,7 +136,7 @@ export default async function PerformancePage() {
         <section className="space-y-4">
           <Grid cols={4}>
             <StatCard
-              label="CA généré grâce à Pharma.ai"
+              label="CA généré grâce à PharmaBoost"
               value={formatCents(monthRevenue.attributedCents)}
               sublabel="ce mois"
               delta={monthRevenue.attributedDelta}
@@ -154,14 +154,14 @@ export default async function PerformancePage() {
             <StatCard
               label="Chiffre d'affaires aujourd'hui"
               value={formatCents(todayRevenue.totalCents)}
-              sublabel={`dont ${formatCents(todayRevenue.attributedCents)} via Pharma.ai`}
+              sublabel={`dont ${formatCents(todayRevenue.attributedCents)} via PharmaBoost`}
               delta={todayRevenue.totalDelta}
               icon={<Euro className="size-4" />}
             />
             <StatCard
               label="Cette semaine"
               value={formatCents(weekRevenue.totalCents)}
-              sublabel={`dont ${formatCents(weekRevenue.attributedCents)} via Pharma.ai`}
+              sublabel={`dont ${formatCents(weekRevenue.attributedCents)} via PharmaBoost`}
               delta={weekRevenue.totalDelta}
               icon={<TrendingUp className="size-4" />}
             />
@@ -208,7 +208,7 @@ export default async function PerformancePage() {
         <Card className="xl:col-span-2">
           <CardHeader
             title="Évolution du chiffre d'affaires"
-            description="Chiffre d'affaires total et part attribuable à Pharma.ai, jour par jour."
+            description="Chiffre d'affaires total et part attribuable à PharmaBoost, jour par jour."
             action={
               <Button asChild variant="ghost" size="sm">
                 <Link href="/analytics">Analytics</Link>
@@ -220,7 +220,7 @@ export default async function PerformancePage() {
               data={series}
               formatValue={formatCentsCompact}
               primaryLabel="CA total"
-              secondaryLabel="CA généré grâce à Pharma.ai"
+              secondaryLabel="CA généré grâce à PharmaBoost"
               showSecondary
               height={250}
             />
@@ -364,7 +364,7 @@ export default async function PerformancePage() {
                         <span className="font-medium">
                           {event.user
                             ? `${event.user.firstName} ${event.user.lastName}`
-                            : "Moteur Pharma.ai"}
+                            : "Moteur PharmaBoost"}
                         </span>{" "}
                         <span className="text-text-secondary">
                           {EVENT_LABELS[event.type] ?? event.type.toLowerCase()}
@@ -403,7 +403,7 @@ export default async function PerformancePage() {
         <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-5">
           <AlertTriangle className="size-[18px] shrink-0 text-brand-700 dark:text-brand-400" />
           <p className="min-w-0 flex-1 text-[12.5px] leading-5 text-text-secondary">
-            Pharma.ai est un outil d&apos;assistance. Il ne prescrit pas, ne pose aucun
+            PharmaBoost est un outil d&apos;assistance. Il ne prescrit pas, ne pose aucun
             diagnostic et ne se substitue à aucun avis médical ou pharmaceutique. Chaque
             conseil affiché au patient a été validé par un professionnel de votre équipe.
           </p>

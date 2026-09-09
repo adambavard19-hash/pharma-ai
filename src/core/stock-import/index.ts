@@ -19,6 +19,7 @@ export {
   normalizeCode,
   parsePriceCents,
   parseQuantity,
+  parseVatRate,
   readRows,
   type ImportIssue,
   type ImportRow,
@@ -35,3 +36,4 @@ export {
   type RowDecision,
   type RowStatus,
 } from "./classify";
+export { tagsFromName } from "./tags";

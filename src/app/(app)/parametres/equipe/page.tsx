@@ -98,7 +98,7 @@ export default async function TeamPage() {
           sublabel="traitées par l'équipe"
         />
         <StatCard
-          label="CA Pharma.ai ce mois"
+          label="CA PharmaBoost ce mois"
           value={formatCents(
             performance.reduce((sum, member) => sum + member.attributedCents, 0),
           )}
@@ -194,7 +194,7 @@ export default async function TeamPage() {
                           : "—"
                       }
                     />
-                    <Stat label="CA Pharma.ai" value={formatCents(stats.attributedCents)} />
+                    <Stat label="CA PharmaBoost" value={formatCents(stats.attributedCents)} />
                   </dl>
                 )}
 

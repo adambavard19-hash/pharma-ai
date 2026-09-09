@@ -61,7 +61,7 @@ export type SaleLineDraft = {
   official: OfficialLineFacts | null;
   /**
    * Ce que l'officine détient de CE médicament. La première question du
-   * pharmacien, à laquelle Pharma.ai ne savait pas répondre jusqu'ici.
+   * pharmacien, à laquelle PharmaBoost ne savait pas répondre jusqu'ici.
    */
   availability: {
     state: "IN_STOCK" | "REFERENCED_EMPTY" | "NOT_REFERENCED" | "UNKNOWN";
@@ -128,6 +128,8 @@ export type AdviceView = {
     question: string | null;
     requiresConfirmation: boolean;
     answer: boolean | null;
+    /** La question a été posée (même si le patient ne savait pas répondre). */
+    answeredAt: string | null;
     /** Pourquoi le modèle a vu ce besoin ici — pour le pharmacien. */
     aiJustification: string | null;
     /** Le pourquoi une fois le besoin confirmé par le patient. */

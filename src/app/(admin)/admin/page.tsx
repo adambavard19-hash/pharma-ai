@@ -18,7 +18,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatCents, formatDate, formatNumber, formatRelative } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Administration Pharma.ai" };
+export const metadata: Metadata = { title: "Administration PharmaBoost" };
 
 /**
  * Console d'administration de l'éditeur.

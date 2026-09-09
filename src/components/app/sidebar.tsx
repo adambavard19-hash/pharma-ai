@@ -82,7 +82,7 @@ export function Sidebar({
 
         <div className="border-t border-border-subtle px-4 py-3">
           <p className="text-[11px] leading-4 text-text-tertiary">
-            Pharma.ai assiste le pharmacien.
+            PharmaBoost assiste le pharmacien.
             <br />
             La décision reste professionnelle.
           </p>

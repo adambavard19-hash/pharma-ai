@@ -49,6 +49,9 @@ const mappingSchema = z.object({
     quantity: z.string().optional(),
     salePrice: z.string().optional(),
     purchasePrice: z.string().optional(),
+    vatRate: z.string().optional(),
+    brand: z.string().optional(),
+    category: z.string().optional(),
   }),
 });
 
@@ -95,11 +98,35 @@ export async function commitStockImportAction(
       createUnknownByDefault: parsed.data.createUnknownByDefault,
     });
     revalidatePath("/stock");
+    revalidatePath("/bienvenue");
     return ok(
       outcome,
       `${outcome.productsCreated} créé(s), ${outcome.productsUpdated + outcome.drugsUpserted} mis à jour, ${outcome.ignored} ignoré(s).`,
     );
   } catch (error) {
     return fail(error instanceof Error ? error.message : "L'import a échoué : rien n'a été écrit.");
+  }
+}
+
+/**
+ * Relance la classification des produits que le moteur ne sait pas encore
+ * relier à un besoin (import ancien, modèle indisponible au moment de
+ * l'import…). Bornée : quelques lots par clic, le reste est annoncé.
+ */
+export async function classifyProductsAction(payload?: { force?: boolean }): Promise<ActionResult<import("@/server/services/product-classification").ClassificationRunSummary>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_MANAGE);
+  try {
+    const { classifyPharmacyProducts } = await import("@/server/services/product-classification");
+    const summary = await classifyPharmacyProducts({ scope: session.scope, force: payload?.force ?? false });
+    revalidatePath("/stock");
+    const classified = summary.fromCache + summary.byHeuristic + summary.byAi;
+    return ok(
+      summary,
+      summary.considered === 0
+        ? "Tous vos produits sont déjà classés."
+        : `${classified} produit(s) compris sur ${summary.considered}${summary.remaining > 0 ? ` — ${summary.remaining} restent à classer, relancez.` : ""}.`,
+    );
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "La classification a échoué.");
   }
 }

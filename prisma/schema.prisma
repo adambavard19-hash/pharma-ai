@@ -77,6 +77,13 @@ model Pharmacy {
   isDemo   Boolean @default(false)
   isActive Boolean @default(true)
 
+  /// Le parcours d'accueil du titulaire (informations, stock, équipe) est
+  /// terminé. Tant que c'est vide, l'application le propose à l'ouverture.
+  onboardingCompletedAt DateTime?
+  /// Dernière synchronisation du stock qui a abouti (import de fichier, ou
+  /// plus tard un connecteur). Vide : le stock n'a jamais été importé.
+  stockSyncedAt         DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -572,6 +579,13 @@ model Product {
 
   isActive  Boolean   @default(true)
   isDemo    Boolean   @default(false)
+
+  /// Quand et par quoi le produit a été rangé dans une catégorie et doté de ses
+  /// étiquettes d'appariement : « HEURISTIC » (dictionnaire), « AI » (modèle,
+  /// vocabulaire fermé), « PHARMACIST » (saisie à la main). Vide : produit
+  /// jamais classé — le moteur ne peut pas le rapprocher d'un besoin.
+  classifiedAt         DateTime?
+  classificationSource String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -1141,6 +1155,27 @@ model PharmacyDrugStock {
 // marqué comme tel (`isDemoData = true`).
 // ===========================================================================
 
+/// Classification d'un PRODUIT (parapharmacie, dispositif, médicament conseil)
+/// dans les catégories et le vocabulaire fermé des règles de conseil, mise en
+/// cache par nom normalisé. Un nom de produit n'est pas une donnée de santé :
+/// la table est partagée entre officines, et une officine qui importe « Ultra-
+/// Levure 200 mg » bénéficie de la classification déjà faite pour une autre.
+model ProductClassification {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  category   String
+  tags       String[] @default([])
+  confidence Float
+  /// « HEURISTIC » (dictionnaire), « AI » (modèle), « PHARMACIST ».
+  source     String
+  providerId String?
+  model      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("product_classifications")
+}
+
 /// Classification d'un médicament par le modèle, mise en cache.
 ///
 /// La substance, le code ATC et la classe d'un médicament ne changent pas
@@ -1375,6 +1410,11 @@ model AnalysisRun {
   /// Ce que la compréhension IA a produit : contexte, classification par
   /// ligne, besoins et écarts de validation. Relisible des mois plus tard.
   understanding  Json?
+  /// L'issue de l'analyse, en un mot (src/core/ai/outcome.ts) : PROPOSALS,
+  /// NO_RELEVANT_NEED, STOCK_NOT_CONFIGURED, OUT_OF_STOCK… C'est ce qui
+  /// permet de dire au comptoir POURQUOI rien n'est proposé, et au titulaire
+  /// combien d'ordonnances ont donné lieu à une proposition.
+  outcome        String?
   isDemo         Boolean        @default(false)
 
   startedAt    DateTime  @default(now())

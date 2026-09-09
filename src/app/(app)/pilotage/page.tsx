@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Check, Euro, ShoppingBag } from "lucide-react";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { getCounterPerformance } from "@/server/services/analytics";
+import { getEngineOutcomeSummary, getCounterPerformance } from "@/server/services/analytics";
 import { isPeriodKey, resolveCustomPeriod, resolvePeriod } from "@/core/analytics/periods";
 import { ROLE_LABELS, type Role } from "@/server/rbac/permissions";
 import { PageHeader } from "@/components/ui/page";
@@ -40,14 +40,26 @@ export default async function PilotagePage({
   const invalidCustom = params.periode === "custom" && !custom;
   const period = custom ?? resolvePeriod(isPeriodKey(params.periode) ? params.periode : "month");
 
-  const { global, collaborators } = await getCounterPerformance(session.scope, period);
+  const [{ global, collaborators }, engine] = await Promise.all([
+    getCounterPerformance(session.scope, period),
+    getEngineOutcomeSummary(session.scope, period),
+  ]);
+  const engineExplanations: [string, string][] = [
+    ["NO_RELEVANT_NEED", "aucun complément pertinent"],
+    ["STOCK_NOT_CONFIGURED", "stock non configuré"],
+    ["NO_COMPATIBLE_PRODUCT", "sans référence adaptée"],
+    ["OUT_OF_STOCK", "références en rupture"],
+    ["SAFETY_FILTERED", "écartées par sécurité"],
+    ["AI_UNAVAILABLE", "compréhension indisponible"],
+    ["ENGINE_ERROR", "analyses interrompues"],
+  ];
   const active = collaborators.filter((row) => row.decided > 0 || row.attributedCents > 0);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Pilotage de l'officine"
-        description="Ce que les conseils Pharma.ai ont produit au comptoir — au global et par collaborateur. Ces chiffres ne sont visibles que de vous."
+        description="Ce que les conseils PharmaBoost ont produit au comptoir — au global et par collaborateur. Ces chiffres ne sont visibles que de vous."
       />
 
       <PeriodPicker
@@ -67,7 +79,20 @@ export default async function PilotagePage({
         Période affichée : <span className="font-medium text-text-secondary">{period.label}</span>
       </p>
 
-      <section className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+      <section className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Taux de proposition"
+          value={`${Math.round(engine.proposalRate * 100)} %`}
+          sublabel={
+            engine.analyses === 0
+              ? "aucune analyse sur la période"
+              : `${engine.withProposals} analyse${engine.withProposals > 1 ? "s" : ""} avec proposition sur ${engine.analyses}${
+                  engineExplanations.filter(([code]) => engine.byOutcome[code]).length > 0
+                    ? " · " + engineExplanations.filter(([code]) => engine.byOutcome[code]).map(([code, label]) => `${engine.byOutcome[code]} ${label}`).join(", ")
+                    : ""
+                }`
+          }
+        />
         <StatCard
           label="Taux d'acceptation"
           value={global.acceptanceRate === null ? "—" : formatPercent(global.acceptanceRate)}
@@ -90,7 +115,7 @@ export default async function PilotagePage({
           icon={<ShoppingBag className="size-[18px]" />}
         />
         <StatCard
-          label="CA additionnel Pharma.ai"
+          label="CA additionnel PharmaBoost"
           value={formatCents(global.attributedCents)}
           sublabel="uniquement les lignes issues d'un conseil"
           icon={<Euro className="size-[18px]" />}
