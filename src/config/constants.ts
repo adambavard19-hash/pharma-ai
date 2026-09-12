@@ -63,3 +63,9 @@ export const MAX_RECOMMENDATIONS_PER_PRESCRIPTION = 3;
 
 export const CURRENCY = "EUR";
 export const LOCALE = "fr-FR";
+/**
+ * Les officines sont en France : toute heure affichée ou envoyée est celle de
+ * Paris, que le rendu ait lieu sur le serveur (UTC chez l'hébergeur) ou dans
+ * le navigateur — sinon les deux divergent et React refait la page au chargement.
+ */
+export const TIME_ZONE = "Europe/Paris";

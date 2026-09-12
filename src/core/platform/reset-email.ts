@@ -1,4 +1,5 @@
 import { escapeHtml } from "@/core/documents/email";
+import { TIME_ZONE } from "@/config/constants";
 
 /**
  * L'e-mail « Définissez votre mot de passe » de la console PharmaBoost.
@@ -14,7 +15,7 @@ export type AdminPasswordEmailVariables = {
 };
 
 function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
 export function buildAdminPasswordEmail(v: AdminPasswordEmailVariables): { subject: string; text: string; html: string } {

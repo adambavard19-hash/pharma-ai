@@ -1,4 +1,4 @@
-import { CURRENCY, LOCALE } from "@/config/constants";
+import { CURRENCY, LOCALE, TIME_ZONE } from "@/config/constants";
 
 /**
  * Formatage français. Les montants sont manipulés en CENTIMES dans tout le
@@ -55,6 +55,7 @@ export function formatDate(date: Date | string | null | undefined): string {
   const d = typeof date === "string" ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat(LOCALE, {
+    timeZone: TIME_ZONE,
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -66,6 +67,7 @@ export function formatDateLong(date: Date | string | null | undefined): string {
   const d = typeof date === "string" ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat(LOCALE, {
+    timeZone: TIME_ZONE,
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -77,6 +79,7 @@ export function formatDateTime(date: Date | string | null | undefined): string {
   const d = typeof date === "string" ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat(LOCALE, {
+    timeZone: TIME_ZONE,
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -89,7 +92,8 @@ export function formatTime(date: Date | string | null | undefined): string {
   if (!date) return "—";
   const d = typeof date === "string" ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2-digit" }).format(d);
+  return new Intl.DateTimeFormat(LOCALE, {
+    timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" }).format(d);
 }
 
 /** Écart lisible : « il y a 3 minutes », « hier ». */

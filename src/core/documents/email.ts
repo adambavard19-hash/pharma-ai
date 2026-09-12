@@ -17,6 +17,7 @@
 
 import type { DayPlanSummary } from "./compose";
 import { DOCUMENT_EMAIL_SIGNATURE_HINT } from "./types";
+import { TIME_ZONE } from "@/config/constants";
 
 export type DocumentEmailVariables = {
   /** Prénom seul : un nom complet dans un objet d'e-mail en dit déjà trop. */
@@ -48,7 +49,7 @@ export type EmailMessage = {
 };
 
 function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
 /** Échappement HTML : le nom d'une officine peut contenir « & » ou « < ». */

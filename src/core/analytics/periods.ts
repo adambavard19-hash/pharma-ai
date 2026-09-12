@@ -1,3 +1,4 @@
+import { TIME_ZONE } from "@/config/constants";
 /**
  * Périodes d'analyse. Toutes les bornes sont calculées dans le fuseau de
  * l'officine (Europe/Paris par défaut) : un « aujourd'hui » qui basculerait à
@@ -138,7 +139,7 @@ function parseISODate(value: string): Date | null {
 }
 
 function formatShort(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(date);
+  return new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "2-digit", month: "short" }).format(date);
 }
 
 /** Série de jours consécutifs, bornes incluses. */

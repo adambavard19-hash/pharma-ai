@@ -1,4 +1,5 @@
 import { escapeHtml } from "@/core/documents/email";
+import { TIME_ZONE } from "@/config/constants";
 
 /**
  * L'e-mail d'accueil d'un titulaire d'officine.
@@ -18,7 +19,7 @@ export type UserPasswordEmailVariables = {
 };
 
 function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
 export function buildUserPasswordEmail(v: UserPasswordEmailVariables): { subject: string; text: string; html: string } {

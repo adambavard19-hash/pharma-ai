@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { ContractDocument } from "./template";
 import { CONTRACT_MARGIN, CONTRACT_PAGE, SIGNATURE_BLOCK, signatureBoxes } from "./layout";
+import { TIME_ZONE } from "@/config/constants";
 
 /**
  * Rendu PDF du contrat : pur JavaScript, sans navigateur — il fonctionne sur
@@ -48,7 +49,7 @@ export async function renderContractPdf(doc: ContractDocument, generatedAt = new
 
   const footer = (p: PDFPage, n: number) => {
     p.drawText(sanitize(`${doc.reference} - page ${n}`), { x: MARGIN, y: 28, size: 8, font: regular, color: grey });
-    p.drawText(sanitize(`Généré le ${new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(generatedAt)}`), { x: A4[0] - MARGIN - 160, y: 28, size: 8, font: regular, color: grey });
+    p.drawText(sanitize(`Généré le ${new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, dateStyle: "long" }).format(generatedAt)}`), { x: A4[0] - MARGIN - 160, y: 28, size: 8, font: regular, color: grey });
   };
   const ensure = (needed: number) => {
     if (y - needed < MARGIN + 30) {

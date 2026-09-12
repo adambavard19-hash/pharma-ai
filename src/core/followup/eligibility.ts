@@ -1,3 +1,4 @@
+import { TIME_ZONE } from "@/config/constants";
 /**
  * Le droit d'envoyer un suivi.
  *
@@ -83,7 +84,7 @@ export function evaluateSendEligibility(input: SendEligibilityInput): SendEligib
       return {
         allowed: false,
         code: "TOO_SOON",
-        reason: `Un suivi a déjà été envoyé récemment. Prochain envoi possible à partir du ${nextPossibleAt.toLocaleDateString("fr-FR")}.`,
+        reason: `Un suivi a déjà été envoyé récemment. Prochain envoi possible à partir du ${nextPossibleAt.toLocaleDateString("fr-FR", { timeZone: TIME_ZONE })}.`,
         nextPossibleAt,
       };
     }

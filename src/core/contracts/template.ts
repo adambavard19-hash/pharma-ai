@@ -1,3 +1,4 @@
+import { TIME_ZONE } from "@/config/constants";
 /**
  * Le modèle de contrat d'abonnement PharmaBoost.
  *
@@ -43,7 +44,7 @@ export type ContractDocument = {
 export const CONTRACT_TEMPLATE_KEY = "abonnement-pharmaboost-v1";
 
 const euros = (cents: number) => `${(cents / 100).toFixed(2).replace(".", ",")} € HT`;
-const dateFr = (d: Date) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric" }).format(d);
+const dateFr = (d: Date) => new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", year: "numeric" }).format(d);
 
 export function buildContractDocument(input: {
   company: ContractParty;

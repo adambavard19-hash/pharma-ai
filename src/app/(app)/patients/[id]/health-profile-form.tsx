@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Badge } from "@/components/ui/badge";
 import type { HealthProfileView } from "@/server/services/patients";
 import type { ActionResult } from "@/server/actions/types";
+import { TIME_ZONE } from "@/config/constants";
 
 const TRI_STATE_OPTIONS = [
   { value: "unknown", label: "Non renseigné" },
@@ -179,7 +180,7 @@ export function HealthProfileForm({
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
           <p className="text-[12px] text-text-tertiary">
             {profile.updatedAt
-              ? `Dernière mise à jour : ${new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" }).format(profile.updatedAt)}`
+              ? `Dernière mise à jour : ${new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, dateStyle: "long", timeStyle: "short" }).format(profile.updatedAt)}`
               : "Aucune donnée enregistrée pour l'instant."}
           </p>
           <Button type="submit" loading={pending} leadingIcon={<Save className="size-4" />}>

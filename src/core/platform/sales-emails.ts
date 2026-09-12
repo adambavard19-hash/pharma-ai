@@ -1,4 +1,5 @@
 import { escapeHtml } from "@/core/documents/email";
+import { TIME_ZONE } from "@/config/constants";
 
 /**
  * Les e-mails de l'extranet commercial : invitation d'un commercial, et
@@ -17,7 +18,7 @@ function shell(title: string, headline: string, inner: string, color = "#111827"
 const button = (url: string, label: string, color = "#111827") =>
   `<a href="${escapeHtml(url)}" style="display:block;margin-top:22px;background:${color};color:#ffffff;text-decoration:none;font-size:17px;line-height:24px;font-weight:700;padding:16px 22px;border-radius:14px;text-align:center">${escapeHtml(label)}</a>`;
 
-const dateTime = (d: Date) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(d);
+const dateTime = (d: Date) => new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(d);
 
 export function buildSalesInvitationEmail(v: { firstName: string; url: string; expiresAt: Date }): { subject: string; text: string; html: string } {
   const text = [
