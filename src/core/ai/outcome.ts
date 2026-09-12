@@ -66,7 +66,7 @@ export type OutcomeMessage = {
   title: string;
   body: string;
   /** Action proposée au pharmacien, quand il y en a une. */
-  action?: "IMPORT_STOCK" | "ADD_ADVICE";
+  action?: "IMPORT_STOCK" | "ADD_ADVICE" | "RELAUNCH";
   tone: "neutral" | "warning" | "info";
 };
 
@@ -103,11 +103,13 @@ export const OUTCOME_MESSAGES: Record<Exclude<EngineOutcome, "PROPOSALS" | "NEED
   AI_UNAVAILABLE: {
     title: "Compréhension de l'ordonnance indisponible",
     body: "Le service de compréhension n'a pas répondu ; l'analyse a tourné avec les seules règles écrites. Relancez l'analyse dans quelques instants.",
+    action: "RELAUNCH",
     tone: "warning",
   },
   ENGINE_ERROR: {
     title: "L'analyse n'a pas pu être menée",
     body: "Aucune ligne confirmée ou une erreur interne a interrompu l'analyse. Confirmez les lignes de l'ordonnance puis relancez.",
+    action: "RELAUNCH",
     tone: "warning",
   },
 };

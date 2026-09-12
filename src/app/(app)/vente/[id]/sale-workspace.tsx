@@ -162,6 +162,31 @@ export function SaleWorkspace({
     setLines(withDefaultConfirmation(initialLines, alreadyVerified));
   }
 
+  // Un conseil accepté côté serveur sans passer par la carte (produit associé,
+  // conseil ajouté par le pharmacien) rejoint la délivrance dès que le serveur
+  // le renvoie ; un prix renseigné après coup remplace le zéro provisoire.
+  const [recommendationsSource, setRecommendationsSource] = useState(recommendations);
+  if (recommendationsSource !== recommendations) {
+    setRecommendationsSource(recommendations);
+    setBasket((current) => {
+      const next = new Map(current);
+      let changed = false;
+      for (const r of recommendations) {
+        if (r.status !== "ACCEPTED" || !r.product) continue;
+        const price = r.unitPriceCents || r.product.salePriceCents;
+        const existing = next.get(r.id);
+        if (!existing) {
+          next.set(r.id, { productId: r.product.presentationId ? null : r.product.id, presentationId: r.product.presentationId, quantity: r.quantity, unitPriceCents: price });
+          changed = true;
+        } else if (existing.unitPriceCents === 0 && price > 0) {
+          next.set(r.id, { ...existing, unitPriceCents: price });
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }
+
   // La phase est dictée par le serveur, jamais par un état local optimiste.
   const analysing = stage !== null;
   const editing = !analysing && (forceEdit || !prescription.verifiedAt);

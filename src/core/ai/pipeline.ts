@@ -567,14 +567,21 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         const product = catalogById.get(item.productId);
         const rule = opportunity?.companion;
         if (!rule || !product || !matchesAny([rule.when], product.name)) return item;
-        const companion = input.catalog.find(
+        // Les motifs sont ordonnés par préférence : le premier qui trouve une
+        // référence en rayon l'emporte.
+        const eligible = input.catalog.filter(
           (candidate) =>
             candidate.id !== product.id &&
             candidate.isActive &&
             candidate.stockQuantity > 0 &&
             !productSafety.blockedProductIds.has(candidate.id) &&
-            matchesAny(rule.productPatterns, candidate.name),
+            !matchesAny(rule.productExclude, candidate.name),
         );
+        let companion: CatalogProduct | undefined;
+        for (const pattern of rule.productPatterns) {
+          companion = eligible.find((candidate) => matchesAny([pattern], candidate.name));
+          if (companion) break;
+        }
         if (!companion) {
           notes.push(`« ${product.name} » : ${rule.label.toLowerCase()} recommandé(e), aucune référence en stock.`);
           return item;

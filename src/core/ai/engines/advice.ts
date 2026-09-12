@@ -124,7 +124,7 @@ export type AdviceRule = {
    * appelle un : `when` reconnaît la référence (un flacon, pas un spray), les
    * `productPatterns` reconnaissent le produit associé dans le stock.
    */
-  companion?: { when: string; productPatterns: string[]; label: string; reason: string };
+  companion?: { when: string; productPatterns: string[]; productExclude?: string[]; label: string; reason: string };
   /** Explication en langage pharmacien. `{drug}` est remplacé. */
   rationaleTemplate: string;
   /**
@@ -463,7 +463,11 @@ export const ADVICE_RULES: AdviceRule[] = [
     // se suffisent.
     companion: {
       when: String.raw`(bouteille|flacon|(250|500|1000) ?ml)(?!.*(spray|pulv|dosette|unidose))`,
-      productPatterns: [String.raw`seringue`, String.raw`poire`, String.raw`lavage (nasal|de nez)`, String.raw`irrigat`, String.raw`rhino ?horn`, String.raw`nasal ?kit`],
+      // Par ordre de préférence : le dispositif nasal dédié d'abord, une
+      // seringue sans aiguille ensuite. Jamais une seringue montée, à insuline
+      // ou intramusculaire.
+      productPatterns: [String.raw`seringue nasale`, String.raw`lavage (nasal|de nez)`, String.raw`poire (nasale|de lavage|a lavement)`, String.raw`rhino ?horn`, String.raw`irrigat`, String.raw`nasal ?kit`, String.raw`seringues? .*sans aig`],
+      productExclude: [String.raw`\bim\b`, String.raw`montee`, String.raw`aig(uille)? (verte|orange|noire|bleue)`, String.raw`insuline`, String.raw`madeleine`, String.raw`effil`, String.raw`nutrisens`],
       label: "Seringue ou dispositif de lavage nasal",
       reason: "Pour administrer le sérum physiologique dans le nez et le laver correctement.",
     },

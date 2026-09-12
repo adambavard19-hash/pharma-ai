@@ -35,6 +35,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ProductPicker } from "./product-picker";
+import { ReanalyseButton } from "./reanalyse-button";
 import { ScoreExplanation } from "./score-explanation";
 import type { AdviceView } from "./types";
 import { OUTCOME_MESSAGES, type EngineOutcome } from "@/core/ai/outcome";
@@ -94,6 +95,8 @@ export function AdviceZone({
   const hidden = available.length - visible.length;
 
   const pending = available.filter((r) => !inBasket(r.id)).length;
+  // Un produit associé déjà ajouté (même après rechargement) ne se propose plus.
+  const presentProductIds = new Set(open.map((r) => r.product?.id).filter((id): id is string => Boolean(id)));
 
   return (
     <section className="space-y-4" aria-labelledby="zone-conseils">
@@ -142,6 +145,7 @@ export function AdviceZone({
               recommendation={recommendation}
               canDecide={canDecide}
               accepted={inBasket(recommendation.id)}
+              presentProductIds={presentProductIds}
               onAccept={() => onAccept(recommendation)}
               onCancelAccept={() => onCancelAccept(recommendation)}
             />
@@ -165,7 +169,7 @@ export function AdviceZone({
           )}
 
           {available.length === 0 && closed.length === 0 && (
-            <EmptyOutcome outcome={outcome} canImportStock={canImportStock} onAddAdvice={() => setAddOpen(true)} />
+            <EmptyOutcome outcome={outcome} canImportStock={canImportStock} canRelaunch={canDecide} prescriptionId={prescriptionId} onAddAdvice={() => setAddOpen(true)} />
           )}
 
           {unavailable.length > 0 && (
@@ -308,6 +312,7 @@ function AdviceCard({
   recommendation,
   canDecide,
   accepted,
+  presentProductIds,
   onAccept,
   onCancelAccept,
 }: {
@@ -315,6 +320,7 @@ function AdviceCard({
   recommendation: AdviceView;
   canDecide: boolean;
   accepted: boolean;
+  presentProductIds: Set<string>;
   onAccept: () => void;
   onCancelAccept: () => void;
 }) {
@@ -381,6 +387,7 @@ function AdviceCard({
         canDecide={canDecide}
         accepted={accepted}
         confirmed={answer === true}
+        companionPresent={Boolean(recommendation.companion && presentProductIds.has(recommendation.companion.productId))}
         onAccept={onAccept}
         onCancelAccept={onCancelAccept}
       />
@@ -398,10 +405,14 @@ function AdviceCard({
 function EmptyOutcome({
   outcome,
   canImportStock,
+  canRelaunch,
+  prescriptionId,
   onAddAdvice,
 }: {
   outcome: EngineOutcome | null;
   canImportStock: boolean;
+  canRelaunch: boolean;
+  prescriptionId: string;
   onAddAdvice: () => void;
 }) {
   const key = outcome && outcome !== "PROPOSALS" && outcome !== "NEEDS_PATIENT_INFORMATION" ? outcome : "NO_RELEVANT_NEED";
@@ -422,8 +433,9 @@ function EmptyOutcome({
           <p className="text-[13px] leading-5 text-text-secondary">{message.body}</p>
         </div>
       </div>
-      {(message.action === "IMPORT_STOCK" && canImportStock) || message.action === "ADD_ADVICE" ? (
+      {(message.action === "IMPORT_STOCK" && canImportStock) || message.action === "ADD_ADVICE" || (message.action === "RELAUNCH" && canRelaunch) ? (
         <div className="mt-4 flex flex-wrap gap-2">
+          {message.action === "RELAUNCH" && canRelaunch && <ReanalyseButton prescriptionId={prescriptionId} />}
           {message.action === "IMPORT_STOCK" && canImportStock && (
             <Button asChild leadingIcon={<Package className="size-[18px]" />}>
               <Link href="/stock/import">Importer mon stock</Link>
@@ -555,6 +567,7 @@ function ProductCard({
   canDecide,
   accepted,
   confirmed,
+  companionPresent = false,
   onAccept,
   onCancelAccept,
 }: {
@@ -562,6 +575,8 @@ function ProductCard({
   recommendation: AdviceView;
   canDecide: boolean;
   accepted: boolean;
+  /** Le produit associé figure déjà parmi les conseils : ne pas le reproposer. */
+  companionPresent?: boolean;
   /** Le patient vient de confirmer le besoin par la question. */
   confirmed: boolean;
   onAccept: () => void;
@@ -605,7 +620,7 @@ function ProductCard({
 
   return (
     <CardFrame accent={accepted ? "success" : "brand"}>
-      {recommendation.companion && !companionAdded && (
+      {recommendation.companion && !companionAdded && !companionPresent && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand-200 bg-brand-50/50 px-4 py-3 dark:border-brand-800 dark:bg-brand-950/20">
           <div className="min-w-0 flex-1">
             <p className="text-[11.5px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">À associer — {recommendation.companion.label}</p>
@@ -676,6 +691,12 @@ function ProductCard({
                   inputMode="decimal"
                   value={priceDraft}
                   onChange={(event) => setPriceDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && /^\d+([.,]\d{1,2})?$/.test(priceDraft.trim()) && !pending) {
+                      event.preventDefault();
+                      run(async () => { const r = await setRecommendationPriceAction({ recommendationId: recommendation.id, unitPriceCents: Math.round(Number(priceDraft.trim().replace(",", ".")) * 100) }); if (r.ok) router.refresh(); return r; });
+                    }
+                  }}
                   placeholder="Prix TTC"
                   aria-label="Prix de vente TTC"
                   className="h-9 w-24 rounded-lg border border-warning-300 bg-warning-50/40 px-2 text-[15px] font-semibold tabular text-text-primary dark:border-warning-800 dark:bg-warning-950/20"

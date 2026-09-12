@@ -384,7 +384,16 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         sell: session.permissions.has(PERMISSIONS.SALE_CREATE),
       }}
       hasSale={prescription.sales.length > 0}
-      outcome={isEngineOutcome(run?.outcome) ? run.outcome : null}
+      outcome={
+        run
+          ? isEngineOutcome(run.outcome)
+            ? run.outcome
+            : null
+          : // Confirmée mais sans analyse enregistrée : l'analyse s'est interrompue.
+            prescription.status === "ANALYZING" || prescription.status === "FAILED"
+            ? "ENGINE_ERROR"
+            : null
+      }
       stockNotice={stockNotice}
       canImportStock={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
     />

@@ -63,9 +63,12 @@ export default async function AnalysisJournalPage({ params }: { params: Promise<
       />
 
       {!latest ? (
-        <Card>
-          <CardContent className="py-6 text-[13.5px] text-text-secondary">Aucune analyse n&apos;a encore été lancée pour cette ordonnance.</CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardContent className="py-6 text-[13.5px] text-text-secondary">Aucune analyse n&apos;a encore été lancée pour cette ordonnance.</CardContent>
+          </Card>
+          {session.permissions.has(PERMISSIONS.PRESCRIPTION_VERIFY) && <ReanalyseButton prescriptionId={prescription.id} />}
+        </>
       ) : (
         <>
           <Card>

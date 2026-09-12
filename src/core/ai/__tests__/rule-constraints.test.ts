@@ -111,3 +111,20 @@ describe("collyre en contexte allergique", () => {
     expect(result.recommendations.map((r) => r.productId)).toEqual(["larmes"]);
   });
 });
+
+describe("choix du produit associé", () => {
+  it("préfère la seringue nasale à une seringue montée, et n'associe jamais une seringue à insuline", async () => {
+    const { runAnalysisPipeline } = await import("../pipeline");
+    const { deriveUnderstanding } = await import("../../understanding");
+    const { patient, product } = await import("./fixtures");
+    const understanding = deriveUnderstanding({ drugs: [{ lineIndex: 0, substance: "ROXITHROMYCINE", atcCode: "J01FA06", therapeuticClass: "Antibiotique macrolide", commonSideEffects: [], confidence: 0.9, source: "MODEL" }], patient: { ageYears: null, sex: "UNSPECIFIED", isPregnant: false, isBreastfeeding: false }, providerId: "t", model: "m" });
+    const bottle = product({ id: "serum", name: "VOG SERUM PHY BOUTEILLE 500ML", category: "SOINS", subCategory: null, matchingTags: ["nez", "nasal", "lavage", "eau de mer", "orl"], commercialClaims: [], stockQuantity: 9 });
+    const mk = (id: string, name: string) => product({ id, name, category: "DISPOSITIFS_MEDICAUX", subCategory: null, matchingTags: [], commercialClaims: [], stockQuantity: 3 });
+    const run = (catalog: ReturnType<typeof product>[]) =>
+      runAnalysisPipeline({ lines: [{ lineIndex: 0, drugName: "RULID", posology: null, durationDays: null, confirmed: true }], knowledge: new Map([["rulid", null]]), patient: patient(), catalog, rules: [], history: {}, explanations: [], extractionFindings: [], understanding, usedSimulatedProviders: false })
+        .recommendations.find((r) => r.productId === "serum")?.companion ?? null;
+    expect(run([bottle, mk("im", "SERINGUE 2 ML IM MONTEE"), mk("nasale", "MCONSEIL SERINGUE NASALE 10ML X2"), mk("sans", "SERINGUE 10 ML SANS AIGUILLE")])?.productId).toBe("nasale");
+    expect(run([bottle, mk("im", "SERINGUE 2 ML IM MONTEE"), mk("sans", "SERINGUE 10 ML SANS AIGUILLE")])?.productId).toBe("sans");
+    expect(run([bottle, mk("insuline", "SERINGUE INSULINE 1ML"), mk("im", "SERINGUE 2 ML IM MONTEE")])).toBeNull();
+  });
+});

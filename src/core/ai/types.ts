@@ -260,7 +260,7 @@ export type AdviceOpportunityResult = {
   /** Motifs de nom qui font préférer une référence (« sans alcool »). */
   productPrefer?: string[];
   /** Le produit à associer à la référence retenue, quand la règle en prévoit un. */
-  companion?: { when: string; productPatterns: string[]; label: string; reason: string } | null;
+  companion?: { when: string; productPatterns: string[]; productExclude?: string[]; label: string; reason: string } | null;
   triggeredBy: { lineIndex: number; drugName: string }[];
   /**
    * La question à poser au patient avant de proposer quoi que ce soit, écrite
