@@ -61,6 +61,7 @@ export function AdviceZone({
   locked,
   outcome,
   canImportStock,
+  stockNotice,
   inBasket,
   onAccept,
   onCancelAccept,
@@ -72,6 +73,7 @@ export function AdviceZone({
   /** Pourquoi il n'y a rien, quand il n'y a rien : c'est ce qui décide du message. */
   outcome: EngineOutcome | null;
   canImportStock: boolean;
+  stockNotice: { tone: "ok" | "warning"; text: string } | null;
   inBasket: (id: string) => boolean;
   /** Le patient accepte : ajout à la délivrance + décision enregistrée. */
   onAccept: (recommendation: AdviceView) => void;
@@ -108,6 +110,13 @@ export function AdviceZone({
           </span>
         )}
       </div>
+
+      {stockNotice && (
+        <p className={cn("flex items-center gap-2 px-1 text-[12.5px]", stockNotice.tone === "warning" ? "text-warning-700 dark:text-warning-400" : "text-text-tertiary")}>
+          {stockNotice.tone === "warning" ? <AlertTriangle className="size-3.5" /> : <Check className="size-3.5" />}
+          {stockNotice.text}
+        </p>
+      )}
 
       {locked ? (
         <div className="flex items-start gap-3 rounded-2xl border border-dashed border-border-default px-5 py-5">

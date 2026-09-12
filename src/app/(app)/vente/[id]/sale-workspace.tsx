@@ -81,6 +81,7 @@ export function SaleWorkspace({
   hasSale,
   outcome,
   canImportStock,
+  stockNotice,
 }: {
   prescription: {
     id: string;
@@ -117,6 +118,8 @@ export function SaleWorkspace({
   /** Pourquoi il y a — ou non — des propositions, d'après la dernière analyse. */
   outcome: EngineOutcome | null;
   canImportStock: boolean;
+  /** De quand date le stock affiché, quand un agent LGO est connecté. */
+  stockNotice: { tone: "ok" | "warning"; text: string } | null;
 }) {
   const alreadyVerified = Boolean(prescription.verifiedAt);
   const [lines, setLines] = useState(() => withDefaultConfirmation(initialLines, alreadyVerified));
@@ -467,7 +470,7 @@ export function SaleWorkspace({
 
           {!editing && !analysing && (
             <>
-              <AdviceZone prescriptionId={prescription.id} recommendations={recommendations} canDecide={permissions.decide} locked={blocked} outcome={outcome} canImportStock={canImportStock} inBasket={(id) => basket.has(id)} onAccept={acceptAdvice} onCancelAccept={cancelAdvice} />
+              <AdviceZone prescriptionId={prescription.id} recommendations={recommendations} canDecide={permissions.decide} locked={blocked} outcome={outcome} canImportStock={canImportStock} stockNotice={stockNotice} inBasket={(id) => basket.has(id)} onAccept={acceptAdvice} onCancelAccept={cancelAdvice} />
               <DeliveryZone
                 accepted={[...basket.entries()].map(([recommendationId, line]) => {
                   const recommendation = recommendations.find((r) => r.id === recommendationId);

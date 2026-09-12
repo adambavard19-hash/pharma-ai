@@ -124,6 +124,9 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
               <Button asChild leadingIcon={<FileSpreadsheet className="size-[18px]" />}>
                 <Link href="/stock/import?retour=bienvenue">{stockDone ? "Importer une mise à jour" : "Importer mon stock"}</Link>
               </Button>
+              <Button asChild variant="outline">
+                <Link href="/stock/connexion">Connecter mon logiciel (synchronisation automatique)</Link>
+              </Button>
               {stockDone && (
                 <Button asChild variant="outline">
                   <Link href="/bienvenue?etape=3">Continuer <ArrowRight className="ml-1 size-4" /></Link>

@@ -110,8 +110,50 @@ model Pharmacy {
   @@index([organizationId])
   /// Le dossier commercial dont cette officine est issue, s'il y en a un.
   prospect Prospect?
+  /// La liaison avec le logiciel de gestion de l'officine, s'il y en a une.
+  stockConnection StockConnection?
 
   @@map("pharmacies")
+}
+
+/// La liaison entre une officine et son logiciel de gestion (LGO), assurée par
+/// l'agent PharmaBoost Connect installé sur le serveur de l'officine.
+///
+/// Un code d'appairage à usage unique relie l'agent à UNE officine ; il
+/// obtient alors une clé, dont seule l'empreinte est conservée. Toute
+/// synchronisation est datée : le comptoir sait toujours de quand date le
+/// stock qu'il affiche, et cesse d'affirmer « en stock » quand c'est trop vieux.
+model StockConnection {
+  id         String @id @default(cuid())
+  pharmacyId String @unique
+  /// Identifiant du LGO (src/core/stock/connectors.ts) : lgpi, smart-rx…
+  lgo        String
+  /// PENDING (code émis, agent pas encore appairé), CONNECTED, STALE, ERROR, DISCONNECTED.
+  status     String @default("PENDING")
+
+  pairingCodeHash  String?   @unique
+  pairingExpiresAt DateTime?
+  agentKeyHash     String?   @unique
+  agentVersion     String?
+  hostname         String?
+
+  /// Réglages transmis à l'agent : chemin de l'export, dossier des scans, intervalle.
+  exportPath      String?
+  scansPath       String?
+  intervalSeconds Int     @default(300)
+
+  lastSeenAt    DateTime?
+  lastSyncAt    DateTime?
+  lastSyncLines Int?
+  lastError     String?
+  pairedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@map("stock_connections")
 }
 
 // ===========================================================================

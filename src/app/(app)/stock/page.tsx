@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Boxes, Clock, History, PackageX, Plus, RefreshCw, Upload } from "lucide-react";
+import { AlertTriangle, Boxes, Cable, Clock, History, PackageX, Plus, RefreshCw, Upload } from "lucide-react";
+import { describeAge, lgoLabel, stockFreshness } from "@/core/stock/connectors";
 import { cn } from "@/lib/utils";
 import { ClassifyProductsButton } from "./classify-button";
 import { prisma } from "@/server/db/client";
@@ -105,11 +106,13 @@ export default async function StockPage({
       orderBy: { finishedAt: "desc" },
       select: { finishedAt: true, fileName: true },
     }),
-    prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true } }),
+    prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true, stockConnection: { select: { lgo: true, status: true, lastSyncAt: true, lastSeenAt: true, intervalSeconds: true, lastError: true } } } }),
     // Les produits que le moteur ne sait pas encore relier à un besoin.
     prisma.product.count({ where: { pharmacyId, deletedAt: null, classifiedAt: null } }),
   ]);
   const syncedAt = pharmacy?.stockSyncedAt ?? lastImport?.finishedAt ?? null;
+  const connection = pharmacy?.stockConnection && pharmacy.stockConnection.status !== "DISCONNECTED" && pharmacy.stockConnection.status !== "PENDING" ? pharmacy.stockConnection : null;
+  const freshness = connection ? stockFreshness({ lastSyncAt: connection.lastSyncAt, lastSeenAt: connection.lastSeenAt, intervalSeconds: connection.intervalSeconds }) : null;
   const zeroPrice = products.filter((product) => product.isActive && product.salePriceCents <= 0).length;
   const anomalies = unclassified + zeroPrice;
 
@@ -190,6 +193,11 @@ export default async function StockPage({
                 <Link href="/stock/ajouter">Ajouter un produit</Link>
               </Button>
             )}
+            {canImport && (
+              <Button asChild variant="ghost" leadingIcon={<Cable className="size-[18px]" />}>
+                <Link href="/stock/connexion">{connection ? "Mon logiciel" : "Connecter mon logiciel"}</Link>
+              </Button>
+            )}
             <Button asChild variant="ghost" leadingIcon={<History className="size-[18px]" />}>
               <Link href="/stock/historique">Historique</Link>
             </Button>
@@ -202,12 +210,19 @@ export default async function StockPage({
       <div
         className={cn(
           "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-[13.5px]",
-          syncedAt ? "border-border-subtle bg-surface-card" : "border-warning-300 bg-warning-50/50 dark:border-warning-800 dark:bg-warning-950/20",
+          (connection ? freshness?.state === "FRESH" : Boolean(syncedAt)) ? "border-border-subtle bg-surface-card" : "border-warning-300 bg-warning-50/50 dark:border-warning-800 dark:bg-warning-950/20",
         )}
       >
         <p className="flex items-center gap-2 text-text-primary">
-          {syncedAt ? <RefreshCw className="size-4 text-success-600" /> : <AlertTriangle className="size-4 text-warning-700 dark:text-warning-400" />}
-          {syncedAt ? (
+          {(connection ? freshness?.state === "FRESH" : Boolean(syncedAt)) ? <RefreshCw className="size-4 text-success-600" /> : <AlertTriangle className="size-4 text-warning-700 dark:text-warning-400" />}
+          {connection && freshness ? (
+            <>
+              <span className="font-medium">
+                {freshness.state === "FRESH" ? `Stock synchronisé avec ${lgoLabel(connection.lgo)} ${describeAge(freshness.ageSeconds)}` : freshness.state === "STALE" ? `Stock ${lgoLabel(connection.lgo)} non synchronisé ${describeAge(freshness.ageSeconds)} : périmé` : `Agent ${lgoLabel(connection.lgo)} injoignable — stock non vérifié ${describeAge(freshness.ageSeconds)}`}
+              </span>
+              <span className="text-text-tertiary">· {rows.length} référence{rows.length > 1 ? "s" : ""}{connection.lastError ? ` · ${connection.lastError}` : ""}</span>
+            </>
+          ) : syncedAt ? (
             <>
               <span className="font-medium">Stock synchronisé le {formatDateTime(syncedAt)}</span>
               <span className="text-text-tertiary">· {rows.length} référence{rows.length > 1 ? "s" : ""} · import de fichier</span>

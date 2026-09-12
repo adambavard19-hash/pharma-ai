@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/feedback";
 import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
+import { lgoLabel, stockFreshness } from "@/core/stock/connectors";
 import { CreatePharmacyButton } from "./pharmacy-form";
 import { StatusToggle } from "./status-toggle";
 
@@ -35,6 +36,7 @@ export default async function ClientPharmaciesPage() {
         createdAt: true,
         onboardingCompletedAt: true,
         stockSyncedAt: true,
+        stockConnection: { select: { lgo: true, status: true, lastSyncAt: true, lastSeenAt: true, intervalSeconds: true } },
         memberships: {
           where: { isActive: true },
           select: {
@@ -201,7 +203,11 @@ export default async function ClientPharmaciesPage() {
                               <span className="text-warning-700"> · {anomaliesOf(pharmacy.id)} à classer</span>
                             )}
                           </span>
-                          <span className="block text-[12px] text-text-tertiary">sync. {formatDate(pharmacy.stockSyncedAt)}</span>
+                          <span className="block text-[12px] text-text-tertiary">
+                            {pharmacy.stockConnection && pharmacy.stockConnection.status !== "PENDING" && pharmacy.stockConnection.status !== "DISCONNECTED"
+                              ? `${lgoLabel(pharmacy.stockConnection.lgo)} · ${stockFreshness({ lastSyncAt: pharmacy.stockConnection.lastSyncAt, lastSeenAt: pharmacy.stockConnection.lastSeenAt, intervalSeconds: pharmacy.stockConnection.intervalSeconds }).state === "FRESH" ? "à jour" : "à vérifier"}`
+                              : `sync. ${formatDate(pharmacy.stockSyncedAt)} · fichier`}
+                          </span>
                         </>
                       ) : (
                         <Badge tone="warning">Jamais importé</Badge>

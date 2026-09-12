@@ -1,6 +1,7 @@
 import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
 import { isEngineOutcome } from "@/core/ai/outcome";
+import { describeAge, lgoLabel, stockFreshness } from "@/core/stock/connectors";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
@@ -97,6 +98,20 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   // Ce que l'officine détient des médicaments prescrits. Une seule requête,
   // ciblée sur les spécialités rattachées.
   const availability = await loadPrescribedAvailability(session.scope.pharmacyId, prescription.id);
+
+  // De quand date le stock affiché ? Avec un agent connecté, le comptoir le
+  // dit, et cesse d'affirmer « en stock » quand la synchronisation a manqué.
+  const connection = await prisma.stockConnection.findUnique({
+    where: { pharmacyId: session.scope.pharmacyId },
+    select: { lgo: true, status: true, lastSyncAt: true, lastSeenAt: true, intervalSeconds: true },
+  });
+  const stockNotice = (() => {
+    if (!connection || connection.status === "PENDING" || connection.status === "DISCONNECTED") return null;
+    const fresh = stockFreshness({ lastSyncAt: connection.lastSyncAt, lastSeenAt: connection.lastSeenAt, intervalSeconds: connection.intervalSeconds });
+    if (fresh.state === "FRESH") return { tone: "ok" as const, text: `Stock ${lgoLabel(connection.lgo)} vérifié ${describeAge(fresh.ageSeconds)}` };
+    if (fresh.state === "STALE") return { tone: "warning" as const, text: `Stock ${lgoLabel(connection.lgo)} non synchronisé ${describeAge(fresh.ageSeconds)} : les quantités affichées peuvent être dépassées.` };
+    return { tone: "warning" as const, text: `Agent ${lgoLabel(connection.lgo)} injoignable : stock non vérifié ${describeAge(fresh.ageSeconds)}.` };
+  })();
 
   // Les facteurs patient qui ont RÉELLEMENT pesé sur l'analyse. Ils sont
   // soumis à la permission de consultation des données de santé : le comptoir
@@ -341,6 +356,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
       }}
       hasSale={prescription.sales.length > 0}
       outcome={isEngineOutcome(run?.outcome) ? run.outcome : null}
+      stockNotice={stockNotice}
       canImportStock={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
     />
   );
