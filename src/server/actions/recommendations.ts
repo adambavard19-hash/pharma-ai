@@ -454,8 +454,9 @@ export async function addManualRecommendationAction(
 }
 
 const ruleSchema = z.object({
-  type: z.enum(["PREFER_PRODUCT", "EXCLUDE_PRODUCT", "PREFER_CATEGORY", "EXCLUDE_CATEGORY"]),
+  type: z.enum(["PREFER_PRODUCT", "EXCLUDE_PRODUCT", "PREFER_CATEGORY", "EXCLUDE_CATEGORY", "PREFER_BRAND", "EXCLUDE_BRAND"]),
   productId: z.string().optional().nullable(),
+  brand: z.string().trim().max(80).optional().nullable(),
   category: z
     .enum([
       "PROBIOTIQUES",
@@ -494,11 +495,13 @@ export async function createPharmacyRuleAction(
     return fail("Vérifiez la règle saisie.", zodFieldErrors(parsed.error.issues));
   }
 
-  const { type, productId, category, note } = parsed.data;
+  const { type, productId, category, note, brand } = parsed.data;
   const targetsProduct = type === "PREFER_PRODUCT" || type === "EXCLUDE_PRODUCT";
+  const targetsBrand = type === "PREFER_BRAND" || type === "EXCLUDE_BRAND";
 
   if (targetsProduct && !productId) return fail("Sélectionnez une référence.");
-  if (!targetsProduct && !category) return fail("Sélectionnez une catégorie.");
+  if (targetsBrand && !brand?.trim()) return fail("Indiquez le laboratoire ou la marque.");
+  if (!targetsProduct && !targetsBrand && !category) return fail("Sélectionnez une catégorie.");
 
   if (productId) {
     const product = await prisma.product.findUnique({
@@ -515,7 +518,8 @@ export async function createPharmacyRuleAction(
       pharmacyId: session.scope.pharmacyId,
       type,
       productId: targetsProduct ? productId : null,
-      category: targetsProduct ? null : category,
+      category: targetsProduct || targetsBrand ? null : category,
+      brand: targetsBrand ? brand?.trim() : null,
       note: note ?? null,
       createdByUserId: session.scope.userId,
     },
@@ -526,11 +530,38 @@ export async function createPharmacyRuleAction(
     entityType: "PharmacyRule",
     pharmacyId: session.scope.pharmacyId,
     userId: session.scope.userId,
-    metadata: { type, productId, category },
+    metadata: { type, productId, category, brand: targetsBrand ? brand : null },
   });
 
   revalidatePath("/parametres/regles");
   return ok(null, "Règle enregistrée. Elle s'appliquera aux prochaines analyses.");
+}
+
+const priceSchema = z.object({
+  recommendationId: z.string().min(1),
+  unitPriceCents: z.coerce.number().int().min(0).max(1_000_000),
+});
+
+/**
+ * Le prix de vente, renseigné au comptoir quand l'export du logiciel ne
+ * l'apportait pas. Il est écrit sur la proposition ET sur la fiche produit :
+ * la prochaine fois, il sera là.
+ */
+export async function setRecommendationPriceAction(payload: z.input<typeof priceSchema>): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_DECIDE);
+  const parsed = priceSchema.safeParse(payload);
+  if (!parsed.success) return fail("Prix invalide.");
+  const recommendation = await assertOwnedRecommendation(parsed.data.recommendationId, session.scope.pharmacyId);
+  if (!recommendation) return fail("Recommandation introuvable dans cette officine.");
+  await prisma.$transaction(async (tx) => {
+    await tx.recommendation.update({ where: { id: recommendation.id }, data: { unitPriceCents: parsed.data.unitPriceCents } });
+    if (recommendation.productId) {
+      await tx.product.update({ where: { id: recommendation.productId }, data: { salePriceCents: parsed.data.unitPriceCents } });
+    }
+  });
+  await recordAudit({ action: "recommendation.modified", entityType: "Recommendation", entityId: recommendation.id, pharmacyId: session.scope.pharmacyId, userId: session.scope.userId, metadata: { unitPriceCents: parsed.data.unitPriceCents, priceSet: true } });
+  revalidatePath(`/vente/${recommendation.prescriptionId}`);
+  return ok(null, "Prix enregistré, sur la proposition et sur la fiche produit.");
 }
 
 export async function deletePharmacyRuleAction(ruleId: string): Promise<ActionResult<null>> {

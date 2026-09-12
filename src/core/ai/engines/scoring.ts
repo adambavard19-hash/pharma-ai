@@ -1,3 +1,4 @@
+import { matchesAny, nameCarriesBrand } from "./product-name";
 import type {
   AdviceOpportunityResult,
   CatalogProduct,
@@ -78,11 +79,15 @@ function scoreRelevance(
     ? matched.length / opportunity.matchingTags.length
     : 0;
 
-  const value = Math.min(1, (categoryMatch ? 0.55 : 0.15) + tagRatio * 0.45);
+  // Une formule que la règle préfère (« sans alcool ») passe devant ses
+  // équivalentes : c'est une question de pertinence, pas de marge.
+  const preferred = matchesAny(opportunity.productPrefer, product.name);
+  const value = Math.min(1, (categoryMatch ? 0.55 : 0.15) + tagRatio * 0.45 + (preferred ? 0.1 : 0));
 
   const details: string[] = [];
   if (categoryMatch) details.push(`catégorie ${opportunity.category.toLowerCase()}`);
   if (matched.length) details.push(`correspondance : ${matched.join(", ")}`);
+  if (preferred) details.push("formule préférée par la règle");
   if (!details.length) details.push("aucune correspondance directe");
 
   return { value, detail: details.join(" · ") };
@@ -200,6 +205,17 @@ function scorePharmacistPreference(
     if (rule.type === "PREFER_CATEGORY" && targetsCategory) {
       value = Math.min(1, value + 0.25 * rule.weight);
       details.push("catégorie privilégiée par l'officine");
+    }
+    // Les laboratoires que l'officine met en avant, ou écarte : reconnus sur
+    // la marque ou dans le nom du produit. Une préférence, jamais un
+    // contournement : elle vit dans cette seule dimension du score.
+    const targetsBrand = Boolean(rule.brand) && nameCarriesBrand(product.name, rule.brand, product.brand);
+    if (rule.type === "EXCLUDE_BRAND" && targetsBrand) {
+      return { value: 0, detail: `laboratoire ${rule.brand} exclu par l'officine`, excluded: true };
+    }
+    if (rule.type === "PREFER_BRAND" && targetsBrand) {
+      value = Math.min(1, value + 0.35 * rule.weight);
+      details.push(`laboratoire ${rule.brand} mis en avant par l'officine`);
     }
   }
 

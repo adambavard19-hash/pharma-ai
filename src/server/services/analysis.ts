@@ -550,6 +550,7 @@ export async function analysePrescription(params: {
           counterScript: recommendation.counterScript,
           precautions: recommendation.precautions,
           unitPriceCents: product?.salePriceCents ?? 0,
+          companion: recommendation.companion ? (recommendation.companion as never) : undefined,
           isDemo: prescription.isDemo,
         },
       });

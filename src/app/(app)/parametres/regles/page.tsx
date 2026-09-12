@@ -135,6 +135,7 @@ export default async function AdvicePage({
               ? `${rule.product.name}${rule.product.brand ? ` (${rule.product.brand})` : ""}`
               : null,
             category: rule.category,
+            brand: rule.brand,
             note: rule.note,
             isActive: rule.isActive,
             createdAt: rule.createdAt.toISOString(),

@@ -111,6 +111,20 @@ export type AdviceRule = {
   basePriority: number;
   matchingTags: string[];
   excludeTags: string[];
+  /**
+   * Motifs (sur le nom du produit, sans accents, en minuscules) qui ÉCARTENT
+   * une référence pour cette règle, sauf si un motif de `productPrefer` la
+   * sauve. Un bain de bouche alcoolisé après un corticoïde inhalé, par exemple.
+   */
+  productExclude?: string[];
+  /** Motifs qui font préférer une référence à ses équivalentes (« sans alcool »). */
+  productPrefer?: string[];
+  /**
+   * Le produit à associer à la proposition, quand la référence retenue en
+   * appelle un : `when` reconnaît la référence (un flacon, pas un spray), les
+   * `productPatterns` reconnaissent le produit associé dans le stock.
+   */
+  companion?: { when: string; productPatterns: string[]; label: string; reason: string };
   /** Explication en langage pharmacien. `{drug}` est remplacé. */
   rationaleTemplate: string;
   /**
@@ -441,6 +455,18 @@ export const ADVICE_RULES: AdviceRule[] = [
     sideEffectTriggers: [],
     basePriority: 62,
     matchingTags: ["nez", "nasal", "lavage", "eau de mer", "orl", "spray nasal"],
+    // « Lavage » est un mot partagé : un collyre ou un produit auriculaire ne
+    // lave pas le nez. Écartés par leur nom.
+    productExclude: [String.raw`collyre`, String.raw`oculaire`, String.raw`ophtalm`, String.raw`\byeux\b`, String.raw`larmes`, String.raw`auriculaire`, String.raw`oreille`],
+    // Un flacon de sérum physiologique ne se lave pas le nez tout seul : il
+    // faut une seringue ou une poire de lavage. Le spray et la dosette, eux,
+    // se suffisent.
+    companion: {
+      when: String.raw`(bouteille|flacon|(250|500|1000) ?ml)(?!.*(spray|pulv|dosette|unidose))`,
+      productPatterns: [String.raw`seringue`, String.raw`poire`, String.raw`lavage (nasal|de nez)`, String.raw`irrigat`, String.raw`rhino ?horn`, String.raw`nasal ?kit`],
+      label: "Seringue ou dispositif de lavage nasal",
+      reason: "Pour administrer le sérum physiologique dans le nez et le laver correctement.",
+    },
     excludeTags: [],
     shortReasonTemplate:
       "Contexte ORL ({drug}) : une gêne nasale est fréquente et l'ordonnance ne prévoit rien pour le nez.",
@@ -588,6 +614,11 @@ export const ADVICE_RULES: AdviceRule[] = [
     sideEffectTriggers: [],
     basePriority: 52,
     matchingTags: ["yeux", "oculaire", "collyre", "lavage", "larmes"],
+    // Une irritation allergique se lave et s'hydrate ; elle ne se traite pas
+    // avec un collyre antiseptique ou antibiotique, qui ont d'autres
+    // indications et sont écartés par leur nom.
+    productExclude: [String.raw`nasal`, String.raw`\bnez\b`, String.raw`rhino`, String.raw`desomedine`, String.raw`hexamidine`, String.raw`antiseptique`, String.raw`antibio`, String.raw`tobramycine`, String.raw`tobrex`, String.raw`rifamycine`, String.raw`azyter`, String.raw`chloramphenicol`, String.raw`ofloxacine`, String.raw`ciprofloxacine`, String.raw`dexamethasone`, String.raw`cortico`],
+    productPrefer: [String.raw`larmes`, String.raw`lavage`, String.raw`hydrat`, String.raw`serum phy`, String.raw`unidose`],
     excludeTags: [],
     shortReasonTemplate:
       "Contexte allergique ({drug}) : une irritation des yeux est fréquente.",
@@ -625,6 +656,12 @@ export const ADVICE_RULES: AdviceRule[] = [
     // Un produit hydratant pour bouche sèche partage la catégorie et les mots,
     // mais il ne rince pas : il est écarté, pas départagé.
     excludeTags: ["hydratation"],
+    // Après un corticoïde inhalé, un bain de bouche alcoolisé irrite et
+    // déséquilibre la flore buccale : les formules connues pour contenir de
+    // l'alcool sont écartées, sauf mention « sans alcool ». Liste à valider par
+    // un pharmacien, comme la règle elle-même.
+    productExclude: [String.raw`alcool`, String.raw`eludril(?! ?(pro|care|junior))`, String.raw`listerine`, String.raw`alodont`, String.raw`hextril`, String.raw`givalex`],
+    productPrefer: [String.raw`sans alcool`, String.raw`0 ?% ?alcool`, String.raw`zero`, String.raw`zéro`],
     shortReasonTemplate:
       "Corticoïde inhalé ({drug}) : rincer la bouche après chaque prise limite les mycoses buccales.",
     rationaleTemplate:
@@ -804,6 +841,9 @@ export function detectAdviceOpportunities(params: {
       blockReason,
       matchingTags: rule.matchingTags,
       excludeTags: rule.excludeTags,
+      productExclude: rule.productExclude ?? [],
+      productPrefer: rule.productPrefer ?? [],
+      companion: rule.companion ?? null,
       triggeredBy: triggers.map((t) => ({ lineIndex: t.lineIndex, drugName: t.drugName })),
       ruleKey: rule.key,
       ruleVersion: rule.version,

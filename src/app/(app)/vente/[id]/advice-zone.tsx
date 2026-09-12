@@ -23,7 +23,9 @@ import {
   removeRecommendationAction,
   reopenRecommendationAction,
   replaceRecommendationAction,
+  setRecommendationPriceAction,
 } from "@/server/actions/recommendations";
+import { useRouter } from "next/navigation";
 import { answerOpportunityAction } from "@/server/actions/opportunities";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -136,6 +138,7 @@ export function AdviceZone({
           {visible.map((recommendation) => (
             <AdviceCard
               key={recommendation.id}
+              prescriptionId={prescriptionId}
               recommendation={recommendation}
               canDecide={canDecide}
               accepted={inBasket(recommendation.id)}
@@ -301,12 +304,14 @@ function ReopenButton({
 }
 
 function AdviceCard({
+  prescriptionId,
   recommendation,
   canDecide,
   accepted,
   onAccept,
   onCancelAccept,
 }: {
+  prescriptionId: string;
   recommendation: AdviceView;
   canDecide: boolean;
   accepted: boolean;
@@ -371,6 +376,7 @@ function AdviceCard({
         </p>
       )}
       <ProductCard
+        prescriptionId={prescriptionId}
         recommendation={recommendation}
         canDecide={canDecide}
         accepted={accepted}
@@ -506,7 +512,7 @@ function QuestionCard({
         {product && (
           <p className="mt-2 text-[13.5px] text-text-secondary">
             Si oui, proposer <span className="font-medium text-text-primary">{product.name}</span> ·{" "}
-            <span className="tabular">{formatCents(price)}</span> · {product.quantity} en stock
+            <span className="tabular">{price > 0 ? formatCents(price) : "prix à renseigner"}</span> · {product.quantity} en stock
           </p>
         )}
       </div>
@@ -544,6 +550,7 @@ function QuestionCard({
 }
 
 function ProductCard({
+  prescriptionId,
   recommendation,
   canDecide,
   accepted,
@@ -551,6 +558,7 @@ function ProductCard({
   onAccept,
   onCancelAccept,
 }: {
+  prescriptionId: string;
   recommendation: AdviceView;
   canDecide: boolean;
   accepted: boolean;
@@ -570,6 +578,9 @@ function ProductCard({
   const product = recommendation.product;
   const lowStock = product ? product.quantity > 0 && product.quantity <= product.alertThreshold : false;
   const price = recommendation.unitPriceCents || (product?.salePriceCents ?? 0);
+  const [priceDraft, setPriceDraft] = useState("");
+  const [companionAdded, setCompanionAdded] = useState(false);
+  const router = useRouter();
 
   // Le pourquoi lu au comptoir vient de la règle : il dit le lien entre
   // l'ordonnance et la proposition. Quand le patient vient de confirmer la
@@ -594,6 +605,44 @@ function ProductCard({
 
   return (
     <CardFrame accent={accepted ? "success" : "brand"}>
+      {recommendation.companion && !companionAdded && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand-200 bg-brand-50/50 px-4 py-3 dark:border-brand-800 dark:bg-brand-950/20">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11.5px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">À associer — {recommendation.companion.label}</p>
+            <p className="text-[14px] font-medium text-text-primary">
+              {recommendation.companion.name}
+              <span className="ml-2 text-[13px] font-normal text-text-secondary">
+                {recommendation.companion.salePriceCents > 0 ? formatCents(recommendation.companion.salePriceCents) : "prix à renseigner"} · {recommendation.companion.stockQuantity} en stock
+              </span>
+            </p>
+            <p className="text-[12.5px] text-text-secondary">{recommendation.companion.reason}</p>
+          </div>
+          {canDecide && (
+            <Button
+              size="sm"
+              loading={pending}
+              leadingIcon={<Plus className="size-4" />}
+              onClick={() =>
+                run(async () => {
+                  const r = await addManualRecommendationAction({
+                    prescriptionId,
+                    productId: recommendation.companion!.productId,
+                    quantity: 1,
+                    patientReason: recommendation.companion!.reason,
+                  });
+                  if (r.ok) {
+                    setCompanionAdded(true);
+                    router.refresh();
+                  }
+                  return r;
+                })
+              }
+            >
+              Ajouter à la délivrance
+            </Button>
+          )}
+        </div>
+      )}
       <div className="flex items-start gap-4">
         {product?.imageUrl ? (
           <Image
@@ -614,9 +663,36 @@ function ProductCard({
             {product?.name ?? "Produit supprimé"}
           </p>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <span className="text-[26px] leading-7 font-semibold tabular text-text-primary">
-              {formatCents(price)}
-            </span>
+            {price > 0 ? (
+              <span className="text-[26px] leading-7 font-semibold tabular text-text-primary">
+                {formatCents(price)}
+              </span>
+            ) : canDecide ? (
+              // Le prix manque (export sans prix de vente) : on le saisit ici,
+              // une fois, et il est écrit sur la fiche produit.
+              <span className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={priceDraft}
+                  onChange={(event) => setPriceDraft(event.target.value)}
+                  placeholder="Prix TTC"
+                  aria-label="Prix de vente TTC"
+                  className="h-9 w-24 rounded-lg border border-warning-300 bg-warning-50/40 px-2 text-[15px] font-semibold tabular text-text-primary dark:border-warning-800 dark:bg-warning-950/20"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!/^\d+([.,]\d{1,2})?$/.test(priceDraft.trim())}
+                  loading={pending}
+                  onClick={() => run(async () => { const r = await setRecommendationPriceAction({ recommendationId: recommendation.id, unitPriceCents: Math.round(Number(priceDraft.trim().replace(",", ".")) * 100) }); if (r.ok) router.refresh(); return r; })}
+                >
+                  Enregistrer le prix
+                </Button>
+              </span>
+            ) : (
+              <span className="text-[15px] font-medium text-warning-700 dark:text-warning-400">Prix à renseigner</span>
+            )}
             <span
               className={cn(
                 "rounded-full px-2.5 py-0.5 text-[12.5px] font-medium",
@@ -1030,6 +1106,7 @@ function RemoveModal({
         </>
       }
     >
+
       <div className="space-y-4">
         <Alert tone="info">
           « Retirer » traduit votre jugement professionnel : la proposition n&apos;était pas

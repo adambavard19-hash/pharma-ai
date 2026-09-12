@@ -17,7 +17,10 @@ import type { TenantScope } from "@/server/db/tenant";
  */
 
 export type SaleLineInput = {
-  productId: string;
+  /** Produit de l'officine, ou `null` pour un médicament conseil du catalogue national. */
+  productId?: string | null;
+  /** Présentation du catalogue national, en stock officine (`PharmacyDrugStock`). */
+  presentationId?: string | null;
   recommendationId?: string | null;
   quantity: number;
   /** Prix unitaire en centimes. Reprend le prix catalogue si absent. */
@@ -60,17 +63,32 @@ export async function recordSale(params: {
     }
   }
 
-  const productIds = params.lines.map((line) => line.productId);
-  const products = await prisma.product.findMany({
-    where: { id: { in: productIds }, pharmacyId: params.scope.pharmacyId },
-    include: { stockItem: true },
-  });
+  const productIds = params.lines.map((line) => line.productId).filter((id): id is string => Boolean(id));
+  const presentationIds = params.lines.map((line) => line.presentationId).filter((id): id is string => Boolean(id));
+  const [products, drugLines] = await Promise.all([
+    prisma.product.findMany({
+      where: { id: { in: productIds }, pharmacyId: params.scope.pharmacyId },
+      include: { stockItem: true },
+    }),
+    // Un médicament conseil ne se vend que s'il est dans le stock de CETTE
+    // officine : la ligne de stock fait foi, jamais le catalogue national seul.
+    presentationIds.length > 0
+      ? prisma.pharmacyDrugStock.findMany({
+          where: { presentationId: { in: presentationIds }, pharmacyId: params.scope.pharmacyId },
+          include: { presentation: { select: { id: true, priceCents: true, reimbursementRate: true, specialty: { select: { name: true } } } } },
+        })
+      : [],
+  ]);
 
   if (products.length !== new Set(productIds).size) {
     throw new Error("Un produit de la vente n'appartient pas à cette officine.");
   }
+  if (drugLines.length !== new Set(presentationIds).size) {
+    throw new Error("Un médicament de la vente n'est pas dans le stock de cette officine.");
+  }
 
   const productById = new Map(products.map((p) => [p.id, p]));
+  const drugByPresentation = new Map(drugLines.map((d) => [d.presentationId, d]));
 
   // Les recommandations citées doivent appartenir à l'officine : sans ce
   // contrôle, une requête forgée pourrait s'attribuer une vente d'un tiers.
@@ -88,18 +106,38 @@ export async function recordSale(params: {
   const validRecommendationIds = new Set(recommendations.map((r) => r.id));
 
   const computed = params.lines.map((line) => {
-    const product = productById.get(line.productId)!;
-    const unitPriceCents = line.unitPriceCents ?? product.salePriceCents;
     const quantity = Math.max(1, Math.trunc(line.quantity));
-    const totalCents = unitPriceCents * quantity;
-    const marginCents = (unitPriceCents - product.purchasePriceCents) * quantity;
     const recommendationId =
       line.recommendationId && validRecommendationIds.has(line.recommendationId)
         ? line.recommendationId
         : null;
 
+    if (line.presentationId) {
+      const drug = drugByPresentation.get(line.presentationId)!;
+      const unitPriceCents = line.unitPriceCents ?? drug.priceCents ?? drug.presentation.priceCents ?? 0;
+      return {
+        product: null,
+        presentation: drug,
+        label: drug.presentation.specialty.name,
+        recommendationId,
+        quantity,
+        unitPriceCents,
+        totalCents: unitPriceCents * quantity,
+        // Prix d'achat inconnu pour un médicament : marge non calculée.
+        marginCents: 0,
+        vatRate: (drug.presentation.reimbursementRate ?? 0) > 0 ? 2.1 : 10,
+      };
+    }
+
+    const product = productById.get(line.productId as string)!;
+    const unitPriceCents = line.unitPriceCents ?? product.salePriceCents;
+    const totalCents = unitPriceCents * quantity;
+    const marginCents = (unitPriceCents - product.purchasePriceCents) * quantity;
+
     return {
       product,
+      presentation: null,
+      label: product.name,
       recommendationId,
       quantity,
       unitPriceCents,
@@ -137,9 +175,10 @@ export async function recordSale(params: {
         isDemo: params.isDemo ?? false,
         lines: {
           create: computed.map((line) => ({
-            productId: line.product.id,
+            productId: line.product?.id ?? null,
+            presentationId: line.presentation?.presentationId ?? null,
             recommendationId: line.recommendationId,
-            label: line.product.name,
+            label: line.label,
             quantity: line.quantity,
             unitPriceCents: line.unitPriceCents,
             totalCents: line.totalCents,
@@ -207,15 +246,27 @@ export async function recordSale(params: {
   // Le mouvement de stock est appliqué hors transaction principale afin que
   // l'échec d'un décrément (produit sans fiche stock) n'annule pas la vente.
   for (const line of computed) {
+    if (line.presentation) {
+      // Stock médicament : décrément direct, jamais en dessous de zéro.
+      await prisma.pharmacyDrugStock
+        .update({
+          where: { id: line.presentation.id },
+          data: { quantity: Math.max(0, line.presentation.quantity - line.quantity) },
+        })
+        .catch((error) => console.error("[sales] stock médicament non décrémenté", line.presentation?.presentationId, error));
+      continue;
+    }
+    if (!line.product) continue;
+    const productId = line.product.id;
     await applyStockMovement({
       scope: params.scope,
-      productId: line.product.id,
+      productId,
       quantityDelta: -line.quantity,
       type: "SALE",
       reason: `Vente ${reference}`,
       saleId: sale.id,
     }).catch((error) => {
-      console.error("[sales] mouvement de stock impossible", line.product.id, error);
+      console.error("[sales] mouvement de stock impossible", productId, error);
     });
   }
 

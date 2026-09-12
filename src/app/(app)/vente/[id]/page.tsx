@@ -1,6 +1,11 @@
 import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
 import { isEngineOutcome } from "@/core/ai/outcome";
+import type { CompanionSuggestion } from "@/core/ai/types";
+
+function isCompanion(value: unknown): value is CompanionSuggestion {
+  return typeof value === "object" && value !== null && typeof (value as CompanionSuggestion).productId === "string" && typeof (value as CompanionSuggestion).name === "string";
+}
 import { describeAge, lgoLabel, stockFreshness } from "@/core/stock/connectors";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/client";
@@ -58,6 +63,16 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         orderBy: [{ totalScore: "desc" }],
         include: {
           product: { include: { stockItem: true } },
+          // Un médicament conseil du catalogue national : son nom officiel,
+          // et la ligne de stock de CETTE officine pour le prix et la quantité.
+          presentation: {
+            select: {
+              id: true,
+              priceCents: true,
+              specialty: { select: { name: true } },
+              pharmacyStocks: { where: { pharmacyId: session.scope.pharmacyId }, select: { quantity: true, alertThreshold: true, priceCents: true } },
+            },
+          },
           opportunity: true,
           decidedBy: { select: { firstName: true, lastName: true } },
         },
@@ -315,6 +330,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           product: recommendation.product
             ? {
                 id: recommendation.product.id,
+                presentationId: null,
                 name: recommendation.product.name,
                 brand: recommendation.product.brand,
                 imageUrl: recommendation.product.imageUrl,
@@ -323,7 +339,20 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                 alertThreshold: recommendation.product.stockItem?.alertThreshold ?? 0,
                 claims: recommendation.product.commercialClaims,
               }
-            : null,
+            : recommendation.presentation
+              ? {
+                  id: recommendation.presentation.id,
+                  presentationId: recommendation.presentation.id,
+                  name: recommendation.presentation.specialty.name,
+                  brand: null,
+                  imageUrl: null,
+                  salePriceCents: recommendation.presentation.pharmacyStocks[0]?.priceCents ?? recommendation.presentation.priceCents ?? 0,
+                  quantity: recommendation.presentation.pharmacyStocks[0]?.quantity ?? 0,
+                  alertThreshold: recommendation.presentation.pharmacyStocks[0]?.alertThreshold ?? 0,
+                  claims: [],
+                }
+              : null,
+          companion: isCompanion(recommendation.companion) ? recommendation.companion : null,
         };
       })}
       analysisRunId={run?.id ?? null}

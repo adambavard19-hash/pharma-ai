@@ -40,7 +40,7 @@ import type {
 import type { PipelineStageTrace } from "@/core/ai/types";
 import type { ProductSearchResult } from "@/app/api/produits/recherche/route";
 
-type BasketLine = { productId: string; quantity: number; unitPriceCents: number };
+type BasketLine = { productId: string | null; presentationId: string | null; quantity: number; unitPriceCents: number };
 
 /**
  * Une ligne lue avec un nom est à confirmer par défaut : le pharmacien exclut
@@ -137,7 +137,8 @@ export function SaleWorkspace({
           .map((r) => [
             r.id,
             {
-              productId: r.product!.id,
+              productId: r.product!.presentationId ? null : r.product!.id,
+              presentationId: r.product!.presentationId,
               quantity: r.quantity,
               unitPriceCents: r.unitPriceCents || r.product!.salePriceCents,
             },
@@ -196,7 +197,8 @@ export function SaleWorkspace({
     setBasket((current) => {
       const next = new Map(current);
       next.set(recommendation.id, {
-        productId: product.id,
+        productId: product.presentationId ? null : product.id,
+        presentationId: product.presentationId,
         quantity: recommendation.quantity,
         unitPriceCents: recommendation.unitPriceCents || product.salePriceCents,
       });
@@ -318,6 +320,7 @@ export function SaleWorkspace({
       ...[...basket.entries()].map(([recommendationId, line]) => ({
         recommendationId,
         productId: line.productId,
+        presentationId: line.presentationId,
         quantity: line.quantity,
         unitPriceCents: line.unitPriceCents,
       })),

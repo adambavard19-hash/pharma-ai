@@ -17,7 +17,7 @@ import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
 import { formatDate } from "@/lib/format";
 import type { ProductCategoryCode } from "@/core/ai/types";
 
-type RuleType = "PREFER_PRODUCT" | "EXCLUDE_PRODUCT" | "PREFER_CATEGORY" | "EXCLUDE_CATEGORY";
+type RuleType = "PREFER_PRODUCT" | "EXCLUDE_PRODUCT" | "PREFER_CATEGORY" | "EXCLUDE_CATEGORY" | "PREFER_BRAND" | "EXCLUDE_BRAND";
 
 const RULE_LABELS: Record<RuleType, { label: string; description: string }> = {
   PREFER_PRODUCT: {
@@ -35,6 +35,14 @@ const RULE_LABELS: Record<RuleType, { label: string; description: string }> = {
   EXCLUDE_CATEGORY: {
     label: "Ne plus proposer cette catégorie",
     description: "Aucun conseil de cette catégorie ne sera proposé.",
+  },
+  PREFER_BRAND: {
+    label: "Mettre en avant ce laboratoire",
+    description: "Entre deux références équivalentes, celle de ce laboratoire passe devant. Jamais devant une référence plus pertinente ou plus sûre.",
+  },
+  EXCLUDE_BRAND: {
+    label: "Ne plus proposer ce laboratoire",
+    description: "Aucune référence de ce laboratoire ne sera proposée.",
   },
 };
 
@@ -55,6 +63,7 @@ export function RulesManager({
     type: string;
     productName: string | null;
     category: string | null;
+    brand: string | null;
     note: string | null;
     isActive: boolean;
     createdAt: string;
@@ -122,6 +131,7 @@ function RuleList({
     type: string;
     productName: string | null;
     category: string | null;
+    brand: string | null;
     note: string | null;
     createdAt: string;
     createdBy: string | null;
@@ -162,6 +172,7 @@ function RuleList({
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="text-[13.5px] font-medium text-text-primary">
                     {rule.productName ??
+                      rule.brand ??
                       PRODUCT_CATEGORY_LABELS[rule.category as ProductCategoryCode] ??
                       "—"}
                   </p>
@@ -208,12 +219,14 @@ function CreateRuleModal({
   const [type, setType] = useState<RuleType>("PREFER_PRODUCT");
   const [productId, setProductId] = useState("");
   const [category, setCategory] = useState<ProductCategoryCode>("PROBIOTIQUES");
+  const [brand, setBrand] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
 
   const targetsProduct = type === "PREFER_PRODUCT" || type === "EXCLUDE_PRODUCT";
+  const targetsBrand = type === "PREFER_BRAND" || type === "EXCLUDE_BRAND";
 
   const submit = () => {
     setError(null);
@@ -221,7 +234,8 @@ function CreateRuleModal({
       const result = await createPharmacyRuleAction({
         type,
         productId: targetsProduct ? productId : null,
-        category: targetsProduct ? null : category,
+        category: targetsProduct || targetsBrand ? null : category,
+        brand: targetsBrand ? brand : null,
         note,
       });
       if (!result.ok) {
@@ -272,7 +286,11 @@ function CreateRuleModal({
           {RULE_LABELS[type].description}
         </p>
 
-        {targetsProduct ? (
+        {targetsBrand ? (
+          <Field label="Laboratoire ou marque" htmlFor="rule-brand" required>
+            <Input id="rule-brand" value={brand} onChange={(event) => setBrand(event.target.value)} placeholder="ex. PiLeJe, Boiron, Vog" />
+          </Field>
+        ) : targetsProduct ? (
           <Field label="Référence" htmlFor="rule-product" required>
             <Select
               id="rule-product"

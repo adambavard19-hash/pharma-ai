@@ -135,8 +135,12 @@ export type AdviceView = {
     /** Le pourquoi une fois le besoin confirmé par le patient. */
     confirmedReason: string | null;
   } | null;
+  /** Le produit à associer à cette proposition, trouvé dans le stock, s'il y en a un. */
+  companion: { productId: string; name: string; salePriceCents: number; stockQuantity: number; label: string; reason: string } | null;
   product: {
     id: string;
+    /** Renseigné quand la référence est un médicament conseil du catalogue national. */
+    presentationId: string | null;
     name: string;
     brand: string | null;
     imageUrl: string | null;

@@ -1,4 +1,5 @@
 import type { AdviceOpportunityResult, CatalogProduct } from "../types";
+import { matchesAny } from "./product-name";
 
 /**
  * Appariement catalogue (étape E).
@@ -66,6 +67,11 @@ export function findCandidateProducts(params: {
 
     // Une référence sans lien de catégorie ni d'étiquette n'est pas candidate.
     if (!categoryMatch && tagHits === 0) continue;
+
+    // La règle peut écarter une formule par son nom (un bain de bouche
+    // alcoolisé après un corticoïde inhalé), sauf si le nom la sauve
+    // explicitement (« sans alcool »).
+    if (matchesAny(opportunity.productExclude, product.name) && !matchesAny(opportunity.productPrefer, product.name)) continue;
 
     candidates.push({ product, tagHits, categoryMatch });
   }

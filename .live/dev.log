@@ -35,3 +35,23 @@ Warning: getHexString - ignoring additional invalid characters.
   ✓ authInterrupts
   · serverActions
 
+ GET /stock/import 200 in 1089ms (next.js: 638ms, application-code: 450ms)
+ GET /vente/nouvelle 200 in 162ms (next.js: 33ms, application-code: 129ms)
+[ordonnances] transfert reçu — 75819 octets en 3 ms.
+[ordonnances] image réduite pour lecture — 75819 → 63136 octets.
+[ordonnances] durées — stockage 5 ms, préparation 8 ms, lecture 37699 ms (total depuis réception 37707 ms).
+[ordonnances] lecture par anthropic:claude-opus-5 en 37708 ms — 4 ligne(s) rendue(s), 4 retenue(s), patient « M. Jean TESTEUR », confiance 0.98.
+ POST /api/ordonnances/depot 200 in 37.9s (next.js: 135ms, application-code: 37.8s)
+[classification] préchauffage — 4 nom(s), 4 déjà connu(s), 4 ms.
+ POST /vente/nouvelle 200 in 135ms (next.js: 3ms, application-code: 132ms)
+  └─ ƒ createPrescriptionAction(null, {}) in 50ms src/server/actions/prescriptions.ts
+ GET /vente/cmtxtab6i0000qlshrhpszv2p 200 in 222ms (next.js: 3ms, application-code: 219ms)
+ GET /vente/cmtxtab6i0000qlshrhpszv2p 200 in 710ms (next.js: 461ms, application-code: 248ms)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ POST /vente/cmtxtab6i0000qlshrhpszv2p 200 in 262ms (next.js: 3ms, application-code: 259ms)
+  └─ ƒ verifyPrescriptionAction({"lines":["[Object]","[Object]","[Object]"],"patientId":null,"prescribedAt":"2026-09-08","...":"3 items not stringified"}) in 30ms src/server/actions/prescriptions.ts
+[analysis] ORD-0001 en 234 ms — chargement 170 ms, comprehension 16 ms, moteur 26 ms, enregistrement 22 ms — compréhension 4/4 en cache — 3 recommandation(s).
+ POST /api/ordonnances/cmtxtab6i0000qlshrhpszv2p/analyse 200 in 803ms (next.js: 552ms, application-code: 251ms)
+ GET /vente/cmtxtab6i0000qlshrhpszv2p 200 in 90ms (next.js: 2ms, application-code: 88ms)
+ GET /vente/cmtxtab6i0000qlshrhpszv2p 200 in 141ms (next.js: 4ms, application-code: 136ms)
+ GET /vente/cmtxtab6i0000qlshrhpszv2p 200 in 134ms (next.js: 4ms, application-code: 130ms)

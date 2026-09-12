@@ -15,12 +15,16 @@ const saleSchema = z.object({
   note: z.string().trim().max(300).optional(),
   lines: z
     .array(
-      z.object({
-        productId: z.string().min(1),
-        recommendationId: z.string().optional().nullable(),
-        quantity: z.coerce.number().int().min(1).max(99),
-        unitPriceCents: z.coerce.number().int().min(0).optional(),
-      }),
+      z
+        .object({
+          productId: z.string().min(1).optional().nullable(),
+          /** Médicament conseil du catalogue national, en stock officine. */
+          presentationId: z.string().min(1).optional().nullable(),
+          recommendationId: z.string().optional().nullable(),
+          quantity: z.coerce.number().int().min(1).max(99),
+          unitPriceCents: z.coerce.number().int().min(0).optional(),
+        })
+        .refine((line) => Boolean(line.productId) !== Boolean(line.presentationId), { message: "Une ligne porte un produit ou une présentation" }),
     )
     .min(1, "Sélectionnez au moins un produit"),
   declinedRecommendationIds: z.array(z.string()).default([]),

@@ -184,9 +184,11 @@ export type CatalogProduct = {
 
 export type PharmacyRuleInput = {
   id: string;
-  type: "PREFER_PRODUCT" | "EXCLUDE_PRODUCT" | "PREFER_CATEGORY" | "EXCLUDE_CATEGORY";
+  type: "PREFER_PRODUCT" | "EXCLUDE_PRODUCT" | "PREFER_CATEGORY" | "EXCLUDE_CATEGORY" | "PREFER_BRAND" | "EXCLUDE_BRAND";
   productId: string | null;
   category: ProductCategoryCode | null;
+  /** Laboratoire ou marque visé, pour PREFER_BRAND / EXCLUDE_BRAND. */
+  brand?: string | null;
   /** Restreint la règle à certains contextes thérapeutiques. */
   context: { atcPrefixes?: string[]; therapeuticClasses?: string[] };
   weight: number;
@@ -253,6 +255,12 @@ export type AdviceOpportunityResult = {
   matchingTags: string[];
   /** Contre-indications à écarter lors de l'appariement. */
   excludeTags: string[];
+  /** Motifs de nom qui écartent une référence pour cette règle (sauf motif préféré). */
+  productExclude?: string[];
+  /** Motifs de nom qui font préférer une référence (« sans alcool »). */
+  productPrefer?: string[];
+  /** Le produit à associer à la référence retenue, quand la règle en prévoit un. */
+  companion?: { when: string; productPatterns: string[]; label: string; reason: string } | null;
   triggeredBy: { lineIndex: number; drugName: string }[];
   /**
    * La question à poser au patient avant de proposer quoi que ce soit, écrite
@@ -312,6 +320,18 @@ export type ScoredRecommendation = {
   precautions: string[];
   /** Contributions ordonnées, pour l'affichage « Pourquoi ce produit ? ». */
   explanation: ScoreContribution[];
+  /** Le produit à associer, trouvé dans le stock, s'il y en a un. */
+  companion?: CompanionSuggestion | null;
+};
+
+/** Un produit à proposer À CÔTÉ d'une recommandation (seringue avec un flacon de sérum). */
+export type CompanionSuggestion = {
+  productId: string;
+  name: string;
+  salePriceCents: number;
+  stockQuantity: number;
+  label: string;
+  reason: string;
 };
 
 /**

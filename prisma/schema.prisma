@@ -1628,6 +1628,11 @@ model Recommendation {
   shortReason   String?
   /// Formulation écrite sur la fiche remise au patient.
   patientReason String?
+  /// Le produit à associer, quand la règle de conseil en prévoit un (une
+  /// seringue de lavage avec un flacon de sérum physiologique, par exemple) :
+  /// { productId, name, salePriceCents, stockQuantity, reason }. Proposé à côté
+  /// de la carte, jamais ajouté sans un geste du pharmacien.
+  companion      Json?
   /// La phrase réellement affichée au pharmacien pour être dite au patient.
   /// Elle provient du catalogue de règles de conseil, jamais d'une génération
   /// libre. On la conserve avec la recommandation parce que c'est ce qui a été
@@ -1710,6 +1715,10 @@ enum PharmacyRuleType {
   EXCLUDE_PRODUCT
   PREFER_CATEGORY
   EXCLUDE_CATEGORY
+  /// Un laboratoire ou une marque à mettre en avant (appariement sur le nom).
+  PREFER_BRAND
+  /// Un laboratoire ou une marque à ne plus proposer.
+  EXCLUDE_BRAND
 }
 
 /// Préférences de conseil propres à l'officine, alimentées par le retour du
@@ -1722,6 +1731,8 @@ model PharmacyRule {
   type            PharmacyRuleType
   productId       String?
   category        ProductCategory?
+  /// Laboratoire ou marque visé par une règle PREFER_BRAND / EXCLUDE_BRAND.
+  brand           String?
   /// Contexte d'application : { drugClasses: [...], atcPrefixes: [...] }
   context         Json             @default("{}")
   note            String?
@@ -1939,6 +1950,9 @@ model SaleLine {
   id               String  @id @default(cuid())
   saleId           String
   productId        String?
+  /// Renseigné quand la ligne est un médicament conseil du catalogue national
+  /// (stock officine `PharmacyDrugStock`), et non un produit de l'officine.
+  presentationId   String?
   /// Renseigné lorsque la vente découle d'une recommandation Pharma.ai.
   /// C'est la clé de l'attribution du chiffre d'affaires additionnel.
   recommendationId String?

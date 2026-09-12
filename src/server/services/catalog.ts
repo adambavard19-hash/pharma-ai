@@ -222,6 +222,7 @@ export async function loadPharmacyRules(scope: TenantScope): Promise<PharmacyRul
     type: rule.type,
     productId: rule.productId,
     category: rule.category,
+    brand: rule.brand ?? null,
     context: (rule.context ?? {}) as PharmacyRuleInput["context"],
     weight: rule.weight,
   }));

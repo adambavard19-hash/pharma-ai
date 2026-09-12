@@ -22,6 +22,7 @@ import {
 } from "../interactions";
 import type { TreatmentUnderstanding } from "../understanding";
 import { deriveOutcome } from "./outcome";
+import { matchesAny } from "./engines/product-name";
 import type {
   AnalysisResult,
   CatalogProduct,
@@ -555,7 +556,44 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         );
       }
 
-      return { output: limited, count: limited.length, notes };
+      // Le produit associé : quand la règle en prévoit un et que la référence
+      // retenue l'appelle (un flacon de sérum physiologique appelle une
+      // seringue de lavage), on le cherche dans le stock, en rayon. Il
+      // accompagne la carte ; il n'est jamais ajouté sans un geste.
+      const catalogById = new Map(input.catalog.map((p) => [p.id, p]));
+      const opportunityByKey = new Map(eligibleOpportunities.map((o) => [o.key, o]));
+      const withCompanions = limited.map((item) => {
+        const opportunity = opportunityByKey.get(item.opportunityKey);
+        const product = catalogById.get(item.productId);
+        const rule = opportunity?.companion;
+        if (!rule || !product || !matchesAny([rule.when], product.name)) return item;
+        const companion = input.catalog.find(
+          (candidate) =>
+            candidate.id !== product.id &&
+            candidate.isActive &&
+            candidate.stockQuantity > 0 &&
+            !productSafety.blockedProductIds.has(candidate.id) &&
+            matchesAny(rule.productPatterns, candidate.name),
+        );
+        if (!companion) {
+          notes.push(`« ${product.name} » : ${rule.label.toLowerCase()} recommandé(e), aucune référence en stock.`);
+          return item;
+        }
+        notes.push(`« ${product.name} » : associé à « ${companion.name} » (${rule.label.toLowerCase()}).`);
+        return {
+          ...item,
+          companion: {
+            productId: companion.id,
+            name: companion.name,
+            salePriceCents: companion.salePriceCents,
+            stockQuantity: companion.stockQuantity,
+            label: rule.label,
+            reason: rule.reason,
+          },
+        };
+      });
+
+      return { output: withCompanions, count: withCompanions.length, notes };
     },
   );
 
