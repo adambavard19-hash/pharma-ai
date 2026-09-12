@@ -19,9 +19,11 @@ const nextConfig: NextConfig = {
   },
   /**
    * Le générateur de PDF pilote un Chromium via Playwright : un paquet natif
-   * que le bundler ne doit pas tenter d'empaqueter.
+   * que le bundler ne doit pas tenter d'empaqueter. pdf.js, lui, charge son
+   * « worker » comme un module à l'exécution : il doit rester dans
+   * node_modules, tel quel, pour le retrouver.
    */
-  serverExternalPackages: ["playwright", "playwright-core"],
+  serverExternalPackages: ["playwright", "playwright-core", "pdfjs-dist"],
 };
 
 export default nextConfig;

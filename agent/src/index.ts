@@ -3,7 +3,8 @@
  *
  * Il ne fait que trois choses, et les dit :
  *   1. lire l'export de stock que le logiciel de gestion (LGO) écrit dans un
- *      dossier, et l'envoyer à PharmaBoost dès qu'il change ;
+ *      dossier (CSV, Excel ou PDF d'inventaire), et l'envoyer à PharmaBoost dès
+ *      qu'il change ;
  *   2. surveiller, si on le lui indique, le dossier où le LGO range les
  *      ordonnances scannées, et envoyer chaque nouveau scan ;
  *   3. donner signe de vie toutes les minutes.
@@ -84,7 +85,7 @@ function latestExport(dir: string): string | null {
   const st = statSync(dir);
   if (st.isFile()) return dir;
   const files = readdirSync(dir)
-    .filter((name) => /\.(csv|txt|xlsx|xls)$/i.test(name))
+    .filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name))
     .map((name) => ({ path: join(dir, name), mtime: statSync(join(dir, name)).mtimeMs }))
     .sort((a, b) => b.mtime - a.mtime);
   return files[0]?.path ?? null;

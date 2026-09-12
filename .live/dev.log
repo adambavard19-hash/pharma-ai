@@ -6,41 +6,21 @@
 - Local:         http://localhost:3000
 - Network:       http://172.20.10.6:3000
 - Environments: .env.local, .env
-✓ Ready in 259ms
-✓ Running next.config.ts took 19ms
+✓ Ready in 174ms
+✓ Running next.config.ts took 17ms
 - Experiments (use with caution):
   ✓ authInterrupts
   · serverActions
 
- GET /login 200 in 642ms (next.js: 344ms, application-code: 299ms)
- GET /api/sante 200 in 113ms (next.js: 96ms, application-code: 17ms)
- GET /login 200 in 51ms (next.js: 8ms, application-code: 43ms)
- GET / 200 in 65ms (next.js: 25ms, application-code: 40ms)
- POST /login 200 in 200ms (next.js: 1.4ms, application-code: 198ms)
-  └─ ƒ loginAction(null, {}) in 92ms src/server/actions/auth.ts
- GET /vente/nouvelle 200 in 101ms (next.js: 3ms, application-code: 98ms)
- GET /vente/nouvelle 200 in 133ms (next.js: 20ms, application-code: 113ms)
- GET /stock/connexion 200 in 709ms (next.js: 542ms, application-code: 167ms)
- POST /stock/connexion 200 in 71ms (next.js: 2ms, application-code: 68ms)
-  └─ ƒ createPairingAction({"lgo":"lgpi"}) in 16ms src/server/actions/stock-sync.ts
- GET /stock/connexion 200 in 28ms (next.js: 1.5ms, application-code: 26ms)
- GET /stock/connexion 200 in 45ms (next.js: 4ms, application-code: 41ms)
- GET /stock/connexion 200 in 107ms (next.js: 3ms, application-code: 104ms)
- POST /stock/connexion 200 in 67ms (next.js: 1.9ms, application-code: 65ms)
-  └─ ƒ createPairingAction({"lgo":"lgpi"}) in 12ms src/server/actions/stock-sync.ts
- GET /stock/connexion 200 in 41ms (next.js: 1.5ms, application-code: 39ms)
- GET /stock/connexion 200 in 43ms (next.js: 2ms, application-code: 41ms)
- POST /api/agent/pair 200 in 360ms (next.js: 333ms, application-code: 27ms)
- POST /api/agent/heartbeat 200 in 610ms (next.js: 584ms, application-code: 26ms)
- POST /api/agent/stock 200 in 321ms (next.js: 171ms, application-code: 150ms)
- GET /stock/connexion 200 in 106ms (next.js: 4ms, application-code: 102ms)
- GET /stock 200 in 141ms (next.js: 20ms, application-code: 121ms)
- GET /stock 200 in 11ms (next.js: 4ms, application-code: 7ms)
- GET /stock 200 in 44ms (next.js: 2ms, application-code: 41ms)
-[ordonnances] image réduite pour lecture — 48777 → 42681 octets.
- GET /vente/cmtu25zs1004tzosh0xeracgi 200 in 631ms (next.js: 448ms, application-code: 183ms)
-[ordonnances] durées — stockage 0 ms, préparation 7 ms, lecture 18535 ms (total depuis réception 18542 ms).
-[ordonnances] lecture par anthropic:claude-opus-5 en 18542 ms — 2 ligne(s) rendue(s), 2 retenue(s), patient « M. Marie ESSAI », confiance 0.98.
- POST /api/agent/prescriptions 200 in 18.8s (next.js: 133ms, application-code: 18.6s)
-[classification] préchauffage — 2 nom(s), 0 déjà connu(s), 4230 ms (appel 4223 ms).
- POST /api/agent/heartbeat 200 in 72ms (next.js: 51ms, application-code: 21ms)
+ GET /login 200 in 595ms (next.js: 306ms, application-code: 289ms)
+ GET /api/sante 200 in 104ms (next.js: 86ms, application-code: 17ms)
+ GET /stock/import 200 in 226ms (next.js: 56ms, application-code: 170ms)
+Warning: Indexing all PDF objects
+Warning: getHexString - ignoring invalid character: 117
+Warning: getHexString - ignoring invalid character: 106
+Warning: getHexString - ignoring invalid character: 95
+Warning: getHexString - ignoring invalid character: 117
+Warning: getHexString - ignoring invalid character: 33
+Warning: getHexString - ignoring additional invalid characters.
+ POST /stock/import 200 in 685ms (next.js: 3ms, application-code: 682ms)
+  └─ ƒ analyseStockImportAction({}) in 636ms src/server/actions/stock-import.ts

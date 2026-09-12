@@ -47,7 +47,7 @@ function latestExport(dir) {
   if (!(0, import_node_fs.existsSync)(dir)) return null;
   const st = (0, import_node_fs.statSync)(dir);
   if (st.isFile()) return dir;
-  const files = (0, import_node_fs.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls)$/i.test(name)).map((name) => ({ path: (0, import_node_path.join)(dir, name), mtime: (0, import_node_fs.statSync)((0, import_node_path.join)(dir, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
+  const files = (0, import_node_fs.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name)).map((name) => ({ path: (0, import_node_path.join)(dir, name), mtime: (0, import_node_fs.statSync)((0, import_node_path.join)(dir, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
   return files[0]?.path ?? null;
 }
 async function syncStock(config) {

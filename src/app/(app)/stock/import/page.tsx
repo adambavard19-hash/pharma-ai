@@ -13,6 +13,10 @@ import { ImportWizard } from "./import-wizard";
 
 export const metadata: Metadata = { title: "Importer mon stock" };
 
+// Un export de plusieurs milliers de lignes, puis leur compréhension par le
+// modèle : on déclare la durée à l'hébergeur plutôt que d'être coupé en route.
+export const maxDuration = 300;
+
 /**
  * L'import du stock — déposer, vérifier, valider.
  *

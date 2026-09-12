@@ -2,7 +2,8 @@
 
 L'agent qui relie le logiciel de gestion de l'officine (LGO) à PharmaBoost.
 Installé sur le serveur de l'officine, il lit l'export de stock que le LGO
-produit dans un dossier et l'envoie à PharmaBoost dès qu'il change. Il peut
+produit dans un dossier (CSV, Excel, ou le PDF d'inventaire de LGPI) et l'envoie
+à PharmaBoost dès qu'il change. Il peut
 aussi surveiller le dossier des ordonnances scannées. Il n'écrit jamais dans le
 LGO.
 

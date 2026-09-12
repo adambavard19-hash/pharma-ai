@@ -22,6 +22,8 @@ import {
 } from "@/core/stock-import";
 import type { TenantScope } from "@/server/db/tenant";
 import { tagsFromName } from "@/core/stock-import/tags";
+import { lgpiInventoryToRecords, parseLgpiInventoryText } from "@/core/stock-import/lgpi-inventory";
+import { extractPdfLayoutText } from "./pdf-text";
 import { classifyPharmacyProducts, type ClassificationRunSummary } from "./product-classification";
 
 /**
@@ -42,6 +44,23 @@ export const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
 export const IMPORT_MAX_ROWS = 50_000;
 
 export type ParsedFile = { headers: string[]; records: Record<string, unknown>[] };
+
+/**
+ * Lit un fichier d'import, y compris un PDF quand c'est une édition
+ * d'inventaire LGPI : le texte en est extrait avec sa mise en page, puis lu
+ * comme un tableau. Un PDF d'une autre forme est refusé, avec le motif.
+ */
+export async function parseImportFileAsync(name: string, bytes: Uint8Array): Promise<ParsedFile> {
+  if (name.toLowerCase().endsWith(".pdf")) {
+    const { text } = await extractPdfLayoutText(bytes);
+    const inventory = parseLgpiInventoryText(text);
+    if (inventory.lines.length === 0) {
+      throw new Error("Ce PDF n'est pas une édition d'inventaire LGPI reconnue. Exportez l'inventaire depuis LGPI (Inventaire → Édition), ou fournissez un CSV / Excel.");
+    }
+    return lgpiInventoryToRecords(inventory);
+  }
+  return parseImportFile(name, bytes);
+}
 
 export function parseImportFile(name: string, bytes: Uint8Array): ParsedFile {
   const lower = name.toLowerCase();
@@ -173,7 +192,7 @@ export async function analyseStockImport(params: {
   bytes: Uint8Array;
   mapping?: ColumnMapping;
 }): Promise<ImportPreview> {
-  const parsed = parseImportFile(params.fileName, params.bytes);
+  const parsed = await parseImportFileAsync(params.fileName, params.bytes);
   if (parsed.headers.length === 0 || parsed.records.length === 0) {
     throw new Error("Le fichier ne contient aucune ligne exploitable.");
   }

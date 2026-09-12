@@ -164,12 +164,12 @@ export function ImportWizard({ returnTo = "/stock" }: { returnTo?: string }) {
             >
               <FileSpreadsheet className="size-7 text-text-tertiary" />
               <span className="text-[13.5px] font-medium text-text-primary">{fileName ?? "Glissez votre fichier ici, ou cliquez pour le choisir"}</span>
-              <span className="text-[12px] text-text-tertiary">CSV ou Excel. Colonnes reconnues : CIP/CIP13/EAN, désignation, quantité, prix de vente, prix d&apos;achat, TVA, marque, rayon.</span>
+              <span className="text-[12px] text-text-tertiary">CSV, Excel, ou le PDF d&apos;inventaire de LGPI. Colonnes reconnues : CIP/CIP13/EAN, désignation, quantité, prix de vente, prix d&apos;achat, TVA, marque, rayon.</span>
               <input
                 id="stock-file"
                 name="file"
                 type="file"
-                accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".csv,.txt,.xlsx,.xls,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className="sr-only"
                 onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
               />

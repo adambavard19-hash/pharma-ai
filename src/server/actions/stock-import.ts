@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
@@ -27,7 +28,7 @@ export async function analyseStockImportAction(formData: FormData): Promise<Acti
   if (!(file instanceof File) || file.size === 0) return fail("Choisissez un fichier CSV ou Excel.");
   if (file.size > IMPORT_MAX_BYTES) return fail("Le fichier dépasse 8 Mo.");
   const lower = file.name.toLowerCase();
-  if (!/\.(csv|txt|xlsx|xls)$/.test(lower)) return fail("Format accepté : CSV ou Excel (.xlsx).");
+  if (!/\.(csv|txt|xlsx|xls|pdf)$/.test(lower)) return fail("Format accepté : CSV, Excel (.xlsx) ou PDF d'inventaire LGPI.");
 
   try {
     const preview = await analyseStockImport({
@@ -99,6 +100,15 @@ export async function commitStockImportAction(
     });
     revalidatePath("/stock");
     revalidatePath("/bienvenue");
+    // Ce que l'import n'a pas eu le temps de comprendre continue après la
+    // réponse, par lots, jusqu'à épuisement : le titulaire n'attend pas.
+    if (outcome.classification && outcome.classification.remaining > 0) {
+      const scope = session.scope;
+      after(async () => {
+        const { classifyPharmacyProducts } = await import("@/server/services/product-classification");
+        await classifyPharmacyProducts({ scope, maxAiBatches: 60 }).catch((error) => console.error("[stock-import] classification différée impossible", error));
+      });
+    }
     return ok(
       outcome,
       `${outcome.productsCreated} créé(s), ${outcome.productsUpdated + outcome.drugsUpserted} mis à jour, ${outcome.ignored} ignoré(s).`,
