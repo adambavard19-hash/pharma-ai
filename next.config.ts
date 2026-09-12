@@ -24,6 +24,14 @@ const nextConfig: NextConfig = {
    * node_modules, tel quel, pour le retrouver.
    */
   serverExternalPackages: ["playwright", "playwright-core", "pdfjs-dist"],
+  /**
+   * Le « worker » de pdf.js n'est référencé par aucun import statique : sans
+   * cette ligne, le traçage des fichiers ne l'embarque pas dans la fonction
+   * déployée, et la lecture d'un PDF échoue en production.
+   */
+  outputFileTracingIncludes: {
+    "/**": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+  },
 };
 
 export default nextConfig;

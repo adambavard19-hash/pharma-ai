@@ -24,3 +24,14 @@ Warning: getHexString - ignoring invalid character: 33
 Warning: getHexString - ignoring additional invalid characters.
  POST /stock/import 200 in 685ms (next.js: 3ms, application-code: 682ms)
   └─ ƒ analyseStockImportAction({}) in 636ms src/server/actions/stock-import.ts
+⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
+▲ Next.js 16.3.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://172.20.10.6:3000
+- Environments: .env.local, .env
+✓ Ready in 259ms
+✓ Running next.config.ts took 22ms
+- Experiments (use with caution):
+  ✓ authInterrupts
+  · serverActions
+
