@@ -64,17 +64,48 @@ export type LgoDefinition = {
    * `GENERIC` : aucun adaptateur spécifique ; export planifié à configurer.
    */
   adapter: "PILOT" | "GENERIC";
+  /** Dossier surveillé par l'agent quand rien d'autre n'est indiqué (créé par l'installateur). */
+  defaultExportPath: string;
+  /** Dossier des ordonnances scannées, surveillé de la même façon. */
+  defaultScansPath: string;
+  /** Les étapes, dans le logiciel, pour produire l'export — vérifiées en officine quand l'adaptateur est PILOT. */
+  exportSteps: string[];
   /** Indication donnée au titulaire pour activer l'export planifié. */
   exportHint: string;
 };
 
+/** Les dossiers que l'installateur crée sur le serveur de l'officine. */
+export const DEFAULT_EXPORT_PATH = "C:\\PharmaBoost\\Export";
+export const DEFAULT_SCANS_PATH = "C:\\PharmaBoost\\Ordonnances";
+
+const GENERIC_EXPORT = {
+  defaultExportPath: DEFAULT_EXPORT_PATH,
+  defaultScansPath: DEFAULT_SCANS_PATH,
+  exportHint: `Programmez, ou faites à la main, un export du stock (CSV, Excel ou PDF) dans ${DEFAULT_EXPORT_PATH} sur le serveur : l'agent le surveille et l'envoie dès qu'il change.`,
+  exportSteps: [
+    "Dans votre logiciel, lancez l'export ou l'édition du stock : code CIP, désignation, quantité, prix de vente.",
+    `Enregistrez le fichier dans ${DEFAULT_EXPORT_PATH}. Un fichier remplacé est relu.`,
+    "PharmaBoost Connect l'envoie dans la minute ; refaites l'export quand le stock doit être rafraîchi.",
+  ],
+};
+
 export const LGO_DEFINITIONS: LgoDefinition[] = [
-  { id: "lgpi", label: "LGPI", editor: "Pharmagest (Equasens)", adapter: "PILOT", exportHint: "Activez l'export planifié du stock (fichier texte ou CSV) et notez le dossier de destination : c'est ce dossier que l'agent surveille." },
-  { id: "smart-rx", label: "Smart Rx", editor: "Cegedim", adapter: "GENERIC", exportHint: "Programmez un export du stock vers un dossier du serveur ; l'agent le surveille." },
-  { id: "pharmaland", label: "Pharmaland", editor: "Pharmaland", adapter: "GENERIC", exportHint: "Programmez un export du stock vers un dossier du serveur ; l'agent le surveille." },
-  { id: "winpharma", label: "Winpharma", editor: "Winpharma", adapter: "GENERIC", exportHint: "Programmez un export du stock vers un dossier du serveur ; l'agent le surveille." },
-  { id: "leo", label: "Léo", editor: "Isipharm", adapter: "GENERIC", exportHint: "Programmez un export du stock vers un dossier du serveur ; l'agent le surveille." },
-  { id: "autre", label: "Autre logiciel", editor: "—", adapter: "GENERIC", exportHint: "Tout logiciel capable d'exporter son stock en CSV ou Excel vers un dossier du serveur." },
+  {
+    id: "lgpi", label: "LGPI", editor: "Pharmagest (Equasens)", adapter: "PILOT",
+    defaultExportPath: DEFAULT_EXPORT_PATH, defaultScansPath: DEFAULT_SCANS_PATH,
+    exportHint: "LGPI n'exporte pas son stock automatiquement : c'est l'édition d'inventaire, enregistrée en PDF dans le dossier surveillé, qui sert d'export. Aucune validation d'inventaire, rien n'est modifié dans LGPI.",
+    exportSteps: [
+      "Dans LGPI, ouvrez le module Inventaire, puis Édition.",
+      "Dans « Saisie des critères d'édition », choisissez « Prix de vente » comme prix de référence, sur l'ensemble du stock.",
+      `Aperçu, puis enregistrez l'édition en PDF dans ${DEFAULT_EXPORT_PATH} — le nom du fichier n'a pas d'importance.`,
+      "PharmaBoost Connect envoie le fichier dans la minute. Refaites cette édition quand le stock doit être rafraîchi, chaque matin par exemple.",
+    ],
+  },
+  { id: "smart-rx", label: "Smart Rx", editor: "Cegedim", adapter: "GENERIC", ...GENERIC_EXPORT },
+  { id: "pharmaland", label: "Pharmaland", editor: "Pharmaland", adapter: "GENERIC", ...GENERIC_EXPORT },
+  { id: "winpharma", label: "Winpharma", editor: "Winpharma", adapter: "GENERIC", ...GENERIC_EXPORT },
+  { id: "leo", label: "Léo", editor: "Isipharm", adapter: "GENERIC", ...GENERIC_EXPORT },
+  { id: "autre", label: "Autre logiciel", editor: "—", adapter: "GENERIC", ...GENERIC_EXPORT, exportHint: "Tout logiciel capable d'exporter son stock en CSV, Excel ou PDF vers un dossier du serveur." },
 ];
 
 export function lgoLabel(id: string): string {

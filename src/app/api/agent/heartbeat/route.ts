@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const agent = await authenticateAgent(request.headers.get("authorization"));
   if (!agent) return NextResponse.json({ ok: false, error: "Clé d'agent inconnue ou révoquée." }, { status: 401 });
-  const body = (await request.json().catch(() => ({}))) as { version?: string; hostname?: string };
-  await recordHeartbeat(agent, body);
+  const body = (await request.json().catch(() => ({}))) as { version?: string; hostname?: string; notice?: string | null };
+  await recordHeartbeat(agent, { version: body.version, hostname: body.hostname, notice: typeof body.notice === "string" || body.notice === null ? body.notice : undefined });
   const connection = await prisma.stockConnection.findUniqueOrThrow({ where: { id: agent.connectionId }, select: { intervalSeconds: true, exportPath: true, scansPath: true } });
   return NextResponse.json({ ok: true, ...connection });
 }

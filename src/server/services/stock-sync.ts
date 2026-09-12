@@ -145,10 +145,16 @@ export async function authenticateAgent(authorization: string | null): Promise<A
   };
 }
 
-export async function recordHeartbeat(agent: AgentContext, meta: { version?: string | null; hostname?: string | null }): Promise<void> {
+/**
+ * Signe de vie. `notice` est ce que l'agent constate sur place (dossier vide,
+ * export refusé) : affiché tel quel au titulaire, effacé quand l'agent dit que
+ * tout va bien. Absent du message, l'état précédent est conservé.
+ */
+export async function recordHeartbeat(agent: AgentContext, meta: { version?: string | null; hostname?: string | null; notice?: string | null }): Promise<void> {
+  const notice = meta.notice === undefined ? undefined : meta.notice ? String(meta.notice).slice(0, 300) : null;
   await prisma.stockConnection.update({
     where: { id: agent.connectionId },
-    data: { lastSeenAt: new Date(), agentVersion: meta.version ?? undefined, hostname: meta.hostname ?? undefined, status: "CONNECTED" },
+    data: { lastSeenAt: new Date(), agentVersion: meta.version ?? undefined, hostname: meta.hostname ?? undefined, status: "CONNECTED", lastError: notice },
   });
 }
 

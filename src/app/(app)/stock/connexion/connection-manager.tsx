@@ -68,7 +68,7 @@ export function ConnectionManager({ lgos, serverUrl, connection }: { lgos: LgoDe
               </span>
               <span className="text-text-tertiary">· signe de vie {describeAge(connection.seenAgeSeconds)}</span>
             </div>
-            {connection.lastError && <Alert tone="warning" title="Dernière erreur">{connection.lastError}</Alert>}
+            {connection.lastError && <Alert tone="warning" title="Ce que signale l'agent">{connection.lastError}</Alert>}
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Intervalle (secondes)" htmlFor="c-int"><Input id="c-int" inputMode="numeric" value={settings.intervalSeconds} onChange={(e) => setSettings({ ...settings, intervalSeconds: e.target.value })} /></Field>
               <Field label="Dossier de l'export de stock" htmlFor="c-exp"><Input id="c-exp" value={settings.exportPath} onChange={(e) => setSettings({ ...settings, exportPath: e.target.value })} placeholder="C:\LGPI\Exports" /></Field>
@@ -103,8 +103,13 @@ export function ConnectionManager({ lgos, serverUrl, connection }: { lgos: LgoDe
             </div>
           </div>
           <p className="text-[13px] text-text-secondary">{definition.exportHint}</p>
+          <ol className="space-y-1.5 text-[13px] text-text-primary">
+            {definition.exportSteps.map((step, index) => (
+              <li key={step} className="flex gap-2"><span className="tabular text-text-tertiary">{index + 1}.</span><span>{step}</span></li>
+            ))}
+          </ol>
           {definition.adapter === "PILOT" && (
-            <p className="text-[12.5px] text-text-tertiary">Adaptateur en cours de mise au point dans une officine pilote : l&apos;emplacement de l&apos;export est renseigné à l&apos;installation.</p>
+            <p className="text-[12.5px] text-text-tertiary">Procédure vérifiée en officine pilote. Les délivrances en temps réel demandent l&apos;accès au serveur du logiciel, soumis à l&apos;accord de l&apos;éditeur.</p>
           )}
         </CardContent>
       </Card>
@@ -118,7 +123,10 @@ export function ConnectionManager({ lgos, serverUrl, connection }: { lgos: LgoDe
               <li>1. Sur le serveur de l&apos;officine, téléchargez l&apos;agent : <a className="text-brand-700 underline underline-offset-2 dark:text-brand-400" href="/api/agent/telecharger">pharmaboost-connect.zip</a> et décompressez-le.</li>
               <li>2. Ouvrez PowerShell en administrateur dans le dossier décompressé, puis lancez :</li>
             </ol>
-            <pre className="overflow-x-auto rounded-xl bg-surface-sunken px-4 py-3 text-[12.5px]">{`.\\install-windows.ps1 -Code ${code.code} -Lgo ${lgo} -Export "C:\\chemin\\vers\\export" -Serveur ${serverUrl}`}</pre>
+            <pre className="overflow-x-auto rounded-xl bg-surface-sunken px-4 py-3 text-[12.5px]">{`powershell -ExecutionPolicy Bypass -File .\\install-windows.ps1 -Code ${code.code} -Lgo ${lgo}${serverUrl === "https://pharmaboost.app" ? "" : ` -Serveur ${serverUrl}`}`}</pre>
+            <p className="text-[12.5px] text-text-tertiary">
+              L&apos;installateur crée {definition.defaultExportPath} (export de stock) et {definition.defaultScansPath} (ordonnances scannées), installe Node.js s&apos;il manque, et enregistre l&apos;agent au démarrage du serveur. Pour d&apos;autres dossiers : <code>-Export</code> et <code>-Scans</code>.
+            </p>
             <p className="text-[12.5px] text-text-tertiary">
               Sans Windows, ou pour un essai : <code>{`node pharmaboost-connect.js --appairer ${code.code} --serveur ${serverUrl} --lgo ${lgo} --export "/chemin/export"`}</code> puis <code>node pharmaboost-connect.js</code>.
             </p>

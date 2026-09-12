@@ -34,3 +34,17 @@ describe("fraîcheur du stock synchronisé", () => {
     expect(lgoLabel("inconnu")).toBe("inconnu");
   });
 });
+
+describe("procédure d'export par logiciel", () => {
+  it("donne à chaque logiciel un dossier surveillé et des étapes, LGPI avec l'édition d'inventaire vérifiée", async () => {
+    const { LGO_DEFINITIONS, DEFAULT_EXPORT_PATH } = await import("../connectors");
+    for (const lgo of LGO_DEFINITIONS) {
+      expect(lgo.defaultExportPath).toBe(DEFAULT_EXPORT_PATH);
+      expect(lgo.exportSteps.length).toBeGreaterThanOrEqual(3);
+    }
+    const lgpi = LGO_DEFINITIONS.find((l) => l.id === "lgpi");
+    expect(lgpi?.exportSteps.join(" ")).toMatch(/Inventaire.*Édition.*Prix de vente.*PDF/s);
+    expect(lgpi?.exportHint).not.toMatch(/export planifié/);
+  });
+});
+
