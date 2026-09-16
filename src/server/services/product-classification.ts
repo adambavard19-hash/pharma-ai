@@ -238,7 +238,7 @@ export async function countUnclassifiedProducts(pharmacyId: string): Promise<num
  * catégorie ne change que si le dictionnaire est sûr de lui.
  */
 /** Étiquettes posées par le dictionnaire seul, jamais par le modèle : elles peuvent être recalculées. */
-const REFRESHABLE_TAGS = new Set(["nettoyant", "visage", "lèvres", "baume", "fer", "calcium", "zinc", "potassium", "vitamine a", "millepertuis", "antiseptique", "cutané", "herpès", "bouton de fièvre", "cicatrisant", "hygiène des mains", "tensiomètre", "pieds"]);
+const REFRESHABLE_TAGS = new Set(["nettoyant", "visage", "lèvres", "baume", "fer", "calcium", "zinc", "potassium", "vitamine a", "millepertuis", "antiseptique", "cutané", "herpès", "bouton de fièvre", "cicatrisant", "hygiène des mains", "tensiomètre", "pieds", "lysine"]);
 
 export async function refreshDictionaryTags(params: { pharmacyId: string }): Promise<{ considered: number; updated: number; retagged: string[] }> {
   const { classifyProductByName } = await import("@/core/catalog/product-vocabulary");

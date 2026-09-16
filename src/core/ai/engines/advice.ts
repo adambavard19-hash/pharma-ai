@@ -851,6 +851,41 @@ export const ADVICE_RULES: AdviceRule[] = [
     safetyNotes: ["Ne pas appliquer sur un œil ni dans le nez ; lavage des mains après la pose."],
   },
   {
+    key: "herpes-lysine",
+    title: "Lysine en accompagnement de l'herpès",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    needTriggers: ["HERPES_LESION_CARE"],
+    category: "NUTRITION",
+    atcPrefixes: ["J05AB"],
+    therapeuticClasses: ["Antiviral", "Antiherpétique"],
+    sideEffectTriggers: [],
+    basePriority: 60,
+    matchingTags: ["lysine"],
+    excludeTags: [],
+    productExclude: [String.raw`aspegic`, String.raw`acetylsalicyl`, String.raw`aspirine`],
+    benefits: ["Conseil classique de l'officine sur l'herpès", "Cure courte, dès la poussée", "Ne remplace pas l'antiviral"],
+    shortReasonTemplate:
+      "Herpès sous {drug} : la lysine est traditionnellement proposée en accompagnement des poussées et pour espacer les récidives.",
+    rationaleTemplate:
+      "En accompagnement de {drug}, la L-lysine est un conseil classique de l'officine sur l'herpès : quelques études anciennes de petite taille suggèrent des récidives moins fréquentes à dose élevée, et les revues récentes jugent les preuves limitées. Elle peut être proposée en cure courte, sans promesse, jamais à la place de l'antiviral.",
+    counterScriptTemplate:
+      "« En plus de {drug}, {product} est souvent conseillé pendant une poussée d'herpès et pour espacer les suivantes : une cure courte, dès maintenant. Ça ne remplace pas votre traitement. »",
+    patientReasonTemplate:
+      "En complément de {drug}, {product} est un conseil habituel de l'officine sur l'herpès, en cure courte. Il ne remplace pas votre traitement.",
+    clinicalContext:
+      "Complément alimentaire. Données cliniques limitées (Griffith 1987 ; revues récentes : preuves insuffisantes). Déconseillé en cas d'insuffisance rénale ; pas de complément pendant la grossesse sans avis.",
+    safetyNotes: ["Complément alimentaire, sans effet démontré sur le virus : ne remplace pas l'antiviral."],
+    blockedFor: (patient) =>
+      patient.renalImpairment
+        ? "Insuffisance rénale déclarée : un apport en acides aminés relève d'un avis médical."
+        : patient.isPregnant
+          ? "Grossesse déclarée : pas de complément alimentaire sans avis médical."
+          : null,
+  },
+  {
     key: "herpes-zona-skin-repair",
     title: "Réparation de la peau après les vésicules",
     kind: "COMFORT",

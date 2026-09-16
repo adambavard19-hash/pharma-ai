@@ -53,7 +53,7 @@ describe("couverture des classes courantes", () => {
     });
     const keys = opportunities.map((o) => o.key);
     expect(keys[0]).toBe("herpes-zona-antiseptic");
-    expect(keys).toEqual(expect.arrayContaining(["herpes-zona-skin-repair", "herpes-labial-patch", "hand-hygiene-contagious"]));
+    expect(keys).toEqual(expect.arrayContaining(["herpes-lysine", "herpes-zona-skin-repair", "herpes-labial-patch", "hand-hygiene-contagious"]));
     expect(opportunities.find((o) => o.key === "herpes-labial-patch")?.requiresConfirmation).toBe(true);
   });
 });

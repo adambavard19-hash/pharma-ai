@@ -228,6 +228,14 @@ const PATTERNS: Pattern[] = [
     ruleKeys: ["hand-hygiene-contagious"],
     confidence: 0.88,
   },
+  {
+    // L'acétylsalicylate de lysine (Aspégic) n'est pas un complément de lysine.
+    test: /^(?!.*(aspegic|aspégic|acetylsalicyl|acétylsalicyl|aspirine|kardegic|\b\d+ ?ch\b))(?=.*(l-?lysine|\blysine\b))/,
+    category: "NUTRITION",
+    tags: ["lysine", "herpès"],
+    ruleKeys: ["herpes-lysine"],
+    confidence: 0.9,
+  },
   // Suivi des traitements chroniques.
   {
     test: /(tensiom|autotensio|omron|microlife|brassard)/,
