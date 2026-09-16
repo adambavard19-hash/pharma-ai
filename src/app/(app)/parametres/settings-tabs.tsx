@@ -28,6 +28,7 @@ export function SettingsTabs({
         ...(canSeeTeam ? [{ key: "equipe", label: "Équipe", href: "/parametres/equipe" }] : []),
         ...(canSeeRules
           ? [
+              { key: "laboratoires", label: "Laboratoires", href: "/parametres/laboratoires" },
               { key: "regles", label: "Règles de conseil", href: "/parametres/regles" },
               { key: "regles-conseil", label: "Registre du moteur", href: "/parametres/regles-conseil" },
             ]
