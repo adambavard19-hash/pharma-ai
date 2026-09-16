@@ -266,6 +266,37 @@ const PATTERNS: Pattern[] = [
     ruleKeys: ["dry-eye-eyelid-care"],
     confidence: 0.9,
   },
+  // Douleur musculaire ou articulaire : poches chaud/froid, patchs chauffants.
+  {
+    test: /(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|bouillotte|pack froid|poche froid|poche chaud|compresse froide|chaud froid)/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["chaud froid", "douleur musculaire"],
+    ruleKeys: ["pain-cold-hot-pack"],
+    confidence: 0.88,
+  },
+  // Hygiène intime et flore vaginale, en accompagnement d'une antibiothérapie.
+  {
+    test: /^(?!.*(mycohydralin|econazole|gynopevaryl|ovule|creme vaginale|crème vaginale|lubrifiant|preserv|préserv))(?=.*(saforelle|hydralin|gyn ?hydralin|feminabiane intima|lactibiane cnd|physioflor|gynophilus|florgynal|probiotique intime|flore vaginale|hygiene intime|hygiène intime|intime))/,
+    category: "HYGIENE",
+    tags: ["hygiène intime", "flore vaginale"],
+    ruleKeys: ["antibiotic-intimate-care"],
+    confidence: 0.85,
+  },
+  // Tisanes à visée respiratoire ou gorge : confort de la toux.
+  {
+    test: /^(?=.*(tisane|infusion))(?=.*(respir|toux|gorge|bronch|thym|eucalyptus|hiver))/,
+    category: "PHYTOTHERAPIE",
+    tags: ["toux", "gorge", "tisane"],
+    ruleKeys: ["cough-throat-comfort"],
+    confidence: 0.8,
+  },
+  {
+    test: /(hydratis|hydranova|viatol|sels? de rehydratation|sels? de réhydratation|\bsro\b|\bors\b|electrolytes?|électrolytes?)/,
+    category: "NUTRITION",
+    tags: ["réhydratation", "sels minéraux"],
+    ruleKeys: ["rehydration-digestive"],
+    confidence: 0.85,
+  },
   // Suivi des traitements chroniques.
   {
     test: /(tensiom|autotensio|omron|microlife|brassard)/,

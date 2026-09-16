@@ -136,7 +136,10 @@ export function parseLgpiInventoryText(text: string): LgpiInventory {
 
 /** Le document LGPI, rendu comme un tableau avec en-têtes — ce que l'import sait lire. */
 export function lgpiInventoryToRecords(inventory: LgpiInventory): { headers: string[]; records: Record<string, unknown>[] } {
-  const priceHeader = /vente/i.test(inventory.priceBasis ?? "") ? "PV TTC" : "PA HT";
+  // « valorisé par PV TTC », « Prix de vente », « PVTTC » : la colonne est un
+  // prix de vente ; « PAMP net », « PA HT » : un prix d'achat. Un prix d'achat
+  // pris pour un prix de vente afficherait des cartes à moitié prix.
+  const priceHeader = /vente|\bPV\b|PVTTC|TTC/i.test(inventory.priceBasis ?? "") ? "PV TTC" : "PA HT";
   const headers = ["Code produit", "Désignation", "Qte Stock", priceHeader, "TVA"];
   return {
     headers,

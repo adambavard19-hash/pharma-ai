@@ -85,3 +85,14 @@ describe("édition d'inventaire LGPI", () => {
     expect(sale.headers[3]).toBe("PV TTC");
   });
 });
+
+describe("base de valorisation", () => {
+  it("« valorisé par PV TTC » donne une colonne de prix de vente, « PAMP net » un prix d'achat", () => {
+    const line = { code: "3400930000001", name: "X", quantity: 1, priceCents: 1234, vatRate: 10 } as never;
+    expect(lgpiInventoryToRecords({ lines: [line], priceBasis: "PV TTC", editedAt: null, pages: 1 }).headers).toContain("PV TTC");
+    expect(lgpiInventoryToRecords({ lines: [line], priceBasis: "Prix de vente", editedAt: null, pages: 1 }).headers).toContain("PV TTC");
+    expect(lgpiInventoryToRecords({ lines: [line], priceBasis: "PAMP net", editedAt: null, pages: 1 }).headers).toContain("PA HT");
+    expect(lgpiInventoryToRecords({ lines: [line], priceBasis: null, editedAt: null, pages: 1 }).headers).toContain("PA HT");
+  });
+});
+

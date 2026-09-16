@@ -43,7 +43,7 @@ import { classifyPharmacyProducts, type ClassificationRunSummary } from "./produ
 export const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
 export const IMPORT_MAX_ROWS = 50_000;
 
-export type ParsedFile = { headers: string[]; records: Record<string, unknown>[] };
+export type ParsedFile = { headers: string[]; records: Record<string, unknown>[]; warnings?: string[] };
 
 /**
  * Lit un fichier d'import, y compris un PDF quand c'est une édition
@@ -52,12 +52,20 @@ export type ParsedFile = { headers: string[]; records: Record<string, unknown>[]
  */
 export async function parseImportFileAsync(name: string, bytes: Uint8Array): Promise<ParsedFile> {
   if (name.toLowerCase().endsWith(".pdf")) {
-    const { text } = await extractPdfLayoutText(bytes);
+    const { text, pages, skippedPages } = await extractPdfLayoutText(bytes);
     const inventory = parseLgpiInventoryText(text);
     if (inventory.lines.length === 0) {
       throw new Error("Ce PDF n'est pas une édition d'inventaire LGPI reconnue. Exportez l'inventaire depuis LGPI (Inventaire → Édition), ou fournissez un CSV / Excel.");
     }
-    return lgpiInventoryToRecords(inventory);
+    const warnings: string[] = [];
+    if (skippedPages > 0) {
+      const perPage = Math.round(inventory.lines.length / Math.max(1, pages - skippedPages));
+      warnings.push(`${skippedPages} page(s) sur ${pages} n'a (ont) pas pu être lue(s) — flux compressé abîmé à l'export. Environ ${perPage * skippedPages} référence(s) manquent : réexportez l'inventaire depuis LGPI si elles comptent.`);
+    }
+    if (!/vente|\bPV\b|PVTTC|TTC/i.test(inventory.priceBasis ?? "")) {
+      warnings.push(`Inventaire valorisé « ${inventory.priceBasis ?? "sans mention"} » : ce sont des prix d'achat. Pour des prix de vente au comptoir, choisissez « Prix de vente » dans les critères d'édition de LGPI.`);
+    }
+    return { ...lgpiInventoryToRecords(inventory), warnings };
   }
   return parseImportFile(name, bytes);
 }
@@ -135,6 +143,8 @@ export type ImportPreview = {
   missing: string[];
   summary: ImportSummary;
   rows: ClassifiedRow[];
+  /** Ce que la lecture du fichier a dû contourner ou signaler : à lire avant de valider. */
+  warnings: string[];
 };
 
 async function buildLookups(scope: TenantScope, rows: ReturnType<typeof readRows>): Promise<Lookups> {
@@ -206,7 +216,7 @@ export async function analyseStockImport(params: {
       totalRows: parsed.records.length,
       userId: params.scope.userId,
       mapping: mapping as never,
-      payload: { headers: parsed.headers, records: parsed.records } as never,
+      payload: { headers: parsed.headers, records: parsed.records, warnings: parsed.warnings ?? [] } as never,
     },
   });
   return classifyJob({ scope: params.scope, jobId: job.id, mapping, parsed });
@@ -219,7 +229,7 @@ export async function remapStockImport(params: {
   mapping: ColumnMapping;
 }): Promise<ImportPreview> {
   const job = await loadPendingJob(params.scope, params.jobId);
-  const payload = job.payload as { headers: string[]; records: Record<string, unknown>[] };
+  const payload = job.payload as { headers: string[]; records: Record<string, unknown>[]; warnings?: string[] };
   await prisma.importJob.update({ where: { id: job.id }, data: { mapping: params.mapping as never } });
   return classifyJob({ scope: params.scope, jobId: job.id, mapping: params.mapping, parsed: payload });
 }
@@ -239,6 +249,7 @@ async function classifyJob(params: {
       headers: params.parsed.headers,
       mapping: params.mapping,
       missing,
+      warnings: params.parsed.warnings ?? [],
       summary: { detected: params.parsed.records.length, medicaments: 0, existing: 0, toVerify: 0, unknown: 0, invalid: 0, withIssues: 0 },
       rows: [],
     };
@@ -257,7 +268,7 @@ async function classifyJob(params: {
     },
   });
 
-  return { jobId: params.jobId, fileName: job.fileName, headers: params.parsed.headers, mapping: params.mapping, missing: [], summary, rows: classified };
+  return { jobId: params.jobId, fileName: job.fileName, headers: params.parsed.headers, mapping: params.mapping, missing: [], summary, rows: classified, warnings: params.parsed.warnings ?? [] };
 }
 
 async function loadPendingJob(scope: TenantScope, jobId: string) {

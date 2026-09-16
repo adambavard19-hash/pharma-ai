@@ -12,7 +12,7 @@ import "server-only";
 
 type TextItem = { str: string; transform: number[]; width: number; hasEOL?: boolean };
 
-export async function extractPdfLayoutText(bytes: Uint8Array, options: { maxPages?: number } = {}): Promise<{ text: string; pages: number }> {
+export async function extractPdfLayoutText(bytes: Uint8Array, options: { maxPages?: number } = {}): Promise<{ text: string; pages: number; skippedPages: number }> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   // Sans navigateur, pdf.js charge son « worker » comme un module : on lui
   // donne le chemin réel du fichier, quel que soit l'empaqueteur.
@@ -24,9 +24,20 @@ export async function extractPdfLayoutText(bytes: Uint8Array, options: { maxPage
   const pages = Math.min(document.numPages, options.maxPages ?? 500);
   const out: string[] = [];
 
+  let skipped = 0;
   for (let pageNumber = 1; pageNumber <= pages; pageNumber += 1) {
-    const page = await document.getPage(pageNumber);
-    const content = await page.getTextContent();
+    // Une page au flux abîmé (compression corrompue à l'export) ne doit pas
+    // faire perdre les cent autres : elle est sautée et signalée.
+    let page: Awaited<ReturnType<typeof document.getPage>>;
+    let content: Awaited<ReturnType<typeof page.getTextContent>>;
+    try {
+      page = await document.getPage(pageNumber);
+      content = await page.getTextContent();
+    } catch (error) {
+      skipped += 1;
+      console.warn(`[pdf] page ${pageNumber} illisible, sautée : ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
     const items = (content.items as TextItem[]).filter((item) => item.str.trim() !== "" && Array.isArray(item.transform));
 
     // Largeur moyenne d'un caractère : la colonne d'un mot est sa position
@@ -61,5 +72,6 @@ export async function extractPdfLayoutText(bytes: Uint8Array, options: { maxPage
     page.cleanup();
   }
   await document.destroy();
-  return { text: out.join("\n"), pages };
+  if (skipped > 0) console.warn(`[pdf] ${skipped} page(s) sur ${pages} sautée(s).`);
+  return { text: out.join("\n"), pages, skippedPages: skipped };
 }

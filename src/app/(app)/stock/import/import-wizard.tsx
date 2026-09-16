@@ -198,6 +198,16 @@ export function ImportWizard({ returnTo = "/stock" }: { returnTo?: string }) {
     <div className="space-y-5">
       {error && <Alert tone="danger">{error}</Alert>}
 
+      {preview.warnings.length > 0 && (
+        <Alert tone="warning" title="À lire avant de valider">
+          <ul className="list-disc space-y-1 pl-4">
+            {preview.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </Alert>
+      )}
+
       {preview.missing.length === 0 && (
         <Card>
           <CardContent className="space-y-5 py-6">

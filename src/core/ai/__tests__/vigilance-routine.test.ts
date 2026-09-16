@@ -186,3 +186,22 @@ describe("lubrifiants oculaires reconnus au nom", () => {
   });
 });
 
+describe("familles ajoutées depuis le second inventaire", () => {
+  it("poches chaud-froid, hygiène intime, tisanes respiratoires et réhydratation sont reconnues", () => {
+    expect(classifyProductByName("THERMCOOL HOT POCHE GEL MULTI ZONE")?.tags).toContain("chaud froid");
+    expect(classifyProductByName("THERAPEARL GENOU COMP")?.tags).toContain("chaud froid");
+    expect(classifyProductByName("SAFORELLE SOIN LAVANT DOUX 250ML")?.tags).toContain("hygiène intime");
+    expect(classifyProductByName("MYCOHYDRALIN 200 mg comprimé vaginal")?.tags ?? []).not.toContain("hygiène intime");
+    expect(classifyProductByName("NAT&FORM TISANES Tis voies respirat Bio B/80g")?.tags).toContain("toux");
+    expect(classifyProductByName("HYDRATIS CITRON SUREAU PAST EFF 20")?.tags).toContain("réhydratation");
+  });
+  it("le conseil intime ne s'adresse jamais à un patient homme", () => {
+    const antibiotic = classify("AMOXICILLINE", "J01CA04", "Antibiotique");
+    const product1 = product({ id: "saf", name: "SAFORELLE SOIN LAVANT DOUX", category: "HYGIENE", subCategory: null, matchingTags: ["hygiène intime", "flore vaginale"], commercialClaims: [], stockQuantity: 5 });
+    const understanding = deriveUnderstanding({ drugs: [antibiotic], patient: { ageYears: null, sex: "MALE", isPregnant: false, isBreastfeeding: false }, providerId: "test", model: "m" });
+    const base: PipelineInput = { lines: [{ lineIndex: 0, drugName: "AMOXICILLINE", posology: null, durationDays: null, confirmed: true }], knowledge: new Map([["amoxicilline", drug({ name: "AMOXICILLINE", inn: "AMOXICILLINE", atcCode: "J01CA04", therapeuticClass: "Antibiotique", commonSideEffects: [] })]]), patient: patient({ sex: "MALE" }), catalog: [product1], rules: [], history: {}, explanations: [], extractionFindings: [], understanding, usedSimulatedProviders: false };
+    expect(runAnalysisPipeline(base).recommendations.map((r) => r.productId)).not.toContain("saf");
+    expect(runAnalysisPipeline({ ...base, patient: patient({ sex: "FEMALE" }) }).recommendations.map((r) => r.productId)).toContain("saf");
+  });
+});
+
