@@ -125,6 +125,21 @@ export type AdviceRule = {
    * `productPatterns` reconnaissent le produit associé dans le stock.
    */
   companion?: { when: string; productPatterns: string[]; productExclude?: string[]; label: string; reason: string };
+  /**
+   * Ce que le conseil apporte dans ce contexte : trois mots-clés au plus,
+   * écrits ici et relus — jamais tirés de l'argumentaire d'un produit. Ils se
+   * lisent sur la carte du comptoir, sous la référence proposée.
+   */
+  benefits?: string[];
+  /**
+   * Une routine : plusieurs étapes, chacune appariée à une référence du stock,
+   * proposées ensemble et si possible dans la même gamme. Chaque étape a ses
+   * propres étiquettes d'appariement ; la règle porte le pourquoi commun.
+   */
+  routine?: {
+    title: string;
+    steps: { key: string; label: string; matchingTags: string[]; productExclude?: string[]; productPrefer?: string[]; benefit: string }[];
+  };
   /** Explication en langage pharmacien. `{drug}` est remplacé. */
   rationaleTemplate: string;
   /**
@@ -185,6 +200,7 @@ export type AdviceRule = {
 export const ADVICE_RULES: AdviceRule[] = [
   {
     key: "digestive-tolerance-antibiotics",
+    benefits: ["Accompagne la flore pendant la cure", "À distance de l'antibiotique", "Cure de la durée du traitement"],
     title: "Tolérance digestive pendant l'antibiothérapie",
     kind: "TOLERANCE",
     version: "1.0",
@@ -256,6 +272,7 @@ export const ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "hydration-dermato-topical",
+    benefits: ["Peau moins sèche, moins irritée", "Application quotidienne", "Sans parfum à privilégier"],
     title: "Accompagnement cutané d'un traitement dermatologique",
     kind: "TOLERANCE",
     version: "1.0",
@@ -283,6 +300,7 @@ export const ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "magnesium-fatigue",
+    benefits: ["Compense une absorption réduite", "Contribue à réduire la fatigue", "Forme bien tolérée à privilégier"],
     title: "Fatigue et tension musculaire",
     kind: "COMFORT",
     version: "1.0",
@@ -316,6 +334,39 @@ export const ADVICE_RULES: AdviceRule[] = [
       patient.renalImpairment
         ? "Insuffisance rénale déclarée : un apport en magnésium relève d'un avis médical."
         : null,
+  },
+  {
+    key: "magnesium-ppi-longterm",
+    title: "Magnésium sous IPP au long cours",
+    kind: "TOLERANCE",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "MAGNESIUM",
+    atcPrefixes: ["A02BC"],
+    therapeuticClasses: ["Inhibiteur de la pompe à protons"],
+    sideEffectTriggers: [],
+    // L'hypomagnésémie sous IPP est un effet du long cours : la question
+    // écarte la cure courte, où le conseil n'aurait pas de sens.
+    question: "Le traitement par IPP dure-t-il depuis plus de trois mois, ou le patient a-t-il des crampes ou une fatigue inhabituelle ?",
+    confirmedReasonTemplate: "IPP au long cours ({drug}) : l'absorption du magnésium peut être diminuée, et le patient le ressent.",
+    basePriority: 64,
+    matchingTags: ["magnésium", "fatigue", "crampes"],
+    excludeTags: [],
+    benefits: ["Compense une absorption réduite", "Contribue à réduire la fatigue", "Forme bien tolérée à privilégier"],
+    shortReasonTemplate:
+      "IPP ({drug}) : au long cours, l'absorption intestinale du magnésium peut diminuer.",
+    rationaleTemplate:
+      "Les inhibiteurs de la pompe à protons ({drug}) peuvent entraîner une diminution de l'absorption intestinale du magnésium, surtout au-delà de trois mois de traitement. Une supplémentation peut être proposée, en particulier en cas de crampes ou de fatigue.",
+    counterScriptTemplate:
+      "« {drug} pris longtemps peut faire baisser le magnésium. {product} compense cet apport ; à prendre à distance des autres médicaments. »",
+    patientReasonTemplate:
+      "Votre traitement ({drug}), pris sur la durée, peut réduire l'absorption du magnésium. {product} compense cet apport.",
+    clinicalContext:
+      "Hypomagnésémie décrite sous IPP prolongé (ANSM, 2011). Un dosage se discute en cas de symptômes persistants ou de traitement associé (diurétique, digoxine).",
+    safetyNotes: ["En cas d'insuffisance rénale, l'apport en magnésium relève d'un avis médical."],
+    blockedFor: (patient) =>
+      patient.renalImpairment ? "Insuffisance rénale déclarée : l'apport en magnésium relève d'un avis médical." : null,
   },
   {
     key: "vitamin-d-elderly",
@@ -409,6 +460,7 @@ export const ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "sun-photosensitivity",
+    benefits: ["Prévient la réaction au soleil", "Indice 50+ à privilégier", "À renouveler toutes les 2 heures"],
     title: "Photosensibilisation",
     kind: "SAFETY",
     version: "1.0",
@@ -442,6 +494,7 @@ export const ADVICE_RULES: AdviceRule[] = [
   // ---------------------------------------------------------------------------
   {
     key: "nasal-hygiene-orl",
+    benefits: ["Lave et dégage le nez", "Sans principe actif", "Compatible avec le traitement"],
     title: "Hygiène nasale en contexte ORL",
     kind: "COMFORT",
     version: "1.0",
@@ -605,6 +658,7 @@ export const ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "eye-irritation-allergy",
+    benefits: ["Apaise et lubrifie l'œil", "Sans principe actif", "Unidoses à privilégier"],
     title: "Yeux irrités en contexte allergique",
     kind: "COMFORT",
     version: "1.0",
@@ -613,7 +667,7 @@ export const ADVICE_RULES: AdviceRule[] = [
     needTriggers: ["ALLERGIC_EYE_IRRITATION"],
     question: "Les yeux du patient piquent-ils ou pleurent-ils ?",
     category: "SOINS",
-    atcPrefixes: [],
+    atcPrefixes: ["D10BA01"],
     therapeuticClasses: [],
     sideEffectTriggers: [],
     basePriority: 52,
@@ -621,7 +675,7 @@ export const ADVICE_RULES: AdviceRule[] = [
     // Une irritation allergique se lave et s'hydrate ; elle ne se traite pas
     // avec un collyre antiseptique ou antibiotique, qui ont d'autres
     // indications et sont écartés par leur nom.
-    productExclude: [String.raw`nasal`, String.raw`\bnez\b`, String.raw`rhino`, String.raw`desomedine`, String.raw`hexamidine`, String.raw`antiseptique`, String.raw`antibio`, String.raw`tobramycine`, String.raw`tobrex`, String.raw`rifamycine`, String.raw`azyter`, String.raw`chloramphenicol`, String.raw`ofloxacine`, String.raw`ciprofloxacine`, String.raw`dexamethasone`, String.raw`cortico`],
+    productExclude: [String.raw`nasal`, String.raw`\bnez\b`, String.raw`rhino`, String.raw`desomedine`, String.raw`desosept`, String.raw`pommade`, String.raw`vitamine a`, String.raw`vita ?pos`, String.raw`hexamidine`, String.raw`antiseptique`, String.raw`antibio`, String.raw`tobramycine`, String.raw`tobrex`, String.raw`rifamycine`, String.raw`azyter`, String.raw`chloramphenicol`, String.raw`ofloxacine`, String.raw`ciprofloxacine`, String.raw`dexamethasone`, String.raw`cortico`],
     productPrefer: [String.raw`larmes`, String.raw`lavage`, String.raw`hydrat`, String.raw`serum phy`, String.raw`unidose`],
     excludeTags: [],
     shortReasonTemplate:
@@ -642,7 +696,97 @@ export const ADVICE_RULES: AdviceRule[] = [
   // l'IA. C'est un conseil d'observance, pas de confort : aucune question.
   // ---------------------------------------------------------------------------
   {
+    key: "isotretinoin-skin-routine",
+    title: "Routine peau sous isotrétinoïne",
+    kind: "TOLERANCE",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "DERMOCOSMETIQUE",
+    atcPrefixes: ["D10BA01"],
+    therapeuticClasses: ["Rétinoïde oral", "Isotrétinoïne"],
+    sideEffectTriggers: [],
+    basePriority: 74,
+    // Les étiquettes vivent dans les étapes : la règle n'apparie rien elle-même.
+    matchingTags: [],
+    excludeTags: [],
+    productExclude: [String.raw`gommage`, String.raw`exfoli`, String.raw`peeling`, String.raw`acide (glycolique|salicylique|lactique)`, String.raw`\baha\b`, String.raw`\bbha\b`, String.raw`retinol`, String.raw`scrub`],
+    routine: {
+      title: "Routine peau sous isotrétinoïne",
+      steps: [
+        {
+          key: "cleanse",
+          label: "Nettoyer",
+          matchingTags: ["nettoyant", "visage"],
+          productPrefer: [String.raw`sans savon`, String.raw`surgras`, String.raw`syndet`, String.raw`\bdoux`, String.raw`apais`, String.raw`purifiant`],
+          benefit: "Nettoie en douceur, sans dessécher",
+        },
+        {
+          key: "hydrate",
+          label: "Hydrater et réparer",
+          matchingTags: ["hydratation", "peau sensible", "apaisant", "émollient"],
+          productExclude: [String.raw`\bcorps\b`, String.raw`\blait\b`, String.raw`pieds`, String.raw`mains`, String.raw`anti ?age`, String.raw`anti ?rides`, String.raw`solaire`, String.raw`\bspf`, String.raw`levres`, String.raw`lèvres`],
+          productPrefer: [String.raw`visag`, String.raw`reparat`, String.raw`repair`, String.raw`apais`, String.raw`ceramide`, String.raw`hydra`, String.raw`relipid`, String.raw`cicalfate`, String.raw`cicaplast`],
+          benefit: "Répare la barrière cutanée fragilisée",
+        },
+        {
+          key: "protect",
+          label: "Protéger",
+          matchingTags: ["protection solaire", "spf", "photoprotection"],
+          productExclude: [String.raw`apres ?soleil`, String.raw`après ?soleil`, String.raw`autobronz`, String.raw`\bhuile\b`, String.raw`\bhle\b`, String.raw`enfant`, String.raw`dermoped`, String.raw`\bkids\b`, String.raw`junior`, String.raw`\d+ ?mois`, String.raw`bebe`, String.raw`bébé`, String.raw`\blait\b`, String.raw`\bcorps\b`, String.raw`\bcorp\b`, String.raw`levre`, String.raw`lèvre`, String.raw`stick`, String.raw`brume`, String.raw`\bspr\b`, String.raw`spray`, String.raw`spf ?(15|20|30)\b`],
+          // « 50 » ne figure pas ici : un motif préféré sauve une référence de l'exclusion, et un solaire enfant SPF 50 ne doit pas être sauvé.
+          productPrefer: [String.raw`visag`, String.raw`\bvis\b`, String.raw`non comedog`, String.raw`fluide`, String.raw`oil control`, String.raw`peau grasse`, String.raw`dry touch`, String.raw`toucher sec`, String.raw`\bmat\b`],
+          benefit: "Très haute protection, non comédogène",
+        },
+      ],
+    },
+    benefits: ["Peau moins sèche et moins irritée", "Barrière cutanée renforcée", "Protection solaire quotidienne"],
+    shortReasonTemplate:
+      "Isotrétinoïne ({drug}) : sécheresse de la peau et des muqueuses quasi constante pendant le traitement.",
+    rationaleTemplate:
+      "L'isotrétinoïne ({drug}) entraîne une sécheresse cutanée et muqueuse importante, et une photosensibilité. Une routine dermocosmétique adaptée — nettoyant doux, crème réparatrice, protection solaire — améliore le confort et la tolérance du traitement.",
+    counterScriptTemplate:
+      "« {drug} dessèche beaucoup la peau : un nettoyant doux, une crème réparatrice et une protection solaire chaque jour changent vraiment le confort. {product} est adapté à cette étape. »",
+    patientReasonTemplate:
+      "Votre traitement ({drug}) rend la peau sèche et fragile. {product} fait partie de la routine quotidienne qui la protège pendant la cure.",
+    clinicalContext:
+      "Sécheresse cutanéo-muqueuse et photosensibilité attendues sous isotrétinoïne orale ; éviter tout soin exfoliant ou irritant.",
+    safetyNotes: [
+      "Pas de gommage, d'acide exfoliant ni de rétinol cosmétique pendant le traitement.",
+      "Protection solaire indispensable : photosensibilisation.",
+    ],
+  },
+  {
+    key: "lip-care-isotretinoin",
+    title: "Lèvres sous isotrétinoïne",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "DERMOCOSMETIQUE",
+    atcPrefixes: ["D10BA01"],
+    therapeuticClasses: ["Rétinoïde oral", "Isotrétinoïne"],
+    sideEffectTriggers: [],
+    basePriority: 66,
+    matchingTags: ["lèvres", "baume"],
+    excludeTags: [],
+    productPrefer: [String.raw`baume`, String.raw`stick`, String.raw`levres`, String.raw`lèvres`, String.raw`\blev\b`, String.raw`ceralip`, String.raw`cicaplast`, String.raw`reparat`],
+    productExclude: [String.raw`gommage`, String.raw`exfoli`, String.raw`teint`, String.raw`gloss`, String.raw`rouge a levres`, String.raw`fievre`, String.raw`herpes`, String.raw`bouton`, String.raw`\bkids\b`, String.raw`chamallow`, String.raw`bubble`, String.raw`vanille`, String.raw`cola\b`, String.raw`\bmain`],
+    benefits: ["Lèvres réparées", "À renouveler dans la journée", "Formule sans parfum à privilégier"],
+    shortReasonTemplate:
+      "Isotrétinoïne ({drug}) : la sécheresse des lèvres (chéilite) touche presque tous les patients.",
+    rationaleTemplate:
+      "La chéilite est l'effet indésirable le plus constant de l'isotrétinoïne ({drug}). Un baume réparateur appliqué plusieurs fois par jour la prévient et la soulage.",
+    counterScriptTemplate:
+      "« Avec {drug}, les lèvres se dessèchent presque toujours. {product}, plusieurs fois par jour dès le début du traitement, évite qu'elles ne craquent. »",
+    patientReasonTemplate:
+      "Votre traitement ({drug}) dessèche les lèvres. {product} s'applique plusieurs fois par jour pour les protéger.",
+    clinicalContext: "Chéilite quasi constante sous isotrétinoïne orale.",
+    safetyNotes: [],
+  },
+  {
     key: "mouth-rinse-inhaled-corticosteroid",
+    benefits: ["Limite les mycoses buccales", "Après chaque inhalation", "Formule sans alcool"],
     title: "Rinçage de bouche après corticoïde inhalé",
     kind: "TOLERANCE",
     version: "1.0",
@@ -814,11 +958,23 @@ export function detectAdviceOpportunities(params: {
       Math.min(PRIORITY_CEILING[rule.kind], raw),
     );
 
-    byKey.set(rule.key, {
-      key: rule.key,
+    const variants: { suffix: string; tags: string[]; exclude: string[]; prefer: string[]; routine: AdviceOpportunityResult["routine"] }[] = rule.routine
+      ? rule.routine.steps.map((step, index) => ({
+          suffix: `:${step.key}`,
+          tags: step.matchingTags,
+          exclude: [...(rule.productExclude ?? []), ...(step.productExclude ?? [])],
+          prefer: step.productPrefer ?? rule.productPrefer ?? [],
+          routine: { key: rule.key, title: rule.routine!.title, stepKey: step.key, stepLabel: step.label, stepIndex: index, stepCount: rule.routine!.steps.length, benefit: step.benefit },
+        }))
+      : [{ suffix: "", tags: rule.matchingTags, exclude: rule.productExclude ?? [], prefer: rule.productPrefer ?? [], routine: null }];
+
+    for (const variant of variants) byKey.set(rule.key + variant.suffix, {
+      key: rule.key + variant.suffix,
       kind: rule.kind,
       category: rule.category,
       title: rule.title,
+      benefits: rule.benefits ?? [],
+      routine: variant.routine,
       // Le pharmacien lit la dénomination officielle : elle est vérifiable.
       rationale: rule.rationaleTemplate.replace(
         "{drug}",
@@ -843,10 +999,10 @@ export function detectAdviceOpportunities(params: {
       priority,
       isBlocked: blockReason !== null,
       blockReason,
-      matchingTags: rule.matchingTags,
+      matchingTags: variant.tags,
       excludeTags: rule.excludeTags,
-      productExclude: rule.productExclude ?? [],
-      productPrefer: rule.productPrefer ?? [],
+      productExclude: variant.exclude,
+      productPrefer: variant.prefer,
       companion: rule.companion ?? null,
       triggeredBy: triggers.map((t) => ({ lineIndex: t.lineIndex, drugName: t.drugName })),
       ruleKey: rule.key,

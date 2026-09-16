@@ -32,7 +32,14 @@ const productSchema = z.object({
   subCategory: z.string().trim().max(80).optional(),
   reference: z.string().trim().max(60).optional(),
   ean: z.string().trim().max(20).optional(),
-  imageUrl: z.string().trim().max(500).optional(),
+  // Une URL, un chemin, ou la photo de la boîte encodée par le navigateur
+  // (réduite à 480 px : quelques dizaines de kilo-octets).
+  imageUrl: z
+    .string()
+    .trim()
+    .max(300_000)
+    .refine((value) => !value || value.startsWith("data:image/") || value.startsWith("/") || /^https?:\/\//.test(value), "Image : URL, chemin ou photo attendus.")
+    .optional(),
   description: z.string().trim().max(1000).optional(),
   purchasePrice: z.string().trim().optional(),
   salePrice: z.string().trim().optional(),

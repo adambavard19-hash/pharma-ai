@@ -1,0 +1,240 @@
+import type { DrugKnowledge, VigilanceKind, VigilanceResult } from "../types";
+
+/**
+ * Vigilances au comptoir : ce que le traitement prescrit impose de savoir
+ * AVANT de conseiller quoi que ce soit en vente libre.
+ *
+ * Quatre natures, et la carte du comptoir les distingue :
+ *   • INTERACTION      — un complément courant se prend à distance du
+ *                        médicament (fer et lévothyroxine, par exemple) ;
+ *   • CONTRAINDICATION — un complément est à écarter sans avis médical
+ *                        (potassium et diurétique hyperkaliémiant) ;
+ *   • MONITORING       — le conseil se discute au vu du bilan biologique ;
+ *   • SCREENING        — le traitement justifie de penser à un dépistage.
+ *
+ * Chaque règle est écrite ici, sourcée, versionnée — jamais formulée par le
+ * modèle. Elle ne dit que ce que le résumé des caractéristiques du produit ou
+ * le thésaurus des interactions de l'ANSM dit ; elle ne diagnostique rien.
+ *
+ * Effets sur le moteur : `blockTags` écarte les conseils et références qui
+ * portent ces étiquettes ; `cautionTags` ajoute une précaution — la phrase de
+ * prise à distance — aux propositions qui les portent, sans les écarter.
+ */
+
+export type VigilanceRule = {
+  key: string;
+  version: string;
+  kind: VigilanceKind;
+  severity: "WARNING" | "INFO";
+  /** Ce que lit le pharmacien en titre : « Interaction potentielle ». */
+  title: string;
+  /** Sous-titre, avec la classe ou la substance : « Lévothyroxine détectée ». */
+  subtitle: string;
+  atcPrefixes: string[];
+  /** Substances (DCI) reconnues dans le nom ou la DCI, sans accents, minuscules. */
+  substances: string[];
+  /** L'explication, `{drug}` remplacé par le nom prescrit. */
+  explanationTemplate: string;
+  /** Les compléments concernés, tels qu'affichés. */
+  concerned: string[];
+  /** La phrase à transmettre au patient, s'il y en a une. */
+  patientAdvice: string | null;
+  /** Étiquettes du vocabulaire produit à ÉCARTER pour cette ordonnance. */
+  blockTags: string[];
+  /** Étiquettes qui appellent une précaution sur la carte, sans écarter. */
+  cautionTags: string[];
+  precautionText: string | null;
+  sources: string[];
+};
+
+/** Étiquettes que les vigilances reconnaissent : elles rejoignent le vocabulaire fermé. */
+export const VIGILANCE_TAGS = ["fer", "calcium", "zinc", "potassium", "vitamine a", "millepertuis", "magnésium"] as const;
+
+export const VIGILANCE_RULES: VigilanceRule[] = [
+  {
+    key: "levothyroxine-mineral-spacing",
+    version: "1.0",
+    kind: "INTERACTION",
+    severity: "WARNING",
+    title: "Interaction potentielle",
+    subtitle: "Lévothyroxine détectée",
+    atcPrefixes: ["H03AA"],
+    substances: ["levothyroxine", "liothyronine"],
+    explanationTemplate:
+      "Le fer, le calcium, le magnésium et les antiacides peuvent diminuer l'absorption de la lévothyroxine ({drug}). Un complément qui en contient se prend à distance : au moins 2 heures après, 4 heures par prudence.",
+    concerned: ["Fer", "Calcium", "Magnésium", "Zinc et multiminéraux"],
+    patientAdvice: "Prenez votre complément au moins 2 heures après votre lévothyroxine, 4 heures par prudence.",
+    blockTags: [],
+    cautionTags: ["fer", "calcium", "magnésium", "zinc"],
+    precautionText: "Lévothyroxine sur l'ordonnance : à prendre au moins 2 heures après, 4 heures par prudence.",
+    sources: ["RCP Levothyrox (ANSM) — interactions : sels de fer, de calcium, antiacides", "Thésaurus des interactions médicamenteuses, ANSM"],
+  },
+  {
+    key: "cycline-quinolone-chelation",
+    version: "1.0",
+    kind: "INTERACTION",
+    severity: "WARNING",
+    title: "Interaction potentielle",
+    subtitle: "Antibiotique chélaté par les minéraux",
+    atcPrefixes: ["J01AA", "J01MA"],
+    substances: ["doxycycline", "minocycline", "lymecycline", "tetracycline", "ciprofloxacine", "levofloxacine", "ofloxacine", "moxifloxacine", "norfloxacine"],
+    explanationTemplate:
+      "Les cyclines et les fluoroquinolones ({drug}) forment des complexes avec le fer, le calcium, le magnésium et le zinc, qui réduisent leur absorption. Un complément minéral se prend à distance de l'antibiotique, au moins 2 heures.",
+    concerned: ["Fer", "Calcium", "Magnésium", "Zinc"],
+    patientAdvice: "Prenez votre complément minéral au moins 2 heures après votre antibiotique.",
+    blockTags: [],
+    cautionTags: ["fer", "calcium", "magnésium", "zinc"],
+    precautionText: "Cycline ou fluoroquinolone sur l'ordonnance : à prendre au moins 2 heures après l'antibiotique.",
+    sources: ["Thésaurus des interactions médicamenteuses, ANSM — cyclines, fluoroquinolones et cations divalents"],
+  },
+  {
+    key: "bisphosphonate-spacing",
+    version: "1.0",
+    kind: "INTERACTION",
+    severity: "WARNING",
+    title: "Interaction potentielle",
+    subtitle: "Bisphosphonate détecté",
+    atcPrefixes: ["M05BA", "M05BB"],
+    substances: ["alendronique", "alendronate", "risedronique", "risedronate", "ibandronique", "ibandronate"],
+    explanationTemplate:
+      "Le calcium, le fer et le magnésium empêchent l'absorption du bisphosphonate ({drug}), qui se prend à jeun avec un grand verre d'eau. Tout complément minéral attend au moins 30 minutes, et le calcium plutôt à un autre moment de la journée.",
+    concerned: ["Calcium", "Fer", "Magnésium"],
+    patientAdvice: "Prenez votre bisphosphonate à jeun, puis attendez au moins 30 minutes avant tout complément ; le calcium, plutôt à un autre moment de la journée.",
+    blockTags: [],
+    cautionTags: ["calcium", "fer", "magnésium"],
+    precautionText: "Bisphosphonate sur l'ordonnance : jamais en même temps, au moins 30 minutes après.",
+    sources: ["RCP acide alendronique (ANSM) — mode d'administration et interactions"],
+  },
+  {
+    key: "potassium-hyperkaliemia",
+    version: "1.0",
+    kind: "CONTRAINDICATION",
+    severity: "WARNING",
+    title: "Contre-indication / vigilance",
+    subtitle: "Traitement hyperkaliémiant détecté",
+    atcPrefixes: ["C03DA", "C03DB", "C03EA", "C09A", "C09B", "C09C", "C09D"],
+    substances: ["spironolactone", "eplerenone", "amiloride", "triamterene"],
+    explanationTemplate:
+      "{drug} favorise la rétention de potassium. Un apport en potassium expose à une hyperkaliémie, surtout en cas d'insuffisance rénale ou d'association à un IEC ou un ARA II : la supplémentation relève d'un avis médical.",
+    concerned: ["Potassium (suppléments, sels de régime, multivitamines riches en potassium)"],
+    patientAdvice: null,
+    blockTags: ["potassium"],
+    cautionTags: [],
+    precautionText: null,
+    sources: ["Thésaurus des interactions médicamenteuses, ANSM — hyperkaliémiants et potassium : association déconseillée"],
+  },
+  {
+    key: "loop-thiazide-monitoring",
+    version: "1.0",
+    kind: "MONITORING",
+    severity: "WARNING",
+    title: "Surveillance",
+    subtitle: "Diurétique détecté",
+    atcPrefixes: ["C03A", "C03B", "C03C"],
+    substances: ["furosemide", "bumetanide", "hydrochlorothiazide", "indapamide", "chlortalidone"],
+    explanationTemplate:
+      "Les diurétiques de l'anse et thiazidiques ({drug}) peuvent augmenter les pertes urinaires de potassium et de magnésium. Une supplémentation se discute au vu du bilan biologique, pas sur le seul ressenti.",
+    concerned: ["Magnésium", "Potassium"],
+    patientAdvice: null,
+    blockTags: [],
+    cautionTags: ["magnésium", "potassium"],
+    precautionText: "Diurétique sur l'ordonnance : conseil à adapter au bilan biologique (kaliémie, magnésémie).",
+    sources: ["RCP furosémide et hydrochlorothiazide (ANSM) — effets indésirables métaboliques"],
+  },
+  {
+    key: "metformin-b12",
+    version: "1.0",
+    kind: "SCREENING",
+    severity: "INFO",
+    title: "Dépistage / vigilance",
+    subtitle: "Metformine détectée",
+    atcPrefixes: ["A10BA02", "A10BD"],
+    substances: ["metformine"],
+    explanationTemplate:
+      "Un traitement prolongé par metformine ({drug}) peut s'accompagner d'une baisse de la vitamine B12. En cas de fatigue inhabituelle, de fourmillements ou d'anémie, un dosage se discute avec le médecin ; une supplémentation ne se propose qu'après.",
+    concerned: ["Vitamine B12 : à proposer seulement si une carence est confirmée"],
+    patientAdvice: null,
+    blockTags: [],
+    cautionTags: [],
+    precautionText: null,
+    sources: ["RCP metformine (ANSM, 2022) — mise en garde : carence en vitamine B12"],
+  },
+  {
+    key: "isotretinoin-vigilance",
+    version: "1.0",
+    kind: "CONTRAINDICATION",
+    severity: "WARNING",
+    title: "Vigilances importantes",
+    subtitle: "Isotrétinoïne détectée",
+    atcPrefixes: ["D10BA01"],
+    substances: ["isotretinoine"],
+    explanationTemplate:
+      "Avec l'isotrétinoïne ({drug}) : pas de vitamine A ni de complément qui en contient (hypervitaminose A), pas de cycline (hypertension intracrânienne — association contre-indiquée), et pas de soin exfoliant ou irritant sur une peau déjà fragilisée.",
+    concerned: ["Vitamine A et multivitamines qui en contiennent", "Cyclines (association contre-indiquée)", "Gommages, acides exfoliants, rétinol cosmétique"],
+    patientAdvice: "Évitez les compléments contenant de la vitamine A et les soins exfoliants pendant le traitement.",
+    blockTags: ["vitamine a"],
+    cautionTags: [],
+    precautionText: null,
+    sources: ["RCP isotrétinoïne orale (ANSM) — contre-indications et mises en garde"],
+  },
+  {
+    key: "anticoagulant-millepertuis",
+    version: "1.0",
+    kind: "CONTRAINDICATION",
+    severity: "WARNING",
+    title: "Contre-indication / vigilance",
+    subtitle: "Anticoagulant détecté",
+    atcPrefixes: ["B01AA", "B01AE", "B01AF"],
+    substances: ["warfarine", "fluindione", "acenocoumarol", "apixaban", "rivaroxaban", "dabigatran", "edoxaban"],
+    explanationTemplate:
+      "Le millepertuis diminue l'effet de {drug} (induction enzymatique) : l'association est contre-indiquée. Tout produit de phytothérapie se vérifie avant d'être conseillé à un patient sous anticoagulant.",
+    concerned: ["Millepertuis (contre-indiqué)", "Phytothérapie : à vérifier au cas par cas"],
+    patientAdvice: "Ne prenez aucun produit à base de millepertuis, et demandez conseil avant toute plante en complément.",
+    blockTags: ["millepertuis"],
+    cautionTags: [],
+    precautionText: null,
+    sources: ["Thésaurus des interactions médicamenteuses, ANSM — millepertuis et anticoagulants oraux"],
+  },
+];
+
+function norm(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+/** Les vigilances que le traitement impose, une par règle déclenchée. */
+export function evaluateVigilances(drugs: DrugKnowledge[]): VigilanceResult[] {
+  const results: VigilanceResult[] = [];
+  for (const rule of VIGILANCE_RULES) {
+    const hits = drugs.filter((drug) => {
+      const atc = drug.atcCode ?? "";
+      if (rule.atcPrefixes.some((prefix) => atc.startsWith(prefix))) return true;
+      const haystack = norm(`${drug.inn ?? ""} ${drug.name}`);
+      return rule.substances.some((substance) => haystack.includes(substance));
+    });
+    if (hits.length === 0) continue;
+    const drugNames = [...new Set(hits.map((drug) => drug.name))];
+    results.push({
+      key: rule.key,
+      version: rule.version,
+      kind: rule.kind,
+      severity: rule.severity,
+      title: rule.title,
+      subtitle: rule.subtitle,
+      drugNames,
+      explanation: rule.explanationTemplate.replaceAll("{drug}", drugNames.join(", ")),
+      concerned: rule.concerned,
+      patientAdvice: rule.patientAdvice,
+      blockTags: rule.blockTags,
+      cautionTags: rule.cautionTags,
+      precautionText: rule.precautionText,
+      sources: rule.sources,
+    });
+  }
+  return results;
+}
+
+/** Vrai si une étiquette du produit ou du conseil tombe sous une vigilance. */
+export function tagsIntersect(tags: readonly string[], vigilanceTags: readonly string[]): string[] {
+  const normalized = new Set(tags.map(norm));
+  return vigilanceTags.filter((tag) => normalized.has(norm(tag)));
+}

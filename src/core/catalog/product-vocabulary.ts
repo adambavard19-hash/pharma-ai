@@ -1,4 +1,5 @@
 import type { ProductCategoryCode } from "@/core/ai/types";
+import { VIGILANCE_TAGS } from "../ai/engines/vigilance";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 
 /**
@@ -20,7 +21,14 @@ import { ADVICE_RULES } from "@/core/ai/engines/advice";
 
 /** Le vocabulaire fermé : toutes les étiquettes que les règles de conseil connaissent. */
 export const ADVICE_VOCABULARY: readonly string[] = [
-  ...new Set(ADVICE_RULES.flatMap((rule) => rule.matchingTags.map((tag) => tag.toLowerCase()))),
+  ...new Set([
+    ...ADVICE_RULES.flatMap((rule) => [
+      ...rule.matchingTags,
+      ...(rule.routine?.steps.flatMap((step) => step.matchingTags) ?? []),
+    ]).map((tag) => tag.toLowerCase()),
+    // Les vigilances reconnaissent les compléments à écarter ou à espacer.
+    ...VIGILANCE_TAGS,
+  ]),
 ].sort();
 
 export const CLASSIFICATION_SOURCES = ["HEURISTIC", "AI", "PHARMACIST"] as const;
@@ -177,6 +185,28 @@ const PATTERNS: Pattern[] = [
     ruleKeys: ["sun-photosensitivity"],
     confidence: 0.9,
   },
+  {
+    test: /^(?!.*(polident|dentier|dentition|intime|\bgyn\b|lingette|diffus|menager|ménager|appareil|lentille|steradent|biberon|tetine|tétine))(?=.*(\bnettoy\w*|gel moussant|mousse nettoyante|eau micellaire|pain dermatologique|syndet|demaquillant|démaquillant|purifiant|cleanser|gel purifiant|sans savon|creme lavante|crème lavante|gel lavant|lavant b5))/,
+    category: "DERMOCOSMETIQUE",
+    tags: ["nettoyant", "visage"],
+    ruleKeys: ["isotretinoin-skin-routine"],
+    confidence: 0.85,
+  },
+  {
+    test: /^(?!.*(fievre|fièvre|herpes|herpès|bouton|rouge a levres|gloss|teint|levure|lev riz|riz rouge|riz r\b|q10|deod))(?=.*(levres|lèvres|\blevre\b|\blev\b|labial|ceralip|homeoplasmine|stick lev))/,
+    category: "DERMOCOSMETIQUE",
+    tags: ["lèvres", "baume"],
+    ruleKeys: ["lip-care-isotretinoin"],
+    confidence: 0.85,
+  },
+  // Compléments que les vigilances doivent reconnaître, pour les écarter ou les espacer.
+  // Une dilution homéopathique (Kalium 7CH, Hypericum 15CH) n'est pas un apport : elle n'est pas étiquetée.
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\bfer\b|ferrostrane|tardyferon|fumafer|timoferol|bisglycinate de fer|fer bisglycinate|ferreux|ferrique))/, category: "MINERAUX", tags: ["fer"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\bcalcium\b|calciforte|\bcacit\b|orocal|calcidose|calperos))/, category: "MINERAUX", tags: ["calcium"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\bzinc\b|rubozinc|effizinc))/, category: "MINERAUX", tags: ["zinc"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(potassium|diffu ?k\b|kaleorid|kalium))/, category: "MINERAUX", tags: ["potassium"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b))(?=.*(vitamine a\b|vit a\b|retinol|rétinol|beta ?carotene|bêta ?carotène|arovit))/, category: "VITAMINES", tags: ["vitamine a"], ruleKeys: [], confidence: 0.75 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(millepertuis|hypericum|mildac|procalmil))/, category: "PHYTOTHERAPIE", tags: ["millepertuis"], ruleKeys: [], confidence: 0.85 },
   // Catégories génériques : le produit est rangé, mais ne sert aucune règle.
   { test: /\b(vitamine|vit ?c|vit ?b|multivitamin|berocca|supradyn|acide folique|complexe vitamin)/, category: "VITAMINES", tags: [], ruleKeys: [], confidence: 0.7 },
   { test: /(\bfer\b|\bzinc\b|selenium|\bcalcium\b|\biode\b|potassium|oligo ?element|mineraux)/, category: "MINERAUX", tags: [], ruleKeys: [], confidence: 0.6 },

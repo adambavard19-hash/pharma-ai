@@ -230,3 +230,39 @@ export async function classifyPharmacyProducts(params: {
 export async function countUnclassifiedProducts(pharmacyId: string): Promise<number> {
   return prisma.product.count({ where: { pharmacyId, deletedAt: null, classifiedAt: null } });
 }
+
+/**
+ * Après une mise à jour du dictionnaire (nouvelles étiquettes : nettoyant,
+ * lèvres, fer, potassium…), les produits déjà classés doivent les recevoir
+ * sans repasser par le modèle. Les étiquettes existantes sont conservées ; la
+ * catégorie ne change que si le dictionnaire est sûr de lui.
+ */
+/** Étiquettes posées par le dictionnaire seul, jamais par le modèle : elles peuvent être recalculées. */
+const REFRESHABLE_TAGS = new Set(["nettoyant", "visage", "lèvres", "baume", "fer", "calcium", "zinc", "potassium", "vitamine a", "millepertuis"]);
+
+export async function refreshDictionaryTags(params: { pharmacyId: string }): Promise<{ considered: number; updated: number; retagged: string[] }> {
+  const { classifyProductByName } = await import("@/core/catalog/product-vocabulary");
+  const products = await prisma.product.findMany({
+    where: { pharmacyId: params.pharmacyId, deletedAt: null },
+    select: { id: true, name: true, description: true, category: true, matchingTags: true },
+  });
+  let updated = 0;
+  const retagged: string[] = [];
+  for (const product of products) {
+    const match = classifyProductByName(product.name, { description: product.description });
+    // Les étiquettes que seul le dictionnaire pose sont recalculées : une
+    // correction du dictionnaire retire ce qu'il avait posé à tort.
+    const kept = product.matchingTags.filter((tag) => !REFRESHABLE_TAGS.has(tag));
+    const tags = [...new Set([...kept, ...(match?.tags ?? []), ...tagsFromName(product.name)])];
+    const category = match && match.confidence >= 0.85 && match.category !== product.category ? match.category : product.category;
+    const added = tags.filter((tag) => !product.matchingTags.includes(tag));
+    const removed = product.matchingTags.filter((tag) => !tags.includes(tag));
+    if (added.length === 0 && removed.length === 0 && category === product.category) continue;
+    if (!match && added.length === 0 && removed.length > 0) retagged.push(`${product.name} −${removed.join(",")}`);
+    await prisma.product.update({ where: { id: product.id }, data: { matchingTags: tags, category } });
+    updated += 1;
+    if (match && added.some((tag) => match.tags.includes(tag))) retagged.push(`${product.name} +${added.filter((tag) => match.tags.includes(tag)).join(",")}`);
+  }
+  return { considered: products.length, updated, retagged };
+}
+

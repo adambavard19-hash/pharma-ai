@@ -81,8 +81,10 @@ function scoreRelevance(
 
   // Une formule que la règle préfère (« sans alcool ») passe devant ses
   // équivalentes : c'est une question de pertinence, pas de marge.
+  // Le plafond laisse la place à la préférence : une référence qui coche
+  // toutes les étiquettes atteint 0,9 ; seule la formule préférée atteint 1.
   const preferred = matchesAny(opportunity.productPrefer, product.name);
-  const value = Math.min(1, (categoryMatch ? 0.55 : 0.15) + tagRatio * 0.45 + (preferred ? 0.1 : 0));
+  const value = Math.min(1, (categoryMatch ? 0.5 : 0.15) + tagRatio * 0.4 + (preferred ? 0.1 : 0));
 
   const details: string[] = [];
   if (categoryMatch) details.push(`catégorie ${opportunity.category.toLowerCase()}`);

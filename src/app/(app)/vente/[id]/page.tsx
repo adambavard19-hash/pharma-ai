@@ -1,7 +1,15 @@
 import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
 import { isEngineOutcome } from "@/core/ai/outcome";
-import type { CompanionSuggestion } from "@/core/ai/types";
+import type { CompanionSuggestion, RoutineStepInfo, VigilanceDetails } from "@/core/ai/types";
+
+function isVigilanceDetails(value: unknown): value is VigilanceDetails {
+  return Boolean(value) && typeof value === "object" && typeof (value as VigilanceDetails).kind === "string" && typeof (value as VigilanceDetails).title === "string";
+}
+
+function isRoutineStep(value: unknown): value is RoutineStepInfo {
+  return Boolean(value) && typeof value === "object" && typeof (value as RoutineStepInfo).key === "string" && typeof (value as RoutineStepInfo).stepIndex === "number";
+}
 
 function isCompanion(value: unknown): value is CompanionSuggestion {
   return typeof value === "object" && value !== null && typeof (value as CompanionSuggestion).productId === "string" && typeof (value as CompanionSuggestion).name === "string";
@@ -270,6 +278,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           message: finding.message,
           subjectType: finding.subjectType,
           acknowledged: Boolean(finding.acknowledgedAt),
+          details: isVigilanceDetails(finding.details) ? finding.details : null,
         })) ?? []
       }
       blockedOpportunities={
@@ -325,8 +334,10 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                 answeredAt: recommendation.opportunity.answeredAt?.toISOString() ?? null,
                 aiJustification: recommendation.opportunity.aiJustification,
                 confirmedReason: recommendation.opportunity.confirmedReason,
+                benefits: recommendation.opportunity.benefits,
               }
             : null,
+          routine: isRoutineStep(recommendation.routine) ? recommendation.routine : null,
           product: recommendation.product
             ? {
                 id: recommendation.product.id,

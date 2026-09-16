@@ -1520,6 +1520,9 @@ model SafetyFinding {
   subjectType   String
   subjectId     String?
   source        String
+  /// Contenu structuré d'une vigilance (interaction, contre-indication,
+  /// surveillance, dépistage) : ce que la carte du comptoir affiche.
+  details       Json?
   createdAt     DateTime       @default(now())
 
   /// Acquittement professionnel. Tant qu'une alerte BLOCKING n'est pas
@@ -1569,6 +1572,9 @@ model AdviceOpportunity {
   ruleVersion      String?
   /// Le « pourquoi » une fois le besoin confirmé par le patient.
   confirmedReason  String?
+  /// Ce que le conseil apporte dans ce contexte, en trois mots-clés écrits
+  /// dans la règle — jamais tirés d'un argumentaire produit.
+  benefits         String[]        @default([])
   createdAt       DateTime        @default(now())
 
   analysisRun     AnalysisRun      @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
@@ -1633,6 +1639,9 @@ model Recommendation {
   /// { productId, name, salePriceCents, stockQuantity, reason }. Proposé à côté
   /// de la carte, jamais ajouté sans un geste du pharmacien.
   companion      Json?
+  /// L'étape d'une routine (nettoyer, hydrater, protéger) quand la
+  /// recommandation en fait partie : clé, titre, rang, bénéfice.
+  routine        Json?
   /// La phrase réellement affichée au pharmacien pour être dite au patient.
   /// Elle provient du catalogue de règles de conseil, jamais d'une génération
   /// libre. On la conserve avec la recommandation parce que c'est ce qui a été

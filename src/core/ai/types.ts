@@ -209,6 +209,45 @@ export type SafetyFindingResult = {
   subjectType: "PRESCRIPTION_LINE" | "OPPORTUNITY" | "PRODUCT" | "PATIENT" | "ANALYSIS";
   subjectId: string | null;
   source: string;
+  /** Contenu structuré d'une vigilance, quand le signal en est une. */
+  details?: VigilanceDetails | null;
+};
+
+// --- Vigilances -------------------------------------------------------------
+
+export type VigilanceKind = "INTERACTION" | "CONTRAINDICATION" | "MONITORING" | "SCREENING";
+
+/** Ce que la carte du comptoir affiche pour une vigilance. */
+export type VigilanceDetails = {
+  key: string;
+  version: string;
+  kind: VigilanceKind;
+  title: string;
+  subtitle: string;
+  /** Les médicaments de l'ordonnance qui l'ont déclenchée, tels que prescrits. */
+  drugNames: string[];
+  explanation: string;
+  concerned: string[];
+  patientAdvice: string | null;
+  sources: string[];
+};
+
+export type VigilanceResult = VigilanceDetails & {
+  severity: "WARNING" | "INFO";
+  blockTags: string[];
+  cautionTags: string[];
+  precautionText: string | null;
+};
+
+/** L'étape d'une routine à laquelle appartient une proposition. */
+export type RoutineStepInfo = {
+  key: string;
+  title: string;
+  stepKey: string;
+  stepLabel: string;
+  stepIndex: number;
+  stepCount: number;
+  benefit: string;
 };
 
 // --- Explication du traitement (étape C) ----------------------------------
@@ -261,6 +300,10 @@ export type AdviceOpportunityResult = {
   productPrefer?: string[];
   /** Le produit à associer à la référence retenue, quand la règle en prévoit un. */
   companion?: { when: string; productPatterns: string[]; productExclude?: string[]; label: string; reason: string } | null;
+  /** Ce que le conseil apporte dans ce contexte, trois mots-clés écrits dans la règle. */
+  benefits?: string[];
+  /** L'étape de routine que cette opportunité représente, quand la règle en décrit une. */
+  routine?: RoutineStepInfo | null;
   triggeredBy: { lineIndex: number; drugName: string }[];
   /**
    * La question à poser au patient avant de proposer quoi que ce soit, écrite
@@ -322,6 +365,8 @@ export type ScoredRecommendation = {
   explanation: ScoreContribution[];
   /** Le produit à associer, trouvé dans le stock, s'il y en a un. */
   companion?: CompanionSuggestion | null;
+  /** L'étape de routine, quand la proposition en fait partie. */
+  routine?: RoutineStepInfo | null;
 };
 
 /** Un produit à proposer À CÔTÉ d'une recommandation (seringue avec un flacon de sérum). */
@@ -392,4 +437,6 @@ export type AnalysisResult = {
   blockedReasons: string[];
   /** `true` si un fournisseur simulé est intervenu dans la chaîne. */
   usedSimulatedProviders: boolean;
+  /** Les vigilances que le traitement impose (interactions, contre-indications, surveillance, dépistage). */
+  vigilances?: VigilanceResult[];
 };

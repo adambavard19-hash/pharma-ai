@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save } from "lucide-react";
+import { Camera, Save, X } from "lucide-react";
 import { saveProductAction } from "@/server/actions/products";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/field";
@@ -46,6 +46,37 @@ export function ProductForm({ product }: { product?: ProductInput }) {
   }, [state, router]);
 
   const fieldErrors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
+  const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? "");
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  // La photo de la boîte, prise au téléphone ou choisie sur le poste : réduite
+  // dans le navigateur à 480 px, encodée, envoyée avec le formulaire. Aucun
+  // stockage externe, rien qui sorte de PharmaBoost.
+  const onPhoto = (file: File | undefined) => {
+    setImageError(null);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return setImageError("Choisissez une image (JPG, PNG, HEIC converti).");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const max = 480;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const context = canvas.getContext("2d");
+        if (!context) return setImageError("Impossible de traiter l'image.");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setImageUrl(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = () => setImageError("Image illisible.");
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <form action={formAction} className="space-y-6">
@@ -106,16 +137,41 @@ export function ProductForm({ product }: { product?: ProductInput }) {
         </div>
 
         <Field
-          label="Visuel"
-          htmlFor="imageUrl"
-          hint="Chemin ou URL de l'image affichée sur la fiche patient."
+          label="Photo de la boîte"
+          htmlFor="photo"
+          hint="Affichée sur la carte du comptoir et sur le plan du patient. Prenez la boîte en photo, ou collez une URL."
+          error={imageError ?? fieldErrors.imageUrl?.[0]}
         >
-          <Input
-            id="imageUrl"
-            name="imageUrl"
-            defaultValue={product?.imageUrl ?? ""}
-            placeholder="/produits/mon-produit.svg"
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            {imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imageUrl} alt="" className="size-20 rounded-xl border border-border-subtle bg-white object-contain p-1" />
+            ) : (
+              <span className="flex size-20 items-center justify-center rounded-xl border border-dashed border-border-default text-text-tertiary"><Camera className="size-6" /></span>
+            )}
+            <div className="flex flex-col gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border-default px-3 py-2 text-[13.5px] font-medium text-text-primary hover:bg-surface-sunken">
+                <Camera className="size-4" />
+                {imageUrl ? "Changer la photo" : "Prendre ou choisir une photo"}
+                <input id="photo" type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => onPhoto(event.target.files?.[0])} />
+              </label>
+              {imageUrl && (
+                <button type="button" onClick={() => setImageUrl("")} className="inline-flex items-center gap-1 text-[12.5px] text-text-tertiary hover:text-text-secondary">
+                  <X className="size-3.5" /> Retirer
+                </button>
+              )}
+            </div>
+          </div>
+          <input type="hidden" name="imageUrl" value={imageUrl} />
+          {!imageUrl.startsWith("data:") && (
+            <Input
+              className="mt-2"
+              value={imageUrl}
+              onChange={(event) => setImageUrl(event.target.value)}
+              placeholder="ou une URL : https://…/boite.jpg"
+              aria-label="URL de l'image"
+            />
+          )}
         </Field>
 
         <Field label="Description" htmlFor="description">

@@ -8,10 +8,14 @@ import {
   rulesServedBy,
 } from "../product-vocabulary";
 import { validateProductClassification } from "../product-classification-schema";
+import { VIGILANCE_TAGS } from "@/core/ai/engines/vigilance";
 
 describe("le vocabulaire fermé des règles", () => {
   it("contient exactement les étiquettes des règles de conseil", () => {
-    const expected = new Set(ADVICE_RULES.flatMap((rule) => rule.matchingTags.map((t) => t.toLowerCase())));
+    const expected = new Set([
+      ...ADVICE_RULES.flatMap((rule) => [...rule.matchingTags, ...(rule.routine?.steps.flatMap((step) => step.matchingTags) ?? [])].map((t) => t.toLowerCase())),
+      ...VIGILANCE_TAGS,
+    ]);
     expect(new Set(ADVICE_VOCABULARY)).toEqual(expected);
   });
 

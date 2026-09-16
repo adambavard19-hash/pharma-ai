@@ -23,6 +23,7 @@ import {
 import type { TreatmentUnderstanding } from "../understanding";
 import { deriveOutcome } from "./outcome";
 import { matchesAny } from "./engines/product-name";
+import { evaluateVigilances, tagsIntersect } from "./engines/vigilance";
 import type {
   AnalysisResult,
   CatalogProduct,
@@ -261,6 +262,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       trace: recorder.trace,
       blockedReasons,
       usedSimulatedProviders: input.usedSimulatedProviders,
+      vigilances: [],
     };
   }
 
@@ -344,11 +346,51 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     .map((d) => d.knowledge)
     .filter((k): k is DrugKnowledge => k !== null);
 
+  // Vigilances : ce que le traitement impose de savoir avant tout conseil.
+  // Elles sont écrites dans des règles sourcées, jamais formulées à la volée.
+  const vigilances = evaluateVigilances(knownDrugs);
+  const vigilanceFindings: SafetyFindingResult[] = vigilances.map((vigilance) => ({
+    severity: vigilance.severity,
+    code: `VIGILANCE_${vigilance.kind}`,
+    message: `${vigilance.title} — ${vigilance.subtitle} : ${vigilance.explanation}`,
+    subjectType: "PRESCRIPTION_LINE",
+    subjectId: vigilance.drugNames.join(", "),
+    source: `vigilance-rules@${vigilance.version}`,
+    details: {
+      key: vigilance.key,
+      version: vigilance.version,
+      kind: vigilance.kind,
+      title: vigilance.title,
+      subtitle: vigilance.subtitle,
+      drugNames: vigilance.drugNames,
+      explanation: vigilance.explanation,
+      concerned: vigilance.concerned,
+      patientAdvice: vigilance.patientAdvice,
+      sources: vigilance.sources,
+    },
+  }));
+  const vigilanceBlockTags = vigilances.flatMap((vigilance) => vigilance.blockTags);
+
   const opportunitySafety = evaluateOpportunitySafety(
     rawOpportunities,
     input.patient,
     knownDrugs,
   );
+  // Un conseil qui porte une étiquette écartée par une vigilance ne se propose
+  // pas — même si sa règle, prise seule, était pertinente.
+  for (const opportunity of rawOpportunities) {
+    const hit = tagsIntersect(opportunity.matchingTags, vigilanceBlockTags);
+    if (hit.length === 0 || opportunitySafety.blockedOpportunityKeys.has(opportunity.key)) continue;
+    opportunitySafety.blockedOpportunityKeys.add(opportunity.key);
+    opportunitySafety.findings.push({
+      severity: "BLOCKING",
+      code: "VIGILANCE_BLOCKED",
+      message: `Conseil « ${opportunity.title} » écarté : ${hit.join(", ")} déconseillé avec ce traitement.`,
+      subjectType: "OPPORTUNITY",
+      subjectId: opportunity.key,
+      source: "vigilance-rules",
+    });
+  }
   // Les substances de l'ordonnance, telles que publiées par le catalogue
   // national. Elles servent à écarter un conseil qui doublerait une dose.
   const prescribedSubstances = [
@@ -364,9 +406,26 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     input.patient,
     prescribedSubstances,
   );
+  // Une référence qui porte une étiquette écartée par une vigilance (potassium
+  // sous diurétique hyperkaliémiant, millepertuis sous anticoagulant) sort du
+  // jeu, quelle que soit la règle qui aurait pu l'appeler.
+  for (const product of input.catalog) {
+    const hit = tagsIntersect(product.matchingTags, vigilanceBlockTags);
+    if (hit.length === 0 || productSafety.blockedProductIds.has(product.id)) continue;
+    productSafety.blockedProductIds.add(product.id);
+    productSafety.findings.push({
+      severity: "INFO",
+      code: "VIGILANCE_PRODUCT_EXCLUDED",
+      message: `« ${product.name} » écarté : ${hit.join(", ")} déconseillé avec ce traitement.`,
+      subjectType: "PRODUCT",
+      subjectId: product.id,
+      source: "vigilance-rules",
+    });
+  }
 
   const allSafetyFindings = [
     ...safetyFindings,
+    ...vigilanceFindings,
     ...opportunitySafety.findings,
     ...productSafety.findings,
   ];
@@ -482,6 +541,18 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     },
   );
 
+  // Une vigilance qui n'écarte pas mais impose une prise à distance (fer et
+  // lévothyroxine) s'écrit en précaution sur la proposition concernée.
+  const catalogById = new Map(input.catalog.map((p) => [p.id, p]));
+  for (const item of scored) {
+    const product = catalogById.get(item.productId);
+    if (!product) continue;
+    for (const vigilance of vigilances) {
+      if (!vigilance.precautionText || tagsIntersect(product.matchingTags, vigilance.cautionTags).length === 0) continue;
+      if (!item.precautions.includes(vigilance.precautionText)) item.precautions.push(vigilance.precautionText);
+    }
+  }
+
   // ---------------------------------------------------------------- ÉTAPE 7
   // OPTIMISATION COMMERCIALE AUTORISÉE — dernière étape, périmètre restreint.
   // Elle ne peut QUE : (a) retenir une référence parmi des candidates déjà
@@ -501,6 +572,38 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
 
       const selected: ScoredRecommendation[] = [];
       const notes: string[] = [];
+      const opportunityByKey = new Map(eligibleOpportunities.map((o) => [o.key, o]));
+
+      // Une routine se propose dans une même gamme quand le stock le permet :
+      // parmi les références jugées proches du meilleur score à chaque étape,
+      // la marque qui couvre le plus d'étapes l'emporte, celle que l'officine
+      // met en avant d'abord. Une marque ne fait jamais monter une référence
+      // moins pertinente : l'écart admis reste étroit.
+      const ROUTINE_BRAND_TOLERANCE = 0.15;
+      const preferredBrands = input.rules.filter((r) => r.type === "PREFER_BRAND" && r.brand).map((r) => (r.brand as string).toLowerCase());
+      const brandOf = (product: CatalogProduct | undefined) => (product?.brand ?? product?.name.split(/\s+/)[0] ?? "").toLowerCase();
+      const routineGroups = new Map<string, string[]>();
+      for (const key of byOpportunity.keys()) {
+        const routine = opportunityByKey.get(key)?.routine;
+        if (routine) routineGroups.set(routine.key, [...(routineGroups.get(routine.key) ?? []), key]);
+      }
+      const routineBrand = new Map<string, string>();
+      for (const [routineKey, keys] of routineGroups) {
+        const coverage = new Map<string, number>();
+        for (const key of keys) {
+          const list = [...(byOpportunity.get(key) ?? [])].sort((a, b) => b.totalScore - a.totalScore);
+          const best = list[0];
+          if (!best) continue;
+          const brands = new Set(list.filter((i) => best.totalScore - i.totalScore < ROUTINE_BRAND_TOLERANCE).map((i) => brandOf(catalogById.get(i.productId))).filter(Boolean));
+          for (const brand of brands) coverage.set(brand, (coverage.get(brand) ?? 0) + 1);
+        }
+        const weight = (entry: [string, number]) => entry[1] + (preferredBrands.includes(entry[0]) ? 0.5 : 0);
+        const ranked = [...coverage.entries()].sort((a, b) => weight(b) - weight(a));
+        if (ranked[0] && ranked[0][1] >= 2) {
+          routineBrand.set(routineKey, ranked[0][0]);
+          notes.push(`Routine « ${routineKey} » : gamme ${ranked[0][0]} retenue sur ${ranked[0][1]} étape(s) sur ${keys.length}${preferredBrands.includes(ranked[0][0]) ? " (marque mise en avant par l'officine)" : ""}.`);
+        }
+      }
 
       for (const [key, list] of byOpportunity) {
         list.sort((a, b) => b.totalScore - a.totalScore);
@@ -535,21 +638,77 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
           );
         }
 
-        selected.push(chosen);
+        const routine = opportunityByKey.get(key)?.routine ?? null;
+        if (!routine) {
+          selected.push(chosen);
+          continue;
+        }
+        const brand = routineBrand.get(routine.key);
+        const sameBrand = brand
+          ? list.find((i) => best.totalScore - i.totalScore < ROUTINE_BRAND_TOLERANCE && brandOf(catalogById.get(i.productId)) === brand)
+          : undefined;
+        if (sameBrand && sameBrand.productId !== chosen.productId) {
+          notes.push(`« ${key} » : référence ${brand} retenue pour la cohérence de la routine.`);
+        }
+        selected.push({ ...(sameBrand ?? chosen), routine });
       }
+
+      // Une référence déjà retenue dans une routine ne se propose pas une
+      // seconde fois seule : la protection solaire du traitement par
+      // isotrétinoïne est l'étape « protéger », pas un conseil à part.
+      const routineProducts = new Set(selected.filter((item) => item.routine).map((item) => item.productId));
+      const routineTags = selected
+        .filter((item) => item.routine)
+        .flatMap((item) => opportunityByKey.get(item.opportunityKey)?.matchingTags ?? []);
+      const coveredByRoutine = (item: ScoredRecommendation) =>
+        !item.routine &&
+        (routineProducts.has(item.productId) ||
+          tagsIntersect(opportunityByKey.get(item.opportunityKey)?.matchingTags ?? [], routineTags).length > 0);
+      for (const item of selected) {
+        if (coveredByRoutine(item)) notes.push(`« ${item.opportunityKey} » : besoin déjà couvert par une étape de routine, non répété.`);
+      }
+      const deduplicated = selected.filter((item) => !coveredByRoutine(item));
+      selected.length = 0;
+      selected.push(...deduplicated);
 
       const priorityByKey = new Map(
         eligibleOpportunities.map((o) => [o.key, o.priority]),
       );
+      // Une routine se classe comme un seul conseil, sur sa meilleure étape,
+      // et ses étapes restent ensemble dans l'ordre de la règle.
+      const routineScore = new Map<string, number>();
+      for (const item of selected) {
+        if (item.routine) routineScore.set(item.routine.key, Math.max(routineScore.get(item.routine.key) ?? 0, item.totalScore));
+      }
+      const rankScore = (item: ScoredRecommendation) => (item.routine ? (routineScore.get(item.routine.key) ?? item.totalScore) : item.totalScore);
       selected.sort((a, b) => {
         const priorityDelta =
           (priorityByKey.get(b.opportunityKey) ?? 0) -
           (priorityByKey.get(a.opportunityKey) ?? 0);
         if (priorityDelta !== 0) return priorityDelta;
+        if (rankScore(b) !== rankScore(a)) return rankScore(b) - rankScore(a);
+        if (a.routine && b.routine && a.routine.key === b.routine.key) return a.routine.stepIndex - b.routine.stepIndex;
         return b.totalScore - a.totalScore;
       });
 
-      const limited = selected.slice(0, maxRecommendations);
+      // La limite compte les conseils, et une routine en est un.
+      const limited: ScoredRecommendation[] = [];
+      const seenRoutines = new Set<string>();
+      let slots = 0;
+      for (const item of selected) {
+        if (item.routine) {
+          if (!seenRoutines.has(item.routine.key)) {
+            if (slots >= maxRecommendations) continue;
+            seenRoutines.add(item.routine.key);
+            slots += 1;
+          }
+          limited.push(item);
+        } else {
+          if (slots >= maxRecommendations) continue;
+          slots += 1;
+          limited.push(item);
+        }
+      }
       if (selected.length > limited.length) {
         notes.push(
           `${selected.length - limited.length} proposition(s) non affichée(s) : limite de ${maxRecommendations} conseils par ordonnance.`,
@@ -560,8 +719,6 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       // retenue l'appelle (un flacon de sérum physiologique appelle une
       // seringue de lavage), on le cherche dans le stock, en rayon. Il
       // accompagne la carte ; il n'est jamais ajouté sans un geste.
-      const catalogById = new Map(input.catalog.map((p) => [p.id, p]));
-      const opportunityByKey = new Map(eligibleOpportunities.map((o) => [o.key, o]));
       const withCompanions = limited.map((item) => {
         const opportunity = opportunityByKey.get(item.opportunityKey);
         const product = catalogById.get(item.productId);
@@ -629,5 +786,6 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     trace: recorder.trace,
     blockedReasons,
     usedSimulatedProviders: input.usedSimulatedProviders,
+    vigilances,
   };
 }

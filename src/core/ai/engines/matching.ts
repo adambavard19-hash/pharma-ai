@@ -25,6 +25,8 @@ export type MatchCandidate = {
   /** Nombre d'étiquettes de l'opportunité retrouvées sur le produit. */
   tagHits: number;
   categoryMatch: boolean;
+  /** Le nom correspond à une formule que la règle préfère. */
+  preferred: boolean;
 };
 
 export function findCandidateProducts(params: {
@@ -34,7 +36,7 @@ export function findCandidateProducts(params: {
   includeOutOfStock?: boolean;
   maxCandidates?: number;
 }): MatchCandidate[] {
-  const { opportunity, catalog, includeOutOfStock = false, maxCandidates = 12 } = params;
+  const { opportunity, catalog, includeOutOfStock = false, maxCandidates = 20 } = params;
 
   const opportunityTokens = tokenize(opportunity.matchingTags);
 
@@ -67,19 +69,26 @@ export function findCandidateProducts(params: {
 
     // Une référence sans lien de catégorie ni d'étiquette n'est pas candidate.
     if (!categoryMatch && tagHits === 0) continue;
+    // Une étape de routine nomme un geste précis (nettoyer, protéger) : la
+    // catégorie seule ne suffit pas, une crème n'est pas un écran solaire.
+    if (opportunity.routine && tagHits === 0) continue;
 
     // La règle peut écarter une formule par son nom (un bain de bouche
     // alcoolisé après un corticoïde inhalé), sauf si le nom la sauve
     // explicitement (« sans alcool »).
     if (matchesAny(opportunity.productExclude, product.name) && !matchesAny(opportunity.productPrefer, product.name)) continue;
 
-    candidates.push({ product, tagHits, categoryMatch });
+    candidates.push({ product, tagHits, categoryMatch, preferred: matchesAny(opportunity.productPrefer, product.name) });
   }
 
+  // Une formule préférée par la règle passe avant le stock : sinon, dans un
+  // rayon fourni, la référence la plus adaptée reste derrière les plus
+  // nombreuses et n'atteint jamais le classement.
   return candidates
     .sort((a, b) => {
       if (a.categoryMatch !== b.categoryMatch) return a.categoryMatch ? -1 : 1;
       if (b.tagHits !== a.tagHits) return b.tagHits - a.tagHits;
+      if (a.preferred !== b.preferred) return a.preferred ? -1 : 1;
       return b.product.stockQuantity - a.product.stockQuantity;
     })
     .slice(0, maxCandidates);

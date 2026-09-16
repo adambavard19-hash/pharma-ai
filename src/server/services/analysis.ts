@@ -439,6 +439,7 @@ export async function analysePrescription(params: {
           subjectType: finding.subjectType,
           subjectId: finding.subjectId,
           source: finding.source,
+          details: finding.details ? (finding.details as never) : undefined,
         },
       });
     }
@@ -450,6 +451,7 @@ export async function analysePrescription(params: {
           analysisRunId: run.id,
           category: opportunity.category,
           title: opportunity.title,
+          benefits: opportunity.benefits ?? [],
           rationale: opportunity.rationale,
           clinicalContext: opportunity.clinicalContext,
           safetyNotes: opportunity.safetyNotes,
@@ -551,6 +553,7 @@ export async function analysePrescription(params: {
           precautions: recommendation.precautions,
           unitPriceCents: product?.salePriceCents ?? 0,
           companion: recommendation.companion ? (recommendation.companion as never) : undefined,
+          routine: recommendation.routine ? (recommendation.routine as never) : undefined,
           isDemo: prescription.isDemo,
         },
       });

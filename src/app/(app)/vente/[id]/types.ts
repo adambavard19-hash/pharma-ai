@@ -1,4 +1,4 @@
-import type { ScoreContribution } from "@/core/ai/types";
+import type { ScoreContribution, RoutineStepInfo, VigilanceDetails } from "@/core/ai/types";
 import type { PosologySchedule } from "@/core/posology";
 
 /**
@@ -90,6 +90,8 @@ export type SafetyFindingView = {
   /** ANALYSIS · PRESCRIPTION_LINE · OPPORTUNITY · PRODUCT */
   subjectType: string;
   acknowledged: boolean;
+  /** Le contenu structuré d'une vigilance, quand le signal en est une. */
+  details: VigilanceDetails | null;
 };
 
 
@@ -134,7 +136,11 @@ export type AdviceView = {
     aiJustification: string | null;
     /** Le pourquoi une fois le besoin confirmé par le patient. */
     confirmedReason: string | null;
+    /** Ce que le conseil apporte ici, trois mots-clés écrits dans la règle. */
+    benefits: string[];
   } | null;
+  /** L'étape de routine (nettoyer, hydrater, protéger) quand la proposition en fait partie. */
+  routine: RoutineStepInfo | null;
   /** Le produit à associer à cette proposition, trouvé dans le stock, s'il y en a un. */
   companion: { productId: string; name: string; salePriceCents: number; stockQuantity: number; label: string; reason: string } | null;
   product: {

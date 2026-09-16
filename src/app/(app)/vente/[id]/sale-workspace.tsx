@@ -23,7 +23,7 @@ import type { PatientOption } from "@/components/app/patient-picker";
 import { PrescriptionZone } from "./prescription-zone";
 import { TreatmentPanel } from "./treatment-panel";
 import { ChecksNote } from "./checks-note";
-import { SafetyZone } from "./safety-zone";
+import { SafetyZone, VigilanceCards } from "./safety-zone";
 import { AdviceZone } from "./advice-zone";
 import type { EngineOutcome } from "@/core/ai/outcome";
 import { DeliveryZone, type DeliveryExtra } from "./delivery-zone";
@@ -484,6 +484,10 @@ export function SaleWorkspace({
             <>
               <TreatmentPanel lines={lines} canEdit={permissions.verify} onEdit={() => setForceEdit(true)} catalogAttribution={catalogAttribution} />
               <ChecksNote findings={findings} blockedOpportunities={blockedOpportunities} stale={identificationChangedSinceAnalysis} prescriptionId={prescription.id} />
+              {/* Les vigilances du traitement (interaction, contre-indication,
+                  surveillance, dépistage) se lisent sous l'ordonnance, avant
+                  toute proposition — sans attendre une alerte bloquante. */}
+              {!blocked && <VigilanceCards findings={findings} />}
             </>
           )}
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, ChevronDown, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ChevronDown, Eye, MessageSquareQuote, ShieldAlert, ShieldCheck, Stethoscope, TriangleAlert } from "lucide-react";
 import { acknowledgeSafetyFindingsAction } from "@/server/actions/prescriptions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -58,7 +58,7 @@ export function summarizeFindings(
   blockedOpportunities: BlockedOpportunityView[],
 ): CompactItem[] {
   const items: CompactItem[] = [];
-  const nonBlocking = findings.filter((finding) => finding.severity !== "BLOCKING");
+  const nonBlocking = findings.filter((finding) => finding.severity !== "BLOCKING" && !finding.details);
 
   const coverage = nonBlocking.filter((finding) => COVERAGE_CODES.has(finding.code));
   if (coverage.some((finding) => finding.code === "INTERACTION_NO_REFERENTIAL")) {
@@ -182,6 +182,7 @@ export function SafetyZone({
 
   return (
     <section className="space-y-2" aria-labelledby="zone-securite">
+      <VigilanceCards findings={findings} />
       {unacknowledged.length > 0 && (
         <Card className="border-danger-400 bg-danger-50/50 dark:border-danger-700/50 dark:bg-danger-700/10">
           <CardContent className="space-y-3 pt-5">
@@ -315,3 +316,104 @@ function CompactRow({ item }: { item: CompactItem }) {
     </li>
   );
 }
+
+/**
+ * Une vigilance : ce que le traitement impose de savoir avant de conseiller.
+ *
+ * Quatre natures, quatre couleurs. Interaction et contre-indication se lisent
+ * en rouge : elles écartent ou espacent. Surveillance et dépistage se lisent
+ * en orange : elles invitent à regarder le bilan ou à en parler au médecin.
+ * « Ok, j'ai compris » replie la carte ; elle ne disparaît pas.
+ */
+const VIGILANCE_STYLE = {
+  INTERACTION: { band: "bg-danger-50 dark:bg-danger-950/30", ring: "border-danger-200 dark:border-danger-800", accent: "text-danger-700 dark:text-danger-300", dot: "bg-danger-600", icon: TriangleAlert, badge: "Alerte importante" },
+  CONTRAINDICATION: { band: "bg-danger-50 dark:bg-danger-950/30", ring: "border-danger-200 dark:border-danger-800", accent: "text-danger-700 dark:text-danger-300", dot: "bg-danger-600", icon: ShieldAlert, badge: "Alerte sécurité" },
+  MONITORING: { band: "bg-warning-50 dark:bg-warning-950/30", ring: "border-warning-200 dark:border-warning-800", accent: "text-warning-800 dark:text-warning-400", dot: "bg-warning-500", icon: Stethoscope, badge: "Surveillance" },
+  SCREENING: { band: "bg-warning-50 dark:bg-warning-950/30", ring: "border-warning-200 dark:border-warning-800", accent: "text-warning-800 dark:text-warning-400", dot: "bg-warning-500", icon: Eye, badge: "Vigilance" },
+} as const;
+
+/** Les vigilances du traitement, en cartes : rendues avec ou sans alerte bloquante. */
+export function VigilanceCards({ findings }: { findings: SafetyFindingView[] }) {
+  const vigilances = findings.filter((finding) => finding.details);
+  if (vigilances.length === 0) return null;
+  return (
+    <div className="space-y-2.5">
+      {vigilances.map((finding) => (
+        <VigilanceCard key={finding.id} finding={finding} />
+      ))}
+    </div>
+  );
+}
+
+function VigilanceCard({ finding }: { finding: SafetyFindingView }) {
+  const [open, setOpen] = useState(true);
+  const details = finding.details;
+  if (!details) return null;
+  const style = VIGILANCE_STYLE[details.kind] ?? VIGILANCE_STYLE.MONITORING;
+  const Icon = style.icon;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn("flex w-full items-center gap-2.5 rounded-xl border px-4 py-2.5 text-left", style.ring, "bg-surface-card")}
+      >
+        <Icon className={cn("size-4 shrink-0", style.accent)} />
+        <span className="min-w-0 flex-1 truncate text-[13.5px] text-text-primary">
+          <span className={cn("font-semibold", style.accent)}>{details.title}</span> — {details.subtitle}
+          {details.patientAdvice ? ` · ${details.patientAdvice}` : ""}
+        </span>
+        <span className="shrink-0 text-[12.5px] text-text-tertiary">Rouvrir</span>
+      </button>
+    );
+  }
+
+  return (
+    <article className={cn("space-y-3 rounded-2xl border bg-surface-card p-4", style.ring)}>
+      <div className={cn("flex items-center gap-3 rounded-xl px-4 py-2.5", style.band)}>
+        <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-full text-white", style.dot)}>
+          <Icon className="size-[18px]" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className={cn("text-[11.5px] font-semibold tracking-[0.1em] uppercase", style.accent)}>{details.title}</p>
+          <p className="text-[15px] font-semibold text-text-primary">{details.subtitle}</p>
+        </div>
+        <span className={cn("shrink-0 rounded-full border px-2.5 py-0.5 text-[12px]", style.ring, style.accent)}>{style.badge}</span>
+      </div>
+
+      <div className="flex items-start gap-3 rounded-xl bg-surface-sunken/70 px-4 py-3">
+        <span className="mt-0.5 text-[12px] font-semibold text-text-tertiary uppercase">{details.drugNames.join(", ")}</span>
+      </div>
+      <p className="px-1 text-[14px] leading-[1.55] text-text-primary">{details.explanation}</p>
+
+      {details.concerned.length > 0 && (
+        <div className={cn("rounded-xl border px-4 py-3", style.ring, style.band)}>
+          <p className={cn("text-[12px] font-semibold tracking-[0.06em] uppercase", style.accent)}>
+            {details.kind === "INTERACTION" ? "Compléments concernés" : details.kind === "CONTRAINDICATION" ? "À éviter ou à utiliser avec prudence" : "À garder en tête"}
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {details.concerned.map((item) => (
+              <li key={item} className="rounded-lg border border-border-subtle bg-surface-card px-3 py-1.5 text-[13px] text-text-primary">{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {details.patientAdvice && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-brand-100 bg-brand-50/70 px-4 py-3 dark:border-brand-900 dark:bg-brand-950/40">
+          <MessageSquareQuote className="mt-0.5 size-4 shrink-0 text-brand-700 dark:text-brand-300" />
+          <p className="text-[14px] leading-[1.5] text-text-primary">
+            <span className="font-semibold">Conseil à transmettre au patient : </span>« {details.patientAdvice} »
+          </p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <p className="text-[11.5px] text-text-tertiary">Sources : {details.sources.join(" · ")}</p>
+        <Button size="sm" variant="outline" onClick={() => setOpen(false)}>Ok, j&apos;ai compris</Button>
+      </div>
+    </article>
+  );
+}
+
