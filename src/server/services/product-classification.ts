@@ -244,7 +244,7 @@ export async function countUnclassifiedProducts(pharmacyId: string): Promise<num
  * catégorie ne change que si le dictionnaire est sûr de lui.
  */
 /** Étiquettes posées par le dictionnaire seul, jamais par le modèle : elles peuvent être recalculées. */
-const REFRESHABLE_TAGS = new Set(["nettoyant", "visage", "lèvres", "baume", "fer", "calcium", "zinc", "potassium", "vitamine a", "millepertuis", "antiseptique", "cutané", "herpès", "bouton de fièvre", "cicatrisant", "hygiène des mains", "tensiomètre", "pieds", "lysine", "huiles essentielles", "bronches", "vitamines", "immunité", "sécheresse oculaire", "paupières", "chaud froid", "douleur musculaire", "hygiène intime", "flore vaginale", "tisane"]);
+const REFRESHABLE_TAGS = new Set(["nettoyant", "visage", "lèvres", "baume", "fer", "calcium", "zinc", "potassium", "vitamine a", "millepertuis", "antiseptique", "cutané", "herpès", "bouton de fièvre", "cicatrisant", "hygiène des mains", "tensiomètre", "pieds", "lysine", "huiles essentielles", "bronches", "vitamines", "immunité", "sécheresse oculaire", "paupières", "chaud froid", "douleur musculaire", "hygiène intime", "flore vaginale", "tisane", "vitamine k", "vitamine b12", "acide folique", "vitamine d", "vitamine e", "vitamine c", "vitamine b6", "biotine", "iode", "chrome", "niacine", "coenzyme q10", "levure de riz rouge", "ail", "ginkgo", "oméga-3", "ginseng", "échinacée", "kava", "thé vert", "curcuma", "réglisse", "hydraste", "antiacide", "multivitamines", "antioxydant"]);
 
 export async function refreshDictionaryTags(params: { pharmacyId: string }): Promise<{ considered: number; updated: number; retagged: string[] }> {
   const { classifyProductByName } = await import("@/core/catalog/product-vocabulary");

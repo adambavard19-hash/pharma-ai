@@ -1,4 +1,5 @@
 import type { DrugKnowledge, VigilanceKind, VigilanceResult } from "../types";
+import { BASE_MAITRE_VIGILANCES } from "./vigilance-base-maitre";
 
 /**
  * Vigilances au comptoir : ce que le traitement prescrit impose de savoir
@@ -48,12 +49,20 @@ export type VigilanceRule = {
   cautionTags: string[];
   precautionText: string | null;
   sources: string[];
+  /** Lignes de la Base maître « Connecteur Pharma » V1 que cette règle couvre. */
+  sourceRules?: number[];
 };
 
 /** Étiquettes que les vigilances reconnaissent : elles rejoignent le vocabulaire fermé. */
-export const VIGILANCE_TAGS = ["fer", "calcium", "zinc", "potassium", "vitamine a", "millepertuis", "magnésium"] as const;
+export const VIGILANCE_TAGS = [
+  "fer", "calcium", "zinc", "potassium", "vitamine a", "millepertuis", "magnésium",
+  // Base maître V1 : les compléments que les cent règles du classeur nomment.
+  "vitamine k", "vitamine b12", "acide folique", "vitamine d", "vitamine e", "vitamine c", "vitamine b6", "biotine",
+  "iode", "chrome", "niacine", "coenzyme q10", "levure de riz rouge", "ail", "ginkgo", "oméga-3", "ginseng",
+  "échinacée", "kava", "thé vert", "curcuma", "réglisse", "hydraste", "antiacide", "multivitamines", "antioxydant",
+] as const;
 
-export const VIGILANCE_RULES: VigilanceRule[] = [
+const CORE_VIGILANCES: VigilanceRule[] = [
   {
     key: "levothyroxine-mineral-spacing",
     version: "1.0",
@@ -65,12 +74,13 @@ export const VIGILANCE_RULES: VigilanceRule[] = [
     substances: ["levothyroxine", "liothyronine"],
     explanationTemplate:
       "Le fer, le calcium, le magnésium et les antiacides peuvent diminuer l'absorption de la lévothyroxine ({drug}). Un complément qui en contient se prend à distance : au moins 2 heures après, 4 heures par prudence.",
-    concerned: ["Fer", "Calcium", "Magnésium", "Zinc et multiminéraux"],
+    concerned: ["Fer", "Calcium", "Magnésium", "Zinc et multiminéraux", "Chrome (picolinate) : à distance", "Biotine : fausse les dosages de TSH et d'hormones thyroïdiennes, à signaler avant un bilan"],
     patientAdvice: "Prenez votre complément au moins 2 heures après votre lévothyroxine, 4 heures par prudence.",
     blockTags: [],
-    cautionTags: ["fer", "calcium", "magnésium", "zinc"],
+    cautionTags: ["fer", "calcium", "magnésium", "zinc", "antiacide", "chrome", "biotine"],
     precautionText: "Lévothyroxine sur l'ordonnance : à prendre au moins 2 heures après, 4 heures par prudence.",
-    sources: ["RCP Levothyrox (ANSM) — interactions : sels de fer, de calcium, antiacides", "Thésaurus des interactions médicamenteuses, ANSM"],
+    sourceRules: [36, 37, 75, 77],
+    sources: ["RCP Levothyrox (ANSM) — interactions : sels de fer, de calcium, antiacides", "Thésaurus des interactions médicamenteuses, ANSM", "NIH Office of Dietary Supplements — Calcium, Iron, Chromium, Biotin (Health Professional fact sheets)"],
   },
   {
     key: "cycline-quinolone-chelation",
@@ -88,6 +98,7 @@ export const VIGILANCE_RULES: VigilanceRule[] = [
     blockTags: [],
     cautionTags: ["fer", "calcium", "magnésium", "zinc"],
     precautionText: "Cycline ou fluoroquinolone sur l'ordonnance : à prendre au moins 2 heures après l'antibiotique.",
+    sourceRules: [39, 40, 41, 42],
     sources: ["Thésaurus des interactions médicamenteuses, ANSM — cyclines, fluoroquinolones et cations divalents"],
   },
   {
@@ -106,6 +117,7 @@ export const VIGILANCE_RULES: VigilanceRule[] = [
     blockTags: [],
     cautionTags: ["calcium", "fer", "magnésium"],
     precautionText: "Bisphosphonate sur l'ordonnance : jamais en même temps, au moins 30 minutes après.",
+    sourceRules: [43],
     sources: ["RCP acide alendronique (ANSM) — mode d'administration et interactions"],
   },
   {
@@ -115,15 +127,16 @@ export const VIGILANCE_RULES: VigilanceRule[] = [
     severity: "WARNING",
     title: "Contre-indication / vigilance",
     subtitle: "Traitement hyperkaliémiant détecté",
-    atcPrefixes: ["C03DA", "C03DB", "C03EA", "C09A", "C09B", "C09C", "C09D"],
-    substances: ["spironolactone", "eplerenone", "amiloride", "triamterene"],
+    atcPrefixes: ["C03DA", "C03DB", "C03EA", "C09A", "C09B", "C09C", "C09D", "G03AA12", "G03AC"],
+    substances: ["spironolactone", "eplerenone", "amiloride", "triamterene", "drospirenone"],
     explanationTemplate:
-      "{drug} favorise la rétention de potassium. Un apport en potassium expose à une hyperkaliémie, surtout en cas d'insuffisance rénale ou d'association à un IEC ou un ARA II : la supplémentation relève d'un avis médical.",
-    concerned: ["Potassium (suppléments, sels de régime, multivitamines riches en potassium)"],
+      "{drug} favorise la rétention de potassium (diurétique épargneur, IEC, ARA II, drospirénone). Un apport en potassium expose à une hyperkaliémie, surtout en cas d'insuffisance rénale ou d'association à un IEC ou un ARA II : la supplémentation relève d'un avis médical.",
+    concerned: ["Potassium (suppléments, sels de régime, multivitamines riches en potassium)", "Iodure de potassium (compléments iodés)"],
     patientAdvice: null,
     blockTags: ["potassium"],
     cautionTags: [],
     precautionText: null,
+    sourceRules: [16, 17, 18, 19, 80, 81, 97],
     sources: ["Thésaurus des interactions médicamenteuses, ANSM — hyperkaliémiants et potassium : association déconseillée"],
   },
   {
@@ -136,13 +149,14 @@ export const VIGILANCE_RULES: VigilanceRule[] = [
     atcPrefixes: ["C03A", "C03B", "C03C"],
     substances: ["furosemide", "bumetanide", "hydrochlorothiazide", "indapamide", "chlortalidone"],
     explanationTemplate:
-      "Les diurétiques de l'anse et thiazidiques ({drug}) peuvent augmenter les pertes urinaires de potassium et de magnésium. Une supplémentation se discute au vu du bilan biologique, pas sur le seul ressenti.",
-    concerned: ["Magnésium", "Potassium"],
+      "Les diurétiques de l'anse et thiazidiques ({drug}) augmentent les pertes urinaires de potassium et de magnésium, et au long cours de zinc. Le potassium ne se vend jamais de lui-même : il dépend du bilan et peut devenir dangereux si le contexte change. Le magnésium et le zinc se discutent au vu du bilan et du terrain. Avec un thiazidique, calcium et vitamine D peuvent conduire à une hypercalcémie, surtout chez le sujet âgé ou insuffisant rénal.",
+    concerned: ["Potassium (écarté sans prescription)", "Magnésium", "Zinc (traitement prolongé)", "Calcium et vitamine D (thiazidique) : hypercalcémie possible"],
     patientAdvice: null,
-    blockTags: [],
-    cautionTags: ["magnésium", "potassium"],
+    blockTags: ["potassium"],
+    cautionTags: ["magnésium", "zinc", "calcium", "vitamine d"],
     precautionText: "Diurétique sur l'ordonnance : conseil à adapter au bilan biologique (kaliémie, magnésémie).",
-    sources: ["RCP furosémide et hydrochlorothiazide (ANSM) — effets indésirables métaboliques"],
+    sourceRules: [11, 12, 13, 14, 15, 49],
+    sources: ["RCP furosémide et hydrochlorothiazide (ANSM) — effets indésirables métaboliques", "NIH Office of Dietary Supplements — Magnesium, Potassium, Zinc, Vitamin D (Health Professional fact sheets)"],
   },
   {
     key: "metformin-b12",
@@ -154,13 +168,14 @@ export const VIGILANCE_RULES: VigilanceRule[] = [
     atcPrefixes: ["A10BA02", "A10BD"],
     substances: ["metformine"],
     explanationTemplate:
-      "Un traitement prolongé par metformine ({drug}) peut s'accompagner d'une baisse de la vitamine B12. En cas de fatigue inhabituelle, de fourmillements ou d'anémie, un dosage se discute avec le médecin ; une supplémentation ne se propose qu'après.",
-    concerned: ["Vitamine B12 : à proposer seulement si une carence est confirmée"],
+      "Un traitement prolongé par metformine ({drug}) peut s'accompagner d'une baisse de la vitamine B12. En cas de fatigue inhabituelle, de fourmillements ou d'anémie, un dosage se discute avec le médecin ; une supplémentation ne se propose qu'après. L'hydraste du Canada (goldenseal) peut réduire l'exposition à la metformine d'environ 25 % : elle est écartée.",
+    concerned: ["Vitamine B12 : à proposer seulement si une carence est confirmée", "Hydraste du Canada (écartée)"],
     patientAdvice: null,
-    blockTags: [],
+    blockTags: ["hydraste"],
     cautionTags: [],
     precautionText: null,
-    sources: ["RCP metformine (ANSM, 2022) — mise en garde : carence en vitamine B12"],
+    sourceRules: [10, 72],
+    sources: ["RCP metformine (ANSM, 2022) — mise en garde : carence en vitamine B12", "MHRA Drug Safety Update — Metformin and reduced vitamin B12 levels", "NCCIH (NIH) — Goldenseal"],
   },
   {
     key: "isotretinoin-vigilance",
@@ -178,6 +193,7 @@ export const VIGILANCE_RULES: VigilanceRule[] = [
     blockTags: ["vitamine a"],
     cautionTags: [],
     precautionText: null,
+    sourceRules: [47],
     sources: ["RCP isotrétinoïne orale (ANSM) — contre-indications et mises en garde"],
   },
   {
@@ -190,13 +206,14 @@ export const VIGILANCE_RULES: VigilanceRule[] = [
     atcPrefixes: ["B01AA", "B01AE", "B01AF"],
     substances: ["warfarine", "fluindione", "acenocoumarol", "apixaban", "rivaroxaban", "dabigatran", "edoxaban"],
     explanationTemplate:
-      "Le millepertuis diminue l'effet de {drug} (induction enzymatique) : l'association est contre-indiquée. Tout produit de phytothérapie se vérifie avant d'être conseillé à un patient sous anticoagulant.",
-    concerned: ["Millepertuis (contre-indiqué)", "Phytothérapie : à vérifier au cas par cas"],
-    patientAdvice: "Ne prenez aucun produit à base de millepertuis, et demandez conseil avant toute plante en complément.",
-    blockTags: ["millepertuis"],
-    cautionTags: [],
-    precautionText: null,
-    sources: ["Thésaurus des interactions médicamenteuses, ANSM — millepertuis et anticoagulants oraux"],
+      "Le millepertuis diminue l'effet de {drug} (induction enzymatique) : l'association est contre-indiquée. Sous AVK, tout apport en vitamine K doit rester stable : pas de supplément qui en contient sans coordination de l'INR — y compris après une antibiothérapie prolongée, qui peut modifier le statut en vitamine K. Le ginkgo, l'ail concentré, la vitamine E à forte dose, les oméga-3 à dose élevée, le ginseng peuvent majorer le risque de saignement ; la coenzyme Q10 peut réduire l'effet de la warfarine. Aucun ne se propose sans avis, et tout saignement inhabituel se signale.",
+    concerned: ["Millepertuis (contre-indiqué)", "Vitamine K et multivitamines qui en contiennent (AVK : écartées sans coordination de l'INR)", "Ginkgo, ail concentré, ginseng : risque de saignement", "Vitamine E à forte dose, oméga-3 à dose élevée : surveillance", "Coenzyme Q10 (warfarine) : effet réduit possible"],
+    patientAdvice: "Ne prenez aucun produit à base de millepertuis, gardez des apports stables en vitamine K, et demandez conseil avant toute plante ou vitamine en complément.",
+    blockTags: ["millepertuis", "vitamine k"],
+    cautionTags: ["ginkgo", "ail", "ginseng", "vitamine e", "oméga-3", "coenzyme q10", "multivitamines"],
+    precautionText: "Anticoagulant sur l'ordonnance : risque de saignement ou d'INR modifié, à ne proposer qu'après avis.",
+    sourceRules: [3, 45, 46, 53, 60, 61, 63, 64, 68, 90],
+    sources: ["Thésaurus des interactions médicamenteuses, ANSM — millepertuis et anticoagulants oraux", "NIH Office of Dietary Supplements — Vitamin K, Vitamin E, Omega-3 Fatty Acids (Health Professional fact sheets)", "NCCIH (NIH) — Ginkgo, Garlic, Coenzyme Q10, Asian Ginseng"],
   },
   // ---- Bon usage : ce que le pharmacien rappelle en remettant la boîte.
   {
@@ -319,6 +336,9 @@ export const VIGILANCE_RULES: VigilanceRule[] = [
     sources: ["RCP Lacrifluid, Aquarest (ANSM) — mode d'administration", "SFO — sécheresse oculaire et écrans"],
   },
 ];
+
+/** Toutes les vigilances : celles du cœur, puis celles de la Base maître V1. */
+export const VIGILANCE_RULES: VigilanceRule[] = [...CORE_VIGILANCES, ...BASE_MAITRE_VIGILANCES];
 
 function norm(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();

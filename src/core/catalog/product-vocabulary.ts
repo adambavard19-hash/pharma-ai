@@ -73,7 +73,7 @@ type Pattern = {
  */
 const PATTERNS: Pattern[] = [
   {
-    test: /\b(probioti|prebioti|levure|ultra ?levure|lactobacil|bifidobact|saccharomyces|flore intestinale|ferments? lactiques?|lactibiane|ergyphilus|smebiocta|bion ?3|probiolog|lactéol|lacteol|enterogermina|alflorex|imgalt)/,
+    test: /\b(probioti|prebioti|levure(?! de riz)|ultra ?levure|lactobacil|bifidobact|saccharomyces|flore intestinale|ferments? lactiques?|lactibiane|ergyphilus|smebiocta|bion ?3|probiolog|lactéol|lacteol|enterogermina|alflorex|imgalt)/,
     category: "PROBIOTIQUES",
     tags: ["probiotique", "flore intestinale", "tolérance digestive"],
     ruleKeys: ["digestive-tolerance-antibiotics"],
@@ -320,6 +320,33 @@ const PATTERNS: Pattern[] = [
   { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(potassium|diffu ?k\b|kaleorid|kalium))/, category: "MINERAUX", tags: ["potassium"], ruleKeys: [], confidence: 0.8 },
   { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b))(?=.*(vitamine a\b|vit a\b|retinol|rétinol|beta ?carotene|bêta ?carotène|arovit))/, category: "VITAMINES", tags: ["vitamine a"], ruleKeys: [], confidence: 0.75 },
   { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(millepertuis|hypericum|mildac|procalmil))/, category: "PHYTOTHERAPIE", tags: ["millepertuis"], ruleKeys: [], confidence: 0.85 },
+  // ---- Base maître V1 : les compléments que les vigilances écartent ou espacent.
+  // Chaque motif reconnaît le complément par son nom, sa DCI ou ses marques
+  // courantes ; l'homéopathie (CH, DH, TG) est exclue en tête comme ailleurs.
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(vitamine k\b|vit k\b|vitamine k[12]\b|menaquinone|phylloquinone|phytomenadione))/, category: "VITAMINES", tags: ["vitamine k"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(vitamine b ?12|vit b ?12|cobalamine|cyanocobalamine|methylcobalamine|méthylcobalamine))/, category: "VITAMINES", tags: ["vitamine b12"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(acide folique|folates?\b|vitamine b ?9|vit b ?9|methylfolate|méthylfolate|speciafoldine|tardyferon b9))/, category: "VITAMINES", tags: ["acide folique"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(vitamine e\b|vit e\b|tocopherol|tocophérol|toco ?500))/, category: "VITAMINES", tags: ["vitamine e", "antioxydant"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(vitamine c\b|vit c\b|acide ascorbique|ascorbate|acerola|acérola|vitascorbol|laroscorbine|upsa c\b|vitamin c\b))/, category: "VITAMINES", tags: ["vitamine c", "antioxydant", "vitamines", "immunité"], ruleKeys: ["convalescence-immunity-vitamins"], confidence: 0.9 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(vitamine b ?6|vit b ?6|pyridoxine))/, category: "VITAMINES", tags: ["vitamine b6"], ruleKeys: [], confidence: 0.75 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(biotine|biotin\b|vitamine b ?8|vit b ?8))/, category: "VITAMINES", tags: ["biotine"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\biode\b|iodure|\bkelp\b|\bfucus\b|varech|laminaria|algue marine))/, category: "MINERAUX", tags: ["iode"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\bchrome\b|chromium|picolinate de chrome))/, category: "MINERAUX", tags: ["chrome"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(niacine|vitamine b ?3\b|vit b ?3\b|nicotinamide|acide nicotinique|niacinamide))/, category: "VITAMINES", tags: ["niacine"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(coenzyme q ?10|co ?q ?10|ubiquinol|ubiquinone))/, category: "NUTRITION", tags: ["coenzyme q10", "antioxydant"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(levure de riz rouge|riz rouge|monacoline))/, category: "NUTRITION", tags: ["levure de riz rouge"], ruleKeys: [], confidence: 0.9 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\bail\b|allium sativum|\balliu?m\b))/, category: "PHYTOTHERAPIE", tags: ["ail"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(ginkgo|gingko|ginko))/, category: "PHYTOTHERAPIE", tags: ["ginkgo"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(omega ?3|oméga ?3|\bepa\b.*\bdha\b|\bdha\b|huile de poisson|huile de krill|huile de foie de morue))/, category: "NUTRITION", tags: ["oméga-3"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(ginseng|panax))/, category: "PHYTOTHERAPIE", tags: ["ginseng"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(echinacea|échinacée|echinacée|echinacee))/, category: "PHYTOTHERAPIE", tags: ["échinacée"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\bkava\b|kawa kawa|piper methysticum))/, category: "PHYTOTHERAPIE", tags: ["kava"], ruleKeys: [], confidence: 0.9 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(th[eé] vert|green tea|camellia sinensis|\begcg\b))/, category: "PHYTOTHERAPIE", tags: ["thé vert"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(curcuma|curcumine|turmeric|curcumin))/, category: "PHYTOTHERAPIE", tags: ["curcuma"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(r[eé]glisse|glycyrrhiz))/, category: "PHYTOTHERAPIE", tags: ["réglisse"], ruleKeys: [], confidence: 0.8 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(hydraste|goldenseal|hydrastis))/, category: "PHYTOTHERAPIE", tags: ["hydraste"], ruleKeys: [], confidence: 0.9 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(antiacide|anti-acide|maalox|gaviscon|rennie|xolaam|phosphalugel|gelox|moxydar|rocgel|hydroxyde d.aluminium|hydroxyde de magnesium|hydroxyde de magnésium|marga\b))/, category: "SOINS", tags: ["antiacide", "confort gastrique", "estomac", "digestion"], ruleKeys: ["gastric-protection-nsaid"], confidence: 0.9 },
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(multivitamin|multi-vitamin|vitamines et mineraux|vitamines et minéraux|supradyn|berocca|azinc\b|alvityl|isoxan|bion ?3|vitalfan|vitamine 22|vitaminé|pharmaton|complexe vitaminique))/, category: "VITAMINES", tags: ["multivitamines", "vitamines", "immunité"], ruleKeys: ["convalescence-immunity-vitamins"], confidence: 0.9 },
   // Catégories génériques : le produit est rangé, mais ne sert aucune règle.
   { test: /\b(vitamine|vit ?c|vit ?b|multivitamin|berocca|supradyn|acide folique|complexe vitamin)/, category: "VITAMINES", tags: [], ruleKeys: [], confidence: 0.7 },
   { test: /(\bfer\b|\bzinc\b|selenium|\bcalcium\b|\biode\b|potassium|oligo ?element|mineraux)/, category: "MINERAUX", tags: [], ruleKeys: [], confidence: 0.6 },
@@ -338,7 +365,7 @@ const PATTERNS: Pattern[] = [
  * nasale.
  */
 const SUBSTANCE_PATTERNS: (Pattern & { requires?: RegExp })[] = [
-  { test: /saccharomyces|lactobacillus|bifidobacterium|bacillus clausii|levure/, category: "PROBIOTIQUES", tags: ["probiotique", "flore intestinale", "tolérance digestive"], ruleKeys: ["digestive-tolerance-antibiotics"], confidence: 0.95 },
+  { test: /saccharomyces|lactobacillus|bifidobacterium|bacillus clausii|levure(?! de riz)/, category: "PROBIOTIQUES", tags: ["probiotique", "flore intestinale", "tolérance digestive"], ruleKeys: ["digestive-tolerance-antibiotics"], confidence: 0.95 },
   { test: /chlorure de sodium|sodium chlorure|eau de mer/, requires: /nasal|nez|spray|pulverisation|dosette|unidose|rhin/, category: "SOINS", tags: ["nez", "nasal", "lavage", "eau de mer", "orl", "spray nasal"], ruleKeys: ["nasal-hygiene-orl"], confidence: 0.85 },
   // Un antiseptique pour la peau : la voie fait la différence avec le bain de bouche ou l'usage gynécologique.
   { test: /chlorhexidine|benzalkonium|povidone|hexamidine|hypochlorite|eosine|chlorocresol|triclocarban/, requires: /application (cutanee|locale)|cutane|solution moussante|dermique/, category: "SOINS", tags: ["antiseptique", "cutané"], ruleKeys: ["herpes-zona-antiseptic"], confidence: 0.92 },

@@ -74,6 +74,8 @@ export type RuleValidation =
 export type AdviceRule = {
   key: string;
   title: string;
+  /** Lignes de la Base maître « Connecteur Pharma » V1 que cette règle couvre. */
+  sourceRules?: number[];
   kind: AdviceKind;
   /** Version de la règle. Toute modification de fond l'incrémente. */
   version: string;
@@ -200,6 +202,7 @@ export type AdviceRule = {
 export const ADVICE_RULES: AdviceRule[] = [
   {
     key: "digestive-tolerance-antibiotics",
+    sourceRules: [1, 2],
     benefits: ["Accompagne la flore pendant la cure", "À distance de l'antibiotique", "Cure de la durée du traitement"],
     title: "Tolérance digestive pendant l'antibiothérapie",
     kind: "TOLERANCE",
@@ -337,6 +340,7 @@ export const ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "magnesium-ppi-longterm",
+    sourceRules: [4, 5, 6, 7],
     title: "Magnésium sous IPP au long cours",
     kind: "TOLERANCE",
     version: "1.0",
@@ -370,6 +374,7 @@ export const ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "vitamin-d-elderly",
+    sourceRules: [20, 21],
     title: "Statut vitaminique D",
     kind: "COMFORT",
     version: "1.0",
@@ -855,6 +860,7 @@ export const ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "herpes-lysine",
+    sourceRules: [98],
     title: "Lysine en accompagnement de l'herpès",
     kind: "COMFORT",
     version: "1.0",
@@ -1219,6 +1225,35 @@ export const ADVICE_RULES: AdviceRule[] = [
     clinicalContext: "Candidose vulvo-vaginale post-antibiotique : facteur de risque documenté (RCP des antibiotiques à large spectre ; CNGOF). Probiotiques vaginaux : données limitées, usage courant.",
     safetyNotes: ["Pertes inhabituelles, fièvre ou douleurs : consultation."],
     blockedFor: (patient) => (patient.sex === "MALE" ? "Conseil réservé aux patientes." : null),
+  },
+  {
+    key: "orlistat-fat-soluble-vitamins",
+    sourceRules: [27],
+    title: "Vitamines liposolubles sous orlistat",
+    kind: "TOLERANCE",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "VITAMINES",
+    atcPrefixes: ["A08AB01"],
+    therapeuticClasses: ["Inhibiteur des lipases gastro-intestinales"],
+    sideEffectTriggers: [],
+    basePriority: 60,
+    matchingTags: ["multivitamines"],
+    excludeTags: [],
+    // Les vitamines A, D, E, K sont absorbées avec les graisses : l'orlistat
+    // en bloque une partie. La notice prévoit un multivitaminé, pris à
+    // distance — au coucher, ou 2 heures avant ou après l'orlistat.
+    benefits: ["Compense les vitamines A, D, E, K", "Prise à distance de l'orlistat", "Prévu par la notice"],
+    shortReasonTemplate: "Orlistat ({drug}) : les vitamines liposolubles sont moins absorbées.",
+    rationaleTemplate:
+      "L'orlistat ({drug}) diminue l'absorption des vitamines liposolubles A, D, E et K. Un multivitaminé se conseille, pris au coucher ou à au moins 2 heures de l'orlistat. Sous AVK, la vitamine K du multivitaminé impose une coordination de l'INR.",
+    counterScriptTemplate:
+      "« {drug} empêche une partie des graisses, et des vitamines qui vont avec, d'être absorbées. {product} compense ; prenez-le au coucher, à distance de l'orlistat. »",
+    patientReasonTemplate:
+      "Votre traitement ({drug}) réduit l'absorption des vitamines A, D, E et K. {product} les apporte ; prenez-le au coucher, à distance du traitement.",
+    clinicalContext: "Notice orlistat : multivitaminé au coucher ou à 2 heures de la prise. Vérifier la vitamine K en cas d'AVK.",
+    safetyNotes: ["Sous AVK : la vitamine K d'un multivitaminé se coordonne avec le suivi de l'INR."],
   },
   {
     key: "mouth-rinse-inhaled-corticosteroid",
