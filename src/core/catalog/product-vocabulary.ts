@@ -253,7 +253,7 @@ const PATTERNS: Pattern[] = [
   },
   // Sécheresse oculaire : lubrifiants à l'acide hyaluronique et soins des paupières.
   {
-    test: /^(?!.*(eucerin|creme|crème|serum|sérum|gelul|gélul|caps|\bpp\b|visage|contour|nuit|spf|elast|comprime|comprimé|lentille))(?=.*(aqualarm|hyabak|hylo|hylovis|vismed|thealoz|optive|systane|artelac|cationorm|hyaluron|hyaluroniq|larmes? artificielles?|lubrifiant oculaire|gtt lubr|gouttes? lubrif|secheresse oculaire|sécheresse oculaire|yeux secs|oeil sec|œil sec))/,
+    test: /^(?!.*(eucerin|creme|crème|serum|sérum|gelul|gélul|caps|\bpp\b|visage|contour|nuit|spf|elast|comprime|comprimé|lentille))(?=.*(aqualarm|hyabak|hylo|hylovis|vismed|thealo|optive|systane|artelac|cationorm|\brefresh\b|\bblink\b|xailin|hyaluvis|dulcilarme|larmabak|nutrivisc|fluidabak|hydrabak|ocutear|dropstar|aquarest|celluvisc|lacrifluid|lacryvisc|liposic|lipimix|hyaluron|hyaluroniq|larmes? artificielles?|lubrifiant oculaire|gtt lubr|gouttes? lubrif|secheresse oculaire|sécheresse oculaire|yeux secs|oeil sec|œil sec))/,
     category: "SOINS",
     tags: ["yeux", "oculaire", "larmes", "sécheresse oculaire"],
     ruleKeys: ["dry-eye-screen-lubricant", "eye-irritation-allergy"],

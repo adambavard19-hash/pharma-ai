@@ -176,3 +176,13 @@ describe("huiles essentielles respiratoires", () => {
   });
 });
 
+describe("lubrifiants oculaires reconnus au nom", () => {
+  it("chaque marque courante reçoit l'étiquette « sécheresse oculaire »", () => {
+    for (const name of ["SYSTANE BALANCE S ocul lubrif Fl/10ml", "SYSTANE ULTRA GTTE OCUL/LUBRI", "VISMED MULTI 10ML", "THEALOSE DUO 10ML", "THEALOZ DUO GEL", "REFRESH TEARS 15ML", "HYABAK 10ML", "HYLO CONFORT COLLY HYD FL", "AQUALARM ECRAN 10ML", "OPTIVE GTT LUBR FL10ML", "CATIONORM MULT EMUL OPH 10ML"]) {
+      expect(classifyProductByName(name)?.tags, name).toContain("sécheresse oculaire");
+    }
+    // Les cosmétiques à l'acide hyaluronique ne sont pas des collyres.
+    expect(classifyProductByName("EUCERIN HYALURON+ELASTICITY YEUX")?.tags ?? []).not.toContain("sécheresse oculaire");
+  });
+});
+
