@@ -98,6 +98,19 @@ export async function classifyPharmacyProducts(params: {
   const pendingForAi: ProductToClassify[] = [];
 
   for (const product of products) {
+    // 2. Le dictionnaire D'ABORD : il vit dans le code, versionné avec les
+    // règles. Une nouvelle officine doit recevoir les étiquettes du jour, pas
+    // celles qu'une autre officine a obtenues avant une mise à jour. Un motif
+    // qui sert une règle suffit ; une catégorie générique est gardée en repli
+    // mais le modèle peut encore préciser.
+    const heuristic = classifyProductByName(product.name, { brand: product.brand, description: product.description });
+    if (heuristic && heuristic.tags.length > 0) {
+      decisions.set(product.id, { ...heuristic, fromCache: false });
+      summary.byHeuristic += 1;
+      continue;
+    }
+    // 1. Le cache partagé, pour ce que le dictionnaire ne sait pas ranger :
+    // il évite de redemander au modèle ce qu'il a déjà dit d'un même nom.
     const key = classificationKey(product.name);
     const hit = key ? cached.get(key) : undefined;
     if (hit) {
@@ -110,14 +123,6 @@ export async function classifyPharmacyProducts(params: {
         fromCache: true,
       });
       summary.fromCache += 1;
-      continue;
-    }
-    // 2. Le dictionnaire. Un motif qui sert une règle suffit ; une catégorie
-    // générique est gardée en repli mais le modèle peut encore préciser.
-    const heuristic = classifyProductByName(product.name, { brand: product.brand, description: product.description });
-    if (heuristic && heuristic.tags.length > 0) {
-      decisions.set(product.id, { ...heuristic, fromCache: false });
-      summary.byHeuristic += 1;
       continue;
     }
     pendingForAi.push(product);
@@ -217,7 +222,8 @@ export async function classifyPharmacyProducts(params: {
         await prisma.productClassification.upsert({
           where: { key },
           create: { key, category: decision.category, tags: decision.tags, confidence: decision.confidence, source: "HEURISTIC" },
-          update: {},
+          // Le dictionnaire a évolué : l'entrée partagée suit, pour les officines suivantes.
+          update: { category: decision.category, tags: decision.tags, confidence: decision.confidence, source: "HEURISTIC" },
         });
       }
     }
