@@ -82,8 +82,13 @@ const SOURCE_EXCEPTION_FORM: RegulationSource = {
 };
 
 const SOURCE_CSS_R163_2: RegulationSource = {
-  label: "Code de la sécurité sociale, article R. 163-2 (médicaments d'exception)",
+  label: "Code de la sécurité sociale, articles R. 163-2 (3e alinéa) et R. 165-1 — visés en tête du formulaire",
   url: "https://www.legifrance.gouv.fr/codes/id/LEGITEXT000006073189/",
+};
+
+const SOURCE_EXCEPTION_FORM_DOWNLOAD: RegulationSource = {
+  label: "Formulaire Cerfa 12708*02 (service-public.fr)",
+  url: "https://entreprendre.service-public.gouv.fr/vosdroits/R2120",
 };
 
 /** Un libellé sans accents ni majuscules, pour reconnaître une famille de conditions. */
@@ -302,10 +307,14 @@ function fromCoverage(coverage: CoverageFacts, today: Date): RegulationAlert[] {
       code: "EXCEPTION_FORM",
       severity: "BLOCKING",
       title: "Ordonnance de médicament d'exception obligatoire",
+      // Ce qu'il y a à contrôler vient du formulaire lui-même (Cerfa
+      // 12708*02, spécimen relu le 17 septembre 2026) : le bon support, la
+      // partie prescripteur signée — qui atteste la conformité à la fiche
+      // d'information thérapeutique de la HAS —, et la partie pharmacien.
       action:
-        "Facturable à l'Assurance Maladie uniquement sur l'ordonnance à 4 volets de médicaments d'exception (Cerfa 12708*02). Sur une ordonnance ordinaire, le dossier est rejeté : demander le bon support avant de facturer.",
+        "Facturable à l'Assurance Maladie uniquement sur l'ordonnance de médicaments, de produits ou de prestations d'exception (Cerfa 12708*02, 4 volets). Sur une ordonnance ordinaire, le dossier est rejeté. Vérifier : le formulaire lui-même, pas une ordonnance classique ; la case « médicament » cochée avec nom, forme, dosage, posologie, voie et durée ; la date et la signature du prescripteur, qui attestent la conformité à la fiche d'information thérapeutique de la HAS ; si la prescription initiale vient d'un établissement, la date limite de la prochaine consultation. Compléter la partie pharmacien (identification, mentions obligatoires, date de délivrance) avant de transmettre.",
       basis: "Statut d'Exception : Oui (base tarifaire de l'Assurance Maladie)",
-      sources: [SOURCE_BDM_IT, SOURCE_CSS_R163_2, SOURCE_EXCEPTION_FORM],
+      sources: [SOURCE_BDM_IT, SOURCE_CSS_R163_2, SOURCE_EXCEPTION_FORM, SOURCE_EXCEPTION_FORM_DOWNLOAD],
     });
   }
   if (coverage.coverageEndsAt && coverage.coverageEndsAt.getTime() < today.getTime()) {

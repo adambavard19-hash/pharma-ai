@@ -195,7 +195,7 @@ export default async function RegulationPage({ searchParams }: { searchParams: P
           <Card>
             <CardHeader title="Les supports d'ordonnance" />
             <CardContent className="space-y-2 pt-0 text-[13px] leading-5 text-text-secondary">
-              <p><span className="font-medium text-text-primary">Ordonnance de médicaments d&apos;exception</span> — formulaire à 4 volets (Cerfa 12708*02). Exigée pour les médicaments au statut d&apos;exception ; sinon, rejet de la facturation.</p>
+              <p><span className="font-medium text-text-primary">Ordonnance de médicaments d&apos;exception</span> — formulaire à 4 volets (Cerfa 12708*02, volet 1 à l&apos;assuré, deux aux caisses, un au pharmacien). Exigée pour les médicaments au statut d&apos;exception ; sinon, rejet. Le prescripteur y atteste la conformité à la fiche d&apos;information thérapeutique de la HAS ; le pharmacien complète sa partie (identification, mentions obligatoires, date de délivrance).</p>
               <p><span className="font-medium text-text-primary">Ordonnance sécurisée</span> — papier filigrané, numéro de lot, carré de microlettres. Exigée pour les stupéfiants et les médicaments dont la condition publiée l&apos;impose.</p>
               <p><span className="font-medium text-text-primary">Ordonnance ordinaire</span> — pour le reste, avec les règles des listes I et II.</p>
             </CardContent>
