@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Camera, Check, FileText, Keyboard, Loader2, Pill, ScanBarcode, Search, UserRound, X } from "lucide-react";
+import { ArrowRight, Camera, Check, FileText, Loader2, Pill, ScanBarcode, Search, UserRound, X } from "lucide-react";
 import { createPrescriptionAction } from "@/server/actions/prescriptions";
 import type {
   DepotOrdonnanceEvenement,
@@ -58,7 +58,7 @@ export function NewPrescriptionForm({
   const [uploading, setUploading] = useState(false);
   const [readingStage, setReadingStage] = useState<ReadingStage | null>(null);
 
-  const [mode, setMode] = useState<"IDLE" | "SAISIE" | "DOUCHETTE">("IDLE");
+  const [mode, setMode] = useState<"IDLE" | "MEDICAMENT">("IDLE");
   const [sourceOuverte, setSourceOuverte] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -290,38 +290,24 @@ export function NewPrescriptionForm({
         </div>
       )}
 
-      {/* Les quatre gestes, nommés par ce qu'ils sont. Une douchette n'est
-          pas une caméra : elle tape le code dans un champ, comme un clavier.
-          Les deux passent par la même recherche — c'est le champ qui change
-          de consigne, pas la mécanique. */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Deux gestes, pas quatre. Une ordonnance, ou une boîte : c'est tout ce
+          qu'un patient pose sur le comptoir. La douchette, le clavier et la
+          caméra ne sont que des façons de lire la boîte — un seul champ les
+          accueille toutes. */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <BigAction
-          icon={<Keyboard className="size-7" />}
-          title="Clavier"
-          subtitle="Nom du médicament"
-          active={mode === "SAISIE"}
-          onClick={() => setMode(mode === "SAISIE" ? "IDLE" : "SAISIE")}
-        />
-        <BigAction
-          icon={<ScanBarcode className="size-7" />}
-          title="Douchette"
-          subtitle="Code CIP de la boîte"
-          active={mode === "DOUCHETTE"}
-          onClick={() => setMode(mode === "DOUCHETTE" ? "IDLE" : "DOUCHETTE")}
-        />
-        <BigAction
-          icon={<Camera className="size-7" />}
-          title="Caméra"
-          subtitle="Scanner le code-barres"
-          active={scannerOuvert}
-          onClick={() => setScannerOuvert(true)}
-        />
-        <BigAction
-          icon={<FileText className="size-7" />}
+          icon={<FileText className="size-8" />}
           title="Ordonnance"
-          subtitle="Photo ou fichier"
+          subtitle="Lire l'ordonnance du patient"
           active={sourceOuverte || upload !== null}
           onClick={() => setSourceOuverte(true)}
+        />
+        <BigAction
+          icon={<ScanBarcode className="size-8" />}
+          title="Médicament"
+          subtitle="Scanner la boîte ou taper le nom"
+          active={mode === "MEDICAMENT" || scannerOuvert}
+          onClick={() => setMode(mode === "MEDICAMENT" ? "IDLE" : "MEDICAMENT")}
         />
       </div>
 
@@ -329,14 +315,21 @@ export function NewPrescriptionForm({
         <p className="text-center text-[12.5px] text-text-tertiary">Vous pouvez aussi glisser une ordonnance, photo ou PDF, n&apos;importe où sur cet écran.</p>
       )}
 
-      {(mode === "SAISIE" || mode === "DOUCHETTE") && (
-        <DrugField
-          scanner={mode === "DOUCHETTE"}
-          onAdd={(nom, forme) => {
-            addLine(nom, forme);
-            push({ tone: "success", title: `${nom} ajouté.` });
-          }}
-        />
+      {mode === "MEDICAMENT" && (
+        <div className="space-y-2">
+          <DrugField
+            onAdd={(nom, forme) => {
+              addLine(nom, forme);
+              push({ tone: "success", title: `${nom} ajouté.` });
+            }}
+          />
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12.5px] text-text-tertiary">
+            <span>La douchette lit le code-barres dans ce champ ; sans douchette, tapez le nom.</span>
+            <button type="button" onClick={() => setScannerOuvert(true)} className="inline-flex items-center gap-1 font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
+              <Camera className="size-3.5" /> Lire le code-barres avec la caméra
+            </button>
+          </p>
+        </div>
       )}
 
       {uploading && <ReadingIndicator stage={readingStage} />}
@@ -486,7 +479,7 @@ export function NewPrescriptionForm({
           }}
           onFallback={() => {
             setScannerOuvert(false);
-            setMode("SAISIE");
+            setMode("MEDICAMENT");
           }}
           onClose={() => setScannerOuvert(false)}
         />
@@ -576,7 +569,7 @@ function BigAction({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-2.5 rounded-2xl border-2 px-4 py-7 text-center",
+        "flex flex-col items-center gap-3 rounded-2xl border-2 px-4 py-9 text-center",
         "transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
         active
@@ -617,7 +610,7 @@ function BigAction({
  * et termine par « Entrée » : le champ ajoute alors le résultat unique sans
  * clic, ou le texte tel quel si le catalogue ne connaît pas le code.
  */
-function DrugField({ onAdd, scanner = false }: { onAdd: (drugName: string, form: string) => void; scanner?: boolean }) {
+function DrugField({ onAdd }: { onAdd: (drugName: string, form: string) => void }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DrugLookupResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -678,9 +671,9 @@ function DrugField({ onAdd, scanner = false }: { onAdd: (drugName: string, form:
           value={query}
           autoFocus
           autoComplete="off"
-          placeholder={scanner ? "Passez la douchette sur la boîte (code CIP)" : "Tapez le nom du médicament"}
-          aria-label={scanner ? "Code CIP lu par la douchette" : "Saisir un médicament"}
-          inputMode={scanner ? "numeric" : "text"}
+          placeholder="Scannez la boîte, ou tapez le nom du médicament"
+          aria-label="Saisir un médicament"
+          inputMode="text"
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
             if (event.key !== "Enter") return;
