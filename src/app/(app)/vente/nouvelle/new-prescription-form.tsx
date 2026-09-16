@@ -198,8 +198,34 @@ export function NewPrescriptionForm({
   const suggestion =
     upload?.suggestedPatient && !patient && !suggestionRejetee ? upload.suggestedPatient : null;
 
+  // Une ordonnance glissée n'importe où sur l'écran vaut un clic sur
+  // « Ordonnance » : au comptoir, c'est le geste le plus court.
+  const [dragging, setDragging] = useState(false);
+
   return (
-    <div className="space-y-5">
+    <div
+      className={cn("relative space-y-5 rounded-2xl transition-shadow", dragging && "ring-2 ring-brand-500 ring-offset-4")}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("Files")) {
+          event.preventDefault();
+          setDragging(true);
+        }
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragging(false);
+        const dropped = event.dataTransfer.files?.[0] ?? null;
+        if (dropped) sendFile(dropped);
+      }}
+    >
+      {dragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-brand-50/80 dark:bg-brand-950/70">
+          <p className="rounded-xl bg-brand-600 px-5 py-3 text-[15px] font-semibold text-white shadow-lg">Déposez l&apos;ordonnance ici</p>
+        </div>
+      )}
       {error && <Alert tone="danger">{error}</Alert>}
 
       {/* Le patient, en bandeau : une information, pas une étape. */}
@@ -298,6 +324,10 @@ export function NewPrescriptionForm({
           onClick={() => setSourceOuverte(true)}
         />
       </div>
+
+      {!hasContent && mode === "IDLE" && !uploading && (
+        <p className="text-center text-[12.5px] text-text-tertiary">Vous pouvez aussi glisser une ordonnance, photo ou PDF, n&apos;importe où sur cet écran.</p>
+      )}
 
       {(mode === "SAISIE" || mode === "DOUCHETTE") && (
         <DrugField
