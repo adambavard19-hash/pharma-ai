@@ -6,9 +6,10 @@ import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { nextReference } from "@/server/services/references";
-import { upsertHealthProfile } from "@/server/services/patients";
+import { recordInteraction, upsertHealthProfile } from "@/server/services/patients";
 import { recordAudit } from "@/server/audit/log";
 import { recordIsDemo } from "@/server/db/demo-scope";
+import type { TenantScope } from "@/server/db/tenant";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 const patientSchema = z.object({
@@ -331,3 +332,112 @@ export async function deletePatientAction(patientId: string): Promise<ActionResu
   revalidatePath("/patients");
   return ok(null, "Patient supprimé et données identifiantes anonymisées.");
 }
+
+const quickPatientSchema = z.object({
+  prescriptionId: z.string().trim().min(1).optional().nullable(),
+  firstName: z.string().trim().min(1, "Le prénom est obligatoire").max(80),
+  lastName: z.string().trim().min(1, "Le nom est obligatoire").max(80),
+  email: z.string().trim().email("Adresse e-mail invalide").optional().or(z.literal("")),
+  phone: z.string().trim().max(30).optional().or(z.literal("")),
+  adviceConsent: z.boolean().default(false),
+});
+
+/**
+ * Un nouveau patient, créé au comptoir en trois champs, rattaché à la
+ * délivrance en cours. Son consentement à recevoir ses conseils par e-mail
+ * est recueilli en même temps, s'il l'a donné : c'est ce qui permet d'envoyer
+ * le plan sans repasser par la fiche. Tout est journalisé, et la délivrance
+ * apparaît dans son historique dès maintenant.
+ */
+export async function quickCreatePatientAction(
+  payload: z.input<typeof quickPatientSchema>,
+): Promise<ActionResult<{ patientId: string; firstName: string; lastName: string; reference: string; email: string | null }>> {
+  const session = await requirePermission(PERMISSIONS.PATIENT_CREATE);
+  const parsed = quickPatientSchema.safeParse(payload);
+  if (!parsed.success) return fail("Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));
+  const input = parsed.data;
+  const scope = session.scope;
+
+  if (input.prescriptionId) {
+    const prescription = await prisma.prescription.findUnique({ where: { id: input.prescriptionId }, select: { pharmacyId: true } });
+    if (!prescription || prescription.pharmacyId !== scope.pharmacyId) return fail("Ordonnance introuvable dans cette officine.");
+  }
+
+  const reference = await nextReference("patient", scope.pharmacyId);
+  const patient = await prisma.patient.create({
+    data: {
+      pharmacyId: scope.pharmacyId,
+      reference,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      email: input.email || null,
+      phone: input.phone || null,
+      sex: "UNSPECIFIED",
+      isDemo: recordIsDemo(session.pharmacy.isDemo),
+      ...(input.adviceConsent && input.email
+        ? { consents: { create: { type: "ADVICE_SHARING", granted: true, grantedAt: new Date(), collectedByUserId: scope.userId } } }
+        : {}),
+    },
+    select: { id: true, firstName: true, lastName: true, reference: true, email: true },
+  });
+
+  await recordAudit({
+    action: "patient.created",
+    entityType: "Patient",
+    entityId: patient.id,
+    pharmacyId: scope.pharmacyId,
+    userId: scope.userId,
+    metadata: { source: "comptoir", withEmail: Boolean(input.email), adviceConsent: input.adviceConsent && Boolean(input.email) },
+  });
+
+  if (input.prescriptionId) {
+    await attachPatientToPrescription({ prescriptionId: input.prescriptionId, patientId: patient.id, scope });
+  }
+
+  revalidatePath("/patients");
+  return ok(
+    { patientId: patient.id, firstName: patient.firstName, lastName: patient.lastName, reference: patient.reference, email: patient.email },
+    `${patient.firstName} ${patient.lastName.toUpperCase()} créé(e)${input.prescriptionId ? " et rattaché(e) à la délivrance" : ""}.`,
+  );
+}
+
+/** Rattache un patient existant à une délivrance, depuis le comptoir ou l'écran de remise. */
+export async function attachPatientAction(payload: { prescriptionId: string; patientId: string }): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.PATIENT_UPDATE);
+  const scope = session.scope;
+  const [prescription, patient] = await Promise.all([
+    prisma.prescription.findUnique({ where: { id: payload.prescriptionId }, select: { pharmacyId: true } }),
+    prisma.patient.findUnique({ where: { id: payload.patientId }, select: { pharmacyId: true, deletedAt: true } }),
+  ]);
+  if (!prescription || prescription.pharmacyId !== scope.pharmacyId) return fail("Ordonnance introuvable dans cette officine.");
+  if (!patient || patient.pharmacyId !== scope.pharmacyId || patient.deletedAt) return fail("Patient introuvable dans cette officine.");
+  await attachPatientToPrescription({ prescriptionId: payload.prescriptionId, patientId: payload.patientId, scope });
+  return ok(null, "Patient rattaché à la délivrance.");
+}
+
+async function attachPatientToPrescription(params: { prescriptionId: string; patientId: string; scope: TenantScope }) {
+  const updated = await prisma.prescription.update({
+    where: { id: params.prescriptionId },
+    data: { patientId: params.patientId },
+    select: { reference: true },
+  });
+  await recordInteraction({
+    patientId: params.patientId,
+    scope: params.scope,
+    type: "PRESCRIPTION_RECEIVED",
+    summary: `Ordonnance ${updated.reference} rattachée au comptoir.`,
+    metadata: { prescriptionId: params.prescriptionId },
+  });
+  await recordAudit({
+    action: "prescription.patient_attached",
+    entityType: "Prescription",
+    entityId: params.prescriptionId,
+    pharmacyId: params.scope.pharmacyId,
+    userId: params.scope.userId,
+    metadata: { patientId: params.patientId },
+  });
+  revalidatePath(`/vente/${params.prescriptionId}`);
+  revalidatePath(`/vente/${params.prescriptionId}/fin`);
+  revalidatePath(`/patients/${params.patientId}`);
+}
+

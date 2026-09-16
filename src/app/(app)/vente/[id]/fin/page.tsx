@@ -60,6 +60,15 @@ export default async function DocumentPage({
 
   if (!prescription || prescription.pharmacyId !== session.scope.pharmacyId) notFound();
 
+  const patients = prescription.patient
+    ? []
+    : await prisma.patient.findMany({
+        where: { pharmacyId: session.scope.pharmacyId, deletedAt: null },
+        orderBy: { lastName: "asc" },
+        select: { id: true, firstName: true, lastName: true, reference: true, email: true },
+        take: 300,
+      });
+
   const latestDocument = prescription.documents[0];
   const messaging = getMessagingProvider();
   const publicBase = resolvePublicBaseUrl();
@@ -148,6 +157,8 @@ export default async function DocumentPage({
         canRecordSale={session.permissions.has(PERMISSIONS.SALE_CREATE)}
         canUpdateConsent={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
         canUpdatePatient={session.permissions.has(PERMISSIONS.PATIENT_UPDATE)}
+        canCreatePatient={session.permissions.has(PERMISSIONS.PATIENT_CREATE)}
+        patients={patients}
         patient={
           prescription.patient
             ? {

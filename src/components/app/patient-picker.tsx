@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Check, Mail, Search, UserRound, X } from "lucide-react";
+import { Check, Mail, Search, UserPlus, UserRound, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { QuickPatientForm } from "./quick-patient-form";
 
 export type PatientOption = {
   id: string;
@@ -23,22 +24,33 @@ export type PatientOption = {
  * s'imprime.
  */
 export function PatientPicker({
-  patients,
+  patients: knownPatients,
   value,
   onChange,
   id = "patientId",
   emptyLabel = "Aucun patient rattaché",
+  create,
 }: {
   patients: PatientOption[];
   value: string;
   onChange: (patientId: string) => void;
   id?: string;
   emptyLabel?: string;
+  /**
+   * Autorise la création d'un nouveau patient depuis la recherche : le
+   * patient est devant le comptoir, on ne l'envoie pas remplir une fiche
+   * ailleurs. Avec `prescriptionId`, il est rattaché à la délivrance aussitôt.
+   */
+  create?: { prescriptionId?: string | null } | null;
 }) {
   const listId = `${id}-resultats`;
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  // Les patients créés ici rejoignent la liste sans attendre un rechargement.
+  const [created, setCreated] = useState<PatientOption[]>([]);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const patients = useMemo(() => [...created, ...knownPatients.filter((p) => !created.some((c) => c.id === p.id))], [created, knownPatients]);
 
   const selected = patients.find((patient) => patient.id === value) ?? null;
 
@@ -85,6 +97,28 @@ export function PatientPicker({
         >
           <X className="size-4" />
         </button>
+      </div>
+    );
+  }
+
+  if (creating && create) {
+    return (
+      <div className="rounded-lg border border-brand-300 bg-brand-50/40 px-3.5 py-3 dark:border-brand-800 dark:bg-brand-950/30">
+        <p className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold text-text-primary">
+          <UserPlus className="size-4 text-brand-700 dark:text-brand-400" /> Nouveau patient
+        </p>
+        <QuickPatientForm
+          compact
+          prescriptionId={create.prescriptionId ?? null}
+          initialQuery={query}
+          onCancel={() => setCreating(false)}
+          onCreated={(patient) => {
+            setCreated((list) => [patient, ...list]);
+            onChange(patient.id);
+            setCreating(false);
+            setQuery("");
+          }}
+        />
       </div>
     );
   }
@@ -142,9 +176,27 @@ export function PatientPicker({
             </button>
           </li>
 
+          {create && (
+            <li>
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setCreating(true);
+                  setOpen(false);
+                  if (blurTimer.current) clearTimeout(blurTimer.current);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[13px] font-medium text-brand-700 transition-colors hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950/40"
+              >
+                <UserPlus className="size-3.5" />
+                Nouveau patient{query.trim() ? ` « ${query.trim()} »` : ""}
+              </button>
+            </li>
+          )}
+
           {results.length === 0 ? (
             <li className="px-2.5 py-3 text-[12.5px] text-text-tertiary">
-              Aucun patient ne correspond à « {query} ».
+              Aucun patient ne correspond à « {query} ».{create ? " Créez-le ci-dessus." : ""}
             </li>
           ) : (
             results.map((patient) => (

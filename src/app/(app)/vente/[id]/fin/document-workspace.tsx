@@ -16,7 +16,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { deliverDocumentAction, generateDocumentAction } from "@/server/actions/documents";
-import { setPatientEmailAction, updateConsentAction } from "@/server/actions/patients";
+import { attachPatientAction, setPatientEmailAction, updateConsentAction } from "@/server/actions/patients";
+import { PatientPicker, type PatientOption } from "@/components/app/patient-picker";
+import { QuickPatientForm } from "@/components/app/quick-patient-form";
 import { recordSaleAction } from "@/server/actions/sales";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -28,6 +30,7 @@ import { PatientDocument } from "@/components/document/patient-document";
 import { QrCode } from "@/components/document/qr-code";
 import { formatCents, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 import type { DocumentContent } from "@/core/documents/types";
 
 type AcceptedRecommendation = {
@@ -77,6 +80,8 @@ export function DocumentWorkspace({
   canRecordSale,
   canUpdateConsent,
   canUpdatePatient,
+  canCreatePatient,
+  patients,
   messaging,
   existingSales,
   history,
@@ -90,6 +95,9 @@ export function DocumentWorkspace({
   publicReach: "PUBLIC" | "LAN" | "LOCAL";
   canUpdateConsent: boolean;
   canUpdatePatient: boolean;
+  canCreatePatient: boolean;
+  /** Les patients de l'officine, pour rattacher une délivrance restée sans patient. */
+  patients: PatientOption[];
   acceptedRecommendations: AcceptedRecommendation[];
   existingDocument: {
     id: string;
@@ -190,6 +198,9 @@ export function DocumentWorkspace({
               patient={patient}
               canSend={canSend}
               canUpdateConsent={canUpdateConsent}
+              canCreatePatient={canCreatePatient}
+              prescriptionId={prescriptionId}
+              patients={patients}
               canUpdatePatient={canUpdatePatient}
               messaging={messaging}
               deliveries={existingDocument.deliveries}
@@ -252,6 +263,9 @@ function DeliveryPanel({
   canSend,
   canUpdateConsent,
   canUpdatePatient,
+  canCreatePatient,
+  prescriptionId,
+  patients,
   messaging,
   deliveries,
   publicReach,
@@ -261,6 +275,9 @@ function DeliveryPanel({
   patient: PatientView | null;
   canUpdateConsent: boolean;
   canUpdatePatient: boolean;
+  canCreatePatient: boolean;
+  prescriptionId: string;
+  patients: PatientOption[];
   canSend: boolean;
   messaging: MessagingState;
   deliveries: { id: string; channel: string; status: string; detail: string | null; createdAt: string }[];
@@ -378,10 +395,7 @@ function DeliveryPanel({
         )}
 
         {!patient && (
-          <Alert tone="neutral" title="Ordonnance non rattachée">
-            Aucun patient n&apos;est rattaché à cette délivrance : le plan s&apos;imprime ou se montre par QR code. Rattachez un patient
-            pour l&apos;envoyer et le retrouver dans son historique.
-          </Alert>
+          <AttachPatientBlock prescriptionId={prescriptionId} patients={patients} canCreate={canCreatePatient} canAttach={canUpdatePatient} />
         )}
 
         {emailResult && <p className="text-[11.5px] leading-4 text-warning-700 dark:text-warning-500">{emailResult}</p>}
@@ -722,3 +736,49 @@ const CHANNEL_LABELS: Record<string, string> = {
   QR_CODE: "QR code",
   LINK: "Lien",
 };
+
+/**
+ * Une délivrance sans patient : on le crée ici, devant lui, ou on le retrouve.
+ * Dès qu'il est rattaché, la page se recharge et le bouton d'envoi s'ouvre.
+ */
+function AttachPatientBlock({ prescriptionId, patients, canCreate, canAttach }: { prescriptionId: string; patients: PatientOption[]; canCreate: boolean; canAttach: boolean }) {
+  const [mode, setMode] = useState<"create" | "search">(canCreate ? "create" : "search");
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  const { push } = useToast();
+
+  const attach = (patientId: string) => {
+    if (!patientId) return;
+    startTransition(async () => {
+      const result = await attachPatientAction({ prescriptionId, patientId });
+      push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Rattaché.") : result.error });
+      if (result.ok) router.refresh();
+    });
+  };
+
+  return (
+    <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 px-4 py-3.5 dark:border-brand-800 dark:bg-brand-950/20">
+      <div>
+        <p className="text-[13.5px] font-semibold text-text-primary">Nouveau patient ? Prenez son adresse maintenant.</p>
+        <p className="text-[12.5px] leading-5 text-text-secondary">Le plan partira par e-mail, et cette délivrance sera dans son historique. Sinon, il s&apos;imprime ou se scanne.</p>
+      </div>
+      {canCreate && canAttach && (
+        <div className="flex gap-3 text-[12.5px]">
+          <button type="button" onClick={() => setMode("create")} className={cn("underline-offset-2", mode === "create" ? "font-semibold text-text-primary" : "text-brand-700 underline dark:text-brand-400")}>Nouveau patient</button>
+          <button type="button" onClick={() => setMode("search")} className={cn("underline-offset-2", mode === "search" ? "font-semibold text-text-primary" : "text-brand-700 underline dark:text-brand-400")}>Patient déjà connu</button>
+        </div>
+      )}
+      {mode === "create" && canCreate && (
+        <QuickPatientForm compact prescriptionId={prescriptionId} onCreated={() => router.refresh()} />
+      )}
+      {mode === "search" && canAttach && (
+        <div className="space-y-2">
+          <PatientPicker patients={patients} value="" onChange={attach} id="fin-patient" emptyLabel="Choisir un patient" />
+          {pending && <p className="text-[12.5px] text-text-tertiary">Rattachement…</p>}
+        </div>
+      )}
+      {!canCreate && !canAttach && <p className="text-[12.5px] text-text-tertiary">Seul un pharmacien peut rattacher un patient.</p>}
+    </div>
+  );
+}
+

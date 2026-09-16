@@ -137,7 +137,7 @@ export function PrescriptionZone({
           {headerOpen && (
             <div className="mt-3 grid gap-4 sm:grid-cols-3">
               <Field label="Patient" htmlFor="patientId">
-                <PatientPicker patients={patients} value={patientId} onChange={onPatientChange} />
+                <PatientPicker patients={patients} value={patientId} onChange={onPatientChange} create={{ prescriptionId }} />
               </Field>
               <Field label="Prescripteur" htmlFor="prescriberName">
                 <Input
