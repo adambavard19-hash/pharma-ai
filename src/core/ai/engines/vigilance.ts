@@ -1,5 +1,6 @@
 import type { DrugKnowledge, VigilanceKind, VigilanceResult } from "../types";
 import { BASE_MAITRE_VIGILANCES } from "./vigilance-base-maitre";
+import { ELECTROLYTE_VIGILANCES } from "./vigilance-electrolytes";
 
 /**
  * Vigilances au comptoir : ce que le traitement prescrit impose de savoir
@@ -127,17 +128,17 @@ const CORE_VIGILANCES: VigilanceRule[] = [
     severity: "WARNING",
     title: "Contre-indication / vigilance",
     subtitle: "Traitement hyperkaliémiant détecté",
-    atcPrefixes: ["C03DA", "C03DB", "C03EA", "C09A", "C09B", "C09C", "C09D", "G03AA12", "G03AC"],
-    substances: ["spironolactone", "eplerenone", "amiloride", "triamterene", "drospirenone"],
+    atcPrefixes: ["C03DA", "C03DB", "C03EA", "C09A", "C09B", "C09C", "C09D", "G03AA12", "G03AC", "A12BA"],
+    substances: ["spironolactone", "eplerenone", "amiloride", "triamterene", "drospirenone", "chlorure de potassium", "diffu-k", "kaleorid"],
     explanationTemplate:
-      "{drug} favorise la rétention de potassium (diurétique épargneur, IEC, ARA II, drospirénone). Un apport en potassium expose à une hyperkaliémie, surtout en cas d'insuffisance rénale ou d'association à un IEC ou un ARA II : la supplémentation relève d'un avis médical.",
-    concerned: ["Potassium (suppléments, sels de régime, multivitamines riches en potassium)", "Iodure de potassium (compléments iodés)"],
+      "{drug} favorise la rétention de potassium (diurétique épargneur, IEC, ARA II, drospirénone). Un apport en potassium expose à une hyperkaliémie, surtout en cas d'insuffisance rénale ou d'association à un IEC ou un ARA II : la supplémentation relève d'un avis médical. Les solutés et pastilles de réhydratation (Hydratis, Hydrafizz, SRO) contiennent du potassium : pas de proposition automatique — une prise occasionnelle se valide au vu de la fonction rénale, de la kaliémie, des autres traitements et de la quantité réelle de potassium.",
+    concerned: ["Potassium (suppléments, sels de régime, multivitamines riches en potassium)", "Iodure de potassium (compléments iodés)", "Électrolytes et solutés de réhydratation contenant du potassium (Hydratis, Hydrafizz, SRO) : validation pharmaceutique"],
     patientAdvice: null,
-    blockTags: ["potassium"],
+    blockTags: ["potassium", "réhydratation"],
     cautionTags: [],
     precautionText: null,
     sourceRules: [16, 17, 18, 19, 80, 81, 97],
-    sources: ["Thésaurus des interactions médicamenteuses, ANSM — hyperkaliémiants et potassium : association déconseillée"],
+    sources: ["Thésaurus des interactions médicamenteuses, ANSM — hyperkaliémiants et potassium : association déconseillée", "Réseau français des centres de pharmacovigilance — Médicaments et potassium (rfcrpv.fr)"],
   },
   {
     key: "loop-thiazide-monitoring",
@@ -146,17 +147,17 @@ const CORE_VIGILANCES: VigilanceRule[] = [
     severity: "WARNING",
     title: "Surveillance",
     subtitle: "Diurétique détecté",
-    atcPrefixes: ["C03A", "C03B", "C03C"],
-    substances: ["furosemide", "bumetanide", "hydrochlorothiazide", "indapamide", "chlortalidone"],
+    atcPrefixes: ["C03A", "C03B", "C03C", "S01EC01"],
+    substances: ["furosemide", "bumetanide", "hydrochlorothiazide", "indapamide", "chlortalidone", "acetazolamide"],
     explanationTemplate:
-      "Les diurétiques de l'anse et thiazidiques ({drug}) augmentent les pertes urinaires de potassium et de magnésium, et au long cours de zinc. Le potassium ne se vend jamais de lui-même : il dépend du bilan et peut devenir dangereux si le contexte change. Le magnésium et le zinc se discutent au vu du bilan et du terrain. Avec un thiazidique, calcium et vitamine D peuvent conduire à une hypercalcémie, surtout chez le sujet âgé ou insuffisant rénal.",
-    concerned: ["Potassium (écarté sans prescription)", "Magnésium", "Zinc (traitement prolongé)", "Calcium et vitamine D (thiazidique) : hypercalcémie possible"],
+      "Les diurétiques de l'anse et thiazidiques ({drug}) augmentent les pertes urinaires de potassium et de magnésium, et au long cours de zinc. Le potassium ne se vend jamais de lui-même : il dépend du bilan et peut devenir dangereux si le contexte change. Le magnésium et le zinc se discutent au vu du bilan et du terrain. Avec un thiazidique, calcium et vitamine D peuvent conduire à une hypercalcémie, surtout chez le sujet âgé ou insuffisant rénal. Les électrolytes de réhydratation ne se proposent pas d'eux-mêmes non plus : ionogramme, fonction rénale ou magnésémie d'abord.",
+    concerned: ["Potassium (écarté sans prescription)", "Magnésium", "Zinc (traitement prolongé)", "Calcium et vitamine D (thiazidique) : hypercalcémie possible", "Électrolytes de réhydratation : après ionogramme, pas d'office"],
     patientAdvice: null,
     blockTags: ["potassium"],
-    cautionTags: ["magnésium", "zinc", "calcium", "vitamine d"],
-    precautionText: "Diurétique sur l'ordonnance : conseil à adapter au bilan biologique (kaliémie, magnésémie).",
+    cautionTags: ["magnésium", "zinc", "calcium", "vitamine d", "réhydratation"],
+    precautionText: "Diurétique sur l'ordonnance : vérifier l'ionogramme et la fonction rénale avant de compenser, pas de conseil d'office.",
     sourceRules: [11, 12, 13, 14, 15, 49],
-    sources: ["RCP furosémide et hydrochlorothiazide (ANSM) — effets indésirables métaboliques", "NIH Office of Dietary Supplements — Magnesium, Potassium, Zinc, Vitamin D (Health Professional fact sheets)"],
+    sources: ["RCP furosémide et hydrochlorothiazide (ANSM) — effets indésirables métaboliques", "VIDAL — hydrochlorothiazide (substance)", "NIH Office of Dietary Supplements — Magnesium, Potassium, Zinc, Vitamin D (Health Professional fact sheets)"],
   },
   {
     key: "metformin-b12",
@@ -293,13 +294,13 @@ const CORE_VIGILANCES: VigilanceRule[] = [
     subtitle: "Anti-inflammatoire",
     atcPrefixes: ["M01A"],
     substances: ["ibuprofene", "ketoprofene", "diclofenac", "naproxene"],
-    explanationTemplate: "{drug} se prend au cours du repas, à la dose la plus faible et le moins longtemps possible : c'est ce qui protège l'estomac.",
+    explanationTemplate: "{drug} se prend au cours du repas, à la dose la plus faible et le moins longtemps possible : c'est ce qui protège l'estomac. Pendant une diarrhée, des vomissements ou une forte chaleur, la déshydratation majore le risque rénal de l'anti-inflammatoire : on hydrate et on réévalue le traitement, on ne se contente pas de vendre des électrolytes.",
     concerned: [],
-    patientAdvice: "Prenez-le pendant le repas, jamais à jeun, et pas plus longtemps que prescrit.",
+    patientAdvice: "Prenez-le pendant le repas, jamais à jeun, et pas plus longtemps que prescrit. Si vous avez la diarrhée, vomissez ou s'il fait très chaud, buvez et demandez conseil : il faut peut-être suspendre l'anti-inflammatoire.",
     blockTags: [],
-    cautionTags: [],
-    precautionText: null,
-    sources: ["RCP ibuprofène, kétoprofène (ANSM) — mode d'administration"],
+    cautionTags: ["réhydratation"],
+    precautionText: "AINS sur l'ordonnance : des pertes hydriques majorent le risque rénal — hydrater et réévaluer l'AINS, pas seulement compenser.",
+    sources: ["RCP ibuprofène, kétoprofène (ANSM) — mode d'administration et mises en garde (déshydratation, fonction rénale)"],
   },
   {
     key: "usage-ppi-before-breakfast",
@@ -337,8 +338,8 @@ const CORE_VIGILANCES: VigilanceRule[] = [
   },
 ];
 
-/** Toutes les vigilances : celles du cœur, puis celles de la Base maître V1. */
-export const VIGILANCE_RULES: VigilanceRule[] = [...CORE_VIGILANCES, ...BASE_MAITRE_VIGILANCES];
+/** Toutes les vigilances : le cœur, la Base maître V1, puis les électrolytes. */
+export const VIGILANCE_RULES: VigilanceRule[] = [...CORE_VIGILANCES, ...BASE_MAITRE_VIGILANCES, ...ELECTROLYTE_VIGILANCES];
 
 function norm(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();

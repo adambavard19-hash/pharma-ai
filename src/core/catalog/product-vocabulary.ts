@@ -116,7 +116,7 @@ const PATTERNS: Pattern[] = [
     confidence: 0.95,
   },
   {
-    test: /\b(rehydratation|réhydratation|adiaril|viatol|hydranova|sels? de rehydratation|\bsro\b|\bors\b|solution de rehydratation|picolite|novalac hydranova)/,
+    test: /\b(rehydratation|réhydratation|adiaril|viatol|fanolyte|hydranova|sels? de rehydratation|\bsro\b|\bors\b|solution de rehydratation|picolite|novalac hydranova)/,
     category: "NUTRITION",
     tags: ["réhydratation", "diarrhée", "sels minéraux"],
     ruleKeys: ["rehydration-digestive"],
@@ -291,7 +291,7 @@ const PATTERNS: Pattern[] = [
     confidence: 0.8,
   },
   {
-    test: /(hydratis|hydranova|viatol|sels? de rehydratation|sels? de réhydratation|\bsro\b|\bors\b|electrolytes?|électrolytes?)/,
+    test: /(hydratis|hydrafizz|hydranova|viatol|fanolyte|sels? de rehydratation|sels? de réhydratation|\bsro\b|\bors\b|electrolytes?|électrolytes?)/,
     category: "NUTRITION",
     tags: ["réhydratation", "sels minéraux"],
     ruleKeys: ["rehydration-digestive"],

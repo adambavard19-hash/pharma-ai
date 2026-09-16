@@ -122,6 +122,14 @@ export type AdviceRule = {
   /** Motifs qui font préférer une référence à ses équivalentes (« sans alcool »). */
   productPrefer?: string[];
   /**
+   * Motifs de préférence et d'exclusion qui DÉPENDENT du patient : un
+   * nourrisson ou une personne âgée fragile reçoit un vrai soluté de
+   * réhydratation orale, pas des pastilles de confort. Ajoutés aux motifs
+   * fixes au moment où l'opportunité se construit.
+   */
+  productPreferFor?: (patient: PatientContext) => string[];
+  productExcludeFor?: (patient: PatientContext) => string[];
+  /**
    * Le produit à associer à la proposition, quand la référence retenue en
    * appelle un : `when` reconnaît la référence (un flacon, pas un spray), les
    * `productPatterns` reconnaissent le produit associé dans le stock.
@@ -199,6 +207,17 @@ export type AdviceRule = {
  * et idéalement adossé à des recommandations professionnelles référencées.
  * Voir docs/CONFORMITE.md.
  */
+/**
+ * Nourrisson, jeune enfant ou personne âgée : la réhydratation ne se fait pas
+ * avec un complément de confort mais avec un soluté de réhydratation orale.
+ * Seuils issus du document « Médicaments et électrolytes » (nourrisson ou
+ * jeune enfant ; personne âgée fragile). Un âge inconnu est traité comme un
+ * adulte : on ne suppose pas la fragilité, on la constate.
+ */
+export function isFragileForRehydration(patient: PatientContext): boolean {
+  return patient.ageYears !== null && (patient.ageYears < 6 || patient.ageYears >= 75);
+}
+
 export const ADVICE_RULES: AdviceRule[] = [
   {
     key: "digestive-tolerance-antibiotics",
@@ -638,30 +657,50 @@ export const ADVICE_RULES: AdviceRule[] = [
     key: "rehydration-digestive",
     title: "Réhydratation",
     kind: "TOLERANCE",
-    version: "1.0",
+    version: "1.1",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_ONLY",
     needTriggers: ["REHYDRATION"],
-    question: "Y a-t-il des vomissements ou une diarrhée ?",
+    // Le principe du document « Médicaments et électrolytes » : les
+    // électrolytes se proposent devant des pertes RÉELLES, jamais sur le seul
+    // traitement. La question est donc posée même pour un antidiarrhéique.
+    question: "Le patient a-t-il réellement une diarrhée ou des vomissements en cours — et, sous antidiarrhéique, sans fièvre ni sang dans les selles ?",
     category: "NUTRITION",
-    atcPrefixes: [],
-    therapeuticClasses: [],
+    // Antidiarrhéiques (racécadotril, lopéramide, diosmectite, S. boulardii,
+    // charbon), puis les traitements qui provoquent parfois diarrhée ou
+    // vomissements : agonistes du GLP-1, metformine et ses associations,
+    // amoxicilline-acide clavulanique, azithromycine, laxatifs stimulants ou
+    // osmotiques à dose excessive. Clindamycine et colchicine sont exclues :
+    // leurs troubles digestifs appellent un avis médical (vigilances dédiées).
+    atcPrefixes: ["A07XA", "A07DA", "A07BC", "A07FA", "A07BA", "A10BJ", "A10BA02", "A10BD", "J01CR02", "J01FA10", "A06AD11", "A06AB02", "A06AB06"],
+    therapeuticClasses: ["Antidiarrhéique", "Ralentisseur du transit", "Adsorbant intestinal"],
     sideEffectTriggers: [],
     basePriority: 64,
     matchingTags: ["réhydratation", "diarrhée", "sels minéraux"],
     excludeTags: [],
+    // Nourrisson, jeune enfant, personne âgée : un véritable soluté de
+    // réhydratation orale (Adiaril, Fanolyte, Viatol), pas un complément de
+    // confort comme Hydratis ou Hydrafizz.
+    productPreferFor: (patient) => (isFragileForRehydration(patient) ? ["adiaril", "fanolyte", "viatol", "solute de rehydratation", "solution de rehydratation", "\\bsro\\b"] : []),
+    productExcludeFor: (patient) => (isFragileForRehydration(patient) ? ["hydratis", "hydrafizz", "pastille"] : []),
+    benefits: ["Compense l'eau et les sels perdus", "Dès les premières selles liquides", "À distance des autres produits oraux"],
     shortReasonTemplate:
       "Diarrhée ou vomissements plausibles dans ce contexte ({drug}) : la réhydratation compte.",
     rationaleTemplate:
-      "Le contexte du traitement ({drug}) rend une diarrhée ou des vomissements plausibles. Compenser les pertes en eau et en sels minéraux est le premier geste, surtout chez l'enfant et la personne âgée.",
+      "Le contexte du traitement ({drug}) rend une diarrhée ou des vomissements plausibles. Compenser les pertes en eau et en sels minéraux est le premier geste : l'antidiarrhéique ne remplace jamais la réhydratation. Chez le nourrisson, l'enfant et la personne âgée fragile, ou en cas de pertes importantes, c'est un véritable soluté de réhydratation orale qu'il faut, pas un complément de confort.",
     counterScriptTemplate:
-      "« En cas de diarrhée ou de vomissements, {product} compense les pertes en eau et en sels. Au-delà de 48 heures, consultez. »",
+      "« En cas de diarrhée ou de vomissements, {product} compense les pertes en eau et en sels. Prenez-le à distance des autres produits (2 heures après une argile ou du charbon). Au-delà de 48 heures, avec de la fièvre ou du sang, consultez. »",
     confirmedReasonTemplate: "Diarrhée ou vomissements confirmés : la réhydratation compte.",
     patientReasonTemplate:
       "En cas de diarrhée ou de vomissements, {product} compense les pertes en eau et en sels minéraux.",
     clinicalContext:
-      "Nourrisson, personne âgée, diarrhée avec fièvre ou sang : orienter rapidement vers le médecin.",
-    safetyNotes: ["Diarrhée persistante au-delà de 48 heures : consulter."],
+      "Adulte sans facteur de risque : électrolytes possibles. Sous lopéramide, vérifier l'absence de fièvre, de sang dans les selles ou de diarrhée infectieuse suspectée. Diosmectite ou charbon : espacer les autres produits oraux d'au moins 2 heures. Sous antidiabétique : vérifier la glycémie et la présence de sucres dans le produit. Laxatif : seulement si la diarrhée vient d'une dose excessive. Nourrisson, personne âgée, diarrhée avec fièvre ou sang, pertes importantes : orienter rapidement vers le médecin.",
+    safetyNotes: [
+      "Diarrhée persistante au-delà de 48 heures, fièvre ou sang dans les selles : consulter.",
+      "Sous antidiabétique : vérifier la glycémie et la présence de sucres dans le produit d'électrolytes.",
+      "Diosmectite ou charbon activé : prendre les électrolytes à distance (au moins 2 heures).",
+    ],
+    adjustPriority: (patient) => (isFragileForRehydration(patient) ? 10 : 0),
   },
   {
     key: "eye-irritation-allergy",
@@ -1448,15 +1487,19 @@ export function detectAdviceOpportunities(params: {
       Math.min(PRIORITY_CEILING[rule.kind], raw),
     );
 
+    // Les motifs qui dépendent du patient (un nourrisson reçoit un vrai
+    // soluté de réhydratation) s'ajoutent aux motifs fixes de la règle.
+    const patientPrefer = rule.productPreferFor?.(patient) ?? [];
+    const patientExclude = rule.productExcludeFor?.(patient) ?? [];
     const variants: { suffix: string; tags: string[]; exclude: string[]; prefer: string[]; routine: AdviceOpportunityResult["routine"] }[] = rule.routine
       ? rule.routine.steps.map((step, index) => ({
           suffix: `:${step.key}`,
           tags: step.matchingTags,
-          exclude: [...(rule.productExclude ?? []), ...(step.productExclude ?? [])],
-          prefer: step.productPrefer ?? rule.productPrefer ?? [],
+          exclude: [...(rule.productExclude ?? []), ...(step.productExclude ?? []), ...patientExclude],
+          prefer: [...(step.productPrefer ?? rule.productPrefer ?? []), ...patientPrefer],
           routine: { key: rule.key, title: rule.routine!.title, stepKey: step.key, stepLabel: step.label, stepIndex: index, stepCount: rule.routine!.steps.length, benefit: step.benefit },
         }))
-      : [{ suffix: "", tags: rule.matchingTags, exclude: rule.productExclude ?? [], prefer: rule.productPrefer ?? [], routine: null }];
+      : [{ suffix: "", tags: rule.matchingTags, exclude: [...(rule.productExclude ?? []), ...patientExclude], prefer: [...(rule.productPrefer ?? []), ...patientPrefer], routine: null }];
 
     for (const variant of variants) byKey.set(rule.key + variant.suffix, {
       key: rule.key + variant.suffix,
