@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    // Les photos de boîtes viennent des bases ouvertes Open Beauty/Products/Food Facts.
+    remotePatterns: [
+      { protocol: "https", hostname: "images.openbeautyfacts.org" },
+      { protocol: "https", hostname: "images.openproductsfacts.org" },
+      { protocol: "https", hostname: "images.openfoodfacts.org" },
+    ],
+  },
   experimental: {
     // Permet à `forbidden()` de rendre une vraie page 403 : sans cela, une
     // permission manquante remonte en erreur 500, ce qui donne à un

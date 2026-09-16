@@ -768,6 +768,7 @@ function ProductCard({
           )}
         </div>
         <BenefitChips benefits={recommendation.opportunity?.benefits ?? []} />
+        <ImageCredit source={product?.imageSource ?? null} />
       </div>
 
       {script && (
@@ -1038,6 +1039,13 @@ function PriceEntry({ recommendationId, compact = false }: { recommendationId: s
       </Button>
     </span>
   );
+}
+
+/** Une photo venue d'une base ouverte se crédite : c'est la condition de sa licence. */
+function ImageCredit({ source }: { source: string | null }) {
+  const label = source === "openbeautyfacts" ? "Open Beauty Facts" : source === "openproductsfacts" ? "Open Products Facts" : source === "openfoodfacts" ? "Open Food Facts" : null;
+  if (!label) return null;
+  return <p className="px-1 text-[10.5px] text-text-tertiary">Photo : {label}, CC BY-SA.</p>;
 }
 
 function StockBadge({ quantity, low }: { quantity: number; low: boolean }) {

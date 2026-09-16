@@ -18,6 +18,8 @@ export async function POST(request: Request) {
     after(async () => {
       const { classifyPharmacyProducts } = await import("@/server/services/product-classification");
       await classifyPharmacyProducts({ scope: agent.scope, maxAiBatches: 60 }).catch((error) => console.error("[agent] classification différée impossible", error));
+      const { fetchMissingProductImages } = await import("@/server/services/product-images");
+      await fetchMissingProductImages({ pharmacyId: agent.scope.pharmacyId, limit: 200 }).catch((error) => console.error("[agent] photos différées impossibles", error));
     });
   }
   return NextResponse.json(result, { status: result.ok ? 200 : 422 });

@@ -4,7 +4,9 @@ import { AlertTriangle, Boxes, Cable, Clock, History, PackageX, Plus, RefreshCw,
 import { describeAge, lgoLabel, stockFreshness } from "@/core/stock/connectors";
 import { cn } from "@/lib/utils";
 import { ClassifyProductsButton } from "./classify-button";
+import { FetchPhotosButton } from "./photos-button";
 import { prisma } from "@/server/db/client";
+import { countProductsWithoutImageLookup } from "@/server/services/product-images";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { normalizeSearchText } from "@/core/reference/search";
@@ -44,7 +46,7 @@ export default async function StockPage({
   const canManage = session.permissions.has(PERMISSIONS.PRODUCT_MANAGE);
   const canImport = session.permissions.has(PERMISSIONS.PRODUCT_IMPORT);
 
-  const [products, drugLines, lastMovement, lastImport, pharmacy, unclassified] = await Promise.all([
+  const [products, drugLines, lastMovement, lastImport, pharmacy, unclassified, withoutImage] = await Promise.all([
     prisma.product.findMany({
       where: {
         pharmacyId,
@@ -109,6 +111,8 @@ export default async function StockPage({
     prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true, stockConnection: { select: { lgo: true, status: true, lastSyncAt: true, lastSeenAt: true, intervalSeconds: true, lastError: true } } } }),
     // Les produits que le moteur ne sait pas encore relier à un besoin.
     prisma.product.count({ where: { pharmacyId, deletedAt: null, classifiedAt: null } }),
+    // Les boîtes dont la photo n'a pas encore été cherchée.
+    countProductsWithoutImageLookup(pharmacyId),
   ]);
   const syncedAt = pharmacy?.stockSyncedAt ?? lastImport?.finishedAt ?? null;
   const connection = pharmacy?.stockConnection && pharmacy.stockConnection.status !== "DISCONNECTED" && pharmacy.stockConnection.status !== "PENDING" ? pharmacy.stockConnection : null;
@@ -232,6 +236,7 @@ export default async function StockPage({
           )}
         </p>
         {unclassified > 0 && canManage && <ClassifyProductsButton pending={unclassified} />}
+        {withoutImage > 0 && canManage && <FetchPhotosButton pending={withoutImage} />}
       </div>
 
       <Grid cols={4}>

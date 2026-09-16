@@ -150,6 +150,8 @@ export type AdviceView = {
     name: string;
     brand: string | null;
     imageUrl: string | null;
+    /** D'où vient la photo : « officine », ou une base ouverte à créditer. */
+    imageSource: string | null;
     salePriceCents: number;
     quantity: number;
     alertThreshold: number;

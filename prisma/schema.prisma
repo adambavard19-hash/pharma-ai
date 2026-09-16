@@ -602,6 +602,9 @@ model Product {
   reference      String
   ean            String?
   imageUrl       String?
+  /// D'où vient la photo : « officine » (prise sur place) ou une base ouverte
+  /// (« openbeautyfacts », « openproductsfacts », « openfoodfacts »), à créditer.
+  imageSource    String?
   description    String?
 
   /// Allégations commerciales autorisées, validées par l'officine.
@@ -957,6 +960,9 @@ model DrugPresentation {
   /// Code Identifiant de Présentation à 13 chiffres. Vérifié unique sur la
   /// base réelle, et toujours préfixé « 3400 » pour les médicaments français.
   cip13       String @unique
+  /// Photo de la boîte, quand une base ouverte la connaît par son code-barres.
+  imageUrl    String?
+  imageSource String?
   cip7        String @unique
 
   label                  String

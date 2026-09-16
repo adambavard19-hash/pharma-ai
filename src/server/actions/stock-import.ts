@@ -109,6 +109,15 @@ export async function commitStockImportAction(
         await classifyPharmacyProducts({ scope, maxAiBatches: 60 }).catch((error) => console.error("[stock-import] classification différée impossible", error));
       });
     }
+    // Les photos des boîtes, par code-barres, sans faire attendre : un premier
+    // passage ici, le bouton de la page Stock fait le reste.
+    {
+      const pharmacyId = session.scope.pharmacyId;
+      after(async () => {
+        const { fetchMissingProductImages } = await import("@/server/services/product-images");
+        await fetchMissingProductImages({ pharmacyId, limit: 200 }).catch((error) => console.error("[stock-import] photos différées impossibles", error));
+      });
+    }
     return ok(
       outcome,
       `${outcome.productsCreated} créé(s), ${outcome.productsUpdated + outcome.drugsUpserted} mis à jour, ${outcome.ignored} ignoré(s).`,
@@ -123,6 +132,18 @@ export async function commitStockImportAction(
  * relier à un besoin (import ancien, modèle indisponible au moment de
  * l'import…). Bornée : quelques lots par clic, le reste est annoncé.
  */
+/** Cherche la photo des boîtes sans image, par code-barres, dans les bases ouvertes. Un passage borné par appel. */
+export async function fetchProductImagesAction(): Promise<ActionResult<import("@/server/services/product-images").ImageFetchSummary>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  const { fetchMissingProductImages } = await import("@/server/services/product-images");
+  const summary = await fetchMissingProductImages({ pharmacyId: session.scope.pharmacyId, limit: 60 });
+  revalidatePath("/stock");
+  return ok(
+    summary,
+    `${summary.found} photo(s) trouvée(s) sur ${summary.considered} cherchée(s)${summary.remaining > 0 ? ` · ${summary.remaining} restante(s), cliquez à nouveau` : ""}.`,
+  );
+}
+
 export async function classifyProductsAction(payload?: { force?: boolean }): Promise<ActionResult<import("@/server/services/product-classification").ClassificationRunSummary>> {
   const session = await requirePermission(PERMISSIONS.PRODUCT_MANAGE);
   try {

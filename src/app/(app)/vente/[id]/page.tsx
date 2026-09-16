@@ -76,7 +76,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           presentation: {
             select: {
               id: true,
-              priceCents: true,
+              priceCents: true, imageUrl: true, imageSource: true,
               specialty: { select: { name: true } },
               pharmacyStocks: { where: { pharmacyId: session.scope.pharmacyId }, select: { quantity: true, alertThreshold: true, priceCents: true } },
             },
@@ -345,6 +345,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                 name: recommendation.product.name,
                 brand: recommendation.product.brand,
                 imageUrl: recommendation.product.imageUrl,
+                imageSource: recommendation.product.imageSource,
                 salePriceCents: recommendation.product.salePriceCents,
                 quantity: recommendation.product.stockItem?.quantity ?? 0,
                 alertThreshold: recommendation.product.stockItem?.alertThreshold ?? 0,
@@ -356,7 +357,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                   presentationId: recommendation.presentation.id,
                   name: recommendation.presentation.specialty.name,
                   brand: null,
-                  imageUrl: null,
+                  imageUrl: recommendation.presentation.imageUrl,
+                  imageSource: recommendation.presentation.imageSource,
                   salePriceCents: recommendation.presentation.pharmacyStocks[0]?.priceCents ?? recommendation.presentation.priceCents ?? 0,
                   quantity: recommendation.presentation.pharmacyStocks[0]?.quantity ?? 0,
                   alertThreshold: recommendation.presentation.pharmacyStocks[0]?.alertThreshold ?? 0,
