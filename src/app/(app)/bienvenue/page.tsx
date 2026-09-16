@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { PharmacyInfoForm } from "./pharmacy-info-form";
 import { FinishButton, VerifyStockButton } from "./buttons";
 import { StockAssistant } from "./stock-assistant";
-import { LGO_DEFINITIONS, stockFreshness } from "@/core/stock/connectors";
+import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 import { getConnection } from "@/server/services/stock-sync";
 import { resolvePublicBaseUrl } from "@/server/public-url";
 
@@ -138,8 +138,9 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
                       lastSyncLines: connection.lastSyncLines,
                       // Un agent qui ne s'est pas présenté depuis plus d'une heure est
                       // tenu pour parti : l'assistant repropose alors l'installation.
-                      reachable: stockFreshness({ lastSyncAt: connection.lastSyncAt, lastSeenAt: connection.lastSeenAt, intervalSeconds: connection.intervalSeconds }).state !== "DISCONNECTED",
-                      seenAgeSeconds: connection.lastSeenAt ? Math.round((Date.now() - connection.lastSeenAt.getTime()) / 1000) : null,
+                      // La fraîcheur et l'âge sont calculés par le service, pas ici.
+                      reachable: connection.freshness !== "DISCONNECTED",
+                      seenAgeSeconds: connection.seenAgeSeconds,
                     }
                   : null
               }
