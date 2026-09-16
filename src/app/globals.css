@@ -8,17 +8,20 @@
 
 @theme {
   /* --- Palette de marque : « teal clinique » ---------------------------- */
-  --color-brand-50: oklch(0.977 0.017 180);
-  --color-brand-100: oklch(0.947 0.038 180);
-  --color-brand-200: oklch(0.898 0.065 180);
-  --color-brand-300: oklch(0.828 0.086 180);
-  --color-brand-400: oklch(0.735 0.093 180);
-  --color-brand-500: oklch(0.652 0.089 181);
-  --color-brand-600: oklch(0.558 0.079 182);
-  --color-brand-700: oklch(0.468 0.067 183);
-  --color-brand-800: oklch(0.397 0.055 184);
-  --color-brand-900: oklch(0.348 0.045 185);
-  --color-brand-950: oklch(0.242 0.033 186);
+  /* Même teinte vert-bleu, plus de saturation sur ce qui se clique : sur un
+     écran d'officine mal réglé, le gris-vert d'avant ne se distinguait plus
+     du fond. Les teintes claires (50 à 200) restent calmes. */
+  --color-brand-50: oklch(0.977 0.02 180);
+  --color-brand-100: oklch(0.945 0.045 180);
+  --color-brand-200: oklch(0.895 0.08 180);
+  --color-brand-300: oklch(0.82 0.11 180);
+  --color-brand-400: oklch(0.72 0.125 180);
+  --color-brand-500: oklch(0.63 0.125 181);
+  --color-brand-600: oklch(0.54 0.115 182);
+  --color-brand-700: oklch(0.455 0.1 183);
+  --color-brand-800: oklch(0.385 0.08 184);
+  --color-brand-900: oklch(0.335 0.06 185);
+  --color-brand-950: oklch(0.235 0.04 186);
 
   /* --- Accent commercial : ambre chaud, réservé au CA additionnel -------- */
   --color-accent-50: oklch(0.98 0.021 85);
@@ -48,27 +51,51 @@
   /* --- États ------------------------------------------------------------ */
   --color-success-50: oklch(0.975 0.023 155);
   --color-success-100: oklch(0.946 0.048 156);
+  --color-success-200: oklch(0.9 0.09 152);
+  --color-success-300: oklch(0.84 0.13 151);
+  --color-success-400: oklch(0.76 0.16 150);
   --color-success-500: oklch(0.68 0.15 154);
   --color-success-600: oklch(0.6 0.135 155);
   --color-success-700: oklch(0.51 0.113 156);
+  --color-success-800: oklch(0.42 0.1 148);
+  --color-success-900: oklch(0.36 0.08 148);
+  --color-success-950: oklch(0.25 0.055 148);
 
   --color-warning-50: oklch(0.978 0.026 85);
   --color-warning-100: oklch(0.955 0.055 87);
+  --color-warning-200: oklch(0.915 0.09 86);
+  --color-warning-300: oklch(0.87 0.13 82);
+  --color-warning-400: oklch(0.83 0.15 80);
   --color-warning-500: oklch(0.79 0.16 78);
   --color-warning-600: oklch(0.7 0.15 65);
   --color-warning-700: oklch(0.58 0.13 55);
+  --color-warning-800: oklch(0.47 0.11 50);
+  --color-warning-900: oklch(0.39 0.09 48);
+  --color-warning-950: oklch(0.27 0.06 46);
 
   --color-danger-50: oklch(0.972 0.017 17);
   --color-danger-100: oklch(0.94 0.033 18);
+  --color-danger-200: oklch(0.9 0.07 22);
+  --color-danger-300: oklch(0.83 0.11 22);
+  --color-danger-400: oklch(0.74 0.16 22);
   --color-danger-500: oklch(0.637 0.208 25);
   --color-danger-600: oklch(0.577 0.213 27);
   --color-danger-700: oklch(0.505 0.191 27);
+  --color-danger-800: oklch(0.44 0.15 25);
+  --color-danger-900: oklch(0.38 0.12 25);
+  --color-danger-950: oklch(0.26 0.08 25);
 
   --color-info-50: oklch(0.973 0.014 255);
   --color-info-100: oklch(0.94 0.031 255);
+  --color-info-200: oklch(0.9 0.07 240);
+  --color-info-300: oklch(0.83 0.1 240);
+  --color-info-400: oklch(0.74 0.13 240);
   --color-info-500: oklch(0.623 0.163 259);
   --color-info-600: oklch(0.546 0.191 262);
   --color-info-700: oklch(0.488 0.187 264);
+  --color-info-800: oklch(0.44 0.11 245);
+  --color-info-900: oklch(0.38 0.09 245);
+  --color-info-950: oklch(0.27 0.06 245);
 
   /* --- Typographie ------------------------------------------------------ */
   --font-sans:
@@ -126,8 +153,8 @@
   --border-strong: var(--color-ink-400);
 
   --text-primary: var(--color-ink-900);
-  --text-secondary: var(--color-ink-600);
-  --text-tertiary: var(--color-ink-500);
+  --text-secondary: var(--color-ink-700);
+  --text-tertiary: var(--color-ink-600);
   --text-inverse: #ffffff;
 
   --focus-ring: var(--color-brand-500);
@@ -177,8 +204,12 @@
    BASE
    ========================================================================== */
 
-* {
-  border-color: var(--border-subtle);
+/* Dans la couche base, sinon cette règle non couchée gagnait sur toutes les
+   utilitaires border-brand-*, border-danger-*… qui restaient grises. */
+@layer base {
+  * {
+    border-color: var(--border-subtle);
+  }
 }
 
 html {

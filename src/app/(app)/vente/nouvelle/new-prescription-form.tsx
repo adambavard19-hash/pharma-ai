@@ -569,19 +569,19 @@ function BigAction({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-3 rounded-2xl border-2 px-4 py-9 text-center",
-        "transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0",
+        "flex flex-col items-center gap-4 rounded-2xl border-2 px-4 py-10 text-center",
+        "transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
         active
           ? "border-brand-600 bg-brand-600 text-white shadow-md"
-          : "border-border-default bg-surface-card hover:border-brand-400",
+          : "border-brand-200 bg-surface-card shadow-sm hover:border-brand-500 dark:border-brand-800",
       )}
       aria-pressed={active}
     >
       <span
         className={cn(
-          "flex size-14 items-center justify-center rounded-2xl transition-colors",
-          active ? "bg-white/15 text-white" : "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-400",
+          "flex size-[72px] items-center justify-center rounded-full transition-colors",
+          active ? "bg-white/15 text-white" : "bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300",
         )}
       >
         {icon}
