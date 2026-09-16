@@ -128,3 +128,20 @@ describe("choix du produit associé", () => {
     expect(run([bottle, mk("insuline", "SERINGUE INSULINE 1ML"), mk("im", "SERINGUE 2 ML IM MONTEE")])).toBeNull();
   });
 });
+
+describe("lubrifiant oculaire sous substitut lacrymal", () => {
+  it("préfère l'acide hyaluronique sans conservateur et écarte antiseptiques, pommades et lavages", () => {
+    const tears: DrugClassification = { lineIndex: 0, substance: "CARBOMERE", atcCode: "S01XA20", therapeuticClass: "Substitut lacrymal", commonSideEffects: [], confidence: 0.95, source: "MODEL" };
+    const eye = (id: string, name: string, tags: string[]) => product({ id, name, category: "SOINS", subCategory: null, matchingTags: tags, commercialClaims: [], stockQuantity: 5, salePriceCents: 990 });
+    const result = analyse(tears, [
+      eye("aqualarm-up", "AQUALARM UP INTEN SOL OPHT10ML", ["yeux", "oculaire", "larmes", "sécheresse oculaire"]),
+      eye("aqualarm", "AQUALARM ECRAN 10ML", ["yeux", "oculaire", "larmes", "sécheresse oculaire"]),
+      eye("deso", "DESOSEPT POMMADE OPHTALMIQ", ["yeux", "oculaire", "collyre", "lavage", "larmes"]),
+      eye("dacryo", "DACRYOSERUM solution pour lavage ophtalmique", ["yeux", "oculaire", "collyre", "lavage", "larmes"]),
+    ]);
+    const lubricant = result.recommendations.find((r) => r.opportunityKey === "dry-eye-screen-lubricant");
+    expect(lubricant?.productId).toBe("aqualarm");
+    expect(result.recommendations.map((r) => r.productId)).not.toContain("deso");
+  });
+});
+

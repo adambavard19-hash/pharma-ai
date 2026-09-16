@@ -251,6 +251,21 @@ const PATTERNS: Pattern[] = [
     ruleKeys: ["convalescence-immunity-vitamins"],
     confidence: 0.85,
   },
+  // Sécheresse oculaire : lubrifiants à l'acide hyaluronique et soins des paupières.
+  {
+    test: /^(?!.*(eucerin|creme|crème|serum|sérum|gelul|gélul|caps|\bpp\b|visage|contour|nuit|spf|elast|comprime|comprimé|lentille))(?=.*(aqualarm|hyabak|hylo|hylovis|vismed|thealoz|optive|systane|artelac|cationorm|hyaluron|hyaluroniq|larmes? artificielles?|lubrifiant oculaire|gtt lubr|gouttes? lubrif|secheresse oculaire|sécheresse oculaire|yeux secs|oeil sec|œil sec))/,
+    category: "SOINS",
+    tags: ["yeux", "oculaire", "larmes", "sécheresse oculaire"],
+    ruleKeys: ["dry-eye-screen-lubricant", "eye-irritation-allergy"],
+    confidence: 0.9,
+  },
+  {
+    test: /(blephaclean|blephasteam|blephagel|blephasol|ophtaxia|hygiene des paupieres|hygiène des paupières|hyg paup|lingettes? (oculaires?|paupi)|compresses? (chauffantes?|oculaires?)|masque chauffant)/,
+    category: "SOINS",
+    tags: ["yeux", "paupières"],
+    ruleKeys: ["dry-eye-eyelid-care"],
+    confidence: 0.9,
+  },
   // Suivi des traitements chroniques.
   {
     test: /(tensiom|autotensio|omron|microlife|brassard)/,
@@ -301,6 +316,7 @@ const SUBSTANCE_PATTERNS: (Pattern & { requires?: RegExp })[] = [
   { test: /lidocaine|tetracaine|amylmetacresol|alcool dichlorobenzylique|benzalkonium|hexamidine/, requires: /pastille|gorge|collutoire|spray|comprime a sucer|comprimé à sucer|tablette/, category: "SOINS", tags: ["gorge", "irritation", "orl", "pastilles"], ruleKeys: ["sore-throat-orl"], confidence: 0.85 },
   { test: /dextromethorphane|oxomemazine|pholcodine|helicidine|hedera helix|lierre|thym|carbocisteine|acetylcysteine|ambroxol/, requires: /sirop|toux|buvable/, category: "SOINS", tags: ["toux", "gorge", "irritation"], ruleKeys: ["cough-throat-comfort"], confidence: 0.8 },
   { test: /glucose.*chlorure de sodium|citrate.*glucose|rehydratation|réhydratation/, category: "NUTRITION", tags: ["réhydratation", "diarrhée", "sels minéraux"], ruleKeys: ["rehydration-digestive"], confidence: 0.9 },
+  { test: /hyaluronate|hyaluronique|carmellose|trehalose|tréhalose/, requires: /collyre|ophtalm|oculaire|yeux|unidose/, category: "SOINS", tags: ["yeux", "oculaire", "larmes", "sécheresse oculaire"], ruleKeys: ["dry-eye-screen-lubricant"], confidence: 0.92 },
   { test: /hyaluronate|hypromellose|carbomere|carbomère|povidone|acide borique|borate/, requires: /collyre|ophtalm|oculaire|yeux|unidose/, category: "SOINS", tags: ["yeux", "oculaire", "collyre", "lavage", "larmes"], ruleKeys: ["eye-irritation-allergy"], confidence: 0.85 },
   { test: /magnesium|magnésium/, category: "MAGNESIUM", tags: ["magnésium", "fatigue", "crampes", "vitamine b6"], ruleKeys: ["magnesium-fatigue"], confidence: 0.9 },
   { test: /colecalciferol|cholecalciferol|ergocalciferol|calcifediol/, category: "VITAMINES", tags: ["vitamine d", "os", "calcium"], ruleKeys: ["vitamin-d-elderly"], confidence: 0.9 },

@@ -83,7 +83,11 @@ export function tokenize(text: string): string[] {
     .replace(/(\d)([A-Z])/g, "$1 $2")
     .replace(/([A-Z])(\d)/g, "$1 $2")
     .split(/[^A-Z0-9]+/)
-    .filter((token) => token.length > 0);
+    .filter((token) => token.length > 0)
+    // « UNIDOSES », « COMPRIMES », « GELULES » sur l'ordonnance ; « unidose »,
+    // « comprimé », « gélule » au catalogue : le pluriel ne doit pas coûter un
+    // rattachement. Les nombres et les termes courts sont laissés tels quels.
+    .map((token) => (token.length > 4 && !/\d/.test(token) && token.endsWith("S") ? token.slice(0, -1) : token));
 }
 
 /** Termes sans pouvoir discriminant : ils ne comptent ni pour ni contre. */

@@ -301,6 +301,23 @@ export const VIGILANCE_RULES: VigilanceRule[] = [
     precautionText: null,
     sources: ["RCP oméprazole, ésoméprazole (ANSM) — mode d'administration"],
   },
+  {
+    key: "usage-tear-substitutes",
+    version: "1.0",
+    kind: "USAGE",
+    severity: "INFO",
+    title: "Bon usage",
+    subtitle: "Larmes artificielles",
+    atcPrefixes: ["S01XA20", "S01KA"],
+    substances: ["carbomere", "carbomère", "hypromellose", "hyaluronate", "carmellose", "povidone", "trehalose", "tréhalose"],
+    explanationTemplate: "{drug} s'instille à distance des autres collyres (au moins cinq minutes, le gel en dernier), et les unidoses ne se gardent pas d'un jour à l'autre. Devant un écran, la règle des 20-20-20 : toutes les 20 minutes, regarder à 20 pieds (6 mètres) pendant 20 secondes, et cligner.",
+    concerned: [],
+    patientAdvice: "Cinq minutes entre deux collyres, le gel en dernier ; devant l'écran, une pause toutes les 20 minutes en regardant au loin, et pensez à cligner.",
+    blockTags: [],
+    cautionTags: [],
+    precautionText: null,
+    sources: ["RCP Lacrifluid, Aquarest (ANSM) — mode d'administration", "SFO — sécheresse oculaire et écrans"],
+  },
 ];
 
 function norm(value: string): string {

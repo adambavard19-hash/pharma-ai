@@ -1101,6 +1101,65 @@ export const ADVICE_RULES: AdviceRule[] = [
     blockedFor: (patient) => (patient.isPregnant ? "Grossesse déclarée : pas de complément multivitaminé sans avis médical." : null),
   },
   {
+    key: "dry-eye-screen-lubricant",
+    title: "Sécheresse oculaire et écrans",
+    kind: "TOLERANCE",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "SOINS",
+    // Substituts lacrymaux : larmes artificielles et gels (S01XA20, S01KA).
+    atcPrefixes: ["S01XA20", "S01KA"],
+    therapeuticClasses: ["Substitut lacrymal", "Larmes artificielles", "Lubrifiant oculaire", "Traitement de la sécheresse oculaire"],
+    sideEffectTriggers: [],
+    basePriority: 66,
+    matchingTags: ["sécheresse oculaire", "larmes"],
+    excludeTags: [],
+    // Ordonnés : devant un écran, la formule « écran » d'abord, puis l'acide hyaluronique, puis les autres lubrifiants.
+    productPrefer: [String.raw`ecran`, String.raw`écran`, String.raw`hyaluron`, String.raw`aqualarm`, String.raw`hylo`, String.raw`vismed`, String.raw`hyabak`, String.raw`thealoz`, String.raw`sans conservateur`],
+    productExclude: [String.raw`antiseptique`, String.raw`desomedine`, String.raw`desosept`, String.raw`pommade`, String.raw`lavage`, String.raw`dacryoserum`, String.raw`allergi`, String.raw`antihistamin`, String.raw`vasoconstric`, String.raw`blanchi`, String.raw`biocanina`, String.raw`lotion`, String.raw`paupi`, String.raw`lingette`],
+    benefits: ["Acide hyaluronique : lubrifie plus longtemps", "En complément du traitement prescrit, pas à sa place", "Sans conservateur à privilégier"],
+    shortReasonTemplate:
+      "Substitut lacrymal prescrit ({drug}) : l'œil est sec, et devant les écrans on cligne deux fois moins.",
+    rationaleTemplate:
+      "{drug} traite une sécheresse oculaire. Devant les écrans, le clignement se raréfie et le film lacrymal s'évapore plus vite : un lubrifiant à l'acide hyaluronique, sans conservateur, complète le traitement prescrit dans la journée, sans le remplacer. Les mentions « écran » ou « lumière bleue » de certains produits ne sont pas des preuves d'effet : c'est l'acide hyaluronique qui fait le travail.",
+    counterScriptTemplate:
+      "« {drug} réhydrate l'œil, continuez-le. Devant les écrans, {product} en complément dans la journée garde l'œil lubrifié plus longtemps : une goutte quand ça tire, et une pause toutes les 20 minutes. »",
+    patientReasonTemplate:
+      "Votre traitement ({drug}) hydrate l'œil. {product} le complète dans la journée, surtout devant les écrans, pour que l'œil reste lubrifié plus longtemps.",
+    clinicalContext:
+      "Sécheresse oculaire, dysfonction lacrymale liée aux écrans. Lubrifiants à l'acide hyaluronique en première intention (SFO / TFOS DEWS II) ; produits sans conservateur si usage fréquent. Aucune preuve d'un bénéfice propre des filtres « lumière bleue ».",
+    safetyNotes: ["Œil rouge et douloureux, baisse de la vision : orientation médicale sans délai.", "Espacer les collyres d'au moins cinq minutes ; un gel toujours en dernier."],
+  },
+  {
+    key: "dry-eye-eyelid-care",
+    title: "Hygiène des paupières",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    question: "Le patient a-t-il les paupières collées le matin, ou des croûtes à la base des cils ?",
+    confirmedReasonTemplate: "Sécheresse oculaire ({drug}) avec paupières collées : les glandes des paupières sont en cause, et se soignent par l'hygiène.",
+    category: "SOINS",
+    atcPrefixes: ["S01XA20", "S01KA"],
+    therapeuticClasses: ["Substitut lacrymal", "Larmes artificielles", "Lubrifiant oculaire"],
+    sideEffectTriggers: [],
+    basePriority: 54,
+    matchingTags: ["paupières"],
+    excludeTags: [],
+    benefits: ["Traite la cause quand les glandes sont bouchées", "Matin et soir, en cure", "Compresses chaudes puis nettoyage"],
+    shortReasonTemplate:
+      "Sécheresse oculaire ({drug}) : quand les paupières collent, ce sont leurs glandes qui manquent, et l'hygiène des paupières les débouche.",
+    rationaleTemplate:
+      "Une sécheresse oculaire sous {drug} avec paupières collées ou croûtes évoque une dysfonction des glandes de Meibomius : la chaleur puis le nettoyage des paupières, matin et soir, sont le traitement de fond recommandé, avant tout collyre supplémentaire.",
+    counterScriptTemplate:
+      "« Si les paupières collent, c'est la base des cils qu'il faut nettoyer : {product} matin et soir, après une compresse chaude, et {drug} continue. »",
+    patientReasonTemplate:
+      "Avec {drug}, {product} nettoie la base des cils matin et soir : c'est là que se forme la sécheresse quand les paupières collent.",
+    clinicalContext: "Dysfonction des glandes de Meibomius : hygiène palpébrale (chaleur, massage, nettoyage) en première intention — TFOS DEWS II, SFO.",
+    safetyNotes: ["Paupière gonflée, douloureuse ou œil rouge : consultation."],
+  },
+  {
     key: "mouth-rinse-inhaled-corticosteroid",
     benefits: ["Limite les mycoses buccales", "Après chaque inhalation", "Formule sans alcool"],
     title: "Rinçage de bouche après corticoïde inhalé",

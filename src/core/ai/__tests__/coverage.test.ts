@@ -31,6 +31,7 @@ const COMMON_CLASSES: { atc: string; label: string; example: string }[] = [
   { atc: "M05BA04", label: "Bisphosphonate", example: "ACIDE ALENDRONIQUE" },
   { atc: "B03AA07", label: "Fer", example: "SULFATE FERREUX" },
   { atc: "H02AB07", label: "Corticoïde oral", example: "PREDNISONE" },
+  { atc: "S01XA20", label: "Substitut lacrymal", example: "LACRIFLUID" },
 ];
 
 describe("couverture des classes courantes", () => {
@@ -57,3 +58,18 @@ describe("couverture des classes courantes", () => {
     expect(opportunities.find((o) => o.key === "herpes-labial-patch")?.requiresConfirmation).toBe(true);
   });
 });
+
+describe("sécheresse oculaire", () => {
+  it("un substitut lacrymal prescrit appelle un lubrifiant à l'acide hyaluronique, et la question des paupières", () => {
+    const opportunities = detectAdviceOpportunities({
+      drugs: [{ lineIndex: 0, drugName: "LACRIFLUID 0,13 %", knowledge: drug({ name: "LACRIFLUID 0,13 %", inn: "CARBOMERE", atcCode: "S01XA20", therapeuticClass: "Substitut lacrymal", commonSideEffects: [] }) }],
+      patient: patient(),
+      needs: [],
+    });
+    const keys = opportunities.map((o) => o.key);
+    expect(keys[0]).toBe("dry-eye-screen-lubricant");
+    expect(keys).toContain("dry-eye-eyelid-care");
+    expect(opportunities.find((o) => o.key === "dry-eye-eyelid-care")?.requiresConfirmation).toBe(true);
+  });
+});
+

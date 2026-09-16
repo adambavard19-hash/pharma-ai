@@ -615,14 +615,24 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         const equivalents = list.filter(
           (item) => Math.abs(item.totalScore - best.totalScore) < 0.02,
         );
-        // Départage, dans cet ordre : d'abord ce que l'officine a réellement en
-        // rayon, ensuite seulement la dimension commerciale. La disponibilité
-        // n'a pas fait monter ces références — elles sont déjà jugées
-        // équivalentes — elle départage ce que la clinique n'a pas tranché.
+        // Départage, dans cet ordre : d'abord l'ordre des formules préférées
+        // par la règle (le premier motif qui reconnaît la référence l'emporte :
+        // « écran » avant « acide hyaluronique » pour un œil sec devant un
+        // écran), puis ce que l'officine a réellement en rayon, enfin seulement
+        // la dimension commerciale. La disponibilité n'a pas fait monter ces
+        // références — elles sont déjà jugées équivalentes — elle départage ce
+        // que la clinique n'a pas tranché.
+        const preferPatterns = opportunityByKey.get(key)?.productPrefer ?? [];
+        const preferRank = (item: ScoredRecommendation) => {
+          const name = catalogById.get(item.productId)?.name ?? "";
+          const index = preferPatterns.findIndex((pattern) => matchesAny([pattern], name));
+          return index === -1 ? preferPatterns.length : index;
+        };
         const chosen =
           equivalents.length > 1
             ? [...equivalents].sort(
                 (a, b) =>
+                  preferRank(a) - preferRank(b) ||
                   b.breakdown.availability - a.breakdown.availability ||
                   b.breakdown.commercial - a.breakdown.commercial,
               )[0]
