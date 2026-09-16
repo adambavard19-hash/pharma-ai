@@ -53,7 +53,8 @@ describe("règles de vigilance", () => {
     expect(byAtc.map((v) => v.key)).toEqual(["levothyroxine-mineral-spacing"]);
     const bySubstance = evaluateVigilances([drug({ name: "Lévothyroxine 75 µg", inn: null, atcCode: null, therapeuticClass: null, commonSideEffects: [] })]);
     expect(bySubstance.map((v) => v.key)).toEqual(["levothyroxine-mineral-spacing"]);
-    expect(evaluateVigilances([drug({ name: "DOLIPRANE", inn: "PARACETAMOL", atcCode: "N02BE01", therapeuticClass: null, commonSideEffects: [] })])).toEqual([]);
+    // Le paracétamol n'appelle aucune vigilance — seulement un rappel de bon usage.
+    expect(evaluateVigilances([drug({ name: "DOLIPRANE", inn: "PARACETAMOL", atcCode: "N02BE01", therapeuticClass: null, commonSideEffects: [] })]).filter((v) => v.kind !== "USAGE")).toEqual([]);
   });
 
   it("étiquettes de vigilance dans le vocabulaire fermé, et reconnues dans les noms", () => {
@@ -141,3 +142,37 @@ describe("routine dermatologique sous isotrétinoïne", () => {
     expect(steps.map((s) => s.routine?.stepKey)).toEqual(["cleanse", "hydrate"]);
   });
 });
+
+describe("bon usage au comptoir", () => {
+  it("corticoïde oral, paracétamol et antitussif : un rappel de bon usage chacun, en information", () => {
+    const solupred = classify("PREDNISOLONE", "H02AB06", "Corticoïde");
+    const doliprane = { ...classify("PARACETAMOL", "N02BE01", "Antalgique"), lineIndex: 1 };
+    const toplexil = { ...classify("OXOMEMAZINE", "R06AD08", "Antitussif antihistaminique"), lineIndex: 2 };
+    const result = analyse([solupred, doliprane, toplexil], []);
+    const usage = result.safetyFindings.filter((f) => f.code === "VIGILANCE_USAGE");
+    expect(usage.map((f) => f.details?.subtitle)).toEqual(["Corticoïde par voie orale", "Paracétamol", "Sirop contre la toux sèche"]);
+    expect(usage.every((f) => f.severity === "INFO")).toBe(true);
+    expect(usage[0]?.details?.patientAdvice).toMatch(/pendant le repas/);
+    expect(usage[2]?.details?.patientAdvice).toMatch(/toux devient grasse/);
+  });
+});
+
+describe("huiles essentielles respiratoires", () => {
+  const oils = product({ id: "oils", name: "OLIOSEPTIL BRONCHE GELU 15", category: "PHYTOTHERAPIE", subCategory: null, matchingTags: ["huiles essentielles", "bronches"], commercialClaims: [], stockQuantity: 12, salePriceCents: 990 });
+  const toplexil = classify("OXOMEMAZINE", "R06AD08", "Antitussif antihistaminique");
+
+  it("proposées pendant une toux, jamais à un asthmatique, un épileptique, une femme enceinte ou un enfant", () => {
+    expect(analyse([toplexil], [oils]).recommendations.map((r) => r.productId)).toContain("oils");
+    const understanding = deriveUnderstanding({ drugs: [toplexil], patient: { ageYears: null, sex: "UNSPECIFIED", isPregnant: false, isBreastfeeding: false }, providerId: "test", model: "m" });
+    const base: PipelineInput = {
+      lines: [{ lineIndex: 0, drugName: "OXOMEMAZINE", posology: null, durationDays: null, confirmed: true }],
+      knowledge: new Map([["oxomemazine", drug({ name: "OXOMEMAZINE", inn: "OXOMEMAZINE", atcCode: "R06AD08", therapeuticClass: "Antitussif", commonSideEffects: [] })]]),
+      patient: patient(), catalog: [oils], rules: [], history: {}, explanations: [], extractionFindings: [], understanding, usedSimulatedProviders: false,
+    };
+    for (const blocked of [patient({ chronicConditions: ["Asthme"] }), patient({ chronicConditions: ["Épilepsie"] }), patient({ isPregnant: true }), patient({ ageYears: 8 })]) {
+      const result = runAnalysisPipeline({ ...base, patient: blocked });
+      expect(result.recommendations.map((r) => r.productId)).not.toContain("oils");
+    }
+  });
+});
+

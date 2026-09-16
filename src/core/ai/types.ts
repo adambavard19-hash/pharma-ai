@@ -215,7 +215,7 @@ export type SafetyFindingResult = {
 
 // --- Vigilances -------------------------------------------------------------
 
-export type VigilanceKind = "INTERACTION" | "CONTRAINDICATION" | "MONITORING" | "SCREENING";
+export type VigilanceKind = "INTERACTION" | "CONTRAINDICATION" | "MONITORING" | "SCREENING" | "USAGE";
 
 /** Ce que la carte du comptoir affiche pour une vigilance. */
 export type VigilanceDetails = {

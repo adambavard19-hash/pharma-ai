@@ -330,18 +330,58 @@ const VIGILANCE_STYLE = {
   CONTRAINDICATION: { band: "bg-danger-50 dark:bg-danger-950/30", ring: "border-danger-200 dark:border-danger-800", accent: "text-danger-700 dark:text-danger-300", dot: "bg-danger-600", icon: ShieldAlert, badge: "Alerte sécurité" },
   MONITORING: { band: "bg-warning-50 dark:bg-warning-950/30", ring: "border-warning-200 dark:border-warning-800", accent: "text-warning-800 dark:text-warning-400", dot: "bg-warning-500", icon: Stethoscope, badge: "Surveillance" },
   SCREENING: { band: "bg-warning-50 dark:bg-warning-950/30", ring: "border-warning-200 dark:border-warning-800", accent: "text-warning-800 dark:text-warning-400", dot: "bg-warning-500", icon: Eye, badge: "Vigilance" },
+  USAGE: { band: "bg-brand-50 dark:bg-brand-950/30", ring: "border-brand-200 dark:border-brand-800", accent: "text-brand-800 dark:text-brand-300", dot: "bg-brand-600", icon: MessageSquareQuote, badge: "À rappeler" },
 } as const;
 
 /** Les vigilances du traitement, en cartes : rendues avec ou sans alerte bloquante. */
 export function VigilanceCards({ findings }: { findings: SafetyFindingView[] }) {
-  const vigilances = findings.filter((finding) => finding.details);
-  if (vigilances.length === 0) return null;
+  const vigilances = findings.filter((finding) => finding.details && finding.details.kind !== "USAGE");
+  const usage = findings.filter((finding) => finding.details?.kind === "USAGE");
+  if (vigilances.length === 0 && usage.length === 0) return null;
   return (
     <div className="space-y-2.5">
       {vigilances.map((finding) => (
         <VigilanceCard key={finding.id} finding={finding} />
       ))}
+      {usage.length > 0 && <UsageCard findings={usage} />}
     </div>
+  );
+}
+
+/**
+ * Le bon usage, en une seule carte : une ligne par médicament, la phrase à
+ * dire en remettant la boîte. Pas une alerte — un rappel, lisible en trois
+ * secondes.
+ */
+function UsageCard({ findings }: { findings: SafetyFindingView[] }) {
+  const [open, setOpen] = useState(true);
+  const style = VIGILANCE_STYLE.USAGE;
+  return (
+    <article className={cn("rounded-2xl border bg-surface-card", style.ring)}>
+      <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className={cn("flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left", open && "rounded-b-none", style.band)}>
+        <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-full text-white", style.dot)}>
+          <MessageSquareQuote className="size-[18px]" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className={cn("block text-[11.5px] font-semibold tracking-[0.1em] uppercase", style.accent)}>Bon usage à rappeler</span>
+          <span className="block truncate text-[14px] font-medium text-text-primary">
+            {findings.map((finding) => finding.details?.subtitle).filter(Boolean).join(" · ")}
+          </span>
+        </span>
+        <ChevronDown className={cn("size-4 shrink-0 text-text-tertiary transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <ul className="divide-y divide-border-subtle px-4">
+          {findings.map((finding) => (
+            <li key={finding.id} className="py-3">
+              <p className="text-[12px] font-semibold text-text-tertiary uppercase">{finding.details?.drugNames.join(", ")}</p>
+              <p className="mt-0.5 text-[14.5px] leading-[1.5] text-text-primary">« {finding.details?.patientAdvice ?? finding.details?.explanation} »</p>
+              <p className="mt-1 text-[12px] leading-4 text-text-secondary">{finding.details?.explanation}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </article>
   );
 }
 

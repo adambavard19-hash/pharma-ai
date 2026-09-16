@@ -503,13 +503,15 @@ export const ADVICE_RULES: AdviceRule[] = [
     needTriggers: ["NASAL_CONGESTION"],
     question: "Le patient a-t-il aussi le nez bouché ou qui coule ?",
     category: "SOINS",
-    atcPrefixes: ["R06A"],
+    atcPrefixes: ["R06AE", "R06AX"],
     therapeuticClasses: [],
     sideEffectTriggers: [],
     basePriority: 62,
     matchingTags: ["nez", "nasal", "lavage", "eau de mer", "orl", "spray nasal"],
     // « Lavage » est un mot partagé : un collyre ou un produit auriculaire ne
     // lave pas le nez. Écartés par leur nom.
+    // Nez bouché confirmé : l'eau de mer hypertonique décongestionne, l'isotonique lave.
+    productPrefer: [String.raw`hypertoni`, String.raw`decongestion`, String.raw`décongestion`, String.raw`actirub`, String.raw`aromaforce`, String.raw`\bforce\b`, String.raw`rhume`],
     productExclude: [String.raw`collyre`, String.raw`oculaire`, String.raw`ophtalm`, String.raw`\byeux\b`, String.raw`larmes`, String.raw`auriculaire`, String.raw`oreille`],
     // Un flacon de sérum physiologique ne se lave pas le nez tout seul : il
     // faut une seringue ou une poire de lavage. Le spray et la dosette, eux,
@@ -667,7 +669,8 @@ export const ADVICE_RULES: AdviceRule[] = [
     needTriggers: ["ALLERGIC_EYE_IRRITATION"],
     question: "Les yeux du patient piquent-ils ou pleurent-ils ?",
     category: "SOINS",
-    atcPrefixes: ["D10BA01", "R06A"],
+    // Antihistaminiques de l'allergie (R06AE, R06AX) : pas les phénothiazines antitussives (oxomémazine, R06AD).
+    atcPrefixes: ["D10BA01", "R06AE", "R06AX"],
     therapeuticClasses: [],
     sideEffectTriggers: [],
     basePriority: 52,
@@ -1026,6 +1029,76 @@ export const ADVICE_RULES: AdviceRule[] = [
       "Avec votre traitement ({drug}), la peau des pieds se dessèche et se blesse facilement. {product} chaque soir, sans en mettre entre les orteils, la protège.",
     clinicalContext: "HAS / SFD, prévention des plaies du pied chez le diabétique : hygiène et hydratation quotidiennes, inspection, chaussage adapté.",
     safetyNotes: ["Plaie, rougeur ou ongle incarné : consultation sans attendre ; jamais d'automédication sur une plaie du pied diabétique."],
+  },
+  {
+    key: "cough-bronchial-essential-oils",
+    title: "Confort respiratoire pendant la toux",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    needTriggers: ["COUGH_COMFORT"],
+    category: "PHYTOTHERAPIE",
+    atcPrefixes: ["R05D", "R05C", "R06AD08"],
+    therapeuticClasses: ["Antitussif", "Expectorant", "Mucolytique"],
+    sideEffectTriggers: [],
+    basePriority: 48,
+    matchingTags: ["huiles essentielles", "bronches"],
+    excludeTags: [],
+    productPrefer: [String.raw`bronch`, String.raw`respir`],
+    productExclude: [String.raw`diffus`, String.raw`roll`, String.raw`piqure`, String.raw`tete`, String.raw`urin`, String.raw`gorge`, String.raw`nasal`, String.raw`\bnez\b`, String.raw`lotion`, String.raw`spray`, String.raw`assainiss`],
+    benefits: ["Complément du sirop, pas un remplaçant", "Cure courte, le temps de la toux", "Jamais chez l'asthmatique ni l'épileptique"],
+    shortReasonTemplate:
+      "Toux traitée ({drug}) : en aromathérapie, les huiles essentielles sont traditionnellement utilisées pour le confort respiratoire.",
+    rationaleTemplate:
+      "Le patient tousse ({drug}). Les capsules d'huiles essentielles à visée respiratoire sont un conseil classique de l'officine, en complément du traitement ; leur effet n'est pas démontré par des essais cliniques, et leurs contre-indications sont strictes : asthme, épilepsie, grossesse, allaitement, enfant.",
+    counterScriptTemplate:
+      "« En plus de {drug}, {product} est souvent conseillé le temps de la toux, pour le confort des bronches. Pas si vous êtes asthmatique ou épileptique, ni enceinte. »",
+    patientReasonTemplate:
+      "Pendant votre toux, {product} accompagne {drug} pour le confort respiratoire, en cure courte. Contre-indiqué en cas d'asthme, d'épilepsie ou de grossesse.",
+    clinicalContext:
+      "Aromathérapie à visée respiratoire : usage traditionnel, sans preuve clinique ; ANSM — huiles essentielles, précautions d'emploi (asthme, épilepsie, grossesse, enfant).",
+    safetyNotes: ["Contre-indiqué en cas d'asthme, d'épilepsie, de grossesse, d'allaitement et avant 12 ans."],
+    blockedFor: (patient) =>
+      patient.chronicConditions.some((c) => /asthm|epilep|épilep|convuls/i.test(c))
+        ? "Asthme ou épilepsie déclarés : les huiles essentielles sont contre-indiquées."
+        : patient.isPregnant || patient.isBreastfeeding
+          ? "Grossesse ou allaitement : les huiles essentielles sont contre-indiquées."
+          : patient.ageYears !== null && patient.ageYears < 12
+            ? "Avant 12 ans, les huiles essentielles sont contre-indiquées."
+            : null,
+  },
+  {
+    key: "convalescence-immunity-vitamins",
+    title: "Vitamines pendant la convalescence",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    question: "Le patient se sent-il fatigué par cette infection ?",
+    confirmedReasonTemplate: "Infection traitée ({drug}) et fatigue confirmée : une cure de vitamines accompagne la convalescence.",
+    category: "VITAMINES",
+    atcPrefixes: ["J01", "J05AB"],
+    therapeuticClasses: ["Antibiotique", "Antibactérien", "Antiviral"],
+    sideEffectTriggers: [],
+    basePriority: 46,
+    matchingTags: ["vitamines", "immunité"],
+    excludeTags: [],
+    productPrefer: [String.raw`immun`, String.raw`vitamine 22`, String.raw`azinc`, String.raw`berocca`, String.raw`supradyn`, String.raw`multivit`],
+    productExclude: [String.raw`enfant`, String.raw`\bkids\b`, String.raw`pediakid`, String.raw`junior`, String.raw`gom`, String.raw`ourson`, String.raw`bebe`, String.raw`bébé`, String.raw`cheveux`, String.raw`ongles`, String.raw`solaire`],
+    benefits: ["Vitamines C, D et zinc : contribuent au fonctionnement normal du système immunitaire", "Cure de 3 à 4 semaines", "Vérifier l'absence de doublon avec une vitamine déjà prise"],
+    shortReasonTemplate:
+      "Infection traitée ({drug}) : la convalescence fatigue, surtout quand l'appétit a baissé.",
+    rationaleTemplate:
+      "Sous {drug}, le patient dit être fatigué par l'infection. Une cure de vitamines et minéraux couvre des apports souvent réduits pendant quelques jours ; les vitamines C, D et le zinc portent une allégation autorisée sur le fonctionnement normal du système immunitaire. Ce n'est ni un traitement ni une garantie de récupération plus rapide.",
+    counterScriptTemplate:
+      "« Le temps de récupérer de cette infection, {product} en cure de quelques semaines aide à couvrir vos apports, en complément de {drug}. »",
+    patientReasonTemplate:
+      "Pendant votre convalescence, {product} complète vos apports en vitamines et minéraux, le temps de retrouver la forme après {drug}.",
+    clinicalContext:
+      "Allégations de santé autorisées (règlement UE 432/2012) : vitamines C, D, B6, B12, zinc, sélénium et fer contribuent au fonctionnement normal du système immunitaire. Aucune preuve d'une convalescence plus rapide.",
+    safetyNotes: ["Pas de cumul avec une autre supplémentation vitaminique ; grossesse : avis médical."],
+    blockedFor: (patient) => (patient.isPregnant ? "Grossesse déclarée : pas de complément multivitaminé sans avis médical." : null),
   },
   {
     key: "mouth-rinse-inhaled-corticosteroid",

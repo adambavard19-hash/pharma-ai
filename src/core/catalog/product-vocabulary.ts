@@ -236,6 +236,21 @@ const PATTERNS: Pattern[] = [
     ruleKeys: ["herpes-lysine"],
     confidence: 0.9,
   },
+  {
+    // Capsules ou gélules d'huiles essentielles à visée respiratoire ; ni diffuseur, ni roll-on, ni spray.
+    test: /^(?!.*(diffus|roll|piqure|piqûre|tete|tête|urin|intest|digest|lotion|spray|assainiss|\bnez\b|nasal|past|pastille|gorge|\bsol\b|solution|\bhle\b|huile de))(?=.*(olioseptil|aromaforce|puressentiel|phytosun|pranarom|arkoessentiel|huiles? essentielles?|gouttes aux essences))(?=.*(bronch|respir|toux|inhal|caps|gelu|gélu|defense|défense|coups? de froid))/,
+    category: "PHYTOTHERAPIE",
+    tags: ["huiles essentielles", "bronches"],
+    ruleKeys: ["cough-bronchial-essential-oils"],
+    confidence: 0.85,
+  },
+  {
+    test: /^(?!.*(\b\d+ ?ch\b|cheveux|ongles|solaire|bronzage|minceur))(?=.*(multivit|berocca|supradyn|azinc|vitamine 22|immun|bion ?3|alvityl|endomune|vitascorbol|vitamine c\b|vit c\b|endurol|defenses? naturelles|défenses? naturelles))/,
+    category: "VITAMINES",
+    tags: ["vitamines", "immunité"],
+    ruleKeys: ["convalescence-immunity-vitamins"],
+    confidence: 0.85,
+  },
   // Suivi des traitements chroniques.
   {
     test: /(tensiom|autotensio|omron|microlife|brassard)/,

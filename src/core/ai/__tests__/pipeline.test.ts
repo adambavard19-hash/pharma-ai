@@ -187,7 +187,7 @@ describe("pipeline — garde-fous", () => {
     );
     const result = runAnalysisPipeline(buildInput({ catalog }));
 
-    expect(MAX_RECOMMENDATIONS_PER_PRESCRIPTION).toBe(3);
+    expect(MAX_RECOMMENDATIONS_PER_PRESCRIPTION).toBe(5);
     expect(result.recommendations.length).toBeLessThanOrEqual(3);
   });
 });

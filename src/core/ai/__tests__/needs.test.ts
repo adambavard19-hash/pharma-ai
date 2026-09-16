@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAX_RECOMMENDATIONS_PER_PRESCRIPTION } from "@/config/constants";
 import { detectAdviceOpportunities } from "../engines/advice";
 import { runAnalysisPipeline, type PipelineInput } from "../pipeline";
 import type { IdentifiedNeed, TreatmentUnderstanding } from "../../understanding";
@@ -175,7 +176,7 @@ describe("du besoin compris au produit en rayon", () => {
     expect(notes.join(" ")).toContain("Contexte ORL");
   });
 
-  it("reste borné à trois propositions, besoins compris", () => {
+  it("reste borné au maximum de propositions, besoins compris", () => {
     const needs: IdentifiedNeed[] = [
       need(),
       need({ key: "SORE_THROAT", justification: "Gorge irritée plausible." }),
@@ -189,6 +190,6 @@ describe("du besoin compris au produit en rayon", () => {
       product({ id: "sro", name: "Solution de réhydratation", category: "NUTRITION", matchingTags: ["réhydratation", "diarrhée"], stockQuantity: 5 }),
     ];
     const result = runAnalysisPipeline(input({ understanding: understanding(needs), catalog }));
-    expect(result.recommendations.length).toBeLessThanOrEqual(3);
+    expect(result.recommendations.length).toBeLessThanOrEqual(MAX_RECOMMENDATIONS_PER_PRESCRIPTION);
   });
 });
