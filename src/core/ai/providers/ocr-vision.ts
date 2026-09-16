@@ -52,6 +52,13 @@ const SUPPORTED_IMAGE_TYPES = new Set([
   "image/webp",
 ]);
 
+/**
+ * Un PDF — scan du logiciel de l'officine, pièce jointe d'un patient — est
+ * envoyé au modèle comme document : chaque page est lue comme une image, et le
+ * texte, s'il y en a, est lu aussi. Aucune conversion côté serveur.
+ */
+const SUPPORTED_DOCUMENT_TYPES = new Set(["application/pdf"]);
+
 export class VisionOCRProvider implements OCRProvider {
   readonly info: ProviderInfo;
   private readonly create: MessagesCreate;
@@ -109,12 +116,21 @@ export class VisionOCRProvider implements OCRProvider {
       return failure("Aucune image n'a pu être lue pour cette ordonnance.");
     }
     const mimeType = input.mimeType ?? "";
-    if (!SUPPORTED_IMAGE_TYPES.has(mimeType)) {
+    if (!SUPPORTED_IMAGE_TYPES.has(mimeType) && !SUPPORTED_DOCUMENT_TYPES.has(mimeType)) {
       return failure(
         `Format non pris en charge par la lecture automatique (${mimeType || "type inconnu"}). ` +
-          "Formats acceptés : JPEG, PNG, GIF, WEBP.",
+          "Formats acceptés : JPEG, PNG, GIF, WEBP, PDF.",
       );
     }
+    const attachment = SUPPORTED_DOCUMENT_TYPES.has(mimeType)
+      ? {
+          type: "document",
+          source: { type: "base64", media_type: mimeType, data: Buffer.from(input.bytes).toString("base64") },
+        }
+      : {
+          type: "image",
+          source: { type: "base64", media_type: mimeType, data: Buffer.from(input.bytes).toString("base64") },
+        };
 
     let response;
     try {
@@ -130,17 +146,7 @@ export class VisionOCRProvider implements OCRProvider {
         messages: [
           {
             role: "user",
-            content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: mimeType,
-                  data: Buffer.from(input.bytes).toString("base64"),
-                },
-              },
-              { type: "text", text: EXTRACTION_USER_PROMPT },
-            ],
+            content: [attachment, { type: "text", text: EXTRACTION_USER_PROMPT }],
           },
         ],
         tools: [

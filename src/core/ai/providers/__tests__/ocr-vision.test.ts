@@ -68,6 +68,19 @@ describe("lecture par modèle de vision", () => {
     expect(result.isSimulated).toBe(false);
   });
 
+  it("envoie un PDF comme document, page par page, sans conversion", async () => {
+    const create = vi.fn(async () => reponse(LECTURE)) as unknown as MessagesCreate;
+    const provider = new VisionOCRProvider(CONFIG, create);
+    const pdf = new Uint8Array([37, 80, 68, 70, 45]);
+    const result = await provider.extract({ fileKey: "k", mimeType: "application/pdf", fileName: "VisuScan.pdf", bytes: pdf });
+    const params = (create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const document = (params.messages[0] as { content: { type: string; source: { media_type: string; data: string } }[] }).content[0];
+    expect(document.type).toBe("document");
+    expect(document.source.media_type).toBe("application/pdf");
+    expect(document.source.data).toBe(Buffer.from(pdf).toString("base64"));
+    expect(result.lines[0].drugName.value).toBe("Amoxicilline");
+  });
+
   it("n'appelle rien quand aucune image n'est disponible", async () => {
     const create = vi.fn() as unknown as MessagesCreate;
     const result = await new VisionOCRProvider(CONFIG, create).extract({
@@ -84,12 +97,12 @@ describe("lecture par modèle de vision", () => {
     const create = vi.fn() as unknown as MessagesCreate;
     const result = await new VisionOCRProvider(CONFIG, create).extract({
       fileKey: "k",
-      mimeType: "application/pdf",
-      fileName: "ordo.pdf",
+      mimeType: "text/plain",
+      fileName: "ordo.txt",
       bytes: IMAGE,
     });
     expect(create).not.toHaveBeenCalled();
-    expect(result.warnings[0]).toContain("application/pdf");
+    expect(result.warnings[0]).toContain("text/plain");
   });
 
   it("ne lève jamais sur une panne : l'ordonnance repart en saisie manuelle", async () => {
