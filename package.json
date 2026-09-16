@@ -25,6 +25,7 @@
     "demo:comptoir": "node --env-file=.env --import tsx scripts/mesure-comptoir.ts",
     "bdpm:sync": "node --env-file=.env --conditions=react-server --import tsx scripts/bdpm-sync.ts",
     "interactions:sync": "node --env-file=.env --conditions=react-server --import tsx scripts/interactions-sync.ts",
+    "reglementation:sync": "node --env-file=.env --conditions=react-server --import tsx scripts/reglementation-sync.ts",
     "followup:run": "node --env-file=.env --conditions=react-server --import tsx scripts/followup-run.ts",
     "comptes:test": "node --env-file=.env --conditions=react-server --import tsx scripts/comptes-test.ts",
     "ocr:test": "node --env-file=.env --conditions=react-server --import tsx scripts/ocr-test.ts",

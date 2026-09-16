@@ -1,5 +1,17 @@
 import type { ScoreContribution, RoutineStepInfo, VigilanceDetails } from "@/core/ai/types";
 import type { PosologySchedule } from "@/core/posology";
+import type { RegulationAlert } from "@/core/regulation/rules";
+
+/**
+ * Ce que la réglementation impose pour une ligne, et ce que le pharmacien a
+ * déjà coché. Les alertes viennent des conditions publiées par l'ANSM et du
+ * statut de prise en charge de l'Assurance Maladie — jamais d'une déduction.
+ */
+export type LineRegulationView = {
+  alerts: RegulationAlert[];
+  /** Codes des alertes déjà vérifiées sur cette ligne. */
+  checked: string[];
+};
 
 /**
  * Formes de données partagées par les trois zones de l'écran de vente.
@@ -80,6 +92,8 @@ export type SaleLineDraft = {
   strengthOptions: string[];
   /** Code CIS de la spécialité rattachée, pour ouvrir sa fiche. */
   cisCode: string | null;
+  /** Alertes réglementaires de la ligne. Vide tant qu'elle n'est pas rattachée. */
+  regulation: LineRegulationView;
 };
 
 export type SafetyFindingView = {

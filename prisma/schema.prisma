@@ -106,13 +106,12 @@ model Pharmacy {
   sessions        Session[]
   imports         ImportJob[]
   aiUsage         AiUsageRecord[]
-
-  @@index([organizationId])
   /// Le dossier commercial dont cette officine est issue, s'il y en a un.
-  prospect Prospect?
+  prospect        Prospect?
   /// La liaison avec le logiciel de gestion de l'officine, s'il y en a une.
   stockConnection StockConnection?
 
+  @@index([organizationId])
   @@map("pharmacies")
 }
 
@@ -231,25 +230,25 @@ enum UserStatus {
 }
 
 model User {
-  id             String     @id @default(cuid())
-  organizationId String
-  email          String     @unique
-  passwordHash   String?
+  id                     String     @id @default(cuid())
+  organizationId         String
+  email                  String     @unique
+  passwordHash           String?
   /// Lien « définir / réinitialiser mon mot de passe » : empreinte du jeton,
   /// usage unique, durée limitée. Créé à l'accueil d'un titulaire ou sur demande.
-  passwordResetTokenHash String?   @unique
+  passwordResetTokenHash String?    @unique
   passwordResetExpiresAt DateTime?
-  firstName      String
-  lastName       String
-  phone          String?
-  avatarUrl      String?
-  status         UserStatus @default(ACTIVE)
+  firstName              String
+  lastName               String
+  phone                  String?
+  avatarUrl              String?
+  status                 UserStatus @default(ACTIVE)
   /// Numéro RPPS pour les professionnels de santé (pharmaciens).
-  rppsNumber     String?
-  lastLoginAt    DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  deletedAt      DateTime?
+  rppsNumber             String?
+  lastLoginAt            DateTime?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+  deletedAt              DateTime?
 
   organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships             Membership[]
@@ -622,8 +621,8 @@ model Product {
   /// Taux de TVA en points de pourcentage (ex. 5.5, 10, 20).
   vatRate            Float @default(20)
 
-  isActive  Boolean   @default(true)
-  isDemo    Boolean   @default(false)
+  isActive Boolean @default(true)
+  isDemo   Boolean @default(false)
 
   /// Quand et par quoi le produit a été rangé dans une catégorie et doté de ses
   /// étiquettes d'appariement : « HEURISTIC » (dictionnaire), « AI » (modèle,
@@ -631,9 +630,9 @@ model Product {
   /// jamais classé — le moteur ne peut pas le rapprocher d'un besoin.
   classifiedAt         DateTime?
   classificationSource String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
 
   pharmacy        Pharmacy         @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   stockItem       StockItem?
@@ -694,10 +693,10 @@ model StockMovement {
   product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([pharmacyId, createdAt])
-  @@index([productId, createdAt])
   /// Une vente ne décompte un produit qu'une fois, quoi qu'il arrive au clic.
   @@unique([saleId, productId])
+  @@index([pharmacyId, createdAt])
+  @@index([productId, createdAt])
   @@map("stock_movements")
 }
 
@@ -846,10 +845,10 @@ model DrugInteractionRule {
   /// Formes normalisées (sans accents, majuscules) servant à l'appariement.
   /// Toujours rangées dans l'ordre lexicographique : un couple n'a qu'une
   /// écriture, quel que soit l'ordre des lignes de l'ordonnance.
-  leftKey  String
-  rightKey String
-  leftKind  InteractionSideKind
-  rightKind InteractionSideKind
+  leftKey    String
+  rightKey   String
+  leftKind   InteractionSideKind
+  rightKind  InteractionSideKind
 
   severity InteractionSeverity
   /// Le risque, mot pour mot depuis la source. Jamais reformulé.
@@ -955,15 +954,15 @@ model DrugSpecialty {
 /// `cip13` est le code-barres imprimé sur la boîte : scanner, c'est lire
 /// directement cette clé.
 model DrugPresentation {
-  id          String @id @default(cuid())
+  id          String  @id @default(cuid())
   specialtyId String
   /// Code Identifiant de Présentation à 13 chiffres. Vérifié unique sur la
   /// base réelle, et toujours préfixé « 3400 » pour les médicaments français.
-  cip13       String @unique
+  cip13       String  @unique
   /// Photo de la boîte, quand une base ouverte la connaît par son code-barres.
   imageUrl    String?
   imageSource String?
-  cip7        String @unique
+  cip7        String  @unique
 
   label                  String
   administrativeStatus   String?
@@ -1000,10 +999,93 @@ model DrugPresentation {
   /// l'inverse.
   pharmacyStocks  PharmacyDrugStock[]
   recommendations Recommendation[]
+  /// Ce que la base tarifaire de l'Assurance Maladie dit de cette boîte.
+  coverageStatus  DrugCoverageStatus?
 
   @@index([specialtyId])
   @@index([marketingStatus])
   @@map("drug_presentations")
+}
+
+/// Le statut de prise en charge d'une boîte, lu sur la fiche CIP de la Base
+/// des médicaments et informations tarifaires (Assurance Maladie).
+///
+/// C'est la seule source qui dise si un médicament relève de l'ordonnance de
+/// médicaments d'exception — l'information qui, ignorée, produit un rejet de
+/// facturation. Une ligne par boîte, réécrite à chaque synchronisation ; les
+/// changements sont journalisés dans `DrugRegulationChange`.
+model DrugCoverageStatus {
+  id             String @id @default(cuid())
+  presentationId String @unique
+  cip13          String @unique
+
+  /// « Statut d'Exception : Oui » sur la fiche.
+  isException       Boolean
+  /// « Médicament Spécifique » — conservé tel quel, jamais interprété.
+  isSpecific        Boolean
+  /// « Nature du médicament » — « A » le plus souvent.
+  nature            String?
+  /// Désignation telle que la CNAM l'écrit.
+  designation       String
+  /// « Médicament NON Remboursable aux Assurés Sociaux » affiché sur la fiche.
+  notReimbursable   Boolean   @default(false)
+  /// Période d'homologation aux assurés sociaux la plus récente.
+  coverageStartsAt  DateTime?
+  coverageEndsAt    DateTime?
+  coverageEndReason String?
+
+  sourceName      String
+  sourceVersion   String?
+  /// Date de mise à jour annoncée par la base, jamais celle de notre lecture.
+  sourceUpdatedAt DateTime?
+  /// Notre dernière lecture réussie de la fiche.
+  checkedAt       DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  presentation DrugPresentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+
+  @@index([isException])
+  @@map("drug_coverage_statuses")
+}
+
+enum RegulationChangeKind {
+  /// Le statut « médicament d'exception » a changé de valeur.
+  EXCEPTION_STATUS
+  /// La fin d'homologation aux assurés sociaux a changé (radiation, prolongation…).
+  COVERAGE_END
+  /// Une condition de prescription ou de délivrance est apparue dans la BDPM.
+  CONDITION_ADDED
+  /// Une condition de prescription ou de délivrance a disparu de la BDPM.
+  CONDITION_REMOVED
+}
+
+/// Une évolution réglementaire constatée entre deux synchronisations.
+///
+/// C'est le fil « dernières évolutions » de l'onglet Réglementation : ce que
+/// les pharmaciens n'ont aucun moyen de suivre jour après jour. Chaque ligne
+/// dit ce qui a changé, pour quel médicament, d'après quelle source et à
+/// quelle date de source. On ne supprime jamais : c'est un journal.
+model DrugRegulationChange {
+  id String @id @default(cuid())
+
+  kind       RegulationChangeKind
+  /// Nom du médicament au moment du constat, pour l'affichage.
+  drugName   String
+  cisCode    String?
+  cip13      String?
+  /// Valeur avant / après, en clair (« Non » → « Oui », un libellé de condition…).
+  before     String?
+  after      String?
+  sourceName String
+  /// Date de mise à jour annoncée par la source au moment du constat.
+  sourceDate DateTime?
+  detectedAt DateTime             @default(now())
+
+  @@index([detectedAt])
+  @@index([cisCode])
+  @@map("drug_regulation_changes")
 }
 
 /// Une substance, dédoublonnée par son code officiel.
@@ -1418,14 +1500,38 @@ model PrescriptionLine {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  prescription Prescription          @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
-  explanation  TreatmentExplanation?
+  prescription     Prescription                  @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  explanation      TreatmentExplanation?
+  /// Les points réglementaires que le pharmacien a cochés pour cette ligne.
+  regulationChecks PrescriptionRegulationCheck[]
   /// `SetNull` et non `Cascade` : une spécialité qui disparaîtrait du
   /// catalogue ne doit pas emporter la ligne d'ordonnance qui la citait.
-  specialty    DrugSpecialty?        @relation(fields: [drugSpecialtyId], references: [id], onDelete: SetNull)
+  specialty        DrugSpecialty?                @relation(fields: [drugSpecialtyId], references: [id], onDelete: SetNull)
 
   @@unique([prescriptionId, position])
   @@map("prescription_lines")
+}
+
+/// Un point réglementaire vérifié par le pharmacien sur une ligne d'ordonnance
+/// (« ordonnance d'exception présente », « ordonnance sécurisée vérifiée »…).
+///
+/// Coché, il dit qui a vérifié et quand : c'est ce que l'on montre en cas de
+/// contrôle. Décoché, la ligne est supprimée — un point non vérifié n'a pas
+/// d'histoire à raconter.
+model PrescriptionRegulationCheck {
+  id              String   @id @default(cuid())
+  prescriptionId  String
+  lineId          String
+  /// Le code de l'alerte (EXCEPTION_FORM, NARCOTIC…), cf. src/core/regulation.
+  code            String
+  checkedByUserId String
+  checkedAt       DateTime @default(now())
+
+  line PrescriptionLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  @@unique([lineId, code])
+  @@index([prescriptionId])
+  @@map("prescription_regulation_checks")
 }
 
 // ===========================================================================
@@ -1548,40 +1654,40 @@ model SafetyFinding {
 /// L'étape est volontairement séparée du catalogue : on détermine d'abord la
 /// pertinence, seulement ensuite ce que l'officine peut proposer.
 model AdviceOpportunity {
-  id              String          @id @default(cuid())
-  analysisRunId   String
-  category        ProductCategory
-  title           String
+  id                   String          @id @default(cuid())
+  analysisRunId        String
+  category             ProductCategory
+  title                String
   /// Pourquoi ce conseil est envisagé, en langage pharmacien.
-  rationale       String
-  clinicalContext String?
-  safetyNotes     String[]        @default([])
+  rationale            String
+  clinicalContext      String?
+  safetyNotes          String[]        @default([])
   /// 0 → 100 : priorité clinique/conseil, indépendante de toute marge.
-  priority        Int             @default(50)
-  isBlocked       Boolean         @default(false)
-  blockReason     String?
+  priority             Int             @default(50)
+  isBlocked            Boolean         @default(false)
+  blockReason          String?
   /// Le besoin identifié par la compréhension IA qui a déclenché la règle.
-  needKey         String?
+  needKey              String?
   /// La question à poser au patient, écrite dans la règle de conseil.
-  question        String?
+  question             String?
   /// Vrai tant que la proposition attend la réponse du patient.
-  requiresConfirmation Boolean    @default(false)
+  requiresConfirmation Boolean         @default(false)
   /// La réponse du patient : oui, non, ou pas encore posée.
-  answer           Boolean?
-  answeredAt       DateTime?
-  answeredByUserId String?
+  answer               Boolean?
+  answeredAt           DateTime?
+  answeredByUserId     String?
   /// Pourquoi le modèle a vu ce besoin ici — pour le pharmacien uniquement.
-  aiJustification  String?
+  aiJustification      String?
   /// La règle de conseil qui a produit l'opportunité, et sa version : on doit
   /// pouvoir relire, des mois plus tard, quelle règle a parlé au comptoir.
-  ruleKey          String?
-  ruleVersion      String?
+  ruleKey              String?
+  ruleVersion          String?
   /// Le « pourquoi » une fois le besoin confirmé par le patient.
-  confirmedReason  String?
+  confirmedReason      String?
   /// Ce que le conseil apporte dans ce contexte, en trois mots-clés écrits
   /// dans la règle — jamais tirés d'un argumentaire produit.
-  benefits         String[]        @default([])
-  createdAt       DateTime        @default(now())
+  benefits             String[]        @default([])
+  createdAt            DateTime        @default(now())
 
   analysisRun     AnalysisRun      @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
   recommendations Recommendation[]
@@ -1644,10 +1750,10 @@ model Recommendation {
   /// seringue de lavage avec un flacon de sérum physiologique, par exemple) :
   /// { productId, name, salePriceCents, stockQuantity, reason }. Proposé à côté
   /// de la carte, jamais ajouté sans un geste du pharmacien.
-  companion      Json?
+  companion     Json?
   /// L'étape d'une routine (nettoyer, hydrater, protéger) quand la
   /// recommandation en fait partie : clé, titre, rang, bénéfice.
-  routine        Json?
+  routine       Json?
   /// La phrase réellement affichée au pharmacien pour être dite au patient.
   /// Elle provient du catalogue de règles de conseil, jamais d'une génération
   /// libre. On la conserve avec la recommandation parce que c'est ce qui a été
@@ -1902,9 +2008,9 @@ model Reminder {
 
   /// Jeton opaque du lien « Comment allez-vous ? » contenu dans le message.
   /// Créé à l'envoi, propre à ce suivi : il ne donne accès à rien d'autre.
-  responseToken String?         @unique
-  answer        FollowUpAnswer?
-  answeredAt    DateTime?
+  responseToken   String?         @unique
+  answer          FollowUpAnswer?
+  answeredAt      DateTime?
   /// Le pharmacien a traité la demande de conseil (rappel, passage au comptoir).
   handledAt       DateTime?
   handledByUserId String?
@@ -2194,11 +2300,11 @@ model Prospect {
   salesRepId String
   status     ProspectStatus @default(PROSPECT)
 
-  lastContactAt   DateTime?
-  nextActionAt    DateTime?
-  nextActionLabel String?
+  lastContactAt     DateTime?
+  nextActionAt      DateTime?
+  nextActionLabel   String?
   /// Notes commerciales courantes (le détail horodaté vit dans les événements).
-  notes           String?
+  notes             String?
   /// Conditions proposées : abonnement mensuel, en centimes.
   monthlyPriceCents Int?
 
@@ -2212,8 +2318,8 @@ model Prospect {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  salesRep    SalesRep         @relation(fields: [salesRepId], references: [id])
-  pharmacy    Pharmacy?        @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+  salesRep    SalesRep        @relation(fields: [salesRepId], references: [id])
+  pharmacy    Pharmacy?       @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
   events      ProspectEvent[]
   contracts   Contract[]
   commissions Commission[]
@@ -2264,13 +2370,13 @@ model SalesTask {
 /// via le fournisseur de stockage ; l'accès passe par un jeton dont seule
 /// l'empreinte est conservée.
 model Contract {
-  id          String         @id @default(cuid())
-  prospectId  String
-  version     Int
-  status      ContractStatus @default(DRAFT)
-  templateKey String
-  fileKey     String
-  accessTokenHash String     @unique
+  id              String         @id @default(cuid())
+  prospectId      String
+  version         Int
+  status          ContractStatus @default(DRAFT)
+  templateKey     String
+  fileKey         String
+  accessTokenHash String         @unique
 
   monthlyPriceCents Int
   durationMonths    Int
@@ -2284,14 +2390,14 @@ model Contract {
   signatureProvider  String  @default("none")
   providerEnvelopeId String?
 
-  sentAt            DateTime?
-  openedAt          DateTime?
-  pharmacySignedAt  DateTime?
-  companySignedAt   DateTime?
-  finalizedAt       DateTime?
-  refusedAt         DateTime?
-  refusalReason     String?
-  expiresAt         DateTime?
+  sentAt           DateTime?
+  openedAt         DateTime?
+  pharmacySignedAt DateTime?
+  companySignedAt  DateTime?
+  finalizedAt      DateTime?
+  refusedAt        DateTime?
+  refusalReason    String?
+  expiresAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2304,17 +2410,17 @@ model Contract {
 }
 
 model Commission {
-  id         String              @id @default(cuid())
-  prospectId String
-  salesRepId String
-  type       SalesCommissionType
+  id          String              @id @default(cuid())
+  prospectId  String
+  salesRepId  String
+  type        SalesCommissionType
   amountCents Int
-  status     CommissionStatus    @default(FORECAST)
-  dueAt      DateTime?
-  paidAt     DateTime?
-  note       String?
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
+  status      CommissionStatus    @default(FORECAST)
+  dueAt       DateTime?
+  paidAt      DateTime?
+  note        String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
   salesRep SalesRep @relation(fields: [salesRepId], references: [id])

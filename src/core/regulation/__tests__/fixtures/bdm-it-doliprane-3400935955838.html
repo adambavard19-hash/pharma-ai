@@ -1,0 +1,355 @@
+<!--  ----------  -->
+<!--  entete HTML -->
+<!--  ----------  -->
+<html>
+<head>
+<title>BdM_IT : fiche</title>
+<link rel="stylesheet" href="/codif/bdm_it/bdm_it.css">
+<SCRIPT LANGUAGE="JavaScript" src="/codif/bdm_it/bdm_it_bibli_cip.js"></SCRIPT>
+<!-- insérez ci-dessous vos tags de la partie HEAD -->
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head>
+<body bgcolor="#ffffff" leftmargin="0" topmargin="0" text="#333333" link="#006699" vlink="#339966" marginwidth="0" marginheight="0">
+<div id='disable-body'>
+    &nbsp;
+</div>
+<div id="alert-box">
+    <div id="alert-icon"></div>
+    <div id="alert-message">&nbsp;</div>
+    <div id="alert-input">
+        <input type="button" onClick='closeAlertBox();' value="OK"/>
+    </div>
+</div>
+<!-- Le menu !!!!! -->
+
+<table border="0" cellpadding="0" cellspacing="0" width="750" vspace="0" hspace="0" align="left">
+<TR><!-- ligne du haut  -->
+<TD>
+<table border="0" cellpadding="0" cellspacing="0" width="750" vspace="0" hspace="0" align="left">
+<tr> 
+<td><img src="/codif/bdm_it//images/shim.gif" width="18" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="168" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="44" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="145" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="339" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="36" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="1" height="1" border="0"></td>
+</tr>
+
+<tr> 
+<td colspan="4"><img name="entete" src="/codif/images/entete_ameli_gdr.gif" width="375" height="53" border="0" align="top" usemap="#bdm_it_map"><map name="bdm_it_map"><area shape="rect" coords="15,8,61,49" style="cursor: pointer;" onClick="confirmBeforeLeaving ('http://www.ameli.fr/')" ></map></td>
+<td colspan="2"  bgcolor="#94C5DB" valign="middle" align="center" height="53">
+<font class="bandeau"><a style="cursor: pointer;" onClick="confirmBeforeLeaving ('http://www.ameli.fr/')" >Ameli.fr</a>
+</font>
+</td>
+</tr>
+
+<tr> 
+<td colspan="6" bgcolor="#94C5DB" height="1"><img src="/codif/bdm_it//images/shim.gif" width="751" height="1" border="0"></td>
+</tr>
+
+<tr> 
+<td valign="top" bgcolor="#006699" height="20">&nbsp;</td>
+<td colspan="4" valign="middle" bgcolor="#006699" height="20">
+<font class="arborescence">
+<!-- insérez ci-dessous l'historique de la rubrique -->
+<!-- ex : HistoRIQUe &gt; Historique 2 &gt; ....    -->
+
+<a class="ARBORESCENCE" href="/codif/bdm_it/index.php?p_site=AMELI">BdM_IT</a> > Fiche
+
+<!-- ---------------- Après historique ---------------- --></font></td>
+<td colspan="1" valign="middle" bgcolor="#006699" height="20">
+	<font class="appVersion">V.180301</font>
+</td>
+<td height="18"><img src="/codif/bdm_it//images/shim.gif" width="1" height="17" border="0"></td>
+</tr>
+<tr valign="top"> 
+	<td rowspan="4" colspan="3"><img name="decoupe2" src="/codif/bdm_it//images/decoupe2.gif" width="230" height="81" border="0"></td>
+	<td colspan="3"><img name="decoupe4" src="/codif/bdm_it//images/decoupe4.gif" width="520" height="29" border="0"></td>
+	<td><img src="/codif/bdm_it//images/shim.gif" width="1" height="29" border="0"></td>
+</tr>
+<tr valign="top"><td rowspan="3" colspan="3">
+<!-- insérez ci-dessous l'image associée à la rubrique -->
+
+<img name="titres_page" src="/codif/bdm_it//images/titre_bdm_it.gif" width="520" height="52" border="0"><!-- -------------------- Après image rubrique -------------------- --></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="1" height="22" border="0"></td>
+</tr>
+
+<tr> 
+<td><img src="/codif/bdm_it//images/shim.gif" width="1" height="1" border="0"></td>
+</tr>
+
+<tr> 
+<td><img src="/codif/bdm_it//images/shim.gif" width="1" height="29" border="0"></td>
+</tr>
+</table>
+</TD>
+</TR>
+<!--
+séparation entre le haut de page (logo+menu+histo+image)
+et le bas (menu + corps)
+-->
+
+<TR> <!-- ligne du bas -->
+<TD>
+<table border="0" cellpadding="0" cellspacing="0" width="750" vspace="0" hspace="0" align="left">
+<tr> 
+<td colspan="2" valign="top"><script type="text/javascript">
+       <!--
+       window.onload=montre;
+       function montre(id) {
+           var d = document.getElementById(id);
+               for (var i = 1; i<=10; i++) {
+                   if (document.getElementById('smenu'+i)) {
+                          document.getElementById('smenu'+i).style.display='none';
+                   }
+               }
+           if (d) {
+              if(document.getElementById('etatmenu').value=="open"){
+                d.style.display='none';
+                document.getElementById('etatmenu').value="close";
+              }else{
+                d.style.display='block';
+              document.getElementById('etatmenu').value="open";
+              }
+            }
+       }
+          //-->
+</script>
+<input type="hidden" name="etatmenu" id="etatmenu">
+<TABLE border='0' CELLSPACING='0' CELLPADDING='0' background='/codif/bdm_it//images/Fond_menugauche.gif' width='186'>
+<tr><td><IMG SRC='/codif/images/bt_bdm_it.gif' BORDER='0'></td></tr>
+<tr><td class='elementMenu'><a href='/codif/bdm_it/index_presentation.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Présentation&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/bdm_it/index.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Recherche par code&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/bdm_it/index_labo.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Recherche par laboratoire&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/bdm_it/index_nouv.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nouvelles Inscriptions&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/bdm_it/index_modif.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Modifications de la semaine&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/bdm_it/index_tele_ucd.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Téléchargement&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td><IMG SRC='/codif/bdm/images/shim.gif' height='10' BORDER='0'></td></tr>
+<tr><td class='elementMenu'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#FFFFFF"><I>MAJ : 07/09/2026</I></font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></tr>
+<tr><td class='elementMenu'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#FFFFFF"><I>Version : 1531</I></font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></tr>
+<tr><td><IMG SRC='/codif/images/bt_nabm.gif' BORDER='0'></td></tr>
+<tr><td class='elementMenu'><a href='/codif/nabm/index_presentation.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Présentation&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/nabm/index.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Recherche par code&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/nabm/chapitre/index_chap.php?p_ref_menu_code=1&p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Recherche par chapitre&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/nabm/critere/index_crit.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Recherche sur autres critères&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/nabm/telecharge/index_tele.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Téléchargement&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td><IMG SRC='/codif/bdm/images/shim.gif' height='10' BORDER='0'></td></tr>
+<tr><td class='elementMenu'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#FFFFFF"><I>MAJ : 04/06/2026</I></font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></tr>
+<tr><td class='elementMenu'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#FFFFFF"><I>Version : 105</I></font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></tr>
+<tr><td><IMG SRC='/codif/images/bt_tips.gif' BORDER='0'></td></tr>
+<tr><td class='elementMenu'><a href='/codif/tips/index_presentation.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Présentation&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/tips/index.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Recherche par code&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/tips//chapitre/index_chap.php?p_ref_menu_code=1&p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Recherche par chapitre&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td class='elementMenu'><a href='/codif/tips//telecharge/index_tele.php?p_site=AMELI'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Téléchargement&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td></tr>
+<tr><td><IMG SRC='/codif/tips//images/shim.gif' height='10' BORDER='0'></td></tr>
+<tr><td class='elementMenu'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#FFFFFF"><I>MAJ : 09/09/2026</I></font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></tr>
+<tr><td class='elementMenu'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#FFFFFF"><I>Version : 901</I></font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></tr>
+<TR><TD><img name='decoupe5' src='/codif/bdm_it//images/decoupe5.gif' width='186' height='34' border='0'></TD></TR></TABLE>
+</td>
+<td valign="top"><img src="/codif/bdm_it//images/shim.gif" width="44" height="1" border="0"></td>
+<td colspan="4" valign="top">
+<!-- ============================================= -->
+<!-- insérez ci-dessous le contenu de la page HTML -->
+<!-- ============================================= -->
+<TABLE BORDER="0" width="100%">
+<TR>
+<TD width="15%">
+<table border='0' width='100%' cellpadding='0'><tr>
+<td width='100%'>
+<DIV CLASS='titrePage'>Fiche</DIV><BR></td>
+</tr>
+</table>
+<TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu">CIP</FONT></TD><TD VALIGN='BOTTOM'><FONT CLASS="titreActu">:</FONT></TD><TD VALIGN='BOTTOM'>3400935955838</TD></TR>
+<TR><TD><FONT CLASS="titreActu">Nature du médicament </FONT></TD><TD><FONT CLASS="titreActu">:</FONT></TD><TD>A</TD></TR>
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Numéro A.M.M</FONT></TD><TD VALIGN='BOTTOM'><FONT CLASS="titreActu">:</FONT></TD><TD VALIGN='BOTTOM'>359 558-3</TD></TR>
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Désignation</FONT></TD><TD VALIGN='BOTTOM'><FONT CLASS="titreActu">:</FONT></TD><TD VALIGN='BOTTOM'>DOLIPRANE 1 000 MG (PARACETAMOL)</TD></TR>
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Conditionnement</FONT></TD><TD VALIGN='BOTTOM'><FONT CLASS="titreActu">:</FONT></TD><TD VALIGN='BOTTOM'>1 BOÎTE DE 8, COMPRIMÉS</TD></TR>
+<TR><TD><FONT CLASS="titreActu">Grand Conditionnement</FONT></TD><TD><FONT CLASS="titreActu">:</FONT></TD><TD>Non</TD></TR>
+<TR><TD><FONT CLASS="titreActu">Statut d'Exception</FONT></TD><TD><FONT CLASS="titreActu">:</FONT></TD><TD>Non</TD></TR>
+<TR><TD><FONT CLASS="titreActu">Médicament Spécifique</FONT></TD><TD><FONT CLASS="titreActu">:</FONT></TD><TD>Non</TD></TR>
+</TABLE>
+<br><hr><br><table border='0' width='100%' cellpadding='0'><tr>
+<td width='100%'>
+<DIV CLASS='titrePage'>Historique pour les assurés</DIV><BR></td>
+</tr>
+</table>
+<TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu"><i>Homologation Assurés Sociaux :</i></FONT></TD></TR>
+</TABLE>
+<TABLE  border=1 cellspacing=2 cellpadding=2><TR>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date début</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date fin</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Motif fin</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Obj maj fin</FONT></TD>
+</TR>
+<TR>
+<TD ALIGN="center">01/06/2025</TD><TD ALIGN="center">31/05/2030</TD><TD ALIGN="center">REEXAMEN</TD><TD ALIGN="center">TACITE RECONDUCTION</TD></TR>
+<TR>
+<TD ALIGN="center">01/06/2020</TD><TD ALIGN="center">31/05/2025</TD><TD ALIGN="center">REEXAMEN</TD><TD ALIGN="center">TACITE RECONDUCTION</TD></TR>
+<TR>
+<TD ALIGN="center">01/06/2015</TD><TD ALIGN="center">31/05/2020</TD><TD ALIGN="center">REEXAMEN</TD><TD ALIGN="center">TACITE RECONDUCTION</TD></TR>
+<TR>
+<TD ALIGN="center">01/06/2010</TD><TD ALIGN="center">31/05/2015</TD><TD ALIGN="center">REEXAMEN</TD><TD ALIGN="center">JO du 20101013</TD></TR>
+<TR>
+<TD ALIGN="center">06/02/2006</TD><TD ALIGN="center">31/05/2010</TD><TD ALIGN="center">REEXAMEN</TD><TD ALIGN="center">JO du 20101013</TD></TR>
+<TR>
+<TD ALIGN="center">19/12/2002</TD><TD ALIGN="center">05/02/2006</TD><TD ALIGN="center">REEXAMEN</TD><TD ALIGN="center">JO du 20071025</TD></TR>
+</TABLE>
+<br><TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu"><i>Historique Désignation :</i></FONT></TD></TR>
+</TABLE>
+<TABLE  border=1 cellspacing=2 cellpadding=2><TR>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Libellé désignation</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date début</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date fin</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Objet maj</FONT></TD>
+</TR>
+<TR>
+<TD ALIGN="left">DOLIPRANE 1 000 MG (PARACETAMOL)</TD><TD ALIGN="center">19/12/2002</TD><TD ALIGN="center">-</TD><TD ALIGN="center">JO du 19/12/02</TD></TR>
+</TABLE>
+<BR>
+<TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu"><i>Grand Conditionnement</i> : </FONT>Non</TD></TR>
+<TR><TD><FONT CLASS="titreActu"><i>Médicament Spécifique</i> : </FONT>Non</TD></TR>
+</TABLE>
+<BR>
+<TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu"><i>Historique Conditionnement :</i></FONT></TD></TR>
+</TABLE>
+<TABLE  border=1 cellspacing=2 cellpadding=2><TR>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Libellé conditionnement</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date début</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date fin</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Objet maj</FONT></TD>
+</TR>
+<TR>
+<TD ALIGN="left">1 BOÎTE DE 8, COMPRIMÉS</TD><TD ALIGN="center">19/12/2002</TD><TD ALIGN="center">-</TD><TD ALIGN="center">JO du 19/12/02</TD></TR>
+</TABLE>
+<BR>
+<TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu"><i>Historique Laboratoire :</i></FONT></TD></TR>
+</TABLE>
+<TABLE  border=1 cellspacing=2 cellpadding=2><TR>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Nom du laboratoire</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date début</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date fin</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Objet maj</FONT></TD>
+</TR>
+<TR>
+<TD ALIGN="left">OPELLA HEALTHCARE FRANCE SAS</TD><TD ALIGN="center">16/11/2021</TD><TD ALIGN="center">-</TD><TD ALIGN="center">JO du 20211116</TD></TR>
+<TR>
+<TD ALIGN="left">SANOFI-AVENTIS FRANCE</TD><TD ALIGN="center">22/02/2008</TD><TD ALIGN="center">15/11/2021</TD><TD ALIGN="center">JO du 20080222</TD></TR>
+<TR>
+<TD ALIGN="left">THERAPLIX</TD><TD ALIGN="center">19/12/2002</TD><TD ALIGN="center">21/02/2008</TD><TD ALIGN="center">JO du 19/12/02</TD></TR>
+</TABLE>
+<BR>
+<TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu"><i>Historique Remboursement :</i></FONT></TD></TR>
+</TABLE>
+<TABLE  border=1 cellspacing=2 cellpadding=2><TR>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Prix Fabricant HT &euro;</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Prix Public TTC &euro;</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Taux de remboursement</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date d'application</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date d'opposabilité PPTTC</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date JO</FONT></TD>
+</TR>
+<TR><TD ALIGN="center">0.760 &euro;</TD><TD ALIGN="center">1.16 &euro;</TD><TD ALIGN="center">65 %</TD><TD ALIGN="center">01/01/2018</TD><TD ALIGN="center">01/01/2018</TD><TD ALIGN="center">20/12/2017</TD></TR>
+<TR><TD ALIGN="center">0.760 &euro;</TD><TD ALIGN="center">1.08 &euro;</TD><TD ALIGN="center">65 %</TD><TD ALIGN="center">10/11/2015</TD><TD ALIGN="center">30/12/2015</TD><TD ALIGN="center">30/10/2015</TD></TR>
+<TR><TD ALIGN="center">0.800 &euro;</TD><TD ALIGN="center">1.12 &euro;</TD><TD ALIGN="center">65 %</TD><TD ALIGN="center">02/01/2015</TD><TD ALIGN="center">21/02/2015</TD><TD ALIGN="center">23/12/2014</TD></TR>
+<TR><TD ALIGN="center">0.860 &euro;</TD><TD ALIGN="center">1.19 &euro;</TD><TD ALIGN="center">65 %</TD><TD ALIGN="center">01/01/2015</TD><TD ALIGN="center">01/01/2015</TD><TD ALIGN="center">02/12/2014</TD></TR>
+<TR><TD ALIGN="center">0.860 &euro;</TD><TD ALIGN="center">1.95 &euro;</TD><TD ALIGN="center">65 %</TD><TD ALIGN="center">01/01/2012</TD><TD ALIGN="center">-</TD><TD ALIGN="center">-</TD></TR>
+<TR><TD ALIGN="center">0.860 &euro;</TD><TD ALIGN="center">1.74 &euro;</TD><TD ALIGN="center">65 %</TD><TD ALIGN="center">07/03/2008</TD><TD ALIGN="center">-</TD><TD ALIGN="center">06/03/2008</TD></TR>
+<TR><TD ALIGN="center">0.860 &euro;</TD><TD ALIGN="center">1.74 &euro;</TD><TD ALIGN="center">65 %</TD><TD ALIGN="center">21/02/2004</TD><TD ALIGN="center">-</TD><TD ALIGN="center">21/02/2004</TD></TR>
+<TR><TD ALIGN="center">0.860 &euro;</TD><TD ALIGN="center">1.74 &euro;</TD><TD ALIGN="center">65 %</TD><TD ALIGN="center">19/12/2002</TD><TD ALIGN="center">-</TD><TD ALIGN="center">19/12/2002</TD></TR>
+</TABLE>
+<TABLE  border=0 cellspacing=2 cellpadding=2>
+</TABLE>
+<br><hr><br><table border='0' width='100%' cellpadding='0'><tr>
+<td width='100%'>
+<DIV CLASS='titrePage'>Historique pour les collectivités</DIV><BR></td>
+</tr>
+</table>
+<TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu"><i>Homologation Collectivité :</i></FONT></TD></TR>
+</TABLE>
+<TABLE  border=1 cellspacing=2 cellpadding=2><TR>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date début</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date fin</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Motif fin</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Objet maj</FONT></TD>
+</TR>
+<TR><TD ALIGN="center">19/12/2002</TD><TD ALIGN="center">-</TD><TD ALIGN="center">-</TD><TD ALIGN="center">JO du 19/12/02</TD></TR>
+</TABLE>
+<br><TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu"><i>Historique Désignation :</i></FONT></TD></TR>
+</TABLE>
+<TABLE  border=1 cellspacing=2 cellpadding=2><TR>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Libellé désignation</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date début</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date fin</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Objet maj</FONT></TD>
+</TR>
+<TR>
+<TD ALIGN="left">DOLIPRANE 1 000 MG (PARACETAMOL)</TD><TD ALIGN="center">19/12/2002</TD><TD ALIGN="center">-</TD><TD ALIGN="center">JO du 19/12/02</TD></TR>
+</TABLE>
+<BR>
+<TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu"><i>Historique Conditionnement :</i></FONT></TD></TR>
+</TABLE>
+<TABLE  border=1 cellspacing=2 cellpadding=2><TR>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Libellé conditionnement</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date début</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date fin</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Objet maj</FONT></TD>
+</TR>
+<TR><TD ALIGN="left">1 Boîte de 8, comprimés</TD><TD ALIGN="center">19/12/2002</TD><TD ALIGN="center">-</TD><TD ALIGN="center">JO du 19/12/02</TD></TR>
+</TABLE>
+<BR>
+<TABLE BORDER="0">
+<TR><TD VALIGN='BOTTOM'><FONT CLASS="titreActu"><i>Historique Laboratoire :</i></FONT></TD></TR>
+</TABLE>
+<TABLE  border=1 cellspacing=2 cellpadding=2><TR>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Nom du laboratoire</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date début</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Date fin</FONT></TD>
+<TD VALIGN='BOTTOM'><FONT CLASS="titreActu">Objet maj</FONT></TD>
+</TR>
+<TR><TD ALIGN="left">OPELLA HEALTHCARE FRANCE SAS</TD><TD ALIGN="center">17/11/2021</TD><TD ALIGN="center">-</TD><TD ALIGN="center">JO du 20211116</TD></TR>
+<TR><TD ALIGN="left">SANOFI-AVENTIS FRANCE</TD><TD ALIGN="center">22/02/2008</TD><TD ALIGN="center">16/11/2021</TD><TD ALIGN="center">JO du 20080222</TD></TR>
+<TR><TD ALIGN="left">THERAPLIX</TD><TD ALIGN="center">19/12/2002</TD><TD ALIGN="center">21/02/2008</TD><TD ALIGN="center">JO du 19/12/02</TD></TR>
+</TABLE>
+<BR>
+<TABLE  border=0 cellspacing=2 cellpadding=2>
+</TABLE>
+</TD>
+</TR>
+</TABLE>
+
+<!-- ------------------------------------------------------- -->
+<!--           Ajoutez des sauts de lignes afin que les      -->
+<!--        menus apparaissent complètement dans Netscape    -->
+<!-- ------------------------------------------------------- -->
+</td>
+</tr>
+
+<tr>
+<td><img src="/codif/bdm_it//images/shim.gif" width="18" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="168" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="44" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="201" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="283" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="36" height="1" border="0"></td>
+<td><img src="/codif/bdm_it//images/shim.gif" width="1" height="1" border="0"></td>
+</tr>
+</table>
+		
+</TD>
+</TR>
+</TABLE>
+</body>
+</html>
+<!-- fin de la page HTML -->
+

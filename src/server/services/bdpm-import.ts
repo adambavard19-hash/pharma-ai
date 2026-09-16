@@ -794,6 +794,33 @@ async function writeConditions(
   for (const batch of chunk(obsolete, UPDATE_CHUNK)) {
     await prisma.drugPrescriptionCondition.deleteMany({ where: { id: { in: batch } } });
   }
+  // Une condition qui apparaît ou disparaît entre deux versions de la source
+  // est une évolution réglementaire : elle va au journal de l'onglet
+  // Réglementation. Pas au premier import — il n'y avait rien avant.
+  if (existing.length > 0 && (toCreate.length > 0 || obsolete.length > 0)) {
+    const obsoleteRows = existing.filter((row) => obsolete.includes(row.id));
+    const specialtyIdsTouched = [...new Set([...toCreate.map(([, row]) => row.specialtyId), ...obsoleteRows.map((row) => row.specialtyId)])];
+    const specialties = await prisma.drugSpecialty.findMany({ where: { id: { in: specialtyIdsTouched } }, select: { id: true, name: true, cisCode: true } });
+    const byId = new Map(specialties.map((row) => [row.id, row]));
+    const sourceDate = await prisma.referenceImport.findFirst({ where: { status: "SUCCEEDED" }, orderBy: { finishedAt: "desc" }, select: { sourceUpdatedAt: true } }).catch(() => null);
+    const journal = [
+      ...toCreate.map(([, row]) => ({ kind: "CONDITION_ADDED" as const, specialtyId: row.specialtyId, label: row.label })),
+      ...obsoleteRows.map((row) => ({ kind: "CONDITION_REMOVED" as const, specialtyId: row.specialtyId, label: row.label })),
+    ];
+    for (const batch of chunk(journal, CREATE_CHUNK)) {
+      await prisma.drugRegulationChange.createMany({
+        data: batch.map((entry) => ({
+          kind: entry.kind,
+          drugName: byId.get(entry.specialtyId)?.name ?? "Spécialité inconnue",
+          cisCode: byId.get(entry.specialtyId)?.cisCode ?? null,
+          before: entry.kind === "CONDITION_REMOVED" ? entry.label : null,
+          after: entry.kind === "CONDITION_ADDED" ? entry.label : null,
+          sourceName: "Base de données publique des médicaments (ANSM)",
+          sourceDate: sourceDate?.sourceUpdatedAt ?? null,
+        })),
+      });
+    }
+  }
 
   report.created = toCreate.length;
   report.unchanged = wanted.size - toCreate.length;

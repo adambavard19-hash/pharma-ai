@@ -3,6 +3,7 @@ import {
   CalendarClock,
   LineChart,
   ScanLine,
+  ScrollText,
   Settings,
   Users,
   UsersRound,
@@ -72,6 +73,13 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.STOCK_VIEW,
     match: ["/stock", "/stocks", "/produits"],
     description: "Ce qui est en rayon — et ce qui manque",
+  },
+  {
+    href: "/reglementation",
+    label: "Réglementation",
+    icon: ScrollText,
+    permission: PERMISSIONS.PRESCRIPTION_VIEW,
+    description: "Ordonnances d'exception, sécurisées, dernières évolutions",
   },
   {
     href: "/suivis",

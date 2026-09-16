@@ -40,6 +40,8 @@ export type AuditAction =
   | "prescription.created"
   | "prescription.verified"
   | "prescription.patient_attached"
+  | "prescription.regulation_checked"
+  | "prescription.regulation_unchecked"
   | "prescription.line_identified"
   | "prescription.analyzed"
   | "prescription.safety_acknowledged"

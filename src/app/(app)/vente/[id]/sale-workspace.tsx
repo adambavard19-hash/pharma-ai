@@ -24,6 +24,7 @@ import { PrescriptionZone } from "./prescription-zone";
 import { TreatmentPanel } from "./treatment-panel";
 import { ChecksNote } from "./checks-note";
 import { SafetyZone, VigilanceCards } from "./safety-zone";
+import { RegulationZone } from "./regulation-zone";
 import { AdviceZone } from "./advice-zone";
 import type { EngineOutcome } from "@/core/ai/outcome";
 import { DeliveryZone, type DeliveryExtra } from "./delivery-zone";
@@ -483,6 +484,10 @@ export function SaleWorkspace({
           {!editing && !analysing && (
             <>
               <TreatmentPanel lines={lines} canEdit={permissions.verify} onEdit={() => setForceEdit(true)} catalogAttribution={catalogAttribution} />
+              {/* Ce que la réglementation impose avant de facturer : support
+                  d'ordonnance, document, durée. Avant les vigilances cliniques,
+                  parce qu'un rejet de facturation se joue à cet instant. */}
+              <RegulationZone lines={lines} canCheck={permissions.verify} />
               <ChecksNote findings={findings} blockedOpportunities={blockedOpportunities} stale={identificationChangedSinceAnalysis} prescriptionId={prescription.id} />
               {/* Les vigilances du traitement (interaction, contre-indication,
                   surveillance, dépistage) se lisent sous l'ordonnance, avant

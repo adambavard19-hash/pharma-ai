@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/feedback";
 import { formatCents, formatDate } from "@/lib/format";
+import { evaluateRegulation } from "@/core/regulation/rules";
+import { loadCoverageBySpecialty } from "@/server/services/regulation";
 
 export const metadata: Metadata = { title: "Fiche médicament" };
 
@@ -52,6 +54,11 @@ export default async function DrugSheetPage({ params }: { params: Promise<{ cis:
     select: { quantity: true, presentation: { select: { cip13: true } } },
   });
   const stockByCip = new Map(stocks.map((s) => [s.presentation.cip13, s.quantity]));
+  // Ce que le médicament impose avant d'être facturé, d'après les conditions
+  // publiées et le statut de prise en charge de l'Assurance Maladie.
+  const coverage = (await loadCoverageBySpecialty([specialty.id])).get(specialty.id) ?? null;
+  const regulation = evaluateRegulation({ conditions: specialty.prescriptionConditions.map((c) => c.label), coverage, durationDays: null, today: new Date() });
+  const SEVERITY_TONE = { BLOCKING: "danger", CHECK: "warning", INFO: "neutral" } as const;
   const active = specialty.compositions.filter((c) => c.nature === "SA");
   const officialPage = `https://base-donnees-publique.medicaments.gouv.fr/extrait.php?specid=${specialty.cisCode}`;
 
@@ -84,6 +91,28 @@ export default async function DrugSheetPage({ params }: { params: Promise<{ cis:
             ))}
             {active.length === 0 && <li className="py-2 text-[13.5px] text-text-secondary">Composition non publiée par la source.</li>}
           </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader title="Réglementation" description="Ce que ce médicament impose avant d'être facturé, d'après l'ANSM et l'Assurance Maladie." />
+        <CardContent className="pt-0 text-[13.5px] leading-5 text-text-secondary">
+          {regulation.length === 0 ? (
+            <p>Aucune condition particulière publiée{coverage ? ", et pas de statut de médicament d'exception" : ""}.</p>
+          ) : (
+            <ul className="space-y-2">
+              {regulation.map((alert, index) => (
+                <li key={`${alert.code}-${index}`} className="flex flex-wrap items-start gap-2">
+                  <Badge tone={SEVERITY_TONE[alert.severity]}>{alert.severity === "BLOCKING" ? "Rejet sans cela" : alert.severity === "CHECK" ? "À vérifier" : "Bon à savoir"}</Badge>
+                  <span className="min-w-0 flex-1">
+                    <span className="font-medium text-text-primary">{alert.title}</span>
+                    <span> — {alert.action}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!coverage && <p className="mt-2 text-[12.5px] text-text-tertiary">La base tarifaire de l&apos;Assurance Maladie n&apos;a pas encore été lue pour ce médicament : le statut de médicament d&apos;exception est inconnu.</p>}
         </CardContent>
       </Card>
 

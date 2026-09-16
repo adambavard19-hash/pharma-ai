@@ -23,6 +23,7 @@ import { referenceAttribution } from "@/core/reference";
 import { getReferenceCatalogState } from "@/server/services/reference";
 import { proposeSpecialties } from "@/server/services/drug-identification";
 import { loadPrescribedAvailability } from "@/server/services/drug-catalog";
+import { evaluateLinesRegulation } from "@/server/services/regulation";
 import { buildPatientContext } from "@/server/services/patients";
 import { AUTO_ACCEPT_REFUSAL_MESSAGES, decideAutoAccept, distinctStrengths } from "@/core/reference";
 import { parsePosology, readSchedule } from "@/core/posology";
@@ -65,6 +66,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
               prescriptionConditions: { select: { label: true } },
             },
           },
+          regulationChecks: { select: { code: true } },
         },
       },
       recommendations: {
@@ -201,6 +203,23 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  // Ce que la réglementation impose ligne par ligne — support d'ordonnance,
+  // document à réclamer, durée maximale — d'après les conditions publiées et
+  // le statut de prise en charge. Calculé ici, avec la page : au comptoir, une
+  // alerte de facturation qui arrive après la vente ne sert à rien.
+  const regulationByLine = new Map(
+    (
+      await evaluateLinesRegulation(
+        prescription.lines.map((line) => ({
+          id: line.id,
+          specialtyId: line.drugSpecialtyId,
+          conditions: line.specialty?.prescriptionConditions.map((item) => item.label) ?? [],
+          durationDays: line.durationDays,
+        })),
+      )
+    ).map((entry) => [entry.lineId, entry.alerts]),
+  );
+
   return (
     <SaleWorkspace
       prescription={{
@@ -265,6 +284,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           : "Aucun catalogue officiel n'est chargé dans PharmaBoost.",
         strengthOptions: strengthOptions.get(line.id) ?? [],
         cisCode: line.specialty?.cisCode ?? null,
+        regulation: { alerts: regulationByLine.get(line.id) ?? [], checked: line.regulationChecks.map((check) => check.code) },
         };
       })}
       catalogAttribution={attribution}
