@@ -199,6 +199,50 @@ const PATTERNS: Pattern[] = [
     ruleKeys: ["lip-care-isotretinoin"],
     confidence: 0.85,
   },
+  // Herpès et zona : soin des lésions.
+  {
+    test: /^(?!.*(boiron|\b\d+ ?ch\b|gargarisme|bain de bouche|vaginal|ovule|scrub|tulle|\bgel\b|pansement medicamenteux))(?=.*(biseptine|betadine|bétadine|cyteal|diaseptyl|hexomedine|hexomédine|dakin|septivon|mercryl|antiseptique|antiseptic))/,
+    category: "SOINS",
+    tags: ["antiseptique", "cutané"],
+    ruleKeys: ["herpes-zona-antiseptic"],
+    confidence: 0.88,
+  },
+  {
+    test: /^(?!.*(boiron|\b\d+ ?ch\b))(?=.*(bouton de fievre|bouton de fièvre|bout fievre|bout fi[eè]vre|herpes|herpès|activir|herpevir|labialis))/,
+    category: "SOINS",
+    tags: ["herpès", "bouton de fièvre"],
+    ruleKeys: ["herpes-labial-patch"],
+    confidence: 0.9,
+  },
+  {
+    test: /^(?!.*(ophtalm|collyre|oculaire|nasal|\bnez\b))(?=.*(cicalfate|cicaplast|cicabio|cicavit|bepanthen|dexpanthenol|epitheliale|épithéliale|cicatris|cicaderma|sensicalm))/,
+    category: "DERMOCOSMETIQUE",
+    tags: ["cicatrisant", "apaisant", "peau sensible", "hydratation", "émollient"],
+    ruleKeys: ["herpes-zona-skin-repair", "hydration-dermato-topical"],
+    confidence: 0.88,
+  },
+  {
+    test: /(hydroalcooli|hydro-alcooli|gel mains|desinfectant mains|désinfectant mains|baccide|aniosgel|sterillium)/,
+    category: "HYGIENE",
+    tags: ["hygiène des mains"],
+    ruleKeys: ["hand-hygiene-contagious"],
+    confidence: 0.88,
+  },
+  // Suivi des traitements chroniques.
+  {
+    test: /(tensiom|autotensio|omron|microlife|brassard)/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["tensiomètre"],
+    ruleKeys: ["hypertension-self-measurement"],
+    confidence: 0.9,
+  },
+  {
+    test: /^(?!.*(detransp|deodor|déodor|sport nok|spray|chauss|semelle|ampoule|durillon|cors\b|verrue|mycose|ongle))(?=.*(\bpieds?\b|akileine|akiléine|talons?|crevasse))(?=.*(creme|crème|\bcr\b|baume|uree|urée|urea|\blait\b|repar|hydrat))/,
+    category: "SOINS",
+    tags: ["pieds", "hydratation"],
+    ruleKeys: ["diabetes-foot-care"],
+    confidence: 0.85,
+  },
   // Compléments que les vigilances doivent reconnaître, pour les écarter ou les espacer.
   // Une dilution homéopathique (Kalium 7CH, Hypericum 15CH) n'est pas un apport : elle n'est pas étiquetée.
   { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\bfer\b|ferrostrane|tardyferon|fumafer|timoferol|bisglycinate de fer|fer bisglycinate|ferreux|ferrique))/, category: "MINERAUX", tags: ["fer"], ruleKeys: [], confidence: 0.8 },
@@ -227,6 +271,9 @@ const PATTERNS: Pattern[] = [
 const SUBSTANCE_PATTERNS: (Pattern & { requires?: RegExp })[] = [
   { test: /saccharomyces|lactobacillus|bifidobacterium|bacillus clausii|levure/, category: "PROBIOTIQUES", tags: ["probiotique", "flore intestinale", "tolérance digestive"], ruleKeys: ["digestive-tolerance-antibiotics"], confidence: 0.95 },
   { test: /chlorure de sodium|sodium chlorure|eau de mer/, requires: /nasal|nez|spray|pulverisation|dosette|unidose|rhin/, category: "SOINS", tags: ["nez", "nasal", "lavage", "eau de mer", "orl", "spray nasal"], ruleKeys: ["nasal-hygiene-orl"], confidence: 0.85 },
+  // Un antiseptique pour la peau : la voie fait la différence avec le bain de bouche ou l'usage gynécologique.
+  { test: /chlorhexidine|benzalkonium|povidone|hexamidine|hypochlorite|eosine|chlorocresol|triclocarban/, requires: /application (cutanee|locale)|cutane|solution moussante|dermique/, category: "SOINS", tags: ["antiseptique", "cutané"], ruleKeys: ["herpes-zona-antiseptic"], confidence: 0.92 },
+  { test: /aciclovir/, requires: /creme|cutane/, category: "SOINS", tags: ["herpès", "bouton de fièvre"], ruleKeys: ["herpes-labial-patch"], confidence: 0.95 },
   { test: /chlorhexidine|hexetidine|cetylpyridinium/, requires: /bain de bouche|buccal|bouche|gargarisme/, category: "HYGIENE", tags: ["bain de bouche", "rinçage", "bucco-dentaire"], ruleKeys: ["mouth-rinse-inhaled-corticosteroid"], confidence: 0.9 },
   { test: /lidocaine|tetracaine|amylmetacresol|alcool dichlorobenzylique|benzalkonium|hexamidine/, requires: /pastille|gorge|collutoire|spray|comprime a sucer|comprimé à sucer|tablette/, category: "SOINS", tags: ["gorge", "irritation", "orl", "pastilles"], ruleKeys: ["sore-throat-orl"], confidence: 0.85 },
   { test: /dextromethorphane|oxomemazine|pholcodine|helicidine|hedera helix|lierre|thym|carbocisteine|acetylcysteine|ambroxol/, requires: /sirop|toux|buvable/, category: "SOINS", tags: ["toux", "gorge", "irritation"], ruleKeys: ["cough-throat-comfort"], confidence: 0.8 },

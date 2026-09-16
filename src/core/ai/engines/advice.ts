@@ -503,7 +503,7 @@ export const ADVICE_RULES: AdviceRule[] = [
     needTriggers: ["NASAL_CONGESTION"],
     question: "Le patient a-t-il aussi le nez bouché ou qui coule ?",
     category: "SOINS",
-    atcPrefixes: [],
+    atcPrefixes: ["R06A"],
     therapeuticClasses: [],
     sideEffectTriggers: [],
     basePriority: 62,
@@ -667,7 +667,7 @@ export const ADVICE_RULES: AdviceRule[] = [
     needTriggers: ["ALLERGIC_EYE_IRRITATION"],
     question: "Les yeux du patient piquent-ils ou pleurent-ils ?",
     category: "SOINS",
-    atcPrefixes: ["D10BA01"],
+    atcPrefixes: ["D10BA01", "R06A"],
     therapeuticClasses: [],
     sideEffectTriggers: [],
     basePriority: 52,
@@ -785,6 +785,214 @@ export const ADVICE_RULES: AdviceRule[] = [
     safetyNotes: [],
   },
   {
+    key: "herpes-zona-antiseptic",
+    title: "Soin des lésions d'herpès ou de zona",
+    kind: "TOLERANCE",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    needTriggers: ["HERPES_LESION_CARE"],
+    category: "SOINS",
+    atcPrefixes: ["J05AB"],
+    therapeuticClasses: ["Antiviral", "Antiherpétique"],
+    sideEffectTriggers: [],
+    basePriority: 72,
+    matchingTags: ["antiseptique", "cutané"],
+    excludeTags: [],
+    // Biseptine d'abord : c'est l'antiseptique de référence des fiches conseil, sans alcool éthylique, adapté aux muqueuses.
+    productPrefer: [String.raw`biseptine`, String.raw`hexomedine`, String.raw`diaseptyl`],
+    productExclude: [String.raw`scrub`, String.raw`moussant`, String.raw`alcoolique`, String.raw`gargarisme`, String.raw`bain de bouche`, String.raw`vaginal`, String.raw`ovule`, String.raw`tulle`, String.raw`\bgel\b`, String.raw`dakin`, String.raw`eosine`, String.raw`ophtalm`, String.raw`collyre`, String.raw`oculaire`, String.raw`lavage`, String.raw`nasal`, String.raw`auriculaire`],
+    benefits: ["Limite la surinfection", "Sur vésicules et croûtes", "Tamponner, sans frotter"],
+    shortReasonTemplate:
+      "Antiviral ({drug}) : les lésions d'herpès ou de zona peuvent se surinfecter tant qu'elles ne sont pas sèches.",
+    rationaleTemplate:
+      "{drug} traite l'infection virale ; il ne protège pas les lésions cutanées ou muqueuses d'une surinfection bactérienne. Un antiseptique cutané doux, appliqué sur les vésicules et croûtes jusqu'à cicatrisation, la limite. L'ordonnance ne prévoit aucun soin local.",
+    counterScriptTemplate:
+      "« {drug} agit sur le virus. Sur les boutons, tamponnez {product} matin et soir, sans frotter, jusqu'à ce qu'ils soient secs : cela évite qu'ils s'infectent. »",
+    patientReasonTemplate:
+      "Votre traitement ({drug}) agit sur le virus. {product}, tamponné sur les lésions jusqu'à ce qu'elles soient sèches, limite le risque d'infection.",
+    clinicalContext:
+      "Herpès labial, génital ou zona sous antiviral oral. Antisepsie locale douce des lésions (Cespharm — fiches conseil herpès et zona ; RCP valaciclovir). Atteinte oculaire : orientation médicale sans délai.",
+    safetyNotes: [
+      "Œil rouge, douloureux ou gêne visuelle : orientation médicale sans délai.",
+      "Lavage des mains après chaque contact avec les lésions ; linge et serviettes à ne pas partager.",
+    ],
+  },
+  {
+    key: "herpes-labial-patch",
+    title: "Bouton de fièvre",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    needTriggers: ["HERPES_LESION_CARE"],
+    question: "Le patient a-t-il un bouton de fièvre sur les lèvres ?",
+    confirmedReasonTemplate: "Bouton de fièvre confirmé sous {drug} : un patch protège la lésion et limite la contagion.",
+    category: "SOINS",
+    atcPrefixes: ["J05AB"],
+    therapeuticClasses: ["Antiviral", "Antiherpétique"],
+    sideEffectTriggers: [],
+    basePriority: 58,
+    matchingTags: ["herpès", "bouton de fièvre"],
+    excludeTags: [],
+    // Un antiviral local n'ajoute rien à l'antiviral oral prescrit : le patch, lui, protège et isole.
+    productPrefer: [String.raw`patch`, String.raw`compeed`, String.raw`invisible`],
+    productExclude: [String.raw`aciclovir`, String.raw`activir`, String.raw`herpevir`],
+    benefits: ["Protège et isole la lésion", "Discret, se garde sous le maquillage", "Limite le contact avec les doigts"],
+    shortReasonTemplate:
+      "Herpès sous {drug} : sur les lèvres, la lésion se touche, se transmet et s'assèche mal.",
+    rationaleTemplate:
+      "Sous {drug}, un bouton de fièvre reste contagieux et exposé. Un patch hydrocolloïde le recouvre, limite les contacts et favorise la cicatrisation. L'antiviral local n'apporte rien de plus à l'antiviral oral.",
+    counterScriptTemplate:
+      "« Sur le bouton de fièvre, {product} le protège et évite qu'on le touche ; à changer quand il se décolle. »",
+    patientReasonTemplate:
+      "Avec {drug}, {product} recouvre le bouton de fièvre : il le protège, limite la contagion et aide à cicatriser.",
+    clinicalContext: "Herpès labial récurrent ; patch hydrocolloïde en complément de l'antiviral (Cespharm — fiche conseil herpès labial).",
+    safetyNotes: ["Ne pas appliquer sur un œil ni dans le nez ; lavage des mains après la pose."],
+  },
+  {
+    key: "herpes-zona-skin-repair",
+    title: "Réparation de la peau après les vésicules",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    needTriggers: ["HERPES_LESION_CARE"],
+    category: "DERMOCOSMETIQUE",
+    atcPrefixes: ["J05AB"],
+    therapeuticClasses: ["Antiviral", "Antiherpétique"],
+    sideEffectTriggers: [],
+    basePriority: 56,
+    matchingTags: ["cicatrisant", "apaisant"],
+    excludeTags: [],
+    productPrefer: [String.raw`cicalfate`, String.raw`cicaplast`, String.raw`cicabio`, String.raw`repar`, String.raw`sensicalm`],
+    productExclude: [String.raw`spf`, String.raw`solaire`, String.raw`nettoy`, String.raw`lavant`, String.raw`gel net`, String.raw`lotion`, String.raw`levres`, String.raw`lèvres`, String.raw`\blev\b`],
+    benefits: ["Apaise et répare une fois les lésions sèches", "Sans parfum à privilégier", "Après l'antiseptique"],
+    shortReasonTemplate:
+      "Après les vésicules d'herpès ou de zona sous {drug}, la peau reste irritée et met du temps à se réparer.",
+    rationaleTemplate:
+      "Une fois les lésions sèches, la peau traitée par {drug} reste irritée. Une crème réparatrice apaisante, sans parfum, accompagne la cicatrisation et limite les marques.",
+    counterScriptTemplate:
+      "« Quand les boutons seront secs, {product} apaise et aide la peau à se réparer sans laisser de marque. »",
+    patientReasonTemplate:
+      "Après les lésions traitées par {drug}, {product} apaise la peau et l'aide à se réparer.",
+    clinicalContext: "Phase de cicatrisation de l'herpès ou du zona (Cespharm — fiche conseil zona).",
+    safetyNotes: ["Jamais sur des vésicules encore ouvertes : d'abord l'antiseptique, la crème une fois sec."],
+  },
+  {
+    key: "hand-hygiene-contagious",
+    title: "Hygiène des mains, lésions contagieuses",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    needTriggers: ["HERPES_LESION_CARE"],
+    category: "HYGIENE",
+    atcPrefixes: ["J05AB"],
+    therapeuticClasses: ["Antiviral", "Antiherpétique"],
+    sideEffectTriggers: [],
+    basePriority: 44,
+    matchingTags: ["hygiène des mains"],
+    excludeTags: [],
+    benefits: ["Après chaque contact avec la lésion", "Protège l'entourage et les yeux", "Format poche"],
+    shortReasonTemplate:
+      "Herpès ou zona sous {drug} : le virus se transmet par les mains tant que les lésions ne sont pas sèches.",
+    rationaleTemplate:
+      "Les lésions d'herpès et de zona traitées par {drug} sont contagieuses jusqu'à l'assèchement ; l'auto-inoculation oculaire est le risque principal. La friction des mains après chaque contact est le geste clé.",
+    counterScriptTemplate:
+      "« Tant que ce n'est pas sec, c'est contagieux : {product} après chaque fois que vous touchez les boutons, et jamais les yeux sans s'être lavé les mains. »",
+    patientReasonTemplate:
+      "Les lésions traitées par {drug} restent contagieuses : {product} après chaque contact protège vos yeux et votre entourage.",
+    clinicalContext: "Prévention de l'auto-inoculation et de la transmission (Cespharm — herpès et zona).",
+    safetyNotes: [],
+  },
+  {
+    key: "opioid-transit",
+    title: "Transit sous antalgique opioïde",
+    kind: "TOLERANCE",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    needTriggers: ["CONSTIPATION"],
+    category: "NUTRITION",
+    atcPrefixes: ["N02A", "R05DA"],
+    therapeuticClasses: ["Opioïde", "Antalgique opioïde", "Antalgique de palier 2", "Antalgique de palier 3"],
+    sideEffectTriggers: [],
+    basePriority: 70,
+    matchingTags: ["transit", "fibres", "confort digestif"],
+    excludeTags: [],
+    productPrefer: [String.raw`macrogol`, String.raw`forlax`, String.raw`movicol`, String.raw`transipeg`, String.raw`lactulose`, String.raw`fibres`, String.raw`psyllium`],
+    benefits: ["Prévient la constipation attendue", "Dès le début du traitement", "Boire suffisamment"],
+    shortReasonTemplate:
+      "Opioïde ({drug}) : la constipation est un effet quasi constant, dès les premiers jours.",
+    rationaleTemplate:
+      "Les antalgiques opioïdes ({drug}) ralentissent le transit chez la plupart des patients, sans accoutumance à cet effet. Un laxatif osmotique ou un apport en fibres, commencé avec le traitement, prévient la constipation plutôt que de la traiter.",
+    counterScriptTemplate:
+      "« {drug} constipe presque toujours. {product} dès aujourd'hui, avec un grand verre d'eau, évite d'en arriver là. »",
+    patientReasonTemplate:
+      "Votre antalgique ({drug}) ralentit le transit chez presque tout le monde. {product}, pris dès le début, prévient la constipation.",
+    clinicalContext:
+      "RCP tramadol, codéine, morphiniques : constipation très fréquente. HAS (douleur, opioïdes) : prévention systématique de la constipation par un laxatif, dès l'instauration.",
+    safetyNotes: ["Douleur abdominale intense ou absence de selles prolongée : avis médical."],
+  },
+  {
+    key: "hypertension-self-measurement",
+    title: "Automesure de la tension",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    question: "Le patient souhaite-t-il suivre sa tension à domicile ?",
+    confirmedReasonTemplate: "Traitement antihypertenseur ({drug}) et patient volontaire pour l'automesure : la HAS la recommande pour ajuster le traitement.",
+    category: "DISPOSITIFS_MEDICAUX",
+    atcPrefixes: ["C02", "C03", "C07", "C08", "C09"],
+    therapeuticClasses: ["Antihypertenseur", "Inhibiteur de l'enzyme de conversion", "Bêtabloquant", "Inhibiteur calcique", "Antagoniste de l'angiotensine II", "Diurétique"],
+    sideEffectTriggers: [],
+    basePriority: 50,
+    matchingTags: ["tensiomètre"],
+    excludeTags: [],
+    productPrefer: [String.raw`bras`, String.raw`omron`, String.raw`valid`],
+    benefits: ["Recommandée par la HAS", "Mesure au bras, automatique", "3 mesures matin et soir, 3 jours"],
+    shortReasonTemplate:
+      "Traitement antihypertenseur ({drug}) : l'automesure à domicile guide l'ajustement du traitement.",
+    rationaleTemplate:
+      "Sous {drug}, la mesure de la tension à domicile, selon la règle des 3 (trois mesures matin et soir pendant trois jours), est recommandée pour confirmer l'efficacité du traitement et éviter l'effet blouse blanche. Un tensiomètre validé, au bras, est l'outil de référence.",
+    counterScriptTemplate:
+      "« Avec {drug}, mesurer sa tension chez soi aide le médecin à régler le traitement. {product} se met au bras ; trois mesures matin et soir, trois jours avant la consultation. »",
+    patientReasonTemplate:
+      "Votre traitement ({drug}) se règle mieux avec vos mesures à domicile. {product} se place au bras : trois mesures matin et soir, pendant trois jours, à montrer à votre médecin.",
+    clinicalContext: "HAS, prise en charge de l'hypertension artérielle de l'adulte (2016) : automesure tensionnelle recommandée, appareil validé, brassard huméral.",
+    safetyNotes: [],
+  },
+  {
+    key: "diabetes-foot-care",
+    title: "Soin des pieds sous traitement antidiabétique",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "SOINS",
+    atcPrefixes: ["A10"],
+    therapeuticClasses: ["Antidiabétique", "Insuline", "Biguanide", "Sulfamide hypoglycémiant"],
+    sideEffectTriggers: [],
+    basePriority: 54,
+    matchingTags: ["pieds", "hydratation"],
+    excludeTags: [],
+    productPrefer: [String.raw`uree`, String.raw`urée`, String.raw`urea`, String.raw`pied`],
+    productExclude: [String.raw`detransp`, String.raw`deodor`, String.raw`sport`, String.raw`spray`],
+    benefits: ["Prévient sécheresse et crevasses", "Hors espaces entre les orteils", "Avec l'inspection quotidienne des pieds"],
+    shortReasonTemplate:
+      "Diabète traité ({drug}) : une peau des pieds sèche se fissure, et une plaie du pied se soigne mal.",
+    rationaleTemplate:
+      "Chez un patient traité par {drug}, la peau des pieds est souvent sèche et les plaies cicatrisent lentement. Une crème hydratante quotidienne, en évitant les espaces entre les orteils, fait partie des soins du pied recommandés, avec l'inspection quotidienne.",
+    counterScriptTemplate:
+      "« Avec le diabète, les pieds demandent un soin chaque jour : {product} le soir, sans en mettre entre les orteils, et un coup d'œil pour vérifier qu'il n'y a pas de plaie. »",
+    patientReasonTemplate:
+      "Avec votre traitement ({drug}), la peau des pieds se dessèche et se blesse facilement. {product} chaque soir, sans en mettre entre les orteils, la protège.",
+    clinicalContext: "HAS / SFD, prévention des plaies du pied chez le diabétique : hygiène et hydratation quotidiennes, inspection, chaussage adapté.",
+    safetyNotes: ["Plaie, rougeur ou ongle incarné : consultation sans attendre ; jamais d'automédication sur une plaie du pied diabétique."],
+  },
+  {
     key: "mouth-rinse-inhaled-corticosteroid",
     benefits: ["Limite les mycoses buccales", "Après chaque inhalation", "Formule sans alcool"],
     title: "Rinçage de bouche après corticoïde inhalé",
@@ -830,9 +1038,23 @@ const norm = (value: string) => value.toLowerCase().trim();
  * « BÉCLOMÉTASONE (DIPROPIONATE DE) » → « BÉCLOMÉTASONE ». Le sel n'apporte
  * rien à une raison lue en une seconde, et il double la longueur de la ligne.
  */
+/**
+ * La substance telle qu'on la lit au comptoir : sans le sel ni l'hydrate.
+ * « CHLORHYDRATE DE VALACICLOVIR » se lit « VALACICLOVIR », « LÉVOTHYROXINE
+ * SODIQUE » se lit « LÉVOTHYROXINE ».
+ */
 function shortSubstance(value: string | null | undefined): string | null {
   if (!value) return null;
-  return value.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim() || null;
+  const SALT_PREFIX = /^(chlorhydrate|dichlorhydrate|sulfate|acetate|acétate|maleate|maléate|mesilate|mésilate|tartrate|citrate|bromhydrate|fumarate|hemifumarate|hémifumarate|succinate|besilate|bésilate|phosphate|nitrate|carbonate|gluconate|diglusonate|digluconate|lactate|oxalate|valerate|valérate|propionate|dipropionate|sodium|potassium|calcium|magnesium|magnésium)\s+(d[e']\s*|de\s+l'\s*)?/i;
+  const SALT_SUFFIX = /\s+(sodique|potassique|calcique|magnesique|magnésique|monosodique|disodique|sodium|potassium|magnesium|magnésium|monohydrate|monohydraté|monohydratee|monohydratée|dihydrate|dihydraté|dihydratee|dihydratée|trihydrate|trihydraté|trihydratee|trihydratée|hemihydrate|hémihydraté|hemihydratee|hémihydratée|anhydre|micronise|micronisé|micronisee|micronisée)\b/gi;
+  const cleaned = value
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(SALT_PREFIX, "")
+    .replace(SALT_SUFFIX, "")
+    .trim();
+  return cleaned || value.trim() || null;
 }
 
 /**

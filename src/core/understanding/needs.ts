@@ -28,6 +28,7 @@ export const NEED_KEYS = [
   "SKIN_DRYNESS",
   "GASTRIC_DISCOMFORT",
   "CONSTIPATION",
+  "HERPES_LESION_CARE",
 ] as const;
 
 export type NeedKey = (typeof NEED_KEYS)[number];
@@ -122,6 +123,12 @@ export const NEED_DEFINITIONS: Record<NeedKey, NeedDefinition> = {
     label: "Transit ralenti",
     description:
       "Traitement dont la constipation est un effet fréquent (fer, opioïdes, certains antispasmodiques), sans laxatif prescrit.",
+  },
+  HERPES_LESION_CARE: {
+    key: "HERPES_LESION_CARE",
+    label: "Lésions d'herpès ou de zona à soigner",
+    description:
+      "Antiviral oral ou local prescrit pour un herpès (labial, génital) ou un zona : des lésions cutanées ou muqueuses sont plausibles, et l'ordonnance ne prévoit ni antiseptique ni soin local.",
   },
 };
 
