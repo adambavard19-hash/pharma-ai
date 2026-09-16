@@ -73,3 +73,17 @@ describe("sécheresse oculaire", () => {
   });
 });
 
+describe("nom de la substance au comptoir", () => {
+  it("retire sel et hydrate, accents compris", () => {
+    const short = (substance: string) =>
+      detectAdviceOpportunities({
+        drugs: [{ lineIndex: 0, drugName: "X", knowledge: drug({ name: "X", inn: substance, atcCode: "J01FA10", therapeuticClass: "Antibiotique", commonSideEffects: [] }), officialSubstance: substance }],
+        patient: patient(),
+        needs: [],
+      }).find((o) => o.key === "digestive-tolerance-antibiotics")?.shortReason ?? "";
+    expect(short("AZITHROMYCINE DIHYDRATÉE")).toContain("(AZITHROMYCINE)");
+    expect(short("CHLORHYDRATE DE VALACICLOVIR")).toContain("(VALACICLOVIR)");
+    expect(short("LÉVOTHYROXINE SODIQUE")).toContain("(LEVOTHYROXINE)");
+  });
+});
+

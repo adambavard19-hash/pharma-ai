@@ -1275,7 +1275,12 @@ function shortSubstance(value: string | null | undefined): string | null {
   if (!value) return null;
   const SALT_PREFIX = /^(chlorhydrate|dichlorhydrate|sulfate|acetate|acétate|maleate|maléate|mesilate|mésilate|tartrate|citrate|bromhydrate|fumarate|hemifumarate|hémifumarate|succinate|besilate|bésilate|phosphate|nitrate|carbonate|gluconate|diglusonate|digluconate|lactate|oxalate|valerate|valérate|propionate|dipropionate|sodium|potassium|calcium|magnesium|magnésium)\s+(d[e']\s*|de\s+l'\s*)?/i;
   const SALT_SUFFIX = /\s+(sodique|potassique|calcique|magnesique|magnésique|monosodique|disodique|sodium|potassium|magnesium|magnésium|monohydrate|monohydraté|monohydratee|monohydratée|dihydrate|dihydraté|dihydratee|dihydratée|trihydrate|trihydraté|trihydratee|trihydratée|hemihydrate|hémihydraté|hemihydratee|hémihydratée|anhydre|micronise|micronisé|micronisee|micronisée)\b/gi;
+  // Les accents sont retirés avant de reconnaître le sel : « DIHYDRATÉE » ne
+  // se lit pas « dihydratee » pour une expression régulière, et on obtenait
+  // « AZITHROMYCINEE ». Au comptoir, la DCI en capitales sans accent se lit.
   const cleaned = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s*\([^)]*\)\s*/g, " ")
     .replace(/\s+/g, " ")
     .trim()
