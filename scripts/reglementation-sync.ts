@@ -4,6 +4,7 @@
  * Exécution : `npm run reglementation:sync -- [options]`
  *
  *   --toutes          toutes les boîtes remboursables (défaut)
+ *   --manquantes      seulement les boîtes remboursables sans statut (reprise)
  *   --cip 3400…       une ou plusieurs boîtes (répétable)
  *   --limite N        s'arrêter après N boîtes (pour un essai)
  *   --concurrence N   lectures en parallèle (défaut 3, maximum 6)
@@ -23,10 +24,14 @@ const DIM = `${ESC}[2m`;
 const RESET = `${ESC}[0m`;
 
 function parseArgs(argv: string[]) {
-  const options: { cip13s: string[]; limit?: number; concurrency?: number } = { cip13s: [] };
+  const options: { cip13s: string[]; limit?: number; concurrency?: number; onlyMissing?: boolean } = { cip13s: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--toutes") continue;
+    if (arg === "--manquantes") {
+      options.onlyMissing = true;
+      continue;
+    }
     if (arg === "--cip") {
       const value = argv[++i];
       if (!value || !/^\d{13}$/.test(value)) throw new Error("--cip attend un code CIP à 13 chiffres.");
@@ -53,6 +58,7 @@ async function main() {
     cip13s: options.cip13s.length > 0 ? options.cip13s : undefined,
     limit: options.limit,
     concurrency: options.concurrency,
+    onlyMissing: options.onlyMissing,
     onProgress: (done, total) => {
       if (done - lastPrinted >= 200 || done === total) {
         lastPrinted = done;

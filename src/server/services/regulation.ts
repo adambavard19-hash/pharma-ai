@@ -15,7 +15,7 @@ import type { Prisma } from "@/generated/prisma";
  */
 
 const USER_AGENT = "PharmaBoost/1.0 (+https://pharmaboost.app ; contact@pharmaboost.app)";
-const FETCH_TIMEOUT_MS = 25_000;
+const FETCH_TIMEOUT_MS = 45_000;
 const PAUSE_BETWEEN_FETCHES_MS = 120;
 
 export async function fetchBdmItRecord(cip13: string, fetchImpl: typeof fetch = fetch): Promise<BdmItReading> {
@@ -33,6 +33,8 @@ export type CoverageSyncOptions = {
   cip13s?: string[];
   /** Nombre maximal de boîtes à lire (pour un essai). */
   limit?: number;
+  /** Ne lire que les boîtes remboursables qui n'ont pas encore de statut (reprise après des lectures manquées). */
+  onlyMissing?: boolean;
   concurrency?: number;
   fetchImpl?: typeof fetch;
   onProgress?: (done: number, total: number) => void;
@@ -69,7 +71,9 @@ export async function syncCoverageStatuses(options: CoverageSyncOptions = {}): P
   const targets = await prisma.drugPresentation.findMany({
     where: options.cip13s
       ? { cip13: { in: options.cip13s } }
-      : { withdrawnAt: null, OR: [{ priceCents: { not: null } }, { coverageStatus: { isNot: null } }] },
+      : options.onlyMissing
+        ? { withdrawnAt: null, priceCents: { not: null }, coverageStatus: { is: null } }
+        : { withdrawnAt: null, OR: [{ priceCents: { not: null } }, { coverageStatus: { isNot: null } }] },
     select: { id: true, cip13: true, specialty: { select: { name: true, cisCode: true } }, coverageStatus: true },
     orderBy: { cip13: "asc" },
     ...(options.limit ? { take: options.limit } : {}),
