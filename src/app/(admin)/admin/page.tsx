@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/feedback";
 import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatCents, formatDate, formatNumber, formatRelative } from "@/lib/format";
+import { BusinessKpis } from "./business-kpis";
 
 export const metadata: Metadata = { title: "Administration PharmaBoost" };
 
@@ -106,6 +107,8 @@ export default async function PlatformAdminPage() {
           sont accessibles par aucun chemin de cette interface — la séparation est structurelle,
           pas seulement affichée.
         </Alert>
+
+        <BusinessKpis />
 
         <Grid cols={4}>
           <StatCard

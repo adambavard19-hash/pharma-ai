@@ -187,7 +187,7 @@ export async function setProspectBlocked(prospectId: string, blocked: boolean, r
   const prospect = await prisma.prospect.update({ where: { id: prospectId }, data: { blockedAt: blocked ? new Date() : null, blockedReason: blocked ? reason : null }, select: { name: true, salesRepId: true } });
   await recordProspectEvent({ prospectId, type: blocked ? "BLOCKED" : "UNBLOCKED", summary: blocked ? `Dossier suspendu${reason ? ` — ${reason}` : ""}.` : "Dossier réactivé.", actor: { type: "ADMIN", id: adminId, label: adminLabel } });
   await recordAudit({ action: "sales.prospect_blocked", entityType: "Prospect", entityId: prospectId, platformAdminId: adminId, metadata: { blocked, reason } });
-  await notifySalesRep({ salesRepId: prospect.salesRepId, type: blocked ? "PROSPECT_BLOCKED" : "PROSPECT_UNBLOCKED", title: `${prospect.name} : ${blocked ? "dossier suspendu" : "dossier réactivé"}`, body: reason ?? "", linkUrl: `/extranet/dossiers/${prospectId}`, severity: blocked ? "WARNING" : "INFO" });
+  if (prospect.salesRepId) await notifySalesRep({ salesRepId: prospect.salesRepId, type: blocked ? "PROSPECT_BLOCKED" : "PROSPECT_UNBLOCKED", title: `${prospect.name} : ${blocked ? "dossier suspendu" : "dossier réactivé"}`, body: reason ?? "", linkUrl: `/extranet/dossiers/${prospectId}`, severity: blocked ? "WARNING" : "INFO" });
 }
 
 export { isOpenStatus };

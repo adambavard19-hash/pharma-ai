@@ -111,6 +111,14 @@ const envSchema = z.object({
   YOUSIGN_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
   YOUSIGN_WEBHOOK_SECRET: z.string().optional(),
 
+  // Abonnements : Stripe. Les clés vivent dans l'environnement, jamais dans
+  // le code. En mode « test », une clé de production est refusée au démarrage.
+  STRIPE_MODE: z.enum(["test", "live"]).default("test"),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  /** Configuration du portail client Stripe à utiliser (facultatif : la configuration par défaut du compte sinon). */
+  STRIPE_PORTAL_CONFIGURATION_ID: z.string().optional(),
+
   EMAIL_PROVIDER: z.enum(["none", "resend", "smtp"]).default("none"),
   SMS_PROVIDER: z.enum(["none", "twilio"]).default("none"),
   /** Expéditeur affiché, ex. « Pharmacie X <contact@pharmacie-x.fr> ». */

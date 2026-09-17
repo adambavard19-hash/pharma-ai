@@ -27,7 +27,7 @@ export default async function ContractPage({ params }: { params: Promise<{ token
             {contract.expiresAt && !contract.finalizedAt ? ` · lien valable jusqu'au ${formatDate(contract.expiresAt)}` : ""}
           </p>
           <p className="mt-2 text-[14px] leading-6 text-[#4b5563]">
-            Votre interlocuteur : {contract.prospect.salesRep.firstName} {contract.prospect.salesRep.lastName} — {contract.prospect.salesRep.email}{contract.prospect.salesRep.phone ? ` — ${contract.prospect.salesRep.phone}` : ""}
+            Votre interlocuteur : {contract.prospect.salesRep ? `${contract.prospect.salesRep.firstName} ${contract.prospect.salesRep.lastName} — ${contract.prospect.salesRep.email}${contract.prospect.salesRep.phone ? ` — ${contract.prospect.salesRep.phone}` : ""}` : `l'équipe PharmaBoost — ${contract.companySignerEmail}`}
           </p>
           {status !== "FINALIZED" && contract.signatureProvider === "none" && (
             <p className="mt-3 rounded-lg bg-[#fff7ed] px-3.5 py-2.5 text-[13.5px] leading-5 text-[#9a3412]">La signature électronique vous sera proposée dans un second temps. D&apos;ici là, lisez le contrat et contactez votre interlocuteur pour toute question.</p>

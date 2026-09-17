@@ -66,7 +66,7 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
 
   await recordProspectEvent({ prospectId, type: "PHARMACY_CREATED", summary: `Espace pharmacie créé (${pharmacy.name}) ; e-mail d'accueil du titulaire : ${welcome.status === "SENT" ? "envoyé" : `non envoyé (${welcome.detail})`}.`, actor, metadata: { pharmacyId: pharmacy.id } });
   await recordAudit({ action: "sales.pharmacy_created", entityType: "Pharmacy", entityId: pharmacy.id, salesRepId: actor.type === "SALES" ? actor.id : null, platformAdminId: actor.type === "ADMIN" ? actor.id : null, metadata: { prospectId } });
-  await notifyAdmins({ type: "PHARMACY_CREATED", title: `${pharmacy.name} : espace créé`, body: `Dossier de ${prospect.salesRep.firstName} ${prospect.salesRep.lastName}.`, linkUrl: `/admin/pharmacies/${pharmacy.id}`, severity: "SUCCESS" });
+  await notifyAdmins({ type: "PHARMACY_CREATED", title: `${pharmacy.name} : espace créé`, body: `Dossier de ${prospect.salesRep ? `${prospect.salesRep.firstName} ${prospect.salesRep.lastName}` : "la console"}.`, linkUrl: `/admin/pharmacies/${pharmacy.id}`, severity: "SUCCESS" });
   return { ok: true, pharmacyId: pharmacy.id, welcome: { status: welcome.status, detail: welcome.detail } };
 }
 
@@ -78,6 +78,6 @@ export async function markProspectActivatedForUser(userId: string): Promise<void
   for (const prospect of prospects) {
     await prisma.prospect.update({ where: { id: prospect.id }, data: { status: "ACTIVATED" } });
     await recordProspectEvent({ prospectId: prospect.id, type: "STATUS_CHANGED", summary: "Le titulaire s'est connecté : officine activée.", actor: { type: "SYSTEM", label: "PharmaBoost" }, metadata: { from: "PHARMACY_CREATED", to: "ACTIVATED" } });
-    await notifySalesRep({ salesRepId: prospect.salesRepId, type: "PHARMACY_ACTIVATED", title: `${prospect.name} est active`, body: "Le titulaire s'est connecté à son espace.", linkUrl: `/extranet/dossiers/${prospect.id}`, severity: "SUCCESS" });
+    if (prospect.salesRepId) await notifySalesRep({ salesRepId: prospect.salesRepId, type: "PHARMACY_ACTIVATED", title: `${prospect.name} est active`, body: "Le titulaire s'est connecté à son espace.", linkUrl: `/extranet/dossiers/${prospect.id}`, severity: "SUCCESS" });
   }
 }

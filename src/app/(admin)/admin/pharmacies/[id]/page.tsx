@@ -75,9 +75,14 @@ export default async function ClientPharmacyPage({
 
   return (
     <>
-      <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
-        <Link href="/admin/pharmacies">Officines clientes</Link>
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
+          <Link href="/admin/pharmacies">Officines clientes</Link>
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/admin/abonnements/${pharmacy.id}`}>Abonnement & contrat</Link>
+        </Button>
+      </div>
 
       <PageHeader
         title={pharmacy.name}

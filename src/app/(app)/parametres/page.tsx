@@ -29,6 +29,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/feedback";
 import { SettingsTabs } from "./settings-tabs";
+import { SUBSCRIPTION_STATUS_LABELS, type SubscriptionStatusCode } from "@/core/billing/subscription";
+import { CONTRACT_STATUS_LABELS, type ContractStatusCode } from "@/core/sales/pipeline";
+import { ManageSubscriptionButton } from "./manage-subscription-button";
 import { formatCents, formatDate, formatDateTime, formatNumber } from "@/lib/format";
 import type { ProviderInfo } from "@/core/ai/ports";
 
@@ -42,6 +45,12 @@ export default async function SettingsPage({
   const session = await requirePermission(PERMISSIONS.SETTINGS_MANAGE);
   const params = await searchParams;
   const tab = params.onglet ?? "officine";
+  // Le contrat de l'officine, s'il existe : celui de la session, jamais un autre.
+  const contract = await prisma.contract.findFirst({
+    where: { OR: [{ pharmacyId: session.scope.pharmacyId }, { prospect: { pharmacyId: session.scope.pharmacyId } }] },
+    orderBy: { version: "desc" },
+    select: { id: true, version: true, status: true, finalizedAt: true, monthlyPriceCents: true, trialDays: true },
+  });
 
   const [pharmacy, subscription, auditLogs] = await Promise.all([
     prisma.pharmacy.findUniqueOrThrow({
@@ -92,12 +101,19 @@ export default async function SettingsPage({
                   planDescription: subscription.plan.description,
                   monthlyPriceCents: subscription.plan.monthlyPriceCents,
                   status: subscription.status,
-                  seats: subscription.seats,
                   trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
                   currentPeriodStart: subscription.currentPeriodStart.toISOString(),
+                  currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() ?? null,
+                  nextInvoiceAt: subscription.nextInvoiceAt?.toISOString() ?? null,
+                  lastPaymentAt: subscription.lastPaymentAt?.toISOString() ?? null,
+                  lastPaymentCents: subscription.lastPaymentCents,
+                  cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+                  cancelAt: subscription.cancelAt?.toISOString() ?? null,
+                  stripeLinked: Boolean(subscription.externalCustomerId),
                 }
               : null
           }
+          contract={contract ? { id: contract.id, version: contract.version, status: contract.status, finalizedAt: contract.finalizedAt?.toISOString() ?? null, monthlyPriceCents: contract.monthlyPriceCents, trialDays: contract.trialDays } : null}
           organizationName={pharmacy.organization.name}
         />
       ) : tab === "audit" ? (
@@ -496,38 +512,29 @@ function ComplianceSettings({ isDemo }: { isDemo: boolean }) {
 function SubscriptionSettings({
   subscription,
   organizationName,
+  contract,
 }: {
   subscription: {
     planName: string;
     planDescription: string;
     monthlyPriceCents: number;
     status: string;
-    seats: number;
     trialEndsAt: string | null;
     currentPeriodStart: string;
+    currentPeriodEnd: string | null;
+    nextInvoiceAt: string | null;
+    lastPaymentAt: string | null;
+    lastPaymentCents: number | null;
+    cancelAtPeriodEnd: boolean;
+    cancelAt: string | null;
+    stripeLinked: boolean;
   } | null;
   organizationName: string;
+  contract: { id: string; version: number; status: string; finalizedAt: string | null; monthlyPriceCents: number; trialDays: number } | null;
 }) {
-  if (!subscription) {
-    return (
-      <Card>
-        <CardContent className="pt-5">
-          <p className="text-[13px] text-text-secondary">
-            Aucun abonnement associé à {organizationName}.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const STATUS_LABELS: Record<string, { label: string; tone: "success" | "warning" | "danger" | "info" }> = {
-    TRIALING: { label: "Période d'essai", tone: "info" },
-    ACTIVE: { label: "Actif", tone: "success" },
-    PAST_DUE: { label: "Paiement en retard", tone: "warning" },
-    CANCELED: { label: "Résilié", tone: "danger" },
-    SUSPENDED: { label: "Suspendu", tone: "danger" },
-  };
-  const status = STATUS_LABELS[subscription.status] ?? { label: subscription.status, tone: "info" as const };
+  const status = subscription ? (SUBSCRIPTION_STATUS_LABELS[subscription.status as SubscriptionStatusCode] ?? { label: subscription.status, tone: "info" as const, patient: "" }) : null;
+  const trialEndsAt = subscription?.trialEndsAt ? new Date(subscription.trialEndsAt) : null;
+  const inTrial = subscription?.status === "TRIALING" && trialEndsAt;
 
   return (
     <div className="grid items-start gap-5 lg:grid-cols-2">
@@ -536,43 +543,54 @@ function SubscriptionSettings({
           title={
             <span className="flex items-center gap-2">
               <CreditCard className="size-4 text-brand-600 dark:text-brand-400" />
-              Abonnement
+              Mon abonnement
             </span>
           }
         />
         <CardContent>
-          <dl className="space-y-3.5">
-            <DataItem label="Groupe">{organizationName}</DataItem>
-            <DataItem label="Formule">
-              <span className="flex items-center gap-2">
-                {subscription.planName}
-                <Badge tone={status.tone}>{status.label}</Badge>
-              </span>
-            </DataItem>
-            <DataItem label="Description">{subscription.planDescription}</DataItem>
-            <DataItem label="Tarif">
-              {formatCents(subscription.monthlyPriceCents)} par mois
-            </DataItem>
-            <DataItem label="Postes">{subscription.seats}</DataItem>
-            <DataItem label="Début de période">
-              {formatDate(subscription.currentPeriodStart)}
-            </DataItem>
-            {subscription.trialEndsAt && (
-              <DataItem label="Fin de l'essai">{formatDate(subscription.trialEndsAt)}</DataItem>
-            )}
-          </dl>
+          {!subscription || !status ? (
+            <p className="text-[13.5px] leading-5 text-text-secondary">Aucun abonnement n&apos;est encore rattaché à {organizationName}. Si vous avez reçu un lien d&apos;activation par e-mail, ouvrez-le pour démarrer votre premier mois offert.</p>
+          ) : (
+            <dl className="space-y-3.5">
+              <DataItem label="Offre">
+                <span className="flex items-center gap-2">
+                  {subscription.planName}
+                  <Badge tone={status.tone}>{status.label}</Badge>
+                </span>
+              </DataItem>
+              {inTrial && <DataItem label="Premier mois offert">Fin de l&apos;essai le {formatDate(subscription.trialEndsAt)}</DataItem>}
+              <DataItem label={inTrial ? "Puis" : "Tarif"}>{formatCents(subscription.monthlyPriceCents)} HT par mois</DataItem>
+              <DataItem label="Prochaine échéance">
+                {subscription.status === "CANCELED" ? "Aucune : abonnement résilié" : subscription.cancelAtPeriodEnd && subscription.cancelAt ? `Résiliation le ${formatDate(subscription.cancelAt)}` : subscription.nextInvoiceAt ? formatDate(subscription.nextInvoiceAt) : trialEndsAt ? formatDate(trialEndsAt) : "—"}
+              </DataItem>
+              {subscription.lastPaymentCents ? <DataItem label="Dernier paiement">{formatCents(subscription.lastPaymentCents)} le {formatDate(subscription.lastPaymentAt)}</DataItem> : null}
+              <DataItem label="Statut">{status.patient}</DataItem>
+            </dl>
+          )}
+          <div className="mt-5">
+            <ManageSubscriptionButton disabled={!subscription?.stripeLinked} />
+            <p className="mt-2 text-[12.5px] leading-5 text-text-tertiary">Moyen de paiement, factures et coordonnées de facturation se gèrent sur le portail sécurisé Stripe. Les conditions de résiliation sont celles de votre contrat.</p>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader title="Facturation" />
+        <CardHeader title="Mon contrat" />
         <CardContent>
-          <Alert tone="info" title="Aucun prestataire de paiement branché">
-            Le modèle de données prévoit le plan, l&apos;abonnement, le statut, la période
-            d&apos;essai et les limites. Le rattachement à un prestataire de paiement se fera
-            via le champ <code className="font-mono text-[12px]">externalCustomerId</code>,
-            sans modification du reste du produit.
-          </Alert>
+          {contract ? (
+            <dl className="space-y-3.5">
+              <DataItem label="Version">{contract.version}</DataItem>
+              <DataItem label="Statut">{CONTRACT_STATUS_LABELS[contract.status as ContractStatusCode] ?? contract.status}{contract.finalizedAt ? ` · signé le ${formatDate(contract.finalizedAt)}` : ""}</DataItem>
+              <DataItem label="Conditions">{formatCents(contract.monthlyPriceCents)} HT par mois{contract.trialDays ? ` · ${contract.trialDays} premiers jours offerts` : ""}</DataItem>
+            </dl>
+          ) : (
+            <p className="text-[13.5px] leading-5 text-text-secondary">Aucun contrat n&apos;est rattaché à votre officine pour l&apos;instant.</p>
+          )}
+          {contract && (
+            <a href={`/api/abonnement/contrat/${contract.id}`} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-brand-700 underline dark:text-brand-300">
+              Consulter le contrat (PDF)
+            </a>
+          )}
         </CardContent>
       </Card>
     </div>

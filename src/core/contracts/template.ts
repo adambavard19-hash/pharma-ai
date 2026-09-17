@@ -31,6 +31,10 @@ export type ContractTerms = {
   /** Nombre de points de vente couverts. */
   outletCount: number;
   startDate: Date;
+  /** Nom de l'offre souscrite (« PharmaBoost »). */
+  planName?: string;
+  /** Jours d'essai offerts à la souscription ; 0 ou absent : aucun. */
+  trialDays?: number;
 };
 
 export type ContractDocument = {
@@ -82,7 +86,10 @@ export function buildContractDocument(input: {
       {
         heading: "Article 3 — Conditions financières",
         paragraphs: [
-          `L'abonnement est facturé ${euros(terms.monthlyPriceCents)} par mois pour ${terms.outletCount} point${terms.outletCount > 1 ? "s" : ""} de vente, soit ${euros(yearly)} par an, payable mensuellement à réception de facture. Les prix s'entendent hors taxes ; la TVA en vigueur s'applique.`,
+          `L'abonnement${terms.planName ? ` « ${terms.planName} »` : ""} est facturé ${euros(terms.monthlyPriceCents)} par mois pour ${terms.outletCount} point${terms.outletCount > 1 ? "s" : ""} de vente, soit ${euros(yearly)} par an, payable mensuellement par prélèvement automatique sur le moyen de paiement enregistré par la Pharmacie. Les prix s'entendent hors taxes ; la TVA en vigueur s'applique.`,
+          ...(terms.trialDays && terms.trialDays > 0
+            ? [`Les ${terms.trialDays} premiers jours suivant la souscription sont offerts : aucun prélèvement n'intervient pendant cette période, et la Pharmacie peut y mettre fin sans frais avant son terme. Le premier prélèvement intervient à l'issue de la période offerte.`]
+            : []),
           "Tout retard de paiement entraîne l'application des pénalités légales et, après mise en demeure restée sans effet quinze jours, la suspension du service.",
         ],
       },

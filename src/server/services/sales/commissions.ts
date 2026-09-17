@@ -13,6 +13,8 @@ const euros = (cents: number) => `${(cents / 100).toFixed(2).replace(".", ",")} 
 export async function upsertCommissionForContract(params: { prospectId: string; contractId: string; status: "FORECAST" | "EARNED"; actor: SalesActor }): Promise<void> {
   const contract = await prisma.contract.findUniqueOrThrow({ where: { id: params.contractId }, include: { prospect: { include: { salesRep: true } } } });
   const rep = contract.prospect.salesRep;
+  // Dossier tenu par la console, sans commercial : aucune commission à calculer.
+  if (!rep) return;
   const amountCents = computeCommissionCents({ type: rep.commissionType, value: rep.commissionValue }, { monthlyPriceCents: contract.monthlyPriceCents, durationMonths: contract.durationMonths });
   const existing = await prisma.commission.findFirst({ where: { prospectId: params.prospectId, status: { in: ["FORECAST", "EARNED", "PAYABLE"] } } });
   const dueAt = params.status === "EARNED" ? endOfNextMonth(new Date()) : null;

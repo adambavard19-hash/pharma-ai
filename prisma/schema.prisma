@@ -87,29 +87,32 @@ model Pharmacy {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships     Membership[]
-  patients        Patient[]
-  reminders       Reminder[]
-  products        Product[]
-  stockItems      StockItem[]
-  stockMovements  StockMovement[]
-  drugStocks      PharmacyDrugStock[]
-  prescriptions   Prescription[]
-  analysisRuns    AnalysisRun[]
-  recommendations Recommendation[]
-  pharmacyRules   PharmacyRule[]
-  documents       PatientDocument[]
-  sales           Sale[]
-  notifications   Notification[]
-  auditLogs       AuditLog[]
-  sessions        Session[]
-  imports         ImportJob[]
-  aiUsage         AiUsageRecord[]
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships         Membership[]
+  patients            Patient[]
+  reminders           Reminder[]
+  products            Product[]
+  stockItems          StockItem[]
+  stockMovements      StockMovement[]
+  drugStocks          PharmacyDrugStock[]
+  prescriptions       Prescription[]
+  analysisRuns        AnalysisRun[]
+  recommendations     Recommendation[]
+  pharmacyRules       PharmacyRule[]
+  documents           PatientDocument[]
+  sales               Sale[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  sessions            Session[]
+  imports             ImportJob[]
+  aiUsage             AiUsageRecord[]
   /// Le dossier commercial dont cette officine est issue, s'il y en a un.
-  prospect        Prospect?
+  prospect            Prospect?
   /// La liaison avec le logiciel de gestion de l'officine, s'il y en a une.
-  stockConnection StockConnection?
+  stockConnection     StockConnection?
+  /// Contrats et liens d'activation rattachés directement à l'officine.
+  contracts           Contract[]
+  subscriptionInvites SubscriptionInvite[]
 
   @@index([organizationId])
   @@map("pharmacies")
@@ -159,55 +162,174 @@ model StockConnection {
 // ABONNEMENT SaaS (modèle économique — facturation branchable ultérieurement)
 // ===========================================================================
 
-enum PlanCode {
-  ESSENTIEL
-  PRO
-  GROUPE
-}
-
+/// Une offre PharmaBoost, pilotée depuis la console : nom, prix mensuel,
+/// durée d'essai. Le prix Stripe correspondant est créé par la console au
+/// moment où l'offre est enregistrée — jamais à la main dans Stripe.
+///
+/// Un prix Stripe est immuable : changer le tarif d'une offre crée un nouveau
+/// prix (`stripePriceId` remplacé) ; les abonnements en cours gardent l'ancien.
 model Plan {
   id                String   @id @default(cuid())
-  code              PlanCode @unique
+  /// Clé stable, en majuscules (« PHARMABOOST »). Libre : plus une énumération.
+  code              String   @unique
   name              String
   description       String
   monthlyPriceCents Int
+  currency          String   @default("eur")
+  /// Jours d'essai offerts à la souscription (30 = « premier mois offert »).
+  trialDays         Int      @default(30)
   /// Limites du plan : { maxPharmacies, maxUsers, maxPrescriptionsPerMonth, ... }
   limits            Json     @default("{}")
   isActive          Boolean  @default(true)
+  /// L'offre proposée par défaut quand on prépare un contrat.
+  isDefault         Boolean  @default(false)
+  stripeProductId   String?
+  stripePriceId     String?  @unique
   createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
 
   subscriptions Subscription[]
+  contracts     Contract[]
+  invites       SubscriptionInvite[]
 
   @@map("plans")
 }
 
+/// Statut de l'abonnement, aligné sur Stripe. `SUSPENDED` est propre à
+/// PharmaBoost : l'accès est coupé par l'administrateur, quel que soit Stripe.
 enum SubscriptionStatus {
   TRIALING
   ACTIVE
   PAST_DUE
   CANCELED
   SUSPENDED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  UNPAID
+  PAUSED
 }
 
 model Subscription {
-  id                 String             @id @default(cuid())
-  organizationId     String             @unique
-  planId             String
-  status             SubscriptionStatus @default(TRIALING)
-  seats              Int                @default(5)
-  trialEndsAt        DateTime?
-  currentPeriodStart DateTime           @default(now())
-  currentPeriodEnd   DateTime?
-  canceledAt         DateTime?
-  /// Référence chez le prestataire de paiement (non connecté dans le MVP).
-  externalCustomerId String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  id                   String             @id @default(cuid())
+  organizationId       String             @unique
+  planId               String
+  status               SubscriptionStatus @default(TRIALING)
+  seats                Int                @default(5)
+  trialStartsAt        DateTime?
+  trialEndsAt          DateTime?
+  currentPeriodStart   DateTime           @default(now())
+  currentPeriodEnd     DateTime?
+  /// Résiliation programmée à la fin de la période en cours.
+  cancelAtPeriodEnd    Boolean            @default(false)
+  cancelAt             DateTime?
+  canceledAt           DateTime?
+  endedAt              DateTime?
+  /// Le client Stripe (`cus_…`). Un identifiant, jamais une autorisation :
+  /// la portée vient toujours de la session.
+  externalCustomerId   String?            @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  /// Prochaine facture annoncée par Stripe, et dernier paiement.
+  nextInvoiceAt        DateTime?
+  lastPaymentAt        DateTime?
+  lastPaymentCents     Int?
+  lastPaymentFailedAt  DateTime?
+  /// Suspension d'accès décidée par l'administrateur.
+  suspendedAt          DateTime?
+  suspendedReason      String?
+  /// Le contrat qui fonde cet abonnement, s'il y en a un.
+  contractId           String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  plan         Plan         @relation(fields: [planId], references: [id])
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         Plan             @relation(fields: [planId], references: [id])
+  payments     BillingPayment[]
 
+  @@index([status])
   @@map("subscriptions")
+}
+
+/// Le lien d'activation envoyé au titulaire : un jeton PharmaBoost, dont seule
+/// l'empreinte est conservée, qui ouvre un Checkout Stripe rattaché à CETTE
+/// officine, cette offre, ce contrat. Renvoyer le lien ne crée pas un nouveau
+/// jeton ; ouvrir le lien crée une session Checkout fraîche (les sessions
+/// Stripe expirent en 24 h, pas le lien).
+model SubscriptionInvite {
+  id                String    @id @default(cuid())
+  pharmacyId        String
+  organizationId    String
+  planId            String
+  contractId        String?
+  tokenHash         String    @unique
+  sentTo            String
+  sentAt            DateTime?
+  sentCount         Int       @default(0)
+  openedAt          DateTime?
+  /// Le client Stripe créé pour cette officine au premier clic ; réutilisé
+  /// à chaque nouvelle session Checkout pour ne pas créer de doublons.
+  stripeCustomerId  String?
+  /// Dernière session Checkout créée pour ce lien.
+  checkoutSessionId String?
+  checkoutCreatedAt DateTime?
+  completedAt       DateTime?
+  expiresAt         DateTime
+  createdByAdminId  String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  pharmacy Pharmacy  @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [planId], references: [id])
+  contract Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  @@index([pharmacyId])
+  @@map("subscription_invites")
+}
+
+/// Une facture Stripe, telle que reçue par webhook : payée, échouée, ouverte.
+model BillingPayment {
+  id               String    @id @default(cuid())
+  subscriptionId   String
+  organizationId   String
+  stripeInvoiceId  String    @unique
+  /// PAID · FAILED · OPEN · VOID · UNCOLLECTIBLE · DRAFT
+  status           String
+  amountCents      Int
+  currency         String    @default("eur")
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  paidAt           DateTime?
+  failedAt         DateTime?
+  attemptCount     Int       @default(0)
+  hostedInvoiceUrl String?
+  invoicePdfUrl    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("billing_payments")
+}
+
+/// Chaque notification Stripe reçue, une fois. L'identifiant d'événement est
+/// unique : un webhook rejoué est reconnu et ignoré, jamais rejoué.
+model BillingEvent {
+  id             String    @id @default(cuid())
+  stripeEventId  String    @unique
+  type           String
+  organizationId String?
+  pharmacyId     String?
+  summary        String
+  /// L'objet Stripe, allégé (identifiants, statuts, montants, dates).
+  payload        Json      @default("{}")
+  receivedAt     DateTime  @default(now())
+  processedAt    DateTime?
+  error          String?
+
+  @@index([organizationId, receivedAt])
+  @@index([receivedAt])
+  @@map("billing_events")
 }
 
 // ===========================================================================
@@ -2297,7 +2419,9 @@ model Prospect {
   siret        String?
   outletCount  Int?
 
-  salesRepId String
+  /// Le commercial qui suit le dossier. Vide : dossier tenu par la console
+  /// (officine créée directement par l'administrateur).
+  salesRepId String?
   status     ProspectStatus @default(PROSPECT)
 
   lastContactAt     DateTime?
@@ -2318,7 +2442,7 @@ model Prospect {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  salesRep    SalesRep        @relation(fields: [salesRepId], references: [id])
+  salesRep    SalesRep?       @relation(fields: [salesRepId], references: [id])
   pharmacy    Pharmacy?       @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
   events      ProspectEvent[]
   contracts   Contract[]
@@ -2380,6 +2504,11 @@ model Contract {
 
   monthlyPriceCents Int
   durationMonths    Int
+  /// L'offre et l'essai contractuels, tels qu'écrits dans le PDF.
+  planId            String?
+  trialDays         Int     @default(0)
+  /// L'officine concernée, quand elle existe déjà au moment du contrat.
+  pharmacyId        String?
 
   pharmacySignerName  String
   pharmacySignerEmail String
@@ -2402,9 +2531,13 @@ model Contract {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  prospect Prospect             @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  plan     Plan?                @relation(fields: [planId], references: [id])
+  pharmacy Pharmacy?            @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+  invites  SubscriptionInvite[]
 
   @@index([prospectId])
+  @@index([pharmacyId])
   @@index([status])
   @@map("contracts")
 }

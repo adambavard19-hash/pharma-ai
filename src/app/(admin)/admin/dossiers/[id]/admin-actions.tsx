@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { COMMISSION_STATUS_LABELS, PROSPECT_STATUSES, PROSPECT_STATUS_LABELS } from "@/core/sales/pipeline";
 
 type Props = {
-  prospect: { id: string; status: string; blocked: boolean; salesRepId: string; pharmacyId: string | null; contracts: { id: string; version: number; status: string; providerEnvelopeId: string | null }[]; commissions: { id: string; amountCents: number; status: string; dueAt: string; note: string }[] };
+  prospect: { id: string; status: string; blocked: boolean; salesRepId: string | null; pharmacyId: string | null; contracts: { id: string; version: number; status: string; providerEnvelopeId: string | null }[]; commissions: { id: string; amountCents: number; status: string; dueAt: string; note: string }[] };
   reps: { id: string; firstName: string; lastName: string }[];
 };
 
@@ -20,7 +20,7 @@ type Props = {
 export function AdminActionsPanel({ prospect, reps }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [rep, setRep] = useState(prospect.salesRepId);
+  const [rep, setRep] = useState(prospect.salesRepId ?? "");
   const [status, setStatus] = useState(prospect.status);
   const [note, setNote] = useState("");
   const [blockReason, setBlockReason] = useState("");
@@ -48,7 +48,7 @@ export function AdminActionsPanel({ prospect, reps }: Props) {
       <Card>
         <CardHeader title="Contrôle du dossier" description="Réassigner, changer l'étape, suspendre : chaque geste est journalisé avec votre nom." />
         <CardContent className="grid gap-4 sm:grid-cols-3">
-          <Field label="Commercial assigné" htmlFor="a-rep"><div className="flex gap-2"><Select id="a-rep" value={rep} onChange={(e) => setRep(e.target.value)}>{reps.map((r) => <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>)}</Select><Button size="sm" variant="outline" disabled={rep === prospect.salesRepId} loading={pending} onClick={() => run(() => reassignProspectAction({ prospectId: prospect.id, salesRepId: rep }))}>OK</Button></div></Field>
+          <Field label="Commercial assigné" htmlFor="a-rep"><div className="flex gap-2"><Select id="a-rep" value={rep} onChange={(e) => setRep(e.target.value)}>{reps.map((r) => <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>)}</Select><Button size="sm" variant="outline" disabled={rep === (prospect.salesRepId ?? "")} loading={pending} onClick={() => run(() => reassignProspectAction({ prospectId: prospect.id, salesRepId: rep }))}>OK</Button></div></Field>
           <Field label="Étape" htmlFor="a-status"><div className="flex gap-2"><Select id="a-status" value={status} onChange={(e) => setStatus(e.target.value)}>{PROSPECT_STATUSES.map((s) => <option key={s} value={s}>{PROSPECT_STATUS_LABELS[s]}</option>)}</Select><Button size="sm" variant="outline" disabled={status === prospect.status} loading={pending} onClick={() => run(() => adminSetProspectStatusAction({ prospectId: prospect.id, status }))}>OK</Button></div></Field>
           <Field label={prospect.blocked ? "Dossier suspendu" : "Suspendre le dossier"} htmlFor="a-block"><div className="flex gap-2">{!prospect.blocked && <Input id="a-block" placeholder="Motif" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} />}<Button size="sm" variant={prospect.blocked ? "outline" : "danger"} loading={pending} leadingIcon={<ShieldAlert className="size-4" />} onClick={() => run(() => setProspectBlockedAction({ prospectId: prospect.id, blocked: !prospect.blocked, reason: blockReason || null }))}>{prospect.blocked ? "Réactiver" : "Suspendre"}</Button></div></Field>
           <div className="sm:col-span-3 flex gap-2"><Textarea rows={1} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note interne (visible du commercial)" /><Button size="sm" variant="outline" disabled={note.trim().length < 2} loading={pending} onClick={() => run(async () => { const r = await adminAddNoteAction({ prospectId: prospect.id, note }); if (r.ok) setNote(""); return r; })}>Noter</Button></div>

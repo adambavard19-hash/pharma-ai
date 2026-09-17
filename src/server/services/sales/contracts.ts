@@ -34,9 +34,9 @@ function reference(prospectName: string, version: number): string {
 }
 
 /** Génère le PDF depuis le modèle et les données vérifiées ; le contrat naît en brouillon. */
-export async function generateContract(prospectId: string, terms: { monthlyPriceCents: number; durationMonths: number; startDate: Date }, actor: SalesActor): Promise<{ ok: true; contractId: string } | { ok: false; error: string }> {
+export async function generateContract(prospectId: string, terms: { monthlyPriceCents: number; durationMonths: number; startDate: Date; planId?: string | null; planName?: string; trialDays?: number }, actor: SalesActor): Promise<{ ok: true; contractId: string } | { ok: false; error: string }> {
   const [prospect, company] = await Promise.all([
-    prisma.prospect.findUnique({ where: { id: prospectId }, include: { contracts: { orderBy: { version: "desc" }, take: 1, select: { version: true, status: true } } } }),
+    prisma.prospect.findUnique({ where: { id: prospectId }, include: { contracts: { orderBy: { version: "desc" }, take: 1, select: { version: true, status: true } }, pharmacy: { select: { id: true } } } }),
     getCompanyProfile(),
   ]);
   if (!prospect) return { ok: false, error: "Dossier introuvable." };
@@ -72,7 +72,7 @@ export async function generateContract(prospectId: string, terms: { monthlyPrice
       siret: prospect.siret,
       email: prospect.email,
     },
-    terms: { ...terms, outletCount: prospect.outletCount ?? 1 },
+    terms: { monthlyPriceCents: terms.monthlyPriceCents, durationMonths: terms.durationMonths, startDate: terms.startDate, planName: terms.planName, trialDays: terms.trialDays ?? 0, outletCount: prospect.outletCount ?? 1 },
   });
   const pdf = await renderContractPdf(document);
   const fileKey = `plateforme/contrats/${prospect.id}/${ref}.pdf`;
@@ -89,6 +89,9 @@ export async function generateContract(prospectId: string, terms: { monthlyPrice
       accessTokenHash: hashToken(token),
       monthlyPriceCents: terms.monthlyPriceCents,
       durationMonths: terms.durationMonths,
+      planId: terms.planId ?? null,
+      trialDays: terms.trialDays ?? 0,
+      pharmacyId: prospect.pharmacy?.id ?? null,
       pharmacySignerName: prospect.ownerName,
       pharmacySignerEmail: prospect.email,
       companySignerName: company.representativeName,
@@ -99,7 +102,7 @@ export async function generateContract(prospectId: string, terms: { monthlyPrice
   // Le jeton en clair n'est conservé nulle part : il repart dans l'e-mail au moment de l'envoi.
   contractTokens.set(contract.id, token);
   await prisma.prospect.update({ where: { id: prospect.id }, data: { monthlyPriceCents: terms.monthlyPriceCents } });
-  await recordProspectEvent({ prospectId: prospect.id, type: "CONTRACT_GENERATED", summary: `Contrat ${ref} généré (${(terms.monthlyPriceCents / 100).toFixed(2).replace(".", ",")} € HT/mois, ${terms.durationMonths} mois).`, actor, metadata: { contractId: contract.id } });
+  await recordProspectEvent({ prospectId: prospect.id, type: "CONTRACT_GENERATED", summary: `Contrat ${ref} généré (${(terms.monthlyPriceCents / 100).toFixed(2).replace(".", ",")} € HT/mois, ${terms.durationMonths} mois${terms.trialDays ? `, ${terms.trialDays} jours offerts` : ""}).`, actor, metadata: { contractId: contract.id, planId: terms.planId ?? null } });
   await recordAudit({ action: "sales.contract_generated", entityType: "Contract", entityId: contract.id, salesRepId: actor.type === "SALES" ? actor.id : null, platformAdminId: actor.type === "ADMIN" ? actor.id : null });
   return { ok: true, contractId: contract.id };
 }
@@ -177,9 +180,9 @@ export async function sendContract(contractId: string, actor: SalesActor): Promi
   const message = buildContractEmail({
     ownerName: contract.pharmacySignerName,
     pharmacyName: contract.prospect.name,
-    salesRepName: `${contract.prospect.salesRep.firstName} ${contract.prospect.salesRep.lastName}`,
-    salesRepEmail: contract.prospect.salesRep.email,
-    salesRepPhone: contract.prospect.salesRep.phone,
+    salesRepName: contract.prospect.salesRep ? `${contract.prospect.salesRep.firstName} ${contract.prospect.salesRep.lastName}` : "L'équipe PharmaBoost",
+    salesRepEmail: contract.prospect.salesRep?.email ?? contract.companySignerEmail,
+    salesRepPhone: contract.prospect.salesRep?.phone ?? null,
     url,
     signingUrl,
     expiresAt,
@@ -239,11 +242,11 @@ export async function applySignatureStatus(contractId: string, status: Signature
   }
   if (status === "FINALIZED") {
     await upsertCommissionForContract({ prospectId: contract.prospect.id, contractId, status: "EARNED", actor: { type: "SYSTEM", label: "PharmaBoost" } });
-    await notifySalesRep({ salesRepId: contract.prospect.salesRepId, type: "CONTRACT_SIGNED", title: `${contract.prospect.name} : contrat signé`, body: "Vous pouvez créer l'espace pharmacie.", linkUrl: `/extranet/dossiers/${contract.prospect.id}`, severity: "SUCCESS" });
+    if (contract.prospect.salesRepId) await notifySalesRep({ salesRepId: contract.prospect.salesRepId, type: "CONTRACT_SIGNED", title: `${contract.prospect.name} : contrat signé`, body: "Vous pouvez créer l'espace pharmacie.", linkUrl: `/extranet/dossiers/${contract.prospect.id}`, severity: "SUCCESS" });
     await notifyAdmins({ type: "CONTRACT_SIGNED", title: `Nouvelle pharmacie signée : ${contract.prospect.name}`, body: `Contrat v${contract.version} finalisé.`, linkUrl: `/admin/dossiers/${contract.prospect.id}`, severity: "SUCCESS" });
   }
   if (status === "REFUSED" || status === "EXPIRED") {
-    await notifySalesRep({ salesRepId: contract.prospect.salesRepId, type: `CONTRACT_${status}`, title: `${contract.prospect.name} : contrat ${CONTRACT_STATUS_LABELS[status].toLowerCase()}`, body: reason ?? "", linkUrl: `/extranet/dossiers/${contract.prospect.id}`, severity: "WARNING" });
+    if (contract.prospect.salesRepId) await notifySalesRep({ salesRepId: contract.prospect.salesRepId, type: `CONTRACT_${status}`, title: `${contract.prospect.name} : contrat ${CONTRACT_STATUS_LABELS[status].toLowerCase()}`, body: reason ?? "", linkUrl: `/extranet/dossiers/${contract.prospect.id}`, severity: "WARNING" });
     await notifyAdmins({ type: `CONTRACT_${status}`, title: `${contract.prospect.name} : contrat ${CONTRACT_STATUS_LABELS[status].toLowerCase()}`, body: reason ?? "", linkUrl: `/admin/dossiers/${contract.prospect.id}`, severity: "WARNING" });
   }
 }

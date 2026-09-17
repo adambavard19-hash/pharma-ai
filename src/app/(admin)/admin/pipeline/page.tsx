@@ -47,7 +47,7 @@ export default async function AdminPipelinePage({ searchParams }: { searchParams
                   <Link href={`/admin/dossiers/${p.id}`} className="font-medium text-text-primary hover:underline">{p.name}</Link>
                   {p.city && <span className="text-text-tertiary">{p.city}</span>}
                   <span aria-hidden="true" className="text-text-tertiary">·</span>
-                  <span className="text-text-secondary">{p.salesRep.firstName}</span>
+                  <span className="text-text-secondary">{p.salesRep?.firstName ?? "Console"}</span>
                   <span aria-hidden="true" className="text-text-tertiary">·</span>
                   <ProspectStatusBadge status={p.status} />
                   {p.contracts[0] && <ContractStatusBadge status={p.contracts[0].status} />}

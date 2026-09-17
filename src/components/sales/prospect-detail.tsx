@@ -29,7 +29,7 @@ export function ProspectDetail({ prospect, actions, mode, pharmacyHref }: { pros
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px] text-text-secondary">
             {prospect.ownerName && <span>{prospect.ownerName}</span>}
             {address && <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" />{address}</span>}
-            {mode === "admin" && <span>Commercial : {prospect.salesRep.firstName} {prospect.salesRep.lastName}</span>}
+            {mode === "admin" && <span>Commercial : {prospect.salesRep ? `${prospect.salesRep.firstName} ${prospect.salesRep.lastName}` : "dossier tenu par la console"}</span>}
           </p>
           <div className="flex flex-wrap gap-2">
             {prospect.phone && <a href={`tel:${prospect.phone.replace(/\s+/g, "")}`} className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border-default px-3.5 text-[13.5px] font-medium text-text-primary hover:bg-surface-sunken"><Phone className="size-4" />{prospect.phone}</a>}

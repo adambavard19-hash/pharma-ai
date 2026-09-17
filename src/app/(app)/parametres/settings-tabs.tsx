@@ -35,7 +35,7 @@ export function SettingsTabs({
           : []),
         { key: "moteur", label: "Moteur PharmaBoost" },
         { key: "conformite", label: "Conformité" },
-        { key: "abonnement", label: "Abonnement" },
+        { key: "abonnement", label: "Mon abonnement" },
         ...(canSeeAudit
           ? [{ key: "audit", label: "Journal d'audit", count: auditCount }]
           : []),
