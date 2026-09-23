@@ -48,10 +48,54 @@ async function resolveScannedItem(pharmacyId: string, raw: string): Promise<Scan
   if (learned && !learned.product.deletedAt) return { kind: "PRODUCT", name: learned.product.name, productId: learned.product.id, ean: digits };
   const product = await prisma.product.findFirst({ where: { pharmacyId, ean: digits, deletedAt: null }, select: { id: true, name: true } });
   if (product) return { kind: "PRODUCT", name: product.name, productId: product.id, ean: digits };
-  // Inconnu : le nom donné par les bases ouvertes aide à retrouver la référence dans le stock.
+  // Inconnu : le nom donné par les bases ouvertes permet de retrouver la
+  // référence dans le stock par ses mots, et de retenir le code si le
+  // rapprochement est sans ambiguïté.
   const facts = await findOpenFactsName(digits);
   const hint = facts ? `${facts.name}${facts.brand ? ` — ${facts.brand}` : ""}` : null;
+  if (facts) {
+    const match = await matchStockProductByName(pharmacyId, `${facts.brand ?? ""} ${facts.name}`);
+    if (match) {
+      await prisma.productBarcode.upsert({ where: { pharmacyId_code: { pharmacyId, code: digits } }, create: { pharmacyId, productId: match.id, code: digits, source: "AUTO" }, update: {} });
+      return { kind: "PRODUCT", name: match.name, productId: match.id, ean: digits };
+    }
+  }
   return { kind: "UNKNOWN", name: hint ? `${hint} (code ${digits}, à rattacher au stock)` : `Code-barres ${digits} (produit inconnu du stock)`, code: digits, hint };
+}
+
+function nameTokens(text: string): string[] {
+  return [...new Set(text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().split(/[^A-Z0-9]+/).filter((token) => token.length >= 3))];
+}
+
+/**
+ * Retrouve un produit du stock d'après un nom venu d'ailleurs (« Ergyphilus
+ * gst — Nutergia »). Les mots du nom sont cherchés dans les libellés du
+ * stock ; on ne retient un produit que s'il est seul à réunir au moins deux
+ * mots, ou seul à en réunir un quand ce mot est rare dans le stock. Au
+ * moindre doute, rien : un mauvais rapprochement vaudrait moins qu'aucun.
+ */
+export async function matchStockProductByName(pharmacyId: string, name: string): Promise<{ id: string; name: string } | null> {
+  const tokens = nameTokens(name);
+  if (tokens.length === 0) return null;
+  const candidates = await prisma.product.findMany({
+    where: { pharmacyId, deletedAt: null, OR: tokens.map((token) => ({ name: { contains: token, mode: "insensitive" as const } })) },
+    select: { id: true, name: true },
+    take: 200,
+  });
+  if (candidates.length === 0) return null;
+  const scored = candidates
+    .map((product) => {
+      const productTokens = nameTokens(product.name);
+      const hits = tokens.filter((token) => productTokens.some((candidate) => candidate === token || (token.length >= 5 && candidate.startsWith(token.slice(0, 5)))));
+      return { product, hits: hits.length };
+    })
+    .sort((a, b) => b.hits - a.hits);
+  const [best, second] = scored;
+  if (!best || best.hits === 0) return null;
+  const unique = !second || second.hits < best.hits;
+  if (best.hits >= 2 && unique) return best.product;
+  if (best.hits === 1 && unique && candidates.length === 1) return best.product;
+  return null;
 }
 
 export async function recordCounterScan(agent: AgentContext, input: { code: string; post: string; scannedAt: Date | null }): Promise<CounterScanResult> {
