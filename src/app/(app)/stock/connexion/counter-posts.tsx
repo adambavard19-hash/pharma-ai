@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Barcode, Plus, Trash2 } from "lucide-react";
+import { Barcode, Download, Plus, Trash2 } from "lucide-react";
 import { createPostPairingAction, revokePostAction } from "@/server/actions/stock-sync";
 import { describeAge } from "@/core/stock/connectors";
 import { Button } from "@/components/ui/button";
@@ -87,7 +87,15 @@ export function CounterPostsCard({ serverUrl, posts }: { serverUrl: string; post
             <Input id="post-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Caisse 1" className="w-56" />
           </Field>
           <Button loading={pending} leadingIcon={<Plus className="size-4" />} onClick={generate}>Ajouter un poste</Button>
+          <Button asChild variant="outline" leadingIcon={<Download className="size-4" />}>
+            <a href="/api/agent/telecharger">Télécharger PharmaBoost Connect</a>
+          </Button>
         </div>
+        {posts.some((post) => post.paired) && (
+          <p className="text-[12.5px] leading-5 text-text-tertiary">
+            Mettre à jour un poste déjà relié : télécharger, extraire, puis dans le dossier extrait <code className="font-mono">powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -MiseAJour</code>. Aucun nouveau code.
+          </p>
+        )}
 
         {code && (
           <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/30">
