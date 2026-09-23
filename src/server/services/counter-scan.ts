@@ -81,7 +81,9 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
       pharmacyId: agent.scope.pharmacyId,
       source: "COUNTER_SCAN",
       counterPost: post,
-      status: { in: ["DRAFT", "NEEDS_VERIFICATION"] },
+      // Une vente déjà analysée mais pas encore encaissée reste celle du
+      // patient au comptoir : un bip de plus la complète et la ré-analyse.
+      status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
       updatedAt: { gte: new Date(now.getTime() - SAME_SALE_WINDOW_MS) },
       sales: { none: {} },
     },
@@ -101,7 +103,8 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
     } else {
       await prisma.prescriptionLine.create({ data: { prescriptionId: open.id, position: open.lines.length + 1, ...lineData } });
     }
-    await prisma.prescription.update({ where: { id: open.id }, data: { status: "NEEDS_VERIFICATION" } });
+    // Retour à « à confirmer » : l'écran relance l'analyse avec la nouvelle boîte.
+    await prisma.prescription.update({ where: { id: open.id }, data: { status: "NEEDS_VERIFICATION", verifiedAt: null } });
   } else {
     reference = await nextReference("prescription", agent.scope.pharmacyId);
     const prescription = await prisma.prescription.create({
