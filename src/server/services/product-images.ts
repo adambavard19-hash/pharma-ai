@@ -111,3 +111,32 @@ export async function fetchMissingProductImages(params: { pharmacyId: string; li
 export async function countProductsWithoutImageLookup(pharmacyId: string): Promise<number> {
   return prisma.product.count({ where: { pharmacyId, deletedAt: null, imageUrl: null, imageSource: null, ean: { not: null } } });
 }
+
+/**
+ * Le nom d'un produit d'après son code-barres, dans les bases ouvertes : une
+ * indication pour retrouver la référence dans le stock, jamais une identité
+ * imposée. Trois secondes au plus par base : le comptoir n'attend pas.
+ */
+export async function findOpenFactsName(ean: string): Promise<{ name: string; brand: string | null; source: OpenFactsSource } | null> {
+  const code = ean.replace(/\D/g, "");
+  if (code.length < 8) return null;
+  for (const source of OPEN_FACTS_SOURCES) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const response = await fetch(`https://world.${source}.org/api/v2/product/${code}.json?fields=product_name,product_name_fr,brands`, {
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!response.ok) continue;
+      const body = (await response.json()) as { status?: number; product?: { product_name?: string | null; product_name_fr?: string | null; brands?: string | null } };
+      const name = body.status === 1 ? (body.product?.product_name_fr || body.product?.product_name || "").trim() : "";
+      if (name) return { name: name.slice(0, 120), brand: body.product?.brands?.split(",")[0]?.trim().slice(0, 60) || null, source };
+    } catch {
+      // Base injoignable : on passe à la suivante.
+    }
+  }
+  return null;
+}
+

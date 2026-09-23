@@ -5,6 +5,7 @@ import { nextReference } from "@/server/services/references";
 import { recordIsDemo } from "@/server/db/demo-scope";
 import { recordAudit } from "@/server/audit/log";
 import type { AgentContext } from "@/server/services/stock-sync";
+import { findOpenFactsName } from "@/server/services/product-images";
 
 /**
  * Un bip de douchette au comptoir, capté par l'agent du poste de caisse.
@@ -32,20 +33,25 @@ export type CounterScanResult =
 type ScannedItem =
   | { kind: "DRUG"; name: string; form: string | null; specialtyId: string; presentationId: string; cip13: string }
   | { kind: "PRODUCT"; name: string; productId: string; ean: string }
-  | { kind: "UNKNOWN"; name: string; code: string };
+  | { kind: "UNKNOWN"; name: string; code: string; hint: string | null };
 
 async function resolveScannedItem(pharmacyId: string, raw: string): Promise<ScannedItem | null> {
   const scanned = readScannedCode(raw);
   if (scanned.kind === "CIP13" || scanned.kind === "CIP7") {
     const presentation = await prisma.drugPresentation.findUnique({ where: { cip13: scanned.cip13 }, select: { id: true, cip13: true, specialty: { select: { id: true, name: true, pharmaceuticalForm: true } } } });
     if (presentation) return { kind: "DRUG", name: presentation.specialty.name, form: presentation.specialty.pharmaceuticalForm, specialtyId: presentation.specialty.id, presentationId: presentation.id, cip13: presentation.cip13 };
-    return { kind: "UNKNOWN", name: `Boîte ${scanned.cip13} (hors catalogue)`, code: scanned.cip13 };
   }
   const digits = raw.replace(/\D/g, "");
   if (digits.length < 7) return null;
-  const product = await prisma.product.findFirst({ where: { pharmacyId, ean: digits, deletedAt: null }, select: { id: true, name: true, ean: true } });
+  // Un code déjà appris au comptoir, puis le code de l'export du LGO.
+  const learned = await prisma.productBarcode.findUnique({ where: { pharmacyId_code: { pharmacyId, code: digits } }, select: { product: { select: { id: true, name: true, deletedAt: true } } } });
+  if (learned && !learned.product.deletedAt) return { kind: "PRODUCT", name: learned.product.name, productId: learned.product.id, ean: digits };
+  const product = await prisma.product.findFirst({ where: { pharmacyId, ean: digits, deletedAt: null }, select: { id: true, name: true } });
   if (product) return { kind: "PRODUCT", name: product.name, productId: product.id, ean: digits };
-  return { kind: "UNKNOWN", name: `Code-barres ${digits} (produit inconnu du stock)`, code: digits };
+  // Inconnu : le nom donné par les bases ouvertes aide à retrouver la référence dans le stock.
+  const facts = await findOpenFactsName(digits);
+  const hint = facts ? `${facts.name}${facts.brand ? ` — ${facts.brand}` : ""}` : null;
+  return { kind: "UNKNOWN", name: hint ? `${hint} (code ${digits}, à rattacher au stock)` : `Code-barres ${digits} (produit inconnu du stock)`, code: digits, hint };
 }
 
 export async function recordCounterScan(agent: AgentContext, input: { code: string; post: string; scannedAt: Date | null }): Promise<CounterScanResult> {
@@ -65,6 +71,7 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
     status: item.kind === "UNKNOWN" ? ("EXTRACTED" as const) : ("CONFIRMED" as const),
     fieldConfidence: { drugName: item.kind === "UNKNOWN" ? 0 : 1 },
     rawText: item.kind === "UNKNOWN" ? item.code : null,
+    instructions: item.kind === "UNKNOWN" && item.hint ? `Douchette : ${item.hint}` : null,
   };
 
   const now = new Date();
@@ -137,3 +144,25 @@ export async function listLiveCounterSales(pharmacyId: string) {
     select: { id: true, reference: true, status: true, counterPost: true, updatedAt: true, createdAt: true, lines: { orderBy: { position: "asc" }, select: { drugName: true, quantity: true } }, _count: { select: { recommendations: true } } },
   });
 }
+
+/**
+ * Le pharmacien rattache un code inconnu à un produit de son stock : la ligne
+ * devient ce produit, le code est retenu pour l'officine, le stock baisse
+ * d'une unité comme pour tout bip.
+ */
+export async function attachBarcodeToProduct(scope: { pharmacyId: string; userId: string }, lineId: string, productId: string): Promise<{ ok: true; productName: string; code: string } | { ok: false; error: string }> {
+  const line = await prisma.prescriptionLine.findFirst({ where: { id: lineId, prescription: { pharmacyId: scope.pharmacyId } }, select: { id: true, rawText: true, drugSpecialtyId: true, prescriptionId: true } });
+  if (!line) return { ok: false, error: "Ligne introuvable." };
+  const code = (line.rawText ?? "").replace(/\D/g, "");
+  if (code.length < 7 || line.drugSpecialtyId) return { ok: false, error: "Cette ligne n'est pas un code-barres inconnu." };
+  const product = await prisma.product.findFirst({ where: { id: productId, pharmacyId: scope.pharmacyId, deletedAt: null }, select: { id: true, name: true } });
+  if (!product) return { ok: false, error: "Produit introuvable dans votre stock." };
+  await prisma.$transaction([
+    prisma.productBarcode.upsert({ where: { pharmacyId_code: { pharmacyId: scope.pharmacyId, code } }, create: { pharmacyId: scope.pharmacyId, productId: product.id, code, source: "LEARNED" }, update: { productId: product.id } }),
+    prisma.prescriptionLine.update({ where: { id: line.id }, data: { drugName: product.name, status: "CONFIRMED", fieldConfidence: { drugName: 1 }, instructions: null, correctedByUserId: scope.userId, correctedAt: new Date() } }),
+    prisma.stockItem.updateMany({ where: { pharmacyId: scope.pharmacyId, productId: product.id, quantity: { gt: 0 } }, data: { quantity: { decrement: 1 } } }),
+  ]);
+  await recordAudit({ action: "prescription.barcode_learned", entityType: "Product", entityId: product.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { code, lineId: line.id } });
+  return { ok: true, productName: product.name, code };
+}
+

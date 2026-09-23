@@ -112,6 +112,8 @@ model Pharmacy {
   stockConnection     StockConnection?
   /// Les postes de caisse qui écoutent la douchette pour cette officine.
   counterPosts        CounterPost[]
+  /// Les codes-barres appris au comptoir.
+  productBarcodes     ProductBarcode[]
   /// Contrats et liens d'activation rattachés directement à l'officine.
   contracts           Contract[]
   subscriptionInvites SubscriptionInvite[]
@@ -163,6 +165,26 @@ model StockConnection {
 // ===========================================================================
 // ABONNEMENT SaaS (modèle économique — facturation branchable ultérieurement)
 // ===========================================================================
+
+/// Un code-barres appris au comptoir : la boîte porte le code du fabricant
+/// (EAN), l'export du LGO ne donne que le code ACL. La première fois, le
+/// pharmacien rattache le code au produit ; ensuite PharmaBoost le reconnaît.
+model ProductBarcode {
+  id         String   @id @default(cuid())
+  pharmacyId String
+  productId  String
+  code       String
+  /// LEARNED (rattaché au comptoir) · IMPORT (venu d'un export)
+  source     String   @default("LEARNED")
+  createdAt  DateTime @default(now())
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([pharmacyId, code])
+  @@index([productId])
+  @@map("product_barcodes")
+}
 
 /// Un poste de caisse de l'officine sur lequel l'agent écoute la douchette.
 ///
@@ -797,6 +819,8 @@ model Product {
   replacedIn      Recommendation[] @relation("RecommendationReplacedProduct")
   saleLines       SaleLine[]
   pharmacyRules   PharmacyRule[]
+
+  barcodes ProductBarcode[]
 
   @@unique([pharmacyId, reference])
   @@index([pharmacyId, category])

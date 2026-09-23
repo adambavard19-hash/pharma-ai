@@ -12,6 +12,7 @@ import { describeRhythm, formatSchedule, unitFor } from "@/core/posology";
 import { VISION_REVIEW_THRESHOLD } from "@/core/extraction";
 import { cn } from "@/lib/utils";
 import { SpecialtyLink } from "./specialty-link";
+import { BarcodeAttach } from "./barcode-attach";
 import type { SaleLineDraft } from "./types";
 
 /**
@@ -186,6 +187,13 @@ function InlineFix({ line, issue, canEdit, attribution }: { line: SaleLineDraft;
         )}
       </div>
     );
+  }
+
+  // Un code-barres inconnu venu de la douchette : pas une lecture incertaine,
+  // un produit à rattacher au stock, une fois pour toutes.
+  const barcode = line.rawText && /^\d{7,20}$/.test(line.rawText) && !line.official ? line.rawText : null;
+  if (barcode && issue.kind === "READING") {
+    return <BarcodeAttach lineId={line.id} code={barcode} hint={line.instructions.replace(/^Douchette : /, "") || null} canEdit={canEdit} />;
   }
 
   if (issue.kind === "READING") {
