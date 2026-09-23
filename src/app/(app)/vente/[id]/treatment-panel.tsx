@@ -38,8 +38,14 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 /** Ce qui, sur une ligne confirmée, appelle encore un geste du pharmacien. */
+/** Un produit de parapharmacie reconnu par son code-barres : pas un médicament à rattacher au catalogue. */
+export function isStockProductLine(line: SaleLineDraft): boolean {
+  return !line.official && Boolean(line.rawText && /^\d{7,20}$/.test(line.rawText)) && (line.confidence.drugName ?? 0) >= 1;
+}
+
 export function lineIssuesAfterAnalysis(line: SaleLineDraft): LineIssue[] {
   const issues: LineIssue[] = [];
+  if (isStockProductLine(line)) return issues;
   if (!line.official) {
     if (!line.dosage && line.strengthOptions.length > 1) {
       issues.push({ kind: "STRENGTH", label: "dosage à préciser" });
@@ -130,6 +136,7 @@ function TreatmentRow({ line, canEdit, attribution }: { line: SaleLineDraft; can
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <AvailabilityChip availability={line.availability} />
+          {isStockProductLine(line) && <Badge tone="neutral">Parapharmacie · stock</Badge>}
           {line.cisCode && (
             <Link href={`/medicaments/${line.cisCode}`} className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] text-text-tertiary hover:bg-surface-sunken hover:text-text-secondary" title="Fiche du médicament (catalogue national)">
               <BookOpen className="size-3.5" />

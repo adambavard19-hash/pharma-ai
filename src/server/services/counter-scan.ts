@@ -70,7 +70,8 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
     // parapharmacie aussi ; un code inconnu reste à confirmer par le pharmacien.
     status: item.kind === "UNKNOWN" ? ("EXTRACTED" as const) : ("CONFIRMED" as const),
     fieldConfidence: { drugName: item.kind === "UNKNOWN" ? 0 : 1 },
-    rawText: item.kind === "UNKNOWN" ? item.code : null,
+    // Le code lu reste sur la ligne : il dit d'où elle vient, et permet de la reconnaître à l'écran.
+    rawText: item.kind === "UNKNOWN" ? item.code : item.kind === "PRODUCT" ? item.ean : null,
     instructions: item.kind === "UNKNOWN" && item.hint ? `Douchette : ${item.hint}` : null,
   };
 
@@ -97,7 +98,7 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
   if (open) {
     prescriptionId = open.id;
     reference = open.reference;
-    const same = open.lines.find((line) => (item.kind === "DRUG" ? line.drugSpecialtyId === itemKey : item.kind === "PRODUCT" ? line.drugName === item.name : line.rawText === item.code));
+    const same = open.lines.find((line) => (item.kind === "DRUG" ? line.drugSpecialtyId === itemKey : item.kind === "PRODUCT" ? line.rawText === item.ean || line.drugName === item.name : line.rawText === item.code));
     if (same) {
       await prisma.prescriptionLine.update({ where: { id: same.id }, data: { quantity: (same.quantity ?? 1) + 1 } });
     } else {
