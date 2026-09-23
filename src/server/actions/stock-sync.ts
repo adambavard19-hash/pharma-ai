@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { createPairing, disconnectAgent, getConnection, isLgoId, updateConnectionSettings } from "@/server/services/stock-sync";
+import { createPairing, createPostPairing, disconnectAgent, getConnection, isLgoId, revokeCounterPost, updateConnectionSettings } from "@/server/services/stock-sync";
 import { LGO_DEFINITIONS, lgoLabel, stockFreshness } from "@/core/stock/connectors";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
@@ -106,5 +106,21 @@ export async function emailInstallInstructionsAction(payload: { lgo: string; cod
   });
   if (outcome.status !== "SENT" && outcome.status !== "SIMULATED") return fail(`Envoi impossible : ${outcome.detail}`);
   return ok(null, `Instructions envoyées à ${session.user.email}.`);
+}
+
+/** Un code d'appairage pour un poste de caisse (douchette). Une heure, un seul usage. */
+export async function createPostPairingAction(payload: { label?: string | null }): Promise<ActionResult<{ code: string; expiresAt: string; postId: string }>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  const label = payload.label?.trim().slice(0, 60) || null;
+  const pairing = await createPostPairing(session.scope, label);
+  revalidatePath("/stock/connexion");
+  return ok({ code: pairing.code, expiresAt: pairing.expiresAt.toISOString(), postId: pairing.postId }, "Code de poste généré. Il est valable une heure.");
+}
+
+export async function revokePostAction(payload: { postId: string }): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  await revokeCounterPost(session.scope, payload.postId);
+  revalidatePath("/stock/connexion");
+  return ok(null, "Poste retiré : sa clé ne fonctionne plus.");
 }
 

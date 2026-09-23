@@ -9,7 +9,11 @@ export async function POST(request: Request) {
   const agent = await authenticateAgent(request.headers.get("authorization"));
   if (!agent) return NextResponse.json({ ok: false, error: "Clé d'agent inconnue ou révoquée." }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { version?: string; hostname?: string; notice?: string | null };
+  if (agent.postId) {
+    await prisma.counterPost.update({ where: { id: agent.postId }, data: { lastSeenAt: new Date(), version: body.version ?? undefined, hostname: body.hostname ?? undefined } });
+    return NextResponse.json({ ok: true, intervalSeconds: 300, exportPath: null, scansPath: null });
+  }
   await recordHeartbeat(agent, { version: body.version, hostname: body.hostname, notice: typeof body.notice === "string" || body.notice === null ? body.notice : undefined });
-  const connection = await prisma.stockConnection.findUniqueOrThrow({ where: { id: agent.connectionId }, select: { intervalSeconds: true, exportPath: true, scansPath: true } });
+  const connection = await prisma.stockConnection.findUniqueOrThrow({ where: { id: agent.connectionId! }, select: { intervalSeconds: true, exportPath: true, scansPath: true } });
   return NextResponse.json({ ok: true, ...connection });
 }

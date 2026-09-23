@@ -233,6 +233,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           : null,
         prescriberName: prescription.prescriberName,
         prescribedAt: prescription.prescribedAt?.toISOString().slice(0, 10) ?? null,
+        source: prescription.source,
       }}
       patients={patients}
       lines={prescription.lines.map((line) => {

@@ -122,21 +122,79 @@ export async function pairAgent(input: { code: string; lgo?: string | null; host
   return { ok: true, agentKey, pharmacyName: connection.pharmacy.name, intervalSeconds: connection.intervalSeconds };
 }
 
-export type AgentContext = { connectionId: string; scope: TenantScope; pharmacyIsDemo: boolean; intervalSeconds: number; exportPath: string | null; scansPath: string | null };
+export type AgentContext = {
+  /** La liaison serveur, ou `null` quand la clé est celle d'un poste de caisse. */
+  connectionId: string | null;
+  /** Le poste de caisse, quand la clé est la sienne. */
+  postId: string | null;
+  scope: TenantScope;
+  pharmacyIsDemo: boolean;
+  intervalSeconds: number;
+  exportPath: string | null;
+  scansPath: string | null;
+};
+
+const POST_PAIRING_TTL_MS = 1000 * 60 * 60;
+
+/** Un code d'appairage pour un poste de caisse : six chiffres, une heure, un seul usage. */
+export async function createPostPairing(scope: TenantScope, label: string | null): Promise<{ code: string; expiresAt: Date; postId: string }> {
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = new Date(Date.now() + POST_PAIRING_TTL_MS);
+  const post = await prisma.counterPost.create({
+    data: { pharmacyId: scope.pharmacyId, hostname: "", label, pairingCodeHash: hashToken(code), pairingExpiresAt: expiresAt },
+  });
+  await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { label } });
+  return { code, expiresAt, postId: post.id };
+}
+
+/** Le poste présente son code : il reçoit sa clé, une fois. */
+export async function pairCounterPost(input: { code: string; hostname?: string | null; version?: string | null }): Promise<{ ok: true; agentKey: string; pharmacyName: string; postLabel: string } | { ok: false; error: string }> {
+  const code = (input.code ?? "").replace(/\D/g, "");
+  if (code.length !== 6) return { ok: false, error: "Code d'appairage invalide." };
+  const post = await prisma.counterPost.findUnique({ where: { pairingCodeHash: hashToken(code) }, include: { pharmacy: { select: { name: true } } } });
+  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return { ok: false, error: "Code de poste inconnu ou expiré. Générez un nouveau code dans PharmaBoost (Stock → Connecter mon logiciel → Postes de caisse)." };
+  const agentKey = generateToken(32);
+  await prisma.counterPost.update({
+    where: { id: post.id },
+    data: { keyHash: hashToken(agentKey), pairingCodeHash: null, pairingExpiresAt: null, pairedAt: new Date(), lastSeenAt: new Date(), hostname: input.hostname ?? "", version: input.version ?? null },
+  });
+  await recordAudit({ action: "stock.post_paired", entityType: "CounterPost", entityId: post.id, pharmacyId: post.pharmacyId, metadata: { hostname: input.hostname ?? null, version: input.version ?? null } });
+  await createNotification({ pharmacyId: post.pharmacyId, userId: null, type: "IMPORT_COMPLETED", severity: "SUCCESS", title: `Poste de caisse ${post.label ?? input.hostname ?? ""} relié`, body: "La douchette de ce poste alimente maintenant le comptoir PharmaBoost.", linkUrl: "/stock/connexion" });
+  return { ok: true, agentKey, pharmacyName: post.pharmacy.name, postLabel: post.label ?? input.hostname ?? "" };
+}
+
+export async function revokeCounterPost(scope: TenantScope, postId: string): Promise<void> {
+  await prisma.counterPost.updateMany({ where: { id: postId, pharmacyId: scope.pharmacyId }, data: { revokedAt: new Date(), keyHash: null, pairingCodeHash: null } });
+  await recordAudit({ action: "stock.post_revoked", entityType: "CounterPost", entityId: postId, pharmacyId: scope.pharmacyId, userId: scope.userId });
+}
+
+export async function listCounterPosts(pharmacyId: string) {
+  return prisma.counterPost.findMany({ where: { pharmacyId, revokedAt: null }, orderBy: { createdAt: "asc" } });
+}
 
 /** La clé de l'agent → l'officine, et le titulaire au nom duquel les écritures sont faites. */
 export async function authenticateAgent(authorization: string | null): Promise<AgentContext | null> {
   const token = authorization?.replace(/^Bearer\s+/i, "").trim();
   if (!token || token.length < 16) return null;
+  const pharmacySelect = { id: true, organizationId: true, isDemo: true, isActive: true, memberships: { where: { role: "OWNER" as const, isActive: true }, take: 1, select: { userId: true } } };
   const connection = await prisma.stockConnection.findUnique({
     where: { agentKeyHash: hashToken(token) },
-    include: { pharmacy: { select: { id: true, organizationId: true, isDemo: true, isActive: true, memberships: { where: { role: "OWNER", isActive: true }, take: 1, select: { userId: true } } } } },
+    include: { pharmacy: { select: pharmacySelect } },
   });
-  if (!connection || connection.status === "DISCONNECTED" || !connection.pharmacy.isActive) return null;
+  if (!connection) {
+    // La clé d'un poste de caisse : même portée, mais elle n'ouvre que le comptoir (bips) et le signe de vie.
+    const post = await prisma.counterPost.findUnique({ where: { keyHash: hashToken(token) }, include: { pharmacy: { select: pharmacySelect } } });
+    if (!post || post.revokedAt || !post.pharmacy.isActive) return null;
+    const postOwner = post.pharmacy.memberships[0];
+    if (!postOwner) return null;
+    return { connectionId: null, postId: post.id, scope: { pharmacyId: post.pharmacy.id, organizationId: post.pharmacy.organizationId, userId: postOwner.userId }, pharmacyIsDemo: post.pharmacy.isDemo, intervalSeconds: 300, exportPath: null, scansPath: null };
+  }
+  if (connection.status === "DISCONNECTED" || !connection.pharmacy.isActive) return null;
   const owner = connection.pharmacy.memberships[0];
   if (!owner) return null;
   return {
     connectionId: connection.id,
+    postId: null,
     scope: { pharmacyId: connection.pharmacy.id, organizationId: connection.pharmacy.organizationId, userId: owner.userId },
     pharmacyIsDemo: connection.pharmacy.isDemo,
     intervalSeconds: connection.intervalSeconds,
@@ -151,9 +209,10 @@ export async function authenticateAgent(authorization: string | null): Promise<A
  * tout va bien. Absent du message, l'état précédent est conservé.
  */
 export async function recordHeartbeat(agent: AgentContext, meta: { version?: string | null; hostname?: string | null; notice?: string | null }): Promise<void> {
+  if (!agent.connectionId) return;
   const notice = meta.notice === undefined ? undefined : meta.notice ? String(meta.notice).slice(0, 300) : null;
   await prisma.stockConnection.update({
-    where: { id: agent.connectionId },
+    where: { id: agent.connectionId! },
     data: { lastSeenAt: new Date(), agentVersion: meta.version ?? undefined, hostname: meta.hostname ?? undefined, status: "CONNECTED", lastError: notice },
   });
 }
@@ -168,11 +227,12 @@ export async function recordHeartbeat(agent: AgentContext, meta: { version?: str
 export async function applyAgentSnapshot(agent: AgentContext, fileName: string, bytes: Uint8Array): Promise<
   { ok: true; lines: number; created: number; updated: number; invalid: number } | { ok: false; error: string }
 > {
+  if (!agent.connectionId) return { ok: false, error: "Un poste de caisse n'envoie pas d'export de stock : seule la liaison serveur le fait." };
   try {
     const preview = await analyseStockImport({ scope: agent.scope, fileName: `[agent] ${fileName}`, bytes });
     if (preview.missing.length > 0) {
       const error = `Colonnes non reconnues dans l'export : ${preview.missing.join(", ")}. Vérifiez le format de l'export du logiciel.`;
-      await prisma.stockConnection.update({ where: { id: agent.connectionId }, data: { lastError: error, status: "ERROR" } });
+      await prisma.stockConnection.update({ where: { id: agent.connectionId! }, data: { lastError: error, status: "ERROR" } });
       return { ok: false, error };
     }
     // Sans personne pour trancher, une piste incertaine devient un produit à
@@ -181,13 +241,13 @@ export async function applyAgentSnapshot(agent: AgentContext, fileName: string, 
     for (const row of preview.rows) if (row.status === "A_VERIFIER") decisions[String(row.line)] = { kind: "CREER_PRODUIT" };
     const outcome = await commitStockImport({ scope: agent.scope, pharmacyIsDemo: agent.pharmacyIsDemo, jobId: preview.jobId, decisions, createUnknownByDefault: true });
     await prisma.stockConnection.update({
-      where: { id: agent.connectionId },
+      where: { id: agent.connectionId! },
       data: { lastSyncAt: new Date(), lastSeenAt: new Date(), lastSyncLines: preview.summary.detected, lastError: null, status: "CONNECTED" },
     });
     return { ok: true, lines: preview.summary.detected, created: outcome.productsCreated, updated: outcome.productsUpdated + outcome.drugsUpserted, invalid: outcome.invalid };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Synchronisation impossible.";
-    await prisma.stockConnection.update({ where: { id: agent.connectionId }, data: { lastError: message, status: "ERROR" } }).catch(() => undefined);
+    await prisma.stockConnection.update({ where: { id: agent.connectionId! }, data: { lastError: message, status: "ERROR" } }).catch(() => undefined);
     return { ok: false, error: message };
   }
 }

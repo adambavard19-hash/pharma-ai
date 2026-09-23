@@ -48,3 +48,20 @@ l'accès au serveur LGPI, soumis à l'accord de Pharmagest.
 
 Prérequis : Node.js 18 ou plus récent. Journal : `pharmaboost-connect.log` à
 côté du fichier de configuration.
+
+## Poste de caisse : la douchette alimente le comptoir
+
+Sur chaque ordinateur où une douchette est branchée, l'agent peut écouter
+les bips et envoyer le code-barres de la boîte à PharmaBoost à l'instant du
+scan, sans second scan et sans rien changer au logiciel de l'officine.
+
+```
+powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -Code 123456
+powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -Code 123456 -Test   (affiche les bips, n'envoie rien)
+```
+
+Le code s'obtient dans PharmaBoost : Stock → Connecter mon logiciel → Postes
+de caisse. L'écoute tourne dans la session Windows de l'utilisateur (tâche à
+l'ouverture de session). Seules les rafales de chiffres d'une douchette sont
+transmises ; aucune autre touche n'est conservée.
+

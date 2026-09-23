@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2, Sparkles, User } from "lucide-react";
@@ -86,6 +86,7 @@ export function SaleWorkspace({
 }: {
   prescription: {
     id: string;
+    source?: string;
     reference: string;
     status: string;
     verifiedAt: string | null;
@@ -191,6 +192,29 @@ export function SaleWorkspace({
   // La phase est dictée par le serveur, jamais par un état local optimiste.
   const analysing = stage !== null;
   const editing = !analysing && (forceEdit || !prescription.verifiedAt);
+
+  // Une vente venue de la douchette se remplit toute seule : l'écran relit
+  // le serveur tant qu'elle est à confirmer, et lance l'analyse de lui-même
+  // dès que les bips se sont arrêtés depuis six secondes.
+  const liveCounter = prescription.source === "COUNTER_SCAN" && !prescription.verifiedAt;
+  const lineSignature = initialLines.map((line) => `${line.id}:${line.quantity ?? 1}`).join("|");
+  useEffect(() => {
+    if (!liveCounter || analysing) return;
+    const id = setInterval(() => router.refresh(), 2500);
+    return () => clearInterval(id);
+  }, [liveCounter, analysing, router]);
+  const autoRunRef = useRef<string | null>(null);
+  // `verify` est défini plus bas ; l'effet l'atteint par une référence tenue à jour.
+  const verifyRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    if (!liveCounter || analysing || initialLines.length === 0) return;
+    const timer = setTimeout(() => {
+      if (autoRunRef.current === lineSignature) return;
+      autoRunRef.current = lineSignature;
+      verifyRef.current();
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [liveCounter, analysing, lineSignature, initialLines.length]);
 
   const blocked = counterIsBlocked(findings);
   const confirmedCount = lines.filter((line) => line.confirmed).length;
@@ -335,6 +359,9 @@ export function SaleWorkspace({
       router.refresh();
     });
   };
+  useEffect(() => {
+    verifyRef.current = verify;
+  });
 
   /**
    * Fin de la délivrance : la vente est enregistrée, le plan patient est généré

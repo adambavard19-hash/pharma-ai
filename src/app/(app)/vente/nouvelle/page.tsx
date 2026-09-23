@@ -10,6 +10,8 @@ import { stockFreshness, describeAge, lgoLabel } from "@/core/stock/connectors";
 import { TIME_ZONE } from "@/config/constants";
 import { formatCents, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { LiveCounterSales } from "./live-counter-sales";
+import { listLiveCounterSales } from "@/server/services/counter-scan";
 import { NewPrescriptionForm } from "./new-prescription-form";
 
 export const metadata: Metadata = { title: "Nouvelle vente" };
@@ -38,6 +40,8 @@ export default async function NewPrescriptionPage({
   // Le comptoir du jour : ce qui est en cours, ce qui a été fait, et l'état
   // du stock. Calculé hors du rendu : l'heure n'est pas une valeur de rendu.
   const home = await loadCounterHome(session.scope.pharmacyId);
+  // Les délivrances qui arrivent de la douchette du LGO : la carte se met à jour seule.
+  const liveSales = (await listLiveCounterSales(session.scope.pharmacyId)).map((sale) => ({ id: sale.id, reference: sale.reference, status: sale.status, post: sale.counterPost, updatedAt: sale.updatedAt.toISOString(), lines: sale.lines.map((line) => ({ drugName: line.drugName ?? "", quantity: line.quantity ?? 1 })), recommendations: sale._count.recommendations }));
   const { openPrescriptions, salesToday, accepted, declined, stockLabel, stockTone, greeting, dateLabel } = home;
 
   return (
@@ -63,6 +67,8 @@ export default async function NewPrescriptionPage({
           {stockLabel}
         </Link>
       </div>
+
+      <LiveCounterSales initial={liveSales} />
 
       <NewPrescriptionForm
         patients={patients}

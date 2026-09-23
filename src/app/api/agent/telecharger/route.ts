@@ -17,14 +17,16 @@ export async function GET() {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
   const dir = join(process.cwd(), "agent");
-  const [program, installer, readme] = await Promise.all([
+  const [program, installer, posteInstaller, readme] = await Promise.all([
     readFile(join(dir, "dist", "pharmaboost-connect.js")),
     readFile(join(dir, "install-windows.ps1")),
+    readFile(join(dir, "install-poste-windows.ps1")),
     readFile(join(dir, "README.md")),
   ]);
   const zip = buildZip([
     { name: "pharmaboost-connect.js", data: program },
     { name: "install-windows.ps1", data: installer },
+    { name: "install-poste-windows.ps1", data: posteInstaller },
     { name: "LISEZMOI.md", data: readme },
   ]);
   return new Response(new Uint8Array(zip), {

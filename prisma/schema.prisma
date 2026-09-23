@@ -110,6 +110,8 @@ model Pharmacy {
   prospect            Prospect?
   /// La liaison avec le logiciel de gestion de l'officine, s'il y en a une.
   stockConnection     StockConnection?
+  /// Les postes de caisse qui écoutent la douchette pour cette officine.
+  counterPosts        CounterPost[]
   /// Contrats et liens d'activation rattachés directement à l'officine.
   contracts           Contract[]
   subscriptionInvites SubscriptionInvite[]
@@ -161,6 +163,38 @@ model StockConnection {
 // ===========================================================================
 // ABONNEMENT SaaS (modèle économique — facturation branchable ultérieurement)
 // ===========================================================================
+
+/// Un poste de caisse de l'officine sur lequel l'agent écoute la douchette.
+///
+/// Chaque poste a sa propre clé (seule l'empreinte est conservée), obtenue
+/// avec un code d'appairage à usage unique — le même mécanisme que la liaison
+/// serveur. Un poste ne lit que les codes-barres tapés par la douchette :
+/// rien d'autre ne quitte le poste.
+model CounterPost {
+  id               String    @id @default(cuid())
+  pharmacyId       String
+  /// Nom de la machine (« POSTE11 »), tel que Windows le donne.
+  hostname         String
+  /// Libellé choisi dans PharmaBoost (« Caisse 1 »). Vide : le nom de machine.
+  label            String?
+  keyHash          String?   @unique
+  /// Code d'appairage à usage unique, le temps que le poste se présente.
+  pairingCodeHash  String?   @unique
+  pairingExpiresAt DateTime?
+  pairedAt         DateTime?
+  version          String?
+  lastSeenAt       DateTime?
+  lastScanAt       DateTime?
+  scanCount        Int       @default(0)
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId])
+  @@map("counter_posts")
+}
 
 /// Une offre PharmaBoost, pilotée depuis la console : nom, prix mensuel,
 /// durée d'essai. Le prix Stripe correspondant est créé par la console au
@@ -1495,6 +1529,8 @@ enum PrescriptionSource {
   IMAGE_UPLOAD
   PDF_UPLOAD
   MANUAL
+  /// Boîtes passées à la douchette dans le LGO, captées par l'agent du poste de caisse.
+  COUNTER_SCAN
 }
 
 enum PrescriptionStatus {
@@ -1511,12 +1547,14 @@ enum PrescriptionStatus {
 }
 
 model Prescription {
-  id         String             @id @default(cuid())
-  pharmacyId String
-  patientId  String?
-  reference  String
-  status     PrescriptionStatus @default(DRAFT)
-  source     PrescriptionSource @default(MANUAL)
+  id          String             @id @default(cuid())
+  pharmacyId  String
+  patientId   String?
+  reference   String
+  status      PrescriptionStatus @default(DRAFT)
+  source      PrescriptionSource @default(MANUAL)
+  /// Le poste de caisse dont viennent les bips (source COUNTER_SCAN).
+  counterPost String?
 
   prescriberName String?
   prescriberRpps String?

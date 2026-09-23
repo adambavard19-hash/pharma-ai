@@ -17,13 +17,20 @@
  *   node pharmaboost-connect.js --appairer 123456 --serveur https://pharmaboost.app --lgo lgpi \
  *        --export "C:\\PharmaBoost\\Export" --scans "C:\\PharmaBoost\\Ordonnances"
  *   node pharmaboost-connect.js            (tourne avec la configuration enregistrée)
+ *
+ * Sur un POSTE DE CAISSE (mode « poste ») : il écoute la douchette et envoie
+ * chaque code-barres de boîte au comptoir PharmaBoost, sans rien changer au
+ * LGO. Voir douchette.ts.
+ *   node pharmaboost-connect.js --poste 123456 --serveur https://pharmaboost.app
+ *   node pharmaboost-connect.js --test-douchette   (affiche les bips, n'envoie rien)
  */
 import { createHash } from "node:crypto";
+import { startDouchette } from "./douchette";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -39,6 +46,8 @@ const DEFAULT_SCANS = process.platform === "win32" ? "C:\\PharmaBoost\\Ordonnanc
 type Config = {
   serverUrl: string;
   agentKey: string;
+  /** « serveur » (export de stock, scans) ou « poste » (douchette de caisse). */
+  role?: "serveur" | "poste";
   lgo: string;
   exportPath: string | null;
   scansPath: string | null;
@@ -88,6 +97,87 @@ async function api(config: Pick<Config, "serverUrl" | "agentKey">, path: string,
   return fetch(`${config.serverUrl.replace(/\/$/, "")}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${config.agentKey}`, "X-Agent-Version": VERSION, ...(init.headers ?? {}) },
+  });
+}
+
+/**
+ * L'appairage d'un POSTE DE CAISSE : le code à six chiffres donné par
+ * PharmaBoost (Stock → Connecter mon logiciel → Postes de caisse) devient la
+ * clé de ce poste, une seule fois. Le poste n'envoie que les bips de la
+ * douchette et un signe de vie par minute.
+ */
+async function pairPost(): Promise<void> {
+  const code = arg("poste");
+  const serverUrl = arg("serveur") ?? "https://pharmaboost.app";
+  const response = await fetch(`${serverUrl.replace(/\/$/, "")}/api/agent/pair`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, role: "poste", hostname: hostname(), version: VERSION }),
+  });
+  const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; agentKey?: string; pharmacyName?: string; postLabel?: string };
+  if (!response.ok || !body.ok || !body.agentKey) throw new Error(body.error ?? `Appairage refusé (HTTP ${response.status}).`);
+  writeConfig({ serverUrl, agentKey: body.agentKey, role: "poste", lgo: arg("lgo") ?? "lgpi", exportPath: null, scansPath: null, intervalSeconds: 300 });
+  log(`Poste ${body.postLabel ?? hostname()} relié à ${body.pharmacyName ?? "l'officine"}. Configuration écrite dans ${CONFIG_PATH}.`);
+}
+
+/** Les bips qui n'ont pas pu partir (coupure Internet) attendent ici, et repartent dans l'ordre. */
+const pendingScans: { code: string; scannedAt: string }[] = [];
+
+async function sendScan(config: Config, code: string, scannedAt: string): Promise<void> {
+  const response = await api(config, "/api/agent/scans", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, post: hostname(), scannedAt }),
+  });
+  const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; drugName?: string; reference?: string; lineCount?: number };
+  if (response.status === 401) throw new Error("clé du poste révoquée");
+  if (response.status === 422) {
+    log(`Bip ignoré (${code}) : ${body.error ?? "code inconnu"}`);
+    return;
+  }
+  if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+  log(`Bip ${code} → ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s)).`);
+}
+
+async function flushScans(config: Config): Promise<void> {
+  while (pendingScans.length > 0) {
+    const next = pendingScans[0]!;
+    await sendScan(config, next.code, next.scannedAt);
+    pendingScans.shift();
+  }
+}
+
+/** Le poste de caisse : écouter la douchette, envoyer chaque bip, donner signe de vie. */
+async function runPost(config: Config): Promise<void> {
+  log(`PharmaBoost Connect ${VERSION} — poste de caisse ${hostname()} — journal : ${LOG_PATH}`);
+  startDouchette(dirname(CONFIG_PATH), {
+    onScan: (code, at) => {
+      pendingScans.push({ code, scannedAt: new Date(at).toISOString() });
+      flushScans(config).catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
+    },
+    onStatus: (message) => log(message),
+  });
+  let lastHeartbeat = 0;
+  for (;;) {
+    try {
+      if (pendingScans.length > 0) await flushScans(config);
+      if (Date.now() - lastHeartbeat > 60_000) {
+        await heartbeat(config);
+        lastHeartbeat = Date.now();
+      }
+    } catch (error) {
+      log(`Erreur : ${error instanceof Error ? error.message : String(error)}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+}
+
+/** Essai sans rien envoyer : chaque bip lu s'affiche à l'écran. Pour vérifier une installation. */
+function testDouchette(): void {
+  console.log("Passez une boîte à la douchette. Chaque code lu s'affiche ci-dessous. Ctrl+C pour arrêter.");
+  startDouchette(dirname(CONFIG_PATH), {
+    onScan: (code) => console.log(`${new Date().toLocaleTimeString("fr-FR")}  BIP  ${code}`),
+    onStatus: (message) => console.log(`  ${message}`),
   });
 }
 
@@ -228,7 +318,8 @@ async function heartbeat(config: Config): Promise<Config> {
 
 async function run(): Promise<void> {
   let config = readConfig();
-  if (!config) throw new Error(`Aucune configuration (${CONFIG_PATH}). Lancez d'abord : --appairer CODE --serveur URL --lgo LGO --export DOSSIER`);
+  if (!config) throw new Error(`Aucune configuration (${CONFIG_PATH}). Lancez d'abord : --appairer CODE --serveur URL --lgo LGO --export DOSSIER (serveur) ou --poste CODE --serveur URL (poste de caisse)`);
+  if (config.role === "poste") return runPost(config);
   log(`PharmaBoost Connect ${VERSION} — ${config.lgo} — export : ${config.exportPath ?? "non configuré"} — scans : ${config.scansPath ?? "non configurés"} — journal : ${LOG_PATH}`);
   let lastHeartbeat = 0;
   let lastCheck = 0;
@@ -257,6 +348,10 @@ async function run(): Promise<void> {
 
 if (arg("appairer")) {
   pair().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
+} else if (arg("poste")) {
+  pairPost().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
+} else if (process.argv.includes("--test-douchette")) {
+  testDouchette();
 } else if (process.argv.includes("--version")) {
   console.log(VERSION);
 } else {
