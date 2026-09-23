@@ -21,7 +21,7 @@ export type ScanDetectorOptions = {
   settleMs?: number;
 };
 
-const DEFAULTS: Required<ScanDetectorOptions> = { maxGapMs: 120, minLength: 7, maxLength: 20, settleMs: 250 };
+const DEFAULTS: Required<ScanDetectorOptions> = { maxGapMs: 120, minLength: 7, maxLength: 80, settleMs: 250 };
 
 export class ScanDetector {
   private buffer = "";
@@ -48,14 +48,20 @@ export class ScanDetector {
       this.buffer = "";
       return;
     }
-    if (/^\d$/.test(event.key)) {
+    if (/^[0-9A-Za-z]$/.test(event.key)) {
+      // Une rafale qui commence juste après une touche spéciale est une frappe humaine.
       if (!this.buffer) this.tainted = event.at - this.lastOtherAt < maxGapMs * 3;
-      this.buffer += event.key;
+      this.buffer += event.key.toUpperCase();
       this.lastAt = event.at;
       if (this.buffer.length > this.options.maxLength) this.buffer = "";
       return;
     }
-    // Lettre, ponctuation, touche spéciale : ce n'est pas un code-barres.
+    // Touche spéciale au milieu d'une rafale (le séparateur GS d'un Datamatrix
+    // arrive parfois ainsi) : on l'ignore ; hors rafale, elle marque une frappe humaine.
+    if (this.buffer && event.at - this.lastAt <= maxGapMs) {
+      this.lastAt = event.at;
+      return;
+    }
     this.buffer = "";
     this.lastOtherAt = event.at;
     void minLength;
@@ -75,15 +81,24 @@ export class ScanDetector {
   }
 }
 
-/** Un code-barres de boîte : CIP13/EAN13 (3400…), CIP7, ou Datamatrix commençant par 01 + GTIN14. */
+/**
+ * Un code-barres de boîte, ou rien.
+ *   - EAN13 / CIP13 : treize chiffres, rien d'autre ;
+ *   - CIP7 ou EAN8 : sept ou huit chiffres, rien d'autre ;
+ *   - GS1 Datamatrix d'un médicament : « 01 » + GTIN-14, puis péremption
+ *     (17…), lot (10…, lettres possibles), série (21…). On en extrait le
+ *     CIP13. Certaines douchettes préfixent le symbole (« ]d2 », « ]C1 »).
+ * Une chaîne de lettres et de chiffres qui n'a pas une de ces formes n'est
+ * pas un code-barres : c'est une frappe humaine, on l'oublie.
+ */
 export function normalizeScannedCode(raw: string): string | null {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 13) return digits;
-  if (digits.length === 7) return digits;
-  // GS1 Datamatrix : (01) GTIN-14 puis (17) péremption, (10) lot, (21) série.
-  if (digits.startsWith("01") && digits.length >= 16) {
-    const gtin14 = digits.slice(2, 16);
-    return gtin14.startsWith("0") ? gtin14.slice(1) : null;
+  const text = raw.replace(/^\](D2|C1|E0|Q3)/i, "").trim();
+  if (/^\d{13}$/.test(text)) return text;
+  if (/^\d{7,8}$/.test(text)) return text;
+  const gs1 = /^01(\d{14})/.exec(text);
+  if (gs1) {
+    const gtin14 = gs1[1]!;
+    return gtin14.startsWith("0") ? gtin14.slice(1) : gtin14;
   }
   return null;
 }

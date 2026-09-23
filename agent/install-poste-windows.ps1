@@ -3,19 +3,23 @@
 # À lancer dans PowerShell, sur le poste où la douchette est branchée, avec
 # la session Windows de la personne qui utilise le LGO :
 #   powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -Code 123456
+#   powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -MiseAJour   (poste déjà relié : nouvelle version)
 #
 # Ce que fait ce poste : il écoute la douchette (et rien d'autre) et envoie
 # chaque code-barres de boîte à PharmaBoost, à l'instant du bip. Le LGO n'est
-# ni modifié, ni ouvert, ni interrogé. Aucune lettre tapée au clavier n'est
-# conservée ni envoyée : seules les rafales de chiffres d'une douchette.
+# ni modifié, ni ouvert, ni interrogé. Aucune frappe humaine n'est conservée
+# ni envoyée : seuls les codes-barres lus par une douchette (code EAN/CIP ou
+# Datamatrix de médicament, dont le CIP est extrait).
 #
 # L'écoute doit tourner dans la session de l'utilisateur (celle qui affiche
 # le LGO) : la tâche démarre à l'ouverture de session, pas au démarrage
 # système.
 param(
-  [Parameter(Mandatory=$true)][string]$Code,
+  [string]$Code = "",
   [string]$Serveur = "https://pharmaboost.app",
-  [switch]$Test
+  [switch]$Test,
+  # Mise à jour d'un poste déjà relié : remplace le programme et relance la tâche, sans nouveau code.
+  [switch]$MiseAJour
 )
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -59,6 +63,19 @@ Write-Host "Node.js : $node"
 
 $env:PHARMABOOST_CONNECT_CONFIG = $config
 
+if ($MiseAJour) {
+  if (-not (Test-Path $config)) { throw "Ce poste n'est pas encore relié : lancez d'abord l'installation avec -Code." }
+  $taskName = "PharmaBoost Connect (poste)"
+  Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+  Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -and (Get-CimInstance Win32_Process -Filter "ProcessId = $($_.Id)").CommandLine -like "*pharmaboost-connect.js*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Seconds 2
+  Start-ScheduledTask -TaskName $taskName
+  Write-Host "Poste mis à jour et relancé."
+  Start-Sleep -Seconds 8
+  if (Test-Path $journal) { Get-Content $journal -Tail 3 }
+  exit
+}
+
 if ($Test) {
   Write-Host "Mode essai : passez une boîte à la douchette, le code doit s'afficher. Ctrl+C pour arrêter."
   & $node "$dir\pharmaboost-connect.js" --test-douchette
@@ -66,6 +83,7 @@ if ($Test) {
 }
 
 # Appairage du poste : le code devient une clé propre à ce poste, une seule fois.
+if ($Code -eq "") { throw "Indiquez le code du poste : -Code 123456 (PharmaBoost → Stock → Connecter mon logiciel → Postes de caisse)." }
 & $node "$dir\pharmaboost-connect.js" --poste $Code --serveur $Serveur
 if ($LASTEXITCODE -ne 0) { throw "Appairage impossible : vérifiez le code (il expire au bout d'une heure) et l'accès Internet du poste." }
 

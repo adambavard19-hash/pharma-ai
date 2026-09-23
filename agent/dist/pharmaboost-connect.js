@@ -10,7 +10,7 @@ var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
 
 // agent/src/scan-detect.ts
-var DEFAULTS = { maxGapMs: 120, minLength: 7, maxLength: 20, settleMs: 250 };
+var DEFAULTS = { maxGapMs: 120, minLength: 7, maxLength: 80, settleMs: 250 };
 var ScanDetector = class {
   constructor(onScan, options = {}) {
     this.onScan = onScan;
@@ -35,11 +35,15 @@ var ScanDetector = class {
       this.buffer = "";
       return;
     }
-    if (/^\d$/.test(event.key)) {
+    if (/^[0-9A-Za-z]$/.test(event.key)) {
       if (!this.buffer) this.tainted = event.at - this.lastOtherAt < maxGapMs * 3;
-      this.buffer += event.key;
+      this.buffer += event.key.toUpperCase();
       this.lastAt = event.at;
       if (this.buffer.length > this.options.maxLength) this.buffer = "";
+      return;
+    }
+    if (this.buffer && event.at - this.lastAt <= maxGapMs) {
+      this.lastAt = event.at;
       return;
     }
     this.buffer = "";
@@ -59,12 +63,13 @@ var ScanDetector = class {
   }
 };
 function normalizeScannedCode(raw) {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 13) return digits;
-  if (digits.length === 7) return digits;
-  if (digits.startsWith("01") && digits.length >= 16) {
-    const gtin14 = digits.slice(2, 16);
-    return gtin14.startsWith("0") ? gtin14.slice(1) : null;
+  const text = raw.replace(/^\](D2|C1|E0|Q3)/i, "").trim();
+  if (/^\d{13}$/.test(text)) return text;
+  if (/^\d{7,8}$/.test(text)) return text;
+  const gs1 = /^01(\d{14})/.exec(text);
+  if (gs1) {
+    const gtin14 = gs1[1];
+    return gtin14.startsWith("0") ? gtin14.slice(1) : gtin14;
   }
   return null;
 }
@@ -108,6 +113,7 @@ public static class PharmaBoostHook {
       string key;
       if (vk >= 0x30 && vk <= 0x39) key = ((char)('0' + (vk - 0x30))).ToString();
       else if (vk >= 0x60 && vk <= 0x69) key = ((char)('0' + (vk - 0x60))).ToString();
+      else if (vk >= 0x41 && vk <= 0x5A) key = ((char)('A' + (vk - 0x41))).ToString();
       else if (vk == 0x0D) key = "Enter";
       else if (vk == 0x09) key = "Tab";
       else if (vk == 0x10 || vk == 0xA0 || vk == 0xA1) key = "Shift";
@@ -174,7 +180,7 @@ function startDouchette(configDir, handlers) {
 var import_node_fs2 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path2 = require("node:path");
-var VERSION = "0.3.0";
+var VERSION = "0.3.1";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path2.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path2.join)((0, import_node_path2.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;

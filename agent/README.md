@@ -62,6 +62,7 @@ powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -Code 12345
 
 Le code s'obtient dans PharmaBoost : Stock → Connecter mon logiciel → Postes
 de caisse. L'écoute tourne dans la session Windows de l'utilisateur (tâche à
-l'ouverture de session). Seules les rafales de chiffres d'une douchette sont
-transmises ; aucune autre touche n'est conservée.
+l'ouverture de session). Seuls les codes-barres lus par la douchette sont
+transmis (EAN/CIP, ou Datamatrix de médicament dont le CIP est extrait) ;
+aucune frappe humaine n'est conservée.
 

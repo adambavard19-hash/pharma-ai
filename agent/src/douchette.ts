@@ -21,10 +21,12 @@ import { ScanDetector, normalizeScannedCode } from "./scan-detect";
 
 /**
  * Le hook clavier, en C# compilé à la volée par PowerShell (Add-Type).
- * Sortie : une ligne « KEY <caractère|Enter|Tab|Other> <horodatage ms> » par
- * touche ne relevant que des chiffres, Entrée et Tabulation ; toute autre
- * touche est signalée comme « Other » sans son contenu. Le tri final (rafale
- * rapide de chiffres) est fait côté Node.
+ * Sortie : une ligne « KEY <chiffre|lettre|Enter|Tab|Other> <horodatage ms> »
+ * par touche ; toute autre touche est signalée comme « Other » sans son
+ * contenu. Les lettres sont nécessaires au Datamatrix des médicaments (le
+ * numéro de lot en contient). Le tri final — une rafale rapide, terminée par
+ * Entrée, qui forme un code-barres valide — est fait côté Node : une frappe
+ * humaine ne sort jamais du processus, ni dans le journal ni sur le réseau.
  */
 export const HOOK_SCRIPT = String.raw`
 $code = @"
@@ -64,6 +66,7 @@ public static class PharmaBoostHook {
       string key;
       if (vk >= 0x30 && vk <= 0x39) key = ((char)('0' + (vk - 0x30))).ToString();
       else if (vk >= 0x60 && vk <= 0x69) key = ((char)('0' + (vk - 0x60))).ToString();
+      else if (vk >= 0x41 && vk <= 0x5A) key = ((char)('A' + (vk - 0x41))).ToString();
       else if (vk == 0x0D) key = "Enter";
       else if (vk == 0x09) key = "Tab";
       else if (vk == 0x10 || vk == 0xA0 || vk == 0xA1) key = "Shift";
