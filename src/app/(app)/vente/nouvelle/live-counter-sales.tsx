@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Barcode } from "lucide-react";
 import { formatTime } from "@/lib/format";
+import { CounterResetButton } from "../counter-reset-button";
 
 export type LiveSale = {
   id: string;
@@ -65,6 +66,7 @@ export function LiveCounterSales({ initial }: { initial: LiveSale[] }) {
         <Barcode className="size-4 text-brand-700 dark:text-brand-300" />
         <h2 className="text-[14px] font-semibold text-text-primary">Douchette : ventes en cours</h2>
         <span className="ml-auto text-[12px] text-text-tertiary">mise à jour automatique</span>
+        <CounterResetButton />
       </div>
       <ul className="divide-y divide-border-subtle border-t border-border-subtle">
         {sales.map((sale) => (

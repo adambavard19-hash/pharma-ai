@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { PRESCRIPTION_STATUS } from "@/config/statuses";
 import type { PatientOption } from "@/components/app/patient-picker";
 import { PrescriptionZone } from "./prescription-zone";
+import { CounterResetButton } from "../counter-reset-button";
 import { TreatmentPanel } from "./treatment-panel";
 import { ChecksNote } from "./checks-note";
 import { SafetyZone, VigilanceCards } from "./safety-zone";
@@ -461,6 +462,7 @@ export function SaleWorkspace({
             <span key={factor.label}>{factor.label}</span>
           ))}
           <span className="tabular">{prescription.reference}</span>
+          {prescription.source === "COUNTER_SCAN" && !hasSale && <CounterResetButton prescriptionId={prescription.id} />}
           {prescription.patientId && (
             <Link href={`/patients/${prescription.patientId}`} className="flex items-center gap-1 text-brand-700 hover:underline dark:text-brand-400">
               <User className="size-3.5" />

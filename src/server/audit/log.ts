@@ -42,6 +42,7 @@ export type AuditAction =
   | "prescription.patient_attached"
   | "prescription.regulation_checked"
   | "prescription.counter_scan"
+  | "prescription.counter_reset"
   | "prescription.barcode_learned"
   | "stock.post_pairing_created"
   | "stock.post_paired"

@@ -214,3 +214,23 @@ export async function attachBarcodeToProduct(scope: { pharmacyId: string; userId
   return { ok: true, productName: product.name, code };
 }
 
+/**
+ * « Nouveau patient » : les ventes de la douchette encore ouvertes (sans
+ * encaissement) sont closes. L'écran redevient vierge et le bip suivant
+ * ouvre une nouvelle vente, même moins de trois minutes après le dernier.
+ */
+export async function closeLiveCounterSales(scope: { pharmacyId: string; userId: string }, prescriptionId?: string): Promise<number> {
+  const result = await prisma.prescription.updateMany({
+    where: {
+      pharmacyId: scope.pharmacyId,
+      source: "COUNTER_SCAN",
+      ...(prescriptionId ? { id: prescriptionId } : {}),
+      status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
+      sales: { none: {} },
+    },
+    data: { status: "CANCELLED" },
+  });
+  if (result.count > 0) await recordAudit({ action: "prescription.counter_reset", entityType: "Prescription", entityId: prescriptionId ?? null, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { closed: result.count } });
+  return result.count;
+}
+
