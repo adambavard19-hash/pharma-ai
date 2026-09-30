@@ -11,6 +11,8 @@
  * mention fausse.
  */
 
+import { TIME_ZONE } from "@/config/constants";
+
 export const BDPM_SOURCE = {
   name: "Base de données publique des médicaments",
   url: "https://base-donnees-publique.medicaments.gouv.fr",
@@ -90,10 +92,13 @@ export function referenceAttribution(state: ReferenceCatalogState): string {
     return `Source : ${BDPM_SOURCE.name} — ${BDPM_SOURCE.url}. Date de mise à jour non communiquée par la source.`;
   }
 
+  // La date publiée par la source se lit en heure de Paris, quel que soit le
+  // fuseau de la machine : un « 1er août » ne doit pas devenir « 31 juillet ».
   const date = new Date(state.sourceUpdatedAt).toLocaleDateString("fr-FR", {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: TIME_ZONE,
   });
 
   return `Source : ${BDPM_SOURCE.name} — ${BDPM_SOURCE.url}, mise à jour du ${date}.`;

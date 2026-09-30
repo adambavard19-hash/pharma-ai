@@ -15799,3 +15799,5 @@
  GET /login 200 in 74ms (next.js: 1.2ms, application-code: 73ms)
  GET /login 200 in 139ms (next.js: 42ms, application-code: 97ms)
  GET /api/agent/conseil?prescription=cmuoraq2q000zwhshxvqo58ut 200 in 20ms (next.js: 3ms, application-code: 17ms)
+ GET /login 200 in 24ms (next.js: 6ms, application-code: 18ms)
+ GET /login 200 in 28ms (next.js: 4ms, application-code: 24ms)
