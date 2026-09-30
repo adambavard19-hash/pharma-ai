@@ -72,3 +72,27 @@ n'est conservée ni envoyée.
 
 Chaque bip retire une boîte du stock PharmaBoost. L'export de stock du LGPI
 (serveur, agent « serveur ») remet le compte exact quand il arrive.
+
+## L'avis en coin d'écran (agent 0.4.0)
+
+Dès que l'analyse d'une vente bipée est prête, le poste affiche un petit
+encart en bas à droite de l'écran, par-dessus le LGO, sans lui prendre le
+clavier : les boîtes bipées, les alertes s'il y en a, puis jusqu'à trois
+conseils avec le prix. Il s'efface seul après quinze secondes ; un clic
+l'ouvre dans PharmaBoost.
+
+- C'est le poste qui déclenche l'analyse, en interrogeant le serveur après
+  chaque bip (`GET /api/agent/conseil`). Six secondes après le dernier bip,
+  la vente passe « vérifiée » et l'analyse tourne côté serveur : aucun écran
+  PharmaBoost n'a besoin d'être ouvert.
+- Une boîte de plus sur la même vente relance l'analyse et réaffiche l'avis.
+- Les avertissements de couverture (référentiel d'interactions absent…)
+  restent sur l'écran complet ; ils n'encombrent pas l'encart.
+
+Mettre à jour un poste déjà relié, puis voir un avis d'exemple :
+
+```
+powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -MiseAJour
+powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -TestAffichage
+```
+

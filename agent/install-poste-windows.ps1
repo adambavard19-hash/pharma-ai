@@ -4,10 +4,13 @@
 # la session Windows de la personne qui utilise le LGO :
 #   powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -Code 123456
 #   powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -MiseAJour   (poste déjà relié : nouvelle version)
+#   powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -TestAffichage (un avis d'exemple en coin d'écran)
 #
 # Ce que fait ce poste : il écoute la douchette (et rien d'autre) et envoie
-# chaque code-barres de boîte à PharmaBoost, à l'instant du bip. Le LGO n'est
-# ni modifié, ni ouvert, ni interrogé. Aucune frappe humaine n'est conservée
+# chaque code-barres de boîte à PharmaBoost, à l'instant du bip ; puis, dès que
+# l'analyse est prête, il affiche l'avis (alertes, conseils) en coin d'écran,
+# par-dessus le LGO, sans lui prendre le clavier. Le LGO n'est ni modifié, ni
+# ouvert, ni interrogé. Aucune frappe humaine n'est conservée
 # ni envoyée : seuls les codes-barres lus par une douchette (code EAN/CIP ou
 # Datamatrix de médicament, dont le CIP est extrait).
 #
@@ -18,6 +21,8 @@ param(
   [string]$Code = "",
   [string]$Serveur = "https://pharmaboost.app",
   [switch]$Test,
+  # Essai de l'affichage : un avis d'exemple en coin d'écran, sans bip.
+  [switch]$TestAffichage,
   # Mise à jour d'un poste déjà relié : remplace le programme et relance la tâche, sans nouveau code.
   [switch]$MiseAJour
 )
@@ -73,6 +78,11 @@ if ($MiseAJour) {
   Write-Host "Poste mis à jour et relancé."
   Start-Sleep -Seconds 8
   if (Test-Path $journal) { Get-Content $journal -Tail 3 }
+  exit
+}
+
+if ($TestAffichage) {
+  & $node "$dir\pharmaboost-connect.js" --test-affichage
   exit
 }
 

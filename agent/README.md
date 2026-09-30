@@ -66,3 +66,10 @@ l'ouverture de session). Seuls les codes-barres lus par la douchette sont
 transmis (EAN/CIP, ou Datamatrix de médicament dont le CIP est extrait) ;
 aucune frappe humaine n'est conservée.
 
+## Poste de caisse : l'avis en coin d'écran
+
+En mode poste, l'agent interroge `/api/agent/conseil` après chaque bip et,
+dès que l'analyse est prête, affiche l'avis (alertes, jusqu'à trois conseils)
+dans une fenêtre WinForms en bas à droite, toujours au-dessus, sans prendre
+le clavier (`WS_EX_NOACTIVATE`). `--test-affichage` montre un avis d'exemple.
+

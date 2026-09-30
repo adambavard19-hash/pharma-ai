@@ -26,11 +26,12 @@
  */
 import { createHash } from "node:crypto";
 import { startDouchette } from "./douchette";
+import { showToast } from "./toast";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.3.1";
+const VERSION = "0.4.0";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -129,7 +130,7 @@ async function sendScan(config: Config, code: string, scannedAt: string): Promis
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ code, post: hostname(), scannedAt }),
   });
-  const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; drugName?: string; reference?: string; lineCount?: number };
+  const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; drugName?: string; reference?: string; lineCount?: number; prescriptionId?: string };
   if (response.status === 401) throw new Error("clé du poste révoquée");
   if (response.status === 422) {
     log(`Bip ignoré (${code}) : ${body.error ?? "code inconnu"}`);
@@ -137,6 +138,7 @@ async function sendScan(config: Config, code: string, scannedAt: string): Promis
   }
   if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
   log(`Bip ${code} → ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s)).`);
+  if (body.prescriptionId) watchPrescription(body.prescriptionId);
 }
 
 async function flushScans(config: Config): Promise<void> {
@@ -145,6 +147,39 @@ async function flushScans(config: Config): Promise<void> {
     await sendScan(config, next.code, next.scannedAt);
     pendingScans.shift();
   }
+}
+
+/** Combien de temps l'avis reste en coin d'écran. */
+const TOAST_SECONDS = 15;
+/** Après un bip, on attend l'analyse jusqu'à deux minutes ; au-delà, elle est à lire dans PharmaBoost. */
+const WATCH_MS = 120_000;
+
+/** La vente que ce poste vient d'ouvrir ou de compléter, dont on attend l'avis. */
+let watched: { prescriptionId: string; since: number; shownSignature: string | null } | null = null;
+
+function watchPrescription(prescriptionId: string): void {
+  watched = { prescriptionId, since: Date.now(), shownSignature: watched?.prescriptionId === prescriptionId ? watched.shownSignature : null };
+}
+
+/**
+ * L'avis de comptoir : dès que l'analyse de la vente bipée est prête, il
+ * s'affiche en coin d'écran, par-dessus le LGO. Une fois par état : une boîte
+ * de plus change l'empreinte, l'avis se réaffiche ; sinon il se tait.
+ */
+async function pollNotice(config: Config): Promise<void> {
+  if (!watched) return;
+  if (Date.now() - watched.since > WATCH_MS) { watched = null; return; }
+  const response = await api(config, `/api/agent/conseil?prescription=${encodeURIComponent(watched.prescriptionId)}`, { method: "GET" });
+  if (response.status === 404) { watched = null; return; }
+  if (!response.ok) return;
+  const body = (await response.json()) as { ok: boolean; state: "PENDING" | "READY" | "CLOSED"; title: string; subject: string; alerts: string[]; advice: string[]; signature: string };
+  if (!body.ok) return;
+  if (body.state === "CLOSED") { watched = null; return; }
+  if (body.state !== "READY" || body.signature === watched.shownSignature) return;
+  watched.shownSignature = body.signature;
+  const url = `${config.serverUrl.replace(/\/$/, "")}/vente/${watched.prescriptionId}`;
+  showToast(dirname(CONFIG_PATH), { title: body.title, subject: body.subject, alerts: body.alerts, advice: body.advice, url, seconds: TOAST_SECONDS }, log);
+  log(`Avis affiché : ${body.subject} — ${body.alerts.length} alerte(s), ${body.advice.length} conseil(s).`);
 }
 
 /** Le poste de caisse : écouter la douchette, envoyer chaque bip, donner signe de vie. */
@@ -161,6 +196,7 @@ async function runPost(config: Config): Promise<void> {
   for (;;) {
     try {
       if (pendingScans.length > 0) await flushScans(config);
+      await pollNotice(config);
       if (Date.now() - lastHeartbeat > 60_000) {
         await heartbeat(config);
         lastHeartbeat = Date.now();
@@ -168,8 +204,22 @@ async function runPost(config: Config): Promise<void> {
     } catch (error) {
       log(`Erreur : ${error instanceof Error ? error.message : String(error)}`);
     }
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await new Promise((resolve) => setTimeout(resolve, watched ? 2000 : 3000));
   }
+}
+
+/** Essai de l'affichage : un avis d'exemple en coin d'écran, sans bip ni serveur. */
+function testAffichage(): void {
+  showToast(dirname(CONFIG_PATH), {
+    title: "PharmaBoost · essai d'affichage",
+    subject: "DOLIPRANE 1000 mg · AMOXICILLINE 1 g",
+    alerts: [],
+    advice: ["PROBIOTIQUE 30 gélules · 14,90 € · Protéger la flore pendant l'antibiotique", "Exemple : l'avis réel vient de l'analyse de la vente"],
+    url: "https://pharmaboost.app/vente/nouvelle",
+    seconds: 15,
+  }, (message) => console.log(`  ${message}`));
+  console.log("Un avis d'exemple doit apparaître en bas à droite de l'écran, pendant 15 secondes.");
+  setTimeout(() => process.exit(0), 20_000);
 }
 
 /** Essai sans rien envoyer : chaque bip lu s'affiche à l'écran. Pour vérifier une installation. */
@@ -352,6 +402,8 @@ if (arg("appairer")) {
   pairPost().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
 } else if (process.argv.includes("--test-douchette")) {
   testDouchette();
+} else if (process.argv.includes("--test-affichage")) {
+  testAffichage();
 } else if (process.argv.includes("--version")) {
   console.log(VERSION);
 } else {
