@@ -43,6 +43,7 @@ export type AuditAction =
   | "prescription.regulation_checked"
   | "prescription.counter_scan"
   | "prescription.counter_reset"
+  | "pharmacy.install_guide_sent"
   | "prescription.file_erased"
   | "patient_data.purged"
   | "counter.request_advised"

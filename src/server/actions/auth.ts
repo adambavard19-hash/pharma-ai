@@ -16,6 +16,7 @@ import {
   switchPharmacy,
 } from "@/server/auth/session";
 import { recordAudit } from "@/server/audit/log";
+import { createPlatformSession } from "@/server/auth/platform-session";
 import { sendUserPasswordLink, setUserPasswordByToken } from "@/server/services/user-password";
 import { markProspectActivatedForUser } from "@/server/services/sales/client-pharmacies";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
@@ -55,6 +56,20 @@ export async function loginAction(
 
   // Message identique dans tous les cas : ne pas révéler quels comptes existent.
   const genericError = "Identifiants incorrects.";
+
+  // Le super administrateur se connecte ici aussi : même page, même geste.
+  // Son compte vit dans une autre table ; s'il n'a pas de compte d'officine
+  // sous cette adresse, c'est la console qui s'ouvre.
+  if (!user || !passwordValid) {
+    const admin = await prisma.platformAdmin.findUnique({ where: { email } });
+    const adminValid = await verifyPassword(password, admin?.passwordHash);
+    if (admin && adminValid && admin.isActive) {
+      const meta = await getRequestMeta();
+      await createPlatformSession({ adminId: admin.id, ipAddress: meta.ipAddress });
+      await recordAudit({ action: "auth.login", entityType: "PlatformAdmin", entityId: admin.id, platformAdminId: admin.id, metadata: { scope: "platform", via: "login" } });
+      redirect("/admin");
+    }
+  }
 
   if (!user) {
     // Une base sans aucun compte n'a rien à protéger : le message générique

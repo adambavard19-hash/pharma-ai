@@ -1,4 +1,26 @@
-# Installer PharmaBoost sur un poste de caisse (douchette) — fiche pas à pas
+# Installer un poste de caisse (agent 0.4.x)
+
+## En une ligne, par le titulaire lui-même
+
+Dans PharmaBoost → Stock → Connecter mon logiciel → **Ajouter un poste** :
+une commande s'affiche, valable sept jours pour un poste. Sur l'ordinateur où
+la douchette est branchée, clic droit sur le bouton Windows → Terminal, coller,
+Entrée :
+
+```
+powershell -ExecutionPolicy Bypass -Command "irm https://pharmaboost.app/api/agent/installer/<jeton> | iex"
+```
+
+Le script (`/api/agent/installer/[token]`) vérifie le jeton, télécharge le
+programme et l'installateur (`/api/agent/fichiers/…`), installe Node.js s'il
+manque, appaire le poste avec le jeton et crée la tâche à l'ouverture de
+session. « Le poste est relié » s'affiche à la fin. Le guide envoyé par
+e-mail à l'activation (`src/core/platform/onboarding-emails.ts`) décrit ces
+étapes au titulaire ; la console peut le renvoyer (fiche officine → « Envoyer
+le guide d'installation »).
+
+## L'autre méthode : code à six chiffres et archive
+
 
 Objectif : chaque boîte scannée dans le LGPI apparaît dans PharmaBoost à
 l'instant du bip, sans second scan. Le LGPI n'est ni modifié ni interrogé.

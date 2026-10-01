@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Barcode, Download, FolderSync, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { createPostPairingAction, requestPostSyncAction, revokePostAction, setPostExportPathAction } from "@/server/actions/stock-sync";
+import { createPostInstallLinkAction, createPostPairingAction, requestPostSyncAction, revokePostAction, setPostExportPathAction } from "@/server/actions/stock-sync";
 import { describeAge } from "@/core/stock/connectors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -23,6 +23,8 @@ type PostRow = { id: string; label: string | null; hostname: string; paired: boo
 export function CounterPostsCard({ serverUrl, posts }: { serverUrl: string; posts: PostRow[] }) {
   const [label, setLabel] = useState("");
   const [code, setCode] = useState<{ code: string; expiresAt: string } | null>(null);
+  const [link, setLink] = useState<{ command: string; expiresAt: string } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [pending, start] = useTransition();
   const router = useRouter();
   const { push } = useToast();
@@ -31,9 +33,21 @@ export function CounterPostsCard({ serverUrl, posts }: { serverUrl: string; post
 
   const generate = () =>
     start(async () => {
+      const result = await createPostInstallLinkAction({ label: label || null });
+      if (!result.ok) return push({ tone: "error", title: result.error });
+      setLink({ command: result.data.command, expiresAt: result.data.expiresAt });
+      setCode(null);
+      setLabel("");
+      router.refresh();
+    });
+
+  // L'autre méthode : un code à six chiffres, à taper à la main avec l'archive téléchargée.
+  const generateCode = () =>
+    start(async () => {
       const result = await createPostPairingAction({ label: label || null });
       if (!result.ok) return push({ tone: "error", title: result.error });
       setCode(result.data);
+      setLink(null);
       setLabel("");
       router.refresh();
     });
@@ -130,6 +144,31 @@ export function CounterPostsCard({ serverUrl, posts }: { serverUrl: string; post
           <p className="text-[12.5px] leading-5 text-text-tertiary">
             Mettre à jour un poste déjà relié : télécharger, extraire, puis dans le dossier extrait <code className="font-mono">powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -MiseAJour</code>. Aucun nouveau code.
           </p>
+        )}
+
+        {link && (
+          <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/30">
+            <p className="text-[14px] font-semibold text-text-primary">Sur l&apos;ordinateur où la douchette est branchée, en une ligne :</p>
+            <ol className="list-decimal space-y-1.5 pl-5 text-[13.5px] leading-5 text-text-primary">
+              <li>Clic droit sur le bouton Windows → « Terminal » (ou « Windows PowerShell »).</li>
+              <li>Collez la ligne ci-dessous, puis Entrée. Tout s&apos;installe seul, Node.js compris : deux minutes.</li>
+            </ol>
+            <pre className="overflow-x-auto rounded-lg bg-ink-950 px-3 py-2.5 font-mono text-[12.5px] text-white">{link.command}</pre>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(link.command).catch(() => undefined);
+                  setLinkCopied(true);
+                  setTimeout(() => setLinkCopied(false), 2500);
+                }}
+              >
+                {linkCopied ? "Copié" : "Copier la ligne"}
+              </Button>
+              <span className="text-[12.5px] text-text-secondary">Valable jusqu&apos;au {formatDateTime(new Date(link.expiresAt))}, pour un seul poste.</span>
+            </div>
+            <p className="text-[12.5px] text-text-secondary">À la fin, « Le poste est relié » s&apos;affiche et le poste apparaît ci-dessus en ligne. Passez une boîte à la douchette dans votre logiciel : elle arrive dans PharmaBoost. <button type="button" onClick={generateCode} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Autre méthode : un code à six chiffres et l&apos;archive à télécharger.</button></p>
+          </div>
         )}
 
         {code && (

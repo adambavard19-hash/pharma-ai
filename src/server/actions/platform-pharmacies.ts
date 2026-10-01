@@ -1,5 +1,7 @@
 "use server";
 
+import { sendInstallationGuide } from "@/server/services/platform-onboarding";
+
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
@@ -326,3 +328,13 @@ export async function createPharmacyOwnerAction(
       : `${input.firstName} ${input.lastName} est titulaire de ${pharmacy.name}, mais l'e-mail d'accueil n'est pas parti (${welcome.detail}).`,
   );
 }
+
+/** Renvoyer le guide d'installation au titulaire, depuis la console. */
+export async function sendInstallationGuideAction(payload: { pharmacyId: string }): Promise<ActionResult<{ sentTo: string | null }>> {
+  const session = await requirePlatformSession();
+  const outcome = await sendInstallationGuide(payload.pharmacyId, { adminId: session.admin.id, reason: "ADMIN" });
+  if (outcome.status === "FAILED") return fail(`Guide non envoyé : ${outcome.detail}`);
+  revalidatePath(`/admin/pharmacies/${payload.pharmacyId}`);
+  return ok({ sentTo: outcome.sentTo }, outcome.status === "SENT" ? `Guide d'installation envoyé à ${outcome.sentTo}.` : `Envoi simulé : ${outcome.detail}`);
+}
+

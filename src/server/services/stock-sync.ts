@@ -135,6 +135,8 @@ export type AgentContext = {
 };
 
 const POST_PAIRING_TTL_MS = 1000 * 60 * 60;
+/** Un lien d'installation vit une semaine : le titulaire le fait quand il a le poste sous la main. */
+const POST_INSTALL_LINK_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
 /** Un code d'appairage pour un poste de caisse : six chiffres, une heure, un seul usage. */
 export async function createPostPairing(scope: TenantScope, label: string | null): Promise<{ code: string; expiresAt: Date; postId: string }> {
@@ -148,9 +150,34 @@ export async function createPostPairing(scope: TenantScope, label: string | null
 }
 
 /** Le poste présente son code : il reçoit sa clé, une fois. */
+/**
+ * Le lien d'installation en une ligne : un jeton long, à usage unique, qui
+ * tient dans une commande PowerShell. Le poste s'appaire avec ce jeton comme
+ * avec un code à six chiffres ; il n'y a rien d'autre à taper.
+ */
+export async function createPostInstallLink(scope: TenantScope, label: string | null): Promise<{ token: string; expiresAt: Date; postId: string }> {
+  const token = generateToken(18);
+  const expiresAt = new Date(Date.now() + POST_INSTALL_LINK_TTL_MS);
+  const post = await prisma.counterPost.create({
+    data: { pharmacyId: scope.pharmacyId, hostname: "", label, pairingCodeHash: hashToken(token), pairingExpiresAt: expiresAt },
+  });
+  await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { label, kind: "install-link" } });
+  return { token, expiresAt, postId: post.id };
+}
+
+/** Un lien d'installation encore valable ? Sans rien consommer : l'installateur le vérifie avant de télécharger. */
+export async function peekPostInstallLink(token: string): Promise<{ pharmacyName: string; label: string | null } | null> {
+  if (!/^[A-Za-z0-9_-]{16,}$/.test(token)) return null;
+  const post = await prisma.counterPost.findUnique({ where: { pairingCodeHash: hashToken(token) }, select: { label: true, pairingExpiresAt: true, pharmacy: { select: { name: true } } } });
+  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return null;
+  return { pharmacyName: post.pharmacy.name, label: post.label };
+}
+
 export async function pairCounterPost(input: { code: string; hostname?: string | null; version?: string | null }): Promise<{ ok: true; agentKey: string; pharmacyName: string; postLabel: string } | { ok: false; error: string }> {
-  const code = (input.code ?? "").replace(/\D/g, "");
-  if (code.length !== 6) return { ok: false, error: "Code d'appairage invalide." };
+  // Un code à six chiffres tapé à la main, ou le jeton d'un lien d'installation.
+  const raw = (input.code ?? "").trim();
+  const code = /^[A-Za-z0-9_-]{16,}$/.test(raw) ? raw : raw.replace(/\D/g, "");
+  if (code.length !== 6 && code.length < 16) return { ok: false, error: "Code d'appairage invalide." };
   const post = await prisma.counterPost.findUnique({ where: { pairingCodeHash: hashToken(code) }, include: { pharmacy: { select: { name: true } } } });
   if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return { ok: false, error: "Code de poste inconnu ou expiré. Générez un nouveau code dans PharmaBoost (Stock → Connecter mon logiciel → Postes de caisse)." };
   const agentKey = generateToken(32);

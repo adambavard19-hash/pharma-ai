@@ -5,6 +5,7 @@ import { generateToken, hashToken } from "@/server/security/tokens";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
+import { sendInstallationGuide } from "@/server/services/platform-onboarding";
 import { notifyAdmins } from "@/server/services/sales/notifications";
 import { getStripe, stripeConfigState } from "./stripe-client";
 import { readSubscription, type SubscriptionShape } from "@/core/billing/stripe-shapes";
@@ -344,6 +345,8 @@ export async function announceSubscriptionStarted(organizationId: string): Promi
   if (owner) {
     const message = buildSubscriptionStartedEmail({ ownerName: `${owner.firstName} ${owner.lastName}`, pharmacyName: pharmacy.name, planName: subscription.plan.name, monthlyPriceCents: subscription.plan.monthlyPriceCents, trialEndsAt: subscription.trialEndsAt, appUrl: publicUrl("/") });
     await getMessagingProvider().sendEmail({ to: owner.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
+    // Puis le guide : les cinq étapes pour mettre l'officine en service, sans visite.
+    await sendInstallationGuide(pharmacy.id, { reason: "SUBSCRIPTION_STARTED" }).catch((error) => console.error("[abonnement] guide d'installation non envoyé", error));
   }
   await notifyAdmins({ type: "SUBSCRIPTION_STARTED", title: `${pharmacy.name} : abonnement démarré`, body: `${subscription.plan.name} — ${formatEuros(subscription.plan.monthlyPriceCents)}/mois${subscription.trialEndsAt ? `, essai jusqu'au ${subscription.trialEndsAt.toLocaleDateString("fr-FR")}` : ""}.`, linkUrl: `/admin/abonnements/${pharmacy.id}`, severity: "SUCCESS" });
   const prospect = await prisma.prospect.findUnique({ where: { pharmacyId: pharmacy.id }, select: { id: true, status: true } });

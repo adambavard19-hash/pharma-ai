@@ -12,6 +12,7 @@ import { Alert } from "@/components/ui/feedback";
 import { formatDate, formatRelative } from "@/lib/format";
 import { EditPharmacyButton } from "../pharmacy-form";
 import { StatusToggle } from "../status-toggle";
+import { InstallGuideButton } from "../install-guide-button";
 import { AddOwnerButton } from "./owner-form";
 
 export const metadata: Metadata = { title: "Officine cliente" };
@@ -67,6 +68,8 @@ export default async function ClientPharmacyPage({
   });
 
   if (!pharmacy) notFound();
+  const { posts, lastGuide } = await loadInstallationState(id);
+
   const unclassified = await prisma.product.count({ where: { pharmacyId: id, deletedAt: null, classifiedAt: null } });
   const lastRun = pharmacy.analysisRuns[0];
 
@@ -187,8 +190,10 @@ export default async function ClientPharmacyPage({
         </Card>
 
         <Card>
-          <CardHeader title="Installation" description="Accueil, stock, moteur, abonnement — des états, jamais un contenu." />
+          <CardHeader title="Installation" description="Accueil, stock, postes, moteur, abonnement — des états, jamais un contenu." action={<InstallGuideButton pharmacyId={pharmacy.id} />} />
           <CardContent className="space-y-2.5 pb-5 text-[13px]">
+            <DataItem label="Postes de comptoir reliés">{posts.length === 0 ? "aucun" : posts.map((post) => `${post.label ?? (post.hostname || "poste")}${post.alive ? " · en ligne" : ""}${post.scanCount > 0 ? ` · ${post.scanCount} bips` : ""}${post.exportPath ? " · stock relu" : ""}`).join(" ; ")}</DataItem>
+            <DataItem label="Guide d'installation">{lastGuide ? `envoyé le ${formatDate(lastGuide.createdAt)}` : "jamais envoyé"}</DataItem>
             <DataItem label="Accueil du titulaire">{pharmacy.onboardingCompletedAt ? `terminé le ${formatDate(pharmacy.onboardingCompletedAt)}` : "en cours"}</DataItem>
             <DataItem label="Stock importé">{pharmacy.stockSyncedAt ? `oui · synchronisé le ${formatDate(pharmacy.stockSyncedAt)}` : "non"}</DataItem>
             <DataItem label="Anomalies de stock">{unclassified > 0 ? `${unclassified} produit(s) à classer` : "aucune"}</DataItem>
@@ -211,3 +216,15 @@ function Counter({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
+
+/** Les postes reliés et le dernier guide envoyé. L'heure se lit ici, pas dans le rendu. */
+async function loadInstallationState(pharmacyId: string) {
+  const now = Date.now();
+  const [rows, lastGuide] = await Promise.all([
+    prisma.counterPost.findMany({ where: { pharmacyId, revokedAt: null, pairedAt: { not: null } }, select: { label: true, hostname: true, lastSeenAt: true, scanCount: true, exportPath: true } }),
+    prisma.auditLog.findFirst({ where: { pharmacyId, action: "pharmacy.install_guide_sent" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
+  ]);
+  const posts = rows.map((post) => ({ ...post, alive: Boolean(post.lastSeenAt && now - post.lastSeenAt.getTime() < 180_000) }));
+  return { posts, lastGuide };
+}
+
