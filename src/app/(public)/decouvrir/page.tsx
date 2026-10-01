@@ -2,7 +2,8 @@ import Link from "next/link";
 import { ArrowRight, Barcode, Check, FileText, MessageCircleQuestion, ScanLine, ShieldCheck, Store } from "lucide-react";
 import { Feature, Section } from "./_components/site-shell";
 import { PilotMock, RequestMock, SafetyMock, ToastMock } from "./_components/mockups";
-import { loadPublicOffer } from "@/server/services/site-leads";
+import { loadLiveProof, loadPublicOffer } from "@/server/services/site-leads";
+import { ProofSection } from "./_components/proof";
 import { formatEuros } from "@/core/billing/subscription";
 import { RoiCalculator } from "./_components/roi-calculator";
 
@@ -22,7 +23,8 @@ const FAQ: { q: string; a: string }[] = [
 ];
 
 export default async function SitePage() {
-  const offer = (await loadPublicOffer()) ?? FALLBACK_OFFER;
+  const [offerRow, live] = await Promise.all([loadPublicOffer(), loadLiveProof()]);
+  const offer = offerRow ?? FALLBACK_OFFER;
   const trial = offer.trialDays >= 28 ? "Premier mois offert" : offer.trialDays > 0 ? `${offer.trialDays} jours offerts` : null;
 
   return (
@@ -36,10 +38,10 @@ export default async function SitePage() {
               <Barcode className="size-3.5 text-brand-600 dark:text-brand-400" /> Fonctionne au bip, sans changer de logiciel
             </p>
             <h1 className="mt-5 text-[40px] leading-[1.08] font-semibold tracking-[-0.025em] text-text-primary text-balance md:text-[52px]">
-              Le bon conseil, vérifié, au moment où la boîte passe au comptoir.
+              Vendez plus de conseil, en toute sécurité, et voyez-le dans vos ventes.
             </h1>
             <p className="mt-5 text-[17px] leading-7 text-text-secondary">
-              PharmaBoost lit l&apos;ordonnance, contrôle le traitement et la réglementation, puis propose dans votre stock le produit qui aide vraiment le patient. L&apos;avis s&apos;affiche sur l&apos;écran de caisse, s&apos;efface seul, et le pharmacien décide.
+              Au bip de la douchette, PharmaBoost lit l&apos;ordonnance, vérifie le traitement et la réglementation, puis propose dans votre stock le produit qui aide vraiment le patient. Le conseil accepté est rattaché à la vente : le chiffre d&apos;affaires additionnel se lit à l&apos;euro près, pas sur une brochure. Et le patient repart avec son plan de prise et ses rappels.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link href="/decouvrir/demo" className="inline-flex h-12 items-center gap-2 rounded-xl bg-brand-600 px-6 text-[15px] font-semibold text-white shadow-sm hover:bg-brand-700">
@@ -50,7 +52,7 @@ export default async function SitePage() {
               </Link>
             </div>
             <ul className="mt-8 grid gap-2 text-[13.5px] text-text-secondary sm:grid-cols-2">
-              {["Installé en quelques minutes par poste", "Sécurité et réglementation avant tout conseil", "Propose uniquement ce qui est en rayon", "Valeur créée constatée, vente par vente"].map((item) => (
+              {["Chiffre d'affaires additionnel constaté, vente par vente", "Sécurité et réglementation avant tout conseil", "Plan de prise et rappels sur le téléphone du patient", "Installé en quelques minutes par poste, sans visite"].map((item) => (
                 <li key={item} className="flex items-center gap-2"><Check className="size-4 shrink-0 text-success-600" /> {item}</li>
               ))}
             </ul>
@@ -58,6 +60,8 @@ export default async function SitePage() {
           <ToastMock className="mx-auto w-full max-w-lg pb-6" />
         </div>
       </section>
+
+      <ProofSection live={live} />
 
       {/* ---- Au bip -------------------------------------------------- */}
       <Section

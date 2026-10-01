@@ -1082,3 +1082,15 @@ Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allow
  GET /pilotage 200 in 204ms (next.js: 29ms, application-code: 175ms)
  GET /pilotage 200 in 45ms (next.js: 7ms, application-code: 38ms)
  GET /decouvrir 200 in 120ms (next.js: 5ms, application-code: 116ms)
+ GET /login 200 in 66ms (next.js: 49ms, application-code: 18ms)
+ POST /pilotage 200 in 115ms (next.js: 5ms, application-code: 111ms)
+  └─ ƒ logoutAction() in 31ms src/server/actions/auth.ts
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+ GET /admin 200 in 102ms (next.js: 37ms, application-code: 65ms)
+ POST /login 200 in 255ms (next.js: 5ms, application-code: 250ms)
+  └─ ƒ loginAction(null, {}) in 139ms src/server/actions/auth.ts
+ GET /admin/equipe 200 in 79ms (next.js: 5ms, application-code: 74ms)
+✓ Compiled in 203ms
+ GET /admin/equipe 200 in 141ms (next.js: 8ms, application-code: 133ms)
+ GET /decouvrir 200 in 271ms (next.js: 20ms, application-code: 250ms)

@@ -86,3 +86,21 @@ export async function loadPublicOffer(): Promise<{ name: string; description: st
 export async function loadCompanyProfile() {
   return prisma.companyProfile.findUnique({ where: { id: "default" } });
 }
+
+/**
+ * La preuve chiffrée du site : conseils acceptés et ventes additionnelles,
+ * agrégés sur toutes les officines réelles. Rien n'est publié en dessous
+ * d'un seuil : un chiffre trop petit ne prouve rien, et une officine seule
+ * ne doit pas être reconnaissable.
+ */
+const PROOF_MIN_ACCEPTED = 50;
+export async function loadLiveProof(): Promise<{ acceptedAdvices: number; attributedCents: number; attributedMarginCents: number; pharmacies: number } | null> {
+  const [accepted, sales, pharmacies] = await Promise.all([
+    prisma.recommendation.count({ where: { isDemo: false, status: { in: ["ACCEPTED", "MODIFIED", "REPLACED", "PRESENTED", "PURCHASED"] } } }),
+    prisma.sale.aggregate({ where: { isDemo: false, attributedCents: { gt: 0 } }, _sum: { attributedCents: true, attributedMarginCents: true } }),
+    prisma.pharmacy.count({ where: { isDemo: false, isActive: true } }),
+  ]);
+  if (accepted < PROOF_MIN_ACCEPTED || pharmacies < 2) return null;
+  return { acceptedAdvices: accepted, attributedCents: sales._sum.attributedCents ?? 0, attributedMarginCents: sales._sum.attributedMarginCents ?? 0, pharmacies };
+}
+
