@@ -11,7 +11,8 @@ des suivis et le HTTPS automatique.
 1. **Un serveur** Linux (Ubuntu 24.04, 2 vCPU, 4 Go de RAM, 40 Go) avec Docker
    installé — Hetzner, OVH, Scaleway… Pour des données de santé de patients
    réels, l'hébergeur doit être certifié **HDS** (Hébergeur de Données de
-   Santé) ; en France : OVHcloud HDS, Scaleway HDS, Outscale, etc.
+   Santé) ; en France : OVHcloud HDS, Scaleway HDS, Outscale, etc. Le choix
+   retenu et la procédure de migration depuis Vercel/Neon : `docs/HDS.md`.
 2. **Le DNS de pharmaboost.app** : un enregistrement `A` (et `AAAA` si IPv6)
    pour `pharmaboost.app` et `www` pointant vers l'adresse IP du serveur.
 3. **Resend** : domaine `pharmaboost.app` ajouté et vérifié (enregistrements

@@ -119,7 +119,10 @@ requiert en France une **certification HDS**. Le stockage local
 (`LocalStorageProvider`) est un outil de développement et ne convient pas.
 
 **À faire** : contractualiser avec un hébergeur certifié HDS pour la base de
-données **et** le stockage des fichiers d'ordonnance.
+données **et** le stockage des fichiers d'ordonnance. Le plan, le choix de
+l'hébergeur, le script de migration et le calendrier sont dans `docs/HDS.md`
+(1er octobre 2026). État constaté : Vercel + Neon en région us-east-1,
+ni l'un ni l'autre certifié.
 
 ### 3.4 Formalités et documentation
 
