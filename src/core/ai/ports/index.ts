@@ -15,6 +15,7 @@ import type {
 } from "../types";
 import type { ClassificationRequest, ClassificationResult } from "../../understanding";
 import type { ProductClassificationRequest, ProductClassificationResponse } from "../../catalog/product-classification-schema";
+import type { RequestUnderstanding, RequestUnderstandingInput } from "../../counter/request";
 
 export type ProviderCapability = "SIMULATED" | "LIVE";
 
@@ -96,6 +97,14 @@ export interface AIProvider {
    * fournisseur n'en est pas capable : le dictionnaire seul aura classé.
    */
   classifyProducts(request: ProductClassificationRequest): Promise<ProductClassificationResponse | null>;
+  /**
+   * Comprend une demande spontanée au comptoir (client sans ordonnance) :
+   * des besoins parmi la liste fermée, des questions à poser, une éventuelle
+   * orientation vers le médecin. Jamais un produit ni un médicament. `null`
+   * quand le fournisseur n'en est pas capable : les mots-clés prennent le
+   * relais, et la trace le dit.
+   */
+  understandRequest(request: RequestUnderstandingInput): Promise<RequestUnderstanding | null>;
 }
 
 // --- Stockage de fichiers --------------------------------------------------

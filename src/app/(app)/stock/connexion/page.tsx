@@ -39,7 +39,7 @@ export default async function StockConnectionPage() {
       />
       <CounterPostsCard
         serverUrl={serverUrl}
-        posts={posts.map((post) => ({ id: post.id, label: post.label, hostname: post.hostname, paired: Boolean(post.pairedAt), pairingExpiresAt: post.pairingExpiresAt?.toISOString() ?? null, lastSeenAt: post.lastSeenAt?.toISOString() ?? null, lastScanAt: post.lastScanAt?.toISOString() ?? null, scanCount: post.scanCount, version: post.version }))}
+        posts={posts.map((post) => ({ id: post.id, label: post.label, hostname: post.hostname, paired: Boolean(post.pairedAt), pairingExpiresAt: post.pairingExpiresAt?.toISOString() ?? null, lastSeenAt: post.lastSeenAt?.toISOString() ?? null, lastScanAt: post.lastScanAt?.toISOString() ?? null, scanCount: post.scanCount, version: post.version, exportPath: post.exportPath, lastExportAt: post.lastExportAt?.toISOString() ?? null, lastExportError: post.lastExportError }))}
       />
       <ConnectionManager
         lgos={LGO_DEFINITIONS}

@@ -281,7 +281,7 @@ function showToast(configDir, content, onStatus) {
 var import_node_fs3 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path3 = require("node:path");
-var VERSION = "0.4.0";
+var VERSION = "0.4.1";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path3.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path3.join)((0, import_node_path3.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -390,6 +390,16 @@ async function pollNotice(config) {
   showToast((0, import_node_path3.dirname)(CONFIG_PATH), { title: body.title, subject: body.subject, alerts: body.alerts, advice: body.advice, url, seconds: TOAST_SECONDS }, log);
   log(`Avis affich\xE9 : ${body.subject} \u2014 ${body.alerts.length} alerte(s), ${body.advice.length} conseil(s).`);
 }
+async function postHeartbeat(config) {
+  const response = await api(config, "/api/agent/heartbeat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version: VERSION, hostname: (0, import_node_os.hostname)(), notice })
+  });
+  if (response.status === 401) throw new Error("cl\xE9 du poste r\xE9voqu\xE9e");
+  const body = await response.json().catch(() => ({}));
+  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null };
+}
 async function runPost(config) {
   log(`PharmaBoost Connect ${VERSION} \u2014 poste de caisse ${(0, import_node_os.hostname)()} \u2014 journal : ${LOG_PATH}`);
   startDouchette((0, import_node_path3.dirname)(CONFIG_PATH), {
@@ -400,13 +410,32 @@ async function runPost(config) {
     onStatus: (message) => log(message)
   });
   let lastHeartbeat = 0;
+  let lastStockCheck = 0;
+  let handledSyncRequest = null;
+  let forceSync = false;
   for (; ; ) {
     try {
       if (pendingScans.length > 0) await flushScans(config);
       await pollNotice(config);
       if (Date.now() - lastHeartbeat > 6e4) {
-        await heartbeat(config);
+        const settings = await postHeartbeat(config);
         lastHeartbeat = Date.now();
+        if (settings.exportPath !== (config.exportPath ?? null)) {
+          config = { ...config, exportPath: settings.exportPath };
+          writeConfig(config);
+          log(settings.exportPath ? `Export de stock \xE0 surveiller : ${settings.exportPath}` : "Ce poste n'envoie plus de stock.");
+          lastStockCheck = 0;
+        }
+        if (settings.syncRequestedAt && settings.syncRequestedAt !== handledSyncRequest) {
+          handledSyncRequest = settings.syncRequestedAt;
+          forceSync = true;
+          lastStockCheck = 0;
+        }
+      }
+      if (config.exportPath && Date.now() - lastStockCheck > CHECK_MS) {
+        config = await syncStock(config, forceSync);
+        forceSync = false;
+        lastStockCheck = Date.now();
       }
     } catch (error) {
       log(`Erreur : ${error instanceof Error ? error.message : String(error)}`);

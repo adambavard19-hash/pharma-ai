@@ -10,8 +10,12 @@ export async function POST(request: Request) {
   if (!agent) return NextResponse.json({ ok: false, error: "Clé d'agent inconnue ou révoquée." }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { version?: string; hostname?: string; notice?: string | null };
   if (agent.postId) {
-    await prisma.counterPost.update({ where: { id: agent.postId }, data: { lastSeenAt: new Date(), version: body.version ?? undefined, hostname: body.hostname ?? undefined } });
-    return NextResponse.json({ ok: true, intervalSeconds: 300, exportPath: null, scansPath: null });
+    const post = await prisma.counterPost.update({
+      where: { id: agent.postId },
+      data: { lastSeenAt: new Date(), version: body.version ?? undefined, hostname: body.hostname ?? undefined, ...(typeof body.notice === "string" || body.notice === null ? { lastExportError: body.notice } : {}) },
+      select: { exportPath: true, syncRequestedAt: true },
+    });
+    return NextResponse.json({ ok: true, intervalSeconds: 300, exportPath: post.exportPath, scansPath: null, syncRequestedAt: post.syncRequestedAt?.toISOString() ?? null });
   }
   await recordHeartbeat(agent, { version: body.version, hostname: body.hostname, notice: typeof body.notice === "string" || body.notice === null ? body.notice : undefined });
   const connection = await prisma.stockConnection.findUniqueOrThrow({ where: { id: agent.connectionId! }, select: { intervalSeconds: true, exportPath: true, scansPath: true } });

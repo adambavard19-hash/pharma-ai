@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Barcode, Download, Plus, Trash2 } from "lucide-react";
-import { createPostPairingAction, revokePostAction } from "@/server/actions/stock-sync";
+import { Barcode, Download, FolderSync, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { createPostPairingAction, requestPostSyncAction, revokePostAction, setPostExportPathAction } from "@/server/actions/stock-sync";
 import { describeAge } from "@/core/stock/connectors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { Field, Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/lib/format";
 
-type PostRow = { id: string; label: string | null; hostname: string; paired: boolean; pairingExpiresAt: string | null; lastSeenAt: string | null; lastScanAt: string | null; scanCount: number; version: string | null };
+type PostRow = { id: string; label: string | null; hostname: string; paired: boolean; pairingExpiresAt: string | null; lastSeenAt: string | null; lastScanAt: string | null; scanCount: number; version: string | null; exportPath: string | null; lastExportAt: string | null; lastExportError: string | null };
 
 /**
  * Les postes de caisse qui écoutent la douchette. Un poste = un code, une
@@ -38,6 +38,20 @@ export function CounterPostsCard({ serverUrl, posts }: { serverUrl: string; post
       router.refresh();
     });
 
+  const [paths, setPaths] = useState<Record<string, string>>(() => Object.fromEntries(posts.map((post) => [post.id, post.exportPath ?? ""])));
+  const savePath = (postId: string) =>
+    start(async () => {
+      const result = await setPostExportPathAction({ postId, exportPath: paths[postId] ?? "" });
+      push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Fait.") : result.error });
+      router.refresh();
+    });
+  const syncNow = (postId: string) =>
+    start(async () => {
+      const result = await requestPostSyncAction({ postId });
+      push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Fait.") : result.error });
+      router.refresh();
+    });
+
   const revoke = (postId: string) =>
     start(async () => {
       const result = await revokePostAction({ postId });
@@ -53,7 +67,7 @@ export function CounterPostsCard({ serverUrl, posts }: { serverUrl: string; post
             <Barcode className="size-4 text-brand-600 dark:text-brand-400" /> Postes de caisse — la douchette alimente le comptoir
           </span>
         }
-        description="Sur chaque ordinateur où une douchette est branchée, l'agent écoute les bips. Chaque boîte scannée dans votre logiciel apparaît dans PharmaBoost à l'instant, sans second scan. Rien n'est modifié dans votre logiciel ; seuls les codes-barres de boîtes sont transmis."
+        description="Sur chaque ordinateur où une douchette est branchée, l'agent écoute les bips. Chaque boîte scannée dans votre logiciel apparaît dans PharmaBoost à l'instant, sans second scan, et l'avis s'affiche en coin d'écran. Si le dossier d'export du logiciel est visible depuis un poste, ce poste relit aussi le stock à chaque nouvel export. Rien n'est modifié dans votre logiciel."
       />
       <CardContent className="space-y-4">
         {posts.length > 0 && (
@@ -76,6 +90,27 @@ export function CounterPostsCard({ serverUrl, posts }: { serverUrl: string; post
                   </span>
                   {post.paired && <Badge tone={alive ? "success" : "warning"}>{alive ? "En ligne" : seen === null ? "Jamais vu" : `Muet depuis ${describeAge(Math.round(seen))}`}</Badge>}
                   <Button size="sm" variant="ghost" leadingIcon={<Trash2 className="size-3.5" />} loading={pending} onClick={() => revoke(post.id)}>Retirer</Button>
+                  {post.paired && (
+                    <div className="flex w-full flex-wrap items-center gap-2 pt-1">
+                      <FolderSync className="size-3.5 shrink-0 text-text-tertiary" />
+                      <Input
+                        value={paths[post.id] ?? ""}
+                        onChange={(e) => setPaths((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                        placeholder={"Dossier d'export du stock vu depuis ce poste, ex. \\\\SERVEUR\\PharmaBoost\\Export"}
+                        className="min-w-64 flex-1 font-mono text-[12.5px]"
+                        aria-label="Dossier d'export du stock"
+                      />
+                      <Button size="sm" variant="outline" loading={pending} onClick={() => savePath(post.id)} disabled={(paths[post.id] ?? "") === (post.exportPath ?? "")}>Enregistrer</Button>
+                      {post.exportPath && (
+                        <Button size="sm" variant="outline" leadingIcon={<RefreshCw className="size-3.5" />} loading={pending} onClick={() => syncNow(post.id)}>Mettre à jour le stock maintenant</Button>
+                      )}
+                      {post.exportPath && (
+                        <span className={`basis-full text-[12.5px] ${post.lastExportError ? "text-danger-700 dark:text-danger-400" : "text-text-secondary"}`}>
+                          {post.lastExportError ? `Dernier essai : ${post.lastExportError}` : post.lastExportAt ? `Stock relu ${describeAge(Math.round((now - new Date(post.lastExportAt).getTime()) / 1000))} depuis ce poste.` : "En attente du premier export : enregistrez l'édition de stock du logiciel dans ce dossier."}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </li>
               );
             })}

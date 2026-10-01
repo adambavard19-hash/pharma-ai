@@ -85,6 +85,11 @@ export class RuleBasedAIProvider implements AIProvider {
     return null;
   }
 
+  /** Sans modèle, la demande se lit par mots-clés (src/core/counter/request.ts). */
+  async understandRequest(): Promise<null> {
+    return null;
+  }
+
   async writePatientReason(request: PatientReasonRequest): Promise<string> {
     const claim = request.productClaims[0];
     if (claim) {

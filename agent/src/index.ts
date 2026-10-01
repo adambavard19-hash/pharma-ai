@@ -31,7 +31,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.4.0";
+const VERSION = "0.4.1";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -182,7 +182,23 @@ async function pollNotice(config: Config): Promise<void> {
   log(`Avis affiché : ${body.subject} — ${body.alerts.length} alerte(s), ${body.advice.length} conseil(s).`);
 }
 
-/** Le poste de caisse : écouter la douchette, envoyer chaque bip, donner signe de vie. */
+/**
+ * Le signe de vie du poste rapporte aussi ses réglages : le dossier d'export
+ * du stock que PharmaBoost lui a confié, et une éventuelle demande de mise à
+ * jour immédiate (« Mettre à jour maintenant » dans PharmaBoost).
+ */
+async function postHeartbeat(config: Config): Promise<{ exportPath: string | null; syncRequestedAt: string | null }> {
+  const response = await api(config, "/api/agent/heartbeat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version: VERSION, hostname: hostname(), notice }),
+  });
+  if (response.status === 401) throw new Error("clé du poste révoquée");
+  const body = (await response.json().catch(() => ({}))) as { exportPath?: string | null; syncRequestedAt?: string | null };
+  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null };
+}
+
+/** Le poste de caisse : écouter la douchette, envoyer chaque bip, donner signe de vie, et relire l'export de stock si on le lui a confié. */
 async function runPost(config: Config): Promise<void> {
   log(`PharmaBoost Connect ${VERSION} — poste de caisse ${hostname()} — journal : ${LOG_PATH}`);
   startDouchette(dirname(CONFIG_PATH), {
@@ -193,13 +209,32 @@ async function runPost(config: Config): Promise<void> {
     onStatus: (message) => log(message),
   });
   let lastHeartbeat = 0;
+  let lastStockCheck = 0;
+  let handledSyncRequest: string | null = null;
+  let forceSync = false;
   for (;;) {
     try {
       if (pendingScans.length > 0) await flushScans(config);
       await pollNotice(config);
       if (Date.now() - lastHeartbeat > 60_000) {
-        await heartbeat(config);
+        const settings = await postHeartbeat(config);
         lastHeartbeat = Date.now();
+        if (settings.exportPath !== (config.exportPath ?? null)) {
+          config = { ...config, exportPath: settings.exportPath };
+          writeConfig(config);
+          log(settings.exportPath ? `Export de stock à surveiller : ${settings.exportPath}` : "Ce poste n'envoie plus de stock.");
+          lastStockCheck = 0;
+        }
+        if (settings.syncRequestedAt && settings.syncRequestedAt !== handledSyncRequest) {
+          handledSyncRequest = settings.syncRequestedAt;
+          forceSync = true;
+          lastStockCheck = 0;
+        }
+      }
+      if (config.exportPath && Date.now() - lastStockCheck > CHECK_MS) {
+        config = await syncStock(config, forceSync);
+        forceSync = false;
+        lastStockCheck = Date.now();
       }
     } catch (error) {
       log(`Erreur : ${error instanceof Error ? error.message : String(error)}`);

@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { LiveCounterSales } from "./live-counter-sales";
 import { listLiveCounterSales } from "@/server/services/counter-scan";
 import { NewPrescriptionForm } from "./new-prescription-form";
+import { CounterRequestCard } from "./counter-request";
+import { countCounterRequestsToday } from "@/server/services/counter-request";
 
 export const metadata: Metadata = { title: "Nouvelle vente" };
 
@@ -43,6 +45,8 @@ export default async function NewPrescriptionPage({
   // Les délivrances qui arrivent de la douchette du LGO : la carte se met à jour seule.
   const liveSales = (await listLiveCounterSales(session.scope.pharmacyId)).map((sale) => ({ id: sale.id, reference: sale.reference, status: sale.status, post: sale.counterPost, updatedAt: sale.updatedAt.toISOString(), lines: sale.lines.map((line) => ({ drugName: line.drugName ?? "", quantity: line.quantity ?? 1 })), recommendations: sale._count.recommendations }));
   const { openPrescriptions, salesToday, accepted, declined, stockLabel, stockTone, greeting, dateLabel } = home;
+  // Les demandes sans ordonnance traitées aujourd'hui : le comptoir voit ce qu'il a fait.
+  const requestsToday = await countCounterRequestsToday(session.scope.pharmacyId, startOfParisDay(new Date()));
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -75,6 +79,8 @@ export default async function NewPrescriptionPage({
         preselectedPatientId={params.patient ?? null}
         canReadPrescriptions={canReadPrescriptions}
       />
+
+      <CounterRequestCard today={requestsToday} />
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <section className="rounded-2xl border border-border-subtle bg-surface-card">

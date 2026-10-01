@@ -18,6 +18,16 @@ import type {
 import type { TreatmentExplanationResult } from "../types";
 import { RuleBasedAIProvider } from "./rule-based-ai";
 import {
+  REQUEST_SCHEMA,
+  REQUEST_SYSTEM_PROMPT,
+  REQUEST_TOOL_NAME,
+  buildRequestUserPrompt,
+  validateRequestUnderstanding,
+  type ClaimedRequestUnderstanding,
+  type RequestUnderstanding,
+  type RequestUnderstandingInput,
+} from "../../counter/request";
+import {
   PRODUCT_CLASSIFICATION_SCHEMA,
   PRODUCT_CLASSIFICATION_SYSTEM_PROMPT,
   PRODUCT_CLASSIFICATION_TOOL_NAME,
@@ -130,6 +140,27 @@ export class AnthropicAIProvider implements AIProvider {
       model: this.config.model,
     });
     return { results, providerId: this.info.id, model: this.config.model, warnings, usage };
+  }
+
+  async understandRequest(request: RequestUnderstandingInput): Promise<RequestUnderstanding | null> {
+    if (!request.text.trim()) return null;
+    const response = await this.create({
+      model: this.config.model,
+      max_tokens: 700,
+      system: REQUEST_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: buildRequestUserPrompt(request) }],
+      tools: [{ name: REQUEST_TOOL_NAME, description: "Enregistre la compréhension de la demande.", input_schema: REQUEST_SCHEMA, strict: true }],
+      tool_choice: { type: "tool", name: REQUEST_TOOL_NAME },
+    });
+    const toolBlock = response.content.find((block) => block.type === "tool_use" && block.name === REQUEST_TOOL_NAME);
+    if (!toolBlock || typeof toolBlock.input !== "object" || toolBlock.input === null) {
+      return {
+        needs: [], questions: [], referToDoctor: false, referReason: null, summary: null,
+        providerId: this.info.id, model: this.config.model,
+        warnings: [response.stop_reason === "refusal" ? "Le modèle a refusé de répondre : aucune compréhension produite." : "Le modèle n'a pas renseigné l'outil : aucune compréhension produite."],
+      };
+    }
+    return validateRequestUnderstanding(toolBlock.input as ClaimedRequestUnderstanding, { providerId: this.info.id, model: this.config.model });
   }
 
   async classifyDrugs(request: ClassificationRequest): Promise<ClassificationResult | null> {

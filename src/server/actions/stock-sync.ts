@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { createPairing, createPostPairing, disconnectAgent, getConnection, isLgoId, revokeCounterPost, updateConnectionSettings } from "@/server/services/stock-sync";
+import { createPairing, createPostPairing, disconnectAgent, getConnection, isLgoId, requestPostSync, revokeCounterPost, setPostExportPath, updateConnectionSettings } from "@/server/services/stock-sync";
 import { LGO_DEFINITIONS, lgoLabel, stockFreshness } from "@/core/stock/connectors";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
@@ -122,5 +122,24 @@ export async function revokePostAction(payload: { postId: string }): Promise<Act
   await revokeCounterPost(session.scope, payload.postId);
   revalidatePath("/stock/connexion");
   return ok(null, "Poste retiré : sa clé ne fonctionne plus.");
+}
+
+export async function setPostExportPathAction(payload: { postId: string; exportPath: string }): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  const exportPath = payload.exportPath.trim().slice(0, 300) || null;
+  await setPostExportPath(session.scope, payload.postId, exportPath);
+  revalidatePath("/stock/connexion");
+  return ok(null, exportPath ? "Dossier enregistré : le poste relira l'export à chaque changement." : "Ce poste n'envoie plus de stock.");
+}
+
+export async function requestPostSyncAction(payload: { postId: string }): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  try {
+    await requestPostSync(session.scope, payload.postId);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Impossible de demander la mise à jour.");
+  }
+  revalidatePath("/stock/connexion");
+  return ok(null, "Demande envoyée : le poste relit l'export dans la minute.");
 }
 

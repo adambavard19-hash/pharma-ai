@@ -227,12 +227,18 @@ export async function recordHeartbeat(agent: AgentContext, meta: { version?: str
 export async function applyAgentSnapshot(agent: AgentContext, fileName: string, bytes: Uint8Array): Promise<
   { ok: true; lines: number; created: number; updated: number; invalid: number } | { ok: false; error: string }
 > {
-  if (!agent.connectionId) return { ok: false, error: "Un poste de caisse n'envoie pas d'export de stock : seule la liaison serveur le fait." };
+  // Un poste de caisse peut aussi envoyer l'export, quand le dossier du LGO
+  // lui est visible : le résultat s'écrit alors sur le poste, pas sur la
+  // liaison serveur.
+  const markError = async (error: string) => {
+    if (agent.connectionId) await prisma.stockConnection.update({ where: { id: agent.connectionId }, data: { lastError: error, status: "ERROR" } }).catch(() => undefined);
+    else if (agent.postId) await prisma.counterPost.update({ where: { id: agent.postId }, data: { lastExportError: error } }).catch(() => undefined);
+  };
   try {
     const preview = await analyseStockImport({ scope: agent.scope, fileName: `[agent] ${fileName}`, bytes });
     if (preview.missing.length > 0) {
       const error = `Colonnes non reconnues dans l'export : ${preview.missing.join(", ")}. Vérifiez le format de l'export du logiciel.`;
-      await prisma.stockConnection.update({ where: { id: agent.connectionId! }, data: { lastError: error, status: "ERROR" } });
+      await markError(error);
       return { ok: false, error };
     }
     // Sans personne pour trancher, une piste incertaine devient un produit à
@@ -240,14 +246,18 @@ export async function applyAgentSnapshot(agent: AgentContext, fileName: string, 
     const decisions: Record<string, RowDecision> = {};
     for (const row of preview.rows) if (row.status === "A_VERIFIER") decisions[String(row.line)] = { kind: "CREER_PRODUIT" };
     const outcome = await commitStockImport({ scope: agent.scope, pharmacyIsDemo: agent.pharmacyIsDemo, jobId: preview.jobId, decisions, createUnknownByDefault: true });
-    await prisma.stockConnection.update({
-      where: { id: agent.connectionId! },
-      data: { lastSyncAt: new Date(), lastSeenAt: new Date(), lastSyncLines: preview.summary.detected, lastError: null, status: "CONNECTED" },
-    });
+    if (agent.connectionId) {
+      await prisma.stockConnection.update({
+        where: { id: agent.connectionId },
+        data: { lastSyncAt: new Date(), lastSeenAt: new Date(), lastSyncLines: preview.summary.detected, lastError: null, status: "CONNECTED" },
+      });
+    } else if (agent.postId) {
+      await prisma.counterPost.update({ where: { id: agent.postId }, data: { lastExportAt: new Date(), lastExportError: null } });
+    }
     return { ok: true, lines: preview.summary.detected, created: outcome.productsCreated, updated: outcome.productsUpdated + outcome.drugsUpserted, invalid: outcome.invalid };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Synchronisation impossible.";
-    await prisma.stockConnection.update({ where: { id: agent.connectionId! }, data: { lastError: message, status: "ERROR" } }).catch(() => undefined);
+    await markError(message);
     return { ok: false, error: message };
   }
 }
@@ -264,3 +274,21 @@ export async function disconnectAgent(scope: TenantScope): Promise<void> {
   });
   await recordAudit({ action: "stock.connection_revoked", entityType: "StockConnection", entityId: scope.pharmacyId, pharmacyId: scope.pharmacyId, userId: scope.userId });
 }
+
+/** Le dossier d'export du LGO, tel que ce poste le voit (« \\SERVEUR\PharmaBoost\Export »). Vide : ce poste n'envoie pas de stock. */
+export async function setPostExportPath(scope: TenantScope, postId: string, exportPath: string | null): Promise<void> {
+  const post = await prisma.counterPost.findFirst({ where: { id: postId, pharmacyId: scope.pharmacyId, revokedAt: null }, select: { id: true } });
+  if (!post) throw new Error("Poste introuvable dans cette officine.");
+  await prisma.counterPost.update({ where: { id: postId }, data: { exportPath, lastExportError: null } });
+  await recordAudit({ action: "stock.post_export_path_set", entityType: "CounterPost", entityId: postId, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { exportPath } });
+}
+
+/** « Mettre à jour maintenant » : le poste relit l'export à son prochain signe de vie (moins d'une minute). */
+export async function requestPostSync(scope: TenantScope, postId: string): Promise<void> {
+  const post = await prisma.counterPost.findFirst({ where: { id: postId, pharmacyId: scope.pharmacyId, revokedAt: null }, select: { id: true, exportPath: true } });
+  if (!post) throw new Error("Poste introuvable dans cette officine.");
+  if (!post.exportPath) throw new Error("Indiquez d'abord le dossier d'export du stock pour ce poste.");
+  await prisma.counterPost.update({ where: { id: postId }, data: { syncRequestedAt: new Date() } });
+  await recordAudit({ action: "stock.post_sync_requested", entityType: "CounterPost", entityId: postId, pharmacyId: scope.pharmacyId, userId: scope.userId });
+}
+

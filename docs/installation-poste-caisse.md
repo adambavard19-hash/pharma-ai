@@ -73,7 +73,7 @@ n'est conservée ni envoyée.
 Chaque bip retire une boîte du stock PharmaBoost. L'export de stock du LGPI
 (serveur, agent « serveur ») remet le compte exact quand il arrive.
 
-## L'avis en coin d'écran (agent 0.4.0)
+## L'avis en coin d'écran (agent 0.4.x)
 
 Dès que l'analyse d'une vente bipée est prête, le poste affiche un petit
 encart en bas à droite de l'écran, par-dessus le LGO, sans lui prendre le

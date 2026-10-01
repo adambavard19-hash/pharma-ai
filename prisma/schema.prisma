@@ -120,6 +120,7 @@ model Pharmacy {
 
   @@index([organizationId])
   @@map("pharmacies")
+  counterRequests CounterRequest[]
 }
 
 /// La liaison entre une officine et son logiciel de gestion (LGO), assurée par
@@ -208,6 +209,15 @@ model CounterPost {
   lastSeenAt       DateTime?
   lastScanAt       DateTime?
   scanCount        Int       @default(0)
+  /// Dossier, visible depuis ce poste, où le LGO enregistre son édition de
+  /// stock (un partage du serveur, par exemple). Vide : ce poste n'envoie
+  /// pas de stock.
+  exportPath       String?
+  /// « Mettre à jour maintenant » : le poste relit l'export dès qu'il voit
+  /// cette date changer.
+  syncRequestedAt  DateTime?
+  lastExportAt     DateTime?
+  lastExportError  String?
   revokedAt        DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -2658,4 +2668,37 @@ model CompanyProfile {
   updatedAt           DateTime @updatedAt
 
   @@map("company_profile")
+}
+
+/// Une demande spontanée au comptoir : un client sans ordonnance décrit ce
+/// qu'il ressent, le moteur propose parmi le stock. Conservée pour que le
+/// titulaire voie ce que le comptoir traite, et pour relire a posteriori ce
+/// qui a été proposé. Jamais rattachée à un patient identifié.
+model CounterRequest {
+  id              String   @id @default(cuid())
+  pharmacyId      String
+  userId          String
+  text            String
+  ageYears        Int?
+  isPregnant      Boolean?
+  isBreastfeeding Boolean?
+  treatments      String[] @default([])
+  /// Les besoins retenus : { key, justification, confidence }[].
+  needs           Json     @default("[]")
+  questions       String[] @default([])
+  referToDoctor   Boolean  @default(false)
+  referReason     String?
+  summary         String?
+  /// Les propositions telles qu'affichées : produit, prix, raison, phrase.
+  proposals       Json     @default("[]")
+  proposalCount   Int      @default(0)
+  providerId      String
+  model           String?
+  isDemo          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, createdAt])
+  @@map("counter_requests")
 }
