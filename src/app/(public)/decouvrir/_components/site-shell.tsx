@@ -57,7 +57,7 @@ export function SiteHeader() {
 export function SiteFooter({ contactEmail }: { contactEmail: string }) {
   return (
     <footer className="border-t border-border-subtle bg-surface-card">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr]">
         <div className="space-y-3">
           <SiteWordmark />
           <p className="max-w-sm text-[13.5px] leading-6 text-text-secondary">
@@ -68,25 +68,10 @@ export function SiteFooter({ contactEmail }: { contactEmail: string }) {
           </p>
         </div>
         <FooterColumn
-          title="Produit"
-          links={[
-            { href: "/decouvrir/pourquoi", label: "Pourquoi PharmaBoost" },
-            { href: "/decouvrir#preuve", label: "Vendre plus, et le voir" },
-            { href: "/decouvrir#bip", label: "L'avis au bip" },
-            { href: "/decouvrir#sans-ordonnance", label: "Demande sans ordonnance" },
-            { href: "/decouvrir#securite", label: "Sécurité et réglementation" },
-            { href: "/decouvrir#pilotage", label: "Pilotage" },
-            { href: "/decouvrir#tarifs", label: "Tarifs" },
-            { href: "/decouvrir#faq", label: "Questions fréquentes" },
-          ]}
-        />
-        <FooterColumn
           title="PharmaBoost"
           links={[
+            { href: "/decouvrir/pourquoi", label: "Pourquoi PharmaBoost" },
             { href: "/decouvrir/equipe", label: "Qui sommes-nous" },
-            { href: "/decouvrir/demo", label: "Réserver une démo" },
-            { href: "/decouvrir/abonnement", label: "S'abonner" },
-            { href: "/login", label: "Se connecter" },
             { href: "/decouvrir/mentions-legales", label: "Mentions légales" },
             { href: "/decouvrir/confidentialite", label: "Confidentialité et données" },
           ]}

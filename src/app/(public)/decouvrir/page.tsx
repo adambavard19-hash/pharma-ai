@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, Barcode, Check, FileText } from "lucide-react";
+import { ArrowRight, Barcode, Check, FileText, HelpCircle } from "lucide-react";
 import { Feature, Section } from "./_components/site-shell";
 import { PilotMock, RequestMock, SafetyMock, ToastMock } from "./_components/mockups";
 import { loadLiveProof, loadPublicOffer } from "@/server/services/site-leads";
 import { ProofSection } from "./_components/proof";
 import { formatEuros } from "@/core/billing/subscription";
-import { RoiCalculator } from "./_components/roi-calculator";
 
 /** L'offre affichée quand la console n'en a pas encore publié : à régler dans Admin → Offres. */
 const FALLBACK_OFFER = { name: "PharmaBoost Officine", description: "Tous les postes de comptoir de l'officine, toutes les fonctions, les mises à jour comprises.", monthlyPriceCents: 6900, trialDays: 30 };
@@ -51,8 +50,8 @@ export default async function SitePage() {
               <Link href="/decouvrir/demo" className="inline-flex h-12 items-center gap-2 rounded-xl bg-brand-600 px-6 text-[15px] font-semibold text-white shadow-sm hover:bg-brand-700">
                 Voir en 20 minutes <ArrowRight className="size-4" />
               </Link>
-              <Link href="/decouvrir/pourquoi" className="inline-flex h-12 items-center rounded-xl border border-border-default px-6 text-[15px] font-medium text-text-primary hover:bg-surface-sunken">
-                Pourquoi PharmaBoost
+              <Link href="/decouvrir/pourquoi" className="inline-flex h-12 items-center gap-2 rounded-xl border-2 border-brand-600 px-6 text-[15px] font-semibold text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-950/40">
+                <HelpCircle className="size-4" /> Pourquoi PharmaBoost
               </Link>
             </div>
           </div>
@@ -68,6 +67,20 @@ export default async function SitePage() {
             />
           </div>
         </div>
+      </section>
+
+      {/* ---- Pourquoi PharmaBoost : visible, pas enfoui ---------------- */}
+      <section className="border-y border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-950/40">
+        <Link href="/decouvrir/pourquoi" className="group mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-6">
+          <div className="flex items-center gap-4">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white"><HelpCircle className="size-5" /></span>
+            <div>
+              <p className="text-[12.5px] font-semibold tracking-[0.1em] text-brand-700 uppercase dark:text-brand-400">Pourquoi PharmaBoost</p>
+              <p className="text-[17px] leading-6 font-semibold text-text-primary">Un pharmacien n&apos;est pas un vendeur. Un patient oublie en dix minutes. Deux problèmes, une réponse.</p>
+            </div>
+          </div>
+          <span className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-600 px-5 text-[14.5px] font-semibold text-white shadow-sm group-hover:bg-brand-700">Lire pourquoi <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" /></span>
+        </Link>
       </section>
 
       <ProofSection live={live} />
@@ -197,7 +210,6 @@ export default async function SitePage() {
               <p className="mt-3 text-[15px] leading-6 text-text-primary">Dix conseils de plus par jour, à 2,30 € de marge en moyenne : <strong>l&apos;abonnement est couvert en {EXAMPLE_DAYS[Math.min(exampleDays, EXAMPLE_DAYS.length - 1)]}.</strong> Le reste du mois est pour vous.</p>
               <p className="mt-2 text-[13px] leading-5 text-text-secondary">Vous signez en ligne, {trial ? `${trial.toLowerCase()}, ` : ""}puis une ligne à coller sur chaque poste. Sans engagement.</p>
             </div>
-            <RoiCalculator monthlyPriceCents={offer.monthlyPriceCents} />
             <div className="rounded-2xl border border-border-subtle bg-surface-card p-6">
               <p className="text-[15px] font-semibold text-text-primary">Parrainez, payez moins.</p>
               <p className="mt-2 text-[14px] leading-6 text-text-secondary">Chaque officine que vous parrainez réduit votre abonnement, tous les mois, jusqu&apos;à le rendre gratuit. Votre code est dans votre espace, onglet Mon abonnement.</p>
