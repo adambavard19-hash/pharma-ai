@@ -35,6 +35,8 @@ export async function ensureDossierForPharmacy(pharmacyId: string, actor: SalesA
       finessNumber: pharmacy.finessNumber,
       siret: pharmacy.siret,
       outletCount: 1,
+      postCount: pharmacy.postCount,
+      origin: "SUPER_ADMIN",
       salesRepId: null,
       status: "PHARMACY_CREATED",
       pharmacyId: pharmacy.id,

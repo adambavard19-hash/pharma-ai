@@ -141,6 +141,8 @@ const envSchema = z.object({
   /** Expéditeur affiché, ex. « Pharmacie X <contact@pharmacie-x.fr> ». */
   EMAIL_FROM: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+  /** Secret de signature des webhooks Resend (« whsec_… ») : statut délivré / rejeté des e-mails. Facultatif. */
+  RESEND_WEBHOOK_SECRET: z.string().optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().max(65535).optional(),
   /** TLS implicite (port 465). Par défaut STARTTLS, qui reste chiffré. */

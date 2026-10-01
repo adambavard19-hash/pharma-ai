@@ -86,10 +86,9 @@ export function AddOwnerButton({ pharmacyId }: { pharmacyId: string }) {
           </Field>
 
           <Field
-            label="Mot de passe initial"
+            label="Mot de passe initial (facultatif)"
             htmlFor="owner-pass"
-            required
-            hint="12 caractères minimum, avec majuscule et chiffre."
+            hint="Laissez vide : le titulaire reçoit un lien sécurisé pour choisir le sien."
           >
             <Input
               id="owner-pass"

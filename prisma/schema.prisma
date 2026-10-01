@@ -83,6 +83,9 @@ model Pharmacy {
 
   /// Le parcours d'accueil du titulaire (informations, stock, équipe) est
   /// terminé. Tant que c'est vide, l'application le propose à l'ouverture.
+  /// Nombre de postes de comptoir déclarés : base du futur calcul de l'abonnement. Historique dans pharmacy_post_count_changes.
+  postCount Int?
+
   onboardingCompletedAt DateTime?
   /// Dernière synchronisation du stock qui a abouti (import de fichier, ou
   /// plus tard un connecteur). Vide : le stock n'a jamais été importé.
@@ -128,6 +131,7 @@ model Pharmacy {
   sealedDocuments SealedDocument[]
   referredBy Pharmacy?  @relation("PharmacyReferral", fields: [referredById], references: [id], onDelete: SetNull)
   referrals  Pharmacy[] @relation("PharmacyReferral")
+  postCountChanges PharmacyPostCountChange[]
 }
 
 /// La liaison entre une officine et son logiciel de gestion (LGO), assurée par
@@ -2539,6 +2543,12 @@ model Prospect {
   finessNumber String?
   siret        String?
   outletCount  Int?
+  /// Nombre de postes de comptoir déclarés. Distinct de `outletCount`, le nombre de POINTS DE VENTE facturé au contrat.
+  postCount    Int?
+  /// E-mail de contact de l'officine, distinct de celui du représentant (`email`, signataire et futur identifiant).
+  contactEmail String?
+  /// Logiciel de gestion déclaré à l'inscription : repris à la création de l'espace.
+  lgo          String?
   /// Raison sociale de la société qui exploite l'officine (SELARL…), si elle diffère du nom commercial.
   legalName    String?
   /// Qualité du représentant signataire (« Pharmacien titulaire », « Gérant »…).
@@ -2585,6 +2595,7 @@ model Prospect {
   contracts   Contract[]
   commissions Commission[]
   tasks       SalesTask[]
+  invitations PharmacyInvitation[]
 
   @@index([salesRepId, status])
   @@index([status])
@@ -2792,3 +2803,72 @@ model CounterRequest {
   @@index([pharmacyId, createdAt])
   @@map("counter_requests")
 }
+
+/// Invitation d'un titulaire à compléter lui-même le dossier de son officine.
+/// Le lien porte un jeton dont seule l'empreinte est conservée ; un renvoi en
+/// émet un nouveau et rend le précédent inutilisable.
+model PharmacyInvitation {
+  id               String    @id @default(cuid())
+  prospectId       String
+  email            String
+  tokenHash        String    @unique
+  expiresAt        DateTime
+  sentAt           DateTime?
+  sendCount        Int       @default(0)
+  lastSendStatus   String?
+  lastSendDetail   String?
+  openedAt         DateTime?
+  completedAt      DateTime?
+  revokedAt        DateTime?
+  createdByAdminId String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId])
+  @@index([email])
+  @@map("pharmacy_invitations")
+}
+
+/// Historique du nombre de postes d'une officine : qui l'a changé, quand, de combien à combien.
+model PharmacyPostCountChange {
+  id         String   @id @default(cuid())
+  pharmacyId String
+  previous   Int?
+  next       Int
+  actorType  String
+  actorLabel String
+  createdAt  DateTime @default(now())
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, createdAt])
+  @@map("pharmacy_post_count_changes")
+}
+
+/// Trace de chaque e-mail transactionnel d'inscription et d'accès : remis au
+/// prestataire, puis délivré ou rejeté quand le prestataire le signale (webhook).
+model EmailDispatch {
+  id                String    @id @default(cuid())
+  kind              String
+  recipient         String
+  provider          String?
+  providerMessageId String?   @unique
+  status            String
+  detail            String?
+  prospectId        String?
+  pharmacyId        String?
+  userId            String?
+  invitationId      String?
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([prospectId, createdAt])
+  @@index([pharmacyId, createdAt])
+  @@index([userId, createdAt])
+  @@map("email_dispatches")
+}
+

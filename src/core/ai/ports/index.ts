@@ -127,6 +127,8 @@ export type DeliveryOutcome = {
   status: "SIMULATED" | "SENT" | "FAILED";
   provider: string;
   detail: string;
+  /** Identifiant du message chez le prestataire, quand il en donne un : il relie les événements de délivrance (webhook). */
+  messageId?: string | null;
 };
 
 /**

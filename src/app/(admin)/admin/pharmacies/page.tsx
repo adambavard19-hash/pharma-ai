@@ -11,6 +11,8 @@ import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/t
 import { formatDate } from "@/lib/format";
 import { lgoLabel, stockFreshness } from "@/core/stock/connectors";
 import { CreatePharmacyButton } from "./pharmacy-form";
+import { onboardingStage } from "@/core/onboarding/stage";
+import { missingContractFields } from "@/core/contracts/requirements";
 import { StatusToggle } from "./status-toggle";
 
 export const metadata: Metadata = { title: "Officines clientes" };
@@ -24,6 +26,17 @@ export const metadata: Metadata = { title: "Officines clientes" };
  */
 export default async function ClientPharmaciesPage() {
   await requirePlatformSession();
+
+  // Les officines invitées qui n'ont pas encore d'espace : visibles dès l'invitation.
+  const enrolling = await prisma.prospect.findMany({
+    where: { pharmacyId: null, status: { not: "LOST" }, invitations: { some: {} } },
+    orderBy: { updatedAt: "desc" },
+    take: 30,
+    include: {
+      invitations: { orderBy: { createdAt: "desc" }, take: 1 },
+      contracts: { orderBy: { version: "desc" }, take: 1, select: { status: true, signedArchivedAt: true } },
+    },
+  });
 
   const [pharmacies, unclassifiedByPharmacy] = await Promise.all([
     prisma.pharmacy.findMany({
@@ -68,6 +81,35 @@ export default async function ClientPharmaciesPage() {
         description="Créer un environnement, suspendre un accès, retrouver un titulaire."
         actions={<CreatePharmacyButton />}
       />
+
+      {enrolling.length > 0 && (
+        <Card>
+          <div className="flex items-center justify-between px-5 pt-4 pb-2">
+            <p className="text-[14px] font-semibold text-text-primary">Inscriptions en cours</p>
+            <p className="text-[12px] text-text-tertiary">{enrolling.length} officine{enrolling.length > 1 ? "s" : ""} invitée{enrolling.length > 1 ? "s" : ""}</p>
+          </div>
+          <ul className="divide-y divide-border-subtle">
+            {enrolling.map((p) => {
+              const missing = missingContractFields(p);
+              const stage = onboardingStage({ prospectStatus: p.status, contract: p.contracts[0] ?? null, invitation: p.invitations[0] ?? null, missingCount: missing.length });
+              return (
+                <li key={p.id}>
+                  <Link href={`/admin/dossiers/${p.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-surface-sunken">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-medium text-text-primary">{p.name}</span>
+                      <span className="block truncate text-[12px] text-text-tertiary">{p.email}{p.postCount ? ` · ${p.postCount} poste${p.postCount > 1 ? "s" : ""}` : ""}{p.siret ? ` · SIRET ${p.siret}` : ""}</span>
+                    </span>
+                    <Badge tone={stage.tone}>{stage.label}</Badge>
+                    {missing.length > 0 && !p.invitations[0]?.completedAt ? <Badge tone="neutral">Dossier incomplet</Badge> : null}
+                    {p.duplicateWarning ? <Badge tone="warning">Doublon possible</Badge> : null}
+                    <ArrowRight className="size-4 text-text-tertiary" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       {pharmacies.length === 0 ? (
         <Card>

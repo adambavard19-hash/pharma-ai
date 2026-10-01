@@ -7,6 +7,8 @@ import { getMessagingProvider } from "@/server/ai/registry";
 import { buildUserPasswordEmail } from "@/core/platform/welcome-email";
 import { publicUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
+import { recordDispatch } from "@/server/services/email-dispatch";
+import type { MessagingProvider } from "@/core/ai/ports";
 
 /** Un lien d'accueil ou de réinitialisation reste valable une semaine. */
 const PASSWORD_LINK_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -30,6 +32,7 @@ export async function issueUserPasswordLink(userId: string): Promise<{ url: stri
 export async function sendUserPasswordLink(
   userId: string,
   kind: "welcome" | "reset",
+  deps?: { messaging?: MessagingProvider },
 ): Promise<{ status: string; detail: string; url: string }> {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
@@ -62,13 +65,11 @@ export async function sendUserPasswordLink(
     kind,
     onboarding,
   });
-  const outcome = await getMessagingProvider().sendEmail({
-    to: user.email,
-    fromName: "PharmaBoost",
-    subject: message.subject,
-    text: message.text,
-    html: message.html,
-  });
+  const messaging = deps?.messaging ?? getMessagingProvider();
+  const outcome = await messaging
+    .sendEmail({ to: user.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html })
+    .catch((error: unknown) => ({ status: "FAILED" as const, provider: messaging.info.id, detail: error instanceof Error ? error.message : "Envoi impossible." }));
+  await recordDispatch({ kind: kind === "welcome" ? "WELCOME" : "ACCESS_LINK", recipient: user.email, outcome, userId: user.id, pharmacyId: user.memberships[0]?.pharmacy.id ?? null });
   await recordAudit({
     action: "auth.password_link_sent",
     entityType: "User",

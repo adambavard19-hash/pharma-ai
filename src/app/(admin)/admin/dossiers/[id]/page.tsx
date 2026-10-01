@@ -10,6 +10,7 @@ import { ProspectDetail } from "@/components/sales/prospect-detail";
 import { AdminActionsPanel } from "./admin-actions";
 import { ContractPanel } from "@/components/sales/contract-panel";
 import { contractPanelData } from "@/server/services/sales/contract-panel-data";
+import { InvitationPanel } from "./invitation-panel";
 
 export const metadata: Metadata = { title: "Dossier commercial" };
 
@@ -26,7 +27,7 @@ export default async function AdminProspectPage({ params }: { params: Promise<{ 
         prospect={prospect}
         mode="admin"
         pharmacyHref={prospect.pharmacyId ? `/admin/pharmacies/${prospect.pharmacyId}` : null}
-        actions={<><ContractPanel mode="admin" data={panel} /><AdminActionsPanel prospect={{ id: prospect.id, status: prospect.status, blocked: Boolean(prospect.blockedAt), salesRepId: prospect.salesRepId, pharmacyId: prospect.pharmacyId, contracts: prospect.contracts.map((c) => ({ id: c.id, version: c.version, status: c.status, providerEnvelopeId: c.providerEnvelopeId })), commissions: prospect.commissions.map((c) => ({ id: c.id, amountCents: c.amountCents, status: c.status, dueAt: c.dueAt?.toISOString().slice(0, 10) ?? "", note: c.note ?? "" })) }} reps={reps} /></>}
+        actions={<><InvitationPanel prospectId={prospect.id} /><ContractPanel mode="admin" data={panel} /><AdminActionsPanel prospect={{ id: prospect.id, status: prospect.status, blocked: Boolean(prospect.blockedAt), salesRepId: prospect.salesRepId, pharmacyId: prospect.pharmacyId, contracts: prospect.contracts.map((c) => ({ id: c.id, version: c.version, status: c.status, providerEnvelopeId: c.providerEnvelopeId })), commissions: prospect.commissions.map((c) => ({ id: c.id, amountCents: c.amountCents, status: c.status, dueAt: c.dueAt?.toISOString().slice(0, 10) ?? "", note: c.note ?? "" })) }} reps={reps} /></>}
       />
     </div>
   );

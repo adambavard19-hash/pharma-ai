@@ -9,11 +9,11 @@ import { requirePlatformSession } from "@/server/auth/platform-session";
 import { hashPassword, validatePasswordStrength } from "@/server/security/password";
 import { recordAudit } from "@/server/audit/log";
 import { sendUserPasswordLink } from "@/server/services/user-password";
-import { uniqueSlug } from "@/server/services/slugs";
 import { generateToken } from "@/server/security/tokens";
-import { isLgoId } from "@/server/services/stock-sync";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 import { resolveReferralCode } from "@/server/services/referral";
+import { createClientPharmacy, findSiretOwner, setPostCount } from "@/server/services/pharmacy-admin";
+import { isValidSiret, normalizeSiret } from "@/core/contracts/identity";
 
 /**
  * Administration des officines clientes, réservée à l'éditeur.
@@ -33,8 +33,11 @@ const pharmacySchema = z.object({
   addressLine1: z.string().trim().max(160).optional(),
   postalCode: z.string().trim().max(10).optional(),
   city: z.string().trim().max(80).optional(),
+  /** Facultatif : ne bloque jamais la création. */
   finessNumber: z.string().trim().max(20).optional(),
   siret: z.string().trim().max(20).optional(),
+  /** Nombre de postes de comptoir : base du futur calcul de l'abonnement. */
+  postCount: z.coerce.number({ message: "Indiquez le nombre de postes." }).int("Un nombre entier.").min(1, "Au moins un poste.").max(99, "99 postes au plus."),
   brandColor: z
     .string()
     .trim()
@@ -71,106 +74,28 @@ export async function createClientPharmacyAction(
   if (!parsed.success) {
     return fail("Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));
   }
-
   const input = parsed.data;
   if (input.ownerPassword) {
     const weaknesses = validatePasswordStrength(input.ownerPassword);
     if (weaknesses.length > 0) {
-      return fail(`Mot de passe trop faible : ${weaknesses.join(", ")}.`, {
-        ownerPassword: `Mot de passe trop faible : ${weaknesses.join(", ")}.`,
-      });
+      return fail(`Mot de passe trop faible : ${weaknesses.join(", ")}.`, { ownerPassword: `Mot de passe trop faible : ${weaknesses.join(", ")}.` });
     }
   }
-
-  const existingUser = await prisma.user.findUnique({
-    where: { email: input.ownerEmail },
-    select: { id: true },
-  });
-  if (existingUser) {
-    return fail("Un compte existe déjà avec cette adresse e-mail.", {
-      ownerEmail: "Un compte existe déjà avec cette adresse e-mail.",
-    });
-  }
-
-  const [organizationSlug, pharmacySlug] = await Promise.all([
-    uniqueSlug(input.name, "organization"),
-    uniqueSlug(input.name, "pharmacy"),
-  ]);
-  // Sans mot de passe fourni, un secret aléatoire que personne ne connaît : le
-  // titulaire choisit le sien par le lien de l'e-mail d'accueil.
-  const passwordHash = await hashPassword(input.ownerPassword || generateToken(24));
-  const lgo = input.lgo && isLgoId(input.lgo) ? input.lgo : null;
   const referrer = await resolveReferralCode(input.referralCode);
   if (input.referralCode && !referrer) return fail("Ce code de parrainage ne correspond à aucune officine.", { referralCode: "Code inconnu." });
 
-  const pharmacy = await prisma.$transaction(async (tx) => {
-    const organization = await tx.organization.create({
-      data: { name: input.name, slug: organizationSlug },
-    });
-
-    const created = await tx.pharmacy.create({
-      data: {
-        organizationId: organization.id,
-        name: input.name,
-        slug: pharmacySlug,
-        email: input.email || null,
-        phone: input.phone || null,
-        addressLine1: input.addressLine1 || null,
-        postalCode: input.postalCode || null,
-        city: input.city || null,
-        finessNumber: input.finessNumber || null,
-        siret: input.siret || null,
-        ...(input.brandColor ? { brandColor: input.brandColor } : {}),
-        isDemo: false,
-        isActive: true,
-        referredById: referrer?.id ?? null,
-      },
-    });
-
-    const owner = await tx.user.create({
-      data: {
-        organizationId: organization.id,
-        email: input.ownerEmail,
-        firstName: input.ownerFirstName,
-        lastName: input.ownerLastName,
-        passwordHash,
-        status: "ACTIVE",
-      },
-    });
-
-    await tx.membership.create({
-      data: { userId: owner.id, pharmacyId: created.id, role: "OWNER", isActive: true },
-    });
-
-    // Le logiciel connu dès la création : l'accueil et l'e-mail s'en servent.
-    if (lgo) await tx.stockConnection.create({ data: { pharmacyId: created.id, lgo, status: "PENDING" } });
-
-    return { created, ownerId: owner.id };
-  });
-
-  await recordAudit({
-    action: "platform.pharmacy_created",
-    entityType: "Pharmacy",
-    entityId: pharmacy.created.id,
-    platformAdminId: session.admin.id,
-    metadata: { name: input.name, ownerEmail: input.ownerEmail },
-  });
-
-  // Le titulaire reçoit un e-mail d'accueil avec un lien pour définir son
-  // mot de passe. Le mot de passe initial saisi par l'éditeur reste valable
-  // en attendant ; l'issue de l'envoi est dite telle quelle.
-  const welcome = await sendUserPasswordLink(pharmacy.ownerId, "welcome").catch((error: unknown) => ({
-    status: "FAILED",
-    detail: error instanceof Error ? error.message : "envoi impossible",
-    url: "",
-  }));
+  const result = await createClientPharmacy(
+    { ...input, referredById: referrer?.id ?? null },
+    { type: "ADMIN", id: session.admin.id, label: session.admin.fullName },
+  );
+  if (!result.ok) return fail(result.error, result.fieldErrors);
 
   revalidatePath("/admin/pharmacies");
   return ok(
-    { pharmacyId: pharmacy.created.id },
-    welcome.status === "SENT"
-      ? `${input.name} est prête. E-mail d'accueil envoyé à ${input.ownerEmail}.`
-      : `${input.name} est prête, mais l'e-mail d'accueil n'est pas parti (${welcome.detail}). Le titulaire peut se connecter avec le mot de passe initial.`,
+    { pharmacyId: result.pharmacyId },
+    result.welcome.status === "SENT"
+      ? `${input.name} est prête. E-mail de bienvenue envoyé à ${input.ownerEmail}.`
+      : `${input.name} est créée, mais l'e-mail de bienvenue n'est pas parti (${result.welcome.detail}). Renvoyez-le depuis la fiche.`,
   );
 }
 
@@ -188,9 +113,17 @@ export async function updateClientPharmacyAction(
   const input = parsed.data;
   const exists = await prisma.pharmacy.findUnique({
     where: { id: input.pharmacyId },
-    select: { id: true },
+    select: { id: true, name: true, siret: true, finessNumber: true, email: true },
   });
   if (!exists) return fail("Officine introuvable.");
+  const actor = { type: "ADMIN" as const, id: session.admin.id, label: session.admin.fullName };
+  let siret: string | null = null;
+  if (input.siret?.trim()) {
+    if (!isValidSiret(input.siret)) return fail("SIRET invalide : 14 chiffres attendus.", { siret: "SIRET invalide." });
+    siret = normalizeSiret(input.siret);
+    const taken = siret ? await findSiretOwner(siret, input.pharmacyId) : null;
+    if (taken) return fail(taken, { siret: "SIRET déjà présent." });
+  }
 
   await prisma.pharmacy.update({
     where: { id: input.pharmacyId },
@@ -201,17 +134,27 @@ export async function updateClientPharmacyAction(
       addressLine1: input.addressLine1 || null,
       postalCode: input.postalCode || null,
       city: input.city || null,
-      finessNumber: input.finessNumber || null,
-      siret: input.siret || null,
+      finessNumber: input.finessNumber?.replace(/\s/g, "") || null,
+      siret,
       ...(input.brandColor ? { brandColor: input.brandColor } : {}),
     },
   });
+  await setPostCount(input.pharmacyId, input.postCount, actor);
 
+  // Ce qui a changé, valeur par valeur : l'historique de la fiche le montre.
+  const changes: Record<string, { from: string | null; to: string | null }> = {};
+  const track = (key: string, from: string | null, to: string | null) => { if ((from ?? "") !== (to ?? "")) changes[key] = { from, to }; };
+  track("name", exists.name, input.name);
+  track("siret", exists.siret, siret);
+  track("finessNumber", exists.finessNumber, input.finessNumber?.replace(/\s/g, "") || null);
+  track("email", exists.email, input.email || null);
   await recordAudit({
     action: "platform.pharmacy_updated",
     entityType: "Pharmacy",
     entityId: input.pharmacyId,
+    pharmacyId: input.pharmacyId,
     platformAdminId: session.admin.id,
+    metadata: { changes },
   });
 
   revalidatePath("/admin/pharmacies");
@@ -275,7 +218,8 @@ const ownerSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
   email: z.string().trim().toLowerCase().email("Adresse e-mail invalide"),
-  password: z.string().min(1),
+  /** Facultatif : sans mot de passe, le titulaire choisit le sien par le lien de bienvenue. */
+  password: z.string().optional().or(z.literal("")),
 });
 
 /** Ajoute un titulaire à une officine existante (reprise, cession, oubli). */
@@ -289,9 +233,9 @@ export async function createPharmacyOwnerAction(
   }
 
   const input = parsed.data;
-  const weaknesses = validatePasswordStrength(input.password);
-  if (weaknesses.length > 0) {
-    return fail(`Mot de passe trop faible : ${weaknesses.join(", ")}.`);
+  if (input.password) {
+    const weaknesses = validatePasswordStrength(input.password);
+    if (weaknesses.length > 0) return fail(`Mot de passe trop faible : ${weaknesses.join(", ")}.`);
   }
 
   const pharmacy = await prisma.pharmacy.findUnique({
@@ -300,13 +244,14 @@ export async function createPharmacyOwnerAction(
   });
   if (!pharmacy) return fail("Officine introuvable.");
 
-  const existing = await prisma.user.findUnique({
-    where: { email: input.email },
-    select: { id: true },
+  const existing = await prisma.user.findFirst({
+    where: { email: { equals: input.email, mode: "insensitive" } },
+    select: { id: true, deletedAt: true },
   });
-  if (existing) return fail("Un compte existe déjà avec cette adresse e-mail.");
+  if (existing) return fail(existing.deletedAt ? "Cette adresse appartient à un compte supprimé : utilisez une autre adresse." : "Un compte existe déjà avec cette adresse e-mail.");
 
-  const passwordHash = await hashPassword(input.password);
+  // Sans mot de passe saisi, un secret que personne ne connaît : le titulaire choisit le sien par le lien de bienvenue.
+  const passwordHash = await hashPassword(input.password || generateToken(24));
 
   const ownerId = await prisma.$transaction(async (tx) => {
     const owner = await tx.user.create({

@@ -8,6 +8,7 @@ import { recordAudit } from "@/server/audit/log";
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
 import { resolveReferralCode } from "@/server/services/referral";
+import { isLgoId } from "@/server/services/stock-sync";
 
 /**
  * L'espace pharmacie né d'un dossier commercial.
@@ -31,7 +32,7 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
     return { ok: false, error: "Le contrat doit être signé par les deux parties (statut « Finalisé ») avant de créer l'espace pharmacie." };
   }
   if (!prospect.email || !prospect.ownerName) return { ok: false, error: "L'e-mail et le nom du titulaire sont requis sur le dossier." };
-  const existingUser = await prisma.user.findUnique({ where: { email: prospect.email }, select: { id: true } });
+  const existingUser = await prisma.user.findFirst({ where: { email: { equals: prospect.email, mode: "insensitive" } }, select: { id: true } });
   if (existingUser) return { ok: false, error: "Un compte utilisateur existe déjà avec l'adresse e-mail du titulaire." };
 
   const [firstName, ...rest] = prospect.ownerName.trim().split(/\s+/);
@@ -48,18 +49,22 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
         organizationId: organization.id,
         name: prospect.name,
         slug: pharmacySlug,
-        email: prospect.email,
+        // L'e-mail de contact déclaré à l'inscription ; à défaut, celui du représentant.
+        email: prospect.contactEmail ?? prospect.email,
         phone: prospect.phone,
         addressLine1: prospect.addressLine1,
         postalCode: prospect.postalCode,
         city: prospect.city,
         finessNumber: prospect.finessNumber,
         siret: prospect.siret,
+        postCount: prospect.postCount,
         isDemo: false,
         isActive: true,
         referredById: referrer?.id ?? null,
       },
     });
+    if (prospect.postCount) await tx.pharmacyPostCountChange.create({ data: { pharmacyId: pharmacy.id, previous: null, next: prospect.postCount, actorType: actor.type, actorLabel: actor.label } });
+    if (prospect.lgo && isLgoId(prospect.lgo)) await tx.stockConnection.create({ data: { pharmacyId: pharmacy.id, lgo: prospect.lgo, status: "PENDING" } });
     const owner = await tx.user.create({ data: { organizationId: organization.id, email: prospect.email!, firstName, lastName, passwordHash, status: "ACTIVE" } });
     await tx.membership.create({ data: { userId: owner.id, pharmacyId: pharmacy.id, role: "OWNER", isActive: true } });
     await tx.prospect.update({ where: { id: prospect.id }, data: { pharmacyId: pharmacy.id, status: "PHARMACY_CREATED" } });

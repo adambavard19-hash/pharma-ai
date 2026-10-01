@@ -73,6 +73,7 @@ export class ResendMessagingProvider implements MessagingProvider {
           status: "SENT",
           provider: this.info.id,
           detail: `Message transmis à Resend pour ${message.to}${id ? ` (id ${id})` : ""}.`,
+          messageId: id,
         };
       }
 
