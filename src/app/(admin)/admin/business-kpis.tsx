@@ -56,7 +56,7 @@ export async function BusinessKpis() {
 
   return (
     <section className="space-y-3">
-      <SectionHeader title="Business" description={mrr === null ? "Le MRR s'affichera dès qu'un abonnement Stripe sera actif. Chaque chiffre ouvre la liste des officines concernées." : "Revenu mensuel récurrent : abonnements actifs et essais avec moyen de paiement, hors résiliations programmées. Chaque chiffre ouvre la liste des officines concernées."} />
+      <SectionHeader title="Business" description={mrr === null ? "Le MRR s'affichera dès qu'un abonnement sera actif. Chaque chiffre ouvre la liste des officines concernées." : "Revenu mensuel récurrent : abonnements actifs et essais, hors résiliations programmées. Chaque chiffre ouvre la liste des officines concernées."} />
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {tiles.map((tile) => (
           <li key={tile.label}>

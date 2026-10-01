@@ -167,6 +167,8 @@ export type AdviceView = {
     /** D'où vient la photo : « officine », ou une base ouverte à créditer. */
     imageSource: string | null;
     salePriceCents: number;
+    /** Prix d'achat connu de l'officine, pour afficher la marge du conseil. 0 = inconnu. */
+    purchasePriceCents?: number;
     quantity: number;
     alertThreshold: number;
     claims: string[];

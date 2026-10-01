@@ -111,6 +111,28 @@ export function buildReminderCalendar(content: DocumentContent, start: Date, now
       "END:VEVENT",
     );
   }
+  // Le suivi, sans rien conserver chez nous : au dernier jour du traitement,
+  // un rappel invite à repasser voir le pharmacien si quelque chose ne va pas.
+  const longest = Math.max(0, ...series.map((s) => s.days));
+  if (longest > 0) {
+    const end = new Date(start);
+    end.setDate(end.getDate() + longest - 1);
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${seed}-fin@plan-de-prise`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART:${localStamp(end, 18, 0)}`,
+      "DURATION:PT15M",
+      `SUMMARY:${escapeText("Fin du traitement — votre pharmacien prend de vos nouvelles")}`,
+      `DESCRIPTION:${escapeText([`Votre traitement se termine aujourd'hui.`, "Si les symptômes persistent, ou si quelque chose vous a gêné, passez voir votre pharmacien ou appelez-le.", "", `${pharmacy}${content.pharmacy.phone ? ` — ${content.pharmacy.phone}` : ""}`].join("\n"))}`,
+      "BEGIN:VALARM",
+      "TRIGGER:PT0M",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${escapeText("Fin du traitement : comment allez-vous ?")}`,
+      "END:VALARM",
+      "END:VEVENT",
+    );
+  }
   lines.push("END:VCALENDAR");
   return lines.map(fold).join("\r\n") + "\r\n";
 }

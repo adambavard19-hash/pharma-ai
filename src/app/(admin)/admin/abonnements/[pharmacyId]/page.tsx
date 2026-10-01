@@ -79,7 +79,7 @@ export default async function PharmacyBillingPage({ params }: { params: Promise<
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Abonnement" description={subscription ? `Offre ${subscription.plan.name}` : "Aucun abonnement Stripe rattaché pour l'instant."} />
+          <CardHeader title="Abonnement" description={subscription ? `Offre ${subscription.plan.name}` : "Aucun abonnement rattaché pour l'instant."} />
           <CardContent className="pt-0">
             {subscription ? (
               <dl className="space-y-3">
@@ -128,7 +128,7 @@ export default async function PharmacyBillingPage({ params }: { params: Promise<
       </div>
 
       <Card>
-        <CardHeader title="Paiements" description="Les factures Stripe reçues par webhook." />
+        <CardHeader title="Paiements" description="Les paiements enregistrés." />
         <CardContent className="pt-0">
           {history.payments.length === 0 ? (
             <p className="text-[13.5px] text-text-secondary">Aucune facture pour l&apos;instant.</p>
@@ -153,7 +153,7 @@ export default async function PharmacyBillingPage({ params }: { params: Promise<
       </Card>
 
       <Card>
-        <CardHeader title="Historique" description="Tout ce qui s'est passé : événements Stripe, liens envoyés, contrat, gestes de la console." />
+        <CardHeader title="Historique" description="Tout ce qui s'est passé : contrat, envois, gestes de la console." />
         <CardContent className="pt-0">
           <ul className="divide-y divide-border-subtle">
             {invites.map((invite) => (

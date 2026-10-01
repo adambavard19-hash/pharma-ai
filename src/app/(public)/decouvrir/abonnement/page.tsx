@@ -15,12 +15,12 @@ export default async function SubscribePage() {
       <div>
         <p className="text-[12.5px] font-semibold tracking-[0.1em] text-brand-700 uppercase dark:text-brand-400">Abonnement</p>
         <h1 className="mt-2 text-[34px] leading-[1.12] font-semibold tracking-[-0.02em] text-text-primary text-balance">Votre espace, prêt sous un jour ouvré.</h1>
-        <p className="mt-4 text-[16px] leading-7 text-text-secondary">Laissez-nous les coordonnées de l&apos;officine. Nous préparons votre espace et vous envoyons par e-mail un lien d&apos;activation personnel. Vous y enregistrez votre carte, rien n&apos;est débité pendant l&apos;essai, et vous pouvez arrêter à tout moment.</p>
+        <p className="mt-4 text-[16px] leading-7 text-text-secondary">Laissez-nous les coordonnées de l&apos;officine. Nous préparons votre espace et vous envoyons par e-mail votre contrat à signer en ligne, avec le mandat de prélèvement. Rien n&apos;est prélevé pendant le premier mois, et vous pouvez arrêter à tout moment.</p>
         <div className="mt-8 rounded-2xl border border-border-subtle bg-surface-card p-6">
           <p className="text-[13px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">{offer?.name ?? "PharmaBoost Officine"}</p>
           <p className="mt-2 flex items-baseline gap-2"><span className="text-[36px] leading-none font-semibold tracking-[-0.02em] text-text-primary tabular">{price}</span><span className="text-[14px] text-text-secondary">HT / mois</span></p>
           <ul className="mt-4 space-y-2 text-[14px] text-text-primary">
-            {[trialDays >= 28 ? "Premier mois offert" : `${trialDays} jours offerts`, "Tous les postes de comptoir de l'officine", "Sans engagement, résiliable à tout moment", "Paiement sécurisé par Stripe"].map((item) => (
+            {[trialDays >= 28 ? "Premier mois offert" : `${trialDays} jours offerts`, "Tous les postes de comptoir de l'officine", "Sans engagement, résiliable à tout moment", "Règlement par prélèvement bancaire, avec le contrat"].map((item) => (
               <li key={item} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-brand-600 dark:text-brand-400" /> {item}</li>
             ))}
           </ul>

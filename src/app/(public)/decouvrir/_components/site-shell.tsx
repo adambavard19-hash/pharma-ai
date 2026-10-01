@@ -10,6 +10,7 @@ const NAV = [
   { href: "/decouvrir#pilotage", label: "Pilotage" },
   { href: "/decouvrir#tarifs", label: "Tarifs" },
   { href: "/decouvrir#faq", label: "FAQ" },
+  { href: "/decouvrir/equipe", label: "Qui sommes-nous" },
 ];
 
 export function SiteWordmark({ className, light = false }: { className?: string; light?: boolean }) {
@@ -36,6 +37,9 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <a href="mailto:contact@pharmaboost.app" className="hidden rounded-md px-3 py-2 text-[13.5px] text-text-secondary hover:text-text-primary md:inline-block">
+            Contact
+          </a>
           <Link href="/login" className="hidden rounded-md px-3 py-2 text-[13.5px] text-text-secondary hover:text-text-primary sm:inline-block">
             Se connecter
           </Link>
@@ -78,6 +82,7 @@ export function SiteFooter({ contactEmail }: { contactEmail: string }) {
         <FooterColumn
           title="PharmaBoost"
           links={[
+            { href: "/decouvrir/equipe", label: "Qui sommes-nous" },
             { href: "/decouvrir/demo", label: "Réserver une démo" },
             { href: "/decouvrir/abonnement", label: "S'abonner" },
             { href: "/login", label: "Se connecter" },

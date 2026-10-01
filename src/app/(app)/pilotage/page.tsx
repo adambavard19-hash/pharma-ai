@@ -117,7 +117,7 @@ export default async function PilotagePage({
         <StatCard
           label="CA additionnel PharmaBoost"
           value={formatCents(global.attributedCents)}
-          sublabel="uniquement les lignes issues d'un conseil"
+          sublabel={global.attributedMarginCents > 0 ? `dont ${formatCents(global.attributedMarginCents)} de marge · lignes issues d'un conseil` : "uniquement les lignes issues d'un conseil"}
           icon={<Euro className="size-[18px]" />}
           emphasis="accent"
         />

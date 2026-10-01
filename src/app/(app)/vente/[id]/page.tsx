@@ -370,6 +370,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                 imageUrl: recommendation.product.imageUrl,
                 imageSource: recommendation.product.imageSource,
                 salePriceCents: recommendation.product.salePriceCents,
+                purchasePriceCents: recommendation.product.purchasePriceCents,
                 quantity: recommendation.product.stockItem?.quantity ?? 0,
                 alertThreshold: recommendation.product.stockItem?.alertThreshold ?? 0,
                 claims: recommendation.product.commercialClaims,

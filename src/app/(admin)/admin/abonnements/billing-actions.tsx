@@ -3,13 +3,10 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ban, Check, FileSignature, FileText, Link2, Power, RefreshCw, Send } from "lucide-react";
+import { Check, FileSignature, FileText, Power, Send } from "lucide-react";
 import {
-  cancelAtPeriodEndAction,
   prepareContractForPharmacyAction,
-  refreshSubscriptionAction,
   sendContractForPharmacyAction,
-  sendSubscriptionInviteAction,
   suspendAccessAction,
 } from "@/server/actions/platform-billing";
 import { Button } from "@/components/ui/button";
@@ -32,12 +29,8 @@ export function PharmacyBillingActions({
   pharmacyId,
   contract,
   hasSubscription,
-  subscriptionStatus,
-  cancelAtPeriodEnd,
   isActive,
-  inviteSent,
   plans,
-  stripeReady,
   compact = false,
 }: {
   pharmacyId: string;
@@ -69,8 +62,6 @@ export function PharmacyBillingActions({
   };
 
   const contractSendable = contract && ["DRAFT", "SENT", "OPENED"].includes(contract.status);
-  const contractDone = contract && ["FINALIZED", "SIGNED_PHARMACY", "SIGNED_COMPANY"].includes(contract.status);
-  const canInvite = !hasSubscription || subscriptionStatus === "CANCELED" || subscriptionStatus === "INCOMPLETE_EXPIRED";
   const size = compact ? "sm" : "md";
 
   return (
@@ -90,24 +81,11 @@ export function PharmacyBillingActions({
           {contract.status === "DRAFT" ? "Envoyer pour signature" : "Renvoyer"}
         </Button>
       )}
-      {canInvite && (
-        <Button size={size} variant={contractDone && !inviteSent ? "primary" : "outline"} loading={pending && busy === "invite"} leadingIcon={<Link2 className="size-3.5" />} disabled={!stripeReady} title={stripeReady ? undefined : "Stripe n'est pas configuré"} onClick={() => run("invite", () => sendSubscriptionInviteAction({ pharmacyId, planId: contract ? null : (plans.find((p) => p.isDefault) ?? plans[0])?.id ?? null, contractId: contract?.id ?? null }))}>
-          {inviteSent ? "Renvoyer le lien d'abonnement" : "Envoyer l'abonnement"}
-        </Button>
-      )}
       {hasSubscription && (
         <>
           <Button asChild size={size} variant="outline">
             <Link href={`/admin/abonnements/${pharmacyId}`}>Voir abonnement</Link>
           </Button>
-          <Button size={size} variant="ghost" loading={pending && busy === "refresh"} leadingIcon={<RefreshCw className="size-3.5" />} onClick={() => run("refresh", () => refreshSubscriptionAction({ pharmacyId }))}>
-            Relire chez Stripe
-          </Button>
-          {subscriptionStatus !== "CANCELED" && (
-            <Button size={size} variant={cancelAtPeriodEnd ? "outline" : "ghost"} loading={pending && busy === "cancel"} leadingIcon={cancelAtPeriodEnd ? <Check className="size-3.5" /> : <Ban className="size-3.5" />} onClick={() => run("cancel", () => cancelAtPeriodEndAction({ pharmacyId, cancel: !cancelAtPeriodEnd }))}>
-              {cancelAtPeriodEnd ? "Annuler la résiliation" : "Résilier en fin de période"}
-            </Button>
-          )}
         </>
       )}
       <Button size={size} variant={isActive ? "ghost" : "outline"} loading={pending && busy === "suspend"} leadingIcon={isActive ? <Power className="size-3.5" /> : <Check className="size-3.5" />} onClick={() => (isActive ? setSuspendOpen(true) : run("suspend", () => suspendAccessAction({ pharmacyId, suspended: false })))}>
@@ -172,7 +150,7 @@ function PrepareContractModal({ open, onClose, pharmacyId, plans }: { open: bool
 function SuspendModal({ open, onClose, onConfirm }: { open: boolean; onClose: () => void; onConfirm: (reason: string) => void }) {
   const [reason, setReason] = useState("");
   return (
-    <Modal open={open} onClose={onClose} title="Suspendre l'accès" description="L'officine ne pourra plus se connecter ; ses sessions en cours sont fermées. L'abonnement Stripe n'est pas modifié.">
+    <Modal open={open} onClose={onClose} title="Suspendre l'accès" description="L'officine ne pourra plus se connecter ; ses sessions en cours sont fermées. L'abonnement n'est pas modifié.">
       <div className="space-y-3">
         <Field label="Motif" htmlFor="sus-reason" hint="Visible dans l'historique et le journal d'audit.">
           <Input id="sus-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Impayé persistant, demande du titulaire…" />

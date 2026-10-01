@@ -80,10 +80,10 @@ export function LeadForm({ kind }: { kind: "DEMO" | "SUBSCRIBE" }) {
       </div>
       <div className="flex flex-wrap items-center gap-3 pt-2">
         <Button type="submit" size="lg" loading={pending}>
-          {kind === "DEMO" ? "Réserver ma démo" : "Demander mon lien d'activation"}
+          {kind === "DEMO" ? "Réserver ma démo" : "Demander mon contrat"}
         </Button>
         <p className="text-[12.5px] text-text-tertiary">
-          {kind === "DEMO" ? "Vingt minutes, en visio ou par téléphone, sur votre poste." : "Premier mois offert. Carte demandée à l'activation, résiliable à tout moment."}
+          {kind === "DEMO" ? "Vingt minutes, en visio ou par téléphone, sur votre poste." : "Premier mois offert. Prélèvement bancaire ensuite, résiliable à tout moment."}
         </p>
       </div>
     </form>

@@ -338,3 +338,55 @@ export async function sendInstallationGuideAction(payload: { pharmacyId: string 
   return ok({ sentTo: outcome.sentTo }, outcome.status === "SENT" ? `Guide d'installation envoyé à ${outcome.sentTo}.` : `Envoi simulé : ${outcome.detail}`);
 }
 
+async function loadMember(pharmacyId: string, membershipId: string) {
+  const membership = await prisma.membership.findFirst({ where: { id: membershipId, pharmacyId }, include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } } });
+  if (!membership) throw new Error("Compte introuvable dans cette officine.");
+  return membership;
+}
+
+/** Renvoyer au collaborateur un lien pour (re)définir son mot de passe. */
+export async function resendPharmacyMemberAccessAction(payload: { pharmacyId: string; membershipId: string }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  try {
+    const membership = await loadMember(payload.pharmacyId, payload.membershipId);
+    const outcome = await sendUserPasswordLink(membership.user.id, "reset");
+    await recordAudit({ action: "platform.member_access_resent", entityType: "User", entityId: membership.user.id, pharmacyId: payload.pharmacyId, platformAdminId: session.admin.id, metadata: { status: outcome.status } });
+    return outcome.status === "SENT" ? ok(null, `Lien envoyé à ${membership.user.email}.`) : fail(`Lien non envoyé : ${outcome.detail}`);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Envoi impossible.");
+  }
+}
+
+/** Suspendre ou réactiver l'accès d'un compte d'officine ; une suspension ferme ses sessions. */
+export async function setPharmacyMemberAccessAction(payload: { pharmacyId: string; membershipId: string; isActive: boolean }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  try {
+    const membership = await loadMember(payload.pharmacyId, payload.membershipId);
+    await prisma.membership.update({ where: { id: membership.id }, data: { isActive: payload.isActive } });
+    if (!payload.isActive) await prisma.session.deleteMany({ where: { userId: membership.user.id, pharmacyId: payload.pharmacyId } });
+    await recordAudit({ action: "platform.member_access_changed", entityType: "User", entityId: membership.user.id, pharmacyId: payload.pharmacyId, platformAdminId: session.admin.id, metadata: { isActive: payload.isActive } });
+    revalidatePath(`/admin/pharmacies/${payload.pharmacyId}`);
+    return ok(null, payload.isActive ? "Accès réactivé." : "Accès suspendu : ses sessions sont fermées.");
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Modification impossible.");
+  }
+}
+
+/** Supprimer un compte d'officine : l'accès est retiré, le compte marqué supprimé ; les traces restent. */
+export async function deletePharmacyMemberAction(payload: { pharmacyId: string; membershipId: string }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  try {
+    const membership = await loadMember(payload.pharmacyId, payload.membershipId);
+    await prisma.$transaction([
+      prisma.session.deleteMany({ where: { userId: membership.user.id } }),
+      prisma.membership.update({ where: { id: membership.id }, data: { isActive: false } }),
+      prisma.user.update({ where: { id: membership.user.id }, data: { deletedAt: new Date(), status: "DISABLED" } }),
+    ]);
+    await recordAudit({ action: "platform.member_deleted", entityType: "User", entityId: membership.user.id, pharmacyId: payload.pharmacyId, platformAdminId: session.admin.id });
+    revalidatePath(`/admin/pharmacies/${payload.pharmacyId}`);
+    return ok(null, `Compte de ${membership.user.firstName} ${membership.user.lastName} supprimé.`);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Suppression impossible.");
+  }
+}
+

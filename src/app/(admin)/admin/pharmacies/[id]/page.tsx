@@ -13,6 +13,7 @@ import { formatDate, formatRelative } from "@/lib/format";
 import { EditPharmacyButton } from "../pharmacy-form";
 import { StatusToggle } from "../status-toggle";
 import { InstallGuideButton } from "../install-guide-button";
+import { MemberActions } from "../member-actions";
 import { AddOwnerButton } from "./owner-form";
 
 export const metadata: Metadata = { title: "Officine cliente" };
@@ -53,8 +54,10 @@ export default async function ClientPharmacyPage({
       organization: { select: { name: true, subscription: { select: { status: true, plan: { select: { name: true } } } } } },
       analysisRuns: { orderBy: { startedAt: "desc" }, take: 1, select: { status: true, outcome: true, startedAt: true } },
       memberships: {
+        where: { user: { deletedAt: null } },
         orderBy: [{ role: "asc" }, { createdAt: "asc" }],
         select: {
+          id: true,
           role: true,
           isActive: true,
           user: {
@@ -155,6 +158,7 @@ export default async function ClientPharmacyPage({
                         {ROLE_LABELS[membership.role] ?? membership.role}
                       </Badge>
                       {!membership.isActive && <Badge tone="warning">Suspendu</Badge>}
+                      <MemberActions pharmacyId={pharmacy.id} membershipId={membership.id} isActive={membership.isActive} name={`${membership.user.firstName} ${membership.user.lastName}`} />
                     </li>
                   ))}
                 </ul>

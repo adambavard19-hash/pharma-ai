@@ -721,7 +721,14 @@ function ProductCard({
             {product?.brand && <p className="mt-0.5 text-[13px] text-text-secondary">{product.brand}</p>}
             <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
               {price > 0 ? (
-                <span className="text-[24px] leading-7 font-semibold tabular text-text-primary">{formatCents(price)}</span>
+                <span className="flex items-baseline gap-2">
+                  <span className="text-[24px] leading-7 font-semibold tabular text-text-primary">{formatCents(price)}</span>
+                  {product?.purchasePriceCents ? (
+                    <span className="rounded-md bg-success-50 px-1.5 py-0.5 text-[12.5px] font-medium tabular text-success-800 dark:bg-success-950/40 dark:text-success-300" title="Prix de vente moins prix d'achat">
+                      marge {formatCents(price - product.purchasePriceCents)}
+                    </span>
+                  ) : null}
+                </span>
               ) : canDecide ? (
                 <span className="flex items-center gap-1.5">
                   <input

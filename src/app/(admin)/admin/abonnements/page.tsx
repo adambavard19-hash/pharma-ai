@@ -61,14 +61,6 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
         }
       />
 
-      {!stripe.configured && (
-        <Alert tone="warning" title="Stripe n'est pas configuré">
-          {stripe.detail} Les contrats se préparent et s&apos;envoient ; les liens d&apos;abonnement attendront la clé de test (STRIPE_SECRET_KEY) et le secret de webhook (STRIPE_WEBHOOK_SECRET).
-        </Alert>
-      )}
-      {stripe.configured && !stripe.webhookConfigured && (
-        <Alert tone="warning" title="Webhook Stripe non configuré">L&apos;état des abonnements ne se mettra pas à jour tout seul tant que STRIPE_WEBHOOK_SECRET n&apos;est pas renseigné. Le bouton « Relire chez Stripe » reste disponible.</Alert>
-      )}
       {plans.length === 0 && (
         <Alert tone="info" title="Aucune offre">Créez l&apos;offre PharmaBoost (prix mensuel, durée d&apos;essai) dans <Link href="/admin/abonnements/offres" className="underline">Offres</Link> avant de préparer un contrat.</Alert>
       )}

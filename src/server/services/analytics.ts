@@ -432,6 +432,8 @@ export type CounterScore = {
   acceptanceRate: number | null;
   /** CA additionnel : uniquement les lignes de vente issues d'un conseil. */
   attributedCents: number;
+  /** Marge additionnelle : prix de vente moins prix d'achat, sur ces mêmes lignes. */
+  attributedMarginCents: number;
   /** Nombre de délivrances ayant généré du CA additionnel. */
   attributedSalesCount: number;
   /** Panier additionnel moyen. Null si aucune vente additionnelle. */
@@ -499,13 +501,13 @@ export async function getCounterPerformance(
       by: ["userId"],
       where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window, attributedCents: { gt: 0 } },
       _count: true,
-      _sum: { attributedCents: true },
+      _sum: { attributedCents: true, attributedMarginCents: true },
     }),
   ]);
 
   const score = (
     rows: { status: string; _count: number }[],
-    revenue: { count: number; cents: number },
+    revenue: { count: number; cents: number; marginCents: number },
   ): CounterScore => {
     const accepted = rows
       .filter((row) => PATIENT_SAID_YES.has(row.status))
@@ -521,6 +523,7 @@ export async function getCounterPerformance(
       declined,
       acceptanceRate: decided > 0 ? accepted / decided : null,
       attributedCents: revenue.cents,
+      attributedMarginCents: revenue.marginCents,
       attributedSalesCount: revenue.count,
       averageBasketCents: revenue.count > 0 ? Math.round(revenue.cents / revenue.count) : null,
     };
@@ -530,8 +533,9 @@ export async function getCounterPerformance(
     (totals, row) => ({
       count: totals.count + row._count,
       cents: totals.cents + (row._sum.attributedCents ?? 0),
+      marginCents: totals.marginCents + (row._sum.attributedMarginCents ?? 0),
     }),
-    { count: 0, cents: 0 },
+    { count: 0, cents: 0, marginCents: 0 },
   );
 
   const proposed = allStatuses.reduce((sum, row) => sum + row._count, 0);
@@ -553,6 +557,7 @@ export async function getCounterPerformance(
           {
             count: userSales?._count ?? 0,
             cents: userSales?._sum.attributedCents ?? 0,
+            marginCents: userSales?._sum.attributedMarginCents ?? 0,
           },
         ),
       };

@@ -4,6 +4,7 @@ import { Feature, Section } from "./_components/site-shell";
 import { PilotMock, RequestMock, SafetyMock, ToastMock } from "./_components/mockups";
 import { loadPublicOffer } from "@/server/services/site-leads";
 import { formatEuros } from "@/core/billing/subscription";
+import { RoiCalculator } from "./_components/roi-calculator";
 
 /** L'offre affichée quand la console n'en a pas encore publié : à régler dans Admin → Offres. */
 const FALLBACK_OFFER = { name: "PharmaBoost Officine", description: "Tous les postes de comptoir de l'officine, toutes les fonctions, les mises à jour comprises.", monthlyPriceCents: 6900, trialDays: 30 };
@@ -17,7 +18,7 @@ const FAQ: { q: string; a: string }[] = [
   { q: "Combien de temps prend l'installation ?", a: "Une commande sur chaque poste de comptoir, avec un code donné par PharmaBoost. Quelques minutes par poste, sans toucher au serveur de l'officine. L'équipe travaille dès le premier bip." },
   { q: "Où sont les données, et qui les voit ?", a: "Chiffrées, isolées par officine, journalisées à chaque accès. Aucune donnée n'est revendue ni partagée, et le patient voit sa pharmacie, pas un logiciel. Les détails, hébergeurs compris, sont dans notre page Confidentialité." },
   { q: "Est-ce un dispositif médical ?", a: "Non. PharmaBoost est un outil d'aide au conseil officinal. Il ne diagnostique pas, ne prescrit pas et ne se substitue pas à l'avis du pharmacien." },
-  { q: "Puis-je arrêter quand je veux ?", a: "Oui. L'abonnement est mensuel, sans engagement, résiliable à tout moment depuis votre espace. Le premier mois est offert et la carte n'est demandée qu'à l'activation." },
+  { q: "Puis-je arrêter quand je veux ?", a: "Oui. L'abonnement est mensuel, sans engagement, résiliable à tout moment par simple e-mail. Le premier mois est offert ; le règlement se fait ensuite par prélèvement bancaire, mis en place avec le contrat." },
 ];
 
 export default async function SitePage() {
@@ -136,12 +137,13 @@ export default async function SitePage() {
       <Section
         id="pilotage"
         eyebrow="Pilotage · titulaire"
-        title="Vos règles, vos laboratoires, et la valeur créée constatée, pas estimée."
+        title="Vos règles, vos laboratoires, la marge de chaque conseil, et la valeur créée constatée, pas estimée."
         lede="Le titulaire règle ce que l'officine met en avant et ce qu'elle écarte. Chaque conseil accepté est rattaché à la vente qui le suit : le chiffre d'affaires additionnel est lu dans les ventes, pas calculé sur une promesse."
       >
         <div className="grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:items-center">
           <PilotMock />
           <ul className="space-y-5">
+            <Feature title="La marge, visible sur chaque conseil" body="Prix de vente, prix d'achat, marge : sur chaque produit proposé au comptoir, et en total sur les ventes additionnelles du mois. Vous voyez ce que chaque conseil rapporte, pas une estimation." />
             <Feature title="Règles de l'officine" body="Laboratoires préférés, gammes à mettre en avant, références à exclure. Les règles de sécurité, elles, ne se désactivent pas." />
             <Feature title="Stock à jour" body="Les ventes se déduisent à la seconde par la douchette ; l'inventaire de votre logiciel est relu à chaque export. Rien à ressaisir." />
             <Feature title="Équipe et traçabilité" body="Rôles par personne, journal de chaque décision, performance par collaborateur. Vous savez qui a proposé quoi, et ce qui a été vendu." />
@@ -178,7 +180,7 @@ export default async function SitePage() {
               <span className="text-[48px] leading-none font-semibold tracking-[-0.03em] text-text-primary tabular">{formatEuros(offer.monthlyPriceCents)}</span>
               <span className="text-[15px] text-text-secondary">HT / mois</span>
             </p>
-            {trial && <p className="mt-2 text-[14px] font-medium text-success-700 dark:text-success-400">{trial}, carte demandée à l&apos;activation</p>}
+            {trial && <p className="mt-2 text-[14px] font-medium text-success-700 dark:text-success-400">{trial}, sans engagement</p>}
             <p className="mt-4 text-[14px] leading-6 text-text-secondary">{offer.description}</p>
             <ul className="mt-6 space-y-2.5 text-[14px] text-text-primary">
               {["L'avis au bip sur chaque poste de comptoir", "Lecture d'ordonnance, photo ou scan", "Sécurité, vigilances et réglementation", "Demande sans ordonnance", "Stock relié, parapharmacie comprise", "Patients, plans de prise, suivis", "Pilotage et traçabilité", "Mises à jour automatiques"].map((item) => (
@@ -193,17 +195,18 @@ export default async function SitePage() {
                 Voir le produit d&apos;abord
               </Link>
             </div>
-            <p className="mt-4 text-[12.5px] text-text-tertiary">Paiement sécurisé par Stripe. PharmaBoost ne voit ni ne conserve votre numéro de carte. Résiliation à tout moment depuis votre espace.</p>
+            <p className="mt-4 text-[12.5px] text-text-tertiary">Règlement par prélèvement bancaire mensuel, mis en place avec le contrat. Résiliation à tout moment, par simple e-mail.</p>
           </div>
           <div className="space-y-6 lg:pt-4">
             <div className="rounded-2xl border border-border-subtle bg-surface-card p-6">
               <p className="flex items-center gap-2 text-[15px] font-semibold text-text-primary"><FileText className="size-4 text-brand-600 dark:text-brand-400" /> Comment ça se passe</p>
               <ol className="mt-3 space-y-2 text-[14px] leading-6 text-text-secondary">
                 <li><strong className="text-text-primary">1.</strong> Vous demandez votre lien d&apos;activation. Nous préparons votre espace sous un jour ouvré.</li>
-                <li><strong className="text-text-primary">2.</strong> Vous activez l&apos;abonnement : {trial ? `${trial.toLowerCase()}, ` : ""}carte enregistrée, rien n&apos;est débité pendant l&apos;essai.</li>
+                <li><strong className="text-text-primary">2.</strong> Vous signez le contrat en ligne et le mandat de prélèvement : {trial ? `${trial.toLowerCase()}, ` : ""}rien n&apos;est prélevé pendant l&apos;essai.</li>
                 <li><strong className="text-text-primary">3.</strong> Une commande sur chaque poste de comptoir, avec le code de votre espace. L&apos;équipe travaille dès le premier bip.</li>
               </ol>
             </div>
+            <RoiCalculator monthlyPriceCents={offer.monthlyPriceCents} />
             <div className="rounded-2xl border border-border-subtle bg-surface-card p-6">
               <p className="text-[15px] font-semibold text-text-primary">Plusieurs officines ?</p>
               <p className="mt-2 text-[14px] leading-6 text-text-secondary">Un groupement ou plusieurs points de vente partagent un espace, avec un stock et un pilotage par officine. Parlons-en en démonstration.</p>

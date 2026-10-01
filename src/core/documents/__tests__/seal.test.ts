@@ -60,6 +60,9 @@ describe("les rappels d'agenda", () => {
     expect(ics).toContain("RRULE:FREQ=DAILY;COUNT=6");
     expect(ics).toContain("SUMMARY:Matin — traitement");
     expect(ics).not.toContain("DOLIPRANE"); // sans horaire validé : pas de rappel inventé
+    // Le suivi de fin de traitement, le dernier jour, à 18 h.
+    expect(ics).toContain("DTSTART:20261006T180000");
+    expect(ics).toContain("Fin du traitement");
     expect(ics.split("\r\n").every((line) => Buffer.byteLength(line, "utf8") <= 75)).toBe(true);
   });
 });

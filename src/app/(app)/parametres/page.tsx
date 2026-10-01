@@ -31,7 +31,6 @@ import { Alert } from "@/components/ui/feedback";
 import { SettingsTabs } from "./settings-tabs";
 import { SUBSCRIPTION_STATUS_LABELS, type SubscriptionStatusCode } from "@/core/billing/subscription";
 import { CONTRACT_STATUS_LABELS, type ContractStatusCode } from "@/core/sales/pipeline";
-import { ManageSubscriptionButton } from "./manage-subscription-button";
 import { formatCents, formatDate, formatDateTime, formatNumber } from "@/lib/format";
 import type { ProviderInfo } from "@/core/ai/ports";
 
@@ -568,8 +567,7 @@ function SubscriptionSettings({
             </dl>
           )}
           <div className="mt-5">
-            <ManageSubscriptionButton disabled={!subscription?.stripeLinked} />
-            <p className="mt-2 text-[12.5px] leading-5 text-text-tertiary">Moyen de paiement, factures et coordonnées de facturation se gèrent sur le portail sécurisé Stripe. Les conditions de résiliation sont celles de votre contrat.</p>
+            <p className="text-[12.5px] leading-5 text-text-tertiary">Règlement par prélèvement bancaire mensuel, selon votre contrat. Pour une facture, un changement de coordonnées bancaires ou une résiliation : <a href="mailto:contact@pharmaboost.app" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">contact@pharmaboost.app</a>.</p>
           </div>
         </CardContent>
       </Card>
