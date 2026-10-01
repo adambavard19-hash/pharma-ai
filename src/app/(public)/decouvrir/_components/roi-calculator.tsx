@@ -10,8 +10,8 @@ import { useState } from "react";
 const DAYS_OPEN = 26;
 
 export function RoiCalculator({ monthlyPriceCents }: { monthlyPriceCents: number }) {
-  const [perDay, setPerDay] = useState(5);
-  const [marginEuros, setMarginEuros] = useState(4.6);
+  const [perDay, setPerDay] = useState(10);
+  const [marginEuros, setMarginEuros] = useState(2.3);
   const price = monthlyPriceCents / 100;
   const dailyMargin = perDay * marginEuros;
   const daysToCover = Math.max(1, Math.ceil(price / dailyMargin));

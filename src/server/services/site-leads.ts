@@ -4,6 +4,7 @@ import { publicUrl } from "@/server/public-url";
 import { recordProspectEvent } from "@/server/services/sales/events";
 import { notifyAdmins } from "@/server/services/sales/notifications";
 import { buildSiteLeadAcknowledgement, buildSiteLeadAlert, type SiteLeadKind, type SiteLeadSummary } from "@/core/platform/site-emails";
+import { resolveReferralCode } from "@/server/services/referral";
 
 export const DEFAULT_CONTACT_EMAIL = "contact@pharmaboost.app";
 
@@ -18,6 +19,7 @@ export type SiteLeadInput = {
   postCount: number | null;
   message: string | null;
   preferredSlot: string | null;
+  referralCode: string | null;
 };
 
 /**
@@ -27,12 +29,15 @@ export type SiteLeadInput = {
  */
 export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectId: string; acknowledged: boolean }> {
   const kindLabel = input.kind === "DEMO" ? "Démonstration demandée depuis le site" : "Abonnement demandé depuis le site";
+  // Le code n'est gardé que s'il désigne une vraie officine : un code inventé ne parraine personne.
+  const referrer = await resolveReferralCode(input.referralCode);
   const notes = [
     kindLabel,
     input.lgo ? `Logiciel : ${input.lgo}` : null,
     input.postCount !== null ? `Postes de comptoir : ${input.postCount}` : null,
     input.preferredSlot ? `Créneau souhaité : ${input.preferredSlot}` : null,
     input.message ? `Message : ${input.message}` : null,
+    referrer ? `Parrainée par : ${referrer.name}` : input.referralCode ? `Code de parrainage inconnu : ${input.referralCode}` : null,
   ].filter(Boolean).join("\n");
 
   // Une officine qui redemande depuis le site retrouve son dossier : l'e-mail
@@ -41,7 +46,7 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
   const prospect = existing
     ? await prisma.prospect.update({
         where: { id: existing.id },
-        data: { status: input.kind === "SUBSCRIBE" ? "INTERESTED" : undefined, lastContactAt: new Date(), notes: [existing.notes, notes].filter(Boolean).join("\n\n") },
+        data: { status: input.kind === "SUBSCRIBE" ? "INTERESTED" : undefined, lastContactAt: new Date(), notes: [existing.notes, notes].filter(Boolean).join("\n\n"), ...(referrer ? { referralCode: input.referralCode!.trim().toUpperCase() } : {}) },
         select: { id: true },
       })
     : await prisma.prospect.create({
@@ -57,6 +62,7 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
           nextActionAt: new Date(Date.now() + 24 * 3600 * 1000),
           nextActionLabel: input.kind === "DEMO" ? "Rappeler pour fixer la démonstration" : "Préparer le contrat et envoyer le lien d'activation",
           notes,
+          referralCode: referrer ? input.referralCode!.trim().toUpperCase() : null,
         },
         select: { id: true },
       });
@@ -76,9 +82,14 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
   return { prospectId: prospect.id, acknowledged: outcome.status === "SENT" };
 }
 
-/** L'offre affichée sur le site : l'offre par défaut de la console, sinon rien. */
+/**
+ * L'offre affichée sur le site : l'offre marquée « par défaut » dans la
+ * console, et elle seule. Sans offre par défaut, le site affiche le tarif
+ * annoncé (voir FALLBACK_OFFER sur la page) : les offres de la grille
+ * interne ne s'affichent pas au public par accident.
+ */
 export async function loadPublicOffer(): Promise<{ name: string; description: string; monthlyPriceCents: number; trialDays: number } | null> {
-  const plan = await prisma.plan.findFirst({ where: { isActive: true }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], select: { name: true, description: true, monthlyPriceCents: true, trialDays: true } });
+  const plan = await prisma.plan.findFirst({ where: { isActive: true, isDefault: true }, orderBy: { createdAt: "asc" }, select: { name: true, description: true, monthlyPriceCents: true, trialDays: true } });
   return plan;
 }
 

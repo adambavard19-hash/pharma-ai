@@ -15,8 +15,8 @@ const SLOTS = ["Matin (9 h – 12 h)", "Début d'après-midi (14 h – 16 h)", "
  * Rien d'autre que les coordonnées de l'officine : aucune donnée de santé,
  * aucune donnée patient.
  */
-export function LeadForm({ kind }: { kind: "DEMO" | "SUBSCRIBE" }) {
-  const [form, setForm] = useState({ pharmacyName: "", contactName: "", email: "", phone: "", city: "", lgo: "", postCount: "2", message: "", preferredSlot: "", website: "" });
+export function LeadForm({ kind, referralCode = "" }: { kind: "DEMO" | "SUBSCRIBE"; referralCode?: string }) {
+  const [form, setForm] = useState({ pharmacyName: "", contactName: "", email: "", phone: "", city: "", lgo: "", postCount: "2", message: "", preferredSlot: "", referralCode, website: "" });
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -61,6 +61,11 @@ export function LeadForm({ kind }: { kind: "DEMO" | "SUBSCRIBE" }) {
         <Field label="Postes de comptoir" htmlFor="lead-posts">
           <Input id="lead-posts" inputMode="numeric" value={form.postCount} onChange={set("postCount")} className="w-24" />
         </Field>
+        {kind === "SUBSCRIBE" && (
+          <Field label="Code de parrainage" htmlFor="lead-referral" hint="Si une officine vous a recommandé PharmaBoost : son code réduit son abonnement.">
+            <Input id="lead-referral" value={form.referralCode} onChange={set("referralCode")} placeholder="PB-XXXXXX" className="uppercase" autoComplete="off" />
+          </Field>
+        )}
         {kind === "DEMO" && (
           <Field label="Créneau préféré" htmlFor="lead-slot">
             <Select id="lead-slot" value={form.preferredSlot} onChange={set("preferredSlot")}>

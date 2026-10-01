@@ -52,6 +52,9 @@ export default async function ClientPharmacyPage({
       onboardingCompletedAt: true,
       stockSyncedAt: true,
       organization: { select: { name: true, subscription: { select: { status: true, plan: { select: { name: true } } } } } },
+      referralCode: true,
+      referredBy: { select: { id: true, name: true } },
+      referrals: { orderBy: { createdAt: "asc" }, select: { id: true, name: true, city: true, isActive: true } },
       analysisRuns: { orderBy: { startedAt: "desc" }, take: 1, select: { status: true, outcome: true, startedAt: true } },
       memberships: {
         where: { user: { deletedAt: null } },
@@ -179,6 +182,17 @@ export default async function ClientPharmacyPage({
               <DataItem label="FINESS">{pharmacy.finessNumber ?? "—"}</DataItem>
               <DataItem label="SIRET">{pharmacy.siret ?? "—"}</DataItem>
               <DataItem label="Organisation">{pharmacy.organization.name}</DataItem>
+              <DataItem label="Code de parrainage">{pharmacy.referralCode ?? "Attribué à la première ouverture de l'onglet Mon abonnement"}</DataItem>
+              <DataItem label="Parrainée par">{pharmacy.referredBy ? <Link href={`/admin/pharmacies/${pharmacy.referredBy.id}`} className="text-brand-700 underline dark:text-brand-300">{pharmacy.referredBy.name}</Link> : "—"}</DataItem>
+              {pharmacy.referrals.length > 0 && (
+                <DataItem label={`Filleuls (${pharmacy.referrals.length})`}>
+                  <ul className="space-y-0.5">
+                    {pharmacy.referrals.map((r) => (
+                      <li key={r.id}><Link href={`/admin/pharmacies/${r.id}`} className="text-brand-700 underline dark:text-brand-300">{r.name}</Link>{r.city ? ` · ${r.city}` : ""}{r.isActive ? "" : " · inactive"}</li>
+                    ))}
+                  </ul>
+                </DataItem>
+              )}
             </CardContent>
           </Card>
         </div>

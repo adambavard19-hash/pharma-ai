@@ -53,6 +53,7 @@ export function CreatePharmacyButton() {
     ownerLastName: "",
     ownerEmail: "",
     lgo: "",
+    referralCode: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -69,7 +70,7 @@ export function CreatePharmacyButton() {
       }
       push({ tone: "success", title: result.message ?? "Officine créée" });
       setValues(EMPTY);
-      setOwner({ ownerFirstName: "", ownerLastName: "", ownerEmail: "", lgo: "" });
+      setOwner({ ownerFirstName: "", ownerLastName: "", ownerEmail: "", lgo: "", referralCode: "" });
       setOpen(false);
       router.push(`/admin/pharmacies/${result.data.pharmacyId}`);
     });
@@ -144,6 +145,9 @@ export function CreatePharmacyButton() {
                 ))}
                 <option value="autre">Autre</option>
               </Select>
+            </Field>
+            <Field label="Code de parrainage" htmlFor="referralCode" hint="Le code d'une officine équipée qui a recommandé celle-ci. Facultatif.">
+              <Input id="referralCode" value={owner.referralCode} onChange={(e) => setOwner({ ...owner, referralCode: e.target.value.toUpperCase() })} placeholder="PB-XXXXXX" />
             </Field>
             <p className="text-[12.5px] leading-5 text-text-tertiary">Le titulaire reçoit un e-mail avec un lien pour choisir son mot de passe, puis les cinq étapes de mise en service. Aucun mot de passe ne transite par ici.</p>
           </div>

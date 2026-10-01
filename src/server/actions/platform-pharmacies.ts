@@ -13,6 +13,7 @@ import { uniqueSlug } from "@/server/services/slugs";
 import { generateToken } from "@/server/security/tokens";
 import { isLgoId } from "@/server/services/stock-sync";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
+import { resolveReferralCode } from "@/server/services/referral";
 
 /**
  * Administration des officines clientes, réservée à l'éditeur.
@@ -50,6 +51,8 @@ const createSchema = pharmacySchema.extend({
   ownerPassword: z.string().optional().or(z.literal("")),
   /** Le logiciel de gestion de l'officine : il guide l'export du stock dès l'e-mail d'accueil. */
   lgo: z.string().trim().max(30).optional().or(z.literal("")),
+  /** Le code de l'officine qui a recommandé celle-ci, s'il y en a une. */
+  referralCode: z.string().trim().max(20).optional().or(z.literal("")),
 });
 
 /**
@@ -97,6 +100,8 @@ export async function createClientPharmacyAction(
   // titulaire choisit le sien par le lien de l'e-mail d'accueil.
   const passwordHash = await hashPassword(input.ownerPassword || generateToken(24));
   const lgo = input.lgo && isLgoId(input.lgo) ? input.lgo : null;
+  const referrer = await resolveReferralCode(input.referralCode);
+  if (input.referralCode && !referrer) return fail("Ce code de parrainage ne correspond à aucune officine.", { referralCode: "Code inconnu." });
 
   const pharmacy = await prisma.$transaction(async (tx) => {
     const organization = await tx.organization.create({
@@ -118,6 +123,7 @@ export async function createClientPharmacyAction(
         ...(input.brandColor ? { brandColor: input.brandColor } : {}),
         isDemo: false,
         isActive: true,
+        referredById: referrer?.id ?? null,
       },
     });
 

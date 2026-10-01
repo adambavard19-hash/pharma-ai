@@ -3,11 +3,13 @@ import { Check } from "lucide-react";
 import { LeadForm } from "../_components/lead-form";
 import { loadPublicOffer } from "@/server/services/site-leads";
 import { formatEuros } from "@/core/billing/subscription";
+import { normalizeReferralCode } from "@/core/billing/referral";
 
 export const metadata: Metadata = { title: "S'abonner", description: "Demandez votre lien d'activation : premier mois offert, carte demandée à l'activation, résiliable à tout moment." };
 
-export default async function SubscribePage() {
-  const offer = await loadPublicOffer();
+export default async function SubscribePage({ searchParams }: { searchParams: Promise<{ parrain?: string }> }) {
+  const [offer, params] = await Promise.all([loadPublicOffer(), searchParams]);
+  const referralCode = normalizeReferralCode(params.parrain) ?? "";
   const price = offer ? formatEuros(offer.monthlyPriceCents) : "69 €";
   const trialDays = offer?.trialDays ?? 30;
   return (
@@ -27,7 +29,8 @@ export default async function SubscribePage() {
         </div>
       </div>
       <div className="relative rounded-3xl border border-border-subtle bg-surface-card p-7 md:p-9">
-        <LeadForm kind="SUBSCRIBE" />
+        {referralCode && <p className="mb-5 rounded-xl bg-brand-50 px-4 py-3 text-[13.5px] text-brand-900 dark:bg-brand-950/40 dark:text-brand-100">Vous venez de la part d&apos;une officine équipée : son code <strong className="tabular">{referralCode}</strong> est déjà renseigné.</p>}
+        <LeadForm kind="SUBSCRIBE" referralCode={referralCode} />
       </div>
     </div>
   );

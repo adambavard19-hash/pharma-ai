@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Barcode, Check, LineChart, ShieldCheck, ShoppingBag } from "lucide-react";
+import { AlertTriangle, Barcode, Bell, Check, Mail, QrCode, ShieldCheck, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,10 +10,10 @@ import { cn } from "@/lib/utils";
  * temps choisi. Les montants sont ceux d'un exemple, et c'est écrit.
  */
 const FRAMES = [
-  { key: "bip", icon: Barcode, title: "La boîte est bipée", why: "Dans votre logiciel. Rien ne change pour l'équipe." },
-  { key: "conseil", icon: ShieldCheck, title: "Le conseil s'affiche, vérifié", why: "Interactions, réglementation, stock : contrôlés avant d'apparaître." },
-  { key: "vente", icon: ShoppingBag, title: "Le patient dit oui, c'est encaissé", why: "La ligne est marquée « conseil PharmaBoost ». Une boîte scannée sans conseil ne compte pas." },
-  { key: "tableau", icon: LineChart, title: "Le tableau de bord compte", why: "À l'euro près, par collaborateur. Constaté, pas estimé." },
+  { key: "bip", icon: Barcode, title: "La boîte est bipée", why: "Dans votre logiciel, comme d'habitude." },
+  { key: "conseil", icon: ShieldCheck, title: "Le conseil s'affiche", why: "Vérifié, et pris dans votre rayon." },
+  { key: "vente", icon: ShoppingBag, title: "Le patient dit oui", why: "Le pharmacien l'ajoute à la délivrance. Ou pas." },
+  { key: "suivi", icon: Mail, title: "Le patient reçoit son plan", why: "Par e-mail ou QR code : les prises, les rappels, un signe le dernier jour." },
 ] as const;
 
 const STEP_MS = 3000;
@@ -36,11 +36,10 @@ export function ProofStory() {
   const auto = tick % FRAMES.length;
   const manualActive = manual !== null && tick < manual.untilTick;
   const frame = manualActive ? manual.frame : auto;
-  const rounds = Math.floor(tick / FRAMES.length) + 1;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-stretch">
-      <ol className="space-y-2" aria-label="La chaîne, du bip au tableau de bord">
+      <ol className="space-y-2" aria-label="La chaîne, du bip au patient">
         {FRAMES.map((item, index) => {
           const active = index === frame;
           const done = index < frame;
@@ -73,7 +72,7 @@ export function ProofStory() {
           {frame === 0 && <FrameBip />}
           {frame === 1 && <FrameConseil />}
           {frame === 2 && <FrameVente />}
-          {frame === 3 && <FrameTableau rounds={rounds} />}
+          {frame === 3 && <FrameSuivi />}
         </div>
         <p className="absolute right-4 bottom-3 text-[11px] text-ink-400">exemple</p>
         <style>{`@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}`}</style>
@@ -131,32 +130,24 @@ function FrameVente() {
   );
 }
 
-/** 4 — le tableau de bord, qui compte. */
-function FrameTableau({ rounds }: { rounds: number }) {
-  const n = 12 + rounds;
-  const fmt = (x: number) => x.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+/** 4 — le patient a son plan : e-mail parti, rappels, dernier jour. */
+function FrameSuivi() {
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <p className="text-[12px] font-semibold tracking-[0.08em] text-ink-500 uppercase">Pilotage · cette semaine</p>
-        <span className="rounded-full bg-success-50 px-2 py-0.5 text-[11.5px] font-medium text-success-700">constaté</span>
+      <div className="mx-auto w-[78%] rounded-[22px] border-[6px] border-ink-900 bg-white p-3 shadow-xl">
+        <p className="text-[10.5px] font-semibold tracking-[0.08em] text-brand-700 uppercase">Votre plan · Pharmacie du Centre</p>
+        <ul className="mt-2 space-y-1.5 text-[12px]">
+          <li className="flex items-center justify-between rounded-lg bg-brand-50 px-2.5 py-1.5"><span>Matin · AMOXICILLINE 1 g</span><span className="text-ink-500">1 cp</span></li>
+          <li className="flex items-center justify-between rounded-lg bg-brand-50 px-2.5 py-1.5"><span>Soir · AMOXICILLINE 1 g</span><span className="text-ink-500">1 cp</span></li>
+          <li className="flex items-center justify-between rounded-lg bg-ink-50 px-2.5 py-1.5"><span>Probiotique · à distance</span><span className="text-ink-500">1 gél.</span></li>
+        </ul>
+        <div className="mt-2.5 flex flex-wrap gap-1.5 text-[10.5px]">
+          <span className="flex items-center gap-1 rounded-full bg-brand-600 px-2 py-1 font-medium text-white"><Bell className="size-3" /> Rappels dans mon agenda</span>
+          <span className="flex items-center gap-1 rounded-full border border-ink-200 px-2 py-1 text-ink-600"><QrCode className="size-3" /> reçu par QR code</span>
+        </div>
+        <p className="mt-2 text-[10.5px] text-ink-500">7 oct. — fin du traitement : comment allez-vous ?</p>
       </div>
-      <dl className="mt-3 grid grid-cols-2 gap-3">
-        <Tile label="Conseils acceptés" value={String(n)} />
-        <Tile label="Taux d'acceptation" value="71 %" />
-        <Tile label="Ventes additionnelles" value={fmt(n * 14.9)} />
-        <Tile label="Marge additionnelle" value={fmt(n * 5.6)} accent />
-      </dl>
-      <div className="mt-3 space-y-1.5">
-        {[["Claire", 7], ["Hugo", 3], ["Inès", 2]].map(([name, count]) => (
-          <div key={String(name)} className="flex items-center gap-2 text-[12.5px]">
-            <span className="w-12 text-ink-500">{name}</span>
-            <span className="h-2 rounded-full bg-brand-600" style={{ width: `${Number(count) * 9}%` }} />
-            <span className="text-ink-700 tabular">{count}</span>
-          </div>
-        ))}
-      </div>
-      <Legend icon={LineChart} text="Vous voyez ce que l'outil rapporte avant de décider de le garder." />
+      <Legend icon={Mail} text="Le patient sait quoi prendre, quand, et sa pharmacie reste présente." />
     </div>
   );
 }
@@ -182,14 +173,5 @@ function Row({ text, tag, highlight = false, accent = false }: { text: string; t
 function Legend({ icon: Icon, text }: { icon: typeof Barcode; text: string }) {
   return (
     <p className="mt-3 flex items-center gap-2 text-[13px] font-medium text-ink-700"><Icon className="size-4 shrink-0 text-brand-600" /> {text}</p>
-  );
-}
-
-function Tile({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className={cn("rounded-xl px-3.5 py-2.5", accent ? "bg-brand-50" : "bg-ink-50")}>
-      <dt className="text-[11.5px] text-ink-500">{label}</dt>
-      <dd className={cn("mt-0.5 text-[20px] font-semibold tabular", accent ? "text-brand-800" : "text-ink-900")}>{value}</dd>
-    </div>
   );
 }

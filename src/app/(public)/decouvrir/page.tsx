@@ -22,9 +22,13 @@ const FAQ: { q: string; a: string }[] = [
   { q: "Puis-je arrêter quand je veux ?", a: "Oui. L'abonnement est mensuel, sans engagement, résiliable à tout moment par simple e-mail. Le premier mois est offert ; le règlement se fait ensuite par prélèvement bancaire, mis en place avec le contrat." },
 ];
 
+const EXAMPLE_DAYS = ["un jour", "un jour", "deux jours", "trois jours", "quatre jours", "cinq jours", "six jours", "sept jours", "huit jours", "neuf jours", "dix jours"];
+
 export default async function SitePage() {
   const [offerRow, live] = await Promise.all([loadPublicOffer(), loadLiveProof()]);
   const offer = offerRow ?? FALLBACK_OFFER;
+  // L'exemple des tarifs : 10 conseils × 2,30 € de marge par jour, rapporté au vrai prix de l'offre.
+  const exampleDays = Math.max(1, Math.ceil(offer.monthlyPriceCents / 100 / (10 * 2.3)));
   const trial = offer.trialDays >= 28 ? "Premier mois offert" : offer.trialDays > 0 ? `${offer.trialDays} jours offerts` : null;
 
   return (
@@ -72,16 +76,16 @@ export default async function SitePage() {
       <Section
         id="bip"
         eyebrow="Au bip · l'avis en coin d'écran"
-        title="La boîte passe à la douchette, l'avis apparaît. Rien d'autre à faire."
-        lede="La douchette de votre logiciel suffit. L'avis s'affiche par-dessus, et s'efface seul."
+        title="Vous êtes dans votre logiciel. Vous scannez. PharmaBoost apparaît."
+        lede="Le pharmacien reste sur son logiciel de gestion. Au moment où il scanne le médicament, la fenêtre PharmaBoost s'ouvre en coin d'écran avec les conseils à donner à ce patient, déjà vérifiés."
         tone="sunken"
       >
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <ul className="space-y-5">
-            <Feature title="Trois conseils au plus" body="Produit, prix, marge, et la phrase à dire." />
+            <Feature title="Rien à installer sur le serveur" body="Un petit programme sur le poste, et votre logiciel ne change pas." />
+            <Feature title="Les conseils référencés pour ce patient" body="Produit en rayon, prix, marge, et la phrase à dire." />
             <Feature title="Les alertes d'abord" body="Interaction, contre-indication, ordonnance d'exception." />
-            <Feature title="Discret" body="Quinze secondes, puis il disparaît. Un clic pour le détail." />
-            <Feature title="Un client, une vente" body="Les boîtes se regroupent. « Nouveau patient » remet à zéro." />
+            <Feature title="Discret" body="Quinze secondes, puis la fenêtre disparaît. Un clic pour le détail." />
           </ul>
           <ToastMock className="mx-auto w-full max-w-lg pb-6" />
         </div>
@@ -92,15 +96,15 @@ export default async function SitePage() {
         id="sans-ordonnance"
         eyebrow="Demande sans ordonnance"
         title="« J'ai le nez bouché depuis hier. »"
-        lede="Le client décrit. PharmaBoost reconnaît le besoin, pose les bonnes questions, propose dans le rayon."
+        lede="Pas d'ordonnance, pas de boîte : le client décrit. Trois secondes plus tard, le besoin est reconnu, les questions à poser s'affichent, et les produits viennent de votre rayon."
       >
         <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
           <RequestMock />
           <ul className="space-y-5">
-            <Feature title="Jamais un produit inventé" body="Le besoin vient d'une liste écrite, le produit de votre rayon." />
-            <Feature title="Les questions d'abord" body="Âge, grossesse, fièvre, traitements en cours." />
+            <Feature title="Tapez ce que dit le client" body="Ses mots, son âge, enceinte ou non. C'est tout." />
+            <Feature title="Les questions d'abord" body="Fièvre, durée, traitements en cours : ce qui change le conseil." />
             <Feature title="Orienter quand il faut" body="Sang, gêne respiratoire, nourrisson : le médecin d'abord." />
-            <Feature title="La même sécurité" body="Les mêmes contrôles qu'une ordonnance." />
+            <Feature title="Jamais un produit inventé" body="Le produit vient de votre rayon, avec la même sécurité qu'une ordonnance." />
           </ul>
         </div>
       </Section>
@@ -128,30 +132,30 @@ export default async function SitePage() {
       <Section
         id="pilotage"
         eyebrow="Pilotage · titulaire"
-        title="Vos règles. Vos laboratoires. Votre marge."
-        lede="Et le chiffre d'affaires additionnel, lu dans vos ventes."
+        title="Vos laboratoires en avant. Vos conseils, plus pertinents."
+        lede="Le titulaire choisit les laboratoires qu'il veut mettre en avant : PharmaBoost propose d'abord leurs produits, par exemple ceux où la marge est la meilleure. La sécurité, elle, passe toujours devant."
       >
         <div className="grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:items-center">
           <PilotMock />
           <ul className="space-y-5">
-            <Feature title="La marge sur chaque conseil" body="Et en total sur le mois." />
-            <Feature title="Vos règles" body="Laboratoires préférés, gammes, exclusions. La sécurité, elle, ne se désactive pas." />
+            <Feature title="Vos laboratoires préférés" body="Cochez-les : à conseil égal, leurs produits passent devant." />
+            <Feature title="La marge sur chaque conseil" body="Visible au comptoir, et en total sur le mois." />
+            <Feature title="Vos exclusions" body="Une gamme que vous ne voulez plus proposer disparaît des conseils." />
             <Feature title="Stock à jour" body="Les ventes au bip, l'inventaire à chaque export." />
-            <Feature title="Par collaborateur" body="Qui a proposé quoi, et ce qui a été vendu." />
           </ul>
         </div>
       </Section>
 
       {/* ---- Pourquoi ----------------------------------------------- */}
-      <Section id="pourquoi" eyebrow="Ce que l'officine y gagne" title="Au comptoir, et dans les comptes." tone="sunken">
+      <Section id="pourquoi" eyebrow="Ce que l'officine y gagne" title="Qui a conseillé quoi, et ce que ça a rapporté. Par jour, par semaine, par mois." tone="sunken">
         <div className="grid gap-5 md:grid-cols-3">
           {[
-            { t: "Un conseil plus régulier", d: "Au moment utile, sans y penser." },
-            { t: "Une équipe qui progresse", d: "Chaque proposition dit pourquoi." },
-            { t: "Un patient mieux accompagné", d: "Le conseil sert d'abord à ça." },
-            { t: "Les mêmes règles pour tous", d: "Et la liberté de chacun." },
+            { t: "Par collaborateur", d: "Qui a proposé le plus de conseils, qui en a vendu le plus." },
+            { t: "Accepté ou refusé", d: "Chaque conseil tranché est compté. Rien n'est deviné." },
+            { t: "Par jour, semaine, mois", d: "Combien de produits vendus en plus, et combien ça rapporte." },
+            { t: "Tout est suivi", d: "La décision, la vente, la marge : rattachées, datées, signées." },
+            { t: "Une équipe qui progresse", d: "Chaque proposition dit pourquoi : on apprend en vendant." },
             { t: "La sécurité ne se discute pas", d: "La marge n'a pas voix au chapitre." },
-            { t: "Le rythme préservé", d: "Pas de second scan, pas de formation." },
           ].map((item) => (
             <div key={item.t} className="rounded-2xl border border-border-subtle bg-surface-app p-6">
               <p className="text-[15.5px] font-semibold text-text-primary">{item.t}</p>
@@ -190,16 +194,13 @@ export default async function SitePage() {
           <div className="space-y-6 lg:pt-4">
             <div className="rounded-2xl border border-border-subtle bg-surface-card p-6">
               <p className="flex items-center gap-2 text-[15px] font-semibold text-text-primary"><FileText className="size-4 text-brand-600 dark:text-brand-400" /> Comment ça se passe</p>
-              <ol className="mt-3 space-y-2 text-[14px] leading-6 text-text-secondary">
-                <li><strong className="text-text-primary">1.</strong> Vous demandez votre lien d&apos;activation. Nous préparons votre espace sous un jour ouvré.</li>
-                <li><strong className="text-text-primary">2.</strong> Vous signez le contrat en ligne et le mandat de prélèvement : {trial ? `${trial.toLowerCase()}, ` : ""}rien n&apos;est prélevé pendant l&apos;essai.</li>
-                <li><strong className="text-text-primary">3.</strong> Une commande sur chaque poste de comptoir, avec le code de votre espace. L&apos;équipe travaille dès le premier bip.</li>
-              </ol>
+              <p className="mt-3 text-[15px] leading-6 text-text-primary">Dix conseils de plus par jour, à 2,30 € de marge en moyenne : <strong>l&apos;abonnement est couvert en {EXAMPLE_DAYS[Math.min(exampleDays, EXAMPLE_DAYS.length - 1)]}.</strong> Le reste du mois est pour vous.</p>
+              <p className="mt-2 text-[13px] leading-5 text-text-secondary">Vous signez en ligne, {trial ? `${trial.toLowerCase()}, ` : ""}puis une ligne à coller sur chaque poste. Sans engagement.</p>
             </div>
             <RoiCalculator monthlyPriceCents={offer.monthlyPriceCents} />
             <div className="rounded-2xl border border-border-subtle bg-surface-card p-6">
-              <p className="text-[15px] font-semibold text-text-primary">Plusieurs officines ?</p>
-              <p className="mt-2 text-[14px] leading-6 text-text-secondary">Un groupement ou plusieurs points de vente partagent un espace, avec un stock et un pilotage par officine. Parlons-en en démonstration.</p>
+              <p className="text-[15px] font-semibold text-text-primary">Parrainez, payez moins.</p>
+              <p className="mt-2 text-[14px] leading-6 text-text-secondary">Chaque officine que vous parrainez réduit votre abonnement, tous les mois, jusqu&apos;à le rendre gratuit. Votre code est dans votre espace, onglet Mon abonnement.</p>
             </div>
           </div>
         </div>

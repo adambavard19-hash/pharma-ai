@@ -47,6 +47,10 @@ model Pharmacy {
   organizationId String
   name           String
   slug           String  @unique
+  /// Code de parrainage de l'officine (« PB-XXXXXX ») : un filleul qui s'abonne avec ce code réduit son abonnement.
+  referralCode   String? @unique
+  /// L'officine qui l'a parrainée, s'il y en a une.
+  referredById   String?
   /// Numéro FINESS de l'officine (identifiant national).
   finessNumber   String?
   siret          String?
@@ -122,6 +126,8 @@ model Pharmacy {
   @@map("pharmacies")
   counterRequests CounterRequest[]
   sealedDocuments SealedDocument[]
+  referredBy Pharmacy?  @relation("PharmacyReferral", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals  Pharmacy[] @relation("PharmacyReferral")
 }
 
 /// La liaison entre une officine et son logiciel de gestion (LGO), assurée par
@@ -2533,6 +2539,8 @@ model Prospect {
   notes             String?
   /// Conditions proposées : abonnement mensuel, en centimes.
   monthlyPriceCents Int?
+  /// Code de parrainage donné à l'inscription, résolu à la création de l'officine.
+  referralCode      String?
 
   /// L'officine créée après signature. Un dossier, une officine.
   pharmacyId String? @unique

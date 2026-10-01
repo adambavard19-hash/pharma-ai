@@ -16,6 +16,7 @@ const schema = z.object({
   postCount: z.number().int().min(1).max(50).nullable().optional(),
   message: z.string().trim().max(1000).optional().or(z.literal("")),
   preferredSlot: z.string().trim().max(120).optional().or(z.literal("")),
+  referralCode: z.string().trim().max(20).optional().or(z.literal("")),
   /** Pot de miel : un humain ne le remplit pas. */
   website: z.string().max(0).optional().or(z.literal("")),
 });
@@ -54,6 +55,7 @@ export async function submitSiteLeadAction(payload: z.input<typeof schema>): Pro
       postCount: input.postCount ?? null,
       message: input.message || null,
       preferredSlot: input.preferredSlot || null,
+      referralCode: input.referralCode || null,
     });
     return ok({ acknowledged: result.acknowledged });
   } catch (error) {

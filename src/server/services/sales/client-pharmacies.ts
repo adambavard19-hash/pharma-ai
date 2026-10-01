@@ -7,6 +7,7 @@ import { sendUserPasswordLink } from "@/server/services/user-password";
 import { recordAudit } from "@/server/audit/log";
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
+import { resolveReferralCode } from "@/server/services/referral";
 
 /**
  * L'espace pharmacie né d'un dossier commercial.
@@ -37,6 +38,8 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
   const lastName = rest.join(" ") || firstName;
   const [organizationSlug, pharmacySlug] = await Promise.all([uniqueSlug(prospect.name, "organization"), uniqueSlug(prospect.name, "pharmacy")]);
   const passwordHash = await hashPassword(randomBytes(32).toString("base64url"));
+  // Le parrain, si le dossier porte un code valide : la remise se calcule à partir de ce lien.
+  const referrer = await resolveReferralCode(prospect.referralCode);
 
   const { pharmacy, ownerId } = await prisma.$transaction(async (tx) => {
     const organization = await tx.organization.create({ data: { name: prospect.name, slug: organizationSlug } });
@@ -54,6 +57,7 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
         siret: prospect.siret,
         isDemo: false,
         isActive: true,
+        referredById: referrer?.id ?? null,
       },
     });
     const owner = await tx.user.create({ data: { organizationId: organization.id, email: prospect.email!, firstName, lastName, passwordHash, status: "ACTIVE" } });

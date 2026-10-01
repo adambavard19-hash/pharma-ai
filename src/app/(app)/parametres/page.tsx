@@ -29,6 +29,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/feedback";
 import { SettingsTabs } from "./settings-tabs";
+import { ReferralCard } from "./referral-card";
+import { referralSummary } from "@/server/services/referral";
 import { SUBSCRIPTION_STATUS_LABELS, type SubscriptionStatusCode } from "@/core/billing/subscription";
 import { CONTRACT_STATUS_LABELS, type ContractStatusCode } from "@/core/sales/pipeline";
 import { formatCents, formatDate, formatDateTime, formatNumber } from "@/lib/format";
@@ -51,6 +53,7 @@ export default async function SettingsPage({
     select: { id: true, version: true, status: true, finalizedAt: true, monthlyPriceCents: true, trialDays: true },
   });
 
+  const referral = tab === "abonnement" ? await referralSummary(session.scope.pharmacyId) : null;
   const [pharmacy, subscription, auditLogs] = await Promise.all([
     prisma.pharmacy.findUniqueOrThrow({
       where: { id: session.scope.pharmacyId },
@@ -93,6 +96,7 @@ export default async function SettingsPage({
         <ComplianceSettings isDemo={isDemoMode()} />
       ) : tab === "abonnement" ? (
         <SubscriptionSettings
+          referral={referral}
           subscription={
             subscription
               ? {
@@ -512,7 +516,9 @@ function SubscriptionSettings({
   subscription,
   organizationName,
   contract,
+  referral,
 }: {
+  referral: Awaited<ReturnType<typeof referralSummary>> | null;
   subscription: {
     planName: string;
     planDescription: string;
@@ -591,6 +597,8 @@ function SubscriptionSettings({
           )}
         </CardContent>
       </Card>
+
+      {referral && <ReferralCard referral={{ ...referral, referrals: referral.referrals.map((r) => ({ ...r, since: r.since.toISOString() })) }} />}
     </div>
   );
 }
