@@ -5,7 +5,7 @@
  * électronique sans relire le document.
  *
  * Unités : points PDF (A4 = 595,28 × 841,89). Le PDF compte les ordonnées
- * depuis le bas ; Yousign depuis le haut — `signatureFieldPlacement` fait la
+ * depuis le bas ; Yousign et DocuSeal depuis le haut — `signatureFieldPlacement` fait la
  * conversion.
  */
 export const CONTRACT_PAGE = { width: 595.28, height: 841.89 } as const;

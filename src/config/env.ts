@@ -118,10 +118,15 @@ const envSchema = z.object({
   // assumé : l'officine remet alors la fiche par impression ou QR code, et
   // l'application ne prétend jamais avoir envoyé quoi que ce soit.
   /** Signature électronique des contrats : « none » tant qu'aucun prestataire n'est contractualisé. */
-  SIGNATURE_PROVIDER: z.enum(["none", "yousign"]).default("none"),
+  SIGNATURE_PROVIDER: z.enum(["none", "yousign", "docuseal"]).default("none"),
   YOUSIGN_API_KEY: z.string().optional(),
   YOUSIGN_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
   YOUSIGN_WEBHOOK_SECRET: z.string().optional(),
+  DOCUSEAL_API_KEY: z.string().optional(),
+  /** « eu » : api.docuseal.eu (données en Europe) · « global » : api.docuseal.com. Le compte doit être créé sur le même serveur. */
+  DOCUSEAL_REGION: z.enum(["eu", "global"]).default("eu"),
+  /** Valeur de l'en-tête x-pharmaboost-secret déclaré sur le webhook DocuSeal. */
+  DOCUSEAL_WEBHOOK_SECRET: z.string().optional(),
 
   // Abonnements : Stripe. Les clés vivent dans l'environnement, jamais dans
   // le code. En mode « test », une clé de production est refusée au démarrage.

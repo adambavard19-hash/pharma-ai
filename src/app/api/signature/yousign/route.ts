@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   const provider = getSignatureProvider();
-  if (provider.info.capability !== "LIVE") return NextResponse.json({ ignored: true, reason: "aucun prestataire configuré" }, { status: 202 });
+  if (provider.info.id !== "yousign") return NextResponse.json({ ignored: true, reason: "Yousign n'est pas le prestataire configuré" }, { status: 202 });
   const rawBody = await request.text().catch(() => "");
   let event;
   try {

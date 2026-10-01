@@ -58,6 +58,12 @@ export function AdminActionsPanel({ prospect, reps }: Props) {
       {contract && (
         <Card>
           <CardHeader title={`Contrat v${contract.version}`} description={contractOpen ? "En attente de signature. Renvoyez le lien, ou enregistrez une signature reçue hors ligne (papier, courriel) avec son motif : ce n'est pas une signature électronique et le journal le dira." : contract.status === "DRAFT" ? "Brouillon : le commercial ne l'a pas encore envoyé." : "Contrat clos."} />
+          {contract.status === "FINALIZED" && (
+            <CardContent className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm"><a href={`/api/contrats/apercu/${contract.id}`} target="_blank" rel="noreferrer">Voir le PDF signé</a></Button>
+              {contract.providerEnvelopeId && <Button variant="outline" size="sm" loading={pending} onClick={() => run(() => refreshSignatureStatusAction({ prospectId: prospect.id, contractId: contract.id }))}>Actualiser chez le prestataire</Button>}
+            </CardContent>
+          )}
           {(contractOpen || contract.status === "DRAFT") && (
             <CardContent className="grid gap-3 sm:grid-cols-[1fr_auto]">
               <div className="flex flex-wrap gap-2 sm:col-span-2">

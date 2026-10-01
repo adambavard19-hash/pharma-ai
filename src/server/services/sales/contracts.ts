@@ -8,7 +8,7 @@ import { renderContractPdf } from "@/core/contracts/pdf";
 import { signatureFieldPlacement } from "@/core/contracts/layout";
 import { PDFDocument } from "pdf-lib";
 import { buildContractEmail } from "@/core/platform/sales-emails";
-import { SignatureNotConfiguredError, type SignatureEvent, type SignatureStatus } from "@/core/signature";
+import { SignatureNotConfiguredError, shouldApplySignatureStatus, signedContractKey, type SignatureEvent, type SignatureStatus } from "@/core/signature";
 import { CONTRACT_STATUS_LABELS, prospectStatusForContract, type ContractStatusCode } from "@/core/sales/pipeline";
 import { publicUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
@@ -241,6 +241,7 @@ export async function applySignatureStatus(contractId: string, status: Signature
     await prisma.prospect.update({ where: { id: contract.prospect.id }, data: { status: next } });
   }
   if (status === "FINALIZED") {
+    await archiveSignedPdf(contractId);
     await upsertCommissionForContract({ prospectId: contract.prospect.id, contractId, status: "EARNED", actor: { type: "SYSTEM", label: "PharmaBoost" } });
     if (contract.prospect.salesRepId) await notifySalesRep({ salesRepId: contract.prospect.salesRepId, type: "CONTRACT_SIGNED", title: `${contract.prospect.name} : contrat signé`, body: "Vous pouvez créer l'espace pharmacie.", linkUrl: `/extranet/dossiers/${contract.prospect.id}`, severity: "SUCCESS" });
     await notifyAdmins({ type: "CONTRACT_SIGNED", title: `Nouvelle pharmacie signée : ${contract.prospect.name}`, body: `Contrat v${contract.version} finalisé.`, linkUrl: `/admin/dossiers/${contract.prospect.id}`, severity: "SUCCESS" });
@@ -267,7 +268,11 @@ export async function refreshContractSignatureStatus(contractId: string, actor: 
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Le prestataire n'a pas répondu." };
   }
-  if (status === contract.status || contract.status === "FINALIZED") return { ok: true, status, changed: false };
+  if (!shouldApplySignatureStatus(contract.status, status)) {
+    // Déjà finalisé : on s'assure au passage que la version signée est archivée.
+    if (contract.status === "FINALIZED") await archiveSignedPdf(contractId);
+    return { ok: true, status, changed: false };
+  }
   await applySignatureStatus(contractId, status, actor, `statut relu chez ${provider.info.label}`);
   return { ok: true, status, changed: true };
 }
@@ -279,7 +284,7 @@ export async function handleSignatureEvent(event: SignatureEvent): Promise<boole
   if (contract.status === "FINALIZED") return true;
   // Notification non authentifiée : seul l'état relu chez le prestataire fait foi.
   const status = event.verified ? event.status : await getSignatureProvider().getStatus(event.envelopeId);
-  if (status === contract.status) return true;
+  if (!shouldApplySignatureStatus(contract.status, status)) return true;
   await applySignatureStatus(contract.id, status, { type: "SIGNER", label: event.verified ? "Prestataire de signature" : "Prestataire de signature (statut relu)" }, event.reason ?? null);
   return true;
 }
@@ -297,7 +302,38 @@ export async function getContractByToken(token: string) {
 }
 
 export async function readContractPdf(contractId: string): Promise<Uint8Array | null> {
-  const contract = await prisma.contract.findUnique({ where: { id: contractId }, select: { fileKey: true } });
+  const contract = await prisma.contract.findUnique({ where: { id: contractId }, select: { fileKey: true, finalizedAt: true } });
   if (!contract) return null;
+  // Une fois finalisé, c'est la version signée qui fait foi, si elle a été archivée.
+  if (contract.finalizedAt) {
+    const signed = await getStorageProvider().read(signedContractKey(contract.fileKey));
+    if (signed) return signed;
+  }
   return getStorageProvider().read(contract.fileKey);
+}
+
+/**
+ * Récupère chez le prestataire le PDF signé (avec son dossier de preuve) et le
+ * range à côté du contrat. Sans effet s'il est déjà archivé ; un échec est
+ * tracé mais ne remet pas en cause la finalisation, et « Relire le statut »
+ * retente l'archivage.
+ */
+export async function archiveSignedPdf(contractId: string): Promise<boolean> {
+  const contract = await prisma.contract.findUnique({ where: { id: contractId }, select: { fileKey: true, providerEnvelopeId: true, signatureProvider: true } });
+  if (!contract?.providerEnvelopeId) return false;
+  const storage = getStorageProvider();
+  const key = signedContractKey(contract.fileKey);
+  if (await storage.read(key)) return true;
+  const provider = getSignatureProvider();
+  if (provider.info.capability !== "LIVE" || provider.info.id !== contract.signatureProvider) return false;
+  try {
+    const pdf = await provider.downloadSigned(contract.providerEnvelopeId);
+    if (!pdf) throw new Error("le prestataire n'a pas fourni le document signé");
+    await storage.put(key, pdf, "application/pdf");
+    await recordAudit({ action: "sales.contract_event", entityType: "Contract", entityId: contractId, metadata: { signedPdf: "archived", bytes: pdf.length, signatureProvider: provider.info.id } });
+    return true;
+  } catch (error) {
+    await recordAudit({ action: "sales.contract_event", entityType: "Contract", entityId: contractId, metadata: { signedPdf: "failed", reason: error instanceof Error ? error.message : String(error) } });
+    return false;
+  }
 }
