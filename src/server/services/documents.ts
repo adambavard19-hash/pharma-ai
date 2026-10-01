@@ -46,11 +46,17 @@ export type DocumentAuthor = {
  * proposition supprimée ou simplement suggérée par le moteur n'atteint jamais
  * le patient.
  */
-export async function generatePatientDocument(params: {
+/**
+ * Le contenu du plan, composé une fois pour toutes les remises : la fiche
+ * conservée (mode `full`) comme le plan scellé (mode `none`). `withIdentity`
+ * à faux ne reprend ni nom ni référence du patient : le plan dit « vous ».
+ */
+export async function composeDocumentContent(params: {
   session: DocumentAuthor;
   prescriptionId: string;
   pharmacistNote?: string | null;
-}): Promise<{ documentId: string; accessToken: string; url: string }> {
+  withIdentity: boolean;
+}) {
   const { session } = params;
   const scope = session.scope;
 
@@ -112,7 +118,7 @@ export async function generatePatientDocument(params: {
       email: pharmacy.email,
     },
     pharmacist: { fullName: session.user.fullName, roleLabel: session.roleLabel },
-    patient: prescription.patient
+    patient: prescription.patient && params.withIdentity
       ? {
           firstName: prescription.patient.firstName,
           lastName: prescription.patient.lastName,
@@ -186,6 +192,18 @@ export async function generatePatientDocument(params: {
     isDemo: prescription.isDemo,
   };
   content.keyPoints = composeKeyPoints(content.treatment);
+  return { content, prescription };
+}
+
+export async function generatePatientDocument(params: {
+  session: DocumentAuthor;
+  prescriptionId: string;
+  pharmacistNote?: string | null;
+}): Promise<{ documentId: string; accessToken: string; url: string }> {
+  const { session } = params;
+  const scope = session.scope;
+
+  const { content, prescription } = await composeDocumentContent({ session, prescriptionId: params.prescriptionId, pharmacistNote: params.pharmacistNote ?? null, withIdentity: true });
 
   const accessToken = generateToken(32);
   const previousVersion = await prisma.patientDocument.count({

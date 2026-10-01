@@ -8,6 +8,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { getOCRProvider } from "@/server/ai/registry";
 import { stockFreshness, describeAge, lgoLabel } from "@/core/stock/connectors";
 import { TIME_ZONE } from "@/config/constants";
+import { patientDataEnabled } from "@/config/env";
 import { formatCents, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { LiveCounterSales } from "./live-counter-sales";
@@ -75,8 +76,9 @@ export default async function NewPrescriptionPage({
       <LiveCounterSales initial={liveSales} />
 
       <NewPrescriptionForm
-        patients={patients}
-        preselectedPatientId={params.patient ?? null}
+        patients={patientDataEnabled() ? patients : []}
+        patientData={patientDataEnabled()}
+        preselectedPatientId={patientDataEnabled() ? (params.patient ?? null) : null}
         canReadPrescriptions={canReadPrescriptions}
       />
 

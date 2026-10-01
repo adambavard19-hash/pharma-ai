@@ -12,6 +12,8 @@ import { PageHeader } from "@/components/ui/page";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { DocumentWorkspace } from "./document-workspace";
+import { SealedWorkspace } from "./sealed-workspace";
+import { patientDataEnabled } from "@/config/env";
 import { FollowUpPanel } from "./follow-up-panel";
 import {
   SUGGESTIBLE_TEMPLATES,
@@ -59,6 +61,39 @@ export default async function DocumentPage({
   });
 
   if (!prescription || prescription.pharmacyId !== session.scope.pharmacyId) notFound();
+
+  // Mode sans patient : le plan est scellé, rien n'est conservé sur la personne.
+  if (!patientDataEnabled()) {
+    const messagingProvider = getMessagingProvider();
+    const sealedCount = await prisma.sealedDocument.count({ where: { prescriptionId: prescription.id } });
+    return (
+      <div className="space-y-6">
+        <Button asChild variant="ghost" size="sm" className="no-print" leadingIcon={<ArrowLeft className="size-4" />}>
+          <Link href={`/vente/${prescription.id}`}>Retour à la délivrance</Link>
+        </Button>
+        <PageHeader className="no-print" title="Remettre le plan au patient" description={`${prescription.reference} — préparé à partir des posologies confirmées et des conseils acceptés. Aucune donnée sur le patient n'est conservée.`} />
+        <SealedWorkspace
+          prescriptionId={prescription.id}
+          canSend={session.permissions.has(PERMISSIONS.DOCUMENT_SEND)}
+          canRecordSale={session.permissions.has(PERMISSIONS.SALE_CREATE)}
+          acceptedRecommendations={prescription.recommendations.map((recommendation) => ({
+            id: recommendation.id,
+            status: recommendation.status,
+            productId: recommendation.productId,
+            productName: recommendation.product?.name ?? "Produit supprimé",
+            imageUrl: recommendation.product?.imageUrl ?? null,
+            unitPriceCents: recommendation.unitPriceCents || (recommendation.product?.salePriceCents ?? 0),
+            quantity: recommendation.quantity,
+            stockQuantity: recommendation.product?.stockItem?.quantity ?? 0,
+          }))}
+          messaging={{ configured: messagingProvider.info.capability === "LIVE", label: messagingProvider.info.label, description: messagingProvider.info.description }}
+          existingSales={prescription.sales.map((sale) => ({ id: sale.id, reference: sale.reference, attributedCents: sale.attributedCents }))}
+          publicReach={resolvePublicBaseUrl().reach}
+          previousVersions={sealedCount}
+        />
+      </div>
+    );
+  }
 
   const patients = prescription.patient
     ? []

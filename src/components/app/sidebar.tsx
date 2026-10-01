@@ -12,14 +12,17 @@ import { useMobileNav } from "./mobile-nav";
 export function Sidebar({
   permissions,
   pharmacyName,
+  hiddenHrefs = [],
 }: {
   permissions: string[];
   pharmacyName: string;
+  /** Entrées retirées par la configuration (mode sans patient : Patients, Suivis). */
+  hiddenHrefs?: string[];
 }) {
   const { open: mobileOpen, closeNav } = useMobileNav();
   const granted = new Set(permissions);
 
-  const items = NAVIGATION.filter((item) => granted.has(item.permission));
+  const items = NAVIGATION.filter((item) => granted.has(item.permission) && !hiddenHrefs.includes(item.href));
   const primary = items.find((item) => item.primary);
   const secondary = items.filter((item) => !item.primary);
 

@@ -25,6 +25,7 @@ import { proposeSpecialties } from "@/server/services/drug-identification";
 import { loadPrescribedAvailability } from "@/server/services/drug-catalog";
 import { evaluateLinesRegulation } from "@/server/services/regulation";
 import { buildPatientContext } from "@/server/services/patients";
+import { patientDataEnabled } from "@/config/env";
 import { AUTO_ACCEPT_REFUSAL_MESSAGES, decideAutoAccept, distinctStrengths } from "@/core/reference";
 import { parsePosology, readSchedule } from "@/core/posology";
 import { SaleWorkspace } from "./sale-workspace";
@@ -235,7 +236,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         prescribedAt: prescription.prescribedAt?.toISOString().slice(0, 10) ?? null,
         source: prescription.source,
       }}
-      patients={patients}
+      patients={patientDataEnabled() ? patients : []}
+      patientData={patientDataEnabled()}
       lines={prescription.lines.map((line) => {
         // La colonne confirmée prime toujours sur une relecture du texte : une
         // fois que le pharmacien a tranché, plus rien ne réinterprète.

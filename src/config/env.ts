@@ -44,6 +44,18 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
 
   /**
+   * Ce que l'application conserve sur les patients.
+   *
+   * `none` : aucune donnée de santé rattachée à une personne. Pas de fiche
+   * patient, pas de suivi programmé, l'image de l'ordonnance est effacée dès
+   * la vérification, et le plan de prise est remis scellé (clé dans le lien).
+   * C'est le mode sans hébergeur HDS (docs/MODE-SANS-PATIENT.md).
+   * `full` : fiches, suivis et documents conservés — exige un hébergement
+   * certifié HDS (docs/HDS.md).
+   */
+  PATIENT_DATA_MODE: z.enum(["none", "full"]).default("full"),
+
+  /**
    * Pré-confirmation des lignes intégralement lues.
    *
    * L'interrupteur du parcours allégé. Une ligne dont chaque champ renseigné a
@@ -175,3 +187,9 @@ export function isDemoMode(): boolean {
 export function preconfirmEnabled(): boolean {
   return getEnv().PRECONFIRM_READ_LINES;
 }
+
+/** `true` lorsque l'application conserve des fiches patient (mode `full`). */
+export function patientDataEnabled(): boolean {
+  return getEnv().PATIENT_DATA_MODE === "full";
+}
+

@@ -83,7 +83,7 @@ export function buildDocumentEmail(variables: DocumentEmailVariables): EmailMess
 
   const lignes = [
     ...(isDemo ? [demoLine, ""] : []),
-    `Bonjour ${patientFirstName},`,
+    patientFirstName ? `Bonjour ${patientFirstName},` : "Bonjour,",
     "",
     `À la suite de votre passage à la ${pharmacyName} le ${passage}, vous trouverez votre plan personnalisé préparé avec votre pharmacien.`,
     "",
@@ -135,7 +135,7 @@ export function buildDocumentEmail(variables: DocumentEmailVariables): EmailMess
       : ""
   }
   <tr><td style="padding:26px 28px 0">
-    <p style="margin:0;font-size:18px;line-height:26px;font-weight:600">Bonjour ${escapeHtml(patientFirstName)},</p>
+    <p style="margin:0;font-size:18px;line-height:26px;font-weight:600">${patientFirstName ? `Bonjour ${escapeHtml(patientFirstName)},` : "Bonjour,"}</p>
     <p style="margin:12px 0 0;font-size:16px;line-height:25px;color:#374151">À la suite de votre passage à la ${escapeHtml(pharmacyName)} le ${escapeHtml(passage)}, vous trouverez votre plan personnalisé préparé avec votre pharmacien.</p>
   </td></tr>
   ${

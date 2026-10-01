@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { DocumentContent } from "@/core/documents/types";
 
-type AcceptedRecommendation = {
+export type AcceptedRecommendation = {
   id: string;
   status: string;
   productId: string | null;
@@ -549,7 +549,7 @@ function NoEmailBlock({
   );
 }
 
-function SalePanel({
+export function SalePanel({
   prescriptionId,
   patientId,
   recommendations,

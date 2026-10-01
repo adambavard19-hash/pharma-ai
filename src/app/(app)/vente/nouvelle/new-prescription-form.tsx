@@ -43,10 +43,13 @@ const ACCEPTED_MIME = new Set([
  */
 export function NewPrescriptionForm({
   patients,
+  patientData = true,
   preselectedPatientId,
   canReadPrescriptions,
 }: {
   patients: PatientOption[];
+  /** Faux en mode sans patient : ni bandeau, ni association, ni suggestion. */
+  patientData?: boolean;
   preselectedPatientId: string | null;
   canReadPrescriptions: boolean;
 }) {
@@ -196,7 +199,7 @@ export function NewPrescriptionForm({
   };
 
   const suggestion =
-    upload?.suggestedPatient && !patient && !suggestionRejetee ? upload.suggestedPatient : null;
+    patientData && upload?.suggestedPatient && !patient && !suggestionRejetee ? upload.suggestedPatient : null;
 
   // Une ordonnance glissée n'importe où sur l'écran vaut un clic sur
   // « Ordonnance » : au comptoir, c'est le geste le plus court.
@@ -228,7 +231,8 @@ export function NewPrescriptionForm({
       )}
       {error && <Alert tone="danger">{error}</Alert>}
 
-      {/* Le patient, en bandeau : une information, pas une étape. */}
+      {/* Le patient, en bandeau : une information, pas une étape. Absent en mode sans patient. */}
+      {patientData && (
       <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-card px-4 py-3">
         <span
           className={cn(
@@ -256,6 +260,7 @@ export function NewPrescriptionForm({
           {patient ? "Changer" : "Associer"}
         </button>
       </div>
+      )}
 
       {/* Nom lu sur l'ordonnance : proposé, jamais appliqué d'office. */}
       {suggestion && (

@@ -43,6 +43,8 @@ export type AuditAction =
   | "prescription.regulation_checked"
   | "prescription.counter_scan"
   | "prescription.counter_reset"
+  | "prescription.file_erased"
+  | "patient_data.purged"
   | "counter.request_advised"
   | "stock.post_export_path_set"
   | "stock.post_sync_requested"

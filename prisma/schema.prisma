@@ -121,6 +121,7 @@ model Pharmacy {
   @@index([organizationId])
   @@map("pharmacies")
   counterRequests CounterRequest[]
+  sealedDocuments SealedDocument[]
 }
 
 /// La liaison entre une officine et son logiciel de gestion (LGO), assurée par
@@ -1629,6 +1630,7 @@ model Prescription {
   @@index([pharmacyId, createdAt])
   @@index([patientId])
   @@map("prescriptions")
+  sealedDocuments SealedDocument[]
 }
 
 /// Comment une ligne d'ordonnance a été rattachée au catalogue national.
@@ -2115,6 +2117,34 @@ enum DeliveryStatus {
   PENDING
   SENT
   FAILED
+}
+
+/// Un plan de prise remis scellé : chiffré avec une clé que le serveur n'a
+/// jamais. Ni patient, ni adresse : seulement l'officine, la vente, et un
+/// contenu illisible sans le lien. Effacé à l'échéance (src/core/documents/seal.ts).
+model SealedDocument {
+  id             String   @id @default(cuid())
+  pharmacyId     String
+  prescriptionId String
+  version        Int      @default(1)
+  ciphertext     Bytes
+  iv             Bytes
+  tag            Bytes
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdByUserId String?
+  viewCount      Int      @default(0)
+  lastViewedAt   DateTime?
+  isDemo         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  pharmacy     Pharmacy     @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, createdAt])
+  @@index([prescriptionId])
+  @@index([expiresAt])
+  @@map("sealed_documents")
 }
 
 model DocumentDelivery {

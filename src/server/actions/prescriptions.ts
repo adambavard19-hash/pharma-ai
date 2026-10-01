@@ -20,6 +20,7 @@ import {
   MAX_PRESCRIPTION_FILE_BYTES,
 } from "@/server/services/prescription-upload";
 import { recordIsDemo } from "@/server/db/demo-scope";
+import { patientDataEnabled } from "@/config/env";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /** Le formulaire transmet les lignes en JSON : une saisie illisible vaut zéro
@@ -381,7 +382,7 @@ export async function verifyPrescriptionAction(
 
   const prescription = await prisma.prescription.findUnique({
     where: { id: input.prescriptionId },
-    select: { id: true, pharmacyId: true, reference: true, patientId: true },
+    select: { id: true, pharmacyId: true, reference: true, patientId: true, fileKey: true },
   });
   if (!prescription || prescription.pharmacyId !== scope.pharmacyId) {
     return fail("Ordonnance introuvable dans cette officine.");
@@ -462,6 +463,15 @@ export async function verifyPrescriptionAction(
     userId: scope.userId,
     metadata: { confirmedLines: confirmedCount, totalLines: input.lines.length },
   });
+
+  // Mode sans patient : la photo de l'ordonnance a servi à la relecture,
+  // elle est confirmée, elle n'a plus de raison d'exister. Les lignes
+  // restent ; l'image, qui porte un nom, s'efface ici et maintenant.
+  if (!patientDataEnabled() && prescription.fileKey) {
+    await getStorageProvider().delete(prescription.fileKey).catch(() => undefined);
+    await prisma.prescription.update({ where: { id: prescription.id }, data: { fileKey: null, fileName: null, fileMimeType: null } });
+    await recordAudit({ action: "prescription.file_erased", entityType: "Prescription", entityId: prescription.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { reason: "PATIENT_DATA_MODE=none" } });
+  }
 
   if (!input.runAnalysis) {
     revalidatePath(`/vente/${prescription.id}`);

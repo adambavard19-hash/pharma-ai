@@ -31,6 +31,7 @@ export function PrescriptionZone({
   lines,
   onLineChange,
   patients,
+  allowPatient = true,
   patientId,
   onPatientChange,
   prescriberName,
@@ -46,6 +47,7 @@ export function PrescriptionZone({
   lines: SaleLineDraft[];
   onLineChange: (id: string, patch: Partial<SaleLineDraft>) => void;
   patients: PatientOption[];
+  allowPatient?: boolean;
   patientId: string;
   onPatientChange: (value: string) => void;
   prescriberName: string;
@@ -137,7 +139,7 @@ export function PrescriptionZone({
           {headerOpen && (
             <div className="mt-3 grid gap-4 sm:grid-cols-3">
               <Field label="Patient" htmlFor="patientId">
-                <PatientPicker patients={patients} value={patientId} onChange={onPatientChange} create={{ prescriptionId }} />
+                {allowPatient && <PatientPicker patients={patients} value={patientId} onChange={onPatientChange} create={{ prescriptionId }} />}
               </Field>
               <Field label="Prescripteur" htmlFor="prescriberName">
                 <Input

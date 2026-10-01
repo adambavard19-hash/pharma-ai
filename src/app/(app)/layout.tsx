@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { requireSession } from "@/server/auth/session";
+import { patientDataEnabled } from "@/config/env";
 import { countUnreadNotifications } from "@/server/services/notifications";
 import { Sidebar } from "@/components/app/sidebar";
 import { Topbar } from "@/components/app/topbar";
@@ -22,6 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <div className="no-print">
           <Sidebar
             permissions={[...session.permissions]}
+            hiddenHrefs={patientDataEnabled() ? [] : ["/patients", "/suivis"]}
             pharmacyName={session.pharmacy.name}
           />
         </div>

@@ -1,3 +1,4 @@
+import { patientDataEnabled } from "@/config/env";
 import "server-only";
 import { activityScope } from "@/server/db/demo-scope";
 import sharp from "sharp";
@@ -165,7 +166,8 @@ export async function storePrescriptionFile(params: {
       onStage?.({ stage: "READ", lines: extracted.lines.length, ms: timings.lecture });
 
       extraction = extracted;
-      patientName = extracted.patientName.value;
+      // Mode sans patient : le nom lu sur l'ordonnance ne sort pas du lecteur.
+      patientName = patientDataEnabled() ? extracted.patientName.value : null;
       const lues = extracted.lines.length;
       lines = extracted.lines
         .filter((line) => line.drugName.value)

@@ -81,6 +81,7 @@ export function SaleWorkspace({
   identificationChangedSinceAnalysis,
   patientFactors,
   hasSale,
+  patientData = true,
   outcome,
   canImportStock,
   stockNotice,
@@ -118,6 +119,7 @@ export function SaleWorkspace({
   /** Ce qui, dans le dossier du patient, a réellement pesé sur cette analyse. */
   patientFactors: PatientFactor[];
   hasSale: boolean;
+  patientData?: boolean;
   /** Pourquoi il y a — ou non — des propositions, d'après la dernière analyse. */
   outcome: EngineOutcome | null;
   canImportStock: boolean;
@@ -496,6 +498,7 @@ export function SaleWorkspace({
               lines={lines}
               onLineChange={updateLine}
               patients={patients}
+              allowPatient={patientData}
               patientId={patientId}
               onPatientChange={setPatientId}
               prescriberName={prescriberName}
