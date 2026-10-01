@@ -3,37 +3,51 @@
 import { useState } from "react";
 
 /**
- * Le calcul de rentabilité, avec ses hypothèses visibles et modifiables.
- * Aucun chiffre n'est présenté comme une mesure : ce sont les trois nombres
- * que le lecteur règle lui-même. Dans le logiciel, en revanche, la marge est
- * lue sur chaque vente réellement enregistrée.
+ * Rentable en combien de jours ? Deux curseurs, un résultat en gros, et le
+ * mois dessiné jour par jour : les jours qui paient l'abonnement, puis les
+ * jours qui restent à l'officine. Les hypothèses sont visibles et modifiables.
  */
+const DAYS_OPEN = 26;
+
 export function RoiCalculator({ monthlyPriceCents }: { monthlyPriceCents: number }) {
   const [perDay, setPerDay] = useState(5);
   const [marginEuros, setMarginEuros] = useState(4.6);
-  const [daysOpen, setDaysOpen] = useState(26);
-  const dailyMargin = perDay * marginEuros;
-  const monthly = dailyMargin * daysOpen;
   const price = monthlyPriceCents / 100;
-  const daysToCover = dailyMargin > 0 ? Math.ceil(price / dailyMargin) : null;
-  const defaultDays = Math.ceil(price / (5 * 4.6));
+  const dailyMargin = perDay * marginEuros;
+  const daysToCover = Math.max(1, Math.ceil(price / dailyMargin));
+  const monthly = dailyMargin * DAYS_OPEN;
   const fmt = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
   return (
     <div className="rounded-2xl border border-border-subtle bg-surface-card p-6">
-      <p className="text-[15px] font-semibold text-text-primary">Au bout de combien de jours l&apos;abonnement est-il couvert ?</p>
-      <p className="mt-1 text-[13px] leading-5 text-text-secondary">Réglez les trois chiffres avec ceux de votre officine. La marge d&apos;un conseil, PharmaBoost la lit sur chaque vente : prix de vente moins prix d&apos;achat.</p>
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[12.5px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">Rentable en</p>
+          <p className="mt-1 text-[44px] leading-none font-semibold tracking-[-0.03em] text-brand-700 tabular dark:text-brand-400">
+            {daysToCover > DAYS_OPEN ? "plus d'un mois" : `${daysToCover} jour${daysToCover > 1 ? "s" : ""}`}
+          </p>
+        </div>
+        <p className="text-right text-[13px] leading-5 text-text-secondary">
+          Abonnement : <strong className="text-text-primary">{fmt(price)} HT</strong> / mois<br />
+          Marge additionnelle : <strong className="text-text-primary">{fmt(monthly)}</strong> / mois
+        </p>
+      </div>
+
+      <div className="mt-5 grid grid-cols-13 gap-1" aria-label={`Le mois, jour par jour : ${Math.min(daysToCover, DAYS_OPEN)} jours paient l'abonnement, le reste va à l'officine`}>
+        {Array.from({ length: DAYS_OPEN }, (_, i) => (
+          <span key={i} className={i < daysToCover ? "h-7 rounded-md bg-ink-300 dark:bg-ink-600" : "h-7 rounded-md bg-brand-500"} title={i < daysToCover ? "paie l'abonnement" : "pour l'officine"} />
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-4 text-[12px] text-text-secondary">
+        <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-ink-300 dark:bg-ink-600" /> jours qui paient l&apos;abonnement</span>
+        <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-brand-500" /> jours pour l&apos;officine</span>
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Slider label="Conseils acceptés par jour" value={perDay} min={1} max={20} step={1} onChange={setPerDay} format={(v) => `${v}`} />
         <Slider label="Marge moyenne par conseil" value={marginEuros} min={1} max={15} step={0.1} onChange={setMarginEuros} format={(v) => `${v.toFixed(2).replace(".", ",")} €`} />
-        <Slider label="Jours d'ouverture par mois" value={daysOpen} min={20} max={30} step={1} onChange={setDaysOpen} format={(v) => `${v}`} />
       </div>
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <Result label="Marge additionnelle par jour" value={fmt(dailyMargin)} />
-        <Result label="Marge additionnelle par mois" value={fmt(monthly)} />
-        <Result label="Abonnement couvert en" value={daysToCover === null ? "—" : `${daysToCover} jour${daysToCover > 1 ? "s" : ""}`} highlight />
-      </div>
-      <p className="mt-4 text-[12.5px] leading-5 text-text-tertiary">Avec cinq conseils acceptés par jour à 4,60 € de marge, l&apos;abonnement de {fmt(price)} HT est couvert en {defaultDays} jour{defaultDays > 1 ? "s" : ""} d&apos;ouverture. Le reste du mois est pour l&apos;officine.</p>
+      <p className="mt-3 text-[12px] leading-5 text-text-tertiary">Vos chiffres, pas les nôtres : réglez les curseurs. Dans le logiciel, la marge est lue sur chaque vente.</p>
     </div>
   );
 }
@@ -44,14 +58,5 @@ function Slider({ label, value, min, max, step, onChange, format }: { label: str
       <span className="flex items-center justify-between text-[12.5px] text-text-secondary"><span>{label}</span><span className="font-semibold text-text-primary tabular">{format(value)}</span></span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="mt-2 w-full accent-[var(--color-brand-600)]" aria-label={label} />
     </label>
-  );
-}
-
-function Result({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
-  return (
-    <div className={highlight ? "rounded-xl bg-brand-600 px-4 py-3 text-white" : "rounded-xl bg-surface-sunken px-4 py-3"}>
-      <p className={highlight ? "text-[12px] text-brand-100" : "text-[12px] text-text-tertiary"}>{label}</p>
-      <p className="mt-0.5 text-[22px] font-semibold tabular">{value}</p>
-    </div>
   );
 }

@@ -1961,3 +1961,67 @@ Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allow
  GET /decouvrir 200 in 239ms (next.js: 50ms, application-code: 189ms)
  GET /decouvrir 200 in 42ms (next.js: 2ms, application-code: 39ms)
 ✓ Compiled in 66ms
+✓ Compiled in 321ms
+ GET /decouvrir 200 in 107ms (next.js: 6ms, application-code: 101ms)
+✓ Compiled in 74ms
+ GET /decouvrir 200 in 44ms (next.js: 2ms, application-code: 42ms)
+⨯ ./src/app/(public)/decouvrir/page.tsx:96:15
+Error: Expected '</', got 'jsx text'
+  [90m 94 |[0m           <[33mToastMock[0m className=[32m"mx-auto w-full max-w-lg pb-6"[0m />
+  [90m 95 |[0m           </div>
+[31m[1m>[0m [90m 96 |[0m         </div>
+  [90m    |[0m               [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m 97 |[0m       </[33mSection[0m>
+  [90m    |[0m [31m[1m^^^^^^[0m
+  [90m 98 |[0m
+  [90m 99 |[0m       {[90m/* ---- Sans ordonnance ---------------------------------------- */[0m}
+  [90m100 |[0m       <[33mSection[0m
+
+Parsing ecmascript source code failed
+
+
+ GET /decouvrir 500 in 748ms (next.js: 577ms, application-code: 171ms)
+[browser] ./src/app/(public)/decouvrir/page.tsx:96:15
+Error: Expected '</', got 'jsx text'
+   94 |           <ToastMock className="mx-auto w-full max-w-lg pb-6" />
+   95 |           </div>
+>  96 |         </div>
+      |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  97 |       </Section>
+      | ^^^^^^
+   98 |
+   99 |       {/* ---- Sans ordonnance ---------------------------------------- */}
+  100 |       <Section
+
+Parsing ecmascript source code failed 
+[browser] Uncaught Error: ./src/app/(public)/decouvrir/page.tsx:96:15
+Error: Expected '</', got 'jsx text'
+   94 |           <ToastMock className="mx-auto w-full max-w-lg pb-6" />
+   95 |           </div>
+>  96 |         </div>
+      |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  97 |       </Section>
+      | ^^^^^^
+   98 |
+   99 |       {/* ---- Sans ordonnance ---------------------------------------- */}
+  100 |       <Section
+
+Parsing ecmascript source code failed
+
+
+    at <unknown> (Error: ./src/app/(public)/decouvrir/page.tsx:96:15)
+    at <unknown> (Error: (./src/app/(public)/decouvrir/page.tsx:96:15)
+[browser] ./src/app/(public)/decouvrir/page.tsx:96:15
+Error: Expected '</', got 'jsx text'
+   94 |           <ToastMock className="mx-auto w-full max-w-lg pb-6" />
+   95 |           </div>
+>  96 |         </div>
+      |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  97 |       </Section>
+      | ^^^^^^
+   98 |
+   99 |       {/* ---- Sans ordonnance ---------------------------------------- */}
+  100 |       <Section
+
+Parsing ecmascript source code failed 
+ GET /decouvrir 200 in 628ms (next.js: 235ms, application-code: 393ms)

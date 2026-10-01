@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Barcode, Check, FileText, MessageCircleQuestion, ScanLine, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, Barcode, Check, FileText } from "lucide-react";
 import { Feature, Section } from "./_components/site-shell";
 import { PilotMock, RequestMock, SafetyMock, ToastMock } from "./_components/mockups";
 import { loadLiveProof, loadPublicOffer } from "@/server/services/site-leads";
@@ -57,7 +57,20 @@ export default async function SitePage() {
               ))}
             </ul>
           </div>
-          <ToastMock className="mx-auto w-full max-w-lg pb-6" />
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {[
+              { n: "0", t: "second scan", d: "La douchette de votre logiciel suffit." },
+              { n: "2 min", t: "par poste", d: "Une ligne à coller, sans visite." },
+              { n: "100 %", t: "des conseils vérifiés", d: "Sécurité et réglementation d'abord." },
+              { n: "1 €", t: "= 1 € constaté", d: "Le tableau de bord lit vos ventes." },
+            ].map((item) => (
+              <li key={item.t} className="rounded-2xl border border-border-subtle bg-surface-card p-5">
+                <p className="text-[30px] leading-none font-semibold tracking-[-0.02em] text-brand-700 tabular dark:text-brand-400">{item.n}</p>
+                <p className="mt-1.5 text-[14px] font-semibold text-text-primary">{item.t}</p>
+                <p className="text-[13px] text-text-secondary">{item.d}</p>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
@@ -71,32 +84,14 @@ export default async function SitePage() {
         lede="Le programme installé sur le poste écoute la douchette de votre logiciel. Chaque boîte ouvre la vente dans PharmaBoost, l'analyse se lance, et l'avis s'affiche par-dessus votre logiciel, sans lui prendre le clavier."
         tone="sunken"
       >
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <ul className="space-y-5">
-            <Feature title="Jusqu'à trois conseils, avec le prix et la raison" body="Le produit, son prix, et pourquoi il aide ce patient avec ce traitement. La phrase à dire est prête." />
+            <Feature title="Jusqu'à trois conseils, avec le prix, la marge et la raison" body="Le produit, son prix, et pourquoi il aide ce patient avec ce traitement. La phrase à dire est prête." />
             <Feature title="Les alertes passent avant les conseils" body="Une interaction, une contre-indication ou une ordonnance d'exception s'affichent en premier. On ne vend rien par-dessus une alerte non lue." />
             <Feature title="Discret, non bloquant" body="L'encart s'efface seul après quinze secondes. Un clic l'ouvre en détail dans PharmaBoost, sur le second écran ou le même." />
             <Feature title="Plusieurs boîtes, une seule vente" body="Les boîtes bipées pour un même client se regroupent. « Nouveau patient » remet l'écran à zéro en un clic." />
           </ul>
-          <div className="rounded-2xl border border-border-subtle bg-surface-app p-6">
-            <p className="text-[12.5px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">Ce qui se passe, dans l&apos;ordre</p>
-            <ol className="mt-4 space-y-4">
-              {[
-                { icon: ScanLine, t: "La boîte est bipée dans votre logiciel", d: "Le code CIP ou EAN, et rien d'autre, part vers PharmaBoost." },
-                { icon: ShieldCheck, t: "Le traitement est vérifié", d: "Interactions, terrain du patient, vigilances, statut réglementaire." },
-                { icon: Store, t: "Le stock est consulté", d: "Seules les références réellement en rayon peuvent être proposées." },
-                { icon: MessageCircleQuestion, t: "L'avis s'affiche à l'écran", d: "Le pharmacien accepte, modifie ou écarte. La décision est tracée." },
-              ].map((step, index) => (
-                <li key={step.t} className="flex gap-3">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300"><step.icon className="size-4" /></span>
-                  <div>
-                    <p className="text-[14px] font-semibold text-text-primary">{index + 1}. {step.t}</p>
-                    <p className="text-[13px] leading-5 text-text-secondary">{step.d}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
+          <ToastMock className="mx-auto w-full max-w-lg pb-6" />
         </div>
       </Section>
 
