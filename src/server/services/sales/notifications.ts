@@ -30,3 +30,11 @@ export async function markSalesNotificationsRead(salesRepId: string): Promise<vo
 export async function listAdminNotifications(limit = 30) {
   return prisma.extranetNotification.findMany({ where: { audience: "ADMIN" }, orderBy: { createdAt: "desc" }, take: limit });
 }
+
+export async function countUnreadAdminNotifications(): Promise<number> {
+  return prisma.extranetNotification.count({ where: { audience: "ADMIN", readAt: null } });
+}
+
+export async function markAdminNotificationsRead(): Promise<void> {
+  await prisma.extranetNotification.updateMany({ where: { audience: "ADMIN", readAt: null }, data: { readAt: new Date() } });
+}

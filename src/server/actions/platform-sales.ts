@@ -5,8 +5,11 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { createSalesRep, sendSalesInvitation, updateSalesRep } from "@/server/services/sales/reps";
-import { reassignProspect, setProspectBlocked, setProspectStatus, addProspectNote } from "@/server/services/sales/prospects";
-import { applySignatureStatus, refreshContractSignatureStatus, sendContract, upsertCompanyProfile } from "@/server/services/sales/contracts";
+import { reassignProspect, setProspectBlocked, setProspectStatus, addProspectNote, createProspect, updateProspect } from "@/server/services/sales/prospects";
+import { applySignatureStatus, refreshContractSignatureStatus, runContractReminders, sendContract, startContracting, upsertCompanyProfile } from "@/server/services/sales/contracts";
+import { saveReminderPolicy } from "@/server/services/platform-settings";
+import { markAdminNotificationsRead } from "@/server/services/sales/notifications";
+import { shouldApplySignatureStatus } from "@/core/signature";
 import { CONTRACT_STATUS_LABELS } from "@/core/sales/pipeline";
 import { updateCommission } from "@/server/services/sales/commissions";
 import { createPharmacyFromProspect } from "@/server/services/sales/client-pharmacies";
@@ -102,11 +105,13 @@ export async function recordOfflineSignatureAction(payload: { prospectId: string
   const session = await requirePlatformSession();
   const reason = payload.reason.trim();
   if (reason.length < 5) return fail("Indiquez comment la signature a été reçue (au moins 5 caractères).");
-  const contract = await prisma.contract.findUnique({ where: { id: payload.contractId }, select: { prospectId: true, status: true } });
+  const contract = await prisma.contract.findUnique({ where: { id: payload.contractId }, select: { prospectId: true, status: true, providerEnvelopeId: true } });
   if (!contract || contract.prospectId !== payload.prospectId) return fail("Contrat introuvable.");
   if (contract.status === "DRAFT") return fail("Ce contrat n'a pas encore été envoyé.");
   if (contract.status === "FINALIZED") return fail("Ce contrat est déjà finalisé.");
-  await prisma.contract.update({ where: { id: payload.contractId }, data: { signatureProvider: "offline" } });
+  if (!shouldApplySignatureStatus(contract.status, payload.status)) return fail("Ce statut ferait reculer le contrat.");
+  // Une demande de signature électronique en cours reste la référence : on ne l'écrase pas par « hors ligne ».
+  if (!contract.providerEnvelopeId) await prisma.contract.update({ where: { id: payload.contractId }, data: { signatureProvider: "offline" } });
   await applySignatureStatus(payload.contractId, payload.status, { type: "ADMIN", id: session.admin.id, label: session.admin.fullName }, `signature hors ligne — ${reason}`);
   revalidatePath(`/admin/dossiers/${payload.prospectId}`);
   return ok(null, "Statut du contrat enregistré.");
@@ -124,6 +129,8 @@ export async function refreshSignatureStatusAction(payload: { prospectId: string
 
 export async function adminResendContractAction(payload: { prospectId: string; contractId: string }): Promise<ActionResult<null>> {
   const session = await requirePlatformSession();
+  const owned = await prisma.contract.findUnique({ where: { id: payload.contractId }, select: { prospectId: true } });
+  if (!owned || owned.prospectId !== payload.prospectId) return fail("Contrat introuvable.");
   const result = await sendContract(payload.contractId, { type: "ADMIN", id: session.admin.id, label: session.admin.fullName });
   if (!result.ok) return fail(result.error);
   revalidatePath(`/admin/dossiers/${payload.prospectId}`);
@@ -177,4 +184,94 @@ export async function saveCompanyProfileAction(payload: z.input<typeof companySc
   await upsertCompanyProfile(parsed.data, session.admin.id);
   revalidatePath("/admin/societe");
   return ok(null, "Société enregistrée.");
+}
+
+// ---- Parcours contractuel (console) -------------------------------------------
+
+const adminProspectSchema = z.object({
+  name: z.string().trim().min(2, "Le nom de la pharmacie est requis.").max(120),
+  legalName: z.string().trim().max(160).optional().nullable(),
+  siret: z.string().trim().max(30).optional().nullable(),
+  finessNumber: z.string().trim().max(20).optional().nullable(),
+  addressLine1: z.string().trim().max(200).optional().nullable(),
+  postalCode: z.string().trim().max(10).optional().nullable(),
+  city: z.string().trim().max(120).optional().nullable(),
+  phone: z.string().trim().max(30).optional().nullable(),
+  ownerName: z.string().trim().max(120).optional().nullable(),
+  ownerTitle: z.string().trim().max(80).optional().nullable(),
+  email: z.string().trim().toLowerCase().email("Adresse e-mail invalide.").optional().nullable().or(z.literal("")),
+  outletCount: z.coerce.number().int().min(1).max(500).optional().nullable(),
+  notes: z.string().trim().max(4000).optional().nullable(),
+  salesRepId: z.string().optional().nullable(),
+});
+
+/** Un dossier créé depuis la console : prospect, démonstration ou dossier en préparation. Aucun contrat ne part. */
+export async function adminCreateProspectAction(payload: z.input<typeof adminProspectSchema>): Promise<ActionResult<{ prospectId: string }>> {
+  const session = await requirePlatformSession();
+  const parsed = adminProspectSchema.safeParse(payload);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));
+  const { salesRepId, ...input } = parsed.data;
+  const rep = salesRepId ? await prisma.salesRep.findFirst({ where: { id: salesRepId, isActive: true }, select: { id: true } }) : null;
+  const { id } = await createProspect({ ...input, email: input.email || null }, rep?.id ?? null, { type: "ADMIN", id: session.admin.id, label: session.admin.fullName }, "SUPER_ADMIN");
+  revalidatePath("/admin/pipeline");
+  return ok({ prospectId: id }, "Dossier créé. Aucun contrat n'a été envoyé.");
+}
+
+export async function adminUpdateProspectAction(payload: Partial<z.input<typeof adminProspectSchema>> & { prospectId: string }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const parsed = adminProspectSchema.partial().safeParse(payload);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));
+  const { salesRepId: _ignored, ...input } = parsed.data;
+  void _ignored;
+  const result = await updateProspect(payload.prospectId, { ...input, ...(input.email !== undefined ? { email: input.email || null } : {}) }, { type: "ADMIN", id: session.admin.id, label: session.admin.fullName });
+  if (!result.ok) return fail(result.error);
+  revalidatePath(`/admin/dossiers/${payload.prospectId}`);
+  return ok(null, "Dossier mis à jour.");
+}
+
+const adminStartSchema = z.object({
+  prospectId: z.string().min(1),
+  planId: z.string().optional().nullable(),
+  monthlyPriceCents: z.coerce.number().int().min(100).max(10_000_000).optional().nullable(),
+  durationMonths: z.coerce.number().int().min(1).max(60).optional().nullable(),
+  startDate: z.string().min(8).optional().nullable(),
+});
+
+/** « Envoyer le contrat » depuis la console : le même moteur que le site et l'extranet. */
+export async function adminStartContractingAction(payload: z.input<typeof adminStartSchema>): Promise<ActionResult<{ outcome: string }>> {
+  const session = await requirePlatformSession();
+  const parsed = adminStartSchema.safeParse(payload);
+  if (!parsed.success) return fail("Vérifiez les conditions du contrat.", zodFieldErrors(parsed.error.issues));
+  const result = await startContracting(parsed.data.prospectId, { type: "ADMIN", id: session.admin.id, label: session.admin.fullName }, {
+    planId: parsed.data.planId || null,
+    monthlyPriceCents: parsed.data.monthlyPriceCents ?? null,
+    durationMonths: parsed.data.durationMonths ?? null,
+    startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
+  });
+  revalidatePath(`/admin/dossiers/${parsed.data.prospectId}`);
+  revalidatePath("/admin/pipeline");
+  if (!result.ok) return fail(result.error, Object.fromEntries((result.missing ?? []).map((m) => [m.field, m.reason === "invalid" ? `${m.label} invalide` : `${m.label} requis`])));
+  return ok({ outcome: result.outcome }, result.message);
+}
+
+/** La cadence des relances, modifiable sans toucher au code. */
+export async function saveReminderPolicyAction(payload: { enabled: boolean; firstAfterDays: number; secondAfterDays: number; escalateAfterDays: number }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const policy = await saveReminderPolicy(payload, session.admin.id);
+  revalidatePath("/admin/societe");
+  return ok(null, policy.enabled ? `Relances enregistrées : J+${policy.firstAfterDays}${policy.secondAfterDays ? `, puis +${policy.secondAfterDays} j` : ""}${policy.escalateAfterDays ? `, signalement +${policy.escalateAfterDays} j` : ""}.` : "Relances automatiques désactivées.");
+}
+
+/** Lance le passage des relances immédiatement (sans attendre la tâche planifiée). */
+export async function runRemindersNowAction(): Promise<ActionResult<null>> {
+  await requirePlatformSession();
+  const report = await runContractReminders();
+  return ok(null, `${report.checked} contrat(s) en attente vérifié(s) : ${report.reminded} relance(s), ${report.escalated} signalement(s), ${report.expired} expiré(s)${report.errors.length ? `, ${report.errors.length} erreur(s)` : ""}.`);
+}
+
+export async function markAdminNotificationsReadAction(): Promise<ActionResult<null>> {
+  await requirePlatformSession();
+  await markAdminNotificationsRead();
+  revalidatePath("/admin/notifications");
+  return ok(null, "Notifications marquées comme lues.");
 }

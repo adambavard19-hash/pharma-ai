@@ -8,17 +8,18 @@ const ITEMS = [
   { href: "/admin/pharmacies", label: "Officines clientes" },
   { href: "/admin/abonnements", label: "Abonnements & Contrats" },
   { href: "/admin/pipeline", label: "Pipeline" },
+  { href: "/admin/notifications", label: "Notifications" },
   { href: "/admin/commerciaux", label: "Commerciaux" },
   { href: "/admin/equipe", label: "Équipe PharmaBoost" },
   { href: "/admin/societe", label: "Société" },
   { href: "/admin", label: "Vue plateforme" },
 ];
 
-export function AdminNav() {
+export function AdminNav({ unread = 0 }: { unread?: number }) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-1" aria-label="Sections de la console">
+    <nav className="flex flex-wrap gap-1" aria-label="Sections de la console">
       {ITEMS.map((item) => {
         const active =
           item.href === "/admin"
@@ -36,6 +37,7 @@ export function AdminNav() {
             )}
           >
             {item.label}
+            {item.href === "/admin/notifications" && unread > 0 && <span className="ml-1.5 rounded-full bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold text-white tabular">{unread}</span>}
           </Link>
         );
       })}

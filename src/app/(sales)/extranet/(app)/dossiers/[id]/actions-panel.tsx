@@ -2,35 +2,27 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, CalendarClock, FileText, MessageSquare, Send } from "lucide-react";
-import { addNoteAction, addTaskAction, createPharmacyFromProspectAction, generateContractAction, sendContractAction, setProspectStatusAction, updateProspectAction } from "@/server/actions/extranet";
+import { CalendarClock, MessageSquare } from "lucide-react";
+import { addNoteAction, addTaskAction, setProspectStatusAction } from "@/server/actions/extranet";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input, Textarea } from "@/components/ui/field";
 import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { MANUAL_STATUSES, PROSPECT_STATUS_LABELS, type ProspectStatusCode } from "@/core/sales/pipeline";
 import { cn } from "@/lib/utils";
 
-type ContractView = { id: string; version: number; status: string };
-
 /**
  * Les gestes du commercial sur un dossier, pensés pour le pouce : changer
  * l'étape en une pression, noter en trois mots, relancer avec un préréglage,
- * générer puis envoyer le contrat, créer l'espace quand le contrat est signé.
+ * le contrat se gère dans son propre panneau (moteur commun).
  */
-export function SalesActionsPanel({ prospect }: { prospect: { id: string; status: string; blocked: boolean; contracts: ContractView[]; pharmacyId: string | null; monthlyPriceCents: number | null; ownerName: string | null; email: string | null; addressLine1: string | null; city: string | null } }) {
+export function SalesActionsPanel({ prospect }: { prospect: { id: string; status: string; blocked: boolean } }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [taskLabel, setTaskLabel] = useState("Relancer");
   const [taskDate, setTaskDate] = useState("");
-  const [price, setPrice] = useState(prospect.monthlyPriceCents ? (prospect.monthlyPriceCents / 100).toFixed(2).replace(".", ",") : "249,00");
-  const [duration, setDuration] = useState("12");
-  const [start, setStart] = useState(() => new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10));
-  const [showContract, setShowContract] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [edit, setEdit] = useState({ ownerName: prospect.ownerName ?? "", email: prospect.email ?? "", addressLine1: prospect.addressLine1 ?? "", city: prospect.city ?? "" });
   const router = useRouter();
   const { push } = useToast();
 
@@ -48,10 +40,6 @@ export function SalesActionsPanel({ prospect }: { prospect: { id: string; status
   };
 
   const current = prospect.status as ProspectStatusCode;
-  const contract = prospect.contracts[0] ?? null;
-  const contractInProgress = contract && ["SENT", "OPENED", "SIGNED_PHARMACY", "SIGNED_COMPANY"].includes(contract.status);
-  const finalized = contract?.status === "FINALIZED";
-  const canGenerate = !prospect.blocked && !contractInProgress && !finalized && !prospect.pharmacyId;
   const pickDays = (days: number) => { const d = new Date(); d.setDate(d.getDate() + days); setTaskDate(d.toISOString().slice(0, 10)); };
 
   return (
@@ -94,61 +82,6 @@ export function SalesActionsPanel({ prospect }: { prospect: { id: string; status
         </CardContent></Card>
       </div>
 
-      {/* Contrat */}
-      <Card>
-        <CardHeader title={contract ? `Contrat v${contract.version}` : "Contrat"} description={finalized ? "Signé par les deux parties." : contractInProgress ? "En attente de signature." : "Généré depuis le modèle PharmaBoost avec les informations du dossier et de la société."} />
-        <CardContent className="space-y-3">
-          {!contract || contract.status === "DRAFT" ? (
-            <>
-              {(!prospect.ownerName || !prospect.email || !prospect.addressLine1 || !prospect.city) && !showEdit && (
-                <Alert tone="warning" title="Informations manquantes pour le contrat">
-                  Nom du titulaire, e-mail, adresse et ville sont requis. <button type="button" className="font-medium underline underline-offset-2" onClick={() => setShowEdit(true)}>Compléter</button>
-                </Alert>
-              )}
-              {prospect.ownerName && prospect.email && prospect.addressLine1 && prospect.city && !showEdit && !contract && (
-                <p className="text-[13px] text-text-secondary">
-                  Signataire : {prospect.ownerName} · {prospect.email}. <button type="button" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400" onClick={() => setShowEdit(true)}>Modifier les coordonnées</button>
-                </p>
-              )}
-              {showEdit && (
-                <div className="grid gap-3 rounded-lg border border-border-subtle p-3 sm:grid-cols-2">
-                  <Field label="Titulaire" htmlFor="e-owner" required><Input id="e-owner" value={edit.ownerName} onChange={(e) => setEdit({ ...edit, ownerName: e.target.value })} /></Field>
-                  <Field label="E-mail du titulaire" htmlFor="e-email" required><Input id="e-email" type="email" value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} /></Field>
-                  <Field label="Adresse" htmlFor="e-addr" required><Input id="e-addr" value={edit.addressLine1} onChange={(e) => setEdit({ ...edit, addressLine1: e.target.value })} /></Field>
-                  <Field label="Ville" htmlFor="e-city" required><Input id="e-city" value={edit.city} onChange={(e) => setEdit({ ...edit, city: e.target.value })} /></Field>
-                  <div className="sm:col-span-2"><Button size="sm" loading={pending} onClick={() => run(async () => { const r = await updateProspectAction({ prospectId: prospect.id, ...edit }); if (r.ok) setShowEdit(false); return r; })}>Enregistrer</Button></div>
-                </div>
-              )}
-              {canGenerate && !contract && !showContract && <Button variant="outline" onClick={() => setShowContract(true)} leadingIcon={<FileText className="size-4" />}>Préparer le contrat</Button>}
-              {canGenerate && !contract && showContract && (
-                <div className="grid gap-3 rounded-lg border border-border-subtle p-3 sm:grid-cols-3">
-                  <Field label="Abonnement mensuel HT" htmlFor="c-price" required><Input id="c-price" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
-                  <Field label="Durée (mois)" htmlFor="c-duration" required><Input id="c-duration" type="number" min={1} max={60} value={duration} onChange={(e) => setDuration(e.target.value)} /></Field>
-                  <Field label="Début" htmlFor="c-start" required><Input id="c-start" type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
-                  <div className="sm:col-span-3"><Button loading={pending} leadingIcon={<FileText className="size-4" />} onClick={() => run(() => generateContractAction({ prospectId: prospect.id, monthlyPriceCents: Math.round(Number(price.replace(",", ".")) * 100), durationMonths: Number(duration), startDate: start }))}>Générer le contrat</Button></div>
-                </div>
-              )}
-              {contract && contract.status === "DRAFT" && (
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild variant="outline"><a href={`/api/contrats/apercu/${contract.id}`} target="_blank" rel="noreferrer">Relire le PDF</a></Button>
-                  <Button loading={pending} leadingIcon={<Send className="size-4" />} onClick={() => run(() => sendContractAction({ prospectId: prospect.id, contractId: contract.id }))}>Envoyer le contrat au titulaire</Button>
-                </div>
-              )}
-            </>
-          ) : contractInProgress ? (
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline"><a href={`/api/contrats/apercu/${contract.id}`} target="_blank" rel="noreferrer">Voir le PDF</a></Button>
-              <Button variant="outline" loading={pending} leadingIcon={<Send className="size-4" />} onClick={() => run(() => sendContractAction({ prospectId: prospect.id, contractId: contract.id }))}>Renvoyer le lien</Button>
-            </div>
-          ) : finalized && !prospect.pharmacyId ? (
-            <Button loading={pending} leadingIcon={<Building2 className="size-[18px]" />} onClick={() => run(() => createPharmacyFromProspectAction(prospect.id))}>Créer l&apos;espace pharmacie</Button>
-          ) : prospect.pharmacyId ? (
-            <p className="text-[13.5px] text-text-secondary">Espace pharmacie créé. Le titulaire a reçu son e-mail d&apos;accueil.</p>
-          ) : (
-            <p className="text-[13.5px] text-text-secondary">Contrat clos ({contract.status.toLowerCase()}). {canGenerate && <button type="button" className="text-brand-700 underline underline-offset-2 dark:text-brand-400" onClick={() => setShowContract(true)}>Préparer un nouveau contrat</button>}</p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

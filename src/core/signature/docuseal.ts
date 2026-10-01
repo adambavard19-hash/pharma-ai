@@ -80,6 +80,7 @@ export class DocusealSignatureProvider implements SignatureProvider {
           name: `${signer.firstName} ${signer.lastName}`.trim(),
           email: signer.email,
           external_id: `${input.reference}:${signer.role}`,
+          send_email: signer.notify !== false,
         })),
       }),
     });

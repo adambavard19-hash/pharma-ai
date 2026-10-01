@@ -88,8 +88,8 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
  * annoncé (voir FALLBACK_OFFER sur la page) : les offres de la grille
  * interne ne s'affichent pas au public par accident.
  */
-export async function loadPublicOffer(): Promise<{ name: string; description: string; monthlyPriceCents: number; trialDays: number } | null> {
-  const plan = await prisma.plan.findFirst({ where: { isActive: true, isDefault: true }, orderBy: { createdAt: "asc" }, select: { name: true, description: true, monthlyPriceCents: true, trialDays: true } });
+export async function loadPublicOffer(): Promise<{ id: string; name: string; description: string; monthlyPriceCents: number; trialDays: number } | null> {
+  const plan = await prisma.plan.findFirst({ where: { isActive: true, isDefault: true }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, description: true, monthlyPriceCents: true, trialDays: true } });
   return plan;
 }
 

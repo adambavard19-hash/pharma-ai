@@ -32,7 +32,11 @@ export default async function ContractPage({ params }: { params: Promise<{ token
           {status !== "FINALIZED" && contract.signatureProvider === "none" && (
             <p className="mt-3 rounded-lg bg-[#fff7ed] px-3.5 py-2.5 text-[13.5px] leading-5 text-[#9a3412]">La signature électronique vous sera proposée dans un second temps. D&apos;ici là, lisez le contrat et contactez votre interlocuteur pour toute question.</p>
           )}
-          <a href={`/api/contrats/${token}`} className="mt-4 inline-flex rounded-xl bg-[#0F766E] px-5 py-3 text-[15px] font-semibold text-white">Télécharger le PDF</a>
+          {status === "FINALIZED" && <p className="mt-3 rounded-lg bg-[#f0faf8] px-3.5 py-2.5 text-[13.5px] leading-5 text-[#0b5c56]">Contrat signé par les deux parties{contract.finalizedAt ? ` le ${formatDate(contract.finalizedAt)}` : ""}. Le document ci-dessous est la version signée.</p>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {contract.pharmacySigningUrl && (status === "SENT" || status === "OPENED") && <a href={contract.pharmacySigningUrl} className="inline-flex rounded-xl bg-[#0F766E] px-5 py-3 text-[15px] font-semibold text-white">Signer le contrat</a>}
+            <a href={`/api/contrats/${token}`} className={contract.pharmacySigningUrl && (status === "SENT" || status === "OPENED") ? "inline-flex rounded-xl border border-[#cbd5e1] px-5 py-3 text-[15px] font-semibold text-[#0F172A]" : "inline-flex rounded-xl bg-[#0F766E] px-5 py-3 text-[15px] font-semibold text-white"}>{status === "FINALIZED" ? "Télécharger le contrat signé" : "Télécharger le PDF"}</a>
+          </div>
         </header>
         <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
           <iframe title="Contrat" src={`/api/contrats/${token}#toolbar=0`} className="h-[80vh] w-full" />

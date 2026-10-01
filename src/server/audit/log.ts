@@ -124,7 +124,11 @@ export type AuditAction =
   | "sales.contract_event"
   | "sales.pharmacy_created"
   | "sales.commission_updated"
-  | "sales.company_profile_updated";
+  | "sales.company_profile_updated"
+  | "sales.signature_webhook"
+  | "sales.contract_reminder"
+  | "sales.subscription_requested"
+  | "platform.setting_updated";
 
 export async function recordAudit(params: {
   action: AuditAction;
