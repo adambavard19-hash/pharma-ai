@@ -31,7 +31,7 @@ export default async function StockConnectionPage() {
         <Link href="/stock">Retour au stock</Link>
       </Button>
       <p className="rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-2.5 text-[13px] text-text-secondary dark:border-brand-800 dark:bg-brand-950/30">
-        Première fois ? <Link href="/bienvenue?etape=2" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">L&apos;assistant pas à pas</Link> vous montre où cliquer dans votre logiciel, puis attend l&apos;agent avec vous.
+        Première fois ? <Link href="/installation" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Le guide de mise en service</Link> vous dit quoi faire, où cliquer, et quoi faire si ça bloque — poste de comptoir compris.
       </p>
       <PageHeader
         title="Connecter mon logiciel"

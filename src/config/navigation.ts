@@ -7,8 +7,7 @@ import {
   Settings,
   Users,
   UsersRound,
-  type LucideIcon,
-} from "lucide-react";
+  type LucideIcon, Rocket } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 
 /**
@@ -65,6 +64,14 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.PATIENT_VIEW,
     match: ["/patients"],
     description: "Fiches, historique et consentements",
+  },
+  {
+    href: "/installation",
+    label: "Mise en service",
+    icon: Rocket,
+    permission: PERMISSIONS.PRODUCT_IMPORT,
+    match: ["/installation"],
+    description: "Les cinq étapes, pas à pas, et l'aide si ça bloque",
   },
   {
     href: "/stock",

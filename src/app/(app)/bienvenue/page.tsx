@@ -226,7 +226,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
             <div className="rounded-xl border border-brand-200 bg-brand-50/40 px-4 py-3 text-[13.5px] leading-5 dark:border-brand-800 dark:bg-brand-950/20">
               <p className="font-medium text-text-primary">Dernier geste, sur chaque poste de comptoir : relier la douchette.</p>
               <p className="mt-1 text-text-secondary">Une ligne à coller dans PowerShell, deux minutes par poste, sans toucher au serveur. Ensuite, chaque boîte bipée dans votre logiciel ouvre le conseil sur l&apos;écran.</p>
-              <Link href="/stock/connexion" className="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Relier mes postes de caisse</Link>
+              <Link href="/installation" className="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Ouvrir le guide de mise en service</Link>
             </div>
             <FinishButton />
           </CardContent>
