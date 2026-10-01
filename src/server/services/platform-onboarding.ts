@@ -4,6 +4,7 @@ import { publicUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
 import { buildInstallationGuideEmail } from "@/core/platform/onboarding-emails";
 import { DEFAULT_CONTACT_EMAIL } from "@/server/services/site-leads";
+import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 
 /**
  * Le guide d'installation, envoyé au titulaire : automatiquement quand son
@@ -19,12 +20,18 @@ export async function sendInstallationGuide(pharmacyId: string, actor: { adminId
   const owner = pharmacy.memberships[0]?.user;
   const to = owner?.email ?? pharmacy.email;
   if (!to) return { status: "FAILED", detail: "Aucune adresse e-mail pour le titulaire.", sentTo: null };
-  const company = await prisma.companyProfile.findUnique({ where: { id: "default" }, select: { representativeEmail: true } });
+  const [company, connection] = await Promise.all([
+    prisma.companyProfile.findUnique({ where: { id: "default" }, select: { representativeEmail: true } }),
+    prisma.stockConnection.findUnique({ where: { pharmacyId }, select: { lgo: true } }),
+  ]);
+  const lgo = connection ? LGO_DEFINITIONS.find((item) => item.id === connection.lgo) ?? null : null;
   const message = buildInstallationGuideEmail({
     ownerName: owner ? `${owner.firstName} ${owner.lastName}` : pharmacy.name,
     pharmacyName: pharmacy.name,
     appUrl: publicUrl("/"),
     contactEmail: company?.representativeEmail ?? DEFAULT_CONTACT_EMAIL,
+    lgoLabel: lgo && lgo.id !== "autre" ? lgo.label : null,
+    exportSteps: lgo?.exportSteps ?? [],
   });
   const outcome = await getMessagingProvider().sendEmail({ to, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
   await recordAudit({ action: "pharmacy.install_guide_sent", entityType: "Pharmacy", entityId: pharmacy.id, pharmacyId: pharmacy.id, platformAdminId: actor.adminId ?? null, metadata: { status: outcome.status, reason: actor.reason, provider: outcome.provider } });

@@ -97,8 +97,8 @@ export const LGO_DEFINITIONS: LgoDefinition[] = [
     exportSteps: [
       "Dans LGPI, ouvrez le module Inventaire, puis Édition.",
       "Dans « Saisie des critères d'édition », choisissez « Prix de vente » comme prix de référence, sur l'ensemble du stock.",
-      `Aperçu, puis enregistrez l'édition en PDF dans ${DEFAULT_EXPORT_PATH} — le nom du fichier n'a pas d'importance.`,
-      "PharmaBoost Connect envoie le fichier dans la minute. Refaites cette édition quand le stock doit être rafraîchi, chaque matin par exemple.",
+      "Enregistrez (F9) l'édition en PDF dans le dossier d'export indiqué dans PharmaBoost, sous le poste relié (un dossier partagé visible depuis ce poste) — le nom du fichier n'a pas d'importance.",
+      "PharmaBoost relit le fichier dans la minute. Refaites cette édition quand le stock doit être rafraîchi, chaque matin par exemple ; les ventes, elles, se déduisent à chaque bip.",
     ],
   },
   { id: "smart-rx", label: "Smart Rx", editor: "Cegedim", adapter: "GENERIC", ...GENERIC_EXPORT },

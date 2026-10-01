@@ -1334,3 +1334,11 @@ Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allow
  GET /decouvrir 200 in 189ms (next.js: 13ms, application-code: 176ms)
  GET /decouvrir 200 in 398ms (next.js: 143ms, application-code: 255ms)
  GET /decouvrir 200 in 112ms (next.js: 5ms, application-code: 107ms)
+ GET /decouvrir 200 in 71ms (next.js: 3ms, application-code: 68ms)
+ GET /decouvrir 200 in 50ms (next.js: 4ms, application-code: 46ms)
+ GET /admin/pharmacies 200 in 284ms (next.js: 94ms, application-code: 190ms)
+ POST /admin/pharmacies 200 in 732ms (next.js: 3ms, application-code: 729ms)
+  └─ ƒ createClientPharmacyAction({"addressLine1":"","brandColor":"#0F766E","city":"Lyon","...":"10 items not stringified"}) in 609ms src/server/actions/platform-pharmacies.ts
+ GET /admin/pharmacies/cmupmbwtz000osvmswfq2vt6t 200 in 84ms (next.js: 28ms, application-code: 56ms)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+ GET /admin/pharmacies/cmupmbwtz000osvmswfq2vt6t 200 in 61ms (next.js: 10ms, application-code: 51ms)

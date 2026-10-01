@@ -1,3 +1,4 @@
+import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 import "server-only";
 import { prisma } from "@/server/db/client";
 import { generateToken, hashToken } from "@/server/security/tokens";
@@ -36,10 +37,22 @@ export async function sendUserPasswordLink(
       id: true,
       email: true,
       firstName: true,
-      memberships: { where: { isActive: true }, take: 1, select: { pharmacy: { select: { name: true } } } },
+      memberships: { where: { isActive: true }, take: 1, select: { pharmacy: { select: { id: true, name: true } } } },
     },
   });
   const { url, expiresAt } = await issueUserPasswordLink(user.id);
+  // Au premier accès, le message porte aussi la mise en service, avec les
+  // étapes d'export propres au logiciel de l'officine quand il est connu.
+  let onboarding: { lgoLabel: string | null; exportSteps: string[]; contactEmail: string } | null = null;
+  if (kind === "welcome") {
+    const pharmacyId = user.memberships[0]?.pharmacy.id ?? null;
+    const [connection, company] = await Promise.all([
+      pharmacyId ? prisma.stockConnection.findUnique({ where: { pharmacyId }, select: { lgo: true } }) : null,
+      prisma.companyProfile.findUnique({ where: { id: "default" }, select: { representativeEmail: true } }),
+    ]);
+    const lgo = connection ? LGO_DEFINITIONS.find((item) => item.id === connection.lgo) ?? null : null;
+    onboarding = { lgoLabel: lgo && lgo.id !== "autre" ? lgo.label : null, exportSteps: lgo?.exportSteps ?? [], contactEmail: company?.representativeEmail ?? "contact@pharmaboost.app" };
+  }
   const message = buildUserPasswordEmail({
     firstName: user.firstName,
     pharmacyName: user.memberships[0]?.pharmacy.name ?? null,
@@ -47,6 +60,7 @@ export async function sendUserPasswordLink(
     loginUrl: publicUrl("/login"),
     expiresAt,
     kind,
+    onboarding,
   });
   const outcome = await getMessagingProvider().sendEmail({
     to: user.email,

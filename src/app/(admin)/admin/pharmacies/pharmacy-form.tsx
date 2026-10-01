@@ -9,7 +9,8 @@ import {
 } from "@/server/actions/platform-pharmacies";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { Field, Input } from "@/components/ui/field";
+import { Field, Input, Select } from "@/components/ui/field";
+import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 
@@ -51,7 +52,7 @@ export function CreatePharmacyButton() {
     ownerFirstName: "",
     ownerLastName: "",
     ownerEmail: "",
-    ownerPassword: "",
+    lgo: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -68,7 +69,7 @@ export function CreatePharmacyButton() {
       }
       push({ tone: "success", title: result.message ?? "Officine créée" });
       setValues(EMPTY);
-      setOwner({ ownerFirstName: "", ownerLastName: "", ownerEmail: "", ownerPassword: "" });
+      setOwner({ ownerFirstName: "", ownerLastName: "", ownerEmail: "", lgo: "" });
       setOpen(false);
       router.push(`/admin/pharmacies/${result.data.pharmacyId}`);
     });
@@ -126,7 +127,7 @@ export function CreatePharmacyButton() {
               </Field>
             </div>
 
-            <Field label="Adresse e-mail" htmlFor="ownerEmail" required hint="Son identifiant.">
+            <Field label="Adresse e-mail" htmlFor="ownerEmail" required hint="Son identifiant : c'est là que part l'e-mail d'accueil.">
               <Input
                 id="ownerEmail"
                 type="email"
@@ -135,19 +136,16 @@ export function CreatePharmacyButton() {
               />
             </Field>
 
-            <Field
-              label="Mot de passe initial"
-              htmlFor="ownerPassword"
-              required
-              hint="12 caractères minimum, avec majuscule et chiffre."
-            >
-              <Input
-                id="ownerPassword"
-                type="text"
-                value={owner.ownerPassword}
-                onChange={(e) => setOwner({ ...owner, ownerPassword: e.target.value })}
-              />
+            <Field label="Logiciel de gestion de l'officine" htmlFor="lgo" hint="L'e-mail d'accueil donne les étapes d'export du stock propres à ce logiciel.">
+              <Select id="lgo" value={owner.lgo} onChange={(e) => setOwner({ ...owner, lgo: e.target.value })}>
+                <option value="">Je ne sais pas encore</option>
+                {LGO_DEFINITIONS.filter((lgo) => lgo.id !== "autre").map((lgo) => (
+                  <option key={lgo.id} value={lgo.id}>{lgo.label} — {lgo.editor}</option>
+                ))}
+                <option value="autre">Autre</option>
+              </Select>
             </Field>
+            <p className="text-[12.5px] leading-5 text-text-tertiary">Le titulaire reçoit un e-mail avec un lien pour choisir son mot de passe, puis les cinq étapes de mise en service. Aucun mot de passe ne transite par ici.</p>
           </div>
         </div>
       </Modal>

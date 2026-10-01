@@ -10,6 +10,8 @@ import { hashPassword, validatePasswordStrength } from "@/server/security/passwo
 import { recordAudit } from "@/server/audit/log";
 import { sendUserPasswordLink } from "@/server/services/user-password";
 import { uniqueSlug } from "@/server/services/slugs";
+import { generateToken } from "@/server/security/tokens";
+import { isLgoId } from "@/server/services/stock-sync";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /**
@@ -44,7 +46,10 @@ const createSchema = pharmacySchema.extend({
   ownerFirstName: z.string().trim().min(1, "Le prénom du titulaire est obligatoire").max(80),
   ownerLastName: z.string().trim().min(1, "Le nom du titulaire est obligatoire").max(80),
   ownerEmail: z.string().trim().toLowerCase().email("Adresse e-mail du titulaire invalide"),
-  ownerPassword: z.string().min(1, "Mot de passe requis"),
+  /** Facultatif : sans mot de passe fourni, le titulaire définit le sien par le lien reçu. */
+  ownerPassword: z.string().optional().or(z.literal("")),
+  /** Le logiciel de gestion de l'officine : il guide l'export du stock dès l'e-mail d'accueil. */
+  lgo: z.string().trim().max(30).optional().or(z.literal("")),
 });
 
 /**
@@ -65,11 +70,13 @@ export async function createClientPharmacyAction(
   }
 
   const input = parsed.data;
-  const weaknesses = validatePasswordStrength(input.ownerPassword);
-  if (weaknesses.length > 0) {
-    return fail(`Mot de passe trop faible : ${weaknesses.join(", ")}.`, {
-      ownerPassword: `Mot de passe trop faible : ${weaknesses.join(", ")}.`,
-    });
+  if (input.ownerPassword) {
+    const weaknesses = validatePasswordStrength(input.ownerPassword);
+    if (weaknesses.length > 0) {
+      return fail(`Mot de passe trop faible : ${weaknesses.join(", ")}.`, {
+        ownerPassword: `Mot de passe trop faible : ${weaknesses.join(", ")}.`,
+      });
+    }
   }
 
   const existingUser = await prisma.user.findUnique({
@@ -86,7 +93,10 @@ export async function createClientPharmacyAction(
     uniqueSlug(input.name, "organization"),
     uniqueSlug(input.name, "pharmacy"),
   ]);
-  const passwordHash = await hashPassword(input.ownerPassword);
+  // Sans mot de passe fourni, un secret aléatoire que personne ne connaît : le
+  // titulaire choisit le sien par le lien de l'e-mail d'accueil.
+  const passwordHash = await hashPassword(input.ownerPassword || generateToken(24));
+  const lgo = input.lgo && isLgoId(input.lgo) ? input.lgo : null;
 
   const pharmacy = await prisma.$transaction(async (tx) => {
     const organization = await tx.organization.create({
@@ -125,6 +135,9 @@ export async function createClientPharmacyAction(
     await tx.membership.create({
       data: { userId: owner.id, pharmacyId: created.id, role: "OWNER", isActive: true },
     });
+
+    // Le logiciel connu dès la création : l'accueil et l'e-mail s'en servent.
+    if (lgo) await tx.stockConnection.create({ data: { pharmacyId: created.id, lgo, status: "PENDING" } });
 
     return { created, ownerId: owner.id };
   });
