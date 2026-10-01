@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireSession } from "@/server/auth/session";
+import { getSession } from "@/server/auth/session";
 import { prisma } from "@/server/db/client";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 
@@ -15,7 +15,9 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
  * gain de clic pour un mur.
  */
 export default async function HomePage() {
-  const session = await requireSession();
+  // Sans session, la racine est le site public ; l'application commence à la connexion.
+  const session = await getSession();
+  if (!session) redirect("/decouvrir");
 
   // Un titulaire dont l'officine n'a ni terminé l'accueil ni importé son stock
   // est conduit à l'accueil : sans stock, le comptoir ne proposerait rien.
