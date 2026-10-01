@@ -6,12 +6,12 @@ import { loadCompanyProfile, DEFAULT_CONTACT_EMAIL } from "@/server/services/sit
 export const metadata: Metadata = {
   title: { default: "PharmaBoost — Le copilote de comptoir de l'officine", template: "%s · PharmaBoost" },
   description:
-    "Au bip de la douchette, PharmaBoost vérifie le traitement, la réglementation et le stock, puis propose le bon conseil sur l'écran du comptoir. Sans changer de logiciel. Le pharmacien décide.",
+    "PharmaBoost analyse l'ordonnance et les produits scannés, croise le stock de l'officine et propose au comptoir les conseils complémentaires. Le pharmacien décide.",
   robots: { index: true, follow: true },
   openGraph: {
     images: [{ url: "/logo-1200.png", width: 1200, height: 1200, alt: "PharmaBoost" }],
     title: "PharmaBoost — Le copilote de comptoir de l'officine",
-    description: "Le conseil associé, vérifié avant d'être proposé, directement au comptoir.",
+    description: "Analyse. Conseil. Suivi. Le copilote du comptoir officinal.",
     locale: "fr_FR",
     type: "website",
   },

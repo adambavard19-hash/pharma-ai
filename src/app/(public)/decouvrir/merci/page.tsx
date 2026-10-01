@@ -13,7 +13,7 @@ export default async function ThanksPage({ searchParams }: { searchParams: Promi
       <h1 className="mt-5 text-[32px] leading-[1.15] font-semibold tracking-[-0.02em] text-text-primary text-balance">{demo ? "Votre démonstration est demandée." : "Votre demande d'abonnement est reçue."}</h1>
       <p className="mt-4 text-[16px] leading-7 text-text-secondary">
         {demo
-          ? "Nous vous rappelons sous un jour ouvré pour fixer un créneau de vingt minutes. Un accusé de réception vient de partir à l'adresse indiquée."
+          ? "Nous vous rappelons sous un jour ouvré pour fixer un créneau. Un accusé de réception vient de partir à l'adresse indiquée."
           : "Nous préparons votre espace et vous envoyons sous un jour ouvré votre contrat à signer en ligne. Un accusé de réception vient de partir à l'adresse indiquée."}
       </p>
       <Link href="/decouvrir" className="mt-8 inline-flex h-11 items-center rounded-xl border border-border-default px-5 text-[14.5px] font-medium text-text-primary hover:bg-surface-sunken">Retour au site</Link>

@@ -76,7 +76,7 @@ export function LeadForm({ kind, referralCode = "" }: { kind: "DEMO" | "SUBSCRIB
         )}
       </div>
       <Field label={kind === "DEMO" ? "Ce que vous voulez voir en priorité" : "Un mot sur votre officine"} htmlFor="lead-message">
-        <Textarea id="lead-message" value={form.message} onChange={set("message")} rows={3} placeholder={kind === "DEMO" ? "L'avis au bip, la lecture d'ordonnance, le stock…" : "Nombre de collaborateurs, parapharmacie, projets…"} />
+        <Textarea id="lead-message" value={form.message} onChange={set("message")} rows={3} placeholder={kind === "DEMO" ? "Le conseil au scan, l'analyse d'ordonnance, le stock…" : "Nombre de collaborateurs, parapharmacie, projets…"} />
       </Field>
       {/* Pot de miel, invisible pour une personne. */}
       <div className="absolute -left-[9999px] top-auto" aria-hidden="true">
@@ -88,7 +88,7 @@ export function LeadForm({ kind, referralCode = "" }: { kind: "DEMO" | "SUBSCRIB
           {kind === "DEMO" ? "Réserver ma démo" : "Demander mon contrat"}
         </Button>
         <p className="text-[12.5px] text-text-tertiary">
-          {kind === "DEMO" ? "Vingt minutes, en visio ou par téléphone, sur votre poste." : "Premier mois offert. Prélèvement bancaire ensuite, résiliable à tout moment."}
+          {kind === "DEMO" ? "En visio ou par téléphone, sur votre poste." : "Premier mois offert. Prélèvement bancaire ensuite, résiliable à tout moment."}
         </p>
       </div>
     </form>

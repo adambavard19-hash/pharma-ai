@@ -17,7 +17,7 @@ export default async function LegalPage() {
         {address && <Row label="Siège">{address}</Row>}
         {company?.siren && <Row label="SIREN">{company.siren}</Row>}
         {company?.representativeName && <Row label="Directeur de la publication">{company.representativeName}{company.representativeTitle ? `, ${company.representativeTitle}` : ""}</Row>}
-        <Row label="Contact"><a href={`mailto:${email}`} className="text-brand-700 hover:underline dark:text-brand-400">{email}</a></Row>
+        <Row label="Contact"><a href={`mailto:${email}`} className="text-brand-700 hover:underline">{email}</a></Row>
         <Row label="Hébergement">Application hébergée par Vercel Inc., base de données par Neon Inc.</Row>
       </dl>
       <h2 className="mt-10 text-[20px] font-semibold text-text-primary">Nature du service</h2>
