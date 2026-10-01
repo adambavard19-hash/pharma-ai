@@ -10,7 +10,7 @@ import { getRequestMeta } from "@/server/auth/session";
 import { recordAudit } from "@/server/audit/log";
 import { peekSalesPasswordToken, sendSalesInvitation, setSalesPasswordByToken } from "@/server/services/sales/reps";
 import { addProspectNote, addProspectTask, completeTask, createProspect, getProspectFor, setProspectStatus, updateProspect } from "@/server/services/sales/prospects";
-import { generateContract, sendContract } from "@/server/services/sales/contracts";
+import { generateContract, sendContract, startContracting } from "@/server/services/sales/contracts";
 import { createPharmacyFromProspect } from "@/server/services/sales/client-pharmacies";
 import { markSalesNotificationsRead } from "@/server/services/sales/notifications";
 import { PROSPECT_STATUSES } from "@/core/sales/pipeline";
@@ -78,7 +78,9 @@ export async function peekSalesTokenAction(token: string) {
 
 const prospectSchema = z.object({
   name: z.string().trim().min(2).max(120),
+  legalName: z.string().trim().max(160).optional().nullable(),
   ownerName: z.string().trim().max(120).optional().nullable(),
+  ownerTitle: z.string().trim().max(80).optional().nullable(),
   phone: z.string().trim().max(30).optional().nullable(),
   email: z.string().trim().toLowerCase().email().optional().nullable().or(z.literal("")),
   addressLine1: z.string().trim().max(200).optional().nullable(),
@@ -115,7 +117,8 @@ export async function updateProspectAction(payload: Partial<z.input<typeof prosp
   const { nextActionAt: _ignoredDate, nextActionLabel: _ignoredLabel, ...input } = parsed.data;
   void _ignoredDate;
   void _ignoredLabel;
-  await updateProspect(payload.prospectId, { ...input, email: input.email || null }, found.actor);
+  const updated = await updateProspect(payload.prospectId, { ...input, ...(input.email !== undefined ? { email: input.email || null } : {}) }, found.actor);
+  if (!updated.ok) return fail(updated.error);
   revalidatePath(`/extranet/dossiers/${payload.prospectId}`);
   return ok(null, "Dossier mis à jour.");
 }
@@ -178,6 +181,34 @@ export async function generateContractAction(payload: z.input<typeof contractSch
   if (!result.ok) return fail(result.error);
   revalidatePath(`/extranet/dossiers/${parsed.data.prospectId}`);
   return ok({ contractId: result.contractId }, "Contrat généré. Relisez-le, puis envoyez-le.");
+}
+
+const startSchema = z.object({
+  prospectId: z.string().min(1),
+  monthlyPriceCents: z.coerce.number().int().min(100).max(10_000_000).optional().nullable(),
+  durationMonths: z.coerce.number().int().min(1).max(60).optional().nullable(),
+  startDate: z.string().min(8).optional().nullable(),
+});
+
+/**
+ * « Envoyer le contrat » : le commercial a obtenu l'accord du titulaire. Le
+ * moteur commun vérifie le dossier, génère le contrat depuis le modèle actif,
+ * le soumet à la signature électronique et l'adresse au titulaire.
+ */
+export async function startContractingAction(payload: z.input<typeof startSchema>): Promise<ActionResult<{ outcome: string; missing?: string[] }>> {
+  const parsed = startSchema.safeParse(payload);
+  if (!parsed.success) return fail("Vérifiez les conditions du contrat.", zodFieldErrors(parsed.error.issues));
+  const found = await actorAndProspect(parsed.data.prospectId);
+  if ("error" in found) return fail(found.error);
+  const result = await startContracting(parsed.data.prospectId, found.actor, {
+    monthlyPriceCents: parsed.data.monthlyPriceCents ?? null,
+    durationMonths: parsed.data.durationMonths ?? null,
+    startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
+  });
+  revalidatePath("/extranet");
+  revalidatePath(`/extranet/dossiers/${parsed.data.prospectId}`);
+  if (!result.ok) return fail(result.error, Object.fromEntries((result.missing ?? []).map((m) => [m.field, m.reason === "invalid" ? `${m.label} invalide` : `${m.label} requis`])));
+  return ok({ outcome: result.outcome }, result.message);
 }
 
 export async function sendContractAction(payload: { prospectId: string; contractId: string }): Promise<ActionResult<{ signature: string }>> {

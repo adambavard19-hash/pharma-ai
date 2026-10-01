@@ -1,4 +1,5 @@
 import { TIME_ZONE } from "@/config/constants";
+import { formatSiret } from "./identity";
 /**
  * Le modèle de contrat d'abonnement PharmaBoost.
  *
@@ -18,7 +19,11 @@ export type ContractParty = {
 
 export type ContractPharmacy = {
   name: string;
+  /** Raison sociale de la société exploitante, quand elle diffère du nom commercial. */
+  legalName?: string | null;
   ownerName: string;
+  /** Qualité du signataire ; par défaut « pharmacien titulaire ». */
+  ownerTitle?: string | null;
   address: string;
   finessNumber?: string | null;
   siret?: string | null;
@@ -45,7 +50,11 @@ export type ContractDocument = {
   signatures: { role: "PHARMACY" | "COMPANY"; label: string; name: string; email: string }[];
 };
 
-export const CONTRACT_TEMPLATE_KEY = "abonnement-pharmaboost-v1";
+/**
+ * v2 (oct. 2026) : raison sociale et qualité du signataire, SIRET lisible,
+ * « premier mois offert » en toutes lettres, terme « l'Officine » partout.
+ */
+export const CONTRACT_TEMPLATE_KEY = "abonnement-pharmaboost-v2";
 
 const euros = (cents: number) => `${(cents / 100).toFixed(2).replace(".", ",")} € HT`;
 const dateFr = (d: Date) => new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", year: "numeric" }).format(d);
@@ -67,7 +76,7 @@ export function buildContractDocument(input: {
         heading: "Entre les soussignés",
         paragraphs: [
           `${company.legalName}${company.legalForm ? `, ${company.legalForm}` : ""}, dont le siège est situé ${company.address}${company.siren ? `, immatriculée sous le numéro SIREN ${company.siren}` : ""}, représentée par ${company.representativeName}${company.representativeTitle ? `, ${company.representativeTitle}` : ""}, ci-après « la Société »,`,
-          `et ${pharmacy.name}, ${pharmacy.address}${pharmacy.finessNumber ? `, FINESS ${pharmacy.finessNumber}` : ""}${pharmacy.siret ? `, SIRET ${pharmacy.siret}` : ""}, représentée par ${pharmacy.ownerName}, pharmacien titulaire, ci-après « l'Officine ».`,
+          `et ${pharmacy.legalName && pharmacy.legalName.trim().toLowerCase() !== pharmacy.name.trim().toLowerCase() ? `${pharmacy.legalName}, exploitant l'officine ${pharmacy.name}` : pharmacy.name}, ${pharmacy.address}${pharmacy.finessNumber ? `, FINESS ${pharmacy.finessNumber}` : ""}${pharmacy.siret ? `, SIRET ${formatSiret(pharmacy.siret)}` : ""}, représentée par ${pharmacy.ownerName}, ${pharmacy.ownerTitle?.trim() || "pharmacien titulaire"}, ci-après « l'Officine ».`,
         ],
       },
       {
@@ -86,9 +95,9 @@ export function buildContractDocument(input: {
       {
         heading: "Article 3 — Conditions financières",
         paragraphs: [
-          `L'abonnement${terms.planName ? ` « ${terms.planName} »` : ""} est facturé ${euros(terms.monthlyPriceCents)} par mois pour ${terms.outletCount} point${terms.outletCount > 1 ? "s" : ""} de vente, soit ${euros(yearly)} par an, payable mensuellement par prélèvement automatique sur le moyen de paiement enregistré par la Pharmacie. Les prix s'entendent hors taxes ; la TVA en vigueur s'applique.`,
+          `L'abonnement${terms.planName ? ` « ${terms.planName} »` : ""} est facturé ${euros(terms.monthlyPriceCents)} par mois pour ${terms.outletCount} point${terms.outletCount > 1 ? "s" : ""} de vente, soit ${euros(yearly)} par an, payable mensuellement par prélèvement automatique sur le moyen de paiement enregistré par l'Officine. Les prix s'entendent hors taxes ; la TVA en vigueur s'applique.`,
           ...(terms.trialDays && terms.trialDays > 0
-            ? [`Les ${terms.trialDays} premiers jours suivant la souscription sont offerts : aucun prélèvement n'intervient pendant cette période, et la Pharmacie peut y mettre fin sans frais avant son terme. Le premier prélèvement intervient à l'issue de la période offerte.`]
+            ? [`${terms.trialDays >= 28 && terms.trialDays <= 31 ? "Le premier mois d'abonnement est offert" : `Les ${terms.trialDays} premiers jours d'abonnement sont offerts`} : aucun prélèvement n'intervient pendant cette période, et l'Officine peut y mettre fin sans frais avant son terme. Le premier prélèvement intervient à l'issue de la période offerte.`]
             : []),
           "Tout retard de paiement entraîne l'application des pénalités légales et, après mise en demeure restée sans effet quinze jours, la suspension du service.",
         ],

@@ -1,22 +1,26 @@
 import { escapeHtml } from "@/core/documents/email";
 import { TIME_ZONE } from "@/config/constants";
+import { DEFAULT_EMAIL_CONTEXT, emailButtonHtml, emailFrame } from "./email-layout";
 
 /**
  * Les e-mails de l'extranet commercial : invitation d'un commercial, et
  * transmission d'un contrat au titulaire. Rédigés ici, transportés par le
  * prestataire ; aucun mot de passe, aucun montant de commission n'y figure.
  */
-export function shell(title: string, headline: string, inner: string, color = "#111827"): string {
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title></head>
-<body style="margin:0;padding:0;background:#eef1f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f4;padding:24px 12px"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:20px;overflow:hidden">
-<tr><td style="background:${color};padding:22px 28px"><div style="font-size:13px;line-height:18px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.75)">PharmaBoost</div><div style="font-size:22px;line-height:28px;font-weight:700;color:#ffffff;margin-top:4px">${escapeHtml(headline)}</div></td></tr>
-<tr><td style="padding:26px 28px 28px">${inner}</td></tr></table></td></tr></table></body></html>`;
+/**
+ * L'enveloppe commune des e-mails de la plateforme : elle délègue au gabarit
+ * PharmaBoost (logo, carte, pied de page légal). La couleur reste acceptée
+ * pour compatibilité ; le gabarit garde une identité unique.
+ */
+export function shell(title: string, headline: string, inner: string, _color = "#111827"): string {
+  void _color;
+  return emailFrame(DEFAULT_EMAIL_CONTEXT, { subject: title, title: headline, bodyHtml: inner });
 }
 
-export const button = (url: string, label: string, color = "#111827") =>
-  `<a href="${escapeHtml(url)}" style="display:block;margin-top:22px;background:${color};color:#ffffff;text-decoration:none;font-size:17px;line-height:24px;font-weight:700;padding:16px 22px;border-radius:14px;text-align:center">${escapeHtml(label)}</a>`;
+export const button = (url: string, label: string, _color = "#111827") => {
+  void _color;
+  return emailButtonHtml(url, label);
+};
 
 export const dateTime = (d: Date) => new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(d);
 

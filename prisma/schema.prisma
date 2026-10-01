@@ -264,6 +264,7 @@ model Plan {
   subscriptions Subscription[]
   contracts     Contract[]
   invites       SubscriptionInvite[]
+  prospects     Prospect[]
 
   @@map("plans")
 }
@@ -2416,6 +2417,12 @@ enum ProspectStatus {
   LOST
 }
 
+enum ProspectOrigin {
+  SELF_SERVICE_SITE
+  SUPER_ADMIN
+  COMMERCIAL
+}
+
 enum ContractStatus {
   DRAFT
   SENT
@@ -2455,6 +2462,12 @@ enum ProspectEventType {
   ASSIGNED
   BLOCKED
   UNBLOCKED
+  SUBSCRIPTION_REQUESTED
+  CONTRACT_REMINDER
+  SIGNED_PDF_ARCHIVED
+  SUBSCRIPTION_PENDING
+  DUPLICATE_SUSPECTED
+  SIGNATURE_ERROR
 }
 
 enum ExtranetAudience {
@@ -2526,6 +2539,19 @@ model Prospect {
   finessNumber String?
   siret        String?
   outletCount  Int?
+  /// Raison sociale de la société qui exploite l'officine (SELARL…), si elle diffère du nom commercial.
+  legalName    String?
+  /// Qualité du représentant signataire (« Pharmacien titulaire », « Gérant »…).
+  ownerTitle   String?
+
+  /// D'où vient le dossier : le site, la console, ou un commercial.
+  origin                  ProspectOrigin @default(COMMERCIAL)
+  /// L'officine a explicitement demandé à souscrire : distinct de la simple création du dossier.
+  subscriptionRequestedAt DateTime?
+  /// Offre choisie (site) ou retenue pour le contrat.
+  planId                  String?
+  /// Doublon possible repéré à la création : texte lisible, pour l'administrateur.
+  duplicateWarning        String?
 
   /// Le commercial qui suit le dossier. Vide : dossier tenu par la console
   /// (officine créée directement par l'administrateur).
@@ -2554,6 +2580,7 @@ model Prospect {
 
   salesRep    SalesRep?       @relation(fields: [salesRepId], references: [id])
   pharmacy    Pharmacy?       @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+  plan        Plan?           @relation(fields: [planId], references: [id])
   events      ProspectEvent[]
   contracts   Contract[]
   commissions Commission[]
@@ -2561,6 +2588,7 @@ model Prospect {
 
   @@index([salesRepId, status])
   @@index([status])
+  @@index([siret])
   @@map("prospects")
 }
 
@@ -2628,6 +2656,19 @@ model Contract {
   /// none · yousign · docusign · … ; « offline » = signature papier enregistrée par l'admin.
   signatureProvider  String  @default("none")
   providerEnvelopeId String?
+  /// Lien de signature du titulaire fourni par le prestataire : repris dans les renvois et les relances.
+  pharmacySigningUrl String?
+  /// Verrou d'envoi : posé le temps de créer la demande de signature, il empêche un double envoi.
+  sendLockedAt       DateTime?
+  /// Date de prise d'effet inscrite au contrat.
+  startDate          DateTime?
+  /// PDF signé récupéré chez le prestataire et archivé.
+  signedArchivedAt   DateTime?
+  /// Relances envoyées au titulaire tant que le contrat n'est pas signé.
+  reminderCount      Int       @default(0)
+  lastReminderAt     DateTime?
+  /// Dossier signalé à l'équipe après les relances.
+  escalatedAt        DateTime?
 
   sentAt           DateTime?
   openedAt         DateTime?
@@ -2689,6 +2730,17 @@ model ExtranetNotification {
 
   @@index([audience, salesRepId, readAt])
   @@map("extranet_notifications")
+}
+
+/// Réglages de la plateforme modifiables depuis la console (clé → valeur JSON).
+/// Ex. « contract.reminders » : la cadence des relances de contrat.
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
 }
 
 /// La société exploitante, partie aux contrats. Une seule ligne.

@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ProspectStatusBadge, ContractStatusBadge } from "@/components/sales/status-badge";
 import { formatDate, formatDateTime } from "@/lib/format";
 import type { ProspectStatus } from "@/generated/prisma";
+import { NewProspect } from "./new-prospect";
+import { journeyStage, JOURNEY_LABELS } from "@/core/contracts/journey";
 
 export const metadata: Metadata = { title: "Pipeline commercial" };
 
@@ -28,6 +30,7 @@ export default async function AdminPipelinePage({ searchParams }: { searchParams
   return (
     <>
       <PageHeader title="Pipeline commercial" description={`${prospects.length} dossier(s)${late.length ? ` · ${late.length} en retard de relance` : ""}`} />
+      <NewProspect reps={reps.map((r) => ({ id: r.id, firstName: r.firstName, lastName: r.lastName }))} />
       <form className="flex flex-wrap items-end gap-2" method="get">
         <input name="q" defaultValue={q.q ?? ""} placeholder="Pharmacie, titulaire, ville" className={field} aria-label="Recherche" />
         <select name="commercial" defaultValue={q.commercial ?? ""} className={field} aria-label="Commercial"><option value="">Tous les commerciaux</option>{reps.map((r) => <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>)}</select>
@@ -51,6 +54,7 @@ export default async function AdminPipelinePage({ searchParams }: { searchParams
                   <span aria-hidden="true" className="text-text-tertiary">·</span>
                   <ProspectStatusBadge status={p.status} />
                   {p.contracts[0] && <ContractStatusBadge status={p.contracts[0].status} />}
+                  {p.contracts[0] && <span className="text-[12.5px] text-text-tertiary">{JOURNEY_LABELS[journeyStage({ prospectStatus: p.status, contract: p.contracts[0] })]}</span>}
                   {p.nextActionAt && <span className={"ml-auto text-[12.5px] " + (p.nextActionAt < new Date() ? "text-warning-700 dark:text-warning-500" : "text-text-tertiary")}>{p.nextActionLabel ?? "Relance"} · {formatDate(p.nextActionAt)}</span>}
                   {p.blockedAt && <span className="text-[12px] font-medium text-danger-700">suspendu</span>}
                 </li>
@@ -58,7 +62,7 @@ export default async function AdminPipelinePage({ searchParams }: { searchParams
             </ul>
           )}
         </CardContent></Card>
-        <Card><CardHeader title="Notifications" /><CardContent className="pt-0">
+        <Card><CardHeader title="Notifications" description={<Link href="/admin/notifications" className="underline underline-offset-2">Tout voir</Link>} /><CardContent className="pt-0">
           <ul className="divide-y divide-border-subtle">{notifications.map((n) => <li key={n.id} className="py-2 text-[13px]"><p className="font-medium text-text-primary">{n.linkUrl ? <Link href={n.linkUrl} className="hover:underline">{n.title}</Link> : n.title}</p>{n.body && <p className="text-text-secondary">{n.body}</p>}<p className="text-[11.5px] text-text-tertiary">{formatDateTime(n.createdAt)}</p></li>)}{notifications.length === 0 && <li className="py-3 text-[13px] text-text-secondary">Rien à signaler.</li>}</ul>
         </CardContent></Card>
       </div>

@@ -47,8 +47,10 @@ export default async function SettingsPage({
   const params = await searchParams;
   const tab = params.onglet ?? "officine";
   // Le contrat de l'officine, s'il existe : celui de la session, jamais un autre.
-  const contract = await prisma.contract.findFirst({
-    where: { OR: [{ pharmacyId: session.scope.pharmacyId }, { prospect: { pharmacyId: session.scope.pharmacyId } }] },
+  // Le contrat signé fait foi ; à défaut, la dernière version (un brouillon plus récent ne le masque pas).
+  const contractScope = { OR: [{ pharmacyId: session.scope.pharmacyId }, { prospect: { pharmacyId: session.scope.pharmacyId } }] };
+  const contract = (await prisma.contract.findFirst({ where: { ...contractScope, status: "FINALIZED" }, orderBy: { version: "desc" }, select: { id: true, version: true, status: true, finalizedAt: true, monthlyPriceCents: true, trialDays: true } })) ?? await prisma.contract.findFirst({
+    where: contractScope,
     orderBy: { version: "desc" },
     select: { id: true, version: true, status: true, finalizedAt: true, monthlyPriceCents: true, trialDays: true },
   });

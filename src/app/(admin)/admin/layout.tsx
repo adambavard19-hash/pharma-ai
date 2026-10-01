@@ -4,6 +4,7 @@ import { requirePlatformSession } from "@/server/auth/platform-session";
 import { platformLogoutAction } from "@/server/actions/platform";
 import { Button } from "@/components/ui/button";
 import { AdminNav } from "./admin-nav";
+import { countUnreadAdminNotifications } from "@/server/services/sales/notifications";
 
 /**
  * La console éditeur.
@@ -14,6 +15,7 @@ import { AdminNav } from "./admin-nav";
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const session = await requirePlatformSession();
+  const unread = await countUnreadAdminNotifications();
 
   return (
     <div className="min-h-dvh bg-surface-app">
@@ -42,7 +44,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </div>
 
         <div className="mx-auto max-w-[1200px] px-6">
-          <AdminNav />
+          <AdminNav unread={unread} />
         </div>
       </header>
 

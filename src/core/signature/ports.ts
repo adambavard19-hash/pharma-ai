@@ -19,6 +19,12 @@ export type SignatureSigner = {
    * prestataire place le champ en bas de la première page.
    */
   field?: { page: number; x: number; y: number; width: number; height: number };
+  /**
+   * `false` : le prestataire n'écrit pas lui-même à ce signataire, PharmaBoost
+   * lui adresse le lien dans son propre e-mail (un seul message, à nos couleurs).
+   * Par défaut, le prestataire notifie.
+   */
+  notify?: boolean;
 };
 
 export type SignatureEnvelope = {

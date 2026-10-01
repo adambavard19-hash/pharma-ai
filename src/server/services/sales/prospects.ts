@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
+import { normalizeSiret } from "@/core/contracts/identity";
 import { canSalesRepSetStatus, isOpenStatus, PROSPECT_STATUS_LABELS, type ProspectStatusCode } from "@/core/sales/pipeline";
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
@@ -8,7 +9,9 @@ import type { Prisma, ProspectStatus } from "@/generated/prisma";
 
 export type ProspectInput = {
   name: string;
+  legalName?: string | null;
   ownerName?: string | null;
+  ownerTitle?: string | null;
   phone?: string | null;
   email?: string | null;
   addressLine1?: string | null;
@@ -24,19 +27,28 @@ export type ProspectInput = {
 };
 
 const clean = (value: string | null | undefined) => (value && value.trim() ? value.trim() : null);
+/** SIRET saisi : 14 chiffres s'il est valide ; sinon tel quel, et le contrat le signalera comme invalide. */
+const cleanSiret = (value: string | null | undefined) => normalizeSiret(value) ?? clean(value);
 
-export async function createProspect(input: ProspectInput, salesRepId: string, actor: SalesActor): Promise<{ id: string }> {
+/** Les champs repris au contrat : figés pour le commercial dès qu'un contrat est envoyé. */
+export const CONTRACTUAL_FIELDS = ["name", "legalName", "siret", "addressLine1", "postalCode", "city", "ownerName", "ownerTitle", "email"] as const;
+const LOCKING_CONTRACT = ["SENT", "OPENED", "SIGNED_PHARMACY", "SIGNED_COMPANY", "FINALIZED"];
+
+export async function createProspect(input: ProspectInput, salesRepId: string | null, actor: SalesActor, origin: "COMMERCIAL" | "SUPER_ADMIN" = "COMMERCIAL"): Promise<{ id: string }> {
   const prospect = await prisma.prospect.create({
     data: {
       name: input.name.trim(),
+      legalName: clean(input.legalName),
       ownerName: clean(input.ownerName),
+      ownerTitle: clean(input.ownerTitle),
+      origin,
       phone: clean(input.phone),
       email: clean(input.email)?.toLowerCase() ?? null,
       addressLine1: clean(input.addressLine1),
       postalCode: clean(input.postalCode),
       city: clean(input.city),
       finessNumber: clean(input.finessNumber),
-      siret: clean(input.siret),
+      siret: cleanSiret(input.siret),
       outletCount: input.outletCount ?? null,
       notes: clean(input.notes),
       monthlyPriceCents: input.monthlyPriceCents ?? null,
@@ -46,7 +58,7 @@ export async function createProspect(input: ProspectInput, salesRepId: string, a
     },
   });
   await recordProspectEvent({ prospectId: prospect.id, type: "CREATED", summary: `Dossier créé pour ${prospect.name}.`, actor });
-  if (input.nextActionAt) {
+  if (input.nextActionAt && salesRepId) {
     await prisma.salesTask.create({ data: { prospectId: prospect.id, salesRepId, label: clean(input.nextActionLabel) ?? "Relancer", dueAt: input.nextActionAt } });
   }
   await recordAudit({ action: "sales.prospect_created", entityType: "Prospect", entityId: prospect.id, salesRepId: actor.type === "SALES" ? actor.id : null, platformAdminId: actor.type === "ADMIN" ? actor.id : null });
@@ -60,7 +72,8 @@ export async function getProspectFor(prospectId: string, viewer: { kind: "SALES"
     include: {
       salesRep: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, commissionType: true, commissionValue: true } },
       pharmacy: { select: { id: true, name: true, isActive: true, createdAt: true, memberships: { where: { role: "OWNER" }, take: 1, select: { user: { select: { email: true, lastLoginAt: true } } } } } },
-      contracts: { orderBy: { version: "desc" } },
+      contracts: { orderBy: { version: "desc" }, include: { plan: { select: { name: true } } } },
+      plan: { select: { id: true, name: true, monthlyPriceCents: true, trialDays: true } },
       commissions: { orderBy: { createdAt: "desc" } },
       tasks: { orderBy: { dueAt: "asc" } },
       events: { orderBy: { createdAt: "desc" }, take: 60 },
@@ -85,18 +98,25 @@ export async function listProspects(filter: { salesRepId?: string; status?: Pros
     orderBy: [{ updatedAt: "desc" }],
     include: {
       salesRep: { select: { id: true, firstName: true, lastName: true } },
-      contracts: { orderBy: { version: "desc" }, take: 1, select: { status: true, sentAt: true, finalizedAt: true } },
+      contracts: { orderBy: { version: "desc" }, take: 1, select: { status: true, sentAt: true, finalizedAt: true, signedArchivedAt: true } },
       commissions: { select: { amountCents: true, status: true } },
       tasks: { where: { doneAt: null }, orderBy: { dueAt: "asc" }, take: 1, select: { label: true, dueAt: true } },
     },
   });
 }
 
-export async function updateProspect(prospectId: string, input: Partial<ProspectInput>, actor: SalesActor): Promise<void> {
+export async function updateProspect(prospectId: string, input: Partial<ProspectInput>, actor: SalesActor): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Une fois le contrat parti, ses données ne bougent plus côté commercial : le contrat reste fidèle au dossier.
+  if (actor.type === "SALES" && CONTRACTUAL_FIELDS.some((field) => input[field] !== undefined)) {
+    const locked = await prisma.contract.findFirst({ where: { prospectId, status: { in: LOCKING_CONTRACT as never } }, select: { id: true } });
+    if (locked) return { ok: false, error: "Un contrat a été envoyé : les informations contractuelles ne se modifient plus depuis l'extranet. Demandez à l'administrateur si une correction est nécessaire." };
+  }
   await prisma.prospect.update({
     where: { id: prospectId },
     data: {
       ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+      ...(input.legalName !== undefined ? { legalName: clean(input.legalName) } : {}),
+      ...(input.ownerTitle !== undefined ? { ownerTitle: clean(input.ownerTitle) } : {}),
       ...(input.ownerName !== undefined ? { ownerName: clean(input.ownerName) } : {}),
       ...(input.phone !== undefined ? { phone: clean(input.phone) } : {}),
       ...(input.email !== undefined ? { email: clean(input.email)?.toLowerCase() ?? null } : {}),
@@ -104,13 +124,14 @@ export async function updateProspect(prospectId: string, input: Partial<Prospect
       ...(input.postalCode !== undefined ? { postalCode: clean(input.postalCode) } : {}),
       ...(input.city !== undefined ? { city: clean(input.city) } : {}),
       ...(input.finessNumber !== undefined ? { finessNumber: clean(input.finessNumber) } : {}),
-      ...(input.siret !== undefined ? { siret: clean(input.siret) } : {}),
+      ...(input.siret !== undefined ? { siret: cleanSiret(input.siret) } : {}),
       ...(input.outletCount !== undefined ? { outletCount: input.outletCount } : {}),
       ...(input.notes !== undefined ? { notes: clean(input.notes) } : {}),
       ...(input.monthlyPriceCents !== undefined ? { monthlyPriceCents: input.monthlyPriceCents } : {}),
     },
   });
   await recordAudit({ action: "sales.prospect_updated", entityType: "Prospect", entityId: prospectId, salesRepId: actor.type === "SALES" ? actor.id : null, platformAdminId: actor.type === "ADMIN" ? actor.id : null, metadata: { fields: Object.keys(input) } });
+  return { ok: true };
 }
 
 /**
@@ -122,6 +143,11 @@ export async function setProspectStatus(prospectId: string, to: ProspectStatusCo
   const prospect = await prisma.prospect.findUniqueOrThrow({ where: { id: prospectId }, select: { status: true, blockedAt: true, name: true, salesRepId: true } });
   const from = prospect.status as ProspectStatusCode;
   if (prospect.blockedAt && actor.type !== "ADMIN") return { ok: false, error: "Ce dossier est suspendu par l'administrateur." };
+  if (actor.type === "SALES" && from === "LOST" && to !== "LOST") {
+    // Un dossier « perdu » dont le contrat suit son cours ne se rouvre pas à la main : l'étape découle du contrat.
+    const active = await prisma.contract.findFirst({ where: { prospectId, status: { in: LOCKING_CONTRACT as never } }, select: { id: true } });
+    if (active) return { ok: false, error: "Un contrat est en cours ou signé pour ce dossier : son étape découle du contrat." };
+  }
   if (actor.type === "SALES" && !canSalesRepSetStatus(from, to)) {
     return { ok: false, error: `Le passage « ${PROSPECT_STATUS_LABELS[from]} → ${PROSPECT_STATUS_LABELS[to]} » n'est pas une étape manuelle : elle découle du contrat ou de la création de l'officine.` };
   }

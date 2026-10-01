@@ -30,7 +30,7 @@ describe("signature électronique — DocuSeal", () => {
       title: "Contrat",
       pdf,
       signers: [
-        { role: "PHARMACY", firstName: "Claire", lastName: "Dumont", email: "c@x.fr", field: signatureFieldPlacement(0, 2, 3) },
+        { role: "PHARMACY", firstName: "Claire", lastName: "Dumont", email: "c@x.fr", field: signatureFieldPlacement(0, 2, 3), notify: false },
         { role: "COMPANY", firstName: "Adam", lastName: "Bavard", email: "a@x.fr", field: signatureFieldPlacement(1, 2, 3) },
       ],
       expiresAt: new Date("2026-10-08T12:00:00.000Z"),
@@ -44,6 +44,8 @@ describe("signature électronique — DocuSeal", () => {
     expect(body.order).toBe("preserved");
     expect(body.expire_at).toBe("2026-10-08 12:00:00 UTC");
     expect(body.submitters.map((s: { role: string; email: string }) => `${s.role}:${s.email}`)).toEqual(["Pharmacie:c@x.fr", "PharmaBoost:a@x.fr"]);
+    // Le titulaire reçoit le lien dans l'e-mail PharmaBoost ; DocuSeal n'écrit qu'au signataire de la société.
+    expect(body.submitters.map((s: { send_email: boolean }) => s.send_email)).toEqual([false, true]);
     expect(Buffer.from(body.documents[0].file, "base64").subarray(0, 4).toString()).toBe("%PDF");
     const [pharmacy, company] = body.documents[0].fields;
     expect(pharmacy).toMatchObject({ type: "signature", role: "Pharmacie", required: true });
