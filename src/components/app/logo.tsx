@@ -1,8 +1,10 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
- * Marque PharmaBoost. Le symbole évoque une croix d'officine dont le quadrant
- * supérieur droit est « augmenté » — l'assistance, pas la substitution.
+ * Marque PharmaBoost : la croix d'officine et la flèche qui monte. Le fichier
+ * source est `public/logo.png` ; les déclinaisons (`logo-256`, `icon`,
+ * `apple-icon`) en sont tirées.
  */
 export function PharmaLogo({
   className,
@@ -12,28 +14,15 @@ export function PharmaLogo({
   size?: number;
 }) {
   return (
-    <svg
+    <Image
+      src="/logo-256.png"
+      alt=""
       width={size}
       height={size}
-      viewBox="0 0 32 32"
-      fill="none"
-      className={cn("shrink-0", className)}
+      className={cn("shrink-0 rounded-[22%]", className)}
       aria-hidden="true"
-    >
-      <rect width="32" height="32" rx="9" fill="url(#pharmaLogoGradient)" />
-      <path
-        d="M13.4 8h5.2v5.4H24v5.2h-5.4V24h-5.2v-5.4H8v-5.2h5.4V8Z"
-        fill="white"
-        fillOpacity="0.95"
-      />
-      <circle cx="23.2" cy="8.8" r="3.4" fill="var(--color-accent-400)" />
-      <defs>
-        <linearGradient id="pharmaLogoGradient" x1="0" y1="0" x2="32" y2="32">
-          <stop stopColor="var(--color-brand-500)" />
-          <stop offset="1" stopColor="var(--color-brand-700)" />
-        </linearGradient>
-      </defs>
-    </svg>
+      priority
+    />
   );
 }
 

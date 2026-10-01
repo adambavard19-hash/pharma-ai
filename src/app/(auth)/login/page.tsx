@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getInstallState } from "@/server/services/install-state";
 import { LoginForm } from "./login-form";
-import { PharmaWordmark } from "@/components/app/logo";
+import { PharmaLogo, PharmaWordmark } from "@/components/app/logo";
 import { ShieldCheck, Sparkles, Stethoscope } from "lucide-react";
 import { Alert } from "@/components/ui/feedback";
 
@@ -41,9 +41,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         />
 
         <div className="relative flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-[10px] bg-white/15 text-lg font-semibold backdrop-blur">
-            ✚
-          </span>
+          <PharmaLogo size={36} className="rounded-[10px]" />
           <p className="text-[17px] font-semibold tracking-[-0.01em]">
             Pharma<span className="text-accent-300">Boost</span>
           </p>
