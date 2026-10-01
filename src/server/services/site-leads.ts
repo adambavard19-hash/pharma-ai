@@ -56,7 +56,8 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
           email: input.email,
           phone: input.phone,
           city: input.city,
-          outletCount: input.postCount,
+          // Les postes de comptoir ne sont pas des points de vente : le contrat facture par point de vente.
+          // Le nombre de postes reste dans les notes du dossier.
           status: input.kind === "SUBSCRIBE" ? "INTERESTED" : "PROSPECT",
           lastContactAt: new Date(),
           nextActionAt: new Date(Date.now() + 24 * 3600 * 1000),
