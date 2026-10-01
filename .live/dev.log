@@ -2025,3 +2025,19 @@ Error: Expected '</', got 'jsx text'
 
 Parsing ecmascript source code failed 
  GET /decouvrir 200 in 628ms (next.js: 235ms, application-code: 393ms)
+ GET /decouvrir?v=2 200 in 286ms (next.js: 11ms, application-code: 275ms)
+✓ Compiled in 192ms
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+⚠ Fast Refresh had to perform a full reload when ./node_modules/next/dist/client/image-component.js changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /decouvrir?v=2 200 in 384ms (next.js: 161ms, application-code: 222ms)
+ GET /decouvrir?v=2 200 in 49ms (next.js: 3ms, application-code: 46ms)
+⨯ Error: The destination stream closed early.
+    at ignore-listed frames {
+  digest: '249673861'
+}
+ GET /decouvrir?v=2 200 in 552ms (next.js: 3ms, application-code: 549ms)
+ GET /decouvrir?v=2 200 in 1865ms (next.js: 1131ms, application-code: 734ms)
+ GET /decouvrir?v=2 200 in 538ms (next.js: 1.6ms, application-code: 536ms)
+ GET /decouvrir?v=2 200 in 46ms (next.js: 5ms, application-code: 41ms)
+ GET /decouvrir/pourquoi 200 in 1208ms (next.js: 1076ms, application-code: 132ms)
+ GET /decouvrir 200 in 265ms (next.js: 66ms, application-code: 199ms)

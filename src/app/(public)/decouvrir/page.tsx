@@ -35,42 +35,34 @@ export default async function SitePage() {
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 pt-16 pb-20 lg:grid-cols-[1.05fr_1fr] lg:pt-24">
           <div className="max-w-xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-3 py-1 text-[12.5px] text-text-secondary">
-              <Barcode className="size-3.5 text-brand-600 dark:text-brand-400" /> Fonctionne au bip, sans changer de logiciel
+              <Barcode className="size-3.5 text-brand-600 dark:text-brand-400" /> Avec votre logiciel actuel, sans rien changer
             </p>
             <h1 className="mt-5 text-[40px] leading-[1.08] font-semibold tracking-[-0.025em] text-text-primary text-balance md:text-[52px]">
-              Vendez plus de conseil, en toute sécurité, et voyez-le dans vos ventes.
+              Le bon conseil à chaque ordonnance. Le bon plan pour chaque patient.
             </h1>
             <p className="mt-5 text-[17px] leading-7 text-text-secondary">
-              Au bip de la douchette, PharmaBoost lit l&apos;ordonnance, vérifie le traitement et la réglementation, puis propose dans votre stock le produit qui aide vraiment le patient. Le conseil accepté est rattaché à la vente : le chiffre d&apos;affaires additionnel se lit à l&apos;euro près, pas sur une brochure. Et le patient repart avec son plan de prise et ses rappels.
+              Au bip de la douchette, PharmaBoost regarde l&apos;ordonnance et votre rayon, et souffle au pharmacien le conseil juste. Le patient repart avec son plan de prise. Vous voyez ce que ça rapporte.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link href="/decouvrir/demo" className="inline-flex h-12 items-center gap-2 rounded-xl bg-brand-600 px-6 text-[15px] font-semibold text-white shadow-sm hover:bg-brand-700">
-                Réserver une démo de 20 min <ArrowRight className="size-4" />
+                Voir en 20 minutes <ArrowRight className="size-4" />
               </Link>
-              <Link href="/decouvrir#tarifs" className="inline-flex h-12 items-center rounded-xl border border-border-default px-6 text-[15px] font-medium text-text-primary hover:bg-surface-sunken">
-                Voir le tarif
+              <Link href="/decouvrir/pourquoi" className="inline-flex h-12 items-center rounded-xl border border-border-default px-6 text-[15px] font-medium text-text-primary hover:bg-surface-sunken">
+                Pourquoi PharmaBoost
               </Link>
             </div>
-            <ul className="mt-8 grid gap-2 text-[13.5px] text-text-secondary sm:grid-cols-2">
-              {["Chiffre d'affaires additionnel constaté, vente par vente", "Sécurité et réglementation avant tout conseil", "Plan de prise et rappels sur le téléphone du patient", "Installé en quelques minutes par poste, sans visite"].map((item) => (
-                <li key={item} className="flex items-center gap-2"><Check className="size-4 shrink-0 text-success-600" /> {item}</li>
-              ))}
-            </ul>
           </div>
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {[
-              { n: "0", t: "second scan", d: "La douchette de votre logiciel suffit." },
-              { n: "2 min", t: "par poste", d: "Une ligne à coller, sans visite." },
-              { n: "100 %", t: "des conseils vérifiés", d: "Sécurité et réglementation d'abord." },
-              { n: "1 €", t: "= 1 € constaté", d: "Le tableau de bord lit vos ventes." },
-            ].map((item) => (
-              <li key={item.t} className="rounded-2xl border border-border-subtle bg-surface-card p-5">
-                <p className="text-[30px] leading-none font-semibold tracking-[-0.02em] text-brand-700 tabular dark:text-brand-400">{item.n}</p>
-                <p className="mt-1.5 text-[14px] font-semibold text-text-primary">{item.t}</p>
-                <p className="text-[13px] text-text-secondary">{item.d}</p>
-              </li>
-            ))}
-          </ul>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <HeroSide
+              title="Au comptoir"
+              items={[["Lit l'ordonnance", "manuscrite comprise"], ["Vérifie d'abord", "interactions, réglementation"], ["Propose dans votre rayon", "prix et marge visibles"], ["Compte ce que ça rapporte", "à l'euro près"]]}
+            />
+            <HeroSide
+              title="À la maison"
+              items={[["Le plan de prise", "matin, midi, soir"], ["Les rappels", "dans l'agenda du téléphone"], ["Le dernier jour", "un signe de la pharmacie"], ["Aucune donnée conservée", "sur le patient"]]}
+              accent
+            />
+          </div>
         </div>
       </section>
 
@@ -81,15 +73,15 @@ export default async function SitePage() {
         id="bip"
         eyebrow="Au bip · l'avis en coin d'écran"
         title="La boîte passe à la douchette, l'avis apparaît. Rien d'autre à faire."
-        lede="Le programme installé sur le poste écoute la douchette de votre logiciel. Chaque boîte ouvre la vente dans PharmaBoost, l'analyse se lance, et l'avis s'affiche par-dessus votre logiciel, sans lui prendre le clavier."
+        lede="La douchette de votre logiciel suffit. L'avis s'affiche par-dessus, et s'efface seul."
         tone="sunken"
       >
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <ul className="space-y-5">
-            <Feature title="Jusqu'à trois conseils, avec le prix, la marge et la raison" body="Le produit, son prix, et pourquoi il aide ce patient avec ce traitement. La phrase à dire est prête." />
-            <Feature title="Les alertes passent avant les conseils" body="Une interaction, une contre-indication ou une ordonnance d'exception s'affichent en premier. On ne vend rien par-dessus une alerte non lue." />
-            <Feature title="Discret, non bloquant" body="L'encart s'efface seul après quinze secondes. Un clic l'ouvre en détail dans PharmaBoost, sur le second écran ou le même." />
-            <Feature title="Plusieurs boîtes, une seule vente" body="Les boîtes bipées pour un même client se regroupent. « Nouveau patient » remet l'écran à zéro en un clic." />
+            <Feature title="Trois conseils au plus" body="Produit, prix, marge, et la phrase à dire." />
+            <Feature title="Les alertes d'abord" body="Interaction, contre-indication, ordonnance d'exception." />
+            <Feature title="Discret" body="Quinze secondes, puis il disparaît. Un clic pour le détail." />
+            <Feature title="Un client, une vente" body="Les boîtes se regroupent. « Nouveau patient » remet à zéro." />
           </ul>
           <ToastMock className="mx-auto w-full max-w-lg pb-6" />
         </div>
@@ -99,16 +91,16 @@ export default async function SitePage() {
       <Section
         id="sans-ordonnance"
         eyebrow="Demande sans ordonnance"
-        title="« J'ai le nez bouché depuis hier. » Le besoin est reconnu, la réponse vient du rayon."
-        lede="Le client décrit ce qu'il ressent. PharmaBoost reconnaît le besoin parmi une liste fermée, pose les questions à vérifier, signale quand il faut orienter vers le médecin, et propose dans le stock. Utile aux juniors comme aux seniors."
+        title="« J'ai le nez bouché depuis hier. »"
+        lede="Le client décrit. PharmaBoost reconnaît le besoin, pose les bonnes questions, propose dans le rayon."
       >
         <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
           <RequestMock />
           <ul className="space-y-5">
-            <Feature title="Jamais un produit inventé" body="L'IA ne nomme pas un produit. Elle reconnaît un besoin dans une liste écrite ; les règles de conseil et le stock font le reste." />
-            <Feature title="Les questions à poser d'abord" body="Âge, grossesse, fièvre, durée, traitements en cours : ce qui change le conseil est demandé avant de proposer." />
-            <Feature title="Orienter quand il le faut" body="Sang, gêne respiratoire, nourrisson, symptômes qui durent : le bandeau « Orienter vers le médecin » passe avant tout conseil." />
-            <Feature title="Le même moteur de sécurité" body="Une demande spontanée passe par les mêmes contrôles qu'une ordonnance. Pas de porte dérobée." />
+            <Feature title="Jamais un produit inventé" body="Le besoin vient d'une liste écrite, le produit de votre rayon." />
+            <Feature title="Les questions d'abord" body="Âge, grossesse, fièvre, traitements en cours." />
+            <Feature title="Orienter quand il faut" body="Sang, gêne respiratoire, nourrisson : le médecin d'abord." />
+            <Feature title="La même sécurité" body="Les mêmes contrôles qu'une ordonnance." />
           </ul>
         </div>
       </Section>
@@ -117,16 +109,16 @@ export default async function SitePage() {
       <Section
         id="securite"
         eyebrow="Sécurité et réglementation"
-        title="Il vérifie avant de conseiller. C'est la différence avec un simple rappel de vente."
-        lede="La chaîne est fixe : sécurité, compréhension du traitement, pertinence, stock, puis seulement le classement commercial. Une considération de marge ne peut pas remonter plus haut, parce que l'ordre des étapes ne le permet pas."
+        title="Il vérifie avant de conseiller."
+        lede="Sécurité, puis traitement, puis rayon. La marge vient en dernier, toujours."
         tone="sunken"
       >
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
           <ul className="space-y-5">
-            <Feature title="L'ordonnance lue en entier" body="Photo ou scan, manuscrite comprise : chaque ligne est lue, rattachée au catalogue national, puis confirmée par un professionnel." />
-            <Feature title="Interactions et terrain" body="Référentiel d'interactions, âge, grossesse, allaitement, insuffisance rénale, allergies déclarées. Ce qui n'est pas couvert est dit, jamais tu." />
-            <Feature title="Cent règles de vigilance écrites par un pharmacien" body="Famille par famille : ce qu'il faut savoir, demander ou éviter avant de proposer quoi que ce soit. Sourcées, versionnées." />
-            <Feature title="Ordonnance d'exception, stupéfiants, prescription restreinte" body="Le statut de chaque boîte est lu sur les bases officielles. L'alerte évite le rejet par l'Assurance maladie, et la vérification est tracée." />
+            <Feature title="L'ordonnance lue en entier" body="Manuscrite comprise, ligne par ligne, confirmée par un professionnel." />
+            <Feature title="Interactions et terrain" body="Âge, grossesse, rein, allergies. Ce qui n'est pas couvert est dit." />
+            <Feature title="Cent règles de vigilance" body="Écrites par un pharmacien, famille par famille." />
+            <Feature title="Ordonnance d'exception, stupéfiants" body="Le statut de chaque boîte, lu sur les bases officielles. Fini le rejet." />
           </ul>
           <SafetyMock />
         </div>
@@ -136,31 +128,30 @@ export default async function SitePage() {
       <Section
         id="pilotage"
         eyebrow="Pilotage · titulaire"
-        title="Vos règles, vos laboratoires, la marge de chaque conseil, et la valeur créée constatée, pas estimée."
-        lede="Le titulaire règle ce que l'officine met en avant et ce qu'elle écarte. Chaque conseil accepté est rattaché à la vente qui le suit : le chiffre d'affaires additionnel est lu dans les ventes, pas calculé sur une promesse."
+        title="Vos règles. Vos laboratoires. Votre marge."
+        lede="Et le chiffre d'affaires additionnel, lu dans vos ventes."
       >
         <div className="grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:items-center">
           <PilotMock />
           <ul className="space-y-5">
-            <Feature title="La marge, visible sur chaque conseil" body="Prix de vente, prix d'achat, marge : sur chaque produit proposé au comptoir, et en total sur les ventes additionnelles du mois. Vous voyez ce que chaque conseil rapporte, pas une estimation." />
-            <Feature title="Règles de l'officine" body="Laboratoires préférés, gammes à mettre en avant, références à exclure. Les règles de sécurité, elles, ne se désactivent pas." />
-            <Feature title="Stock à jour" body="Les ventes se déduisent à la seconde par la douchette ; l'inventaire de votre logiciel est relu à chaque export. Rien à ressaisir." />
-            <Feature title="Équipe et traçabilité" body="Rôles par personne, journal de chaque décision, performance par collaborateur. Vous savez qui a proposé quoi, et ce qui a été vendu." />
-            <Feature title="Le patient repart avec son plan" body="Plan de prise, fiche conseil, QR code et suivi programmé : le patient voit sa pharmacie, pas un logiciel." />
+            <Feature title="La marge sur chaque conseil" body="Et en total sur le mois." />
+            <Feature title="Vos règles" body="Laboratoires préférés, gammes, exclusions. La sécurité, elle, ne se désactive pas." />
+            <Feature title="Stock à jour" body="Les ventes au bip, l'inventaire à chaque export." />
+            <Feature title="Par collaborateur" body="Qui a proposé quoi, et ce qui a été vendu." />
           </ul>
         </div>
       </Section>
 
       {/* ---- Pourquoi ----------------------------------------------- */}
-      <Section id="pourquoi" eyebrow="Pourquoi PharmaBoost" title="Ce qu'une officine y gagne, au comptoir et dans les comptes." tone="sunken">
+      <Section id="pourquoi" eyebrow="Ce que l'officine y gagne" title="Au comptoir, et dans les comptes." tone="sunken">
         <div className="grid gap-5 md:grid-cols-3">
           {[
-            { t: "Un conseil plus régulier", d: "L'opportunité apparaît au moment où elle est utile, pendant la vente ou face à une demande spontanée, sans y penser." },
-            { t: "Une équipe qui monte en compétence", d: "Chaque proposition explique pourquoi. Le junior apprend, le senior gagne du temps, le patient entend la même chose de tous." },
-            { t: "Un patient mieux accompagné", d: "Anticiper un effet indésirable, soutenir l'observance, compléter utilement un traitement : le conseil sert d'abord à ça." },
-            { t: "Des pratiques harmonisées", d: "Le même socle de règles pour tout le comptoir, et la liberté de chacun de l'adapter au patient en face." },
-            { t: "La sécurité qui ne se discute pas", d: "Une proposition contre-indiquée est écartée avant même que le catalogue soit regardé. La marge n'a pas voix au chapitre." },
-            { t: "Le rythme du comptoir préservé", d: "Pas de second scan, pas de fenêtre qui bloque, pas de formation. Le premier bip suffit." },
+            { t: "Un conseil plus régulier", d: "Au moment utile, sans y penser." },
+            { t: "Une équipe qui progresse", d: "Chaque proposition dit pourquoi." },
+            { t: "Un patient mieux accompagné", d: "Le conseil sert d'abord à ça." },
+            { t: "Les mêmes règles pour tous", d: "Et la liberté de chacun." },
+            { t: "La sécurité ne se discute pas", d: "La marge n'a pas voix au chapitre." },
+            { t: "Le rythme préservé", d: "Pas de second scan, pas de formation." },
           ].map((item) => (
             <div key={item.t} className="rounded-2xl border border-border-subtle bg-surface-app p-6">
               <p className="text-[15.5px] font-semibold text-text-primary">{item.t}</p>
@@ -171,7 +162,7 @@ export default async function SitePage() {
       </Section>
 
       {/* ---- Tarifs ------------------------------------------------- */}
-      <Section id="tarifs" eyebrow="Tarifs" title="Un abonnement simple, sans engagement." lede="Tous les postes de comptoir de l'officine, toutes les fonctions, les mises à jour comprises. Pas de licence à compter.">
+      <Section id="tarifs" eyebrow="Tarifs" title="Un abonnement simple, sans engagement." lede="Tous les postes, toutes les fonctions, les mises à jour comprises.">
         <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
           <div className="rounded-3xl border border-brand-200 bg-surface-card p-8 shadow-[0_24px_60px_-32px_rgba(15,118,110,0.45)] dark:border-brand-800">
             <p className="text-[13px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">{offer.name}</p>
@@ -248,5 +239,21 @@ export default async function SitePage() {
         </div>
       </section>
     </>
+  );
+}
+
+function HeroSide({ title, items, accent = false }: { title: string; items: [string, string][]; accent?: boolean }) {
+  return (
+    <div className={accent ? "rounded-2xl bg-brand-800 p-5 text-white" : "rounded-2xl border border-border-subtle bg-surface-card p-5"}>
+      <p className={accent ? "text-[12px] font-semibold tracking-[0.08em] text-brand-200 uppercase" : "text-[12px] font-semibold tracking-[0.08em] text-text-tertiary uppercase"}>{title}</p>
+      <ul className="mt-3 space-y-2.5">
+        {items.map(([t, d]) => (
+          <li key={t} className="flex items-start gap-2.5">
+            <Check className={accent ? "mt-0.5 size-4 shrink-0 text-accent-300" : "mt-0.5 size-4 shrink-0 text-success-600"} />
+            <span className="text-[14px] leading-5"><span className={accent ? "font-semibold text-white" : "font-semibold text-text-primary"}>{t}</span> <span className={accent ? "text-brand-100" : "text-text-secondary"}>· {d}</span></span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

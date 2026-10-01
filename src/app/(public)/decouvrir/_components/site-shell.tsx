@@ -4,6 +4,7 @@ import { PharmaLogo } from "@/components/app/logo";
 import { cn } from "@/lib/utils";
 
 const NAV = [
+  { href: "/decouvrir/pourquoi", label: "Pourquoi" },
   { href: "/decouvrir#preuve", label: "Vendre plus" },
   { href: "/decouvrir#bip", label: "Au bip" },
   { href: "/decouvrir#sans-ordonnance", label: "Sans ordonnance" },
@@ -72,7 +73,8 @@ export function SiteFooter({ contactEmail }: { contactEmail: string }) {
         <FooterColumn
           title="Produit"
           links={[
-            { href: "/decouvrir#preuve", label: "Vendre plus, et le prouver" },
+            { href: "/decouvrir/pourquoi", label: "Pourquoi PharmaBoost" },
+            { href: "/decouvrir#preuve", label: "Vendre plus, et le voir" },
             { href: "/decouvrir#bip", label: "L'avis au bip" },
             { href: "/decouvrir#sans-ordonnance", label: "Demande sans ordonnance" },
             { href: "/decouvrir#securite", label: "Sécurité et réglementation" },
