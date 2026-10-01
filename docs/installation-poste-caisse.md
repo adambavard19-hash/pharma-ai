@@ -96,3 +96,13 @@ powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -MiseAJour
 powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -TestAffichage
 ```
 
+## Le stock relu par le poste (agent 0.4.1)
+
+Si le dossier où le LGO enregistre son édition de stock est visible depuis
+un poste (un partage du serveur, par exemple `\\SERVEUR\PharmaBoost\Export`),
+on l'indique dans PharmaBoost → Stock → Connecter mon logiciel → Postes de
+caisse, sous le poste. Le poste le relit à chaque nouvel export (vérification
+toutes les trente secondes) et PharmaBoost remet le stock d'aplomb. Le bouton
+« Mettre à jour le stock maintenant » force une relecture dans la minute.
+Le serveur, lui, n'a besoin ni d'Internet ni d'un programme.
+
