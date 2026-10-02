@@ -76,7 +76,7 @@ export default async function TeamPage() {
           <a href={`mailto:${email}`} className="mt-4 inline-block text-[18px] font-semibold text-brand-700 underline underline-offset-4">{email}</a>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/decouvrir/demo" className="inline-flex h-11 items-center gap-2 rounded-full bg-brand-600 px-5 text-[14.5px] font-semibold text-white hover:bg-brand-700">Réserver une démo <ArrowRight className="size-4" /></Link>
-            <Link href="/decouvrir#tarifs" className="inline-flex h-11 items-center rounded-full border border-border-default px-5 text-[14.5px] font-medium text-text-primary hover:bg-surface-sunken">Voir le tarif</Link>
+            <Link href="/decouvrir#tarif"className="inline-flex h-11 items-center rounded-full border border-border-default px-5 text-[14.5px] font-medium text-text-primary hover:bg-surface-sunken">Voir le tarif</Link>
           </div>
         </div>
       </section>
