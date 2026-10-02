@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/server/db/client";
 import { withAdvisoryLock } from "@/server/db/advisory-lock";
-import { generateToken, hashToken } from "@/server/security/tokens";
+import { deriveToken, generateToken, hashToken } from "@/server/security/tokens";
 import { getMessagingProvider, getStorageProvider } from "@/server/ai/registry";
 import { getSignatureProvider } from "@/server/signature/registry";
 import { buildContractDocument, CONTRACT_TEMPLATE_KEY } from "@/core/contracts/template";
@@ -153,8 +153,9 @@ export async function generateContract(prospectId: string, terms: { monthlyPrice
       expiresAt: new Date(Date.now() + CONTRACT_LINK_TTL_MS),
     },
   });
-  // Le jeton en clair n'est conservé nulle part : il repart dans l'e-mail au moment de l'envoi.
-  contractTokens.set(contract.id, token);
+  void token;
+  // Le jeton définitif dérive de l'identifiant du contrat : stable d'une instance à l'autre.
+  await ensureContractToken(contract.id);
   await prisma.prospect.update({ where: { id: prospect.id }, data: { monthlyPriceCents: terms.monthlyPriceCents, planId: terms.planId ?? prospect.planId } });
   await recordProspectEvent({ prospectId: prospect.id, type: "CONTRACT_GENERATED", summary: `Contrat ${ref} généré (${(terms.monthlyPriceCents / 100).toFixed(2).replace(".", ",")} € HT/mois, ${terms.durationMonths} mois${terms.trialDays ? `, ${terms.trialDays >= 28 && terms.trialDays <= 31 ? "premier mois offert" : `${terms.trialDays} jours offerts`}` : ""}).`, actor, metadata: { contractId: contract.id, planId: terms.planId ?? null, templateKey: CONTRACT_TEMPLATE_KEY } });
   await recordAudit({ action: "sales.contract_generated", entityType: "Contract", entityId: contract.id, salesRepId: actor.type === "SALES" ? actor.id : null, platformAdminId: actor.type === "ADMIN" ? actor.id : null });
@@ -162,18 +163,15 @@ export async function generateContract(prospectId: string, terms: { monthlyPrice
 }
 
 /**
- * Le jeton d'accès en clair, entre la génération et l'envoi, vit en mémoire du
- * processus. Si l'envoi a lieu plus tard ou depuis une autre instance, un
- * nouveau jeton est émis (l'ancien devient caduc) — c'est le comportement voulu.
+ * Le jeton du lien « /contrat/… » : dérivé du secret de l'application et de
+ * l'identifiant du contrat. Il est le même sur toutes les instances et à
+ * chaque envoi : un lien déjà reçu reste valable. Seule son empreinte est en
+ * base. Un contrat plus ancien (jeton aléatoire) bascule une fois sur ce régime.
  */
-const contractTokens = new Map<string, string>();
-
 async function ensureContractToken(contractId: string): Promise<string> {
-  const known = contractTokens.get(contractId);
-  if (known) return known;
-  const token = generateToken(32);
-  await prisma.contract.update({ where: { id: contractId }, data: { accessTokenHash: hashToken(token) } });
-  contractTokens.set(contractId, token);
+  const token = deriveToken(`contract:${contractId}`);
+  const hash = hashToken(token);
+  await prisma.contract.updateMany({ where: { id: contractId, NOT: { accessTokenHash: hash } }, data: { accessTokenHash: hash } });
   return token;
 }
 
@@ -221,7 +219,10 @@ async function startContractingLocked(prospectId: string, actor: SalesActor, inp
     (input.durationMonths == null || input.durationMonths === last.durationMonths) &&
     (input.planId == null || input.planId === last.planId) &&
     sameDay(input.startDate, last.startDate);
-  let contractId = last?.status === "DRAFT" && (draftMatches || last.providerEnvelopeId) ? last.id : null;
+  // Un dossier corrigé après la génération (adresse, signataire…) donne un nouveau contrat : jamais l'ancien PDF.
+  const STALE_MARGIN_MS = 5_000;
+  const dossierChangedSinceDraft = last ? prospect.updatedAt.getTime() > last.createdAt.getTime() + STALE_MARGIN_MS : false;
+  let contractId = last?.status === "DRAFT" && draftMatches && !dossierChangedSinceDraft ? last.id : null;
   if (!contractId) {
     const resolved = await resolveContractTerms(prospect, input);
     if (!resolved.ok) return resolved;
@@ -587,7 +588,8 @@ export type ReminderRunReport = { checked: number; reminded: number; escalated: 
 export async function runContractReminders(now = new Date(), policyOverride?: ReminderPolicy): Promise<ReminderRunReport> {
   const policy = policyOverride ?? (await loadReminderPolicy());
   const report: ReminderRunReport = { checked: 0, reminded: 0, escalated: 0, expired: 0, errors: [] };
-  const contracts = await prisma.contract.findMany({ where: { status: { in: AWAITING_PHARMACY as ContractStatusCode[] } }, include: { prospect: { select: { id: true, name: true, salesRepId: true, blockedAt: true } } } });
+  // Seuls les contrats du moteur actuel sont relancés : les anciens (modèle v1, sans lien de signature conservé) ne le sont jamais.
+  const contracts = await prisma.contract.findMany({ where: { status: { in: AWAITING_PHARMACY as ContractStatusCode[] }, templateKey: CONTRACT_TEMPLATE_KEY }, include: { prospect: { select: { id: true, name: true, salesRepId: true, blockedAt: true } } } });
   for (const contract of contracts) {
     report.checked += 1;
     if (contract.prospect.blockedAt) continue;

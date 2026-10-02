@@ -15,7 +15,8 @@ export default async function CompanyPage() {
     <>
       <PageHeader title="Société exploitante" description="La partie signataire des contrats d'abonnement. Ces informations sont injectées dans chaque contrat généré." />
       <CompanyForm initial={profile ? { legalName: profile.legalName, legalForm: profile.legalForm ?? "", addressLine1: profile.addressLine1 ?? "", postalCode: profile.postalCode ?? "", city: profile.city ?? "", siren: profile.siren ?? "", representativeName: profile.representativeName, representativeTitle: profile.representativeTitle ?? "", representativeEmail: profile.representativeEmail } : null} />
-      <RemindersForm initial={policy} />
+      {/* La tâche planifiée n'existe que si CRON_SECRET est configuré : on le dit tel quel. */}
+      <RemindersForm initial={policy} scheduled={Boolean(process.env.CRON_SECRET)} />
     </>
   );
 }

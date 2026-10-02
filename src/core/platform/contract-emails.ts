@@ -145,6 +145,23 @@ export function buildSubscriptionReceivedEmail(ctx: EmailContext, v: { ownerName
   });
 }
 
+/** Confirmation de l'adresse avant tout envoi de contrat (demande faite sur le site). */
+export function buildEmailConfirmationEmail(ctx: EmailContext, v: { ownerName: string; pharmacyName: string; confirmUrl: string }): RenderedEmail {
+  return renderEmail(ctx, {
+    subject: "Confirmez votre demande d'abonnement PharmaBoost",
+    preheader: `Une confirmation, et le contrat de ${v.pharmacyName} vous est adressé.`,
+    eyebrow: "Demande d'abonnement",
+    title: "Confirmez votre adresse e-mail",
+    greeting: `Bonjour ${v.ownerName},`,
+    blocks: [
+      { kind: "paragraph", text: `Nous avons bien reçu la demande d'abonnement de ${v.pharmacyName}. Pour vous adresser le contrat en toute sécurité, confirmez que cette adresse est bien la vôtre.`, strong: [v.pharmacyName] },
+      { kind: "button", url: v.confirmUrl, label: "Confirmer et recevoir mon contrat" },
+      { kind: "note", text: "Ce lien est valable 48 heures. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : aucun contrat ne sera envoyé." },
+    ],
+    reason: "Vous recevez cet e-mail à la suite d'une demande d'abonnement sur pharmaboost.app.",
+  });
+}
+
 /** Une action est attendue du titulaire (information manquante, contrat expiré…). */
 export function buildActionRequiredEmail(ctx: EmailContext, v: { ownerName: string; pharmacyName: string; title: string; message: string; actionUrl?: string | null; actionLabel?: string }): RenderedEmail {
   return renderEmail(ctx, {
