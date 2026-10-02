@@ -34,7 +34,10 @@ import { trainingsForProducts } from "@/server/services/training";
 import { parseSuggestionVigilances } from "@/config/vigilances";
 import { requiresPharmacistValidation } from "@/core/ai/engines/population-vigilance";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
-import type { PatientFactor, SpecialtyProposal } from "./types";
+import { brandKey, brandLabelOf } from "@/core/catalog/brand";
+import { selectCounterCards } from "@/core/partners/counter-card";
+import { counterBrandsFor } from "@/server/services/partners/visibility";
+import type { PartnerCardView, PatientFactor, SpecialtyProposal } from "./types";
 
 export const metadata: Metadata = { title: "Vente" };
 
@@ -237,6 +240,29 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         )
       : Promise.resolve(new Map<string, { id: string; title: string }[]>()),
   ]);
+  // Gammes partenaires : calculées APRÈS le moteur, à partir des conseils qu'il
+  // a déjà rendus, et affichées à part. Rien ici ne retourne au moteur.
+  const orderedRecommendations = [...prescription.recommendations].sort(
+    (a, b) => (b.opportunity?.priority ?? 0) - (a.opportunity?.priority ?? 0) || b.totalScore - a.totalScore,
+  );
+  const partnerCards: PartnerCardView[] = session.permissions.has(PERMISSIONS.PARTNERS_VIEW)
+    ? selectCounterCards(
+        orderedRecommendations.map((recommendation) => {
+          const label = recommendation.product ? brandLabelOf(recommendation.product.name, recommendation.product.brand) : null;
+          return {
+            recommendationId: recommendation.id,
+            category: recommendation.opportunity?.category ?? null,
+            opportunityBlocked: recommendation.opportunity?.isBlocked ?? false,
+            patientAnswer: recommendation.opportunity?.answer ?? null,
+            status: recommendation.status,
+            contraindicated: parseSuggestionVigilances(recommendation.vigilances).some((v) => v.level === "CONTRAINDICATION" && v.status === true),
+            productBrandKey: label ? brandKey(label) : null,
+          };
+        }),
+        await counterBrandsFor(session.scope),
+      ).map(({ brandId, slug, name, partnerName, logoUrl, universe }) => ({ brandId, slug, name, partnerName, logoUrl, universe }))
+    : [];
+
   const shortDateOf = (key: string) => {
     const shortDate = shortDates.get(key);
     return shortDate && (shortDate.level === "SOON" || shortDate.level === "URGENT") ? { daysLeft: shortDate.daysLeft, level: shortDate.level } : null;
@@ -462,6 +488,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
       }
       stockNotice={stockNotice}
       canImportStock={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
+      partnerCards={partnerCards}
     />
   );
 }

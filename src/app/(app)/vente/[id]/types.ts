@@ -197,6 +197,19 @@ export type PatientFactor = {
   tone: "warning" | "neutral";
 };
 
+/**
+ * Une carte « Gamme partenaire » : calculée après le moteur, jamais un conseil
+ * (cf. src/core/partners/counter-card.ts).
+ */
+export type PartnerCardView = {
+  brandId: string;
+  slug: string;
+  name: string;
+  partnerName: string;
+  logoUrl: string | null;
+  universe: string;
+};
+
 export type BlockedOpportunityView = {
   id: string;
   title: string;

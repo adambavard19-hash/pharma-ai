@@ -27,6 +27,7 @@ import { ChecksNote } from "./checks-note";
 import { SafetyZone, VigilanceCards } from "./safety-zone";
 import { RegulationZone } from "./regulation-zone";
 import { AdviceZone } from "./advice-zone";
+import { PartnerCards } from "./partner-cards";
 import type { EngineOutcome } from "@/core/ai/outcome";
 import { DeliveryZone, type DeliveryExtra } from "./delivery-zone";
 import { counterIsBlocked } from "@/core/ai/safety-gate";
@@ -35,6 +36,7 @@ import type { AnalysisStage } from "@/server/services/analysis";
 import type {
   AdviceView,
   BlockedOpportunityView,
+  PartnerCardView,
   PatientFactor,
   SafetyFindingView,
   SaleLineDraft,
@@ -85,6 +87,7 @@ export function SaleWorkspace({
   outcome,
   canImportStock,
   stockNotice,
+  partnerCards = [],
 }: {
   prescription: {
     id: string;
@@ -125,6 +128,8 @@ export function SaleWorkspace({
   canImportStock: boolean;
   /** De quand date le stock affiché, quand un agent LGO est connecté. */
   stockNotice: { tone: "ok" | "warning"; text: string } | null;
+  /** Gammes partenaires à découvrir : à part, jamais des conseils. */
+  partnerCards?: PartnerCardView[];
 }) {
   const alreadyVerified = Boolean(prescription.verifiedAt);
   const [lines, setLines] = useState(() => withDefaultConfirmation(initialLines, alreadyVerified));
@@ -540,6 +545,7 @@ export function SaleWorkspace({
           {!editing && !analysing && (
             <>
               <AdviceZone prescriptionId={prescription.id} recommendations={recommendations} canDecide={permissions.decide} canVerify={permissions.verify} locked={blocked} outcome={outcome} canImportStock={canImportStock} stockNotice={stockNotice} inBasket={(id) => basket.has(id)} onAccept={acceptAdvice} onCancelAccept={cancelAdvice} />
+              {!blocked && <PartnerCards cards={partnerCards} />}
               <DeliveryZone
                 accepted={[...basket.entries()].map(([recommendationId, line]) => {
                   const recommendation = recommendations.find((r) => r.id === recommendationId);
