@@ -176,7 +176,8 @@ export type AuditAction =
   | "partner.preference_updated"
   | "partner.lead_created"
   | "partner.order_created"
-  | "partner.order_status_changed";
+  | "partner.order_status_changed"
+  | "partner.orders_exported";
 
 export async function recordAudit(params: {
   action: AuditAction;

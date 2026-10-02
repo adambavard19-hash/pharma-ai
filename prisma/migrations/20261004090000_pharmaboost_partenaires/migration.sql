@@ -313,6 +313,7 @@ CREATE TABLE "partner_orders" (
     "totalCents" INTEGER,
     "partnerReference" TEXT,
     "statusDetail" TEXT,
+    "note" TEXT,
     "transmittedAt" TIMESTAMP(3),
     "confirmedAt" TIMESTAMP(3),
     "createdByUserId" TEXT,

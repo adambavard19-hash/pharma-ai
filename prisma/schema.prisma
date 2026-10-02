@@ -3601,6 +3601,8 @@ model PartnerOrder {
   totalCents       Int?
   partnerReference String?
   statusDetail     String?
+  /// Note libre de l'officine pour le partenaire (jamais de donnée patient).
+  note             String?
   transmittedAt    DateTime?
   confirmedAt      DateTime?
   createdByUserId  String?
