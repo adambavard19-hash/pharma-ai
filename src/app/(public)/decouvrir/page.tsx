@@ -37,9 +37,9 @@ const STOCK_POINTS = [
 ];
 
 const SAFETY = [
-  { label: "Vigilances", value: "100 règles écrites par un pharmacien" },
-  { label: "Réglementation", value: "Ordonnance d'exception signalée" },
-  { label: "Décision", value: "Le pharmacien valide chaque conseil" },
+  { label: "Vigilances", value: "Contrôles intégrés au parcours" },
+  { label: "Réglementation", value: "Les situations à risque sont signalées" },
+  { label: "Décision", value: "Le pharmacien garde la validation finale" },
   { label: "Données", value: "Aucune donnée patient conservée" },
 ];
 
