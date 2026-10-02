@@ -134,7 +134,7 @@ export function SubscriptionForm({ planId, offerLabel, referralCode = "" }: { pl
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" size="lg" loading={pending} disabled={!confirm}>Recevoir mon contrat à signer</Button>
-        <p className="text-[12.5px] text-text-tertiary">Vous le recevez par e-mail dans la minute. Rien n&apos;est prélevé à cette étape.</p>
+        <p className="text-[12.5px] text-text-tertiary">Une confirmation de votre adresse, puis le contrat arrive aussitôt. Rien n&apos;est prélevé à cette étape.</p>
       </div>
     </form>
   );

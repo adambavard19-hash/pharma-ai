@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { headers } from "next/headers";
 import { receiveSiteLead } from "@/server/services/site-leads";
-import { normalizeSubscriptionRequest, requestSubscription, type SubscriptionRequestOutcome } from "@/server/services/subscription-requests";
+import { confirmSubscription, normalizeSubscriptionRequest, requestSubscription, type SubscriptionRequestOutcome } from "@/server/services/subscription-requests";
 import { fail, ok, type ActionResult } from "./types";
 
 const schema = z.object({
@@ -116,7 +116,8 @@ export async function submitSubscriptionRequestAction(payload: z.input<typeof su
   const checked = normalizeSubscriptionRequest(request);
   if (!checked.ok) return fail("Certaines informations sont à corriger.", checked.errors);
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "inconnue";
-  if (throttled(`souscription:${ip}:${checked.value.siret}`)) return fail("Nous avons déjà reçu votre demande : votre contrat vous a été adressé par e-mail.");
+  // Limite par adresse IP et par adresse e-mail, quel que soit le SIRET saisi (mémoire de l'instance).
+  if (throttled(`souscription-ip:${ip}`) || throttled(`souscription-email:${checked.value.email}`)) return fail("Nous avons déjà reçu plusieurs demandes : notre équipe revient vers vous. Pour toute urgence, écrivez à contact@pharmaboost.app.");
   try {
     const result = await requestSubscription(request);
     if (!result.ok) return fail("Certaines informations sont à corriger.", result.errors);
@@ -125,4 +126,14 @@ export async function submitSubscriptionRequestAction(payload: z.input<typeof su
     console.error("[site] souscription impossible", error);
     return fail("Votre demande n'a pas pu être enregistrée. Écrivez-nous à contact@pharmaboost.app.");
   }
+}
+
+/** Le titulaire confirme son adresse depuis le lien reçu : le contrat part alors, une seule fois. */
+export async function confirmSubscriptionAction(token: string): Promise<ActionResult<{ status: string; email: string }>> {
+  if (typeof token !== "string" || token.length > 2000) return fail("Lien invalide.");
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "inconnue";
+  if (throttled(`confirmation:${ip}`)) return fail("Trop de tentatives : réessayez dans une heure.");
+  const result = await confirmSubscription(token);
+  if (!result.ok) return fail(result.error);
+  return ok({ status: result.status, email: result.email });
 }

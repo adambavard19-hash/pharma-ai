@@ -17,7 +17,7 @@ export default async function SubscribePage({ searchParams }: { searchParams: Pr
       <div>
         <p className="font-mono text-[12px] tracking-[0.14em] text-brand-700 uppercase">Abonnement</p>
         <h1 className="mt-3 text-[34px] leading-[1.08] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[42px]">Souscrire à PharmaBoost.</h1>
-        <p className="mt-4 text-[16px] leading-7 text-text-secondary">Vos informations une seule fois. Le contrat prérempli arrive par e-mail, à signer en ligne.</p>
+        <p className="mt-4 text-[16px] leading-7 text-text-secondary">Vos informations une seule fois. Après confirmation de votre adresse e-mail, le contrat prérempli vous est envoyé pour une signature en ligne. L&apos;abonnement démarre à la signature.</p>
         <div className="mt-8 rounded-[28px] border border-border-subtle bg-surface-card p-6">
           <p className="font-mono text-[11.5px] tracking-[0.14em] text-text-tertiary uppercase">{offer?.name ?? "PharmaBoost Officine"}</p>
           <p className="mt-2 flex items-baseline gap-2"><span className="text-[36px] leading-none font-semibold tracking-[-0.02em] text-text-primary tabular">{price}</span><span className="text-[14px] text-text-secondary">HT / mois</span></p>

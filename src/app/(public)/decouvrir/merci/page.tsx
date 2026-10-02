@@ -5,10 +5,8 @@ import { CheckCircle2 } from "lucide-react";
 export const metadata: Metadata = { title: "Demande reçue", robots: { index: false, follow: false } };
 
 const SUBSCRIPTION_OUTCOMES: Record<string, { title: string; body: string }> = {
-  contract_sent: { title: "Votre contrat est en route.", body: "Il vient de partir à l'adresse indiquée : ouvrez l'e-mail « Votre contrat PharmaBoost est prêt à être signé » et signez-le en ligne, en quelques minutes. Pensez à vérifier les courriers indésirables." },
-  already_in_progress: { title: "Votre contrat vous attend déjà.", body: "Un contrat a déjà été adressé à cette officine : retrouvez-le dans votre messagerie pour le signer. Notre équipe reste à votre disposition." },
-  already_client: { title: "Votre officine est déjà connue de PharmaBoost.", body: "Notre équipe revient vers vous rapidement pour donner suite à votre demande." },
-  received: { title: "Votre demande d'abonnement est reçue.", body: "Votre contrat est en cours de préparation : vous le recevez par e-mail très prochainement. Un accusé de réception vient de partir à l'adresse indiquée." },
+  confirmation_sent: { title: "Plus qu'une confirmation.", body: "Un e-mail vient de partir à l'adresse indiquée : cliquez sur « Confirmer et recevoir mon contrat ». Votre contrat prérempli vous est alors adressé aussitôt pour signature électronique. Pensez à vérifier les courriers indésirables." },
+  received: { title: "Votre demande d'abonnement est reçue.", body: "Notre équipe vérifie votre demande et revient vers vous très rapidement. Un accusé de réception vient de partir à l'adresse indiquée." },
 };
 
 export default async function ThanksPage({ searchParams }: { searchParams: Promise<{ type?: string; etat?: string }> }) {

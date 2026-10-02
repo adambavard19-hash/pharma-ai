@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildContractFinalizedEmail, buildPharmacySignedEmail, buildSignatureReminderEmail, buildSignatureRequestEmail, buildSubscriptionReceivedEmail } from "../contract-emails";
+import { buildContractFinalizedEmail, buildEmailConfirmationEmail, buildPharmacySignedEmail, buildSignatureReminderEmail, buildSignatureRequestEmail, buildSubscriptionReceivedEmail } from "../contract-emails";
 import { renderEmail, trialLabel } from "../email-layout";
 import { buildContractEmail, shell } from "../sales-emails";
 
@@ -58,7 +58,10 @@ describe("e-mails du parcours contractuel", () => {
       buildPharmacySignedEmail(ctx, { ...facts, signedAt: new Date() }),
       buildContractFinalizedEmail(ctx, { ...facts, finalizedAt: new Date(), documentUrl: "https://pharmaboost.app/contrat/tok" }),
       buildSubscriptionReceivedEmail(ctx, { ownerName: "Marc", pharmacyName: "Pharmacie du Port", nextStep: "Votre contrat arrive." }),
+      buildEmailConfirmationEmail(ctx, { ownerName: "Marc", pharmacyName: "Pharmacie du Port", confirmUrl: "https://pharmaboost.app/decouvrir/abonnement/confirmer?jeton=x" }),
     ];
+    expect(all[4].html).toContain("Confirmer et recevoir mon contrat");
+    expect(all[4].text).toContain("aucun contrat ne sera envoyé");
     expect(all[0].subject).toBe("Votre contrat PharmaBoost attend toujours votre signature");
     expect(all[2].html).toContain("Télécharger le contrat signé");
     expect(all[2].text).toContain("Les prochaines étapes");

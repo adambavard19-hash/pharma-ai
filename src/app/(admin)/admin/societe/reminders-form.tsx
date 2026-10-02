@@ -14,7 +14,7 @@ import type { ReminderPolicy } from "@/core/contracts/reminders";
  * La cadence des relances d'un contrat non signé. Sobre par défaut ; elle
  * s'arrête d'elle-même dès que le titulaire a signé.
  */
-export function RemindersForm({ initial }: { initial: ReminderPolicy }) {
+export function RemindersForm({ initial, scheduled }: { initial: ReminderPolicy; scheduled: boolean }) {
   const [policy, setPolicy] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -47,7 +47,11 @@ export function RemindersForm({ initial }: { initial: ReminderPolicy }) {
           <Button loading={pending} onClick={() => run(() => saveReminderPolicyAction(policy))}>Enregistrer</Button>
           <Button variant="outline" loading={pending} onClick={() => run(() => runRemindersNowAction())}>Lancer le passage maintenant</Button>
         </div>
-        <p className="text-[12.5px] text-text-tertiary">Le passage s&apos;exécute chaque jour automatiquement ; « Lancer le passage maintenant » l&apos;exécute à la demande. Un contrat dont le délai de signature est dépassé passe « Expiré ».</p>
+        {scheduled ? (
+          <p className="text-[12.5px] text-text-tertiary">Passage automatique : chaque jour à 8 h (UTC). « Lancer le passage maintenant » l&apos;exécute à la demande. Un contrat dont le délai de signature est dépassé passe « Expiré ». Seuls les contrats du modèle actuel sont relancés.</p>
+        ) : (
+          <Alert tone="warning">Passage automatique inactif : la variable CRON_SECRET n&apos;est pas configurée sur ce serveur. Les relances ne partent que par « Lancer le passage maintenant ».</Alert>
+        )}
       </CardContent>
     </Card>
   );
