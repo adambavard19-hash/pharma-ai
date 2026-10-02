@@ -5,6 +5,9 @@
  * fournisseur d'IA. C'est ce qui permet de tester le moteur métier isolément
  * et de changer de modèle sans réécrire les règles.
  */
+import type { ShortDate } from "../stock/expiry";
+import type { SuggestionVigilance, VigilanceLevel } from "../../config/vigilances";
+import type { PopulationVigilanceRule } from "./engines/population-vigilance";
 import type { EngineOutcome } from "./outcome";
 
 export type ProductCategoryCode =
@@ -178,6 +181,13 @@ export type CatalogProduct = {
   /** Disponibilité dans une autre officine du groupe, si l'option est active. */
   availableInSiblingPharmacy: boolean;
   isActive: boolean;
+  /**
+   * Le lot non périmé le plus proche, quand l'officine suit ses dates. Ne sert
+   * qu'au départage de références équivalentes — jamais au score.
+   */
+  shortDate?: ShortDate | null;
+  /** Vigilances patient déclarées par l'officine sur ce produit. */
+  vigilances?: { population: string; level: VigilanceLevel; note: string | null }[];
 };
 
 // --- Règles de l'officine --------------------------------------------------
@@ -304,6 +314,8 @@ export type AdviceOpportunityResult = {
   benefits?: string[];
   /** L'étape de routine que cette opportunité représente, quand la règle en décrit une. */
   routine?: RoutineStepInfo | null;
+  /** Vigilances par population écrites dans la règle (sourcées, jamais déduites). */
+  populations?: PopulationVigilanceRule[];
   triggeredBy: { lineIndex: number; drugName: string }[];
   /**
    * La question à poser au patient avant de proposer quoi que ce soit, écrite
@@ -367,6 +379,12 @@ export type ScoredRecommendation = {
   companion?: CompanionSuggestion | null;
   /** L'étape de routine, quand la proposition en fait partie. */
   routine?: RoutineStepInfo | null;
+  /** Vigilances patient à afficher sur la carte (jamais dans le document patient). */
+  vigilances?: SuggestionVigilance[];
+  /** Date courte de la référence retenue, s'il y en a une (information, jamais un argument). */
+  shortDate?: ShortDate | null;
+  /** Ce qui a départagé des références cliniquement équivalentes (trace). */
+  tiebreak?: string | null;
 };
 
 /** Un produit à proposer À CÔTÉ d'une recommandation (seringue avec un flacon de sérum). */

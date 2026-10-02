@@ -28,6 +28,8 @@ import {
   loadStockState,
   loadNationalDrugCandidates,
   loadPharmacyRules,
+  loadPreferredRanges,
+  enrichCatalog,
   loadValidationHistory,
 } from "./catalog";
 import { buildPatientContext } from "./patients";
@@ -252,7 +254,7 @@ export async function analysePrescription(params: {
   const knowledgeProvider = getDrugKnowledgeProvider();
 
   params.onStage?.("IDENTIFICATION");
-  const [patient, pharmacyCatalog, nationalCandidates, rules, history, stockState] = await Promise.all([
+  const [patient, pharmacyCatalog, nationalCandidates, rules, history, stockState, preferredRanges] = await Promise.all([
     buildPatientContext(prescription.patientId),
     loadCatalogSnapshot(params.scope, { includeSiblingAvailability: true }),
     // Les médicaments de l'officine susceptibles de répondre à une règle de
@@ -263,11 +265,13 @@ export async function analysePrescription(params: {
     // Le stock est-il seulement configuré ? La réponse change ce que le
     // comptoir affiche quand rien n'est proposé.
     loadStockState(params.scope),
+    // Gammes privilégiées : départage d'équivalents seulement (jamais le score).
+    loadPreferredRanges(params.scope),
   ]);
 
   // Les deux origines se rejoignent ici, le temps d'un classement. Elles ne se
-  // mélangent jamais en base.
-  const catalog = [...pharmacyCatalog, ...nationalCandidates];
+  // mélangent jamais en base. Dates courtes et vigilances déclarées s'y ajoutent.
+  const catalog = await enrichCatalog(params.scope, [...pharmacyCatalog, ...nationalCandidates]);
 
   const drugNames = prescription.lines
     .map((line) => line.drugName)
@@ -359,6 +363,7 @@ export async function analysePrescription(params: {
     history,
     explanations,
     extractionFindings,
+    preferredRanges,
     interactions: {
       substancesByLine,
       rules: interactionData.rules,
@@ -551,6 +556,7 @@ export async function analysePrescription(params: {
           patientReason: recommendation.patientReason,
           counterScript: recommendation.counterScript,
           precautions: recommendation.precautions,
+          vigilances: recommendation.vigilances && recommendation.vigilances.length > 0 ? (recommendation.vigilances as never) : undefined,
           unitPriceCents: product?.salePriceCents ?? 0,
           companion: recommendation.companion ? (recommendation.companion as never) : undefined,
           routine: recommendation.routine ? (recommendation.routine as never) : undefined,

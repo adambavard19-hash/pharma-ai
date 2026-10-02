@@ -18,6 +18,12 @@ import {
   type NeedKey,
 } from "../understanding";
 import { RECOMMENDATION_MIN_RELEVANCE, RECOMMENDATION_MIN_SCORE } from "@/config/constants";
+import { chooseAmongEquivalents } from "../ai/engines/tiebreak";
+import { declaredContraindicationFor, suggestionVigilances } from "../ai/engines/population-vigilance";
+import { matchesAny } from "../ai/engines/product-name";
+import { rangeRankFor, type PreferredRangeInput } from "../catalog/preferred-ranges";
+import type { ShortDate } from "../stock/expiry";
+import type { SuggestionVigilance } from "@/config/vigilances";
 import { detectAdviceOpportunities } from "../ai/engines/advice";
 import { findCandidateProducts } from "../ai/engines/matching";
 import { evaluateOpportunitySafety, evaluateProductSafety } from "../ai/engines/safety";
@@ -228,6 +234,10 @@ export type RequestProposal = {
   /** La question écrite dans la règle, à poser avant de proposer. */
   question: string | null;
   totalScore: number;
+  /** Vigilances patient à afficher (grossesse, asthme…), jamais remises au client. */
+  vigilances?: SuggestionVigilance[];
+  /** Date courte de la référence retenue, pour information. */
+  shortDate?: ShortDate | null;
 };
 
 export type RequestPipelineResult = {
@@ -253,6 +263,8 @@ export function runRequestPipeline(params: {
   rules: PharmacyRuleInput[];
   history: ProductValidationHistory;
   stockConfigured: boolean;
+  /** Gammes privilégiées : départage de références équivalentes, jamais le score. */
+  preferredRanges?: PreferredRangeInput[];
 }): RequestPipelineResult {
   const notes: string[] = [];
   const blocked: string[] = [];
@@ -272,6 +284,10 @@ export function runRequestPipeline(params: {
   }
   const opportunitySafety = evaluateOpportunitySafety(opportunities, params.patient, []);
   const productSafety = evaluateProductSafety(params.catalog, params.patient, []);
+  // Les contre-indications déclarées par l'officine sur ses fiches, comme pour une ordonnance.
+  for (const product of params.catalog) {
+    if (!productSafety.blockedProductIds.has(product.id) && declaredContraindicationFor(product, params.patient)) productSafety.blockedProductIds.add(product.id);
+  }
   const eligible = opportunities.filter((opportunity) => {
     const isBlocked = opportunity.isBlocked || opportunitySafety.blockedOpportunityKeys.has(opportunity.key);
     if (isBlocked) blocked.push(`${opportunity.title} : ${opportunity.blockReason ?? opportunitySafety.findings.find((f) => f.subjectId === opportunity.key)?.message ?? "écarté par le moteur de sécurité."}`);
@@ -294,12 +310,32 @@ export function runRequestPipeline(params: {
       );
       continue;
     }
-    let best: ScoredRecommendation | null = null;
+    const valid: ScoredRecommendation[] = [];
     for (const candidate of candidates) {
       const scored = scoreProductForOpportunity({ product: candidate.product, opportunity, patient: params.patient, rules: params.rules, history: params.history, blockedProductIds: productSafety.blockedProductIds });
       if (!scored || scored.totalScore < RECOMMENDATION_MIN_SCORE || scored.breakdown.relevance < RECOMMENDATION_MIN_RELEVANCE) continue;
-      if (!best || scored.totalScore > best.totalScore) best = scored;
+      scored.vigilances = suggestionVigilances(opportunity.populations ?? [], candidate.product, params.patient);
+      scored.shortDate = candidate.product.shortDate ?? null;
+      valid.push(scored);
     }
+    // Même règle que pour une ordonnance : la clinique désigne la meilleure
+    // référence, les préférences ne départagent que des équivalentes.
+    const catalogById = new Map(candidates.map((c) => [c.product.id, c.product]));
+    const best: ScoredRecommendation | null = valid.length
+      ? chooseAmongEquivalents(valid, {
+          formulaRank: (item) => {
+            const name = catalogById.get(item.productId)?.name ?? "";
+            const prefer = opportunity.productPrefer ?? [];
+            const index = prefer.findIndex((pattern) => matchesAny([pattern], name));
+            return index === -1 ? prefer.length : index;
+          },
+          rangeRank: (item) => {
+            const product = catalogById.get(item.productId);
+            return product ? rangeRankFor(product, opportunity.category ?? null, params.preferredRanges ?? []) : null;
+          },
+          shortDate: (item) => catalogById.get(item.productId)?.shortDate ?? null,
+        }).chosen
+      : null;
     if (!best) {
       notes.push(`« ${opportunity.title} » : les références candidates n'atteignent pas le seuil de pertinence.`);
       continue;
@@ -323,6 +359,8 @@ export function runRequestPipeline(params: {
       precautions: best.precautions,
       question: opportunity.question ?? null,
       totalScore: best.totalScore,
+      vigilances: best.vigilances ?? [],
+      shortDate: best.shortDate ?? null,
     });
   }
   proposals.sort((a, b) => b.totalScore - a.totalScore);

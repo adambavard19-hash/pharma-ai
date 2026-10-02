@@ -24,6 +24,9 @@ import type { TreatmentUnderstanding } from "../understanding";
 import { deriveOutcome } from "./outcome";
 import { matchesAny } from "./engines/product-name";
 import { evaluateVigilances, tagsIntersect } from "./engines/vigilance";
+import { chooseAmongEquivalents, clinicalSignature, TIEBREAK_LABELS } from "./engines/tiebreak";
+import { declaredContraindicationFor, suggestionVigilances } from "./engines/population-vigilance";
+import { rangeRankFor, type PreferredRangeInput } from "../catalog/preferred-ranges";
 import type {
   AnalysisResult,
   CatalogProduct,
@@ -106,6 +109,12 @@ export type PipelineInput = {
    * se fie au catalogue reçu.
    */
   stock?: { configured: boolean; referenceCount: number };
+  /**
+   * Gammes privilégiées de l'officine. Elles ne départagent que des références
+   * cliniquement équivalentes (engines/tiebreak.ts) : jamais un score, jamais
+   * une entrée dans le jeu. Les challenges laboratoires, eux, n'entrent pas ici.
+   */
+  preferredRanges?: PreferredRangeInput[];
   /** La compréhension IA a manqué (fournisseur absent ou appel en échec). */
   aiUnavailable?: boolean;
 };
@@ -423,6 +432,23 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     });
   }
 
+  // Une contre-indication que le pharmacien a déclarée sur sa fiche produit
+  // (grossesse, asthme…) écarte la référence quand le patient est concerné.
+  for (const product of input.catalog) {
+    if (productSafety.blockedProductIds.has(product.id)) continue;
+    const population = declaredContraindicationFor(product, input.patient);
+    if (!population) continue;
+    productSafety.blockedProductIds.add(product.id);
+    productSafety.findings.push({
+      severity: "BLOCKING",
+      code: "PRODUCT_CONTRAINDICATED_DECLARED",
+      message: `« ${product.name} » écarté : contre-indiqué (${population.toLowerCase()}) selon la fiche produit de l'officine.`,
+      subjectType: "PRODUCT",
+      subjectId: product.id,
+      source: "product-vigilances",
+    });
+  }
+
   const allSafetyFindings = [
     ...safetyFindings,
     ...vigilanceFindings,
@@ -553,6 +579,17 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     }
   }
 
+  // Vigilances patient (grossesse, asthme…) de la règle et de la fiche produit,
+  // et date courte de la référence : avant le départage, pour qu'une référence
+  // plus signalée ne soit jamais tenue pour équivalente à une autre.
+  const populationsByOpportunity = new Map(eligibleOpportunities.map((o) => [o.key, o.populations ?? []]));
+  for (const item of scored) {
+    const product = catalogById.get(item.productId);
+    if (!product) continue;
+    item.vigilances = suggestionVigilances(populationsByOpportunity.get(item.opportunityKey) ?? [], product, input.patient);
+    item.shortDate = product.shortDate ?? null;
+  }
+
   // ---------------------------------------------------------------- ÉTAPE 7
   // OPTIMISATION COMMERCIALE AUTORISÉE — dernière étape, périmètre restreint.
   // Elle ne peut QUE : (a) retenir une référence parmi des candidates déjà
@@ -590,14 +627,23 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       const routineBrand = new Map<string, string>();
       for (const [routineKey, keys] of routineGroups) {
         const coverage = new Map<string, number>();
+        const rangeBrands = new Set<string>();
         for (const key of keys) {
           const list = [...(byOpportunity.get(key) ?? [])].sort((a, b) => b.totalScore - a.totalScore);
           const best = list[0];
           if (!best) continue;
-          const brands = new Set(list.filter((i) => best.totalScore - i.totalScore < ROUTINE_BRAND_TOLERANCE).map((i) => brandOf(catalogById.get(i.productId))).filter(Boolean));
+          const near = list.filter((i) => best.totalScore - i.totalScore < ROUTINE_BRAND_TOLERANCE);
+          const brands = new Set(near.map((i) => brandOf(catalogById.get(i.productId))).filter(Boolean));
           for (const brand of brands) coverage.set(brand, (coverage.get(brand) ?? 0) + 1);
+          const category = opportunityByKey.get(key)?.category ?? null;
+          for (const i of near) {
+            const product = catalogById.get(i.productId);
+            if (product && rangeRankFor(product, category, input.preferredRanges ?? []) !== null) rangeBrands.add(brandOf(product));
+          }
         }
-        const weight = (entry: [string, number]) => entry[1] + (preferredBrands.includes(entry[0]) ? 0.5 : 0);
+        // À couverture égale, la marque mise en avant l'emporte, puis une gamme
+        // privilégiée qui s'applique à ces étapes : jamais au point de compter une étape de plus.
+        const weight = (entry: [string, number]) => entry[1] + (preferredBrands.includes(entry[0]) ? 0.5 : 0) + (rangeBrands.has(entry[0]) ? 0.25 : 0);
         const ranked = [...coverage.entries()].sort((a, b) => weight(b) - weight(a));
         if (ranked[0] && ranked[0][1] >= 2) {
           routineBrand.set(routineKey, ranked[0][0]);
@@ -606,45 +652,37 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       }
 
       for (const [key, list] of byOpportunity) {
-        list.sort((a, b) => b.totalScore - a.totalScore);
-        const best = list[0];
-        if (!best) continue;
-
-        // Équivalence clinique : écart de score < 2 %. On départage alors par
-        // la dimension commerciale, seul cas où elle est décisive.
-        const equivalents = list.filter(
-          (item) => Math.abs(item.totalScore - best.totalScore) < 0.02,
-        );
-        // Départage, dans cet ordre : d'abord l'ordre des formules préférées
-        // par la règle (le premier motif qui reconnaît la référence l'emporte :
-        // « écran » avant « acide hyaluronique » pour un œil sec devant un
-        // écran), puis ce que l'officine a réellement en rayon, enfin seulement
-        // la dimension commerciale. La disponibilité n'a pas fait monter ces
-        // références — elles sont déjà jugées équivalentes — elle départage ce
-        // que la clinique n'a pas tranché.
+        // La clinique seule désigne la meilleure référence ; les critères de
+        // l'officine ne départagent que des références cliniquement
+        // équivalentes (même sécurité, même adéquation, mêmes vigilances).
         const preferPatterns = opportunityByKey.get(key)?.productPrefer ?? [];
-        const preferRank = (item: ScoredRecommendation) => {
-          const name = catalogById.get(item.productId)?.name ?? "";
-          const index = preferPatterns.findIndex((pattern) => matchesAny([pattern], name));
-          return index === -1 ? preferPatterns.length : index;
-        };
-        const chosen =
-          equivalents.length > 1
-            ? [...equivalents].sort(
-                (a, b) =>
-                  preferRank(a) - preferRank(b) ||
-                  b.breakdown.availability - a.breakdown.availability ||
-                  b.breakdown.commercial - a.breakdown.commercial,
-              )[0]
-            : best;
+        const opportunityCategory = opportunityByKey.get(key)?.category ?? null;
+        const decision = chooseAmongEquivalents(list, {
+          // L'ordre des formules préférées par la règle : le premier motif qui
+          // reconnaît la référence l'emporte (« écran » avant « acide
+          // hyaluronique » pour un œil sec devant un écran).
+          formulaRank: (item) => {
+            const name = catalogById.get(item.productId)?.name ?? "";
+            const index = preferPatterns.findIndex((pattern) => matchesAny([pattern], name));
+            return index === -1 ? preferPatterns.length : index;
+          },
+          rangeRank: (item) => {
+            const product = catalogById.get(item.productId);
+            return product ? rangeRankFor(product, opportunityCategory, input.preferredRanges ?? []) : null;
+          },
+          shortDate: (item) => catalogById.get(item.productId)?.shortDate ?? null,
+        });
+        const best = decision.best;
+        list.sort((a, b) => (a === best ? -1 : b === best ? 1 : 0));
+        const chosen = { ...decision.chosen, tiebreak: decision.criterion };
 
-        // La note est émise dès qu'un départage commercial a eu lieu, même
-        // lorsqu'il confirme la référence déjà en tête : la trace doit refléter
-        // ce qui s'est réellement passé, pas seulement ce qui a changé.
-        if (equivalents.length > 1) {
+        // La note est émise dès qu'un départage a eu lieu, même lorsqu'il
+        // confirme la référence déjà en tête : la trace doit refléter ce qui
+        // s'est réellement passé, pas seulement ce qui a changé.
+        if (decision.equivalents.length > 1) {
           const changed = chosen.productId !== best.productId;
           notes.push(
-            `« ${key} » : ${equivalents.length} références cliniquement équivalentes, départage commercial appliqué${changed ? " (référence retenue modifiée)" : " (référence en tête confirmée)"}.`,
+            `« ${key} » : ${decision.equivalents.length} références cliniquement équivalentes, départage commercial ${decision.criterion ? `(${TIEBREAK_LABELS[decision.criterion]})` : "(sans critère décisif)"}${changed ? " (référence retenue modifiée)" : " (référence en tête confirmée)"}.`,
           );
         }
 
@@ -654,8 +692,18 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
           continue;
         }
         const brand = routineBrand.get(routine.key);
+        // La cohérence de gamme tolère un petit écart de pertinence, jamais un
+        // écart de sécurité : l'étape de la marque doit être aussi sûre et
+        // aussi peu signalée que la meilleure.
         const sameBrand = brand
-          ? list.find((i) => best.totalScore - i.totalScore < ROUTINE_BRAND_TOLERANCE && brandOf(catalogById.get(i.productId)) === brand)
+          ? list.find(
+              (i) =>
+                best.totalScore - i.totalScore < ROUTINE_BRAND_TOLERANCE &&
+                brandOf(catalogById.get(i.productId)) === brand &&
+                i.breakdown.safety >= best.breakdown.safety &&
+                i.breakdown.patientFit >= best.breakdown.patientFit &&
+                clinicalSignature({ ...i, breakdown: best.breakdown }) === clinicalSignature(best),
+            )
           : undefined;
         if (sameBrand && sameBrand.productId !== chosen.productId) {
           notes.push(`« ${key} » : référence ${brand} retenue pour la cohérence de la routine.`);

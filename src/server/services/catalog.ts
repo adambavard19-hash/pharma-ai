@@ -6,6 +6,9 @@ import { PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { normalizeSearchText } from "@/core/reference/search";
 import { classifyNationalDrug } from "@/core/catalog/product-vocabulary";
+import { engineRangesFrom, type PreferredRangeInput } from "@/core/catalog/preferred-ranges";
+import { nearestShortDatesFor } from "@/server/services/stock-lots";
+import type { VigilanceLevel } from "@/config/vigilances";
 
 /**
  * Le stock est-il configuré ? Vrai dès qu'une référence existe — produit ou
@@ -225,6 +228,44 @@ export async function loadPharmacyRules(scope: TenantScope): Promise<PharmacyRul
     brand: rule.brand ?? null,
     context: (rule.context ?? {}) as PharmacyRuleInput["context"],
     weight: rule.weight,
+  }));
+}
+
+/**
+ * Les gammes privilégiées actives de l'officine, telles que le moteur les lit.
+ * Elles ne servent qu'au départage de références cliniquement équivalentes.
+ */
+export async function loadPreferredRanges(scope: TenantScope): Promise<PreferredRangeInput[]> {
+  const ranges = await prisma.preferredRange.findMany({
+    where: { pharmacyId: scope.pharmacyId, isActive: true },
+    select: { id: true, universe: true, brandKey: true, priority: true, productIds: true, isActive: true },
+  });
+  return engineRangesFrom(ranges);
+}
+
+/**
+ * Ajoute au catalogue du moteur ce que l'officine sait de ses boîtes : la date
+ * courte la plus proche (lots non sortis du suivi) et les vigilances patient
+ * qu'elle a déclarées. `today` est la date du serveur : le moteur, lui, reste
+ * pur et ne lit jamais l'heure.
+ */
+export async function enrichCatalog(scope: TenantScope, catalog: CatalogProduct[], today: Date = new Date()): Promise<CatalogProduct[]> {
+  const [shortDates, vigilances] = await Promise.all([
+    // Lots non périmés dans le seuil « bientôt » de l'officine (service des dates courtes).
+    nearestShortDatesFor(scope.pharmacyId, today),
+    prisma.productVigilance.findMany({
+      where: { pharmacyId: scope.pharmacyId },
+      select: { productId: true, population: true, level: true, note: true },
+    }),
+  ]);
+  const vigilancesByProduct = new Map<string, { population: string; level: VigilanceLevel; note: string | null }[]>();
+  for (const v of vigilances) {
+    vigilancesByProduct.set(v.productId, [...(vigilancesByProduct.get(v.productId) ?? []), { population: v.population, level: v.level, note: v.note }]);
+  }
+  return catalog.map((product) => ({
+    ...product,
+    shortDate: shortDates.get(product.presentationId ? `d:${product.presentationId}` : `p:${product.id}`) ?? null,
+    vigilances: product.origin === "PHARMACY_CATALOG" ? (vigilancesByProduct.get(product.id) ?? []) : [],
   }));
 }
 

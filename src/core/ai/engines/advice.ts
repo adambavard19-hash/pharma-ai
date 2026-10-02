@@ -1,3 +1,4 @@
+import type { PopulationVigilanceRule } from "./population-vigilance";
 import type {
   AdviceOpportunityResult,
   DrugKnowledge,
@@ -195,6 +196,13 @@ export type AdviceRule = {
   safetyNotes: string[];
   /** Renvoie une raison de blocage, ou `null` si la règle reste applicable. */
   blockedFor?: (patient: PatientContext) => string | null;
+  /**
+   * Les vigilances par population (grossesse, allaitement, asthme, épilepsie,
+   * enfant) que la règle porte, écrites à partir de ses propres sources. Elles
+   * s'affichent sur la carte ; elles ne remplacent pas `blockedFor`, qui reste
+   * le seul à écarter le conseil quand le patient est concerné.
+   */
+  populations?: PopulationVigilanceRule[];
   /** Ajustement de priorité selon le contexte patient (−30 → +30). */
   adjustPriority?: (patient: PatientContext) => number;
 };
@@ -595,6 +603,7 @@ export const ADVICE_RULES: AdviceRule[] = [
     clinicalContext:
       "À proposer uniquement si le patient confirme la gêne. Douleur intense ou difficulté à avaler : orienter vers le médecin.",
     safetyNotes: ["Pastilles à éviter avant 6 ans (risque de fausse route)."],
+    populations: [{ population: "CHILD", level: "CAUTION", maxAgeYears: 6, text: "Pastilles à éviter avant 6 ans (risque de fausse route).", sources: ["Règle de conseil PharmaBoost (gorge)"] }],
   },
   {
     key: "cough-throat-comfort",
@@ -624,6 +633,7 @@ export const ADVICE_RULES: AdviceRule[] = [
     clinicalContext:
       "Ne jamais proposer si un antitussif figure déjà sur l'ordonnance. Toux grasse : ne pas bloquer l'expectoration.",
     safetyNotes: ["Aucun sirop antitussif avant 2 ans sans avis médical."],
+    populations: [{ population: "CHILD", level: "PHARMACIST_VALIDATION", maxAgeYears: 2, text: "Aucun sirop antitussif avant 2 ans sans avis médical.", sources: ["Règle de conseil PharmaBoost (toux)"] }],
   },
   {
     key: "fever-thermometer",
@@ -926,6 +936,7 @@ export const ADVICE_RULES: AdviceRule[] = [
     clinicalContext:
       "Complément alimentaire. Données cliniques limitées (Griffith 1987 ; revues récentes : preuves insuffisantes). Déconseillé en cas d'insuffisance rénale ; pas de complément pendant la grossesse sans avis.",
     safetyNotes: ["Complément alimentaire, sans effet démontré sur le virus : ne remplace pas l'antiviral."],
+    populations: [{ population: "PREGNANCY", level: "PHARMACIST_VALIDATION", text: "Grossesse : pas de complément alimentaire sans avis médical.", sources: ["Règle de conseil PharmaBoost (herpès)"] }],
     blockedFor: (patient) =>
       patient.renalImpairment
         ? "Insuffisance rénale déclarée : un apport en acides aminés relève d'un avis médical."
@@ -1104,6 +1115,13 @@ export const ADVICE_RULES: AdviceRule[] = [
     clinicalContext:
       "Aromathérapie à visée respiratoire : usage traditionnel, sans preuve clinique ; ANSM — huiles essentielles, précautions d'emploi (asthme, épilepsie, grossesse, enfant).",
     safetyNotes: ["Contre-indiqué en cas d'asthme, d'épilepsie, de grossesse, d'allaitement et avant 12 ans."],
+    populations: [
+      { population: "ASTHMA", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées en cas d'asthme.", sources: ["ANSM — huiles essentielles, précautions d'emploi"] },
+      { population: "EPILEPSY", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées en cas d'épilepsie ou d'antécédent de convulsions.", sources: ["ANSM — huiles essentielles, précautions d'emploi"] },
+      { population: "PREGNANCY", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées pendant la grossesse.", sources: ["ANSM — huiles essentielles, précautions d'emploi"] },
+      { population: "BREASTFEEDING", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées pendant l'allaitement.", sources: ["ANSM — huiles essentielles, précautions d'emploi"] },
+      { population: "CHILD", level: "CONTRAINDICATION", maxAgeYears: 12, text: "Huiles essentielles : contre-indiquées avant 12 ans.", sources: ["ANSM — huiles essentielles, précautions d'emploi"] },
+    ],
     blockedFor: (patient) =>
       patient.chronicConditions.some((c) => /asthm|epilep|épilep|convuls/i.test(c))
         ? "Asthme ou épilepsie déclarés : les huiles essentielles sont contre-indiquées."
@@ -1143,6 +1161,7 @@ export const ADVICE_RULES: AdviceRule[] = [
     clinicalContext:
       "Allégations de santé autorisées (règlement UE 432/2012) : vitamines C, D, B6, B12, zinc, sélénium et fer contribuent au fonctionnement normal du système immunitaire. Aucune preuve d'une convalescence plus rapide.",
     safetyNotes: ["Pas de cumul avec une autre supplémentation vitaminique ; grossesse : avis médical."],
+    populations: [{ population: "PREGNANCY", level: "PHARMACIST_VALIDATION", text: "Grossesse : pas de complément multivitaminé sans avis médical.", sources: ["Règle de conseil PharmaBoost (convalescence)"] }],
     blockedFor: (patient) => (patient.isPregnant ? "Grossesse déclarée : pas de complément multivitaminé sans avis médical." : null),
   },
   {
@@ -1529,6 +1548,7 @@ export function detectAdviceOpportunities(params: {
       ),
       clinicalContext: rule.clinicalContext,
       safetyNotes: rule.safetyNotes,
+      populations: rule.populations ?? [],
       priority,
       isBlocked: blockReason !== null,
       blockReason,
