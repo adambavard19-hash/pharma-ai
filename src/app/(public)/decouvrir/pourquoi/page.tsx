@@ -1,63 +1,141 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, HelpCircle, Home, Pill, Users } from "lucide-react";
-import { BeforeAfter } from "../_components/before-after";
+import type { ReactNode } from "react";
+import { ArrowRight, CalendarCheck, CheckCircle2, FileText, HelpCircle, Home, XCircle } from "lucide-react";
 import { KeyCell, SectionHead } from "../_components/site-shell";
+import { ExampleTag } from "../_components/visuals";
 import { VideoButton } from "../_components/video-dialog";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Pourquoi PharmaBoost", description: "Au comptoir, l'information utile au moment du scan. À la maison, une posologie claire. Le pharmacien décide." };
+export const metadata: Metadata = {
+  title: "Pourquoi PharmaBoost",
+  description: "Personne ne peut penser à tout. Au comptoir, PharmaBoost propose le bon conseil et le bon produit pour chaque ordonnance. À la maison, le patient a son bilan.",
+};
 
 /**
- * Pourquoi PharmaBoost : deux moments, montrés en « sans / avec ». Peu de
- * texte, aucun jugement sur l'équipe : le sujet est l'information disponible
- * au bon moment, pas la compétence de ceux qui conseillent.
+ * Pourquoi PharmaBoost : deux problèmes, chacun montré sur la même ordonnance
+ * « sans » et « avec », côte à côte, pour se comprendre d'un coup d'œil.
+ * Aucun jugement sur l'équipe : le sujet est ce qu'on ne peut pas avoir en
+ * tête, pas la compétence de ceux qui conseillent.
  */
+
+const FLORE = "/site/produits/flore-equilibre-10-milliards.webp";
+
 export default function WhyPage() {
   return (
     <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
       <div className="max-w-3xl">
-        <SectionHead as="h1" kicker="Pourquoi PharmaBoost" title="Au comptoir, puis à la maison." />
+        <SectionHead as="h1" kicker="Pourquoi PharmaBoost" title="Personne ne peut penser à tout.">
+          Au comptoir, le pharmacien enchaîne les ordonnances. À la maison, le patient se retrouve seul avec ses boîtes. PharmaBoost aide à ces deux moments.
+        </SectionHead>
         <VideoButton film="pourquoi" label="Voir en vidéo" className="mt-8" />
       </div>
 
-      {/* ---- Au comptoir --------------------------------------------- */}
-      <section className="mt-16 grid grid-cols-1 gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-        <div>
-          <SectionHead n="01" kicker="Au comptoir" title="Votre expertise, augmentée.">
-            Le produit en rayon et les vigilances, affichés au moment du scan.
-          </SectionHead>
+      {/* ---- 01 · Au comptoir ------------------------------------------ */}
+      <section className="mt-20 md:mt-28">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-14">
+          <SectionHead n="01" kicker="Au comptoir" title="Des milliers de produits. Un patient à la fois." />
+          <div className="space-y-4 text-[17px] leading-7 lg:pt-10">
+            <p className="text-text-secondary">
+              En rayon, des milliers de références. Sur chaque ordonnance, des médicaments qui appellent un conseil ou une précaution. Avec la file qui attend, impossible de tout avoir en tête : le bon conseil passe parfois à la trappe.
+            </p>
+            <p className="font-medium text-text-primary">
+              PharmaBoost y pense avec vous. Au moment du scan, il propose les meilleures références de votre officine pour ce patient, cette ordonnance et ces médicaments. Vous décidez.
+            </p>
+          </div>
         </div>
-        <BeforeAfter
-          before={<Counter tone="before" bubbles={["Quel produit avons-nous en rayon ?", "Une vigilance à rappeler ?", "La file d'attente…"]} footer="Tout repose sur la mémoire, en pleine affluence." />}
-          after={<Counter tone="after" bubbles={["Flore Équilibre 10 milliards · 34 en rayon", "Contrôles de sécurité faits", "Phrase prête : « votre antibiotique peut perturber la flore… »"]} footer="La suggestion arrive au scan. Le pharmacien décide." />}
-        />
-      </section>
-      <dl className="mt-8 grid gap-px overflow-hidden rounded-3xl border border-border-subtle bg-border-subtle sm:grid-cols-3">
-        <KeyCell label="Analyse" value="Le traitement délivré" className="bg-surface-card" />
-        <KeyCell label="Stock" value="Le rayon à portée" className="bg-surface-card" />
-        <KeyCell label="Sécurité" value="Avant toute suggestion" className="bg-surface-card" />
-      </dl>
 
-      {/* ---- À la maison --------------------------------------------- */}
-      <section className="mt-24 grid grid-cols-1 gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-        <div className="order-2 lg:order-1">
-          <BeforeAfter
-            before={<HomeScene tone="before" items={["Celui-là, c'est matin ou soir ?", "Pourquoi deux boîtes ?", "Jusqu'à quand ?"]} footer="Les questions arrivent une fois rentré." />}
-            after={<HomeScene tone="after" items={["Matin : AMOXICILLINE 1 g · 1 comprimé", "Soir : AMOXICILLINE 1 g · 1 comprimé", "Pendant 6 jours"]} footer="Par QR code, e-mail ou papier. Rien n'est conservé sur le patient." />}
-          />
-        </div>
-        <div className="order-1 lg:order-2">
-          <SectionHead n="02" kicker="À la maison" title="Une posologie claire.">
-            Le plan de prise et les rappels, sur le téléphone du patient.
-          </SectionHead>
-        </div>
+        <Compare
+          context={<Context icon={<FileText className="size-4" />} label="Ordonnance du patient" value="AMOXICILLINE 1 g · PARACÉTAMOL 1000 mg" />}
+          without={
+            <>
+              <p className="text-[13.5px] text-text-tertiary">Ce que le pharmacien doit se rappeler, seul :</p>
+              <Questions items={["Un probiotique avec cet antibiotique ? Lequel ?", "Est-ce qu'il nous en reste en rayon ?", "Une précaution à rappeler ?", "Trois patients attendent…"]} />
+            </>
+          }
+          withPb={
+            <>
+              <p className="text-[13.5px] text-text-secondary">Au scan, l&apos;écran affiche :</p>
+              <div className="mt-2 rounded-xl border border-border-subtle bg-surface-card p-3.5">
+                <p className="font-mono text-[10.5px] tracking-[0.12em] text-brand-700 uppercase">Conseil associé</p>
+                <div className="mt-2 flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille */}
+                  <img src={FLORE} alt="" width={60} height={60} className="shrink-0 rounded-xl bg-surface-app object-contain" />
+                  <div className="min-w-0">
+                    <p className="text-[15px] leading-tight font-semibold text-text-primary">Flore Équilibre 10 milliards</p>
+                    <p className="mt-0.5 text-[13px] text-text-secondary">Probiotique · 1 par jour pendant le traitement</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-medium">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-1 text-success-700 ring-1 ring-success-100 ring-inset"><span className="size-1.5 rounded-full bg-success-600" /> En rayon · 34</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-brand-800 ring-1 ring-brand-200 ring-inset"><CheckCircle2 className="size-3.5" /> Précautions vérifiées</span>
+                </div>
+                <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-[13px] leading-5 text-brand-900">« Votre antibiotique peut perturber la flore intestinale. Ce probiotique l&apos;accompagne. »</p>
+              </div>
+            </>
+          }
+          withoutResult="Le patient repart sans conseil."
+          withResult="Le patient repart avec le bon conseil."
+        />
+
+        <dl className="mt-6 grid gap-px overflow-hidden rounded-3xl border border-border-subtle bg-border-subtle sm:grid-cols-3">
+          <KeyCell label="Chaque patient" value="Les précautions à vérifier" className="bg-surface-card" />
+          <KeyCell label="Chaque ordonnance" value="Le traitement lu en entier" className="bg-surface-card" />
+          <KeyCell label="Chaque médicament" value="Le conseil qui l'accompagne" className="bg-surface-card" />
+        </dl>
       </section>
-      <dl className="mt-8 grid gap-px overflow-hidden rounded-3xl border border-border-subtle bg-border-subtle sm:grid-cols-3">
-        <KeyCell label="Posologie" value="QR code, e-mail ou papier" className="bg-surface-card" />
-        <KeyCell label="Rappels" value="Dans l'agenda du téléphone" className="bg-surface-card" />
-        <KeyCell label="Données" value="Aucune conservée" className="bg-surface-card" />
-      </dl>
+
+      {/* ---- 02 · À la maison ------------------------------------------ */}
+      <section className="mt-24 md:mt-32">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-14">
+          <SectionHead n="02" kicker="À la maison" title="Plusieurs boîtes. Et beaucoup de questions." />
+          <div className="space-y-4 text-[17px] leading-7 lg:pt-10">
+            <p className="text-text-secondary">
+              Une fois rentré, le patient ne se souvient plus de tout : quel médicament le matin, lequel le soir, pendant combien de jours, et à quoi sert chacun. Il hésite, oublie une prise ou arrête trop tôt.
+            </p>
+            <p className="font-medium text-text-primary">
+              Avec PharmaBoost, il repart avec son bilan : chaque médicament, à quoi il sert, quand le prendre et jusqu&apos;à quand, avec vos conseils. Sur son téléphone, par e-mail ou sur papier, avec des rappels.
+            </p>
+          </div>
+        </div>
+
+        <Compare
+          context={<Context icon={<Home className="size-4" />} label="De retour à la maison" value="3 boîtes sur la table" />}
+          without={
+            <>
+              <div className="flex flex-wrap gap-2">
+                {["AMOXICILLINE 1 g", "PARACÉTAMOL 1000 mg", "Flore Équilibre"].map((box) => (
+                  <span key={box} className="rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-[12px] text-text-primary shadow-sm">{box}</span>
+                ))}
+              </div>
+              <p className="mt-4 text-[13.5px] text-text-tertiary">Les questions du patient, seul :</p>
+              <Questions items={["C'est le matin ou le soir ?", "Pendant combien de jours ?", "Celui-là, il sert à quoi ?"]} />
+            </>
+          }
+          withPb={
+            <div className="mx-auto w-full max-w-[330px] rounded-[26px] border-[5px] border-ink-900 bg-surface-card p-3.5 shadow-sm">
+              <p className="font-mono text-[10.5px] tracking-[0.12em] text-brand-700 uppercase">Votre bilan · votre pharmacie</p>
+              <ul className="mt-2.5 divide-y divide-border-subtle">
+                <Med name="AMOXICILLINE 1 g" why="Antibiotique : traite l'infection" when={["Matin · 1", "Soir · 1"]} until="6 jours" />
+                <Med name="PARACÉTAMOL 1000 mg" why="Contre la douleur et la fièvre" when={["Si besoin"]} />
+                <Med name="Flore Équilibre 10 milliards" why="Conseil : accompagne la flore pendant l'antibiotique" when={["1 par jour"]} until="6 jours" advice />
+              </ul>
+              <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-brand-600 px-2.5 py-1.5 text-[12px] font-medium text-white">
+                <CalendarCheck className="size-3.5" /> 08:00 · Rappel de prise
+              </div>
+            </div>
+          }
+          withoutResult="Il hésite, oublie une prise ou arrête trop tôt."
+          withResult="Il sait quoi prendre, quand, et pourquoi."
+        />
+
+        <dl className="mt-6 grid gap-px overflow-hidden rounded-3xl border border-border-subtle bg-border-subtle sm:grid-cols-2 lg:grid-cols-4">
+          <KeyCell label="Posologie" value="Matin, midi, soir et durée" className="bg-surface-card" />
+          <KeyCell label="Explication" value="À quoi sert chaque médicament" className="bg-surface-card" />
+          <KeyCell label="Rappels" value="Dans l'agenda du téléphone" className="bg-surface-card" />
+          <KeyCell label="Données" value="Aucune conservée" className="bg-surface-card" />
+        </dl>
+      </section>
 
       {/* ---- Appel ----------------------------------------------------- */}
       <section className="mt-24 rounded-[32px] border border-border-subtle bg-surface-card px-7 py-12 sm:px-12">
@@ -72,56 +150,69 @@ export default function WhyPage() {
   );
 }
 
-/** Le comptoir : une file, le pharmacien, ce qu'il doit avoir en tête. */
-function Counter({ bubbles, tone, footer }: { bubbles: string[]; tone: "before" | "after"; footer: string }) {
-  const after = tone === "after";
+/** La même situation, sans puis avec PharmaBoost, côte à côte, avec ce qu'il en résulte pour le patient. */
+function Compare({ context, without, withPb, withoutResult, withResult }: { context: ReactNode; without: ReactNode; withPb: ReactNode; withoutResult: string; withResult: string }) {
   return (
-    <div>
-      <div className="flex items-end justify-between gap-4">
-        <div className="flex items-end gap-1.5" aria-hidden="true">
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className={cn("flex size-8 items-center justify-center rounded-full", i === 0 ? "bg-brand-100 text-brand-800" : "bg-surface-sunken text-text-tertiary")}><Users className="size-4" /></span>
-          ))}
-        </div>
-        <span className={cn("flex size-10 items-center justify-center rounded-full", after ? "bg-brand-600 text-white" : "bg-ink-200 text-ink-700")} aria-hidden="true"><Pill className="size-5" /></span>
+    <div className="mt-10 rounded-[28px] border border-border-subtle bg-surface-card p-4 sm:p-6">
+      {context}
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Side tone="without" result={withoutResult}>{without}</Side>
+        <Side tone="with" result={withResult}>{withPb}</Side>
       </div>
-      <ul className="mt-4 space-y-2">
-        {bubbles.map((text) => (
-          <li key={text} className={cn("ml-auto flex w-[92%] items-center gap-2 rounded-2xl rounded-tr-sm px-4 py-2.5 text-[14px] sm:w-[82%]", after ? "bg-brand-50 text-brand-900" : "bg-surface-sunken text-text-secondary italic")}>
-            {after ? <Check className="size-4 shrink-0 text-success-600" /> : <HelpCircle className="size-4 shrink-0 text-warning-600" />}
-            {text}
-          </li>
-        ))}
-      </ul>
-      <p className={cn("mt-4 text-[14px]", after ? "font-semibold text-text-primary" : "text-text-secondary")}>{footer}</p>
     </div>
   );
 }
 
-/** La maison : les questions, ou la posologie sur le téléphone. */
-function HomeScene({ items, tone, footer }: { items: string[]; tone: "before" | "after"; footer: string }) {
-  const after = tone === "after";
+function Side({ tone, result, children }: { tone: "without" | "with"; result: string; children: ReactNode }) {
+  const withPb = tone === "with";
   return (
-    <div>
-      <div className="flex items-center gap-2 font-mono text-[11px] tracking-[0.12em] text-text-tertiary uppercase" aria-hidden="true"><Home className="size-4" /> À la maison</div>
-      <div className={cn("mt-3 rounded-2xl p-4", after ? "border border-brand-200 bg-surface-card" : "bg-surface-sunken")}>
-        {after && <p className="font-mono text-[11px] tracking-[0.12em] text-brand-700 uppercase">Posologie · votre pharmacie</p>}
-        <ul className={cn("space-y-2", after && "mt-2")}>
-          {items.map((text) => (
-            <li key={text} className={cn("flex items-center gap-2 rounded-xl px-3 py-2 text-[14px]", after ? "bg-brand-50 text-text-primary" : "bg-surface-card text-text-secondary italic")}>
-              {after ? <Check className="size-4 shrink-0 text-success-600" /> : <HelpCircle className="size-4 shrink-0 text-warning-600" />}
-              {text}
-            </li>
-          ))}
-        </ul>
-        {after && (
-          <div className="mt-3 flex flex-wrap gap-2 text-[12.5px]">
-            <span className="rounded-full bg-brand-600 px-2.5 py-1 font-medium text-white">Rappels dans l&apos;agenda</span>
-            <span className="rounded-full border border-border-subtle px-2.5 py-1 text-text-secondary">Rappel de fin de traitement</span>
-          </div>
-        )}
-      </div>
-      <p className={cn("mt-4 text-[14px]", after ? "font-semibold text-text-primary" : "text-text-secondary")}>{footer}</p>
+    <div className={cn("flex flex-col rounded-2xl border p-4 sm:p-5", withPb ? "border-brand-200 bg-brand-50/50" : "border-border-subtle bg-surface-app")}>
+      <span className={cn("w-fit rounded-full px-3 py-1 text-[12.5px] font-semibold text-white", withPb ? "bg-brand-600" : "bg-ink-700")}>{withPb ? "Avec PharmaBoost" : "Sans PharmaBoost"}</span>
+      <div className="mt-4 flex-1">{children}</div>
+      <p className={cn("mt-5 flex items-start gap-2 border-t pt-4 text-[15.5px] leading-snug font-semibold", withPb ? "border-brand-200 text-success-700" : "border-border-subtle text-danger-700")}>
+        {withPb ? <CheckCircle2 className="mt-0.5 size-5 shrink-0" /> : <XCircle className="mt-0.5 size-5 shrink-0" />}
+        {result}
+      </p>
     </div>
+  );
+}
+
+function Context({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-surface-app px-4 py-3">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-800" aria-hidden="true">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="font-mono text-[11px] tracking-[0.12em] text-text-tertiary uppercase">{label}</p>
+        <p className="truncate font-mono text-[13.5px] text-text-primary">{value}</p>
+      </div>
+      <ExampleTag />
+    </div>
+  );
+}
+
+function Questions({ items }: { items: string[] }) {
+  return (
+    <ul className="mt-2 space-y-2">
+      {items.map((text) => (
+        <li key={text} className="flex items-center gap-2.5 rounded-xl bg-surface-card px-3 py-2.5 text-[14px] text-text-secondary">
+          <HelpCircle className="size-4 shrink-0 text-warning-600" /> {text}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Med({ name, why, when, until, advice = false }: { name: string; why: string; when: string[]; until?: string; advice?: boolean }) {
+  return (
+    <li className="py-2.5 first:pt-0 last:pb-0">
+      <p className={cn("text-[13px] font-semibold", advice ? "text-brand-800" : "font-mono text-text-primary")}>{name}</p>
+      <p className="text-[12px] text-text-secondary">{why}</p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11.5px]">
+        {when.map((w) => (
+          <span key={w} className="rounded-md bg-brand-50 px-2 py-0.5 text-brand-900">{w}</span>
+        ))}
+        {until && <span className="text-text-tertiary">· {until}</span>}
+      </div>
+    </li>
   );
 }
