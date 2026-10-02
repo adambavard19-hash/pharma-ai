@@ -129,7 +129,7 @@ export default async function SitePage() {
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
           <div className="flex flex-wrap items-end justify-between gap-6">
             <SectionHead kicker="Comment ça marche" title="Du scan au bilan, en trois étapes." />
-            <VideoButton />
+            <VideoButton film="comment" label="Voir comment ça marche" />
           </div>
           <ol className="relative mt-14 grid gap-8 md:grid-cols-3 md:gap-5">
             <div className={cn("absolute top-[-1px] right-0 left-0 hidden h-px md:block", HAIRLINE)} aria-hidden="true" />
@@ -168,6 +168,7 @@ export default async function SitePage() {
                 <Figure label="Ventes additionnelles" value={formatEuros(live.attributedCents)} />
               </div>
             )}
+            <VideoButton film="avantages" label="Voir les avantages" className="mt-8" />
           </div>
         </div>
       </section>
@@ -183,6 +184,7 @@ export default async function SitePage() {
               </li>
             ))}
           </ul>
+          <VideoButton film="sansOrdonnance" label="Voir en vidéo" className="mt-8" />
         </div>
         <RequestVisual />
       </section>
@@ -260,7 +262,6 @@ export default async function SitePage() {
               <Link href="/decouvrir/demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white hover:bg-brand-700">
                 Réserver une démo <ArrowRight className="size-4" />
               </Link>
-              <VideoButton />
             </div>
           </div>
         </div>

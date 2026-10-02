@@ -14,7 +14,7 @@ const EXAMPLE = {
   second: "PARACÉTAMOL 1000 mg cp",
   need: "Tolérance digestive sous antibiotique",
   product: "Flore Équilibre 10 milliards",
-  tile: "/produits/probio-flore-10.svg",
+  tile: "/site/produits/flore-equilibre-10-milliards.webp",
   price: "14,90 €",
   margin: "8,70 €",
   stock: 34,
@@ -45,9 +45,10 @@ function MarginBadge() {
   );
 }
 
+/** La boîte du produit, en vignette sur un fond clair, comme une fiche produit. */
 function ProductTile({ size }: { size: number }) {
-  // eslint-disable-next-line @next/next/no-img-element -- vignette SVG locale, sans optimisation utile
-  return <img src={EXAMPLE.tile} alt="" width={size} height={size} className="shrink-0 rounded-xl" />;
+  // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
+  return <img src={EXAMPLE.tile} alt="" width={size} height={size} className="shrink-0 rounded-xl bg-surface-app object-contain" />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -86,7 +87,7 @@ export function HeroVisual() {
         <p className="mt-3 font-mono text-[10.5px] tracking-[0.12em] text-brand-700 uppercase">Conseil associé</p>
         <p className="text-[14.5px] font-semibold text-text-primary">{EXAMPLE.need}</p>
         <div className="mt-3 flex items-center gap-3">
-          <ProductTile size={48} />
+          <ProductTile size={64} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[14px] font-semibold text-text-primary">{EXAMPLE.product}</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -181,7 +182,7 @@ export function StepConseil() {
       <p className="font-mono text-[10px] tracking-[0.1em] text-brand-700 uppercase">Conseil associé</p>
       <p className="text-[11.5px] text-text-secondary">{EXAMPLE.need}</p>
       <div className="mt-2 flex items-center gap-2.5">
-        <ProductTile size={40} />
+        <ProductTile size={52} />
         <div className="min-w-0">
           <p className="truncate text-[12.5px] font-semibold text-text-primary">{EXAMPLE.product}</p>
           <p className="text-[12px] text-text-secondary tabular">{EXAMPLE.price}</p>
@@ -230,7 +231,7 @@ export function StockMarginVisual() {
         <ExampleTag />
       </div>
       <div className="mt-5 flex items-center gap-4">
-        <ProductTile size={72} />
+        <ProductTile size={96} />
         <div className="min-w-0 flex-1">
           <p className="text-[18px] leading-tight font-semibold text-text-primary sm:text-[21px]">{EXAMPLE.product}</p>
           <p className="mt-1 hidden text-[13px] text-text-secondary sm:block">{EXAMPLE.need}</p>
@@ -257,8 +258,8 @@ export function StockMarginVisual() {
 
 export function RequestVisual() {
   const products = [
-    { name: "Spray nasal eau de mer isotonique", tile: "/produits/spray-nasal-marin.svg", price: "6,90 €", stock: 36 },
-    { name: "Pastilles gorge miel-citron", tile: "/produits/pastilles-gorge.svg", price: "5,90 €", stock: 58 },
+    { name: "Spray nasal eau de mer isotonique", tile: "/site/produits/spray-nasal-eau-de-mer.webp", price: "6,90 €", stock: 36 },
+    { name: "Pastilles gorge miel-citron", tile: "/site/produits/pastilles-gorge-miel-citron.webp", price: "5,90 €", stock: 58 },
   ];
   return (
     <div className="rounded-[28px] border border-border-subtle bg-surface-card p-6 shadow-[0_40px_90px_-50px_rgba(15,23,42,0.45)] sm:p-7" aria-hidden="true">
@@ -277,7 +278,7 @@ export function RequestVisual() {
         {products.map((p) => (
           <li key={p.name} className="flex items-center gap-3 rounded-xl border border-border-subtle p-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element -- vignette SVG locale */}
-            <img src={p.tile} alt="" width={36} height={36} className="rounded-lg" />
+            <img src={p.tile} alt="" width={44} height={44} className="rounded-lg bg-surface-app object-contain" />
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-text-primary">{p.name}</span>
             <span className="hidden sm:inline-flex"><StockBadge n={p.stock} /></span>
             <span className="text-[13px] font-semibold text-text-primary tabular">{p.price}</span>

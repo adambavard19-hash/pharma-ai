@@ -18,6 +18,7 @@ export default function WhyPage() {
     <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
       <div className="max-w-3xl">
         <SectionHead as="h1" kicker="Pourquoi PharmaBoost" title="Au comptoir, puis à la maison." />
+        <VideoButton film="pourquoi" label="Voir en vidéo" className="mt-8" />
       </div>
 
       {/* ---- Au comptoir --------------------------------------------- */}
@@ -64,7 +65,6 @@ export default function WhyPage() {
           <h2 className="text-[30px] leading-[1.08] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[40px]">L&apos;information utile, au bon moment.</h2>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link href="/decouvrir/demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white hover:bg-brand-700">Réserver une démo <ArrowRight className="size-4" /></Link>
-            <VideoButton />
           </div>
         </div>
       </section>
