@@ -3,12 +3,14 @@ import { FilmShell, filmDuration, type FilmSpec } from "./FilmShell";
 import { OUT_FPS } from "./theme";
 import { LANCEMENT } from "./films/lancement";
 import { COMMENT } from "./films/comment";
+import { PRESENTATION } from "./films/presentation";
 import { POURQUOI } from "./films/pourquoi";
 import { AVANTAGES } from "./films/avantages";
 import { SANS_ORDONNANCE } from "./films/sans-ordonnance";
 
 /** Les films de la série, 16:9, 60 images/s. L'identifiant sert au rendu (scripts/export.mjs). */
 export const FILMS: Record<string, FilmSpec> = {
+  Presentation: PRESENTATION,
   Lancement: LANCEMENT,
   CommentCaMarche: COMMENT,
   Pourquoi: POURQUOI,

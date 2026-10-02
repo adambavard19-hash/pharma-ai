@@ -43,6 +43,7 @@ export function PlanScreen({ show }: { show: (i: number) => number }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, 34px)", gap: 6, alignItems: "center", ...b(2) }}>
           <div>
             <div style={{ fontSize: 14.5, fontWeight: 600, color: C.ink900 }}>AMOXICILLINE 1 g</div>
+            <div style={{ fontSize: 12.5, color: C.brand700 }}>Antibiotique : traite l&apos;infection</div>
             <div style={{ fontSize: 12.5, color: C.ink500 }}>Pendant 6 jours</div>
           </div>
           <Dot on /><Dot on={false} /><Dot on /><Dot on={false} />

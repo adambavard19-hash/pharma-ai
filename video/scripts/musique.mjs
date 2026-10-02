@@ -39,13 +39,23 @@ const PRESETS = {
     holdFrom: 21,
   },
   // Comment ça marche (35 s) : 136 BPM, 20 mesures.
+  // Comment ça marche (39 s) : 136 BPM, 22 mesures ; trois étapes, chacune relancée par un impact.
   comment: {
-    bpm: 136, bars: 20,
-    layers: (b) => (b < 2 ? QUIET : b < 6 ? L({ arp: 0.7, bass: 0.6, hat: 0.6, bright: 0.55 }) : b === 15 ? BREATH : b < 17 ? (b >= 12 ? PEAK : DRIVE) : END),
-    chord: (b) => (b >= 19 ? C : b === 18 ? G : b === 17 ? F : MAJOR[b % 4]),
-    impacts: [{ at: 0.5, gain: 0.6 }, { at: 17, gain: 1 }],
-    risers: [[5, 6], [16, 17]],
-    holdFrom: 17,
+    bpm: 136, bars: 22,
+    layers: (b) => (b < 1 ? QUIET : b < 5 ? L({ arp: 0.7, bass: 0.6, hat: 0.6, bright: 0.55 }) : b < 7 ? BREATH : b < 12 ? DRIVE : b < 14 ? PEAK : b < 16 ? BREATH : b < 19 ? L({ arp: 0.7, bass: 0.6, hat: 0.6, bright: 0.6 }) : END),
+    chord: (b) => (b >= 21 ? C : b === 20 ? G : b === 19 ? F : MAJOR[b % 4]),
+    impacts: [{ at: 0, gain: 0.6 }, { at: 5.5, gain: 0.5 }, { at: 14.5, gain: 0.5 }, { at: 19, gain: 1 }],
+    risers: [[4.5, 5.5], [13.5, 14.5], [18, 19]],
+    holdFrom: 19,
+  },
+  // La présentation du site (42 s) : 120 BPM, 21 mesures.
+  presentation: {
+    bpm: 120, bars: 21,
+    layers: (b) => (b < 3 ? (b < 1 ? QUIET : L({ arp: 0.45, bright: 0.45 })) : b < 7 ? L({ arp: 0.6, bass: 0.5, hat: 0.5, bright: 0.5 }) : b < 12 ? DRIVE : b < 15 ? L({ arp: 0.6, bass: 0.6, hat: 0.6, bright: 0.6 }) : b < 18 ? PEAK : END),
+    chord: (b) => (b >= 20 ? C : b === 19 ? G : b === 18 ? F : MAJOR[b % 4]),
+    impacts: [{ at: 0.1, gain: 0.6 }, { at: 1.5, gain: 0.45 }, { at: 15, gain: 0.6 }, { at: 18, gain: 1 }],
+    risers: [[2, 3], [14, 15], [17, 18]],
+    holdFrom: 18,
   },
   // Pourquoi (34 s) : 120 BPM, 17 mesures ; mineur pour les problèmes, majeur pour les réponses.
   pourquoi: {

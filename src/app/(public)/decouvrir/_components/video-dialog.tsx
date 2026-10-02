@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
  * ferme au clic hors du cadre ou avec Échap.
  */
 export const FILMS = {
-  presentation: { src: "/video/pharmaboost-presentation-v1.mp4", poster: "/video/pharmaboost-presentation-v1.jpg", duration: "50 s", title: "Présentation de PharmaBoost" },
-  comment: { src: "/video/pharmaboost-comment-ca-marche.mp4", poster: "/video/pharmaboost-comment-ca-marche.jpg", duration: "35 s", title: "Comment ça marche" },
+  presentation: { src: "/video/pharmaboost-presentation.mp4", poster: "/video/pharmaboost-presentation.jpg", duration: "42 s", title: "Présentation de PharmaBoost" },
+  comment: { src: "/video/pharmaboost-comment-ca-marche.mp4", poster: "/video/pharmaboost-comment-ca-marche.jpg", duration: "39 s", title: "Comment ça marche" },
   pourquoi: { src: "/video/pharmaboost-pourquoi.mp4", poster: "/video/pharmaboost-pourquoi.jpg", duration: "34 s", title: "Pourquoi PharmaBoost" },
   avantages: { src: "/video/pharmaboost-avantages.mp4", poster: "/video/pharmaboost-avantages.jpg", duration: "34 s", title: "Les avantages" },
   sansOrdonnance: { src: "/video/pharmaboost-sans-ordonnance.mp4", poster: "/video/pharmaboost-sans-ordonnance.jpg", duration: "25 s", title: "Sans ordonnance" },

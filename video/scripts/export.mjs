@@ -12,6 +12,7 @@ import { mkdirSync, rmSync } from "node:fs";
 
 const mode = process.argv[2] ?? "final";
 const FILES = {
+  Presentation: "pharmaboost-presentation",
   Lancement: "pharmaboost-lancement",
   CommentCaMarche: "pharmaboost-comment-ca-marche",
   Pourquoi: "pharmaboost-pourquoi",

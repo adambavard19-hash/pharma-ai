@@ -23,7 +23,16 @@ export const EXAMPLE = {
   say: "« Amoxicilline est un antibiotique : il peut perturber la flore intestinale. Flore Équilibre 10 milliards l'accompagne, à prendre à distance de l'antibiotique. »",
 };
 
+/** Les produits qui ont leur vraie boîte (la même que sur le site) ; les autres gardent leur vignette. */
+const BOXES: Record<string, string> = {
+  "probio-flore-10": "produits/boites/flore-equilibre-10-milliards.webp",
+  "spray-nasal-marin": "produits/boites/spray-nasal-eau-de-mer.webp",
+  "pastilles-gorge": "produits/boites/pastilles-gorge-miel-citron.webp",
+};
+
 export function ProductTile({ name, size, style }: { name: string; size: number; style?: CSSProperties }) {
+  const box = BOXES[name];
+  if (box) return <Img src={staticFile(box)} style={{ width: size, height: size, borderRadius: size * 0.075, display: "block", background: "#F1F5F3", objectFit: "contain", ...style }} />;
   return <Img src={staticFile(`produits/${name}.svg`)} style={{ width: size, height: size, borderRadius: size * 0.075, display: "block", ...style }} />;
 }
 

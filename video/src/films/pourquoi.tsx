@@ -22,7 +22,7 @@ function Title({ intro }: { intro: number }) {
     <AbsoluteFill style={{ opacity: (1 - exit) * (intro ? tw(f, [-intro, 0], [0, 1]) : 1), transform: `scale(${1 + 0.06 * tw(f, [0, 100], [0, 1]) + 0.25 * exit})` }}>
       <DarkStage>
         <At x={0} y={330} w={1920}>
-          <Kinetic at={10} size={132} color={C.white} align="center" stagger={3} lines={[words("Deux problèmes."), words("*De tous les jours.*", C.brand300)]} />
+          <Kinetic at={10} size={132} color={C.white} align="center" stagger={3} lines={[words("Personne ne peut"), words("*penser à tout.*", C.brand300)]} />
         </At>
         <Sfx at={10} name="impact" volume={0.4} />
         <Sfx at={13} name="tic" volume={0.5} />
@@ -40,18 +40,18 @@ function Counter({ intro }: { intro: number }) {
   const enter = tw(f, [-intro, 4], [0, 1], EASE_IN_OUT);
   const exit = tw(f, [344, 364], [0, 1], EASE_IN_OUT);
   const on = tw(f, [HALF - 6, HALF + 6], [0, 1], EASE_IN_OUT);
-  const doubts = ["Un probiotique ? Il m'en reste ?", "Une précaution avec son traitement ?", "Et la file d'attente…"];
-  const answers = ["Probiotique · en rayon · 34 en stock", "Contrôles de sécurité faits", "Phrase prête : « votre antibiotique peut perturber la flore… »"];
+  const doubts = ["Un probiotique avec cet antibiotique ?", "Il nous en reste en rayon ?", "Une précaution à rappeler ?"];
+  const answers = ["Flore Équilibre 10 milliards · 34 en rayon", "Précautions vérifiées", "Phrase prête : « votre antibiotique peut perturber la flore… »"];
   const doubtAt = [44, 64, 84];
   const answerAt = [HALF + 18, HALF + 34, HALF + 50];
   return (
     <AbsoluteFill style={{ opacity: enter, transform: `translateY(${-exit * 120}px)`, filter: `blur(${exit * 10}px)` }}>
       <LightStage>
         <At x={120} y={250} w={820}>
-          <TitleBlock chip="Problème 1 · Au comptoir" chipAt={2} at={8} out={HALF - 14} lines={[words("Pas le temps"), words("*de tout dire.*", C.brand600)]} sub="Trente patients à l'heure. Le conseil passe à la trappe." subAt={40} subOut={HALF - 16} />
+          <TitleBlock chip="Problème 1 · Au comptoir" chipAt={2} at={8} out={HALF - 14} size={70} lines={[words("Des milliers"), words("de produits."), words("*Un patient à la fois.*", C.brand600)]} sub="Impossible de tout avoir en tête : le conseil passe à la trappe." subAt={40} subOut={HALF - 16} />
         </At>
         <At x={120} y={250} w={820} style={{ paddingTop: 88 }}>
-          <TitleBlock at={HALF + 4} lines={[words("Le conseil arrive"), words("*au bip.*", C.brand600)]} sub="Vérifié, pris dans votre rayon. Vous décidez." subAt={HALF + 30} />
+          <TitleBlock at={HALF + 4} lines={[words("PharmaBoost"), words("*y pense avec vous.*", C.brand600)]} sub="Les meilleures références de votre rayon, pour chaque ordonnance. Vous décidez." subAt={HALF + 30} />
         </At>
         <At x={980} y={150}>
           <Panel style={{ width: 820, padding: 34 }}>
@@ -71,8 +71,8 @@ function Counter({ intro }: { intro: number }) {
                 const p = sp(f, answerAt[i], { damping: 18, stiffness: 190 });
                 return f >= answerAt[i] - 1 ? <Bubble key={t} text={t} tone="ok" p={p} style={{ position: "absolute", right: 0, top: i * 110, maxWidth: 720 }} /> : null;
               })}
-              <div style={{ position: "absolute", left: 0, bottom: 0, fontSize: 25, fontWeight: 600, color: C.ink500, opacity: Math.min(tw(f, [112, 124], [0, 1]), 1 - tw(f, [HALF - 12, HALF - 4], [0, 1])) }}>Le patient repart sans le conseil.</div>
-              <div style={{ position: "absolute", left: 0, bottom: 0, fontSize: 25, fontWeight: 600, color: C.brand700, opacity: tw(f, [HALF + 76, HALF + 88], [0, 1]) }}>Vous proposez. Le patient choisit.</div>
+              <div style={{ position: "absolute", left: 0, bottom: 0, fontSize: 25, fontWeight: 600, color: C.ink500, opacity: Math.min(tw(f, [112, 124], [0, 1]), 1 - tw(f, [HALF - 12, HALF - 4], [0, 1])) }}>Le patient repart sans conseil.</div>
+              <div style={{ position: "absolute", left: 0, bottom: 0, fontSize: 25, fontWeight: 600, color: C.brand700, opacity: tw(f, [HALF + 76, HALF + 88], [0, 1]) }}>Le patient repart avec le bon conseil.</div>
             </div>
           </Panel>
         </At>
@@ -92,12 +92,12 @@ function Home({ intro }: { intro: number }) {
   const enter = tw(f, [-intro, 4], [0, 1], EASE_IN_OUT);
   const exit = tw(f, [344, 364], [0, 1], EASE_IN_OUT);
   const on = tw(f, [HALF - 6, HALF + 6], [0, 1], EASE_IN_OUT);
-  const doubts = ["Celui-là, c'est matin ou soir ?", "Pourquoi deux boîtes ?", "Jusqu'à quand ?"];
+  const doubts = ["C'est le matin ou le soir ?", "Pendant combien de jours ?", "Celui-là, il sert à quoi ?"];
   const doubtAt = [64, 84, 104];
   const boxes = [
     { name: "AMOXICILLINE 1 g", form: "comprimé dispersible", x: 0, y: 150, r: -8, at: 14 },
     { name: "PARACÉTAMOL 1000 mg", form: "comprimé", x: 230, y: 60, r: 7, at: 22 },
-    { name: "Probiotique", form: "gélules", x: 120, y: 250, r: -3, at: 30 },
+    { name: "Flore Équilibre", form: "probiotique · gélules", x: 120, y: 250, r: -3, at: 30 },
   ];
   const phone = sp(f, HALF + 4, { damping: 22, stiffness: 120 });
   const n1 = sp(f, HALF + 48, { damping: 18, stiffness: 170 });
@@ -107,10 +107,10 @@ function Home({ intro }: { intro: number }) {
       <LightStage>
         <AbsoluteFill style={{ opacity: 1 - exit }}>
           <At x={120} y={250} w={820}>
-            <TitleBlock chip="Problème 2 · À la maison" chipAt={2} at={8} out={HALF - 14} lines={[words("Cinq boîtes."), words("Dix minutes après,"), words("*il a oublié.*", C.brand600)]} />
+            <TitleBlock chip="Problème 2 · À la maison" chipAt={2} at={8} out={HALF - 14} lines={[words("Plusieurs boîtes."), words("Et beaucoup"), words("*de questions.*", C.brand600)]} />
           </At>
           <At x={120} y={250} w={820} style={{ paddingTop: 88 }}>
-            <TitleBlock at={HALF + 4} lines={[words("Son plan,"), words("ses rappels,"), words("*sur son téléphone.*", C.brand600)]} sub="Et un signe de la pharmacie le dernier jour." subAt={HALF + 96} />
+            <TitleBlock at={HALF + 4} lines={[words("Il repart"), words("avec son bilan,"), words("*et ses rappels.*", C.brand600)]} sub="Chaque médicament, à quoi il sert, quand le prendre. Et un signe de la pharmacie le dernier jour." subAt={HALF + 96} />
           </At>
           <At x={1060} y={110}>
             <Toggle on={on} />
