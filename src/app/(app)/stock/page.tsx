@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Boxes, Cable, Clock, History, PackageX, Plus, RefreshCw, Upload } from "lucide-react";
+import { AlertTriangle, Boxes, Cable, Clock, History, Hourglass, PackageX, Plus, RefreshCw, Upload } from "lucide-react";
 import { describeAge, lgoLabel, stockFreshness } from "@/core/stock/connectors";
 import { cn } from "@/lib/utils";
 import { ClassifyProductsButton } from "./classify-button";
 import { FetchPhotosButton } from "./photos-button";
 import { prisma } from "@/server/db/client";
 import { countProductsWithoutImageLookup } from "@/server/services/product-images";
+import { countLotsNeedingAction } from "@/server/services/stock-lots";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { normalizeSearchText } from "@/core/reference/search";
@@ -46,7 +47,7 @@ export default async function StockPage({
   const canManage = session.permissions.has(PERMISSIONS.PRODUCT_MANAGE);
   const canImport = session.permissions.has(PERMISSIONS.PRODUCT_IMPORT);
 
-  const [products, drugLines, lastMovement, lastImport, pharmacy, unclassified, withoutImage] = await Promise.all([
+  const [products, drugLines, lastMovement, lastImport, pharmacy, unclassified, withoutImage, shortDates] = await Promise.all([
     prisma.product.findMany({
       where: {
         pharmacyId,
@@ -113,7 +114,10 @@ export default async function StockPage({
     prisma.product.count({ where: { pharmacyId, deletedAt: null, classifiedAt: null } }),
     // Les boîtes dont la photo n'a pas encore été cherchée.
     countProductsWithoutImageLookup(pharmacyId),
+    // Les lots à date courte qui demandent un geste (urgents et expirés).
+    countLotsNeedingAction(session.scope),
   ]);
+  const shortDateAlerts = shortDates.urgent + shortDates.expired;
   const syncedAt = pharmacy?.stockSyncedAt ?? lastImport?.finishedAt ?? null;
   const connection = pharmacy?.stockConnection && pharmacy.stockConnection.status !== "DISCONNECTED" && pharmacy.stockConnection.status !== "PENDING" ? pharmacy.stockConnection : null;
   const freshness = connection ? stockFreshness({ lastSyncAt: connection.lastSyncAt, lastSeenAt: connection.lastSeenAt, intervalSeconds: connection.intervalSeconds }) : null;
@@ -202,6 +206,14 @@ export default async function StockPage({
                 <Link href="/stock/connexion">{connection ? "Mon logiciel" : "Connecter mon logiciel"}</Link>
               </Button>
             )}
+            <Button asChild variant="ghost" leadingIcon={<Hourglass className="size-[18px]" />}>
+              <Link href="/stock/dates-courtes" title={shortDateAlerts > 0 ? `${shortDates.expired} expiré(s) · ${shortDates.urgent} urgent(s)` : undefined}>
+                Dates courtes
+                {shortDateAlerts > 0 && (
+                  <span className="rounded-full bg-danger-600 px-1.5 py-0.5 text-[11px] leading-none font-semibold text-white tabular">{shortDateAlerts}</span>
+                )}
+              </Link>
+            </Button>
             <Button asChild variant="ghost" leadingIcon={<History className="size-[18px]" />}>
               <Link href="/stock/historique">Historique</Link>
             </Button>
