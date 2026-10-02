@@ -154,7 +154,29 @@ export type AuditAction =
   | "recommendation.validation_required"
   | "training.saved"
   | "training.archived"
-  | "training.progress_updated";
+  | "training.progress_updated"
+  | "partner.application_received"
+  | "partner.application_status_changed"
+  | "partner.application_note_added"
+  | "partner.saved"
+  | "partner.status_changed"
+  | "partner.contact_saved"
+  | "partner.contact_deleted"
+  | "partner.contract_saved"
+  | "partner.integration_saved"
+  | "partner.brand_saved"
+  | "partner.brand_status_changed"
+  | "partner.brand_audience_updated"
+  | "partner.pilot_updated"
+  | "partner.range_saved"
+  | "partner.product_saved"
+  | "partner.product_deleted"
+  | "partner.document_saved"
+  | "partner.offer_saved"
+  | "partner.preference_updated"
+  | "partner.lead_created"
+  | "partner.order_created"
+  | "partner.order_status_changed";
 
 export async function recordAudit(params: {
   action: AuditAction;

@@ -19,6 +19,7 @@ export type Universe = {
 export const UNIVERSES: Universe[] = [
   { key: "COMPLEMENTS_ALIMENTAIRES", label: "Compléments alimentaires", categories: ["VITAMINES", "MINERAUX", "MAGNESIUM", "PROBIOTIQUES", "PHYTOTHERAPIE"] },
   { key: "NUTRITION", label: "Nutrition", categories: ["NUTRITION"] },
+  { key: "DERMOCOSMETIQUE", label: "Dermocosmétique", categories: ["DERMOCOSMETIQUE", "DERMATOLOGIE", "SOINS"] },
   { key: "VETERINAIRE", label: "Vétérinaire", categories: [] },
   { key: "ORTHOPEDIE", label: "Orthopédie", categories: ["DISPOSITIFS_MEDICAUX"] },
   { key: "BUCCO_DENTAIRE", label: "Bucco-dentaire", categories: [] },

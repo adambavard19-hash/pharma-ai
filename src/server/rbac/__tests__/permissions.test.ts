@@ -8,9 +8,11 @@ import { PERMISSIONS, PERMISSION_LABELS, ROLE_PERMISSIONS, resolvePermissions, t
 
 const ROLES: Role[] = ["OWNER", "PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"];
 
-/** Ce que chaque rôle peut faire dans les briques gammes / challenges / dates courtes / vigilances / formation. */
+/** Ce que chaque rôle peut faire dans les briques gammes / challenges / dates courtes / vigilances / formation / partenaires. */
 const EXPECTED: Record<Role, Partial<Record<Permission, boolean>>> = {
   OWNER: {
+    [PERMISSIONS.PARTNERS_VIEW]: true,
+    [PERMISSIONS.PARTNERS_MANAGE]: true,
     [PERMISSIONS.LAB_PROGRAMS_MANAGE]: true,
     [PERMISSIONS.TRAINING_VIEW]: true,
     [PERMISSIONS.TRAINING_MANAGE]: true,
@@ -20,6 +22,8 @@ const EXPECTED: Record<Role, Partial<Record<Permission, boolean>>> = {
     [PERMISSIONS.PRESCRIPTION_VERIFY]: true,
   },
   PHARMACIST: {
+    [PERMISSIONS.PARTNERS_VIEW]: true,
+    [PERMISSIONS.PARTNERS_MANAGE]: false,
     [PERMISSIONS.LAB_PROGRAMS_MANAGE]: false,
     [PERMISSIONS.TRAINING_VIEW]: true,
     [PERMISSIONS.TRAINING_MANAGE]: false,
@@ -29,6 +33,8 @@ const EXPECTED: Record<Role, Partial<Record<Permission, boolean>>> = {
     [PERMISSIONS.PRESCRIPTION_VERIFY]: true,
   },
   TECHNICIAN: {
+    [PERMISSIONS.PARTNERS_VIEW]: true,
+    [PERMISSIONS.PARTNERS_MANAGE]: false,
     [PERMISSIONS.LAB_PROGRAMS_MANAGE]: false,
     [PERMISSIONS.TRAINING_VIEW]: true,
     [PERMISSIONS.TRAINING_MANAGE]: false,
@@ -38,12 +44,16 @@ const EXPECTED: Record<Role, Partial<Record<Permission, boolean>>> = {
     [PERMISSIONS.PRESCRIPTION_VERIFY]: false,
   },
   STUDENT: {
+    [PERMISSIONS.PARTNERS_VIEW]: false,
+    [PERMISSIONS.PARTNERS_MANAGE]: false,
     [PERMISSIONS.LAB_PROGRAMS_MANAGE]: false,
     [PERMISSIONS.TRAINING_VIEW]: true,
     [PERMISSIONS.STOCK_ADJUST]: false,
     [PERMISSIONS.PRESCRIPTION_VERIFY]: false,
   },
   VIEWER: {
+    [PERMISSIONS.PARTNERS_VIEW]: false,
+    [PERMISSIONS.PARTNERS_MANAGE]: false,
     [PERMISSIONS.LAB_PROGRAMS_MANAGE]: false,
     [PERMISSIONS.TRAINING_MANAGE]: false,
     [PERMISSIONS.STOCK_ADJUST]: false,

@@ -7,7 +7,7 @@ import {
   Settings,
   Users,
   UsersRound,
-  type LucideIcon, Rocket, GraduationCap } from "lucide-react";
+  type LucideIcon, Rocket, GraduationCap, Handshake } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 
 /**
@@ -95,6 +95,16 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.TRAINING_VIEW,
     match: ["/formation"],
     description: "Les formations utiles sur les produits et les gammes de l'officine",
+  },
+  {
+    href: "/partenaires",
+    label: "Partenaires",
+    icon: Handshake,
+    // Décision d'achat : l'entrée de menu est celle du titulaire. L'équipe
+    // au comptoir atteint une gamme depuis la carte « À découvrir ».
+    permission: PERMISSIONS.PARTNERS_MANAGE,
+    match: ["/partenaires"],
+    description: "Les gammes partenaires disponibles pour l'officine",
   },
   {
     href: "/suivis",

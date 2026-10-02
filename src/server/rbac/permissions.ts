@@ -81,6 +81,12 @@ export const PERMISSIONS = {
   TRAINING_VIEW: "training:view",
   /// Publier des contenus propres à l'officine.
   TRAINING_MANAGE: "training:manage",
+
+  // PharmaBoost Partenaires : gammes partenaires diffusées par la plateforme.
+  /// Consulter les marques partenaires (catalogue, carte « à découvrir » au comptoir).
+  PARTNERS_VIEW: "partners:view",
+  /// Masquer ou refuser une marque, contacter un partenaire, commander : décision d'achat du titulaire.
+  PARTNERS_MANAGE: "partners:manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -115,6 +121,7 @@ const PHARMACIST_PERMISSIONS: Permission[] = [
   PERMISSIONS.SALE_CREATE,
   PERMISSIONS.ANALYTICS_VIEW,
   PERMISSIONS.TRAINING_VIEW,
+  PERMISSIONS.PARTNERS_VIEW,
 ];
 
 const TECHNICIAN_PERMISSIONS: Permission[] = [
@@ -135,6 +142,7 @@ const TECHNICIAN_PERMISSIONS: Permission[] = [
   PERMISSIONS.SALE_VIEW,
   PERMISSIONS.SALE_CREATE,
   PERMISSIONS.TRAINING_VIEW,
+  PERMISSIONS.PARTNERS_VIEW,
 ];
 
 const STUDENT_PERMISSIONS: Permission[] = [
@@ -220,6 +228,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [PERMISSIONS.LAB_PROGRAMS_MANAGE]: "Gérer les gammes privilégiées et les challenges",
   [PERMISSIONS.TRAINING_VIEW]: "Suivre les formations",
   [PERMISSIONS.TRAINING_MANAGE]: "Publier des formations pour l'officine",
+  [PERMISSIONS.PARTNERS_VIEW]: "Consulter les gammes partenaires",
+  [PERMISSIONS.PARTNERS_MANAGE]: "Masquer, contacter et commander auprès des marques partenaires",
 };
 
 /** Permissions effectives = rôle + accordées − retirées. */

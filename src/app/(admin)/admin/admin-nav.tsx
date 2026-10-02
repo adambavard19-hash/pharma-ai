@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/admin/notifications", label: "Notifications" },
   { href: "/admin/formations", label: "Formations" },
   { href: "/admin/challenges", label: "Challenges" },
+  { href: "/admin/partenaires", label: "Partenaires" },
   { href: "/admin/commerciaux", label: "Commerciaux" },
   { href: "/admin/equipe", label: "Équipe PharmaBoost" },
   { href: "/admin/societe", label: "Société" },

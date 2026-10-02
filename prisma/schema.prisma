@@ -82,6 +82,10 @@ model Pharmacy {
   shortDateSoonDays   Int @default(90)
   shortDateUrgentDays Int @default(30)
 
+  /// Officine du groupe pilote PharmaBoost Partenaires : elle voit les
+  /// marques et gammes en statut TEST avant leur diffusion.
+  partnerPilot Boolean @default(false)
+
   /// Marque le jeu de données de démonstration. Jamais vrai en production réelle.
   isDemo   Boolean @default(false)
   isActive Boolean @default(true)
@@ -135,6 +139,12 @@ model Pharmacy {
   stockLots         StockLot[]
   productVigilances ProductVigilance[]
   trainingContents  TrainingContent[]
+
+  partnerAudiences    PartnerBrandAudience[]
+  partnerPreferences  PharmacyPartnerPreference[]
+  partnerAttributions PartnerAttribution[]
+  partnerLeads        PartnerLead[]
+  partnerOrders       PartnerOrder[]
 
   @@index([organizationId])
   @@map("pharmacies")
@@ -3132,4 +3142,492 @@ model TrainingProgress {
   @@unique([contentId, userId, pharmacyId])
   @@index([pharmacyId, userId])
   @@map("training_progress")
+}
+
+// ---------------------------------------------------------------------------
+// PharmaBoost Partenaires (octobre 2026). Des laboratoires et marques
+// référencent leurs gammes ; les officines éligibles les découvrent, peuvent
+// les masquer, contacter la marque ou commander quand l'intégration le
+// permet ; PharmaBoost attribue leads et commandes. Données centrales, jamais
+// dupliquées par officine. AUCUNE donnée patient ni d'ordonnance dans ces
+// tables, et rien ici n'est lu par le moteur de conseil.
+// ---------------------------------------------------------------------------
+
+/// Cycle de publication central : une marque ACTIVE est disponible pour les officines éligibles.
+enum PartnerPublicationStatus {
+  DRAFT
+  TEST
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+/// À qui une marque est diffusée. En statut TEST, seul le groupe pilote la voit, quel que soit ce choix.
+enum PartnerAudience {
+  ALL_PHARMACIES
+  SELECTED_PHARMACIES
+  PILOT_GROUP
+}
+
+/// Masquée : absente du comptoir, toujours consultable au catalogue. Refusée : absente partout.
+enum PartnerPreferenceChoice {
+  HIDDEN
+  REFUSED
+}
+
+enum PartnerApplicationStatus {
+  NEW
+  REVIEWING
+  CONTACTED
+  NEGOTIATION
+  ACCEPTED
+  REFUSED
+  ACTIVE_PARTNER
+}
+
+enum PartnerAnswer {
+  YES
+  NO
+  UNKNOWN
+}
+
+/// Comment une commande ou une prise de contact parvient au partenaire.
+enum PartnerIntegrationMode {
+  API
+  B2B_LINK
+  FORM
+  EMAIL
+  IMPORT_EXPORT
+  MANUAL
+}
+
+enum PartnerContractType {
+  FLAT_FEE
+  COMMISSION
+  HYBRID
+  PILOT
+  FREE
+}
+
+enum PartnerOrderStatus {
+  SUBMITTED
+  TRANSMITTED
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+enum PartnerLeadKind {
+  CONTACT_REQUEST
+  B2B_LINK_OPENED
+  FORM_OPENED
+}
+
+enum PartnerAttributionKind {
+  VIEW
+  LEAD
+  ORDER
+}
+
+enum PartnerAttributionSource {
+  COUNTER_CARD
+  CATALOG
+  BRAND_PAGE
+}
+
+/// Candidature déposée sur le site public. Aucune activation automatique.
+model PartnerApplication {
+  id               String                   @id @default(cuid())
+  status           PartnerApplicationStatus @default(NEW)
+  company          String
+  brand            String
+  contactFirstName String
+  contactLastName  String
+  contactRole      String?
+  email            String
+  phone            String?
+  website          String?
+  universes        String[]                 @default([])
+  approxReferences Int?
+  distribution     String?
+  hasApi           PartnerAnswer            @default(UNKNOWN)
+  hasB2bPortal     Boolean?
+  hasCatalog       Boolean?
+  hasTrainings     Boolean?
+  message          String?
+  consentAt        DateTime
+  /// Le partenaire créé à partir de cette candidature, une fois acceptée.
+  partnerId        String?
+  acknowledgedAt   DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  partner Partner?                  @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  events  PartnerApplicationEvent[]
+
+  @@index([status, createdAt])
+  @@map("partner_applications")
+}
+
+/// Historique d'une candidature : changements de statut et notes internes.
+model PartnerApplicationEvent {
+  id              String                    @id @default(cuid())
+  applicationId   String
+  kind            String
+  fromStatus      PartnerApplicationStatus?
+  toStatus        PartnerApplicationStatus?
+  note            String?
+  platformAdminId String?
+  createdAt       DateTime                  @default(now())
+
+  application PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@map("partner_application_events")
+}
+
+/// Le laboratoire ou la société partenaire.
+model Partner {
+  id               String                   @id @default(cuid())
+  name             String
+  slug             String                   @unique
+  legalName        String?
+  website          String?
+  logoUrl          String?
+  description      String?
+  universes        String[]                 @default([])
+  status           PartnerPublicationStatus @default(DRAFT)
+  startsAt         DateTime?
+  endsAt           DateTime?
+  /// Notes internes PharmaBoost, jamais montrées aux officines.
+  notes            String?
+  createdByAdminId String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  contacts     PartnerContact[]
+  brands       PartnerBrand[]
+  offers       PartnerOffer[]
+  integrations PartnerIntegration[]
+  contracts    PartnerContract[]
+  applications PartnerApplication[]
+  attributions PartnerAttribution[]
+  leads        PartnerLead[]
+  orders       PartnerOrder[]
+
+  @@index([status])
+  @@map("partners")
+}
+
+model PartnerContact {
+  id             String   @id @default(cuid())
+  partnerId      String
+  firstName      String
+  lastName       String
+  role           String?
+  email          String?
+  phone          String?
+  isPrimary      Boolean  @default(false)
+  /// Reçoit les commandes et prises de contact transmises par e-mail.
+  receivesOrders Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@map("partner_contacts")
+}
+
+/// Une marque d'un partenaire, publiée de façon centrale.
+model PartnerBrand {
+  id               String                   @id @default(cuid())
+  partnerId        String
+  name             String
+  slug             String                   @unique
+  /// Marque normalisée (src/core/catalog/brand.ts) : relie la marque au stock et aux formations.
+  brandKey         String
+  logoUrl          String?
+  description      String?
+  universes        String[]                 @default([])
+  status           PartnerPublicationStatus @default(DRAFT)
+  audience         PartnerAudience          @default(ALL_PHARMACIES)
+  /// Critères futurs (zones, typologies…), non interprétés aujourd'hui.
+  audienceCriteria Json?
+  publishedAt      DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  partner     Partner                     @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  ranges      PartnerRange[]
+  products    PartnerProduct[]
+  documents   PartnerDocument[]
+  offers      PartnerOffer[]
+  audiences   PartnerBrandAudience[]
+  preferences PharmacyPartnerPreference[]
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([brandKey])
+  @@map("partner_brands")
+}
+
+/// Une gamme d'une marque.
+model PartnerRange {
+  id          String                   @id @default(cuid())
+  brandId     String
+  name        String
+  description String?
+  universe    String?
+  status      PartnerPublicationStatus @default(DRAFT)
+  sortOrder   Int                      @default(0)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  brand    PartnerBrand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  products PartnerProduct[]
+  offers   PartnerOffer[]
+
+  @@index([brandId])
+  @@map("partner_ranges")
+}
+
+/// Un produit du catalogue partenaire (central, jamais copié dans les officines).
+model PartnerProduct {
+  id               String   @id @default(cuid())
+  brandId          String
+  rangeId          String?
+  name             String
+  ean              String?
+  cip13            String?
+  description      String?
+  imageUrl         String?
+  packaging        String?
+  proPriceCents    Int?
+  publicPriceCents Int?
+  externalRef      String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  brand PartnerBrand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  range PartnerRange? @relation(fields: [rangeId], references: [id], onDelete: SetNull)
+
+  @@index([brandId])
+  @@index([rangeId])
+  @@index([ean])
+  @@map("partner_products")
+}
+
+/// Documentation professionnelle d'une marque (lien vers la source).
+model PartnerDocument {
+  id        String   @id @default(cuid())
+  brandId   String
+  title     String
+  kind      String   @default("DOCUMENT")
+  url       String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  brand PartnerBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId])
+  @@map("partner_documents")
+}
+
+/// Conditions professionnelles proposées aux officines.
+model PartnerOffer {
+  id                String                   @id @default(cuid())
+  partnerId         String
+  brandId           String?
+  rangeId           String?
+  title             String
+  conditions        String
+  discountPercent   Decimal?                 @db.Decimal(5, 2)
+  minimumOrderCents Int?
+  validFrom         DateTime?
+  validTo           DateTime?
+  status            PartnerPublicationStatus @default(DRAFT)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  partner Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  brand   PartnerBrand? @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  range   PartnerRange? @relation(fields: [rangeId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId])
+  @@index([brandId])
+  @@map("partner_offers")
+}
+
+/// Mode d'intégration d'un partenaire. Aucun secret ici : une clé d'API vivra
+/// dans le coffre de secrets, jamais en base.
+model PartnerIntegration {
+  id             String                 @id @default(cuid())
+  partnerId      String
+  mode           PartnerIntegrationMode
+  isActive       Boolean                @default(false)
+  /// Lien du portail B2B, avec {code} remplacé par l'identifiant d'attribution.
+  b2bUrlTemplate String?
+  orderEmail     String?
+  formUrl        String?
+  /// Capacités annoncées : CATALOG, AVAILABILITY, PRO_PRICE, ORDER_CREATE, ORDER_STATUS, ATTRIBUTION.
+  capabilities   String[]               @default([])
+  notes          String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@map("partner_integrations")
+}
+
+/// Contrat partenaire : strictement interne à PharmaBoost. Aucune facturation automatique.
+model PartnerContract {
+  id                     String              @id @default(cuid())
+  partnerId              String
+  type                   PartnerContractType
+  startsAt               DateTime?
+  endsAt                 DateTime?
+  fixedAmountCents       Int?
+  commissionPercent      Decimal?            @db.Decimal(5, 2)
+  commissionPerUnitCents Int?
+  minimumCents           Int?
+  notes                  String?
+  createdByAdminId       String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@map("partner_contracts")
+}
+
+/// Officines retenues pour une marque diffusée à une sélection.
+model PartnerBrandAudience {
+  id         String   @id @default(cuid())
+  brandId    String
+  pharmacyId String
+  createdAt  DateTime @default(now())
+
+  brand    PartnerBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  pharmacy Pharmacy     @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, pharmacyId])
+  @@map("partner_brand_audiences")
+}
+
+/// Une officine masque ou refuse une marque partenaire.
+model PharmacyPartnerPreference {
+  id         String                  @id @default(cuid())
+  pharmacyId String
+  brandId    String
+  choice     PartnerPreferenceChoice @default(HIDDEN)
+  reason     String?
+  userId     String?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  pharmacy Pharmacy     @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  brand    PartnerBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([pharmacyId, brandId])
+  @@map("pharmacy_partner_preferences")
+}
+
+/// Identifiant d'attribution PharmaBoost : ce qui prouve qu'une consultation,
+/// une prise de contact ou une commande vient de PharmaBoost. Jamais de patient.
+model PartnerAttribution {
+  id         String                   @id @default(cuid())
+  code       String                   @unique
+  kind       PartnerAttributionKind
+  source     PartnerAttributionSource
+  partnerId  String
+  brandId    String?
+  rangeId    String?
+  pharmacyId String
+  userId     String?
+  /// Univers du conseil qui a fait apparaître la carte : jamais le patient ni l'ordonnance.
+  universe   String?
+  createdAt  DateTime                 @default(now())
+
+  partner  Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  pharmacy Pharmacy      @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  lead     PartnerLead?
+  order    PartnerOrder?
+
+  @@index([partnerId, createdAt])
+  @@index([pharmacyId, createdAt])
+  @@map("partner_attributions")
+}
+
+model PartnerLead {
+  id              String          @id @default(cuid())
+  attributionId   String          @unique
+  partnerId       String
+  brandId         String?
+  pharmacyId      String
+  kind            PartnerLeadKind
+  /// NEW → TRANSMITTED → CLOSED.
+  message         String?
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  status          String          @default("NEW")
+  transmittedAt   DateTime?
+  createdByUserId String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  attribution PartnerAttribution @relation(fields: [attributionId], references: [id], onDelete: Cascade)
+  partner     Partner            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  pharmacy    Pharmacy           @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, createdAt])
+  @@index([pharmacyId, createdAt])
+  @@map("partner_leads")
+}
+
+model PartnerOrder {
+  id               String                 @id @default(cuid())
+  attributionId    String                 @unique
+  partnerId        String
+  brandId          String
+  pharmacyId       String
+  integrationMode  PartnerIntegrationMode
+  status           PartnerOrderStatus     @default(SUBMITTED)
+  totalCents       Int?
+  partnerReference String?
+  statusDetail     String?
+  transmittedAt    DateTime?
+  confirmedAt      DateTime?
+  createdByUserId  String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  attribution PartnerAttribution @relation(fields: [attributionId], references: [id], onDelete: Cascade)
+  partner     Partner            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  pharmacy    Pharmacy           @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  lines       PartnerOrderLine[]
+
+  @@index([partnerId, createdAt])
+  @@index([pharmacyId, createdAt])
+  @@map("partner_orders")
+}
+
+model PartnerOrderLine {
+  id               String  @id @default(cuid())
+  orderId          String
+  partnerProductId String?
+  name             String
+  ean              String?
+  quantity         Int
+  unitPriceCents   Int?
+
+  order PartnerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("partner_order_lines")
 }
