@@ -14,11 +14,14 @@ export function SettingsTabs({
   canSeeRules,
   canSeeAudit,
   auditCount,
+  canSeePrograms = false,
 }: {
   canSeeTeam: boolean;
   canSeeRules: boolean;
   canSeeAudit: boolean;
   auditCount?: number;
+  /** Gammes privilégiées et challenges (titulaire) : l'onglet Laboratoires y mène. */
+  canSeePrograms?: boolean;
 }) {
   return (
     <LinkTabs
@@ -26,9 +29,11 @@ export function SettingsTabs({
       items={[
         { key: "officine", label: "Officine" },
         ...(canSeeTeam ? [{ key: "equipe", label: "Équipe", href: "/parametres/equipe" }] : []),
+        ...(canSeeRules || canSeePrograms
+          ? [{ key: "laboratoires", label: "Laboratoires & gammes", href: canSeeRules ? "/parametres/laboratoires" : "/parametres/laboratoires/gammes" }]
+          : []),
         ...(canSeeRules
           ? [
-              { key: "laboratoires", label: "Laboratoires", href: "/parametres/laboratoires" },
               { key: "regles", label: "Règles de conseil", href: "/parametres/regles" },
               { key: "regles-conseil", label: "Registre du moteur", href: "/parametres/regles-conseil" },
             ]

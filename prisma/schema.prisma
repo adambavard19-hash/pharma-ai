@@ -77,6 +77,11 @@ model Pharmacy {
   /// de spammer le patient.
   followUpMinIntervalDays Int @default(30)
 
+  /// Dates courtes : une date de péremption à moins de N jours est « bientôt »,
+  /// à moins de M jours « urgente ». Réglables par l'officine.
+  shortDateSoonDays   Int @default(90)
+  shortDateUrgentDays Int @default(30)
+
   /// Marque le jeu de données de démonstration. Jamais vrai en production réelle.
   isDemo   Boolean @default(false)
   isActive Boolean @default(true)
@@ -124,6 +129,12 @@ model Pharmacy {
   /// Contrats et liens d'activation rattachés directement à l'officine.
   contracts           Contract[]
   subscriptionInvites SubscriptionInvite[]
+
+  preferredRanges   PreferredRange[]
+  labChallenges     LabChallenge[]
+  stockLots         StockLot[]
+  productVigilances ProductVigilance[]
+  trainingContents  TrainingContent[]
 
   @@index([organizationId])
   @@map("pharmacies")
@@ -843,6 +854,9 @@ model Product {
   pharmacyRules   PharmacyRule[]
 
   barcodes ProductBarcode[]
+
+  stockLots   StockLot[]
+  vigilances  ProductVigilance[]
 
   @@unique([pharmacyId, reference])
   @@index([pharmacyId, category])
@@ -1967,6 +1981,10 @@ model Recommendation {
   /// dit au comptoir : il faut pouvoir le relire des mois plus tard.
   counterScript String?
   precautions   String[] @default([])
+  /// Vigilances patient structurées affichées sur la carte (grossesse,
+  /// allaitement, asthme, épilepsie, enfant…) : population, niveau, texte,
+  /// source. Jamais recopiées dans le document remis au patient.
+  vigilances    Json?
 
   quantity       Int @default(1)
   unitPriceCents Int @default(0)
@@ -2325,6 +2343,8 @@ model SaleLine {
   recommendation Recommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
 
   @@index([saleId])
+  @@index([productId])
+  @@index([presentationId])
   @@index([recommendationId])
   @@map("sale_lines")
 }
@@ -2872,3 +2892,244 @@ model EmailDispatch {
   @@map("email_dispatches")
 }
 
+
+// ---------------------------------------------------------------------------
+// Gammes privilégiées, challenges laboratoires, dates courtes, vigilances
+// produit, formation (octobre 2026). Tout est propre à une officine
+// (pharmacyId), sauf les formations publiées par PharmaBoost pour toutes
+// (pharmacyId vide). Rien de commercial n'entre dans le score clinique : les
+// gammes et les dates courtes ne servent qu'au départage de références
+// également pertinentes et sûres ; les challenges n'entrent pas dans le moteur.
+// ---------------------------------------------------------------------------
+
+/// Une gamme ou un laboratoire travaillé en priorité dans un univers.
+model PreferredRange {
+  id              String   @id @default(cuid())
+  pharmacyId      String
+  /// Clé d'univers (src/config/universes.ts) : du texte, pour ajouter un univers sans migration.
+  universe        String
+  laboratory      String
+  /// Marque normalisée (src/core/catalog/brand.ts) : ce qui relie la gamme aux produits.
+  brandKey        String
+  rangeName       String?
+  isActive        Boolean  @default(true)
+  /// 1 = la plus prioritaire de l'univers.
+  priority        Int      @default(1)
+  /// Remise ou marge négociée, en %, quand l'officine la connaît.
+  discountPercent Decimal? @db.Decimal(5, 2)
+  notes           String?
+  /// Produits concernés (Product.id de l'officine). Vide : toute la marque.
+  productIds      String[] @default([])
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, universe])
+  @@index([pharmacyId, brandKey])
+  @@map("preferred_ranges")
+}
+
+enum LabChallengeStatus {
+  ACTIVE
+  ENDED
+  ARCHIVED
+}
+
+enum LabChallengeCountMode {
+  /// Toutes les ventes enregistrées des produits concernés.
+  ALL_SALES
+  /// Seulement les ventes issues d'un conseil PharmaBoost.
+  ATTRIBUTED
+}
+
+/// Un challenge commercial proposé par un laboratoire. Hors du moteur de conseil.
+model LabChallenge {
+  id                String                @id @default(cuid())
+  pharmacyId        String
+  title             String
+  laboratory        String
+  brandKey          String?
+  universe          String?
+  /// Produits concernés (Product.id). Vide : toute la marque (brandKey).
+  productIds        String[]              @default([])
+  startsAt          DateTime              @db.Date
+  endsAt            DateTime              @db.Date
+  targetUnits       Int?
+  bonusPerUnitCents Int?
+  /// Paliers : [{ units, bonusCents }].
+  tiers             Json?
+  status            LabChallengeStatus    @default(ACTIVE)
+  countMode         LabChallengeCountMode @default(ALL_SALES)
+  /// D'où viennent les chiffres : PHARMABOOST (ventes enregistrées + saisies).
+  /// Un connecteur partenaire (Opeaz…) pourra plus tard en fournir d'autres.
+  dataSource        String                @default("PHARMABOOST")
+  externalRef       String?
+  notes             String?
+  createdByUserId   String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  pharmacy Pharmacy            @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  entries  LabChallengeEntry[]
+
+  @@index([pharmacyId, status])
+  @@map("lab_challenges")
+}
+
+/// Unités ajoutées à la main (ventes hors PharmaBoost, relevé du laboratoire).
+model LabChallengeEntry {
+  id              String   @id @default(cuid())
+  challengeId     String
+  pharmacyId      String
+  units           Int
+  occurredOn      DateTime @db.Date
+  note            String?
+  source          String   @default("MANUAL")
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  challenge LabChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@index([challengeId])
+  @@index([pharmacyId])
+  @@map("lab_challenge_entries")
+}
+
+enum StockLotSource {
+  MANUAL
+  IMPORT
+  SCAN
+}
+
+/// Un lot et sa date de péremption. Couche à part : la quantité du logiciel de
+/// gestion reste la référence du stock, un lot ne la modifie jamais.
+model StockLot {
+  id              String         @id @default(cuid())
+  pharmacyId      String
+  productId       String?
+  /// Médicament du stock (DrugPresentation.id), quand ce n'est pas un produit du catalogue.
+  presentationId  String?
+  /// Nom figé à la saisie, pour l'affichage.
+  label           String
+  lotNumber       String?
+  expiresOn       DateTime       @db.Date
+  /// DAY ou MONTH : beaucoup de boîtes ne portent que MM/AAAA.
+  expiryPrecision String         @default("DAY")
+  quantity        Int?
+  source          StockLotSource @default(MANUAL)
+  importJobId     String?
+  note            String?
+  /// Lot sorti du suivi (vendu, retourné, détruit) : il ne compte plus.
+  resolvedAt      DateTime?
+  resolution      String?
+  createdByUserId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  product  Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, expiresOn])
+  @@index([productId])
+  @@index([presentationId])
+  @@map("stock_lots")
+}
+
+enum VigilanceLevel {
+  INFO
+  CAUTION
+  CONTRAINDICATION
+  PHARMACIST_VALIDATION
+}
+
+/// Vigilance déclarée par l'officine sur l'un de ses produits (source : le pharmacien).
+model ProductVigilance {
+  id              String         @id @default(cuid())
+  pharmacyId      String
+  productId       String
+  /// Population (src/config/vigilances.ts) : PREGNANCY, BREASTFEEDING, ASTHMA, EPILEPSY, CHILD…
+  population      String
+  level           VigilanceLevel
+  note            String?
+  source          String         @default("PHARMACIST")
+  createdByUserId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, population])
+  @@index([pharmacyId])
+  @@map("product_vigilances")
+}
+
+enum TrainingKind {
+  VIDEO
+  SHEET
+  DOCUMENT
+  EXTERNAL_LINK
+  QUIZ
+}
+
+enum TrainingStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+/// Un contenu de formation : lien officiel, vidéo, fiche courte ou document
+/// fourni ou autorisé par son auteur. Vide pharmacyId : publié pour toutes les officines.
+model TrainingContent {
+  id               String       @id @default(cuid())
+  pharmacyId       String?
+  title            String
+  summary          String?
+  kind             TrainingKind
+  url              String?
+  body             String?
+  laboratory       String?
+  brandKey         String?
+  rangeName        String?
+  universe         String?
+  /// Codes produit (CIP13/EAN) : un contenu global ne connaît pas les fiches d'une officine.
+  productCodes     String[]     @default([])
+  /// Produits de l'officine (contenus propres à une officine).
+  productIds       String[]     @default([])
+  durationMinutes  Int?
+  /// Provenance affichée : « Lien officiel du laboratoire », « Contenu fourni par … ».
+  sourceLabel      String?
+  isActive         Boolean      @default(true)
+  createdByAdminId String?
+  createdByUserId  String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  pharmacy Pharmacy?          @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  progress TrainingProgress[]
+
+  @@index([pharmacyId, isActive])
+  @@index([brandKey])
+  @@map("training_contents")
+}
+
+/// La progression d'un membre de l'équipe sur un contenu, dans une officine.
+model TrainingProgress {
+  id              String         @id @default(cuid())
+  contentId       String
+  userId          String
+  pharmacyId      String
+  status          TrainingStatus @default(IN_PROGRESS)
+  progressPercent Int            @default(0)
+  startedAt       DateTime       @default(now())
+  completedAt     DateTime?
+  updatedAt       DateTime       @updatedAt
+
+  content TrainingContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, userId, pharmacyId])
+  @@index([pharmacyId, userId])
+  @@map("training_progress")
+}

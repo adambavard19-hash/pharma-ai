@@ -9,6 +9,8 @@ const ITEMS = [
   { href: "/admin/abonnements", label: "Abonnements & Contrats" },
   { href: "/admin/pipeline", label: "Pipeline" },
   { href: "/admin/notifications", label: "Notifications" },
+  { href: "/admin/formations", label: "Formations" },
+  { href: "/admin/challenges", label: "Challenges" },
   { href: "/admin/commerciaux", label: "Commerciaux" },
   { href: "/admin/equipe", label: "Équipe PharmaBoost" },
   { href: "/admin/societe", label: "Société" },

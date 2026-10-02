@@ -7,7 +7,7 @@ import {
   Settings,
   Users,
   UsersRound,
-  type LucideIcon, Rocket } from "lucide-react";
+  type LucideIcon, Rocket, GraduationCap } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 
 /**
@@ -87,6 +87,14 @@ export const NAVIGATION: NavItem[] = [
     icon: ScrollText,
     permission: PERMISSIONS.PRESCRIPTION_VIEW,
     description: "Ordonnances d'exception, sécurisées, dernières évolutions",
+  },
+  {
+    href: "/formation",
+    label: "Formation",
+    icon: GraduationCap,
+    permission: PERMISSIONS.TRAINING_VIEW,
+    match: ["/formation"],
+    description: "Les formations utiles sur les produits et les gammes de l'officine",
   },
   {
     href: "/suivis",

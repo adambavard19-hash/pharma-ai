@@ -73,6 +73,14 @@ export const PERMISSIONS = {
 
   // Journal d'audit
   AUDIT_VIEW: "audit:view",
+
+  // Gammes privilégiées et challenges laboratoires — décision commerciale du titulaire.
+  LAB_PROGRAMS_MANAGE: "lab-programs:manage",
+
+  // Formation de l'équipe
+  TRAINING_VIEW: "training:view",
+  /// Publier des contenus propres à l'officine.
+  TRAINING_MANAGE: "training:manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -106,6 +114,7 @@ const PHARMACIST_PERMISSIONS: Permission[] = [
   PERMISSIONS.SALE_VIEW,
   PERMISSIONS.SALE_CREATE,
   PERMISSIONS.ANALYTICS_VIEW,
+  PERMISSIONS.TRAINING_VIEW,
 ];
 
 const TECHNICIAN_PERMISSIONS: Permission[] = [
@@ -125,6 +134,7 @@ const TECHNICIAN_PERMISSIONS: Permission[] = [
   PERMISSIONS.FOLLOWUP_SEND,
   PERMISSIONS.SALE_VIEW,
   PERMISSIONS.SALE_CREATE,
+  PERMISSIONS.TRAINING_VIEW,
 ];
 
 const STUDENT_PERMISSIONS: Permission[] = [
@@ -136,6 +146,7 @@ const STUDENT_PERMISSIONS: Permission[] = [
   PERMISSIONS.PRESCRIPTION_CREATE,
   PERMISSIONS.RECOMMENDATION_VIEW,
   PERMISSIONS.FOLLOWUP_VIEW,
+  PERMISSIONS.TRAINING_VIEW,
 ];
 
 const VIEWER_PERMISSIONS: Permission[] = [
@@ -206,6 +217,9 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE]: "Voir les performances par collaborateur",
   [PERMISSIONS.ANALYTICS_EXPORT]: "Exporter les statistiques",
   [PERMISSIONS.AUDIT_VIEW]: "Consulter le journal d'audit",
+  [PERMISSIONS.LAB_PROGRAMS_MANAGE]: "Gérer les gammes privilégiées et les challenges",
+  [PERMISSIONS.TRAINING_VIEW]: "Suivre les formations",
+  [PERMISSIONS.TRAINING_MANAGE]: "Publier des formations pour l'officine",
 };
 
 /** Permissions effectives = rôle + accordées − retirées. */

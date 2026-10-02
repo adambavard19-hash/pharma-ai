@@ -138,7 +138,23 @@ export type AuditAction =
   | "sales.signature_webhook"
   | "sales.contract_reminder"
   | "sales.subscription_requested"
-  | "platform.setting_updated";
+  | "platform.setting_updated"
+  | "range.saved"
+  | "range.deleted"
+  | "challenge.saved"
+  | "challenge.deleted"
+  | "challenge.entry_added"
+  | "challenge.entry_deleted"
+  | "stock.lot_saved"
+  | "stock.lot_resolved"
+  | "stock.lot_deleted"
+  | "stock.short_date_settings_updated"
+  | "vigilance.product_saved"
+  | "vigilance.product_deleted"
+  | "recommendation.validation_required"
+  | "training.saved"
+  | "training.archived"
+  | "training.progress_updated";
 
 export async function recordAudit(params: {
   action: AuditAction;
