@@ -8,3 +8,4 @@ storage
 .playwright-mcp
 coverage
 *.log
+video

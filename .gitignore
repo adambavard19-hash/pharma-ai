@@ -48,3 +48,9 @@ yarn-error.log*
 
 # Traces de la session navigateur pilotée (Playwright MCP)
 .playwright-mcp/
+
+# film de présentation (Remotion)
+/video/node_modules
+/video/out
+/video/public/music
+/video/public/sfx
