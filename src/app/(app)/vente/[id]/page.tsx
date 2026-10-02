@@ -29,6 +29,10 @@ import { patientDataEnabled } from "@/config/env";
 import { AUTO_ACCEPT_REFUSAL_MESSAGES, decideAutoAccept, distinctStrengths } from "@/core/reference";
 import { parsePosology, readSchedule } from "@/core/posology";
 import { SaleWorkspace } from "./sale-workspace";
+import { nearestShortDatesFor, todayFor } from "@/server/services/stock-lots";
+import { trainingsForProducts } from "@/server/services/training";
+import { parseSuggestionVigilances } from "@/config/vigilances";
+import { requiresPharmacistValidation } from "@/core/ai/engines/population-vigilance";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
 import type { PatientFactor, SpecialtyProposal } from "./types";
 
@@ -221,6 +225,23 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
     ).map((entry) => [entry.lineId, entry.alerts]),
   );
 
+  // Dates courtes du jour et formations liées : lues à l'affichage, elles
+  // changent sans nouvelle analyse (un lot sorti, un contenu publié).
+  const [shortDates, trainingsByProduct] = await Promise.all([
+    nearestShortDatesFor(session.scope.pharmacyId, await todayFor(session.scope.pharmacyId)),
+    // Le lien de formation ne s'affiche qu'à qui peut ouvrir la formation.
+    session.permissions.has(PERMISSIONS.TRAINING_VIEW)
+      ? trainingsForProducts(
+          session.scope,
+          prescription.recommendations.map((r) => r.product?.id).filter((id): id is string => Boolean(id)),
+        )
+      : Promise.resolve(new Map<string, { id: string; title: string }[]>()),
+  ]);
+  const shortDateOf = (key: string) => {
+    const shortDate = shortDates.get(key);
+    return shortDate && (shortDate.level === "SOON" || shortDate.level === "URGENT") ? { daysLeft: shortDate.daysLeft, level: shortDate.level } : null;
+  };
+
   return (
     <SaleWorkspace
       prescription={{
@@ -390,6 +411,14 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                 }
               : null,
           companion: isCompanion(recommendation.companion) ? recommendation.companion : null,
+          vigilances: parseSuggestionVigilances(recommendation.vigilances),
+          requiresValidation: requiresPharmacistValidation(parseSuggestionVigilances(recommendation.vigilances)),
+          shortDate: recommendation.product
+            ? shortDateOf(`p:${recommendation.product.id}`)
+            : recommendation.presentation
+              ? shortDateOf(`d:${recommendation.presentation.id}`)
+              : null,
+          trainings: recommendation.product ? (trainingsByProduct.get(recommendation.product.id) ?? []) : [],
         };
       })}
       analysisRunId={run?.id ?? null}

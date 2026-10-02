@@ -1,3 +1,4 @@
+import type { SuggestionVigilance } from "@/config/vigilances";
 import type { ScoreContribution, RoutineStepInfo, VigilanceDetails } from "@/core/ai/types";
 import type { PosologySchedule } from "@/core/posology";
 import type { RegulationAlert } from "@/core/regulation/rules";
@@ -157,6 +158,14 @@ export type AdviceView = {
   routine: RoutineStepInfo | null;
   /** Le produit à associer à cette proposition, trouvé dans le stock, s'il y en a un. */
   companion: { productId: string; name: string; salePriceCents: number; stockQuantity: number; label: string; reason: string } | null;
+  /** Vigilances patient (grossesse, asthme…) : pictogrammes de la carte, jamais remis au patient. */
+  vigilances: SuggestionVigilance[];
+  /** Un pharmacien doit valider avant que la proposition soit acceptée. */
+  requiresValidation: boolean;
+  /** Date courte de la référence, recalculée chaque jour depuis les lots suivis. */
+  shortDate: { daysLeft: number; level: "SOON" | "URGENT" } | null;
+  /** Formations liées au produit (« Se former sur ce produit »). */
+  trainings: { id: string; title: string }[];
   product: {
     id: string;
     /** Renseigné quand la référence est un médicament conseil du catalogue national. */

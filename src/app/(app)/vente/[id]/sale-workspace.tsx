@@ -539,7 +539,7 @@ export function SaleWorkspace({
 
           {!editing && !analysing && (
             <>
-              <AdviceZone prescriptionId={prescription.id} recommendations={recommendations} canDecide={permissions.decide} locked={blocked} outcome={outcome} canImportStock={canImportStock} stockNotice={stockNotice} inBasket={(id) => basket.has(id)} onAccept={acceptAdvice} onCancelAccept={cancelAdvice} />
+              <AdviceZone prescriptionId={prescription.id} recommendations={recommendations} canDecide={permissions.decide} canVerify={permissions.verify} locked={blocked} outcome={outcome} canImportStock={canImportStock} stockNotice={stockNotice} inBasket={(id) => basket.has(id)} onAccept={acceptAdvice} onCancelAccept={cancelAdvice} />
               <DeliveryZone
                 accepted={[...basket.entries()].map(([recommendationId, line]) => {
                   const recommendation = recommendations.find((r) => r.id === recommendationId);

@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { formatCents } from "@/lib/format";
+import { ShortDateBadge, VigilanceStrip } from "../[id]/vigilance-strip";
 
 /**
  * La demande sans ordonnance : le client décrit ce qu'il ressent, l'officine
@@ -118,8 +119,12 @@ export function CounterRequestCard({ today }: { today: { total: number; withProp
                       <div className="shrink-0 text-right">
                         <p className="text-[14px] font-semibold text-text-primary tabular">{formatCents(proposal.salePriceCents)}</p>
                         <p className="text-[12px] text-text-tertiary">{proposal.stockQuantity} en stock</p>
+                        {proposal.shortDate && (proposal.shortDate.level === "SOON" || proposal.shortDate.level === "URGENT") && (
+                          <div className="mt-1"><ShortDateBadge shortDate={{ daysLeft: proposal.shortDate.daysLeft, level: proposal.shortDate.level }} /></div>
+                        )}
                       </div>
                     </div>
+                    {(proposal.vigilances?.length ?? 0) > 0 && <div className="mt-2"><VigilanceStrip vigilances={proposal.vigilances ?? []} canVerify /></div>}
                     <p className="mt-2 text-[13px] text-text-secondary">{proposal.shortReason}</p>
                     <p className="mt-2 rounded-lg bg-surface-card px-3 py-2 text-[13.5px] text-text-primary italic">{proposal.counterScript}</p>
                     {proposal.precautions.length > 0 && <p className="mt-1 text-[12.5px] text-text-tertiary">{proposal.precautions.join(" ")}</p>}

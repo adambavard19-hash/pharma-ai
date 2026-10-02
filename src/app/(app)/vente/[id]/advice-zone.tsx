@@ -41,6 +41,8 @@ import { cn } from "@/lib/utils";
 import { ProductPicker } from "./product-picker";
 import { ReanalyseButton } from "./reanalyse-button";
 import { ScoreExplanation } from "./score-explanation";
+import { ShortDateBadge, VigilanceStrip } from "./vigilance-strip";
+import { ProductTrainingLink } from "../../formation/_components/product-training-link";
 import type { AdviceView } from "./types";
 import { OUTCOME_MESSAGES, type EngineOutcome } from "@/core/ai/outcome";
 
@@ -69,6 +71,7 @@ export function AdviceZone({
   prescriptionId,
   recommendations,
   canDecide,
+  canVerify = true,
   locked,
   outcome,
   canImportStock,
@@ -80,6 +83,8 @@ export function AdviceZone({
   prescriptionId: string;
   recommendations: AdviceView[];
   canDecide: boolean;
+  /** Pharmacien vérificateur : peut valider une proposition qui porte une vigilance. */
+  canVerify?: boolean;
   locked: boolean;
   /** Pourquoi il n'y a rien, quand il n'y a rien : c'est ce qui décide du message. */
   outcome: EngineOutcome | null;
@@ -172,6 +177,7 @@ export function AdviceZone({
                 index={index + 1}
                 steps={card.steps}
                 canDecide={canDecide}
+                canVerify={canVerify}
                 inBasket={inBasket}
                 onAccept={onAccept}
                 onCancelAccept={onCancelAccept}
@@ -183,6 +189,7 @@ export function AdviceZone({
                 prescriptionId={prescriptionId}
                 recommendation={card.recommendation}
                 canDecide={canDecide}
+                canVerify={canVerify}
                 accepted={inBasket(card.recommendation.id)}
                 presentProductIds={presentProductIds}
                 onAccept={() => onAccept(card.recommendation)}
@@ -352,6 +359,7 @@ function AdviceCard({
   prescriptionId,
   recommendation,
   canDecide,
+  canVerify = true,
   accepted,
   presentProductIds,
   onAccept,
@@ -360,6 +368,7 @@ function AdviceCard({
   prescriptionId: string;
   recommendation: AdviceView;
   canDecide: boolean;
+  canVerify?: boolean;
   index?: number;
   accepted: boolean;
   presentProductIds: Set<string>;
@@ -428,6 +437,7 @@ function AdviceCard({
         prescriptionId={prescriptionId}
         recommendation={recommendation}
         canDecide={canDecide}
+        canVerify={canVerify}
         accepted={accepted}
         confirmed={answer === true}
         companionPresent={Boolean(recommendation.companion && presentProductIds.has(recommendation.companion.productId))}
@@ -609,6 +619,7 @@ function ProductCard({
   prescriptionId,
   recommendation,
   canDecide,
+  canVerify = true,
   accepted,
   confirmed,
   companionPresent = false,
@@ -619,6 +630,8 @@ function ProductCard({
   prescriptionId: string;
   recommendation: AdviceView;
   canDecide: boolean;
+  /** L'utilisateur est pharmacien vérificateur (validation des vigilances). */
+  canVerify?: boolean;
   accepted: boolean;
   /** Le produit associé figure déjà parmi les conseils : ne pas le reproposer. */
   companionPresent?: boolean;
@@ -705,6 +718,8 @@ function ProductCard({
       )}
       <CardBand index={index} kind="Conseil associé" title={recommendation.opportunity?.title ?? "Conseil"} />
 
+      <VigilanceStrip vigilances={recommendation.vigilances ?? []} canVerify={canVerify} />
+
       {why && (
         <div className="flex items-start gap-3 rounded-xl bg-surface-sunken/70 px-4 py-3.5">
           <Pill className="mt-0.5 size-[18px] shrink-0 text-text-tertiary" />
@@ -760,6 +775,7 @@ function ProductCard({
                 <span className="text-[15px] font-medium text-warning-700 dark:text-warning-400">Prix à renseigner</span>
               )}
               <StockBadge quantity={product?.quantity ?? 0} low={lowStock} />
+              <ShortDateBadge shortDate={recommendation.shortDate ?? null} />
             </p>
           </div>
           {canDecide && (
@@ -799,8 +815,8 @@ function ProductCard({
             tone="accept"
             icon={<Check className="size-6" strokeWidth={2.75} />}
             label="Proposer ce produit"
-            hint="Ajouté à la délivrance"
-            disabled={pending}
+            hint={recommendation.requiresValidation && !canVerify ? "Validation pharmacien requise" : "Ajouté à la délivrance"}
+            disabled={pending || (recommendation.requiresValidation && !canVerify)}
             onClick={onAccept}
           />
           <DecisionButton
@@ -822,8 +838,15 @@ function ProductCard({
         </div>
       )}
 
+      {recommendation.origin !== "AI" && (recommendation.trainings?.length ?? 0) > 0 && (
+        <div className="px-1">
+          <ProductTrainingLink trainings={recommendation.trainings} />
+        </div>
+      )}
+
       {recommendation.origin === "AI" && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+          <ProductTrainingLink trainings={recommendation.trainings ?? []} className="order-last" />
           <button
             type="button"
             onClick={() => setShowExplanation((value) => !value)}
@@ -1098,6 +1121,7 @@ function RoutineCard({
   index,
   steps,
   canDecide,
+  canVerify = true,
   inBasket,
   onAccept,
   onCancelAccept,
@@ -1105,6 +1129,7 @@ function RoutineCard({
   index?: number;
   steps: AdviceView[];
   canDecide: boolean;
+  canVerify?: boolean;
   inBasket: (id: string) => boolean;
   onAccept: (recommendation: AdviceView) => void;
   onCancelAccept: (recommendation: AdviceView) => void;
@@ -1123,6 +1148,13 @@ function RoutineCard({
   const brands = [...new Set(steps.map(brandOf).filter(Boolean))];
   const brand = brands.length === 1 && brands[0] ? brands[0].charAt(0).toUpperCase() + brands[0].slice(1).toLowerCase() : null;
   const vigilances = first.opportunity?.safetyNotes ?? [];
+  // Vigilances patient de toutes les étapes, une seule fois par population (la plus forte).
+  const rank = { INFO: 0, CAUTION: 1, PHARMACIST_VALIDATION: 2, CONTRAINDICATION: 3 } as const;
+  const patientVigilances = [...steps.flatMap((step) => step.vigilances ?? []).reduce((map, v) => {
+    const previous = map.get(v.population);
+    if (!previous || rank[v.level] > rank[previous.level]) map.set(v.population, v);
+    return map;
+  }, new Map<string, AdviceView["vigilances"][number]>()).values()];
 
   const ignoreAll = () =>
     startTransition(async () => {
@@ -1133,6 +1165,8 @@ function RoutineCard({
   return (
     <CardFrame accent={remaining.length === 0 ? "success" : "brand"}>
       <CardBand index={index} kind="Routine associée" title={routine.title} tone="brand" />
+
+      <VigilanceStrip vigilances={patientVigilances} canVerify={canVerify} />
 
       {first.shortReason && (
         <div className="flex items-start gap-3 rounded-xl bg-surface-sunken/70 px-4 py-3.5">
@@ -1185,6 +1219,7 @@ function RoutineCard({
                     <span className="text-[13px] font-medium text-warning-700 dark:text-warning-400">Prix à renseigner</span>
                   )}
                   <StockBadge quantity={step.product?.quantity ?? 0} low={low} />
+                  <ShortDateBadge shortDate={step.shortDate ?? null} />
                 </div>
                 {step.precautions.filter((note) => !vigilances.includes(note)).length > 0 && (
                   <p className="text-[12px] leading-4 text-warning-800 dark:text-warning-500">⚠ {step.precautions.filter((note) => !vigilances.includes(note)).join(" · ")}</p>
@@ -1197,7 +1232,7 @@ function RoutineCard({
                     </p>
                   ) : (
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => onAccept(step)} disabled={pending}>Proposer</Button>
+                      <Button size="sm" onClick={() => onAccept(step)} disabled={pending || (step.requiresValidation && !canVerify)} title={step.requiresValidation && !canVerify ? "Validation pharmacien requise" : undefined}>Proposer</Button>
                       <Button size="sm" variant="ghost" disabled={pending} onClick={() => startTransition(async () => { await declineRecommendationAction(step.id); })}>Ignorer</Button>
                     </div>
                   )

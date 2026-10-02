@@ -8,6 +8,8 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { recordAudit, type AuditAction } from "@/server/audit/log";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 import type { RecommendationEventType, RecommendationStatus } from "@/generated/prisma";
+import { parseSuggestionVigilances } from "@/config/vigilances";
+import { requiresPharmacistValidation } from "@/core/ai/engines/population-vigilance";
 
 /**
  * Décisions du pharmacien sur les recommandations.
@@ -28,6 +30,7 @@ async function assertOwnedRecommendation(recommendationId: string, pharmacyId: s
       productId: true,
       status: true,
       counterScript: true,
+      vigilances: true,
       product: { select: { name: true } },
     },
   });
@@ -106,6 +109,20 @@ export async function acceptRecommendationAction(
     session.scope.pharmacyId,
   );
   if (!recommendation) return fail("Recommandation introuvable dans cette officine.");
+
+  // Une vigilance patient qui demande la validation d'un pharmacien (grossesse,
+  // asthme… à vérifier) : le bouton est désactivé à l'écran, mais c'est ici
+  // que la règle tient.
+  if (requiresPharmacistValidation(parseSuggestionVigilances(recommendation.vigilances)) && !session.permissions.has(PERMISSIONS.PRESCRIPTION_VERIFY)) {
+    await recordAudit({
+      action: "recommendation.validation_required",
+      entityType: "Recommendation",
+      entityId: recommendationId,
+      pharmacyId: session.scope.pharmacyId,
+      userId: session.scope.userId,
+    });
+    return fail("Validation pharmacien requise : ce conseil porte une vigilance patient à vérifier par un pharmacien.");
+  }
 
   await transition({
     recommendationId,

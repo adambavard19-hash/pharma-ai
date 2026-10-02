@@ -17,6 +17,12 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { computeMargin, formatCents, formatDateTime, formatPercent } from "@/lib/format";
 import { StockAdjustForm } from "./stock-form";
+import { listLots } from "@/server/services/stock-lots";
+import { ProductLots } from "../dates-courtes/product-lots";
+import { ProductVigilances } from "./product-vigilances";
+import { listProductVigilances } from "@/server/services/product-vigilances";
+import { trainingsForProduct } from "@/server/services/training";
+import { ProductTrainingLink } from "../../formation/_components/product-training-link";
 import type { ProductCategoryCode } from "@/core/ai/types";
 
 export const metadata: Metadata = { title: "Fiche produit" };
@@ -45,7 +51,8 @@ export default async function ProductDetailPage({
     notFound();
   }
 
-  const [recommendationStats, salesStats] = await Promise.all([
+  const canSeeLots = session.permissions.has(PERMISSIONS.STOCK_VIEW);
+  const [recommendationStats, salesStats, productLots, vigilances, trainings] = await Promise.all([
     prisma.recommendation.groupBy({
       by: ["status"],
       where: { productId: product.id, pharmacyId: session.scope.pharmacyId },
@@ -59,6 +66,11 @@ export default async function ProductDetailPage({
       },
       _sum: { totalCents: true, quantity: true },
     }),
+    // Les dates de péremption suivies : une couche à part, sans effet sur la quantité.
+    canSeeLots ? listLots(session.scope, { productId: product.id }) : Promise.resolve(null),
+    // Les vigilances patient que l'officine a déclarées sur ce produit.
+    listProductVigilances(session.scope, product.id),
+    session.permissions.has(PERMISSIONS.TRAINING_VIEW) ? trainingsForProduct(session.scope, product.id) : Promise.resolve([]),
   ]);
 
   const proposed = recommendationStats.reduce((sum, row) => sum + row._count, 0);
@@ -177,7 +189,7 @@ export default async function ProductDetailPage({
         />
       </Grid>
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
           <Card>
             <CardHeader
@@ -220,8 +232,15 @@ export default async function ProductDetailPage({
                 values={product.contraindications}
                 tone="danger"
               />
+              <ProductTrainingLink trainings={trainings} />
             </CardContent>
           </Card>
+
+          <ProductVigilances
+            productId={product.id}
+            rows={vigilances.map((v) => ({ id: v.id, population: v.population, level: v.level, note: v.note }))}
+            canManage={session.permissions.has(PERMISSIONS.RECOMMENDATION_RULES_MANAGE)}
+          />
 
           <Card>
             <CardHeader title="Historique" description="Chaque entrée et sortie, avec son motif et son auteur." />
@@ -316,6 +335,16 @@ export default async function ProductDetailPage({
               )}
             </CardContent>
           </Card>
+
+          {productLots && (
+            <ProductLots
+              lots={productLots.lots}
+              today={productLots.today}
+              thresholds={productLots.thresholds}
+              target={{ kind: "PRODUCT", id: product.id, label: product.name, detail: product.brand }}
+              canAdjust={session.permissions.has(PERMISSIONS.STOCK_ADJUST)}
+            />
+          )}
         </div>
       </div>
     </div>
