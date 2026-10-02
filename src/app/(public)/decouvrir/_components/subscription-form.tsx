@@ -67,7 +67,7 @@ export function SubscriptionForm({ planId, offerLabel, referralCode = "" }: { pl
       {error && <Alert tone="danger">{error}</Alert>}
 
       <fieldset className="space-y-4">
-        <legend className="text-[13px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">L&apos;officine</legend>
+        <legend className="text-[13px] font-semibold tracking-[0.08em] text-brand-700 uppercase">L&apos;officine</legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nom de la pharmacie" htmlFor="sub-name" required error={err("pharmacyName")}>
             <Input id="sub-name" value={form.pharmacyName} onChange={set("pharmacyName")} placeholder="Pharmacie du Centre" autoComplete="organization" />
@@ -100,7 +100,7 @@ export function SubscriptionForm({ planId, offerLabel, referralCode = "" }: { pl
       </fieldset>
 
       <fieldset className="space-y-4">
-        <legend className="text-[13px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">Le signataire</legend>
+        <legend className="text-[13px] font-semibold tracking-[0.08em] text-brand-700 uppercase">Le signataire</legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Prénom" htmlFor="sub-first" required error={err("ownerFirstName")}>
             <Input id="sub-first" value={form.ownerFirstName} onChange={set("ownerFirstName")} autoComplete="given-name" />
