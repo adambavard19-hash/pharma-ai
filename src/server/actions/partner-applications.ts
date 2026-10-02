@@ -4,6 +4,7 @@ import { z } from "zod";
 import { headers } from "next/headers";
 import { receivePartnerApplication } from "@/server/services/partners/application-intake";
 import { isUniverseKey } from "@/config/universes";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 const CONSENT_REQUIRED = "Votre accord est nécessaire pour que nous puissions étudier votre candidature.";
@@ -88,7 +89,7 @@ export async function submitPartnerApplicationAction(payload: PartnerApplication
 
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "inconnue";
   if (throttled(`partenaire-email:${ip}:${input.email.toLowerCase()}`, 3) || throttled(`partenaire-ip:${ip}`, 10)) {
-    return fail("Nous avons déjà reçu votre candidature. Notre équipe revient vers vous ; pour toute précision, écrivez à contact@pharmaboost.app.");
+    return fail(`Nous avons déjà reçu votre candidature. Notre équipe revient vers vous ; pour toute précision, écrivez à ${PUBLIC_CONTACT_EMAIL}.`);
   }
 
   try {
@@ -113,6 +114,6 @@ export async function submitPartnerApplicationAction(payload: PartnerApplication
     return ok({ acknowledged: result.acknowledged });
   } catch (error) {
     console.error("[site] candidature partenaire impossible", error);
-    return fail("Votre candidature n'a pas pu être enregistrée. Écrivez-nous à contact@pharmaboost.app.");
+    return fail(`Votre candidature n'a pas pu être enregistrée. Écrivez-nous à ${PUBLIC_CONTACT_EMAIL}.`);
   }
 }

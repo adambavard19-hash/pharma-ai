@@ -1,4 +1,5 @@
 import { escapeHtml } from "@/core/documents/email";
+import { PUBLIC_CONTACT_EMAIL } from "../../config/contact";
 
 /**
  * Le gabarit unique des e-mails PharmaBoost envoyés aux officines, aux
@@ -123,7 +124,7 @@ function blockText(block: EmailBlock): string {
 
 export const DEFAULT_EMAIL_CONTEXT: EmailContext = {
   baseUrl: "https://pharmaboost.app",
-  company: { legalName: "PharmaBoost", contactEmail: "contact@pharmaboost.app" },
+  company: { legalName: "PharmaBoost", contactEmail: PUBLIC_CONTACT_EMAIL },
 };
 
 export type FrameInput = { subject: string; preheader?: string; eyebrow?: string; title: string; bodyHtml: string; reason?: string };

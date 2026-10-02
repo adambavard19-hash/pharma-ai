@@ -35,6 +35,7 @@ import { SUBSCRIPTION_STATUS_LABELS, type SubscriptionStatusCode } from "@/core/
 import { CONTRACT_STATUS_LABELS, type ContractStatusCode } from "@/core/sales/pipeline";
 import { formatCents, formatDate, formatDateTime, formatNumber } from "@/lib/format";
 import type { ProviderInfo } from "@/core/ai/ports";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 export const metadata: Metadata = { title: "Paramètres" };
 
@@ -575,7 +576,7 @@ function SubscriptionSettings({
             </dl>
           )}
           <div className="mt-5">
-            <p className="text-[12.5px] leading-5 text-text-tertiary">Règlement par prélèvement bancaire mensuel, selon votre contrat. Pour une facture, un changement de coordonnées bancaires ou une résiliation : <a href="mailto:contact@pharmaboost.app" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">contact@pharmaboost.app</a>.</p>
+            <p className="text-[12.5px] leading-5 text-text-tertiary">Règlement par prélèvement bancaire mensuel, selon votre contrat. Pour une facture, un changement de coordonnées bancaires ou une résiliation : <a href="mailto:contact@pharmaboost.app" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">{PUBLIC_CONTACT_EMAIL}</a>.</p>
           </div>
         </CardContent>
       </Card>

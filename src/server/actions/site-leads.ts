@@ -4,6 +4,7 @@ import { z } from "zod";
 import { headers } from "next/headers";
 import { receiveSiteLead } from "@/server/services/site-leads";
 import { confirmSubscription, normalizeSubscriptionRequest, requestSubscription, type SubscriptionRequestOutcome } from "@/server/services/subscription-requests";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 import { fail, ok, type ActionResult } from "./types";
 
 const schema = z.object({
@@ -61,7 +62,7 @@ export async function submitSiteLeadAction(payload: z.input<typeof schema>): Pro
     return ok({ acknowledged: result.acknowledged });
   } catch (error) {
     console.error("[site] demande impossible", error);
-    return fail("Votre demande n'a pas pu être enregistrée. Écrivez-nous à contact@pharmaboost.app.");
+    return fail(`Votre demande n'a pas pu être enregistrée. Écrivez-nous à ${PUBLIC_CONTACT_EMAIL}.`);
   }
 }
 
@@ -117,14 +118,14 @@ export async function submitSubscriptionRequestAction(payload: z.input<typeof su
   if (!checked.ok) return fail("Certaines informations sont à corriger.", checked.errors);
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "inconnue";
   // Limite par adresse IP et par adresse e-mail, quel que soit le SIRET saisi (mémoire de l'instance).
-  if (throttled(`souscription-ip:${ip}`) || throttled(`souscription-email:${checked.value.email}`)) return fail("Nous avons déjà reçu plusieurs demandes : notre équipe revient vers vous. Pour toute urgence, écrivez à contact@pharmaboost.app.");
+  if (throttled(`souscription-ip:${ip}`) || throttled(`souscription-email:${checked.value.email}`)) return fail(`Nous avons déjà reçu plusieurs demandes : notre équipe revient vers vous. Pour toute urgence, écrivez à ${PUBLIC_CONTACT_EMAIL}.`);
   try {
     const result = await requestSubscription(request);
     if (!result.ok) return fail("Certaines informations sont à corriger.", result.errors);
     return ok({ outcome: result.outcome.status });
   } catch (error) {
     console.error("[site] souscription impossible", error);
-    return fail("Votre demande n'a pas pu être enregistrée. Écrivez-nous à contact@pharmaboost.app.");
+    return fail(`Votre demande n'a pas pu être enregistrée. Écrivez-nous à ${PUBLIC_CONTACT_EMAIL}.`);
   }
 }
 

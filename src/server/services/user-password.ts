@@ -9,6 +9,7 @@ import { publicUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
 import { recordDispatch } from "@/server/services/email-dispatch";
 import type { MessagingProvider } from "@/core/ai/ports";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 /** Un lien d'accueil ou de réinitialisation reste valable une semaine. */
 const PASSWORD_LINK_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -49,12 +50,9 @@ export async function sendUserPasswordLink(
   let onboarding: { lgoLabel: string | null; exportSteps: string[]; contactEmail: string } | null = null;
   if (kind === "welcome") {
     const pharmacyId = user.memberships[0]?.pharmacy.id ?? null;
-    const [connection, company] = await Promise.all([
-      pharmacyId ? prisma.stockConnection.findUnique({ where: { pharmacyId }, select: { lgo: true } }) : null,
-      prisma.companyProfile.findUnique({ where: { id: "default" }, select: { representativeEmail: true } }),
-    ]);
+    const connection = pharmacyId ? await prisma.stockConnection.findUnique({ where: { pharmacyId }, select: { lgo: true } }) : null;
     const lgo = connection ? LGO_DEFINITIONS.find((item) => item.id === connection.lgo) ?? null : null;
-    onboarding = { lgoLabel: lgo && lgo.id !== "autre" ? lgo.label : null, exportSteps: lgo?.exportSteps ?? [], contactEmail: company?.representativeEmail ?? "contact@pharmaboost.app" };
+    onboarding = { lgoLabel: lgo && lgo.id !== "autre" ? lgo.label : null, exportSteps: lgo?.exportSteps ?? [], contactEmail: PUBLIC_CONTACT_EMAIL };
   }
   const message = buildUserPasswordEmail({
     firstName: user.firstName,

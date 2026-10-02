@@ -11,6 +11,7 @@ import { LGO_DEFINITIONS, lgoLabel, stockFreshness } from "@/core/stock/connecto
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
 import { fail, ok, type ActionResult } from "./types";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 /** Réservé au titulaire (import de stock) : appairer, régler, révoquer l'agent. */
 
@@ -97,7 +98,7 @@ export async function emailInstallInstructionsAction(payload: { lgo: string; cod
     "",
     "L'agent lit ce dossier et rien d'autre. Il n'écrit jamais dans votre logiciel.",
     "",
-    "Besoin d'aide : contact@pharmaboost.app",
+    `Besoin d'aide : ${PUBLIC_CONTACT_EMAIL}`,
   ].join("\n");
   const outcome = await getMessagingProvider().sendEmail({
     to: session.user.email,

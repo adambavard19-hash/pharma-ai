@@ -12,6 +12,7 @@ import { readSubscription, type SubscriptionShape } from "@/core/billing/stripe-
 import { subscriptionStatusFromStripe, trialEndDate, trialSentence, formatEuros } from "@/core/billing/subscription";
 import { buildSubscriptionInviteEmail, buildSubscriptionStartedEmail } from "@/core/platform/billing-emails";
 import type { Plan, Prisma } from "@/generated/prisma";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 /**
  * L'abonnement PharmaBoost, côté serveur : l'offre et son prix Stripe, le
@@ -146,7 +147,6 @@ export async function sendSubscriptionInvite(params: { pharmacyId: string; planI
     ? await prisma.subscriptionInvite.update({ where: { id: previous.id }, data: { planId: plan.id, contractId, tokenHash: hashToken(token), sentTo, expiresAt, sentCount: { increment: 1 }, sentAt: now } })
     : await prisma.subscriptionInvite.create({ data: { pharmacyId: pharmacy.id, organizationId: pharmacy.organizationId, planId: plan.id, contractId, tokenHash: hashToken(token), sentTo, expiresAt, sentCount: 1, sentAt: now, createdByAdminId: params.adminId } });
 
-  const company = await prisma.companyProfile.findUnique({ where: { id: "default" }, select: { representativeEmail: true } });
   const message = buildSubscriptionInviteEmail({
     ownerName: owner ? `${owner.firstName} ${owner.lastName}` : pharmacy.name,
     pharmacyName: pharmacy.name,
@@ -155,7 +155,7 @@ export async function sendSubscriptionInvite(params: { pharmacyId: string; planI
     trialDays: plan.trialDays,
     url: publicUrl(`/abonnement/activer/${token}`),
     expiresAt,
-    contactEmail: company?.representativeEmail ?? "contact@pharmaboost.app",
+    contactEmail: PUBLIC_CONTACT_EMAIL,
   });
   const outcome = await getMessagingProvider().sendEmail({ to: sentTo, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
   if (outcome.status !== "SENT") {

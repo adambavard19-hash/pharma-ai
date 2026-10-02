@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "./_components/site-shell";
-import { loadCompanyProfile, DEFAULT_CONTACT_EMAIL } from "@/server/services/site-leads";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 export const metadata: Metadata = {
   title: { default: "PharmaBoost — Le copilote de comptoir de l'officine", template: "%s · PharmaBoost" },
@@ -18,13 +18,12 @@ export const metadata: Metadata = {
 };
 
 /** Le site public : aucune session, aucune donnée d'officine, aucun compteur. */
-export default async function SiteLayout({ children }: { children: ReactNode }) {
-  const company = await loadCompanyProfile();
+export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh bg-surface-app text-text-primary">
       <SiteHeader />
       <main>{children}</main>
-      <SiteFooter contactEmail={company?.representativeEmail ?? DEFAULT_CONTACT_EMAIL} />
+      <SiteFooter contactEmail={PUBLIC_CONTACT_EMAIL} />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { loadCompanyProfile, DEFAULT_CONTACT_EMAIL } from "@/server/services/site-leads";
+import { loadCompanyProfile } from "@/server/services/site-leads";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 export const metadata: Metadata = { title: "Mentions légales" };
 
@@ -8,7 +9,7 @@ export default async function LegalPage() {
   const company = await loadCompanyProfile();
   const legalName = company?.legalName ?? "PharmaBoost";
   const address = [company?.addressLine1, [company?.postalCode, company?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-  const email = company?.representativeEmail ?? DEFAULT_CONTACT_EMAIL;
+  const email = PUBLIC_CONTACT_EMAIL;
   return (
     <article className="mx-auto max-w-2xl px-5 py-16">
       <h1 className="text-[32px] leading-[1.15] font-semibold tracking-[-0.02em] text-text-primary">Mentions légales</h1>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PharmaLogo } from "@/components/app/logo";
 import { openInvitation } from "@/server/services/onboarding";
 import { SignupForm } from "./signup-form";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 export const metadata: Metadata = {
   title: { absolute: "Configurer mon officine · PharmaBoost" },
@@ -52,7 +53,7 @@ function Closed({ state }: { state: string }) {
       <h1 className="mt-3 text-[28px] leading-[1.1] font-semibold tracking-[-0.02em] text-text-primary">{content.title}</h1>
       <p className="mx-auto mt-3 max-w-md text-[15px] leading-6 text-text-secondary">{content.body}</p>
       <p className="mt-6 text-[14px] text-text-secondary">
-        Une question : <a href="mailto:contact@pharmaboost.app" className="font-semibold text-brand-700 underline underline-offset-2">contact@pharmaboost.app</a>
+        Une question : <a href="mailto:contact@pharmaboost.app" className="font-semibold text-brand-700 underline underline-offset-2">{PUBLIC_CONTACT_EMAIL}</a>
       </p>
     </div>
   );

@@ -10,10 +10,11 @@ import { useToast } from "@/components/ui/toast";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { InstallationState } from "@/app/api/installation/etat/route";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 type Lgo = { id: string; label: string; exportHint: string; exportSteps: string[] } | null;
 
-const CONTACT = "contact@pharmaboost.app";
+const CONTACT = PUBLIC_CONTACT_EMAIL;
 
 /**
  * Le guide de mise en service. Cinq étapes, chacune avec : quoi faire, ce

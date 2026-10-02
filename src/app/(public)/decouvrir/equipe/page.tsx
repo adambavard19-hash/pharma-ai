@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { loadCompanyProfile, DEFAULT_CONTACT_EMAIL } from "@/server/services/site-leads";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 export const metadata: Metadata = { title: "Qui sommes-nous", description: "PharmaBoost est né dans une officine : une pharmacienne titulaire et un dirigeant, avec l'équipe qui l'utilise." };
 
@@ -24,9 +24,8 @@ const TEAM = [
   },
 ];
 
-export default async function TeamPage() {
-  const company = await loadCompanyProfile();
-  const email = company?.representativeEmail ?? DEFAULT_CONTACT_EMAIL;
+export default function TeamPage() {
+  const email = PUBLIC_CONTACT_EMAIL;
   return (
     <div className="mx-auto max-w-6xl px-5 py-16">
       <div className="max-w-2xl">
