@@ -120,7 +120,7 @@ function LgoRow({ text, active = false }: { text: string; active?: boolean }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Les quatre étapes : un visuel qui se comprend sans le texte          */
+/* Les étapes : un visuel qui se comprend sans le texte                 */
 /* ------------------------------------------------------------------ */
 
 // Les barres d'un code-barres décoratif : largeur et position calculées une fois.
@@ -179,6 +179,7 @@ export function StepConseil() {
   return (
     <div className="relative w-full max-w-[240px] rounded-xl border border-border-subtle bg-surface-card p-3 shadow-sm">
       <p className="font-mono text-[10px] tracking-[0.1em] text-brand-700 uppercase">Conseil associé</p>
+      <p className="text-[11.5px] text-text-secondary">{EXAMPLE.need}</p>
       <div className="mt-2 flex items-center gap-2.5">
         <ProductTile size={40} />
         <div className="min-w-0">
@@ -197,14 +198,19 @@ export function StepConseil() {
 
 export function StepSuivi() {
   return (
-    <div className="w-full max-w-[200px] rounded-[22px] border-[5px] border-ink-900 bg-surface-card p-2.5 shadow-sm">
-      <p className="font-mono text-[9.5px] tracking-[0.1em] text-brand-700 uppercase">Posologie</p>
-      <p className="text-[12px] font-semibold text-text-primary">AMOXICILLINE 1 g</p>
+    <div className="w-full max-w-[210px] rounded-[22px] border-[5px] border-ink-900 bg-surface-card p-2.5 shadow-sm">
+      <p className="font-mono text-[9.5px] tracking-[0.1em] text-brand-700 uppercase">Votre bilan</p>
+      <p className="mt-0.5 text-[12px] font-semibold text-text-primary">AMOXICILLINE 1 g</p>
+      <p className="text-[10.5px] text-text-secondary">Antibiotique : traite l&apos;infection</p>
       <div className="mt-1.5 grid grid-cols-2 gap-1 text-[10.5px]">
         <span className="rounded-md bg-brand-50 px-2 py-1 text-brand-900">Matin · 1</span>
         <span className="rounded-md bg-brand-50 px-2 py-1 text-brand-900">Soir · 1</span>
       </div>
-      <p className="mt-1.5 text-[10.5px] text-text-secondary">Pendant 6 jours</p>
+      <div className="mt-2 border-t border-border-subtle pt-1.5">
+        <p className="font-mono text-[9px] tracking-[0.1em] text-text-tertiary uppercase">Conseil du pharmacien</p>
+        <p className="text-[11px] font-semibold text-text-primary">{EXAMPLE.product}</p>
+        <p className="text-[10.5px] text-text-secondary">Pendant le traitement, pour la flore</p>
+      </div>
       <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-brand-600 px-2 py-1.5 text-[10.5px] font-medium text-white">
         <CalendarCheck className="size-3" /> 08:00 · Rappel de prise
       </div>
