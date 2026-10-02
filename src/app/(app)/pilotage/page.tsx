@@ -12,6 +12,7 @@ import { Alert, EmptyState } from "@/components/ui/feedback";
 import { Table, TBody, TD, TH, THead, TR, TableWrapper } from "@/components/ui/table";
 import { formatCents, formatPercent } from "@/lib/format";
 import { PeriodPicker } from "./period-picker";
+import { ChallengesPilotageSection } from "../parametres/laboratoires/challenges/challenges-pilotage";
 
 export const metadata: Metadata = { title: "Pilotage" };
 
@@ -257,6 +258,8 @@ export default async function PilotagePage({
           </>
         )}
       </section>
+
+      <ChallengesPilotageSection scope={session.scope} canOpen={session.permissions.has(PERMISSIONS.LAB_PROGRAMS_MANAGE)} />
 
       <p className="text-[11.5px] leading-4 text-text-tertiary">
         Indicateurs nominatifs : leur usage suppose l&apos;information préalable des personnes
