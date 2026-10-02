@@ -30,7 +30,8 @@
     "comptes:test": "node --env-file=.env --conditions=react-server --import tsx scripts/comptes-test.ts",
     "ocr:test": "node --env-file=.env --conditions=react-server --import tsx scripts/ocr-test.ts",
     "agent:build": "node -e \"require('esbuild').buildSync({entryPoints:['agent/src/index.ts'],bundle:true,platform:'node',target:'node18',format:'cjs',outfile:'agent/dist/pharmaboost-connect.js',banner:{js:'#!/usr/bin/env node'}})\"",
-    "onboarding:parcours": "EMAIL_PROVIDER=none SIGNATURE_PROVIDER=none node --env-file=.env --conditions=react-server --import tsx scripts/onboarding/parcours.mts"
+    "onboarding:parcours": "EMAIL_PROVIDER=none SIGNATURE_PROVIDER=none node --env-file=.env --conditions=react-server --import tsx scripts/onboarding/parcours.mts",
+    "lot:isolation": "node --env-file=.env --conditions=react-server --import tsx scripts/lot-pharmacienne/isolation.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
