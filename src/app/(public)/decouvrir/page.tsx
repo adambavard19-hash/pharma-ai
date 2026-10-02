@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { HAIRLINE, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
-import { HeroVisual, RequestVisual, StepAnalyse, StepConseil, StepScan, StepSuivi, StockMarginVisual } from "./_components/visuals";
+import { HeroVisual, RequestVisual, StepConseil, StepScan, StepSuivi, StockMarginVisual } from "./_components/visuals";
 import { VideoButton } from "./_components/video-dialog";
 import { loadLiveProof, loadPublicOffer } from "@/server/services/site-leads";
 import { formatEuros } from "@/core/billing/subscription";
@@ -16,20 +16,17 @@ import { cn } from "@/lib/utils";
 /** L'offre affichée quand la console n'en a pas encore publié : à régler dans Admin → Offres. */
 const FALLBACK_OFFER = { name: "PharmaBoost Officine", description: "", monthlyPriceCents: 6900, trialDays: 30 };
 
-const CAPABILITIES = [
-  { label: "Analyse", value: "Ordonnance et produits scannés" },
-  { label: "Stock", value: "Produits disponibles en rayon" },
-  { label: "Conseil", value: "Suggestions complémentaires" },
-  { label: "Posologie", value: "Claire pour le patient" },
-  { label: "Suivi", value: "Rappels de prise" },
-  { label: "Marge", value: "Visible au comptoir" },
+/** Des conseils réels du moteur (probiotique et vitamines sous antibiotique, routine peau sous isotrétinoïne). */
+const EXAMPLES = [
+  { rx: "Antibiotique", advice: "Probiotique", why: "L'antibiotique peut déséquilibrer la flore intestinale." },
+  { rx: "Antibiotique, patient fatigué", advice: "Vitamines", why: "Pour accompagner la convalescence." },
+  { rx: "Traitement contre l'acné", advice: "Crème hydratante et baume à lèvres", why: "Ce traitement assèche la peau et les lèvres." },
 ];
 
 const STEPS = [
-  { n: "01", title: "Scan", line: "Ordonnance ou produit", Visual: StepScan },
-  { n: "02", title: "Analyse", line: "Traitement, sécurité, stock", Visual: StepAnalyse },
-  { n: "03", title: "Conseil", line: "Proposé au comptoir", Visual: StepConseil },
-  { n: "04", title: "Suivi", line: "Posologie et rappels", Visual: StepSuivi },
+  { n: "01", title: "Vous scannez l'ordonnance", line: "Comme d'habitude, dans votre logiciel de gestion.", Visual: StepScan },
+  { n: "02", title: "Les conseils apparaissent", line: "Les produits qui accompagnent le traitement, pris dans votre rayon. Vous les proposez, ou non.", Visual: StepConseil },
+  { n: "03", title: "Le patient repart avec son bilan", line: "La posologie, le rôle de chaque médicament et vos conseils, sur papier ou sur son téléphone.", Visual: StepSuivi },
 ];
 
 const STOCK_POINTS = [
@@ -50,12 +47,12 @@ const FAQ: { q: string; a: string }[] = [
   { q: "Compatible avec mon logiciel ?", a: "PharmaBoost fonctionne à côté de votre logiciel de gestion, sans le modifier. Premier déploiement : LGPI ; les autres logiciels s'installent avec nous." },
   { q: "Qui décide du conseil ?", a: "Le pharmacien. Chaque suggestion est proposée, remplacée ou ignorée par un membre de l'équipe." },
   { q: "Une IA choisit-elle les produits ?", a: "Non. L'IA analyse l'ordonnance et repère les besoins. Les produits viennent de règles écrites, de la sécurité et de votre stock." },
-  { q: "Quelles données sont conservées ?", a: "Aucune donnée patient. Le plan de prise est chiffré et remis au patient." },
+  { q: "Quelles données sont conservées ?", a: "Aucune donnée patient. Le bilan est chiffré et remis au patient." },
   { q: "Est-ce un dispositif médical ?", a: "Non. C'est un outil d'aide au conseil : il ne diagnostique pas et ne prescrit pas." },
   { q: "Quel engagement ?", a: "Aucun. Abonnement mensuel, résiliable à tout moment." },
 ];
 
-const INCLUDED = ["Tous les postes de comptoir", "Analyse d'ordonnance", "Conseil au scan", "Demande sans ordonnance", "Stock et marge", "Plan de prise et rappels", "Pilotage par collaborateur"];
+const INCLUDED = ["Tous les postes de comptoir", "Analyse d'ordonnance", "Conseil au scan", "Demande sans ordonnance", "Stock et marge", "Bilan patient et rappels", "Pilotage par collaborateur"];
 
 export default async function SitePage() {
   const [offerRow, live] = await Promise.all([loadPublicOffer(), loadLiveProof()]);
@@ -76,14 +73,14 @@ export default async function SitePage() {
               <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
             </p>
             <h1 className="mt-7 text-[56px] leading-[0.98] font-semibold tracking-[-0.04em] text-text-primary md:text-[80px]">
-              Analyse.
+              Scan.
               <br />
               Conseil.
               <br />
-              <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Suivi.</span>
+              <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Bilan.</span>
             </h1>
             <p className="mt-7 max-w-xl text-[17px] leading-7 text-text-secondary">
-              PharmaBoost analyse l&apos;ordonnance et les produits scannés, et propose au comptoir les conseils disponibles en rayon.
+              Au comptoir, vous scannez les médicaments de l&apos;ordonnance. PharmaBoost vous montre aussitôt ce qu&apos;il est utile de conseiller en plus : probiotique, vitamines, crème… Et le patient repart avec le bilan de son traitement.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Link href="/decouvrir/demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white shadow-sm hover:bg-brand-700">
@@ -96,22 +93,34 @@ export default async function SitePage() {
         </div>
       </section>
 
-      {/* ---- L'expertise, augmentée --------------------------------- */}
+      {/* ---- Le conseil qui va avec l'ordonnance --------------------- */}
       <section className="border-y border-border-subtle bg-surface-card">
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
           <div>
-            <SectionHead kicker="Au comptoir" title="Votre expertise, augmentée au comptoir.">
-              L&apos;information utile, au moment du scan. La décision reste la vôtre.
+            <SectionHead kicker="Exemples" title="Le conseil qui va avec l'ordonnance.">
+              Le médecin prescrit le traitement. PharmaBoost vous rappelle ce qui l&apos;accompagne, avec les produits de votre rayon.
             </SectionHead>
             <Link href="/decouvrir/pourquoi" className="mt-6 inline-flex items-center gap-1.5 text-[15px] font-semibold text-brand-700 hover:text-brand-800">
               Pourquoi PharmaBoost <ArrowRight className="size-4" />
             </Link>
           </div>
-          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-border-subtle bg-border-subtle sm:grid-cols-3">
-            {CAPABILITIES.map((c) => (
-              <KeyCell key={c.label} label={c.label} value={c.value} className="bg-surface-app" />
-            ))}
-          </dl>
+          <div className="overflow-hidden rounded-3xl border border-border-subtle bg-surface-app">
+            <div className="hidden grid-cols-[1fr_1fr_1.3fr] gap-5 border-b border-border-subtle px-6 py-3 sm:grid">
+              {["Sur l'ordonnance", "Vous conseillez", "Pourquoi"].map((h) => (
+                <span key={h} className="font-mono text-[11px] tracking-[0.14em] text-text-tertiary uppercase">{h}</span>
+              ))}
+            </div>
+            <ul className="divide-y divide-border-subtle">
+              {EXAMPLES.map((e) => (
+                <li key={e.advice} className="grid gap-1 px-6 py-5 sm:grid-cols-[1fr_1fr_1.3fr] sm:items-baseline sm:gap-5">
+                  <p className="text-[15px] text-text-secondary">{e.rx}</p>
+                  <p className="text-[16px] font-semibold text-text-primary"><span className="text-brand-600">+</span> {e.advice}</p>
+                  <p className="text-[14.5px] leading-6 text-text-secondary">{e.why}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="border-t border-border-subtle px-6 py-3.5 text-[13px] text-text-tertiary">Vous choisissez toujours : proposer, remplacer ou ignorer.</p>
+          </div>
         </div>
       </section>
 
@@ -119,21 +128,19 @@ export default async function SitePage() {
       <section id="fonctionnement" className="scroll-mt-20">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
           <div className="flex flex-wrap items-end justify-between gap-6">
-            <SectionHead kicker="Comment ça marche" title="Du scan au patient, en quatre étapes." />
+            <SectionHead kicker="Comment ça marche" title="Du scan au bilan, en trois étapes." />
             <VideoButton />
           </div>
-          <ol className="relative mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <div className={cn("absolute top-[-1px] right-0 left-0 hidden h-px lg:block", HAIRLINE)} aria-hidden="true" />
+          <ol className="relative mt-14 grid gap-8 md:grid-cols-3 md:gap-5">
+            <div className={cn("absolute top-[-1px] right-0 left-0 hidden h-px md:block", HAIRLINE)} aria-hidden="true" />
             {STEPS.map(({ n, title, line, Visual }) => (
               <li key={n} className="flex flex-col">
-                <div className="flex aspect-[5/4] items-center justify-center overflow-hidden rounded-3xl border border-border-subtle bg-surface-card p-5 lg:mt-6">
+                <div className="flex aspect-[5/4] items-center justify-center overflow-hidden rounded-3xl border border-border-subtle bg-surface-card p-5 md:mt-6">
                   <Visual />
                 </div>
-                <div className="mt-5 flex items-baseline gap-3">
-                  <span className="font-mono text-[13px] text-brand-700">{n}</span>
-                  <h3 className="text-[22px] font-semibold tracking-[-0.02em] text-text-primary">{title}</h3>
-                </div>
-                <p className="mt-1 pl-[2.1rem] text-[15px] text-text-secondary">{line}</p>
+                <span className="mt-5 font-mono text-[13px] text-brand-700">{n}</span>
+                <h3 className="mt-1 text-[21px] leading-tight font-semibold tracking-[-0.02em] text-text-primary text-balance">{title}</h3>
+                <p className="mt-2 text-[15px] leading-6 text-text-secondary">{line}</p>
               </li>
             ))}
           </ol>
