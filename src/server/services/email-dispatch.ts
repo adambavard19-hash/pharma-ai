@@ -1,24 +1,31 @@
 import "server-only";
 import { prisma } from "@/server/db/client";
 import type { DeliveryOutcome } from "@/core/ai/ports";
+import { DISPATCH_STATUS } from "@/core/admin/statuses";
 
 /**
- * Le journal des e-mails d'inscription et d'accès. Chaque envoi y laisse une
+ * Le journal des e-mails : inscription et accès, contrats, facturation, et
+ * tout ce qui part du centre de modèles. Chaque envoi y laisse une
  * ligne : remis au prestataire (SENT), simulé, ou en échec avec le motif.
  * Les événements de délivrance du prestataire (webhook Resend) complètent la
  * même ligne : DELIVERED, BOUNCED, COMPLAINED, DELAYED.
  */
-export type DispatchKind = "INVITATION" | "WELCOME" | "ACCESS_LINK" | "DOSSIER_RECEIVED";
+export type DispatchKind =
+  | "INVITATION"
+  | "WELCOME"
+  | "ACCESS_LINK"
+  | "DOSSIER_RECEIVED"
+  | "CONTRACT_SENT"
+  | "CONTRACT_REMINDER"
+  | "PAYMENT_FAILED"
+  | "TRIAL_ENDING"
+  | "SUBSCRIPTION_STARTED"
+  /** Un modèle du centre de modèles (relance automatique, envoi manuel, test). */
+  | "TEMPLATE";
 
-export const DISPATCH_STATUS_LABELS: Record<string, { label: string; tone: "success" | "info" | "warning" | "danger" | "neutral" }> = {
-  SENT: { label: "Envoyé", tone: "info" },
-  DELIVERED: { label: "Délivré", tone: "success" },
-  DELAYED: { label: "Délivrance retardée", tone: "warning" },
-  BOUNCED: { label: "Adresse rejetée", tone: "danger" },
-  COMPLAINED: { label: "Signalé comme indésirable", tone: "danger" },
-  FAILED: { label: "Échec d'envoi", tone: "danger" },
-  SIMULATED: { label: "Non envoyé (messagerie non configurée)", tone: "warning" },
-};
+export type DispatchTrigger = "AUTOMATIC" | "MANUAL" | "TEST" | "SYSTEM";
+
+export const DISPATCH_STATUS_LABELS: Record<string, { label: string; tone: "success" | "info" | "warning" | "danger" | "neutral" }> = DISPATCH_STATUS as Record<string, { label: string; tone: "success" | "info" | "warning" | "danger" | "neutral" }>;
 
 export async function recordDispatch(input: {
   kind: DispatchKind;
@@ -28,8 +35,16 @@ export async function recordDispatch(input: {
   pharmacyId?: string | null;
   userId?: string | null;
   invitationId?: string | null;
-}): Promise<void> {
-  await prisma.emailDispatch.create({
+  subject?: string | null;
+  templateKey?: string | null;
+  trigger?: DispatchTrigger | null;
+  ruleKey?: string | null;
+  contractId?: string | null;
+  organizationId?: string | null;
+  sentByAdminId?: string | null;
+}): Promise<{ id: string }> {
+  return prisma.emailDispatch.create({
+    select: { id: true },
     data: {
       kind: input.kind,
       recipient: input.recipient,
@@ -41,9 +56,30 @@ export async function recordDispatch(input: {
       pharmacyId: input.pharmacyId ?? null,
       userId: input.userId ?? null,
       invitationId: input.invitationId ?? null,
+      subject: input.subject?.slice(0, 300) ?? null,
+      templateKey: input.templateKey ?? null,
+      trigger: input.trigger ?? "SYSTEM",
+      ruleKey: input.ruleKey ?? null,
+      contractId: input.contractId ?? null,
+      organizationId: input.organizationId ?? null,
+      sentByAdminId: input.sentByAdminId ?? null,
       failedAt: input.outcome.status === "FAILED" ? new Date() : null,
     },
   });
+}
+
+/**
+ * Comme `recordDispatch`, sans jamais faire échouer l'envoi qu'elle trace :
+ * pour les e-mails déjà partis (webhooks, relances) dont on veut garder la
+ * trace dans l'historique des communications.
+ */
+export async function traceDispatch(input: Parameters<typeof recordDispatch>[0]): Promise<{ id: string } | null> {
+  try {
+    return await recordDispatch(input);
+  } catch (error) {
+    console.error("[e-mails] trace impossible", input.kind, error);
+    return null;
+  }
 }
 
 const RESEND_EVENT_STATUS: Record<string, string> = {

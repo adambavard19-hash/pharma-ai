@@ -177,7 +177,28 @@ export type AuditAction =
   | "partner.lead_created"
   | "partner.order_created"
   | "partner.order_status_changed"
-  | "partner.orders_exported";
+  | "partner.orders_exported"
+  // Centre de contrôle Super Admin
+  | "billing.contract_price_changed"
+  | "billing.subscription_refreshed"
+  | "billing.cancellation_created"
+  | "billing.cancellation_status_changed"
+  | "billing.cancellation_note_added"
+  | "billing.cancellation_stripe_scheduled"
+  | "platform.note_added"
+  | "platform.note_pinned"
+  | "platform.email_sent"
+  | "platform.email_test_sent"
+  | "platform.email_template_saved"
+  | "platform.email_template_reset"
+  | "platform.automation_updated"
+  | "platform.automation_run"
+  | "platform.incident_resolved"
+  | "sales.contract_reminded"
+  | "sales.demo_scheduled"
+  | "sales.demo_done"
+  | "sales.demo_canceled"
+  | "sales.followup_set";
 
 export async function recordAudit(params: {
   action: AuditAction;

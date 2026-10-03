@@ -19,6 +19,11 @@ import { publicUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
 import { platformEmailContext } from "@/server/services/email-context";
 import { loadReminderPolicy } from "@/server/services/platform-settings";
+import { traceDispatch } from "@/server/services/email-dispatch";
+import { emailTemplate, renderTemplateEmail } from "@/core/admin/email-templates";
+import { formatFrenchDate } from "@/core/billing/subscription";
+import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
+import type { DeliveryOutcome } from "@/core/ai/ports";
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
 import { upsertCommissionForContract } from "./commissions";
@@ -577,6 +582,63 @@ export async function archiveSignedPdf(contractId: string): Promise<boolean> {
 // Relances
 // ---------------------------------------------------------------------------
 
+const REMINDER_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+type ReminderContractRow = { id: string; prospectId: string; pharmacyId: string | null; pharmacySignerName: string; pharmacySignerEmail: string; pharmacySigningUrl: string | null; sentAt: Date | null; expiresAt: Date | null; reminderCount: number };
+
+/**
+ * L'e-mail de relance d'un contrat : le modèle « Contrat — relance de
+ * signature » s'il a été réécrit dans la console, sinon l'e-mail historique.
+ * Le lien de signature est toujours celui du contrat. L'envoi est tracé
+ * (historique des communications et journal du dossier).
+ */
+async function deliverContractReminder(contract: ReminderContractRow, now: Date, actor: SalesActor, trigger: "AUTOMATIC" | "MANUAL", adminId?: string): Promise<DeliveryOutcome> {
+  const bundle = await contractFacts(contract.id);
+  const ctx = await platformEmailContext();
+  const token = await ensureContractToken(contract.id);
+  const reminderNumber = contract.reminderCount + 1;
+  const override = await prisma.emailTemplate.findUnique({ where: { key: "contract.reminder" } });
+  const definition = emailTemplate("contract.reminder");
+  const email =
+    override && definition
+      ? renderTemplateEmail(ctx, definition, { subject: override.subject, title: override.title, body: override.body }, {
+          prenom: contract.pharmacySignerName.trim().split(/\s+/)[0] ?? "",
+          titulaire: contract.pharmacySignerName,
+          officine: bundle!.facts.pharmacyName,
+          contact: PUBLIC_CONTACT_EMAIL,
+          date_envoi_contrat: contract.sentAt ? formatFrenchDate(contract.sentAt) : "",
+          lien_contrat: contract.pharmacySigningUrl ?? contractUrl(token),
+        })
+      : buildSignatureReminderEmail(ctx, { ...bundle!.facts, signingUrl: contract.pharmacySigningUrl, viewUrl: contractUrl(token), expiresAt: contract.expiresAt ?? new Date(now.getTime() + CONTRACT_LINK_TTL_MS), reminderNumber });
+  const outcome = await getMessagingProvider().sendEmail({ to: contract.pharmacySignerEmail, fromName: "PharmaBoost", subject: email.subject, text: email.text, html: email.html });
+  await traceDispatch({ kind: "CONTRACT_REMINDER", recipient: contract.pharmacySignerEmail, outcome, subject: email.subject, templateKey: override ? "contract.reminder" : null, trigger, ruleKey: trigger === "AUTOMATIC" ? "contract.reminders" : null, prospectId: contract.prospectId, pharmacyId: contract.pharmacyId, contractId: contract.id, sentByAdminId: adminId ?? null });
+  await recordProspectEvent({ prospectId: contract.prospectId, type: "CONTRACT_REMINDER", summary: outcome.status === "SENT" ? `Relance ${reminderNumber} envoyée à ${contract.pharmacySignerEmail}${trigger === "MANUAL" ? " (depuis la console)" : ""}.` : `Relance ${reminderNumber} NON envoyée : ${outcome.detail}`, actor, metadata: { contractId: contract.id, emailStatus: outcome.status, trigger } });
+  return outcome;
+}
+
+/**
+ * Relancer maintenant, depuis la console : mêmes garde-fous que la relance
+ * automatique (statut relu chez le prestataire, verrou sur le compteur), et
+ * jamais deux relances en moins de 24 heures.
+ */
+export async function remindContractNow(contractId: string, actor: SalesActor & { type: "ADMIN" }, now = new Date()): Promise<{ ok: true; email: { status: string; detail: string } } | { ok: false; error: string }> {
+  const contract = await prisma.contract.findUnique({ where: { id: contractId }, include: { prospect: { select: { blockedAt: true } } } });
+  if (!contract) return { ok: false, error: "Contrat introuvable." };
+  if (!AWAITING_PHARMACY.includes(contract.status)) return { ok: false, error: "Ce contrat n'attend pas la signature du titulaire : il n'y a rien à relancer." };
+  if (contract.prospect.blockedAt) return { ok: false, error: "Le dossier est suspendu : levez la suspension avant de relancer." };
+  if (contract.expiresAt && contract.expiresAt <= now) return { ok: false, error: "Le lien de signature a expiré : préparez une nouvelle version du contrat." };
+  if (contract.lastReminderAt && now.getTime() - contract.lastReminderAt.getTime() < REMINDER_MIN_INTERVAL_MS) return { ok: false, error: "Une relance est déjà partie il y a moins de 24 heures." };
+  if (contract.providerEnvelopeId) {
+    const refreshed = await refreshContractSignatureStatus(contract.id, { type: "ADMIN", id: actor.id, label: actor.label });
+    if (refreshed.ok && !AWAITING_PHARMACY.includes(refreshed.status)) return { ok: false, error: "Le prestataire indique que le contrat n'attend plus de signature : la fiche a été mise à jour." };
+  }
+  const claimed = await prisma.contract.updateMany({ where: { id: contract.id, reminderCount: contract.reminderCount, status: { in: AWAITING_PHARMACY as ContractStatusCode[] } }, data: { reminderCount: { increment: 1 }, lastReminderAt: now } });
+  if (claimed.count === 0) return { ok: false, error: "Une autre relance vient de partir pour ce contrat." };
+  const outcome = await deliverContractReminder(contract, now, actor, "MANUAL", actor.id);
+  await recordAudit({ action: "sales.contract_reminded", entityType: "Contract", entityId: contract.id, pharmacyId: contract.pharmacyId, platformAdminId: actor.id, metadata: { reminder: contract.reminderCount + 1, emailStatus: outcome.status } });
+  return { ok: true, email: { status: outcome.status, detail: outcome.detail } };
+}
+
 export type ReminderRunReport = { checked: number; reminded: number; escalated: number; expired: number; errors: string[] };
 
 /**
@@ -608,12 +670,7 @@ export async function runContractReminders(now = new Date(), policyOverride?: Re
       if (action === "REMIND") {
         const claimed = await prisma.contract.updateMany({ where: { id: contract.id, reminderCount: contract.reminderCount, status: { in: AWAITING_PHARMACY as ContractStatusCode[] } }, data: { reminderCount: { increment: 1 }, lastReminderAt: now } });
         if (claimed.count === 0) continue;
-        const bundle = await contractFacts(contract.id);
-        const ctx = await platformEmailContext();
-        const token = await ensureContractToken(contract.id);
-        const email = buildSignatureReminderEmail(ctx, { ...bundle!.facts, signingUrl: contract.pharmacySigningUrl, viewUrl: contractUrl(token), expiresAt: contract.expiresAt ?? new Date(now.getTime() + CONTRACT_LINK_TTL_MS), reminderNumber: contract.reminderCount + 1 });
-        const outcome = await getMessagingProvider().sendEmail({ to: contract.pharmacySignerEmail, fromName: "PharmaBoost", subject: email.subject, text: email.text, html: email.html });
-        await recordProspectEvent({ prospectId: contract.prospectId, type: "CONTRACT_REMINDER", summary: outcome.status === "SENT" ? `Relance ${contract.reminderCount + 1} envoyée à ${contract.pharmacySignerEmail}.` : `Relance ${contract.reminderCount + 1} NON envoyée : ${outcome.detail}`, actor: { type: "SYSTEM", label: "Relances automatiques" }, metadata: { contractId: contract.id, emailStatus: outcome.status } });
+        const outcome = await deliverContractReminder(contract, now, { type: "SYSTEM", label: "Relances automatiques" }, "AUTOMATIC");
         await recordAudit({ action: "sales.contract_reminder", entityType: "Contract", entityId: contract.id, metadata: { reminder: contract.reminderCount + 1, emailStatus: outcome.status } });
         if (outcome.status === "SENT") report.reminded += 1;
       } else {

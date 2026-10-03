@@ -10,6 +10,8 @@
 export const PROSPECT_STATUSES = [
   "PROSPECT",
   "CONTACTED",
+  "DEMO_SCHEDULED",
+  "DEMO_DONE",
   "INTERESTED",
   "PROPOSAL_SENT",
   "CONTRACT_SENT",
@@ -24,6 +26,8 @@ export type ProspectStatusCode = (typeof PROSPECT_STATUSES)[number];
 export const PROSPECT_STATUS_LABELS: Record<ProspectStatusCode, string> = {
   PROSPECT: "Prospect",
   CONTACTED: "Contacté",
+  DEMO_SCHEDULED: "Démo programmée",
+  DEMO_DONE: "Démo réalisée",
   INTERESTED: "Intéressé",
   PROPOSAL_SENT: "Proposition envoyée",
   CONTRACT_SENT: "Contrat envoyé",
@@ -36,6 +40,8 @@ export const PROSPECT_STATUS_LABELS: Record<ProspectStatusCode, string> = {
 export const PROSPECT_STATUS_TONES: Record<ProspectStatusCode, "neutral" | "info" | "brand" | "warning" | "success" | "danger"> = {
   PROSPECT: "neutral",
   CONTACTED: "info",
+  DEMO_SCHEDULED: "brand",
+  DEMO_DONE: "brand",
   INTERESTED: "info",
   PROPOSAL_SENT: "brand",
   CONTRACT_SENT: "warning",
@@ -46,7 +52,7 @@ export const PROSPECT_STATUS_TONES: Record<ProspectStatusCode, "neutral" | "info
 };
 
 /** Étapes qu'un commercial choisit à la main. Les autres découlent d'un fait. */
-export const MANUAL_STATUSES: ProspectStatusCode[] = ["PROSPECT", "CONTACTED", "INTERESTED", "PROPOSAL_SENT", "LOST"];
+export const MANUAL_STATUSES: ProspectStatusCode[] = ["PROSPECT", "CONTACTED", "DEMO_SCHEDULED", "DEMO_DONE", "INTERESTED", "PROPOSAL_SENT", "LOST"];
 
 /** Étapes portées par un contrat ou une officine : jamais saisies à la main. */
 export const SYSTEM_STATUSES: ProspectStatusCode[] = ["CONTRACT_SENT", "CONTRACT_SIGNED", "PHARMACY_CREATED", "ACTIVATED"];

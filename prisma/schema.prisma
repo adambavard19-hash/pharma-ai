@@ -140,19 +140,21 @@ model Pharmacy {
   productVigilances ProductVigilance[]
   trainingContents  TrainingContent[]
 
-  partnerAudiences    PartnerBrandAudience[]
-  partnerPreferences  PharmacyPartnerPreference[]
-  partnerAttributions PartnerAttribution[]
-  partnerLeads        PartnerLead[]
-  partnerOrders       PartnerOrder[]
+  partnerAudiences     PartnerBrandAudience[]
+  partnerPreferences   PharmacyPartnerPreference[]
+  partnerAttributions  PartnerAttribution[]
+  partnerLeads         PartnerLead[]
+  partnerOrders        PartnerOrder[]
+  counterRequests      CounterRequest[]
+  sealedDocuments      SealedDocument[]
+  referredBy           Pharmacy?                   @relation("PharmacyReferral", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals            Pharmacy[]                  @relation("PharmacyReferral")
+  postCountChanges     PharmacyPostCountChange[]
+  adminNotes           AdminNote[]
+  cancellationRequests CancellationRequest[]
 
   @@index([organizationId])
   @@map("pharmacies")
-  counterRequests CounterRequest[]
-  sealedDocuments SealedDocument[]
-  referredBy Pharmacy?  @relation("PharmacyReferral", fields: [referredById], references: [id], onDelete: SetNull)
-  referrals  Pharmacy[] @relation("PharmacyReferral")
-  postCountChanges PharmacyPostCountChange[]
 }
 
 /// La liaison entre une officine et son logiciel de gestion (LGO), assurée par
@@ -267,24 +269,38 @@ model CounterPost {
 /// Un prix Stripe est immuable : changer le tarif d'une offre crée un nouveau
 /// prix (`stripePriceId` remplacé) ; les abonnements en cours gardent l'ancien.
 model Plan {
-  id                String   @id @default(cuid())
+  id                 String   @id @default(cuid())
   /// Clé stable, en majuscules (« PHARMABOOST »). Libre : plus une énumération.
-  code              String   @unique
-  name              String
-  description       String
-  monthlyPriceCents Int
-  currency          String   @default("eur")
+  code               String   @unique
+  name               String
+  description        String
+  monthlyPriceCents  Int
+  currency           String   @default("eur")
   /// Jours d'essai offerts à la souscription (30 = « premier mois offert »).
-  trialDays         Int      @default(30)
+  trialDays          Int      @default(30)
   /// Limites du plan : { maxPharmacies, maxUsers, maxPrescriptionsPerMonth, ... }
-  limits            Json     @default("{}")
-  isActive          Boolean  @default(true)
+  limits             Json     @default("{}")
+  isActive           Boolean  @default(true)
   /// L'offre proposée par défaut quand on prépare un contrat.
-  isDefault         Boolean  @default(false)
-  stripeProductId   String?
-  stripePriceId     String?  @unique
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @default(now()) @updatedAt
+  isDefault          Boolean  @default(false)
+  /// Catalogue : prix annuel affiché (la facturation annuelle n'est pas branchée chez Stripe).
+  annualPriceCents   Int?
+  /// Tarif fondateur proposé aux premières officines : un tarif de catalogue, jamais appliqué d'office.
+  foundingPriceCents Int?
+  /// Remise de catalogue proposée à la préparation d'un contrat (pourcentage entier) et son libellé.
+  discountPercent    Int?
+  discountLabel      String?
+  /// Ce que comprend l'offre, et ses options : une ligne par élément.
+  features           String[] @default([])
+  options            String[] @default([])
+  /// Nombre d'utilisateurs inclus, si l'offre en fixe un.
+  maxUsers           Int?
+  /// Ordre d'affichage au catalogue.
+  sortOrder          Int      @default(0)
+  stripeProductId    String?
+  stripePriceId      String?  @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
 
   subscriptions Subscription[]
   contracts     Contract[]
@@ -338,12 +354,19 @@ model Subscription {
   suspendedReason      String?
   /// Le contrat qui fonde cet abonnement, s'il y en a un.
   contractId           String?
+  /// Tarif contractuel mensuel HT de CETTE officine, en centimes. Figé à la
+  /// souscription (contrat signé, sinon offre du moment) : une modification du
+  /// catalogue ne le change jamais. Seule une modification explicite, tracée
+  /// dans `SubscriptionPriceChange`, le fait évoluer.
+  contractPriceCents   Int?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  plan         Plan             @relation(fields: [planId], references: [id])
-  payments     BillingPayment[]
+  organization         Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan                 Plan                      @relation(fields: [planId], references: [id])
+  payments             BillingPayment[]
+  priceChanges         SubscriptionPriceChange[]
+  cancellationRequests CancellationRequest[]
 
   @@index([status])
   @@map("subscriptions")
@@ -865,8 +888,8 @@ model Product {
 
   barcodes ProductBarcode[]
 
-  stockLots   StockLot[]
-  vigilances  ProductVigilance[]
+  stockLots  StockLot[]
+  vigilances ProductVigilance[]
 
   @@unique([pharmacyId, reference])
   @@index([pharmacyId, category])
@@ -1659,13 +1682,13 @@ model Prescription {
   recommendations Recommendation[]
   documents       PatientDocument[]
   sales           Sale[]
+  sealedDocuments SealedDocument[]
 
   @@unique([pharmacyId, reference])
   @@index([pharmacyId, status])
   @@index([pharmacyId, createdAt])
   @@index([patientId])
   @@map("prescriptions")
-  sealedDocuments SealedDocument[]
 }
 
 /// Comment une ligne d'ordonnance a été rattachée au catalogue national.
@@ -2162,20 +2185,20 @@ enum DeliveryStatus {
 /// jamais. Ni patient, ni adresse : seulement l'officine, la vente, et un
 /// contenu illisible sans le lien. Effacé à l'échéance (src/core/documents/seal.ts).
 model SealedDocument {
-  id             String   @id @default(cuid())
-  pharmacyId     String
-  prescriptionId String
-  version        Int      @default(1)
-  ciphertext     Bytes
-  iv             Bytes
-  tag            Bytes
-  expiresAt      DateTime
-  revokedAt      DateTime?
+  id              String    @id @default(cuid())
+  pharmacyId      String
+  prescriptionId  String
+  version         Int       @default(1)
+  ciphertext      Bytes
+  iv              Bytes
+  tag             Bytes
+  expiresAt       DateTime
+  revokedAt       DateTime?
   createdByUserId String?
-  viewCount      Int      @default(0)
-  lastViewedAt   DateTime?
-  isDemo         Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  viewCount       Int       @default(0)
+  lastViewedAt    DateTime?
+  isDemo          Boolean   @default(false)
+  createdAt       DateTime  @default(now())
 
   pharmacy     Pharmacy     @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
@@ -2442,6 +2465,8 @@ enum SalesCommissionType {
 enum ProspectStatus {
   PROSPECT
   CONTACTED
+  DEMO_SCHEDULED
+  DEMO_DONE
   INTERESTED
   PROPOSAL_SENT
   CONTRACT_SENT
@@ -2601,6 +2626,9 @@ model Prospect {
   lastContactAt     DateTime?
   nextActionAt      DateTime?
   nextActionLabel   String?
+  /// Démonstration programmée (date et heure), puis réalisée.
+  demoAt            DateTime?
+  demoDoneAt        DateTime?
   /// Notes commerciales courantes (le détail horodaté vit dans les événements).
   notes             String?
   /// Conditions proposées : abonnement mensuel, en centimes.
@@ -2618,18 +2646,20 @@ model Prospect {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  salesRep    SalesRep?       @relation(fields: [salesRepId], references: [id])
-  pharmacy    Pharmacy?       @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
-  plan        Plan?           @relation(fields: [planId], references: [id])
+  salesRep    SalesRep?            @relation(fields: [salesRepId], references: [id])
+  pharmacy    Pharmacy?            @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+  plan        Plan?                @relation(fields: [planId], references: [id])
   events      ProspectEvent[]
   contracts   Contract[]
   commissions Commission[]
   tasks       SalesTask[]
   invitations PharmacyInvitation[]
+  adminNotes  AdminNote[]
 
   @@index([salesRepId, status])
   @@index([status])
   @@index([siret])
+  @@index([demoAt])
   @@map("prospects")
 }
 
@@ -2695,7 +2725,7 @@ model Contract {
   companySignerEmail  String
 
   /// none · yousign · docusign · … ; « offline » = signature papier enregistrée par l'admin.
-  signatureProvider  String  @default("none")
+  signatureProvider  String    @default("none")
   providerEnvelopeId String?
   /// Lien de signature du titulaire fourni par le prestataire : repris dans les renvois et les relances.
   pharmacySigningUrl String?
@@ -2710,6 +2740,13 @@ model Contract {
   lastReminderAt     DateTime?
   /// Dossier signalé à l'équipe après les relances.
   escalatedAt        DateTime?
+  /// Référence imprimée dans le PDF, figée à la génération.
+  reference          String?
+  /// Copie des parties telles qu'imprimées au contrat (société exploitante,
+  /// officine) : une modification ultérieure de la fiche société ne touche
+  /// jamais un contrat déjà généré.
+  companySnapshot    Json?
+  pharmacySnapshot   Json?
 
   sentAt           DateTime?
   openedAt         DateTime?
@@ -2891,6 +2928,16 @@ model EmailDispatch {
   pharmacyId        String?
   userId            String?
   invitationId      String?
+  /// Objet de l'e-mail, et modèle utilisé s'il vient du centre de modèles.
+  subject           String?
+  templateKey       String?
+  /// AUTOMATIC (scénario) · MANUAL (console) · TEST · SYSTEM (transactionnel)
+  trigger           String?
+  /// La règle d'automatisation à l'origine de l'envoi.
+  ruleKey           String?
+  contractId        String?
+  organizationId    String?
+  sentByAdminId     String?
   deliveredAt       DateTime?
   failedAt          DateTime?
   createdAt         DateTime  @default(now())
@@ -2899,9 +2946,10 @@ model EmailDispatch {
   @@index([prospectId, createdAt])
   @@index([pharmacyId, createdAt])
   @@index([userId, createdAt])
+  @@index([createdAt])
+  @@index([ruleKey, createdAt])
   @@map("email_dispatches")
 }
-
 
 // ---------------------------------------------------------------------------
 // Gammes privilégiées, challenges laboratoires, dates courtes, vigilances
@@ -3632,4 +3680,160 @@ model PartnerOrderLine {
 
   @@index([orderId])
   @@map("partner_order_lines")
+}
+
+// ===========================================================================
+// Centre de contrôle Super Admin
+// ===========================================================================
+
+/// Un changement de tarif contractuel d'un abonnement existant : toujours
+/// explicite, motivé et tracé. Le catalogue (`Plan`) n'en crée jamais.
+model SubscriptionPriceChange {
+  id               String   @id @default(cuid())
+  subscriptionId   String
+  organizationId   String
+  previousCents    Int?
+  nextCents        Int
+  reason           String
+  /// L'abonnement Stripe a été mis à jour ; sinon, seule la fiche a changé.
+  appliedToStripe  Boolean  @default(false)
+  effectiveAt      DateTime @default(now())
+  changedByAdminId String?
+  createdAt        DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, createdAt])
+  @@map("subscription_price_changes")
+}
+
+/// Note interne de l'équipe PharmaBoost sur une officine ou un dossier.
+/// Jamais visible de l'officine ni des commerciaux.
+model AdminNote {
+  id            String   @id @default(cuid())
+  pharmacyId    String?
+  prospectId    String?
+  body          String
+  pinned        Boolean  @default(false)
+  authorAdminId String
+  authorLabel   String
+  createdAt     DateTime @default(now())
+
+  pharmacy Pharmacy? @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  prospect Prospect? @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, createdAt])
+  @@index([prospectId, createdAt])
+  @@map("admin_notes")
+}
+
+enum CancellationStatus {
+  RECEIVED
+  IN_PROGRESS
+  CONFIRMED
+  CANCELED
+  COMPLETED
+}
+
+/// Une demande de résiliation : reçue, traitée, confirmée ou annulée, puis
+/// terminée. Rien n'est jamais supprimé : l'historique reste.
+model CancellationRequest {
+  id               String             @id @default(cuid())
+  pharmacyId       String
+  organizationId   String
+  subscriptionId   String?
+  status           CancellationStatus @default(RECEIVED)
+  /// PRICE · NOT_USED · MISSING_FEATURE · CLOSURE · COMPETITOR · TECHNICAL · OTHER
+  reason           String
+  reasonDetail     String?
+  /// EMAIL · PHONE · MAIL · MEETING · OTHER
+  channel          String
+  requestedAt      DateTime
+  plannedEndAt     DateTime?
+  confirmedAt      DateTime?
+  completedAt      DateTime?
+  canceledAt       DateTime?
+  lastContactAt    DateTime?
+  /// La fin a été programmée chez Stripe (résiliation à la fin de la période).
+  stripeScheduled  Boolean            @default(false)
+  createdByAdminId String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  pharmacy     Pharmacy            @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  subscription Subscription?       @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  events       CancellationEvent[]
+
+  @@index([status])
+  @@index([pharmacyId, createdAt])
+  @@map("cancellation_requests")
+}
+
+model CancellationEvent {
+  id           String   @id @default(cuid())
+  requestId    String
+  /// CREATED · STATUS_CHANGED · NOTE · CONTACT · STRIPE_SCHEDULED · EMAIL_SENT
+  type         String
+  summary      String
+  fromStatus   String?
+  toStatus     String?
+  actorAdminId String?
+  actorLabel   String?
+  createdAt    DateTime @default(now())
+
+  request CancellationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@map("cancellation_events")
+}
+
+/// Le texte d'un modèle d'e-mail, modifié par l'équipe. Sans ligne : le texte
+/// par défaut, écrit dans le code (`src/core/admin/email-templates.ts`).
+model EmailTemplate {
+  key              String   @id
+  subject          String
+  title            String
+  body             String
+  updatedByAdminId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("email_templates")
+}
+
+/// Le réglage d'une règle d'automatisation. Sans ligne : la règle est
+/// désactivée, avec son délai par défaut. Rien ne part tant qu'un
+/// administrateur ne l'a pas activée.
+model AutomationRule {
+  key              String   @id
+  enabled          Boolean  @default(false)
+  /// Délai en jours : après l'événement déclencheur, ou avant l'échéance.
+  offsetDays       Int
+  updatedByAdminId String?
+  updatedAt        DateTime @updatedAt
+
+  @@map("automation_rules")
+}
+
+/// Chaque déclenchement d'une règle, une seule fois par cible et par
+/// occurrence : la clé unique interdit toute relance en double, même si deux
+/// passages se chevauchent.
+model AutomationDispatch {
+  id              String   @id @default(cuid())
+  ruleKey         String
+  dedupeKey       String   @unique
+  /// Subscription · Contract · CancellationRequest · Prospect
+  targetType      String
+  targetId        String
+  pharmacyId      String?
+  /// SENT · FAILED · SIMULATED · INTERNAL · SKIPPED
+  status          String
+  recipient       String?
+  detail          String?
+  emailDispatchId String?
+  createdAt       DateTime @default(now())
+
+  @@index([ruleKey, createdAt])
+  @@index([pharmacyId, createdAt])
+  @@map("automation_dispatches")
 }
