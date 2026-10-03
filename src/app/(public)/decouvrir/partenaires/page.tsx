@@ -161,20 +161,12 @@ export default function PartnersPage() {
       </section>
 
       {/* ---- Candidature ---------------------------------------------- */}
-      <section id="candidature" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1.2fr] lg:items-start">
-          <div className="lg:sticky lg:top-24">
-            <SectionHead kicker="Candidature" title="Présentez votre marque.">
-              Quelques minutes suffisent. Notre équipe étudie chaque candidature et vous recontacte.
-            </SectionHead>
-            <ul className="mt-8 space-y-3 text-[14.5px] text-text-primary">
-              {["Votre société et votre marque", "Vos univers et vos références", "Vos outils : API, portail B2B, catalogue, formations"].map((item) => (
-                <li key={item} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-brand-600" /> {item}</li>
-              ))}
-            </ul>
-            <p className="mt-8 text-[14px] leading-6 text-text-tertiary">Aucune activation n&apos;est automatique. Vos informations servent uniquement à étudier votre candidature et à vous recontacter.</p>
-          </div>
-          <div className="relative rounded-[28px] border border-border-subtle bg-surface-app p-5 sm:p-7 md:p-9">
+      <section id="candidature" className="scroll-mt-20 border-t border-border-subtle">
+        <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
+          <SectionHead kicker="Candidature" title="Présentez votre marque.">
+            Une question à la fois, quelques minutes. Notre équipe étudie chaque candidature et vous recontacte.
+          </SectionHead>
+          <div className="mt-10">
             <PartnerApplicationForm />
           </div>
         </div>

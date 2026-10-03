@@ -1,282 +1,415 @@
 "use client";
 
-import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { Check } from "lucide-react";
 import { submitPartnerApplicationAction } from "@/server/actions/partner-applications";
-import { UNIVERSES } from "@/config/universes";
-import { Button } from "@/components/ui/button";
-import { Field, Input, Textarea } from "@/components/ui/field";
-import { Alert } from "@/components/ui/feedback";
+import { partnerApplicationSchema, type PartnerApplicationPayload } from "@/core/partners/application-form";
+import { UNIVERSES, universeLabel } from "@/config/universes";
+import { personName } from "@/core/contracts/identity";
+import { Flow, type FlowErrors, type FlowStep } from "@/components/flow/flow";
+import { LiveCard, LiveRow, LongTextAnswer, MultiCards, Segmented, TextAnswer } from "@/components/flow/controls";
+import { EmailAnswer } from "@/components/flow/email-answer";
 import { cn } from "@/lib/utils";
 
 type ApiAnswer = "YES" | "NO" | "UNKNOWN";
+type YesNo = "yes" | "no";
 
 const API_OPTIONS: { value: ApiAnswer; label: string }[] = [
   { value: "YES", label: "Oui" },
   { value: "NO", label: "Non" },
   { value: "UNKNOWN", label: "Je ne sais pas" },
 ];
-
-const YES_NO: { value: "yes" | "no"; label: string }[] = [
+const YES_NO: { value: YesNo; label: string }[] = [
   { value: "yes", label: "Oui" },
   { value: "no", label: "Non" },
 ];
+const CHANNELS = ["Grossistes-répartiteurs", "Vente directe aux officines", "Groupements et enseignes", "Centrales d'achat", "Plateformes en ligne"];
 
-const LEGEND = "text-[13px] font-semibold tracking-[0.08em] text-brand-700 uppercase";
+type Values = {
+  company: string;
+  brand: string;
+  universes: string[];
+  approxReferences: string;
+  channels: string[];
+  distributionNote: string;
+  websiteUrl: string;
+  hasApi: ApiAnswer | "";
+  hasB2bPortal: YesNo | "";
+  hasCatalog: YesNo | "";
+  hasTrainings: YesNo | "";
+  contactFirstName: string;
+  contactLastName: string;
+  contactRole: string;
+  email: string;
+  phone: string;
+  message: string;
+  consent: boolean;
+  website: string;
+};
+
+const yesNo = (value: YesNo | ""): boolean | null => (value === "" ? null : value === "yes");
+
+/** Les canaux cochés et la précision deviennent le texte « distribution » attendu par le serveur. */
+function distributionText(v: Values): string {
+  return [v.channels.join(", "), v.distributionNote.trim()].filter(Boolean).join(" — ");
+}
+
+function toPayload(v: Values): PartnerApplicationPayload {
+  const refs = v.approxReferences.replace(/[\s  .]/g, "");
+  return {
+    company: v.company,
+    brand: v.brand,
+    contactFirstName: v.contactFirstName,
+    contactLastName: v.contactLastName,
+    contactRole: v.contactRole,
+    email: v.email,
+    phone: v.phone,
+    websiteUrl: v.websiteUrl,
+    universes: v.universes,
+    approxReferences: refs ? (/^\d+$/.test(refs) ? Number(refs) : Number.NaN) : null,
+    distribution: distributionText(v),
+    hasApi: v.hasApi || "UNKNOWN",
+    hasB2bPortal: yesNo(v.hasB2bPortal),
+    hasCatalog: yesNo(v.hasCatalog),
+    hasTrainings: yesNo(v.hasTrainings),
+    message: v.message,
+    consent: v.consent,
+    website: v.website,
+  };
+}
+
+/** Les règles du serveur (partnerApplicationSchema), appliquées aux seuls champs de la question. */
+function validate(v: Values, fields: string[]): FlowErrors {
+  const parsed = partnerApplicationSchema.safeParse(toPayload(v));
+  if (parsed.success) return {};
+  const errors: FlowErrors = {};
+  for (const issue of parsed.error.issues) {
+    const key = String(issue.path[0]);
+    if (fields.includes(key)) errors[key] ??= key === "approxReferences" ? "Indiquez un nombre, par exemple 120." : issue.message;
+  }
+  return errors;
+}
+
+/** « 1200 » → « 1 200 » au fil de la frappe. */
+function groupDigits(value: string): string {
+  const digits = value.replace(/\D+/g, "").slice(0, 7);
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
 
 /**
- * La candidature d'un laboratoire ou d'une marque. Les coordonnées d'une
- * société, rien d'autre : aucune donnée de santé. Le consentement est
- * obligatoire, et l'envoi n'active rien : l'équipe étudie la candidature.
+ * La candidature d'un laboratoire ou d'une marque, une question à la fois.
+ * Les coordonnées d'une société, rien d'autre : aucune donnée de santé. Le
+ * consentement est obligatoire, et l'envoi n'active rien : l'équipe étudie
+ * la candidature.
  */
 export function PartnerApplicationForm() {
-  const [form, setForm] = useState({
-    company: "",
-    brand: "",
-    websiteUrl: "",
-    distribution: "",
-    contactFirstName: "",
-    contactLastName: "",
-    contactRole: "",
-    email: "",
-    phone: "",
-    approxReferences: "",
-    message: "",
-    website: "",
-  });
-  const [universes, setUniverses] = useState<string[]>([]);
-  const [hasApi, setHasApi] = useState<ApiAnswer | null>(null);
-  const [tools, setTools] = useState<{ hasB2bPortal: boolean | null; hasCatalog: boolean | null; hasTrainings: boolean | null }>({ hasB2bPortal: null, hasCatalog: null, hasTrainings: null });
-  const [consent, setConsent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [done, setDone] = useState<{ acknowledged: boolean; email: string } | null>(null);
-  const [pending, start] = useTransition();
-  const formRef = useRef<HTMLFormElement>(null);
-  const doneRef = useRef<HTMLDivElement>(null);
+  const initialValues = useMemo<Values>(
+    () => ({
+      company: "",
+      brand: "",
+      universes: [],
+      approxReferences: "",
+      channels: [],
+      distributionNote: "",
+      websiteUrl: "",
+      hasApi: "",
+      hasB2bPortal: "",
+      hasCatalog: "",
+      hasTrainings: "",
+      contactFirstName: "",
+      contactLastName: "",
+      contactRole: "",
+      email: "",
+      phone: "",
+      message: "",
+      consent: false,
+      website: "",
+    }),
+    [],
+  );
 
-  const err = (key: string) => fieldErrors[key];
-  const clear = (key: string) => setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: "" } : prev));
-  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setForm((prev) => ({ ...prev, [key]: value }));
-    clear(key);
-  };
-  const toggleUniverse = (key: string) => setUniverses((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
-
-  /** Après une erreur, le curseur va au premier champ à corriger. */
-  const focusFirstError = () => requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pending) return;
-    setError(null);
-
-    const local: Record<string, string> = {};
-    const refsText = form.approxReferences.replace(/[\s  .]/g, "");
-    if (refsText && !/^\d+$/.test(refsText)) local.approxReferences = "Indiquez un nombre.";
-    if (!consent) local.consent = "Cochez cette case pour envoyer votre candidature.";
-    if (Object.keys(local).length > 0) {
-      setFieldErrors(local);
-      setError(local.consent ? "Votre accord est nécessaire pour que nous puissions étudier votre candidature." : "Certaines informations sont à corriger.");
-      focusFirstError();
-      return;
-    }
-    setFieldErrors({});
-
-    start(async () => {
-      const result = await submitPartnerApplicationAction({
-        ...form,
-        approxReferences: refsText ? Number(refsText) : null,
-        universes,
-        hasApi: hasApi ?? "UNKNOWN",
-        ...tools,
-        consent,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        setFieldErrors(result.fieldErrors ?? {});
-        focusFirstError();
-        return;
-      }
-      setDone({ acknowledged: result.data.acknowledged, email: form.email.trim() });
-      requestAnimationFrame(() => doneRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
-    });
-  };
-
-  if (done) {
-    return (
-      <div ref={doneRef} className="py-6 text-center sm:py-10" role="status">
-        <CheckCircle2 className="mx-auto size-12 text-success-600" aria-hidden="true" />
-        <h3 className="mt-5 text-[28px] leading-[1.15] font-semibold tracking-[-0.02em] text-text-primary text-balance">Candidature reçue.</h3>
-        <p className="mx-auto mt-4 max-w-md text-[16px] leading-7 text-text-secondary">
-          {done.acknowledged ? (
-            <>Un accusé de réception vous a été envoyé à <span className="font-medium text-text-primary">{done.email}</span>.</>
-          ) : (
-            <>Votre candidature est enregistrée ; notre équipe vous recontacte à <span className="font-medium text-text-primary">{done.email}</span>.</>
-          )}{" "}
-          Aucune activation n&apos;est automatique : notre équipe étudie chaque candidature.
-        </p>
-        <Link href="/decouvrir" className="mt-8 inline-flex h-11 items-center rounded-xl border border-border-default px-5 text-[14.5px] font-medium text-text-primary hover:bg-surface-sunken">
-          Retour au site
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <form ref={formRef} onSubmit={submit} className="space-y-8" noValidate>
-      <fieldset className="space-y-4">
-        <legend className={LEGEND}>La société</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Société" htmlFor="pa-company" required error={err("company")}>
-            <Input id="pa-company" value={form.company} onChange={set("company")} autoComplete="organization" aria-invalid={Boolean(err("company"))} />
-          </Field>
-          <Field label="Marque" htmlFor="pa-brand" required error={err("brand")}>
-            <Input id="pa-brand" value={form.brand} onChange={set("brand")} autoComplete="off" aria-invalid={Boolean(err("brand"))} />
-          </Field>
-          <Field label="Site internet" htmlFor="pa-site" error={err("websiteUrl")}>
-            <Input id="pa-site" value={form.websiteUrl} onChange={set("websiteUrl")} inputMode="url" placeholder="www.votre-marque.fr" autoComplete="url" aria-invalid={Boolean(err("websiteUrl"))} />
-          </Field>
-          <Field label="Réseau de distribution" htmlFor="pa-distribution" hint="Grossistes, vente directe, groupements…" error={err("distribution")}>
-            <Input id="pa-distribution" value={form.distribution} onChange={set("distribution")} autoComplete="off" aria-invalid={Boolean(err("distribution"))} />
-          </Field>
-        </div>
-      </fieldset>
-
-      <fieldset className="space-y-4">
-        <legend className={LEGEND}>Le contact</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Prénom" htmlFor="pa-first" required error={err("contactFirstName")}>
-            <Input id="pa-first" value={form.contactFirstName} onChange={set("contactFirstName")} autoComplete="given-name" aria-invalid={Boolean(err("contactFirstName"))} />
-          </Field>
-          <Field label="Nom" htmlFor="pa-last" required error={err("contactLastName")}>
-            <Input id="pa-last" value={form.contactLastName} onChange={set("contactLastName")} autoComplete="family-name" aria-invalid={Boolean(err("contactLastName"))} />
-          </Field>
-          <Field label="Fonction" htmlFor="pa-role" error={err("contactRole")}>
-            <Input id="pa-role" value={form.contactRole} onChange={set("contactRole")} autoComplete="organization-title" aria-invalid={Boolean(err("contactRole"))} />
-          </Field>
-          <Field label="E-mail professionnel" htmlFor="pa-email" required error={err("email")} hint="L'accusé de réception y est envoyé.">
-            <Input id="pa-email" type="email" value={form.email} onChange={set("email")} autoComplete="email" aria-invalid={Boolean(err("email"))} />
-          </Field>
-          <Field label="Téléphone" htmlFor="pa-phone" error={err("phone")}>
-            <Input id="pa-phone" type="tel" value={form.phone} onChange={set("phone")} autoComplete="tel" aria-invalid={Boolean(err("phone"))} />
-          </Field>
-        </div>
-      </fieldset>
-
-      <fieldset className="space-y-4">
-        <legend className={LEGEND}>Vos gammes</legend>
-        <div className="space-y-2">
-          <p className="text-[13px] font-medium text-text-primary" id="pa-universes">Univers</p>
-          <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:grid-cols-3" role="group" aria-labelledby="pa-universes">
-            {UNIVERSES.map((u) => (
-              <label
-                key={u.key}
-                className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border-subtle bg-surface-card px-3 py-2.5 text-[13.5px] leading-5 font-medium text-text-primary transition-colors hover:border-brand-300 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50/70"
-              >
-                <input type="checkbox" checked={universes.includes(u.key)} onChange={() => toggleUniverse(u.key)} className="mt-0.5 size-4 shrink-0 accent-brand-700" />
-                {u.label}
-              </label>
-            ))}
+  const steps = useMemo<FlowStep<Values>[]>(() => {
+    const first = (v: Values) => personName(v.contactFirstName) ?? "";
+    return [
+      {
+        id: "societe",
+        section: "Votre société",
+        question: "Quelle société représentez-vous ?",
+        help: "Le laboratoire ou la société qui commercialise vos gammes.",
+        fields: ["company"],
+        seconds: 6,
+        validate: (v) => validate(v, ["company"]),
+        render: ({ values, errors, set }) => <TextAnswer srLabel="Société" value={values.company} onValueChange={(v) => set("company", v)} error={errors.company} autoComplete="organization" placeholder="Laboratoires Exemple" />,
+        recap: { label: "Société", value: (v) => v.company.trim() || null },
+      },
+      {
+        id: "marque",
+        section: "Votre société",
+        question: "Et la marque que vous souhaitez présenter ?",
+        help: "Plusieurs marques ? Indiquez la principale, et les autres dans votre message.",
+        fields: ["brand"],
+        seconds: 6,
+        validate: (v) => validate(v, ["brand"]),
+        render: ({ values, errors, set }) => (
+          <div className="space-y-3">
+            <TextAnswer id="pa-brand" srLabel="Marque" value={values.brand} onValueChange={(v) => set("brand", v)} error={errors.brand} autoComplete="off" />
+            {values.company.trim() && values.brand.trim() !== values.company.trim() && (
+              <button type="button" onClick={() => {
+                  set("brand", values.company.trim());
+                  requestAnimationFrame(() => document.getElementById("pa-brand")?.focus());
+                }} className="rounded-full border border-border-default bg-surface-app px-3.5 py-1.5 text-[13.5px] font-medium text-text-secondary hover:border-brand-300 hover:text-text-primary">
+                Même nom que la société : {values.company.trim()}
+              </button>
+            )}
           </div>
-          <p className="text-[12.5px] text-text-tertiary">Un autre univers ? Précisez-le dans votre message.</p>
-        </div>
-        <Field label="Nombre approximatif de références" htmlFor="pa-refs" error={err("approxReferences")}>
-          <Input id="pa-refs" inputMode="numeric" value={form.approxReferences} onChange={set("approxReferences")} className="w-32" autoComplete="off" aria-invalid={Boolean(err("approxReferences"))} />
-        </Field>
-      </fieldset>
+        ),
+        recap: { label: "Marque", value: (v) => v.brand.trim() || null },
+      },
+      {
+        id: "univers",
+        section: "Vos gammes",
+        question: "Dans quels univers sont vos gammes ?",
+        help: "Plusieurs réponses possibles. Un autre univers ? Précisez-le dans votre message.",
+        fields: ["universes"],
+        optional: true,
+        seconds: 10,
+        render: ({ values, set }) => <MultiCards label="Univers" dense columns={3} options={UNIVERSES.map((u) => ({ value: u.key, label: u.label }))} values={values.universes} onToggle={(key) => set("universes", values.universes.includes(key) ? values.universes.filter((k) => k !== key) : [...values.universes, key])} />,
+        recap: { label: "Univers", value: (v) => v.universes.map(universeLabel).join(", ") || null },
+      },
+      {
+        id: "references",
+        section: "Vos gammes",
+        question: "Combien de références environ ?",
+        help: "Un ordre de grandeur suffit.",
+        fields: ["approxReferences"],
+        optional: true,
+        seconds: 5,
+        validate: (v) => validate(v, ["approxReferences"]),
+        render: ({ values, errors, set }) => <TextAnswer srLabel="Nombre de références" value={groupDigits(values.approxReferences)} onValueChange={(v) => set("approxReferences", v.replace(/\D+/g, ""))} error={errors.approxReferences} inputMode="numeric" autoComplete="off" placeholder="120" className="max-w-56" trailing={<span className="text-[14px] text-text-tertiary">réf.</span>} />,
+        recap: { label: "Références", value: (v) => (v.approxReferences ? groupDigits(v.approxReferences) : null) },
+      },
+      {
+        id: "distribution",
+        section: "Vos gammes",
+        question: "Comment vos produits arrivent-ils en officine ?",
+        help: "Plusieurs réponses possibles.",
+        fields: ["distribution", "channels", "distributionNote"],
+        optional: true,
+        isEmpty: (v) => v.channels.length === 0 && !v.distributionNote.trim(),
+        seconds: 10,
+        validate: (v) => {
+          const errors = validate(v, ["distribution"]);
+          return errors.distribution ? { distributionNote: "Précision trop longue : 300 caractères au plus en tout." } : {};
+        },
+        render: ({ values, errors, set }) => (
+          <div className="space-y-4">
+            <MultiCards label="Canaux de distribution" options={CHANNELS.map((c) => ({ value: c, label: c }))} values={values.channels} onToggle={(c) => set("channels", values.channels.includes(c) ? values.channels.filter((x) => x !== c) : [...values.channels, c])} />
+            <TextAnswer label="Une précision ?" value={values.distributionNote} onValueChange={(v) => set("distributionNote", v)} error={errors.distributionNote} autoComplete="off" placeholder="Grossistes nationaux, référencement en cours chez…" maxLength={200} />
+          </div>
+        ),
+        recap: { label: "Distribution", value: (v) => distributionText(v) || null },
+      },
+      {
+        id: "site",
+        section: "Vos gammes",
+        question: "Votre site internet ?",
+        fields: ["websiteUrl"],
+        optional: true,
+        seconds: 5,
+        validate: (v) => validate(v, ["websiteUrl"]),
+        render: ({ values, errors, set }) => <TextAnswer srLabel="Site internet" value={values.websiteUrl} onValueChange={(v) => set("websiteUrl", v)} error={errors.websiteUrl} inputMode="url" autoComplete="url" autoCapitalize="none" spellCheck={false} placeholder="www.votre-marque.fr" />,
+        recap: { label: "Site", value: (v) => v.websiteUrl.trim() || null },
+      },
+      {
+        id: "outils",
+        section: "Vos outils",
+        question: "Quels outils pouvez-vous partager ?",
+        help: "Pour savoir comment nous pourrions travailler ensemble. Rien n'est requis à ce stade.",
+        fields: ["hasApi", "hasB2bPortal", "hasCatalog", "hasTrainings"],
+        optional: true,
+        seconds: 12,
+        render: ({ values, set }) => (
+          <div className="divide-y divide-border-subtle rounded-2xl border border-border-subtle px-4 sm:px-5">
+            <Segmented label="Une API" options={API_OPTIONS} value={values.hasApi || null} onChange={(v) => set("hasApi", v)} />
+            <Segmented label="Un portail B2B" options={YES_NO} value={values.hasB2bPortal || null} onChange={(v) => set("hasB2bPortal", v)} />
+            <Segmented label="Un catalogue" options={YES_NO} value={values.hasCatalog || null} onChange={(v) => set("hasCatalog", v)} />
+            <Segmented label="Des formations" options={YES_NO} value={values.hasTrainings || null} onChange={(v) => set("hasTrainings", v)} />
+          </div>
+        ),
+        recap: {
+          label: "Outils",
+          value: (v) => {
+            const answer = (value: string) => ({ YES: "oui", NO: "non", UNKNOWN: "je ne sais pas", yes: "oui", no: "non" })[value];
+            const parts = [
+              ["API", v.hasApi],
+              ["Portail B2B", v.hasB2bPortal],
+              ["Catalogue", v.hasCatalog],
+              ["Formations", v.hasTrainings],
+            ]
+              .filter(([, value]) => value)
+              .map(([name, value]) => `${name} : ${answer(value)}`);
+            return parts.join(" · ") || null;
+          },
+        },
+      },
+      {
+        id: "interlocuteur",
+        section: "Vous",
+        question: "Faisons connaissance : qui êtes-vous ?",
+        fields: ["contactFirstName", "contactLastName", "contactRole"],
+        seconds: 12,
+        validate: (v) => validate(v, ["contactFirstName", "contactLastName", "contactRole"]),
+        render: ({ values, errors, set }) => (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextAnswer label="Prénom" value={values.contactFirstName} onValueChange={(v) => set("contactFirstName", v)} error={errors.contactFirstName} autoComplete="given-name" />
+            <TextAnswer label="Nom" value={values.contactLastName} onValueChange={(v) => set("contactLastName", v)} error={errors.contactLastName} autoComplete="family-name" />
+            <TextAnswer label="Fonction" className="sm:col-span-2" value={values.contactRole} onValueChange={(v) => set("contactRole", v)} error={errors.contactRole} autoComplete="organization-title" placeholder="Directrice commerciale, responsable trade marketing…" hint="Facultatif." />
+          </div>
+        ),
+        recap: { label: "Interlocuteur", value: (v) => [[personName(v.contactFirstName), personName(v.contactLastName)].filter(Boolean).join(" "), v.contactRole.trim()].filter(Boolean).join(", ") || null },
+      },
+      {
+        id: "contact",
+        section: "Vous",
+        question: (v) => (first(v) ? `Comment vous joindre, ${first(v)} ?` : "Comment vous joindre ?"),
+        help: "L'accusé de réception part à cette adresse.",
+        fields: ["email", "phone"],
+        seconds: 10,
+        validate: (v) => validate(v, ["email", "phone"]),
+        render: ({ values, errors, set }) => (
+          <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
+            <EmailAnswer label="E-mail professionnel" value={values.email} onValueChange={(v) => set("email", v)} error={errors.email} placeholder="vous@votre-marque.fr" />
+            <TextAnswer label="Téléphone" type="tel" value={values.phone} onValueChange={(v) => set("phone", v)} error={errors.phone} autoComplete="tel" hint="Facultatif." />
+          </div>
+        ),
+        recap: { label: "Contact", value: (v) => [v.email.trim(), v.phone.trim()].filter(Boolean).join(" · ") || null },
+      },
+      {
+        id: "message",
+        section: "Votre projet",
+        question: "Un mot sur votre projet ?",
+        help: "Vos gammes, ce que vous attendez d'un partenariat, un autre univers…",
+        fields: ["message"],
+        optional: true,
+        seconds: 20,
+        validate: (v) => validate(v, ["message"]),
+        render: ({ values, errors, set }) => <LongTextAnswer srLabel="Message" value={values.message} onValueChange={(v) => set("message", v)} error={errors.message} rows={5} maxLength={2000} />,
+        recap: { label: "Message", value: (v) => v.message.trim() || null },
+      },
+    ];
+  }, []);
 
-      <fieldset className="space-y-1">
-        <legend className={LEGEND}>Vos outils</legend>
-        <p className="pt-3 text-[13px] text-text-tertiary">Pour savoir comment nous pourrions travailler ensemble. Rien n&apos;est requis à ce stade.</p>
-        <div className="divide-y divide-border-subtle">
-          <Choice id="pa-api" label="API disponible" options={API_OPTIONS} value={hasApi} onChange={setHasApi} />
-          <Choice id="pa-b2b" label="Portail B2B" options={YES_NO} value={toChoice(tools.hasB2bPortal)} onChange={(v) => setTools((t) => ({ ...t, hasB2bPortal: v === "yes" }))} />
-          <Choice id="pa-catalog" label="Catalogue disponible" options={YES_NO} value={toChoice(tools.hasCatalog)} onChange={(v) => setTools((t) => ({ ...t, hasCatalog: v === "yes" }))} />
-          <Choice id="pa-trainings" label="Formations disponibles" options={YES_NO} value={toChoice(tools.hasTrainings)} onChange={(v) => setTools((t) => ({ ...t, hasTrainings: v === "yes" }))} />
-        </div>
-      </fieldset>
+  if (done) return <PartnerDone acknowledged={done.acknowledged} email={done.email} />;
 
-      <Field label="Message" htmlFor="pa-message" error={err("message")} hint="Vos gammes, ce que vous attendez d'un partenariat, un autre univers…">
-        <Textarea id="pa-message" value={form.message} onChange={set("message")} rows={4} aria-invalid={Boolean(err("message"))} />
-      </Field>
-
-      {/* Pot de miel, invisible pour une personne. */}
-      <div className="absolute -left-[9999px] top-auto" aria-hidden="true">
-        <label htmlFor="pa-website">Site web</label>
-        <input id="pa-website" tabIndex={-1} autoComplete="off" value={form.website} onChange={set("website")} />
-      </div>
-
-      <div className="space-y-1.5">
-        <label className={cn("flex items-start gap-3 rounded-xl border bg-surface-sunken/60 p-4 text-[14px] leading-6 text-text-primary", err("consent") ? "border-danger-500" : "border-border-subtle")}>
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => {
-              setConsent(e.target.checked);
-              clear("consent");
-            }}
-            className="mt-1 size-4 shrink-0 accent-brand-700"
-            aria-invalid={Boolean(err("consent"))}
-            aria-describedby={err("consent") ? "pa-consent-error" : undefined}
-          />
-          <span>
-            J&apos;accepte que PharmaBoost utilise ces informations uniquement pour étudier ma candidature et me recontacter. Elles ne sont pas utilisées à d&apos;autres fins. <Consent>En savoir plus</Consent>
-            <span className="text-danger-600" aria-hidden="true"> *</span>
-          </span>
-        </label>
-        {err("consent") && (
-          <p id="pa-consent-error" className="text-[12.5px] text-danger-600" role="alert">
-            {err("consent")}
-          </p>
-        )}
-      </div>
-
-      {error && <Alert tone="danger">{error}</Alert>}
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" size="lg" loading={pending}>
-          {pending ? "Envoi en cours…" : "Envoyer ma candidature"}
-        </Button>
-        <p className="text-[12.5px] text-text-tertiary">Aucune activation automatique : notre équipe étudie chaque candidature.</p>
-      </div>
-    </form>
-  );
-}
-
-function toChoice(value: boolean | null): "yes" | "no" | null {
-  if (value === null) return null;
-  return value ? "yes" : "no";
-}
-
-function Consent({ children }: { children: ReactNode }) {
   return (
-    <Link href="/decouvrir/confidentialite" target="_blank" rel="noopener" className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800">
-      {children}
-    </Link>
-  );
-}
-
-/** Une question fermée : des pastilles à choix unique, lisibles au doigt comme à la souris. */
-function Choice<T extends string>({ id, label, options, value, onChange }: { id: string; label: string; options: { value: T; label: string }[]; value: T | null; onChange: (value: T) => void }) {
-  return (
-    <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4" role="radiogroup" aria-labelledby={`${id}-label`}>
-      <span id={`${id}-label`} className="text-[14px] font-medium text-text-primary">
-        {label}
-      </span>
-      <div className="inline-flex w-fit shrink-0 rounded-full border border-border-default bg-surface-card p-0.5">
-        {options.map((option) => (
-          <label
-            key={option.value}
-            className="cursor-pointer rounded-full px-3.5 py-1.5 text-[13px] font-medium whitespace-nowrap text-text-secondary transition-colors hover:text-text-primary has-[:checked]:bg-brand-600 has-[:checked]:text-white has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500/40"
-          >
-            <input type="radio" name={id} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} className="sr-only" />
-            {option.label}
+    <Flow<Values>
+      name="partenaire"
+      steps={steps}
+      initialValues={initialValues}
+      ephemeral={["consent"]}
+      honeypot="website"
+      recapTitle="Votre candidature est prête."
+      aside={(v) => <PartnerAside values={v} />}
+      final={({ values, errors, set }) => (
+        <div className="space-y-1.5">
+          <label className={cn("flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-[14.5px] leading-6 text-text-primary transition-colors", errors.consent ? "border-danger-500" : values.consent ? "border-brand-400 bg-brand-50/70 dark:bg-brand-950/30" : "border-border-default bg-surface-app hover:border-brand-300")}>
+            <input type="checkbox" checked={values.consent} onChange={(e) => set("consent", e.target.checked)} className="mt-1 size-[18px] shrink-0 accent-brand-700" aria-invalid={errors.consent ? true : undefined} aria-describedby={errors.consent ? "pa-consent-error" : undefined} />
+            <span>
+              J&apos;accepte que PharmaBoost utilise ces informations uniquement pour étudier ma candidature et me recontacter. Elles ne sont pas utilisées à d&apos;autres fins.{" "}
+              <Link href="/decouvrir/confidentialite" target="_blank" rel="noopener" className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800">
+                En savoir plus
+              </Link>
+              <span className="text-danger-600" aria-hidden="true"> *</span>
+            </span>
           </label>
-        ))}
+          {errors.consent && (
+            <p id="pa-consent-error" className="text-[12.5px] text-danger-600" role="alert">
+              {errors.consent}
+            </p>
+          )}
+        </div>
+      )}
+      canSubmit={(v) => v.consent}
+      submitLabel="Envoyer ma candidature"
+      submitHint="Aucune activation automatique : notre équipe étudie chaque candidature."
+      onSubmit={async (v) => {
+        const result = await submitPartnerApplicationAction(toPayload(v));
+        if (!result.ok) return { ok: false, error: result.error, fieldErrors: result.fieldErrors };
+        setDone({ acknowledged: result.data.acknowledged, email: v.email.trim() });
+        return { ok: true };
+      }}
+    />
+  );
+}
+
+function PartnerAside({ values }: { values: Values }) {
+  const contact = [personName(values.contactFirstName), personName(values.contactLastName)].filter(Boolean).join(" ");
+  return (
+    <LiveCard title="Votre candidature" footer="Aucune activation automatique : notre équipe étudie chaque candidature et vous recontacte.">
+      <div className="divide-y divide-border-subtle/70">
+        <LiveRow label="Société" value={values.company.trim()} />
+        <LiveRow label="Marque" value={values.brand.trim()} />
+        <LiveRow
+          label="Univers"
+          value={
+            values.universes.length ? (
+              <span className="mt-1 flex flex-wrap gap-1">
+                {values.universes.map((key) => (
+                  <span key={key} className="rounded-full bg-brand-50 px-2 py-0.5 text-[12px] font-medium text-brand-800 dark:bg-brand-950/50 dark:text-brand-200">
+                    {universeLabel(key)}
+                  </span>
+                ))}
+              </span>
+            ) : null
+          }
+        />
+        <LiveRow label="Références" value={values.approxReferences ? `${groupDigits(values.approxReferences)} environ` : null} />
+        <LiveRow label="Interlocuteur" value={contact} />
       </div>
+    </LiveCard>
+  );
+}
+
+function PartnerDone({ acknowledged, email }: { acknowledged: boolean; email: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Le parcours disparaît, la page raccourcit : la confirmation vient sous les yeux.
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, []);
+  return (
+    <div ref={ref} className="mx-auto max-w-2xl py-6 sm:py-10" role="status">
+      <span className="flex size-14 items-center justify-center rounded-full bg-brand-600 text-white motion-safe:animate-slide-up" aria-hidden="true">
+        <Check className="size-7" strokeWidth={3} />
+      </span>
+      <h3 className="mt-6 text-[30px] leading-[1.1] font-semibold tracking-[-0.03em] text-text-primary text-balance">Candidature reçue.</h3>
+      <p className="mt-4 text-[16px] leading-7 text-text-secondary">
+        {acknowledged ? (
+          <>Un accusé de réception vous a été envoyé à <span className="font-medium text-text-primary">{email}</span>.</>
+        ) : (
+          <>Votre candidature est enregistrée ; notre équipe vous recontacte à <span className="font-medium text-text-primary">{email}</span>.</>
+        )}
+      </p>
+      <h4 className="mt-9 font-mono text-[11.5px] tracking-[0.14em] text-text-tertiary uppercase">Et maintenant</h4>
+      <ol className="mt-4 space-y-4">
+        {[
+          { title: "Notre équipe étudie votre candidature", body: "Rien n'est activé automatiquement." },
+          { title: "Nous échangeons", body: "Nous convenons ensemble des gammes, des conditions et de la façon de travailler." },
+          { title: "Diffusion aux officines", body: "Les gammes retenues sont présentées aux officines, dans leur espace partenaire." },
+        ].map((step, i) => (
+          <li key={step.title} className="flex gap-4">
+            <span className={i === 0 ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[13px] font-semibold text-white" : "flex size-8 shrink-0 items-center justify-center rounded-full border border-border-default text-[13px] font-semibold text-text-secondary"}>{i + 1}</span>
+            <div className="pt-1">
+              <p className="text-[15.5px] font-semibold text-text-primary">{step.title}</p>
+              <p className="mt-0.5 text-[14px] leading-6 text-text-secondary">{step.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <Link href="/decouvrir" className="mt-9 inline-flex h-11 items-center rounded-xl border border-border-default px-5 text-[14.5px] font-medium text-text-primary hover:bg-surface-sunken">
+        Retour au site
+      </Link>
     </div>
   );
 }

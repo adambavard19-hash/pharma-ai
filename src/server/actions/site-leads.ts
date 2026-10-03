@@ -5,23 +5,8 @@ import { headers } from "next/headers";
 import { receiveSiteLead } from "@/server/services/site-leads";
 import { confirmSubscription, normalizeSubscriptionRequest, requestSubscription, type SubscriptionRequestOutcome } from "@/server/services/subscription-requests";
 import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
+import { siteLeadSchema, type SiteLeadPayload } from "@/core/site/lead-form";
 import { fail, ok, type ActionResult } from "./types";
-
-const schema = z.object({
-  kind: z.enum(["DEMO", "SUBSCRIBE"]),
-  pharmacyName: z.string().trim().min(2, "Le nom de l'officine est requis.").max(120),
-  contactName: z.string().trim().min(2, "Votre nom est requis.").max(120),
-  email: z.string().trim().email("Adresse e-mail invalide.").max(160),
-  phone: z.string().trim().max(30).optional().or(z.literal("")),
-  city: z.string().trim().max(80).optional().or(z.literal("")),
-  lgo: z.string().trim().max(60).optional().or(z.literal("")),
-  postCount: z.number().int().min(1).max(50).nullable().optional(),
-  message: z.string().trim().max(1000).optional().or(z.literal("")),
-  preferredSlot: z.string().trim().max(120).optional().or(z.literal("")),
-  referralCode: z.string().trim().max(20).optional().or(z.literal("")),
-  /** Pot de miel : un humain ne le remplit pas. */
-  website: z.string().max(0).optional().or(z.literal("")),
-});
 
 // Une même adresse ne peut pas inonder la boîte : trois demandes par heure.
 const recent = new Map<string, number[]>();
@@ -38,8 +23,8 @@ function throttled(key: string): boolean {
 }
 
 /** Une demande de démonstration ou d'abonnement, depuis le site public. */
-export async function submitSiteLeadAction(payload: z.input<typeof schema>): Promise<ActionResult<{ acknowledged: boolean }>> {
-  const parsed = schema.safeParse(payload);
+export async function submitSiteLeadAction(payload: SiteLeadPayload): Promise<ActionResult<{ acknowledged: boolean }>> {
+  const parsed = siteLeadSchema.safeParse(payload);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Vérifiez le formulaire.");
   const input = parsed.data;
   if (input.website) return ok({ acknowledged: false });
@@ -84,7 +69,7 @@ const subscriptionSchema = z.object({
   referralCode: z.string().trim().max(20).optional().or(z.literal("")),
   /** Confirmation explicite : c'est elle qui déclenche l'envoi du contrat. */
   confirm: z.literal(true, { message: "Confirmez votre demande de souscription pour recevoir le contrat." }),
-  website: z.string().max(0).optional().or(z.literal("")),
+  website: z.string().max(500).optional(),
 });
 
 /**

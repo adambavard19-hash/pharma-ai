@@ -1,62 +1,10 @@
 "use server";
 
-import { z } from "zod";
 import { headers } from "next/headers";
 import { receivePartnerApplication } from "@/server/services/partners/application-intake";
-import { isUniverseKey } from "@/config/universes";
+import { CONSENT_REQUIRED, partnerApplicationSchema, type PartnerApplicationPayload } from "@/core/partners/application-form";
 import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
-
-const CONSENT_REQUIRED = "Votre accord est nécessaire pour que nous puissions étudier votre candidature.";
-
-const optionalText = (max: number) => z.string().trim().max(max, `${max} caractères au plus.`).optional().or(z.literal(""));
-
-/** « www.marque.fr » ou « https://marque.fr » : on garde une adresse https/http complète, ou rien. */
-const websiteField = z
-  .string()
-  .trim()
-  .max(200, "Adresse trop longue.")
-  .optional()
-  .transform((value, context) => {
-    if (!value) return null;
-    const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-    try {
-      const url = new URL(candidate);
-      if ((url.protocol === "https:" || url.protocol === "http:") && url.hostname.includes(".") && !/\s/.test(value)) return url.toString().replace(/\/$/, "");
-    } catch {
-      // adresse illisible : signalée ci-dessous
-    }
-    context.addIssue({ code: "custom", message: "Adresse de site invalide (exemple : www.votre-marque.fr)." });
-    return z.NEVER;
-  });
-
-const schema = z.object({
-  company: z.string().trim().min(2, "Le nom de la société est requis.").max(160, "160 caractères au plus."),
-  brand: z.string().trim().min(1, "La marque est requise.").max(120, "120 caractères au plus."),
-  contactFirstName: z.string().trim().min(1, "Votre prénom est requis.").max(80, "80 caractères au plus."),
-  contactLastName: z.string().trim().min(1, "Votre nom est requis.").max(80, "80 caractères au plus."),
-  contactRole: optionalText(120),
-  email: z.string().trim().email("Adresse e-mail invalide.").max(160, "Adresse e-mail trop longue."),
-  phone: optionalText(30),
-  websiteUrl: websiteField,
-  // Seuls les univers connus sont gardés : un « autre » univers se précise dans le message.
-  universes: z
-    .array(z.string().max(60))
-    .max(30)
-    .default([])
-    .transform((keys) => [...new Set(keys)].filter(isUniverseKey)),
-  approxReferences: z.number({ message: "Indiquez un nombre." }).int("Indiquez un nombre entier.").min(1, "Indiquez un nombre positif.").max(1_000_000, "Nombre trop élevé.").nullable().optional(),
-  distribution: optionalText(300),
-  hasApi: z.enum(["YES", "NO", "UNKNOWN"]).default("UNKNOWN"),
-  hasB2bPortal: z.boolean().nullable().default(null),
-  hasCatalog: z.boolean().nullable().default(null),
-  hasTrainings: z.boolean().nullable().default(null),
-  message: optionalText(2000),
-  /** Consentement explicite : sans lui, rien n'est enregistré. */
-  consent: z.literal(true, { message: CONSENT_REQUIRED }),
-  /** Pot de miel : un humain ne le remplit pas. */
-  website: z.string().max(500).optional(),
-});
 
 // Pas d'inondation : trois candidatures par heure pour une même adresse, dix par adresse IP.
 const recent = new Map<string, number[]>();
@@ -71,11 +19,11 @@ function throttled(key: string, max: number): boolean {
   return false;
 }
 
-export type PartnerApplicationPayload = Omit<z.input<typeof schema>, "consent"> & { consent: boolean };
+export type { PartnerApplicationPayload };
 
 /** Une candidature PharmaBoost Partenaires, depuis le site public. Aucune activation : l'équipe l'étudie. */
 export async function submitPartnerApplicationAction(payload: PartnerApplicationPayload): Promise<ActionResult<{ acknowledged: boolean }>> {
-  const parsed = schema.safeParse(payload);
+  const parsed = partnerApplicationSchema.safeParse(payload);
   if (!parsed.success) {
     const issues = parsed.error.issues;
     const fieldErrors = zodFieldErrors(issues);

@@ -1,141 +1,279 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
 import { submitSubscriptionRequestAction } from "@/server/actions/site-leads";
-import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/field";
-import { Alert } from "@/components/ui/feedback";
+import { normalizeSubscriptionRequest } from "@/core/contracts/subscription-request";
+import { formatSiret, personName } from "@/core/contracts/identity";
+import { normalizeReferralCode } from "@/core/billing/referral";
+import { Flow, type FlowErrors, type FlowStep } from "@/components/flow/flow";
+import { ChoiceCards, CountAnswer, LiveCard, LiveRow, TextAnswer } from "@/components/flow/controls";
+import { EmailAnswer } from "@/components/flow/email-answer";
+import { officineSteps } from "@/components/flow/officine-steps";
+import type { Prefill } from "@/components/flow/registry-answers";
+import { cn } from "@/lib/utils";
 
-const TITLES = ["Pharmacien titulaire", "Pharmacienne titulaire", "Gérant", "Gérante", "Président", "Présidente", "Co-titulaire"];
+const TITLES = ["Pharmacien titulaire", "Pharmacienne titulaire", "Co-titulaire", "Gérant", "Gérante", "Président", "Présidente"];
+
+type Values = {
+  siret: string;
+  pharmacyName: string;
+  legalName: string;
+  addressLine1: string;
+  postalCode: string;
+  city: string;
+  finessNumber: string;
+  phone: string;
+  outletCount: string;
+  ownerFirstName: string;
+  ownerLastName: string;
+  ownerTitle: string;
+  titleOther: boolean;
+  ownerEmail: string;
+  hasReferral: "" | "yes" | "no";
+  referralCode: string;
+  confirm: boolean;
+  website: string;
+  prefill: Prefill;
+};
+
+export type PublicOffer = { name: string; price: string; perks: string[] };
+
+function toRequest(v: Values) {
+  const outlets = Number(v.outletCount);
+  return {
+    pharmacyName: v.pharmacyName,
+    legalName: v.legalName,
+    siret: v.siret,
+    finessNumber: v.finessNumber,
+    addressLine1: v.addressLine1,
+    postalCode: v.postalCode,
+    city: v.city,
+    phone: v.phone,
+    ownerFirstName: v.ownerFirstName,
+    ownerLastName: v.ownerLastName,
+    ownerTitle: v.ownerTitle,
+    ownerEmail: v.ownerEmail,
+    outletCount: Number.isFinite(outlets) && outlets > 0 ? Math.round(outlets) : null,
+    referralCode: v.hasReferral === "no" ? "" : v.referralCode,
+  };
+}
+
+/** Les règles du serveur (normalizeSubscriptionRequest), appliquées aux seuls champs de la question. */
+function validate(v: Values, fields: string[]): FlowErrors {
+  const checked = normalizeSubscriptionRequest(toRequest(v));
+  const errors: FlowErrors = {};
+  if (!checked.ok) for (const field of fields) if (checked.errors[field]) errors[field] = checked.errors[field];
+  if (fields.includes("finessNumber") && v.finessNumber && !/^\d{9}$/.test(v.finessNumber)) errors.finessNumber = "Le FINESS compte 9 chiffres, ou laissez vide.";
+  return errors;
+}
 
 /**
- * La souscription en une fois : l'officine, son représentant, l'offre. Les
- * informations saisies ici deviennent celles du dossier, du contrat et de
- * l'espace PharmaBoost ; rien ne sera redemandé. Aucune donnée patient.
+ * La souscription en une question à la fois : l'officine (retrouvée par son
+ * SIRET), son signataire, l'offre. Les informations deviennent celles du
+ * dossier, du contrat et de l'espace PharmaBoost ; rien ne sera redemandé.
+ * Aucune donnée patient.
  */
-export function SubscriptionForm({ planId, offerLabel, referralCode = "" }: { planId: string | null; offerLabel: string; referralCode?: string }) {
-  const [form, setForm] = useState({
-    pharmacyName: "",
-    legalName: "",
-    siret: "",
-    finessNumber: "",
-    addressLine1: "",
-    postalCode: "",
-    city: "",
-    phone: "",
-    ownerFirstName: "",
-    ownerLastName: "",
-    ownerTitle: "Pharmacien titulaire",
-    ownerEmail: "",
-    outletCount: "1",
-    referralCode,
-    website: "",
-  });
-  const [confirm, setConfirm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [pending, start] = useTransition();
+export function SubscriptionForm({ planId, offer, offerLabel, referralCode = "" }: { planId: string | null; offer: PublicOffer; offerLabel: string; referralCode?: string }) {
   const router = useRouter();
-  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
-  const err = (key: string) => fieldErrors[key];
+  const initialValues = useMemo<Values>(
+    () => ({
+      siret: "",
+      pharmacyName: "",
+      legalName: "",
+      addressLine1: "",
+      postalCode: "",
+      city: "",
+      finessNumber: "",
+      phone: "",
+      outletCount: "1",
+      ownerFirstName: "",
+      ownerLastName: "",
+      ownerTitle: "",
+      titleOther: false,
+      ownerEmail: "",
+      hasReferral: referralCode ? "yes" : "",
+      referralCode,
+      confirm: false,
+      website: "",
+      prefill: {},
+    }),
+    [referralCode],
+  );
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pending) return;
-    setError(null);
-    setFieldErrors({});
-    start(async () => {
-      const outlets = Number(form.outletCount);
-      const result = await submitSubscriptionRequestAction({
-        ...form,
-        outletCount: Number.isFinite(outlets) && outlets > 0 ? Math.round(outlets) : null,
-        planId: planId ?? "",
-        confirm: confirm as true,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        setFieldErrors(result.fieldErrors ?? {});
-        return;
-      }
-      router.push(`/decouvrir/merci?type=abonnement&etat=${result.data.outcome.toLowerCase()}`);
-    });
-  };
+  const steps = useMemo<FlowStep<Values>[]>(() => {
+    const first = (v: Values) => personName(v.ownerFirstName) ?? "";
+    return [
+      ...officineSteps<Values>({ keys: { siret: "siret", name: "pharmacyName", legalName: "legalName", addressLine1: "addressLine1", postalCode: "postalCode", city: "city", finessNumber: "finessNumber", phone: "phone" }, validate }),
+      {
+        id: "points-de-vente",
+        section: "L'officine",
+        question: "Combien de points de vente ?",
+        help: "Le contrat couvre ce nombre de points de vente, avec tous leurs postes de comptoir.",
+        fields: ["outletCount"],
+        seconds: 5,
+        validate: (v) => {
+          const n = Number(v.outletCount);
+          return Number.isInteger(n) && n >= 1 && n <= 50 ? {} : { outletCount: "Indiquez un nombre entre 1 et 50." };
+        },
+        render: ({ values, errors, set, choose }) => <CountAnswer label="Points de vente" value={values.outletCount} onValueChange={(v) => set("outletCount", v)} onChoose={(v) => choose("outletCount", v)} quick={[1, 2, 3]} max={50} error={errors.outletCount} />,
+        recap: { label: "Points de vente", value: (v) => v.outletCount || null },
+      },
+      {
+        id: "signataire",
+        section: "Le signataire",
+        question: "Qui signera le contrat ?",
+        help: "Le ou la titulaire, ou la personne habilitée à engager l'officine.",
+        fields: ["ownerFirstName", "ownerLastName"],
+        seconds: 10,
+        validate: (v) => validate(v, ["ownerFirstName", "ownerLastName"]),
+        render: ({ values, errors, set }) => (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextAnswer label="Prénom" value={values.ownerFirstName} onValueChange={(v) => set("ownerFirstName", v)} error={errors.ownerFirstName} autoComplete="given-name" />
+            <TextAnswer label="Nom" value={values.ownerLastName} onValueChange={(v) => set("ownerLastName", v)} error={errors.ownerLastName} autoComplete="family-name" />
+          </div>
+        ),
+        recap: { label: "Signataire", value: (v) => [personName(v.ownerFirstName), personName(v.ownerLastName)].filter(Boolean).join(" ") || null },
+      },
+      {
+        id: "qualite",
+        section: "Le signataire",
+        question: (v) => (first(v) ? `En quelle qualité, ${first(v)} ?` : "En quelle qualité signez-vous ?"),
+        help: "Elle figure au contrat, à côté de votre nom.",
+        fields: ["ownerTitle"],
+        seconds: 5,
+        validate: (v) => validate(v, ["ownerTitle"]),
+        render: ({ values, errors, set, patch, choose }) => (
+          <div className="space-y-4">
+            <ChoiceCards
+              label="Qualité du signataire"
+              options={[...TITLES.map((t) => ({ value: t, label: t })), { value: "__autre", label: "Autre qualité" }]}
+              value={values.titleOther ? "__autre" : values.ownerTitle}
+              onChoose={(value) => {
+                if (value === "__autre") patch({ titleOther: true, ownerTitle: TITLES.includes(values.ownerTitle) ? "" : values.ownerTitle });
+                else {
+                  patch({ titleOther: false });
+                  choose("ownerTitle", value);
+                }
+              }}
+              error={values.titleOther ? undefined : errors.ownerTitle}
+            />
+            {values.titleOther && <TextAnswer label="Votre qualité" value={values.ownerTitle} onValueChange={(v) => set("ownerTitle", v)} error={errors.ownerTitle} placeholder="Directeur général délégué" autofocus />}
+          </div>
+        ),
+        recap: { label: "Qualité", value: (v) => v.ownerTitle || null },
+      },
+      {
+        id: "email",
+        section: "Le signataire",
+        question: (v) => (first(v) ? `À quelle adresse envoyer le contrat, ${first(v)} ?` : "À quelle adresse envoyer le contrat ?"),
+        help: "Vous y recevrez d'abord un lien pour confirmer votre adresse, puis le contrat prérempli à signer.",
+        fields: ["ownerEmail"],
+        seconds: 10,
+        validate: (v) => validate(v, ["ownerEmail"]),
+        render: ({ values, errors, set }) => <EmailAnswer value={values.ownerEmail} onValueChange={(v) => set("ownerEmail", v)} error={errors.ownerEmail} placeholder="vous@pharmacie.fr" />,
+        recap: { label: "E-mail", value: (v) => v.ownerEmail.trim() || null },
+      },
+      {
+        id: "parrainage",
+        section: "Pour finir",
+        question: "Une officine vous a recommandé PharmaBoost ?",
+        help: "Son code de parrainage réduit son abonnement : elle vous en remerciera.",
+        fields: ["referralCode"],
+        optional: true,
+        isEmpty: (v) => v.hasReferral === "",
+        when: () => !referralCode,
+        seconds: 6,
+        validate: (v) => {
+          if (v.hasReferral !== "yes") return {};
+          if (!v.referralCode.trim()) return { referralCode: "Indiquez le code, ou répondez « Non »." };
+          return normalizeReferralCode(v.referralCode) ? {} : { referralCode: "Un code de parrainage s'écrit PB- suivi de 6 caractères." };
+        },
+        render: ({ values, errors, set, choose }) => (
+          <div className="space-y-4">
+            <ChoiceCards
+              label="Recommandation"
+              options={[
+                { value: "yes", label: "Oui, j'ai un code" },
+                { value: "no", label: "Non" },
+              ]}
+              value={values.hasReferral}
+              onChoose={(value) => (value === "no" ? choose("hasReferral", value) : set("hasReferral", value))}
+            />
+            {values.hasReferral === "yes" && <TextAnswer label="Code de parrainage" value={values.referralCode} onValueChange={(v) => set("referralCode", v.toUpperCase())} error={errors.referralCode} placeholder="PB-XXXXXX" autoComplete="off" className="max-w-xs" autofocus style={{ letterSpacing: "0.06em" }} />}
+          </div>
+        ),
+        recap: { label: "Parrainage", value: (v) => (v.hasReferral === "yes" && v.referralCode ? v.referralCode : null) },
+      },
+    ];
+  }, [referralCode]);
 
   return (
-    <form onSubmit={submit} className="space-y-7" noValidate>
-      {error && <Alert tone="danger">{error}</Alert>}
+    <Flow<Values>
+      name="abonnement"
+      steps={steps}
+      initialValues={initialValues}
+      pinned={["referralCode", "hasReferral"]}
+      ephemeral={["confirm"]}
+      honeypot="website"
+      autoFocus
+      recapTitle="Votre dossier est prêt."
+      aside={(v) => <SubscriptionAside offer={offer} values={v} referralCode={referralCode} />}
+      final={({ values, set }) => (
+        <label className={cn("flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-[14.5px] leading-6 text-text-primary transition-colors", values.confirm ? "border-brand-400 bg-brand-50/70 dark:bg-brand-950/30" : "border-border-default bg-surface-app hover:border-brand-300")}>
+          <input type="checkbox" checked={values.confirm} onChange={(e) => set("confirm", e.target.checked)} className="mt-1 size-[18px] shrink-0 accent-brand-700" />
+          <span>
+            Je demande la souscription à l&apos;offre <strong>{offerLabel}</strong> pour cette officine et je souhaite recevoir le contrat d&apos;abonnement à signer électroniquement.
+          </span>
+        </label>
+      )}
+      canSubmit={(v) => v.confirm}
+      submitLabel="Recevoir mon contrat à signer"
+      submitHint="Une confirmation de votre adresse, puis le contrat arrive aussitôt. Rien n'est prélevé à cette étape."
+      onSubmit={async (v) => {
+        const result = await submitSubscriptionRequestAction({ ...toRequest(v), planId: planId ?? "", confirm: v.confirm as true, website: v.website });
+        if (!result.ok) return { ok: false, error: result.error, fieldErrors: result.fieldErrors };
+        router.push(`/decouvrir/merci?type=abonnement&etat=${result.data.outcome.toLowerCase()}`);
+        return { ok: true };
+      }}
+    />
+  );
+}
 
-      <fieldset className="space-y-4">
-        <legend className="text-[13px] font-semibold tracking-[0.08em] text-brand-700 uppercase">L&apos;officine</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Nom de la pharmacie" htmlFor="sub-name" required error={err("pharmacyName")}>
-            <Input id="sub-name" value={form.pharmacyName} onChange={set("pharmacyName")} placeholder="Pharmacie du Centre" autoComplete="organization" />
-          </Field>
-          <Field label="Raison sociale" htmlFor="sub-legal" required error={err("legalName")} hint="Telle qu'inscrite au registre (SELARL…).">
-            <Input id="sub-legal" value={form.legalName} onChange={set("legalName")} placeholder="SELARL Pharmacie du Centre" />
-          </Field>
-          <Field label="SIRET" htmlFor="sub-siret" required error={err("siret")} hint="14 chiffres.">
-            <Input id="sub-siret" value={form.siret} onChange={set("siret")} inputMode="numeric" placeholder="123 456 789 00012" autoComplete="off" />
-          </Field>
-          <Field label="N° FINESS" htmlFor="sub-finess" error={err("finessNumber")} hint="Facultatif.">
-            <Input id="sub-finess" value={form.finessNumber} onChange={set("finessNumber")} inputMode="numeric" autoComplete="off" />
-          </Field>
-          <Field label="Adresse" htmlFor="sub-address" required error={err("addressLine1")} className="sm:col-span-2">
-            <Input id="sub-address" value={form.addressLine1} onChange={set("addressLine1")} autoComplete="street-address" />
-          </Field>
-          <Field label="Code postal" htmlFor="sub-postal" required error={err("postalCode")}>
-            <Input id="sub-postal" value={form.postalCode} onChange={set("postalCode")} inputMode="numeric" autoComplete="postal-code" />
-          </Field>
-          <Field label="Ville" htmlFor="sub-city" required error={err("city")}>
-            <Input id="sub-city" value={form.city} onChange={set("city")} autoComplete="address-level2" />
-          </Field>
-          <Field label="Téléphone de l'officine" htmlFor="sub-phone" error={err("phone")}>
-            <Input id="sub-phone" type="tel" value={form.phone} onChange={set("phone")} autoComplete="tel" />
-          </Field>
-          <Field label="Points de vente" htmlFor="sub-outlets">
-            <Input id="sub-outlets" inputMode="numeric" value={form.outletCount} onChange={set("outletCount")} className="w-24" />
-          </Field>
-        </div>
-      </fieldset>
-
-      <fieldset className="space-y-4">
-        <legend className="text-[13px] font-semibold tracking-[0.08em] text-brand-700 uppercase">Le signataire</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Prénom" htmlFor="sub-first" required error={err("ownerFirstName")}>
-            <Input id="sub-first" value={form.ownerFirstName} onChange={set("ownerFirstName")} autoComplete="given-name" />
-          </Field>
-          <Field label="Nom" htmlFor="sub-last" required error={err("ownerLastName")}>
-            <Input id="sub-last" value={form.ownerLastName} onChange={set("ownerLastName")} autoComplete="family-name" />
-          </Field>
-          <Field label="Qualité" htmlFor="sub-title" required error={err("ownerTitle")}>
-            <Input id="sub-title" list="sub-titles" value={form.ownerTitle} onChange={set("ownerTitle")} />
-            <datalist id="sub-titles">{TITLES.map((t) => <option key={t} value={t} />)}</datalist>
-          </Field>
-          <Field label="E-mail professionnel" htmlFor="sub-email" required error={err("ownerEmail")} hint="Le contrat à signer y est envoyé.">
-            <Input id="sub-email" type="email" value={form.ownerEmail} onChange={set("ownerEmail")} autoComplete="email" />
-          </Field>
-          <Field label="Code de parrainage" htmlFor="sub-referral" hint="Si une officine vous a recommandé PharmaBoost.">
-            <Input id="sub-referral" value={form.referralCode} onChange={set("referralCode")} placeholder="PB-XXXXXX" className="uppercase" autoComplete="off" />
-          </Field>
-        </div>
-      </fieldset>
-
-      {/* Pot de miel, invisible pour une personne. */}
-      <div className="absolute -left-[9999px] top-auto" aria-hidden="true">
-        <label htmlFor="sub-website">Site web</label>
-        <input id="sub-website" tabIndex={-1} autoComplete="off" value={form.website} onChange={set("website")} />
+function SubscriptionAside({ offer, values, referralCode }: { offer: PublicOffer; values: Values; referralCode: string }) {
+  const signer = [personName(values.ownerFirstName), personName(values.ownerLastName)].filter(Boolean).join(" ");
+  const place = [values.addressLine1, [values.postalCode, values.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  return (
+    <div className="space-y-4">
+      <div className="rounded-[24px] border border-border-subtle bg-surface-card p-5">
+        <p className="font-mono text-[11px] tracking-[0.14em] text-text-tertiary uppercase">{offer.name}</p>
+        <p className="mt-2 flex items-baseline gap-1.5">
+          <span className="text-[30px] leading-none font-semibold tracking-[-0.02em] text-text-primary tabular-nums">{offer.price}</span>
+          <span className="text-[13px] text-text-secondary">HT / mois</span>
+        </p>
+        <ul className="mt-3.5 space-y-1.5 text-[13px] text-text-primary">
+          {offer.perks.map((perk) => (
+            <li key={perk} className="flex items-start gap-2">
+              <Check className="mt-0.5 size-3.5 shrink-0 text-brand-600" strokeWidth={3} aria-hidden="true" /> {perk}
+            </li>
+          ))}
+        </ul>
+        {(referralCode || (values.hasReferral === "yes" && normalizeReferralCode(values.referralCode))) && (
+          <p className="mt-3.5 rounded-xl bg-brand-50 px-3 py-2 text-[12.5px] text-brand-900 dark:bg-brand-950/40 dark:text-brand-100">
+            Parrainage <strong className="tabular-nums">{normalizeReferralCode(values.referralCode) ?? referralCode}</strong> renseigné.
+          </p>
+        )}
       </div>
-
-      <label className="flex items-start gap-3 rounded-xl border border-border-subtle bg-surface-sunken/60 p-4 text-[14px] leading-6 text-text-primary">
-        <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} className="mt-1 size-4 accent-brand-700" />
-        <span>Je demande la souscription à l&apos;offre <strong>{offerLabel}</strong> pour cette officine et je souhaite recevoir le contrat d&apos;abonnement à signer électroniquement.</span>
-      </label>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" size="lg" loading={pending} disabled={!confirm}>Recevoir mon contrat à signer</Button>
-        <p className="text-[12.5px] text-text-tertiary">Une confirmation de votre adresse, puis le contrat arrive aussitôt. Rien n&apos;est prélevé à cette étape.</p>
-      </div>
-    </form>
+      <LiveCard title="Votre dossier" footer="Ces informations deviennent celles du contrat et de votre espace PharmaBoost. Votre saisie est gardée sur cet appareil jusqu'à l'envoi.">
+        <div className="divide-y divide-border-subtle/70">
+          <LiveRow label="Pharmacie" value={values.pharmacyName} />
+          <LiveRow label="SIRET" value={values.siret.length === 14 ? formatSiret(values.siret) : null} />
+          <LiveRow label="Adresse" value={place} />
+          <LiveRow label="Signataire" value={signer ? `${signer}${values.ownerTitle ? `, ${values.ownerTitle.toLowerCase()}` : ""}` : null} />
+          <LiveRow label="Contrat envoyé à" value={values.ownerEmail.trim()} />
+        </div>
+      </LiveCard>
+    </div>
   );
 }
