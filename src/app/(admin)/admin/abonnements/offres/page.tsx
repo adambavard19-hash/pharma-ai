@@ -1,37 +1,74 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { stripeConfigState } from "@/server/billing/stripe-client";
-import { PageHeader } from "@/components/ui/page";
+import { planSubscriptionStats } from "@/server/services/admin/billing-admin";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
+import { StripeNotConfigured } from "../billing-ui";
 import { PlansManager } from "./plans-manager";
 
-export const metadata: Metadata = { title: "Offres" };
+export const metadata: Metadata = { title: "Offres & tarifs" };
 
 /**
- * Les offres PharmaBoost : nom, prix mensuel, jours d'essai. Modifiables ici
- * sans toucher au code ; le prix Stripe correspondant est créé ou remplacé à
- * l'enregistrement. Une offre archivée n'est plus proposée aux nouveaux
- * contrats mais reste attachée aux abonnements en cours.
+ * Le catalogue PharmaBoost : offres, prix, essai, contenu, remises. Il ne
+ * s'applique qu'aux NOUVEAUX abonnements ; chaque officine abonnée garde son
+ * tarif contractuel. Pour chaque offre, on montre combien d'abonnements en
+ * cours y sont rattachés et combien paient un tarif différent du catalogue.
  */
 export default async function PlansPage() {
   await requirePlatformSession();
-  const [plans, stripe] = await Promise.all([
-    prisma.plan.findMany({ orderBy: [{ isActive: "desc" }, { isDefault: "desc" }, { name: "asc" }], include: { _count: { select: { subscriptions: true, contracts: true } } } }),
-    Promise.resolve(stripeConfigState()),
-  ]);
+  const [plans, stats] = await Promise.all([prisma.plan.findMany({ orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }), planSubscriptionStats()]);
+  const stripe = stripeConfigState();
+
   return (
-    <div className="space-y-5">
-      <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
-        <Link href="/admin/abonnements">Abonnements & Contrats</Link>
-      </Button>
-      <PageHeader title="Offres" description="Nom, prix mensuel hors taxes, durée d'essai. Le prix Stripe est créé à l'enregistrement ; un changement de tarif crée un nouveau prix, les abonnements en cours gardent l'ancien." />
-      {!stripe.configured && <Alert tone="warning" title="Stripe non configuré">{stripe.detail} Les offres s&apos;enregistrent ; leur prix Stripe sera créé dès que la clé sera renseignée.</Alert>}
+    <div className="space-y-6">
+      <AdminPageHeader
+        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        parent={{ label: "Abonnements", href: "/admin/abonnements" }}
+        title="Offres & tarifs"
+        description="Nom, prix, essai, contenu et remises de chaque offre. Le prix Stripe est créé à l'enregistrement ; un changement de prix crée un nouveau prix Stripe, les abonnements en cours gardent le leur."
+        actions={
+          <Button asChild variant="outline" size="sm" leadingIcon={<CreditCard className="size-4" />}>
+            <Link href="/admin/abonnements">Abonnements</Link>
+          </Button>
+        }
+      />
+
+      <Alert tone="info" title="Le catalogue s'applique uniquement aux nouveaux abonnements.">
+        Les officines déjà abonnées gardent leur tarif contractuel. Pour changer le tarif d&apos;une officine, passez par sa fiche abonnement : la modification est motivée et tracée.
+      </Alert>
+      {!stripe.configured && <StripeNotConfigured detail={stripe.detail}>Les offres s&apos;enregistrent ; leur prix Stripe sera créé dès que la clé sera renseignée.</StripeNotConfigured>}
+
       <PlansManager
-        plans={plans.map((plan) => ({ id: plan.id, code: plan.code, name: plan.name, description: plan.description, monthlyPriceCents: plan.monthlyPriceCents, trialDays: plan.trialDays, isActive: plan.isActive, isDefault: plan.isDefault, stripePriceId: plan.stripePriceId, subscriptions: plan._count.subscriptions, contracts: plan._count.contracts }))}
+        plans={plans.map((plan) => {
+          const stat = stats.get(plan.id);
+          return {
+            id: plan.id,
+            code: plan.code,
+            name: plan.name,
+            description: plan.description,
+            monthlyPriceCents: plan.monthlyPriceCents,
+            annualPriceCents: plan.annualPriceCents,
+            foundingPriceCents: plan.foundingPriceCents,
+            discountPercent: plan.discountPercent,
+            discountLabel: plan.discountLabel,
+            features: plan.features,
+            options: plan.options,
+            maxUsers: plan.maxUsers,
+            sortOrder: plan.sortOrder,
+            trialDays: plan.trialDays,
+            isActive: plan.isActive,
+            isDefault: plan.isDefault,
+            stripePriceId: plan.stripePriceId,
+            ongoing: stat?.ongoing ?? 0,
+            differing: stat?.differing ?? 0,
+            contracts: stat?.contracts ?? 0,
+          };
+        })}
       />
     </div>
   );

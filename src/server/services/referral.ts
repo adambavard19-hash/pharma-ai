@@ -2,6 +2,7 @@ import { prisma } from "@/server/db/client";
 import { publicUrl } from "@/server/public-url";
 import { randomBytes } from "node:crypto";
 import { REFERRAL_DISCOUNT_CENTS, normalizeReferralCode, referralDiscountCents } from "@/core/billing/referral";
+import { contractualPrice } from "@/core/billing/contract-price";
 
 export { REFERRAL_DISCOUNT_CENTS, normalizeReferralCode };
 
@@ -61,7 +62,7 @@ export async function referralSummary(pharmacyId: string): Promise<ReferralSumma
     select: {
       referredBy: { select: { name: true } },
       referrals: { orderBy: { createdAt: "asc" }, select: { name: true, city: true, isActive: true, createdAt: true, organization: { select: { subscription: { select: { status: true } } } } } },
-      organization: { select: { subscription: { select: { plan: { select: { monthlyPriceCents: true } } } } } },
+      organization: { select: { subscription: { select: { contractPriceCents: true, plan: { select: { monthlyPriceCents: true } } } } } },
     },
   });
   const referrals = pharmacy.referrals.map((r) => ({
@@ -72,7 +73,9 @@ export async function referralSummary(pharmacyId: string): Promise<ReferralSumma
     since: r.createdAt,
   }));
   const activeCount = referrals.filter((r) => r.active).length;
-  const monthlyPriceCents = pharmacy.organization.subscription?.plan.monthlyPriceCents ?? null;
+  // Le plafond de la remise est le tarif contractuel de l'officine (ce qu'elle paie), pas le prix catalogue de l'offre.
+  const subscription = pharmacy.organization.subscription;
+  const monthlyPriceCents = subscription ? contractualPrice(subscription, subscription.plan).cents : null;
   return {
     code,
     link: publicUrl(`/decouvrir/abonnement?parrain=${encodeURIComponent(code)}`),

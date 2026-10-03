@@ -2,6 +2,7 @@ import { prisma } from "@/server/db/client";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
+import { traceDispatch } from "@/server/services/email-dispatch";
 import { buildInstallationGuideEmail } from "@/core/platform/onboarding-emails";
 import { DEFAULT_CONTACT_EMAIL } from "@/server/services/site-leads";
 import { LGO_DEFINITIONS } from "@/core/stock/connectors";
@@ -14,7 +15,7 @@ import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 export async function sendInstallationGuide(pharmacyId: string, actor: { adminId?: string | null; reason: "SUBSCRIPTION_STARTED" | "ADMIN" }): Promise<{ status: string; detail: string; sentTo: string | null }> {
   const pharmacy = await prisma.pharmacy.findUnique({
     where: { id: pharmacyId },
-    select: { id: true, name: true, email: true, memberships: { where: { role: "OWNER", isActive: true }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
+    select: { id: true, name: true, email: true, organizationId: true, memberships: { where: { role: "OWNER", isActive: true }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
   });
   if (!pharmacy) return { status: "FAILED", detail: "Officine introuvable.", sentTo: null };
   const owner = pharmacy.memberships[0]?.user;
@@ -34,6 +35,8 @@ export async function sendInstallationGuide(pharmacyId: string, actor: { adminId
     exportSteps: lgo?.exportSteps ?? [],
   });
   const outcome = await getMessagingProvider().sendEmail({ to, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
+  // Le journal des e-mails garde chaque envoi du guide, réussi ou non.
+  await traceDispatch({ kind: "INSTALL_GUIDE", recipient: to, outcome, subject: message.subject, trigger: "SYSTEM", pharmacyId: pharmacy.id, organizationId: pharmacy.organizationId, sentByAdminId: actor.adminId ?? null });
   await recordAudit({ action: "pharmacy.install_guide_sent", entityType: "Pharmacy", entityId: pharmacy.id, pharmacyId: pharmacy.id, platformAdminId: actor.adminId ?? null, metadata: { status: outcome.status, reason: actor.reason, provider: outcome.provider } });
   return { status: outcome.status, detail: outcome.detail, sentTo: to };
 }

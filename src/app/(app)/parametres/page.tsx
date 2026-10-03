@@ -32,6 +32,7 @@ import { SettingsTabs } from "./settings-tabs";
 import { ReferralCard } from "./referral-card";
 import { referralSummary } from "@/server/services/referral";
 import { SUBSCRIPTION_STATUS_LABELS, type SubscriptionStatusCode } from "@/core/billing/subscription";
+import { contractualPrice } from "@/core/billing/contract-price";
 import { CONTRACT_STATUS_LABELS, type ContractStatusCode } from "@/core/sales/pipeline";
 import { formatCents, formatDate, formatDateTime, formatNumber } from "@/lib/format";
 import type { ProviderInfo } from "@/core/ai/ports";
@@ -105,7 +106,8 @@ export default async function SettingsPage({
               ? {
                   planName: subscription.plan.name,
                   planDescription: subscription.plan.description,
-                  monthlyPriceCents: subscription.plan.monthlyPriceCents,
+                  // Le titulaire voit son tarif contractuel, jamais le catalogue du jour.
+                  monthlyPriceCents: contractualPrice(subscription, subscription.plan).cents,
                   status: subscription.status,
                   trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
                   currentPeriodStart: subscription.currentPeriodStart.toISOString(),

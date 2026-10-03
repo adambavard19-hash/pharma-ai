@@ -1,125 +1,207 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CreditCard, Settings2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Ban, CreditCard, Hourglass, Layers, ReceiptText, Wallet } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { prisma } from "@/server/db/client";
-import { latestContractOf, listPharmaciesBilling } from "@/server/billing/subscriptions";
 import { stripeConfigState } from "@/server/billing/stripe-client";
-import { contractStage, subscriptionStage, trialEndingSoon, type SubscriptionStatusCode } from "@/core/billing/subscription";
-import { PageHeader } from "@/components/ui/page";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  DEFAULT_SUBSCRIPTION_PERIOD,
+  SUBSCRIPTION_FILTERS,
+  countSubscriptionFilters,
+  listSubscriptionRows,
+  matchesQuery,
+  matchesSubscriptionFilter,
+  resolveSubscriptionFilter,
+  subscriptionListMrrCents,
+} from "@/server/services/admin/billing-admin";
+import { formatEuros, formatFrenchDate, subscriptionStage } from "@/core/billing/subscription";
+import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
+import { KpiTile } from "@/components/admin/kpis";
+import { FilterChips, PERIODS, SearchBox } from "@/components/admin/filters";
+import { StatusBadge, SubscriptionStatusBadge } from "@/components/admin/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, EmptyState } from "@/components/ui/feedback";
-import { formatCents, formatDate } from "@/lib/format";
-import { PharmacyBillingActions } from "./billing-actions";
+import { Table, TBody, TD, TH, THead, TR, TableWrapper } from "@/components/ui/table";
+import { ContractPriceCell, DateText, RowLink, StatusWithDetail, StripeNotConfigured, readParam } from "./billing-ui";
 
-export const metadata: Metadata = { title: "Abonnements & Contrats" };
-
-export const FILTERS: Record<string, { label: string; test: (row: { status: SubscriptionStatusCode | null; contractStatus: string | null; trialEndsAt: Date | null; lastPaymentFailedAt: Date | null; inviteSentAt: Date | null }) => boolean }> = {
-  essai: { label: "En essai", test: (r) => r.status === "TRIALING" },
-  actifs: { label: "Actifs", test: (r) => r.status === "ACTIVE" },
-  "contrats-envoyes": { label: "Contrats envoyés", test: (r) => r.contractStatus === "SENT" || r.contractStatus === "OPENED" },
-  "contrats-attente": { label: "Contrats en attente", test: (r) => r.contractStatus === null || r.contractStatus === "DRAFT" || r.contractStatus === "SENT" || r.contractStatus === "OPENED" || r.contractStatus === "SIGNED_PHARMACY" },
-  "contrats-signes": { label: "Contrats signés", test: (r) => r.contractStatus === "FINALIZED" },
-  "fin-essai": { label: "Essais se terminant", test: (r) => r.status === "TRIALING" && trialEndingSoon(r.trialEndsAt, new Date(), 7) },
-  impayes: { label: "Paiements échoués", test: (r) => r.status === "PAST_DUE" || r.status === "UNPAID" || Boolean(r.lastPaymentFailedAt && r.status !== "ACTIVE") },
-  resilies: { label: "Résiliés", test: (r) => r.status === "CANCELED" || r.status === "INCOMPLETE_EXPIRED" },
-  invites: { label: "Invitations envoyées", test: (r) => r.status === null && Boolean(r.inviteSentAt) },
-};
+export const metadata: Metadata = { title: "Abonnements" };
 
 /**
- * Abonnements & Contrats : une carte par officine, l'état du contrat, de
- * l'abonnement, de l'essai, du prochain prélèvement, et les gestes.
- * Les identifiants Stripe n'apparaissent pas : la console parle d'officines.
+ * Les abonnements de toutes les officines réelles : offre, tarif contractuel
+ * (et son écart au catalogue), essai, statut, échéance, état du paiement.
+ * Filtres et recherche par l'adresse, pour que chaque chiffre du cockpit se
+ * vérifie d'un clic : `?filtre=nouveaux&periode=30j` et
+ * `?filtre=resilies&periode=30j` reprennent les tuiles de période du cockpit.
  */
-export default async function SubscriptionsPage({ searchParams }: { searchParams: Promise<{ filtre?: string }> }) {
+export default async function SubscriptionsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePlatformSession();
-  const { filtre } = await searchParams;
-  const [rows, plans, stripe] = await Promise.all([listPharmaciesBilling(), prisma.plan.findMany({ where: { isActive: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }), Promise.resolve(stripeConfigState())]);
-  const filter = filtre ? FILTERS[filtre] : null;
+  const params = await searchParams;
+  const q = readParam(params, "q");
+  const filter = resolveSubscriptionFilter(readParam(params, "filtre"));
+  // La période des filtres datés (« Nouveaux », « Résiliés ») : celle du cockpit, ou aucune.
+  const period = PERIODS.find((p) => p.value === readParam(params, "periode")) ?? null;
+  const newPeriodLabel = (period ?? PERIODS.find((p) => p.value === DEFAULT_SUBSCRIPTION_PERIOD.value) ?? PERIODS[0]).label;
+  const now = new Date();
 
-  const cards = rows
-    .map((row) => {
-      const subscription = row.organization.subscription;
-      const contract = latestContractOf(row);
-      const invite = row.subscriptionInvites[0] ?? null;
-      const status = (subscription?.status as SubscriptionStatusCode | undefined) ?? null;
-      return { row, subscription, contract, invite, status, contractStatus: contract?.status ?? null };
-    })
-    .filter((card) => !filter || filter.test({ status: card.status, contractStatus: card.contractStatus, trialEndsAt: card.subscription?.trialEndsAt ?? null, lastPaymentFailedAt: card.subscription?.lastPaymentFailedAt ?? null, inviteSentAt: card.invite?.sentAt ?? null }));
+  const [rows, activePlans] = await Promise.all([listSubscriptionRows(), prisma.plan.count({ where: { isActive: true } })]);
+  const stripe = stripeConfigState();
+
+  const searched = rows.filter((r) => matchesQuery(q, [r.pharmacyName, r.city, r.ownerName, r.ownerEmail, r.subscription?.planName]));
+  const counts = countSubscriptionFilters(searched.map((r) => r.classInput), now, period);
+  const visible = filter ? searched.filter((r) => matchesSubscriptionFilter(filter.key, r.classInput, now, period)) : searched;
+
+  const allCounts = countSubscriptionFilters(rows.map((r) => r.classInput), now);
+  const mrr = subscriptionListMrrCents(rows);
+  const withSubscription = rows.filter((r) => r.subscription).length;
+
+  // Les pastilles datées disent leur période : le chiffre se lit à côté de celui du cockpit.
+  const chipLabel = (key: string, label: string) => (key === "nouveaux" ? `${label} sur ${newPeriodLabel}` : key === "resilies" && period ? `${label} sur ${period.label}` : label);
+  const chipOptions: { value: string | null; label: string; count?: number }[] = [
+    { value: null, label: "Toutes", count: searched.length },
+    ...SUBSCRIPTION_FILTERS.map((f) => ({ value: f.key, label: chipLabel(f.key, f.label), count: counts[f.key] })),
+  ];
+  // Une ancienne adresse (« contrats-envoyes »…) reste lisible : sa pastille s'ajoute, active.
+  if (filter?.legacy) chipOptions.push({ value: filter.key, label: `${filter.label} (ancienne vue)` });
+  const dated = filter?.key === "nouveaux" || filter?.key === "resilies";
+  const periodOptions =
+    filter?.key === "resilies"
+      ? [{ value: null, label: "Abonnements terminés" }, ...PERIODS.map((p) => ({ value: p.value, label: `Départs sur ${p.label}` }))]
+      : PERIODS.map((p) => ({ value: p.value, label: p.label }));
+  const periodCurrent = filter?.key === "nouveaux" ? (period ?? DEFAULT_SUBSCRIPTION_PERIOD).value : (period?.value ?? null);
+  const periodHint =
+    filter?.key === "nouveaux"
+      ? `Abonnements créés sur ${newPeriodLabel}, aujourd'hui compris — la règle de la tuile « Nouveaux abonnements » du cockpit.`
+      : filter?.key === "resilies" && period
+        ? `Départs sur ${period.label} : fin chez Stripe ou demande de résiliation confirmée, une fois par officine, à la première des deux dates — la règle de la tuile « Résiliations » du cockpit.`
+        : "Abonnements résiliés ou expirés, quelle que soit la date. Choisissez une période pour retrouver les départs comptés au cockpit.";
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Abonnements & Contrats"
-        description="Pour chaque officine : le contrat, l'abonnement, l'essai, le prochain prélèvement. Tout se pilote d'ici ; le pharmacien n'a rien à configurer."
+    <div className="space-y-6">
+      <AdminPageHeader
+        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        title="Abonnements"
+        description="Chaque officine, son offre et son tarif contractuel, l'essai, l'échéance et l'état du paiement. Le catalogue ne change jamais un abonnement en cours."
         actions={
-          <Button asChild variant="outline" leadingIcon={<Settings2 className="size-4" />}>
-            <Link href="/admin/abonnements/offres">Offres</Link>
-          </Button>
+          <>
+            <Button asChild variant="outline" size="sm" leadingIcon={<Layers className="size-4" />}>
+              <Link href="/admin/abonnements/offres">Offres & tarifs</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" leadingIcon={<ReceiptText className="size-4" />}>
+              <Link href="/admin/paiements">Paiements</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" leadingIcon={<Ban className="size-4" />}>
+              <Link href="/admin/resiliations">Résiliations</Link>
+            </Button>
+          </>
         }
       />
 
-      {plans.length === 0 && (
-        <Alert tone="info" title="Aucune offre">Créez l&apos;offre PharmaBoost (prix mensuel, durée d&apos;essai) dans <Link href="/admin/abonnements/offres" className="underline">Offres</Link> avant de préparer un contrat.</Alert>
+      {!stripe.configured && <StripeNotConfigured detail={stripe.detail}>Les abonnements affichés sont ceux connus en base ; la relecture chez Stripe, la résiliation programmée et le lien d&apos;activation sont indisponibles.</StripeNotConfigured>}
+      {activePlans === 0 && (
+        <Alert tone="info" title="Aucune offre active">
+          Créez l&apos;offre PharmaBoost (prix mensuel, durée d&apos;essai) dans{" "}
+          <Link href="/admin/abonnements/offres" className="font-medium underline">
+            Offres & tarifs
+          </Link>{" "}
+          avant de préparer un contrat.
+        </Alert>
       )}
 
-      <div className="flex flex-wrap gap-1.5">
-        <Link href="/admin/abonnements" className={`rounded-full border px-3 py-1 text-[12.5px] font-medium ${!filter ? "border-brand-600 bg-brand-50 text-brand-700" : "border-border-default text-text-secondary"}`}>Toutes ({rows.length})</Link>
-        {Object.entries(FILTERS).map(([key, def]) => (
-          <Link key={key} href={`/admin/abonnements?filtre=${key}`} className={`rounded-full border px-3 py-1 text-[12.5px] font-medium ${filtre === key ? "border-brand-600 bg-brand-50 text-brand-700" : "border-border-default text-text-secondary"}`}>{def.label}</Link>
-        ))}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <KpiTile label="MRR contractuel" value={formatEuros(mrr)} hint="Actifs et en retard, hors fin programmée — tarifs contractuels HT" icon={<Wallet className="size-4" />} tone="brand" />
+        <KpiTile label="Abonnements actifs" value={allCounts.actifs} hint={`${withSubscription} abonnement${withSubscription > 1 ? "s" : ""} au total`} href="/admin/abonnements?filtre=actifs" icon={<CreditCard className="size-4" />} />
+        <KpiTile label="En essai" value={allCounts.essai} hint={allCounts["fin-essai"] > 0 ? `${allCounts["fin-essai"]} se termine${allCounts["fin-essai"] > 1 ? "nt" : ""} sous 7 jours` : "Aucune fin d'essai sous 7 jours"} href="/admin/abonnements?filtre=essai" icon={<Hourglass className="size-4" />} tone={allCounts["fin-essai"] > 0 ? "info" : "default"} />
+        <KpiTile label="En retard de paiement" value={allCounts.retard} hint="Échec non régularisé ou impayé" href="/admin/impayes" icon={<AlertTriangle className="size-4" />} tone={allCounts.retard > 0 ? "danger" : "default"} />
+        <KpiTile label="Résiliation demandée" value={allCounts.resiliation} hint="Demande ouverte ou fin programmée" href="/admin/abonnements?filtre=resiliation" icon={<Ban className="size-4" />} tone={allCounts.resiliation > 0 ? "warning" : "default"} />
       </div>
 
-      {cards.length === 0 ? (
-        <EmptyState icon={<CreditCard className="size-6" />} title="Aucune officine ici" description={filter ? "Aucune officine ne correspond à ce filtre." : "Créez une officine dans « Officines clientes » pour démarrer son parcours."} />
-      ) : (
-        <ul className="grid gap-4 lg:grid-cols-2">
-          {cards.map(({ row, subscription, contract, invite, status }) => {
-            const stage = subscriptionStage({ status, inviteSentAt: invite?.sentAt ?? null, suspendedAt: subscription?.suspendedAt ?? null });
-            const cStage = contractStage({ status: contract?.status ?? null });
-            const price = subscription?.plan.monthlyPriceCents ?? contract?.monthlyPriceCents ?? invite?.plan.monthlyPriceCents ?? null;
-            const owner = row.memberships[0]?.user ?? null;
-            const lastPayment = subscription?.payments[0] ?? null;
-            return (
-              <li key={row.id}>
-                <Card>
-                  <CardContent className="space-y-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <Link href={`/admin/abonnements/${row.id}`} className="text-[16px] font-semibold text-text-primary hover:underline">{row.name}</Link>
-                        <p className="text-[12.5px] text-text-tertiary">{[row.city, owner ? `${owner.firstName} ${owner.lastName}` : null, owner?.email].filter(Boolean).join(" · ")}</p>
-                      </div>
-                      {!row.isActive && <Badge tone="danger">Accès suspendu</Badge>}
-                    </div>
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13px] sm:grid-cols-3">
-                      <div><dt className="text-text-tertiary">Contrat</dt><dd><Badge tone={cStage.tone}>{cStage.label}</Badge></dd></div>
-                      <div><dt className="text-text-tertiary">Abonnement</dt><dd><Badge tone={stage.tone}>{stage.label}</Badge>{subscription?.cancelAtPeriodEnd ? <span className="ml-1 text-[12px] text-danger-700">fin de période</span> : null}</dd></div>
-                      <div><dt className="text-text-tertiary">Prix</dt><dd className="font-medium text-text-primary">{price !== null ? `${formatCents(price)}/mois` : "—"}</dd></div>
-                      <div><dt className="text-text-tertiary">Essai</dt><dd className="text-text-primary">{subscription?.trialStartsAt && subscription.trialEndsAt ? `${formatDate(subscription.trialStartsAt)} → ${formatDate(subscription.trialEndsAt)}` : subscription?.trialEndsAt ? `→ ${formatDate(subscription.trialEndsAt)}` : "—"}</dd></div>
-                      <div><dt className="text-text-tertiary">Prochaine échéance</dt><dd className="text-text-primary">{subscription?.nextInvoiceAt && status !== "CANCELED" ? formatDate(subscription.nextInvoiceAt) : "—"}</dd></div>
-                      <div><dt className="text-text-tertiary">Dernier paiement</dt><dd className="text-text-primary">{lastPayment ? `${formatCents(lastPayment.amountCents)} · ${lastPayment.status === "PAID" ? "payé" : lastPayment.status === "FAILED" ? "échoué" : lastPayment.status.toLowerCase()} le ${formatDate(lastPayment.paidAt ?? lastPayment.failedAt ?? lastPayment.createdAt)}` : subscription?.lastPaymentCents ? `${formatCents(subscription.lastPaymentCents)} le ${formatDate(subscription.lastPaymentAt)}` : "—"}</dd></div>
-                    </dl>
-                    <PharmacyBillingActions
-                      pharmacyId={row.id}
-                      contract={contract ? { id: contract.id, status: contract.status, version: contract.version } : null}
-                      hasSubscription={Boolean(subscription?.stripeSubscriptionId)}
-                      subscriptionStatus={status}
-                      cancelAtPeriodEnd={subscription?.cancelAtPeriodEnd ?? false}
-                      isActive={row.isActive}
-                      inviteSent={Boolean(invite?.sentAt) && !invite?.completedAt}
-                      plans={plans.map((plan) => ({ id: plan.id, name: plan.name, monthlyPriceCents: plan.monthlyPriceCents, trialDays: plan.trialDays, isDefault: plan.isDefault }))}
-                      stripeReady={stripe.configured}
-                      compact
-                    />
-                  </CardContent>
-                </Card>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <AdminSection padded={false}>
+        <div className="flex flex-col gap-3 border-b border-border-subtle p-4 lg:flex-row lg:items-center lg:justify-between">
+          <FilterChips basePath="/admin/abonnements" param="filtre" options={chipOptions} current={filter?.key ?? null} keep={{ q, periode: period?.value ?? null }} label="Filtrer les abonnements" />
+          <SearchBox action="/admin/abonnements" defaultValue={q} placeholder="Officine, ville, titulaire, offre…" keep={{ filtre: filter?.key ?? null, periode: period?.value ?? null }} />
+        </div>
+        {dated && filter && (
+          <div className="flex flex-col gap-2 border-b border-border-subtle px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+            <FilterChips basePath="/admin/abonnements" param="periode" options={periodOptions} current={periodCurrent} keep={{ q, filtre: filter.key }} label="Période" />
+            <p className="text-[12px] text-text-tertiary lg:max-w-[52%] lg:text-right">{periodHint}</p>
+          </div>
+        )}
+
+        {visible.length === 0 ? (
+          rows.length === 0 ? (
+            <EmptyState
+              icon={<CreditCard className="size-6" />}
+              title="Aucune officine cliente pour l'instant"
+              description="Les abonnements apparaissent ici dès qu'une officine est créée puis abonnée."
+              action={
+                <Button asChild size="sm">
+                  <Link href="/admin/pharmacies?nouveau=officine">Créer une officine</Link>
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState icon={<CreditCard className="size-6" />} title="Aucun abonnement ne correspond" description={q ? `Aucun résultat pour « ${q} »${filter ? ` dans « ${filter.label} »` : ""}.` : "Aucune officine dans ce filtre pour l'instant."} action={<Button asChild size="sm" variant="outline"><Link href="/admin/abonnements">Tout afficher</Link></Button>} />
+          )
+        ) : (
+          <TableWrapper className="rounded-none border-0">
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Officine</TH>
+                  <TH>Offre</TH>
+                  <TH>Tarif contractuel</TH>
+                  <TH>Début</TH>
+                  <TH>Fin d&apos;essai</TH>
+                  <TH>Statut</TH>
+                  <TH>Prochaine échéance</TH>
+                  <TH>Paiement</TH>
+                  <TH className="w-10"><span className="sr-only">Ouvrir</span></TH>
+                </TR>
+              </THead>
+              <TBody>
+                {visible.map((row) => {
+                  const sub = row.subscription;
+                  const stage = sub ? null : subscriptionStage({ status: null, inviteSentAt: row.classInput.inviteSentAt && !row.classInput.inviteCompletedAt ? row.classInput.inviteSentAt : null, suspendedAt: null });
+                  return (
+                    <TR key={row.pharmacyId} interactive>
+                      <TD>
+                        <RowLink href={`/admin/abonnements/${row.pharmacyId}`}>{row.pharmacyName}</RowLink>
+                        <p className="text-[12px] text-text-tertiary">{[row.city, row.ownerName].filter(Boolean).join(" · ") || "—"}</p>
+                      </TD>
+                      <TD>{sub ? sub.planName : <span className="text-text-tertiary">—</span>}</TD>
+                      <TD>{sub ? <ContractPriceCell cents={sub.price.cents} source={sub.price.source} catalogCents={sub.catalogCents} differs={sub.differs} /> : <span className="text-text-tertiary">—</span>}</TD>
+                      <TD><DateText date={sub?.startedAt} /></TD>
+                      <TD><DateText date={sub?.trialEndsAt} /></TD>
+                      <TD>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {sub ? <SubscriptionStatusBadge status={sub.status} /> : stage && <StatusBadge status={stage} />}
+                          {sub?.cancelAtPeriodEnd && <Badge tone="warning">Fin programmée</Badge>}
+                          {row.openCancellation && <Badge tone="warning">Résiliation demandée</Badge>}
+                          {filter?.key === "resilies" && period && row.classInput.departureAt && <Badge tone="neutral">Départ le {formatFrenchDate(row.classInput.departureAt)}</Badge>}
+                          {!row.isActive && sub?.status !== "SUSPENDED" && <Badge tone="danger">Accès suspendu</Badge>}
+                        </div>
+                      </TD>
+                      <TD><DateText date={sub?.nextInvoiceAt} /></TD>
+                      <TD>{sub ? <StatusWithDetail status={row.payment} detail={row.payment.detail} /> : <span className="text-text-tertiary">—</span>}</TD>
+                      <TD>
+                        <Link href={`/admin/abonnements/${row.pharmacyId}`} className="flex size-8 items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-surface-sunken hover:text-text-primary" aria-label={`Ouvrir l'abonnement de ${row.pharmacyName}`}>
+                          <ArrowRight className="size-4" aria-hidden="true" />
+                        </Link>
+                      </TD>
+                    </TR>
+                  );
+                })}
+              </TBody>
+            </Table>
+          </TableWrapper>
+        )}
+        {visible.length > 0 && (
+          <p className="border-t border-border-subtle px-4 py-2.5 text-[12px] text-text-tertiary">
+            {visible.length} officine{visible.length > 1 ? "s" : ""} affichée{visible.length > 1 ? "s" : ""}. Hors officines de démonstration.
+          </p>
+        )}
+      </AdminSection>
     </div>
   );
 }

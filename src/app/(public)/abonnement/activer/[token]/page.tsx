@@ -11,14 +11,23 @@ export const metadata: Metadata = { title: { absolute: "Activer votre abonnement
  * Le lien d'activation, vu par le titulaire : ce qu'il souscrit, pour quelle
  * officine, à quel prix, avec quel essai — puis le bouton vers le paiement
  * sécurisé Stripe. Aucun compte demandé : le jeton, long et daté, suffit.
+ *
+ * Le prix et l'essai affichés sont ceux réellement appliqués au clic : ceux du
+ * contrat signé quand le lien en porte un, sinon ceux de l'offre. Un lien déjà
+ * utilisé ne réaffiche aucun prix : celui de l'abonnement se lit dans
+ * l'application (Paramètres → Mon abonnement), le catalogue du jour n'en dit
+ * rien.
  */
 export default async function ActivateSubscriptionPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const peeked = await peekInvite(token);
   if (!peeked) notFound();
   const { invite, expired } = peeked;
-  const trialEndsAt = trialEndDate(new Date(), invite.plan.trialDays);
+  const trialDays = invite.billedTrialDays;
+  const monthlyPriceCents = invite.billedMonthlyPriceCents;
+  const trialEndsAt = trialEndDate(new Date(), trialDays);
   const ready = stripeConfigState().configured;
+  const used = Boolean(invite.completedAt);
 
   return (
     <div className="min-h-dvh bg-[#eef1f4] py-8">
@@ -30,18 +39,20 @@ export default async function ActivateSubscriptionPage({ params }: { params: Pro
 
           <dl className="mt-6 divide-y divide-[#e5e7eb] rounded-xl border border-[#e5e7eb]">
             <div className="flex items-baseline justify-between gap-4 px-4 py-3"><dt className="text-[13.5px] text-[#6b7280]">Offre</dt><dd className="text-[15px] font-semibold text-[#111827]">{invite.plan.name}</dd></div>
-            <div className="flex items-baseline justify-between gap-4 px-4 py-3"><dt className="text-[13.5px] text-[#6b7280]">Tarif</dt><dd className="text-[15px] font-semibold text-[#111827]">{formatEuros(invite.plan.monthlyPriceCents)} HT / mois</dd></div>
-            {invite.plan.trialDays > 0 && (
-              <div className="flex items-baseline justify-between gap-4 px-4 py-3"><dt className="text-[13.5px] text-[#6b7280]">Essai</dt><dd className="text-[15px] font-semibold text-[#0F766E]">{invite.plan.trialDays === 30 || invite.plan.trialDays === 31 ? "Premier mois offert" : `${invite.plan.trialDays} jours offerts`}</dd></div>
+            {!used && (
+              <div className="flex items-baseline justify-between gap-4 px-4 py-3"><dt className="text-[13.5px] text-[#6b7280]">Tarif</dt><dd className="text-[15px] font-semibold text-[#111827]">{formatEuros(monthlyPriceCents)} HT / mois</dd></div>
+            )}
+            {!used && trialDays > 0 && (
+              <div className="flex items-baseline justify-between gap-4 px-4 py-3"><dt className="text-[13.5px] text-[#6b7280]">Essai</dt><dd className="text-[15px] font-semibold text-[#0F766E]">{trialDays === 30 || trialDays === 31 ? "Premier mois offert" : `${trialDays} jours offerts`}</dd></div>
             )}
             {invite.contract && (
               <div className="flex items-baseline justify-between gap-4 px-4 py-3"><dt className="text-[13.5px] text-[#6b7280]">Contrat</dt><dd className="text-[15px] text-[#111827]">Version {invite.contract.version}</dd></div>
             )}
           </dl>
 
-          <p className="mt-5 rounded-xl bg-[#ecfdf5] px-4 py-3 text-[14.5px] leading-6 text-[#065f46]">{trialSentence({ monthlyPriceCents: invite.plan.monthlyPriceCents, trialDays: invite.plan.trialDays, trialEndsAt })}</p>
+          {!used && <p className="mt-5 rounded-xl bg-[#ecfdf5] px-4 py-3 text-[14.5px] leading-6 text-[#065f46]">{trialSentence({ monthlyPriceCents, trialDays, trialEndsAt })}</p>}
 
-          {invite.completedAt ? (
+          {used ? (
             <p className="mt-5 rounded-xl bg-[#f3f4f6] px-4 py-3 text-[14px] leading-6 text-[#374151]">Cet abonnement a déjà été activé. Vous pouvez le gérer depuis PharmaBoost, Paramètres → Mon abonnement.</p>
           ) : expired ? (
             <p className="mt-5 rounded-xl bg-[#fff7ed] px-4 py-3 text-[14px] leading-6 text-[#9a3412]">Ce lien a expiré. Écrivez-nous pour en recevoir un nouveau.</p>

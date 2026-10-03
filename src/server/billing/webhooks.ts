@@ -5,6 +5,9 @@ import { Prisma } from "@/generated/prisma";
 import { publicUrl } from "@/server/public-url";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { notifyAdmins } from "@/server/services/sales/notifications";
+import { traceDispatch } from "@/server/services/email-dispatch";
+import { contractualPrice } from "@/core/billing/contract-price";
+import { formatEuros } from "@/core/billing/subscription";
 import { readCheckoutSession, readInvoice, readSubscription, paymentStatusFromInvoice } from "@/core/billing/stripe-shapes";
 import { describeEvent } from "@/core/billing/webhook-summary";
 import { buildPaymentFailedEmail, buildTrialEndingEmail } from "@/core/platform/billing-emails";
@@ -91,9 +94,11 @@ async function recordInvoice(event: Stripe.Event): Promise<string | null> {
     const found = await ownerOfOrganization(subscription.organizationId);
     if (found?.owner) {
       const message = buildPaymentFailedEmail({ ownerName: `${found.owner.firstName} ${found.owner.lastName}`, pharmacyName: found.pharmacy.name, amountCents: shape.amountDueCents, nextAttemptAt: shape.nextPaymentAttempt, manageUrl: publicUrl("/parametres?onglet=abonnement") });
-      await getMessagingProvider().sendEmail({ to: found.owner.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
+      const outcome = await getMessagingProvider().sendEmail({ to: found.owner.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
+      // L'e-mail système laisse sa trace dans l'historique des communications de l'officine.
+      await traceDispatch({ kind: "PAYMENT_FAILED", recipient: found.owner.email, outcome, subject: message.subject, trigger: "SYSTEM", pharmacyId: found.pharmacy.id, organizationId: subscription.organizationId });
     }
-    if (found) await notifyAdmins({ type: "PAYMENT_FAILED", title: `${found.pharmacy.name} : paiement échoué`, body: `${shape.amountDueCents / 100} € — tentative ${shape.attemptCount}.`, linkUrl: `/admin/abonnements/${found.pharmacy.id}`, severity: "WARNING" });
+    if (found) await notifyAdmins({ type: "PAYMENT_FAILED", title: `${found.pharmacy.name} : paiement échoué`, body: `${formatEuros(shape.amountDueCents)} — tentative ${shape.attemptCount}.`, linkUrl: `/admin/abonnements/${found.pharmacy.id}`, severity: "WARNING" });
   }
   return subscription.organizationId;
 }
@@ -149,8 +154,10 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<WebhookOut
         if (organizationId && shape.trialEnd) {
           const [found, subscription] = await Promise.all([ownerOfOrganization(organizationId), prisma.subscription.findUnique({ where: { organizationId }, include: { plan: true } })]);
           if (found?.owner && subscription) {
-            const message = buildTrialEndingEmail({ ownerName: `${found.owner.firstName} ${found.owner.lastName}`, pharmacyName: found.pharmacy.name, monthlyPriceCents: subscription.plan.monthlyPriceCents, trialEndsAt: shape.trialEnd, manageUrl: publicUrl("/parametres?onglet=abonnement") });
-            await getMessagingProvider().sendEmail({ to: found.owner.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
+            // Le prix annoncé est le tarif contractuel de l'officine, pas celui du catalogue.
+            const message = buildTrialEndingEmail({ ownerName: `${found.owner.firstName} ${found.owner.lastName}`, pharmacyName: found.pharmacy.name, monthlyPriceCents: contractualPrice(subscription, subscription.plan).cents, trialEndsAt: shape.trialEnd, manageUrl: publicUrl("/parametres?onglet=abonnement") });
+            const outcome = await getMessagingProvider().sendEmail({ to: found.owner.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
+            await traceDispatch({ kind: "TRIAL_ENDING", recipient: found.owner.email, outcome, subject: message.subject, trigger: "SYSTEM", pharmacyId: found.pharmacy.id, organizationId });
           }
         }
         break;
