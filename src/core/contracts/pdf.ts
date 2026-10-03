@@ -27,9 +27,12 @@ function wrap(text: string, font: PDFFont, size: number, maxWidth: number): stri
   return lines;
 }
 
-/** pdf-lib ne connaît que WinAnsi avec les polices standard : on remplace ce qu'elle ne sait pas dessiner. */
+/**
+ * pdf-lib ne connaît que WinAnsi avec les polices standard : on remplace ce qu'elle ne sait pas dessiner.
+ * Le signe euro et « œ » appartiennent à WinAnsi : ils sont conservés (sinon le tarif s'imprimait « 129,00 ? HT »).
+ */
 function sanitize(text: string): string {
-  return text.replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/—/g, "-").replace(/–/g, "-").replace(/ /g, " ").replace(/ /g, " ").replace(/[^\x00-\xFF]/g, "?");
+  return text.replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/—/g, "-").replace(/–/g, "-").replace(/ /g, " ").replace(/ /g, " ").replace(/[^\x00-\xFF€œŒ]/g, "?");
 }
 
 export async function renderContractPdf(doc: ContractDocument, generatedAt = new Date()): Promise<Uint8Array> {

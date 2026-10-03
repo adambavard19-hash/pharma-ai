@@ -7,6 +7,7 @@ import { recordProspectEvent } from "@/server/services/sales/events";
 import { notifyAdmins, notifySalesRep } from "@/server/services/sales/notifications";
 import { startContracting } from "@/server/services/sales/contracts";
 import { platformEmailContext } from "@/server/services/email-context";
+import { traceDispatch } from "@/server/services/email-dispatch";
 import { resolveReferralCode } from "@/server/services/referral";
 import { buildEmailConfirmationEmail, buildSubscriptionReceivedEmail } from "@/core/platform/contract-emails";
 import { signPayload, verifyPayload } from "@/server/security/tokens";
@@ -69,7 +70,7 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
     for (const p of prospectsBySiret) {
       if (p.salesRepId) await notifySalesRep({ salesRepId: p.salesRepId, type: "SITE_SUBSCRIPTION_TO_MATCH", title: `${p.name} : demande d'abonnement reçue du site`, body: "À vérifier avec le titulaire avant d'envoyer le contrat.", linkUrl: `/extranet/dossiers/${p.id}`, severity: "INFO" });
     }
-    await acknowledge(v, GENERIC_NEXT_STEP);
+    await acknowledge(v, GENERIC_NEXT_STEP, { prospectId: existingIds[0] ?? null, pharmacyId: pharmacyBySiret?.id ?? null });
     return { status: "RECEIVED", prospectId: existingIds[0] ?? null, reason: "SIRET déjà connu" };
   }
 
@@ -116,7 +117,7 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
 
   if (input.planId && !plan) {
     await notifyAdmins({ type: "DOSSIER_BLOCKED", title: `Contrat retenu — ${v.name}`, body: "L'offre choisie sur le site n'est plus proposée : choisissez les conditions puis « Envoyer le contrat ».", linkUrl: `/admin/dossiers/${prospectId}`, severity: "WARNING" });
-    await acknowledge(v, GENERIC_NEXT_STEP);
+    await acknowledge(v, GENERIC_NEXT_STEP, { prospectId });
     return { status: "RECEIVED", prospectId, reason: "offre indisponible" };
   }
   if (warning) {
@@ -124,7 +125,7 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
     await notifyAdmins({ type: "DUPLICATE_SUSPECTED", title: `Doublon possible — ${v.name}`, body: warning, linkUrl: `/admin/dossiers/${prospectId}`, severity: "WARNING" });
     if (suspects.some((s) => s.contracts[0] && (s.contracts[0].status === "FINALIZED" || IN_PROGRESS.includes(s.contracts[0].status)))) {
       await notifyAdmins({ type: "DOSSIER_BLOCKED", title: `Contrat retenu — ${v.name}`, body: "Un dossier proche a déjà un contrat en cours ou signé : vérifiez avant d'envoyer (« Envoyer le contrat »).", linkUrl: `/admin/dossiers/${prospectId}`, severity: "WARNING" });
-      await acknowledge(v, GENERIC_NEXT_STEP);
+      await acknowledge(v, GENERIC_NEXT_STEP, { prospectId });
       return { status: "RECEIVED", prospectId, reason: "rapprochement à vérifier" };
     }
   }
@@ -134,6 +135,8 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
   const ctx = await platformEmailContext();
   const email = buildEmailConfirmationEmail(ctx, { ownerName: v.ownerName, pharmacyName: v.name, confirmUrl: publicUrl(`/decouvrir/abonnement/confirmer?jeton=${encodeURIComponent(token)}`) });
   const outcome = await getMessagingProvider().sendEmail({ to: v.email, fromName: "PharmaBoost", subject: email.subject, text: email.text, html: email.html });
+  // Historique des communications, envoyé ou non (ne lève jamais).
+  await traceDispatch({ kind: "EMAIL_CONFIRMATION", recipient: v.email, outcome, subject: email.subject, trigger: "SYSTEM", prospectId });
   await recordProspectEvent({ prospectId, type: "EMAIL_SENT", summary: outcome.status === "SENT" ? `Demande de confirmation de l'adresse envoyée à ${v.email}.` : `Demande de confirmation NON envoyée : ${outcome.detail}`, actor: system, metadata: { emailStatus: outcome.status } });
   return { status: "CONFIRMATION_SENT", prospectId, email: v.email };
 }
@@ -160,8 +163,10 @@ export async function confirmSubscription(token: string): Promise<ConfirmationRe
   return { ok: true, status: result.outcome === "SENT" ? "SENT" : result.outcome === "ALREADY_SIGNED" ? "ALREADY_SIGNED" : "ALREADY_SENT", pharmacyName: prospect.name, email: payload.e };
 }
 
-async function acknowledge(v: NormalizedRequest, nextStep: string): Promise<void> {
+/** L'accusé de réception au demandeur, tracé dans l'historique des communications (dossier et officine quand ils sont connus). */
+async function acknowledge(v: NormalizedRequest, nextStep: string, links: { prospectId: string | null; pharmacyId?: string | null }): Promise<void> {
   const ctx = await platformEmailContext();
   const email = buildSubscriptionReceivedEmail(ctx, { ownerName: v.ownerName, pharmacyName: v.name, nextStep });
-  await getMessagingProvider().sendEmail({ to: v.email, fromName: "PharmaBoost", subject: email.subject, text: email.text, html: email.html });
+  const outcome = await getMessagingProvider().sendEmail({ to: v.email, fromName: "PharmaBoost", subject: email.subject, text: email.text, html: email.html });
+  await traceDispatch({ kind: "SUBSCRIPTION_RECEIVED", recipient: v.email, outcome, subject: email.subject, trigger: "SYSTEM", prospectId: links.prospectId, pharmacyId: links.pharmacyId ?? null });
 }

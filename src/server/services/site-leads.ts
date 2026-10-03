@@ -3,6 +3,7 @@ import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
 import { recordProspectEvent } from "@/server/services/sales/events";
 import { notifyAdmins } from "@/server/services/sales/notifications";
+import { traceDispatch } from "@/server/services/email-dispatch";
 import { buildSiteLeadAcknowledgement, buildSiteLeadAlert, type SiteLeadKind, type SiteLeadSummary } from "@/core/platform/site-emails";
 import { resolveReferralCode } from "@/server/services/referral";
 
@@ -52,6 +53,8 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
     : await prisma.prospect.create({
         data: {
           name: input.pharmacyName,
+          // Venu du site : sans cette origine, le dossier se présentait comme créé par un commercial.
+          origin: "SELF_SERVICE_SITE",
           ownerName: input.contactName,
           email: input.email,
           phone: input.phone,
@@ -80,6 +83,8 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
   await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html });
   const ack = buildSiteLeadAcknowledgement({ ...summary, contactEmail });
   const outcome = await messaging.sendEmail({ to: input.email, fromName: "PharmaBoost", subject: ack.subject, text: ack.text, html: ack.html });
+  // L'accusé au demandeur entre dans l'historique des communications, envoyé ou non (ne lève jamais).
+  await traceDispatch({ kind: "SITE_LEAD_ACK", recipient: input.email, outcome, subject: ack.subject, trigger: "SYSTEM", prospectId: prospect.id });
   return { prospectId: prospect.id, acknowledged: outcome.status === "SENT" };
 }
 

@@ -5,6 +5,7 @@ import { deriveToken, generateToken, hashToken } from "@/server/security/tokens"
 import { getMessagingProvider, getStorageProvider } from "@/server/ai/registry";
 import { getSignatureProvider } from "@/server/signature/registry";
 import { buildContractDocument, CONTRACT_TEMPLATE_KEY } from "@/core/contracts/template";
+import { companyPartyOf, contractReference, contractSnapshot, diffCompanyProfile, pharmacyPartyOf, printedReference, type CompanyProfileChanges, type CompanyProfileInput } from "@/core/contracts/snapshot";
 import { renderContractPdf } from "@/core/contracts/pdf";
 import { signatureFieldPlacement } from "@/core/contracts/layout";
 import { describeMissing, missingCompanyFields, missingContractFields, type MissingField } from "@/core/contracts/requirements";
@@ -41,15 +42,20 @@ export async function getCompanyProfile() {
   return prisma.companyProfile.findUnique({ where: { id: "default" } });
 }
 
-export async function upsertCompanyProfile(input: { legalName: string; legalForm?: string | null; addressLine1?: string | null; postalCode?: string | null; city?: string | null; siren?: string | null; representativeName: string; representativeTitle?: string | null; representativeEmail: string }, adminId: string): Promise<void> {
+/**
+ * Enregistre la fiche de la société exploitante. Elle ne vaut que pour les
+ * contrats à venir : aucun contrat existant n'est touché ici (chaque contrat
+ * garde la copie des parties imprimée à sa génération). L'avant/après est
+ * consigné au journal d'audit.
+ */
+export async function upsertCompanyProfile(input: CompanyProfileInput, adminId: string): Promise<{ created: boolean; changes: CompanyProfileChanges }> {
+  const before = await prisma.companyProfile.findUnique({ where: { id: "default" } });
   await prisma.companyProfile.upsert({ where: { id: "default" }, update: input, create: { id: "default", ...input } });
-  await recordAudit({ action: "sales.company_profile_updated", entityType: "CompanyProfile", entityId: "default", platformAdminId: adminId });
-}
-
-function reference(prospectName: string, version: number): string {
-  const year = new Date().getFullYear();
-  const slug = prospectName.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "").toUpperCase().slice(0, 8) || "PHARMA";
-  return `PB-${year}-${slug}-V${version}`;
+  const changes = diffCompanyProfile(before, input);
+  if (!before || Object.keys(changes).length > 0) {
+    await recordAudit({ action: "sales.company_profile_updated", entityType: "CompanyProfile", entityId: "default", platformAdminId: adminId, metadata: { created: !before, changes } });
+  }
+  return { created: !before, changes };
 }
 
 // ---------------------------------------------------------------------------
@@ -108,30 +114,18 @@ export async function generateContract(prospectId: string, terms: { monthlyPrice
   if (last && last.status === "FINALIZED") return { ok: false, error: "Un contrat finalisé existe déjà pour ce dossier." };
 
   const version = (last?.version ?? 0) + 1;
-  const ref = reference(prospect.name, version);
+  const ref = contractReference(prospect.name, version, new Date().getFullYear());
+  // Les parties sont construites une fois : le PDF et la copie enregistrée avec le contrat lisent les mêmes valeurs.
+  const companyParty = companyPartyOf(company);
+  const pharmacyParty = pharmacyPartyOf({ ...prospect, ownerName: prospect.ownerName!, email: prospect.email! });
+  const outletCount = prospect.outletCount ?? 1;
   const document = buildContractDocument({
     reference: ref,
-    company: {
-      legalName: company.legalName,
-      legalForm: company.legalForm,
-      address: [company.addressLine1, [company.postalCode, company.city].filter(Boolean).join(" ")].filter(Boolean).join(", "),
-      siren: company.siren,
-      representativeName: company.representativeName,
-      representativeTitle: company.representativeTitle,
-      representativeEmail: company.representativeEmail,
-    },
-    pharmacy: {
-      name: prospect.name,
-      legalName: prospect.legalName,
-      ownerName: prospect.ownerName!,
-      ownerTitle: prospect.ownerTitle,
-      address: [prospect.addressLine1, [prospect.postalCode, prospect.city].filter(Boolean).join(" ")].filter(Boolean).join(", "),
-      finessNumber: prospect.finessNumber,
-      siret: prospect.siret,
-      email: prospect.email!,
-    },
-    terms: { monthlyPriceCents: terms.monthlyPriceCents, durationMonths: terms.durationMonths, startDate: terms.startDate, planName: terms.planName, trialDays: terms.trialDays ?? 0, outletCount: prospect.outletCount ?? 1 },
+    company: companyParty,
+    pharmacy: pharmacyParty,
+    terms: { monthlyPriceCents: terms.monthlyPriceCents, durationMonths: terms.durationMonths, startDate: terms.startDate, planName: terms.planName, trialDays: terms.trialDays ?? 0, outletCount },
   });
+  const snapshot = contractSnapshot({ company: companyParty, pharmacy: pharmacyParty, outletCount });
   const pdf = await renderContractPdf(document);
   const fileKey = `plateforme/contrats/${prospect.id}/${ref}.pdf`;
   await getStorageProvider().put(fileKey, pdf, "application/pdf");
@@ -144,6 +138,9 @@ export async function generateContract(prospectId: string, terms: { monthlyPrice
       status: "DRAFT",
       templateKey: CONTRACT_TEMPLATE_KEY,
       fileKey,
+      reference: ref,
+      companySnapshot: snapshot.company,
+      pharmacySnapshot: snapshot.pharmacy,
       accessTokenHash: hashToken(token),
       monthlyPriceCents: terms.monthlyPriceCents,
       durationMonths: terms.durationMonths,
@@ -255,7 +252,7 @@ async function contractFacts(contractId: string): Promise<{ facts: ContractEmail
       monthlyPriceCents: contract.monthlyPriceCents,
       durationMonths: contract.durationMonths,
       trialDays: contract.trialDays,
-      reference: reference(contract.prospect.name, contract.version),
+      reference: printedReference(contract, contract.prospect.name),
       contact: rep ? { name: `${rep.firstName} ${rep.lastName}`, email: rep.email, phone: rep.phone } : null,
     },
   };
@@ -291,6 +288,9 @@ async function sendContractLocked(contractId: string, actor: SalesActor): Promis
   if (!contract) return { ok: false, error: "Contrat introuvable." };
   if (contract.prospect.blockedAt) return { ok: false, error: "Ce dossier est suspendu par l'administrateur." };
   if (!["DRAFT", "SENT", "OPENED"].includes(contract.status)) return { ok: false, error: `Ce contrat est « ${CONTRACT_STATUS_LABELS[contract.status as ContractStatusCode]} » : il ne peut plus être renvoyé.` };
+  // Une version remplacée ne part jamais, quel que soit l'écran d'où vient l'envoi (page restée ouverte, autre onglet).
+  const newer = await prisma.contract.count({ where: { prospectId: contract.prospectId, version: { gt: contract.version } } });
+  if (newer > 0) return { ok: false, error: "Une version plus récente de ce contrat existe : cette version ne peut plus être envoyée." };
 
   const firstSend = contract.status === "DRAFT";
   const token = await ensureContractToken(contract.id);
@@ -312,7 +312,7 @@ async function sendContractLocked(contractId: string, actor: SalesActor): Promis
       // Les champs de signature vont dans les cases dessinées en bas de la dernière page.
       const pageCount = (await PDFDocument.load(pdf, { updateMetadata: false })).getPageCount();
       const envelope = await signature.createEnvelope({
-        reference: reference(contract.prospect.name, contract.version),
+        reference: printedReference(contract, contract.prospect.name),
         title: "Contrat d'abonnement PharmaBoost",
         pdf,
         signers: [
@@ -343,6 +343,8 @@ async function sendContractLocked(contractId: string, actor: SalesActor): Promis
   const [ctx, factsBundle] = await Promise.all([platformEmailContext(), contractFacts(contract.id)]);
   const message = buildSignatureRequestEmail(ctx, { ...factsBundle!.facts, signingUrl, viewUrl, expiresAt });
   const outcome = await getMessagingProvider().sendEmail({ to: contract.pharmacySignerEmail, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
+  // L'e-mail de demande de signature entre dans l'historique des communications, envoyé ou non (ne lève jamais).
+  await traceDispatch({ kind: "CONTRACT_SENT", recipient: contract.pharmacySignerEmail, outcome, subject: message.subject, trigger: "SYSTEM", prospectId: contract.prospectId, pharmacyId: contract.pharmacyId, contractId: contract.id, sentByAdminId: actor.type === "ADMIN" ? actor.id : null });
   const sent = outcome.status === "SENT";
 
   await prisma.contract.update({
@@ -462,6 +464,8 @@ async function sendClientEmail(contractId: string, kind: "PHARMACY_SIGNED" | "FI
       ? buildPharmacySignedEmail(ctx, { ...bundle.facts, signedAt: contract.pharmacySignedAt ?? new Date() })
       : buildContractFinalizedEmail(ctx, { ...bundle.facts, finalizedAt: contract.finalizedAt ?? new Date(), documentUrl: contractUrl(await ensureContractToken(contractId)) });
   const outcome = await getMessagingProvider().sendEmail({ to: contract.pharmacySignerEmail, fromName: "PharmaBoost", subject: email.subject, text: email.text, html: email.html });
+  // Historique des communications, envoyé ou non (ne lève jamais) ; l'événement ci-dessous garde la frise du dossier.
+  await traceDispatch({ kind: kind === "PHARMACY_SIGNED" ? "CONTRACT_SIGNED_PHARMACY" : "CONTRACT_FINALIZED", recipient: contract.pharmacySignerEmail, outcome, subject: email.subject, trigger: "SYSTEM", prospectId: contract.prospectId, pharmacyId: contract.pharmacyId, contractId: contract.id });
   await recordProspectEvent({
     prospectId: contract.prospectId,
     type: "EMAIL_SENT",
@@ -592,7 +596,7 @@ type ReminderContractRow = { id: string; prospectId: string; pharmacyId: string 
  * Le lien de signature est toujours celui du contrat. L'envoi est tracé
  * (historique des communications et journal du dossier).
  */
-async function deliverContractReminder(contract: ReminderContractRow, now: Date, actor: SalesActor, trigger: "AUTOMATIC" | "MANUAL", adminId?: string): Promise<DeliveryOutcome> {
+async function deliverContractReminder(contract: ReminderContractRow, now: Date, actor: SalesActor, trigger: "AUTOMATIC" | "MANUAL", adminId?: string, attempt?: { outcome?: DeliveryOutcome }): Promise<DeliveryOutcome> {
   const bundle = await contractFacts(contract.id);
   const ctx = await platformEmailContext();
   const token = await ensureContractToken(contract.id);
@@ -611,6 +615,8 @@ async function deliverContractReminder(contract: ReminderContractRow, now: Date,
         })
       : buildSignatureReminderEmail(ctx, { ...bundle!.facts, signingUrl: contract.pharmacySigningUrl, viewUrl: contractUrl(token), expiresAt: contract.expiresAt ?? new Date(now.getTime() + CONTRACT_LINK_TTL_MS), reminderNumber });
   const outcome = await getMessagingProvider().sendEmail({ to: contract.pharmacySignerEmail, fromName: "PharmaBoost", subject: email.subject, text: email.text, html: email.html });
+  // L'appelant sait ainsi si l'e-mail est parti, même si la suite (journal du dossier) échoue.
+  if (attempt) attempt.outcome = outcome;
   await traceDispatch({ kind: "CONTRACT_REMINDER", recipient: contract.pharmacySignerEmail, outcome, subject: email.subject, templateKey: override ? "contract.reminder" : null, trigger, ruleKey: trigger === "AUTOMATIC" ? "contract.reminders" : null, prospectId: contract.prospectId, pharmacyId: contract.pharmacyId, contractId: contract.id, sentByAdminId: adminId ?? null });
   await recordProspectEvent({ prospectId: contract.prospectId, type: "CONTRACT_REMINDER", summary: outcome.status === "SENT" ? `Relance ${reminderNumber} envoyée à ${contract.pharmacySignerEmail}${trigger === "MANUAL" ? " (depuis la console)" : ""}.` : `Relance ${reminderNumber} NON envoyée : ${outcome.detail}`, actor, metadata: { contractId: contract.id, emailStatus: outcome.status, trigger } });
   return outcome;
@@ -619,7 +625,10 @@ async function deliverContractReminder(contract: ReminderContractRow, now: Date,
 /**
  * Relancer maintenant, depuis la console : mêmes garde-fous que la relance
  * automatique (statut relu chez le prestataire, verrou sur le compteur), et
- * jamais deux relances en moins de 24 heures.
+ * jamais deux relances en moins de 24 heures. Une relance qui n'est pas
+ * partie (refus du prestataire d'envoi, erreur avant l'envoi) ne compte pas :
+ * le compteur et la date de dernière relance reprennent leur valeur, l'échec
+ * reste tracé, et l'administrateur peut réessayer aussitôt.
  */
 export async function remindContractNow(contractId: string, actor: SalesActor & { type: "ADMIN" }, now = new Date()): Promise<{ ok: true; email: { status: string; detail: string } } | { ok: false; error: string }> {
   const contract = await prisma.contract.findUnique({ where: { id: contractId }, include: { prospect: { select: { blockedAt: true } } } });
@@ -634,8 +643,21 @@ export async function remindContractNow(contractId: string, actor: SalesActor & 
   }
   const claimed = await prisma.contract.updateMany({ where: { id: contract.id, reminderCount: contract.reminderCount, status: { in: AWAITING_PHARMACY as ContractStatusCode[] } }, data: { reminderCount: { increment: 1 }, lastReminderAt: now } });
   if (claimed.count === 0) return { ok: false, error: "Une autre relance vient de partir pour ce contrat." };
-  const outcome = await deliverContractReminder(contract, now, actor, "MANUAL", actor.id);
-  await recordAudit({ action: "sales.contract_reminded", entityType: "Contract", entityId: contract.id, pharmacyId: contract.pharmacyId, platformAdminId: actor.id, metadata: { reminder: contract.reminderCount + 1, emailStatus: outcome.status } });
+  // Rend la réservation, seulement si personne n'a relancé entre-temps.
+  const release = () =>
+    prisma.contract.updateMany({ where: { id: contract.id, reminderCount: contract.reminderCount + 1, lastReminderAt: now }, data: { reminderCount: contract.reminderCount, lastReminderAt: contract.lastReminderAt } });
+  const attempt: { outcome?: DeliveryOutcome } = {};
+  let outcome: DeliveryOutcome;
+  try {
+    outcome = await deliverContractReminder(contract, now, actor, "MANUAL", actor.id, attempt);
+  } catch (error) {
+    // Erreur avant l'envoi, ou envoi refusé : rien n'est parti. Un e-mail déjà remis garde sa réservation.
+    if (!attempt.outcome || attempt.outcome.status === "FAILED") await release().catch(() => undefined);
+    throw error;
+  }
+  const released = outcome.status === "FAILED" ? (await release()).count > 0 : false;
+  const reminderCount = { from: contract.reminderCount, to: released ? contract.reminderCount : contract.reminderCount + 1 };
+  await recordAudit({ action: "sales.contract_reminded", entityType: "Contract", entityId: contract.id, pharmacyId: contract.pharmacyId, platformAdminId: actor.id, metadata: { reminder: contract.reminderCount + 1, emailStatus: outcome.status, released, reminderCount } });
   return { ok: true, email: { status: outcome.status, detail: outcome.detail } };
 }
 
