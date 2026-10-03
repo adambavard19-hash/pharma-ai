@@ -2,27 +2,65 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Power, Trash2 } from "lucide-react";
+import { Mail, Power, RotateCcw, Trash2 } from "lucide-react";
 import { deletePharmacyMemberAction, resendPharmacyMemberAccessAction, setPharmacyMemberAccessAction } from "@/server/actions/platform-pharmacies";
+import { ConfirmAction } from "@/components/admin/confirm-action";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
-/** Les gestes de la console sur un compte d'officine : renvoyer l'accès, suspendre, supprimer. */
+/**
+ * Les gestes de la console sur un compte d'officine : renvoyer l'accès (sans
+ * conséquence, direct), suspendre ou supprimer (toujours confirmés).
+ */
 export function MemberActions({ pharmacyId, membershipId, isActive, name }: { pharmacyId: string; membershipId: string; isActive: boolean; name: string }) {
   const [pending, start] = useTransition();
   const router = useRouter();
   const { push } = useToast();
-  const run = (fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) =>
+  const resend = () =>
     start(async () => {
-      const result = await fn();
-      push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Fait.") : (result.error ?? "Erreur") });
+      const result = await resendPharmacyMemberAccessAction({ pharmacyId, membershipId });
+      push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Lien envoyé.") : result.error });
       router.refresh();
     });
   return (
-    <span className="flex flex-wrap gap-1">
-      <Button size="sm" variant="ghost" loading={pending} leadingIcon={<Mail className="size-3.5" />} onClick={() => run(() => resendPharmacyMemberAccessAction({ pharmacyId, membershipId }))}>Renvoyer l&apos;accès</Button>
-      <Button size="sm" variant="ghost" loading={pending} leadingIcon={<Power className="size-3.5" />} onClick={() => run(() => setPharmacyMemberAccessAction({ pharmacyId, membershipId, isActive: !isActive }))}>{isActive ? "Suspendre" : "Réactiver"}</Button>
-      <Button size="sm" variant="ghost" loading={pending} leadingIcon={<Trash2 className="size-3.5" />} onClick={() => { if (window.confirm(`Supprimer le compte de ${name} ? Il ne pourra plus se connecter.`)) run(() => deletePharmacyMemberAction({ pharmacyId, membershipId })); }}>Supprimer</Button>
+    <span className="flex flex-wrap justify-end gap-1">
+      <Button size="sm" variant="ghost" loading={pending} leadingIcon={<Mail className="size-3.5" />} onClick={resend}>
+        Renvoyer l&apos;accès
+      </Button>
+      {isActive ? (
+        <ConfirmAction
+          label="Suspendre"
+          icon={<Power className="size-3.5" />}
+          variant="ghost"
+          title={`Suspendre le compte de ${name}`}
+          consequences={["Ce compte ne peut plus se connecter à cette officine ; ses sessions sont fermées.", "Le reste de l'équipe n'est pas concerné.", "Le geste est tracé au journal d'audit."]}
+          confirmLabel="Suspendre le compte"
+          tone="danger"
+          onConfirm={() => setPharmacyMemberAccessAction({ pharmacyId, membershipId, isActive: false })}
+        />
+      ) : (
+        <ConfirmAction
+          label="Réactiver"
+          icon={<RotateCcw className="size-3.5" />}
+          variant="ghost"
+          title={`Réactiver le compte de ${name}`}
+          consequences={["Ce compte peut de nouveau se connecter à cette officine.", "Le geste est tracé au journal d'audit."]}
+          confirmLabel="Réactiver le compte"
+          onConfirm={() => setPharmacyMemberAccessAction({ pharmacyId, membershipId, isActive: true })}
+        />
+      )}
+      <ConfirmAction
+        label="Supprimer"
+        icon={<Trash2 className="size-3.5" />}
+        variant="ghost"
+        tone="danger"
+        title={`Supprimer le compte de ${name}`}
+        description="Le compte est retiré de l'officine et ne peut plus se connecter."
+        consequences={["Ses sessions sont fermées et son accès retiré.", "Le compte est marqué supprimé ; son adresse ne peut pas être réutilisée telle quelle.", "Les traces (journal, historique) restent."]}
+        typedConfirmation="SUPPRIMER"
+        confirmLabel="Supprimer le compte"
+        onConfirm={() => deletePharmacyMemberAction({ pharmacyId, membershipId })}
+      />
     </span>
   );
 }

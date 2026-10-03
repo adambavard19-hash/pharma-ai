@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Building2, Mail, Plus } from "lucide-react";
 import {
   createClientPharmacyAction,
@@ -49,8 +49,28 @@ const EMPTY: PharmacyFormValues = {
  *  B. « Inviter le titulaire » : seule l'adresse est connue ; un dossier
  *     « Officine à compléter » s'ouvre et le titulaire le remplit lui-même.
  */
-export function CreatePharmacyButton() {
-  const [open, setOpen] = useState(false);
+export function CreatePharmacyButton({ openFromAddress = false }: { openFromAddress?: boolean } = {}) {
+  const [open, setOpenState] = useState(false);
+  // `openFromAddress` : la fenêtre s'ouvre d'elle-même quand l'adresse porte
+  // « ?nouveau=officine » (action rapide de l'en-tête), y compris si l'on est
+  // déjà sur la page. Ajustement pendant le rendu, sans effet.
+  const wanted = useSearchParams().get("nouveau") === "officine" && openFromAddress;
+  const [lastWanted, setLastWanted] = useState(false);
+  if (wanted !== lastWanted) {
+    setLastWanted(wanted);
+    if (wanted) setOpenState(true);
+  }
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    // Une fois refermée, l'adresse perd « nouveau=officine » : recharger la page ne la rouvre pas.
+    if (!next && typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("nouveau")) {
+        url.searchParams.delete("nouveau");
+        window.history.replaceState(window.history.state, "", url.toString());
+      }
+    }
+  };
   const [mode, setMode] = useState<"create" | "invite">("create");
   const [values, setValues] = useState<PharmacyFormValues>(EMPTY);
   const [owner, setOwner] = useState({ ownerFirstName: "", ownerLastName: "", ownerEmail: "", lgo: "", referralCode: "" });
