@@ -8,17 +8,23 @@
  *   1. une règle est DÉSACTIVÉE tant qu'un administrateur ne l'a pas activée :
  *      déployer ce code n'envoie rien ;
  *   2. une règle ne rattrape que ce qui est échu depuis moins de
- *      `CATCH_UP_DAYS` : activer une règle aujourd'hui n'écrit pas à tous les
- *      essais des derniers mois ;
+ *      `CATCH_UP_DAYS` jours calendaires : activer une règle aujourd'hui
+ *      n'écrit pas à tous les essais des derniers mois ;
  *   3. chaque déclenchement porte une clé unique (règle, cible, occurrence) :
  *      deux passages, même simultanés, n'envoient jamais deux fois.
+ *
+ * Les délais se comptent en JOURS calendaires, au fuseau de la société
+ * (Europe/Paris) : « J+1 » part le lendemain de l'événement, « Le jour même »
+ * le jour même, quelle que soit l'heure de l'événement et celle du passage
+ * quotidien.
  *
  * Ce module est pur : il reçoit les candidats lus en base et rend la liste
  * de ce qui est dû. L'envoi et l'écriture des clés sont faits côté serveur.
  */
+import { TIME_ZONE } from "@/config/constants";
+import { addDays as addDayKey, calendarDay, daysBetween, zonedDayStart, type DayKey } from "@/core/challenges/dates";
 
 export const CATCH_UP_DAYS = 2;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type AutomationScenario = "TRIAL" | "PAYMENT" | "CANCELLATION" | "COMMERCIAL";
 export type AutomationChannel = "EMAIL" | "INTERNAL";
@@ -123,6 +129,12 @@ export type SubscriptionCandidate = {
   trialEndsAt: Date | null;
   lastPaymentAt: Date | null;
   lastPaymentFailedAt: Date | null;
+  /**
+   * Le début de la série impayée en cours (voir `unpaidSeriesStart`) : les
+   * relances de paiement s'y ancrent, et non sur la dernière tentative de
+   * Stripe, qui avance à chaque nouvel essai. À défaut, `lastPaymentFailedAt`.
+   */
+  unpaidSinceAt?: Date | null;
   suspendedAt: Date | null;
 };
 
@@ -138,6 +150,8 @@ export type ProspectCandidate = {
   id: string;
   status: string;
   nextActionAt: Date | null;
+  /** Le dernier contact noté sur le dossier : postérieur à la relance prévue, la relance a eu lieu. */
+  lastContactAt?: Date | null;
   blockedAt: Date | null;
   salesRepId: string | null;
 };
@@ -148,7 +162,7 @@ export type PlannedAutomation = {
   targetType: "Subscription" | "CancellationRequest" | "Prospect";
   targetId: string;
   pharmacyId: string | null;
-  /** Le moment où la règle devenait due. */
+  /** Le moment où la règle devenait due : minuit (heure de Paris) de son jour d'échéance. */
   dueAt: Date;
   channel: AutomationChannel;
   templateKey?: string;
@@ -156,13 +170,26 @@ export type PlannedAutomation = {
   anchorAt: Date;
 };
 
+/** Le jour de l'événement dans la clé de dédoublonnage (jour UTC, inchangé : les clés déjà écrites restent valables). */
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
-const addDays = (d: Date, days: number) => new Date(d.getTime() + days * DAY_MS);
 
-/** Une règle est due si son échéance est passée depuis moins de `CATCH_UP_DAYS`. */
-export function isDueNow(dueAt: Date, now: Date): boolean {
-  const age = now.getTime() - dueAt.getTime();
-  return age >= 0 && age <= CATCH_UP_DAYS * DAY_MS;
+/** Le jour d'échéance d'une règle : le jour (heure de Paris) de l'événement, plus le délai en jours calendaires. */
+export function dueDay(anchorAt: Date, offsetDays: number, timeZone: string = TIME_ZONE): DayKey {
+  return addDayKey(calendarDay(anchorAt, timeZone), offsetDays);
+}
+
+/**
+ * Une règle est due dès que son jour d'échéance est atteint (heure de Paris),
+ * et rattrapée au plus `CATCH_UP_DAYS` jours calendaires après.
+ */
+export function isDueNow(dueOn: DayKey, now: Date, timeZone: string = TIME_ZONE): boolean {
+  const late = daysBetween(dueOn, calendarDay(now, timeZone));
+  return late >= 0 && late <= CATCH_UP_DAYS;
+}
+
+/** Les jours calendaires (heure de Paris) d'aujourd'hui jusqu'à cette date : 0 le jour même, jamais négatif. */
+export function calendarDaysUntil(target: Date, now: Date, timeZone: string = TIME_ZONE): number {
+  return Math.max(0, daysBetween(calendarDay(now, timeZone), calendarDay(target, timeZone)));
 }
 
 /** Un paiement échoué est encore impayé si aucun paiement réussi n'est venu après. */
@@ -170,6 +197,63 @@ export function hasUnpaidFailure(sub: Pick<SubscriptionCandidate, "lastPaymentAt
   if (!sub.lastPaymentFailedAt) return false;
   if (sub.status === "CANCELED" || sub.status === "INCOMPLETE_EXPIRED") return false;
   return !sub.lastPaymentAt || sub.lastPaymentAt.getTime() < sub.lastPaymentFailedAt.getTime();
+}
+
+/** Les factures (`BillingPayment.status`) qui restent dues. */
+export const UNPAID_INVOICE_STATUSES = ["FAILED", "OPEN"] as const;
+const UNPAID_INVOICE = new Set<string>(UNPAID_INVOICE_STATUSES);
+
+/**
+ * Le début de la série impayée : la création de la plus ancienne facture en
+ * échec ou ouverte, venue après le dernier paiement réussi. Stable d'une
+ * tentative de Stripe à l'autre ; une nouvelle série (après un paiement
+ * réussi) repart de sa propre facture. À défaut de facture connue, le dernier
+ * échec signalé.
+ */
+export function unpaidSeriesStart(sub: Pick<SubscriptionCandidate, "lastPaymentAt" | "lastPaymentFailedAt">, invoices: { status: string; createdAt: Date }[]): Date | null {
+  const paidUntil = sub.lastPaymentAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+  let oldest: Date | null = null;
+  for (const invoice of invoices) {
+    if (!UNPAID_INVOICE.has(invoice.status) || invoice.createdAt.getTime() <= paidUntil) continue;
+    if (!oldest || invoice.createdAt.getTime() < oldest.getTime()) oldest = invoice.createdAt;
+  }
+  return oldest ?? sub.lastPaymentFailedAt;
+}
+
+/**
+ * L'ordre des relances de paiement : la deuxième relance part après la
+ * première (jamais le même jour), l'alerte à l'équipe au plus tôt avec la
+ * dernière relance. Seules les règles actives comptent.
+ */
+const PAYMENT_SEQUENCE: { key: string; strictlyAfterPrevious: boolean }[] = [
+  { key: "payment.reminder_1", strictlyAfterPrevious: true },
+  { key: "payment.reminder_2", strictlyAfterPrevious: true },
+  { key: "payment.internal_alert", strictlyAfterPrevious: false },
+];
+
+/** Le réglage `change` casserait-il l'ordre des relances de paiement ? Le message à afficher, sinon `null`. */
+export function paymentSequenceError(rules: ResolvedRule[], change: { key: string; enabled: boolean; offsetDays: number }): string | null {
+  if (!change.enabled || !PAYMENT_SEQUENCE.some((s) => s.key === change.key)) return null;
+  const chain = PAYMENT_SEQUENCE.flatMap((step) => {
+    const rule = rules.find((r) => r.key === step.key);
+    if (!rule) return [];
+    const effective = rule.key === change.key ? { ...rule, enabled: true, offsetDays: change.offsetDays } : rule;
+    return effective.enabled ? [{ ...step, rule: effective }] : [];
+  });
+  const index = chain.findIndex((s) => s.key === change.key);
+  const current = chain[index];
+  const previous = chain[index - 1];
+  const next = chain[index + 1];
+  const inOrder = (earlier: (typeof chain)[number], later: (typeof chain)[number]) => (later.strictlyAfterPrevious ? later.rule.offsetDays > earlier.rule.offsetDays : later.rule.offsetDays >= earlier.rule.offsetDays);
+  if (previous && !inOrder(previous, current)) {
+    const earliest = current.strictlyAfterPrevious ? previous.rule.offsetDays + 1 : previous.rule.offsetDays;
+    return `« ${current.rule.label} » doit partir ${current.strictlyAfterPrevious ? "après" : "au plus tôt le même jour que"} « ${previous.rule.label} » (${describeOffset(previous.rule.offsetDays)}) : choisissez au moins ${describeOffset(earliest)}.`;
+  }
+  if (next && !inOrder(current, next)) {
+    const latest = next.strictlyAfterPrevious ? next.rule.offsetDays - 1 : next.rule.offsetDays;
+    return `« ${current.rule.label} » doit partir ${next.strictlyAfterPrevious ? "avant" : "au plus tard le même jour que"} « ${next.rule.label} » (${describeOffset(next.rule.offsetDays)}) : choisissez au plus ${describeOffset(latest)}, ou repoussez d'abord « ${next.rule.label} ».`;
+  }
+  return null;
 }
 
 const TRIAL_NOT_CONTINUED = new Set(["PAUSED", "CANCELED", "INCOMPLETE", "INCOMPLETE_EXPIRED"]);
@@ -192,8 +276,9 @@ export function planAutomations(input: {
   const out: PlannedAutomation[] = [];
   const seen = new Set<string>();
   const push = (rule: ResolvedRule, target: { type: PlannedAutomation["targetType"]; id: string; pharmacyId: string | null }, anchorAt: Date) => {
-    const dueAt = addDays(anchorAt, rule.offsetDays);
-    if (!isDueNow(dueAt, now)) return;
+    const dueOn = dueDay(anchorAt, rule.offsetDays);
+    if (!isDueNow(dueOn, now)) return;
+    const dueAt = zonedDayStart(dueOn, TIME_ZONE);
     const dedupeKey = `${rule.key}:${target.id}:${isoDay(anchorAt)}`;
     if (input.alreadyDone.has(dedupeKey) || seen.has(dedupeKey)) return;
     seen.add(dedupeKey);
@@ -228,7 +313,8 @@ export function planAutomations(input: {
       case "payment.internal_alert":
         for (const sub of input.subscriptions) {
           if (sub.suspendedAt || !hasUnpaidFailure(sub)) continue;
-          push(rule, { type: "Subscription", id: sub.id, pharmacyId: sub.pharmacyId }, sub.lastPaymentFailedAt!);
+          // Ancrées sur le début de la série impayée : une nouvelle tentative de Stripe ne relance pas la série.
+          push(rule, { type: "Subscription", id: sub.id, pharmacyId: sub.pharmacyId }, sub.unpaidSinceAt ?? sub.lastPaymentFailedAt!);
         }
         break;
       case "cancellation.acknowledgement":
@@ -246,10 +332,34 @@ export function planAutomations(input: {
       case "prospect.followup_overdue":
         for (const p of input.prospects) {
           if (!p.nextActionAt || p.blockedAt || CLOSED_PROSPECT.has(p.status)) continue;
+          // Un contact noté après la date prévue : la relance a eu lieu, rien à signaler.
+          if (p.lastContactAt && p.lastContactAt.getTime() > p.nextActionAt.getTime()) continue;
           push(rule, { type: "Prospect", id: p.id, pharmacyId: null }, p.nextActionAt);
         }
         break;
     }
   }
   return out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
+}
+
+// ---------------------------------------------------------------- Envoi manuel (« Contacter »)
+
+/**
+ * Les modèles qui ont besoin d'un contexte que la fenêtre « Contacter » n'a
+ * pas : la relance de contrat porte le lien de signature (elle passe par le
+ * bouton « Relancer » du contrat, qui tient aussi le compte des relances), les
+ * modèles de résiliation la date de la demande ou la date de fin.
+ */
+export function isContextBoundTemplate(key: string): boolean {
+  return key === "contract.reminder" || key.startsWith("cancellation.");
+}
+
+/**
+ * Les modèles proposés par « Contacter » : ceux du public demandé (plus le
+ * message libre) ; un modèle lié à un contexte seulement si l'appelant le
+ * demande explicitement (`defaultTemplateKey`), depuis la page qui détient ce
+ * contexte.
+ */
+export function contactTemplateChoices<T extends { key: string; audience: string }>(templates: T[], options: { audience?: string; defaultTemplateKey?: string } = {}): T[] {
+  return templates.filter((t) => (!options.audience || t.audience === options.audience || t.key === "generic.message") && (!isContextBoundTemplate(t.key) || t.key === options.defaultTemplateKey));
 }

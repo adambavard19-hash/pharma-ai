@@ -102,5 +102,12 @@ export const DISPATCH_KIND_LABELS: Record<string, string> = {
   PAYMENT_FAILED: "Paiement échoué",
   TRIAL_ENDING: "Fin d'essai (Stripe)",
   SUBSCRIPTION_STARTED: "Abonnement démarré",
+  CONTRACT_SIGNED_PHARMACY: "Signature de l'officine reçue",
+  CONTRACT_FINALIZED: "Contrat finalisé",
+  SUBSCRIPTION_INVITE: "Lien d'activation de l'abonnement",
+  EMAIL_CONFIRMATION: "Confirmation d'adresse avant contrat",
+  SUBSCRIPTION_RECEIVED: "Demande d'abonnement reçue",
+  SITE_LEAD_ACK: "Accusé de demande de démonstration",
+  INSTALL_GUIDE: "Guide d'installation",
   TEMPLATE: "Modèle",
 };

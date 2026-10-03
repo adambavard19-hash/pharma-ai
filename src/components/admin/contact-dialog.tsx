@@ -7,6 +7,7 @@ import { Button, type ButtonProps } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { previewTemplateEmailAction, sendManualEmailAction } from "@/server/actions/admin-email";
+import { contactTemplateChoices } from "@/core/admin/automations";
 
 export type ContactTemplateOption = { key: string; label: string; category: string; audience: string; text: { subject: string; title: string; body: string } };
 
@@ -27,6 +28,7 @@ export function ContactDialog({
   pharmacyId?: string;
   prospectId?: string;
   templates: ContactTemplateOption[];
+  /** Le modèle choisi à l'ouverture ; seul moyen de proposer un modèle lié à un contexte (relance de contrat, résiliation). */
   defaultTemplateKey?: string;
   label?: string;
   variant?: ButtonProps["variant"];
@@ -34,7 +36,8 @@ export function ContactDialog({
   /** Ne propose que les modèles de ce public (« Titulaire », « Prospect »). */
   audience?: string;
 }) {
-  const options = useMemo(() => (audience ? templates.filter((t) => t.audience === audience || t.key === "generic.message") : templates), [templates, audience]);
+  // Ni la relance de contrat (sans lien de signature ici) ni les modèles de résiliation (sans leurs dates), sauf demandés par l'appelant.
+  const options = useMemo(() => contactTemplateChoices(templates, { audience, defaultTemplateKey }), [templates, audience, defaultTemplateKey]);
   const initial = options.find((t) => t.key === defaultTemplateKey) ?? options[0];
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState(initial?.key ?? "");

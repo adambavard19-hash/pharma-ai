@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { AUTOMATION_RULES, CATCH_UP_DAYS, clampOffset, describeOffset, hasUnpaidFailure, planAutomations, resolveRules, type SubscriptionCandidate } from "../automations";
+import {
+  AUTOMATION_RULES,
+  CATCH_UP_DAYS,
+  calendarDaysUntil,
+  clampOffset,
+  contactTemplateChoices,
+  describeOffset,
+  dueDay,
+  hasUnpaidFailure,
+  isDueNow,
+  paymentSequenceError,
+  planAutomations,
+  resolveRules,
+  unpaidSeriesStart,
+  type PlannedAutomation,
+  type SubscriptionCandidate,
+} from "../automations";
 import { EMAIL_TEMPLATES, emailTemplate, fillVariables, renderTemplateEmail, sampleValues, unknownVariables, validateTemplateText, variablesIn } from "../email-templates";
 import { ADMIN_NAV, activeNavItem } from "../nav";
 import { filterTimeline, groupTimelineByDay, mergeTimeline, type TimelineEntry } from "../timeline";
@@ -54,19 +70,59 @@ describe("automatisations : sûres par défaut", () => {
     expect(planned.map((p) => p.targetId)).toEqual(["lapsed"]);
   });
 
-  it("paiement : relance tant que l'échec reste impayé, et une nouvelle occurrence repart de zéro", () => {
-    const failed = sub({ status: "PAST_DUE", lastPaymentFailedAt: daysAgo(2), lastPaymentAt: daysAgo(40) });
+  it("paiement : relance tant que l'échec reste impayé, et une nouvelle série (après un paiement réussi) repart de zéro", () => {
+    const failed = sub({ status: "PAST_DUE", lastPaymentFailedAt: daysAgo(2), unpaidSinceAt: daysAgo(2), lastPaymentAt: daysAgo(40) });
     const paidSince = sub({ id: "paid", status: "ACTIVE", lastPaymentFailedAt: daysAgo(2), lastPaymentAt: daysAgo(1) });
     expect(hasUnpaidFailure(failed)).toBe(true);
     expect(hasUnpaidFailure(paidSince)).toBe(false);
     const first = planAutomations({ rules: enabled(["payment.reminder_1"]), subscriptions: [failed, paidSince], cancellations: [], prospects: [], alreadyDone: new Set(), now: NOW });
     expect(first.map((p) => p.targetId)).toEqual(["sub_1"]);
-    const later = sub({ status: "PAST_DUE", lastPaymentFailedAt: daysAgo(2), lastPaymentAt: daysAgo(40) });
-    // Même échec : clé déjà consommée. Un nouvel échec (autre date) : nouvelle clé.
-    expect(planAutomations({ rules: enabled(["payment.reminder_1"]), subscriptions: [later], cancellations: [], prospects: [], alreadyDone: new Set(first.map((p) => p.dedupeKey)), now: NOW })).toEqual([]);
-    const newFailure = sub({ status: "PAST_DUE", lastPaymentFailedAt: new Date(NOW.getTime() + 20 * DAY), lastPaymentAt: daysAgo(40) });
+    // Même série : clé déjà consommée.
+    expect(planAutomations({ rules: enabled(["payment.reminder_1"]), subscriptions: [failed], cancellations: [], prospects: [], alreadyDone: new Set(first.map((p) => p.dedupeKey)), now: NOW })).toEqual([]);
+    // Payé dix jours plus tard, puis un nouvel échec : nouvelle série, nouvelle clé.
+    const newSeries = sub({ status: "PAST_DUE", lastPaymentAt: new Date(NOW.getTime() + 10 * DAY), lastPaymentFailedAt: new Date(NOW.getTime() + 20 * DAY), unpaidSinceAt: new Date(NOW.getTime() + 20 * DAY) });
     const inTwentyTwoDays = new Date(NOW.getTime() + 22 * DAY);
-    expect(planAutomations({ rules: enabled(["payment.reminder_1"]), subscriptions: [newFailure], cancellations: [], prospects: [], alreadyDone: new Set(first.map((p) => p.dedupeKey)), now: inTwentyTwoDays })).toHaveLength(1);
+    expect(planAutomations({ rules: enabled(["payment.reminder_1"]), subscriptions: [newSeries], cancellations: [], prospects: [], alreadyDone: new Set(first.map((p) => p.dedupeKey)), now: inTwentyTwoDays })).toHaveLength(1);
+  });
+
+  it("paiement : ancré sur le début de la série impayée, une nouvelle tentative de Stripe ne relance pas la série", () => {
+    // Premier échec le 1er octobre à 11 h (Paris), tentatives de Stripe à J+3, J+6, J+9 ; un passage chaque matin à 8 h 15 UTC.
+    const firstFailure = new Date("2026-10-01T09:00:00Z");
+    const attempts = [0, 3, 6, 9].map((d) => new Date(firstFailure.getTime() + d * DAY));
+    const rules = enabled(["payment.reminder_1", "payment.reminder_2", "payment.internal_alert"]);
+    const done = new Set<string>();
+    const fired: { day: number; rule: string; anchorAt: string }[] = [];
+    for (let day = 0; day <= 20; day += 1) {
+      const now = new Date(Date.UTC(2026, 9, 1 + day, 8, 15));
+      const lastAttempt = attempts.filter((a) => a.getTime() <= now.getTime()).at(-1) ?? null;
+      const candidate = sub({ status: "PAST_DUE", trialStartsAt: null, trialEndsAt: null, lastPaymentAt: new Date("2026-09-01T09:00:00Z"), lastPaymentFailedAt: lastAttempt, unpaidSinceAt: lastAttempt ? firstFailure : null });
+      for (const planned of planAutomations({ rules, subscriptions: [candidate], cancellations: [], prospects: [], alreadyDone: done, now })) {
+        done.add(planned.dedupeKey);
+        fired.push({ day, rule: planned.ruleKey, anchorAt: planned.anchorAt.toISOString() });
+      }
+    }
+    expect(fired).toEqual([
+      { day: 2, rule: "payment.reminder_1", anchorAt: firstFailure.toISOString() },
+      { day: 7, rule: "payment.reminder_2", anchorAt: firstFailure.toISOString() },
+      { day: 10, rule: "payment.internal_alert", anchorAt: firstFailure.toISOString() },
+    ]);
+  });
+
+  it("série impayée : la plus ancienne facture due après le dernier paiement réussi, sinon le dernier échec", () => {
+    const lastPaymentAt = new Date("2026-09-15T08:00:00Z");
+    const lastPaymentFailedAt = new Date("2026-10-09T08:00:00Z");
+    const invoices = [
+      { status: "FAILED", createdAt: new Date("2026-09-01T08:00:00Z") }, // avant le dernier paiement : une autre série
+      { status: "PAID", createdAt: new Date("2026-09-30T08:00:00Z") },
+      { status: "VOID", createdAt: new Date("2026-09-30T09:00:00Z") },
+      { status: "FAILED", createdAt: new Date("2026-10-05T08:00:00Z") },
+      { status: "OPEN", createdAt: new Date("2026-10-02T08:00:00Z") },
+    ];
+    expect(unpaidSeriesStart({ lastPaymentAt, lastPaymentFailedAt }, invoices)?.toISOString()).toBe("2026-10-02T08:00:00.000Z");
+    expect(unpaidSeriesStart({ lastPaymentAt, lastPaymentFailedAt }, [])).toBe(lastPaymentFailedAt);
+    // Payé le 20 octobre, nouvel échec le 1er novembre : la série repart de la nouvelle facture.
+    const nextSeries = [...invoices, { status: "FAILED", createdAt: new Date("2026-11-01T08:00:00Z") }];
+    expect(unpaidSeriesStart({ lastPaymentAt: new Date("2026-10-20T08:00:00Z"), lastPaymentFailedAt: new Date("2026-11-04T08:00:00Z") }, nextSeries)?.toISOString()).toBe("2026-11-01T08:00:00.000Z");
   });
 
   it("une officine suspendue ne reçoit aucune relance automatique", () => {
@@ -106,6 +162,21 @@ describe("automatisations : sûres par défaut", () => {
     expect(planned[0]).toMatchObject({ targetId: "p_late", channel: "INTERNAL" });
   });
 
+  it("suivi commercial : un contact noté après la date prévue vaut relance faite, aucune alerte", () => {
+    const planned = planAutomations({
+      rules: enabled(["prospect.followup_overdue"]),
+      subscriptions: [],
+      cancellations: [],
+      prospects: [
+        { id: "p_done", status: "CONTRACT_SENT", nextActionAt: daysAgo(1.5), lastContactAt: daysAgo(1.4), blockedAt: null, salesRepId: "rep_1" },
+        { id: "p_stale", status: "CONTACTED", nextActionAt: daysAgo(1.5), lastContactAt: daysAgo(3), blockedAt: null, salesRepId: "rep_1" },
+      ],
+      alreadyDone: new Set(),
+      now: NOW,
+    });
+    expect(planned.map((p) => p.targetId)).toEqual(["p_stale"]);
+  });
+
   it("un délai réglé hors bornes est ramené dans les bornes", () => {
     const rule = AUTOMATION_RULES.find((r) => r.key === "trial.ending_soon")!;
     expect(clampOffset(rule, 3)).toBe(-1);
@@ -116,6 +187,99 @@ describe("automatisations : sûres par défaut", () => {
 
   it("chaque règle e-mail pointe vers un modèle existant", () => {
     for (const rule of AUTOMATION_RULES) if (rule.channel === "EMAIL") expect(emailTemplate(rule.templateKey!)).not.toBeNull();
+  });
+});
+
+describe("automatisations : échéances au jour de Paris", () => {
+  const plan = (keys: string[], input: { subscriptions?: SubscriptionCandidate[]; cancellations?: Parameters<typeof planAutomations>[0]["cancellations"] }, now: Date, offsets: Record<string, number> = {}): PlannedAutomation[] =>
+    planAutomations({ rules: enabled(keys, offsets), subscriptions: input.subscriptions ?? [], cancellations: input.cancellations ?? [], prospects: [], alreadyDone: new Set(), now });
+
+  it("J+1 part le lendemain au passage du matin, même pour un essai commencé après ce passage", () => {
+    // Essai commencé le 9 à 11 h 30 (Paris), après le passage de 8 h 15 UTC : la bienvenue part le 10 au matin.
+    const started = sub({ trialStartsAt: new Date("2026-10-09T09:30:00Z") });
+    expect(plan(["trial.welcome"], { subscriptions: [started] }, new Date("2026-10-10T08:15:00Z"))).toHaveLength(1);
+    expect(plan(["trial.welcome"], { subscriptions: [started] }, new Date("2026-10-09T21:00:00Z"))).toEqual([]);
+  });
+
+  it("le jour se lit à Paris, pas en UTC : 0 h 30 le 10 (Paris) est le 10, pas le 9", () => {
+    const started = sub({ trialStartsAt: new Date("2026-10-09T22:30:00Z") });
+    expect(dueDay(started.trialStartsAt!, 1)).toBe("2026-10-11");
+    expect(plan(["trial.welcome"], { subscriptions: [started] }, new Date("2026-10-10T08:15:00Z"))).toEqual([]);
+    expect(plan(["trial.welcome"], { subscriptions: [started] }, new Date("2026-10-11T08:15:00Z"))).toHaveLength(1);
+  });
+
+  it("« Le jour même » part le jour même, quelle que soit l'heure de la demande", () => {
+    const request = { id: "c_1", pharmacyId: "ph_1", status: "RECEIVED", requestedAt: new Date("2026-10-10T14:00:00Z"), confirmedAt: null };
+    const [planned] = plan(["cancellation.acknowledgement"], { cancellations: [request] }, new Date("2026-10-10T16:00:00Z"));
+    expect(planned).toMatchObject({ targetId: "c_1" });
+    // Échue depuis minuit, heure de Paris.
+    expect(planned.dueAt.toISOString()).toBe("2026-10-09T22:00:00.000Z");
+    // Sans passage le soir même, le passage du lendemain matin la rattrape.
+    expect(plan(["cancellation.acknowledgement"], { cancellations: [request] }, new Date("2026-10-11T08:15:00Z"))).toHaveLength(1);
+  });
+
+  it(`rattrapage : jusqu'à ${CATCH_UP_DAYS} jours calendaires après le jour d'échéance, pas au-delà`, () => {
+    expect(isDueNow("2026-10-10", new Date("2026-10-09T21:59:00Z"))).toBe(false);
+    expect(isDueNow("2026-10-10", new Date("2026-10-09T22:00:00Z"))).toBe(true);
+    expect(isDueNow("2026-10-10", new Date("2026-10-12T21:59:00Z"))).toBe(true);
+    expect(isDueNow("2026-10-10", new Date("2026-10-12T22:00:00Z"))).toBe(false);
+  });
+
+  it("{{jours_restants}} : des jours calendaires, pas des tranches de 24 h arrondies", () => {
+    const trialEnd = new Date("2026-10-20T14:00:00Z");
+    expect(calendarDaysUntil(trialEnd, new Date("2026-10-16T08:15:00Z"))).toBe(4);
+    expect(Math.ceil((trialEnd.getTime() - new Date("2026-10-16T08:15:00Z").getTime()) / DAY)).toBe(5);
+    expect(calendarDaysUntil(trialEnd, new Date("2026-10-20T06:00:00Z"))).toBe(0);
+    expect(calendarDaysUntil(trialEnd, new Date("2026-10-22T06:00:00Z"))).toBe(0);
+  });
+});
+
+describe("automatisations : ordre des relances de paiement", () => {
+  const rules = (settings: Record<string, { enabled: boolean; offsetDays: number }>) => resolveRules(Object.entries(settings).map(([key, v]) => ({ key, ...v })));
+
+  it("la deuxième relance part après la première, jamais le même jour", () => {
+    const current = rules({ "payment.reminder_1": { enabled: true, offsetDays: 5 } });
+    expect(paymentSequenceError(current, { key: "payment.reminder_2", enabled: true, offsetDays: 4 })).toMatch(/« Deuxième relance » doit partir après « Première relance » \(J\+5\) : choisissez au moins J\+6/);
+    expect(paymentSequenceError(current, { key: "payment.reminder_2", enabled: true, offsetDays: 5 })).not.toBeNull();
+    expect(paymentSequenceError(current, { key: "payment.reminder_2", enabled: true, offsetDays: 6 })).toBeNull();
+  });
+
+  it("la première relance ne peut pas être repoussée après la deuxième", () => {
+    const current = rules({ "payment.reminder_2": { enabled: true, offsetDays: 7 } });
+    expect(paymentSequenceError(current, { key: "payment.reminder_1", enabled: true, offsetDays: 8 })).toMatch(/doit partir avant « Deuxième relance » \(J\+7\)/);
+    expect(paymentSequenceError(current, { key: "payment.reminder_1", enabled: true, offsetDays: 6 })).toBeNull();
+  });
+
+  it("l'alerte à l'équipe au plus tôt le jour de la dernière relance", () => {
+    const current = rules({ "payment.reminder_1": { enabled: true, offsetDays: 2 }, "payment.reminder_2": { enabled: true, offsetDays: 7 } });
+    expect(paymentSequenceError(current, { key: "payment.internal_alert", enabled: true, offsetDays: 6 })).toMatch(/au plus tôt le même jour que « Deuxième relance »/);
+    expect(paymentSequenceError(current, { key: "payment.internal_alert", enabled: true, offsetDays: 7 })).toBeNull();
+  });
+
+  it("une règle désactivée ne compte pas ; désactiver est toujours permis ; les autres scénarios ne sont pas concernés", () => {
+    const current = rules({ "payment.reminder_2": { enabled: false, offsetDays: 3 } });
+    expect(paymentSequenceError(current, { key: "payment.reminder_1", enabled: true, offsetDays: 5 })).toBeNull();
+    expect(paymentSequenceError(rules({ "payment.reminder_1": { enabled: true, offsetDays: 9 } }), { key: "payment.reminder_2", enabled: false, offsetDays: 2 })).toBeNull();
+    expect(paymentSequenceError(current, { key: "trial.welcome", enabled: true, offsetDays: 0 })).toBeNull();
+  });
+});
+
+describe("« Contacter » : les modèles proposés", () => {
+  const keysOf = (list: { key: string }[]) => list.map((t) => t.key);
+
+  it("ni relance de contrat ni résiliation hors de leur contexte", () => {
+    const offered = keysOf(contactTemplateChoices(EMAIL_TEMPLATES, { audience: "Titulaire" }));
+    expect(offered).not.toContain("contract.reminder");
+    expect(offered).not.toContain("cancellation.received");
+    expect(offered).not.toContain("cancellation.confirmed");
+    expect(offered).toEqual(expect.arrayContaining(["trial.ending_soon", "payment.failed_reminder", "generic.message"]));
+  });
+
+  it("un modèle lié à un contexte reste proposé quand l'appelant le demande", () => {
+    const offered = keysOf(contactTemplateChoices(EMAIL_TEMPLATES, { defaultTemplateKey: "cancellation.received" }));
+    expect(offered).toContain("cancellation.received");
+    expect(offered).not.toContain("cancellation.confirmed");
+    expect(offered).not.toContain("contract.reminder");
   });
 });
 

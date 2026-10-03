@@ -20,6 +20,13 @@ export type DispatchKind =
   | "PAYMENT_FAILED"
   | "TRIAL_ENDING"
   | "SUBSCRIPTION_STARTED"
+  | "CONTRACT_SIGNED_PHARMACY"
+  | "CONTRACT_FINALIZED"
+  | "SUBSCRIPTION_INVITE"
+  | "EMAIL_CONFIRMATION"
+  | "SUBSCRIPTION_RECEIVED"
+  | "SITE_LEAD_ACK"
+  | "INSTALL_GUIDE"
   /** Un modèle du centre de modèles (relance automatique, envoi manuel, test). */
   | "TEMPLATE";
 

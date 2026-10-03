@@ -326,7 +326,7 @@ export const SYSTEM_EMAILS: { label: string; trigger: string; recipient: string 
   { label: "Accès à l'espace (bienvenue, nouveau mot de passe)", trigger: "Création d'officine, renvoi d'accès, mot de passe oublié", recipient: "Membre de l'officine" },
   { label: "Demande de signature du contrat", trigger: "Envoi du contrat", recipient: "Signataire de l'officine" },
   { label: "Contrat signé par l'officine, puis finalisé", trigger: "Signature électronique", recipient: "Signataire de l'officine" },
-  { label: "Confirmation d'adresse avant contrat", trigger: "Souscription depuis le site", recipient: "Demandeur" },
+  { label: "Confirmation d'adresse avant contrat, ou accusé de réception de la demande", trigger: "Souscription depuis le site (accusé seul quand l'équipe doit d'abord vérifier le dossier)", recipient: "Demandeur" },
   { label: "Lien d'activation de l'abonnement", trigger: "Envoi du lien de paiement depuis la console", recipient: "Titulaire" },
   { label: "Abonnement démarré et guide d'installation", trigger: "Premier paiement ou début d'essai chez Stripe", recipient: "Titulaire" },
   { label: "Paiement échoué", trigger: "Notification Stripe d'échec de paiement", recipient: "Titulaire" },
