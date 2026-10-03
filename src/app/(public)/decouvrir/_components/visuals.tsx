@@ -9,15 +9,20 @@ import { cn } from "@/lib/utils";
  * démonstration : chaque visuel le dit (« exemple »).
  */
 
+/**
+ * L'exemple suit une vraie règle du moteur (« Photosensibilisation », règle de
+ * sécurité : une cycline rend la peau sensible au soleil, RCP de la
+ * doxycycline). Produit, prix, marge et stock : catalogue de démonstration.
+ */
 const EXAMPLE = {
-  drug: "AMOXICILLINE 1 g cp disp.",
+  drug: "DOXYCYCLINE 100 mg cp séc.",
   second: "PARACÉTAMOL 1000 mg cp",
-  need: "Tolérance digestive sous antibiotique",
-  product: "Flore Équilibre 10 milliards",
-  tile: "/site/produits/flore-equilibre-10-milliards.webp",
-  price: "14,90 €",
-  margin: "8,70 €",
-  stock: 34,
+  need: "Protection solaire sous doxycycline",
+  product: "Crème solaire SPF 50+",
+  tile: "/site/produits/creme-solaire-spf50.webp",
+  price: "16,90 €",
+  margin: "7,40 €",
+  stock: 18,
 };
 
 /** La lueur de balayage : une bande qui descend, très discrète. Désactivée si l'utilisateur réduit les animations. */
@@ -136,8 +141,8 @@ export function StepScan() {
     <div className="relative w-full max-w-[230px] overflow-hidden rounded-xl border border-border-subtle bg-surface-card p-3 shadow-sm">
       <style>{SCAN_CSS}</style>
       <div className="h-1.5 rounded-full bg-gradient-to-r from-brand-600 to-brand-400" />
-      <p className="mt-2.5 text-[12.5px] font-semibold text-text-primary">AMOXICILLINE 1 g</p>
-      <p className="text-[11px] text-text-tertiary">comprimé dispersible</p>
+      <p className="mt-2.5 text-[12.5px] font-semibold text-text-primary">DOXYCYCLINE 100 mg</p>
+      <p className="text-[11px] text-text-tertiary">comprimé sécable</p>
       <div className="relative mt-3 overflow-hidden rounded-md bg-white p-1.5">
         <svg viewBox="0 0 160 40" className="h-10 w-full" preserveAspectRatio="none">
           {BARS.map((bar, i) => (
@@ -200,8 +205,8 @@ export function StepConseil() {
 export function StepSuivi() {
   return (
     <div className="w-full max-w-[210px] rounded-[22px] border-[5px] border-ink-900 bg-surface-card p-2.5 shadow-sm">
-      <p className="font-mono text-[9.5px] tracking-[0.1em] text-brand-700 uppercase">Votre bilan</p>
-      <p className="mt-0.5 text-[12px] font-semibold text-text-primary">AMOXICILLINE 1 g</p>
+      <p className="font-mono text-[9.5px] tracking-[0.1em] text-brand-700 uppercase">Plan conseil patient</p>
+      <p className="mt-0.5 text-[12px] font-semibold text-text-primary">DOXYCYCLINE 100 mg</p>
       <p className="text-[10.5px] text-text-secondary">Antibiotique : traite l&apos;infection</p>
       <div className="mt-1.5 grid grid-cols-2 gap-1 text-[10.5px]">
         <span className="rounded-md bg-brand-50 px-2 py-1 text-brand-900">Matin · 1</span>
@@ -210,7 +215,7 @@ export function StepSuivi() {
       <div className="mt-2 border-t border-border-subtle pt-1.5">
         <p className="font-mono text-[9px] tracking-[0.1em] text-text-tertiary uppercase">Conseil du pharmacien</p>
         <p className="text-[11px] font-semibold text-text-primary">{EXAMPLE.product}</p>
-        <p className="text-[10.5px] text-text-secondary">Pendant le traitement, pour la flore</p>
+        <p className="text-[10.5px] text-text-secondary">Avant chaque sortie au soleil</p>
       </div>
       <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-brand-600 px-2 py-1.5 text-[10.5px] font-medium text-white">
         <CalendarCheck className="size-3" /> 08:00 · Rappel de prise

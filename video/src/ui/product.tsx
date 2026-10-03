@@ -10,22 +10,31 @@ import { mix } from "./counter";
  * démonstration : des exemples, signalés comme tels à l'écran.
  */
 
+/**
+ * L'exemple suit une vraie règle du moteur : « Photosensibilisation »
+ * (src/core/ai/engines/advice.ts, règle de sécurité — une cycline rend la
+ * peau sensible au soleil, RCP de la doxycycline). Textes repris de la règle.
+ */
 export const EXAMPLE = {
   ref: "ORD-0042",
-  drugs: ["AMOXICILLINE 1 g", "PARACÉTAMOL 1000 mg"],
-  product: "Flore Équilibre 10 milliards",
-  price: "14,90 €",
-  margin: "marge 8,70 €",
-  stock: 34,
-  ruleTitle: "Tolérance digestive pendant l'antibiothérapie",
-  need: "Tolérance digestive sous antibiotique",
-  reason: "Antibiothérapie (amoxicilline) : la flore intestinale peut être perturbée pendant la cure.",
-  say: "« Amoxicilline est un antibiotique : il peut perturber la flore intestinale. Flore Équilibre 10 milliards l'accompagne, à prendre à distance de l'antibiotique. »",
+  drugs: ["DOXYCYCLINE 100 mg", "PARACÉTAMOL 1000 mg"],
+  product: "Crème solaire SPF 50+",
+  tile: "creme-solaire-spf50",
+  price: "16,90 €",
+  margin: "marge 7,40 €",
+  stock: 18,
+  ruleTitle: "Photosensibilisation",
+  need: "Protection solaire sous doxycycline",
+  reason: "Doxycycline : la peau devient plus sensible au soleil pendant tout le traitement.",
+  toast: "Doxycycline photosensibilise : l'exposition au soleil demande une précaution.",
+  say: "« Pendant tout le traitement, la doxycycline rend la peau plus sensible au soleil. Évitez l'exposition directe : Crème solaire SPF 50+ protège les zones découvertes. »",
+  planAdvice: "avant chaque sortie, pendant tout le traitement.",
 };
 
 /** Les produits qui ont leur vraie boîte (la même que sur le site) ; les autres gardent leur vignette. */
 const BOXES: Record<string, string> = {
   "probio-flore-10": "produits/boites/flore-equilibre-10-milliards.webp",
+  "creme-solaire-spf50": "produits/boites/creme-solaire-spf50.webp",
   "spray-nasal-marin": "produits/boites/spray-nasal-eau-de-mer.webp",
   "pastilles-gorge": "produits/boites/pastilles-gorge-miel-citron.webp",
 };
@@ -69,7 +78,7 @@ export function Toast({ w }: { w: number }) {
       <div style={{ fontSize: 12 * k, fontWeight: 600, color: C.toastTitle }}>PharmaBoost · {EXAMPLE.ref}</div>
       <div style={{ fontSize: 13.5 * k, fontWeight: 600, color: C.white, marginTop: 3 * k }}>{EXAMPLE.drugs.join(" · ")}</div>
       <div style={{ fontSize: 13 * k, color: C.white, lineHeight: 1.4, marginTop: 8 * k }}>
-        • {EXAMPLE.product} · {EXAMPLE.price} · Antibiothérapie (AMOXICILLINE) : la flore intestinale peut être perturbée pendant la cure.
+        • {EXAMPLE.product} · {EXAMPLE.price} · {EXAMPLE.toast}
       </div>
       <div style={{ fontSize: 10.5 * k, color: C.toastFoot, marginTop: 9 * k }}>Cliquer pour ouvrir dans PharmaBoost · disparaît dans 15 s</div>
     </div>
@@ -109,7 +118,7 @@ export function AdviceCard({ w, show, accepted, press, stockPulse = 0 }: { w: nu
         <div style={block(2)}>
           <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: C.ink500 }}>Solution disponible dans votre officine</div>
           <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 12 }}>
-            <ProductTile name="probio-flore-10" size={96} />
+            <ProductTile name={EXAMPLE.tile} size={96} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 30, fontWeight: 600, color: C.ink900, letterSpacing: "-0.015em" }}>{EXAMPLE.product}</div>
               <div style={{ display: "flex", gap: 10, marginTop: 10, ...block(3) }}>

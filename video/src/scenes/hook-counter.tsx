@@ -34,7 +34,7 @@ export function Hook(_: { intro: number }) {
     <DarkStage glow={C.brand800}>
       <AbsoluteFill style={{ transform: `translate(${tx}px, ${ty}px) scale(${scale})` }}>
         <At x={box.x} y={box.y}>
-          <MedBox name="AMOXICILLINE 1 g" form="comprimé dispersible" w={box.w} lit={lit} />
+          <MedBox name="DOXYCYCLINE 100 mg" form="comprimé sécable" w={box.w} lit={lit} />
         </At>
         <Laser from={nose} to={[bx, by + sweep * laserOn]} spread={250} on={laserOn} />
         <ScannerAt nx={nose[0]} ny={nose[1]} w={380} deg={24} led={lit} />
@@ -61,7 +61,7 @@ export function Hook(_: { intro: number }) {
 
 const BIPS = [36, 72];
 const LINES = [
-  { text: "AMOXICILLINE 1 g cp disp. — 1 boîte", at: BIPS[0] },
+  { text: "DOXYCYCLINE 100 mg cp séc. — 1 boîte", at: BIPS[0] },
   { text: "PARACÉTAMOL 1000 mg cp — 1 boîte", at: BIPS[1] },
 ];
 
@@ -81,7 +81,7 @@ export function Counter({ intro }: { intro: number }) {
 
   // La petite scène de scan, à droite : une boîte par bip.
   const boxes = [
-    { name: "AMOXICILLINE 1 g", form: "comprimé dispersible", in: 8, bip: BIPS[0], out: 46 },
+    { name: "DOXYCYCLINE 100 mg", form: "comprimé sécable", in: 8, bip: BIPS[0], out: 46 },
     { name: "PARACÉTAMOL 1000 mg", form: "comprimé", in: 50, bip: BIPS[1], out: 84 },
   ];
   const box = { x: 1290, y: 640, w: 340 };
@@ -140,7 +140,7 @@ export function Counter({ intro }: { intro: number }) {
 }
 
 const ROWS = [
-  { name: "AMOXICILLINE 1 g", at: 132 },
+  { name: "DOXYCYCLINE 100 mg", at: 132 },
   { name: "PARACÉTAMOL 1000 mg", at: 142 },
 ];
 

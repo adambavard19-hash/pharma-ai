@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Pourquoi PharmaBoost",
-  description: "Personne ne peut penser à tout. Au comptoir, PharmaBoost propose le bon conseil et le bon produit pour chaque ordonnance. À la maison, le patient a son bilan.",
+  description: "Et si chaque délivrance révélait tout son potentiel de conseil ? Au comptoir, PharmaBoost propose le bon conseil et le bon produit pour chaque ordonnance. À la maison, le patient a son plan conseil.",
 };
 
 /**
@@ -19,14 +19,14 @@ export const metadata: Metadata = {
  * tête, pas la compétence de ceux qui conseillent.
  */
 
-const FLORE = "/site/produits/flore-equilibre-10-milliards.webp";
+const SOLAIRE = "/site/produits/creme-solaire-spf50.webp";
 
 export default function WhyPage() {
   return (
     <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
       <div className="max-w-3xl">
-        <SectionHead as="h1" kicker="Pourquoi PharmaBoost" title="Personne ne peut penser à tout.">
-          Au comptoir, le pharmacien enchaîne les ordonnances. À la maison, le patient se retrouve seul avec ses boîtes. PharmaBoost aide à ces deux moments.
+        <SectionHead as="h1" kicker="Pourquoi PharmaBoost" title="Et si chaque délivrance révélait tout son potentiel de conseil ?">
+          Comment ne manquer aucune opportunité de conseil au comptoir ? Votre équipe officinale peut-elle penser à tout le potentiel de conseil, à chaque délivrance ? <span className="font-semibold text-text-primary">PharmaBoost, oui.</span> Au comptoir pour l&apos;équipe, à la maison pour le patient.
         </SectionHead>
         <VideoButton film="pourquoi" label="Voir en vidéo" className="mt-8" />
       </div>
@@ -46,11 +46,11 @@ export default function WhyPage() {
         </div>
 
         <Compare
-          context={<Context icon={<FileText className="size-4" />} label="Ordonnance du patient" value="AMOXICILLINE 1 g · PARACÉTAMOL 1000 mg" />}
+          context={<Context icon={<FileText className="size-4" />} label="Ordonnance du patient" value="DOXYCYCLINE 100 mg · PARACÉTAMOL 1000 mg" />}
           without={
             <>
               <p className="text-[13.5px] text-text-tertiary">Ce que le pharmacien doit se rappeler, seul :</p>
-              <Questions items={["Un probiotique avec cet antibiotique ? Lequel ?", "Est-ce qu'il nous en reste en rayon ?", "Une précaution à rappeler ?", "Trois patients attendent…"]} />
+              <Questions items={["Cet antibiotique rend-il la peau sensible au soleil ?", "Une protection solaire en rayon ? Laquelle ?", "Une précaution à rappeler ?", "Trois patients attendent…"]} />
             </>
           }
           withPb={
@@ -60,17 +60,17 @@ export default function WhyPage() {
                 <p className="font-mono text-[10.5px] tracking-[0.12em] text-brand-700 uppercase">Conseil associé</p>
                 <div className="mt-2 flex items-center gap-3">
                   {/* eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille */}
-                  <img src={FLORE} alt="" width={60} height={60} className="shrink-0 rounded-xl bg-surface-app object-contain" />
+                  <img src={SOLAIRE} alt="" width={60} height={60} className="shrink-0 rounded-xl bg-surface-app object-contain" />
                   <div className="min-w-0">
-                    <p className="text-[15px] leading-tight font-semibold text-text-primary">Flore Équilibre 10 milliards</p>
-                    <p className="mt-0.5 text-[13px] text-text-secondary">Probiotique · 1 par jour pendant le traitement</p>
+                    <p className="text-[15px] leading-tight font-semibold text-text-primary">Crème solaire SPF 50+</p>
+                    <p className="mt-0.5 text-[13px] text-text-secondary">Protection solaire · avant chaque exposition</p>
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-medium">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-1 text-success-700 ring-1 ring-success-100 ring-inset"><span className="size-1.5 rounded-full bg-success-600" /> En rayon · 34</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-1 text-success-700 ring-1 ring-success-100 ring-inset"><span className="size-1.5 rounded-full bg-success-600" /> En rayon · 18</span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-brand-800 ring-1 ring-brand-200 ring-inset"><CheckCircle2 className="size-3.5" /> Précautions vérifiées</span>
                 </div>
-                <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-[13px] leading-5 text-brand-900">« Votre antibiotique peut perturber la flore intestinale. Ce probiotique l&apos;accompagne. »</p>
+                <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-[13px] leading-5 text-brand-900">« Pendant tout le traitement, la doxycycline rend la peau plus sensible au soleil. Évitez l&apos;exposition directe : cette crème protège les zones découvertes. »</p>
               </div>
             </>
           }
@@ -94,7 +94,7 @@ export default function WhyPage() {
               Une fois rentré, le patient ne se souvient plus de tout : quel médicament le matin, lequel le soir, pendant combien de jours, et à quoi sert chacun. Il hésite, oublie une prise ou arrête trop tôt.
             </p>
             <p className="font-medium text-text-primary">
-              Avec PharmaBoost, il repart avec son bilan : chaque médicament, à quoi il sert, quand le prendre et jusqu&apos;à quand, avec vos conseils. Sur son téléphone, par e-mail ou sur papier, avec des rappels.
+              Avec PharmaBoost, il repart avec son plan conseil : la posologie, l&apos;indication de chaque médicament et vos conseils. Sur son téléphone via un QR code, par e-mail ou en version imprimée, avec des rappels.
             </p>
           </div>
         </div>
@@ -104,7 +104,7 @@ export default function WhyPage() {
           without={
             <>
               <div className="flex flex-wrap gap-2">
-                {["AMOXICILLINE 1 g", "PARACÉTAMOL 1000 mg", "Flore Équilibre"].map((box) => (
+                {["DOXYCYCLINE 100 mg", "PARACÉTAMOL 1000 mg", "Crème solaire SPF 50+"].map((box) => (
                   <span key={box} className="rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-[12px] text-text-primary shadow-sm">{box}</span>
                 ))}
               </div>
@@ -114,11 +114,11 @@ export default function WhyPage() {
           }
           withPb={
             <div className="mx-auto w-full max-w-[330px] rounded-[26px] border-[5px] border-ink-900 bg-surface-card p-3.5 shadow-sm">
-              <p className="font-mono text-[10.5px] tracking-[0.12em] text-brand-700 uppercase">Votre bilan · votre pharmacie</p>
+              <p className="font-mono text-[10.5px] tracking-[0.12em] text-brand-700 uppercase">Plan conseil patient · votre pharmacie</p>
               <ul className="mt-2.5 divide-y divide-border-subtle">
-                <Med name="AMOXICILLINE 1 g" why="Antibiotique : traite l'infection" when={["Matin · 1", "Soir · 1"]} until="6 jours" />
+                <Med name="DOXYCYCLINE 100 mg" why="Antibiotique : traite l'infection" when={["Matin · 1", "Soir · 1"]} until="10 jours" />
                 <Med name="PARACÉTAMOL 1000 mg" why="Contre la douleur et la fièvre" when={["Si besoin"]} />
-                <Med name="Flore Équilibre 10 milliards" why="Conseil : accompagne la flore pendant l'antibiotique" when={["1 par jour"]} until="6 jours" advice />
+                <Med name="Crème solaire SPF 50+" why="Conseil : protège la peau du soleil pendant le traitement" when={["Avant chaque sortie"]} until="10 jours" advice />
               </ul>
               <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-brand-600 px-2.5 py-1.5 text-[12px] font-medium text-white">
                 <CalendarCheck className="size-3.5" /> 08:00 · Rappel de prise

@@ -6,7 +6,7 @@ import { EXAMPLE, ProductTile } from "./product";
 /**
  * Le plan du patient tel qu'il s'ouvre sur son téléphone (/plan/[id]) : en-tête
  * de l'officine, bouton des rappels, tableau des prises. Posologie du scénario
- * de démonstration : amoxicilline 1 g, matin et soir, 6 jours.
+ * de démonstration : doxycycline 100 mg, matin et soir, 10 jours.
  */
 export function Phone({ h = 860, children }: { h?: number; children: React.ReactNode }) {
   const w = h * 0.49;
@@ -35,16 +35,16 @@ export function PlanScreen({ show }: { show: (i: number) => number }) {
         <CalendarCheck size={18} /> Ajouter les rappels à mon agenda
       </div>
       <div style={{ background: C.white, borderRadius: 16, padding: "16px 14px", display: "flex", flexDirection: "column", gap: 10, ...b(1) }}>
-        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.1em", color: C.brand700 }}>PLAN PERSONNALISÉ</div>
+        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.1em", color: C.brand700 }}>PLAN CONSEIL PATIENT</div>
         <div style={{ fontSize: 19, fontWeight: 600, color: C.ink900 }}>Votre traitement au quotidien</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, 34px)", gap: 6, alignItems: "center", fontSize: 11.5, color: C.ink500, fontWeight: 500 }}>
           <span>Médicament</span><span>Matin</span><span>Midi</span><span>Soir</span><span>Couch.</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, 34px)", gap: 6, alignItems: "center", ...b(2) }}>
           <div>
-            <div style={{ fontSize: 14.5, fontWeight: 600, color: C.ink900 }}>AMOXICILLINE 1 g</div>
+            <div style={{ fontSize: 14.5, fontWeight: 600, color: C.ink900 }}>DOXYCYCLINE 100 mg</div>
             <div style={{ fontSize: 12.5, color: C.brand700 }}>Antibiotique : traite l&apos;infection</div>
-            <div style={{ fontSize: 12.5, color: C.ink500 }}>Pendant 6 jours</div>
+            <div style={{ fontSize: 12.5, color: C.ink500 }}>Pendant 10 jours</div>
           </div>
           <Dot on /><Dot on={false} /><Dot on /><Dot on={false} />
         </div>
@@ -52,8 +52,8 @@ export function PlanScreen({ show }: { show: (i: number) => number }) {
       <div style={{ background: C.white, borderRadius: 16, padding: "14px", ...b(3) }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: C.ink900 }}>Les conseils de votre pharmacien</div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8 }}>
-          <ProductTile name="probio-flore-10" size={46} />
-          <div style={{ fontSize: 13, color: C.ink700, lineHeight: 1.35 }}>{EXAMPLE.product} : à prendre à distance de l&apos;antibiotique.</div>
+          <ProductTile name={EXAMPLE.tile} size={46} />
+          <div style={{ fontSize: 13, color: C.ink700, lineHeight: 1.35 }}>{EXAMPLE.product} : {EXAMPLE.planAdvice}</div>
         </div>
       </div>
     </div>
@@ -109,7 +109,7 @@ const card: CSSProperties = { background: C.white, borderRadius: 24, border: `1p
 export function StockPanel({ at, bipAt }: { at: number; bipAt: number }) {
   const f = useF();
   const rows = [
-    { tile: "probio-flore-10", name: EXAMPLE.product, cat: "Probiotiques", qty: EXAMPLE.stock, tone: "ok" as const },
+    { tile: EXAMPLE.tile, name: EXAMPLE.product, cat: "Protection solaire", qty: EXAMPLE.stock, tone: "ok" as const },
     { tile: "spray-nasal-marin", name: "Spray nasal eau de mer", cat: "ORL", qty: 12, tone: "ok" as const },
     { tile: "pastilles-gorge", name: "Pastilles gorge miel-citron", cat: "ORL", qty: 3, tone: "low" as const },
     { tile: "vitamine-c-1000", name: "Vitamine C 1000", cat: "Vitamines", qty: 18, tone: "ok" as const },

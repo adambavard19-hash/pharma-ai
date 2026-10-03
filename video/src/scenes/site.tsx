@@ -8,29 +8,49 @@ import { CalendarBanner, Phone, PlanScreen } from "../ui/panels";
 import { Sfx } from "../ui/sfx";
 
 /* ==========================================================================
- * Les scènes du site refait (octobre 2026) : la promesse « Personne ne peut
- * penser à tout », les trois étapes « Scan. Conseil. Bilan. », les exemples
- * de conseil, le bilan du patient et la sécurité. Mêmes mots que le site.
+ * Les scènes du site refait (octobre 2026) : les trois questions d'ouverture
+ * (« Et si chaque délivrance révélait tout son potentiel de conseil ? »), les
+ * trois étapes, les exemples de conseil, le plan conseil du patient et la
+ * sécurité. Mêmes mots que le site.
  * ======================================================================== */
 
-/** « Personne ne peut penser à tout. » puis « PharmaBoost y pense avec vous. » — 216 images. */
+/** Durée de l'ouverture : six mesures à 120 BPM. */
+export const PROMESSE_FRAMES = 432;
+
+/**
+ * Trois questions, puis la réponse : « Et si chaque délivrance révélait tout
+ * son potentiel de conseil ? », « Comment ne manquer aucune opportunité de
+ * conseil au comptoir ? », « Votre équipe officinale peut-elle penser à tout
+ * le potentiel de conseil à chaque délivrance ? » → « PharmaBoost, oui. »
+ * 432 images.
+ */
 export function Promesse({ intro }: { intro: number }) {
   const f = useF();
-  const exit = tw(f, [190, 214], [0, 1], EASE_IN_OUT);
+  const exit = tw(f, [406, 430], [0, 1], EASE_IN_OUT);
   return (
-    <AbsoluteFill style={{ opacity: (1 - exit) * (intro ? tw(f, [-intro, 0], [0, 1]) : 1), transform: `scale(${1 + 0.05 * tw(f, [0, 190], [0, 1]) + 0.22 * exit})` }}>
+    <AbsoluteFill style={{ opacity: (1 - exit) * (intro ? tw(f, [-intro, 0], [0, 1]) : 1), transform: `scale(${1 + 0.05 * tw(f, [0, 406], [0, 1]) + 0.22 * exit})` }}>
       <DarkStage>
-        <At x={0} y={360} w={1920}>
-          <Kinetic at={8} out={92} size={124} color={C.white} align="center" stagger={3} lines={[words("Personne ne peut"), words("*penser à tout.*", C.brand300)]} />
+        <At x={0} y={330} w={1920}>
+          <Kinetic at={8} out={104} size={104} color={C.white} align="center" stagger={2} lines={[words("Et si chaque délivrance"), words("révélait tout son potentiel"), words("*de conseil ?*", C.brand300)]} />
         </At>
-        <At x={0} y={360} w={1920}>
-          <Kinetic at={106} size={124} color={C.white} align="center" stagger={3} lines={[words("PharmaBoost y pense"), words("*avec vous.*", C.accent300)]} />
+        <At x={0} y={380} w={1920}>
+          <Kinetic at={116} out={204} size={100} color={C.white} align="center" stagger={2} lines={[words("Comment ne manquer aucune"), words("*opportunité de conseil* au comptoir ?", C.brand300)]} />
+        </At>
+        <At x={0} y={330} w={1920}>
+          <Kinetic at={216} out={318} size={84} color={C.white} align="center" stagger={2} lines={[words("Votre équipe officinale peut-elle penser"), words("à tout le potentiel de conseil"), words("*à chaque délivrance ?*", C.brand300)]} />
+        </At>
+        <At x={0} y={420} w={1920}>
+          <Kinetic at={330} size={150} color={C.white} align="center" stagger={3} lines={[words("PharmaBoost, *oui.*", C.accent300)]} />
         </At>
         <Sfx at={8} name="impact" volume={0.45} />
-        {[12, 18, 24, 30].map((a) => <Sfx key={a} at={a} name="tic" volume={0.4} />)}
-        <Sfx at={92} name="whoosh" volume={0.45} />
-        <Sfx at={106} name="pop" volume={0.45} />
-        <Sfx at={190} name="whoosh" volume={0.55} />
+        {[12, 18, 24].map((a) => <Sfx key={a} at={a} name="tic" volume={0.4} />)}
+        <Sfx at={104} name="whoosh" volume={0.4} />
+        <Sfx at={116} name="tic" volume={0.4} />
+        <Sfx at={204} name="whoosh" volume={0.4} />
+        <Sfx at={216} name="tic" volume={0.4} />
+        <Sfx at={318} name="whoosh" volume={0.45} />
+        <Sfx at={330} name="impact" volume={0.5} />
+        <Sfx at={406} name="whoosh" volume={0.55} />
       </DarkStage>
     </AbsoluteFill>
   );
@@ -69,7 +89,7 @@ export function Examples({ intro }: { intro: number }) {
   const enter = tw(f, [-intro, 4], [0, 1], EASE_IN_OUT);
   const exit = tw(f, [160, 178], [0, 1], EASE_IN_OUT);
   const rows = [
-    { rx: "Antibiotique", advice: "Probiotique", why: "L'antibiotique peut déséquilibrer la flore intestinale.", at: 34 },
+    { rx: "Antibiotique photosensibilisant", advice: "Protection solaire SPF 50+", why: "Ce traitement rend la peau plus sensible au soleil.", at: 34 },
     { rx: "Antibiotique, patient fatigué", advice: "Vitamines", why: "Pour accompagner la convalescence.", at: 60 },
     { rx: "Traitement contre l'acné", advice: "Crème hydratante et baume à lèvres", why: "Ce traitement assèche la peau et les lèvres.", at: 86 },
   ];
@@ -105,7 +125,7 @@ export function Examples({ intro }: { intro: number }) {
   );
 }
 
-/** « Il repart avec son bilan » : le téléphone du patient et le premier rappel. 216 images. */
+/** « Il repart avec son plan conseil » : le téléphone du patient et le premier rappel. 216 images. */
 export function Bilan({ intro }: { intro: number }) {
   const f = useF();
   const enter = tw(f, [-intro, 4], [0, 1], EASE_IN_OUT);
@@ -116,7 +136,7 @@ export function Bilan({ intro }: { intro: number }) {
     <AbsoluteFill style={{ opacity: enter * (1 - exit), transform: `translateY(${(1 - enter) * 100 - exit * 100}px)` }}>
       <LightStage>
         <At x={140} y={290} w={880}>
-          <TitleBlock chip="Le bilan du patient" chipAt={2} at={8} size={84} lines={[words("Il repart"), words("*avec son bilan.*", C.brand600)]} sub="La posologie, à quoi sert chaque médicament, vos conseils. Sur son téléphone, par e-mail ou sur papier." subAt={44} />
+          <TitleBlock chip="Plan conseil patient" chipAt={2} at={8} size={80} lines={[words("Il repart avec"), words("*son plan conseil.*", C.brand600)]} sub="La posologie, l'indication, vos conseils. Sur son téléphone via un QR code, un e-mail ou une version imprimée papier." subAt={44} />
         </At>
         <At x={1210} y={120 + (1 - phone) * 900}>
           <Phone h={840}>
@@ -124,7 +144,7 @@ export function Bilan({ intro }: { intro: number }) {
           </Phone>
         </At>
         <At x={1090} y={170} w={600} style={{ opacity: n1, transform: `translateY(${(1 - n1) * -40}px) scale(${0.96 + 0.04 * n1})` }}>
-          <CalendarBanner title="Matin — traitement" body="AMOXICILLINE 1 g — 1 comprimé" time="08:00" />
+          <CalendarBanner title="Matin — traitement" body="DOXYCYCLINE 100 mg — 1 comprimé" time="08:00" />
         </At>
         <Sfx at={8} name="swish" volume={0.45} />
         {[0, 1, 2, 3].map((i) => <Sfx key={i} at={30 + i * 9} name="tic" volume={0.3} />)}

@@ -7,6 +7,7 @@ import { MedBox } from "../ui/counter";
 import { Bubble, EndCard, Panel, Pharmacist, Queue, TitleBlock, Toggle } from "../ui/common";
 import { CalendarBanner, Phone, PlanScreen } from "../ui/panels";
 import { Sfx } from "../ui/sfx";
+import { EXAMPLE } from "../ui/product";
 
 /* ==========================================================================
  * « Pourquoi PharmaBoost » — 34 s, 120 BPM (un temps = 15 images, une mesure
@@ -22,7 +23,7 @@ function Title({ intro }: { intro: number }) {
     <AbsoluteFill style={{ opacity: (1 - exit) * (intro ? tw(f, [-intro, 0], [0, 1]) : 1), transform: `scale(${1 + 0.06 * tw(f, [0, 100], [0, 1]) + 0.25 * exit})` }}>
       <DarkStage>
         <At x={0} y={330} w={1920}>
-          <Kinetic at={10} size={132} color={C.white} align="center" stagger={3} lines={[words("Personne ne peut"), words("*penser à tout.*", C.brand300)]} />
+          <Kinetic at={10} size={104} color={C.white} align="center" stagger={2} lines={[words("Et si chaque délivrance"), words("révélait tout son potentiel"), words("*de conseil ?*", C.brand300)]} />
         </At>
         <Sfx at={10} name="impact" volume={0.4} />
         <Sfx at={13} name="tic" volume={0.5} />
@@ -40,8 +41,8 @@ function Counter({ intro }: { intro: number }) {
   const enter = tw(f, [-intro, 4], [0, 1], EASE_IN_OUT);
   const exit = tw(f, [344, 364], [0, 1], EASE_IN_OUT);
   const on = tw(f, [HALF - 6, HALF + 6], [0, 1], EASE_IN_OUT);
-  const doubts = ["Un probiotique avec cet antibiotique ?", "Il nous en reste en rayon ?", "Une précaution à rappeler ?"];
-  const answers = ["Flore Équilibre 10 milliards · 34 en rayon", "Précautions vérifiées", "Phrase prête : « votre antibiotique peut perturber la flore… »"];
+  const doubts = ["Cet antibiotique rend-il sensible au soleil ?", "Une protection solaire en rayon ?", "Une précaution à rappeler ?"];
+  const answers = [`${EXAMPLE.product} · ${EXAMPLE.stock} en rayon`, "Précautions vérifiées", "Phrase prête : « la doxycycline rend la peau sensible au soleil… »"];
   const doubtAt = [44, 64, 84];
   const answerAt = [HALF + 18, HALF + 34, HALF + 50];
   return (
@@ -95,9 +96,9 @@ function Home({ intro }: { intro: number }) {
   const doubts = ["C'est le matin ou le soir ?", "Pendant combien de jours ?", "Celui-là, il sert à quoi ?"];
   const doubtAt = [64, 84, 104];
   const boxes = [
-    { name: "AMOXICILLINE 1 g", form: "comprimé dispersible", x: 0, y: 150, r: -8, at: 14 },
+    { name: "DOXYCYCLINE 100 mg", form: "comprimé sécable", x: 0, y: 150, r: -8, at: 14 },
     { name: "PARACÉTAMOL 1000 mg", form: "comprimé", x: 230, y: 60, r: 7, at: 22 },
-    { name: "Flore Équilibre", form: "probiotique · gélules", x: 120, y: 250, r: -3, at: 30 },
+    { name: "Crème solaire SPF 50+", form: "protection solaire · 50 ml", x: 120, y: 250, r: -3, at: 30 },
   ];
   const phone = sp(f, HALF + 4, { damping: 22, stiffness: 120 });
   const n1 = sp(f, HALF + 48, { damping: 18, stiffness: 170 });
@@ -138,7 +139,7 @@ function Home({ intro }: { intro: number }) {
             </Phone>
           </At>
           <At x={1120} y={236} w={600} style={{ opacity: n1, transform: `translateY(${(1 - n1) * -40}px) scale(${0.96 + 0.04 * n1})` }}>
-            <CalendarBanner title="Matin — traitement" body="AMOXICILLINE 1 g — 1 comprimé" time="08:00" />
+            <CalendarBanner title="Matin — traitement" body="DOXYCYCLINE 100 mg — 1 comprimé" time="08:00" />
           </At>
           <At x={1120} y={348} w={600} style={{ opacity: n2, transform: `translateY(${(1 - n2) * -40}px) scale(${0.96 + 0.04 * n2})` }}>
             <CalendarBanner title="Fin du traitement — votre pharmacien prend de vos nouvelles" body="Fin du traitement : comment allez-vous ?" time="18:00" />

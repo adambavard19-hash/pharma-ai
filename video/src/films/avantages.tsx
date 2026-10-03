@@ -5,7 +5,7 @@ import type { FilmSpec } from "../FilmShell";
 import { DarkStage, LightStage, At } from "../ui/stage";
 import { Kinetic, words, type Word } from "../ui/kinetic";
 import { LgoWindow } from "../ui/counter";
-import { AdviceCard, Cursor, ProductTile, Toast } from "../ui/product";
+import { AdviceCard, Cursor, EXAMPLE, ProductTile, Toast } from "../ui/product";
 import { CalendarBanner, Phone, PilotagePanel, PlanScreen } from "../ui/panels";
 import { EndCard, LabsPanel, Panel } from "../ui/common";
 import { Sfx } from "../ui/sfx";
@@ -27,7 +27,7 @@ const ITEMS: Item[] = [
   { title: T("Votre logiciel", "*ne change pas.*"), sub: "Même scan, même comptoir. PharmaBoost travaille à côté.", visual: () => <VisualSoftware /> },
   { title: T("Le conseil arrive", "*au bip.*"), sub: "Quelques secondes après la dernière boîte, en coin d'écran.", visual: () => <VisualToast /> },
   { title: T("Choisi", "*dans votre stock.*"), sub: "Uniquement ce que vous avez en rayon, avec le prix et la marge.", visual: () => <VisualStock /> },
-  { title: T("Vous gardez", "*la décision.*"), sub: "Proposer, changer ou ignorer : un clic.", visual: () => <VisualDecision /> },
+  { title: T("Le pharmacien et le préparateur", "*gardent la décision.*"), sub: "Proposer, changer ou ignorer : un clic.", visual: () => <VisualDecision /> },
   { title: T("Vos laboratoires", "*en avant.*"), sub: "À conseil égal, leurs produits passent devant.", visual: () => <At x={980} y={250}><LabsPanel at={0} /></At> },
   { title: T("Un plan", "*pour chaque patient.*"), sub: "QR code, e-mail ou papier. Les rappels dans son agenda.", visual: () => <VisualPlan /> },
   { title: T("Vos résultats,", "*par collaborateur.*"), sub: "Proposés, acceptés, refusés : par jour, semaine, mois.", visual: () => <At x={930} y={170} style={{ transformOrigin: "0 0", transform: "scale(0.95)" }}><PilotagePanel at={0} /></At> },
@@ -84,7 +84,7 @@ function VisualSoftware() {
   return (
     <>
       <At x={980} y={260}>
-        <LgoWindow w={820} lines={[{ text: "AMOXICILLINE 1 g cp disp. — 1 boîte", at: 22 }]} />
+        <LgoWindow w={820} lines={[{ text: "DOXYCYCLINE 100 mg cp séc. — 1 boîte", at: 22 }]} />
       </At>
       <At x={1300} y={700} style={{ opacity: chip, transform: `translateY(${(1 - chip) * 30}px)` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 24px", borderRadius: 999, background: C.brand900, color: C.white, fontSize: 24, fontWeight: 600, boxShadow: "0 20px 40px -18px rgba(0,64,59,.6)" }}>
@@ -103,7 +103,7 @@ function VisualToast() {
   return (
     <>
       <At x={960} y={230}>
-        <LgoWindow w={820} lines={[{ text: "AMOXICILLINE 1 g cp disp. — 1 boîte", at: -999 }, { text: "PARACÉTAMOL 1000 mg cp — 1 boîte", at: -999 }]} />
+        <LgoWindow w={820} lines={[{ text: "DOXYCYCLINE 100 mg cp séc. — 1 boîte", at: -999 }, { text: "PARACÉTAMOL 1000 mg cp — 1 boîte", at: -999 }]} />
       </At>
       <At x={1200} y={520} style={{ opacity: t, transform: `translateY(${(1 - t) * 40}px) scale(${0.94 + 0.06 * t})` }}>
         <Toast w={600} />
@@ -114,7 +114,7 @@ function VisualToast() {
 }
 
 const TILES = [
-  { n: "vitamine-c-1000" }, { n: "probio-flore-10", pick: true }, { n: "spray-nasal-marin" }, { n: "magnesium-marin-b6" },
+  { n: "vitamine-c-1000" }, { n: "creme-solaire-spf50", pick: true }, { n: "spray-nasal-marin" }, { n: "magnesium-marin-b6" },
   { n: "probio-enfant", empty: true }, { n: "pastilles-gorge" }, { n: "probio-confort", match: true }, { n: "calcium-vitamine-d" },
   { n: "brumisateur" }, { n: "zinc-selenium" }, { n: "gel-hydroalcoolique" }, { n: "thermometre-frontal" },
 ];
@@ -139,9 +139,9 @@ function VisualStock() {
           })}
         </div>
         <div style={{ marginTop: 22, display: "flex", alignItems: "center", gap: 14, opacity: pick }}>
-          <span style={{ fontSize: 26, fontWeight: 600, color: C.ink900 }}>Flore Équilibre 10 milliards</span>
-          <span style={{ fontSize: 26, fontWeight: 600, color: C.ink900, marginLeft: "auto" }}>14,90 €</span>
-          <span style={{ fontSize: 18, fontWeight: 500, color: C.success700, background: C.success50, borderRadius: 999, padding: "6px 14px" }}>En stock : 34</span>
+          <span style={{ fontSize: 26, fontWeight: 600, color: C.ink900 }}>{EXAMPLE.product}</span>
+          <span style={{ fontSize: 26, fontWeight: 600, color: C.ink900, marginLeft: "auto" }}>{EXAMPLE.price}</span>
+          <span style={{ fontSize: 18, fontWeight: 500, color: C.success700, background: C.success50, borderRadius: 999, padding: "6px 14px" }}>En stock : {EXAMPLE.stock}</span>
         </div>
       </Panel>
       <Sfx at={30} name="swish" volume={0.35} />
@@ -182,7 +182,7 @@ function VisualPlan() {
         </Phone>
       </At>
       <At x={1150} y={200} w={600} style={{ opacity: n, transform: `translateY(${(1 - n) * -40}px) scale(${0.96 + 0.04 * n})` }}>
-        <CalendarBanner title="Matin — traitement" body="AMOXICILLINE 1 g — 1 comprimé" time="08:00" />
+        <CalendarBanner title="Matin — traitement" body="DOXYCYCLINE 100 mg — 1 comprimé" time="08:00" />
       </At>
       <Sfx at={34} name="notif" volume={0.6} />
     </>

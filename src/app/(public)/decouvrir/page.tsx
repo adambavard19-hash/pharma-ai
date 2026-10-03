@@ -16,9 +16,9 @@ import { cn } from "@/lib/utils";
 /** L'offre affichée quand la console n'en a pas encore publié : à régler dans Admin → Offres. */
 const FALLBACK_OFFER = { name: "PharmaBoost Officine", description: "", monthlyPriceCents: 6900, trialDays: 30 };
 
-/** Des conseils réels du moteur (probiotique et vitamines sous antibiotique, routine peau sous isotrétinoïne). */
+/** Des conseils réels du moteur (protection solaire sous cycline, vitamines sous antibiotique, routine peau sous isotrétinoïne). */
 const EXAMPLES = [
-  { rx: "Antibiotique", advice: "Probiotique", why: "L'antibiotique peut déséquilibrer la flore intestinale." },
+  { rx: "Antibiotique photosensibilisant", advice: "Protection solaire SPF 50+", why: "Ce traitement rend la peau plus sensible au soleil." },
   { rx: "Antibiotique, patient fatigué", advice: "Vitamines", why: "Pour accompagner la convalescence." },
   { rx: "Traitement contre l'acné", advice: "Crème hydratante et baume à lèvres", why: "Ce traitement assèche la peau et les lèvres." },
 ];
@@ -26,7 +26,7 @@ const EXAMPLES = [
 const STEPS = [
   { n: "01", title: "Vous scannez l'ordonnance", line: "Comme d'habitude, dans votre logiciel de gestion.", Visual: StepScan },
   { n: "02", title: "Les conseils apparaissent", line: "Les produits qui accompagnent le traitement, pris dans votre rayon. Vous les proposez, ou non.", Visual: StepConseil },
-  { n: "03", title: "Le patient repart avec son bilan", line: "La posologie, le rôle de chaque médicament et vos conseils, sur papier ou sur son téléphone.", Visual: StepSuivi },
+  { n: "03", title: "Le patient repart avec son plan conseil", line: "La posologie, l'indication, vos conseils. Sur son téléphone via un QR code, par e-mail ou en version imprimée.", Visual: StepSuivi },
 ];
 
 const STOCK_POINTS = [
@@ -47,12 +47,12 @@ const FAQ: { q: string; a: string }[] = [
   { q: "Compatible avec mon logiciel ?", a: "PharmaBoost fonctionne à côté de votre logiciel de gestion, sans le modifier. Premier déploiement : LGPI ; les autres logiciels s'installent avec nous." },
   { q: "Qui décide du conseil ?", a: "Le pharmacien. Chaque suggestion est proposée, remplacée ou ignorée par un membre de l'équipe." },
   { q: "Une IA choisit-elle les produits ?", a: "Non. L'IA analyse l'ordonnance et repère les besoins. Les produits viennent de règles écrites, de la sécurité et de votre stock." },
-  { q: "Quelles données sont conservées ?", a: "Aucune donnée patient. Le bilan est chiffré et remis au patient." },
+  { q: "Quelles données sont conservées ?", a: "Aucune donnée patient. Le plan conseil est chiffré et remis au patient." },
   { q: "Est-ce un dispositif médical ?", a: "Non. C'est un outil d'aide au conseil : il ne diagnostique pas et ne prescrit pas." },
   { q: "Quel engagement ?", a: "Aucun. Abonnement mensuel, résiliable à tout moment." },
 ];
 
-const INCLUDED = ["Tous les postes de comptoir", "Analyse d'ordonnance", "Conseil au scan", "Demande sans ordonnance", "Stock et marge", "Bilan patient et rappels", "Pilotage par collaborateur"];
+const INCLUDED = ["Tous les postes de comptoir", "Analyse d'ordonnance", "Conseil au scan", "Demande sans ordonnance", "Stock et marge", "Plan conseil patient et rappels", "Pilotage par collaborateur"];
 
 export default async function SitePage() {
   const [offerRow, live] = await Promise.all([loadPublicOffer(), loadLiveProof()]);
@@ -80,7 +80,7 @@ export default async function SitePage() {
               <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Bilan.</span>
             </h1>
             <p className="mt-7 max-w-xl text-[17px] leading-7 text-text-secondary">
-              Au comptoir, vous scannez les médicaments de l&apos;ordonnance. PharmaBoost vous montre aussitôt ce qu&apos;il est utile de conseiller en plus : probiotique, vitamines, crème… Et le patient repart avec le bilan de son traitement.
+              Au comptoir, vous scannez les médicaments de l&apos;ordonnance. PharmaBoost vous montre aussitôt ce qu&apos;il est utile de conseiller en plus : protection solaire, vitamines, soin… Et le patient repart avec son plan conseil.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Link href="/decouvrir/demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white shadow-sm hover:bg-brand-700">
@@ -128,7 +128,7 @@ export default async function SitePage() {
       <section id="fonctionnement" className="scroll-mt-20">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
           <div className="flex flex-wrap items-end justify-between gap-6">
-            <SectionHead kicker="Comment ça marche" title="Du scan au bilan, en trois étapes." />
+            <SectionHead kicker="Comment ça marche" title="Du scan au plan conseil, en trois étapes." />
             <VideoButton film="comment" label="Voir comment ça marche" />
           </div>
           <ol className="relative mt-14 grid gap-8 md:grid-cols-3 md:gap-5">

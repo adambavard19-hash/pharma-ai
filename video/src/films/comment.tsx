@@ -26,7 +26,7 @@ export const COMMENT: FilmSpec = {
     { C: stepCard("02", "Les conseils apparaissent"), at: 396 },
     { C: Decision, at: DECISION },
     { C: Examples, at: 864 },
-    { C: stepCard("03", "Le patient repart avec son bilan"), at: 1044 },
+    { C: stepCard("03", "Le patient repart avec son plan conseil"), at: 1044 },
     { C: Bilan, at: 1152 },
     { C: End, at: 1368 },
   ],

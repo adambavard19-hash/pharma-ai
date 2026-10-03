@@ -73,15 +73,15 @@ export function Decision({ intro }: { intro: number }) {
           }}
         >
           <At x={240} y={250}>
-            <LgoWindow w={1280} lines={[{ text: "AMOXICILLINE 1 g cp disp. — 1 boîte", at: -999 }, { text: "PARACÉTAMOL 1000 mg cp — 1 boîte", at: -999 }]} />
+            <LgoWindow w={1280} lines={[{ text: "DOXYCYCLINE 100 mg cp séc. — 1 boîte", at: -999 }, { text: "PARACÉTAMOL 1000 mg cp — 1 boîte", at: -999 }]} />
           </At>
           <At x={TOAST.x} y={TOAST.y} style={{ opacity: toastIn, transform: `translateY(${(1 - toastIn) * 26}px) scale(${1 - 0.03 * pressToast})` }}>
             <Toast w={TOAST.w} />
           </At>
         </AbsoluteFill>
 
-        <At x={240} y={86} w={1400}>
-          <Kinetic at={6} out={64} size={64} lines={[words("Le conseil s'affiche *au comptoir.*", C.brand600)]} />
+        <At x={240} y={48} w={1400}>
+          <Kinetic at={6} out={64} size={52} lines={[words("Le conseil s'affiche *au comptoir,*", C.brand600), words("*sans gêner votre délivrance sur votre LGO.*", C.ink500)]} />
         </At>
 
         {/* La vente dans PharmaBoost : la carte de conseil */}
@@ -104,7 +104,7 @@ export function Decision({ intro }: { intro: number }) {
           <Kinetic at={150} out={226} size={60} lines={[words("Choisi *dans votre stock.*", C.brand600)]} />
         </At>
         <At x={CARD.x} y={66} w={1400}>
-          <Kinetic at={CLICK_ACCEPT + 8} out={338} size={68} lines={[words("Vous gardez *la décision.*", C.brand600)]} />
+          <Kinetic at={CLICK_ACCEPT + 8} out={338} size={52} lines={[words("Le pharmacien et le préparateur"), words("*gardent la décision.*", C.brand600)]} />
         </At>
 
         <Cursor x={cx} y={cy} opacity={cursorOpacity} press={Math.max(pressToast, press)} click={f < 150 ? (clickToast > 0 && clickToast < 1 ? clickToast : -1) : clickAccept > 0 && clickAccept < 1 ? clickAccept : -1} />

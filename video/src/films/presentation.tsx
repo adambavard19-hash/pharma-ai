@@ -1,34 +1,36 @@
 import type { FilmSpec } from "../FilmShell";
 import { Counter } from "../scenes/hook-counter";
 import { Decision } from "../scenes/decision";
-import { Bilan, Promesse, Security } from "../scenes/site";
+import { Bilan, PROMESSE_FRAMES, Promesse, Security } from "../scenes/site";
 import { C } from "../theme";
 import { words } from "../ui/kinetic";
 import { EndCard } from "../ui/common";
 
 /**
- * La présentation du site (haut de l'accueil) : « Personne ne peut penser à
- * tout » → vous scannez → le conseil arrive, vous décidez → le patient repart
- * avec son bilan → la sécurité → « Scan. Conseil. Bilan. ». 120 BPM, 21
- * mesures : 42 s.
+ * La présentation du site (haut de l'accueil) : trois questions (« Et si
+ * chaque délivrance révélait tout son potentiel de conseil ? »…) et
+ * « PharmaBoost, oui. » → vous scannez → le conseil arrive, sans gêner la
+ * délivrance sur le LGO → le pharmacien et le préparateur décident → le
+ * patient repart avec son plan conseil → la sécurité → « Scan. Conseil.
+ * Bilan. ». 120 BPM, 24 mesures : 48 s.
  */
 function End({ intro }: { intro: number }) {
   return <EndCard intro={intro} lead={[words("Scan. Conseil. *Bilan.*", C.brand300)]} />;
 }
 
-const COUNTER = 216;
-const DECISION = 504;
+const COUNTER = PROMESSE_FRAMES;
+const DECISION = COUNTER + 288;
 
 export const PRESENTATION: FilmSpec = {
   scenes: [
     { C: Promesse, at: 0 },
     { C: Counter, at: COUNTER },
     { C: Decision, at: DECISION },
-    { C: Bilan, at: 864 },
-    { C: Security, at: 1080 },
-    { C: End, at: 1296 },
+    { C: Bilan, at: DECISION + 360 },
+    { C: Security, at: DECISION + 576 },
+    { C: End, at: DECISION + 792 },
   ],
-  end: 1512,
+  end: DECISION + 1008,
   overlap: 18,
   speed: 1.2,
   music: "music/presentation.wav",
