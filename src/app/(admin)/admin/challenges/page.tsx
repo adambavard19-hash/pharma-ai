@@ -4,7 +4,8 @@ import { requirePlatformSession } from "@/server/auth/platform-session";
 import { listChallengesForPlatform, type PlatformChallengeRow } from "@/server/services/challenges";
 import { challengeSourcesLine } from "@/server/services/challenge-sources";
 import { EFFECTIVE_STATUS_ORDER, progressPercent, sumRewards } from "@/core/challenges/progress";
-import { PageHeader, Grid } from "@/components/ui/page";
+import { Grid } from "@/components/ui/page";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Alert, EmptyState, Progress } from "@/components/ui/feedback";
@@ -41,7 +42,8 @@ export default async function AdminChallengesPage() {
 
   return (
     <>
-      <PageHeader
+      <AdminPageHeader
+        space={{ label: "Administration", href: "/admin/societe" }}
         title="Challenges laboratoires"
         description="Les challenges saisis par les officines clientes, et où ils en sont. Chaque officine les gère elle-même dans ses Paramètres."
       />

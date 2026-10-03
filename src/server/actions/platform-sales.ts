@@ -7,7 +7,9 @@ import { requirePlatformSession } from "@/server/auth/platform-session";
 import { createSalesRep, sendSalesInvitation, updateSalesRep } from "@/server/services/sales/reps";
 import { reassignProspect, setProspectBlocked, setProspectStatus, addProspectNote, createProspect, updateProspect } from "@/server/services/sales/prospects";
 import { applySignatureStatus, refreshContractSignatureStatus, runContractReminders, sendContract, startContracting, upsertCompanyProfile } from "@/server/services/sales/contracts";
-import { saveReminderPolicy } from "@/server/services/platform-settings";
+import { loadReminderPolicy } from "@/server/services/platform-settings";
+import { recordAudit } from "@/server/audit/log";
+import { REMINDER_SETTING_KEY, sanitizePolicy, type ReminderPolicy } from "@/core/contracts/reminders";
 import { markAdminNotificationsRead } from "@/server/services/sales/notifications";
 import { shouldApplySignatureStatus } from "@/core/signature";
 import { CONTRACT_STATUS_LABELS } from "@/core/sales/pipeline";
@@ -254,12 +256,26 @@ export async function adminStartContractingAction(payload: z.input<typeof adminS
   return ok({ outcome: result.outcome }, result.message);
 }
 
-/** La cadence des relances, modifiable sans toucher au code. */
+/**
+ * La cadence des relances de contrat, modifiable sans toucher au code (centre
+ * des relances, section « Contrat »). Le journal garde l'avant et l'après :
+ * l'avant est la cadence qui s'appliquait, celle de la console ou, à défaut, la
+ * règle par défaut. Une cadence inchangée n'écrit ni ne journalise rien.
+ */
 export async function saveReminderPolicyAction(payload: { enabled: boolean; firstAfterDays: number; secondAfterDays: number; escalateAfterDays: number }): Promise<ActionResult<null>> {
   const session = await requirePlatformSession();
-  const policy = await saveReminderPolicy(payload, session.admin.id);
-  revalidatePath("/admin/societe");
-  return ok(null, policy.enabled ? `Relances enregistrées : J+${policy.firstAfterDays}${policy.secondAfterDays ? `, puis +${policy.secondAfterDays} j` : ""}${policy.escalateAfterDays ? `, signalement +${policy.escalateAfterDays} j` : ""}.` : "Relances automatiques désactivées.");
+  const before = await loadReminderPolicy();
+  const policy = sanitizePolicy(payload);
+  const summary = policy.enabled ? `J+${policy.firstAfterDays}${policy.secondAfterDays ? `, puis +${policy.secondAfterDays} j` : ""}${policy.escalateAfterDays ? `, signalement +${policy.escalateAfterDays} j` : ""}` : null;
+  const unchanged = (Object.keys(policy) as (keyof ReminderPolicy)[]).every((key) => before[key] === policy[key]);
+  if (unchanged) {
+    revalidatePath("/admin/relances");
+    return ok(null, summary ? `Cadence inchangée : ${summary}.` : "Relances automatiques déjà désactivées.");
+  }
+  await prisma.platformSetting.upsert({ where: { key: REMINDER_SETTING_KEY }, update: { value: policy, updatedBy: session.admin.id }, create: { key: REMINDER_SETTING_KEY, value: policy, updatedBy: session.admin.id } });
+  await recordAudit({ action: "platform.setting_updated", entityType: "PlatformSetting", entityId: REMINDER_SETTING_KEY, platformAdminId: session.admin.id, metadata: { before, after: policy } });
+  revalidatePath("/admin/relances");
+  return ok(null, summary ? `Relances enregistrées : ${summary}.` : "Relances automatiques désactivées.");
 }
 
 /** Lance le passage des relances immédiatement (sans attendre la tâche planifiée). */

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ShieldCheck } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { listGlobalTrainings } from "@/server/services/training";
-import { PageHeader } from "@/components/ui/page";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { Alert } from "@/components/ui/feedback";
 import { GlobalTrainingsManager } from "./global-trainings-manager";
 
@@ -21,7 +21,8 @@ export default async function AdminTrainingsPage() {
   const trainings = await listGlobalTrainings();
   return (
     <div className="space-y-5">
-      <PageHeader
+      <AdminPageHeader
+        space={{ label: "Administration", href: "/admin/societe" }}
         title="Formations"
         description="Les contenus proposés à toutes les officines dans leur centre de formation. Un contenu désactivé disparaît des catalogues ; la progression des équipes est conservée."
       />
