@@ -1,0 +1,59 @@
+{
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "label": "34 Rue du Pla 11510 Fitou",
+    "score": 0.8647672727272726,
+    "name": "34 Rue du Pla",
+    "postcode": "11510",
+    "city": "Fitou",
+    "type": "housenumber"
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "label": "Rue du Pla 46800 Montcuq-en-Quercy-Blanc",
+    "score": 0.5854790909090909,
+    "name": "Rue du Pla",
+    "postcode": "46800",
+    "city": "Montcuq-en-Quercy-Blanc",
+    "type": "street"
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "label": "Rue du Pla 66210 Bolquère",
+    "score": 0.5838299999999998,
+    "name": "Rue du Pla",
+    "postcode": "66210",
+    "city": "Bolquère",
+    "type": "street"
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "label": "Rue du Pla 34980 Combaillaux",
+    "score": 0.5831636363636362,
+    "name": "Rue du Pla",
+    "postcode": "34980",
+    "city": "Combaillaux",
+    "type": "street"
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "label": "Rue du Pla 66500 Ria-Sirach",
+    "score": 0.5823872727272728,
+    "name": "Rue du Pla",
+    "postcode": "66500",
+    "city": "Ria-Sirach",
+    "type": "street"
+   }
+  }
+ ]
+}

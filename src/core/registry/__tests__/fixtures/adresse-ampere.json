@@ -1,0 +1,15 @@
+{
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "label": "8 Place Ampère 69002 Lyon",
+    "score": 0.9590981818181817,
+    "name": "8 Place Ampère",
+    "postcode": "69002",
+    "city": "Lyon",
+    "type": "housenumber"
+   }
+  }
+ ]
+}

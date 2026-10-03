@@ -1,0 +1,40 @@
+{
+ "results": [
+  {
+   "siren": "938813722",
+   "nom_complet": "PHARMACIE D'AINAY (PHARMACIE AMPERE AINAY)",
+   "nom_raison_sociale": "PHARMACIE D'AINAY",
+   "activite_principale": "47.73Z",
+   "etat_administratif": "A",
+   "siege": {
+    "siret": "93881372200023",
+    "adresse": "8 PLACE AMPERE 69002 LYON",
+    "code_postal": "69002",
+    "libelle_commune": "LYON",
+    "liste_enseignes": null,
+    "nom_commercial": "PHARMACIE AMPERE AINAY",
+    "liste_finess": null,
+    "etat_administratif": "A",
+    "activite_principale": "47.73Z",
+    "statut_diffusion_etablissement": "O",
+    "est_siege": true
+   },
+   "matching_etablissements": [
+    {
+     "siret": "93881372200023",
+     "adresse": "8 PLACE AMPERE 69002 LYON",
+     "code_postal": "69002",
+     "libelle_commune": "LYON",
+     "liste_enseignes": null,
+     "nom_commercial": "PHARMACIE AMPERE AINAY",
+     "liste_finess": null,
+     "etat_administratif": "A",
+     "activite_principale": "47.73Z",
+     "statut_diffusion_etablissement": "O",
+     "est_siege": true
+    }
+   ]
+  }
+ ],
+ "total_results": 1
+}

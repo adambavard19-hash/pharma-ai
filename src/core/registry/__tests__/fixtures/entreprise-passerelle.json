@@ -1,0 +1,48 @@
+{
+ "results": [
+  {
+   "siren": "797832227",
+   "nom_complet": "PHARMACIE DE LA PASSERELLE",
+   "nom_raison_sociale": "PHARMACIE DE LA PASSERELLE",
+   "activite_principale": "47.73Z",
+   "etat_administratif": "A",
+   "siege": {
+    "siret": "79783222700012",
+    "adresse": "34 RUE DU PLAT 69002 LYON",
+    "code_postal": "69002",
+    "libelle_commune": "LYON",
+    "liste_enseignes": [
+     "PHARMACIE DE LA PASSERELLE"
+    ],
+    "nom_commercial": null,
+    "liste_finess": [
+     "690018502"
+    ],
+    "etat_administratif": "A",
+    "activite_principale": "47.73Z",
+    "statut_diffusion_etablissement": "O",
+    "est_siege": true
+   },
+   "matching_etablissements": [
+    {
+     "siret": "79783222700012",
+     "adresse": "34 RUE DU PLAT 69002 LYON",
+     "code_postal": "69002",
+     "libelle_commune": "LYON",
+     "liste_enseignes": [
+      "PHARMACIE DE LA PASSERELLE"
+     ],
+     "nom_commercial": null,
+     "liste_finess": [
+      "690018502"
+     ],
+     "etat_administratif": "A",
+     "activite_principale": "47.73Z",
+     "statut_diffusion_etablissement": "O",
+     "est_siege": true
+    }
+   ]
+  }
+ ],
+ "total_results": 1
+}
