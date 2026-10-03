@@ -12,7 +12,7 @@ import { EndCard } from "../ui/common";
  * les exemples) → 03 Le patient repart avec son bilan. 136 BPM, 22 mesures : 39 s.
  */
 function End({ intro }: { intro: number }) {
-  return <EndCard intro={intro} lead={[words("Du scan au bilan,"), words("*en trois étapes.*", C.brand300)]} />;
+  return <EndCard intro={intro} lead={[words("Du scan au plan conseil,"), words("*en trois étapes.*", C.brand300)]} />;
 }
 
 const COUNTER = 108;

@@ -213,7 +213,7 @@ function RedFlag({ intro }: { intro: number }) {
 }
 
 function End({ intro }: { intro: number }) {
-  return <EndCard intro={intro} lead={[words("Sans ordonnance aussi,"), words("le pharmacien et le préparateur"), words("*gardent la décision.*", C.brand300)]} />;
+  return <EndCard intro={intro} lead={[words("Le pharmacien et le préparateur"), words("*gardent la décision.*", C.brand300)]} />;
 }
 
 export const SANS_ORDONNANCE: FilmSpec = {

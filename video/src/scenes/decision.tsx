@@ -80,6 +80,10 @@ export function Decision({ intro }: { intro: number }) {
           </At>
         </AbsoluteFill>
 
+        {/* Un fond clair derrière le titre : pendant le zoom, la fenêtre du logiciel passe dessous. */}
+        <At x={212} y={30} w={1180} style={{ height: 150, borderRadius: 26, background: "rgba(248,250,252,0.94)", boxShadow: "0 18px 40px -24px rgba(15,23,42,.35)", opacity: Math.min(tw(f, [2, 10], [0, 1]), 1 - tw(f, [64, 74], [0, 1])) }}>
+          <span />
+        </At>
         <At x={240} y={48} w={1400}>
           <Kinetic at={6} out={64} size={52} lines={[words("Le conseil s'affiche *au comptoir,*", C.brand600), words("*sans gêner votre délivrance sur votre LGO.*", C.ink500)]} />
         </At>

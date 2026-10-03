@@ -111,7 +111,7 @@ function Home({ intro }: { intro: number }) {
             <TitleBlock chip="Problème 2 · À la maison" chipAt={2} at={8} out={HALF - 14} lines={[words("Plusieurs boîtes."), words("Et beaucoup"), words("*de questions.*", C.brand600)]} />
           </At>
           <At x={120} y={250} w={820} style={{ paddingTop: 88 }}>
-            <TitleBlock at={HALF + 4} lines={[words("Il repart"), words("avec son bilan,"), words("*et ses rappels.*", C.brand600)]} sub="Chaque médicament, à quoi il sert, quand le prendre. Et un signe de la pharmacie le dernier jour." subAt={HALF + 96} />
+            <TitleBlock at={HALF + 4} lines={[words("Il repart avec"), words("son plan conseil,"), words("*et ses rappels.*", C.brand600)]} sub="Chaque médicament, à quoi il sert, quand le prendre. Et un signe de la pharmacie le dernier jour." subAt={HALF + 96} />
           </At>
           <At x={1060} y={110}>
             <Toggle on={on} />
