@@ -3,7 +3,7 @@ import { Mail, MapPin, Phone } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatCents, formatDate, formatDateTime } from "@/lib/format";
-import { CommissionStatusBadge, ContractStatusBadge, ProspectStatusBadge } from "./status-badge";
+import { CommissionStatusBadge, ContractStatusBadge, DemoBadge, ProspectStatusBadge } from "./status-badge";
 import type { getProspectFor } from "@/server/services/sales/prospects";
 import { JOURNEY_LABELS, JOURNEY_STEPS, ORIGIN_LABELS, journeyStage, journeyStepIndex } from "@/core/contracts/journey";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ export function ProspectDetail({ prospect, actions, mode, pharmacyHref }: { pros
             <h1 className="text-[24px] leading-7 font-semibold tracking-[-0.02em] text-text-primary">{prospect.name}</h1>
             <ProspectStatusBadge status={prospect.status} />
             {prospect.blockedAt && <Badge tone="danger">Suspendu</Badge>}
+            <DemoBadge demoAt={prospect.demoAt} demoDoneAt={prospect.demoDoneAt} />
             <Badge tone="neutral">{ORIGIN_LABELS[prospect.origin] ?? prospect.origin}</Badge>
           </div>
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px] text-text-secondary">
@@ -138,6 +139,7 @@ export function ProspectDetail({ prospect, actions, mode, pharmacyHref }: { pros
             <Row label="Abonnement proposé" value={prospect.monthlyPriceCents ? `${formatCents(prospect.monthlyPriceCents)} HT/mois` : null} />
             <Row label="Dernier contact" value={prospect.lastContactAt ? formatDateTime(prospect.lastContactAt) : null} />
             <Row label="Prochaine action" value={prospect.nextActionAt ? `${prospect.nextActionLabel ?? "Relancer"} · ${formatDate(prospect.nextActionAt)}` : null} />
+            {(prospect.demoAt || prospect.demoDoneAt) && <Row label="Démonstration" value={demoSummary(prospect.demoAt, prospect.demoDoneAt)} />}
             {prospect.notes && <p className="mt-2 rounded-lg bg-surface-sunken/70 px-3 py-2 text-[13px] leading-5 text-text-secondary">{prospect.notes}</p>}
           </CardContent>
         </Card>
@@ -163,6 +165,12 @@ export function ProspectDetail({ prospect, actions, mode, pharmacyHref }: { pros
       </aside>
     </div>
   );
+}
+
+/** « programmée le 05/10/2026 14:30 », ou « réalisée le 06/10/2026 (prévue le …) ». */
+function demoSummary(demoAt: Date | null, demoDoneAt: Date | null): string {
+  if (demoDoneAt) return `réalisée le ${formatDate(demoDoneAt)}${demoAt ? ` (prévue le ${formatDateTime(demoAt)})` : ""}`;
+  return `programmée le ${formatDateTime(demoAt)}`;
 }
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {

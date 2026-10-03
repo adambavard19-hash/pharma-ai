@@ -9,6 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { Checkbox, Field, Input, Select } from "@/components/ui/field";
 import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
+import { useClearNewParam } from "../demonstrations/demo-dialog";
 
 export type RepFormValues = { firstName: string; lastName: string; email: string; phone: string; zone: string; commissionType: "FIXED" | "PERCENT" | "RECURRING"; commissionValue: string; isActive: boolean };
 
@@ -40,14 +41,20 @@ function RepFields({ values, onChange }: { values: RepFormValues; onChange: (v: 
   );
 }
 
-export function CreateSalesRepButton() {
-  const [open, setOpen] = useState(false);
+/** « Nouveau commercial ». L'action rapide `?nouveau=commercial` ouvre directement la fenêtre (`defaultOpen`). */
+export function CreateSalesRepButton({ defaultOpen = false }: { defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [values, setValues] = useState(EMPTY);
   const [invite, setInvite] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const { push } = useToast();
+  const clearNewParam = useClearNewParam(defaultOpen);
+  const close = () => {
+    setOpen(false);
+    clearNewParam();
+  };
   const submit = () => {
     setError(null);
     startTransition(async () => {
@@ -62,7 +69,7 @@ export function CreateSalesRepButton() {
   return (
     <>
       <Button onClick={() => setOpen(true)} leadingIcon={<Plus className="size-[18px]" />}>Nouveau commercial</Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Nouveau commercial" description="Le compte est créé ; l'invitation lui envoie un lien pour définir son mot de passe." size="lg" footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button onClick={submit} loading={pending} leadingIcon={<UserPlus className="size-4" />}>{invite ? "Créer et inviter" : "Créer"}</Button></>}>
+      <Modal open={open} onClose={close} title="Nouveau commercial" description="Le compte est créé ; l'invitation lui envoie un lien pour définir son mot de passe." size="lg" footer={<><Button variant="ghost" onClick={close}>Annuler</Button><Button onClick={submit} loading={pending} leadingIcon={<UserPlus className="size-4" />}>{invite ? "Créer et inviter" : "Créer"}</Button></>}>
         <div className="space-y-5">{error && <Alert tone="danger">{error}</Alert>}<RepFields values={values} onChange={setValues} /><Checkbox label="Envoyer l'invitation maintenant" checked={invite} onChange={(e) => setInvite(e.target.checked)} /></div>
       </Modal>
     </>

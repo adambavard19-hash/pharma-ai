@@ -9,7 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/field";
 import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
-import { MANUAL_STATUSES, PROSPECT_STATUS_LABELS, type ProspectStatusCode } from "@/core/sales/pipeline";
+import { PROSPECT_STATUS_LABELS } from "@/core/sales/pipeline";
+import { parisDayInDays, parisDayInputToDate, salesRepStagePills } from "@/core/sales/board";
 import { cn } from "@/lib/utils";
 
 /**
@@ -39,8 +40,15 @@ export function SalesActionsPanel({ prospect }: { prospect: { id: string; status
     });
   };
 
-  const current = prospect.status as ProspectStatusCode;
-  const pickDays = (days: number) => { const d = new Date(); d.setDate(d.getDate() + days); setTaskDate(d.toISOString().slice(0, 10)); };
+  const current = prospect.status;
+  const { pills, followsContract } = salesRepStagePills(current);
+  // Jours de Paris, comme l'agenda et les relances de la console : la relance tombe à 9 h, heure de Paris.
+  const pickDays = (days: number) => setTaskDate(parisDayInDays(new Date(), days));
+  const programTask = () => {
+    const dueAt = parisDayInputToDate(taskDate);
+    if (!dueAt) return setError("Indiquez une date valide.");
+    run(() => addTaskAction({ prospectId: prospect.id, label: taskLabel, dueAt: dueAt.toISOString() }));
+  };
 
   return (
     <div className="space-y-4">
@@ -50,17 +58,18 @@ export function SalesActionsPanel({ prospect }: { prospect: { id: string; status
       <Card><CardContent className="py-4">
         <p className="text-[11.5px] font-semibold tracking-wide text-text-tertiary uppercase">Étape</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {MANUAL_STATUSES.filter((s) => s !== "LOST").map((s) => (
-            <button key={s} type="button" disabled={pending || prospect.blocked || s === current || !["PROSPECT", "CONTACTED", "INTERESTED", "PROPOSAL_SENT"].includes(current)} onClick={() => run(() => setProspectStatusAction({ prospectId: prospect.id, status: s }))}
-              className={cn("min-h-[40px] rounded-full border px-3.5 text-[13px] font-medium transition-colors disabled:opacity-50", s === current ? "border-brand-600 bg-brand-600 text-white" : "border-border-default text-text-secondary hover:border-brand-400 hover:text-text-primary")}>
-              {PROSPECT_STATUS_LABELS[s]}
+          {pills.map((pill) => (
+            <button key={pill.status} type="button" aria-pressed={pill.current} disabled={pending || prospect.blocked || !pill.enabled} onClick={() => run(() => setProspectStatusAction({ prospectId: prospect.id, status: pill.status }))}
+              className={cn("min-h-[40px] rounded-full border px-3.5 text-[13px] font-medium transition-colors disabled:opacity-50", pill.current ? "border-brand-600 bg-brand-600 text-white" : "border-border-default text-text-secondary hover:border-brand-400 hover:text-text-primary")}>
+              {PROSPECT_STATUS_LABELS[pill.status]}
             </button>
           ))}
           {current !== "LOST" && current !== "ACTIVATED" && (
             <button type="button" disabled={pending || prospect.blocked} onClick={() => { const reason = window.prompt("Motif (facultatif) :") ?? ""; run(() => setProspectStatusAction({ prospectId: prospect.id, status: "LOST", reason })); }} className="min-h-[40px] rounded-full border border-danger-300 px-3.5 text-[13px] font-medium text-danger-700 hover:bg-danger-50 disabled:opacity-50 dark:text-danger-400">Perdu</button>
           )}
         </div>
-        {!["PROSPECT", "CONTACTED", "INTERESTED", "PROPOSAL_SENT", "LOST"].includes(current) && <p className="mt-2 text-[12.5px] text-text-tertiary">L&apos;étape suit désormais le contrat et l&apos;officine.</p>}
+        {followsContract && <p className="mt-2 text-[12.5px] text-text-tertiary">L&apos;étape suit désormais le contrat et l&apos;officine.</p>}
+        {current === "DEMO_SCHEDULED" && <p className="mt-2 text-[12.5px] text-text-tertiary">La date de la démonstration est fixée par l&apos;administrateur. Une fois faite, passez le dossier en « Démo réalisée ».</p>}
       </CardContent></Card>
 
       {/* Note et relance rapides */}
@@ -77,8 +86,8 @@ export function SalesActionsPanel({ prospect }: { prospect: { id: string; status
               <button key={String(label)} type="button" onClick={() => { setTaskLabel(String(label).replace(/ dans .*/, "")); pickDays(Number(days)); }} className="rounded-full border border-border-default px-3 py-1.5 text-[12.5px] text-text-secondary hover:border-brand-400 hover:text-text-primary">{label}</button>
             ))}
           </div>
-          <div className="flex gap-2"><Input value={taskLabel} onChange={(e) => setTaskLabel(e.target.value)} aria-label="Intitulé de la relance" /><Input type="date" value={taskDate} onChange={(e) => setTaskDate(e.target.value)} className="max-w-[160px]" aria-label="Date" /></div>
-          <Button size="sm" variant="outline" disabled={!taskDate} loading={pending} onClick={() => run(() => addTaskAction({ prospectId: prospect.id, label: taskLabel, dueAt: new Date(`${taskDate}T09:00:00`).toISOString() }))}>Programmer</Button>
+          <div className="flex gap-2"><Input value={taskLabel} onChange={(e) => setTaskLabel(e.target.value)} aria-label="Intitulé de la relance" /><Input type="date" value={taskDate} onChange={(e) => setTaskDate(e.target.value)} className="max-w-[160px]" aria-label="Date (jour de Paris)" /></div>
+          <Button size="sm" variant="outline" disabled={!taskDate} loading={pending} onClick={programTask}>Programmer</Button>
         </CardContent></Card>
       </div>
 

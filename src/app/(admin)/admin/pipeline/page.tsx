@@ -1,71 +1,122 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { BellRing, List } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
-import { prisma } from "@/server/db/client";
-import { listProspects } from "@/server/services/sales/prospects";
-import { listAdminNotifications } from "@/server/services/sales/notifications";
-import { PROSPECT_STATUSES, PROSPECT_STATUS_LABELS } from "@/core/sales/pipeline";
-import { PageHeader } from "@/components/ui/page";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ProspectStatusBadge, ContractStatusBadge } from "@/components/sales/status-badge";
-import { formatDate, formatDateTime } from "@/lib/format";
-import type { ProspectStatus } from "@/generated/prisma";
+import { BOARD_CLOSED_DAYS, followUpCounts, listRepOptions, loadBoardCards } from "@/server/services/admin/commercial";
+import { defaultDemoInput, isOverdue, parseStatusParam } from "@/core/sales/board";
+import { isOpenStatus } from "@/core/sales/pipeline";
+import { AdminPageHeader } from "@/components/admin/page-header";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/feedback";
 import { NewProspect } from "./new-prospect";
-import { journeyStage, JOURNEY_LABELS } from "@/core/contracts/journey";
+import { PipelineBoard } from "./board";
+import { CommercialFilterForm, param } from "./filter-form";
 
 export const metadata: Metadata = { title: "Pipeline commercial" };
 
-/** Toutes les pharmacies en cours, tous commerciaux, avec filtres par l'URL. */
-export default async function AdminPipelinePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+/**
+ * Le pipeline en colonnes, tous commerciaux. Filtres par l'adresse :
+ * `?commercial=` (identifiant, ou `console`), `?ville=`, `?q=`.
+ * `?nouveau=prospect` ouvre la création d'un dossier. Les anciens filtres
+ * par étape renvoient vers la liste des prospects. Le tableau ne porte pas
+ * les dossiers clos (activés, perdus) sans mouvement depuis 90 jours : un
+ * lien mène à la liste, qui les a tous.
+ */
+export default async function AdminPipelinePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePlatformSession();
-  const q = await searchParams;
-  const status = PROSPECT_STATUSES.find((s) => s === q.statut) as ProspectStatus | undefined;
-  const [prospects, reps, notifications] = await Promise.all([
-    listProspects({ salesRepId: q.commercial || undefined, status, city: q.ville || undefined, query: q.q || undefined, hasContract: q.contrat === "1", activated: q.activation === "1" }),
-    prisma.salesRep.findMany({ orderBy: { lastName: "asc" }, select: { id: true, firstName: true, lastName: true } }),
-    listAdminNotifications(8),
-  ]);
-  const late = prospects.filter((p) => p.nextActionAt && p.nextActionAt < new Date() && !["ACTIVATED", "LOST"].includes(p.status));
-  const field = "rounded-md border border-border-default bg-surface-card px-2.5 py-1.5 text-[13px] text-text-primary";
+  const params = await searchParams;
+  // L'ancienne liste du pipeline filtrait par étape (`?statut=`, `?activation=1`) : ces liens mènent désormais à la liste des prospects.
+  const legacyStatus = parseStatusParam(param(params.statut)) ?? (param(params.activation) === "1" ? "ACTIVATED" : null);
+  if (legacyStatus) {
+    const target = new URLSearchParams({ statut: legacyStatus });
+    for (const key of ["commercial", "q"] as const) {
+      const value = param(params[key]);
+      if (value) target.set(key, value);
+    }
+    redirect(`/admin/prospects?${target.toString()}`);
+  }
+  const filter = { commercial: param(params.commercial), q: param(params.q), ville: param(params.ville) };
+  const now = new Date();
+  const [{ cards, hiddenClosed, truncated }, reps, followUps] = await Promise.all([loadBoardCards(filter, now), listRepOptions(), followUpCounts({ commercial: filter.commercial }, now)]);
+  const late = followUps.retard;
+  const open = cards.filter((card) => isOpenStatus(card.status)).length;
+  const overdueCards = cards.filter((card) => isOpenStatus(card.status) && isOverdue(card.nextActionAt, now)).length;
+  const filtered = Boolean(filter.commercial || filter.q || filter.ville);
+  /** La liste des prospects, aux filtres du tableau qu'elle connaît (commercial, recherche), éventuellement à une étape. */
+  const listHref = (statut?: string) => {
+    const target = new URLSearchParams();
+    if (statut) target.set("statut", statut);
+    if (filter.commercial) target.set("commercial", filter.commercial);
+    if (filter.q) target.set("q", filter.q);
+    const query = target.toString();
+    return `/admin/prospects${query ? `?${query}` : ""}`;
+  };
+
   return (
     <>
-      <PageHeader title="Pipeline commercial" description={`${prospects.length} dossier(s)${late.length ? ` · ${late.length} en retard de relance` : ""}`} />
-      <NewProspect reps={reps.map((r) => ({ id: r.id, firstName: r.firstName, lastName: r.lastName }))} />
-      <form className="flex flex-wrap items-end gap-2" method="get">
-        <input name="q" defaultValue={q.q ?? ""} placeholder="Pharmacie, titulaire, ville" className={field} aria-label="Recherche" />
-        <select name="commercial" defaultValue={q.commercial ?? ""} className={field} aria-label="Commercial"><option value="">Tous les commerciaux</option>{reps.map((r) => <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>)}</select>
-        <select name="statut" defaultValue={q.statut ?? ""} className={field} aria-label="Statut"><option value="">Tous les statuts</option>{PROSPECT_STATUSES.map((s) => <option key={s} value={s}>{PROSPECT_STATUS_LABELS[s]}</option>)}</select>
-        <input name="ville" defaultValue={q.ville ?? ""} placeholder="Ville" className={field} aria-label="Ville" />
-        <label className="flex items-center gap-1.5 text-[13px] text-text-secondary"><input type="checkbox" name="contrat" value="1" defaultChecked={q.contrat === "1"} /> Contrat envoyé</label>
-        <label className="flex items-center gap-1.5 text-[13px] text-text-secondary"><input type="checkbox" name="activation" value="1" defaultChecked={q.activation === "1"} /> Activées</label>
-        <button type="submit" className="rounded-md bg-brand-600 px-3.5 py-1.5 text-[13px] font-medium text-white">Filtrer</button>
-        {Object.values(q).some(Boolean) && <Link href="/admin/pipeline" className="text-[13px] text-text-tertiary underline underline-offset-2">Effacer</Link>}
-      </form>
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <Card><CardContent className="pt-0">
-          {prospects.length === 0 ? <p className="py-6 text-[13.5px] text-text-secondary">Aucun dossier ne correspond.</p> : (
-            <ul className="divide-y divide-border-subtle">
-              {prospects.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-[14px]">
-                  <Link href={`/admin/dossiers/${p.id}`} className="font-medium text-text-primary hover:underline">{p.name}</Link>
-                  {p.city && <span className="text-text-tertiary">{p.city}</span>}
-                  <span aria-hidden="true" className="text-text-tertiary">·</span>
-                  <span className="text-text-secondary">{p.salesRep?.firstName ?? "Console"}</span>
-                  <span aria-hidden="true" className="text-text-tertiary">·</span>
-                  <ProspectStatusBadge status={p.status} />
-                  {p.contracts[0] && <ContractStatusBadge status={p.contracts[0].status} />}
-                  {p.contracts[0] && <span className="text-[12.5px] text-text-tertiary">{JOURNEY_LABELS[journeyStage({ prospectStatus: p.status, contract: p.contracts[0] })]}</span>}
-                  {p.nextActionAt && <span className={"ml-auto text-[12.5px] " + (p.nextActionAt < new Date() ? "text-warning-700 dark:text-warning-500" : "text-text-tertiary")}>{p.nextActionLabel ?? "Relance"} · {formatDate(p.nextActionAt)}</span>}
-                  {p.blockedAt && <span className="text-[12px] font-medium text-danger-700">suspendu</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent></Card>
-        <Card><CardHeader title="Notifications" description={<Link href="/admin/notifications" className="underline underline-offset-2">Tout voir</Link>} /><CardContent className="pt-0">
-          <ul className="divide-y divide-border-subtle">{notifications.map((n) => <li key={n.id} className="py-2 text-[13px]"><p className="font-medium text-text-primary">{n.linkUrl ? <Link href={n.linkUrl} className="hover:underline">{n.title}</Link> : n.title}</p>{n.body && <p className="text-text-secondary">{n.body}</p>}<p className="text-[11.5px] text-text-tertiary">{formatDateTime(n.createdAt)}</p></li>)}{notifications.length === 0 && <li className="py-3 text-[13px] text-text-secondary">Rien à signaler.</li>}</ul>
-        </CardContent></Card>
-      </div>
+      <AdminPageHeader
+        space={{ label: "Commercial", href: "/admin/pipeline" }}
+        title="Pipeline"
+        description={`${open} dossier${open > 1 ? "s" : ""} en cours${filtered ? " pour ce filtre" : ""} · ${cards.length} sur le tableau. Glissez une carte d'une étape à l'autre, ou utilisez « Déplacer vers… ».`}
+        actions={
+          <>
+            <Button asChild variant="outline" leadingIcon={<List className="size-4" />}>
+              <Link href={listHref()}>Vue liste</Link>
+            </Button>
+            {/* La clé suit `?nouveau=` : la fenêtre s'ouvre aussi quand on est déjà sur la page, et à chaque nouvel usage. */}
+            <NewProspect key={param(params.nouveau) ?? "aucun"} reps={reps.filter((rep) => rep.isActive)} defaultOpen={param(params.nouveau) === "prospect"} />
+          </>
+        }
+      />
+
+      {late > 0 && (
+        <Alert
+          tone="warning"
+          icon={<BellRing className="size-[18px]" aria-hidden="true" />}
+          title={`${late} relance${late > 1 ? "s" : ""} en retard`}
+          action={
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/admin/relances-commerciales?vue=retard${filter.commercial ? `&commercial=${encodeURIComponent(filter.commercial)}` : ""}`}>Voir les relances</Link>
+            </Button>
+          }
+        >
+          {overdueCards > 0 ? `${overdueCards} dossier${overdueCards > 1 ? "s ont" : " a"} une prochaine action dépassée : ${overdueCards > 1 ? "ils sont" : "il est"} en tête de colonne, en orange.` : "Des relances de l'agenda des commerciaux sont dépassées."}
+        </Alert>
+      )}
+
+      <CommercialFilterForm action="/admin/pipeline" reps={reps} values={filter} fields={["q", "commercial", "ville"]} />
+
+      {cards.length === 0 && !filtered && hiddenClosed === 0 && (
+        <Alert tone="info" title="Aucun dossier pour l'instant">
+          Les demandes du site public arrivent ici d&apos;elles-mêmes ; vous pouvez aussi créer un dossier avec « Nouveau dossier ».
+        </Alert>
+      )}
+
+      {cards.length === 0 && filtered ? (
+        <p className="rounded-2xl border border-dashed border-border-default bg-surface-card px-6 py-10 text-center text-[13.5px] text-text-secondary">
+          Aucun dossier ne correspond à ce filtre. <Link href="/admin/pipeline" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Effacer les filtres</Link>
+        </p>
+      ) : (
+        <PipelineBoard cards={cards} nowIso={now.toISOString()} defaultDemoAt={defaultDemoInput(now)} />
+      )}
+
+      {(hiddenClosed > 0 || truncated) && (
+        <p className="text-[12.5px] text-text-tertiary">
+          {truncated ? `Le tableau montre les ${cards.length} dossiers les plus récemment modifiés. ` : ""}
+          {hiddenClosed > 0 ? `${hiddenClosed} dossier${hiddenClosed > 1 ? "s" : ""} clos (activé${hiddenClosed > 1 ? "s" : ""} ou perdu${hiddenClosed > 1 ? "s" : ""}) sans mouvement depuis plus de ${BOARD_CLOSED_DAYS} jours ${hiddenClosed > 1 ? "ne sont" : "n'est"} pas sur le tableau. ` : ""}
+          Voir tout dans la liste :{" "}
+          {hiddenClosed > 0 ? (
+            <>
+              <Link href={listHref("ACTIVATED")} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">activés</Link>
+              {" · "}
+              <Link href={listHref("LOST")} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">perdus</Link>
+              {" · "}
+            </>
+          ) : null}
+          <Link href={listHref()} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">tous les dossiers</Link>.
+        </p>
+      )}
     </>
   );
 }
