@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { getEnv } from "@/config/env";
 
 /**
@@ -61,6 +61,48 @@ export function verifyPayload<T extends Record<string, unknown>>(token: string):
   if (!safeCompare(mac, expected)) return null;
   try {
     const data = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as T & { x?: number };
+    if (typeof data.x !== "number" || data.x < Date.now()) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * L'empreinte d'une adresse e-mail : HMAC-SHA256 de l'adresse en minuscules,
+ * avec le secret de l'application. Sert à reconnaître une adresse (unicité d'un
+ * abonnement, liste de désinscription) sans conserver ni exposer l'adresse.
+ */
+export function hashEmail(email: string): string {
+  return createHmac("sha256", getEnv().AUTH_SESSION_SECRET).update(`email:${email.trim().toLowerCase()}`).digest("hex");
+}
+
+/**
+ * Un jeton opaque ET chiffré (AES-256-GCM) : le contenu n'est lisible ni dans
+ * l'adresse du lien, ni dans un journal d'accès. Sert quand le lien porte une
+ * donnée personnelle (l'adresse d'un patient) qu'on ne veut conserver nulle
+ * part tant que la personne n'a pas agi. Daté : `ttlMs`, au-delà, il est refusé.
+ * Le `purpose` lie le jeton à son usage : un jeton d'inscription ne sert pas
+ * ailleurs.
+ */
+export function sealToken(purpose: string, payload: Record<string, unknown>, ttlMs: number): string {
+  const key = createHash("sha256").update(`sealed-token:${purpose}:${getEnv().DATA_ENCRYPTION_KEY}`).digest();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const plain = Buffer.from(JSON.stringify({ ...payload, x: Date.now() + ttlMs }), "utf8");
+  const encrypted = Buffer.concat([cipher.update(plain), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64url");
+}
+
+export function openToken<T extends Record<string, unknown>>(purpose: string, token: string): T | null {
+  try {
+    const raw = Buffer.from(token, "base64url");
+    if (raw.length < 12 + 16 + 2) return null;
+    const key = createHash("sha256").update(`sealed-token:${purpose}:${getEnv().DATA_ENCRYPTION_KEY}`).digest();
+    const decipher = createDecipheriv("aes-256-gcm", key, raw.subarray(0, 12));
+    decipher.setAuthTag(raw.subarray(12, 28));
+    const plain = Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString("utf8");
+    const data = JSON.parse(plain) as T & { x?: number };
     if (typeof data.x !== "number" || data.x < Date.now()) return null;
     return data;
   } catch {

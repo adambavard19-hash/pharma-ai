@@ -110,4 +110,5 @@ export const DISPATCH_KIND_LABELS: Record<string, string> = {
   SITE_LEAD_ACK: "Accusé de demande de démonstration",
   INSTALL_GUIDE: "Guide d'installation",
   TEMPLATE: "Modèle",
+  CAMPAIGN: "Campagne",
 };

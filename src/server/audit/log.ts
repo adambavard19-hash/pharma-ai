@@ -198,7 +198,26 @@ export type AuditAction =
   | "sales.demo_scheduled"
   | "sales.demo_done"
   | "sales.demo_canceled"
-  | "sales.followup_set";
+  | "sales.followup_set"
+  | "campaign.created"
+  | "campaign.updated"
+  | "campaign.test_sent"
+  | "campaign.scheduled"
+  | "campaign.sent"
+  | "campaign.resumed"
+  | "campaign.canceled"
+  | "campaign.deleted"
+  | "campaign.referral_offer_started"
+  | "campaign.referral_offer_ended"
+  | "marketing.opted_out"
+  | "marketing.opt_out_removed"
+  | "patient_news.subscribed"
+  | "patient_news.unsubscribed"
+  | "patient_news.announcement_sent"
+  | "patient_news.settings_changed"
+  | "patient_news.purged"
+  | "referral.filleul_notified"
+  | "partner.invitation_sent";
 
 export async function recordAudit(params: {
   action: AuditAction;

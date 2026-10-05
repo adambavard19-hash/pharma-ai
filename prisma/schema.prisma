@@ -86,6 +86,16 @@ model Pharmacy {
   /// marques et gammes en statut TEST avant leur diffusion.
   partnerPilot Boolean @default(false)
 
+  /// L'e-mail du plan propose au patient de s'abonner aux nouveautés de
+  /// l'officine (un lien : rien n'est conservé tant que le patient ne l'ouvre
+  /// pas). Réglable par le titulaire.
+  patientNewsEnabled Boolean @default(true)
+
+  /// Ce que CE filleul apporte à son parrain chaque mois, en centimes, figé à
+  /// son inscription (offre de parrainage en cours à ce moment-là). Vide : la
+  /// règle standard (src/core/billing/referral.ts).
+  referralAmountCents Int?
+
   /// Marque le jeu de données de démonstration. Jamais vrai en production réelle.
   isDemo   Boolean @default(false)
   isActive Boolean @default(true)
@@ -140,18 +150,20 @@ model Pharmacy {
   productVigilances ProductVigilance[]
   trainingContents  TrainingContent[]
 
-  partnerAudiences     PartnerBrandAudience[]
-  partnerPreferences   PharmacyPartnerPreference[]
-  partnerAttributions  PartnerAttribution[]
-  partnerLeads         PartnerLead[]
-  partnerOrders        PartnerOrder[]
-  counterRequests      CounterRequest[]
-  sealedDocuments      SealedDocument[]
-  referredBy           Pharmacy?                   @relation("PharmacyReferral", fields: [referredById], references: [id], onDelete: SetNull)
-  referrals            Pharmacy[]                  @relation("PharmacyReferral")
-  postCountChanges     PharmacyPostCountChange[]
-  adminNotes           AdminNote[]
-  cancellationRequests CancellationRequest[]
+  partnerAudiences         PartnerBrandAudience[]
+  partnerPreferences       PharmacyPartnerPreference[]
+  partnerAttributions      PartnerAttribution[]
+  partnerLeads             PartnerLead[]
+  partnerOrders            PartnerOrder[]
+  counterRequests          CounterRequest[]
+  sealedDocuments          SealedDocument[]
+  referredBy               Pharmacy?                   @relation("PharmacyReferral", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals                Pharmacy[]                  @relation("PharmacyReferral")
+  postCountChanges         PharmacyPostCountChange[]
+  adminNotes               AdminNote[]
+  cancellationRequests     CancellationRequest[]
+  patientNewsSubscriptions PatientNewsSubscription[]
+  patientNewsAnnouncements PatientNewsAnnouncement[]
 
   @@index([organizationId])
   @@map("pharmacies")
@@ -3836,4 +3848,227 @@ model AutomationDispatch {
   @@index([ruleKey, createdAt])
   @@index([pharmacyId, createdAt])
   @@map("automation_dispatches")
+}
+
+// ===========================================================================
+// NOTIFICATIONS ET CAMPAGNES (octobre 2026) — additif
+//
+// 1. Les nouveautés d'une officine pour les patients qui l'ont demandé : le
+//    patient s'abonne lui-même, depuis le lien de l'e-mail du plan. Rien
+//    n'est conservé sans son geste. AUCUNE donnée de santé ici : ni
+//    ordonnance, ni traitement, ni lien avec un plan.
+// 2. Les campagnes de la console (offre bonus, parrainage, invitation des
+//    partenaires) et la liste de désinscription des offres.
+// 3. Les offres de parrainage appliquées aux nouveaux filleuls.
+// ===========================================================================
+
+enum PatientNewsStatus {
+  ACTIVE
+  UNSUBSCRIBED
+}
+
+/// L'abonnement d'un patient aux nouveautés de SON officine. Une seule
+/// officine par ligne : jamais partagé. L'adresse est chiffrée ; la
+/// désinscription l'efface et ne garde que l'empreinte et les dates.
+model PatientNewsSubscription {
+  id             String            @id @default(cuid())
+  pharmacyId     String
+  /// Empreinte HMAC de l'adresse : unicité et retrouvailles sans la lire.
+  emailHash      String
+  /// L'adresse chiffrée (AES-256-GCM, DATA_ENCRYPTION_KEY). Effacée à la désinscription.
+  emailCipher    String?
+  /// Forme masquée pour l'écran (j***@exemple.fr). Effacée à la désinscription.
+  emailMasked    String?
+  status         PatientNewsStatus @default(ACTIVE)
+  /// D'où vient le consentement : PLAN_EMAIL (lien de l'e-mail du plan).
+  consentSource  String            @default("PLAN_EMAIL")
+  consentAt      DateTime
+  /// Version du texte d'information présenté au patient.
+  noticeVersion  String            @default("v1")
+  unsubscribedAt DateTime?
+  lastNewsAt     DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  pharmacy   Pharmacy              @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  deliveries PatientNewsDelivery[]
+
+  @@unique([pharmacyId, emailHash])
+  @@index([pharmacyId, status])
+  @@index([consentAt])
+  @@map("patient_news_subscriptions")
+}
+
+/// Une annonce de l'officine à ses abonnés (« une nouvelle gamme est arrivée »).
+model PatientNewsAnnouncement {
+  id              String    @id @default(cuid())
+  pharmacyId      String
+  /// L'objet de l'e-mail.
+  title           String
+  /// La marque ou la gamme annoncée, en texte libre.
+  rangeLabel      String?
+  message         String
+  /// SENDING · SENT · PARTIAL · FAILED
+  status          String    @default("SENDING")
+  recipientCount  Int       @default(0)
+  sentCount       Int       @default(0)
+  failedCount     Int       @default(0)
+  /// Envoyée sans messagerie configurée : les envois ont été simulés.
+  simulated       Boolean   @default(false)
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  pharmacy   Pharmacy              @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  deliveries PatientNewsDelivery[]
+
+  @@index([pharmacyId, createdAt])
+  @@map("patient_news_announcements")
+}
+
+/// L'envoi d'une annonce à un abonné. La clé unique (annonce, abonné) est
+/// inscrite AVANT l'envoi : jamais deux e-mails pour la même annonce.
+model PatientNewsDelivery {
+  id             String   @id @default(cuid())
+  announcementId String
+  subscriptionId String
+  /// CLAIMED · SENT · FAILED · SIMULATED
+  status         String   @default("CLAIMED")
+  detail         String?
+  createdAt      DateTime @default(now())
+
+  announcement PatientNewsAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  subscription PatientNewsSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, subscriptionId])
+  @@index([subscriptionId])
+  @@map("patient_news_deliveries")
+}
+
+enum CampaignKind {
+  BONUS_OFFER
+  REFERRAL_OFFER
+  PARTNER_INVITATION
+  ANNOUNCEMENT
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELED
+}
+
+/// Une campagne de la console : un message, des destinataires, éventuellement
+/// une offre chiffrée. Rien ne part sans un envoi confirmé ; le brouillon ne
+/// contacte personne.
+model Campaign {
+  id               String         @id @default(cuid())
+  kind             CampaignKind
+  /// Nom interne, visible dans la console seulement.
+  name             String
+  status           CampaignStatus @default(DRAFT)
+  subject          String
+  title            String
+  body             String
+  buttonLabel      String?
+  /// Où mène le bouton : une clé (espace, parrainage, candidature), jamais une adresse libre.
+  buttonTarget     String?
+  /// Le segment de destinataires (clé de src/core/admin/campaigns.ts).
+  audience         String
+  /// Paramètres du segment : identifiants choisis à la main.
+  audienceParams   Json           @default("{}")
+  /// Aussi une notification dans l'application des officines destinataires.
+  alsoInApp        Boolean        @default(false)
+  offerAmountCents Int?
+  offerEndsAt      DateTime?
+  offerConditions  String?
+  /// Date d'envoi programmée : l'envoi part au passage quotidien de ce jour-là.
+  scheduledFor     DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  canceledAt       DateTime?
+  recipientCount   Int            @default(0)
+  sentCount        Int            @default(0)
+  failedCount      Int            @default(0)
+  skippedCount     Int            @default(0)
+  /// Envoyée sans messagerie configurée : les envois ont été simulés.
+  simulated        Boolean        @default(false)
+  createdByAdminId String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  recipients    CampaignRecipient[]
+  referralOffer ReferralOffer?
+
+  @@index([status, scheduledFor])
+  @@index([createdAt])
+  @@map("campaigns")
+}
+
+/// Un destinataire d'une campagne, figé au démarrage de l'envoi. Un seul
+/// message par adresse et par campagne (clé unique).
+model CampaignRecipient {
+  id              String    @id @default(cuid())
+  campaignId      String
+  /// PHARMACY · PARTNER_CONTACT · PARTNER_APPLICATION
+  targetType      String
+  targetId        String
+  pharmacyId      String?
+  partnerId       String?
+  /// L'adresse en minuscules : la clé du dédoublonnage.
+  emailKey        String
+  email           String
+  name            String?
+  /// PENDING · SENDING · SENT · FAILED · SIMULATED · SKIPPED
+  status          String    @default("PENDING")
+  /// Le motif d'une exclusion (désinscrit, sans adresse) ou d'un échec.
+  detail          String?
+  emailDispatchId String?
+  sentAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, emailKey])
+  @@index([campaignId, status])
+  @@index([pharmacyId])
+  @@map("campaign_recipients")
+}
+
+/// Les adresses professionnelles qui ne veulent plus recevoir d'offres de
+/// PharmaBoost. Une campagne ne leur écrit jamais. On ne garde que l'empreinte.
+model MarketingOptOut {
+  id          String   @id @default(cuid())
+  emailHash   String   @unique
+  emailMasked String?
+  /// LINK (lien du message) · ADMIN (saisi dans la console)
+  source      String   @default("LINK")
+  campaignId  String?
+  createdAt   DateTime @default(now())
+
+  @@map("marketing_opt_outs")
+}
+
+/// Une offre de parrainage : pendant sa durée, un filleul inscrit apporte à
+/// son parrain ce montant par mois (au lieu du montant standard), figé sur sa
+/// fiche (`Pharmacy.referralAmountCents`). Les filleuls déjà inscrits
+/// gardent leur montant.
+model ReferralOffer {
+  id               String    @id @default(cuid())
+  label            String
+  /// Remise mensuelle par filleul actif, en centimes.
+  amountCents      Int
+  startsAt         DateTime
+  endsAt           DateTime?
+  canceledAt       DateTime?
+  campaignId       String?   @unique
+  createdByAdminId String?
+  createdAt        DateTime  @default(now())
+
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([startsAt, endsAt])
+  @@map("referral_offers")
 }

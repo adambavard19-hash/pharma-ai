@@ -87,6 +87,10 @@ export const PERMISSIONS = {
   PARTNERS_VIEW: "partners:view",
   /// Masquer ou refuser une marque, contacter un partenaire, commander : décision d'achat du titulaire.
   PARTNERS_MANAGE: "partners:manage",
+
+  // Nouveautés pour les patients : annoncer une gamme aux patients qui l'ont demandé.
+  /// Décision commerciale du titulaire, au nom de l'officine ; il peut la confier.
+  NEWS_MANAGE: "news:manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -230,6 +234,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [PERMISSIONS.TRAINING_MANAGE]: "Publier des formations pour l'officine",
   [PERMISSIONS.PARTNERS_VIEW]: "Consulter les gammes partenaires",
   [PERMISSIONS.PARTNERS_MANAGE]: "Masquer, contacter et commander auprès des marques partenaires",
+  [PERMISSIONS.NEWS_MANAGE]: "Annoncer les nouveautés aux patients abonnés",
 };
 
 /** Permissions effectives = rôle + accordées − retirées. */

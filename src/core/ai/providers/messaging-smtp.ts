@@ -34,6 +34,7 @@ export type SmtpTransport = {
     subject: string;
     text: string;
     html?: string;
+    headers?: Record<string, string>;
   }): Promise<{ messageId?: string; rejected?: unknown[] }>;
 };
 
@@ -81,6 +82,7 @@ export class SmtpMessagingProvider implements MessagingProvider {
         subject: message.subject,
         text: message.text,
         ...(message.html ? { html: message.html } : {}),
+        ...(message.headers && Object.keys(message.headers).length > 0 ? { headers: message.headers } : {}),
       });
 
       // Un serveur peut accepter la connexion et rejeter le destinataire : ce

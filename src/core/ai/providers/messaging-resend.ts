@@ -57,6 +57,7 @@ export class ResendMessagingProvider implements MessagingProvider {
           subject: message.subject,
           text: message.text,
           ...(message.html ? { html: message.html } : {}),
+          ...(message.headers && Object.keys(message.headers).length > 0 ? { headers: message.headers } : {}),
         }),
         signal: controller.signal,
       });

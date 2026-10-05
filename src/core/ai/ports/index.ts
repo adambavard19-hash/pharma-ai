@@ -152,6 +152,12 @@ export type OutgoingEmail = {
   text: string;
   /** Version HTML facultative, strictement équivalente au texte. */
   html?: string;
+  /**
+   * En-têtes supplémentaires. Sert aux messages promotionnels : `List-Unsubscribe`
+   * (et `List-Unsubscribe-Post`) font apparaître le bouton « Se désabonner »
+   * de la messagerie du destinataire.
+   */
+  headers?: Record<string, string>;
 };
 
 export interface MessagingProvider {

@@ -28,7 +28,9 @@ export type DispatchKind =
   | "SITE_LEAD_ACK"
   | "INSTALL_GUIDE"
   /** Un modèle du centre de modèles (relance automatique, envoi manuel, test). */
-  | "TEMPLATE";
+  | "TEMPLATE"
+  /** Une campagne de la console (offre bonus, parrainage, invitation des partenaires). */
+  | "CAMPAIGN";
 
 export type DispatchTrigger = "AUTOMATIC" | "MANUAL" | "TEST" | "SYSTEM";
 
