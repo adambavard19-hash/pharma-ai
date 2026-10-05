@@ -71,7 +71,8 @@ function walk(state: WizardState): WizardStep[] {
 const flows: Record<string, () => WizardState> = {
   "offre bonus": () => ({ ...selectKind(initialState(), "BONUS_OFFER", NOW), amount: "12,50", endsOn: inDays(20), conditions: "Offre réservée aux officines abonnées." }),
   "offre de parrainage avec fin": () => ({ ...selectKind(initialState(), "REFERRAL_OFFER", NOW), amount: "20", endsOn: inDays(30) }),
-  "offre de parrainage au montant standard, sans fin": () => ({ ...selectKind(initialState(), "REFERRAL_OFFER", NOW), amount: "10" }),
+  "offre de parrainage sans fin (plus de montant standard : c'est une vraie offre)": () => ({ ...selectKind(initialState(), "REFERRAL_OFFER", NOW), amount: "30" }),
+  "offre de parrainage à 10 €, sans fin : inférieure aux 20 %, avertie mais valide": () => ({ ...selectKind(initialState(), "REFERRAL_OFFER", NOW), amount: "10" }),
   "invitation des partenaires": () => selectKind(initialState(), "PARTNER_INVITATION", NOW),
   "annonce aux officines choisies": () => ({ ...selectAudience(selectKind(initialState(), "ANNOUNCEMENT", NOW), "pharmacies.selected"), pharmacyIds: ["ph_1", "ph_2"], body: "Bonjour {{prenom}},\n\nLa pharmacie du port ouvre un samedi par mois.", buttonLabel: "Ouvrir mon espace", buttonTarget: "espace" as const }),
   "annonce aux partenaires choisis": () => ({ ...selectAudience(selectKind(initialState(), "ANNOUNCEMENT", NOW), "partners.selected"), partnerIds: ["pa_1"], body: "Bonjour {{prenom}},\n\nUne nouvelle session de candidatures s'ouvre." }),

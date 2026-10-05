@@ -2673,15 +2673,17 @@ model Prospect {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  salesRep    SalesRep?            @relation(fields: [salesRepId], references: [id])
-  pharmacy    Pharmacy?            @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
-  plan        Plan?                @relation(fields: [planId], references: [id])
-  events      ProspectEvent[]
-  contracts   Contract[]
-  commissions Commission[]
-  tasks       SalesTask[]
-  invitations PharmacyInvitation[]
-  adminNotes  AdminNote[]
+  salesRep         SalesRep?            @relation(fields: [salesRepId], references: [id])
+  pharmacy         Pharmacy?            @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+  plan             Plan?                @relation(fields: [planId], references: [id])
+  events           ProspectEvent[]
+  contracts        Contract[]
+  commissions      Commission[]
+  tasks            SalesTask[]
+  invitations      PharmacyInvitation[]
+  adminNotes       AdminNote[]
+  referralLeads    ReferralLead[]       @relation("ReferrerLeads")
+  referredFromLead ReferralLead?        @relation("ReferredLead")
 
   @@index([salesRepId, status])
   @@index([status])
@@ -4156,4 +4158,33 @@ model SalesApplicationEvent {
 
   @@index([applicationId, createdAt])
   @@map("sales_application_events")
+}
+
+// ===========================================================================
+// PARRAINAGE : LES CONFRÈRES PROPOSÉS À L'INSCRIPTION (octobre 2026) — additif
+// À l'inscription, une officine peut indiquer une personne à parrainer (e-mail,
+// téléphone). Rien n'est envoyé à cette personne : l'équipe la contacte. Si elle
+// s'abonne, l'officine qui parraine passe à 20 % de moins par mois.
+// ===========================================================================
+
+model ReferralLead {
+  id                 String   @id @default(cuid())
+  /// Le dossier de l'officine qui parraine.
+  referrerProspectId String
+  contactName        String?
+  email              String
+  phone              String
+  /// NEW · CONTACTED · LINKED (la personne a ouvert son propre dossier) · DECLINED
+  status             String   @default("NEW")
+  /// Le dossier ouvert par la personne parrainée, rapproché par son e-mail.
+  referredProspectId String?  @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  referrerProspect Prospect  @relation("ReferrerLeads", fields: [referrerProspectId], references: [id], onDelete: Cascade)
+  referredProspect Prospect? @relation("ReferredLead", fields: [referredProspectId], references: [id], onDelete: SetNull)
+
+  @@index([referrerProspectId])
+  @@index([email])
+  @@map("referral_leads")
 }

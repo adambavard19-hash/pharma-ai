@@ -1,64 +1,52 @@
 import { describe, expect, it } from "vitest";
-import { OFFICIAL_OFFER, formatPriceEuros, formulaQuery, parseFormula, pricingPlanGaps, resolvePublicPricing, resolveStandardCommissionCents, STANDARD_COMMISSION_MAX_CENTS } from "../official-offer";
+import { OFFICIAL_OFFER, formatPriceEuros, pricingPlanGaps, referrerPriceCents, resolvePublicPricing, resolveStandardCommissionCents, STANDARD_COMMISSION_MAX_CENTS } from "../official-offer";
 
 describe("l'offre officielle", () => {
-  it("dit 99 € HT par mois avec 390 € de mise en service, et 1 188 € HT par an avec mise en service offerte", () => {
-    expect(OFFICIAL_OFFER.monthly).toEqual({ priceCents: 9_900, setupFeeCents: 39_000 });
-    expect(OFFICIAL_OFFER.annual).toEqual({ priceCents: 118_800, setupFeeCents: 0, commitmentMonths: 12 });
-    expect(OFFICIAL_OFFER.standardCommissionCents).toBe(25_000);
+  it("dit un seul abonnement : 126 € HT par mois, engagement 12 mois, mise en service unique de 290 € HT, parrainage à 20 %", () => {
+    expect(OFFICIAL_OFFER).toMatchObject({ monthlyPriceCents: 12_600, setupFeeCents: 29_000, commitmentMonths: 12, referralDiscountPercent: 20, standardCommissionCents: 25_000 });
   });
 
-  it("l'annuel coûte autant que douze mois : l'avantage est la mise en service offerte, pas un prix inventé", () => {
-    const pricing = resolvePublicPricing(null);
-    expect(pricing.annual.priceCents).toBe(pricing.monthly.priceCents * 12);
-    expect(pricing.annual.monthlyEquivalentCents).toBe(9_900);
-    expect(pricing.monthly.setupFeeCents - pricing.annual.setupFeeCents).toBe(39_000);
+  it("n'a plus de formule annuelle", () => {
+    expect(Object.keys(OFFICIAL_OFFER)).not.toContain("annual");
+    expect(Object.keys(resolvePublicPricing(null))).not.toContain("annual");
   });
 });
 
 describe("resolvePublicPricing", () => {
-  const plan = { name: "Offre console", monthlyPriceCents: 10_900, annualPriceCents: 130_800, setupFeeCents: 45_000, annualSetupFeeCents: 0 };
+  const plan = { name: "Offre console", monthlyPriceCents: 13_900, setupFeeCents: 31_000 };
 
   it("sans offre publiée : l'offre officielle", () => {
-    expect(resolvePublicPricing(null)).toMatchObject({ source: "OFFICIAL_DEFAULT", name: "PharmaBoost Officine", monthly: { priceCents: 9_900 } });
+    expect(resolvePublicPricing(null)).toEqual({ name: "PharmaBoost Officine", source: "OFFICIAL_DEFAULT", monthlyPriceCents: 12_600, setupFeeCents: 29_000, commitmentMonths: 12, referralDiscountPercent: 20 });
   });
 
   it("une offre COMPLÈTE de la console prime", () => {
-    const pricing = resolvePublicPricing(plan);
-    expect(pricing.source).toBe("PLAN");
-    expect(pricing.monthly).toEqual({ priceCents: 10_900, setupFeeCents: 45_000 });
-    expect(pricing.annual.priceCents).toBe(130_800);
-    expect(pricing.annual.setupFeeCents).toBe(0);
+    expect(resolvePublicPricing(plan)).toMatchObject({ source: "PLAN", name: "Offre console", monthlyPriceCents: 13_900, setupFeeCents: 31_000, commitmentMonths: 12 });
   });
 
   it("une offre incomplète ne se mélange jamais à l'officielle : l'officielle d'un bloc", () => {
-    for (const partial of [{ ...plan, annualPriceCents: null }, { ...plan, setupFeeCents: null }, { ...plan, annualSetupFeeCents: null }, { ...plan, monthlyPriceCents: 0 }]) {
-      const pricing = resolvePublicPricing(partial);
-      expect(pricing.source).toBe("OFFICIAL_DEFAULT");
-      expect(pricing.monthly).toEqual(OFFICIAL_OFFER.monthly);
+    for (const partial of [{ ...plan, setupFeeCents: null }, { ...plan, monthlyPriceCents: 0 }]) {
+      expect(resolvePublicPricing(partial)).toMatchObject({ source: "OFFICIAL_DEFAULT", monthlyPriceCents: 12_600, setupFeeCents: 29_000 });
     }
   });
 
-  it("une mise en service annuelle à 0 est une mise en service OFFERTE, pas une valeur manquante", () => {
-    expect(resolvePublicPricing({ ...plan, annualSetupFeeCents: 0 }).source).toBe("PLAN");
+  it("une mise en service à 0 est une mise en service OFFERTE, pas une valeur manquante", () => {
+    expect(resolvePublicPricing({ ...plan, setupFeeCents: 0 })).toMatchObject({ source: "PLAN", setupFeeCents: 0 });
   });
 
   it("dit à l'administrateur pourquoi l'offre de la console n'est pas affichée", () => {
     expect(pricingPlanGaps(null)[0]).toContain("Aucune offre par défaut");
-    expect(pricingPlanGaps({ ...plan, annualPriceCents: null })[0]).toContain("le prix annuel");
+    expect(pricingPlanGaps({ ...plan, setupFeeCents: null })[0]).toContain("la mise en service");
     expect(pricingPlanGaps(plan)).toEqual([]);
   });
 });
 
-describe("la formule dans l'adresse du site", () => {
-  it("se lit en français et en anglais, et refuse le reste", () => {
-    expect(parseFormula("annuelle")).toBe("ANNUAL");
-    expect(parseFormula(" MENSUELLE ")).toBe("MONTHLY");
-    expect(parseFormula("annual")).toBe("ANNUAL");
-    expect(parseFormula("trimestrielle")).toBeNull();
-    expect(parseFormula(undefined)).toBeNull();
-    expect(formulaQuery("ANNUAL")).toBe("annuelle");
-    expect(formulaQuery("MONTHLY")).toBe("mensuelle");
+describe("le parrainage : 20 % de moins par mois", () => {
+  it("126 € deviennent 100,80 € HT", () => {
+    expect(referrerPriceCents(12_600)).toBe(10_080);
+    expect(referrerPriceCents(12_600, 20)).toBe(10_080);
+  });
+  it("arrondit au centime", () => {
+    expect(referrerPriceCents(9_999)).toBe(7_999);
   });
 });
 
@@ -74,9 +62,9 @@ describe("la commission standard", () => {
 
 describe("formatPriceEuros", () => {
   it("espaces insécables, virgule française, pas de décimales inutiles", () => {
-    expect(formatPriceEuros(9_900)).toBe("99 €");
-    expect(formatPriceEuros(118_800)).toBe("1 188 €");
-    expect(formatPriceEuros(39_000)).toBe("390 €");
-    expect(formatPriceEuros(1_250)).toBe("12,50 €");
+    expect(formatPriceEuros(12_600)).toBe("126\u00a0€");
+    expect(formatPriceEuros(29_000)).toBe("290\u00a0€");
+    expect(formatPriceEuros(10_080)).toBe("100,80\u00a0€");
+    expect(formatPriceEuros(500_000)).toBe("5\u00a0000\u00a0€");
   });
 });

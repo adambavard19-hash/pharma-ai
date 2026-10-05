@@ -26,7 +26,6 @@ import {
   type CampaignKindKey,
   type CampaignSide,
 } from "@/core/admin/campaigns";
-import { REFERRAL_DISCOUNT_CENTS } from "@/core/billing/referral";
 import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
 import { calendarDay, zonedDayStart } from "@/core/challenges/dates";
 import type { EmailContext } from "@/core/platform/email-layout";
@@ -457,9 +456,9 @@ type Who = { adminId: string | null; now: Date; deadline: number };
 
 const progressOf = (row: CampaignRow): Progress => ({ recipientCount: row.recipientCount, sentCount: row.sentCount, failedCount: row.failedCount, skippedCount: row.skippedCount, simulated: row.simulated, complete: row.status === "SENT" });
 
-/** Le montant est le montant standard, sans fin : rien à appliquer, le message ne fait que le rappeler. */
+/** Toute campagne de parrainage chiffrée ouvre une offre : il n'y a plus de montant « standard » par filleul (la règle est en pourcentage). */
 function needsReferralOffer(draft: CampaignDraftInput): boolean {
-  return draft.kind === "REFERRAL_OFFER" && draft.offerAmountCents !== null && !(draft.offerAmountCents === REFERRAL_DISCOUNT_CENTS && !draft.offerEndsAt);
+  return draft.kind === "REFERRAL_OFFER" && draft.offerAmountCents !== null;
 }
 
 /** Le nom de l'offre vient du montant appliqué : le texte montré aux officines et la valeur appliquée ne peuvent pas diverger. */

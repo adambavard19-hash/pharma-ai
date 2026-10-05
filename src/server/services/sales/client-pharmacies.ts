@@ -9,6 +9,7 @@ import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
 import { resolveReferralCode } from "@/server/services/referral";
 import { referralAmountForNewFilleul } from "@/server/services/referral-offers";
+import { recordLeadAttachment, referrerFromLead } from "@/server/services/referral-leads";
 import { isLgoId } from "@/server/services/stock-sync";
 
 /**
@@ -41,7 +42,11 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
   const [organizationSlug, pharmacySlug] = await Promise.all([uniqueSlug(prospect.name, "organization"), uniqueSlug(prospect.name, "pharmacy")]);
   const passwordHash = await hashPassword(randomBytes(32).toString("base64url"));
   // Le parrain, si le dossier porte un code valide : la remise se calcule à partir de ce lien.
-  const referrer = await resolveReferralCode(prospect.referralCode);
+  const codeReferrer = await resolveReferralCode(prospect.referralCode);
+  // Sans code, le dossier d'un confrère proposé au parrainage a pour parrain l'officine de celui qui l'a proposé (si elle existe déjà).
+  // Un code déjà renseigné l'emporte : rien n'est changé pour lui.
+  const leadReferrer = codeReferrer ? null : await referrerFromLead(prospect.id);
+  const referrer = codeReferrer ?? leadReferrer;
   // Ce que ce filleul apportera à son parrain est figé maintenant : une offre de parrainage qui change ensuite ne le modifie pas.
   const referralAmountCents = referrer ? await referralAmountForNewFilleul() : null;
 
@@ -79,6 +84,7 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
 
   await recordProspectEvent({ prospectId, type: "PHARMACY_CREATED", summary: `Espace pharmacie créé (${pharmacy.name}) ; e-mail d'accueil du titulaire : ${welcome.status === "SENT" ? "envoyé" : `non envoyé (${welcome.detail})`}.`, actor, metadata: { pharmacyId: pharmacy.id } });
   await recordAudit({ action: "sales.pharmacy_created", entityType: "Pharmacy", entityId: pharmacy.id, salesRepId: actor.type === "SALES" ? actor.id : null, platformAdminId: actor.type === "ADMIN" ? actor.id : null, metadata: { prospectId } });
+  if (leadReferrer) await recordLeadAttachment({ referredProspectId: prospect.id, referredName: pharmacy.name, referrer: leadReferrer, actor });
   await notifyAdmins({ type: "PHARMACY_CREATED", title: `${pharmacy.name} : espace créé`, body: `Dossier de ${prospect.salesRep ? `${prospect.salesRep.firstName} ${prospect.salesRep.lastName}` : "la console"}.`, linkUrl: `/admin/pharmacies/${pharmacy.id}`, severity: "SUCCESS" });
   return { ok: true, pharmacyId: pharmacy.id, welcome: { status: welcome.status, detail: welcome.detail } };
 }

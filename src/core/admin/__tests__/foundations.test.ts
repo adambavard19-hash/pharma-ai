@@ -547,13 +547,23 @@ describe("modèles d'e-mails : parrainage et partenaires", () => {
     expect(new Set(EMAIL_TEMPLATES.map((t) => t.key)).size).toBe(EMAIL_TEMPLATES.length);
   });
 
-  it("le message de parrainage ne cite que le nom de l'officine parrainée et le montant mensuel", () => {
+  it("le message de parrainage ne cite que le nom de l'officine parrainée et la remise : « votre abonnement passe à 20 % de moins »", () => {
     expect(variablesIn(`${referral.defaults.subject}\n${referral.defaults.title}\n${referral.defaults.body}`).sort()).toEqual(["filleul", "montant_remise", "prenom"]);
-    const rendered = renderTemplateEmail(DEFAULT_EMAIL_CONTEXT, referral, referral.defaults, { prenom: "Camille", filleul: "Pharmacie du Marché", montant_remise: "25 €", lien_espace: "https://pharmaboost.app/parametres?onglet=abonnement" });
+    const rendered = renderTemplateEmail(DEFAULT_EMAIL_CONTEXT, referral, referral.defaults, { prenom: "Camille", filleul: "Pharmacie du Marché", montant_remise: "20 %", lien_espace: "https://pharmaboost.app/parametres?onglet=abonnement" });
     expect(rendered.subject).toBe("Pharmacie du Marché a rejoint PharmaBoost avec votre code de parrainage");
-    expect(rendered.text).toContain("25 € HT par mois");
+    expect(rendered.text).toContain("votre abonnement passe à 20 % de moins par mois");
+    expect(rendered.text).toContain("appliquée à votre abonnement par l'équipe PharmaBoost");
+    expect(rendered.text).toContain("elle ne se cumule pas");
     expect(rendered.text).toContain("Voir mon parrainage : https://pharmaboost.app/parametres?onglet=abonnement");
     expect(rendered.text).not.toContain("{{");
+    // Plus aucun montant fixe par filleul.
+    expect(rendered.text).not.toMatch(/10\s?€|réduit votre abonnement de/);
+  });
+
+  it("la variable de remise du parrainage s'exemplifie en pourcentage, jamais en euros", () => {
+    const variable = referral.variables.find((v) => v.key === "montant_remise")!;
+    expect(variable.sample).toBe("20 %");
+    expect(variable.label).toContain("pourcentage");
   });
 
   it("l'invitation d'un partenaire n'a ni officine, ni abonnement, ni lien d'espace : seulement ce qui a un sens pour lui", () => {

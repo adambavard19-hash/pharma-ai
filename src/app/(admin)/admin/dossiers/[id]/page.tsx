@@ -12,6 +12,7 @@ import { ContractPanel } from "@/components/sales/contract-panel";
 import { contractPanelData } from "@/server/services/sales/contract-panel-data";
 import { InvitationPanel } from "./invitation-panel";
 import { DossierCommercialPanel } from "./commercial-panel";
+import { ReferralPanel } from "./referral-panel";
 
 export const metadata: Metadata = { title: "Dossier commercial" };
 
@@ -45,6 +46,7 @@ export default async function AdminProspectPage({ params }: { params: Promise<{ 
               defaultDue={defaultFollowUpInput(now)}
             />
             <InvitationPanel prospectId={prospect.id} />
+            <ReferralPanel prospectId={prospect.id} />
             <ContractPanel mode="admin" data={panel} />
             <AdminActionsPanel prospect={{ id: prospect.id, status: prospect.status, blocked: Boolean(prospect.blockedAt), salesRepId: prospect.salesRepId, pharmacyId: prospect.pharmacyId, contracts: prospect.contracts.map((c) => ({ id: c.id, version: c.version, status: c.status, providerEnvelopeId: c.providerEnvelopeId })), commissions: prospect.commissions.map((c) => ({ id: c.id, amountCents: c.amountCents, status: c.status, dueAt: c.dueAt?.toISOString().slice(0, 10) ?? "", note: c.note ?? "" })) }} reps={reps} />
           </>

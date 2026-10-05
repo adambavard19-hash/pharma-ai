@@ -1,4 +1,3 @@
-import type { SubscriptionFormula } from "@/core/pricing/official-offer";
 import { cleanText, normalizeEmail, normalizePhone, normalizePostalCode, normalizeSiret, personName } from "./identity";
 
 /**
@@ -22,9 +21,12 @@ export type SubscriptionRequestInput = {
   planId?: string | null;
   outletCount?: number | null;
   referralCode?: string | null;
-  /** La formule choisie sur le site : mensuelle ou annuelle. Vide : appel sans choix (ancien parcours). */
-  formula?: SubscriptionFormula | null;
+  /** Le confrère que l'officine souhaite parrainer (facultatif) : l'équipe le contacte, rien ne lui est envoyé. */
+  referee?: { name?: string | null; email: string; phone: string } | null;
 };
+
+/** Le confrère à parrainer, validé et normalisé. */
+export type NormalizedReferee = { name: string | null; email: string; phone: string };
 
 export type NormalizedRequest = {
   name: string;
@@ -39,7 +41,10 @@ export type NormalizedRequest = {
   ownerTitle: string;
   email: string;
   outletCount: number | null;
+  referee: NormalizedReferee | null;
 };
+
+export const REFEREE_NAME_MAX = 120;
 
 /** Validation et normalisation : une valeur invalide est refusée avec son libellé, rien n'est deviné. */
 export function normalizeSubscriptionRequest(input: SubscriptionRequestInput): { ok: true; value: NormalizedRequest } | { ok: false; errors: Record<string, string> } {
@@ -63,6 +68,7 @@ export function normalizeSubscriptionRequest(input: SubscriptionRequestInput): {
   if (!cleanText(input.ownerTitle)) errors.ownerTitle = "Indiquez la qualité du signataire.";
   if (!email) errors.ownerEmail = "Cette adresse e-mail n'est pas valide.";
   if (input.phone?.trim() && !phone) errors.phone = "Ce numéro de téléphone n'est pas valide.";
+  const referee = normalizeReferee(input.referee, email, errors);
   if (Object.keys(errors).length) return { ok: false, errors };
   return {
     ok: true,
@@ -79,7 +85,26 @@ export function normalizeSubscriptionRequest(input: SubscriptionRequestInput): {
       ownerTitle: cleanText(input.ownerTitle)!,
       email: email!,
       outletCount: input.outletCount && input.outletCount > 0 ? Math.min(input.outletCount, 50) : null,
+      referee,
     },
   };
+}
+
+/**
+ * Le confrère à parrainer : facultatif, mais s'il est donné, son e-mail et son
+ * téléphone doivent être valides. Une adresse identique à celle du signataire est
+ * refusée : on parraine un confrère, pas soi-même. Les erreurs sont rattachées à
+ * `referee.email`, `referee.phone` et `referee.name`.
+ */
+function normalizeReferee(raw: SubscriptionRequestInput["referee"], signerEmail: string | null, errors: Record<string, string>): NormalizedReferee | null {
+  if (!raw) return null;
+  const name = cleanText(raw.name);
+  const email = normalizeEmail(raw.email);
+  const phone = normalizePhone(raw.phone);
+  if (name && name.length > REFEREE_NAME_MAX) errors["referee.name"] = `${REFEREE_NAME_MAX} caractères au plus.`;
+  if (!email) errors["referee.email"] = "Cette adresse e-mail n'est pas valide.";
+  else if (signerEmail && email === signerEmail) errors["referee.email"] = "Indiquez un confrère, pas vous-même.";
+  if (!phone) errors["referee.phone"] = "Ce numéro de téléphone n'est pas valide.";
+  return email && phone ? { name, email, phone } : null;
 }
 

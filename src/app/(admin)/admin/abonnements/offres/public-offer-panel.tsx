@@ -13,10 +13,9 @@ export type PublicOfferPanelData = {
   source: "PLAN" | "OFFICIAL_DEFAULT";
   planName: string;
   monthlyPriceCents: number;
-  monthlySetupFeeCents: number;
-  annualPriceCents: number;
-  annualSetupFeeCents: number;
+  setupFeeCents: number;
   commitmentMonths: number;
+  referralDiscountPercent: number;
   commissionCents: number;
   gaps: string[];
   /** L'offre officielle est déjà celle du site (rien à publier). */
@@ -43,7 +42,6 @@ export function PublicOfferPanel({ data }: { data: PublicOfferPanelData }) {
   const { push } = useToast();
   const [pending, start] = useTransition();
   const [commission, setCommission] = useState(String(data.commissionCents / 100).replace(".", ","));
-  const annualSetup = data.annualSetupFeeCents === 0 ? "Offerte" : `${formatPriceEuros(data.annualSetupFeeCents)} HT`;
 
   const saveCommission = () =>
     start(async () => {
@@ -68,7 +66,7 @@ export function PublicOfferPanel({ data }: { data: PublicOfferPanelData }) {
             title="Publier l'offre officielle ?"
             description="L'offre « PharmaBoost Officine » devient l'offre par défaut : le site et les nouveaux contrats l'utilisent."
             consequences={[
-              "99 € HT par mois, mise en service 390 € HT ; 1 188 € HT par an, mise en service offerte, aucun essai.",
+              "Un seul abonnement : 126 € HT par mois, engagement de 12 mois, mise en service 290 € HT, aucun essai.",
               data.previousDefaultName ? `« ${data.previousDefaultName} » n'est plus l'offre par défaut.` : "Aucune autre offre par défaut n'est remplacée.",
               "Aucun abonnement existant n'est modifié : chaque officine garde le tarif de son contrat.",
             ]}
@@ -83,11 +81,10 @@ export function PublicOfferPanel({ data }: { data: PublicOfferPanelData }) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Item label="Tarif mensuel" value={`${formatPriceEuros(data.monthlyPriceCents)} HT`} hint="par mois et par officine" />
-        <Item label="Mise en service mensuelle" value={`${formatPriceEuros(data.monthlySetupFeeCents)} HT`} hint="une seule fois" />
-        <Item label="Tarif annuel" value={`${formatPriceEuros(data.annualPriceCents)} HT`} hint={`par an, engagement ${data.commitmentMonths} mois`} />
-        <Item label="Mise en service annuelle" value={annualSetup} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Item label="Abonnement mensuel" value={`${formatPriceEuros(data.monthlyPriceCents)} HT`} hint={`par mois, engagement de ${data.commitmentMonths} mois`} />
+        <Item label="Mise en service" value={`${formatPriceEuros(data.setupFeeCents)} HT`} hint="une seule fois" />
+        <Item label="Remise de parrainage" value={`${data.referralDiscountPercent} %`} hint="par mois, dès que la personne parrainée s'abonne" />
         <Item label="Commission standard" value={formatPriceEuros(data.commissionCents)} hint="par pharmacie activée" />
       </div>
 

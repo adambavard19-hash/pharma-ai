@@ -9,7 +9,6 @@ import {
   dateLabel,
   firstParam,
   hasNextPage,
-  isStandardOffer,
   kindLabel,
   offerHeadline,
   offerSendLines,
@@ -143,17 +142,10 @@ describe("l'offre de parrainage liée", () => {
     expect(referralOfferState({ ...offer, endsAt: null }, now).label).toBe("En cours");
   });
 
-  it("le montant standard sans fin n'est pas une offre : aucune ligne n'est créée", () => {
-    expect(isStandardOffer({ offerAmountCents: 1000, offerEndsAt: null })).toBe(true);
-    expect(isStandardOffer({ offerAmountCents: 1000, offerEndsAt: at("2026-10-31T22:59:59Z") })).toBe(false);
-    expect(isStandardOffer({ offerAmountCents: 2000, offerEndsAt: null })).toBe(false);
-  });
-
   it("dit ce qui se passera, ou ce qui ne s'est pas passé, quand aucune offre n'est liée", () => {
-    const draft = { kind: "REFERRAL_OFFER", status: "DRAFT", offerAmountCents: 2000, offerEndsAt: null, referralOffer: null };
+    const draft = { kind: "REFERRAL_OFFER", status: "DRAFT", referralOffer: null };
     expect(referralOfferExpectation(draft)).toContain("sera créée au moment de l'envoi");
-    expect(referralOfferExpectation({ ...draft, offerAmountCents: 1000 })).toContain("aucune offre ne sera créée");
-    expect(referralOfferExpectation({ ...draft, status: "SENT", offerAmountCents: 1000 })).toContain("Aucune offre créée");
+    expect(referralOfferExpectation({ ...draft, status: "SCHEDULED" })).toContain("sera créée au moment de l'envoi");
     expect(referralOfferExpectation({ ...draft, status: "SENT" })).toBe("Aucune offre de parrainage n'est liée à cette campagne.");
     expect(referralOfferExpectation({ ...draft, referralOffer: { id: "o1" } })).toBeNull();
     expect(referralOfferExpectation({ ...draft, kind: "BONUS_OFFER" })).toBeNull();
@@ -173,8 +165,25 @@ describe("le montant, en toutes lettres", () => {
     expect(referral).toContain("réellement appliqué");
     expect(referral).toContain("déjà inscrits gardent leur montant");
     expect(offerSendLines("REFERRAL_OFFER", 2000, true, "schedule")[0]).toContain("créée au moment de l'envoi, pas maintenant");
-    expect(offerSendLines("REFERRAL_OFFER", 1000, false, "send")[0]).toContain("aucune offre n'est créée");
+    // Plus de montant « standard » : un montant de 10 € est une vraie offre comme une autre, créée à l'envoi.
+    expect(offerSendLines("REFERRAL_OFFER", 1000, true, "send")[0]).toContain("Le montant de 10 € par filleul et par mois est réellement appliqué");
+    expect(offerSendLines("REFERRAL_OFFER", 1000, true, "send").join(" ")).not.toContain("aucune offre n'est créée");
     expect(offerSendLines("PARTNER_INVITATION", null, false, "send")).toEqual([]);
+  });
+
+  it("un parrainage dit qu'il est une exception à la remise de 20 % (le parrain a le plus avantageux des deux)", () => {
+    const line = offerSendLines("REFERRAL_OFFER", 3000, true, "send")[0];
+    expect(line).toContain("exception à la remise de 20 % du parrainage");
+    expect(line).toContain("plus avantageux des deux");
+  });
+
+  it("une offre sans date de fin le dit : elle court jusqu'à l'annulation de la campagne ; avec une fin, rien à ajouter", () => {
+    expect(offerSendLines("REFERRAL_OFFER", 3000, true, "send")).toHaveLength(1);
+    const open = offerSendLines("REFERRAL_OFFER", 3000, false, "send");
+    expect(open).toHaveLength(2);
+    expect(open[1]).toContain("pas de date de fin");
+    expect(open[1]).toContain("jusqu'à l'annulation de la campagne");
+    expect(offerSendLines("REFERRAL_OFFER", 3000, false, "schedule")[1]).toContain("pas de date de fin");
   });
 });
 

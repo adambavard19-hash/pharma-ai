@@ -6,6 +6,7 @@ import { notifyAdmins } from "@/server/services/sales/notifications";
 import { traceDispatch } from "@/server/services/email-dispatch";
 import { buildSiteLeadAcknowledgement, buildSiteLeadAlert, type SiteLeadKind, type SiteLeadSummary } from "@/core/platform/site-emails";
 import { resolveReferralCode } from "@/server/services/referral";
+import { reconcileNewProspect } from "@/server/services/referral-leads";
 
 export const DEFAULT_CONTACT_EMAIL = "contact@pharmaboost.app";
 
@@ -71,7 +72,10 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
         select: { id: true },
       });
 
-  await recordProspectEvent({ prospectId: prospect.id, type: "CREATED", summary: kindLabel, actor: { type: "SYSTEM", label: "Site public" }, metadata: { kind: input.kind, existing: Boolean(existing) } });
+  const siteActor = { type: "SYSTEM" as const, label: "Site public" };
+  await recordProspectEvent({ prospectId: prospect.id, type: "CREATED", summary: kindLabel, actor: siteActor, metadata: { kind: input.kind, existing: Boolean(existing) } });
+  // Un NOUVEAU dossier dont l'e-mail est celui d'un confrère proposé au parrainage lui est rattaché (casse ignorée).
+  if (!existing) await reconcileNewProspect({ id: prospect.id, email: input.email, name: input.pharmacyName }, siteActor);
   const adminUrl = publicUrl(`/admin/dossiers/${prospect.id}`);
   await notifyAdmins({ type: "SITE_LEAD", title: `${kindLabel} — ${input.pharmacyName}`, body: `${input.contactName} · ${input.email}${input.phone ? ` · ${input.phone}` : ""}`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO" });
 

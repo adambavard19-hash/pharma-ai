@@ -22,7 +22,6 @@ export type PlanRow = {
   monthlyPriceCents: number;
   annualPriceCents: number | null;
   setupFeeCents: number | null;
-  annualSetupFeeCents: number | null;
   foundingPriceCents: number | null;
   discountPercent: number | null;
   discountLabel: string | null;
@@ -129,15 +128,9 @@ function PlanCard({ plan, onEdit, onToggle, busy }: { plan: PlanRow; onEdit: () 
           <span className="ml-1 text-[13px] text-text-tertiary">HT / mois</span>
         </p>
         <p className="text-[13px] text-text-secondary">{plan.trialDays > 0 ? `${plan.trialDays} jours offerts` : "Sans essai"}</p>
-        {plan.annualPriceCents !== null && <p className="text-[13px] text-text-secondary">{formatEuros(plan.annualPriceCents)} HT / an <span className="text-text-tertiary">(affiché)</span></p>}
-        {(plan.setupFeeCents !== null || plan.annualSetupFeeCents !== null) && (
-          <p className="text-[13px] text-text-secondary">
-            Mise en service : {plan.setupFeeCents !== null ? `${formatEuros(plan.setupFeeCents)} HT` : "—"} (mensuelle) · {plan.annualSetupFeeCents === null ? "—" : plan.annualSetupFeeCents === 0 ? "offerte" : `${formatEuros(plan.annualSetupFeeCents)} HT`} (annuelle)
-          </p>
+        {plan.setupFeeCents !== null && (
+          <p className="text-[13px] text-text-secondary">Mise en service : {plan.setupFeeCents === 0 ? "offerte" : `${formatEuros(plan.setupFeeCents)} HT, une seule fois`}</p>
         )}
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-1.5">
         {plan.foundingPriceCents !== null && <Badge tone="accent">Tarif fondateur : {formatEuros(plan.foundingPriceCents)}</Badge>}
         {plan.discountPercent !== null && <Badge tone="info">{plan.discountLabel ?? "Remise"} : −{plan.discountPercent} %</Badge>}
         {plan.maxUsers !== null && <Badge tone="neutral" icon={<Users className="size-3" />}>{plural(plan.maxUsers, "utilisateur inclus", "utilisateurs inclus")}</Badge>}
@@ -208,9 +201,7 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
   const [code, setCode] = useState(plan?.code ?? "");
   const [description, setDescription] = useState(plan?.description ?? "");
   const [price, setPrice] = useState(centsToField(plan?.monthlyPriceCents ?? null));
-  const [annual, setAnnual] = useState(centsToField(plan?.annualPriceCents ?? null));
   const [setupFee, setSetupFee] = useState(centsToField(plan?.setupFeeCents ?? null));
-  const [annualSetupFee, setAnnualSetupFee] = useState(plan?.annualSetupFeeCents === 0 ? "0" : centsToField(plan?.annualSetupFeeCents ?? null));
   const [founding, setFounding] = useState(centsToField(plan?.foundingPriceCents ?? null));
   const [discountPercent, setDiscountPercent] = useState(plan?.discountPercent !== null && plan?.discountPercent !== undefined ? String(plan.discountPercent) : "");
   const [discountLabel, setDiscountLabel] = useState(plan?.discountLabel ?? "");
@@ -239,9 +230,7 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
       code,
       description,
       monthlyPriceCents: cents ?? 0,
-      annualPriceCents: optionalCents(annual),
       setupFeeCents: optionalFee(setupFee),
-      annualSetupFeeCents: optionalFee(annualSetupFee),
       foundingPriceCents: optionalCents(founding),
       discountPercent: discountPercent.trim() ? Number(discountPercent) : null,
       discountLabel: discountLabel.trim() || null,
@@ -305,9 +294,6 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
             <Field label="Prix mensuel HT (€)" htmlFor="pl-price" required error={fieldErrors.monthlyPriceCents} hint={priceChanged ? `Actuel : ${formatEuros(plan.monthlyPriceCents)}. Nouveaux abonnements seulement.` : undefined}>
               <Input id="pl-price" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="ex. 149" />
             </Field>
-            <Field label="Prix annuel affiché HT (€)" htmlFor="pl-annual" error={fieldErrors.annualPriceCents} hint="Affichage seulement : la facturation annuelle n'est pas branchée.">
-              <Input id="pl-annual" inputMode="decimal" value={annual} onChange={(e) => setAnnual(e.target.value)} placeholder="facultatif" />
-            </Field>
             <Field label="Tarif fondateur HT (€)" htmlFor="pl-founding" error={fieldErrors.foundingPriceCents} hint="Proposé aux premières officines ; jamais appliqué d'office.">
               <Input id="pl-founding" inputMode="decimal" value={founding} onChange={(e) => setFounding(e.target.value)} placeholder="facultatif" />
             </Field>
@@ -316,11 +302,8 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="Mise en service mensuelle HT (€)" htmlFor="pl-setup" error={fieldErrors.setupFeeCents} hint="Facturée une seule fois, formule mensuelle. 0 = offerte.">
-              <Input id="pl-setup" inputMode="decimal" value={setupFee} onChange={(e) => setSetupFee(e.target.value)} placeholder="ex. 390" />
-            </Field>
-            <Field label="Mise en service annuelle HT (€)" htmlFor="pl-setup-annual" error={fieldErrors.annualSetupFeeCents} hint="Formule annuelle. 0 = offerte.">
-              <Input id="pl-setup-annual" inputMode="decimal" value={annualSetupFee} onChange={(e) => setAnnualSetupFee(e.target.value)} placeholder="0 = offerte" />
+            <Field label="Mise en service HT (€)" htmlFor="pl-setup" error={fieldErrors.setupFeeCents} hint="Facturée une seule fois à la souscription. 0 = offerte.">
+              <Input id="pl-setup" inputMode="decimal" value={setupFee} onChange={(e) => setSetupFee(e.target.value)} placeholder="ex. 290" />
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -8,6 +8,8 @@ const db = vi.hoisted(() => ({
   plan: { findFirst: vi.fn(), findUnique: vi.fn() },
   emailTemplate: { findUnique: vi.fn() },
   companyProfile: { findUnique: vi.fn() },
+  // Le rapprochement d'un nouveau dossier avec un confrère proposé au parrainage : aucun ici.
+  referralLead: { findFirst: vi.fn().mockResolvedValue(null) },
 }));
 const messaging = vi.hoisted(() => ({ sendEmail: vi.fn() }));
 const dispatch = vi.hoisted(() => ({ traceDispatch: vi.fn() }));
@@ -115,7 +117,7 @@ describe("e-mails système tracés dans l'historique des communications", () => 
 
   const request = { pharmacyName: "Pharmacie du Port", legalName: "SELARL Pharmacie du Port", siret: "73282932000074", addressLine1: "1 quai du Port", postalCode: "13002", city: "Marseille", ownerFirstName: "Marc", ownerLastName: "Delaunay", ownerTitle: "Pharmacien titulaire", ownerEmail: "marc@port.fr" };
 
-  it("souscription d'un nouveau dossier : la demande de confirmation d'adresse est tracée", async () => {
+  it("souscription d'un nouveau dossier : l'accusé de réception est tracé ; plus de demande de confirmation d'adresse, le contrat est retenu", async () => {
     db.plan.findFirst.mockResolvedValue(null);
     db.pharmacy.findFirst.mockResolvedValue(null);
     db.prospect.findMany.mockResolvedValue([]);
@@ -123,9 +125,10 @@ describe("e-mails système tracés dans l'historique des communications", () => 
 
     const result = await subscriptions.requestSubscription(request);
 
-    expect(result).toMatchObject({ ok: true, outcome: { status: "CONFIRMATION_SENT", prospectId: "p-new" } });
+    expect(result).toMatchObject({ ok: true, outcome: { status: "RECEIVED", prospectId: "p-new" } });
     expect(dispatch.traceDispatch).toHaveBeenCalledTimes(1);
-    expect(dispatch.traceDispatch).toHaveBeenCalledWith({ kind: "EMAIL_CONFIRMATION", recipient: "marc@port.fr", outcome: SENT, subject: "Confirmez votre demande d'abonnement PharmaBoost", trigger: "SYSTEM", prospectId: "p-new" });
+    expect(dispatch.traceDispatch).toHaveBeenCalledWith({ kind: "SUBSCRIPTION_RECEIVED", recipient: "marc@port.fr", outcome: SENT, subject: "Votre demande d'abonnement PharmaBoost est bien reçue", trigger: "SYSTEM", prospectId: "p-new", pharmacyId: null });
+    expect(dispatch.traceDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ kind: "EMAIL_CONFIRMATION" }));
   });
 
   it("souscription pour un SIRET déjà connu : l'accusé de réception est tracé sur le dossier et l'officine existants", async () => {

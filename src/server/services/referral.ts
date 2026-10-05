@@ -1,22 +1,24 @@
 import { prisma } from "@/server/db/client";
 import { publicUrl } from "@/server/public-url";
 import { randomBytes } from "node:crypto";
-import { REFERRAL_DISCOUNT_CENTS, normalizeReferralCode, referralAmountFor, referralDiscountForAmounts } from "@/core/billing/referral";
+import { normalizeReferralCode, referralBenefit, referralOfferAmountFor, type ReferralBenefit } from "@/core/billing/referral";
 import { contractualPrice } from "@/core/billing/contract-price";
 import { activeReferralOffer } from "@/server/services/referral-offers";
 
-export { REFERRAL_DISCOUNT_CENTS, normalizeReferralCode };
+export { normalizeReferralCode };
 
 /**
  * Le parrainage : chaque officine a un code. Une officine qui s'abonne avec
- * ce code est son filleul, et chaque filleul actif réduit l'abonnement du
- * parrain d'un montant fixe par mois, jusqu'à l'abonnement gratuit.
+ * ce code (ou que l'équipe a rattachée à son parrain) est son filleul. Dès
+ * qu'un filleul est actif, l'abonnement du parrain passe à 20 % de moins par
+ * mois, une seule fois : deux filleuls ne font pas 40 %.
  *
- * Le montant est une règle de la plateforme (core/billing/referral), figé sur
- * chaque filleul à son inscription : le montant standard, ou celui de l'offre
- * de parrainage en cours à ce moment-là. La remise est appliquée au
- * prélèvement à partir de ce calcul : l'écran du titulaire et la console lisent
- * la même somme.
+ * La règle vit dans core/billing/referral. Seule exception : le montant par
+ * filleul d'une offre de parrainage de la console, figé sur la fiche du filleul
+ * à son inscription ; le parrain a alors le plus avantageux des deux. La remise
+ * est calculée et affichée ici, l'écran du titulaire et la console lisent le même
+ * calcul ; elle est appliquée à l'abonnement par l'équipe PharmaBoost (aucune
+ * remise Stripe n'est créée).
  */
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -49,15 +51,17 @@ export async function resolveReferralCode(value: string | null | undefined): Pro
 export type ReferralSummary = {
   code: string;
   link: string;
-  /** Ce qu'apporterait un filleul qui s'inscrirait maintenant : le montant de l'offre en cours, sinon le montant standard. */
-  discountPerReferralCents: number;
-  /** L'offre de parrainage en cours, si elle change le montant des nouveaux filleuls. */
+  /** L'offre de parrainage en cours : un montant par filleul inscrit pendant sa durée, exception aux 20 %. */
   currentOffer: { amountCents: number; endsAt: Date | null; label: string } | null;
+  /** Le tarif contractuel de l'officine, ou `null` sans abonnement suivi. */
   monthlyPriceCents: number | null;
-  /** `amountCents` : ce que CE filleul apporte par mois, figé à son inscription. */
-  referrals: { name: string; city: string | null; active: boolean; since: Date; amountCents: number }[];
+  /** `offerAmountCents` : le montant d'offre figé à l'inscription de CE filleul, `null` hors offre. */
+  referrals: { name: string; city: string | null; active: boolean; since: Date; offerAmountCents: number | null }[];
   activeCount: number;
+  /** La remise mensuelle appliquée aujourd'hui : 0 sans filleul actif ou sans abonnement. */
   discountCents: number;
+  /** D'où vient la remise : les 20 %, ou les montants d'offre quand ils sont plus avantageux. */
+  discountBasis: ReferralBenefit["basis"];
   referredBy: string | null;
 };
 
@@ -78,23 +82,23 @@ export async function referralSummary(pharmacyId: string): Promise<ReferralSumma
     // Un filleul compte quand son officine est active ; l'abonnement, s'il est suivi, doit l'être aussi.
     active: r.isActive && (!r.organization.subscription || ["TRIALING", "ACTIVE", "PAST_DUE"].includes(r.organization.subscription.status)),
     since: r.createdAt,
-    amountCents: referralAmountFor(r),
+    offerAmountCents: referralOfferAmountFor(r),
   }));
-  const activeReferrals = referrals.filter((r) => r.active);
   // Le plafond de la remise est le tarif contractuel de l'officine (ce qu'elle paie), pas le prix catalogue de l'offre.
   const subscription = pharmacy.organization.subscription;
   const monthlyPriceCents = subscription ? contractualPrice(subscription, subscription.plan).cents : null;
   const offer = await activeReferralOffer();
+  // 20 % dès un filleul actif, ou la somme des montants d'offre si elle est plus avantageuse : ce que l'équipe applique.
+  const benefit = referralBenefit(referrals, monthlyPriceCents);
   return {
     code,
     link: publicUrl(`/decouvrir/abonnement?parrain=${encodeURIComponent(code)}`),
-    discountPerReferralCents: offer?.amountCents ?? REFERRAL_DISCOUNT_CENTS,
     currentOffer: offer ? { amountCents: offer.amountCents, endsAt: offer.endsAt, label: offer.label } : null,
     monthlyPriceCents,
     referrals,
-    activeCount: activeReferrals.length,
-    // La somme des montants propres à chaque filleul actif, bornée par le tarif contractuel : ce que le prélèvement applique.
-    discountCents: referralDiscountForAmounts(activeReferrals.map((r) => r.amountCents), monthlyPriceCents),
+    activeCount: referrals.filter((r) => r.active).length,
+    discountCents: benefit.discountCents,
+    discountBasis: benefit.basis,
     referredBy: pharmacy.referredBy?.name ?? null,
   };
 }

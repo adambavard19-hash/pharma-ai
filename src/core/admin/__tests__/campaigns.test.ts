@@ -19,7 +19,7 @@ import {
   type CampaignDraftInput,
   type CampaignKindKey,
 } from "../campaigns";
-import { REFERRAL_DISCOUNT_CENTS } from "@/core/billing/referral";
+import { REFERRAL_DISCOUNT_PERCENT } from "@/core/billing/referral";
 import { DEFAULT_EMAIL_CONTEXT } from "@/core/platform/email-layout";
 
 const NOW = new Date("2026-10-04T08:00:00Z");
@@ -249,10 +249,15 @@ describe("validation : l'offre honnête", () => {
     expect(refused(draftFor("BONUS_OFFER", { body: "Bonjour {{prenom}}, un bonus de 1 500 € jusqu'au {{date_fin_offre}}. {{conditions_offre}}", offerAmountCents: 50_000 }))).toContain("1 500 €");
   });
 
-  it("le montant standard peut être cité dans une offre de parrainage (« au lieu de 10 € »), pas dans un bonus", () => {
-    const body = `Bonjour {{prenom}}, {{montant_offre}} par filleul au lieu de ${REFERRAL_DISCOUNT_CENTS / 100} € d'habitude.`;
-    expect(valid(draftFor("REFERRAL_OFFER", { body, offerAmountCents: 2000 })).ok).toBe(true);
+  it("plus de montant « standard » : l'ancien « 10 € d'habitude » est refusé comme tout autre montant, dans un parrainage comme dans un bonus", () => {
+    const body = "Bonjour {{prenom}}, {{montant_offre}} par filleul au lieu de 10 € d'habitude.";
+    expect(refused(draftFor("REFERRAL_OFFER", { body, offerAmountCents: 2000 }))).toContain("10 €");
     expect(refused(draftFor("BONUS_OFFER", { body: "Bonjour {{prenom}}, {{montant_offre}} au lieu de 10 € {{date_fin_offre}} {{conditions_offre}}", offerAmountCents: 2000 }))).toContain("10 €");
+  });
+
+  it("la remise du parrainage se dit en pourcentage : « 20 % de moins » n'est pas un montant en euros et passe", () => {
+    const body = `Bonjour {{prenom}}, {{montant_offre}} par filleul, ou ${REFERRAL_DISCOUNT_PERCENT} % de moins sur votre abonnement.`;
+    expect(valid(draftFor("REFERRAL_OFFER", { body, offerAmountCents: 3000 })).ok).toBe(true);
   });
 
   it("un type sans offre n'est pas contraint : une annonce peut parler d'un prix", () => {
@@ -266,14 +271,32 @@ describe("validation : l'offre honnête", () => {
     expect(warnings).toContain("Des conditions sont écrites mais le message ne les dit pas : écrivez {{conditions_offre}}.");
   });
 
-  it("avertit d'un parrainage inférieur au standard, et d'un parrainage standard sans fin (aucune offre ne sera créée)", () => {
-    expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 500 })).warnings.join(" ")).toContain("inférieur au montant standard");
-    expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: REFERRAL_DISCOUNT_CENTS, offerEndsAt: null })).warnings.join(" ")).toContain("aucune offre ne sera créée");
-    expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: REFERRAL_DISCOUNT_CENTS, offerEndsAt: "2026-10-31" })).warnings.join(" ")).not.toContain("aucune offre ne sera créée");
+  it("avertit d'un parrainage inférieur à la remise de 20 % (25,20 € pour un abonnement à 126 € HT), pas d'un parrainage plus avantageux", () => {
+    const low = valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 1000 })).warnings.join(" ");
+    expect(low).toContain("inférieur à la remise de 20 % du parrainage");
+    expect(low).toContain("25,20 €");
+    expect(low).toContain("126 € HT");
+    expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 2519 })).warnings.join(" ")).toContain("inférieur à la remise");
+    expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 2520 })).warnings.join(" ")).not.toContain("inférieur à la remise");
+    expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 4000 })).warnings.join(" ")).not.toContain("inférieur à la remise");
   });
 
-  it("le texte par défaut du parrainage ne déclenche aucun avertissement", () => {
-    expect(valid(draftFor("REFERRAL_OFFER", { offerEndsAt: null })).warnings).toEqual([]);
+  it("plus de montant standard : aucun avertissement « aucune offre ne sera créée », avec ou sans date de fin, quel que soit le montant", () => {
+    for (const offerAmountCents of [1000, 2000, 3000]) {
+      for (const offerEndsAt of [null, "2026-10-31"]) expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents, offerEndsAt })).warnings.join(" ")).not.toContain("aucune offre ne sera créée");
+    }
+  });
+
+  it("le texte par défaut du parrainage ne déclenche aucun avertissement (montant au moins égal à la remise de 20 %)", () => {
+    expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 3000, offerEndsAt: null })).warnings).toEqual([]);
+  });
+
+  it("le texte par défaut du parrainage dit la règle : 20 % de moins, le plus avantageux des deux, et plus aucun montant standard", () => {
+    const { body, subject, title } = CAMPAIGN_KINDS.REFERRAL_OFFER.defaults;
+    expect(body).toContain("la remise de 20 % du parrainage");
+    expect(body).toContain("plus avantageux entre la somme de ces montants");
+    expect(CAMPAIGN_KINDS.REFERRAL_OFFER.description).toContain("20 %");
+    expect(`${subject}${title}${body}${CAMPAIGN_KINDS.REFERRAL_OFFER.description}`).not.toMatch(/standard|10\s?€|10 euros/i);
   });
 });
 

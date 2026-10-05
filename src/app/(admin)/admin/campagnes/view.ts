@@ -4,7 +4,7 @@
  * résultat, et les conséquences d'une annulation. Pur, donc testé.
  */
 import { CAMPAIGN_KINDS, CAMPAIGN_RECIPIENT_STATUS_LABELS, CAMPAIGN_STATUS_LABELS, type CampaignKindKey } from "@/core/admin/campaigns";
-import { REFERRAL_DISCOUNT_CENTS } from "@/core/billing/referral";
+import { REFERRAL_DISCOUNT_PERCENT } from "@/core/billing/referral";
 import { formatEuros } from "@/core/billing/subscription";
 import type { StatusLabel } from "@/core/admin/statuses";
 
@@ -91,21 +91,15 @@ export function referralOfferState(offer: OfferWindow, now: Date): StatusLabel {
   return { label: "En cours", tone: "success" };
 }
 
-/** Une offre au montant standard et sans fin n'en est pas une : aucune ligne `ReferralOffer` n'est créée. */
-export function isStandardOffer(campaign: { offerAmountCents: number | null; offerEndsAt: Date | null }): boolean {
-  return campaign.offerAmountCents === REFERRAL_DISCOUNT_CENTS && !campaign.offerEndsAt;
-}
-
-/** Ce qu'il faut dire d'une campagne de parrainage qui n'a pas (ou pas encore) d'offre liée. */
-export function referralOfferExpectation(campaign: { kind: string; status: string; offerAmountCents: number | null; offerEndsAt: Date | null; referralOffer: unknown }): string | null {
+/**
+ * Ce qu'il faut dire d'une campagne de parrainage qui n'a pas (ou pas encore) d'offre liée. Toute offre de
+ * parrainage est une vraie offre : il n'y a plus de montant « standard » par filleul (la règle est de 20 % de moins,
+ * en pourcentage), donc plus de campagne qui ne ferait que rappeler un montant sans rien appliquer.
+ */
+export function referralOfferExpectation(campaign: { kind: string; status: string; referralOffer: unknown }): string | null {
   if (campaign.kind !== "REFERRAL_OFFER" || campaign.referralOffer) return null;
-  const standard = isStandardOffer(campaign);
-  if (campaign.status === "DRAFT" || campaign.status === "SCHEDULED") {
-    return standard
-      ? `Ce montant est le montant standard (${formatEuros(REFERRAL_DISCOUNT_CENTS)}) sans date de fin : aucune offre ne sera créée à l'envoi, le message ne fait que rappeler le parrainage.`
-      : "L'offre de parrainage sera créée au moment de l'envoi : les officines qui s'inscrivent ensuite comme filleules apportent ce montant par mois.";
-  }
-  return standard ? `Aucune offre créée : montant standard (${formatEuros(REFERRAL_DISCOUNT_CENTS)}) sans date de fin.` : "Aucune offre de parrainage n'est liée à cette campagne.";
+  if (campaign.status === "DRAFT" || campaign.status === "SCHEDULED") return "L'offre de parrainage sera créée au moment de l'envoi : les officines qui s'inscrivent ensuite comme filleules apportent ce montant par mois.";
+  return "Aucune offre de parrainage n'est liée à cette campagne.";
 }
 
 // ---------------------------------------------------------------- Conséquences d'une annulation
@@ -139,12 +133,13 @@ export function offerHeadline(kind: string, cents: number | null): string | null
 export function offerSendLines(kind: string, cents: number | null, hasEnd: boolean, mode: "send" | "schedule"): string[] {
   if (kind === "BONUS_OFFER") return ["Le bonus est annoncé dans le message ; l'équipe l'applique à la main. Aucun crédit automatique n'existe."];
   if (kind !== "REFERRAL_OFFER" || cents === null) return [];
-  if (cents === REFERRAL_DISCOUNT_CENTS && !hasEnd) return [`Ce montant est le montant standard (${formatEuros(cents)}) sans date de fin : aucune offre n'est créée, le message ne fait que rappeler le parrainage.`];
-  return [
+  const lines = [
     mode === "send"
-      ? `Le montant de ${formatEuros(cents)} par filleul et par mois est réellement appliqué : les officines qui s'inscrivent comme filleules pendant l'offre l'apportent à leur parrain, chaque mois. Les filleuls déjà inscrits gardent leur montant.`
+      ? `Le montant de ${formatEuros(cents)} par filleul et par mois est réellement appliqué : les officines qui s'inscrivent comme filleules pendant l'offre l'apportent à leur parrain, chaque mois. Les filleuls déjà inscrits gardent leur montant. C'est une exception à la remise de ${REFERRAL_DISCOUNT_PERCENT} % du parrainage : le parrain bénéficie du plus avantageux des deux.`
       : "L'offre de parrainage est créée au moment de l'envoi, pas maintenant. Elle s'applique alors aux officines qui s'inscrivent comme filleules ; les filleuls déjà inscrits gardent leur montant.",
   ];
+  if (!hasEnd) lines.push("L'offre n'a pas de date de fin : elle s'applique à chaque officine qui s'inscrit comme filleule, jusqu'à l'annulation de la campagne.");
+  return lines;
 }
 
 /**

@@ -67,15 +67,26 @@ const subscriptionSchema = z.object({
   outletCount: z.number().int().min(1).max(50).nullable().optional(),
   planId: z.string().trim().max(40).optional().or(z.literal("")),
   referralCode: z.string().trim().max(20).optional().or(z.literal("")),
-  formula: z.enum(["MONTHLY", "ANNUAL"]).optional(),
-  /** Confirmation explicite : c'est elle qui déclenche l'envoi du contrat. */
-  confirm: z.literal(true, { message: "Confirmez votre demande de souscription pour recevoir le contrat." }),
+  /** Le confrère à parrainer (facultatif) : l'équipe le contacte, rien ne lui est envoyé. */
+  referee: z
+    .object({
+      name: z.string().trim().max(120, "120 caractères au plus.").optional().nullable(),
+      email: z.string().trim().max(160, "160 caractères au plus."),
+      phone: z.string().trim().max(30, "30 caractères au plus."),
+    })
+    .nullable()
+    .optional(),
+  /** Confirmation explicite de la demande de souscription. */
+  confirm: z.literal(true, { message: "Confirmez votre demande de souscription." }),
   website: z.string().max(500).optional(),
 });
 
 /**
- * Souscription depuis le site : l'officine confirme sa demande, le contrat
- * part automatiquement (même moteur que la console et l'extranet).
+ * Souscription depuis le site : l'officine confirme sa demande. Le dossier est créé
+ * et l'équipe prévenue ; le contrat ne part PAS tout seul (la mise en service de
+ * l'abonnement unique n'existe pas dans le contrat automatique), l'équipe l'envoie
+ * depuis la console. Le confrère à parrainer, s'il est indiqué, est enregistré et
+ * contacté par l'équipe : rien ne lui est envoyé.
  */
 export async function submitSubscriptionRequestAction(payload: z.input<typeof subscriptionSchema>): Promise<ActionResult<{ outcome: SubscriptionRequestOutcome["status"] }>> {
   const parsed = subscriptionSchema.safeParse(payload);
@@ -98,7 +109,7 @@ export async function submitSubscriptionRequestAction(payload: z.input<typeof su
     outletCount: input.outletCount ?? null,
     planId: input.planId || null,
     referralCode: input.referralCode || null,
-    formula: input.formula ?? null,
+    referee: input.referee ? { name: input.referee.name || null, email: input.referee.email, phone: input.referee.phone } : null,
   };
   // Une saisie à corriger ne compte pas comme une demande : on valide avant de limiter.
   const checked = normalizeSubscriptionRequest(request);
@@ -116,12 +127,15 @@ export async function submitSubscriptionRequestAction(payload: z.input<typeof su
   }
 }
 
-/** Le titulaire confirme son adresse depuis le lien reçu : le contrat part alors, une seule fois. */
+/**
+ * Le titulaire ouvre l'ancien lien de confirmation d'adresse (envoyé avant l'abonnement
+ * unique, valable 48 heures) : l'adresse est notée, l'équipe prévenue, mais le contrat ne
+ * part pas tout seul. La réponse dit où en est la demande.
+ */
 export async function confirmSubscriptionAction(token: string): Promise<ActionResult<{ status: string; email: string }>> {
   if (typeof token !== "string" || token.length > 2000) return fail("Lien invalide.");
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "inconnue";
   if (throttled(`confirmation:${ip}`)) return fail("Trop de tentatives : réessayez dans une heure.");
   const result = await confirmSubscription(token);
-  if (!result.ok) return fail(result.error);
-  return ok({ status: result.status, email: result.email });
+  return fail(result.error);
 }

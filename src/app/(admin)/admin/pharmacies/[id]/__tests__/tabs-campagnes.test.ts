@@ -125,41 +125,45 @@ describe("onglet Communication : campagnes reçues", () => {
   });
 });
 
-describe("onglet Commercial : le montant de parrainage figé", () => {
+describe("onglet Commercial : la remise de parrainage", () => {
   const now = new Date("2026-10-10T08:00:00Z");
 
-  it("pour une filleule : le montant qu'elle apporte à son parrain, figé à son inscription", async () => {
+  it("pour une filleule hors offre : 20 % de moins pour son parrain, non cumulable, plus aucun montant fixe par filleul", async () => {
+    for (const referralAmountCents of [null, 0]) {
+      const html = text(await render(CommercialTab, { base: baseFor({ referredBy: { id: "ph_0", name: "Pharmacie Parrain" }, referralAmountCents }), now }));
+      expect(html).toContain("Remise apportée à son parrain 20 % de moins par mois sur l'abonnement de son parrain");
+      expect(html).toContain("Non cumulable : dès un filleul actif le parrain paie 20 % de moins, jamais davantage.");
+      expect(html).toContain("Aucune offre de parrainage n'était en cours à son inscription.");
+      expect(html).not.toMatch(/10 €|Montant apporté|montant standard/i);
+    }
+  });
+
+  it("pour une filleule inscrite pendant une offre : le montant figé est dit, et le plus avantageux des deux s'applique", async () => {
     const base = baseFor({ referredBy: { id: "ph_0", name: "Pharmacie Parrain" }, referralAmountCents: 2000 });
     const html = text(await render(CommercialTab, { base, now }));
-    expect(html).toContain("Montant apporté à son parrain 20 € par mois");
+    expect(html).toContain("20 % de moins par mois sur l'abonnement de son parrain, ou 20 € par mois (offre à son inscription)");
     expect(html).toContain("Montant d'une offre de parrainage en cours à son inscription : figé, il ne change plus.");
+    expect(html).toContain("plus avantageux entre les 20 % et la somme des montants d'offre de ses filleuls");
   });
 
-  it("montant standard : dit standard, que la colonne soit vide (avant les offres) ou égale à 10 €", async () => {
-    const legacy = text(await render(CommercialTab, { base: baseFor({ referredBy: { id: "ph_0", name: "P" }, referralAmountCents: null }), now }));
-    expect(legacy).toContain("Montant apporté à son parrain 10 € par mois");
-    expect(legacy).toContain("Montant standard : aucune offre n'était en cours à son inscription.");
-    const frozen = text(await render(CommercialTab, { base: baseFor({ referredBy: { id: "ph_0", name: "P" }, referralAmountCents: 1000 }), now }));
-    expect(frozen).toContain("Montant standard, figé à son inscription.");
+  it("une officine qui n'est la filleule de personne n'a pas de ligne « remise apportée »", async () => {
+    expect(text(await render(CommercialTab, { base: baseFor(), now }))).not.toContain("Remise apportée à son parrain");
   });
 
-  it("une officine qui n'est la filleule de personne n'a pas de ligne « montant apporté »", async () => {
-    expect(text(await render(CommercialTab, { base: baseFor(), now }))).not.toContain("Montant apporté à son parrain");
-  });
-
-  it("pour un parrain : le montant de chaque filleule seulement quand il diffère du standard", async () => {
+  it("pour un parrain : le montant d'offre de chaque filleule seulement quand elle est née d'une offre ; hors offre, rien", async () => {
     const base = baseFor({
       referrals: [
         { id: "f1", name: "Filleule Offre", city: "Lyon", isActive: true, referralAmountCents: 2000 },
-        { id: "f2", name: "Filleule Standard", city: "Brest", isActive: true, referralAmountCents: 1000 },
+        { id: "f2", name: "Filleule Hors Offre", city: "Brest", isActive: true, referralAmountCents: null },
         { id: "f3", name: "Filleule Ancienne", city: null, isActive: false, referralAmountCents: null },
       ],
     });
     const html = text(await render(CommercialTab, { base, now }));
     expect(html).toContain("Filleule Offre · Lyon · 20 € par mois (offre à son inscription)");
-    expect(html).toContain("Filleule Standard · Brest");
-    expect(html).not.toContain("Filleule Standard · Brest · 10 €");
+    expect(html).toContain("Filleule Hors Offre · Brest");
+    expect(html).not.toContain("Filleule Hors Offre · Brest ·  ");
+    expect(html).not.toMatch(/Filleule Hors Offre · Brest · \d/);
     expect(html).toContain("Filleule Ancienne · suspendue");
-    expect(html).not.toContain("Filleule Ancienne · 10 €");
+    expect(html).not.toMatch(/Filleule Ancienne · \d/);
   });
 });

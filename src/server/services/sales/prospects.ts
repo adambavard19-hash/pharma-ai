@@ -7,6 +7,7 @@ import { DEMO_TASK_CANCELED_LABEL, DEMO_TASK_LABEL, dropDecision, pickNextAction
 import { formatDate, formatDateTime } from "@/lib/format";
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
+import { reconcileNewProspect } from "@/server/services/referral-leads";
 import type { Prisma, ProspectStatus } from "@/generated/prisma";
 
 export type ProspectInput = {
@@ -60,6 +61,8 @@ export async function createProspect(input: ProspectInput, salesRepId: string | 
     },
   });
   await recordProspectEvent({ prospectId: prospect.id, type: "CREATED", summary: `Dossier créé pour ${prospect.name}.`, actor });
+  // Un dossier créé à la main dont l'e-mail est celui d'un confrère proposé au parrainage lui est rattaché.
+  await reconcileNewProspect({ id: prospect.id, email: prospect.email, name: prospect.name }, actor);
   if (input.nextActionAt && salesRepId) {
     await prisma.salesTask.create({ data: { prospectId: prospect.id, salesRepId, label: clean(input.nextActionLabel) ?? "Relancer", dueAt: input.nextActionAt } });
   }

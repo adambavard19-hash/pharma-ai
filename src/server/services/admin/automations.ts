@@ -30,8 +30,8 @@ import {
 } from "@/core/admin/automations";
 import { zonedDayStart } from "@/core/challenges/dates";
 import { emailTemplate } from "@/core/admin/email-templates";
-import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
-import { referralAmountFor } from "@/core/billing/referral";
+import { formatFrenchDate } from "@/core/billing/subscription";
+import { REFERRAL_DISCOUNT_PERCENT } from "@/core/billing/referral";
 import { TIME_ZONE } from "@/config/constants";
 
 /**
@@ -109,8 +109,8 @@ type CandidateContext = {
   trialEnds: Map<string, Date>;
   cancellations: Map<string, { requestedAt: Date; plannedEndAt: Date | null; subscriptionEndAt: Date | null }>;
   prospects: Map<string, { name: string; nextActionAt: Date | null; nextActionLabel: string | null; salesRepId: string | null }>;
-  /** Pour chaque filleul : ce qu'il apporte par mois à son parrain, tel que figé à son inscription. */
-  filleuls: Map<string, { name: string; amountCents: number }>;
+  /** Pour chaque filleul : son nom. La remise annoncée à son parrain est celle de la règle (20 % de moins), la même pour tous. */
+  filleuls: Map<string, { name: string }>;
   partners: Map<string, { name: string }>;
 };
 
@@ -166,7 +166,7 @@ export async function loadCandidates(now: Date, enabledRuleKeys: ReadonlySet<str
     wantsFilleuls
       ? prisma.pharmacy.findMany({
           where: { isDemo: false, referredById: { not: null }, referredBy: { isDemo: false }, createdAt: { gte: since } },
-          select: { id: true, name: true, isDemo: true, createdAt: true, referredById: true, referralAmountCents: true, referredBy: { select: { name: true } } },
+          select: { id: true, name: true, isDemo: true, createdAt: true, referredById: true, referredBy: { select: { name: true } } },
         })
       : Promise.resolve([]),
     wantsPartners
@@ -209,7 +209,7 @@ export async function loadCandidates(now: Date, enabledRuleKeys: ReadonlySet<str
     return { id: row.id, status: row.status, nextActionAt: row.nextActionAt, lastContactAt: row.lastContactAt, blockedAt: row.blockedAt, salesRepId: row.salesRepId };
   });
   const filleuls: FilleulCandidate[] = filleulRows.map((row) => {
-    context.filleuls.set(row.id, { name: row.name, amountCents: referralAmountFor(row) });
+    context.filleuls.set(row.id, { name: row.name });
     context.pharmacyNames.set(row.id, row.name);
     if (row.referredById && row.referredBy) context.pharmacyNames.set(row.referredById, row.referredBy.name);
     return { id: row.id, referrerId: row.referredById, isDemo: row.isDemo, createdAt: row.createdAt };
@@ -323,9 +323,9 @@ function targetLabel(item: PlannedAutomation, context: CandidateContext): string
  */
 function ruleValues(item: PlannedAutomation, context: CandidateContext, now: Date): Record<string, string | null> {
   if (item.targetType === "Pharmacy") {
-    // Le nom de l'officine du filleul et ce qu'elle apporte : rien d'autre sur elle, ni sur la personne qui l'a inscrite.
+    // Le nom de l'officine du filleul et la remise du parrain (20 % de moins, une seule fois) : rien d'autre sur elle, ni sur la personne qui l'a inscrite.
     const filleul = context.filleuls.get(item.targetId);
-    return filleul ? { filleul: filleul.name, montant_remise: formatEuros(filleul.amountCents) } : {};
+    return filleul ? { filleul: filleul.name, montant_remise: `${REFERRAL_DISCOUNT_PERCENT} %` } : {};
   }
   if (item.targetType === "Partner") {
     const partner = context.partners.get(item.targetId);
@@ -416,7 +416,7 @@ async function isOptedOut(item: Pick<PlannedAutomation, "targetType">, recipient
  * la notification dans l'application du parrain, et la trace au journal d'audit.
  * La clé est déjà consommée : une erreur ici ne change pas l'issue de l'e-mail,
  * elle est dite dans le détail du déclenchement. Rien de personnel n'est écrit :
- * le nom de l'officine parrainée et le montant mensuel seulement.
+ * le nom de l'officine parrainée et le pourcentage de la remise seulement.
  */
 async function afterEmail(planned: PlannedAutomation, context: CandidateContext, emailStatus: string, adminId: string | null): Promise<string | null> {
   if (planned.ruleKey === "partner.range_invitation") {
@@ -434,7 +434,7 @@ async function afterEmail(planned: PlannedAutomation, context: CandidateContext,
       type: "SYSTEM",
       severity: "SUCCESS",
       title: `Nouveau filleul : ${filleul.name}`,
-      body: `${filleul.name} a rejoint PharmaBoost avec votre code de parrainage. Cette officine réduit votre abonnement de ${formatEuros(filleul.amountCents)} HT par mois, tant qu'elle reste abonnée.`,
+      body: `${filleul.name} a rejoint PharmaBoost avec votre code de parrainage. Votre abonnement passe à ${REFERRAL_DISCOUNT_PERCENT} % de moins par mois, tant que cette officine reste abonnée. La remise est appliquée par l'équipe PharmaBoost ; elle ne se cumule pas entre filleuls.`,
       linkUrl: "/parametres?onglet=abonnement",
     });
     inApp = true;
@@ -442,7 +442,7 @@ async function afterEmail(planned: PlannedAutomation, context: CandidateContext,
   } catch (error) {
     note = `La notification dans l'application n'a pas pu être créée : ${error instanceof Error ? error.message : String(error)}.`;
   }
-  await recordAudit({ action: "referral.filleul_notified", entityType: "Pharmacy", entityId: planned.targetId, pharmacyId: planned.pharmacyId, platformAdminId: adminId, metadata: { ruleKey: planned.ruleKey, amountCents: filleul.amountCents, emailStatus, inApp } });
+  await recordAudit({ action: "referral.filleul_notified", entityType: "Pharmacy", entityId: planned.targetId, pharmacyId: planned.pharmacyId, platformAdminId: adminId, metadata: { ruleKey: planned.ruleKey, discountPercent: REFERRAL_DISCOUNT_PERCENT, emailStatus, inApp } });
   return note;
 }
 

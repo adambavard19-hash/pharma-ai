@@ -11,7 +11,7 @@ import { resolvePublicPricing, pricingPlanGaps, type PublicPricing } from "@/cor
  * Ce sont des tarifs de catalogue. Le prix d'une officine déjà cliente est celui
  * de son contrat, figé à la souscription : cette lecture n'y touche jamais.
  */
-const PLAN_SELECT = { id: true, name: true, monthlyPriceCents: true, annualPriceCents: true, setupFeeCents: true, annualSetupFeeCents: true } as const;
+const PLAN_SELECT = { id: true, name: true, monthlyPriceCents: true, setupFeeCents: true } as const;
 
 async function loadDefaultPlan() {
   return prisma.plan.findFirst({ where: { isActive: true, isDefault: true }, orderBy: { createdAt: "asc" }, select: PLAN_SELECT });

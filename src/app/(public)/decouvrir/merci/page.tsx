@@ -18,23 +18,13 @@ const OUTCOMES: Record<string, Outcome> = {
       { title: "Vous décidez", body: "Si PharmaBoost vous convient, la souscription se fait en ligne, en deux minutes." },
     ],
   },
-  confirmation_sent: {
-    kicker: "Abonnement",
-    title: "Plus qu'une confirmation.",
-    body: "Un e-mail vient de partir à l'adresse indiquée. Pensez à vérifier les courriers indésirables.",
-    steps: [
-      { title: "Confirmez votre adresse e-mail", body: "Cliquez sur « Confirmer et recevoir mon contrat » dans l'e-mail que nous venons d'envoyer." },
-      { title: "Signez votre contrat en ligne", body: "Le contrat prérempli arrive aussitôt. PharmaBoost le contresigne et vous adresse la version signée par les deux parties." },
-      { title: "Activez l'abonnement, installez vos postes", body: "Vous recevez par e-mail le lien d'activation, puis le guide de mise en service. Rien n'est prélevé avant." },
-    ],
-  },
   received: {
     kicker: "Abonnement",
     title: "Votre demande d'abonnement est reçue.",
     body: "Un accusé de réception vient de partir à l'adresse indiquée.",
     steps: [
-      { title: "Notre équipe vérifie votre demande", body: "Nous rapprochons les informations de votre officine avant tout envoi de contrat." },
-      { title: "Nous revenons vers vous", body: "Très rapidement, par e-mail ou par téléphone." },
+      { title: "Notre équipe prépare votre contrat", body: "Abonnement, engagement de 12 mois et mise en service : nous vérifions les informations de votre officine avant tout envoi." },
+      { title: "Vous le recevez sous un jour ouvré", body: "Par e-mail, à signer en ligne. Rien n'est prélevé avant l'activation." },
     ],
   },
 };

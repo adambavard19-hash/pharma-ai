@@ -110,9 +110,10 @@ export async function savePlanAction(payload: z.input<typeof planSchema>): Promi
     description: input.description,
     monthlyPriceCents: input.monthlyPriceCents,
     trialDays: input.trialDays,
-    annualPriceCents: input.annualPriceCents ?? null,
+    // Plus d'offre annuelle : le formulaire n'envoie plus ces deux montants, la valeur déjà enregistrée est conservée.
+    annualPriceCents: input.annualPriceCents === undefined ? (before?.annualPriceCents ?? null) : input.annualPriceCents,
     setupFeeCents: input.setupFeeCents ?? null,
-    annualSetupFeeCents: input.annualSetupFeeCents ?? null,
+    annualSetupFeeCents: input.annualSetupFeeCents === undefined ? (before?.annualSetupFeeCents ?? null) : input.annualSetupFeeCents,
     foundingPriceCents: input.foundingPriceCents ?? null,
     discountPercent: input.discountPercent ?? null,
     discountLabel: input.discountPercent ? (input.discountLabel?.trim() || null) : null,

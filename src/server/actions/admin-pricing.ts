@@ -11,8 +11,8 @@ import { OFFICIAL_OFFER, STANDARD_COMMISSION_MAX_CENTS } from "@/core/pricing/of
 import { fail, ok, type ActionResult } from "./types";
 
 /**
- * Le tarif du site, depuis la console : publier l'offre officielle (99 € HT par
- * mois, mise en service 390 € HT ; 1 188 € HT par an, mise en service offerte)
+ * Le tarif du site, depuis la console : publier l'offre officielle (un seul
+ * abonnement, 126 € HT par mois, engagement 12 mois, mise en service 290 € HT)
  * comme offre par défaut, et régler la commission standard d'un commercial.
  *
  * Ce sont des tarifs de CATALOGUE : aucun abonnement existant n'est modifié, le
@@ -24,7 +24,7 @@ const OFFICIAL_FEATURES = ["Tous les postes de l'officine"];
 /** Crée ou met à jour l'offre officielle et la rend offre par défaut (celle du site et des nouveaux contrats). */
 export async function publishOfficialOfferAction(): Promise<ActionResult<{ planId: string }>> {
   const session = await requirePlatformSession();
-  const existing = await prisma.plan.findUnique({ where: { code: OFFICIAL_OFFER.code }, select: { id: true, name: true, description: true, features: true, options: true, maxUsers: true, discountPercent: true, discountLabel: true, foundingPriceCents: true, sortOrder: true, monthlyPriceCents: true, annualPriceCents: true, setupFeeCents: true, annualSetupFeeCents: true, trialDays: true, isDefault: true, isActive: true } });
+  const existing = await prisma.plan.findUnique({ where: { code: OFFICIAL_OFFER.code }, select: { id: true, name: true, description: true, features: true, options: true, maxUsers: true, discountPercent: true, discountLabel: true, foundingPriceCents: true, sortOrder: true, monthlyPriceCents: true, setupFeeCents: true, trialDays: true, isDefault: true, isActive: true } });
   const previousDefault = await prisma.plan.findFirst({ where: { isDefault: true, isActive: true, ...(existing ? { id: { not: existing.id } } : {}) }, select: { id: true, name: true } });
 
   const result = await savePlanAction({
@@ -32,10 +32,11 @@ export async function publishOfficialOfferAction(): Promise<ActionResult<{ planI
     code: OFFICIAL_OFFER.code,
     name: existing?.name ?? OFFICIAL_OFFER.name,
     description: existing?.description ?? "",
-    monthlyPriceCents: OFFICIAL_OFFER.monthly.priceCents,
-    annualPriceCents: OFFICIAL_OFFER.annual.priceCents,
-    setupFeeCents: OFFICIAL_OFFER.monthly.setupFeeCents,
-    annualSetupFeeCents: OFFICIAL_OFFER.annual.setupFeeCents,
+    monthlyPriceCents: OFFICIAL_OFFER.monthlyPriceCents,
+    // Un seul abonnement : plus de prix annuel dans l'offre officielle.
+    annualPriceCents: null,
+    setupFeeCents: OFFICIAL_OFFER.setupFeeCents,
+    annualSetupFeeCents: null,
     // Aucun essai dans l'offre officielle : rien n'est offert qui ne soit annoncé.
     trialDays: 0,
     foundingPriceCents: existing?.foundingPriceCents ?? null,
@@ -56,8 +57,8 @@ export async function publishOfficialOfferAction(): Promise<ActionResult<{ planI
     entityId: result.data.planId,
     platformAdminId: session.admin.id,
     metadata: {
-      before: existing ? { monthlyPriceCents: existing.monthlyPriceCents, annualPriceCents: existing.annualPriceCents, setupFeeCents: existing.setupFeeCents, annualSetupFeeCents: existing.annualSetupFeeCents, trialDays: existing.trialDays, isDefault: existing.isDefault } : null,
-      after: { monthlyPriceCents: OFFICIAL_OFFER.monthly.priceCents, annualPriceCents: OFFICIAL_OFFER.annual.priceCents, setupFeeCents: OFFICIAL_OFFER.monthly.setupFeeCents, annualSetupFeeCents: OFFICIAL_OFFER.annual.setupFeeCents, trialDays: 0, isDefault: true },
+      before: existing ? { monthlyPriceCents: existing.monthlyPriceCents, setupFeeCents: existing.setupFeeCents, trialDays: existing.trialDays, isDefault: existing.isDefault } : null,
+      after: { monthlyPriceCents: OFFICIAL_OFFER.monthlyPriceCents, setupFeeCents: OFFICIAL_OFFER.setupFeeCents, trialDays: 0, isDefault: true },
       previousDefault: previousDefault?.name ?? null,
       note: "Tarif de catalogue : aucun abonnement existant n'est modifié.",
     },

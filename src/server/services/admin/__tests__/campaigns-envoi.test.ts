@@ -479,15 +479,16 @@ describe("offre de parrainage : appliquée, pas seulement annoncée", () => {
     expect(mocks.startReferralOffer.mock.invocationCallOrder[0]).toBeLessThan(mocks.sendEmail.mock.invocationCallOrder[0]);
   });
 
-  it("le montant standard sans date de fin n'ouvre aucune offre : le message ne fait que le rappeler", async () => {
+  it("plus de montant « standard » : un montant de 10 € sans date de fin ouvre une VRAIE offre, comme tout autre montant", async () => {
     const id = seedReferral({ offerAmountCents: 1000, offerEndsAt: null });
     setAudience(recipientsOf(2));
     expect((await svc.startCampaign(id, "adm_1", 2)).ok).toBe(true);
-    expect(mocks.startReferralOffer).not.toHaveBeenCalled();
+    expect(mocks.startReferralOffer).toHaveBeenCalledTimes(1);
+    expect(mocks.startReferralOffer).toHaveBeenCalledWith(expect.objectContaining({ campaignId: id, amountCents: 1000, endsAt: null, label: "Parrainage à 10 € par filleul et par mois" }));
     expect(messages()[0].text).toContain("10 € par mois");
   });
 
-  it("le montant standard avec une date de fin ouvre une offre ; un montant différent sans fin aussi", async () => {
+  it("avec une date de fin ouvre une offre ; un autre montant sans fin aussi", async () => {
     setAudience(recipientsOf(2));
     const withEnd = seedReferral({ offerAmountCents: 1000 });
     await svc.startCampaign(withEnd, "adm_1", 2);

@@ -19,7 +19,8 @@
 import { renderEmail, type EmailBlock, type EmailContext, type RenderedEmail } from "@/core/platform/email-layout";
 import { fillVariables, variablesIn } from "@/core/admin/email-templates";
 import type { StatusLabel } from "@/core/admin/statuses";
-import { REFERRAL_DISCOUNT_CENTS } from "@/core/billing/referral";
+import { REFERRAL_DISCOUNT_PERCENT, referralPercentDiscountCents } from "@/core/billing/referral";
+import { OFFICIAL_OFFER } from "@/core/pricing/official-offer";
 import { formatEuros } from "@/core/billing/subscription";
 import { addDays, calendarDay, daysBetween, isCalendarDay, zonedDayStart, type DayKey } from "@/core/challenges/dates";
 import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
@@ -84,7 +85,7 @@ export const CAMPAIGN_KINDS: Record<
   },
   REFERRAL_OFFER: {
     label: "Offre de parrainage",
-    description: "Le montant par filleul et par mois est réellement appliqué aux officines qui s'inscrivent pendant l'offre. Les filleuls déjà inscrits gardent leur montant.",
+    description: `Le montant par filleul et par mois est réellement appliqué aux officines qui s'inscrivent pendant l'offre. Les filleuls déjà inscrits gardent leur montant. C'est une exception à la remise de ${REFERRAL_DISCOUNT_PERCENT} % du parrainage : le parrain bénéficie du plus avantageux des deux.`,
     side: ["PHARMACY"],
     needsAmount: true,
     amountLabel: "Montant par filleul et par mois",
@@ -93,7 +94,7 @@ export const CAMPAIGN_KINDS: Record<
     defaults: {
       subject: "Parrainage : {{montant_offre}} par filleul et par mois",
       title: "Parrainez une officine, {{montant_offre}} par mois",
-      body: "Bonjour {{prenom}},\n\nChaque officine que {{officine}} parraine et qui s'abonne à PharmaBoost pendant cette offre réduit votre abonnement de {{montant_offre}} par mois, tant qu'elle reste abonnée.\n\nVotre code de parrainage : {{code_parrainage}}\nVotre lien à partager : {{lien_parrainage}}\n\nCe montant s'applique aux officines qui s'inscrivent pendant l'offre. Les officines déjà parrainées gardent le montant prévu à leur inscription, et votre abonnement ne descend jamais en dessous de zéro.",
+      body: `Bonjour {{prenom}},\n\nChaque officine que {{officine}} parraine et qui s'abonne à PharmaBoost pendant cette offre réduit votre abonnement de {{montant_offre}} par mois, tant qu'elle reste abonnée. Vous bénéficiez du plus avantageux entre la somme de ces montants et la remise de ${REFERRAL_DISCOUNT_PERCENT} % du parrainage.\n\nVotre code de parrainage : {{code_parrainage}}\nVotre lien à partager : {{lien_parrainage}}\n\nCe montant s'applique aux officines qui s'inscrivent pendant l'offre. Les officines déjà parrainées gardent le montant prévu à leur inscription, et votre abonnement ne descend jamais en dessous de zéro.`,
       buttonLabel: "Voir mon code de parrainage",
       audience: "pharmacies.all_active",
     },
@@ -351,8 +352,8 @@ export function validateCampaignDraft(raw: unknown, now: Date = new Date()): Cam
 
   // Le montant du message est celui de l'offre : un autre montant tapé à la main serait une promesse que rien n'applique.
   if (offerAmountCents !== null) {
-    const accepted = new Set([offerAmountCents, ...(kind === "REFERRAL_OFFER" ? [REFERRAL_DISCOUNT_CENTS] : [])]);
-    const stray = eurosWrittenIn(text).find((cents) => !accepted.has(cents));
+    // Le seul montant en euros que le message peut écrire est celui de l'offre : la remise du parrainage se dit en pourcentage.
+    const stray = eurosWrittenIn(text).find((cents) => cents !== offerAmountCents);
     if (stray !== undefined) return { ok: false, error: `Le texte cite un montant (${formatEuros(stray)}) qui n'est pas celui de l'offre (${formatEuros(offerAmountCents)}). Écrivez {{montant_offre}} : le message annonce alors toujours le montant appliqué.` };
   }
 
@@ -363,8 +364,8 @@ export function validateCampaignDraft(raw: unknown, now: Date = new Date()): Cam
     if (offerConditions && !used.includes("conditions_offre")) warnings.push("Des conditions sont écrites mais le message ne les dit pas : écrivez {{conditions_offre}}.");
   }
   if (kind === "REFERRAL_OFFER" && offerAmountCents !== null) {
-    if (offerAmountCents < REFERRAL_DISCOUNT_CENTS) warnings.push(`Ce montant est inférieur au montant standard (${formatEuros(REFERRAL_DISCOUNT_CENTS)}) : pendant l'offre, chaque nouveau filleul rapportera moins que d'habitude.`);
-    if (offerAmountCents === REFERRAL_DISCOUNT_CENTS && !offerEndsAt) warnings.push("Ce montant est le montant standard, sans date de fin : aucune offre ne sera créée, le message ne fait que rappeler le parrainage.");
+    const percentDiscount = referralPercentDiscountCents(OFFICIAL_OFFER.monthlyPriceCents);
+    if (offerAmountCents < percentDiscount) warnings.push(`Ce montant est inférieur à la remise de ${REFERRAL_DISCOUNT_PERCENT} % du parrainage (${formatEuros(percentDiscount)} pour un abonnement à ${formatEuros(OFFICIAL_OFFER.monthlyPriceCents)} HT par mois) : un parrain n'en profite que si la somme des montants de ses filleuls inscrits pendant l'offre dépasse cette remise.`);
   }
 
   return {

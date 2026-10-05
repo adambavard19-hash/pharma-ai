@@ -48,7 +48,7 @@ const FAQ: { q: string; a: string }[] = [
   { q: "Une IA choisit-elle les produits ?", a: "Non. L'IA analyse l'ordonnance et repère les besoins. Les produits viennent de règles écrites, de la sécurité et de votre stock." },
   { q: "Quelles données sont conservées ?", a: "Aucune donnée patient. Le plan conseil est chiffré et remis au patient." },
   { q: "Est-ce un dispositif médical ?", a: "Non. C'est un outil d'aide au conseil : il ne diagnostique pas et ne prescrit pas." },
-  { q: "Quel engagement ?", a: "Deux formules : mensuelle, sans engagement, ou annuelle, avec un engagement de 12 mois et la mise en service offerte." },
+  { q: "Quel engagement ?", a: "Un seul abonnement, avec un engagement de 12 mois. La mise en service, installation, paramétrage et formation de l'équipe comprises, est facturée une seule fois." },
 ];
 
 export default async function SitePage() {

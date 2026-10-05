@@ -1,4 +1,5 @@
 import { renderEmail, type EmailBlock, type EmailContext, type RenderedEmail } from "@/core/platform/email-layout";
+import { REFERRAL_DISCOUNT_PERCENT } from "@/core/billing/referral";
 
 /**
  * Les modèles d'e-mails que l'équipe PharmaBoost peut réécrire depuis la
@@ -56,7 +57,7 @@ const V = {
   dateDemande: { key: "date_demande", label: "Date de la demande", sample: "03/10/2026" },
   contact: { key: "contact", label: "Adresse de contact PharmaBoost", sample: "contact@pharmaboost.app" },
   filleul: { key: "filleul", label: "Nom de l'officine parrainée", sample: "Pharmacie du Marché" },
-  montantRemise: { key: "montant_remise", label: "Remise mensuelle HT apportée par ce filleul", sample: "10 €" },
+  montantRemise: { key: "montant_remise", label: "Remise de parrainage sur l'abonnement du parrain (en pourcentage)", sample: `${REFERRAL_DISCOUNT_PERCENT} %` },
   nomPartenaire: { key: "nom_partenaire", label: "Nom du partenaire", sample: "Laboratoires Exemple" },
   lienCandidature: { key: "lien_candidature", label: "Lien vers le formulaire de référencement des partenaires", sample: "https://pharmaboost.app/decouvrir/partenaires" },
 } satisfies Record<string, TemplateVariable>;
@@ -249,7 +250,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
     defaults: {
       subject: "{{filleul}} a rejoint PharmaBoost avec votre code de parrainage",
       title: "Un nouveau filleul",
-      body: "Bonjour {{prenom}},\n\n{{filleul}} vient de rejoindre PharmaBoost avec votre code de parrainage. Merci de votre recommandation.\n\nTant que cette officine reste abonnée, elle réduit votre abonnement de {{montant_remise}} HT par mois. Vous retrouvez vos filleuls et votre remise dans votre espace.",
+      body: "Bonjour {{prenom}},\n\n{{filleul}} vient de rejoindre PharmaBoost avec votre code de parrainage. Merci de votre recommandation.\n\nTant que cette officine reste abonnée, votre abonnement passe à {{montant_remise}} de moins par mois. La remise est appliquée à votre abonnement par l'équipe PharmaBoost, et elle ne se cumule pas : un seul filleul suffit, plusieurs ne la changent pas. Vous retrouvez vos filleuls et votre remise dans votre espace.",
     },
     button: { label: "Voir mon parrainage", urlVariable: "lien_espace" },
     eyebrow: "Parrainage",

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { submitSubscriptionRequestAction } from "@/server/actions/site-leads";
 import { normalizeSubscriptionRequest } from "@/core/contracts/subscription-request";
-import { formatSiret, personName } from "@/core/contracts/identity";
+import { formatSiret, normalizeEmail, normalizePhone, personName } from "@/core/contracts/identity";
 import { normalizeReferralCode } from "@/core/billing/referral";
 import { Flow, type FlowErrors, type FlowStep } from "@/components/flow/flow";
 import { ChoiceCards, CountAnswer, LiveCard, LiveRow, TextAnswer } from "@/components/flow/controls";
@@ -33,12 +33,20 @@ type Values = {
   ownerEmail: string;
   hasReferral: "" | "yes" | "no";
   referralCode: string;
+  /** Le confrère que l'officine parraine : facultatif. */
+  hasReferee: "" | "yes" | "no";
+  refereeName: string;
+  refereeEmail: string;
+  refereePhone: string;
   confirm: boolean;
   website: string;
   prefill: Prefill;
 };
 
 export type PublicOffer = { name: string; price: string; perks: string[] };
+
+/** Ce que change le parrainage sur la facture mensuelle, déjà chiffré par la page. */
+export type ReferralTerms = { percent: number; fullPrice: string; reducedPrice: string };
 
 function toRequest(v: Values) {
   const outlets = Number(v.outletCount);
@@ -57,6 +65,7 @@ function toRequest(v: Values) {
     ownerEmail: v.ownerEmail,
     outletCount: Number.isFinite(outlets) && outlets > 0 ? Math.round(outlets) : null,
     referralCode: v.hasReferral === "no" ? "" : v.referralCode,
+    referee: v.hasReferee === "yes" ? { name: v.refereeName.trim() || null, email: v.refereeEmail.trim(), phone: v.refereePhone.trim() } : null,
   };
 }
 
@@ -75,7 +84,7 @@ function validate(v: Values, fields: string[]): FlowErrors {
  * dossier, du contrat et de l'espace PharmaBoost ; rien ne sera redemandé.
  * Aucune donnée patient.
  */
-export function SubscriptionForm({ planId, formula, offer, offerLabel, referralCode = "" }: { planId: string | null; formula: "MONTHLY" | "ANNUAL"; offer: PublicOffer; offerLabel: string; referralCode?: string }) {
+export function SubscriptionForm({ planId, offer, offerLabel, referral, referralCode = "" }: { planId: string | null; offer: PublicOffer; offerLabel: string; referral: ReferralTerms; referralCode?: string }) {
   const router = useRouter();
   const initialValues = useMemo<Values>(
     () => ({
@@ -95,6 +104,10 @@ export function SubscriptionForm({ planId, formula, offer, offerLabel, referralC
       ownerEmail: "",
       hasReferral: referralCode ? "yes" : "",
       referralCode,
+      hasReferee: "",
+      refereeName: "",
+      refereeEmail: "",
+      refereePhone: "",
       confirm: false,
       website: "",
       prefill: {},
@@ -206,8 +219,48 @@ export function SubscriptionForm({ planId, formula, offer, offerLabel, referralC
         ),
         recap: { label: "Parrainage", value: (v) => (v.hasReferral === "yes" && v.referralCode ? v.referralCode : null) },
       },
+      {
+        id: "parrainer",
+        section: "Pour finir",
+        question: "Parrainez-vous un confrère ?",
+        help: `Si la personne que vous parrainez s'abonne, vous ne payez plus ${referral.fullPrice} mais ${referral.reducedPrice} HT par mois (${referral.percent} % de moins). Nous la contactons : rien ne lui est envoyé sans nous.`,
+        fields: ["refereeEmail", "refereePhone"],
+        optional: true,
+        isEmpty: (v) => v.hasReferee === "",
+        seconds: 15,
+        validate: (v) => {
+          if (v.hasReferee !== "yes") return {};
+          const errors: FlowErrors = {};
+          const email = normalizeEmail(v.refereeEmail);
+          if (!email) errors.refereeEmail = "Indiquez l'adresse e-mail de la personne.";
+          else if (email === normalizeEmail(v.ownerEmail)) errors.refereeEmail = "Indiquez l'adresse d'un confrère, pas la vôtre.";
+          if (!v.refereePhone.trim() || !normalizePhone(v.refereePhone)) errors.refereePhone = "Indiquez son numéro de téléphone.";
+          return errors;
+        },
+        render: ({ values, errors, set, choose }) => (
+          <div className="space-y-4">
+            <ChoiceCards
+              label="Parrainage d'un confrère"
+              options={[
+                { value: "yes", label: "Oui, j'indique un confrère" },
+                { value: "no", label: "Non, pas maintenant" },
+              ]}
+              value={values.hasReferee}
+              onChoose={(value) => (value === "no" ? choose("hasReferee", value) : set("hasReferee", value))}
+            />
+            {values.hasReferee === "yes" && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextAnswer label="Prénom et nom (facultatif)" value={values.refereeName} onValueChange={(v) => set("refereeName", v)} autoComplete="off" className="sm:col-span-2" />
+                <EmailAnswer value={values.refereeEmail} onValueChange={(v) => set("refereeEmail", v)} error={errors.refereeEmail} placeholder="confrere@pharmacie.fr" />
+                <TextAnswer label="Téléphone" value={values.refereePhone} onValueChange={(v) => set("refereePhone", v)} error={errors.refereePhone} autoComplete="off" inputMode="tel" placeholder="06 12 34 56 78" />
+              </div>
+            )}
+          </div>
+        ),
+        recap: { label: "Confrère parrainé", value: (v) => (v.hasReferee === "yes" ? [v.refereeName.trim(), v.refereeEmail.trim()].filter(Boolean).join(" · ") || null : null) },
+      },
     ];
-  }, [referralCode]);
+  }, [referralCode, referral]);
 
   return (
     <Flow<Values>
@@ -230,10 +283,16 @@ export function SubscriptionForm({ planId, formula, offer, offerLabel, referralC
       )}
       canSubmit={(v) => v.confirm}
       submitLabel="Recevoir mon contrat à signer"
-      submitHint="Une confirmation de votre adresse, puis le contrat arrive aussitôt. Rien n'est prélevé à cette étape."
+      submitHint="Notre équipe prépare votre contrat et vous l'envoie sous un jour ouvré. Rien n'est prélevé à cette étape."
       onSubmit={async (v) => {
-        const result = await submitSubscriptionRequestAction({ ...toRequest(v), planId: planId ?? "", formula, confirm: v.confirm as true, website: v.website });
-        if (!result.ok) return { ok: false, error: result.error, fieldErrors: result.fieldErrors };
+        const result = await submitSubscriptionRequestAction({ ...toRequest(v), planId: planId ?? "", confirm: v.confirm as true, website: v.website });
+        if (!result.ok) {
+          // Les erreurs du confrère reviennent sous les champs de sa question.
+          const fieldErrors = { ...(result.fieldErrors ?? {}) };
+          if (fieldErrors["referee.email"]) fieldErrors.refereeEmail = fieldErrors["referee.email"];
+          if (fieldErrors["referee.phone"]) fieldErrors.refereePhone = fieldErrors["referee.phone"];
+          return { ok: false, error: result.error, fieldErrors };
+        }
         router.push(`/decouvrir/merci?type=abonnement&etat=${result.data.outcome.toLowerCase()}`);
         return { ok: true };
       }}

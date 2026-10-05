@@ -8,6 +8,7 @@ import { isLgoId } from "@/server/services/stock-sync";
 import { sendUserPasswordLink } from "@/server/services/user-password";
 import { lastDispatchFor } from "@/server/services/email-dispatch";
 import { referralAmountForNewFilleul } from "@/server/services/referral-offers";
+import { attachReferrerFromLead, reconcileNewProspect } from "@/server/services/referral-leads";
 import { ensureDossierForPharmacy } from "@/server/services/sales/pharmacy-dossier";
 import { recordProspectEvent, type SalesActor } from "@/server/services/sales/events";
 import { normalizeEmail, normalizeSiret, isValidSiret } from "@/core/contracts/identity";
@@ -117,6 +118,12 @@ export async function createClientPharmacy(input: CreateClientPharmacyInput, act
 
   // Le dossier commercial est ouvert tout de suite : contrat, signature et abonnement s'y rattachent, sans ressaisie.
   const dossier = await ensureDossierForPharmacy(created.pharmacyId, actor);
+  if (dossier.ok) {
+    // Si l'adresse du titulaire est celle d'un confrère proposé au parrainage, ce dossier lui est rattaché, et l'officine
+    // qui l'a proposé devient son parrain (sauf si un code de parrainage a été saisi : il l'emporte).
+    await reconcileNewProspect({ id: dossier.prospectId, email: ownerEmail, name: input.name }, actor);
+    await attachReferrerFromLead({ prospectId: dossier.prospectId, pharmacyId: created.pharmacyId, pharmacyName: input.name, actor });
+  }
   await recordAudit({ action: "platform.pharmacy_created", entityType: "Pharmacy", entityId: created.pharmacyId, pharmacyId: created.pharmacyId, platformAdminId: actor.id, metadata: { name: input.name, ownerEmail, postCount: input.postCount, siret } });
 
   const welcome = await sendUserPasswordLink(created.ownerId, "welcome", deps).catch((error: unknown) => ({ status: "FAILED", detail: error instanceof Error ? error.message : "Envoi impossible.", url: "" }));

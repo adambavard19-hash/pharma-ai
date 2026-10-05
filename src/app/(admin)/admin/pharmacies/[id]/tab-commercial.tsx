@@ -7,7 +7,7 @@ import { Timeline } from "@/components/admin/timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, EmptyState } from "@/components/ui/feedback";
-import { REFERRAL_DISCOUNT_CENTS, referralAmountFor } from "@/core/billing/referral";
+import { REFERRAL_DISCOUNT_PERCENT, referralOfferAmountFor } from "@/core/billing/referral";
 import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
 import { ORIGIN_LABELS } from "@/core/contracts/journey";
 import { PROSPECT_STATUS_LABELS, PROSPECT_STATUS_TONES, type ProspectStatusCode } from "@/core/sales/pipeline";
@@ -18,10 +18,18 @@ import { formatDateTime } from "@/lib/format";
 import { When } from "../client-ui";
 import { EmptyLine } from "./shared";
 
-/** Ce que le montant apporté au parrain dit de son origine : standard, ou une offre en cours à l'inscription. */
-function referralAmountNote(amountCents: number | null): string {
-  if (amountCents === null) return "Montant standard : aucune offre n'était en cours à son inscription.";
-  return amountCents === REFERRAL_DISCOUNT_CENTS ? "Montant standard, figé à son inscription." : "Montant d'une offre de parrainage en cours à son inscription : figé, il ne change plus.";
+/**
+ * Ce que sa filleule apporte à son parrain : 20 % de moins par mois, une seule fois (jamais cumulé entre filleuls),
+ * appliqués à l'abonnement par l'équipe. Seule exception : le montant d'une offre de parrainage en cours à son
+ * inscription, figé sur sa fiche (`null` hors offre).
+ */
+function referralEffect(amountCents: number | null): { value: string; hint: string } {
+  const percent = `${REFERRAL_DISCOUNT_PERCENT} % de moins par mois sur l'abonnement de son parrain`;
+  if (amountCents === null) return { value: percent, hint: `Non cumulable : dès un filleul actif le parrain paie ${REFERRAL_DISCOUNT_PERCENT} % de moins, jamais davantage. Aucune offre de parrainage n'était en cours à son inscription.` };
+  return {
+    value: `${percent}, ou ${formatEuros(amountCents)} par mois (offre à son inscription)`,
+    hint: `Montant d'une offre de parrainage en cours à son inscription : figé, il ne change plus. Le parrain bénéficie du plus avantageux entre les ${REFERRAL_DISCOUNT_PERCENT} % et la somme des montants d'offre de ses filleuls.`,
+  };
 }
 
 /** Le dossier commercial dont l'officine est issue : étape, commercial, démo, relances, tâches. */
@@ -35,8 +43,8 @@ export async function CommercialTab({ base, now }: { base: Pharmacy360; now: Dat
         items={[
           { label: "Code de parrainage", value: pharmacy.referralCode ?? "Attribué à la première ouverture de l'onglet Mon abonnement" },
           { label: "Parrainée par", value: pharmacy.referredBy ? <Link href={`/admin/pharmacies/${pharmacy.referredBy.id}`} className="text-brand-700 hover:underline dark:text-brand-400">{pharmacy.referredBy.name}</Link> : "—" },
-          // Pour un filleul : ce qu'il apporte à son parrain chaque mois, tel que figé à son inscription.
-          ...(pharmacy.referredBy ? [{ label: "Montant apporté à son parrain", value: `${formatEuros(referralAmountFor(pharmacy))} par mois`, hint: referralAmountNote(pharmacy.referralAmountCents) }] : []),
+          // Pour un filleul : ce qu'il apporte à son parrain, les 20 % ou le montant d'offre figé à son inscription.
+          ...(pharmacy.referredBy ? [{ label: "Remise apportée à son parrain", ...referralEffect(referralOfferAmountFor(pharmacy)) }] : []),
           {
             label: `Filleules (${pharmacy.referrals.length})`,
             value:
@@ -50,8 +58,8 @@ export async function CommercialTab({ base, now }: { base: Pharmacy360; now: Dat
                         {r.name}
                       </Link>
                       {r.city ? ` · ${r.city}` : ""}
-                      {/* Le montant figé n'est dit que lorsqu'il diffère du standard : c'est lui qui change la remise du parrain. */}
-                      {r.referralAmountCents !== null && r.referralAmountCents !== REFERRAL_DISCOUNT_CENTS ? ` · ${formatEuros(r.referralAmountCents)} par mois (offre à son inscription)` : ""}
+                      {/* Le montant figé n'est dit que pour une offre à son inscription : hors offre, c'est la règle des 20 %. */}
+                      {referralOfferAmountFor(r) !== null ? ` · ${formatEuros(r.referralAmountCents!)} par mois (offre à son inscription)` : ""}
                       {r.isActive ? "" : " · suspendue"}
                     </li>
                   ))}
