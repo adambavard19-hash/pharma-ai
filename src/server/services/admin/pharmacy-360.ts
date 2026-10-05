@@ -53,6 +53,10 @@ const PHARMACY_SELECT = {
   stockSyncedAt: true,
   organizationId: true,
   referralCode: true,
+  /** Ce que cette officine apporte à son parrain par mois, figé à son inscription (null : le montant standard). */
+  referralAmountCents: true,
+  /** La fonction « nouveautés pour les patients » est-elle activée ? (un réglage, jamais une liste de patients) */
+  patientNewsEnabled: true,
   organization: {
     select: {
       name: true,
@@ -86,7 +90,7 @@ const PHARMACY_SELECT = {
     },
   },
   referredBy: { select: { id: true, name: true } },
-  referrals: { orderBy: { createdAt: "asc" as const }, select: { id: true, name: true, city: true, isActive: true } },
+  referrals: { orderBy: { createdAt: "asc" as const }, select: { id: true, name: true, city: true, isActive: true, referralAmountCents: true } },
   memberships: {
     where: { user: { deletedAt: null } },
     orderBy: [{ role: "asc" as const }, { createdAt: "asc" as const }],
@@ -288,6 +292,46 @@ export async function loadCommunicationTab(base: Pharmacy360) {
   ]);
   const names = await namesFor({ adminIds: emails.map((e) => e.sentByAdminId) });
   return { emails: emails.map((e) => ({ ...e, sentBy: e.sentByAdminId ? (names.admins.get(e.sentByAdminId) ?? null) : null })), notifications };
+}
+
+/** Les campagnes affichées sur la fiche : les plus récentes ; le total dit s'il y en a davantage. */
+export const CAMPAIGNS_RECEIVED_LIMIT = 20;
+
+/**
+ * Les nouveautés pour les patients de cette officine, en AGRÉGATS : la fonction
+ * est-elle activée, combien d'abonnés actifs, combien d'annonces parties et
+ * quand la dernière. Jamais une adresse, jamais une liste de patients : en mode
+ * sans patient, la console ne voit que des effectifs. Une annonce « envoyée »
+ * a réellement contacté quelqu'un (ni échec complet, ni envoi simulé) ; les
+ * envois simulés sont comptés à part.
+ */
+export async function loadNewsAggregates(base: Pharmacy360) {
+  const pharmacyId = base.pharmacy.id;
+  const [activeSubscribers, sent, simulated] = await Promise.all([
+    prisma.patientNewsSubscription.count({ where: { pharmacyId, status: "ACTIVE" } }),
+    prisma.patientNewsAnnouncement.aggregate({ where: { pharmacyId, status: { in: ["SENT", "PARTIAL"] }, simulated: false }, _count: { _all: true }, _max: { createdAt: true } }),
+    prisma.patientNewsAnnouncement.count({ where: { pharmacyId, simulated: true } }),
+  ]);
+  return { enabled: base.pharmacy.patientNewsEnabled, activeSubscribers, announcementsSent: sent._count._all, announcementsSimulated: simulated, lastAnnouncementAt: sent._max.createdAt };
+}
+
+/**
+ * Les campagnes de la console reçues par cette officine (destinataire figé par
+ * `pharmacyId`) : le nom, la date et l'issue, avec le lien vers la campagne.
+ * Aucune adresse n'est relue ici.
+ */
+export async function loadCampaignsReceived(base: Pharmacy360) {
+  const where = { pharmacyId: base.pharmacy.id };
+  const [rows, total] = await Promise.all([
+    prisma.campaignRecipient.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: CAMPAIGNS_RECEIVED_LIMIT,
+      select: { id: true, status: true, detail: true, sentAt: true, createdAt: true, campaign: { select: { id: true, name: true, kind: true } } },
+    }),
+    prisma.campaignRecipient.count({ where }),
+  ]);
+  return { rows, total };
 }
 
 // ---------------------------------------------------------------- Commercial

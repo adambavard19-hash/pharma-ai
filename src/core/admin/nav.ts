@@ -62,6 +62,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
     label: "Communication",
     href: "/admin/communications",
     items: [
+      { href: "/admin/campagnes", label: "Campagnes", description: "Offres bonus, parrainage, invitations des partenaires : envoi immédiat ou programmé." },
       { href: "/admin/communications", label: "Historique", description: "Tous les e-mails, relances et notifications, filtrables." },
       { href: "/admin/emails/modeles", label: "Modèles d'e-mails", description: "Les textes des relances et messages, avec aperçu." },
       { href: "/admin/relances", label: "Relances automatiques", description: "Scénarios d'essai, de contrat, de paiement, de résiliation." },

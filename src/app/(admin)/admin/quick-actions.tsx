@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, CalendarClock, FileSignature, Plus, UserPlus, Briefcase } from "lucide-react";
+import { Building2, CalendarClock, FileSignature, Megaphone, Plus, UserPlus, Briefcase } from "lucide-react";
 import { Dropdown, DropdownLabel } from "@/components/ui/dropdown";
 
 const ACTIONS = [
@@ -10,6 +10,7 @@ const ACTIONS = [
   { href: "/admin/demonstrations?nouveau=demo", label: "Programmer une démo", icon: CalendarClock },
   { href: "/admin/contrats?vue=a-envoyer", label: "Envoyer un contrat", icon: FileSignature },
   { href: "/admin/commerciaux?nouveau=commercial", label: "Créer un commercial", icon: UserPlus },
+  { href: "/admin/campagnes/nouvelle", label: "Campagne", icon: Megaphone },
 ];
 
 /** « Créer » : les gestes les plus fréquents, à un clic de n'importe quelle page de la console. */

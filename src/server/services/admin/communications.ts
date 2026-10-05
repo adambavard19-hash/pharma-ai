@@ -103,6 +103,7 @@ export const ENGINE_NOTIFICATION_TYPE_PREFIX = "AUTOMATION_";
 /** `?nature=relance-contrat` : une famille d'e-mails, par leur type d'envoi. Les autres sources en sont exclues. */
 export const COMMUNICATION_NATURES = {
   "relance-contrat": { label: "Relances de contrat", kinds: ["CONTRACT_REMINDER"] },
+  campagne: { label: "Campagnes", kinds: ["CAMPAIGN"] },
 } as const satisfies Record<string, { label: string; kinds: readonly string[] }>;
 
 export type CommunicationNature = keyof typeof COMMUNICATION_NATURES;
@@ -204,6 +205,15 @@ export type ProspectEventRow = { id: string; type: string; summary: string; acto
 
 const pharmacyHref = (pharmacyId: string) => `/admin/pharmacies/${pharmacyId}?onglet=communication`;
 
+/**
+ * La campagne d'un e-mail de campagne : son modèle de trace est « campaign:<id> ».
+ * L'essai (« campaign:test ») n'appartient à aucune campagne : pas de lien.
+ */
+export function campaignIdOf(templateKey: string | null): string | null {
+  const match = /^campaign:([A-Za-z0-9]{6,40})$/.exec(templateKey ?? "");
+  return match ? match[1] : null;
+}
+
 /** Le libellé d'une règle : celles du centre des relances, plus la cadence des contrats. */
 export function ruleLabelOf(ruleKey: string): string {
   if (ruleKey === "contract.reminders") return "Relances de contrat";
@@ -214,6 +224,7 @@ export function emailEntry(row: EmailRow, pharmacyNames: Map<string, string>): C
   const template = row.templateKey ? emailTemplate(row.templateKey) : null;
   const kindLabel = row.kind === "TEMPLATE" ? (template?.label ?? "Modèle") : (DISPATCH_KIND_LABELS[row.kind] ?? row.kind);
   const status = dispatchStatusLabel(row.status);
+  const campaignId = row.kind === "CAMPAIGN" ? campaignIdOf(row.templateKey) : null;
   return {
     id: `email:${row.id}`,
     type: "email",
@@ -227,7 +238,8 @@ export function emailEntry(row: EmailRow, pharmacyNames: Map<string, string>): C
     pharmacyId: row.pharmacyId,
     pharmacyName: row.pharmacyId ? (pharmacyNames.get(row.pharmacyId) ?? null) : null,
     prospectId: row.prospectId,
-    href: row.pharmacyId ? pharmacyHref(row.pharmacyId) : row.prospectId ? `/admin/dossiers/${row.prospectId}` : null,
+    // Un e-mail de campagne mène à sa campagne ; l'officine reste atteignable par sa colonne.
+    href: campaignId ? `/admin/campagnes/${campaignId}` : row.pharmacyId ? pharmacyHref(row.pharmacyId) : row.prospectId ? `/admin/dossiers/${row.prospectId}` : null,
     actor: null,
   };
 }
@@ -268,7 +280,8 @@ export function automationEntry(row: AutomationRow, pharmacyNames: Map<string, s
     pharmacyId: row.pharmacyId,
     pharmacyName: row.pharmacyId ? (pharmacyNames.get(row.pharmacyId) ?? null) : null,
     prospectId: row.targetType === "Prospect" ? row.targetId : null,
-    href: row.pharmacyId ? pharmacyHref(row.pharmacyId) : row.targetType === "Prospect" ? `/admin/dossiers/${row.targetId}` : "/admin/relances",
+    // La cible d'une relance aux partenaires est la fiche du partenaire.
+    href: row.pharmacyId ? pharmacyHref(row.pharmacyId) : row.targetType === "Prospect" ? `/admin/dossiers/${row.targetId}` : row.targetType === "Partner" ? `/admin/partenaires/liste/${row.targetId}` : "/admin/relances",
     actor: null,
   };
 }

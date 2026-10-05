@@ -369,6 +369,30 @@ describe("navigation de la console", () => {
     expect(activeNavItem("/admin/partenaires/marques/1").space.key).toBe("administration");
     expect(activeNavItem("/admin").space.key).toBe("overview");
   });
+
+  it("« Campagnes » ouvre l'espace Communication, devant les autres rubriques, sans en déplacer aucune", () => {
+    const communication = ADMIN_NAV.find((space) => space.key === "communication")!;
+    expect(communication.items.map((item) => item.href)).toEqual(["/admin/campagnes", "/admin/communications", "/admin/emails/modeles", "/admin/relances", "/admin/notifications"]);
+    expect(communication.items[0]).toMatchObject({ label: "Campagnes" });
+    expect(communication.items[0].description.length).toBeGreaterThan(20);
+    // L'espace garde son adresse : l'historique reste ce qu'on ouvre en cliquant sur « Communication ».
+    expect(communication.href).toBe("/admin/communications");
+  });
+
+  it("les pages d'une campagne se rattachent à « Campagnes », sans prendre la place de l'historique ni des relances", () => {
+    for (const path of ["/admin/campagnes", "/admin/campagnes/nouvelle", "/admin/campagnes/ckx123abc", "/admin/campagnes/ckx123abc/modifier"]) {
+      expect(activeNavItem(path)).toMatchObject({ space: { key: "communication" }, item: { label: "Campagnes" } });
+    }
+    expect(activeNavItem("/admin/communications").item?.label).toBe("Historique");
+    expect(activeNavItem("/admin/relances").item?.label).toBe("Relances automatiques");
+    expect(activeNavItem("/admin/emails/modeles/trial.welcome").item?.label).toBe("Modèles d'e-mails");
+  });
+
+  it("chaque rubrique de la console a une adresse unique et une description", () => {
+    const hrefs = ADMIN_NAV.flatMap((space) => space.items.map((item) => item.href));
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+    for (const item of ADMIN_NAV.flatMap((space) => space.items)) expect(item.description.trim().length).toBeGreaterThan(0);
+  });
 });
 
 describe("frise d'une officine", () => {

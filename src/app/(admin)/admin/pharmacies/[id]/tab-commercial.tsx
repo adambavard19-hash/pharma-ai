@@ -7,6 +7,7 @@ import { Timeline } from "@/components/admin/timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, EmptyState } from "@/components/ui/feedback";
+import { REFERRAL_DISCOUNT_CENTS, referralAmountFor } from "@/core/billing/referral";
 import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
 import { ORIGIN_LABELS } from "@/core/contracts/journey";
 import { PROSPECT_STATUS_LABELS, PROSPECT_STATUS_TONES, type ProspectStatusCode } from "@/core/sales/pipeline";
@@ -16,6 +17,12 @@ import { prospectEventEntry } from "@/core/admin/clients";
 import { formatDateTime } from "@/lib/format";
 import { When } from "../client-ui";
 import { EmptyLine } from "./shared";
+
+/** Ce que le montant apporté au parrain dit de son origine : standard, ou une offre en cours à l'inscription. */
+function referralAmountNote(amountCents: number | null): string {
+  if (amountCents === null) return "Montant standard : aucune offre n'était en cours à son inscription.";
+  return amountCents === REFERRAL_DISCOUNT_CENTS ? "Montant standard, figé à son inscription." : "Montant d'une offre de parrainage en cours à son inscription : figé, il ne change plus.";
+}
 
 /** Le dossier commercial dont l'officine est issue : étape, commercial, démo, relances, tâches. */
 export async function CommercialTab({ base, now }: { base: Pharmacy360; now: Date }) {
@@ -28,6 +35,8 @@ export async function CommercialTab({ base, now }: { base: Pharmacy360; now: Dat
         items={[
           { label: "Code de parrainage", value: pharmacy.referralCode ?? "Attribué à la première ouverture de l'onglet Mon abonnement" },
           { label: "Parrainée par", value: pharmacy.referredBy ? <Link href={`/admin/pharmacies/${pharmacy.referredBy.id}`} className="text-brand-700 hover:underline dark:text-brand-400">{pharmacy.referredBy.name}</Link> : "—" },
+          // Pour un filleul : ce qu'il apporte à son parrain chaque mois, tel que figé à son inscription.
+          ...(pharmacy.referredBy ? [{ label: "Montant apporté à son parrain", value: `${formatEuros(referralAmountFor(pharmacy))} par mois`, hint: referralAmountNote(pharmacy.referralAmountCents) }] : []),
           {
             label: `Filleules (${pharmacy.referrals.length})`,
             value:
@@ -41,6 +50,8 @@ export async function CommercialTab({ base, now }: { base: Pharmacy360; now: Dat
                         {r.name}
                       </Link>
                       {r.city ? ` · ${r.city}` : ""}
+                      {/* Le montant figé n'est dit que lorsqu'il diffère du standard : c'est lui qui change la remise du parrain. */}
+                      {r.referralAmountCents !== null && r.referralAmountCents !== REFERRAL_DISCOUNT_CENTS ? ` · ${formatEuros(r.referralAmountCents)} par mois (offre à son inscription)` : ""}
                       {r.isActive ? "" : " · suspendue"}
                     </li>
                   ))}

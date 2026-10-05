@@ -102,6 +102,14 @@ export default async function CommunicationsPage({ searchParams }: { searchParam
           <FilterChips basePath={BASE} param="statut" label="Statut" current={filters.statut} keep={{ ...keep, statut: null }} options={[{ value: null, label: "Tous statuts" }, ...statusOptions.map((key) => ({ value: key, label: COMMUNICATION_STATUS_FILTERS[key].label }))]} />
           <FilterChips basePath={BASE} param="periode" label="Période" current={filters.periode === "30j" ? null : filters.periode} keep={{ ...keep, periode: null }} options={PERIOD_OPTIONS} />
         </div>
+        <FilterChips
+          basePath={BASE}
+          param="nature"
+          label="Famille d'e-mails"
+          current={filters.nature}
+          keep={{ ...keep, nature: null }}
+          options={[{ value: null, label: "Toutes les familles" }, ...(Object.keys(COMMUNICATION_NATURES) as (keyof typeof COMMUNICATION_NATURES)[]).map((key) => ({ value: key, label: COMMUNICATION_NATURES[key].label }))]}
+        />
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <PharmacySelect options={selectOptions} current={result.officine?.id ?? null} keep={{ ...keep, officine: null }} />
           <SearchBox action={BASE} defaultValue={filters.q} placeholder="Destinataire, objet, dossier…" keep={{ ...keep, q: null }} />

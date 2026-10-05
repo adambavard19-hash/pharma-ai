@@ -55,6 +55,52 @@ describe("mise en forme des sources", () => {
     expect(com.ruleLabelOf("payment.reminder_1")).toBe("Première relance");
   });
 
+  describe("e-mails de campagne", () => {
+    const campaignMail = (templateKey: string | null, overrides: Partial<Parameters<typeof com.emailEntry>[0]> = {}) =>
+      com.emailEntry({ id: "c1", kind: "CAMPAIGN", recipient: "titulaire@officine.fr", status: "SENT", detail: null, subject: "Un bonus pour votre officine", templateKey, trigger: "MANUAL", ruleKey: null, pharmacyId: "ph_1", prospectId: null, createdAt: at("2026-10-04T09:00:00Z"), ...overrides }, names);
+
+    it("renvoie vers la campagne, et garde l'officine atteignable par sa colonne", () => {
+      const entry = campaignMail("campaign:ckx1234abcd5678efgh9012ij");
+      expect(entry).toMatchObject({ type: "email", title: "Un bonus pour votre officine", detail: "Campagne", trigger: "Manuel", ruleLabel: null, pharmacyId: "ph_1", pharmacyName: "Pharmacie du Port", href: "/admin/campagnes/ckx1234abcd5678efgh9012ij" });
+    });
+
+    it("sans identifiant de campagne (essai, trace ancienne, autre modèle), aucun lien vers une campagne inexistante", () => {
+      expect(campaignMail("campaign:test").href).toBe("/admin/pharmacies/ph_1?onglet=communication");
+      expect(campaignMail(null).href).toBe("/admin/pharmacies/ph_1?onglet=communication");
+      expect(campaignMail("campaign:").href).toBe("/admin/pharmacies/ph_1?onglet=communication");
+      expect(campaignMail("campaign:../../admin/equipe").href).toBe("/admin/pharmacies/ph_1?onglet=communication");
+      expect(campaignMail("campaign:ckx1234abcd", { pharmacyId: null }).href).toBe("/admin/campagnes/ckx1234abcd");
+      expect(campaignMail("campaign:test", { pharmacyId: null }).href).toBeNull();
+    });
+
+    it("un autre type d'e-mail n'est jamais pris pour une campagne, même avec une clé qui y ressemble", () => {
+      const other = com.emailEntry({ id: "c2", kind: "TEMPLATE", recipient: "a@b.fr", status: "SENT", detail: null, subject: "Objet", templateKey: "campaign:ckx1234abcd", trigger: "MANUAL", ruleKey: null, pharmacyId: "ph_1", prospectId: null, createdAt: at("2026-10-04T09:00:00Z") }, names);
+      expect(other.href).toBe("/admin/pharmacies/ph_1?onglet=communication");
+    });
+
+    it("extrait l'identifiant d'une clé « campaign:<id> », rien d'autre", () => {
+      expect(com.campaignIdOf("campaign:ckx1234abcd")).toBe("ckx1234abcd");
+      expect(com.campaignIdOf("campaign:test")).toBeNull();
+      expect(com.campaignIdOf("campaign:ckx1234abcd/extra")).toBeNull();
+      expect(com.campaignIdOf("trial.welcome")).toBeNull();
+      expect(com.campaignIdOf(null)).toBeNull();
+    });
+  });
+
+  describe("relances automatiques selon leur cible", () => {
+    const entryFor = (targetType: string, pharmacyId: string | null = null) => com.automationEntry({ id: "a9", ruleKey: "partner.range_invitation", status: "SENT", recipient: "contact@labo.fr", detail: null, pharmacyId, targetType, targetId: "cible_1", createdAt: at("2026-10-02T10:00:00Z") }, names);
+
+    it("la cible « Partner » renvoie vers la fiche du partenaire", () => {
+      expect(entryFor("Partner").href).toBe("/admin/partenaires/liste/cible_1");
+    });
+
+    it("les autres cibles gardent leur lien : officine, dossier, sinon le centre des relances", () => {
+      expect(entryFor("Pharmacy", "ph_1").href).toBe("/admin/pharmacies/ph_1?onglet=communication");
+      expect(entryFor("Prospect").href).toBe("/admin/dossiers/cible_1");
+      expect(entryFor("Subscription").href).toBe("/admin/relances");
+    });
+  });
+
   it("une notification non lue garde sa sévérité ; lue, elle l'indique", () => {
     expect(notification).toMatchObject({ type: "notification", status: { code: "UNREAD", label: "À voir" }, href: "/admin/dossiers/pr_1" });
     const read = com.notificationEntry({ id: "n2", type: "X", severity: "CRITICAL", title: "t", body: "", linkUrl: null, readAt: at("2026-10-02T12:00:00Z"), createdAt: at("2026-10-02T09:00:00Z") });
@@ -204,6 +250,16 @@ describe("lecture en base", () => {
   it("?nature=relance-contrat : seulement les e-mails de relance de contrat", async () => {
     await com.loadCommunications(com.parseCommunicationFilters({ nature: "relance-contrat", statut: "envoye" }), at("2026-10-10T08:00:00Z"));
     expect(whereOf(db.prisma.emailDispatch.findMany)?.AND).toContainEqual({ kind: { in: ["CONTRACT_REMINDER"] } });
+    expect(db.prisma.extranetNotification.findMany).not.toHaveBeenCalled();
+    expect(db.prisma.automationDispatch.findMany).not.toHaveBeenCalled();
+    expect(db.prisma.prospectEvent.findMany).not.toHaveBeenCalled();
+  });
+
+  it("?nature=campagne : seulement les e-mails de campagne, les autres sources n'ont rien à montrer", async () => {
+    expect(com.parseCommunicationFilters({ nature: "campagne" }).nature).toBe("campagne");
+    expect(com.COMMUNICATION_NATURES.campagne.label).toBe("Campagnes");
+    await com.loadCommunications(com.parseCommunicationFilters({ nature: "campagne" }), at("2026-10-10T08:00:00Z"));
+    expect(whereOf(db.prisma.emailDispatch.findMany)?.AND).toContainEqual({ kind: { in: ["CAMPAIGN"] } });
     expect(db.prisma.extranetNotification.findMany).not.toHaveBeenCalled();
     expect(db.prisma.automationDispatch.findMany).not.toHaveBeenCalled();
     expect(db.prisma.prospectEvent.findMany).not.toHaveBeenCalled();
