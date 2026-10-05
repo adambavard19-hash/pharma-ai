@@ -120,6 +120,9 @@ describe("routine dermatologique sous isotrétinoïne", () => {
     expect(steps.map((s) => s.routine?.stepLabel)).toEqual(["Nettoyer", "Hydrater et réparer", "Protéger"]);
     expect(result.recommendations.map((r) => r.productId)).not.toContain("g1");
     expect(result.recommendations.map((r) => r.productId)).not.toContain("vita");
+    // Ni en conseil ni en alternative : « doux » ne sauve pas un gommage de l'exclusion de la règle.
+    const proposedEverywhere = result.recommendations.flatMap((r) => [r.productId, ...(r.alternatives ?? []).map((a) => a.productId)]);
+    expect(proposedEverywhere).not.toContain("g1");
     expect(result.safetyFindings.find((f) => f.code === "VIGILANCE_CONTRAINDICATION")?.details?.subtitle).toBe("Isotrétinoïne détectée");
     // Le baume à lèvres accompagne la routine : quatre produits, deux conseils.
     expect(result.recommendations.find((r) => r.productId === "lip")).toBeDefined();

@@ -43,45 +43,44 @@ import { ReanalyseButton } from "./reanalyse-button";
 import { ScoreExplanation } from "./score-explanation";
 import { ShortDateBadge, VigilanceStrip } from "./vigilance-strip";
 import { ProductTrainingLink } from "../../formation/_components/product-training-link";
+import { countUndecided, splitAdvice } from "./group-advice";
 import type { AdviceView } from "./types";
 import { OUTCOME_MESSAGES, type EngineOutcome } from "@/core/ai/outcome";
 
 /** La note posée par le serveur quand le patient répond « non » à la question. */
 const NOT_NEEDED_NOTE = "Le patient n'a pas ce besoin.";
 
-/** Jamais plus de trois cartes ouvertes à la fois : le reste attend un clic. */
-const MAX_VISIBLE = 3;
-
-type CardItem =
-  | { kind: "single"; recommendation: AdviceView }
-  | { kind: "routine"; key: string; steps: AdviceView[] };
-
 /**
- * Ce que PharmaBoost rappelle de proposer — l'écran le plus important du produit.
+ * Ce que PharmaBoost rappelle de proposer, et tout ce qui n'a pas de médicament.
  *
- * Trois grandes cartes au plus, lisibles debout, à un mètre : le produit, son
- * prix et son stock, pourquoi on le propose, ce qu'on dit au patient, et deux
- * cibles géantes de même poids — accepte, refuse. Quand le conseil ne se
- * justifie pas par l'ordonnance seule, la carte pose d'abord SA question au
- * patient ; le produit n'apparaît qu'après un « oui ». Tout ce qui est
- * technique — score, référence, reformulation — vit derrière un seul bouton
- * discret. Rien de tout cela n'est visible au comptoir.
+ * Les conseils liés à un médicament se lisent SOUS ce médicament (voir
+ * `MedicationAdvice`) : c'est là que le pharmacien les attend. Cette zone
+ * garde ce qui ne se rattache à aucune ligne — un conseil propre au patient,
+ * ajouté à la main, ou issu d'une analyse antérieure au rattachement — et ce
+ * qui est global : l'avis de stock, l'issue de l'analyse quand elle n'a rien
+ * proposé du tout, l'ajout d'un conseil de son choix.
  */
 export function AdviceZone({
   prescriptionId,
   recommendations,
+  nothingProposed,
   canDecide,
   canVerify = true,
   locked,
   outcome,
   canImportStock,
   stockNotice,
+  presentProductIds,
   inBasket,
   onAccept,
   onCancelAccept,
+  renderAlternatives,
 }: {
   prescriptionId: string;
+  /** Les conseils rattachés à aucun médicament affiché. */
   recommendations: AdviceView[];
+  /** Rien à montrer nulle part, ni sous un médicament ni ici : l'issue de l'analyse parle. */
+  nothingProposed: boolean;
   canDecide: boolean;
   /** Pharmacien vérificateur : peut valider une proposition qui porte une vigilance. */
   canVerify?: boolean;
@@ -90,63 +89,39 @@ export function AdviceZone({
   outcome: EngineOutcome | null;
   canImportStock: boolean;
   stockNotice: { tone: "ok" | "warning"; text: string } | null;
+  /** Les produits déjà présents parmi tous les conseils : un produit associé ne se repropose pas. */
+  presentProductIds: Set<string>;
   inBasket: (id: string) => boolean;
   /** Le patient accepte : ajout à la délivrance + décision enregistrée. */
   onAccept: (recommendation: AdviceView) => void;
   /** Retour en arrière immédiat, avant que la vente ne soit close. */
   onCancelAccept: (recommendation: AdviceView) => void;
+  /** Les autres références, pour un conseil sans médicament lié mais issu d'une analyse qui les a enregistrées. */
+  renderAlternatives?: (recommendation: AdviceView) => React.ReactNode;
 }) {
   const [addOpen, setAddOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const split = splitAdvice(recommendations);
 
-  const decided = new Set(["DECLINED", "REMOVED", "PURCHASED"]);
-  const open = recommendations.filter((r) => !decided.has(r.status));
-  const available = open.filter((r) => !r.product || r.product.quantity > 0);
-  const unavailable = open.filter((r) => r.product && r.product.quantity <= 0);
-  const closed = recommendations.filter((r) => decided.has(r.status));
-
-  // Une routine (nettoyer, hydrater, protéger) est une seule carte : ses
-  // étapes se lisent ensemble et se proposent ensemble.
-  const cards: CardItem[] = [];
-  const seenRoutines = new Set<string>();
-  for (const recommendation of available) {
-    const routine = recommendation.routine;
-    if (!routine) {
-      cards.push({ kind: "single", recommendation });
-      continue;
-    }
-    if (seenRoutines.has(routine.key)) continue;
-    seenRoutines.add(routine.key);
-    cards.push({
-      kind: "routine",
-      key: routine.key,
-      steps: available.filter((r) => r.routine?.key === routine.key).sort((a, b) => (a.routine?.stepIndex ?? 0) - (b.routine?.stepIndex ?? 0)),
-    });
-  }
-  const visible = showAll ? cards : cards.slice(0, MAX_VISIBLE);
-  const hidden = cards.length - visible.length;
-
-  const pending = cards.filter((card) => (card.kind === "single" ? !inBasket(card.recommendation.id) : card.steps.some((step) => !inBasket(step.id)))).length;
-  // Un produit associé déjà ajouté (même après rechargement) ne se propose plus.
-  const presentProductIds = new Set(open.map((r) => r.product?.id).filter((id): id is string => Boolean(id)));
+  // Tout est rattaché sous les médicaments et rien de global à dire : pas de
+  // zone vide, pas d'espace perdu entre deux blocs.
+  const empty = split.cards.length + split.unavailable.length + split.closed.length === 0 && !nothingProposed && !canDecide;
+  if (!stockNotice && (locked || empty)) return null;
 
   return (
-    <section className="space-y-4" aria-labelledby="zone-conseils">
-      <div className="flex items-end justify-between gap-3">
-        <h2 id="zone-conseils" className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
-            <Sparkles className="size-[18px]" />
-          </span>
-          <span className="text-[17px] font-semibold tracking-[-0.01em] text-text-primary">
-            À proposer au patient
-          </span>
-        </h2>
-        {!locked && available.length > 0 && (
-          <span className="rounded-full bg-brand-50 px-3 py-1 text-[12.5px] font-medium text-brand-800 tabular dark:bg-brand-950 dark:text-brand-300">
-            {pending > 0 ? `${pending} à décider` : "Tout est décidé"}
-          </span>
-        )}
-      </div>
+    <section className="space-y-4" aria-label="Conseils pour ce patient">
+      {!locked && split.cards.length > 0 && (
+        <div className="flex items-end justify-between gap-3">
+          <h2 id="zone-conseils" className="flex items-center gap-2.5">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
+              <Sparkles className="size-[18px]" />
+            </span>
+            <span className="text-[17px] font-semibold tracking-[-0.01em] text-text-primary">
+              Conseils pour ce patient
+            </span>
+          </h2>
+          <UndecidedPill count={countUndecided(split.cards, inBasket)} />
+        </div>
+      )}
 
       {stockNotice && (
         <p className={cn("flex items-center gap-2 px-1 text-[12.5px]", stockNotice.tone === "warning" ? "text-warning-700 dark:text-warning-400" : "text-text-tertiary")}>
@@ -155,75 +130,23 @@ export function AdviceZone({
         </p>
       )}
 
-      {locked ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-dashed border-border-default px-5 py-5">
-          <Lock className="mt-0.5 size-[18px] shrink-0 text-text-tertiary" />
-          <div className="space-y-1">
-            <p className="text-[14px] font-medium text-text-primary">
-              En attente de la vérification de sécurité
-            </p>
-            <p className="text-[13px] leading-5 text-text-secondary">
-              Une alerte bloquante est ouverte au-dessus. Acquittez-la pour ouvrir les
-              propositions : aucune vente ne se fait par-dessus une alerte non lue.
-            </p>
-          </div>
-        </div>
-      ) : (
+      {!locked && (
         <>
-          {visible.map((card, index) =>
-            card.kind === "routine" ? (
-              <RoutineCard
-                key={card.key}
-                index={index + 1}
-                steps={card.steps}
-                canDecide={canDecide}
-                canVerify={canVerify}
-                inBasket={inBasket}
-                onAccept={onAccept}
-                onCancelAccept={onCancelAccept}
-              />
-            ) : (
-              <AdviceCard
-                key={card.recommendation.id}
-                index={index + 1}
-                prescriptionId={prescriptionId}
-                recommendation={card.recommendation}
-                canDecide={canDecide}
-                canVerify={canVerify}
-                accepted={inBasket(card.recommendation.id)}
-                presentProductIds={presentProductIds}
-                onAccept={() => onAccept(card.recommendation)}
-                onCancelAccept={() => onCancelAccept(card.recommendation)}
-              />
-            ),
-          )}
+          <AdviceStack
+            prescriptionId={prescriptionId}
+            split={split}
+            canDecide={canDecide}
+            canVerify={canVerify}
+            presentProductIds={presentProductIds}
+            inBasket={inBasket}
+            onAccept={onAccept}
+            onCancelAccept={onCancelAccept}
+            numbered
+            renderAlternatives={renderAlternatives}
+          />
 
-          {hidden > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowAll(true)}
-              className="w-full rounded-xl border border-dashed border-border-default py-3 text-[13.5px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
-            >
-              Voir {hidden} autre{hidden > 1 ? "s" : ""} proposition{hidden > 1 ? "s" : ""}
-            </button>
-          )}
-
-          {available.length === 0 && closed.length > 0 && (
-            <p className="flex items-center gap-2 px-1 text-[14px] text-text-secondary">
-              <Check className="size-[18px] text-success-600 dark:text-success-500" />
-              Toutes les propositions ont été décidées avec le patient.
-            </p>
-          )}
-
-          {available.length === 0 && closed.length === 0 && (
+          {nothingProposed && (
             <EmptyOutcome outcome={outcome} canImportStock={canImportStock} canRelaunch={canDecide} prescriptionId={prescriptionId} onAddAdvice={() => setAddOpen(true)} />
-          )}
-
-          {unavailable.length > 0 && (
-            <p className="px-1 text-[12.5px] leading-5 text-text-tertiary">
-              Non proposé faute de stock :{" "}
-              {unavailable.map((r) => r.product?.name).filter(Boolean).join(", ")}.
-            </p>
           )}
 
           {canDecide && (
@@ -243,11 +166,119 @@ export function AdviceZone({
               />
             </>
           )}
-
-          {closed.length > 0 && <ClosedList recommendations={closed} canDecide={canDecide} />}
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Une alerte bloquante est ouverte : rien ne se propose par-dessus.
+ *
+ * Dit une seule fois, en tête de la liste des médicaments — pas sous chacun.
+ */
+export function AdviceLocked() {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-dashed border-border-default px-5 py-5">
+      <Lock className="mt-0.5 size-[18px] shrink-0 text-text-tertiary" />
+      <div className="space-y-1">
+        <p className="text-[14px] font-medium text-text-primary">
+          En attente de la vérification de sécurité
+        </p>
+        <p className="text-[13px] leading-5 text-text-secondary">
+          Une alerte bloquante est ouverte au-dessus. Acquittez-la pour ouvrir les
+          propositions : aucune vente ne se fait par-dessus une alerte non lue.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Où en sont les décisions : ce qu'il reste à trancher avec le patient. */
+export function UndecidedPill({ count }: { count: number }) {
+  return (
+    <span className="shrink-0 rounded-full bg-brand-50 px-3 py-1 text-[12.5px] font-medium text-brand-800 tabular dark:bg-brand-950 dark:text-brand-300">
+      {count > 0 ? `${count} à décider` : "Tout est décidé"}
+    </span>
+  );
+}
+
+/**
+ * Les conseils d'un groupe — ceux d'un médicament, ou ceux qui n'en ont pas.
+ *
+ * Les cartes à décider d'abord (la question au patient s'affiche avant le
+ * produit quand la règle l'exige), puis ce qu'on ne propose pas faute de
+ * stock, puis ce qui est tranché : refusé ou retiré, il reste là où il était
+ * proposé, barré, avec « Revenir ». Aucun plafond d'affichage : le moteur en
+ * retient cinq au plus, tous se lisent.
+ */
+export function AdviceStack({
+  prescriptionId,
+  split,
+  canDecide,
+  canVerify = true,
+  presentProductIds,
+  inBasket,
+  onAccept,
+  onCancelAccept,
+  numbered = false,
+  renderAlternatives,
+}: {
+  prescriptionId: string;
+  split: ReturnType<typeof splitAdvice>;
+  canDecide: boolean;
+  canVerify?: boolean;
+  presentProductIds: Set<string>;
+  inBasket: (id: string) => boolean;
+  onAccept: (recommendation: AdviceView) => void;
+  onCancelAccept: (recommendation: AdviceView) => void;
+  /** Numérote les suggestions (« Suggestion n°2 ») : utile dans une liste sans médicament, inutile sous un médicament. */
+  numbered?: boolean;
+  /** Les autres références possibles, montrées sous un conseil encore à décider. */
+  renderAlternatives?: (recommendation: AdviceView) => React.ReactNode;
+}) {
+  const { cards, unavailable, closed } = split;
+  if (cards.length + unavailable.length + closed.length === 0) return null;
+  return (
+    <div className="space-y-3.5">
+      {cards.map((card, index) =>
+        card.kind === "routine" ? (
+          <RoutineCard
+            key={card.key}
+            index={numbered ? index + 1 : undefined}
+            steps={card.steps}
+            canDecide={canDecide}
+            canVerify={canVerify}
+            inBasket={inBasket}
+            onAccept={onAccept}
+            onCancelAccept={onCancelAccept}
+          />
+        ) : (
+          <AdviceCard
+            key={card.recommendation.id}
+            index={numbered ? index + 1 : undefined}
+            prescriptionId={prescriptionId}
+            recommendation={card.recommendation}
+            canDecide={canDecide}
+            canVerify={canVerify}
+            accepted={inBasket(card.recommendation.id)}
+            presentProductIds={presentProductIds}
+            onAccept={() => onAccept(card.recommendation)}
+            onCancelAccept={() => onCancelAccept(card.recommendation)}
+            alternatives={renderAlternatives?.(card.recommendation)}
+          />
+        ),
+      )}
+
+      {unavailable.length > 0 && (
+        <p className="px-1 text-[12.5px] leading-5 text-text-tertiary">
+          Non proposé faute de stock :{" "}
+          {unavailable.map((r) => r.product?.name).filter(Boolean).join(", ")}.
+        </p>
+      )}
+
+      {closed.length > 0 && <ClosedList recommendations={closed} canDecide={canDecide} />}
+    </div>
   );
 }
 
@@ -364,6 +395,7 @@ function AdviceCard({
   presentProductIds,
   onAccept,
   onCancelAccept,
+  alternatives,
 }: {
   prescriptionId: string;
   recommendation: AdviceView;
@@ -374,6 +406,8 @@ function AdviceCard({
   presentProductIds: Set<string>;
   onAccept: () => void;
   onCancelAccept: () => void;
+  /** Les autres références possibles : sous la décision, tant que le conseil n'est pas accepté. */
+  alternatives?: React.ReactNode;
 }) {
   const opportunity = recommendation.opportunity;
   // La réponse du patient, locale d'abord : la carte réagit au clic, le
@@ -443,6 +477,7 @@ function AdviceCard({
         companionPresent={Boolean(recommendation.companion && presentProductIds.has(recommendation.companion.productId))}
         onAccept={onAccept}
         onCancelAccept={onCancelAccept}
+        alternatives={alternatives}
       />
     </div>
   );
@@ -526,7 +561,7 @@ function CardFrame({
     >
       <div
         className={cn(
-          "h-1.5",
+          "h-1",
           accent === "success"
             ? "bg-success-500"
             : accent === "question"
@@ -534,7 +569,7 @@ function CardFrame({
               : "bg-gradient-to-r from-brand-600 to-brand-400",
         )}
       />
-      <div className="space-y-5 p-5 sm:p-6">{children}</div>
+      <div className="space-y-3.5 p-4 sm:p-5">{children}</div>
     </article>
   );
 }
@@ -571,7 +606,7 @@ function QuestionCard({
         <p className="text-[11.5px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">
           Une question au patient
         </p>
-        <p className="mt-2 text-[24px] leading-8 font-semibold tracking-[-0.015em] text-text-primary">
+        <p className="mt-2 text-[20px] leading-7 font-semibold tracking-[-0.015em] text-text-primary">
           {opportunity.question}
         </p>
         {product && (
@@ -625,6 +660,7 @@ function ProductCard({
   companionPresent = false,
   onAccept,
   onCancelAccept,
+  alternatives,
 }: {
   index?: number;
   prescriptionId: string;
@@ -639,6 +675,7 @@ function ProductCard({
   confirmed: boolean;
   onAccept: () => void;
   onCancelAccept: () => void;
+  alternatives?: React.ReactNode;
 }) {
   const [pending, startTransition] = useTransition();
   const [modifyOpen, setModifyOpen] = useState(false);
@@ -721,23 +758,23 @@ function ProductCard({
       <VigilanceStrip vigilances={recommendation.vigilances ?? []} canVerify={canVerify} />
 
       {why && (
-        <div className="flex items-start gap-3 rounded-xl bg-surface-sunken/70 px-4 py-3.5">
+        <div className="flex items-start gap-3 rounded-xl bg-surface-sunken/70 px-3.5 py-3">
           <Pill className="mt-0.5 size-[18px] shrink-0 text-text-tertiary" />
-          <p className="text-[15px] leading-[1.5] text-text-primary">{why}</p>
+          <p className="text-[14.5px] leading-[1.5] text-text-primary">{why}</p>
         </div>
       )}
 
       <div className="space-y-2">
         <p className="text-[12px] font-semibold tracking-[0.06em] text-text-tertiary uppercase">Solution disponible dans votre officine</p>
-        <div className="flex items-start gap-4 rounded-xl border border-border-subtle bg-surface-card px-4 py-3.5">
-          <ProductVisual product={product} size={84} />
+        <div className="flex items-start gap-3.5 rounded-xl border border-border-subtle bg-surface-card px-3.5 py-3">
+          <ProductVisual product={product} size={72} />
           <div className="min-w-0 flex-1">
-            <p className="text-[19px] leading-6 font-semibold tracking-[-0.01em] text-text-primary">{product?.name ?? "Produit supprimé"}</p>
+            <p className="text-[17px] leading-6 font-semibold tracking-[-0.01em] text-text-primary">{product?.name ?? "Produit supprimé"}</p>
             {product?.brand && <p className="mt-0.5 text-[13px] text-text-secondary">{product.brand}</p>}
-            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
               {price > 0 ? (
                 <span className="flex items-baseline gap-2">
-                  <span className="text-[24px] leading-7 font-semibold tabular text-text-primary">{formatCents(price)}</span>
+                  <span className="text-[22px] leading-7 font-semibold tabular text-text-primary">{formatCents(price)}</span>
                   {product?.purchasePriceCents ? (
                     <span className="rounded-md bg-success-50 px-1.5 py-0.5 text-[12.5px] font-medium tabular text-success-800 dark:bg-success-950/40 dark:text-success-300" title="Prix de vente moins prix d'achat">
                       marge {formatCents(price - product.purchasePriceCents)}
@@ -795,11 +832,11 @@ function ProductCard({
       </div>
 
       {script && (
-        <div className="rounded-xl border border-brand-100 bg-brand-50/70 px-4 py-3.5 dark:border-brand-900 dark:bg-brand-950/50">
+        <div className="rounded-xl border border-brand-100 bg-brand-50/70 px-3.5 py-3 dark:border-brand-900 dark:bg-brand-950/50">
           <p className="text-[11.5px] font-semibold tracking-[0.08em] text-brand-800 uppercase dark:text-brand-300">
             À dire au patient
           </p>
-          <p className="mt-1 text-[17px] leading-[1.5] text-text-primary">{script}</p>
+          <p className="mt-1 text-[16px] leading-[1.5] text-text-primary">{script}</p>
         </div>
       )}
 
@@ -838,6 +875,8 @@ function ProductCard({
         </div>
       )}
 
+      {canDecide && !accepted && alternatives}
+
       {recommendation.origin !== "AI" && (recommendation.trainings?.length ?? 0) > 0 && (
         <div className="px-1">
           <ProductTrainingLink trainings={recommendation.trainings} />
@@ -869,7 +908,7 @@ function ProductCard({
       )}
 
       {canDecide && accepted && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-success-100/70 px-4 py-3.5 dark:bg-success-900/25">
+        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-success-100/70 px-3.5 py-3 dark:bg-success-900/25">
           <Check className="size-6 shrink-0 text-success-700 dark:text-success-400" strokeWidth={2.5} />
           <p className="min-w-0 flex-1 text-[15px] font-semibold text-success-900 dark:text-success-200">
             Ajouté à la délivrance
@@ -943,7 +982,7 @@ function DecisionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex min-h-[84px] items-center gap-3.5 rounded-2xl border-2 px-5 py-4 text-left transition-all",
+        "flex min-h-[64px] items-center gap-3 rounded-xl border-2 px-4 py-2.5 text-left transition-all",
         "focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50",
         tone === "accept" &&
           "border-success-600 bg-success-600 text-white shadow-[0_8px_20px_-10px_rgba(22,163,74,0.8)] hover:bg-success-700 active:scale-[0.99] focus-visible:outline-success-600",
@@ -955,14 +994,14 @@ function DecisionButton({
     >
       <span
         className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-full",
+          "flex size-9 shrink-0 items-center justify-center rounded-full",
           tone === "accept" ? "bg-white/20" : "bg-surface-sunken",
         )}
       >
         {icon}
       </span>
       <span className="min-w-0">
-        <span className="block text-[17px] leading-5 font-semibold tracking-[-0.01em]">
+        <span className="block text-[16px] leading-5 font-semibold tracking-[-0.01em]">
           {label}
         </span>
         <span className={cn("mt-0.5 block text-[12.5px] leading-4", tone === "accept" ? "text-white/80" : "text-text-tertiary")}>
@@ -978,12 +1017,12 @@ function CardBand({ index, kind, title, tone = "success" }: { index?: number; ki
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-xl px-4 py-2.5",
+        "flex items-center gap-3 rounded-xl px-3.5 py-2",
         tone === "success" ? "bg-success-50 dark:bg-success-950/30" : "bg-brand-50 dark:bg-brand-950/30",
       )}
     >
-      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-full text-white", tone === "success" ? "bg-success-600" : "bg-brand-600")}>
-        {tone === "success" ? <Lightbulb className="size-[18px]" /> : <Sparkles className="size-[18px]" />}
+      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-white", tone === "success" ? "bg-success-600" : "bg-brand-600")}>
+        {tone === "success" ? <Lightbulb className="size-[17px]" /> : <Sparkles className="size-[17px]" />}
       </span>
       <div className="min-w-0 flex-1">
         <p className={cn("text-[11.5px] font-semibold tracking-[0.1em] uppercase", tone === "success" ? "text-success-800 dark:text-success-300" : "text-brand-800 dark:text-brand-300")}>{kind}</p>
@@ -997,7 +1036,7 @@ function CardBand({ index, kind, title, tone = "success" }: { index?: number; ki
 }
 
 /** La boîte, ou à défaut les initiales de la marque : jamais une case vide. */
-function ProductVisual({ product, size = 84 }: { product: AdviceView["product"]; size?: number }) {
+export function ProductVisual({ product, size = 84 }: { product: { imageUrl: string | null; brand: string | null; name: string } | null; size?: number }) {
   if (product?.imageUrl) {
     return (
       <Image
@@ -1078,7 +1117,7 @@ function ImageCredit({ source }: { source: string | null }) {
   return <p className="px-1 text-[10.5px] text-text-tertiary">Photo : {label}, CC BY-SA.</p>;
 }
 
-function StockBadge({ quantity, low }: { quantity: number; low: boolean }) {
+export function StockBadge({ quantity, low }: { quantity: number; low: boolean }) {
   return (
     <span
       className={cn(
@@ -1100,9 +1139,9 @@ function StockBadge({ quantity, low }: { quantity: number; low: boolean }) {
 function BenefitChips({ benefits }: { benefits: string[] }) {
   if (benefits.length === 0) return null;
   return (
-    <ul className="grid gap-2 sm:grid-cols-3">
+    <ul className="flex flex-wrap gap-1.5">
       {benefits.slice(0, 3).map((benefit) => (
-        <li key={benefit} className="flex items-center gap-2 rounded-lg bg-surface-sunken/70 px-3 py-2 text-[12.5px] leading-4 text-text-secondary">
+        <li key={benefit} className="flex items-center gap-1.5 rounded-full bg-surface-sunken/70 px-2.5 py-1 text-[12.5px] leading-4 text-text-secondary">
           <Check className="size-3.5 shrink-0 text-brand-600 dark:text-brand-400" strokeWidth={2.5} />
           {benefit}
         </li>
@@ -1169,9 +1208,9 @@ function RoutineCard({
       <VigilanceStrip vigilances={patientVigilances} canVerify={canVerify} />
 
       {first.shortReason && (
-        <div className="flex items-start gap-3 rounded-xl bg-surface-sunken/70 px-4 py-3.5">
+        <div className="flex items-start gap-3 rounded-xl bg-surface-sunken/70 px-3.5 py-3">
           <Pill className="mt-0.5 size-[18px] shrink-0 text-text-tertiary" />
-          <p className="text-[15px] leading-[1.5] text-text-primary">{first.shortReason}</p>
+          <p className="text-[14.5px] leading-[1.5] text-text-primary">{first.shortReason}</p>
         </div>
       )}
 
@@ -1244,7 +1283,7 @@ function RoutineCard({
       </div>
 
       {first.counterScript && (
-        <div className="rounded-xl border border-brand-100 bg-brand-50/70 px-4 py-3.5 dark:border-brand-900 dark:bg-brand-950/50">
+        <div className="rounded-xl border border-brand-100 bg-brand-50/70 px-3.5 py-3 dark:border-brand-900 dark:bg-brand-950/50">
           <p className="text-[11.5px] font-semibold tracking-[0.08em] text-brand-800 uppercase dark:text-brand-300">À dire au patient</p>
           <p className="mt-1 text-[16px] leading-[1.5] text-text-primary">{first.counterScript.replace(/\.\s*[^.]*est adapté à cette étape\.\s*»$/, ". »")}</p>
         </div>

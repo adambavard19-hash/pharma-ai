@@ -457,6 +457,13 @@ export async function analysePrescription(params: {
           category: opportunity.category,
           title: opportunity.title,
           benefits: opportunity.benefits ?? [],
+          // Les lignes de l'ordonnance qui ont déclenché le conseil : c'est ce
+          // qui le range sous le bon médicament. Même rapprochement par position
+          // que les explications ; une ligne introuvable est ignorée.
+          triggeredLineIds: opportunity.triggeredBy.flatMap((trigger) => {
+            const line = prescription.lines.find((l) => l.position === trigger.lineIndex);
+            return line ? [line.id] : [];
+          }),
           rationale: opportunity.rationale,
           clinicalContext: opportunity.clinicalContext,
           safetyNotes: opportunity.safetyNotes,
@@ -536,6 +543,17 @@ export async function analysePrescription(params: {
       // il se range dans l'autre colonne. Les deux liens ne sont jamais remplis
       // ensemble.
       const isNationalDrug = product?.origin === "NATIONAL_DRUG";
+      // Les autres références du même besoin. Seules des références de
+      // l'officine se proposent et se remplacent l'une par l'autre : un
+      // médicament conseil du catalogue national se range dans l'autre colonne.
+      // Un produit déjà tranché sur cette ordonnance n'y revient pas non plus.
+      const alternatives = isNationalDrug
+        ? []
+        : (recommendation.alternatives ?? []).filter(
+            (alternative) =>
+              !alreadyDecided.has(alternative.productId) &&
+              catalogById.get(alternative.productId)?.origin === "PHARMACY_CATALOG",
+          );
       const created = await tx.recommendation.create({
         data: {
           pharmacyId: params.scope.pharmacyId,
@@ -559,6 +577,7 @@ export async function analysePrescription(params: {
           vigilances: recommendation.vigilances && recommendation.vigilances.length > 0 ? (recommendation.vigilances as never) : undefined,
           unitPriceCents: product?.salePriceCents ?? 0,
           companion: recommendation.companion ? (recommendation.companion as never) : undefined,
+          alternatives: alternatives.length > 0 ? (alternatives as never) : undefined,
           routine: recommendation.routine ? (recommendation.routine as never) : undefined,
           isDemo: prescription.isDemo,
         },

@@ -110,8 +110,33 @@ export type SafetyFindingView = {
 };
 
 
+/**
+ * Une autre référence du stock, adaptée au même besoin que le conseil retenu.
+ * Elle est montrée sous le conseil, avec son prix et son stock du jour ; elle
+ * n'entre dans la délivrance que par un geste du pharmacien.
+ */
+export type AdviceAlternativeView = {
+  productId: string;
+  name: string;
+  brand: string | null;
+  imageUrl: string | null;
+  salePriceCents: number;
+  /** Quantité en stock aujourd'hui (jamais recopiée de l'analyse). */
+  quantity: number;
+  /** Pourquoi cette référence convient, en une ligne, écrite par la règle. */
+  shortReason: string | null;
+};
+
 export type AdviceView = {
   id: string;
+  /**
+   * Les médicaments de l'ordonnance (SaleLineDraft.id) qui ont déclenché ce
+   * conseil : il s'affiche sous le premier d'entre eux. Vide : conseil propre
+   * au patient, ajouté à la main, ou analyse antérieure à ce rattachement.
+   */
+  lineIds: string[];
+  /** Jusqu'à trois autres références du stock, dans l'ordre du classement. */
+  alternatives: AdviceAlternativeView[];
   status: string;
   origin: string;
   totalScore: number;

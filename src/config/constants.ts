@@ -55,13 +55,23 @@ export const RECOMMENDATION_MIN_RELEVANCE = 0.6;
 /**
  * Nombre maximal de recommandations proposées pour une ordonnance.
  *
- * Cinq au plus retenues par le moteur ; l'écran du comptoir n'en montre que
- * trois d'un coup, le reste derrière « Voir N autres propositions ». Au-delà
- * de trois affichées, le pharmacien ne choisit plus, il survole — mais un
- * conseil pertinent de rang quatre ne doit pas disparaître pour autant : une
- * ordonnance d'infection respiratoire en appelle facilement cinq.
+ * Cinq au plus retenues par le moteur, toutes affichées : chaque conseil
+ * s'affiche sous le médicament qui l'a déclenché, si bien que le pharmacien
+ * les lit médicament par médicament et non en une pile. Un conseil pertinent de
+ * rang quatre ne disparaît pas : une ordonnance d'infection respiratoire en
+ * appelle facilement cinq.
  */
 export const MAX_RECOMMENDATIONS_PER_PRESCRIPTION = 5;
+
+/**
+ * Nombre maximal d'autres références montrées sous un conseil retenu.
+ *
+ * Un plafond d'affichage, pas une promesse : deux ou trois alternatives quand
+ * le rayon les contient, moins sinon — jamais une référence hors besoin pour
+ * remplir la liste. Au-delà de trois, le pharmacien ne compare plus, il
+ * survole.
+ */
+export const MAX_ALTERNATIVES_PER_ADVICE = 3;
 
 export const CURRENCY = "EUR";
 export const LOCALE = "fr-FR";

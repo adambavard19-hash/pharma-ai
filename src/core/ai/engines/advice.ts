@@ -775,7 +775,9 @@ export const ADVICE_RULES: AdviceRule[] = [
           key: "cleanse",
           label: "Nettoyer",
           matchingTags: ["nettoyant", "visage"],
-          productPrefer: [String.raw`sans savon`, String.raw`surgras`, String.raw`syndet`, String.raw`\bdoux`, String.raw`apais`, String.raw`purifiant`],
+          // « doux » ne sauve jamais un gommage : un motif préféré lève une exclusion
+          // (matching.ts), et « gommage doux » doit rester exclu sous isotrétinoïne.
+          productPrefer: [String.raw`sans savon`, String.raw`surgras`, String.raw`syndet`, String.raw`^(?!.*(gommage|exfoli|peeling|scrub)).*\bdoux`, String.raw`apais`, String.raw`purifiant`],
           benefit: "Nettoie en douceur, sans dessécher",
         },
         {

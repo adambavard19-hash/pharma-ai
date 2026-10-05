@@ -22,6 +22,10 @@ import type { SaleLineDraft } from "./types";
  * la spécialité quand le catalogue hésite, préciser un dosage absent parmi ceux
  * qui existent, confirmer une lecture incertaine. Plus de panneau
  * « éléments à vérifier » à part : le problème est là où on le règle.
+ *
+ * Les conseils se lisent de la même façon : sous la ligne qui les a déclenchés
+ * (`renderAdvice`), dans le même cadre, pour que le pharmacien voie d'un seul
+ * regard le médicament et ce qu'il peut y associer.
  */
 export type LineIssue =
   | { kind: "ATTACH"; label: string }
@@ -69,11 +73,14 @@ export function TreatmentPanel({
   canEdit,
   onEdit,
   catalogAttribution,
+  renderAdvice,
 }: {
   lines: SaleLineDraft[];
   canEdit: boolean;
   onEdit: () => void;
   catalogAttribution: string | null;
+  /** Ce qui se montre sous une ligne : ses conseils. Rien quand la fonction est absente. */
+  renderAdvice?: (line: SaleLineDraft) => React.ReactNode;
 }) {
   const confirmed = lines.filter((line) => line.confirmed);
   const withIssues = confirmed.filter((line) => lineIssuesAfterAnalysis(line).length > 0).length;
@@ -102,7 +109,7 @@ export function TreatmentPanel({
       <Card>
         <ul className="divide-y divide-border-subtle">
           {confirmed.map((line) => (
-            <TreatmentRow key={line.id} line={line} canEdit={canEdit} attribution={catalogAttribution} />
+            <TreatmentRow key={line.id} line={line} canEdit={canEdit} attribution={catalogAttribution} advice={renderAdvice?.(line)} />
           ))}
           {confirmed.length === 0 && <li className="px-4 py-4 text-[13px] text-text-tertiary">Aucune ligne confirmée.</li>}
         </ul>
@@ -111,7 +118,7 @@ export function TreatmentPanel({
   );
 }
 
-function TreatmentRow({ line, canEdit, attribution }: { line: SaleLineDraft; canEdit: boolean; attribution: string | null }) {
+function TreatmentRow({ line, canEdit, attribution, advice }: { line: SaleLineDraft; canEdit: boolean; attribution: string | null; advice?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const issues = lineIssuesAfterAnalysis(line);
   const unit = unitFor(line.official?.pharmaceuticalForm ?? line.form);
@@ -161,6 +168,8 @@ function TreatmentRow({ line, canEdit, attribution }: { line: SaleLineDraft; can
           {line.purpose && <p className="mt-1.5 text-[12.5px] leading-5 text-text-secondary">{line.purpose}</p>}
         </div>
       )}
+
+      {advice}
     </li>
   );
 }

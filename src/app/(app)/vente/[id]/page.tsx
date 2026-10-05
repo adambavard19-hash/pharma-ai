@@ -33,6 +33,8 @@ import { nearestShortDatesFor, todayFor } from "@/server/services/stock-lots";
 import { trainingsForProducts } from "@/server/services/training";
 import { parseSuggestionVigilances } from "@/config/vigilances";
 import { requiresPharmacistValidation } from "@/core/ai/engines/population-vigilance";
+import { parseStoredAlternatives } from "@/core/ai/alternatives";
+import { MAX_ALTERNATIVES_PER_ADVICE } from "@/config/constants";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
 import { brandKey, brandLabelOf } from "@/core/catalog/brand";
 import { selectCounterCards } from "@/core/partners/counter-card";
@@ -240,6 +242,23 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         )
       : Promise.resolve(new Map<string, { id: string; title: string }[]>()),
   ]);
+  // Les autres références retenues avec chaque conseil, enrichies d'UNE requête
+  // groupée : le nom, le prix et le stock sont ceux d'aujourd'hui, jamais ceux
+  // de l'analyse. Une référence disparue, inactive, hors stock ou d'une autre
+  // officine est écartée sans bruit — une alternative qu'on ne peut plus
+  // remettre au patient n'a pas à s'afficher.
+  const storedAlternatives = new Map(prescription.recommendations.map((r) => [r.id, parseStoredAlternatives(r.alternatives)]));
+  const alternativeProductIds = [...new Set([...storedAlternatives.values()].flatMap((list) => list.map((alternative) => alternative.productId)))];
+  const alternativeProducts = new Map(
+    (alternativeProductIds.length === 0
+      ? []
+      : await prisma.product.findMany({
+          where: { id: { in: alternativeProductIds }, pharmacyId: session.scope.pharmacyId, isActive: true },
+          select: { id: true, name: true, brand: true, imageUrl: true, salePriceCents: true, stockItem: { select: { quantity: true } } },
+        })
+    ).map((product) => [product.id, product]),
+  );
+
   // Gammes partenaires : calculées APRÈS le moteur, à partir des conseils qu'il
   // a déjà rendus, et affichées à part. Rien ici ne retourne au moteur.
   const orderedRecommendations = [...prescription.recommendations].sort(
@@ -375,6 +394,27 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
 
         return {
           id: recommendation.id,
+          lineIds: recommendation.opportunity?.triggeredLineIds ?? [],
+          alternatives: (storedAlternatives.get(recommendation.id) ?? [])
+            .flatMap((alternative) => {
+              const found = alternativeProducts.get(alternative.productId);
+              const quantity = found?.stockItem?.quantity ?? 0;
+              // La référence déjà retenue ne se propose pas à côté d'elle-même
+              // (un remplacement à la main a pu la rapprocher de cette liste).
+              if (!found || quantity <= 0 || found.id === recommendation.productId) return [];
+              return [
+                {
+                  productId: found.id,
+                  name: found.name,
+                  brand: found.brand,
+                  imageUrl: found.imageUrl,
+                  salePriceCents: found.salePriceCents,
+                  quantity,
+                  shortReason: alternative.shortReason || null,
+                },
+              ];
+            })
+            .slice(0, MAX_ALTERNATIVES_PER_ADVICE),
           status: recommendation.status,
           origin: recommendation.origin,
           totalScore: recommendation.totalScore,

@@ -1,5 +1,6 @@
 import {
   ENGINE_VERSION,
+  MAX_ALTERNATIVES_PER_ADVICE,
   MAX_RECOMMENDATIONS_PER_PRESCRIPTION,
   RECOMMENDATION_MIN_RELEVANCE,
   RECOMMENDATION_MIN_SCORE,
@@ -30,6 +31,7 @@ import { rangeRankFor, type PreferredRangeInput } from "../catalog/preferred-ran
 import type {
   AnalysisResult,
   CatalogProduct,
+  CompanionSuggestion,
   DrugKnowledge,
   OfficialDrugFacts,
   PatientContext,
@@ -38,6 +40,7 @@ import type {
   PipelineStageTrace,
   ProductValidationHistory,
   SafetyFindingResult,
+  ScoredAlternative,
   ScoredRecommendation,
   TreatmentExplanationResult,
 } from "./types";
@@ -593,8 +596,10 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
   // ---------------------------------------------------------------- ÉTAPE 7
   // OPTIMISATION COMMERCIALE AUTORISÉE — dernière étape, périmètre restreint.
   // Elle ne peut QUE : (a) retenir une référence parmi des candidates déjà
-  // jugées cliniquement équivalentes, (b) limiter le nombre de propositions.
-  // Elle ne peut jamais réintroduire une référence écartée en amont.
+  // jugées cliniquement équivalentes, (b) limiter le nombre de propositions,
+  // (c) montrer, à côté de chaque conseil retenu, les autres candidates déjà
+  // admises pour le même besoin. Elle ne peut jamais réintroduire une
+  // référence écartée en amont.
   const recommendations = recorder.run(
     "COMMERCIAL_OPTIMIZATION",
     "Optimisation commerciale autorisée",
@@ -774,14 +779,13 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       }
 
       // Le produit associé : quand la règle en prévoit un et que la référence
-      // retenue l'appelle (un flacon de sérum physiologique appelle une
-      // seringue de lavage), on le cherche dans le stock, en rayon. Il
+      // l'appelle (un flacon de sérum physiologique appelle une seringue de
+      // lavage, un spray non), on le cherche dans le stock, en rayon. Il
       // accompagne la carte ; il n'est jamais ajouté sans un geste.
-      const withCompanions = limited.map((item) => {
-        const opportunity = opportunityByKey.get(item.opportunityKey);
-        const product = catalogById.get(item.productId);
-        const rule = opportunity?.companion;
-        if (!rule || !product || !matchesAny([rule.when], product.name)) return item;
+      const companionFor = (productId: string, opportunityKey: string): { companion: CompanionSuggestion | null; note: string | null } => {
+        const product = catalogById.get(productId);
+        const rule = opportunityByKey.get(opportunityKey)?.companion;
+        if (!rule || !product || !matchesAny([rule.when], product.name)) return { companion: null, note: null };
         // Les motifs sont ordonnés par préférence : le premier qui trouve une
         // référence en rayon l'emporte.
         const eligible = input.catalog.filter(
@@ -798,12 +802,9 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
           if (companion) break;
         }
         if (!companion) {
-          notes.push(`« ${product.name} » : ${rule.label.toLowerCase()} recommandé(e), aucune référence en stock.`);
-          return item;
+          return { companion: null, note: `« ${product.name} » : ${rule.label.toLowerCase()} recommandé(e), aucune référence en stock.` };
         }
-        notes.push(`« ${product.name} » : associé à « ${companion.name} » (${rule.label.toLowerCase()}).`);
         return {
-          ...item,
           companion: {
             productId: companion.id,
             name: companion.name,
@@ -812,10 +813,56 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
             label: rule.label,
             reason: rule.reason,
           },
+          note: `« ${product.name} » : associé à « ${companion.name} » (${rule.label.toLowerCase()}).`,
         };
+      };
+      const withCompanions = limited.map((item) => {
+        const { companion, note } = companionFor(item.productId, item.opportunityKey);
+        if (note) notes.push(note);
+        return companion ? { ...item, companion } : item;
       });
 
-      return { output: withCompanions, count: withCompanions.length, notes };
+      // Les autres références de chaque conseil retenu. Elles se cherchent
+      // APRÈS le choix, parmi les candidates que le même besoin a déjà fait
+      // passer par la sécurité, les seuils et le stock : elles suivent le
+      // conseil, elles ne l'orientent jamais. Une référence retenue pour un
+      // conseil — celui-ci ou un autre — n'est pas reproposée à côté.
+      const retainedProducts = new Set(withCompanions.map((item) => item.productId));
+      const productName = (productId: string) => catalogById.get(productId)?.name ?? "";
+      const withAlternatives = withCompanions.map((item) => {
+        const alternatives = (byOpportunity.get(item.opportunityKey) ?? [])
+          .filter((candidate) => !retainedProducts.has(candidate.productId))
+          .sort(
+            (a, b) =>
+              b.totalScore - a.totalScore ||
+              productName(a.productId).localeCompare(productName(b.productId), "fr") ||
+              a.productId.localeCompare(b.productId),
+          )
+          .slice(0, MAX_ALTERNATIVES_PER_ADVICE)
+          .map((candidate): ScoredAlternative => {
+            // Elle porte son propre produit associé : choisie à la place du
+            // conseil, elle doit apparaître comme le moteur l'aurait produite.
+            const { companion } = companionFor(candidate.productId, item.opportunityKey);
+            return {
+              productId: candidate.productId,
+              totalScore: candidate.totalScore,
+              breakdown: candidate.breakdown,
+              justification: candidate.justification,
+              shortReason: candidate.shortReason,
+              patientReason: candidate.patientReason,
+              counterScript: candidate.counterScript,
+              precautions: candidate.precautions,
+              explanation: candidate.explanation,
+              vigilances: candidate.vigilances,
+              shortDate: candidate.shortDate,
+              ...(companion ? { companion } : {}),
+            };
+          });
+        notes.push(`« ${item.opportunityKey} » : ${alternatives.length} alternative(s) retenue(s).`);
+        return alternatives.length > 0 ? { ...item, alternatives } : item;
+      });
+
+      return { output: withAlternatives, count: withAlternatives.length, notes };
     },
   );
 

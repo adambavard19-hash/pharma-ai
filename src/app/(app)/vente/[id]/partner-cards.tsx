@@ -4,7 +4,8 @@ import { universeLabel } from "@/config/universes";
 import type { PartnerCardView } from "./types";
 
 /**
- * « Gamme partenaire » : une petite carte à part, sous les conseils.
+ * « Gamme partenaire » : une petite carte à part, dans la colonne de droite,
+ * jamais mêlée aux conseils.
  *
  * Elle n'est PAS un conseil : le moteur ne l'a ni choisie ni classée, elle ne
  * s'ajoute pas à la délivrance et ne remplace aucune proposition. Elle signale
@@ -50,7 +51,7 @@ export function PartnerCards({ cards }: { cards: PartnerCardView[] }) {
         ))}
       </ul>
       <p className="px-1 text-[11.5px] leading-4 text-text-tertiary">
-        Proposée par un laboratoire partenaire de PharmaBoost. Elle n&apos;entre jamais dans le choix des conseils ci-dessus.
+        Proposée par un laboratoire partenaire de PharmaBoost. Elle n&apos;entre jamais dans le choix des conseils.
       </p>
     </section>
   );

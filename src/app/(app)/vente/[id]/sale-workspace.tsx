@@ -26,7 +26,10 @@ import { TreatmentPanel } from "./treatment-panel";
 import { ChecksNote } from "./checks-note";
 import { SafetyZone, VigilanceCards } from "./safety-zone";
 import { RegulationZone } from "./regulation-zone";
-import { AdviceZone } from "./advice-zone";
+import { AdviceLocked, AdviceZone } from "./advice-zone";
+import { AlternativesList } from "./alternatives-list";
+import { MedicationAdvice } from "./medication-advice";
+import { groupAdviceByLine, nothingToShow, presentProductIds } from "./group-advice";
 import { PartnerCards } from "./partner-cards";
 import type { EngineOutcome } from "@/core/ai/outcome";
 import { DeliveryZone, type DeliveryExtra } from "./delivery-zone";
@@ -63,12 +66,14 @@ function withDefaultConfirmation(lines: SaleLineDraft[], alreadyVerified: boolea
 /**
  * L'écran de vente.
  *
- * Un pharmacien, un patient devant lui, trente secondes. L'ordre de l'écran
- * est celui de l'urgence : ce qu'il y a à proposer d'abord, ce qu'il faut
- * vérifier ensuite, la délivrance, et tout le reste sous « Voir les détails ».
+ * Un pharmacien, un patient devant lui, trente secondes. La colonne de gauche
+ * porte tout son travail : les médicaments, et SOUS chacun ce qu'il peut y
+ * associer — le conseil se lit là où il se décide. La colonne de droite ne
+ * garde que ce qui n'est pas un conseil : la délivrance et les gammes
+ * partenaires.
  *
- *   Ordonnance → l'IA comprend → PharmaBoost rappelle quoi proposer →
- *   le patient accepte ou refuse → terminé.
+ *   Ordonnance → l'IA comprend → PharmaBoost rappelle quoi proposer sous
+ *   chaque médicament → le patient accepte ou refuse → terminé.
  */
 export function SaleWorkspace({
   prescription,
@@ -237,6 +242,19 @@ export function SaleWorkspace({
     [extras],
   );
   const basketTotal = adviceTotal + extrasTotal;
+
+  // Chaque conseil se range sous le premier médicament affiché qui l'a
+  // déclenché ; les autres (sans lien, ou lien vers une ligne non affichée)
+  // restent dans la zone générale.
+  const { byLine, general } = useMemo(
+    () =>
+      groupAdviceByLine(
+        lines.filter((line) => line.confirmed),
+        recommendations,
+      ),
+    [lines, recommendations],
+  );
+  const presentProducts = useMemo(() => presentProductIds(recommendations), [recommendations]);
 
   const updateLine = (id: string, patch: Partial<SaleLineDraft>) =>
     setLines((current) => current.map((line) => (line.id === id ? { ...line, ...patch } : line)));
@@ -493,8 +511,8 @@ export function SaleWorkspace({
         </div>
       )}
 
-      {/* ---- Traitement à gauche, conseils à droite ------------------------ */}
-      <div className="grid items-start gap-6 pb-28 lg:grid-cols-2">
+      {/* ---- Le travail à gauche, la délivrance à droite -------------------- */}
+      <div className="grid items-start gap-6 pb-28 xl:grid-cols-[minmax(0,1fr)_minmax(0,23rem)]">
         <div className="min-w-0 space-y-5">
           {editing && (
             <PrescriptionZone
@@ -520,16 +538,59 @@ export function SaleWorkspace({
 
           {!editing && !analysing && (
             <>
-              <TreatmentPanel lines={lines} canEdit={permissions.verify} onEdit={() => setForceEdit(true)} catalogAttribution={catalogAttribution} />
+              {/* Les vigilances du traitement (interaction, contre-indication,
+                  surveillance, dépistage) se lisent avant toute proposition,
+                  sans attendre une alerte bloquante : elles passent donc avant
+                  la liste, où chaque conseil se propose sous son médicament. */}
+              {!blocked && <VigilanceCards findings={findings} />}
+              {blocked && <AdviceLocked />}
+              <TreatmentPanel
+                lines={lines}
+                canEdit={permissions.verify}
+                onEdit={() => setForceEdit(true)}
+                catalogAttribution={catalogAttribution}
+                renderAdvice={
+                  blocked
+                    ? undefined
+                    : (line) => (
+                        <MedicationAdvice
+                          drugName={line.drugName}
+                          prescriptionId={prescription.id}
+                          recommendations={byLine.get(line.id) ?? []}
+                          canDecide={permissions.decide}
+                          canVerify={permissions.verify}
+                          presentProductIds={presentProducts}
+                          inBasket={(id) => basket.has(id)}
+                          onAccept={acceptAdvice}
+                          onCancelAccept={cancelAdvice}
+                        />
+                      )
+                }
+              />
+              <AdviceZone
+                prescriptionId={prescription.id}
+                recommendations={general}
+                nothingProposed={nothingToShow(recommendations)}
+                canDecide={permissions.decide}
+                canVerify={permissions.verify}
+                locked={blocked}
+                outcome={outcome}
+                canImportStock={canImportStock}
+                stockNotice={stockNotice}
+                presentProductIds={presentProducts}
+                inBasket={(id) => basket.has(id)}
+                onAccept={acceptAdvice}
+                onCancelAccept={cancelAdvice}
+                // Un conseil sans médicament lié montre ses alternatives seulement si l'analyse en a enregistré :
+                // une analyse ancienne n'en a pas, et « aucune autre référence » y serait faux.
+                renderAlternatives={(recommendation) =>
+                  recommendation.alternatives.length > 0 ? <AlternativesList recommendationId={recommendation.id} alternatives={recommendation.alternatives} /> : null
+                }
+              />
               {/* Ce que la réglementation impose avant de facturer : support
-                  d'ordonnance, document, durée. Avant les vigilances cliniques,
-                  parce qu'un rejet de facturation se joue à cet instant. */}
+                  d'ordonnance, document, durée. */}
               <RegulationZone lines={lines} canCheck={permissions.verify} />
               <ChecksNote findings={findings} blockedOpportunities={blockedOpportunities} stale={identificationChangedSinceAnalysis} prescriptionId={prescription.id} />
-              {/* Les vigilances du traitement (interaction, contre-indication,
-                  surveillance, dépistage) se lisent sous l'ordonnance, avant
-                  toute proposition — sans attendre une alerte bloquante. */}
-              {!blocked && <VigilanceCards findings={findings} />}
             </>
           )}
         </div>
@@ -537,15 +598,13 @@ export function SaleWorkspace({
         <div className="min-w-0 space-y-5">
           {(editing || analysing) && (
             <div className="rounded-2xl border border-dashed border-border-default px-5 py-6 text-[13.5px] leading-5 text-text-secondary">
-              <p className="font-medium text-text-primary">Les conseils à proposer apparaîtront ici</p>
-              <p className="mt-1">Après confirmation du traitement : au plus trois propositions, issues de votre stock, chacune avec son prix, sa raison et ce que vous dites au patient.</p>
+              <p className="font-medium text-text-primary">Les conseils apparaîtront sous chaque médicament</p>
+              <p className="mt-1">Après confirmation du traitement, les conseils issus de votre stock se lisent sous le médicament qui les motive, chacun avec son prix, sa raison et ce que vous dites au patient.</p>
             </div>
           )}
 
           {!editing && !analysing && (
             <>
-              <AdviceZone prescriptionId={prescription.id} recommendations={recommendations} canDecide={permissions.decide} canVerify={permissions.verify} locked={blocked} outcome={outcome} canImportStock={canImportStock} stockNotice={stockNotice} inBasket={(id) => basket.has(id)} onAccept={acceptAdvice} onCancelAccept={cancelAdvice} />
-              {!blocked && <PartnerCards cards={partnerCards} />}
               <DeliveryZone
                 accepted={[...basket.entries()].map(([recommendationId, line]) => {
                   const recommendation = recommendations.find((r) => r.id === recommendationId);
@@ -556,6 +615,7 @@ export function SaleWorkspace({
                 onRemoveExtra={removeExtra}
                 canSell={permissions.sell}
               />
+              {!blocked && <PartnerCards cards={partnerCards} />}
             </>
           )}
         </div>

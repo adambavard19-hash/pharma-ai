@@ -385,7 +385,37 @@ export type ScoredRecommendation = {
   shortDate?: ShortDate | null;
   /** Ce qui a départagé des références cliniquement équivalentes (trace). */
   tiebreak?: string | null;
+  /**
+   * Les autres références du stock adaptées au MÊME besoin. Elles suivent le
+   * choix du conseil sans jamais l'influencer : calculées une fois le conseil
+   * retenu, parmi des candidates déjà passées par la sécurité, les seuils et le
+   * stock.
+   */
+  alternatives?: ScoredAlternative[];
 };
+
+/**
+ * Une autre référence adaptée au besoin d'un conseil retenu, avec tout ce qu'il
+ * faut pour la mettre à sa place comme si le moteur l'avait choisie : son score,
+ * les textes écrits pour elle, ses précautions, ses vigilances, son produit
+ * associé. Rien de plus que pour le conseil principal — une alternative ne
+ * change ni le besoin ni la routine.
+ */
+export type ScoredAlternative = Pick<
+  ScoredRecommendation,
+  | "productId"
+  | "totalScore"
+  | "breakdown"
+  | "justification"
+  | "shortReason"
+  | "patientReason"
+  | "counterScript"
+  | "precautions"
+  | "explanation"
+  | "companion"
+  | "vigilances"
+  | "shortDate"
+>;
 
 /** Un produit à proposer À CÔTÉ d'une recommandation (seringue avec un flacon de sérum). */
 export type CompanionSuggestion = {

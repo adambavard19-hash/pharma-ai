@@ -7,9 +7,10 @@ import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { recordAudit, type AuditAction } from "@/server/audit/log";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
-import type { RecommendationEventType, RecommendationStatus } from "@/generated/prisma";
+import { Prisma, type RecommendationEventType, type RecommendationStatus } from "@/generated/prisma";
 import { parseSuggestionVigilances } from "@/config/vigilances";
 import { requiresPharmacistValidation } from "@/core/ai/engines/population-vigilance";
+import { alternativeFromRecommendation, parseStoredAlternatives } from "@/core/ai/alternatives";
 
 /**
  * Décisions du pharmacien sur les recommandations.
@@ -343,6 +344,143 @@ export async function replaceRecommendationAction(
         : undefined,
       precautions: product.precautions,
     },
+  });
+
+  revalidatePath(`/vente/${recommendation.prescriptionId}`);
+  return ok(null, `Conseil remplacé par ${product.name}.`);
+}
+
+/**
+ * Les statuts où un conseil attend encore la décision du pharmacien : ceux-là
+ * seuls acceptent qu'on change de référence. Un conseil accepté, refusé, retiré
+ * ou acheté est tranché — accepter est un geste distinct, qu'un échange ne
+ * défait jamais en silence. Une liste fermée : un statut ajouté plus tard n'ouvre
+ * pas l'échange sans qu'on l'ait décidé.
+ */
+const SWAPPABLE_STATUSES: RecommendationStatus[] = ["PROPOSED", "PRESENTED", "MODIFIED", "REPLACED"];
+
+const alternativeSchema = z.object({
+  recommendationId: z.string().min(1),
+  productId: z.string().min(1),
+});
+
+/**
+ * « Proposer celle-ci » — le pharmacien met une autre référence du MÊME besoin
+ * à la place du conseil retenu.
+ *
+ * Le serveur n'accepte que ce que le moteur a admis : la référence doit figurer
+ * dans les alternatives ENREGISTRÉES avec ce conseil, et être encore en stock.
+ * Elle reprend ce que le moteur aurait produit pour elle (score, textes,
+ * précautions, vigilances, produit associé) — pas l'argumentaire commercial du
+ * produit, comme le fait le remplacement à la main. L'ancienne référence devient
+ * une alternative : on peut revenir en arrière. Le statut ne change pas, et rien
+ * n'entre dans la délivrance : accepter reste un geste du comptoir.
+ */
+export async function chooseAdviceAlternativeAction(
+  payload: z.input<typeof alternativeSchema>,
+): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_DECIDE);
+  const parsed = alternativeSchema.safeParse(payload);
+  if (!parsed.success) {
+    return fail("Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));
+  }
+
+  const recommendation = await prisma.recommendation.findUnique({
+    where: { id: parsed.data.recommendationId },
+    select: {
+      id: true,
+      pharmacyId: true,
+      prescriptionId: true,
+      productId: true,
+      status: true,
+      totalScore: true,
+      scoreBreakdown: true,
+      justification: true,
+      shortReason: true,
+      patientReason: true,
+      counterScript: true,
+      precautions: true,
+      vigilances: true,
+      companion: true,
+      alternatives: true,
+    },
+  });
+  if (!recommendation || recommendation.pharmacyId !== session.scope.pharmacyId) {
+    return fail("Recommandation introuvable dans cette officine.");
+  }
+  if (!SWAPPABLE_STATUSES.includes(recommendation.status)) {
+    return fail("Ce conseil est déjà tranché : annulez d'abord la décision pour changer de référence.");
+  }
+
+  const alternatives = parseStoredAlternatives(recommendation.alternatives);
+  const chosen = alternatives.find((alternative) => alternative.productId === parsed.data.productId);
+  if (!chosen || chosen.productId === recommendation.productId) {
+    return fail("Cette référence ne fait pas partie des alternatives retenues pour ce conseil.");
+  }
+  const previous = alternativeFromRecommendation(recommendation);
+  if (!previous) return fail("Ce conseil ne peut pas être échangé : la référence actuelle n'est pas reconstituable.");
+
+  const product = await prisma.product.findUnique({
+    where: { id: chosen.productId },
+    select: { id: true, pharmacyId: true, name: true, salePriceCents: true, isActive: true, stockItem: { select: { quantity: true } } },
+  });
+  if (!product || product.pharmacyId !== session.scope.pharmacyId || !product.isActive) {
+    return fail("Produit introuvable dans cette officine.");
+  }
+  if ((product.stockItem?.quantity ?? 0) <= 0) {
+    return fail(`${product.name} n'est plus en stock : choisissez une autre référence.`);
+  }
+
+  // L'ancienne référence prend la place de celle qui sort ; le classement par
+  // score est stable, donc à score égal elle passe en tête.
+  const remaining = [previous, ...alternatives.filter((alternative) => alternative.productId !== chosen.productId)].sort((a, b) => b.totalScore - a.totalScore);
+
+  const swapped = await prisma.$transaction(async (tx) => {
+    // Mise à jour conditionnelle sur la référence ET le statut lus plus haut :
+    // deux clics simultanés, ou une acceptation entre-temps, ne laissent jamais
+    // un conseil à moitié échangé ni une liste d'alternatives incohérente.
+    const { count } = await tx.recommendation.updateMany({
+      where: {
+        id: recommendation.id,
+        pharmacyId: session.scope.pharmacyId,
+        productId: recommendation.productId,
+        status: { in: SWAPPABLE_STATUSES },
+      },
+      data: {
+        productId: product.id,
+        unitPriceCents: product.salePriceCents,
+        totalScore: chosen.totalScore,
+        scoreBreakdown: { ...chosen.breakdown, explanation: chosen.explanation } as never,
+        justification: chosen.justification,
+        shortReason: chosen.shortReason || null,
+        patientReason: chosen.patientReason || null,
+        counterScript: chosen.counterScript || null,
+        precautions: chosen.precautions,
+        vigilances: chosen.vigilances && chosen.vigilances.length > 0 ? (chosen.vigilances as never) : Prisma.DbNull,
+        companion: chosen.companion ? (chosen.companion as never) : Prisma.DbNull,
+        alternatives: remaining as never,
+      },
+    });
+    if (count === 0) return false;
+    await tx.recommendationEvent.create({
+      data: {
+        recommendationId: recommendation.id,
+        type: "REPLACED",
+        userId: session.scope.userId,
+        metadata: { alternative: true, fromProductId: recommendation.productId, toProductId: product.id } as never,
+      },
+    });
+    return true;
+  });
+  if (!swapped) return fail("Ce conseil vient d'être modifié : rechargez l'écran avant de choisir une référence.");
+
+  await recordAudit({
+    action: "recommendation.replaced",
+    entityType: "Recommendation",
+    entityId: recommendation.id,
+    pharmacyId: session.scope.pharmacyId,
+    userId: session.scope.userId,
+    metadata: { alternative: true, fromProductId: recommendation.productId, toProductId: product.id },
   });
 
   revalidatePath(`/vente/${recommendation.prescriptionId}`);
