@@ -3,7 +3,7 @@ import { renderEmail, type EmailBlock, type EmailContext, type RenderedEmail } f
 /**
  * Les modèles d'e-mails que l'équipe PharmaBoost peut réécrire depuis la
  * console : relances d'essai, de contrat, de paiement, résiliation, relance
- * commerciale, message libre.
+ * commerciale, parrainage, invitation des partenaires, message libre.
  *
  * Ce qui reste figé, volontairement :
  *   - le gabarit (logo, pied de page légal, mise en forme) : `renderEmail` ;
@@ -19,7 +19,7 @@ import { renderEmail, type EmailBlock, type EmailContext, type RenderedEmail } f
 
 export type TemplateVariable = { key: string; label: string; sample: string };
 
-export type EmailTemplateCategory = "Essai" | "Contrat" | "Abonnement" | "Paiement" | "Résiliation" | "Commercial" | "Message";
+export type EmailTemplateCategory = "Essai" | "Contrat" | "Abonnement" | "Paiement" | "Résiliation" | "Commercial" | "Parrainage" | "Partenaire" | "Message";
 
 export type EmailTemplateDefinition = {
   key: string;
@@ -27,8 +27,8 @@ export type EmailTemplateDefinition = {
   category: EmailTemplateCategory;
   /** Quand ce modèle part : affiché dans le centre de modèles. */
   usage: string;
-  /** À qui il s'adresse. */
-  audience: "Titulaire" | "Prospect";
+  /** À qui il s'adresse. « Partenaire » : le contact d'un laboratoire ou d'une société partenaire, jamais un titulaire ni un prospect. */
+  audience: "Titulaire" | "Prospect" | "Partenaire";
   variables: TemplateVariable[];
   defaults: { subject: string; title: string; body: string };
   /** Bouton ajouté par le système, toujours présent : l'adresse vient d'une variable. */
@@ -55,9 +55,15 @@ const V = {
   dateFinPrevue: { key: "date_fin_prevue", label: "Date de fin prévue", sample: "31/12/2026" },
   dateDemande: { key: "date_demande", label: "Date de la demande", sample: "03/10/2026" },
   contact: { key: "contact", label: "Adresse de contact PharmaBoost", sample: "contact@pharmaboost.app" },
+  filleul: { key: "filleul", label: "Nom de l'officine parrainée", sample: "Pharmacie du Marché" },
+  montantRemise: { key: "montant_remise", label: "Remise mensuelle HT apportée par ce filleul", sample: "10 €" },
+  nomPartenaire: { key: "nom_partenaire", label: "Nom du partenaire", sample: "Laboratoires Exemple" },
+  lienCandidature: { key: "lien_candidature", label: "Lien vers le formulaire de référencement des partenaires", sample: "https://pharmaboost.app/decouvrir/partenaires" },
 } satisfies Record<string, TemplateVariable>;
 
 const COMMON = [V.prenom, V.titulaire, V.officine, V.contact];
+/** Un partenaire n'a ni officine ni abonnement : seules les variables qui ont un sens pour lui. */
+const PARTNER_COMMON = [V.prenom, V.titulaire, V.nomPartenaire, V.contact];
 
 export const EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
   {
@@ -232,6 +238,38 @@ export const EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
     },
     eyebrow: "PharmaBoost",
     reason: "Vous recevez ce message parce que vous avez échangé avec l'équipe PharmaBoost.",
+  },
+  {
+    key: "referral.filleul_joined",
+    label: "Parrainage : un filleul s'est inscrit",
+    category: "Parrainage",
+    usage: "Quelques jours après l'inscription d'une officine parrainée (règle « Filleul inscrit »), au titulaire du parrain, avec une notification dans son application. Il ne part que par cette règle.",
+    audience: "Titulaire",
+    variables: [...COMMON, V.filleul, V.montantRemise, V.lienEspace],
+    defaults: {
+      subject: "{{filleul}} a rejoint PharmaBoost avec votre code de parrainage",
+      title: "Un nouveau filleul",
+      body: "Bonjour {{prenom}},\n\n{{filleul}} vient de rejoindre PharmaBoost avec votre code de parrainage. Merci de votre recommandation.\n\nTant que cette officine reste abonnée, elle réduit votre abonnement de {{montant_remise}} HT par mois. Vous retrouvez vos filleuls et votre remise dans votre espace.",
+    },
+    button: { label: "Voir mon parrainage", urlVariable: "lien_espace" },
+    eyebrow: "Parrainage",
+    reason: "Vous recevez ce message parce qu'une officine s'est inscrite avec votre code de parrainage PharmaBoost.",
+  },
+  {
+    key: "partner.range_invitation",
+    label: "Partenaire : invitation à référencer sa gamme",
+    category: "Partenaire",
+    usage: "Quelques jours après la création d'une fiche partenaire sans aucune marque référencée (règle « Invitation à référencer sa gamme »). Il ne part que par cette règle.",
+    audience: "Partenaire",
+    variables: [...PARTNER_COMMON, V.lienCandidature],
+    defaults: {
+      subject: "Référencer la gamme de {{nom_partenaire}} dans PharmaBoost",
+      title: "Référencer votre gamme dans PharmaBoost",
+      body: "Bonjour {{prenom}},\n\n{{nom_partenaire}} figure parmi les partenaires de PharmaBoost, mais aucune de vos marques n'y est encore référencée.\n\nPour présenter vos gammes, déposez-les depuis le formulaire de référencement : vos marques, vos gammes et vos conditions. Le référencement n'est jamais automatique : notre équipe étudie chaque demande et revient vers vous.\n\nUn principe ne change pas : un partenaire n'achète jamais une recommandation. Ce qui est conseillé au comptoir dépend du patient et de l'officine, pas d'un accord commercial.\n\nSi vous ne souhaitez plus recevoir ce type de message, répondez simplement à cet e-mail ou écrivez-nous à {{contact}} : nous ne vous écrirons plus.",
+    },
+    button: { label: "Déposer ma gamme", urlVariable: "lien_candidature" },
+    eyebrow: "Partenaires",
+    reason: "Vous recevez ce message parce que votre société est enregistrée comme partenaire de PharmaBoost, sans marque référencée à ce jour.",
   },
   {
     key: "generic.message",

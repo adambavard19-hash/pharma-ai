@@ -4,6 +4,7 @@ import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
 import { traceDispatch, type DispatchTrigger } from "@/server/services/email-dispatch";
 import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
+import { normalizeEmail } from "@/core/contracts/identity";
 import { contractualPrice } from "@/core/billing/contract-price";
 import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
 import { renderTemplate } from "./email-templates";
@@ -48,6 +49,33 @@ export async function prospectRecipient(prospectId: string): Promise<Recipient |
   return { email: prospect.email, firstName, fullName: prospect.ownerName, pharmacyId: prospect.pharmacyId, organizationId: prospect.pharmacy?.organizationId ?? null, prospectId: prospect.id, pharmacyName: prospect.name };
 }
 
+/**
+ * Le contact d'un partenaire : son contact principal, sinon le premier contact
+ * qui a une adresse, sinon l'adresse de la candidature liée. `null` si rien.
+ * Le message n'est rattaché ni à une officine, ni à une organisation, ni à un
+ * dossier : le lien avec le partenaire est porté par le déclenchement de la
+ * règle (`AutomationDispatch`, cible « Partner »).
+ */
+export async function partnerRecipient(partnerId: string): Promise<Recipient | null> {
+  const partner = await prisma.partner.findUnique({
+    where: { id: partnerId },
+    select: {
+      name: true,
+      contacts: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], select: { email: true, firstName: true, lastName: true } },
+      applications: { orderBy: { createdAt: "desc" }, take: 1, select: { email: true, contactFirstName: true, contactLastName: true } },
+    },
+  });
+  if (!partner) return null;
+  // Le contact principal d'abord (tri), mais seulement s'il a une adresse valable : sinon le premier qui en a une.
+  const contact = partner.contacts.map((c) => ({ email: normalizeEmail(c.email), firstName: c.firstName, lastName: c.lastName })).find((c) => c.email);
+  const application = partner.applications[0];
+  const chosen = contact ?? (application ? { email: normalizeEmail(application.email), firstName: application.contactFirstName, lastName: application.contactLastName } : null);
+  if (!chosen?.email) return null;
+  const firstName = chosen.firstName.trim() || null;
+  const fullName = [chosen.firstName, chosen.lastName].map((part) => part.trim()).filter(Boolean).join(" ") || null;
+  return { email: chosen.email, firstName, fullName, pharmacyId: null, organizationId: null, prospectId: null, pharmacyName: partner.name };
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -62,6 +90,7 @@ export async function templateValuesFor(recipient: Recipient, extra: Record<stri
     officine: recipient.pharmacyName,
     contact: PUBLIC_CONTACT_EMAIL,
     lien_espace: publicUrl("/parametres?onglet=abonnement"),
+    lien_candidature: publicUrl("/decouvrir/partenaires"),
   };
   if (recipient.organizationId) {
     const subscription = await prisma.subscription.findUnique({ where: { organizationId: recipient.organizationId }, select: { contractPriceCents: true, trialEndsAt: true, lastPaymentFailedAt: true, plan: { select: { name: true, monthlyPriceCents: true } }, payments: { where: { status: "FAILED" }, orderBy: { createdAt: "desc" }, take: 1, select: { amountCents: true } } } });

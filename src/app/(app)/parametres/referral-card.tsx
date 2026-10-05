@@ -6,14 +6,17 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatCents, formatDate } from "@/lib/format";
 
-type Referral = { name: string; city: string | null; active: boolean; since: string };
+type Referral = { name: string; city: string | null; active: boolean; since: string; amountCents: number };
+type CurrentOffer = { amountCents: number; endsAt: Date | string | null };
 
 /**
  * Parrainage, vu du titulaire : son code, son lien à partager, ses filleuls
  * et ce que ça change sur son abonnement. Chaque filleul actif retire une
- * somme fixe par mois ; à partir d'assez de filleuls, l'abonnement est à zéro.
+ * somme par mois, celle qui était en vigueur à son inscription (une offre en
+ * cours ne change que les NOUVEAUX filleuls) ; à partir d'assez de filleuls,
+ * l'abonnement est à zéro.
  */
-export function ReferralCard({ referral }: { referral: { code: string; link: string; discountPerReferralCents: number; monthlyPriceCents: number | null; referrals: Referral[]; activeCount: number; discountCents: number; referredBy: string | null } }) {
+export function ReferralCard({ referral }: { referral: { code: string; link: string; discountPerReferralCents: number; currentOffer: CurrentOffer | null; monthlyPriceCents: number | null; referrals: Referral[]; activeCount: number; discountCents: number; referredBy: string | null } }) {
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const copy = async (what: "code" | "link") => {
     try {
@@ -26,7 +29,11 @@ export function ReferralCard({ referral }: { referral: { code: string; link: str
   };
   const price = referral.monthlyPriceCents;
   const after = price === null ? null : Math.max(0, price - referral.discountCents);
-  const toFree = price === null ? null : Math.max(0, Math.ceil(price / referral.discountPerReferralCents) - referral.activeCount);
+  // Ce qui reste à couvrir, au montant d'un nouveau filleul d'aujourd'hui : les filleuls déjà inscrits comptent pour leur propre montant.
+  const toFree = price === null ? null : Math.max(0, Math.ceil(Math.max(0, price - referral.discountCents) / referral.discountPerReferralCents));
+  const offer = referral.currentOffer;
+  // La date de fin est le premier instant où l'offre ne s'applique plus : le dernier jour d'inscription est celui de l'instant d'avant.
+  const lastOfferDay = offer?.endsAt ? new Date(new Date(offer.endsAt).getTime() - 1) : null;
 
   return (
     <Card className="lg:col-span-2">
@@ -37,7 +44,11 @@ export function ReferralCard({ referral }: { referral: { code: string; link: str
             Parrainage : plus vous recommandez, moins vous payez
           </span>
         }
-        description={`Chaque officine que vous parrainez retire ${formatCents(referral.discountPerReferralCents)} HT par mois de votre abonnement, tant qu'elle est abonnée. Jusqu'à l'abonnement gratuit.`}
+        description={
+          offer
+            ? `Offre en cours : chaque nouvelle officine que vous parrainez retire ${formatCents(offer.amountCents)} HT par mois de votre abonnement, tant qu'elle est abonnée${lastOfferDay ? `, pour toute inscription jusqu'au ${formatDate(lastOfferDay)} inclus` : ""}. Les filleuls déjà inscrits gardent leur montant.`
+            : `Chaque officine que vous parrainez retire ${formatCents(referral.discountPerReferralCents)} HT par mois de votre abonnement, tant qu'elle est abonnée. Jusqu'à l'abonnement gratuit.`
+        }
       />
       <CardContent className="grid gap-6 lg:grid-cols-[1fr_1fr]">
         <div className="space-y-4">
@@ -69,7 +80,7 @@ export function ReferralCard({ referral }: { referral: { code: string; link: str
           </div>
           {toFree !== null && (
             <p className="text-[13px] leading-5 text-text-secondary">
-              {toFree === 0 ? "Votre abonnement est entièrement couvert par vos parrainages." : `Encore ${toFree} filleul${toFree > 1 ? "s" : ""} actif${toFree > 1 ? "s" : ""} et votre abonnement est gratuit.`}
+              {toFree === 0 ? "Votre abonnement est entièrement couvert par vos parrainages." : `Encore ${toFree} filleul${toFree > 1 ? "s" : ""} actif${toFree > 1 ? "s" : ""}${offer ? " au montant de l'offre en cours" : ""} et votre abonnement est gratuit.`}
             </p>
           )}
           <div>
@@ -82,6 +93,8 @@ export function ReferralCard({ referral }: { referral: { code: string; link: str
                   <li key={`${r.name}-${r.since}`} className="flex items-center justify-between gap-3 py-2 text-[13px]">
                     <span className="min-w-0 truncate text-text-primary">{r.name}{r.city ? <span className="text-text-tertiary"> · {r.city}</span> : null}</span>
                     <span className="flex shrink-0 items-center gap-2 text-text-tertiary">
+                      <span className="tabular">{formatCents(r.amountCents)} HT/mois</span>
+                      <span aria-hidden="true">·</span>
                       depuis le {formatDate(r.since)}
                       <Badge tone={r.active ? "success" : "neutral"}>{r.active ? "active" : "inactive"}</Badge>
                     </span>

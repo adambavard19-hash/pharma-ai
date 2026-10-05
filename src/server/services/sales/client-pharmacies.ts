@@ -8,6 +8,7 @@ import { recordAudit } from "@/server/audit/log";
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
 import { resolveReferralCode } from "@/server/services/referral";
+import { referralAmountForNewFilleul } from "@/server/services/referral-offers";
 import { isLgoId } from "@/server/services/stock-sync";
 
 /**
@@ -41,6 +42,8 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
   const passwordHash = await hashPassword(randomBytes(32).toString("base64url"));
   // Le parrain, si le dossier porte un code valide : la remise se calcule à partir de ce lien.
   const referrer = await resolveReferralCode(prospect.referralCode);
+  // Ce que ce filleul apportera à son parrain est figé maintenant : une offre de parrainage qui change ensuite ne le modifie pas.
+  const referralAmountCents = referrer ? await referralAmountForNewFilleul() : null;
 
   const { pharmacy, ownerId } = await prisma.$transaction(async (tx) => {
     const organization = await tx.organization.create({ data: { name: prospect.name, slug: organizationSlug } });
@@ -61,6 +64,7 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
         isDemo: false,
         isActive: true,
         referredById: referrer?.id ?? null,
+        referralAmountCents,
       },
     });
     if (prospect.postCount) await tx.pharmacyPostCountChange.create({ data: { pharmacyId: pharmacy.id, previous: null, next: prospect.postCount, actorType: actor.type, actorLabel: actor.label } });

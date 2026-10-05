@@ -16,7 +16,7 @@ import { formatDateTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Modèles d'e-mails" };
 
-const CATEGORY_ORDER: EmailTemplateCategory[] = ["Essai", "Contrat", "Abonnement", "Paiement", "Résiliation", "Commercial", "Message"];
+const CATEGORY_ORDER: EmailTemplateCategory[] = ["Essai", "Contrat", "Abonnement", "Paiement", "Résiliation", "Commercial", "Parrainage", "Partenaire", "Message"];
 
 const CATEGORY_HINT: Record<EmailTemplateCategory, string> = {
   Essai: "Accompagner l'officine pendant son essai gratuit.",
@@ -25,6 +25,8 @@ const CATEGORY_HINT: Record<EmailTemplateCategory, string> = {
   Paiement: "Relancer après un paiement échoué resté impayé.",
   Résiliation: "Accuser réception d'une demande, puis la confirmer.",
   Commercial: "Relancer un prospect.",
+  Parrainage: "Prévenir un titulaire qu'une officine s'est inscrite avec son code.",
+  Partenaire: "Inviter un partenaire à déposer sa gamme.",
   Message: "Écrire librement, depuis la console.",
 };
 

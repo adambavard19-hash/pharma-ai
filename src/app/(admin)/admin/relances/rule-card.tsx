@@ -10,7 +10,7 @@ import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmAction } from "@/components/admin/confirm-action";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { describeOffset, type ResolvedRule } from "@/core/admin/automations";
+import { CATCH_UP_DAYS, describeOffset, type ResolvedRule } from "@/core/admin/automations";
 import type { StatusLabel } from "@/core/admin/statuses";
 import type { TemplateText } from "@/core/admin/email-templates";
 import { saveAutomationRuleAction } from "@/server/actions/admin-communication";
@@ -55,14 +55,17 @@ export function RuleCard({ rule, template, recent, messagingLive, schedulerActiv
   const dirty = draftValid && draftOffset !== rule.offsetDays;
   const phrase = delayPhrase(rule.trigger, draftOffset);
   const isEmail = rule.channel === "EMAIL";
+  const toPartner = rule.audience === "Partenaire";
+  const recipientNoun = toPartner ? "partenaire" : "officine";
 
   const schedule = schedulerActive ? "Passage automatique chaque jour à 8 h 15 (UTC), ou à la demande avec « Lancer maintenant »." : "La tâche planifiée n'est pas active sur ce serveur : les relances ne partent que par « Lancer maintenant ».";
   const activationConsequences = isEmail
     ? [
-        "Des e-mails partiront automatiquement aux officines concernées, sans autre validation.",
+        toPartner ? "Des e-mails partiront automatiquement aux partenaires concernés, sans autre validation." : "Des e-mails partiront automatiquement aux officines concernées, sans autre validation.",
+        ...(rule.alsoDoes ? [rule.alsoDoes] : []),
         `Délai appliqué : ${phrase.toLowerCase()} (${describeOffset(draftOffset)}).`,
         schedule,
-        "Chaque relance part une seule fois par officine et par occurrence ; rien n'est rattrapé au-delà de 2 jours.",
+        `Chaque relance part une seule fois par ${recipientNoun} et par occurrence ; rien n'est rattrapé au-delà de ${CATCH_UP_DAYS} jours.`,
         ...(messagingLive ? [] : ["La messagerie n'est pas configurée : les envois seront tracés « non transmis » tant qu'elle ne l'est pas."]),
       ]
     : [
@@ -102,7 +105,7 @@ export function RuleCard({ rule, template, recent, messagingLive, schedulerActiv
             <h3 className="text-[14.5px] leading-5 font-semibold text-text-primary">{rule.label}</h3>
             <Badge tone={rule.enabled ? "success" : "neutral"}>{rule.enabled ? "Activée" : "Désactivée"}</Badge>
             <Badge tone={isEmail ? "info" : "brand"} icon={isEmail ? <Mail className="size-3" aria-hidden="true" /> : <BellRing className="size-3" aria-hidden="true" />}>
-              {isEmail ? "E-mail à l'officine" : "Alerte interne"}
+              {isEmail ? `E-mail ${toPartner ? "au partenaire" : "à l'officine"}` : "Alerte interne"}
             </Badge>
           </div>
           <p className="text-[12.5px] leading-5 text-text-secondary">

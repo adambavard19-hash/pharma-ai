@@ -2,9 +2,11 @@ import "server-only";
 import { prisma } from "@/server/db/client";
 import type { Prisma } from "@/generated/prisma";
 import { recordAudit } from "@/server/audit/log";
+import { hashEmail } from "@/server/security/tokens";
 import { notifyAdmins, notifySalesRep } from "@/server/services/sales/notifications";
+import { createNotification } from "@/server/services/notifications";
 import { contractCounters } from "@/server/services/admin/contracts-admin";
-import { pharmacyRecipient, sendTemplatedEmail, templateValuesFor, type Recipient } from "./outbound-email";
+import { partnerRecipient, pharmacyRecipient, sendTemplatedEmail, templateValuesFor, type Recipient } from "./outbound-email";
 import { countCommunications, parseCommunicationFilters, shownCount } from "./communications";
 import {
   AUTOMATION_RULES,
@@ -19,6 +21,8 @@ import {
   resolveRules,
   unpaidSeriesStart,
   type CancellationCandidate,
+  type FilleulCandidate,
+  type PartnerCandidate,
   type PlannedAutomation,
   type ProspectCandidate,
   type ResolvedRule,
@@ -26,7 +30,8 @@ import {
 } from "@/core/admin/automations";
 import { zonedDayStart } from "@/core/challenges/dates";
 import { emailTemplate } from "@/core/admin/email-templates";
-import { formatFrenchDate } from "@/core/billing/subscription";
+import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
+import { referralAmountFor } from "@/core/billing/referral";
 import { TIME_ZONE } from "@/config/constants";
 
 /**
@@ -104,24 +109,35 @@ type CandidateContext = {
   trialEnds: Map<string, Date>;
   cancellations: Map<string, { requestedAt: Date; plannedEndAt: Date | null; subscriptionEndAt: Date | null }>;
   prospects: Map<string, { name: string; nextActionAt: Date | null; nextActionLabel: string | null; salesRepId: string | null }>;
+  /** Pour chaque filleul : ce qu'il apporte par mois à son parrain, tel que figé à son inscription. */
+  filleuls: Map<string, { name: string; amountCents: number }>;
+  partners: Map<string, { name: string }>;
 };
 
 export type AutomationCandidates = {
   subscriptions: SubscriptionCandidate[];
   cancellations: CancellationCandidate[];
   prospects: ProspectCandidate[];
+  filleuls: FilleulCandidate[];
+  partners: PartnerCandidate[];
   context: CandidateContext;
 };
+
+/** Les statuts d'un partenaire qu'on peut inviter : ni suspendu ni archivé (le module pur applique la même règle). */
+const INVITABLE_PARTNER_STATUSES = ["DRAFT", "TEST", "ACTIVE"] as const;
 
 /**
  * Les cibles possibles : abonnements (rattachés à leur première officine hors
  * démonstration), demandes de résiliation ouvertes, dossiers commerciaux
- * ouverts avec une relance prévue. Seuls les événements assez récents pour
- * être encore dus sont lus.
+ * ouverts avec une relance prévue, et — seulement si une règle qui s'y
+ * rapporte est activée — officines parrainées et fiches partenaires. Seuls les
+ * événements assez récents pour être encore dus sont lus.
  */
-export async function loadCandidates(now: Date): Promise<AutomationCandidates> {
+export async function loadCandidates(now: Date, enabledRuleKeys: ReadonlySet<string> = new Set(AUTOMATION_RULES.map((r) => r.key))): Promise<AutomationCandidates> {
   const since = anchorWindowStart(now);
-  const [subscriptionRows, cancellationRows, prospectRows] = await Promise.all([
+  const wantsFilleuls = enabledRuleKeys.has("referral.filleul_joined");
+  const wantsPartners = enabledRuleKeys.has("partner.range_invitation");
+  const [subscriptionRows, cancellationRows, prospectRows, filleulRows, partnerRows] = await Promise.all([
     prisma.subscription.findMany({
       where: { OR: [{ trialStartsAt: { gte: since } }, { trialEndsAt: { gte: since } }, { lastPaymentFailedAt: { gte: since } }] },
       select: {
@@ -146,9 +162,22 @@ export async function loadCandidates(now: Date): Promise<AutomationCandidates> {
       where: { nextActionAt: { gte: since }, blockedAt: null, status: { notIn: ["ACTIVATED", "LOST"] } },
       select: { id: true, name: true, status: true, nextActionAt: true, nextActionLabel: true, lastContactAt: true, blockedAt: true, salesRepId: true },
     }),
+    // Les officines parrainées inscrites dans la fenêtre : ni démonstration, ni parrain de démonstration.
+    wantsFilleuls
+      ? prisma.pharmacy.findMany({
+          where: { isDemo: false, referredById: { not: null }, referredBy: { isDemo: false }, createdAt: { gte: since } },
+          select: { id: true, name: true, isDemo: true, createdAt: true, referredById: true, referralAmountCents: true, referredBy: { select: { name: true } } },
+        })
+      : Promise.resolve([]),
+    wantsPartners
+      ? prisma.partner.findMany({
+          where: { status: { in: [...INVITABLE_PARTNER_STATUSES] }, createdAt: { gte: since } },
+          select: { id: true, name: true, status: true, createdAt: true, _count: { select: { brands: true } } },
+        })
+      : Promise.resolve([]),
   ]);
 
-  const context: CandidateContext = { pharmacyNames: new Map(), trialEnds: new Map(), cancellations: new Map(), prospects: new Map() };
+  const context: CandidateContext = { pharmacyNames: new Map(), trialEnds: new Map(), cancellations: new Map(), prospects: new Map(), filleuls: new Map(), partners: new Map() };
   const subscriptions: SubscriptionCandidate[] = [];
   for (const row of subscriptionRows) {
     const pharmacy = row.organization.pharmacies[0];
@@ -179,7 +208,17 @@ export async function loadCandidates(now: Date): Promise<AutomationCandidates> {
     context.prospects.set(row.id, { name: row.name, nextActionAt: row.nextActionAt, nextActionLabel: row.nextActionLabel, salesRepId: row.salesRepId });
     return { id: row.id, status: row.status, nextActionAt: row.nextActionAt, lastContactAt: row.lastContactAt, blockedAt: row.blockedAt, salesRepId: row.salesRepId };
   });
-  return { subscriptions, cancellations, prospects, context };
+  const filleuls: FilleulCandidate[] = filleulRows.map((row) => {
+    context.filleuls.set(row.id, { name: row.name, amountCents: referralAmountFor(row) });
+    context.pharmacyNames.set(row.id, row.name);
+    if (row.referredById && row.referredBy) context.pharmacyNames.set(row.referredById, row.referredBy.name);
+    return { id: row.id, referrerId: row.referredById, isDemo: row.isDemo, createdAt: row.createdAt };
+  });
+  const partners: PartnerCandidate[] = partnerRows.map((row) => {
+    context.partners.set(row.id, { name: row.name });
+    return { id: row.id, status: row.status, brandCount: row._count.brands, createdAt: row.createdAt };
+  });
+  return { subscriptions, cancellations, prospects, filleuls, partners, context };
 }
 
 // ---------------------------------------------------------------- Plan
@@ -192,8 +231,8 @@ export type AutomationPlan = { rules: ResolvedRule[]; planned: PlannedAutomation
  */
 async function planWith(rules: ResolvedRule[], now: Date): Promise<AutomationPlan> {
   if (!rules.some((r) => r.enabled)) return { rules, planned: [], alreadyDone: 0, candidates: null, now };
-  const candidates = await loadCandidates(now);
-  const input = { rules, subscriptions: candidates.subscriptions, cancellations: candidates.cancellations, prospects: candidates.prospects, now };
+  const candidates = await loadCandidates(now, new Set(rules.filter((r) => r.enabled).map((r) => r.key)));
+  const input = { rules, subscriptions: candidates.subscriptions, cancellations: candidates.cancellations, prospects: candidates.prospects, filleuls: candidates.filleuls, partners: candidates.partners, now };
   const due = planAutomations({ ...input, alreadyDone: new Set() });
   if (due.length === 0) return { rules, planned: [], alreadyDone: 0, candidates, now };
   const existing = await prisma.automationDispatch.findMany({ where: { dedupeKey: { in: due.map((p) => p.dedupeKey) } }, select: { dedupeKey: true } });
@@ -255,6 +294,10 @@ export type AutomationRunReport = {
 };
 
 const NO_RECIPIENT = "Aucune adresse e-mail connue pour cette officine (ni titulaire actif, ni e-mail de l'officine).";
+const NO_PARTNER_RECIPIENT = "Aucune adresse e-mail connue pour ce partenaire (ni contact avec une adresse, ni candidature liée).";
+const OPTED_OUT = "Cette adresse s'est désinscrite des offres de PharmaBoost : aucune invitation ne lui est envoyée.";
+
+const noRecipientDetail = (item: Pick<PlannedAutomation, "targetType">) => (item.targetType === "Partner" ? NO_PARTNER_RECIPIENT : NO_RECIPIENT);
 
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && (error as { code?: string }).code === "P2002";
@@ -262,6 +305,13 @@ function isUniqueViolation(error: unknown): boolean {
 
 function targetLabel(item: PlannedAutomation, context: CandidateContext): string {
   if (item.targetType === "Prospect") return context.prospects.get(item.targetId)?.name ?? "Dossier commercial";
+  if (item.targetType === "Partner") return context.partners.get(item.targetId)?.name ?? "Partenaire";
+  if (item.targetType === "Pharmacy") {
+    // Le filleul est la cible, son parrain le destinataire : les deux noms, pour savoir qui est prévenu de quoi.
+    const filleul = context.filleuls.get(item.targetId)?.name ?? "Officine";
+    const referrer = item.pharmacyId ? context.pharmacyNames.get(item.pharmacyId) : null;
+    return referrer ? `${filleul} (filleul de ${referrer})` : filleul;
+  }
   return (item.pharmacyId && context.pharmacyNames.get(item.pharmacyId)) || "Officine";
 }
 
@@ -272,6 +322,15 @@ function targetLabel(item: PlannedAutomation, context: CandidateContext): string
  * finit le 20, c'est « 4 jours », quelle que soit l'heure.
  */
 function ruleValues(item: PlannedAutomation, context: CandidateContext, now: Date): Record<string, string | null> {
+  if (item.targetType === "Pharmacy") {
+    // Le nom de l'officine du filleul et ce qu'elle apporte : rien d'autre sur elle, ni sur la personne qui l'a inscrite.
+    const filleul = context.filleuls.get(item.targetId);
+    return filleul ? { filleul: filleul.name, montant_remise: formatEuros(filleul.amountCents) } : {};
+  }
+  if (item.targetType === "Partner") {
+    const partner = context.partners.get(item.targetId);
+    return partner ? { nom_partenaire: partner.name } : {};
+  }
   if (item.targetType === "Subscription") {
     const trialEndsAt = context.trialEnds.get(item.targetId);
     return trialEndsAt ? { jours_restants: String(calendarDaysUntil(trialEndsAt, now)) } : {};
@@ -286,6 +345,8 @@ function ruleValues(item: PlannedAutomation, context: CandidateContext, now: Dat
 /** Une valeur indispensable au texte manque : mieux vaut ne pas envoyer qu'envoyer une phrase vide. */
 function missingValue(item: PlannedAutomation, values: Record<string, string | null>): string | null {
   if (item.ruleKey === "cancellation.confirmation" && !values.date_fin_prevue) return "Date de fin prévue inconnue : renseignez-la sur la demande de résiliation, puis écrivez au titulaire depuis sa fiche.";
+  if (item.ruleKey === "referral.filleul_joined" && !values.filleul) return "Officine parrainée introuvable : rien à annoncer au parrain.";
+  if (item.ruleKey === "partner.range_invitation" && !values.nom_partenaire) return "Partenaire introuvable : rien à envoyer.";
   return null;
 }
 
@@ -318,22 +379,71 @@ function emptyReport(dryRun: boolean, enabledRules: number): AutomationRunReport
   return { dryRun, enabledRules, planned: 0, sent: 0, failed: 0, simulated: 0, skipped: 0, internal: 0, alreadyDone: 0, errors: [], items: [] };
 }
 
-/** Le destinataire de chaque officine, lu une fois par passage. Une lecture en erreur n'est pas gardée : la relance suivante la refait. */
+/**
+ * Le destinataire de chaque officine (ou, pour une invitation, de chaque
+ * partenaire), lu une fois par passage. Une lecture en erreur n'est pas
+ * gardée : la relance suivante la refait.
+ */
 function recipientCache() {
   const cache = new Map<string, Promise<Recipient | null>>();
-  return (pharmacyId: string | null) => {
-    if (!pharmacyId) return Promise.resolve(null);
-    if (!cache.has(pharmacyId)) {
+  return (item: Pick<PlannedAutomation, "targetType" | "targetId" | "pharmacyId">) => {
+    const partner = item.targetType === "Partner";
+    const id = partner ? item.targetId : item.pharmacyId;
+    if (!id) return Promise.resolve(null);
+    const key = `${partner ? "partner" : "pharmacy"}:${id}`;
+    if (!cache.has(key)) {
       cache.set(
-        pharmacyId,
-        pharmacyRecipient(pharmacyId).catch((error: unknown) => {
-          cache.delete(pharmacyId);
+        key,
+        (partner ? partnerRecipient(id) : pharmacyRecipient(id)).catch((error: unknown) => {
+          cache.delete(key);
           throw error;
         }),
       );
     }
-    return cache.get(pharmacyId)!;
+    return cache.get(key)!;
   };
+}
+
+/** Une invitation à un partenaire ne part jamais vers une adresse de la liste de désinscription des offres (on n'y garde que des empreintes). */
+async function isOptedOut(item: Pick<PlannedAutomation, "targetType">, recipient: Recipient): Promise<boolean> {
+  if (item.targetType !== "Partner") return false;
+  const row = await prisma.marketingOptOut.findUnique({ where: { emailHash: hashEmail(recipient.email) }, select: { id: true } });
+  return Boolean(row);
+}
+
+/**
+ * Ce que certaines règles font EN PLUS de l'e-mail, une fois qu'il a été tenté :
+ * la notification dans l'application du parrain, et la trace au journal d'audit.
+ * La clé est déjà consommée : une erreur ici ne change pas l'issue de l'e-mail,
+ * elle est dite dans le détail du déclenchement. Rien de personnel n'est écrit :
+ * le nom de l'officine parrainée et le montant mensuel seulement.
+ */
+async function afterEmail(planned: PlannedAutomation, context: CandidateContext, emailStatus: string, adminId: string | null): Promise<string | null> {
+  if (planned.ruleKey === "partner.range_invitation") {
+    await recordAudit({ action: "partner.invitation_sent", entityType: "Partner", entityId: planned.targetId, platformAdminId: adminId, metadata: { ruleKey: planned.ruleKey, emailStatus } });
+    return null;
+  }
+  if (planned.ruleKey !== "referral.filleul_joined" || !planned.pharmacyId) return null;
+  const filleul = context.filleuls.get(planned.targetId);
+  if (!filleul) return null;
+  let note: string;
+  let inApp = false;
+  try {
+    await createNotification({
+      pharmacyId: planned.pharmacyId,
+      type: "SYSTEM",
+      severity: "SUCCESS",
+      title: `Nouveau filleul : ${filleul.name}`,
+      body: `${filleul.name} a rejoint PharmaBoost avec votre code de parrainage. Cette officine réduit votre abonnement de ${formatEuros(filleul.amountCents)} HT par mois, tant qu'elle reste abonnée.`,
+      linkUrl: "/parametres?onglet=abonnement",
+    });
+    inApp = true;
+    note = "Notification ajoutée dans l'application du parrain.";
+  } catch (error) {
+    note = `La notification dans l'application n'a pas pu être créée : ${error instanceof Error ? error.message : String(error)}.`;
+  }
+  await recordAudit({ action: "referral.filleul_notified", entityType: "Pharmacy", entityId: planned.targetId, pharmacyId: planned.pharmacyId, platformAdminId: adminId, metadata: { ruleKey: planned.ruleKey, amountCents: filleul.amountCents, emailStatus, inApp } });
+  return note;
 }
 
 /** Un e-mail réellement remis au prestataire. */
@@ -399,12 +509,15 @@ async function describePlan(plan: AutomationPlan): Promise<AutomationRunItem[]> 
       item.recipient = message.salesRep ? "Équipe PharmaBoost et commercial du dossier" : "Équipe PharmaBoost";
       item.detail = message.title;
     } else {
-      const recipient = await recipientOf(planned.pharmacyId);
+      const recipient = await recipientOf(planned);
       const missing = missingValue(planned, ruleValues(planned, context, plan.now));
       item.recipient = recipient?.email ?? null;
       if (!recipient || missing) {
         item.status = "PREVIEW_SKIPPED";
-        item.detail = recipient ? missing : NO_RECIPIENT;
+        item.detail = recipient ? missing : noRecipientDetail(planned);
+      } else if (await isOptedOut(planned, recipient)) {
+        item.status = "PREVIEW_SKIPPED";
+        item.detail = OPTED_OUT;
       } else {
         const manualAt = await manualSendSince(planned, rule, recipient);
         if (manualAt) {
@@ -484,12 +597,14 @@ export async function runAutomations(options: { now: Date; dryRun: boolean; admi
           continue;
         }
 
-        const recipient = await recipientOf(planned.pharmacyId);
+        const recipient = await recipientOf(planned);
         const extra = ruleValues(planned, context, now);
-        const missing = !recipient ? NO_RECIPIENT : !planned.templateKey ? "Aucun modèle d'e-mail associé à cette règle." : missingValue(planned, extra);
+        const missing = !recipient ? noRecipientDetail(planned) : !planned.templateKey ? "Aucun modèle d'e-mail associé à cette règle." : missingValue(planned, extra);
+        // Une adresse désinscrite des offres n'est jamais contactée.
+        const optedOut = recipient && !missing ? await isOptedOut(planned, recipient) : false;
         // Le même modèle déjà envoyé à la main depuis l'événement : la relance n'a plus d'objet.
-        const manualAt = recipient && !missing ? await manualSendSince(planned, rule, recipient) : null;
-        const skipReason = missing ?? (manualAt ? manualSendDetail(manualAt) : null);
+        const manualAt = recipient && !missing && !optedOut ? await manualSendSince(planned, rule, recipient) : null;
+        const skipReason = missing ?? (optedOut ? OPTED_OUT : manualAt ? manualSendDetail(manualAt) : null);
         if (!recipient || !planned.templateKey || skipReason) {
           item.status = "SKIPPED";
           item.recipient = recipient?.email ?? null;
@@ -502,10 +617,12 @@ export async function runAutomations(options: { now: Date; dryRun: boolean; admi
         const values = await templateValuesFor(recipient, extra);
         attempted = true;
         const sent = await sendTemplatedEmail({ templateKey: planned.templateKey, recipient, values, trigger: "AUTOMATIC", ruleKey: planned.ruleKey, adminId: adminId ?? null });
+        const alsoDone = await afterEmail(planned, context, sent.outcome.status, adminId ?? null);
+        const detail = [sent.outcome.detail, alsoDone].filter(Boolean).join(" ");
         item.status = sent.outcome.status;
         item.recipient = recipient.email;
-        item.detail = sent.outcome.detail;
-        await prisma.automationDispatch.update({ where: { id: claimId }, data: { status: sent.outcome.status, recipient: recipient.email, emailDispatchId: sent.dispatchId, detail: sent.outcome.detail.slice(0, 500) } });
+        item.detail = detail;
+        await prisma.automationDispatch.update({ where: { id: claimId }, data: { status: sent.outcome.status, recipient: recipient.email, emailDispatchId: sent.dispatchId, detail: detail.slice(0, 500) } });
         if (sent.outcome.status === "SENT") report.sent += 1;
         else if (sent.outcome.status === "SIMULATED") report.simulated += 1;
         else report.failed += 1;
@@ -575,16 +692,20 @@ export async function recentDispatchesByRule(perRule = 5): Promise<Map<string, R
   const flat = rows.flat();
   const pharmacyIds = [...new Set(flat.map((r) => r.pharmacyId).filter((id): id is string => Boolean(id)))];
   const prospectIds = [...new Set(flat.filter((r) => r.targetType === "Prospect").map((r) => r.targetId))];
-  const [pharmacies, prospects] = await Promise.all([
+  const partnerIds = [...new Set(flat.filter((r) => r.targetType === "Partner").map((r) => r.targetId))];
+  const [pharmacies, prospects, partners] = await Promise.all([
     pharmacyIds.length ? prisma.pharmacy.findMany({ where: { id: { in: pharmacyIds } }, select: { id: true, name: true } }) : Promise.resolve([]),
     prospectIds.length ? prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, name: true } }) : Promise.resolve([]),
+    partnerIds.length ? prisma.partner.findMany({ where: { id: { in: partnerIds } }, select: { id: true, name: true } }) : Promise.resolve([]),
   ]);
   const pharmacyNames = new Map(pharmacies.map((p) => [p.id, p.name]));
   const prospectNames = new Map(prospects.map((p) => [p.id, p.name]));
+  const partnerNames = new Map(partners.map((p) => [p.id, p.name]));
   const out = new Map<string, RecentDispatch[]>();
   for (const row of flat) {
     const list = out.get(row.ruleKey) ?? [];
-    const targetLabel = row.pharmacyId ? (pharmacyNames.get(row.pharmacyId) ?? null) : row.targetType === "Prospect" ? (prospectNames.get(row.targetId) ?? null) : null;
+    // Un parrainage se lit par l'officine prévenue (le parrain) : son nom, comme pour les autres règles ; un partenaire par son propre nom.
+    const targetLabel = row.pharmacyId ? (pharmacyNames.get(row.pharmacyId) ?? null) : row.targetType === "Prospect" ? (prospectNames.get(row.targetId) ?? null) : row.targetType === "Partner" ? (partnerNames.get(row.targetId) ?? null) : null;
     list.push({ ...row, targetLabel });
     out.set(row.ruleKey, list);
   }

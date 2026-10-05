@@ -1,8 +1,9 @@
 /**
  * Les scénarios de relance de la console : essai, paiement, résiliation,
- * suivi commercial. La cadence des relances de contrat, elle, existe déjà
- * (`PlatformSetting["contract.reminders"]`, `runContractReminders`) : la
- * console la présente avec les autres, sans la dupliquer.
+ * suivi commercial, parrainage, partenaires. La cadence des relances de
+ * contrat, elle, existe déjà (`PlatformSetting["contract.reminders"]`,
+ * `runContractReminders`) : la console la présente avec les autres, sans la
+ * dupliquer.
  *
  * Trois garde-fous structurels :
  *   1. une règle est DÉSACTIVÉE tant qu'un administrateur ne l'a pas activée :
@@ -26,7 +27,7 @@ import { addDays as addDayKey, calendarDay, daysBetween, zonedDayStart, type Day
 
 export const CATCH_UP_DAYS = 2;
 
-export type AutomationScenario = "TRIAL" | "PAYMENT" | "CANCELLATION" | "COMMERCIAL";
+export type AutomationScenario = "TRIAL" | "PAYMENT" | "CANCELLATION" | "COMMERCIAL" | "REFERRAL" | "PARTNER";
 export type AutomationChannel = "EMAIL" | "INTERNAL";
 
 export type AutomationRuleDefinition = {
@@ -43,6 +44,10 @@ export type AutomationRuleDefinition = {
   channel: AutomationChannel;
   /** Le modèle d'e-mail envoyé (canal EMAIL). */
   templateKey?: string;
+  /** À qui part l'e-mail : le titulaire d'une officine (par défaut) ou le contact d'un partenaire. */
+  audience?: "Titulaire" | "Partenaire";
+  /** Ce que la règle fait EN PLUS de l'e-mail, en clair : redit à l'activation. */
+  alsoDoes?: string;
   /** Avertissement affiché : un autre envoi existe déjà pour le même moment. */
   overlap?: string;
 };
@@ -52,6 +57,8 @@ export const AUTOMATION_SCENARIOS: Record<AutomationScenario, { label: string; d
   PAYMENT: { label: "Paiement", description: "Après un paiement échoué resté impayé : relances au titulaire, puis alerte à l'équipe." },
   CANCELLATION: { label: "Résiliation", description: "Accusé de réception d'une demande, puis confirmation." },
   COMMERCIAL: { label: "Suivi commercial", description: "Alerte interne quand une relance prévue sur un dossier est dépassée." },
+  REFERRAL: { label: "Parrainage", description: "Quand une officine parrainée s'inscrit : un e-mail et une notification dans l'application pour le titulaire qui l'a parrainée." },
+  PARTNER: { label: "Partenaires", description: "Une invitation à déposer sa gamme, pour les fiches partenaires encore sans aucune marque référencée." },
 };
 
 export const AUTOMATION_RULES: AutomationRuleDefinition[] = [
@@ -87,6 +94,30 @@ export const AUTOMATION_RULES: AutomationRuleDefinition[] = [
   { key: "cancellation.acknowledgement", scenario: "CANCELLATION", label: "Accusé de réception", trigger: "Jours après l'enregistrement de la demande", defaultOffsetDays: 0, minOffsetDays: 0, maxOffsetDays: 3, channel: "EMAIL", templateKey: "cancellation.received" },
   { key: "cancellation.confirmation", scenario: "CANCELLATION", label: "Confirmation", trigger: "Jours après la confirmation de la résiliation", defaultOffsetDays: 0, minOffsetDays: 0, maxOffsetDays: 3, channel: "EMAIL", templateKey: "cancellation.confirmed" },
   { key: "prospect.followup_overdue", scenario: "COMMERCIAL", label: "Relance commerciale dépassée", trigger: "Jours après la date de relance prévue sur un dossier ouvert", defaultOffsetDays: 1, minOffsetDays: 0, maxOffsetDays: 14, channel: "INTERNAL" },
+  {
+    key: "referral.filleul_joined",
+    scenario: "REFERRAL",
+    label: "Filleul inscrit",
+    trigger: "Jours après l'inscription du filleul",
+    defaultOffsetDays: 0,
+    minOffsetDays: 0,
+    maxOffsetDays: 3,
+    channel: "EMAIL",
+    templateKey: "referral.filleul_joined",
+    alsoDoes: "Une notification s'affiche aussi dans l'application de l'officine du parrain.",
+  },
+  {
+    key: "partner.range_invitation",
+    scenario: "PARTNER",
+    label: "Invitation à référencer sa gamme",
+    trigger: "Jours après la création de la fiche partenaire, si aucune marque n'est encore référencée",
+    defaultOffsetDays: 5,
+    minOffsetDays: 1,
+    maxOffsetDays: 30,
+    channel: "EMAIL",
+    templateKey: "partner.range_invitation",
+    audience: "Partenaire",
+  },
 ];
 
 const RULES_BY_KEY = new Map(AUTOMATION_RULES.map((r) => [r.key, r]));
@@ -156,11 +187,30 @@ export type ProspectCandidate = {
   salesRepId: string | null;
 };
 
+/** Une officine parrainée, avec son parrain : l'e-mail et la notification vont au parrain. */
+export type FilleulCandidate = {
+  id: string;
+  referrerId: string | null;
+  isDemo: boolean;
+  /** L'inscription du filleul : la création de son officine. */
+  createdAt: Date;
+};
+
+export type PartnerCandidate = {
+  id: string;
+  /** `PartnerPublicationStatus` : un partenaire archivé ou suspendu n'est jamais invité. */
+  status: string;
+  brandCount: number;
+  createdAt: Date;
+};
+
 export type PlannedAutomation = {
   ruleKey: string;
   dedupeKey: string;
-  targetType: "Subscription" | "CancellationRequest" | "Prospect";
+  /** « Pharmacy » : le filleul d'une règle de parrainage (le message va à son parrain, porté par `pharmacyId`). */
+  targetType: "Subscription" | "CancellationRequest" | "Prospect" | "Pharmacy" | "Partner";
   targetId: string;
+  /** L'officine DESTINATAIRE (pour un partenaire : aucune). */
   pharmacyId: string | null;
   /** Le moment où la règle devenait due : minuit (heure de Paris) de son jour d'échéance. */
   dueAt: Date;
@@ -259,6 +309,7 @@ export function paymentSequenceError(rules: ResolvedRule[], change: { key: strin
 const TRIAL_NOT_CONTINUED = new Set(["PAUSED", "CANCELED", "INCOMPLETE", "INCOMPLETE_EXPIRED"]);
 const OPEN_CANCELLATION = new Set(["RECEIVED", "IN_PROGRESS"]);
 const CLOSED_PROSPECT = new Set(["ACTIVATED", "LOST"]);
+const PARTNER_NOT_INVITED = new Set(["SUSPENDED", "ARCHIVED"]);
 
 /**
  * Ce qui est dû maintenant, règle par règle. `alreadyDone` contient les clés
@@ -269,6 +320,9 @@ export function planAutomations(input: {
   subscriptions: SubscriptionCandidate[];
   cancellations: CancellationCandidate[];
   prospects: ProspectCandidate[];
+  /** Facultatifs : sans eux, les règles de parrainage et de partenaires ne planifient rien. */
+  filleuls?: FilleulCandidate[];
+  partners?: PartnerCandidate[];
   alreadyDone: Set<string>;
   now: Date;
 }): PlannedAutomation[] {
@@ -337,6 +391,19 @@ export function planAutomations(input: {
           push(rule, { type: "Prospect", id: p.id, pharmacyId: null }, p.nextActionAt);
         }
         break;
+      case "referral.filleul_joined":
+        for (const filleul of input.filleuls ?? []) {
+          // Une officine de démonstration, ou sans parrain, n'annonce rien à personne.
+          if (filleul.isDemo || !filleul.referrerId) continue;
+          push(rule, { type: "Pharmacy", id: filleul.id, pharmacyId: filleul.referrerId }, filleul.createdAt);
+        }
+        break;
+      case "partner.range_invitation":
+        for (const partner of input.partners ?? []) {
+          if (PARTNER_NOT_INVITED.has(partner.status) || partner.brandCount > 0) continue;
+          push(rule, { type: "Partner", id: partner.id, pharmacyId: null }, partner.createdAt);
+        }
+        break;
     }
   }
   return out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
@@ -348,18 +415,25 @@ export function planAutomations(input: {
  * Les modèles qui ont besoin d'un contexte que la fenêtre « Contacter » n'a
  * pas : la relance de contrat porte le lien de signature (elle passe par le
  * bouton « Relancer » du contrat, qui tient aussi le compte des relances), les
- * modèles de résiliation la date de la demande ou la date de fin.
+ * modèles de résiliation la date de la demande ou la date de fin, le message
+ * de parrainage le nom du filleul et son montant, l'invitation d'un partenaire
+ * le partenaire lui-même (« Contacter » ne connaît que des officines et des
+ * dossiers).
  */
 export function isContextBoundTemplate(key: string): boolean {
-  return key === "contract.reminder" || key.startsWith("cancellation.");
+  return key === "contract.reminder" || key.startsWith("cancellation.") || key === "referral.filleul_joined" || key === "partner.range_invitation";
 }
 
 /**
  * Les modèles proposés par « Contacter » : ceux du public demandé (plus le
  * message libre) ; un modèle lié à un contexte seulement si l'appelant le
  * demande explicitement (`defaultTemplateKey`), depuis la page qui détient ce
- * contexte.
+ * contexte. Un modèle du public « Partenaire » n'est jamais proposé à un
+ * titulaire ni à un prospect, même quand l'appelant ne précise aucun public.
  */
 export function contactTemplateChoices<T extends { key: string; audience: string }>(templates: T[], options: { audience?: string; defaultTemplateKey?: string } = {}): T[] {
-  return templates.filter((t) => (!options.audience || t.audience === options.audience || t.key === "generic.message") && (!isContextBoundTemplate(t.key) || t.key === options.defaultTemplateKey));
+  return templates.filter((t) => {
+    const audienceFits = options.audience ? t.audience === options.audience || t.key === "generic.message" : t.audience !== "Partenaire";
+    return audienceFits && (!isContextBoundTemplate(t.key) || t.key === options.defaultTemplateKey);
+  });
 }

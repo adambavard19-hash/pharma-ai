@@ -24,14 +24,21 @@ import { AutomationPreviewButton } from "./automation-preview";
 
 export const metadata: Metadata = { title: "Relances automatiques" };
 
-/** L'ordre de lecture : du premier jour d'essai jusqu'au suivi commercial ; le contrat s'insère après l'essai. */
-const SECTIONS: { key: AutomationScenario | "CONTRACT"; anchor: string; label: string }[] = [
-  { key: "TRIAL", anchor: "essai", label: "Essai" },
-  { key: "CONTRACT", anchor: "contrat", label: "Contrat" },
-  { key: "PAYMENT", anchor: "paiement", label: "Paiement" },
-  { key: "CANCELLATION", anchor: "resiliation", label: "Résiliation" },
-  { key: "COMMERCIAL", anchor: "commercial", label: "Suivi commercial" },
-];
+/** L'ancre et la puce de navigation de chaque section : le type oblige à en nommer une pour tout nouveau scénario. */
+const SECTION_NAV: Record<AutomationScenario | "CONTRACT", { anchor: string; label: string }> = {
+  TRIAL: { anchor: "essai", label: "Essai" },
+  CONTRACT: { anchor: "contrat", label: "Contrat" },
+  PAYMENT: { anchor: "paiement", label: "Paiement" },
+  CANCELLATION: { anchor: "resiliation", label: "Résiliation" },
+  COMMERCIAL: { anchor: "commercial", label: "Suivi commercial" },
+  REFERRAL: { anchor: "parrainage", label: "Parrainage" },
+  PARTNER: { anchor: "partenaires", label: "Partenaires" },
+};
+
+/** L'ordre de lecture : les scénarios dans l'ordre où ils sont déclarés, tous, sans liste à tenir à part ; le contrat s'insère après l'essai. */
+const SECTIONS: { key: AutomationScenario | "CONTRACT"; anchor: string; label: string }[] = (Object.keys(AUTOMATION_SCENARIOS) as AutomationScenario[])
+  .flatMap((key): (AutomationScenario | "CONTRACT")[] => (key === "TRIAL" ? [key, "CONTRACT"] : [key]))
+  .map((key) => ({ key, ...SECTION_NAV[key] }));
 
 function StatePanel({ icon, title, badge, children }: { icon: ReactNode; title: string; badge: { label: string; tone: "success" | "warning" | "neutral" | "info" }; children: ReactNode }) {
   return (
@@ -84,8 +91,8 @@ export default async function RelancesPage() {
       status: automationStatusLabel(d.status),
       recipient: d.recipient,
       detail: d.detail,
-      targetLabel: d.targetLabel ?? (d.targetType === "Prospect" ? "Dossier commercial" : null),
-      href: d.pharmacyId ? `/admin/pharmacies/${d.pharmacyId}?onglet=communication` : d.targetType === "Prospect" ? `/admin/dossiers/${d.targetId}` : null,
+      targetLabel: d.targetLabel ?? (d.targetType === "Prospect" ? "Dossier commercial" : d.targetType === "Partner" ? "Partenaire" : null),
+      href: d.pharmacyId ? `/admin/pharmacies/${d.pharmacyId}?onglet=communication` : d.targetType === "Prospect" ? `/admin/dossiers/${d.targetId}` : d.targetType === "Partner" ? `/admin/partenaires/liste/${d.targetId}` : null,
     }));
   const contractTemplate = templateByKey.get("contract.reminder");
 

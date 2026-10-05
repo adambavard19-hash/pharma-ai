@@ -7,11 +7,17 @@ import { loadRules } from "@/server/services/admin/automations";
 import { loadReminderPolicy } from "@/server/services/platform-settings";
 import { adminNames } from "@/server/services/admin/communications";
 import { describeOffset, isContextBoundTemplate } from "@/core/admin/automations";
-import { emailTemplate } from "@/core/admin/email-templates";
+import { emailTemplate, type EmailTemplateDefinition } from "@/core/admin/email-templates";
 import { AdminPageHeader, AdminSection, FactList } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/format";
 import { TemplateEditor } from "./template-editor";
+
+const RECIPIENT_BY_AUDIENCE: Record<EmailTemplateDefinition["audience"], string> = {
+  Titulaire: "Le titulaire de l'officine (à défaut, l'e-mail de l'officine)",
+  Prospect: "Le contact du dossier commercial",
+  Partenaire: "Le contact principal du partenaire (à défaut, le premier contact avec une adresse, puis la candidature liée)",
+};
 
 export async function generateMetadata({ params }: { params: Promise<{ key: string }> }): Promise<Metadata> {
   const { key } = await params;
@@ -45,7 +51,7 @@ export default async function EmailTemplatePage({ params }: { params: Promise<{ 
           className="lg:grid-cols-4"
           items={[
             { label: "Catégorie", value: definition.category },
-            { label: "Destinataire", value: definition.audience === "Prospect" ? "Le contact du dossier commercial" : "Le titulaire de l'officine (à défaut, l'e-mail de l'officine)" },
+            { label: "Destinataire", value: RECIPIENT_BY_AUDIENCE[definition.audience] },
             {
               label: "Envoyé par",
               value:
@@ -70,9 +76,11 @@ export default async function EmailTemplatePage({ params }: { params: Promise<{ 
               hint:
                 definition.key === "contract.reminder"
                   ? "Relance manuelle : bouton « Relancer » du contrat, qui joint le lien de signature."
-                  : isContextBoundTemplate(definition.key)
+                  : definition.key.startsWith("cancellation.")
                     ? "Envoi manuel depuis la page de la demande de résiliation."
-                    : "Il reste aussi disponible pour un envoi manuel.",
+                    : isContextBoundTemplate(definition.key)
+                      ? "Il ne part que par sa règle automatique : il n'est pas proposé dans la fenêtre « Contacter »."
+                      : "Il reste aussi disponible pour un envoi manuel.",
             },
             { label: "Dernière modification", value: loaded.updatedAt ? formatDateTime(loaded.updatedAt) : "Jamais modifié", hint: author ? `par ${author}` : undefined },
           ]}

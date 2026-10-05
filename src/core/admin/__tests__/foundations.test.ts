@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AUTOMATION_RULES,
+  AUTOMATION_SCENARIOS,
   CATCH_UP_DAYS,
   calendarDaysUntil,
   clampOffset,
@@ -8,11 +9,14 @@ import {
   describeOffset,
   dueDay,
   hasUnpaidFailure,
+  isContextBoundTemplate,
   isDueNow,
   paymentSequenceError,
   planAutomations,
   resolveRules,
   unpaidSeriesStart,
+  type FilleulCandidate,
+  type PartnerCandidate,
   type PlannedAutomation,
   type SubscriptionCandidate,
 } from "../automations";
@@ -389,5 +393,182 @@ describe("résiliations : passages permis", () => {
     expect(canMoveCancellation("COMPLETED", "RECEIVED")).toBe(false);
     expect(canMoveCancellation("CANCELED", "IN_PROGRESS")).toBe(false);
     for (const status of CANCELLATION_STATUSES) expect(CANCELLATION_TRANSITIONS[status]).not.toContain(status);
+  });
+});
+
+describe("automatisations : parrainage et partenaires", () => {
+  const filleul = (overrides: Partial<FilleulCandidate> = {}): FilleulCandidate => ({ id: "ph_filleul", referrerId: "ph_parrain", isDemo: false, createdAt: daysAgo(1), ...overrides });
+  const partner = (overrides: Partial<PartnerCandidate> = {}): PartnerCandidate => ({ id: "pa_1", status: "ACTIVE", brandCount: 0, createdAt: daysAgo(5), ...overrides });
+  const plan = (keys: string[], input: { filleuls?: FilleulCandidate[]; partners?: PartnerCandidate[]; alreadyDone?: Set<string> }, now: Date = NOW, offsets: Record<string, number> = {}) =>
+    planAutomations({ rules: enabled(keys, offsets), subscriptions: [], cancellations: [], prospects: [], filleuls: input.filleuls, partners: input.partners, alreadyDone: input.alreadyDone ?? new Set(), now });
+
+  it("les deux scénarios et leurs règles existent, désactivés par défaut, avec les bornes prévues", () => {
+    expect(AUTOMATION_SCENARIOS.REFERRAL.label).toBe("Parrainage");
+    expect(AUTOMATION_SCENARIOS.PARTNER.label).toBe("Partenaires");
+    const resolved = resolveRules([]);
+    const filleulRule = resolved.find((r) => r.key === "referral.filleul_joined")!;
+    const partnerRule = resolved.find((r) => r.key === "partner.range_invitation")!;
+    expect(filleulRule).toMatchObject({ scenario: "REFERRAL", channel: "EMAIL", templateKey: "referral.filleul_joined", enabled: false, offsetDays: 0, minOffsetDays: 0, maxOffsetDays: 3 });
+    expect(partnerRule).toMatchObject({ scenario: "PARTNER", channel: "EMAIL", templateKey: "partner.range_invitation", enabled: false, offsetDays: 5, minOffsetDays: 1, maxOffsetDays: 30, audience: "Partenaire" });
+  });
+
+  it("chaque règle appartient à un scénario déclaré (l'écran des relances les itère)", () => {
+    for (const rule of AUTOMATION_RULES) expect(Object.keys(AUTOMATION_SCENARIOS)).toContain(rule.scenario);
+    for (const scenario of Object.keys(AUTOMATION_SCENARIOS)) expect(AUTOMATION_RULES.some((r) => r.scenario === scenario)).toBe(true);
+  });
+
+  it("désactivées, elles ne planifient rien, même avec des candidats dus", () => {
+    const rules = resolveRules([]);
+    expect(planAutomations({ rules, subscriptions: [], cancellations: [], prospects: [], filleuls: [filleul()], partners: [partner()], alreadyDone: new Set(), now: NOW })).toEqual([]);
+  });
+
+  it("sans candidats fournis (appels d'avant), elles ne planifient rien", () => {
+    expect(plan(["referral.filleul_joined", "partner.range_invitation"], {})).toEqual([]);
+  });
+
+  it("filleul inscrit : le message va au PARRAIN, la cible est le filleul, une clé par filleul et par jour d'inscription", () => {
+    const [planned] = plan(["referral.filleul_joined"], { filleuls: [filleul({ createdAt: new Date("2026-10-09T14:00:00Z") })] });
+    expect(planned).toMatchObject({ ruleKey: "referral.filleul_joined", targetType: "Pharmacy", targetId: "ph_filleul", pharmacyId: "ph_parrain", channel: "EMAIL", templateKey: "referral.filleul_joined", dedupeKey: "referral.filleul_joined:ph_filleul:2026-10-09" });
+  });
+
+  it("filleul inscrit : ni officine de démonstration, ni officine sans parrain", () => {
+    const planned = plan(["referral.filleul_joined"], { filleuls: [filleul({ id: "demo", isDemo: true }), filleul({ id: "sans_parrain", referrerId: null }), filleul({ id: "reel" })] });
+    expect(planned.map((p) => p.targetId)).toEqual(["reel"]);
+  });
+
+  it(`filleul inscrit : rattrapage de ${CATCH_UP_DAYS} jours, pas au-delà ; le délai réglé décale l'envoi`, () => {
+    // Inscrit le 10 à midi (Paris) ; délai 0 : dû le 10, rattrapé jusqu'au 12.
+    const signedUp = filleul({ createdAt: new Date("2026-10-10T10:00:00Z") });
+    expect(plan(["referral.filleul_joined"], { filleuls: [signedUp] }, new Date("2026-10-10T08:15:00Z"))).toHaveLength(1);
+    expect(plan(["referral.filleul_joined"], { filleuls: [signedUp] }, new Date("2026-10-12T08:15:00Z"))).toHaveLength(1);
+    expect(plan(["referral.filleul_joined"], { filleuls: [signedUp] }, new Date("2026-10-13T08:15:00Z"))).toEqual([]);
+    // Délai de 3 jours : rien le 12, dû le 13.
+    expect(plan(["referral.filleul_joined"], { filleuls: [signedUp] }, new Date("2026-10-12T08:15:00Z"), { "referral.filleul_joined": 3 })).toEqual([]);
+    expect(plan(["referral.filleul_joined"], { filleuls: [signedUp] }, new Date("2026-10-13T08:15:00Z"), { "referral.filleul_joined": 3 })).toHaveLength(1);
+  });
+
+  it("activer la règle ne rattrape pas les filleuls des derniers mois", () => {
+    const old = [filleul({ id: "f_30", createdAt: daysAgo(30) }), filleul({ id: "f_90", createdAt: daysAgo(90) }), filleul({ id: "f_recent", createdAt: daysAgo(1) })];
+    expect(plan(["referral.filleul_joined"], { filleuls: old }).map((p) => p.targetId)).toEqual(["f_recent"]);
+  });
+
+  it("une clé déjà consommée n'est jamais reproposée", () => {
+    const [first] = plan(["referral.filleul_joined"], { filleuls: [filleul()] });
+    expect(plan(["referral.filleul_joined"], { filleuls: [filleul()], alreadyDone: new Set([first.dedupeKey]) })).toEqual([]);
+  });
+
+  it("deux filleuls du même parrain : deux déclenchements distincts", () => {
+    const planned = plan(["referral.filleul_joined"], { filleuls: [filleul({ id: "f1" }), filleul({ id: "f2" })] });
+    expect(new Set(planned.map((p) => p.dedupeKey)).size).toBe(2);
+    expect(new Set(planned.map((p) => p.pharmacyId))).toEqual(new Set(["ph_parrain"]));
+  });
+
+  it("invitation partenaire : cible Partner, aucune officine destinataire, due après le délai (5 jours par défaut)", () => {
+    const [planned] = plan(["partner.range_invitation"], { partners: [partner({ createdAt: new Date("2026-10-05T09:00:00Z") })] });
+    expect(planned).toMatchObject({ ruleKey: "partner.range_invitation", targetType: "Partner", targetId: "pa_1", pharmacyId: null, channel: "EMAIL", templateKey: "partner.range_invitation", dedupeKey: "partner.range_invitation:pa_1:2026-10-05" });
+    // Fiche créée le 8 : pas avant le 13.
+    const recent = [partner({ createdAt: new Date("2026-10-08T09:00:00Z") })];
+    expect(plan(["partner.range_invitation"], { partners: recent })).toEqual([]);
+    expect(plan(["partner.range_invitation"], { partners: recent }, new Date("2026-10-13T08:15:00Z"))).toHaveLength(1);
+  });
+
+  it("invitation partenaire : seulement sans aucune marque, et ni suspendu ni archivé", () => {
+    const planned = plan(["partner.range_invitation"], {
+      partners: [
+        partner({ id: "avec_marque", brandCount: 1 }),
+        partner({ id: "suspendu", status: "SUSPENDED" }),
+        partner({ id: "archive", status: "ARCHIVED" }),
+        partner({ id: "brouillon", status: "DRAFT" }),
+        partner({ id: "test", status: "TEST" }),
+        partner({ id: "actif", status: "ACTIVE" }),
+      ],
+    });
+    expect(planned.map((p) => p.targetId).sort()).toEqual(["actif", "brouillon", "test"]);
+  });
+
+  it(`invitation partenaire : rattrapage de ${CATCH_UP_DAYS} jours, pas au-delà ; même au délai maximal`, () => {
+    const longest = AUTOMATION_RULES.find((r) => r.key === "partner.range_invitation")!.maxOffsetDays;
+    expect(plan(["partner.range_invitation"], { partners: [partner({ createdAt: daysAgo(5 + CATCH_UP_DAYS) })] })).toHaveLength(1);
+    expect(plan(["partner.range_invitation"], { partners: [partner({ createdAt: daysAgo(5 + CATCH_UP_DAYS + 1) })] })).toEqual([]);
+    expect(plan(["partner.range_invitation"], { partners: [partner({ createdAt: daysAgo(longest + CATCH_UP_DAYS) })] }, NOW, { "partner.range_invitation": longest })).toHaveLength(1);
+    expect(plan(["partner.range_invitation"], { partners: [partner({ createdAt: daysAgo(40) })] })).toEqual([]);
+  });
+
+  it("une fiche partenaire ne reçoit qu'une invitation, quelle que soit la suite", () => {
+    const [first] = plan(["partner.range_invitation"], { partners: [partner()] });
+    expect(plan(["partner.range_invitation"], { partners: [partner()], alreadyDone: new Set([first.dedupeKey]) })).toEqual([]);
+  });
+});
+
+describe("modèles d'e-mails : parrainage et partenaires", () => {
+  const referral = emailTemplate("referral.filleul_joined")!;
+  const invitation = emailTemplate("partner.range_invitation")!;
+
+  it("deux modèles de plus, dans leur catégorie et pour leur public", () => {
+    expect(referral).toMatchObject({ category: "Parrainage", audience: "Titulaire" });
+    expect(invitation).toMatchObject({ category: "Partenaire", audience: "Partenaire" });
+    expect(new Set(EMAIL_TEMPLATES.map((t) => t.key)).size).toBe(EMAIL_TEMPLATES.length);
+  });
+
+  it("le message de parrainage ne cite que le nom de l'officine parrainée et le montant mensuel", () => {
+    expect(variablesIn(`${referral.defaults.subject}\n${referral.defaults.title}\n${referral.defaults.body}`).sort()).toEqual(["filleul", "montant_remise", "prenom"]);
+    const rendered = renderTemplateEmail(DEFAULT_EMAIL_CONTEXT, referral, referral.defaults, { prenom: "Camille", filleul: "Pharmacie du Marché", montant_remise: "25 €", lien_espace: "https://pharmaboost.app/parametres?onglet=abonnement" });
+    expect(rendered.subject).toBe("Pharmacie du Marché a rejoint PharmaBoost avec votre code de parrainage");
+    expect(rendered.text).toContain("25 € HT par mois");
+    expect(rendered.text).toContain("Voir mon parrainage : https://pharmaboost.app/parametres?onglet=abonnement");
+    expect(rendered.text).not.toContain("{{");
+  });
+
+  it("l'invitation d'un partenaire n'a ni officine, ni abonnement, ni lien d'espace : seulement ce qui a un sens pour lui", () => {
+    const keys = invitation.variables.map((v) => v.key);
+    expect(keys).toEqual(expect.arrayContaining(["prenom", "nom_partenaire", "lien_candidature", "contact"]));
+    for (const forbidden of ["officine", "prix", "offre", "lien_espace", "lien_contrat", "date_fin_essai"]) expect(keys).not.toContain(forbidden);
+    expect(unknownVariables(invitation, { subject: "Bonjour {{officine}}", title: "Titre", body: "Texte {{prix}}" })).toEqual(["officine", "prix"]);
+  });
+
+  it("l'invitation renvoie au formulaire public, ne promet ni portail ni diffusion, et rappelle qu'on n'achète pas une recommandation", () => {
+    const rendered = renderTemplateEmail(DEFAULT_EMAIL_CONTEXT, invitation, invitation.defaults, { prenom: "Claire", nom_partenaire: "Laboratoires Exemple", lien_candidature: "https://pharmaboost.app/decouvrir/partenaires", contact: "contact@pharmaboost.app" });
+    expect(rendered.html).toContain("https://pharmaboost.app/decouvrir/partenaires");
+    expect(rendered.text).toContain("Déposer ma gamme : https://pharmaboost.app/decouvrir/partenaires");
+    expect(rendered.text).toContain("un partenaire n'achète jamais une recommandation");
+    expect(rendered.text).toContain("Laboratoires Exemple");
+    const lower = rendered.text.toLowerCase();
+    for (const promise of ["portail", "espace partenaire", "garanti", "visibilité", "vendre plus", "augmenter vos ventes"]) expect(lower).not.toContain(promise);
+    expect(rendered.text).not.toMatch(/\p{Extended_Pictographic}/u);
+    expect(rendered.text).not.toContain("{{");
+  });
+
+  it("un modèle de parrainage ou de partenaire ne se renseigne que par sa règle : il n'est pas un envoi manuel", () => {
+    expect(isContextBoundTemplate("referral.filleul_joined")).toBe(true);
+    expect(isContextBoundTemplate("partner.range_invitation")).toBe(true);
+    expect(isContextBoundTemplate("trial.welcome")).toBe(false);
+  });
+});
+
+describe("« Contacter » : les modèles de parrainage et de partenaire", () => {
+  const keysOf = (list: { key: string }[]) => list.map((t) => t.key);
+
+  it("un modèle « Partenaire » n'est jamais proposé à un titulaire ni à un prospect, avec ou sans public précisé", () => {
+    expect(keysOf(contactTemplateChoices(EMAIL_TEMPLATES, { audience: "Titulaire" }))).not.toContain("partner.range_invitation");
+    expect(keysOf(contactTemplateChoices(EMAIL_TEMPLATES, { audience: "Prospect" }))).not.toContain("partner.range_invitation");
+    expect(keysOf(contactTemplateChoices(EMAIL_TEMPLATES, {}))).not.toContain("partner.range_invitation");
+    // Même demandé comme modèle par défaut, il ne passe pas dans la liste d'un public qui n'est pas le sien.
+    expect(keysOf(contactTemplateChoices(EMAIL_TEMPLATES, { audience: "Titulaire", defaultTemplateKey: "partner.range_invitation" }))).not.toContain("partner.range_invitation");
+    expect(keysOf(contactTemplateChoices(EMAIL_TEMPLATES, { defaultTemplateKey: "partner.range_invitation" }))).not.toContain("partner.range_invitation");
+  });
+
+  it("la liste d'un partenaire ne contient que ses modèles (et le message libre), jamais ceux des officines", () => {
+    const offered = keysOf(contactTemplateChoices(EMAIL_TEMPLATES, { audience: "Partenaire", defaultTemplateKey: "partner.range_invitation" }));
+    expect(offered.sort()).toEqual(["generic.message", "partner.range_invitation"]);
+  });
+
+  it("le message de parrainage n'est pas proposé dans « Contacter » : il lui manque le filleul et son montant", () => {
+    expect(keysOf(contactTemplateChoices(EMAIL_TEMPLATES, { audience: "Titulaire" }))).not.toContain("referral.filleul_joined");
+    expect(keysOf(contactTemplateChoices(EMAIL_TEMPLATES, {}))).not.toContain("referral.filleul_joined");
+  });
+
+  it("rien ne change pour les officines et les prospects : mêmes modèles qu'avant", () => {
+    expect(keysOf(contactTemplateChoices(EMAIL_TEMPLATES, { audience: "Titulaire" })).sort()).toEqual(["generic.message", "payment.failed_reminder", "payment.unpaid_final", "subscription.welcome", "trial.ending_soon", "trial.ended", "trial.onboarding", "trial.welcome"].sort());
+    expect(keysOf(contactTemplateChoices(EMAIL_TEMPLATES, { audience: "Prospect" })).sort()).toEqual(["commercial.followup", "generic.message"]);
   });
 });

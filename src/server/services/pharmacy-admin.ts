@@ -7,6 +7,7 @@ import { uniqueSlug } from "@/server/services/slugs";
 import { isLgoId } from "@/server/services/stock-sync";
 import { sendUserPasswordLink } from "@/server/services/user-password";
 import { lastDispatchFor } from "@/server/services/email-dispatch";
+import { referralAmountForNewFilleul } from "@/server/services/referral-offers";
 import { ensureDossierForPharmacy } from "@/server/services/sales/pharmacy-dossier";
 import { recordProspectEvent, type SalesActor } from "@/server/services/sales/events";
 import { normalizeEmail, normalizeSiret, isValidSiret } from "@/core/contracts/identity";
@@ -82,6 +83,8 @@ export async function createClientPharmacy(input: CreateClientPharmacyInput, act
   // Sans mot de passe fourni, un secret aléatoire que personne ne connaît : le titulaire choisit le sien par le lien reçu.
   const passwordHash = await hashPassword(input.ownerPassword || generateToken(24));
   const lgo = input.lgo && isLgoId(input.lgo) ? input.lgo : null;
+  // Ce que ce filleul apportera à son parrain est figé maintenant : une offre de parrainage qui change ensuite ne le modifie pas.
+  const referralAmountCents = input.referredById ? await referralAmountForNewFilleul() : null;
 
   const created = await prisma.$transaction(async (tx) => {
     const organization = await tx.organization.create({ data: { name: input.name, slug: organizationSlug } });
@@ -102,6 +105,7 @@ export async function createClientPharmacy(input: CreateClientPharmacyInput, act
         isDemo: false,
         isActive: true,
         referredById: input.referredById ?? null,
+        referralAmountCents,
       },
     });
     const owner = await tx.user.create({ data: { organizationId: organization.id, email: ownerEmail, firstName: input.ownerFirstName, lastName: input.ownerLastName, passwordHash, status: "ACTIVE" } });
