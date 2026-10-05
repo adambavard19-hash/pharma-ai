@@ -19,6 +19,8 @@ Pharma.ai traite, dans son usage cible :
 | Ordonnance | médicaments, posologies, prescripteur | **Données de santé** |
 | Profil médical | allergies, pathologies, grossesse | **Données de santé** |
 | Commercial | achats, conseils acceptés | Données personnelles |
+| Abonnement aux nouveautés | adresse e-mail d'un patient, rattachée à une seule officine (chiffrée) | Donnée personnelle. **Pas une donnée de santé** : aucun lien avec une ordonnance, un plan ou un produit |
+| Contacts professionnels | adresse et nom d'un titulaire d'officine ou d'un contact de laboratoire (campagnes, relances) | Données personnelles professionnelles |
 | Équipe | activité par collaborateur | Données personnelles — suivi salarié |
 
 La présence de données de santé déclenche des obligations renforcées : base
@@ -49,6 +51,10 @@ légale spécifique, hébergement agréé, analyse d'impact.
 - Chacun est **horodaté**, porte la méthode de recueil, l'auteur du recueil et
   la version du texte d'information présenté.
 - Chacun est **révocable** à tout moment depuis la fiche patient.
+- **En dehors de ces six**, l'abonnement aux nouveautés de l'officine est recueilli
+  par le patient lui-même, sans fiche : lien facultatif de l'e-mail du plan,
+  confirmation par un bouton, adresse chiffrée, **36 mois**, désinscription en un
+  clic qui efface l'adresse (`docs/NOTIFICATIONS-CAMPAGNES.md`).
 - L'application **refuse** l'envoi de la fiche conseil sans consentement
   `ADVICE_SHARING` — le bouton est désactivé et le motif affiché.
 - Elle **refuse** de même tout suivi sans consentement `FOLLOW_UP_MESSAGE`, ou
@@ -133,7 +139,16 @@ ni l'un ni l'autre certifié.
 
 - **Analyse d'impact relative à la protection des données (AIPD)** — probable
   au vu du traitement de données de santé à grande échelle.
-- **Registre des traitements**.
+- **Registre des traitements**. Traitements ajoutés par le lot « Notifications et
+  campagnes » (octobre 2026), à inscrire avec leur finalité, leur base légale et
+  leurs destinataires :
+
+  | Traitement | Finalité | Données | Durée | Base légale |
+  |---|---|---|---|---|
+  | Nouveautés de l'officine | prévenir un patient des nouvelles gammes de sa pharmacie, à sa demande | adresse chiffrée, empreinte, dates, version du texte | 36 mois après le consentement (purge) | consentement, à valider |
+  | Annonces aux patients | trace des annonces envoyées | texte, compteurs, statuts d'envoi sans adresse | à arrêter (aucune purge) | à qualifier |
+  | Campagnes aux professionnels | offres, parrainage, invitation des partenaires | adresse professionnelle, nom, statut d'envoi | à arrêter (aucune purge) | à qualifier (B2B) |
+  | Liste de désinscription des offres | respecter l'opposition | empreinte seule | sans limite, nécessaire à l'opposition | à qualifier |
 - **Politique de conservation** : les durées ne sont pas encore arrêtées ni
   automatisées. Voir § 4.
 - **Base légale** à déterminer pour chaque finalité (le consentement n'est pas
@@ -164,6 +179,26 @@ conforme pour autant. Trois points relèvent d'un avis juridique :
    côté serveur sans consentement `ADVICE_SHARING`.
 3. **Conservation.** La durée de vie des rappels envoyés et des traces d'envoi
    doit être arrêtée avec le reste des durées (§ 4).
+
+### 3.5 ter Nouveautés de l'officine et campagnes — à faire valider
+
+Le lot est construit et ses garde-fous sont appliqués par le code et par des tests
+(abonnement par un geste explicite, aucune donnée de santé, 36 mois et purge,
+désinscription, aucun envoi sans confirmation). Cela ne le rend pas conforme pour
+autant. Les points à faire valider sont réunis dans
+`docs/NOTIFICATIONS-CAMPAGNES.md` § 10 ; les principaux :
+
+1. **Adresse conservée sur consentement en mode sans patient** : une adresse chiffrée
+   et le nom d'une pharmacie, sans lien avec un traitement.
+2. **Texte d'information** (page d'abonnement, pied de page des messages) rédigé au
+   nom de la pharmacie, responsable du traitement ; PharmaBoost sous-traitant. Toute
+   modification incrémente `PATIENT_NEWS_NOTICE_VERSION`.
+3. **Exercice des droits** : aucun outil n'efface ni n'exporte l'abonnement d'une
+   adresse donnée si le patient a perdu ses liens.
+4. **Base légale des campagnes B2B** et **durée de conservation des destinataires**
+   (aucune purge aujourd'hui).
+5. **Rappels de prise par le serveur : non construits** (donnée de santé liée à une
+   adresse, donc HDS, décision du 1er octobre 2026).
 
 ### 3.5 Transferts et fournisseurs d'IA
 
@@ -203,7 +238,8 @@ l'interface. Sa mise en œuvre suppose néanmoins :
 ## 4. Durées de conservation — à arrêter
 
 Le modèle prévoit les champs nécessaires (`deletedAt`, `anonymizedAt`,
-`tokenExpiresAt`). **Les durées ne sont pas encore définies ni automatisées.**
+`tokenExpiresAt`). **Les durées ne sont pas encore définies ni automatisées**, sauf
+celles des nouveautés de l'officine (ligne ci-dessous, purge au passage quotidien).
 
 | Donnée | Champ | Durée à définir |
 |---|---|---|
@@ -212,6 +248,13 @@ Le modèle prévoit les champs nécessaires (`deletedAt`, `anonymizedAt`,
 | Fiche patient publiée | `PatientDocument` | 90 jours (jeton) — contenu ⚠️ |
 | Journal d'audit | `AuditLog` | ⚠️ à arrêter |
 | Sessions | `Session.expiresAt` | 12 h ✅ |
+| Abonnement aux nouveautés (adresse chiffrée, empreinte) | `PatientNewsSubscription.consentAt` | 36 mois ✅ (purge quotidienne) ; adresse effacée dès la désinscription |
+| Lien d'abonnement aux nouveautés | jeton chiffré | 90 jours ✅ |
+| Lien de désinscription des nouveautés | jeton signé | 5 ans ✅ |
+| Annonces aux patients (texte, compteurs) | `PatientNewsAnnouncement` | ⚠️ à arrêter (aucune donnée sur les abonnés) |
+| Destinataires d'une campagne (adresse pro, nom) | `CampaignRecipient` | ⚠️ à arrêter (aucune purge) |
+| Traces d'envoi des e-mails | `EmailDispatch` | ⚠️ à arrêter |
+| Liste de désinscription des offres | `MarketingOptOut` (empreinte) | sans limite, nécessaire à l'opposition ; à confirmer |
 | Historique commercial | `Sale` | Obligations comptables |
 
 **À faire** : arrêter chaque durée, l'inscrire au registre, et implémenter une

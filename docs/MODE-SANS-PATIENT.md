@@ -20,7 +20,8 @@ dans le code pour le jour où l'hébergement HDS est en place.
 | Image de l'ordonnance | conservée | **effacée à la vérification** des lignes (`prescription.file_erased` au journal) |
 | Lignes de médicaments, conseils, vente | conservés, rattachés au patient | conservés, **sans personne** |
 | Plan de prise remis | document conservé, lien à jeton | **plan scellé** : chiffré, clé dans le lien, effacé après 90 jours |
-| E-mail au patient | adresse de la fiche, consentement enregistré | adresse donnée au comptoir, utilisée une fois, non conservée (forme masquée au journal) |
+| E-mail au patient (l'e-mail du plan) | adresse de la fiche, consentement enregistré | adresse donnée au comptoir, utilisée une fois, non conservée (forme masquée au journal) |
+| Nouveautés de l'officine (facultatif) | abonnement sur le geste du patient : adresse chiffrée, 36 mois, aucun lien avec la fiche | **même mécanisme** : adresse chiffrée, 36 mois, aucun lien avec un plan, une ordonnance ou un produit (voir ci-dessous) |
 | Rappels de prise | messages de suivi programmés par l'officine | **dans l'agenda du téléphone** du patient (fichier iCalendar produit dans son navigateur) |
 | Suivis à J+7 | écran Suivis | écran absent |
 
@@ -37,11 +38,43 @@ dans le code pour le jour où l'hébergement HDS est en place.
    construit un fichier iCalendar à partir du plan, dans le navigateur.
 5. Le plan en clair ne revient qu'au poste du pharmacien, pour l'afficher et
    l'imprimer. L'e-mail ne contient que le lien et le nombre de prises par
-   moment, jamais un nom de médicament.
+   moment, jamais un nom de médicament. Il porte aussi, sauf si l'officine l'a
+   coupé, un bloc **facultatif** d'invitation aux nouveautés de la pharmacie : un
+   lien, et rien n'est enregistré sans le geste du patient (section suivante).
 6. À l'échéance, `purgeExpiredSealedDocuments` efface le chiffré.
 
 Code : `src/core/documents/seal.ts`, `src/core/documents/calendar.ts`,
 `src/server/services/sealed-documents.ts`, `src/app/(public)/plan/[id]`.
+
+## La seule exception : l'abonnement aux nouveautés de l'officine
+
+La ligne « E-mail au patient » ci-dessus reste vraie pour l'e-mail du plan :
+l'adresse donnée au comptoir sert à cet envoi et n'est pas conservée. **Une
+adresse n'est conservée que dans un cas : le patient lui-même demande à être
+prévenu des nouveautés de sa pharmacie.** Rien d'autre ne la retient, et rien n'est
+fait à sa place.
+
+- **Le geste.** L'e-mail du plan contient un lien facultatif. L'adresse y est dans
+  un **jeton chiffré** (valable 90 jours) : elle n'est enregistrée nulle part tant
+  que le patient n'a pas ouvert la page **et** cliqué sur « Oui, tenez-moi
+  informé(e) ». Ouvrir la page n'écrit rien.
+- **Ce qui est conservé** (`patient_news_subscriptions`) : l'officine, l'adresse
+  **chiffrée** (AES-256-GCM), son empreinte, le statut, la date et la source du
+  consentement, la version du texte d'information. **Aucun lien avec le plan, une
+  ordonnance, un produit ou un traitement ; aucun nom ; aucune donnée de santé.**
+  Le patient n'a pas de fiche.
+- **Conservation : 36 mois** après le consentement, puis purge (passage quotidien).
+  La désinscription, présente dans chaque message et sans compte, efface
+  l'adresse sur-le-champ.
+- **Ce qui part** : une annonce du titulaire, une par semaine au plus, sans lien
+  libre ni mot d'ordonnance. Le plan, lui, ne dépend jamais de l'abonnement.
+- **Ce que ça ne change pas** : les rappels de prise restent dans l'agenda du
+  téléphone du patient ; le serveur n'en envoie aucun (un rappel de prise lié à
+  une adresse serait une donnée de santé : `NOTIFICATIONS-CAMPAGNES.md` § 3).
+- Le script de purge ci-dessous ne touche pas à ces abonnements : ce ne sont pas des
+  données de santé, ils ont leur propre purge.
+
+Détail, limites et points ouverts : [`NOTIFICATIONS-CAMPAGNES.md`](./NOTIFICATIONS-CAMPAGNES.md).
 
 ## Passer une base existante en mode `none`
 
@@ -56,6 +89,12 @@ prescripteur ; garde ordonnances, lignes, ventes, conseils, stock. Inscrit
 
 ## Ce qui reste à faire valider par un juriste
 
+- **L'abonnement aux nouveautés** : une adresse e-mail est conservée, chiffrée,
+  36 mois, sur le seul geste du patient, sans lien avec un plan ni un traitement.
+  À confirmer : elle n'est pas une donnée de santé ; savoir qu'une personne est
+  cliente d'une pharmacie donnée est acceptable ; le texte d'information et la
+  durée conviennent ; l'option est activée par défaut dans l'e-mail du plan.
+  Liste complète : `NOTIFICATIONS-CAMPAGNES.md` § 10.
 - L'e-mail de remise : une adresse utilisée une fois sans conservation, un
   message sans donnée de santé. C'est la construction la plus prudente qu'on
   sache faire ; elle mérite une relecture.

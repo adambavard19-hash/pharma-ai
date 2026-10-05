@@ -25,12 +25,26 @@ le permet ; PharmaBoost attribue chaque prise de contact et chaque commande.
   comme n'importe quel autre : la clinique d'abord, les préférences de
   l'officine seulement entre équivalents (voir `pipeline.ts`). Le contrat du
   partenaire n'existe que dans la console.
+- **Indépendance des messages.** Les annonces que l'officine adresse à ses
+  patients (« nouveautés ») sont un acte de l'officine : **jamais déclenchées ni
+  facturées par un partenaire**, toujours signées du nom de l'officine, et le
+  module qui les porte n'importe aucun module ni modèle partenaire (test
+  `src/core/patient-news/__tests__/independance.test.ts`). Les invitations que
+  PharmaBoost adresse aux partenaires pour qu'ils déposent leur gamme **ne vendent
+  aucune recommandation** : elles renvoient au formulaire de candidature et le
+  disent dans leur texte par défaut.
 
 ## Parcours
 
 1. **Candidature** — `/decouvrir/partenaires` : formulaire public, consentement
    obligatoire, enregistrement en base (`PartnerApplication`), notification de
-   l'équipe, accusé de réception. Rien n'est activé automatiquement.
+   l'équipe, accusé de réception. Rien n'est activé automatiquement. L'équipe peut
+   inviter un partenaire à déposer sa gamme : campagne d'invitation de la console,
+   ou relance automatique « Invitation à référencer sa gamme » (désactivée par
+   défaut, partenaires sans aucune marque) ; ces messages renvoient au même
+   formulaire, **il n'existe pas de portail partenaire** (voir plus bas), et une
+   adresse désinscrite des offres n'est jamais contactée
+   (`NOTIFICATIONS-CAMPAGNES.md`).
 2. **Étude** — console `/admin/partenaires/candidatures` : Nouveau → En étude →
    Contacté → Négociation → Accepté / Refusé → Partenaire actif, notes
    internes et historique (`PartnerApplicationEvent`).
