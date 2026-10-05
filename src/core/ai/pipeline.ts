@@ -34,6 +34,7 @@ import type {
   CompanionSuggestion,
   DrugKnowledge,
   OfficialDrugFacts,
+  OpportunityCoverage,
   PatientContext,
   PharmacyRuleInput,
   PipelineStageName,
@@ -483,6 +484,8 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
   // zéro : un rayon vide et un rayon jamais importé ne se traitent pas pareil.
   const stockConfigured = input.stock?.configured ?? input.catalog.length > 0;
   const matchingSignals = { inStockCandidates: 0, outOfStockCandidates: 0, safetyRemoved: 0 };
+  // Pour dire, besoin par besoin, ce que le stock a répondu : références en rupture, par besoin.
+  const outOfStockByOpportunity = new Map<string, number>();
 
   // ---------------------------------------------------------------- ÉTAPE 5
   // APPARIEMENT STOCK — le catalogue n'entre en jeu qu'ici.
@@ -506,6 +509,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
             includeOutOfStock: true,
           }).filter((c) => c.product.stockQuantity <= 0);
           matchingSignals.outOfStockCandidates += outOfStock.length;
+          outOfStockByOpportunity.set(opportunity.key, outOfStock.length);
           notes.push(
             outOfStock.length > 0
               ? `« ${opportunity.title} » : ${outOfStock.length} référence(s) adaptée(s) mais en rupture (${outOfStock
@@ -866,6 +870,26 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     },
   );
 
+  // Ce que le stock a répondu à chaque besoin non bloqué : c'est ce qui permet au titulaire de voir les
+  // besoins réels que son assortiment ne couvre pas. N'influence aucun conseil.
+  const adviceKeys = new Set(recommendations.map((r) => r.opportunityKey));
+  const scoredKeys = new Set(scored.map((s) => s.opportunityKey));
+  const coverageByKey = new Map<string, OpportunityCoverage>();
+  for (const opportunity of eligibleOpportunities) {
+    const candidates = candidatesByOpportunity.get(opportunity.key) ?? [];
+    coverageByKey.set(
+      opportunity.key,
+      adviceKeys.has(opportunity.key) || scoredKeys.has(opportunity.key)
+        ? "COVERED"
+        : candidates.length > 0
+          ? "NO_SUITABLE"
+          : (outOfStockByOpportunity.get(opportunity.key) ?? 0) > 0
+            ? "OUT_OF_STOCK"
+            : "NOT_REFERENCED",
+    );
+  }
+  const opportunitiesWithCoverage = opportunities.map((opportunity) => ({ ...opportunity, coverage: coverageByKey.get(opportunity.key) ?? null }));
+
   const hasPartial = recorder.trace.some((s) => s.status === "PARTIAL");
 
   const outcome = deriveOutcome({
@@ -886,7 +910,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     outcome,
     safetyFindings: allSafetyFindings,
     explanations,
-    opportunities,
+    opportunities: opportunitiesWithCoverage,
     recommendations,
     trace: recorder.trace,
     blockedReasons,

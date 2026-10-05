@@ -227,7 +227,8 @@ export type AuditAction =
   | "sales_application.status_changed"
   | "sales_application.note_added"
   | "sales_application.converted"
-  | "sales_application.cv_downloaded";
+  | "sales_application.cv_downloaded"
+  | "assortment.lab_suggested";
 
 export async function recordAudit(params: {
   action: AuditAction;

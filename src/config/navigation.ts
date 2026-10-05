@@ -8,7 +8,7 @@ import {
   Settings,
   Users,
   UsersRound,
-  type LucideIcon, Rocket, GraduationCap, Handshake } from "lucide-react";
+  type LucideIcon, Rocket, GraduationCap, Handshake, PackageSearch } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 
 /**
@@ -116,6 +116,16 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.NEWS_MANAGE,
     match: ["/nouveautes"],
     description: "Prévenir vos patients abonnés des nouvelles gammes",
+  },
+  {
+    href: "/assortiment",
+    label: "Assortiment",
+    icon: PackageSearch,
+    // Réservé au titulaire, comme les partenaires : les besoins que le stock n'a pas couverts
+    // ne remontent pas de l'équipe au comptoir, le titulaire les consulte ici.
+    permission: PERMISSIONS.PARTNERS_MANAGE,
+    match: ["/assortiment"],
+    description: "Les besoins que votre stock n'a pas couverts, et ce qui existe chez nos partenaires",
   },
   {
     href: "/suivis",

@@ -37,3 +37,20 @@ describe("l'entrée « Nouveautés »", () => {
     expect(new Set(NAVIGATION.map((item) => item.href)).size).toBe(NAVIGATION.length);
   });
 });
+
+describe("l'entrée « Assortiment » (les besoins que le stock n'a pas couverts)", () => {
+  const entry = NAVIGATION.find((item) => item.href === "/assortiment");
+
+  it("existe, avec la permission des partenaires : une décision du titulaire", () => {
+    expect(entry).toMatchObject({ label: "Assortiment", permission: PERMISSIONS.PARTNERS_MANAGE, match: ["/assortiment"] });
+  });
+
+  it("n'apparaît que pour le titulaire : jamais dans le menu de l'équipe au comptoir", () => {
+    expect(menuOf("OWNER")).toContain("Assortiment");
+    for (const role of ["PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const) expect(menuOf(role)).not.toContain("Assortiment");
+  });
+
+  it("la permission qui la garde n'est détenue par aucun rôle de l'équipe", () => {
+    for (const role of ["PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const) expect(ROLE_PERMISSIONS[role]).not.toContain(PERMISSIONS.PARTNERS_MANAGE);
+  });
+});

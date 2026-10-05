@@ -477,6 +477,7 @@ export async function analysePrescription(params: {
           ruleKey: opportunity.ruleKey ?? null,
           ruleVersion: opportunity.ruleVersion ?? null,
           confirmedReason: opportunity.confirmedReason ?? null,
+          coverage: opportunity.coverage ?? null,
         },
       });
       opportunityIdByKey.set(opportunity.key, created.id);

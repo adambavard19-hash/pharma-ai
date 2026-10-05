@@ -318,6 +318,12 @@ export type AdviceOpportunityResult = {
   populations?: PopulationVigilanceRule[];
   triggeredBy: { lineIndex: number; drugName: string }[];
   /**
+   * Le stock de l'officine a-t-il pu répondre à ce besoin ? Renseigné pour les
+   * besoins non bloqués seulement (un besoin écarté par la sécurité n'est pas un
+   * manque d'assortiment).
+   */
+  coverage?: OpportunityCoverage | null;
+  /**
    * La question à poser au patient avant de proposer quoi que ce soit, écrite
    * dans la règle — jamais formulée à la volée. `null` quand le conseil se
    * justifie par le traitement seul.
@@ -488,3 +494,12 @@ export type AnalysisResult = {
   /** Les vigilances que le traitement impose (interactions, contre-indications, surveillance, dépistage). */
   vigilances?: VigilanceResult[];
 };
+
+/**
+ * Ce que le stock a répondu à un besoin de conseil :
+ *  - COVERED : une référence convient (retenue, ou écartée seulement par la limite d'affichage) ;
+ *  - NO_SUITABLE : des références existent mais aucune ne convient au besoin ;
+ *  - OUT_OF_STOCK : des références correspondent mais sont en rupture ;
+ *  - NOT_REFERENCED : aucune référence de l'officine ne correspond.
+ */
+export type OpportunityCoverage = "COVERED" | "NO_SUITABLE" | "OUT_OF_STOCK" | "NOT_REFERENCED";

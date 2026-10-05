@@ -1961,6 +1961,12 @@ model AdviceOpportunity {
   /// conseil : c'est ce qui permet de l'afficher sous le médicament concerné.
   /// Vide : conseil propre au patient, ou analyse antérieure à ce rattachement.
   triggeredLineIds     String[]        @default([])
+  /// Le stock de l'officine a-t-il pu répondre à ce besoin ? COVERED · NO_SUITABLE
+  /// (des références existent mais aucune ne convient) · OUT_OF_STOCK (en rupture)
+  /// · NOT_REFERENCED (aucune référence). Vide : besoin écarté par la sécurité, ou
+  /// analyse antérieure à cette information. C'est elle qui nourrit « Votre
+  /// assortiment » : un besoin réel que le stock n'a pas couvert.
+  coverage             String?
   createdAt            DateTime        @default(now())
 
   analysisRun     AnalysisRun      @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
