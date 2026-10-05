@@ -254,6 +254,9 @@ export function SaleWorkspace({
       ),
     [lines, recommendations],
   );
+  // Une analyse récente sait rattacher ses conseils aux médicaments : un médicament
+  // sans conseil le dit alors. Une analyse ancienne n'a aucun lien : on ne le dit pas.
+  const adviceIsLinked = recommendations.some((recommendation) => recommendation.lineIds.length > 0);
   const presentProducts = useMemo(() => presentProductIds(recommendations), [recommendations]);
 
   const updateLine = (id: string, patch: Partial<SaleLineDraft>) =>
@@ -563,6 +566,7 @@ export function SaleWorkspace({
                           inBasket={(id) => basket.has(id)}
                           onAccept={acceptAdvice}
                           onCancelAccept={cancelAdvice}
+                          saysWhenEmpty={adviceIsLinked}
                         />
                       )
                 }

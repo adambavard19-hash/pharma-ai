@@ -153,6 +153,15 @@ describe("les conseils se lisent sous leur médicament", () => {
     expect(count(html, "Aucune autre référence adaptée en stock.")).toBe(1);
   });
 
+  it("un médicament sans conseil le dit quand l'analyse rattache ses conseils aux médicaments, et se tait sur une analyse ancienne", () => {
+    // Récente : le conseil est lié à l'amoxicilline, le Doliprane n'en a pas.
+    const recent = render({ recommendations: [flore] });
+    expect(count(recent, "Aucun conseil à proposer avec ce médicament.")).toBe(1);
+    // Ancienne : aucun lien, les conseils sont dans la zone générale ; dire « aucun » serait faux.
+    const legacy = render({ recommendations: [{ ...flore, lineIds: [] }] });
+    expect(text(legacy)).not.toContain("Aucun conseil à proposer avec ce médicament.");
+  });
+
   it("un conseil sans médicament lié montre ses alternatives enregistrées, et n'affirme jamais « aucune » quand rien n'a été enregistré", () => {
     const orphanWith = advice({ id: "r_orph1", lineIds: [], alternatives: [alternative({ productId: "alt_o", name: "Probiotique de repli" })], product: { ...advice().product!, id: "p_o1", name: "Conseil orphelin A" } });
     const orphanWithout = advice({ id: "r_orph2", lineIds: [], alternatives: [], product: { ...advice().product!, id: "p_o2", name: "Conseil orphelin B" } });

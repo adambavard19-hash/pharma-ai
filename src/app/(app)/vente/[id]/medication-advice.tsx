@@ -29,6 +29,7 @@ export function MedicationAdvice({
   inBasket,
   onAccept,
   onCancelAccept,
+  saysWhenEmpty = false,
 }: {
   drugName: string;
   prescriptionId: string;
@@ -40,8 +41,16 @@ export function MedicationAdvice({
   inBasket: (id: string) => boolean;
   onAccept: (recommendation: AdviceView) => void;
   onCancelAccept: (recommendation: AdviceView) => void;
+  /**
+   * Dire qu'il n'y a rien à proposer avec ce médicament. Seulement quand
+   * l'analyse sait rattacher ses conseils aux médicaments : sur une analyse plus
+   * ancienne, ils sont dans « Conseils pour ce patient » et cette phrase serait fausse.
+   */
+  saysWhenEmpty?: boolean;
 }) {
-  if (recommendations.length === 0) return null;
+  if (recommendations.length === 0) {
+    return saysWhenEmpty ? <p className="mt-2 pl-3 text-[12.5px] text-text-tertiary sm:pl-4">Aucun conseil à proposer avec ce médicament.</p> : null;
+  }
   const split = splitAdvice(recommendations);
 
   return (
