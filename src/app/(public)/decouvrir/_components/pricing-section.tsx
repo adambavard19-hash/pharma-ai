@@ -33,7 +33,6 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
           <p className="mt-1.5 text-[13.5px] text-text-secondary">par officine</p>
           <dl className="mt-7 divide-y divide-border-subtle border-y border-border-subtle text-[14.5px]">
             <Row label="Engagement" value="Sans engagement" />
-            <Row label="Postes" value="Tous les postes de l'officine" />
             <Row label="Mise en service" value={`${formatPriceEuros(monthly.setupFeeCents)} HT, une seule fois`} />
           </dl>
           <div className="mt-auto pt-8">
@@ -54,8 +53,6 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
           </p>
           <p className="mt-1.5 text-[13.5px] text-text-secondary">par officine · soit {formatPriceEuros(annual.monthlyEquivalentCents)} HT / mois</p>
           <dl className="mt-7 divide-y divide-border-subtle border-y border-border-subtle text-[14.5px]">
-            <Row label="Engagement" value={`${annual.commitmentMonths} mois`} />
-            <Row label="Postes" value="Tous les postes de l'officine" />
             <Row label="Mise en service" value={annualSetupLabel} strong={annualSetupOffered} />
           </dl>
           {annualSetupOffered && saved > 0 && (

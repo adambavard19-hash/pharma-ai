@@ -18,9 +18,15 @@ describe("la section tarif du site", () => {
     expect(t).toContain("390 € HT, une seule fois");
     expect(t).toContain("1 188 € HT / an");
     expect(t).toContain("Sans engagement");
-    expect(t).toContain("12 mois");
-    expect(t).toContain("Tous les postes de l'officine");
     expect(t).toContain("Offerte");
+  });
+
+  it("n'affiche ni la ligne « Engagement 12 mois » de l'annuelle, ni la ligne « Postes » des deux formules", () => {
+    expect(t).not.toContain("12 mois");
+    expect(t).not.toContain("Tous les postes de l'officine");
+    expect(t).not.toContain("Postes");
+    // Il ne reste qu'une ligne « Engagement » : celle de la mensuelle, « Sans engagement ».
+    expect(t.match(/Engagement/g)).toHaveLength(1);
   });
 
   it("met l'annuelle en valeur, et elle seule", () => {

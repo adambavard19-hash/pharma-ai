@@ -19,12 +19,12 @@ export default async function SubscribePage({ searchParams }: { searchParams: Pr
       ? {
           name: `${pricing.name} · formule annuelle`,
           price: `${formatPriceEuros(annual.priceCents)} HT / an`,
-          perks: [`Engagement ${annual.commitmentMonths} mois`, "Tous les postes de l'officine", annual.setupFeeCents === 0 ? "Mise en service offerte" : `Mise en service : ${formatPriceEuros(annual.setupFeeCents)} HT, une seule fois`, "Contrat signé en ligne"],
+          perks: [annual.setupFeeCents === 0 ? "Mise en service offerte" : `Mise en service : ${formatPriceEuros(annual.setupFeeCents)} HT, une seule fois`, "Contrat signé en ligne"],
         }
       : {
           name: `${pricing.name} · formule mensuelle`,
           price: `${formatPriceEuros(monthly.priceCents)} HT / mois`,
-          perks: ["Sans engagement", "Tous les postes de l'officine", `Mise en service : ${formatPriceEuros(monthly.setupFeeCents)} HT, une seule fois`, "Contrat signé en ligne"],
+          perks: ["Sans engagement", `Mise en service : ${formatPriceEuros(monthly.setupFeeCents)} HT, une seule fois`, "Contrat signé en ligne"],
         };
   const other: SubscriptionFormula = formula === "ANNUAL" ? "MONTHLY" : "ANNUAL";
 
