@@ -59,6 +59,12 @@ export type EmailContent = {
   signature?: string;
   /** Pourquoi ce message : affiché en pied de page. */
   reason?: string;
+  /**
+   * Message promotionnel : l'adresse où le destinataire cesse de recevoir ces
+   * offres, dite en pied de page. Sans elle, le pied de page reste celui d'un
+   * message de service.
+   */
+  unsubscribeUrl?: string | null;
 };
 
 export type RenderedEmail = { subject: string; text: string; html: string };
@@ -127,7 +133,7 @@ export const DEFAULT_EMAIL_CONTEXT: EmailContext = {
   company: { legalName: "PharmaBoost", contactEmail: PUBLIC_CONTACT_EMAIL },
 };
 
-export type FrameInput = { subject: string; preheader?: string; eyebrow?: string; title: string; bodyHtml: string; reason?: string };
+export type FrameInput = { subject: string; preheader?: string; eyebrow?: string; title: string; bodyHtml: string; reason?: string; unsubscribeUrl?: string | null };
 
 /** L'enveloppe commune : en-tête, carte, pied de page légal. Le corps est déjà en HTML. */
 export function emailFrame(ctx: EmailContext, input: FrameInput): string {
@@ -170,7 +176,7 @@ ${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opaci
       </table>
     </td></tr>
     <tr><td class="pb-pad" style="padding:22px 16px 0;font-family:${FONT};font-size:12px;line-height:19px;color:${BRAND.muted}">
-      ${input.reason ? `<p style="margin:0 0 10px">${escapeHtml(input.reason)}</p>` : ""}
+      ${input.reason ? `<p style="margin:0 0 10px">${escapeHtml(input.reason)}</p>` : ""}${input.unsubscribeUrl ? `<p style="margin:0 0 10px">Ne plus recevoir ces offres : <a href="${escapeHtml(input.unsubscribeUrl)}" style="color:${BRAND.muted}">me désinscrire</a></p>` : ""}
       <p style="margin:0 0 10px">Une question ? Écrivez-nous à <a href="mailto:${escapeHtml(ctx.company.contactEmail)}" style="color:${BRAND.primary};text-decoration:none">${escapeHtml(ctx.company.contactEmail)}</a>.</p>
       <p style="margin:0 0 10px">${escapeHtml(companyLine)}</p>
       <p style="margin:0"><a href="${escapeHtml(legal)}" style="color:${BRAND.muted}">Mentions légales</a> &nbsp;·&nbsp; <a href="${escapeHtml(privacy)}" style="color:${BRAND.muted}">Confidentialité</a></p>
@@ -191,7 +197,7 @@ export function renderEmail(ctx: EmailContext, content: EmailContent): RenderedE
     ...content.blocks.map(blockHtml),
     `<p style="margin:8px 0 8px;font-family:${FONT};font-size:16px;line-height:26px;color:${BRAND.body}">${escapeHtml(signature)}</p>`,
   ].join("\n");
-  const html = emailFrame(ctx, { subject: content.subject, preheader: content.preheader, eyebrow: content.eyebrow, title: content.title, bodyHtml, reason: content.reason });
+  const html = emailFrame(ctx, { subject: content.subject, preheader: content.preheader, eyebrow: content.eyebrow, title: content.title, bodyHtml, reason: content.reason, unsubscribeUrl: content.unsubscribeUrl });
 
   const text = [
     content.title,
@@ -202,6 +208,7 @@ export function renderEmail(ctx: EmailContext, content: EmailContent): RenderedE
     "",
     "—",
     ...(content.reason ? [content.reason] : []),
+    ...(content.unsubscribeUrl ? [`Ne plus recevoir ces offres : ${content.unsubscribeUrl}`] : []),
     `Contact : ${ctx.company.contactEmail}`,
     companyLine,
     `Mentions légales : ${base}/decouvrir/mentions-legales`,
