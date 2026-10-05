@@ -142,14 +142,17 @@ export function buildNewsWelcomeEmail(variables: Branding & { unsubscribeUrl: st
 }
 
 /**
- * L'en-tête qui fait apparaître « Se désabonner » dans la messagerie du patient.
+ * Les en-têtes qui font apparaître « Se désabonner » dans la messagerie du
+ * patient, en un clic (RFC 8058).
  *
- * Seul `List-Unsubscribe` est posé : le lien mène à une page qui demande une
- * confirmation. L'en-tête `List-Unsubscribe-Post` (désinscription en un clic,
- * RFC 8058) promet qu'un POST sur ce lien désinscrit ; la page n'en traite
- * aucun, et la promettre ferait croire au patient qu'il est désinscrit alors
- * qu'il ne l'est pas.
+ * Les messageries envoient un POST à l'adresse de `List-Unsubscribe`, sans
+ * demander quoi que ce soit au patient. La page de désinscription, elle, est
+ * une page à confirmation : un POST sur elle ne ferait rien et la messagerie
+ * croirait l'adresse désinscrite. L'en-tête pointe donc sur la route
+ * `/un-clic` de ce même lien : un GET n'y écrit rien et mène à la page, un POST
+ * y désinscrit (voir `desinscription/[token]/un-clic/route.ts`). Le lien
+ * visible dans le pied de page, lui, reste celui de la page.
  */
 export function newsUnsubscribeHeaders(unsubscribeUrl: string): Record<string, string> {
-  return { "List-Unsubscribe": `<${unsubscribeUrl}>` };
+  return { "List-Unsubscribe": `<${unsubscribeUrl}/un-clic>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
 }

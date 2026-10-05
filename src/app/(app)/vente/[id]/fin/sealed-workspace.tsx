@@ -26,7 +26,7 @@ type Sealed = { documentId: string; url: string; expiresAt: string; content: Doc
  * page rouverte plus tard prépare un nouveau lien, l'ancien reste valable
  * pour le patient qui l'a reçu.
  */
-export function SealedWorkspace({ prescriptionId, acceptedRecommendations, canSend, canRecordSale, messaging, existingSales, publicReach, previousVersions }: {
+export function SealedWorkspace({ prescriptionId, acceptedRecommendations, canSend, canRecordSale, messaging, existingSales, publicReach, previousVersions, newsOptInOffered }: {
   prescriptionId: string;
   acceptedRecommendations: AcceptedRecommendation[];
   canSend: boolean;
@@ -35,6 +35,8 @@ export function SealedWorkspace({ prescriptionId, acceptedRecommendations, canSe
   existingSales: { id: string; reference: string; attributedCents: number }[];
   publicReach: "PUBLIC" | "LAN" | "LOCAL";
   previousVersions: number;
+  /** L'e-mail du plan propose au patient, en option, de recevoir les nouveautés de la pharmacie. */
+  newsOptInOffered: boolean;
 }) {
   const [sealed, setSealed] = useState<Sealed | null>(null);
   const [note, setNote] = useState("");
@@ -154,10 +156,7 @@ export function SealedWorkspace({ prescriptionId, acceptedRecommendations, canSe
                   ) : (
                     <p className="text-[12.5px] text-text-secondary">L&apos;envoi par e-mail n&apos;est pas activé sur cette officine.</p>
                   )}
-                  <p className="flex items-start gap-1.5 text-[11.5px] leading-4 text-text-tertiary">
-                    <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
-                    L&apos;adresse sert à cet envoi et n&apos;est pas enregistrée. L&apos;e-mail ne contient aucun nom de médicament : seulement le lien et le nombre de prises par moment.
-                  </p>
+                  <AddressNotice newsOptInOffered={newsOptInOffered} />
                   {emailState === "simulated" && <p className="text-[11.5px] text-warning-700 dark:text-warning-500">Envoi simulé : aucun service d&apos;e-mail n&apos;est branché.</p>}
                 </div>
               )}
@@ -177,6 +176,27 @@ export function SealedWorkspace({ prescriptionId, acceptedRecommendations, canSe
 
         {canRecordSale && existingSales.length === 0 && <SalePanel prescriptionId={prescriptionId} patientId={null} recommendations={acceptedRecommendations} existingSales={existingSales} />}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Ce que le comptoir doit savoir de l'adresse saisie. L'envoi du plan ne
+ * l'enregistre pas ; l'abonnement aux nouveautés, quand il est proposé, est un
+ * acte à part du patient : il ne se fait que par son clic sur le lien du message.
+ */
+export function AddressNotice({ newsOptInOffered }: { newsOptInOffered: boolean }) {
+  return (
+    <div className="space-y-1.5 text-[11.5px] leading-4 text-text-tertiary">
+      <p className="flex items-start gap-1.5">
+        <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
+        L&apos;adresse sert à cet envoi et n&apos;est pas enregistrée. L&apos;e-mail ne contient aucun nom de médicament : seulement le lien et le nombre de prises par moment.
+      </p>
+      {newsOptInOffered && (
+        <p className="pl-5">
+          Le message propose aussi au patient, en option, de recevoir les nouveautés de la pharmacie. C&apos;est son choix, à part de cet envoi : son adresse n&apos;est conservée que s&apos;il clique sur ce lien et confirme.
+        </p>
+      )}
     </div>
   );
 }

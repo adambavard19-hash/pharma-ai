@@ -105,13 +105,15 @@ function readUnsubscribeToken(token: string): { pharmacyId: string; emailHash: s
  * Le lien d'abonnement à glisser dans l'e-mail du plan. L'adresse y est
  * chiffrée : rien ne la conserve avant que le patient ait confirmé. `null`
  * quand l'officine a coupé la fonction (ou n'existe plus) : le message part
- * alors sans le bloc.
+ * alors sans le bloc. `null` aussi pour une officine de démonstration : un vrai
+ * patient (un essai au comptoir, une démonstration à un confrère) ne doit pas
+ * s'abonner aux annonces d'une pharmacie fictive.
  */
 export async function newsOptInUrlFor(pharmacyId: string, email: string): Promise<string | null> {
   const address = email.trim();
   if (address.length > 254 || !EMAIL_SHAPE.test(address)) return null;
-  const pharmacy = await prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { isActive: true, patientNewsEnabled: true } });
-  if (!pharmacy?.isActive || !pharmacy.patientNewsEnabled) return null;
+  const pharmacy = await prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { isActive: true, isDemo: true, patientNewsEnabled: true } });
+  if (!pharmacy?.isActive || pharmacy.isDemo || !pharmacy.patientNewsEnabled) return null;
   return publicUrl(`/nouveautes/abonnement/${sealToken(OPT_IN_PURPOSE, { p: pharmacyId, e: address }, NEWS_OPT_IN_TTL_MS)}`);
 }
 

@@ -125,13 +125,20 @@ describe("le message de confirmation", () => {
   });
 });
 
-describe("l'en-tête de désinscription", () => {
-  it("List-Unsubscribe mène à la page qui demande confirmation", () => {
-    expect(newsUnsubscribeHeaders(UNSUBSCRIBE)).toEqual({ "List-Unsubscribe": `<${UNSUBSCRIBE}>` });
+describe("les en-têtes de désinscription", () => {
+  it("List-Unsubscribe pointe sur la route « un clic » du lien, pas sur la page à confirmation", () => {
+    expect(newsUnsubscribeHeaders(UNSUBSCRIBE)["List-Unsubscribe"]).toBe(`<${UNSUBSCRIBE}/un-clic>`);
   });
 
-  it("ne promet pas la désinscription en un clic (RFC 8058) : la page ne traite aucun POST de la messagerie", () => {
-    expect(newsUnsubscribeHeaders(UNSUBSCRIBE)).not.toHaveProperty("List-Unsubscribe-Post");
+  it("List-Unsubscribe-Post promet le POST en un clic (RFC 8058), que la route traite", () => {
+    expect(newsUnsubscribeHeaders(UNSUBSCRIBE)).toEqual({ "List-Unsubscribe": `<${UNSUBSCRIBE}/un-clic>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" });
+  });
+
+  it("le lien visible du message reste celui de la page : le patient qui clique confirme lui-même", () => {
+    const { text, html } = buildPatientNewsEmail(BASE);
+    expect(text).toContain(`Se désinscrire : ${UNSUBSCRIBE}\n`);
+    expect(html).toContain(`href="${UNSUBSCRIBE}"`);
+    expect(`${text}${html}`).not.toContain("/un-clic");
   });
 });
 

@@ -195,6 +195,7 @@ vi.mock("@/config/env", () => ({ getEnv: () => ({ AUTH_SESSION_SECRET: "secret-d
 const svc = await import("../patient-news");
 const { hashEmail, openToken, sealToken, signPayload } = await import("@/server/security/tokens");
 const { decryptField, encryptField } = await import("@/server/security/encryption");
+const route = await import("@/app/(public)/nouveautes/desinscription/[token]/un-clic/route");
 
 const NOW = new Date("2026-10-14T10:00:00Z");
 const DAY = 24 * 60 * 60 * 1000;
@@ -298,6 +299,15 @@ describe("le lien d'abonnement de l'e-mail du plan", () => {
     expect(await svc.newsOptInUrlFor("ph_inconnue", MARIE)).toBeNull();
   });
 
+  it("n'existe pas pour une officine de démonstration : un vrai patient ne s'abonne pas à une pharmacie fictive", async () => {
+    db.state.pharmacies[0].isDemo = true;
+    expect(await svc.newsOptInUrlFor("ph_a", MARIE)).toBeNull();
+    noWrites();
+    // Les autres officines ne sont pas touchées, et une officine réelle (isDemo faux ou absent) reçoit son lien.
+    db.state.pharmacies[1].isDemo = false;
+    expect(await svc.newsOptInUrlFor("ph_b", MARIE)).toMatch(/\/nouveautes\/abonnement\//);
+  });
+
   it("n'existe pas pour une adresse qui n'en est pas une", async () => {
     for (const address of ["", "pas-une-adresse", "a@b", "a b@c.fr", `${"x".repeat(250)}@example.org`]) expect(await svc.newsOptInUrlFor("ph_a", address)).toBeNull();
   });
@@ -383,7 +393,7 @@ describe("confirmNewsOptIn : le geste du patient", () => {
     const [welcome] = sentMessages();
     expect(welcome).toMatchObject({ to: MARIE, fromName: "Pharmacie Saint-Michel", subject: "Vous serez prévenu(e) des nouveautés — Pharmacie Saint-Michel" });
     expect(welcome.text).toContain("votre accord est enregistré");
-    expect(welcome.headers).toEqual({ "List-Unsubscribe": expect.stringMatching(/^<https:\/\/pharma\.example\/nouveautes\/desinscription\/.+>$/) });
+    expect(welcome.headers).toEqual({ "List-Unsubscribe": expect.stringMatching(/^<https:\/\/pharma\.example\/nouveautes\/desinscription\/.+\/un-clic>$/), "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" });
     expect(`${welcome.text}${welcome.html}`).not.toMatch(/pharmaboost/i);
   });
 
@@ -568,6 +578,87 @@ describe("la désinscription", () => {
   });
 });
 
+describe("le POST « en un clic » des messageries", () => {
+  const context = (token: string) => ({ params: Promise.resolve({ token }) });
+  const post = (token: string, ip: string) => route.POST(new Request("http://localhost/x", { method: "POST", headers: { "x-forwarded-for": ip, "content-type": "application/x-www-form-urlencoded" }, body: "List-Unsubscribe=One-Click" }), context(token));
+  /** Le jeton tel que la messagerie le lit dans l'en-tête List-Unsubscribe du message de bienvenue. */
+  const headerToken = (): string => /desinscription\/(.+)\/un-clic>$/.exec(sentMessages()[0].headers!["List-Unsubscribe"])![1];
+
+  async function subscribed(): Promise<void> {
+    await svc.confirmNewsOptIn(optInToken("ph_a", MARIE));
+  }
+
+  it("le POST sur l'adresse de l'en-tête désinscrit réellement le patient : le message ne promet rien qui ne soit tenu", async () => {
+    await subscribed();
+    const [welcome] = sentMessages();
+    expect(welcome.headers!["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+    // La route de l'en-tête porte le même jeton que le lien du pied de page.
+    expect(headerToken()).toBe(unsubscribeTokenIn(welcome.text));
+    audit.recordAudit.mockClear();
+
+    const response = await post(headerToken(), "10.1.0.1");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(db.state.subs[0]).toMatchObject({ status: "UNSUBSCRIBED", emailCipher: null, emailMasked: null, unsubscribedAt: NOW });
+    expect(auditActions()).toEqual(["patient_news.unsubscribed"]);
+  });
+
+  it("est idempotent : un second POST répond 200, sans second audit", async () => {
+    await subscribed();
+    audit.recordAudit.mockClear();
+    expect((await post(headerToken(), "10.1.0.2")).status).toBe(200);
+    expect((await post(headerToken(), "10.1.0.2")).status).toBe(200);
+    expect(auditActions()).toEqual(["patient_news.unsubscribed"]);
+  });
+
+  it("le POST d'une messagerie et le bouton de la page passent par la même écriture : le second ne défait ni ne double le premier", async () => {
+    await subscribed();
+    audit.recordAudit.mockClear();
+    await post(headerToken(), "10.1.0.3");
+    expect(await svc.confirmNewsUnsubscribe(headerToken())).toMatchObject({ ok: true });
+    expect(auditActions()).toEqual(["patient_news.unsubscribed"]);
+  });
+
+  it("un jeton invalide : 400, aucun détail, rien d'écrit, l'abonné reste abonné", async () => {
+    await subscribed();
+    db.state.writes.length = 0;
+    audit.recordAudit.mockClear();
+    for (const token of ["n'importe-quoi", "a".repeat(5000), signPayload({ p: "ph_a", h: hashEmail(MARIE), t: "offers-optout" }, DAY), optInToken("ph_a", MARIE)]) {
+      const response = await post(token, "10.1.0.4");
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { ok: boolean; error: string };
+      expect(body.ok).toBe(false);
+      expect(body.error).toContain("Ce lien de désinscription n'est plus valide");
+      expect(body.error).not.toMatch(/token|jeton|prisma|undefined|error/i);
+    }
+    noWrites();
+    expect(audit.recordAudit).not.toHaveBeenCalled();
+    expect(db.state.subs[0].status).toBe("ACTIVE");
+  });
+
+  it("un GET n'écrit rien : il renvoie vers la page de confirmation (les aperçus de messagerie ouvrent les liens)", async () => {
+    await subscribed();
+    db.state.writes.length = 0;
+    audit.recordAudit.mockClear();
+    const token = headerToken();
+    await expect(route.GET(new Request("http://localhost/x"), context(token))).rejects.toMatchObject({ digest: expect.stringContaining(`/nouveautes/desinscription/${token}`) });
+    noWrites();
+    expect(audit.recordAudit).not.toHaveBeenCalled();
+    expect(db.state.subs[0].status).toBe("ACTIVE");
+  });
+
+  it("limite de débit : au-delà de 30 demandes par heure et par adresse IP, 429 sans écriture ; une autre adresse passe", async () => {
+    await subscribed();
+    const token = headerToken();
+    for (let i = 0; i < 30; i += 1) expect((await post(token, "10.1.0.9")).status).toBe(200);
+    db.state.writes.length = 0;
+    const limited = await post(token, "10.1.0.9");
+    expect(limited.status).toBe(429);
+    noWrites();
+    expect((await post(token, "10.1.0.10")).status).toBe(200);
+  });
+});
+
 describe("sendAnnouncement : les règles avant tout envoi", () => {
   beforeEach(() => {
     seedSubscribers("ph_a", 3);
@@ -674,7 +765,7 @@ describe("sendAnnouncement : l'envoi", () => {
       expect(message.text).toContain("Vous recevez ce message parce que vous avez demandé à être informé(e) des nouveautés de Pharmacie Saint-Michel.");
       expect(`${message.text}${message.html}`).not.toMatch(/pharmaboost/i);
       const token = unsubscribeTokenIn(message.text);
-      expect(message.headers).toEqual({ "List-Unsubscribe": `<https://pharma.example/nouveautes/desinscription/${token}>` });
+      expect(message.headers).toEqual({ "List-Unsubscribe": `<https://pharma.example/nouveautes/desinscription/${token}/un-clic>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" });
       // Le lien désinscrit CE destinataire, dans CETTE officine.
       expect(token).not.toContain(message.to);
     }

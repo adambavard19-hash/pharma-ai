@@ -66,6 +66,12 @@ export default async function DocumentPage({
   if (!patientDataEnabled()) {
     const messagingProvider = getMessagingProvider();
     const sealedCount = await prisma.sealedDocument.count({ where: { prescriptionId: prescription.id } });
+    // L'e-mail du plan propose l'abonnement aux nouveautés quand l'officine l'a
+    // laissé actif, jamais pour une officine de démonstration (même règle que
+    // `newsOptInUrlFor`) : le message affiché au comptoir doit dire ce que le
+    // patient recevra vraiment.
+    const newsSettings = await prisma.pharmacy.findUnique({ where: { id: session.scope.pharmacyId }, select: { patientNewsEnabled: true, isDemo: true } });
+    const newsOptInOffered = Boolean(newsSettings?.patientNewsEnabled && !newsSettings.isDemo);
     return (
       <div className="space-y-6">
         <Button asChild variant="ghost" size="sm" className="no-print" leadingIcon={<ArrowLeft className="size-4" />}>
@@ -90,6 +96,7 @@ export default async function DocumentPage({
           existingSales={prescription.sales.map((sale) => ({ id: sale.id, reference: sale.reference, attributedCents: sale.attributedCents }))}
           publicReach={resolvePublicBaseUrl().reach}
           previousVersions={sealedCount}
+          newsOptInOffered={newsOptInOffered}
         />
       </div>
     );

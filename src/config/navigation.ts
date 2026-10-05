@@ -2,6 +2,7 @@ import {
   Boxes,
   CalendarClock,
   LineChart,
+  Megaphone,
   ScanLine,
   ScrollText,
   Settings,
@@ -105,6 +106,16 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.PARTNERS_MANAGE,
     match: ["/partenaires"],
     description: "Les gammes partenaires disponibles pour l'officine",
+  },
+  {
+    href: "/nouveautes",
+    label: "Nouveautés",
+    icon: Megaphone,
+    // Écrire aux patients abonnés est un acte du titulaire, comme Partenaires :
+    // l'entrée n'apparaît pas au comptoir.
+    permission: PERMISSIONS.NEWS_MANAGE,
+    match: ["/nouveautes"],
+    description: "Prévenir vos patients abonnés des nouvelles gammes",
   },
   {
     href: "/suivis",
