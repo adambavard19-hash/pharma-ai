@@ -21,6 +21,8 @@ export type PlanRow = {
   description: string;
   monthlyPriceCents: number;
   annualPriceCents: number | null;
+  setupFeeCents: number | null;
+  annualSetupFeeCents: number | null;
   foundingPriceCents: number | null;
   discountPercent: number | null;
   discountLabel: string | null;
@@ -128,6 +130,11 @@ function PlanCard({ plan, onEdit, onToggle, busy }: { plan: PlanRow; onEdit: () 
         </p>
         <p className="text-[13px] text-text-secondary">{plan.trialDays > 0 ? `${plan.trialDays} jours offerts` : "Sans essai"}</p>
         {plan.annualPriceCents !== null && <p className="text-[13px] text-text-secondary">{formatEuros(plan.annualPriceCents)} HT / an <span className="text-text-tertiary">(affiché)</span></p>}
+        {(plan.setupFeeCents !== null || plan.annualSetupFeeCents !== null) && (
+          <p className="text-[13px] text-text-secondary">
+            Mise en service : {plan.setupFeeCents !== null ? `${formatEuros(plan.setupFeeCents)} HT` : "—"} (mensuelle) · {plan.annualSetupFeeCents === null ? "—" : plan.annualSetupFeeCents === 0 ? "offerte" : `${formatEuros(plan.annualSetupFeeCents)} HT`} (annuelle)
+          </p>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -202,6 +209,8 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
   const [description, setDescription] = useState(plan?.description ?? "");
   const [price, setPrice] = useState(centsToField(plan?.monthlyPriceCents ?? null));
   const [annual, setAnnual] = useState(centsToField(plan?.annualPriceCents ?? null));
+  const [setupFee, setSetupFee] = useState(centsToField(plan?.setupFeeCents ?? null));
+  const [annualSetupFee, setAnnualSetupFee] = useState(plan?.annualSetupFeeCents === 0 ? "0" : centsToField(plan?.annualSetupFeeCents ?? null));
   const [founding, setFounding] = useState(centsToField(plan?.foundingPriceCents ?? null));
   const [discountPercent, setDiscountPercent] = useState(plan?.discountPercent !== null && plan?.discountPercent !== undefined ? String(plan.discountPercent) : "");
   const [discountLabel, setDiscountLabel] = useState(plan?.discountLabel ?? "");
@@ -217,6 +226,8 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
 
   const cents = price.trim() ? parseAmountToCents(price) : null;
   const optionalCents = (value: string) => (value.trim() ? parseAmountToCents(value) : null);
+  // Une mise en service vide est « non renseignée » ; 0 est « offerte ».
+  const optionalFee = (value: string) => (value.trim() ? parseAmountToCents(value) : null);
   const priceChanged = plan !== null && cents !== null && cents !== plan.monthlyPriceCents;
   const ready = name.trim().length >= 2 && code.trim().length >= 2 && cents !== null && cents >= 100;
 
@@ -229,6 +240,8 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
       description,
       monthlyPriceCents: cents ?? 0,
       annualPriceCents: optionalCents(annual),
+      setupFeeCents: optionalFee(setupFee),
+      annualSetupFeeCents: optionalFee(annualSetupFee),
       foundingPriceCents: optionalCents(founding),
       discountPercent: discountPercent.trim() ? Number(discountPercent) : null,
       discountLabel: discountLabel.trim() || null,
@@ -300,6 +313,14 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
             </Field>
             <Field label="Jours d'essai offerts" htmlFor="pl-trial" error={fieldErrors.trialDays} hint="30 = premier mois offert. 0 = aucun essai.">
               <Input id="pl-trial" inputMode="numeric" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Mise en service mensuelle HT (€)" htmlFor="pl-setup" error={fieldErrors.setupFeeCents} hint="Facturée une seule fois, formule mensuelle. 0 = offerte.">
+              <Input id="pl-setup" inputMode="decimal" value={setupFee} onChange={(e) => setSetupFee(e.target.value)} placeholder="ex. 390" />
+            </Field>
+            <Field label="Mise en service annuelle HT (€)" htmlFor="pl-setup-annual" error={fieldErrors.annualSetupFeeCents} hint="Formule annuelle. 0 = offerte.">
+              <Input id="pl-setup-annual" inputMode="decimal" value={annualSetupFee} onChange={(e) => setAnnualSetupFee(e.target.value)} placeholder="0 = offerte" />
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

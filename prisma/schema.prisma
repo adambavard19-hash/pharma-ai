@@ -281,38 +281,42 @@ model CounterPost {
 /// Un prix Stripe est immuable : changer le tarif d'une offre crée un nouveau
 /// prix (`stripePriceId` remplacé) ; les abonnements en cours gardent l'ancien.
 model Plan {
-  id                 String   @id @default(cuid())
+  id                  String   @id @default(cuid())
   /// Clé stable, en majuscules (« PHARMABOOST »). Libre : plus une énumération.
-  code               String   @unique
-  name               String
-  description        String
-  monthlyPriceCents  Int
-  currency           String   @default("eur")
+  code                String   @unique
+  name                String
+  description         String
+  monthlyPriceCents   Int
+  currency            String   @default("eur")
   /// Jours d'essai offerts à la souscription (30 = « premier mois offert »).
-  trialDays          Int      @default(30)
+  trialDays           Int      @default(30)
   /// Limites du plan : { maxPharmacies, maxUsers, maxPrescriptionsPerMonth, ... }
-  limits             Json     @default("{}")
-  isActive           Boolean  @default(true)
+  limits              Json     @default("{}")
+  isActive            Boolean  @default(true)
   /// L'offre proposée par défaut quand on prépare un contrat.
-  isDefault          Boolean  @default(false)
+  isDefault           Boolean  @default(false)
   /// Catalogue : prix annuel affiché (la facturation annuelle n'est pas branchée chez Stripe).
-  annualPriceCents   Int?
+  annualPriceCents    Int?
+  /// Catalogue : mise en service de la formule mensuelle, en centimes HT, due une seule fois. Vide : non renseignée.
+  setupFeeCents       Int?
+  /// Catalogue : mise en service de la formule annuelle, en centimes HT. 0 = offerte ; vide : non renseignée.
+  annualSetupFeeCents Int?
   /// Tarif fondateur proposé aux premières officines : un tarif de catalogue, jamais appliqué d'office.
-  foundingPriceCents Int?
+  foundingPriceCents  Int?
   /// Remise de catalogue proposée à la préparation d'un contrat (pourcentage entier) et son libellé.
-  discountPercent    Int?
-  discountLabel      String?
+  discountPercent     Int?
+  discountLabel       String?
   /// Ce que comprend l'offre, et ses options : une ligne par élément.
-  features           String[] @default([])
-  options            String[] @default([])
+  features            String[] @default([])
+  options             String[] @default([])
   /// Nombre d'utilisateurs inclus, si l'offre en fixe un.
-  maxUsers           Int?
+  maxUsers            Int?
   /// Ordre d'affichage au catalogue.
-  sortOrder          Int      @default(0)
-  stripeProductId    String?
-  stripePriceId      String?  @unique
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @default(now()) @updatedAt
+  sortOrder           Int      @default(0)
+  stripeProductId     String?
+  stripePriceId       String?  @unique
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now()) @updatedAt
 
   subscriptions Subscription[]
   contracts     Contract[]
@@ -2586,6 +2590,7 @@ model SalesRep {
   commissions   Commission[]
   tasks         SalesTask[]
   notifications ExtranetNotification[]
+  application   SalesApplication?
 
   @@map("sales_reps")
 }
@@ -2643,18 +2648,20 @@ model Prospect {
   salesRepId String?
   status     ProspectStatus @default(PROSPECT)
 
-  lastContactAt     DateTime?
-  nextActionAt      DateTime?
-  nextActionLabel   String?
+  lastContactAt       DateTime?
+  nextActionAt        DateTime?
+  nextActionLabel     String?
   /// Démonstration programmée (date et heure), puis réalisée.
-  demoAt            DateTime?
-  demoDoneAt        DateTime?
+  demoAt              DateTime?
+  demoDoneAt          DateTime?
   /// Notes commerciales courantes (le détail horodaté vit dans les événements).
-  notes             String?
+  notes               String?
   /// Conditions proposées : abonnement mensuel, en centimes.
-  monthlyPriceCents Int?
+  monthlyPriceCents   Int?
   /// Code de parrainage donné à l'inscription, résolu à la création de l'officine.
-  referralCode      String?
+  /// La formule choisie par le visiteur sur le site : MONTHLY ou ANNUAL. Vide : aucune (dossier créé à la main).
+  subscriptionFormula String?
+  referralCode        String?
 
   /// L'officine créée après signature. Un dossier, une officine.
   pharmacyId String? @unique
@@ -4079,4 +4086,74 @@ model ReferralOffer {
 
   @@index([startsAt, endsAt])
   @@map("referral_offers")
+}
+
+// ===========================================================================
+// CANDIDATURES COMMERCIALES (octobre 2026) — additif
+// Le formulaire public « Rejoindre l'équipe commerciale ». Rien n'est créé
+// automatiquement : une candidature acceptée peut devenir un commercial par un
+// geste de l'administrateur.
+// ===========================================================================
+
+enum SalesApplicationStatus {
+  NEW
+  TO_CONTACT
+  INTERVIEW
+  ACCEPTED
+  REFUSED
+}
+
+model SalesApplication {
+  id               String                 @id @default(cuid())
+  status           SalesApplicationStatus @default(NEW)
+  firstName        String
+  lastName         String
+  email            String
+  phone            String
+  /// Ville ou secteur géographique de la personne.
+  city             String
+  /// L'expérience commerciale, dite par la personne.
+  salesExperience  String
+  /// L'expérience avec les pharmacies ou la santé : facultative.
+  healthExperience String?
+  /// Statut actuel : SALARIED · FREELANCE · JOB_SEEKING · STUDENT · OTHER.
+  currentStatus    String
+  /// La zone dans laquelle la personne souhaite travailler.
+  zone             String
+  message          String
+  consentAt        DateTime
+  /// Le CV déposé (PDF), dans le stockage de la plateforme ; vide si aucun.
+  cvKey            String?
+  cvFileName       String?
+  cvSizeBytes      Int?
+  /// Le commercial créé à partir de cette candidature, une fois acceptée.
+  salesRepId       String?                @unique
+  acknowledgedAt   DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  salesRep SalesRep?               @relation(fields: [salesRepId], references: [id], onDelete: SetNull)
+  events   SalesApplicationEvent[]
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@map("sales_applications")
+}
+
+/// L'historique d'une candidature : changements de statut, notes internes, création du commercial.
+model SalesApplicationEvent {
+  id              String                  @id @default(cuid())
+  applicationId   String
+  /// CREATED · STATUS_CHANGED · NOTE · CONVERTED
+  kind            String
+  fromStatus      SalesApplicationStatus?
+  toStatus        SalesApplicationStatus?
+  note            String?
+  platformAdminId String?
+  createdAt       DateTime                @default(now())
+
+  application SalesApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@map("sales_application_events")
 }

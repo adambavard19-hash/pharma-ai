@@ -13,7 +13,7 @@ import { useClearNewParam } from "../demonstrations/demo-dialog";
 
 export type RepFormValues = { firstName: string; lastName: string; email: string; phone: string; zone: string; commissionType: "FIXED" | "PERCENT" | "RECURRING"; commissionValue: string; isActive: boolean };
 
-const EMPTY: RepFormValues = { firstName: "", lastName: "", email: "", phone: "", zone: "", commissionType: "FIXED", commissionValue: "300", isActive: true };
+const EMPTY: RepFormValues = { firstName: "", lastName: "", email: "", phone: "", zone: "", commissionType: "FIXED", commissionValue: "250", isActive: true };
 
 /** La valeur saisie en euros ou en pour cent, convertie pour le stockage (centimes / centièmes de %). */
 function toStored(type: RepFormValues["commissionType"], value: string): number {
@@ -42,9 +42,10 @@ function RepFields({ values, onChange }: { values: RepFormValues; onChange: (v: 
 }
 
 /** « Nouveau commercial ». L'action rapide `?nouveau=commercial` ouvre directement la fenêtre (`defaultOpen`). */
-export function CreateSalesRepButton({ defaultOpen = false }: { defaultOpen?: boolean }) {
+export function CreateSalesRepButton({ defaultOpen = false, defaultCommissionEuros }: { defaultOpen?: boolean; defaultCommissionEuros?: string }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [values, setValues] = useState(EMPTY);
+  // La commission proposée est la commission standard de la console (250 € par pharmacie activée) ; elle reste modifiable.
+  const [values, setValues] = useState(defaultCommissionEuros ? { ...EMPTY, commissionValue: defaultCommissionEuros } : EMPTY);
   const [invite, setInvite] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

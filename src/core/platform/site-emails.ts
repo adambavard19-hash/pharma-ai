@@ -28,7 +28,7 @@ export function buildSiteLeadAcknowledgement(v: SiteLeadSummary & { contactEmail
   const next =
     v.kind === "DEMO"
       ? "Nous vous rappelons sous un jour ouvré pour fixer un créneau de vingt minutes, en visio ou par téléphone, sur votre poste de comptoir."
-      : "Nous préparons votre espace et vous envoyons sous un jour ouvré votre contrat à signer en ligne, avec le mandat de prélèvement : le premier mois est offert, et vous pouvez arrêter à tout moment.";
+      : "Nous préparons votre espace et vous envoyons sous un jour ouvré votre contrat à signer en ligne, avec le mandat de prélèvement.";
   const text = [
     `Bonjour ${v.contactName},`,
     "",

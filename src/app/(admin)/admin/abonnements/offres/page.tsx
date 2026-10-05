@@ -10,6 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { StripeNotConfigured } from "../billing-ui";
 import { PlansManager } from "./plans-manager";
+import { PublicOfferPanel } from "./public-offer-panel";
+import { describePublicPricing } from "@/server/services/public-pricing";
+import { getStandardCommissionCents } from "@/server/services/standard-commission";
+import { OFFICIAL_OFFER } from "@/core/pricing/official-offer";
 
 export const metadata: Metadata = { title: "Offres & tarifs" };
 
@@ -21,7 +25,13 @@ export const metadata: Metadata = { title: "Offres & tarifs" };
  */
 export default async function PlansPage() {
   await requirePlatformSession();
-  const [plans, stats] = await Promise.all([prisma.plan.findMany({ orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }), planSubscriptionStats()]);
+  const [plans, stats, offer, commissionCents] = await Promise.all([
+    prisma.plan.findMany({ orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }),
+    planSubscriptionStats(),
+    describePublicPricing(),
+    getStandardCommissionCents(),
+  ]);
+  const defaultPlan = plans.find((plan) => plan.isDefault && plan.isActive) ?? null;
   const stripe = stripeConfigState();
 
   return (
@@ -43,6 +53,22 @@ export default async function PlansPage() {
       </Alert>
       {!stripe.configured && <StripeNotConfigured detail={stripe.detail}>Les offres s&apos;enregistrent ; leur prix Stripe sera créé dès que la clé sera renseignée.</StripeNotConfigured>}
 
+      <PublicOfferPanel
+        data={{
+          source: offer.pricing.source,
+          planName: offer.pricing.name,
+          monthlyPriceCents: offer.pricing.monthly.priceCents,
+          monthlySetupFeeCents: offer.pricing.monthly.setupFeeCents,
+          annualPriceCents: offer.pricing.annual.priceCents,
+          annualSetupFeeCents: offer.pricing.annual.setupFeeCents,
+          commitmentMonths: offer.pricing.annual.commitmentMonths,
+          commissionCents,
+          gaps: offer.gaps,
+          officialIsLive: offer.pricing.source === "PLAN" && defaultPlan?.code === OFFICIAL_OFFER.code,
+          previousDefaultName: defaultPlan && defaultPlan.code !== OFFICIAL_OFFER.code ? defaultPlan.name : null,
+        }}
+      />
+
       <PlansManager
         plans={plans.map((plan) => {
           const stat = stats.get(plan.id);
@@ -53,6 +79,8 @@ export default async function PlansPage() {
             description: plan.description,
             monthlyPriceCents: plan.monthlyPriceCents,
             annualPriceCents: plan.annualPriceCents,
+            setupFeeCents: plan.setupFeeCents,
+            annualSetupFeeCents: plan.annualSetupFeeCents,
             foundingPriceCents: plan.foundingPriceCents,
             discountPercent: plan.discountPercent,
             discountLabel: plan.discountLabel,

@@ -3,8 +3,10 @@ import { ArrowRight, Check } from "lucide-react";
 import { HAIRLINE, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
 import { HeroVisual, RequestVisual, StepConseil, StepScan, StepSuivi, StockMarginVisual } from "./_components/visuals";
 import { VideoButton } from "./_components/video-dialog";
-import { loadLiveProof, loadPublicOffer } from "@/server/services/site-leads";
+import { loadLiveProof } from "@/server/services/site-leads";
+import { loadPublicPricing } from "@/server/services/public-pricing";
 import { formatEuros } from "@/core/billing/subscription";
+import { PricingSection } from "./_components/pricing-section";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,9 +14,6 @@ import { cn } from "@/lib/utils";
  * Tout ce qui est affirmé ici existe dans l'application ; les montants des
  * visuels sont ceux du catalogue de démonstration et sont marqués « exemple ».
  */
-
-/** L'offre affichée quand la console n'en a pas encore publié : à régler dans Admin → Offres. */
-const FALLBACK_OFFER = { name: "PharmaBoost Officine", description: "", monthlyPriceCents: 6900, trialDays: 30 };
 
 /** Des conseils réels du moteur (protection solaire sous cycline, vitamines sous antibiotique, routine peau sous isotrétinoïne). */
 const EXAMPLES = [
@@ -49,15 +48,11 @@ const FAQ: { q: string; a: string }[] = [
   { q: "Une IA choisit-elle les produits ?", a: "Non. L'IA analyse l'ordonnance et repère les besoins. Les produits viennent de règles écrites, de la sécurité et de votre stock." },
   { q: "Quelles données sont conservées ?", a: "Aucune donnée patient. Le plan conseil est chiffré et remis au patient." },
   { q: "Est-ce un dispositif médical ?", a: "Non. C'est un outil d'aide au conseil : il ne diagnostique pas et ne prescrit pas." },
-  { q: "Quel engagement ?", a: "Aucun. Abonnement mensuel, résiliable à tout moment." },
+  { q: "Quel engagement ?", a: "Deux formules : mensuelle, sans engagement, ou annuelle, avec un engagement de 12 mois et la mise en service offerte." },
 ];
 
-const INCLUDED = ["Tous les postes de comptoir", "Analyse d'ordonnance", "Conseil au scan", "Demande sans ordonnance", "Stock et marge", "Plan conseil patient et rappels", "Pilotage par collaborateur"];
-
 export default async function SitePage() {
-  const [offerRow, live] = await Promise.all([loadPublicOffer(), loadLiveProof()]);
-  const offer = offerRow ?? FALLBACK_OFFER;
-  const trial = offer.trialDays >= 28 ? "Premier mois offert" : offer.trialDays > 0 ? `${offer.trialDays} jours offerts` : null;
+  const [pricing, live] = await Promise.all([loadPublicPricing(), loadLiveProof()]);
 
   return (
     <>
@@ -201,40 +196,8 @@ export default async function SitePage() {
         </div>
       </section>
 
-      {/* ---- Tarif ---------------------------------------------------- */}
-      <section id="tarif" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 md:py-28">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-          <div>
-            <SectionHead kicker="Tarif" title="Un abonnement. Tout compris." />
-            <p className="mt-6 text-[15px] text-text-secondary">
-              <span className="font-semibold text-text-primary">Parrainage</span> · chaque officine parrainée réduit votre abonnement.
-            </p>
-          </div>
-          <div className="relative rounded-[28px] border border-border-subtle bg-surface-card p-7 sm:p-9">
-            <div className={cn("absolute inset-x-8 top-0 h-px", HAIRLINE)} aria-hidden="true" />
-            <p className="font-mono text-[11.5px] tracking-[0.14em] text-text-tertiary uppercase">{offer.name}</p>
-            <p className="mt-3 flex items-baseline gap-2">
-              <span className="text-[52px] leading-none font-semibold tracking-[-0.04em] text-text-primary tabular">{formatEuros(offer.monthlyPriceCents)}</span>
-              <span className="text-[15px] text-text-secondary">HT / mois</span>
-            </p>
-            <p className="mt-2 text-[14px] font-medium text-brand-700">{[trial, "Sans engagement"].filter(Boolean).join(" · ")}</p>
-            <ul className="mt-7 grid gap-x-6 gap-y-2.5 text-[14.5px] text-text-primary sm:grid-cols-2">
-              {INCLUDED.map((item) => (
-                <li key={item} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-brand-600" /> {item}</li>
-              ))}
-            </ul>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/decouvrir/abonnement" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white hover:bg-brand-700">
-                S&apos;abonner <ArrowRight className="size-4" />
-              </Link>
-              <Link href="/decouvrir/demo" className="inline-flex h-12 items-center justify-center rounded-full border border-border-default px-7 text-[15px] font-semibold text-text-primary hover:border-brand-400">
-                Réserver une démo
-              </Link>
-            </div>
-            <p className="mt-5 text-[13px] text-text-tertiary">Prélèvement mensuel, résiliable à tout moment.</p>
-          </div>
-        </div>
-      </section>
+      {/* ---- Tarif : deux formules, une source (console ou offre officielle) ---- */}
+      <PricingSection pricing={pricing} />
 
       {/* ---- Questions ------------------------------------------------ */}
       <section className="border-y border-border-subtle bg-surface-card">

@@ -14,6 +14,8 @@ import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/t
 import { formatDate } from "@/lib/format";
 import { param } from "../pipeline/filter-form";
 import { CreateSalesRepButton } from "./rep-form";
+import { getStandardCommissionCents } from "@/server/services/standard-commission";
+import { formatPriceEuros } from "@/core/pricing/official-offer";
 
 export const metadata: Metadata = { title: "Commerciaux" };
 
@@ -28,7 +30,8 @@ export default async function SalesRepsPage({ searchParams }: { searchParams: Pr
   await requirePlatformSession();
   const params = await searchParams;
   const period = resolveCommercialPeriod(param(params.periode));
-  const { reps, team, console: consoleMetrics } = await teamMetrics(period);
+  const [{ reps, team, console: consoleMetrics }, standardCommissionCents] = await Promise.all([teamMetrics(period), getStandardCommissionCents()]);
+  const defaultCommissionEuros = String(standardCommissionCents / 100).replace(".", ",");
   const activeCount = reps.filter((r) => r.rep.isActive).length;
   const periodHint = period.value === "tout" ? "depuis le début" : `sur ${period.label}`;
 
@@ -37,9 +40,9 @@ export default async function SalesRepsPage({ searchParams }: { searchParams: Pr
       <AdminPageHeader
         space={{ label: "Commercial", href: "/admin/pipeline" }}
         title="Commerciaux"
-        description={`${activeCount} commercial${activeCount > 1 ? "aux" : ""} actif${activeCount > 1 ? "s" : ""} sur ${reps.length}. Portefeuilles, résultats et commissions.`}
+        description={`${activeCount} commercial${activeCount > 1 ? "aux" : ""} actif${activeCount > 1 ? "s" : ""} sur ${reps.length}. Portefeuilles, résultats et commissions. Commission standard : ${formatPriceEuros(standardCommissionCents)} par pharmacie activée (réglage dans Offres & tarifs).`}
         // La clé suit `?nouveau=` : la fenêtre s'ouvre aussi quand on est déjà sur la page, et à chaque nouvel usage.
-        actions={<CreateSalesRepButton key={param(params.nouveau) ?? "aucun"} defaultOpen={param(params.nouveau) === "commercial"} />}
+        actions={<CreateSalesRepButton key={param(params.nouveau) ?? "aucun"} defaultOpen={param(params.nouveau) === "commercial"} defaultCommissionEuros={defaultCommissionEuros} />}
       />
 
       <FilterChips basePath="/admin/commerciaux" param="periode" current={period.value === "30j" ? null : period.value} label="Période" options={COMMERCIAL_PERIODS.map((p) => ({ value: p.value === "30j" ? null : p.value, label: p.label }))} />
@@ -55,7 +58,7 @@ export default async function SalesRepsPage({ searchParams }: { searchParams: Pr
 
       {reps.length === 0 ? (
         <div className="rounded-2xl border border-border-subtle bg-surface-card">
-          <EmptyState icon={<Users className="size-5" />} title="Aucun commercial pour l'instant" description="Créez le premier compte : il recevra une invitation par e-mail pour définir son mot de passe." action={<CreateSalesRepButton />} />
+          <EmptyState icon={<Users className="size-5" />} title="Aucun commercial pour l'instant" description="Créez le premier compte : il recevra une invitation par e-mail pour définir son mot de passe." action={<CreateSalesRepButton defaultCommissionEuros={defaultCommissionEuros} />} />
         </div>
       ) : (
         <TableWrapper>

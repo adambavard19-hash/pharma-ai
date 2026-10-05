@@ -31,6 +31,8 @@ const lines = z
   });
 
 const optionalCents = z.preprocess((v) => (v === "" || v === null || v === undefined ? null : v), z.coerce.number("Montant invalide.").int("Montant invalide.").min(100, "Au moins 1 €.").max(100_000_000, "Montant trop élevé.").nullable());
+/** Une mise en service : 0 est une valeur (« offerte »), vide est « non renseignée ». */
+const optionalFee = z.preprocess((v) => (v === "" || v === null || v === undefined ? null : v), z.coerce.number("Montant invalide.").int("Montant invalide.").min(0, "Montant invalide.").max(10_000_000, "Montant trop élevé.").nullable());
 const optionalInt = (min: number, max: number) => z.preprocess((v) => (v === "" || v === null || v === undefined ? null : v), z.coerce.number("Nombre invalide.").int("Nombre entier attendu.").min(min, `Entre ${min} et ${max}.`).max(max, `Entre ${min} et ${max}.`).nullable());
 
 const planSchema = z.object({
@@ -41,6 +43,8 @@ const planSchema = z.object({
   monthlyPriceCents: z.coerce.number("Prix invalide.").int("Prix invalide.").min(100, "Le prix doit être d'au moins 1 €.").max(10_000_000, "Prix trop élevé."),
   trialDays: z.coerce.number("Nombre de jours invalide.").int("Nombre entier attendu.").min(0, "Entre 0 et 365 jours.").max(365, "Entre 0 et 365 jours."),
   annualPriceCents: optionalCents.optional(),
+  setupFeeCents: optionalFee.optional(),
+  annualSetupFeeCents: optionalFee.optional(),
   foundingPriceCents: optionalCents.optional(),
   discountPercent: optionalInt(1, 90).optional(),
   discountLabel: z.string().trim().max(80, "80 caractères au plus.").optional().nullable(),
@@ -64,7 +68,7 @@ function revalidateBilling(pharmacyId?: string) {
   }
 }
 
-const PLAN_AUDITED_FIELDS = ["code", "name", "description", "monthlyPriceCents", "trialDays", "annualPriceCents", "foundingPriceCents", "discountPercent", "discountLabel", "features", "options", "maxUsers", "sortOrder", "isActive", "isDefault"] as const;
+const PLAN_AUDITED_FIELDS = ["code", "name", "description", "monthlyPriceCents", "trialDays", "annualPriceCents", "setupFeeCents", "annualSetupFeeCents", "foundingPriceCents", "discountPercent", "discountLabel", "features", "options", "maxUsers", "sortOrder", "isActive", "isDefault"] as const;
 
 /** Les champs réellement modifiés, en {from, to} : le journal dit ce qui a changé, pas tout le formulaire. */
 function planChanges(before: Record<string, unknown> | null, after: Record<string, unknown>): Record<string, { from: unknown; to: unknown }> {
@@ -107,6 +111,8 @@ export async function savePlanAction(payload: z.input<typeof planSchema>): Promi
     monthlyPriceCents: input.monthlyPriceCents,
     trialDays: input.trialDays,
     annualPriceCents: input.annualPriceCents ?? null,
+    setupFeeCents: input.setupFeeCents ?? null,
+    annualSetupFeeCents: input.annualSetupFeeCents ?? null,
     foundingPriceCents: input.foundingPriceCents ?? null,
     discountPercent: input.discountPercent ?? null,
     discountLabel: input.discountPercent ? (input.discountLabel?.trim() || null) : null,

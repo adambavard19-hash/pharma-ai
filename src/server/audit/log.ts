@@ -217,7 +217,14 @@ export type AuditAction =
   | "patient_news.settings_changed"
   | "patient_news.purged"
   | "referral.filleul_notified"
-  | "partner.invitation_sent";
+  | "partner.invitation_sent"
+  | "platform.standard_commission_updated"
+  | "platform.public_offer_published"
+  | "sales_application.created"
+  | "sales_application.status_changed"
+  | "sales_application.note_added"
+  | "sales_application.converted"
+  | "sales_application.cv_downloaded";
 
 export async function recordAudit(params: {
   action: AuditAction;

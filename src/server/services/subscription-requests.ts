@@ -9,6 +9,8 @@ import { startContracting } from "@/server/services/sales/contracts";
 import { platformEmailContext } from "@/server/services/email-context";
 import { traceDispatch } from "@/server/services/email-dispatch";
 import { resolveReferralCode } from "@/server/services/referral";
+import { loadPublicPricing } from "@/server/services/public-pricing";
+import { FORMULA_LABELS, formatPriceEuros } from "@/core/pricing/official-offer";
 import { buildEmailConfirmationEmail, buildSubscriptionReceivedEmail } from "@/core/platform/contract-emails";
 import { signPayload, verifyPayload } from "@/server/security/tokens";
 import { publicUrl } from "@/server/public-url";
@@ -54,6 +56,10 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
     : await prisma.plan.findFirst({ where: { isActive: true, isDefault: true }, orderBy: { createdAt: "asc" } });
   const referrer = await resolveReferralCode(input.referralCode);
   const now = new Date();
+  // La formule vue par le visiteur et ses montants : l'offre de la console ou, à défaut, l'offre officielle.
+  const formula = input.formula ?? null;
+  const pricing = await loadPublicPricing();
+  const formulaPrice = formula === "ANNUAL" ? pricing.annual.monthlyEquivalentCents : formula === "MONTHLY" ? pricing.monthly.priceCents : null;
 
   // 1. Officine déjà cliente, ou dossier déjà ouvert pour ce SIRET : on rattache, on ne touche à rien.
   const [pharmacyBySiret, prospectsBySiret] = await Promise.all([
@@ -100,8 +106,9 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
       origin: "SELF_SERVICE_SITE",
       subscriptionRequestedAt: now,
       planId: plan?.id ?? null,
-      // Le tarif vu par le visiteur est figé au dossier : le contrat reprendra celui-là.
-      monthlyPriceCents: plan?.monthlyPriceCents ?? null,
+      // Le tarif vu par le visiteur est figé au dossier : le contrat reprendra celui-là (par mois : l'annuel / 12).
+      monthlyPriceCents: formulaPrice ?? plan?.monthlyPriceCents ?? null,
+      subscriptionFormula: formula,
       status: "INTERESTED",
       lastContactAt: now,
       duplicateWarning: warning,
@@ -110,7 +117,7 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
     select: { id: true },
   });
   const prospectId = created.id;
-  await recordProspectEvent({ prospectId, type: "SUBSCRIPTION_REQUESTED", summary: `Demande d'abonnement reçue depuis le site (${v.ownerName}, ${v.ownerTitle})${plan ? ` — offre ${plan.name}` : ""}.`, actor: system, metadata: { siret: v.siret, planId: plan?.id ?? null, referral: referrer?.name ?? null } });
+  await recordProspectEvent({ prospectId, type: "SUBSCRIPTION_REQUESTED", summary: `Demande d'abonnement reçue depuis le site (${v.ownerName}, ${v.ownerTitle})${plan ? ` — offre ${plan.name}` : ""}${formula ? ` — ${FORMULA_LABELS[formula].toLowerCase()} choisie (${formula === "ANNUAL" ? `${formatPriceEuros(pricing.annual.priceCents)} HT / an, engagement ${pricing.annual.commitmentMonths} mois` : `${formatPriceEuros(pricing.monthly.priceCents)} HT / mois, sans engagement`})` : ""}.`, actor: system, metadata: { siret: v.siret, planId: plan?.id ?? null, referral: referrer?.name ?? null, formula } });
   await recordProspectEvent({ prospectId, type: "CREATED", summary: `Dossier créé pour ${v.name}.`, actor: system });
   await recordAudit({ action: "sales.subscription_requested", entityType: "Prospect", entityId: prospectId, metadata: { siret: v.siret, planId: plan?.id ?? null } });
   await notifyAdmins({ type: "SITE_SUBSCRIPTION", title: `Nouvelle demande d'abonnement — ${v.name}`, body: `${submitted}. En attente de confirmation de l'adresse e-mail.`, linkUrl: `/admin/dossiers/${prospectId}`, severity: "SUCCESS" });
@@ -119,6 +126,13 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
     await notifyAdmins({ type: "DOSSIER_BLOCKED", title: `Contrat retenu — ${v.name}`, body: "L'offre choisie sur le site n'est plus proposée : choisissez les conditions puis « Envoyer le contrat ».", linkUrl: `/admin/dossiers/${prospectId}`, severity: "WARNING" });
     await acknowledge(v, GENERIC_NEXT_STEP, { prospectId });
     return { status: "RECEIVED", prospectId, reason: "offre indisponible" };
+  }
+  // Formule mensuelle : la mise en service n'existe pas dans le contrat automatique. Le contrat ne part pas tout seul,
+  // l'équipe fixe les conditions : jamais un contrat qui tait un frais annoncé sur le site.
+  if (formula === "MONTHLY" && pricing.monthly.setupFeeCents > 0) {
+    await notifyAdmins({ type: "DOSSIER_BLOCKED", title: `Contrat retenu — ${v.name}`, body: `Formule mensuelle choisie : la mise en service de ${formatPriceEuros(pricing.monthly.setupFeeCents)} HT n'est pas prévue au contrat automatique. Fixez les conditions puis « Envoyer le contrat ».`, linkUrl: `/admin/dossiers/${prospectId}`, severity: "WARNING" });
+    await acknowledge(v, GENERIC_NEXT_STEP, { prospectId });
+    return { status: "RECEIVED", prospectId, reason: "formule mensuelle : mise en service à faire figurer au contrat" };
   }
   if (warning) {
     await recordProspectEvent({ prospectId, type: "DUPLICATE_SUSPECTED", summary: warning, actor: system, metadata: { suspects: suspects.map((s) => s.id) } });

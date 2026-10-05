@@ -1,3 +1,4 @@
+import type { SubscriptionFormula } from "@/core/pricing/official-offer";
 import { cleanText, normalizeEmail, normalizePhone, normalizePostalCode, normalizeSiret, personName } from "./identity";
 
 /**
@@ -21,6 +22,8 @@ export type SubscriptionRequestInput = {
   planId?: string | null;
   outletCount?: number | null;
   referralCode?: string | null;
+  /** La formule choisie sur le site : mensuelle ou annuelle. Vide : appel sans choix (ancien parcours). */
+  formula?: SubscriptionFormula | null;
 };
 
 export type NormalizedRequest = {

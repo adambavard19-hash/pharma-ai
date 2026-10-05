@@ -1,19 +1,33 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SubscriptionForm } from "../_components/subscription-form";
-import { loadPublicOffer } from "@/server/services/site-leads";
-import { formatEuros } from "@/core/billing/subscription";
+import { loadPublicPricing } from "@/server/services/public-pricing";
 import { normalizeReferralCode } from "@/core/billing/referral";
+import { formatPriceEuros, formulaQuery, parseFormula, type SubscriptionFormula } from "@/core/pricing/official-offer";
 
 export const metadata: Metadata = { title: "S'abonner", description: "Souscription en ligne : vos informations une seule fois, votre contrat à signer électroniquement." };
 
-export default async function SubscribePage({ searchParams }: { searchParams: Promise<{ parrain?: string }> }) {
-  const [offer, params] = await Promise.all([loadPublicOffer(), searchParams]);
+export default async function SubscribePage({ searchParams }: { searchParams: Promise<{ parrain?: string; formule?: string }> }) {
+  const [pricing, params] = await Promise.all([loadPublicPricing(), searchParams]);
   const referralCode = normalizeReferralCode(params.parrain) ?? "";
-  const price = offer ? formatEuros(offer.monthlyPriceCents) : "69 €";
-  const trialDays = offer?.trialDays ?? 30;
-  const name = offer?.name ?? "PharmaBoost Officine";
-  const trial = trialDays >= 28 && trialDays <= 31 ? "premier mois offert" : trialDays > 0 ? `${trialDays} jours offerts` : null;
-  const perks = [trialDays >= 28 ? "Premier mois offert" : `${trialDays} jours offerts`, "Tous les postes de comptoir", "Sans engagement", "Contrat signé en ligne"];
+  const formula: SubscriptionFormula = parseFormula(params.formule) ?? "MONTHLY";
+  const { monthly, annual } = pricing;
+
+  // Ce que le visiteur a choisi, dit une fois, avec les mêmes montants que la page des tarifs.
+  const offer =
+    formula === "ANNUAL"
+      ? {
+          name: `${pricing.name} · formule annuelle`,
+          price: `${formatPriceEuros(annual.priceCents)} HT / an`,
+          perks: [`Engagement ${annual.commitmentMonths} mois`, "Tous les postes de l'officine", annual.setupFeeCents === 0 ? "Mise en service offerte" : `Mise en service : ${formatPriceEuros(annual.setupFeeCents)} HT, une seule fois`, "Contrat signé en ligne"],
+        }
+      : {
+          name: `${pricing.name} · formule mensuelle`,
+          price: `${formatPriceEuros(monthly.priceCents)} HT / mois`,
+          perks: ["Sans engagement", "Tous les postes de l'officine", `Mise en service : ${formatPriceEuros(monthly.setupFeeCents)} HT, une seule fois`, "Contrat signé en ligne"],
+        };
+  const other: SubscriptionFormula = formula === "ANNUAL" ? "MONTHLY" : "ANNUAL";
+
   return (
     <div className="mx-auto max-w-6xl px-5 pt-10 pb-16 md:pt-14 md:pb-24">
       <div className="mb-7 max-w-2xl">
@@ -21,13 +35,18 @@ export default async function SubscribePage({ searchParams }: { searchParams: Pr
         <h1 className="mt-2 text-[30px] leading-[1.08] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[38px]">Souscrire à PharmaBoost.</h1>
         <p className="mt-3 text-[15.5px] leading-7 text-text-secondary">Une question à la fois, environ deux minutes. Le contrat prérempli vous est ensuite envoyé pour une signature en ligne.</p>
         <p className="mt-4 inline-flex flex-wrap items-baseline gap-x-2 rounded-full border border-border-subtle bg-surface-card px-4 py-2 text-[13.5px] text-text-secondary lg:hidden">
-          <span className="font-semibold text-text-primary">{name}</span>
-          <span className="tabular-nums">{price} HT / mois</span>
-          {trial && <span>· {trial}</span>}
+          <span className="font-semibold text-text-primary">{formula === "ANNUAL" ? "Formule annuelle" : "Formule mensuelle"}</span>
+          <span className="tabular-nums">{offer.price}</span>
+        </p>
+        <p className="mt-3 text-[13.5px] text-text-secondary">
+          Formule {formula === "ANNUAL" ? "annuelle" : "mensuelle"} choisie.{" "}
+          <Link href={`/decouvrir/abonnement?formule=${formulaQuery(other)}${referralCode ? `&parrain=${encodeURIComponent(referralCode)}` : ""}`} className="font-semibold text-brand-700 underline underline-offset-4 hover:text-brand-800">
+            Choisir plutôt la formule {other === "ANNUAL" ? "annuelle" : "mensuelle"}
+          </Link>
         </p>
       </div>
       {referralCode && <p className="mb-5 max-w-2xl rounded-xl bg-brand-50 px-4 py-3 text-[13.5px] text-brand-900">Vous venez de la part d&apos;une officine équipée : son code <strong className="tabular-nums">{referralCode}</strong> est déjà renseigné.</p>}
-      <SubscriptionForm planId={offer?.id ?? null} offer={{ name, price, perks }} offerLabel={`${name} — ${price} HT / mois${trial ? `, ${trial}` : ""}`} referralCode={referralCode} />
+      <SubscriptionForm planId={pricing.planId} formula={formula} offer={offer} offerLabel={`${offer.name} — ${offer.price}`} referralCode={referralCode} />
     </div>
   );
 }

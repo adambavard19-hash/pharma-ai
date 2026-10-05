@@ -67,6 +67,7 @@ const subscriptionSchema = z.object({
   outletCount: z.number().int().min(1).max(50).nullable().optional(),
   planId: z.string().trim().max(40).optional().or(z.literal("")),
   referralCode: z.string().trim().max(20).optional().or(z.literal("")),
+  formula: z.enum(["MONTHLY", "ANNUAL"]).optional(),
   /** Confirmation explicite : c'est elle qui déclenche l'envoi du contrat. */
   confirm: z.literal(true, { message: "Confirmez votre demande de souscription pour recevoir le contrat." }),
   website: z.string().max(500).optional(),
@@ -97,6 +98,7 @@ export async function submitSubscriptionRequestAction(payload: z.input<typeof su
     outletCount: input.outletCount ?? null,
     planId: input.planId || null,
     referralCode: input.referralCode || null,
+    formula: input.formula ?? null,
   };
   // Une saisie à corriger ne compte pas comme une demande : on valide avant de limiter.
   const checked = normalizeSubscriptionRequest(request);

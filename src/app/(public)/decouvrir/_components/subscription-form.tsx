@@ -75,7 +75,7 @@ function validate(v: Values, fields: string[]): FlowErrors {
  * dossier, du contrat et de l'espace PharmaBoost ; rien ne sera redemandé.
  * Aucune donnée patient.
  */
-export function SubscriptionForm({ planId, offer, offerLabel, referralCode = "" }: { planId: string | null; offer: PublicOffer; offerLabel: string; referralCode?: string }) {
+export function SubscriptionForm({ planId, formula, offer, offerLabel, referralCode = "" }: { planId: string | null; formula: "MONTHLY" | "ANNUAL"; offer: PublicOffer; offerLabel: string; referralCode?: string }) {
   const router = useRouter();
   const initialValues = useMemo<Values>(
     () => ({
@@ -232,7 +232,7 @@ export function SubscriptionForm({ planId, offer, offerLabel, referralCode = "" 
       submitLabel="Recevoir mon contrat à signer"
       submitHint="Une confirmation de votre adresse, puis le contrat arrive aussitôt. Rien n'est prélevé à cette étape."
       onSubmit={async (v) => {
-        const result = await submitSubscriptionRequestAction({ ...toRequest(v), planId: planId ?? "", confirm: v.confirm as true, website: v.website });
+        const result = await submitSubscriptionRequestAction({ ...toRequest(v), planId: planId ?? "", formula, confirm: v.confirm as true, website: v.website });
         if (!result.ok) return { ok: false, error: result.error, fieldErrors: result.fieldErrors };
         router.push(`/decouvrir/merci?type=abonnement&etat=${result.data.outcome.toLowerCase()}`);
         return { ok: true };
@@ -248,10 +248,7 @@ function SubscriptionAside({ offer, values, referralCode }: { offer: PublicOffer
     <div className="space-y-4">
       <div className="rounded-[24px] border border-border-subtle bg-surface-card p-5">
         <p className="font-mono text-[11px] tracking-[0.14em] text-text-tertiary uppercase">{offer.name}</p>
-        <p className="mt-2 flex items-baseline gap-1.5">
-          <span className="text-[30px] leading-none font-semibold tracking-[-0.02em] text-text-primary tabular-nums">{offer.price}</span>
-          <span className="text-[13px] text-text-secondary">HT / mois</span>
-        </p>
+        <p className="mt-2 text-[26px] leading-none font-semibold tracking-[-0.02em] text-text-primary tabular-nums">{offer.price}</p>
         <ul className="mt-3.5 space-y-1.5 text-[13px] text-text-primary">
           {offer.perks.map((perk) => (
             <li key={perk} className="flex items-start gap-2">
