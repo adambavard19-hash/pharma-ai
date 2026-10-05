@@ -3,6 +3,7 @@ import { getMessagingProvider } from "@/server/ai/registry";
 import { resolvePublicBaseUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
 import { maskEmail } from "@/server/security/tokens";
+import { newsOptInUrlFor } from "@/server/services/patient-news";
 import type { DocumentAuthor } from "@/server/services/documents";
 import { composeDocumentContent } from "@/server/services/documents";
 import { SEALED_DOCUMENT_TTL_MS, buildSealedUrl, sealContent } from "@/core/documents/seal";
@@ -61,11 +62,20 @@ export async function readSealedDocument(id: string): Promise<{ ciphertext: Buff
  * L'envoi par e-mail : l'adresse est donnée au comptoir, utilisée une fois,
  * jamais conservée — seule une forme masquée (j***@exemple.fr) reste dans la
  * trace. Le message ne contient aucune donnée de santé : un lien, et le
- * nombre de prises par moment.
+ * nombre de prises par moment. Le lien facultatif d'abonnement aux nouveautés
+ * porte l'adresse chiffrée : c'est le patient qui, en le confirmant, décidera
+ * seul de la faire conserver.
  */
 export async function emailSealedDocument(params: { scope: { pharmacyId: string; userId: string }; documentId: string; url: string; to: string; content: DocumentContent }): Promise<{ status: string; detail: string }> {
   const document = await prisma.sealedDocument.findUnique({ where: { id: params.documentId }, select: { pharmacyId: true, expiresAt: true, isDemo: true } });
   if (!document || document.pharmacyId !== params.scope.pharmacyId) throw new Error("Plan introuvable dans cette officine.");
+  // Un lien d'abonnement qui ne peut pas être préparé ne doit jamais retarder ni empêcher la remise du plan.
+  let newsOptInUrl: string | null = null;
+  try {
+    newsOptInUrl = await newsOptInUrlFor(params.scope.pharmacyId, params.to);
+  } catch {
+    console.error("[nouveautés] lien d'abonnement non préparé : le plan part sans le bloc");
+  }
   const message = buildDocumentEmail({
     patientFirstName: "",
     pharmacyName: params.content.pharmacy.name,
@@ -77,6 +87,7 @@ export async function emailSealedDocument(params: { scope: { pharmacyId: string;
     printUrl: null,
     expiresAt: document.expiresAt,
     isDemo: document.isDemo,
+    newsOptIn: newsOptInUrl ? { url: newsOptInUrl } : null,
   });
   const outcome = await getMessagingProvider().sendEmail({ to: params.to, fromName: params.content.pharmacy.name, subject: message.subject, text: message.text, html: message.html });
   await recordAudit({ action: "document.delivered", entityType: "SealedDocument", entityId: params.documentId, pharmacyId: params.scope.pharmacyId, userId: params.scope.userId, metadata: { channel: "EMAIL", status: outcome.status, target: maskEmail(params.to), provider: outcome.provider } });

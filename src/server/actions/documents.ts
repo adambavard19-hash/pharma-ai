@@ -13,6 +13,7 @@ import { getMessagingProvider } from "@/server/ai/registry";
 import { maskEmail } from "@/server/security/tokens";
 import { recordAudit } from "@/server/audit/log";
 import { buildDocumentUrl } from "@/server/services/documents";
+import { newsOptInUrlFor } from "@/server/services/patient-news";
 import { fail, ok, type ActionResult } from "./types";
 
 const generateSchema = z.object({
@@ -189,6 +190,13 @@ export async function deliverDocumentAction(
   // les prises par moment, il ne nomme aucun médicament.
   const content = document.contentJson as unknown as DocumentContent;
   const url = buildDocumentUrl(document.accessToken);
+  // Le lien facultatif d'abonnement aux nouveautés ne doit jamais retarder ni empêcher la remise du plan.
+  let newsOptInUrl: string | null = null;
+  try {
+    newsOptInUrl = await newsOptInUrlFor(session.scope.pharmacyId, recipient);
+  } catch {
+    console.error("[nouveautés] lien d'abonnement non préparé : le plan part sans le bloc");
+  }
   const message = buildDocumentEmail({
     patientFirstName: document.patient?.firstName ?? "",
     pharmacyName: session.pharmacy.name,
@@ -200,6 +208,7 @@ export async function deliverDocumentAction(
     printUrl: `${url}?imprimer=1`,
     expiresAt: document.tokenExpiresAt,
     isDemo: document.isDemo,
+    newsOptIn: newsOptInUrl ? { url: newsOptInUrl } : null,
   });
 
   const messaging = getMessagingProvider();

@@ -38,6 +38,12 @@ export type DocumentEmailVariables = {
   expiresAt: Date;
   /** Plan de démonstration : le message doit le dire avant toute autre chose. */
   isDemo: boolean;
+  /**
+   * Lien d'abonnement aux nouveautés de l'officine. Absent (ou `null`), le
+   * message est strictement celui d'avant ; présent, un bloc distinct et
+   * facultatif s'ajoute, qui ne se mélange ni au plan ni à son bouton.
+   */
+  newsOptIn?: { url: string } | null;
 };
 
 export type EmailMessage = {
@@ -71,12 +77,42 @@ function prises(count: number): string {
   return `${count} prise${count > 1 ? "s" : ""}`;
 }
 
+/**
+ * L'invitation facultative à suivre les nouveautés de l'officine.
+ *
+ * Un LIEN, jamais une case cochée d'avance : le patient donne son accord en
+ * ouvrant la page et en confirmant, et seulement là. Le bloc dit que ce n'est
+ * pas nécessaire pour consulter le plan et que rien n'est enregistré avant sa
+ * confirmation. `html` est une ligne de tableau, prête à être posée dans la
+ * carte du message.
+ */
+export function buildNewsOptInBlock(variables: { pharmacyName: string; url: string; brandColor?: string | null }): { text: string[]; html: string } {
+  const { pharmacyName, url } = variables;
+  const color = safeColor(variables.brandColor);
+  const intro = `Si vous le souhaitez, ${pharmacyName} peut vous écrire de temps en temps lorsqu'une nouvelle gamme arrive en pharmacie. Ce n'est pas nécessaire pour consulter votre plan : rien n'est enregistré tant que vous n'avez pas confirmé sur la page du lien.`;
+  const text = [
+    "Facultatif : être prévenu(e) des nouveautés de votre pharmacie",
+    intro,
+    `Je souhaite être prévenu(e) : ${url}`,
+  ];
+  const html = `<tr><td style="padding:22px 28px 0">
+    <div style="border:1px solid #e5e7eb;border-radius:14px;padding:16px 18px">
+      <div style="font-size:12px;line-height:16px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;font-weight:600">Facultatif</div>
+      <p style="margin:6px 0 0;font-size:16px;line-height:23px;font-weight:600;color:#111827">Être prévenu(e) des nouveautés de votre pharmacie</p>
+      <p style="margin:6px 0 0;font-size:14px;line-height:21px;color:#374151">${escapeHtml(intro)}</p>
+      <a href="${escapeHtml(url)}" style="display:inline-block;margin-top:10px;color:${color};font-size:15px;line-height:22px;font-weight:600;text-decoration:underline">Je souhaite être prévenu(e)</a>
+    </div>
+  </td></tr>`;
+  return { text, html };
+}
+
 export function buildDocumentEmail(variables: DocumentEmailVariables): EmailMessage {
   const { patientFirstName, pharmacyName, pharmacyPhone, url, expiresAt, isDemo, dayPlan } = variables;
   const color = safeColor(variables.brandColor);
   const printUrl = variables.printUrl ?? null;
   const passage = formatDate(variables.passageAt);
   const hasPlan = dayPlan.some((moment) => moment.count > 0);
+  const newsOptIn = variables.newsOptIn ? buildNewsOptInBlock({ pharmacyName, url: variables.newsOptIn.url, brandColor: variables.brandColor }) : null;
 
   const demoLine =
     "MESSAGE DE DÉMONSTRATION — ce plan est fictif et ne concerne aucun patient réel.";
@@ -97,6 +133,7 @@ export function buildDocumentEmail(variables: DocumentEmailVariables): EmailMess
     `Consulter mon plan : ${url}`,
     ...(printUrl ? [`Télécharger / imprimer : ${printUrl}`] : []),
     "",
+    ...(newsOptIn ? [...newsOptIn.text, ""] : []),
     `Ce lien est personnel et reste valable jusqu'au ${formatDate(expiresAt)}.`,
     "Ce plan ne remplace ni votre ordonnance, ni l'avis de votre médecin.",
     pharmacyPhone
@@ -154,7 +191,7 @@ export function buildDocumentEmail(variables: DocumentEmailVariables): EmailMess
         ? `<a href="${escapeHtml(printUrl)}" style="display:block;margin-top:10px;color:${color};text-decoration:none;font-size:15px;line-height:22px;font-weight:600;padding:12px 22px;border:1.5px solid ${color};border-radius:14px;text-align:center">Télécharger / imprimer</a>`
         : ""
     }
-  </td></tr>
+  </td></tr>${newsOptIn ? `\n  ${newsOptIn.html}` : ""}
   <tr><td style="padding:22px 28px 0">
     <p style="margin:0;font-size:13px;line-height:19px;color:#6b7280">Ce lien est personnel et reste valable jusqu'au ${escapeHtml(formatDate(expiresAt))}.<br>Ce plan ne remplace ni votre ordonnance, ni l'avis de votre médecin.</p>
     <p style="margin:10px 0 0;font-size:15px;line-height:22px;color:#374151">${
