@@ -24,7 +24,18 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
         Un abonnement par officine, quel que soit le nombre de postes de comptoir.
       </SectionHead>
 
-      <div className="mx-auto mt-12 grid max-w-4xl items-stretch gap-5 md:grid-cols-2">
+      {/* Le mot de réassurance : la promesse d'abord, la précision ensuite, plus discrète. */}
+      <div className="mx-auto mt-10 max-w-3xl text-center">
+        <div className={cn("mx-auto mb-5 h-px w-16", HAIRLINE)} aria-hidden="true" />
+        <p className="text-[20px] leading-[1.35] font-semibold tracking-[-0.015em] text-text-primary text-balance md:text-[26px]">
+          Rassurez-vous, l’objectif est simple : que PharmaBoost vous rapporte bien plus qu’il ne vous coûte.
+        </p>
+        <p className="mx-auto mt-3 max-w-2xl text-[14px] leading-6 text-text-tertiary text-balance md:text-[14.5px]">
+          Plus de conseils pertinents, plus d’opportunités au comptoir, sans changer vos habitudes.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-10 grid max-w-4xl items-stretch gap-5 md:grid-cols-2">
         {/* ---- Mensuelle ---- */}
         <article className="order-2 flex flex-col rounded-[28px] border border-border-subtle bg-surface-card p-7 sm:p-8 md:order-1" aria-labelledby="formule-mensuelle">
           <h3 id="formule-mensuelle" className="font-mono text-[12px] tracking-[0.14em] text-text-tertiary uppercase">Mensuelle</h3>

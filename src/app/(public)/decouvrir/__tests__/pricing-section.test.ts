@@ -43,6 +43,26 @@ describe("la section tarif du site", () => {
     expect(t.match(/Engagement/g)).toHaveLength(1);
   });
 
+  it("pose le mot de réassurance juste au-dessus des deux offres : la promesse d'abord, la précision ensuite, plus discrète", () => {
+    const promise = "Rassurez-vous, l’objectif est simple : que PharmaBoost vous rapporte bien plus qu’il ne vous coûte.";
+    const detail = "Plus de conseils pertinents, plus d’opportunités au comptoir, sans changer vos habitudes.";
+    expect(t).toContain(promise);
+    expect(t).toContain(detail);
+    // Dans l'ordre : le titre de la section, la promesse, la précision, puis les offres.
+    expect(t.indexOf("Tous les postes inclus")).toBeLessThan(t.indexOf(promise));
+    expect(t.indexOf(promise)).toBeLessThan(t.indexOf(detail));
+    expect(t.indexOf(detail)).toBeLessThan(t.indexOf("Mensuelle"));
+    // La promesse ressort davantage : plus grande et plus foncée que la précision.
+    const promiseTag = html.slice(html.lastIndexOf("<p", html.indexOf("Rassurez-vous")), html.indexOf("Rassurez-vous"));
+    const detailTag = html.slice(html.lastIndexOf("<p", html.indexOf("Plus de conseils")), html.indexOf("Plus de conseils"));
+    expect(promiseTag).toContain("font-semibold");
+    expect(promiseTag).toContain("text-text-primary");
+    expect(promiseTag).toContain("md:text-[26px]");
+    expect(detailTag).toContain("text-text-tertiary");
+    expect(detailTag).toContain("text-[14px]");
+    expect(detailTag).not.toContain("font-semibold");
+  });
+
   it("met l'annuelle en valeur, et elle seule", () => {
     expect(t.match(/La plus avantageuse/g)).toHaveLength(1);
     expect(t.indexOf("La plus avantageuse")).toBeGreaterThan(t.indexOf("Mensuelle"));
