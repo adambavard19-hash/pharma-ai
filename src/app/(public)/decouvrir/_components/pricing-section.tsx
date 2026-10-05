@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 export function PricingSection({ pricing }: { pricing: PublicPricing }) {
   const { monthly, annual } = pricing;
   const saved = monthly.setupFeeCents - annual.setupFeeCents;
+  // Une année en formule mensuelle : 12 mois + la mise en service (99 × 12 + 390 = 1 578 €).
+  const firstYearCents = monthly.priceCents * annual.commitmentMonths + monthly.setupFeeCents;
   const annualSetupOffered = annual.setupFeeCents === 0;
   const annualSetupLabel = annualSetupOffered ? "Offerte" : `${formatPriceEuros(annual.setupFeeCents)} HT, une seule fois`;
 
@@ -26,9 +28,14 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
         {/* ---- Mensuelle ---- */}
         <article className="order-2 flex flex-col rounded-[28px] border border-border-subtle bg-surface-card p-7 sm:p-8 md:order-1" aria-labelledby="formule-mensuelle">
           <h3 id="formule-mensuelle" className="font-mono text-[12px] tracking-[0.14em] text-text-tertiary uppercase">Mensuelle</h3>
-          <p className="mt-4 flex items-baseline gap-2">
+          <p className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="text-[48px] leading-none font-semibold tracking-[-0.04em] text-text-primary tabular">{formatPriceEuros(monthly.priceCents)}</span>
             <span className="text-[15px] text-text-secondary">HT / mois</span>
+            {/* Ce que coûte une année en formule mensuelle : 12 mois + la mise en service, à comparer à l'annuelle. */}
+            <span className="text-[20px] font-semibold text-text-secondary tabular" title={`12 mois à ${formatPriceEuros(monthly.priceCents)} HT + mise en service de ${formatPriceEuros(monthly.setupFeeCents)} HT`}>
+              ({formatPriceEuros(firstYearCents)})
+              <span className="sr-only"> sur un an, mise en service comprise</span>
+            </span>
           </p>
           <p className="mt-1.5 text-[13.5px] text-text-secondary">par officine</p>
           <dl className="mt-7 divide-y divide-border-subtle border-y border-border-subtle text-[14.5px]">
@@ -51,7 +58,6 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
             <span className="text-[48px] leading-none font-semibold tracking-[-0.04em] text-text-primary tabular">{formatPriceEuros(annual.priceCents)}</span>
             <span className="text-[15px] text-text-secondary">HT / an</span>
           </p>
-          <p className="mt-1.5 text-[13.5px] text-text-secondary">par officine · soit {formatPriceEuros(annual.monthlyEquivalentCents)} HT / mois</p>
           <dl className="mt-7 divide-y divide-border-subtle border-y border-border-subtle text-[14.5px]">
             <Row label="Mise en service" value={annualSetupLabel} strong={annualSetupOffered} />
           </dl>
