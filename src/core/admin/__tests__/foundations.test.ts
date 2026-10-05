@@ -357,7 +357,7 @@ describe("modèles d'e-mails", () => {
 describe("navigation de la console", () => {
   it("toutes les adresses existantes restent rangées dans un espace", () => {
     const hrefs = ADMIN_NAV.flatMap((s) => [s.href, ...s.items.map((i) => i.href)]);
-    for (const existing of ["/admin", "/admin/pharmacies", "/admin/abonnements", "/admin/abonnements/offres", "/admin/pipeline", "/admin/notifications", "/admin/formations", "/admin/challenges", "/admin/partenaires", "/admin/commerciaux", "/admin/equipe", "/admin/societe"]) {
+    for (const existing of ["/admin", "/admin/pharmacies", "/admin/abonnements", "/admin/abonnements/offres", "/admin/pipeline", "/admin/notifications", "/admin/formations", "/admin/challenges", "/admin/partenaires", "/admin/commerciaux", "/admin/candidatures-commerciales", "/admin/equipe", "/admin/societe"]) {
       expect(hrefs).toContain(existing);
     }
   });
@@ -386,6 +386,19 @@ describe("navigation de la console", () => {
     expect(activeNavItem("/admin/communications").item?.label).toBe("Historique");
     expect(activeNavItem("/admin/relances").item?.label).toBe("Relances automatiques");
     expect(activeNavItem("/admin/emails/modeles/trial.welcome").item?.label).toBe("Modèles d'e-mails");
+  });
+
+  it("« Candidatures commerciales » suit « Commerciaux » dans l'espace Commercial, sans prendre la place d'aucune autre rubrique", () => {
+    const commercial = ADMIN_NAV.find((space) => space.key === "commercial")!;
+    const hrefs = commercial.items.map((item) => item.href);
+    expect(hrefs).toEqual(["/admin/pipeline", "/admin/prospects", "/admin/demonstrations", "/admin/relances-commerciales", "/admin/commerciaux", "/admin/candidatures-commerciales"]);
+    for (const path of ["/admin/candidatures-commerciales", "/admin/candidatures-commerciales/ckx123abc"]) {
+      expect(activeNavItem(path)).toMatchObject({ space: { key: "commercial" }, item: { label: "Candidatures commerciales" } });
+    }
+    // Les adresses voisines gardent leur rubrique : « commerciaux » n'est pas un préfixe de « candidatures-commerciales ».
+    expect(activeNavItem("/admin/commerciaux/ckx123abc").item?.label).toBe("Commerciaux");
+    expect(activeNavItem("/admin/relances-commerciales").item?.label).toBe("Relances commerciales");
+    expect(commercial.href).toBe("/admin/pipeline");
   });
 
   it("chaque rubrique de la console a une adresse unique et une description", () => {

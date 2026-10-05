@@ -33,6 +33,7 @@ export const JOURNAL_FAMILIES: JournalFamily[] = [
   { key: "plateforme", prefix: "platform", label: "Plateforme", tone: "neutral" },
   { key: "facturation", prefix: "billing", label: "Facturation", tone: "info" },
   { key: "commercial", prefix: "sales", label: "Commercial", tone: "brand" },
+  { key: "candidatures-commerciales", prefix: "sales_application", label: "Candidatures commerciales", tone: "brand" },
   { key: "partenaires", prefix: "partner", label: "Partenaires", tone: "warning" },
   { key: "formations", prefix: "training", label: "Formations", tone: "success" },
   { key: "challenges", prefix: "challenge", label: "Challenges", tone: "success" },

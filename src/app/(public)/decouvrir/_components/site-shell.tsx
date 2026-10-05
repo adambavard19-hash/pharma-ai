@@ -58,6 +58,7 @@ export function SiteHeader() {
             <Link href="/decouvrir/abonnement" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-sunken">S&apos;abonner</Link>
             <Link href="/login" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-secondary hover:bg-surface-sunken">Se connecter</Link>
             <Link href="/decouvrir/partenaires" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-secondary hover:bg-surface-sunken">Devenir partenaire</Link>
+            <Link href="/decouvrir/commercial" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-secondary hover:bg-surface-sunken">Devenir commercial</Link>
           </MobileMenu>
         </div>
       </div>
@@ -79,6 +80,7 @@ export function SiteFooter({ contactEmail }: { contactEmail: string }) {
             { href: "/decouvrir/pourquoi", label: "Pourquoi PharmaBoost" },
             { href: "/decouvrir/equipe", label: "Qui sommes-nous" },
             { href: "/decouvrir/partenaires", label: "Devenir partenaire" },
+            { href: "/decouvrir/commercial", label: "Devenir commercial" },
             { href: "/decouvrir/mentions-legales", label: "Mentions légales" },
             { href: "/decouvrir/confidentialite", label: "Confidentialité et données" },
           ].map((link) => (

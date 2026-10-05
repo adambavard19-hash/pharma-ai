@@ -16,7 +16,7 @@ import {
 
 describe("journal d'audit : familles autorisées et refusées", () => {
   it("laisse passer les familles business", () => {
-    for (const action of ["platform.admin_deleted", "billing.plan_saved", "billing.contract_price_changed", "sales.prospect_status_changed", "partner.saved", "training.saved", "challenge.saved"]) {
+    for (const action of ["platform.admin_deleted", "billing.plan_saved", "billing.contract_price_changed", "sales.prospect_status_changed", "sales_application.status_changed", "partner.saved", "training.saved", "challenge.saved"]) {
       expect(isBusinessAction(action), action).toBe(true);
     }
   });
@@ -65,7 +65,7 @@ describe("journal d'audit : la liste blanche est dans la requête", () => {
 
   it("sans filtre : uniquement les préfixes business, connexions restreintes aux administrateurs", () => {
     const clauses = prefixesOf(journalWhere({ family: null }));
-    expect(clauses.map((c) => c.prefix).sort()).toEqual(["auth.", "billing.", "challenge.", "partner.", "platform.", "sales.", "training."]);
+    expect(clauses.map((c) => c.prefix).sort()).toEqual(["auth.", "billing.", "challenge.", "partner.", "platform.", "sales.", "sales_application.", "training."]);
     expect(clauses.find((c) => c.prefix === "auth.")?.admin).toEqual({ not: null });
     expect(clauses.some((c) => /patient|prescription|recommendation|document|reminder/.test(c.prefix))).toBe(false);
     expect(journalWhere({ family: null }).AND[1]).toEqual({ action: { notIn: ["training.progress_updated"] } });
