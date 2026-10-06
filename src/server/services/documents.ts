@@ -323,7 +323,7 @@ export async function recordDocumentView(documentId: string): Promise<void> {
 
 export async function listDocuments(scope: TenantScope, limit = 30) {
   return prisma.patientDocument.findMany({
-    where: { pharmacyId: scope.pharmacyId, ...activityScope() },
+    where: { pharmacyId: scope.pharmacyId, ...activityScope(scope) },
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {

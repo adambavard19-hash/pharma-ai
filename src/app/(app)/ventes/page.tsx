@@ -33,7 +33,7 @@ export default async function SalesPage({
     prisma.sale.findMany({
       where: {
         pharmacyId: session.scope.pharmacyId,
-        ...activityScope(),
+        ...activityScope(session.scope),
         createdAt: { gte: period.start, lte: period.end },
       },
       orderBy: { createdAt: "desc" },

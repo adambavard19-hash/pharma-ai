@@ -41,7 +41,7 @@ export async function ensureClassifications(params: {
   lines: UnderstandingLine[];
 }): Promise<ClassificationOutcome> {
   const startedAt = Date.now();
-  const provider = getAIProvider();
+  const provider = getAIProvider({ demo: params.scope.isDemo });
   const keyed = params.lines.map((line) => ({ line, key: classificationKey(line.drugName) }));
   const keys = [...new Set(keyed.map((item) => item.key).filter(Boolean))];
 

@@ -35,7 +35,7 @@ export default async function PrescriptionsPage({
   const tab = params.statut ?? params.onglet ?? "toutes";
   const filter = TAB_FILTERS[tab] ?? null;
 
-  const baseWhere = { pharmacyId: session.scope.pharmacyId, deletedAt: null, ...activityScope() };
+  const baseWhere = { pharmacyId: session.scope.pharmacyId, deletedAt: null, ...activityScope(session.scope) };
 
   const [prescriptions, counts] = await Promise.all([
     prisma.prescription.findMany({

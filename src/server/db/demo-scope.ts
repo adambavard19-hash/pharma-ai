@@ -11,8 +11,9 @@ import { isDemoMode } from "@/config/env";
  * exclut donc ce qui est marqué démo. Le catalogue et le stock, eux, sont
  * l'outil de travail de l'officine : ils ne sont pas filtrés.
  */
-export function activityScope(): { isDemo?: false } {
-  return isDemoMode() ? {} : { isDemo: false };
+export function activityScope(scope?: { readonly isDemo?: boolean }): { isDemo?: false } {
+  // L'officine de démonstration commerciale voit SON activité (toute marquée démo) ; une vraie officine ne la voit jamais.
+  return isDemoMode() || scope?.isDemo ? {} : { isDemo: false };
 }
 
 /**

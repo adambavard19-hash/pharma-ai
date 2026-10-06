@@ -79,7 +79,7 @@ export default async function PerformancePage() {
       take: 6,
     }),
     prisma.recommendationEvent.findMany({
-      where: { recommendation: { pharmacyId: scope.pharmacyId, ...activityScope() } },
+      where: { recommendation: { pharmacyId: scope.pharmacyId, ...activityScope(scope) } },
       orderBy: { createdAt: "desc" },
       take: 8,
       include: {
@@ -96,7 +96,7 @@ export default async function PerformancePage() {
       where: {
         pharmacyId: scope.pharmacyId,
         deletedAt: null,
-        ...activityScope(),
+        ...activityScope(scope),
         status: { in: ["NEEDS_VERIFICATION", "EXTRACTING", "DRAFT"] },
       },
     }),

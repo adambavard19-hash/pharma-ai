@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, LogOut, Settings, Store } from "lucide-react";
+import { Bell, LogOut, ScanLine, Settings, Store } from "lucide-react";
 import { GlobalSearch } from "./global-search";
 import { MobileNavTrigger } from "./mobile-nav";
 import { Avatar } from "@/components/ui/avatar";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown";
 import { logoutAction, switchPharmacyAction } from "@/server/actions/auth";
 import type { SessionContext } from "@/server/auth/session";
+import { DEMO_MODE_HINT, DEMO_MODE_LABEL, isCommercialDemoPharmacy } from "@/core/demo/identity";
 
 export function Topbar({
   session,
@@ -27,6 +28,21 @@ export function Topbar({
       <div className="min-w-0 flex-1">
         <GlobalSearch />
       </div>
+
+      {session.pharmacy.isDemo && (
+        <span title={DEMO_MODE_HINT} className="hidden shrink-0 rounded-full border border-warning-300 bg-warning-50 px-2.5 py-0.5 text-[11.5px] font-medium text-warning-800 sm:inline dark:border-warning-800 dark:bg-warning-950/30 dark:text-warning-400">
+          {DEMO_MODE_LABEL}
+        </span>
+      )}
+      {isCommercialDemoPharmacy(session.pharmacy) && (
+        <Link
+          href="/demo"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50 px-3 py-1.5 text-[12.5px] font-medium text-brand-800 transition-colors hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300"
+        >
+          <ScanLine className="size-3.5" aria-hidden="true" />
+          Simuler une délivrance
+        </Link>
+      )}
 
       <Link
         href="/notifications"

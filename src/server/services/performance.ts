@@ -115,9 +115,9 @@ function toAdviceRow(row: AdviceRecord): AdviceRow {
 }
 
 /** Les conseils créés dans `[start, end[`, ajouts manuels et ordonnances supprimées compris (le calcul les écarte et les compte à part). */
-async function readAdvice(pharmacyId: string, start: Date, end: Date): Promise<AdviceRow[]> {
+async function readAdvice(pharmacyId: string, start: Date, end: Date, demo = false): Promise<AdviceRow[]> {
   const rows = await prisma.recommendation.findMany({
-    where: { pharmacyId, ...activityScope(), createdAt: { gte: start, lt: end } },
+    where: { pharmacyId, ...activityScope({ isDemo: demo }), createdAt: { gte: start, lt: end } },
     select: ADVICE_SELECT,
   });
   return rows.map(toAdviceRow);
@@ -129,12 +129,12 @@ async function readAdvice(pharmacyId: string, start: Date, end: Date): Promise<A
  * les vrais conseils PharmaBoost (hors ajouts manuels, hors ordonnances
  * supprimées) entrent dans cette lecture.
  */
-async function readRhythmAdvice(pharmacyId: string, now: Date): Promise<AdviceRow[]> {
+async function readRhythmAdvice(pharmacyId: string, now: Date, demo = false): Promise<AdviceRow[]> {
   const since = new Date(now.getTime() - RHYTHM_WINDOW_DAYS * DAY_MS);
   const rows = await prisma.recommendation.findMany({
     where: {
       pharmacyId,
-      ...activityScope(),
+      ...activityScope({ isDemo: demo }),
       origin: { in: [...PHARMABOOST_ORIGINS] },
       prescription: { deletedAt: null },
       createdAt: { gte: since, lt: now },
@@ -179,13 +179,13 @@ type PharmacyLine = { pharmacyId: string; line: ConfirmedLineRow };
  * population). `onlyPharmaBoost` écarte les ajouts manuels dès la requête
  * (retour sur abonnement, portefeuille).
  */
-function confirmedLineWhere(ids: string[], onlyPharmaBoost: boolean): Prisma.SaleLineWhereInput {
+function confirmedLineWhere(ids: string[], onlyPharmaBoost: boolean, demo = false): Prisma.SaleLineWhereInput {
   return {
     recommendationId: { not: null },
     recommendation: {
       is: {
         pharmacyId: pharmacyFilter(ids),
-        ...activityScope(),
+        ...activityScope({ isDemo: demo }),
         prescription: { deletedAt: null },
         ...(onlyPharmaBoost ? { origin: { in: [...PHARMABOOST_ORIGINS] } } : {}),
       },
@@ -203,16 +203,17 @@ async function readConfirmedLines(
   ids: string[],
   windows: Window[],
   onlyPharmaBoost: boolean,
+  demo = false,
 ): Promise<PharmacyLine[]> {
   if (windows.length === 0) return [];
-  const lineWhere = confirmedLineWhere(ids, onlyPharmaBoost);
+  const lineWhere = confirmedLineWhere(ids, onlyPharmaBoost, demo);
   const dates: Prisma.SaleWhereInput =
     windows.length === 1
       ? { createdAt: { gte: windows[0].start, lt: windows[0].end } }
       : { OR: windows.map((w) => ({ createdAt: { gte: w.start, lt: w.end } })) };
 
   const sales = await prisma.sale.findMany({
-    where: { pharmacyId: pharmacyFilter(ids), ...activityScope(), ...dates, lines: { some: lineWhere } },
+    where: { pharmacyId: pharmacyFilter(ids), ...activityScope({ isDemo: demo }), ...dates, lines: { some: lineWhere } },
     select: {
       id: true,
       pharmacyId: true,
@@ -262,8 +263,8 @@ function isPharmaBoostOrigin(origin: string): boolean {
   return (PHARMABOOST_ORIGINS as readonly string[]).includes(origin);
 }
 
-async function readLinesOf(pharmacyId: string, window: Window, onlyPharmaBoost: boolean): Promise<ConfirmedLineRow[]> {
-  const rows = await readConfirmedLines([pharmacyId], [window], onlyPharmaBoost);
+async function readLinesOf(pharmacyId: string, window: Window, onlyPharmaBoost: boolean, demo = false): Promise<ConfirmedLineRow[]> {
+  const rows = await readConfirmedLines([pharmacyId], [window], onlyPharmaBoost, demo);
   return rows.map((row) => row.line);
 }
 
@@ -316,17 +317,20 @@ export async function loadPerformanceReport(params: {
   pharmacyId: string;
   period: PerformancePeriod;
   now?: Date;
+  /** L'officine est celle de la démonstration commerciale : elle voit sa propre activité marquée démo. */
+  pharmacyIsDemo?: boolean;
 }): Promise<PerformanceReport> {
   const { pharmacyId, period } = params;
+  const demo = params.pharmacyIsDemo === true;
   assertPharmacyId(pharmacyId);
   const now = params.now ?? new Date();
 
   const [advice, previousAdvice, rhythmAdvice, lines, previousLines] = await Promise.all([
-    readAdvice(pharmacyId, period.start, period.end),
-    readAdvice(pharmacyId, period.previousStart, period.previousEnd),
-    readRhythmAdvice(pharmacyId, now),
-    readLinesOf(pharmacyId, { start: period.start, end: period.end }, false),
-    readLinesOf(pharmacyId, { start: period.previousStart, end: period.previousEnd }, false),
+    readAdvice(pharmacyId, period.start, period.end, demo),
+    readAdvice(pharmacyId, period.previousStart, period.previousEnd, demo),
+    readRhythmAdvice(pharmacyId, now, demo),
+    readLinesOf(pharmacyId, { start: period.start, end: period.end }, false, demo),
+    readLinesOf(pharmacyId, { start: period.previousStart, end: period.previousEnd }, false, demo),
   ]);
 
   return computePerformance({
@@ -342,7 +346,7 @@ export async function loadPerformanceReport(params: {
 }
 
 /** « Mon abonnement me coûte X € » : toujours le mois civil en cours, quelle que soit la période choisie. */
-export async function loadSubscriptionReturn(params: { pharmacyId: string; now?: Date }): Promise<SubscriptionReturn> {
+export async function loadSubscriptionReturn(params: { pharmacyId: string; now?: Date; pharmacyIsDemo?: boolean }): Promise<SubscriptionReturn> {
   const { pharmacyId } = params;
   assertPharmacyId(pharmacyId);
   const now = params.now ?? new Date();
@@ -350,7 +354,7 @@ export async function loadSubscriptionReturn(params: { pharmacyId: string; now?:
 
   const [subscription, monthLines] = await Promise.all([
     readSubscription(pharmacyId),
-    readLinesOf(pharmacyId, { start: month.start, end: month.end }, true),
+    readLinesOf(pharmacyId, { start: month.start, end: month.end }, true, params.pharmacyIsDemo === true),
   ]);
 
   return computeSubscriptionReturn({ subscription, monthLines, monthLabel: month.label, now });

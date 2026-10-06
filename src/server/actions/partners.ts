@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
+import { refuseInDemo } from "./demo-guard";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { recordAudit } from "@/server/audit/log";
 import { PREFERENCE_CHOICE_LABELS } from "@/core/partners/status";
@@ -115,6 +116,8 @@ const contactSchema = z.object({
 
 export async function requestPartnerContactAction(payload: z.input<typeof contactSchema>): Promise<ActionResult<{ code: string; transmitted: boolean }>> {
   const session = await requirePermission(PERMISSIONS.PARTNERS_MANAGE);
+  const refused = refuseInDemo(session, "Mode démo : la demande n'est pas transmise au partenaire.");
+  if (refused) return refused;
   const parsed = contactSchema.safeParse(payload);
   if (!parsed.success) return fail("Vérifiez la demande.", zodFieldErrors(parsed.error.issues));
   const input = parsed.data;
@@ -157,6 +160,8 @@ const linkSchema = z.object({ brandId: id, source, universe });
 
 export async function openPartnerLinkAction(payload: z.input<typeof linkSchema>): Promise<ActionResult<{ url: string; code: string; kind: "B2B_LINK_OPENED" | "FORM_OPENED" }>> {
   const session = await requirePermission(PERMISSIONS.PARTNERS_MANAGE);
+  const refused = refuseInDemo(session, "Mode démo : le site du partenaire n'est pas ouvert.");
+  if (refused) return refused;
   const parsed = linkSchema.safeParse(payload);
   if (!parsed.success) return fail("Demande invalide.");
 
@@ -204,6 +209,8 @@ export async function placePartnerOrderAction(
   payload: z.input<typeof orderSchema>,
 ): Promise<ActionResult<Pick<OrderOutcome, "code" | "status" | "totalCents" | "lineCount" | "mode">>> {
   const session = await requirePermission(PERMISSIONS.PARTNERS_MANAGE);
+  const refused = refuseInDemo(session, "Mode démo : aucune commande n'est passée auprès du partenaire.");
+  if (refused) return refused;
   const parsed = orderSchema.safeParse(payload);
   if (!parsed.success) return fail("Vérifiez la commande.", zodFieldErrors(parsed.error.issues));
   const input = parsed.data;

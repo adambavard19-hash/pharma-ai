@@ -157,7 +157,7 @@ export function SealedWorkspace({ prescriptionId, acceptedRecommendations, canSe
                     <p className="text-[12.5px] text-text-secondary">L&apos;envoi par e-mail n&apos;est pas activé sur cette officine.</p>
                   )}
                   <AddressNotice newsOptInOffered={newsOptInOffered} />
-                  {emailState === "simulated" && <p className="text-[11.5px] text-warning-700 dark:text-warning-500">Envoi simulé : aucun service d&apos;e-mail n&apos;est branché.</p>}
+                  {emailState === "simulated" && <p className="text-[11.5px] text-warning-700 dark:text-warning-500">Envoi simulé : aucun e-mail n&apos;est parti.</p>}
                 </div>
               )}
             </CardContent>

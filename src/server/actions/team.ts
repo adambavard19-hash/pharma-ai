@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
+import { refuseInDemo } from "./demo-guard";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { hashPassword, validatePasswordStrength } from "@/server/security/password";
 import { recordAudit } from "@/server/audit/log";
@@ -226,6 +227,8 @@ export async function resetCollaboratorPasswordAction(
   payload: z.input<typeof passwordSchema>,
 ): Promise<ActionResult<null>> {
   const session = await requirePermission(PERMISSIONS.TEAM_MANAGE);
+  const refused = refuseInDemo(session, "Mode démo : les mots de passe du compte de démonstration ne changent pas.");
+  if (refused) return refused;
   const parsed = passwordSchema.safeParse(payload);
   if (!parsed.success) return fail("Requête invalide.");
 

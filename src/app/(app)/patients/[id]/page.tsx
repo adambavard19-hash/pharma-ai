@@ -41,7 +41,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
     include: {
       consents: true,
       prescriptions: {
-        where: { deletedAt: null, ...activityScope() },
+        where: { deletedAt: null, ...activityScope(session.scope) },
         orderBy: { createdAt: "desc" },
         take: 10,
         include: {
@@ -58,7 +58,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           },
         },
       },
-      reminders: { where: activityScope(), orderBy: { dueAt: "desc" }, take: 10 },
+      reminders: { where: activityScope(session.scope), orderBy: { dueAt: "desc" }, take: 10 },
       interactions: { orderBy: { createdAt: "desc" }, take: 20 },
     },
   });

@@ -37,7 +37,7 @@ export async function getRevenueSummary(
     prisma.sale.aggregate({
       where: {
         pharmacyId: scope.pharmacyId,
-        ...activityScope(),
+        ...activityScope(scope),
         createdAt: { gte: period.start, lte: period.end },
       },
       _sum: {
@@ -50,7 +50,7 @@ export async function getRevenueSummary(
     prisma.sale.aggregate({
       where: {
         pharmacyId: scope.pharmacyId,
-        ...activityScope(),
+        ...activityScope(scope),
         createdAt: { gte: period.previousStart, lt: period.previousEnd },
       },
       _sum: { totalCents: true, attributedCents: true },
@@ -58,7 +58,7 @@ export async function getRevenueSummary(
     prisma.sale.count({
       where: {
         pharmacyId: scope.pharmacyId,
-        ...activityScope(),
+        ...activityScope(scope),
         createdAt: { gte: period.start, lte: period.end },
         attributedCents: { gt: 0 },
       },
@@ -105,7 +105,7 @@ export async function getRecommendationFunnel(
 ): Promise<RecommendationFunnel> {
   const where = {
     pharmacyId: scope.pharmacyId,
-    ...activityScope(),
+    ...activityScope(scope),
     createdAt: { gte: period.start, lte: period.end },
   };
 
@@ -162,7 +162,7 @@ export async function getDailyRevenueSeries(
   const sales = await prisma.sale.findMany({
     where: {
       pharmacyId: scope.pharmacyId,
-      ...activityScope(),
+      ...activityScope(scope),
       createdAt: { gte: period.start, lte: period.end },
     },
     select: { createdAt: true, totalCents: true, attributedCents: true },
@@ -211,7 +211,7 @@ export async function getProductPerformance(
     prisma.recommendation.findMany({
       where: {
         pharmacyId: scope.pharmacyId,
-        ...activityScope(),
+        ...activityScope(scope),
         createdAt: { gte: period.start, lte: period.end },
         productId: { not: null },
       },
@@ -225,7 +225,7 @@ export async function getProductPerformance(
       where: {
         sale: {
           pharmacyId: scope.pharmacyId,
-          ...activityScope(),
+          ...activityScope(scope),
           createdAt: { gte: period.start, lte: period.end },
         },
         recommendationId: { not: null },
@@ -361,14 +361,14 @@ export async function getTeamPerformance(
   const [prescriptions, decisions, sales] = await Promise.all([
     prisma.prescription.groupBy({
       by: ["createdByUserId"],
-      where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window },
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window },
       _count: true,
     }),
     prisma.recommendation.groupBy({
       by: ["decidedByUserId", "status"],
       where: {
         pharmacyId: scope.pharmacyId,
-        ...activityScope(),
+        ...activityScope(scope),
         createdAt: window,
         decidedByUserId: { not: null },
       },
@@ -376,7 +376,7 @@ export async function getTeamPerformance(
     }),
     prisma.sale.groupBy({
       by: ["userId"],
-      where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window },
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window },
       _count: true,
       _sum: { attributedCents: true },
     }),
@@ -489,17 +489,17 @@ export async function getCounterPerformance(
     }),
     prisma.recommendation.groupBy({
       by: ["decidedByUserId", "status"],
-      where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window, decidedByUserId: { not: null } },
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window, decidedByUserId: { not: null } },
       _count: true,
     }),
     prisma.recommendation.groupBy({
       by: ["status"],
-      where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window },
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window },
       _count: true,
     }),
     prisma.sale.groupBy({
       by: ["userId"],
-      where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window, attributedCents: { gt: 0 } },
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window, attributedCents: { gt: 0 } },
       _count: true,
       _sum: { attributedCents: true, attributedMarginCents: true },
     }),
@@ -594,26 +594,26 @@ export async function getActivitySummary(
       prisma.prescription.count({
         where: {
           pharmacyId: scope.pharmacyId,
-          ...activityScope(),
+          ...activityScope(scope),
           createdAt: window,
           status: { in: ["ANALYZED", "VALIDATED", "DELIVERED"] },
         },
       }),
       prisma.recommendation.count({
-        where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window },
+        where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window },
       }),
       prisma.patientDocument.count({
-        where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window },
+        where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window },
       }),
       prisma.prescription.findMany({
-        where: { pharmacyId: scope.pharmacyId, ...activityScope(), createdAt: window, patientId: { not: null } },
+        where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window, patientId: { not: null } },
         select: { patientId: true },
         distinct: ["patientId"],
       }),
       prisma.sale.aggregate({
         where: {
           pharmacyId: scope.pharmacyId,
-          ...activityScope(),
+          ...activityScope(scope),
           createdAt: window,
           attributedCents: { gt: 0 },
         },
@@ -653,7 +653,7 @@ export async function getDeclinedRecommendations(
   const rows = await prisma.recommendation.findMany({
     where: {
       pharmacyId: scope.pharmacyId,
-      ...activityScope(),
+      ...activityScope(scope),
       createdAt: { gte: period.start, lte: period.end },
       status: { in: ["REMOVED", "DECLINED", "REPLACED"] },
     },
@@ -701,7 +701,7 @@ export async function getEngineOutcomeSummary(
 ): Promise<EngineOutcomeSummary> {
   const rows = await prisma.analysisRun.groupBy({
     by: ["outcome"],
-    where: { pharmacyId: scope.pharmacyId, ...activityScope(), startedAt: { gte: period.start, lte: period.end } },
+    where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), startedAt: { gte: period.start, lte: period.end } },
     _count: true,
   });
   const byOutcome: Record<string, number> = {};

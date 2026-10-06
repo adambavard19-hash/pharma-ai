@@ -130,7 +130,7 @@ export async function storePrescriptionFile(params: {
     return { ok: false, error: { kind: "STOCKAGE_INDISPONIBLE" } };
   }
 
-  const reader = getOCRProvider();
+  const reader = getOCRProvider({ demo: scope.isDemo });
   const canRead = reader.info.capability === "LIVE";
 
   let patientName: string | null = null;

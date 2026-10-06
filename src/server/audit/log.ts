@@ -229,6 +229,8 @@ export type AuditAction =
   | "sales_application.converted"
   | "sales_application.cv_downloaded"
   | "assortment.lab_suggested"
+  | "demo.delivery_simulated"
+  | "demo.reset"
   // Dépôts de stock : le fichier de stock du titulaire (jamais son contenu)
   | "stock.deposit_received"
   | "stock.deposit_applied"

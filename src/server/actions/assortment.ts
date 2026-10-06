@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
+import { refuseInDemo } from "./demo-guard";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { rateLimited } from "@/server/http/rate-limit";
 import { recordAudit } from "@/server/audit/log";
@@ -24,6 +25,8 @@ const suggestionSchema = z.object({
  */
 export async function suggestLabAction(payload: z.input<typeof suggestionSchema>): Promise<ActionResult<null>> {
   const session = await requirePermission(PERMISSIONS.PARTNERS_MANAGE);
+  const refused = refuseInDemo(session, "Mode démo : la suggestion n'est pas transmise à l'équipe PharmaBoost.");
+  if (refused) return refused;
   const parsed = suggestionSchema.safeParse(payload);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Vérifiez les informations saisies.");
   if (rateLimited(`lab-suggestion:${session.scope.pharmacyId}`, 10, DAY_MS)) return fail("Vous avez déjà envoyé plusieurs suggestions aujourd'hui. Notre équipe les étudie.");

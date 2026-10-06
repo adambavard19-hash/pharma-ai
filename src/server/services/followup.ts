@@ -386,7 +386,7 @@ export async function sendReminder(params: {
 
   const pharmacy = await prisma.pharmacy.findUniqueOrThrow({
     where: { id: params.scope.pharmacyId },
-    select: { name: true, brandColor: true, followUpMinIntervalDays: true },
+    select: { name: true, brandColor: true, followUpMinIntervalDays: true, isDemo: true },
   });
 
   const lastSent = await prisma.reminder.findFirst({
@@ -433,7 +433,7 @@ export async function sendReminder(params: {
     responseLink: template.asksFeedback && responseToken ? buildResponseUrl(responseToken) : null,
   };
 
-  const outcome = await getMessagingProvider().sendEmail({
+  const outcome = await getMessagingProvider({ demo: pharmacy.isDemo }).sendEmail({
     to: recipient,
     fromName: pharmacy.name,
     subject: template.subject(variables),

@@ -41,7 +41,7 @@ export async function sendUserPasswordLink(
       id: true,
       email: true,
       firstName: true,
-      memberships: { where: { isActive: true }, take: 1, select: { pharmacy: { select: { id: true, name: true } } } },
+      memberships: { where: { isActive: true }, take: 1, select: { pharmacy: { select: { id: true, name: true, isDemo: true } } } },
     },
   });
   const { url, expiresAt } = await issueUserPasswordLink(user.id);
@@ -63,7 +63,7 @@ export async function sendUserPasswordLink(
     kind,
     onboarding,
   });
-  const messaging = deps?.messaging ?? getMessagingProvider();
+  const messaging = deps?.messaging ?? getMessagingProvider({ demo: user.memberships[0]?.pharmacy.isDemo === true });
   const outcome = await messaging
     .sendEmail({ to: user.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html })
     .catch((error: unknown) => ({ status: "FAILED" as const, provider: messaging.info.id, detail: error instanceof Error ? error.message : "Envoi impossible." }));

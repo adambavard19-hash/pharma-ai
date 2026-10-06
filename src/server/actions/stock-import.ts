@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
+import { refuseInDemo } from "./demo-guard";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import {
   IMPORT_MAX_BYTES,
@@ -135,6 +136,8 @@ export async function commitStockImportAction(
 /** Cherche la photo des boîtes sans image, par code-barres, dans les bases ouvertes. Un passage borné par appel. */
 export async function fetchProductImagesAction(): Promise<ActionResult<import("@/server/services/product-images").ImageFetchSummary>> {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  const refused = refuseInDemo(session, "Mode démo : les photos des produits sont déjà en place, aucune recherche n'est lancée sur Internet.");
+  if (refused) return refused;
   const { fetchMissingProductImages } = await import("@/server/services/product-images");
   const summary = await fetchMissingProductImages({ pharmacyId: session.scope.pharmacyId, limit: 60 });
   revalidatePath("/stock");

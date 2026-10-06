@@ -32,10 +32,10 @@ export default async function ResultatsPage({
   const period = parsePeriodParams(await searchParams, now, TIME_ZONE);
   const { pharmacyId } = session.scope;
 
-  const [report, roi] = await Promise.all([
-    loadPerformanceReport({ pharmacyId, period, now }),
-    loadSubscriptionReturn({ pharmacyId, now }),
-  ]);
+  // L'officine de démonstration commerciale lit sa propre activité marquée démo ; une vraie officine, jamais.
+  const demo = session.scope.isDemo ? { pharmacyIsDemo: true } : {};
+
+  const [report, roi] = await Promise.all([loadPerformanceReport({ pharmacyId, period, now, ...demo }), loadSubscriptionReturn({ pharmacyId, now, ...demo })]);
 
   return (
     <div className="space-y-6">

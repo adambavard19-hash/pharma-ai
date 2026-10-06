@@ -195,6 +195,7 @@ export const getSession = cache(async (): Promise<SessionContext | null> => {
       pharmacyId: active.pharmacy.id,
       organizationId: active.pharmacy.organizationId,
       userId: user.id,
+      isDemo: active.pharmacy.isDemo,
     },
     sessionId: session.id,
   };

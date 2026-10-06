@@ -33,7 +33,7 @@ export default async function AdvicePage({
 
   const [recommendations, rules, products, statusCounts] = await Promise.all([
     prisma.recommendation.findMany({
-      where: { pharmacyId: session.scope.pharmacyId, ...activityScope() },
+      where: { pharmacyId: session.scope.pharmacyId, ...activityScope(session.scope) },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {

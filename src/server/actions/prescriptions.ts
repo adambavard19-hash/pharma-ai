@@ -236,7 +236,7 @@ export async function createPrescriptionAction(
       where: { id: prescription.id },
       data: { status: "NEEDS_VERIFICATION" },
     });
-  } else if (!extraction && fileKey && getOCRProvider().info.capability === "LIVE") {
+  } else if (!extraction && fileKey && getOCRProvider({ demo: session.scope.isDemo }).info.capability === "LIVE") {
     // La lecture n'est tentée que si un lecteur RÉEL est branché. Sans lui,
     // l'ordonnance reste vide et le pharmacien saisit les lignes : c'est le
     // point le plus important de tout ce fichier. Un lecteur simulé rendrait

@@ -113,7 +113,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   if (!prescription || prescription.pharmacyId !== session.scope.pharmacyId) notFound();
 
   const patients = await prisma.patient.findMany({
-    where: { pharmacyId: session.scope.pharmacyId, deletedAt: null, ...activityScope() },
+    where: { pharmacyId: session.scope.pharmacyId, deletedAt: null, ...activityScope(session.scope) },
     orderBy: { lastName: "asc" },
     select: { id: true, firstName: true, lastName: true, reference: true, email: true },
     take: 300,

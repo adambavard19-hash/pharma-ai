@@ -100,7 +100,7 @@ export async function emailInstallInstructionsAction(payload: { lgo: string; cod
     "",
     `Besoin d'aide : ${PUBLIC_CONTACT_EMAIL}`,
   ].join("\n");
-  const outcome = await getMessagingProvider().sendEmail({
+  const outcome = await getMessagingProvider({ demo: session.scope.isDemo }).sendEmail({
     to: session.user.email,
     fromName: "PharmaBoost",
     subject: `PharmaBoost — connecter le stock de l'officine (${lgoLabel(payload.lgo)})`,

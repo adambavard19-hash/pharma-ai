@@ -19,6 +19,9 @@ import { chooseOCRProvider } from "@/core/ai/providers/ocr-factory";
 import { chooseMessagingProvider } from "@/core/ai/providers/messaging-factory";
 import { chooseAIProvider } from "@/core/ai/providers/ai-factory";
 import { UnavailableVideoProvider } from "@/core/ai/providers/video";
+import { DemoMessagingProvider, guardReservedRecipients } from "@/core/ai/providers/demo-messaging";
+import { MockOCRProvider } from "@/core/ai/providers/mock-ocr";
+import { RuleBasedAIProvider } from "@/core/ai/providers/rule-based-ai";
 import type { DrugKnowledge } from "@/core/ai/types";
 
 /**
@@ -34,6 +37,9 @@ import type { DrugKnowledge } from "@/core/ai/types";
 
 let drugProvider: LocalDrugKnowledgeProvider | null = null;
 
+/** `demo` : l'appel est fait pour l'officine de démonstration commerciale (`TenantScope.isDemo`). */
+type DemoOption = { demo?: boolean };
+
 /**
  * Choix du lecteur d'ordonnance.
  *
@@ -42,7 +48,9 @@ let drugProvider: LocalDrugKnowledgeProvider | null = null;
  * ne quitte pas l'officine sans autorisation explicite. Le registre ne fait que
  * lui passer la configuration.
  */
-export function getOCRProvider(): OCRProvider {
+export function getOCRProvider(options?: DemoOption): OCRProvider {
+  // L'officine de démonstration ne confie jamais une image à un tiers.
+  if (options?.demo) return new MockOCRProvider("Officine de démonstration : aucune image n'est transmise à un tiers.");
   const env = getEnv();
   const provider = chooseOCRProvider({
     provider: env.OCR_PROVIDER,
@@ -66,7 +74,9 @@ export function getOCRProvider(): OCRProvider {
  * l'autorisation explicite de transmettre des données d'ordonnance à un tiers.
  * Le registre ne fait que lui passer la configuration.
  */
-export function getAIProvider(): AIProvider {
+export function getAIProvider(options?: DemoOption): AIProvider {
+  // L'officine de démonstration ne sollicite aucun modèle externe : le moteur tourne sur ses règles et le référentiel.
+  if (options?.demo) return new RuleBasedAIProvider();
   const env = getEnv();
   const provider = chooseAIProvider({
     provider: env.AI_PROVIDER,
@@ -144,18 +154,23 @@ export function getStorageProvider(): StorageProvider {
  * (`src/core/ai/providers/messaging-factory.ts`), où elle est testable sans
  * base ni réseau. Le registre ne fait que lui passer la configuration.
  */
-export function getMessagingProvider(): MessagingProvider {
+export function getMessagingProvider(options?: DemoOption): MessagingProvider {
+  // L'officine de démonstration n'envoie rien, à personne.
+  if (options?.demo) return new DemoMessagingProvider();
   const env = getEnv();
-  return chooseMessagingProvider({
-    provider: env.EMAIL_PROVIDER,
-    from: env.EMAIL_FROM,
-    resendApiKey: env.RESEND_API_KEY,
-    smtpHost: env.SMTP_HOST,
-    smtpPort: env.SMTP_PORT,
-    smtpSecure: env.SMTP_SECURE,
-    smtpUser: env.SMTP_USER,
-    smtpPassword: env.SMTP_PASSWORD,
-  });
+  // Une adresse réservée (.test, .invalid…) n'est jamais confiée au prestataire, quel que soit l'appelant.
+  return guardReservedRecipients(
+    chooseMessagingProvider({
+      provider: env.EMAIL_PROVIDER,
+      from: env.EMAIL_FROM,
+      resendApiKey: env.RESEND_API_KEY,
+      smtpHost: env.SMTP_HOST,
+      smtpPort: env.SMTP_PORT,
+      smtpSecure: env.SMTP_SECURE,
+      smtpUser: env.SMTP_USER,
+      smtpPassword: env.SMTP_PASSWORD,
+    }),
+  );
 }
 
 export function getVideoProvider(): VideoProvider {

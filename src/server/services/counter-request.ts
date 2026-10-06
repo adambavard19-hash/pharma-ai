@@ -55,7 +55,7 @@ export async function adviseCounterRequest(params: { scope: TenantScope; pharmac
   };
   const request = { text, patient: { ageYears: input.ageYears, isPregnant: input.isPregnant, isBreastfeeding: input.isBreastfeeding, currentTreatments: input.treatments } };
 
-  const provider = getAIProvider();
+  const provider = getAIProvider({ demo: params.pharmacyIsDemo });
   let understanding: RequestUnderstanding | null = null;
   try {
     understanding = await provider.understandRequest(request);
@@ -118,7 +118,8 @@ export async function adviseCounterRequest(params: { scope: TenantScope; pharmac
     notes: result.notes,
     blocked: result.blocked,
     providerId: understanding.providerId,
-    warnings: understanding.warnings,
+    // Dans l'officine de démonstration, aucun modèle externe n'est appelé : on le dit pour ce que c'est, pas comme une panne.
+    warnings: params.pharmacyIsDemo ? understanding.warnings.map((warning) => (/^Aucun modèle/.test(warning) ? "Mode démo : les besoins sont lus dans les mots de la demande, aucun service externe n'est appelé." : warning)) : understanding.warnings,
   };
 }
 

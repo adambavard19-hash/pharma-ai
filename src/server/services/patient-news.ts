@@ -70,7 +70,7 @@ function formatDay(date: Date): string {
   return new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
-const pharmacySelect = { id: true, name: true, phone: true, brandColor: true, isActive: true, patientNewsEnabled: true } as const;
+const pharmacySelect = { id: true, name: true, phone: true, brandColor: true, isActive: true, patientNewsEnabled: true, isDemo: true } as const;
 
 async function loadPharmacy(pharmacyId: string) {
   return prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: pharmacySelect });
@@ -162,7 +162,7 @@ async function sendWelcome(pharmacy: SendingPharmacy, email: string, emailHash: 
   try {
     const unsubscribeUrl = unsubscribeUrlFor(pharmacy.id, emailHash);
     const message = buildNewsWelcomeEmail({ pharmacyName: pharmacy.name, pharmacyPhone: pharmacy.phone, brandColor: pharmacy.brandColor, unsubscribeUrl });
-    const outcome = await getMessagingProvider().sendEmail({ to: email, fromName: pharmacy.name, subject: message.subject, text: message.text, html: message.html, headers: newsUnsubscribeHeaders(unsubscribeUrl) });
+    const outcome = await getMessagingProvider({ demo: pharmacy.isDemo }).sendEmail({ to: email, fromName: pharmacy.name, subject: message.subject, text: message.text, html: message.html, headers: newsUnsubscribeHeaders(unsubscribeUrl) });
     return outcome.status === "SENT";
   } catch {
     return false;
@@ -319,7 +319,7 @@ export async function sendAnnouncementTest(scope: TenantScope & { email: string 
   if (!pharmacy) return { status: "FAILED", detail: "Officine introuvable." };
   const message = buildPatientNewsEmail({ pharmacyName: pharmacy.name, pharmacyPhone: pharmacy.phone, brandColor: pharmacy.brandColor, ...checked.value, unsubscribeUrl: exampleUnsubscribeUrl(), isTest: true });
   try {
-    const outcome = await getMessagingProvider().sendEmail({ to: scope.email, fromName: pharmacy.name, subject: message.subject, text: message.text, html: message.html });
+    const outcome = await getMessagingProvider({ demo: scope.isDemo }).sendEmail({ to: scope.email, fromName: pharmacy.name, subject: message.subject, text: message.text, html: message.html });
     return { status: outcome.status, detail: scrub(outcome.detail) };
   } catch (error) {
     return { status: "FAILED", detail: scrub(error instanceof Error ? error.message : "Envoi impossible.") };
@@ -364,7 +364,7 @@ async function deliverTo(subscriptionId: string, announcement: AnnouncementRow, 
   try {
     const unsubscribeUrl = unsubscribeUrlFor(announcement.pharmacyId, subscriber.emailHash);
     const message = buildPatientNewsEmail({ pharmacyName: pharmacy.name, pharmacyPhone: pharmacy.phone, brandColor: pharmacy.brandColor, title: announcement.title, rangeLabel: announcement.rangeLabel, message: announcement.message, unsubscribeUrl });
-    const outcome = await getMessagingProvider().sendEmail({ to: address, fromName: pharmacy.name, subject: message.subject, text: message.text, html: message.html, headers: newsUnsubscribeHeaders(unsubscribeUrl) });
+    const outcome = await getMessagingProvider({ demo: pharmacy.isDemo }).sendEmail({ to: address, fromName: pharmacy.name, subject: message.subject, text: message.text, html: message.html, headers: newsUnsubscribeHeaders(unsubscribeUrl) });
     await settle(outcome.status, scrub(outcome.detail));
   } catch (error) {
     await settle("FAILED", scrub(error instanceof Error ? error.message : "Envoi impossible."));

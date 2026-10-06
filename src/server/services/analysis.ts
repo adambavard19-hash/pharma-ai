@@ -150,7 +150,7 @@ export async function extractPrescription(params: {
     throw new Error("Ordonnance introuvable dans cette officine.");
   }
 
-  const ocr = getOCRProvider();
+  const ocr = getOCRProvider({ demo: params.scope.isDemo });
   await prisma.prescription.update({
     where: { id: prescription.id },
     data: { status: "EXTRACTING" },
@@ -249,8 +249,8 @@ export async function analysePrescription(params: {
     data: { status: "ANALYZING" },
   });
 
-  const ocrProvider = getOCRProvider();
-  const aiProvider = getAIProvider();
+  const ocrProvider = getOCRProvider({ demo: params.scope.isDemo });
+  const aiProvider = getAIProvider({ demo: params.scope.isDemo });
   const knowledgeProvider = getDrugKnowledgeProvider();
 
   params.onStage?.("IDENTIFICATION");

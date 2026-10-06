@@ -14,6 +14,14 @@ export type TenantScope = {
   readonly pharmacyId: string;
   readonly organizationId: string;
   readonly userId: string;
+  /**
+   * Cette officine est l'officine de démonstration commerciale. Posé par la
+   * session ; absent (donc faux) partout ailleurs. Il fait deux choses et
+   * seulement deux : l'activité marquée démo devient visible pour ELLE seule
+   * (`activityScope`), et plus aucun service externe (IA, lecture d'image,
+   * e-mail) n'est appelé pour elle.
+   */
+  readonly isDemo?: boolean;
 };
 
 export class TenantIsolationError extends Error {

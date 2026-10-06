@@ -33,7 +33,7 @@ export default async function PatientsPage({
   const where = {
     pharmacyId: session.scope.pharmacyId,
     deletedAt: null,
-    ...activityScope(),
+    ...activityScope(session.scope),
     ...(query
       ? {
           OR: [

@@ -130,7 +130,7 @@ export async function classifyPharmacyProducts(params: {
   }
 
   // 3. Le modèle, sur le reste, par lots bornés.
-  const provider = getAIProvider();
+  const provider = getAIProvider({ demo: params.scope.isDemo });
   summary.aiAvailable = provider.info.capability === "LIVE";
   const maxBatches = params.maxAiBatches ?? CLASSIFICATION_MAX_BATCHES_INLINE;
   const batches: ProductToClassify[][] = [];

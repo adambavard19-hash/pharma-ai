@@ -66,7 +66,7 @@ export async function readSealedDocument(id: string): Promise<{ ciphertext: Buff
  * porte l'adresse chiffrée : c'est le patient qui, en le confirmant, décidera
  * seul de la faire conserver.
  */
-export async function emailSealedDocument(params: { scope: { pharmacyId: string; userId: string }; documentId: string; url: string; to: string; content: DocumentContent }): Promise<{ status: string; detail: string }> {
+export async function emailSealedDocument(params: { scope: { pharmacyId: string; userId: string; isDemo?: boolean }; documentId: string; url: string; to: string; content: DocumentContent }): Promise<{ status: string; detail: string }> {
   const document = await prisma.sealedDocument.findUnique({ where: { id: params.documentId }, select: { pharmacyId: true, expiresAt: true, isDemo: true } });
   if (!document || document.pharmacyId !== params.scope.pharmacyId) throw new Error("Plan introuvable dans cette officine.");
   // Un lien d'abonnement qui ne peut pas être préparé ne doit jamais retarder ni empêcher la remise du plan.
@@ -89,7 +89,7 @@ export async function emailSealedDocument(params: { scope: { pharmacyId: string;
     isDemo: document.isDemo,
     newsOptIn: newsOptInUrl ? { url: newsOptInUrl } : null,
   });
-  const outcome = await getMessagingProvider().sendEmail({ to: params.to, fromName: params.content.pharmacy.name, subject: message.subject, text: message.text, html: message.html });
+  const outcome = await getMessagingProvider({ demo: params.scope.isDemo }).sendEmail({ to: params.to, fromName: params.content.pharmacy.name, subject: message.subject, text: message.text, html: message.html });
   await recordAudit({ action: "document.delivered", entityType: "SealedDocument", entityId: params.documentId, pharmacyId: params.scope.pharmacyId, userId: params.scope.userId, metadata: { channel: "EMAIL", status: outcome.status, target: maskEmail(params.to), provider: outcome.provider } });
   return { status: outcome.status, detail: outcome.detail };
 }

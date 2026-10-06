@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, Clock, FileText, Sparkles, TrendingUp } from "lucide-react";
 import { prisma } from "@/server/db/client";
+import type { TenantScope } from "@/server/db/tenant";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { getOCRProvider } from "@/server/ai/registry";
@@ -16,6 +17,8 @@ import { LiveCounterSales } from "./live-counter-sales";
 import { listLiveCounterSales } from "@/server/services/counter-scan";
 import { NewPrescriptionForm } from "./new-prescription-form";
 import { CounterRequestCard } from "./counter-request";
+import { isCommercialDemoPharmacy } from "@/core/demo/identity";
+import { findDemoScenario } from "@/core/demo/scenarios";
 import { countCounterRequestsToday } from "@/server/services/counter-request";
 
 export const metadata: Metadata = { title: "Nouvelle vente" };
@@ -23,14 +26,14 @@ export const metadata: Metadata = { title: "Nouvelle vente" };
 export default async function NewPrescriptionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ patient?: string }>;
+  searchParams: Promise<{ patient?: string; demande?: string }>;
 }) {
   const session = await requirePermission(PERMISSIONS.PRESCRIPTION_CREATE);
   const params = await searchParams;
 
   const patients = await prisma.patient.findMany({
     where: {
-      ...activityScope(),
+      ...activityScope(session.scope),
  pharmacyId: session.scope.pharmacyId, deletedAt: null },
     orderBy: { lastName: "asc" },
     select: { id: true, firstName: true, lastName: true, reference: true, email: true },
@@ -43,7 +46,9 @@ export default async function NewPrescriptionPage({
 
   // Le comptoir du jour : ce qui est en cours, ce qui a été fait, et l'état
   // du stock. Calculé hors du rendu : l'heure n'est pas une valeur de rendu.
-  const home = await loadCounterHome(session.scope.pharmacyId);
+  // Un scénario de démonstration « sans ordonnance » arrive avec sa demande déjà saisie (jamais lancée toute seule).
+  const demoRequest = isCommercialDemoPharmacy(session.pharmacy) && params.demande ? (findDemoScenario(params.demande)?.request ?? null) : null;
+  const home = await loadCounterHome(session.scope);
   // Les délivrances qui arrivent de la douchette du LGO : la carte se met à jour seule.
   const liveSales = (await listLiveCounterSales(session.scope.pharmacyId)).map((sale) => ({ id: sale.id, reference: sale.reference, status: sale.status, post: sale.counterPost, updatedAt: sale.updatedAt.toISOString(), lines: sale.lines.map((line) => ({ drugName: line.drugName ?? "", quantity: line.quantity ?? 1 })), recommendations: sale._count.recommendations }));
   const { openPrescriptions, salesToday, accepted, declined, stockLabel, stockTone, stockSyncedAt, greeting, dateLabel } = home;
@@ -77,6 +82,16 @@ export default async function NewPrescriptionPage({
       {/* Le rappel du stock : seulement pour le titulaire, jamais pour l'équipe au comptoir. */}
       <StockReminderBanner stockSyncedAt={stockSyncedAt} canImport={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)} isDemo={session.pharmacy.isDemo} />
 
+      {isCommercialDemoPharmacy(session.pharmacy) && (
+        <p className="rounded-xl border border-dashed border-brand-300 bg-brand-50/50 px-4 py-3 text-[13.5px] text-text-secondary dark:border-brand-800 dark:bg-brand-950/20">
+          Pas de douchette dans cette démonstration.{" "}
+          <Link href="/demo" className="font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
+            Simuler une délivrance
+          </Link>{" "}
+          : les boîtes arrivent comme si elles étaient passées à la caisse.
+        </p>
+      )}
+
       <LiveCounterSales initial={liveSales} />
 
       <NewPrescriptionForm
@@ -86,7 +101,7 @@ export default async function NewPrescriptionPage({
         canReadPrescriptions={canReadPrescriptions}
       />
 
-      <CounterRequestCard today={requestsToday} />
+      <CounterRequestCard today={requestsToday} prefill={demoRequest} />
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <section className="rounded-2xl border border-border-subtle bg-surface-card">
@@ -144,14 +159,15 @@ export default async function NewPrescriptionPage({
   );
 }
 
-async function loadCounterHome(pharmacyId: string) {
+async function loadCounterHome(scope: TenantScope) {
+  const { pharmacyId } = scope;
   const now = new Date();
   const startOfDay = startOfParisDay(now);
   const [openPrescriptions, salesToday, decidedToday, pharmacy] = await Promise.all([
     prisma.prescription.findMany({
       where: {
         pharmacyId,
-        ...activityScope(),
+        ...activityScope(scope),
         status: { in: ["NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED", "VALIDATED"] },
         sales: { none: {} },
         createdAt: { gte: new Date(now.getTime() - 48 * 3600 * 1000) },

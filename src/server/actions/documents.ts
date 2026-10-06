@@ -211,7 +211,7 @@ export async function deliverDocumentAction(
     newsOptIn: newsOptInUrl ? { url: newsOptInUrl } : null,
   });
 
-  const messaging = getMessagingProvider();
+  const messaging = getMessagingProvider({ demo: session.scope.isDemo });
   const outcome = await messaging.sendEmail({
     to: recipient,
     fromName: session.pharmacy.name,
@@ -246,7 +246,9 @@ export async function deliverDocumentAction(
   if (outcome.status === "SIMULATED") {
     return ok(
       { status: outcome.status, detail: outcome.detail },
-      "Envoi NON effectué : aucun service de messagerie n'est configuré.",
+      outcome.provider === "demo"
+        ? "Mode démo : envoi simulé, aucun e-mail n'est parti."
+        : "Envoi NON effectué : aucun service de messagerie n'est configuré.",
     );
   }
 

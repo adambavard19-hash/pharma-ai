@@ -18,6 +18,7 @@ import {
 import { recordAudit } from "@/server/audit/log";
 import { createPlatformSession } from "@/server/auth/platform-session";
 import { sendUserPasswordLink, setUserPasswordByToken } from "@/server/services/user-password";
+import { refuseInDemo } from "./demo-guard";
 import { markProspectActivatedForUser } from "@/server/services/sales/client-pharmacies";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
@@ -217,6 +218,8 @@ export async function changeOwnPasswordAction(
   payload: z.input<typeof changePasswordSchema>,
 ): Promise<ActionResult<null>> {
   const session = await requireSession();
+  const refused = refuseInDemo(session, "Mode démo : le mot de passe du compte de démonstration ne se change pas.");
+  if (refused) return refused;
   const parsed = changePasswordSchema.safeParse(payload);
   if (!parsed.success) {
     return fail("Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));

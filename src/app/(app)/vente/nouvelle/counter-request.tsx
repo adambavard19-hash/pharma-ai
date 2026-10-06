@@ -19,12 +19,18 @@ import { ShortDateBadge, VigilanceStrip } from "../[id]/vigilance-strip";
  * fermés, règles écrites, sécurité avant tout — et aucune donnée patient
  * identifiée : un âge, une situation, pas un nom.
  */
-export function CounterRequestCard({ today }: { today: { total: number; withProposal: number } }) {
-  const [text, setText] = useState("");
-  const [age, setAge] = useState("");
-  const [pregnant, setPregnant] = useState(false);
-  const [breastfeeding, setBreastfeeding] = useState(false);
-  const [treatments, setTreatments] = useState("");
+export type CounterRequestPrefill = { text: string; ageYears: number | null; isPregnant: boolean; isBreastfeeding: boolean; treatments: string[] };
+
+/**
+ * `prefill` : la demande est déjà saisie (scénario de l'officine de démonstration). Elle n'est JAMAIS
+ * lancée toute seule : le présentateur clique sur « Conseiller », comme au comptoir.
+ */
+export function CounterRequestCard({ today, prefill = null }: { today: { total: number; withProposal: number }; prefill?: CounterRequestPrefill | null }) {
+  const [text, setText] = useState(prefill?.text ?? "");
+  const [age, setAge] = useState(prefill?.ageYears != null ? String(prefill.ageYears) : "");
+  const [pregnant, setPregnant] = useState(prefill?.isPregnant ?? false);
+  const [breastfeeding, setBreastfeeding] = useState(prefill?.isBreastfeeding ?? false);
+  const [treatments, setTreatments] = useState(prefill?.treatments.join(", ") ?? "");
   const [answer, setAnswer] = useState<CounterRequestAnswer | null>(null);
   const [pending, start] = useTransition();
   const { push } = useToast();
@@ -44,7 +50,7 @@ export function CounterRequestCard({ today }: { today: { total: number; withProp
     });
 
   return (
-    <Card>
+    <Card id="demande" className={prefill ? "ring-2 ring-brand-300 dark:ring-brand-700" : undefined}>
       <CardHeader
         title={
           <span className="flex items-center gap-2">

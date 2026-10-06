@@ -22,6 +22,8 @@ export const RECOMMENDATION_STATUS: Record<string, { label: string; tone: Tone }
   PRESENTED: { label: "Présenté au patient", tone: "info" },
   PURCHASED: { label: "Acheté", tone: "accent" },
   DECLINED: { label: "Non retenu", tone: "neutral" },
+  // Proposé, jamais tranché, et la vente s'est terminée : un résultat à part entière.
+  IGNORED: { label: "Sans réponse", tone: "neutral" },
 };
 
 export const CONSENT_LABELS: Record<string, { label: string; description: string }> = {

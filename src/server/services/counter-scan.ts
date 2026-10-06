@@ -63,7 +63,7 @@ type ScannedItem =
   | { kind: "PRODUCT"; name: string; productId: string; ean: string }
   | { kind: "UNKNOWN"; name: string; code: string; hint: string | null };
 
-async function resolveScannedItem(pharmacyId: string, raw: string): Promise<ScannedItem | null> {
+async function resolveScannedItem(pharmacyId: string, raw: string, demo = false): Promise<ScannedItem | null> {
   const scanned = readScannedCode(raw);
   if (scanned.kind === "CIP13" || scanned.kind === "CIP7") {
     const presentation = await prisma.drugPresentation.findUnique({ where: { cip13: scanned.cip13 }, select: { id: true, cip13: true, specialty: { select: { id: true, name: true, pharmaceuticalForm: true } } } });
@@ -79,7 +79,8 @@ async function resolveScannedItem(pharmacyId: string, raw: string): Promise<Scan
   // Inconnu : le nom donné par les bases ouvertes permet de retrouver la
   // référence dans le stock par ses mots, et de retenir le code si le
   // rapprochement est sans ambiguïté.
-  const facts = await findOpenFactsName(digits);
+  // L'officine de démonstration n'interroge aucune base ouverte : un code inconnu reste inconnu.
+  const facts = demo ? null : await findOpenFactsName(digits);
   const hint = facts ? `${facts.name}${facts.brand ? ` — ${facts.brand}` : ""}` : null;
   if (facts) {
     const match = await matchStockProductByName(pharmacyId, `${facts.brand ?? ""} ${facts.name}`);
@@ -127,7 +128,7 @@ export async function matchStockProductByName(pharmacyId: string, name: string):
 }
 
 export async function recordCounterScan(agent: AgentContext, input: { code: string; post: string; scannedAt: Date | null }): Promise<CounterScanResult> {
-  const item = await resolveScannedItem(agent.scope.pharmacyId, input.code);
+  const item = await resolveScannedItem(agent.scope.pharmacyId, input.code, agent.pharmacyIsDemo);
   if (!item) return { ok: false, code: "UNKNOWN_CODE", error: "Ce code ne ressemble pas à un code-barres de produit." };
   // Ce qui distingue deux bips d'un même article : le CIP, l'EAN ou le code brut.
   const itemKey = item.kind === "DRUG" ? item.specialtyId : item.kind === "PRODUCT" ? item.productId : item.code;

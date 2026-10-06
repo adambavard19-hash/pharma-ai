@@ -664,7 +664,8 @@ async function announce(row: StockDeposit, ctx: { scope: TenantScope; adminId: s
   }
 
   const needsAttention = row.status === "HELD" || row.status === "FAILED";
-  if (ctx.notifyTeam) {
+  // Un dépôt de l'officine de démonstration ne réveille pas l'équipe PharmaBoost.
+  if (ctx.notifyTeam && !ctx.scope.isDemo) {
     await quietly("notification de l'équipe", async () => {
       const name = ctx.pharmacyName ?? (await prisma.pharmacy.findUnique({ where: { id: row.pharmacyId }, select: { name: true } }))?.name ?? "Officine";
       const detail = needsAttention ? row.message ?? "" : describeDepositResult(view);
