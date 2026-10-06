@@ -37,3 +37,4 @@ export {
   type RowStatus,
 } from "./classify";
 export { tagsFromName } from "./tags";
+export { UnreadableFileError } from "./errors";

@@ -61,7 +61,7 @@ export function RangesManager({ ranges, brands }: { ranges: PreferredRangeRow[];
 
       {brands.length === 0 && (
         <Alert tone="neutral" title="Aucune marque lue dans votre stock">
-          Les marques se proposent d&apos;elles-mêmes une fois le stock importé (<Link href="/stock/import" className="font-medium text-brand-700 underline-offset-2 hover:underline">importer le stock</Link>). En attendant, vous pouvez saisir une marque telle qu&apos;elle figure sur vos étiquettes.
+          Les marques se proposent d&apos;elles-mêmes une fois le stock importé (<Link href="/stock/mise-a-jour" className="font-medium text-brand-700 underline-offset-2 hover:underline">importer le stock</Link>). En attendant, vous pouvez saisir une marque telle qu&apos;elle figure sur vos étiquettes.
         </Alert>
       )}
 

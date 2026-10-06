@@ -30,6 +30,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
       { href: "/admin/activite", label: "Activité", description: "Officines actives, inactives, usage récent." },
       { href: "/admin/acces", label: "Accès", description: "Officines et comptes suspendus, invitations en attente." },
       { href: "/admin/technique", label: "État technique", description: "Connecteurs, postes de comptoir, versions, incidents." },
+      { href: "/admin/depots-stock", label: "Stocks reçus", description: "Le dernier stock reçu de chaque officine, et chaque fichier envoyé." },
     ],
   },
   {

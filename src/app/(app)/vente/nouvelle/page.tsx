@@ -11,6 +11,7 @@ import { TIME_ZONE } from "@/config/constants";
 import { patientDataEnabled } from "@/config/env";
 import { formatCents, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { StockReminderBanner } from "@/components/app/stock-reminder";
 import { LiveCounterSales } from "./live-counter-sales";
 import { listLiveCounterSales } from "@/server/services/counter-scan";
 import { NewPrescriptionForm } from "./new-prescription-form";
@@ -45,7 +46,7 @@ export default async function NewPrescriptionPage({
   const home = await loadCounterHome(session.scope.pharmacyId);
   // Les délivrances qui arrivent de la douchette du LGO : la carte se met à jour seule.
   const liveSales = (await listLiveCounterSales(session.scope.pharmacyId)).map((sale) => ({ id: sale.id, reference: sale.reference, status: sale.status, post: sale.counterPost, updatedAt: sale.updatedAt.toISOString(), lines: sale.lines.map((line) => ({ drugName: line.drugName ?? "", quantity: line.quantity ?? 1 })), recommendations: sale._count.recommendations }));
-  const { openPrescriptions, salesToday, accepted, declined, stockLabel, stockTone, greeting, dateLabel } = home;
+  const { openPrescriptions, salesToday, accepted, declined, stockLabel, stockTone, stockSyncedAt, greeting, dateLabel } = home;
   // Les demandes sans ordonnance traitées aujourd'hui : le comptoir voit ce qu'il a fait.
   const requestsToday = await countCounterRequestsToday(session.scope.pharmacyId, startOfParisDay(new Date()));
 
@@ -72,6 +73,9 @@ export default async function NewPrescriptionPage({
           {stockLabel}
         </Link>
       </div>
+
+      {/* Le rappel du stock : seulement pour le titulaire, jamais pour l'équipe au comptoir. */}
+      <StockReminderBanner stockSyncedAt={stockSyncedAt} canImport={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)} isDemo={session.pharmacy.isDemo} />
 
       <LiveCounterSales initial={liveSales} />
 
@@ -176,7 +180,7 @@ async function loadCounterHome(pharmacyId: string) {
   const stockTone: "ok" | "warn" = connection && freshness ? (freshness.state === "FRESH" ? "ok" : "warn") : pharmacy?.stockSyncedAt ? "ok" : "warn";
   const greeting = parisHour(now) < 18 ? "Bonjour" : "Bonsoir";
   const dateLabel = formatParisDate(now);
-  return { openPrescriptions, salesToday, accepted, declined, stockLabel, stockTone, greeting, dateLabel };
+  return { openPrescriptions, salesToday, accepted, declined, stockLabel, stockTone, stockSyncedAt: pharmacy?.stockSyncedAt ?? null, greeting, dateLabel };
 }
 
 function Figure({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {

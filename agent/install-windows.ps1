@@ -1,4 +1,4 @@
-# PharmaBoost Connect — installation sur le serveur de l'officine (Windows).
+﻿# PharmaBoost Connect — installation sur le serveur de l'officine (Windows).
 #
 # À lancer dans PowerShell en administrateur, depuis le dossier décompressé :
 #   powershell -ExecutionPolicy Bypass -File .\install-windows.ps1 -Code 123456 -Lgo lgpi
@@ -9,6 +9,20 @@
 #   - le serveur est                      https://pharmaboost.app
 # Les deux dossiers sont créés s'ils n'existent pas. L'agent n'écrit jamais
 # dans le logiciel de l'officine : il lit ces dossiers, rien d'autre.
+#
+# En fin d'installation, le dossier d'export devient aussi atteignable par le
+# titulaire : un raccourci « Stock PharmaBoost » sur le Bureau public, et le
+# partage réseau « PharmaBoost » (\\NOMDUSERVEUR\PharmaBoost), en modification
+# pour les utilisateurs authentifiés seulement. Le partage n'est créé (et les
+# droits du dossier modifiés) que pour le dossier par défaut,
+# C:\PharmaBoost\Export : avec -Export vers un autre dossier (celui où le
+# logiciel de l'officine écrit ses éditions), seul le raccourci est posé.
+# Ces deux étapes sont facultatives : si l'une échoue, un message jaune le
+# dit et l'installation reste réussie.
+#
+# Le dossier d'export ne contient que les fichiers de stock : le programme
+# envoie le plus récent des CSV, TXT, Excel et PDF qu'il y trouve, donc rien
+# d'autre n'y est écrit (pas de mémo, pas de LISEZMOI).
 param(
   [Parameter(Mandatory=$true)][string]$Code,
   [string]$Lgo = "lgpi",
@@ -25,18 +39,13 @@ $journal = Join-Path $dir "pharmaboost-connect.log"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 Copy-Item -Force (Join-Path $PSScriptRoot "pharmaboost-connect.js") $dir
 
-# Les dossiers surveillés, avec un mot d'explication dedans.
+# Les dossiers surveillés. Rien n'est écrit dans le dossier d'export : tout
+# fichier CSV, TXT, Excel ou PDF qui s'y trouve serait envoyé comme stock.
+# (Le message d'aide est donné par le raccourci du Bureau et par la page
+# « Mettre à jour mon stock » de PharmaBoost.)
 foreach ($d in @($Export, $Scans)) {
   if ($d -ne "") { New-Item -ItemType Directory -Force -Path $d | Out-Null }
 }
-Set-Content -Encoding UTF8 -Path (Join-Path $Export "LISEZMOI.txt") -Value @"
-Dossier surveillé par PharmaBoost Connect.
-
-Enregistrez ici l'export de stock de votre logiciel (PDF d'édition d'inventaire,
-CSV ou Excel). Dès qu'un fichier y est déposé ou remplacé, il est envoyé à
-PharmaBoost et votre stock y est mis à jour dans la minute.
-Rien n'est modifié dans votre logiciel.
-"@
 if ($Scans -ne "") {
   Set-Content -Encoding UTF8 -Path (Join-Path $Scans "LISEZMOI.txt") -Value @"
 Dossier surveillé par PharmaBoost Connect.
@@ -108,3 +117,75 @@ if (Test-Path $journal) {
 }
 Write-Host ""
 Write-Host "Dans PharmaBoost, la page Stock > Connecter mon logiciel affiche maintenant « agent connecté »."
+
+# ---------------------------------------------------------------------------
+# Stock : le dossier d'export, atteignable par le titulaire
+# Facultatif : un échec s'affiche en jaune et n'interrompt jamais l'installation
+# (le programme est déjà installé et démarré à ce stade).
+# ---------------------------------------------------------------------------
+$nomPartage = "PharmaBoost"
+# Le seul dossier que ce script accepte de partager et dont il modifie les droits.
+$exportParDefaut = "C:\PharmaBoost\Export"
+$raccourciCree = $false
+$partageCree = $false
+$partagePersonnalise = $false
+
+if ($Export -ne "") {
+  # (1) Un raccourci « Stock PharmaBoost » sur le Bureau public : il ouvre le dossier d'export.
+  try {
+    $racine = $env:PUBLIC
+    if ([string]::IsNullOrEmpty($racine)) { $racine = "C:\Users\Public" }
+    $bureauPublic = Join-Path $racine "Desktop"
+    if (-not (Test-Path $bureauPublic)) { New-Item -ItemType Directory -Force -Path $bureauPublic | Out-Null }
+    $lien = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $bureauPublic "Stock PharmaBoost.lnk"))
+    $lien.TargetPath = $Export
+    $lien.Description = "Dossier où enregistrer le stock envoyé à PharmaBoost"
+    $lien.Save()
+    $raccourciCree = $true
+  } catch {
+    Write-Host "Raccourci « Stock PharmaBoost » non créé : $($_.Exception.Message)" -ForegroundColor Yellow
+  }
+
+  # (2) Le partage réseau « PharmaBoost » : le titulaire y dépose son stock depuis son poste.
+  # Modification pour les utilisateurs authentifiés seulement, jamais pour « Tout le monde ».
+  # Seulement pour le dossier créé par ce script : un -Export personnalisé est le dossier
+  # où le logiciel de l'officine écrit ses éditions (données patients comprises), qu'on
+  # ne rend pas lisible par tout le réseau. Le raccourci (1) reste posé dans tous les cas.
+  if ($Export -ieq $exportParDefaut) {
+    try {
+      if (-not (Get-Command New-SmbShare -ErrorAction SilentlyContinue)) { throw "cette version de Windows ne sait pas créer de partage (New-SmbShare absent)." }
+      # « Utilisateurs authentifiés » désigné par son identifiant (S-1-5-11) : son nom change avec la langue de Windows.
+      $authentifies = (New-Object -TypeName Security.Principal.SecurityIdentifier -ArgumentList "S-1-5-11").Translate([Security.Principal.NTAccount]).Value
+      # Le dossier lui-même doit laisser écrire ces utilisateurs, en plus du partage.
+      & icacls.exe $Export /grant "*S-1-5-11:(OI)(CI)M" | Out-Null
+      if ($LASTEXITCODE -ne 0) { throw "les droits sur le dossier n'ont pas pu être accordés (icacls, code $LASTEXITCODE)." }
+      # Un partage du même nom (installation précédente) est refait : il pointe toujours vers le bon dossier.
+      if (Get-SmbShare -Name $nomPartage -ErrorAction SilentlyContinue) { Remove-SmbShare -Name $nomPartage -Force }
+      New-SmbShare -Name $nomPartage -Path $Export -ChangeAccess $authentifies -Description "Stock PharmaBoost" | Out-Null
+      $partageCree = $true
+    } catch {
+      Write-Host "Partage réseau « PharmaBoost » non créé : $($_.Exception.Message)" -ForegroundColor Yellow
+      Write-Host "  À faire à la main : clic droit sur le dossier $Export, Propriétés, Partage, nom « PharmaBoost », droit Modifier pour les utilisateurs authentifiés." -ForegroundColor Yellow
+    }
+  } else {
+    $partagePersonnalise = $true
+    Write-Host "Dossier d'export personnalisé ($Export) : partage réseau « PharmaBoost » non créé. Le raccourci « Stock PharmaBoost » reste posé." -ForegroundColor Yellow
+  }
+}
+
+# (3) Le message final : ce qui est installé, et le chemin à donner au titulaire.
+Write-Host ""
+Write-Host "Installation terminée." -ForegroundColor Green
+Write-Host "  Programme PharmaBoost Connect : installé et démarré"
+Write-Host "  Dossier du stock              : $Export"
+if ($partageCree) {
+  Write-Host "  Partage réseau                : \\$($env:COMPUTERNAME)\$nomPartage"
+} elseif ($partagePersonnalise) {
+  Write-Host "  Partage réseau                : non créé (dossier d'export personnalisé)" -ForegroundColor Yellow
+} else {
+  Write-Host "  Partage réseau                : non créé (voir le message jaune ci-dessus)" -ForegroundColor Yellow
+}
+if ($raccourciCree) { Write-Host "  Raccourci sur le Bureau       : « Stock PharmaBoost »" }
+Write-Host ""
+Write-Host "À dire au titulaire : enregistrez l'édition du stock dans le dossier PharmaBoost, c'est tout."
+if ($partageCree) { Write-Host "Depuis son poste, ce dossier s'ouvre avec  \\$($env:COMPUTERNAME)\$nomPartage" }

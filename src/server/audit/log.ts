@@ -228,7 +228,16 @@ export type AuditAction =
   | "sales_application.note_added"
   | "sales_application.converted"
   | "sales_application.cv_downloaded"
-  | "assortment.lab_suggested";
+  | "assortment.lab_suggested"
+  // Dépôts de stock : le fichier de stock du titulaire (jamais son contenu)
+  | "stock.deposit_received"
+  | "stock.deposit_applied"
+  | "stock.deposit_held"
+  | "stock.deposit_failed"
+  | "stock.deposit_decided"
+  | "stock.deposit_retried"
+  | "stock.deposit_files_purged"
+  | "stock.deposit_downloaded";
 
 export async function recordAudit(params: {
   action: AuditAction;

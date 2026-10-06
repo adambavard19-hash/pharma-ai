@@ -526,7 +526,7 @@ function EmptyOutcome({
           {message.action === "RELAUNCH" && canRelaunch && <ReanalyseButton prescriptionId={prescriptionId} />}
           {message.action === "IMPORT_STOCK" && canImportStock && (
             <Button asChild leadingIcon={<Package className="size-[18px]" />}>
-              <Link href="/stock/import">Importer mon stock</Link>
+              <Link href="/stock/mise-a-jour">Importer mon stock</Link>
             </Button>
           )}
           {message.action === "ADD_ADVICE" && (

@@ -131,6 +131,7 @@ model Pharmacy {
   auditLogs           AuditLog[]
   sessions            Session[]
   imports             ImportJob[]
+  stockDeposits       StockDeposit[]
   aiUsage             AiUsageRecord[]
   /// Le dossier commercial dont cette officine est issue, s'il y en a un.
   prospect            Prospect?
@@ -524,6 +525,7 @@ model User {
   notifications           Notification[]
   pharmacyRules           PharmacyRule[]
   imports                 ImportJob[]
+  stockDeposits           StockDeposit[]
 
   @@index([organizationId])
   @@map("users")
@@ -977,6 +979,67 @@ enum ImportStatus {
   RUNNING
   COMPLETED
   FAILED
+}
+
+/// Un fichier de stock envoyé par le titulaire depuis son espace PharmaBoost.
+/// Le fichier d'origine est gardé (stockage privé, 90 jours) ; le stock de
+/// l'officine est mis à jour sans intervention, sauf quand le fichier est
+/// bien plus petit que le stock connu : il attend alors la décision de
+/// l'équipe (HELD). Aucune donnée de patient dans un fichier de stock.
+enum StockDepositStatus {
+  /// Reçu, traitement en cours.
+  RECEIVED
+  /// Appliqué au stock de l'officine.
+  APPLIED
+  /// Reçu mais non appliqué : l'équipe PharmaBoost doit trancher.
+  HELD
+  /// Illisible ou refusé : le stock n'a pas bougé.
+  FAILED
+  /// Écarté par l'équipe : le stock n'a pas bougé.
+  REJECTED
+}
+
+model StockDeposit {
+  id            String             @id @default(cuid())
+  pharmacyId    String
+  /// Le membre de l'officine qui a envoyé le fichier.
+  userId        String?
+  fileName      String
+  fileSize      Int
+  /// Empreinte SHA-256 du fichier : reconnaître un double envoi.
+  fileSha256    String
+  /// Clé du fichier d'origine dans le stockage privé ; vide une fois purgé.
+  storageKey    String?
+  status        StockDepositStatus @default(RECEIVED)
+  /// D'où vient le fichier : WEB (espace du titulaire), AGENT (le petit facteur du serveur) ou CONSOLE (déposé par l'équipe).
+  source        String             @default("WEB")
+  /// Lignes valides détectées dans le fichier.
+  lines         Int?
+  created       Int?
+  updated       Int?
+  invalid       Int?
+  /// Produits absents du fichier remis à zéro.
+  zeroed        Int?
+  /// Lignes de stock connues avant l'envoi (pour juger la taille du fichier).
+  knownLines    Int?
+  /// L'erreur, ou la raison pour laquelle l'équipe doit trancher.
+  message       String?
+  /// L'import ligne à ligne produit par ce dépôt.
+  importJobId   String?
+  receivedAt    DateTime           @default(now())
+  appliedAt     DateTime?
+  /// L'administrateur de la console qui a tranché (« HELD ») ou relancé.
+  decidedById   String?
+  decidedAt     DateTime?
+  /// Date de suppression du fichier d'origine (purge à 90 jours).
+  fileDeletedAt DateTime?
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([pharmacyId, receivedAt])
+  @@index([status, receivedAt])
+  @@map("stock_deposits")
 }
 
 model ImportJob {

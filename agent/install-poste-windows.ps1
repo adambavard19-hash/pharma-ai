@@ -1,4 +1,4 @@
-# PharmaBoost Connect — installation sur un POSTE DE CAISSE (Windows).
+﻿# PharmaBoost Connect — installation sur un POSTE DE CAISSE (Windows).
 #
 # À lancer dans PowerShell, sur le poste où la douchette est branchée, avec
 # la session Windows de la personne qui utilise le LGO :
@@ -17,9 +17,16 @@
 # L'écoute doit tourner dans la session de l'utilisateur (celle qui affiche
 # le LGO) : la tâche démarre à l'ouverture de session, pas au démarrage
 # système.
+#
+# Quand le serveur de l'officine est déjà relié, la ligne d'installation passe
+# -DossierStock (\\NOMDUSERVEUR\PharmaBoost) : un raccourci « Stock PharmaBoost »
+# est posé sur le Bureau de cette session, pour ouvrir le dossier où le
+# titulaire enregistre son stock. Facultatif : sans -DossierStock, rien n'est créé.
 param(
   [string]$Code = "",
   [string]$Serveur = "https://pharmaboost.app",
+  # Le dossier du stock sur le serveur de l'officine. Vide : pas de raccourci.
+  [string]$DossierStock = "",
   [switch]$Test,
   # Essai de l'affichage : un avis d'exemple en coin d'écran, sans bip.
   [switch]$TestAffichage,
@@ -107,10 +114,26 @@ $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -User $env:USERNAME -Force | Out-Null
 Start-ScheduledTask -TaskName $taskName
 
+# Un raccourci « Stock PharmaBoost » sur le Bureau de cette session, vers le dossier du serveur.
+# Facultatif : sans serveur connu, rien n'est créé ; un échec s'affiche en jaune sans rien interrompre.
+$raccourciStock = $false
+if ($DossierStock -ne "") {
+  try {
+    $lien = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath("Desktop")) "Stock PharmaBoost.lnk"))
+    $lien.TargetPath = $DossierStock
+    $lien.Description = "Dossier où enregistrer le stock envoyé à PharmaBoost"
+    $lien.Save()
+    $raccourciStock = $true
+  } catch {
+    Write-Host "Raccourci « Stock PharmaBoost » non créé : $($_.Exception.Message)" -ForegroundColor Yellow
+  }
+}
+
 Write-Host ""
 Write-Host "Le poste est relié. Passez une boîte à la douchette dans votre logiciel :"
 Write-Host "elle doit apparaître dans PharmaBoost, écran Nouvelle vente, dans la seconde."
 Write-Host "  Journal : $journal"
+if ($raccourciStock) { Write-Host "Sur votre Bureau, le raccourci « Stock PharmaBoost » ouvre le dossier du stock ($DossierStock)." }
 Start-Sleep -Seconds 8
 if (Test-Path $journal) {
   Write-Host ""

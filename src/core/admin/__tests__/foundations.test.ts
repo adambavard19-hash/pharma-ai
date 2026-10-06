@@ -401,6 +401,18 @@ describe("navigation de la console", () => {
     expect(commercial.href).toBe("/admin/pipeline");
   });
 
+  it("« Stocks reçus » ferme l'espace Clients, sans déplacer aucune autre rubrique", () => {
+    const clients = ADMIN_NAV.find((space) => space.key === "clients")!;
+    expect(clients.items.map((item) => item.href)).toEqual(["/admin/pharmacies", "/admin/utilisateurs", "/admin/activite", "/admin/acces", "/admin/technique", "/admin/depots-stock"]);
+    expect(clients.items.at(-1)).toMatchObject({ label: "Stocks reçus", description: "Le dernier stock reçu de chaque officine, et chaque fichier envoyé." });
+    // L'espace garde son adresse : « Clients » ouvre toujours la liste des officines.
+    expect(clients.href).toBe("/admin/pharmacies");
+    expect(activeNavItem("/admin/depots-stock")).toMatchObject({ space: { key: "clients" }, item: { label: "Stocks reçus" } });
+    // Le fichier d'un dépôt reste rattaché à la même rubrique ; « État technique » garde la sienne.
+    expect(activeNavItem("/admin/depots-stock/ckx123abc").item?.label).toBe("Stocks reçus");
+    expect(activeNavItem("/admin/technique").item?.label).toBe("État technique");
+  });
+
   it("chaque rubrique de la console a une adresse unique et une description", () => {
     const hrefs = ADMIN_NAV.flatMap((space) => space.items.map((item) => item.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);

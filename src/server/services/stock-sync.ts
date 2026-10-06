@@ -6,6 +6,7 @@ import { recordAudit } from "@/server/audit/log";
 import { createNotification } from "./notifications";
 import { analyseStockImport, commitStockImport } from "./stock-import";
 import { LGO_DEFINITIONS, lgoLabel, stockFreshness, type LgoId, type StockFreshness } from "@/core/stock/connectors";
+import { safeServerHostname } from "@/core/stock/install";
 import type { RowDecision } from "@/core/stock-import";
 import type { TenantScope } from "@/server/db/tenant";
 
@@ -69,8 +70,16 @@ export async function getConnection(pharmacyId: string): Promise<ConnectionView 
   return row ? view(row) : null;
 }
 
+/**
+ * Qui a demandé l'émission : un administrateur de la console (installation
+ * sous AnyDesk) ou, sans acteur, le titulaire lui-même. L'audit nomme le bon.
+ */
+export type IssueActor = { platformAdminId: string };
+
+const auditActor = (scope: TenantScope, actor?: IssueActor) => (actor ? { userId: null, platformAdminId: actor.platformAdminId } : { userId: scope.userId });
+
 /** Émet (ou renouvelle) le code d'appairage. Le code n'est rendu qu'ici, une fois. */
-export async function createPairing(scope: TenantScope, lgo: LgoId): Promise<{ code: string; expiresAt: Date }> {
+export async function createPairing(scope: TenantScope, lgo: LgoId, actor?: IssueActor): Promise<{ code: string; expiresAt: Date }> {
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const expiresAt = new Date(Date.now() + PAIRING_TTL_MS);
   await prisma.stockConnection.upsert({
@@ -78,7 +87,7 @@ export async function createPairing(scope: TenantScope, lgo: LgoId): Promise<{ c
     create: { pharmacyId: scope.pharmacyId, lgo, status: "PENDING", pairingCodeHash: hashToken(code), pairingExpiresAt: expiresAt },
     update: { lgo, pairingCodeHash: hashToken(code), pairingExpiresAt: expiresAt, lastError: null },
   });
-  await recordAudit({ action: "stock.connection_pairing_issued", entityType: "StockConnection", entityId: scope.pharmacyId, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { lgo } });
+  await recordAudit({ action: "stock.connection_pairing_issued", entityType: "StockConnection", entityId: scope.pharmacyId, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), metadata: { lgo, ...(actor ? { by: "console" } : {}) } });
   return { code, expiresAt };
 }
 
@@ -115,9 +124,10 @@ export async function pairAgent(input: { code: string; lgo?: string | null; host
     userId: null,
     type: "IMPORT_COMPLETED",
     severity: "SUCCESS",
-    title: `${lgoLabel(connection.lgo)} connecté`,
-    body: `L'agent PharmaBoost Connect est appairé${input.hostname ? ` sur ${input.hostname}` : ""}. Le stock se synchronisera automatiquement.`,
-    linkUrl: "/stock/connexion",
+    // Ce que lit le titulaire : le dossier est prêt, c'est à lui d'y enregistrer son édition (rien ne part tout seul).
+    title: "Dossier PharmaBoost prêt",
+    body: "Le dossier PharmaBoost est prêt sur votre serveur. Enregistrez-y l'édition de votre stock pour le mettre à jour.",
+    linkUrl: "/stock/mise-a-jour",
   });
   return { ok: true, agentKey, pharmacyName: connection.pharmacy.name, intervalSeconds: connection.intervalSeconds };
 }
@@ -155,22 +165,102 @@ export async function createPostPairing(scope: TenantScope, label: string | null
  * tient dans une commande PowerShell. Le poste s'appaire avec ce jeton comme
  * avec un code à six chiffres ; il n'y a rien d'autre à taper.
  */
-export async function createPostInstallLink(scope: TenantScope, label: string | null): Promise<{ token: string; expiresAt: Date; postId: string }> {
+export async function createPostInstallLink(scope: TenantScope, label: string | null, actor?: IssueActor): Promise<{ token: string; expiresAt: Date; postId: string }> {
   const token = generateToken(18);
   const expiresAt = new Date(Date.now() + POST_INSTALL_LINK_TTL_MS);
   const post = await prisma.counterPost.create({
     data: { pharmacyId: scope.pharmacyId, hostname: "", label, pairingCodeHash: hashToken(token), pairingExpiresAt: expiresAt },
   });
-  await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { label, kind: "install-link" } });
+  await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), metadata: { label, kind: "install-link", ...(actor ? { by: "console" } : {}) } });
   return { token, expiresAt, postId: post.id };
 }
 
-/** Un lien d'installation encore valable ? Sans rien consommer : l'installateur le vérifie avant de télécharger. */
-export async function peekPostInstallLink(token: string): Promise<{ pharmacyName: string; label: string | null } | null> {
+/**
+ * Un lien d'installation encore valable ? Sans rien consommer : l'installateur le vérifie avant de télécharger.
+ * Rend aussi le nom de machine du serveur relié (s'il y en a un, et s'il est sûr) : le poste en tire le chemin du dossier partagé.
+ */
+export async function peekPostInstallLink(token: string): Promise<{ pharmacyName: string; label: string | null; serverHostname: string | null } | null> {
   if (!/^[A-Za-z0-9_-]{16,}$/.test(token)) return null;
-  const post = await prisma.counterPost.findUnique({ where: { pairingCodeHash: hashToken(token) }, select: { label: true, pairingExpiresAt: true, pharmacy: { select: { name: true } } } });
+  const post = await prisma.counterPost.findUnique({ where: { pairingCodeHash: hashToken(token) }, select: { label: true, pharmacyId: true, pairingExpiresAt: true, pharmacy: { select: { name: true } } } });
   if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return null;
-  return { pharmacyName: post.pharmacy.name, label: post.label };
+  const server = await prisma.stockConnection.findUnique({ where: { pharmacyId: post.pharmacyId }, select: { hostname: true, pairedAt: true } });
+  return { pharmacyName: post.pharmacy.name, label: post.label, serverHostname: server?.pairedAt ? safeServerHostname(server.hostname) : null };
+}
+
+/**
+ * Un code d'installation du serveur encore valable ? Sans rien consommer et
+ * sans rien révéler de l'officine : seul le logiciel à configurer sort d'ici.
+ */
+export async function peekServerPairing(code: string): Promise<{ lgo: LgoId } | null> {
+  if (!/^\d{6}$/.test(code)) return null;
+  const connection = await prisma.stockConnection.findUnique({ where: { pairingCodeHash: hashToken(code) }, select: { lgo: true, pairingExpiresAt: true } });
+  if (!connection || !connection.pairingExpiresAt || connection.pairingExpiresAt < new Date()) return null;
+  return { lgo: isLgoId(connection.lgo) ? connection.lgo : "autre" };
+}
+
+/**
+ * L'officine pour laquelle la console prépare une installation : son titulaire
+ * actif (au nom duquel l'agent écrira) et le logiciel déjà connu. Une officine
+ * suspendue est refusée : son agent n'aurait de toute façon pas le droit d'écrire.
+ */
+export async function resolveInstallTarget(pharmacyId: string): Promise<
+  { ok: true; scope: TenantScope; pharmacyName: string; lgo: LgoId | null } | { ok: false; reason: "NOT_FOUND" | "SUSPENDED" | "NO_OWNER" }
+> {
+  const pharmacy = await prisma.pharmacy.findUnique({
+    where: { id: pharmacyId },
+    select: {
+      id: true, name: true, organizationId: true, isActive: true,
+      memberships: { where: { role: "OWNER", isActive: true }, orderBy: { createdAt: "asc" }, take: 1, select: { userId: true } },
+      stockConnection: { select: { lgo: true } },
+    },
+  });
+  if (!pharmacy) return { ok: false, reason: "NOT_FOUND" };
+  if (!pharmacy.isActive) return { ok: false, reason: "SUSPENDED" };
+  const owner = pharmacy.memberships[0];
+  if (!owner) return { ok: false, reason: "NO_OWNER" };
+  const lgo = pharmacy.stockConnection?.lgo;
+  return { ok: true, scope: { pharmacyId: pharmacy.id, organizationId: pharmacy.organizationId, userId: owner.userId }, pharmacyName: pharmacy.name, lgo: lgo && isLgoId(lgo) ? lgo : null };
+}
+
+/** Ce que la fiche officine montre de l'installation : le serveur, les postes, le dernier stock reçu. Des états, jamais un code. */
+export type InstallState = {
+  server: {
+    lgo: string;
+    lgoLabel: string;
+    hostname: string | null;
+    /** Le serveur s'est présenté avec son code et n'a pas été déconnecté depuis. */
+    linked: boolean;
+    pairedAt: Date | null;
+    lastSeenAt: Date | null;
+    /** Un code émis et pas encore utilisé, jusqu'à quand. */
+    codeValidUntil: Date | null;
+  } | null;
+  posts: { id: string; label: string | null; hostname: string; linked: boolean; pairedAt: Date | null; lastSeenAt: Date | null; linkValidUntil: Date | null }[];
+  stockSyncedAt: Date | null;
+};
+
+export async function pharmacyInstallState(pharmacyId: string, now: Date = new Date()): Promise<InstallState> {
+  const [connection, posts, pharmacy] = await Promise.all([
+    prisma.stockConnection.findUnique({ where: { pharmacyId }, select: { lgo: true, status: true, hostname: true, pairedAt: true, lastSeenAt: true, pairingExpiresAt: true } }),
+    prisma.counterPost.findMany({ where: { pharmacyId, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true, label: true, hostname: true, pairedAt: true, lastSeenAt: true, pairingExpiresAt: true } }),
+    prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true } }),
+  ]);
+  const stillValid = (date: Date | null) => (date && date > now ? date : null);
+  return {
+    server: connection
+      ? {
+          lgo: connection.lgo,
+          lgoLabel: lgoLabel(connection.lgo),
+          hostname: connection.hostname,
+          linked: Boolean(connection.pairedAt) && connection.status !== "DISCONNECTED",
+          pairedAt: connection.pairedAt,
+          lastSeenAt: connection.lastSeenAt,
+          codeValidUntil: stillValid(connection.pairingExpiresAt),
+        }
+      : null,
+    posts: posts.map((post) => ({ id: post.id, label: post.label, hostname: post.hostname, linked: Boolean(post.pairedAt), pairedAt: post.pairedAt, lastSeenAt: post.lastSeenAt, linkValidUntil: stillValid(post.pairingExpiresAt) })),
+    stockSyncedAt: pharmacy?.stockSyncedAt ?? null,
+  };
 }
 
 export async function pairCounterPost(input: { code: string; hostname?: string | null; version?: string | null }): Promise<{ ok: true; agentKey: string; pharmacyName: string; postLabel: string } | { ok: false; error: string }> {

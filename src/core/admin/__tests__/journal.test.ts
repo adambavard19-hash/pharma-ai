@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   actionLabel,
+  actionTone,
   actionsMatching,
   contextEntries,
   diffEntries,
@@ -65,7 +66,7 @@ describe("journal d'audit : la liste blanche est dans la requête", () => {
 
   it("sans filtre : uniquement les préfixes business, connexions restreintes aux administrateurs", () => {
     const clauses = prefixesOf(journalWhere({ family: null }));
-    expect(clauses.map((c) => c.prefix).sort()).toEqual(["auth.", "billing.", "challenge.", "partner.", "platform.", "sales.", "sales_application.", "training."]);
+    expect(clauses.map((c) => c.prefix).sort()).toEqual(["auth.", "billing.", "challenge.", "partner.", "platform.", "sales.", "sales_application.", "stock.deposit_", "training."]);
     expect(clauses.find((c) => c.prefix === "auth.")?.admin).toEqual({ not: null });
     expect(clauses.some((c) => /patient|prescription|recommendation|document|reminder/.test(c.prefix))).toBe(false);
     expect(journalWhere({ family: null }).AND[1]).toEqual({ action: { notIn: ["training.progress_updated"] } });
@@ -90,6 +91,59 @@ describe("journal d'audit : la liste blanche est dans la requête", () => {
   it("une recherche par libellé ne ramène jamais une action clinique", () => {
     expect(actionsMatching("créé").every((code) => isBusinessAction(code, { platformAdminId: "x" }))).toBe(true);
     expect(actionsMatching("ab")).toEqual([]);
+  });
+});
+
+describe("journal d'audit : les stocks reçus", () => {
+  const DEPOSIT_ACTIONS = ["stock.deposit_received", "stock.deposit_applied", "stock.deposit_held", "stock.deposit_failed", "stock.deposit_decided", "stock.deposit_retried", "stock.deposit_files_purged", "stock.deposit_downloaded"];
+
+  it("les gestes sur les fichiers de stock sont visibles, y compris ceux du cron (sans administrateur)", () => {
+    for (const action of DEPOSIT_ACTIONS) {
+      expect(isBusinessAction(action), action).toBe(true);
+      expect(isBusinessAction(action, { platformAdminId: "adm_1" }), action).toBe(true);
+    }
+  });
+
+  it("les autres gestes de stock de l'officine restent hors de la console", () => {
+    for (const action of ["stock.adjusted", "stock.agent_sync", "stock.lot_saved", "stock.post_paired", "stock.connection_paired", "stock.deposit", "stock.deposit_", "stock.depositaire"]) {
+      expect(isBusinessAction(action, { platformAdminId: "adm_1" }), action).toBe(false);
+    }
+  });
+
+  it("la famille se lit par sa clé française, et la requête ne cible que les dépôts", () => {
+    const family = journalFamily("stocks-recus");
+    expect(family).toMatchObject({ prefix: "stock", actionPrefix: "stock.deposit_", label: "Stocks reçus" });
+    const or = (journalWhere({ family }).AND[0] as { OR: { action: { startsWith: string } }[] }).OR;
+    expect(or).toEqual([{ action: { startsWith: "stock.deposit_" } }]);
+    expect(journalFamily("stock")?.key).toBe("stocks-recus");
+  });
+
+  it("chaque action a son libellé, sa couleur, son lien vers la console", () => {
+    for (const action of DEPOSIT_ACTIONS) expect(actionLabel(action), action).not.toBe(action);
+    expect(actionLabel("stock.deposit_held")).toBe("Fichier de stock mis en attente");
+    expect(actionTone("stock.deposit_failed")).toBe("danger");
+    expect(actionTone("stock.deposit_held")).toBe("warning");
+    expect(actionTone("stock.deposit_applied")).toBe("success");
+    expect(actionTone("stock.deposit_received")).toBe("neutral");
+    // Un téléchargement du fichier d'un titulaire se lit en clair dans le journal, sans couleur d'alerte.
+    expect(actionLabel("stock.deposit_downloaded")).toBe("Fichier de stock téléchargé");
+    expect(actionTone("stock.deposit_downloaded")).toBe("neutral");
+    expect(entityHref({ entityType: "StockDeposit", entityId: "dep_1", pharmacyId: "ph_1" })).toBe("/admin/depots-stock");
+    expect(actionsMatching("stock reçu").length).toBeGreaterThan(0);
+  });
+
+  it("le téléchargement de la console : taille seule, le nom d'un administrateur, jamais le contenu", () => {
+    expect(contextEntries({ sizeBytes: 4096 }, "stock.deposit_downloaded")).toEqual([{ field: "sizeBytes", label: "Taille (octets)", value: new Intl.NumberFormat("fr-FR").format(4096) }]);
+  });
+
+  it("le contexte d'une ligne : origine et décision en clair, compteurs lisibles, rien du contenu du fichier", () => {
+    const context = contextEntries({ source: "AGENT", lines: 4235, zeroed: 30, decision: "APPLY_FULL" }, "stock.deposit_decided");
+    expect(context).toEqual([
+      { field: "source", label: "Origine", value: "Dossier PharmaBoost (petit facteur)" },
+      { field: "lines", label: "Lignes lues", value: new Intl.NumberFormat("fr-FR").format(4235) },
+      { field: "zeroed", label: "Remis à zéro", value: "30" },
+      { field: "decision", label: "Décision", value: "Appliqué (stock complet)" },
+    ]);
   });
 });
 

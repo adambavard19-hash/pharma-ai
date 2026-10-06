@@ -1,6 +1,7 @@
 import { CANCELLATION_CHANNELS, CANCELLATION_REASONS, CANCELLATION_STATUS_LABELS, DISPATCH_STATUS, PAYMENT_STATUS_LABELS, type StatusTone } from "./statuses";
 import { CONTRACT_STATUS_LABELS, PROSPECT_STATUS_LABELS } from "@/core/sales/pipeline";
 import { formatEuros, SUBSCRIPTION_STATUS_LABELS } from "@/core/billing/subscription";
+import { DEPOSIT_DECISION_LABELS, DEPOSIT_SOURCE_LABELS } from "@/core/stock-deposit/rules";
 
 /**
  * Le journal d'audit de la console, vu du domaine : quelles actions il montre,
@@ -23,6 +24,12 @@ export type JournalFamily = {
   key: string;
   /** Préfixe du code d'action (`billing` pour `billing.plan_saved`). */
   prefix: string;
+  /**
+   * Préfixe plus étroit que « <préfixe>. » quand la famille ne montre qu'une
+   * partie des actions de son préfixe (`stock.deposit_` : les dépôts de stock,
+   * pas les gestes courants du stock de l'officine).
+   */
+  actionPrefix?: string;
   label: string;
   tone: StatusTone;
   /** Ne montrer que les lignes portées par un administrateur de la console. */
@@ -37,6 +44,7 @@ export const JOURNAL_FAMILIES: JournalFamily[] = [
   { key: "partenaires", prefix: "partner", label: "Partenaires", tone: "warning" },
   { key: "formations", prefix: "training", label: "Formations", tone: "success" },
   { key: "challenges", prefix: "challenge", label: "Challenges", tone: "success" },
+  { key: "stocks-recus", prefix: "stock", actionPrefix: "stock.deposit_", label: "Stocks reçus", tone: "info" },
   // Les connexions des officines et des commerciaux ne regardent pas la
   // console : seules celles des administrateurs y figurent.
   { key: "connexions", prefix: "auth", label: "Connexions console", tone: "neutral", requiresAdmin: true },
@@ -76,6 +84,7 @@ export function isBusinessAction(action: string, context: { platformAdminId?: st
   const allowed = JOURNAL_FAMILIES.find((f) => f.prefix === family);
   if (!allowed) return false;
   if (action === `${family}.` || action.length <= family.length + 1) return false;
+  if (allowed.actionPrefix && (!action.startsWith(allowed.actionPrefix) || action.length === allowed.actionPrefix.length)) return false;
   if (allowed.requiresAdmin && !context.platformAdminId) return false;
   return true;
 }
@@ -94,8 +103,9 @@ export type JournalWhere = {
  */
 export function journalWhere(input: { family: JournalFamily | null; adminId?: string | null; since?: Date | null; q?: string | null }): JournalWhere {
   const families = input.family ? [input.family] : JOURNAL_FAMILIES;
+  const startsWith = (f: JournalFamily) => f.actionPrefix ?? `${f.prefix}.`;
   const and: Record<string, unknown>[] = [
-    { OR: families.map((f) => (f.requiresAdmin ? { action: { startsWith: `${f.prefix}.` }, platformAdminId: { not: null } } : { action: { startsWith: `${f.prefix}.` } })) },
+    { OR: families.map((f) => (f.requiresAdmin ? { action: { startsWith: startsWith(f) }, platformAdminId: { not: null } } : { action: { startsWith: startsWith(f) } })) },
     { action: { notIn: [...EXCLUDED_ACTIONS] } },
   ];
   if (input.since) and.push({ createdAt: { gte: input.since } });
@@ -221,6 +231,15 @@ export const ACTION_LABELS: Record<string, string> = {
   "partner.order_created": "Commande créée",
   "partner.order_status_changed": "Statut de commande modifié",
   "partner.orders_exported": "Commandes exportées",
+  // Stocks reçus
+  "stock.deposit_received": "Fichier de stock reçu",
+  "stock.deposit_applied": "Stock mis à jour depuis un fichier",
+  "stock.deposit_held": "Fichier de stock mis en attente",
+  "stock.deposit_failed": "Fichier de stock non lu",
+  "stock.deposit_decided": "Fichier de stock tranché par l'équipe",
+  "stock.deposit_retried": "Fichier de stock relancé",
+  "stock.deposit_files_purged": "Anciens fichiers de stock supprimés",
+  "stock.deposit_downloaded": "Fichier de stock téléchargé",
   // Formations et challenges
   "training.saved": "Formation enregistrée",
   "training.archived": "Formation archivée",
@@ -246,9 +265,9 @@ export function actionsMatching(q: string): string[] {
 
 /** La couleur d'une action : les gestes qui retirent ou bloquent en rouge, ceux qui rétablissent en vert. */
 export function actionTone(action: string): StatusTone {
-  if (/(deleted|suspended|revoked|login_failed|cancel_scheduled|cancellation_created|cancellation_stripe_scheduled|admin_deactivated|blocked)$/.test(action)) return "danger";
-  if (/(restored|activated|signature_recorded|demo_done|incident_resolved|cancel_revoked)$/.test(action)) return "success";
-  if (/(price_changed|status_changed|reassigned|setting_updated|template_saved|template_reset|automation_updated)$/.test(action)) return "warning";
+  if (/(deleted|suspended|revoked|login_failed|cancel_scheduled|cancellation_created|cancellation_stripe_scheduled|admin_deactivated|blocked|deposit_failed)$/.test(action)) return "danger";
+  if (/(restored|activated|signature_recorded|demo_done|incident_resolved|cancel_revoked|deposit_applied)$/.test(action)) return "success";
+  if (/(price_changed|status_changed|reassigned|setting_updated|template_saved|template_reset|automation_updated|deposit_held)$/.test(action)) return "warning";
   return "neutral";
 }
 
@@ -287,6 +306,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   TrainingContent: "Formation",
   LabChallenge: "Challenge",
   LabChallengeEntry: "Saisie de challenge",
+  StockDeposit: "Stock reçu",
 };
 
 export function entityLabel(entityType: string): string {
@@ -347,6 +367,8 @@ export function entityHref(row: { entityType: string; entityId: string | null; p
     case "LabChallenge":
     case "LabChallengeEntry":
       return "/admin/challenges";
+    case "StockDeposit":
+      return "/admin/depots-stock";
     default:
       return null;
   }
@@ -418,6 +440,16 @@ export const FIELD_LABELS: Record<string, string> = {
   failed: "Échecs",
   skipped: "Ignorés",
   value: "Valeur",
+  source: "Origine",
+  lines: "Lignes lues",
+  created: "Produits créés",
+  updated: "Produits mis à jour",
+  invalid: "Lignes ignorées",
+  zeroed: "Remis à zéro",
+  knownLines: "Lignes connues avant",
+  decision: "Décision",
+  purged: "Fichiers supprimés",
+  sizeBytes: "Taille (octets)",
 };
 
 export function fieldLabel(field: string): string {
@@ -442,6 +474,7 @@ const GENERIC_CODES: Record<string, string> = {
 
 function codeMapsFor(action: string): Record<string, string>[] {
   const labels = (record: Record<string, { label: string }>) => Object.fromEntries(Object.entries(record).map(([k, v]) => [k, v.label]));
+  if (action.startsWith("stock.deposit")) return [DEPOSIT_SOURCE_LABELS, DEPOSIT_DECISION_LABELS];
   if (action.includes("cancellation")) return [labels(CANCELLATION_STATUS_LABELS), CANCELLATION_REASONS, CANCELLATION_CHANNELS];
   if (action.startsWith("sales.prospect") || action.startsWith("sales.demo") || action.startsWith("sales.followup")) return [PROSPECT_STATUS_LABELS];
   if (action.includes("contract")) return [CONTRACT_STATUS_LABELS];

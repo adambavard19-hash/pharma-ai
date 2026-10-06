@@ -33,6 +33,9 @@ export default async function StockConnectionPage() {
       <p className="rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-2.5 text-[13px] text-text-secondary dark:border-brand-800 dark:bg-brand-950/30">
         Première fois ? <Link href="/installation" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Le guide de mise en service</Link> vous dit quoi faire, où cliquer, et quoi faire si ça bloque — poste de comptoir compris.
       </p>
+      <p className="text-[13px] text-text-secondary">
+        Vous voulez seulement mettre votre stock à jour ? <Link href="/stock/mise-a-jour" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Mettre à jour mon stock</Link> : trois étapes, une minute.
+      </p>
       <PageHeader
         title="Connecter mon logiciel"
         description="Un petit programme, PharmaBoost Connect, s'installe sur le serveur de l'officine. Il lit l'export de stock que votre logiciel produit et le synchronise en continu. Il n'écrit jamais dans votre logiciel."

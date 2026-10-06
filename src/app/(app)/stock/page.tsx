@@ -16,6 +16,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/format";
 import { PatientSearchBar } from "../patients/search-bar";
+import { StockReminderBanner } from "@/components/app/stock-reminder";
 import { StockList, type StockRow } from "./stock-list";
 
 export const metadata: Metadata = { title: "Stock de mon officine" };
@@ -186,6 +187,7 @@ export default async function StockPage({
 
   return (
     <div className="space-y-6">
+      <StockReminderBanner stockSyncedAt={pharmacy?.stockSyncedAt ?? null} canImport={canImport} isDemo={session.pharmacy.isDemo} />
       <PageHeader
         title="Stock de mon officine"
         description="Ce que vous avez réellement en rayon, en quelle quantité et à quel prix. PharmaBoost ne propose jamais un produit absent de cette liste."
@@ -193,7 +195,7 @@ export default async function StockPage({
           <div className="flex flex-wrap gap-2">
             {canImport && (
               <Button asChild variant={syncedAt ? "outline" : "primary"} leadingIcon={<Upload className="size-[18px]" />}>
-                <Link href="/stock/import">{syncedAt ? "Mettre à jour mon stock" : "Importer mon stock"}</Link>
+                <Link href="/stock/mise-a-jour">{syncedAt ? "Mettre à jour mon stock" : "Importer mon stock"}</Link>
               </Button>
             )}
             {(canManage || canAdjust) && (

@@ -12,7 +12,12 @@ import "server-only";
 
 type TextItem = { str: string; transform: number[]; width: number; hasEOL?: boolean };
 
-export async function extractPdfLayoutText(bytes: Uint8Array, options: { maxPages?: number } = {}): Promise<{ text: string; pages: number; skippedPages: number }> {
+/**
+ * `pages` : les pages lues (ou tentées) ; `totalPages` : toutes celles du
+ * document — plus grand quand le plafond de pages est atteint ; `skippedPages` :
+ * celles au flux abîmé, sautées.
+ */
+export async function extractPdfLayoutText(bytes: Uint8Array, options: { maxPages?: number } = {}): Promise<{ text: string; pages: number; skippedPages: number; totalPages: number }> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   // Sans navigateur, pdf.js charge son « worker » comme un module : on lui
   // donne le chemin réel du fichier, quel que soit l'empaqueteur.
@@ -21,7 +26,8 @@ export async function extractPdfLayoutText(bytes: Uint8Array, options: { maxPage
     pdfjs.GlobalWorkerOptions.workerSrc = createRequire(process.cwd() + "/package.json").resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
   }
   const document = await pdfjs.getDocument({ data: bytes, useSystemFonts: true, isEvalSupported: false, disableFontFace: true }).promise;
-  const pages = Math.min(document.numPages, options.maxPages ?? 500);
+  const totalPages = document.numPages;
+  const pages = Math.min(totalPages, options.maxPages ?? 500);
   const out: string[] = [];
 
   let skipped = 0;
@@ -73,5 +79,5 @@ export async function extractPdfLayoutText(bytes: Uint8Array, options: { maxPage
   }
   await document.destroy();
   if (skipped > 0) console.warn(`[pdf] ${skipped} page(s) sur ${pages} sautée(s).`);
-  return { text: out.join("\n"), pages, skippedPages: skipped };
+  return { text: out.join("\n"), pages, skippedPages: skipped, totalPages };
 }

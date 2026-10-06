@@ -27,6 +27,7 @@ import { ContractsTab } from "./tab-contrats";
 import { PaymentsTab } from "./tab-paiements";
 import { UsersTab } from "./tab-utilisateurs";
 import { TechniqueTab } from "./tab-technique";
+import { InstallPanel } from "./install-panel";
 import { CommunicationTab } from "./tab-communication";
 import { CommercialTab } from "./tab-commercial";
 import { HistoryTab } from "./tab-historique";
@@ -154,7 +155,13 @@ function TabContent({ tab, base, now, templates, kind }: { tab: TabKey; base: Ph
     case "utilisateurs":
       return <UsersTab base={base} />;
     case "technique":
-      return <TechniqueTab base={base} now={now} />;
+      // L'installation sous AnyDesk d'abord : c'est ce que l'équipe vient faire ici.
+      return (
+        <div className="space-y-5">
+          <InstallPanel pharmacyId={base.pharmacy.id} now={now} />
+          <TechniqueTab base={base} now={now} />
+        </div>
+      );
     case "communication":
       return <CommunicationTab base={base} templates={templates} />;
     case "commercial":

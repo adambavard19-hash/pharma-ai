@@ -13,6 +13,7 @@ import {
   readRows,
   suggestMapping,
   summarize,
+  UnreadableFileError,
   type ClassifiedRow,
   type ColumnMapping,
   type ImportSummary,
@@ -43,7 +44,24 @@ import { classifyPharmacyProducts, type ClassificationRunSummary } from "./produ
 export const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
 export const IMPORT_MAX_ROWS = 50_000;
 
-export type ParsedFile = { headers: string[]; records: Record<string, unknown>[]; warnings?: string[] };
+export type ParsedFile = {
+  headers: string[];
+  records: Record<string, unknown>[];
+  warnings?: string[];
+  /**
+   * Vrai quand une partie du fichier n'a pas été lue : pages d'un PDF sautées,
+   * plafond de pages ou de lignes atteint. Ce qui n'a pas été lu n'est pas
+   * « absent du stock » : un stock complet ne doit pas le remettre à zéro.
+   */
+  incomplete: boolean;
+  /** Ce qui n'a pas été lu, en une phrase sans majuscule ni point (« 3 pages du fichier n'ont pas pu être lues »). */
+  incompleteReason?: string;
+};
+
+/** Pages max lues dans un PDF d'inventaire (le plafond de `extractPdfLayoutText`). */
+export const IMPORT_MAX_PDF_PAGES = 500;
+
+const countPages = (n: number) => `${n} page${n > 1 ? "s" : ""}`;
 
 /**
  * Lit un fichier d'import, y compris un PDF quand c'est une édition
@@ -52,12 +70,17 @@ export type ParsedFile = { headers: string[]; records: Record<string, unknown>[]
  */
 export async function parseImportFileAsync(name: string, bytes: Uint8Array): Promise<ParsedFile> {
   if (name.toLowerCase().endsWith(".pdf")) {
-    const { text, pages, skippedPages } = await extractPdfLayoutText(bytes);
+    const { text, pages, skippedPages, totalPages } = await extractPdfLayoutText(bytes, { maxPages: IMPORT_MAX_PDF_PAGES });
     const inventory = parseLgpiInventoryText(text);
     if (inventory.lines.length === 0) {
-      throw new Error("Ce PDF n'est pas une édition d'inventaire LGPI reconnue. Exportez l'inventaire depuis LGPI (Inventaire → Édition), ou fournissez un CSV / Excel.");
+      // Des pages abîmées : le fichier est peut-être bien un inventaire, on ne le tranche pas à la place de l'équipe.
+      if (skippedPages > 0) throw new Error("Ce PDF n'a pas pu être lu : ses pages sont abîmées. Réexportez l'inventaire depuis LGPI, ou fournissez un CSV / Excel.");
+      throw new UnreadableFileError("Ce PDF n'est pas une édition d'inventaire LGPI reconnue. Exportez l'inventaire depuis LGPI (Inventaire → Édition), ou fournissez un CSV / Excel.");
     }
     const warnings: string[] = [];
+    const notRead: string[] = [];
+    if (skippedPages > 0) notRead.push(`${countPages(skippedPages)} du fichier ${skippedPages > 1 ? "n'ont" : "n'a"} pas pu être lue${skippedPages > 1 ? "s" : ""}`);
+    if (totalPages > pages) notRead.push(`${countPages(totalPages)} dans le fichier, seules les ${pages} premières ont été lues`);
     if (skippedPages > 0) {
       const perPage = Math.round(inventory.lines.length / Math.max(1, pages - skippedPages));
       warnings.push(`${skippedPages} page(s) sur ${pages} n'a (ont) pas pu être lue(s) — flux compressé abîmé à l'export. Environ ${perPage * skippedPages} référence(s) manquent : réexportez l'inventaire depuis LGPI si elles comptent.`);
@@ -65,7 +88,7 @@ export async function parseImportFileAsync(name: string, bytes: Uint8Array): Pro
     if (!/vente|\bPV\b|PVTTC|TTC/i.test(inventory.priceBasis ?? "")) {
       warnings.push(`Inventaire valorisé « ${inventory.priceBasis ?? "sans mention"} » : ce sont des prix d'achat. Pour des prix de vente au comptoir, choisissez « Prix de vente » dans les critères d'édition de LGPI.`);
     }
-    return { ...lgpiInventoryToRecords(inventory), warnings };
+    return { ...lgpiInventoryToRecords(inventory), warnings, incomplete: notRead.length > 0, ...(notRead.length > 0 ? { incompleteReason: notRead.join(" ; ") } : {}) };
   }
   return parseImportFile(name, bytes);
 }
@@ -75,7 +98,7 @@ export function parseImportFile(name: string, bytes: Uint8Array): ParsedFile {
   if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
     const workbook = XLSX.read(bytes, { type: "array" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    if (!sheet) return { headers: [], records: [] };
+    if (!sheet) return { headers: [], records: [], incomplete: false };
     const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
     return fromMatrix(matrix);
   }
@@ -84,8 +107,9 @@ export function parseImportFile(name: string, bytes: Uint8Array): ParsedFile {
 
 function fromMatrix(matrix: unknown[][]): ParsedFile {
   const nonEmpty = matrix.filter((row) => row.some((cell) => cell !== null && cell !== undefined && String(cell).trim() !== ""));
-  if (nonEmpty.length === 0) return { headers: [], records: [] };
+  if (nonEmpty.length === 0) return { headers: [], records: [], incomplete: false };
   const headers = nonEmpty[0].map((cell, index) => (cell === null || cell === undefined || String(cell).trim() === "" ? `Colonne ${index + 1}` : String(cell).trim()));
+  const dataRows = nonEmpty.length - 1;
   const records = nonEmpty.slice(1, IMPORT_MAX_ROWS + 1).map((row) => {
     const record: Record<string, unknown> = {};
     headers.forEach((header, index) => {
@@ -93,7 +117,11 @@ function fromMatrix(matrix: unknown[][]): ParsedFile {
     });
     return record;
   });
-  return { headers, records };
+  // Au-delà du plafond, la fin du fichier est ignorée : elle ne doit pas passer pour « absente du stock ».
+  if (dataRows > IMPORT_MAX_ROWS) {
+    return { headers, records, incomplete: true, incompleteReason: `${dataRows.toLocaleString("fr-FR")} lignes dans le fichier, seules les ${IMPORT_MAX_ROWS.toLocaleString("fr-FR")} premières ont été lues` };
+  }
+  return { headers, records, incomplete: false };
 }
 
 /** CSV : séparateur `;`, `,` ou tabulation, guillemets doublés, retours Windows. */
@@ -145,6 +173,9 @@ export type ImportPreview = {
   rows: ClassifiedRow[];
   /** Ce que la lecture du fichier a dû contourner ou signaler : à lire avant de valider. */
   warnings: string[];
+  /** Une partie du fichier n'a pas été lue (pages sautées, plafond atteint) : jamais un « stock complet ». */
+  incomplete: boolean;
+  incompleteReason?: string;
 };
 
 async function buildLookups(scope: TenantScope, rows: ReturnType<typeof readRows>): Promise<Lookups> {
@@ -204,7 +235,7 @@ export async function analyseStockImport(params: {
 }): Promise<ImportPreview> {
   const parsed = await parseImportFileAsync(params.fileName, params.bytes);
   if (parsed.headers.length === 0 || parsed.records.length === 0) {
-    throw new Error("Le fichier ne contient aucune ligne exploitable.");
+    throw new UnreadableFileError("Le fichier ne contient aucune ligne exploitable.");
   }
   const mapping = params.mapping ?? suggestMapping(parsed.headers);
   const job = await prisma.importJob.create({
@@ -216,10 +247,21 @@ export async function analyseStockImport(params: {
       totalRows: parsed.records.length,
       userId: params.scope.userId,
       mapping: mapping as never,
-      payload: { headers: parsed.headers, records: parsed.records, warnings: parsed.warnings ?? [] } as never,
+      payload: { headers: parsed.headers, records: parsed.records, ...carried(parsed) } as never,
     },
   });
-  return classifyJob({ scope: params.scope, jobId: job.id, mapping, parsed });
+  try {
+    return await classifyJob({ scope: params.scope, jobId: job.id, mapping, parsed });
+  } catch (error) {
+    // Une analyse qui échoue ne laisse pas le fichier entier dans l'import « en attente » : personne ne le validera.
+    await prisma.importJob.updateMany({ where: { id: job.id, status: "PENDING" }, data: { status: "FAILED", finishedAt: new Date(), payload: {} as never } }).catch(() => undefined);
+    throw error;
+  }
+}
+
+/** Ce que la lecture a signalé, gardé avec l'analyse : une nouvelle correspondance de colonnes ne le perd pas. */
+function carried(parsed: ParsedFile): { warnings: string[]; incomplete: boolean; incompleteReason?: string } {
+  return { warnings: parsed.warnings ?? [], incomplete: parsed.incomplete, ...(parsed.incompleteReason ? { incompleteReason: parsed.incompleteReason } : {}) };
 }
 
 /** Réanalyse avec une autre correspondance de colonnes, sans renvoyer le fichier. */
@@ -229,9 +271,9 @@ export async function remapStockImport(params: {
   mapping: ColumnMapping;
 }): Promise<ImportPreview> {
   const job = await loadPendingJob(params.scope, params.jobId);
-  const payload = job.payload as { headers: string[]; records: Record<string, unknown>[]; warnings?: string[] };
+  const payload = job.payload as { headers: string[]; records: Record<string, unknown>[]; warnings?: string[]; incomplete?: boolean; incompleteReason?: string };
   await prisma.importJob.update({ where: { id: job.id }, data: { mapping: params.mapping as never } });
-  return classifyJob({ scope: params.scope, jobId: job.id, mapping: params.mapping, parsed: payload });
+  return classifyJob({ scope: params.scope, jobId: job.id, mapping: params.mapping, parsed: { ...payload, incomplete: payload.incomplete ?? false } });
 }
 
 async function classifyJob(params: {
@@ -250,6 +292,8 @@ async function classifyJob(params: {
       mapping: params.mapping,
       missing,
       warnings: params.parsed.warnings ?? [],
+      incomplete: params.parsed.incomplete,
+      ...(params.parsed.incompleteReason ? { incompleteReason: params.parsed.incompleteReason } : {}),
       summary: { detected: params.parsed.records.length, medicaments: 0, existing: 0, toVerify: 0, unknown: 0, invalid: 0, withIssues: 0 },
       rows: [],
     };
@@ -264,11 +308,22 @@ async function classifyJob(params: {
     where: { id: params.jobId },
     data: {
       summary: summary as never,
-      payload: { headers: params.parsed.headers, records: params.parsed.records, rows: classified } as never,
+      payload: { headers: params.parsed.headers, records: params.parsed.records, rows: classified, ...carried(params.parsed) } as never,
     },
   });
 
-  return { jobId: params.jobId, fileName: job.fileName, headers: params.parsed.headers, mapping: params.mapping, missing: [], summary, rows: classified, warnings: params.parsed.warnings ?? [] };
+  return {
+    jobId: params.jobId,
+    fileName: job.fileName,
+    headers: params.parsed.headers,
+    mapping: params.mapping,
+    missing: [],
+    summary,
+    rows: classified,
+    warnings: params.parsed.warnings ?? [],
+    incomplete: params.parsed.incomplete,
+    ...(params.parsed.incompleteReason ? { incompleteReason: params.parsed.incompleteReason } : {}),
+  };
 }
 
 async function loadPendingJob(scope: TenantScope, jobId: string) {
@@ -285,6 +340,8 @@ export type ImportOutcome = {
   productsCreated: number;
   ignored: number;
   invalid: number;
+  /** Produits absents du fichier remis à zéro (`zeroAbsent`) ; 0 quand la remise à zéro n'est pas demandée. */
+  zeroed: number;
   /** Ce que le moteur a compris des produits créés : combien il pourra relier à un besoin. */
   classification: ClassificationRunSummary | null;
 };
@@ -304,8 +361,21 @@ export async function commitStockImport(params: {
   decisions: Record<string, RowDecision>;
   /** Quand vrai, toute ligne non reconnue est créée comme produit de l'officine. */
   createUnknownByDefault: boolean;
+  /**
+   * Quand vrai, le fichier est le stock COMPLET : ce que l'officine avait par
+   * import et que le fichier ne mentionne plus passe à zéro, dans la même
+   * transaction. Faux par défaut : un import ordinaire ne touche que ses lignes.
+   */
+  zeroAbsent?: boolean;
+  /**
+   * L'administrateur de la console qui agit au nom du titulaire (dépôt, décision,
+   * relance) : il est nommé dans le journal et les mouvements ne sont pas
+   * attribués au titulaire, qui n'a rien fait. Sans lui, c'est le membre du scope.
+   */
+  actor?: { platformAdminId: string };
 }): Promise<ImportOutcome> {
   const job = await loadPendingJob(params.scope, params.jobId);
+  const movementUserId = params.actor ? null : params.scope.userId;
   const payload = job.payload as { rows?: ClassifiedRow[] } | null;
   const rows = payload?.rows ?? [];
   if (rows.length === 0) throw new Error("Aucune ligne analysée : relancez l'analyse du fichier.");
@@ -336,9 +406,13 @@ export async function commitStockImport(params: {
     productsCreated: 0,
     ignored: plan.filter((item) => item.action === "IGNORE").length,
     invalid: plan.filter((item) => item.action === "INVALID").length,
+    zeroed: 0,
     classification: null,
   };
   const createdProductIds: string[] = [];
+  // Ce que le fichier a touché : tout le reste, absent du fichier, est candidat à la remise à zéro.
+  const touchedPresentationIds = new Set<string>();
+  const touchedProductIds = new Set<string>();
 
   await prisma.$transaction(
     async (tx) => {
@@ -360,6 +434,7 @@ export async function commitStockImport(params: {
             },
             update: { quantity, priceCents: row.salePriceCents ?? undefined, source: "IMPORT", lastCountedAt: new Date() },
           });
+          touchedPresentationIds.add(item.targetId);
           outcome.drugsUpserted += 1;
         } else if (item.action === "PRODUCT") {
           const product = await tx.product.findUnique({ where: { id: item.targetId }, select: { pharmacyId: true } });
@@ -376,7 +451,8 @@ export async function commitStockImport(params: {
               ...(row.code && row.code.length === 13 ? { ean: row.code } : {}),
             },
           });
-          await inventoryInTx(tx, params.scope, item.targetId, quantity, `Import ${job.fileName}`);
+          await inventoryInTx(tx, params.scope, movementUserId, item.targetId, quantity, `Import ${job.fileName}`);
+          touchedProductIds.add(item.targetId);
           outcome.productsUpdated += 1;
         } else if (item.action === "CREATE") {
           const name = row.name ?? `Produit ${row.code}`;
@@ -403,6 +479,7 @@ export async function commitStockImport(params: {
             select: { id: true },
           });
           createdProductIds.push(created.id);
+          touchedProductIds.add(created.id);
           await tx.stockMovement.create({
             data: {
               pharmacyId: params.scope.pharmacyId,
@@ -411,11 +488,15 @@ export async function commitStockImport(params: {
               quantityDelta: quantity,
               quantityAfter: quantity,
               reason: `Import ${job.fileName}`,
-              userId: params.scope.userId,
+              userId: movementUserId,
             },
           });
           outcome.productsCreated += 1;
         }
+      }
+
+      if (params.zeroAbsent) {
+        outcome.zeroed = await zeroAbsentInTx(tx, params.scope, movementUserId, { presentationIds: touchedPresentationIds, productIds: touchedProductIds }, `Absent du stock envoyé (${job.fileName})`);
       }
 
       await tx.importJob.update({
@@ -456,27 +537,102 @@ export async function commitStockImport(params: {
     entityType: "ImportJob",
     entityId: job.id,
     pharmacyId: params.scope.pharmacyId,
-    userId: params.scope.userId,
-    metadata: outcome as never,
+    userId: params.actor ? null : params.scope.userId,
+    ...(params.actor ? { platformAdminId: params.actor.platformAdminId } : {}),
+    metadata: (params.actor ? { ...outcome, by: "console" } : outcome) as never,
   });
-  await createNotification({
-    pharmacyId: params.scope.pharmacyId,
-    userId: params.scope.userId,
-    type: "IMPORT_COMPLETED",
-    severity: outcome.invalid > 0 ? "WARNING" : "SUCCESS",
-    title: "Import du stock terminé",
-    body: `${outcome.productsCreated} produit(s) créé(s), ${outcome.productsUpdated + outcome.drugsUpserted} mis à jour, ${outcome.ignored} ignoré(s), ${outcome.invalid} ligne(s) invalide(s).`,
-    linkUrl: "/stock",
-  });
-  await refreshStockNotifications(params.scope.pharmacyId);
+  // Le stock est écrit : une notification qui échoue ne le fait pas passer pour perdu.
+  try {
+    await createNotification({
+      pharmacyId: params.scope.pharmacyId,
+      userId: params.scope.userId,
+      type: "IMPORT_COMPLETED",
+      severity: outcome.invalid > 0 ? "WARNING" : "SUCCESS",
+      title: "Import du stock terminé",
+      body: `${outcome.productsCreated} produit(s) créé(s), ${outcome.productsUpdated + outcome.drugsUpserted} mis à jour, ${outcome.ignored} ignoré(s), ${outcome.invalid} ligne(s) invalide(s)${outcome.zeroed > 0 ? `, ${outcome.zeroed} remis à zéro` : ""}.`,
+      linkUrl: "/stock",
+    });
+    await refreshStockNotifications(params.scope.pharmacyId);
+  } catch (error) {
+    console.error(`[stock-import] notifications impossibles : ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   return outcome;
+}
+
+/** Taille des lots d'écriture de la remise à zéro : bien en dessous de la limite de paramètres d'une requête. */
+const ZERO_CHUNK = 1_000;
+
+function chunks<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Remet à zéro ce que le fichier (stock complet) ne mentionne plus : les
+ * médicaments et les produits que l'officine avait PAR IMPORT. Un produit
+ * créé à la main (aucun mouvement d'import) n'est jamais touché, ni rien
+ * d'une autre officine : tout est filtré par `pharmacyId`. Chaque produit
+ * remis à zéro garde la trace de son mouvement (type IMPORT, avec le motif).
+ */
+async function zeroAbsentInTx(
+  tx: Prisma.TransactionClient,
+  scope: TenantScope,
+  userId: string | null,
+  touched: { presentationIds: Set<string>; productIds: Set<string> },
+  reason: string,
+): Promise<number> {
+  const now = new Date();
+  let zeroed = 0;
+
+  const drugs = await tx.pharmacyDrugStock.findMany({
+    where: { pharmacyId: scope.pharmacyId, source: "IMPORT", quantity: { gt: 0 } },
+    select: { id: true, presentationId: true },
+  });
+  const absentDrugIds = drugs.filter((drug) => !touched.presentationIds.has(drug.presentationId)).map((drug) => drug.id);
+  for (const ids of chunks(absentDrugIds, ZERO_CHUNK)) {
+    await tx.pharmacyDrugStock.updateMany({ where: { id: { in: ids }, pharmacyId: scope.pharmacyId }, data: { quantity: 0, lastCountedAt: now } });
+  }
+  zeroed += absentDrugIds.length;
+
+  const products = await tx.product.findMany({
+    where: {
+      pharmacyId: scope.pharmacyId,
+      deletedAt: null,
+      stockItem: { quantity: { gt: 0 } },
+      stockMovements: { some: { type: "IMPORT" } },
+    },
+    select: { id: true, stockItem: { select: { id: true, quantity: true } } },
+  });
+  const absentProducts = products.filter((product) => product.stockItem && !touched.productIds.has(product.id));
+  for (const batch of chunks(absentProducts, ZERO_CHUNK)) {
+    await tx.stockItem.updateMany({
+      where: { id: { in: batch.map((product) => product.stockItem!.id) }, pharmacyId: scope.pharmacyId },
+      data: { quantity: 0, lastCountedAt: now },
+    });
+    await tx.stockMovement.createMany({
+      data: batch.map((product) => ({
+        pharmacyId: scope.pharmacyId,
+        productId: product.id,
+        type: "IMPORT" as const,
+        quantityDelta: -product.stockItem!.quantity,
+        quantityAfter: 0,
+        reason,
+        userId,
+      })),
+    });
+  }
+  zeroed += absentProducts.length;
+
+  return zeroed;
 }
 
 /** Une quantité déclarée par inventaire, avec son mouvement, dans la transaction courante. */
 async function inventoryInTx(
   tx: Prisma.TransactionClient,
   scope: TenantScope,
+  userId: string | null,
   productId: string,
   quantity: number,
   reason: string,
@@ -496,7 +652,7 @@ async function inventoryInTx(
       quantityDelta: quantity - before,
       quantityAfter: quantity,
       reason,
-      userId: scope.userId,
+      userId,
     },
   });
 }
