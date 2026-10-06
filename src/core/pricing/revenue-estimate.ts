@@ -4,10 +4,10 @@
  *
  * Le raisonnement tient en quatre lignes, dites telles quelles au visiteur :
  *   - 10 % de ses clients se voient proposer, et prennent, un produit conseillé ;
- *   - à 10 € le produit en moyenne ;
+ *   - à 7 € le produit en moyenne ;
  *   - sur 25 jours d'ouverture par mois.
- * 200 clients par jour : 20 clients conseillés, 20 × 10 € = 200 € par jour,
- * × 25 jours = 5 000 € par mois.
+ * 200 clients par jour : 20 clients conseillés, 20 × 7 € = 140 € par jour,
+ * × 25 jours = 3 500 € par mois.
  *
  * C'est une ESTIMATION indicative, pas une promesse : elle ne dit rien de la
  * marge, et ses trois hypothèses sont celles de PharmaBoost, affichées à côté.
@@ -16,7 +16,7 @@ export const ESTIMATE_ASSUMPTIONS = {
   /** Part des clients qui prennent un produit conseillé. */
   adviceRate: 0.1,
   /** Prix moyen d'un produit conseillé, en centimes. */
-  averageProductCents: 1_000,
+  averageProductCents: 700,
   /** Jours d'ouverture de la pharmacie par mois. */
   openDaysPerMonth: 25,
 } as const;

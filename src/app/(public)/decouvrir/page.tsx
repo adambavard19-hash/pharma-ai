@@ -28,10 +28,14 @@ const STEPS = [
   { n: "03", title: "Le patient repart avec son plan conseil", line: "La posologie, l'indication, vos conseils. Sur son téléphone via un QR code, par e-mail ou en version imprimée.", Visual: StepSuivi },
 ];
 
-const STOCK_POINTS = [
+const STOCK_POINTS: { label: string; value: string; hint?: string }[] = [
   { label: "Stock", value: "Uniquement des produits en rayon" },
   { label: "Marge", value: "Affichée avec la suggestion" },
-  { label: "Laboratoires", value: "Vos préférences, à conseil égal" },
+  {
+    label: "Laboratoires",
+    value: "Vos laboratoires préférés passent en premier",
+    hint: "Dites simplement à PharmaBoost quels laboratoires vous préférez : quand deux produits répondent aussi bien au besoin, c'est le vôtre qui est proposé en premier. Le conseil reste choisi pour le patient, jamais pour le laboratoire.",
+  },
   { label: "Résultats", value: "Proposés, acceptés, par collaborateur" },
 ];
 
@@ -152,7 +156,10 @@ export default async function SitePage() {
               {STOCK_POINTS.map((p) => (
                 <div key={p.label} className="grid grid-cols-[8.5rem_1fr] items-baseline gap-4 py-4">
                   <dt className="font-mono text-[11.5px] tracking-[0.14em] text-text-tertiary uppercase">{p.label}</dt>
-                  <dd className="text-[16px] font-semibold text-text-primary">{p.value}</dd>
+                  <dd>
+                    <span className="block text-[16px] font-semibold text-text-primary">{p.value}</span>
+                    {p.hint && <span className="mt-1.5 block text-[14px] leading-6 font-normal text-text-secondary">{p.hint}</span>}
+                  </dd>
                 </div>
               ))}
             </dl>

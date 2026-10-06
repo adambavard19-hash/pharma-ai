@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const SLIDER_MAX = 600;
 
 /**
- * Le simulateur : « combien de clients par jour ? » → le chiffre d'affaires
+ * Le simulateur : « à combien estimez-vous votre nombre de clients/patients par jour ? » → le chiffre d'affaires
  * supplémentaire estimé par mois. Chaque étape du calcul est visible et se refait
  * à la calculette ; les trois hypothèses sont écrites dessous, avec le mot
  * « estimation » : ce n'est pas une promesse de résultat.
@@ -25,7 +25,7 @@ export function RevenueCalculator({ monthlyPriceCents }: { monthlyPriceCents: nu
       <h3 className="font-mono text-[12px] tracking-[0.14em] text-brand-700 uppercase">Estimez ce que PharmaBoost vous rapporte</h3>
 
       <label htmlFor="clients-par-jour" className="mt-5 block text-[16px] font-semibold text-text-primary">
-        Combien de clients passent chez vous chaque jour ?
+        À combien estimez-vous votre nombre de clients/patients par jour ?
       </label>
       <div className="mt-3 flex items-center gap-3">
         <input

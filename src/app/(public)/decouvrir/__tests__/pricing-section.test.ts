@@ -40,17 +40,18 @@ describe("la section tarif du site : un seul abonnement", () => {
     expect(t).toContain("vous ne payez plus 126 € mais 100,80 € HT par mois");
   });
 
-  it("propose le simulateur, ouvert sur l'exemple de 200 clients par jour : 20 conseillés, 200 € par jour, 5 000 € par mois", () => {
-    expect(t).toContain("Combien de clients passent chez vous chaque jour ?");
+  it("propose le simulateur, ouvert sur l'exemple de 200 clients par jour : 20 conseillés, 140 € par jour, 3 500 € par mois", () => {
+    expect(t).toContain("À combien estimez-vous votre nombre de clients/patients par jour ?");
+    expect(t).not.toContain("Combien de clients passent chez vous");
     expect(html).toContain('value="200"');
     expect(t).toContain("Clients conseillés (10 %) 20 par jour");
-    expect(t).toContain("× 10 € par produit en moyenne 200 € par jour");
-    expect(t).toContain("× 25 jours d'ouverture 5 000 € par mois");
-    expect(t).toContain("Chiffre d'affaires supplémentaire estimé 5 000 € par mois");
+    expect(t).toContain("× 7 € par produit en moyenne 140 € par jour");
+    expect(t).toContain("× 25 jours d'ouverture 3 500 € par mois");
+    expect(t).toContain("Chiffre d'affaires supplémentaire estimé 3 500 € par mois");
   });
 
   it("dit que c'est une estimation, avec ses trois hypothèses, et la compare à l'abonnement", () => {
-    expect(t).toContain("Estimation indicative : 10 % de vos clients prennent un produit conseillé, à 10 € en moyenne, sur 25 jours d'ouverture par mois. Ce n'est pas une promesse de résultat.");
+    expect(t).toContain("Estimation indicative : 10 % de vos clients prennent un produit conseillé, à 7 € en moyenne, sur 25 jours d'ouverture par mois. Ce n'est pas une promesse de résultat.");
     expect(t).toContain("Pour un abonnement de 126 € HT par mois.");
   });
 
@@ -59,7 +60,7 @@ describe("la section tarif du site : un seul abonnement", () => {
     const detail = "Plus de conseils pertinents, plus d’opportunités au comptoir, sans changer vos habitudes.";
     expect(t.indexOf(promise)).toBeGreaterThan(-1);
     expect(t.indexOf(promise)).toBeLessThan(t.indexOf(detail));
-    expect(t.indexOf(detail)).toBeLessThan(t.indexOf("Combien de clients"));
+    expect(t.indexOf(detail)).toBeLessThan(t.indexOf("À combien estimez-vous"));
     const promiseTag = html.slice(html.lastIndexOf("<p", html.indexOf("Rassurez-vous")), html.indexOf("Rassurez-vous"));
     const detailTag = html.slice(html.lastIndexOf("<p", html.indexOf("Plus de conseils")), html.indexOf("Plus de conseils"));
     expect(promiseTag).toContain("font-semibold");

@@ -9,7 +9,6 @@ const NAV = [
   { href: "/decouvrir#stock-marge", label: "Stock et marge" },
   { href: "/decouvrir/pourquoi", label: "Pourquoi" },
   { href: "/decouvrir#tarif", label: "Tarif" },
-  { href: "/decouvrir/equipe", label: "Équipe" },
 ];
 
 /** Le filet de la marque : du vert au bleu du symbole. */
@@ -78,7 +77,6 @@ export function SiteFooter({ contactEmail }: { contactEmail: string }) {
         <ul className="space-y-2 text-[13.5px]">
           {[
             { href: "/decouvrir/pourquoi", label: "Pourquoi PharmaBoost" },
-            { href: "/decouvrir/equipe", label: "Qui sommes-nous" },
             { href: "/decouvrir/partenaires", label: "Devenir partenaire" },
             { href: "/decouvrir/commercial", label: "Devenir commercial" },
             { href: "/decouvrir/mentions-legales", label: "Mentions légales" },

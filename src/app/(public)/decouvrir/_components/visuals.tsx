@@ -25,6 +25,20 @@ const EXAMPLE = {
   stock: 18,
 };
 
+/**
+ * L'exemple de la section « Stock et marge » : un autre produit que celui de
+ * l'accueil (probiotique pendant un antibiotique, règle du moteur). Prix, marge
+ * (prix de vente moins prix d'achat) et stock : catalogue de démonstration.
+ */
+const STOCK_EXAMPLE = {
+  need: "Ferments lactiques pendant un antibiotique",
+  product: "Flore Équilibre 10 milliards",
+  tile: "/site/produits/flore-equilibre-10-milliards.webp",
+  price: "14,90 €",
+  margin: "8,70 €",
+  stock: 29,
+};
+
 /** La lueur de balayage : une bande qui descend, très discrète. Désactivée si l'utilisateur réduit les animations. */
 const SCAN_CSS = `@keyframes pb-scan{0%{transform:translateY(-100%)}100%{transform:translateY(420%)}}
 .pb-scan{animation:pb-scan 3.2s cubic-bezier(.65,0,.35,1) infinite}
@@ -42,18 +56,18 @@ function StockBadge({ n = EXAMPLE.stock }: { n?: number }) {
   );
 }
 
-function MarginBadge() {
+function MarginBadge({ value = EXAMPLE.margin }: { value?: string }) {
   return (
     <span className="inline-flex items-center rounded-full bg-accent-50 px-2.5 py-1 text-[12px] font-medium text-accent-800 ring-1 ring-accent-200 ring-inset">
-      Marge {EXAMPLE.margin}
+      Marge {value}
     </span>
   );
 }
 
 /** La boîte du produit, en vignette sur un fond clair, comme une fiche produit. */
-function ProductTile({ size }: { size: number }) {
+function ProductTile({ size, tile = EXAMPLE.tile }: { size: number; tile?: string }) {
   // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
-  return <img src={EXAMPLE.tile} alt="" width={size} height={size} className="shrink-0 rounded-xl bg-surface-app object-contain" />;
+  return <img src={tile} alt="" width={size} height={size} className="shrink-0 rounded-xl bg-surface-app object-contain" />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -236,20 +250,20 @@ export function StockMarginVisual() {
         <ExampleTag />
       </div>
       <div className="mt-5 flex items-center gap-4">
-        <ProductTile size={96} />
+        <ProductTile size={96} tile={STOCK_EXAMPLE.tile} />
         <div className="min-w-0 flex-1">
-          <p className="text-[18px] leading-tight font-semibold text-text-primary sm:text-[21px]">{EXAMPLE.product}</p>
-          <p className="mt-1 hidden text-[13px] text-text-secondary sm:block">{EXAMPLE.need}</p>
+          <p className="text-[18px] leading-tight font-semibold text-text-primary sm:text-[21px]">{STOCK_EXAMPLE.product}</p>
+          <p className="mt-1 hidden text-[13px] text-text-secondary sm:block">{STOCK_EXAMPLE.need}</p>
         </div>
-        <p className="text-[22px] font-semibold tracking-[-0.02em] text-text-primary tabular sm:text-[26px]">{EXAMPLE.price}</p>
+        <p className="text-[22px] font-semibold tracking-[-0.02em] text-text-primary tabular sm:text-[26px]">{STOCK_EXAMPLE.price}</p>
       </div>
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl bg-surface-app p-4">
-          <StockBadge />
+          <StockBadge n={STOCK_EXAMPLE.stock} />
           <p className="mt-3 text-[13px] text-text-secondary">Stock de l&apos;officine</p>
         </div>
         <div className="rounded-2xl bg-surface-app p-4">
-          <MarginBadge />
+          <MarginBadge value={STOCK_EXAMPLE.margin} />
           <p className="mt-3 text-[13px] text-text-secondary">Prix de vente moins prix d&apos;achat</p>
         </div>
       </div>
