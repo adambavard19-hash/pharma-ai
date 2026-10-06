@@ -7,7 +7,7 @@ import { contractStage } from "@/core/billing/subscription";
 
 /** Éléments communs aux onglets de la fiche 360°. */
 
-export const TAB_KEYS = ["apercu", "abonnement", "contrats", "paiements", "utilisateurs", "technique", "communication", "commercial", "historique", "notes"] as const;
+export const TAB_KEYS = ["apercu", "abonnement", "performance", "contrats", "paiements", "utilisateurs", "technique", "communication", "commercial", "historique", "notes"] as const;
 export type TabKey = (typeof TAB_KEYS)[number];
 
 export function parseTab(value: string | null): TabKey {

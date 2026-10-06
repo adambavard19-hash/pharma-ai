@@ -6,6 +6,7 @@ import {
   ScanLine,
   ScrollText,
   Settings,
+  Sparkles,
   Users,
   UsersRound,
   type LucideIcon, Rocket, GraduationCap, Handshake, PackageSearch } from "lucide-react";
@@ -144,6 +145,16 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.TEAM_MANAGE,
     match: ["/equipe"],
     description: "Comptes, accès et rôles de vos collaborateurs",
+  },
+  {
+    href: "/resultats",
+    label: "Ce que ça rapporte",
+    icon: Sparkles,
+    // Même permission que Pilotage : la valeur chiffrée reste une vue de
+    // titulaire. L'équipe au comptoir ne voit ni l'entrée ni la page.
+    permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
+    match: ["/resultats"],
+    description: "Les ventes confirmées issues des conseils PharmaBoost",
   },
   {
     href: "/pilotage",

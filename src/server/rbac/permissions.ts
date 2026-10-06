@@ -226,7 +226,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [PERMISSIONS.SALE_VIEW]: "Voir les ventes",
   [PERMISSIONS.SALE_CREATE]: "Enregistrer une vente",
   [PERMISSIONS.ANALYTICS_VIEW]: "Voir les statistiques",
-  [PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE]: "Voir les performances par collaborateur",
+  [PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE]: "Voir les performances par collaborateur et la valeur générée par PharmaBoost",
   [PERMISSIONS.ANALYTICS_EXPORT]: "Exporter les statistiques",
   [PERMISSIONS.AUDIT_VIEW]: "Consulter le journal d'audit",
   [PERMISSIONS.LAB_PROGRAMS_MANAGE]: "Gérer les gammes privilégiées et les challenges",

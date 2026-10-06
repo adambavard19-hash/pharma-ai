@@ -79,6 +79,12 @@ describe("permissions des nouvelles briques", () => {
     for (const permission of Object.values(PERMISSIONS)) expect(PERMISSION_LABELS[permission], permission).toBeTruthy();
   });
 
+  it("la permission des performances dit ce qu'elle ouvre : la ventilation par collaborateur ET la valeur générée", () => {
+    // Elle ouvre Pilotage (résultats de chaque collègue) et « Ce que PharmaBoost vous rapporte » (CA, retour sur abonnement) :
+    // le titulaire qui la coche doit lire les deux.
+    expect(PERMISSION_LABELS[PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE]).toBe("Voir les performances par collaborateur et la valeur générée par PharmaBoost");
+  });
+
   it("le titulaire peut accorder ou retirer une permission ; le retrait l'emporte ; une chaîne inconnue est ignorée", () => {
     expect(resolvePermissions("TECHNICIAN", [PERMISSIONS.TRAINING_MANAGE]).has(PERMISSIONS.TRAINING_MANAGE)).toBe(true);
     expect(resolvePermissions("PHARMACIST", [], [PERMISSIONS.TRAINING_VIEW]).has(PERMISSIONS.TRAINING_VIEW)).toBe(false);

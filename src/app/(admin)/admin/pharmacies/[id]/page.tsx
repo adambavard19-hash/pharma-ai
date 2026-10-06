@@ -23,6 +23,7 @@ import { AddNoteButton } from "./notes";
 import { parseTab, tabHref, type TabKey } from "./shared";
 import { OverviewTab } from "./tab-apercu";
 import { SubscriptionTab } from "./tab-abonnement";
+import { PerformanceTab } from "./tab-performance";
 import { ContractsTab } from "./tab-contrats";
 import { PaymentsTab } from "./tab-paiements";
 import { UsersTab } from "./tab-utilisateurs";
@@ -128,6 +129,7 @@ export default async function ClientPharmacyPage({ params, searchParams }: { par
         items={[
           { key: "apercu", label: "Aperçu" },
           { key: "abonnement", label: "Abonnement" },
+          { key: "performance", label: "Performance" },
           { key: "contrats", label: "Contrats", count: base.counts.contracts },
           { key: "paiements", label: "Paiements", count: base.counts.payments },
           { key: "utilisateurs", label: "Utilisateurs", count: base.counts.users },
@@ -139,15 +141,18 @@ export default async function ClientPharmacyPage({ params, searchParams }: { par
         ]}
       />
 
-      <TabContent tab={tab} base={base} now={now} templates={templates} kind={parseTimelineKind(searchParam(query, "type"))} />
+      <TabContent tab={tab} base={base} now={now} templates={templates} kind={parseTimelineKind(searchParam(query, "type"))} query={query} />
     </>
   );
 }
 
-function TabContent({ tab, base, now, templates, kind }: { tab: TabKey; base: Pharmacy360; now: Date; templates: Awaited<ReturnType<typeof loadAllTemplates>>; kind: ReturnType<typeof parseTimelineKind> }) {
+function TabContent({ tab, base, now, templates, kind, query }: { tab: TabKey; base: Pharmacy360; now: Date; templates: Awaited<ReturnType<typeof loadAllTemplates>>; kind: ReturnType<typeof parseTimelineKind>; query: Record<string, string | string[] | undefined> }) {
   switch (tab) {
     case "abonnement":
       return <SubscriptionTab base={base} now={now} />;
+    case "performance":
+      // L'identifiant vient de la fiche déjà chargée (existence vérifiée), jamais de l'adresse brute.
+      return <PerformanceTab pharmacyId={base.pharmacy.id} query={query} now={now} />;
     case "contrats":
       return <ContractsTab base={base} now={now} />;
     case "paiements":

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Check, Euro, ShoppingBag } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Check, Euro, ShoppingBag } from "lucide-react";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { getEngineOutcomeSummary, getCounterPerformance } from "@/server/services/analytics";
@@ -62,6 +63,17 @@ export default async function PilotagePage({
         title="Pilotage de l'officine"
         description="Ce que les conseils PharmaBoost ont produit au comptoir — au global et par collaborateur. Ces chiffres ne sont visibles que de vous."
       />
+
+      <p className="text-[12.5px] text-text-tertiary">
+        Le « CA additionnel » ci-dessous compte aussi les produits ajoutés à la main. « Ce que ça rapporte » ne compte que les conseils proposés par PharmaBoost, en ventes confirmées.{" "}
+        <Link
+          href="/resultats?periode=mois"
+          className="inline-flex items-center gap-1 font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400"
+        >
+          Voir « Ce que ça rapporte »
+          <ArrowRight className="size-3" aria-hidden="true" />
+        </Link>
+      </p>
 
       <PeriodPicker
         activeKey={custom ? "custom" : (isPeriodKey(params.periode) ? params.periode : "month")}
