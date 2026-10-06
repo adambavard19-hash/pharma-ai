@@ -13,7 +13,7 @@ import { REMINDER_SETTING_KEY, sanitizePolicy, type ReminderPolicy } from "@/cor
 import { markAdminNotificationsRead } from "@/server/services/sales/notifications";
 import { shouldApplySignatureStatus } from "@/core/signature";
 import { CONTRACT_STATUS_LABELS } from "@/core/sales/pipeline";
-import { updateCommission } from "@/server/services/sales/commissions";
+import { CommissionChangedError, CommissionInvoicedError, updateCommission } from "@/server/services/sales/commissions";
 import { createPharmacyFromProspect } from "@/server/services/sales/client-pharmacies";
 import { PROSPECT_STATUSES } from "@/core/sales/pipeline";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
@@ -161,7 +161,13 @@ export async function updateCommissionAction(payload: z.input<typeof commissionS
   const parsed = commissionSchema.safeParse(payload);
   if (!parsed.success) return fail("Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));
   const { commissionId, prospectId, dueAt, ...rest } = parsed.data;
-  await updateCommission(commissionId, { ...rest, ...(dueAt !== undefined ? { dueAt: dueAt ? new Date(dueAt) : null } : {}) }, session.admin.id, session.admin.fullName);
+  try {
+    await updateCommission(commissionId, { ...rest, ...(dueAt !== undefined ? { dueAt: dueAt ? new Date(dueAt) : null } : {}) }, session.admin.id, session.admin.fullName);
+  } catch (error) {
+    // Commission réclamée par une facture, ou changée entre-temps : refus lisible, rien n'est écrit.
+    if (error instanceof CommissionInvoicedError || error instanceof CommissionChangedError) return fail(error.message);
+    throw error;
+  }
   revalidatePath(`/admin/dossiers/${prospectId}`);
   revalidatePath("/admin/commerciaux");
   return ok(null, "Commission mise à jour.");

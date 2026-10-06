@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireSalesSession } from "@/server/auth/sales-session";
-import { listCommissionsFor } from "@/server/services/sales/commissions";
+import { listCommissionsFor, listInvoicesFor } from "@/server/services/sales/commissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { CommissionStatusBadge } from "@/components/sales/status-badge";
+import { InvoiceStatusBadge } from "@/components/sales/invoice-status-badge";
 import { formatCents, formatDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: { absolute: "Mes commissions — PharmaBoost" } };
 
 export default async function SalesCommissionsPage() {
   const session = await requireSalesSession();
-  const data = await listCommissionsFor(session.rep.id);
+  const [data, invoices] = await Promise.all([listCommissionsFor(session.rep.id), listInvoicesFor(session.rep.id)]);
   const kpis = [["Ce mois", data.thisMonthCents], ["Acquises", data.earnedCents], ["En attente", data.pendingCents], ["Payées", data.paidCents], ["Total année", data.yearCents]] as const;
   return (
     <>
@@ -36,6 +37,29 @@ export default async function SalesCommissionsPage() {
           </table></div>
         )}
       </CardContent></Card>
+      <section aria-labelledby="mes-factures" className="space-y-3">
+        <div>
+          <h2 id="mes-factures" className="text-[16px] leading-6 font-semibold text-text-primary">Mes factures</h2>
+          <p className="text-[13px] text-text-secondary">Les factures que vous avez envoyées à la direction commerciale, une fois enregistrées.</p>
+        </div>
+        <Card><CardContent className="pt-0">
+          {invoices.length === 0 ? <p className="py-6 text-[13.5px] text-text-secondary">Aucune facture enregistrée pour l&apos;instant.</p> : (
+            <div className="overflow-x-auto"><table className="w-full text-[13.5px]">
+              <thead><tr className="text-left text-[11.5px] font-semibold tracking-wide text-text-tertiary uppercase"><th className="py-2.5 pr-3">Facture</th><th className="py-2.5 pr-3">Date</th><th className="py-2.5 pr-3 text-right">Montant</th><th className="py-2.5">Statut</th></tr></thead>
+              <tbody className="divide-y divide-border-subtle">
+                {invoices.map((invoice) => (
+                  <tr key={invoice.id}>
+                    <td className="py-2.5 pr-3 font-medium text-text-primary">{invoice.number}</td>
+                    <td className="py-2.5 pr-3 text-text-secondary">{formatDate(invoice.issuedAt)}</td>
+                    <td className="py-2.5 pr-3 text-right font-semibold tabular text-text-primary">{formatCents(invoice.amountCents)}</td>
+                    <td className="py-2.5"><InvoiceStatusBadge status={invoice.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+          )}
+        </CardContent></Card>
+      </section>
     </>
   );
 }

@@ -6,8 +6,9 @@ import { COMMISSION_STATUS_LABELS, type CommissionStatusCode } from "@/core/sale
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
 import type { CommissionStatus } from "@/generated/prisma";
+import { formatCents } from "@/lib/format";
 
-const euros = (cents: number) => `${(cents / 100).toFixed(2).replace(".", ",")} €`;
+const euros = (cents: number) => formatCents(cents);
 
 /** Crée (ou met à jour) la commission d'un dossier à partir du contrat et de la règle du commercial. */
 export async function upsertCommissionForContract(params: { prospectId: string; contractId: string; status: "FORECAST" | "EARNED"; actor: SalesActor }): Promise<void> {
@@ -38,12 +39,50 @@ function endOfNextMonth(from: Date): Date {
   return new Date(from.getFullYear(), from.getMonth() + 2, 0, 12, 0, 0);
 }
 
-/** Modification par l'administrateur : montant, statut, date, note. Tracée et notifiée. */
-export async function updateCommission(commissionId: string, patch: { amountCents?: number; status?: CommissionStatusCode; dueAt?: Date | null; note?: string | null }, adminId: string, adminLabel: string): Promise<void> {
+/** Qui modifie une commission : un administrateur de la console ou le directeur commercial. */
+export type CommissionActor = { type: "ADMIN" | "DIRECTOR"; id: string; label: string };
+
+export type UpdateCommissionOptions = {
+  /** Vrai quand l'appel vient du flux de la facture : seul cas où une commission facturée change de statut ou de montant. */
+  viaInvoice?: boolean;
+};
+
+export class CommissionInvoicedError extends Error {
+  constructor() {
+    super("Cette commission est réclamée par une facture : gérez-la depuis la facture.");
+    this.name = "CommissionInvoicedError";
+  }
+}
+
+export class CommissionChangedError extends Error {
+  constructor() {
+    super("La commission a changé entre-temps : rechargez la page.");
+    this.name = "CommissionChangedError";
+  }
+}
+
+/**
+ * Modification d'une commission : montant, statut, date, note. Tracée et notifiée.
+ *
+ * L'acteur est soit un administrateur, soit le directeur commercial (objet
+ * `{ type, id, label }`), soit — forme historique, conservée pour la console —
+ * l'identifiant et le nom d'un administrateur.
+ */
+export async function updateCommission(commissionId: string, patch: { amountCents?: number; status?: CommissionStatusCode; dueAt?: Date | null; note?: string | null }, actor: CommissionActor, options?: UpdateCommissionOptions): Promise<void>;
+export async function updateCommission(commissionId: string, patch: { amountCents?: number; status?: CommissionStatusCode; dueAt?: Date | null; note?: string | null }, adminId: string, adminLabel: string): Promise<void>;
+export async function updateCommission(commissionId: string, patch: { amountCents?: number; status?: CommissionStatusCode; dueAt?: Date | null; note?: string | null }, actorOrAdminId: CommissionActor | string, adminLabelOrOptions?: string | UpdateCommissionOptions): Promise<void> {
+  const adminLabel = typeof adminLabelOrOptions === "string" ? adminLabelOrOptions : undefined;
+  const options: UpdateCommissionOptions = typeof adminLabelOrOptions === "object" && adminLabelOrOptions ? adminLabelOrOptions : {};
+  const actor: CommissionActor = typeof actorOrAdminId === "string" ? { type: "ADMIN", id: actorOrAdminId, label: adminLabel ?? "" } : actorOrAdminId;
   const before = await prisma.commission.findUniqueOrThrow({ where: { id: commissionId }, include: { prospect: { select: { name: true } } } });
+  // Une commission réclamée par une facture se règle PAR la facture : la changer ici la ferait diverger de ce que la facture annonce.
+  if (before.invoiceId && !options.viaInvoice && (patch.status !== undefined || patch.amountCents !== undefined)) {
+    throw new CommissionInvoicedError();
+  }
   const status = (patch.status ?? before.status) as CommissionStatus;
-  const commission = await prisma.commission.update({
-    where: { id: commissionId },
+  // Écriture conditionnée au statut relu : deux gestes quasi simultanés ne s'écrasent pas (le second est refusé, sans doublon d'événement ni de notification).
+  const written = await prisma.commission.updateMany({
+    where: { id: commissionId, status: before.status },
     data: {
       ...(patch.amountCents !== undefined ? { amountCents: patch.amountCents } : {}),
       ...(patch.status ? { status } : {}),
@@ -52,15 +91,23 @@ export async function updateCommission(commissionId: string, patch: { amountCent
       ...(patch.status === "PAID" ? { paidAt: new Date() } : {}),
     },
   });
-  const actor: SalesActor = { type: "ADMIN", id: adminId, label: adminLabel };
+  if (written.count !== 1) throw new CommissionChangedError();
+  const commission = await prisma.commission.findUniqueOrThrow({ where: { id: commissionId } });
+  const salesActor: SalesActor = { type: actor.type, id: actor.id, label: actor.label };
   await recordProspectEvent({
     prospectId: commission.prospectId,
     type: patch.status === "PAID" ? "COMMISSION_PAID" : "COMMISSION_UPDATED",
     summary: patch.status === "PAID" ? `Commission ${euros(commission.amountCents)} payée.` : `Commission mise à jour : ${euros(commission.amountCents)} — ${COMMISSION_STATUS_LABELS[commission.status as CommissionStatusCode]}.`,
-    actor,
+    actor: salesActor,
     metadata: { before: { amountCents: before.amountCents, status: before.status }, after: { amountCents: commission.amountCents, status: commission.status } },
   });
-  await recordAudit({ action: "sales.commission_updated", entityType: "Commission", entityId: commissionId, platformAdminId: adminId, metadata: { patch: { ...patch, dueAt: patch.dueAt?.toISOString() } } });
+  await recordAudit({
+    action: "sales.commission_updated",
+    entityType: "Commission",
+    entityId: commissionId,
+    ...(actor.type === "DIRECTOR" ? { salesDirectorId: actor.id } : { platformAdminId: actor.id }),
+    metadata: { patch: { ...patch, dueAt: patch.dueAt?.toISOString() } },
+  });
   if (patch.status === "PAID") {
     await notifySalesRep({ salesRepId: commission.salesRepId, type: "COMMISSION_PAID", title: `Commission payée : ${euros(commission.amountCents)}`, body: before.prospect.name, linkUrl: "/extranet/commissions", severity: "SUCCESS" });
   }
@@ -78,4 +125,18 @@ export async function listCommissionsFor(salesRepId: string) {
     paidCents: sum((r) => r.status === "PAID"),
     yearCents: sum((r) => r.status !== "CANCELLED" && r.status !== "FORECAST" && r.createdAt.getFullYear() === now.getFullYear()),
   };
+}
+
+/**
+ * Les factures d'un commercial, pour sa page Commissions : numéro, date,
+ * montant, statut, et rien d'autre (ni motif de refus, ni note, ni fichier).
+ * Le périmètre est l'identifiant de SA session, jamais un paramètre d'URL.
+ */
+export async function listInvoicesFor(salesRepId: string) {
+  return prisma.salesInvoice.findMany({
+    where: { salesRepId },
+    orderBy: [{ issuedAt: "desc" }, { createdAt: "desc" }],
+    take: 100,
+    select: { id: true, number: true, issuedAt: true, amountCents: true, status: true },
+  });
 }

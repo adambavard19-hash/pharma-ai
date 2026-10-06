@@ -43,6 +43,40 @@ export function buildSalesInvitationEmail(v: { firstName: string; url: string; e
   return { subject: "Votre espace commercial — PharmaBoost", text, html };
 }
 
+/**
+ * L'e-mail du directeur commercial : invitation à la création de son espace,
+ * ou (`kind: "reset"`) lien pour changer un mot de passe oublié. Le lien est
+ * personnel, à usage unique et daté ; ni mot de passe ni montant n'y figure.
+ */
+export function buildDirectorInvitationEmail(v: { firstName: string; url: string; expiresAt: Date; kind?: "invitation" | "reset" }): { subject: string; text: string; html: string } {
+  const reset = v.kind === "reset";
+  const subject = reset ? "Réinitialiser votre mot de passe — PharmaBoost" : "Votre espace de direction commerciale — PharmaBoost";
+  const headline = reset ? "Réinitialiser votre mot de passe" : "Votre espace de direction commerciale";
+  const intro = reset
+    ? "Vous avez demandé à réinitialiser votre mot de passe. Choisissez-en un nouveau avec le lien ci-dessous."
+    : "Votre espace de direction commerciale PharmaBoost est prêt. Définissez votre mot de passe pour y accéder. Vous y suivrez vos commerciaux, leurs dossiers, leurs commissions et leurs challenges.";
+  const action = reset ? "Choisir un nouveau mot de passe" : "Définir mon mot de passe";
+  const until = dateTime(v.expiresAt);
+  const ignore = "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : rien ne sera modifié.";
+  const text = [
+    `Bonjour ${v.firstName},`,
+    "",
+    intro,
+    v.url,
+    "",
+    `Ce lien est personnel, à usage unique, et reste valable jusqu'au ${until}.`,
+    ...(reset ? [ignore] : []),
+    "",
+    "L'équipe PharmaBoost",
+  ].join("\n");
+  const html = shell(
+    subject,
+    headline,
+    `<p style="margin:0;font-size:18px;line-height:26px;font-weight:600">Bonjour ${escapeHtml(v.firstName)},</p><p style="margin:12px 0 0;font-size:16px;line-height:25px;color:#374151">${escapeHtml(intro)}</p>${button(v.url, action)}<p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Ce lien est personnel, à usage unique, et reste valable jusqu'au ${escapeHtml(until)}.${reset ? `<br>${escapeHtml(ignore)}` : ""}</p>`,
+  );
+  return { subject, text, html };
+}
+
 export function buildContractEmail(v: {
   ownerName: string;
   pharmacyName: string;

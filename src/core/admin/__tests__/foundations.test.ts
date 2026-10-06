@@ -391,7 +391,7 @@ describe("navigation de la console", () => {
   it("« Candidatures commerciales » suit « Commerciaux » dans l'espace Commercial, sans prendre la place d'aucune autre rubrique", () => {
     const commercial = ADMIN_NAV.find((space) => space.key === "commercial")!;
     const hrefs = commercial.items.map((item) => item.href);
-    expect(hrefs).toEqual(["/admin/pipeline", "/admin/prospects", "/admin/demonstrations", "/admin/relances-commerciales", "/admin/commerciaux", "/admin/candidatures-commerciales"]);
+    expect(hrefs).toEqual(["/admin/pipeline", "/admin/prospects", "/admin/demonstrations", "/admin/relances-commerciales", "/admin/commerciaux", "/admin/candidatures-commerciales", "/admin/directeur-commercial"]);
     for (const path of ["/admin/candidatures-commerciales", "/admin/candidatures-commerciales/ckx123abc"]) {
       expect(activeNavItem(path)).toMatchObject({ space: { key: "commercial" }, item: { label: "Candidatures commerciales" } });
     }
@@ -399,6 +399,15 @@ describe("navigation de la console", () => {
     expect(activeNavItem("/admin/commerciaux/ckx123abc").item?.label).toBe("Commerciaux");
     expect(activeNavItem("/admin/relances-commerciales").item?.label).toBe("Relances commerciales");
     expect(commercial.href).toBe("/admin/pipeline");
+  });
+
+  it("« Directeur commercial » ferme l'espace Commercial et garde sa propre rubrique", () => {
+    const item = ADMIN_NAV.find((space) => space.key === "commercial")!.items.find((entry) => entry.href === "/admin/directeur-commercial")!;
+    expect(item.label).toBe("Directeur commercial");
+    expect(item.description).toBe("Le compte qui gère l'équipe commerciale depuis son propre espace.");
+    expect(activeNavItem("/admin/directeur-commercial")).toMatchObject({ space: { key: "commercial" }, item: { label: "Directeur commercial" } });
+    // « commercial » n'est préfixe d'aucune rubrique voisine, et inversement.
+    expect(activeNavItem("/admin/commerciaux").item?.label).toBe("Commerciaux");
   });
 
   it("« Stocks reçus » ferme l'espace Clients, sans déplacer aucune autre rubrique", () => {

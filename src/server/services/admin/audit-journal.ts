@@ -44,7 +44,7 @@ export type JournalFilters = {
   page?: number;
 };
 
-export type JournalAuthor = { kind: "admin" | "commercial" | "officine" | "systeme"; label: string; href: string | null };
+export type JournalAuthor = { kind: "admin" | "directeur" | "commercial" | "officine" | "systeme"; label: string; href: string | null };
 
 export type JournalRow = {
   id: string;
@@ -139,26 +139,35 @@ export async function loadAuditJournal(filters: JournalFilters, now: Date = new 
   const prospectIds = ids(visible.filter((l) => l.entityType === "Prospect").map((l) => l.entityId));
   const repIds = ids([...visible.map((l) => metaString(l.metadata, "salesRepId")), ...visible.filter((l) => l.entityType === "SalesRep").map((l) => l.entityId)]);
 
-  const [pharmacies, prospects, reps] = await Promise.all([
+  // Le directeur commercial : auteur d'un geste de son espace (`salesDirectorId`) ou cible d'un geste de la console.
+  const directorIds = ids([...visible.map((l) => metaString(l.metadata, "salesDirectorId")), ...visible.filter((l) => l.entityType === "SalesDirector").map((l) => l.entityId)]);
+
+  const [pharmacies, prospects, reps, directors] = await Promise.all([
     pharmacyIds.length ? prisma.pharmacy.findMany({ where: { id: { in: pharmacyIds } }, select: { id: true, name: true } }) : [],
     prospectIds.length ? prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, name: true } }) : [],
     repIds.length ? prisma.salesRep.findMany({ where: { id: { in: repIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
+    directorIds.length ? prisma.salesDirector.findMany({ where: { id: { in: directorIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
   ]);
 
   const adminName = new Map(admins.map((a) => [a.id, `${a.firstName} ${a.lastName}`]));
   const pharmacyName = new Map(pharmacies.map((p) => [p.id, p.name]));
   const prospectName = new Map(prospects.map((p) => [p.id, p.name]));
   const repName = new Map(reps.map((r) => [r.id, `${r.firstName} ${r.lastName}`]));
+  const directorName = new Map(directors.map((d) => [d.id, `${d.firstName} ${d.lastName}`]));
 
   const rows: JournalRow[] = visible.map((log) => {
     const repId = metaString(log.metadata, "salesRepId");
+    const directorId = metaString(log.metadata, "salesDirectorId");
+    // Le directeur passe avant le commercial : son geste peut citer un commercial (celui qu'il réaffecte) sans en être l'auteur.
     const author: JournalAuthor = log.platformAdminId
       ? { kind: "admin", label: adminName.get(log.platformAdminId) ?? "Administrateur supprimé", href: null }
-      : repId
-        ? { kind: "commercial", label: repName.get(repId) ? `${repName.get(repId)} (commercial)` : "Commercial", href: `/admin/commerciaux/${encodeURIComponent(repId)}` }
-        : log.userId
-          ? { kind: "officine", label: "Équipe de l'officine", href: null }
-          : { kind: "systeme", label: "Système", href: null };
+      : directorId
+        ? { kind: "directeur", label: directorName.has(directorId) ? `${directorName.get(directorId)} (directeur commercial)` : "Directeur commercial (compte supprimé)", href: "/admin/directeur-commercial" }
+        : repId
+          ? { kind: "commercial", label: repName.get(repId) ? `${repName.get(repId)} (commercial)` : "Commercial", href: `/admin/commerciaux/${encodeURIComponent(repId)}` }
+          : log.userId
+            ? { kind: "officine", label: "Équipe de l'officine", href: null }
+            : { kind: "systeme", label: "Système", href: null };
 
     const f = JOURNAL_FAMILIES.find((x) => x.prefix === actionFamily(log.action)) ?? null;
     const contract = log.entityType === "Contract" && log.entityId ? contractById.get(log.entityId) : undefined;
@@ -173,11 +182,13 @@ export async function loadAuditJournal(filters: JournalFilters, now: Date = new 
           ? (prospectName.get(log.entityId) ?? null)
           : log.entityType === "SalesRep" && log.entityId
             ? (repName.get(log.entityId) ?? null)
-            : log.entityType === "PlatformAdmin" && log.entityId
-              ? (adminName.get(log.entityId) ?? null)
-              : contract
-                ? contract.reference
-                : null;
+            : log.entityType === "SalesDirector" && log.entityId
+              ? (directorName.get(log.entityId) ?? null)
+              : log.entityType === "PlatformAdmin" && log.entityId
+                ? (adminName.get(log.entityId) ?? null)
+                : contract
+                  ? contract.reference
+                  : null;
     const shortId = log.entityId ? (cuidLike.test(log.entityId) ? `…${log.entityId.slice(-6)}` : log.entityId.slice(0, 40)) : null;
     const href = contract && !pharmacyId ? `/admin/dossiers/${encodeURIComponent(contract.prospectId)}` : entityHref({ entityType: log.entityType, entityId: log.entityId, pharmacyId });
     const pharmacy = pharmacyId && log.entityType !== "Pharmacy" ? { id: pharmacyId, name: pharmacyName.get(pharmacyId)!, href: `/admin/pharmacies/${encodeURIComponent(pharmacyId)}` } : null;

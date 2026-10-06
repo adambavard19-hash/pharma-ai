@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CalendarClock, Euro, Home, KanbanSquare } from "lucide-react";
+import { Bell, CalendarClock, Euro, Home, KanbanSquare, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
@@ -10,13 +10,14 @@ const ITEMS = [
   { href: "/extranet/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/extranet/taches", label: "Relances", icon: CalendarClock },
   { href: "/extranet/commissions", label: "Commissions", icon: Euro },
+  { href: "/extranet/challenges", label: "Challenges", icon: Trophy },
   { href: "/extranet/notifications", label: "Alertes", icon: Bell },
 ];
 
 export function SalesNav({ unread, mobile = false }: { unread: number; mobile?: boolean }) {
   const pathname = usePathname();
   return (
-    <nav className={cn(mobile ? "grid grid-cols-5" : "flex gap-1")} aria-label="Sections de l'extranet">
+    <nav className={cn(mobile ? "flex" : "flex gap-1")} aria-label="Sections de l'extranet">
       {ITEMS.map((item) => {
         const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
         return (
@@ -25,7 +26,7 @@ export function SalesNav({ unread, mobile = false }: { unread: number; mobile?: 
             href={item.href}
             className={cn(
               mobile
-                ? "flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium"
+                ? "flex flex-auto flex-col items-center gap-0.5 px-1 py-2 text-[11px] font-medium"
                 : "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13.5px] font-medium transition-colors",
               active ? (mobile ? "text-brand-700 dark:text-brand-400" : "border-brand-600 text-brand-700 dark:text-brand-400") : mobile ? "text-text-tertiary" : "border-transparent text-text-secondary hover:text-text-primary",
             )}

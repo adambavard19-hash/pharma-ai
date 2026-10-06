@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   actionLabel,
   actionTone,
+  entityLabel,
+  fieldLabel,
   actionsMatching,
   contextEntries,
   diffEntries,
@@ -249,5 +251,48 @@ describe("journal d'audit : regroupement et pagination", () => {
     expect(parsePage("-2")).toBe(1);
     expect(parsePage("abc")).toBe(1);
     expect(parsePage(null)).toBe(1);
+  });
+});
+
+describe("journal d'audit : le directeur commercial", () => {
+  const DIRECTOR_ACTIONS = ["sales.director_created", "sales.director_updated", "sales.director_invited", "sales.director_deleted"];
+
+  it("les gestes sur le directeur sont visibles dans la famille Commercial, avec ou sans administrateur", () => {
+    for (const action of DIRECTOR_ACTIONS) {
+      expect(isBusinessAction(action, { platformAdminId: "adm_1" }), action).toBe(true);
+      expect(isBusinessAction(action), action).toBe(true);
+    }
+    expect(journalFamily("commercial")?.prefix).toBe("sales");
+  });
+
+  it("chaque geste du lot a son libellé en clair, jamais le code brut", () => {
+    expect(actionLabel("sales.director_created")).toBe("Directeur commercial ajouté");
+    expect(actionLabel("sales.director_updated")).toBe("Directeur commercial modifié");
+    expect(actionLabel("sales.director_invited")).toBe("Directeur commercial invité");
+    expect(actionLabel("sales.director_deleted")).toBe("Directeur commercial supprimé");
+    for (const action of ["sales.rep_deleted", "sales.invoice_created", "sales.invoice_updated", "sales.invoice_deleted", "sales.challenge_saved", "sales.challenge_deleted"]) {
+      expect(actionLabel(action), action).not.toBe(action);
+      expect(isBusinessAction(action, { platformAdminId: "adm_1" }), action).toBe(true);
+    }
+    expect(actionsMatching("directeur").sort()).toEqual([...DIRECTOR_ACTIONS].sort());
+  });
+
+  it("une suppression se lit en rouge, une invitation reste neutre", () => {
+    expect(actionTone("sales.director_deleted")).toBe("danger");
+    expect(actionTone("sales.director_invited")).toBe("neutral");
+  });
+
+  it("la clé salesDirectorId se lit « Directeur commercial » ; l'auteur n'est pas répété dans le contexte", () => {
+    expect(fieldLabel("salesDirectorId")).toBe("Directeur commercial");
+    expect(entityLabel("SalesDirector")).toBe("Directeur commercial");
+    expect(contextEntries({ salesDirectorId: "dir_1", status: "SENT" }, "sales.director_invited")).toEqual([{ field: "status", label: "Statut", value: "Envoyé" }]);
+  });
+
+  it("un directeur ouvre la liste de la console, jamais une fiche qui n'existe pas", () => {
+    expect(entityHref({ entityType: "SalesDirector", entityId: "dir_1" })).toBe("/admin/directeur-commercial");
+  });
+
+  it("l'avant / l'après d'une désactivation est lisible", () => {
+    expect(diffEntries({ fields: ["isActive"], changes: { isActive: { from: true, to: false } } }, "sales.director_updated")).toEqual([{ field: "isActive", label: "Actif", from: "Oui", to: "Non" }]);
   });
 });

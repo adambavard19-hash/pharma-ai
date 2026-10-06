@@ -6,7 +6,8 @@ import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
 import { sendInstallationGuide } from "@/server/services/platform-onboarding";
-import { notifyAdmins } from "@/server/services/sales/notifications";
+import { notifyAdmins, notifySalesRep } from "@/server/services/sales/notifications";
+import { recordProspectEvent } from "@/server/services/sales/events";
 import { traceDispatch } from "@/server/services/email-dispatch";
 import { getStripe, stripeConfigState } from "./stripe-client";
 import { readSubscription, type SubscriptionShape } from "@/core/billing/stripe-shapes";
@@ -528,8 +529,28 @@ export async function announceSubscriptionStarted(organizationId: string): Promi
     await sendInstallationGuide(pharmacy.id, { reason: "SUBSCRIPTION_STARTED" }).catch((error) => console.error("[abonnement] guide d'installation non envoyé", error));
   }
   await notifyAdmins({ type: "SUBSCRIPTION_STARTED", title: `${pharmacy.name} : abonnement démarré`, body: `${subscription.plan.name} — ${formatEuros(priceCents)}/mois${subscription.trialEndsAt ? `, essai jusqu'au ${formatFrenchDate(subscription.trialEndsAt)}` : ""}.`, linkUrl: `/admin/abonnements/${pharmacy.id}`, severity: "SUCCESS" });
-  const prospect = await prisma.prospect.findUnique({ where: { pharmacyId: pharmacy.id }, select: { id: true, status: true } });
-  if (prospect && prospect.status !== "ACTIVATED") await prisma.prospect.update({ where: { id: prospect.id }, data: { status: "ACTIVATED" } });
+  const prospect = await prisma.prospect.findUnique({ where: { pharmacyId: pharmacy.id }, select: { id: true, name: true, status: true, salesRepId: true } });
+  if (!prospect) return;
+  if (prospect.status !== "ACTIVATED") await prisma.prospect.update({ where: { id: prospect.id }, data: { status: "ACTIVATED" } });
+  await recordActivation(prospect);
+}
+
+/**
+ * Le démarrage de l'abonnement active l'officine. L'événement « activée » est
+ * ce que comptent les challenges, le tableau de bord et le classement : il est
+ * écrit UNE seule fois (la connexion du titulaire a pu le poser avant), et le
+ * commercial est prévenu comme par le chemin habituel. Une panne ici ne doit
+ * pas rejouer le webhook (les e-mails sont déjà partis).
+ */
+async function recordActivation(prospect: { id: string; name: string; salesRepId: string | null }): Promise<void> {
+  try {
+    const already = await prisma.prospectEvent.findFirst({ where: { prospectId: prospect.id, type: "STATUS_CHANGED", metadata: { path: ["to"], equals: "ACTIVATED" } }, select: { id: true } });
+    if (already) return;
+    await recordProspectEvent({ prospectId: prospect.id, type: "STATUS_CHANGED", summary: "Abonnement démarré : officine activée.", actor: { type: "SYSTEM", label: "Abonnement démarré" }, metadata: { to: "ACTIVATED", via: "SUBSCRIPTION" } });
+    if (prospect.salesRepId) await notifySalesRep({ salesRepId: prospect.salesRepId, type: "PHARMACY_ACTIVATED", title: `${prospect.name} est active`, body: "L'abonnement de l'officine a démarré.", linkUrl: `/extranet/dossiers/${prospect.id}`, severity: "SUCCESS" });
+  } catch (error) {
+    console.error("[abonnement] activation du dossier non tracée", error instanceof Error ? error.message : "erreur inconnue");
+  }
 }
 
 // ---------------------------------------------------------------- Portail et gestes

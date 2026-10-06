@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bot, Briefcase, ChevronLeft, ChevronRight, ScrollText, ShieldCheck, Store, UserRound } from "lucide-react";
+import { ArrowRight, Bot, Briefcase, ChevronLeft, ChevronRight, ScrollText, ShieldCheck, Store, UserCog, UserRound } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { JOURNAL_PAGE_SIZE, loadAuditJournal, type JournalAuthor, type JournalRow } from "@/server/services/admin/audit-journal";
 import { groupByDay, JOURNAL_FAMILIES, parsePage } from "@/core/admin/journal";
@@ -32,6 +32,7 @@ const TONE_DOT = {
 
 const AUTHOR_ICON: Record<JournalAuthor["kind"], typeof UserRound> = {
   admin: ShieldCheck,
+  directeur: UserCog,
   commercial: Briefcase,
   officine: Store,
   systeme: Bot,

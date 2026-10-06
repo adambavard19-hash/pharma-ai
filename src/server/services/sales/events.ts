@@ -6,6 +6,7 @@ import type { ProspectEventType } from "@/generated/prisma";
 export type SalesActor =
   | { type: "SALES"; id: string; label: string }
   | { type: "ADMIN"; id: string; label: string }
+  | { type: "DIRECTOR"; id: string; label: string }
   | { type: "SYSTEM"; id?: null; label: string }
   | { type: "SIGNER"; id?: null; label: string };
 

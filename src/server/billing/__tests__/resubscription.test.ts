@@ -44,7 +44,8 @@ vi.mock("@/server/billing/stripe-client", () => ({ stripeConfigState: mocks.stri
 vi.mock("@/server/ai/registry", () => ({ getMessagingProvider: () => ({ sendEmail: mocks.sendEmail }) }));
 vi.mock("@/server/public-url", () => ({ publicUrl: (path: string) => `https://pharmaboost.test${path}` }));
 vi.mock("@/server/security/tokens", () => ({ generateToken: () => "jeton-de-test-0123456789abcdef", hashToken: (token: string) => `hash:${token}` }));
-vi.mock("@/server/services/sales/notifications", () => ({ notifyAdmins: mocks.notifyAdmins }));
+vi.mock("@/server/services/sales/notifications", () => ({ notifyAdmins: mocks.notifyAdmins, notifySalesRep: vi.fn() }));
+vi.mock("@/server/services/sales/events", () => ({ recordProspectEvent: vi.fn() }));
 vi.mock("@/server/services/email-dispatch", () => ({ traceDispatch: mocks.traceDispatch }));
 vi.mock("@/server/services/site-leads", () => ({ DEFAULT_CONTACT_EMAIL: "contact@pharmaboost.test" }));
 vi.mock("@/server/auth/platform-session", () => ({ requirePlatformSession: mocks.requirePlatformSession }));

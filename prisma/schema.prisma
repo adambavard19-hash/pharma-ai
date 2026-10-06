@@ -2660,6 +2660,7 @@ model SalesRep {
   tasks         SalesTask[]
   notifications ExtranetNotification[]
   application   SalesApplication?
+  invoices      SalesInvoice[]
 
   @@map("sales_reps")
 }
@@ -2882,11 +2883,132 @@ model Commission {
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
-  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
-  salesRep SalesRep @relation(fields: [salesRepId], references: [id])
+  /// La facture du commercial qui réclame cette commission, s'il y en a une.
+  invoiceId String?
+
+  prospect Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  salesRep SalesRep      @relation(fields: [salesRepId], references: [id])
+  invoice  SalesInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([salesRepId, status])
+  @@index([invoiceId])
   @@map("commissions")
+}
+
+/// Le directeur commercial : un compte de la plateforme, distinct des commerciaux
+/// et des administrateurs. Il gère l'équipe commerciale (commerciaux, candidats,
+/// commissions, factures, challenges) depuis son propre espace, sans jamais
+/// avoir de portée sur une officine ni sur des données patients.
+model SalesDirector {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  phone        String?
+  isActive     Boolean   @default(true)
+  invitedAt    DateTime?
+  lastLoginAt  DateTime?
+
+  /// Lien « définir mon mot de passe » : seule l'empreinte du jeton est conservée.
+  passwordResetTokenHash String?   @unique
+  passwordResetExpiresAt DateTime?
+
+  /// L'administrateur de la console qui a créé ce compte.
+  createdByAdminId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  sessions SalesDirectorSession[]
+
+  @@map("sales_directors")
+}
+
+model SalesDirectorSession {
+  id              String    @id @default(cuid())
+  tokenHash       String    @unique
+  salesDirectorId String
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+  revokedAt       DateTime?
+  ipAddress       String?
+
+  salesDirector SalesDirector @relation(fields: [salesDirectorId], references: [id], onDelete: Cascade)
+
+  @@index([salesDirectorId])
+  @@map("sales_director_sessions")
+}
+
+/// Ce que mesure un challenge commercial.
+enum SalesChallengeMetric {
+  PROSPECTS_CREATED
+  DEMOS_DONE
+  CONTRACTS_SIGNED
+  ACTIVATIONS
+}
+
+/// Un challenge de l'équipe commerciale : un objectif chiffré sur une période, pour tous
+/// les commerciaux actifs. L'avancement se calcule toujours à partir des dossiers réels,
+/// jamais d'une saisie.
+model SalesChallenge {
+  id             String               @id @default(cuid())
+  title          String
+  description    String?
+  metric         SalesChallengeMetric
+  /// Objectif par commercial sur la période.
+  target         Int
+  startsAt       DateTime
+  endsAt         DateTime
+  /// La récompense, en clair (« 200 € de prime »), et son montant s'il y en a un.
+  rewardLabel    String?
+  rewardCents    Int?
+  isActive       Boolean              @default(true)
+  /// Qui l'a créé (directeur commercial ou administrateur).
+  createdByType  String
+  createdById    String?
+  createdByLabel String
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([startsAt, endsAt])
+  @@map("sales_challenges")
+}
+
+enum SalesInvoiceStatus {
+  RECEIVED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+/// Une facture émise par un commercial pour ses commissions : reçue, validée, payée ou refusée.
+model SalesInvoice {
+  id              String             @id @default(cuid())
+  salesRepId      String
+  number          String
+  amountCents     Int
+  issuedAt        DateTime
+  periodLabel     String?
+  status          SalesInvoiceStatus @default(RECEIVED)
+  /// Le fichier de la facture (stockage privé), s'il a été joint.
+  fileKey         String?
+  fileName        String?
+  note            String?
+  rejectionReason String?
+  approvedAt      DateTime?
+  paidAt          DateTime?
+  createdByType   String
+  createdById     String?
+  createdByLabel  String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  salesRep    SalesRep     @relation(fields: [salesRepId], references: [id])
+  commissions Commission[]
+
+  @@unique([salesRepId, number])
+  @@index([status, issuedAt])
+  @@map("sales_invoices")
 }
 
 /// Notifications de l'extranet : pour un commercial, ou pour les administrateurs.

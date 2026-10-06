@@ -7,6 +7,7 @@ import { getMessagingProvider } from "@/server/ai/registry";
 import { buildSalesInvitationEmail } from "@/core/platform/sales-emails";
 import { publicUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
+import { auditIdentity, type RepActorInput } from "./rep-actor";
 import type { SalesCommissionType } from "@/generated/prisma";
 
 const LINK_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -22,8 +23,14 @@ export type SalesRepInput = {
   isActive?: boolean;
 };
 
-/** Crée un commercial. Le mot de passe initial est aléatoire et inconnu : seul le lien d'invitation permet d'en définir un. */
-export async function createSalesRep(input: SalesRepInput, adminId: string): Promise<{ id: string }> {
+/**
+ * Crée un commercial. Le mot de passe initial est aléatoire et inconnu : seul le lien d'invitation permet d'en définir un.
+ *
+ * `actor` : l'identifiant d'un administrateur (forme historique) ou l'acteur
+ * complet, administrateur ou directeur commercial ; la ligne d'audit porte
+ * l'identité qui convient.
+ */
+export async function createSalesRep(input: SalesRepInput, actor: RepActorInput): Promise<{ id: string }> {
   const rep = await prisma.salesRep.create({
     data: {
       ...input,
@@ -34,16 +41,16 @@ export async function createSalesRep(input: SalesRepInput, adminId: string): Pro
       passwordHash: await hashPassword(randomBytes(32).toString("base64url")),
     },
   });
-  await recordAudit({ action: "sales.rep_created", entityType: "SalesRep", entityId: rep.id, platformAdminId: adminId, metadata: { email: rep.email } });
+  await recordAudit({ action: "sales.rep_created", entityType: "SalesRep", entityId: rep.id, ...auditIdentity(actor), metadata: { email: rep.email } });
   return { id: rep.id };
 }
 
-export async function updateSalesRep(id: string, input: Partial<SalesRepInput>, adminId: string): Promise<void> {
+export async function updateSalesRep(id: string, input: Partial<SalesRepInput>, actor: RepActorInput): Promise<void> {
   await prisma.salesRep.update({ where: { id }, data: { ...input, ...(input.email ? { email: input.email.toLowerCase() } : {}) } });
   if (input.isActive === false) {
     await prisma.salesRepSession.updateMany({ where: { salesRepId: id, revokedAt: null }, data: { revokedAt: new Date() } });
   }
-  await recordAudit({ action: "sales.rep_updated", entityType: "SalesRep", entityId: id, platformAdminId: adminId, metadata: { fields: Object.keys(input) } });
+  await recordAudit({ action: "sales.rep_updated", entityType: "SalesRep", entityId: id, ...auditIdentity(actor), metadata: { fields: Object.keys(input) } });
 }
 
 export async function issueSalesPasswordLink(salesRepId: string): Promise<{ url: string; expiresAt: Date }> {
@@ -54,13 +61,13 @@ export async function issueSalesPasswordLink(salesRepId: string): Promise<{ url:
 }
 
 /** Envoie (ou renvoie) l'invitation. L'issue du prestataire est rendue telle quelle. */
-export async function sendSalesInvitation(salesRepId: string, adminId: string | null): Promise<{ status: string; detail: string }> {
+export async function sendSalesInvitation(salesRepId: string, actor: RepActorInput): Promise<{ status: string; detail: string }> {
   const rep = await prisma.salesRep.findUniqueOrThrow({ where: { id: salesRepId } });
   const { url, expiresAt } = await issueSalesPasswordLink(rep.id);
   const message = buildSalesInvitationEmail({ firstName: rep.firstName, url, expiresAt });
   const outcome = await getMessagingProvider().sendEmail({ to: rep.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
   await prisma.salesRep.update({ where: { id: rep.id }, data: { invitedAt: new Date() } });
-  await recordAudit({ action: "sales.rep_invited", entityType: "SalesRep", entityId: rep.id, platformAdminId: adminId, metadata: { status: outcome.status } });
+  await recordAudit({ action: "sales.rep_invited", entityType: "SalesRep", entityId: rep.id, ...auditIdentity(actor), metadata: { status: outcome.status } });
   return { status: outcome.status, detail: outcome.detail };
 }
 

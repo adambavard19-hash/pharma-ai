@@ -45,6 +45,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
       { href: "/admin/relances-commerciales", label: "Relances commerciales", description: "Les relances prévues, en retard et du jour." },
       { href: "/admin/commerciaux", label: "Commerciaux", description: "L'équipe commerciale, portefeuilles et résultats." },
       { href: "/admin/candidatures-commerciales", label: "Candidatures commerciales", description: "Les personnes qui veulent rejoindre l'équipe commerciale : à contacter, entretien, acceptation." },
+      { href: "/admin/directeur-commercial", label: "Directeur commercial", description: "Le compte qui gère l'équipe commerciale depuis son propre espace." },
     ],
   },
   {

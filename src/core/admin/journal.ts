@@ -207,6 +207,16 @@ export const ACTION_LABELS: Record<string, string> = {
   "sales.demo_done": "Démonstration réalisée",
   "sales.demo_canceled": "Démonstration annulée",
   "sales.followup_set": "Relance commerciale programmée",
+  "sales.rep_deleted": "Commercial supprimé",
+  "sales.director_created": "Directeur commercial ajouté",
+  "sales.director_updated": "Directeur commercial modifié",
+  "sales.director_invited": "Directeur commercial invité",
+  "sales.director_deleted": "Directeur commercial supprimé",
+  "sales.invoice_created": "Facture de commercial enregistrée",
+  "sales.invoice_updated": "Facture de commercial mise à jour",
+  "sales.invoice_deleted": "Facture de commercial supprimée",
+  "sales.challenge_saved": "Challenge commercial enregistré",
+  "sales.challenge_deleted": "Challenge commercial supprimé",
   // Partenaires
   "partner.application_received": "Candidature partenaire reçue",
   "partner.application_status_changed": "Candidature : statut modifié",
@@ -281,6 +291,9 @@ export const ENTITY_LABELS: Record<string, string> = {
   Contract: "Contrat",
   Plan: "Offre",
   SalesRep: "Commercial",
+  SalesDirector: "Directeur commercial",
+  SalesInvoice: "Facture de commercial",
+  SalesChallenge: "Challenge commercial",
   Commission: "Commission",
   PlatformAdmin: "Administrateur",
   PlatformSetting: "Paramètre",
@@ -338,6 +351,9 @@ export function entityHref(row: { entityType: string; entityId: string | null; p
       return pharmacy ? `/admin/pharmacies/${pharmacy}?onglet=notes` : null;
     case "SalesRep":
       return id ? `/admin/commerciaux/${id}` : null;
+    case "SalesDirector":
+      // Un directeur supprimé n'a plus de fiche : la liste, sans lien cassé.
+      return "/admin/directeur-commercial";
     case "Plan":
       return "/admin/abonnements/offres";
     case "PlatformAdmin":
@@ -414,6 +430,7 @@ export const FIELD_LABELS: Record<string, string> = {
   code: "Code",
   planId: "Offre",
   salesRepId: "Commercial",
+  salesDirectorId: "Directeur commercial",
   templateKey: "Modèle",
   ruleKey: "Règle",
   postCount: "Postes",
@@ -461,7 +478,7 @@ const MAX_TEXT = 160;
 // secret n'a rien à faire à l'écran, même tronqué.
 const HIDDEN_KEY = /(token|secret|password|passwd|hash|apikey|api_key|^ip(address)?$|^useragent$)/i;
 // Clés déjà montrées ailleurs dans la ligne (auteur, officine liée) ou par l'avant / après.
-const RESERVED_KEYS = new Set(["changes", "before", "after", "from", "to", "salesRepId", "pharmacyId"]);
+const RESERVED_KEYS = new Set(["changes", "before", "after", "from", "to", "salesRepId", "salesDirectorId", "pharmacyId"]);
 
 const GENERIC_CODES: Record<string, string> = {
   SENT: "Envoyé",

@@ -237,7 +237,17 @@ export type AuditAction =
   | "stock.deposit_decided"
   | "stock.deposit_retried"
   | "stock.deposit_files_purged"
-  | "stock.deposit_downloaded";
+  | "stock.deposit_downloaded"
+  | "sales.director_created"
+  | "sales.director_updated"
+  | "sales.director_invited"
+  | "sales.director_deleted"
+  | "sales.rep_deleted"
+  | "sales.invoice_created"
+  | "sales.invoice_updated"
+  | "sales.invoice_deleted"
+  | "sales.challenge_saved"
+  | "sales.challenge_deleted";
 
 export async function recordAudit(params: {
   action: AuditAction;
@@ -248,6 +258,8 @@ export async function recordAudit(params: {
   platformAdminId?: string | null;
   /** Commercial à l'origine de l'action, pour l'extranet. */
   salesRepId?: string | null;
+  /** Directeur commercial à l'origine de l'action, pour son espace. */
+  salesDirectorId?: string | null;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   try {
@@ -261,7 +273,7 @@ export async function recordAudit(params: {
         pharmacyId: params.pharmacyId ?? null,
         userId: params.userId ?? null,
         platformAdminId: params.platformAdminId ?? null,
-        metadata: ({ ...(params.metadata ?? {}), ...(params.salesRepId ? { salesRepId: params.salesRepId } : {}) }) as never,
+        metadata: ({ ...(params.metadata ?? {}), ...(params.salesRepId ? { salesRepId: params.salesRepId } : {}), ...(params.salesDirectorId ? { salesDirectorId: params.salesDirectorId } : {}) }) as never,
         ipAddress: meta.ipAddress,
         userAgent: meta.userAgent,
       },

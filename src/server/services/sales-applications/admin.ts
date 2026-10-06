@@ -5,6 +5,7 @@ import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import { getStorageProvider } from "@/server/ai/registry";
 import { createSalesRep, sendSalesInvitation } from "@/server/services/sales/reps";
+import { applicationEventActorId, auditIdentity, splitEventActors, type RepActorInput } from "@/server/services/sales/rep-actor";
 import { getStandardCommissionCents } from "@/server/services/standard-commission";
 import { SALES_APPLICATION_STATUSES, SALES_APPLICATION_STATUS_LABELS, SALES_APPLICATION_STATUS_TONES, type SalesApplicationStatusKey } from "@/core/sales-applications/status";
 import { formatPriceEuros } from "@/core/pricing/official-offer";
@@ -22,6 +23,11 @@ import type { TimelineEntry } from "@/core/admin/timeline";
  * laissent un événement daté (historique de la fiche) et une ligne d'audit.
  * L'audit ne contient jamais la donnée personnelle du candidat : des
  * identifiants, des statuts, des compteurs.
+ *
+ * Les gestes (statut, note, transformation, CV) sont ceux de la console comme
+ * ceux du directeur commercial : chaque fonction reçoit l'acteur (`actor`) soit
+ * comme identifiant d'administrateur (forme historique), soit comme acteur
+ * complet `{ type: "ADMIN" | "DIRECTOR", id, label }`.
  */
 
 export const SALES_APPLICATIONS_PAGE_SIZE = 25;
@@ -151,6 +157,8 @@ export function buildApplicationTimeline(
   application: { id: string; createdAt: Date; acknowledgedAt: Date | null; salesRepId: string | null },
   events: EventRow[],
   adminNames: Map<string, string>,
+  /** Où mène le lien vers le commercial créé : la console par défaut, l'espace du directeur sinon. */
+  repBasePath = "/admin/commerciaux",
 ): TimelineEntry[] {
   const entries: TimelineEntry[] = events.map((event): TimelineEntry => {
     const actor = event.platformAdminId ? (adminNames.get(event.platformAdminId) ?? null) : null;
@@ -165,7 +173,7 @@ export function buildApplicationTimeline(
       case SALES_APPLICATION_EVENT_KINDS.NOTE:
         return { id: `event:${event.id}`, at: event.createdAt, kind: "note", title: "Note interne", detail: event.note, actor };
       case SALES_APPLICATION_EVENT_KINDS.CONVERTED:
-        return { id: `event:${event.id}`, at: event.createdAt, kind: "commercial", title: "Transformée en commercial", detail: event.note, tone: "success", actor, href: application.salesRepId ? `/admin/commerciaux/${application.salesRepId}` : null };
+        return { id: `event:${event.id}`, at: event.createdAt, kind: "commercial", title: "Transformée en commercial", detail: event.note, tone: "success", actor, href: application.salesRepId ? `${repBasePath}/${application.salesRepId}` : null };
       default:
         return { id: `event:${event.id}`, at: event.createdAt, kind: "dossier", title: event.kind, detail: event.note, actor };
     }
@@ -203,7 +211,7 @@ export type SalesApplicationDetail = {
   timeline: TimelineEntry[];
 };
 
-export async function getSalesApplication(id: string): Promise<SalesApplicationDetail | null> {
+export async function getSalesApplication(id: string, options: { repBasePath?: string } = {}): Promise<SalesApplicationDetail | null> {
   const application = await prisma.salesApplication.findUnique({
     where: { id },
     include: {
@@ -213,9 +221,16 @@ export async function getSalesApplication(id: string): Promise<SalesApplicationD
   });
   if (!application) return null;
 
-  const adminIds = [...new Set(application.events.map((event) => event.platformAdminId).filter((value): value is string => Boolean(value)))];
-  const admins = adminIds.length > 0 ? await prisma.platformAdmin.findMany({ where: { id: { in: adminIds } }, select: { id: true, firstName: true, lastName: true } }) : [];
-  const adminNames = new Map(admins.map((admin) => [admin.id, `${admin.firstName} ${admin.lastName}`.trim()]));
+  // L'auteur d'un événement est un administrateur (son identifiant) ou le directeur commercial (`director:<id>`).
+  const { adminIds, directorIds } = splitEventActors(application.events.map((event) => event.platformAdminId));
+  const [admins, directors] = await Promise.all([
+    adminIds.length > 0 ? prisma.platformAdmin.findMany({ where: { id: { in: adminIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
+    directorIds.length > 0 ? prisma.salesDirector.findMany({ where: { id: { in: directorIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
+  ]);
+  const adminNames = new Map<string, string>([
+    ...admins.map((admin): [string, string] => [admin.id, `${admin.firstName} ${admin.lastName}`.trim()]),
+    ...directors.map((director): [string, string] => [applicationEventActorId({ type: "DIRECTOR", id: director.id, label: "" }) ?? director.id, `${director.firstName} ${director.lastName}`.trim()]),
+  ]);
 
   return {
     id: application.id,
@@ -235,7 +250,7 @@ export async function getSalesApplication(id: string): Promise<SalesApplicationD
     createdAt: application.createdAt,
     cv: application.cvKey ? { fileName: application.cvFileName || "cv.pdf", sizeBytes: application.cvSizeBytes } : null,
     salesRep: application.salesRep ? { id: application.salesRep.id, name: `${application.salesRep.firstName} ${application.salesRep.lastName}`.trim(), isActive: application.salesRep.isActive } : null,
-    timeline: buildApplicationTimeline(application, application.events, adminNames),
+    timeline: buildApplicationTimeline(application, application.events, adminNames, options.repBasePath),
   };
 }
 
@@ -252,7 +267,7 @@ export type MoveResult =
  * on peut rouvrir une candidature refusée). Une candidature déjà transformée en
  * commercial ne bouge plus : son statut dit ce qu'elle est devenue.
  */
-export async function moveSalesApplication(id: string, to: SalesApplicationStatusKey, adminId: string): Promise<MoveResult> {
+export async function moveSalesApplication(id: string, to: SalesApplicationStatusKey, actor: RepActorInput): Promise<MoveResult> {
   const application = await prisma.salesApplication.findUnique({ where: { id }, select: { status: true, salesRepId: true } });
   if (!application) return { ok: false, reason: "NOT_FOUND" };
   if (application.salesRepId) return { ok: false, reason: "CONVERTED" };
@@ -263,7 +278,7 @@ export async function moveSalesApplication(id: string, to: SalesApplicationStatu
     // Conditionné au statut lu : deux gestes simultanés ne s'écrasent pas.
     const updated = await tx.salesApplication.updateMany({ where: { id, status: from, salesRepId: null }, data: { status: to } });
     if (updated.count === 0) return false;
-    await tx.salesApplicationEvent.create({ data: { applicationId: id, kind: SALES_APPLICATION_EVENT_KINDS.STATUS_CHANGED, fromStatus: from, toStatus: to, platformAdminId: adminId } });
+    await tx.salesApplicationEvent.create({ data: { applicationId: id, kind: SALES_APPLICATION_EVENT_KINDS.STATUS_CHANGED, fromStatus: from, toStatus: to, platformAdminId: applicationEventActorId(actor) } });
     return true;
   });
   if (!moved) return { ok: false, reason: "CONFLICT" };
@@ -272,7 +287,7 @@ export async function moveSalesApplication(id: string, to: SalesApplicationStatu
     action: "sales_application.status_changed",
     entityType: "SalesApplication",
     entityId: id,
-    platformAdminId: adminId,
+    ...auditIdentity(actor),
     metadata: { before: { status: from }, after: { status: to } },
   });
   return { ok: true, from, to };
@@ -282,14 +297,14 @@ export async function moveSalesApplication(id: string, to: SalesApplicationStatu
 // Notes
 // ---------------------------------------------------------------------------
 
-export async function addSalesApplicationNote(id: string, note: string, adminId: string): Promise<{ ok: true; eventId: string } | { ok: false }> {
+export async function addSalesApplicationNote(id: string, note: string, actor: RepActorInput): Promise<{ ok: true; eventId: string } | { ok: false }> {
   const application = await prisma.salesApplication.findUnique({ where: { id }, select: { id: true } });
   if (!application) return { ok: false };
   const event = await prisma.salesApplicationEvent.create({
-    data: { applicationId: id, kind: SALES_APPLICATION_EVENT_KINDS.NOTE, note, platformAdminId: adminId },
+    data: { applicationId: id, kind: SALES_APPLICATION_EVENT_KINDS.NOTE, note, platformAdminId: applicationEventActorId(actor) },
     select: { id: true },
   });
-  await recordAudit({ action: "sales_application.note_added", entityType: "SalesApplication", entityId: id, platformAdminId: adminId, metadata: { eventId: event.id, length: note.length } });
+  await recordAudit({ action: "sales_application.note_added", entityType: "SalesApplication", entityId: id, ...auditIdentity(actor), metadata: { eventId: event.id, length: note.length } });
   return { ok: true, eventId: event.id };
 }
 
@@ -327,7 +342,7 @@ function isUniqueViolation(error: unknown): boolean {
  * n'est pas acceptée. Le commercial n'est lié à la candidature (avec son
  * événement) qu'en une seule transaction conditionnée à l'état lu.
  */
-export async function convertSalesApplication(id: string, adminId: string, options: { invite?: boolean } = {}): Promise<ConvertResult> {
+export async function convertSalesApplication(id: string, actor: RepActorInput, options: { invite?: boolean } = {}): Promise<ConvertResult> {
   const application = await prisma.salesApplication.findUnique({
     where: { id },
     select: { status: true, salesRepId: true, firstName: true, lastName: true, email: true, phone: true, zone: true },
@@ -347,7 +362,7 @@ export async function convertSalesApplication(id: string, adminId: string, optio
   const commissionCents = await getStandardCommissionCents();
   let created: { id: string };
   try {
-    created = await createSalesRep({ ...identity, commissionType: "FIXED", commissionValue: commissionCents }, adminId);
+    created = await createSalesRep({ ...identity, commissionType: "FIXED", commissionValue: commissionCents }, actor);
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
     // Deux gestes simultanés : l'adresse est le verrou. Le perdant lit ce que le gagnant a fait.
@@ -364,7 +379,7 @@ export async function convertSalesApplication(id: string, adminId: string, optio
         applicationId: id,
         kind: SALES_APPLICATION_EVENT_KINDS.CONVERTED,
         note: `Commercial créé : ${name}. Commission fixe de ${formatPriceEuros(commissionCents)} par pharmacie activée.`,
-        platformAdminId: adminId,
+        platformAdminId: applicationEventActorId(actor),
       },
     });
     return true;
@@ -378,7 +393,7 @@ export async function convertSalesApplication(id: string, adminId: string, optio
   let invitation: { status: string; detail: string } | null = null;
   if (options.invite !== false) {
     try {
-      invitation = await sendSalesInvitation(created.id, adminId);
+      invitation = await sendSalesInvitation(created.id, actor);
     } catch {
       // Le commercial existe ; seule l'invitation a échoué, et la fiche du commercial permet de la renvoyer.
       invitation = { status: "FAILED", detail: "l'envoi a échoué, renvoyez l'invitation depuis la fiche du commercial" };
@@ -389,7 +404,7 @@ export async function convertSalesApplication(id: string, adminId: string, optio
     action: "sales_application.converted",
     entityType: "SalesApplication",
     entityId: id,
-    platformAdminId: adminId,
+    ...auditIdentity(actor),
     metadata: { salesRepId: created.id, commissionType: "FIXED", commissionCents, invitation: invitation?.status ?? "NOT_REQUESTED" },
   });
   return { ok: true, salesRepId: created.id, name, commissionCents, invitation };
@@ -425,11 +440,11 @@ export type CvResult =
   | { ok: false; reason: "NOT_FOUND" | "NO_CV" | "STORAGE_UNAVAILABLE" | "FILE_MISSING" };
 
 /**
- * Relit le CV d'une candidature, pour la console. La clé doit être celle de
+ * Relit le CV d'une candidature, pour la console ou pour le directeur. La clé doit être celle de
  * cette candidature (`sales-applications/<id>/…`) : une clé altérée ne permet
  * jamais de lire le fichier d'une autre officine. Chaque lecture est tracée.
  */
-export async function readSalesApplicationCv(id: string, adminId: string): Promise<CvResult> {
+export async function readSalesApplicationCv(id: string, actor: RepActorInput): Promise<CvResult> {
   const application = await prisma.salesApplication.findUnique({ where: { id }, select: { cvKey: true, cvFileName: true, firstName: true, lastName: true } });
   if (!application) return { ok: false, reason: "NOT_FOUND" };
   const key = application.cvKey;
@@ -443,6 +458,6 @@ export async function readSalesApplicationCv(id: string, adminId: string): Promi
   }
   if (!bytes) return { ok: false, reason: "FILE_MISSING" };
 
-  await recordAudit({ action: "sales_application.cv_downloaded", entityType: "SalesApplication", entityId: id, platformAdminId: adminId, metadata: { sizeBytes: bytes.length } });
+  await recordAudit({ action: "sales_application.cv_downloaded", entityType: "SalesApplication", entityId: id, ...auditIdentity(actor), metadata: { sizeBytes: bytes.length } });
   return { ok: true, bytes, fileName: cvDownloadName(application.cvFileName, application.firstName, application.lastName) };
 }
