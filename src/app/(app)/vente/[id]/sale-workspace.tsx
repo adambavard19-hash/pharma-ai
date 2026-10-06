@@ -29,6 +29,7 @@ import { RegulationZone } from "./regulation-zone";
 import { AdviceLocked, AdviceZone } from "./advice-zone";
 import { AlternativesList } from "./alternatives-list";
 import { MedicationAdvice } from "./medication-advice";
+import { CompleteAdviceBanner } from "./complete-advice";
 import { groupAdviceByLine, nothingToShow, presentProductIds } from "./group-advice";
 import { PartnerCards } from "./partner-cards";
 import type { EngineOutcome } from "@/core/ai/outcome";
@@ -547,6 +548,9 @@ export function SaleWorkspace({
                   la liste, où chaque conseil se propose sous son médicament. */}
               {!blocked && <VigilanceCards findings={findings} />}
               {blocked && <AdviceLocked />}
+              {/* Ce que l'ordonnance reçoit, famille par famille, et les questions
+                  qui permettraient d'aller plus loin : au-dessus des conseils. */}
+              {!blocked && <CompleteAdviceBanner recommendations={recommendations} />}
               <TreatmentPanel
                 lines={lines}
                 canEdit={permissions.verify}

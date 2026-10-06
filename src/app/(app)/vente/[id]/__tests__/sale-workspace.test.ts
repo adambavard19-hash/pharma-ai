@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { OUTCOME_MESSAGES } from "@/core/ai/outcome";
 import type { AdviceView, SaleLineDraft } from "../types";
 import { advice, alternative, line, text } from "./fixtures";
+import { childOf, descendants, elementWithText, findByAttr, isInside, parseHtml, textOf, type HtmlNode } from "./html-tree";
 
 /**
  * L'écran de vente, rendu côté serveur : où se lit chaque conseil, ce qui reste
@@ -179,6 +180,192 @@ describe("les conseils se lisent sous leur médicament", () => {
     expect(html).not.toContain("Choisir celle-ci");
     expect(text(html)).toContain("Ajouté à la délivrance");
     expect(text(html)).toContain("1 vente additionnelle");
+  });
+});
+
+describe("le conseil complet : bandeau et familles", () => {
+  const medicament = advice({ id: "r_med", family: "MEDICAMENT", lineIds: ["l_amox"], product: { ...advice().product!, id: "p_med", presentationId: "pres_1", name: "Spasfon Lyoc" } });
+  const parapharmacie = advice({ id: "r_para", family: "PARAPHARMACIE", lineIds: ["l_doli"], product: { ...advice().product!, id: "p_para", name: "Crème apaisante" } });
+  const blocking = [{ id: "f_block", severity: "BLOCKING", code: "DRUG_UNREADABLE", message: "Un nom de médicament est illisible.", subjectType: "PRESCRIPTION_LINE", acknowledged: false, details: null }];
+
+  it("le bandeau se lit au-dessus des conseils, avec le mélange des familles", () => {
+    const html = render({ recommendations: [flore, medicament, parapharmacie] });
+    expect(text(html)).toContain("Conseil complet : 1 médicament conseil · 1 complément alimentaire · 1 produit de parapharmacie");
+    expect(at(html, 'aria-label="Conseil complet"')).toBeLessThan(at(html, "À proposer avec ce médicament"));
+    expect(at(html, 'aria-label="Conseil complet"')).toBeLessThan(at(html, "Flore Équilibre"));
+    expect(count(html, 'aria-label="Conseil complet"')).toBe(1);
+  });
+
+  it("il compte les conseils sous les médicaments ET ceux de la zone générale", () => {
+    const orphan = advice({ id: "r_orph", family: "COMPLEMENT", lineIds: [], product: { ...advice().product!, id: "p_orph", name: "Conseil orphelin" } });
+    expect(text(render({ recommendations: [flore, orphan] }))).toContain("Conseil complet : 2 compléments alimentaires");
+  });
+
+  it("aucun conseil : pas de bandeau", () => {
+    expect(render({ recommendations: [], outcome: "NO_RELEVANT_NEED" })).not.toContain("Conseil complet");
+  });
+
+  it("un seul conseil écarté faute de stock : pas de bandeau", () => {
+    const empty = advice({ id: "v", lineIds: [], product: { ...advice().product!, id: "p_v", name: "Probiotique en rupture", quantity: 0 } });
+    expect(render({ recommendations: [empty] })).not.toContain('aria-label="Conseil complet"');
+  });
+
+  it("alerte bloquante, saisie ou analyse en cours : pas de bandeau, rien ne se propose", () => {
+    expect(render({ recommendations: [flore], findings: blocking })).not.toContain("Conseil complet");
+    expect(render({ prescription: { ...baseProps().prescription, status: "NEEDS_VERIFICATION", verifiedAt: null }, recommendations: [flore] })).not.toContain("Conseil complet");
+  });
+
+  it("un conseil tranché ne compte plus", () => {
+    const html = render({ recommendations: [flore, { ...gorge, status: "DECLINED" }] });
+    expect(text(html)).toContain("Conseil complet : 1 complément alimentaire");
+    expect(text(html)).not.toContain("2 compléments alimentaires");
+  });
+
+  it("chaque carte porte la pastille de sa famille, et rien d'autre n'y change", () => {
+    const html = render({ recommendations: [medicament, parapharmacie] });
+    expect(count(html, 'data-family="MEDICAMENT"')).toBe(1);
+    expect(count(html, 'data-family="PARAPHARMACIE"')).toBe(1);
+    expect(count(html, "Médicament conseil</span>")).toBe(1);
+    expect(count(html, "Parapharmacie</span>")).toBe(1);
+    // La pastille est dans la carte du conseil, sous son médicament.
+    expect(at(html, "AMOXICILLINE ALMUS")).toBeLessThan(at(html, 'data-family="MEDICAMENT"'));
+    expect(at(html, 'data-family="MEDICAMENT"')).toBeLessThan(at(html, "DOLIPRANE 1000 mg"));
+    expect(text(html)).toContain("Proposer ce produit");
+  });
+
+  it("la question au patient est lue dans le bandeau ET posée sur la carte, qui garde les boutons", () => {
+    const asked = advice({
+      id: "r_q",
+      family: "COMPLEMENT",
+      lineIds: ["l_amox"],
+      opportunity: { ...advice().opportunity!, id: "opp_q", requiresConfirmation: true, question: "Le patient a-t-il le ventre sensible ?" },
+    });
+    const html = render({ recommendations: [asked, parapharmacie] });
+    const banner = html.slice(at(html, 'aria-label="Conseil complet"'), at(html, 'aria-labelledby="zone-traitement"'));
+    // Le complément est derrière la question : il n'est pas affirmé, il est annoncé sous réserve.
+    expect(text(banner)).toContain("Conseil complet : 1 produit de parapharmacie");
+    expect(text(banner)).toContain("+ 1 de plus selon les réponses du patient (1 complément alimentaire)");
+    expect(text(banner)).toContain("1 question pour aller plus loin");
+    expect(text(banner)).toContain("Le patient a-t-il le ventre sensible ?");
+    expect(banner).not.toContain("<button");
+    // La carte pose la question et porte la pastille de la famille du produit.
+    expect(count(text(html), "Une question au patient")).toBe(1);
+    expect(count(html, 'data-family="COMPLEMENT"')).toBe(1);
+    expect(html).toContain("Ne sait pas");
+  });
+});
+
+describe("le bandeau compte ce que l'écran propose, pas ce qui attend une réponse", () => {
+  const withQuestion = (id: string, family: AdviceView["family"], lineId: string, question: string) =>
+    advice({ id, family, lineIds: [lineId], product: { ...advice().product!, id: `p_${id}`, name: `Produit ${id}` }, opportunity: { ...advice().opportunity!, id: `opp_${id}`, requiresConfirmation: true, question } });
+  const open = (id: string, family: AdviceView["family"], lineId: string) => advice({ id, family, lineIds: [lineId], product: { ...advice().product!, id: `p_${id}`, name: `Produit ${id}` } });
+
+  it("autant de conseils « sous réserve » dans le bandeau que de cartes « Une question au patient » à l'écran", () => {
+    const recommendations = [open("a", "COMPLEMENT", "l_amox"), withQuestion("b", "PARAPHARMACIE", "l_amox", "Le nez est-il bouché ?"), withQuestion("c", "PARAPHARMACIE", "l_doli", "La gorge est-elle irritée ?"), open("d", "PARAPHARMACIE", "l_doli")];
+    const html = render({ recommendations });
+    const banner = text(html.slice(at(html, 'aria-label="Conseil complet"'), at(html, 'aria-labelledby="zone-traitement"')));
+    expect(banner).toContain("Conseil complet : 1 complément alimentaire · 1 produit de parapharmacie");
+    expect(banner).toContain("+ 2 de plus selon les réponses du patient (2 produits de parapharmacie)");
+    expect(count(text(html), "Une question au patient")).toBe(2);
+    // Les deux cartes « question » ne montrent pas leur produit comme proposé : ni « Proposer ce produit » pour elles.
+    expect(count(text(html), "Proposer ce produit")).toBe(2);
+  });
+
+  it("le patient répond oui : le conseil sort de « sous réserve » et le bandeau l'ajoute à ceux qui sont proposés", () => {
+    const answered = { ...withQuestion("b", "PARAPHARMACIE", "l_amox", "Le nez est-il bouché ?"), opportunity: { ...withQuestion("b", "PARAPHARMACIE", "l_amox", "Le nez est-il bouché ?").opportunity!, answer: true, answeredAt: "2026-10-06T09:00:00.000Z" } };
+    const html = render({ recommendations: [open("a", "COMPLEMENT", "l_amox"), answered] });
+    const banner = text(html.slice(at(html, 'aria-label="Conseil complet"'), at(html, 'aria-labelledby="zone-traitement"')));
+    expect(banner).toContain("Conseil complet : 1 complément alimentaire · 1 produit de parapharmacie");
+    expect(banner).not.toContain("de plus selon les réponses");
+    expect(count(text(html), "Une question au patient")).toBe(0);
+  });
+});
+
+describe("l'en-tête d'une carte : la pastille de famille ne prend pas la place du titre du besoin", () => {
+  const medicament = advice({ id: "r_med", family: "MEDICAMENT", lineIds: ["l_amox"], product: { ...advice().product!, id: "p_med", presentationId: "pres_1", name: "Spasfon Lyoc" }, opportunity: { ...advice().opportunity!, id: "opp_med", title: "Tolérance digestive de l'antibiotique" } });
+  const routineStep = (id: string, stepIndex: number) =>
+    advice({
+      id,
+      family: "PARAPHARMACIE",
+      lineIds: ["l_doli"],
+      routine: { key: "routine_peau", title: "Routine peau", stepKey: `s${stepIndex}`, stepLabel: ["Nettoyer", "Hydrater", "Protéger"][stepIndex], stepIndex, stepCount: 3, benefit: "Pour la peau." },
+      product: { ...advice().product!, id: `p_${id}`, name: `Soin ${id}` },
+    });
+
+  /**
+   * Ce que la structure doit garantir, sans nommer une classe de style : la
+   * pastille est RANGÉE DANS le bloc du titre, derrière le texte du titre — elle
+   * n'est pas une colonne de plus de l'en-tête qui prendrait sa part de la ligne.
+   */
+  const headerOf = (html: string, kind: string, title: string) => {
+    const root = parseHtml(html);
+    const pill = findByAttr(root, "data-family").find((candidate) => textOf(candidate.parent?.parent?.parent ?? root).includes(kind) && textOf(candidate.parent!.parent!).includes(title));
+    expect(pill, `pastille de l'en-tête « ${kind} » introuvable`).toBeDefined();
+    const slot = pill!.parent!; // l'emplacement de la pastille
+    const titleBlock = slot.parent!; // le bloc du titre, qui l'abrite
+    const band = titleBlock.parent!; // l'en-tête de la carte
+    // Le bloc du titre n'est PAS l'en-tête entier : l'icône de la carte est à côté de lui, pas dedans.
+    expect(descendants(titleBlock).some((node) => node.tag === "svg")).toBe(false);
+    expect(descendants(band).some((node) => node.tag === "svg")).toBe(true);
+    expect(band.children.indexOf(titleBlock)).toBeGreaterThan(0);
+    return { pill: pill!, slot, titleBlock, band, root };
+  };
+
+  it("carte de conseil : le texte du titre, puis la pastille, dans le même bloc ; « Suggestion n° » reste à part", () => {
+    const html = render({ recommendations: [medicament] });
+    const { pill, slot, titleBlock, band } = headerOf(html, "Conseil associé", "Tolérance digestive de l'antibiotique");
+    const text = elementWithText(titleBlock, "Conseil associé Tolérance digestive de l'antibiotique");
+    // Le texte (nature du conseil + titre du besoin) et la pastille sont deux enfants du même bloc, dans cet ordre.
+    expect(text.parent).toBe(titleBlock);
+    expect(titleBlock.children.indexOf(text)).toBeLessThan(titleBlock.children.indexOf(slot));
+    expect(textOf(slot)).toBe("Médicament conseil");
+    // La pastille n'est pas une colonne de l'en-tête : l'en-tête n'a que l'icône et le bloc du titre.
+    expect(findByAttr(band, "data-family")).toHaveLength(1);
+    expect(isInside(pill, titleBlock)).toBe(true);
+    expect(childOf(band, pill)).toBe(titleBlock);
+    // Le titre n'est pas dans l'emplacement de la pastille : elle ne le contient ni ne le suit sur sa ligne par construction.
+    expect(textOf(slot)).not.toContain("Tolérance");
+  });
+
+  it("« Suggestion n° » (zone générale) est un élément d'en-tête à part : ni dans le bloc du titre, ni avec la pastille", () => {
+    const orphan = advice({ id: "r_orph", family: "COMPLEMENT", lineIds: [], product: { ...advice().product!, id: "p_orph", name: "Conseil orphelin" }, opportunity: { ...advice().opportunity!, id: "opp_orph", title: "Besoin sans médicament" } });
+    const html = render({ recommendations: [orphan] });
+    const { titleBlock, band } = headerOf(html, "Conseil associé", "Besoin sans médicament");
+    expect(textOf(titleBlock)).not.toContain("Suggestion");
+    expect(textOf(band)).toContain("Suggestion n°1");
+    const suggestion = elementWithText(band, "Suggestion n°1");
+    expect(childOf(band, suggestion)).not.toBe(titleBlock);
+    expect(band.children.indexOf(childOf(band, suggestion)!)).toBeGreaterThan(band.children.indexOf(titleBlock));
+  });
+
+  it("carte de routine : même structure (le titre de la routine, puis la pastille de sa première étape)", () => {
+    const html = render({ recommendations: [routineStep("s0", 0), routineStep("s1", 1), routineStep("s2", 2)] });
+    const { slot, titleBlock, band } = headerOf(html, "Routine associée", "Routine peau");
+    const text = elementWithText(titleBlock, "Routine associée Routine peau");
+    expect(titleBlock.children.indexOf(text)).toBeLessThan(titleBlock.children.indexOf(slot));
+    expect(textOf(slot)).toBe("Parapharmacie");
+    expect(findByAttr(band, "data-family")).toHaveLength(1);
+  });
+
+  it("une seule pastille par carte : jamais une copie pour téléphone et une autre pour grand écran", () => {
+    const html = render({ recommendations: [medicament] });
+    expect(count(html, 'data-family="MEDICAMENT"')).toBe(1);
+    expect(count(html, "Médicament conseil</span>")).toBe(1);
+  });
+
+  it("carte « question au patient » : la pastille est dans l'en-tête, avant la question qu'elle ne réduit pas", () => {
+    const asked = advice({ id: "r_q", family: "COMPLEMENT", lineIds: ["l_amox"], opportunity: { ...advice().opportunity!, id: "opp_q", requiresConfirmation: true, question: "Le patient a-t-il le ventre sensible ?" } });
+    const html = render({ recommendations: [asked] });
+    const root = parseHtml(html);
+    const [pill] = findByAttr(root, "data-family");
+    const header = pill.parent!;
+    expect(textOf(header)).toBe("Une question au patient Complément alimentaire");
+    // La question elle-même est un bloc à part, APRÈS cet en-tête : la pastille ne la touche pas.
+    const card = header.parent!;
+    const question = card.children.find((child) => typeof child !== "string" && textOf(child) === "Le patient a-t-il le ventre sensible ?");
+    expect(question).toBeDefined();
+    expect(card.children.indexOf(header)).toBeLessThan(card.children.indexOf(question!));
+    expect(isInside(pill, question as HtmlNode)).toBe(false);
   });
 });
 

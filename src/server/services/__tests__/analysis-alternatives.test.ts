@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisResult, CatalogProduct, ScoredAlternative, ScoredRecommendation } from "@/core/ai/types";
 import { product } from "@/core/ai/__tests__/fixtures";
 
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => {
     treatmentExplanation: { upsert: vi.fn() },
     recommendation: { deleteMany: vi.fn(), findMany: vi.fn(), create: vi.fn() },
     recommendationEvent: { create: vi.fn() },
-    prescription: { update: vi.fn() },
+    prescription: { update: vi.fn(), updateMany: vi.fn() },
   };
   return {
     tx,
@@ -278,5 +278,100 @@ describe("l'audit", () => {
     const [entry] = mocks.recordAudit.mock.calls[0];
     expect(Object.keys(entry.metadata).sort()).toEqual(["analysisRunId", "blocking", "durationMs", "engineVersion", "recommendations"]);
     expect(JSON.stringify(entry)).not.toMatch(/p1|p2|p3|line_a|alternative/);
+  });
+});
+
+/**
+ * Le verdict de l'analyse (« analysée » ou « en échec ») ne s'écrit que si la
+ * vente est encore « en cours d'analyse ». Un bip de douchette arrivé PENDANT
+ * l'analyse a remis la vente « à confirmer » : l'analyse en cours n'a pas lu
+ * cette boîte, son verdict ne doit pas l'écraser, sans quoi le poste afficherait
+ * un avis périmé et plus rien ne relancerait l'analyse.
+ *
+ * La base simulée tient le statut de la vente et applique réellement le
+ * filtre `where.status` de l'écriture finale.
+ */
+describe("le statut final de l'analyse", () => {
+  const sale = { status: "VERIFIED" as string };
+
+  beforeEach(() => {
+    sale.status = "VERIFIED";
+    // Le statut « en cours » posé en début d'analyse (hors transaction).
+    mocks.prisma.prescription.update.mockImplementation(async ({ data }: { data: { status: string } }) => {
+      sale.status = data.status;
+    });
+    // L'écriture finale gardée : n'agit que si le statut actuel est celui demandé.
+    mocks.tx.prescription.updateMany.mockImplementation(async ({ where, data }: { where: { id: string; status?: string }; data: { status: string } }) => {
+      if (where.id !== "rx_1" || (where.status !== undefined && where.status !== sale.status)) return { count: 0 };
+      sale.status = data.status;
+      return { count: 1 };
+    });
+    // L'ancienne écriture, sans garde : si le code y revenait, ce test le verrait.
+    mocks.tx.prescription.update.mockImplementation(async ({ data }: { data: { status: string } }) => {
+      sale.status = data.status;
+    });
+  });
+
+  afterEach(() => {
+    mocks.prisma.prescription.update.mockReset();
+    mocks.tx.prescription.update.mockReset();
+    mocks.tx.prescription.updateMany.mockReset();
+    mocks.runAnalysisPipeline.mockReset();
+  });
+
+  /** L'analyse tourne ; `duringAnalysis` est ce qui arrive au comptoir pendant qu'elle calcule. */
+  const analyseWhile = (value: AnalysisResult, duringAnalysis?: () => void) => {
+    mocks.runAnalysisPipeline.mockImplementation(() => {
+      expect(sale.status).toBe("ANALYZING");
+      duringAnalysis?.();
+      return value;
+    });
+    return analysePrescription({ scope: SCOPE, prescriptionId: "rx_1" });
+  };
+
+  it("une analyse sans incident rend « analysée »", async () => {
+    await analyseWhile(result());
+    expect(sale.status).toBe("ANALYZED");
+  });
+
+  it("une analyse qui échoue rend « en échec »", async () => {
+    await analyseWhile(result({ status: "FAILED", outcome: "NO_COMPATIBLE_PRODUCT", blockedReasons: ["aucune ligne confirmée"] }));
+    expect(sale.status).toBe("FAILED");
+  });
+
+  it("une ligne ajoutée pendant l'analyse (bip) : le statut « à confirmer » n'est pas écrasé par « analysée »", async () => {
+    await analyseWhile(result(), () => {
+      sale.status = "NEEDS_VERIFICATION";
+    });
+    expect(sale.status).toBe("NEEDS_VERIFICATION");
+  });
+
+  it("même quand l'analyse échoue : le bip qui l'a devancée reste le dernier mot", async () => {
+    await analyseWhile(result({ status: "FAILED", outcome: "NO_COMPATIBLE_PRODUCT", blockedReasons: ["aucune ligne confirmée"] }), () => {
+      sale.status = "NEEDS_VERIFICATION";
+    });
+    expect(sale.status).toBe("NEEDS_VERIFICATION");
+  });
+
+  it("« Nouveau patient » pendant l'analyse : la vente close le reste, elle n'est pas ressuscitée", async () => {
+    await analyseWhile(result(), () => {
+      sale.status = "CANCELLED";
+    });
+    expect(sale.status).toBe("CANCELLED");
+  });
+
+  it("l'écriture finale vise l'ordonnance analysée, et seulement tant qu'elle est « en cours d'analyse »", async () => {
+    await analyseWhile(result());
+    expect(mocks.tx.prescription.updateMany).toHaveBeenCalledTimes(1);
+    expect(mocks.tx.prescription.updateMany).toHaveBeenCalledWith({ where: { id: "rx_1", status: "ANALYZING" }, data: { status: "ANALYZED" } });
+    expect(mocks.tx.prescription.update).not.toHaveBeenCalled();
+  });
+
+  it("le reste de l'analyse est écrit comme avant, même si le verdict n'a pas été retenu", async () => {
+    await analyseWhile(result({ recommendations: [recommendation("p1")] }), () => {
+      sale.status = "NEEDS_VERIFICATION";
+    });
+    expect(mocks.tx.recommendation.create).toHaveBeenCalledTimes(1);
+    expect(mocks.tx.analysisRun.create).toHaveBeenCalledTimes(1);
   });
 });

@@ -44,6 +44,8 @@ import { ScoreExplanation } from "./score-explanation";
 import { ShortDateBadge, VigilanceStrip } from "./vigilance-strip";
 import { ProductTrainingLink } from "../../formation/_components/product-training-link";
 import { countUndecided, splitAdvice } from "./group-advice";
+import { FamilyPill } from "./complete-advice";
+import type { AdviceFamily } from "@/core/ai/family";
 import type { AdviceView } from "./types";
 import { OUTCOME_MESSAGES, type EngineOutcome } from "@/core/ai/outcome";
 
@@ -209,8 +211,8 @@ export function UndecidedPill({ count }: { count: number }) {
  * Les cartes à décider d'abord (la question au patient s'affiche avant le
  * produit quand la règle l'exige), puis ce qu'on ne propose pas faute de
  * stock, puis ce qui est tranché : refusé ou retiré, il reste là où il était
- * proposé, barré, avec « Revenir ». Aucun plafond d'affichage : le moteur en
- * retient cinq au plus, tous se lisent.
+ * proposé, barré, avec « Revenir ». Aucun plafond d'affichage : tout ce que le
+ * moteur retient se lit.
  */
 export function AdviceStack({
   prescriptionId,
@@ -603,9 +605,12 @@ function QuestionCard({
   return (
     <CardFrame accent="question">
       <div>
-        <p className="text-[11.5px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">
-          Une question au patient
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11.5px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">
+            Une question au patient
+          </p>
+          <FamilyPill family={recommendation.family} />
+        </div>
         <p className="mt-2 text-[20px] leading-7 font-semibold tracking-[-0.015em] text-text-primary">
           {opportunity.question}
         </p>
@@ -753,7 +758,7 @@ function ProductCard({
           )}
         </div>
       )}
-      <CardBand index={index} kind="Conseil associé" title={recommendation.opportunity?.title ?? "Conseil"} />
+      <CardBand index={index} kind="Conseil associé" title={recommendation.opportunity?.title ?? "Conseil"} family={recommendation.family} />
 
       <VigilanceStrip vigilances={recommendation.vigilances ?? []} canVerify={canVerify} />
 
@@ -1012,8 +1017,17 @@ function DecisionButton({
   );
 }
 
-/** L'en-tête d'une carte : la nature du conseil, le besoin, son rang. */
-function CardBand({ index, kind, title, tone = "success" }: { index?: number; kind: string; title: string; tone?: "success" | "brand" }) {
+/**
+ * L'en-tête d'une carte : la nature du conseil, le besoin, son rang.
+ *
+ * La pastille de famille ne réduit JAMAIS le titre du besoin (seul endroit où
+ * il s'affiche) : elle fait partie du bloc du titre, derrière lui. Sur grand
+ * écran (à partir de `sm`) elle se lit à sa droite, sur la même ligne ; sur
+ * téléphone elle passe SOUS le titre, qui garde toute la largeur du bloc. Un
+ * seul élément, rangé dans le bloc du titre — pas une colonne de plus qui
+ * prendrait sa part de la ligne, ni deux copies dont l'une serait cachée.
+ */
+function CardBand({ index, kind, title, tone = "success", family }: { index?: number; kind: string; title: string; tone?: "success" | "brand"; family?: AdviceFamily }) {
   return (
     <div
       className={cn(
@@ -1024,9 +1038,16 @@ function CardBand({ index, kind, title, tone = "success" }: { index?: number; ki
       <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-white", tone === "success" ? "bg-success-600" : "bg-brand-600")}>
         {tone === "success" ? <Lightbulb className="size-[17px]" /> : <Sparkles className="size-[17px]" />}
       </span>
-      <div className="min-w-0 flex-1">
-        <p className={cn("text-[11.5px] font-semibold tracking-[0.1em] uppercase", tone === "success" ? "text-success-800 dark:text-success-300" : "text-brand-800 dark:text-brand-300")}>{kind}</p>
-        <p className="truncate text-[15px] font-semibold text-text-primary">{title}</p>
+      <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
+        <div className="min-w-0 sm:flex-1">
+          <p className={cn("text-[11.5px] font-semibold tracking-[0.1em] uppercase", tone === "success" ? "text-success-800 dark:text-success-300" : "text-brand-800 dark:text-brand-300")}>{kind}</p>
+          <p className="truncate text-[15px] font-semibold text-text-primary">{title}</p>
+        </div>
+        {family && (
+          <div className="mt-1 max-w-full sm:mt-0 sm:shrink-0">
+            <FamilyPill family={family} />
+          </div>
+        )}
       </div>
       {index !== undefined && (
         <span className="shrink-0 rounded-full border border-border-default bg-surface-card px-2.5 py-0.5 text-[12px] text-text-secondary">Suggestion n°{index}</span>
@@ -1203,7 +1224,7 @@ function RoutineCard({
 
   return (
     <CardFrame accent={remaining.length === 0 ? "success" : "brand"}>
-      <CardBand index={index} kind="Routine associée" title={routine.title} tone="brand" />
+      <CardBand index={index} kind="Routine associée" title={routine.title} tone="brand" family={first.family} />
 
       <VigilanceStrip vigilances={patientVigilances} canVerify={canVerify} />
 

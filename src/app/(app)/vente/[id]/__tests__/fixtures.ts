@@ -7,6 +7,7 @@ export const advice = (overrides: Partial<AdviceView> = {}): AdviceView => ({
   alternatives: [],
   status: "PROPOSED",
   origin: "AI",
+  family: "COMPLEMENT",
   totalScore: 80,
   justification: "Justification longue du moteur.",
   shortReason: "La flore intestinale peut être perturbée pendant la cure.",

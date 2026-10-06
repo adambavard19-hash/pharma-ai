@@ -598,8 +598,12 @@ export async function analysePrescription(params: {
       });
     }
 
-    await tx.prescription.update({
-      where: { id: prescription.id },
+    // Écriture finale gardée : seule une analyse encore « en cours » rend son
+    // verdict. Un bip arrivé pendant l'analyse a remis la vente à « à confirmer »
+    // (une boîte de plus que cette analyse n'a pas lue) : ce statut-là survit, et
+    // le poste relance une analyse complète au lieu d'afficher un avis périmé.
+    await tx.prescription.updateMany({
+      where: { id: prescription.id, status: "ANALYZING" },
       data: { status: result.status === "FAILED" ? "FAILED" : "ANALYZED" },
     });
 

@@ -1,5 +1,6 @@
 import type { SuggestionVigilance } from "@/config/vigilances";
 import type { ScoreContribution, RoutineStepInfo, VigilanceDetails } from "@/core/ai/types";
+import type { AdviceFamily } from "@/core/ai/family";
 import type { PosologySchedule } from "@/core/posology";
 import type { RegulationAlert } from "@/core/regulation/rules";
 
@@ -139,6 +140,12 @@ export type AdviceView = {
   alternatives: AdviceAlternativeView[];
   status: string;
   origin: string;
+  /**
+   * Médicament conseil, complément alimentaire ou parapharmacie : déduite du
+   * produit côté serveur (`adviceFamilyOf`), jamais saisie. Elle se lit d'un
+   * coup d'œil sur la carte et ne change aucun score.
+   */
+  family: AdviceFamily;
   totalScore: number;
   justification: string;
   /**

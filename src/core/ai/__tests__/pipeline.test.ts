@@ -177,18 +177,22 @@ describe("pipeline — garde-fous", () => {
   });
 
   /**
-   * Le plafond par défaut est une décision produit, pas un réglage : au
-   * comptoir, au-delà de trois propositions le pharmacien ne choisit plus, il
-   * survole. Le test empêche qu'on le desserre sans s'en apercevoir.
+   * Le plafond par défaut est une décision produit, pas un réglage : huit
+   * conseils au plus, une routine comptant pour un. Le test empêche qu'on le
+   * desserre ou qu'on le resserre sans s'en apercevoir ; la sélection équilibrée
+   * des familles sous ce plafond a ses propres tests (portfolio-famille.test.ts).
    */
-  it("ne propose jamais plus de trois conseils par défaut", () => {
+  it("ne propose jamais plus de huit conseils par défaut", () => {
     const catalog = Array.from({ length: 12 }, (_, index) =>
       product({ id: `p${index}`, reference: `REF-${index}` }),
     );
     const result = runAnalysisPipeline(buildInput({ catalog }));
 
-    expect(MAX_RECOMMENDATIONS_PER_PRESCRIPTION).toBe(5);
-    expect(result.recommendations.length).toBeLessThanOrEqual(3);
+    expect(MAX_RECOMMENDATIONS_PER_PRESCRIPTION).toBe(8);
+    // Le nombre écrit en dur, jamais la constante : comparer la constante à elle-même ne vérifierait rien.
+    // Ce catalogue n'appelle qu'un conseil ; la limite tenue sur une ordonnance qui en appelle plus de huit
+    // est éprouvée par portfolio-famille.test.ts (« une ordonnance chargée en donne huit »).
+    expect(result.recommendations.length).toBeLessThanOrEqual(8);
   });
 });
 

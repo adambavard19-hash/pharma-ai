@@ -88,11 +88,11 @@ describe("le bloc sous un médicament", () => {
     expect(render([advice()])).toContain('aria-label="À proposer avec AMOXICILLINE ALMUS"');
   });
 
-  it("aucun plafond d'affichage : les cinq conseils retenus se lisent tous, sous leur médicament", () => {
-    const five = ["a", "b", "c", "d", "e"].map((id) => advice({ id, product: { ...advice().product!, id: `p_${id}`, name: `Produit ${id}` } }));
-    const shown = text(render(five));
-    for (const id of ["a", "b", "c", "d", "e"]) expect(shown).toContain(`Produit ${id}`);
-    expect(shown).toContain("5 à décider");
+  it("aucun plafond d'affichage : les huit conseils retenus se lisent tous, sous leur médicament", () => {
+    const eight = ["a", "b", "c", "d", "e", "f", "g", "h"].map((id) => advice({ id, product: { ...advice().product!, id: `p_${id}`, name: `Produit ${id}` } }));
+    const shown = text(render(eight));
+    for (const id of ["a", "b", "c", "d", "e", "f", "g", "h"]) expect(shown).toContain(`Produit ${id}`);
+    expect(shown).toContain("8 à décider");
     expect(shown).not.toMatch(/Voir \d+ autres? proposition/);
   });
 
@@ -102,6 +102,38 @@ describe("le bloc sous un médicament", () => {
 
   it("l'état « tout est décidé » quand chaque carte est acceptée", () => {
     expect(text(render([advice({ id: "a" })], { inBasket: () => true }))).toContain("Tout est décidé");
+  });
+});
+
+describe("la famille du conseil", () => {
+  it("la carte porte la pastille de sa famille, au nom du catalogue", () => {
+    const html = render([advice({ id: "a", family: "COMPLEMENT" }), advice({ id: "b", family: "MEDICAMENT" }), advice({ id: "c", family: "PARAPHARMACIE" })]);
+    expect(html.match(/data-family="COMPLEMENT"/g)).toHaveLength(1);
+    expect(html.match(/data-family="MEDICAMENT"/g)).toHaveLength(1);
+    expect(html.match(/data-family="PARAPHARMACIE"/g)).toHaveLength(1);
+    const shown = text(html);
+    for (const label of ["Complément alimentaire", "Médicament conseil", "Parapharmacie"]) expect(shown).toContain(label);
+  });
+
+  it("la pastille ne change rien d'autre à la carte : même produit, même prix, mêmes boutons", () => {
+    const shown = text(render([advice({ family: "PARAPHARMACIE" })]));
+    for (const part of ["Flore Équilibre 10 milliards", "14,90", "En stock : 12", "À dire au patient", "Proposer ce produit", "Ignorer"]) expect(shown).toContain(part);
+  });
+
+  it("la carte qui pose une question la porte aussi : on sait de quelle famille est le produit derrière", () => {
+    const html = render([advice({ family: "COMPLEMENT", opportunity: { ...advice().opportunity!, requiresConfirmation: true, question: "Le patient a-t-il le ventre sensible ?" } })]);
+    expect(text(html)).toContain("Une question au patient");
+    expect(html.match(/data-family="COMPLEMENT"/g)).toHaveLength(1);
+  });
+
+  it("une routine porte la famille de sa première étape, une seule fois", () => {
+    const step = (id: string, stepIndex: number) =>
+      advice({ id, family: "PARAPHARMACIE", routine: { key: "routine_peau", title: "Routine peau", stepKey: `s${stepIndex}`, stepLabel: "Étape", stepIndex, stepCount: 3, benefit: "Pour la peau." } });
+    expect(render([step("s0", 0), step("s1", 1), step("s2", 2)]).match(/data-family="PARAPHARMACIE"/g)).toHaveLength(1);
+  });
+
+  it("un conseil tranché, barré, n'a pas de pastille : il n'est plus proposé", () => {
+    expect(render([advice({ status: "DECLINED", family: "COMPLEMENT" })])).not.toContain("data-family");
   });
 });
 

@@ -1,3 +1,4 @@
+import { countByFamily, describeFamilyMix, type AdviceFamily, type FamilyCounts } from "@/core/ai/family";
 import type { AdviceView } from "./types";
 
 /**
@@ -128,4 +129,86 @@ export function presentProductIds(recommendations: AdviceView[]): Set<string> {
       .map((recommendation) => recommendation.product?.id)
       .filter((id): id is string => Boolean(id)),
   );
+}
+
+/**
+ * Vrai quand le conseil attend la réponse du patient : son besoin ne se
+ * confirme que par lui (`requiresConfirmation`), sa question n'est pas vide, et
+ * elle n'a ni réponse ni « ne sait pas » (`answer` et `answeredAt` vides). C'est
+ * alors une « Une question au patient » à l'écran, et le produit ne se propose
+ * qu'après un « oui ».
+ *
+ * UN seul prédicat, pour le bandeau (ce qui est proposé, ce qui l'est sous
+ * réserve) et pour la liste des questions : les deux ne peuvent pas se contredire.
+ */
+function awaitsAnswer(recommendation: AdviceView): boolean {
+  const opportunity = recommendation.opportunity;
+  const question = opportunity?.question?.trim();
+  if (!opportunity || !question || !opportunity.requiresConfirmation) return false;
+  return opportunity.answer === null && opportunity.answeredAt === null;
+}
+
+/** Les conseils d'un même lot, famille par famille. */
+export type FamilyMix = { counts: FamilyCounts; total: number; summary: string };
+
+const mixOf = (families: AdviceFamily[]): FamilyMix => {
+  const counts = countByFamily(families);
+  return { counts, total: families.length, summary: describeFamilyMix(counts) };
+};
+
+/**
+ * Le « conseil complet » : ce que l'ordonnance reçoit, famille par famille.
+ *
+ * Il se déduit des cartes ouvertes — ni tranchées, ni écartées faute de stock —
+ * et jamais d'autre chose : une famille sans carte n'est pas écrite (pas de
+ * reproche, pas de produit inventé). Une routine est UNE carte, de la famille
+ * de sa première étape, comme dans le moteur où elle compte pour un conseil.
+ *
+ * Deux décomptes, pour ne rien affirmer que l'écran ne tienne :
+ * - `open` : les conseils qu'on peut proposer tout de suite, sans réponse du patient ;
+ * - `conditional` : les conseils sous réserve d'une réponse du patient (leur
+ *   carte est une question, le produit n'est proposé qu'après un « oui »).
+ * Une routine ne pose pas de question : elle est toujours `open`.
+ */
+export function familyMixOf(recommendations: AdviceView[]): { open: FamilyMix; conditional: FamilyMix } {
+  const { cards } = splitAdvice(recommendations);
+  const open: AdviceFamily[] = [];
+  const conditional: AdviceFamily[] = [];
+  for (const card of cards) {
+    if (card.kind === "routine") open.push(card.steps[0].family);
+    else (awaitsAnswer(card.recommendation) ? conditional : open).push(card.recommendation.family);
+  }
+  return { open: mixOf(open), conditional: mixOf(conditional) };
+}
+
+/** Une question à poser au patient, avec le conseil qu'elle ouvre. */
+export type PendingQuestion = { opportunityId: string; recommendationId: string; question: string };
+
+/**
+ * Les questions qui attendent encore une réponse : celles des cartes ouvertes
+ * dont le conseil attend la réponse du patient (même prédicat que le bandeau,
+ * `awaitsAnswer`).
+ *
+ * Le geste de réponse reste celui de la carte : cette liste ne fait que dire
+ * combien il y en a. Une question par besoin : si deux conseils partagent le
+ * même besoin, la réponse vaut pour les deux. Une routine ne pose pas de
+ * question sur sa carte, donc ses étapes n'en ajoutent aucune ici.
+ */
+export function pendingQuestionsOf(recommendations: AdviceView[]): PendingQuestion[] {
+  const { cards } = splitAdvice(recommendations);
+  const seen = new Set<string>();
+  const pending: PendingQuestion[] = [];
+  for (const card of cards) {
+    if (card.kind !== "single" || !awaitsAnswer(card.recommendation)) continue;
+    const opportunity = card.recommendation.opportunity!;
+    if (seen.has(opportunity.id)) continue;
+    seen.add(opportunity.id);
+    pending.push({ opportunityId: opportunity.id, recommendationId: card.recommendation.id, question: opportunity.question!.trim() });
+  }
+  return pending;
+}
+
+/** « 1 question pour aller plus loin », « 3 questions pour aller plus loin ». */
+export function describePendingQuestions(count: number): string {
+  return `${count} question${count > 1 ? "s" : ""} pour aller plus loin`;
 }

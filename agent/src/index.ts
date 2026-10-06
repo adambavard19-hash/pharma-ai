@@ -27,11 +27,12 @@
 import { createHash } from "node:crypto";
 import { startDouchette } from "./douchette";
 import { showToast } from "./toast";
+import { createScanQueue } from "./scan-queue";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.4.1";
+const VERSION = "0.4.2";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -121,9 +122,6 @@ async function pairPost(): Promise<void> {
   log(`Poste ${body.postLabel ?? hostname()} relié à ${body.pharmacyName ?? "l'officine"}. Configuration écrite dans ${CONFIG_PATH}.`);
 }
 
-/** Les bips qui n'ont pas pu partir (coupure Internet) attendent ici, et repartent dans l'ordre. */
-const pendingScans: { code: string; scannedAt: string }[] = [];
-
 async function sendScan(config: Config, code: string, scannedAt: string): Promise<void> {
   const response = await api(config, "/api/agent/scans", {
     method: "POST",
@@ -139,14 +137,6 @@ async function sendScan(config: Config, code: string, scannedAt: string): Promis
   if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
   log(`Bip ${code} → ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s)).`);
   if (body.prescriptionId) watchPrescription(body.prescriptionId);
-}
-
-async function flushScans(config: Config): Promise<void> {
-  while (pendingScans.length > 0) {
-    const next = pendingScans[0]!;
-    await sendScan(config, next.code, next.scannedAt);
-    pendingScans.shift();
-  }
 }
 
 /** Combien de temps l'avis reste en coin d'écran. */
@@ -201,10 +191,17 @@ async function postHeartbeat(config: Config): Promise<{ exportPath: string | nul
 /** Le poste de caisse : écouter la douchette, envoyer chaque bip, donner signe de vie, et relire l'export de stock si on le lui a confié. */
 async function runPost(config: Config): Promise<void> {
   log(`PharmaBoost Connect ${VERSION} — poste de caisse ${hostname()} — journal : ${LOG_PATH}`);
+  // Les bips en file, vidangés un par un et dans l'ordre. Ceux qui n'ont pas pu
+  // partir (coupure Internet) attendent en tête et repartent au tour suivant.
+  // La vidange est monofil (voir scan-queue.ts) : un bip lu pendant un envoi en
+  // vol, ou un tour de la boucle qui tombe pendant l'envoi, ne renvoie jamais la
+  // même boîte deux fois — le serveur compterait « 2 × » et baisserait le stock
+  // deux fois. `config` est relue à chaque envoi : le poste la met à jour.
+  const scans = createScanQueue((scan) => sendScan(config, scan.code, scan.scannedAt));
   startDouchette(dirname(CONFIG_PATH), {
     onScan: (code, at) => {
-      pendingScans.push({ code, scannedAt: new Date(at).toISOString() });
-      flushScans(config).catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
+      scans.push({ code, scannedAt: new Date(at).toISOString() });
+      scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
     },
     onStatus: (message) => log(message),
   });
@@ -214,7 +211,7 @@ async function runPost(config: Config): Promise<void> {
   let forceSync = false;
   for (;;) {
     try {
-      if (pendingScans.length > 0) await flushScans(config);
+      if (scans.size > 0) await scans.flush();
       await pollNotice(config);
       if (Date.now() - lastHeartbeat > 60_000) {
         const settings = await postHeartbeat(config);

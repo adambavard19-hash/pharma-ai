@@ -35,6 +35,7 @@ import { parseSuggestionVigilances } from "@/config/vigilances";
 import { requiresPharmacistValidation } from "@/core/ai/engines/population-vigilance";
 import { parseStoredAlternatives } from "@/core/ai/alternatives";
 import { MAX_ALTERNATIVES_PER_ADVICE } from "@/config/constants";
+import { adviceFamilyOf } from "@/core/ai/family";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
 import { brandKey, brandLabelOf } from "@/core/catalog/brand";
 import { selectCounterCards } from "@/core/partners/counter-card";
@@ -417,6 +418,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
             .slice(0, MAX_ALTERNATIVES_PER_ADVICE),
           status: recommendation.status,
           origin: recommendation.origin,
+          // Une présentation du catalogue national est un médicament conseil ; sinon la catégorie du produit décide, et sans produit : parapharmacie.
+          family: adviceFamilyOf({ presentationId: recommendation.presentation?.id ?? null, category: recommendation.product?.category ?? "AUTRE" }),
           totalScore: recommendation.totalScore,
           justification: recommendation.justification,
           shortReason: recommendation.shortReason,

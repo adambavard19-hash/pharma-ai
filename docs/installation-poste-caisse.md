@@ -95,6 +95,26 @@ n'est conservée ni envoyée.
 Chaque bip retire une boîte du stock PharmaBoost. L'export de stock du LGPI
 (serveur, agent « serveur ») remet le compte exact quand il arrive.
 
+## Un patient, une vente
+
+Les bips d'un même poste forment UNE vente — donc une seule ordonnance, sur
+laquelle PharmaBoost construit le conseil — tant que deux bips se suivent à
+moins d'une minute. Au-delà d'une minute sans bip, le suivant ouvre la vente
+d'un nouveau patient.
+
+L'écart se mesure entre deux BIPS du poste, à l'heure où la douchette les a lus
+(l'agent date chaque bip) : le décompte repart à chaque bip. Un patient qui
+passe dix boîtes, une toutes les quarante secondes, reste une seule vente. Ni
+l'analyse ni l'écran ne prolongent la minute : un bip 70 secondes après le
+dernier ouvre toujours une nouvelle vente, même si l'analyse de la précédente
+vient de se terminer. Après une coupure Internet, les bips en attente repartent
+dans l'ordre avec leur heure de lecture : deux bips lus à cinq minutes
+d'écart restent deux ventes, même reçus ensemble. Un horodatage dans le futur
+ou vieux de plus de six heures est ignoré (l'heure de réception est retenue).
+
+Entre deux patients très rapprochés, le bouton « Nouveau patient » de
+PharmaBoost remet l'écran à zéro sans attendre.
+
 ## L'avis en coin d'écran (agent 0.4.x)
 
 Dès que l'analyse d'une vente bipée est prête, le poste affiche un petit

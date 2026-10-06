@@ -23,6 +23,8 @@ import {
 } from "../interactions";
 import type { TreatmentUnderstanding } from "../understanding";
 import { deriveOutcome } from "./outcome";
+import { adviceFamilyOf, countByFamily, describeFamilyMix, FAMILY_LABELS } from "./family";
+import { reserveFamilies, type PortfolioProfile } from "./portfolio";
 import { matchesAny } from "./engines/product-name";
 import { evaluateVigilances, tagsIntersect } from "./engines/vigilance";
 import { chooseAmongEquivalents, clinicalSignature, TIEBREAK_LABELS } from "./engines/tiebreak";
@@ -330,6 +332,10 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     officialName: input.official?.get((line.drugName as string).toLowerCase())?.name ?? null,
     officialSubstance:
       input.official?.get((line.drugName as string).toLowerCase())?.substances[0] ?? null,
+    // La durée prescrite, quand la ligne la porte : une règle qui ne vaut que
+    // pour un traitement long (corticoïde au long cours) s'en sert pour ne pas
+    // poser sa question à une cure de cinq jours. Inconnue, elle reste `null`.
+    durationDays: line.durationDays ?? null,
   }));
 
   const rawOpportunities = recorder.run(
@@ -600,10 +606,11 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
   // ---------------------------------------------------------------- ÉTAPE 7
   // OPTIMISATION COMMERCIALE AUTORISÉE — dernière étape, périmètre restreint.
   // Elle ne peut QUE : (a) retenir une référence parmi des candidates déjà
-  // jugées cliniquement équivalentes, (b) limiter le nombre de propositions,
-  // (c) montrer, à côté de chaque conseil retenu, les autres candidates déjà
-  // admises pour le même besoin. Elle ne peut jamais réintroduire une
-  // référence écartée en amont.
+  // jugées cliniquement équivalentes, (b) limiter le nombre de propositions
+  // (une même référence une seule fois, puis un plafond de conseils qui garde
+  // une place à chaque famille de produit), (c) montrer, à côté de chaque
+  // conseil retenu, les autres candidates déjà admises pour le même besoin.
+  // Elle ne peut jamais réintroduire une référence écartée en amont.
   const recommendations = recorder.run(
     "COMMERCIAL_OPTIMIZATION",
     "Optimisation commerciale autorisée",
@@ -758,28 +765,62 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         return b.totalScore - a.totalScore;
       });
 
-      // La limite compte les conseils, et une routine en est un.
-      const limited: ScoredRecommendation[] = [];
-      const seenRoutines = new Set<string>();
-      let slots = 0;
+      const isSafetyAdvice = (item: ScoredRecommendation) => opportunityByKey.get(item.opportunityKey)?.kind === "SAFETY";
+
+      // Une même référence ne se propose qu'UNE fois par ordonnance : deux cartes
+      // pour le même produit prendraient deux places, compteraient double dans le
+      // conseil complet et feraient deux lignes de panier (acheter « MAG 2 » deux
+      // fois). La première carte dans l'ordre de la priorité clinique la garde, un
+      // conseil de sécurité passant avant tout autre ; l'autre besoin n'est pas
+      // reporté sur une référence moins adaptée. Les étapes d'une routine ne sont
+      // pas touchées : une référence de routine n'est déjà plus proposée seule.
+      const owners = new Map<string, ScoredRecommendation>();
       for (const item of selected) {
-        if (item.routine) {
-          if (!seenRoutines.has(item.routine.key)) {
-            if (slots >= maxRecommendations) continue;
-            seenRoutines.add(item.routine.key);
-            slots += 1;
-          }
-          limited.push(item);
-        } else {
-          if (slots >= maxRecommendations) continue;
-          slots += 1;
-          limited.push(item);
-        }
+        if (item.routine) continue;
+        const owner = owners.get(item.productId);
+        if (!owner || (isSafetyAdvice(item) && !isSafetyAdvice(owner))) owners.set(item.productId, item);
       }
-      if (selected.length > limited.length) {
+      const distinct = selected.filter((item) => {
+        if (item.routine || owners.get(item.productId) === item) return true;
+        notes.push(`« ${item.opportunityKey} » : référence déjà proposée pour un autre conseil, non répétée.`);
+        return false;
+      });
+
+      // La limite compte les conseils, et une routine en est un. Avant de
+      // tronquer, chaque famille de produit présente dans la liste mérite une
+      // place pour son meilleur conseil (src/core/ai/portfolio.ts) : un conseil
+      // de sécurité n'est jamais déplacé, ni le seul de sa famille, et sous le
+      // plafond rien ne change. La famille se lit sur le produit, elle ne
+      // modifie aucun score.
+      const profileOf = (item: ScoredRecommendation): PortfolioProfile => {
+        const product = catalogById.get(item.productId);
+        return {
+          family: product ? adviceFamilyOf(product) : "PARAPHARMACIE",
+          safety: isSafetyAdvice(item),
+          routineKey: item.routine?.key ?? null,
+        };
+      };
+      const { limited, reservations } = reserveFamilies(distinct, maxRecommendations, profileOf);
+      if (distinct.length > limited.length) {
         notes.push(
-          `${selected.length - limited.length} proposition(s) non affichée(s) : limite de ${maxRecommendations} conseils par ordonnance.`,
+          `${distinct.length - limited.length} proposition(s) non affichée(s) : limite de ${maxRecommendations} conseils par ordonnance.`,
         );
+      }
+      // Le mélange se compte par conseil, comme le plafond et le bandeau de
+      // l'écran : une routine, quel que soit son nombre d'étapes, est UN conseil,
+      // de la famille de sa première étape.
+      const countedRoutines = new Set<string>();
+      const adviceFamilies = limited.flatMap((item) => {
+        if (item.routine) {
+          if (countedRoutines.has(item.routine.key)) return [];
+          countedRoutines.add(item.routine.key);
+        }
+        return [profileOf(item).family];
+      });
+      const mix = describeFamilyMix(countByFamily(adviceFamilies));
+      if (mix) notes.push(`Conseil complet : ${mix}.`);
+      for (const reservation of reservations) {
+        notes.push(`Un conseil de la famille « ${FAMILY_LABELS[reservation.family]} » a été gardé malgré la limite.`);
       }
 
       // Le produit associé : quand la règle en prévoit un et que la référence

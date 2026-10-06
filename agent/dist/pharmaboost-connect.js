@@ -277,11 +277,37 @@ function showToast(configDir, content, onStatus) {
   });
 }
 
+// agent/src/scan-queue.ts
+function createScanQueue(send) {
+  const pending = [];
+  let flushing = null;
+  async function drain() {
+    while (pending.length > 0) {
+      await send(pending[0]);
+      pending.shift();
+    }
+  }
+  return {
+    push(scan) {
+      pending.push(scan);
+    },
+    flush() {
+      flushing ??= drain().finally(() => {
+        flushing = null;
+      });
+      return flushing;
+    },
+    get size() {
+      return pending.length;
+    }
+  };
+}
+
 // agent/src/index.ts
 var import_node_fs3 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path3 = require("node:path");
-var VERSION = "0.4.1";
+var VERSION = "0.4.2";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path3.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path3.join)((0, import_node_path3.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -336,7 +362,6 @@ async function pairPost() {
   writeConfig({ serverUrl, agentKey: body.agentKey, role: "poste", lgo: arg("lgo") ?? "lgpi", exportPath: null, scansPath: null, intervalSeconds: 300 });
   log(`Poste ${body.postLabel ?? (0, import_node_os.hostname)()} reli\xE9 \xE0 ${body.pharmacyName ?? "l'officine"}. Configuration \xE9crite dans ${CONFIG_PATH}.`);
 }
-var pendingScans = [];
 async function sendScan(config, code, scannedAt) {
   const response = await api(config, "/api/agent/scans", {
     method: "POST",
@@ -352,13 +377,6 @@ async function sendScan(config, code, scannedAt) {
   if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
   log(`Bip ${code} \u2192 ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s)).`);
   if (body.prescriptionId) watchPrescription(body.prescriptionId);
-}
-async function flushScans(config) {
-  while (pendingScans.length > 0) {
-    const next = pendingScans[0];
-    await sendScan(config, next.code, next.scannedAt);
-    pendingScans.shift();
-  }
 }
 var TOAST_SECONDS = 15;
 var WATCH_MS = 12e4;
@@ -402,10 +420,11 @@ async function postHeartbeat(config) {
 }
 async function runPost(config) {
   log(`PharmaBoost Connect ${VERSION} \u2014 poste de caisse ${(0, import_node_os.hostname)()} \u2014 journal : ${LOG_PATH}`);
+  const scans = createScanQueue((scan) => sendScan(config, scan.code, scan.scannedAt));
   startDouchette((0, import_node_path3.dirname)(CONFIG_PATH), {
     onScan: (code, at) => {
-      pendingScans.push({ code, scannedAt: new Date(at).toISOString() });
-      flushScans(config).catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
+      scans.push({ code, scannedAt: new Date(at).toISOString() });
+      scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
     },
     onStatus: (message) => log(message)
   });
@@ -415,7 +434,7 @@ async function runPost(config) {
   let forceSync = false;
   for (; ; ) {
     try {
-      if (pendingScans.length > 0) await flushScans(config);
+      if (scans.size > 0) await scans.flush();
       await pollNotice(config);
       if (Date.now() - lastHeartbeat > 6e4) {
         const settings = await postHeartbeat(config);

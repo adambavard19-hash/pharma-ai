@@ -62,9 +62,14 @@ const PRINCIPAUX_AVANT: Record<string, string[]> = {
     "nasal-hygiene-orl | nasal-flacon | 0.8772 | - | nasal-seringue",
     "eye-irritation-allergy | eyes-a | 0.8975 | - | -",
   ],
+  // Seule valeur qui diffère du moteur d'avant, volontairement (lot « conseil complet ») : ce rayon
+  // n'a aucun collyre, et le sérum physiologique, retenu pour l'hygiène nasale, était AUSSI proposé
+  // pour les yeux irrités (« eye-irritation-allergy | nasal-flacon | 0.7892 »). Une même référence ne
+  // se propose plus qu'une fois par ordonnance : deux cartes, c'était deux places, un décompte double
+  // et deux lignes de panier pour le même flacon. Le besoin des yeux, moins prioritaire, n'est pas
+  // reporté sur une référence moins adaptée : il n'a pas de carte.
   "nasal-flacon-avec-seringue-associee": [
     "nasal-hygiene-orl | nasal-flacon | 0.8772 | - | nasal-seringue",
-    "eye-irritation-allergy | nasal-flacon | 0.7892 | - | -",
   ],
   "ibuprofene-protection-gastrique": [
     "gastric-protection-nsaid | gastric-a | 0.8895 | - | -",
@@ -103,12 +108,16 @@ const PRINCIPAUX_AVANT: Record<string, string[]> = {
     "isotretinoin-skin-routine:hydrate | l2 | 0.9273 | - | -",
     "lip-care-isotretinoin | lip | 0.9273 | - | -",
   ],
+  // Le plafond est passé de cinq à huit conseils (lot « conseil complet ») : les cinq premiers
+  // sont exactement ceux d'avant, les deux suivants ne faisaient que passer sous la coupe.
   "ordonnance-chargee-limite-par-defaut": [
     "digestive-tolerance-antibiotics | probio-a | 0.8895 | COMMERCIAL | -",
     "hydration-dermato-topical | emol-a | 0.8895 | - | -",
     "gastric-protection-nsaid | gastric-a | 0.8895 | - | -",
     "nasal-hygiene-orl | nasal-hyper | 0.8905 | - | -",
     "eye-irritation-allergy | eyes-a | 0.8975 | - | -",
+    "sore-throat-orl | gorge-a | 0.8255 | - | -",
+    "fever-thermometer | thermo-b | 0.8895 | DISPONIBILITE | -",
   ],
   "ordonnance-chargee-limite-deux": [
     "digestive-tolerance-antibiotics | probio-a | 0.8895 | COMMERCIAL | -",
@@ -201,6 +210,16 @@ describe("les alternatives : jamais le conseil lui-même, jamais un autre consei
     const retainedElsewhere = scenario("serum-flacon-principal-d-un-besoin-candidat-d-un-autre");
     expect(conseil(retainedElsewhere, "nasal-hygiene-orl")?.productId).toBe("nasal-flacon");
     expect(alternativeIds(conseil(retainedElsewhere, "eye-irritation-allergy"))).not.toContain("nasal-flacon");
+  });
+
+  it("un même flacon n'est conseillé qu'une fois : le besoin des yeux, sans collyre en rayon, n'a pas de carte", () => {
+    const result = scenario("nasal-flacon-avec-seringue-associee");
+    expect(result.recommendations.map((r) => r.productId)).toEqual(["nasal-flacon"]);
+    expect(conseil(result, "eye-irritation-allergy")).toBeUndefined();
+    const notes = result.trace.find((s) => s.stage === "COMMERCIAL_OPTIMIZATION")?.notes ?? [];
+    expect(notes).toContain("« eye-irritation-allergy » : référence déjà proposée pour un autre conseil, non répétée.");
+    // Le besoin n'est pas pour autant déclaré « sans référence » : le rayon avait bien une réponse.
+    expect(result.opportunities.find((o) => o.key === "eye-irritation-allergy")?.coverage).toBe("COVERED");
   });
 
   it("jamais une référence retenue dans une routine, à une autre étape ou ailleurs", () => {

@@ -297,3 +297,40 @@ describe("les alternatives d'un conseil", () => {
     expect(first.product).toMatchObject({ id: "p1", name: "Produit p1", quantity: 8, salePriceCents: 1490 });
   });
 });
+
+describe("la famille d'un conseil, calculée côté serveur", () => {
+  const presentation = { id: "pres_1", priceCents: 520, imageUrl: null, imageSource: null, specialty: { name: "SPASFON LYOC" }, pharmacyStocks: [{ quantity: 4, alertThreshold: 1, priceCents: 520 }] };
+
+  it("un produit de l'officine : sa catégorie décide (complément alimentaire, ou parapharmacie)", async () => {
+    const [probiotique, magnesium, creme, dispositif] = await render([
+      recommendation("rec_1", { product: catalogProduct("p1", { category: "PROBIOTIQUES" }) }),
+      recommendation("rec_2", { product: catalogProduct("p2", { category: "MAGNESIUM" }) }),
+      recommendation("rec_3", { product: catalogProduct("p3", { category: "DERMOCOSMETIQUE" }) }),
+      recommendation("rec_4", { product: catalogProduct("p4", { category: "DISPOSITIFS_MEDICAUX" }) }),
+    ]);
+    expect(probiotique.family).toBe("COMPLEMENT");
+    expect(magnesium.family).toBe("COMPLEMENT");
+    expect(creme.family).toBe("PARAPHARMACIE");
+    expect(dispositif.family).toBe("PARAPHARMACIE");
+  });
+
+  it("une présentation du catalogue national est un médicament conseil", async () => {
+    const [advice] = await render([recommendation("rec_1", { productId: null, product: null, presentation })]);
+    expect(advice.family).toBe("MEDICAMENT");
+  });
+
+  it("sans produit : parapharmacie par défaut, sans erreur", async () => {
+    const [advice] = await render([recommendation("rec_1", { productId: null, product: null, presentation: null })]);
+    expect(advice.family).toBe("PARAPHARMACIE");
+  });
+
+  it("ne change ni l'ordre des conseils ni leur score", async () => {
+    const [first, second] = await render([
+      recommendation("rec_low", { totalScore: 0.7, product: catalogProduct("p1", { category: "PROBIOTIQUES" }), opportunity: { ...opportunity([]), priority: 40 } }),
+      recommendation("rec_high", { totalScore: 0.8, product: catalogProduct("p2", { category: "HYGIENE" }), opportunity: { ...opportunity(["line_a"]), priority: 90 } }),
+    ]);
+    expect([first.id, second.id]).toEqual(["rec_high", "rec_low"]);
+    expect([first.totalScore, second.totalScore]).toEqual([0.8, 0.7]);
+    expect([first.family, second.family]).toEqual(["PARAPHARMACIE", "COMPLEMENT"]);
+  });
+});

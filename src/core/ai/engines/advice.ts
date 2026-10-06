@@ -197,6 +197,16 @@ export type AdviceRule = {
   /** Renvoie une raison de blocage, ou `null` si la règle reste applicable. */
   blockedFor?: (patient: PatientContext) => string | null;
   /**
+   * Une durée de traitement CONNUE et inférieure à `minDays` écarte la règle pour les médicaments
+   * dont le code ATC commence par l'un de ces préfixes, et pour eux seuls. Une cure courte de
+   * corticoïde (5 jours) n'expose pas l'os : le conseil suppose plus de 3 mois.
+   *
+   * Durée inconnue : la règle reste telle quelle, avec sa question. Le préfixe est le garde-fou de
+   * la portée : la durée d'une boîte de biphosphonate (M05B) ou de vitamine D n'est pas celle du
+   * traitement, elle ne doit jamais écarter la règle pour ces préfixes.
+   */
+  durationGate?: { atcPrefixes: string[]; minDays: number };
+  /**
    * Les vigilances par population (grossesse, allaitement, asthme, épilepsie,
    * enfant) que la règle porte, écrites à partir de ses propres sources. Elles
    * s'affichent sur la carte ; elles ne remplacent pas `blockedFor`, qui reste
@@ -224,6 +234,37 @@ export type AdviceRule = {
  */
 export function isFragileForRehydration(patient: PatientContext): boolean {
   return patient.ageYears !== null && (patient.ageYears < 6 || patient.ageYears >= 75);
+}
+
+/**
+ * Une chambre d'inhalation, par son nom de fichier de stock : « chambre d'inhalation »,
+ * « CHAMB INHAL », « CH/INHAL », ou une marque connue (Aerochamber, Babyhaler, Optichamber,
+ * Volumatic). Sert d'ancre aux motifs d'âge : « masque » ou « bébé » ne désignent une chambre
+ * que s'ils accompagnent ce mot.
+ */
+const CHAMBER_NAME = String.raw`(?:\b(?:chamb(?:res?)?|ch)[ /.]*(?:d['’ ]\s?)?inhal|aero ?chamb|opti ?chamb|babyhaler|volumatic|nebuhaler|\bspacer\b)`;
+
+/**
+ * Les chambres que l'âge du patient fait préférer : masque et petit volume avant 6 ans, embout ensuite.
+ * Un motif préféré lève une exclusion (matching.ts) : de 2 à 5 ans, il refuse donc d'abord la chambre
+ * réservée à l'adulte, que `chamberExcludeFor` écarte — sans quoi « AEROCHAMBER masque adulte » serait
+ * sauvé par « masque ». La chambre « nourrisson » n'y est pas préférée à la chambre « enfant » : elle
+ * reste possible, faute de mieux, mais derrière.
+ */
+function chamberPreferFor(ageYears: number | null): string[] {
+  if (ageYears === null || ageYears >= 6) return [];
+  if (ageYears < 2) return [String.raw`babyhaler`, `${CHAMBER_NAME}.*(?:nourr?iss|bebe|baby)`];
+  const notBabyOnly = String.raw`^(?!.*(?:adulte|\+ ?(?:6|12) ?ans|nourr?iss|bebe|baby)).*`;
+  return [`${notBabyOnly}${CHAMBER_NAME}.*(?:masque|enfant|pediatr)`];
+}
+
+/** Les chambres que l'âge écarte : adulte avant 6 ans, nourrisson ensuite, et « enfant » à partir de 12 ans. */
+function chamberExcludeFor(ageYears: number | null): string[] {
+  if (ageYears === null) return [];
+  // Une chambre « enfant/adulte » sert les deux : seule la chambre réservée à l'autre âge est écartée.
+  if (ageYears < 6) return [String.raw`^(?!.*(?:enfant|nourr?iss|bebe|baby|pediatr)).*(?:adulte|\+ ?(?:6|12) ?ans)`];
+  if (ageYears < 12) return [String.raw`bebe`, String.raw`nourr?iss`, String.raw`babyhaler`];
+  return [String.raw`bebe`, String.raw`nourr?iss`, String.raw`babyhaler`, String.raw`^(?!.*adulte).*(?:enfant|pediatr)`];
 }
 
 export const ADVICE_RULES: AdviceRule[] = [
@@ -421,6 +462,10 @@ export const ADVICE_RULES: AdviceRule[] = [
     basePriority: 55,
     matchingTags: ["vitamine d", "os", "calcium"],
     excludeTags: [],
+    // Une cure de corticoïde de moins de 3 mois (le cas ORL le plus courant) n'est pas un contexte
+    // osseux. Seul le préfixe H02 est concerné : la durée d'une boîte de biphosphonate (M05B) ou
+    // d'hormone parathyroïdienne (H05) n'est pas celle du traitement.
+    durationGate: { atcPrefixes: ["H02"], minDays: 90 },
     shortReasonTemplate:
       "Contexte osseux ({drug}) : le statut en vitamine D mérite d'être évoqué.",
     rationaleTemplate:
@@ -470,7 +515,10 @@ export const ADVICE_RULES: AdviceRule[] = [
     version: "1.0",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_ONLY",
-    needTriggers: ["CONSTIPATION"],
+    // Pas de `needTriggers: ["CONSTIPATION"]` : ce besoin est aussi dérivé des opioïdes (N02A) et
+    // des antispasmodiques (A03), et la règle leur disait « le fer ralentit le transit » : une
+    // fausse raison, et le même laxatif proposé deux fois avec « opioid-transit ». Le fer (B03A)
+    // suffit à la déclencher ; la constipation d'un opioïde reste servie par « opioid-transit ».
     category: "NUTRITION",
     atcPrefixes: ["B03A"],
     therapeuticClasses: ["Supplémentation en fer"],
@@ -604,6 +652,9 @@ export const ADVICE_RULES: AdviceRule[] = [
       "À proposer uniquement si le patient confirme la gêne. Douleur intense ou difficulté à avaler : orienter vers le médecin.",
     safetyNotes: ["Pastilles à éviter avant 6 ans (risque de fausse route)."],
     populations: [{ population: "CHILD", level: "CAUTION", maxAgeYears: 6, text: "Pastilles à éviter avant 6 ans (risque de fausse route).", sources: ["Règle de conseil PharmaBoost (gorge)"] }],
+    // La règle dit « pastilles à éviter avant 6 ans » : elle ne les propose donc plus à cet âge.
+    // Spray, miel ou sirop restent possibles ; un âge inconnu n'écarte rien.
+    productExcludeFor: (patient) => (patient.ageYears !== null && patient.ageYears < 6 ? [String.raw`pastille`, String.raw`gomme`, String.raw`a sucer`] : []),
   },
   {
     key: "cough-throat-comfort",
@@ -774,10 +825,18 @@ export const ADVICE_RULES: AdviceRule[] = [
         {
           key: "cleanse",
           label: "Nettoyer",
-          matchingTags: ["nettoyant", "visage"],
-          // « doux » ne sauve jamais un gommage : un motif préféré lève une exclusion
-          // (matching.ts), et « gommage doux » doit rester exclu sous isotrétinoïne.
-          productPrefer: [String.raw`sans savon`, String.raw`surgras`, String.raw`syndet`, String.raw`^(?!.*(gommage|exfoli|peeling|scrub)).*\bdoux`, String.raw`apais`, String.raw`purifiant`],
+          // Le seul mot « nettoyant » : avec « visage », un « fluide visage SPF » (écran solaire) avait
+          // une étiquette en commun et remplissait l'étape, puis servait aussi « Protéger ». Les
+          // nettoyants du dictionnaire portent déjà « nettoyant » ; l'étape sans nettoyant reste vide.
+          matchingTags: ["nettoyant"],
+          // Un produit solaire ne nettoie pas, même si son nom parle de nettoyage ou de visage.
+          productExclude: [String.raw`solaire`, String.raw`\bspf`, String.raw`uvmune`, String.raw`anthelios`, String.raw`photoprotect`, String.raw`ecran`],
+          // Un motif préféré lève une exclusion (matching.ts) : « apaisant » ne doit sauver ni un écran
+          // solaire, ni « gommage doux » (exclu sous isotrétinoïne). Chaque préférence refuse donc d'abord
+          // ce que la règle et l'étape excluent.
+          productPrefer: [
+            String.raw`^(?!.*(?:solaire|\bspf|uvmune|anthelios|photoprotect|ecran|gommage|exfoli|peeling|scrub|acide (?:glycolique|salicylique|lactique)|\baha\b|\bbha\b|retinol)).*(?:sans savon|surgras|syndet|apais|purifiant|\bdoux)`,
+          ],
           benefit: "Nettoie en douceur, sans dessécher",
         },
         {
@@ -1164,7 +1223,15 @@ export const ADVICE_RULES: AdviceRule[] = [
       "Allégations de santé autorisées (règlement UE 432/2012) : vitamines C, D, B6, B12, zinc, sélénium et fer contribuent au fonctionnement normal du système immunitaire. Aucune preuve d'une convalescence plus rapide.",
     safetyNotes: ["Pas de cumul avec une autre supplémentation vitaminique ; grossesse : avis médical."],
     populations: [{ population: "PREGNANCY", level: "PHARMACIST_VALIDATION", text: "Grossesse : pas de complément multivitaminé sans avis médical.", sources: ["Règle de conseil PharmaBoost (convalescence)"] }],
-    blockedFor: (patient) => (patient.isPregnant ? "Grossesse déclarée : pas de complément multivitaminé sans avis médical." : null),
+    // Les références pédiatriques sont écartées par `productExclude` (enfant, kids, gom…) : un enfant
+    // se retrouvait alors avec le multivitaminé ADULTE du rayon. Avant 12 ans, la formule relève du
+    // pharmacien, pas d'un rapprochement par catégorie.
+    blockedFor: (patient) =>
+      patient.ageYears !== null && patient.ageYears < 12
+        ? "Enfant : formule pédiatrique, avis du pharmacien."
+        : patient.isPregnant
+          ? "Grossesse déclarée : pas de complément multivitaminé sans avis médical."
+          : null,
   },
   {
     key: "dry-eye-screen-lubricant",
@@ -1241,8 +1308,16 @@ export const ADVICE_RULES: AdviceRule[] = [
     basePriority: 44,
     matchingTags: ["chaud froid", "douleur musculaire"],
     excludeTags: [],
-    productPrefer: [String.raw`chaud ?froid`, String.raw`thera ?pearl`, String.raw`thermcool`, String.raw`poche`],
-    productExclude: [String.raw`\bkids\b`, String.raw`enfant`, String.raw`bouillotte`],
+    // Un motif préféré LÈVE une exclusion (matching.ts) : « thera ?pearl » sauvait donc
+    // « THERAPEARL MASQ OCUL » et « chaud ?froid » le « MASQUE OCULAIRE chaud froid ».
+    // Chaque préférence refuse d'abord ce que la règle exclut, pour que l'exclusion tienne.
+    productPrefer: [
+      String.raw`^(?!.*(?:masq|ocul|\bkids?\b|enfant|bouillotte)).*chaud ?froid`,
+      String.raw`^(?!.*(?:masq|ocul|\bkids?\b|enfant|bouillotte)).*thera ?pearl`,
+      String.raw`^(?!.*(?:masq|ocul|\bkids?\b|enfant|bouillotte)).*thermcool`,
+      String.raw`^(?!.*(?:masq|ocul|\bkids?\b|enfant|bouillotte)).*poche`,
+    ],
+    productExclude: [String.raw`\bkids?\b`, String.raw`enfant`, String.raw`bouillotte`, String.raw`masq(?:ue)? ?ocul`, String.raw`oculaire`],
     benefits: ["Froid les 48 premières heures d'une entorse", "Chaud sur une contracture", "Sans médicament, en plus du traitement"],
     shortReasonTemplate:
       "Antalgique ou anti-inflammatoire ({drug}) : sur une douleur musculaire ou articulaire, le froid ou le chaud local soulage en plus.",
@@ -1353,6 +1428,240 @@ export const ADVICE_RULES: AdviceRule[] = [
       "Rappeler aussi la technique d'inhalation et l'usage de la chambre d'inhalation si elle est prescrite.",
     safetyNotes: [],
   },
+  // ---------------------------------------------------------------------------
+  // Conseil complet par ordonnance : cinq règles minces, chacune fondée sur un
+  // document officiel cité dans docs/sources-conseil.md (§ 6). Ce ne sont pas
+  // des argumentaires : le texte reste au conditionnel, et celles qui dépendent
+  // d'une situation que l'ordonnance ne dit pas posent leur question avant de
+  // proposer quoi que ce soit. Aucune n'est un conseil de sécurité.
+  // ---------------------------------------------------------------------------
+  {
+    key: "inhaler-spacer-chamber",
+    title: "Chambre d'inhalation avec un aérosol-doseur",
+    kind: "TOLERANCE",
+    version: "1.0.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "DISPOSITIFS_MEDICAUX",
+    // R03AC : bêta-2 mimétiques inhalés ; R03BA : corticoïdes inhalés. L'ATC ne
+    // distingue pas l'aérosol-doseur de la poudre à inhaler : la question le fait.
+    atcPrefixes: ["R03AC", "R03BA"],
+    therapeuticClasses: ["Bêta-2 mimétique inhalé", "Corticoïde inhalé", "Corticostéroïde inhalé"],
+    sideEffectTriggers: [],
+    question: "Le traitement s'inhale-t-il avec un aérosol-doseur (flacon que l'on déclenche en appuyant), et non avec une poudre ?",
+    confirmedReasonTemplate: "Aérosol-doseur confirmé ({drug}) : une chambre d'inhalation peut aider quand le déclenchement et l'inspiration se coordonnent mal, et chez le jeune enfant.",
+    basePriority: 62,
+    matchingTags: ["chambre d'inhalation"],
+    excludeTags: [],
+    // La chambre se choisit selon l'âge : avec masque pour un jeune enfant, avec
+    // embout ensuite. Un adolescent ou un adulte ne reçoit pas une chambre de nourrisson.
+    // Chaque motif d'âge est ANCRÉ sur la chambre : « masque » ou « bébé » tout seuls
+    // reconnaissaient un masque FFP2, une pochette ou un kit de nébuliseur adulte, et la
+    // préférence suffisait à les faire passer pour une chambre (scoring.ts : un bonus de
+    // préférence ne s'ajoute plus sans étiquette commune, mais le motif doit rester exact).
+    productPreferFor: (patient) => chamberPreferFor(patient.ageYears),
+    productExcludeFor: (patient) => chamberExcludeFor(patient.ageYears),
+    benefits: ["Aide si le geste est difficile à coordonner", "Avec masque pour un jeune enfant", "Inspirer après chaque déclenchement"],
+    shortReasonTemplate: "Aérosol-doseur possible ({drug}) : une chambre d'inhalation aide à coordonner le geste.",
+    rationaleTemplate:
+      "Si {drug} se prend avec un aérosol-doseur, le geste demande de coordonner le déclenchement et l'inspiration. Le résumé des caractéristiques du produit indique une chambre d'inhalation en cas de mauvaise synchronisation main-poumon, et les nourrissons et jeunes enfants peuvent en bénéficier avec un masque facial. Une poudre à inhaler n'est pas concernée.",
+    counterScriptTemplate:
+      "« Avec {drug}, déclencher le spray et inspirer en même temps n'est pas toujours simple. {product} peut vous aider : le spray s'y déclenche, puis vous inspirez calmement, tout de suite après. Pour un jeune enfant, avec un masque. »",
+    patientReasonTemplate:
+      "Avec votre traitement en spray ({drug}), la chambre d'inhalation peut faciliter la prise : {product} reçoit le spray, puis vous inspirez calmement.",
+    clinicalContext:
+      "RCP des aérosols-doseurs (Ventoline, Flixotide) : chambre d'inhalation indiquée en cas de mauvaise synchronisation main/poumon ; nourrissons et jeunes enfants : chambre munie d'un masque facial (Ventoline). Poudre à inhaler : cette règle ne s'applique pas.",
+    safetyNotes: ["Inhaler immédiatement après chaque déclenchement du spray.", "Poudre à inhaler : pas de chambre d'inhalation."],
+  },
+  {
+    key: "head-lice-comb",
+    title: "Peigne à poux avec un traitement antipoux",
+    kind: "COMFORT",
+    version: "1.0.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "DISPOSITIFS_MEDICAUX",
+    // P03A regroupe aussi les traitements de la gale : la question les écarte.
+    atcPrefixes: ["P03A"],
+    therapeuticClasses: ["Antiparasitaire externe", "Pédiculicide", "Antipoux"],
+    sideEffectTriggers: [],
+    question: "Le traitement est-il destiné à des poux de tête (et non à de la gale) ?",
+    confirmedReasonTemplate: "Poux de tête confirmés sous {drug} : le peigne à poux complète le produit antipoux.",
+    basePriority: 60,
+    matchingTags: ["peigne anti-poux"],
+    excludeTags: [],
+    // Ni lotion ou coffret (le traitement est déjà prescrit), ni peigne électrique :
+    // la source ne cite que le peigne à poux, fin et rigide.
+    // Les fichiers de stock abrègent : « Sol », « Spr », « Hle », « LOT », « SH ». Un coffret
+    // « lotion + peigne » (PARANIX Sol antipoux Hle ess Spr/100ml+peigne, POUXIT XF LOT 100ML+PEIGNE)
+    // est un second antipoux, pas un peigne : un peigne n'a ni volume ni « + peigne » dans son nom.
+    productExclude: [
+      String.raw`lotion`, String.raw`shampo`, String.raw`spray`, String.raw`mousse`, String.raw`solution`, String.raw`creme`, String.raw`emulsion`, String.raw`huile`,
+      String.raw`\bgel\b`, String.raw`coffret`, String.raw`\bkit\b`, String.raw`electri`, String.raw`electron`, String.raw`ultrason`,
+      String.raw`\b(?:lot|sol|spr|hle|sh|shp|shamp|mse|cr)\b`,
+      String.raw`\d+ ?(?:ml|g)\b`,
+      String.raw`\+ ?peigne|peigne ?\+`,
+    ],
+    benefits: ["Sur cheveux mouillés et démêlés", "Après le produit antipoux", "Contrôle des cheveux ensuite"],
+    shortReasonTemplate: "Antiparasitaire externe ({drug}) : en cas de poux, on peigne les cheveux après le produit.",
+    rationaleTemplate:
+      "{drug} est un antiparasitaire externe. En cas de poux de tête, l'Assurance Maladie indique d'appliquer le produit, de laver les cheveux au shampoing doux après le temps de pose, puis de les peigner avec un peigne à poux, fin et rigide. Pour la gale, ce conseil ne s'applique pas.",
+    counterScriptTemplate:
+      "« Après {drug}, lavez les cheveux au shampoing doux, puis peignez-les mouillés et démêlés avec {product}, soigneusement : cela peut aider à retirer poux et lentes. »",
+    patientReasonTemplate:
+      "Après votre traitement ({drug}), {product} sert à peigner soigneusement les cheveux mouillés et démêlés, pour retirer les poux et les lentes.",
+    clinicalContext:
+      "Assurance Maladie, « Poux : comment s'en débarrasser ? » : produit sur cheveux secs, lavage au shampoing doux après le temps de pose, peigne à poux sur cheveux mouillés et démêlés, seconde application 7 à 10 jours plus tard. Traiter seulement si des poux vivants ont été vus. La gale ne relève pas de ce conseil.",
+    safetyNotes: ["Traiter seulement si des poux vivants ont été vus : le traitement préventif est inutile.", "Seconde application du produit 7 à 10 jours plus tard."],
+  },
+  {
+    key: "self-injection-sharps-container",
+    title: "Collecteur d'aiguilles pour les injections à domicile",
+    // Une obligation de collecte des déchets perforants, pas un risque du traitement : jamais SAFETY.
+    kind: "TOLERANCE",
+    version: "1.0.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "DISPOSITIFS_MEDICAUX",
+    // Insulines (A10A), analogues du GLP-1 (A10BJ), héparines de bas poids moléculaire
+    // (B01AB). Un GLP-1 existe aussi en comprimé, et une héparine peut être injectée
+    // par un infirmier : seule la réponse du patient décide.
+    atcPrefixes: ["A10A", "A10BJ", "B01AB"],
+    therapeuticClasses: ["Analogue de l'insuline", "Insuline humaine", "Analogue du GLP-1", "Agoniste du récepteur du GLP-1", "Héparine de bas poids moléculaire"],
+    sideEffectTriggers: [],
+    question: "Le patient s'injecte-t-il lui-même le traitement (stylo ou seringue) ?",
+    confirmedReasonTemplate: "Injections à domicile confirmées ({drug}) : les aiguilles usagées sont des déchets perforants, à mettre dans un collecteur dédié.",
+    basePriority: 60,
+    matchingTags: ["collecteur d'aiguilles"],
+    excludeTags: [],
+    // Un collecteur se reconnaît à ce qu'il collecte : « collecteur » tout seul ne suffit pas.
+    // Le mot de l'étiquette (« collecteur d'aiguilles ») s'apparie mot à mot au nom du produit, et
+    // une préférence sur « collecteur » faisait passer un sac à urine (MEDISET COLLECTEUR URINE)
+    // à 0,65 de pertinence : il était proposé pour des aiguilles usagées.
+    productPrefer: [
+      String.raw`dast?ri`,
+      String.raw`collecteurs?\s+(?:d['’]\s?|d\s+|de\s+)?(?:aiguille|piquant|coupant|perforant)`,
+      String.raw`boites? a aiguilles?(?!.*(?:stylo|insuline))`,
+    ],
+    productExclude: [
+      String.raw`aiguilles? .*stylo`,
+      String.raw`\bstylos?\b`,
+      // Les autres collecteurs du rayon : urine, stomie, selles, poches, bocaux.
+      String.raw`urin`,
+      String.raw`stomi`,
+      String.raw`\bselles?\b`,
+      String.raw`poche`,
+      String.raw`bocal`,
+      // Tout « collecteur » qui ne dit pas ce qu'il collecte est écarté : seul un nom qui cite les
+      // aiguilles, les piquants ou le DASRI sauve le produit (productPrefer).
+      String.raw`^(?!.*(?:aiguille|dast?ri|piquant|coupant|perforant)).*collecteur`,
+    ],
+    benefits: ["Aiguilles usagées : jamais à la poubelle", "À rapporter plein à la pharmacie", "Collecte gratuite en officine"],
+    shortReasonTemplate: "{drug} : quand il s'injecte à domicile, les aiguilles usagées vont dans un collecteur dédié.",
+    rationaleTemplate:
+      "Quand {drug} est injecté par le patient lui-même, les aiguilles et les stylos usagés sont des déchets perforants. Le code de la santé publique (articles R. 1335-8-1 et suivants) organise leur collecte : un collecteur dédié, rapporté plein à la pharmacie, qui le reprend gratuitement.",
+    counterScriptTemplate:
+      "« Vos aiguilles usagées ne vont jamais à la poubelle. {product} peut les recevoir ; une fois plein, vous le rapportez à la pharmacie. »",
+    patientReasonTemplate:
+      "Vos aiguilles et stylos usagés ({drug}) sont des déchets piquants. {product} peut les recevoir ; une fois plein, rapportez-le à la pharmacie.",
+    clinicalContext:
+      "Patients en autotraitement : filière des déchets d'activités de soins à risques infectieux perforants (CSP R. 1335-8-1 à R. 1335-8-7) ; collecteurs mis à disposition sans frais en officine par l'éco-organisme DASTRI, collecte gratuite en pharmacie. Ne concerne que le patient qui s'injecte lui-même.",
+    safetyNotes: ["Aiguilles et stylos usagés : jamais à la poubelle ni au tri sélectif.", "Collecteur plein : à rapporter à la pharmacie."],
+  },
+  {
+    key: "corticosteroid-oral-calcium",
+    title: "Calcium sous corticothérapie orale prolongée",
+    kind: "TOLERANCE",
+    version: "1.0.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "MINERAUX",
+    // H02AB : glucocorticoïdes. La durée n'est pas sur l'ordonnance de façon fiable :
+    // la recommandation vise plus de 3 mois, d'où la question.
+    atcPrefixes: ["H02AB"],
+    therapeuticClasses: ["Corticoïde par voie orale", "Corticoïde systémique", "Corticothérapie au long cours"],
+    sideEffectTriggers: [],
+    question: "Le corticoïde oral est-il prévu pour plus de 3 mois, avec une alimentation pauvre en calcium (peu de produits laitiers) ?",
+    confirmedReasonTemplate: "Corticothérapie orale de plus de 3 mois ({drug}) et apports en calcium faibles : un apport en calcium peut être discuté.",
+    basePriority: 54,
+    // La recommandation vise plus de 3 mois : une durée connue plus courte écarte la règle (Solupred
+    // 5 jours : aucune question). Durée inconnue : la question reste, c'est elle qui tranche.
+    durationGate: { atcPrefixes: ["H02"], minDays: 90 },
+    matchingTags: ["calcium"],
+    excludeTags: [],
+    // Le produit visé par la recommandation est un calcium, le plus souvent associé à la vitamine
+    // D3 (Calcium 500 + Vitamine D3, CACIT D3, CALCIUM VITAMINE D3 ARROW, OROCAL D3). Le dictionnaire
+    // le range en vitamines (0,15 + 0,4 = 0,55, sous le seuil) : la préférence sur « calcium … D3 »
+    // le porte à 0,65, car il porte bien l'étiquette « calcium ». Une vitamine D seule (UVEDOSE) n'a
+    // pas ce nom : elle reste à la règle « Statut vitaminique D », jamais reprise ici.
+    productPrefer: [
+      String.raw`(?:calcium|cacit|orocal|calcidose|calperos|calciforte).*(?:vitamine d|vit\.? ?d\b|\bd ?3\b)`,
+      String.raw`(?:vitamine d|vit\.? ?d\b|\bd ?3\b).*calcium`,
+    ],
+    // Les sels et injectables que le mot « calcium » seul ramenait : le citrate de bétaïne est un
+    // digestif (7 jours au plus), le fluorure un produit dentaire, le chlorure et le gluconate des
+    // solutés ou des perfusions, le folinate de calcium un antidote de chimiothérapie.
+    productExclude: [String.raw`betaine`, String.raw`fluorure`, String.raw`chlorure`, String.raw`gluconate`, String.raw`folinate`, String.raw`injectable`, String.raw`perfusion`, String.raw`solute`],
+    benefits: ["Pour la solidité des os", "Avec la vitamine D", "Selon l'alimentation"],
+    shortReasonTemplate: "Corticoïde oral ({drug}) : au-delà de 3 mois, l'os se fragilise et l'apport en calcium compte.",
+    rationaleTemplate:
+      "Une corticothérapie orale ({drug}) de plus de 3 mois expose à l'ostéoporose cortico-induite. Les recommandations de la Société française de rhumatologie et du GRIO (2014) préconisent des apports en calcium suffisants, par l'alimentation, et une supplémentation calcique si ces apports sont insuffisants. Un apport en calcium peut donc être discuté, avec la vitamine D.",
+    counterScriptTemplate:
+      "« Votre corticoïde ({drug}), pris longtemps, peut fragiliser les os. Si votre alimentation apporte peu de calcium, {product} peut compléter vos apports ; parlez-en à votre médecin, avec la vitamine D. »",
+    patientReasonTemplate:
+      "Pris longtemps, votre corticoïde ({drug}) peut fragiliser les os. {product} peut compléter vos apports en calcium si votre alimentation en apporte peu.",
+    clinicalContext:
+      "SFR / GRIO, actualisation 2014 des recommandations sur la prévention et le traitement de l'ostéoporose cortico-induite (méthode HAS) : corticothérapie orale prévue pour plus de 3 mois ou reçue depuis au moins 3 mois, apports calciques suffisants par l'alimentation, supplémentation calcique si apports insuffisants, vitamine D si taux bas. Cure de moins de 3 mois : pas de conseil. RCP des sels de calcium : contre-indiqués en cas d'hypercalcémie, d'hypercalciurie avec lithiase calcique ou de calcifications tissulaires.",
+    safetyNotes: [
+      "Ne pas cumuler avec un autre apport de calcium déjà en cours.",
+      "Contre-indiqué en cas d'hypercalcémie, de lithiase calcique ou de calcifications tissulaires.",
+      "En cas d'insuffisance rénale, l'apport en calcium relève d'un avis médical.",
+    ],
+    // Les recommandations sont écrites pour l'adulte.
+    blockedFor: (patient) =>
+      patient.ageYears !== null && patient.ageYears < 18
+        ? "Enfant ou adolescent : l'apport en calcium sous corticoïde relève d'un avis médical."
+        : patient.renalImpairment
+          ? "Insuffisance rénale déclarée : l'apport en calcium relève d'un avis médical (calcémie et calciurie à surveiller)."
+          : patient.chronicConditions.some((c) => /lithiase|calculs? r[ée]na|hypercalc|n[ée]phrocalcinose/i.test(c))
+            ? "Lithiase calcique ou hypercalcémie déclarée : le calcium est contre-indiqué."
+            : null,
+  },
+  {
+    key: "hypoglycemia-fast-sugar",
+    title: "Sucre rapide en cas d'hypoglycémie",
+    kind: "TOLERANCE",
+    version: "1.0.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "NUTRITION",
+    // Les traitements que la source cite : insuline (A10A), sulfamides
+    // hypoglycémiants (A10BB), glinides (répaglinide A10BX02, natéglinide A10BX03),
+    // et les associations qui CONTIENNENT un sulfamide : metformine + sulfamide
+    // (A10BD02, GLUCOVANCE), glimépiride + rosiglitazone (A10BD04), glimépiride +
+    // pioglitazone (A10BD06). Les autres antidiabétiques, dont la metformine
+    // seule (A10BA) et ses associations sans sulfamide, ne déclenchent pas ce conseil.
+    atcPrefixes: ["A10A", "A10BB", "A10BD02", "A10BD04", "A10BD06", "A10BX02", "A10BX03"],
+    therapeuticClasses: ["Analogue de l'insuline", "Insuline humaine", "Sulfamide hypoglycémiant", "Glinide"],
+    sideEffectTriggers: [],
+    question: "Le patient souhaite-t-il garder une source de sucre rapide sur lui (hypoglycémie) ?",
+    confirmedReasonTemplate: "Traitement exposant à l'hypoglycémie ({drug}) : une source de sucre rapide à garder sur soi est conseillée par l'Assurance Maladie.",
+    basePriority: 58,
+    matchingTags: ["resucrage"],
+    excludeTags: [],
+    productExclude: [String.raw`glucagon`, String.raw`glucagen`, String.raw`injectable`, String.raw`perfusion`, String.raw`sirop`, String.raw`solute`, String.raw`sans sucre`, String.raw`light`],
+    benefits: ["15 g de sucre pour se resucrer", "À garder toujours sur soi", "Ne remplace pas l'avis du médecin"],
+    shortReasonTemplate: "{drug} peut provoquer une hypoglycémie : garder sur soi 15 g de sucre rapide.",
+    rationaleTemplate:
+      "Le traitement ({drug}) expose au risque d'hypoglycémie. L'Assurance Maladie préconise de se resucrer rapidement avec l'équivalent de 15 g de sucre (3 morceaux) et de garder toujours sur soi une source de sucre rapide. Un produit de sucre rapide peut compléter les morceaux de sucre, le jus de fruits ou le soda (non light) que la source cite.",
+    counterScriptTemplate:
+      "« Avec {drug}, une hypoglycémie peut arriver. Gardez toujours sur vous de quoi vous resucrer vite, environ 15 g de sucre ; {product} peut faire partie de ce que vous emportez. »",
+    patientReasonTemplate:
+      "Votre traitement ({drug}) peut faire baisser la glycémie. En cas de malaise, 15 g de sucre aident à la remonter vite : {product} peut faire partie de ce que vous gardez sur vous.",
+    clinicalContext:
+      "Assurance Maladie, « Diabète : hypoglycémie, hyperglycémie et acidocétose » : risque surtout sous sulfamides, glinides et insuline ; resucrage avec l'équivalent de 15 g de sucre (3 morceaux) ; sources de sucre rapide à garder sur soi ; les fruits et le chocolat ne sont pas efficaces. Les antidiabétiques qui ne figurent pas dans cette liste ne déclenchent pas ce conseil.",
+    safetyNotes: ["Les fruits et le chocolat ne sont pas efficaces pour corriger une hypoglycémie.", "Le sucre rapide ne remplace pas la conduite à tenir donnée par le médecin."],
+  },
 ];
 
 const norm = (value: string) => value.toLowerCase().trim();
@@ -1386,6 +1695,20 @@ function shortSubstance(value: string | null | undefined): string | null {
 }
 
 /**
+ * Vrai si la durée CONNUE du traitement est inférieure au seuil de la règle, pour un médicament
+ * dont le code ATC porte l'un des préfixes de `durationGate`. Durée absente, nulle ou invalide :
+ * faux, la règle reste. Autre préfixe ATC : faux, la durée de cette boîte n'est pas celle d'un
+ * traitement osseux au long cours.
+ */
+function isTooShortForRule(rule: AdviceRule, atcCode: string, durationDays: number | null | undefined): boolean {
+  const gate = rule.durationGate;
+  if (!gate) return false;
+  if (typeof durationDays !== "number" || !Number.isFinite(durationDays) || durationDays <= 0) return false;
+  if (!gate.atcPrefixes.some((prefix) => atcCode.startsWith(prefix))) return false;
+  return durationDays < gate.minDays;
+}
+
+/**
  * Détermine les opportunités pertinentes pour un traitement donné.
  * Aucun produit n'est consulté à ce stade — c'est volontaire.
  */
@@ -1408,6 +1731,11 @@ export function detectAdviceOpportunities(params: {
      * seul.
      */
     officialSubstance?: string | null;
+    /**
+     * Durée du traitement écrite sur l'ordonnance, en jours, quand elle est connue. Elle ne sert
+     * qu'aux règles qui portent une `durationGate` : une durée absente n'écarte jamais rien.
+     */
+    durationDays?: number | null;
   }[];
   patient: PatientContext;
   /**
@@ -1447,6 +1775,10 @@ export function detectAdviceOpportunities(params: {
 
       const classHitAny = atcHit || classHit;
 
+      // Une cure plus courte que celle que la règle suppose n'ouvre pas la règle (corticoïde de
+      // 5 jours et ostéoporose). Une durée inconnue ou un autre préfixe : la règle reste.
+      if (classHitAny && isTooShortForRule(rule, atc, drug.durationDays)) continue;
+
       // Une règle qui affirme quelque chose sur la classe du médicament ne peut
       // pas se déclencher sur un simple effet indésirable partagé : cela
       // produirait une justification fausse (« Amoxicilline est une
@@ -1483,7 +1815,9 @@ export function detectAdviceOpportunities(params: {
 
     if (need && triggers.length === 0) {
       const cited = drugs.filter((drug) => need.lineIndexes.includes(drug.lineIndex));
-      for (const drug of cited.length > 0 ? cited : drugs) {
+      // Une durée connue et trop courte écarte aussi le besoin compris par l'IA (`durationGate`).
+      const pool = (cited.length > 0 ? cited : drugs).filter((drug) => !isTooShortForRule(rule, drug.knowledge?.atcCode ?? "", drug.durationDays));
+      for (const drug of pool) {
         triggers.push({
           lineIndex: drug.lineIndex,
           drugName: drug.drugName,

@@ -267,8 +267,9 @@ const PATTERNS: Pattern[] = [
     confidence: 0.9,
   },
   // Douleur musculaire ou articulaire : poches chaud/froid, patchs chauffants.
+  // Un masque pour les yeux de la même gamme (THERAPEARL MASQ OCUL) n'est pas une poche pour le dos.
   {
-    test: /(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|bouillotte|pack froid|poche froid|poche chaud|compresse froide|chaud froid)/,
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|bouillotte|pack froid|poche froid|poche chaud|compresse froide|chaud froid))/,
     category: "DISPOSITIFS_MEDICAUX",
     tags: ["chaud froid", "douleur musculaire"],
     ruleKeys: ["pain-cold-hot-pack"],
@@ -312,10 +313,50 @@ const PATTERNS: Pattern[] = [
     ruleKeys: ["diabetes-foot-care"],
     confidence: 0.85,
   },
+  // Conseil complet par ordonnance : les produits que cinq règles minces et sourcées
+  // appellent. Chaque motif reconnaît le produit par son nom ; la règle, elle, dit
+  // pourquoi (docs/sources-conseil.md, § 6).
+  {
+    // Chambre d'inhalation, avec ou sans masque. Pas un nébuliseur. Les fichiers de stock abrègent :
+    // « BIOSYNEX CH/INHAL NOURISS 0- », « CHAMB INHAL ENFANT MASQUE », « INHAL'AIR CH/INHAL +6ANS/ADULTE ».
+    test: /^(?!.*(nebuli))(?=.*(chambres? (d )?inhalation|\bch(?:amb(?:re)?)? ?inhal(?:ation)?\b|aero ?chamber|aerochambre|babyhaler|opti ?chamber|volumatic|nebuhaler|\bspacer\b))/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["chambre d'inhalation"],
+    ruleKeys: ["inhaler-spacer-chamber"],
+    confidence: 0.95,
+  },
+  {
+    // Peigne à poux, fin et rigide. Ni une lotion ou un coffret, ni un peigne électrique. Les fichiers
+    // de stock abrègent (« PARANIX Sol antipoux Hle ess Spr/100ml+peigne », « POUXIT XF LOT 100ML+PEIGNE ») :
+    // un peigne n'a ni volume ni forme galénique dans son nom.
+    test: /^(?!.*(lotion|shampo|spray|mousse|solution|creme|emulsion|huile|\bgel\b|coffret|\bkit\b|electri|electron|ultrason|\b(?:lot|sol|spr|hle|sh|shp|shamp|mse|cr)\b|\d+ ?(?:ml|g)\b))(?=.*(peignes?))(?=.*(poux|lentes|pediculos|pediculi))/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["peigne anti-poux"],
+    ruleKeys: ["head-lice-comb"],
+    confidence: 0.92,
+  },
+  {
+    // Collecteur de déchets perforants (DASRI). La boîte d'aiguilles à stylo n'est pas un collecteur.
+    test: /(collecteurs? (d )?(aiguilles?|dasri|piquants?|coupants?|perforants?|dechets|seringues?)|mini ?collecteur|boites? a aiguilles?|\bdasri\b|\bdastri\b)/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["collecteur d'aiguilles"],
+    ruleKeys: ["self-injection-sharps-container"],
+    confidence: 0.95,
+  },
+  {
+    // Sucre rapide à garder sur soi : glucose en comprimés, sachets ou gel. Ni glucagon, ni soluté, ni sirop.
+    test: /^(?!.*(glucagon|glucagen|baqsimi|gvoke|injectable|perfusion|sirop|solute|sans sucre|\blight\b|\b\d+ ?ch\b))(?=.*(dextro ?energy|dextrosol|dextrose|glucodex|gluco ?boost|glucosport|resucrage|sucre rapide|(comprimes?|sachets?|gel|tablettes?|sticks?|bonbons?) (de |au |a )?glucose|glucose (a croquer|en |comprimes?|sachets?|sticks?|gel|tablettes?)))/,
+    category: "NUTRITION",
+    tags: ["resucrage"],
+    ruleKeys: ["hypoglycemia-fast-sugar"],
+    confidence: 0.9,
+  },
   // Compléments que les vigilances doivent reconnaître, pour les écarter ou les espacer.
   // Une dilution homéopathique (Kalium 7CH, Hypericum 15CH) n'est pas un apport : elle n'est pas étiquetée.
   { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\bfer\b|ferrostrane|tardyferon|fumafer|timoferol|bisglycinate de fer|fer bisglycinate|ferreux|ferrique))/, category: "MINERAUX", tags: ["fer"], ruleKeys: [], confidence: 0.8 },
-  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\bcalcium\b|calciforte|\bcacit\b|orocal|calcidose|calperos))/, category: "MINERAUX", tags: ["calcium"], ruleKeys: [], confidence: 0.8 },
+  // Le mot « calcium » seul ramenait des produits sans rapport (citrate de bétaïne, un digestif) ou des
+  // injectables (chlorure, gluconate, folinate) : ils ne sont pas un apport calcique de comptoir.
+  { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr|betaine|fluorure|chlorure|gluconate|folinate|ascorbate|dialyse|perfusion|injectable|solute))(?=.*(\bcalcium\b|calciforte|\bcacit\b|orocal|calcidose|calperos))/, category: "MINERAUX", tags: ["calcium"], ruleKeys: ["corticosteroid-oral-calcium"], confidence: 0.8 },
   { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(\bzinc\b|rubozinc|effizinc))/, category: "MINERAUX", tags: ["zinc"], ruleKeys: [], confidence: 0.8 },
   { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b|\btg\b|\btu gr))(?=.*(potassium|diffu ?k\b|kaleorid|kalium))/, category: "MINERAUX", tags: ["potassium"], ruleKeys: [], confidence: 0.8 },
   { test: /^(?!.*(\b\d+ ?ch\b|\bdh\b))(?=.*(vitamine a\b|vit a\b|retinol|rétinol|beta ?carotene|bêta ?carotène|arovit))/, category: "VITAMINES", tags: ["vitamine a"], ruleKeys: [], confidence: 0.75 },

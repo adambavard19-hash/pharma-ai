@@ -83,7 +83,13 @@ function scoreRelevance(
   // équivalentes : c'est une question de pertinence, pas de marge.
   // Le plafond laisse la place à la préférence : une référence qui coche
   // toutes les étiquettes atteint 0,9 ; seule la formule préférée atteint 1.
-  const preferred = matchesAny(opportunity.productPrefer, product.name);
+  //
+  // Une préférence DÉPARTAGE des références qui répondent déjà au besoin ; elle
+  // n'en fabrique jamais une. Sans aucune étiquette en commun, +0,1 portait un
+  // dispositif médical de la bonne catégorie (0,5) pile au seuil (0,6) : un
+  // masque FFP2 devenait « chambre d'inhalation » parce que son nom contenait
+  // « masque ». Le bonus ne s'ajoute donc que si une étiquette correspond.
+  const preferred = matched.length > 0 && matchesAny(opportunity.productPrefer, product.name);
   const value = Math.min(1, (categoryMatch ? 0.5 : 0.15) + tagRatio * 0.4 + (preferred ? 0.1 : 0));
 
   const details: string[] = [];

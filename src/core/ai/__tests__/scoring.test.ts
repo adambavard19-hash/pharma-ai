@@ -390,3 +390,44 @@ describe("moteur d'opportunités", () => {
     }
   });
 });
+
+describe("une formule préférée départage, elle ne crée jamais de la pertinence", () => {
+  // Un dispositif médical dont le nom contient « masque », pour une règle de chambre d'inhalation :
+  // la catégorie (0,5) plus le bonus de préférence (0,1) atteignait pile le seuil de 0,6, sans la
+  // moindre étiquette en commun. Le bonus ne s'ajoute plus que s'il y a une étiquette en commun.
+  const chamberRule = (overrides: Partial<AdviceOpportunityResult> = {}) =>
+    opportunity({
+      key: "inhaler-spacer-chamber",
+      category: "DISPOSITIFS_MEDICAUX",
+      matchingTags: ["chambre d'inhalation"],
+      productPrefer: [String.raw`masque`],
+      ...overrides,
+    });
+  const score = (name: string, tags: string[], overrides: Partial<AdviceOpportunityResult> = {}) =>
+    scoreProductForOpportunity({
+      ...baseArgs,
+      opportunity: chamberRule(overrides),
+      product: product({ id: name, name, category: "DISPOSITIFS_MEDICAUX", subCategory: null, matchingTags: tags, commercialClaims: [] }),
+    })!;
+
+  it("sans étiquette en commun, la préférence n'ajoute rien : le masque FFP2 reste à 0,5, sous le seuil de 0,6", () => {
+    const scored = score("FFP2 BLANCS SACHET DE 5 MASQUES", []);
+    expect(scored.breakdown.relevance).toBe(0.5);
+    expect(scored.explanation.find((c) => c.dimension === "relevance")!.detail).not.toMatch(/préférée/);
+  });
+
+  it("avec une étiquette en commun, la préférence départage comme avant : 0,9 sans, 1 avec", () => {
+    const tags = ["chambre d'inhalation"];
+    expect(score("AEROCHAMBER PLUS MASQUE ENFANT", tags, { productPrefer: [] }).breakdown.relevance).toBeCloseTo(0.9, 5);
+    const preferred = score("AEROCHAMBER PLUS MASQUE ENFANT", tags);
+    expect(preferred.breakdown.relevance).toBeCloseTo(1, 5);
+    expect(preferred.explanation.find((c) => c.dimension === "relevance")!.detail).toMatch(/préférée/);
+  });
+
+  it("à étiquettes égales, la formule préférée passe devant sa voisine", () => {
+    const tags = ["chambre d'inhalation"];
+    const preferred = score("AEROCHAMBER PLUS MASQUE ENFANT", tags);
+    const neighbour = score("AEROCHAMBER PLUS EMBOUT", tags);
+    expect(preferred.totalScore).toBeGreaterThan(neighbour.totalScore);
+  });
+});

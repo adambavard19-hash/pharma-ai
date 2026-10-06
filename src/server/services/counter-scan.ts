@@ -12,13 +12,41 @@ import { findOpenFactsName } from "@/server/services/product-images";
  *
  * Le code-barres devient une ligne de délivrance : la boîte est identifiée
  * par son CIP dans le catalogue national, sans lecture ni devinette. Les bips
- * d'un même poste, rapprochés dans le temps, forment UNE délivrance — celle
- * du patient qui est au comptoir. Le stock de l'officine baisse d'une boîte ;
- * l'export du LGO remettra le compte exact.
+ * d'un même poste, à moins d'une minute l'un de l'autre, forment UNE
+ * délivrance — celle du patient qui est au comptoir, donc une seule
+ * ordonnance : c'est sur elle, en entier, que le conseil se construit. Le
+ * stock de l'officine baisse d'une boîte ; l'export du LGO remettra le compte
+ * exact.
  */
 
-/** Deux bips séparés de plus de trois minutes sont deux patients. */
-const SAME_SALE_WINDOW_MS = 3 * 60 * 1000;
+/**
+ * Deux bips d'un même poste séparés de plus d'une minute sont deux patients.
+ *
+ * La fenêtre glisse et se mesure sur l'horloge du POSTE : l'écart entre ce bip
+ * et le bip précédent du même poste (`CounterPost.lastScanAt`, lu avant sa
+ * mise à jour). Elle ne se mesure PAS depuis `Prescription.updatedAt`, que
+ * l'analyse fait avancer : un patient dont l'analyse a duré trente secondes
+ * aurait sinon prolongé la fenêtre du suivant. Un patient qui passe dix
+ * boîtes, une toutes les quarante secondes, reste une seule vente ; un bip
+ * soixante et une secondes après le dernier ouvre la vente d'un autre patient,
+ * analyse ou pas entre les deux.
+ */
+export const SAME_SALE_WINDOW_MS = 60 * 1000;
+
+/** Un horodatage de bip plus ancien que cela n'est pas crédible (horloge du poste fausse) : on retient l'instant de réception. */
+const MAX_SCAN_AGE_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * L'instant du bip : celui que le poste a daté (`scannedAt`) s'il est crédible,
+ * pour que des bips rejoués après une coupure Internet gardent l'écart réel
+ * qui les sépare. Un horodatage invalide, dans le futur ou vieux de plus de
+ * six heures retombe sur « maintenant » (l'instant où le serveur le reçoit).
+ */
+export function scanInstant(scannedAt: Date | null, now: Date): Date {
+  if (!scannedAt || Number.isNaN(scannedAt.getTime())) return now;
+  const age = now.getTime() - scannedAt.getTime();
+  return age >= 0 && age <= MAX_SCAN_AGE_MS ? scannedAt : now;
+}
 
 export type CounterScanResult =
   | { ok: true; prescriptionId: string; reference: string; lineCount: number; drugName: string; created: boolean; kind: "DRUG" | "PRODUCT" | "UNKNOWN" }
@@ -120,21 +148,46 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
   };
 
   const now = new Date();
+  const at = scanInstant(input.scannedAt, now);
   const post = input.post.trim().slice(0, 60) || "poste";
-  const open = await prisma.prescription.findFirst({
-    where: {
-      pharmacyId: agent.scope.pharmacyId,
-      source: "COUNTER_SCAN",
-      counterPost: post,
-      // Une vente déjà analysée mais pas encore encaissée reste celle du
-      // patient au comptoir : un bip de plus la complète et la ré-analyse.
-      status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
-      updatedAt: { gte: new Date(now.getTime() - SAME_SALE_WINDOW_MS) },
-      sales: { none: {} },
-    },
-    orderBy: { updatedAt: "desc" },
-    select: { id: true, reference: true, lines: { select: { id: true, drugSpecialtyId: true, rawText: true, drugName: true, quantity: true, position: true } } },
-  });
+
+  // Le bip précédent de CE poste, lu avant que celui-ci ne le remplace : c'est
+  // lui, et non la dernière écriture de la vente, qui dit si le patient est le même.
+  let previousScanAt: Date | null = null;
+  if (agent.postId) {
+    const known = await prisma.counterPost.findUnique({ where: { id: agent.postId }, select: { lastScanAt: true } });
+    previousScanAt = known?.lastScanAt ?? null;
+  }
+  const withinWindow = previousScanAt !== null && Math.abs(at.getTime() - previousScanAt.getTime()) <= SAME_SALE_WINDOW_MS;
+
+  // Où chercher la vente de ce patient, et depuis quand elle doit avoir été écrite.
+  // - Poste connu : au-delà d'une minute depuis son dernier bip (ou sans bip
+  //   antérieur), c'est un autre patient : aucune vente n'est cherchée. Sinon,
+  //   la vente qui a reçu le bip précédent a été écrite depuis ce bip. Ce n'est
+  //   pas une fenêtre, c'est un garde-fou : une vente restée ouverte depuis
+  //   longtemps (une vente bipée n'est presque jamais encaissée dans PharmaBoost)
+  //   ne reprend pas un patient parce que la vente suivante vient d'être encaissée.
+  // - Poste inconnu (clé d'un serveur) : repli sur la dernière écriture de la vente.
+  const writtenSince = agent.postId ? (withinWindow ? previousScanAt : null) : new Date(now.getTime() - SAME_SALE_WINDOW_MS);
+  const open = writtenSince
+    ? await prisma.prescription.findFirst({
+        where: {
+          pharmacyId: agent.scope.pharmacyId,
+          source: "COUNTER_SCAN",
+          counterPost: post,
+          // Une vente déjà analysée mais pas encore encaissée reste celle du
+          // patient au comptoir : un bip de plus la complète et la ré-analyse.
+          status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
+          updatedAt: { gte: writtenSince },
+          sales: { none: {} },
+        },
+        // La vente que ce poste a ouverte en dernier, jamais une plus ancienne
+        // encore ouverte : l'ordre est celui de la création, pas de l'écriture
+        // (une analyse tardive d'une vente ancienne la ferait remonter).
+        orderBy: { createdAt: "desc" },
+        select: { id: true, reference: true, lines: { select: { id: true, drugSpecialtyId: true, rawText: true, drugName: true, quantity: true, position: true } } },
+      })
+    : null;
 
   let prescriptionId: string;
   let reference: string;
@@ -176,10 +229,12 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
     await prisma.stockItem.updateMany({ where: { pharmacyId: agent.scope.pharmacyId, productId: item.productId, quantity: { gt: 0 } }, data: { quantity: { decrement: 1 } } });
   }
   if (agent.postId) {
-    await prisma.counterPost.update({ where: { id: agent.postId }, data: { lastScanAt: now, lastSeenAt: now, scanCount: { increment: 1 } } });
+    // Le poste retient l'instant du bip, jamais en arrière de ce qu'il a déjà (un bip rejoué en retard ne fait pas reculer son dernier bip).
+    const lastScanAt = previousScanAt && previousScanAt.getTime() > at.getTime() ? previousScanAt : at;
+    await prisma.counterPost.update({ where: { id: agent.postId }, data: { lastScanAt, lastSeenAt: now, scanCount: { increment: 1 } } });
   }
   const lineCount = await prisma.prescriptionLine.count({ where: { prescriptionId } });
-  await recordAudit({ action: "prescription.counter_scan", entityType: "Prescription", entityId: prescriptionId, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { code: input.code, kind: item.kind, post, scannedAt: input.scannedAt?.toISOString() ?? null } });
+  await recordAudit({ action: "prescription.counter_scan", entityType: "Prescription", entityId: prescriptionId, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { code: input.code, kind: item.kind, post, scannedAt: input.scannedAt && !Number.isNaN(input.scannedAt.getTime()) ? input.scannedAt.toISOString() : null } });
   return { ok: true, prescriptionId, reference, lineCount, drugName: item.name, created, kind: item.kind };
 }
 
@@ -217,7 +272,7 @@ export async function attachBarcodeToProduct(scope: { pharmacyId: string; userId
 /**
  * « Nouveau patient » : les ventes de la douchette encore ouvertes (sans
  * encaissement) sont closes. L'écran redevient vierge et le bip suivant
- * ouvre une nouvelle vente, même moins de trois minutes après le dernier.
+ * ouvre une nouvelle vente, même moins d'une minute après le dernier.
  */
 export async function closeLiveCounterSales(scope: { pharmacyId: string; userId: string }, prescriptionId?: string): Promise<number> {
   const result = await prisma.prescription.updateMany({
