@@ -39,6 +39,20 @@ describe("GET /api/agent/fichiers/[name]", () => {
     expect(await head(response)).not.toEqual([0xef, 0xbb, 0xbf]);
   });
 
+  it("sert le diagnostic du robot en .cmd à télécharger : enveloppe en ASCII, sans BOM, fins de ligne Windows, script UTF-8 après le repère", async () => {
+    const response = await call("diagnostic-robot.cmd");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Disposition")).toBe('attachment; filename="PharmaBoost-Diagnostic-Robot.cmd"');
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    expect([...bytes.subarray(0, 3)]).not.toEqual([0xef, 0xbb, 0xbf]);
+    const text = new TextDecoder().decode(bytes);
+    expect(text.startsWith("@echo off\r\n")).toBe(true);
+    expect(text.split("#<<POWERSHELL>>").pop()).toContain("function New-Report");
+    expect(text.split(/\r?\n/).every((line, index, lines) => index === lines.length - 1 || text.includes(line + "\r\n"))).toBe(true);
+    expect(text).not.toMatch(/[^\r]\n/);
+  });
+
   it("tout ce qui n'est pas dans la liste blanche : 404", async () => {
     for (const name of ["inconnu.ps1", "README.md", "../package.json", "constructor", "__proto__", "toString", "hasOwnProperty"]) {
       const response = await call(name);

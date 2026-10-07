@@ -358,11 +358,129 @@ function writeStatus(configPath, status) {
   }
 }
 
-// agent/src/index.ts
+// agent/src/robot.ts
 var import_node_fs4 = require("node:fs");
+function compileRobotPattern(pattern) {
+  if (!pattern.trim()) return { ok: false, error: "Indiquez l'expression qui d\xE9signe le code produit." };
+  let regex;
+  try {
+    regex = new RegExp(pattern, "g");
+  } catch (error) {
+    return { ok: false, error: `Expression illisible : ${error instanceof Error ? error.message : String(error)}` };
+  }
+  if (new RegExp(`${pattern}|`).exec("")?.length === 1) return { ok: false, error: "L'expression doit avoir un groupe de capture : (\\d{13}) par exemple." };
+  return { ok: true, regex };
+}
+function extractRobotCodes(line, regex) {
+  const codes = [];
+  regex.lastIndex = 0;
+  for (let match = regex.exec(line); match; match = regex.exec(line)) {
+    if (match[0] === "") regex.lastIndex += 1;
+    const code = match[1] ? normalizeScannedCode(match[1]) : null;
+    if (code && !codes.includes(code)) codes.push(code);
+  }
+  return codes;
+}
+var LineBuffer = class {
+  rest = "";
+  push(chunk) {
+    const parts = (this.rest + chunk).split(/\r?\n/);
+    this.rest = parts.pop() ?? "";
+    if (this.rest.length > 64 * 1024) this.rest = this.rest.slice(-4096);
+    return parts;
+  }
+};
+var POLL_MS = 1e3;
+var MAX_READ_BYTES = 1024 * 1024;
+function startRobotJournal(config, handlers) {
+  const compiled = compileRobotPattern(config.pattern);
+  if (!compiled.ok) {
+    handlers.onStatus(`Robot : ${compiled.error}`);
+    return () => void 0;
+  }
+  const regex = compiled.regex;
+  const lines = new LineBuffer();
+  let offset = null;
+  let announcedMissing = false;
+  const poll = () => {
+    try {
+      if (!(0, import_node_fs4.existsSync)(config.path)) {
+        if (!announcedMissing) handlers.onStatus(`Robot : le fichier ${config.path} n'existe pas (encore).`);
+        announcedMissing = true;
+        offset = null;
+        return;
+      }
+      announcedMissing = false;
+      const size = (0, import_node_fs4.statSync)(config.path).size;
+      if (offset === null) {
+        offset = size;
+        handlers.onStatus(`Robot : lecture de ${config.path} \xE0 partir de maintenant.`);
+        return;
+      }
+      if (size < offset) offset = 0;
+      if (size === offset) return;
+      const length = Math.min(size - offset, MAX_READ_BYTES);
+      const buffer = Buffer.alloc(length);
+      const fd = (0, import_node_fs4.openSync)(config.path, "r");
+      try {
+        (0, import_node_fs4.readSync)(fd, buffer, 0, length, offset);
+      } finally {
+        (0, import_node_fs4.closeSync)(fd);
+      }
+      offset += length;
+      const at = Date.now();
+      for (const line of lines.push(buffer.toString("latin1"))) {
+        for (const code of extractRobotCodes(line, regex)) handlers.onScan(code, at);
+      }
+    } catch (error) {
+      handlers.onStatus(`Robot : ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  const timer = setInterval(poll, POLL_MS);
+  poll();
+  return () => clearInterval(timer);
+}
+var CrossSourceDedupe = class {
+  constructor(windowMs = 45e3) {
+    this.windowMs = windowMs;
+  }
+  windowMs;
+  last = /* @__PURE__ */ new Map();
+  /** Vrai si ce code vient d'être annoncé par une autre source. Sinon l'enregistre et rend faux. */
+  isDuplicate(code, source, at) {
+    const previous = this.last.get(code);
+    if (previous && previous.source !== source && at - previous.at <= this.windowMs) return true;
+    this.last.set(code, { source, at });
+    if (this.last.size > 500) {
+      for (const [key, value] of this.last) if (at - value.at > this.windowMs) this.last.delete(key);
+    }
+    return false;
+  }
+};
+function dryRunRobotFile(path, pattern, maxBytes = 5 * 1024 * 1024) {
+  const compiled = compileRobotPattern(pattern);
+  if (!compiled.ok) return compiled;
+  if (!(0, import_node_fs4.existsSync)(path)) return { ok: false, error: `Le fichier ${path} n'existe pas.` };
+  const size = (0, import_node_fs4.statSync)(path).size;
+  const length = Math.min(size, maxBytes);
+  const buffer = Buffer.alloc(length);
+  const fd = (0, import_node_fs4.openSync)(path, "r");
+  try {
+    (0, import_node_fs4.readSync)(fd, buffer, 0, length, size - length);
+  } finally {
+    (0, import_node_fs4.closeSync)(fd);
+  }
+  const lines = buffer.toString("latin1").split(/\r?\n/);
+  const codes = [];
+  for (const line of lines) codes.push(...extractRobotCodes(line, compiled.regex));
+  return { ok: true, lines: lines.length, codes };
+}
+
+// agent/src/index.ts
+var import_node_fs5 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path4 = require("node:path");
-var VERSION = "0.5.0";
+var VERSION = "0.5.1";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path4.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path4.join)((0, import_node_path4.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -375,9 +493,9 @@ function log(message) {
   const line = `${(/* @__PURE__ */ new Date()).toISOString()} ${message}`;
   console.log(line);
   try {
-    (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(LOG_PATH), { recursive: true });
-    if ((0, import_node_fs4.existsSync)(LOG_PATH) && (0, import_node_fs4.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs4.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
-    (0, import_node_fs4.appendFileSync)(LOG_PATH, `${line}
+    (0, import_node_fs5.mkdirSync)((0, import_node_path4.dirname)(LOG_PATH), { recursive: true });
+    if ((0, import_node_fs5.existsSync)(LOG_PATH) && (0, import_node_fs5.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs5.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
+    (0, import_node_fs5.appendFileSync)(LOG_PATH, `${line}
 `);
   } catch {
   }
@@ -391,12 +509,12 @@ function arg(name) {
   return i >= 0 ? process.argv[i + 1] : void 0;
 }
 function readConfig() {
-  if (!(0, import_node_fs4.existsSync)(CONFIG_PATH)) return null;
-  return JSON.parse((0, import_node_fs4.readFileSync)(CONFIG_PATH, "utf8"));
+  if (!(0, import_node_fs5.existsSync)(CONFIG_PATH)) return null;
+  return JSON.parse((0, import_node_fs5.readFileSync)(CONFIG_PATH, "utf8"));
 }
 function writeConfig(config) {
-  (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(CONFIG_PATH), { recursive: true });
-  (0, import_node_fs4.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
+  (0, import_node_fs5.mkdirSync)((0, import_node_path4.dirname)(CONFIG_PATH), { recursive: true });
+  (0, import_node_fs5.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 async function api(config, path, init) {
   return fetch(`${config.serverUrl.replace(/\/$/, "")}${path}`, {
@@ -511,13 +629,17 @@ async function postHeartbeat(config) {
 async function runPost(config) {
   log(`PharmaBoost Connect ${VERSION} \u2014 poste de caisse ${(0, import_node_os.hostname)()} \u2014 journal : ${LOG_PATH}`);
   const scans = createScanQueue((scan) => sendScan(config, scan.code, scan.scannedAt));
-  startDouchette((0, import_node_path4.dirname)(CONFIG_PATH), {
-    onScan: (code, at) => {
-      scans.push({ code, scannedAt: new Date(at).toISOString() });
-      scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
-    },
-    onStatus: (message) => log(message)
-  });
+  const dedupe = new CrossSourceDedupe();
+  const accept = (source) => (code, at) => {
+    if (dedupe.isDuplicate(code, source, at)) {
+      log(`${source === "robot" ? "Robot" : "Bip"} ${code} ignor\xE9 : d\xE9j\xE0 annonc\xE9 \xE0 l'instant par ${source === "robot" ? "la douchette" : "le robot"}.`);
+      return;
+    }
+    scans.push({ code, scannedAt: new Date(at).toISOString() });
+    scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
+  };
+  startDouchette((0, import_node_path4.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
+  if (config.robot) startRobotJournal(config.robot, { onScan: accept("robot"), onStatus: (message) => log(message) });
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let handledSyncRequest = null;
@@ -561,6 +683,36 @@ async function runPost(config) {
     await new Promise((resolve) => setTimeout(resolve, watched ? 2e3 : 3e3));
   }
 }
+function testRobot() {
+  const path = arg("test-robot") ?? "";
+  const result = dryRunRobotFile(path, arg("motif") ?? "");
+  if (!result.ok) {
+    console.log(result.error);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`${result.lines} ligne(s) lue(s), ${result.codes.length} code(s) produit trouv\xE9(s).`);
+  for (const code of result.codes.slice(0, 50)) console.log(`  ${code}`);
+  if (result.codes.length === 0) console.log("Aucun code : l'expression ne correspond \xE0 rien, ou le fichier ne contient pas encore de dispensation.");
+}
+function enableRobot() {
+  const config = readConfig();
+  if (!config || config.role !== "poste") {
+    console.log("Ce poste n'est pas encore reli\xE9 \xE0 PharmaBoost.");
+    process.exitCode = 1;
+    return;
+  }
+  const path = arg("robot") ?? "";
+  const pattern = arg("motif") ?? "";
+  const compiled = compileRobotPattern(pattern);
+  if (!path || !compiled.ok) {
+    console.log(!path ? "Indiquez le fichier \xE0 lire." : compiled.error);
+    process.exitCode = 1;
+    return;
+  }
+  writeConfig({ ...config, robot: { kind: "journal", path, pattern } });
+  console.log(`Robot branch\xE9 : ${path}. Quittez PharmaBoost (ic\xF4ne pr\xE8s de l'horloge) puis relancez-le.`);
+}
 function testAffichage() {
   showToast((0, import_node_path4.dirname)(CONFIG_PATH), {
     title: "PharmaBoost \xB7 essai d'affichage",
@@ -589,7 +741,7 @@ async function pair() {
   for (const dir of [exportPath, scansPath]) {
     if (dir) {
       try {
-        (0, import_node_fs4.mkdirSync)(dir, { recursive: true });
+        (0, import_node_fs5.mkdirSync)(dir, { recursive: true });
       } catch {
       }
     }
@@ -605,11 +757,11 @@ async function pair() {
   log(`Appair\xE9 avec ${body.pharmacyName ?? "l'officine"}. Configuration \xE9crite dans ${CONFIG_PATH}. Export surveill\xE9 : ${exportPath}${scansPath ? ` \u2014 scans : ${scansPath}` : ""}.`);
 }
 function latestExport(dir) {
-  if (!(0, import_node_fs4.existsSync)(dir)) return null;
-  const st = (0, import_node_fs4.statSync)(dir);
+  if (!(0, import_node_fs5.existsSync)(dir)) return null;
+  const st = (0, import_node_fs5.statSync)(dir);
   if (st.isFile()) return { path: dir, mtime: st.mtimeMs, size: st.size };
-  const files = (0, import_node_fs4.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
-    const s = (0, import_node_fs4.statSync)((0, import_node_path4.join)(dir, name));
+  const files = (0, import_node_fs5.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
+    const s = (0, import_node_fs5.statSync)((0, import_node_path4.join)(dir, name));
     return { path: (0, import_node_path4.join)(dir, name), mtime: s.mtimeMs, size: s.size };
   }).sort((a, b) => b.mtime - a.mtime);
   return files[0] ?? null;
@@ -617,7 +769,7 @@ function latestExport(dir) {
 var lastStamp = null;
 async function syncStock(config, force) {
   if (!config.exportPath) return config;
-  if (!(0, import_node_fs4.existsSync)(config.exportPath)) {
+  if (!(0, import_node_fs5.existsSync)(config.exportPath)) {
     setNotice(`Le dossier d'export ${config.exportPath} n'existe pas sur ${(0, import_node_os.hostname)()}.`);
     return config;
   }
@@ -630,7 +782,7 @@ async function syncStock(config, force) {
   const stamp = `${file.path}:${file.mtime}:${file.size}`;
   if (!force && stamp === lastStamp) return config;
   lastStamp = stamp;
-  const bytes = (0, import_node_fs4.readFileSync)(file.path);
+  const bytes = (0, import_node_fs5.readFileSync)(file.path);
   const hash = (0, import_node_crypto.createHash)("sha256").update(bytes).digest("hex");
   if (hash === config.lastExportHash) {
     if (notice?.startsWith("Aucun export") || notice?.startsWith("Le dossier")) setNotice(null);
@@ -649,16 +801,16 @@ async function syncStock(config, force) {
   return { ...config, lastExportHash: hash };
 }
 async function syncScans(config) {
-  if (!config.scansPath || !(0, import_node_fs4.existsSync)(config.scansPath)) return config;
+  if (!config.scansPath || !(0, import_node_fs5.existsSync)(config.scansPath)) return config;
   const sent = new Set(config.sentScans ?? []);
-  const files = (0, import_node_fs4.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path4.join)(config.scansPath, name), stat: (0, import_node_fs4.statSync)((0, import_node_path4.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
+  const files = (0, import_node_fs5.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path4.join)(config.scansPath, name), stat: (0, import_node_fs5.statSync)((0, import_node_path4.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
   let next = config;
   for (const { path, stat } of files) {
     const key = `${(0, import_node_path4.basename)(path)}:${stat.size}`;
     if (sent.has(key)) continue;
     const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path4.extname)(path).toLowerCase()] ?? "application/octet-stream";
     const form = new FormData();
-    form.set("file", new Blob([(0, import_node_fs4.readFileSync)(path)], { type: mime }), (0, import_node_path4.basename)(path));
+    form.set("file", new Blob([(0, import_node_fs5.readFileSync)(path)], { type: mime }), (0, import_node_path4.basename)(path));
     const response = await api(config, "/api/agent/prescriptions", { method: "POST", body: form });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.ok) {
@@ -726,6 +878,10 @@ if (arg("appairer")) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   });
+} else if (process.argv.includes("--test-robot")) {
+  testRobot();
+} else if (process.argv.includes("--robot")) {
+  enableRobot();
 } else if (process.argv.includes("--installer")) {
   installFromInstaller().then((code) => {
     process.exitCode = code;

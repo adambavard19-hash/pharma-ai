@@ -34,11 +34,12 @@ import { showToast } from "./toast";
 import { createScanQueue } from "./scan-queue";
 import { INSTALLER_EXIT, resolveInstallCode } from "./installer";
 import { stateForFailure, writeStatus, type PostState } from "./status";
+import { CrossSourceDedupe, compileRobotPattern, dryRunRobotFile, startRobotJournal, type RobotConfig } from "./robot";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.5.0";
+const VERSION = "0.5.1";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -67,6 +68,8 @@ type Config = {
   /** Pour l'icône près de l'horloge : l'officine et le nom du poste, tels que PharmaBoost les connaît. */
   pharmacyName?: string;
   postLabel?: string;
+  /** Un robot de dispensation à écouter, une fois observé chez cette officine (voir robot.ts). Absent : rien n'est lu. */
+  robot?: RobotConfig;
 };
 
 /** Ce que l'agent constate et que PharmaBoost doit montrer ; vide quand tout va bien. */
@@ -251,13 +254,18 @@ async function runPost(config: Config): Promise<void> {
   // même boîte deux fois — le serveur compterait « 2 × » et baisserait le stock
   // deux fois. `config` est relue à chaque envoi : le poste la met à jour.
   const scans = createScanQueue((scan) => sendScan(config, scan.code, scan.scannedAt));
-  startDouchette(dirname(CONFIG_PATH), {
-    onScan: (code, at) => {
-      scans.push({ code, scannedAt: new Date(at).toISOString() });
-      scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
-    },
-    onStatus: (message) => log(message),
-  });
+  // Douchette et robot annoncent parfois la même boîte : elle ne compte qu'une fois (voir robot.ts).
+  const dedupe = new CrossSourceDedupe();
+  const accept = (source: "douchette" | "robot") => (code: string, at: number) => {
+    if (dedupe.isDuplicate(code, source, at)) {
+      log(`${source === "robot" ? "Robot" : "Bip"} ${code} ignoré : déjà annoncé à l'instant par ${source === "robot" ? "la douchette" : "le robot"}.`);
+      return;
+    }
+    scans.push({ code, scannedAt: new Date(at).toISOString() });
+    scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
+  };
+  startDouchette(dirname(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
+  if (config.robot) startRobotJournal(config.robot, { onScan: accept("robot"), onStatus: (message) => log(message) });
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let handledSyncRequest: string | null = null;
@@ -303,6 +311,44 @@ async function runPost(config: Config): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, watched ? 2000 : 3000));
   }
+}
+
+/**
+ * Essai du branchement robot, sans rien envoyer ni rien écrire :
+ *   --test-robot "<fichier>" --motif "article=(\\d{13})"
+ * Lit la fin du fichier et affiche les codes produit que l'expression y trouve.
+ */
+function testRobot(): void {
+  const path = arg("test-robot") ?? "";
+  const result = dryRunRobotFile(path, arg("motif") ?? "");
+  if (!result.ok) {
+    console.log(result.error);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`${result.lines} ligne(s) lue(s), ${result.codes.length} code(s) produit trouvé(s).`);
+  for (const code of result.codes.slice(0, 50)) console.log(`  ${code}`);
+  if (result.codes.length === 0) console.log("Aucun code : l'expression ne correspond à rien, ou le fichier ne contient pas encore de dispensation.");
+}
+
+/** Branche le robot sur ce poste : --robot "<fichier>" --motif "<expression>". Écrit la configuration ; relancer l'icône PharmaBoost ensuite. */
+function enableRobot(): void {
+  const config = readConfig();
+  if (!config || config.role !== "poste") {
+    console.log("Ce poste n'est pas encore relié à PharmaBoost.");
+    process.exitCode = 1;
+    return;
+  }
+  const path = arg("robot") ?? "";
+  const pattern = arg("motif") ?? "";
+  const compiled = compileRobotPattern(pattern);
+  if (!path || !compiled.ok) {
+    console.log(!path ? "Indiquez le fichier à lire." : (compiled as { error: string }).error);
+    process.exitCode = 1;
+    return;
+  }
+  writeConfig({ ...config, robot: { kind: "journal", path, pattern } });
+  console.log(`Robot branché : ${path}. Quittez PharmaBoost (icône près de l'horloge) puis relancez-le.`);
 }
 
 /** Essai de l'affichage : un avis d'exemple en coin d'écran, sans bip ni serveur. */
@@ -495,6 +541,10 @@ async function run(): Promise<void> {
 
 if (arg("appairer")) {
   pair().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
+} else if (process.argv.includes("--test-robot")) {
+  testRobot();
+} else if (process.argv.includes("--robot")) {
+  enableRobot();
 } else if (process.argv.includes("--installer")) {
   installFromInstaller().then((code) => { process.exitCode = code; });
 } else if (arg("poste")) {

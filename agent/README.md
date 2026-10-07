@@ -73,3 +73,8 @@ dès que l'analyse est prête, affiche l'avis (alertes, jusqu'à trois conseils)
 dans une fenêtre WinForms en bas à droite, toujours au-dessus, sans prendre
 le clavier (`WS_EX_NOACTIVATE`). `--test-affichage` montre un avis d'exemple.
 
+## Robot de dispensation
+
+Le branchement au robot (BD Rowa…) est décrit dans `docs/robot.md` : le diagnostic en lecture seule
+(`diagnostic-robot.ps1`, servi en `.cmd` par `/api/agent/fichiers/diagnostic-robot.cmd`) et la lecture d'un
+journal (`--test-robot`, `--robot`). Rien n'est lu tant qu'aucun robot n'est configuré.

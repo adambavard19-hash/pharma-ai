@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { buildDiagnosticRobotCmd } from "@/core/stock/diagnostic";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,13 @@ export const dynamic = "force-dynamic";
  * PowerShell 5.1 : les accents s'abîment et certains caractères (tiret long,
  * « œ ») deviennent des guillemets qui cassent le script. `bom` ajoute la
  * marque UTF-8 si le fichier ne l'a pas.
+ *
+ * `diagnostic-robot.cmd` est le collecteur en lecture seule du robot (voir
+ * docs/robot.md), sous une enveloppe .cmd qui se lance d'un double-clic ; il
+ * se télécharge (`attachment`) au lieu de s'afficher.
  */
-const FILES: Record<string, { path: string[]; type: string; bom?: boolean }> = {
+const FILES: Record<string, { path: string[]; type: string; bom?: boolean; diagnosticCmd?: boolean; attachment?: string }> = {
+  "diagnostic-robot.cmd": { path: ["diagnostic-robot.ps1"], type: "application/octet-stream", diagnosticCmd: true, attachment: "PharmaBoost-Diagnostic-Robot.cmd" },
   "pharmaboost-connect.js": { path: ["dist", "pharmaboost-connect.js"], type: "application/javascript; charset=utf-8" },
   "install-windows.ps1": { path: ["install-windows.ps1"], type: "text/plain; charset=utf-8", bom: true },
   "install-poste-windows.ps1": { path: ["install-poste-windows.ps1"], type: "text/plain; charset=utf-8", bom: true },
@@ -26,5 +32,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ nam
   if (!file) return new Response("Fichier inconnu.", { status: 404 });
   let bytes = await readFile(join(process.cwd(), "agent", ...file.path));
   if (file.bom && !bytes.subarray(0, 3).equals(UTF8_BOM)) bytes = Buffer.concat([UTF8_BOM, bytes]);
-  return new Response(new Uint8Array(bytes), { headers: { "Content-Type": file.type, "Cache-Control": "no-store" } });
+  if (file.diagnosticCmd) bytes = Buffer.from(buildDiagnosticRobotCmd(bytes.toString("utf8")), "utf8");
+  return new Response(new Uint8Array(bytes), {
+    headers: { "Content-Type": file.type, "Cache-Control": "no-store", ...(file.attachment ? { "Content-Disposition": `attachment; filename="${file.attachment}"`, "X-Content-Type-Options": "nosniff" } : {}) },
+  });
 }
