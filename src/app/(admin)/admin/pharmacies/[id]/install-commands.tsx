@@ -11,9 +11,13 @@ import { formatDateTime, formatTime } from "@/lib/format";
 
 type Prepared = { command: string; expiresAt: string };
 type ServerPrepared = Prepared & { baseline: string | null };
-type PostPrepared = Prepared & { postId: string };
+type PostPrepared = Prepared & { postId: string; downloadUrl: string };
 
-/** Les deux gestes de l'équipe sous AnyDesk : la ligne du serveur, la ligne d'un poste. Chaque ligne se copie d'un clic. */
+/**
+ * Les deux gestes de l'équipe : la ligne du serveur (sous AnyDesk) et le poste de comptoir — un lien
+ * vers l'installateur Windows à envoyer au titulaire, et la même installation en une ligne pour qui
+ * prend la main à distance. Chaque lien ou ligne se copie d'un clic.
+ */
 export function InstallCommands({
   pharmacyId,
   lgos,
@@ -35,7 +39,7 @@ export function InstallCommands({
   const [label, setLabel] = useState("");
   const [server, setServer] = useState<ServerPrepared | null>(null);
   const [post, setPost] = useState<PostPrepared | null>(null);
-  const [copied, setCopied] = useState<"server" | "post" | null>(null);
+  const [copied, setCopied] = useState<"server" | "post" | "postLine" | null>(null);
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<"server" | "post" | null>(null);
   const router = useRouter();
@@ -72,13 +76,13 @@ export function InstallCommands({
       const result = await preparePostInstallAction({ pharmacyId, label: label.trim() || null });
       setBusy(null);
       if (!result.ok) return push({ tone: "error", title: result.error });
-      setPost({ command: result.data.postCommand, expiresAt: result.data.expiresAt, postId: result.data.postId });
+      setPost({ command: result.data.postCommand, downloadUrl: result.data.postDownloadUrl, expiresAt: result.data.expiresAt, postId: result.data.postId });
       setLabel("");
       setCopied(null);
     });
   };
 
-  const copy = async (which: "server" | "post", command: string) => {
+  const copy = async (which: "server" | "post" | "postLine", command: string) => {
     try {
       await navigator.clipboard.writeText(command);
       setCopied(which);
@@ -133,15 +137,32 @@ export function InstallCommands({
           </Button>
         </div>
         {post && (
-          <CommandBox
-            title="Sur le poste, collez cette ligne"
-            command={post.command}
-            validity={`Valable 7 jours, jusqu'au ${formatDateTime(new Date(post.expiresAt))}. Un seul poste.`}
-            steps={["Sur le poste, dans la session de la personne qui utilise le logiciel, ouvrez PowerShell.", "Collez la ligne, puis Entrée.", "Attendez « Le poste est relié » : 1 à 2 minutes."]}
-            copied={copied === "post"}
-            onCopy={() => copy("post", post.command)}
-            done={postDone ? "Le poste vient de se relier : l'installation est terminée." : null}
-          />
+          <>
+            <CommandBox
+              title="Envoyez ce lien au titulaire, ou ouvrez-le sur le poste"
+              command={post.downloadUrl}
+              copyLabel="Copier le lien"
+              validity={`Valable 7 jours, jusqu'au ${formatDateTime(new Date(post.expiresAt))}. Un seul poste.`}
+              steps={["Sur le poste, dans la session de la personne qui utilise le logiciel, ouvrez ce lien.", "Cliquez « Télécharger l'installateur », puis double-cliquez le fichier.", "Attendez la fin de l'assistant : 1 minute, rien à taper."]}
+              copied={copied === "post"}
+              onCopy={() => copy("post", post.downloadUrl)}
+              done={postDone ? "Le poste vient de se relier : l'installation est terminée." : null}
+            />
+            <details className="rounded-xl border border-border-subtle p-3.5">
+              <summary className="cursor-pointer text-[13.5px] font-semibold text-text-primary">Sous AnyDesk : la même installation en une ligne</summary>
+              <div className="mt-3">
+                <CommandBox
+                  title="Sur le poste, collez cette ligne"
+                  command={post.command}
+                  validity="Même lien, même poste : l'un ou l'autre."
+                  steps={["Sur le poste, dans la session de la personne qui utilise le logiciel, ouvrez PowerShell.", "Collez la ligne, puis Entrée.", "Attendez « Le poste est relié » : 1 à 2 minutes."]}
+                  copied={copied === "postLine"}
+                  onCopy={() => copy("postLine", post.command)}
+                  done={null}
+                />
+              </div>
+            </details>
+          </>
         )}
       </div>
     </div>
@@ -149,14 +170,14 @@ export function InstallCommands({
 }
 
 /** Une ligne à copier, en grand, avec ses trois étapes. Un clic dessus la sélectionne en entier. */
-export function CommandBox({ title, command, validity, steps, copied, onCopy, done }: { title: string; command: string; validity: string; steps: string[]; copied: boolean; onCopy: () => void; done: ReactNode }) {
+export function CommandBox({ title, command, validity, steps, copied, onCopy, done, copyLabel = "Copier la ligne" }: { title: string; command: string; validity: string; steps: string[]; copied: boolean; onCopy: () => void; done: ReactNode; copyLabel?: string }) {
   return (
     <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/30">
       <p className="text-[14px] font-semibold text-text-primary">{title}</p>
-      <pre aria-label="Ligne à copier" className="rounded-lg bg-ink-950 px-3.5 py-3 font-mono text-[13px] leading-5 break-all whitespace-pre-wrap text-white select-all">{command}</pre>
+      <pre aria-label={copyLabel === "Copier le lien" ? "Lien à copier" : "Ligne à copier"} className="rounded-lg bg-ink-950 px-3.5 py-3 font-mono text-[13px] leading-5 break-all whitespace-pre-wrap text-white select-all">{command}</pre>
       <div className="flex flex-wrap items-center gap-3">
         <Button size="sm" leadingIcon={copied ? <Check className="size-4" /> : <Copy className="size-4" />} onClick={onCopy}>
-          {copied ? "Copié" : "Copier la ligne"}
+          {copied ? "Copié" : copyLabel}
         </Button>
         <span className="text-[12.5px] text-text-secondary">{validity}</span>
       </div>

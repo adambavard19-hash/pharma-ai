@@ -16,8 +16,8 @@ export const INSTALLATION_STEPS: { title: string; body: string }[] = [
     body: "Dans votre logiciel de gestion, faites l'édition de l'inventaire (PDF, Excel ou CSV) et déposez le fichier dans PharmaBoost → Stock. C'est ce qui permet au comptoir de proposer ce qui est réellement en rayon.",
   },
   {
-    title: "Reliez chaque poste de comptoir, en une ligne",
-    body: "Sur l'ordinateur où la douchette est branchée : PharmaBoost → Mise en service → étape 3. Le guide vous montre comment ouvrir PowerShell (clic droit sur le bouton Windows → Terminal), vous donne la ligne à copier, et vous voyez le poste apparaître en direct. Deux minutes par poste. Dès lors, chaque boîte bipée dans votre logiciel ouvre le conseil sur l'écran.",
+    title: "Reliez chaque poste de comptoir, en un double-clic",
+    body: "Sur l'ordinateur où la douchette est branchée : PharmaBoost → Mise en service → étape 3. Générez le lien, ouvrez-le sur le poste, téléchargez l'installateur et double-cliquez le fichier : rien à taper, aucun mot de passe administrateur, et vous voyez le poste apparaître en direct. Une minute par poste. Dès lors, chaque boîte bipée dans votre logiciel ouvre le conseil sur l'écran.",
   },
   {
     title: "Faites suivre l'inventaire automatiquement",

@@ -179,12 +179,12 @@ export async function createPostInstallLink(scope: TenantScope, label: string | 
  * Un lien d'installation encore valable ? Sans rien consommer : l'installateur le vérifie avant de télécharger.
  * Rend aussi le nom de machine du serveur relié (s'il y en a un, et s'il est sûr) : le poste en tire le chemin du dossier partagé.
  */
-export async function peekPostInstallLink(token: string): Promise<{ pharmacyName: string; label: string | null; serverHostname: string | null } | null> {
+export async function peekPostInstallLink(token: string): Promise<{ pharmacyName: string; label: string | null; serverHostname: string | null; expiresAt: Date } | null> {
   if (!/^[A-Za-z0-9_-]{16,}$/.test(token)) return null;
   const post = await prisma.counterPost.findUnique({ where: { pairingCodeHash: hashToken(token) }, select: { label: true, pharmacyId: true, pairingExpiresAt: true, pharmacy: { select: { name: true } } } });
   if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return null;
   const server = await prisma.stockConnection.findUnique({ where: { pharmacyId: post.pharmacyId }, select: { hostname: true, pairedAt: true } });
-  return { pharmacyName: post.pharmacy.name, label: post.label, serverHostname: server?.pairedAt ? safeServerHostname(server.hostname) : null };
+  return { pharmacyName: post.pharmacy.name, label: post.label, serverHostname: server?.pairedAt ? safeServerHostname(server.hostname) : null, expiresAt: post.pairingExpiresAt };
 }
 
 /**

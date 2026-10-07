@@ -30,6 +30,24 @@ export function buildServerInstallCommand(baseUrl: string, code: string): string
   return `powershell -ExecutionPolicy Bypass -Command "${TLS12}irm ${withoutSlash(baseUrl)}/api/agent/installer-serveur/${code} | iex"`;
 }
 
+/** Le préfixe du nom de l'installateur : l'installateur Windows y lit le jeton (voir agent/src/installer.ts, qui doit rester d'accord). */
+export const INSTALLER_FILE_PREFIX = "PharmaBoost-Installation-";
+
+/** Le nom sous lequel le poste télécharge l'installateur : le jeton y voyage, les octets restent les mêmes pour tous. */
+export function installerFileName(token: string): string {
+  return `${INSTALLER_FILE_PREFIX}${token}.exe`;
+}
+
+/** La page que le titulaire ouvre pour télécharger l'installateur de son poste : c'est ce lien qu'on envoie par e-mail. */
+export function buildPostDownloadUrl(baseUrl: string, token: string): string {
+  return `${withoutSlash(baseUrl)}/installer/${token}`;
+}
+
+/** Le fichier lui-même, sous le jeton : le bouton de la page ci-dessus. */
+export function buildPostInstallerFileUrl(baseUrl: string, token: string): string {
+  return `${withoutSlash(baseUrl)}/api/agent/installateur/${token}`;
+}
+
 /** La ligne à coller sur un poste de comptoir. */
 export function buildPostInstallCommand(baseUrl: string, token: string): string {
   return `powershell -ExecutionPolicy Bypass -Command "${TLS12}irm ${withoutSlash(baseUrl)}/api/agent/installer/${token} | iex"`;

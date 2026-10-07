@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    PharmaBoostPreparation.exe : l'outil que l'installateur lance pour mettre en
+    place Node.js (le moteur de l'agent). Console, .NET Framework 4.8 : présent
+    sur tout Windows 10 à jour, rien à installer de plus.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>PharmaBoostPreparation</AssemblyName>
+    <RootNamespace>PharmaBoost.Setup</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Product>PharmaBoost</Product>
+    <Company>PharmaBoost</Company>
+    <ApplicationIcon>..\assets\pharmaboost.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

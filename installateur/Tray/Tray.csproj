@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    PharmaBoost.exe : l'icône près de l'horloge. Elle démarre l'agent (Node.js,
+    sans fenêtre), le relance s'il s'arrête, le met à jour quand PharmaBoost en
+    publie une nouvelle version, et montre en un coup d'œil si le poste est
+    relié. .NET Framework 4.8 : présent sur tout Windows 10 à jour.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>PharmaBoost</AssemblyName>
+    <RootNamespace>PharmaBoost.Tray</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <Product>PharmaBoost</Product>
+    <Company>PharmaBoost</Company>
+    <ApplicationIcon>..\assets\pharmaboost.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Web.Extensions" />
+    <EmbeddedResource Include="..\assets\logo-32.png" LogicalName="logo-32.png" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

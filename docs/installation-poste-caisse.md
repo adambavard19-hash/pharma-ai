@@ -1,11 +1,52 @@
-# Installer un poste de caisse (agent 0.4.x)
+# Installer un poste de caisse (agent 0.5.x)
 
-## En une ligne, par le titulaire lui-même
+## Par le titulaire lui-même : un lien, un fichier, un double-clic
 
-Dans PharmaBoost → Stock → Connecter mon logiciel → **Ajouter un poste** :
-une commande s'affiche, valable sept jours pour un poste. Sur l'ordinateur où
-la douchette est branchée, clic droit sur le bouton Windows → Terminal, coller,
-Entrée :
+Dans PharmaBoost → Stock → Connecter mon logiciel → **Ajouter un poste** (ou
+Mise en service → étape 3) : un lien s'affiche, valable sept jours pour un
+poste. Il s'ouvre sur l'ordinateur où la douchette est branchée — ou il part
+par e-mail à la personne qui s'y trouve :
+
+```
+https://pharmaboost.app/installer/<jeton>
+```
+
+La page (`/installer/[token]`) donne le bouton « Télécharger l'installateur » :
+`PharmaBoost-Installation-<jeton>.exe`. Double-clic, une minute, rien à taper,
+aucun mot de passe administrateur. Ensuite l'icône PharmaBoost est près de
+l'horloge (point vert : le poste est relié) et le poste apparaît « En ligne »
+dans PharmaBoost.
+
+Ce que fait l'installateur, dans la session de la personne qui utilise le LGPI :
+
+1. arrête une éventuelle ancienne installation (tâche « PharmaBoost Connect
+   (poste) » de l'installation en une ligne comprise) ;
+2. copie l'icône (`PharmaBoost.exe`) et l'agent (`pharmaboost-connect.js`) dans
+   `%LOCALAPPDATA%\PharmaBoost\Poste` ;
+3. télécharge Node.js (version épinglée, empreinte SHA-256 vérifiée avant
+   d'ouvrir l'archive) ;
+4. relie le poste avec le jeton lu dans le **nom du fichier** (le même
+   installateur sert toutes les officines) ; un fichier renommé demande le
+   code à six chiffres ou le lien ;
+5. démarre avec Windows (clé Run de l'utilisateur), pose un raccourci sur le
+   Bureau et dans le menu Démarrer, et s'inscrit dans « Applications
+   installées » (désinstallation propre).
+
+L'icône supervise l'agent (relance), le **met à jour toute seule** (elle
+compare l'empreinte annoncée par `/api/agent/version` à celle du fichier
+local, vérifie l'empreinte du fichier téléchargé, garde l'ancienne version et
+y revient si la nouvelle ne tient pas), et dit l'état du poste. Clic droit :
+ouvrir PharmaBoost, essayer l'affichage d'un avis, voir le journal.
+
+Un technicien sous AnyDesk garde la **ligne de commande** (même lien, même
+poste), décrite ci-dessous. Construction, signature et essai sur Windows de
+l'installateur : `installateur/README.md`.
+
+## En une ligne (technicien, ou prise en main à distance)
+
+Dans PharmaBoost → Stock → Connecter mon logiciel → **Ajouter un poste**, le
+détail « Technicien… » affiche une commande. Sur le poste, clic droit sur le
+bouton Windows → Terminal, coller, Entrée :
 
 ```
 powershell -ExecutionPolicy Bypass -Command "irm https://pharmaboost.app/api/agent/installer/<jeton> | iex"
@@ -14,10 +55,9 @@ powershell -ExecutionPolicy Bypass -Command "irm https://pharmaboost.app/api/age
 Le script (`/api/agent/installer/[token]`) vérifie le jeton, télécharge le
 programme et l'installateur (`/api/agent/fichiers/…`), installe Node.js s'il
 manque, appaire le poste avec le jeton et crée la tâche à l'ouverture de
-session. « Le poste est relié » s'affiche à la fin. Le guide envoyé par
-e-mail à l'activation (`src/core/platform/onboarding-emails.ts`) décrit ces
-étapes au titulaire ; la console peut le renvoyer (fiche officine → « Envoyer
-le guide d'installation »).
+session. « Le poste est relié » s'affiche à la fin. Cette installation n'a
+pas l'icône ni la mise à jour automatique : un poste installé ainsi peut être
+réinstallé avec l'installateur, qui reprend la place de la tâche.
 
 ## L'autre méthode : code à six chiffres et archive
 

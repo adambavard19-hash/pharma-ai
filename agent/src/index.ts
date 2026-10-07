@@ -23,16 +23,22 @@
  * LGO. Voir douchette.ts.
  *   node pharmaboost-connect.js --poste 123456 --serveur https://pharmaboost.app
  *   node pharmaboost-connect.js --test-douchette   (affiche les bips, n'envoie rien)
+ *
+ * Installé par PharmaBoost-Installation-<jeton>.exe (double-clic, sans terminal),
+ * l'installateur relie le poste avec le jeton du nom de fichier :
+ *   node pharmaboost-connect.js --installer "PharmaBoost-Installation-<jeton>.exe"
  */
 import { createHash } from "node:crypto";
 import { startDouchette } from "./douchette";
 import { showToast } from "./toast";
 import { createScanQueue } from "./scan-queue";
+import { INSTALLER_EXIT, resolveInstallCode } from "./installer";
+import { stateForFailure, writeStatus, type PostState } from "./status";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.4.2";
+const VERSION = "0.5.0";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -58,6 +64,9 @@ type Config = {
   lastExportHash?: string;
   /** Scans déjà envoyés (nom + taille), pour ne jamais envoyer deux fois. */
   sentScans?: string[];
+  /** Pour l'icône près de l'horloge : l'officine et le nom du poste, tels que PharmaBoost les connaît. */
+  pharmacyName?: string;
+  postLabel?: string;
 };
 
 /** Ce que l'agent constate et que PharmaBoost doit montrer ; vide quand tout va bien. */
@@ -109,17 +118,59 @@ async function api(config: Pick<Config, "serverUrl" | "agentKey">, path: string,
  * douchette et un signe de vie par minute.
  */
 async function pairPost(): Promise<void> {
-  const code = arg("poste");
-  const serverUrl = arg("serveur") ?? "https://pharmaboost.app";
-  const response = await fetch(`${serverUrl.replace(/\/$/, "")}/api/agent/pair`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, role: "poste", hostname: hostname(), version: VERSION }),
-  });
+  const paired = await requestPostPairing(arg("poste") ?? "", arg("serveur") ?? "https://pharmaboost.app", arg("lgo") ?? "lgpi");
+  log(`Poste ${paired.postLabel || hostname()} relié à ${paired.pharmacyName || "l'officine"}. Configuration écrite dans ${CONFIG_PATH}.`);
+}
+
+/** Le serveur a répondu non (code expiré ou inconnu) ou n'a pas pu être joint : l'installateur Windows ne dit pas la même chose dans les deux cas. */
+class PairingError extends Error {
+  constructor(message: string, readonly kind: "refused" | "unreachable") {
+    super(message);
+    this.name = "PairingError";
+  }
+}
+
+async function requestPostPairing(code: string, serverUrl: string, lgo: string): Promise<{ pharmacyName: string; postLabel: string }> {
+  let response: Response;
+  try {
+    response = await fetch(`${serverUrl.replace(/\/$/, "")}/api/agent/pair`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, role: "poste", hostname: hostname(), version: VERSION }),
+    });
+  } catch (error) {
+    throw new PairingError(`PharmaBoost est injoignable (${error instanceof Error ? error.message : String(error)}).`, "unreachable");
+  }
   const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; agentKey?: string; pharmacyName?: string; postLabel?: string };
-  if (!response.ok || !body.ok || !body.agentKey) throw new Error(body.error ?? `Appairage refusé (HTTP ${response.status}).`);
-  writeConfig({ serverUrl, agentKey: body.agentKey, role: "poste", lgo: arg("lgo") ?? "lgpi", exportPath: null, scansPath: null, intervalSeconds: 300 });
-  log(`Poste ${body.postLabel ?? hostname()} relié à ${body.pharmacyName ?? "l'officine"}. Configuration écrite dans ${CONFIG_PATH}.`);
+  if (!response.ok || !body.ok || !body.agentKey) {
+    throw new PairingError(body.error ?? `Appairage refusé (HTTP ${response.status}).`, response.status >= 500 ? "unreachable" : "refused");
+  }
+  const pharmacyName = body.pharmacyName ?? "";
+  const postLabel = body.postLabel ?? "";
+  writeConfig({ serverUrl, agentKey: body.agentKey, role: "poste", lgo, exportPath: null, scansPath: null, intervalSeconds: 300, pharmacyName, postLabel });
+  return { pharmacyName, postLabel };
+}
+
+/**
+ * Le dernier geste de l'installateur Windows (PharmaBoost-Installation-<jeton>.exe) :
+ * relier ce poste. Le jeton vient du nom du fichier téléchargé, ou d'un code
+ * saisi (`--code`) quand le fichier a été renommé. Le résultat est un code de
+ * sortie (voir installer.ts) : l'installateur écrit lui-même le message.
+ */
+async function installFromInstaller(): Promise<number> {
+  const code = resolveInstallCode({ fileName: arg("installer"), typed: arg("code") });
+  if (!code) {
+    log("Installation : aucun code d'installation dans le nom du fichier, et aucun code saisi.");
+    return INSTALLER_EXIT.noCode;
+  }
+  try {
+    const paired = await requestPostPairing(code, arg("serveur") ?? "https://pharmaboost.app", arg("lgo") ?? "lgpi");
+    log(`Installation : poste ${paired.postLabel || hostname()} relié à ${paired.pharmacyName || "l'officine"}.`);
+    return INSTALLER_EXIT.ok;
+  } catch (error) {
+    log(`Installation : ${error instanceof Error ? error.message : String(error)}`);
+    return error instanceof PairingError && error.kind === "unreachable" ? INSTALLER_EXIT.unreachable : INSTALLER_EXIT.refused;
+  }
 }
 
 async function sendScan(config: Config, code: string, scannedAt: string): Promise<void> {
@@ -184,6 +235,8 @@ async function postHeartbeat(config: Config): Promise<{ exportPath: string | nul
     body: JSON.stringify({ version: VERSION, hostname: hostname(), notice }),
   });
   if (response.status === 401) throw new Error("clé du poste révoquée");
+  // Un serveur en panne (502, 503) n'est pas un signe de vie : l'icône du poste doit dire « hors ligne », pas « relié ».
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = (await response.json().catch(() => ({}))) as { exportPath?: string | null; syncRequestedAt?: string | null };
   return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null };
 }
@@ -209,12 +262,24 @@ async function runPost(config: Config): Promise<void> {
   let lastStockCheck = 0;
   let handledSyncRequest: string | null = null;
   let forceSync = false;
+  // L'état que l'icône près de l'horloge affiche : écrit à chaque signe de vie, réussi ou non.
+  const reportState = (etat: PostState) =>
+    writeStatus(CONFIG_PATH, { etat, at: new Date().toISOString(), version: VERSION, poste: config.postLabel || hostname(), officine: config.pharmacyName ?? null, notice });
   for (;;) {
     try {
       if (scans.size > 0) await scans.flush();
       await pollNotice(config);
       if (Date.now() - lastHeartbeat > 60_000) {
-        const settings = await postHeartbeat(config);
+        let settings: Awaited<ReturnType<typeof postHeartbeat>>;
+        try {
+          settings = await postHeartbeat(config);
+        } catch (error) {
+          reportState(stateForFailure(error));
+          // Nouvel essai dans 15 secondes plutôt qu'à chaque tour de boucle : une coupure ne remplit pas le journal.
+          lastHeartbeat = Date.now() - 45_000;
+          throw error;
+        }
+        reportState("ok");
         lastHeartbeat = Date.now();
         if (settings.exportPath !== (config.exportPath ?? null)) {
           config = { ...config, exportPath: settings.exportPath };
@@ -430,6 +495,8 @@ async function run(): Promise<void> {
 
 if (arg("appairer")) {
   pair().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
+} else if (process.argv.includes("--installer")) {
+  installFromInstaller().then((code) => { process.exitCode = code; });
 } else if (arg("poste")) {
   pairPost().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
 } else if (process.argv.includes("--test-douchette")) {

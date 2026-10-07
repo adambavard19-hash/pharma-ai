@@ -8,6 +8,7 @@ import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { createPairing, createPostInstallLink, createPostPairing, disconnectAgent, getConnection, isLgoId, requestPostSync, revokeCounterPost, setPostExportPath, updateConnectionSettings } from "@/server/services/stock-sync";
 import { LGO_DEFINITIONS, lgoLabel, stockFreshness } from "@/core/stock/connectors";
+import { buildPostDownloadUrl } from "@/core/stock/install";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
 import { fail, ok, type ActionResult } from "./types";
@@ -146,14 +147,18 @@ export async function requestPostSyncAction(payload: { postId: string }): Promis
   return ok(null, "Demande envoyée : le poste relit l'export dans la minute.");
 }
 
-/** Le lien d'installation d'un poste : une ligne à coller dans PowerShell sur l'ordinateur de la douchette. */
-export async function createPostInstallLinkAction(payload: { label?: string | null }): Promise<ActionResult<{ token: string; expiresAt: string; postId: string; command: string }>> {
+/**
+ * Le lien d'installation d'un poste : `downloadUrl` est la page où l'on télécharge
+ * l'installateur Windows (le lien à envoyer par e-mail) ; `command` est la même
+ * installation en une ligne, pour une personne qui prend la main à distance.
+ */
+export async function createPostInstallLinkAction(payload: { label?: string | null }): Promise<ActionResult<{ token: string; expiresAt: string; postId: string; command: string; downloadUrl: string }>> {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   const label = payload.label?.trim().slice(0, 60) || null;
   const link = await createPostInstallLink(session.scope, label);
   const base = resolvePublicBaseUrl().url.replace(/\/$/, "");
   const command = `powershell -ExecutionPolicy Bypass -Command "irm ${base}/api/agent/installer/${link.token} | iex"`;
   revalidatePath("/stock/connexion");
-  return ok({ token: link.token, expiresAt: link.expiresAt.toISOString(), postId: link.postId, command }, "Lien d'installation prêt, valable sept jours.");
+  return ok({ token: link.token, expiresAt: link.expiresAt.toISOString(), postId: link.postId, command, downloadUrl: buildPostDownloadUrl(base, link.token) }, "Lien d'installation prêt, valable sept jours.");
 }
 

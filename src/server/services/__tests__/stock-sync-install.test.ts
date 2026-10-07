@@ -83,7 +83,7 @@ describe("peekPostInstallLink : le serveur relié de l'officine", () => {
   it("rend le nom de machine du serveur relié", async () => {
     db.counterPost.findUnique.mockResolvedValue(post());
     db.stockConnection.findUnique.mockResolvedValue({ hostname: "SRV-PHARMA", pairedAt: PAST });
-    expect(await service.peekPostInstallLink(TOKEN)).toEqual({ pharmacyName: "Pharmacie du Port", label: "Comptoir 1", serverHostname: "SRV-PHARMA" });
+    expect(await service.peekPostInstallLink(TOKEN)).toEqual({ pharmacyName: "Pharmacie du Port", label: "Comptoir 1", serverHostname: "SRV-PHARMA", expiresAt: FUTURE });
     expect(db.stockConnection.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { pharmacyId: "ph_1" } }));
   });
 

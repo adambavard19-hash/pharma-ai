@@ -23,8 +23,9 @@ type PostRow = { id: string; label: string | null; hostname: string; paired: boo
 export function CounterPostsCard({ serverUrl, posts }: { serverUrl: string; posts: PostRow[] }) {
   const [label, setLabel] = useState("");
   const [code, setCode] = useState<{ code: string; expiresAt: string } | null>(null);
-  const [link, setLink] = useState<{ command: string; expiresAt: string } | null>(null);
+  const [link, setLink] = useState<{ command: string; downloadUrl: string; expiresAt: string } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [lineCopied, setLineCopied] = useState(false);
   const [pending, start] = useTransition();
   const router = useRouter();
   const { push } = useToast();
@@ -35,7 +36,7 @@ export function CounterPostsCard({ serverUrl, posts }: { serverUrl: string; post
     start(async () => {
       const result = await createPostInstallLinkAction({ label: label || null });
       if (!result.ok) return push({ tone: "error", title: result.error });
-      setLink({ command: result.data.command, expiresAt: result.data.expiresAt });
+      setLink({ command: result.data.command, downloadUrl: result.data.downloadUrl, expiresAt: result.data.expiresAt });
       setCode(null);
       setLabel("");
       router.refresh();
@@ -142,32 +143,58 @@ export function CounterPostsCard({ serverUrl, posts }: { serverUrl: string; post
         </div>
         {posts.some((post) => post.paired) && (
           <p className="text-[12.5px] leading-5 text-text-tertiary">
-            Mettre à jour un poste déjà relié : télécharger, extraire, puis dans le dossier extrait <code className="font-mono">powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -MiseAJour</code>. Aucun nouveau code.
+            Un poste installé avec l&apos;installateur se met à jour tout seul. Un poste installé à l&apos;ancienne, en ligne de commande : télécharger, extraire, puis dans le dossier extrait <code className="font-mono">powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -MiseAJour</code> (aucun nouveau code), ou le réinstaller avec l&apos;installateur.
           </p>
         )}
 
         {link && (
           <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/30">
-            <p className="text-[14px] font-semibold text-text-primary">Sur l&apos;ordinateur où la douchette est branchée, en une ligne :</p>
+            <p className="text-[14px] font-semibold text-text-primary">Installer ce poste : un lien, un fichier, un double-clic.</p>
             <ol className="list-decimal space-y-1.5 pl-5 text-[13.5px] leading-5 text-text-primary">
-              <li>Clic droit sur le bouton Windows → « Terminal » (ou « Windows PowerShell »).</li>
-              <li>Collez la ligne ci-dessous, puis Entrée. Tout s&apos;installe seul, Node.js compris : deux minutes.</li>
+              <li>Sur l&apos;ordinateur où la douchette est branchée, ouvrez ce lien et téléchargez l&apos;installateur — ou envoyez-le par e-mail à la personne qui s&apos;y trouve.</li>
+              <li>Double-cliquez le fichier téléchargé : une minute, rien à taper, aucun mot de passe administrateur.</li>
+              <li>L&apos;icône PharmaBoost apparaît près de l&apos;horloge, et le poste apparaît ci-dessus « En ligne ». Passez une boîte à la douchette dans votre logiciel : elle arrive dans PharmaBoost.</li>
             </ol>
-            <pre className="overflow-x-auto rounded-lg bg-ink-950 px-3 py-2.5 font-mono text-[12.5px] text-white">{link.command}</pre>
+            <pre aria-label="Lien à copier" className="overflow-x-auto rounded-lg bg-ink-950 px-3 py-2.5 font-mono text-[12.5px] text-white select-all">{link.downloadUrl}</pre>
             <div className="flex flex-wrap items-center gap-2">
+              <Button asChild size="sm" leadingIcon={<Download className="size-3.5" />}>
+                <a href={link.downloadUrl}>Ouvrir la page de téléchargement</a>
+              </Button>
               <Button
                 size="sm"
+                variant="outline"
                 onClick={async () => {
-                  await navigator.clipboard.writeText(link.command).catch(() => undefined);
+                  await navigator.clipboard.writeText(link.downloadUrl).catch(() => undefined);
                   setLinkCopied(true);
                   setTimeout(() => setLinkCopied(false), 2500);
                 }}
               >
-                {linkCopied ? "Copié" : "Copier la ligne"}
+                {linkCopied ? "Copié" : "Copier le lien"}
               </Button>
               <span className="text-[12.5px] text-text-secondary">Valable jusqu&apos;au {formatDateTime(new Date(link.expiresAt))}, pour un seul poste.</span>
             </div>
-            <p className="text-[12.5px] text-text-secondary">À la fin, « Le poste est relié » s&apos;affiche et le poste apparaît ci-dessus en ligne. Passez une boîte à la douchette dans votre logiciel : elle arrive dans PharmaBoost. <button type="button" onClick={generateCode} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Autre méthode : un code à six chiffres et l&apos;archive à télécharger.</button></p>
+            <details className="rounded-lg border border-border-subtle bg-surface-card px-3.5 py-2.5">
+              <summary className="cursor-pointer text-[13px] font-semibold text-text-primary">Technicien ou prise en main à distance : la même installation en une ligne</summary>
+              <div className="mt-3 space-y-2.5">
+                <ol className="list-decimal space-y-1 pl-5 text-[13px] leading-5 text-text-primary">
+                  <li>Clic droit sur le bouton Windows → « Terminal » (ou « Windows PowerShell »).</li>
+                  <li>Collez la ligne ci-dessous, puis Entrée. Tout s&apos;installe seul, Node.js compris : deux minutes.</li>
+                </ol>
+                <pre className="overflow-x-auto rounded-lg bg-ink-950 px-3 py-2.5 font-mono text-[12.5px] text-white">{link.command}</pre>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(link.command).catch(() => undefined);
+                    setLineCopied(true);
+                    setTimeout(() => setLineCopied(false), 2500);
+                  }}
+                >
+                  {lineCopied ? "Copiée" : "Copier la ligne"}
+                </Button>
+              </div>
+            </details>
+            <p className="text-[12.5px] text-text-secondary">Le fichier téléchargé porte le nom de ce lien : ne le renommez pas. <button type="button" onClick={generateCode} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Autre méthode : un code à six chiffres et l&apos;archive à télécharger.</button></p>
           </div>
         )}
 

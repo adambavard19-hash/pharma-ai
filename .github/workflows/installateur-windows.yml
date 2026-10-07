@@ -1,0 +1,96 @@
+# Essai de l'installateur Windows sur un vrai Windows, contre un faux PharmaBoost (aucune donnée réelle).
+# Lancé à la main : Actions → « Installateur Windows (essai) » → Run workflow.
+#
+# Il vérifie ce qu'on ne peut pas vérifier depuis un Mac : l'installation silencieuse, le téléchargement
+# et la vérification de Node, la liaison du poste, l'icône et l'agent qui tournent, la réinstallation et
+# la désinstallation. Voir installateur/README.md.
+name: Installateur Windows (essai)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  installateur:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: "Faux serveur PharmaBoost"
+        shell: pwsh
+        run: |
+          Start-Process node -ArgumentList "installateur/tests/serveur-factice.mjs", "8787" -WindowStyle Hidden
+          Start-Sleep -Seconds 3
+          Invoke-RestMethod http://127.0.0.1:8787/__etat
+
+      - name: "Un lien refusé s'arrête avec le code 3 et ne laisse rien derrière lui"
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP "PharmaBoost-Installation-BADBADBADBADBADBADBAD.exe"
+          Copy-Item agent/installateur/PharmaBoost-Installation.exe $exe
+          $p = Start-Process $exe -ArgumentList "/S", "/SERVEUR=http://127.0.0.1:8787" -PassThru
+          $p.WaitForExit()
+          if ($p.ExitCode -ne 3) { throw "code de sortie $($p.ExitCode), attendu 3" }
+          if (Test-Path "$env:LOCALAPPDATA\PharmaBoost\Poste") { throw "l'installation refusée a laissé des fichiers" }
+
+      - name: "Installation avec un lien valable (nom de fichier avec « (1) », comme un navigateur)"
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP "PharmaBoost-Installation-GOODGOODGOODGOODGOOD (1).exe"
+          Copy-Item agent/installateur/PharmaBoost-Installation.exe $exe
+          $p = Start-Process $exe -ArgumentList "/S", "/SERVEUR=http://127.0.0.1:8787" -PassThru
+          $p.WaitForExit()
+          if ($p.ExitCode -ne 0) { throw "code de sortie $($p.ExitCode), attendu 0" }
+          $dir = "$env:LOCALAPPDATA\PharmaBoost\Poste"
+          foreach ($f in "PharmaBoost.exe", "pharmaboost-connect.js", "node\node.exe", "pharmaboost-connect.json", "Desinstaller.exe") {
+            if (-not (Test-Path "$dir\$f")) { throw "manque : $f" }
+          }
+          if (-not (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run").PharmaBoost) { throw "pas de démarrage avec Windows" }
+          if (-not (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PharmaBoostPoste")) { throw "pas d'entrée Applications installées" }
+
+      - name: "L'icône tourne, l'agent donne signe de vie et le fichier d'état dit « ok »"
+        shell: pwsh
+        run: |
+          $dir = "$env:LOCALAPPDATA\PharmaBoost\Poste"
+          $statut = $null
+          for ($i = 0; $i -lt 60; $i++) {
+            if (Test-Path "$dir\pharmaboost-statut.json") { $statut = Get-Content "$dir\pharmaboost-statut.json" -Raw | ConvertFrom-Json; break }
+            Start-Sleep -Seconds 2
+          }
+          if (-not $statut) { throw "l'agent n'a jamais écrit son état" }
+          if ($statut.etat -ne "ok") { throw "état : $($statut.etat)" }
+          if (-not (Get-Process PharmaBoost -ErrorAction SilentlyContinue)) { throw "l'icône ne tourne pas" }
+          $etat = Invoke-RestMethod http://127.0.0.1:8787/__etat
+          if ($etat.signesDeVie -lt 1) { throw "le faux serveur n'a reçu aucun signe de vie" }
+          Write-Host "Poste relié : $($statut.poste) · $($statut.officine) · agent $($statut.version)"
+
+      - name: "Réinstallation sur un poste déjà relié : le lien déjà utilisé ne casse rien"
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP "PharmaBoost-Installation-GOODGOODGOODGOODGOOD (1).exe"
+          $p = Start-Process $exe -ArgumentList "/S", "/SERVEUR=http://127.0.0.1:8787" -PassThru
+          $p.WaitForExit()
+          if ($p.ExitCode -ne 0) { throw "code de sortie $($p.ExitCode), attendu 0" }
+          if (-not (Test-Path "$env:LOCALAPPDATA\PharmaBoost\Poste\pharmaboost-connect.json")) { throw "la configuration a disparu" }
+
+      - name: "Désinstallation silencieuse"
+        shell: pwsh
+        run: |
+          $dir = "$env:LOCALAPPDATA\PharmaBoost\Poste"
+          Start-Process "$dir\Desinstaller.exe" -ArgumentList "/S"
+          for ($i = 0; $i -lt 30 -and (Test-Path $dir); $i++) { Start-Sleep -Seconds 2 }
+          if (Test-Path $dir) { throw "le dossier est toujours là" }
+          if ((Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -ErrorAction SilentlyContinue).PharmaBoost) { throw "le démarrage avec Windows est resté" }
+          if (Get-Process PharmaBoost -ErrorAction SilentlyContinue) { throw "l'icône tourne encore" }
+
+      - name: "Journaux"
+        if: always()
+        shell: pwsh
+        run: |
+          $dir = "$env:LOCALAPPDATA\PharmaBoost\Poste"
+          foreach ($f in "pharmaboost-connect.log", "pharmaboost-icone.log") {
+            if (Test-Path "$dir\$f") { Write-Host "--- $f"; Get-Content "$dir\$f" -Tail 40 }
+          }

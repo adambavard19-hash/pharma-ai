@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { resolvePublicBaseUrl } from "@/server/public-url";
 import { createPairing, createPostInstallLink, isLgoId, resolveInstallTarget } from "@/server/services/stock-sync";
-import { buildPostInstallCommand, buildServerInstallCommand, cleanPostLabel } from "@/core/stock/install";
+import { buildPostDownloadUrl, buildPostInstallCommand, buildServerInstallCommand, cleanPostLabel } from "@/core/stock/install";
 import { fail, ok, type ActionResult } from "./types";
 
 /**
@@ -44,8 +44,12 @@ export async function prepareInstallationAction(payload: { pharmacyId: string; l
   return ok({ serverCommand: buildServerInstallCommand(baseUrl(), pairing.code), serverCodeExpiresAt: pairing.expiresAt.toISOString() }, "Ligne prête, valable une heure.");
 }
 
-/** Le lien d'un poste de comptoir : une ligne, sept jours, un seul poste. Le nom du poste est facultatif. */
-export async function preparePostInstallAction(payload: { pharmacyId: string; label?: string | null }): Promise<ActionResult<{ postCommand: string; expiresAt: string; postId: string }>> {
+/**
+ * Le lien d'un poste de comptoir : sept jours, un seul poste, le nom du poste est
+ * facultatif. `postDownloadUrl` est la page de l'installateur Windows (le lien à
+ * envoyer au titulaire) ; `postCommand` la même installation en une ligne, sous AnyDesk.
+ */
+export async function preparePostInstallAction(payload: { pharmacyId: string; label?: string | null }): Promise<ActionResult<{ postCommand: string; postDownloadUrl: string; expiresAt: string; postId: string }>> {
   const session = await requirePlatformSession();
   const parsed = postSchema.safeParse(payload);
   if (!parsed.success) return fail("Requête invalide.");
@@ -53,5 +57,5 @@ export async function preparePostInstallAction(payload: { pharmacyId: string; la
   if (!target.ok) return fail(REFUSALS[target.reason]);
   const link = await createPostInstallLink(target.scope, cleanPostLabel(parsed.data.label), { platformAdminId: session.admin.id });
   revalidatePath(`/admin/pharmacies/${target.scope.pharmacyId}`);
-  return ok({ postCommand: buildPostInstallCommand(baseUrl(), link.token), expiresAt: link.expiresAt.toISOString(), postId: link.postId }, "Ligne prête, valable sept jours.");
+  return ok({ postCommand: buildPostInstallCommand(baseUrl(), link.token), postDownloadUrl: buildPostDownloadUrl(baseUrl(), link.token), expiresAt: link.expiresAt.toISOString(), postId: link.postId }, "Ligne prête, valable sept jours.");
 }

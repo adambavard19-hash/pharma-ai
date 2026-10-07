@@ -112,30 +112,29 @@ export function InstallationGuide({ initial, firstName, pharmacyName, lgo }: { i
 
       {/* ---------------------------------------------------------- 3 */}
       <Step id="poste" number={3} title="Le poste de comptoir" done={postsPaired.length > 0} open={current === "poste"} icon={Barcode}>
-        <p className="text-[13.5px] leading-6 text-text-secondary">Un petit programme sur l&apos;ordinateur où la douchette est branchée. Il écoute la douchette, et rien d&apos;autre : chaque boîte bipée dans votre logiciel ouvre le conseil sur l&apos;écran. Deux minutes par poste, à refaire sur chaque poste de comptoir.</p>
+        <p className="text-[13.5px] leading-6 text-text-secondary">Un petit programme sur l&apos;ordinateur où la douchette est branchée. Il écoute la douchette, et rien d&apos;autre : chaque boîte bipée dans votre logiciel ouvre le conseil sur l&apos;écran. Une minute par poste, à refaire sur chaque poste de comptoir.</p>
 
-        <Do title="A. Sur le poste de comptoir, ouvrez PowerShell (la fenêtre où l'on tape une commande) :">
-          <li><strong>Le plus simple :</strong> clic droit sur le bouton Windows, en bas à gauche de l&apos;écran, puis « Terminal » ou « Windows PowerShell » dans la liste.</li>
-          <li><strong>Sinon :</strong> appuyez sur la touche Windows du clavier, tapez <code>powershell</code>, puis Entrée.</li>
-          <li>Une fenêtre bleue ou noire s&apos;ouvre, avec un curseur qui clignote. C&apos;est là qu&apos;on colle la ligne. Pas besoin d&apos;être administrateur.</li>
+        <Do title="A. Sur le poste de comptoir, ouvrez le lien d'installation :">
+          <li>Générez le lien ci-dessous. Ouvrez-le sur l&apos;ordinateur où la douchette est branchée — ou envoyez-le par e-mail à la personne qui s&apos;y trouve — puis cliquez « Télécharger l&apos;installateur ».</li>
         </Do>
 
         <InstallLine />
 
-        <Do title="C. Collez la ligne dans la fenêtre PowerShell, puis Entrée :">
-          <li>Clic droit dans la fenêtre colle le texte (ou Ctrl + V). Appuyez sur Entrée.</li>
-          <li>Laissez faire : le programme se télécharge, Node.js s&apos;installe s&apos;il manque (une minute), puis le poste se relie.</li>
+        <Do title="C. Double-cliquez le fichier téléchargé :">
+          <li>Suivez l&apos;assistant : une minute, Internet requis. Rien à taper, aucun mot de passe administrateur.</li>
+          <li>L&apos;icône PharmaBoost apparaît près de l&apos;horloge, avec un point vert quand le poste est relié.</li>
         </Do>
-        <See>Dans la fenêtre : « Le poste est relié ». Et ci-dessous, dans la minute, le poste apparaît « en ligne ». Passez alors une boîte à la douchette dans votre logiciel : elle arrive dans PharmaBoost, écran Nouvelle vente.</See>
+        <See>L&apos;assistant dit « PharmaBoost est installé ». Et ci-dessous, dans la minute, le poste apparaît « en ligne ». Passez alors une boîte à la douchette dans votre logiciel : elle arrive dans PharmaBoost, écran Nouvelle vente.</See>
 
         <PostsLive posts={state.posts} />
 
         <Trouble items={[
-          ["Rouge : « l'exécution de scripts est désactivée sur ce système »", "La ligne commence par « powershell -ExecutionPolicy Bypass » justement pour passer outre. Vérifiez qu'elle a été collée en entier, du premier au dernier caractère, puis Entrée."],
-          ["Une fenêtre « Windows a protégé votre ordinateur » ou un antivirus", "Cliquez « Informations complémentaires » puis « Exécuter quand même ». Le programme est PharmaBoost Connect, téléchargé depuis pharmaboost.app ; si votre antivirus l'arrête, ajoutez une exception sur le dossier PharmaBoost dans AppData."],
-          ["Le poste n'apparaît pas au bout de deux minutes", "Vérifiez que l'ordinateur a Internet (ouvrez pharmaboost.app dans un navigateur). Puis rejouez la ligne : si le lien a déjà servi, générez-en un nouveau, chaque lien ne vaut que pour un poste."],
-          ["« Ce lien d'installation n'est plus valable »", "Le lien a expiré (sept jours) ou a déjà relié un poste. Cliquez « Générer ma ligne » pour en obtenir un nouveau."],
-          ["La boîte bipée n'apparaît pas dans PharmaBoost", "Le programme écoute la douchette à partir de la prochaine ouverture de session Windows : fermez la session et rouvrez-la, ou redémarrez le poste. Si le poste est « en ligne » mais rien n'arrive, bipez une boîte de médicament (code CIP) : la parapharmacie se reconnaît ensuite."],
+          ["Une fenêtre « Windows a protégé votre ordinateur »", "C'est normal pour un programme que Windows ne connaît pas encore. Cliquez « Informations complémentaires », puis « Exécuter quand même ». Dans le navigateur, si le fichier est signalé, choisissez « Conserver »."],
+          ["L'installateur dit « Ce lien d'installation n'est plus valable »", "Le lien a expiré (sept jours) ou a déjà relié un poste. Cliquez « Générer un autre lien » ci-dessus, et téléchargez de nouveau l'installateur : chaque lien ne vaut que pour un poste."],
+          ["L'installateur dit que PharmaBoost est injoignable", "Vérifiez que l'ordinateur a Internet (ouvrez pharmaboost.app dans un navigateur). Si un pare-feu filtre les sites, il doit laisser passer pharmaboost.app et nodejs.org."],
+          ["Mon antivirus retire le programme", "Ajoutez une exception sur le dossier PharmaBoost, dans AppData\\Local (tapez %LOCALAPPDATA%\\PharmaBoost dans l'Explorateur), puis relancez l'installateur."],
+          ["Le poste n'apparaît pas au bout de deux minutes", "Cherchez l'icône PharmaBoost près de l'horloge (flèche ^ à gauche des icônes). Absente : menu Démarrer, puis PharmaBoost. Point orange ou rouge : passez dessus, elle dit ce qui bloque."],
+          ["La boîte bipée n'apparaît pas dans PharmaBoost", "L'icône doit avoir un point vert. Si le poste est « en ligne » mais que rien n'arrive, bipez une boîte de médicament (code CIP) : la parapharmacie se reconnaît ensuite. Clic droit sur l'icône → « Essayer l'affichage d'un avis » montre où l'avis s'affiche."],
           ["Je n'y arrive pas", `Écrivez à ${CONTACT} avec une photo de l'écran : on vous rappelle et on le fait avec vous, à distance.`],
         ]} />
       </Step>
@@ -183,46 +182,56 @@ export function InstallationGuide({ initial, firstName, pharmacyName, lgo }: { i
   );
 }
 
-/** La ligne d'installation : générée à la demande, copiée en un clic. */
+/** Le lien d'installation : généré à la demande, ouvert ou copié en un clic. La ligne de commande reste là, pour un technicien. */
 function InstallLine() {
-  const [link, setLink] = useState<{ command: string; expiresAt: string } | null>(null);
+  const [link, setLink] = useState<{ command: string; downloadUrl: string; expiresAt: string } | null>(null);
   const [label, setLabel] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"link" | "line" | null>(null);
   const [pending, start] = useTransition();
   const { push } = useToast();
   const generate = () =>
     start(async () => {
       const result = await createPostInstallLinkAction({ label: label || null });
       if (!result.ok) return push({ tone: "error", title: result.error });
-      setLink({ command: result.data.command, expiresAt: result.data.expiresAt });
+      setLink({ command: result.data.command, downloadUrl: result.data.downloadUrl, expiresAt: result.data.expiresAt });
     });
+  const copy = async (which: "link" | "line", text: string) => {
+    await navigator.clipboard.writeText(text).catch(() => undefined);
+    setCopied(which);
+    setTimeout(() => setCopied(null), 2500);
+  };
   return (
     <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/30">
-      <p className="text-[13.5px] font-semibold text-text-primary">B. Générez votre ligne, puis copiez-la :</p>
+      <p className="text-[13.5px] font-semibold text-text-primary">B. Générez votre lien d&apos;installation :</p>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="text-[12.5px] text-text-secondary">
           Nom du poste (facultatif)
           <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Caisse 1" className="mt-1 w-44" />
         </label>
-        <Button loading={pending} onClick={generate}>{link ? "Générer une autre ligne" : "Générer ma ligne"}</Button>
+        <Button loading={pending} onClick={generate}>{link ? "Générer un autre lien" : "Générer mon lien"}</Button>
       </div>
       {link && (
         <div className="mt-3 space-y-2">
-          <pre className="overflow-x-auto rounded-lg bg-ink-950 px-3 py-2.5 font-mono text-[12.5px] text-white">{link.command}</pre>
+          <pre aria-label="Lien à copier" className="overflow-x-auto rounded-lg bg-ink-950 px-3 py-2.5 font-mono text-[12.5px] text-white select-all">{link.downloadUrl}</pre>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              leadingIcon={copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-              onClick={async () => {
-                await navigator.clipboard.writeText(link.command).catch(() => undefined);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2500);
-              }}
-            >
-              {copied ? "Copiée" : "Copier la ligne"}
+            <Button asChild size="sm">
+              <a href={link.downloadUrl}>Ouvrir la page de téléchargement</a>
             </Button>
-            <span className="text-[12.5px] text-text-secondary">Valable jusqu&apos;au {formatDateTime(new Date(link.expiresAt))}, pour un seul poste. Un autre poste : une autre ligne.</span>
+            <Button size="sm" variant="outline" leadingIcon={copied === "link" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} onClick={() => copy("link", link.downloadUrl)}>
+              {copied === "link" ? "Copié" : "Copier le lien"}
+            </Button>
+            <span className="text-[12.5px] text-text-secondary">Valable jusqu&apos;au {formatDateTime(new Date(link.expiresAt))}, pour un seul poste. Un autre poste : un autre lien.</span>
           </div>
+          <details className="rounded-lg border border-border-subtle bg-surface-card px-3.5 py-2.5">
+            <summary className="cursor-pointer text-[13px] font-semibold text-text-primary">Un technicien prend la main à distance ? La même installation en une ligne</summary>
+            <div className="mt-3 space-y-2">
+              <p className="text-[13px] leading-5 text-text-secondary">Dans PowerShell sur le poste (clic droit sur le bouton Windows → « Terminal »), collez la ligne, puis Entrée.</p>
+              <pre className="overflow-x-auto rounded-lg bg-ink-950 px-3 py-2.5 font-mono text-[12.5px] text-white">{link.command}</pre>
+              <Button size="sm" variant="outline" leadingIcon={copied === "line" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} onClick={() => copy("line", link.command)}>
+                {copied === "line" ? "Copiée" : "Copier la ligne"}
+              </Button>
+            </div>
+          </details>
         </div>
       )}
     </div>

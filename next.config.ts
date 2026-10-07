@@ -39,6 +39,9 @@ const nextConfig: NextConfig = {
    */
   outputFileTracingIncludes: {
     "/**": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+    // L'agent et l'installateur Windows sont lus sur disque par les routes /api/agent/* : sans eux dans la
+    // trace, le déploiement n'embarquerait pas les fichiers et le téléchargement échouerait en production.
+    "/api/agent/**": ["./agent/dist/pharmaboost-connect.js", "./agent/installateur/PharmaBoost-Installation.exe"],
   },
 };
 

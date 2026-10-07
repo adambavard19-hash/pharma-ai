@@ -303,26 +303,81 @@ function createScanQueue(send) {
   };
 }
 
-// agent/src/index.ts
+// agent/src/installer.ts
+var INSTALLER_FILE_PREFIX = "PharmaBoost-Installation-";
+var INSTALLER_EXIT = {
+  ok: 0,
+  /** Ni jeton dans le nom du fichier, ni code saisi. */
+  noCode: 2,
+  /** Le serveur a répondu non : lien expiré, déjà utilisé, code inconnu. */
+  refused: 3,
+  /** PharmaBoost n'a pas pu être joint : Internet, pare-feu, proxy. */
+  unreachable: 4
+};
+function isInstallCode(value) {
+  return /^\d{6}$/.test(value) || /^[A-Za-z0-9_-]{16,64}$/.test(value);
+}
+function tokenFromInstallerName(fileName) {
+  const base = fileName.split(/[\\/]/).pop() ?? "";
+  const match = new RegExp(`^${INSTALLER_FILE_PREFIX}([A-Za-z0-9_-]+)(?=$|[\\s.(])`, "i").exec(base);
+  return match && isInstallCode(match[1]) ? match[1] : null;
+}
+function normalizeInstallCode(input) {
+  const text = input.trim();
+  if (!text) return null;
+  const link = /\/(?:installer|installateur)\/([A-Za-z0-9_-]+)\/?(?:[?#].*)?$/i.exec(text);
+  if (link) return isInstallCode(link[1]) ? link[1] : null;
+  const digits = text.replace(/[\s.-]/g, "");
+  if (/^\d{6}$/.test(digits)) return digits;
+  return isInstallCode(text) ? text : null;
+}
+function resolveInstallCode(input) {
+  if (input.typed && input.typed.trim()) return normalizeInstallCode(input.typed);
+  return input.fileName ? tokenFromInstallerName(input.fileName) : null;
+}
+
+// agent/src/status.ts
 var import_node_fs3 = require("node:fs");
-var import_node_os = require("node:os");
 var import_node_path3 = require("node:path");
-var VERSION = "0.4.2";
-var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path3.join)(process.cwd(), "pharmaboost-connect.json");
-var LOG_PATH = (0, import_node_path3.join)((0, import_node_path3.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
+var STATUS_FILE_NAME = "pharmaboost-statut.json";
+function statusFilePath(configPath) {
+  return (0, import_node_path3.join)((0, import_node_path3.dirname)(configPath), STATUS_FILE_NAME);
+}
+function stateForFailure(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /révoquée/i.test(message) ? "revoque" : "hors-ligne";
+}
+function writeStatus(configPath, status) {
+  const target = statusFilePath(configPath);
+  try {
+    (0, import_node_fs3.mkdirSync)((0, import_node_path3.dirname)(target), { recursive: true });
+    const temporary = `${target}.tmp`;
+    (0, import_node_fs3.writeFileSync)(temporary, JSON.stringify(status));
+    (0, import_node_fs3.renameSync)(temporary, target);
+  } catch {
+  }
+}
+
+// agent/src/index.ts
+var import_node_fs4 = require("node:fs");
+var import_node_os = require("node:os");
+var import_node_path4 = require("node:path");
+var VERSION = "0.5.0";
+var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path4.join)(process.cwd(), "pharmaboost-connect.json");
+var LOG_PATH = (0, import_node_path4.join)((0, import_node_path4.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
 var SETTLE_MS = 1e4;
 var CHECK_MS = 3e4;
-var DEFAULT_EXPORT = process.platform === "win32" ? "C:\\PharmaBoost\\Export" : (0, import_node_path3.join)(process.cwd(), "export");
+var DEFAULT_EXPORT = process.platform === "win32" ? "C:\\PharmaBoost\\Export" : (0, import_node_path4.join)(process.cwd(), "export");
 var DEFAULT_SCANS = process.platform === "win32" ? "C:\\PharmaBoost\\Ordonnances" : null;
 var notice = null;
 function log(message) {
   const line = `${(/* @__PURE__ */ new Date()).toISOString()} ${message}`;
   console.log(line);
   try {
-    (0, import_node_fs3.mkdirSync)((0, import_node_path3.dirname)(LOG_PATH), { recursive: true });
-    if ((0, import_node_fs3.existsSync)(LOG_PATH) && (0, import_node_fs3.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs3.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
-    (0, import_node_fs3.appendFileSync)(LOG_PATH, `${line}
+    (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(LOG_PATH), { recursive: true });
+    if ((0, import_node_fs4.existsSync)(LOG_PATH) && (0, import_node_fs4.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs4.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
+    (0, import_node_fs4.appendFileSync)(LOG_PATH, `${line}
 `);
   } catch {
   }
@@ -336,12 +391,12 @@ function arg(name) {
   return i >= 0 ? process.argv[i + 1] : void 0;
 }
 function readConfig() {
-  if (!(0, import_node_fs3.existsSync)(CONFIG_PATH)) return null;
-  return JSON.parse((0, import_node_fs3.readFileSync)(CONFIG_PATH, "utf8"));
+  if (!(0, import_node_fs4.existsSync)(CONFIG_PATH)) return null;
+  return JSON.parse((0, import_node_fs4.readFileSync)(CONFIG_PATH, "utf8"));
 }
 function writeConfig(config) {
-  (0, import_node_fs3.mkdirSync)((0, import_node_path3.dirname)(CONFIG_PATH), { recursive: true });
-  (0, import_node_fs3.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
+  (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(CONFIG_PATH), { recursive: true });
+  (0, import_node_fs4.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 async function api(config, path, init) {
   return fetch(`${config.serverUrl.replace(/\/$/, "")}${path}`, {
@@ -350,17 +405,51 @@ async function api(config, path, init) {
   });
 }
 async function pairPost() {
-  const code = arg("poste");
-  const serverUrl = arg("serveur") ?? "https://pharmaboost.app";
-  const response = await fetch(`${serverUrl.replace(/\/$/, "")}/api/agent/pair`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, role: "poste", hostname: (0, import_node_os.hostname)(), version: VERSION })
-  });
+  const paired = await requestPostPairing(arg("poste") ?? "", arg("serveur") ?? "https://pharmaboost.app", arg("lgo") ?? "lgpi");
+  log(`Poste ${paired.postLabel || (0, import_node_os.hostname)()} reli\xE9 \xE0 ${paired.pharmacyName || "l'officine"}. Configuration \xE9crite dans ${CONFIG_PATH}.`);
+}
+var PairingError = class extends Error {
+  constructor(message, kind) {
+    super(message);
+    this.kind = kind;
+    this.name = "PairingError";
+  }
+  kind;
+};
+async function requestPostPairing(code, serverUrl, lgo) {
+  let response;
+  try {
+    response = await fetch(`${serverUrl.replace(/\/$/, "")}/api/agent/pair`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, role: "poste", hostname: (0, import_node_os.hostname)(), version: VERSION })
+    });
+  } catch (error) {
+    throw new PairingError(`PharmaBoost est injoignable (${error instanceof Error ? error.message : String(error)}).`, "unreachable");
+  }
   const body = await response.json().catch(() => ({}));
-  if (!response.ok || !body.ok || !body.agentKey) throw new Error(body.error ?? `Appairage refus\xE9 (HTTP ${response.status}).`);
-  writeConfig({ serverUrl, agentKey: body.agentKey, role: "poste", lgo: arg("lgo") ?? "lgpi", exportPath: null, scansPath: null, intervalSeconds: 300 });
-  log(`Poste ${body.postLabel ?? (0, import_node_os.hostname)()} reli\xE9 \xE0 ${body.pharmacyName ?? "l'officine"}. Configuration \xE9crite dans ${CONFIG_PATH}.`);
+  if (!response.ok || !body.ok || !body.agentKey) {
+    throw new PairingError(body.error ?? `Appairage refus\xE9 (HTTP ${response.status}).`, response.status >= 500 ? "unreachable" : "refused");
+  }
+  const pharmacyName = body.pharmacyName ?? "";
+  const postLabel = body.postLabel ?? "";
+  writeConfig({ serverUrl, agentKey: body.agentKey, role: "poste", lgo, exportPath: null, scansPath: null, intervalSeconds: 300, pharmacyName, postLabel });
+  return { pharmacyName, postLabel };
+}
+async function installFromInstaller() {
+  const code = resolveInstallCode({ fileName: arg("installer"), typed: arg("code") });
+  if (!code) {
+    log("Installation : aucun code d'installation dans le nom du fichier, et aucun code saisi.");
+    return INSTALLER_EXIT.noCode;
+  }
+  try {
+    const paired = await requestPostPairing(code, arg("serveur") ?? "https://pharmaboost.app", arg("lgo") ?? "lgpi");
+    log(`Installation : poste ${paired.postLabel || (0, import_node_os.hostname)()} reli\xE9 \xE0 ${paired.pharmacyName || "l'officine"}.`);
+    return INSTALLER_EXIT.ok;
+  } catch (error) {
+    log(`Installation : ${error instanceof Error ? error.message : String(error)}`);
+    return error instanceof PairingError && error.kind === "unreachable" ? INSTALLER_EXIT.unreachable : INSTALLER_EXIT.refused;
+  }
 }
 async function sendScan(config, code, scannedAt) {
   const response = await api(config, "/api/agent/scans", {
@@ -405,7 +494,7 @@ async function pollNotice(config) {
   if (body.state !== "READY" || body.signature === watched.shownSignature) return;
   watched.shownSignature = body.signature;
   const url = `${config.serverUrl.replace(/\/$/, "")}/vente/${watched.prescriptionId}`;
-  showToast((0, import_node_path3.dirname)(CONFIG_PATH), { title: body.title, subject: body.subject, alerts: body.alerts, advice: body.advice, url, seconds: TOAST_SECONDS }, log);
+  showToast((0, import_node_path4.dirname)(CONFIG_PATH), { title: body.title, subject: body.subject, alerts: body.alerts, advice: body.advice, url, seconds: TOAST_SECONDS }, log);
   log(`Avis affich\xE9 : ${body.subject} \u2014 ${body.alerts.length} alerte(s), ${body.advice.length} conseil(s).`);
 }
 async function postHeartbeat(config) {
@@ -415,13 +504,14 @@ async function postHeartbeat(config) {
     body: JSON.stringify({ version: VERSION, hostname: (0, import_node_os.hostname)(), notice })
   });
   if (response.status === 401) throw new Error("cl\xE9 du poste r\xE9voqu\xE9e");
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = await response.json().catch(() => ({}));
   return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null };
 }
 async function runPost(config) {
   log(`PharmaBoost Connect ${VERSION} \u2014 poste de caisse ${(0, import_node_os.hostname)()} \u2014 journal : ${LOG_PATH}`);
   const scans = createScanQueue((scan) => sendScan(config, scan.code, scan.scannedAt));
-  startDouchette((0, import_node_path3.dirname)(CONFIG_PATH), {
+  startDouchette((0, import_node_path4.dirname)(CONFIG_PATH), {
     onScan: (code, at) => {
       scans.push({ code, scannedAt: new Date(at).toISOString() });
       scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
@@ -432,12 +522,21 @@ async function runPost(config) {
   let lastStockCheck = 0;
   let handledSyncRequest = null;
   let forceSync = false;
+  const reportState = (etat) => writeStatus(CONFIG_PATH, { etat, at: (/* @__PURE__ */ new Date()).toISOString(), version: VERSION, poste: config.postLabel || (0, import_node_os.hostname)(), officine: config.pharmacyName ?? null, notice });
   for (; ; ) {
     try {
       if (scans.size > 0) await scans.flush();
       await pollNotice(config);
       if (Date.now() - lastHeartbeat > 6e4) {
-        const settings = await postHeartbeat(config);
+        let settings;
+        try {
+          settings = await postHeartbeat(config);
+        } catch (error) {
+          reportState(stateForFailure(error));
+          lastHeartbeat = Date.now() - 45e3;
+          throw error;
+        }
+        reportState("ok");
         lastHeartbeat = Date.now();
         if (settings.exportPath !== (config.exportPath ?? null)) {
           config = { ...config, exportPath: settings.exportPath };
@@ -463,7 +562,7 @@ async function runPost(config) {
   }
 }
 function testAffichage() {
-  showToast((0, import_node_path3.dirname)(CONFIG_PATH), {
+  showToast((0, import_node_path4.dirname)(CONFIG_PATH), {
     title: "PharmaBoost \xB7 essai d'affichage",
     subject: "DOLIPRANE 1000 mg \xB7 AMOXICILLINE 1 g",
     alerts: [],
@@ -476,7 +575,7 @@ function testAffichage() {
 }
 function testDouchette() {
   console.log("Passez une bo\xEEte \xE0 la douchette. Chaque code lu s'affiche ci-dessous. Ctrl+C pour arr\xEAter.");
-  startDouchette((0, import_node_path3.dirname)(CONFIG_PATH), {
+  startDouchette((0, import_node_path4.dirname)(CONFIG_PATH), {
     onScan: (code) => console.log(`${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR")}  BIP  ${code}`),
     onStatus: (message) => console.log(`  ${message}`)
   });
@@ -490,7 +589,7 @@ async function pair() {
   for (const dir of [exportPath, scansPath]) {
     if (dir) {
       try {
-        (0, import_node_fs3.mkdirSync)(dir, { recursive: true });
+        (0, import_node_fs4.mkdirSync)(dir, { recursive: true });
       } catch {
       }
     }
@@ -506,19 +605,19 @@ async function pair() {
   log(`Appair\xE9 avec ${body.pharmacyName ?? "l'officine"}. Configuration \xE9crite dans ${CONFIG_PATH}. Export surveill\xE9 : ${exportPath}${scansPath ? ` \u2014 scans : ${scansPath}` : ""}.`);
 }
 function latestExport(dir) {
-  if (!(0, import_node_fs3.existsSync)(dir)) return null;
-  const st = (0, import_node_fs3.statSync)(dir);
+  if (!(0, import_node_fs4.existsSync)(dir)) return null;
+  const st = (0, import_node_fs4.statSync)(dir);
   if (st.isFile()) return { path: dir, mtime: st.mtimeMs, size: st.size };
-  const files = (0, import_node_fs3.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
-    const s = (0, import_node_fs3.statSync)((0, import_node_path3.join)(dir, name));
-    return { path: (0, import_node_path3.join)(dir, name), mtime: s.mtimeMs, size: s.size };
+  const files = (0, import_node_fs4.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
+    const s = (0, import_node_fs4.statSync)((0, import_node_path4.join)(dir, name));
+    return { path: (0, import_node_path4.join)(dir, name), mtime: s.mtimeMs, size: s.size };
   }).sort((a, b) => b.mtime - a.mtime);
   return files[0] ?? null;
 }
 var lastStamp = null;
 async function syncStock(config, force) {
   if (!config.exportPath) return config;
-  if (!(0, import_node_fs3.existsSync)(config.exportPath)) {
+  if (!(0, import_node_fs4.existsSync)(config.exportPath)) {
     setNotice(`Le dossier d'export ${config.exportPath} n'existe pas sur ${(0, import_node_os.hostname)()}.`);
     return config;
   }
@@ -531,45 +630,45 @@ async function syncStock(config, force) {
   const stamp = `${file.path}:${file.mtime}:${file.size}`;
   if (!force && stamp === lastStamp) return config;
   lastStamp = stamp;
-  const bytes = (0, import_node_fs3.readFileSync)(file.path);
+  const bytes = (0, import_node_fs4.readFileSync)(file.path);
   const hash = (0, import_node_crypto.createHash)("sha256").update(bytes).digest("hex");
   if (hash === config.lastExportHash) {
     if (notice?.startsWith("Aucun export") || notice?.startsWith("Le dossier")) setNotice(null);
     return config;
   }
   const form = new FormData();
-  form.set("file", new Blob([bytes]), (0, import_node_path3.basename)(file.path));
+  form.set("file", new Blob([bytes]), (0, import_node_path4.basename)(file.path));
   const response = await api(config, "/api/agent/stock", { method: "POST", body: form });
   const body = await response.json().catch(() => ({}));
   if (!response.ok || !body.ok) {
-    setNotice(`Export refus\xE9 (${(0, import_node_path3.basename)(file.path)}) : ${body.error ?? `HTTP ${response.status}`}`);
+    setNotice(`Export refus\xE9 (${(0, import_node_path4.basename)(file.path)}) : ${body.error ?? `HTTP ${response.status}`}`);
     return config;
   }
   setNotice(null);
-  log(`Stock synchronis\xE9 : ${body.lines ?? "?"} ligne(s), ${body.created ?? 0} cr\xE9\xE9e(s), ${body.updated ?? 0} mise(s) \xE0 jour (${(0, import_node_path3.basename)(file.path)}).`);
+  log(`Stock synchronis\xE9 : ${body.lines ?? "?"} ligne(s), ${body.created ?? 0} cr\xE9\xE9e(s), ${body.updated ?? 0} mise(s) \xE0 jour (${(0, import_node_path4.basename)(file.path)}).`);
   return { ...config, lastExportHash: hash };
 }
 async function syncScans(config) {
-  if (!config.scansPath || !(0, import_node_fs3.existsSync)(config.scansPath)) return config;
+  if (!config.scansPath || !(0, import_node_fs4.existsSync)(config.scansPath)) return config;
   const sent = new Set(config.sentScans ?? []);
-  const files = (0, import_node_fs3.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path3.join)(config.scansPath, name), stat: (0, import_node_fs3.statSync)((0, import_node_path3.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
+  const files = (0, import_node_fs4.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path4.join)(config.scansPath, name), stat: (0, import_node_fs4.statSync)((0, import_node_path4.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
   let next = config;
   for (const { path, stat } of files) {
-    const key = `${(0, import_node_path3.basename)(path)}:${stat.size}`;
+    const key = `${(0, import_node_path4.basename)(path)}:${stat.size}`;
     if (sent.has(key)) continue;
-    const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path3.extname)(path).toLowerCase()] ?? "application/octet-stream";
+    const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path4.extname)(path).toLowerCase()] ?? "application/octet-stream";
     const form = new FormData();
-    form.set("file", new Blob([(0, import_node_fs3.readFileSync)(path)], { type: mime }), (0, import_node_path3.basename)(path));
+    form.set("file", new Blob([(0, import_node_fs4.readFileSync)(path)], { type: mime }), (0, import_node_path4.basename)(path));
     const response = await api(config, "/api/agent/prescriptions", { method: "POST", body: form });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.ok) {
-      log(`Scan refus\xE9 (${(0, import_node_path3.basename)(path)}) : ${body.error ?? `HTTP ${response.status}`}`);
+      log(`Scan refus\xE9 (${(0, import_node_path4.basename)(path)}) : ${body.error ?? `HTTP ${response.status}`}`);
       continue;
     }
     sent.add(key);
     next = { ...next, sentScans: [...sent].slice(-2e3) };
     writeConfig(next);
-    log(`Ordonnance envoy\xE9e : ${(0, import_node_path3.basename)(path)} \u2192 ${body.reference ?? "?"} (${body.lines ?? 0} ligne(s) lue(s)).`);
+    log(`Ordonnance envoy\xE9e : ${(0, import_node_path4.basename)(path)} \u2192 ${body.reference ?? "?"} (${body.lines ?? 0} ligne(s) lue(s)).`);
   }
   return next;
 }
@@ -626,6 +725,10 @@ if (arg("appairer")) {
   pair().catch((error) => {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
+  });
+} else if (process.argv.includes("--installer")) {
+  installFromInstaller().then((code) => {
+    process.exitCode = code;
   });
 } else if (arg("poste")) {
   pairPost().catch((error) => {
