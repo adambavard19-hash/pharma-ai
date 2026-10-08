@@ -75,6 +75,36 @@ rapport (un test vérifie qu'il ne contient aucune commande qui modifie, supprim
 Testé ici : la syntaxe (PowerShell 7), les fonctions de masquage sur des lignes inventées, l'enveloppe
 .cmd. **Pas testé** : l'exécution sur un vrai Windows avec un vrai robot.
 
+## Premier rapport reçu : un poste de comptoir, pas le robot (8 octobre 2026)
+
+Rapport de **POSTE5** (Windows 11 Pro), lancé par la pharmacienne au comptoir. Ce qu'il établit :
+
+- Le logiciel de l'officine est **Pharmagest LGPI** (ID. 7.4.1, OffiPos 2.3.0, Vitale Connect, PC Info…).
+- Cet ordinateur est **un poste de comptoir** : aucun logiciel de robot (Rowa, Apostore, Willach, Consis…), **aucun port
+  COM**, aucune connexion vers un robot. Les seuls services réseau sont ceux de Pharmagest pour les périphériques :
+  `escpos2rest` (impression de tickets, port 9061, connexion avec lui-même) et `offipos` (caisse, JavaPOS).
+- Les journaux sont vides ou minuscules (`offipos.log` 0 Ko, `requests.log` 0 Ko) : rien sur un échange avec un robot.
+- La lecture automatique du rapport (« un programme du robot écoute… ») était une **fausse piste** : le diagnostic prenait le service
+  d'impression de tickets pour un robot. Corrigé (voir plus bas).
+
+**Conclusion : on ne sait toujours pas comment le logiciel et le robot se parlent**, parce que l'échange n'a pas lieu sur
+ce poste. Il faut le rapport du **serveur** du logiciel et celui de l'**ordinateur du robot** (s'il en a un). Rien n'est
+écrit pour le robot tant qu'on n'a pas vu une ligne réelle de cet échange : écrire un lecteur sans en connaître le
+format serait inventer.
+
+**Diagnostic complet (8 octobre 2026, après que l'utilisateur a précisé que le robot Rowa est bien branché sur cet
+ordinateur — la première version ne l'a donc pas vu, ce qui était un défaut du diagnostic)** : le rapport garde les sections
+1 à 7 et ajoute, sans rien modifier ni envoyer : 8 tous les programmes installés (hors Microsoft) · 9 tous les services
+hors Windows (le programme, jamais ses arguments) · 10 tous les programmes en cours, avec leur dossier · 11 toutes les
+connexions établies, regroupées, avec « cet ordinateur / autre ordinateur du réseau local / hors du réseau local » · 12
+adresses, passerelle et voisins du réseau local · 13 dossiers partagés et lecteurs réseau (un échange par fichier passe
+par là) · 14 appareils série et adaptateurs USB-série · 15 tâches planifiées hors Windows · 16 noms de clés du registre ·
+17 fichiers dont le NOM parle du robot · 18 journaux des 30 derniers jours qui mentionnent le robot (**nombre de mentions
+par mot**, jamais le texte) · 19 les lignes de ces journaux, masquées comme avant · 20 la lecture. Un programme Java est
+reconnu par son dossier ou sa ligne de lancement (jamais écrite dans le rapport). Durée : deux à cinq minutes (recherche
+bornée à 90 s, lecture des journaux à 100 s, 4 Mo par journal). Testé avec PowerShell 7 sur des machines et un disque
+simulés ; **pas testé avec Windows PowerShell 5.1 (celui de Windows 11 par défaut) ni sur un vrai Windows**.
+
 ## Brancher un journal (prêt, à utiliser quand le diagnostic en a trouvé un)
 
 Sur le poste de caisse déjà installé (voir `installation-poste-caisse.md`), dans le dossier
