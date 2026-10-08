@@ -66,12 +66,16 @@ l'ouverture de session). Seuls les codes-barres lus par la douchette sont
 transmis (EAN/CIP, ou Datamatrix de médicament dont le CIP est extrait) ;
 aucune frappe humaine n'est conservée.
 
-## Poste de caisse : l'avis en coin d'écran
+## Poste de caisse : l'avis
 
-En mode poste, l'agent interroge `/api/agent/conseil` après chaque bip et,
-dès que l'analyse est prête, affiche l'avis (alertes, jusqu'à trois conseils)
-dans une fenêtre WinForms en bas à droite, toujours au-dessus, sans prendre
-le clavier (`WS_EX_NOACTIVATE`). `--test-affichage` montre un avis d'exemple.
+En mode poste, l'agent interroge `/api/agent/conseil` après chaque bip et, dès que l'analyse est prête, confie l'avis à
+une fenêtre Windows Forms (`notice-host.ts`, C# 5 compilé par PowerShell, un seul processus vivant) pilotée par
+`notice-center.ts` : fond blanc, photo, disponibilité, « Voir le conseil » / « Ignorer », 30 s puis rangée près de
+l'horloge avec un compteur, jamais le clavier (`WS_EX_NOACTIVATE`). L'ancienne fenêtre (`toast.ts`) reste le secours.
+`--test-affichage` montre un conseil d'exemple. Détail : `docs/installation-poste-caisse.md`.
+
+Contrôler la compilation du code Windows (demande `dotnet`) :
+`PB_CSHARP_CHECK=1 npx vitest run agent/src/__tests__/notice-host.test.ts`.
 
 ## Robot de dispensation
 

@@ -16,7 +16,31 @@ export type NoticeAlert = { severity: string; subjectType: string; code: string;
  * d'écran pendant que le client attend.
  */
 const COVERAGE_CODES = new Set(["DRUG_NO_INTERACTION_DATA", "INTERACTION_NO_REFERENTIAL", "DEMO_REFERENTIAL", "DRUG_CLASSIFIED_BY_AI", "DRUG_NOT_IN_REFERENTIAL"]);
-export type NoticeRecommendation = { name: string; priceCents: number | null; reason: string | null; status: string };
+export type NoticeRecommendation = {
+  name: string;
+  priceCents: number | null;
+  reason: string | null;
+  status: string;
+  /** La photo du produit, quand l'officine en a une. Jamais indispensable : la fenêtre s'en passe. */
+  imageUrl?: string | null;
+  /** Le stock de l'officine pour ce produit, quand il est connu. */
+  quantity?: number | null;
+  alertThreshold?: number | null;
+};
+
+/** Ce que le pharmacien lit sur la fenêtre : « En stock », « Stock faible », « Rupture », ou « Stock à vérifier ». */
+export type NoticeAvailability = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
+
+/** Un conseil, prêt à s'afficher sur le poste de caisse. */
+export type NoticeItem = {
+  name: string;
+  /** Le prix de vente, seulement quand le prix ET le stock sont fiables. */
+  priceCents: number | null;
+  reason: string | null;
+  availability: NoticeAvailability;
+  quantity: number | null;
+  imageUrl: string | null;
+};
 
 export type CounterNoticeInput = {
   reference: string;
@@ -25,6 +49,13 @@ export type CounterNoticeInput = {
   alerts: NoticeAlert[];
   recommendations: NoticeRecommendation[];
   outcome: string | null;
+  /**
+   * Le stock a-t-il été mis à jour récemment ? Faux : on n'affiche ni prix ni « En stock » — un chiffre ancien
+   * donnerait au pharmacien une certitude qu'on n'a pas. Absent : fiable (comportement historique).
+   */
+  stockReliable?: boolean;
+  /** Ce que chaque ligne bipée est : un médicament du catalogue national, ou un produit de l'officine. */
+  lineKinds?: ("DRUG" | "PRODUCT")[];
 };
 
 export type CounterNotice = {
@@ -36,6 +67,12 @@ export type CounterNotice = {
   alerts: string[];
   /** Jusqu'à trois conseils : « Produit · 8,90 € · pourquoi ». */
   advice: string[];
+  /** Les mêmes conseils, structurés (photo, disponibilité, prix) : c'est ce que la fenêtre du poste dessine. */
+  items: NoticeItem[];
+  /** Les médicaments ou produits bipés, un par élément, sans la forme galénique. */
+  drugs: string[];
+  /** « Médicament détecté », « Produit détecté » ou « Détecté » : le titre au-dessus de ce qui a été bipé. */
+  detectedLabel: string;
   /** Une empreinte : si elle ne change pas, on ne réaffiche pas. */
   signature: string;
 };
@@ -55,30 +92,54 @@ function shortName(name: string): string {
   return name.replace(/,.*$/, "").trim();
 }
 
+/** La disponibilité d'un produit, dite honnêtement : sans stock fiable, « à vérifier » plutôt qu'un chiffre périmé. */
+export function availabilityOf(quantity: number | null | undefined, alertThreshold: number | null | undefined, reliable: boolean): NoticeAvailability {
+  if (!reliable || quantity === null || quantity === undefined) return "UNKNOWN";
+  if (quantity <= 0) return "OUT_OF_STOCK";
+  return quantity <= (alertThreshold ?? 0) ? "LOW_STOCK" : "IN_STOCK";
+}
+
+/** Le titre de ce qui a été bipé : exact quand on sait ce que c'est, neutre sinon (jamais « médicament » pour un produit). */
+export function detectedLabelOf(kinds: ("DRUG" | "PRODUCT")[] | undefined): string {
+  if (!kinds || kinds.length === 0) return "Détecté";
+  if (kinds.every((kind) => kind === "DRUG")) return "Médicament détecté";
+  if (kinds.every((kind) => kind === "PRODUCT")) return "Produit détecté";
+  return "Détecté";
+}
+
 export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
-  const subject = input.lineNames.map(shortName).join(" · ");
-  const base = { title: `PharmaBoost · ${input.reference}`, subject };
+  const drugs = input.lineNames.map(shortName).filter(Boolean);
+  const subject = drugs.join(" · ");
+  const base = { title: `PharmaBoost · ${input.reference}`, subject, drugs, detectedLabel: detectedLabelOf(input.lineKinds) };
+  const reliable = input.stockReliable !== false;
   if (["CANCELLED", "DELIVERED", "FAILED"].includes(input.prescriptionStatus)) {
-    return { ...base, state: "CLOSED", alerts: [], advice: [], signature: `closed:${input.reference}` };
+    return { ...base, state: "CLOSED", alerts: [], advice: [], items: [], signature: `closed:${input.reference}` };
   }
   if (!["ANALYZED", "VALIDATED"].includes(input.prescriptionStatus)) {
-    return { ...base, state: "PENDING", alerts: [], advice: [], signature: `pending:${input.reference}:${input.lineNames.length}` };
+    return { ...base, state: "PENDING", alerts: [], advice: [], items: [], signature: `pending:${input.reference}:${input.lineNames.length}` };
   }
   const alerts = [...input.alerts]
     .filter((alert) => !alert.acknowledged && !COVERAGE_CODES.has(alert.code) && (alert.severity === "BLOCKING" || alert.severity === "WARNING"))
     .sort((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9))
     .slice(0, MAX_ALERTS)
     .map((alert) => alert.message);
-  const advice = input.recommendations
-    .filter((rec) => SHOWN_STATUSES.has(rec.status))
-    .slice(0, MAX_ADVICE)
-    .map((rec) => [shortName(rec.name), euros(rec.priceCents), rec.reason].filter(Boolean).join(" · "));
+  const shown = input.recommendations.filter((rec) => SHOWN_STATUSES.has(rec.status)).slice(0, MAX_ADVICE);
+  // Le prix ne s'affiche que si le stock est fiable : les deux viennent du même export du logiciel de gestion.
+  const items: NoticeItem[] = shown.map((rec) => ({
+    name: shortName(rec.name),
+    priceCents: reliable && rec.priceCents !== null && rec.priceCents > 0 ? rec.priceCents : null,
+    reason: rec.reason,
+    availability: availabilityOf(rec.quantity, rec.alertThreshold, reliable),
+    quantity: reliable ? (rec.quantity ?? null) : null,
+    imageUrl: rec.imageUrl ?? null,
+  }));
+  const advice = items.map((item) => [item.name, euros(item.priceCents), item.reason].filter(Boolean).join(" · "));
   if (advice.length === 0 && alerts.length === 0) {
     const why =
       input.outcome === "OUT_OF_STOCK" ? "Conseil possible mais produit absent du stock."
       : input.outcome === "SAFETY_FILTERED" ? "Conseils écartés par la sécurité."
       : "Rien à ajouter pour cette délivrance.";
-    return { ...base, state: "READY", alerts: [], advice: [why], signature: `ready:${input.reference}:${input.lineNames.length}:none` };
+    return { ...base, state: "READY", alerts: [], advice: [why], items: [], signature: `ready:${input.reference}:${input.lineNames.length}:none` };
   }
-  return { ...base, state: "READY", alerts, advice, signature: `ready:${input.reference}:${input.lineNames.length}:${alerts.length}:${advice.join("|")}` };
+  return { ...base, state: "READY", alerts, advice, items, signature: `ready:${input.reference}:${input.lineNames.length}:${alerts.length}:${advice.join("|")}` };
 }

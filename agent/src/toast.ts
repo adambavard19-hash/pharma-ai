@@ -1,4 +1,8 @@
 /**
+ * L'ANCIENNE fenêtre d'avis : du texte sur fond sombre, quinze secondes. Elle reste le SECOURS de la nouvelle fenêtre
+ * (notice-host.ts) : si celle-ci ne démarre pas sur un poste, le centre d'avis (notice-center.ts) retombe ici plutôt
+ * que de ne plus rien afficher.
+ *
  * L'avis de comptoir affiché sur le poste de caisse, par-dessus le LGO.
  *
  * Une petite fenêtre en bas à droite de l'écran, toujours au-dessus, qui ne

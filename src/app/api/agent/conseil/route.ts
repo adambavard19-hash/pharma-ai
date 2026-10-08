@@ -5,6 +5,7 @@ import { buildCounterNotice } from "@/core/counter/notice";
 import { analysePrescription } from "@/server/services/analysis";
 import { recordAudit } from "@/server/audit/log";
 import { getEnv } from "@/config/env";
+import { stockReminderLevel } from "@/core/stock-deposit/rules";
 
 export const dynamic = "force-dynamic";
 // L'analyse peut dépasser dix secondes : on le déclare à l'hébergeur.
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
     select: {
       reference: true,
       status: true,
-      lines: { orderBy: { position: "asc" }, select: { drugName: true } },
+      lines: { orderBy: { position: "asc" }, select: { drugName: true, drugSpecialtyId: true } },
       analysisRuns: {
         orderBy: { startedAt: "desc" },
         take: 1,
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
       },
       recommendations: {
         orderBy: { totalScore: "desc" },
-        select: { status: true, shortReason: true, justification: true, product: { select: { name: true, salePriceCents: true } }, presentation: { select: { priceCents: true, specialty: { select: { name: true } }, pharmacyStocks: { where: { pharmacyId: agent.scope.pharmacyId }, select: { priceCents: true } } } } },
+        select: { status: true, shortReason: true, justification: true, product: { select: { name: true, salePriceCents: true, imageUrl: true, stockItem: { select: { quantity: true, alertThreshold: true } } } }, presentation: { select: { priceCents: true, specialty: { select: { name: true } }, pharmacyStocks: { where: { pharmacyId: agent.scope.pharmacyId }, select: { priceCents: true, quantity: true } } } } },
       },
     },
   });
@@ -72,18 +73,26 @@ export async function GET(request: Request) {
   }
 
   const run = prescription.analysisRuns[0];
+  // Prix et « En stock » viennent du même export : un stock ancien ne s'affiche pas comme un fait.
+  const pharmacy = await prisma.pharmacy.findUnique({ where: { id: agent.scope.pharmacyId }, select: { stockSyncedAt: true } });
+  const stockReliable = stockReminderLevel(pharmacy?.stockSyncedAt ?? null, new Date()) === "none";
   const notice = buildCounterNotice({
     reference: prescription.reference,
     prescriptionStatus: prescription.status,
     lineNames: prescription.lines.map((line) => line.drugName ?? "").filter(Boolean),
+    lineKinds: prescription.lines.filter((line) => line.drugName).map((line) => (line.drugSpecialtyId ? ("DRUG" as const) : ("PRODUCT" as const))),
     alerts: (run?.safetyFindings ?? []).map((finding) => ({ severity: finding.severity, subjectType: finding.subjectType, code: finding.code, message: finding.message, acknowledged: finding.acknowledgedAt !== null })),
     recommendations: prescription.recommendations.map((rec) => ({
       name: rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
       priceCents: rec.product?.salePriceCents ?? rec.presentation?.pharmacyStocks[0]?.priceCents ?? rec.presentation?.priceCents ?? null,
       reason: rec.shortReason ?? rec.justification,
       status: rec.status,
+      imageUrl: rec.product?.imageUrl ?? null,
+      quantity: rec.product ? (rec.product.stockItem?.quantity ?? null) : (rec.presentation?.pharmacyStocks[0]?.quantity ?? null),
+      alertThreshold: rec.product?.stockItem?.alertThreshold ?? null,
     })),
     outcome: run?.outcome ?? null,
+    stockReliable,
   });
   return NextResponse.json({ ok: true, ...notice, url: `${getEnv().APP_URL}/vente/${id}` });
 }

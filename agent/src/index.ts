@@ -31,6 +31,7 @@
 import { createHash } from "node:crypto";
 import { startDouchette } from "./douchette";
 import { showToast } from "./toast";
+import { DEFAULT_NOTICE_SECONDS, NoticeCenter, POSITIONS, buildHostEntry, cachedImage, fetchImage, imageSource, type HostEntry, type NoticeBody, type NoticePosition } from "./notice-center";
 import { createScanQueue } from "./scan-queue";
 import { INSTALLER_EXIT, resolveInstallCode } from "./installer";
 import { stateForFailure, writeStatus, type PostState } from "./status";
@@ -39,7 +40,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.5.1";
+const VERSION = "0.6.0";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -70,6 +71,8 @@ type Config = {
   postLabel?: string;
   /** Un robot de dispensation à écouter, une fois observé chez cette officine (voir robot.ts). Absent : rien n'est lu. */
   robot?: RobotConfig;
+  /** La fenêtre d'avis : où elle se pose (« milieu-droite » par défaut) et combien de secondes elle reste avant de se ranger. */
+  affichage?: { position?: NoticePosition; secondes?: number; ancienne?: boolean };
 };
 
 /** Ce que l'agent constate et que PharmaBoost doit montrer ; vide quand tout va bien. */
@@ -193,8 +196,28 @@ async function sendScan(config: Config, code: string, scannedAt: string): Promis
   if (body.prescriptionId) watchPrescription(body.prescriptionId);
 }
 
-/** Combien de temps l'avis reste en coin d'écran. */
-const TOAST_SECONDS = 15;
+/** Les photos des produits conseillés, gardées à côté de la configuration. */
+const IMAGES_DIR = join(dirname(CONFIG_PATH), "avis-images");
+
+/**
+ * Le centre d'avis : la fenêtre du conseil (30 s, puis rangée près de l'horloge avec un compteur), mise à jour sur
+ * place, qui ne reprend jamais le clavier. L'ancienne fenêtre reste le secours si la nouvelle ne démarre pas.
+ */
+const notices = new NoticeCenter({
+  configDir: dirname(CONFIG_PATH),
+  log: (message) => log(message),
+  legacyShow: (content) => showToast(dirname(CONFIG_PATH), content, log),
+});
+
+/** Applique les réglages du poste (durée, endroit) ; une valeur inconnue est ignorée, jamais une panne. */
+function applyDisplayPreferences(config: Config): void {
+  const wanted = config.affichage;
+  notices.configure({
+    seconds: typeof wanted?.secondes === "number" ? wanted.secondes : DEFAULT_NOTICE_SECONDS,
+    position: wanted?.position && (POSITIONS as readonly string[]).includes(wanted.position) ? wanted.position : "milieu-droite",
+    legacy: wanted?.ancienne === true,
+  });
+}
 /** Après un bip, on attend l'analyse jusqu'à deux minutes ; au-delà, elle est à lire dans PharmaBoost. */
 const WATCH_MS = 120_000;
 
@@ -211,19 +234,61 @@ function watchPrescription(prescriptionId: string): void {
  * de plus change l'empreinte, l'avis se réaffiche ; sinon il se tait.
  */
 async function pollNotice(config: Config): Promise<void> {
+  await dropClosedNotices(config);
   if (!watched) return;
   if (Date.now() - watched.since > WATCH_MS) { watched = null; return; }
   const response = await api(config, `/api/agent/conseil?prescription=${encodeURIComponent(watched.prescriptionId)}`, { method: "GET" });
   if (response.status === 404) { watched = null; return; }
   if (!response.ok) return;
-  const body = (await response.json()) as { ok: boolean; state: "PENDING" | "READY" | "CLOSED"; title: string; subject: string; alerts: string[]; advice: string[]; signature: string };
+  const body = (await response.json()) as NoticeBody;
   if (!body.ok) return;
-  if (body.state === "CLOSED") { watched = null; return; }
+  if (body.state === "CLOSED") { notices.remove(watched.prescriptionId); watched = null; return; }
   if (body.state !== "READY" || body.signature === watched.shownSignature) return;
   watched.shownSignature = body.signature;
-  const url = `${config.serverUrl.replace(/\/$/, "")}/vente/${watched.prescriptionId}`;
-  showToast(dirname(CONFIG_PATH), { title: body.title, subject: body.subject, alerts: body.alerts, advice: body.advice, url, seconds: TOAST_SECONDS }, log);
-  log(`Avis affiché : ${body.subject} — ${body.alerts.length} alerte(s), ${body.advice.length} conseil(s).`);
+  applyDisplayPreferences(config);
+  const prescriptionId = watched.prescriptionId;
+  // Les photos déjà connues s'affichent tout de suite ; les autres arrivent après et complètent la fenêtre sur place.
+  const known = new Map<string, string>();
+  const missing: { imageUrl: string; source: string }[] = [];
+  for (const item of body.items ?? []) {
+    const source = imageSource(item.imageUrl, config.serverUrl);
+    if (!item.imageUrl || !source) continue;
+    const hit = cachedImage(IMAGES_DIR, source);
+    if (hit) known.set(item.imageUrl, hit);
+    else missing.push({ imageUrl: item.imageUrl, source });
+  }
+  notices.show(buildHostEntry({ prescriptionId, serverUrl: config.serverUrl, body, images: known }));
+  log(`Avis affiché : ${body.subject} — ${body.alerts.length} alerte(s), ${(body.items ?? []).length || body.advice.length} conseil(s).`);
+  if (missing.length > 0) void completeImages(config, prescriptionId, body, known, missing);
+}
+
+/** Télécharge les photos manquantes, puis remet à jour la fenêtre : jamais un retard ni une erreur pour l'avis. */
+async function completeImages(config: Config, prescriptionId: string, body: NoticeBody, known: Map<string, string>, missing: { imageUrl: string; source: string }[]): Promise<void> {
+  let added = 0;
+  for (const { imageUrl, source } of missing) {
+    const path = await fetchImage(source, config.serverUrl, IMAGES_DIR);
+    if (path) { known.set(imageUrl, path); added += 1; }
+  }
+  if (added > 0) notices.show(buildHostEntry({ prescriptionId, serverUrl: config.serverUrl, body, images: known }));
+}
+
+let lastClosedCheck = 0;
+
+/**
+ * Les conseils rangés près de l'horloge ne doivent pas survivre à leur vente : toutes les trente secondes, on
+ * demande au serveur si elles sont encore ouvertes, et on retire celles qui ne le sont plus.
+ */
+async function dropClosedNotices(config: Config): Promise<void> {
+  if (Date.now() - lastClosedCheck < 30_000) return;
+  lastClosedCheck = Date.now();
+  for (const id of notices.ids()) {
+    if (watched?.prescriptionId === id) continue;
+    const response = await api(config, `/api/agent/conseil?prescription=${encodeURIComponent(id)}`, { method: "GET" });
+    if (response.status === 404) { notices.remove(id); continue; }
+    if (!response.ok) continue;
+    const state = ((await response.json().catch(() => ({}))) as { state?: string }).state;
+    if (state === "CLOSED") notices.remove(id);
+  }
 }
 
 /**
@@ -351,18 +416,33 @@ function enableRobot(): void {
   console.log(`Robot branché : ${path}. Quittez PharmaBoost (icône près de l'horloge) puis relancez-le.`);
 }
 
-/** Essai de l'affichage : un avis d'exemple en coin d'écran, sans bip ni serveur. */
+/**
+ * Essai de l'affichage : un conseil d'exemple, sans bip ni serveur. Il reste 30 s à l'écran, puis se range près de
+ * l'horloge pendant 30 s de plus (le compteur), pour que le pharmacien voie les deux.
+ */
 function testAffichage(): void {
-  showToast(dirname(CONFIG_PATH), {
-    title: "PharmaBoost · essai d'affichage",
+  let config: Config | null = null;
+  try { config = readConfig(); } catch { /* sans configuration lisible, l'essai garde les réglages par défaut */ }
+  if (config) applyDisplayPreferences(config);
+  const entry: HostEntry = {
+    id: "essai",
+    reference: "ESSAI",
+    label: "Médicament détecté",
     subject: "DOLIPRANE 1000 mg · AMOXICILLINE 1 g",
+    url: `${config?.serverUrl.replace(/\/$/, "") ?? "https://pharmaboost.app"}/vente/nouvelle`,
+    signature: "essai",
+    quiet: false,
     alerts: [],
-    advice: ["PROBIOTIQUE 30 gélules · 14,90 € · Protéger la flore pendant l'antibiotique", "Exemple : l'avis réel vient de l'analyse de la vente"],
-    url: "https://pharmaboost.app/vente/nouvelle",
-    seconds: 15,
-  }, (message) => console.log(`  ${message}`));
-  console.log("Un avis d'exemple doit apparaître en bas à droite de l'écran, pendant 15 secondes.");
-  setTimeout(() => process.exit(0), 20_000);
+    notes: [],
+    items: [
+      { name: "PROBIOTIQUE 30 gélules", price: "14,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", image: "" },
+      { name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "", availability: "LOW_STOCK", image: "" },
+    ],
+  };
+  notices.show(entry);
+  console.log("Un conseil d'exemple doit apparaître à droite de l'écran, à mi-hauteur (déplaçable à la souris).");
+  console.log("Au bout de 30 secondes il se range : une petite icône avec le nombre « 1 » apparaît près de l'horloge. Un clic la rouvre.");
+  setTimeout(() => { notices.stop(); process.exit(0); }, 75_000);
 }
 
 /** Essai sans rien envoyer : chaque bip lu s'affiche à l'écran. Pour vérifier une installation. */

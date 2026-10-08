@@ -163,21 +163,53 @@ ou vieux de plus de six heures est ignoré (l'heure de réception est retenue).
 Entre deux patients très rapprochés, le bouton « Nouveau patient » de
 PharmaBoost remet l'écran à zéro sans attendre.
 
-## L'avis en coin d'écran (agent 0.4.x)
+## L'avis sur le poste de caisse (agent 0.6.0)
 
-Dès que l'analyse d'une vente bipée est prête, le poste affiche un petit
-encart en bas à droite de l'écran, par-dessus le LGO, sans lui prendre le
-clavier : les boîtes bipées, les alertes s'il y en a, puis jusqu'à trois
-conseils avec le prix. Il s'efface seul après quinze secondes ; un clic
-l'ouvre dans PharmaBoost.
+État : **en développement seulement.** Le code Windows compile (C# 5, .NET Framework 4.8) et sa logique est testée, mais
+la fenêtre n'a **jamais été dessinée sur un vrai Windows**. Premier essai à faire au poste : icône PharmaBoost près de
+l'horloge → clic droit → « Essayer l'affichage d'un avis ».
 
-- C'est le poste qui déclenche l'analyse, en interrogeant le serveur après
-  chaque bip (`GET /api/agent/conseil`). Six secondes après le dernier bip,
-  la vente passe « vérifiée » et l'analyse tourne côté serveur : aucun écran
-  PharmaBoost n'a besoin d'être ouvert.
-- Une boîte de plus sur la même vente relance l'analyse et réaffiche l'avis.
-- Les avertissements de couverture (référentiel d'interactions absent…)
-  restent sur l'écran complet ; ils n'encombrent pas l'encart.
+Dès que l'analyse d'une vente bipée est prête, le poste affiche une fenêtre d'après la maquette : fond blanc, bordure
+verte, « PharmaBoost · Conseil disponible », la disponibilité du produit (« En stock », « Stock faible », « Rupture »,
+« Stock à vérifier »), ce qui a été détecté (« Médicament détecté » ou « Produit détecté »), les alertes s'il y en a, puis
+le produit conseillé avec sa **photo** (un flacon gris à défaut), son **prix** quand le stock est fiable, la raison, et
+« Suggestion à vérifier par le pharmacien ». Deux gestes : **« Voir le conseil »** (ouvre la vente dans PharmaBoost) et
+**« Ignorer »**.
+
+Les cinq améliorations demandées :
+1. **Le conseil ne se perd plus** : 30 secondes à l'écran, puis la fenêtre se range près de l'horloge, où une petite
+   icône verte porte le **nombre de conseils en attente**. Un clic rouvre le dernier ; clic droit : la liste, et « Tout
+   ignorer ». L'icône disparaît quand plus rien n'attend. (Windows 11 range d'abord les nouvelles icônes sous la flèche
+   « ^ » : la glisser une fois sur la barre pour l'y garder.)
+2. **Le produit et sa disponibilité** : nom, photo, badge de stock, prix de vente. Le prix et « En stock » ne
+   s'affichent que si le stock a été mis à jour il y a moins de trois jours ; sinon : « Stock à vérifier », sans prix.
+3. **Deux gestes simples**, et le clic ouvre la vente concernée.
+4. **Pas de répétition** : une vente n'a qu'**une** fenêtre, mise à jour sur place ; plusieurs produits bipés se
+   regroupent (le premier conseil en grand, les autres sur une ligne). Ce que le pharmacien a vu ou écarté ne revient
+   pas : seule une information nouvelle (un autre produit, une autre alerte) rouvre la fenêtre.
+5. **Elle ne gêne jamais le logiciel de gestion** : elle ne prend ni le clavier ni le focus (même quand on clique
+   dessus), n'apparaît ni dans la barre des tâches ni dans Alt+Tab, et se pose **à droite à mi-hauteur** — le bas de
+   l'écran porte les boutons de facturation du LGO (« Valider »…) que l'ancienne fenêtre masquait. On peut la
+   **déplacer à la souris** ; l'endroit est retenu (`pharmaboost-avis-position.txt`).
+
+Réglages (facultatifs) dans `pharmaboost-connect.json` : `"affichage": { "position": "milieu-droite" | "bas-droite" |
+"haut-droite", "secondes": 30, "ancienne": false }` (de 5 à 120 secondes). `"ancienne": true` remet l'ancienne
+fenêtre de texte sur ce poste — l'interrupteur de secours, sans attendre un correctif.
+
+- C'est le poste qui déclenche l'analyse, en interrogeant le serveur après chaque bip (`GET /api/agent/conseil`). Six
+  secondes après le dernier bip, la vente passe « vérifiée » et l'analyse tourne côté serveur : aucun écran PharmaBoost
+  n'a besoin d'être ouvert. Le serveur répond avec les conseils **structurés** (photo, stock, prix) ; un serveur plus
+  ancien répond par des lignes de texte, que la fenêtre montre telles quelles.
+- Les photos viennent des bases ouvertes du catalogue (`images.open{beauty,food,products}facts.org`) ou de PharmaBoost,
+  en https, jpeg ou png seulement, 600 Ko au plus, quatre secondes d'attente : elles se téléchargent **après** l'affichage
+  et complètent la fenêtre sur place. Sans photo (ou en SVG), un flacon gris prend sa place.
+- Un conseil rangé près de l'horloge est retiré dès que sa vente est close (le poste interroge le serveur toutes les
+  trente secondes), ou après deux heures.
+- **Secours** : si la nouvelle fenêtre ne démarre pas (erreur de compilation, trente secondes sans « PRET »), le poste
+  retombe sur l'ancienne fenêtre de texte et le dit dans le journal : un avis n'est jamais perdu.
+- Les avertissements de couverture (référentiel d'interactions absent…) restent sur l'écran complet.
+- Pas encore : l'icône de compteur ne fait pas partie de l'icône PharmaBoost principale (il faudrait un nouvel
+  installateur) ; « Ignorer » n'est pas remonté au serveur ; la photo n'est pas sur la carte « Rien à ajouter ».
 
 Mettre à jour un poste déjà relié, puis voir un avis d'exemple :
 
