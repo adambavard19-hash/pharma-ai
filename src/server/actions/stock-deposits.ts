@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { continueAfterStockDeposit, receiveStockDeposit } from "@/server/services/stock-deposits";
-import { DEPOSIT_MAX_BYTES } from "@/core/stock-deposit/rules";
+import { DEPOSIT_CONFIRMATION, DEPOSIT_MAX_BYTES } from "@/core/stock-deposit/rules";
 import type { DepositView } from "@/core/stock-deposit/types";
 import { fail, ok, type ActionResult } from "./types";
 
@@ -19,6 +19,8 @@ const lines = (count: number | null) => `${(count ?? 0).toLocaleString("fr-FR")}
 
 export async function sendStockAction(formData: FormData): Promise<ActionResult<DepositView>> {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  // Un fichier remplace le stock (ce qui n'y figure pas passe à 0) : l'écran le fait confirmer, et le serveur l'exige.
+  if (formData.get("confirmation") !== DEPOSIT_CONFIRMATION) return fail("Confirmez d'abord que ce fichier remplace votre stock.");
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return fail("Choisissez le fichier de votre stock.");
   if (file.size > DEPOSIT_MAX_BYTES) return fail("Le fichier dépasse 8 Mo.");

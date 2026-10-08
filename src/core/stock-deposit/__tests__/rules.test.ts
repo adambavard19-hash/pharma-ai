@@ -262,3 +262,32 @@ describe("les libellés", () => {
     expect(titulaire).not.toMatch(/agent|appairage|CIP|import job/i);
   });
 });
+
+describe("assessDeposit : un passage à zéro massif ne se fait pas sans contrôle", () => {
+  const base = { validLines: 900, knownLines: 1000 };
+
+  it("100 produits connus absents sur 1 000 (10 %) : le fichier attend la décision de l'équipe", () => {
+    const verdict = assessDeposit({ ...base, absentLines: 100 });
+    expect(verdict.verdict).toBe("HOLD");
+    expect(verdict.verdict === "HOLD" && verdict.reason).toMatch(/mettrait 100 produits à 0 \(10 % du stock connu\)/);
+  });
+
+  it("à 5 % ou moins, ou à 25 produits ou moins : appliqué", () => {
+    expect(assessDeposit({ ...base, absentLines: 50 }).verdict).toBe("APPLY"); // 5 % exactement
+    expect(assessDeposit({ validLines: 180, knownLines: 200, absentLines: 20 }).verdict).toBe("APPLY"); // 10 %, mais 20 produits seulement
+    expect(assessDeposit({ ...base, absentLines: 0 }).verdict).toBe("APPLY");
+  });
+
+  it("les trois contrôles d'avant restent prioritaires", () => {
+    expect(assessDeposit({ validLines: 600, knownLines: 1000, absentLines: 400 }).verdict === "HOLD" && (assessDeposit({ validLines: 600, knownLines: 1000, absentLines: 400 }) as { reason: string }).reason).toMatch(/moins de 80 %/);
+    expect((assessDeposit({ ...base, incompleteReason: "Pages illisibles", absentLines: 100 }) as { reason: string }).reason).toMatch(/Pages illisibles/);
+  });
+
+  it("un petit stock connu (moins de 50 produits) n'est pas concerné", () => {
+    expect(assessDeposit({ validLines: 30, knownLines: 40, absentLines: 30 }).verdict).toBe("APPLY");
+  });
+
+  it("sans compte des absents (une décision déjà prise), le comportement est celui d'avant", () => {
+    expect(assessDeposit(base).verdict).toBe("APPLY");
+  });
+});

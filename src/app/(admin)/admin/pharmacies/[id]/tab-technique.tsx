@@ -14,6 +14,7 @@ import { InstallGuideButton } from "../install-guide-button";
 import { Stack, TechText, When } from "../client-ui";
 import { ResolveIncidentButton } from "../../technique/resolve-incident-button";
 import { EmptyLine } from "./shared";
+import { AssistancePanel } from "./assistance/panel";
 
 const SEVERITY = { CRITICAL: { label: "Critique", tone: "danger" }, WARNING: { label: "Attention", tone: "warning" }, INFO: { label: "Information", tone: "info" } } as const;
 
@@ -137,6 +138,9 @@ export async function TechniqueTab({ base, now }: { base: Pharmacy360; now: Date
           />
         </AdminSection>
       </div>
+
+      {/* Tout le technique de la connexion, retiré de l'écran du pharmacien : réservé à l'assistance. */}
+      <AssistancePanel pharmacyId={pharmacy.id} />
     </div>
   );
 }

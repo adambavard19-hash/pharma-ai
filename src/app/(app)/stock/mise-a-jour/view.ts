@@ -3,6 +3,7 @@ import { DEFAULT_EXPORT_PATH, LGO_DEFINITIONS, type LgoDefinition, type LgoId } 
 import {
   DEPOSIT_ACCEPTED,
   DEPOSIT_ACCEPTED_LABEL,
+  DEPOSIT_CONFIRMATION,
   DEPOSIT_MAX_BYTES,
   DEPOSIT_STATUS_LABELS,
   describeDepositResult,
@@ -310,6 +311,8 @@ export async function submitDeposit(file: File, send: (body: FormData) => Promis
   try {
     const body = new FormData();
     body.set("file", file);
+    // L'écran a prévenu que le fichier remplace le stock (voir FULL_STOCK_REMINDER) ; cet envoi vaut confirmation.
+    body.set("confirmation", DEPOSIT_CONFIRMATION);
     const result = await send(body);
     return { outcome: sendOutcome(result), sent: result.ok };
   } catch {

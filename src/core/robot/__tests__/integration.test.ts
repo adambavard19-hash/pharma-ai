@@ -5,9 +5,12 @@ import {
   describeRobot,
   describeRobotFlows,
   describeTriggers,
+  mergeRobotSetup,
   readRobotSetup,
   resolveRobotIntegration,
+  robotIdentitySchema,
   robotSetupSchema,
+  robotTechnicalSchema,
   type RobotConnector,
 } from "../integration";
 
@@ -127,5 +130,42 @@ describe("la configuration gardée", () => {
     expect(describeRobot(robotSetupSchema.parse(valid))).toBe("BD Rowa Vmax");
     expect(describeRobot(robotSetupSchema.parse({ manufacturer: "autre", manufacturerOther: "Robotix", model: "R2" }))).toBe("Robotix R2");
     expect(describeRobot(robotSetupSchema.parse({ manufacturer: "autre" }))).toBe("Robot");
+  });
+});
+
+
+describe("le pharmacien désigne le robot, l'assistance règle les paramètres", () => {
+  it("l'identité : fabricant et modèle, rien d'autre — ni port, ni adresse, ni mot de passe", () => {
+    expect(robotIdentitySchema.parse({ manufacturer: "bd-rowa", model: " Vmax " })).toEqual({ manufacturer: "bd-rowa", manufacturerOther: null, model: "Vmax" });
+    for (const extra of [{ port: 6050 }, { host: "PC" }, { journalPath: "C:\\x" }, { password: "x" }, { linkKind: "network" }]) {
+      expect(robotIdentitySchema.safeParse({ manufacturer: "bd-rowa", ...extra }).success, JSON.stringify(extra)).toBe(false);
+    }
+  });
+
+  it("les paramètres techniques : liaison, hôte, port, fichier d'échange — avec la même validation", () => {
+    expect(robotTechnicalSchema.parse({ linkKind: "network", host: "192.168.1.20", port: "6050", journalPath: "" })).toEqual({ linkKind: "network", host: "192.168.1.20", port: 6050, journalPath: null });
+    expect(robotTechnicalSchema.safeParse({ host: "http://x" }).success).toBe(false);
+    expect(robotTechnicalSchema.safeParse({ port: 70000 }).success).toBe(false);
+    expect(robotTechnicalSchema.safeParse({ manufacturer: "bd-rowa" }).success).toBe(false);
+  });
+
+  it("fusionne sans rien perdre : l'identité garde les paramètres, les paramètres gardent l'identité", () => {
+    const current = robotSetupSchema.parse({ manufacturer: "bd-rowa", model: "Vmax", linkKind: "network", host: "PC-ROBOT", port: 6050 });
+    const identity = mergeRobotSetup(current, { manufacturer: "mach4", model: "M2" });
+    expect(identity.success && identity.data).toMatchObject({ manufacturer: "mach4", model: "M2", linkKind: "network", host: "PC-ROBOT", port: 6050 });
+    const technical = mergeRobotSetup(current, { host: "AUTRE-PC" });
+    expect(technical.success && technical.data).toMatchObject({ manufacturer: "bd-rowa", model: "Vmax", host: "AUTRE-PC", port: 6050 });
+  });
+
+  it("sans robot existant, l'identité part d'une liaison « inconnue »", () => {
+    const merged = mergeRobotSetup(null, { manufacturer: "willach" });
+    expect(merged.success && merged.data).toMatchObject({ manufacturer: "willach", linkKind: "unknown", host: null });
+  });
+});
+
+describe("la liste des fabricants", () => {
+  it("propose BD Rowa, Mach4, Willach, Apostore et autre — et ne promet aucune compatibilité", () => {
+    expect(ROBOT_MANUFACTURERS.map((maker) => maker.label)).toEqual(["BD Rowa", "Mach4", "Willach", "Apostore", "Autre fabricant ou je ne sais pas"]);
+    expect(ROBOT_CONNECTORS).toHaveLength(0);
   });
 });

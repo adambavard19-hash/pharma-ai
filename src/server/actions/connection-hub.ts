@@ -3,51 +3,26 @@
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { loadConnectionOverview } from "@/server/services/connection-overview";
-import { clearRobotSetup, loadRobotSetup, saveRobotSetup } from "@/server/services/robot-setup";
-import { buildConnectionTest, type ConnectionTestResult } from "@/core/stock/connection-test";
-import { lgoLabel } from "@/core/stock/connectors";
-import { LATEST_AGENT_VERSION } from "@/core/admin/agent-version";
-import type { RobotSetup, RobotSetupInput } from "@/core/robot/integration";
-import type { Serialized } from "./stock-sync";
+import { clearRobotSetup, saveRobotIdentity } from "@/server/services/robot-setup";
+import type { RobotIdentityInput, RobotSetup } from "@/core/robot/integration";
 import { fail, ok, type ActionResult } from "./types";
 
 /**
- * Les actions de la page « Ma connexion » : le test de connexion et la désignation du robot.
- * Même permission que le reste de la page (import de stock, c'est-à-dire le titulaire) ; l'officine
- * est toujours celle de la session, jamais un identifiant reçu du client.
+ * L'étape « Connecter mon robot » de la page « Installer PharmaBoost » : le pharmacien désigne son robot
+ * (fabricant et modèle) ou le retire. Même permission que le reste de la page (import de stock, c'est-à-dire le
+ * titulaire) ; l'officine est toujours celle de la session, jamais un identifiant reçu du client.
+ *
+ * Les paramètres techniques ne passent pas par ici : ils se règlent depuis l'espace d'assistance de la console
+ * (`admin-connection.ts`). Le test de connexion et les réglages des comptoirs et du serveur y sont aussi.
  */
 
-export type ConnectionTestSnapshot = Serialized<ConnectionTestResult>;
-
-/**
- * « Tester ma connexion » : relit tout d'un coup et rend les contrôles. Lecture seule — le test ne
- * change rien, ne contacte aucun ordinateur de l'officine et n'écrit rien dans le logiciel.
- */
-export async function testConnectionAction(): Promise<ActionResult<ConnectionTestSnapshot>> {
+/** Désigne le robot de l'officine. N'ouvre aucune connexion : l'intégration n'est pas disponible. */
+export async function saveRobotSetupAction(payload: RobotIdentityInput): Promise<ActionResult<RobotSetup>> {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
-  const now = new Date();
-  const [loaded, robot] = await Promise.all([loadConnectionOverview(session.scope.pharmacyId, now), loadRobotSetup(session.scope.pharmacyId)]);
-  const result = buildConnectionTest({
-    now,
-    lgo: loaded.lgo,
-    lgoLabel: loaded.lgo ? lgoLabel(loaded.lgo) : null,
-    overview: loaded.overview,
-    connection: loaded.connection,
-    posts: loaded.posts,
-    latestAgentVersion: LATEST_AGENT_VERSION,
-    robot,
-  });
-  return ok(JSON.parse(JSON.stringify(result)) as ConnectionTestSnapshot);
-}
-
-/** Désigne le robot de l'officine. N'ouvre aucune connexion : l'intégration est en préparation. */
-export async function saveRobotSetupAction(payload: RobotSetupInput): Promise<ActionResult<RobotSetup>> {
-  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
-  const result = await saveRobotSetup(session.scope, payload);
+  const result = await saveRobotIdentity(session.scope, payload);
   if (!result.ok) return fail(result.error, result.fieldErrors);
   revalidatePath("/connexion");
-  return ok(result.setup, "Robot enregistré. L'intégration est en préparation : rien n'est encore lu du robot.");
+  return ok(result.setup, "Robot enregistré. L'intégration n'est pas encore disponible : rien n'est lu du robot.");
 }
 
 export async function clearRobotSetupAction(): Promise<ActionResult<null>> {
@@ -56,4 +31,3 @@ export async function clearRobotSetupAction(): Promise<ActionResult<null>> {
   revalidatePath("/connexion");
   return ok(null, "Robot retiré.");
 }
-

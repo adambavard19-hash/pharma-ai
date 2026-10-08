@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 
 /**
- * « Connecter mon logiciel » est devenue « Connecter ma pharmacie » : l'assistant
- * en haut, les réglages techniques dans « Avancé ». Les anciens liens arrivent ici.
+ * « Connecter mon logiciel » est devenue « Installer PharmaBoost » (menu « Ma connexion »). Les anciens liens
+ * arrivent ici ; les réglages techniques sont dans l'espace d'assistance de la console.
  */
 export default function StockConnectionPage() {
-  redirect("/connexion?avance=1");
+  redirect("/connexion");
 }

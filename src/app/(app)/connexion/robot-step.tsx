@@ -4,10 +4,10 @@ import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, Check, Trash2 } from "lucide-react";
 import { clearRobotSetupAction, saveRobotSetupAction } from "@/server/actions/connection-hub";
-import { ROBOT_LINK_KINDS, ROBOT_MANUFACTURERS, describeRobot, resolveRobotIntegration, type RobotLinkKind, type RobotSetup } from "@/core/robot/integration";
+import { ROBOT_MANUFACTURERS, describeRobot, resolveRobotIntegration, type RobotSetup } from "@/core/robot/integration";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Select } from "@/components/ui/field";
+import { Field, Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { BIG_BUTTON, SetupCard } from "./setup-card";
@@ -15,18 +15,14 @@ import { BIG_BUTTON, SetupCard } from "./setup-card";
 /**
  * Étape 3 — « Connecter mon robot » (facultatif).
  *
- * Elle enregistre quel robot l'officine utilise et prépare les paramètres d'une future intégration. Elle ne se
- * connecte à rien : tant qu'aucun connecteur n'est validé (`ROBOT_CONNECTORS`, vide), l'état reste « Connexion en
- * préparation », et aucune connexion n'est jamais simulée. Les paramètres techniques sont repliés : ils servent
- * à l'assistance, pas au pharmacien.
+ * Le pharmacien enregistre le fabricant et le modèle de son robot. C'est tout : l'intégration n'est PAS disponible,
+ * l'écran le dit, et rien n'est jamais présenté comme connecté. Les paramètres techniques d'une future intégration
+ * se règlent depuis l'espace d'assistance, pas ici.
  */
 
-const empty = { manufacturer: "", manufacturerOther: "", model: "", linkKind: "unknown" as RobotLinkKind, host: "", port: "", journalPath: "" };
+const empty = { manufacturer: "", manufacturerOther: "", model: "" };
 
-const toForm = (setup: RobotSetup | null) =>
-  setup
-    ? { manufacturer: setup.manufacturer, manufacturerOther: setup.manufacturerOther ?? "", model: setup.model ?? "", linkKind: setup.linkKind, host: setup.host ?? "", port: setup.port ? String(setup.port) : "", journalPath: setup.journalPath ?? "" }
-    : empty;
+const toForm = (setup: RobotSetup | null) => (setup ? { manufacturer: setup.manufacturer, manufacturerOther: setup.manufacturerOther ?? "", model: setup.model ?? "" } : empty);
 
 export function RobotStep({ setup, lgo }: { setup: RobotSetup | null; lgo: string | null }) {
   const uid = useId();
@@ -43,7 +39,7 @@ export function RobotStep({ setup, lgo }: { setup: RobotSetup | null; lgo: strin
   const save = () =>
     start(async () => {
       setErrors({});
-      const result = await saveRobotSetupAction({ ...form, manufacturer: form.manufacturer });
+      const result = await saveRobotSetupAction(form);
       if (!result.ok) {
         setErrors(result.fieldErrors ?? {});
         return push({ tone: "error", title: result.error });
@@ -81,9 +77,9 @@ export function RobotStep({ setup, lgo }: { setup: RobotSetup | null; lgo: strin
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-border-subtle bg-surface-sunken/60 px-4 py-3">
           <span className="min-w-0 flex-1 basis-40">
             <span className="block text-[16px] leading-6 font-medium text-text-primary">{describeRobot(saved)}</span>
-            <span className="block text-[12.5px] leading-5 text-text-secondary">Configuration enregistrée</span>
+            <span className="block text-[12.5px] leading-5 text-text-secondary">Enregistré</span>
           </span>
-          <Badge tone="info">{integration.stage === "PREPARING" ? "Connexion en préparation" : integration.label}</Badge>
+          <Badge tone="info">{integration.stage === "PREPARING" ? "Intégration non disponible" : integration.label}</Badge>
         </div>
       )}
 
@@ -141,29 +137,6 @@ export function RobotStep({ setup, lgo }: { setup: RobotSetup | null; lgo: strin
               <Field label="Modèle (facultatif)" htmlFor={`${uid}-model`} error={errors.model}>
                 <Input id={`${uid}-model`} value={form.model} maxLength={60} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="Comme écrit sur le robot" />
               </Field>
-
-              <details className="rounded-xl border border-border-subtle px-4 py-3">
-                <summary className="cursor-pointer text-[13.5px] font-medium text-text-secondary">Paramètres pour l&apos;assistance</summary>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Field label="Comment le logiciel et le robot se parlent" htmlFor={`${uid}-link`} error={errors.linkKind} className="sm:col-span-2">
-                    <Select id={`${uid}-link`} value={form.linkKind} onChange={(e) => setForm({ ...form, linkKind: e.target.value as RobotLinkKind })}>
-                      {ROBOT_LINK_KINDS.map((kind) => (
-                        <option key={kind.id} value={kind.id}>{kind.label}</option>
-                      ))}
-                    </Select>
-                  </Field>
-                  <Field label="Ordinateur du robot" htmlFor={`${uid}-host`} error={errors.host}>
-                    <Input id={`${uid}-host`} value={form.host} maxLength={80} onChange={(e) => setForm({ ...form, host: e.target.value })} placeholder="PC-ROBOT ou 192.168.1.20" />
-                  </Field>
-                  <Field label="Port réseau" htmlFor={`${uid}-port`} error={errors.port}>
-                    <Input id={`${uid}-port`} inputMode="numeric" value={form.port} maxLength={5} onChange={(e) => setForm({ ...form, port: e.target.value })} placeholder="6050" />
-                  </Field>
-                  <Field label="Dossier ou fichier d'échange" htmlFor={`${uid}-journal`} error={errors.journalPath} className="sm:col-span-2">
-                    <Input id={`${uid}-journal`} value={form.journalPath} maxLength={300} onChange={(e) => setForm({ ...form, journalPath: e.target.value })} placeholder="C:\…" className="font-mono text-[13px]" />
-                  </Field>
-                  <p className="text-[12.5px] leading-5 text-text-secondary sm:col-span-2">Enregistrés pour préparer l&apos;intégration : PharmaBoost ne s&apos;en sert pas pour se connecter. Aucun mot de passe n&apos;est demandé.</p>
-                </div>
-              </details>
             </div>
           )}
 
@@ -178,7 +151,7 @@ export function RobotStep({ setup, lgo }: { setup: RobotSetup | null; lgo: strin
         </form>
       )}
 
-      <p className="text-[13.5px] leading-5 text-text-secondary">Connexion technique en préparation. Cette étape peut être ignorée.</p>
+      <p className="text-[13.5px] leading-5 text-text-secondary">Intégration non disponible pour le moment : PharmaBoost ne se connecte pas encore aux robots. Cette étape peut être ignorée.</p>
     </SetupCard>
   );
 }

@@ -23,6 +23,7 @@ import {
   DEPOSIT_STALLED_MS,
   DEPOSIT_SUPERSEDED_ERROR,
   DEPOSIT_SUPERSEDED_MESSAGE,
+  DEPOSIT_HOLD_MIN_KNOWN,
   assessDeposit,
   cleanDepositFileName,
   depositMaxBytes,
@@ -527,6 +528,20 @@ async function countKnownStockLines(pharmacyId: string): Promise<number> {
   return drugs + products;
 }
 
+/**
+ * Combien de produits connus (déjà importés, en rayon) ne figurent PAS dans le fichier : ceux que « stock complet » mettrait
+ * à zéro. Même règle que la remise à zéro elle-même, mais en lecture seule, avant d'écrire quoi que ce soit.
+ */
+async function countAbsentLines(pharmacyId: string, rows: { status: string; targetId: string | null }[], knownLines: number): Promise<number> {
+  const presentationIds = rows.filter((row) => row.status === "MEDICAMENT" && row.targetId).map((row) => row.targetId as string);
+  const productIds = rows.filter((row) => row.status === "PRODUIT_EXISTANT" && row.targetId).map((row) => row.targetId as string);
+  const [drugsInFile, productsInFile] = await Promise.all([
+    presentationIds.length > 0 ? prisma.pharmacyDrugStock.count({ where: { pharmacyId, source: "IMPORT", quantity: { gt: 0 }, presentationId: { in: presentationIds } } }) : 0,
+    productIds.length > 0 ? prisma.product.count({ where: { pharmacyId, deletedAt: null, id: { in: productIds }, stockItem: { quantity: { gt: 0 } }, stockMovements: { some: { type: "IMPORT" } } } }) : 0,
+  ]);
+  return Math.max(0, knownLines - (drugsInFile ?? 0) - (productsInFile ?? 0));
+}
+
 /** Un message du moteur n'est montré tel quel que s'il parle du fichier ; une panne technique reste dans les journaux. */
 function readableError(error: unknown, fallback: string): string {
   const text = error instanceof Error ? error.message.trim() : "";
@@ -596,7 +611,12 @@ async function processDeposit(params: { row: StockDeposit; scope: TenantScope; p
 
     const knownLines = await countKnownStockLines(scope.pharmacyId);
     if (!params.decided) {
-      const verdict = assessDeposit({ validLines, knownLines, invalidLines: invalid, incompleteReason: preview.incomplete ? preview.incompleteReason ?? INCOMPLETE_FALLBACK : null });
+      const base = { validLines, knownLines, invalidLines: invalid, incompleteReason: preview.incomplete ? preview.incompleteReason ?? INCOMPLETE_FALLBACK : null };
+      let verdict = assessDeposit(base);
+      // Un fichier qui passe les trois premiers contrôles est encore compté : combien de produits connus resteraient à zéro ?
+      if (verdict.verdict === "APPLY" && params.zeroAbsent && knownLines >= DEPOSIT_HOLD_MIN_KNOWN) {
+        verdict = assessDeposit({ ...base, absentLines: await countAbsentLines(scope.pharmacyId, preview.rows, knownLines) });
+      }
       if (verdict.verdict === "HOLD") {
         await closeImportJob(jobId);
         return await settle({ status: "HELD", importJobId: jobId, lines: validLines, invalid, knownLines, message: verdict.reason });

@@ -15,7 +15,6 @@ const calls = (source: string, name: string) => [...source.matchAll(new RegExp(`
 
 const MESSAGING_SITES = [
   "src/server/actions/documents.ts",
-  "src/server/actions/stock-sync.ts",
   "src/server/services/followup.ts",
   "src/server/services/user-password.ts",
   "src/server/services/sealed-documents.ts",

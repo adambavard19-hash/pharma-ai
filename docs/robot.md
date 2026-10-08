@@ -123,19 +123,23 @@ inventées pour l'essai : ils ne disent rien du format réel d'un journal BD Row
 
 ## Préparation dans PharmaBoost (8 octobre 2026)
 
-La page « Ma connexion » a une rubrique « Connecter mon robot » : le titulaire désigne le fabricant, le modèle, et
-(pour le technicien) comment le logiciel et le robot se parlent, l'ordinateur du robot, un port, un fichier
-d'échange. **Rien n'est connecté** : l'écran dit « Intégration en préparation », ne simule aucun état « connecté »
-et le test de connexion le classe en information, jamais en réussite.
+La page « Ma connexion » a une étape « Connecter mon robot » (facultatif) : le pharmacien enregistre le fabricant
+(BD Rowa, Mach4, Willach, Apostore, autre) et le modèle. **Rien n'est connecté** : l'écran dit « Intégration non
+disponible », ne simule aucun état « connecté » et le test de connexion de l'assistance le classe en information, jamais
+en réussite.
 
-- Les deux flux sont séparés à l'écran et dans le code : le **logiciel** apporte le stock (disponible par fichier),
-  le **robot** apportera la délivrance en cours (en préparation). Ce ne sont pas les mêmes informations.
+- Les paramètres techniques d'une future intégration (comment le logiciel et le robot se parlent, ordinateur et port,
+  fichier d'échange) et le diagnostic en lecture seule sont dans l'**espace d'assistance** de la console. Le pharmacien
+  n'en voit rien ; son enregistrement n'efface jamais ces paramètres, et l'assistance n'en crée pas avant que le titulaire
+  ait désigné son robot.
+- Les deux flux sont séparés dans le code et dans l'assistance : le **logiciel** apporte le stock (disponible par
+  fichier), le **robot** apportera la délivrance en cours (non disponible). Ce ne sont pas les mêmes informations.
 - Architecture : `src/core/robot/integration.ts`. `ROBOT_CONNECTORS` est **vide exprès** ; y inscrire un connecteur
   (fabricant, logiciels, stade, flux, paramètres) est le seul moyen de faire afficher « en essai » ou « disponible ».
   `DispenseSignal` fixe le contrat d'une délivrance détectée (mêmes codes qu'un bip, source « robot »).
-- Configuration gardée dans `Pharmacy.settings.robot` (pas de migration). Le schéma est strict : toute clé inconnue,
-  en premier lieu un mot de passe ou un jeton, est refusée. Hôte et port ne servent qu'à un futur connecteur ; l'audit
-  ne les retient pas. La liste des fabricants est une liste de **choix**, pas de compatibilités.
+- Configuration gardée dans `Pharmacy.settings.robot` (pas de migration). Les schémas sont stricts : toute clé inconnue,
+  en premier lieu un mot de passe ou un jeton, est refusée. L'audit ne retient ni adresse ni chemin. La liste des
+  fabricants est une liste de **choix**, pas de compatibilités.
 
 ## Suite
 

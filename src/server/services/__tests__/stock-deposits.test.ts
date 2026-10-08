@@ -163,7 +163,7 @@ const SHA = createHash("sha256").update(BYTES).digest("hex");
 function preview(options: { valid?: number; invalid?: number; toVerify?: number; missing?: string[]; jobId?: string; incomplete?: boolean; incompleteReason?: string } = {}) {
   const { valid = 10, invalid = 0, toVerify = 0, missing = [], jobId = "job_1", incomplete = false, incompleteReason } = options;
   const rows = [
-    ...Array.from({ length: valid }, (_, index) => ({ line: index + 1, status: index < toVerify ? "A_VERIFIER" : "MEDICAMENT" })),
+    ...Array.from({ length: valid }, (_, index) => ({ line: index + 1, status: index < toVerify ? "A_VERIFIER" : "MEDICAMENT", targetId: index < toVerify ? null : `pres_${index}` })),
     ...Array.from({ length: invalid }, (_, index) => ({ line: valid + index + 1, status: "INVALIDE" })),
   ];
   return { jobId, fileName: "stock.csv", headers: [], mapping: {}, missing, warnings: [], incomplete, ...(incompleteReason ? { incompleteReason } : {}), rows, summary: { detected: rows.length, invalid } };
@@ -904,6 +904,37 @@ describe("un fichier lu en partie n'est jamais appliqué comme un stock complet"
     db.state.deposits = [stored("dep_1", { status: "HELD", appliedAt: null })];
     mocks.analyse.mockResolvedValue(preview({ valid: 3700, invalid: 80 }));
     expect(await service.decideHeldDeposit("dep_1", "adm_1", "APPLY_PARTIAL")).toMatchObject({ ok: true, deposit: { status: "APPLIED" } });
+  });
+});
+
+describe("le garde-fou du passage à zéro massif", () => {
+  /** Le stock connu compte `known` produits ; `inFile` d'entre eux figurent dans le fichier. */
+  const stock = (known: number, inFile: number) => {
+    db.prisma.pharmacyDrugStock.count.mockImplementation(async (args?: { where?: { presentationId?: unknown } }) => (args?.where?.presentationId ? inFile : known));
+    db.prisma.product.count.mockResolvedValue(0);
+  };
+
+  it("un fichier à 90 % du stock, mais qui laisserait 100 produits à zéro, attend l'équipe : rien n'est écrit", async () => {
+    stock(1000, 900);
+    mocks.analyse.mockResolvedValue(preview({ valid: 900 }));
+    const result = await send();
+    expect(result.ok && result.deposit).toMatchObject({ status: "HELD", lines: 900, knownLines: 1000, appliedAt: null });
+    expect(result.ok && result.deposit.message).toMatch(/mettrait 100 produits à 0 \(10 % du stock connu\)/);
+    expect(mocks.commit).not.toHaveBeenCalled();
+  });
+
+  it("à 25 produits ou 5 % : toujours appliqué (un petit écart est normal : produits retirés du rayon)", async () => {
+    stock(1000, 970);
+    mocks.analyse.mockResolvedValue(preview({ valid: 970 }));
+    expect((await send()).ok && db.state.deposits[0].status).toBe("APPLIED");
+    expect(mocks.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("une décision de l'équipe lève ce contrôle : c'est elle qui a tranché", async () => {
+    stock(1000, 900);
+    db.state.deposits = [stored("dep_1", { status: "HELD", appliedAt: null })];
+    mocks.analyse.mockResolvedValue(preview({ valid: 900 }));
+    expect(await service.decideHeldDeposit("dep_1", "adm_1", "APPLY_FULL")).toMatchObject({ ok: true, deposit: { status: "APPLIED" } });
   });
 });
 

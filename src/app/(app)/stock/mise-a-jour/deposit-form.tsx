@@ -115,6 +115,7 @@ export function DepositForm({ defaultOpen }: { defaultOpen: boolean }) {
           <Button type="submit" size="lg" className="w-full sm:w-auto" loading={pending} disabled={!file || Boolean(problem)} leadingIcon={<Upload className="size-[18px]" />}>
             Envoyer
           </Button>
+          <p className="text-[12.5px] text-text-secondary">En envoyant, vous confirmez que ce fichier remplace votre stock : ce qui n&apos;y figure pas passe à 0.</p>
         </form>
 
         <div role="status" aria-live="polite" className="space-y-3">

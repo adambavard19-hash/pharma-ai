@@ -3,52 +3,47 @@
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Boxes, Loader2, Upload } from "lucide-react";
-import { chooseLgoAction, type OverviewSnapshot } from "@/server/actions/stock-sync";
+import { Boxes, FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import type { OverviewSnapshot } from "@/server/actions/stock-sync";
 import { sendStockAction } from "@/server/actions/stock-deposits";
-import { SEND_FAILED, ZERO_ABSENT_NOTICE, checkDepositFile, uploadSummary, type SendOutcome } from "@/app/(app)/stock/mise-a-jour/view";
-import type { LgoDefinition } from "@/core/stock/connectors";
+import { DEPOSIT_CONFIRMATION } from "@/core/stock-deposit/rules";
+import { SEND_FAILED, ZERO_ABSENT_NOTICE, checkDepositFile, formatFileSize, uploadSummary, type SendOutcome } from "@/app/(app)/stock/mise-a-jour/view";
 import { Alert } from "@/components/ui/feedback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/toast";
 import { formatNumber } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import { BIG_BUTTON, SetupCard } from "./setup-card";
 
 /**
  * Étape 2 — « Envoyer mon stock ».
  *
- * Un seul gros bouton : il ouvre le choix du fichier, et le fichier part dès qu'il est choisi. La confirmation
- * dit combien de produits et quand. Les garde-fous sont ceux du serveur (un fichier qui couvrirait trop peu du
- * stock attend l'équipe, un fichier illisible ne change rien) : l'écran les dit, il ne les contourne pas.
- * La mise à jour automatique n'apparaît que si PharmaBoost Connect a réellement lu un export.
+ * Un seul gros bouton, l'état du dernier import, un petit guide LGPI. Le bouton ouvre le choix du fichier ; avant
+ * tout envoi, la personne CONFIRME explicitement : ce fichier remplace son stock, ce qui n'y figure pas passe à 0.
+ * Les contrôles du serveur restent entiers (un fichier incomplet, trop d'absents ou trop de lignes illisibles ne
+ * s'applique pas : l'équipe le vérifie d'abord) ; l'écran les dit, il ne les contourne pas.
  */
 
 type Stock = OverviewSnapshot["overview"]["stock"];
-type AutoSync = OverviewSnapshot["overview"]["autoSync"];
 
-export function StockStep({ lgos, lgo, stock, autoSync, onChanged }: { lgos: LgoDefinition[]; lgo: string | null; stock: Stock; autoSync: AutoSync; onChanged: () => void }) {
+export function StockStep({ stock, onChanged }: { stock: Stock; onChanged: () => void }) {
   return (
     <SetupCard icon={Boxes} title="2. Envoyer mon stock" badge={stock.state === "FRESH" ? <Badge tone="success">À jour</Badge> : undefined}>
-      <StockSendBody lgos={lgos} lgo={lgo} stock={stock} autoSync={autoSync} onChanged={onChanged} />
+      <StockSendBody stock={stock} onChanged={onChanged} />
     </SetupCard>
   );
 }
 
 /** Le contenu de l'étape, sans son cadre : il sert aussi à l'accueil d'une nouvelle officine. */
-export function StockSendBody({ lgos, lgo, stock, autoSync, onChanged }: { lgos: LgoDefinition[]; lgo: string | null; stock: Stock; autoSync: AutoSync; onChanged?: () => void }) {
+export function StockSendBody({ stock, onChanged }: { stock: Stock; onChanged?: () => void }) {
   const input = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const { push } = useToast();
   const [pending, start] = useTransition();
+  const [chosen, setChosen] = useState<File | null>(null);
   const [outcome, setOutcome] = useState<SendOutcome | null>(null);
-  const [software, setSoftware] = useState(lgo ?? "");
-  const [saving, startSave] = useTransition();
 
-  const changed = () => {
-    onChanged?.();
-    router.refresh();
+  const reset = () => {
+    setChosen(null);
+    if (input.current) input.current.value = "";
   };
 
   const pick = (file: File | null) => {
@@ -56,35 +51,35 @@ export function StockSendBody({ lgos, lgo, stock, autoSync, onChanged }: { lgos:
     setOutcome(null);
     const problem = checkDepositFile(file);
     if (problem) {
+      reset();
       setOutcome({ tone: "danger", title: "Fichier non envoyé", detail: problem });
-      if (input.current) input.current.value = "";
       return;
     }
+    // Rien ne part tant que la personne n'a pas confirmé.
+    setChosen(file);
+  };
+
+  const confirm = () => {
+    const file = chosen;
+    if (!file) return;
     start(async () => {
       try {
         const body = new FormData();
         body.set("file", file);
+        body.set("confirmation", DEPOSIT_CONFIRMATION);
         const result = await sendStockAction(body);
         setOutcome(uploadSummary(result, new Date()));
-        if (result.ok) changed();
+        if (result.ok) {
+          onChanged?.();
+          router.refresh();
+        }
       } catch {
         setOutcome({ tone: "danger", title: "Votre stock n'a pas été mis à jour", detail: SEND_FAILED });
       }
-      if (input.current) input.current.value = "";
+      reset();
     });
   };
 
-  const chooseSoftware = (value: string) => {
-    setSoftware(value);
-    if (!value) return;
-    startSave(async () => {
-      const result = await chooseLgoAction({ lgo: value });
-      if (!result.ok) return push({ tone: "error", title: result.error });
-      onChanged?.();
-    });
-  };
-
-  const guide = `/connexion/guide${software ? `?logiciel=${software}` : ""}`;
   const aged = stock.state === "OLD";
 
   return (
@@ -98,7 +93,7 @@ export function StockSendBody({ lgos, lgo, stock, autoSync, onChanged }: { lgos:
               {formatNumber(stock.productCount)} produit{stock.productCount > 1 ? "s" : ""}
             </span>
             <span className="block text-[12.5px] leading-5 text-text-secondary">
-              Reçu {stock.receivedLabel}
+              Dernier import : {stock.receivedLabel}
               {stock.ignored !== null && stock.ignored > 0 && <> · {formatNumber(stock.ignored)} ligne{stock.ignored > 1 ? "s" : ""} illisible{stock.ignored > 1 ? "s" : ""} ignorée{stock.ignored > 1 ? "s" : ""}</>}
             </span>
           </span>
@@ -122,9 +117,31 @@ export function StockSendBody({ lgos, lgo, stock, autoSync, onChanged }: { lgos:
         disabled={pending}
         onChange={(event) => pick(event.target.files?.[0] ?? null)}
       />
-      <Button size="xl" variant="outline" className={BIG_BUTTON} loading={pending} onClick={() => input.current?.click()} leadingIcon={<Upload className="size-5" />}>
-        Envoyer mon stock
-      </Button>
+
+      {chosen ? (
+        <div role="group" aria-label="Confirmer l'envoi" className="space-y-3 rounded-xl border border-warning-300 bg-warning-50/60 p-4 dark:border-warning-800 dark:bg-warning-950/20">
+          <p className="flex items-center gap-2 text-[15px] leading-6 font-semibold text-text-primary">
+            <FileSpreadsheet className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
+            <span className="min-w-0 break-words">{chosen.name}</span>
+            <span className="shrink-0 text-[13px] font-normal text-text-secondary">{formatFileSize(chosen.size)}</span>
+          </p>
+          <p className="text-[14px] leading-6 text-text-primary">
+            Ce fichier <strong>remplace votre stock</strong> : envoyez tout votre stock. {ZERO_ABSENT_NOTICE} S&apos;il paraît incomplet, PharmaBoost ne l&apos;applique pas : l&apos;équipe le vérifie d&apos;abord.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button size="lg" className="rounded-full sm:flex-1" loading={pending} onClick={confirm} leadingIcon={<Upload className="size-[18px]" />}>
+              Confirmer et envoyer
+            </Button>
+            <Button size="lg" variant="ghost" className="rounded-full" disabled={pending} onClick={reset}>
+              Choisir un autre fichier
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="xl" variant="outline" className={BIG_BUTTON} disabled={pending} onClick={() => input.current?.click()} leadingIcon={<Upload className="size-5" />}>
+          Envoyer mon stock
+        </Button>
+      )}
 
       <div role="status" aria-live="polite" className="space-y-2">
         {pending && (
@@ -140,40 +157,9 @@ export function StockSendBody({ lgos, lgo, stock, autoSync, onChanged }: { lgos:
         )}
       </div>
 
-      <p className="text-[13.5px] leading-5 text-text-secondary">
-        Envoyez tout votre stock. {ZERO_ABSENT_NOTICE}
-      </p>
-
-      {autoSync.state !== "NONE" && (
-        <p className={cn("flex items-start gap-2 text-[13.5px] leading-5", autoSync.state === "ACTIVE" ? "text-success-700 dark:text-success-400" : "text-warning-800 dark:text-warning-400")}>
-          <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", autoSync.state === "ACTIVE" ? "bg-success-600" : "bg-warning-500")} aria-hidden="true" />
-          <span>
-            <strong className="font-semibold">Mise à jour automatique {autoSync.state === "ACTIVE" ? "active" : "pas encore active"}.</strong> {autoSync.detail}
-          </span>
-        </p>
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border-subtle pt-3">
-        <Link href={guide} className="text-[13.5px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-400">
-          Comment récupérer mon stock ?
-        </Link>
-        <label className="flex items-center gap-2 text-[13px] text-text-secondary">
-          Mon logiciel
-          <select
-            value={software}
-            disabled={saving}
-            onChange={(event) => chooseSoftware(event.target.value)}
-            className="h-9 rounded-lg border border-border-default bg-surface-card px-2.5 text-[13.5px] text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
-          >
-            {!software && <option value="">Choisir…</option>}
-            {lgos.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.id === "autre" ? "Autre" : candidate.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <Link href="/connexion/guide?logiciel=lgpi" className="inline-block text-[13.5px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-400">
+        Comment récupérer mon stock dans LGPI ?
+      </Link>
     </>
   );
 }

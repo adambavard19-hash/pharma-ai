@@ -2,14 +2,13 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AlertTriangle, CheckCircle2, CircleAlert, Info, Loader2, ScanBarcode, ShieldCheck, XCircle } from "lucide-react";
-import { testConnectionAction, type ConnectionTestSnapshot } from "@/server/actions/connection-hub";
-import { getConnectionOverviewAction } from "@/server/actions/stock-sync";
+import { adminScanCountAction, adminTestConnectionAction, type AdminConnectionTest } from "@/server/actions/admin-connection";
 import { GROUP_LABELS, type CheckGroup, type CheckStatus } from "@/core/stock/connection-test";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { TONE_STYLES } from "./status";
+import { TONE_STYLES } from "@/app/(app)/connexion/status";
 
 /**
  * « Tester ma connexion » : un bouton, des contrôles réels, une phrase par contrôle — ce qui a été
@@ -31,7 +30,9 @@ const GROUP_ORDER: CheckGroup[] = ["software", "connect", "stock", "sales", "rob
 const BIP_POLL_MS = 3_000;
 const BIP_WAIT_MS = 90_000;
 
-export function ConnectionTestPanel({ result, running, canTestScan, scanCount, onRun }: { result: ConnectionTestSnapshot | null; running: boolean; canTestScan: boolean; scanCount: number; onRun: () => void }) {
+export function AssistanceTest({ pharmacyId, salesFollowed, scanCount }: { pharmacyId: string; salesFollowed: boolean; scanCount: number }) {
+  const { result, running, run: onRun } = useAssistanceTest(pharmacyId);
+  const canTestScan = salesFollowed;
   const tone = result ? TONE_STYLES[result.tone] : null;
   return (
     <section aria-label="Tester ma connexion" className="space-y-4 rounded-2xl border border-border-subtle bg-surface-card p-5">
@@ -40,11 +41,11 @@ export function ConnectionTestPanel({ result, running, canTestScan, scanCount, o
           <ShieldCheck className="size-5 text-text-secondary" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[17px] leading-6 font-semibold text-text-primary">Tester ma connexion</h2>
-          <p className="text-[13.5px] leading-5 text-text-secondary">Contrôle chaque point en quelques secondes et dit quoi corriger.</p>
+          <h2 className="text-[17px] leading-6 font-semibold text-text-primary">Test de connexion</h2>
+          <p className="text-[13.5px] leading-5 text-text-secondary">Contrôle chaque point à partir de ce que les programmes de l&apos;officine ont envoyé, et dit quoi corriger.</p>
         </div>
         <Button size="lg" loading={running} onClick={onRun} leadingIcon={!running ? <ShieldCheck className="size-[18px]" /> : undefined}>
-          {result ? "Relancer le test" : "Tester ma connexion"}
+          {result ? "Relancer le test" : "Lancer le test"}
         </Button>
       </div>
 
@@ -93,7 +94,7 @@ export function ConnectionTestPanel({ result, running, canTestScan, scanCount, o
             })}
           </div>
 
-          {canTestScan && <ScanTrial initialCount={scanCount} />}
+          {canTestScan && <ScanTrial pharmacyId={pharmacyId} initialCount={scanCount} />}
 
           <p className="text-[12.5px] leading-5 text-text-tertiary">
             Test du {formatDateTime(new Date(result.at))}. {result.limits}
@@ -105,7 +106,7 @@ export function ConnectionTestPanel({ result, running, canTestScan, scanCount, o
 }
 
 /** L'essai du bip : on bipe une boîte au comptoir, PharmaBoost dit s'il l'a reçue. */
-function ScanTrial({ initialCount }: { initialCount: number }) {
+function ScanTrial({ pharmacyId, initialCount }: { pharmacyId: string; initialCount: number }) {
   const [phase, setPhase] = useState<"idle" | "waiting" | "received" | "missed">("idle");
   const baseline = useRef(initialCount);
   const timers = useRef<{ poll?: ReturnType<typeof setInterval>; stop?: ReturnType<typeof setTimeout> }>({});
@@ -119,12 +120,12 @@ function ScanTrial({ initialCount }: { initialCount: number }) {
   const start = async () => {
     clear();
     // La référence est lue maintenant : seul un bip POSTÉRIEUR au clic compte.
-    const first = await getConnectionOverviewAction();
-    baseline.current = first.ok ? first.data.overview.sales.scanCount : initialCount;
+    const first = await adminScanCountAction({ pharmacyId });
+    baseline.current = first.ok ? first.data.scanCount : initialCount;
     setPhase("waiting");
     timers.current.poll = setInterval(async () => {
-      const next = await getConnectionOverviewAction();
-      if (next.ok && next.data.overview.sales.scanCount > baseline.current) {
+      const next = await adminScanCountAction({ pharmacyId });
+      if (next.ok && next.data.scanCount > baseline.current) {
         clear();
         setPhase("received");
       }
@@ -141,10 +142,10 @@ function ScanTrial({ initialCount }: { initialCount: number }) {
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-medium text-text-primary">Essai du bip (facultatif)</p>
         <p className="text-[13.5px] leading-5 text-text-secondary">
-          {phase === "idle" && "Bipez une boîte au comptoir : on vérifie que PharmaBoost la reçoit."}
-          {phase === "waiting" && "En attente d'un bip… bipez une boîte maintenant (90 secondes)."}
+          {phase === "idle" && "Faites biper une boîte au comptoir : on vérifie que PharmaBoost la reçoit."}
+          {phase === "waiting" && "En attente d'un bip… faites biper une boîte maintenant (90 secondes)."}
           {phase === "received" && "Bip reçu : le suivi des ventes fonctionne."}
-          {phase === "missed" && "Aucun bip reçu. Vérifiez que la douchette est branchée sur le poste relié, que l'icône PharmaBoost est visible, puis réessayez."}
+          {phase === "missed" && "Aucun bip reçu. Vérifiez que la douchette est branchée sur le poste relié et que l'icône PharmaBoost est visible, puis réessayez."}
         </p>
       </div>
       {phase === "waiting" ? (
@@ -158,19 +159,19 @@ function ScanTrial({ initialCount }: { initialCount: number }) {
   );
 }
 
-/** Le test, lancé depuis la page : un seul endroit sait le lancer, le panneau et l'étape 3 l'appellent. */
-export function useConnectionTest() {
-  const [result, setResult] = useState<ConnectionTestSnapshot | null>(null);
+/** Le test, lancé depuis la fiche : un seul endroit sait le lancer. */
+function useAssistanceTest(pharmacyId: string) {
+  const [result, setResult] = useState<AdminConnectionTest | null>(null);
   const [running, start] = useTransition();
   const { push } = useToast();
   const run = () =>
     start(async () => {
       try {
-        const next = await testConnectionAction();
+        const next = await adminTestConnectionAction({ pharmacyId });
         if (!next.ok) return push({ tone: "error", title: next.error });
         setResult(next.data);
       } catch {
-        push({ tone: "error", title: "Le test n'a pas pu se faire. Vérifiez votre connexion Internet et réessayez." });
+        push({ tone: "error", title: "Le test n'a pas pu se faire. Vérifiez la connexion Internet et réessayez." });
       }
     });
   return { result, running, run };

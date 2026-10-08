@@ -3,18 +3,29 @@ import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import type { TenantScope } from "@/server/db/tenant";
-import { ROBOT_SETTINGS_KEY, readRobotSetup, robotSetupSchema, type RobotSetup, type RobotSetupInput } from "@/core/robot/integration";
+import {
+  ROBOT_SETTINGS_KEY,
+  mergeRobotSetup,
+  readRobotSetup,
+  robotIdentitySchema,
+  robotTechnicalSchema,
+  type RobotIdentityInput,
+  type RobotSetup,
+  type RobotTechnicalInput,
+} from "@/core/robot/integration";
 
 /**
- * Le robot que le titulaire a désigné, gardé dans les paramètres de SON officine
- * (`Pharmacy.settings.robot`) : pas de table de plus, pas de secret.
+ * Le robot de l'officine, gardé dans SES paramètres (`Pharmacy.settings.robot`) : pas de table de plus, pas de secret.
  *
- * Ce qui est gardé : le fabricant, le modèle, comment le logiciel et le robot se parlent, et
- * quelques paramètres techniques pour un futur connecteur. Ce qui ne l'est JAMAIS : un mot de
- * passe, un jeton, une clé — le schéma refuse toute clé inconnue. PharmaBoost ne se connecte
- * pas au robot ; cette configuration ne déclenche aucune connexion.
+ * Deux écritures, deux personnes :
+ *   • le PHARMACIEN désigne le robot (fabricant, modèle) : `saveRobotIdentity`. Il n'efface jamais les paramètres
+ *     techniques que l'assistance a pu renseigner ;
+ *   • l'ASSISTANCE (console) règle les paramètres techniques d'une future intégration : `saveRobotTechnical`.
+ * Aucun mot de passe, jeton ou clé n'est jamais gardé : les schémas refusent toute clé inconnue. PharmaBoost ne se
+ * connecte pas au robot ; cette configuration ne déclenche aucune connexion.
  *
- * L'officine est toujours celle de la session (`scope`) : jamais un identifiant reçu du client.
+ * L'officine est celle de la session (`scope`), ou celle que la console désigne : jamais un identifiant reçu du
+ * pharmacien.
  */
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -28,35 +39,69 @@ export async function loadRobotSetup(pharmacyId: string): Promise<RobotSetup | n
 
 export type SaveRobotResult = { ok: true; setup: RobotSetup } | { ok: false; error: string; fieldErrors: Record<string, string> };
 
-export async function saveRobotSetup(scope: TenantScope, input: RobotSetupInput): Promise<SaveRobotResult> {
-  const parsed = robotSetupSchema.safeParse(input);
-  if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const key = issue.path.map(String).join(".") || "form";
-      if (!fieldErrors[key]) fieldErrors[key] = issue.message;
-    }
-    return { ok: false, error: Object.values(fieldErrors)[0] ?? "Configuration invalide.", fieldErrors };
+function refuse(error: { issues: { path: PropertyKey[]; message: string }[] }): SaveRobotResult {
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const key = issue.path.map(String).join(".") || "form";
+    if (!fieldErrors[key]) fieldErrors[key] = issue.message;
   }
-  const setup = parsed.data;
-  // « Autre fabricant » est le seul cas où le nom saisi a un sens.
-  const clean: RobotSetup = setup.manufacturer === "autre" ? setup : { ...setup, manufacturerOther: null };
+  return { ok: false, error: Object.values(fieldErrors)[0] ?? "Configuration invalide.", fieldErrors };
+}
+
+async function writeSetup(pharmacyId: string, settings: Record<string, unknown>, setup: RobotSetup): Promise<void> {
+  await prisma.pharmacy.update({ where: { id: pharmacyId }, data: { settings: { ...settings, [ROBOT_SETTINGS_KEY]: setup } as Prisma.InputJsonValue } });
+}
+
+/** Le pharmacien désigne son robot : fabricant et modèle. Les paramètres techniques déjà enregistrés sont conservés. */
+export async function saveRobotIdentity(scope: TenantScope, input: RobotIdentityInput): Promise<SaveRobotResult> {
+  const identity = robotIdentitySchema.safeParse(input);
+  if (!identity.success) return refuse(identity.error);
   const current = await prisma.pharmacy.findUnique({ where: { id: scope.pharmacyId }, select: { settings: true } });
   if (!current) return { ok: false, error: "Officine introuvable.", fieldErrors: {} };
-  await prisma.pharmacy.update({
-    where: { id: scope.pharmacyId },
-    data: { settings: { ...asObject(current.settings), [ROBOT_SETTINGS_KEY]: clean } as Prisma.InputJsonValue },
+  const settings = asObject(current.settings);
+  const merged = mergeRobotSetup(readRobotSetup(settings[ROBOT_SETTINGS_KEY]), {
+    ...identity.data,
+    // « Autre fabricant » est le seul cas où le nom saisi a un sens.
+    manufacturerOther: identity.data.manufacturer === "autre" ? identity.data.manufacturerOther : null,
   });
-  // L'audit ne garde ni l'adresse ni le chemin : seulement ce qui dit qu'un robot a été désigné.
+  if (!merged.success) return refuse(merged.error);
+  await writeSetup(scope.pharmacyId, settings, merged.data);
   await recordAudit({
     action: "robot.setup_saved",
     entityType: "Pharmacy",
     entityId: scope.pharmacyId,
     pharmacyId: scope.pharmacyId,
     userId: scope.userId,
-    metadata: { manufacturer: clean.manufacturer, linkKind: clean.linkKind, hasNetworkAddress: Boolean(clean.host) },
+    metadata: { manufacturer: merged.data.manufacturer },
   });
-  return { ok: true, setup: clean };
+  return { ok: true, setup: merged.data };
+}
+
+/**
+ * L'assistance règle les paramètres techniques. Il faut que le robot ait déjà été désigné par le titulaire : on ne
+ * crée pas un robot à sa place. L'audit nomme l'administrateur et ne retient ni l'adresse ni le chemin.
+ */
+export async function saveRobotTechnical(pharmacyId: string, input: RobotTechnicalInput, actor: { platformAdminId: string }): Promise<SaveRobotResult> {
+  const technical = robotTechnicalSchema.safeParse(input);
+  if (!technical.success) return refuse(technical.error);
+  const current = await prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { settings: true } });
+  if (!current) return { ok: false, error: "Officine introuvable.", fieldErrors: {} };
+  const settings = asObject(current.settings);
+  const existing = readRobotSetup(settings[ROBOT_SETTINGS_KEY]);
+  if (!existing) return { ok: false, error: "Le titulaire n'a pas encore désigné son robot : les paramètres techniques viennent ensuite.", fieldErrors: {} };
+  const merged = mergeRobotSetup(existing, technical.data);
+  if (!merged.success) return refuse(merged.error);
+  await writeSetup(pharmacyId, settings, merged.data);
+  await recordAudit({
+    action: "robot.technical_saved",
+    entityType: "Pharmacy",
+    entityId: pharmacyId,
+    pharmacyId,
+    userId: null,
+    platformAdminId: actor.platformAdminId,
+    metadata: { manufacturer: merged.data.manufacturer, linkKind: merged.data.linkKind, hasNetworkAddress: Boolean(merged.data.host) },
+  });
+  return { ok: true, setup: merged.data };
 }
 
 export async function clearRobotSetup(scope: TenantScope): Promise<void> {

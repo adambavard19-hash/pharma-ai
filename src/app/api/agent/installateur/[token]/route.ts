@@ -1,9 +1,8 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { peekPostInstallLink } from "@/server/services/stock-sync";
 import { resolvePublicBaseUrl } from "@/server/public-url";
 import { installerFileName } from "@/core/stock/install";
+import { installerResponse, loadInstaller } from "@/server/services/installer-file";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +21,11 @@ export const dynamic = "force-dynamic";
  *
  * Le fichier est construit par `npm run installateur:construire` et livré avec
  * le code (agent/installateur/) : la taille reste sous la limite d'une réponse
- * de fonction.
+ * de fonction. Il n'est servi que vérifié (voir `installer-file.ts`).
+ *
+ * Ce lien-ci est celui de l'assistance et des liens déjà envoyés ; le bouton « Télécharger PharmaBoost »
+ * du pharmacien prépare son jeton lui-même (`/api/connexion/installateur`).
  */
-const INSTALLER = ["agent", "installateur", "PharmaBoost-Installation.exe"];
 
 export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -33,19 +34,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     const base = resolvePublicBaseUrl().url.replace(/\/$/, "");
     return NextResponse.redirect(`${base}/installer/${encodeURIComponent(token)}`, 302);
   }
-  let bytes: Buffer;
-  try {
-    bytes = await readFile(join(process.cwd(), ...INSTALLER));
-  } catch {
+  const installer = await loadInstaller();
+  if (!installer.status.available || !installer.bytes) {
     return new Response("L'installateur n'est pas disponible pour le moment. Écrivez à contact@pharmaboost.app.", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
   }
-  return new Response(new Uint8Array(bytes), {
-    headers: {
-      "Content-Type": "application/vnd.microsoft.portable-executable",
-      "Content-Disposition": `attachment; filename="${installerFileName(token)}"`,
-      "Content-Length": String(bytes.length),
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  return installerResponse(installer.bytes, installerFileName(token));
 }

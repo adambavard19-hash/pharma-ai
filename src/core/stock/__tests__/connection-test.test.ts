@@ -73,10 +73,11 @@ describe("le départ : rien n'est fait", () => {
     expect(result.title).not.toMatch(/fonctionne/);
   });
 
-  it("sans logiciel choisi, le test le demande", () => {
+  it("sans logiciel précisé : une information, pas un manque (le pharmacien ne le choisit plus à l'écran)", () => {
     const overview = buildConnectionOverview({ now: NOW, lgo: null, connection: null, posts: [], stockSyncedAt: null, stockLines: null, stockProblem: null });
     const result = buildConnectionTest({ now: NOW, lgo: null, lgoLabel: null, overview, connection: null, posts: [], latestAgentVersion: LATEST_AGENT_VERSION, robot: null });
-    expect(byId(result, "software")).toMatchObject({ status: "warn" });
+    expect(byId(result, "software")).toMatchObject({ status: "info" });
+    expect(result.counts.toFix).toBe(1); // seul le stock manque
   });
 
   it("PharmaBoost Connect non installé n'est pas une erreur : c'est facultatif", () => {

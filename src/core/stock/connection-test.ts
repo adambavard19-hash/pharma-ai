@@ -108,9 +108,10 @@ export function buildConnectionTest(input: ConnectionTestInput): ConnectionTestR
 
   // ---- Mon logiciel
   if (!input.lgo) {
-    add({ id: "software", group: "software", status: "warn", title: "Logiciel de l'officine", detail: "Vous n'avez pas encore choisi votre logiciel.", fix: "Choisissez-le à l'étape 1 : PharmaBoost adapte alors ses explications." });
+    // Le pharmacien ne choisit plus son logiciel à l'écran (le guide est celui de LGPI) : « non précisé » n'est pas un manque.
+    add({ id: "software", group: "software", status: "info", title: "Logiciel de l'officine", detail: "Non précisé. Il s'enregistre à l'installation du serveur de l'officine.", fix: null });
   } else {
-    add({ id: "software", group: "software", status: "ok", title: "Logiciel de l'officine", detail: `${input.lgoLabel ?? input.lgo} est choisi.`, fix: null });
+    add({ id: "software", group: "software", status: "ok", title: "Logiciel de l'officine", detail: `${input.lgoLabel ?? input.lgo}.`, fix: null });
   }
 
   // ---- PharmaBoost Connect : chaque appareil installé

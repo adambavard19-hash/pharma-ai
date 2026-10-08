@@ -1,21 +1,24 @@
 # Installer un poste de caisse (agent 0.5.x)
 
-## Par le titulaire lui-même : un lien, un fichier, un double-clic
+## Par le titulaire lui-même : un bouton, un fichier, un double-clic
 
-Dans PharmaBoost → **Ma connexion** → étape 1, « Envoyer un lien d'installation » :
-un comptoir (« Comptoir 2 », « Comptoir 3 »…) et son lien sont créés, valable sept jours pour un
-poste. Il se copie, ou il part par e-mail à l'adresse du titulaire (et à aucune autre) ; il
-s'ouvre sur l'ordinateur où la douchette est branchée :
+Sur l'ordinateur du comptoir, dans PharmaBoost → **Ma connexion** → étape 1, un seul bouton :
+**« Télécharger PharmaBoost »**. Aucun lien n'est montré, copié ni envoyé : le clic prépare le comptoir
+(« Comptoir 2 », « Comptoir 3 »… un jeton à usage unique, sept jours) et télécharge directement l'installateur
+Windows, `PharmaBoost-Installation-<jeton>.exe` (route `POST /api/connexion/installateur`). Double-clic, une
+minute, rien à taper, aucun mot de passe administrateur : au premier lancement, le poste s'associe à son officine
+avec le jeton porté par le nom du fichier. Le comptoir apparaît « Connecté » dans la petite liste dès qu'il s'est
+présenté ET qu'il donne signe de vie ; l'icône PharmaBoost est près de l'horloge (point vert).
 
-```
-https://pharmaboost.app/installer/<jeton>
-```
+Le bouton n'existe que si l'installateur livré est **vérifié** (présent, exécutable Windows, taille et SHA-256 du
+manifeste `agent/installateur/installateur.json` : `src/server/services/installer-file.ts`). Sinon la page le dit
+et ne propose rien. Garde-fous de la route : session de l'officine avec la permission d'importer le stock, requête
+venue de PharmaBoost lui-même (en-tête Origin), vingt téléchargements par heure au plus, rien n'est préparé si
+l'installateur n'est pas disponible. Un fichier ne s'associe qu'**une fois** : un deuxième ordinateur doit
+télécharger de son côté.
 
-La page (`/installer/[token]`) donne le bouton « Télécharger l'installateur » :
-`PharmaBoost-Installation-<jeton>.exe`. Double-clic, une minute, rien à taper,
-aucun mot de passe administrateur. Ensuite l'icône PharmaBoost est près de
-l'horloge (point vert : le poste est relié) et le poste apparaît « En ligne »
-dans PharmaBoost.
+Les liens `/installer/<jeton>` et `/api/agent/installateur/<jeton>` existent toujours, pour l'assistance (console)
+et les liens déjà envoyés.
 
 Ce que fait l'installateur, dans la session de la personne qui utilise le LGPI :
 
@@ -192,18 +195,23 @@ Le serveur, lui, n'a besoin ni d'Internet ni d'un programme.
 ## L'écran « Ma connexion »
 
 Depuis le 8 octobre 2026, « Mise en service », « Stock → Connecter mon logiciel » et l'assistant d'accueil
-sont **une seule page**, `/connexion` (les anciennes adresses y renvoient) : l'état en cinq lignes (logiciel,
-PharmaBoost Connect, stock, ventes, robot), « Tester ma connexion », le parcours guidé en trois étapes (logiciel,
-envoi du stock, vérification), « Connecter mon robot », les réglages techniques dans « Configuration avancée », un
-guide illustré (`/connexion/guide`).
+sont **une seule page**, `/connexion` (les anciennes adresses y renvoient) : « Installer PharmaBoost », **trois
+blocs** et rien d'autre.
 
-**Tester ma connexion** (`src/core/stock/connection-test.ts`) : des contrôles tirés de ce que PharmaBoost a
-reçu (signes de vie, date et références du stock, lignes illisibles, dernier export lu par le programme, erreurs
-signalées, bips). Il ne se connecte à aucun ordinateur de l'officine et le dit. L'« envoi automatique du stock » n'est
-déclaré bon que si un export a réellement été lu récemment. L'essai du bip (facultatif) attend qu'un bip arrive.
+1. **Installer sur mes comptoirs** : « Télécharger PharmaBoost », la petite liste des comptoirs (« Connecté » =
+   appairé ET signe de vie de moins de dix minutes, sinon « Ne répond plus »), « Retirer » (avec confirmation) pour
+   un ordinateur volé ou remplacé.
+2. **Envoyer mon stock** : un bouton, le choix du fichier, puis une **confirmation explicite** (« ce fichier remplace
+   votre stock, ce qui n'y figure pas passe à 0 ») avant tout envoi ; le serveur l'exige aussi (`confirmation`). L'état
+   du dernier import (produits, date, lignes illisibles, fichier non appliqué) et un petit guide LGPI. Les
+   protections du serveur restent entières : fichier lu en partie, trop de lignes illisibles, moins de 80 % du stock
+   connu, ou plus de 25 produits et 5 % du stock qui passeraient à 0 : le fichier n'est PAS appliqué, l'équipe le
+   vérifie.
+3. **Connecter mon robot** (facultatif) : fabricant et modèle seulement ; « Intégration non disponible ».
 
-Trois états **séparés**, calculés une seule fois (`src/core/stock/connection-overview.ts`) et lus partout pareil :
-la connexion de PharmaBoost Connect (serveur et postes ; « en ligne » = signe de vie de moins de dix minutes),
-le stock reçu (à jour sous trois jours, ancien au-delà), les ventes (suivies au bip d'un poste ; la lecture directe
-des ventes du logiciel n'est pas disponible). Rien n'est présenté comme automatique quand ça ne l'est pas : LGPI
-n'envoie pas son stock tout seul, les autres logiciels demandent un export à programmer, non essayé.
+Tout le technique a quitté l'écran du pharmacien et vit dans l'**espace d'assistance** de la console (fiche officine,
+onglet Technique, `src/app/(admin)/admin/pharmacies/[id]/assistance/`), réservé aux administrateurs de la plateforme
+(chaque action commence par `requirePlatformSession`, l'audit nomme l'administrateur) : état détaillé, test de
+connexion (`src/core/stock/connection-test.ts`), dossiers d'export et relecture du stock par poste, retrait d'un
+poste, code à six chiffres, réglages et déconnexion du serveur, paramètres techniques et diagnostic du robot, état de
+l'installateur Windows. Les statuts se calculent une seule fois (`src/core/stock/connection-overview.ts`).

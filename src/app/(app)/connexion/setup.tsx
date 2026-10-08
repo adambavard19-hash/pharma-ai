@@ -1,6 +1,5 @@
 "use client";
 
-import type { LgoDefinition } from "@/core/stock/connectors";
 import type { RobotSetup } from "@/core/robot/integration";
 import type { OverviewSnapshot } from "@/server/actions/stock-sync";
 import { Badge } from "@/components/ui/badge";
@@ -10,14 +9,14 @@ import { StockStep } from "./stock-step";
 import { useLiveSnapshot } from "./use-live-snapshot";
 
 /**
- * « Installer PharmaBoost » : la page en trois étapes, rien d'autre.
+ * « Installer PharmaBoost » : trois blocs, rien d'autre.
  *
  *   1. Installer sur mes comptoirs   2. Envoyer mon stock   3. Connecter mon robot (facultatif)
  *
- * L'état affiché se relit tout seul (dix secondes, quatre pendant qu'un comptoir s'installe) : un comptoir
- * passe à « Connecté » sous les yeux de la personne, et seulement quand le poste s'est vraiment présenté.
+ * La liste des comptoirs se relit toute seule (dix secondes, quatre pendant qu'une installation est attendue) : un
+ * comptoir y apparaît « Connecté » sous les yeux de la personne, et seulement quand le poste s'est vraiment présenté.
  */
-export function ConnectionSetup({ initial, lgos, robot, userEmail }: { initial: OverviewSnapshot; lgos: LgoDefinition[]; robot: RobotSetup | null; userEmail: string }) {
+export function ConnectionSetup({ initial, robot, installerAvailable }: { initial: OverviewSnapshot; robot: RobotSetup | null; installerAvailable: boolean }) {
   const { snapshot, refresh } = useLiveSnapshot(initial);
   const { overview, lgo } = snapshot;
 
@@ -31,8 +30,8 @@ export function ConnectionSetup({ initial, lgos, robot, userEmail }: { initial: 
         <Badge tone="success" className="mt-2">Configuration</Badge>
       </header>
 
-      <CountersStep counters={overview.counters} userEmail={userEmail} onChanged={() => void refresh()} />
-      <StockStep lgos={lgos} lgo={lgo} stock={overview.stock} autoSync={overview.autoSync} onChanged={() => void refresh()} />
+      <CountersStep counters={overview.counters} installerAvailable={installerAvailable} onChanged={() => void refresh()} />
+      <StockStep stock={overview.stock} onChanged={() => void refresh()} />
       <RobotStep setup={robot} lgo={lgo} />
     </section>
   );

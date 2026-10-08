@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 import { PharmacyInfoForm } from "./pharmacy-info-form";
 import { FinishButton, VerifyStockButton } from "./buttons";
 import { StockSendBody } from "../connexion/stock-step";
-import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 import { loadConnectionOverview } from "@/server/services/connection-overview";
 import type { OverviewSnapshot } from "@/server/actions/stock-sync";
 
@@ -123,7 +122,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
                 )}
               </div>
             ) : null}
-            <StockSendBody lgos={LGO_DEFINITIONS} lgo={snapshot.lgo} stock={snapshot.overview.stock} autoSync={snapshot.overview.autoSync} />
+            <StockSendBody stock={snapshot.overview.stock} />
             <p className="text-[13.5px] text-text-secondary">
               Vos comptoirs, un par un : <Link href="/connexion" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Ma connexion</Link>.
             </p>

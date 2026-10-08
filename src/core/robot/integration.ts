@@ -110,6 +110,43 @@ export const robotSetupSchema = z
 export type RobotSetup = z.output<typeof robotSetupSchema>;
 export type RobotSetupInput = z.input<typeof robotSetupSchema>;
 
+/**
+ * Ce que le PHARMACIEN renseigne : le fabricant et le modèle, rien d'autre. Les paramètres techniques ne sont pas à
+ * lui : ils se règlent depuis l'espace d'assistance (`robotTechnicalSchema`), et un enregistrement du pharmacien
+ * ne les efface pas (voir `mergeRobotSetup`).
+ */
+export const robotIdentitySchema = z
+  .object({
+    manufacturer: z.enum(MANUFACTURER_IDS, { message: "Choisissez un fabricant dans la liste." }),
+    manufacturerOther: optionalText(60),
+    model: optionalText(60),
+  })
+  .strict();
+
+export type RobotIdentityInput = z.input<typeof robotIdentitySchema>;
+
+/** Les paramètres techniques d'une future intégration : réservés à l'assistance. Même validation que la configuration complète. */
+export const robotTechnicalSchema = z
+  .object({
+    linkKind: robotSetupSchema.shape.linkKind,
+    host: robotSetupSchema.shape.host,
+    port: robotSetupSchema.shape.port,
+    journalPath: robotSetupSchema.shape.journalPath,
+  })
+  .strict();
+
+export type RobotTechnicalInput = z.input<typeof robotTechnicalSchema>;
+
+/**
+ * La configuration complète à partir de ce qui existe déjà et de ce qui change : le pharmacien change l'identité
+ * (le fabricant et le modèle) sans effacer les paramètres techniques ; l'assistance change les paramètres sans
+ * toucher à l'identité.
+ */
+export function mergeRobotSetup(current: RobotSetup | null, change: Partial<RobotSetupInput>): ReturnType<typeof robotSetupSchema.safeParse> {
+  const base = current ?? { linkKind: "unknown" as const };
+  return robotSetupSchema.safeParse({ ...base, ...change });
+}
+
 /** La clé sous laquelle la configuration est gardée dans les paramètres de l'officine. */
 export const ROBOT_SETTINGS_KEY = "robot";
 

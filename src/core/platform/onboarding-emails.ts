@@ -17,7 +17,7 @@ export const INSTALLATION_STEPS: { title: string; body: string }[] = [
   },
   {
     title: "Reliez chaque poste de comptoir, en un double-clic",
-    body: "Sur l'ordinateur où la douchette est branchée : PharmaBoost → Ma connexion → étape 1, « Envoyer un lien d'installation ». Copiez le lien (ou recevez-le par e-mail), ouvrez-le sur le poste, téléchargez l'installateur et double-cliquez le fichier : rien à taper, aucun mot de passe administrateur, et vous voyez le poste apparaître en direct. Une minute par poste. Dès lors, chaque boîte bipée dans votre logiciel ouvre le conseil sur l'écran.",
+    body: "Sur l'ordinateur où la douchette est branchée : PharmaBoost → Ma connexion → étape 1, « Télécharger PharmaBoost ». Faites-le sur le poste lui-même, puis ouvrez (double-clic) le fichier téléchargé : rien à taper, aucun mot de passe administrateur, et vous voyez le poste apparaître en direct. Une minute par poste. Dès lors, chaque boîte bipée dans votre logiciel ouvre le conseil sur l'écran.",
   },
   {
     title: "Faites suivre l'inventaire automatiquement",

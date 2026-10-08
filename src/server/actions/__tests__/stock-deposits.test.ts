@@ -48,6 +48,7 @@ const view = (extra: Record<string, unknown> = {}) => ({
 
 const form = (file: File | null = new File(["cip;qte\n1;2"], "stock.csv", { type: "text/csv" }), extra: Record<string, string> = {}) => {
   const data = new FormData();
+  data.set("confirmation", "remplacer");
   if (file) data.set("file", file);
   for (const [key, value] of Object.entries(extra)) data.set(key, value);
   return data;
@@ -72,6 +73,21 @@ describe("la permission", () => {
     await expect(actions.sendStockAction(form())).rejects.toBe(refused);
     expect(mocks.receive).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("la confirmation : un fichier remplace le stock", () => {
+  it("sans confirmation explicite, rien n'est lu ni écrit", async () => {
+    const data = new FormData();
+    data.set("file", new File(["a;b\n1;2"], "stock.csv"));
+    expect(await actions.sendStockAction(data)).toMatchObject({ ok: false, error: "Confirmez d'abord que ce fichier remplace votre stock." });
+    expect(mocks.receive).not.toHaveBeenCalled();
+  });
+
+  it("une autre valeur que celle de l'écran n'est pas une confirmation", async () => {
+    const data = form(new File(["a;b\n1;2"], "stock.csv"), { confirmation: "oui" });
+    expect(await actions.sendStockAction(data)).toMatchObject({ ok: false });
+    expect(mocks.receive).not.toHaveBeenCalled();
   });
 });
 

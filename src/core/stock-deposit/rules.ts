@@ -29,6 +29,13 @@ export const DEPOSIT_STALLED_MS = 10 * 60 * 1000;
 /** Au passage quotidien, un dépôt « en cours » depuis plus de 15 minutes est refermé en échec. */
 export const DEPOSIT_ABANDONED_MS = 15 * 60 * 1000;
 /** Lignes illisibles tolérées : jusqu'à 5, ou 2 % des lignes du fichier si c'est plus. */
+/**
+ * Passage à zéro massif : un fichier qui couvre 80 % du stock mais laisserait plus de 25 produits ET plus de 5 % du
+ * stock connu à zéro n'est pas appliqué sans contrôle. Il attend la décision de l'équipe (stock complet, ou fichier partiel).
+ */
+export const DEPOSIT_ABSENT_MIN = 25;
+export const DEPOSIT_ABSENT_PERCENT = 5;
+
 export const DEPOSIT_INVALID_MIN = 5;
 export const DEPOSIT_INVALID_PERCENT = 2;
 
@@ -51,6 +58,9 @@ export const DEPOSIT_SUPERSEDED_MESSAGE = "Remplacé par un envoi plus récent."
 export const DEPOSIT_SUPERSEDED_ERROR = "Un envoi plus récent a déjà mis le stock à jour : écartez ce fichier.";
 export const DEPOSIT_INTERRUPTED_MESSAGE = "Le traitement a été interrompu avant la fin. Le stock n'a pas changé : renvoyez le fichier.";
 
+/** Ce que l'écran envoie pour dire « oui, ce fichier remplace mon stock » : sans lui, le serveur refuse l'envoi du titulaire. */
+export const DEPOSIT_CONFIRMATION = "remplacer";
+
 export type DepositAssessment = { verdict: "APPLY" } | { verdict: "HOLD"; reason: string };
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("fr-FR")} ${n > 1 ? many : one}`;
@@ -65,10 +75,12 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString("fr
  * 2. trop de lignes illisibles (plus de 5, et plus de 2 % du fichier) : leurs
  *    produits, absents des lignes lues, seraient remis à 0 ;
  * 3. le fichier couvre moins de 80 % du stock connu (par exemple seulement les
- *    nouveautés, ou un seul rayon).
+ *    nouveautés, ou un seul rayon) ;
+ * 4. le fichier couvre plus de 80 % du stock, mais en laisserait plus de 25 produits
+ *    et plus de 5 % à zéro : un passage à zéro massif ne se fait pas sans contrôle.
  */
-export function assessDeposit(input: { validLines: number; knownLines: number; invalidLines?: number; incompleteReason?: string | null }): DepositAssessment {
-  const { validLines, knownLines, invalidLines = 0, incompleteReason = null } = input;
+export function assessDeposit(input: { validLines: number; knownLines: number; invalidLines?: number; incompleteReason?: string | null; absentLines?: number }): DepositAssessment {
+  const { validLines, knownLines, invalidLines = 0, incompleteReason = null, absentLines = 0 } = input;
   if (incompleteReason) {
     return { verdict: "HOLD", reason: `${incompleteReason} : le stock n'a pas été appliqué. Appliquer ce fichier en stock complet mettrait à 0 les produits qui n'ont pas été lus.` };
   }
@@ -83,6 +95,14 @@ export function assessDeposit(input: { validLines: number; knownLines: number; i
     return {
       verdict: "HOLD",
       reason: `Le fichier contient ${validLines} ligne${validLines > 1 ? "s" : ""} valide${validLines > 1 ? "s" : ""}, alors que le stock de l'officine en compte ${knownLines} : moins de ${Math.round(DEPOSIT_HOLD_RATIO * 100)} % du stock connu. Il n'a pas été appliqué : est-ce un stock complet ?`,
+    };
+  }
+  // 4. un fichier assez complet, mais qui remettrait à 0 beaucoup de produits connus : contrôle avant d'écrire.
+  if (knownLines >= DEPOSIT_HOLD_MIN_KNOWN && absentLines > DEPOSIT_ABSENT_MIN && absentLines * 100 > knownLines * DEPOSIT_ABSENT_PERCENT) {
+    const percent = Math.round((absentLines * 100) / knownLines);
+    return {
+      verdict: "HOLD",
+      reason: `Appliquer ce fichier mettrait ${plural(absentLines, "produit", "produits")} à 0 (${percent} % du stock connu), parce qu'ils n'y figurent pas : le stock n'a pas été appliqué. Est-ce bien votre stock complet ?`,
     };
   }
   return { verdict: "APPLY" };

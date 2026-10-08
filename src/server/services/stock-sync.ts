@@ -149,13 +149,13 @@ const POST_PAIRING_TTL_MS = 1000 * 60 * 60;
 const POST_INSTALL_LINK_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
 /** Un code d'appairage pour un poste de caisse : six chiffres, une heure, un seul usage. */
-export async function createPostPairing(scope: TenantScope, label: string | null): Promise<{ code: string; expiresAt: Date; postId: string }> {
+export async function createPostPairing(scope: TenantScope, label: string | null, actor?: IssueActor): Promise<{ code: string; expiresAt: Date; postId: string }> {
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const expiresAt = new Date(Date.now() + POST_PAIRING_TTL_MS);
   const post = await prisma.counterPost.create({
     data: { pharmacyId: scope.pharmacyId, hostname: "", label, pairingCodeHash: hashToken(code), pairingExpiresAt: expiresAt },
   });
-  await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { label } });
+  await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), metadata: { label, kind: "code", ...(actor ? { by: "console" } : {}) } });
   return { code, expiresAt, postId: post.id };
 }
 
@@ -173,36 +173,6 @@ export async function createPostInstallLink(scope: TenantScope, label: string | 
   });
   await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), metadata: { label, kind: "install-link", ...(actor ? { by: "console" } : {}) } });
   return { token, expiresAt, postId: post.id };
-}
-
-/**
- * Un nouveau lien pour un comptoir qui attend encore son installation (lien perdu, expiré). Un comptoir déjà
- * installé n'en reçoit pas : son association est faite, un second lien en ferait un autre poste. Le comptoir
- * doit appartenir à l'officine de la session ; l'ancien lien cesse de marcher.
- */
-export async function reissuePostInstallLink(scope: TenantScope, postId: string): Promise<{ ok: true; token: string; expiresAt: Date; label: string | null } | { ok: false; error: string }> {
-  const post = await prisma.counterPost.findFirst({ where: { id: postId, pharmacyId: scope.pharmacyId, revokedAt: null }, select: { id: true, label: true, pairedAt: true } });
-  if (!post) return { ok: false, error: "Comptoir introuvable." };
-  if (post.pairedAt) return { ok: false, error: "Ce comptoir est déjà installé. Pour en ajouter un autre, utilisez « Envoyer un lien d'installation »." };
-  const token = generateToken(18);
-  const expiresAt = new Date(Date.now() + POST_INSTALL_LINK_TTL_MS);
-  await prisma.counterPost.update({ where: { id: post.id }, data: { pairingCodeHash: hashToken(token), pairingExpiresAt: expiresAt } });
-  await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { label: post.label, kind: "install-link-reissued" } });
-  return { ok: true, token, expiresAt, label: post.label };
-}
-
-/**
- * Le lien d'installation dont le titulaire détient le jeton : il est bien de SON officine, et encore valable.
- * Sert à n'envoyer par e-mail que ce que cette officine a vraiment créé.
- */
-export async function findOwnPostInstallLink(scope: TenantScope, token: string): Promise<{ label: string | null; expiresAt: Date; pharmacyName: string } | null> {
-  if (!/^[A-Za-z0-9_-]{16,}$/.test(token)) return null;
-  const post = await prisma.counterPost.findFirst({
-    where: { pharmacyId: scope.pharmacyId, pairingCodeHash: hashToken(token), revokedAt: null, pairedAt: null },
-    select: { label: true, pairingExpiresAt: true, pharmacy: { select: { name: true } } },
-  });
-  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return null;
-  return { label: post.label, expiresAt: post.pairingExpiresAt, pharmacyName: post.pharmacy.name };
 }
 
 /**
@@ -246,6 +216,27 @@ export async function resolveInstallTarget(pharmacyId: string): Promise<
   });
   if (!pharmacy) return { ok: false, reason: "NOT_FOUND" };
   if (!pharmacy.isActive) return { ok: false, reason: "SUSPENDED" };
+  const owner = pharmacy.memberships[0];
+  if (!owner) return { ok: false, reason: "NO_OWNER" };
+  const lgo = pharmacy.stockConnection?.lgo;
+  return { ok: true, scope: { pharmacyId: pharmacy.id, organizationId: pharmacy.organizationId, userId: owner.userId }, pharmacyName: pharmacy.name, lgo: lgo && isLgoId(lgo) ? lgo : null };
+}
+
+/**
+ * L'officine pour laquelle la console assiste, sans exiger qu'elle soit active : retirer un poste volé ou couper un
+ * serveur doit rester possible sur une officine suspendue. Le « scope » n'ouvre ici que les fonctions de liaison
+ * (aucune donnée de patient) et ne sert que de support ; l'audit nomme l'administrateur, pas le titulaire.
+ */
+export async function resolveSupportScope(pharmacyId: string): Promise<{ ok: true; scope: TenantScope; pharmacyName: string; lgo: LgoId | null } | { ok: false; reason: "NOT_FOUND" | "NO_OWNER" }> {
+  const pharmacy = await prisma.pharmacy.findUnique({
+    where: { id: pharmacyId },
+    select: {
+      id: true, name: true, organizationId: true,
+      memberships: { where: { role: "OWNER", isActive: true }, orderBy: { createdAt: "asc" }, take: 1, select: { userId: true } },
+      stockConnection: { select: { lgo: true } },
+    },
+  });
+  if (!pharmacy) return { ok: false, reason: "NOT_FOUND" };
   const owner = pharmacy.memberships[0];
   if (!owner) return { ok: false, reason: "NO_OWNER" };
   const lgo = pharmacy.stockConnection?.lgo;
@@ -299,7 +290,7 @@ export async function pairCounterPost(input: { code: string; hostname?: string |
   const code = /^[A-Za-z0-9_-]{16,}$/.test(raw) ? raw : raw.replace(/\D/g, "");
   if (code.length !== 6 && code.length < 16) return { ok: false, error: "Code d'appairage invalide." };
   const post = await prisma.counterPost.findUnique({ where: { pairingCodeHash: hashToken(code) }, include: { pharmacy: { select: { name: true } } } });
-  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return { ok: false, error: "Code de poste inconnu ou expiré. Générez un nouveau lien dans PharmaBoost (Ma connexion → Envoyer un lien d'installation)." };
+  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return { ok: false, error: "Code de poste inconnu ou expiré. Générez un nouveau lien dans PharmaBoost (Ma connexion → Télécharger PharmaBoost)." };
   const agentKey = generateToken(32);
   await prisma.counterPost.update({
     where: { id: post.id },
@@ -310,9 +301,9 @@ export async function pairCounterPost(input: { code: string; hostname?: string |
   return { ok: true, agentKey, pharmacyName: post.pharmacy.name, postLabel: post.label ?? input.hostname ?? "" };
 }
 
-export async function revokeCounterPost(scope: TenantScope, postId: string): Promise<void> {
+export async function revokeCounterPost(scope: TenantScope, postId: string, actor?: IssueActor): Promise<void> {
   await prisma.counterPost.updateMany({ where: { id: postId, pharmacyId: scope.pharmacyId }, data: { revokedAt: new Date(), keyHash: null, pairingCodeHash: null } });
-  await recordAudit({ action: "stock.post_revoked", entityType: "CounterPost", entityId: postId, pharmacyId: scope.pharmacyId, userId: scope.userId });
+  await recordAudit({ action: "stock.post_revoked", entityType: "CounterPost", entityId: postId, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), ...(actor ? { metadata: { by: "console" } } : {}) });
 }
 
 export async function listCounterPosts(pharmacyId: string) {
@@ -409,33 +400,35 @@ export async function applyAgentSnapshot(agent: AgentContext, fileName: string, 
   }
 }
 
-export async function updateConnectionSettings(scope: TenantScope, patch: { intervalSeconds?: number; exportPath?: string | null; scansPath?: string | null }): Promise<void> {
+export async function updateConnectionSettings(scope: TenantScope, patch: { intervalSeconds?: number; exportPath?: string | null; scansPath?: string | null }, actor?: IssueActor): Promise<void> {
   await prisma.stockConnection.update({ where: { pharmacyId: scope.pharmacyId }, data: patch });
+  // Le chemin lui-même n'est pas écrit dans le journal : il dit seulement que les réglages ont changé, et par qui.
+  if (actor) await recordAudit({ action: "stock.connection_settings_changed", entityType: "StockConnection", entityId: scope.pharmacyId, pharmacyId: scope.pharmacyId, userId: null, platformAdminId: actor.platformAdminId, metadata: { fields: Object.keys(patch), by: "console" } });
 }
 
 /** Révoque la clé : l'agent ne peut plus rien envoyer tant qu'il n'est pas ré-appairé. */
-export async function disconnectAgent(scope: TenantScope): Promise<void> {
+export async function disconnectAgent(scope: TenantScope, actor?: IssueActor): Promise<void> {
   await prisma.stockConnection.update({
     where: { pharmacyId: scope.pharmacyId },
     data: { status: "DISCONNECTED", agentKeyHash: null, pairingCodeHash: null, pairingExpiresAt: null },
   });
-  await recordAudit({ action: "stock.connection_revoked", entityType: "StockConnection", entityId: scope.pharmacyId, pharmacyId: scope.pharmacyId, userId: scope.userId });
+  await recordAudit({ action: "stock.connection_revoked", entityType: "StockConnection", entityId: scope.pharmacyId, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), ...(actor ? { metadata: { by: "console" } } : {}) });
 }
 
 /** Le dossier d'export du LGO, tel que ce poste le voit (« \\SERVEUR\PharmaBoost\Export »). Vide : ce poste n'envoie pas de stock. */
-export async function setPostExportPath(scope: TenantScope, postId: string, exportPath: string | null): Promise<void> {
+export async function setPostExportPath(scope: TenantScope, postId: string, exportPath: string | null, actor?: IssueActor): Promise<void> {
   const post = await prisma.counterPost.findFirst({ where: { id: postId, pharmacyId: scope.pharmacyId, revokedAt: null }, select: { id: true } });
   if (!post) throw new Error("Poste introuvable dans cette officine.");
   await prisma.counterPost.update({ where: { id: postId }, data: { exportPath, lastExportError: null } });
-  await recordAudit({ action: "stock.post_export_path_set", entityType: "CounterPost", entityId: postId, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { exportPath } });
+  await recordAudit({ action: "stock.post_export_path_set", entityType: "CounterPost", entityId: postId, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), metadata: { exportPath, ...(actor ? { by: "console" } : {}) } });
 }
 
 /** « Mettre à jour maintenant » : le poste relit l'export à son prochain signe de vie (moins d'une minute). */
-export async function requestPostSync(scope: TenantScope, postId: string): Promise<void> {
+export async function requestPostSync(scope: TenantScope, postId: string, actor?: IssueActor): Promise<void> {
   const post = await prisma.counterPost.findFirst({ where: { id: postId, pharmacyId: scope.pharmacyId, revokedAt: null }, select: { id: true, exportPath: true } });
   if (!post) throw new Error("Poste introuvable dans cette officine.");
   if (!post.exportPath) throw new Error("Indiquez d'abord le dossier d'export du stock pour ce poste.");
   await prisma.counterPost.update({ where: { id: postId }, data: { syncRequestedAt: new Date() } });
-  await recordAudit({ action: "stock.post_sync_requested", entityType: "CounterPost", entityId: postId, pharmacyId: scope.pharmacyId, userId: scope.userId });
+  await recordAudit({ action: "stock.post_sync_requested", entityType: "CounterPost", entityId: postId, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), ...(actor ? { metadata: { by: "console" } } : {}) });
 }
 
