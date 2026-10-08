@@ -109,6 +109,8 @@ export const DISPATCH_KIND_LABELS: Record<string, string> = {
   SUBSCRIPTION_RECEIVED: "Demande d'abonnement reçue",
   SITE_LEAD_ACK: "Accusé de demande de démonstration",
   INSTALL_GUIDE: "Guide d'installation",
+  SUPPORT_ALERT: "Alerte support (une officine a écrit)",
+  SUPPORT_REPLY: "Réponse du support à une officine",
   TEMPLATE: "Modèle",
   CAMPAIGN: "Campagne",
 };

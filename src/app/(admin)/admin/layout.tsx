@@ -8,6 +8,7 @@ import { AdminNav } from "./admin-nav";
 import { AdminSearch } from "./admin-search";
 import { QuickActions } from "./quick-actions";
 import { countUnreadAdminNotifications } from "@/server/services/sales/notifications";
+import { countSupportToAnswer } from "@/server/services/support";
 
 /**
  * La console éditeur : le centre de contrôle de PharmaBoost.
@@ -18,7 +19,7 @@ import { countUnreadAdminNotifications } from "@/server/services/sales/notificat
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const session = await requirePlatformSession();
-  const unread = await countUnreadAdminNotifications();
+  const [unread, supportOpen] = await Promise.all([countUnreadAdminNotifications(), countSupportToAnswer()]);
 
   return (
     <div className="min-h-dvh bg-surface-app">
@@ -64,7 +65,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </div>
 
         <div className="mx-auto max-w-[1320px] px-6">
-          <AdminNav unread={unread} />
+          <AdminNav unread={unread} supportOpen={supportOpen} />
         </div>
       </header>
 

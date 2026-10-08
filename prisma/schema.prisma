@@ -116,6 +116,7 @@ model Pharmacy {
   organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships         Membership[]
   patients            Patient[]
+  supportThreads      SupportThread[]
   reminders           Reminder[]
   products            Product[]
   stockItems          StockItem[]
@@ -4383,4 +4384,77 @@ model ReferralLead {
   @@index([referrerProspectId])
   @@index([email])
   @@map("referral_leads")
+}
+
+// ---------------------------------------------------------------------------
+// Contact support : les discussions entre une officine et l'équipe PharmaBoost
+// ---------------------------------------------------------------------------
+
+enum SupportTopic {
+  QUESTION
+  TECHNICAL
+  BILLING
+  SUGGESTION
+}
+
+enum SupportThreadStatus {
+  OPEN
+  CLOSED
+}
+
+/// Qui a écrit : l'officine ou l'équipe PharmaBoost.
+enum SupportAuthor {
+  PHARMACY
+  SUPPORT
+}
+
+/// Une discussion ouverte par une officine depuis « Contact support ». Visible de toute son équipe, et de la console.
+/// Aucune donnée de santé n'y a sa place : l'écran le dit avant d'écrire.
+model SupportThread {
+  id                String              @id @default(cuid())
+  pharmacyId        String
+  /// Qui l'a ouverte (identifiant seul : la discussion survit au compte).
+  createdByUserId   String?
+  subject           String
+  topic             SupportTopic        @default(QUESTION)
+  status            SupportThreadStatus @default(OPEN)
+  /// Qui a écrit en dernier : l'officine attend une réponse, ou c'est l'équipe qui attend l'officine.
+  lastMessageFrom   SupportAuthor
+  lastMessageAt     DateTime
+  /// Un message de l'officine que l'équipe n'a pas encore lu.
+  unreadForSupport  Boolean             @default(false)
+  /// Une réponse de l'équipe que l'officine n'a pas encore lue.
+  unreadForPharmacy Boolean             @default(false)
+  /// Dernier e-mail d'alerte envoyé à l'équipe pour cette discussion : sert à ne pas l'inonder.
+  supportAlertedAt  DateTime?
+  closedAt          DateTime?
+  /// Une officine de démonstration n'écrit jamais au vrai support.
+  isDemo            Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  pharmacy Pharmacy         @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+
+  @@index([pharmacyId, lastMessageAt])
+  @@index([status, lastMessageFrom, lastMessageAt])
+  @@map("support_threads")
+}
+
+model SupportMessage {
+  id            String        @id @default(cuid())
+  threadId      String
+  author        SupportAuthor
+  /// Le compte de l'officine, ou l'administrateur PharmaBoost, qui a écrit (identifiants seuls).
+  authorUserId  String?
+  authorAdminId String?
+  /// Le nom tel qu'il s'affichait au moment d'écrire : la discussion se relit même si le compte change.
+  authorName    String
+  body          String
+  createdAt     DateTime      @default(now())
+
+  thread SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@map("support_messages")
 }

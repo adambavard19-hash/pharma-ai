@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X } from "lucide-react";
+import { LifeBuoy, X } from "lucide-react";
 import { NAVIGATION, groupNavigation, isNavItemActive, type NavItem } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import { PharmaWordmark } from "./logo";
@@ -12,9 +12,12 @@ export function Sidebar({
   permissions,
   pharmacyName,
   hiddenHrefs = [],
+  supportUnread = 0,
 }: {
   permissions: string[];
   pharmacyName: string;
+  /** Réponses de l'équipe PharmaBoost pas encore lues : le chiffre du lien « Contact support ». */
+  supportUnread?: number;
   /** Entrées retirées par la configuration (mode sans patient : Patients, Suivis). */
   hiddenHrefs?: string[];
 }) {
@@ -96,7 +99,28 @@ export function Sidebar({
           ))}
         </nav>
 
-        <div className="border-t border-border-subtle px-4 py-3">
+        {/* Toujours visible, hors du menu qui défile : l'aide est à un clic, quel que soit l'écran. */}
+        <div className="border-t border-border-subtle px-3 pt-3">
+          <Link
+            href="/support"
+            onClick={closeNav}
+            aria-current={pathname === "/support" || pathname.startsWith("/support/") ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-3 rounded-md border px-2.5 py-2 text-sm transition-colors",
+              pathname === "/support" || pathname.startsWith("/support/") ? "border-brand-200 bg-brand-100 font-medium text-brand-800 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300" : "border-border-default bg-surface-card text-text-primary hover:bg-surface-sunken",
+            )}
+          >
+            <LifeBuoy className="size-4 text-brand-700 dark:text-brand-400" aria-hidden="true" />
+            <span className="flex-1">Contact support</span>
+            {supportUnread > 0 && (
+              <span className="min-w-5 rounded-full bg-brand-600 px-1.5 text-center text-[11px] leading-5 font-semibold text-white tabular" aria-label={`${supportUnread} réponse${supportUnread > 1 ? "s" : ""} non lue${supportUnread > 1 ? "s" : ""}`}>
+                {supportUnread}
+              </span>
+            )}
+          </Link>
+        </div>
+
+        <div className="px-4 py-3">
           <p className="text-xs leading-4 text-text-tertiary">
             PharmaBoost assiste le pharmacien.
             <br />

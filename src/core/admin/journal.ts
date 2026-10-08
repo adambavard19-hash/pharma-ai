@@ -163,6 +163,8 @@ export const ACTION_LABELS: Record<string, string> = {
   "platform.member_removed": "Membre retiré d'une officine",
   "platform.user_deleted": "Compte supprimé",
   "platform.pharmacy_deleted": "Officine supprimée",
+  "platform.support_replied": "Réponse du support envoyée",
+  "platform.support_status_changed": "Discussion du support fermée ou rouverte",
   "platform.invitation_sent": "Invitation envoyée",
   "platform.invitation_link_issued": "Lien d'invitation émis",
   "platform.invitation_email_changed": "Adresse d'invitation modifiée",

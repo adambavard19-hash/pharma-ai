@@ -26,6 +26,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
     href: "/admin/pharmacies",
     items: [
       { href: "/admin/pharmacies", label: "Officines clientes", description: "Fiches 360°, inscriptions en cours, création d'officine." },
+      { href: "/admin/support", label: "Support", description: "Les questions posées par les officines : lire, répondre, clore." },
       { href: "/admin/utilisateurs", label: "Utilisateurs", description: "Les comptes des officines, leurs rôles et dernière connexion." },
       { href: "/admin/activite", label: "Activité", description: "Officines actives, inactives, usage récent." },
       { href: "/admin/performance", label: "Performance", description: "La valeur générée par PharmaBoost, officine par officine : qui en tire beaucoup, qui a besoin d'accompagnement." },

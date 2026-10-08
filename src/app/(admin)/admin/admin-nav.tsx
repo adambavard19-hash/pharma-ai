@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * sur l'espace ouvre le menu (clavier compris) ; la page courante est
  * soulignée, et sa rubrique cochée dans le menu.
  */
-export function AdminNav({ unread = 0 }: { unread?: number }) {
+export function AdminNav({ unread = 0, supportOpen = 0 }: { unread?: number; supportOpen?: number }) {
   const pathname = usePathname();
   const active = activeNavItem(pathname);
   // Le menu ouvert est rattaché à la page où il a été ouvert : changer de page le referme, sans effet.
@@ -54,9 +54,10 @@ export function AdminNav({ unread = 0 }: { unread?: number }) {
             <button type="button" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpenKey(open ? null : space.key)} className={cn(tabClass(isActive), "inline-flex items-center gap-1")}>
               {space.label}
               {space.key === "communication" && unread > 0 && <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10.5px] leading-none font-semibold text-white tabular-nums">{unread}</span>}
+              {space.key === "clients" && supportOpen > 0 && <span className="rounded-full bg-warning-500 px-1.5 py-0.5 text-[10.5px] leading-none font-semibold text-ink-950 tabular-nums" title={`${supportOpen} question${supportOpen > 1 ? "s" : ""} à répondre`}>{supportOpen}</span>}
               <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden="true" />
             </button>
-            {open && <SpaceMenu space={space} activeHref={active.item?.href ?? null} unread={unread} />}
+            {open && <SpaceMenu space={space} activeHref={active.item?.href ?? null} unread={unread} supportOpen={supportOpen} />}
           </div>
         );
       })}
@@ -71,7 +72,7 @@ function tabClass(active: boolean) {
   );
 }
 
-function SpaceMenu({ space, activeHref, unread }: { space: AdminNavSpace; activeHref: string | null; unread: number }) {
+function SpaceMenu({ space, activeHref, unread, supportOpen }: { space: AdminNavSpace; activeHref: string | null; unread: number; supportOpen: number }) {
   return (
     <div role="menu" className="absolute top-full left-0 z-50 mt-1 w-[22rem] rounded-xl border border-border-subtle bg-surface-card p-1.5 shadow-xl animate-[slide-up_0.15s_ease-out] motion-reduce:animate-none">
       {space.items.map((item) => {
@@ -83,6 +84,7 @@ function SpaceMenu({ space, activeHref, unread }: { space: AdminNavSpace; active
               <span className={cn("flex items-center gap-1.5 text-[13.5px] font-semibold", current ? "text-brand-800 dark:text-brand-200" : "text-text-primary")}>
                 {item.label}
                 {item.href === "/admin/notifications" && unread > 0 && <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10.5px] leading-none text-white tabular-nums">{unread}</span>}
+                {item.href === "/admin/support" && supportOpen > 0 && <span className="rounded-full bg-warning-500 px-1.5 py-0.5 text-[10.5px] leading-none font-semibold text-ink-950 tabular-nums">{supportOpen}</span>}
               </span>
               <span className="mt-0.5 block text-[12px] leading-4 text-text-secondary">{item.description}</span>
             </span>

@@ -412,7 +412,7 @@ describe("navigation de la console", () => {
 
   it("« Stocks reçus » ferme l'espace Clients, sans déplacer aucune autre rubrique", () => {
     const clients = ADMIN_NAV.find((space) => space.key === "clients")!;
-    expect(clients.items.map((item) => item.href)).toEqual(["/admin/pharmacies", "/admin/utilisateurs", "/admin/activite", "/admin/performance", "/admin/acces", "/admin/technique", "/admin/depots-stock"]);
+    expect(clients.items.map((item) => item.href)).toEqual(["/admin/pharmacies", "/admin/support", "/admin/utilisateurs", "/admin/activite", "/admin/performance", "/admin/acces", "/admin/technique", "/admin/depots-stock"]);
     expect(clients.items.at(-1)).toMatchObject({ label: "Stocks reçus", description: "Le dernier stock reçu de chaque officine, et chaque fichier envoyé." });
     // L'espace garde son adresse : « Clients » ouvre toujours la liste des officines.
     expect(clients.href).toBe("/admin/pharmacies");
@@ -420,6 +420,17 @@ describe("navigation de la console", () => {
     // Le fichier d'un dépôt reste rattaché à la même rubrique ; « État technique » garde la sienne.
     expect(activeNavItem("/admin/depots-stock/ckx123abc").item?.label).toBe("Stocks reçus");
     expect(activeNavItem("/admin/technique").item?.label).toBe("État technique");
+  });
+
+  it("« Support » rejoint l'espace Clients juste après les fiches officines, et ses discussions s'y rattachent", () => {
+    const clients = ADMIN_NAV.find((space) => space.key === "clients")!;
+    const hrefs = clients.items.map((item) => item.href);
+    expect(hrefs.indexOf("/admin/support")).toBe(hrefs.indexOf("/admin/pharmacies") + 1);
+    expect(clients.items.find((item) => item.href === "/admin/support")).toMatchObject({ label: "Support", description: "Les questions posées par les officines : lire, répondre, clore." });
+    expect(activeNavItem("/admin/support")).toMatchObject({ space: { key: "clients" }, item: { label: "Support" } });
+    expect(activeNavItem("/admin/support/ckx123abc").item?.label).toBe("Support");
+    // Rien d'autre ne bouge : « Officines clientes » garde ses fiches.
+    expect(activeNavItem("/admin/pharmacies/abc").item?.label).toBe("Officines clientes");
   });
 
   it("« Performance » suit « Activité » dans l'espace Clients, avec sa phrase, sans prendre la place des fiches officines", () => {

@@ -2,13 +2,14 @@ import type { ReactNode } from "react";
 import { requireSession } from "@/server/auth/session";
 import { patientDataEnabled } from "@/config/env";
 import { countUnreadNotifications } from "@/server/services/notifications";
+import { countPharmacyUnread } from "@/server/services/support";
 import { Sidebar } from "@/components/app/sidebar";
 import { Topbar } from "@/components/app/topbar";
 import { MobileNavProvider } from "@/components/app/mobile-nav";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
-  const unread = await countUnreadNotifications(session.scope);
+  const [unread, supportUnread] = await Promise.all([countUnreadNotifications(session.scope), countPharmacyUnread(session.pharmacy.id)]);
 
   return (
     <MobileNavProvider>
@@ -25,6 +26,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             permissions={[...session.permissions]}
             hiddenHrefs={patientDataEnabled() ? [] : ["/patients", "/suivis"]}
             pharmacyName={session.pharmacy.name}
+            supportUnread={supportUnread}
           />
         </div>
 

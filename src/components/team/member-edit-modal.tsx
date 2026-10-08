@@ -155,7 +155,7 @@ function MemberEditForm({ member, canManageOwners, admin, onSave, onClose }: { m
         </Field>
 
         {form.role === "OWNER" && (
-          <label className={cn("flex items-start gap-3 rounded-xl border px-3.5 py-3", form.isPrincipal ? "border-brand-300 bg-brand-50/60" : "border-border-subtle")}>
+          <label className={cn("flex items-start gap-3 rounded-xl border px-3.5 py-3", form.isPrincipal ? "border-brand-300 bg-brand-50/60 dark:bg-brand-950/40" : "border-border-subtle")}>
             <input
               type="checkbox"
               className="mt-0.5 size-4"

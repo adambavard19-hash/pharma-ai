@@ -233,6 +233,11 @@ export const OFF_MENU_DESTINATIONS: {
   reachableFrom: string;
 }[] = [
   {
+    href: "/support",
+    label: "Contact support",
+    reachableFrom: "le lien « Contact support », toujours visible en bas du menu",
+  },
+  {
     href: "/pilotage",
     label: "Pilotage de l'officine",
     reachableFrom: "Performances (le lien « Pilotage par collaborateur »)",

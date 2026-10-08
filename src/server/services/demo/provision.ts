@@ -34,6 +34,8 @@ export const WIPED_MODELS = [
   "stockMovement", "sale", "recommendation", "analysisRun", "counterRequest", "prescription", "patient",
   "pharmacyRule", "preferredRange", "productVigilance", "stockLot", "productBarcode", "stockItem", "product", "pharmacyDrugStock",
   "notification", "emailDispatch", "storedFile", "automationDispatch", "patientNewsSubscription", "patientNewsAnnouncement", "aiUsageRecord", "auditLog",
+  // La démonstration n'écrit pas au vrai support (le geste est refusé) ; si une discussion existait, elle ne survit pas à la réinitialisation.
+  "supportThread",
   // Une liaison logiciel créée pendant un rendez-vous (clé d'agent comprise) ne survit pas à la démo.
   "stockConnection",
 ] as const;

@@ -27,6 +27,10 @@ export type DispatchKind =
   | "SUBSCRIPTION_RECEIVED"
   | "SITE_LEAD_ACK"
   | "INSTALL_GUIDE"
+  /** Une officine a écrit au support : l'alerte à l'équipe. */
+  | "SUPPORT_ALERT"
+  /** L'équipe a répondu à une officine depuis la console. */
+  | "SUPPORT_REPLY"
   /** Un modèle du centre de modèles (relance automatique, envoi manuel, test). */
   | "TEMPLATE"
   /** Une campagne de la console (offre bonus, parrainage, invitation des partenaires). */
