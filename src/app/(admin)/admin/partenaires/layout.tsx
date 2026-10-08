@@ -15,7 +15,7 @@ export default function PartnersAdminLayout({ children }: { children: ReactNode 
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Administration", href: "/admin/societe" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Partenaires"
         description="Candidatures des laboratoires, fiches partenaires, marques et catalogues, diffusion aux officines, commandes et leads attribués."
       />

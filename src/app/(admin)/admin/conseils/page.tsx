@@ -30,7 +30,7 @@ export default async function AdminAdvicePage() {
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Conseils", href: "/admin/conseils" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Conseils & associations"
         description="Tout ce que PharmaBoost conseille au comptoir, au même endroit. Ce que vous décidez ici vaut pour toutes les pharmacies, celles qui existent et celles à venir."
       />

@@ -43,7 +43,7 @@ export default async function AdminChallengesPage() {
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Administration", href: "/admin/societe" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Challenges laboratoires"
         description="Les challenges saisis par les officines clientes, et où ils en sont. Chaque officine les gère elle-même dans ses Paramètres."
       />

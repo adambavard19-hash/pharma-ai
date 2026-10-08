@@ -79,7 +79,7 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        space={{ label: "Finances", href: "/admin/abonnements" }}
         title="Abonnements"
         description="Chaque officine, son offre et son tarif contractuel, l'essai, l'échéance et l'état du paiement. Le catalogue ne change jamais un abonnement en cours."
         actions={

@@ -99,7 +99,7 @@ export default async function RelancesPage() {
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Communication", href: "/admin/communications" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Relances automatiques"
         description="Les scénarios qui écrivent aux officines à votre place, ou qui alertent l'équipe. Chaque règle est désactivée tant que vous ne l'avez pas activée."
         actions={

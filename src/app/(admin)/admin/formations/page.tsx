@@ -22,7 +22,7 @@ export default async function AdminTrainingsPage() {
   return (
     <div className="space-y-5">
       <AdminPageHeader
-        space={{ label: "Administration", href: "/admin/societe" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Formations"
         description="Les contenus proposés à toutes les officines dans leur centre de formation. Un contenu désactivé disparaît des catalogues ; la progression des équipes est conservée."
       />

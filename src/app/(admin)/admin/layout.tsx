@@ -4,7 +4,7 @@ import { Bell, LogOut } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { platformLogoutAction } from "@/server/actions/platform";
 import { Dropdown, DropdownLabel, DropdownSeparator } from "@/components/ui/dropdown";
-import { AdminNav } from "./admin-nav";
+import { AdminNav, AdminSectionNav } from "./admin-nav";
 import { AdminSearch } from "./admin-search";
 import { QuickActions } from "./quick-actions";
 import { countUnreadAdminNotifications } from "@/server/services/sales/notifications";
@@ -12,6 +12,8 @@ import { countSupportToAnswer } from "@/server/services/support";
 
 /**
  * La console éditeur : le centre de contrôle de PharmaBoost.
+ *
+ * Cinq rubriques (Accueil, Officines, Commercial, Finances, Gestion) ; sous chacune, des onglets, jamais de menus déroulants.
  *
  * Volontairement distincte de l'application officine : quand on bascule d'un
  * espace à l'autre, on doit voir immédiatement qu'on a changé de monde. Ici
@@ -65,11 +67,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </div>
 
         <div className="mx-auto max-w-[1320px] px-6">
-          <AdminNav unread={unread} supportOpen={supportOpen} />
+          <AdminNav />
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1320px] space-y-6 px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-[1320px] space-y-6 px-6 py-6">
+        <AdminSectionNav badges={{ support: supportOpen }} />
+        {children}
+      </main>
     </div>
   );
 }

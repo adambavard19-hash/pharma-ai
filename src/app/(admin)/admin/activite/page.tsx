@@ -34,7 +34,7 @@ export default async function ClientActivityPage({ searchParams }: { searchParam
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Clients", href: "/admin/pharmacies" }}
+        space={{ label: "Officines", href: "/admin/pharmacies" }}
         title="Activité"
         description={`Qui utilise PharmaBoost, et qui décroche. Une officine est inactive quand aucun compte ne s'est connecté depuis ${INACTIVE_AFTER_DAYS} jours.`}
       />

@@ -48,7 +48,7 @@ export default async function AdminNotificationsPage({ searchParams }: { searchP
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Communication", href: "/admin/communications" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Notifications"
         description={unread ? `${unread} non lue${unread > 1 ? "s" : ""} sur ${total}. Les alertes de la plateforme pour l'équipe : contrats bloqués, impayés, relances dépassées…` : "Tout est lu. Les alertes de la plateforme pour l'équipe arrivent ici."}
         actions={

@@ -35,7 +35,7 @@ export default async function PlatformTeamPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Administration", href: "/admin/societe" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Équipe PharmaBoost"
         description="Les administrateurs de la console. Un compte, un e-mail, un lien pour définir son mot de passe."
       />

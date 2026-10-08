@@ -38,7 +38,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        space={{ label: "Finances", href: "/admin/abonnements" }}
         title="Paiements"
         description="Les factures reçues de Stripe : payées, échouées, en attente. Chaque montant vient d'une facture réelle."
         actions={

@@ -43,7 +43,7 @@ export default async function PharmacyUsersPage({ searchParams }: { searchParams
 
   return (
     <>
-      <AdminPageHeader space={{ label: "Clients", href: "/admin/pharmacies" }} title="Utilisateurs" description="Les comptes des officines clientes, leur rôle et leur dernière connexion. Supprimer se fait ici ; renvoyer l'accès ou suspendre, depuis la fiche de l'officine." />
+      <AdminPageHeader space={{ label: "Officines", href: "/admin/pharmacies" }} title="Utilisateurs" description="Les comptes des officines clientes, leur rôle et leur dernière connexion. Supprimer se fait ici ; renvoyer l'accès ou suspendre, depuis la fiche de l'officine." />
 
       <section className="space-y-3">
         <SearchBox action="/admin/utilisateurs" defaultValue={q} placeholder="Nom, e-mail ou officine" keep={keep} />

@@ -16,7 +16,7 @@ export function AdminPageHeader({
   badge,
   className,
 }: {
-  /** L'espace de navigation (« Facturation ») et, au besoin, son adresse. */
+  /** La rubrique de navigation (« Finances »), pour le fil d'Ariane d'une page enfant. Seule, elle n'affiche rien : la navigation la montre déjà. */
   space?: { label: string; href?: string };
   /** Une page parente (« Abonnements ») entre l'espace et le titre. */
   parent?: { label: string; href: string };
@@ -29,7 +29,8 @@ export function AdminPageHeader({
   return (
     <header className={cn("flex flex-col gap-4 md:flex-row md:items-end md:justify-between", className)}>
       <div className="min-w-0 space-y-1.5">
-        {(space || parent) && (
+        {/* La rubrique est déjà dans la navigation : le fil d'Ariane ne sert que pour revenir à une page parente. */}
+        {parent && (
           <nav aria-label="Fil d'Ariane" className="flex flex-wrap items-center gap-1 text-[12.5px] text-text-tertiary">
             {space && (space.href ? <Link href={space.href} className="hover:text-text-primary">{space.label}</Link> : <span>{space.label}</span>)}
             {space && parent && <ChevronRight className="size-3.5" aria-hidden="true" />}

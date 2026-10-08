@@ -37,7 +37,7 @@ export default async function PlansPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        space={{ label: "Finances", href: "/admin/abonnements" }}
         parent={{ label: "Abonnements", href: "/admin/abonnements" }}
         title="Offres & tarifs"
         description="Nom, prix, essai, contenu et remises de chaque offre. Le prix Stripe est créé à l'enregistrement ; un changement de prix crée un nouveau prix Stripe, les abonnements en cours gardent le leur."

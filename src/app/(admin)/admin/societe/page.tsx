@@ -40,7 +40,7 @@ export default async function CompanyPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Administration", href: "/admin/societe" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Société exploitante"
         badge={profile ? missing.length === 0 ? <Badge tone="success">Prête pour les contrats</Badge> : <Badge tone="warning">Incomplète</Badge> : <Badge tone="warning">Non renseignée</Badge>}
         description="Ces informations identifient la société qui exploite PharmaBoost et sont utilisées comme partie signataire dans les contrats générés."

@@ -45,7 +45,7 @@ export default async function UnpaidPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        space={{ label: "Finances", href: "/admin/abonnements" }}
         title="Impayés"
         description="Les paiements échoués restés impayés, le retard de chacun, et les relances déjà parties. Rien n'est suspendu automatiquement."
         actions={

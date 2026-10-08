@@ -28,7 +28,7 @@ export default async function SupportThreadPage({ params }: { params: Promise<{ 
     <>
       <AutoRefresh intervalMs={10_000} />
       <AdminPageHeader
-        space={{ label: "Clients", href: "/admin/pharmacies" }}
+        space={{ label: "Officines", href: "/admin/pharmacies" }}
         parent={{ label: "Support", href: "/admin/support" }}
         title={thread.subject}
         badge={<Badge tone={state.tone}>{state.label}</Badge>}

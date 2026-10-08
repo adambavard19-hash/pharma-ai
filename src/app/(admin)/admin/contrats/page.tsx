@@ -49,7 +49,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        space={{ label: "Finances", href: "/admin/abonnements" }}
         title="Contrats"
         description="Les contrats d'abonnement de chaque dossier : brouillons à envoyer, signatures attendues, relances, contrats signés. Le PDF, le dossier et l'historique sont à un clic."
         actions={

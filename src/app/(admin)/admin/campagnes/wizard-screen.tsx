@@ -29,7 +29,7 @@ export async function WizardScreen({ campaign, adminEmail }: { campaign: Editabl
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Communication", href: "/admin/communications" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         parent={{ label: "Campagnes", href: "/admin/campagnes" }}
         title={campaign ? "Modifier la campagne" : "Nouvelle campagne"}
         description="Une étape à la fois. Un brouillon ne contacte personne : rien ne part avant la confirmation de la dernière étape."

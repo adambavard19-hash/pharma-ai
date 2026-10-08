@@ -59,7 +59,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        space={{ label: "Finances", href: "/admin/abonnements" }}
         parent={{ label: "Contrats", href: "/admin/contrats" }}
         title={`Contrat ${reference}`}
         badge={<StatusBadge status={display} />}

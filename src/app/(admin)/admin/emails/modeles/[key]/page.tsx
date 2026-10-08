@@ -39,7 +39,7 @@ export default async function EmailTemplatePage({ params }: { params: Promise<{ 
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Communication", href: "/admin/communications" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         parent={{ label: "Modèles d'e-mails", href: "/admin/emails/modeles" }}
         title={definition.label}
         badge={<Badge tone={loaded.customized ? "brand" : "neutral"}>{loaded.customized ? "Personnalisé" : "Texte par défaut"}</Badge>}

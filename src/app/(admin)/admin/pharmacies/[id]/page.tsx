@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { Cable, Clock3, CreditCard, FileSignature, FileText, PencilLine } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
@@ -20,7 +21,7 @@ import { parseTimelineKind, pharmacyStatusLabel, searchParam } from "@/core/admi
 import { formatRelative } from "@/lib/format";
 import { AccessToggle } from "../access-toggle";
 import { AddNoteButton } from "./notes";
-import { parseTab, tabHref, type TabKey } from "./shared";
+import { parseTab, sectionToOpen, tabGroupOf, tabHref, TAB_GROUPS, type TabGroupKey } from "./shared";
 import { OverviewTab } from "./tab-apercu";
 import { SubscriptionTab } from "./tab-abonnement";
 import { PerformanceTab } from "./tab-performance";
@@ -33,6 +34,11 @@ import { CommunicationTab } from "./tab-communication";
 import { CommercialTab } from "./tab-commercial";
 import { HistoryTab } from "./tab-historique";
 import { NotesTab } from "./tab-notes";
+import { StockSection } from "./tab-stock";
+import { SupportSection } from "./tab-support";
+import { ScrollToSection } from "./scroll-to-section";
+import { CreateCancellationButton } from "../../resiliations/create-cancellation";
+import { dayInParis } from "@/server/services/admin/billing-admin";
 
 export const metadata: Metadata = { title: "Officine cliente" };
 
@@ -46,6 +52,8 @@ export default async function ClientPharmacyPage({ params, searchParams }: { par
   const { id } = await params;
   const query = await searchParams;
   const tab = parseTab(searchParam(query, "onglet"));
+  const group = tabGroupOf(tab);
+  const section = sectionToOpen(tab);
   const now = new Date();
 
   const base = await loadPharmacy360(id, now);
@@ -53,12 +61,19 @@ export default async function ClientPharmacyPage({ params, searchParams }: { par
   const templates = await loadAllTemplates();
   const { pharmacy, subscription, price, latestContract } = base;
   const suspended = !pharmacy.isActive || Boolean(subscription?.suspendedAt);
+  // Les pastilles des onglets : ce qui demande un regard (incidents), ou le nombre d'éléments utiles.
+  const counts: Partial<Record<TabGroupKey, number>> = {
+    equipe: base.counts.users,
+    technique: base.counts.openIncidents,
+    facturation: base.counts.contracts + base.counts.payments,
+    communication: base.counts.emails,
+    commercial: base.counts.notes,
+  };
 
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Clients", href: "/admin/pharmacies" }}
-        parent={{ label: "Officines clientes", href: "/admin/pharmacies" }}
+        parent={{ label: "Toutes les officines", href: "/admin/pharmacies" }}
         title={pharmacy.name}
         badge={
           <span className="flex flex-wrap items-center gap-1.5">
@@ -126,58 +141,114 @@ export default async function ClientPharmacyPage({ params, searchParams }: { par
 
       <LinkTabs
         basePath={`/admin/pharmacies/${pharmacy.id}`}
-        items={[
-          { key: "apercu", label: "Aperçu" },
-          { key: "abonnement", label: "Abonnement" },
-          { key: "performance", label: "Performance" },
-          { key: "contrats", label: "Contrats", count: base.counts.contracts },
-          { key: "paiements", label: "Paiements", count: base.counts.payments },
-          { key: "utilisateurs", label: "Utilisateurs", count: base.counts.users },
-          { key: "technique", label: "Technique", ...(base.counts.openIncidents > 0 ? { count: base.counts.openIncidents } : {}) },
-          { key: "communication", label: "Communication", count: base.counts.emails },
-          { key: "commercial", label: "Commercial" },
-          { key: "historique", label: "Historique" },
-          { key: "notes", label: "Notes", count: base.counts.notes },
-        ]}
+        activeKey={group}
+        items={TAB_GROUPS.map((entry) => ({
+          key: entry.key,
+          label: entry.label,
+          ...(counts[entry.key] ? { count: counts[entry.key] } : {}),
+        }))}
       />
+      {section && <ScrollToSection id={section} />}
 
-      <TabContent tab={tab} base={base} now={now} templates={templates} kind={parseTimelineKind(searchParam(query, "type"))} query={query} />
+      <TabContent group={group} base={base} now={now} templates={templates} kind={parseTimelineKind(searchParam(query, "type"))} query={query} />
     </>
   );
 }
 
-function TabContent({ tab, base, now, templates, kind, query }: { tab: TabKey; base: Pharmacy360; now: Date; templates: Awaited<ReturnType<typeof loadAllTemplates>>; kind: ReturnType<typeof parseTimelineKind>; query: Record<string, string | string[] | undefined> }) {
-  switch (tab) {
-    case "abonnement":
-      return <SubscriptionTab base={base} now={now} />;
-    case "performance":
-      // L'identifiant vient de la fiche déjà chargée (existence vérifiée), jamais de l'adresse brute.
-      return <PerformanceTab pharmacyId={base.pharmacy.id} query={query} now={now} />;
-    case "contrats":
-      return <ContractsTab base={base} now={now} />;
-    case "paiements":
-      return <PaymentsTab base={base} />;
-    case "utilisateurs":
+function TabContent({ group, base, now, templates, kind, query }: { group: TabGroupKey; base: Pharmacy360; now: Date; templates: Awaited<ReturnType<typeof loadAllTemplates>>; kind: ReturnType<typeof parseTimelineKind>; query: Record<string, string | string[] | undefined> }) {
+  switch (group) {
+    case "equipe":
       return <UsersTab base={base} />;
     case "technique":
       // L'installation sous AnyDesk d'abord : c'est ce que l'équipe vient faire ici.
       return (
-        <div className="space-y-5">
-          <InstallPanel pharmacyId={base.pharmacy.id} now={now} />
-          <TechniqueTab base={base} now={now} />
+        <div className="space-y-8">
+          <div id="technique" className="scroll-mt-44 space-y-5">
+            <InstallPanel pharmacyId={base.pharmacy.id} now={now} />
+            <TechniqueTab base={base} now={now} />
+          </div>
+          <StockSection base={base} now={now} />
+        </div>
+      );
+    case "facturation":
+      return (
+        <div className="space-y-8">
+          <div id="abonnement" className="scroll-mt-44 space-y-3">
+            <SectionLabel>Abonnement et tarif</SectionLabel>
+            <SubscriptionTab base={base} now={now} />
+            <CancellationPrompt base={base} />
+          </div>
+          <div id="contrats" className="scroll-mt-44 space-y-3">
+            <SectionLabel>Contrats et signatures</SectionLabel>
+            <ContractsTab base={base} now={now} />
+          </div>
+          <div id="paiements" className="scroll-mt-44 space-y-3">
+            <SectionLabel>Paiements</SectionLabel>
+            <PaymentsTab base={base} />
+          </div>
         </div>
       );
     case "communication":
-      return <CommunicationTab base={base} templates={templates} />;
+      return (
+        <div className="space-y-8">
+          <div id="communication" className="scroll-mt-44 space-y-3">
+            <SectionLabel>Échanges avec le titulaire</SectionLabel>
+            <CommunicationTab base={base} templates={templates} />
+          </div>
+          <SupportSection pharmacyId={base.pharmacy.id} />
+        </div>
+      );
     case "commercial":
-      return <CommercialTab base={base} now={now} />;
-    case "historique":
-      return <HistoryTab base={base} kind={kind} now={now} />;
-    case "notes":
-      return <NotesTab base={base} />;
+      return (
+        <div className="space-y-8">
+          <div id="commercial" className="scroll-mt-44 space-y-3">
+            <SectionLabel>Suivi commercial</SectionLabel>
+            <CommercialTab base={base} now={now} />
+          </div>
+          <div id="notes" className="scroll-mt-44 space-y-3">
+            <SectionLabel>Notes internes</SectionLabel>
+            <NotesTab base={base} />
+          </div>
+        </div>
+      );
+    case "activite":
+      return (
+        <div className="space-y-8">
+          <div id="performance" className="scroll-mt-44 space-y-3">
+            <SectionLabel>Performance</SectionLabel>
+            {/* L'identifiant vient de la fiche déjà chargée (existence vérifiée), jamais de l'adresse brute. */}
+            <PerformanceTab pharmacyId={base.pharmacy.id} query={query} now={now} />
+          </div>
+          <div id="historique" className="scroll-mt-44 space-y-3">
+            <SectionLabel>Historique</SectionLabel>
+            <HistoryTab base={base} kind={kind} now={now} />
+          </div>
+        </div>
+      );
     default:
       return <OverviewTab base={base} now={now} />;
   }
+}
+
+/** Le titre discret d'une section quand plusieurs partagent un onglet. */
+function SectionLabel({ children }: { children: ReactNode }) {
+  return <h2 className="text-[12.5px] font-semibold tracking-wide text-text-tertiary uppercase">{children}</h2>;
+}
+
+/** Enregistrer une demande de résiliation depuis la fiche : rien n'est coupé, la demande suit son cours dans « Résiliations ». */
+function CancellationPrompt({ base }: { base: Pharmacy360 }) {
+  const { pharmacy, subscription, cancellationOpen } = base;
+  if (cancellationOpen) return null;
+  const ongoing = Boolean(subscription && !["CANCELED", "INCOMPLETE_EXPIRED"].includes(subscription.status));
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-sunken px-4 py-3">
+      <p className="text-[13px] text-text-secondary">Le titulaire veut arrêter ? Enregistrer la demande ne coupe rien : elle suit son cours dans « Finances → Résiliations ».</p>
+      <CreateCancellationButton
+        fixedPharmacy={{ id: pharmacy.id, name: pharmacy.name, city: pharmacy.city, hasOpenRequest: false, hasSubscription: Boolean(subscription), suggestedEndAt: ongoing ? dayInParis(subscription?.currentPeriodEnd) : null }}
+        label="Enregistrer une demande de résiliation"
+      />
+    </div>
+  );
 }
 
 /** La barre d'actions rapides : contacter, relancer (selon la situation), contrat, abonnement, note, accès. */

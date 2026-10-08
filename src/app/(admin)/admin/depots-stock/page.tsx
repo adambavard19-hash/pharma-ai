@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FileText, Inbox } from "lucide-react";
+import { Inbox } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { consoleStockOverview, countDepositsNeedingAttention, listDepositsForConsole } from "@/server/services/stock-deposits";
-import { DEPOSIT_RETENTION_DAYS, DEPOSIT_SOURCE_LABELS, describeDepositResult, stockReminderLevel } from "@/core/stock-deposit/rules";
+import { DEPOSIT_SOURCE_LABELS, stockReminderLevel } from "@/core/stock-deposit/rules";
 import { searchParam } from "@/core/admin/clients";
 import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
 import { FilterChips } from "@/components/admin/filters";
 import { KpiTile } from "@/components/admin/kpis";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
-import { formatDate, formatDateTime, formatNumber } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { formatDate, formatNumber } from "@/lib/format";
 import { When } from "../pharmacies/client-ui";
-import { HeldActions, RetryButton } from "./_components/deposit-actions";
+import { DepositFileRow } from "./_components/deposit-file-row";
 import { DepositForPharmacy } from "./_components/deposit-for-pharmacy";
-import { DepositStatusBadge, FreshnessBadge, STALLED_MESSAGE, formatFileSize, viewFromParam } from "./_components/status";
+import { FreshnessBadge, viewFromParam } from "./_components/status";
 
 export const metadata: Metadata = { title: "Stocks reçus" };
 // Le dépôt par l'équipe lit le fichier pendant l'envoi : une grosse édition d'inventaire peut prendre un moment.
@@ -52,7 +51,7 @@ export default async function StockDepositsPage({ searchParams }: { searchParams
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Clients", href: "/admin/pharmacies" }}
+        space={{ label: "Officines", href: "/admin/pharmacies" }}
         title="Stocks reçus"
         description="Le dernier stock reçu de chaque officine, et chaque fichier envoyé. Le stock se met à jour tout seul à la réception : vous n'intervenez que si un fichier vous attend, ou pour déposer un fichier à la place d'un titulaire."
       />
@@ -136,51 +135,9 @@ export default async function StockDepositsPage({ searchParams }: { searchParams
           )
         ) : (
           <ul className="-my-4 divide-y divide-border-subtle">
-            {files.map((deposit) => {
-              const result = describeDepositResult(deposit);
-              return (
-                <li key={deposit.id} className="space-y-2 py-4">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    {deposit.pharmacyName ? (
-                      <Link href={`/admin/pharmacies/${deposit.pharmacyId}`} className="text-[14px] font-semibold text-text-primary hover:underline">
-                        {deposit.pharmacyName}
-                      </Link>
-                    ) : (
-                      <span className="text-[14px] font-semibold text-text-tertiary">Officine supprimée</span>
-                    )}
-                    <DepositStatusBadge status={deposit.status} stalled={deposit.stalled} />
-                    <span className="text-[12px] text-text-tertiary">
-                      <time dateTime={deposit.receivedAt.toISOString()}>{formatDateTime(deposit.receivedAt)}</time> · {DEPOSIT_SOURCE_LABELS[deposit.source]}
-                    </span>
-                  </div>
-
-                  <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-text-secondary">
-                    <FileText className="size-3.5 shrink-0 text-text-tertiary" aria-hidden="true" />
-                    {deposit.hasFile ? (
-                      <a href={`/api/admin/depots-stock/${deposit.id}/fichier`} title="Télécharger le fichier reçu" className="min-w-0 font-medium break-all text-brand-700 hover:underline dark:text-brand-400">
-                        {deposit.fileName}
-                      </a>
-                    ) : (
-                      <span className="min-w-0 break-all">{deposit.fileName}</span>
-                    )}
-                    <span className="text-text-tertiary">
-                      {formatFileSize(deposit.fileSize)}
-                      {deposit.hasFile ? "" : ` · fichier supprimé (gardé ${DEPOSIT_RETENTION_DAYS} jours)`}
-                    </span>
-                  </p>
-
-                  {result && <p className="text-[13px] text-text-primary">{result}</p>}
-                  {deposit.stalled && !deposit.message && <p className="text-[12.5px] leading-5 text-danger-700 dark:text-danger-500">{STALLED_MESSAGE}</p>}
-                  {deposit.message && (
-                    <p className={cn("text-[12.5px] leading-5", deposit.status === "HELD" && "text-warning-700 dark:text-warning-500", deposit.status === "FAILED" && "text-danger-700 dark:text-danger-500", deposit.status !== "HELD" && deposit.status !== "FAILED" && "text-text-tertiary")}>{deposit.message}</p>
-                  )}
-
-                  {deposit.status === "HELD" && <HeldActions id={deposit.id} fileName={deposit.fileName} pharmacyName={deposit.pharmacyName} />}
-                  {/* Un fichier « en cours » depuis trop longtemps se relance comme un fichier en échec. */}
-                  {(deposit.status === "FAILED" || deposit.stalled) && <RetryButton id={deposit.id} />}
-                </li>
-              );
-            })}
+            {files.map((deposit) => (
+              <DepositFileRow key={deposit.id} deposit={deposit} />
+            ))}
           </ul>
         )}
       </AdminSection>

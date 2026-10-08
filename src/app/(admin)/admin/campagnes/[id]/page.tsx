@@ -101,7 +101,7 @@ export default async function CampaignDetailPage({ params, searchParams }: { par
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Communication", href: "/admin/communications" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         parent={{ label: "Campagnes", href: "/admin/campagnes" }}
         title={campaign.name}
         badge={

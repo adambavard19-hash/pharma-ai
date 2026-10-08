@@ -118,7 +118,7 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        space={{ label: "Finances", href: "/admin/abonnements" }}
         parent={{ label: "Abonnements", href: "/admin/abonnements" }}
         title={row.name}
         badge={<StatusBadge status={stage} />}

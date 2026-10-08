@@ -1,5 +1,7 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
-import { AlertTriangle, BadgeCheck, FileClock, Hourglass, Percent, Store, TrendingUp, UserMinus, UserPlus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { BadgeCheck, Hourglass, Percent, Store, TrendingUp, UserMinus, UserPlus } from "lucide-react";
 import { AdminSection } from "@/components/admin/page-header";
 import { KpiTile } from "@/components/admin/kpis";
 import { FilterChips, PERIODS } from "@/components/admin/filters";
@@ -29,35 +31,53 @@ function SectionTitle({ id, title, description, action }: { id: string; title: s
   );
 }
 
-/** Le parc à date : ces chiffres ne dépendent pas de la période choisie. */
+/**
+ * Les chiffres qui comptent, en une ligne : ce que rapporte le parc, combien d'officines, combien d'essais en cours,
+ * combien d'abonnements à jour. Pas de tuile pour un chiffre sans intérêt : les paiements en retard et les contrats bloqués
+ * sont dans « À traiter » dès qu'ils existent.
+ */
 export function FleetKpis({ kpis }: { kpis: CockpitKpis }) {
-  const { contracts } = kpis;
+  const figures: { label: string; value: ReactNode; hint: string; href: string; icon: ReactNode; strong?: boolean }[] = [
+    {
+      label: "Revenu mensuel récurrent",
+      value: formatEuros(kpis.mrrCents),
+      hint: kpis.mrrCatalogFallback > 0 ? `tarifs contractuels · ${kpis.mrrCatalogFallback} au tarif catalogue` : "tarifs contractuels",
+      href: COCKPIT_LINKS.mrr,
+      icon: <TrendingUp className={ICON} />,
+      strong: true,
+    },
+    { label: "Officines clientes", value: kpis.activePharmacies, hint: "actives, hors démonstration", href: COCKPIT_LINKS.activePharmacies, icon: <Store className={ICON} /> },
+    { label: "Essais en cours", value: kpis.trials, hint: kpis.trialsEnding > 0 ? `dont ${kpis.trialsEnding} finissant sous 7 jours` : "aucun ne finit sous 7 jours", href: COCKPIT_LINKS.trials, icon: <Hourglass className={ICON} /> },
+    { label: "Abonnements actifs", value: kpis.activeSubscriptions, hint: "payants, à jour", href: COCKPIT_LINKS.activeSubscriptions, icon: <BadgeCheck className={ICON} /> },
+  ];
   return (
     <section aria-labelledby="cockpit-parc" className="space-y-3">
-      <SectionTitle id="cockpit-parc" title="Le parc aujourd'hui" description="Chiffres à date, hors démonstration. Chaque tuile ouvre sa liste." />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-        <KpiTile label="Officines clientes" value={kpis.activePharmacies} hint="actives, hors démonstration" href={COCKPIT_LINKS.activePharmacies} icon={<Store className={ICON} />} />
-        <KpiTile label="Essais en cours" value={kpis.trials} hint={kpis.trialsEnding > 0 ? `dont ${kpis.trialsEnding} finissant sous 7 jours` : "aucun ne finit sous 7 jours"} href={COCKPIT_LINKS.trials} icon={<Hourglass className={ICON} />} />
-        <KpiTile label="Abonnements actifs" value={kpis.activeSubscriptions} hint="payants, à jour" href={COCKPIT_LINKS.activeSubscriptions} tone={kpis.activeSubscriptions > 0 ? "success" : "default"} icon={<BadgeCheck className={ICON} />} />
-        <KpiTile
-          label="MRR"
-          value={formatEuros(kpis.mrrCents)}
-          hint={kpis.mrrCatalogFallback > 0 ? `tarifs contractuels · ${kpis.mrrCatalogFallback} au tarif catalogue` : "tarifs contractuels"}
-          href={COCKPIT_LINKS.mrr}
-          tone="brand"
-          icon={<TrendingUp className={ICON} />}
-        />
-        <KpiTile
-          label="Contrats en attente"
-          value={contracts.pending}
-          hint={contracts.pending > 0 ? `${plural(contracts.drafts, "brouillon", "brouillons")} · ${contracts.toSign} à signer · ${contracts.toCountersign} à contresigner` : "aucun contrat en cours"}
-          href={COCKPIT_LINKS.pendingContracts}
-          icon={<FileClock className={ICON} />}
-        />
-        <KpiTile label="Paiements en retard" value={kpis.paymentsLate} hint="retards et impayés" href={COCKPIT_LINKS.paymentsLate} tone={kpis.paymentsLate > 0 ? "danger" : "default"} icon={<AlertTriangle className={ICON} />} />
-      </div>
+      <h2 id="cockpit-parc" className="text-[17px] leading-6 font-semibold tracking-[-0.01em] text-text-primary">
+        Le parc en chiffres
+      </h2>
+      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-border-subtle ring-1 ring-border-subtle lg:grid-cols-4">
+        {figures.map((figure) => (
+          <div key={figure.label} className="bg-surface-card">
+            <Link href={figure.href} className="group block h-full px-5 py-4 transition-colors hover:bg-surface-sunken/60 focus-visible:bg-surface-sunken/60 focus-visible:outline-none">
+              <dt className="flex items-center gap-1.5 text-[12.5px] leading-5 font-medium text-text-secondary">
+                <span className="text-text-tertiary" aria-hidden="true">
+                  {figure.icon}
+                </span>
+                {figure.label}
+              </dt>
+              <dd className={cn("mt-1.5 leading-9 font-semibold tracking-[-0.02em] tabular-nums", figure.strong ? "text-[30px] text-brand-800 dark:text-brand-200" : "text-[28px] text-text-primary")}>{figure.value}</dd>
+              <dd className="mt-0.5 text-[12px] leading-4 text-text-tertiary">{figure.hint}</dd>
+            </Link>
+          </div>
+        ))}
+      </dl>
     </section>
   );
+}
+
+/** Y a-t-il quelque chose à tracer ? Sans paiement ni abonnement, les courbes seraient trois lignes plates. */
+export function hasTrend(series: CockpitSeries): boolean {
+  return [series.mrr, series.newSubscriptions, series.cancellations].some((points) => points.some((point) => point.value > 0));
 }
 
 /** Ce qui s'est passé sur la période choisie : flux, conversion et courbes. */

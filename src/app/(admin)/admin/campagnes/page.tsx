@@ -69,7 +69,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Communication", href: "/admin/communications" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Campagnes"
         description="Les messages que l'équipe envoie aux officines et aux partenaires : offres bonus, parrainage, invitations, annonces. Maintenant ou à un jour choisi ; rien ne part sans confirmation."
         actions={

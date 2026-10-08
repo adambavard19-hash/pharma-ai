@@ -74,7 +74,7 @@ export default async function CommunicationsPage({ searchParams }: { searchParam
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Communication", href: BASE }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Historique des communications"
         description="Les e-mails partis (relances, envois manuels, tests, e-mails système), les notifications de l'équipe, les relances internes et les actions commerciales, du plus récent au plus ancien."
         actions={

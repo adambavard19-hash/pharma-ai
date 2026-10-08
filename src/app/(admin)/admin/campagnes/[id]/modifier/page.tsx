@@ -24,7 +24,7 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
   if (campaign.status !== "DRAFT" && campaign.status !== "SCHEDULED") {
     return (
       <>
-        <AdminPageHeader space={{ label: "Communication", href: "/admin/communications" }} parent={{ label: "Campagnes", href: "/admin/campagnes" }} title="Modifier la campagne" />
+        <AdminPageHeader space={{ label: "Gestion", href: "/admin/conseils" }} parent={{ label: "Campagnes", href: "/admin/campagnes" }} title="Modifier la campagne" />
         <Alert
           tone="warning"
           title={`Cette campagne n'est plus modifiable : ${campaignStatusLabel(campaign).label.toLowerCase()}`}

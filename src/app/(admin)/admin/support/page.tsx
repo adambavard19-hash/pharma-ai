@@ -38,7 +38,7 @@ export default async function SupportInboxPage({ searchParams }: { searchParams:
 
   return (
     <>
-      <AdminPageHeader space={{ label: "Clients", href: "/admin/pharmacies" }} title="Support" description="Les questions posées par les officines depuis « Contact support ». Une réponse les prévient par e-mail et dans PharmaBoost." />
+      <AdminPageHeader space={{ label: "Officines", href: "/admin/pharmacies" }} title="Support" description="Les questions posées par les officines depuis « Contact support ». Une réponse les prévient par e-mail et dans PharmaBoost." />
 
       <section className="space-y-3">
         <SearchBox action="/admin/support" defaultValue={q} placeholder="Officine, ville ou sujet" keep={{ statut: keep.statut }} />

@@ -41,7 +41,7 @@ export default async function PerformancePortfolioPage({ searchParams }: { searc
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Clients", href: "/admin/pharmacies" }}
+        space={{ label: "Officines", href: "/admin/pharmacies" }}
         title="Performance"
         description="La valeur générée par PharmaBoost, officine par officine : qui en tire beaucoup, qui a besoin d'accompagnement. Chiffres du mois en cours, à partir des ventes enregistrées dans PharmaBoost."
       />

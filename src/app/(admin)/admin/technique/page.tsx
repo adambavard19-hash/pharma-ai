@@ -50,7 +50,7 @@ export default async function TechnicalPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <AdminPageHeader space={{ label: "Clients", href: "/admin/pharmacies" }} title="État technique" description={`Connecteurs, postes de comptoir, incidents et consommation IA. Dernière version publiée de PharmaBoost Connect : ${LATEST_AGENT_VERSION}.`} />
+      <AdminPageHeader space={{ label: "Officines", href: "/admin/pharmacies" }} title="État technique" description={`Connecteurs, postes de comptoir, incidents et consommation IA. Dernière version publiée de PharmaBoost Connect : ${LATEST_AGENT_VERSION}.`} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AttentionCard count={connectorsToCheck.length} title="Connecteurs à vérifier" description="En erreur, déconnectés, hors ligne ou en retard." href="/admin/technique?filtre=erreurs" tone="danger" icon={<Cable className="size-4" />} />

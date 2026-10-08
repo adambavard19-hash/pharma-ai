@@ -55,7 +55,7 @@ export default async function ClientPharmaciesPage({ searchParams }: { searchPar
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Clients", href: "/admin/pharmacies" }}
+        space={{ label: "Officines", href: "/admin/pharmacies" }}
         title="Officines clientes"
         description="Créer un environnement, retrouver un titulaire, ouvrir la fiche 360° d'une officine."
         actions={<CreatePharmacyButton openFromAddress />}

@@ -29,7 +29,7 @@ export default async function PlatformSettingsPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Administration", href: "/admin/societe" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Paramètres"
         description="L'état de chaque service de la plateforme et ce qu'il reste à faire. Les secrets ne s'affichent jamais : seulement s'ils sont présents, et le nom de la variable à renseigner."
         badge={<Badge tone={health.environment === "Production" ? "brand" : "neutral"}>{health.environment}</Badge>}

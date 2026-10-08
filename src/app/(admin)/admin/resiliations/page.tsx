@@ -38,7 +38,7 @@ export default async function CancellationsPage({ searchParams }: { searchParams
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        space={{ label: "Finances", href: "/admin/abonnements" }}
         title="Résiliations"
         description="Les demandes de résiliation, de la réception à la fin. Chaque étape est confirmée, tracée, et ne coupe rien d'elle-même."
         actions={<CreateCancellationButton pharmacies={candidates} variant="primary" />}

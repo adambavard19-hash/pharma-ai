@@ -69,7 +69,7 @@ export default async function CancellationDetailPage({ params }: { params: Promi
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Facturation", href: "/admin/abonnements" }}
+        space={{ label: "Finances", href: "/admin/abonnements" }}
         parent={{ label: "Résiliations", href: "/admin/resiliations" }}
         title={request.pharmacy.name}
         badge={<CancellationStatusBadge status={request.status} />}

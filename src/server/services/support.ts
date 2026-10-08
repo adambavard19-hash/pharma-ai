@@ -185,6 +185,20 @@ export async function listSupportInbox(input: { filter: InboxFilter; q: string |
   return { rows, total, pages: Math.max(1, Math.ceil(total / INBOX_PAGE_SIZE)), counts: { "a-repondre": toAnswer, "en-attente": waiting, fermees: closed, toutes: all } };
 }
 
+/** Les discussions d'UNE officine, pour sa fiche dans la console : les plus récentes d'abord, avec le dernier message. */
+export async function listSupportThreadsForPharmacy(pharmacyId: string, limit = 8) {
+  const [total, rows] = await Promise.all([
+    prisma.supportThread.count({ where: { pharmacyId } }),
+    prisma.supportThread.findMany({
+      where: { pharmacyId },
+      orderBy: { lastMessageAt: "desc" },
+      take: limit,
+      select: { id: true, subject: true, topic: true, status: true, lastMessageFrom: true, lastMessageAt: true, unreadForSupport: true, messages: { orderBy: { createdAt: "desc" }, take: 1, select: { body: true, authorName: true } }, _count: { select: { messages: true } } },
+    }),
+  ]);
+  return { total, rows };
+}
+
 /** Le chiffre du menu de la console : les discussions où l'officine attend une réponse. */
 export async function countSupportToAnswer(): Promise<number> {
   return prisma.supportThread.count({ where: { status: "OPEN", lastMessageFrom: "PHARMACY" } });

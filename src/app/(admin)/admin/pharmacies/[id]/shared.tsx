@@ -7,11 +7,41 @@ import { contractStage } from "@/core/billing/subscription";
 
 /** Éléments communs aux onglets de la fiche 360°. */
 
-export const TAB_KEYS = ["apercu", "abonnement", "performance", "contrats", "paiements", "utilisateurs", "technique", "communication", "commercial", "historique", "notes"] as const;
+/**
+ * Les ONGLETS de la fiche : sept, au lieu de onze. Chacun réunit des SECTIONS qui étaient des onglets (leurs adresses
+ * `?onglet=paiements`, `?onglet=notes`… répondent toujours : on ouvre l'onglet qui les contient et on descend à la section).
+ */
+export const TAB_GROUPS = [
+  { key: "apercu", label: "Aperçu", sections: [] },
+  { key: "equipe", label: "Équipe & accès", sections: ["utilisateurs"] },
+  { key: "technique", label: "Technique & stock", sections: ["technique", "stock"] },
+  { key: "facturation", label: "Facturation", sections: ["abonnement", "contrats", "paiements"] },
+  { key: "communication", label: "Communication", sections: ["communication", "support"] },
+  { key: "commercial", label: "Commercial & notes", sections: ["commercial", "notes"] },
+  { key: "activite", label: "Activité", sections: ["performance", "historique"] },
+] as const;
+
+export type TabGroupKey = (typeof TAB_GROUPS)[number]["key"];
+
+/** Toutes les clés acceptées dans `?onglet=` : les sept onglets, et les sections qu'ils contiennent. */
+export const TAB_KEYS = ["apercu", "equipe", "facturation", "activite", "stock", "support", "abonnement", "performance", "contrats", "paiements", "utilisateurs", "technique", "communication", "commercial", "historique", "notes"] as const;
 export type TabKey = (typeof TAB_KEYS)[number];
 
 export function parseTab(value: string | null): TabKey {
   return (TAB_KEYS as readonly string[]).includes(value ?? "") ? (value as TabKey) : "apercu";
+}
+
+/** L'onglet qui contient cette clé : l'onglet lui-même, ou celui qui a repris la section. */
+export function tabGroupOf(tab: TabKey): TabGroupKey {
+  const direct = TAB_GROUPS.find((group) => group.key === tab);
+  if (direct) return direct.key;
+  return TAB_GROUPS.find((group) => (group.sections as readonly string[]).includes(tab))?.key ?? "apercu";
+}
+
+/** La section où descendre à l'ouverture : seulement quand la clé demandée est une section qui n'ouvre pas son onglet. */
+export function sectionToOpen(tab: TabKey): string | null {
+  const group = TAB_GROUPS.find((entry) => (entry.sections as readonly string[]).includes(tab));
+  return group && group.sections[0] !== tab ? tab : null;
 }
 
 export function tabHref(pharmacyId: string, tab: TabKey, extra: Record<string, string> = {}): string {

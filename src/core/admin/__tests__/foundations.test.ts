@@ -355,114 +355,102 @@ describe("modèles d'e-mails", () => {
 });
 
 describe("navigation de la console", () => {
-  it("toutes les adresses existantes restent rangées dans un espace", () => {
-    const hrefs = ADMIN_NAV.flatMap((s) => [s.href, ...s.items.map((i) => i.href)]);
-    for (const existing of ["/admin", "/admin/pharmacies", "/admin/abonnements", "/admin/abonnements/offres", "/admin/pipeline", "/admin/notifications", "/admin/formations", "/admin/challenges", "/admin/partenaires", "/admin/commerciaux", "/admin/candidatures-commerciales", "/admin/equipe", "/admin/societe"]) {
-      expect(hrefs).toContain(existing);
+  /** Chaque adresse qui avait un menu avant la refonte : aucune ne doit disparaître, ni changer de rubrique sans que ce soit voulu. */
+  const WHERE: Record<string, { space: string; item: string }> = {
+    "/admin/pharmacies": { space: "pharmacies", item: "Officines clientes" },
+    "/admin/utilisateurs": { space: "pharmacies", item: "Officines clientes" },
+    "/admin/acces": { space: "pharmacies", item: "Officines clientes" },
+    "/admin/technique": { space: "pharmacies", item: "Officines clientes" },
+    "/admin/depots-stock": { space: "pharmacies", item: "Officines clientes" },
+    "/admin/support": { space: "pharmacies", item: "Support" },
+    "/admin/performance": { space: "pharmacies", item: "Performance" },
+    "/admin/activite": { space: "pharmacies", item: "Activité" },
+    "/admin/pipeline": { space: "commercial", item: "Pipeline" },
+    "/admin/prospects": { space: "commercial", item: "Liste" },
+    "/admin/dossiers/ckx1": { space: "commercial", item: "Liste" },
+    "/admin/demonstrations": { space: "commercial", item: "Démonstrations" },
+    "/admin/relances-commerciales": { space: "commercial", item: "Relances" },
+    "/admin/commerciaux/ckx1": { space: "commercial", item: "Commerciaux" },
+    "/admin/candidatures-commerciales/ckx1": { space: "commercial", item: "Candidatures" },
+    "/admin/directeur-commercial": { space: "commercial", item: "Directeur commercial" },
+    "/admin/abonnements": { space: "finance", item: "Abonnements" },
+    "/admin/abonnements/ckx1": { space: "finance", item: "Abonnements" },
+    "/admin/abonnements/offres": { space: "finance", item: "Offres & tarifs" },
+    "/admin/contrats/ckx1": { space: "finance", item: "Contrats" },
+    "/admin/paiements": { space: "finance", item: "Paiements" },
+    "/admin/impayes": { space: "finance", item: "Impayés" },
+    "/admin/resiliations/ckx1": { space: "finance", item: "Résiliations" },
+    "/admin/conseils": { space: "management", item: "Conseils & associations" },
+    "/admin/campagnes/nouvelle": { space: "management", item: "Campagnes" },
+    "/admin/campagnes/ckx1/modifier": { space: "management", item: "Campagnes" },
+    "/admin/communications": { space: "management", item: "Historique" },
+    "/admin/emails/modeles/trial.welcome": { space: "management", item: "Modèles d'e-mails" },
+    "/admin/relances": { space: "management", item: "Relances automatiques" },
+    "/admin/partenaires/marques/1": { space: "management", item: "Partenaires" },
+    "/admin/formations": { space: "management", item: "Formations" },
+    "/admin/challenges": { space: "management", item: "Challenges" },
+    "/admin/equipe": { space: "management", item: "Équipe PharmaBoost" },
+    "/admin/societe": { space: "management", item: "Société exploitante" },
+    "/admin/parametres": { space: "management", item: "Paramètres" },
+    "/admin/journal": { space: "management", item: "Journal d'audit" },
+  };
+
+  it("cinq rubriques, pas une de plus : Accueil, Officines, Commercial, Finances, Gestion", () => {
+    expect(ADMIN_NAV.map((space) => space.label)).toEqual(["Accueil", "Officines", "Commercial", "Finances", "Gestion"]);
+    expect(ADMIN_NAV.map((space) => space.href)).toEqual(["/admin", "/admin/pharmacies", "/admin/pipeline", "/admin/abonnements", "/admin/conseils"]);
+  });
+
+  it("aucune adresse n'a disparu : chaque page d'avant retrouve sa rubrique et son onglet", () => {
+    for (const [path, expected] of Object.entries(WHERE)) {
+      const found = activeNavItem(path);
+      expect({ path, space: found.space.key, item: found.item?.label }).toEqual({ path, ...expected });
     }
   });
 
-  it("la rubrique la plus précise l'emporte (Offres & tarifs plutôt qu'Abonnements)", () => {
+  it("l'accueil et la cloche des notifications restent dans l'Accueil, sans onglet", () => {
+    expect(activeNavItem("/admin")).toMatchObject({ space: { key: "home" }, group: null, item: null });
+    expect(activeNavItem("/admin/notifications")).toMatchObject({ space: { key: "home" }, group: null, item: null });
+    expect(ADMIN_NAV[0].groups).toEqual([]);
+  });
+
+  it("une adresse inconnue retombe sur l'Accueil plutôt que de casser la navigation", () => {
+    expect(activeNavItem("/admin/inconnue").space.key).toBe("home");
+  });
+
+  it("la vue la plus précise l'emporte (Offres & tarifs plutôt qu'Abonnements ; « commerciaux » n'est pas un préfixe de « candidatures-commerciales »)", () => {
     expect(activeNavItem("/admin/abonnements/offres").item?.label).toBe("Offres & tarifs");
     expect(activeNavItem("/admin/abonnements/abc123").item?.label).toBe("Abonnements");
-    expect(activeNavItem("/admin/dossiers/xyz").item?.label).toBe("Prospects");
-    expect(activeNavItem("/admin/partenaires/marques/1").space.key).toBe("administration");
-    expect(activeNavItem("/admin").space.key).toBe("overview");
-  });
-
-  it("« Conseils » est un lien direct : règles, conseils et associations de toutes les pharmacies, au même endroit", () => {
-    const advice = ADMIN_NAV.find((space) => space.key === "advice")!;
-    expect(advice).toMatchObject({ label: "Conseils", href: "/admin/conseils", items: [] });
-    expect(activeNavItem("/admin/conseils").space.key).toBe("advice");
-    expect(activeNavItem("/admin/conseils/autre").space.key).toBe("advice");
-    // L'accueil et les autres espaces ne sont pas touchés.
-    expect(activeNavItem("/admin").space.key).toBe("overview");
-    expect(activeNavItem("/admin/pharmacies/abc").space.key).toBe("clients");
-  });
-
-  it("« Campagnes » ouvre l'espace Communication, devant les autres rubriques, sans en déplacer aucune", () => {
-    const communication = ADMIN_NAV.find((space) => space.key === "communication")!;
-    expect(communication.items.map((item) => item.href)).toEqual(["/admin/campagnes", "/admin/communications", "/admin/emails/modeles", "/admin/relances", "/admin/notifications"]);
-    expect(communication.items[0]).toMatchObject({ label: "Campagnes" });
-    expect(communication.items[0].description.length).toBeGreaterThan(20);
-    // L'espace garde son adresse : l'historique reste ce qu'on ouvre en cliquant sur « Communication ».
-    expect(communication.href).toBe("/admin/communications");
-  });
-
-  it("les pages d'une campagne se rattachent à « Campagnes », sans prendre la place de l'historique ni des relances", () => {
-    for (const path of ["/admin/campagnes", "/admin/campagnes/nouvelle", "/admin/campagnes/ckx123abc", "/admin/campagnes/ckx123abc/modifier"]) {
-      expect(activeNavItem(path)).toMatchObject({ space: { key: "communication" }, item: { label: "Campagnes" } });
-    }
-    expect(activeNavItem("/admin/communications").item?.label).toBe("Historique");
     expect(activeNavItem("/admin/relances").item?.label).toBe("Relances automatiques");
-    expect(activeNavItem("/admin/emails/modeles/trial.welcome").item?.label).toBe("Modèles d'e-mails");
-  });
-
-  it("« Candidatures commerciales » suit « Commerciaux » dans l'espace Commercial, sans prendre la place d'aucune autre rubrique", () => {
-    const commercial = ADMIN_NAV.find((space) => space.key === "commercial")!;
-    const hrefs = commercial.items.map((item) => item.href);
-    expect(hrefs).toEqual(["/admin/pipeline", "/admin/prospects", "/admin/demonstrations", "/admin/relances-commerciales", "/admin/commerciaux", "/admin/candidatures-commerciales", "/admin/directeur-commercial"]);
-    for (const path of ["/admin/candidatures-commerciales", "/admin/candidatures-commerciales/ckx123abc"]) {
-      expect(activeNavItem(path)).toMatchObject({ space: { key: "commercial" }, item: { label: "Candidatures commerciales" } });
-    }
-    // Les adresses voisines gardent leur rubrique : « commerciaux » n'est pas un préfixe de « candidatures-commerciales ».
-    expect(activeNavItem("/admin/commerciaux/ckx123abc").item?.label).toBe("Commerciaux");
-    expect(activeNavItem("/admin/relances-commerciales").item?.label).toBe("Relances commerciales");
-    expect(commercial.href).toBe("/admin/pipeline");
-  });
-
-  it("« Directeur commercial » ferme l'espace Commercial et garde sa propre rubrique", () => {
-    const item = ADMIN_NAV.find((space) => space.key === "commercial")!.items.find((entry) => entry.href === "/admin/directeur-commercial")!;
-    expect(item.label).toBe("Directeur commercial");
-    expect(item.description).toBe("Le compte qui gère l'équipe commerciale depuis son propre espace.");
-    expect(activeNavItem("/admin/directeur-commercial")).toMatchObject({ space: { key: "commercial" }, item: { label: "Directeur commercial" } });
-    // « commercial » n'est préfixe d'aucune rubrique voisine, et inversement.
+    expect(activeNavItem("/admin/relances-commerciales").item?.label).toBe("Relances");
     expect(activeNavItem("/admin/commerciaux").item?.label).toBe("Commerciaux");
   });
 
-  it("« Stocks reçus » ferme l'espace Clients, sans déplacer aucune autre rubrique", () => {
-    const clients = ADMIN_NAV.find((space) => space.key === "clients")!;
-    expect(clients.items.map((item) => item.href)).toEqual(["/admin/pharmacies", "/admin/support", "/admin/utilisateurs", "/admin/activite", "/admin/performance", "/admin/acces", "/admin/technique", "/admin/depots-stock"]);
-    expect(clients.items.at(-1)).toMatchObject({ label: "Stocks reçus", description: "Le dernier stock reçu de chaque officine, et chaque fichier envoyé." });
-    // L'espace garde son adresse : « Clients » ouvre toujours la liste des officines.
-    expect(clients.href).toBe("/admin/pharmacies");
-    expect(activeNavItem("/admin/depots-stock")).toMatchObject({ space: { key: "clients" }, item: { label: "Stocks reçus" } });
-    // Le fichier d'un dépôt reste rattaché à la même rubrique ; « État technique » garde la sienne.
-    expect(activeNavItem("/admin/depots-stock/ckx123abc").item?.label).toBe("Stocks reçus");
-    expect(activeNavItem("/admin/technique").item?.label).toBe("État technique");
+  it("les onglets réunissent les vues liées : prospects, paiements et impayés, communication, performance", () => {
+    const groups = (space: string) => ADMIN_NAV.find((entry) => entry.key === space)!.groups;
+    expect(groups("commercial")[0].items.map((item) => item.label)).toEqual(["Pipeline", "Liste", "Démonstrations", "Relances"]);
+    expect(groups("finance").find((group) => group.key === "paiements")!.items.map((item) => item.label)).toEqual(["Paiements", "Impayés"]);
+    expect(groups("management").find((group) => group.key === "communication")!.items.map((item) => item.label)).toEqual(["Campagnes", "Historique", "Modèles d'e-mails", "Relances automatiques"]);
+    expect(groups("pharmacies").find((group) => group.key === "performance")!.items.map((item) => item.label)).toEqual(["Performance", "Activité"]);
   });
 
-  it("« Support » rejoint l'espace Clients juste après les fiches officines, et ses discussions s'y rattachent", () => {
-    const clients = ADMIN_NAV.find((space) => space.key === "clients")!;
-    const hrefs = clients.items.map((item) => item.href);
-    expect(hrefs.indexOf("/admin/support")).toBe(hrefs.indexOf("/admin/pharmacies") + 1);
-    expect(clients.items.find((item) => item.href === "/admin/support")).toMatchObject({ label: "Support", description: "Les questions posées par les officines : lire, répondre, clore." });
-    expect(activeNavItem("/admin/support")).toMatchObject({ space: { key: "clients" }, item: { label: "Support" } });
-    expect(activeNavItem("/admin/support/ckx123abc").item?.label).toBe("Support");
-    // Rien d'autre ne bouge : « Officines clientes » garde ses fiches.
-    expect(activeNavItem("/admin/pharmacies/abc").item?.label).toBe("Officines clientes");
+  it("les anciennes listes transversales (utilisateurs, accès, état technique, stocks reçus) ne sont plus des rubriques : elles vivent dans la fiche de chaque officine", () => {
+    const labels = ADMIN_NAV.flatMap((space) => space.groups.flatMap((group) => group.items.map((item) => item.label)));
+    for (const gone of ["Utilisateurs", "Accès", "État technique", "Stocks reçus", "Notifications"]) expect(labels).not.toContain(gone);
+    // …mais leurs adresses répondent toujours, rangées sous les officines.
+    for (const path of ["/admin/utilisateurs", "/admin/acces", "/admin/technique", "/admin/depots-stock/ckx1"]) expect(activeNavItem(path).space.key).toBe("pharmacies");
   });
 
-  it("« Performance » suit « Activité » dans l'espace Clients, avec sa phrase, sans prendre la place des fiches officines", () => {
-    const clients = ADMIN_NAV.find((space) => space.key === "clients")!;
-    const hrefs = clients.items.map((item) => item.href);
-    expect(hrefs.indexOf("/admin/performance")).toBe(hrefs.indexOf("/admin/activite") + 1);
-    expect(clients.items.find((item) => item.href === "/admin/performance")).toEqual({
-      href: "/admin/performance",
-      label: "Performance",
-      description: "La valeur générée par PharmaBoost, officine par officine : qui en tire beaucoup, qui a besoin d'accompagnement.",
-    });
-    expect(activeNavItem("/admin/performance")).toMatchObject({ space: { key: "clients" }, item: { label: "Performance" } });
-    // L'onglet « Performance » d'une fiche est une page de la fiche (`?onglet=`) : la rubrique reste « Officines clientes ».
-    expect(activeNavItem("/admin/pharmacies/ckx123abc")).toMatchObject({ space: { key: "clients" }, item: { label: "Officines clientes" } });
-    // Les rubriques voisines gardent la leur.
-    expect(activeNavItem("/admin/activite").item?.label).toBe("Activité");
-  });
-
-  it("chaque rubrique de la console a une adresse unique et une description", () => {
-    const hrefs = ADMIN_NAV.flatMap((space) => space.items.map((item) => item.href));
+  it("chaque vue a une adresse unique et une description", () => {
+    const items = ADMIN_NAV.flatMap((space) => space.groups.flatMap((group) => group.items));
+    const hrefs = items.map((item) => item.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    for (const item of ADMIN_NAV.flatMap((space) => space.items)) expect(item.description.trim().length).toBeGreaterThan(0);
+    for (const item of items) expect(item.description.trim().length).toBeGreaterThan(0);
+    // Chaque onglet mène à sa première vue.
+    for (const space of ADMIN_NAV) for (const group of space.groups) expect(group.items.length).toBeGreaterThan(0);
+  });
+
+  it("le lien d'une rubrique mène à une vue qui existe dans cette rubrique", () => {
+    for (const space of ADMIN_NAV.slice(1)) expect(space.groups.flatMap((group) => group.items.map((item) => item.href))).toContain(space.href);
   });
 });
 

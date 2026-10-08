@@ -30,11 +30,14 @@ export function LinkTabs({
   paramName = "onglet",
   basePath,
   className,
+  activeKey,
 }: {
   items: TabItem[];
   paramName?: string;
   basePath?: string;
   className?: string;
+  /** L'onglet à allumer, quand la page sait mieux que l'adresse lequel c'est (une ancienne adresse rattachée à un onglet). */
+  activeKey?: string;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -44,7 +47,9 @@ export function LinkTabs({
   const routed = items.find(
     (item) => item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`)),
   );
-  const active = routed
+  const active = activeKey
+    ? activeKey
+    : routed
     ? routed.key
     : pathname === base
       ? (searchParams.get(paramName) ?? defaultKey)

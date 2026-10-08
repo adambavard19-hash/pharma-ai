@@ -1,93 +1,163 @@
 /**
- * La navigation de la console, en sept espaces. Les adresses existantes ne
- * changent pas (aucun lien cassé) : elles sont seulement rangées.
+ * La navigation de la console, en CINQ rubriques.
+ *
+ * Accueil · Officines · Commercial · Finances · Gestion. Chaque rubrique se déplie en groupes (les onglets) et chaque groupe
+ * peut contenir quelques vues (les pastilles). Aucune adresse ne change : ce qui était un menu est devenu un onglet, et rien
+ * n'a été supprimé — une page est toujours à l'adresse où elle était, et son onglet s'allume.
  */
 export type AdminNavItem = {
   href: string;
   label: string;
-  /** Une phrase, affichée dans le menu déroulant. */
+  /** Une phrase qui dit à quoi sert la vue (aide à la lecture, recherche). */
   description: string;
-  /** Autres préfixes d'adresse qui rattachent une page à cet élément. */
+  /** Autres préfixes d'adresse qui rattachent une page à cette vue. */
   matches?: string[];
 };
 
-export type AdminNavSpace = {
-  key: "overview" | "clients" | "commercial" | "billing" | "communication" | "advice" | "administration";
+/**
+ * Un onglet : une seule vue (un lien) ou plusieurs vues liées, affichées en pastilles sous l'onglet. La première vue est
+ * celle où l'onglet mène.
+ */
+export type AdminNavGroup = {
+  key: string;
   label: string;
-  href: string;
   items: AdminNavItem[];
 };
 
+export type AdminNavSpaceKey = "home" | "pharmacies" | "commercial" | "finance" | "management";
+
+export type AdminNavSpace = {
+  key: AdminNavSpaceKey;
+  label: string;
+  href: string;
+  /** Les adresses sans onglet qui appartiennent à cette rubrique (la cloche des notifications, par exemple). */
+  matches?: string[];
+  groups: AdminNavGroup[];
+};
+
 export const ADMIN_NAV: AdminNavSpace[] = [
-  { key: "overview", label: "Vue d'ensemble", href: "/admin", items: [] },
+  { key: "home", label: "Accueil", href: "/admin", matches: ["/admin/notifications"], groups: [] },
   {
-    key: "clients",
-    label: "Clients",
+    key: "pharmacies",
+    label: "Officines",
     href: "/admin/pharmacies",
-    items: [
-      { href: "/admin/pharmacies", label: "Officines clientes", description: "Fiches 360°, inscriptions en cours, création d'officine." },
-      { href: "/admin/support", label: "Support", description: "Les questions posées par les officines : lire, répondre, clore." },
-      { href: "/admin/utilisateurs", label: "Utilisateurs", description: "Les comptes des officines, leurs rôles et dernière connexion." },
-      { href: "/admin/activite", label: "Activité", description: "Officines actives, inactives, usage récent." },
-      { href: "/admin/performance", label: "Performance", description: "La valeur générée par PharmaBoost, officine par officine : qui en tire beaucoup, qui a besoin d'accompagnement." },
-      { href: "/admin/acces", label: "Accès", description: "Officines et comptes suspendus, invitations en attente." },
-      { href: "/admin/technique", label: "État technique", description: "Connecteurs, postes de comptoir, versions, incidents." },
-      { href: "/admin/depots-stock", label: "Stocks reçus", description: "Le dernier stock reçu de chaque officine, et chaque fichier envoyé." },
+    groups: [
+      {
+        key: "officines",
+        label: "Mes officines",
+        items: [
+          {
+            href: "/admin/pharmacies",
+            label: "Officines clientes",
+            description: "Chaque pharmacie a sa fiche : équipe, postes, stock, abonnement, contrats, échanges, notes, performance.",
+            // Les anciennes listes transversales restent à leur adresse ; leur contenu est dans chaque fiche.
+            matches: ["/admin/utilisateurs", "/admin/acces", "/admin/technique", "/admin/depots-stock"],
+          },
+        ],
+      },
+      { key: "support", label: "Support", items: [{ href: "/admin/support", label: "Support", description: "Les questions posées par les officines : lire, répondre, clore." }] },
+      {
+        key: "performance",
+        label: "Performance",
+        items: [
+          { href: "/admin/performance", label: "Performance", description: "La valeur générée par PharmaBoost, officine par officine : qui en tire beaucoup, qui a besoin d'accompagnement." },
+          { href: "/admin/activite", label: "Activité", description: "Officines actives, inactives, usage récent." },
+        ],
+      },
     ],
   },
   {
     key: "commercial",
     label: "Commercial",
     href: "/admin/pipeline",
-    items: [
-      { href: "/admin/pipeline", label: "Pipeline", description: "Les dossiers par étape, à déplacer d'une colonne à l'autre." },
-      { href: "/admin/prospects", label: "Prospects", description: "Tous les dossiers, filtrables et cherchables.", matches: ["/admin/dossiers"] },
-      { href: "/admin/demonstrations", label: "Démonstrations", description: "Démos programmées et réalisées." },
-      { href: "/admin/relances-commerciales", label: "Relances commerciales", description: "Les relances prévues, en retard et du jour." },
-      { href: "/admin/commerciaux", label: "Commerciaux", description: "L'équipe commerciale, portefeuilles et résultats." },
-      { href: "/admin/candidatures-commerciales", label: "Candidatures commerciales", description: "Les personnes qui veulent rejoindre l'équipe commerciale : à contacter, entretien, acceptation." },
-      { href: "/admin/directeur-commercial", label: "Directeur commercial", description: "Le compte qui gère l'équipe commerciale depuis son propre espace." },
+    groups: [
+      {
+        key: "prospects",
+        label: "Prospects",
+        items: [
+          { href: "/admin/pipeline", label: "Pipeline", description: "Les dossiers par étape, à déplacer d'une colonne à l'autre." },
+          { href: "/admin/prospects", label: "Liste", description: "Tous les dossiers, filtrables et cherchables.", matches: ["/admin/dossiers"] },
+          { href: "/admin/demonstrations", label: "Démonstrations", description: "Démos programmées et réalisées." },
+          { href: "/admin/relances-commerciales", label: "Relances", description: "Les relances prévues, en retard et du jour." },
+        ],
+      },
+      {
+        key: "equipe-commerciale",
+        label: "Équipe commerciale",
+        items: [
+          { href: "/admin/commerciaux", label: "Commerciaux", description: "L'équipe commerciale, portefeuilles et résultats." },
+          { href: "/admin/candidatures-commerciales", label: "Candidatures", description: "Les personnes qui veulent rejoindre l'équipe commerciale : à contacter, entretien, acceptation." },
+          { href: "/admin/directeur-commercial", label: "Directeur commercial", description: "Le compte qui gère l'équipe commerciale depuis son propre espace." },
+        ],
+      },
     ],
   },
   {
-    key: "billing",
-    label: "Facturation",
+    key: "finance",
+    label: "Finances",
     href: "/admin/abonnements",
-    items: [
-      { href: "/admin/abonnements", label: "Abonnements", description: "Essais, actifs, retards, résiliations demandées." },
-      { href: "/admin/abonnements/offres", label: "Offres & tarifs", description: "Le catalogue : il ne s'applique qu'aux nouveaux abonnements." },
-      { href: "/admin/contrats", label: "Contrats", description: "Brouillons, envois, signatures, relances." },
-      { href: "/admin/paiements", label: "Paiements", description: "Les factures Stripe reçues : payées, échouées, en attente." },
-      { href: "/admin/impayes", label: "Impayés", description: "Paiements échoués restés impayés, et leurs relances." },
-      { href: "/admin/resiliations", label: "Résiliations", description: "Demandes reçues, en traitement, confirmées, terminées." },
+    groups: [
+      {
+        key: "abonnements",
+        label: "Abonnements",
+        items: [
+          { href: "/admin/abonnements", label: "Abonnements", description: "Essais, actifs, retards, résiliations demandées." },
+          { href: "/admin/abonnements/offres", label: "Offres & tarifs", description: "Le catalogue : il ne s'applique qu'aux nouveaux abonnements." },
+        ],
+      },
+      { key: "contrats", label: "Contrats", items: [{ href: "/admin/contrats", label: "Contrats", description: "Brouillons, envois, signatures, relances." }] },
+      {
+        key: "paiements",
+        label: "Paiements",
+        items: [
+          { href: "/admin/paiements", label: "Paiements", description: "Les factures Stripe reçues : payées, échouées, en attente." },
+          { href: "/admin/impayes", label: "Impayés", description: "Paiements échoués restés impayés, et leurs relances." },
+        ],
+      },
+      { key: "resiliations", label: "Résiliations", items: [{ href: "/admin/resiliations", label: "Résiliations", description: "Demandes reçues, en traitement, confirmées, terminées." }] },
     ],
   },
   {
-    key: "communication",
-    label: "Communication",
-    href: "/admin/communications",
-    items: [
-      { href: "/admin/campagnes", label: "Campagnes", description: "Offres bonus, parrainage, invitations des partenaires : envoi immédiat ou programmé." },
-      { href: "/admin/communications", label: "Historique", description: "Tous les e-mails, relances et notifications, filtrables." },
-      { href: "/admin/emails/modeles", label: "Modèles d'e-mails", description: "Les textes des relances et messages, avec aperçu." },
-      { href: "/admin/relances", label: "Relances automatiques", description: "Scénarios d'essai, de contrat, de paiement, de résiliation." },
-      { href: "/admin/notifications", label: "Notifications", description: "Les alertes de la plateforme pour l'équipe." },
-    ],
-  },
-  // Un seul écran, donc un lien direct : les règles, les conseils et les associations de toutes les pharmacies, au même endroit.
-  { key: "advice", label: "Conseils", href: "/admin/conseils", items: [] },
-  {
-    key: "administration",
-    label: "Administration",
-    href: "/admin/societe",
-    items: [
-      { href: "/admin/societe", label: "Société exploitante", description: "La partie signataire des contrats." },
-      { href: "/admin/equipe", label: "Équipe PharmaBoost", description: "Les administrateurs de la console." },
-      { href: "/admin/partenaires", label: "Partenaires", description: "Candidatures, marques, catalogues, commandes." },
-      { href: "/admin/formations", label: "Formations", description: "Les formations proposées aux officines." },
-      { href: "/admin/challenges", label: "Challenges", description: "Challenges laboratoires, en agrégats." },
-      { href: "/admin/parametres", label: "Paramètres", description: "Messagerie, paiement, signature, tâches planifiées." },
-      { href: "/admin/journal", label: "Journal d'audit", description: "Qui a fait quoi, quand, avec l'avant et l'après." },
+    key: "management",
+    label: "Gestion",
+    href: "/admin/conseils",
+    groups: [
+      { key: "conseils", label: "Conseils", items: [{ href: "/admin/conseils", label: "Conseils & associations", description: "Les règles, les conseils et les associations de PharmaBoost : valider, supprimer, ajouter, pour toutes les pharmacies." }] },
+      {
+        key: "communication",
+        label: "Communication",
+        items: [
+          { href: "/admin/campagnes", label: "Campagnes", description: "Offres bonus, parrainage, invitations des partenaires : envoi immédiat ou programmé." },
+          { href: "/admin/communications", label: "Historique", description: "Tous les e-mails, relances et notifications, filtrables." },
+          { href: "/admin/emails/modeles", label: "Modèles d'e-mails", description: "Les textes des relances et messages, avec aperçu.", matches: ["/admin/emails"] },
+          { href: "/admin/relances", label: "Relances automatiques", description: "Scénarios d'essai, de contrat, de paiement, de résiliation." },
+        ],
+      },
+      { key: "partenaires", label: "Partenaires", items: [{ href: "/admin/partenaires", label: "Partenaires", description: "Candidatures, marques, catalogues, commandes." }] },
+      {
+        key: "formations",
+        label: "Formations & challenges",
+        items: [
+          { href: "/admin/formations", label: "Formations", description: "Les formations proposées aux officines." },
+          { href: "/admin/challenges", label: "Challenges", description: "Challenges laboratoires, en agrégats." },
+        ],
+      },
+      {
+        key: "equipe",
+        label: "Équipe & société",
+        items: [
+          { href: "/admin/equipe", label: "Équipe PharmaBoost", description: "Les administrateurs de la console." },
+          { href: "/admin/societe", label: "Société exploitante", description: "La partie signataire des contrats." },
+        ],
+      },
+      {
+        key: "parametres",
+        label: "Paramètres",
+        items: [
+          { href: "/admin/parametres", label: "Paramètres", description: "Messagerie, paiement, signature, tâches planifiées." },
+          { href: "/admin/journal", label: "Journal d'audit", description: "Qui a fait quoi, quand, avec l'avant et l'après." },
+        ],
+      },
     ],
   },
 ];
@@ -96,19 +166,26 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-/** L'élément le plus précis qui correspond à l'adresse (« Offres & tarifs » plutôt qu'« Abonnements »). */
-export function activeNavItem(pathname: string): { space: AdminNavSpace; item: AdminNavItem | null } {
-  if (pathname === "/admin") return { space: ADMIN_NAV[0], item: null };
-  // Un espace sans menu est un lien direct (hors « Vue d'ensemble », qui est l'accueil) : sa propre adresse l'active.
-  const direct = ADMIN_NAV.find((space) => space.items.length === 0 && space.key !== "overview" && matchesPrefix(pathname, space.href));
-  if (direct) return { space: direct, item: null };
-  let best: { space: AdminNavSpace; item: AdminNavItem; length: number } | null = null;
-  for (const space of ADMIN_NAV) {
-    for (const item of space.items) {
-      for (const prefix of [item.href, ...(item.matches ?? [])]) {
-        if (matchesPrefix(pathname, prefix) && (!best || prefix.length > best.length)) best = { space, item, length: prefix.length };
-      }
+export type ActiveNav = { space: AdminNavSpace; group: AdminNavGroup | null; item: AdminNavItem | null };
+
+/** Toutes les vues de la console, à plat, avec leur rubrique et leur onglet. */
+export function allNavItems(): { space: AdminNavSpace; group: AdminNavGroup; item: AdminNavItem }[] {
+  return ADMIN_NAV.flatMap((space) => space.groups.flatMap((group) => group.items.map((item) => ({ space, group, item }))));
+}
+
+/**
+ * La vue la plus précise qui correspond à l'adresse (« Offres & tarifs » plutôt qu'« Abonnements »). Une adresse inconnue
+ * ou l'accueil tombe sur l'Accueil.
+ */
+export function activeNavItem(pathname: string): ActiveNav {
+  let best: (ActiveNav & { group: AdminNavGroup; item: AdminNavItem; length: number }) | null = null;
+  for (const { space, group, item } of allNavItems()) {
+    for (const prefix of [item.href, ...(item.matches ?? [])]) {
+      if (matchesPrefix(pathname, prefix) && (!best || prefix.length > best.length)) best = { space, group, item, length: prefix.length };
     }
   }
-  return best ? { space: best.space, item: best.item } : { space: ADMIN_NAV[0], item: null };
+  if (best) return { space: best.space, group: best.group, item: best.item };
+  const home = ADMIN_NAV[0];
+  const attached = ADMIN_NAV.find((space) => (space.matches ?? []).some((prefix) => matchesPrefix(pathname, prefix)));
+  return { space: attached ?? home, group: null, item: null };
 }

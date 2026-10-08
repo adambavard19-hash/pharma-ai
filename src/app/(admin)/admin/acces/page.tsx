@@ -38,7 +38,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <AdminPageHeader space={{ label: "Clients", href: "/admin/pharmacies" }} title="Accès" description="Officines et comptes suspendus, invitations en attente, e-mails d'accès en échec." />
+      <AdminPageHeader space={{ label: "Officines", href: "/admin/pharmacies" }} title="Accès" description="Officines et comptes suspendus, invitations en attente, e-mails d'accès en échec." />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AttentionCard count={data.suspendedPharmacies.length} title="Officines suspendues" description="Aucun compte ne peut s'y connecter." href="/admin/acces?filtre=suspendus" tone="danger" icon={<Ban className="size-4" />} />

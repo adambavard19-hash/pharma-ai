@@ -65,7 +65,7 @@ export default async function AuditJournalPage({ searchParams }: { searchParams:
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Administration", href: "/admin/societe" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Journal d'audit"
         description="Qui a fait quoi, quand, avec l'avant et l'après. Seules les actions d'entreprise y figurent : aucune donnée patient, ordonnance ou document clinique."
       />

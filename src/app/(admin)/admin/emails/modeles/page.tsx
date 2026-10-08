@@ -51,7 +51,7 @@ export default async function EmailTemplatesPage() {
   return (
     <>
       <AdminPageHeader
-        space={{ label: "Communication", href: "/admin/communications" }}
+        space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Modèles d'e-mails"
         description="Les textes des relances et des messages envoyés depuis la console. Le gabarit PharmaBoost (logo, pied de page légal) et les boutons d'action restent fixes : vous réécrivez le texte, pas les liens."
       />
