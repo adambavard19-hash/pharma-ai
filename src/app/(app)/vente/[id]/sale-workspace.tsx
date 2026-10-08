@@ -91,6 +91,7 @@ export function SaleWorkspace({
   hasSale,
   patientData = true,
   outcome,
+  analysisInFlight = false,
   canImportStock,
   stockNotice,
   partnerCards = [],
@@ -131,6 +132,8 @@ export function SaleWorkspace({
   patientData?: boolean;
   /** Pourquoi il y a — ou non — des propositions, d'après la dernière analyse. */
   outcome: EngineOutcome | null;
+  /** Le serveur analyse cette vente en ce moment (le poste de caisse l'a lancée) : aucun résultat n'est encore enregistré. */
+  analysisInFlight?: boolean;
   canImportStock: boolean;
   /** De quand date le stock affiché, quand un agent LGO est connecté. */
   stockNotice: { tone: "ok" | "warning"; text: string } | null;
@@ -204,8 +207,15 @@ export function SaleWorkspace({
   }
 
   // La phase est dictée par le serveur, jamais par un état local optimiste.
-  const analysing = stage !== null;
+  // L'analyse tourne ici (étape annoncée par le flux) ou sur le serveur (lancée par le poste de caisse).
+  const analysing = stage !== null || analysisInFlight;
   const editing = !analysing && (forceEdit || !prescription.verifiedAt);
+  // Une analyse lancée par le poste n'avertit pas l'écran de sa fin : on relit le serveur jusqu'à ce qu'elle ait rendu son résultat.
+  useEffect(() => {
+    if (!analysisInFlight || stage !== null) return;
+    const id = setInterval(() => router.refresh(), 2000);
+    return () => clearInterval(id);
+  }, [analysisInFlight, stage, router]);
 
   // Une vente venue de la douchette se remplit toute seule : l'écran relit
   // le serveur tant qu'elle est à confirmer, et lance l'analyse de lui-même
@@ -440,6 +450,17 @@ export function SaleWorkspace({
   const alertFactors = patientFactors.filter((factor) => factor.tone === "warning");
   const neutralFactors = patientFactors.filter((factor) => factor.tone !== "warning");
 
+  const waitingForServer = analysisInFlight && stage === null && (
+    <Card>
+      <CardContent className="py-5">
+        <p className="flex items-center gap-3 text-[14px] font-medium text-text-primary">
+          <Loader2 className="size-[18px] shrink-0 animate-spin text-brand-600 dark:text-brand-400" />
+          Recherche des conseils disponibles…
+        </p>
+      </CardContent>
+    </Card>
+  );
+
   const analysisStage = analysing && stage && (
     <Card>
       <CardContent className="py-5">
@@ -539,6 +560,7 @@ export function SaleWorkspace({
           )}
 
           {analysisStage}
+          {waitingForServer}
 
           {!editing && !analysing && (
             <>

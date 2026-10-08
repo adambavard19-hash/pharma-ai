@@ -117,3 +117,20 @@ export const OUTCOME_MESSAGES: Record<Exclude<EngineOutcome, "PROPOSALS" | "NEED
 export function isEngineOutcome(value: unknown): value is EngineOutcome {
   return typeof value === "string" && (ENGINE_OUTCOMES as readonly string[]).includes(value);
 }
+
+/** Au-delà de ce délai, une analyse « en cours » sans résultat est considérée comme interrompue. */
+export const ANALYSIS_STALE_AFTER_MS = 90_000;
+
+/**
+ * Une analyse « en cours » est-elle réellement en train de tourner ?
+ *
+ * Le poste de caisse lance l'analyse de lui-même quelques secondes après le dernier bip : l'écran de la vente peut
+ * s'ouvrir pendant ce temps. Sans résultat enregistré, « en cours » et « interrompue » se ressemblent ; seul l'âge de
+ * la dernière écriture les distingue. Une analyse qui tourne dure quelques secondes : passé `ANALYSIS_STALE_AFTER_MS`,
+ * elle est annoncée comme interrompue (avec « Relancer »), jamais plus tôt — annoncer un échec pendant qu'elle tourne
+ * est faux et ne se corrige pas tout seul.
+ */
+export function isAnalysisInFlight(input: { status: string; hasRun: boolean; updatedAt: Date; now: Date }): boolean {
+  if (input.hasRun || input.status !== "ANALYZING") return false;
+  return input.now.getTime() - input.updatedAt.getTime() < ANALYSIS_STALE_AFTER_MS;
+}

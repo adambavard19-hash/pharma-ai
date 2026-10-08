@@ -1,6 +1,6 @@
 import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
-import { isEngineOutcome } from "@/core/ai/outcome";
+import { isAnalysisInFlight, isEngineOutcome } from "@/core/ai/outcome";
 import type { CompanionSuggestion, RoutineStepInfo, VigilanceDetails } from "@/core/ai/types";
 
 function isVigilanceDetails(value: unknown): value is VigilanceDetails {
@@ -120,6 +120,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   });
 
   const run = prescription.analysisRuns[0] ?? null;
+  // Le poste de caisse analyse la vente de lui-même : l'écran peut s'ouvrir pendant ce temps.
+  const analysisInFlight = isAnalysisInFlight({ status: prescription.status, hasRun: run !== null, updatedAt: prescription.updatedAt, now: new Date() });
 
   // Un rattachement décidé après l'analyse rend les signaux de sécurité
   // périmés : ils parlent encore d'un médicament « non rattaché ». On le dit
@@ -524,11 +526,12 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           ? isEngineOutcome(run.outcome)
             ? run.outcome
             : null
-          : // Confirmée mais sans analyse enregistrée : l'analyse s'est interrompue.
-            prescription.status === "ANALYZING" || prescription.status === "FAILED"
+          : // Confirmée mais sans analyse enregistrée : l'analyse s'est interrompue — sauf si elle est en train de tourner.
+            (prescription.status === "ANALYZING" && !analysisInFlight) || prescription.status === "FAILED"
             ? "ENGINE_ERROR"
             : null
       }
+      analysisInFlight={analysisInFlight}
       stockNotice={stockNotice}
       canImportStock={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
       partnerCards={partnerCards}

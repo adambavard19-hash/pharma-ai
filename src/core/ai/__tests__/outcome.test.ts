@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OUTCOME_MESSAGES, deriveOutcome, isEngineOutcome, type OutcomeSignals } from "../outcome";
+import { ANALYSIS_STALE_AFTER_MS, OUTCOME_MESSAGES, deriveOutcome, isAnalysisInFlight, isEngineOutcome, type OutcomeSignals } from "../outcome";
 
 const base: OutcomeSignals = {
   recommendationCount: 0,
@@ -57,5 +57,25 @@ describe("l'issue d'une analyse", () => {
     expect(isEngineOutcome("OUT_OF_STOCK")).toBe(true);
     expect(isEngineOutcome("RIEN")).toBe(false);
     expect(isEngineOutcome(null)).toBe(false);
+  });
+});
+
+describe("une analyse en cours, ou interrompue", () => {
+  const now = new Date("2026-10-08T11:31:00.000Z");
+  const ago = (ms: number) => new Date(now.getTime() - ms);
+
+  it("tourne encore quand elle vient de commencer et qu'aucun résultat n'existe", () => {
+    expect(isAnalysisInFlight({ status: "ANALYZING", hasRun: false, updatedAt: ago(4_000), now })).toBe(true);
+  });
+
+  it("est annoncée interrompue passé le délai, jamais avant", () => {
+    expect(isAnalysisInFlight({ status: "ANALYZING", hasRun: false, updatedAt: ago(ANALYSIS_STALE_AFTER_MS - 1), now })).toBe(true);
+    expect(isAnalysisInFlight({ status: "ANALYZING", hasRun: false, updatedAt: ago(ANALYSIS_STALE_AFTER_MS), now })).toBe(false);
+  });
+
+  it("ne tourne plus dès qu'un résultat est enregistré, ou quand le statut est autre", () => {
+    expect(isAnalysisInFlight({ status: "ANALYZING", hasRun: true, updatedAt: ago(1_000), now })).toBe(false);
+    expect(isAnalysisInFlight({ status: "ANALYZED", hasRun: false, updatedAt: ago(1_000), now })).toBe(false);
+    expect(isAnalysisInFlight({ status: "FAILED", hasRun: false, updatedAt: ago(1_000), now })).toBe(false);
   });
 });
