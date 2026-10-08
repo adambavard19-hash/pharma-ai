@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   GraduationCap,
   Handshake,
+  Link2,
   Megaphone,
   Plug,
   ScanLine,
@@ -141,6 +142,17 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.PARTNERS_MANAGE,
     match: ["/assortiment"],
     description: "Les besoins que votre stock n'a pas couverts, et ce qui existe chez nos partenaires",
+    group: "pharmacie",
+  },
+  {
+    href: "/associations",
+    label: "Mes associations",
+    icon: Link2,
+    // Décider quel produit en appelle quel autre est un acte de pharmacien (ou de titulaire) : la même permission que
+    // les règles de conseil de l'officine. L'équipe au comptoir voit le résultat sur la carte, pas l'écran.
+    permission: PERMISSIONS.RECOMMENDATION_RULES_MANAGE,
+    match: ["/associations"],
+    description: "Quand un produit est vendu, quel autre produit PharmaBoost propose avec",
     group: "pharmacie",
   },
   {

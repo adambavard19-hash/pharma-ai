@@ -50,6 +50,7 @@ import {
   type UnderstandingLine,
 } from "@/core/understanding";
 import { ensureClassifications } from "./classification";
+import { loadAssociationInput } from "./product-associations";
 
 /**
  * Orchestration de l'analyse d'une ordonnance.
@@ -374,6 +375,9 @@ export async function analysePrescription(params: {
   }
 
   params.onStage?.("ENGINE");
+  // Second axe du conseil : les associations de produits de l'officine (un produit conseil en appelle un autre) et
+  // les lignes de la vente qui SONT un produit du stock. Aucune requête de plus si l'officine n'en a pas écrit.
+  const associations = await loadAssociationInput(params.scope, prescription.lines);
   // Signaux issus de l'extraction, reconstruits depuis les champs persistés.
   const extractionFindings = evaluateExtractionSafety(
     prescription.lines.map((line) => rebuildExtractedLine(line)),
@@ -411,6 +415,7 @@ export async function analysePrescription(params: {
       aiProvider.info.capability === "SIMULATED" ||
       (knowledgeProvider.info.capability === "SIMULATED" && knowledgeFromEditorial),
     stock: stockState,
+    associations,
     // La compréhension a manqué si aucun modèle n'est branché, ou si l'appel a
     // échoué : le moteur a tourné sur les seules règles, et l'issue le dira.
     aiUnavailable:
@@ -549,7 +554,7 @@ export async function analysePrescription(params: {
     // Les recommandations précédentes non décidées sont remplacées : une
     // nouvelle analyse ne doit pas laisser d'anciennes propositions orphelines.
     await tx.recommendation.deleteMany({
-      where: { prescriptionId: prescription.id, status: "PROPOSED", origin: "AI" },
+      where: { prescriptionId: prescription.id, status: "PROPOSED", origin: { in: ["AI", "RULE"] } },
     });
 
     const catalogById = new Map(catalog.map((p) => [p.id, p]));
@@ -597,7 +602,9 @@ export async function analysePrescription(params: {
           opportunityId: opportunityIdByKey.get(recommendation.opportunityKey) ?? null,
           productId: isNationalDrug ? null : recommendation.productId,
           presentationId: isNationalDrug ? (product?.presentationId ?? null) : null,
-          origin: "AI",
+          // Une association écrite par le pharmacien est une règle de l'officine, pas une proposition du moteur ; le
+          // suivi de performance compte les deux comme des conseils PharmaBoost.
+          origin: recommendation.source === "ASSOCIATION" ? "RULE" : "AI",
           status: "PROPOSED",
           scoreBreakdown: {
             ...recommendation.breakdown,
@@ -606,7 +613,7 @@ export async function analysePrescription(params: {
           totalScore: recommendation.totalScore,
           justification: recommendation.justification,
           shortReason: recommendation.shortReason,
-          patientReason: recommendation.patientReason,
+          patientReason: recommendation.patientReason || null,
           counterScript: recommendation.counterScript,
           precautions: recommendation.precautions,
           vigilances: recommendation.vigilances && recommendation.vigilances.length > 0 ? (recommendation.vigilances as never) : undefined,

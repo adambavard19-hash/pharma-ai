@@ -882,13 +882,13 @@ function ProductCard({
 
       {canDecide && !accepted && alternatives}
 
-      {recommendation.origin !== "AI" && (recommendation.trainings?.length ?? 0) > 0 && (
+      {recommendation.origin === "MANUAL" && (recommendation.trainings?.length ?? 0) > 0 && (
         <div className="px-1">
           <ProductTrainingLink trainings={recommendation.trainings} />
         </div>
       )}
 
-      {recommendation.origin === "AI" && (
+      {recommendation.origin !== "MANUAL" && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
           <ProductTrainingLink trainings={recommendation.trainings ?? []} className="order-last" />
           <button

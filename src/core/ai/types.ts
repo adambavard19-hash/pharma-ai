@@ -389,6 +389,11 @@ export type ScoreBreakdown = {
 export type ScoredRecommendation = {
   opportunityKey: string;
   productId: string;
+  /**
+   * D'où vient la proposition. Absent : les règles du moteur (un médicament déclenche un produit conseil).
+   * `ASSOCIATION` : une association écrite par le pharmacien (un produit conseil en appelle un autre).
+   */
+  source?: "ASSOCIATION";
   totalScore: number;
   breakdown: ScoreBreakdown;
   /** Explication technique destinée au pharmacien. */
@@ -491,7 +496,8 @@ export type PipelineStageName =
   | "ADVICE_OPPORTUNITIES"
   | "CATALOG_MATCHING"
   | "SCORING"
-  | "COMMERCIAL_OPTIMIZATION";
+  | "COMMERCIAL_OPTIMIZATION"
+  | "PRODUCT_ASSOCIATIONS";
 
 export type PipelineStageTrace = {
   stage: PipelineStageName;

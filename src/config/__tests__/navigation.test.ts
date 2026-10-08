@@ -18,7 +18,7 @@ describe("le menu, en quatre groupes", () => {
   it("chaque groupe contient les entrées prévues, dans cet ordre", () => {
     const labels = (key: string) => NAVIGATION.filter((item) => item.group === key).map((item) => item.label);
     expect(labels("comptoir")).toEqual(["Patients", "Suivis patients", "Réglementation"]);
-    expect(labels("pharmacie")).toEqual(["Mon stock", "Performances", "Mon assortiment", "Mon équipe"]);
+    expect(labels("pharmacie")).toEqual(["Mon stock", "Performances", "Mon assortiment", "Mes associations", "Mon équipe"]);
     expect(labels("decouvrir")).toEqual(["Formations", "Partenaires", "Actualités"]);
     expect(labels("configuration")).toEqual(["Mes connexions", "Paramètres"]);
   });

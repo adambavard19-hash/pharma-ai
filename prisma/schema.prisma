@@ -126,6 +126,7 @@ model Pharmacy {
   analysisRuns        AnalysisRun[]
   recommendations     Recommendation[]
   pharmacyRules       PharmacyRule[]
+  productAssociations ProductAssociation[]
   documents           PatientDocument[]
   sales               Sale[]
   notifications       Notification[]
@@ -525,6 +526,7 @@ model User {
   auditLogs               AuditLog[]
   notifications           Notification[]
   pharmacyRules           PharmacyRule[]
+  createdAssociations     ProductAssociation[]
   imports                 ImportJob[]
   stockDeposits           StockDeposit[]
 
@@ -909,6 +911,9 @@ model Product {
   replacedIn      Recommendation[] @relation("RecommendationReplacedProduct")
   saleLines       SaleLine[]
   pharmacyRules   PharmacyRule[]
+  /// Les associations où ce produit est le déclencheur, ou le produit conseillé.
+  triggerAssociations ProductAssociation[] @relation("AssociationTrigger")
+  adviceAssociations  ProductAssociation[] @relation("AssociationAdvice")
 
   barcodes ProductBarcode[]
 
@@ -2226,6 +2231,36 @@ model PharmacyRule {
 
   @@index([pharmacyId, isActive])
   @@map("pharmacy_rules")
+}
+
+/// Une association de l'officine : quand le produit déclencheur est dans la vente, PharmaBoost propose le produit
+/// conseillé. C'est le second axe du conseil (le premier : un MÉDICAMENT déclenche un produit conseil, par les règles du
+/// moteur) : un produit conseil en appelle un autre, même sans médicament — une vente spontanée suffit. L'association est
+/// écrite par le pharmacien ; elle passe par les mêmes garde-fous que tout conseil (stock, sécurité, patient) et ne les
+/// contourne jamais.
+model ProductAssociation {
+  id               String   @id @default(cuid())
+  pharmacyId       String
+  triggerProductId String
+  adviceProductId  String
+  /// Ce que le pharmacien dit au patient, écrit par lui — jamais généré. Vide : la carte n'affiche que l'association.
+  sentence         String?
+  isActive         Boolean  @default(true)
+  /// L'ordre de proposition : le plus petit d'abord.
+  sortOrder        Int      @default(0)
+  createdByUserId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  pharmacy       Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  triggerProduct Product  @relation("AssociationTrigger", fields: [triggerProductId], references: [id], onDelete: Cascade)
+  adviceProduct  Product  @relation("AssociationAdvice", fields: [adviceProductId], references: [id], onDelete: Cascade)
+  createdBy      User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([pharmacyId, triggerProductId, adviceProductId])
+  @@index([pharmacyId, isActive])
+  @@index([pharmacyId, triggerProductId])
+  @@map("product_associations")
 }
 
 // ===========================================================================

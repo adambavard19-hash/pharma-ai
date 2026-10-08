@@ -29,6 +29,7 @@ import { matchesAny } from "./engines/product-name";
 import { evaluateVigilances, tagsIntersect } from "./engines/vigilance";
 import { chooseAmongEquivalents, clinicalSignature, TIEBREAK_LABELS } from "./engines/tiebreak";
 import { declaredContraindicationFor, suggestionVigilances } from "./engines/population-vigilance";
+import { buildAssociationAdvice, type AssociationInput } from "./engines/associations";
 import { rangeRankFor, type PreferredRangeInput } from "../catalog/preferred-ranges";
 import type {
   AnalysisResult,
@@ -123,6 +124,11 @@ export type PipelineInput = {
   preferredRanges?: PreferredRangeInput[];
   /** La compréhension IA a manqué (fournisseur absent ou appel en échec). */
   aiUnavailable?: boolean;
+  /**
+   * Les associations de produits de l'officine (second axe du conseil : un produit conseil en appelle un autre) et les
+   * lignes de la vente qui SONT un produit du stock. Absent : aucune association à appliquer.
+   */
+  associations?: AssociationInput;
 };
 
 type StageRecorder = {
@@ -911,6 +917,26 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     },
   );
 
+  // ---------------------------------------------------------------- ÉTAPE 8
+  // ASSOCIATIONS DE PRODUITS — le second axe : un produit de la vente en appelle un autre, sans médicament.
+  // Elles passent APRÈS tout le reste et par les mêmes garde-fous : stock, produits écartés par la sécurité pour
+  // ce patient, médicament à prescription, produit déjà dans la vente ou déjà proposé par le moteur.
+  const associationAdvice =
+    input.associations && input.associations.rules.length > 0
+      ? recorder.run("PRODUCT_ASSOCIATIONS", "Associations de l'officine", input.associations.rules.length, () => {
+          const advice = buildAssociationAdvice({
+            association: input.associations as AssociationInput,
+            lines: usableLines.map((line) => ({ lineIndex: line.lineIndex, drugName: line.drugName })),
+            catalog: input.catalog,
+            blockedProductIds: productSafety.blockedProductIds,
+            alreadyProposedProductIds: new Set(recommendations.flatMap((item) => [item.productId, ...(item.companion ? [item.companion.productId] : [])])),
+            patient: input.patient,
+          });
+          return { output: advice, count: advice.recommendations.length, notes: advice.notes };
+        })
+      : { opportunities: [], recommendations: [], skipped: [], notes: [] };
+  const allRecommendations = [...recommendations, ...associationAdvice.recommendations];
+
   // Ce que le stock a répondu à chaque besoin non bloqué : c'est ce qui permet au titulaire de voir les
   // besoins réels que son assortiment ne couvre pas. N'influence aucun conseil.
   const adviceKeys = new Set(recommendations.map((r) => r.opportunityKey));
@@ -934,7 +960,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
   const hasPartial = recorder.trace.some((s) => s.status === "PARTIAL");
 
   const outcome = deriveOutcome({
-    recommendationCount: recommendations.length,
+    recommendationCount: allRecommendations.length,
     opportunityCount: opportunities.length,
     blockedOpportunityCount: opportunities.filter((o) => o.isBlocked).length,
     stockConfigured,
@@ -951,8 +977,8 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     outcome,
     safetyFindings: allSafetyFindings,
     explanations,
-    opportunities: opportunitiesWithCoverage,
-    recommendations,
+    opportunities: [...opportunitiesWithCoverage, ...associationAdvice.opportunities],
+    recommendations: allRecommendations,
     trace: recorder.trace,
     blockedReasons,
     usedSimulatedProviders: input.usedSimulatedProviders,

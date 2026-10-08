@@ -58,6 +58,8 @@ vi.mock("../drug-identification", () => ({
   proposeSpecialties: async () => [],
 }));
 vi.mock("../reference", () => ({ getReferenceCatalogState: async () => ({ status: "EMPTY" }) }));
+// Les associations de produits (second axe du conseil) ont leurs propres tests : ici, l'officine n'en a aucune.
+vi.mock("../product-associations", () => ({ loadAssociationInput: async () => undefined }));
 vi.mock("../classification", () => ({
   ensureClassifications: async () => ({ drugs: [], providerId: "test", model: "m", warnings: [], usage: null, cachedCount: 0, durationMs: 0 }),
 }));
@@ -373,5 +375,18 @@ describe("le statut final de l'analyse", () => {
     });
     expect(mocks.tx.recommendation.create).toHaveBeenCalledTimes(1);
     expect(mocks.tx.analysisRun.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("une association de l'officine (second axe du conseil)", () => {
+  it("s'écrit comme une règle de l'officine, pas comme une proposition du moteur ; une relance remplace les deux", async () => {
+    const association: ScoredRecommendation = { ...recommendation("p2", undefined, "association:r1"), source: "ASSOCIATION", patientReason: "" };
+    await analyse(result({ opportunities: [opportunity("association:r1", [{ lineIndex: 0, drugName: "Amoxicilline 1 g" }])] as AnalysisResult["opportunities"], recommendations: [recommendation("p1"), association] }));
+    const writes = recommendationWrites();
+    expect(writes.map((write) => [write.productId, write.origin])).toEqual([["p1", "AI"], ["p2", "RULE"]]);
+    // Rien de vide écrit : une raison patient absente est « null », pas une chaîne vide.
+    expect(writes[1].patientReason).toBeNull();
+    expect(writes[0].patientReason).toBe("p1 l'accompagne.");
+    expect(mocks.tx.recommendation.deleteMany).toHaveBeenCalledWith({ where: { prescriptionId: "rx_1", status: "PROPOSED", origin: { in: ["AI", "RULE"] } } });
   });
 });

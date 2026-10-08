@@ -52,13 +52,15 @@ export function MedicationAdvice({
     return saysWhenEmpty ? <p className="mt-2 pl-3 text-[12.5px] text-text-tertiary sm:pl-4">Aucun conseil à proposer avec ce médicament.</p> : null;
   }
   const split = splitAdvice(recommendations);
+  // Sous un produit de parapharmacie, il n'y a que des associations de l'officine : « ce produit », pas « ce médicament ».
+  const subject = recommendations.every((recommendation) => recommendation.origin === "RULE") ? "ce produit" : "ce médicament";
 
   return (
-    <section aria-label={`À proposer avec ${drugName || "ce médicament"}`} className="mt-3 border-l-2 border-brand-300 pl-3 sm:pl-4 dark:border-brand-700">
+    <section aria-label={`À proposer avec ${drugName || subject}`} className="mt-3 border-l-2 border-brand-300 pl-3 sm:pl-4 dark:border-brand-700">
       <div className="mb-2.5 flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-1.5 text-[12px] font-semibold tracking-[0.06em] text-brand-800 uppercase dark:text-brand-300">
           <Sparkles className="size-3.5" />
-          À proposer avec ce médicament
+          À proposer avec {subject}
         </h3>
         {split.cards.length > 0 && <UndecidedPill count={countUndecided(split.cards, inBasket)} />}
       </div>
@@ -71,9 +73,10 @@ export function MedicationAdvice({
         inBasket={inBasket}
         onAccept={onAccept}
         onCancelAccept={onCancelAccept}
-        renderAlternatives={(recommendation) => (
-          <AlternativesList recommendationId={recommendation.id} alternatives={recommendation.alternatives} />
-        )}
+        // Une association écrite par le pharmacien désigne UN produit : elle n'a pas d'« autres références du même besoin ».
+        renderAlternatives={(recommendation) =>
+          recommendation.origin === "RULE" ? null : <AlternativesList recommendationId={recommendation.id} alternatives={recommendation.alternatives} />
+        }
       />
     </section>
   );
