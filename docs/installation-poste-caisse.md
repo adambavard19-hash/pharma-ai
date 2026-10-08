@@ -108,10 +108,15 @@ powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -Code 12345
 ## Étape 3 — vérifier
 
 1. Sur un second écran ou une tablette, ouvrir PharmaBoost → Nouvelle vente.
+   La page dit « Votre comptoir est prêt » avec la pastille « Connecté » et le
+   poste (« Poste comptoir 1 ») ; tant qu'aucun bip n'est arrivé, elle ajoute
+   « Aucun bip reçu pour l'instant » : le suivi n'est pas encore prouvé.
 2. Dans le LGPI, faire une vente normale : passer une boîte à la douchette.
-3. Dans PharmaBoost, la vente apparaît dans « Douchette : ventes en cours »
+3. Dans PharmaBoost, la vente apparaît dans la carte « Délivrance en cours »
    et s'ouvre d'elle-même ; six secondes après le dernier bip, les conseils
-   et les alertes s'affichent.
+   et les alertes s'affichent. Le compteur « Délivrances détectées » passe à 1.
+
+Voir `docs/comptoir-tableau-de-bord.md`.
 
 Pour tester la douchette sans rien envoyer : ajouter `-Test` à la commande
 de l'étape 2. Chaque bip s'affiche dans la fenêtre.
