@@ -34,7 +34,7 @@ export function HeadlineBar({ tone, title, detail, action }: { tone: Tone; title
 }
 
 /** Un des trois états de la connexion : une icône, un mot en couleur, une ligne de détail, un geste. */
-export function StatusTile({ icon: Icon, label, tone, title, detail, children, action }: { icon: LucideIcon; label: string; tone: Tone; title: string; detail: string; children?: ReactNode; action?: ReactNode }) {
+export function StatusTile({ icon: Icon, label, tone, title, detail, children, action, help }: { icon: LucideIcon; label: string; tone: Tone; title: string; detail: string; children?: ReactNode; action?: ReactNode; help?: ReactNode }) {
   const look = TONE_STYLES[tone];
   return (
     <article className="flex flex-col gap-4 rounded-2xl border border-border-subtle bg-surface-card p-5 sm:flex-row sm:items-start">
@@ -42,7 +42,10 @@ export function StatusTile({ icon: Icon, label, tone, title, detail, children, a
         <Icon className={cn("size-5", look.text)} aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1 space-y-1.5">
-        <p className="text-[12px] font-semibold tracking-[0.06em] text-text-tertiary uppercase">{label}</p>
+        <p className="flex items-center gap-1.5 text-[12px] font-semibold tracking-[0.06em] text-text-tertiary uppercase">
+          {label}
+          {help}
+        </p>
         <p className="flex items-center gap-2 text-[18px] leading-6 font-semibold text-text-primary">
           <span className={cn("size-2.5 shrink-0 rounded-full", look.dot)} aria-hidden="true" />
           {title}

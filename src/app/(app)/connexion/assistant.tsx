@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, BookOpen, Boxes, Check, FileUp, Link2Off, Monitor, Plug, Server, ShoppingCart, type LucideIcon } from "lucide-react";
-import { chooseLgoAction, getConnectionOverviewAction, type OverviewSnapshot } from "@/server/actions/stock-sync";
+import { chooseLgoAction, type OverviewSnapshot } from "@/server/actions/stock-sync";
 import { connectionMethods } from "@/core/stock/connection-overview";
 import type { LgoDefinition } from "@/core/stock/connectors";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { PostInstallFlow, ServerInstallFlow } from "./install-panels";
 import { HeadlineBar, StatusTile } from "./status";
+import { useLiveSnapshot } from "./use-live-snapshot";
 
 /**
  * « Connecter ma pharmacie » : un seul parcours, trois étapes.
@@ -27,12 +28,14 @@ import { HeadlineBar, StatusTile } from "./status";
  * seul « connecté ». Rien n'est présenté comme automatique quand ça ne l'est pas.
  */
 
-type Step = 1 | 2 | 3;
-const STEP_LABELS: Record<Step, string> = { 1: "Choisir mon logiciel", 2: "Envoyer mon stock", 3: "Vérifier la connexion" };
-const POLL_MS = 10_000;
-/** Un onglet oublié ne doit pas interroger le serveur toute la journée. */
-const POLL_MAX_MS = 30 * 60 * 1000;
+export type Step = 1 | 2 | 3;
+export const STEP_LABELS: Record<Step, string> = { 1: "Choisir mon logiciel", 2: "Envoyer mon stock", 3: "Vérifier la connexion" };
 
+/**
+ * L'assistant seul, avec sa phrase de dix secondes : c'est ce que voit un titulaire qui ouvre sa
+ * pharmacie pour la première fois (page d'accueil). La page « Ma connexion » prend les mêmes étapes
+ * (`ConnectSteps`) et y ajoute le tableau d'état, le test et le robot.
+ */
 export function ConnectAssistant({
   lgos,
   initial,
@@ -45,9 +48,47 @@ export function ConnectAssistant({
   /** Dans l'accueil d'une nouvelle officine : où continuer une fois le stock reçu. */
   continueHref?: string;
 }) {
-  const [snapshot, setSnapshot] = useState(initial);
-  const [lgo, setLgo] = useState<string | null>(initial.lgo);
+  const { snapshot, refresh } = useLiveSnapshot(initial);
   const [step, setStep] = useState<Step>(initial.lgo ? initial.overview.headline.step : 1);
+  const headline = snapshot.overview.headline;
+  return (
+    <div className="space-y-5">
+      <HeadlineBar
+        tone={headline.tone}
+        title={headline.title}
+        detail={headline.detail}
+        action={headline.action ? <Button onClick={() => setStep(snapshot.lgo || headline.step === 1 ? headline.step : 1)} trailingIcon={<ArrowRight className="size-4" />}>{headline.action}</Button> : undefined}
+      />
+      <ConnectSteps lgos={lgos} snapshot={snapshot} serverUrl={serverUrl} step={step} onStep={setStep} continueHref={continueHref} onChanged={() => void refresh()} />
+    </div>
+  );
+}
+
+/**
+ * Les trois étapes, rien d'autre : l'étape ouverte, et les deux autres repliées en dessous.
+ * `step3` remplace le contenu de la dernière étape (la page « Ma connexion » y met son test).
+ */
+export function ConnectSteps({
+  lgos,
+  snapshot,
+  serverUrl,
+  step,
+  onStep,
+  continueHref,
+  step3,
+  onChanged,
+}: {
+  lgos: LgoDefinition[];
+  snapshot: OverviewSnapshot;
+  serverUrl: string;
+  step: Step;
+  onStep: (step: Step) => void;
+  continueHref?: string;
+  step3?: ReactNode;
+  /** Le logiciel vient d'être choisi, ou un poste d'être créé : relire l'état tout de suite. */
+  onChanged?: () => void;
+}) {
+  const [lgo, setLgo] = useState<string | null>(snapshot.lgo);
   const [method, setMethod] = useState<"file" | "connect" | null>(null);
   const [device, setDevice] = useState<"post" | "server" | null>(null);
   const [saving, startSave] = useTransition();
@@ -56,54 +97,25 @@ export function ConnectAssistant({
   const { overview } = snapshot;
   const methods = connectionMethods(lgo);
   const lgoName = methods.lgo && methods.lgo.id !== "autre" ? methods.lgo.label : "votre logiciel";
-  const online = useRef(new Set(overview.agent.items.filter((item) => item.online).map((item) => item.id)));
-
-  // L'écran se relit tout seul : un poste qui vient de se relier, un stock qui arrive.
-  useEffect(() => {
-    const startedAt = Date.now();
-    let stopped = false;
-    const tick = async () => {
-      if (stopped || Date.now() - startedAt > POLL_MAX_MS) return;
-      const result = await getConnectionOverviewAction();
-      if (stopped || !result.ok) return;
-      const now = new Set(result.data.overview.agent.items.filter((item) => item.online).map((item) => item.id));
-      const arrived = result.data.overview.agent.items.filter((item) => item.online && !online.current.has(item.id));
-      online.current = now;
-      for (const item of arrived) push({ tone: "success", title: `${item.label} est relié.` });
-      setSnapshot(result.data);
-    };
-    const timer = setInterval(() => void tick(), POLL_MS);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-    };
-  }, [push]);
 
   const chooseAndContinue = () => {
     if (!lgo) return;
     startSave(async () => {
       const result = await chooseLgoAction({ lgo });
       if (!result.ok) return push({ tone: "error", title: result.error });
-      setStep(2);
+      onStep(2);
+      onChanged?.();
       router.refresh();
     });
   };
 
-  const headline = overview.headline;
   const goTo = (target: Step) => {
     if (target > 1 && !lgo) return;
-    setStep(target);
+    onStep(target);
   };
 
   return (
     <div className="space-y-5">
-      <HeadlineBar
-        tone={headline.tone}
-        title={headline.title}
-        detail={headline.detail}
-        action={headline.action ? <Button onClick={() => goTo(headline.step)} trailingIcon={<ArrowRight className="size-4" />}>{headline.action}</Button> : undefined}
-      />
-
       <section className="space-y-5 rounded-3xl border border-border-subtle bg-surface-card p-5 sm:p-6">
         <div className="space-y-3">
           <div className="flex items-baseline justify-between gap-3">
@@ -161,7 +173,7 @@ export function ConnectAssistant({
             <div className="space-y-1">
               <h3 className="text-[22px] leading-7 font-semibold tracking-[-0.01em] text-text-primary">Comment envoyer votre stock ?</h3>
               <p className="text-[14px] text-text-secondary">
-                Avec {lgoName}. <button type="button" onClick={() => setStep(1)} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Changer de logiciel</button>
+                Avec {lgoName}. <button type="button" onClick={() => onStep(1)} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Changer de logiciel</button>
               </p>
             </div>
 
@@ -205,7 +217,7 @@ export function ConnectAssistant({
                   <DeviceButton icon={Monitor} title="Poste de comptoir" subtitle="Là où la douchette est branchée" selected={device === "post"} onClick={() => setDevice("post")} />
                   <DeviceButton icon={Server} title="Serveur de l'officine" subtitle="Là où le stock est enregistré" selected={device === "server"} onClick={() => setDevice("server")} />
                 </div>
-                {device === "post" && <PostInstallFlow onCreated={() => setStep(2)} />}
+                {device === "post" && <PostInstallFlow onCreated={() => onStep(2)} />}
                 {device === "server" && lgo && <ServerInstallFlow lgo={lgo} serverUrl={serverUrl} />}
               </MethodTile>
 
@@ -213,13 +225,13 @@ export function ConnectAssistant({
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
-              <Button variant="ghost" onClick={() => setStep(1)}>Retour</Button>
-              <Button variant="outline" onClick={() => setStep(3)} trailingIcon={<ArrowRight className="size-4" />}>Vérifier la connexion</Button>
+              <Button variant="ghost" onClick={() => onStep(1)}>Retour</Button>
+              <Button variant="outline" onClick={() => onStep(3)} trailingIcon={<ArrowRight className="size-4" />}>Vérifier la connexion</Button>
             </div>
           </div>
         )}
 
-        {step === 3 && (
+        {step === 3 && (step3 ?? (
           <div className="space-y-4">
             <h3 className="text-[22px] leading-7 font-semibold tracking-[-0.01em] text-text-primary">Où en est votre connexion ?</h3>
             <div className="grid gap-3">
@@ -230,7 +242,7 @@ export function ConnectAssistant({
                 title={overview.agent.title}
                 detail={overview.agent.detail}
                 action={
-                  <Button size="sm" variant="outline" onClick={() => { setStep(2); setMethod("connect"); }}>
+                  <Button size="sm" variant="outline" onClick={() => { onStep(2); setMethod("connect"); }}>
                     {overview.agent.items.length > 0 ? "Ajouter un appareil" : "Installer"}
                   </Button>
                 }
@@ -269,14 +281,14 @@ export function ConnectAssistant({
                 tone={overview.sales.tone}
                 title={overview.sales.title}
                 detail={overview.sales.detail}
-                action={overview.sales.state === "NO_POST" ? <Button size="sm" variant="outline" onClick={() => { setStep(2); setMethod("connect"); setDevice("post"); }}>Ajouter un poste</Button> : undefined}
+                action={overview.sales.state === "NO_POST" ? <Button size="sm" variant="outline" onClick={() => { onStep(2); setMethod("connect"); setDevice("post"); }}>Ajouter un poste</Button> : undefined}
               />
             </div>
             {overview.stock.problem && (
               <p className="rounded-xl border border-warning-300 bg-warning-50/60 px-4 py-2.5 text-[13.5px] text-text-primary dark:border-warning-800 dark:bg-warning-950/20">{overview.stock.problem}</p>
             )}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
-              <Button variant="ghost" onClick={() => setStep(2)}>Retour</Button>
+              <Button variant="ghost" onClick={() => onStep(2)}>Retour</Button>
               <div className="flex gap-2">
                 <Button asChild variant="outline"><Link href="/stock">Voir mon stock</Link></Button>
                 {continueHref && overview.stock.state !== "NONE" && (
@@ -285,7 +297,7 @@ export function ConnectAssistant({
               </div>
             </div>
           </div>
-        )}
+        ))}
       </section>
 
       {/* Les deux autres étapes, repliées : on voit d'un coup d'œil où l'on est. */}
@@ -342,12 +354,12 @@ function MethodTile({
         disabled={disabled}
         aria-expanded={disabled ? undefined : selected}
         onClick={onClick}
-        className="flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-left focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none disabled:cursor-not-allowed"
+        className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl px-4 py-4 text-left focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none disabled:cursor-not-allowed sm:flex-nowrap sm:px-5"
       >
         <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-sunken text-text-secondary">
           <Icon className="size-5" aria-hidden="true" />
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex-1 basis-44">
           <span className="block text-[17px] leading-6 font-semibold text-text-primary">{title}</span>
           <span className="block text-[13.5px] leading-5 text-text-secondary">{subtitle}</span>
         </span>

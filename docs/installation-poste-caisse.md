@@ -2,7 +2,7 @@
 
 ## Par le titulaire lui-même : un lien, un fichier, un double-clic
 
-Dans PharmaBoost → **Connecter ma pharmacie** → étape 2, « Installer PharmaBoost
+Dans PharmaBoost → **Ma connexion** → étape 2, « Installer PharmaBoost
 Connect », « Poste de comptoir » : un lien s'affiche, valable sept jours pour un
 poste. Il s'ouvre sur l'ordinateur où la douchette est branchée — ou il part
 par e-mail à la personne qui s'y trouve :
@@ -44,7 +44,7 @@ l'installateur : `installateur/README.md`.
 
 ## En une ligne (technicien, ou prise en main à distance)
 
-Dans PharmaBoost → Connecter ma pharmacie, le détail « Pour un technicien »
+Dans PharmaBoost → Ma connexion, le détail « Pour un technicien »
 affiche une commande. Sur le poste, clic droit sur le
 bouton Windows → Terminal, coller, Entrée :
 
@@ -84,12 +84,12 @@ un autre mode : ne pas aller plus loin, envoyer une photo du branchement.
 
 ## Étape 1 — le code du poste (dans PharmaBoost)
 
-Connecter ma pharmacie → « Avancé » → « Postes de comptoir » → « Ajouter un poste »
+Ma connexion → « Configuration avancée » → « Postes de comptoir » → « Ajouter un poste »
 (nom : « Caisse 1 »). Un code à six chiffres s'affiche, valable une heure.
 
 ## Étape 2 — installer sur le poste
 
-1. Sur le poste, ouvrir PharmaBoost, Connecter ma pharmacie, cliquer
+1. Sur le poste, ouvrir PharmaBoost, Ma connexion, cliquer
    « Télécharger PharmaBoost Connect », puis décompresser l'archive (clic
    droit → Extraire tout).
 2. Dans le dossier décompressé : clic droit → « Ouvrir dans le Terminal ».
@@ -182,18 +182,25 @@ powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -TestAffich
 
 Si le dossier où le LGO enregistre son édition de stock est visible depuis
 un poste (un partage du serveur, par exemple `\\SERVEUR\PharmaBoost\Export`),
-on l'indique dans PharmaBoost → Connecter ma pharmacie → Avancé → Postes de
+on l'indique dans PharmaBoost → Ma connexion → Configuration avancée → Postes de
 caisse, sous le poste. Le poste le relit à chaque nouvel export (vérification
 toutes les trente secondes) et PharmaBoost remet le stock d'aplomb. Le bouton
 « Mettre à jour le stock maintenant » force une relecture dans la minute.
 Le serveur, lui, n'a besoin ni d'Internet ni d'un programme.
 
 
-## L'écran « Connecter ma pharmacie »
+## L'écran « Ma connexion »
 
 Depuis le 8 octobre 2026, « Mise en service », « Stock → Connecter mon logiciel » et l'assistant d'accueil
-sont **une seule page**, `/connexion` (les anciennes adresses y renvoient) : trois étapes (logiciel, envoi du
-stock, vérification), les réglages techniques dans « Avancé », un guide illustré (`/connexion/guide`).
+sont **une seule page**, `/connexion` (les anciennes adresses y renvoient) : l'état en cinq lignes (logiciel,
+PharmaBoost Connect, stock, ventes, robot), « Tester ma connexion », le parcours guidé en trois étapes (logiciel,
+envoi du stock, vérification), « Connecter mon robot », les réglages techniques dans « Configuration avancée », un
+guide illustré (`/connexion/guide`).
+
+**Tester ma connexion** (`src/core/stock/connection-test.ts`) : des contrôles tirés de ce que PharmaBoost a
+reçu (signes de vie, date et références du stock, lignes illisibles, dernier export lu par le programme, erreurs
+signalées, bips). Il ne se connecte à aucun ordinateur de l'officine et le dit. L'« envoi automatique du stock » n'est
+déclaré bon que si un export a réellement été lu récemment. L'essai du bip (facultatif) attend qu'un bip arrive.
 
 Trois états **séparés**, calculés une seule fois (`src/core/stock/connection-overview.ts`) et lus partout pareil :
 la connexion de PharmaBoost Connect (serveur et postes ; « en ligne » = signe de vie de moins de dix minutes),

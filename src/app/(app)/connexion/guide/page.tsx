@@ -21,11 +21,13 @@ export const metadata: Metadata = { title: "Guide pas à pas" };
  */
 const TROUBLES: [string, string][] = [
   ["Windows affiche « Windows a protégé votre ordinateur »", "C'est normal pour un programme qu'il ne connaît pas encore. Cliquez « Informations complémentaires », puis « Exécuter quand même ». Dans le navigateur, si le fichier est signalé, choisissez « Conserver »."],
-  ["L'installateur dit « Ce lien d'installation n'est plus valable »", "Un lien dure sept jours et ne sert que pour un poste. Dans l'assistant, obtenez-en un nouveau, puis téléchargez de nouveau l'installateur."],
+  ["L'installateur dit « Ce lien d'installation n'est plus valable »", "Un lien dure sept jours et ne sert que pour un poste. Dans Ma connexion, obtenez-en un nouveau, puis téléchargez de nouveau l'installateur."],
   ["L'installateur dit que PharmaBoost est injoignable", "Vérifiez que l'ordinateur a Internet (ouvrez pharmaboost.app dans un navigateur). Si un pare-feu filtre les sites, il doit laisser passer pharmaboost.app et nodejs.org."],
   ["Mon antivirus retire le programme", "Ajoutez une exception sur le dossier PharmaBoost, dans AppData\\Local (tapez %LOCALAPPDATA%\\PharmaBoost dans l'Explorateur), puis relancez l'installateur."],
   ["Le poste n'apparaît pas au bout de deux minutes", "Cherchez l'icône PharmaBoost près de l'horloge (flèche ^ à gauche des icônes). Absente : menu Démarrer, puis PharmaBoost. Point orange ou rouge : passez dessus, elle dit ce qui bloque."],
   ["Mon fichier de stock est refusé", "Il doit contenir au moins un code (CIP ou EAN), une désignation et une quantité. Prenez l'édition la plus complète de votre logiciel, ou envoyez-nous le fichier : on vous dit lequel."],
+  ["Le test dit qu'un appareil « ne répond plus »", "PharmaBoost n'a reçu aucun signe de vie depuis plus de 10 minutes. Vérifiez que l'ordinateur est allumé et relié à Internet, puis redémarrez-le : PharmaBoost se relance tout seul. Patientez une minute et relancez le test."],
+  ["Le test dit que mon stock est ancien alors que PharmaBoost Connect est en ligne", "Être en ligne ne veut pas dire que le stock arrive : votre logiciel doit enregistrer son édition de stock dans le dossier PharmaBoost. Refaites l'export, ou faites-le programmer par l'éditeur de votre logiciel."],
   ["Je n'y arrive pas", `Écrivez à ${PUBLIC_CONTACT_EMAIL} en disant à quelle étape vous êtes, avec une photo de l'écran : on vous rappelle et on le fait avec vous, à distance.`],
 ];
 
@@ -46,7 +48,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-3">
         <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
-          <Link href="/connexion">Retour à l&apos;assistant</Link>
+          <Link href="/connexion">Retour à Ma connexion</Link>
         </Button>
         <h1 className="text-[28px] leading-9 font-semibold tracking-[-0.015em] text-text-primary">Guide pas à pas</h1>
         <nav aria-label="Logiciel" className="flex flex-wrap gap-2">
@@ -75,11 +77,11 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           {guide.notice && <p className="text-[13px] leading-5 text-text-secondary">{guide.notice}</p>}
         </GuideStep>
         <GuideStep n={2} title="Envoyez le fichier à PharmaBoost" illustration={<FileIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">Dans l&apos;assistant, « Envoyer un fichier » puis « Choisir mon fichier ». Le nom du fichier n&apos;a pas d&apos;importance.</p>
+          <p className="text-[14.5px] leading-6 text-text-primary">Dans Ma connexion, étape 2, « Envoyer un fichier » puis « Choisir mon fichier ». Le nom du fichier n&apos;a pas d&apos;importance.</p>
           <Button asChild size="sm"><Link href="/stock/mise-a-jour">Choisir mon fichier</Link></Button>
         </GuideStep>
         <GuideStep n={3} title="Le stock se met à jour" illustration={<StockOkIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">PharmaBoost lit le fichier en une minute. L&apos;assistant, étape 3, dit « Stock à jour » avec l&apos;heure de réception.</p>
+          <p className="text-[14.5px] leading-6 text-text-primary">PharmaBoost lit le fichier en une minute. Ma connexion affiche « Stock à jour » avec l&apos;heure de réception et le nombre de références.</p>
         </GuideStep>
       </section>
 
@@ -87,14 +89,31 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         <h2 className="text-[20px] font-semibold text-text-primary">B. Installer PharmaBoost Connect sur le poste de comptoir</h2>
         <p className="text-[14px] leading-6 text-text-secondary">Pour l&apos;ordinateur où la douchette est branchée. {methods.connect.note}</p>
         <GuideStep n={1} title="Téléchargez l'installateur" illustration={<DownloadIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">Dans l&apos;assistant, « Installer PharmaBoost Connect », « Poste de comptoir », puis « Obtenir mon lien d&apos;installation ». Ouvrez le lien sur l&apos;ordinateur de la douchette et cliquez « Télécharger l&apos;installateur ».</p>
+          <p className="text-[14.5px] leading-6 text-text-primary">Dans Ma connexion, étape 2, « Installer PharmaBoost Connect », « Poste de comptoir », puis « Obtenir mon lien d&apos;installation ». Ouvrez le lien sur l&apos;ordinateur de la douchette et cliquez « Télécharger l&apos;installateur ».</p>
         </GuideStep>
         <GuideStep n={2} title="Double-cliquez le fichier" illustration={<InstallerIllustration />}>
           <p className="text-[14.5px] leading-6 text-text-primary">Suivez l&apos;assistant d&apos;installation : une minute, Internet requis, aucun mot de passe administrateur et rien à taper.</p>
         </GuideStep>
         <GuideStep n={3} title="Cherchez le point vert près de l'horloge" illustration={<TrayIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">L&apos;icône PharmaBoost apparaît avec un point vert quand le poste est relié. Dans l&apos;assistant, le poste s&apos;affiche « en ligne ».</p>
+          <p className="text-[14.5px] leading-6 text-text-primary">L&apos;icône PharmaBoost apparaît avec un point vert quand le poste est relié. Dans Ma connexion, le poste s&apos;affiche « en ligne ».</p>
         </GuideStep>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-[20px] font-semibold text-text-primary">C. Tester ma connexion</h2>
+        <GuideStep n={1} title="Cliquez « Tester ma connexion »" illustration={<StockOkIllustration />}>
+          <p className="text-[14.5px] leading-6 text-text-primary">PharmaBoost contrôle le logiciel choisi, chaque appareil installé, le stock reçu (date, références, lignes illisibles) et les ventes. Chaque contrôle dit ce qui a été constaté et, si ce n&apos;est pas bon, quoi faire.</p>
+          <p className="text-[13.5px] leading-5 text-text-secondary">Le test lit ce que vos programmes ont envoyé à PharmaBoost ; il ne se connecte pas à vos ordinateurs. Pour prouver le suivi des ventes, faites l&apos;« essai du bip » : bipez une boîte, PharmaBoost dit s&apos;il l&apos;a reçue.</p>
+        </GuideStep>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-[20px] font-semibold text-text-primary">D. Mon robot</h2>
+        <div className="space-y-2 rounded-2xl border border-border-subtle bg-surface-card p-5 text-[14.5px] leading-6 text-text-primary">
+          <p><strong>PharmaBoost ne se connecte pas encore à un robot.</strong> La rubrique « Connecter mon robot » vous laisse désigner le vôtre (fabricant, modèle) pour préparer l&apos;intégration.</p>
+          <p className="text-[14px] text-text-secondary">Votre logiciel et votre robot sont deux sources différentes : le logiciel donne le stock, le robot donnera un jour les produits qu&apos;on lui demande de sortir. Aujourd&apos;hui, ce sont les bips de la douchette qui affichent les conseils au comptoir.</p>
+          <p className="text-[14px] text-text-secondary">Pour aider à préparer l&apos;intégration, un diagnostic en lecture seule peut être lancé sur l&apos;ordinateur du robot : il écrit un rapport sur le Bureau, n&apos;envoie rien, et vous le relisez avant de nous le transmettre.</p>
+        </div>
       </section>
 
       <section className="space-y-3">

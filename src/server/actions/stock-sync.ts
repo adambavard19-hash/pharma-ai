@@ -93,7 +93,7 @@ export async function emailInstallInstructionsAction(payload: { lgo: string; cod
     "",
     `   ${command}`,
     "",
-    `   Le code ${payload.code} est valable une heure. Passé ce délai, générez-en un nouveau dans PharmaBoost, page Connecter ma pharmacie.`,
+    `   Le code ${payload.code} est valable une heure. Passé ce délai, générez-en un nouveau dans PharmaBoost, page Ma connexion.`,
     "4. L'installateur crée les dossiers C:\\PharmaBoost\\Export et C:\\PharmaBoost\\Ordonnances, installe ce qu'il faut, et démarre l'agent. PharmaBoost affiche alors « agent connecté ».",
     "",
     `B. Dans ${lgoLabel(payload.lgo)}, pour sortir le stock (à refaire quand le stock doit être rafraîchi, chaque matin par exemple) :`,
@@ -164,7 +164,7 @@ export async function createPostInstallLinkAction(payload: { label?: string | nu
   return ok({ token: link.token, expiresAt: link.expiresAt.toISOString(), postId: link.postId, command, downloadUrl: buildPostDownloadUrl(base, link.token) }, "Lien d'installation prêt, valable sept jours.");
 }
 
-/** Le logiciel de l'officine, choisi dans l'assistant « Connecter ma pharmacie » : rien n'est installé ni annoncé par ce choix. */
+/** Le logiciel de l'officine, choisi dans l'assistant « Ma connexion » : rien n'est installé ni annoncé par ce choix. */
 export async function chooseLgoAction(payload: { lgo: string }): Promise<ActionResult<null>> {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   if (!isLgoId(payload.lgo)) return fail("Logiciel inconnu.");

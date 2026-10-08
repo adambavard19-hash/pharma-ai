@@ -103,7 +103,7 @@ export default async function StockPage({
       },
       orderBy: { updatedAt: "desc" },
     }),
-    // L'état de la connexion : calculé une seule fois, partout pareil (voir « Connecter ma pharmacie »).
+    // L'état de la connexion : calculé une seule fois, partout pareil (voir « Ma connexion »).
     loadConnectionOverview(pharmacyId),
     // Les produits que le moteur ne sait pas encore relier à un besoin.
     prisma.product.count({ where: { pharmacyId, deletedAt: null, classifiedAt: null } }),
@@ -188,7 +188,7 @@ export default async function StockPage({
             )}
             {canImport && (
               <Button asChild variant="ghost" leadingIcon={<Cable className="size-[18px]" />}>
-                <Link href="/connexion">Connecter ma pharmacie</Link>
+                <Link href="/connexion">Ma connexion</Link>
               </Button>
             )}
             <Button asChild variant="ghost" leadingIcon={<Hourglass className="size-[18px]" />}>

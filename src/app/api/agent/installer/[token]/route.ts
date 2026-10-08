@@ -26,7 +26,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   const link = await peekPostInstallLink(token);
   const headers = { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" };
   if (!link) {
-    return new Response(buildRefusalScript("Ce lien d'installation PharmaBoost n'est plus valable. Générez-en un nouveau : PharmaBoost → Connecter ma pharmacie → Installer PharmaBoost Connect → Poste de comptoir (ou, pour l'équipe, la fiche de l'officine dans la console)."), { headers });
+    return new Response(buildRefusalScript("Ce lien d'installation PharmaBoost n'est plus valable. Générez-en un nouveau : PharmaBoost → Ma connexion → Installer PharmaBoost Connect → Poste de comptoir (ou, pour l'équipe, la fiche de l'officine dans la console)."), { headers });
   }
   const baseUrl = resolvePublicBaseUrl().url.replace(/\/$/, "");
   return new Response(buildPostInstallScript({ baseUrl, token, label: link.label, pharmacyName: link.pharmacyName, serverHostname: link.serverHostname }), { headers });

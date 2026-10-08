@@ -8,25 +8,27 @@ import { resolvePublicBaseUrl } from "@/server/public-url";
 import { ONLINE_WITHIN_SECONDS } from "@/core/stock/connection-overview";
 import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 import type { OverviewSnapshot } from "@/server/actions/stock-sync";
-import { ConnectAssistant } from "./assistant";
+import { loadRobotSetup } from "@/server/services/robot-setup";
+import { ConnectionHub } from "./hub";
 import { ConnectionManager } from "./connection-manager";
 import { CounterPostsCard } from "./counter-posts";
 
-export const metadata: Metadata = { title: "Connecter ma pharmacie" };
+export const metadata: Metadata = { title: "Ma connexion" };
 
 /**
- * Connecter ma pharmacie — la page unique : le logiciel, le stock, le poste de
- * comptoir. Elle remplace « Mise en service », « Connecter mon logiciel » et
- * l'assistant d'accueil, qui disaient trois fois la même chose en trois endroits.
+ * Ma connexion — la page centrale : le logiciel, PharmaBoost Connect, le stock, les
+ * ventes, le robot, le test de connexion et le parcours guidé en trois étapes. Elle
+ * remplace « Mise en service », « Connecter mon logiciel » et l'assistant d'accueil, qui
+ * disaient trois fois la même chose en trois endroits.
  *
- * Ce qu'on lit en dix secondes est en haut (l'assistant). Tout ce qui est
- * technique — les postes, le serveur, les dossiers, les lignes de commande —
- * est dans « Avancé », rien n'a été retiré.
+ * Ce qu'on lit en dix secondes est en haut. Tout ce qui est technique — les postes, le
+ * serveur, les dossiers, les lignes de commande — est dans « Configuration avancée »,
+ * rien n'a été retiré.
  */
 export default async function ConnectPage({ searchParams }: { searchParams: Promise<{ avance?: string }> }) {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   const { avance } = await searchParams;
-  const loaded = await loadConnectionOverview(session.scope.pharmacyId);
+  const [loaded, robot] = await Promise.all([loadConnectionOverview(session.scope.pharmacyId), loadRobotSetup(session.scope.pharmacyId)]);
   const serverUrl = resolvePublicBaseUrl().url;
   const { connection, posts } = loaded;
   const snapshot = JSON.parse(JSON.stringify({ overview: loaded.overview, lgo: loaded.lgo })) as OverviewSnapshot;
@@ -35,16 +37,16 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header className="space-y-1.5">
-        <h1 className="text-[30px] leading-9 font-semibold tracking-[-0.02em] text-text-primary">Connecter ma pharmacie</h1>
-        <p className="text-[15px] leading-6 text-text-secondary">Un seul parcours guidé. Aucune connaissance informatique nécessaire.</p>
+        <h1 className="text-[30px] leading-9 font-semibold tracking-[-0.02em] text-text-primary">Ma connexion</h1>
+        <p className="text-[15px] leading-6 text-text-secondary">Votre logiciel, PharmaBoost Connect, votre stock et votre robot, au même endroit. Aucune connaissance informatique nécessaire.</p>
       </header>
 
-      <ConnectAssistant lgos={LGO_DEFINITIONS} initial={snapshot} serverUrl={serverUrl} />
+      <ConnectionHub lgos={LGO_DEFINITIONS} initial={snapshot} serverUrl={serverUrl} robot={robot} />
 
       <details id="avance" open={avance === "1"} className="group rounded-2xl border border-border-subtle bg-surface-card">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
           <span>
-            <span className="block text-[16px] font-semibold text-text-primary">Avancé</span>
+            <span className="block text-[16px] font-semibold text-text-primary">Configuration avancée</span>
             <span className="block text-[13.5px] text-text-secondary">Postes, serveur, dossiers, lignes de commande : pour l&apos;informaticien.</span>
           </span>
           <ChevronDown className="size-4 text-text-tertiary transition-transform group-open:rotate-180" aria-hidden="true" />

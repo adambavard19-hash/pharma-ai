@@ -27,12 +27,15 @@ export type LoadedConnection = {
 };
 
 export async function loadConnectionOverview(pharmacyId: string, now: Date = new Date()): Promise<LoadedConnection> {
-  const [connection, posts, pharmacy, deposits, lastImport] = await Promise.all([
+  const [connection, posts, pharmacy, deposits, lastImport, drugReferences, productReferences] = await Promise.all([
     getConnection(pharmacyId),
     listCounterPosts(pharmacyId),
     prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true } }),
     listPharmacyDeposits(pharmacyId, 5),
     prisma.importJob.findFirst({ where: { pharmacyId, kind: "STOCK", status: "COMPLETED" }, orderBy: { finishedAt: "desc" }, select: { finishedAt: true } }),
+    // Les références réellement en rayon : celles que le comptoir peut conseiller (médicaments + parapharmacie).
+    prisma.pharmacyDrugStock.count({ where: { pharmacyId, quantity: { gt: 0 } } }),
+    prisma.product.count({ where: { pharmacyId, deletedAt: null, isActive: true, stockItem: { is: { quantity: { gt: 0 } } } } }),
   ]);
   // Comme la page Stock : à défaut de date de réception, la fin du dernier import terminé.
   const stockSyncedAt = pharmacy?.stockSyncedAt ?? lastImport?.finishedAt ?? null;
@@ -40,6 +43,11 @@ export async function loadConnectionOverview(pharmacyId: string, now: Date = new
   if (stockLines === null && stockSyncedAt && connection?.lastSyncAt && connection.lastSyncLines !== null && Math.abs(connection.lastSyncAt.getTime() - stockSyncedAt.getTime()) <= SAME_EVENT_MS) {
     stockLines = connection.lastSyncLines;
   }
+  // Les lignes illisibles du fichier qui a produit le stock affiché : même règle que le nombre de lignes.
+  const applied = deposits.find((deposit) => deposit.status === "APPLIED");
+  const appliedAt = applied ? (applied.appliedAt ?? applied.receivedAt) : null;
+  const stockIgnored = applied && appliedAt && stockSyncedAt && Math.abs(appliedAt.getTime() - stockSyncedAt.getTime()) <= SAME_EVENT_MS ? applied.invalid : null;
+  const stockReferences = stockSyncedAt ? drugReferences + productReferences : null;
   // Un fichier qui n'a pas été appliqué ne se signale que s'il est le DERNIER envoi : un envoi réussi depuis le remplace.
   const latest = deposits[0] ?? null;
   const stockProblem = latest && (latest.status === "HELD" || latest.status === "FAILED" || latest.status === "REJECTED") ? latest.status : null;
@@ -72,6 +80,8 @@ export async function loadConnectionOverview(pharmacyId: string, now: Date = new
     stockSyncedAt,
     stockLines,
     stockProblem,
+    stockReferences,
+    stockIgnored,
   });
   return { overview, connection, posts, lgo: connection?.lgo ?? null, stockSyncedAt };
 }

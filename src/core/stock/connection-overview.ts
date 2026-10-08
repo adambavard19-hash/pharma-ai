@@ -59,6 +59,10 @@ export type OverviewInput = {
   stockLines: number | null;
   /** Le dernier fichier envoyé qui n'a pas été appliqué, s'il y en a un à signaler. */
   stockProblem: "HELD" | "FAILED" | "REJECTED" | null;
+  /** Les références réellement en stock aujourd'hui (quantité au-dessus de zéro), quand on les a comptées. */
+  stockReferences?: number | null;
+  /** Les lignes du dernier fichier que PharmaBoost n'a pas pu lire, quand on le sait. */
+  stockIgnored?: number | null;
 };
 
 export type AgentItem = {
@@ -87,6 +91,10 @@ export type ConnectionOverview = {
     detail: string;
     receivedAt: Date | null;
     lines: number | null;
+    /** Les références en stock aujourd'hui : ce que le comptoir peut conseiller. Une autre mesure que les lignes du fichier. */
+    references: number | null;
+    /** Lignes du dernier fichier illisibles, ignorées : l'erreur la plus fréquente d'un export. */
+    ignored: number | null;
     ageDays: number | null;
     /** Un fichier envoyé depuis n'a pas été appliqué : le stock affiché est celui d'avant. */
     problem: string | null;
@@ -180,15 +188,17 @@ export function buildConnectionOverview(input: OverviewInput): ConnectionOvervie
   const problem = input.stockProblem ? PROBLEM_TEXT[input.stockProblem] : null;
   let stock: ConnectionOverview["stock"];
   if (!received) {
-    stock = { state: "NONE", tone: problem ? "warning" : "neutral", title: "Aucun stock reçu", detail: problem ?? "Envoyez votre stock : PharmaBoost ne conseille que ce que vous avez en rayon.", receivedAt: null, lines: null, ageDays: null, problem };
+    stock = { state: "NONE", tone: problem ? "warning" : "neutral", title: "Aucun stock reçu", detail: problem ?? "Envoyez votre stock : PharmaBoost ne conseille que ce que vous avez en rayon.", receivedAt: null, lines: null, references: null, ignored: null, ageDays: null, problem };
   } else {
     const fresh = stockReminderLevel(received, now) === "none";
     const when = describeDay(received, now);
     const lines = input.stockLines;
+    const references = input.stockReferences ?? null;
+    const ignored = input.stockIgnored ?? null;
     const detail = `Reçu ${when}${lines !== null ? ` · ${lines.toLocaleString("fr-FR")} ligne${lines > 1 ? "s" : ""}` : ""}`;
     stock = fresh
-      ? { state: "FRESH", tone: problem ? "warning" : "success", title: "Stock à jour", detail: problem ? `${detail}. ${problem}` : detail, receivedAt: received, lines, ageDays: days, problem }
-      : { state: "OLD", tone: "warning", title: `Stock ancien : ${days ?? 0} jour${(days ?? 0) > 1 ? "s" : ""}`, detail: `${detail}. Mettez-le à jour.${problem ? ` ${problem}` : ""}`, receivedAt: received, lines, ageDays: days, problem };
+      ? { state: "FRESH", tone: problem ? "warning" : "success", title: "Stock à jour", detail: problem ? `${detail}. ${problem}` : detail, receivedAt: received, lines, references, ignored, ageDays: days, problem }
+      : { state: "OLD", tone: "warning", title: `Stock ancien : ${days ?? 0} jour${(days ?? 0) > 1 ? "s" : ""}`, detail: `${detail}. Mettez-le à jour.${problem ? ` ${problem}` : ""}`, receivedAt: received, lines, references, ignored, ageDays: days, problem };
   }
 
   // ---- 3. Les ventes : suivies au bip d'un poste de comptoir, pas par le logiciel de l'officine.

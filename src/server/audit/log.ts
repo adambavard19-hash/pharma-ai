@@ -31,6 +31,8 @@ export type AuditAction =
   | "stock.connection_pairing_issued"
   | "stock.connection_paired"
   | "stock.connection_revoked"
+  | "robot.setup_saved"
+  | "robot.setup_cleared"
   | "stock.agent_sync"
   | "pharmacy.onboarding_completed"
   | "stock.adjusted"

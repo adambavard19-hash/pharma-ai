@@ -69,11 +69,11 @@ export const NAVIGATION: NavItem[] = [
   },
   {
     href: "/connexion",
-    label: "Connecter ma pharmacie",
+    label: "Ma connexion",
     icon: Plug,
     permission: PERMISSIONS.PRODUCT_IMPORT,
     match: ["/connexion", "/installation"],
-    description: "Votre logiciel, votre stock et le poste de comptoir : un seul parcours",
+    description: "Votre logiciel, PharmaBoost Connect, votre stock et votre robot : tout au même endroit",
   },
   {
     href: "/stock",
