@@ -1282,6 +1282,8 @@ model DrugSpecialty {
   genericMemberships     DrugGenericMember[]
   smrOpinions            DrugSmrOpinion[]
   prescriptionLines      PrescriptionLine[]
+  /// Les associations de pharmacie qui partent de ce médicament (voir ProductAssociation).
+  associationTriggers    ProductAssociation[] @relation("AssociationTriggerSpecialty")
 
   @@index([name])
   @@index([marketingStatus])
@@ -2241,8 +2243,12 @@ model PharmacyRule {
 model ProductAssociation {
   id               String   @id @default(cuid())
   pharmacyId       String
-  triggerProductId String
-  adviceProductId  String
+  /// Le déclencheur est SOIT un produit du stock (triggerProductId), SOIT un médicament du catalogue national
+  /// (triggerSpecialtyId) — jamais les deux, jamais aucun (contrainte en base : product_associations_one_trigger).
+  /// Un médicament conseil comme Coryzalia se lit par son code CIP : il est au catalogue national, pas dans le stock.
+  triggerProductId   String?
+  triggerSpecialtyId String?
+  adviceProductId    String
   /// Ce que le pharmacien dit au patient, écrit par lui — jamais généré. Vide : la carte n'affiche que l'association.
   sentence         String?
   isActive         Boolean  @default(true)
@@ -2253,13 +2259,16 @@ model ProductAssociation {
   updatedAt        DateTime @updatedAt
 
   pharmacy       Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  triggerProduct Product  @relation("AssociationTrigger", fields: [triggerProductId], references: [id], onDelete: Cascade)
-  adviceProduct  Product  @relation("AssociationAdvice", fields: [adviceProductId], references: [id], onDelete: Cascade)
-  createdBy      User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  triggerProduct   Product?       @relation("AssociationTrigger", fields: [triggerProductId], references: [id], onDelete: Cascade)
+  triggerSpecialty DrugSpecialty? @relation("AssociationTriggerSpecialty", fields: [triggerSpecialtyId], references: [id], onDelete: Cascade)
+  adviceProduct    Product        @relation("AssociationAdvice", fields: [adviceProductId], references: [id], onDelete: Cascade)
+  createdBy        User?          @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@unique([pharmacyId, triggerProductId, adviceProductId])
+  @@unique([pharmacyId, triggerSpecialtyId, adviceProductId])
   @@index([pharmacyId, isActive])
   @@index([pharmacyId, triggerProductId])
+  @@index([pharmacyId, triggerSpecialtyId])
   @@map("product_associations")
 }
 

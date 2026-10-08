@@ -16,6 +16,23 @@ export type NoticeAlert = { severity: string; subjectType: string; code: string;
  * d'écran pendant que le client attend.
  */
 const COVERAGE_CODES = new Set(["DRUG_NO_INTERACTION_DATA", "INTERACTION_NO_REFERENTIAL", "DEMO_REFERENTIAL", "DRUG_CLASSIFIED_BY_AI", "DRUG_NOT_IN_REFERENTIAL"]);
+
+/**
+ * Les « écarté » : un produit que le moteur n'a PAS proposé (déjà présent dans la vente, allergie, grossesse, ordonnance
+ * obligatoire…). Ce sont des explications sur nos propres propositions, une par produit du catalogue qui a été écarté,
+ * pas des alertes sur ce que le client emporte : elles ne disent rien au pharmacien qui a la boîte en main. Elles restent
+ * lisibles sur l'écran complet de la vente ; elles n'ont rien à faire en coin d'écran.
+ */
+const DISCARDED_CANDIDATE_CODES = new Set([
+  "SUBSTANCE_ALREADY_PRESCRIBED",
+  "PRESCRIPTION_REQUIRED",
+  "PATIENT_ALLERGY",
+  "PRODUCT_CONTRAINDICATED_PREGNANCY",
+  "PRODUCT_CONTRAINDICATED_BREASTFEEDING",
+  "PRODUCT_CONTRAINDICATED_CHILD",
+  "PRODUCT_CONTRAINDICATED_DECLARED",
+  "VIGILANCE_PRODUCT_EXCLUDED",
+]);
 export type NoticeRecommendation = {
   name: string;
   priceCents: number | null;
@@ -119,7 +136,7 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
     return { ...base, state: "PENDING", alerts: [], advice: [], items: [], signature: `pending:${input.reference}:${input.lineNames.length}` };
   }
   const alerts = [...input.alerts]
-    .filter((alert) => !alert.acknowledged && !COVERAGE_CODES.has(alert.code) && (alert.severity === "BLOCKING" || alert.severity === "WARNING"))
+    .filter((alert) => !alert.acknowledged && !COVERAGE_CODES.has(alert.code) && !DISCARDED_CANDIDATE_CODES.has(alert.code) && (alert.severity === "BLOCKING" || alert.severity === "WARNING"))
     .sort((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9))
     .slice(0, MAX_ALERTS)
     .map((alert) => alert.message);

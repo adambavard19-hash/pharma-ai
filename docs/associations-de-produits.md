@@ -1,9 +1,10 @@
 # Associations de produits — un produit conseil en appelle un autre
 
-État : **en développement seulement.** Une migration (additive, une table) à passer sur la base de production avant
-publication : `20261016090000_associations_de_produits`. Essayé pour de vrai en local (création, vente spontanée,
-acceptation, suspension, suppression) avec le stock de la Pharmacie Saint-Michel ; **jamais essayé sur le poste de caisse
-Windows** ni avec les produits réels de la pharmacienne (Olioseptil Bronche n'est pas dans le stock local).
+État : la première version (déclencheur = un produit du stock) est **en ligne** depuis le 8 octobre 2026. La suite — le
+déclencheur peut aussi être **un médicament du catalogue national** (Coryzalia, Oscillococcinum…) — est **en développement
+seulement** : une migration (`20261017090000_associations_depuis_un_medicament`, additive : une colonne, deux index, une
+contrainte) est à passer sur la base de production avec la publication. Essayé pour de vrai en local avec le code CIP réel
+de Coryzalia ; jamais sur le poste de caisse Windows.
 
 ## Les deux axes du conseil
 
@@ -14,10 +15,17 @@ Windows** ni avec les produits réels de la pharmacienne (Olioseptil Bronche n'e
 
 Le second axe marche **sans médicament** : une vente spontanée (un produit bipé au comptoir, sans ordonnance) suffit.
 
+**Le déclencheur** est au choix : **un produit de mon stock** (spray nasal, Olioseptil…), ou **un médicament** du catalogue
+national. Un médicament conseil comme Coryzalia ou Oscillococcinum se lit par son **code CIP** : il est au catalogue
+national, pas dans le stock de l'officine, donc il fallait pouvoir partir de lui. L'association vaut pour **toutes les
+formes** du même nom (« CORYZALIA, comprimé orodispersible » et « CORYZALIA, solution buvable ») ; le dosage, lui, fait partie
+du nom (DOLIPRANE 500 mg ≠ DOLIPRANE 1000 mg).
+
 ## Où cliquer
 
 Menu **Ma pharmacie → Mes associations** (pharmacien et titulaire). On choisit :
-1. *Quand ce produit est dans la vente* — le déclencheur (recherche par nom, marque, référence, EAN) ;
+1. *Quand ce produit / ce médicament est dans la vente* — le déclencheur : onglet **« Un produit de mon stock »** (recherche
+   par nom, marque, référence, EAN) ou onglet **« Un médicament »** (recherche au catalogue national, par nom ou substance) ;
 2. *PharmaBoost propose ce produit* — le produit conseillé ;
 3. facultatif : *Ce que vous dites au patient* (240 caractères) — vos mots, repris tels quels sur la carte.
 
@@ -26,7 +34,7 @@ se **supprime**. On enchaîne souvent plusieurs conseils pour un même déclench
 
 ## Ce qui se passe à la vente
 
-Au bip d'un produit déclencheur (ou dès qu'il est une ligne confirmée de la vente), l'analyse ajoute à la trace une étape
+Au bip d'un déclencheur (produit du stock ou médicament, dès qu'il est une ligne confirmée de la vente), l'analyse ajoute à la trace une étape
 **« Associations de l'officine »** (visible dans « Comment l'analyse s'est déroulée ») et une carte **« Conseil associé »**
 apparaît sous le produit : « À proposer avec ce produit », la phrase du pharmacien, le prix, la marge, le stock, et les mêmes
 gestes que tout conseil (proposer, changer de référence, ignorer). Accepté, il passe en **Délivrance** et compte comme
@@ -49,6 +57,13 @@ associations par vente**. Les associations passent en dernier : un besoin cliniq
 
 Un bip de parapharmacie garde l'EAN de la ligne : on retrouve le produit par son code appris au comptoir, par son EAN, à
 défaut par son **nom exact** (sans casse ni accents). Seuls les produits déclencheurs d'une association sont cherchés.
+
+## La fenêtre du poste de caisse et les produits « écartés »
+
+L'analyse écarte, pour chaque vente, des produits du catalogue qu'elle ne proposera pas (substance déjà dans la vente,
+allergie, grossesse, ordonnance obligatoire…) et note pourquoi. Ces notes restent sur l'écran complet de la vente ; elles
+**n'apparaissent plus dans la fenêtre du poste** : elles ne parlent pas de ce que le client emporte. Et leur texte dit
+désormais « déjà présent dans cette délivrance » (une vente bipée n'a pas d'ordonnance).
 
 ## Pas encore (à décider)
 

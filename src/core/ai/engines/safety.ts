@@ -319,7 +319,7 @@ export function evaluateOpportunitySafety(
 export function evaluateProductSafety(
   products: CatalogProduct[],
   patient: PatientContext,
-  /** Substances actives déjà présentes sur l'ordonnance, telles que publiées. */
+  /** Substances actives déjà présentes dans la délivrance (ordonnance ou boîtes bipées), telles que publiées. */
   prescribedSubstances: string[] = [],
 ): { findings: SafetyFindingResult[]; blockedProductIds: Set<string> } {
   const findings: SafetyFindingResult[] = [];
@@ -363,7 +363,8 @@ export function evaluateProductSafety(
       findings.push({
         severity: "BLOCKING",
         code: "SUBSTANCE_ALREADY_PRESCRIBED",
-        message: `« ${product.name} » écarté : contient ${duplicated}, déjà présent sur l'ordonnance. Risque de doublement de dose.`,
+        // « délivrance » : une vente bipée au comptoir n'a pas d'ordonnance.
+        message: `« ${product.name} » écarté : contient ${duplicated}, déjà présent dans cette délivrance. Risque de doublement de dose.`,
         subjectType: "PRODUCT",
         subjectId: product.id,
         source: SOURCE,

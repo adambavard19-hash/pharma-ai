@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { associationError, cleanSentence, MAX_SENTENCE_LENGTH } from "../rules";
+import { associationError, cleanSentence, MAX_SENTENCE_LENGTH, sentenceError } from "../rules";
 
 describe("la phrase du pharmacien", () => {
   it("ramène les espaces et les retours à la ligne à un seul espace, et retire les caractères de contrôle", () => {
@@ -17,17 +17,33 @@ describe("la phrase du pharmacien", () => {
   it("garde le texte tel quel : aucune balise interprétée, aucune réécriture", () => {
     expect(cleanSentence("<b>ça</b> « marche »")).toBe("<b>ça</b> « marche »");
   });
+
+  it("a une longueur limitée", () => {
+    expect(sentenceError("x".repeat(MAX_SENTENCE_LENGTH))).toBeNull();
+    expect(sentenceError("x".repeat(MAX_SENTENCE_LENGTH + 1))).toContain("trop longue");
+    expect(sentenceError(null)).toBeNull();
+  });
 });
 
 describe("ce qu'une association refuse", () => {
-  const ok = { triggerProductId: "a", adviceProductId: "b", sentence: null };
-  it("accepte deux produits différents, avec ou sans phrase", () => {
-    expect(associationError(ok)).toBeNull();
-    expect(associationError({ ...ok, sentence: "x".repeat(MAX_SENTENCE_LENGTH) })).toBeNull();
+  const byProduct = { triggerProductId: "a", adviceProductId: "b", sentence: null };
+  const byDrug = { triggerSpecialtyId: "s1", adviceProductId: "b", sentence: null };
+
+  it("accepte un produit OU un médicament comme déclencheur, avec ou sans phrase", () => {
+    expect(associationError(byProduct)).toBeNull();
+    expect(associationError(byDrug)).toBeNull();
+    expect(associationError({ ...byDrug, sentence: "x".repeat(MAX_SENTENCE_LENGTH) })).toBeNull();
   });
-  it("refuse un produit associé à lui-même, un choix incomplet et une phrase trop longue", () => {
-    expect(associationError({ ...ok, adviceProductId: "a" })).toBe("Un produit ne peut pas être associé à lui-même.");
-    expect(associationError({ ...ok, adviceProductId: "" })).toBe("Choisissez les deux produits.");
-    expect(associationError({ ...ok, sentence: "x".repeat(MAX_SENTENCE_LENGTH + 1) })).toContain("trop longue");
+
+  it("refuse un produit associé à lui-même, un choix incomplet, deux déclencheurs et une phrase trop longue", () => {
+    expect(associationError({ ...byProduct, adviceProductId: "a" })).toBe("Un produit ne peut pas être associé à lui-même.");
+    expect(associationError({ ...byProduct, adviceProductId: "" })).toBe("Choisissez le produit à conseiller.");
+    expect(associationError({ adviceProductId: "b", sentence: null })).toBe("Choisissez le produit ou le médicament déclencheur.");
+    expect(associationError({ triggerProductId: "a", triggerSpecialtyId: "s1", adviceProductId: "b", sentence: null })).toBe("Choisissez un seul déclencheur : un produit ou un médicament.");
+    expect(associationError({ ...byDrug, sentence: "x".repeat(MAX_SENTENCE_LENGTH + 1) })).toContain("trop longue");
+  });
+
+  it("un médicament peut déclencher un produit portant le même identifiant : ce ne sont pas les mêmes choses", () => {
+    expect(associationError({ triggerSpecialtyId: "b", adviceProductId: "b", sentence: null })).toBeNull();
   });
 });

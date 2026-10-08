@@ -12,9 +12,14 @@ import { Alert, EmptyState } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/format";
 import type { ProductSearchResult } from "@/app/api/produits/recherche/route";
+import type { DrugSpecialtyResult } from "@/app/api/medicaments/specialites/route";
 
 type ProductBrief = { id: string; name: string; brand: string | null; quantity: number; deleted: boolean };
-type AssociationRow = { id: string; trigger: ProductBrief; advice: ProductBrief; sentence: string | null; isActive: boolean; createdBy: string | null; createdAt: string };
+/** Ce qui déclenche : un produit du stock, ou un médicament du catalogue national (sans stock connu). */
+type TriggerBrief = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number | null; deleted: boolean };
+type AssociationRow = { id: string; trigger: TriggerBrief; advice: ProductBrief; sentence: string | null; isActive: boolean; createdBy: string | null; createdAt: string };
+/** Le déclencheur en cours de choix dans le formulaire. */
+type PickedTrigger = { kind: "PRODUCT"; product: ProductSearchResult } | { kind: "DRUG"; drug: DrugSpecialtyResult };
 
 /**
  * Les associations de produits : à gauche le produit qui déclenche, à droite celui qu'on propose.
@@ -25,9 +30,9 @@ type AssociationRow = { id: string; trigger: ProductBrief; advice: ProductBrief;
  */
 export function AssociationsManager({ associations }: { associations: AssociationRow[] }) {
   // Les associations groupées par produit déclencheur, dans l'ordre d'arrivée.
-  const groups: { trigger: ProductBrief; items: AssociationRow[] }[] = [];
+  const groups: { trigger: TriggerBrief; items: AssociationRow[] }[] = [];
   for (const association of associations) {
-    const group = groups.find((candidate) => candidate.trigger.id === association.trigger.id);
+    const group = groups.find((candidate) => candidate.trigger.kind === association.trigger.kind && candidate.trigger.id === association.trigger.id);
     if (group) group.items.push(association);
     else groups.push({ trigger: association.trigger, items: [association] });
   }
@@ -39,7 +44,7 @@ export function AssociationsManager({ associations }: { associations: Associatio
           <strong>Un médicament déclenche un produit conseil</strong> — un antibiotique appelle un spray pour laver le nez : c&apos;est le moteur de PharmaBoost, rien à régler ici.
         </span>
         <span className="mt-1 block">
-          <strong>Un produit conseil en appelle un autre</strong> — le spray pour le nez appelle Olioseptil Bronche, même sur une vente spontanée : c&apos;est cette page, et c&apos;est vous qui décidez.
+          <strong>Un produit ou un médicament conseil en appelle un autre</strong> — Coryzalia, ou le spray pour le nez, appelle le produit de votre choix, même sur une vente spontanée : c&apos;est cette page, et c&apos;est vous qui décidez.
         </span>
       </Alert>
 
@@ -56,15 +61,16 @@ export function AssociationsManager({ associations }: { associations: Associatio
       ) : (
         <div className="space-y-4">
           {groups.map((group) => (
-            <Card key={group.trigger.id}>
+            <Card key={`${group.trigger.kind}:${group.trigger.id}`}>
               <CardHeader
                 title={
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span>Quand « {group.trigger.name} » est dans la vente</span>
+                    <span>Quand « {group.trigger.kind === "DRUG" ? group.trigger.name.split(",")[0].trim() : group.trigger.name} » est dans la vente</span>
+                    {group.trigger.kind === "DRUG" && <Badge tone="info">Médicament</Badge>}
                     {group.trigger.deleted && <Badge tone="danger">Produit supprimé</Badge>}
                   </span>
                 }
-                description={group.trigger.brand ?? undefined}
+                description={group.trigger.kind === "DRUG" ? "Toutes les formes de ce médicament" : (group.trigger.brand ?? undefined)}
               />
               <CardContent className="pt-0">
                 <ul className="divide-y divide-border-subtle">
@@ -82,7 +88,8 @@ export function AssociationsManager({ associations }: { associations: Associatio
 }
 
 function NewAssociation() {
-  const [trigger, setTrigger] = useState<ProductSearchResult | null>(null);
+  const [mode, setMode] = useState<"PRODUCT" | "DRUG">("PRODUCT");
+  const [trigger, setTrigger] = useState<PickedTrigger | null>(null);
   const [advice, setAdvice] = useState<ProductSearchResult | null>(null);
   const [sentence, setSentence] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +103,11 @@ function NewAssociation() {
       return;
     }
     startTransition(async () => {
-      const result = await createAssociationAction({ triggerProductId: trigger.id, adviceProductId: advice.id, sentence: sentence.trim() || null });
+      const result = await createAssociationAction({
+        ...(trigger.kind === "PRODUCT" ? { triggerProductId: trigger.product.id } : { triggerSpecialtyId: trigger.drug.id }),
+        adviceProductId: advice.id,
+        sentence: sentence.trim() || null,
+      });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -113,9 +124,31 @@ function NewAssociation() {
       <CardHeader title="Nouvelle association" description="Le produit de gauche appelle le produit de droite." />
       <CardContent className="space-y-4">
         <div className="grid items-start gap-4 md:grid-cols-[1fr_auto_1fr]">
-          <ProductField label="Quand ce produit est dans la vente" value={trigger} onChange={setTrigger} excludeId={advice?.id} />
-          <ArrowRight className="mt-9 hidden size-5 shrink-0 text-text-tertiary md:block" aria-hidden />
-          <ProductField label="PharmaBoost propose ce produit" value={advice} onChange={setAdvice} excludeId={trigger?.id} />
+          <div className="space-y-3">
+            <div role="tablist" aria-label="Ce qui déclenche l'association" className="inline-flex rounded-lg bg-surface-sunken p-1 text-[13px] font-medium">
+              {([["PRODUCT", "Un produit de mon stock"], ["DRUG", "Un médicament"]] as const).map(([kind, label]) => (
+                <button
+                  key={kind}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === kind}
+                  onClick={() => { setMode(kind); setTrigger(null); }}
+                  className={mode === kind ? "rounded-md bg-surface-card px-3 py-1.5 text-text-primary shadow-sm" : "rounded-md px-3 py-1.5 text-text-secondary hover:text-text-primary"}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {mode === "PRODUCT" ? (
+              <ProductField label="Quand ce produit est dans la vente" value={trigger?.kind === "PRODUCT" ? trigger.product : null} onChange={(product) => setTrigger(product ? { kind: "PRODUCT", product } : null)} excludeId={advice?.id} />
+            ) : (
+              <DrugField label="Quand ce médicament est dans la vente" value={trigger?.kind === "DRUG" ? trigger.drug : null} onChange={(drug) => setTrigger(drug ? { kind: "DRUG", drug } : null)} />
+            )}
+          </div>
+          <ArrowRight className="mt-16 hidden size-5 shrink-0 text-text-tertiary md:block" aria-hidden />
+          <div className="md:pt-[3.1rem]">
+            <ProductField label="PharmaBoost propose ce produit" value={advice} onChange={setAdvice} excludeId={trigger?.kind === "PRODUCT" ? trigger.product.id : undefined} />
+          </div>
         </div>
 
         <Field
@@ -140,6 +173,77 @@ function NewAssociation() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Recherche dans le catalogue national des médicaments (nom ou substance) : Coryzalia se lit par son code CIP, il n'est pas dans le stock. */
+function DrugField({ label, value, onChange }: { label: string; value: DrugSpecialtyResult | null; onChange: (drug: DrugSpecialtyResult | null) => void }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<DrugSpecialtyResult[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (value || query.trim().length < 3) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/medicaments/specialites?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
+        if (response.ok) setResults(((await response.json()) as { results: DrugSpecialtyResult[] }).results);
+      } catch {
+        // Requête annulée : on garde l'affichage précédent.
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 250);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [query, value]);
+
+  if (value) {
+    return (
+      <Field label={label} hint="L'association vaut pour toutes les formes de ce médicament (comprimé, solution buvable…).">
+        <div className="flex items-center gap-3 rounded-lg border border-brand-300 bg-brand-50/60 p-3 dark:border-brand-700 dark:bg-brand-950/30">
+          <Check className="size-4 shrink-0 text-brand-700 dark:text-brand-300" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14px] font-medium text-text-primary">{value.name.split(",")[0].trim()}</span>
+            <span className="block truncate text-[12px] text-text-tertiary">{value.name.includes(",") ? value.name.slice(value.name.indexOf(",") + 1).trim() : (value.form ?? "")}</span>
+          </span>
+          <button type="button" onClick={() => { onChange(null); setQuery(""); setResults([]); }} className="shrink-0 rounded-md p-1.5 text-text-tertiary hover:bg-surface-sunken hover:text-text-primary" aria-label={`Changer : ${label}`}>
+            <X className="size-4" />
+          </button>
+        </div>
+      </Field>
+    );
+  }
+
+  return (
+    <Field label={label}>
+      <div className="space-y-2">
+        <Input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom du médicament ou substance (3 lettres au moins)…" leadingIcon={loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />} aria-label={label} />
+        {query.trim().length >= 3 && (
+          <ul className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-border-subtle bg-surface-card p-1.5">
+            {results.length === 0 && !loading ? (
+              <li className="px-2 py-3 text-center text-[12.5px] text-text-tertiary">Aucun médicament trouvé au catalogue national.</li>
+            ) : (
+              results.map((drug) => (
+                <li key={drug.id}>
+                  <button type="button" onClick={() => onChange(drug)} className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-brand-50/70 dark:hover:bg-brand-950/40">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13.5px] font-medium text-text-primary">{drug.name}</span>
+                      <span className="block truncate text-[12px] text-text-tertiary">{drug.substances.join(", ") || "—"}</span>
+                    </span>
+                    {!drug.marketed && <Badge tone="warning">Non commercialisé</Badge>}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+      </div>
+    </Field>
   );
 }
 

@@ -109,3 +109,24 @@ describe("le titre de ce qui a été bipé", () => {
     expect(buildCounterNotice({ ...base, prescriptionStatus: "ANALYZING", lineKinds: ["DRUG", "DRUG"] }).detectedLabel).toBe("Médicament détecté");
   });
 });
+
+describe("l'avis ne montre pas les explications sur nos propres propositions écartées", () => {
+  const alerts = [
+    { severity: "BLOCKING", subjectType: "PRODUCT", code: "SUBSTANCE_ALREADY_PRESCRIBED", message: "« ALLIUM CEPA COMPOSE » écarté : contient ALLIUM CEPA, déjà présent dans cette délivrance. Risque de doublement de dose.", acknowledged: false },
+    { severity: "BLOCKING", subjectType: "PRODUCT", code: "PATIENT_ALLERGY", message: "« X » écarté : allergie déclarée (arnica).", acknowledged: false },
+    { severity: "BLOCKING", subjectType: "PRODUCT", code: "PRESCRIPTION_REQUIRED", message: "« Y » écarté : soumis à prescription.", acknowledged: false },
+    { severity: "WARNING", subjectType: "PRODUCT", code: "DOCUMENTED_INTERACTION", message: "Interaction avec le millepertuis", acknowledged: false },
+  ];
+
+  it("garde les vraies alertes sur ce qui est délivré, retire les « écarté »", () => {
+    const notice = buildCounterNotice({ ...base, alerts });
+    expect(notice.alerts).toEqual(["Interaction avec le millepertuis"]);
+  });
+
+  it("n'affiche rien d'alarmant quand il n'y a que des produits écartés : « rien à ajouter », pas une alerte", () => {
+    const notice = buildCounterNotice({ ...base, alerts: alerts.slice(0, 3) });
+    expect(notice.alerts).toEqual([]);
+    expect(notice.advice).toEqual(["Rien à ajouter pour cette délivrance."]);
+    expect(notice.items).toEqual([]);
+  });
+});

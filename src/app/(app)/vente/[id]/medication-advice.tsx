@@ -52,8 +52,10 @@ export function MedicationAdvice({
     return saysWhenEmpty ? <p className="mt-2 pl-3 text-[12.5px] text-text-tertiary sm:pl-4">Aucun conseil à proposer avec ce médicament.</p> : null;
   }
   const split = splitAdvice(recommendations);
-  // Sous un produit de parapharmacie, il n'y a que des associations de l'officine : « ce produit », pas « ce médicament ».
-  const subject = recommendations.every((recommendation) => recommendation.origin === "RULE") ? "ce produit" : "ce médicament";
+  // Sous un produit ou un médicament qui ne porte que des associations de l'officine, le titre dit son nom (« avec CORYZALIA »)
+  // plutôt que « ce médicament » : ce peut être un produit de parapharmacie.
+  const spoken = drugName.split(",")[0].trim();
+  const subject = recommendations.every((recommendation) => recommendation.origin === "RULE") ? spoken || "ce produit" : "ce médicament";
 
   return (
     <section aria-label={`À proposer avec ${drugName || subject}`} className="mt-3 border-l-2 border-brand-300 pl-3 sm:pl-4 dark:border-brand-700">

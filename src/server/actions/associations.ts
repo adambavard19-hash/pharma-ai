@@ -16,7 +16,10 @@ import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
  */
 
 const createSchema = z.object({
-  triggerProductId: z.string().min(1, "Choisissez le produit déclencheur."),
+  /** Le déclencheur : un produit du stock… */
+  triggerProductId: z.string().min(1).optional().nullable(),
+  /** …ou un médicament du catalogue national (un médicament conseil comme Coryzalia). Un seul des deux. */
+  triggerSpecialtyId: z.string().min(1).optional().nullable(),
   adviceProductId: z.string().min(1, "Choisissez le produit à conseiller."),
   sentence: z.string().max(MAX_SENTENCE_LENGTH + 200, "La phrase est trop longue.").optional().nullable(),
 });

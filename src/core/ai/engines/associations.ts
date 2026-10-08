@@ -1,3 +1,4 @@
+import { normalizeSearchText } from "@/core/reference/search";
 import type { AdviceOpportunityResult, CatalogProduct, PatientContext, ScoredRecommendation } from "../types";
 import { suggestionVigilances } from "./population-vigilance";
 
@@ -14,13 +15,33 @@ import { suggestionVigilances } from "./population-vigilance";
  *  • l'ordonnance : un médicament à prescription obligatoire ne se propose jamais en vente additionnelle ;
  *  • la vente elle-même : ce qui y est déjà n'est pas reproposé, ni ce que le moteur propose déjà par ailleurs.
  *
+ * Le DÉCLENCHEUR est soit un produit du stock (« product:<id> »), soit un médicament du catalogue national, reconnu par
+ * son nom sans la forme (« drug:CORYZALIA » pour « CORYZALIA, comprimé orodispersible » comme pour « CORYZALIA, solution
+ * buvable ») : un médicament conseil se lit par son code CIP, il n'est pas dans le stock de l'officine.
+ *
  * Module PUR : aucune base, aucune API, aucune horloge. Les textes affichés sont ceux que le pharmacien a écrits ;
  * rien n'est généré, aucune allégation de santé n'est ajoutée.
  */
 
+/** La clé d'un produit du stock comme déclencheur. */
+export const productKey = (productId: string): string => `product:${productId}`;
+
+/**
+ * La clé d'un médicament comme déclencheur : son nom sans la forme galénique, sans accents ni casse.
+ * « CORYZALIA, comprimé orodispersible » et « Coryzalia » donnent la même clé ; « DOLIPRANE 500 mg » et
+ * « DOLIPRANE 1000 mg » en donnent deux (le dosage fait partie du nom).
+ */
+export function drugKey(name: string): string {
+  return `drug:${normalizeSearchText(name.split(",")[0])}`;
+}
+
+/** Le nom tel qu'on le dit à voix haute : sans la forme galénique. */
+const spokenName = (name: string): string => name.split(",")[0].trim();
+
 export type ProductAssociationRule = {
   id: string;
-  triggerProductId: string;
+  /** Ce qui déclenche : `productKey(id)` ou `drugKey(nom)`. */
+  triggerKey: string;
   adviceProductId: string;
   /** Ce que le pharmacien dit au patient, écrit par lui. */
   sentence: string | null;
@@ -31,8 +52,11 @@ export type ProductAssociationRule = {
 export type AssociationInput = {
   /** Les associations actives de l'officine. */
   rules: ProductAssociationRule[];
-  /** Les lignes de la vente qui SONT un produit du stock (un bip de parapharmacie, par exemple). */
-  lineProducts: { lineIndex: number; productId: string }[];
+  /**
+   * Chaque ligne de la vente : les clés qu'elle porte (le médicament qu'elle est, le produit du stock qu'elle est) et, le
+   * cas échéant, ce produit du stock — pour ne pas reproposer ce qui est déjà dans la vente.
+   */
+  lines: { lineIndex: number; keys: string[]; productId: string | null }[];
 };
 
 /** Combien d'associations au plus se proposent sur une vente : au-delà, le comptoir est noyé. */
@@ -87,13 +111,13 @@ export function buildAssociationAdvice(args: {
   const catalogById = new Map(args.catalog.map((product) => [product.id, product]));
   const lineNameOf = (lineIndex: number) => args.lines.find((line) => line.lineIndex === lineIndex)?.drugName ?? null;
 
-  // Pour chaque produit de la vente : où il se trouve, et sous quel nom il est affiché.
-  const triggersByProduct = new Map<string, { lineIndex: number; name: string; productId: string }[]>();
-  for (const { lineIndex, productId } of args.association.lineProducts) {
-    const name = lineNameOf(lineIndex) ?? catalogById.get(productId)?.name ?? "ce produit";
-    triggersByProduct.set(productId, [...(triggersByProduct.get(productId) ?? []), { lineIndex, name, productId }]);
+  // Pour chaque clé de la vente : où elle se trouve, et sous quel nom elle est affichée.
+  const triggersByKey = new Map<string, { lineIndex: number; name: string; productId: string }[]>();
+  for (const { lineIndex, keys, productId } of args.association.lines) {
+    const name = spokenName(lineNameOf(lineIndex) ?? (productId ? catalogById.get(productId)?.name : undefined) ?? "ce produit");
+    for (const key of keys) triggersByKey.set(key, [...(triggersByKey.get(key) ?? []), { lineIndex, name, productId: productId ?? "" }]);
   }
-  const inSale = new Set(args.association.lineProducts.map((line) => line.productId));
+  const inSale = new Set(args.association.lines.map((line) => line.productId).filter((id): id is string => id !== null));
 
   const skipped: AssociationSkip[] = [];
   const notes: string[] = [];
@@ -101,7 +125,7 @@ export function buildAssociationAdvice(args: {
   const rules = [...args.association.rules].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
 
   for (const rule of rules) {
-    const triggers = triggersByProduct.get(rule.triggerProductId);
+    const triggers = triggersByKey.get(rule.triggerKey);
     // Le déclencheur n'est pas dans la vente : l'association ne s'applique pas, et il n'y a rien à dire.
     if (!triggers) continue;
     const advice = catalogById.get(rule.adviceProductId);

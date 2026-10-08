@@ -30,8 +30,8 @@ export default async function AssociationsPage() {
       <AssociationsManager
         associations={associations.map((association) => ({
           id: association.id,
-          trigger: association.triggerProduct,
-          advice: association.adviceProduct,
+          trigger: association.trigger,
+          advice: association.advice,
           sentence: association.sentence,
           isActive: association.isActive,
           createdBy: association.createdBy,
