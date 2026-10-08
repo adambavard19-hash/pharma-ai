@@ -76,3 +76,25 @@ Les tests (`npx vitest run`), `tsc --noEmit` et `eslint` restent la vérificatio
 de fond. Voir une couleur changer dans le navigateur ne dit rien d'une règle de
 sécurité. Le navigateur prouve que l'écran est juste ; les tests prouvent que le
 moteur l'est.
+
+# Flux de travail unique : développer, montrer, préparer — jamais publier
+
+Le fondateur ne gère pas Git et ne veut plus en entendre parler. Pour toute
+fonctionnalité demandée :
+
+1. **Une seule branche de travail : `developpement`.** On y développe et on y
+   intègre tout le travail terminé, sans écraser l'existant (jamais de
+   `reset --hard`, de force push, de suppression de branche ou de travail d'une
+   autre session). Ne plus parler de `lot/…` à l'utilisateur ; ces branches
+   restent de l'historique. Ne jamais laisser l'aperçu sur une autre branche :
+   l'aperçu (`npm run live`) montre toujours `developpement`.
+2. **Montrer dans l'aperçu**, avec le navigateur piloté, quand c'est possible.
+3. **Dire où cliquer** dans PharmaBoost, avec les libellés exacts de l'écran
+   (menu, onglet, bouton) — jamais un nom de fichier ni de branche.
+4. **Dire clairement l'état** : « en développement seulement » ou « prête à être
+   publiée sur pharmaboost.app », avec la raison (essai réel manquant, signature,
+   validation du pharmacien, migration, variable d'environnement…).
+5. **Préparer pour `main`, sans publier** : `developpement` reste fusionnable en
+   avance rapide sur `origin/main` ; `npm run publication:etat` dit ce qui attend.
+   Publier (`git push` vers `main`, qui déclenche la mise en ligne) et déployer
+   sont réservés à l'utilisateur, sur son ordre explicite et seulement alors.

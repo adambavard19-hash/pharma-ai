@@ -31,6 +31,7 @@
     "demo:commercial": "node --env-file=.env --conditions=react-server --import tsx scripts/demo-commercial.ts",
     "comptes:test": "node --env-file=.env --conditions=react-server --import tsx scripts/comptes-test.ts",
     "ocr:test": "node --env-file=.env --conditions=react-server --import tsx scripts/ocr-test.ts",
+    "publication:etat": "node scripts/etat-publication.mjs",
     "installateur:construire": "node scripts/construire-installateur.mjs",
     "agent:build": "node -e \"require('esbuild').buildSync({entryPoints:['agent/src/index.ts'],bundle:true,platform:'node',target:'node18',format:'cjs',outfile:'agent/dist/pharmaboost-connect.js',banner:{js:'#!/usr/bin/env node'}})\"",
     "onboarding:parcours": "EMAIL_PROVIDER=none SIGNATURE_PROVIDER=none node --env-file=.env --conditions=react-server --import tsx scripts/onboarding/parcours.mts",
