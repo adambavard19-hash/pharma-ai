@@ -1,7 +1,9 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DIAGNOSTIC_MARKER, buildDiagnosticRobotCmd } from "../diagnostic";
+import { DIAGNOSTIC_MARKER, LIRE_JOURNAL_MARKER, buildDiagnosticRobotCmd, buildLireJournalCmd } from "../diagnostic";
 
 const SCRIPT = readFileSync(join(process.cwd(), "agent", "diagnostic-robot.ps1"), "utf8");
 
@@ -65,5 +67,62 @@ describe("le collecteur lui-même (agent/diagnostic-robot.ps1)", () => {
     expect(SCRIPT).toContain("Hide-XmlValues");
     expect(SCRIPT).toContain("Hide-TextValues");
     expect(SCRIPT).toContain("MotsDuProtocole");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// La lecture du journal de LGPI : `lire-journal.cmd`
+// ---------------------------------------------------------------------------------------------------------------
+
+describe("l'enveloppe .cmd de la lecture du journal de LGPI", () => {
+  const bundle = readFileSync(join(process.cwd(), "agent", "dist", "lire-journal.js"), "utf8");
+  const cmd = buildLireJournalCmd(bundle);
+  const envelope = cmd.slice(0, cmd.indexOf(LIRE_JOURNAL_MARKER, cmd.indexOf("exit /b")));
+
+  it("l'enveloppe est en ASCII pur : cmd.exe ne lit pas l'UTF-8", () => {
+    expect(/^[\x20-\x7e\r\n]*$/.test(envelope)).toBe(true);
+    expect(envelope.split("\r\n")[0]).toBe("@echo off");
+  });
+
+  it("le programme est placé après le DERNIER repère, en fins de ligne Windows, et l'enveloppe s'arrête avant (exit /b)", () => {
+    expect(cmd.lastIndexOf(LIRE_JOURNAL_MARKER)).toBeGreaterThan(cmd.indexOf("exit /b"));
+    expect(cmd).toContain("\r\n");
+    expect(/[^\r]\n/.test(cmd)).toBe(false);
+    expect(cmd.slice(cmd.lastIndexOf(LIRE_JOURNAL_MARKER) + LIRE_JOURNAL_MARKER.length)).toContain("PB_LIRE_JOURNAL_LANCER");
+  });
+
+  it("l'enveloppe ne fait que lancer le Node de PharmaBoost : aucun téléchargement, aucune suppression, aucun réglage de Windows", () => {
+    for (const forbidden of [/curl|wget|bitsadmin|Invoke-WebRequest|DownloadFile/i, /\bdel\b|\brmdir\b|\bformat\b/i, /\breg\s+(add|delete)/i, /Set-ExecutionPolicy|schtasks|sc\s+(config|stop)/i, /netsh/i]) {
+      expect(forbidden.test(envelope)).toBe(false);
+    }
+    expect(envelope).toContain("%LOCALAPPDATA%\\PharmaBoost\\Poste\\node\\node.exe");
+    expect(envelope).toContain("chcp 65001");
+  });
+
+  it("le fichier s'exécute VRAIMENT : relu par Node comme le fait Windows, il écrit son rapport sur un faux Bureau", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pb-cmd-"));
+    try {
+      const logs = join(dir, "lgpi");
+      const desktop = join(dir, "Bureau");
+      mkdirSync(logs);
+      mkdirSync(desktop);
+      writeFileSync(join(logs, "lgpi.2026-10-08.log"), "2026-10-08 15:41:03,200 INFO  [AAA-RobotWorker-4] fr.pharmagest.stock.StockAutomate - Stock automate : Code produit 3095123 dans 2 emplacements\r\n");
+      const file = join(dir, "PharmaBoost-Lecture-Journal.cmd");
+      writeFileSync(file, cmd, "utf8");
+      // La commande du .cmd, extraite de l'enveloppe : on exécute exactement ce qu'exécuterait Windows.
+      const line = envelope.split("\r\n").find((l) => l.startsWith('"%PB_NODE%" -e '))!;
+      const bootstrap = line.replace('"%PB_NODE%" -e "', "").replace(/"$/, "");
+      const out = execFileSync(process.execPath, ["-e", bootstrap], {
+        encoding: "utf8",
+        env: { ...process.env, PB_FICHIER: file, PB_LIRE_JOURNAL_LANCER: "1", PB_BUREAU: desktop, PB_JOURNAL_DIR: logs },
+      });
+      expect(out).toContain("TERMINÉ");
+      const reports = readdirSync(desktop);
+      expect(reports).toHaveLength(1);
+      expect(reports[0]).toMatch(/^PharmaBoost-lecture-journal-.*\.txt$/);
+      expect(readFileSync(join(desktop, reports[0]), "utf8")).toContain("3095123");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

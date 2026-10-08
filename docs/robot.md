@@ -105,6 +105,48 @@ reconnu par son dossier ou sa ligne de lancement (jamais écrite dans le rapport
 bornée à 90 s, lecture des journaux à 100 s, 4 Mo par journal). Testé avec PowerShell 7 sur des machines et un disque
 simulés ; **pas testé avec Windows PowerShell 5.1 (celui de Windows 11 par défaut) ni sur un vrai Windows**.
 
+## Deuxième rapport complet : la piste « journal » existe (9 octobre 2026, POSTE5)
+
+Le diagnostic complet de POSTE5 a trouvé ce que le premier ne cherchait pas : **LGPI tient lui-même, sur chaque poste, un journal
+en clair de son échange avec l'automate** — `C:\var\log\lgpi\application\lgpi.AAAA-MM-JJ.log`, un fichier par jour, écrit en continu.
+Sur les 30 derniers jours, 9 journaux citent le robot (jusqu'à 692 lignes « automate » et 44 « OutputRequest » dans une même journée).
+
+Ce que le rapport établit (valeurs masquées) :
+
+- des lignes `Réception message en provenance de l'automate : …Request(…)` et les envois correspondants, avec un identifiant à
+  huit chiffres (`id=99999999`) ; `OutputRequest` est le terme de l'interface WWKS2 de BD Rowa pour **une demande de sortie**, donc la
+  délivrance elle-même ;
+- des lignes `… : Code produit 9999999 … 9 …` : un code produit à **sept chiffres** (la forme d'un CIP7), cité par un composant qui
+  parle au stock de l'automate ;
+- l'échange passe par le serveur de l'officine (192.168.0.100 : base de données, file de messages RabbitMQ sur le port 5672) ; le poste n'a ni
+  logiciel de robot, ni port COM, ni dossier partagé — il n'y a **rien à brancher ni à capturer** : le journal local suffit, en lecture seule.
+
+Ce qu'on **ignore encore** (et qu'on n'invente pas) : à quel moment exact ces lignes apparaissent par rapport au geste du pharmacien
+(sélection du produit ? sortie du robot ? validation de la vente ?), et quel champ porte le code produit dans une demande de sortie.
+Le masquage du premier rapport cachait les noms des champs ; un second rapport les montre.
+
+### La lecture du journal de LGPI (prête)
+
+`lire-journal.cmd` (fichier `PharmaBoost-Lecture-Journal.cmd`, à télécharger depuis la console : Officines → fiche → Technique & stock →
+Assistance → Robot, ou `https://pharmaboost.app/api/agent/fichiers/lire-journal.cmd`), à double-cliquer **sur un poste où PharmaBoost est
+installé**, juste après une vente de test d'UNE boîte connue. Il lit la fin des trois derniers journaux de LGPI (6 Mo chacun, en lecture
+partagée : LGPI continue d'écrire) et écrit un rapport sur le Bureau :
+
+1. quels journaux, quelles tailles, combien de lignes du robot par jour ;
+2. les **formes** de lignes du robot, comptées, avec première et dernière heure — les noms de structures (`OutputRequest(`) et de champs
+   (`articleId=`) restent lisibles, tout le reste est masqué (chiffres → 9, mots → a/A) ;
+3. les 40 dernières lignes du robot, masquées ;
+4. les **codes produit** que trois motifs candidats trouvent (`Code produit …`, `article…=…`, `cip/ean/gtin…=…`), avec l'heure : des
+   produits, jamais un patient ; on les compare à la vente de test, à la minute près.
+
+Jamais lues : les lignes qui ne commencent pas par une date (la suite d'une trace d'erreur, où passent les noms). Rien n'est envoyé, rien n'est
+installé, le seul programme lancé est PowerShell pour demander où est le Bureau. Le programme (`agent/src/lire-journal.ts`) est
+exécuté par le Node.js que PharmaBoost a installé sur le poste (`%LOCALAPPDATA%\PharmaBoost\Poste\node\node.exe`) : testé ici de bout en bout
+(le .cmd est relu par Node comme Windows le fait), mais **pas encore sur un vrai Windows**.
+
+Ensuite : le bon motif entre dans `--robot` (voir ci-dessous), le fichier du jour change chaque matin (`lgpi.AAAA-MM-JJ.log`) — le poste devra
+suivre le journal du jour, ce que `--robot` ne sait pas encore faire.
+
 ## Brancher un journal (prêt, à utiliser quand le diagnostic en a trouvé un)
 
 Sur le poste de caisse déjà installé (voir `installation-poste-caisse.md`), dans le dossier

@@ -53,6 +53,18 @@ describe("GET /api/agent/fichiers/[name]", () => {
     expect(text).not.toMatch(/[^\r]\n/);
   });
 
+  it("sert la lecture du journal de LGPI en .cmd à télécharger : enveloppe en ASCII, programme exécuté par le Node de PharmaBoost", async () => {
+    const response = await call("lire-journal.cmd");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Disposition")).toBe('attachment; filename="PharmaBoost-Lecture-Journal.cmd"');
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const text = new TextDecoder().decode(new Uint8Array(await response.arrayBuffer()));
+    expect(text.startsWith("@echo off\r\n")).toBe(true);
+    expect(text).toContain("%LOCALAPPDATA%\\PharmaBoost\\Poste\\node\\node.exe");
+    expect(text.split("//<<JS>>").pop()).toContain("PB_LIRE_JOURNAL_LANCER");
+    expect(text).not.toMatch(/[^\r]\n/);
+  });
+
   it("tout ce qui n'est pas dans la liste blanche : 404", async () => {
     for (const name of ["inconnu.ps1", "README.md", "../package.json", "constructor", "__proto__", "toString", "hasOwnProperty"]) {
       const response = await call(name);

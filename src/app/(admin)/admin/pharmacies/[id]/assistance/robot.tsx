@@ -105,6 +105,12 @@ export function AssistanceRobot({ pharmacyId, robot, lgo, postsOnline }: { pharm
         Télécharger le diagnostic du robot (lecture seule)
       </a>
       <p className="text-text-secondary">À ouvrir sur l&apos;ordinateur du robot : il écrit un rapport sur le Bureau, n&apos;envoie rien et ne change aucun réglage.</p>
+
+      <a href="/api/agent/fichiers/lire-journal.cmd" className="inline-flex items-center gap-2 font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">
+        <FileText className="size-4" aria-hidden="true" />
+        Télécharger la lecture du journal de LGPI (lecture seule)
+      </a>
+      <p className="text-text-secondary">À ouvrir sur un poste où PharmaBoost est installé, juste après une vente de test d&apos;une seule boîte : il lit la fin du journal de LGPI et montre où se trouve le code produit, sans aucune donnée patient.</p>
     </div>
   );
 }
