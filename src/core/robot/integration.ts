@@ -40,7 +40,7 @@ export type RobotManufacturer = {
 export const ROBOT_MANUFACTURERS: readonly RobotManufacturer[] = [
   { id: "bd-rowa", label: "BD Rowa", knownInterface: "WWKS2" },
   { id: "mach4", label: "Mach4", knownInterface: null },
-  { id: "willach", label: "Willach (Consis)", knownInterface: null },
+  { id: "willach", label: "Willach", knownInterface: null },
   { id: "apostore", label: "Apostore", knownInterface: null },
   { id: "autre", label: "Autre fabricant ou je ne sais pas", knownInterface: null },
 ];

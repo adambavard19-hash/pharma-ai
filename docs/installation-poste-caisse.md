@@ -2,10 +2,10 @@
 
 ## Par le titulaire lui-même : un lien, un fichier, un double-clic
 
-Dans PharmaBoost → **Ma connexion** → étape 2, « Installer PharmaBoost
-Connect », « Poste de comptoir » : un lien s'affiche, valable sept jours pour un
-poste. Il s'ouvre sur l'ordinateur où la douchette est branchée — ou il part
-par e-mail à la personne qui s'y trouve :
+Dans PharmaBoost → **Ma connexion** → étape 1, « Envoyer un lien d'installation » :
+un comptoir (« Comptoir 2 », « Comptoir 3 »…) et son lien sont créés, valable sept jours pour un
+poste. Il se copie, ou il part par e-mail à l'adresse du titulaire (et à aucune autre) ; il
+s'ouvre sur l'ordinateur où la douchette est branchée :
 
 ```
 https://pharmaboost.app/installer/<jeton>

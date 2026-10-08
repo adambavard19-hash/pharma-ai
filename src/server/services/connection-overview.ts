@@ -76,6 +76,8 @@ export async function loadConnectionOverview(pharmacyId: string, now: Date = new
       scanCount: post.scanCount,
       version: post.version,
       pairingExpiresAt: post.pairingExpiresAt,
+      exportPath: post.exportPath,
+      lastExportAt: post.lastExportAt,
     })),
     stockSyncedAt,
     stockLines,

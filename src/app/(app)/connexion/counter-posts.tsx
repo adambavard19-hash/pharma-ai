@@ -11,14 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/lib/format";
-import { PostInstallFlow } from "./install-panels";
 
 type PostRow = { id: string; label: string | null; hostname: string; paired: boolean; pairingExpiresAt: string | null; lastSeenAt: string | null; lastScanAt: string | null; scanCount: number; version: string | null; exportPath: string | null; lastExportAt: string | null; lastExportError: string | null };
 
 /**
  * Les postes de comptoir, côté réglages : la liste, l'état de chacun, le
  * dossier d'export qu'il relit, « mettre à jour maintenant », retirer — et
- * l'ajout d'un poste, qui est le même geste que dans l'assistant. « En ligne »
+ * l'ajout d'un poste se fait à l'étape 1 de la page. « En ligne »
  * veut dire : un signe de vie de moins de dix minutes, comme partout.
  */
 export function CounterPostsCard({ posts }: { posts: PostRow[] }) {
@@ -48,7 +47,7 @@ export function CounterPostsCard({ posts }: { posts: PostRow[] }) {
             return (
               <li key={post.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-[13.5px]">
                 <span className="min-w-0 flex-1">
-                  <span className="font-medium text-text-primary">{post.label ?? post.hostname ?? "Poste"}</span>
+                  <span className="font-medium text-text-primary">{post.label || post.hostname || "Poste"}</span>
                   {post.hostname && post.label && <span className="ml-2 text-text-tertiary">{post.hostname}</span>}
                   <span className="block text-[12.5px] text-text-secondary">
                     {!post.paired
@@ -86,10 +85,6 @@ export function CounterPostsCard({ posts }: { posts: PostRow[] }) {
           })}
         </ul>
       )}
-      <div className="space-y-3 rounded-xl border border-border-subtle p-4">
-        <p className="text-[14px] font-semibold text-text-primary">Ajouter un poste</p>
-        <PostInstallFlow />
-      </div>
       <p className="text-[12.5px] leading-5 text-text-tertiary">
         Un poste installé avec l&apos;installateur se met à jour tout seul. Un poste installé à l&apos;ancienne, en ligne de commande : le réinstaller avec l&apos;installateur, ou relancer <code className="font-mono">install-poste-windows.ps1 -MiseAJour</code> (aucun nouveau code).
       </p>

@@ -46,8 +46,8 @@ export function ConnectionManager({ serverUrl, connection, lgo }: { serverUrl: s
   if (!connection) {
     return (
       <div className="space-y-3">
-        <p className="text-[13.5px] text-text-secondary">Aucun serveur n&apos;est relié. Pour en relier un : étape 2 de l&apos;assistant, « Installer PharmaBoost Connect », puis « Serveur de l&apos;officine ».</p>
-        {lgo && <ServerInstallFlow lgo={lgo} serverUrl={serverUrl} />}
+        <p className="text-[13.5px] text-text-secondary">Aucun serveur n&apos;est relié. Il est facultatif : un fichier de stock suffit, et les comptoirs s&apos;installent à l&apos;étape 1.</p>
+        {lgo ? <ServerInstallFlow lgo={lgo} serverUrl={serverUrl} /> : <p className="text-[13.5px] text-text-secondary">Pour obtenir un code d&apos;installation du serveur, choisissez d&apos;abord « Mon logiciel » à l&apos;étape 2.</p>}
       </div>
     );
   }

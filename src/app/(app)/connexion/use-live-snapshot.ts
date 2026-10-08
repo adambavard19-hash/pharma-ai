@@ -5,6 +5,8 @@ import { getConnectionOverviewAction, type OverviewSnapshot } from "@/server/act
 import { useToast } from "@/components/ui/toast";
 
 const POLL_MS = 10_000;
+/** Pendant qu'un comptoir est en cours d'installation, on regarde plus souvent : le titulaire est devant l'écran. */
+const POLL_FAST_MS = 4_000;
 /** Un onglet oublié ne doit pas interroger le serveur toute la journée. */
 const POLL_MAX_MS = 30 * 60 * 1000;
 
@@ -15,6 +17,14 @@ const POLL_MAX_MS = 30 * 60 * 1000;
  */
 export function useLiveSnapshot(initial: OverviewSnapshot) {
   const [snapshot, setSnapshot] = useState(initial);
+  // Quand la page serveur se relit (un comptoir retiré dans le diagnostic, un envoi de stock), son état neuf remplace l'ancien tout de suite.
+  const [seen, setSeen] = useState(initial);
+  if (initial !== seen) {
+    setSeen(initial);
+    setSnapshot(initial);
+  }
+  // Un comptoir en cours d'installation se regarde de plus près : la personne est devant l'écran.
+  const interval = snapshot.overview.counters.some((counter) => counter.state === "TO_INSTALL") ? POLL_FAST_MS : POLL_MS;
   const { push } = useToast();
   const online = useRef(new Set(initial.overview.agent.items.filter((item) => item.online).map((item) => item.id)));
   const alive = useRef(true);
@@ -34,12 +44,12 @@ export function useLiveSnapshot(initial: OverviewSnapshot) {
     const timer = setInterval(() => {
       if (Date.now() - startedAt > POLL_MAX_MS) return;
       void refresh();
-    }, POLL_MS);
+    }, interval);
     return () => {
       alive.current = false;
       clearInterval(timer);
     };
-  }, [refresh]);
+  }, [refresh, interval]);
 
   return { snapshot, refresh };
 }

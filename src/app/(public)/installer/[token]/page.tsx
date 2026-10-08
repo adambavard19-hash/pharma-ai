@@ -46,7 +46,7 @@ export default async function InstallPostPage({ params }: { params: Promise<{ to
                 Un lien d&apos;installation dure sept jours et ne sert qu&apos;une fois : celui-ci a expiré ou a déjà installé un poste.
               </p>
               <p className="mt-3 rounded-lg bg-[#f0faf8] px-3.5 py-2.5 text-[13.5px] leading-5 text-[#0b5c56]">
-                Dans PharmaBoost, ouvrez <strong>Ma connexion</strong>, puis <strong>« Installer PharmaBoost Connect »</strong> et <strong>« Poste de comptoir »</strong> : un nouveau lien est prêt en quelques secondes. Sinon, écrivez-nous : <a href={`mailto:${CONTACT}`} className="font-semibold underline">{CONTACT}</a>.
+                Dans PharmaBoost, ouvrez <strong>Ma connexion</strong>, puis <strong>« Envoyer un lien d&apos;installation »</strong> : un nouveau lien est prêt en quelques secondes. Sinon, écrivez-nous : <a href={`mailto:${CONTACT}`} className="font-semibold underline">{CONTACT}</a>.
               </p>
             </>
           )}

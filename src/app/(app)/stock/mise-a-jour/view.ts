@@ -279,6 +279,26 @@ export function sendOutcome(result: ActionResult<DepositView>): SendOutcome {
 }
 
 /**
+ * La confirmation de « Envoyer mon stock » : ce que la personne veut lire en une ligne — combien de produits, et quand.
+ * Un fichier appliqué dit son nombre de produits et sa date ; les lignes illisibles sont dites à part, jamais cachées.
+ * Un fichier en vérification ou refusé garde les mots de `sendOutcome` : le stock n'a pas changé, et ça se dit.
+ */
+export function uploadSummary(result: ActionResult<DepositView>, now: Date): SendOutcome {
+  if (result.ok && result.data.status === "APPLIED") {
+    const deposit = result.data;
+    const products = deposit.lines ?? 0;
+    const parts = [`${formatNumber(products)} produit${products > 1 ? "s" : ""}`, describeReceived(deposit.appliedAt ?? deposit.receivedAt, now)];
+    const ignored = deposit.invalid ?? 0;
+    return {
+      tone: ignored > 0 ? "warning" : "success",
+      title: "Stock reçu",
+      detail: `${parts.join(" · ")}.${ignored > 0 ? ` ${formatNumber(ignored)} ligne${ignored > 1 ? "s" : ""} illisible${ignored > 1 ? "s" : ""} ignorée${ignored > 1 ? "s" : ""}.` : ""}`,
+    };
+  }
+  return sendOutcome(result);
+}
+
+/**
  * L'envoi, du fichier choisi à la phrase affichée. `sent` dit si le fichier
  * est parti (lu ou en vérification) : la zone peut alors se vider. Un fichier
  * refusé par le contrôle ne part pas ; une panne réseau n'est jamais une

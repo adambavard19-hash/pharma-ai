@@ -66,30 +66,10 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-[20px] font-semibold text-text-primary">A. Envoyer un fichier de stock</h2>
-        <GuideStep n={1} title={`Sortez le stock de ${guide.name}`} illustration={<MenuIllustration items={MENU_PATH[lgo.id] ?? GENERIC_MENU_PATH} />}>
-          <ul className="space-y-1.5 text-[14.5px] leading-6 text-text-primary">
-            {guide.menuSteps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ul>
-          <p className="text-[14px] leading-6 font-medium text-text-primary">Prenez tout votre stock, pas seulement les nouveautés. {ZERO_ABSENT_NOTICE}</p>
-          {guide.notice && <p className="text-[13px] leading-5 text-text-secondary">{guide.notice}</p>}
-        </GuideStep>
-        <GuideStep n={2} title="Envoyez le fichier à PharmaBoost" illustration={<FileIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">Dans Ma connexion, étape 2, « Envoyer un fichier » puis « Choisir mon fichier ». Le nom du fichier n&apos;a pas d&apos;importance.</p>
-          <Button asChild size="sm"><Link href="/stock/mise-a-jour">Choisir mon fichier</Link></Button>
-        </GuideStep>
-        <GuideStep n={3} title="Le stock se met à jour" illustration={<StockOkIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">PharmaBoost lit le fichier en une minute. Ma connexion affiche « Stock à jour » avec l&apos;heure de réception et le nombre de références.</p>
-        </GuideStep>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-[20px] font-semibold text-text-primary">B. Installer PharmaBoost Connect sur le poste de comptoir</h2>
-        <p className="text-[14px] leading-6 text-text-secondary">Pour l&apos;ordinateur où la douchette est branchée. {methods.connect.note}</p>
+        <h2 className="text-[20px] font-semibold text-text-primary">Étape 1 — Installer PharmaBoost sur un comptoir</h2>
+        <p className="text-[14px] leading-6 text-text-secondary">Pour chaque ordinateur Windows du comptoir, un par un : « Comptoir 1 », « Comptoir 2 »… {methods.connect.note}</p>
         <GuideStep n={1} title="Téléchargez l'installateur" illustration={<DownloadIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">Dans Ma connexion, étape 2, « Installer PharmaBoost Connect », « Poste de comptoir », puis « Obtenir mon lien d&apos;installation ». Ouvrez le lien sur l&apos;ordinateur de la douchette et cliquez « Télécharger l&apos;installateur ».</p>
+          <p className="text-[14.5px] leading-6 text-text-primary">Dans Ma connexion, étape 1, « Envoyer un lien d&apos;installation ». Copiez le lien, ou recevez-le par e-mail, puis ouvrez-le sur l&apos;ordinateur de la douchette et cliquez « Télécharger l&apos;installateur ».</p>
         </GuideStep>
         <GuideStep n={2} title="Double-cliquez le fichier" illustration={<InstallerIllustration />}>
           <p className="text-[14.5px] leading-6 text-text-primary">Suivez l&apos;assistant d&apos;installation : une minute, Internet requis, aucun mot de passe administrateur et rien à taper.</p>
@@ -100,20 +80,40 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-[20px] font-semibold text-text-primary">C. Tester ma connexion</h2>
-        <GuideStep n={1} title="Cliquez « Tester ma connexion »" illustration={<StockOkIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">PharmaBoost contrôle le logiciel choisi, chaque appareil installé, le stock reçu (date, références, lignes illisibles) et les ventes. Chaque contrôle dit ce qui a été constaté et, si ce n&apos;est pas bon, quoi faire.</p>
-          <p className="text-[13.5px] leading-5 text-text-secondary">Le test lit ce que vos programmes ont envoyé à PharmaBoost ; il ne se connecte pas à vos ordinateurs. Pour prouver le suivi des ventes, faites l&apos;« essai du bip » : bipez une boîte, PharmaBoost dit s&apos;il l&apos;a reçue.</p>
+        <h2 className="text-[20px] font-semibold text-text-primary">Étape 2 — Envoyer mon stock</h2>
+        <GuideStep n={1} title={`Sortez le stock de ${guide.name}`} illustration={<MenuIllustration items={MENU_PATH[lgo.id] ?? GENERIC_MENU_PATH} />}>
+          <ul className="space-y-1.5 text-[14.5px] leading-6 text-text-primary">
+            {guide.menuSteps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ul>
+          <p className="text-[14px] leading-6 font-medium text-text-primary">Prenez tout votre stock, pas seulement les nouveautés. {ZERO_ABSENT_NOTICE}</p>
+          {guide.notice && <p className="text-[13px] leading-5 text-text-secondary">{guide.notice}</p>}
+        </GuideStep>
+        <GuideStep n={2} title="Envoyez le fichier à PharmaBoost" illustration={<FileIllustration />}>
+          <p className="text-[14.5px] leading-6 text-text-primary">Dans Ma connexion, étape 2, cliquez « Envoyer mon stock » et choisissez le fichier. Le nom du fichier n&apos;a pas d&apos;importance.</p>
+          <Button asChild size="sm"><Link href="/stock/mise-a-jour">Choisir mon fichier</Link></Button>
+        </GuideStep>
+        <GuideStep n={3} title="Le stock se met à jour" illustration={<StockOkIllustration />}>
+          <p className="text-[14.5px] leading-6 text-text-primary">PharmaBoost lit le fichier en une minute. Ma connexion affiche « Stock à jour » avec l&apos;heure de réception et le nombre de références.</p>
         </GuideStep>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-[20px] font-semibold text-text-primary">D. Mon robot</h2>
+        <h2 className="text-[20px] font-semibold text-text-primary">Étape 3 — Connecter mon robot</h2>
         <div className="space-y-2 rounded-2xl border border-border-subtle bg-surface-card p-5 text-[14.5px] leading-6 text-text-primary">
-          <p><strong>PharmaBoost ne se connecte pas encore à un robot.</strong> La rubrique « Connecter mon robot » vous laisse désigner le vôtre (fabricant, modèle) pour préparer l&apos;intégration.</p>
+          <p><strong>PharmaBoost ne se connecte pas encore à un robot.</strong> L&apos;étape 3 vous laisse désigner le vôtre (fabricant, modèle) pour préparer l&apos;intégration.</p>
           <p className="text-[14px] text-text-secondary">Votre logiciel et votre robot sont deux sources différentes : le logiciel donne le stock, le robot donnera un jour les produits qu&apos;on lui demande de sortir. Aujourd&apos;hui, ce sont les bips de la douchette qui affichent les conseils au comptoir.</p>
           <p className="text-[14px] text-text-secondary">Pour aider à préparer l&apos;intégration, un diagnostic en lecture seule peut être lancé sur l&apos;ordinateur du robot : il écrit un rapport sur le Bureau, n&apos;envoie rien, et vous le relisez avant de nous le transmettre.</p>
         </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-[20px] font-semibold text-text-primary">Tester ma connexion (diagnostic technique)</h2>
+        <GuideStep n={1} title="Ouvrez « Diagnostic technique », puis « Tester ma connexion »" illustration={<StockOkIllustration />}>
+          <p className="text-[14.5px] leading-6 text-text-primary">PharmaBoost contrôle le logiciel choisi, chaque appareil installé, le stock reçu (date, références, lignes illisibles) et les ventes. Chaque contrôle dit ce qui a été constaté et, si ce n&apos;est pas bon, quoi faire.</p>
+          <p className="text-[13.5px] leading-5 text-text-secondary">Le test lit ce que vos programmes ont envoyé à PharmaBoost ; il ne se connecte pas à vos ordinateurs. Pour prouver le suivi des ventes, faites l&apos;« essai du bip » : bipez une boîte, PharmaBoost dit s&apos;il l&apos;a reçue.</p>
+        </GuideStep>
       </section>
 
       <section className="space-y-3">

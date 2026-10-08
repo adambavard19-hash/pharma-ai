@@ -163,3 +163,15 @@ Write-Host "Installation…"
 & (Join-Path $setup "install-poste-windows.ps1") -Code ${psq(input.token)} -Serveur $serveur${stock}
 `;
 }
+
+/**
+ * Le nom du prochain comptoir : « Comptoir 2 » quand il y en a déjà un, « Comptoir 3 » quand il y en a deux…
+ * Un nom déjà pris (par un ancien poste, « Caisse 1 » compris dans le compte) n'est jamais repris.
+ */
+export function nextCounterLabel(existing: readonly (string | null | undefined)[]): string {
+  const taken = new Set(existing.map((label) => (label ?? "").trim().toLowerCase()));
+  for (let n = existing.length + 1; n < existing.length + 1000; n++) {
+    if (!taken.has(`comptoir ${n}`)) return `Comptoir ${n}`;
+  }
+  return `Comptoir ${existing.length + 1}`;
+}

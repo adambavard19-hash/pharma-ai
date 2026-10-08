@@ -176,6 +176,36 @@ export async function createPostInstallLink(scope: TenantScope, label: string | 
 }
 
 /**
+ * Un nouveau lien pour un comptoir qui attend encore son installation (lien perdu, expiré). Un comptoir déjà
+ * installé n'en reçoit pas : son association est faite, un second lien en ferait un autre poste. Le comptoir
+ * doit appartenir à l'officine de la session ; l'ancien lien cesse de marcher.
+ */
+export async function reissuePostInstallLink(scope: TenantScope, postId: string): Promise<{ ok: true; token: string; expiresAt: Date; label: string | null } | { ok: false; error: string }> {
+  const post = await prisma.counterPost.findFirst({ where: { id: postId, pharmacyId: scope.pharmacyId, revokedAt: null }, select: { id: true, label: true, pairedAt: true } });
+  if (!post) return { ok: false, error: "Comptoir introuvable." };
+  if (post.pairedAt) return { ok: false, error: "Ce comptoir est déjà installé. Pour en ajouter un autre, utilisez « Envoyer un lien d'installation »." };
+  const token = generateToken(18);
+  const expiresAt = new Date(Date.now() + POST_INSTALL_LINK_TTL_MS);
+  await prisma.counterPost.update({ where: { id: post.id }, data: { pairingCodeHash: hashToken(token), pairingExpiresAt: expiresAt } });
+  await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { label: post.label, kind: "install-link-reissued" } });
+  return { ok: true, token, expiresAt, label: post.label };
+}
+
+/**
+ * Le lien d'installation dont le titulaire détient le jeton : il est bien de SON officine, et encore valable.
+ * Sert à n'envoyer par e-mail que ce que cette officine a vraiment créé.
+ */
+export async function findOwnPostInstallLink(scope: TenantScope, token: string): Promise<{ label: string | null; expiresAt: Date; pharmacyName: string } | null> {
+  if (!/^[A-Za-z0-9_-]{16,}$/.test(token)) return null;
+  const post = await prisma.counterPost.findFirst({
+    where: { pharmacyId: scope.pharmacyId, pairingCodeHash: hashToken(token), revokedAt: null, pairedAt: null },
+    select: { label: true, pairingExpiresAt: true, pharmacy: { select: { name: true } } },
+  });
+  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return null;
+  return { label: post.label, expiresAt: post.pairingExpiresAt, pharmacyName: post.pharmacy.name };
+}
+
+/**
  * Un lien d'installation encore valable ? Sans rien consommer : l'installateur le vérifie avant de télécharger.
  * Rend aussi le nom de machine du serveur relié (s'il y en a un, et s'il est sûr) : le poste en tire le chemin du dossier partagé.
  */
@@ -269,7 +299,7 @@ export async function pairCounterPost(input: { code: string; hostname?: string |
   const code = /^[A-Za-z0-9_-]{16,}$/.test(raw) ? raw : raw.replace(/\D/g, "");
   if (code.length !== 6 && code.length < 16) return { ok: false, error: "Code d'appairage invalide." };
   const post = await prisma.counterPost.findUnique({ where: { pairingCodeHash: hashToken(code) }, include: { pharmacy: { select: { name: true } } } });
-  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return { ok: false, error: "Code de poste inconnu ou expiré. Générez un nouveau lien dans PharmaBoost (Ma connexion → Installer PharmaBoost Connect → Poste de comptoir)." };
+  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return { ok: false, error: "Code de poste inconnu ou expiré. Générez un nouveau lien dans PharmaBoost (Ma connexion → Envoyer un lien d'installation)." };
   const agentKey = generateToken(32);
   await prisma.counterPost.update({
     where: { id: post.id },

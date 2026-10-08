@@ -10,11 +10,10 @@ import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PharmacyInfoForm } from "./pharmacy-info-form";
 import { FinishButton, VerifyStockButton } from "./buttons";
-import { ConnectAssistant } from "../connexion/assistant";
+import { StockSendBody } from "../connexion/stock-step";
 import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 import { loadConnectionOverview } from "@/server/services/connection-overview";
 import type { OverviewSnapshot } from "@/server/actions/stock-sync";
-import { resolvePublicBaseUrl } from "@/server/public-url";
 
 export const metadata: Metadata = { title: "Bienvenue sur PharmaBoost" };
 
@@ -46,7 +45,6 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
 
   const connectionState = await loadConnectionOverview(session.scope.pharmacyId);
   const snapshot = JSON.parse(JSON.stringify({ overview: connectionState.overview, lgo: connectionState.lgo })) as OverviewSnapshot;
-  const serverUrl = resolvePublicBaseUrl().url;
 
   const infoDone = Boolean(pharmacy.addressLine1 && pharmacy.city && pharmacy.postalCode);
   const stockDone = Boolean(pharmacy.stockSyncedAt);
@@ -114,7 +112,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
       {current === 2 && (
         <Card>
           <CardContent className="space-y-4 py-6">
-            <StepTitle icon={FileSpreadsheet} title="2. Mettre mon stock dans PharmaBoost" description="Choisissez votre logiciel, puis envoyez votre stock : un fichier, ou PharmaBoost Connect. Rien ne se saisit à la main." />
+            <StepTitle icon={FileSpreadsheet} title="2. Mettre mon stock dans PharmaBoost" description="Envoyez le fichier de votre logiciel : PharmaBoost le lit et vous confirme les produits reçus. Rien ne se saisit à la main." />
             {stockDone ? (
               <div className="rounded-xl border border-success-300 bg-success-50/40 px-4 py-3 text-[13.5px] dark:border-success-800 dark:bg-success-950/20">
                 <p className="font-medium text-text-primary">Stock importé le {formatDateTime(pharmacy.stockSyncedAt!)} — {references} référence{references > 1 ? "s" : ""}.</p>
@@ -125,7 +123,10 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
                 )}
               </div>
             ) : null}
-            <ConnectAssistant lgos={LGO_DEFINITIONS} initial={snapshot} serverUrl={serverUrl} />
+            <StockSendBody lgos={LGO_DEFINITIONS} lgo={snapshot.lgo} stock={snapshot.overview.stock} autoSync={snapshot.overview.autoSync} />
+            <p className="text-[13.5px] text-text-secondary">
+              Vos comptoirs, un par un : <Link href="/connexion" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Ma connexion</Link>.
+            </p>
             {stockDone && (
               <div className="flex justify-end border-t border-border-subtle pt-4">
                 <Button asChild>

@@ -4,54 +4,63 @@ import { ChevronDown } from "lucide-react";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { loadConnectionOverview } from "@/server/services/connection-overview";
+import { loadRobotSetup } from "@/server/services/robot-setup";
 import { resolvePublicBaseUrl } from "@/server/public-url";
 import { ONLINE_WITHIN_SECONDS } from "@/core/stock/connection-overview";
 import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 import type { OverviewSnapshot } from "@/server/actions/stock-sync";
-import { loadRobotSetup } from "@/server/services/robot-setup";
-import { ConnectionHub } from "./hub";
+import { AssistanceCode } from "./assistance-code";
 import { ConnectionManager } from "./connection-manager";
 import { CounterPostsCard } from "./counter-posts";
+import { DiagnosticTest } from "./diagnostic-test";
+import { RobotDiagnostic } from "./robot-diagnostic";
+import { ConnectionSetup } from "./setup";
+import { ConnectionSummary } from "./summary";
 
 export const metadata: Metadata = { title: "Ma connexion" };
 
 /**
- * Ma connexion — la page centrale : le logiciel, PharmaBoost Connect, le stock, les
- * ventes, le robot, le test de connexion et le parcours guidé en trois étapes. Elle
- * remplace « Mise en service », « Connecter mon logiciel » et l'assistant d'accueil, qui
- * disaient trois fois la même chose en trois endroits.
+ * Ma connexion — une seule page, trois étapes : installer sur mes comptoirs, envoyer mon stock, connecter mon
+ * robot (facultatif). Elle remplace « Mise en service », « Connecter mon logiciel » et l'assistant d'accueil.
  *
- * Ce qu'on lit en dix secondes est en haut. Tout ce qui est technique — les postes, le
- * serveur, les dossiers, les lignes de commande — est dans « Configuration avancée »,
- * rien n'a été retiré.
+ * Tout ce qui est technique — l'état détaillé, le test de connexion, les postes, le serveur, les dossiers, le
+ * robot — est dans « Diagnostic technique », replié : c'est pour l'assistance, pas pour installer. Rien n'a été
+ * retiré. (« ?avance=1 » ouvre le diagnostic : les anciennes adresses y arrivent.)
  */
-export default async function ConnectPage({ searchParams }: { searchParams: Promise<{ avance?: string }> }) {
+export default async function ConnectPage({ searchParams }: { searchParams: Promise<{ avance?: string; diagnostic?: string }> }) {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
-  const { avance } = await searchParams;
+  const { avance, diagnostic } = await searchParams;
   const [loaded, robot] = await Promise.all([loadConnectionOverview(session.scope.pharmacyId), loadRobotSetup(session.scope.pharmacyId)]);
   const serverUrl = resolvePublicBaseUrl().url;
-  const { connection, posts } = loaded;
-  const snapshot = JSON.parse(JSON.stringify({ overview: loaded.overview, lgo: loaded.lgo })) as OverviewSnapshot;
-  const serverItem = loaded.overview.agent.items.find((item) => item.kind === "server");
+  const { connection, posts, overview } = loaded;
+  const snapshot = JSON.parse(JSON.stringify({ overview, lgo: loaded.lgo })) as OverviewSnapshot;
+  const serverItem = overview.agent.items.find((item) => item.kind === "server");
+  const postsOnline = overview.agent.items.filter((item) => item.kind === "post" && item.online).length;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header className="space-y-1.5">
-        <h1 className="text-[30px] leading-9 font-semibold tracking-[-0.02em] text-text-primary">Ma connexion</h1>
-        <p className="text-[15px] leading-6 text-text-secondary">Votre logiciel, PharmaBoost Connect, votre stock et votre robot, au même endroit. Aucune connaissance informatique nécessaire.</p>
-      </header>
+    <div className="mx-auto w-full max-w-2xl space-y-6 pb-20">
+      <ConnectionSetup initial={snapshot} lgos={LGO_DEFINITIONS} robot={robot} userEmail={session.user.email} />
 
-      <ConnectionHub lgos={LGO_DEFINITIONS} initial={snapshot} serverUrl={serverUrl} robot={robot} />
-
-      <details id="avance" open={avance === "1"} className="group rounded-2xl border border-border-subtle bg-surface-card">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+      <details id="diagnostic" open={avance === "1" || diagnostic === "1"} className="group rounded-2xl border border-border-subtle bg-surface-card">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-5 py-4 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none">
           <span>
-            <span className="block text-[16px] font-semibold text-text-primary">Configuration avancée</span>
-            <span className="block text-[13.5px] text-text-secondary">Postes, serveur, dossiers, lignes de commande : pour l&apos;informaticien.</span>
+            <span className="block text-[16px] font-semibold text-text-primary">Diagnostic technique</span>
+            <span className="block text-[13.5px] text-text-secondary">Pour l&apos;assistance PharmaBoost. Rien à faire ici pour installer.</span>
           </span>
-          <ChevronDown className="size-4 text-text-tertiary transition-transform group-open:rotate-180" aria-hidden="true" />
+          <ChevronDown className="size-4 shrink-0 text-text-tertiary transition-transform group-open:rotate-180" aria-hidden="true" />
         </summary>
-        <div className="space-y-8 border-t border-border-subtle px-5 py-5">
+        <div className="space-y-8 border-t border-border-subtle px-4 py-5 sm:px-5">
+          <section className="space-y-3">
+            <h2 className="text-[15px] font-semibold text-text-primary">État</h2>
+            <ConnectionSummary overview={overview} canOpen={false} />
+            <p className="text-[12.5px] text-text-tertiary">Un appareil est « en ligne » s&apos;il a donné signe de vie depuis moins de {ONLINE_WITHIN_SECONDS / 60} minutes.</p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-[15px] font-semibold text-text-primary">Test de connexion</h2>
+            <DiagnosticTest salesFollowed={overview.sales.state === "FOLLOWED" || overview.sales.state === "WAITING_SCAN"} scanCount={overview.sales.scanCount} />
+          </section>
+
           <section className="space-y-3">
             <h2 className="text-[15px] font-semibold text-text-primary">Postes de comptoir</h2>
             <CounterPostsCard
@@ -70,7 +79,9 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
                 lastExportError: post.lastExportError,
               }))}
             />
+            <AssistanceCode />
           </section>
+
           <section className="space-y-3">
             <h2 className="text-[15px] font-semibold text-text-primary">Serveur de l&apos;officine</h2>
             <ConnectionManager
@@ -97,6 +108,12 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
               }
             />
           </section>
+
+          <section className="space-y-3">
+            <h2 className="text-[15px] font-semibold text-text-primary">Robot</h2>
+            <RobotDiagnostic robot={robot} lgo={loaded.lgo} postsOnline={postsOnline} />
+          </section>
+
           <section className="space-y-2">
             <h2 className="text-[15px] font-semibold text-text-primary">Autres outils</h2>
             <ul className="space-y-1.5 text-[14px]">
@@ -105,14 +122,9 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
               <li><Link href="/stock/historique" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Historique des mouvements de stock</Link></li>
               <li><Link href="/connexion/guide" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Guide pas à pas, avec schémas</Link></li>
             </ul>
-            <p className="text-[12.5px] text-text-tertiary">Un appareil est « en ligne » s&apos;il a donné signe de vie depuis moins de {ONLINE_WITHIN_SECONDS / 60} minutes.</p>
           </section>
         </div>
       </details>
-
-      <p className="text-center text-[13.5px] text-text-secondary">
-        Pour bien démarrer : <Link href="/bienvenue" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">compléter mon officine</Link> · <Link href="/equipe" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">inviter mon équipe</Link> · <Link href="/connexion/guide" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">guide pas à pas</Link>
-      </p>
     </div>
   );
 }

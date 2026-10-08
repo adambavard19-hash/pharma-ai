@@ -210,3 +210,95 @@ describe("les méthodes réellement disponibles : jamais de promesse qui n'est p
     expect(text).not.toMatch(/synchronisation automatique|temps réel|en continu/i);
   });
 });
+
+describe("les comptoirs : « Connecté » demande un appairage ET un signe de vie", () => {
+  it("un poste appairé qui répond : connecté", () => {
+    const [row] = overview({ posts: [post()] }).counters;
+    expect(row).toMatchObject({ id: "post_1", label: "Caisse 1", state: "CONNECTED", title: "Connecté" });
+  });
+
+  it("un poste appairé sans signe de vie récent : « ne répond plus », jamais connecté", () => {
+    const [row] = overview({ posts: [post({ lastSeenAt: ago(2 * HOUR) })] }).counters;
+    expect(row).toMatchObject({ state: "OFFLINE", title: "Ne répond plus" });
+    expect(row.detail).toMatch(/Dernier signe de vie/);
+  });
+
+  it("un poste appairé qui n'a jamais donné signe de vie : « ne répond plus »", () => {
+    expect(overview({ posts: [post({ lastSeenAt: null })] }).counters[0].state).toBe("OFFLINE");
+  });
+
+  it("un lien envoyé et valable : à installer, avec sa date limite — pas connecté", () => {
+    const [row] = overview({ posts: [post({ pairedAt: null, lastSeenAt: null, pairingExpiresAt: new Date(NOW.getTime() + 3 * DAY * 1000) })] }).counters;
+    expect(row).toMatchObject({ state: "TO_INSTALL", title: "À installer" });
+    expect(row.detail).toMatch(/valable jusqu'au 11\/10/);
+  });
+
+  it("un lien expiré : à renouveler", () => {
+    const [row] = overview({ posts: [post({ pairedAt: null, lastSeenAt: null, pairingExpiresAt: ago(HOUR) })] }).counters;
+    expect(row).toMatchObject({ state: "EXPIRED", title: "Lien expiré" });
+  });
+
+  it("garde l'ordre de création et nomme un poste sans libellé par son numéro", () => {
+    const rows = overview({ posts: [post({ id: "a", label: "Comptoir 1" }), post({ id: "b", label: null, hostname: "", pairedAt: null, lastSeenAt: null, pairingExpiresAt: new Date(NOW.getTime() + DAY * 1000) })] }).counters;
+    expect(rows.map((row) => [row.id, row.label])).toEqual([["a", "Comptoir 1"], ["b", "Comptoir 2"]]);
+  });
+
+  it("aucun poste : aucun comptoir listé", () => {
+    expect(overview().counters).toEqual([]);
+  });
+});
+
+describe("l'envoi automatique n'est « actif » que s'il a eu lieu", () => {
+  it("rien d'installé : non utilisé", () => {
+    expect(overview().autoSync.state).toBe("NONE");
+  });
+
+  it("un serveur relié qui n'a encore rien lu : en attente, jamais actif", () => {
+    expect(overview({ connection: connection({ lastSyncAt: null }) }).autoSync.state).toBe("WAITING");
+  });
+
+  it("un export lu il y a deux heures : actif", () => {
+    const sync = overview({ connection: connection({ lastSyncAt: ago(2 * HOUR) }) }).autoSync;
+    expect(sync.state).toBe("ACTIVE");
+    expect(sync.detail).toMatch(/Dernier export lu il y a 2 h/);
+  });
+
+  it("un serveur en ligne mais sans export depuis dix jours : périmé, pas actif", () => {
+    expect(overview({ connection: connection({ lastSyncAt: ago(10 * DAY) }) }).autoSync.state).toBe("STALE");
+  });
+
+  it("un poste qui relit un dossier d'export compte, un poste sans dossier non", () => {
+    expect(overview({ posts: [post({ exportPath: "\\\\SRV\\PharmaBoost", lastExportAt: ago(HOUR) })] }).autoSync.state).toBe("ACTIVE");
+    expect(overview({ posts: [post()] }).autoSync.state).toBe("NONE");
+  });
+});
+
+describe("le stock se dit comme on le dirait : une date et un nombre de produits", () => {
+  it("sans stock reçu : ni date ni nombre", () => {
+    expect(overview().stock).toMatchObject({ receivedLabel: null, productCount: null });
+  });
+
+  it("le nombre de produits est celui du dernier fichier, à défaut les références en rayon", () => {
+    expect(overview({ stockSyncedAt: ago(HOUR), stockLines: 4200, stockReferences: 3980 }).stock.productCount).toBe(4200);
+    expect(overview({ stockSyncedAt: ago(HOUR), stockReferences: 3980 }).stock.productCount).toBe(3980);
+    expect(overview({ stockSyncedAt: ago(HOUR) }).stock.productCount).toBeNull();
+  });
+
+  it("la date est dite « aujourd'hui à… », « hier à… » ou en toutes lettres", () => {
+    expect(overview({ stockSyncedAt: ago(HOUR) }).stock.receivedLabel).toMatch(/^aujourd'hui à \d\d:\d\d$/);
+    expect(overview({ stockSyncedAt: ago(DAY + HOUR) }).stock.receivedLabel).toMatch(/^hier à \d\d:\d\d$/);
+    expect(overview({ stockSyncedAt: ago(5 * DAY) }).stock.receivedLabel).toMatch(/^le \d\d\/\d\d\/2026 à \d\d:\d\d$/);
+  });
+});
+
+describe("les ventes ne sont « suivies » qu'après un vrai bip", () => {
+  it("un poste en ligne qui n'a jamais reçu de bip : en attente du premier bip, pas « suivies »", () => {
+    const sales = overview({ posts: [post({ scanCount: 0, lastScanAt: null })] }).sales;
+    expect(sales).toMatchObject({ state: "WAITING_SCAN", tone: "neutral", title: "En attente du premier bip", scanCount: 0 });
+    expect(sales.detail).toMatch(/Bipez une boîte/);
+  });
+
+  it("dès qu'un bip est arrivé : suivies", () => {
+    expect(overview({ posts: [post({ scanCount: 1 })] }).sales.state).toBe("FOLLOWED");
+  });
+});

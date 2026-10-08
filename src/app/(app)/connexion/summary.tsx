@@ -10,8 +10,10 @@ import { TONE_STYLES } from "./status";
  * l'état se lit partout pareil, parce qu'il est calculé une seule fois.
  */
 export function ConnectionSummary({ overview, canOpen }: { overview: ConnectionOverview; canOpen: boolean }) {
+  // « Connecté » ne cache pas un appareil muet : s'il y en a un, on le dit à côté.
+  const silent = overview.agent.items.filter((item) => !item.online).length;
   const parts = [
-    { label: "PharmaBoost Connect", tone: overview.agent.tone, title: overview.agent.title },
+    { label: "PharmaBoost Connect", tone: overview.agent.tone, title: overview.agent.state === "ONLINE" && silent > 0 ? `${overview.agent.title} · ${silent} hors ligne` : overview.agent.title },
     { label: "Stock reçu", tone: overview.stock.tone, title: overview.stock.title },
     { label: "Ventes", tone: overview.sales.tone, title: overview.sales.title },
   ] as const;

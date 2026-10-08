@@ -1,7 +1,6 @@
 import { describeAge } from "./connectors";
 import { ONLINE_WITHIN_SECONDS, type ConnectionOverview, type Tone } from "./connection-overview";
 import { compareVersions } from "@/core/admin/agent-version";
-import { stockReminderLevel } from "@/core/stock-deposit/rules";
 import { describeRobot, resolveRobotIntegration, type RobotSetup } from "@/core/robot/integration";
 
 /**
@@ -103,7 +102,7 @@ function ageSeconds(date: Date | null, now: Date): number | null {
 const OFFLINE_FIX = "Vérifiez que l'ordinateur est allumé et connecté à Internet. Redémarrez-le : PharmaBoost se relance tout seul et l'icône réapparaît près de l'horloge.";
 
 export function buildConnectionTest(input: ConnectionTestInput): ConnectionTestResult {
-  const { now, overview, connection, posts } = input;
+  const { now, overview, posts } = input;
   const checks: TestCheck[] = [];
   const add = (check: TestCheck) => checks.push(check);
 
@@ -173,20 +172,16 @@ export function buildConnectionTest(input: ConnectionTestInput): ConnectionTestR
     add({ id: "stock-problem", group: "stock", status: "fail", title: "Dernier fichier envoyé", detail: stock.problem, fix: "Envoyez votre stock complet (tous les produits en stock), pas seulement les nouveautés." });
   }
 
-  // ---- Mon stock : l'envoi automatique, vérifié seulement s'il a vraiment eu lieu
-  const autoReads = [connection?.pairedAt && connection.status !== "DISCONNECTED" ? connection.lastSyncAt : null, ...posts.filter((post) => post.pairedAt && post.exportPath).map((post) => post.lastExportAt)].filter((date): date is Date => date !== null);
-  const reader = Boolean((connection?.pairedAt && connection.status !== "DISCONNECTED" && connection.status !== "PENDING") || posts.some((post) => post.pairedAt && post.exportPath));
-  if (!reader) {
-    add({ id: "stock-auto", group: "stock", status: "info", title: "Envoi automatique du stock", detail: "Non utilisé : votre stock est envoyé à la main, par fichier.", fix: null });
-  } else if (autoReads.length === 0) {
-    add({ id: "stock-auto", group: "stock", status: "warn", title: "Envoi automatique du stock", detail: "PharmaBoost Connect n'a encore lu aucun export de stock.", fix: `Enregistrez l'édition de stock${input.lgoLabel ? ` de ${input.lgoLabel}` : ""} dans le dossier PharmaBoost : le programme la lit dans la minute.` });
+  // ---- Mon stock : l'envoi automatique, vérifié seulement s'il a vraiment eu lieu (calculé une fois, dans l'aperçu)
+  const auto = overview.autoSync;
+  if (auto.state === "NONE") {
+    add({ id: "stock-auto", group: "stock", status: "info", title: "Envoi automatique du stock", detail: auto.detail, fix: null });
+  } else if (auto.state === "WAITING") {
+    add({ id: "stock-auto", group: "stock", status: "warn", title: "Envoi automatique du stock", detail: auto.detail, fix: `Enregistrez l'édition de stock${input.lgoLabel ? ` de ${input.lgoLabel}` : ""} dans le dossier PharmaBoost : le programme la lit dans la minute.` });
+  } else if (auto.state === "ACTIVE") {
+    add({ id: "stock-auto", group: "stock", status: "ok", title: "Envoi automatique du stock", detail: auto.detail, fix: null });
   } else {
-    const newest = autoReads.reduce((a, b) => (a.getTime() >= b.getTime() ? a : b));
-    if (stockReminderLevel(newest, now) === "none") {
-      add({ id: "stock-auto", group: "stock", status: "ok", title: "Envoi automatique du stock", detail: `Dernier export lu par PharmaBoost Connect ${describeAge(ageSeconds(newest, now))}.`, fix: null });
-    } else {
-      add({ id: "stock-auto", group: "stock", status: "warn", title: "Envoi automatique du stock", detail: `Dernier export lu ${describeAge(ageSeconds(newest, now))}.`, fix: "Votre logiciel n'enregistre pas son stock tout seul : refaites l'export dans le dossier PharmaBoost, ou faites-le programmer par son éditeur." });
-    }
+    add({ id: "stock-auto", group: "stock", status: "warn", title: "Envoi automatique du stock", detail: auto.detail, fix: "Votre logiciel n'enregistre pas son stock tout seul : refaites l'export dans le dossier PharmaBoost, ou faites-le programmer par son éditeur." });
   }
   for (const post of posts) {
     if (post.pairedAt && post.exportPath && post.lastExportError) {
@@ -200,7 +195,7 @@ export function buildConnectionTest(input: ConnectionTestInput): ConnectionTestR
     add({ id: "sales", group: "sales", status: "info", title: "Ventes suivies au bip", detail: "Aucun poste de comptoir relié. Lire les ventes du logiciel lui-même n'est pas disponible.", fix: "Installez PharmaBoost Connect sur l'ordinateur où la douchette est branchée (étape 2)." });
   } else if (sales.state === "POST_OFFLINE") {
     add({ id: "sales", group: "sales", status: "warn", title: "Ventes suivies au bip", detail: "Le poste de comptoir ne répond pas : les boîtes bipées ne sont pas suivies.", fix: OFFLINE_FIX });
-  } else if (sales.scanCount === 0) {
+  } else if (sales.state === "WAITING_SCAN") {
     add({ id: "sales", group: "sales", status: "warn", title: "Ventes suivies au bip", detail: "Le poste répond, mais aucun bip n'a encore été reçu : le suivi n'est pas prouvé.", fix: "Faites l'essai du bip ci-dessous : bipez une boîte au comptoir." });
   } else {
     add({ id: "sales", group: "sales", status: "ok", title: "Ventes suivies au bip", detail: `${sales.scanCount.toLocaleString("fr-FR")} bip${sales.scanCount > 1 ? "s" : ""} reçu${sales.scanCount > 1 ? "s" : ""}${sales.lastScanAt ? ` · dernier ${describeAge(ageSeconds(sales.lastScanAt, now))}` : ""}.`, fix: null });

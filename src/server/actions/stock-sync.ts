@@ -6,9 +6,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { createPairing, createPostInstallLink, createPostPairing, disconnectAgent, getConnection, isLgoId, requestPostSync, revokeCounterPost, setPostExportPath, updateConnectionSettings } from "@/server/services/stock-sync";
+import { createPairing, createPostInstallLink, createPostPairing, disconnectAgent, findOwnPostInstallLink, getConnection, isLgoId, listCounterPosts, reissuePostInstallLink, requestPostSync, revokeCounterPost, setPostExportPath, updateConnectionSettings } from "@/server/services/stock-sync";
 import { LGO_DEFINITIONS, lgoLabel, stockFreshness } from "@/core/stock/connectors";
-import { buildPostDownloadUrl } from "@/core/stock/install";
+import { buildPostDownloadUrl, nextCounterLabel, POST_LINK_VALIDITY_LABEL } from "@/core/stock/install";
+import { buildCounterInstallEmail } from "@/core/stock/install-email";
+import { rateLimited } from "@/server/http/rate-limit";
 import { chooseLgo, loadConnectionOverview } from "@/server/services/connection-overview";
 import type { ConnectionOverview } from "@/core/stock/connection-overview";
 import { getMessagingProvider } from "@/server/ai/registry";
@@ -154,14 +156,59 @@ export async function requestPostSyncAction(payload: { postId: string }): Promis
  * l'installateur Windows (le lien à envoyer par e-mail) ; `command` est la même
  * installation en une ligne, pour une personne qui prend la main à distance.
  */
-export async function createPostInstallLinkAction(payload: { label?: string | null }): Promise<ActionResult<{ token: string; expiresAt: string; postId: string; command: string; downloadUrl: string }>> {
-  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
-  const label = payload.label?.trim().slice(0, 60) || null;
-  const link = await createPostInstallLink(session.scope, label);
+export type InstallLinkView = { token: string; expiresAt: string; postId: string; label: string; command: string; downloadUrl: string };
+
+function installLinkView(token: string, expiresAt: Date, postId: string, label: string): InstallLinkView {
   const base = resolvePublicBaseUrl().url.replace(/\/$/, "");
-  const command = `powershell -ExecutionPolicy Bypass -Command "irm ${base}/api/agent/installer/${link.token} | iex"`;
+  const command = `powershell -ExecutionPolicy Bypass -Command "irm ${base}/api/agent/installer/${token} | iex"`;
+  return { token, expiresAt: expiresAt.toISOString(), postId, label, command, downloadUrl: buildPostDownloadUrl(base, token) };
+}
+
+/**
+ * Un nouveau comptoir : « Comptoir 2 », « Comptoir 3 »… et son lien. `downloadUrl` est la page où l'on télécharge
+ * l'installateur Windows (le lien à envoyer) ; `command` est la même installation en une ligne, pour une personne
+ * qui prend la main à distance (l'assistance).
+ */
+export async function createPostInstallLinkAction(payload: { label?: string | null }): Promise<ActionResult<InstallLinkView>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  const typed = payload.label?.trim().slice(0, 60) || null;
+  const label = typed ?? nextCounterLabel((await listCounterPosts(session.scope.pharmacyId)).map((post) => post.label ?? post.hostname));
+  const link = await createPostInstallLink(session.scope, label);
   revalidatePath("/connexion");
-  return ok({ token: link.token, expiresAt: link.expiresAt.toISOString(), postId: link.postId, command, downloadUrl: buildPostDownloadUrl(base, link.token) }, "Lien d'installation prêt, valable sept jours.");
+  return ok(installLinkView(link.token, link.expiresAt, link.postId, label), "Lien d'installation prêt, valable sept jours.");
+}
+
+/** Un nouveau lien pour un comptoir qui n'est pas encore installé : le lien perdu ou expiré. */
+export async function reissuePostInstallLinkAction(payload: { postId: string }): Promise<ActionResult<InstallLinkView>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  const result = await reissuePostInstallLink(session.scope, String(payload.postId ?? ""));
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/connexion");
+  return ok(installLinkView(result.token, result.expiresAt, String(payload.postId), result.label ?? "Comptoir"), "Nouveau lien prêt, valable sept jours. L'ancien ne marche plus.");
+}
+
+/**
+ * Le lien d'installation, envoyé PAR E-MAIL à l'adresse du titulaire connecté, et à aucune autre : il ouvre
+ * l'e-mail sur l'ordinateur du comptoir, ou le fait suivre. Le jeton doit être celui d'un lien de SON officine,
+ * encore valable et pas encore utilisé. Un envoi simulé (adresse de démonstration, envoi non configuré) n'est
+ * jamais présenté comme un envoi réel.
+ */
+export async function emailPostInstallLinkAction(payload: { token: string }): Promise<ActionResult<{ to: string }>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  if (rateLimited(`counter-link-mail:${session.scope.pharmacyId}`, 10, 60 * 60 * 1000)) return fail("Trop d'envois pour le moment : copiez le lien, ou réessayez dans une heure.");
+  const link = await findOwnPostInstallLink(session.scope, String(payload.token ?? ""));
+  if (!link) return fail("Ce lien n'est plus valable. Obtenez-en un nouveau.");
+  const base = resolvePublicBaseUrl().url.replace(/\/$/, "");
+  const message = buildCounterInstallEmail({ pharmacyName: link.pharmacyName, counterLabel: link.label ?? "un comptoir", downloadUrl: buildPostDownloadUrl(base, String(payload.token)), validity: POST_LINK_VALIDITY_LABEL, contactEmail: PUBLIC_CONTACT_EMAIL });
+  let outcome: Awaited<ReturnType<ReturnType<typeof getMessagingProvider>["sendEmail"]>>;
+  try {
+    outcome = await getMessagingProvider({ demo: session.scope.isDemo }).sendEmail({ to: session.user.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
+  } catch {
+    return fail("L'e-mail n'a pas pu partir. Copiez le lien à la place.");
+  }
+  if (outcome.status === "SENT") return ok({ to: session.user.email }, `Lien envoyé à ${session.user.email}.`);
+  if (outcome.status === "SIMULATED") return fail("E-mail non envoyé : l'envoi est simulé sur cette installation. Copiez le lien à la place.");
+  return fail(`L'e-mail n'a pas pu partir (${outcome.detail}). Copiez le lien à la place.`);
 }
 
 /** Le logiciel de l'officine, choisi dans l'assistant « Ma connexion » : rien n'est installé ni annoncé par ce choix. */

@@ -46,6 +46,9 @@ export type OverviewPost = {
   scanCount: number;
   version: string | null;
   pairingExpiresAt: Date | null;
+  /** Le dossier d'export que ce poste relit, et la dernière fois qu'il l'a lu : sert à dire si l'envoi automatique a vraiment eu lieu. */
+  exportPath?: string | null;
+  lastExportAt?: Date | null;
 };
 
 export type OverviewInput = {
@@ -74,7 +77,27 @@ export type AgentItem = {
   version: string | null;
 };
 
+/** Un comptoir tel que le titulaire le voit : un nom et un état, rien d'autre. */
+export type CounterRow = {
+  id: string;
+  label: string;
+  /** « Connecté » n'est dit que d'un poste appairé qui a donné signe de vie il y a moins de dix minutes. */
+  state: "CONNECTED" | "OFFLINE" | "TO_INSTALL" | "EXPIRED";
+  title: string;
+  detail: string;
+};
+
+/** L'envoi automatique du stock, dit seulement s'il a eu lieu : un programme qui n'a rien lu n'est jamais « actif ». */
+export type AutoSync = {
+  state: "NONE" | "WAITING" | "ACTIVE" | "STALE";
+  lastReadAt: Date | null;
+  detail: string;
+};
+
 export type ConnectionOverview = {
+  /** Tous les comptoirs, installés ou en attente d'installation, dans l'ordre de leur création. */
+  counters: CounterRow[];
+  autoSync: AutoSync;
   agent: {
     state: "NOT_INSTALLED" | "WAITING" | "ONLINE" | "OFFLINE";
     tone: Tone;
@@ -90,6 +113,10 @@ export type ConnectionOverview = {
     title: string;
     detail: string;
     receivedAt: Date | null;
+    /** « aujourd'hui à 14:02 », « hier à 21:10 », « le 16/09/2026 à 17:44 » : la date dite comme on la dirait. */
+    receivedLabel: string | null;
+    /** Le nombre de produits du dernier stock : les lignes du fichier reçu, à défaut les références en rayon. */
+    productCount: number | null;
     lines: number | null;
     /** Les références en stock aujourd'hui : ce que le comptoir peut conseiller. Une autre mesure que les lignes du fichier. */
     references: number | null;
@@ -100,7 +127,7 @@ export type ConnectionOverview = {
     problem: string | null;
   };
   sales: {
-    state: "NO_POST" | "POST_OFFLINE" | "FOLLOWED";
+    state: "NO_POST" | "POST_OFFLINE" | "WAITING_SCAN" | "FOLLOWED";
     tone: Tone;
     title: string;
     detail: string;
@@ -188,7 +215,7 @@ export function buildConnectionOverview(input: OverviewInput): ConnectionOvervie
   const problem = input.stockProblem ? PROBLEM_TEXT[input.stockProblem] : null;
   let stock: ConnectionOverview["stock"];
   if (!received) {
-    stock = { state: "NONE", tone: problem ? "warning" : "neutral", title: "Aucun stock reçu", detail: problem ?? "Envoyez votre stock : PharmaBoost ne conseille que ce que vous avez en rayon.", receivedAt: null, lines: null, references: null, ignored: null, ageDays: null, problem };
+    stock = { state: "NONE", tone: problem ? "warning" : "neutral", title: "Aucun stock reçu", detail: problem ?? "Envoyez votre stock : PharmaBoost ne conseille que ce que vous avez en rayon.", receivedAt: null, receivedLabel: null, productCount: null, lines: null, references: null, ignored: null, ageDays: null, problem };
   } else {
     const fresh = stockReminderLevel(received, now) === "none";
     const when = describeDay(received, now);
@@ -197,8 +224,8 @@ export function buildConnectionOverview(input: OverviewInput): ConnectionOvervie
     const ignored = input.stockIgnored ?? null;
     const detail = `Reçu ${when}${lines !== null ? ` · ${lines.toLocaleString("fr-FR")} ligne${lines > 1 ? "s" : ""}` : ""}`;
     stock = fresh
-      ? { state: "FRESH", tone: problem ? "warning" : "success", title: "Stock à jour", detail: problem ? `${detail}. ${problem}` : detail, receivedAt: received, lines, references, ignored, ageDays: days, problem }
-      : { state: "OLD", tone: "warning", title: `Stock ancien : ${days ?? 0} jour${(days ?? 0) > 1 ? "s" : ""}`, detail: `${detail}. Mettez-le à jour.${problem ? ` ${problem}` : ""}`, receivedAt: received, lines, references, ignored, ageDays: days, problem };
+      ? { state: "FRESH", tone: problem ? "warning" : "success", title: "Stock à jour", detail: problem ? `${detail}. ${problem}` : detail, receivedAt: received, receivedLabel: when, productCount: lines ?? references, lines, references, ignored, ageDays: days, problem }
+      : { state: "OLD", tone: "warning", title: `Stock ancien : ${days ?? 0} jour${(days ?? 0) > 1 ? "s" : ""}`, detail: `${detail}. Mettez-le à jour.${problem ? ` ${problem}` : ""}`, receivedAt: received, receivedLabel: when, productCount: lines ?? references, lines, references, ignored, ageDays: days, problem };
   }
 
   // ---- 3. Les ventes : suivies au bip d'un poste de comptoir, pas par le logiciel de l'officine.
@@ -211,16 +238,46 @@ export function buildConnectionOverview(input: OverviewInput): ConnectionOvervie
     sales = { state: "NO_POST", tone: "neutral", title: "Ventes non suivies", detail: "Un poste de comptoir relié suit chaque boîte bipée à la douchette. Lire les ventes du logiciel lui-même n'est pas disponible.", lastScanAt: null, scanCount };
   } else if (postsOnline.length === 0) {
     sales = { state: "POST_OFFLINE", tone: "warning", title: "Poste hors ligne", detail: "Les boîtes bipées ne sont plus suivies tant que le poste ne répond pas.", lastScanAt, scanCount };
+  } else if (scanCount === 0) {
+    // Un poste qui répond ne prouve pas que les bips arrivent : « suivies » attend un vrai bip.
+    sales = { state: "WAITING_SCAN", tone: "neutral", title: "En attente du premier bip", detail: `${postsOnline.length} ${plural(postsOnline.length, "poste", "postes")} en ligne. Bipez une boîte au comptoir pour vérifier que le suivi arrive.`, lastScanAt: null, scanCount };
   } else {
     sales = {
       state: "FOLLOWED",
       tone: "success",
       title: "Ventes suivies au bip",
-      detail: `${postsOnline.length} ${plural(postsOnline.length, "poste", "postes")} en ligne${lastScanAt ? ` · dernier bip ${describeAge(ageSeconds(lastScanAt, now))}` : " · aucun bip reçu encore"}`,
+      detail: `${postsOnline.length} ${plural(postsOnline.length, "poste", "postes")} en ligne${lastScanAt ? ` · dernier bip ${describeAge(ageSeconds(lastScanAt, now))}` : ""}`,
       lastScanAt,
       scanCount,
     };
   }
+
+  // ---- Les comptoirs : un nom, un état. « Connecté » demande un appairage ET un signe de vie récent.
+  const expiryFmt = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit" });
+  const counters: CounterRow[] = posts.map((post, index) => {
+    const label = post.label || post.hostname || `Comptoir ${index + 1}`;
+    if (post.pairedAt) {
+      const seen = ageSeconds(post.lastSeenAt, now);
+      return seen !== null && seen <= ONLINE_WITHIN_SECONDS
+        ? { id: post.id, label, state: "CONNECTED", title: "Connecté", detail: `Signe de vie ${describeAge(seen)}.` }
+        : { id: post.id, label, state: "OFFLINE", title: "Ne répond plus", detail: seen === null ? "Aucun signe de vie reçu." : `Dernier signe de vie ${describeAge(seen)}.` };
+    }
+    return post.pairingExpiresAt && post.pairingExpiresAt > now
+      ? { id: post.id, label, state: "TO_INSTALL", title: "À installer", detail: `Lien valable jusqu'au ${expiryFmt.format(post.pairingExpiresAt)}.` }
+      : { id: post.id, label, state: "EXPIRED", title: "Lien expiré", detail: "Obtenez un nouveau lien." };
+  });
+
+  // ---- L'envoi automatique du stock : « actif » seulement si un export a réellement été lu récemment.
+  const serverReads = serverInstalled && connection?.lastSyncAt ? [connection.lastSyncAt] : [];
+  const postReads = posts.filter((post) => post.pairedAt && post.exportPath && post.lastExportAt).map((post) => post.lastExportAt as Date);
+  const reads = [...serverReads, ...postReads];
+  const hasReader = serverInstalled || posts.some((post) => post.pairedAt && post.exportPath);
+  const newestRead = reads.length > 0 ? reads.reduce((a, b) => (a.getTime() >= b.getTime() ? a : b)) : null;
+  let autoSync: AutoSync;
+  if (!hasReader) autoSync = { state: "NONE", lastReadAt: null, detail: "Non utilisé : le stock est envoyé à la main." };
+  else if (!newestRead) autoSync = { state: "WAITING", lastReadAt: null, detail: "PharmaBoost Connect n'a encore lu aucun export de stock." };
+  else if (stockReminderLevel(newestRead, now) === "none") autoSync = { state: "ACTIVE", lastReadAt: newestRead, detail: `Dernier export lu ${describeAge(ageSeconds(newestRead, now))}.` };
+  else autoSync = { state: "STALE", lastReadAt: newestRead, detail: `Dernier export lu ${describeAge(ageSeconds(newestRead, now))}.` };
 
   // ---- La phrase de dix secondes.
   let headline: ConnectionOverview["headline"];
@@ -236,7 +293,7 @@ export function buildConnectionOverview(input: OverviewInput): ConnectionOvervie
     headline = { tone: problem ? "warning" : "success", title: problem ? "Stock à jour, mais un fichier est à revoir" : "Tout fonctionne", detail: stock.detail, step: 3, action: null };
   }
 
-  return { agent, stock, sales, headline };
+  return { counters, autoSync, agent, stock, sales, headline };
 }
 
 // ---- Les méthodes réellement disponibles pour un logiciel --------------------------------------
