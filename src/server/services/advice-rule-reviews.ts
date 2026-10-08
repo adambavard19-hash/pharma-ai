@@ -22,7 +22,7 @@ export type RuleReviewView = {
   state: RuleState;
   decidedBy: string | null;
   decidedAt: Date | null;
-  /** La règle a été relue sous une version plus ancienne : elle est à relire. */
+  /** La règle a été relue sous une version plus ancienne : elle compte comme pas relue. */
   outdated: boolean;
 };
 
@@ -50,7 +50,7 @@ export async function listRuleReviews(scope: TenantScope): Promise<RuleReviewVie
 }
 
 /**
- * Valide ou refuse une règle pour l'officine ; `null` la remet « à relire ». La décision est datée, signée du nom de
+ * Valide ou refuse une règle pour l'officine ; `null` efface la décision. La décision est datée, signée du nom de
  * qui l'a prise, et porte sur la version actuelle de la règle.
  */
 export async function setRuleDecision(scope: TenantScope, ruleKey: string, decision: RuleDecision | null): Promise<{ ok: true; title: string } | { ok: false; error: string }> {

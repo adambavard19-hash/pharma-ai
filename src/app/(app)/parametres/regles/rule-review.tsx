@@ -17,7 +17,7 @@ export type ReviewRuleView = {
   title: string;
   version: string;
   state: RuleState;
-  /** Relue sous une version plus ancienne : à relire. */
+  /** Relue sous une version plus ancienne : à considérer comme pas relue. */
   outdated: boolean;
   decidedBy: string | null;
   decidedAt: string | null;
@@ -34,7 +34,7 @@ export type ReviewRuleView = {
 };
 
 const FILTERS: { key: RuleState | "ALL"; label: string }[] = [
-  { key: "TO_REVIEW", label: "À relire" },
+  { key: "TO_REVIEW", label: "Pas relues" },
   { key: "VALIDATED", label: "Validées" },
   { key: "REJECTED", label: "Refusées" },
   { key: "ALL", label: "Toutes" },
@@ -43,24 +43,23 @@ const FILTERS: { key: RuleState | "ALL"; label: string }[] = [
 const TONES: Record<RuleState, "warning" | "success" | "danger"> = { TO_REVIEW: "warning", VALIDATED: "success", REJECTED: "danger" };
 
 /**
- * La relecture des règles de conseil par la pharmacienne.
+ * La relecture des règles de conseil par la pharmacienne — facultative.
  *
- * Chaque règle est dite en clair — quand elle se déclenche, ce qu'elle propose, ce que le pharmacien dirait — et la
- * pharmacienne la valide ou la refuse pour SON officine. Refusée, elle ne se déclenche plus nulle part. Validée, elle peut
- * parler dans la fenêtre du poste de caisse. Pas relue, elle reste sur l'écran complet de la vente, jamais dans la fenêtre.
+ * Les règles du moteur fonctionnent déjà dans toute officine, sans rien régler. Ici, la pharmacienne peut les lire en
+ * clair et, pour SON officine seulement, en refuser une (elle ne se déclenche plus nulle part) ou la valider (une trace
+ * signée et datée, sans effet sur ce qui s'affiche).
  */
 export function RuleReview({ rules, canManage }: { rules: ReviewRuleView[]; canManage: boolean }) {
-  const [filter, setFilter] = useState<RuleState | "ALL">("TO_REVIEW");
+  const [filter, setFilter] = useState<RuleState | "ALL">("ALL");
   const counts = useMemo(() => ({ TO_REVIEW: rules.filter((r) => r.state === "TO_REVIEW").length, VALIDATED: rules.filter((r) => r.state === "VALIDATED").length, REJECTED: rules.filter((r) => r.state === "REJECTED").length, ALL: rules.length }), [rules]);
   const shown = filter === "ALL" ? rules : rules.filter((rule) => rule.state === filter);
 
   return (
     <div className="space-y-5">
-      <Alert tone="info" title="C'est vous qui décidez ce que PharmaBoost conseille à votre comptoir">
-        Les règles ci-dessous sont celles du moteur. <strong>Aucune n&apos;avait été relue par un pharmacien</strong> : lisez-les, et validez celles que vous
-        diriez vous-même. Une règle <strong>refusée</strong> ne se déclenche plus jamais dans votre officine. Une règle <strong>validée</strong> peut parler dans la
-        fenêtre du poste de caisse. Une règle <strong>à relire</strong> reste visible sur l&apos;écran complet de la vente, mais n&apos;apparaît jamais dans la fenêtre.
-        Vos propres associations (« Mes associations ») parlent toujours.
+      <Alert tone="info" title="Les conseils fonctionnent déjà dans votre officine : vous n'avez rien à régler">
+        Les règles ci-dessous sont celles du moteur, communes à toutes les officines PharmaBoost, et elles s&apos;appliquent dès l&apos;envoi du stock.
+        Si l&apos;une ne vous convient pas, <strong>refusez-la</strong> : elle ne se déclenchera plus jamais dans votre officine. <strong>Valider</strong> une règle
+        garde simplement la trace que vous la cautionnez. Vos propres associations (« Mes associations ») s&apos;ajoutent à ces règles.
       </Alert>
 
       <div role="tablist" aria-label="Filtrer les règles" className="flex flex-wrap gap-2">
@@ -80,7 +79,7 @@ export function RuleReview({ rules, canManage }: { rules: ReviewRuleView[]; canM
 
       {shown.length === 0 ? (
         <Card>
-          <CardContent className="py-8 text-center text-[13.5px] text-text-secondary">{filter === "TO_REVIEW" ? "Toutes les règles ont été relues. Merci." : "Aucune règle dans cette liste."}</CardContent>
+          <CardContent className="py-8 text-center text-[13.5px] text-text-secondary">Aucune règle dans cette liste.</CardContent>
         </Card>
       ) : (
         <ul className="space-y-3">
@@ -137,7 +136,7 @@ function RuleCard({ rule, canManage }: { rule: ReviewRuleView; canManage: boolea
                 )}
                 {rule.state !== "TO_REVIEW" && (
                   <Button size="sm" variant="ghost" disabled={pending} onClick={() => decide(null)} leadingIcon={<RotateCcw className="size-4" />}>
-                    Remettre à relire
+                    Annuler ma décision
                   </Button>
                 )}
               </div>

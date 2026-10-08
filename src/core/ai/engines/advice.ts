@@ -1688,6 +1688,22 @@ export const ADVICE_RULES: AdviceRule[] = [...CORE_ADVICE_RULES, ...SKIN_SERIES_
 const norm = (value: string) => value.toLowerCase().trim();
 
 /**
+ * La classe d'un médicament (écrite par le catalogue ou par le modèle) contient-elle ce terme — et non sa négation ?
+ * « Antalgique antipyrétique non opioïde » nomme un opioïde dans le texte, mais dit le contraire : le Doliprane ne doit
+ * pas déclencher la règle de la constipation sous opioïde. Un « non », « sans » ou « pas d' » juste avant le terme l'annule.
+ */
+export function classNames(therapeuticClass: string, term: string): boolean {
+  const text = norm(therapeuticClass);
+  const wanted = norm(term);
+  if (!wanted) return false;
+  for (let at = text.indexOf(wanted); at !== -1; at = text.indexOf(wanted, at + 1)) {
+    const before = text.slice(Math.max(0, at - 12), at);
+    if (!/\b(non|sans|pas|aucun)[\s'’-]+(d[eu']\s*|d’\s*)?$/.test(before)) return true;
+  }
+  return false;
+}
+
+/**
  * « BÉCLOMÉTASONE (DIPROPIONATE DE) » → « BÉCLOMÉTASONE ». Le sel n'apporte
  * rien à une raison lue en une seconde, et il double la longueur de la ligne.
  */
@@ -1794,9 +1810,7 @@ export function detectAdviceOpportunities(params: {
       const sideEffects = knowledge.commonSideEffects.map(norm);
 
       const atcHit = rule.atcPrefixes.some((prefix) => atc.startsWith(prefix));
-      const classHit = rule.therapeuticClasses.some((c) =>
-        therapeuticClass.includes(norm(c)),
-      );
+      const classHit = rule.therapeuticClasses.some((c) => classNames(therapeuticClass, c));
       const sideEffectHit = rule.sideEffectTriggers.some((trigger) =>
         sideEffects.some((effect) => effect.includes(norm(trigger))),
       );

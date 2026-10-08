@@ -32,7 +32,7 @@ export default async function AdvicePage({
   const session = await requirePermission(PERMISSIONS.RECOMMENDATION_RULES_MANAGE);
   const params = await searchParams;
   // La relecture des règles par la pharmacienne est l'écran d'arrivée : c'est elle qui fait la confiance dans les conseils.
-  const tab = params.vue ?? "revue";
+  const tab = params.vue ?? "recommandations";
 
   const [recommendations, rules, products, statusCounts] = await Promise.all([
     prisma.recommendation.findMany({
@@ -68,7 +68,7 @@ export default async function AdvicePage({
   ]);
 
   const reviewStates = await listRuleReviews(session.scope);
-  const toReviewCount = reviewStates.filter((rule) => rule.state === "TO_REVIEW").length;
+  const refusedCount = reviewStates.filter((rule) => rule.state === "REJECTED").length;
   const reviewRules: ReviewRuleView[] = reviewStates.map((state) => {
     const rule = ADVICE_RULES.find((candidate) => candidate.key === state.key)!;
     return {
@@ -145,8 +145,8 @@ export default async function AdvicePage({
       <LinkTabs
         paramName="vue"
         items={[
-          { key: "revue", label: "Revue des conseils", count: toReviewCount },
           { key: "recommandations", label: "Historique", count: recommendations.length },
+          { key: "revue", label: "Revue des conseils", count: refusedCount > 0 ? refusedCount : undefined },
           { key: "regles", label: "Règles de l'officine", count: rules.length },
           { key: "moteur", label: "Comment ça marche" },
         ]}
@@ -257,9 +257,9 @@ export default async function AdvicePage({
   );
 }
 
-/** Une phrase de modèle commence par « le médicament… » une fois les marques remplacées : on remet la majuscule. */
+/** Un modèle de phrase commence par « le médicament… » une fois les marques remplacées : on remet les majuscules (début, après un point ou un guillemet). */
 function startSentence(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  return text.replace(/(^|[.!?]\s+|«\s*)([a-zà-ÿ])/g, (_match, before: string, letter: string) => before + letter.toUpperCase());
 }
 
 function EngineExplainer() {

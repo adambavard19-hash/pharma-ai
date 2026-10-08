@@ -8,7 +8,7 @@ const rules: ReviewableRule[] = [
 ];
 
 describe("où en est une règle dans une officine", () => {
-  it("à relire tant que personne n'a décidé", () => {
+  it("pas relue tant que personne n'a décidé", () => {
     expect(ruleState(rules[0], reviewsByKey([]))).toBe("TO_REVIEW");
   });
 
@@ -43,12 +43,16 @@ describe("ce que la relecture gouverne", () => {
     expect(disabledRuleKeys(rules, reviewsByKey([]))).toEqual([]);
   });
 
-  it("seule une règle validée parle dans la fenêtre du poste : ni une règle à relire, ni refusée, ni inconnue, ni absente", () => {
+  it("une officine qui n'a rien relu est opérationnelle : toute règle parle dans la fenêtre du poste, sauf celle qu'elle a refusée", () => {
     expect(mayShowAtCounter("dry-mouth-hygiene", rules, reviews)).toBe(true);
-    expect(mayShowAtCounter("rehydration-digestive", rules, reviews)).toBe(false);
+    expect(mayShowAtCounter("dry-mouth-hygiene", rules, reviewsByKey([]))).toBe(true);
     expect(mayShowAtCounter("ancienne-regle-validee-en-code", rules, reviewsByKey([]))).toBe(true);
+    expect(mayShowAtCounter("rehydration-digestive", rules, reviewsByKey([]))).toBe(true);
+    expect(mayShowAtCounter("rehydration-digestive", rules, reviews)).toBe(false);
+  });
+
+  it("une règle inconnue (supprimée depuis) ou absente n'est jamais montrée au comptoir", () => {
     expect(mayShowAtCounter("regle-supprimee", rules, reviews)).toBe(false);
     expect(mayShowAtCounter(null, rules, reviews)).toBe(false);
-    expect(mayShowAtCounter("dry-mouth-hygiene", rules, reviewsByKey([]))).toBe(false);
   });
 });

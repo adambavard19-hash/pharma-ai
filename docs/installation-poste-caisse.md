@@ -223,6 +223,15 @@ powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -MiseAJour
 powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -TestAffichage
 ```
 
+## Plusieurs boîtes : une seule vente, un avis qui s'affine
+
+Les bips d'un même poste séparés de moins d'une minute forment UNE vente (`counter-scan.ts`, `SAME_SALE_WINDOW_MS`).
+Après 3 secondes sans nouveau bip, la vente est analysée avec toutes ses boîtes : un premier avis arrive vite pour la
+première boîte. Un bip de plus, même cinq secondes plus tard, remet la vente « à confirmer », relance l'analyse sur
+**l'ensemble des boîtes** et la même fenêtre se met à jour sur place avec les meilleurs conseils pour l'ordonnance entière
+(essai du 8 oct. 2026 : amoxicilline → probiotique, vitamine C ; + ibuprofène → confort gastrique ; + Doliprane → pastilles
+gorge ; à chaque bip, 4 à 5 s entre le bip et l'avis).
+
 ## La mise à jour automatique (agent 0.6.1)
 
 Avant : l'icône ne vérifiait les nouvelles versions qu'à son démarrage, puis toutes les six heures. Après chaque

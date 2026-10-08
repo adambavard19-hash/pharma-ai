@@ -1,15 +1,14 @@
 /**
- * La relecture des règles de conseil par la pharmacienne.
+ * La relecture des règles de conseil par la pharmacienne — un OUTIL FACULTATIF, jamais un prérequis.
  *
- * Les règles du moteur sont écrites et testées, mais aucune n'avait été relue par un pharmacien : au comptoir, une règle
- * mal réglée (un soluté de réhydratation pour un laxatif, un bain de bouche pour une bouche sèche) fait perdre la confiance
- * en tout le reste. La pharmacienne décide donc, règle par règle, pour SON officine :
+ * Les règles du moteur vivent dans le code : toute officine, dès que son stock est envoyé, en bénéficie sans rien régler.
+ * Ce qu'une pharmacienne peut faire, pour SON officine seulement :
  *
- *  • VALIDATED — elle peut parler au comptoir, y compris dans la fenêtre du poste de caisse ;
- *  • REJECTED  — elle ne se déclenche plus jamais dans cette officine ;
- *  • TO_REVIEW — personne ne l'a relue : elle s'affiche sur l'écran complet de la vente, jamais dans la fenêtre du poste.
+ *  • REJECTED  — refuser une règle : elle ne se déclenche plus jamais dans cette officine (ni à l'écran, ni au poste) ;
+ *  • VALIDATED — dire qu'elle la cautionne : une trace signée et datée, sans effet sur ce qui s'affiche ;
+ *  • TO_REVIEW — personne n'a rien décidé : la règle fonctionne comme pour toutes les officines.
  *
- * La décision porte sur une VERSION : une règle réécrite depuis (version différente) redevient « à relire ».
+ * La décision porte sur une VERSION : une règle réécrite depuis (version différente) redevient « pas relue ».
  * Module pur : aucune base, aucune horloge.
  */
 
@@ -39,16 +38,16 @@ export function disabledRuleKeys(rules: ReviewableRule[], reviews: ReadonlyMap<s
 
 /**
  * Le conseil qui sort de cette règle peut-il s'afficher dans la fenêtre du poste de caisse ?
- * Seulement si la pharmacienne l'a validée. Une règle inconnue (supprimée depuis) n'est jamais montrée au comptoir.
+ * Oui, sauf si la pharmacienne a refusé la règle. Une règle inconnue (supprimée depuis) n'est jamais montrée au comptoir.
  */
 export function mayShowAtCounter(ruleKey: string | null | undefined, rules: ReviewableRule[], reviews: ReadonlyMap<string, RuleReviewRow>): boolean {
   if (!ruleKey) return false;
   const rule = rules.find((candidate) => candidate.key === ruleKey);
-  return rule ? ruleState(rule, reviews) === "VALIDATED" : false;
+  return rule ? ruleState(rule, reviews) !== "REJECTED" : false;
 }
 
 export const RULE_STATE_LABELS: Record<RuleState, string> = {
   VALIDATED: "Validée",
   REJECTED: "Refusée",
-  TO_REVIEW: "À relire",
+  TO_REVIEW: "Pas relue",
 };
