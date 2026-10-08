@@ -112,8 +112,33 @@ export type DrugKnowledge = {
    * médicament (substance, ATC, classe) faute de fiche éditoriale. Elle
    * suffit à déclencher une règle de conseil ; elle ne porte ni explication
    * patient ni interaction, et le moteur de sécurité le signale.
+   * `VETERINARY_NAME` : le libellé désigne un produit pour animaux (« … chien »,
+   * « … chat »). Aucune règle du médicament humain ne s'y applique ; seules les
+   * vigilances vétérinaires (`engines/vigilance-veterinaire.ts`) le lisent.
    */
-  origin?: "EDITORIAL" | "AI_CLASSIFICATION";
+  origin?: "EDITORIAL" | "AI_CLASSIFICATION" | "VETERINARY_NAME";
+  /** Ce que le libellé dit d'un produit vétérinaire. Présent seulement pour `VETERINARY_NAME`. */
+  veterinary?: VeterinaryInfo;
+};
+
+export type VeterinarySpecies = "CHIEN" | "CHAT" | "LAPIN";
+export type VeterinaryForm = "SPOT_ON" | "COLLIER" | "SPRAY" | "SHAMPOOING" | "POUDRE" | "COMPRIME";
+
+/**
+ * Un produit vétérinaire tel que son libellé le désigne. Rien ici n'est déduit
+ * d'une marque : seuls comptent les mots du libellé (espèce, forme, substance).
+ */
+export type VeterinaryInfo = {
+  species: VeterinarySpecies[];
+  form: VeterinaryForm | null;
+  /** Substances antiparasitaires nommées dans le libellé, sans accents, en minuscules. */
+  substances: string[];
+  /**
+   * Antiparasitaire externe À APPLICATION CUTANÉE (pipette, collier, spray,
+   * shampooing, poudre) : le champ des publications de l'ANSES-ANMV sur
+   * lesquelles reposent les vigilances. Un comprimé n'en fait pas partie.
+   */
+  cutaneous: boolean;
 };
 
 // --- Contexte patient ------------------------------------------------------

@@ -7,6 +7,7 @@ import {
   substanceKey,
 } from "./interactions";
 import { evaluateExtractionSafety } from "@/core/ai/engines/safety";
+import { isVeterinaryKnowledge, veterinaryKnowledge } from "@/core/ai/engines/veterinary";
 import type {
   AnalysisResult,
   DrugKnowledge,
@@ -287,16 +288,31 @@ export async function analysePrescription(params: {
   ]);
   lap("chargement");
 
+  // Produits pour animaux (« … SPOT ON CHIEN »). Reconnus au libellé AVANT la compréhension :
+  // sans cela, l'IA les rangerait parmi les médicaments humains — un antiparasitaire « externe »
+  // déclencherait le conseil anti-poux. Une ligne rattachée au catalogue national (CIP, BDPM)
+  // ou déjà dotée d'une fiche reste ce qu'elle est : jamais vétérinaire.
+  for (const line of prescription.lines) {
+    if (!line.drugName || line.drugSpecialtyId) continue;
+    const key = line.drugName.toLowerCase();
+    if (knowledge.get(key) || official.get(key)) continue;
+    const veterinary = veterinaryKnowledge(line.drugName);
+    if (veterinary) knowledge.set(key, veterinary);
+  }
+
   // Étape B quater : compréhension du traitement. Le modèle classe chaque
   // médicament et identifie des besoins parmi une liste fermée ; il ne voit
   // ni le catalogue, ni le stock, ni le nom du patient. Un échec ne bloque
   // pas le comptoir : le moteur continue sur la couche éditoriale et le dit.
   params.onStage?.("UNDERSTANDING");
+  const understoodLines = prescription.lines.filter((line) => !(line.drugName && isVeterinaryKnowledge(knowledge.get(line.drugName.toLowerCase()))));
+  const understoodLineCount = understoodLines.filter((line) => line.status === "CONFIRMED" && line.drugName).length;
   const understanding = await understandTreatment({
     scope: params.scope,
     patient,
     official,
-    lines: prescription.lines,
+    // Les produits vétérinaires n'ont pas à être classés comme des médicaments humains.
+    lines: understoodLines,
   });
   lap("comprehension");
   const knowledgeFromEditorial = [...knowledge.values()].some((entry) => entry !== null);
@@ -328,6 +344,22 @@ export async function analysePrescription(params: {
         sourceRefs: [],
         confidence: 0,
         requiresReview: true,
+      });
+      continue;
+    }
+
+    // Aucune explication « patient » pour un produit pour animaux : elle serait écrite pour un médicament humain.
+    if (isVeterinaryKnowledge(drug)) {
+      explanations.push({
+        lineIndex: line.position,
+        purpose: null,
+        instructions: null,
+        tips: [],
+        precautions: [],
+        source: "UNAVAILABLE",
+        sourceRefs: [],
+        confidence: 0,
+        requiresReview: false,
       });
       continue;
     }
@@ -383,8 +415,10 @@ export async function analysePrescription(params: {
     // échoué : le moteur a tourné sur les seules règles, et l'issue le dira.
     aiUnavailable:
       aiProvider.info.capability !== "LIVE" ||
-      !understanding ||
-      understanding.warnings.some((warning) => warning.startsWith("Classification impossible")),
+      // Une ordonnance qui ne compte que des produits pour animaux n'envoie rien à l'IA : ce n'est
+      // pas une panne, la compréhension n'avait rien à comprendre.
+      (understoodLineCount > 0 && !understanding) ||
+      Boolean(understanding?.warnings.some((warning) => warning.startsWith("Classification impossible"))),
   });
 
   lap("moteur");

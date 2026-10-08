@@ -8,6 +8,7 @@ import type {
   SafetyFindingResult,
 } from "../types";
 import { OCR_REVIEW_THRESHOLD } from "@/config/constants";
+import { isVeterinaryKnowledge } from "./veterinary";
 
 /**
  * Moteur de sécurité — PREMIÈRE étape du pipeline, avant toute considération
@@ -144,6 +145,20 @@ export function evaluateKnowledgeCoverage(
         severity: "WARNING",
         code: "DRUG_NOT_IN_REFERENTIAL",
         message: `« ${line.drugName} » est absent du référentiel médicamenteux connecté. Aucune explication automatique n'est produite pour ce médicament.`,
+        subjectType: "PRESCRIPTION_LINE",
+        subjectId,
+        source: SOURCE,
+      });
+      return;
+    }
+
+    // Un produit pour animaux n'a pas à figurer au catalogue des médicaments humains, et aucune
+    // interaction humaine ne s'y applique : le dire une fois, sans l'avertissement de couverture.
+    if (isVeterinaryKnowledge(advisory)) {
+      findings.push({
+        severity: "INFO",
+        code: "VETERINARY_PRODUCT",
+        message: `« ${line.drugName} » est reconnu comme un produit pour animaux (d'après son libellé) : le catalogue des médicaments humains et ses interactions ne s'y appliquent pas. Les précautions d'usage sourcées s'affichent pour les antiparasitaires externes.`,
         subjectType: "PRESCRIPTION_LINE",
         subjectId,
         source: SOURCE,

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { PatientPicker, type PatientOption } from "@/components/app/patient-picker";
 import { EMPTY_SCHEDULE, totalDailyDoses, unitsForDuration } from "@/core/posology";
 import { VISION_REVIEW_THRESHOLD } from "@/core/extraction";
+import { readVeterinaryProduct } from "@/core/ai/engines/veterinary";
 import { PosologyEditor } from "./posology-editor";
 import { AddLine } from "./add-line";
 import { SpecialtyLink } from "./specialty-link";
@@ -599,6 +600,7 @@ function DetailLine({
           refusal={line.identificationRefusal}
           attribution={attribution}
           canEdit={canEdit}
+          veterinary={readVeterinaryProduct(line.drugName) !== null}
         />
       )}
     </li>

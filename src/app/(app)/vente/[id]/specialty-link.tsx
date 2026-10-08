@@ -51,6 +51,7 @@ export function SpecialtyLink({
   refusal,
   attribution,
   canEdit,
+  veterinary = false,
 }: {
   lineId: string;
   official: OfficialLineFacts | null;
@@ -61,7 +62,17 @@ export function SpecialtyLink({
   /** Mention de source et de date, imposée par la licence du catalogue. */
   attribution: string | null;
   canEdit: boolean;
+  /** Le libellé désigne un produit pour animaux : il n'a pas à figurer au catalogue des médicaments humains. */
+  veterinary?: boolean;
 }) {
+  if (!official && veterinary) {
+    return (
+      <p className="mt-1.5 rounded-lg border border-border-subtle bg-surface-sunken/50 px-3 py-2 text-[12.5px] leading-4 text-text-secondary">
+        Produit pour animaux : il n&apos;a pas de fiche dans le catalogue des médicaments humains. Les précautions d&apos;usage s&apos;affichent dans les conseils.
+      </p>
+    );
+  }
+
   if (official) {
     return (
       <OfficialFacts

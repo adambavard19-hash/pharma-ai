@@ -1,5 +1,7 @@
-import type { DrugKnowledge, VigilanceKind, VigilanceResult } from "../types";
+import type { DrugKnowledge, VeterinaryForm, VeterinaryInfo, VeterinarySpecies, VigilanceKind, VigilanceResult } from "../types";
 import { BASE_MAITRE_VIGILANCES } from "./vigilance-base-maitre";
+import { VETERINARY_VIGILANCES } from "./vigilance-veterinaire";
+import { isVeterinaryKnowledge } from "./veterinary";
 import { SKIN_SERIES_2_VIGILANCES } from "./conseil-peau-serie-2";
 import { ELECTROLYTE_VIGILANCES } from "./vigilance-electrolytes";
 
@@ -31,6 +33,30 @@ import { ELECTROLYTE_VIGILANCES } from "./vigilance-electrolytes";
  * prise à distance — aux propositions qui les portent, sans les écarter.
  */
 
+/**
+ * Ce qu'une vigilance vétérinaire lit dans le libellé d'un produit pour animaux
+ * (`veterinary.ts`). Une règle qui porte ce critère ne s'applique QU'aux
+ * produits reconnus comme vétérinaires — jamais à un médicament humain.
+ */
+export type VeterinaryMatch = {
+  /** Antiparasitaire externe à application cutanée (pipette, collier, spray, shampooing, poudre). */
+  cutaneous: true;
+  /** Au moins une de ces espèces est écrite dans le libellé. */
+  species?: VeterinarySpecies[];
+  /** Aucune de ces espèces n'est écrite dans le libellé. */
+  excludeSpecies?: VeterinarySpecies[];
+  /** La forme du libellé est l'une de celles-ci. */
+  forms?: VeterinaryForm[];
+};
+
+export function matchesVeterinary(match: VeterinaryMatch, info: VeterinaryInfo): boolean {
+  if (match.cutaneous && !info.cutaneous) return false;
+  if (match.species && !match.species.some((species) => info.species.includes(species))) return false;
+  if (match.excludeSpecies?.some((species) => info.species.includes(species))) return false;
+  if (match.forms && !(info.form && match.forms.includes(info.form))) return false;
+  return true;
+}
+
 export type VigilanceRule = {
   key: string;
   version: string;
@@ -43,6 +69,8 @@ export type VigilanceRule = {
   atcPrefixes: string[];
   /** Substances (DCI) reconnues dans le nom ou la DCI, sans accents, minuscules. */
   substances: string[];
+  /** Règle d'un produit pour animaux : elle ignore ATC et substances, et ne lit que le libellé reconnu. */
+  veterinary?: VeterinaryMatch;
   /** L'explication, `{drug}` remplacé par le nom prescrit. */
   explanationTemplate: string;
   /** Les compléments concernés, tels qu'affichés. */
@@ -355,8 +383,8 @@ const CORE_VIGILANCES: VigilanceRule[] = [
   },
 ];
 
-/** Toutes les vigilances : le cœur, la Base maître V1, les électrolytes, puis « Conseil peau — Série 2 ». */
-export const VIGILANCE_RULES: VigilanceRule[] = [...CORE_VIGILANCES, ...BASE_MAITRE_VIGILANCES, ...ELECTROLYTE_VIGILANCES, ...SKIN_SERIES_2_VIGILANCES];
+/** Toutes les vigilances : le cœur, la Base maître V1, les électrolytes, « Conseil peau — Série 2 », puis les antiparasitaires vétérinaires. */
+export const VIGILANCE_RULES: VigilanceRule[] = [...CORE_VIGILANCES, ...BASE_MAITRE_VIGILANCES, ...ELECTROLYTE_VIGILANCES, ...SKIN_SERIES_2_VIGILANCES, ...VETERINARY_VIGILANCES];
 
 function norm(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -367,6 +395,10 @@ export function evaluateVigilances(drugs: DrugKnowledge[]): VigilanceResult[] {
   const results: VigilanceResult[] = [];
   for (const rule of VIGILANCE_RULES) {
     const hits = drugs.filter((drug) => {
+      // Les deux mondes ne se croisent jamais : un produit pour animaux ne lit que les règles
+      // vétérinaires, un médicament humain ne les déclenche pas (perméthrine contre la gale).
+      if (rule.veterinary) return isVeterinaryKnowledge(drug) && matchesVeterinary(rule.veterinary, drug.veterinary!);
+      if (isVeterinaryKnowledge(drug)) return false;
       const atc = drug.atcCode ?? "";
       if (rule.atcPrefixes.some((prefix) => atc.startsWith(prefix))) return true;
       if (rule.systemicOnly && atc) return false;

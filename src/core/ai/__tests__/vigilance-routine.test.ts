@@ -44,7 +44,7 @@ describe("règles de vigilance", () => {
       expect(rule.sources.length).toBeGreaterThan(0);
       expect(rule.version).toMatch(/^\d+\.\d+$/);
       expect(rule.explanationTemplate).toContain("{drug}");
-      expect(rule.atcPrefixes.length + rule.substances.length).toBeGreaterThan(0);
+      expect(rule.atcPrefixes.length + rule.substances.length + (rule.veterinary ? 1 : 0)).toBeGreaterThan(0);
     }
   });
 

@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import { describeRhythm, formatSchedule, unitFor } from "@/core/posology";
 import { VISION_REVIEW_THRESHOLD } from "@/core/extraction";
 import { cn } from "@/lib/utils";
+import { readVeterinaryProduct } from "@/core/ai/engines/veterinary";
 import { SpecialtyLink } from "./specialty-link";
 import { BarcodeAttach } from "./barcode-attach";
 import type { SaleLineDraft } from "./types";
@@ -230,7 +231,7 @@ function InlineFix({ line, issue, canEdit, attribution }: { line: SaleLineDraft;
   }
 
   return (
-    <SpecialtyLink lineId={line.id} official={null} availability={line.availability} identifiedBy={line.identifiedBy} candidates={line.candidates} refusal={line.identificationRefusal} attribution={attribution} canEdit={canEdit} />
+    <SpecialtyLink lineId={line.id} official={null} availability={line.availability} identifiedBy={line.identifiedBy} candidates={line.candidates} refusal={line.identificationRefusal} attribution={attribution} canEdit={canEdit} veterinary={readVeterinaryProduct(line.drugName) !== null} />
   );
 }
 
