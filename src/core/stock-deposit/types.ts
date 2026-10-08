@@ -42,3 +42,27 @@ export type DepositView = {
   /** Reçu depuis plus de 10 minutes et toujours « en cours » : le traitement a été interrompu. */
   stalled: boolean;
 };
+
+/**
+ * Ce que PharmaBoost a compris d'un fichier de stock, montré AVANT qu'il soit appliqué : de quoi décider en connaissance
+ * de cause. Rien n'a été écrit dans le stock pour l'obtenir.
+ */
+export type StockPreview = {
+  fileName: string;
+  /** Lignes de produits lues dans le fichier. */
+  products: number;
+  /** Reconnues : un médicament du catalogue ou un produit déjà connu de l'officine. */
+  recognized: number;
+  /** Nouvelles : elles deviendront des produits de l'officine. */
+  created: number;
+  /** Lignes illisibles, ignorées. */
+  invalid: number;
+  /** Produits actuellement en rayon, venus d'un import. */
+  knownStock: number;
+  /** Produits en rayon qui ne figurent pas dans le fichier : ils passeraient à 0. `null` : pas de stock connu à comparer. */
+  absent: number | null;
+  /** « APPLY » : le fichier sera appliqué ; « HOLD » : il attendra la décision de l'équipe PharmaBoost, le stock ne bouge pas. */
+  verdict: "APPLY" | "HOLD";
+  reason: string | null;
+  warnings: string[];
+};

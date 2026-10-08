@@ -201,12 +201,9 @@ blocs** et rien d'autre.
 1. **Installer sur mes comptoirs** : « Télécharger PharmaBoost », la petite liste des comptoirs (« Connecté » =
    appairé ET signe de vie de moins de dix minutes, sinon « Ne répond plus »), « Retirer » (avec confirmation) pour
    un ordinateur volé ou remplacé.
-2. **Envoyer mon stock** : un bouton, le choix du fichier, puis une **confirmation explicite** (« ce fichier remplace
-   votre stock, ce qui n'y figure pas passe à 0 ») avant tout envoi ; le serveur l'exige aussi (`confirmation`). L'état
-   du dernier import (produits, date, lignes illisibles, fichier non appliqué) et un petit guide LGPI. Les
-   protections du serveur restent entières : fichier lu en partie, trop de lignes illisibles, moins de 80 % du stock
-   connu, ou plus de 25 produits et 5 % du stock qui passeraient à 0 : le fichier n'est PAS appliqué, l'équipe le
-   vérifie.
+2. **Envoyer mon stock** : l'état du dernier import (produits, date, lignes illisibles, fichier non appliqué), un petit
+   guide LGPI, et un bouton qui ouvre le parcours « Mettre à jour mon stock » en trois étapes (choisir, vérifier, confirmer) :
+   voir `docs/ecran-stock.md`. Les protections du serveur restent entières.
 3. **Connecter mon robot** (facultatif) : fabricant et modèle seulement ; « Intégration non disponible ».
 
 Tout le technique a quitté l'écran du pharmacien et vit dans l'**espace d'assistance** de la console (fiche officine,

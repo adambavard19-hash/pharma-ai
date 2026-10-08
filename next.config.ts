@@ -41,7 +41,12 @@ const nextConfig: NextConfig = {
     "/**": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
     // L'agent et l'installateur Windows sont lus sur disque par les routes /api/agent/* : sans eux dans la
     // trace, le déploiement n'embarquerait pas les fichiers et le téléchargement échouerait en production.
-    "/api/agent/**": ["./agent/dist/pharmaboost-connect.js", "./agent/installateur/PharmaBoost-Installation.exe"],
+    "/api/agent/**": ["./agent/dist/pharmaboost-connect.js", "./agent/installateur/PharmaBoost-Installation.exe", "./agent/installateur/installateur.json"],
+    // « Télécharger PharmaBoost » (page « Ma connexion » et sa route) et l'état de l'installateur dans l'espace d'assistance
+    // lisent le même fichier et son manifeste : sans eux dans la trace, le bouton dirait « indisponible » en production.
+    "/api/connexion/**": ["./agent/installateur/PharmaBoost-Installation.exe", "./agent/installateur/installateur.json"],
+    "/connexion": ["./agent/installateur/PharmaBoost-Installation.exe", "./agent/installateur/installateur.json"],
+    "/admin/pharmacies/[id]": ["./agent/installateur/PharmaBoost-Installation.exe", "./agent/installateur/installateur.json"],
   },
 };
 

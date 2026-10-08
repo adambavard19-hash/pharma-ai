@@ -12,13 +12,14 @@ const mocks = vi.hoisted(() => ({
   after: vi.fn(),
   receive: vi.fn(),
   continueAfter: vi.fn(),
+  preview: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/server", () => ({ after: mocks.after }));
 vi.mock("@/server/auth/session", () => ({ requirePermission: mocks.requirePermission }));
-vi.mock("@/server/services/stock-deposits", () => ({ receiveStockDeposit: mocks.receive, continueAfterStockDeposit: mocks.continueAfter }));
+vi.mock("@/server/services/stock-deposits", () => ({ receiveStockDeposit: mocks.receive, continueAfterStockDeposit: mocks.continueAfter, previewStockDeposit: mocks.preview }));
 
 const { PERMISSIONS } = await import("@/server/rbac/permissions");
 const actions = await import("../stock-deposits");
@@ -167,5 +168,50 @@ describe("l'envoi", () => {
     const result = await actions.sendStockAction(form());
     expect(result).toMatchObject({ ok: false, error: expect.stringContaining("Rien n'a été modifié") });
     expect(JSON.stringify(result)).not.toContain("base indisponible");
+  });
+});
+
+
+describe("previewStockAction : « Vérifier » avant de confirmer", () => {
+  const PREVIEW = { fileName: "stock.csv", products: 4306, recognized: 4300, created: 6, invalid: 0, knownStock: 4306, absent: 2, verdict: "APPLY", reason: null, warnings: [] };
+
+  it("exige la permission d'import et lit le fichier pour l'officine de la session — sans confirmation, car rien n'est écrit", async () => {
+    mocks.preview.mockResolvedValue({ ok: true, preview: PREVIEW });
+    const data = new FormData();
+    data.set("file", new File(["a;b\n1;2"], "stock.csv"));
+    data.set("pharmacyId", "ph_pirate");
+    const result = await actions.previewStockAction(data);
+    expect(mocks.requirePermission).toHaveBeenCalledWith(PERMISSIONS.PRODUCT_IMPORT);
+    expect(mocks.preview.mock.calls[0][0].scope).toEqual(SESSION.scope);
+    expect(result).toMatchObject({ ok: true, data: { products: 4306, verdict: "APPLY" } });
+    // Une vérification n'écrit rien : ni dépôt, ni page rafraîchie.
+    expect(mocks.receive).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("sans permission, rien n'est lu", async () => {
+    mocks.requirePermission.mockRejectedValue(new Error("interdit"));
+    await expect(actions.previewStockAction(new FormData())).rejects.toThrow("interdit");
+    expect(mocks.preview).not.toHaveBeenCalled();
+  });
+
+  it("fichier absent, vide ou trop gros : refusé avant d'être lu", async () => {
+    expect(await actions.previewStockAction(new FormData())).toMatchObject({ ok: false, error: "Choisissez le fichier de votre stock." });
+    const empty = new FormData();
+    empty.set("file", new File([], "stock.csv"));
+    expect(await actions.previewStockAction(empty)).toMatchObject({ ok: false });
+    const big = new FormData();
+    big.set("file", new File([new Uint8Array(8 * 1024 * 1024 + 1)], "stock.csv"));
+    expect(await actions.previewStockAction(big)).toMatchObject({ ok: false, error: "Le fichier dépasse 8 Mo." });
+    expect(mocks.preview).not.toHaveBeenCalled();
+  });
+
+  it("le message du service, tel quel, et une panne ne devient jamais une exception", async () => {
+    const data = new FormData();
+    data.set("file", new File(["a"], "stock.csv"));
+    mocks.preview.mockResolvedValue({ ok: false, error: "Colonnes non reconnues : quantité." });
+    expect(await actions.previewStockAction(data)).toMatchObject({ ok: false, error: "Colonnes non reconnues : quantité." });
+    mocks.preview.mockRejectedValue(new Error("boom"));
+    expect(await actions.previewStockAction(data)).toMatchObject({ ok: false, error: expect.stringMatching(/n'a pas pu être vérifié/) });
   });
 });

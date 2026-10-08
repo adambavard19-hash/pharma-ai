@@ -1,9 +1,8 @@
 import { TIME_ZONE } from "@/config/constants";
-import { DEFAULT_EXPORT_PATH, LGO_DEFINITIONS, type LgoDefinition, type LgoId } from "@/core/stock/connectors";
+import { LGO_DEFINITIONS, type LgoDefinition, type LgoId } from "@/core/stock/connectors";
 import {
   DEPOSIT_ACCEPTED,
   DEPOSIT_ACCEPTED_LABEL,
-  DEPOSIT_CONFIRMATION,
   DEPOSIT_MAX_BYTES,
   DEPOSIT_STATUS_LABELS,
   describeDepositResult,
@@ -31,8 +30,6 @@ export const HELD_NOTICE =
 /** La conséquence la plus lourde du moteur, dite AVANT l'envoi : un produit absent du fichier passe à 0 en stock. */
 export const ZERO_ABSENT_NOTICE = "Ce qui n'est pas dans le fichier sera mis à 0 en stock.";
 
-export const FULL_STOCK_REMINDER = `Envoyez toujours votre stock complet (tous les produits en stock), pas seulement ce qui vient d'arriver. ${ZERO_ABSENT_NOTICE}`;
-
 /** Le dernier fichier a été écarté par l'équipe : la page le dit en haut, avec quoi faire. */
 export const REJECTED_NOTICE = "L'équipe PharmaBoost n'a pas appliqué votre dernier fichier. Votre stock n'a pas changé. Envoyez votre stock complet.";
 
@@ -40,32 +37,6 @@ export const REJECTED_NOTICE = "L'équipe PharmaBoost n'a pas appliqué votre de
 export const INTERRUPTED_LINE = "Lecture interrompue, renvoyez votre fichier.";
 
 export const SEND_FAILED = "L'envoi n'a pas abouti. Vérifiez votre connexion et réessayez.";
-
-// --- Le dossier PharmaBoost --------------------------------------------------
-
-/**
- * Le dossier à ouvrir, tel que le titulaire le voit : le partage réseau du
- * serveur quand on le connaît (`\\SERVEUR\PharmaBoost`, atteignable depuis
- * n'importe quel poste), sinon le dossier local d'installation. Rien ne prouve
- * que le partage existe : la page le dit (voir `FOLDER_LOCATION_NOTICE`) et
- * propose toujours l'envoi du fichier à la place.
- */
-export function sharedFolderPath(hostname: string | null | undefined): string {
-  const name = (hostname ?? "").trim().replace(/^[\\/]+/, "").replace(/[\\/]+$/, "");
-  return name ? `\\\\${name}\\PharmaBoost` : DEFAULT_EXPORT_PATH;
-}
-
-/** Où se trouve le dossier : sur le serveur de l'officine. Le chemin lui-même est affiché juste après. */
-export const FOLDER_LOCATION_NOTICE = "Le dossier PharmaBoost se trouve sur le serveur de l'officine :";
-/** Le raccourci est posé sur le serveur seulement : on ne promet pas le bureau d'un poste. */
-export const FOLDER_SHORTCUT_NOTICE = "Sur le serveur, un raccourci « Stock PharmaBoost » est posé sur le bureau.";
-/** Le chemin réseau peut ne pas s'ouvrir : l'envoi par le bouton est tout aussi bon, et le dit. */
-export const FOLDER_FALLBACK_NOTICE = "Ce chemin ne s'ouvre pas ? Pas de souci : envoyez le fichier avec le bouton ci-dessous, c'est tout aussi bon.";
-
-/** Un serveur est « relié » une fois appairé ; une liaison en attente ou coupée n'a pas de dossier. */
-export function isFolderReady(connection: { status: string } | null | undefined): boolean {
-  return Boolean(connection && connection.status !== "PENDING" && connection.status !== "DISCONNECTED");
-}
 
 // --- Les trois étapes --------------------------------------------------------
 
@@ -159,87 +130,6 @@ export function linesOfLastStock(syncedAt: Date | null, deposits: Pick<DepositVi
   return Math.abs(at.getTime() - syncedAt.getTime()) <= SAME_EVENT_MS ? applied.lines : null;
 }
 
-// --- Le statut en direct (étape 3) -------------------------------------------
-
-export type LatestDeposit = { id: string; status: DepositStatus; lines: number | null; message: string | null; stalled?: boolean };
-
-export type ReceiveState = "waiting" | "reading" | "interrupted" | "done" | "held" | "failed" | "rejected";
-
-/**
- * Où en est l'envoi attendu ? `baseline` est le dernier dépôt connu à
- * l'ouverture de la page : tant que rien de plus récent n'arrive, on attend.
- * Un dépôt déjà en cours de lecture à l'ouverture compte comme celui qu'on
- * attend.
- *
- * « Plus récent » se juge sur le dépôt ET sur son statut : un fichier en
- * vérification ou en échec à l'ouverture, que l'équipe applique ensuite (même
- * dépôt, autre statut), est bien une nouveauté pour l'écran — de même qu'un
- * dépôt encore en lecture à l'ouverture, qui se termine. Quand une lecture
- * est restée bloquée (`stalled`), on ne fait pas tourner une roue pour rien :
- * l'état dit que la lecture s'est interrompue.
- */
-export function receiveState(
-  baseline: Pick<LatestDeposit, "id" | "status"> | null,
-  latest: (Pick<LatestDeposit, "id" | "status"> & { stalled?: boolean }) | null,
-): ReceiveState {
-  if (!latest) return "waiting";
-  if (latest.status === "RECEIVED") return latest.stalled ? "interrupted" : "reading";
-  const isNew = !baseline || latest.id !== baseline.id || latest.status !== baseline.status;
-  if (!isNew) return "waiting";
-  if (latest.status === "APPLIED") return "done";
-  if (latest.status === "HELD") return "held";
-  if (latest.status === "FAILED") return "failed";
-  return "rejected";
-}
-
-/**
- * Tant que l'envoi attendu n'est pas « à jour », la page continue de
- * s'actualiser : après une vérification, un échec ou un écart, le titulaire
- * renvoie un fichier corrigé (ou l'équipe applique l'ancien) et l'écran doit le
- * voir sans rechargement.
- */
-export function isStillExpected(state: ReceiveState): boolean {
-  return state !== "done";
-}
-
-/**
- * La page interroge-t-elle le serveur ? Pas quand elle a abandonné (plafond), ni
- * une fois le stock à jour. Sans dossier installé, rien n'arrive tout seul : on
- * n'attend rien tant qu'aucun fichier n'a été envoyé d'ici — mais dès qu'un
- * fichier est là (lecture, vérification, échec, écart), on suit son sort.
- */
-export function shouldPoll(state: ReceiveState, options: { folderReady: boolean; gaveUp: boolean }): boolean {
-  if (options.gaveUp || !isStillExpected(state)) return false;
-  return options.folderReady || state !== "waiting";
-}
-
-export const RECEIVE_POLL_MS = 10_000;
-/** Au-delà, on arrête de demander : un onglet oublié ne doit pas interroger le serveur toute la journée. */
-export const RECEIVE_POLL_MAX_MS = 30 * 60 * 1000;
-
-const RELOAD_HINT = "Rechargez la page pour vérifier de nouveau.";
-
-export function receiveText(state: ReceiveState, latest: Pick<LatestDeposit, "lines"> | null, options: { folderReady: boolean; gaveUp: boolean }): string {
-  const withHint = (text: string) => (options.gaveUp ? `${text} ${RELOAD_HINT}` : text);
-  switch (state) {
-    case "reading":
-      return options.gaveUp ? `La lecture prend plus de temps que prévu. ${RELOAD_HINT}` : "Fichier reçu, lecture en cours…";
-    case "interrupted":
-      return withHint(INTERRUPTED_LINE);
-    case "done":
-      return latest && latest.lines !== null ? `Fichier reçu : ${formatNumber(latest.lines)} ligne${latest.lines > 1 ? "s" : ""}, stock à jour.` : "Fichier reçu, stock à jour.";
-    case "held":
-      return withHint("Fichier reçu : l'équipe PharmaBoost le vérifie, votre stock n'a pas changé.");
-    case "failed":
-      return withHint("Fichier reçu, mais impossible à lire. Votre stock n'a pas changé.");
-    case "rejected":
-      return withHint("Fichier écarté par l'équipe PharmaBoost. Votre stock n'a pas changé.");
-    default:
-      if (!options.folderReady) return "Quand vous envoyez votre fichier ci-dessous, PharmaBoost le lit dans la minute.";
-      return options.gaveUp ? `Pas de fichier reçu pour l'instant. ${RELOAD_HINT}` : "En attente de votre fichier… cette page se met à jour toute seule.";
-  }
-}
-
 // --- L'envoi du fichier ------------------------------------------------------
 
 /** « 812 Ko », « 2,4 Mo ». */
@@ -297,27 +187,6 @@ export function uploadSummary(result: ActionResult<DepositView>, now: Date): Sen
     };
   }
   return sendOutcome(result);
-}
-
-/**
- * L'envoi, du fichier choisi à la phrase affichée. `sent` dit si le fichier
- * est parti (lu ou en vérification) : la zone peut alors se vider. Un fichier
- * refusé par le contrôle ne part pas ; une panne réseau n'est jamais une
- * exception qui remonte à l'écran.
- */
-export async function submitDeposit(file: File, send: (body: FormData) => Promise<ActionResult<DepositView>>): Promise<{ outcome: SendOutcome; sent: boolean }> {
-  const problem = checkDepositFile(file);
-  if (problem) return { outcome: { tone: "danger", title: NOT_SENT, detail: problem }, sent: false };
-  try {
-    const body = new FormData();
-    body.set("file", file);
-    // L'écran a prévenu que le fichier remplace le stock (voir FULL_STOCK_REMINDER) ; cet envoi vaut confirmation.
-    body.set("confirmation", DEPOSIT_CONFIRMATION);
-    const result = await send(body);
-    return { outcome: sendOutcome(result), sent: result.ok };
-  } catch {
-    return { outcome: { tone: "danger", title: NOT_SENT, detail: SEND_FAILED }, sent: false };
-  }
 }
 
 // --- Vos derniers envois -----------------------------------------------------

@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, Loader2, Pill, Package } from "lucide-react";
+import { Check, ChevronRight, Loader2 } from "lucide-react";
 import { setQuantityAction } from "@/server/actions/stock";
+import { availabilityOf, type Availability, type StockFilter } from "@/core/stock/stock-summary";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
-import { formatCents } from "@/lib/format";
+import { formatCents, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type StockRow = {
@@ -17,38 +18,30 @@ export type StockRow = {
   detail: string | null;
   code: string | null;
   quantity: number;
-  threshold: number;
   priceCents: number | null;
-  /** Visible seulement pour qui gère le catalogue. */
-  purchasePriceCents: number | null;
   active: boolean;
   href: string;
-  updatedAt: string;
 };
 
-type StateKey = "tous" | "stock" | "faible" | "rupture" | "inactif";
-
-const STATE_LABELS: Record<StateKey, string> = {
+const FILTER_LABELS: Record<StockFilter, string> = {
   tous: "Tous",
-  stock: "En stock",
-  faible: "Stock faible",
+  disponible: "Disponibles",
   rupture: "Ruptures",
-  inactif: "Désactivés",
+  desactive: "Désactivés",
 };
 
-function stateOf(row: StockRow): Exclude<StateKey, "tous"> {
-  if (!row.active) return "inactif";
-  if (row.quantity <= 0) return "rupture";
-  if (row.threshold > 0 && row.quantity <= row.threshold) return "faible";
-  return "stock";
-}
+const STATE_STYLES: Record<Availability, { badge: string; label: string }> = {
+  disponible: { badge: "bg-success-50 text-success-700 ring-success-100 dark:bg-success-700/20 dark:text-success-500 dark:ring-success-700/40", label: "Disponible" },
+  rupture: { badge: "bg-danger-50 text-danger-700 ring-danger-100 dark:bg-danger-700/20 dark:text-danger-500 dark:ring-danger-700/40", label: "Rupture" },
+  desactive: { badge: "bg-ink-100 text-ink-700 ring-ink-200 dark:bg-ink-800 dark:text-ink-300 dark:ring-ink-700", label: "Désactivé" },
+};
 
 /**
- * La liste du stock, compacte : produit, quantité, prix, état.
+ * La liste du stock : le produit, sa quantité, son prix, sa disponibilité — rien d'autre. Un produit est disponible
+ * (quantité supérieure à zéro), en rupture, ou désactivé : un stock « faible » n'est pas une rupture.
  *
- * La quantité est un champ, pas un texte : « 8 » devient « 12 » en tapant et
- * en validant, et l'inventaire est consigné. Le reste de la ligne mène à la
- * fiche.
+ * La quantité est un champ : « 8 » devient « 12 » en tapant et en validant, et l'inventaire est consigné. Le reste de
+ * la ligne mène à la fiche du produit.
  */
 export function StockList({
   rows,
@@ -59,19 +52,17 @@ export function StockList({
   totalPages,
   query,
   canAdjust,
-  canManage,
 }: {
   rows: StockRow[];
   total: number;
-  filter: string;
-  counts: Record<StateKey, number>;
+  filter: StockFilter;
+  counts: Record<StockFilter, number>;
   page: number;
   totalPages: number;
   query: string;
   canAdjust: boolean;
-  canManage: boolean;
 }) {
-  const href = (state: StateKey, nextPage = 1) => {
+  const href = (state: StockFilter, nextPage = 1) => {
     const search = new URLSearchParams();
     if (query) search.set("q", query);
     if (state !== "tous") search.set("etat", state);
@@ -79,59 +70,50 @@ export function StockList({
     const text = search.toString();
     return `/stock${text ? `?${text}` : ""}`;
   };
+  // « Désactivés » n'apparaît que s'il y en a : un filtre vide est du bruit.
+  const filters = (Object.keys(FILTER_LABELS) as StockFilter[]).filter((state) => state !== "desactive" || counts.desactive > 0 || filter === "desactive");
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        {(Object.keys(STATE_LABELS) as StateKey[]).map((state) => (
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filtrer la liste">
+        {filters.map((state) => (
           <Link
             key={state}
             href={href(state)}
+            aria-current={filter === state ? "true" : undefined}
             className={cn(
-              "rounded-full border px-3 py-1 text-[12.5px] transition-colors",
-              filter === state
-                ? "border-brand-600 bg-brand-600 text-white"
-                : "border-border-default text-text-secondary hover:border-border-strong",
+              "rounded-full border px-3 py-1 text-[13px] transition-colors",
+              filter === state ? "border-brand-600 bg-brand-600 text-white" : "border-border-default text-text-secondary hover:border-border-strong",
             )}
           >
-            {STATE_LABELS[state]} <span className="tabular opacity-80">{counts[state]}</span>
+            {FILTER_LABELS[state]} <span className="tabular opacity-80">{formatNumber(counts[state])}</span>
           </Link>
         ))}
-        <span className="ml-auto text-[12.5px] text-text-tertiary tabular">
-          {total} référence{total > 1 ? "s" : ""}
-        </span>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-card">
-        <div className="hidden grid-cols-[minmax(0,1fr)_110px_120px_130px_28px] gap-3 border-b border-border-subtle bg-surface-sunken/60 px-4 py-2 text-[11.5px] font-semibold tracking-wide text-text-tertiary uppercase sm:grid">
-          <span>Produit</span>
-          <span className="text-right">Stock</span>
-          <span className="text-right">Prix</span>
-          <span>État</span>
-          <span />
-        </div>
-        {rows.length === 0 ? (
-          <p className="px-4 py-8 text-center text-[13.5px] text-text-secondary">
-            {query ? "Aucun produit ne correspond à cette recherche." : "Aucun produit dans cette liste."}
-          </p>
-        ) : (
-          <ul className="divide-y divide-border-subtle">
-            {rows.map((row) => (
-              <StockLine key={`${row.kind}-${row.id}`} row={row} canAdjust={canAdjust} canManage={canManage} />
-            ))}
-          </ul>
-        )}
-      </div>
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-border-subtle px-4 py-8 text-center text-[14px] text-text-secondary">
+          {query ? "Aucun produit ne correspond à cette recherche." : "Aucun produit dans cette liste."}
+        </p>
+      ) : (
+        <ul className="divide-y divide-border-subtle overflow-hidden rounded-xl border border-border-subtle">
+          {rows.map((row) => (
+            <StockLine key={`${row.kind}-${row.id}`} row={row} canAdjust={canAdjust} />
+          ))}
+        </ul>
+      )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[13px] text-text-tertiary">Page {page} sur {totalPages}</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[13px] text-text-tertiary tabular">
+            Page {page} sur {totalPages} · {formatNumber(total)} référence{total > 1 ? "s" : ""}
+          </p>
           <div className="flex gap-2">
             <Button asChild variant="outline" size="sm" disabled={page <= 1}>
-              <Link href={href(filter as StateKey, page - 1)}>Précédent</Link>
+              <Link href={href(filter, page - 1)}>Précédent</Link>
             </Button>
             <Button asChild variant="outline" size="sm" disabled={page >= totalPages}>
-              <Link href={href(filter as StateKey, page + 1)}>Suivant</Link>
+              <Link href={href(filter, page + 1)}>Suivant</Link>
             </Button>
           </div>
         </div>
@@ -140,56 +122,32 @@ export function StockList({
   );
 }
 
-const STATE_STYLES: Record<Exclude<StateKey, "tous">, { dot: string; label: string }> = {
-  stock: { dot: "bg-success-500", label: "En stock" },
-  faible: { dot: "bg-warning-500", label: "Stock faible" },
-  rupture: { dot: "bg-danger-500", label: "Rupture" },
-  inactif: { dot: "bg-text-tertiary/40", label: "Désactivé" },
-};
-
-function StockLine({ row, canAdjust, canManage }: { row: StockRow; canAdjust: boolean; canManage: boolean }) {
-  const state = stateOf(row);
+function StockLine({ row, canAdjust }: { row: StockRow; canAdjust: boolean }) {
+  const state = availabilityOf(row);
   const style = STATE_STYLES[state];
 
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_110px_120px_130px_28px]">
-      <Link href={row.href} className="flex min-w-0 items-center gap-3 hover:underline">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-sunken text-text-tertiary">
-          {row.kind === "DRUG" ? <Pill className="size-4" /> : <Package className="size-4" />}
-        </span>
-        <span className="min-w-0">
-          <span className={cn("block truncate text-[14px] font-medium text-text-primary", !row.active && "text-text-tertiary line-through")}>
-            {row.name}
+    <li className="px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Link href={row.href} className="group flex min-w-0 flex-1 basis-56 items-center gap-2 hover:underline">
+          <span className="min-w-0">
+            <span className={cn("block truncate text-[15px] leading-5 font-semibold text-text-primary", !row.active && "text-text-tertiary line-through")}>{row.name}</span>
+            <span className="block truncate text-[12.5px] leading-5 text-text-tertiary">
+              {[row.detail, row.code ? (row.kind === "DRUG" ? `CIP ${row.code}` : `EAN ${row.code}`) : null].filter(Boolean).join(" · ") || (row.kind === "DRUG" ? "Médicament" : "Produit")}
+            </span>
           </span>
-          <span className="block truncate text-[12px] text-text-tertiary">
-            {[row.detail, row.code ? (row.kind === "DRUG" ? `CIP ${row.code}` : `EAN ${row.code}`) : null].filter(Boolean).join(" · ")}
-          </span>
-        </span>
-      </Link>
+          <ChevronRight className="hidden size-4 shrink-0 text-text-tertiary group-hover:text-text-secondary sm:block" aria-hidden="true" />
+        </Link>
 
-      <div className="flex justify-end">
-        {canAdjust && row.active ? (
-          <QuantityField row={row} />
-        ) : (
-          <span className="text-[15px] font-semibold tabular text-text-primary">{row.quantity}</span>
-        )}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <span className="flex items-center gap-2 text-[13px] text-text-secondary">
+            Quantité
+            {canAdjust && row.active ? <QuantityField row={row} /> : <span className="text-[15px] font-semibold tabular text-text-primary">{formatNumber(row.quantity)}</span>}
+          </span>
+          <span className="min-w-[4.5rem] text-right text-[14px] font-medium tabular text-text-primary">{row.priceCents !== null && row.priceCents > 0 ? formatCents(row.priceCents) : <span className="text-text-tertiary">—</span>}</span>
+          <span className={cn("inline-flex min-w-[6.5rem] justify-center rounded-full px-2.5 py-0.5 text-[12.5px] font-medium ring-1 ring-inset", style.badge)}>{style.label}</span>
+        </div>
       </div>
-
-      <span className="text-right text-[14px] font-medium tabular text-text-primary">
-        {row.priceCents !== null ? formatCents(row.priceCents) : "—"}
-        {canManage && row.purchasePriceCents !== null && row.purchasePriceCents > 0 && (
-          <span className="block text-[11.5px] font-normal text-text-tertiary">achat {formatCents(row.purchasePriceCents)}</span>
-        )}
-      </span>
-
-      <span className="flex items-center gap-2 text-[13px] text-text-secondary">
-        <span className={cn("size-2 shrink-0 rounded-full", style.dot)} />
-        {style.label}
-      </span>
-
-      <Link href={row.href} aria-label={`Détails de ${row.name}`} className="hidden text-text-tertiary hover:text-text-secondary sm:block">
-        <ChevronRight className="size-4" />
-      </Link>
     </li>
   );
 }
@@ -236,13 +194,13 @@ function QuantityField({ row }: { row: StockRow }) {
         }}
         aria-label={`Quantité de ${row.name}`}
         className={cn(
-          "w-[84px] rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 text-right text-[15px] font-semibold tabular text-text-primary",
+          "w-[76px] rounded-lg border border-border-default bg-surface-card px-2 py-1 text-right text-[15px] font-semibold tabular text-text-primary",
           "focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none",
           pending && "opacity-60",
         )}
       />
-      {pending && <Loader2 className="absolute -left-5 size-4 animate-spin text-text-tertiary" />}
-      {saved && !pending && <Check className="absolute -left-5 size-4 text-success-600" />}
+      {pending && <Loader2 className="absolute -left-5 size-4 animate-spin text-text-tertiary" aria-hidden="true" />}
+      {saved && !pending && <Check className="absolute -left-5 size-4 text-success-600" aria-hidden="true" />}
     </span>
   );
 }

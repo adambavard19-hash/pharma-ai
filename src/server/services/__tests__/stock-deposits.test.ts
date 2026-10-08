@@ -117,7 +117,7 @@ const db = vi.hoisted(() => {
     },
     pharmacyDrugStock: { count: vi.fn() },
     product: { count: vi.fn() },
-    importJob: { updateMany: vi.fn() },
+    importJob: { updateMany: vi.fn(), deleteMany: vi.fn() },
     stockConnection: { updateMany: vi.fn() },
   };
 
@@ -224,6 +224,7 @@ beforeEach(() => {
   db.prisma.pharmacyDrugStock.count.mockResolvedValue(10);
   db.prisma.product.count.mockResolvedValue(0);
   db.prisma.importJob.updateMany.mockResolvedValue({ count: 1 });
+  db.prisma.importJob.deleteMany.mockResolvedValue({ count: 1 });
   db.prisma.stockConnection.updateMany.mockResolvedValue({ count: 1 });
 });
 
@@ -904,6 +905,101 @@ describe("un fichier lu en partie n'est jamais appliqué comme un stock complet"
     db.state.deposits = [stored("dep_1", { status: "HELD", appliedAt: null })];
     mocks.analyse.mockResolvedValue(preview({ valid: 3700, invalid: 80 }));
     expect(await service.decideHeldDeposit("dep_1", "adm_1", "APPLY_PARTIAL")).toMatchObject({ ok: true, deposit: { status: "APPLIED" } });
+  });
+});
+
+describe("previewStockDeposit : montrer ce que va faire le fichier, sans rien écrire", () => {
+  const stock = (known: number, inFile: number) => {
+    db.prisma.pharmacyDrugStock.count.mockImplementation(async (args?: { where?: { presentationId?: unknown } }) => (args?.where?.presentationId ? inFile : known));
+    db.prisma.product.count.mockResolvedValue(0);
+  };
+  const look = (options: { fileName?: string; bytes?: Uint8Array } = {}) => service.previewStockDeposit({ scope: SCOPE, fileName: options.fileName ?? "stock.csv", bytes: options.bytes ?? BYTES });
+
+  it("dit combien de produits sont lus, reconnus, nouveaux, illisibles, et combien passeraient à 0", async () => {
+    stock(1000, 990);
+    mocks.analyse.mockResolvedValue(preview({ valid: 995, invalid: 3, toVerify: 5 }));
+    const result = await look();
+    expect(result).toMatchObject({ ok: true, preview: { fileName: "stock.csv", products: 995, recognized: 990, created: 5, invalid: 3, knownStock: 1000, absent: 10, verdict: "APPLY", reason: null } });
+  });
+
+  it("n'écrit RIEN : ni stock, ni produit, ni dépôt, ni fichier gardé ; l'analyse temporaire est supprimée", async () => {
+    stock(1000, 1000);
+    mocks.analyse.mockResolvedValue(preview({ valid: 1000, jobId: "job_apercu" }));
+    await look();
+    expect(mocks.commit).not.toHaveBeenCalled();
+    expect(mocks.put).not.toHaveBeenCalled();
+    expect(db.state.deposits).toHaveLength(0);
+    expect(mocks.recordAudit).not.toHaveBeenCalled();
+    expect(mocks.notifyAdmins).not.toHaveBeenCalled();
+    expect(db.prisma.importJob.deleteMany).toHaveBeenCalledWith({ where: { id: "job_apercu", pharmacyId: "ph_1", status: "PENDING" } });
+  });
+
+  it("un fichier à 60 % du stock : verdict « retenu », avec la raison, avant même l'envoi", async () => {
+    stock(1000, 600);
+    mocks.analyse.mockResolvedValue(preview({ valid: 600 }));
+    const result = await look();
+    expect(result.ok && result.preview).toMatchObject({ verdict: "HOLD", absent: 400 });
+    expect(result.ok && result.preview.reason).toMatch(/moins de 80 %/);
+  });
+
+  it("un passage à zéro massif : verdict « retenu », et l'aperçu dit combien", async () => {
+    stock(1000, 900);
+    mocks.analyse.mockResolvedValue(preview({ valid: 900 }));
+    const result = await look();
+    expect(result.ok && result.preview).toMatchObject({ verdict: "HOLD", absent: 100 });
+    expect(result.ok && result.preview.reason).toMatch(/mettrait 100 produits à 0/);
+  });
+
+  it("donne le même verdict que l'envoi réel du même fichier", async () => {
+    for (const [known, inFile, valid] of [[1000, 970, 970], [1000, 900, 900], [1000, 600, 600], [10, 10, 10]] as const) {
+      stock(known, inFile);
+      mocks.analyse.mockResolvedValue(preview({ valid }));
+      const shown = await look();
+      db.state.deposits = [];
+      mocks.commit.mockClear();
+      const sent = await send({ fileName: `f-${known}-${inFile}.csv`, bytes: new TextEncoder().encode(`f${known}${inFile}`) });
+      const expectedStatus = shown.ok && shown.preview.verdict === "HOLD" ? "HELD" : "APPLIED";
+      expect(sent.ok && sent.deposit.status, `${known}/${inFile}`).toBe(expectedStatus);
+    }
+  });
+
+  it("refuse avant toute lecture : mauvais format, fichier vide, trop gros", async () => {
+    expect(await look({ fileName: "photo.jpg" })).toMatchObject({ ok: false, error: expect.stringMatching(/Format non accepté/) });
+    expect(await look({ bytes: new Uint8Array(0) })).toMatchObject({ ok: false, error: "Le fichier est vide." });
+    expect(await look({ bytes: new Uint8Array(8 * 1024 * 1024 + 1) })).toMatchObject({ ok: false, error: expect.stringMatching(/dépasse/) });
+    expect(mocks.analyse).not.toHaveBeenCalled();
+  });
+
+  it("des colonnes non reconnues : on le dit, rien n'est lu plus loin", async () => {
+    mocks.analyse.mockResolvedValue(preview({ missing: ["quantity"] }));
+    const result = await look();
+    expect(result).toMatchObject({ ok: false, error: expect.stringMatching(/Colonnes non reconnues/) });
+    expect(db.prisma.importJob.deleteMany).toHaveBeenCalled();
+  });
+
+  it("aucune ligne lisible : on le dit", async () => {
+    mocks.analyse.mockResolvedValue(preview({ valid: 0, invalid: 4 }));
+    expect(await look()).toMatchObject({ ok: false, error: expect.stringMatching(/Aucune ligne de stock lisible/) });
+  });
+
+  it("une lecture qui échoue donne un message lisible, jamais une exception", async () => {
+    mocks.analyse.mockRejectedValue(new UnreadableFileError("Le fichier ne contient aucune ligne exploitable."));
+    expect(await look()).toMatchObject({ ok: false, error: "Le fichier ne contient aucune ligne exploitable." });
+    mocks.analyse.mockRejectedValue(new Error("prisma: connection refused"));
+    expect(await look()).toMatchObject({ ok: false, error: expect.stringMatching(/n'a pas pu être lu/) });
+  });
+
+  it("limite le nombre de vérifications par heure", async () => {
+    mocks.rateLimited.mockReturnValue(true);
+    expect(await look()).toMatchObject({ ok: false, error: expect.stringMatching(/Trop de vérifications/) });
+    expect(mocks.analyse).not.toHaveBeenCalled();
+  });
+
+  it("sans stock connu (première fois), pas de comparaison : absent = null, fichier appliqué", async () => {
+    stock(0, 0);
+    mocks.analyse.mockResolvedValue(preview({ valid: 300 }));
+    const result = await look();
+    expect(result.ok && result.preview).toMatchObject({ knownStock: 0, absent: null, verdict: "APPLY" });
   });
 });
 

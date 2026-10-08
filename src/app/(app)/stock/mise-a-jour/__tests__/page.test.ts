@@ -4,14 +4,14 @@ import type { DepositView } from "@/core/stock-deposit/types";
 
 /**
  * La page « Mettre à jour mon stock », rendue côté serveur sans base ni
- * navigateur : l'état en haut, les trois étapes, l'envoi du fichier, les
- * derniers envois. Services simulés ; on lit le texte rendu, pas le balisage.
+ * navigateur : l'état en haut, le parcours en trois étapes (choisir, vérifier,
+ * confirmer), les derniers envois. Services simulés ; on lit le texte rendu,
+ * pas le balisage.
  */
 
 const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(),
   findPharmacy: vi.fn(),
-  getConnection: vi.fn(),
   listPharmacyDeposits: vi.fn(),
 }));
 
@@ -20,9 +20,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: 
 vi.mock("@/components/ui/toast", () => ({ useToast: () => ({ push: vi.fn() }) }));
 vi.mock("@/server/auth/session", () => ({ requirePermission: mocks.requirePermission }));
 vi.mock("@/server/db/client", () => ({ prisma: { pharmacy: { findUnique: mocks.findPharmacy } } }));
-vi.mock("@/server/services/stock-sync", () => ({ getConnection: mocks.getConnection }));
 vi.mock("@/server/services/stock-deposits", () => ({ listPharmacyDeposits: mocks.listPharmacyDeposits }));
-vi.mock("@/server/actions/stock-deposits", () => ({ sendStockAction: vi.fn() }));
+vi.mock("@/server/actions/stock-deposits", () => ({ sendStockAction: vi.fn(), previewStockAction: vi.fn() }));
 
 const { default: StockUpdatePage } = await import("../page");
 const { PERMISSIONS } = await import("@/server/rbac/permissions");
@@ -64,35 +63,12 @@ const deposit = (overrides: Partial<DepositView> = {}): DepositView => ({
   ...overrides,
 });
 
-const connection = (overrides: Record<string, unknown> = {}) => ({
-  id: "c1",
-  lgo: "lgpi",
-  lgoLabel: "LGPI",
-  status: "CONNECTED",
-  hostname: "SRV-PHARMA",
-  agentVersion: "0.2.0",
-  exportPath: null,
-  scansPath: null,
-  intervalSeconds: 300,
-  lastSeenAt: ago(60_000),
-  lastSyncAt: ago(HOUR),
-  lastSyncLines: 4235,
-  lastError: null,
-  pairedAt: ago(10 * DAY),
-  pairingExpiresAt: null,
-  freshness: "FRESH",
-  ageSeconds: 3600,
-  seenAgeSeconds: 60,
-  ...overrides,
-});
-
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   mocks.requirePermission.mockResolvedValue({ scope: { pharmacyId: "ph-1", userId: "u-1" }, pharmacy: { isDemo: false } });
   mocks.findPharmacy.mockResolvedValue({ stockSyncedAt: new Date("2026-10-05T06:42:00Z") });
-  mocks.getConnection.mockResolvedValue(connection());
   mocks.listPharmacyDeposits.mockResolvedValue([deposit()]);
 });
 
@@ -104,22 +80,19 @@ describe("l'accès", () => {
     await expect(render()).rejects.toThrow("403");
     expect(mocks.requirePermission).toHaveBeenCalledWith(PERMISSIONS.PRODUCT_IMPORT);
     expect(mocks.findPharmacy).not.toHaveBeenCalled();
-    expect(mocks.getConnection).not.toHaveBeenCalled();
     expect(mocks.listPharmacyDeposits).not.toHaveBeenCalled();
   });
 
-  it("ne lit que l'officine de la session : cinq derniers envois, liaison et date du stock", async () => {
+  it("ne lit que l'officine de la session : cinq derniers envois et date du stock", async () => {
     await render();
     expect(mocks.findPharmacy).toHaveBeenCalledWith({ where: { id: "ph-1" }, select: { stockSyncedAt: true } });
-    expect(mocks.getConnection).toHaveBeenCalledWith("ph-1");
     expect(mocks.listPharmacyDeposits).toHaveBeenCalledWith("ph-1", 5);
   });
 });
 
 describe("l'état du stock, en haut", () => {
   it("à jour : « reçu aujourd'hui à 08:42 (4 235 lignes) »", async () => {
-    const html = await render();
-    const t = text(html);
+    const t = text(await render());
     expect(t).toContain("Mettre à jour mon stock");
     expect(t).toContain("Votre stock est à jour");
     expect(t).toContain("Reçu aujourd'hui à 08:42 (4 235 lignes)");
@@ -136,7 +109,6 @@ describe("l'état du stock, en haut", () => {
   it("jamais reçu : « aucun stock reçu pour l'instant », et aucun envoi listé", async () => {
     mocks.findPharmacy.mockResolvedValue({ stockSyncedAt: null });
     mocks.listPharmacyDeposits.mockResolvedValue([]);
-    mocks.getConnection.mockResolvedValue(null);
     const t = text(await render());
     expect(t).toContain("Aucun stock reçu pour l'instant");
     expect(t).toContain("Aucun fichier reçu pour l'instant.");
@@ -149,90 +121,24 @@ describe("l'état du stock, en haut", () => {
   });
 });
 
-describe("les trois étapes", () => {
-  it("LGPI, serveur connu : la procédure vérifiée, le chemin du dossier sur le serveur, sans promesse du bureau d'un poste", async () => {
+describe("le parcours en trois étapes", () => {
+  it("annonce choisir, vérifier, confirmer, et ouvre sur le choix du fichier avec UN seul bouton vert", async () => {
     const html = await render();
     const t = text(html);
-    expect(t).toContain("En 3 étapes");
-    expect(t).toContain("Sortez votre stock de LGPI");
-    expect(t).toContain("ouvrez le module Inventaire, puis Édition");
-    expect(t).toContain("Prenez tout votre stock, pas seulement les nouveautés.");
-    expect(t).toContain("Enregistrez le fichier dans le dossier PharmaBoost");
-    expect(html).toContain("\\\\SRV-PHARMA\\PharmaBoost");
-    expect(t).toContain("Copier");
-    expect(t).toContain("Dans LGPI, enregistrez (F9) l'édition en PDF dans ce dossier.");
-    expect(t).toContain("C'est tout : PharmaBoost lit le fichier dans la minute");
-    expect(t).not.toContain(UNVERIFIED);
+    expect(t).toContain("Choisir le fichier");
+    expect(t).toContain("Vérifier");
+    expect(t).toContain("Confirmer");
+    expect(t).toContain("Choisissez le fichier de votre stock");
+    expect(t).toContain("Choisir mon fichier");
+    expect(t).toContain("Comment récupérer mon stock dans LGPI ?");
+    expect(html).toContain("/connexion/guide?logiciel=lgpi");
+    // Rien ne s'applique à ce stade : pas de bouton de confirmation avant d'avoir vérifié le fichier.
+    expect(t).not.toContain("Confirmer la mise à jour");
   });
 
-  it("le chemin ne promet rien : « se trouve sur le serveur », un raccourci posé sur le serveur seulement, et le repli par l'envoi du fichier", async () => {
+  it("ne montre plus ni dossier, ni chemin réseau, ni réglage du serveur", async () => {
     const t = text(await render());
-    expect(t).toContain("Le dossier PharmaBoost se trouve sur le serveur de l'officine : \\\\SRV-PHARMA\\PharmaBoost");
-    expect(t).toContain("Sur le serveur, un raccourci « Stock PharmaBoost » est posé sur le bureau.");
-    expect(t).toContain("Ce chemin ne s'ouvre pas ? Pas de souci : envoyez le fichier avec le bouton ci-dessous, c'est tout aussi bon.");
-    // Les anciennes affirmations (le raccourci sur « votre » bureau, l'Explorateur) ne sont plus faites.
-    expect(t).not.toContain("Sur votre bureau");
-    expect(t).not.toContain("ouvre ce dossier");
-    expect(t).not.toContain("Explorateur");
-  });
-
-  it("l'étape 1 prévient : ce qui n'est pas dans le fichier sera mis à 0 en stock", async () => {
-    const t = text(await render());
-    expect(t).toContain("Prenez tout votre stock, pas seulement les nouveautés. Ce qui n'est pas dans le fichier sera mis à 0 en stock.");
-  });
-
-  it("serveur sans nom connu : le dossier d'installation", async () => {
-    mocks.getConnection.mockResolvedValue(connection({ hostname: null }));
-    expect(await render()).toContain("C:\\PharmaBoost\\Export");
-  });
-
-  it("un autre logiciel : texte générique, aucun menu inventé, et la mention honnête", async () => {
-    mocks.getConnection.mockResolvedValue(connection({ lgo: "winpharma" }));
-    const t = text(await render());
-    expect(t).toContain("Sortez votre stock de Winpharma");
-    expect(t).toContain("lancez l'export ou l'édition du stock");
-    expect(t).toContain(UNVERIFIED);
-    expect(t).not.toContain("module Inventaire");
-    expect(t).not.toContain("(F9)");
-  });
-
-  it("logiciel inconnu (pas de liaison) : « votre logiciel »", async () => {
-    mocks.getConnection.mockResolvedValue(null);
-    const t = text(await render());
-    expect(t).toContain("Sortez votre stock de votre logiciel");
-    expect(t).toContain(UNVERIFIED);
-  });
-
-  it("pas de dossier installé : on le dit, on ne montre aucun chemin qui n'existe pas, et l'envoi s'ouvre", async () => {
-    mocks.getConnection.mockResolvedValue(connection({ status: "PENDING", hostname: "" }));
-    const html = await render();
-    const t = text(html);
-    expect(t).toContain("Ce dossier est créé sur votre serveur quand votre conseiller PharmaBoost installe PharmaBoost");
-    expect(html).not.toContain("C:\\PharmaBoost\\Export");
-    expect(t).toContain("Quand vous envoyez votre fichier ci-dessous");
-    expect(html).toContain('aria-expanded="true"');
-  });
-
-  it("dossier installé et vivant : l'envoi reste replié", async () => {
-    expect(await render()).toContain('aria-expanded="false"');
-  });
-
-  it("serveur silencieux depuis plus d'une heure : avertissement, et l'envoi s'ouvre", async () => {
-    mocks.getConnection.mockResolvedValue(connection({ freshness: "DISCONNECTED", seenAgeSeconds: 3 * 86400 }));
-    const html = await render();
-    expect(text(html)).toContain("Le dossier PharmaBoost ne répond plus (dernier signe : il y a 3 j)");
-    expect(html).toContain('aria-expanded="true"');
-  });
-});
-
-describe("l'envoi attendu, en direct", () => {
-  it("rien de nouveau : on attend le fichier", async () => {
-    expect(text(await render())).toContain("En attente de votre fichier… cette page se met à jour toute seule.");
-  });
-
-  it("un fichier en cours de lecture : « lecture en cours »", async () => {
-    mocks.listPharmacyDeposits.mockResolvedValue([deposit({ status: "RECEIVED", lines: null, appliedAt: null })]);
-    expect(text(await render())).toContain("Fichier reçu, lecture en cours…");
+    expect(t).not.toMatch(/dossier PharmaBoost|\\\\|raccourci|serveur de l'officine|PowerShell/i);
   });
 });
 
@@ -253,14 +159,12 @@ describe("un fichier qui attend, ou qui n'a pas pu être lu", () => {
     expect(t).toContain("Colonnes non reconnues : quantité. Votre stock n'a pas changé. L'équipe PharmaBoost est prévenue.");
   });
 
-  it("écarté : une alerte neutre en haut — l'équipe n'a pas appliqué le fichier, le stock n'a pas changé, envoyez le stock complet", async () => {
+  it("écarté : une alerte neutre — l'équipe n'a pas appliqué le fichier, le stock n'a pas changé", async () => {
     mocks.listPharmacyDeposits.mockResolvedValue([deposit({ status: "REJECTED", lines: null, appliedAt: null })]);
-    const html = await render();
-    const t = text(html);
+    const t = text(await render());
     expect(t).toContain("Votre dernier fichier n'a pas été appliqué");
     expect(t).toContain("L'équipe PharmaBoost n'a pas appliqué votre dernier fichier. Votre stock n'a pas changé. Envoyez votre stock complet.");
-    expect(t).toContain("Écarté par l'équipe PharmaBoost."); // la ligne de « Vos derniers envois »
-    // Neutre : ni l'orange d'une vérification ni le rouge d'un échec.
+    expect(t).toContain("Écarté par l'équipe PharmaBoost.");
     expect(t).not.toContain("Votre dernier fichier n'a pas pu être lu");
     expect(t).not.toContain("Votre dernier fichier est en vérification");
   });
@@ -271,40 +175,19 @@ describe("un fichier qui attend, ou qui n'a pas pu être lu", () => {
     expect(t).not.toContain("interrompue");
   });
 
-  it("une lecture restée bloquée : « Lecture interrompue, renvoyez votre fichier » — pas de roue qui tourne à vie", async () => {
+  it("une lecture restée bloquée : on le dit et on invite à renvoyer le fichier", async () => {
     mocks.listPharmacyDeposits.mockResolvedValue([deposit({ status: "RECEIVED", stalled: true, lines: null, appliedAt: null, receivedAt: ago(30 * 60_000) })]);
     const html = await render();
     const t = text(html);
     expect(t).toContain("La lecture de votre dernier fichier s'est interrompue");
+    expect(t).toContain("Renvoyez votre fichier avec le parcours ci-dessous");
     expect(t).toContain("Lecture interrompue, renvoyez votre fichier.");
-    expect(t).not.toContain("lecture en cours");
-    expect(t).not.toContain("Lecture en cours…");
     expect(html).not.toContain("animate-spin");
-    expect(t).toContain("Lecture interrompue"); // la pastille et la ligne de la liste
-  });
-
-  it("une lecture récente, elle, reste « en cours » (et la roue tourne)", async () => {
-    mocks.listPharmacyDeposits.mockResolvedValue([deposit({ status: "RECEIVED", stalled: false, lines: null, appliedAt: null })]);
-    const html = await render();
-    expect(text(html)).not.toContain("interrompue");
-    expect(html).toContain("animate-spin");
   });
 
   it("un dernier envoi réussi efface l'alerte d'un ancien fichier en vérification", async () => {
     mocks.listPharmacyDeposits.mockResolvedValue([deposit({ id: "d2" }), deposit({ id: "d1", status: "HELD", appliedAt: null })]);
     expect(text(await render())).not.toContain("Votre dernier fichier est en vérification");
-  });
-});
-
-describe("l'envoi du fichier depuis la page", () => {
-  it("un seul bloc, replié par défaut, avec le rappel « stock complet » et un seul bouton Envoyer", async () => {
-    const html = await render();
-    const t = text(html);
-    expect(t).toContain("Je n'ai pas le dossier PharmaBoost, ou je préfère envoyer le fichier ici");
-    expect(t).toContain("Envoyez toujours votre stock complet (tous les produits en stock), pas seulement ce qui vient d'arriver. Ce qui n'est pas dans le fichier sera mis à 0 en stock.");
-    expect(t).toContain("Choisir le fichier");
-    expect(html.match(/type="submit"/g)).toHaveLength(1);
-    expect(html).toContain('id="stock-deposit-file"');
   });
 });
 
@@ -335,12 +218,9 @@ describe("le vocabulaire du titulaire", () => {
       ["jamais reçu", () => {
         mocks.findPharmacy.mockResolvedValue({ stockSyncedAt: null });
         mocks.listPharmacyDeposits.mockResolvedValue([]);
-        mocks.getConnection.mockResolvedValue(null);
       }],
-      ["autre logiciel", () => mocks.getConnection.mockResolvedValue(connection({ lgo: "autre" }))],
       ["en vérification", () => mocks.listPharmacyDeposits.mockResolvedValue([deposit({ status: "HELD", message: "raison de la console" })])],
       ["non lu", () => mocks.listPharmacyDeposits.mockResolvedValue([deposit({ status: "FAILED", message: "Colonnes non reconnues : quantité." })])],
-      ["serveur silencieux", () => mocks.getConnection.mockResolvedValue(connection({ freshness: "DISCONNECTED", seenAgeSeconds: 7200 }))],
       ["écarté", () => mocks.listPharmacyDeposits.mockResolvedValue([deposit({ status: "REJECTED", message: "raison de la console" })])],
       ["lecture interrompue", () => mocks.listPharmacyDeposits.mockResolvedValue([deposit({ status: "RECEIVED", stalled: true, message: null })])],
     ];
@@ -348,13 +228,9 @@ describe("le vocabulaire du titulaire", () => {
       vi.clearAllMocks();
       mocks.requirePermission.mockResolvedValue({ scope: { pharmacyId: "ph-1", userId: "u-1" }, pharmacy: { isDemo: false } });
       mocks.findPharmacy.mockResolvedValue({ stockSyncedAt: new Date("2026-10-05T06:42:00Z") });
-      mocks.getConnection.mockResolvedValue(connection());
       mocks.listPharmacyDeposits.mockResolvedValue([deposit()]);
       arrange();
       expect(text(await render()), name).not.toMatch(/\bagent\b|appairage|facteur|\bCIP\b|import job/i);
     }
   });
 });
-
-/** La mention honnête d'un logiciel dont la procédure n'est pas vérifiée. */
-const UNVERIFIED = "Les étapes exactes de votre logiciel seront ajoutées avec votre conseiller PharmaBoost.";

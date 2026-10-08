@@ -10,16 +10,21 @@ export function PatientSearchBar({
   initialQuery,
   placeholder = "Rechercher un patient (nom, référence, e-mail, téléphone…)",
   basePath = "/patients",
+  className = "max-w-md",
 }: {
   initialQuery: string;
   placeholder?: string;
   basePath?: string;
+  /** La largeur de la barre : `max-w-md` par défaut, `max-w-none` pour remplir son conteneur. */
+  className?: string;
 }) {
   const [value, setValue] = useState(initialQuery);
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    // Au chargement, la valeur est celle de l'adresse : rien à changer (et surtout pas la page demandée, qui serait perdue).
+    if (value.trim() === initialQuery.trim()) return;
     const timer = setTimeout(() => {
       const params = new URLSearchParams(searchParams.toString());
       if (value.trim()) params.set("q", value.trim());
@@ -36,7 +41,7 @@ export function PatientSearchBar({
   }, [value]);
 
   return (
-    <div className="w-full max-w-md">
+    <div className={`w-full ${className}`}>
       <label htmlFor="list-search" className="sr-only">
         {placeholder}
       </label>

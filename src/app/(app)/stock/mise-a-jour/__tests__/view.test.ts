@@ -1,12 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { DEPOSIT_MAX_BYTES, describeDepositResult } from "@/core/stock-deposit/rules";
 import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 import type { DepositView } from "@/core/stock-deposit/types";
 import {
-  FOLDER_FALLBACK_NOTICE,
-  FOLDER_LOCATION_NOTICE,
-  FOLDER_SHORTCUT_NOTICE,
-  FULL_STOCK_REMINDER,
   HELD_NOTICE,
   INTERRUPTED_LINE,
   REJECTED_NOTICE,
@@ -18,16 +14,9 @@ import {
   describeReceived,
   exportGuide,
   formatFileSize,
-  isFolderReady,
-  isStillExpected,
   linesOfLastStock,
-  receiveState,
-  receiveText,
   sendOutcome,
-  shouldPoll,
-  sharedFolderPath,
   stockState,
-  submitDeposit,
 } from "../view";
 
 /** La page « Mettre à jour mon stock » : ce qui se décide sans écran. */
@@ -58,24 +47,6 @@ const deposit = (overrides: Partial<DepositView> = {}): DepositView => ({
   hasFile: true,
   stalled: false,
   ...overrides,
-});
-
-describe("le dossier PharmaBoost", () => {
-  it("le partage du serveur quand on le connaît, sinon le dossier d'installation", () => {
-    expect(sharedFolderPath("SRV-PHARMA")).toBe("\\\\SRV-PHARMA\\PharmaBoost");
-    expect(sharedFolderPath("  SRV-PHARMA  ")).toBe("\\\\SRV-PHARMA\\PharmaBoost");
-    expect(sharedFolderPath("\\\\SRV\\")).toBe("\\\\SRV\\PharmaBoost");
-    expect(sharedFolderPath(null)).toBe("C:\\PharmaBoost\\Export");
-    expect(sharedFolderPath("")).toBe("C:\\PharmaBoost\\Export");
-  });
-
-  it("le dossier n'existe qu'une fois le serveur relié", () => {
-    expect(isFolderReady(null)).toBe(false);
-    expect(isFolderReady({ status: "PENDING" })).toBe(false);
-    expect(isFolderReady({ status: "DISCONNECTED" })).toBe(false);
-    expect(isFolderReady({ status: "CONNECTED" })).toBe(true);
-    expect(isFolderReady({ status: "ERROR" })).toBe(true);
-  });
 });
 
 describe("les étapes selon le logiciel", () => {
@@ -176,106 +147,6 @@ describe("le nombre de lignes du dernier stock", () => {
   });
 });
 
-describe("le statut en direct de l'étape 3", () => {
-  const known = { id: "d1", status: "APPLIED" as const };
-
-  it("rien de nouveau depuis l'ouverture : on attend", () => {
-    expect(receiveState(null, null)).toBe("waiting");
-    expect(receiveState(known, known)).toBe("waiting");
-  });
-
-  it("un nouveau dépôt : lecture, puis stock à jour — sans jamais confondre avec l'ancien", () => {
-    expect(receiveState(known, { id: "d2", status: "RECEIVED" })).toBe("reading");
-    expect(receiveState(known, { id: "d2", status: "APPLIED" })).toBe("done");
-    expect(receiveState(null, { id: "d2", status: "APPLIED" })).toBe("done");
-  });
-
-  it("en vérification, non lu, écarté : chacun son état, jamais « à jour »", () => {
-    expect(receiveState(known, { id: "d2", status: "HELD" })).toBe("held");
-    expect(receiveState(known, { id: "d2", status: "FAILED" })).toBe("failed");
-    expect(receiveState(known, { id: "d2", status: "REJECTED" })).toBe("rejected");
-  });
-
-  it("un dépôt déjà en lecture à l'ouverture est celui qu'on attend : il finit en « à jour »", () => {
-    const reading = { id: "d2", status: "RECEIVED" as const };
-    expect(receiveState(reading, reading)).toBe("reading");
-    expect(receiveState(reading, { id: "d2", status: "APPLIED" })).toBe("done");
-  });
-
-  it("la page se rafraîchit seule tant que le stock n'est pas à jour — y compris après une vérification, un échec ou un écart", () => {
-    for (const state of ["waiting", "reading", "interrupted", "held", "failed", "rejected"] as const) expect(isStillExpected(state), state).toBe(true);
-    expect(isStillExpected("done")).toBe(false);
-  });
-
-  it("un même dépôt dont le statut change est une nouveauté : le fichier en vérification ou en échec à l'ouverture, ensuite appliqué par l'équipe", () => {
-    expect(receiveState({ id: "d1", status: "HELD" }, { id: "d1", status: "HELD" })).toBe("waiting");
-    expect(receiveState({ id: "d1", status: "HELD" }, { id: "d1", status: "APPLIED" })).toBe("done");
-    expect(receiveState({ id: "d1", status: "FAILED" }, { id: "d1", status: "APPLIED" })).toBe("done");
-    expect(receiveState({ id: "d1", status: "HELD" }, { id: "d1", status: "REJECTED" })).toBe("rejected");
-  });
-
-  it("après un échec, le dépôt suivant est bien « nouveau » : appliqué, il passe au vert", () => {
-    const failed = { id: "d2", status: "FAILED" as const };
-    expect(receiveState(known, failed)).toBe("failed");
-    expect(receiveState(known, { id: "d3", status: "APPLIED" })).toBe("done");
-  });
-
-  it("une lecture restée bloquée ne tourne pas à vie : « interrompue »", () => {
-    expect(receiveState(known, { id: "d2", status: "RECEIVED", stalled: true })).toBe("interrupted");
-    expect(receiveState({ id: "d2", status: "RECEIVED" }, { id: "d2", status: "RECEIVED", stalled: true })).toBe("interrupted");
-    expect(receiveState(known, { id: "d2", status: "RECEIVED", stalled: false })).toBe("reading");
-  });
-
-  it("qui interroge le serveur : tout sauf « à jour » et l'abandon ; sans dossier, seulement un fichier réellement envoyé", () => {
-    const folder = { folderReady: true, gaveUp: false };
-    const noFolder = { folderReady: false, gaveUp: false };
-    for (const state of ["waiting", "reading", "interrupted", "held", "failed", "rejected"] as const) expect(shouldPoll(state, folder), `dossier ${state}`).toBe(true);
-    expect(shouldPoll("done", folder)).toBe(false);
-
-    expect(shouldPoll("waiting", noFolder)).toBe(false);
-    for (const state of ["reading", "interrupted", "held", "failed", "rejected"] as const) expect(shouldPoll(state, noFolder), `sans dossier ${state}`).toBe(true);
-    expect(shouldPoll("done", noFolder)).toBe(false);
-
-    for (const state of ["waiting", "reading", "held", "failed"] as const) expect(shouldPoll(state, { folderReady: true, gaveUp: true }), `abandon ${state}`).toBe(false);
-  });
-
-  it("les phrases : jamais de jargon, le nombre de lignes quand on le connaît", () => {
-    const options = { folderReady: true, gaveUp: false };
-    expect(norm(receiveText("done", { lines: 4235 }, options))).toBe("Fichier reçu : 4 235 lignes, stock à jour.");
-    expect(receiveText("done", { lines: 1 }, options)).toBe("Fichier reçu : 1 ligne, stock à jour.");
-    expect(receiveText("done", { lines: null }, options)).toBe("Fichier reçu, stock à jour.");
-    expect(receiveText("reading", null, options)).toContain("lecture en cours");
-    expect(receiveText("held", null, options)).toContain("l'équipe PharmaBoost le vérifie");
-    expect(receiveText("failed", null, options)).toContain("Votre stock n'a pas changé");
-    expect(receiveText("waiting", null, options)).toContain("En attente de votre fichier");
-  });
-
-  it("sans dossier, on n'attend rien tout seul ; après l'abandon de l'attente, on le dit", () => {
-    expect(receiveText("waiting", null, { folderReady: false, gaveUp: false })).toContain("Quand vous envoyez votre fichier ci-dessous");
-    expect(receiveText("waiting", null, { folderReady: true, gaveUp: true })).toContain("Rechargez la page");
-  });
-
-  it("une lecture interrompue : « Lecture interrompue, renvoyez votre fichier » — sans promettre que le stock n'a pas changé", () => {
-    const text = receiveText("interrupted", null, { folderReady: true, gaveUp: false });
-    expect(text).toBe("Lecture interrompue, renvoyez votre fichier.");
-    expect(text).toBe(INTERRUPTED_LINE);
-    expect(text).not.toContain("n'a pas changé");
-  });
-
-  it("après l'abandon, chaque état garde sa phrase et ajoute l'invitation à recharger", () => {
-    const gaveUp = { folderReady: true, gaveUp: true };
-    for (const state of ["held", "failed", "rejected", "interrupted"] as const) {
-      const text = receiveText(state, null, gaveUp);
-      expect(text, state).toContain(receiveText(state, null, { folderReady: true, gaveUp: false }));
-      expect(text, state).toContain("Rechargez la page pour vérifier de nouveau.");
-    }
-    expect(receiveText("reading", null, gaveUp)).toContain("La lecture prend plus de temps que prévu. Rechargez la page");
-    expect(receiveText("reading", null, gaveUp)).not.toContain("lecture en cours");
-    // Un stock à jour n'a rien à recharger.
-    expect(receiveText("done", { lines: 3 }, gaveUp)).not.toContain("Rechargez");
-  });
-});
-
 describe("le contrôle du fichier avant l'envoi", () => {
   it("accepte un CSV, un Excel, un PDF d'inventaire, quelle que soit la casse", () => {
     for (const name of ["stock.csv", "STOCK.XLSX", "inventaire.pdf", "stock.xls", "export.txt"]) expect(checkDepositFile({ name, size: 1000 })).toBeNull();
@@ -332,50 +203,6 @@ describe("la réponse du serveur, dite au titulaire", () => {
   });
 });
 
-describe("l'envoi, du fichier choisi à la phrase affichée", () => {
-  const file = (name = "stock.csv", content = "cip;qte\n1;2") => new File([content], name);
-
-  it("envoie le fichier dans le champ « file » et rend l'issue", async () => {
-    const send = vi.fn(async (body: FormData) => {
-      expect((body.get("file") as File).name).toBe("stock.csv");
-      return { ok: true as const, data: deposit() };
-    });
-    const result = await submitDeposit(file(), send);
-    expect(send).toHaveBeenCalledOnce();
-    expect(result.sent).toBe(true);
-    expect(result.outcome.tone).toBe("success");
-  });
-
-  it("un fichier refusé par le contrôle ne part pas", async () => {
-    const send = vi.fn();
-    const result = await submitDeposit(file("photo.jpg"), send);
-    expect(send).not.toHaveBeenCalled();
-    expect(result.sent).toBe(false);
-    expect(result.outcome.detail).toContain("Ce format n'est pas lu");
-  });
-
-  it("en vérification : parti (la zone se vide), mais jamais présenté comme réussi", async () => {
-    const result = await submitDeposit(file(), async () => ({ ok: true as const, data: deposit({ status: "HELD" }) }));
-    expect(result.sent).toBe(true);
-    expect(result.outcome.tone).toBe("warning");
-  });
-
-  it("une erreur du serveur : le fichier reste choisi, pour réessayer", async () => {
-    const result = await submitDeposit(file(), async () => ({ ok: false as const, error: "Trop d'envois aujourd'hui." }));
-    expect(result.sent).toBe(false);
-    expect(result.outcome.detail).toBe("Trop d'envois aujourd'hui.");
-  });
-
-  it("une panne réseau ne devient jamais une exception à l'écran", async () => {
-    const result = await submitDeposit(file(), async () => {
-      throw new Error("fetch failed");
-    });
-    expect(result.sent).toBe(false);
-    expect(result.outcome.tone).toBe("danger");
-    expect(result.outcome.detail).toBe("L'envoi n'a pas abouti. Vérifiez votre connexion et réessayez.");
-  });
-});
-
 describe("vos derniers envois", () => {
   it("chaque état se résume en une ligne, sans jargon", () => {
     expect(norm(describeDepositLine(deposit()))).toBe(norm(describeDepositResult(deposit())));
@@ -411,23 +238,17 @@ describe("un envoi dont la lecture s'est interrompue", () => {
 });
 
 describe("ce que le titulaire sait avant d'envoyer", () => {
-  it("le rappel « stock complet » dit que ce qui n'est pas dans le fichier sera mis à 0", () => {
+  it("le rappel dit que ce qui n'est pas dans le fichier sera mis à 0", () => {
     expect(ZERO_ABSENT_NOTICE).toBe("Ce qui n'est pas dans le fichier sera mis à 0 en stock.");
-    expect(FULL_STOCK_REMINDER).toContain("Envoyez toujours votre stock complet (tous les produits en stock), pas seulement ce qui vient d'arriver.");
-    expect(FULL_STOCK_REMINDER).toContain(ZERO_ABSENT_NOTICE);
   });
 
   it("un fichier écarté a sa phrase : rien n'a changé, envoyez le stock complet", () => {
     expect(REJECTED_NOTICE).toBe("L'équipe PharmaBoost n'a pas appliqué votre dernier fichier. Votre stock n'a pas changé. Envoyez votre stock complet.");
   });
 
-  it("le dossier : où il se trouve, le raccourci du serveur, et le repli par l'envoi du fichier — sans jargon", () => {
-    expect(FOLDER_LOCATION_NOTICE).toBe("Le dossier PharmaBoost se trouve sur le serveur de l'officine :");
-    expect(FOLDER_SHORTCUT_NOTICE).toBe("Sur le serveur, un raccourci « Stock PharmaBoost » est posé sur le bureau.");
-    expect(FOLDER_FALLBACK_NOTICE).toBe("Ce chemin ne s'ouvre pas ? Pas de souci : envoyez le fichier avec le bouton ci-dessous, c'est tout aussi bon.");
-    for (const notice of [FOLDER_LOCATION_NOTICE, FOLDER_SHORTCUT_NOTICE, FOLDER_FALLBACK_NOTICE, FULL_STOCK_REMINDER, REJECTED_NOTICE, INTERRUPTED_LINE]) {
+  it("aucune de ces phrases ne parle d'agent, d'appairage ou de CIP", () => {
+    for (const notice of [ZERO_ABSENT_NOTICE, REJECTED_NOTICE, HELD_NOTICE, INTERRUPTED_LINE]) {
       expect(notice).not.toMatch(/\bagent\b|appairage|facteur|\bCIP\b/i);
     }
   });
 });
-

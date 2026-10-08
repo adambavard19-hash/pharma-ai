@@ -31,7 +31,7 @@ export function ConnectionSetup({ initial, robot, installerAvailable }: { initia
       </header>
 
       <CountersStep counters={overview.counters} installerAvailable={installerAvailable} onChanged={() => void refresh()} />
-      <StockStep stock={overview.stock} onChanged={() => void refresh()} />
+      <StockStep stock={overview.stock} />
       <RobotStep setup={robot} lgo={lgo} />
     </section>
   );

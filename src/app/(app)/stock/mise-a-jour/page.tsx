@@ -4,31 +4,14 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, Inbox } from "lucide-react";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { getConnection } from "@/server/services/stock-sync";
 import { listPharmacyDeposits } from "@/server/services/stock-deposits";
-import { describeAge } from "@/core/stock/connectors";
-import { PageHeader, SectionHeader } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
-import { CopyPath } from "./copy-path";
-import { DepositForm } from "./deposit-form";
-import { ReceiveStep } from "./receive-step";
 import { RecentDeposits } from "./recent-deposits";
-import { StepCard } from "./step-card";
-import {
-  FOLDER_FALLBACK_NOTICE,
-  FOLDER_LOCATION_NOTICE,
-  FOLDER_SHORTCUT_NOTICE,
-  HELD_NOTICE,
-  REJECTED_NOTICE,
-  ZERO_ABSENT_NOTICE,
-  exportGuide,
-  isFolderReady,
-  linesOfLastStock,
-  sharedFolderPath,
-  stockState,
-} from "./view";
+import { UpdateFlow } from "./update-flow";
+import { HELD_NOTICE, REJECTED_NOTICE, linesOfLastStock, stockState } from "./view";
 
 export const metadata: Metadata = { title: "Mettre à jour mon stock" };
 
@@ -43,21 +26,17 @@ const STATE_STYLES = {
 } as const;
 
 /**
- * Mettre à jour mon stock — la page unique du titulaire.
- *
- * Du haut en bas : où en est mon stock, comment le mettre à jour en trois
- * étapes (le chemin simple : le dossier PharmaBoost), envoyer le fichier d'ici
- * si je n'ai pas le dossier, et ce qui s'est passé aux derniers envois. Pas de
- * choix de colonnes, pas d'aperçu : la lecture et ses garde-fous sont ceux du
- * serveur, et l'équipe PharmaBoost tranche ce qui sort de l'ordinaire.
+ * Mettre à jour mon stock — le parcours en trois étapes (choisir le fichier, vérifier, confirmer), l'état du stock en
+ * haut, et ce qui s'est passé aux derniers envois en bas. Les contrôles (fichier incomplet, lignes illisibles, produits
+ * qui passeraient à 0) sont ceux du serveur ; l'équipe PharmaBoost tranche ce qui sort de l'ordinaire. Les dossiers et
+ * les réglages du serveur de l'officine n'ont plus rien à faire ici : ils sont dans l'espace d'assistance de la console.
  */
 export default async function StockUpdatePage() {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   const pharmacyId = session.scope.pharmacyId;
 
-  const [pharmacy, connection, deposits] = await Promise.all([
+  const [pharmacy, deposits] = await Promise.all([
     prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true } }),
-    getConnection(pharmacyId),
     listPharmacyDeposits(pharmacyId, 5),
   ]);
 
@@ -65,27 +44,23 @@ export default async function StockUpdatePage() {
   const syncedAt = pharmacy?.stockSyncedAt ?? null;
   const state = stockState({ syncedAt, lines: linesOfLastStock(syncedAt, deposits), now });
   const look = STATE_STYLES[state.tone];
-
-  const folderReady = isFolderReady(connection);
-  const unreachable = folderReady && connection?.freshness === "DISCONNECTED";
-  const guide = exportGuide(connection?.lgo ?? "autre");
   const latest = deposits[0] ?? null;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-2xl space-y-5 pb-20">
       <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
-        <Link href="/stock">Retour au stock</Link>
+        <Link href="/stock">Mon stock</Link>
       </Button>
 
       <PageHeader title="Mettre à jour mon stock" description="PharmaBoost ne conseille que ce que vous avez en rayon : plus votre stock est récent, plus ses conseils sont justes." />
 
-      <section aria-labelledby="etat-du-stock" className={cn("flex items-start gap-4 rounded-2xl border p-5 sm:p-6", look.box)}>
-        <look.Icon className={cn("mt-1 size-8 shrink-0", look.icon)} aria-hidden="true" />
-        <div className="min-w-0 space-y-1">
-          <h2 id="etat-du-stock" className="text-[22px] leading-8 font-semibold tracking-[-0.01em] text-text-primary sm:text-[26px] sm:leading-9">
+      <section aria-labelledby="etat-du-stock" className={cn("flex items-start gap-3 rounded-2xl border p-4 sm:p-5", look.box)}>
+        <look.Icon className={cn("mt-0.5 size-6 shrink-0", look.icon)} aria-hidden="true" />
+        <div className="min-w-0">
+          <h2 id="etat-du-stock" className="text-[17px] leading-6 font-semibold text-text-primary">
             {state.title}
           </h2>
-          <p className="text-[15px] leading-6 text-text-secondary">{state.detail}</p>
+          <p className="text-[14px] leading-5 text-text-secondary">{state.detail}</p>
         </div>
       </section>
 
@@ -106,51 +81,11 @@ export default async function StockUpdatePage() {
       )}
       {latest?.status === "RECEIVED" && latest.stalled && (
         <Alert tone="warning" title="La lecture de votre dernier fichier s'est interrompue">
-          Renvoyez votre fichier : depuis le dossier PharmaBoost, ou avec le bouton d&apos;envoi plus bas sur cette page.
+          Renvoyez votre fichier avec le parcours ci-dessous : votre stock n&apos;a pas changé.
         </Alert>
       )}
 
-      <section className="space-y-3">
-        <SectionHeader title="En 3 étapes" />
-        <ol className="space-y-3">
-          <StepCard number={1} title={`Sortez votre stock de ${guide.name}`}>
-            <ul className="space-y-1 text-[14.5px] leading-6 text-text-primary">
-              {guide.menuSteps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ul>
-            <p className="text-[14.5px] leading-6 font-medium text-text-primary">
-              Prenez tout votre stock, pas seulement les nouveautés. {ZERO_ABSENT_NOTICE}
-            </p>
-            {guide.notice && <p className="text-[13px] leading-5 text-text-secondary">{guide.notice}</p>}
-          </StepCard>
-
-          <StepCard number={2} title="Enregistrez le fichier dans le dossier PharmaBoost">
-            {folderReady ? (
-              <>
-                <p className="text-[14px] leading-6 text-text-secondary">{FOLDER_LOCATION_NOTICE}</p>
-                <CopyPath path={sharedFolderPath(connection?.hostname)} />
-                <p className="text-[14px] leading-6 text-text-secondary">{FOLDER_SHORTCUT_NOTICE}</p>
-                <p className="text-[14px] leading-6 text-text-secondary">{FOLDER_FALLBACK_NOTICE}</p>
-                {guide.saveHint && <p className="text-[14px] leading-6 text-text-primary">{guide.saveHint} Le nom du fichier n&apos;a pas d&apos;importance.</p>}
-                {unreachable && (
-                  <Alert tone="warning">
-                    Le dossier PharmaBoost ne répond plus (dernier signe : {describeAge(connection?.seenAgeSeconds ?? null)}). Votre serveur est peut-être éteint. En attendant, envoyez votre fichier plus bas sur cette page.
-                  </Alert>
-                )}
-              </>
-            ) : (
-              <p className="text-[14px] leading-6 text-text-secondary">
-                Ce dossier est créé sur votre serveur quand votre conseiller PharmaBoost installe PharmaBoost. Pas encore fait : envoyez plutôt votre fichier ici, juste en dessous.
-              </p>
-            )}
-          </StepCard>
-
-          <ReceiveStep latest={latest && { id: latest.id, status: latest.status, lines: latest.lines, message: latest.message, stalled: latest.stalled }} folderReady={folderReady} />
-        </ol>
-      </section>
-
-      <DepositForm defaultOpen={!folderReady || unreachable} />
+      <UpdateFlow />
 
       <RecentDeposits deposits={deposits} />
     </div>

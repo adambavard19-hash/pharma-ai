@@ -25,6 +25,7 @@ import {
   DEPOSIT_SUPERSEDED_MESSAGE,
   DEPOSIT_HOLD_MIN_KNOWN,
   assessDeposit,
+  type DepositAssessment,
   cleanDepositFileName,
   depositMaxBytes,
   depositMaxLabel,
@@ -35,7 +36,7 @@ import {
   isDepositStorageKey,
   retentionCutoff,
 } from "@/core/stock-deposit/rules";
-import { DEPOSIT_DECISIONS, DEPOSIT_SOURCES, type DepositDecision, type DepositSource, type DepositStatus, type DepositView } from "@/core/stock-deposit/types";
+import { DEPOSIT_DECISIONS, DEPOSIT_SOURCES, type DepositDecision, type DepositSource, type DepositStatus, type DepositView, type StockPreview } from "@/core/stock-deposit/types";
 import type { TenantScope } from "@/server/db/tenant";
 
 /**
@@ -372,6 +373,69 @@ export async function receiveStockDeposit(params: {
   return { ok: true, deposit: toView(done), duplicate: false };
 }
 
+// ---------------------------------------------------------------- Prévisualiser
+
+export type PreviewResult = { ok: true; preview: StockPreview } | { ok: false; error: string };
+
+const PREVIEW_HOURLY_LIMIT = 30;
+
+/**
+ * Lit un fichier de stock et dit ce qu'il contient, SANS rien appliquer : combien de produits, combien reconnus ou
+ * nouveaux, combien de lignes illisibles, combien de produits en rayon passeraient à zéro, et si le fichier serait
+ * appliqué ou retenu pour l'équipe. Les contrôles sont ceux de l'envoi réel (`evaluateFile`) ; l'analyse n'est qu'une
+ * lecture : le stock, les produits et les dépôts ne changent pas, et l'analyse temporaire est supprimée.
+ *
+ * C'est l'étape « Vérifier » de la mise à jour : la personne voit ce qui va se passer, puis confirme (ou pas).
+ */
+export async function previewStockDeposit(params: { scope: TenantScope; fileName: string; bytes: Uint8Array }): Promise<PreviewResult> {
+  const { scope, bytes } = params;
+  const fileName = cleanDepositFileName(params.fileName ?? "");
+  if (!DEPOSIT_ACCEPTED.test(fileName)) return { ok: false, error: `Format non accepté. Envoyez un fichier ${DEPOSIT_ACCEPTED_LABEL}.` };
+  if (bytes.byteLength === 0) return { ok: false, error: "Le fichier est vide." };
+  if (bytes.byteLength > depositMaxBytes("WEB")) return { ok: false, error: `Le fichier dépasse ${depositMaxLabel("WEB")}.` };
+  if (rateLimited(`stock-preview:${scope.pharmacyId}`, PREVIEW_HOURLY_LIMIT, 60 * 60 * 1000)) {
+    return { ok: false, error: "Trop de vérifications pour le moment. Réessayez dans une heure, ou prévenez votre conseiller PharmaBoost." };
+  }
+
+  let jobId: string | null = null;
+  try {
+    const analysed = await analyseStockImport({ scope, fileName, bytes });
+    jobId = analysed.jobId;
+    if (analysed.missing.length > 0) {
+      const labels: Record<string, string> = IMPORT_FIELD_LABELS;
+      const names = analysed.missing.map((field) => labels[field] ?? field).join(", ");
+      return { ok: false, error: `Colonnes non reconnues : ${names}. Envoyez l'édition d'inventaire complète de votre logiciel.` };
+    }
+    const evaluation = await evaluateFile(scope.pharmacyId, analysed, { zeroAbsent: true, enforce: true, showAbsent: true });
+    if (evaluation.validLines === 0) return { ok: false, error: "Aucune ligne de stock lisible dans ce fichier : vérifiez qu'il contient bien les quantités en stock." };
+    const count = (...statuses: string[]) => analysed.rows.filter((line) => statuses.includes(line.status)).length;
+    return {
+      ok: true,
+      preview: {
+        fileName,
+        products: evaluation.validLines,
+        recognized: count("MEDICAMENT", "PRODUIT_EXISTANT"),
+        created: count("A_VERIFIER", "NON_RECONNU"),
+        invalid: evaluation.invalid,
+        knownStock: evaluation.knownLines,
+        absent: evaluation.absentLines,
+        verdict: evaluation.verdict.verdict,
+        reason: evaluation.verdict.verdict === "HOLD" ? evaluation.verdict.reason : null,
+        warnings: analysed.warnings ?? [],
+      },
+    };
+  } catch (error) {
+    console.error(`[stock-preview] lecture du fichier en échec : ${error instanceof Error ? error.message : String(error)}`);
+    return { ok: false, error: readableError(error, READ_FALLBACK) };
+  } finally {
+    // L'analyse n'est qu'une lecture : elle ne reste pas parmi les imports « en attente ».
+    if (jobId) {
+      const id = jobId;
+      await quietly("suppression de l'analyse", () => prisma.importJob.deleteMany({ where: { id, pharmacyId: scope.pharmacyId, status: "PENDING" } }));
+    }
+  }
+}
+
 // ---------------------------------------------------------------- Trancher, relancer
 
 /** L'équipe tranche un fichier resté en attente : l'appliquer en entier, l'appliquer sans remise à zéro, ou l'écarter. */
@@ -528,6 +592,32 @@ async function countKnownStockLines(pharmacyId: string): Promise<number> {
   return drugs + products;
 }
 
+type AnalysedFile = { rows: { status: string; targetId: string | null }[]; summary: { invalid: number }; incomplete: boolean; incompleteReason?: string };
+
+/**
+ * Ce que vaut un fichier analysé, AVANT d'écrire quoi que ce soit : combien de lignes valides, combien d'illisibles,
+ * combien de produits connus, et le verdict — appliquer, ou attendre l'équipe. C'est le seul endroit où ce verdict se
+ * décide : l'envoi réel et l'aperçu montré avant la confirmation lisent la même réponse.
+ *
+ * `enforce: false` (l'équipe a déjà tranché) ne calcule rien de plus que les comptes. `showAbsent` demande les produits
+ * absents même quand le fichier est déjà retenu : l'aperçu les montre toujours.
+ */
+async function evaluateFile(pharmacyId: string, preview: AnalysedFile, options: { zeroAbsent: boolean; enforce: boolean; showAbsent: boolean }) {
+  const validLines = preview.rows.filter((line) => line.status !== "INVALIDE").length;
+  const invalid = preview.summary.invalid;
+  const knownLines = await countKnownStockLines(pharmacyId);
+  const base = { validLines, knownLines, invalidLines: invalid, incompleteReason: preview.incomplete ? preview.incompleteReason ?? INCOMPLETE_FALLBACK : null };
+  let verdict: DepositAssessment = options.enforce ? assessDeposit(base) : { verdict: "APPLY" };
+  let absentLines: number | null = null;
+  const worthCounting = options.zeroAbsent && knownLines > 0 && (options.showAbsent || (options.enforce && verdict.verdict === "APPLY" && knownLines >= DEPOSIT_HOLD_MIN_KNOWN));
+  if (worthCounting) {
+    absentLines = await countAbsentLines(pharmacyId, preview.rows, knownLines);
+    // Un fichier qui passe les trois premiers contrôles est encore compté : combien de produits connus resteraient à zéro ?
+    if (options.enforce && verdict.verdict === "APPLY") verdict = assessDeposit({ ...base, absentLines });
+  }
+  return { validLines, invalid, knownLines, absentLines, verdict };
+}
+
 /**
  * Combien de produits connus (déjà importés, en rayon) ne figurent PAS dans le fichier : ceux que « stock complet » mettrait
  * à zéro. Même règle que la remise à zéro elle-même, mais en lecture seule, avant d'écrire quoi que ce soit.
@@ -609,14 +699,9 @@ async function processDeposit(params: { row: StockDeposit; scope: TenantScope; p
       return await settle({ status: "FAILED", importJobId: jobId, lines: 0, invalid, message: "Aucune ligne de stock lisible dans ce fichier : vérifiez qu'il contient bien les quantités en stock.", ...(await discardStoredFile(row)) });
     }
 
-    const knownLines = await countKnownStockLines(scope.pharmacyId);
+    // Les mêmes contrôles que l'aperçu montre avant l'envoi (voir `previewStockDeposit`) : un seul endroit les décide.
+    const { knownLines, verdict } = await evaluateFile(scope.pharmacyId, preview, { zeroAbsent: params.zeroAbsent, enforce: !params.decided, showAbsent: false });
     if (!params.decided) {
-      const base = { validLines, knownLines, invalidLines: invalid, incompleteReason: preview.incomplete ? preview.incompleteReason ?? INCOMPLETE_FALLBACK : null };
-      let verdict = assessDeposit(base);
-      // Un fichier qui passe les trois premiers contrôles est encore compté : combien de produits connus resteraient à zéro ?
-      if (verdict.verdict === "APPLY" && params.zeroAbsent && knownLines >= DEPOSIT_HOLD_MIN_KNOWN) {
-        verdict = assessDeposit({ ...base, absentLines: await countAbsentLines(scope.pharmacyId, preview.rows, knownLines) });
-      }
       if (verdict.verdict === "HOLD") {
         await closeImportJob(jobId);
         return await settle({ status: "HELD", importJobId: jobId, lines: validLines, invalid, knownLines, message: verdict.reason });

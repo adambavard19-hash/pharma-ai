@@ -1,35 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Boxes, Cable, Clock, History, Hourglass, PackageX, Plus, Upload } from "lucide-react";
-import { ClassifyProductsButton } from "./classify-button";
-import { FetchPhotosButton } from "./photos-button";
+import { ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { prisma } from "@/server/db/client";
-import { countProductsWithoutImageLookup } from "@/server/services/product-images";
 import { countLotsNeedingAction } from "@/server/services/stock-lots";
+import { loadConnectionOverview } from "@/server/services/connection-overview";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { normalizeSearchText } from "@/core/reference/search";
-import { PageHeader, Grid } from "@/components/ui/page";
-import { StatCard } from "@/components/ui/stat-card";
+import { availabilityOf, describeStockAge, parseStockFilter, stockStatus, summarizeStock } from "@/core/stock/stock-summary";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
 import { PatientSearchBar } from "../patients/search-bar";
-import { loadConnectionOverview } from "@/server/services/connection-overview";
-import { ConnectionSummary } from "../connexion/summary";
 import { StockList, type StockRow } from "./stock-list";
 
-export const metadata: Metadata = { title: "Stock de mon officine" };
+export const metadata: Metadata = { title: "Mon stock" };
 
-const PAGE_SIZE = 60;
+const PAGE_SIZE = 25;
 
 /**
- * Le stock de l'officine — une seule liste.
+ * Mon stock — un écran simple : l'état du stock et le bouton qui le met à jour, deux chiffres (produits référencés,
+ * produits disponibles), la recherche, la liste, « Ajouter un produit ».
  *
- * Médicaments (catalogue national, par CIP) et produits de parapharmacie
- * (catalogue de l'officine) vivent dans deux tables, pour de bonnes raisons.
- * Le titulaire, lui, n'a qu'une question : qu'est-ce que j'ai, en quelle
- * quantité, à quel prix ? Cet écran répond en une liste, et une quantité se
- * corrige sur la ligne même.
+ * Les chiffres sont ceux de TOUT le catalogue (jamais ceux de la recherche) et viennent d'un seul calcul
+ * (`summarizeStock`) : un produit est disponible (quantité supérieure à zéro), en rupture, ou désactivé. Un produit
+ * « non classé » ou sans photo n'est pas en rupture ; ces sujets-là sont dans « Qualité du catalogue ».
  */
 export default async function StockPage({
   searchParams,
@@ -39,7 +34,7 @@ export default async function StockPage({
   const session = await requirePermission(PERMISSIONS.STOCK_VIEW);
   const params = await searchParams;
   const query = (params.q ?? "").trim();
-  const filter = params.etat ?? "tous";
+  const filter = parseStockFilter(params.etat);
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
   const pharmacyId = session.scope.pharmacyId;
 
@@ -47,7 +42,10 @@ export default async function StockPage({
   const canManage = session.permissions.has(PERMISSIONS.PRODUCT_MANAGE);
   const canImport = session.permissions.has(PERMISSIONS.PRODUCT_IMPORT);
 
-  const [products, drugLines, connectionState, unclassified, withoutImage, shortDates] = await Promise.all([
+  const [catalogue, catalogueDrugs, products, drugLines, connection, shortDates] = await Promise.all([
+    // Les chiffres de tout le catalogue : deux lectures légères, jamais filtrées par la recherche.
+    prisma.product.findMany({ where: { pharmacyId, deletedAt: null }, select: { isActive: true, stockItem: { select: { quantity: true } } } }),
+    prisma.pharmacyDrugStock.findMany({ where: { pharmacyId }, select: { quantity: true } }),
     prisma.product.findMany({
       where: {
         pharmacyId,
@@ -63,17 +61,7 @@ export default async function StockPage({
             }
           : {}),
       },
-      select: {
-        id: true,
-        name: true,
-        brand: true,
-        ean: true,
-        salePriceCents: true,
-        purchasePriceCents: true,
-        isActive: true,
-        updatedAt: true,
-        stockItem: { select: { quantity: true, alertThreshold: true, updatedAt: true } },
-      },
+      select: { id: true, name: true, brand: true, ean: true, salePriceCents: true, isActive: true, stockItem: { select: { quantity: true } } },
       orderBy: { name: "asc" },
     }),
     prisma.pharmacyDrugStock.findMany({
@@ -91,31 +79,14 @@ export default async function StockPage({
             }
           : {}),
       },
-      select: {
-        id: true,
-        quantity: true,
-        alertThreshold: true,
-        priceCents: true,
-        updatedAt: true,
-        presentation: {
-          select: { cip13: true, label: true, priceCents: true, specialty: { select: { name: true } } },
-        },
-      },
+      select: { id: true, quantity: true, priceCents: true, presentation: { select: { cip13: true, label: true, priceCents: true, specialty: { select: { name: true } } } } },
       orderBy: { updatedAt: "desc" },
     }),
-    // L'état de la connexion : calculé une seule fois, partout pareil (voir « Ma connexion »).
     loadConnectionOverview(pharmacyId),
-    // Les produits que le moteur ne sait pas encore relier à un besoin.
-    prisma.product.count({ where: { pharmacyId, deletedAt: null, classifiedAt: null } }),
-    // Les boîtes dont la photo n'a pas encore été cherchée.
-    countProductsWithoutImageLookup(pharmacyId),
-    // Les lots à date courte qui demandent un geste (urgents et expirés).
     countLotsNeedingAction(session.scope),
   ]);
-  const shortDateAlerts = shortDates.urgent + shortDates.expired;
-  const { overview, stockSyncedAt: syncedAt } = connectionState;
-  const zeroPrice = products.filter((product) => product.isActive && product.salePriceCents <= 0).length;
-  const anomalies = unclassified + zeroPrice;
+
+  const summary = summarizeStock([...catalogue.map((product) => ({ active: product.isActive, quantity: product.stockItem?.quantity ?? 0 })), ...catalogueDrugs.map((line) => ({ active: true, quantity: line.quantity }))]);
 
   const rows: StockRow[] = [
     ...products.map((product) => ({
@@ -125,12 +96,9 @@ export default async function StockPage({
       detail: product.brand,
       code: product.ean,
       quantity: product.stockItem?.quantity ?? 0,
-      threshold: product.stockItem?.alertThreshold ?? 0,
       priceCents: product.salePriceCents,
-      purchasePriceCents: canManage ? product.purchasePriceCents : null,
       active: product.isActive,
       href: `/stock/${product.id}`,
-      updatedAt: (product.stockItem?.updatedAt ?? product.updatedAt).toISOString(),
     })),
     ...drugLines.map((line) => ({
       kind: "DRUG" as const,
@@ -139,113 +107,89 @@ export default async function StockPage({
       detail: line.presentation.label,
       code: line.presentation.cip13,
       quantity: line.quantity,
-      threshold: line.alertThreshold,
       priceCents: line.priceCents ?? line.presentation.priceCents,
-      purchasePriceCents: null,
       active: true,
       href: `/stock/medicaments?q=${line.presentation.cip13}`,
-      updatedAt: line.updatedAt.toISOString(),
     })),
   ];
 
-  const stateOf = (row: StockRow) =>
-    !row.active ? "inactif" : row.quantity <= 0 ? "rupture" : row.threshold > 0 && row.quantity <= row.threshold ? "faible" : "stock";
-
-  const counts = {
-    inStock: rows.filter((row) => stateOf(row) === "stock").length,
-    out: rows.filter((row) => stateOf(row) === "rupture").length,
-    low: rows.filter((row) => stateOf(row) === "faible").length,
-    inactive: rows.filter((row) => stateOf(row) === "inactif").length,
-  };
-
+  const shown = summarizeStock(rows);
+  const counts = { tous: shown.referenced, disponible: shown.available, rupture: shown.outOfStock, desactive: shown.inactive };
   const filtered = rows
-    .filter((row) => (filter === "tous" ? true : stateOf(row) === filter))
-    .sort((a, b) => {
-      // Ce qui manque d'abord, puis l'ordre alphabétique : au comptoir, une
-      // rupture est une information avant d'être une ligne.
-      const rank = (row: StockRow) => (stateOf(row) === "rupture" ? 0 : stateOf(row) === "faible" ? 1 : 2);
-      return rank(a) - rank(b) || a.name.localeCompare(b.name, "fr");
-    });
+    .filter((row) => filter === "tous" || availabilityOf(row) === filter)
+    // Ce qui manque d'abord, puis l'ordre alphabétique : au comptoir, une rupture est une information avant d'être une ligne.
+    .sort((a, b) => Number(availabilityOf(b) === "rupture") - Number(availabilityOf(a) === "rupture") || a.name.localeCompare(b.name, "fr"));
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const now = new Date();
+  const syncedAt = connection.stockSyncedAt;
+  const status = stockStatus(syncedAt, now);
+  const age = describeStockAge(syncedAt, now);
+  const urgentDates = shortDates.urgent + shortDates.expired;
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Stock de mon officine"
-        description="Ce que vous avez réellement en rayon, en quelle quantité et à quel prix. PharmaBoost ne propose jamais un produit absent de cette liste."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {canImport && (
-              <Button asChild variant={syncedAt ? "outline" : "primary"} leadingIcon={<Upload className="size-[18px]" />}>
-                <Link href="/stock/mise-a-jour">{syncedAt ? "Mettre à jour mon stock" : "Importer mon stock"}</Link>
-              </Button>
-            )}
-            {(canManage || canAdjust) && (
-              <Button asChild variant={syncedAt ? "primary" : "outline"} leadingIcon={<Plus className="size-[18px]" />}>
-                <Link href="/stock/ajouter">Ajouter un produit</Link>
-              </Button>
-            )}
-            {canImport && (
-              <Button asChild variant="ghost" leadingIcon={<Cable className="size-[18px]" />}>
-                <Link href="/connexion">Ma connexion</Link>
-              </Button>
-            )}
-            <Button asChild variant="ghost" leadingIcon={<Hourglass className="size-[18px]" />}>
-              <Link href="/stock/dates-courtes" title={shortDateAlerts > 0 ? `${shortDates.expired} expiré(s) · ${shortDates.urgent} urgent(s)` : undefined}>
-                Dates courtes
-                {shortDateAlerts > 0 && (
-                  <span className="rounded-full bg-danger-600 px-1.5 py-0.5 text-[11px] leading-none font-semibold text-white tabular">{shortDateAlerts}</span>
-                )}
-              </Link>
+    <div className="mx-auto w-full max-w-3xl pb-20">
+      <section aria-label="Mon stock" className="space-y-4 rounded-3xl border border-border-subtle bg-surface-card p-4 sm:p-6">
+        <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+          <div className="min-w-0">
+            <h1 className="text-[28px] leading-9 font-semibold tracking-[-0.02em] text-text-primary sm:text-[32px] sm:leading-10">Mon stock</h1>
+            <p className="truncate text-[15px] leading-6 text-text-secondary">{session.pharmacy.name}</p>
+          </div>
+          <Badge tone={status.tone} className="mt-2">{status.label}</Badge>
+        </header>
+
+        <div className="space-y-3 rounded-2xl border border-border-subtle bg-surface-sunken/60 p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+            <h2 className="text-[17px] leading-6 font-semibold text-text-primary">Dernière mise à jour</h2>
+            <p className="text-[14.5px] text-text-secondary">{age ?? "Aucun stock reçu"}</p>
+          </div>
+          {canImport && (
+            <Button asChild variant="success" size="xl" className="w-full rounded-full" leadingIcon={<RefreshCw className="size-5" />}>
+              <Link href="/stock/mise-a-jour">{syncedAt ? "Mettre à jour mon stock" : "Envoyer mon stock"}</Link>
             </Button>
-            <Button asChild variant="ghost" leadingIcon={<History className="size-[18px]" />}>
-              <Link href="/stock/historique">Historique</Link>
+          )}
+        </div>
+
+        <dl className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-border-subtle p-4">
+            <dt className="text-[13.5px] leading-5 text-text-secondary">Produits référencés</dt>
+            <dd className="mt-1 text-[30px] leading-9 font-semibold tabular text-text-primary">{formatNumber(summary.referenced)}</dd>
+            <dd className="text-[12.5px] leading-5 text-text-tertiary">Dans votre catalogue</dd>
+          </div>
+          <div className="rounded-2xl border border-border-subtle p-4">
+            <dt className="text-[13.5px] leading-5 text-text-secondary">Produits disponibles</dt>
+            <dd className="mt-1 text-[30px] leading-9 font-semibold tabular text-success-600 dark:text-success-500">{formatNumber(summary.available)}</dd>
+            <dd className="text-[12.5px] leading-5 text-text-tertiary">Quantité supérieure à zéro</dd>
+          </div>
+        </dl>
+
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <h2 className="text-[19px] leading-7 font-semibold text-text-primary">Rechercher un produit</h2>
+            <p className="text-[13.5px] text-text-tertiary tabular">{formatNumber(filtered.length)} référence{filtered.length > 1 ? "s" : ""}</p>
+          </div>
+          <PatientSearchBar initialQuery={query} basePath="/stock" placeholder="Nom, code CIP, EAN…" className="max-w-none" />
+          <StockList rows={visible} total={filtered.length} filter={filter} counts={counts} page={page} totalPages={totalPages} query={query} canAdjust={canAdjust} />
+        </div>
+
+        {(canManage || canAdjust) && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
+            <p className="text-[14px] text-text-secondary">Gestion manuelle d&apos;un produit</p>
+            <Button asChild variant="outline" className="rounded-full" leadingIcon={<Plus className="size-[18px]" />}>
+              <Link href="/stock/ajouter">Ajouter un produit</Link>
             </Button>
           </div>
-        }
-      />
+        )}
+      </section>
 
-      {/* L'état de la connexion, en une ligne : la première question du titulaire, et ce qui
-          conditionne ce que le comptoir propose. Trois états séparés, les mêmes partout. */}
-      <ConnectionSummary overview={overview} canOpen={canImport} />
-      {((unclassified > 0 && canManage) || (withoutImage > 0 && canManage)) && (
-        <div className="flex flex-wrap items-center gap-3">
-          {unclassified > 0 && canManage && <ClassifyProductsButton pending={unclassified} />}
-          {withoutImage > 0 && canManage && <FetchPhotosButton pending={withoutImage} />}
-        </div>
-      )}
-
-      <Grid cols={4}>
-        <StatCard label="Références" value={rows.length} sublabel={`${counts.inStock} en stock`} icon={<Boxes className="size-4" />} emphasis="brand" />
-        <StatCard label="Ruptures" value={counts.out} sublabel={counts.out > 0 ? "jamais proposées" : "aucune rupture"} icon={<PackageX className="size-4" />} />
-        <StatCard
-          label="Anomalies"
-          value={anomalies}
-          sublabel={anomalies === 0 ? "rien à corriger" : [unclassified > 0 ? `${unclassified} à comprendre` : null, zeroPrice > 0 ? `${zeroPrice} sans prix` : null].filter(Boolean).join(" · ")}
-          icon={<AlertTriangle className="size-4" />}
-        />
-        <StatCard
-          label="Stock reçu"
-          value={syncedAt ? formatDateTime(syncedAt) : "—"}
-          sublabel={overview.stock.state === "NONE" ? "aucun stock reçu" : overview.stock.state === "FRESH" ? "à jour" : overview.stock.title.toLowerCase()}
-          icon={<Clock className="size-4" />}
-        />
-      </Grid>
-
-      <PatientSearchBar initialQuery={query} basePath="/stock" placeholder="Rechercher un produit — nom, CIP, EAN…" />
-
-      <StockList
-        rows={visible}
-        total={filtered.length}
-        filter={filter}
-        counts={{ tous: rows.length, stock: counts.inStock, faible: counts.low, rupture: counts.out, inactif: counts.inactive }}
-        page={page}
-        totalPages={totalPages}
-        query={query}
-        canAdjust={canAdjust}
-        canManage={canManage}
-      />
+      <p className="mt-4 text-center">
+        <Link href="/stock/qualite" className="inline-flex items-center gap-1 text-[13.5px] font-medium text-text-secondary underline-offset-2 hover:text-text-primary hover:underline">
+          Qualité du catalogue
+          {urgentDates > 0 && <span className="rounded-full bg-warning-500 px-1.5 py-0.5 text-[11px] leading-none font-semibold text-white tabular" title={`${urgentDates} date${urgentDates > 1 ? "s" : ""} courte${urgentDates > 1 ? "s" : ""} à traiter`}>{urgentDates}</span>}
+          <ChevronRight className="size-3.5" aria-hidden="true" />
+        </Link>
+      </p>
     </div>
   );
 }
