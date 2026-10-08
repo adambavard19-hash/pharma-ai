@@ -111,6 +111,24 @@ export function parsePharmacyStatusFilter(value: string | null): PharmacyStatusF
   return (PHARMACY_STATUS_FILTERS as readonly string[]).includes(value ?? "") ? (value as PharmacyStatusFilter) : null;
 }
 
+/**
+ * « À surveiller » : trois façons de repérer, dans la liste des officines, celles qui demandent un regard — un connecteur à
+ * vérifier, une équipe qui ne se connecte plus, un stock qui n'arrive plus. Elles remplacent les listes transversales
+ * (« État technique », « Activité », « Stocks reçus ») : le détail de chaque cas est dans la fiche de l'officine.
+ */
+export const WATCH_FILTERS = ["technique", "inactives", "stock"] as const;
+export type WatchFilter = (typeof WATCH_FILTERS)[number];
+
+export const WATCH_FILTER_LABELS: Record<WatchFilter, string> = {
+  technique: "Connecteur à vérifier",
+  inactives: "Inactives depuis 14 jours",
+  stock: "Stock à rafraîchir",
+};
+
+export function parseWatchFilter(value: string | null): WatchFilter | null {
+  return (WATCH_FILTERS as readonly string[]).includes(value ?? "") ? (value as WatchFilter) : null;
+}
+
 export const PHARMACY_SORTS = ["recent", "nom", "activite"] as const;
 export type PharmacySort = (typeof PHARMACY_SORTS)[number];
 

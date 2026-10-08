@@ -7,6 +7,7 @@ import { loadRules } from "@/server/services/admin/automations";
 import { loadReminderPolicy } from "@/server/services/platform-settings";
 import { adminNames } from "@/server/services/admin/communications";
 import { EMAIL_TEMPLATES, SYSTEM_EMAILS, type EmailTemplateCategory } from "@/core/admin/email-templates";
+import { CommunicationViews } from "../../_communication/views";
 import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
 import { KpiTile } from "@/components/admin/kpis";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,7 @@ export default async function EmailTemplatesPage() {
         title="Modèles d'e-mails"
         description="Les textes des relances et des messages envoyés depuis la console. Le gabarit PharmaBoost (logo, pied de page légal) et les boutons d'action restent fixes : vous réécrivez le texte, pas les liens."
       />
+      <CommunicationViews active="modeles" />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTile label="Modèles modifiables" value={EMAIL_TEMPLATES.length} icon={<PenLine className="size-4" />} />

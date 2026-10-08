@@ -43,6 +43,22 @@ const and = (...parts: (Prisma.ProspectWhereInput | null)[]): Prisma.ProspectWhe
   return kept.length === 0 ? {} : { AND: kept };
 };
 
+// ---- Les compteurs de l'espace de travail commercial -------------------------------------------
+
+/**
+ * Ce que l'en-tête du suivi commercial affiche sur chacune de ses vues : les dossiers ouverts, les démonstrations du jour et
+ * les relances en retard. Comptés par la base, sans filtre : c'est l'état de toute l'équipe commerciale.
+ */
+export async function commercialWorkspaceCounts(now: Date): Promise<{ open: number; demosToday: number; followUpsLate: number; followUpsToday: number }> {
+  const today = todayRange(now);
+  const [open, demosToday, followUps] = await Promise.all([
+    prisma.prospect.count({ where: { status: { notIn: [...CLOSED_STATUSES] } } }),
+    prisma.prospect.count({ where: { demoAt: { gte: today.start, lt: today.end } } }),
+    followUpCounts({ commercial: null }, now),
+  ]);
+  return { open, demosToday, followUpsLate: followUps.retard, followUpsToday: followUps.aujourdhui };
+}
+
 // ---- Liste des dossiers ----------------------------------------------------------
 
 export const PROSPECT_FILTERS = ["sans-reponse", "a-relancer"] as const;

@@ -17,7 +17,7 @@ import { lgoLabel } from "@/core/stock/connectors";
 import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
 import { onboardingStage } from "@/core/onboarding/stage";
 import { missingContractFields } from "@/core/contracts/requirements";
-import { PHARMACY_STATUS_FILTERS, PHARMACY_STATUS_FILTER_LABELS, parsePharmacySort, parsePharmacyStatusFilter, pharmacyStatusLabel, searchParam } from "@/core/admin/clients";
+import { PHARMACY_STATUS_FILTERS, PHARMACY_STATUS_FILTER_LABELS, WATCH_FILTERS, WATCH_FILTER_LABELS, parsePharmacySort, parsePharmacyStatusFilter, parseWatchFilter, pharmacyStatusLabel, searchParam } from "@/core/admin/clients";
 import { CreatePharmacyButton } from "./pharmacy-form";
 import { When } from "./client-ui";
 
@@ -34,7 +34,8 @@ export default async function ClientPharmaciesPage({ searchParams }: { searchPar
   const q = searchParam(params, "q");
   const statut = parsePharmacyStatusFilter(searchParam(params, "statut"));
   const tri = parsePharmacySort(searchParam(params, "tri"));
-  const keep = { q, statut, tri: tri === "recent" ? null : tri };
+  const surveiller = parseWatchFilter(searchParam(params, "surveiller"));
+  const keep = { q, statut, surveiller, tri: tri === "recent" ? null : tri };
   const now = new Date();
 
   // Les officines invitées qui n'ont pas encore d'espace : visibles dès l'invitation.
@@ -48,7 +49,7 @@ export default async function ClientPharmaciesPage({ searchParams }: { searchPar
         contracts: { orderBy: { version: "desc" }, take: 1, select: { status: true, signedArchivedAt: true } },
       },
     }),
-    listClientPharmacies({ q, statut, tri, now }),
+    listClientPharmacies({ q, statut, surveiller, tri, now }),
   ]);
   const { rows } = list;
 
@@ -64,8 +65,8 @@ export default async function ClientPharmaciesPage({ searchParams }: { searchPar
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiTile label="Officines actives" value={list.allCounts.actives} hint={`${list.total} officine${list.total > 1 ? "s" : ""} au total, démonstrations comprises`} href="/admin/pharmacies?statut=actives" icon={<Building2 className="size-4" />} />
         <KpiTile label="En essai gratuit" value={list.allCounts.essai} hint="Abonnements en période d'essai" href="/admin/pharmacies?statut=essai" tone={list.allCounts.essai > 0 ? "info" : "default"} icon={<FlaskConical className="size-4" />} />
-        <KpiTile label="Inactives depuis 14 jours" value={list.inactive} hint="Aucune connexion de l'équipe" href="/admin/activite?filtre=inactives" tone={list.inactive > 0 ? "warning" : "default"} icon={<Clock3 className="size-4" />} />
-        <KpiTile label="Connecteurs à vérifier" value={list.connectorsToCheck} hint="En erreur, hors ligne ou en retard" href="/admin/technique?filtre=erreurs" tone={list.connectorsToCheck > 0 ? "danger" : "default"} icon={<Cable className="size-4" />} />
+        <KpiTile label="Inactives depuis 14 jours" value={list.inactive} hint="Aucune connexion de l'équipe" href="/admin/pharmacies?surveiller=inactives" tone={list.inactive > 0 ? "warning" : "default"} icon={<Clock3 className="size-4" />} />
+        <KpiTile label="Connecteurs à vérifier" value={list.connectorsToCheck} hint="En erreur, hors ligne ou en retard" href="/admin/pharmacies?surveiller=technique" tone={list.connectorsToCheck > 0 ? "danger" : "default"} icon={<Cable className="size-4" />} />
       </div>
 
       {enrolling.length > 0 && (
@@ -115,6 +116,14 @@ export default async function ClientPharmaciesPage({ searchParams }: { searchPar
           current={statut}
           keep={keep}
           options={[{ value: null, label: "Toutes", count: list.searched }, ...PHARMACY_STATUS_FILTERS.map((f) => ({ value: f, label: PHARMACY_STATUS_FILTER_LABELS[f], count: list.counts[f] }))]}
+        />
+        <FilterChips
+          label="À surveiller"
+          basePath="/admin/pharmacies"
+          param="surveiller"
+          current={surveiller}
+          keep={{ q, statut, tri: keep.tri }}
+          options={[{ value: null, label: "Toutes" }, ...WATCH_FILTERS.map((f) => ({ value: f, label: WATCH_FILTER_LABELS[f], count: list.watchCounts[f] }))]}
         />
       </section>
 
@@ -186,7 +195,7 @@ export default async function ClientPharmaciesPage({ searchParams }: { searchPar
           <p className="text-[12.5px] text-text-tertiary">
             {rows.length} officine{rows.length > 1 ? "s" : ""} affichée{rows.length > 1 ? "s" : ""}
             {rows.length !== list.total ? ` sur ${list.total}` : ""}.{" "}
-            {(q || statut) && (
+            {(q || statut || surveiller) && (
               <Link href={hrefWith("/admin/pharmacies", {}, { tri: keep.tri })} className="font-medium text-brand-700 hover:underline dark:text-brand-400">
                 Tout afficher
               </Link>

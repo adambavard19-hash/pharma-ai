@@ -13,7 +13,7 @@ export function AdminNav() {
   const pathname = usePathname();
   const active = activeNavItem(pathname);
   return (
-    <nav className="-mb-px flex flex-wrap items-center gap-1" aria-label="Rubriques de la console">
+    <nav className="-mb-px flex flex-nowrap items-center overflow-x-auto sm:gap-1" aria-label="Rubriques de la console">
       {ADMIN_NAV.map((space) => {
         const isActive = active.space.key === space.key;
         return (
@@ -22,7 +22,7 @@ export function AdminNav() {
             href={space.href}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "border-b-2 px-3.5 py-3 text-[14.5px] font-semibold whitespace-nowrap transition-colors",
+              "border-b-2 px-2 py-3 text-[12.5px] font-semibold whitespace-nowrap transition-colors sm:px-3.5 sm:text-[14.5px]",
               isActive ? "border-brand-600 text-text-primary" : "border-transparent text-text-secondary hover:text-text-primary",
             )}
           >
@@ -70,7 +70,7 @@ export function AdminSectionNav({ badges = {} }: { badges?: Record<string, numbe
         </div>
       </div>
 
-      {group && group.items.length > 1 && (
+      {group && group.items.length > 1 && !group.ownViewSwitcher && (
         <ul className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[13px]" aria-label={`Vues de ${group.label}`}>
           {group.items.map((item) => {
             const isActive = active.item?.href === item.href;

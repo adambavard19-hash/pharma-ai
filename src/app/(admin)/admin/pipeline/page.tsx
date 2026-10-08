@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BellRing, List } from "lucide-react";
+import { BellRing } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { BOARD_CLOSED_DAYS, followUpCounts, listRepOptions, loadBoardCards } from "@/server/services/admin/commercial";
 import { defaultDemoInput, isOverdue, parseStatusParam } from "@/core/sales/board";
 import { isOpenStatus } from "@/core/sales/pipeline";
-import { AdminPageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
-import { NewProspect } from "./new-prospect";
+import { CommercialWorkspaceHeader } from "../_commercial/workspace-header";
 import { PipelineBoard } from "./board";
 import { CommercialFilterForm, param } from "./filter-form";
 
@@ -55,19 +54,10 @@ export default async function AdminPipelinePage({ searchParams }: { searchParams
 
   return (
     <>
-      <AdminPageHeader
-        space={{ label: "Commercial", href: "/admin/pipeline" }}
-        title="Pipeline"
+      <CommercialWorkspaceHeader
+        active="pipeline"
         description={`${open} dossier${open > 1 ? "s" : ""} en cours${filtered ? " pour ce filtre" : ""} · ${cards.length} sur le tableau. Glissez une carte d'une étape à l'autre, ou utilisez « Déplacer vers… ».`}
-        actions={
-          <>
-            <Button asChild variant="outline" leadingIcon={<List className="size-4" />}>
-              <Link href={listHref()}>Vue liste</Link>
-            </Button>
-            {/* La clé suit `?nouveau=` : la fenêtre s'ouvre aussi quand on est déjà sur la page, et à chaque nouvel usage. */}
-            <NewProspect key={param(params.nouveau) ?? "aucun"} reps={reps.filter((rep) => rep.isActive)} defaultOpen={param(params.nouveau) === "prospect"} />
-          </>
-        }
+        params={{ nouveau: param(params.nouveau) }}
       />
 
       {late > 0 && (

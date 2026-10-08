@@ -5,6 +5,7 @@ import { requirePlatformSession } from "@/server/auth/platform-session";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { listCampaigns } from "@/server/services/admin/campaigns";
 import { CAMPAIGN_KIND_KEYS, CAMPAIGN_KINDS, CAMPAIGN_STATUS_LABELS } from "@/core/admin/campaigns";
+import { CommunicationViews } from "../_communication/views";
 import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
 import { FilterChips, hrefWith } from "@/components/admin/filters";
 import { KpiTile } from "@/components/admin/kpis";
@@ -78,6 +79,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
           </Button>
         }
       />
+      <CommunicationViews active="campagnes" />
 
       {!messagingLive && (
         <Alert tone="warning" title="Messagerie non configurée : les envois seront simulés">

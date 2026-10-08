@@ -10,6 +10,7 @@ import { loadRelancesOverview, loadRules, recentDispatchesByRule, relancesTileHr
 import { automationStatusLabel } from "@/server/services/admin/communications";
 import { AUTOMATION_SCENARIOS, CATCH_UP_DAYS, type AutomationScenario, type ResolvedRule } from "@/core/admin/automations";
 import { DISPATCH_TRIGGER_LABELS, dispatchStatusLabel } from "@/core/admin/statuses";
+import { CommunicationViews } from "../_communication/views";
 import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
 import { KpiTile } from "@/components/admin/kpis";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -109,6 +110,7 @@ export default async function RelancesPage() {
           </>
         }
       />
+      <CommunicationViews active="relances" />
 
       <div className="grid gap-3 md:grid-cols-3">
         <StatePanel icon={<Mail className="size-5" />} title="Messagerie" badge={messagingLive ? { label: "Configurée", tone: "success" } : { label: "Non configurée", tone: "warning" }}>

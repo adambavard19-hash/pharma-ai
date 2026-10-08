@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { CreditCard } from "lucide-react";
 import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { stripeConfigState } from "@/server/billing/stripe-client";
 import { planSubscriptionStats } from "@/server/services/admin/billing-admin";
 import { AdminPageHeader } from "@/components/admin/page-header";
-import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { StripeNotConfigured } from "../billing-ui";
 import { PlansManager } from "./plans-manager";
@@ -41,11 +38,6 @@ export default async function PlansPage() {
         parent={{ label: "Abonnements", href: "/admin/abonnements" }}
         title="Offres & tarifs"
         description="Nom, prix, essai, contenu et remises de chaque offre. Le prix Stripe est créé à l'enregistrement ; un changement de prix crée un nouveau prix Stripe, les abonnements en cours gardent le leur."
-        actions={
-          <Button asChild variant="outline" size="sm" leadingIcon={<CreditCard className="size-4" />}>
-            <Link href="/admin/abonnements">Abonnements</Link>
-          </Button>
-        }
       />
 
       <Alert tone="info" title="Le catalogue s'applique uniquement aux nouveaux abonnements.">

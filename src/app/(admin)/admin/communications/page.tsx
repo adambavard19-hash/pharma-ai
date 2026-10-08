@@ -14,6 +14,7 @@ import {
   type CommunicationEntry,
   type CommunicationType,
 } from "@/server/services/admin/communications";
+import { CommunicationViews } from "../_communication/views";
 import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
 import { FilterChips, SearchBox, hrefWith } from "@/components/admin/filters";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -77,17 +78,8 @@ export default async function CommunicationsPage({ searchParams }: { searchParam
         space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Historique des communications"
         description="Les e-mails partis (relances, envois manuels, tests, e-mails système), les notifications de l'équipe, les relances internes et les actions commerciales, du plus récent au plus ancien."
-        actions={
-          <>
-            <Button asChild variant="secondary" size="md">
-              <Link href="/admin/emails/modeles">Modèles d&apos;e-mails</Link>
-            </Button>
-            <Button asChild variant="secondary" size="md">
-              <Link href="/admin/relances">Relances automatiques</Link>
-            </Button>
-          </>
-        }
       />
+      <CommunicationViews active="historique" />
 
       <div className="space-y-3 rounded-2xl border border-border-subtle bg-surface-card p-4">
         <FilterChips

@@ -22,6 +22,8 @@ export type AdminNavGroup = {
   key: string;
   label: string;
   items: AdminNavItem[];
+  /** Les vues se choisissent dans l'en-tête de la page (un espace de travail à lui) : pas de pastilles sous l'onglet. */
+  ownViewSwitcher?: boolean;
 };
 
 export type AdminNavSpaceKey = "home" | "pharmacies" | "commercial" | "finance" | "management";
@@ -73,7 +75,8 @@ export const ADMIN_NAV: AdminNavSpace[] = [
     groups: [
       {
         key: "prospects",
-        label: "Prospects",
+        label: "Suivi commercial",
+        ownViewSwitcher: true,
         items: [
           { href: "/admin/pipeline", label: "Pipeline", description: "Les dossiers par étape, à déplacer d'une colonne à l'autre." },
           { href: "/admin/prospects", label: "Liste", description: "Tous les dossiers, filtrables et cherchables.", matches: ["/admin/dossiers"] },
@@ -109,10 +112,8 @@ export const ADMIN_NAV: AdminNavSpace[] = [
       {
         key: "paiements",
         label: "Paiements",
-        items: [
-          { href: "/admin/paiements", label: "Paiements", description: "Les factures Stripe reçues : payées, échouées, en attente." },
-          { href: "/admin/impayes", label: "Impayés", description: "Paiements échoués restés impayés, et leurs relances." },
-        ],
+        // Les impayés sont une vue de la page « Paiements » (`?vue=impayes`) ; l'ancienne adresse y redirige.
+        items: [{ href: "/admin/paiements", label: "Paiements", description: "Les factures Stripe reçues, et les impayés à relancer.", matches: ["/admin/impayes"] }],
       },
       { key: "resiliations", label: "Résiliations", items: [{ href: "/admin/resiliations", label: "Résiliations", description: "Demandes reçues, en traitement, confirmées, terminées." }] },
     ],
@@ -126,6 +127,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
       {
         key: "communication",
         label: "Communication",
+        ownViewSwitcher: true,
         items: [
           { href: "/admin/campagnes", label: "Campagnes", description: "Offres bonus, parrainage, invitations des partenaires : envoi immédiat ou programmé." },
           { href: "/admin/communications", label: "Historique", description: "Tous les e-mails, relances et notifications, filtrables." },

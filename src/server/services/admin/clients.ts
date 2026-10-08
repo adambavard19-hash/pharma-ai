@@ -23,7 +23,10 @@ import {
   type PharmacySort,
   type PharmacyStatusFilter,
   type UserStatusFilter,
+  WATCH_FILTERS,
+  type WatchFilter,
 } from "@/core/admin/clients";
+import { stockReminderLevel } from "@/core/stock-deposit/rules";
 
 /**
  * Les lectures de l'espace « Clients » : officines, comptes, activité, accès,
@@ -41,9 +44,11 @@ export type ClientPharmacyRow = PharmacyListFacts & {
   memberCount: number;
   subscriptionView: { status: string; planName: string; priceCents: number; priceSource: "CONTRACT" | "CATALOG_FALLBACK"; catalogCents: number; catalogDiffers: boolean; cancelAtPeriodEnd: boolean; trialEndsAt: Date | null } | null;
   connector: ReturnType<typeof connectorState> & { lgo: string | null };
+  /** Ce qui demande un regard (les démonstrations n'en font jamais partie) : voir `WATCH_FILTERS`. */
+  watch: Record<WatchFilter, boolean>;
 };
 
-export async function listClientPharmacies(input: { q: string | null; statut: PharmacyStatusFilter | null; tri: PharmacySort; now: Date }): Promise<{ rows: ClientPharmacyRow[]; counts: Record<PharmacyStatusFilter, number>; allCounts: Record<PharmacyStatusFilter, number>; total: number; searched: number; inactive: number; connectorsToCheck: number }> {
+export async function listClientPharmacies(input: { q: string | null; statut: PharmacyStatusFilter | null; surveiller?: WatchFilter | null; tri: PharmacySort; now: Date }): Promise<{ rows: ClientPharmacyRow[]; counts: Record<PharmacyStatusFilter, number>; allCounts: Record<PharmacyStatusFilter, number>; total: number; searched: number; inactive: number; connectorsToCheck: number; watchCounts: Record<WatchFilter, number> }> {
   const pharmacies = await prisma.pharmacy.findMany({
     select: {
       id: true,
@@ -54,6 +59,7 @@ export async function listClientPharmacies(input: { q: string | null; statut: Ph
       isActive: true,
       isDemo: true,
       createdAt: true,
+      stockSyncedAt: true,
       stockConnection: { select: { lgo: true, status: true, lastSyncAt: true, lastSeenAt: true, intervalSeconds: true } },
       memberships: { where: { user: { deletedAt: null } }, select: { role: true, isActive: true, user: { select: { firstName: true, lastName: true, email: true, lastLoginAt: true } } } },
       organization: { select: { subscription: { select: { status: true, suspendedAt: true, contractPriceCents: true, cancelAtPeriodEnd: true, trialEndsAt: true, plan: { select: { name: true, monthlyPriceCents: true } } } } } },
@@ -64,7 +70,7 @@ export async function listClientPharmacies(input: { q: string | null; statut: Ph
     const sub = p.organization.subscription;
     const owner = p.memberships.find((m) => m.role === "OWNER" && m.isActive) ?? p.memberships.find((m) => m.role === "OWNER");
     const price = sub ? contractualPrice(sub, sub.plan) : null;
-    return {
+    const row: ClientPharmacyRow = {
       id: p.id,
       name: p.name,
       city: p.city,
@@ -81,15 +87,26 @@ export async function listClientPharmacies(input: { q: string | null; statut: Ph
       memberCount: p.memberships.filter((m) => m.isActive).length,
       subscriptionView: sub && price ? { status: sub.status, planName: sub.plan.name, priceCents: price.cents, priceSource: price.source, catalogCents: sub.plan.monthlyPriceCents, catalogDiffers: catalogDiffers(sub, sub.plan), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, trialEndsAt: sub.trialEndsAt } : null,
       connector: { ...connectorState(p.stockConnection, input.now), lgo: p.stockConnection?.lgo ?? null },
+      watch: { technique: false, inactives: false, stock: false },
     };
+    const monitored = p.isActive && !p.isDemo;
+    row.watch = {
+      technique: monitored && connectorNeedsAttention(row.connector.state),
+      inactives: isInactivePharmacy(row, input.now),
+      stock: monitored && stockReminderLevel(p.stockSyncedAt, input.now) !== "none",
+    };
+    return row;
   });
 
   // Les compteurs des filtres suivent la recherche en cours, pas le filtre choisi.
   const searched = all.filter((row) => matchesPharmacySearch(row, input.q));
-  const rows = sortPharmacies(searched.filter((row) => matchesPharmacyStatus(row, input.statut)), input.tri);
+  const watched = input.surveiller ? searched.filter((row) => row.watch[input.surveiller as WatchFilter]) : searched;
+  const rows = sortPharmacies(watched.filter((row) => matchesPharmacyStatus(row, input.statut)), input.tri);
   return {
     rows,
     counts: countPharmacyFilters(searched),
+    // Les pastilles « À surveiller » : comptées sur toute la liste, comme les chiffres de l'accueil.
+    watchCounts: Object.fromEntries(WATCH_FILTERS.map((filter) => [filter, all.filter((row) => row.watch[filter]).length])) as Record<WatchFilter, number>,
     allCounts: countPharmacyFilters(all),
     total: all.length,
     searched: searched.length,

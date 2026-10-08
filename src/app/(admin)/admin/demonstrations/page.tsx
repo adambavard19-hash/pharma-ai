@@ -4,7 +4,6 @@ import { CalendarCheck2, CalendarClock, CalendarDays, CalendarX2 } from "lucide-
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { PAST_DEMOS_ALL_LIMIT, countDemosDoneSince, listOpenProspectOptions, listRepOptions, loadDemos } from "@/server/services/admin/commercial";
 import { defaultDemoInput, demoBucket, type DemoBucket } from "@/core/sales/board";
-import { AdminPageHeader } from "@/components/admin/page-header";
 import { KpiTile } from "@/components/admin/kpis";
 import { FilterChips, hrefWith } from "@/components/admin/filters";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +13,7 @@ import { ProspectStatusBadge } from "@/components/sales/status-badge";
 import { formatDate, formatTime } from "@/lib/format";
 import { TIME_ZONE } from "@/config/constants";
 import { CommercialFilterForm, param } from "../pipeline/filter-form";
+import { CommercialWorkspaceHeader } from "../_commercial/workspace-header";
 import { ScheduleDemoButton } from "./demo-dialog";
 import { DemoActions } from "./demo-actions";
 
@@ -53,13 +53,7 @@ export default async function DemonstrationsPage({ searchParams }: { searchParam
 
   return (
     <>
-      <AdminPageHeader
-        space={{ label: "Commercial", href: "/admin/pipeline" }}
-        title="Démonstrations"
-        description="Les démos programmées et réalisées. Une démo programmée pour un dossier suivi par un commercial entre dans son agenda."
-        // La clé suit `?nouveau=` (et `?dossier=`) : la fenêtre s'ouvre aussi quand on est déjà sur la page, et à chaque nouvel usage.
-        actions={<ScheduleDemoButton key={`${param(params.nouveau) ?? "aucun"}:${param(params.dossier) ?? ""}`} prospects={options} defaultAt={defaultAt} defaultOpen={param(params.nouveau) === "demo"} initialProspectId={param(params.dossier)} />}
-      />
+      <CommercialWorkspaceHeader active="demos" description="Les démos programmées et réalisées. Une démo programmée pour un dossier suivi par un commercial entre dans son agenda." params={{ nouveau: param(params.nouveau), dossier: param(params.dossier) }} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTile label="Aujourd'hui" value={count("aujourdhui")} href="/admin/demonstrations?vue=aujourdhui" tone={count("aujourdhui") > 0 ? "brand" : "default"} icon={<CalendarClock className="size-4" />} />

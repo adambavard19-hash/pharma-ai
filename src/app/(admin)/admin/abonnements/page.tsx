@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Ban, CreditCard, Hourglass, Layers, ReceiptText, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, Ban, CreditCard, Hourglass, Wallet } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { prisma } from "@/server/db/client";
 import { stripeConfigState } from "@/server/billing/stripe-client";
@@ -82,19 +82,6 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
         space={{ label: "Finances", href: "/admin/abonnements" }}
         title="Abonnements"
         description="Chaque officine, son offre et son tarif contractuel, l'essai, l'échéance et l'état du paiement. Le catalogue ne change jamais un abonnement en cours."
-        actions={
-          <>
-            <Button asChild variant="outline" size="sm" leadingIcon={<Layers className="size-4" />}>
-              <Link href="/admin/abonnements/offres">Offres & tarifs</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" leadingIcon={<ReceiptText className="size-4" />}>
-              <Link href="/admin/paiements">Paiements</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" leadingIcon={<Ban className="size-4" />}>
-              <Link href="/admin/resiliations">Résiliations</Link>
-            </Button>
-          </>
-        }
       />
 
       {!stripe.configured && <StripeNotConfigured detail={stripe.detail}>Les abonnements affichés sont ceux connus en base ; la relecture chez Stripe, la résiliation programmée et le lien d&apos;activation sont indisponibles.</StripeNotConfigured>}

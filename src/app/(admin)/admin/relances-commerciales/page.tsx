@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlarmClock, BellRing, CalendarDays, CalendarRange, CheckCircle2 } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
-import { FOLLOW_UP_ALL_LIMIT, FOLLOW_UP_LIMIT, followUpCounts, listOpenProspectOptions, listRepOptions, loadFollowUps } from "@/server/services/admin/commercial";
+import { FOLLOW_UP_ALL_LIMIT, FOLLOW_UP_LIMIT, followUpCounts, listRepOptions, loadFollowUps } from "@/server/services/admin/commercial";
 import { defaultFollowUpInput, type DayBucket } from "@/core/sales/board";
-import { AdminPageHeader } from "@/components/admin/page-header";
 import { KpiTile } from "@/components/admin/kpis";
 import { FilterChips, hrefWith } from "@/components/admin/filters";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +14,7 @@ import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CommercialFilterForm, param } from "../pipeline/filter-form";
 import { FollowUpButton, FollowUpDoneButton } from "./follow-up-dialog";
+import { CommercialWorkspaceHeader } from "../_commercial/workspace-header";
 
 export const metadata: Metadata = { title: "Relances commerciales" };
 
@@ -39,7 +39,7 @@ export default async function SalesFollowUpsPage({ searchParams }: { searchParam
   const commercial = param(params.commercial);
   const view = VIEWS.find((v) => v.value === param(params.vue))?.value ?? null;
   const all = param(params.tout) === "1";
-  const [{ items: rows, truncated }, counts, options, reps] = await Promise.all([loadFollowUps({ commercial, view }, now, all ? FOLLOW_UP_ALL_LIMIT : FOLLOW_UP_LIMIT), followUpCounts({ commercial }, now), listOpenProspectOptions(), listRepOptions()]);
+  const [{ items: rows, truncated }, counts, reps] = await Promise.all([loadFollowUps({ commercial, view }, now, all ? FOLLOW_UP_ALL_LIMIT : FOLLOW_UP_LIMIT), followUpCounts({ commercial }, now), listRepOptions()]);
 
   const count = (bucket: DayBucket) => counts[bucket];
   const keep = { vue: view, commercial, tout: all ? "1" : null };
@@ -47,12 +47,7 @@ export default async function SalesFollowUpsPage({ searchParams }: { searchParam
 
   return (
     <>
-      <AdminPageHeader
-        space={{ label: "Commercial", href: "/admin/pipeline" }}
-        title="Relances commerciales"
-        description="Les relances prévues, tous commerciaux. Une relance fixée sur un dossier suivi par un commercial entre dans son agenda."
-        actions={<FollowUpButton prospects={options} defaultDue={defaultDue} />}
-      />
+      <CommercialWorkspaceHeader active="relances" description="Les relances prévues, tous commerciaux. Une relance fixée sur un dossier suivi par un commercial entre dans son agenda." />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <KpiTile label="En retard" value={count("retard")} hint="échéance passée" href="/admin/relances-commerciales?vue=retard" tone={count("retard") > 0 ? "warning" : "default"} icon={<AlarmClock className="size-4" />} />

@@ -3,16 +3,17 @@ import Link from "next/link";
 import { AlertTriangle, Banknote, Clock3, ExternalLink, ReceiptText } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { stripeConfigState } from "@/server/billing/stripe-client";
-import { PAYMENT_FILTERS, listPayments, paymentFilterStatuses, paymentTotals } from "@/server/services/admin/billing-admin";
+import { PAYMENT_FILTERS, listPayments, listUnpaid, paymentFilterStatuses, paymentTotals } from "@/server/services/admin/billing-admin";
 import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
 import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
 import { KpiTile } from "@/components/admin/kpis";
 import { FilterChips, PERIODS, hrefWith, resolvePeriod } from "@/components/admin/filters";
 import { PaymentStatusBadge } from "@/components/admin/status-badge";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { Table, TBody, TD, TH, THead, TR, TableWrapper } from "@/components/ui/table";
+import { ViewSwitch } from "@/components/admin/view-switch";
 import { DateText, RowLink, StripeNotConfigured, readParam } from "../abonnements/billing-ui";
+import { UnpaidView } from "./unpaid-view";
 
 export const metadata: Metadata = { title: "Paiements" };
 
@@ -31,23 +32,30 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const activeStatut = statuses ? statut : null;
   const stripe = stripeConfigState();
 
-  const { rows, all } = await listPayments({ statuses, days: period.days });
+  const [{ rows, all }, unpaid] = await Promise.all([listPayments({ statuses, days: period.days }), listUnpaid(new Date())]);
   const totals = paymentTotals(all);
   const keep = { statut: activeStatut, periode: period.value };
+  const view = readParam(params, "vue") === "impayes" ? "impayes" : "factures";
 
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        space={{ label: "Finances", href: "/admin/abonnements" }}
         title="Paiements"
-        description="Les factures reçues de Stripe : payées, échouées, en attente. Chaque montant vient d'une facture réelle."
-        actions={
-          <Button asChild variant="outline" size="sm" leadingIcon={<AlertTriangle className="size-4" />}>
-            <Link href="/admin/impayes">Impayés</Link>
-          </Button>
-        }
+        description={view === "impayes" ? "Les paiements échoués restés impayés, le retard de chacun, et les relances déjà parties. Rien n'est suspendu automatiquement." : "Les factures reçues de Stripe : payées, échouées, en attente. Chaque montant vient d'une facture réelle."}
+      />
+      <ViewSwitch
+        label="Vues des paiements"
+        active={view}
+        items={[
+          { key: "factures", label: "Factures", href: "/admin/paiements" },
+          { key: "impayes", label: "Impayés à relancer", href: "/admin/paiements?vue=impayes", ...(unpaid.length > 0 ? { badge: { text: String(unpaid.length), tone: "danger" as const } } : {}) },
+        ]}
       />
 
+      {view === "impayes" ? (
+        <UnpaidView rows={unpaid} />
+      ) : (
+        <>
       {!stripe.configured && <StripeNotConfigured detail={stripe.detail}>Aucune facture ne peut arriver tant que Stripe n&apos;est pas branché ; celles déjà reçues restent affichées.</StripeNotConfigured>}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -130,6 +138,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         )}
         {rows.length > 0 && <p className="border-t border-border-subtle px-4 py-2.5 text-[12px] text-text-tertiary">{rows.length} facture{rows.length > 1 ? "s" : ""}{rows.length >= 300 ? " (les 300 plus récentes)" : ""} — {period.label}.</p>}
       </AdminSection>
+        </>
+      )}
     </div>
   );
 }

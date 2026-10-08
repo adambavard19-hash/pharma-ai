@@ -378,7 +378,7 @@ describe("navigation de la console", () => {
     "/admin/abonnements/offres": { space: "finance", item: "Offres & tarifs" },
     "/admin/contrats/ckx1": { space: "finance", item: "Contrats" },
     "/admin/paiements": { space: "finance", item: "Paiements" },
-    "/admin/impayes": { space: "finance", item: "Impayés" },
+    "/admin/impayes": { space: "finance", item: "Paiements" },
     "/admin/resiliations/ckx1": { space: "finance", item: "Résiliations" },
     "/admin/conseils": { space: "management", item: "Conseils & associations" },
     "/admin/campagnes/nouvelle": { space: "management", item: "Campagnes" },
@@ -425,10 +425,11 @@ describe("navigation de la console", () => {
     expect(activeNavItem("/admin/commerciaux").item?.label).toBe("Commerciaux");
   });
 
-  it("les onglets réunissent les vues liées : prospects, paiements et impayés, communication, performance", () => {
+  it("les onglets réunissent les vues liées : suivi commercial, paiements et impayés, communication, performance", () => {
     const groups = (space: string) => ADMIN_NAV.find((entry) => entry.key === space)!.groups;
     expect(groups("commercial")[0].items.map((item) => item.label)).toEqual(["Pipeline", "Liste", "Démonstrations", "Relances"]);
-    expect(groups("finance").find((group) => group.key === "paiements")!.items.map((item) => item.label)).toEqual(["Paiements", "Impayés"]);
+    // Paiements et impayés : une seule page (les impayés en sont une vue), l'ancienne adresse y mène.
+    expect(groups("finance").find((group) => group.key === "paiements")!.items.map((item) => item.label)).toEqual(["Paiements"]);
     expect(groups("management").find((group) => group.key === "communication")!.items.map((item) => item.label)).toEqual(["Campagnes", "Historique", "Modèles d'e-mails", "Relances automatiques"]);
     expect(groups("pharmacies").find((group) => group.key === "performance")!.items.map((item) => item.label)).toEqual(["Performance", "Activité"]);
   });

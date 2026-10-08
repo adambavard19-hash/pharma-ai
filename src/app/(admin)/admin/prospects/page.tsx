@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Columns3, FolderSearch } from "lucide-react";
+import { FolderSearch } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { CONSOLE_REP, NO_REPLY_DAYS, ORIGIN_PARAMS, listProspectRows, listRepOptions, parseOriginParam, parseProspectFilter, prospectListCounts, type ProspectListFilter } from "@/server/services/admin/commercial";
 import { isOverdue, parseStatusParam } from "@/core/sales/board";
 import { PROSPECT_STATUSES, PROSPECT_STATUS_LABELS } from "@/core/sales/pipeline";
-import { AdminPageHeader } from "@/components/admin/page-header";
 import { FilterChips, hrefWith } from "@/components/admin/filters";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
@@ -14,6 +13,7 @@ import { ContractStatusBadge, OriginBadge, ProspectStatusBadge } from "@/compone
 import { formatDate, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CommercialFilterForm, param } from "../pipeline/filter-form";
+import { CommercialWorkspaceHeader } from "../_commercial/workspace-header";
 
 export const metadata: Metadata = { title: "Prospects" };
 
@@ -40,16 +40,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <AdminPageHeader
-        space={{ label: "Commercial", href: "/admin/pipeline" }}
-        title="Prospects"
-        description="Tous les dossiers, du premier contact à l'activation. Cliquez un nom pour ouvrir la fiche."
-        actions={
-          <Button asChild variant="outline" leadingIcon={<Columns3 className="size-4" />}>
-            <Link href="/admin/pipeline">Vue pipeline</Link>
-          </Button>
-        }
-      />
+      <CommercialWorkspaceHeader active="liste" description="Tous les dossiers, du premier contact à l'activation. Cliquez un nom pour ouvrir la fiche." params={{ nouveau: param(params.nouveau) }} />
 
       <div className="space-y-3">
         <FilterChips

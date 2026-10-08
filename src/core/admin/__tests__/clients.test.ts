@@ -13,6 +13,9 @@ import {
   contractEntries,
   countActiveSince,
   countPharmacyFilters,
+  parseWatchFilter,
+  WATCH_FILTERS,
+  WATCH_FILTER_LABELS,
   counterPostInError,
   counterPostState,
   describeAuditMetadata,
@@ -313,5 +316,15 @@ describe("frise de l'officine depuis les lignes brutes", () => {
       [prospectEventEntry({ id: "e1", type: "CREATED", summary: "Dossier créé", actorLabel: null, createdAt: daysAgo(30) })],
     ]);
     expect(merged.map((e) => e.kind)).toEqual(["paiement", "note", "dossier"]);
+  });
+});
+
+describe("« À surveiller »", () => {
+  it("trois pastilles, chacune avec son libellé ; une valeur inconnue n'en est pas une", () => {
+    expect(WATCH_FILTERS).toEqual(["technique", "inactives", "stock"]);
+    for (const filter of WATCH_FILTERS) expect(WATCH_FILTER_LABELS[filter].length).toBeGreaterThan(3);
+    expect(parseWatchFilter("stock")).toBe("stock");
+    expect(parseWatchFilter("n-importe-quoi")).toBeNull();
+    expect(parseWatchFilter(null)).toBeNull();
   });
 });

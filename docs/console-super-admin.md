@@ -1,6 +1,6 @@
 # La console super admin — cinq rubriques
 
-*Refonte du 9 octobre 2026, phase 1 (navigation, fiche officine 360°, accueil).*
+*Refonte du 9 octobre 2026 : phase 1 (navigation, fiche officine 360°, accueil) et phase 2 (commercial, finances, communication, officines à surveiller, téléphone).*
 
 Objectif : piloter PharmaBoost sans chercher. Cinq rubriques, sous chacune des onglets (jamais de menu déroulant), et une fiche
 par officine où tout se gère. **Aucune adresse n'a changé** : ce qui était un menu est devenu un onglet, rien n'a été supprimé ni
@@ -52,11 +52,31 @@ journée vide tient en une ligne), **Le parc en chiffres** (revenu mensuel récu
 **Accès rapides**, et la **tendance** seulement quand il y a de quoi la tracer. S'y ajoutent deux files qui n'y étaient pas :
 les questions des officines à répondre (support) et les fichiers de stock à trancher. Aucune donnée médicale n'est lue.
 
-## Reste à faire (phases suivantes)
+## Phase 2 — un espace de travail par sujet
 
-- Commercial : une seule interface « Suivi commercial » (tableau, liste, démos, relances) avec filtres et actions rapides,
-  au lieu de quatre pages liées par des onglets.
-- Finances : paiements et impayés dans une seule page à statuts ; moins de doublons entre abonnements, contrats et résiliations.
-- Communication : un espace unique (campagnes, modèles, historique, automatisations).
-- Officines : filtres « à surveiller » (technique, stock, accès) sur la liste, pour remplacer les listes transversales.
-- Design : passer la même hiérarchie (moins de bordures, boutons cohérents) aux pages des autres rubriques.
+- **Suivi commercial** (Commercial → Suivi commercial) : un seul en-tête pour le tableau, la liste, les démonstrations et les
+  relances (`_commercial/workspace-header.tsx`) — sélecteur de vues avec ce qui attend (« 1 en retard », « 2 aujourd'hui »), et
+  les trois gestes de tous les jours partout : nouveau dossier, programmer une démo, fixer une relance. Les vues gardent leurs
+  adresses, leurs filtres et leurs liens `?nouveau=…`, `?vue=…`.
+- **Paiements** (Finances → Paiements) : les factures Stripe et les impayés à relancer sont **une seule page** à deux vues
+  (`?vue=impayes`) ; `/admin/impayes` y redirige. Le bouton de navigation « Impayés » et les boutons croisés des pages
+  Abonnements et Offres, devenus redondants avec les onglets, sont retirés.
+- **Communication** (Gestion → Communication) : campagnes, historique, modèles d'e-mails et relances automatiques partagent un
+  même sélecteur de vues (`_communication/views.tsx`) ; les échanges d'une officine sont aussi dans sa fiche.
+- **Officines à surveiller** : sur la liste des officines, trois pastilles — connecteur à vérifier, inactives depuis 14 jours,
+  stock à rafraîchir (`?surveiller=technique|inactives|stock`, `core/admin/clients.ts`, `WATCH_FILTERS`) — avec les mêmes règles
+  que l'accueil (hors démonstrations et officines suspendues). Elles remplacent les listes transversales État technique, Activité
+  et Stocks reçus, qui restent à leur adresse.
+- **Téléphone** : les cinq rubriques tiennent sur une ligne, les onglets et les vues défilent, les boutons s'empilent.
+
+Composants communs : `components/admin/view-switch.tsx` (`ViewSwitch`) pour tout sélecteur de vues ; `AdminNavGroup.ownViewSwitcher`
+masque les pastilles de la navigation quand la page a son propre sélecteur.
+
+## Reste à faire
+
+- Design : étendre la même hiérarchie (moins de bordures, boutons cohérents) aux pages des autres rubriques — les tuiles de
+  chiffres et les cartes des pages d'origine n'ont pas été reprises une à une.
+- Abonnements, contrats, résiliations : les trois restent trois pages (chacune a sa structure) ; leurs chiffres communs
+  pourraient être réunis dans un même bandeau.
+- Fiche officine : modifier le tarif contractuel sans quitter la fiche (aujourd'hui « Modifier l'abonnement » ouvre la page de
+  facturation de l'officine).

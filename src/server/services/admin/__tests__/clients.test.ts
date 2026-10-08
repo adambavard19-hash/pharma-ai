@@ -105,6 +105,7 @@ describe("liste des officines (lecture)", () => {
       isActive: true,
       isDemo: false,
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      stockSyncedAt: new Date("2026-10-02T08:00:00.000Z"),
       stockConnection: null,
       memberships: [{ role: "OWNER", isActive: true, user: { firstName: "Camille", lastName: "Martin", email: "camille@marche.fr", lastLoginAt: new Date("2026-10-01T08:00:00.000Z") } }],
       organization: { subscription: { status: "ACTIVE", suspendedAt: null, contractPriceCents: 29000, cancelAtPeriodEnd: false, trialEndsAt: null, plan: { name: "PharmaBoost", monthlyPriceCents: 34900 } } },
@@ -133,6 +134,33 @@ describe("liste des officines (lecture)", () => {
     const searched = await clients.listClientPharmacies({ q: "camille@", statut: "abonnees", tri: "recent", now: NOW });
     expect(searched.rows.map((r) => r.id)).toEqual(["ph1"]);
     expect(searched.searched).toBe(1);
+  });
+
+  it("« À surveiller » : connecteur à vérifier, inactives, stock à rafraîchir — comptés sur toute la liste, jamais sur une démonstration", async () => {
+    const stale = new Date("2026-09-20T08:00:00.000Z");
+    prisma.pharmacy.findMany.mockResolvedValue([
+      pharmacyRow({ id: "ok", name: "A à jour" }),
+      pharmacyRow({ id: "stock", name: "B stock ancien", stockSyncedAt: stale }),
+      pharmacyRow({ id: "jamais", name: "C jamais de stock", stockSyncedAt: null }),
+      pharmacyRow({ id: "panne", name: "D connecteur", stockConnection: { lgo: "lgpi", status: "ERROR", lastSyncAt: null, lastSeenAt: null, intervalSeconds: 300 } }),
+      pharmacyRow({ id: "dormante", name: "E dormante", memberships: [] }),
+      pharmacyRow({ id: "demo", name: "F démo", isDemo: true, stockSyncedAt: null, stockConnection: { lgo: "lgpi", status: "ERROR", lastSyncAt: null, lastSeenAt: null, intervalSeconds: 300 } }),
+      pharmacyRow({ id: "suspendue", name: "G suspendue", isActive: false, stockSyncedAt: null }),
+    ]);
+    const all = await clients.listClientPharmacies({ q: null, statut: null, tri: "nom", now: NOW });
+    expect(all.watchCounts).toEqual({ technique: 1, inactives: 1, stock: 2 });
+
+    const byStock = await clients.listClientPharmacies({ q: null, statut: null, surveiller: "stock", tri: "nom", now: NOW });
+    expect(byStock.rows.map((row) => row.id)).toEqual(["stock", "jamais"]);
+    const byTech = await clients.listClientPharmacies({ q: null, statut: null, surveiller: "technique", tri: "nom", now: NOW });
+    expect(byTech.rows.map((row) => row.id)).toEqual(["panne"]);
+    const byInactive = await clients.listClientPharmacies({ q: null, statut: null, surveiller: "inactives", tri: "nom", now: NOW });
+    expect(byInactive.rows.map((row) => row.id)).toEqual(["dormante"]);
+
+    // Les compteurs des pastilles ne bougent pas quand on en choisit une ; les filtres se combinent avec la recherche.
+    expect(byStock.watchCounts).toEqual(all.watchCounts);
+    const searched = await clients.listClientPharmacies({ q: "jamais", statut: null, surveiller: "stock", tri: "nom", now: NOW });
+    expect(searched.rows.map((row) => row.id)).toEqual(["jamais"]);
   });
 
   it("un compte suspendu, même connecté hier, ne rend pas l'équipe active (règle du cockpit)", async () => {
