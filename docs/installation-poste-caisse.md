@@ -2,7 +2,7 @@
 
 ## Par le titulaire lui-même : un bouton, un fichier, un double-clic
 
-Sur l'ordinateur du comptoir, dans PharmaBoost → **Ma connexion** → étape 1, un seul bouton :
+Sur l'ordinateur du comptoir, dans PharmaBoost → **Mes connexions** → étape 1, un seul bouton :
 **« Télécharger PharmaBoost »**. Aucun lien n'est montré, copié ni envoyé : le clic prépare le comptoir
 (« Comptoir 2 », « Comptoir 3 »… un jeton à usage unique, sept jours) et télécharge directement l'installateur
 Windows, `PharmaBoost-Installation-<jeton>.exe` (route `POST /api/connexion/installateur`). Double-clic, une
@@ -47,7 +47,7 @@ l'installateur : `installateur/README.md`.
 
 ## En une ligne (technicien, ou prise en main à distance)
 
-Dans PharmaBoost → Ma connexion, le détail « Pour un technicien »
+Dans PharmaBoost → Mes connexions, le détail « Pour un technicien »
 affiche une commande. Sur le poste, clic droit sur le
 bouton Windows → Terminal, coller, Entrée :
 
@@ -87,12 +87,12 @@ un autre mode : ne pas aller plus loin, envoyer une photo du branchement.
 
 ## Étape 1 — le code du poste (dans PharmaBoost)
 
-Ma connexion → « Configuration avancée » → « Postes de comptoir » → « Ajouter un poste »
+Mes connexions → « Configuration avancée » → « Postes de comptoir » → « Ajouter un poste »
 (nom : « Caisse 1 »). Un code à six chiffres s'affiche, valable une heure.
 
 ## Étape 2 — installer sur le poste
 
-1. Sur le poste, ouvrir PharmaBoost, Ma connexion, cliquer
+1. Sur le poste, ouvrir PharmaBoost, Mes connexions, cliquer
    « Télécharger PharmaBoost Connect », puis décompresser l'archive (clic
    droit → Extraire tout).
 2. Dans le dossier décompressé : clic droit → « Ouvrir dans le Terminal ».
@@ -185,14 +185,14 @@ powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -TestAffich
 
 Si le dossier où le LGO enregistre son édition de stock est visible depuis
 un poste (un partage du serveur, par exemple `\\SERVEUR\PharmaBoost\Export`),
-on l'indique dans PharmaBoost → Ma connexion → Configuration avancée → Postes de
+on l'indique dans PharmaBoost → Mes connexions → Configuration avancée → Postes de
 caisse, sous le poste. Le poste le relit à chaque nouvel export (vérification
 toutes les trente secondes) et PharmaBoost remet le stock d'aplomb. Le bouton
 « Mettre à jour le stock maintenant » force une relecture dans la minute.
 Le serveur, lui, n'a besoin ni d'Internet ni d'un programme.
 
 
-## L'écran « Ma connexion »
+## L'écran « Mes connexions »
 
 Depuis le 8 octobre 2026, « Mise en service », « Stock → Connecter mon logiciel » et l'assistant d'accueil
 sont **une seule page**, `/connexion` (les anciennes adresses y renvoient) : « Installer PharmaBoost », **trois

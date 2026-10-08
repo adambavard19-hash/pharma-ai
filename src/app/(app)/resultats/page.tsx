@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { loadPerformanceReport, loadSubscriptionReturn } from "@/server/services/performance";
@@ -43,6 +45,15 @@ export default async function ResultatsPage({
         title="Ce que PharmaBoost vous rapporte"
         description="Les conseils proposés à votre équipe, ceux qu'elle a retenus, et les ventes confirmées qui en découlent. Ces chiffres sont réservés au titulaire de l'officine et à l'équipe PharmaBoost qui vous accompagne."
       />
+
+      <p className="text-[12.5px] text-text-tertiary">
+        Le détail du travail de chaque collaborateur est dans le{" "}
+        <Link href="/pilotage" className="inline-flex items-center gap-1 font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
+          Pilotage par collaborateur
+          <ArrowRight className="size-3" aria-hidden="true" />
+        </Link>
+        .
+      </p>
 
       <PerformanceDashboard report={report} roi={roi} basePath="/resultats" audience="owner" now={now} />
     </div>

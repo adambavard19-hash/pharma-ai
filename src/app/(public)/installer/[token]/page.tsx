@@ -8,7 +8,7 @@ const CONTACT = "contact@pharmaboost.app";
 
 /**
  * La page du lien d'installation d'un poste de comptoir : le titulaire la reçoit
- * par e-mail (ou la prend dans PharmaBoost, Ma connexion),
+ * par e-mail (ou la prend dans PharmaBoost, Mes connexions),
  * l'ouvre sur l'ordinateur de la douchette, et télécharge un seul fichier à
  * double-cliquer. Aucun compte demandé : le jeton long et daté du lien suffit.
  *
@@ -46,7 +46,7 @@ export default async function InstallPostPage({ params }: { params: Promise<{ to
                 Un lien d&apos;installation dure sept jours et ne sert qu&apos;une fois : celui-ci a expiré ou a déjà installé un poste.
               </p>
               <p className="mt-3 rounded-lg bg-[#f0faf8] px-3.5 py-2.5 text-[13.5px] leading-5 text-[#0b5c56]">
-                Dans PharmaBoost, ouvrez <strong>Ma connexion</strong>, puis <strong>« Télécharger PharmaBoost »</strong>, sur l&apos;ordinateur du comptoir : l&apos;installateur est prêt en quelques secondes. Sinon, écrivez-nous : <a href={`mailto:${CONTACT}`} className="font-semibold underline">{CONTACT}</a>.
+                Dans PharmaBoost, ouvrez <strong>Mes connexions</strong>, puis <strong>« Télécharger PharmaBoost »</strong>, sur l&apos;ordinateur du comptoir : l&apos;installateur est prêt en quelques secondes. Sinon, écrivez-nous : <a href={`mailto:${CONTACT}`} className="font-semibold underline">{CONTACT}</a>.
               </p>
             </>
           )}

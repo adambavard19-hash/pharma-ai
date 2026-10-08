@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
-import { NAVIGATION, isNavItemActive, type NavItem } from "@/config/navigation";
+import { NAVIGATION, groupNavigation, isNavItemActive, type NavItem } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import { PharmaWordmark } from "./logo";
-import { Button } from "@/components/ui/button";
 import { useMobileNav } from "./mobile-nav";
 
 export function Sidebar({
@@ -20,11 +19,12 @@ export function Sidebar({
   hiddenHrefs?: string[];
 }) {
   const { open: mobileOpen, closeNav } = useMobileNav();
+  const pathname = usePathname();
   const granted = new Set(permissions);
 
   const items = NAVIGATION.filter((item) => granted.has(item.permission) && !hiddenHrefs.includes(item.href));
   const primary = items.find((item) => item.primary);
-  const secondary = items.filter((item) => !item.primary);
+  const groups = groupNavigation(items);
 
   return (
     <>
@@ -63,23 +63,35 @@ export function Sidebar({
         </div>
 
         {primary && (
-          <div className="px-3 pb-4">
-            <Button
-              asChild
-              size="lg"
-              className="w-full justify-start shadow-sm"
-              leadingIcon={<primary.icon className="size-[18px]" />}
+          <div className="px-3 pb-3">
+            <Link
+              href={primary.href}
+              onClick={closeNav}
+              aria-current={isNavItemActive(primary, pathname) ? "page" : undefined}
+              className={cn(
+                "flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-[14.5px] font-semibold text-text-primary transition-colors",
+                "border-success-200 bg-success-50 hover:bg-success-100 dark:border-success-800 dark:bg-success-950/40 dark:hover:bg-success-950/70",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
+              )}
             >
-              <Link href={primary.href} onClick={closeNav}>
-                {primary.label}
-              </Link>
-            </Button>
+              <primary.icon className="size-[18px] text-success-600 dark:text-success-500" aria-hidden="true" />
+              {primary.label}
+            </Link>
           </div>
         )}
 
-        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-          {secondary.map((item) => (
-            <NavLink key={item.href} item={item} onNavigate={closeNav} />
+        <nav aria-label="Menu" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          {groups.map((group, index) => (
+            <div key={group.key} className={cn(index > 0 && "mt-3 border-t border-border-subtle pt-3")}>
+              <p className="px-2.5 pb-1.5 text-[11px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">{group.label}</p>
+              <ul className="space-y-0.5">
+                {group.items.map((item) => (
+                  <li key={item.href}>
+                    <NavLink item={item} onNavigate={closeNav} />
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
         </nav>
 
@@ -106,7 +118,7 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }
       onClick={onNavigate}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13.5px] font-medium transition-colors",
+        "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13.5px] font-medium transition-colors",
         isActive
           ? "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300"
           : "text-text-secondary hover:bg-surface-sunken hover:text-text-primary",

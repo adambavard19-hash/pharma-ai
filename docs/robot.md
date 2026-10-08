@@ -123,7 +123,7 @@ inventées pour l'essai : ils ne disent rien du format réel d'un journal BD Row
 
 ## Préparation dans PharmaBoost (8 octobre 2026)
 
-La page « Ma connexion » a une étape « Connecter mon robot » (facultatif) : le pharmacien enregistre le fabricant
+La page « Mes connexions » a une étape « Connecter mon robot » (facultatif) : le pharmacien enregistre le fabricant
 (BD Rowa, Mach4, Willach, Apostore, autre) et le modèle. **Rien n'est connecté** : l'écran dit « Intégration non
 disponible », ne simule aucun état « connecté » et le test de connexion de l'assistance le classe en information, jamais
 en réussite.

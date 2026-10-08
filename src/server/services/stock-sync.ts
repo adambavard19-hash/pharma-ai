@@ -290,7 +290,7 @@ export async function pairCounterPost(input: { code: string; hostname?: string |
   const code = /^[A-Za-z0-9_-]{16,}$/.test(raw) ? raw : raw.replace(/\D/g, "");
   if (code.length !== 6 && code.length < 16) return { ok: false, error: "Code d'appairage invalide." };
   const post = await prisma.counterPost.findUnique({ where: { pairingCodeHash: hashToken(code) }, include: { pharmacy: { select: { name: true } } } });
-  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return { ok: false, error: "Code de poste inconnu ou expiré. Générez un nouveau lien dans PharmaBoost (Ma connexion → Télécharger PharmaBoost)." };
+  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return { ok: false, error: "Code de poste inconnu ou expiré. Générez un nouveau lien dans PharmaBoost (Mes connexions → Télécharger PharmaBoost)." };
   const agentKey = generateToken(32);
   await prisma.counterPost.update({
     where: { id: post.id },

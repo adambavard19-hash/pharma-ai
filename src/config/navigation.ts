@@ -1,15 +1,19 @@
 import {
+  BarChart3,
+  Box,
   Boxes,
-  CalendarClock,
-  LineChart,
+  CalendarCheck,
+  GraduationCap,
+  Handshake,
   Megaphone,
+  Plug,
   ScanLine,
   ScrollText,
   Settings,
-  Sparkles,
   Users,
   UsersRound,
-  type LucideIcon, Plug, GraduationCap, Handshake, PackageSearch } from "lucide-react";
+  type LucideIcon,
+} from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 
 /**
@@ -20,16 +24,32 @@ import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
  * du système (ordonnances, produits, stocks, ventes, analytics…) : c'était la
  * carte d'un ERP.
  *
+ * Quatre groupes, dans l'ordre d'une journée : AU COMPTOIR (le patient devant
+ * soi), MA PHARMACIE (le stock, ce que ça rapporte, l'assortiment, l'équipe),
+ * DÉCOUVRIR (se former, les partenaires, les actualités) et CONFIGURATION (les
+ * connexions, les paramètres). Seuls les intitulés et les regroupements ont
+ * changé : aucune page n'a été retirée.
+ *
  * Elle se plie au rôle, et c'est une décision de produit autant que de droits :
- * un collaborateur voit QUATRE entrées — vendre, patients, stock, suivis — et
- * rien de la gestion. Le titulaire voit les mêmes, plus Pilotage, Équipe et
- * Paramètres. Personne n'a à traverser des écrans qui ne le concernent pas
- * pour atteindre le sien.
+ * un collaborateur voit peu d'entrées — vendre, patients, suivis, stock — et
+ * rien de la gestion. Le titulaire voit les mêmes, plus ses vues de gestion. Un
+ * groupe sans entrée visible n'est pas affiché. Personne n'a à traverser des
+ * écrans qui ne le concernent pas pour atteindre le sien.
  *
  * Tout ce qui a quitté ce menu reste atteignable (cf. `OFF_MENU_DESTINATIONS`) :
  * retirer du menu n'est pas supprimer. Ce qui disparaît, c'est la charge
  * mentale, pas la fonctionnalité.
  */
+
+export type NavGroupKey = "comptoir" | "pharmacie" | "decouvrir" | "configuration";
+
+/** Les groupes du menu, dans l'ordre où ils s'affichent. */
+export const NAV_GROUPS: { key: NavGroupKey; label: string }[] = [
+  { key: "comptoir", label: "Au comptoir" },
+  { key: "pharmacie", label: "Ma pharmacie" },
+  { key: "decouvrir", label: "Découvrir" },
+  { key: "configuration", label: "Configuration" },
+];
 
 export type NavItem = {
   href: string;
@@ -43,10 +63,12 @@ export type NavItem = {
   match?: string[];
   description: string;
   /**
-   * L'action principale de l'application. Rendue comme un bouton plein en tête
-   * de la barre latérale, pas comme un lien parmi d'autres.
+   * L'action principale de l'application. Rendue comme une ligne mise en avant
+   * en tête de la barre latérale, hors des groupes.
    */
   primary?: boolean;
+  /** Le groupe du menu ; absent pour l'action principale. */
+  group?: NavGroupKey;
 };
 
 export const NAVIGATION: NavItem[] = [
@@ -59,6 +81,8 @@ export const NAVIGATION: NavItem[] = [
     description: "Scanner une ordonnance et conseiller le patient",
     primary: true,
   },
+
+  // --- Au comptoir
   {
     href: "/patients",
     label: "Patients",
@@ -66,22 +90,16 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.PATIENT_VIEW,
     match: ["/patients"],
     description: "Fiches, historique et consentements",
+    group: "comptoir",
   },
   {
-    href: "/connexion",
-    label: "Ma connexion",
-    icon: Plug,
-    permission: PERMISSIONS.PRODUCT_IMPORT,
-    match: ["/connexion", "/installation"],
-    description: "Votre logiciel, PharmaBoost Connect, votre stock et votre robot : tout au même endroit",
-  },
-  {
-    href: "/stock",
-    label: "Stock",
-    icon: Boxes,
-    permission: PERMISSIONS.STOCK_VIEW,
-    match: ["/stock", "/stocks", "/produits"],
-    description: "Ce qui est en rayon — et ce qui manque",
+    href: "/suivis",
+    label: "Suivis patients",
+    icon: CalendarCheck,
+    permission: PERMISSIONS.FOLLOWUP_VIEW,
+    match: ["/suivis"],
+    description: "Les patients à recontacter aujourd'hui",
+    group: "comptoir",
   },
   {
     href: "/reglementation",
@@ -89,14 +107,63 @@ export const NAVIGATION: NavItem[] = [
     icon: ScrollText,
     permission: PERMISSIONS.PRESCRIPTION_VIEW,
     description: "Ordonnances d'exception, sécurisées, dernières évolutions",
+    group: "comptoir",
+  },
+
+  // --- Ma pharmacie
+  {
+    href: "/stock",
+    label: "Mon stock",
+    icon: Box,
+    permission: PERMISSIONS.STOCK_VIEW,
+    match: ["/stock", "/stocks", "/produits"],
+    description: "Ce qui est en rayon — et ce qui manque",
+    group: "pharmacie",
   },
   {
+    href: "/resultats",
+    label: "Performances",
+    icon: BarChart3,
+    // Même permission que le pilotage par collaborateur : la valeur chiffrée reste une vue de titulaire.
+    // L'équipe au comptoir ne voit ni l'entrée ni la page. Deux pages, une entrée : « Ce que PharmaBoost vous
+    // rapporte » (ventes confirmées) mène au détail par collaborateur (Pilotage), qui y renvoie.
+    permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
+    match: ["/resultats", "/pilotage", "/performance", "/analytics", "/ventes"],
+    description: "Ce que les conseils ont rapporté, au global et par collaborateur",
+    group: "pharmacie",
+  },
+  {
+    href: "/assortiment",
+    label: "Mon assortiment",
+    icon: Boxes,
+    // Réservé au titulaire, comme les partenaires : les besoins que le stock n'a pas couverts
+    // ne remontent pas de l'équipe au comptoir, le titulaire les consulte ici.
+    permission: PERMISSIONS.PARTNERS_MANAGE,
+    match: ["/assortiment"],
+    description: "Les besoins que votre stock n'a pas couverts, et ce qui existe chez nos partenaires",
+    group: "pharmacie",
+  },
+  {
+    href: "/equipe",
+    label: "Mon équipe",
+    icon: UsersRound,
+    // Gérer l'équipe est un acte de titulaire. Un pharmacien adjoint garde
+    // TEAM_VIEW ailleurs, mais n'a rien à faire dans cet écran au comptoir.
+    permission: PERMISSIONS.TEAM_MANAGE,
+    match: ["/equipe"],
+    description: "Comptes, accès et rôles de vos collaborateurs",
+    group: "pharmacie",
+  },
+
+  // --- Découvrir
+  {
     href: "/formation",
-    label: "Formation",
+    label: "Formations",
     icon: GraduationCap,
     permission: PERMISSIONS.TRAINING_VIEW,
     match: ["/formation"],
     description: "Les formations utiles sur les produits et les gammes de l'officine",
+    group: "decouvrir",
   },
   {
     href: "/partenaires",
@@ -107,65 +174,29 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.PARTNERS_MANAGE,
     match: ["/partenaires"],
     description: "Les gammes partenaires disponibles pour l'officine",
+    group: "decouvrir",
   },
   {
     href: "/nouveautes",
-    label: "Nouveautés",
+    label: "Actualités",
     icon: Megaphone,
     // Écrire aux patients abonnés est un acte du titulaire, comme Partenaires :
     // l'entrée n'apparaît pas au comptoir.
     permission: PERMISSIONS.NEWS_MANAGE,
     match: ["/nouveautes"],
     description: "Prévenir vos patients abonnés des nouvelles gammes",
+    group: "decouvrir",
   },
+
+  // --- Configuration
   {
-    href: "/assortiment",
-    label: "Assortiment",
-    icon: PackageSearch,
-    // Réservé au titulaire, comme les partenaires : les besoins que le stock n'a pas couverts
-    // ne remontent pas de l'équipe au comptoir, le titulaire les consulte ici.
-    permission: PERMISSIONS.PARTNERS_MANAGE,
-    match: ["/assortiment"],
-    description: "Les besoins que votre stock n'a pas couverts, et ce qui existe chez nos partenaires",
-  },
-  {
-    href: "/suivis",
-    label: "Suivis",
-    icon: CalendarClock,
-    permission: PERMISSIONS.FOLLOWUP_VIEW,
-    match: ["/suivis"],
-    description: "Les patients à recontacter aujourd'hui",
-  },
-  {
-    href: "/equipe",
-    label: "Équipe",
-    icon: UsersRound,
-    // Gérer l'équipe est un acte de titulaire. Un pharmacien adjoint garde
-    // TEAM_VIEW ailleurs, mais n'a rien à faire dans cet écran au comptoir.
-    permission: PERMISSIONS.TEAM_MANAGE,
-    match: ["/equipe"],
-    description: "Comptes, accès et rôles de vos collaborateurs",
-  },
-  {
-    href: "/resultats",
-    label: "Ce que ça rapporte",
-    icon: Sparkles,
-    // Même permission que Pilotage : la valeur chiffrée reste une vue de
-    // titulaire. L'équipe au comptoir ne voit ni l'entrée ni la page.
-    permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
-    match: ["/resultats"],
-    description: "Les ventes confirmées issues des conseils PharmaBoost",
-  },
-  {
-    href: "/pilotage",
-    label: "Pilotage",
-    icon: LineChart,
-    // Permission de titulaire : un pharmacien au comptoir ne voit pas cette
-    // entrée, et l'écran de vente ne montre jamais ces chiffres. La séparation
-    // est le point : un conseil n'est pas un objectif commercial.
-    permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
-    match: ["/pilotage", "/performance", "/analytics", "/ventes"],
-    description: "Ce que les conseils ont produit, par collaborateur",
+    href: "/connexion",
+    label: "Mes connexions",
+    icon: Plug,
+    permission: PERMISSIONS.PRODUCT_IMPORT,
+    match: ["/connexion", "/installation"],
+    description: "Installer PharmaBoost sur vos comptoirs, envoyer votre stock, connecter votre robot",
+    group: "configuration",
   },
   {
     href: "/parametres",
@@ -177,8 +208,14 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.SETTINGS_MANAGE,
     match: ["/parametres", "/conseils"],
     description: "Officine, règles de conseil, conformité",
+    group: "configuration",
   },
 ];
+
+/** Les entrées visibles, rangées par groupe (dans l'ordre du menu) ; un groupe vide n'est pas rendu. */
+export function groupNavigation(items: NavItem[]): { key: NavGroupKey; label: string; items: NavItem[] }[] {
+  return NAV_GROUPS.map((group) => ({ ...group, items: items.filter((item) => item.group === group.key) })).filter((group) => group.items.length > 0);
+}
 
 /**
  * Les écrans sortis du menu mais conservés.
@@ -195,6 +232,11 @@ export const OFF_MENU_DESTINATIONS: {
   label: string;
   reachableFrom: string;
 }[] = [
+  {
+    href: "/pilotage",
+    label: "Pilotage de l'officine",
+    reachableFrom: "Performances (le lien « Pilotage par collaborateur »)",
+  },
   {
     href: "/performance",
     label: "Performance de l'officine",

@@ -9,7 +9,7 @@ dernier stock (« Il y a 21 jours »), **un seul bouton vert** « Mettre à jour
 EAN), la liste (produit, quantité modifiable sur place, prix, disponibilité), « Ajouter un produit » (secondaire, en bas), et un
 lien discret « Qualité du catalogue ».
 
-Retirés de l'écran principal — rien n'est supprimé, tout est déplacé : « Ma connexion » (déjà dans le menu), « Comprendre les
+Retirés de l'écran principal — rien n'est supprimé, tout est déplacé : « Mes connexions » (déjà dans le menu), « Comprendre les
 produits non classés », « Chercher les photos de boîtes », la carte « Anomalies », la bande d'état de la connexion, « Dates
 courtes » et « Historique » → page **Qualité du catalogue** (`/stock/qualite`).
 

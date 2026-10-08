@@ -88,9 +88,9 @@ describe("l'écran « Mon stock »", () => {
     expect(none).toContain("Envoyer mon stock");
   });
 
-  it("n'affiche QUE ce qui est demandé : plus de « Ma connexion », de produits à comprendre, de photos, d'anomalies ni d'alertes répétées", async () => {
+  it("n'affiche QUE ce qui est demandé : plus de « Mes connexions », de produits à comprendre, de photos, d'anomalies ni d'alertes répétées", async () => {
     const t = text(await render());
-    for (const gone of ["Ma connexion", "Comprendre", "non classés", "Chercher les photos", "Anomalies", "Stock reçu", "Dates courtes", "Historique", "PharmaBoost Connect"]) {
+    for (const gone of ["Mes connexions", "Comprendre", "non classés", "Chercher les photos", "Anomalies", "Stock reçu", "Dates courtes", "Historique", "PharmaBoost Connect"]) {
       expect(t, gone).not.toContain(gone);
     }
     expect(t).toContain("Ajouter un produit");

@@ -9,7 +9,7 @@ import { button, shell } from "./sales-emails";
 export const INSTALLATION_STEPS: { title: string; body: string }[] = [
   {
     title: "Ouvrez PharmaBoost et complétez votre officine",
-    body: "Connectez-vous avec votre adresse e-mail. Dans le menu, « Ma connexion » vous guide pas à pas, avec l'aide pour chaque étape si ça bloque : votre logiciel, puis votre stock.",
+    body: "Connectez-vous avec votre adresse e-mail. Dans le menu, « Mes connexions » vous guident pas à pas, avec l'aide pour chaque étape si ça bloque : votre logiciel, puis votre stock.",
   },
   {
     title: "Importez votre stock",
@@ -17,7 +17,7 @@ export const INSTALLATION_STEPS: { title: string; body: string }[] = [
   },
   {
     title: "Reliez chaque poste de comptoir, en un double-clic",
-    body: "Sur l'ordinateur où la douchette est branchée : PharmaBoost → Ma connexion → étape 1, « Télécharger PharmaBoost ». Faites-le sur le poste lui-même, puis ouvrez (double-clic) le fichier téléchargé : rien à taper, aucun mot de passe administrateur, et vous voyez le poste apparaître en direct. Une minute par poste. Dès lors, chaque boîte bipée dans votre logiciel ouvre le conseil sur l'écran.",
+    body: "Sur l'ordinateur où la douchette est branchée : PharmaBoost → Mes connexions → étape 1, « Télécharger PharmaBoost ». Faites-le sur le poste lui-même, puis ouvrez (double-clic) le fichier téléchargé : rien à taper, aucun mot de passe administrateur, et vous voyez le poste apparaître en direct. Une minute par poste. Dès lors, chaque boîte bipée dans votre logiciel ouvre le conseil sur l'écran.",
   },
   {
     title: "Faites suivre l'inventaire automatiquement",

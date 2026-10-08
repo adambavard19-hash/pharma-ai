@@ -10,7 +10,7 @@ describe("le guide d'installation envoyé au titulaire", () => {
       expect(message.text).toContain(`${index + 1}. ${step.title}`);
       expect(message.html).toContain(step.title);
     }
-    expect(message.text).toContain("Ma connexion");
+    expect(message.text).toContain("Mes connexions");
     expect(message.text).toContain("https://pharmaboost.app/");
     expect(message.text).toContain("contact@pharmaboost.app");
     expect(message.html).not.toContain("<script");

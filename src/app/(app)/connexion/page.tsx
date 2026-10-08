@@ -7,7 +7,7 @@ import { installerStatus } from "@/server/services/installer-file";
 import type { OverviewSnapshot } from "@/server/actions/stock-sync";
 import { ConnectionSetup } from "./setup";
 
-export const metadata: Metadata = { title: "Ma connexion" };
+export const metadata: Metadata = { title: "Mes connexions" };
 
 /**
  * « Installer PharmaBoost » — une page courte, trois blocs : installer sur mes comptoirs, envoyer mon stock,
