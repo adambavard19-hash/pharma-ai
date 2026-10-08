@@ -259,6 +259,30 @@ describe("la fenêtre et son processus", () => {
     expect(legacy).toEqual([]);
   });
 
+  it("se prépare avant le premier conseil : la fenêtre démarre sans rien afficher, une seule fois, et sert ensuite", () => {
+    const notices = center();
+    notices.warmUp();
+    notices.warmUp();
+    expect(hosts).toHaveLength(1);
+    expect(hosts[0].written).toEqual([]);
+    notices.show(entry());
+    expect(hosts).toHaveLength(1);
+    expect(commands(hosts[0]).map((command) => command.op)).toEqual(["show"]);
+  });
+
+  it("ne se prépare pas hors Windows, ni quand l'ancienne fenêtre est demandée, ni après un échec", () => {
+    center({ platform: "darwin" }).warmUp();
+    const forced = center();
+    forced.configure({ legacy: true });
+    forced.warmUp();
+    expect(hosts).toHaveLength(0);
+    const failing = center();
+    failing.warmUp();
+    hosts[0].stderr.emit("data", "Add-Type : error");
+    failing.warmUp();
+    expect(hosts).toHaveLength(1);
+  });
+
   it("l'interrupteur du poste : « ancienne fenêtre » ne lance jamais la nouvelle, et se lève aussi vite", () => {
     const notices = center();
     notices.configure({ legacy: true });

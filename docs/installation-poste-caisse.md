@@ -196,9 +196,14 @@ Réglages (facultatifs) dans `pharmaboost-connect.json` : `"affichage": { "posit
 "haut-droite", "secondes": 30, "ancienne": false }` (de 5 à 120 secondes). `"ancienne": true` remet l'ancienne
 fenêtre de texte sur ce poste — l'interrupteur de secours, sans attendre un correctif.
 
-- C'est le poste qui déclenche l'analyse, en interrogeant le serveur après chaque bip (`GET /api/agent/conseil`). Six
-  secondes après le dernier bip, la vente passe « vérifiée » et l'analyse tourne côté serveur : aucun écran PharmaBoost
-  n'a besoin d'être ouvert. Le serveur répond avec les conseils **structurés** (photo, stock, prix) ; un serveur plus
+- C'est le poste qui déclenche l'analyse, en interrogeant le serveur après chaque bip (`GET /api/agent/conseil`). **Trois**
+  secondes après le dernier bip (six jusqu'au 8 octobre : trop long), la vente passe « vérifiée » et l'analyse tourne côté
+  serveur : aucun écran PharmaBoost n'a besoin d'être ouvert. La réponse qui déclenche l'analyse **porte déjà son
+  résultat** (le poste n'attend plus un tour d'interrogation de deux secondes), et la fenêtre se **prépare au premier bip**,
+  pendant que le serveur analyse (agent 0.6.1) : sa compilation ne retarde plus le premier conseil. Mesuré en production
+  le 8 octobre 2026 sur un premier Dulcolax : vingt secondes du scan à la fenêtre — sept d'attente, cinq d'analyse (le
+  médicament n'était pas encore connu du moteur : classé une fois, retenu ensuite), deux de relecture, le reste, la
+  préparation de la fenêtre. Le serveur répond avec les conseils **structurés** (photo, stock, prix) ; un serveur plus
   ancien répond par des lignes de texte, que la fenêtre montre telles quelles.
 - Les photos viennent des bases ouvertes du catalogue (`images.open{beauty,food,products}facts.org`) ou de PharmaBoost,
   en https, jpeg ou png seulement, 600 Ko au plus, quatre secondes d'attente : elles se téléchargent **après** l'affichage

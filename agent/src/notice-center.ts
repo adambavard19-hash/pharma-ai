@@ -234,6 +234,15 @@ export class NoticeCenter {
     if (preferences.position !== undefined && (POSITIONS as readonly string[]).includes(preferences.position)) this.options.position = preferences.position;
   }
 
+  /**
+   * Lance la fenêtre sans rien afficher. Sa préparation (PowerShell, compilation du code : quelques secondes) se fait
+   * alors pendant que le serveur analyse la vente, et non après : le premier conseil de la journée n'attend plus.
+   */
+  warmUp(): void {
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy) return;
+    this.ensureHost();
+  }
+
   /** Les ventes dont un conseil attend près de l'horloge. */
   ids(): string[] { return [...this.held.keys()]; }
 
@@ -298,7 +307,7 @@ export class NoticeCenter {
       host.stderr.on("data", (chunk) => this.onError(String(chunk)));
       host.on("exit", () => this.onExit());
       host.on("error", (error: Error) => this.giveUp(`le processus n'a pas démarré (${error.message})`));
-      this.startTimer = setTimeout(() => { if (!this.ready) this.giveUp("la fenêtre n'a pas démarré à temps"); }, this.options.startTimeoutMs ?? 30_000);
+      this.startTimer = setTimeout(() => { if (!this.ready) this.giveUp("la fenêtre n'a pas démarré à temps"); }, this.options.startTimeoutMs ?? 60_000);
       this.startTimer.unref?.();
       return true;
     } catch (error) {

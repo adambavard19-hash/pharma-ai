@@ -745,10 +745,13 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     // Antidiarrhéiques (racécadotril, lopéramide, diosmectite, S. boulardii,
     // charbon), puis les traitements qui provoquent parfois diarrhée ou
     // vomissements : agonistes du GLP-1, metformine et ses associations,
-    // amoxicilline-acide clavulanique, azithromycine, laxatifs stimulants ou
-    // osmotiques à dose excessive. Clindamycine et colchicine sont exclues :
-    // leurs troubles digestifs appellent un avis médical (vigilances dédiées).
-    atcPrefixes: ["A07XA", "A07DA", "A07BC", "A07FA", "A07BA", "A10BJ", "A10BA02", "A10BD", "J01CR02", "J01FA10", "A06AD11", "A06AB02", "A06AB06"],
+    // amoxicilline-acide clavulanique, azithromycine. Clindamycine et colchicine
+    // sont exclues : leurs troubles digestifs appellent un avis médical (vigilances dédiées).
+    // Les LAXATIFS (bisacodyl, séné, lactulose) ne déclenchent PLUS ce conseil : on les vend pour une
+    // constipation, et proposer un soluté de réhydratation à ce client n'a aucun sens au comptoir
+    // (retour de la pharmacienne, octobre 2026). Une diarrhée par excès de laxatif se signale à l'oral,
+    // elle ne se présume pas sur le seul produit.
+    atcPrefixes: ["A07XA", "A07DA", "A07BC", "A07FA", "A07BA", "A10BJ", "A10BA02", "A10BD", "J01CR02", "J01FA10"],
     therapeuticClasses: ["Antidiarrhéique", "Ralentisseur du transit", "Adsorbant intestinal"],
     sideEffectTriggers: [],
     basePriority: 64,
@@ -770,7 +773,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     patientReasonTemplate:
       "En cas de diarrhée ou de vomissements, {product} compense les pertes en eau et en sels minéraux.",
     clinicalContext:
-      "Adulte sans facteur de risque : électrolytes possibles. Sous lopéramide, vérifier l'absence de fièvre, de sang dans les selles ou de diarrhée infectieuse suspectée. Diosmectite ou charbon : espacer les autres produits oraux d'au moins 2 heures. Sous antidiabétique : vérifier la glycémie et la présence de sucres dans le produit. Laxatif : seulement si la diarrhée vient d'une dose excessive. Nourrisson, personne âgée, diarrhée avec fièvre ou sang, pertes importantes : orienter rapidement vers le médecin.",
+      "Adulte sans facteur de risque : électrolytes possibles. Sous lopéramide, vérifier l'absence de fièvre, de sang dans les selles ou de diarrhée infectieuse suspectée. Diosmectite ou charbon : espacer les autres produits oraux d'au moins 2 heures. Sous antidiabétique : vérifier la glycémie et la présence de sucres dans le produit. Nourrisson, personne âgée, diarrhée avec fièvre ou sang, pertes importantes : orienter rapidement vers le médecin.",
     safetyNotes: [
       "Diarrhée persistante au-delà de 48 heures, fièvre ou sang dans les selles : consulter.",
       "Sous antidiabétique : vérifier la glycémie et la présence de sucres dans le produit d'électrolytes.",

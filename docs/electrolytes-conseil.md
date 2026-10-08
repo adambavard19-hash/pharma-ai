@@ -14,7 +14,8 @@ réelles. Le traitement seul ne déclenche jamais la vente.
 | --- | --- | --- |
 | Racécadotril, lopéramide, diosmectite, S. boulardii, charbon (diarrhée) | 🟢/🟡 | Règle de conseil `rehydration-digestive` : question « pertes réelles ? », consignes lopéramide (ni fièvre ni sang), diosmectite et charbon (2 h d'écart) |
 | Nourrisson, jeune enfant, personne âgée | 🔴 pour Hydratis/Hydrafizz | Même règle : avant 6 ans ou à partir de 75 ans, préférence pour un vrai soluté de réhydratation orale (Adiaril, Fanolyte, Viatol) et exclusion des pastilles de confort (`productPreferFor` / `productExcludeFor`) |
-| GLP-1, metformine, amoxicilline-acide clavulanique, azithromycine, laxatifs (seulement s'ils provoquent réellement des pertes) | 🟡 | Même règle, déclenchée par la classe mais retenue par la question ; note « vérifier la glycémie et les sucres du produit » sous antidiabétique |
+| GLP-1, metformine, amoxicilline-acide clavulanique, azithromycine | 🟡 | Même règle, déclenchée par la classe mais retenue par la question ; note « vérifier la glycémie et les sucres du produit » sous antidiabétique |
+| Laxatifs (bisacodyl, séné, lactulose) | — | **Plus de conseil** (retour de la pharmacienne, 8 oct. 2026) : on les vend pour une constipation, un soluté de réhydratation n'a aucun sens au comptoir. Une diarrhée par excès de laxatif se signale à l'oral ; elle ne se présume pas sur le seul produit. |
 | Clindamycine (diarrhée importante) | 🟡 avis médical | Vigilance `clindamycin-diarrhea` : pas d'électrolytes ni d'antidiarrhéique en réponse |
 | Colchicine (diarrhée, vomissements = surdosage) | 🟡 avis médical | Vigilance `colchicine-gi-overdose` |
 | Inhibiteurs du SGLT2 | 🟠 | Vigilance `sglt2-dehydration` : rechercher soif, hypotension, pertes ; déshydratation réelle = avis médical |

@@ -1326,6 +1326,14 @@ var NoticeCenter = class {
     if (preferences.seconds !== void 0) this.options.seconds = Math.max(5, Math.min(120, Math.round(preferences.seconds)));
     if (preferences.position !== void 0 && POSITIONS.includes(preferences.position)) this.options.position = preferences.position;
   }
+  /**
+   * Lance la fenêtre sans rien afficher. Sa préparation (PowerShell, compilation du code : quelques secondes) se fait
+   * alors pendant que le serveur analyse la vente, et non après : le premier conseil de la journée n'attend plus.
+   */
+  warmUp() {
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy) return;
+    this.ensureHost();
+  }
   /** Les ventes dont un conseil attend près de l'horloge. */
   ids() {
     return [...this.held.keys()];
@@ -1392,7 +1400,7 @@ var NoticeCenter = class {
       host.on("error", (error) => this.giveUp(`le processus n'a pas d\xE9marr\xE9 (${error.message})`));
       this.startTimer = setTimeout(() => {
         if (!this.ready) this.giveUp("la fen\xEAtre n'a pas d\xE9marr\xE9 \xE0 temps");
-      }, this.options.startTimeoutMs ?? 3e4);
+      }, this.options.startTimeoutMs ?? 6e4);
       this.startTimer.unref?.();
       return true;
     } catch (error) {
@@ -1658,7 +1666,7 @@ function dryRunRobotFile(path, pattern, maxBytes = 5 * 1024 * 1024) {
 var import_node_fs6 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path5 = require("node:path");
-var VERSION = "0.6.0";
+var VERSION = "0.6.1";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path5.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path5.join)((0, import_node_path5.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -1761,6 +1769,7 @@ async function sendScan(config, code, scannedAt) {
   }
   if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
   log(`Bip ${code} \u2192 ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s)).`);
+  notices.warmUp();
   if (body.prescriptionId) watchPrescription(body.prescriptionId);
 }
 var IMAGES_DIR = (0, import_node_path5.join)((0, import_node_path5.dirname)(CONFIG_PATH), "avis-images");

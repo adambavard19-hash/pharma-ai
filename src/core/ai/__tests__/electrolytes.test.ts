@@ -71,12 +71,18 @@ describe("électrolytes — surveillance avant de proposer", () => {
 
 describe("électrolytes — le conseil lui-même", () => {
   it("se déclenche sur les antidiarrhéiques et les traitements qui provoquent des pertes, toujours avec la question", () => {
-    for (const atc of ["A07XA04", "A07DA03", "A07BC05", "A10BJ06", "A10BA02", "J01CR02", "A06AB02"]) {
+    for (const atc of ["A07XA04", "A07DA03", "A07BC05", "A10BJ06", "A10BA02", "J01CR02"]) {
       expect(rehydration.atcPrefixes.some((prefix) => atc.startsWith(prefix)), atc).toBe(true);
     }
     expect(rehydration.question).toMatch(/réellement/);
     expect(rehydration.safetyNotes.join(" ")).toMatch(/glycémie/);
     expect(rehydration.safetyNotes.join(" ")).toMatch(/2 heures/);
+  });
+
+  it("ne se déclenche PAS sur un laxatif : on le vend pour une constipation, pas pour une diarrhée (bisacodyl, séné, lactulose)", () => {
+    for (const atc of ["A06AB02", "A06AB06", "A06AD11", "A06AD15", "A06AB08"]) {
+      expect(rehydration.atcPrefixes.some((prefix) => atc.startsWith(prefix)), atc).toBe(false);
+    }
   });
 
   it("préfère un vrai soluté de réhydratation orale pour l'enfant et la personne âgée, pas pour l'adulte", () => {
