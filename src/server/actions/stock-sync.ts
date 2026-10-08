@@ -9,6 +9,8 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { createPairing, createPostInstallLink, createPostPairing, disconnectAgent, getConnection, isLgoId, requestPostSync, revokeCounterPost, setPostExportPath, updateConnectionSettings } from "@/server/services/stock-sync";
 import { LGO_DEFINITIONS, lgoLabel, stockFreshness } from "@/core/stock/connectors";
 import { buildPostDownloadUrl } from "@/core/stock/install";
+import { chooseLgo, loadConnectionOverview } from "@/server/services/connection-overview";
+import type { ConnectionOverview } from "@/core/stock/connection-overview";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
 import { fail, ok, type ActionResult } from "./types";
@@ -20,7 +22,7 @@ export async function createPairingAction(payload: { lgo: string }): Promise<Act
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   if (!isLgoId(payload.lgo)) return fail("Logiciel inconnu.");
   const pairing = await createPairing(session.scope, payload.lgo);
-  revalidatePath("/stock/connexion");
+  revalidatePath("/connexion");
   return ok({ code: pairing.code, expiresAt: pairing.expiresAt.toISOString() }, "Code d'appairage généré. Il est valable une heure.");
 }
 
@@ -39,14 +41,14 @@ export async function updateConnectionSettingsAction(payload: z.input<typeof set
     exportPath: parsed.data.exportPath || null,
     scansPath: parsed.data.scansPath || null,
   });
-  revalidatePath("/stock/connexion");
+  revalidatePath("/connexion");
   return ok(null, "Réglages enregistrés. L'agent les applique à son prochain signe de vie.");
 }
 
 export async function disconnectAgentAction(): Promise<ActionResult<null>> {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   await disconnectAgent(session.scope);
-  revalidatePath("/stock/connexion");
+  revalidatePath("/connexion");
   revalidatePath("/stock");
   return ok(null, "Agent déconnecté : sa clé est révoquée.");
 }
@@ -91,7 +93,7 @@ export async function emailInstallInstructionsAction(payload: { lgo: string; cod
     "",
     `   ${command}`,
     "",
-    `   Le code ${payload.code} est valable une heure. Passé ce délai, générez-en un nouveau dans PharmaBoost, page Stock > Connecter mon logiciel.`,
+    `   Le code ${payload.code} est valable une heure. Passé ce délai, générez-en un nouveau dans PharmaBoost, page Connecter ma pharmacie.`,
     "4. L'installateur crée les dossiers C:\\PharmaBoost\\Export et C:\\PharmaBoost\\Ordonnances, installe ce qu'il faut, et démarre l'agent. PharmaBoost affiche alors « agent connecté ».",
     "",
     `B. Dans ${lgoLabel(payload.lgo)}, pour sortir le stock (à refaire quand le stock doit être rafraîchi, chaque matin par exemple) :`,
@@ -117,14 +119,14 @@ export async function createPostPairingAction(payload: { label?: string | null }
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   const label = payload.label?.trim().slice(0, 60) || null;
   const pairing = await createPostPairing(session.scope, label);
-  revalidatePath("/stock/connexion");
+  revalidatePath("/connexion");
   return ok({ code: pairing.code, expiresAt: pairing.expiresAt.toISOString(), postId: pairing.postId }, "Code de poste généré. Il est valable une heure.");
 }
 
 export async function revokePostAction(payload: { postId: string }): Promise<ActionResult<null>> {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   await revokeCounterPost(session.scope, payload.postId);
-  revalidatePath("/stock/connexion");
+  revalidatePath("/connexion");
   return ok(null, "Poste retiré : sa clé ne fonctionne plus.");
 }
 
@@ -132,7 +134,7 @@ export async function setPostExportPathAction(payload: { postId: string; exportP
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   const exportPath = payload.exportPath.trim().slice(0, 300) || null;
   await setPostExportPath(session.scope, payload.postId, exportPath);
-  revalidatePath("/stock/connexion");
+  revalidatePath("/connexion");
   return ok(null, exportPath ? "Dossier enregistré : le poste relira l'export à chaque changement." : "Ce poste n'envoie plus de stock.");
 }
 
@@ -143,7 +145,7 @@ export async function requestPostSyncAction(payload: { postId: string }): Promis
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Impossible de demander la mise à jour.");
   }
-  revalidatePath("/stock/connexion");
+  revalidatePath("/connexion");
   return ok(null, "Demande envoyée : le poste relit l'export dans la minute.");
 }
 
@@ -158,7 +160,25 @@ export async function createPostInstallLinkAction(payload: { label?: string | nu
   const link = await createPostInstallLink(session.scope, label);
   const base = resolvePublicBaseUrl().url.replace(/\/$/, "");
   const command = `powershell -ExecutionPolicy Bypass -Command "irm ${base}/api/agent/installer/${link.token} | iex"`;
-  revalidatePath("/stock/connexion");
+  revalidatePath("/connexion");
   return ok({ token: link.token, expiresAt: link.expiresAt.toISOString(), postId: link.postId, command, downloadUrl: buildPostDownloadUrl(base, link.token) }, "Lien d'installation prêt, valable sept jours.");
 }
 
+/** Le logiciel de l'officine, choisi dans l'assistant « Connecter ma pharmacie » : rien n'est installé ni annoncé par ce choix. */
+export async function chooseLgoAction(payload: { lgo: string }): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  if (!isLgoId(payload.lgo)) return fail("Logiciel inconnu.");
+  await chooseLgo(session.scope.pharmacyId, payload.lgo);
+  revalidatePath("/connexion");
+  return ok(null);
+}
+
+/** Un état sans date ni objet : ce que l'assistant relit toutes les dix secondes. Aucune clé, aucun code. */
+export type Serialized<T> = T extends Date ? string : T extends (infer U)[] ? Serialized<U>[] : T extends object ? { [K in keyof T]: Serialized<T[K]> } : T;
+export type OverviewSnapshot = { overview: Serialized<ConnectionOverview>; lgo: string | null };
+
+export async function getConnectionOverviewAction(): Promise<ActionResult<OverviewSnapshot>> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
+  const loaded = await loadConnectionOverview(session.scope.pharmacyId);
+  return ok({ overview: JSON.parse(JSON.stringify(loaded.overview)) as Serialized<ConnectionOverview>, lgo: loaded.lgo });
+}

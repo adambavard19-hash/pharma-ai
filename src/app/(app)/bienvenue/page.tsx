@@ -10,9 +10,10 @@ import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PharmacyInfoForm } from "./pharmacy-info-form";
 import { FinishButton, VerifyStockButton } from "./buttons";
-import { StockAssistant } from "./stock-assistant";
+import { ConnectAssistant } from "../connexion/assistant";
 import { LGO_DEFINITIONS } from "@/core/stock/connectors";
-import { getConnection } from "@/server/services/stock-sync";
+import { loadConnectionOverview } from "@/server/services/connection-overview";
+import type { OverviewSnapshot } from "@/server/actions/stock-sync";
 import { resolvePublicBaseUrl } from "@/server/public-url";
 
 export const metadata: Metadata = { title: "Bienvenue sur PharmaBoost" };
@@ -43,7 +44,8 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
     prisma.importJob.findFirst({ where: { pharmacyId: session.scope.pharmacyId, kind: "STOCK", status: "COMPLETED" }, orderBy: { finishedAt: "desc" }, select: { summary: true, fileName: true } }),
   ]);
 
-  const connection = await getConnection(session.scope.pharmacyId);
+  const connectionState = await loadConnectionOverview(session.scope.pharmacyId);
+  const snapshot = JSON.parse(JSON.stringify({ overview: connectionState.overview, lgo: connectionState.lgo })) as OverviewSnapshot;
   const serverUrl = resolvePublicBaseUrl().url;
 
   const infoDone = Boolean(pharmacy.addressLine1 && pharmacy.city && pharmacy.postalCode);
@@ -112,7 +114,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
       {current === 2 && (
         <Card>
           <CardContent className="space-y-4 py-6">
-            <StepTitle icon={FileSpreadsheet} title="2. Mettre mon stock dans PharmaBoost" description="Dites quel logiciel vous utilisez : on vous montre où cliquer pour sortir le stock, puis vous le déposez, ou vous branchez l'agent une fois pour toutes. Rien ne se saisit à la main." />
+            <StepTitle icon={FileSpreadsheet} title="2. Mettre mon stock dans PharmaBoost" description="Choisissez votre logiciel, puis envoyez votre stock : un fichier, ou PharmaBoost Connect. Rien ne se saisit à la main." />
             {stockDone ? (
               <div className="rounded-xl border border-success-300 bg-success-50/40 px-4 py-3 text-[13.5px] dark:border-success-800 dark:bg-success-950/20">
                 <p className="font-medium text-text-primary">Stock importé le {formatDateTime(pharmacy.stockSyncedAt!)} — {references} référence{references > 1 ? "s" : ""}.</p>
@@ -123,28 +125,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
                 )}
               </div>
             ) : null}
-            <StockAssistant
-              lgos={LGO_DEFINITIONS}
-              serverUrl={serverUrl}
-              stockDone={stockDone}
-              userEmail={session.user.email}
-              connection={
-                connection
-                  ? {
-                      status: connection.status,
-                      lgo: connection.lgo,
-                      hostname: connection.hostname,
-                      lastSyncAt: connection.lastSyncAt?.toISOString() ?? null,
-                      lastSyncLines: connection.lastSyncLines,
-                      // Un agent qui ne s'est pas présenté depuis plus d'une heure est
-                      // tenu pour parti : l'assistant repropose alors l'installation.
-                      // La fraîcheur et l'âge sont calculés par le service, pas ici.
-                      reachable: connection.freshness !== "DISCONNECTED",
-                      seenAgeSeconds: connection.seenAgeSeconds,
-                    }
-                  : null
-              }
-            />
+            <ConnectAssistant lgos={LGO_DEFINITIONS} initial={snapshot} serverUrl={serverUrl} />
             {stockDone && (
               <div className="flex justify-end border-t border-border-subtle pt-4">
                 <Button asChild>
@@ -225,8 +206,8 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
             )}
             <div className="rounded-xl border border-brand-200 bg-brand-50/40 px-4 py-3 text-[13.5px] leading-5 dark:border-brand-800 dark:bg-brand-950/20">
               <p className="font-medium text-text-primary">Dernier geste, sur chaque poste de comptoir : relier la douchette.</p>
-              <p className="mt-1 text-text-secondary">Une ligne à coller dans PowerShell, deux minutes par poste, sans toucher au serveur. Ensuite, chaque boîte bipée dans votre logiciel ouvre le conseil sur l&apos;écran.</p>
-              <Link href="/installation" className="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Ouvrir le guide de mise en service</Link>
+              <p className="mt-1 text-text-secondary">Un lien à ouvrir sur le poste, un fichier à double-cliquer : une minute par poste. Ensuite, chaque boîte bipée dans votre logiciel ouvre le conseil sur l&apos;écran.</p>
+              <Link href="/connexion" className="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Ouvrir « Connecter ma pharmacie »</Link>
             </div>
             <FinishButton />
           </CardContent>

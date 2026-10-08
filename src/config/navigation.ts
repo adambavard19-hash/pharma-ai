@@ -9,7 +9,7 @@ import {
   Sparkles,
   Users,
   UsersRound,
-  type LucideIcon, Rocket, GraduationCap, Handshake, PackageSearch } from "lucide-react";
+  type LucideIcon, Plug, GraduationCap, Handshake, PackageSearch } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 
 /**
@@ -68,12 +68,12 @@ export const NAVIGATION: NavItem[] = [
     description: "Fiches, historique et consentements",
   },
   {
-    href: "/installation",
-    label: "Mise en service",
-    icon: Rocket,
+    href: "/connexion",
+    label: "Connecter ma pharmacie",
+    icon: Plug,
     permission: PERMISSIONS.PRODUCT_IMPORT,
-    match: ["/installation"],
-    description: "Les cinq étapes, pas à pas, et l'aide si ça bloque",
+    match: ["/connexion", "/installation"],
+    description: "Votre logiciel, votre stock et le poste de comptoir : un seul parcours",
   },
   {
     href: "/stock",

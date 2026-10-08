@@ -269,14 +269,14 @@ export async function pairCounterPost(input: { code: string; hostname?: string |
   const code = /^[A-Za-z0-9_-]{16,}$/.test(raw) ? raw : raw.replace(/\D/g, "");
   if (code.length !== 6 && code.length < 16) return { ok: false, error: "Code d'appairage invalide." };
   const post = await prisma.counterPost.findUnique({ where: { pairingCodeHash: hashToken(code) }, include: { pharmacy: { select: { name: true } } } });
-  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return { ok: false, error: "Code de poste inconnu ou expiré. Générez un nouveau code dans PharmaBoost (Stock → Connecter mon logiciel → Postes de caisse)." };
+  if (!post || !post.pairingExpiresAt || post.pairingExpiresAt < new Date()) return { ok: false, error: "Code de poste inconnu ou expiré. Générez un nouveau lien dans PharmaBoost (Connecter ma pharmacie → Installer PharmaBoost Connect → Poste de comptoir)." };
   const agentKey = generateToken(32);
   await prisma.counterPost.update({
     where: { id: post.id },
     data: { keyHash: hashToken(agentKey), pairingCodeHash: null, pairingExpiresAt: null, pairedAt: new Date(), lastSeenAt: new Date(), hostname: input.hostname ?? "", version: input.version ?? null },
   });
   await recordAudit({ action: "stock.post_paired", entityType: "CounterPost", entityId: post.id, pharmacyId: post.pharmacyId, metadata: { hostname: input.hostname ?? null, version: input.version ?? null } });
-  await createNotification({ pharmacyId: post.pharmacyId, userId: null, type: "IMPORT_COMPLETED", severity: "SUCCESS", title: `Poste de caisse ${post.label ?? input.hostname ?? ""} relié`, body: "La douchette de ce poste alimente maintenant le comptoir PharmaBoost.", linkUrl: "/stock/connexion" });
+  await createNotification({ pharmacyId: post.pharmacyId, userId: null, type: "IMPORT_COMPLETED", severity: "SUCCESS", title: `Poste de caisse ${post.label ?? input.hostname ?? ""} relié`, body: "La douchette de ce poste alimente maintenant le comptoir PharmaBoost.", linkUrl: "/connexion" });
   return { ok: true, agentKey, pharmacyName: post.pharmacy.name, postLabel: post.label ?? input.hostname ?? "" };
 }
 

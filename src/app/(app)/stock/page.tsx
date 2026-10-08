@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Boxes, Cable, Clock, History, Hourglass, PackageX, Plus, RefreshCw, Upload } from "lucide-react";
-import { describeAge, lgoLabel, stockFreshness } from "@/core/stock/connectors";
-import { cn } from "@/lib/utils";
+import { AlertTriangle, Boxes, Cable, Clock, History, Hourglass, PackageX, Plus, Upload } from "lucide-react";
 import { ClassifyProductsButton } from "./classify-button";
 import { FetchPhotosButton } from "./photos-button";
 import { prisma } from "@/server/db/client";
@@ -16,7 +14,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/format";
 import { PatientSearchBar } from "../patients/search-bar";
-import { StockReminderBanner } from "@/components/app/stock-reminder";
+import { loadConnectionOverview } from "@/server/services/connection-overview";
+import { ConnectionSummary } from "../connexion/summary";
 import { StockList, type StockRow } from "./stock-list";
 
 export const metadata: Metadata = { title: "Stock de mon officine" };
@@ -48,7 +47,7 @@ export default async function StockPage({
   const canManage = session.permissions.has(PERMISSIONS.PRODUCT_MANAGE);
   const canImport = session.permissions.has(PERMISSIONS.PRODUCT_IMPORT);
 
-  const [products, drugLines, lastMovement, lastImport, pharmacy, unclassified, withoutImage, shortDates] = await Promise.all([
+  const [products, drugLines, connectionState, unclassified, withoutImage, shortDates] = await Promise.all([
     prisma.product.findMany({
       where: {
         pharmacyId,
@@ -104,13 +103,8 @@ export default async function StockPage({
       },
       orderBy: { updatedAt: "desc" },
     }),
-    prisma.stockMovement.findFirst({ where: { pharmacyId }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
-    prisma.importJob.findFirst({
-      where: { pharmacyId, kind: "STOCK", status: "COMPLETED" },
-      orderBy: { finishedAt: "desc" },
-      select: { finishedAt: true, fileName: true },
-    }),
-    prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true, stockConnection: { select: { lgo: true, status: true, lastSyncAt: true, lastSeenAt: true, intervalSeconds: true, lastError: true } } } }),
+    // L'état de la connexion : calculé une seule fois, partout pareil (voir « Connecter ma pharmacie »).
+    loadConnectionOverview(pharmacyId),
     // Les produits que le moteur ne sait pas encore relier à un besoin.
     prisma.product.count({ where: { pharmacyId, deletedAt: null, classifiedAt: null } }),
     // Les boîtes dont la photo n'a pas encore été cherchée.
@@ -119,9 +113,7 @@ export default async function StockPage({
     countLotsNeedingAction(session.scope),
   ]);
   const shortDateAlerts = shortDates.urgent + shortDates.expired;
-  const syncedAt = pharmacy?.stockSyncedAt ?? lastImport?.finishedAt ?? null;
-  const connection = pharmacy?.stockConnection && pharmacy.stockConnection.status !== "DISCONNECTED" && pharmacy.stockConnection.status !== "PENDING" ? pharmacy.stockConnection : null;
-  const freshness = connection ? stockFreshness({ lastSyncAt: connection.lastSyncAt, lastSeenAt: connection.lastSeenAt, intervalSeconds: connection.intervalSeconds }) : null;
+  const { overview, stockSyncedAt: syncedAt } = connectionState;
   const zeroPrice = products.filter((product) => product.isActive && product.salePriceCents <= 0).length;
   const anomalies = unclassified + zeroPrice;
 
@@ -166,14 +158,6 @@ export default async function StockPage({
     inactive: rows.filter((row) => stateOf(row) === "inactif").length,
   };
 
-  const lastUpdate = [
-    lastMovement?.createdAt ?? null,
-    lastImport?.finishedAt ?? null,
-    ...rows.map((row) => new Date(row.updatedAt)),
-  ]
-    .filter((date): date is Date => date !== null)
-    .sort((a, b) => b.getTime() - a.getTime())[0];
-
   const filtered = rows
     .filter((row) => (filter === "tous" ? true : stateOf(row) === filter))
     .sort((a, b) => {
@@ -187,7 +171,6 @@ export default async function StockPage({
 
   return (
     <div className="space-y-6">
-      <StockReminderBanner stockSyncedAt={pharmacy?.stockSyncedAt ?? null} canImport={canImport} isDemo={session.pharmacy.isDemo} />
       <PageHeader
         title="Stock de mon officine"
         description="Ce que vous avez réellement en rayon, en quelle quantité et à quel prix. PharmaBoost ne propose jamais un produit absent de cette liste."
@@ -205,7 +188,7 @@ export default async function StockPage({
             )}
             {canImport && (
               <Button asChild variant="ghost" leadingIcon={<Cable className="size-[18px]" />}>
-                <Link href="/stock/connexion">{connection ? "Mon logiciel" : "Connecter mon logiciel"}</Link>
+                <Link href="/connexion">Connecter ma pharmacie</Link>
               </Button>
             )}
             <Button asChild variant="ghost" leadingIcon={<Hourglass className="size-[18px]" />}>
@@ -223,35 +206,15 @@ export default async function StockPage({
         }
       />
 
-      {/* L'état de synchronisation, en une ligne : c'est la première question
-          du titulaire, et c'est ce qui conditionne ce que le comptoir propose. */}
-      <div
-        className={cn(
-          "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-[13.5px]",
-          (connection ? freshness?.state === "FRESH" : Boolean(syncedAt)) ? "border-border-subtle bg-surface-card" : "border-warning-300 bg-warning-50/50 dark:border-warning-800 dark:bg-warning-950/20",
-        )}
-      >
-        <p className="flex items-center gap-2 text-text-primary">
-          {(connection ? freshness?.state === "FRESH" : Boolean(syncedAt)) ? <RefreshCw className="size-4 text-success-600" /> : <AlertTriangle className="size-4 text-warning-700 dark:text-warning-400" />}
-          {connection && freshness ? (
-            <>
-              <span className="font-medium">
-                {freshness.state === "FRESH" ? `Stock synchronisé avec ${lgoLabel(connection.lgo)} ${describeAge(freshness.ageSeconds)}` : freshness.state === "STALE" ? `Stock ${lgoLabel(connection.lgo)} non synchronisé ${describeAge(freshness.ageSeconds)} : périmé` : `Agent ${lgoLabel(connection.lgo)} injoignable — stock non vérifié ${describeAge(freshness.ageSeconds)}`}
-              </span>
-              <span className="text-text-tertiary">· {rows.length} référence{rows.length > 1 ? "s" : ""}{connection.lastError ? ` · ${connection.lastError}` : ""}</span>
-            </>
-          ) : syncedAt ? (
-            <>
-              <span className="font-medium">Stock synchronisé le {formatDateTime(syncedAt)}</span>
-              <span className="text-text-tertiary">· {rows.length} référence{rows.length > 1 ? "s" : ""} · import de fichier</span>
-            </>
-          ) : (
-            <span className="font-medium">Stock jamais importé — le comptoir ne peut rien proposer de votre rayon.</span>
-          )}
-        </p>
-        {unclassified > 0 && canManage && <ClassifyProductsButton pending={unclassified} />}
-        {withoutImage > 0 && canManage && <FetchPhotosButton pending={withoutImage} />}
-      </div>
+      {/* L'état de la connexion, en une ligne : la première question du titulaire, et ce qui
+          conditionne ce que le comptoir propose. Trois états séparés, les mêmes partout. */}
+      <ConnectionSummary overview={overview} canOpen={canImport} />
+      {((unclassified > 0 && canManage) || (withoutImage > 0 && canManage)) && (
+        <div className="flex flex-wrap items-center gap-3">
+          {unclassified > 0 && canManage && <ClassifyProductsButton pending={unclassified} />}
+          {withoutImage > 0 && canManage && <FetchPhotosButton pending={withoutImage} />}
+        </div>
+      )}
 
       <Grid cols={4}>
         <StatCard label="Références" value={rows.length} sublabel={`${counts.inStock} en stock`} icon={<Boxes className="size-4" />} emphasis="brand" />
@@ -263,9 +226,9 @@ export default async function StockPage({
           icon={<AlertTriangle className="size-4" />}
         />
         <StatCard
-          label="Dernière mise à jour"
-          value={lastUpdate ? formatDateTime(lastUpdate) : "—"}
-          sublabel={lastImport ? `Import : ${lastImport.fileName}` : counts.low > 0 ? `${counts.low} en stock faible` : "aucun import"}
+          label="Stock reçu"
+          value={syncedAt ? formatDateTime(syncedAt) : "—"}
+          sublabel={overview.stock.state === "NONE" ? "aucun stock reçu" : overview.stock.state === "FRESH" ? "à jour" : overview.stock.title.toLowerCase()}
           icon={<Clock className="size-4" />}
         />
       </Grid>
