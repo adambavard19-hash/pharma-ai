@@ -60,7 +60,7 @@ describe("createPostInstallLinkAction", () => {
     expect(mocks.requirePermission).toHaveBeenCalledWith(PERMISSIONS.PRODUCT_IMPORT);
     expect(mocks.createLink).toHaveBeenCalledWith(SESSION.scope, "Comptoir 1");
     if (!result.ok) throw new Error("attendu");
-    expect(result.data).toMatchObject({ label: "Comptoir 1", postId: "post_1", downloadUrl: `https://pharmaboost.test/installer/${TOKEN}` });
+    expect(result.data).toMatchObject({ label: "Comptoir 1", postId: "post_1", downloadUrl: `https://pharmaboost.test/installer/${TOKEN}`, fileUrl: `https://pharmaboost.test/api/agent/installateur/${TOKEN}` });
   });
 
   it("le suivant s'appelle « Comptoir 3 » quand il y en a déjà deux", async () => {

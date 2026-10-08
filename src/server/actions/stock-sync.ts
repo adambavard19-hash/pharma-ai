@@ -8,7 +8,7 @@ import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { createPairing, createPostInstallLink, createPostPairing, disconnectAgent, findOwnPostInstallLink, getConnection, isLgoId, listCounterPosts, reissuePostInstallLink, requestPostSync, revokeCounterPost, setPostExportPath, updateConnectionSettings } from "@/server/services/stock-sync";
 import { LGO_DEFINITIONS, lgoLabel, stockFreshness } from "@/core/stock/connectors";
-import { buildPostDownloadUrl, nextCounterLabel, POST_LINK_VALIDITY_LABEL } from "@/core/stock/install";
+import { buildPostDownloadUrl, buildPostInstallerFileUrl, nextCounterLabel, POST_LINK_VALIDITY_LABEL } from "@/core/stock/install";
 import { buildCounterInstallEmail } from "@/core/stock/install-email";
 import { rateLimited } from "@/server/http/rate-limit";
 import { chooseLgo, loadConnectionOverview } from "@/server/services/connection-overview";
@@ -156,12 +156,13 @@ export async function requestPostSyncAction(payload: { postId: string }): Promis
  * l'installateur Windows (le lien à envoyer par e-mail) ; `command` est la même
  * installation en une ligne, pour une personne qui prend la main à distance.
  */
-export type InstallLinkView = { token: string; expiresAt: string; postId: string; label: string; command: string; downloadUrl: string };
+/** `downloadUrl` : la page du lien (celle qu'on envoie) ; `fileUrl` : l'installateur lui-même, à télécharger puis double-cliquer. */
+export type InstallLinkView = { token: string; expiresAt: string; postId: string; label: string; command: string; downloadUrl: string; fileUrl: string };
 
 function installLinkView(token: string, expiresAt: Date, postId: string, label: string): InstallLinkView {
   const base = resolvePublicBaseUrl().url.replace(/\/$/, "");
   const command = `powershell -ExecutionPolicy Bypass -Command "irm ${base}/api/agent/installer/${token} | iex"`;
-  return { token, expiresAt: expiresAt.toISOString(), postId, label, command, downloadUrl: buildPostDownloadUrl(base, token) };
+  return { token, expiresAt: expiresAt.toISOString(), postId, label, command, downloadUrl: buildPostDownloadUrl(base, token), fileUrl: buildPostInstallerFileUrl(base, token) };
 }
 
 /**

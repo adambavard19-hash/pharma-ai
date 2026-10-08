@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Copy, Mail, Monitor, RefreshCw, Send } from "lucide-react";
+import { Check, Copy, Download, Mail, Monitor, RefreshCw, Send } from "lucide-react";
 import { createPostInstallLinkAction, emailPostInstallLinkAction, reissuePostInstallLinkAction, type InstallLinkView } from "@/server/actions/stock-sync";
 import type { OverviewSnapshot } from "@/server/actions/stock-sync";
 import { POST_LINK_VALIDITY_LABEL } from "@/core/stock/install";
@@ -117,9 +117,16 @@ function LinkReady({ link, userEmail }: { link: InstallLinkView; userEmail: stri
   return (
     <div role="status" aria-live="polite" className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/30">
       <div>
-        <p className="text-[16px] leading-6 font-semibold text-text-primary">Lien prêt pour {link.label}</p>
-        <p className="text-[13.5px] leading-5 text-text-secondary">Ouvrez-le sur l&apos;ordinateur du comptoir, puis double-cliquez le fichier téléchargé. {link.label} passera à « Connecté » ici.</p>
+        <p className="text-[16px] leading-6 font-semibold text-text-primary">Installateur prêt pour {link.label}</p>
+        <p className="text-[13.5px] leading-5 text-text-secondary">Sur l&apos;ordinateur du comptoir : téléchargez le fichier, puis double-cliquez dessus. L&apos;installation se fait toute seule, et {link.label} passera à « Connecté » ici.</p>
       </div>
+      <Button asChild size="lg" className="w-full rounded-full">
+        <a href={link.fileUrl} download>
+          <Download className="size-5" aria-hidden="true" />
+          Télécharger l&apos;installateur
+        </a>
+      </Button>
+      <p className="text-[13px] leading-5 text-text-secondary">Vous n&apos;êtes pas sur cet ordinateur ? Copiez le lien ou recevez-le par e-mail : il ouvre la page où l&apos;on télécharge le fichier.</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button variant="outline" className="rounded-full sm:flex-1" onClick={copy} leadingIcon={copied ? <Check className="size-4" /> : <Copy className="size-4" />}>
           {copied ? "Lien copié" : "Copier le lien"}
