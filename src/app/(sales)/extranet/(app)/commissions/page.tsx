@@ -15,7 +15,7 @@ export default async function SalesCommissionsPage() {
   const kpis = [["Ce mois", data.thisMonthCents], ["Acquises", data.earnedCents], ["En attente", data.pendingCents], ["Payées", data.paidCents], ["Total année", data.yearCents]] as const;
   return (
     <>
-      <h1 className="text-[22px] leading-7 font-semibold tracking-[-0.015em] text-text-primary">Mes commissions</h1>
+      <h1 className="text-[22px] leading-7 font-bold tracking-[-0.025em] text-text-primary">Mes commissions</h1>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {kpis.map(([label, cents]) => <Card key={label}><CardContent className="py-3.5"><p className="text-[11.5px] font-semibold tracking-wide text-text-tertiary uppercase">{label}</p><p className="mt-1 text-[22px] leading-none font-semibold tabular text-text-primary">{formatCents(cents)}</p></CardContent></Card>)}
       </div>

@@ -42,7 +42,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
             <img src={partner.logoUrl} alt="" className="size-12 shrink-0 rounded-lg border border-border-subtle bg-white object-contain p-1" />
           )}
           <div className="min-w-0 space-y-1">
-            <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em] break-words text-text-primary">{partner.name}</h1>
+            <h1 className="text-2xl leading-8 font-bold tracking-[-0.025em] break-words text-text-primary">{partner.name}</h1>
             <p className="text-[13px] break-words text-text-secondary">
               {[partner.legalName && partner.legalName !== partner.name ? partner.legalName : null, `créé le ${formatDate(partner.createdAt)}`].filter(Boolean).join(" · ")}
               {partner.website && (

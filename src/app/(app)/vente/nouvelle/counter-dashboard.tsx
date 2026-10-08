@@ -138,12 +138,12 @@ export function CounterDashboard({
 
   return (
     <div className="space-y-5">
-      <section aria-labelledby="titre-comptoir" className="rounded-[28px] border border-border-subtle bg-surface-card p-5 shadow-xs sm:p-8">
+      <section aria-labelledby="titre-comptoir" className="rounded-2xl border border-border-subtle bg-surface-card p-5 shadow-card sm:p-8">
         {/* Le titre garde au moins onze rem : en dessous, la pastille passe sous lui plutôt que de l'étrangler. */}
         <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-3">
           <div className="min-w-0 grow basis-44 space-y-2">
             <p className="text-[12.5px] font-medium tracking-[0.08em] text-text-secondary uppercase">{dateLabel}</p>
-            <h1 id="titre-comptoir" className="text-[28px] leading-[34px] font-semibold tracking-[-0.02em] text-balance text-text-primary sm:text-[32px] sm:leading-10">
+            <h1 id="titre-comptoir" className="text-[28px] leading-[34px] font-bold tracking-[-0.025em] text-balance text-text-primary sm:text-[32px] sm:leading-10">
               {status.title}
             </h1>
           </div>
@@ -154,7 +154,7 @@ export function CounterDashboard({
         </header>
         <p className="mt-3 max-w-xl text-[15px] leading-6 text-text-secondary">{status.subtitle}</p>
 
-        <div className="mt-6 rounded-3xl bg-surface-sunken/70 px-5 py-8 sm:px-8" aria-live="polite">
+        <div className="mt-6 rounded-2xl bg-surface-sunken/70 px-5 py-8 sm:px-8" aria-live="polite">
           {sales.length > 0 ? <InProgress sales={sales} /> : <Waiting status={status} canConfigure={canConfigure} />}
         </div>
 
@@ -169,12 +169,12 @@ export function CounterDashboard({
           <span className="text-[14px] text-text-secondary">Aujourd&apos;hui</span>
         </div>
         {activity.length === 0 ? (
-          <div className="mt-3 flex flex-col items-center gap-3 rounded-3xl border border-border-subtle px-5 py-8 text-center">
+          <div className="mt-3 flex flex-col items-center gap-3 rounded-xl border border-border-subtle px-5 py-8 text-center">
             <Clock className="size-5 text-text-tertiary" />
             <p className="text-[15px] text-text-secondary">Les dernières délivrances apparaîtront ici.</p>
           </div>
         ) : (
-          <ul className="mt-3 divide-y divide-border-subtle overflow-hidden rounded-3xl border border-border-subtle">
+          <ul className="mt-3 divide-y divide-border-subtle overflow-hidden rounded-xl border border-border-subtle shadow-card">
             {activity.map((item) => (
               <li key={item.id}>
                 <Link href={`/vente/${item.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-sunken/60 sm:px-5">
@@ -205,9 +205,9 @@ export function CounterDashboard({
             onClick={toggleManual}
             aria-expanded={manual}
             aria-controls="saisie-manuelle"
-            className="inline-flex items-center gap-2.5 rounded-full border border-border-default bg-surface-card px-5 py-3 text-[16px] font-medium text-text-primary transition-colors hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+            className="inline-flex h-11 items-center gap-2.5 rounded-md border border-border-default bg-surface-card px-6 text-sm font-medium text-text-primary transition-colors hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
           >
-            <NotebookPen className="size-5 text-text-secondary" />
+            <NotebookPen className="size-4 text-text-secondary" />
             Saisie manuelle
             <ChevronDown className={cn("size-4 text-text-tertiary transition-transform", manual && "rotate-180")} />
           </button>
@@ -228,7 +228,7 @@ export function CounterDashboard({
 
 function Figure({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col-reverse justify-end gap-1 rounded-3xl border border-border-subtle px-4 py-4 sm:px-5">
+    <div className="flex flex-col-reverse justify-end gap-1 rounded-xl border border-border-subtle px-4 py-4 shadow-card sm:px-5">
       <dt className="text-[13.5px] leading-[18px] text-text-secondary">{label}</dt>
       <dd className="text-[26px] leading-8 font-semibold tabular text-text-primary">{value}</dd>
     </div>
@@ -267,7 +267,7 @@ function Waiting({ status, canConfigure }: { status: CounterDashboardData["statu
       )}
       {status.awaitingFirstScan && <p className="max-w-md text-[13.5px] leading-5 text-text-secondary">Aucun bip reçu pour l&apos;instant : bipez une boîte au comptoir pour vérifier que le suivi arrive.</p>}
       {status.state === "NOT_CONNECTED" && canConfigure && (
-        <Link href="/connexion" className="inline-flex items-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-[15px] font-medium text-white transition-colors hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none">
+        <Link href="/connexion" className="inline-flex h-11 items-center gap-2 rounded-md bg-brand-gradient px-6 text-sm font-medium text-white shadow-xs transition-[filter] hover:brightness-[0.93] focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none">
           Connecter mon comptoir
           <ArrowRight className="size-4" />
         </Link>

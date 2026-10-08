@@ -16,7 +16,7 @@ export default function PrivacyPage() {
   ];
   return (
     <article className="mx-auto max-w-2xl px-5 py-16">
-      <h1 className="text-[32px] leading-[1.15] font-semibold tracking-[-0.02em] text-text-primary">Confidentialité et données</h1>
+      <h1 className="text-[32px] leading-[1.15] font-bold tracking-[-0.025em] text-text-primary">Confidentialité et données</h1>
       <p className="mt-4 text-[15px] leading-7 text-text-secondary">Le patient voit sa pharmacie, pas un logiciel. Le pharmacien décide. Aucune donnée n&apos;est revendue. Voici, concrètement, ce que cela veut dire.</p>
       {blocks.map((block) => (
         <section key={block.t} id={block.id} className="mt-10 scroll-mt-24">

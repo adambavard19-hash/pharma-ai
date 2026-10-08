@@ -18,7 +18,7 @@ export default async function SetPasswordPage({ params }: { params: Promise<{ to
       <div className="w-full max-w-sm space-y-8">
         <div className="space-y-2 text-center">
           <span className="mx-auto flex size-11 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white">✚</span>
-          <h1 className="text-[19px] font-semibold text-ink-50">Définir mon mot de passe</h1>
+          <h1 className="text-[19px] font-bold text-ink-50">Définir mon mot de passe</h1>
           {account ? (
             <p className="text-[13px] leading-5 text-ink-400">
               Compte administrateur <span className="text-ink-200">{account.email}</span>. Douze caractères au minimum.

@@ -46,7 +46,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
           <Link href="/connexion">Retour à Mes connexions</Link>
         </Button>
-        <h1 className="text-[28px] leading-9 font-semibold tracking-[-0.015em] text-text-primary">Guide pas à pas</h1>
+        <h1 className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary">Guide pas à pas</h1>
         <nav aria-label="Logiciel" className="flex flex-wrap gap-2">
           {LGO_DEFINITIONS.map((candidate) => (
             <Link

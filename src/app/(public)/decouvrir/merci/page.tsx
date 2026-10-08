@@ -38,7 +38,7 @@ export default async function ThanksPage({ searchParams }: { searchParams: Promi
         <Check className="size-7" strokeWidth={3} />
       </span>
       <p className="mt-6 font-mono text-[12px] tracking-[0.14em] text-brand-700 uppercase">{outcome.kicker}</p>
-      <h1 className="mt-2 text-[32px] leading-[1.1] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[40px]">{outcome.title}</h1>
+      <h1 className="mt-2 text-[32px] leading-[1.1] font-bold tracking-[-0.03em] text-text-primary text-balance md:text-[40px]">{outcome.title}</h1>
       <p className="mt-4 text-[16px] leading-7 text-text-secondary">{outcome.body}</p>
 
       <h2 className="mt-10 font-mono text-[11.5px] tracking-[0.14em] text-text-tertiary uppercase">Et maintenant</h2>

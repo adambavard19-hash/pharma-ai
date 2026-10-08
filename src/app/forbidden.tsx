@@ -15,7 +15,7 @@ export default function Forbidden() {
         <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-sunken text-text-tertiary">
           <Lock className="size-5" />
         </span>
-        <h1 className="text-[19px] font-semibold text-text-primary">Accès réservé</h1>
+        <h1 className="text-[19px] font-bold text-text-primary">Accès réservé</h1>
         <p className="text-[13.5px] leading-6 text-text-secondary">
           Cet écran est réservé au titulaire de l&apos;officine.
         </p>

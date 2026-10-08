@@ -14,7 +14,7 @@ export default async function SalesLoginPage({ searchParams }: { searchParams: P
       <div className="w-full max-w-sm space-y-8">
         <div className="space-y-2 text-center">
           <span className="mx-auto flex size-11 items-center justify-center rounded-xl bg-brand-500 text-lg font-semibold text-white">✚</span>
-          <h1 className="text-[20px] font-semibold text-white">Extranet commercial</h1>
+          <h1 className="text-[20px] font-bold text-white">Extranet commercial</h1>
           <p className="text-[13px] leading-5 text-white/60">PharmaBoost — vos dossiers, vos contrats, vos commissions.</p>
         </div>
         {defini === "1" && <p className="rounded-lg bg-success-700/30 px-3.5 py-3 text-center text-[13.5px] text-success-200">Mot de passe enregistré. Connectez-vous.</p>}

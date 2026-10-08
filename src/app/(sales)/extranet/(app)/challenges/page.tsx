@@ -149,7 +149,7 @@ export default async function SalesChallengesPage() {
   return (
     <>
       <div>
-        <h1 className="text-[22px] leading-7 font-semibold tracking-[-0.015em] text-text-primary">Mes challenges</h1>
+        <h1 className="text-[22px] leading-7 font-bold tracking-[-0.025em] text-text-primary">Mes challenges</h1>
         <p className="mt-1 text-[13.5px] text-text-secondary">Votre avancement se calcule tout seul, à partir de vos dossiers.</p>
       </div>
 

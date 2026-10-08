@@ -66,7 +66,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <p className="text-[12px] font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-400">Bienvenue sur PharmaBoost</p>
-        <h1 className="mt-1 text-[26px] font-semibold tracking-[-0.015em] text-text-primary">Bonjour {session.user.firstName}, préparons {pharmacy.name}.</h1>
+        <h1 className="mt-1 text-[26px] font-bold tracking-[-0.025em] text-text-primary">Bonjour {session.user.firstName}, préparons {pharmacy.name}.</h1>
         <p className="mt-1 text-[14px] text-text-secondary">Cinq étapes, dix minutes. La plus importante : votre stock. Sans lui, le comptoir ne peut rien proposer de votre rayon.</p>
       </div>
 

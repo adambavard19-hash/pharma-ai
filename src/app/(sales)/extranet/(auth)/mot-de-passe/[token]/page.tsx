@@ -13,7 +13,7 @@ export default async function SalesSetPasswordPage({ params }: { params: Promise
       <div className="w-full max-w-sm space-y-8">
         <div className="space-y-2 text-center">
           <span className="mx-auto flex size-11 items-center justify-center rounded-xl bg-brand-500 text-lg font-semibold text-white">✚</span>
-          <h1 className="text-[20px] font-semibold text-white">Bienvenue{account ? ` ${account.firstName}` : ""}</h1>
+          <h1 className="text-[20px] font-bold text-white">Bienvenue{account ? ` ${account.firstName}` : ""}</h1>
           {account ? (
             <p className="text-[13px] leading-5 text-white/60">Compte <span className="text-white">{account.email}</span>. Choisissez un mot de passe : douze caractères au minimum, avec une majuscule et un chiffre.</p>
           ) : (

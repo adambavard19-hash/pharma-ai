@@ -17,7 +17,7 @@ export default async function PlatformLoginPage({ searchParams }: { searchParams
           <span className="mx-auto flex size-11 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white">
             ✚
           </span>
-          <h1 className="text-[19px] font-semibold text-ink-50">
+          <h1 className="text-[19px] font-bold text-ink-50">
             Administration PharmaBoost
           </h1>
           <p className="text-[13px] leading-5 text-ink-400">

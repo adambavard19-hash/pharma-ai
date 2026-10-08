@@ -7,7 +7,7 @@ export default function DocumentNotFound() {
         <span className="mx-auto flex size-12 items-center justify-center rounded-xl bg-surface-sunken text-text-tertiary">
           <LinkIcon className="size-5" />
         </span>
-        <h1 className="text-[19px] font-semibold text-text-primary">
+        <h1 className="text-[19px] font-bold text-text-primary">
           Ce lien n&apos;est plus valide
         </h1>
         <p className="text-[13.5px] leading-6 text-text-secondary">

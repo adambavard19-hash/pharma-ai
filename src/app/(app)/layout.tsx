@@ -28,14 +28,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           />
         </div>
 
-        <div className="lg:pl-[248px] print:pl-0">
+        <div className="lg:pl-[256px] print:pl-0">
           <div className="no-print">
             <Topbar session={session} unreadNotifications={unread} />
           </div>
 
           <main
             id="contenu"
-            className="mx-auto max-w-[1400px] px-4 py-6 lg:px-8 lg:py-8 print:max-w-none print:p-0"
+            className="mx-auto max-w-[1400px] px-4 py-6 lg:px-10 lg:py-10 print:max-w-none print:p-0"
           >
             {children}
           </main>

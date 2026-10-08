@@ -17,7 +17,7 @@ export default function NewsNotFound() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-12">
       <div className="space-y-3 rounded-2xl border border-border-subtle bg-surface-card p-7">
-        <h1 className="text-xl leading-7 font-semibold tracking-[-0.015em] text-text-primary">Ce lien n&apos;est plus valide</h1>
+        <h1 className="text-xl leading-7 font-bold tracking-[-0.025em] text-text-primary">Ce lien n&apos;est plus valide</h1>
         <p className="text-[13.5px] leading-5 text-text-secondary">
           Il a peut-être expiré, ou il est incomplet. Votre pharmacie reste joignable directement : elle peut vous transmettre un nouveau lien
           pour recevoir ses nouveautés, ou supprimer votre adresse si vous ne souhaitez plus en recevoir.

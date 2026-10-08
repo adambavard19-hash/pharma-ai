@@ -18,12 +18,12 @@ export function PageHeader({
     <header className={cn("space-y-3", className)}>
       {breadcrumb}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em] text-text-primary">
+        <div className="min-w-0 space-y-1.5">
+          <h1 className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary sm:text-[30px]">
             {title}
           </h1>
           {description && (
-            <p className="max-w-2xl text-[13.5px] leading-5 text-text-secondary">
+            <p className="max-w-2xl text-[15px] leading-6 text-text-secondary">
               {description}
             </p>
           )}
@@ -48,8 +48,8 @@ export function SectionHeader({
   return (
     <div className={cn("flex flex-wrap items-end justify-between gap-3", className)}>
       <div className="space-y-0.5">
-        <h2 className="text-[15px] font-semibold text-text-primary">{title}</h2>
-        {description && <p className="text-[13px] text-text-secondary">{description}</p>}
+        <h2 className="text-[17px] leading-6 font-semibold tracking-[-0.02em] text-text-primary">{title}</h2>
+        {description && <p className="text-sm text-text-secondary">{description}</p>}
       </div>
       {action}
     </div>

@@ -14,8 +14,9 @@ type Variant =
 type Size = "sm" | "md" | "lg" | "xl" | "icon";
 
 const VARIANTS: Record<Variant, string> = {
+  // Le dégradé de marque (teal → vert) : le bouton principal, comme sur le site de référence.
   primary:
-    "bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-800 disabled:bg-brand-300",
+    "bg-brand-gradient text-white shadow-xs hover:brightness-[0.93] active:brightness-[0.88] disabled:saturate-50",
   secondary:
     "bg-surface-raised text-text-primary border border-border-default shadow-xs hover:bg-surface-sunken active:bg-ink-200 dark:active:bg-ink-700",
   outline:
@@ -23,8 +24,9 @@ const VARIANTS: Record<Variant, string> = {
   ghost: "text-text-secondary hover:bg-surface-sunken hover:text-text-primary",
   danger:
     "bg-danger-600 text-white shadow-sm hover:bg-danger-700 active:bg-danger-700 disabled:bg-danger-500/50",
+  // Vert foncé : le texte blanc reste lisible (5,6:1 ; le vert plus clair d'avant n'atteignait que 3,7:1).
   success:
-    "bg-success-600 text-white shadow-sm hover:bg-success-700 active:bg-success-700",
+    "bg-success-700 text-white shadow-xs hover:bg-success-800 active:bg-success-900",
   accent:
     "bg-accent-500 text-ink-950 shadow-sm hover:bg-accent-400 active:bg-accent-600",
 };
@@ -32,7 +34,7 @@ const VARIANTS: Record<Variant, string> = {
 const SIZES: Record<Size, string> = {
   sm: "h-8 px-3 text-[13px] gap-1.5 rounded-md",
   md: "h-10 px-4 text-sm gap-2 rounded-md",
-  lg: "h-11 px-5 text-[15px] gap-2 rounded-lg",
+  lg: "h-11 px-6 text-sm gap-2 rounded-md",
   xl: "h-14 px-7 text-base gap-2.5 rounded-xl font-semibold",
   icon: "h-10 w-10 rounded-md",
 };

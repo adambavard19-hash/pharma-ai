@@ -19,7 +19,7 @@ export default async function SetPasswordPage({ params }: { params: Promise<{ to
       <div className="space-y-6 rounded-2xl border border-border-subtle bg-surface-card p-7">
         <div className="space-y-3">
           <PharmaWordmark />
-          <h1 className="text-[20px] leading-7 font-semibold tracking-[-0.015em] text-text-primary">Définir mon mot de passe</h1>
+          <h1 className="text-[20px] leading-7 font-bold tracking-[-0.025em] text-text-primary">Définir mon mot de passe</h1>
           {account ? (
             <p className="text-[13.5px] leading-5 text-text-secondary">
               Bonjour {account.firstName}. Compte <span className="font-medium text-text-primary">{account.email}</span>. Douze caractères au minimum, avec une majuscule et un chiffre.

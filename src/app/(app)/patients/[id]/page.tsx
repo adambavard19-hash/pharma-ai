@@ -96,7 +96,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         <div className="flex items-center gap-4">
           <Avatar size="xl" initials={initials(patient.firstName, patient.lastName)} name={`${patient.firstName} ${patient.lastName}`} />
           <div className="space-y-1">
-            <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em] text-text-primary">
+            <h1 className="text-2xl leading-8 font-bold tracking-[-0.025em] text-text-primary">
               {patient.firstName} {patient.lastName.toUpperCase()}
             </h1>
             <p className="text-[14px] leading-5 text-text-secondary">

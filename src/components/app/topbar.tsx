@@ -22,7 +22,7 @@ export function Topbar({
   unreadNotifications: number;
 }) {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border-subtle bg-surface-card/85 px-4 backdrop-blur-md lg:px-6">
+    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border-subtle bg-surface-app/80 px-4 backdrop-blur-xs lg:px-6">
       <MobileNavTrigger />
 
       <div className="min-w-0 flex-1">
@@ -51,7 +51,7 @@ export function Topbar({
       >
         <Bell className="size-[18px]" />
         {unreadNotifications > 0 && (
-          <span className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-danger-500 text-[9.5px] font-semibold text-white tabular">
+          <span className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-danger-600 text-[9.5px] font-semibold text-white tabular">
             {unreadNotifications > 9 ? "9+" : unreadNotifications}
           </span>
         )}

@@ -109,7 +109,7 @@ export default async function ProductDetailPage({
           )}
           <div className="space-y-2">
             <div className="space-y-1">
-              <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em] text-text-primary">
+              <h1 className="text-2xl leading-8 font-bold tracking-[-0.025em] text-text-primary">
                 {product.name}
               </h1>
               <p className="text-[13.5px] text-text-secondary">

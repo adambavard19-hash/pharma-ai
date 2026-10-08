@@ -28,7 +28,7 @@ export default async function OptOutPage({
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-12">
       <div className="space-y-5 rounded-2xl border border-border-subtle bg-surface-card p-7">
         <div className="space-y-2">
-          <h1 className="text-xl leading-7 font-semibold tracking-[-0.015em] text-text-primary">
+          <h1 className="text-xl leading-7 font-bold tracking-[-0.025em] text-text-primary">
             Suivis de {state.pharmacyName}
           </h1>
           <p className="text-[13.5px] leading-5 text-text-secondary">

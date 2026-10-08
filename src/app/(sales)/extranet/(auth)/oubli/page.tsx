@@ -10,7 +10,7 @@ export default function SalesForgotPage() {
       <div className="w-full max-w-sm space-y-8">
         <div className="space-y-2 text-center">
           <span className="mx-auto flex size-11 items-center justify-center rounded-xl bg-brand-500 text-lg font-semibold text-white">✚</span>
-          <h1 className="text-[20px] font-semibold text-white">Recevoir un lien de connexion</h1>
+          <h1 className="text-[20px] font-bold text-white">Recevoir un lien de connexion</h1>
           <p className="text-[13px] leading-5 text-white/60">Un lien pour définir votre mot de passe sera envoyé à l&apos;adresse de votre compte.</p>
         </div>
         <RequestSalesLinkForm />

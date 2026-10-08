@@ -15,7 +15,7 @@ export default async function SalesNotificationsPage() {
   await markSalesNotificationsRead(session.rep.id);
   return (
     <>
-      <h1 className="text-[22px] leading-7 font-semibold tracking-[-0.015em] text-text-primary">Alertes</h1>
+      <h1 className="text-[22px] leading-7 font-bold tracking-[-0.025em] text-text-primary">Alertes</h1>
       <Card><CardContent className="pt-0">
         {items.length === 0 ? <p className="py-6 text-[13.5px] text-text-secondary">Aucune alerte.</p> : (
           <ul className="divide-y divide-border-subtle">

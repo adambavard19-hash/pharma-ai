@@ -47,7 +47,7 @@ export default async function CatalogQualityPage() {
       </Button>
 
       <header className="space-y-1">
-        <h1 className="text-[28px] leading-9 font-semibold tracking-[-0.02em] text-text-primary">Qualité du catalogue</h1>
+        <h1 className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary">Qualité du catalogue</h1>
         <p className="text-[15px] leading-6 text-text-secondary">Ce qui rend les conseils plus justes. Aucun de ces sujets n&apos;est une rupture de stock : ces produits sont bien en rayon.</p>
       </header>
 

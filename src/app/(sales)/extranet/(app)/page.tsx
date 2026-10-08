@@ -27,7 +27,7 @@ export default async function SalesHomePage() {
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[26px] leading-8 font-semibold tracking-[-0.02em] text-text-primary">Bonjour {session.rep.firstName}</h1>
+          <h1 className="text-[26px] leading-8 font-bold tracking-[-0.025em] text-text-primary">Bonjour {session.rep.firstName}</h1>
           <p className="mt-1 text-[13.5px] text-text-secondary">{toCall.length > 0 ? `${toCall.length} relance${toCall.length > 1 ? "s" : ""} à faire aujourd'hui.` : "Aucune relance en attente aujourd'hui."}</p>
         </div>
         <Button asChild leadingIcon={<Plus className="size-[18px]" />}><Link href="/extranet/dossiers/nouveau">Nouvelle pharmacie</Link></Button>

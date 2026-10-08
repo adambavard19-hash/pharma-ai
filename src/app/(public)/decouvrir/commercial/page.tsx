@@ -56,7 +56,7 @@ export default async function BecomeSalesPage() {
             <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-3 py-1.5 text-[13px] font-medium text-text-secondary">
               <span className="size-1.5 rounded-full bg-brand-500" /> PharmaBoost · équipe commerciale
             </p>
-            <h1 className="mt-7 text-[44px] leading-[1.02] font-semibold tracking-[-0.04em] text-text-primary text-balance md:text-[68px]">
+            <h1 className="mt-7 text-[44px] leading-[1.02] font-bold tracking-[-0.04em] text-text-primary text-balance md:text-[68px]">
               Développez PharmaBoost auprès des{" "}
               <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">officines.</span>
             </h1>

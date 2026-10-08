@@ -11,7 +11,7 @@ export default function ForgotPasswordPage() {
       <div className="space-y-6 rounded-2xl border border-border-subtle bg-surface-card p-7">
         <div className="space-y-3">
           <PharmaWordmark />
-          <h1 className="text-[20px] leading-7 font-semibold tracking-[-0.015em] text-text-primary">Recevoir un lien de connexion</h1>
+          <h1 className="text-[20px] leading-7 font-bold tracking-[-0.025em] text-text-primary">Recevoir un lien de connexion</h1>
           <p className="text-[13.5px] leading-5 text-text-secondary">
             Indiquez l&apos;adresse e-mail de votre compte : un lien pour définir un nouveau mot de passe lui sera envoyé.
           </p>

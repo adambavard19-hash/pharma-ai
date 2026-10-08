@@ -71,7 +71,7 @@ export default async function SitePage() {
             <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-3 py-1.5 text-[13px] font-medium text-text-secondary">
               <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
             </p>
-            <h1 className="mt-7 text-[56px] leading-[0.98] font-semibold tracking-[-0.04em] text-text-primary md:text-[80px]">
+            <h1 className="mt-7 text-[56px] leading-[0.98] font-bold tracking-[-0.04em] text-text-primary md:text-[80px]">
               Scan.
               <br />
               Conseil.

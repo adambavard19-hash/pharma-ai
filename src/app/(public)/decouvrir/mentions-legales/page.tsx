@@ -12,7 +12,7 @@ export default async function LegalPage() {
   const email = PUBLIC_CONTACT_EMAIL;
   return (
     <article className="mx-auto max-w-2xl px-5 py-16">
-      <h1 className="text-[32px] leading-[1.15] font-semibold tracking-[-0.02em] text-text-primary">Mentions légales</h1>
+      <h1 className="text-[32px] leading-[1.15] font-bold tracking-[-0.025em] text-text-primary">Mentions légales</h1>
       <dl className="mt-8 divide-y divide-border-subtle rounded-2xl border border-border-subtle bg-surface-card text-[14.5px]">
         <Row label="Éditeur du site">{legalName}{company?.legalForm ? `, ${company.legalForm}` : ""}</Row>
         {address && <Row label="Siège">{address}</Row>}

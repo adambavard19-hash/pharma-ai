@@ -50,7 +50,7 @@ function Closed({ state }: { state: string }) {
   return (
     <div className="mx-auto max-w-3xl rounded-[28px] border border-border-subtle bg-surface-card p-8 text-center sm:p-12">
       <p className="font-mono text-[12px] tracking-[0.14em] text-brand-700 uppercase">Inscription</p>
-      <h1 className="mt-3 text-[28px] leading-[1.1] font-semibold tracking-[-0.02em] text-text-primary">{content.title}</h1>
+      <h1 className="mt-3 text-[28px] leading-[1.1] font-bold tracking-[-0.025em] text-text-primary">{content.title}</h1>
       <p className="mx-auto mt-3 max-w-md text-[15px] leading-6 text-text-secondary">{content.body}</p>
       <p className="mt-6 text-[14px] text-text-secondary">
         Une question : <a href="mailto:contact@pharmaboost.app" className="font-semibold text-brand-700 underline underline-offset-2">{PUBLIC_CONTACT_EMAIL}</a>

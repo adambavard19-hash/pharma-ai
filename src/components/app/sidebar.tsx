@@ -38,7 +38,7 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col border-r border-border-subtle bg-surface-card",
+          "fixed inset-y-0 left-0 z-40 flex w-[256px] flex-col border-r border-border-subtle bg-surface-sidebar",
           "transition-transform duration-250 lg:translate-x-0",
           // `invisible` et non `hidden` : la transition reste fluide, mais le
           // tiroir fermé sort du parcours de tabulation et de l'arbre
@@ -69,12 +69,13 @@ export function Sidebar({
               onClick={closeNav}
               aria-current={isNavItemActive(primary, pathname) ? "page" : undefined}
               className={cn(
-                "flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-[14.5px] font-semibold text-text-primary transition-colors",
-                "border-success-200 bg-success-50 hover:bg-success-100 dark:border-success-800 dark:bg-success-950/40 dark:hover:bg-success-950/70",
+                "flex h-11 items-center gap-2.5 rounded-md px-3.5 text-sm font-medium text-white shadow-xs transition-[filter]",
+                "bg-brand-gradient hover:brightness-[0.93] active:brightness-[0.88]",
+                "aria-[current=page]:ring-2 aria-[current=page]:ring-brand-300 aria-[current=page]:ring-offset-2 aria-[current=page]:ring-offset-surface-sidebar dark:aria-[current=page]:ring-brand-700",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
               )}
             >
-              <primary.icon className="size-[18px] text-success-600 dark:text-success-500" aria-hidden="true" />
+              <primary.icon className="size-4" aria-hidden="true" />
               {primary.label}
             </Link>
           </div>
@@ -96,7 +97,7 @@ export function Sidebar({
         </nav>
 
         <div className="border-t border-border-subtle px-4 py-3">
-          <p className="text-[11px] leading-4 text-text-tertiary">
+          <p className="text-xs leading-4 text-text-tertiary">
             PharmaBoost assiste le pharmacien.
             <br />
             La décision reste professionnelle.
@@ -118,14 +119,14 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }
       onClick={onNavigate}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13.5px] font-medium transition-colors",
+        "flex items-center gap-3 rounded-md px-2.5 py-1.5 text-sm transition-colors",
         isActive
-          ? "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300"
-          : "text-text-secondary hover:bg-surface-sunken hover:text-text-primary",
+          ? "bg-brand-100 font-medium text-brand-800 dark:bg-brand-950 dark:text-brand-300"
+          : "text-text-primary hover:bg-surface-sunken",
       )}
     >
-      <span className={cn(isActive ? "text-brand-600 dark:text-brand-400" : "text-text-tertiary")}>
-        <Icon className="size-[17px]" />
+      <span className={cn(isActive ? "text-brand-800 dark:text-brand-400" : "text-text-secondary")}>
+        <Icon className="size-4" />
       </span>
       {item.label}
     </Link>

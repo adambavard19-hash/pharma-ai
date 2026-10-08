@@ -49,7 +49,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
         <div className="relative max-w-lg space-y-8">
           <div className="space-y-4">
-            <h1 className="text-[34px] leading-[1.15] font-semibold tracking-[-0.02em] xl:text-[40px]">
+            <h1 className="text-[34px] leading-[1.15] font-bold tracking-[-0.025em] xl:text-[40px]">
               Le copilote intelligent de l&apos;officine.
             </h1>
             <p className="text-[15px] leading-6 text-brand-100">

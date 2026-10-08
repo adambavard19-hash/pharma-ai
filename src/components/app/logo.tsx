@@ -28,7 +28,7 @@ export function PharmaLogo({
 
 export function PharmaWordmark({
   className,
-  size = 32,
+  size = 36,
   subtitle,
 }: {
   className?: string;
@@ -39,11 +39,11 @@ export function PharmaWordmark({
     <div className={cn("flex items-center gap-2.5", className)}>
       <PharmaLogo size={size} />
       <div className="min-w-0">
-        <p className="text-[15px] leading-5 font-semibold tracking-[-0.01em] text-text-primary">
-          Pharma<span className="text-brand-600 dark:text-brand-400">Boost</span>
+        <p className="text-sm leading-5 font-bold tracking-[-0.025em] text-text-primary">
+          Pharma<span className="text-brand-700 dark:text-brand-400">Boost</span>
         </p>
         {subtitle && (
-          <p className="truncate text-[11.5px] leading-4 text-text-tertiary">{subtitle}</p>
+          <p className="truncate text-xs leading-4 text-text-tertiary">{subtitle}</p>
         )}
       </div>
     </div>

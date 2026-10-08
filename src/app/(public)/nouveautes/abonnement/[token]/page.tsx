@@ -33,7 +33,7 @@ export default async function NewsOptInPage({ params }: { params: Promise<{ toke
         <div className="space-y-5 p-7">
           <div className="space-y-2">
             <p className="text-[12.5px] font-semibold tracking-[0.1em] text-text-tertiary uppercase">{state.pharmacyName}</p>
-            <h1 className="text-xl leading-7 font-semibold tracking-[-0.015em] text-text-primary">Être prévenu(e) des nouveautés de votre pharmacie</h1>
+            <h1 className="text-xl leading-7 font-bold tracking-[-0.025em] text-text-primary">Être prévenu(e) des nouveautés de votre pharmacie</h1>
             <p className="text-[13.5px] leading-5 text-text-secondary">
               {state.alreadySubscribed
                 ? "Vous êtes déjà inscrit(e) : il n'y a rien à faire. Chaque message contient un lien pour vous désinscrire."

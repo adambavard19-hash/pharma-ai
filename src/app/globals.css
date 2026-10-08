@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/*
+ * Le thème sombre suit la classe `.dark` (jetons ci-dessous), pas le réglage du système : sans cela, Tailwind activait
+ * ses variantes `dark:` seules quand l'ordinateur était en mode sombre, et l'écran s'affichait à moitié sombre.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ==========================================================================
    PHARMA.AI — SYSTÈME DE DESIGN
    Identité : médicale, calme, précise. Beaucoup d'air, une hiérarchie nette,
@@ -11,17 +17,20 @@
   /* Même teinte vert-bleu, plus de saturation sur ce qui se clique : sur un
      écran d'officine mal réglé, le gris-vert d'avant ne se distinguait plus
      du fond. Les teintes claires (50 à 200) restent calmes. */
-  --color-brand-50: oklch(0.977 0.02 180);
-  --color-brand-100: oklch(0.945 0.045 180);
-  --color-brand-200: oklch(0.895 0.08 180);
-  --color-brand-300: oklch(0.82 0.11 180);
-  --color-brand-400: oklch(0.72 0.125 180);
-  --color-brand-500: oklch(0.63 0.125 181);
-  --color-brand-600: oklch(0.54 0.115 182);
-  --color-brand-700: oklch(0.455 0.1 183);
-  --color-brand-800: oklch(0.385 0.08 184);
-  --color-brand-900: oklch(0.335 0.06 185);
-  --color-brand-950: oklch(0.235 0.04 186);
+  --color-brand-50: oklch(0.979 0.008 188);
+  --color-brand-100: oklch(0.95 0.018 187);
+  --color-brand-200: oklch(0.905 0.045 185);
+  --color-brand-300: oklch(0.835 0.075 183);
+  --color-brand-400: oklch(0.735 0.1 182);
+  --color-brand-500: oklch(0.64 0.105 182);
+  --color-brand-600: oklch(0.545 0.09 182);
+  --color-brand-700: oklch(0.5 0.078 183);
+  --color-brand-800: oklch(0.445 0.066 183);
+  --color-brand-900: oklch(0.375 0.052 184);
+  --color-brand-950: oklch(0.26 0.036 185);
+
+  /* Le vert de l'arrivée du dégradé de marque (teal → vert), et des mots mis en valeur. */
+  --color-leaf-500: oklch(0.635 0.119 162);
 
   /* --- Accent commercial : ambre chaud, réservé au CA additionnel -------- */
   --color-accent-50: oklch(0.98 0.021 85);
@@ -36,17 +45,17 @@
   --color-accent-900: oklch(0.408 0.085 68);
 
   /* --- Neutres légèrement froids ---------------------------------------- */
-  --color-ink-50: oklch(0.984 0.003 240);
-  --color-ink-100: oklch(0.968 0.005 240);
-  --color-ink-200: oklch(0.929 0.008 240);
-  --color-ink-300: oklch(0.869 0.011 240);
-  --color-ink-400: oklch(0.704 0.015 244);
-  --color-ink-500: oklch(0.554 0.017 246);
-  --color-ink-600: oklch(0.446 0.017 248);
-  --color-ink-700: oklch(0.372 0.017 250);
-  --color-ink-800: oklch(0.279 0.016 252);
-  --color-ink-900: oklch(0.211 0.015 254);
-  --color-ink-950: oklch(0.134 0.014 256);
+  --color-ink-50: oklch(0.986 0.003 190);
+  --color-ink-100: oklch(0.966 0.005 195);
+  --color-ink-200: oklch(0.929 0.008 197);
+  --color-ink-300: oklch(0.885 0.01 200);
+  --color-ink-400: oklch(0.72 0.015 215);
+  --color-ink-500: oklch(0.515 0.022 228);
+  --color-ink-600: oklch(0.44 0.022 229);
+  --color-ink-700: oklch(0.38 0.02 230);
+  --color-ink-800: oklch(0.29 0.018 230);
+  --color-ink-900: oklch(0.241 0.017 230);
+  --color-ink-950: oklch(0.17 0.014 232);
 
   /* --- États ------------------------------------------------------------ */
   --color-success-50: oklch(0.975 0.023 155);
@@ -68,7 +77,7 @@
   --color-warning-400: oklch(0.83 0.15 80);
   --color-warning-500: oklch(0.79 0.16 78);
   --color-warning-600: oklch(0.7 0.15 65);
-  --color-warning-700: oklch(0.58 0.13 55);
+  --color-warning-700: oklch(0.53 0.12 52);
   --color-warning-800: oklch(0.47 0.11 50);
   --color-warning-900: oklch(0.39 0.09 48);
   --color-warning-950: oklch(0.27 0.06 46);
@@ -98,9 +107,6 @@
   --color-info-950: oklch(0.27 0.06 245);
 
   /* --- Typographie ------------------------------------------------------ */
-  --font-sans:
-    "Inter var", "Inter", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono:
     ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
 
@@ -108,16 +114,16 @@
   --radius-xs: 0.375rem;
   --radius-sm: 0.5rem;
   --radius-md: 0.625rem;
-  --radius-lg: 0.875rem;
-  --radius-xl: 1.125rem;
-  --radius-2xl: 1.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
 
   /* --- Ombres discrètes, superposées ------------------------------------ */
-  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
-  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.04);
-  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.04);
-  --shadow-lg: 0 12px 28px -6px rgb(15 23 42 / 0.10), 0 4px 10px -4px rgb(15 23 42 / 0.05);
-  --shadow-xl: 0 24px 48px -12px rgb(15 23 42 / 0.16);
+  --shadow-xs: 0 1px 2px 0 rgb(23 33 38 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(23 33 38 / 0.06), 0 1px 2px -1px rgb(23 33 38 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(23 33 38 / 0.07), 0 2px 4px -2px rgb(23 33 38 / 0.04);
+  --shadow-lg: 0 12px 28px -6px rgb(23 33 38 / 0.10), 0 4px 10px -4px rgb(23 33 38 / 0.05);
+  --shadow-xl: 0 24px 48px -12px rgb(23 33 38 / 0.16);
 
   --animate-fade-in: fade-in 0.25s ease-out;
   --animate-slide-up: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -147,36 +153,48 @@
   --surface-raised: #ffffff;
   --surface-sunken: var(--color-ink-100);
   --surface-inverse: var(--color-ink-900);
+  /* Le menu : un fond à peine teinté de la couleur de marque. */
+  --surface-sidebar: oklch(0.981 0.006 188);
 
   --border-subtle: var(--color-ink-200);
   --border-default: var(--color-ink-300);
   --border-strong: var(--color-ink-400);
 
+  /* Texte : le principal est presque noir, le secondaire et le discret sont plus doux (≥ 4,5:1 partout). */
   --text-primary: var(--color-ink-900);
-  --text-secondary: var(--color-ink-700);
-  --text-tertiary: var(--color-ink-600);
+  --text-secondary: var(--color-ink-600);
+  --text-tertiary: var(--color-ink-500);
   --text-inverse: #ffffff;
 
   --focus-ring: var(--color-brand-500);
+
+  /* Les cartes : une ombre large et douce, de la teinte de la marque (et qui se creuse au survol). */
+  --card-shadow: 0 4px 24px -4px oklch(0.566 0.09 182 / 0.1);
+  --card-shadow-hover: 0 8px 32px -4px oklch(0.566 0.09 182 / 0.18);
 
   color-scheme: light;
 }
 
 .dark {
   --surface-app: var(--color-ink-950);
-  --surface-card: var(--color-ink-900);
+  --surface-card: oklch(0.215 0.015 231);
   --surface-raised: var(--color-ink-800);
-  --surface-sunken: oklch(0.176 0.014 255);
+  --surface-sunken: oklch(0.145 0.012 232);
   --surface-inverse: var(--color-ink-100);
+  --surface-sidebar: oklch(0.195 0.014 231);
 
-  --border-subtle: oklch(0.29 0.015 252);
-  --border-default: oklch(0.35 0.016 251);
-  --border-strong: oklch(0.44 0.017 249);
+  --border-subtle: oklch(0.3 0.014 230);
+  --border-default: oklch(0.36 0.015 230);
+  --border-strong: oklch(0.45 0.016 229);
 
   --text-primary: var(--color-ink-100);
-  --text-secondary: var(--color-ink-400);
-  --text-tertiary: var(--color-ink-500);
+  --text-secondary: oklch(0.78 0.015 222);
+  --text-tertiary: oklch(0.68 0.018 225);
   --text-inverse: var(--color-ink-950);
+
+  /* Les ombres teintées se voient mal sur fond sombre : elles s'effacent, la bordure fait le travail. */
+  --card-shadow: 0 4px 24px -4px rgb(0 0 0 / 0.35);
+  --card-shadow-hover: 0 8px 32px -4px rgb(0 0 0 / 0.5);
 
   --focus-ring: var(--color-brand-400);
 
@@ -184,11 +202,20 @@
 }
 
 @theme inline {
+  /* Plus Jakarta Sans, chargée dans le layout racine (next/font) ; la pile système prend le relais pendant le chargement. */
+  --font-sans:
+    var(--font-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Les ombres de cartes changent entre clair et sombre : elles se lisent à l'usage. */
+  --shadow-card: var(--card-shadow);
+  --shadow-card-hover: var(--card-shadow-hover);
+
   --color-surface-app: var(--surface-app);
   --color-surface-card: var(--surface-card);
   --color-surface-raised: var(--surface-raised);
   --color-surface-sunken: var(--surface-sunken);
   --color-surface-inverse: var(--surface-inverse);
+  --color-surface-sidebar: var(--surface-sidebar);
 
   --color-border-subtle: var(--border-subtle);
   --color-border-default: var(--border-default);
@@ -210,6 +237,28 @@
   * {
     border-color: var(--border-subtle);
   }
+
+  /* Des titres un peu resserrés : c'est ce qui donne à Plus Jakarta Sans son allure nette (-0,025 em). */
+  h1, h2, h3, h4 {
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+}
+
+/*
+ * Le dégradé de marque (teal → vert). Fond de bouton : les deux extrémités sont assombries pour que le texte blanc
+ * reste lisible (5,3:1 et 4,8:1 ; le teal et le vert d'origine, plus clairs, tombent à 4,3:1 et 3,2:1).
+ */
+@utility bg-brand-gradient {
+  background-image: linear-gradient(135deg, oklch(0.52 0.085 182), oklch(0.54 0.106 162));
+}
+/* Mots mis en valeur dans un grand titre seulement (texte de 24 px et plus) : teal et vert d'origine. */
+@utility text-brand-gradient {
+  background-image: linear-gradient(135deg, var(--color-brand-600), var(--color-leaf-500));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 html {
@@ -221,7 +270,6 @@ body {
   background-color: var(--surface-app);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;

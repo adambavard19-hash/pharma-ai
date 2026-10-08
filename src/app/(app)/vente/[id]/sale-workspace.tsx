@@ -476,7 +476,7 @@ export function SaleWorkspace({
       {/* ---- Le patient, en haut ------------------------------------------ */}
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-4">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="text-[22px] leading-7 font-semibold tracking-[-0.015em] text-text-primary uppercase">
+          <h1 className="text-[22px] leading-7 font-bold tracking-[-0.025em] text-text-primary uppercase">
             {prescription.patientName ?? "Patient non rattaché"}
           </h1>
           <Badge tone={status.tone}>{status.label}</Badge>

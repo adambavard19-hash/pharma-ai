@@ -14,7 +14,7 @@ export default async function SalesTasksPage() {
   const groups = [["En retard", tasks.late, "warning"], ["Aujourd'hui", tasks.today, "brand"], ["À venir", tasks.upcoming, "neutral"]] as const;
   return (
     <>
-      <h1 className="text-[22px] leading-7 font-semibold tracking-[-0.015em] text-text-primary">Relances</h1>
+      <h1 className="text-[22px] leading-7 font-bold tracking-[-0.025em] text-text-primary">Relances</h1>
       {groups.map(([title, items, tone]) => (
         <section key={title} className="space-y-2">
           <h2 className={"text-[14px] font-semibold " + (tone === "warning" ? "text-warning-700 dark:text-warning-500" : "text-text-primary")}>{title} <span className="text-[12.5px] font-normal text-text-tertiary">{items.length}</span></h2>

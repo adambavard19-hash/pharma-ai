@@ -51,7 +51,7 @@ export default async function TrainingPage({ params }: { params: Promise<{ id: s
           <KindBadge kind={training.kind} />
           <DurationBadge minutes={training.durationMinutes} />
         </div>
-        <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em] break-words text-text-primary">{training.title}</h1>
+        <h1 className="text-2xl leading-8 font-bold tracking-[-0.025em] break-words text-text-primary">{training.title}</h1>
         {facts.length > 0 && <p className="text-[13.5px] text-text-secondary">{facts.join(" · ")}</p>}
         <p className="text-[12.5px] text-text-tertiary">{source}</p>
       </header>

@@ -139,7 +139,7 @@ export function SignupForm({ token, prefill, expiresAt }: { token: string; prefi
         <span className="flex size-14 items-center justify-center rounded-full bg-brand-600 text-white motion-safe:animate-slide-up" aria-hidden="true">
           <Check className="size-7" strokeWidth={3} />
         </span>
-        <h1 className="mt-6 text-[30px] leading-[1.1] font-semibold tracking-[-0.03em] text-text-primary text-balance">Votre dossier est complet.</h1>
+        <h1 className="mt-6 text-[30px] leading-[1.1] font-bold tracking-[-0.03em] text-text-primary text-balance">Votre dossier est complet.</h1>
         <p className="mt-3 text-[15.5px] leading-7 text-text-secondary">Les informations de {done.pharmacyName} sont enregistrées. Votre contrat, prérempli, vous sera adressé par e-mail pour une signature en ligne.</p>
       </div>
     );
@@ -151,7 +151,7 @@ export function SignupForm({ token, prefill, expiresAt }: { token: string; prefi
     <div>
       <div className="mb-7 max-w-2xl">
         <p className="font-mono text-[12px] tracking-[0.14em] text-brand-700 uppercase">Inscription</p>
-        <h1 className="mt-2 text-[30px] leading-[1.08] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[38px]">Configurer mon officine</h1>
+        <h1 className="mt-2 text-[30px] leading-[1.08] font-bold tracking-[-0.03em] text-text-primary text-balance md:text-[38px]">Configurer mon officine</h1>
         <p className="mt-3 text-[15.5px] leading-7 text-text-secondary">Une question à la fois, environ deux minutes. Ce qui est déjà connu est prérempli : vous vérifiez, vous complétez. Lien valable jusqu&apos;au {until}.</p>
       </div>
       <Flow<Values>
