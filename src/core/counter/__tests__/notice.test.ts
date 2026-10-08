@@ -139,7 +139,7 @@ describe("seul parle dans la fenêtre du poste ce que la pharmacienne a validé"
     expect(notice.items.map((item) => item.name)).toEqual(["PASTILLES GORGE", "SANS INFORMATION"]);
   });
 
-  it("quand tout est à relire : « rien à ajouter », pas une alerte, pas un conseil non relu", () => {
+  it("quand tout a été supprimé de PharmaBoost : « rien à ajouter », pas une alerte, pas un conseil supprimé", () => {
     const notice = buildCounterNotice({ ...base, recommendations: [rec("ADIARIL", false)] });
     expect(notice.items).toEqual([]);
     expect(notice.advice).toEqual(["Rien à ajouter pour cette délivrance."]);

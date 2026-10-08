@@ -84,7 +84,7 @@ export default async function SettingsPage({
     <div className="space-y-6">
       <PageHeader
         title="Paramètres"
-        description="Officine, équipe, règles de conseil, moteur et conformité — tout ce qui se règle une fois, pas à chaque patient."
+        description="Officine, équipe, préférences de conseil, moteur et conformité — tout ce qui se règle une fois, pas à chaque patient."
       />
 
       <SettingsTabs

@@ -127,7 +127,6 @@ model Pharmacy {
   recommendations     Recommendation[]
   pharmacyRules       PharmacyRule[]
   productAssociations ProductAssociation[]
-  adviceRuleReviews   AdviceRuleReview[]
   documents           PatientDocument[]
   sales               Sale[]
   notifications       Notification[]
@@ -528,7 +527,6 @@ model User {
   notifications           Notification[]
   pharmacyRules           PharmacyRule[]
   createdAssociations     ProductAssociation[]
-  adviceRuleReviews       AdviceRuleReview[]
   imports                 ImportJob[]
   stockDeposits           StockDeposit[]
 
@@ -2274,32 +2272,77 @@ model ProductAssociation {
   @@map("product_associations")
 }
 
-/// Ce que la pharmacienne a décidé d'une règle de conseil du moteur : la valider (elle peut parler au comptoir), ou la
-/// refuser (elle ne se déclenche plus jamais dans CETTE officine). Une règle que personne n'a relue reste « à relire » : elle
-/// s'affiche sur l'écran complet de la vente, jamais dans la fenêtre du poste de caisse. La décision porte sur une VERSION
-/// de la règle : une règle réécrite depuis redevient « à relire ».
-model AdviceRuleReview {
-  id              String             @id @default(cuid())
-  pharmacyId      String
-  ruleKey         String
-  ruleVersion     String
-  decision        AdviceRuleDecision
-  note            String?
-  decidedByUserId String?
-  decidedAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  pharmacy  Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  decidedBy User?    @relation(fields: [decidedByUserId], references: [id], onDelete: SetNull)
-
-  @@unique([pharmacyId, ruleKey])
-  @@index([pharmacyId])
-  @@map("advice_rule_reviews")
+/// Le centre de contrôle des conseils : ce que l'équipe PharmaBoost (la pharmacienne qui relit) décide des conseils, UNE FOIS,
+/// pour TOUTES les officines — existantes et à venir. Les règles du moteur vivent dans le code et parlent partout dès l'envoi
+/// du stock ; cette table ne garde que les DÉCISIONS (valider, supprimer) et les règles AJOUTÉES depuis la console.
+///  • ACTIVE    — en ligne, pas encore relue (l'état de départ de toute règle : elle parle déjà) ;
+///  • VALIDATED — relue et validée, datée, signée ;
+///  • REMOVED   — supprimée : elle n'existe plus dans PharmaBoost (on peut la rétablir).
+enum CentralStatus {
+  ACTIVE
+  VALIDATED
+  REMOVED
 }
 
-enum AdviceRuleDecision {
-  VALIDATED
-  REJECTED
+enum CentralRuleSource {
+  /// Une règle écrite dans le code : seule sa décision est en base.
+  BUILT_IN
+  /// Une règle ajoutée depuis la console : sa définition est en base (`definition`).
+  CUSTOM
+}
+
+model CentralAdviceRule {
+  id               String            @id @default(cuid())
+  /// La clé de la règle : celle du code (« opioid-transit »), ou « custom-<id> » pour une règle ajoutée.
+  ruleKey          String            @unique
+  source           CentralRuleSource
+  status           CentralStatus     @default(ACTIVE)
+  /// La version de la règle au moment de la validation : une règle réécrite depuis redevient « à relire ».
+  ruleVersion      String?
+  /// Règle ajoutée : sa définition (voir core/ai/central-advice.ts). Vide pour une règle du code.
+  definition       Json?
+  decidedAt        DateTime?
+  decidedByAdminId String?
+  /// Le nom de la personne qui a décidé, tel qu'il était à ce moment-là.
+  decidedByName    String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([status])
+  @@map("central_advice_rules")
+}
+
+enum CentralTriggerKind {
+  /// Un médicament du catalogue national (clé « drug:<nom sans la forme> »).
+  MEDICINE
+  /// Un produit, reconnu par son code-barres dans le stock de chaque officine (clé « ean:<code> »).
+  PRODUCT
+}
+
+/// Une association commune à toutes les officines : un médicament ou un produit en appelle un autre. Le produit conseillé est
+/// désigné par son code-barres : chaque officine le retrouve dans SON stock et ne le propose que si elle l'a.
+model CentralAssociation {
+  id               String             @id @default(cuid())
+  triggerKind      CentralTriggerKind
+  triggerKey       String
+  triggerLabel     String
+  adviceEan        String
+  adviceLabel      String
+  /// Ce que le pharmacien dit au patient, écrit par la pharmacienne de PharmaBoost.
+  sentence         String?
+  status           CentralStatus      @default(ACTIVE)
+  sortOrder        Int                @default(0)
+  decidedAt        DateTime?
+  decidedByAdminId String?
+  decidedByName    String?
+  createdByAdminId String?
+  createdByName    String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([triggerKey, adviceEan])
+  @@index([status])
+  @@map("central_associations")
 }
 
 // ===========================================================================

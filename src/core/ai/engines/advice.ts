@@ -1782,14 +1782,17 @@ export function detectAdviceOpportunities(params: {
    */
   needs?: IdentifiedNeed[];
   /**
-   * Les règles que la pharmacienne de CETTE officine a refusées (voir `rule-review.ts`) : elles ne se déclenchent jamais.
+   * Les règles que l'équipe PharmaBoost a supprimées depuis la console (voir `central-advice.ts`) : elles ne se déclenchent
+   * jamais, dans aucune officine.
    */
   disabledRuleKeys?: ReadonlySet<string>;
+  /** Les conseils ajoutés depuis la console de PharmaBoost (central-advice.ts) : ils s'ajoutent aux règles du code. */
+  extraRules?: AdviceRule[];
 }): AdviceOpportunityResult[] {
-  const { drugs, patient, needs = [], disabledRuleKeys } = params;
+  const { drugs, patient, needs = [], disabledRuleKeys, extraRules = [] } = params;
   const byKey = new Map<string, AdviceOpportunityResult>();
 
-  for (const rule of ADVICE_RULES) {
+  for (const rule of [...ADVICE_RULES, ...extraRules]) {
     if (disabledRuleKeys?.has(rule.key)) continue;
     const triggers: {
       lineIndex: number;

@@ -1,5 +1,5 @@
 /**
- * La navigation de la console, en six espaces. Les adresses existantes ne
+ * La navigation de la console, en sept espaces. Les adresses existantes ne
  * changent pas (aucun lien cassé) : elles sont seulement rangées.
  */
 export type AdminNavItem = {
@@ -12,7 +12,7 @@ export type AdminNavItem = {
 };
 
 export type AdminNavSpace = {
-  key: "overview" | "clients" | "commercial" | "billing" | "communication" | "administration";
+  key: "overview" | "clients" | "commercial" | "billing" | "communication" | "advice" | "administration";
   label: string;
   href: string;
   items: AdminNavItem[];
@@ -74,6 +74,8 @@ export const ADMIN_NAV: AdminNavSpace[] = [
       { href: "/admin/notifications", label: "Notifications", description: "Les alertes de la plateforme pour l'équipe." },
     ],
   },
+  // Un seul écran, donc un lien direct : les règles, les conseils et les associations de toutes les pharmacies, au même endroit.
+  { key: "advice", label: "Conseils", href: "/admin/conseils", items: [] },
   {
     key: "administration",
     label: "Administration",
@@ -97,6 +99,9 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
 /** L'élément le plus précis qui correspond à l'adresse (« Offres & tarifs » plutôt qu'« Abonnements »). */
 export function activeNavItem(pathname: string): { space: AdminNavSpace; item: AdminNavItem | null } {
   if (pathname === "/admin") return { space: ADMIN_NAV[0], item: null };
+  // Un espace sans menu est un lien direct (hors « Vue d'ensemble », qui est l'accueil) : sa propre adresse l'active.
+  const direct = ADMIN_NAV.find((space) => space.items.length === 0 && space.key !== "overview" && matchesPrefix(pathname, space.href));
+  if (direct) return { space: direct, item: null };
   let best: { space: AdminNavSpace; item: AdminNavItem; length: number } | null = null;
   for (const space of ADMIN_NAV) {
     for (const item of space.items) {

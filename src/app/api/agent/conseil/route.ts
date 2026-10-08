@@ -8,8 +8,7 @@ import { recordAudit } from "@/server/audit/log";
 import { getEnv } from "@/config/env";
 import { stockReminderLevel } from "@/core/stock-deposit/rules";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
-import { mayShowAtCounter, reviewsByKey } from "@/core/ai/rule-review";
-import { loadRuleReviews } from "@/server/services/advice-rule-reviews";
+import { loadCentralAdvice } from "@/server/services/central-advice";
 
 export const dynamic = "force-dynamic";
 // L'analyse peut dépasser dix secondes : on le déclare à l'hébergeur.
@@ -65,9 +64,11 @@ async function readNotice(agent: Agent, id: string): Promise<{ status: string; n
   // Prix et « En stock » viennent du même export : un stock ancien ne s'affiche pas comme un fait.
   const pharmacy = await prisma.pharmacy.findUnique({ where: { id: agent.scope.pharmacyId }, select: { stockSyncedAt: true } });
   const stockReliable = stockReminderLevel(pharmacy?.stockSyncedAt ?? null, new Date()) === "none";
-  // Dans la fenêtre du poste, seul parle ce que la pharmacienne a validé : ses propres associations, ses ajouts, et les
-  // règles du moteur qu'elle a relues. Le reste reste lisible sur l'écran complet de la vente.
-  const reviews = reviewsByKey(await loadRuleReviews(agent.scope.pharmacyId));
+  // Dans la fenêtre du poste comme sur l'écran de la vente, une règle supprimée dans la console de PharmaBoost n'existe plus :
+  // un conseil resté dans une analyse ancienne ne s'affiche pas. Les règles en ligne parlent, validées ou non.
+  const central = await loadCentralAdvice();
+  const removed = new Set(central.removed);
+  const known = new Set([...ADVICE_RULES.map((rule) => rule.key), ...central.custom.map((rule) => rule.key)]);
   const notice = buildCounterNotice({
     reference: prescription.reference,
     prescriptionStatus: prescription.status,
@@ -79,7 +80,7 @@ async function readNotice(agent: Agent, id: string): Promise<{ status: string; n
       priceCents: rec.product?.salePriceCents ?? rec.presentation?.pharmacyStocks[0]?.priceCents ?? rec.presentation?.priceCents ?? null,
       reason: rec.shortReason ?? rec.justification,
       status: rec.status,
-      trusted: rec.origin !== "AI" || mayShowAtCounter(rec.opportunity?.ruleKey, ADVICE_RULES, reviews),
+      trusted: rec.origin !== "AI" || (rec.opportunity?.ruleKey != null && known.has(rec.opportunity.ruleKey) && !removed.has(rec.opportunity.ruleKey)),
       imageUrl: rec.product?.imageUrl ?? null,
       quantity: rec.product ? (rec.product.stockItem?.quantity ?? null) : (rec.presentation?.pharmacyStocks[0]?.quantity ?? null),
       alertThreshold: rec.product?.stockItem?.alertThreshold ?? null,

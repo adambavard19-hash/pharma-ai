@@ -44,8 +44,9 @@ export type NoticeRecommendation = {
   quantity?: number | null;
   alertThreshold?: number | null;
   /**
-   * Ce conseil peut-il parler dans la fenêtre du poste ? Faux pour une règle du moteur que la pharmacienne n'a pas encore
-   * relue (elle s'affiche alors sur l'écran complet de la vente, jamais ici). Absent : oui (comportement historique).
+   * Ce conseil peut-il parler dans la fenêtre du poste ? Faux pour une règle du moteur que l'équipe PharmaBoost a supprimée
+   * depuis (console, « Conseils »), ou qui n'existe plus : un conseil resté dans une analyse ancienne ne s'affiche pas.
+   * Absent : oui (comportement historique).
    */
   trusted?: boolean;
 };

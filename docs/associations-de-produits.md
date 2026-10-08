@@ -83,3 +83,11 @@ désormais « déjà présent dans cette délivrance » (une vente bipée n'a pa
   l'officine du demandeur) ; `src/server/actions/associations.ts` — les gestes, permission « règles de conseil ».
 - `src/app/(app)/associations/` — l'écran ; table `product_associations` (`ProductAssociation`).
 - Tests : `src/core/ai/__tests__/associations.test.ts`, `src/core/associations/__tests__`, `src/server/services/__tests__/product-associations.test.ts`.
+
+## Associations communes à toutes les pharmacies
+
+Celles de ce document sont écrites par le titulaire, pour SON officine (« Mes associations »). L'équipe PharmaBoost peut aussi
+en écrire pour TOUTES les pharmacies depuis la console super admin → **Conseils** → Associations : un médicament ou un produit
+(code-barres) en appelle un autre produit (code-barres). Chaque pharmacie retrouve le produit conseillé dans son stock par le
+code-barres et ne le propose que si elle l'a ; les associations de l'officine passent avant ; la carte dit « Association
+PharmaBoost avec … ». Voir `docs/centre-de-controle-des-conseils.md`.

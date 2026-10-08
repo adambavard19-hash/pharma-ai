@@ -84,28 +84,73 @@ export async function resolveLineTriggers(
 }
 
 /**
- * Ce que le moteur reçoit : les associations actives et ce que chaque ligne de la vente est.
- * `undefined` quand l'officine n'a aucune association (aucune requête de plus, aucune étape dans la trace).
+ * Les associations communes à toutes les officines (créées dans la console de PharmaBoost), ramenées à CETTE officine : le
+ * produit conseillé et, pour un produit déclencheur, ce produit sont retrouvés dans son stock par leur code-barres. Une
+ * association dont le produit conseillé n'est pas dans le stock de l'officine ne s'applique simplement pas chez elle.
+ */
+async function loadCentralRules(pharmacyId: string): Promise<{ rules: AssociationInput["rules"]; triggerProductIds: string[] }> {
+  const central = await prisma.centralAssociation.findMany({
+    where: { status: { not: "REMOVED" } },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+    select: { id: true, triggerKind: true, triggerKey: true, adviceEan: true, sentence: true, sortOrder: true },
+  });
+  if (central.length === 0) return { rules: [], triggerProductIds: [] };
+
+  const eans = [...new Set(central.flatMap((row) => (row.triggerKind === "PRODUCT" ? [row.adviceEan, row.triggerKey.slice("ean:".length)] : [row.adviceEan])))];
+  const [products, barcodes] = await Promise.all([
+    prisma.product.findMany({ where: { pharmacyId, ean: { in: eans }, deletedAt: null, isActive: true }, select: { id: true, ean: true } }),
+    prisma.productBarcode.findMany({ where: { pharmacyId, code: { in: eans }, product: { deletedAt: null, isActive: true } }, select: { code: true, productId: true } }),
+  ]);
+  const productByEan = new Map<string, string>();
+  for (const barcode of barcodes) productByEan.set(barcode.code, barcode.productId);
+  for (const product of products) if (product.ean) productByEan.set(product.ean, product.id);
+
+  const rules: AssociationInput["rules"] = [];
+  const triggerProductIds: string[] = [];
+  for (const row of central) {
+    const adviceProductId = productByEan.get(row.adviceEan);
+    if (!adviceProductId) continue;
+    let triggerKey = row.triggerKey;
+    if (row.triggerKind === "PRODUCT") {
+      const triggerProductId = productByEan.get(row.triggerKey.slice("ean:".length));
+      if (!triggerProductId || triggerProductId === adviceProductId) continue;
+      triggerKey = productKey(triggerProductId);
+      triggerProductIds.push(triggerProductId);
+    }
+    // Les associations de l'officine passent avant : elles sont la voix du pharmacien de cette officine.
+    rules.push({ id: `central:${row.id}`, triggerKey, adviceProductId, sentence: row.sentence, sortOrder: 1_000_000 + row.sortOrder });
+  }
+  return { rules, triggerProductIds };
+}
+
+/**
+ * Ce que le moteur reçoit : les associations actives — celles de l'officine, puis celles communes à toutes les officines —
+ * et ce que chaque ligne de la vente est. `undefined` quand il n'y en a aucune (aucune requête de plus, aucune étape dans
+ * la trace).
  */
 export async function loadAssociationInput(scope: TenantScope, lines: LineForAssociations[]): Promise<AssociationInput | undefined> {
-  const rows = await prisma.productAssociation.findMany({
-    where: {
-      pharmacyId: scope.pharmacyId,
-      isActive: true,
-      adviceProduct: { deletedAt: null },
-      OR: [{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }],
-    },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-    select: { id: true, triggerProductId: true, triggerSpecialty: { select: { name: true } }, adviceProductId: true, sentence: true, sortOrder: true },
-  });
-  if (rows.length === 0) return undefined;
-
-  const rules = rows.flatMap((row) => {
+  const [rows, common] = await Promise.all([
+    prisma.productAssociation.findMany({
+      where: {
+        pharmacyId: scope.pharmacyId,
+        isActive: true,
+        adviceProduct: { deletedAt: null },
+        OR: [{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }],
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      select: { id: true, triggerProductId: true, triggerSpecialty: { select: { name: true } }, adviceProductId: true, sentence: true, sortOrder: true },
+    }),
+    loadCentralRules(scope.pharmacyId),
+  ]);
+  const own = rows.flatMap((row) => {
     const triggerKey = row.triggerProductId ? productKey(row.triggerProductId) : row.triggerSpecialty ? drugKey(row.triggerSpecialty.name) : null;
     return triggerKey ? [{ id: row.id, triggerKey, adviceProductId: row.adviceProductId, sentence: row.sentence, sortOrder: row.sortOrder }] : [];
   });
+  const rules = [...own, ...common.rules];
+  if (rules.length === 0) return undefined;
+
   const wanted = {
-    productIds: [...new Set(rows.map((row) => row.triggerProductId).filter((id): id is string => id !== null))],
+    productIds: [...new Set([...rows.map((row) => row.triggerProductId).filter((id): id is string => id !== null), ...common.triggerProductIds])],
     drugKeys: new Set(rules.map((rule) => rule.triggerKey).filter((key) => key.startsWith("drug:"))),
   };
   return { rules, lines: await resolveLineTriggers(scope.pharmacyId, lines, wanted) };

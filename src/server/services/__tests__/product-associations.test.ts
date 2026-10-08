@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   prisma: {
     productAssociation: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    centralAssociation: { findMany: vi.fn() },
     productBarcode: { findMany: vi.fn() },
     product: { findMany: vi.fn(), findFirst: vi.fn() },
     drugSpecialty: { findMany: vi.fn(), findUnique: vi.fn() },
@@ -27,6 +28,7 @@ const line = (position: number, drugName: string, rawText: string | null = null,
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.prisma.productAssociation.findMany.mockResolvedValue([]);
+  mocks.prisma.centralAssociation.findMany.mockResolvedValue([]);
   mocks.prisma.productBarcode.findMany.mockResolvedValue([]);
   mocks.prisma.product.findMany.mockResolvedValue([]);
   mocks.prisma.drugSpecialty.findMany.mockResolvedValue([]);
@@ -103,6 +105,57 @@ describe("ce que le moteur reçoit", () => {
     const where = mocks.prisma.productAssociation.findMany.mock.calls[0][0].where;
     expect(where).toMatchObject({ pharmacyId: "ph_1", isActive: true, adviceProduct: { deletedAt: null } });
     expect(where.OR).toEqual([{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }]);
+  });
+});
+
+describe("les associations communes à toutes les officines", () => {
+  const central = (overrides: Record<string, unknown> = {}) => ({ id: "ca1", triggerKind: "MEDICINE", triggerKey: "drug:CORYZALIA", adviceEan: "3401111111111", sentence: "Pour accompagner.", sortOrder: 0, ...overrides });
+
+  it("ne lit que les associations en ligne (ni supprimées), et les pose sur le stock de CETTE officine par code-barres", async () => {
+    mocks.prisma.centralAssociation.findMany.mockResolvedValue([central()]);
+    mocks.prisma.product.findMany.mockResolvedValueOnce([{ id: "p_advice", ean: "3401111111111" }]);
+    const input = await loadAssociationInput(SCOPE, [line(0, "CORYZALIA, comprimé orodispersible")]);
+    expect(mocks.prisma.centralAssociation.findMany.mock.calls[0][0].where).toEqual({ status: { not: "REMOVED" } });
+    expect(mocks.prisma.product.findMany.mock.calls[0][0].where).toMatchObject({ pharmacyId: "ph_1", ean: { in: ["3401111111111"] }, deletedAt: null });
+    expect(input?.rules).toEqual([{ id: "central:ca1", triggerKey: "drug:CORYZALIA", adviceProductId: "p_advice", sentence: "Pour accompagner.", sortOrder: 1_000_000 }]);
+    expect(input?.lines).toEqual([{ lineIndex: 0, keys: ["drug:CORYZALIA"], productId: null }]);
+  });
+
+  it("une officine qui n'a pas le produit conseillé en stock ne reçoit pas l'association : rien du tout", async () => {
+    mocks.prisma.centralAssociation.findMany.mockResolvedValue([central()]);
+    expect(await loadAssociationInput(SCOPE, [line(0, "CORYZALIA, comprimé orodispersible")])).toBeUndefined();
+  });
+
+  it("retrouve le produit conseillé aussi par un code appris au comptoir", async () => {
+    mocks.prisma.centralAssociation.findMany.mockResolvedValue([central()]);
+    mocks.prisma.productBarcode.findMany.mockResolvedValueOnce([{ code: "3401111111111", productId: "p_learned" }]);
+    const input = await loadAssociationInput(SCOPE, [line(0, "CORYZALIA, comprimé orodispersible")]);
+    expect(input?.rules[0]).toMatchObject({ adviceProductId: "p_learned" });
+  });
+
+  it("un produit déclencheur est retrouvé dans le stock par son code-barres ; absent du stock, l'association ne s'applique pas", async () => {
+    mocks.prisma.centralAssociation.findMany.mockResolvedValue([
+      central({ id: "ca2", triggerKind: "PRODUCT", triggerKey: "ean:3400222222222" }),
+      central({ id: "ca3", triggerKind: "PRODUCT", triggerKey: "ean:3400999999999" }),
+    ]);
+    mocks.prisma.product.findMany.mockResolvedValueOnce([{ id: "p_advice", ean: "3401111111111" }, { id: "p_trigger", ean: "3400222222222" }]);
+    const input = await loadAssociationInput(SCOPE, [line(0, "Spray nasal", "3400222222222")]);
+    expect(input?.rules.map((rule) => [rule.id, rule.triggerKey])).toEqual([["central:ca2", "product:p_trigger"]]);
+    expect(mocks.prisma.product.findMany.mock.calls[1][0].where).toMatchObject({ id: { in: ["p_trigger"] } });
+  });
+
+  it("un produit n'est jamais associé à lui-même, même retrouvé sous le même code", async () => {
+    mocks.prisma.centralAssociation.findMany.mockResolvedValue([central({ triggerKind: "PRODUCT", triggerKey: "ean:3401111111111" })]);
+    mocks.prisma.product.findMany.mockResolvedValueOnce([{ id: "p_same", ean: "3401111111111" }]);
+    expect(await loadAssociationInput(SCOPE, [line(0, "Spray nasal")])).toBeUndefined();
+  });
+
+  it("les associations de l'officine passent avant les communes", async () => {
+    mocks.prisma.productAssociation.findMany.mockResolvedValue([{ id: "a1", triggerProductId: null, triggerSpecialty: { name: "CORYZALIA, comprimé orodispersible" }, adviceProductId: "p_own", sentence: null, sortOrder: 7 }]);
+    mocks.prisma.centralAssociation.findMany.mockResolvedValue([central()]);
+    mocks.prisma.product.findMany.mockResolvedValueOnce([{ id: "p_advice", ean: "3401111111111" }]);
+    const input = await loadAssociationInput(SCOPE, [line(0, "CORYZALIA, comprimé orodispersible")]);
+    expect(input?.rules.map((rule) => rule.id)).toEqual(["a1", "central:ca1"]);
   });
 });
 

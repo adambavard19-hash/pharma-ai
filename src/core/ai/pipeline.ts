@@ -5,7 +5,7 @@ import {
   RECOMMENDATION_MIN_RELEVANCE,
   RECOMMENDATION_MIN_SCORE,
 } from "@/config/constants";
-import { detectAdviceOpportunities } from "./engines/advice";
+import { detectAdviceOpportunities, type AdviceRule } from "./engines/advice";
 import { findCandidateProducts } from "./engines/matching";
 import {
   evaluateKnowledgeCoverage,
@@ -129,8 +129,10 @@ export type PipelineInput = {
    * lignes de la vente qui SONT un produit du stock. Absent : aucune association à appliquer.
    */
   associations?: AssociationInput;
-  /** Les règles de conseil que la pharmacienne de l'officine a refusées : elles ne se déclenchent pas (rule-review.ts). */
+  /** Les règles de conseil supprimées par l'équipe PharmaBoost, pour toutes les officines : elles ne se déclenchent pas (central-advice.ts). */
   disabledRuleKeys?: string[];
+  /** Les conseils ajoutés depuis la console de PharmaBoost : ils s'ajoutent aux règles du code. */
+  customRules?: AdviceRule[];
 };
 
 type StageRecorder = {
@@ -356,13 +358,14 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         patient: input.patient,
         needs: input.understanding?.needs ?? [],
         disabledRuleKeys: input.disabledRuleKeys && input.disabledRuleKeys.length > 0 ? new Set(input.disabledRuleKeys) : undefined,
+        extraRules: input.customRules,
       });
       const refused = input.disabledRuleKeys?.length ?? 0;
       return {
         output: detected,
         count: detected.length,
         notes: [
-          ...(refused > 0 ? [`${refused} règle(s) de conseil refusée(s) par la pharmacienne de l'officine : elles ne se déclenchent pas.`] : []),
+          ...(refused > 0 ? [`${refused} règle(s) de conseil supprimée(s) par l'équipe PharmaBoost : elles ne se déclenchent pas.`] : []),
           ...(detected.length === 0 ? ["Aucune opportunité de conseil identifiée pour ce traitement."] : []),
         ],
       };

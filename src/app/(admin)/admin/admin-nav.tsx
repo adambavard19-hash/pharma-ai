@@ -8,7 +8,7 @@ import { ADMIN_NAV, activeNavItem, type AdminNavSpace } from "@/core/admin/nav";
 import { cn } from "@/lib/utils";
 
 /**
- * La navigation de la console : six espaces, chacun avec son menu. Un clic
+ * La navigation de la console : sept espaces, chacun avec son menu. Un clic
  * sur l'espace ouvre le menu (clavier compris) ; la page courante est
  * soulignée, et sa rubrique cochée dans le menu.
  */

@@ -33,6 +33,21 @@ function build(over: { rules?: ProductAssociationRule[]; catalog?: CatalogProduc
   });
 }
 
+describe("une association commune à toutes les officines se présente comme telle", () => {
+  it("dit « PharmaBoost » (et non « votre officine ») ; celle de l'officine garde ses mots", () => {
+    const common = build({ rules: [rule("central:ca1", "spray", "olio")] });
+    expect(common.recommendations[0].shortReason).toBe("Association PharmaBoost avec « Spray nasal eau de mer »");
+    expect(common.recommendations[0].justification).toContain("définie par PharmaBoost");
+    expect(common.recommendations[0].source).toBe("ASSOCIATION");
+    const own = build({ rules: [rule("a1", "spray", "olio")] });
+    expect(own.recommendations[0].shortReason).toBe("Association de votre officine avec « Spray nasal eau de mer »");
+    // Quand la même association existe aux deux endroits, c'est celle de l'officine qui parle.
+    const both = build({ rules: [rule("a1", "spray", "olio"), rule("central:ca1", "spray", "olio")] });
+    expect(both.recommendations).toHaveLength(1);
+    expect(both.recommendations[0].shortReason).toBe("Association de votre officine avec « Spray nasal eau de mer »");
+  });
+});
+
 describe("une association propose le produit conseillé", () => {
   it("quand son déclencheur est dans la vente, sans aucun médicament", () => {
     const { recommendations, opportunities, skipped } = build();

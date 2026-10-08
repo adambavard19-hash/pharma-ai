@@ -370,6 +370,16 @@ describe("navigation de la console", () => {
     expect(activeNavItem("/admin").space.key).toBe("overview");
   });
 
+  it("« Conseils » est un lien direct : règles, conseils et associations de toutes les pharmacies, au même endroit", () => {
+    const advice = ADMIN_NAV.find((space) => space.key === "advice")!;
+    expect(advice).toMatchObject({ label: "Conseils", href: "/admin/conseils", items: [] });
+    expect(activeNavItem("/admin/conseils").space.key).toBe("advice");
+    expect(activeNavItem("/admin/conseils/autre").space.key).toBe("advice");
+    // L'accueil et les autres espaces ne sont pas touchés.
+    expect(activeNavItem("/admin").space.key).toBe("overview");
+    expect(activeNavItem("/admin/pharmacies/abc").space.key).toBe("clients");
+  });
+
   it("« Campagnes » ouvre l'espace Communication, devant les autres rubriques, sans en déplacer aucune", () => {
     const communication = ADMIN_NAV.find((space) => space.key === "communication")!;
     expect(communication.items.map((item) => item.href)).toEqual(["/admin/campagnes", "/admin/communications", "/admin/emails/modeles", "/admin/relances", "/admin/notifications"]);

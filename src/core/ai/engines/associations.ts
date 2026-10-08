@@ -165,14 +165,16 @@ export function buildAssociationAdvice(args: {
     // La phrase du pharmacien qui prime : la première association (dans l'ordre choisi) qui en porte une.
     const sentence = groupRules.map((rule) => rule.sentence?.trim()).find((text): text is string => Boolean(text)) ?? null;
     const key = `association:${groupRules[0].id}`;
-    const shortReason = `Association de votre officine avec ${names}`;
+    // Une association commune à toutes les officines (écrite dans la console de PharmaBoost) le dit ; celle de l'officine passe avant.
+    const common = groupRules[0].id.startsWith("central:");
+    const shortReason = common ? `Association PharmaBoost avec ${names}` : `Association de votre officine avec ${names}`;
 
     opportunities.push({
       key,
       kind: "COMFORT",
       category: advice.category,
       title: `Associé à ${names}`,
-      rationale: `Votre officine associe ${names} à « ${advice.name} ».`,
+      rationale: `${common ? "PharmaBoost associe" : "Votre officine associe"} ${names} à « ${advice.name} ».`,
       shortReason,
       counterScriptTemplate: sentence ?? "",
       patientReasonTemplate: "",
@@ -201,14 +203,14 @@ export function buildAssociationAdvice(args: {
       source: "ASSOCIATION",
       totalScore: Math.max(0.5, 0.7 - index * 0.02),
       breakdown: { relevance: 1, safety: 1, availability: 1, patientFit: 1, pharmacistPreference: 1, validationHistory: 0, commercial: 0 },
-      justification: `Association définie par votre officine : ${names} → « ${advice.name} ». Elle passe par les mêmes contrôles que tout conseil : stock, sécurité, fiche produit, patient.`,
+      justification: `Association définie par ${common ? "PharmaBoost" : "votre officine"} : ${names} → « ${advice.name} ». Elle passe par les mêmes contrôles que tout conseil : stock, sécurité, fiche produit, patient.`,
       shortReason,
       patientReason: "",
       // Les mots du pharmacien s'il en a écrit ; sinon une phrase neutre, sans aucune allégation.
       counterScript: sentence ?? `Avec ${names}, je peux aussi vous proposer « ${advice.name} ».`,
       precautions: [...advice.precautions],
       explanation: [
-        { dimension: "pharmacistPreference", label: "Association de votre officine", value: 1, weight: 1, detail: `${names} ${triggers.length > 1 ? "sont" : "est"} dans la vente : vous avez associé « ${advice.name} ».`, role: "SCORE" },
+        { dimension: "pharmacistPreference", label: common ? "Association PharmaBoost" : "Association de votre officine", value: 1, weight: 1, detail: `${names} ${triggers.length > 1 ? "sont" : "est"} dans la vente : ${common ? "PharmaBoost a associé" : "vous avez associé"} « ${advice.name} ».`, role: "SCORE" },
         { dimension: "availability", label: "Disponibilité", value: 1, weight: 0, detail: `${advice.stockQuantity} en stock : le produit peut être remis.`, role: "FILTRE" },
         { dimension: "safety", label: "Sécurité", value: 1, weight: 0, detail: "Aucune vigilance bloquante sur la fiche produit pour ce patient.", role: "FILTRE" },
       ],
