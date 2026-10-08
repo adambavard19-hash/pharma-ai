@@ -54,10 +54,27 @@ describe("comprendre un produit par son nom", () => {
   });
 
   it("range sans étiquette d'usage ce qui ne sert aucune règle", () => {
-    const shampoo = classifyProductByName("Shampooing doux 200 ml");
-    expect(shampoo?.category).toBe("HYGIENE");
-    expect(shampoo?.tags).toEqual([]);
-    expect(shampoo?.ruleKeys).toEqual([]);
+    const shower = classifyProductByName("Gel douche 250 ml");
+    expect(shower?.category).toBe("HYGIENE");
+    expect(shower?.tags).toEqual([]);
+    expect(shower?.ruleKeys).toEqual([]);
+  });
+
+  it("un shampooing doux sert le lavage entre les applications d'un shampooing au ciclopirox ; un antipelliculaire, non", () => {
+    const gentle = classifyProductByName("Bioderma Nodé Fluide shampooing 200 ml");
+    expect(gentle?.tags).toEqual(["shampooing", "cuir chevelu"]);
+    expect(gentle?.ruleKeys).toEqual(["skin-ciclopirox-shampoo"]);
+    const dandruff = classifyProductByName("Ducray Kelual DS Intensive shampooing 100 ml");
+    expect(dandruff?.tags).toEqual(["antipelliculaire"]);
+    expect(dandruff?.ruleKeys).toEqual([]);
+  });
+
+  it("un exfoliant se reconnaît, même quand son nom dit « purifiant » : ce n'est pas un lavant doux", () => {
+    for (const name of ["Eucerin DermoPure Clinical Gommage Purifiant 100 ml", "Eucerin DermoPure Clinical Peeling 10 30 ml", "La Roche-Posay Effaclar Sérum Ultra Concentré 30 ml", "Gel exfoliant visage", "Scrub corps"]) {
+      expect(classifyProductByName(name)?.tags, name).toEqual(["exfoliant"]);
+    }
+    // Un lavant doux n'est pas un exfoliant.
+    expect(classifyProductByName("La Roche-Posay Lipikar Syndet AP+ 400 ml")?.tags).not.toContain("exfoliant");
   });
 
   it("répond null pour un nom qui ne dit rien", () => {

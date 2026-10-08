@@ -172,7 +172,7 @@ const PATTERNS: Pattern[] = [
     confidence: 0.85,
   },
   {
-    test: /\b(emollient|émollient|hydratant|creme hydratante|lait hydratant|baume|dexeryl|atoderm|lipikar|xemose|xeracalm|topialyse|peau seche|peaux? seches?|peau sensible|peaux? sensibles?|cold cream|cicalfate|cicaplast|apaisant|relipidant|nutritive)/,
+    test: /\b(emollient|émollient|hydratant|creme hydratante|lait hydratant|baume|dexeryl|atoderm|lipikar|xemose|xeracalm|topialyse|peau seche|peaux? seches?|peau sensible|peaux? sensibles?|cold cream|cicalfate|cicaplast|apaisant|relipidant|nutritive|hydra repair)/,
     category: "DERMOCOSMETIQUE",
     tags: ["hydratation", "peau sensible", "émollient", "apaisant"],
     ruleKeys: ["hydration-dermato-topical"],
@@ -184,6 +184,36 @@ const PATTERNS: Pattern[] = [
     tags: ["protection solaire", "spf", "photoprotection"],
     ruleKeys: ["sun-photosensitivity"],
     confidence: 0.9,
+  },
+  // « Conseil peau — Série 2 » (docs/conseil-peau-serie-2.md). Un exfoliant prime sur « nettoyant » : un
+  // « gommage purifiant » est un exfoliant, pas un lavant doux. Les vigilances écartent cette étiquette
+  // sous peroxyde de benzoyle, rétinoïdes cutanés et dermocorticoïdes.
+  {
+    // Pas de \b devant « peeling » ni « exfoli » : « MICROPEELING » est un exfoliant (nom de stock réel).
+    test: /(gommage|peeling|exfoli|\bscrub\b|\baha\b|\bbha\b|acides? (glycolique|salicylique|lactique|mandelique)|dermo ?acides?|\b3 acides\b|effaclar serum)/,
+    category: "DERMOCOSMETIQUE",
+    tags: ["exfoliant"],
+    ruleKeys: [],
+    confidence: 0.95,
+  },
+  // Un shampooing antipelliculaire ou traitant : pas d'ajout automatique sous shampooing au ciclopirox.
+  {
+    // « A/PELLICULAIRE », « A/PELLIC INTENSE », « ANTI PEL » : les abréviations du stock réel (LGPI).
+    // Le sélénium d'un complément (« SELENIUM ACE ») n'est pas un antipelliculaire : seul le sulfure de sélénium l'est.
+    test: /(pellic|anti ?pel\b|kelual|ketoconazole|ketoderm|selsun|selenium sulf|squanorm|dandruff)/,
+    category: "DERMOCOSMETIQUE",
+    tags: ["antipelliculaire"],
+    ruleKeys: [],
+    confidence: 0.95,
+  },
+  // Un shampooing doux, de lavage intermédiaire.
+  {
+    // « SHP », « SH », « SHAMP » : les abréviations du stock réel (LGPI). Ni antipelliculaire, ni shampooing d'animal ou anti-poux.
+    test: /^(?!.*(pellic|anti ?pel\b|kelual|ketoconazole|ketoderm|selsun|selenium sulf|squanorm|traitant|\bds\b|canin|chien|\bchat\b|animal|veterin|poux|\bpou\b))(?=.*\b(shampo\w*|shamp|shp|sh)\b)/,
+    category: "DERMOCOSMETIQUE",
+    tags: ["shampooing", "cuir chevelu"],
+    ruleKeys: ["skin-ciclopirox-shampoo"],
+    confidence: 0.88,
   },
   {
     test: /^(?!.*(polident|dentier|dentition|intime|\bgyn\b|lingette|diffus|menager|ménager|appareil|lentille|steradent|biberon|tetine|tétine))(?=.*(\bnettoy\w*|gel moussant|mousse nettoyante|eau micellaire|pain dermatologique|syndet|demaquillant|démaquillant|purifiant|cleanser|gel purifiant|sans savon|creme lavante|crème lavante|gel lavant|lavant b5))/,

@@ -78,8 +78,10 @@ const PRINCIPAUX_AVANT: Record<string, string[]> = {
     "nasal-hygiene-orl | nasal-hyper | 0.8905 | - | -",
     "eye-irritation-allergy | eyes-a | 0.8975 | - | -",
   ],
+  // Changé le 2026-10-07, volontairement : la règle précise « Conseil peau — Série 2 » (avec sa question) remplace
+  // la règle générale pour les dermocorticoïdes. Même produit ; le score gagne le bonus de la référence préférée.
   "dermatologie-emollients": [
-    "hydration-dermato-topical | emol-a | 0.8895 | - | -",
+    "skin-corticoid-atopic-emollient | emol-a | 0.9295 | - | -",
   ],
   "levothyroxine-ipp-magnesium": [
     "magnesium-ppi-longterm | mag-a | 0.8801 | COMMERCIAL | -",
@@ -112,7 +114,7 @@ const PRINCIPAUX_AVANT: Record<string, string[]> = {
   // sont exactement ceux d'avant, les deux suivants ne faisaient que passer sous la coupe.
   "ordonnance-chargee-limite-par-defaut": [
     "digestive-tolerance-antibiotics | probio-a | 0.8895 | COMMERCIAL | -",
-    "hydration-dermato-topical | emol-a | 0.8895 | - | -",
+    "skin-corticoid-atopic-emollient | emol-a | 0.9295 | - | -",
     "gastric-protection-nsaid | gastric-a | 0.8895 | - | -",
     "nasal-hygiene-orl | nasal-hyper | 0.8905 | - | -",
     "eye-irritation-allergy | eyes-a | 0.8975 | - | -",

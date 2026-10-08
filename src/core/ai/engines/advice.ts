@@ -1,4 +1,5 @@
 import type { PopulationVigilanceRule } from "./population-vigilance";
+import { SKIN_SERIES_2_ADVICE_RULES } from "./conseil-peau-serie-2";
 import type {
   AdviceOpportunityResult,
   DrugKnowledge,
@@ -77,6 +78,8 @@ export type AdviceRule = {
   title: string;
   /** Lignes de la Base maître « Connecteur Pharma » V1 que cette règle couvre. */
   sourceRules?: number[];
+  /** Les lignes d'un document de conseil reçu (« Conseil peau — Série 2 ») que cette règle porte. */
+  documentRows?: { document: string; rows: number[] };
   kind: AdviceKind;
   /** Version de la règle. Toute modification de fond l'incrémente. */
   version: string;
@@ -85,6 +88,12 @@ export type AdviceRule = {
   category: ProductCategoryCode;
   /** Préfixes de code ATC déclenchant la règle. */
   atcPrefixes: string[];
+  /**
+   * Préfixes de code ATC pour lesquels la règle s'efface : une règle plus précise (écrite pour ce
+   * médicament, avec sa question) s'en charge. Sans cela, deux règles proposeraient le même
+   * hydratant, et la plus générale le ferait sans poser la question que la plus précise exige.
+   */
+  excludeAtcPrefixes?: string[];
   /** Classes thérapeutiques (libellés du référentiel) déclenchant la règle. */
   therapeuticClasses: string[];
   /** Effets indésirables fréquents qui rendent le conseil pertinent. */
@@ -267,7 +276,7 @@ function chamberExcludeFor(ageYears: number | null): string[] {
   return [String.raw`bebe`, String.raw`nourr?iss`, String.raw`babyhaler`, String.raw`^(?!.*adulte).*(?:enfant|pediatr)`];
 }
 
-export const ADVICE_RULES: AdviceRule[] = [
+const CORE_ADVICE_RULES: AdviceRule[] = [
   {
     key: "digestive-tolerance-antibiotics",
     sourceRules: [1, 2],
@@ -352,6 +361,9 @@ export const ADVICE_RULES: AdviceRule[] = [
     needTriggers: ["SKIN_DRYNESS"],
     category: "DERMOCOSMETIQUE",
     atcPrefixes: ["D07", "D05", "D10"],
+    // Dermocorticoïdes, rétinoïdes et peroxyde de benzoyle : « Conseil peau — Série 2 » écrit une règle
+    // précise, avec sa question, pour chacun (conseil-peau-serie-2.ts). Celle-ci garde le reste.
+    excludeAtcPrefixes: ["D07A", "D10AD", "D10AE"],
     therapeuticClasses: ["Dermocorticoïde", "Traitement dermatologique"],
     sideEffectTriggers: ["sécheresse cutanée", "irritation"],
     basePriority: 68,
@@ -549,6 +561,9 @@ export const ADVICE_RULES: AdviceRule[] = [
     needTriggers: ["PHOTOSENSITIVITY"],
     category: "DERMOCOSMETIQUE",
     atcPrefixes: ["J01A", "C03", "L01"],
+    // La doxycycline a sa règle (question sur l'exposition, produit pour peau à tendance acnéique) :
+    // « Conseil peau — Série 2 ». Les autres cyclines et les diurétiques restent ici.
+    excludeAtcPrefixes: ["J01AA02"],
     therapeuticClasses: ["Cycline", "Diurétique"],
     sideEffectTriggers: ["photosensibilisation", "photosensibilité"],
     basePriority: 88,
@@ -1664,6 +1679,9 @@ export const ADVICE_RULES: AdviceRule[] = [
   },
 ];
 
+/** Toutes les règles de conseil : le cœur, puis celles des documents de conseil reçus (Série 2 peau). */
+export const ADVICE_RULES: AdviceRule[] = [...CORE_ADVICE_RULES, ...SKIN_SERIES_2_ADVICE_RULES];
+
 const norm = (value: string) => value.toLowerCase().trim();
 
 /**
@@ -1762,6 +1780,8 @@ export function detectAdviceOpportunities(params: {
       if (!knowledge) continue;
 
       const atc = knowledge.atcCode ?? "";
+      // Une règle plus précise s'en charge (voir `excludeAtcPrefixes`).
+      if (rule.excludeAtcPrefixes?.some((prefix) => atc.startsWith(prefix))) continue;
       const therapeuticClass = norm(knowledge.therapeuticClass ?? "");
       const sideEffects = knowledge.commonSideEffects.map(norm);
 
@@ -1816,7 +1836,9 @@ export function detectAdviceOpportunities(params: {
     if (need && triggers.length === 0) {
       const cited = drugs.filter((drug) => need.lineIndexes.includes(drug.lineIndex));
       // Une durée connue et trop courte écarte aussi le besoin compris par l'IA (`durationGate`).
-      const pool = (cited.length > 0 ? cited : drugs).filter((drug) => !isTooShortForRule(rule, drug.knowledge?.atcCode ?? "", drug.durationDays));
+      const pool = (cited.length > 0 ? cited : drugs).filter(
+        (drug) => !isTooShortForRule(rule, drug.knowledge?.atcCode ?? "", drug.durationDays) && !rule.excludeAtcPrefixes?.some((prefix) => (drug.knowledge?.atcCode ?? "").startsWith(prefix)),
+      );
       for (const drug of pool) {
         triggers.push({
           lineIndex: drug.lineIndex,
@@ -1896,7 +1918,8 @@ export function detectAdviceOpportunities(params: {
       triggeredBy: triggers.map((t) => ({ lineIndex: t.lineIndex, drugName: t.drugName })),
       ruleKey: rule.key,
       ruleVersion: rule.version,
-      confirmedReason: rule.confirmedReasonTemplate ?? null,
+      // `{drug}` est remplacé ici comme dans les autres textes de la règle : la raison confirmée se lit sur la carte.
+      confirmedReason: rule.confirmedReasonTemplate?.replaceAll("{drug}", [...new Set(triggers.map((t) => t.shortLabel))].join(", ")) ?? null,
       question: rule.question ?? null,
       requiresConfirmation: Boolean(rule.question),
       needKey: need?.key ?? null,

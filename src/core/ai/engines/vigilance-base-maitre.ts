@@ -85,6 +85,7 @@ export const BASE_MAITRE_VIGILANCES: VigilanceRule[] = [
     subtitle: "Corticoïde systémique détecté",
     atcPrefixes: ["H02AB"],
     substances: ["prednisone", "prednisolone", "methylprednisolone", "dexamethasone", "betamethasone", "hydrocortisone"],
+    systemicOnly: true,
     explanationTemplate:
       "Une corticothérapie systémique prolongée ({drug}) altère le métabolisme de la vitamine D et l'absorption du calcium, et expose l'os. Au long cours, la prévention osseuse (vitamine D, calcium, apports) s'évalue avec le prescripteur, à dose individualisée. La réglisse contenant de la glycyrrhizine se déconseille : hypertension, hypokaliémie, troubles du rythme.",
     concerned: ["Vitamine D et calcium : prévention osseuse à évaluer si traitement prolongé", "Réglisse (glycyrrhizine) : à éviter"],
@@ -342,6 +343,8 @@ export const BASE_MAITRE_VIGILANCES: VigilanceRule[] = [
     subtitle: "Immunosuppresseur détecté",
     atcPrefixes: ["L04AD", "L04AA06", "L04AA10", "L04AA18"],
     substances: ["ciclosporine", "tacrolimus", "mycophenolate", "sirolimus", "everolimus"],
+    // Le tacrolimus d'une pommade (Protopic, D11AH01) n'est pas un immunosuppresseur de greffe.
+    systemicOnly: true,
     explanationTemplate:
       "Avec un immunosuppresseur ({drug}), le millepertuis peut réduire fortement l'exposition du traitement (risque de rejet ou de perte d'efficacité) et l'échinacée pourrait s'opposer à l'immunosuppression : les deux sont écartés. Les antiacides à base d'aluminium ou de magnésium réduisent l'absorption du mycophénolate : jamais en même temps, l'antiacide 2 heures après.",
     concerned: ["Millepertuis (écarté)", "Échinacée (écartée)", "Antiacides aluminium / magnésium : 2 heures après le mycophénolate"],

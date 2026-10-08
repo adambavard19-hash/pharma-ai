@@ -1,5 +1,6 @@
 import type { DrugKnowledge, VigilanceKind, VigilanceResult } from "../types";
 import { BASE_MAITRE_VIGILANCES } from "./vigilance-base-maitre";
+import { SKIN_SERIES_2_VIGILANCES } from "./conseil-peau-serie-2";
 import { ELECTROLYTE_VIGILANCES } from "./vigilance-electrolytes";
 
 /**
@@ -15,7 +16,11 @@ import { ELECTROLYTE_VIGILANCES } from "./vigilance-electrolytes";
  *   • SCREENING        — le traitement justifie de penser à un dépistage ;
  *   • USAGE            — le bon usage à rappeler au comptoir (au cours du
  *                        repas, intervalle entre deux prises, toux sèche
- *                        seulement…), tiré du RCP.
+ *                        seulement…), tiré du RCP ;
+ *   • AVOID            — ce qu'il vaut mieux NE PAS ajouter ni faire pendant
+ *                        le traitement (un exfoliant sur une peau déjà irritée,
+ *                        un pansement occlusif, le soleil) : un déconseillé,
+ *                        pas une contre-indication — la carte dit lequel.
  *
  * Chaque règle est écrite ici, sourcée, versionnée — jamais formulée par le
  * modèle. Elle ne dit que ce que le résumé des caractéristiques du produit ou
@@ -52,6 +57,15 @@ export type VigilanceRule = {
   sources: string[];
   /** Lignes de la Base maître « Connecteur Pharma » V1 que cette règle couvre. */
   sourceRules?: number[];
+  /** Les lignes d'un document de conseil reçu (« Conseil peau — Série 2 ») que cette règle porte. */
+  documentRows?: { document: string; rows: number[] };
+  /**
+   * La règle ne vise que la voie générale. Quand le code ATC du médicament est connu, il décide seul :
+   * une crème ou une pommade (D07, D11, S01…) qui porte la même substance qu'un comprimé ne la
+   * déclenche pas. La substance n'est lue qu'à défaut de code ATC. Sans cela, la bétaméthasone d'une
+   * crème recevrait le bon usage d'un corticoïde « le matin, pendant le repas ».
+   */
+  systemicOnly?: boolean;
 };
 
 /** Étiquettes que les vigilances reconnaissent : elles rejoignent le vocabulaire fermé. */
@@ -61,6 +75,8 @@ export const VIGILANCE_TAGS = [
   "vitamine k", "vitamine b12", "acide folique", "vitamine d", "vitamine e", "vitamine c", "vitamine b6", "biotine",
   "iode", "chrome", "niacine", "coenzyme q10", "levure de riz rouge", "ail", "ginkgo", "oméga-3", "ginseng",
   "échinacée", "kava", "thé vert", "curcuma", "réglisse", "hydraste", "antiacide", "multivitamines", "antioxydant",
+  // « Conseil peau — Série 2 » : ce qu'un traitement dermatologique ne se voit pas ajouter.
+  "exfoliant", "antipelliculaire",
 ] as const;
 
 const CORE_VIGILANCES: VigilanceRule[] = [
@@ -226,6 +242,7 @@ const CORE_VIGILANCES: VigilanceRule[] = [
     subtitle: "Corticoïde par voie orale",
     atcPrefixes: ["H02AB"],
     substances: ["prednisolone", "prednisone", "methylprednisolone", "betamethasone", "dexamethasone"],
+    systemicOnly: true,
     explanationTemplate: "{drug} se prend en une seule prise, le matin, au cours du repas : c'est ce qui limite l'irritation de l'estomac et respecte le rythme naturel du cortisol.",
     concerned: [],
     patientAdvice: "Prenez-le le matin, en une seule fois, pendant le repas — jamais à jeun.",
@@ -338,8 +355,8 @@ const CORE_VIGILANCES: VigilanceRule[] = [
   },
 ];
 
-/** Toutes les vigilances : le cœur, la Base maître V1, puis les électrolytes. */
-export const VIGILANCE_RULES: VigilanceRule[] = [...CORE_VIGILANCES, ...BASE_MAITRE_VIGILANCES, ...ELECTROLYTE_VIGILANCES];
+/** Toutes les vigilances : le cœur, la Base maître V1, les électrolytes, puis « Conseil peau — Série 2 ». */
+export const VIGILANCE_RULES: VigilanceRule[] = [...CORE_VIGILANCES, ...BASE_MAITRE_VIGILANCES, ...ELECTROLYTE_VIGILANCES, ...SKIN_SERIES_2_VIGILANCES];
 
 function norm(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -352,6 +369,7 @@ export function evaluateVigilances(drugs: DrugKnowledge[]): VigilanceResult[] {
     const hits = drugs.filter((drug) => {
       const atc = drug.atcCode ?? "";
       if (rule.atcPrefixes.some((prefix) => atc.startsWith(prefix))) return true;
+      if (rule.systemicOnly && atc) return false;
       const haystack = norm(`${drug.inn ?? ""} ${drug.name}`);
       return rule.substances.some((substance) => haystack.includes(substance));
     });

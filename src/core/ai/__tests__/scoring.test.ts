@@ -274,10 +274,12 @@ describe("moteur d'opportunités", () => {
       drugs: [
         {
           lineIndex: 0,
-          drugName: "Doxycycline",
+          // La doxycycline a désormais sa règle précise (« Conseil peau — Série 2 ») : la garantie
+          // structurelle se vérifie ici sur une autre cycline, qui garde la règle générale.
+          drugName: "Lymécycline",
           knowledge: drug({
-            name: "Doxycycline",
-            atcCode: "J01AA02",
+            name: "Lymécycline",
+            atcCode: "J01AA04",
             therapeuticClass: "Antibiotique de la famille des cyclines",
             commonSideEffects: ["photosensibilisation", "troubles digestifs"],
           }),

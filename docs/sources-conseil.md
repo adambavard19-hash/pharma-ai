@@ -194,3 +194,14 @@ Pistes examinées et non retenues :
 
 Après toute évolution du dictionnaire : `scripts/rafraichir-etiquettes.ts` (à
 lancer par le chef de lot, pas par la règle).
+
+## 7. Les séries « Conseil peau » (documents de conseil du pharmacien)
+
+Documents reçus du pharmacien associé, un par série : pour chaque médicament
+déclencheur, la question, le produit conseil, les précautions et **ce qu'on
+n'associe pas**. Le document est la source des choix ; le **RCP de la base
+publique des médicaments (ANSM)** est la source des faits, relus un à un.
+Série 2 (acné, photoprotection, eczéma, cuir chevelu, 7 octobre 2026) : voir
+`docs/conseil-peau-serie-2.md`. Vidal et Claude Bernard, sous licence, ne sont
+pas interrogés : ce qui n'en vient que par le document est étiqueté « référence du
+document » et reste à confirmer par le pharmacien qui signe.

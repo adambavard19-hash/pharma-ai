@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, ChevronDown, Eye, MessageSquareQuote, ShieldAlert, ShieldCheck, Stethoscope, TriangleAlert } from "lucide-react";
+import { AlertTriangle, Ban, ChevronDown, Eye, MessageSquareQuote, ShieldAlert, ShieldCheck, Stethoscope, TriangleAlert } from "lucide-react";
 import { acknowledgeSafetyFindingsAction } from "@/server/actions/prescriptions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -330,6 +330,8 @@ const VIGILANCE_STYLE = {
   CONTRAINDICATION: { band: "bg-danger-50 dark:bg-danger-950/30", ring: "border-danger-200 dark:border-danger-800", accent: "text-danger-700 dark:text-danger-300", dot: "bg-danger-600", icon: ShieldAlert, badge: "Alerte sécurité" },
   MONITORING: { band: "bg-warning-50 dark:bg-warning-950/30", ring: "border-warning-200 dark:border-warning-800", accent: "text-warning-800 dark:text-warning-400", dot: "bg-warning-500", icon: Stethoscope, badge: "Surveillance" },
   SCREENING: { band: "bg-warning-50 dark:bg-warning-950/30", ring: "border-warning-200 dark:border-warning-800", accent: "text-warning-800 dark:text-warning-400", dot: "bg-warning-500", icon: Eye, badge: "Vigilance" },
+  // Un déconseillé, pas une contre-indication : orange, et la carte le dit en toutes lettres.
+  AVOID: { band: "bg-warning-50 dark:bg-warning-950/30", ring: "border-warning-300 dark:border-warning-700", accent: "text-warning-800 dark:text-warning-300", dot: "bg-warning-600", icon: Ban, badge: "À éviter" },
   USAGE: { band: "bg-brand-50 dark:bg-brand-950/30", ring: "border-brand-200 dark:border-brand-800", accent: "text-brand-800 dark:text-brand-300", dot: "bg-brand-600", icon: MessageSquareQuote, badge: "À rappeler" },
 } as const;
 
@@ -430,7 +432,7 @@ function VigilanceCard({ finding }: { finding: SafetyFindingView }) {
       {details.concerned.length > 0 && (
         <div className={cn("rounded-xl border px-4 py-3", style.ring, style.band)}>
           <p className={cn("text-[12px] font-semibold tracking-[0.06em] uppercase", style.accent)}>
-            {details.kind === "INTERACTION" ? "Compléments concernés" : details.kind === "CONTRAINDICATION" ? "À éviter ou à utiliser avec prudence" : "À garder en tête"}
+            {details.kind === "INTERACTION" ? "Compléments concernés" : details.kind === "CONTRAINDICATION" ? "À éviter ou à utiliser avec prudence" : details.kind === "AVOID" ? "À ne pas ajouter, à ne pas faire" : "À garder en tête"}
           </p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {details.concerned.map((item) => (
