@@ -119,6 +119,7 @@ export type AuditAction =
   | "association.created"
   | "association.updated"
   | "association.deleted"
+  | "advice_rule.reviewed"
   | "rule.deleted"
   | "document.generated"
   | "document.delivered"

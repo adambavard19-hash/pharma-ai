@@ -18,6 +18,8 @@ import { LinkTabs } from "@/components/ui/tabs";
 import { SettingsTabs } from "../settings-tabs";
 import { formatCents, formatDate, formatPercent } from "@/lib/format";
 import { RulesManager } from "./rules-manager";
+import { RuleReview, type ReviewRuleView } from "./rule-review";
+import { listRuleReviews } from "@/server/services/advice-rule-reviews";
 import type { ProductCategoryCode } from "@/core/ai/types";
 
 export const metadata: Metadata = { title: "Règles de conseil" };
@@ -29,7 +31,8 @@ export default async function AdvicePage({
 }) {
   const session = await requirePermission(PERMISSIONS.RECOMMENDATION_RULES_MANAGE);
   const params = await searchParams;
-  const tab = params.vue ?? "recommandations";
+  // La relecture des règles par la pharmacienne est l'écran d'arrivée : c'est elle qui fait la confiance dans les conseils.
+  const tab = params.vue ?? "revue";
 
   const [recommendations, rules, products, statusCounts] = await Promise.all([
     prisma.recommendation.findMany({
@@ -63,6 +66,28 @@ export default async function AdvicePage({
       _count: true,
     }),
   ]);
+
+  const reviewStates = await listRuleReviews(session.scope);
+  const toReviewCount = reviewStates.filter((rule) => rule.state === "TO_REVIEW").length;
+  const reviewRules: ReviewRuleView[] = reviewStates.map((state) => {
+    const rule = ADVICE_RULES.find((candidate) => candidate.key === state.key)!;
+    return {
+      key: state.key,
+      title: state.title,
+      version: state.version,
+      state: state.state,
+      outdated: state.outdated,
+      decidedBy: state.decidedBy,
+      decidedAt: state.decidedAt ? state.decidedAt.toISOString() : null,
+      when: rule.therapeuticClasses.length > 0 ? rule.therapeuticClasses.join(", ") : rule.atcPrefixes.length > 0 ? `codes ATC ${rule.atcPrefixes.slice(0, 8).join(", ")}${rule.atcPrefixes.length > 8 ? "…" : ""}` : "selon le besoin repéré",
+      sideEffects: rule.sideEffectTriggers,
+      proposes: `${PRODUCT_CATEGORY_LABELS[rule.category as ProductCategoryCode] ?? rule.category}${rule.matchingTags.length > 0 ? " — " + rule.matchingTags.slice(0, 5).join(", ") : ""}`,
+      question: rule.question ?? null,
+      script: startSentence(rule.counterScriptTemplate.replaceAll("{drug}", "le médicament").replaceAll("{product}", "le produit")),
+      reason: startSentence(rule.shortReasonTemplate.replaceAll("{drug}", "le médicament")),
+      safetyNotes: rule.safetyNotes,
+    };
+  });
 
   const total = statusCounts.reduce((sum, row) => sum + row._count, 0);
   const purchased = statusCounts.find((r) => r.status === "PURCHASED")?._count ?? 0;
@@ -120,13 +145,16 @@ export default async function AdvicePage({
       <LinkTabs
         paramName="vue"
         items={[
+          { key: "revue", label: "Revue des conseils", count: toReviewCount },
           { key: "recommandations", label: "Historique", count: recommendations.length },
           { key: "regles", label: "Règles de l'officine", count: rules.length },
           { key: "moteur", label: "Comment ça marche" },
         ]}
       />
 
-      {tab === "regles" ? (
+      {tab === "revue" ? (
+        <RuleReview rules={reviewRules} canManage={canManageRules} />
+      ) : tab === "regles" ? (
         <RulesManager
           rules={rules.map((rule) => ({
             id: rule.id,
@@ -227,6 +255,11 @@ export default async function AdvicePage({
       )}
     </div>
   );
+}
+
+/** Une phrase de modèle commence par « le médicament… » une fois les marques remplacées : on remet la majuscule. */
+function startSentence(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function EngineExplainer() {

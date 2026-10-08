@@ -2,7 +2,7 @@
 "use strict";
 
 // agent/src/index.ts
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
 
 // agent/src/douchette.ts
 var import_node_child_process = require("node:child_process");
@@ -277,11 +277,66 @@ function showToast(configDir, content, onStatus) {
   });
 }
 
-// agent/src/notice-center.ts
-var import_node_child_process3 = require("node:child_process");
+// agent/src/self-update.ts
 var import_node_crypto = require("node:crypto");
 var import_node_fs3 = require("node:fs");
 var import_node_path3 = require("node:path");
+var UPDATE_CHECK_EVERY_MS = 12e4;
+var QUIET_AFTER_SCAN_MS = 3e4;
+var MAX_AGENT_BYTES = 3e6;
+function isTrustedServer(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+var sha256 = (bytes) => (0, import_node_crypto.createHash)("sha256").update(bytes).digest("hex");
+function canUpdateNow(state) {
+  if (state.watching || state.queuedScans > 0 || state.pendingNotices > 0) return false;
+  return state.lastScanAt === null || state.now - state.lastScanAt >= QUIET_AFTER_SCAN_MS;
+}
+function isInstalledAgent(agentPath, configPath, platform = process.platform) {
+  if (platform !== "win32" || !agentPath) return false;
+  return /pharmaboost-connect\.js$/i.test(agentPath) && import_node_path3.win32.dirname(agentPath).toLowerCase() === import_node_path3.win32.dirname(configPath).toLowerCase();
+}
+async function selfUpdate(options) {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const base = options.serverUrl.replace(/\/$/, "");
+  if (!isTrustedServer(base)) return { status: "skipped", detail: "serveur non s\xFBr (ni https, ni poste de d\xE9veloppement)" };
+  if (!(0, import_node_fs3.existsSync)(options.agentPath)) return { status: "skipped", detail: "fichier de l'agent introuvable" };
+  try {
+    const meta = await (await fetchImpl(`${base}/api/agent/version`, { signal: AbortSignal.timeout(1e4), headers: { accept: "application/json" } })).json();
+    const wanted = typeof meta.sha256 === "string" ? meta.sha256.toLowerCase() : "";
+    if (!/^[0-9a-f]{64}$/.test(wanted)) return { status: "skipped", detail: "empreinte annonc\xE9e illisible" };
+    const current2 = sha256((0, import_node_fs3.readFileSync)(options.agentPath));
+    if (current2 === wanted) return { status: "uptodate", detail: "\xE0 jour", sha: current2 };
+    const dir = (0, import_node_path3.dirname)(options.agentPath);
+    const refusedPath = (0, import_node_path3.join)(dir, "pharmaboost-refusee.txt");
+    if ((0, import_node_fs3.existsSync)(refusedPath) && (0, import_node_fs3.readFileSync)(refusedPath, "utf8").trim() === wanted) return { status: "skipped", detail: "cette version n'a pas tenu sur ce poste : elle n'est pas r\xE9install\xE9e", sha: wanted };
+    const response = await fetchImpl(`${base}/api/agent/fichiers/pharmaboost-connect.js`, { signal: AbortSignal.timeout(3e4) });
+    if (!response.ok) return { status: "failed", detail: `t\xE9l\xE9chargement refus\xE9 (HTTP ${response.status})` };
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > MAX_AGENT_BYTES) return { status: "failed", detail: "fichier re\xE7u de taille anormale" };
+    if (sha256(bytes) !== wanted) return { status: "failed", detail: "l'empreinte du fichier re\xE7u n'est pas celle annonc\xE9e : mise \xE0 jour ignor\xE9e" };
+    const staged = `${options.agentPath}.new`;
+    (0, import_node_fs3.writeFileSync)(staged, bytes);
+    (0, import_node_fs3.copyFileSync)(options.agentPath, `${options.agentPath}.previous`);
+    (0, import_node_fs3.copyFileSync)(staged, options.agentPath);
+    (0, import_node_fs3.unlinkSync)(staged);
+    (0, import_node_fs3.writeFileSync)((0, import_node_path3.join)(dir, "pharmaboost-maj.txt"), wanted);
+    return { status: "updated", detail: `nouvelle version ${typeof meta.version === "string" ? meta.version : ""} install\xE9e`.trim(), sha: wanted };
+  } catch (error) {
+    return { status: "failed", detail: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+// agent/src/notice-center.ts
+var import_node_child_process3 = require("node:child_process");
+var import_node_crypto2 = require("node:crypto");
+var import_node_fs4 = require("node:fs");
+var import_node_path4 = require("node:path");
 
 // agent/src/notice-host.ts
 var NOTICE_HOST_CSHARP = String.raw`
@@ -1263,18 +1318,18 @@ function sniff(bytes) {
   if (bytes.length > 8 && bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71) return "png";
   return null;
 }
-var cacheKey = (source) => (0, import_node_crypto.createHash)("sha1").update(source).digest("hex").slice(0, 20);
+var cacheKey = (source) => (0, import_node_crypto2.createHash)("sha1").update(source).digest("hex").slice(0, 20);
 function cachedImage(dir, source) {
   for (const extension of ["jpg", "png"]) {
-    const path = (0, import_node_path3.join)(dir, `${cacheKey(source)}.${extension}`);
-    if ((0, import_node_fs3.existsSync)(path)) return path;
+    const path = (0, import_node_path4.join)(dir, `${cacheKey(source)}.${extension}`);
+    if ((0, import_node_fs4.existsSync)(path)) return path;
   }
   return null;
 }
 function pruneCache(dir) {
   try {
-    const files = (0, import_node_fs3.readdirSync)(dir).map((name) => ({ name, at: (0, import_node_fs3.statSync)((0, import_node_path3.join)(dir, name)).mtimeMs })).sort((a, b) => b.at - a.at);
-    for (const old of files.slice(IMAGE_CACHE_MAX_FILES)) (0, import_node_fs3.unlinkSync)((0, import_node_path3.join)(dir, old.name));
+    const files = (0, import_node_fs4.readdirSync)(dir).map((name) => ({ name, at: (0, import_node_fs4.statSync)((0, import_node_path4.join)(dir, name)).mtimeMs })).sort((a, b) => b.at - a.at);
+    for (const old of files.slice(IMAGE_CACHE_MAX_FILES)) (0, import_node_fs4.unlinkSync)((0, import_node_path4.join)(dir, old.name));
   } catch {
   }
 }
@@ -1291,9 +1346,9 @@ async function fetchImage(source, serverUrl, dir, fetchImpl = fetch) {
     if (bytes.length === 0 || bytes.length > IMAGE_MAX_BYTES) return null;
     const kind = sniff(bytes);
     if (!kind) return null;
-    (0, import_node_fs3.mkdirSync)(dir, { recursive: true });
-    const path = (0, import_node_path3.join)(dir, `${cacheKey(source)}.${kind}`);
-    (0, import_node_fs3.writeFileSync)(path, bytes);
+    (0, import_node_fs4.mkdirSync)(dir, { recursive: true });
+    const path = (0, import_node_path4.join)(dir, `${cacheKey(source)}.${kind}`);
+    (0, import_node_fs4.writeFileSync)(path, bytes);
     pruneCache(dir);
     return path;
   } catch {
@@ -1354,7 +1409,7 @@ var NoticeCenter = class {
       return;
     }
     if (!entry.quiet) this.held.set(entry.id, entry.signature);
-    this.send({ op: "show", entry, seconds: this.seconds, position: this.options.position ?? "milieu-droite", positionFile: (0, import_node_path3.join)(this.options.configDir, "pharmaboost-avis-position.txt") });
+    this.send({ op: "show", entry, seconds: this.seconds, position: this.options.position ?? "milieu-droite", positionFile: (0, import_node_path4.join)(this.options.configDir, "pharmaboost-avis-position.txt") });
   }
   /** La vente est close : son conseil n'a plus lieu d'être. */
   remove(id) {
@@ -1385,9 +1440,9 @@ var NoticeCenter = class {
   ensureHost() {
     if (this.host) return true;
     try {
-      (0, import_node_fs3.mkdirSync)(this.options.configDir, { recursive: true });
-      const scriptPath = (0, import_node_path3.join)(this.options.configDir, "pharmaboost-avis-hote.ps1");
-      (0, import_node_fs3.writeFileSync)(scriptPath, `\uFEFF${NOTICE_HOST_SCRIPT}`, "utf8");
+      (0, import_node_fs4.mkdirSync)(this.options.configDir, { recursive: true });
+      const scriptPath = (0, import_node_path4.join)(this.options.configDir, "pharmaboost-avis-hote.ps1");
+      (0, import_node_fs4.writeFileSync)(scriptPath, `\uFEFF${NOTICE_HOST_SCRIPT}`, "utf8");
       const host = this.options.spawnHost ? this.options.spawnHost(scriptPath) : this.spawnReal(scriptPath);
       this.host = host;
       this.ready = false;
@@ -1523,11 +1578,11 @@ function resolveInstallCode(input) {
 }
 
 // agent/src/status.ts
-var import_node_fs4 = require("node:fs");
-var import_node_path4 = require("node:path");
+var import_node_fs5 = require("node:fs");
+var import_node_path5 = require("node:path");
 var STATUS_FILE_NAME = "pharmaboost-statut.json";
 function statusFilePath(configPath) {
-  return (0, import_node_path4.join)((0, import_node_path4.dirname)(configPath), STATUS_FILE_NAME);
+  return (0, import_node_path5.join)((0, import_node_path5.dirname)(configPath), STATUS_FILE_NAME);
 }
 function stateForFailure(error) {
   const message = error instanceof Error ? error.message : String(error);
@@ -1536,16 +1591,16 @@ function stateForFailure(error) {
 function writeStatus(configPath, status) {
   const target = statusFilePath(configPath);
   try {
-    (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(target), { recursive: true });
+    (0, import_node_fs5.mkdirSync)((0, import_node_path5.dirname)(target), { recursive: true });
     const temporary = `${target}.tmp`;
-    (0, import_node_fs4.writeFileSync)(temporary, JSON.stringify(status));
-    (0, import_node_fs4.renameSync)(temporary, target);
+    (0, import_node_fs5.writeFileSync)(temporary, JSON.stringify(status));
+    (0, import_node_fs5.renameSync)(temporary, target);
   } catch {
   }
 }
 
 // agent/src/robot.ts
-var import_node_fs5 = require("node:fs");
+var import_node_fs6 = require("node:fs");
 function compileRobotPattern(pattern) {
   if (!pattern.trim()) return { ok: false, error: "Indiquez l'expression qui d\xE9signe le code produit." };
   let regex;
@@ -1590,14 +1645,14 @@ function startRobotJournal(config, handlers) {
   let announcedMissing = false;
   const poll = () => {
     try {
-      if (!(0, import_node_fs5.existsSync)(config.path)) {
+      if (!(0, import_node_fs6.existsSync)(config.path)) {
         if (!announcedMissing) handlers.onStatus(`Robot : le fichier ${config.path} n'existe pas (encore).`);
         announcedMissing = true;
         offset = null;
         return;
       }
       announcedMissing = false;
-      const size = (0, import_node_fs5.statSync)(config.path).size;
+      const size = (0, import_node_fs6.statSync)(config.path).size;
       if (offset === null) {
         offset = size;
         handlers.onStatus(`Robot : lecture de ${config.path} \xE0 partir de maintenant.`);
@@ -1607,11 +1662,11 @@ function startRobotJournal(config, handlers) {
       if (size === offset) return;
       const length = Math.min(size - offset, MAX_READ_BYTES);
       const buffer = Buffer.alloc(length);
-      const fd = (0, import_node_fs5.openSync)(config.path, "r");
+      const fd = (0, import_node_fs6.openSync)(config.path, "r");
       try {
-        (0, import_node_fs5.readSync)(fd, buffer, 0, length, offset);
+        (0, import_node_fs6.readSync)(fd, buffer, 0, length, offset);
       } finally {
-        (0, import_node_fs5.closeSync)(fd);
+        (0, import_node_fs6.closeSync)(fd);
       }
       offset += length;
       const at = Date.now();
@@ -1646,15 +1701,15 @@ var CrossSourceDedupe = class {
 function dryRunRobotFile(path, pattern, maxBytes = 5 * 1024 * 1024) {
   const compiled = compileRobotPattern(pattern);
   if (!compiled.ok) return compiled;
-  if (!(0, import_node_fs5.existsSync)(path)) return { ok: false, error: `Le fichier ${path} n'existe pas.` };
-  const size = (0, import_node_fs5.statSync)(path).size;
+  if (!(0, import_node_fs6.existsSync)(path)) return { ok: false, error: `Le fichier ${path} n'existe pas.` };
+  const size = (0, import_node_fs6.statSync)(path).size;
   const length = Math.min(size, maxBytes);
   const buffer = Buffer.alloc(length);
-  const fd = (0, import_node_fs5.openSync)(path, "r");
+  const fd = (0, import_node_fs6.openSync)(path, "r");
   try {
-    (0, import_node_fs5.readSync)(fd, buffer, 0, length, size - length);
+    (0, import_node_fs6.readSync)(fd, buffer, 0, length, size - length);
   } finally {
-    (0, import_node_fs5.closeSync)(fd);
+    (0, import_node_fs6.closeSync)(fd);
   }
   const lines = buffer.toString("latin1").split(/\r?\n/);
   const codes = [];
@@ -1663,25 +1718,25 @@ function dryRunRobotFile(path, pattern, maxBytes = 5 * 1024 * 1024) {
 }
 
 // agent/src/index.ts
-var import_node_fs6 = require("node:fs");
+var import_node_fs7 = require("node:fs");
 var import_node_os = require("node:os");
-var import_node_path5 = require("node:path");
+var import_node_path6 = require("node:path");
 var VERSION = "0.6.1";
-var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path5.join)(process.cwd(), "pharmaboost-connect.json");
-var LOG_PATH = (0, import_node_path5.join)((0, import_node_path5.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
+var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path6.join)(process.cwd(), "pharmaboost-connect.json");
+var LOG_PATH = (0, import_node_path6.join)((0, import_node_path6.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
 var SETTLE_MS = 1e4;
 var CHECK_MS = 3e4;
-var DEFAULT_EXPORT = process.platform === "win32" ? "C:\\PharmaBoost\\Export" : (0, import_node_path5.join)(process.cwd(), "export");
+var DEFAULT_EXPORT = process.platform === "win32" ? "C:\\PharmaBoost\\Export" : (0, import_node_path6.join)(process.cwd(), "export");
 var DEFAULT_SCANS = process.platform === "win32" ? "C:\\PharmaBoost\\Ordonnances" : null;
 var notice = null;
 function log(message) {
   const line = `${(/* @__PURE__ */ new Date()).toISOString()} ${message}`;
   console.log(line);
   try {
-    (0, import_node_fs6.mkdirSync)((0, import_node_path5.dirname)(LOG_PATH), { recursive: true });
-    if ((0, import_node_fs6.existsSync)(LOG_PATH) && (0, import_node_fs6.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs6.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
-    (0, import_node_fs6.appendFileSync)(LOG_PATH, `${line}
+    (0, import_node_fs7.mkdirSync)((0, import_node_path6.dirname)(LOG_PATH), { recursive: true });
+    if ((0, import_node_fs7.existsSync)(LOG_PATH) && (0, import_node_fs7.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs7.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
+    (0, import_node_fs7.appendFileSync)(LOG_PATH, `${line}
 `);
   } catch {
   }
@@ -1695,12 +1750,12 @@ function arg(name) {
   return i >= 0 ? process.argv[i + 1] : void 0;
 }
 function readConfig() {
-  if (!(0, import_node_fs6.existsSync)(CONFIG_PATH)) return null;
-  return JSON.parse((0, import_node_fs6.readFileSync)(CONFIG_PATH, "utf8"));
+  if (!(0, import_node_fs7.existsSync)(CONFIG_PATH)) return null;
+  return JSON.parse((0, import_node_fs7.readFileSync)(CONFIG_PATH, "utf8"));
 }
 function writeConfig(config) {
-  (0, import_node_fs6.mkdirSync)((0, import_node_path5.dirname)(CONFIG_PATH), { recursive: true });
-  (0, import_node_fs6.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
+  (0, import_node_fs7.mkdirSync)((0, import_node_path6.dirname)(CONFIG_PATH), { recursive: true });
+  (0, import_node_fs7.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 async function api(config, path, init) {
   return fetch(`${config.serverUrl.replace(/\/$/, "")}${path}`, {
@@ -1769,14 +1824,38 @@ async function sendScan(config, code, scannedAt) {
   }
   if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
   log(`Bip ${code} \u2192 ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s)).`);
+  lastScanAt = Date.now();
   notices.warmUp();
   if (body.prescriptionId) watchPrescription(body.prescriptionId);
 }
-var IMAGES_DIR = (0, import_node_path5.join)((0, import_node_path5.dirname)(CONFIG_PATH), "avis-images");
+var lastScanAt = null;
+var nextUpdateCheck = Date.now() + 45e3;
+var restartWhenIdle = false;
+async function checkForUpdate(config, scans) {
+  const idle = () => canUpdateNow({ watching: watched !== null, queuedScans: scans.size, lastScanAt, pendingNotices: notices.ids().length, now: Date.now() });
+  const restart = () => {
+    log("Mise \xE0 jour automatique : red\xE9marrage de l'agent.");
+    notices.stop();
+    process.exit(0);
+  };
+  if (restartWhenIdle && idle()) restart();
+  if (Date.now() < nextUpdateCheck) return;
+  nextUpdateCheck = Date.now() + UPDATE_CHECK_EVERY_MS;
+  const agentPath = process.argv[1];
+  if (!isInstalledAgent(agentPath, CONFIG_PATH) || config.affichage?.miseAJourAuto === false) return;
+  const result = await selfUpdate({ serverUrl: config.serverUrl, agentPath });
+  if (result.status === "failed") log(`Mise \xE0 jour automatique impossible : ${result.detail}`);
+  if (result.status !== "updated") return;
+  log(`Mise \xE0 jour automatique : ${result.detail}.`);
+  if (idle()) restart();
+  restartWhenIdle = true;
+  log("Elle prendra effet d\xE8s qu'aucune vente n'est en cours.");
+}
+var IMAGES_DIR = (0, import_node_path6.join)((0, import_node_path6.dirname)(CONFIG_PATH), "avis-images");
 var notices = new NoticeCenter({
-  configDir: (0, import_node_path5.dirname)(CONFIG_PATH),
+  configDir: (0, import_node_path6.dirname)(CONFIG_PATH),
   log: (message) => log(message),
-  legacyShow: (content) => showToast((0, import_node_path5.dirname)(CONFIG_PATH), content, log)
+  legacyShow: (content) => showToast((0, import_node_path6.dirname)(CONFIG_PATH), content, log)
 });
 function applyDisplayPreferences(config) {
   const wanted = config.affichage;
@@ -1878,7 +1957,7 @@ async function runPost(config) {
     scans.push({ code, scannedAt: new Date(at).toISOString() });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
-  startDouchette((0, import_node_path5.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
+  startDouchette((0, import_node_path6.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
   if (config.robot) startRobotJournal(config.robot, { onScan: accept("robot"), onStatus: (message) => log(message) });
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
@@ -1889,6 +1968,7 @@ async function runPost(config) {
     try {
       if (scans.size > 0) await scans.flush();
       await pollNotice(config);
+      await checkForUpdate(config, scans);
       if (Date.now() - lastHeartbeat > 6e4) {
         let settings;
         try {
@@ -1985,7 +2065,7 @@ function testAffichage() {
 }
 function testDouchette() {
   console.log("Passez une bo\xEEte \xE0 la douchette. Chaque code lu s'affiche ci-dessous. Ctrl+C pour arr\xEAter.");
-  startDouchette((0, import_node_path5.dirname)(CONFIG_PATH), {
+  startDouchette((0, import_node_path6.dirname)(CONFIG_PATH), {
     onScan: (code) => console.log(`${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR")}  BIP  ${code}`),
     onStatus: (message) => console.log(`  ${message}`)
   });
@@ -1999,7 +2079,7 @@ async function pair() {
   for (const dir of [exportPath, scansPath]) {
     if (dir) {
       try {
-        (0, import_node_fs6.mkdirSync)(dir, { recursive: true });
+        (0, import_node_fs7.mkdirSync)(dir, { recursive: true });
       } catch {
       }
     }
@@ -2015,19 +2095,19 @@ async function pair() {
   log(`Appair\xE9 avec ${body.pharmacyName ?? "l'officine"}. Configuration \xE9crite dans ${CONFIG_PATH}. Export surveill\xE9 : ${exportPath}${scansPath ? ` \u2014 scans : ${scansPath}` : ""}.`);
 }
 function latestExport(dir) {
-  if (!(0, import_node_fs6.existsSync)(dir)) return null;
-  const st = (0, import_node_fs6.statSync)(dir);
+  if (!(0, import_node_fs7.existsSync)(dir)) return null;
+  const st = (0, import_node_fs7.statSync)(dir);
   if (st.isFile()) return { path: dir, mtime: st.mtimeMs, size: st.size };
-  const files = (0, import_node_fs6.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
-    const s = (0, import_node_fs6.statSync)((0, import_node_path5.join)(dir, name));
-    return { path: (0, import_node_path5.join)(dir, name), mtime: s.mtimeMs, size: s.size };
+  const files = (0, import_node_fs7.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
+    const s = (0, import_node_fs7.statSync)((0, import_node_path6.join)(dir, name));
+    return { path: (0, import_node_path6.join)(dir, name), mtime: s.mtimeMs, size: s.size };
   }).sort((a, b) => b.mtime - a.mtime);
   return files[0] ?? null;
 }
 var lastStamp = null;
 async function syncStock(config, force) {
   if (!config.exportPath) return config;
-  if (!(0, import_node_fs6.existsSync)(config.exportPath)) {
+  if (!(0, import_node_fs7.existsSync)(config.exportPath)) {
     setNotice(`Le dossier d'export ${config.exportPath} n'existe pas sur ${(0, import_node_os.hostname)()}.`);
     return config;
   }
@@ -2040,45 +2120,45 @@ async function syncStock(config, force) {
   const stamp = `${file.path}:${file.mtime}:${file.size}`;
   if (!force && stamp === lastStamp) return config;
   lastStamp = stamp;
-  const bytes = (0, import_node_fs6.readFileSync)(file.path);
-  const hash = (0, import_node_crypto2.createHash)("sha256").update(bytes).digest("hex");
+  const bytes = (0, import_node_fs7.readFileSync)(file.path);
+  const hash = (0, import_node_crypto3.createHash)("sha256").update(bytes).digest("hex");
   if (hash === config.lastExportHash) {
     if (notice?.startsWith("Aucun export") || notice?.startsWith("Le dossier")) setNotice(null);
     return config;
   }
   const form = new FormData();
-  form.set("file", new Blob([bytes]), (0, import_node_path5.basename)(file.path));
+  form.set("file", new Blob([bytes]), (0, import_node_path6.basename)(file.path));
   const response = await api(config, "/api/agent/stock", { method: "POST", body: form });
   const body = await response.json().catch(() => ({}));
   if (!response.ok || !body.ok) {
-    setNotice(`Export refus\xE9 (${(0, import_node_path5.basename)(file.path)}) : ${body.error ?? `HTTP ${response.status}`}`);
+    setNotice(`Export refus\xE9 (${(0, import_node_path6.basename)(file.path)}) : ${body.error ?? `HTTP ${response.status}`}`);
     return config;
   }
   setNotice(null);
-  log(`Stock synchronis\xE9 : ${body.lines ?? "?"} ligne(s), ${body.created ?? 0} cr\xE9\xE9e(s), ${body.updated ?? 0} mise(s) \xE0 jour (${(0, import_node_path5.basename)(file.path)}).`);
+  log(`Stock synchronis\xE9 : ${body.lines ?? "?"} ligne(s), ${body.created ?? 0} cr\xE9\xE9e(s), ${body.updated ?? 0} mise(s) \xE0 jour (${(0, import_node_path6.basename)(file.path)}).`);
   return { ...config, lastExportHash: hash };
 }
 async function syncScans(config) {
-  if (!config.scansPath || !(0, import_node_fs6.existsSync)(config.scansPath)) return config;
+  if (!config.scansPath || !(0, import_node_fs7.existsSync)(config.scansPath)) return config;
   const sent = new Set(config.sentScans ?? []);
-  const files = (0, import_node_fs6.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path5.join)(config.scansPath, name), stat: (0, import_node_fs6.statSync)((0, import_node_path5.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
+  const files = (0, import_node_fs7.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path6.join)(config.scansPath, name), stat: (0, import_node_fs7.statSync)((0, import_node_path6.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
   let next = config;
   for (const { path, stat } of files) {
-    const key = `${(0, import_node_path5.basename)(path)}:${stat.size}`;
+    const key = `${(0, import_node_path6.basename)(path)}:${stat.size}`;
     if (sent.has(key)) continue;
-    const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path5.extname)(path).toLowerCase()] ?? "application/octet-stream";
+    const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path6.extname)(path).toLowerCase()] ?? "application/octet-stream";
     const form = new FormData();
-    form.set("file", new Blob([(0, import_node_fs6.readFileSync)(path)], { type: mime }), (0, import_node_path5.basename)(path));
+    form.set("file", new Blob([(0, import_node_fs7.readFileSync)(path)], { type: mime }), (0, import_node_path6.basename)(path));
     const response = await api(config, "/api/agent/prescriptions", { method: "POST", body: form });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.ok) {
-      log(`Scan refus\xE9 (${(0, import_node_path5.basename)(path)}) : ${body.error ?? `HTTP ${response.status}`}`);
+      log(`Scan refus\xE9 (${(0, import_node_path6.basename)(path)}) : ${body.error ?? `HTTP ${response.status}`}`);
       continue;
     }
     sent.add(key);
     next = { ...next, sentScans: [...sent].slice(-2e3) };
     writeConfig(next);
-    log(`Ordonnance envoy\xE9e : ${(0, import_node_path5.basename)(path)} \u2192 ${body.reference ?? "?"} (${body.lines ?? 0} ligne(s) lue(s)).`);
+    log(`Ordonnance envoy\xE9e : ${(0, import_node_path6.basename)(path)} \u2192 ${body.reference ?? "?"} (${body.lines ?? 0} ligne(s) lue(s)).`);
   }
   return next;
 }

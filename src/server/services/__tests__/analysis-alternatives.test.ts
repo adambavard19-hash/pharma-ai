@@ -60,6 +60,8 @@ vi.mock("../drug-identification", () => ({
 vi.mock("../reference", () => ({ getReferenceCatalogState: async () => ({ status: "EMPTY" }) }));
 // Les associations de produits (second axe du conseil) ont leurs propres tests : ici, l'officine n'en a aucune.
 vi.mock("../product-associations", () => ({ loadAssociationInput: async () => undefined }));
+// La relecture des règles a ses propres tests : ici, la pharmacienne n'en a refusé aucune.
+vi.mock("../advice-rule-reviews", () => ({ loadRuleReviews: async () => [] }));
 vi.mock("../classification", () => ({
   ensureClassifications: async () => ({ drugs: [], providerId: "test", model: "m", warnings: [], usage: null, cachedCount: 0, durationMs: 0 }),
 }));

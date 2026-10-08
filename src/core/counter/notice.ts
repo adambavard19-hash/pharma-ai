@@ -43,6 +43,11 @@ export type NoticeRecommendation = {
   /** Le stock de l'officine pour ce produit, quand il est connu. */
   quantity?: number | null;
   alertThreshold?: number | null;
+  /**
+   * Ce conseil peut-il parler dans la fenêtre du poste ? Faux pour une règle du moteur que la pharmacienne n'a pas encore
+   * relue (elle s'affiche alors sur l'écran complet de la vente, jamais ici). Absent : oui (comportement historique).
+   */
+  trusted?: boolean;
 };
 
 /** Ce que le pharmacien lit sur la fenêtre : « En stock », « Stock faible », « Rupture », ou « Stock à vérifier ». */
@@ -140,7 +145,7 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
     .sort((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9))
     .slice(0, MAX_ALERTS)
     .map((alert) => alert.message);
-  const shown = input.recommendations.filter((rec) => SHOWN_STATUSES.has(rec.status)).slice(0, MAX_ADVICE);
+  const shown = input.recommendations.filter((rec) => SHOWN_STATUSES.has(rec.status) && rec.trusted !== false).slice(0, MAX_ADVICE);
   // Le prix ne s'affiche que si le stock est fiable : les deux viennent du même export du logiciel de gestion.
   const items: NoticeItem[] = shown.map((rec) => ({
     name: shortName(rec.name),

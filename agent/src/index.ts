@@ -31,6 +31,7 @@
 import { createHash } from "node:crypto";
 import { startDouchette } from "./douchette";
 import { showToast } from "./toast";
+import { UPDATE_CHECK_EVERY_MS, canUpdateNow, isInstalledAgent, selfUpdate } from "./self-update";
 import { DEFAULT_NOTICE_SECONDS, NoticeCenter, POSITIONS, buildHostEntry, cachedImage, fetchImage, imageSource, type HostEntry, type NoticeBody, type NoticePosition } from "./notice-center";
 import { createScanQueue } from "./scan-queue";
 import { INSTALLER_EXIT, resolveInstallCode } from "./installer";
@@ -72,7 +73,7 @@ type Config = {
   /** Un robot de dispensation à écouter, une fois observé chez cette officine (voir robot.ts). Absent : rien n'est lu. */
   robot?: RobotConfig;
   /** La fenêtre d'avis : où elle se pose (« milieu-droite » par défaut) et combien de secondes elle reste avant de se ranger. */
-  affichage?: { position?: NoticePosition; secondes?: number; ancienne?: boolean };
+  affichage?: { position?: NoticePosition; secondes?: number; ancienne?: boolean; miseAJourAuto?: boolean };
 };
 
 /** Ce que l'agent constate et que PharmaBoost doit montrer ; vide quand tout va bien. */
@@ -193,9 +194,43 @@ async function sendScan(config: Config, code: string, scannedAt: string): Promis
   }
   if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
   log(`Bip ${code} → ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s)).`);
+  lastScanAt = Date.now();
   // La fenêtre d'avis se prépare pendant que le serveur analyse : le conseil n'attend pas sa compilation.
   notices.warmUp();
   if (body.prescriptionId) watchPrescription(body.prescriptionId);
+}
+
+/** Le dernier bip envoyé au serveur : on ne remplace jamais l'agent dans les secondes qui suivent (voir self-update.ts). */
+let lastScanAt: number | null = null;
+
+/**
+ * Mise à jour automatique : toutes les deux minutes, l'agent demande à PharmaBoost s'il existe une version plus récente ;
+ * si oui et si personne n'est en train de vendre, il la pose et s'arrête — l'icône le relance aussitôt. Plus jamais
+ * « quitter puis rouvrir PharmaBoost » après une publication.
+ */
+let nextUpdateCheck = Date.now() + 45_000;
+/** La nouvelle version est posée sur le disque mais une vente était en cours : on redémarre au premier moment calme. */
+let restartWhenIdle = false;
+async function checkForUpdate(config: Config, scans: { size: number }): Promise<void> {
+  const idle = () => canUpdateNow({ watching: watched !== null, queuedScans: scans.size, lastScanAt, pendingNotices: notices.ids().length, now: Date.now() });
+  const restart = () => {
+    log("Mise à jour automatique : redémarrage de l'agent.");
+    notices.stop();
+    process.exit(0);
+  };
+  if (restartWhenIdle && idle()) restart();
+  if (Date.now() < nextUpdateCheck) return;
+  nextUpdateCheck = Date.now() + UPDATE_CHECK_EVERY_MS;
+  const agentPath = process.argv[1];
+  if (!isInstalledAgent(agentPath, CONFIG_PATH) || config.affichage?.miseAJourAuto === false) return;
+  const result = await selfUpdate({ serverUrl: config.serverUrl, agentPath });
+  if (result.status === "failed") log(`Mise à jour automatique impossible : ${result.detail}`);
+  if (result.status !== "updated") return;
+  log(`Mise à jour automatique : ${result.detail}.`);
+  if (idle()) restart();
+  // Une vente est en cours : le nouveau fichier est en place, l'agent actuel continue, et s'arrêtera au premier moment calme.
+  restartWhenIdle = true;
+  log("Elle prendra effet dès qu'aucune vente n'est en cours.");
 }
 
 /** Les photos des produits conseillés, gardées à côté de la configuration. */
@@ -344,6 +379,7 @@ async function runPost(config: Config): Promise<void> {
     try {
       if (scans.size > 0) await scans.flush();
       await pollNotice(config);
+      await checkForUpdate(config, scans);
       if (Date.now() - lastHeartbeat > 60_000) {
         let settings: Awaited<ReturnType<typeof postHeartbeat>>;
         try {

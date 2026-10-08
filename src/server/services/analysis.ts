@@ -51,6 +51,9 @@ import {
 } from "@/core/understanding";
 import { ensureClassifications } from "./classification";
 import { loadAssociationInput } from "./product-associations";
+import { loadRuleReviews } from "./advice-rule-reviews";
+import { ADVICE_RULES } from "@/core/ai/engines/advice";
+import { disabledRuleKeys, reviewsByKey } from "@/core/ai/rule-review";
 
 /**
  * Orchestration de l'analyse d'une ordonnance.
@@ -378,6 +381,8 @@ export async function analysePrescription(params: {
   // Second axe du conseil : les associations de produits de l'officine (un produit conseil en appelle un autre) et
   // les lignes de la vente qui SONT un produit du stock. Aucune requête de plus si l'officine n'en a pas écrit.
   const associations = await loadAssociationInput(params.scope, prescription.lines);
+  // La relecture de la pharmacienne : une règle qu'elle a refusée ne se déclenche pas dans son officine.
+  const refusedRules = disabledRuleKeys(ADVICE_RULES, reviewsByKey(await loadRuleReviews(params.scope.pharmacyId)));
   // Signaux issus de l'extraction, reconstruits depuis les champs persistés.
   const extractionFindings = evaluateExtractionSafety(
     prescription.lines.map((line) => rebuildExtractedLine(line)),
@@ -416,6 +421,7 @@ export async function analysePrescription(params: {
       (knowledgeProvider.info.capability === "SIMULATED" && knowledgeFromEditorial),
     stock: stockState,
     associations,
+    disabledRuleKeys: refusedRules,
     // La compréhension a manqué si aucun modèle n'est branché, ou si l'appel a
     // échoué : le moteur a tourné sur les seules règles, et l'issue le dira.
     aiUnavailable:

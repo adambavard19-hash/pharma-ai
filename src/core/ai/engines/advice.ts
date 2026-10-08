@@ -1765,11 +1765,16 @@ export function detectAdviceOpportunities(params: {
    * s'ajoutent à elle, et une règle ne s'en sert que si elle l'a déclaré.
    */
   needs?: IdentifiedNeed[];
+  /**
+   * Les règles que la pharmacienne de CETTE officine a refusées (voir `rule-review.ts`) : elles ne se déclenchent jamais.
+   */
+  disabledRuleKeys?: ReadonlySet<string>;
 }): AdviceOpportunityResult[] {
-  const { drugs, patient, needs = [] } = params;
+  const { drugs, patient, needs = [], disabledRuleKeys } = params;
   const byKey = new Map<string, AdviceOpportunityResult>();
 
   for (const rule of ADVICE_RULES) {
+    if (disabledRuleKeys?.has(rule.key)) continue;
     const triggers: {
       lineIndex: number;
       drugName: string;

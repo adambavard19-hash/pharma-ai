@@ -7,6 +7,9 @@ import { analysePrescription } from "@/server/services/analysis";
 import { recordAudit } from "@/server/audit/log";
 import { getEnv } from "@/config/env";
 import { stockReminderLevel } from "@/core/stock-deposit/rules";
+import { ADVICE_RULES } from "@/core/ai/engines/advice";
+import { mayShowAtCounter, reviewsByKey } from "@/core/ai/rule-review";
+import { loadRuleReviews } from "@/server/services/advice-rule-reviews";
 
 export const dynamic = "force-dynamic";
 // L'analyse peut dépasser dix secondes : on le déclare à l'hébergeur.
@@ -49,7 +52,7 @@ async function readNotice(agent: Agent, id: string): Promise<{ status: string; n
       },
       recommendations: {
         orderBy: { totalScore: "desc" },
-        select: { status: true, shortReason: true, justification: true, product: { select: { name: true, salePriceCents: true, imageUrl: true, stockItem: { select: { quantity: true, alertThreshold: true } } } }, presentation: { select: { priceCents: true, specialty: { select: { name: true } }, pharmacyStocks: { where: { pharmacyId: agent.scope.pharmacyId }, select: { priceCents: true, quantity: true } } } } },
+        select: { status: true, origin: true, opportunity: { select: { ruleKey: true } }, shortReason: true, justification: true, product: { select: { name: true, salePriceCents: true, imageUrl: true, stockItem: { select: { quantity: true, alertThreshold: true } } } }, presentation: { select: { priceCents: true, specialty: { select: { name: true } }, pharmacyStocks: { where: { pharmacyId: agent.scope.pharmacyId }, select: { priceCents: true, quantity: true } } } } },
       },
     },
   });
@@ -62,6 +65,9 @@ async function readNotice(agent: Agent, id: string): Promise<{ status: string; n
   // Prix et « En stock » viennent du même export : un stock ancien ne s'affiche pas comme un fait.
   const pharmacy = await prisma.pharmacy.findUnique({ where: { id: agent.scope.pharmacyId }, select: { stockSyncedAt: true } });
   const stockReliable = stockReminderLevel(pharmacy?.stockSyncedAt ?? null, new Date()) === "none";
+  // Dans la fenêtre du poste, seul parle ce que la pharmacienne a validé : ses propres associations, ses ajouts, et les
+  // règles du moteur qu'elle a relues. Le reste reste lisible sur l'écran complet de la vente.
+  const reviews = reviewsByKey(await loadRuleReviews(agent.scope.pharmacyId));
   const notice = buildCounterNotice({
     reference: prescription.reference,
     prescriptionStatus: prescription.status,
@@ -73,6 +79,7 @@ async function readNotice(agent: Agent, id: string): Promise<{ status: string; n
       priceCents: rec.product?.salePriceCents ?? rec.presentation?.pharmacyStocks[0]?.priceCents ?? rec.presentation?.priceCents ?? null,
       reason: rec.shortReason ?? rec.justification,
       status: rec.status,
+      trusted: rec.origin !== "AI" || mayShowAtCounter(rec.opportunity?.ruleKey, ADVICE_RULES, reviews),
       imageUrl: rec.product?.imageUrl ?? null,
       quantity: rec.product ? (rec.product.stockItem?.quantity ?? null) : (rec.presentation?.pharmacyStocks[0]?.quantity ?? null),
       alertThreshold: rec.product?.stockItem?.alertThreshold ?? null,

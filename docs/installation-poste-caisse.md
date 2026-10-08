@@ -223,6 +223,26 @@ powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -MiseAJour
 powershell -ExecutionPolicy Bypass -File .\install-poste-windows.ps1 -TestAffichage
 ```
 
+## La mise à jour automatique (agent 0.6.1)
+
+Avant : l'icône ne vérifiait les nouvelles versions qu'à son démarrage, puis toutes les six heures. Après chaque
+publication, il fallait quitter l'icône et la rouvrir pour voir le changement.
+
+Désormais l'agent, qui tourne en permanence, demande à PharmaBoost toutes les deux minutes (`/api/agent/version`) si une
+version plus récente existe. Si oui il la télécharge, vérifie son empreinte SHA-256, remplace son propre fichier (même
+protocole que l'icône : copie de secours `.previous`, marqueur `pharmaboost-maj.txt`) puis s'arrête ; l'icône le relance
+aussitôt avec le nouveau fichier. Trois arrêts de suite : retour à l'ancienne version, qui n'est plus réinstallée
+(`pharmaboost-refusee.txt`).
+
+Garde-fous (`agent/src/self-update.ts`) : jamais depuis un serveur en clair (https, ou le poste de développement) ;
+jamais un fichier dont l'empreinte diffère de celle annoncée ; **jamais pendant une vente** (vente suivie, bip en file ou
+de moins de 30 s, avis en attente) — la nouvelle version est alors posée sur le disque et prend effet au premier moment
+calme ; jamais hors d'un poste installé par l'installateur (à côté de sa configuration). Réglage :
+`affichage.miseAJourAuto: false` dans la configuration pour la couper.
+
+**Une dernière fois à la main** : un poste qui exécute encore une version antérieure à 0.6.1 doit être quitté puis
+relancé (ou le PC redémarré) pour recevoir cet agent. Ensuite, plus jamais.
+
 ## Le stock relu par le poste (agent 0.4.1)
 
 Si le dossier où le LGO enregistre son édition de stock est visible depuis

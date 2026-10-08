@@ -127,6 +127,7 @@ model Pharmacy {
   recommendations     Recommendation[]
   pharmacyRules       PharmacyRule[]
   productAssociations ProductAssociation[]
+  adviceRuleReviews   AdviceRuleReview[]
   documents           PatientDocument[]
   sales               Sale[]
   notifications       Notification[]
@@ -527,6 +528,7 @@ model User {
   notifications           Notification[]
   pharmacyRules           PharmacyRule[]
   createdAssociations     ProductAssociation[]
+  adviceRuleReviews       AdviceRuleReview[]
   imports                 ImportJob[]
   stockDeposits           StockDeposit[]
 
@@ -2270,6 +2272,34 @@ model ProductAssociation {
   @@index([pharmacyId, triggerProductId])
   @@index([pharmacyId, triggerSpecialtyId])
   @@map("product_associations")
+}
+
+/// Ce que la pharmacienne a décidé d'une règle de conseil du moteur : la valider (elle peut parler au comptoir), ou la
+/// refuser (elle ne se déclenche plus jamais dans CETTE officine). Une règle que personne n'a relue reste « à relire » : elle
+/// s'affiche sur l'écran complet de la vente, jamais dans la fenêtre du poste de caisse. La décision porte sur une VERSION
+/// de la règle : une règle réécrite depuis redevient « à relire ».
+model AdviceRuleReview {
+  id              String             @id @default(cuid())
+  pharmacyId      String
+  ruleKey         String
+  ruleVersion     String
+  decision        AdviceRuleDecision
+  note            String?
+  decidedByUserId String?
+  decidedAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  pharmacy  Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  decidedBy User?    @relation(fields: [decidedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([pharmacyId, ruleKey])
+  @@index([pharmacyId])
+  @@map("advice_rule_reviews")
+}
+
+enum AdviceRuleDecision {
+  VALIDATED
+  REJECTED
 }
 
 // ===========================================================================

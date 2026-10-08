@@ -130,3 +130,23 @@ describe("l'avis ne montre pas les explications sur nos propres propositions éc
     expect(notice.items).toEqual([]);
   });
 });
+
+describe("seul parle dans la fenêtre du poste ce que la pharmacienne a validé", () => {
+  const rec = (name: string, trusted?: boolean) => ({ name, priceCents: 590, reason: "Une raison", status: "PROPOSED", ...(trusted === undefined ? {} : { trusted }) });
+
+  it("écarte un conseil dont la règle n'est pas relue, garde les autres", () => {
+    const notice = buildCounterNotice({ ...base, recommendations: [rec("ADIARIL", false), rec("PASTILLES GORGE", true), rec("SANS INFORMATION")] });
+    expect(notice.items.map((item) => item.name)).toEqual(["PASTILLES GORGE", "SANS INFORMATION"]);
+  });
+
+  it("quand tout est à relire : « rien à ajouter », pas une alerte, pas un conseil non relu", () => {
+    const notice = buildCounterNotice({ ...base, recommendations: [rec("ADIARIL", false)] });
+    expect(notice.items).toEqual([]);
+    expect(notice.advice).toEqual(["Rien à ajouter pour cette délivrance."]);
+  });
+
+  it("les trois conseils de la fenêtre sont pris parmi ceux qui ont le droit d'y être", () => {
+    const notice = buildCounterNotice({ ...base, recommendations: [rec("A", false), rec("B", false), rec("C", true), rec("D", true), rec("E", true), rec("F", true)] });
+    expect(notice.items.map((item) => item.name)).toEqual(["C", "D", "E"]);
+  });
+});

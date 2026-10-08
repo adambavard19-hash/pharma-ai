@@ -129,6 +129,8 @@ export type PipelineInput = {
    * lignes de la vente qui SONT un produit du stock. Absent : aucune association à appliquer.
    */
   associations?: AssociationInput;
+  /** Les règles de conseil que la pharmacienne de l'officine a refusées : elles ne se déclenchent pas (rule-review.ts). */
+  disabledRuleKeys?: string[];
 };
 
 type StageRecorder = {
@@ -353,14 +355,16 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         drugs: drugsForAdvice,
         patient: input.patient,
         needs: input.understanding?.needs ?? [],
+        disabledRuleKeys: input.disabledRuleKeys && input.disabledRuleKeys.length > 0 ? new Set(input.disabledRuleKeys) : undefined,
       });
+      const refused = input.disabledRuleKeys?.length ?? 0;
       return {
         output: detected,
         count: detected.length,
-        notes:
-          detected.length === 0
-            ? ["Aucune opportunité de conseil identifiée pour ce traitement."]
-            : [],
+        notes: [
+          ...(refused > 0 ? [`${refused} règle(s) de conseil refusée(s) par la pharmacienne de l'officine : elles ne se déclenchent pas.`] : []),
+          ...(detected.length === 0 ? ["Aucune opportunité de conseil identifiée pour ce traitement."] : []),
+        ],
       };
     },
   );
