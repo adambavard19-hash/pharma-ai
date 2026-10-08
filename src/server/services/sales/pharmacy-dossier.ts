@@ -17,7 +17,7 @@ export async function ensureDossierForPharmacy(pharmacyId: string, actor: SalesA
     where: { id: pharmacyId },
     include: {
       prospect: { select: { id: true } },
-      memberships: { where: { role: "OWNER", isActive: true }, orderBy: { createdAt: "asc" }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } },
+      memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } },
     },
   });
   if (!pharmacy) return { ok: false, error: "Officine introuvable." };
@@ -48,7 +48,7 @@ export async function ensureDossierForPharmacy(pharmacyId: string, actor: SalesA
 
 /** Rafraîchit le dossier avec les informations courantes de l'officine et du titulaire (sans écraser une saisie plus précise). */
 export async function refreshDossierFromPharmacy(prospectId: string): Promise<void> {
-  const prospect = await prisma.prospect.findUnique({ where: { id: prospectId }, include: { pharmacy: { include: { memberships: { where: { role: "OWNER", isActive: true }, orderBy: { createdAt: "asc" }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } } } } });
+  const prospect = await prisma.prospect.findUnique({ where: { id: prospectId }, include: { pharmacy: { include: { memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } } } } });
   if (!prospect?.pharmacy) return;
   const owner = prospect.pharmacy.memberships[0]?.user ?? null;
   await prisma.prospect.update({

@@ -51,7 +51,7 @@ async function organizationForCustomer(customerId: string | null): Promise<strin
 }
 
 async function ownerOfOrganization(organizationId: string) {
-  const pharmacy = await prisma.pharmacy.findFirst({ where: { organizationId }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, memberships: { where: { role: "OWNER", isActive: true }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } } });
+  const pharmacy = await prisma.pharmacy.findFirst({ where: { organizationId }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } } });
   return pharmacy ? { pharmacy, owner: pharmacy.memberships[0]?.user ?? null } : null;
 }
 

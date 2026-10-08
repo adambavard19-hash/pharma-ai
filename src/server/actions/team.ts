@@ -8,6 +8,8 @@ import { refuseInDemo } from "./demo-guard";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { hashPassword, validatePasswordStrength } from "@/server/security/password";
 import { recordAudit } from "@/server/audit/log";
+import { moveTeamMember, nextSortOrder, updateTeamMember, type MemberChanges } from "@/server/services/team-management";
+import type { TeamActor, TeamRole } from "@/core/team/rules";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /**
@@ -19,6 +21,7 @@ import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
  * dépend jamais de ce que l'écran a bien voulu envoyer.
  */
 
+/** Les postes qu'on peut donner à quelqu'un qu'on AJOUTE ; devenir titulaire passe par « Modifier » (règles de l'équipe). */
 const ASSIGNABLE_ROLES = ["PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const;
 
 const createSchema = z.object({
@@ -111,6 +114,8 @@ export async function createCollaboratorAction(
         pharmacyId: session.scope.pharmacyId,
         role: input.role,
         isActive: true,
+        // Le nouveau collaborateur arrive en dernier dans la liste ; le titulaire peut le remonter.
+        sortOrder: await nextSortOrder(tx, session.scope.pharmacyId),
       },
     });
 
@@ -182,40 +187,92 @@ export async function setCollaboratorAccessAction(
   );
 }
 
+const TEAM_ROLE_VALUES = ["OWNER", "PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const;
+
+/** Qui agit, pour les règles de l'équipe : un membre de l'officine, avec son poste. */
+const memberActor = (session: { scope: { userId: string }; role: string }): TeamActor => ({ kind: "member", userId: session.scope.userId, role: session.role as TeamRole });
+
 const roleSchema = z.object({
   userId: z.string().min(1),
-  role: z.enum(ASSIGNABLE_ROLES),
+  role: z.enum(TEAM_ROLE_VALUES),
 });
 
+/**
+ * Changer le poste de quelqu'un, d'un geste (le choix dans la liste). Passe par les règles de l'équipe : on peut
+ * nommer un autre titulaire (associé), jamais laisser l'officine sans titulaire actif ni sans titulaire principal.
+ */
 export async function setCollaboratorRoleAction(
   payload: z.input<typeof roleSchema>,
 ): Promise<ActionResult<null>> {
   const session = await requirePermission(PERMISSIONS.TEAM_MANAGE);
   const parsed = roleSchema.safeParse(payload);
-  if (!parsed.success) return fail("Rôle invalide.");
+  if (!parsed.success) return fail("Poste invalide.");
 
-  const membership = await membershipInScope(parsed.data.userId, session.scope.pharmacyId);
-  if (!membership) return fail("Collaborateur introuvable dans votre équipe.");
-  if (membership.role === "OWNER") {
-    return fail("Le rôle du titulaire ne se modifie pas depuis cet écran.");
-  }
-
-  await prisma.membership.update({
-    where: { id: membership.id },
-    data: { role: parsed.data.role },
-  });
-
-  await recordAudit({
-    action: "team.member_role_changed",
-    entityType: "User",
-    entityId: membership.userId,
+  const result = await updateTeamMember({
     pharmacyId: session.scope.pharmacyId,
-    userId: session.scope.userId,
-    metadata: { role: parsed.data.role },
+    userId: parsed.data.userId,
+    changes: { role: parsed.data.role },
+    actor: memberActor(session),
+    audit: { userId: session.scope.userId },
   });
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/equipe");
+  return ok(null, result.changed.length > 0 ? "Poste mis à jour." : "Rien à changer.");
+}
+
+const updateSchema = z.object({
+  userId: z.string().min(1),
+  firstName: z.string().trim().min(1, "Le prénom est obligatoire").max(80).optional(),
+  lastName: z.string().trim().min(1, "Le nom est obligatoire").max(80).optional(),
+  email: z.string().trim().toLowerCase().email("Adresse e-mail invalide").max(160).optional(),
+  phone: z.string().trim().max(30).regex(/^[0-9+().\s-]*$/, "Numéro de téléphone invalide").nullable().optional(),
+  rppsNumber: z.string().trim().max(20).regex(/^[0-9]*$/, "Le numéro RPPS ne contient que des chiffres").nullable().optional(),
+  role: z.enum(TEAM_ROLE_VALUES).optional(),
+  isPrincipal: z.boolean().optional(),
+});
+
+/**
+ * Modifier un collaborateur depuis l'espace du titulaire : prénom, nom, adresse, téléphone, RPPS, poste, et titulaire
+ * principal. Tout ou rien. Un compte qui travaille aussi dans une autre officine garde son identité (voir
+ * `core/team/rules.ts`) ; on ne change pas sa propre adresse ici.
+ */
+export async function updateCollaboratorAction(
+  payload: z.input<typeof updateSchema>,
+): Promise<ActionResult<{ changed: string[] }>> {
+  const session = await requirePermission(PERMISSIONS.TEAM_MANAGE);
+  const refused = refuseInDemo(session, "Mode démo : les comptes de la démonstration ne se modifient pas.");
+  if (refused) return refused;
+  const parsed = updateSchema.safeParse(payload);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));
+
+  const { userId, ...changes } = parsed.data;
+  const result = await updateTeamMember({
+    pharmacyId: session.scope.pharmacyId,
+    userId,
+    changes: changes as MemberChanges,
+    actor: memberActor(session),
+    audit: { userId: session.scope.userId },
+  });
+  if (!result.ok) return fail(result.error);
 
   revalidatePath("/equipe");
-  return ok(null, "Rôle mis à jour.");
+  if (result.changed.length === 0) return ok({ changed: [] }, "Rien à changer.");
+  return ok({ changed: result.changed }, result.changed.includes("email") ? `${result.name} est à jour. Son adresse a changé : ses sessions sont fermées, pensez à lui définir un nouveau mot de passe.` : `${result.name} est à jour.`);
+}
+
+const moveSchema = z.object({ userId: z.string().min(1), direction: z.enum(["up", "down"]) });
+
+/** Monter ou descendre un collaborateur dans la liste de l'équipe. */
+export async function moveCollaboratorAction(
+  payload: z.input<typeof moveSchema>,
+): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.TEAM_MANAGE);
+  const parsed = moveSchema.safeParse(payload);
+  if (!parsed.success) return fail("Requête invalide.");
+  const result = await moveTeamMember({ pharmacyId: session.scope.pharmacyId, userId: parsed.data.userId, direction: parsed.data.direction, audit: { userId: session.scope.userId } });
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/equipe");
+  return ok(null, result.moved ? `${result.name} a changé de place.` : parsed.data.direction === "up" ? `${result.name} est déjà en première place.` : `${result.name} est déjà en dernière place.`);
 }
 
 const passwordSchema = z.object({

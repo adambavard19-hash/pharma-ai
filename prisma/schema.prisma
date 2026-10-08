@@ -541,6 +541,11 @@ model Membership {
   /// Permissions retirées malgré le rôle.
   revokedPermissions String[] @default([])
   isActive           Boolean  @default(true)
+  /// Le titulaire principal de l'officine : celui que PharmaBoost contacte (contrat, facture, accès). Un titulaire
+  /// (`role = OWNER`) seulement, et au plus un par officine — tenu par le code (une transaction), pas par un index.
+  isPrincipal        Boolean  @default(false)
+  /// La place dans la liste de l'équipe, choisie par le titulaire (1 = premier).
+  sortOrder          Int      @default(0)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

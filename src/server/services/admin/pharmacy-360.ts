@@ -93,8 +93,9 @@ const PHARMACY_SELECT = {
   referrals: { orderBy: { createdAt: "asc" as const }, select: { id: true, name: true, city: true, isActive: true, referralAmountCents: true } },
   memberships: {
     where: { user: { deletedAt: null } },
-    orderBy: [{ role: "asc" as const }, { createdAt: "asc" as const }],
-    select: { id: true, role: true, isActive: true, createdAt: true, user: { select: { id: true, firstName: true, lastName: true, email: true, lastLoginAt: true, status: true } } },
+    // L'ordre choisi par le titulaire pour son équipe, puis l'ancienneté.
+    orderBy: [{ sortOrder: "asc" as const }, { createdAt: "asc" as const }],
+    select: { id: true, role: true, isActive: true, isPrincipal: true, createdAt: true, user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, rppsNumber: true, lastLoginAt: true, status: true, _count: { select: { memberships: true } } } } },
   },
   prospect: {
     select: {
@@ -178,7 +179,7 @@ export async function loadPharmacy360(id: string, now: Date = new Date()) {
   ]);
 
   const owners = pharmacy.memberships.filter((m) => m.role === "OWNER");
-  const owner = owners.find((m) => m.isActive) ?? owners[0] ?? null;
+  const owner = owners.find((m) => m.isPrincipal && m.isActive) ?? owners.find((m) => m.isActive) ?? owners[0] ?? null;
   const latestContract = contracts[0] ?? null;
   const price = subscription ? contractualPrice(subscription, subscription.plan) : null;
 

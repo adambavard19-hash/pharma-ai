@@ -60,7 +60,7 @@ async function pharmacyCandidates(audience: AudienceKey, params: CampaignDraftIn
     where: { isDemo: false, isActive: true, ...segment },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     // Le destinataire est celui de `pharmacyRecipient` : le titulaire actif, à défaut l'e-mail de l'officine.
-    select: { id: true, name: true, email: true, memberships: { where: { role: "OWNER", isActive: true, user: { deletedAt: null } }, take: 1, select: { user: { select: { email: true } } } } },
+    select: { id: true, name: true, email: true, memberships: { where: { role: "OWNER", isActive: true, user: { deletedAt: null } }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { email: true } } } } },
   });
   const candidates: AudienceRecipient[] = [];
   let noEmail = 0;

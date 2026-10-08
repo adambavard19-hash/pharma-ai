@@ -75,7 +75,7 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
     if (prospect.postCount) await tx.pharmacyPostCountChange.create({ data: { pharmacyId: pharmacy.id, previous: null, next: prospect.postCount, actorType: actor.type, actorLabel: actor.label } });
     if (prospect.lgo && isLgoId(prospect.lgo)) await tx.stockConnection.create({ data: { pharmacyId: pharmacy.id, lgo: prospect.lgo, status: "PENDING" } });
     const owner = await tx.user.create({ data: { organizationId: organization.id, email: prospect.email!, firstName, lastName, passwordHash, status: "ACTIVE" } });
-    await tx.membership.create({ data: { userId: owner.id, pharmacyId: pharmacy.id, role: "OWNER", isActive: true } });
+    await tx.membership.create({ data: { userId: owner.id, pharmacyId: pharmacy.id, role: "OWNER", isActive: true, isPrincipal: true, sortOrder: 1 } });
     await tx.prospect.update({ where: { id: prospect.id }, data: { pharmacyId: pharmacy.id, status: "PHARMACY_CREATED" } });
     return { pharmacy, ownerId: owner.id };
   });

@@ -13,6 +13,8 @@ import { generateToken } from "@/server/security/tokens";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 import { resolveReferralCode } from "@/server/services/referral";
 import { createClientPharmacy, findSiretOwner, setPostCount } from "@/server/services/pharmacy-admin";
+import { removeMemberFromPharmacy } from "@/server/services/admin/deletion";
+import { ensurePrincipal, nextSortOrder } from "@/server/services/team-management";
 import { isValidSiret, normalizeSiret } from "@/core/contracts/identity";
 
 /**
@@ -265,8 +267,10 @@ export async function createPharmacyOwnerAction(
       },
     });
     await tx.membership.create({
-      data: { userId: owner.id, pharmacyId: pharmacy.id, role: "OWNER", isActive: true },
+      data: { userId: owner.id, pharmacyId: pharmacy.id, role: "OWNER", isActive: true, sortOrder: await nextSortOrder(tx, pharmacy.id) },
     });
+    // Une officine qui n'avait aucun titulaire actif en a maintenant un principal : celui-ci.
+    await ensurePrincipal(tx, pharmacy.id);
     return owner.id;
   });
 
@@ -336,21 +340,18 @@ export async function setPharmacyMemberAccessAction(payload: { pharmacyId: strin
   }
 }
 
-/** Supprimer un compte d'officine : l'accès est retiré, le compte marqué supprimé ; les traces restent. */
+/**
+ * Supprimer un compte depuis la fiche d'une officine.
+ *
+ * Un compte qui n'a que cette officine est supprimé (et son adresse e-mail libérée). Un compte qui travaille AUSSI
+ * ailleurs n'est que retiré d'ici : l'ancien geste le supprimait partout, au détriment de l'autre officine. Le seul
+ * titulaire d'une officine ne se supprime pas (voir `services/admin/deletion.ts`).
+ */
 export async function deletePharmacyMemberAction(payload: { pharmacyId: string; membershipId: string }): Promise<ActionResult<null>> {
   const session = await requirePlatformSession();
-  try {
-    const membership = await loadMember(payload.pharmacyId, payload.membershipId);
-    await prisma.$transaction([
-      prisma.session.deleteMany({ where: { userId: membership.user.id } }),
-      prisma.membership.update({ where: { id: membership.id }, data: { isActive: false } }),
-      prisma.user.update({ where: { id: membership.user.id }, data: { deletedAt: new Date(), status: "DISABLED" } }),
-    ]);
-    await recordAudit({ action: "platform.member_deleted", entityType: "User", entityId: membership.user.id, pharmacyId: payload.pharmacyId, platformAdminId: session.admin.id });
-    revalidatePath(`/admin/pharmacies/${payload.pharmacyId}`);
-    return ok(null, `Compte de ${membership.user.firstName} ${membership.user.lastName} supprimé.`);
-  } catch (error) {
-    return fail(error instanceof Error ? error.message : "Suppression impossible.");
-  }
+  const result = await removeMemberFromPharmacy({ pharmacyId: payload.pharmacyId, membershipId: payload.membershipId, adminId: session.admin.id });
+  if (!result.ok) return fail(result.error);
+  for (const path of [`/admin/pharmacies/${payload.pharmacyId}`, "/admin/utilisateurs", "/admin/acces"]) revalidatePath(path);
+  return ok(null, result.accountDeleted ? `Le compte de ${result.name} est supprimé. Son adresse e-mail est de nouveau disponible.` : `${result.name} est retiré de cette officine ; son compte reste actif dans l'autre.`);
 }
 

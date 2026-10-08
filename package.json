@@ -30,6 +30,7 @@
     "demo:verifier": "node --env-file=.env --conditions=react-server --import tsx scripts/demo-verifier.ts",
     "demo:commercial": "node --env-file=.env --conditions=react-server --import tsx scripts/demo-commercial.ts",
     "comptes:test": "node --env-file=.env --conditions=react-server --import tsx scripts/comptes-test.ts",
+    "comptes:liberer-adresses": "node --env-file=.env --conditions=react-server --import tsx scripts/liberer-adresses-supprimees.ts",
     "ocr:test": "node --env-file=.env --conditions=react-server --import tsx scripts/ocr-test.ts",
     "publication:etat": "node scripts/etat-publication.mjs",
     "installateur:construire": "node scripts/construire-installateur.mjs",

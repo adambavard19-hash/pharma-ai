@@ -210,7 +210,7 @@ export async function resolveInstallTarget(pharmacyId: string): Promise<
     where: { id: pharmacyId },
     select: {
       id: true, name: true, organizationId: true, isActive: true,
-      memberships: { where: { role: "OWNER", isActive: true }, orderBy: { createdAt: "asc" }, take: 1, select: { userId: true } },
+      memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { userId: true } },
       stockConnection: { select: { lgo: true } },
     },
   });
@@ -232,7 +232,7 @@ export async function resolveSupportScope(pharmacyId: string): Promise<{ ok: tru
     where: { id: pharmacyId },
     select: {
       id: true, name: true, organizationId: true,
-      memberships: { where: { role: "OWNER", isActive: true }, orderBy: { createdAt: "asc" }, take: 1, select: { userId: true } },
+      memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { userId: true } },
       stockConnection: { select: { lgo: true } },
     },
   });
@@ -314,7 +314,7 @@ export async function listCounterPosts(pharmacyId: string) {
 export async function authenticateAgent(authorization: string | null): Promise<AgentContext | null> {
   const token = authorization?.replace(/^Bearer\s+/i, "").trim();
   if (!token || token.length < 16) return null;
-  const pharmacySelect = { id: true, organizationId: true, isDemo: true, isActive: true, memberships: { where: { role: "OWNER" as const, isActive: true }, take: 1, select: { userId: true } } };
+  const pharmacySelect = { id: true, organizationId: true, isDemo: true, isActive: true, memberships: { where: { role: "OWNER" as const, isActive: true }, orderBy: [{ isPrincipal: "desc" as const }, { createdAt: "asc" as const }], take: 1, select: { userId: true } } };
   const connection = await prisma.stockConnection.findUnique({
     where: { agentKeyHash: hashToken(token) },
     include: { pharmacy: { select: pharmacySelect } },

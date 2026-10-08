@@ -147,7 +147,7 @@ export async function listPharmacyUsers(input: { q: string | null; role: UserRol
         status: true,
         lastLoginAt: true,
         createdAt: true,
-        memberships: { orderBy: { createdAt: "asc" }, select: { id: true, role: true, isActive: true, pharmacy: { select: { id: true, name: true, city: true, isActive: true, isDemo: true } } } },
+        memberships: { orderBy: { createdAt: "asc" }, select: { id: true, role: true, isActive: true, isPrincipal: true, pharmacy: { select: { id: true, name: true, city: true, isActive: true, isDemo: true } } } },
       },
     }),
   ]);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
+import { loadTeam } from "@/server/services/team-management";
 import { PageHeader } from "@/components/ui/page";
 import { TeamManager, type TeamMember } from "./team-manager";
 
@@ -12,47 +12,34 @@ export const metadata: Metadata = { title: "Équipe" };
  *
  * La requête est bornée à `pharmacyId` : un titulaire de groupe qui bascule
  * d'officine voit l'équipe de l'officine active, jamais l'union des deux.
+ * L'ordre est celui que le titulaire a choisi (flèches de la liste).
  */
 export default async function TeamPage() {
   const session = await requirePermission(PERMISSIONS.TEAM_MANAGE);
 
-  const memberships = await prisma.membership.findMany({
-    where: { pharmacyId: session.scope.pharmacyId },
-    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
-    include: {
-      user: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          lastLoginAt: true,
-          deletedAt: true,
-        },
-      },
-    },
-  });
-
-  const members: TeamMember[] = memberships
-    .filter((membership) => !membership.user.deletedAt)
-    .map((membership) => ({
-      userId: membership.user.id,
-      firstName: membership.user.firstName,
-      lastName: membership.user.lastName,
-      email: membership.user.email,
-      role: membership.role,
-      isActive: membership.isActive,
-      lastLoginAt: membership.user.lastLoginAt?.toISOString() ?? null,
-      isSelf: membership.user.id === session.scope.userId,
-    }));
+  const team = await loadTeam(session.scope.pharmacyId);
+  const members: TeamMember[] = team.map((member) => ({
+    userId: member.userId,
+    firstName: member.firstName,
+    lastName: member.lastName,
+    email: member.email,
+    phone: member.phone,
+    rppsNumber: member.rppsNumber,
+    role: member.role,
+    isActive: member.isActive,
+    isPrincipal: member.isPrincipal,
+    sharedAccount: member.sharedAccount,
+    lastLoginAt: member.lastLoginAt?.toISOString() ?? null,
+    isSelf: member.userId === session.scope.userId,
+  }));
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         title="Équipe"
-        description={`Les accès à ${session.pharmacy.name}.`}
+        description={`Les accès à ${session.pharmacy.name} : le poste de chacun, le titulaire principal, l'ordre de l'équipe.`}
       />
-      <TeamManager members={members} />
+      <TeamManager members={members} canManageOwners={session.role === "OWNER"} />
     </div>
   );
 }

@@ -186,7 +186,7 @@ export async function ownerScopeForPharmacy(pharmacyId: string): Promise<{ scope
       name: true,
       organizationId: true,
       isDemo: true,
-      memberships: { where: { role: "OWNER", isActive: true }, orderBy: { createdAt: "asc" }, take: 1, select: { userId: true } },
+      memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { userId: true } },
     },
   });
   const owner = pharmacy?.memberships[0];

@@ -1,13 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, KeyRound, Plus, ShieldOff, UserPlus } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, KeyRound, Pencil, Plus, ShieldOff, UserPlus } from "lucide-react";
 import {
   createCollaboratorAction,
+  moveCollaboratorAction,
   resetCollaboratorPasswordAction,
   setCollaboratorAccessAction,
   setCollaboratorRoleAction,
+  updateCollaboratorAction,
 } from "@/server/actions/team";
+import { TEAM_ROLES, TEAM_ROLE_LABELS, type TeamRole } from "@/core/team/rules";
+import { MemberEditModal } from "@/components/team/member-edit-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,33 +28,36 @@ export type TeamMember = {
   firstName: string;
   lastName: string;
   email: string;
-  role: string;
+  phone: string | null;
+  rppsNumber: string | null;
+  role: TeamRole;
   isActive: boolean;
+  /** Le titulaire principal : celui que PharmaBoost contacte (contrat, facture, accès). */
+  isPrincipal: boolean;
+  /** Le compte travaille aussi dans une autre officine : son identité ne se modifie pas d'ici. */
+  sharedAccount: boolean;
   lastLoginAt: string | null;
   isSelf: boolean;
 };
 
 type AssignableRole = "PHARMACIST" | "TECHNICIAN" | "STUDENT" | "VIEWER";
 
-const ROLE_OPTIONS: { value: AssignableRole; label: string; hint: string }[] = [
-  { value: "PHARMACIST", label: "Pharmacien", hint: "Vérifie les ordonnances et valide les conseils" },
-  { value: "TECHNICIAN", label: "Préparateur", hint: "Comptoir, patients et stock" },
-  { value: "STUDENT", label: "Étudiant", hint: "Consultation et préparation, sans validation" },
-  { value: "VIEWER", label: "Consultation", hint: "Lecture seule" },
-];
-
+/** Les postes qu'on peut donner à quelqu'un qu'on AJOUTE : devenir titulaire passe par « Modifier ». */
+const ROLE_OPTIONS = TEAM_ROLES.filter((role): role is (typeof TEAM_ROLES)[number] & { value: AssignableRole } => role.value !== "OWNER");
 
 /**
  * L'équipe de l'officine.
  *
- * Un titulaire ne gère pas des « utilisateurs » : il ouvre un accès à quelqu'un
- * qui arrive, le suspend quand il part. D'où trois gestes seulement, visibles
- * sans ouvrir de sous-écran, et un rôle expliqué en une ligne plutôt qu'une
- * matrice de permissions.
+ * Un titulaire ne gère pas des « utilisateurs » : il ouvre un accès à quelqu'un qui arrive, le suspend quand il part,
+ * corrige un nom, change un poste, choisit qui est le titulaire principal et dans quel ordre l'équipe se présente. Les
+ * gestes sont visibles sans ouvrir de sous-écran, et un poste est expliqué en une ligne plutôt qu'une matrice de
+ * permissions. Le serveur applique les règles (une officine garde toujours un titulaire actif et un titulaire principal) ;
+ * l'écran n'offre que ce qui passera, et dit pourquoi quand un geste est refusé.
  */
-export function TeamManager({ members }: { members: TeamMember[] }) {
+export function TeamManager({ members, canManageOwners }: { members: TeamMember[]; canManageOwners: boolean }) {
   const [addOpen, setAddOpen] = useState(false);
   const [passwordFor, setPasswordFor] = useState<TeamMember | null>(null);
+  const [editFor, setEditFor] = useState<TeamMember | null>(null);
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
 
@@ -62,6 +69,9 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
         title: result.ok ? (result.message ?? "Enregistré") : (result.error ?? "Erreur"),
       });
     });
+
+  // Les postes proposés dans la liste : « Titulaire » seulement à un titulaire (nommer un associé est son affaire).
+  const roleChoices = TEAM_ROLES.filter((role) => canManageOwners || role.value !== "OWNER");
 
   return (
     <div className="space-y-4">
@@ -78,7 +88,7 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
       <Card>
         <CardContent className="p-0">
           <ul className="divide-y divide-border-subtle">
-            {members.map((member) => (
+            {members.map((member, index) => (
               <li
                 key={member.userId}
                 className={cn(
@@ -86,6 +96,29 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
                   !member.isActive && "bg-surface-sunken/50",
                 )}
               >
+                <span className="flex flex-col" role="group" aria-label={`Place de ${member.firstName} dans la liste`}>
+                  <button
+                    type="button"
+                    disabled={pending || index === 0}
+                    aria-label={`Monter ${member.firstName} ${member.lastName}`}
+                    title="Monter"
+                    onClick={() => run(() => moveCollaboratorAction({ userId: member.userId, direction: "up" }))}
+                    className="rounded p-0.5 text-text-tertiary transition-colors hover:bg-surface-sunken hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <ArrowUp className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pending || index === members.length - 1}
+                    aria-label={`Descendre ${member.firstName} ${member.lastName}`}
+                    title="Descendre"
+                    onClick={() => run(() => moveCollaboratorAction({ userId: member.userId, direction: "down" }))}
+                    className="rounded p-0.5 text-text-tertiary transition-colors hover:bg-surface-sunken hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <ArrowDown className="size-4" />
+                  </button>
+                </span>
+
                 <Avatar
                   initials={`${member.firstName.at(0) ?? ""}${member.lastName.at(0) ?? ""}`.toUpperCase()}
                   name={`${member.firstName} ${member.lastName}`}
@@ -96,6 +129,7 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
                   <p className="flex flex-wrap items-center gap-2 text-[14px] font-medium text-text-primary">
                     {member.firstName} {member.lastName.toUpperCase()}
                     {member.isSelf && <Badge tone="neutral">Vous</Badge>}
+                    {member.isPrincipal && <Badge tone="brand">Titulaire principal</Badge>}
                     {!member.isActive && <Badge tone="warning">Accès suspendu</Badge>}
                   </p>
                   <p className="truncate text-[12.5px] text-text-tertiary">
@@ -106,24 +140,20 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
                   </p>
                 </div>
 
-                {member.role === "OWNER" ? (
+                {member.isPrincipal ? (
+                  // Le titulaire principal ne change pas de poste : on en désigne un autre à sa place (« Modifier »).
+                  <span className="w-[150px] text-[13.5px] font-medium text-text-primary">{TEAM_ROLE_LABELS[member.role]}</span>
+                ) : member.role === "OWNER" && !canManageOwners ? (
                   <Badge tone="brand">Titulaire</Badge>
                 ) : (
                   <Select
-                    aria-label={`Rôle de ${member.firstName}`}
+                    aria-label={`Poste de ${member.firstName}`}
                     value={member.role}
                     disabled={pending}
-                    onChange={(event) =>
-                      run(() =>
-                        setCollaboratorRoleAction({
-                          userId: member.userId,
-                          role: event.target.value as AssignableRole,
-                        }),
-                      )
-                    }
+                    onChange={(event) => run(() => setCollaboratorRoleAction({ userId: member.userId, role: event.target.value as TeamRole }))}
                     className="w-[150px]"
                   >
-                    {ROLE_OPTIONS.map((option) => (
+                    {roleChoices.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -132,6 +162,9 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
                 )}
 
                 <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => setEditFor(member)} leadingIcon={<Pencil className="size-4" />}>
+                    Modifier
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -173,6 +206,12 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
 
       <AddMemberModal open={addOpen} onClose={() => setAddOpen(false)} />
       <PasswordModal member={passwordFor} onClose={() => setPasswordFor(null)} />
+      <MemberEditModal
+        member={editFor}
+        canManageOwners={canManageOwners}
+        onSave={(changes) => updateCollaboratorAction({ userId: editFor!.userId, ...changes })}
+        onClose={() => setEditFor(null)}
+      />
     </div>
   );
 }

@@ -401,7 +401,7 @@ async function main() {
     });
 
     await prisma.membership.create({
-      data: { userId: user.id, pharmacyId: pharmacy.id, role: member.role },
+      data: { userId: user.id, pharmacyId: pharmacy.id, role: member.role, isPrincipal: member.role === "OWNER", sortOrder: users.length + 1 },
     });
 
     // La titulaire pilote les deux officines du groupe.

@@ -183,7 +183,7 @@ export async function prepareContractForPharmacyAction(payload: z.input<typeof c
   const actor = { type: "ADMIN" as const, id: session.admin.id, label: session.admin.fullName };
   // Le contrat reprend l'adresse de l'officine et le titulaire : sans eux, on
   // le dit tout de suite, avec l'endroit où les compléter.
-  const pharmacy = await prisma.pharmacy.findUnique({ where: { id: parsed.data.pharmacyId }, select: { addressLine1: true, city: true, email: true, memberships: { where: { role: "OWNER", isActive: true }, take: 1, select: { user: { select: { email: true } } } } } });
+  const pharmacy = await prisma.pharmacy.findUnique({ where: { id: parsed.data.pharmacyId }, select: { addressLine1: true, city: true, email: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { email: true } } } } } });
   if (!pharmacy) return fail("Officine introuvable.");
   const missing = [!pharmacy.addressLine1 ? "adresse" : null, !pharmacy.city ? "ville" : null, !pharmacy.memberships[0] && !pharmacy.email ? "titulaire ou e-mail" : null].filter(Boolean);
   if (missing.length > 0) return fail(`Complétez d'abord la fiche de l'officine (Officines clientes → Modifier) : ${missing.join(", ")}.`);

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SearchX, Users } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { listPharmacyUsers } from "@/server/services/admin/clients";
+import { soleOwnerPharmaciesByUser } from "@/server/services/admin/deletion";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { FilterChips, SearchBox } from "@/components/admin/filters";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -14,13 +15,14 @@ import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/t
 import { formatFrenchDate } from "@/core/billing/subscription";
 import { parsePage, parseUserRole, parseUserStatusFilter, ROLE_LABELS, searchParam, USER_ROLES, USER_STATUS_FILTERS, USER_STATUS_FILTER_LABELS, userAccessState } from "@/core/admin/clients";
 import { Pagination, When } from "../pharmacies/client-ui";
+import { DeleteUserButton } from "./delete-user-button";
 
 export const metadata: Metadata = { title: "Utilisateurs des officines" };
 
 /**
  * Tous les comptes des officines clientes : rôle, statut, dernière connexion.
- * Les gestes (renvoyer l'accès, suspendre) se font depuis la fiche de
- * l'officine, onglet Utilisateurs.
+ * Supprimer un compte se fait d'ici (partout où il travaille) ; renvoyer l'accès
+ * ou suspendre se fait depuis la fiche de l'officine, onglet Utilisateurs.
  */
 export default async function PharmacyUsersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePlatformSession();
@@ -36,10 +38,12 @@ export default async function PharmacyUsersPage({ searchParams }: { searchParams
   if (data.rows.length === 0 && data.total > 0 && requestedPage > data.pages) data = await listPharmacyUsers({ q, role, statut, page: data.pages });
   const page = Math.min(requestedPage, data.pages);
   const { rows } = data;
+  // Les officines dont un compte est le seul titulaire : son bouton « Supprimer » s'éteint (deux requêtes pour la page).
+  const soleOwners = await soleOwnerPharmaciesByUser(rows.map((user) => user.id));
 
   return (
     <>
-      <AdminPageHeader space={{ label: "Clients", href: "/admin/pharmacies" }} title="Utilisateurs" description="Les comptes des officines clientes, leur rôle et leur dernière connexion. Les gestes se font depuis la fiche de l'officine." />
+      <AdminPageHeader space={{ label: "Clients", href: "/admin/pharmacies" }} title="Utilisateurs" description="Les comptes des officines clientes, leur rôle et leur dernière connexion. Supprimer se fait ici ; renvoyer l'accès ou suspendre, depuis la fiche de l'officine." />
 
       <section className="space-y-3">
         <SearchBox action="/admin/utilisateurs" defaultValue={q} placeholder="Nom, e-mail ou officine" keep={keep} />
@@ -81,10 +85,13 @@ export default async function PharmacyUsersPage({ searchParams }: { searchParams
                 <TR>
                   <TH>Compte</TH>
                   <TH>Officine</TH>
-                  <TH>Rôle</TH>
+                  <TH>Poste</TH>
                   <TH>Statut</TH>
                   <TH>Dernière connexion</TH>
                   <TH>Créé le</TH>
+                  <TH className="text-right">
+                    <span className="sr-only">Gestes</span>
+                  </TH>
                 </TR>
               </THead>
               <TBody>
@@ -123,6 +130,7 @@ export default async function PharmacyUsersPage({ searchParams }: { searchParams
                               {ROLE_LABELS[r] ?? r}
                             </Badge>
                           ))}
+                          {user.memberships.some((m) => m.isPrincipal) && <Badge tone="accent">Titulaire principal</Badge>}
                         </span>
                       </TD>
                       <TD>
@@ -132,6 +140,15 @@ export default async function PharmacyUsersPage({ searchParams }: { searchParams
                         <When date={user.lastLoginAt} empty="Jamais" className="text-[13px]" />
                       </TD>
                       <TD className="text-[13px] text-text-secondary">{formatFrenchDate(user.createdAt)}</TD>
+                      <TD className="text-right">
+                        <DeleteUserButton
+                          userId={user.id}
+                          name={`${user.firstName} ${user.lastName}`}
+                          email={user.email}
+                          pharmacies={user.memberships.map((m) => m.pharmacy.name)}
+                          soleOwnerOf={soleOwners.get(user.id) ?? []}
+                        />
+                      </TD>
                     </TR>
                   );
                 })}

@@ -69,6 +69,7 @@ async function main() {
         pharmacyId: pharmacy.id,
         role: account.role,
         isActive: true,
+        isPrincipal: account.role === "OWNER",
       },
     });
 

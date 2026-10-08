@@ -15,7 +15,7 @@ import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 export async function sendInstallationGuide(pharmacyId: string, actor: { adminId?: string | null; reason: "SUBSCRIPTION_STARTED" | "ADMIN" }): Promise<{ status: string; detail: string; sentTo: string | null }> {
   const pharmacy = await prisma.pharmacy.findUnique({
     where: { id: pharmacyId },
-    select: { id: true, name: true, email: true, organizationId: true, memberships: { where: { role: "OWNER", isActive: true }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
+    select: { id: true, name: true, email: true, organizationId: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
   });
   if (!pharmacy) return { status: "FAILED", detail: "Officine introuvable.", sentTo: null };
   const owner = pharmacy.memberships[0]?.user;

@@ -76,7 +76,7 @@ export async function getProspectFor(prospectId: string, viewer: { kind: "SALES"
     where: { id: prospectId },
     include: {
       salesRep: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, commissionType: true, commissionValue: true } },
-      pharmacy: { select: { id: true, name: true, isActive: true, createdAt: true, memberships: { where: { role: "OWNER" }, take: 1, select: { user: { select: { email: true, lastLoginAt: true } } } } } },
+      pharmacy: { select: { id: true, name: true, isActive: true, createdAt: true, memberships: { where: { role: "OWNER" }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { email: true, lastLoginAt: true } } } } } },
       contracts: { orderBy: { version: "desc" }, include: { plan: { select: { name: true } } } },
       plan: { select: { id: true, name: true, monthlyPriceCents: true, trialDays: true } },
       commissions: { orderBy: { createdAt: "desc" } },

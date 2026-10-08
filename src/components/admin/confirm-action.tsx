@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { confirmationMatches } from "@/core/admin/deletion";
 import type { ActionResult } from "@/server/actions/types";
 
 /**
@@ -24,6 +25,7 @@ export function ConfirmAction({
   typedConfirmation,
   onConfirm,
   successMessage,
+  redirectTo,
   variant = "secondary",
   size = "sm",
   icon,
@@ -39,10 +41,13 @@ export function ConfirmAction({
   tone?: "primary" | "danger";
   /** Motif obligatoire (au moins 5 caractères). */
   reason?: { label: string; placeholder?: string };
-  /** Mot à retaper pour confirmer (« RÉSILIER »). */
+  /** Mot (« RÉSILIER ») ou nom (celui d'une officine) à retaper pour confirmer : sans casse ni accents. */
   typedConfirmation?: string;
-  onConfirm: (reason: string | undefined) => Promise<ActionResult<unknown>>;
+  /** Reçoit le motif saisi et le texte retapé : le serveur revérifie ce second texte, l'écran ne fait qu'aider. */
+  onConfirm: (reason: string | undefined, typed: string) => Promise<ActionResult<unknown>>;
   successMessage?: string;
+  /** Où aller après le succès, quand la page courante n'existe plus (une officine supprimée). Sinon la page se recharge. */
+  redirectTo?: string;
   variant?: ButtonProps["variant"];
   size?: ButtonProps["size"];
   icon?: ReactNode;
@@ -59,7 +64,7 @@ export function ConfirmAction({
   const { push } = useToast();
 
   const reasonOk = !reason || motive.trim().length >= 5;
-  const typedOk = !typedConfirmation || typed.trim().toUpperCase() === typedConfirmation.toUpperCase();
+  const typedOk = !typedConfirmation || confirmationMatches(typedConfirmation, typed);
 
   const close = () => {
     if (pending) return;
@@ -73,7 +78,7 @@ export function ConfirmAction({
     if (!reasonOk || !typedOk) return;
     setError(null);
     start(async () => {
-      const result = await onConfirm(reason ? motive.trim() : undefined);
+      const result = await onConfirm(reason ? motive.trim() : undefined, typed.trim());
       if (!result.ok) {
         setError(result.error);
         push({ tone: "error", title: result.error });
@@ -83,7 +88,8 @@ export function ConfirmAction({
       setOpen(false);
       setMotive("");
       setTyped("");
-      router.refresh();
+      if (redirectTo) router.push(redirectTo);
+      else router.refresh();
     });
   };
 

@@ -55,8 +55,13 @@ export function MemberActions({ pharmacyId, membershipId, isActive, name }: { ph
         variant="ghost"
         tone="danger"
         title={`Supprimer le compte de ${name}`}
-        description="Le compte est retiré de l'officine et ne peut plus se connecter."
-        consequences={["Ses sessions sont fermées et son accès retiré.", "Le compte est marqué supprimé ; son adresse ne peut pas être réutilisée telle quelle.", "Les traces (journal, historique) restent."]}
+        description="Le compte est retiré de cette officine."
+        consequences={[
+          "Un compte qui n'a que cette officine est supprimé : ses sessions sont fermées et son adresse e-mail est libérée.",
+          "Un compte qui travaille aussi dans une autre officine est seulement retiré d'ici : il garde son compte là-bas.",
+          "Le seul titulaire de l'officine ne peut pas être supprimé : ajoutez d'abord un autre titulaire.",
+          "Les traces (journal, historique) restent.",
+        ]}
         typedConfirmation="SUPPRIMER"
         confirmLabel="Supprimer le compte"
         onConfirm={() => deletePharmacyMemberAction({ pharmacyId, membershipId })}

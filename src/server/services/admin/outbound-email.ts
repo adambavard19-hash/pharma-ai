@@ -32,7 +32,7 @@ export type Recipient = {
 export async function pharmacyRecipient(pharmacyId: string): Promise<Recipient | null> {
   const pharmacy = await prisma.pharmacy.findUnique({
     where: { id: pharmacyId },
-    select: { id: true, name: true, email: true, organizationId: true, prospect: { select: { id: true } }, memberships: { where: { role: "OWNER", isActive: true, user: { deletedAt: null } }, take: 1, select: { user: { select: { email: true, firstName: true, lastName: true } } } } },
+    select: { id: true, name: true, email: true, organizationId: true, prospect: { select: { id: true } }, memberships: { where: { role: "OWNER", isActive: true, user: { deletedAt: null } }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { email: true, firstName: true, lastName: true } } } } },
   });
   if (!pharmacy) return null;
   const owner = pharmacy.memberships[0]?.user ?? null;

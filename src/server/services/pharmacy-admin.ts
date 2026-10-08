@@ -110,7 +110,8 @@ export async function createClientPharmacy(input: CreateClientPharmacyInput, act
       },
     });
     const owner = await tx.user.create({ data: { organizationId: organization.id, email: ownerEmail, firstName: input.ownerFirstName, lastName: input.ownerLastName, passwordHash, status: "ACTIVE" } });
-    await tx.membership.create({ data: { userId: owner.id, pharmacyId: pharmacy.id, role: "OWNER", isActive: true } });
+    // Le premier titulaire d'une officine en est le titulaire principal, et le premier de la liste.
+    await tx.membership.create({ data: { userId: owner.id, pharmacyId: pharmacy.id, role: "OWNER", isActive: true, isPrincipal: true, sortOrder: 1 } });
     if (lgo) await tx.stockConnection.create({ data: { pharmacyId: pharmacy.id, lgo, status: "PENDING" } });
     await tx.pharmacyPostCountChange.create({ data: { pharmacyId: pharmacy.id, previous: null, next: input.postCount, actorType: actor.type, actorLabel: actor.label } });
     return { pharmacyId: pharmacy.id, ownerId: owner.id };
@@ -162,7 +163,8 @@ export async function changePharmacyContactEmail(pharmacyId: string, raw: string
 async function activeOwner(pharmacyId: string) {
   const membership = await prisma.membership.findFirst({
     where: { pharmacyId, role: "OWNER", isActive: true, user: { deletedAt: null } },
-    orderBy: { createdAt: "asc" },
+    // Le titulaire principal d'abord : c'est lui que PharmaBoost contacte.
+    orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }],
     select: { user: { select: { id: true, email: true, firstName: true, lastName: true, lastLoginAt: true, status: true } } },
   });
   return membership?.user ?? null;

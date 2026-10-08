@@ -175,7 +175,7 @@ export async function installDemoPharmacy(options: InstallOptions = {}): Promise
     userIds[member.key] = user.id;
     await prisma.membership.upsert({
       where: { userId_pharmacyId: { userId: user.id, pharmacyId: pharmacy.id } },
-      create: { userId: user.id, pharmacyId: pharmacy.id, role: member.role, isActive: true },
+      create: { userId: user.id, pharmacyId: pharmacy.id, role: member.role, isActive: true, isPrincipal: member.key === "owner", sortOrder: DEMO_TEAM.indexOf(member) + 1 },
       update: { role: member.role, isActive: true, grantedPermissions: [], revokedPermissions: [] },
     });
   }

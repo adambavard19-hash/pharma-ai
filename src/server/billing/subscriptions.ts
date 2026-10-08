@@ -125,7 +125,7 @@ async function loadInviteContext(pharmacyId: string, planId: string, contractId:
   const [pharmacy, plan] = await Promise.all([
     prisma.pharmacy.findUnique({
       where: { id: pharmacyId },
-      select: { id: true, name: true, organizationId: true, email: true, addressLine1: true, postalCode: true, city: true, siret: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: { createdAt: "asc" }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
+      select: { id: true, name: true, organizationId: true, email: true, addressLine1: true, postalCode: true, city: true, siret: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
     }),
     prisma.plan.findUnique({ where: { id: planId } }),
   ]);
@@ -257,7 +257,7 @@ export async function startCheckoutForInvite(token: string): Promise<{ ok: true;
   const stripe = getStripe();
   const pharmacy = await prisma.pharmacy.findUniqueOrThrow({
     where: { id: invite.pharmacyId },
-    select: { name: true, email: true, addressLine1: true, addressLine2: true, postalCode: true, city: true, country: true, siret: true, memberships: { where: { role: "OWNER", isActive: true }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
+    select: { name: true, email: true, addressLine1: true, addressLine2: true, postalCode: true, city: true, country: true, siret: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
   });
   const owner = pharmacy.memberships[0]?.user ?? null;
   const existing = await prisma.subscription.findUnique({ where: { organizationId: invite.organizationId }, select: { externalCustomerId: true } });
@@ -515,7 +515,7 @@ export async function refreshSubscriptionFromStripe(organizationId: string): Pro
 
 /** Après la première synchronisation d'un abonnement, prévenir le titulaire et la console. */
 export async function announceSubscriptionStarted(organizationId: string): Promise<void> {
-  const subscription = await prisma.subscription.findUnique({ where: { organizationId }, include: { plan: true, organization: { select: { pharmacies: { take: 1, select: { id: true, name: true, memberships: { where: { role: "OWNER", isActive: true }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } } } } } } });
+  const subscription = await prisma.subscription.findUnique({ where: { organizationId }, include: { plan: true, organization: { select: { pharmacies: { take: 1, select: { id: true, name: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } } } } } } });
   const pharmacy = subscription?.organization.pharmacies[0];
   if (!subscription || !pharmacy) return;
   // Le tarif annoncé est le tarif contractuel de l'officine, jamais le catalogue du jour.
@@ -720,7 +720,7 @@ export const PHARMACY_BILLING_SELECT = {
   contracts: { orderBy: { version: "desc" as const }, take: 1, select: { id: true, status: true, version: true, sentAt: true, finalizedAt: true, monthlyPriceCents: true, trialDays: true, plan: { select: { name: true } } } },
   prospect: { select: { id: true, contracts: { orderBy: { version: "desc" as const }, take: 1, select: { id: true, status: true, version: true, sentAt: true, finalizedAt: true, monthlyPriceCents: true, trialDays: true, plan: { select: { name: true } } } } } },
   subscriptionInvites: { orderBy: { createdAt: "desc" as const }, take: 1, select: { id: true, sentAt: true, sentCount: true, openedAt: true, completedAt: true, expiresAt: true, sentTo: true, plan: { select: { name: true, monthlyPriceCents: true, trialDays: true } } } },
-  memberships: { where: { role: "OWNER" as const, isActive: true }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } },
+  memberships: { where: { role: "OWNER" as const, isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } },
 } satisfies Prisma.PharmacySelect;
 
 /** Le dernier contrat d'une officine : rattaché directement, sinon via son dossier. */

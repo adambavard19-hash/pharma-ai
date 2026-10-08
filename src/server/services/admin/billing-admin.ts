@@ -288,7 +288,7 @@ const LIST_SELECT = {
   contracts: { orderBy: { version: "desc" as const }, take: 1, select: { status: true } },
   prospect: { select: { contracts: { orderBy: { version: "desc" as const }, take: 1, select: { status: true } } } },
   subscriptionInvites: { orderBy: { createdAt: "desc" as const }, take: 1, select: { sentAt: true, completedAt: true } },
-  memberships: { where: { role: "OWNER" as const, isActive: true }, take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } },
+  memberships: { where: { role: "OWNER" as const, isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } },
   cancellationRequests: { where: { status: { in: OPEN_CANCELLATION_STATUSES } }, orderBy: { createdAt: "desc" as const }, take: 1, select: { id: true, status: true } },
 } satisfies Prisma.PharmacySelect;
 

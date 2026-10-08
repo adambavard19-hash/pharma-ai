@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Pin } from "lucide-react";
 import { loadOverviewExtras, type Pharmacy360 } from "@/server/services/admin/pharmacy-360";
+import { loadPharmacyDeletionImpact } from "@/server/services/admin/deletion";
 import { AdminSection, FactList } from "@/components/admin/page-header";
 import { PaymentStatusBadge, StatusBadge, SubscriptionStatusBadge } from "@/components/admin/status-badge";
 import { Timeline } from "@/components/admin/timeline";
@@ -12,6 +13,7 @@ import { PROSPECT_STATUS_LABELS, PROSPECT_STATUS_TONES, type ProspectStatusCode 
 import { pharmacyStatusLabel, truncate } from "@/core/admin/clients";
 import { formatDateTime } from "@/lib/format";
 import { EditPharmacyButton } from "../pharmacy-form";
+import { DeletePharmacyPanel } from "./delete-pharmacy";
 import { When } from "../client-ui";
 import { AddNoteButton } from "./notes";
 import { ContractPdfLink, ContractStatusBadge, EmptyLine, MoreLink, tabHref } from "./shared";
@@ -19,7 +21,7 @@ import { ContractPdfLink, ContractStatusBadge, EmptyLine, MoreLink, tabHref } fr
 /** L'aperçu : l'essentiel de chaque onglet, en une page. */
 export async function OverviewTab({ base, now }: { base: Pharmacy360; now: Date }) {
   const { pharmacy, subscription, price, latestContract, owner } = base;
-  const extras = await loadOverviewExtras(base, now);
+  const [extras, deletion] = await Promise.all([loadOverviewExtras(base, now), loadPharmacyDeletionImpact(pharmacy.id)]);
   const address = [pharmacy.addressLine1, pharmacy.addressLine2, [pharmacy.postalCode, pharmacy.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   const prospect = pharmacy.prospect;
 
@@ -172,6 +174,12 @@ export async function OverviewTab({ base, now }: { base: Pharmacy360; now: Date 
       <AdminSection className="lg:col-span-2" title="Dernière activité" description="Les huit derniers faits, toutes sources confondues." action={<MoreLink href={tabHref(pharmacy.id, "historique")}>Tout l&apos;historique</MoreLink>}>
         <Timeline entries={extras.timeline} emptyText="Rien d'enregistré pour l'instant." />
       </AdminSection>
+
+      {deletion && (
+        <AdminSection className="border-danger-200 lg:col-span-3 dark:border-danger-800" title="Zone sensible" description="Les gestes qui ne se rattrapent pas.">
+          <DeletePharmacyPanel impact={deletion} />
+        </AdminSection>
+      )}
     </div>
   );
 }

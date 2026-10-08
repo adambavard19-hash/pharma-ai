@@ -9,6 +9,8 @@ import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/t
 import { formatFrenchDate } from "@/core/billing/subscription";
 import { ROLE_LABELS, userAccessState } from "@/core/admin/clients";
 import { MemberActions } from "../member-actions";
+import { EditMemberButton } from "../edit-member-button";
+import type { TeamRole } from "@/core/team/rules";
 import { When } from "../client-ui";
 import { AddOwnerButton } from "./owner-form";
 import { ChangeEmailButton, ResendAccessButton } from "./access-actions";
@@ -57,7 +59,7 @@ export async function UsersTab({ base }: { base: Pharmacy360 }) {
         )}
       </AdminSection>
 
-      <AdminSection title="Comptes" description="Qui peut se connecter à cette officine." action={access ? <AddOwnerButton pharmacyId={pharmacy.id} /> : undefined} padded={pharmacy.memberships.length === 0}>
+      <AdminSection title="Comptes" description="Qui peut se connecter à cette officine, à quel poste, et qui est le titulaire principal (celui que PharmaBoost contacte)." action={access ? <AddOwnerButton pharmacyId={pharmacy.id} /> : undefined} padded={pharmacy.memberships.length === 0}>
         {pharmacy.memberships.length === 0 ? (
           <EmptyState icon={<Users className="size-5" />} title="Aucun compte pour l'instant" description="Ajoutez un titulaire pour ouvrir l'accès." />
         ) : (
@@ -66,7 +68,7 @@ export async function UsersTab({ base }: { base: Pharmacy360 }) {
               <THead>
                 <TR>
                   <TH>Compte</TH>
-                  <TH>Rôle</TH>
+                  <TH>Poste</TH>
                   <TH>Statut</TH>
                   <TH>Dernière connexion</TH>
                   <TH>Rattaché le</TH>
@@ -87,7 +89,10 @@ export async function UsersTab({ base }: { base: Pharmacy360 }) {
                         <span className="block text-[12px] text-text-tertiary">{m.user.email}</span>
                       </TD>
                       <TD>
-                        <Badge tone={m.role === "OWNER" ? "brand" : "neutral"}>{ROLE_LABELS[m.role] ?? m.role}</Badge>
+                        <span className="flex flex-wrap gap-1">
+                          <Badge tone={m.role === "OWNER" ? "brand" : "neutral"}>{ROLE_LABELS[m.role] ?? m.role}</Badge>
+                          {m.isPrincipal && <Badge tone="accent">Titulaire principal</Badge>}
+                        </span>
                       </TD>
                       <TD>
                         <StatusBadge status={state} />
@@ -97,7 +102,13 @@ export async function UsersTab({ base }: { base: Pharmacy360 }) {
                       </TD>
                       <TD className="text-[13px] text-text-secondary">{formatFrenchDate(m.createdAt)}</TD>
                       <TD>
-                        <MemberActions pharmacyId={pharmacy.id} membershipId={m.id} isActive={m.isActive} name={`${m.user.firstName} ${m.user.lastName}`} />
+                        <span className="flex flex-wrap items-center justify-end gap-1">
+                          <EditMemberButton
+                            pharmacyId={pharmacy.id}
+                            member={{ userId: m.user.id, firstName: m.user.firstName, lastName: m.user.lastName, email: m.user.email, phone: m.user.phone, rppsNumber: m.user.rppsNumber, role: m.role as TeamRole, isPrincipal: m.isPrincipal, sharedAccount: m.user._count.memberships > 1 }}
+                          />
+                          <MemberActions pharmacyId={pharmacy.id} membershipId={m.id} isActive={m.isActive} name={`${m.user.firstName} ${m.user.lastName}`} />
+                        </span>
                       </TD>
                     </TR>
                   );
