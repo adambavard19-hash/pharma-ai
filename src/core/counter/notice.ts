@@ -34,7 +34,15 @@ const DISCARDED_CANDIDATE_CODES = new Set([
   "VIGILANCE_PRODUCT_EXCLUDED",
 ]);
 export type NoticeRecommendation = {
+  /** L'identifiant du conseil : les boutons « Vendu » / « Non vendu » de la fenêtre le désignent. */
+  id?: string;
   name: string;
+  /** Le médicament (ou produit) de la vente qui a déclenché ce conseil, tel que le pharmacien le lit sur son écran. */
+  forDrug?: string | null;
+  /** Le challenge actif auquel ce produit participe, s'il y en a un : son titre. Jamais inventé. */
+  challengeTitle?: string | null;
+  /** La date de péremption (AAAA-MM-JJ) du lot le plus proche, quand elle est courte. Jamais inventée. */
+  shortDateOn?: string | null;
   priceCents: number | null;
   reason: string | null;
   status: string;
@@ -54,8 +62,23 @@ export type NoticeRecommendation = {
 /** Ce que le pharmacien lit sur la fenêtre : « En stock », « Stock faible », « Rupture », ou « Stock à vérifier ». */
 export type NoticeAvailability = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
 
+/** Où en est un conseil : pas encore de réponse, « Vendu » ou « Non vendu ». */
+export type NoticeOutcome = "NONE" | "SOLD" | "NOT_SOLD";
+
+export function outcomeOf(status: string): NoticeOutcome {
+  return status === "PURCHASED" ? "SOLD" : status === "DECLINED" ? "NOT_SOLD" : "NONE";
+}
+
 /** Un conseil, prêt à s'afficher sur le poste de caisse. */
 export type NoticeItem = {
+  id: string | null;
+  /** Le médicament de la vente concerné par ce conseil. */
+  drug: string | null;
+  /** Le titre du challenge actif, ou `null`. */
+  challenge: string | null;
+  /** La date de péremption du lot à écouler (AAAA-MM-JJ), ou `null`. */
+  shortDateOn: string | null;
+  outcome: NoticeOutcome;
   name: string;
   /** Le prix de vente, seulement quand le prix ET le stock sont fiables. */
   priceCents: number | null;
@@ -101,9 +124,10 @@ export type CounterNotice = {
 };
 
 const MAX_ALERTS = 2;
-const MAX_ADVICE = 3;
 const RANK: Record<string, number> = { BLOCKING: 0, WARNING: 1, CAUTION: 2, INFO: 3 };
-const SHOWN_STATUSES = new Set(["PROPOSED", "ACCEPTED", "MODIFIED"]);
+const MAX_ADVICE = 4;
+/** Un conseil reste sous les yeux du pharmacien après sa réponse : « Vendu » et « Non vendu » le marquent, ils ne le font pas disparaître. */
+const SHOWN_STATUSES = new Set(["PROPOSED", "ACCEPTED", "MODIFIED", "PURCHASED", "DECLINED"]);
 
 function euros(cents: number | null): string | null {
   if (cents === null || cents <= 0) return null;
@@ -146,9 +170,24 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
     .sort((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9))
     .slice(0, MAX_ALERTS)
     .map((alert) => alert.message);
-  const shown = input.recommendations.filter((rec) => SHOWN_STATUSES.has(rec.status) && rec.trusted !== false).slice(0, MAX_ADVICE);
+  // Un produit n'est conseillé qu'une fois : le mieux classé reste, les doublons (même produit pour deux médicaments) s'effacent.
+  const seenProducts = new Set<string>();
+  const shown = input.recommendations
+    .filter((rec) => SHOWN_STATUSES.has(rec.status) && rec.trusted !== false)
+    .filter((rec) => {
+      const key = shortName(rec.name).toLowerCase();
+      if (seenProducts.has(key)) return false;
+      seenProducts.add(key);
+      return true;
+    })
+    .slice(0, MAX_ADVICE);
   // Le prix ne s'affiche que si le stock est fiable : les deux viennent du même export du logiciel de gestion.
   const items: NoticeItem[] = shown.map((rec) => ({
+    id: rec.id ?? null,
+    drug: rec.forDrug ? shortName(rec.forDrug) : null,
+    challenge: rec.challengeTitle ?? null,
+    shortDateOn: rec.shortDateOn ?? null,
+    outcome: outcomeOf(rec.status),
     name: shortName(rec.name),
     priceCents: reliable && rec.priceCents !== null && rec.priceCents > 0 ? rec.priceCents : null,
     reason: rec.reason,
@@ -164,5 +203,6 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
       : "Rien à ajouter pour cette délivrance.";
     return { ...base, state: "READY", alerts: [], advice: [why], items: [], signature: `ready:${input.reference}:${input.lineNames.length}:none` };
   }
-  return { ...base, state: "READY", alerts, advice, items, signature: `ready:${input.reference}:${input.lineNames.length}:${alerts.length}:${advice.join("|")}` };
+  const marks = items.map((item) => `${item.outcome[0]}${item.challenge ? "c" : ""}${item.shortDateOn ? "d" : ""}`).join("");
+  return { ...base, state: "READY", alerts, advice, items, signature: `ready:${input.reference}:${input.lineNames.length}:${alerts.length}:${advice.join("|")}:${marks}` };
 }

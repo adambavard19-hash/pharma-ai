@@ -358,15 +358,28 @@ namespace PharmaBoostAvis
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr handle);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] public static extern int GetWindowLong(IntPtr hWnd, int index);
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW")] public static extern int SetWindowLong(IntPtr hWnd, int index, int value);
     public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
     public const uint SWP_NOSIZE = 0x1;
     public const uint SWP_NOMOVE = 0x2;
     public const uint SWP_NOACTIVATE = 0x10;
     public const uint SWP_SHOWWINDOW = 0x40;
+    public const int GWL_EXSTYLE = -20;
+    public const int WS_EX_NOACTIVATE = 0x08000000;
   }
 
+  /// <summary>Un conseil de la vente : le produit, le médicament concerné, les pastilles, la réponse du pharmacien.</summary>
   public class Item
   {
+    public string Id = "";
+    public string Drug = "";
+    public string Challenge = "";
+    public string ShortDate = "";
+    /// <summary>NONE (pas de réponse), SOLD (Vendu) ou NOT_SOLD (Non vendu).</summary>
+    public string Outcome = "NONE";
     public string Name = "";
     public string Price = "";
     public string Reason = "";
@@ -374,6 +387,7 @@ namespace PharmaBoostAvis
     public string Image = "";
   }
 
+  /// <summary>Ce que la fenêtre affiche pour UNE vente, du premier bip à « Vente terminée ».</summary>
   public class Entry
   {
     public string Id = "";
@@ -383,11 +397,23 @@ namespace PharmaBoostAvis
     public string Url = "";
     public string Signature = "";
     public bool Quiet;
+    public bool EmailSaved;
+    public string EmailError = "";
     public List<string> Alerts = new List<string>();
     public List<string> Notes = new List<string>();
     public List<Item> Items = new List<Item>();
     public List<string> Shown = new List<string>();
     public DateTime Since = DateTime.Now;
+  }
+
+  /// <summary>Le message de fin de vente : ce qui a été enregistré, et si un bilan est parti.</summary>
+  public class DoneInfo
+  {
+    public string Id = "";
+    public string Title = "";
+    public List<string> Lines = new List<string>();
+    public string Badge = "";
+    public bool Warning;
   }
 
   internal static class Look
@@ -402,6 +428,10 @@ namespace PharmaBoostAvis
     public static readonly Color GreenSoft = Color.FromArgb(232, 246, 240);
     public static readonly Color Amber = Color.FromArgb(181, 71, 8);
     public static readonly Color AmberSoft = Color.FromArgb(255, 247, 232);
+    public static readonly Color ChallengeBack = Color.FromArgb(255, 237, 213);
+    public static readonly Color ChallengeFore = Color.FromArgb(194, 65, 12);
+    public static readonly Color DateBack = Color.FromArgb(254, 226, 226);
+    public static readonly Color DateFore = Color.FromArgb(185, 28, 28);
 
     public static GraphicsPath Round(Rectangle r, int radius)
     {
@@ -480,6 +510,34 @@ namespace PharmaBoostAvis
       return bmp;
     }
 
+    /// <summary>Le rond de fin de vente : une coche blanche sur fond vert (ou un point d'exclamation si quelque chose a échoué).</summary>
+    public static Bitmap CheckBadge(int size, bool warning)
+    {
+      Bitmap bmp = new Bitmap(size, size);
+      using (Graphics g = Graphics.FromImage(bmp))
+      {
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(Color.Transparent);
+        using (SolidBrush fill = new SolidBrush(warning ? Color.FromArgb(217, 119, 6) : Green)) { g.FillEllipse(fill, 1, 1, size - 3, size - 3); }
+        using (Pen pen = new Pen(Color.White, Math.Max(3f, size / 11f)))
+        {
+          pen.StartCap = LineCap.Round;
+          pen.EndCap = LineCap.Round;
+          pen.LineJoin = LineJoin.Round;
+          if (warning)
+          {
+            g.DrawLine(pen, size / 2, size * 28 / 100, size / 2, size * 58 / 100);
+            g.DrawLine(pen, size / 2, size * 72 / 100, size / 2, size * 73 / 100);
+          }
+          else
+          {
+            g.DrawLines(pen, new Point[] { new Point(size * 28 / 100, size * 53 / 100), new Point(size * 44 / 100, size * 68 / 100), new Point(size * 72 / 100, size * 34 / 100) });
+          }
+        }
+      }
+      return bmp;
+    }
+
     /// <summary>L'icône près de l'horloge : le logo et, en pastille rouge, le nombre de conseils en attente.</summary>
     public static Bitmap CounterIcon(int count)
     {
@@ -499,6 +557,7 @@ namespace PharmaBoostAvis
           g.FillRectangle(white, 12, 8, 4, 16);
           g.FillRectangle(white, 6, 14, 16, 4);
         }
+        if (count <= 0) return bmp;
         string label = count > 9 ? "9+" : count.ToString();
         using (SolidBrush red = new SolidBrush(Color.FromArgb(217, 45, 32)))
         using (Pen ring = new Pen(Color.White, 2f))
@@ -525,6 +584,8 @@ namespace PharmaBoostAvis
     private readonly Color backHover;
     private readonly Color border;
     private bool hovered;
+    /// <summary>Un bouton momentanément inutilisable : grisé, et sans effet (le clic est ignoré par celui qui l'écoute).</summary>
+    public bool Muted;
 
     public PillButton(string text, bool filled, Color back, Color backHover, Color fore, Color border, Font font)
     {
@@ -551,34 +612,70 @@ namespace PharmaBoostAvis
       int radius = Math.Max(6, Height / 4);
       using (GraphicsPath path = Look.Round(new Rectangle(0, 0, Width - 1, Height - 1), radius))
       {
-        using (SolidBrush fill = new SolidBrush(hovered ? backHover : back)) { g.FillPath(fill, path); }
-        if (!filled)
+        using (SolidBrush fill = new SolidBrush(Muted ? Color.FromArgb(228, 231, 236) : (hovered ? backHover : back))) { g.FillPath(fill, path); }
+        if (!filled && !Muted)
         {
           using (Pen pen = new Pen(border, 1.5f)) { g.DrawPath(pen, path); }
         }
       }
-      TextRenderer.DrawText(g, Text, Font, new Rectangle(0, 0, Width, Height), ForeColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+      TextRenderer.DrawText(g, Text, Font, new Rectangle(0, 0, Width, Height), Muted ? Color.FromArgb(120, 130, 146) : ForeColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+    }
+  }
+
+  /// <summary>Une carte arrondie, fond blanc, filet clair : un conseil.</summary>
+  public class Card : Panel
+  {
+    public Card()
+    {
+      DoubleBuffered = true;
+      BackColor = Color.White;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+      base.OnPaint(e);
+      e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+      using (GraphicsPath path = Look.Round(new Rectangle(0, 0, Width - 1, Height - 1), 10))
+      using (Pen pen = new Pen(Look.Line, 1.5f))
+      {
+        e.Graphics.DrawPath(pen, path);
+      }
     }
   }
 
   /// <summary>
-  /// La fenêtre du conseil. Jamais activée : ni clavier, ni focus volé au logiciel de gestion.
+  /// La fenêtre de la vente. Elle ne prend ni le clavier ni le focus, sauf UN geste volontaire du pharmacien :
+  /// cliquer dans le champ « e-mail du patient » (BeginTyping, EndTyping). Tout le reste se fait à la souris.
   /// </summary>
-  public class ToastForm : Form
+  public class SaleForm : Form
   {
-    public event Action<Entry> ViewClicked;
-    public event Action<Entry> IgnoreClicked;
+    public event Action<string> Word;
     public event Action<Point> Moved;
 
     private readonly float scale;
+    private readonly System.Windows.Forms.Timer typingTimer = new System.Windows.Forms.Timer();
     private Entry entry;
+    private Entry deferred;
+    private DoneInfo done;
     private bool dragging;
     private Point dragStart;
     private Point dragOrigin;
+    private bool editing;
+    private IntPtr previousForeground = IntPtr.Zero;
+    private bool emailOpen;
+    private string emailText = "";
+    private bool emailConsent;
+    private bool finishing;
+    private TextBox emailBox;
+    private PillButton saveButton;
+    private Label emailMessage;
+    public bool Reduced;
+    /// <summary>Rien à conseiller : un mot de quelques secondes, sans réponse à donner ni bouton.</summary>
+    public bool Quiet;
     public string Position = "milieu-droite";
     public string PositionFile = "";
 
-    public ToastForm()
+    public SaleForm()
     {
       using (Graphics g = Graphics.FromHwnd(IntPtr.Zero)) { scale = g.DpiX / 96f; }
       FormBorderStyle = FormBorderStyle.None;
@@ -587,6 +684,7 @@ namespace PharmaBoostAvis
       StartPosition = FormStartPosition.Manual;
       BackColor = Color.White;
       DoubleBuffered = true;
+      typingTimer.Tick += delegate { EndTyping(true); };
     }
 
     protected override bool ShowWithoutActivation { get { return true; } }
@@ -605,14 +703,33 @@ namespace PharmaBoostAvis
     protected override void WndProc(ref Message m)
     {
       // WM_MOUSEACTIVATE : même un clic sur un bouton de la fenêtre n'active pas la fenêtre (MA_NOACTIVATE).
-      if (m.Msg == 0x0021) { m.Result = (IntPtr)3; return; }
+      // Seule la saisie de l'e-mail, voulue par un clic dans son champ, a le droit d'activer.
+      if (m.Msg == 0x0021 && !editing) { m.Result = (IntPtr)3; return; }
       base.WndProc(ref m);
+    }
+
+    protected override void OnDeactivate(EventArgs e)
+    {
+      base.OnDeactivate(e);
+      // Le pharmacien a cliqué ailleurs (le logiciel de gestion) : la saisie s'arrête, la fenêtre redevient muette.
+      if (editing) EndTyping(false);
     }
 
     private int S(int value) { return (int)Math.Round(value * scale); }
     private Font F(float points, FontStyle style) { return new Font("Segoe UI", points, style, GraphicsUnit.Point); }
 
-    private Label Words(string text, Font font, Color color, int x, int y, int width)
+    private void Say(string text)
+    {
+      if (Word != null) Word(text);
+    }
+
+    private static string Shorten(string text, int max)
+    {
+      if (text == null) return "";
+      return text.Length > max ? text.Substring(0, max - 1).TrimEnd() + "…" : text;
+    }
+
+    private Label Words(Control parent, string text, Font font, Color color, int x, int y, int width)
     {
       Size size = TextRenderer.MeasureText(text, font, new Size(Math.Max(10, width - S(4)), 10000), TextFormatFlags.WordBreak);
       Label label = new Label();
@@ -625,188 +742,573 @@ namespace PharmaBoostAvis
       label.BackColor = Color.Transparent;
       label.Location = new Point(x, y);
       label.Size = new Size(width, size.Height + S(3));
-      Controls.Add(label);
+      parent.Controls.Add(label);
       return label;
     }
 
-    /// <summary>Dessine (ou redessine, sur place) le conseil d'une vente.</summary>
+    /// <summary>Un lien cliquable (texte souligné, main au survol), à droite ou à gauche.</summary>
+    private Label Link(Control parent, string text, int x, int y, bool alignRight, Action click)
+    {
+      Font font = new Font("Segoe UI", 9.5f, FontStyle.Underline | FontStyle.Bold, GraphicsUnit.Point);
+      Size size = TextRenderer.MeasureText(text, font);
+      Label label = new Label();
+      label.AutoSize = false;
+      label.UseMnemonic = false;
+      label.UseCompatibleTextRendering = false;
+      label.Text = text;
+      label.Font = font;
+      label.ForeColor = Look.Green;
+      label.BackColor = Color.Transparent;
+      label.Cursor = Cursors.Hand;
+      label.Size = new Size(size.Width + S(4), size.Height + S(3));
+      label.Location = new Point(alignRight ? x - label.Width : x, y);
+      label.Click += delegate { click(); };
+      parent.Controls.Add(label);
+      return label;
+    }
+
+    /// <summary>Une pastille posée à la suite des autres (à partir de left), à la ligne quand la place manque.</summary>
+    private void AddPill(Control parent, int left, string text, Color back, Color fore, bool bold, int maxWidth, ref int x, ref int y)
+    {
+      Font font = F(9f, bold ? FontStyle.Bold : FontStyle.Regular);
+      Size size = TextRenderer.MeasureText(text, font);
+      bool plain = back == Color.Transparent;
+      int width = size.Width + (plain ? S(4) : S(18));
+      if (x > 0 && x + width > maxWidth) { x = 0; y += S(24); }
+      Label pill = new Label();
+      pill.AutoSize = false;
+      pill.UseMnemonic = false;
+      pill.UseCompatibleTextRendering = false;
+      pill.Text = text;
+      pill.Font = font;
+      pill.ForeColor = fore;
+      pill.BackColor = back;
+      pill.TextAlign = ContentAlignment.MiddleCenter;
+      pill.Size = new Size(width, S(20));
+      pill.Location = new Point(left + x, y);
+      parent.Controls.Add(pill);
+      if (!plain) Look.Rounded(pill, S(10));
+      x += width + S(6);
+    }
+
+    private static void DisposeTree(Control control)
+    {
+      List<Control> children = new List<Control>();
+      foreach (Control child in control.Controls) children.Add(child);
+      foreach (Control child in children)
+      {
+        control.Controls.Remove(child);
+        PictureBox picture = child as PictureBox;
+        if (picture != null && picture.Image != null) { picture.Image.Dispose(); picture.Image = null; }
+        DisposeTree(child);
+        child.Dispose();
+      }
+    }
+
+    // ------------------------------------------------------------------------------------------------------------
+    // Les états de la fenêtre.
+    // ------------------------------------------------------------------------------------------------------------
+
+    /// <summary>Dessine (ou redessine, sur place) la vente. Pendant une saisie d'e-mail, la mise à jour attend la fin de la saisie.</summary>
     public void Render(Entry e)
     {
+      if (editing) { deferred = e; return; }
       entry = e;
-      SuspendLayout();
-      while (Controls.Count > 0)
-      {
-        Control old = Controls[0];
-        Controls.RemoveAt(0);
-        PictureBox oldPicture = old as PictureBox;
-        if (oldPicture != null && oldPicture.Image != null) oldPicture.Image.Dispose();
-        old.Dispose();
-      }
-      int pad = S(16);
-      int width = S(432);
-      int inner = width - 2 * pad;
-      int y = pad;
+      done = null;
+      finishing = false;
+      Rebuild();
+    }
 
-      // --- En-tête : logo, « PharmaBoost / Conseil disponible », disponibilité du premier produit.
+    public void RenderDone(DoneInfo info)
+    {
+      if (editing) EndTyping(false);
+      deferred = null;
+      done = info;
+      Rebuild();
+    }
+
+    public void SetReduced(bool value)
+    {
+      if (Reduced == value) return;
+      Reduced = value;
+      if (editing) EndTyping(false);
+      Rebuild();
+    }
+
+    private void Rebuild()
+    {
+      SuspendLayout();
+      DisposeTree(this);
+      emailBox = null;
+      saveButton = null;
+      emailMessage = null;
+      if (done != null) BuildDone();
+      else if (entry != null && Quiet) BuildQuiet();
+      else if (entry != null && Reduced) BuildReduced();
+      else if (entry != null) BuildOpen();
+      Look.Rounded(this, S(18));
+      WireDrag(this);
+      ResumeLayout(true);
+      Invalidate();
+      if (Visible) Clamp();
+    }
+
+    /// <summary>mode 0 : fenêtre ouverte (bouton « réduire »), 1 : réduite (bouton « agrandir »), 2 : message de fin, sans bouton.</summary>
+    private int BuildHeader(int width, string subtitle, int mode)
+    {
+      int pad = S(14);
       PictureBox logo = new PictureBox();
-      logo.Image = Look.Logo(S(46));
+      logo.Image = Look.Logo(S(36));
       logo.SizeMode = PictureBoxSizeMode.Normal;
-      logo.Location = new Point(pad, y);
-      logo.Size = new Size(S(46), S(46));
+      logo.Location = new Point(pad, S(10));
+      logo.Size = new Size(S(36), S(36));
       logo.BackColor = Color.Transparent;
       Controls.Add(logo);
-      int textLeft = pad + S(46) + S(12);
-      Words("PharmaBoost", F(14f, FontStyle.Bold), Look.Ink, textLeft, y - S(1), S(200));
-      string subtitle = e.Items.Count > 1 ? e.Items.Count + " conseils disponibles" : (e.Items.Count == 1 ? "Conseil disponible" : (e.Alerts.Count > 0 ? "À lire avant de conseiller" : "Aucun conseil à proposer"));
-      Words(subtitle, F(10.5f, FontStyle.Regular), Look.Faint, textLeft, y + S(23), S(210));
-      if (e.Items.Count > 0)
+      int textLeft = pad + S(36) + S(10);
+      Words(this, "PharmaBoost", F(12.5f, FontStyle.Bold), Look.Ink, textLeft, S(7), S(220));
+      Words(this, subtitle, F(9.5f, FontStyle.Regular), Look.Faint, textLeft, S(27), width - textLeft - S(60));
+      if (mode == 2) return S(56);
+      PillButton toggle = new PillButton(mode == 1 ? "+" : "–", false, Color.White, Color.FromArgb(242, 244, 247), Look.Ink, Color.FromArgb(208, 213, 221), F(12f, FontStyle.Bold));
+      toggle.Location = new Point(width - pad - S(30), S(13));
+      toggle.Size = new Size(S(30), S(30));
+      toggle.Click += delegate { SetReduced(!Reduced); };
+      Controls.Add(toggle);
+      return S(56);
+    }
+
+    private string SubtitleOf(Entry e)
+    {
+      if (e.Items.Count == 0) return e.Alerts.Count > 0 ? "À lire avant de conseiller" : "Aucun conseil à proposer";
+      int open = 0;
+      foreach (Item item in e.Items) { if (item.Outcome == "NONE") open++; }
+      string count = e.Items.Count > 1 ? e.Items.Count + " conseils" : "1 conseil";
+      return "Vente en cours · " + count + (open == 0 ? " · tous traités" : "");
+    }
+
+    private void BuildQuiet()
+    {
+      int width = S(380);
+      int pad = S(14);
+      int hh = BuildHeader(width, SubtitleOf(entry), 2);
+      int y = hh;
+      Words(this, entry.Label, F(9.5f, FontStyle.Regular), Look.Faint, pad, y, width - 2 * pad);
+      y += S(18);
+      Label subject = Words(this, entry.Subject, F(12f, FontStyle.Bold), Look.Ink, pad, y, width - 2 * pad);
+      y += subject.Height + S(4);
+      foreach (string note in entry.Notes)
       {
-        string pillText; Color pillBack; Color pillFore;
-        Look.Availability(e.Items[0].Availability, out pillText, out pillBack, out pillFore);
-        Font pillFont = F(10f, FontStyle.Bold);
-        Size pillSize = TextRenderer.MeasureText(pillText, pillFont);
-        Label pill = new Label();
-        pill.AutoSize = false;
-        pill.UseCompatibleTextRendering = false;
-        pill.Text = pillText;
-        pill.Font = pillFont;
-        pill.ForeColor = pillFore;
-        pill.BackColor = pillBack;
-        pill.TextAlign = ContentAlignment.MiddleCenter;
-        pill.Size = new Size(pillSize.Width + S(26), S(28));
-        pill.Location = new Point(width - pad - pill.Width, y + S(4));
-        Controls.Add(pill);
-        Look.Rounded(pill, S(14));
+        Label line = Words(this, note, F(10.5f, FontStyle.Regular), Look.Soft, pad, y, width - 2 * pad);
+        y += line.Height + S(2);
       }
-      y += S(46) + S(14);
+      ClientSize = new Size(width, y + S(12));
+    }
 
-      // --- Ce qui a été détecté.
-      Words(e.Label, F(10.5f, FontStyle.Regular), Look.Faint, pad, y, inner);
-      y += S(21);
-      Label subject = Words(e.Subject, F(14f, FontStyle.Bold), Look.Ink, pad, y, inner);
-      y += subject.Height + S(10);
+    private void BuildReduced()
+    {
+      int width = S(330);
+      int hh = BuildHeader(width, SubtitleOf(entry), 1);
+      ClientSize = new Size(width, hh);
+    }
 
-      // --- Les alertes, avant les conseils : on ne vend rien par-dessus une alerte non lue.
-      if (e.Alerts.Count > 0)
+    private void BuildOpen()
+    {
+      int width = S(420);
+      int pad = S(14);
+      string subtitle = SubtitleOf(entry);
+      int hh = BuildHeader(width, subtitle, 0);
+
+      // Le pied : « Vente terminée », toujours visible.
+      string hint = "Enregistre les résultats ; le bilan part si le patient a donné son accord.";
+      Font hintFont = F(9f, FontStyle.Regular);
+      Size hintSize = TextRenderer.MeasureText(hint, hintFont, new Size(width - 2 * pad - S(4), 10000), TextFormatFlags.WordBreak);
+      int footerH = S(12) + S(44) + S(6) + hintSize.Height + S(10);
+      int maxMiddle = (int)(Screen.PrimaryScreen.WorkingArea.Height * 0.9) - hh - footerH;
+      if (maxMiddle < S(160)) maxMiddle = S(160);
+
+      Panel scroll = new Panel();
+      scroll.AutoScroll = true;
+      scroll.BackColor = Color.White;
+      scroll.Location = new Point(0, hh);
+      int contentWidth = width - 2 * pad;
+      scroll.Size = new Size(width, S(100));
+      Controls.Add(scroll);
+      int height = BuildMiddle(scroll, pad, contentWidth);
+      if (height > maxMiddle)
+      {
+        DisposeTree(scroll);
+        contentWidth = width - 2 * pad - SystemInformation.VerticalScrollBarWidth;
+        height = BuildMiddle(scroll, pad, contentWidth);
+      }
+      scroll.Size = new Size(width, Math.Min(height, maxMiddle));
+      scroll.AutoScrollMinSize = new Size(0, height);
+
+      int fy = hh + scroll.Height;
+      Panel line = new Panel();
+      line.BackColor = Look.Line;
+      line.Location = new Point(pad, fy);
+      line.Size = new Size(width - 2 * pad, 1);
+      Controls.Add(line);
+      PillButton finish = new PillButton(finishing ? "Enregistrement…" : "Vente terminée", true, Look.Green, Look.GreenDark, Color.White, Look.Green, F(12f, FontStyle.Bold));
+      finish.Location = new Point(pad, fy + S(12));
+      finish.Size = new Size(width - 2 * pad, S(44));
+      finish.Muted = finishing;
+      finish.Click += delegate
+      {
+        if (finishing || entry == null) return;
+        finishing = true;
+        Say("TERMINER " + entry.Id);
+        Rebuild();
+      };
+      Controls.Add(finish);
+      Words(this, hint, hintFont, Look.Faint, pad, fy + S(12) + S(44) + S(6), width - 2 * pad);
+      ClientSize = new Size(width, fy + footerH);
+    }
+
+    private int BuildMiddle(Panel scroll, int x, int w)
+    {
+      int y = S(2);
+      Words(scroll, entry.Label, F(9.5f, FontStyle.Regular), Look.Faint, x, y, w);
+      y += S(18);
+      Label subject = Words(scroll, entry.Subject, F(12f, FontStyle.Bold), Look.Ink, x, y, w);
+      y += subject.Height + S(8);
+
+      if (entry.Alerts.Count > 0)
       {
         Panel box = new Panel();
         box.BackColor = Look.AmberSoft;
-        box.Location = new Point(pad, y);
+        box.Location = new Point(x, y);
         int boxY = S(8);
-        foreach (string alert in e.Alerts)
+        foreach (string alert in entry.Alerts)
         {
-          Label line = new Label();
-          line.AutoSize = false;
-          line.UseMnemonic = false;
-          line.UseCompatibleTextRendering = false;
-          Font f = F(10.5f, FontStyle.Bold);
-          string text = "⚠ " + alert;
-          Size size = TextRenderer.MeasureText(text, f, new Size(inner - S(28), 10000), TextFormatFlags.WordBreak);
-          line.Text = text;
-          line.Font = f;
-          line.ForeColor = Look.Amber;
-          line.BackColor = Color.Transparent;
-          line.Location = new Point(S(12), boxY);
-          line.Size = new Size(inner - S(24), size.Height + S(3));
-          box.Controls.Add(line);
+          Label line = Words(box, "⚠ " + alert, F(10f, FontStyle.Bold), Look.Amber, S(12), boxY, w - S(24));
           boxY += line.Height + S(4);
         }
-        box.Size = new Size(inner, boxY + S(4));
-        Controls.Add(box);
+        box.Size = new Size(w, boxY + S(4));
+        scroll.Controls.Add(box);
         Look.Rounded(box, S(10));
-        y += box.Height + S(10);
+        y += box.Height + S(8);
       }
 
-      // --- Les conseils : le premier avec sa photo, les suivants en une ligne.
-      if (e.Items.Count > 0)
+      if (entry.Items.Count > 0)
       {
-        Panel divider = new Panel();
-        divider.BackColor = Look.Line;
-        divider.Location = new Point(pad, y);
-        divider.Size = new Size(inner, 1);
-        Controls.Add(divider);
-        y += S(14);
-
-        Item first = e.Items[0];
-        int photo = S(84);
-        PictureBox picture = new PictureBox();
-        picture.Location = new Point(pad, y);
-        picture.Size = new Size(photo, photo);
-        picture.SizeMode = PictureBoxSizeMode.Zoom;
-        picture.BackColor = Color.FromArgb(242, 244, 247);
-        picture.Image = LoadPhoto(first.Image, photo);
-        Controls.Add(picture);
-        Look.Rounded(picture, S(12));
-
-        int colX = pad + photo + S(14);
-        int colW = inner - photo - S(14);
-        int cy = y;
-        Label name = Words(first.Name, F(13f, FontStyle.Bold), Look.Ink, colX, cy, colW);
-        cy += name.Height + S(1);
-        if (first.Price.Length > 0)
+        foreach (Item item in entry.Items)
         {
-          Label price = Words(first.Price, F(11.5f, FontStyle.Bold), Look.Green, colX, cy, colW);
-          cy += price.Height;
+          int cardHeight = BuildCard(scroll, item, x, y, w);
+          y += cardHeight + S(8);
         }
-        if (first.Reason.Length > 0)
-        {
-          Label reason = Words(first.Reason, F(10f, FontStyle.Regular), Look.Soft, colX, cy, colW);
-          cy += reason.Height;
-        }
-        Label check = Words("Suggestion à vérifier par le pharmacien", F(9f, FontStyle.Italic), Look.Faint, colX, cy, colW);
-        cy += check.Height;
-        y = Math.Max(y + photo, cy) + S(10);
-
-        for (int i = 1; i < e.Items.Count; i++)
-        {
-          Item more = e.Items[i];
-          string availabilityText; Color unusedBack; Color unusedFore;
-          Look.Availability(more.Availability, out availabilityText, out unusedBack, out unusedFore);
-          string line = "• " + more.Name + (more.Price.Length > 0 ? " · " + more.Price : "") + (more.Availability == "IN_STOCK" ? "" : " · " + availabilityText.ToLower());
-          Label extra = Words(line, F(10.5f, FontStyle.Regular), Look.Ink, pad, y, inner);
-          y += extra.Height + S(2);
-        }
-        if (e.Items.Count > 1) y += S(6);
       }
-      else if (e.Notes.Count > 0)
+      else
       {
-        foreach (string note in e.Notes)
+        foreach (string note in entry.Notes)
         {
-          Label line = Words(note, F(10.5f, FontStyle.Regular), Look.Soft, pad, y, inner);
+          Label line = Words(scroll, note, F(10.5f, FontStyle.Regular), Look.Soft, x, y, w);
           y += line.Height + S(2);
         }
         y += S(6);
       }
 
-      // --- Deux gestes, pas un de plus.
-      int buttonHeight = S(44);
-      int ignoreWidth = S(104);
-      PillButton view = new PillButton("Voir le conseil   →", true, Look.Green, Look.GreenDark, Color.White, Look.Green, F(11.5f, FontStyle.Bold));
-      view.Location = new Point(pad, y);
-      view.Size = new Size(inner - ignoreWidth - S(10), buttonHeight);
-      view.Click += delegate { if (ViewClicked != null) ViewClicked(entry); };
-      Controls.Add(view);
-      PillButton ignore = new PillButton("Ignorer", false, Color.White, Color.FromArgb(242, 244, 247), Look.Ink, Color.FromArgb(208, 213, 221), F(11.5f, FontStyle.Bold));
-      ignore.Location = new Point(pad + view.Width + S(10), y);
-      ignore.Size = new Size(ignoreWidth, buttonHeight);
-      ignore.Click += delegate { if (IgnoreClicked != null) IgnoreClicked(entry); };
-      Controls.Add(ignore);
-      y += buttonHeight + S(10);
-
-      if (!e.Quiet)
-      {
-        Words("Ce conseil reste disponible près de l'horloge.", F(9f, FontStyle.Regular), Look.Faint, pad, y, inner);
-        y += S(20);
-      }
-      y += S(4);
-
-      ClientSize = new Size(width, y);
-      Look.Rounded(this, S(18));
-      // Les éléments qui ne sont pas des boutons font glisser la fenêtre.
-      WireDrag(this);
-      ResumeLayout(true);
-      Invalidate();
+      y += BuildEmail(scroll, x, y, w) + S(10);
+      return y;
     }
+
+    private int BuildCard(Panel scroll, Item item, int x, int y, int w)
+    {
+      Card card = new Card();
+      card.Location = new Point(x, y);
+      int cp = S(10);
+      int photo = S(52);
+      PictureBox picture = new PictureBox();
+      picture.Location = new Point(cp, cp);
+      picture.Size = new Size(photo, photo);
+      picture.SizeMode = PictureBoxSizeMode.Zoom;
+      picture.BackColor = Color.FromArgb(242, 244, 247);
+      picture.Image = LoadPhoto(item.Image, photo);
+      card.Controls.Add(picture);
+      Look.Rounded(picture, S(10));
+
+      int colX = cp + photo + S(10);
+      int colW = w - colX - cp;
+      int cy = cp;
+      Label name = Words(card, item.Name, F(11f, FontStyle.Bold), Look.Ink, colX, cy, colW);
+      cy += name.Height;
+      if (item.Drug.Length > 0)
+      {
+        Label drug = Words(card, "Pour : " + item.Drug, F(9f, FontStyle.Regular), Look.Faint, colX, cy, colW);
+        cy += drug.Height;
+      }
+      if (item.Reason.Length > 0)
+      {
+        Label reason = Words(card, Shorten(item.Reason, 120), F(9.5f, FontStyle.Regular), Look.Soft, colX, cy, colW);
+        cy += reason.Height;
+      }
+      // Les pastilles : prix, stock, challenge (orange), date courte (rouge). Jamais inventées : le serveur ne les envoie que si elles sont réelles.
+      int px = 0;
+      int py = cy + S(3);
+      if (item.Price.Length > 0) AddPill(card, colX, item.Price, Color.Transparent, Look.Green, true, colW, ref px, ref py);
+      string availabilityText; Color availabilityBack; Color availabilityFore;
+      Look.Availability(item.Availability, out availabilityText, out availabilityBack, out availabilityFore);
+      AddPill(card, colX, availabilityText, availabilityBack, availabilityFore, true, colW, ref px, ref py);
+      if (item.Challenge.Length > 0) AddPill(card, colX, "Challenge", Look.ChallengeBack, Look.ChallengeFore, true, colW, ref px, ref py);
+      if (item.ShortDate.Length > 0) AddPill(card, colX, "Date courte " + item.ShortDate, Look.DateBack, Look.DateFore, true, colW, ref px, ref py);
+      int ya = Math.Max(cp + photo, py + S(20)) + S(8);
+
+      int buttonH = S(34);
+      if (item.Outcome == "NONE")
+      {
+        PillButton sold = new PillButton("Vendu", true, Look.Green, Look.GreenDark, Color.White, Look.Green, F(10.5f, FontStyle.Bold));
+        sold.Location = new Point(cp, ya);
+        sold.Size = new Size(S(98), buttonH);
+        sold.Click += delegate { Choose(item, "SOLD"); };
+        card.Controls.Add(sold);
+        PillButton notSold = new PillButton("Non vendu", false, Color.White, Color.FromArgb(242, 244, 247), Look.Ink, Color.FromArgb(208, 213, 221), F(10.5f, FontStyle.Bold));
+        notSold.Location = new Point(cp + sold.Width + S(8), ya);
+        notSold.Size = new Size(S(106), buttonH);
+        notSold.Click += delegate { Choose(item, "NOT_SOLD"); };
+        card.Controls.Add(notSold);
+      }
+      else
+      {
+        bool isSold = item.Outcome == "SOLD";
+        int cx = 0;
+        int cyy = ya + S(6);
+        AddPill(card, cp, isSold ? "✓ Vendu" : "Non vendu", isSold ? Color.FromArgb(220, 250, 230) : Color.FromArgb(242, 244, 247), isSold ? Color.FromArgb(6, 118, 71) : Look.Soft, true, w, ref cx, ref cyy);
+        Link(card, "Modifier", cp + cx, ya + S(7), false, delegate { Choose(item, "NONE"); });
+      }
+      Link(card, "Voir le détail", w - cp, ya + S(7), true, delegate { Say("VOIR " + entry.Id); });
+
+      card.Size = new Size(w, ya + buttonH + cp);
+      scroll.Controls.Add(card);
+      Look.Rounded(card, S(10));
+      return card.Height;
+    }
+
+    private void Choose(Item item, string outcome)
+    {
+      if (entry == null || item.Id.Length == 0) return;
+      item.Outcome = outcome;
+      Say((outcome == "SOLD" ? "VENDU " : outcome == "NOT_SOLD" ? "NONVENDU " : "ANNULER ") + entry.Id + " " + item.Id);
+      Rebuild();
+    }
+
+    // ------------------------------------------------------------------------------------------------------------
+    // L'e-mail du patient : facultatif, avec son accord, saisi à la main.
+    // ------------------------------------------------------------------------------------------------------------
+
+    private int BuildEmail(Panel scroll, int x, int y, int w)
+    {
+      if (entry.EmailSaved)
+      {
+        Label saved = Words(scroll, "✓ E-mail enregistré · le bilan partira à la fin de la vente", F(9.5f, FontStyle.Bold), Look.GreenDark, x, y, w - S(70));
+        Link(scroll, "Retirer", x + w, y, true, delegate { Say("EMAIL_RETIRER " + entry.Id); entry.EmailSaved = false; Rebuild(); });
+        return saved.Height;
+      }
+      if (!emailOpen && entry.EmailError.Length == 0)
+      {
+        Words(scroll, "✉  E-mail du patient (facultatif)", F(10f, FontStyle.Regular), Look.Soft, x, y + S(2), w - S(80));
+        Link(scroll, "Ajouter", x + w, y + S(1), true, delegate { emailOpen = true; Rebuild(); });
+        return S(26);
+      }
+
+      Panel box = new Panel();
+      box.BackColor = Look.GreenSoft;
+      box.Location = new Point(x, y);
+      int bp = S(12);
+      int bw = w - 2 * bp;
+      int by = bp;
+      Label title = Words(box, "E-mail du patient", F(10.5f, FontStyle.Bold), Look.Ink, bp, by, bw);
+      by += title.Height + S(2);
+
+      emailBox = new TextBox();
+      emailBox.Font = F(11f, FontStyle.Regular);
+      emailBox.BorderStyle = BorderStyle.FixedSingle;
+      emailBox.Location = new Point(bp, by);
+      emailBox.Width = bw;
+      emailBox.Text = emailText;
+      emailBox.MaxLength = 160;
+      emailBox.MouseDown += delegate { BeginTyping(); };
+      emailBox.TextChanged += delegate
+      {
+        string typed = emailBox.Text;
+        // Un code-barres tombé dans le champ (douchette) n'est pas une adresse : on l'efface.
+        if (typed.Length >= 8 && IsAllDigits(typed)) { emailBox.Text = ""; typed = ""; }
+        emailText = typed;
+        RefreshSave();
+      };
+      emailBox.KeyDown += delegate (object sender, KeyEventArgs k)
+      {
+        if (k.KeyCode == Keys.Enter) { k.SuppressKeyPress = true; SaveEmail(); }
+        else if (k.KeyCode == Keys.Escape) { k.SuppressKeyPress = true; LaterEmail(); }
+      };
+      box.Controls.Add(emailBox);
+      by += emailBox.Height + S(6);
+
+      CheckBox consent = new CheckBox();
+      consent.Text = "Le patient accepte de recevoir son bilan par e-mail";
+      consent.Font = F(9.5f, FontStyle.Regular);
+      consent.ForeColor = Look.Ink;
+      consent.BackColor = Color.Transparent;
+      consent.UseCompatibleTextRendering = false;
+      consent.Checked = emailConsent;
+      consent.AutoSize = false;
+      consent.Location = new Point(bp, by);
+      consent.Size = new Size(bw, S(22));
+      consent.TabStop = false;
+      consent.CheckedChanged += delegate { emailConsent = consent.Checked; RefreshSave(); };
+      box.Controls.Add(consent);
+      by += consent.Height + S(4);
+
+      emailMessage = Words(box, entry.EmailError, F(9.5f, FontStyle.Bold), Look.Amber, bp, by, bw);
+      by += Math.Max(emailMessage.Height, S(4));
+
+      saveButton = new PillButton("Enregistrer l'e-mail", true, Look.Green, Look.GreenDark, Color.White, Look.Green, F(10.5f, FontStyle.Bold));
+      saveButton.Location = new Point(bp, by);
+      saveButton.Size = new Size(bw - S(96) - S(8), S(36));
+      saveButton.Click += delegate { SaveEmail(); };
+      box.Controls.Add(saveButton);
+      PillButton later = new PillButton("Plus tard", false, Color.White, Color.FromArgb(242, 244, 247), Look.Ink, Color.FromArgb(208, 213, 221), F(10.5f, FontStyle.Bold));
+      later.Location = new Point(bp + saveButton.Width + S(8), by);
+      later.Size = new Size(S(96), S(36));
+      later.Click += delegate { LaterEmail(); };
+      box.Controls.Add(later);
+      by += S(36) + bp;
+      RefreshSave();
+
+      box.Size = new Size(w, by);
+      scroll.Controls.Add(box);
+      Look.Rounded(box, S(10));
+      return box.Height;
+    }
+
+    private static bool IsAllDigits(string text)
+    {
+      foreach (char c in text) { if (c < '0' || c > '9') return false; }
+      return text.Length > 0;
+    }
+
+    private static bool LooksLikeEmail(string text)
+    {
+      if (text.Length < 6 || text.Length > 160 || text.Contains(" ")) return false;
+      int at = text.IndexOf('@');
+      if (at < 1 || at != text.LastIndexOf('@')) return false;
+      string domain = text.Substring(at + 1);
+      int dot = domain.LastIndexOf('.');
+      return dot > 0 && dot < domain.Length - 2 && !domain.Contains("..");
+    }
+
+    private void RefreshSave()
+    {
+      if (saveButton == null) return;
+      saveButton.Muted = !(emailConsent && LooksLikeEmail(emailText.Trim()));
+      saveButton.Invalidate();
+    }
+
+    private void SaveEmail()
+    {
+      if (entry == null) return;
+      string text = emailText.Trim();
+      if (!emailConsent) { if (emailMessage != null) emailMessage.Text = "Le patient doit d'abord donner son accord."; return; }
+      if (!LooksLikeEmail(text)) { if (emailMessage != null) emailMessage.Text = "Cette adresse ne semble pas valide."; return; }
+      string id = entry.Id;
+      emailText = "";
+      emailConsent = false;
+      emailOpen = false;
+      EndTyping(true);
+      if (entry != null && entry.Id == id) entry.EmailSaved = true;
+      Say("EMAIL " + id + " " + Convert.ToBase64String(Encoding.UTF8.GetBytes(text)));
+      Rebuild();
+    }
+
+    private void LaterEmail()
+    {
+      emailOpen = false;
+      emailText = "";
+      emailConsent = false;
+      if (entry != null) entry.EmailError = "";
+      EndTyping(true);
+      Rebuild();
+    }
+
+    /// <summary>
+    /// Le seul moment où la fenêtre prend le clavier : le pharmacien a cliqué dans le champ de l'e-mail. Elle retient la
+    /// fenêtre qui était devant (le logiciel de gestion) pour la lui rendre aussitôt la saisie finie.
+    /// </summary>
+    private void BeginTyping()
+    {
+      if (editing || emailBox == null) return;
+      editing = true;
+      previousForeground = Native.GetForegroundWindow();
+      if (previousForeground == Handle) previousForeground = IntPtr.Zero;
+      int style = Native.GetWindowLong(Handle, Native.GWL_EXSTYLE);
+      Native.SetWindowLong(Handle, Native.GWL_EXSTYLE, style & ~Native.WS_EX_NOACTIVATE);
+      Native.SetForegroundWindow(Handle);
+      ActiveControl = emailBox;
+      typingTimer.Stop();
+      typingTimer.Interval = 40000;
+      typingTimer.Start();
+    }
+
+    private void EndTyping(bool giveBack)
+    {
+      if (!editing) return;
+      editing = false;
+      typingTimer.Stop();
+      try
+      {
+        int style = Native.GetWindowLong(Handle, Native.GWL_EXSTYLE);
+        Native.SetWindowLong(Handle, Native.GWL_EXSTYLE, style | Native.WS_EX_NOACTIVATE);
+      }
+      catch (Exception) { }
+      ActiveControl = null;
+      if (giveBack && previousForeground != IntPtr.Zero) Native.SetForegroundWindow(previousForeground);
+      previousForeground = IntPtr.Zero;
+      if (deferred != null)
+      {
+        Entry waiting = deferred;
+        deferred = null;
+        Render(waiting);
+      }
+    }
+
+    // ------------------------------------------------------------------------------------------------------------
+    // La fin de vente.
+    // ------------------------------------------------------------------------------------------------------------
+
+    private void BuildDone()
+    {
+      int width = S(380);
+      int pad = S(14);
+      int hh = BuildHeader(width, "Vente terminée", 2);
+      int y = hh + S(4);
+      PictureBox badge = new PictureBox();
+      badge.Image = Look.CheckBadge(S(52), done.Warning);
+      badge.SizeMode = PictureBoxSizeMode.Normal;
+      badge.Location = new Point(pad, y);
+      badge.Size = new Size(S(52), S(52));
+      badge.BackColor = Color.Transparent;
+      Controls.Add(badge);
+      int textX = pad + S(52) + S(12);
+      int textW = width - textX - pad;
+      Label title = Words(this, done.Title, F(12.5f, FontStyle.Bold), Look.Ink, textX, y, textW);
+      int ty = y + title.Height + S(2);
+      foreach (string text in done.Lines)
+      {
+        Label line = Words(this, text, F(10f, FontStyle.Regular), Look.Soft, textX, ty, textW);
+        ty += line.Height;
+      }
+      y = Math.Max(y + S(52), ty) + S(10);
+      if (done.Badge.Length > 0)
+      {
+        int px = 0;
+        int py = y;
+        AddPill(this, pad, done.Badge, Color.FromArgb(220, 250, 230), Color.FromArgb(6, 118, 71), true, width - 2 * pad, ref px, ref py);
+        y += S(28);
+      }
+      ClientSize = new Size(width, y + S(10));
+    }
+
+    // ------------------------------------------------------------------------------------------------------------
+    // La photo, le déplacement, la place à l'écran.
+    // ------------------------------------------------------------------------------------------------------------
 
     private Image LoadPhoto(string path, int size)
     {
@@ -829,7 +1331,7 @@ namespace PharmaBoostAvis
     {
       foreach (Control child in parent.Controls)
       {
-        if (child is PillButton) continue;
+        if (child is PillButton || child is TextBox || child is CheckBox) continue;
         child.MouseDown += OnDragDown;
         child.MouseMove += OnDragMove;
         child.MouseUp += OnDragUp;
@@ -898,6 +1400,16 @@ namespace PharmaBoostAvis
       }
       catch (Exception) { }
       Location = wanted;
+      Clamp();
+    }
+
+    /// <summary>La fenêtre change de hauteur avec la vente : elle ne déborde jamais de l'écran où elle se trouve.</summary>
+    private void Clamp()
+    {
+      Rectangle area = Screen.FromControl(this).WorkingArea;
+      int x = Math.Min(Math.Max(Left, area.Left), Math.Max(area.Left, area.Right - Width));
+      int y = Math.Min(Math.Max(Top, area.Top), Math.Max(area.Top, area.Bottom - Height));
+      if (x != Left || y != Top) Location = new Point(x, y);
     }
 
     public void Reveal()
@@ -907,23 +1419,24 @@ namespace PharmaBoostAvis
     }
   }
 
-  /// <summary>Le chef d'orchestre : les conseils en attente, la fenêtre, l'icône près de l'horloge, la ligne de commande.</summary>
+  /// <summary>Le chef d'orchestre : la vente en cours, la fenêtre, l'icône près de l'horloge, la ligne de commande.</summary>
   public class Host : ApplicationContext
   {
-    private static readonly TimeSpan MaxAge = TimeSpan.FromHours(2);
+    private static readonly TimeSpan MaxAge = TimeSpan.FromHours(3);
 
-    private readonly List<Entry> pending = new List<Entry>();
-    private readonly Dictionary<string, List<string>> dismissed = new Dictionary<string, List<string>>();
     private readonly NotifyIcon counter = new NotifyIcon();
     private readonly ContextMenuStrip menu = new ContextMenuStrip();
-    private readonly System.Windows.Forms.Timer hideTimer = new System.Windows.Forms.Timer();
+    private readonly System.Windows.Forms.Timer quietTimer = new System.Windows.Forms.Timer();
+    private readonly System.Windows.Forms.Timer doneTimer = new System.Windows.Forms.Timer();
     private readonly System.Windows.Forms.Timer ageTimer = new System.Windows.Forms.Timer();
     private readonly Control ui = new Control();
     private readonly JavaScriptSerializer json = new JavaScriptSerializer();
-    private ToastForm form;
+    private SaleForm form;
+    /// <summary>La vente affichée. Tant qu'elle est « ouverte », la fenêtre reste : aucun délai, jusqu'à « Vente terminée ».</summary>
     private Entry current;
+    private bool sessionOpen;
+    private string doneId = "";
     private IntPtr iconHandle = IntPtr.Zero;
-    private int seconds = 30;
     private string position = "milieu-droite";
     private string positionFile = "";
 
@@ -933,9 +1446,10 @@ namespace PharmaBoostAvis
       IntPtr unused = ui.Handle;
       counter.Visible = false;
       counter.ContextMenuStrip = menu;
-      counter.MouseClick += delegate (object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left) ShowLatest(); };
+      counter.MouseClick += delegate (object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left) Expand(); };
       menu.Opening += delegate { BuildMenu(); };
-      hideTimer.Tick += delegate { hideTimer.Stop(); Tuck(); };
+      quietTimer.Tick += delegate { quietTimer.Stop(); if (!sessionOpen) End(); };
+      doneTimer.Tick += delegate { doneTimer.Stop(); string finished = doneId; End(); if (finished.Length > 0) Say("FERMEE " + finished); };
       ageTimer.Interval = 60000;
       ageTimer.Tick += delegate { Expire(); };
       ageTimer.Start();
@@ -978,12 +1492,16 @@ namespace PharmaBoostAvis
         string op = Str(command, "op");
         if (op == "show")
         {
-          seconds = Math.Max(5, Math.Min(120, Int(command, "seconds", 30)));
           position = Str(command, "position");
           if (position.Length == 0) position = "milieu-droite";
           positionFile = Str(command, "positionFile");
           Dictionary<string, object> raw = command.ContainsKey("entry") ? command["entry"] as Dictionary<string, object> : null;
           if (raw != null) Show(Parse(raw));
+        }
+        else if (op == "done")
+        {
+          Dictionary<string, object> raw = command.ContainsKey("info") ? command["info"] as Dictionary<string, object> : null;
+          if (raw != null) Finish(ParseDone(raw));
         }
         else if (op == "remove") Remove(Str(command, "id"));
         else if (op == "quit") Quit();
@@ -997,11 +1515,10 @@ namespace PharmaBoostAvis
       return d.TryGetValue(key, out value) && value != null ? Convert.ToString(value) : "";
     }
 
-    private static int Int(Dictionary<string, object> d, string key, int fallback)
+    private static bool Flag(Dictionary<string, object> d, string key)
     {
-      object value;
-      if (!d.TryGetValue(key, out value) || value == null) return fallback;
-      try { return Convert.ToInt32(value); } catch (Exception) { return fallback; }
+      string text = Str(d, key);
+      return text == "True" || text == "true";
     }
 
     private static List<object> Seq(Dictionary<string, object> d, string key)
@@ -1025,7 +1542,9 @@ namespace PharmaBoostAvis
       e.Subject = Str(d, "subject");
       e.Url = Str(d, "url");
       e.Signature = Str(d, "signature");
-      e.Quiet = Str(d, "quiet") == "True" || Str(d, "quiet") == "true";
+      e.Quiet = Flag(d, "quiet");
+      e.EmailSaved = Flag(d, "emailSaved");
+      e.EmailError = Str(d, "emailError");
       foreach (object a in Seq(d, "alerts")) e.Alerts.Add(Convert.ToString(a));
       foreach (object n in Seq(d, "notes")) e.Notes.Add(Convert.ToString(n));
       foreach (object o in Seq(d, "items"))
@@ -1033,6 +1552,12 @@ namespace PharmaBoostAvis
         Dictionary<string, object> raw = o as Dictionary<string, object>;
         if (raw == null) continue;
         Item item = new Item();
+        item.Id = Str(raw, "id");
+        item.Drug = Str(raw, "drug");
+        item.Challenge = Str(raw, "challenge");
+        item.ShortDate = Str(raw, "shortDate");
+        item.Outcome = Str(raw, "outcome");
+        if (item.Outcome != "SOLD" && item.Outcome != "NOT_SOLD") item.Outcome = "NONE";
         item.Name = Str(raw, "name");
         item.Price = Str(raw, "price");
         item.Reason = Str(raw, "reason");
@@ -1043,62 +1568,91 @@ namespace PharmaBoostAvis
       return e;
     }
 
-    /// <summary>Un conseil arrive ou se met à jour. Seul du NOUVEAU rouvre la fenêtre.</summary>
+    private static DoneInfo ParseDone(Dictionary<string, object> d)
+    {
+      DoneInfo info = new DoneInfo();
+      info.Id = Str(d, "id");
+      info.Title = Str(d, "title");
+      info.Badge = Str(d, "badge");
+      info.Warning = Flag(d, "warning");
+      foreach (object line in Seq(d, "lines")) info.Lines.Add(Convert.ToString(line));
+      return info;
+    }
+
+    private static string KeyOf(Item item) { return "p:" + item.Name; }
+
+    /// <summary>
+    /// Une vente arrive ou se met à jour. Une vente n'a qu'UNE fenêtre, mise à jour sur place, qui reste jusqu'à
+    /// « Vente terminée ». Seule une information NOUVELLE (un autre produit, une autre alerte) rouvre la fenêtre réduite.
+    /// </summary>
     private void Show(Entry entry)
     {
-      Entry existing = pending.Find(delegate (Entry p) { return p.Id == entry.Id; });
-      List<string> already;
-      bool wasDismissed = dismissed.TryGetValue(entry.Id, out already);
+      Entry existing = (current != null && current.Id == entry.Id) ? current : null;
       List<string> known = new List<string>();
       if (existing != null) known.AddRange(existing.Shown);
-      if (wasDismissed) known.AddRange(already);
       List<string> fresh = new List<string>();
-      foreach (Item item in entry.Items) { string key = "p:" + item.Name; if (!known.Contains(key)) fresh.Add(key); }
+      foreach (Item item in entry.Items) { string key = KeyOf(item); if (!known.Contains(key)) fresh.Add(key); }
       foreach (string alert in entry.Alerts) { string key = "a:" + alert; if (!known.Contains(key)) fresh.Add(key); }
       entry.Shown.AddRange(known);
       entry.Shown.AddRange(fresh);
+      if (existing != null) entry.Since = existing.Since;
 
-      if (existing != null && fresh.Count == 0)
+      doneTimer.Stop();
+      doneId = "";
+      bool sameSale = existing != null;
+      if (entry.Quiet && !(sameSale && sessionOpen))
       {
-        // Rien de nouveau (une photo qui arrive, un prix qui change) : on met à jour sur place, sans rouvrir.
-        entry.Since = existing.Since;
-        pending[pending.IndexOf(existing)] = entry;
-        if (current != null && current.Id == entry.Id)
-        {
-          current = entry;
-          if (form != null && form.Visible) { form.Render(entry); form.Place(); form.Reveal(); }
-        }
-        Refresh();
+        // Rien à conseiller : un mot de huit secondes, sans session ni compteur.
+        current = entry;
+        sessionOpen = false;
+        EnsureForm();
+        form.Reduced = false;
+        form.Quiet = true;
+        Present(entry);
+        quietTimer.Stop();
+        quietTimer.Interval = 8000;
+        quietTimer.Start();
         return;
       }
-      if (existing == null && wasDismissed && fresh.Count == 0) return;
-      if (!entry.Quiet)
-      {
-        if (existing != null) { entry.Since = existing.Since; pending[pending.IndexOf(existing)] = entry; }
-        else pending.Add(entry);
-      }
-      Present(entry, entry.Quiet ? 8 : seconds);
+      quietTimer.Stop();
+      current = entry;
+      sessionOpen = true;
+      EnsureForm();
+      form.Quiet = false;
+      if (!sameSale) form.Reduced = false;
+      else if (fresh.Count > 0 && form.Reduced) form.Reduced = false;
+      Present(entry);
     }
 
-    private void Present(Entry entry, int secondsToStay)
+    private void EnsureForm()
     {
-      current = entry;
-      if (form == null || form.IsDisposed)
-      {
-        form = new ToastForm();
-        form.ViewClicked += delegate (Entry e) { View(e); };
-        form.IgnoreClicked += delegate (Entry e) { Ignore(e); };
-        form.Moved += delegate (Point p) { SavePosition(p); };
-      }
+      if (form != null && !form.IsDisposed) return;
+      form = new SaleForm();
+      form.Word += delegate (string word) { OnFormWord(word); };
+      form.Moved += delegate (Point p) { SavePosition(p); };
+    }
+
+    private void Present(Entry entry)
+    {
+      EnsureForm();
       form.Position = position;
       form.PositionFile = positionFile;
+      bool firstShow = !form.Visible;
       form.Render(entry);
-      form.Place();
+      if (firstShow) form.Place();
       form.Reveal();
-      hideTimer.Stop();
-      hideTimer.Interval = secondsToStay * 1000;
-      hideTimer.Start();
-      Refresh();
+      RefreshIcon();
+    }
+
+    /// <summary>Ce que la fenêtre dit : les réponses vont à l'agent ; « Voir le détail » ouvre la vente dans PharmaBoost.</summary>
+    private void OnFormWord(string word)
+    {
+      if (word.StartsWith("VOIR "))
+      {
+        Entry shown = current;
+        try { if (shown != null && !string.IsNullOrEmpty(shown.Url)) Process.Start(shown.Url); } catch (Exception) { }
+      }
+      Say(word);
     }
 
     private void SavePosition(Point p)
@@ -1106,111 +1660,95 @@ namespace PharmaBoostAvis
       try { if (!string.IsNullOrEmpty(positionFile)) File.WriteAllText(positionFile, p.X + "," + p.Y); } catch (Exception) { }
     }
 
-    /// <summary>Le délai est écoulé : la fenêtre se range, le conseil reste compté près de l'horloge.</summary>
-    private void Tuck()
+    /// <summary>La vente est terminée : le message reste quelques secondes, puis la fenêtre s'efface et attend la suivante.</summary>
+    private void Finish(DoneInfo info)
     {
-      Entry shown = current;
-      Hide();
-      if (shown != null && !shown.Quiet) Say("ATTENTE " + shown.Id);
-      Refresh();
+      if (current == null || current.Id != info.Id || form == null || form.IsDisposed) return;
+      sessionOpen = false;
+      quietTimer.Stop();
+      doneId = info.Id;
+      form.RenderDone(info);
+      form.Place();
+      form.Reveal();
+      RefreshIcon();
+      doneTimer.Stop();
+      doneTimer.Interval = 7000;
+      doneTimer.Start();
     }
 
-    private void Hide()
+    private void End()
     {
-      hideTimer.Stop();
-      if (form != null && !form.IsDisposed) form.Hide();
+      quietTimer.Stop();
+      doneTimer.Stop();
+      sessionOpen = false;
+      doneId = "";
       current = null;
-    }
-
-    private void View(Entry entry)
-    {
-      try { if (!string.IsNullOrEmpty(entry.Url)) Process.Start(entry.Url); } catch (Exception) { }
-      Dismiss(entry);
-      Say("VOIR " + entry.Id);
-    }
-
-    private void Ignore(Entry entry)
-    {
-      Dismiss(entry);
-      Say("IGNORER " + entry.Id);
-    }
-
-    /// <summary>Vu ou écarté : on s'en souvient, pour ne rouvrir la fenêtre que sur du nouveau.</summary>
-    private void Dismiss(Entry entry)
-    {
-      dismissed[entry.Id] = new List<string>(entry.Shown);
-      pending.RemoveAll(delegate (Entry p) { return p.Id == entry.Id; });
-      Hide();
-      Refresh();
+      if (form != null && !form.IsDisposed) form.Hide();
+      RefreshIcon();
     }
 
     private void Remove(string id)
     {
-      pending.RemoveAll(delegate (Entry p) { return p.Id == id; });
-      dismissed.Remove(id);
-      if (current != null && current.Id == id) Hide();
-      Refresh();
+      if (current != null && current.Id == id) End();
     }
 
-    private void ShowLatest()
+    private void Expand()
     {
-      if (pending.Count == 0) return;
-      Present(pending[pending.Count - 1], seconds);
-    }
-
-    private void IgnoreAll()
-    {
-      foreach (Entry entry in new List<Entry>(pending)) { dismissed[entry.Id] = new List<string>(entry.Shown); Say("IGNORER " + entry.Id); }
-      pending.Clear();
-      Hide();
-      Refresh();
+      if (current == null || form == null || form.IsDisposed) return;
+      form.SetReduced(false);
+      form.Place();
+      form.Reveal();
     }
 
     private void Expire()
     {
-      int before = pending.Count;
-      pending.RemoveAll(delegate (Entry p) { return DateTime.Now - p.Since > MaxAge; });
-      if (pending.Count != before) Refresh();
+      if (current != null && DateTime.Now - current.Since > MaxAge) End();
+    }
+
+    private int Unanswered()
+    {
+      int count = 0;
+      if (current == null) return 0;
+      foreach (Item item in current.Items) { if (item.Outcome == "NONE") count++; }
+      return count;
     }
 
     private void BuildMenu()
     {
       menu.Items.Clear();
-      ToolStripMenuItem title = new ToolStripMenuItem("PharmaBoost — " + pending.Count + (pending.Count > 1 ? " conseils en attente" : " conseil en attente"));
+      if (current == null || !sessionOpen)
+      {
+        ToolStripMenuItem none = new ToolStripMenuItem("PharmaBoost — aucune vente en cours");
+        none.Enabled = false;
+        menu.Items.Add(none);
+        return;
+      }
+      int open = Unanswered();
+      ToolStripMenuItem title = new ToolStripMenuItem("PharmaBoost — " + open + (open > 1 ? " conseils sans réponse" : " conseil sans réponse"));
       title.Enabled = false;
       menu.Items.Add(title);
       menu.Items.Add(new ToolStripSeparator());
-      for (int i = pending.Count - 1; i >= 0; i--)
-      {
-        Entry entry = pending[i];
-        string text = entry.Items.Count > 0 ? entry.Items[0].Name : entry.Subject;
-        if (text.Length > 44) text = text.Substring(0, 43) + "…";
-        ToolStripMenuItem item = new ToolStripMenuItem("Voir : " + text + "   (" + entry.Reference + ")");
-        item.Click += delegate { View(entry); };
-        menu.Items.Add(item);
-      }
-      if (pending.Count > 0)
-      {
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Tout ignorer", null, delegate { IgnoreAll(); });
-      }
+      menu.Items.Add("Afficher la fenêtre", null, delegate { Expand(); });
+      menu.Items.Add("Réduire la fenêtre", null, delegate { if (form != null && !form.IsDisposed) form.SetReduced(true); });
+      menu.Items.Add("Vente terminée", null, delegate { if (current != null) Say("TERMINER " + current.Id); });
     }
 
-    /// <summary>L'icône près de l'horloge n'existe que tant qu'un conseil attend ; elle porte leur nombre.</summary>
-    private void Refresh()
+    /// <summary>L'icône près de l'horloge n'existe que pendant une vente ouverte ; elle porte le nombre de conseils sans réponse.</summary>
+    private void RefreshIcon()
     {
-      if (pending.Count == 0)
+      if (current == null || !sessionOpen)
       {
         counter.Visible = false;
         return;
       }
+      int open = Unanswered();
       IntPtr previous = iconHandle;
-      using (Bitmap bmp = Look.CounterIcon(pending.Count))
+      using (Bitmap bmp = Look.CounterIcon(open))
       {
         iconHandle = bmp.GetHicon();
         counter.Icon = Icon.FromHandle(iconHandle);
       }
-      string tip = "PharmaBoost — " + pending.Count + (pending.Count > 1 ? " conseils en attente" : " conseil en attente");
+      string tip = "PharmaBoost — vente en cours · " + open + (open > 1 ? " conseils sans réponse" : " conseil sans réponse");
       counter.Text = tip.Length > 63 ? tip.Substring(0, 62) + "…" : tip;
       counter.Visible = true;
       if (previous != IntPtr.Zero) Native.DestroyIcon(previous);
@@ -1218,7 +1756,8 @@ namespace PharmaBoostAvis
 
     private void Quit()
     {
-      hideTimer.Stop();
+      quietTimer.Stop();
+      doneTimer.Stop();
       ageTimer.Stop();
       counter.Visible = false;
       counter.Dispose();
@@ -1259,11 +1798,20 @@ function referenceOf(title) {
   return title.replace(/^PharmaBoost\s*·\s*/, "").trim();
 }
 var oneLine = (text) => text.replace(/[\r\n\u2028\u2029]+/g, " ").trim();
+function frenchDate(iso) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
+}
 function buildHostEntry(input) {
   const { body } = input;
   const images = input.images ?? /* @__PURE__ */ new Map();
   const structured = body.items ?? [];
   const items = structured.map((item) => ({
+    id: item.id ?? "",
+    drug: oneLine(item.drug ?? ""),
+    challenge: oneLine(item.challenge ?? ""),
+    shortDate: frenchDate(item.shortDateOn),
+    outcome: item.outcome === "SOLD" || item.outcome === "NOT_SOLD" ? item.outcome : "NONE",
     name: oneLine(item.name),
     price: euros(item.priceCents),
     reason: oneLine(item.reason ?? ""),
@@ -1271,9 +1819,9 @@ function buildHostEntry(input) {
     image: item.imageUrl && images.get(item.imageUrl) || ""
   }));
   const legacyOnly = body.items === void 0 && body.advice.length > 0;
-  const alerts = body.alerts.map(oneLine);
+  const alerts = [...body.alerts.map(oneLine), ...input.problem ? [oneLine(input.problem)] : []];
   const notes = items.length === 0 && !legacyOnly ? body.advice.map(oneLine) : [];
-  const finalItems = legacyOnly ? body.advice.map((text) => ({ name: oneLine(text), price: "", reason: "", availability: "UNKNOWN", image: "" })) : items;
+  const finalItems = legacyOnly ? body.advice.map((text) => ({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: oneLine(text), price: "", reason: "", availability: "UNKNOWN", image: "" })) : items;
   return {
     id: input.prescriptionId,
     reference: referenceOf(body.title),
@@ -1282,9 +1830,37 @@ function buildHostEntry(input) {
     url: `${input.serverUrl.replace(/\/$/, "")}/vente/${input.prescriptionId}`,
     signature: body.signature,
     quiet: finalItems.length === 0 && alerts.length === 0,
+    emailSaved: body.followUp?.emailSaved === true,
+    emailError: oneLine(input.emailError ?? ""),
     alerts,
     notes,
     items: finalItems
+  };
+}
+function ordinalFr(rank) {
+  return rank === 1 ? "1er" : `${rank}e`;
+}
+var plural = (count, one, many) => `${count} ${count > 1 ? many : one}`;
+function buildDoneInfo(input) {
+  const { result } = input;
+  const lines = [];
+  if (result.proposed === 0) lines.push("Aucun conseil \xE0 enregistrer.");
+  else {
+    lines.push([plural(result.sold, "vendu", "vendus"), `${result.notSold} non vendu${result.notSold > 1 ? "s" : ""}`, `${result.unanswered} sans r\xE9ponse`].join(" \xB7 "));
+  }
+  let warning = false;
+  if (result.report === "SENT") lines.push("\u2713 Bilan envoy\xE9 au patient.");
+  else if (result.report === "SIMULATED") lines.push("Bilan pr\xE9par\xE9 (l'envoi d'e-mails est en mode test).");
+  else if (result.report === "FAILED") {
+    lines.push("\u26A0 Le bilan n'a pas pu \xEAtre envoy\xE9 au patient.");
+    warning = true;
+  } else if (input.emailWasSaved) lines.push("Aucun bilan envoy\xE9 : aucun produit n'a \xE9t\xE9 vendu.");
+  return {
+    id: input.saleId,
+    title: "Vente termin\xE9e \u2014 r\xE9sultats enregistr\xE9s",
+    lines,
+    badge: result.sold > 0 && result.soldToday && result.soldToday > 0 ? `${ordinalFr(result.soldToday)} conseil vendu aujourd'hui` : "",
+    warning
   };
 }
 function legacyContentOf(entry, seconds) {
@@ -1367,7 +1943,7 @@ var NoticeCenter = class {
   startTimer = null;
   lastEntry = null;
   stderrText = "";
-  /** Les ventes que la fenêtre garde en attente, d'après ce qu'elle a répondu. */
+  /** Les ventes que la fenêtre garde ouvertes (jusqu'à « Vente terminée »), d'après ce qu'elle a répondu. */
   held = /* @__PURE__ */ new Map();
   get platform() {
     return this.options.platform ?? process.platform;
@@ -1389,7 +1965,7 @@ var NoticeCenter = class {
     if (this.platform !== "win32" || this.broken || this.forcedLegacy) return;
     this.ensureHost();
   }
-  /** Les ventes dont un conseil attend près de l'horloge. */
+  /** Les ventes que la fenêtre garde ouvertes. */
   ids() {
     return [...this.held.keys()];
   }
@@ -1409,7 +1985,20 @@ var NoticeCenter = class {
       return;
     }
     if (!entry.quiet) this.held.set(entry.id, entry.signature);
-    this.send({ op: "show", entry, seconds: this.seconds, position: this.options.position ?? "milieu-droite", positionFile: (0, import_node_path4.join)(this.options.configDir, "pharmaboost-avis-position.txt") });
+    this.send({ op: "show", entry, position: this.options.position ?? "milieu-droite", positionFile: (0, import_node_path4.join)(this.options.configDir, "pharmaboost-avis-position.txt") });
+  }
+  /** « Vente terminée » est enregistrée : la fenêtre montre le message de fin, puis s'efface et attend la vente suivante. */
+  done(info) {
+    this.held.delete(info.id);
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy || !this.host) {
+      this.options.log(`Vente termin\xE9e : ${info.title} \u2014 ${info.lines.join(" / ")}${info.badge ? ` \u2014 ${info.badge}` : ""}`);
+      return;
+    }
+    this.send({ op: "done", info });
+  }
+  /** La fenêtre passe à une autre vente : l'ancienne n'est plus suivie ici (la fenêtre, elle, n'est pas touchée). */
+  forget(id) {
+    this.held.delete(id);
   }
   /** La vente est close : son conseil n'a plus lieu d'être. */
   remove(id) {
@@ -1475,16 +2064,33 @@ var NoticeCenter = class {
         this.ready = true;
         if (this.startTimer) clearTimeout(this.startTimer);
         this.options.log("Avis : fen\xEAtre pr\xEAte.");
-      } else if (line.startsWith("VOIR ") || line.startsWith("IGNORER ")) {
-        const [action, id] = line.split(" ");
-        this.held.delete(id);
-        this.options.log(`Avis ${action === "VOIR" ? "ouvert dans PharmaBoost" : "ignor\xE9"} : ${id}.`);
-      } else if (line.startsWith("ATTENTE ")) {
-        this.options.log(`Avis rang\xE9 pr\xE8s de l'horloge : ${line.slice(8)}.`);
-      } else if (line.startsWith("ERREUR")) {
-        this.options.log(`Avis : ${line}`);
+      } else {
+        this.onWord(line);
       }
     }
+  }
+  /** Un mot de la fenêtre : la réponse du pharmacien à un geste. Un mot inconnu est ignoré, jamais une panne. */
+  onWord(line) {
+    const [word, saleId = "", argument = ""] = line.split(" ");
+    const act = (action) => {
+      try {
+        this.options.onAction?.(action);
+      } catch (error) {
+        this.options.log(`Avis : action ${word} impossible (${error instanceof Error ? error.message : String(error)}).`);
+      }
+    };
+    if (!saleId && word !== "ERREUR") return;
+    if (word === "VENDU" && argument) act({ kind: "sold", saleId, adviceId: argument });
+    else if (word === "NONVENDU" && argument) act({ kind: "not_sold", saleId, adviceId: argument });
+    else if (word === "ANNULER" && argument) act({ kind: "undo", saleId, adviceId: argument });
+    else if (word === "EMAIL" && argument) {
+      const email = Buffer.from(argument, "base64").toString("utf8").trim();
+      if (email && email.length <= 200 && !/[\r\n\s]/.test(email)) act({ kind: "email", saleId, email });
+    } else if (word === "EMAIL_RETIRER") act({ kind: "email_remove", saleId });
+    else if (word === "TERMINER") act({ kind: "finish", saleId });
+    else if (word === "VOIR") act({ kind: "view", saleId });
+    else if (word === "FERMEE") this.held.delete(saleId);
+    else if (word === "ERREUR") this.options.log(`Avis : ${line}`);
   }
   onError(text) {
     this.stderrText = `${this.stderrText}${text}`.slice(0, 600);
@@ -1721,7 +2327,7 @@ function dryRunRobotFile(path, pattern, maxBytes = 5 * 1024 * 1024) {
 var import_node_fs7 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path6 = require("node:path");
-var VERSION = "0.6.1";
+var VERSION = "0.7.0";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path6.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path6.join)((0, import_node_path6.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -1832,7 +2438,8 @@ var lastScanAt = null;
 var nextUpdateCheck = Date.now() + 45e3;
 var restartWhenIdle = false;
 async function checkForUpdate(config, scans) {
-  const idle = () => canUpdateNow({ watching: watched !== null, queuedScans: scans.size, lastScanAt, pendingNotices: notices.ids().length, now: Date.now() });
+  const sessionActive = () => watched !== null && Date.now() - watched.lastChange < SESSION_IDLE_MS;
+  const idle = () => canUpdateNow({ watching: sessionActive(), queuedScans: scans.size, lastScanAt, pendingNotices: sessionActive() ? notices.ids().length : 0, now: Date.now() });
   const restart = () => {
     log("Mise \xE0 jour automatique : red\xE9marrage de l'agent.");
     notices.stop();
@@ -1855,7 +2462,10 @@ var IMAGES_DIR = (0, import_node_path6.join)((0, import_node_path6.dirname)(CONF
 var notices = new NoticeCenter({
   configDir: (0, import_node_path6.dirname)(CONFIG_PATH),
   log: (message) => log(message),
-  legacyShow: (content) => showToast((0, import_node_path6.dirname)(CONFIG_PATH), content, log)
+  legacyShow: (content) => showToast((0, import_node_path6.dirname)(CONFIG_PATH), content, log),
+  onAction: (action) => {
+    void handleAction(action);
+  }
 });
 function applyDisplayPreferences(config) {
   const wanted = config.affichage;
@@ -1865,15 +2475,22 @@ function applyDisplayPreferences(config) {
     legacy: wanted?.ancienne === true
   });
 }
-var WATCH_MS = 12e4;
+var SESSION_MAX_MS = 3 * 60 * 6e4;
+var SESSION_IDLE_MS = 10 * 6e4;
+var SESSION_CALM_MS = 3 * 6e4;
 var watched = null;
+var activeConfig = null;
 function watchPrescription(prescriptionId) {
-  watched = { prescriptionId, since: Date.now(), shownSignature: watched?.prescriptionId === prescriptionId ? watched.shownSignature : null };
+  const same = watched?.prescriptionId === prescriptionId;
+  if (watched && !same) notices.forget(watched.prescriptionId);
+  const now = Date.now();
+  watched = { prescriptionId, since: same ? watched.since : now, lastChange: now, shownSignature: same ? watched.shownSignature : null, body: same ? watched.body : null, images: same ? watched.images : /* @__PURE__ */ new Map() };
 }
 async function pollNotice(config) {
   await dropClosedNotices(config);
   if (!watched) return;
-  if (Date.now() - watched.since > WATCH_MS) {
+  if (Date.now() - watched.since > SESSION_MAX_MS) {
+    notices.remove(watched.prescriptionId);
     watched = null;
     return;
   }
@@ -1892,19 +2509,24 @@ async function pollNotice(config) {
   }
   if (body.state !== "READY" || body.signature === watched.shownSignature) return;
   watched.shownSignature = body.signature;
+  watched.lastChange = Date.now();
   applyDisplayPreferences(config);
-  const prescriptionId = watched.prescriptionId;
-  const known = /* @__PURE__ */ new Map();
+  await showBody(config, watched.prescriptionId, body, {});
+  log(`Avis affich\xE9 : ${body.subject} \u2014 ${body.alerts.length} alerte(s), ${(body.items ?? []).length || body.advice.length} conseil(s).`);
+}
+async function showBody(config, prescriptionId, body, extras) {
+  const current2 = watched?.prescriptionId === prescriptionId ? watched : null;
+  if (current2) current2.body = body;
+  const known = current2 ? current2.images : /* @__PURE__ */ new Map();
   const missing = [];
   for (const item of body.items ?? []) {
     const source = imageSource(item.imageUrl, config.serverUrl);
-    if (!item.imageUrl || !source) continue;
+    if (!item.imageUrl || !source || known.has(item.imageUrl)) continue;
     const hit = cachedImage(IMAGES_DIR, source);
     if (hit) known.set(item.imageUrl, hit);
     else missing.push({ imageUrl: item.imageUrl, source });
   }
-  notices.show(buildHostEntry({ prescriptionId, serverUrl: config.serverUrl, body, images: known }));
-  log(`Avis affich\xE9 : ${body.subject} \u2014 ${body.alerts.length} alerte(s), ${(body.items ?? []).length || body.advice.length} conseil(s).`);
+  notices.show(buildHostEntry({ prescriptionId, serverUrl: config.serverUrl, body, images: known, ...extras }));
   if (missing.length > 0) void completeImages(config, prescriptionId, body, known, missing);
 }
 async function completeImages(config, prescriptionId, body, known, missing) {
@@ -1916,7 +2538,54 @@ async function completeImages(config, prescriptionId, body, known, missing) {
       added += 1;
     }
   }
-  if (added > 0) notices.show(buildHostEntry({ prescriptionId, serverUrl: config.serverUrl, body, images: known }));
+  if (added > 0 && watched?.prescriptionId === prescriptionId && watched.body === body) notices.show(buildHostEntry({ prescriptionId, serverUrl: config.serverUrl, body, images: known }));
+}
+async function refreshNow(config, extras = {}) {
+  if (!watched) return;
+  const prescriptionId = watched.prescriptionId;
+  const response = await api(config, `/api/agent/conseil?prescription=${encodeURIComponent(prescriptionId)}`, { method: "GET" });
+  if (!response.ok) return;
+  const body = await response.json();
+  if (!body.ok || body.state !== "READY" || watched?.prescriptionId !== prescriptionId) return;
+  watched.shownSignature = body.signature;
+  watched.lastChange = Date.now();
+  await showBody(config, prescriptionId, body, extras);
+}
+async function postJson(config, path, payload) {
+  const response = await api(config, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  return { status: response.status, body: await response.json().catch(() => null) };
+}
+async function handleAction(action) {
+  const config = activeConfig;
+  if (!config || action.kind === "view") return;
+  if (watched) watched.lastChange = Date.now();
+  try {
+    if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {
+      const outcome = action.kind === "sold" ? "SOLD" : action.kind === "not_sold" ? "NOT_SOLD" : "NONE";
+      const result = await postJson(config, "/api/agent/conseil/decision", { prescription: action.saleId, recommendation: action.adviceId, outcome });
+      log(`Conseil ${action.adviceId} \u2192 ${outcome} : ${result.body?.ok ? "enregistr\xE9" : result.body?.error ?? `HTTP ${result.status}`}.`);
+      await refreshNow(config, result.body?.ok ? {} : { problem: result.body?.error ?? "La r\xE9ponse n'a pas pu \xEAtre enregistr\xE9e." });
+    } else if (action.kind === "email" || action.kind === "email_remove") {
+      const email = action.kind === "email" ? action.email : null;
+      const result = await postJson(config, "/api/agent/conseil/email", { prescription: action.saleId, email, consent: email !== null });
+      log(email ? `E-mail du patient : ${result.body?.ok ? "enregistr\xE9 (avec son accord)" : result.body?.error ?? `HTTP ${result.status}`}.` : "E-mail du patient retir\xE9.");
+      await refreshNow(config, result.body?.ok ? {} : { emailError: result.body?.error ?? "L'adresse n'a pas pu \xEAtre enregistr\xE9e." });
+    } else if (action.kind === "finish") {
+      const emailWasSaved = watched?.body?.followUp?.emailSaved === true;
+      const result = await postJson(config, "/api/agent/conseil/terminer", { prescription: action.saleId });
+      if (result.body?.ok) {
+        log(`Vente termin\xE9e : ${result.body.sold} vendu(s), ${result.body.notSold} non vendu(s), ${result.body.unanswered} sans r\xE9ponse ; bilan : ${result.body.report}.`);
+        notices.done(buildDoneInfo({ saleId: action.saleId, result: result.body, emailWasSaved }));
+        if (watched?.prescriptionId === action.saleId) watched = null;
+      } else {
+        log(`Vente termin\xE9e impossible : ${result.body?.error ?? `HTTP ${result.status}`}.`);
+        await refreshNow(config, { problem: "La fin de la vente n'a pas pu \xEAtre enregistr\xE9e. R\xE9essayez dans un instant." });
+      }
+    }
+  } catch (error) {
+    log(`Action ${action.kind} : ${error instanceof Error ? error.message : String(error)}`);
+    await refreshNow(config, { problem: "Pas de connexion \xE0 PharmaBoost : ce geste n'a pas \xE9t\xE9 enregistr\xE9." }).catch(() => void 0);
+  }
 }
 var lastClosedCheck = 0;
 async function dropClosedNotices(config) {
@@ -1966,6 +2635,7 @@ async function runPost(config) {
   const reportState = (etat) => writeStatus(CONFIG_PATH, { etat, at: (/* @__PURE__ */ new Date()).toISOString(), version: VERSION, poste: config.postLabel || (0, import_node_os.hostname)(), officine: config.pharmacyName ?? null, notice });
   for (; ; ) {
     try {
+      activeConfig = config;
       if (scans.size > 0) await scans.flush();
       await pollNotice(config);
       await checkForUpdate(config, scans);
@@ -2000,7 +2670,7 @@ async function runPost(config) {
     } catch (error) {
       log(`Erreur : ${error instanceof Error ? error.message : String(error)}`);
     }
-    await new Promise((resolve) => setTimeout(resolve, watched ? 2e3 : 3e3));
+    await new Promise((resolve) => setTimeout(resolve, watched ? Date.now() - watched.lastChange > SESSION_CALM_MS ? 8e3 : 2e3 : 3e3));
   }
 }
 function testRobot() {
@@ -2048,16 +2718,18 @@ function testAffichage() {
     url: `${config?.serverUrl.replace(/\/$/, "") ?? "https://pharmaboost.app"}/vente/nouvelle`,
     signature: "essai",
     quiet: false,
+    emailSaved: false,
+    emailError: "",
     alerts: [],
     notes: [],
     items: [
-      { name: "PROBIOTIQUE 30 g\xE9lules", price: "14,90 \u20AC", reason: "Prot\xE9ger la flore pendant l'antibiotique", availability: "IN_STOCK", image: "" },
-      { name: "S\xC9RUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 \u20AC", reason: "", availability: "LOW_STOCK", image: "" }
+      { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 g\xE9lules", price: "14,90 \u20AC", reason: "Prot\xE9ger la flore pendant l'antibiotique", availability: "IN_STOCK", image: "" },
+      { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "S\xC9RUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 \u20AC", reason: "", availability: "LOW_STOCK", image: "" }
     ]
   };
   notices.show(entry);
-  console.log("Un conseil d'exemple doit appara\xEEtre \xE0 droite de l'\xE9cran, \xE0 mi-hauteur (d\xE9pla\xE7able \xE0 la souris).");
-  console.log("Au bout de 30 secondes il se range : une petite ic\xF4ne avec le nombre \xAB 1 \xBB appara\xEEt pr\xE8s de l'horloge. Un clic la rouvre.");
+  console.log("Une vente d'exemple doit appara\xEEtre \xE0 droite de l'\xE9cran, \xE0 mi-hauteur (d\xE9pla\xE7able \xE0 la souris).");
+  console.log("Elle reste ouverte : essayez \xAB Vendu \xBB, \xAB Non vendu \xBB, le bouton \xAB \u2013 \xBB qui la r\xE9duit. Rien n'est envoy\xE9.");
   setTimeout(() => {
     notices.stop();
     process.exit(0);

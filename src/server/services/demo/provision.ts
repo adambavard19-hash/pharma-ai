@@ -31,7 +31,7 @@ import type { Prisma } from "@/generated/prisma";
 export const WIPED_MODELS = [
   "labChallengeEntry", "labChallenge", "partnerOrder", "partnerAttribution", "partnerLead", "pharmacyPartnerPreference",
   "trainingProgress", "stockDeposit", "importJob", "sealedDocument", "patientDocument", "reminder", "patientInteraction",
-  "stockMovement", "sale", "recommendation", "analysisRun", "counterRequest", "prescription", "patient",
+  "stockMovement", "sale", "recommendation", "analysisRun", "counterRequest", "counterSaleFollowUp", "prescription", "patient",
   "pharmacyRule", "productAssociation", "preferredRange", "productVigilance", "stockLot", "productBarcode", "stockItem", "product", "pharmacyDrugStock",
   "notification", "emailDispatch", "storedFile", "automationDispatch", "patientNewsSubscription", "patientNewsAnnouncement", "aiUsageRecord", "auditLog",
   // La démonstration n'écrit pas au vrai support (le geste est refusé) ; si une discussion existait, elle ne survit pas à la réinitialisation.

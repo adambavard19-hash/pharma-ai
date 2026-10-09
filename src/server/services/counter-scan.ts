@@ -181,6 +181,8 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
           status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
           updatedAt: { gte: writtenSince },
           sales: { none: {} },
+          // « Vente terminée » dans la fenêtre du poste : le bip suivant est un autre patient.
+          NOT: { counterFollowUp: { closedAt: { not: null } } },
         },
         // La vente que ce poste a ouverte en dernier, jamais une plus ancienne
         // encore ouverte : l'ordre est celui de la création, pas de l'écriture
@@ -242,7 +244,7 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
 /** La délivrance en cours sur un poste (pour l'écran du comptoir), s'il y en a une. */
 export async function listLiveCounterSales(pharmacyId: string) {
   return prisma.prescription.findMany({
-    where: { pharmacyId, source: "COUNTER_SCAN", status: { in: ["NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] }, sales: { none: {} }, updatedAt: { gte: new Date(Date.now() - 6 * 60 * 60 * 1000) } },
+    where: { pharmacyId, source: "COUNTER_SCAN", status: { in: ["NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] }, sales: { none: {} }, NOT: { counterFollowUp: { closedAt: { not: null } } }, updatedAt: { gte: new Date(Date.now() - 6 * 60 * 60 * 1000) } },
     orderBy: { updatedAt: "desc" },
     take: 6,
     select: { id: true, reference: true, status: true, counterPost: true, updatedAt: true, createdAt: true, lines: { orderBy: { position: "asc" }, select: { drugName: true, quantity: true } }, _count: { select: { recommendations: true } } },

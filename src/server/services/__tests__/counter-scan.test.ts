@@ -14,17 +14,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 type Line = { id: string; drugSpecialtyId: string | null; rawText: string | null; drugName: string; quantity: number | null; position: number };
-type Sale = { id: string; reference: string; pharmacyId: string; source: string; counterPost: string; status: string; createdAt: Date; updatedAt: Date; sales: unknown[]; lines: Line[] };
+type Sale = { id: string; reference: string; pharmacyId: string; source: string; counterPost: string; status: string; createdAt: Date; updatedAt: Date; sales: unknown[]; lines: Line[]; followUpClosed?: boolean };
 type Post = { lastScanAt: Date | null; lastSeenAt: Date | null; scanCount: number };
 
 type DateFilter = { gte?: Date; gt?: Date };
-type SaleWhere = { pharmacyId?: string; source?: string; counterPost?: string; id?: string; status?: { in: string[] }; updatedAt?: DateFilter; sales?: { none?: Record<string, never> } };
+type SaleWhere = { pharmacyId?: string; source?: string; counterPost?: string; id?: string; status?: { in: string[] }; updatedAt?: DateFilter; sales?: { none?: Record<string, never> }; NOT?: { counterFollowUp?: { closedAt?: { not: null } } } };
 type OrderBy = { createdAt?: "asc" | "desc"; updatedAt?: "asc" | "desc" };
 
 const mem = vi.hoisted(() => ({ sales: [] as Sale[], posts: new Map<string, Post>(), next: 0 }));
 
 const db = vi.hoisted(() => {
-  const KNOWN_KEYS = ["pharmacyId", "source", "counterPost", "id", "status", "updatedAt", "sales"];
+  const KNOWN_KEYS = ["pharmacyId", "source", "counterPost", "id", "status", "updatedAt", "sales", "NOT"];
 
   /** Le filtre `where` de Prisma, appliqué pour de bon à une vente. */
   const matches = (sale: Sale, where: SaleWhere): boolean => {
@@ -45,6 +45,12 @@ const db = vi.hoisted(() => {
       // `none: {}` : aucune vente encaissée ne s'y rattache. Toute autre forme n'est pas simulée.
       if (!where.sales.none || Object.keys(where.sales.none).length > 0) throw new Error("Base simulée : filtre `sales` non géré");
       if (sale.sales.length > 0) return false;
+    }
+    if (where.NOT !== undefined) {
+      // `NOT: { counterFollowUp: { closedAt: { not: null } } }` : la vente que le pharmacien a terminée ne reprend pas de bip.
+      const closed = where.NOT.counterFollowUp?.closedAt;
+      if (!closed || closed.not !== null) throw new Error("Base simulée : filtre `NOT` non géré");
+      if (sale.followUpClosed) return false;
     }
     return true;
   };

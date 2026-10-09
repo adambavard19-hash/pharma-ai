@@ -8,6 +8,8 @@ import { parsePeriodParams } from "@/core/performance/periods";
 import { TIME_ZONE } from "@/config/constants";
 import { PageHeader } from "@/components/ui/page";
 import { PerformanceDashboard } from "@/components/performance/performance-dashboard";
+import { CounterResultsCard } from "@/components/performance/counter-results-card";
+import { loadCounterResults } from "@/server/services/counter-results";
 
 export const metadata: Metadata = { title: "Ce que PharmaBoost vous rapporte" };
 
@@ -37,7 +39,11 @@ export default async function ResultatsPage({
   // L'officine de démonstration commerciale lit sa propre activité marquée démo ; une vraie officine, jamais.
   const demo = session.scope.isDemo ? { pharmacyIsDemo: true } : {};
 
-  const [report, roi] = await Promise.all([loadPerformanceReport({ pharmacyId, period, now, ...demo }), loadSubscriptionReturn({ pharmacyId, now, ...demo })]);
+  const [report, roi, counter] = await Promise.all([
+    loadPerformanceReport({ pharmacyId, period, now, ...demo }),
+    loadSubscriptionReturn({ pharmacyId, now, ...demo }),
+    loadCounterResults({ pharmacyId, since: period.start, until: period.end }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -56,6 +62,8 @@ export default async function ResultatsPage({
       </p>
 
       <PerformanceDashboard report={report} roi={roi} basePath="/resultats" audience="owner" now={now} />
+
+      <CounterResultsCard results={counter} periodLabel={period.label} />
     </div>
   );
 }

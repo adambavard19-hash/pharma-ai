@@ -127,6 +127,7 @@ model Pharmacy {
   recommendations     Recommendation[]
   pharmacyRules       PharmacyRule[]
   productAssociations ProductAssociation[]
+  counterSaleFollowUps CounterSaleFollowUp[]
   documents           PatientDocument[]
   sales               Sale[]
   notifications       Notification[]
@@ -1777,6 +1778,8 @@ model Prescription {
   sealedDocuments SealedDocument[]
 
   @@unique([pharmacyId, reference])
+  counterFollowUp CounterSaleFollowUp?
+
   @@index([pharmacyId, status])
   @@index([pharmacyId, createdAt])
   @@index([patientId])
@@ -2130,6 +2133,12 @@ model Recommendation {
 
   decidedByUserId   String?
   decidedAt         DateTime?
+  /// D'où vient le résultat d'un conseil : « COUNTER_DECLARED » (le pharmacien a cliqué « Vendu » / « Non vendu » dans la fenêtre du
+  /// poste de caisse — une déclaration, pas une vente lue dans le logiciel de gestion), « LGO_CONFIRMED » (réservé : une vente
+  /// lue dans le logiciel). Vide : décidé sur l'écran de la vente, ou jamais décidé.
+  outcomeSource     String?
+  /// Le poste de caisse qui l'a déclaré (« Comptoir 2 ») : le collaborateur n'est pas identifiable depuis le logiciel de gestion.
+  outcomePost       String?
   replacedProductId String?
   /// Note libre du pharmacien lors de la modification.
   pharmacistNote    String?
@@ -2343,6 +2352,37 @@ model CentralAssociation {
   @@unique([triggerKey, adviceEan])
   @@index([status])
   @@map("central_associations")
+}
+
+/// Le suivi d'une vente au comptoir, tenu par la fenêtre PharmaBoost du poste de caisse : le bilan chiffré de la vente (conseils
+/// proposés, vendus, non vendus, sans réponse) et, si le patient l'a accepté, son e-mail — gardé CHIFFRÉ, avec l'instant du
+/// consentement — pour lui envoyer son bilan à la fin de la vente. Aucune donnée de santé n'est gardée ici.
+model CounterSaleFollowUp {
+  id              String    @id @default(cuid())
+  pharmacyId      String
+  prescriptionId  String    @unique
+  /// L'adresse du patient, chiffrée (voir server/security/encryption.ts) ; vide tant qu'il ne l'a pas donnée.
+  emailEncrypted  String?
+  /// Quand le patient a donné son accord (déclaré au comptoir), et sur quel poste.
+  consentAt       DateTime?
+  consentPost     String?
+  closedAt        DateTime?
+  closedPost      String?
+  proposedCount   Int       @default(0)
+  soldCount       Int       @default(0)
+  notSoldCount    Int       @default(0)
+  unansweredCount Int       @default(0)
+  /// Le bilan au patient : NONE (pas d'accord), SENT, SIMULATED (messagerie non branchée), FAILED.
+  reportStatus    String?
+  reportSentAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  pharmacy     Pharmacy     @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, closedAt])
+  @@map("counter_sale_follow_ups")
 }
 
 // ===========================================================================

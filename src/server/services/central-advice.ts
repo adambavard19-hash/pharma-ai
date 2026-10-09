@@ -46,6 +46,22 @@ export async function loadCentralAdvice(): Promise<{ removed: string[]; custom: 
   return { removed: removedRuleKeys(rows), custom: customRulesFrom(rows) };
 }
 
+/**
+ * Les règles relues et validées par le pharmacien de PharmaBoost (version courante pour celles du code). Seules leurs phrases
+ * « patient » peuvent partir dans un e-mail à un patient : une règle encore à relire ne parle pas en son nom.
+ */
+export async function validatedRuleKeys(): Promise<Set<string>> {
+  const rows = await loadCentralRuleRows();
+  const byKey = rowsByKey(rows);
+  const keys = new Set<string>();
+  for (const rule of ADVICE_RULES) {
+    const state = centralState(rule, byKey);
+    if (state.status === "VALIDATED" && !state.outdated) keys.add(rule.key);
+  }
+  for (const row of rows) if (row.source === "CUSTOM" && row.status === "VALIDATED") keys.add(row.ruleKey);
+  return keys;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // L'écran de la console
 // ---------------------------------------------------------------------------------------------------------------

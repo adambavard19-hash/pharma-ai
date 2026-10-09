@@ -21,7 +21,7 @@ describe("l'avis de comptoir affiché sur le poste de caisse", () => {
     expect(buildCounterNotice({ ...base, prescriptionStatus: "DELIVERED" }).state).toBe("CLOSED");
   });
 
-  it("met les alertes avant les conseils, trois conseils au plus, sans la forme galénique", () => {
+  it("met les alertes avant les conseils, quatre conseils au plus, sans la forme galénique", () => {
     const notice = buildCounterNotice({
       ...base,
       alerts: [
@@ -36,13 +36,14 @@ describe("l'avis de comptoir affiché sur le poste de caisse", () => {
         { name: "Retirée", priceCents: 100, reason: null, status: "REMOVED" },
         { name: "PROBIOTIQUE 30 gélules", priceCents: 1490, reason: "Antibiotique en cours", status: "ACCEPTED" },
         { name: "SÉRUM PHYSIOLOGIQUE", priceCents: null, reason: "Lavage de nez", status: "PROPOSED" },
-        { name: "Quatrième", priceCents: 100, reason: "Trop", status: "PROPOSED" },
+        { name: "Quatrième", priceCents: 100, reason: "Dernier retenu", status: "PROPOSED" },
+        { name: "Cinquième", priceCents: 100, reason: "Trop", status: "PROPOSED" },
       ],
     });
     expect(notice.state).toBe("READY");
     expect(notice.subject).toBe("DOLIPRANE 1000 mg · SPASFON LYOC 80 mg");
     expect(notice.alerts).toEqual(["Ligne illisible", "Interaction avec le millepertuis"]);
-    expect(notice.advice).toEqual(["VITAMINE C 1 g · 8,90 € · Fatigue hivernale", "PROBIOTIQUE 30 gélules · 14,90 € · Antibiotique en cours", "SÉRUM PHYSIOLOGIQUE · Lavage de nez"]);
+    expect(notice.advice).toEqual(["VITAMINE C 1 g · 8,90 € · Fatigue hivernale", "PROBIOTIQUE 30 gélules · 14,90 € · Antibiotique en cours", "SÉRUM PHYSIOLOGIQUE · Lavage de nez", "Quatrième · 1,00 € · Dernier retenu"]);
   });
 
   it("dit pourquoi il n'y a rien, plutôt que de ne rien dire", () => {
@@ -66,7 +67,7 @@ describe("les conseils structurés de la fenêtre du poste (photo, disponibilit�
   it("porte pour chaque conseil son nom, son prix, sa raison, sa photo et sa disponibilité", () => {
     const { items, drugs } = notice([rec()]);
     expect(drugs).toEqual(["QUETIAPINE VIATRIS LP 50 mg"]);
-    expect(items).toEqual([{ name: "ELUDAY GENCIVE 500 ml", priceCents: 790, reason: "Sécheresse buccale", availability: "IN_STOCK", quantity: 6, imageUrl: "https://images.openbeautyfacts.org/x.jpg" }]);
+    expect(items).toEqual([{ id: null, drug: null, challenge: null, shortDateOn: null, outcome: "NONE", name: "ELUDAY GENCIVE 500 ml", priceCents: 790, reason: "Sécheresse buccale", availability: "IN_STOCK", quantity: 6, imageUrl: "https://images.openbeautyfacts.org/x.jpg" }]);
   });
 
   it("dit la disponibilité telle qu'elle est : en stock, stock faible, rupture, inconnue", () => {
@@ -145,8 +146,41 @@ describe("seul parle dans la fenêtre du poste ce que la pharmacienne a validé"
     expect(notice.advice).toEqual(["Rien à ajouter pour cette délivrance."]);
   });
 
-  it("les trois conseils de la fenêtre sont pris parmi ceux qui ont le droit d'y être", () => {
-    const notice = buildCounterNotice({ ...base, recommendations: [rec("A", false), rec("B", false), rec("C", true), rec("D", true), rec("E", true), rec("F", true)] });
-    expect(notice.items.map((item) => item.name)).toEqual(["C", "D", "E"]);
+  it("les quatre conseils de la fenêtre sont pris parmi ceux qui ont le droit d'y être", () => {
+    const notice = buildCounterNotice({ ...base, recommendations: [rec("A", false), rec("B", false), rec("C", true), rec("D", true), rec("E", true), rec("F", true), rec("G", true)] });
+    expect(notice.items.map((item) => item.name)).toEqual(["C", "D", "E", "F"]);
   });
 });
+
+describe("la fenêtre qui reste ouverte pendant toute la vente", () => {
+  const rec = (over: Partial<Parameters<typeof buildCounterNotice>[0]["recommendations"][number]> = {}) => ({ id: "r1", name: "ELUDAY GENCIVE 500 ml", forDrug: "QUETIAPINE VIATRIS LP 50 mg, comprimé", priceCents: 790, reason: "Sécheresse buccale", status: "PROPOSED", quantity: 6, alertThreshold: 2, ...over });
+  const notice = (recommendations: ReturnType<typeof rec>[]) => buildCounterNotice({ ...base, lineNames: ["QUETIAPINE VIATRIS LP 50 mg, comprimé"], recommendations });
+
+  it("chaque conseil dit quel médicament il concerne, sans la forme", () => {
+    expect(notice([rec()]).items[0]).toMatchObject({ id: "r1", drug: "QUETIAPINE VIATRIS LP 50 mg", outcome: "NONE" });
+  });
+
+  it("« Vendu » et « Non vendu » marquent le conseil sans le faire disparaître", () => {
+    const { items } = notice([rec({ id: "a", status: "PURCHASED" }), rec({ id: "b", name: "AUTRE", status: "DECLINED" }), rec({ id: "c", name: "TROISIEME" })]);
+    expect(items.map((item) => [item.id, item.outcome])).toEqual([["a", "SOLD"], ["b", "NOT_SOLD"], ["c", "NONE"]]);
+  });
+
+  it("un challenge et une date courte ne sont portés que s'ils sont connus", () => {
+    const { items } = notice([rec({ challengeTitle: "Challenge Avène été", shortDateOn: "2026-11-30" }), rec({ id: "r2", name: "SANS" })]);
+    expect(items[0]).toMatchObject({ challenge: "Challenge Avène été", shortDateOn: "2026-11-30" });
+    expect(items[1]).toMatchObject({ challenge: null, shortDateOn: null });
+  });
+
+  it("un même produit n'est conseillé qu'une fois, même pour deux médicaments", () => {
+    const { items } = notice([rec({ id: "x1", forDrug: "A" }), rec({ id: "x2", forDrug: "B" })]);
+    expect(items.map((item) => item.id)).toEqual(["x1"]);
+  });
+
+  it("répondre à un conseil change l'empreinte : la fenêtre se redessine", () => {
+    const before = notice([rec()]).signature;
+    expect(notice([rec({ status: "PURCHASED" })]).signature).not.toBe(before);
+    expect(notice([rec({ challengeTitle: "Challenge" })]).signature).not.toBe(before);
+    expect(notice([rec({ shortDateOn: "2026-11-30" })]).signature).not.toBe(before);
+  });
+});
+

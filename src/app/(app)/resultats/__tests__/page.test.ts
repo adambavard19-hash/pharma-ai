@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(),
   loadPerformanceReport: vi.fn(),
   loadSubscriptionReturn: vi.fn(),
+  loadCounterResults: vi.fn(),
   dashboard: vi.fn(),
 }));
 
@@ -26,6 +27,8 @@ vi.mock("@/server/services/performance", () => ({
   loadPerformanceReport: mocks.loadPerformanceReport,
   loadSubscriptionReturn: mocks.loadSubscriptionReturn,
 }));
+vi.mock("@/server/services/counter-results", () => ({ loadCounterResults: mocks.loadCounterResults }));
+vi.mock("@/components/performance/counter-results-card", () => ({ CounterResultsCard: () => createElement("div", { "data-testid": "comptoir" }, "au comptoir") }));
 vi.mock("@/components/performance/performance-dashboard", () => ({
   PerformanceDashboard: (props: Record<string, unknown>) => {
     mocks.dashboard(props);
@@ -94,6 +97,7 @@ beforeEach(() => {
   connectedAs("OWNER");
   mocks.loadPerformanceReport.mockResolvedValue(REPORT);
   mocks.loadSubscriptionReturn.mockResolvedValue(ROI_SHOWN);
+  mocks.loadCounterResults.mockResolvedValue({ marker: "comptoir" });
 });
 
 afterEach(() => {

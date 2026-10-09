@@ -31,6 +31,10 @@ export type DispatchKind =
   | "SUPPORT_ALERT"
   /** L'équipe a répondu à une officine depuis la console. */
   | "SUPPORT_REPLY"
+  /** Le bilan envoyé au patient à la fin de sa vente au comptoir (adresse masquée dans le journal). */
+  | "PATIENT_REPORT"
+  /** Le bilan du mois écoulé au comptoir, envoyé au titulaire. */
+  | "COUNTER_MONTHLY"
   /** Un modèle du centre de modèles (relance automatique, envoi manuel, test). */
   | "TEMPLATE"
   /** Une campagne de la console (offre bonus, parrainage, invitation des partenaires). */

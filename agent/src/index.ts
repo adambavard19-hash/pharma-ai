@@ -32,7 +32,7 @@ import { createHash } from "node:crypto";
 import { startDouchette } from "./douchette";
 import { showToast } from "./toast";
 import { UPDATE_CHECK_EVERY_MS, canUpdateNow, isInstalledAgent, selfUpdate } from "./self-update";
-import { DEFAULT_NOTICE_SECONDS, NoticeCenter, POSITIONS, buildHostEntry, cachedImage, fetchImage, imageSource, type HostEntry, type NoticeBody, type NoticePosition } from "./notice-center";
+import { DEFAULT_NOTICE_SECONDS, NoticeCenter, POSITIONS, buildDoneInfo, buildHostEntry, cachedImage, fetchImage, imageSource, type HostAction, type HostEntry, type NoticeBody, type NoticePosition } from "./notice-center";
 import { createScanQueue } from "./scan-queue";
 import { INSTALLER_EXIT, resolveInstallCode } from "./installer";
 import { stateForFailure, writeStatus, type PostState } from "./status";
@@ -41,7 +41,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.6.1";
+const VERSION = "0.7.0";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -212,7 +212,9 @@ let nextUpdateCheck = Date.now() + 45_000;
 /** La nouvelle version est posée sur le disque mais une vente était en cours : on redémarre au premier moment calme. */
 let restartWhenIdle = false;
 async function checkForUpdate(config: Config, scans: { size: number }): Promise<void> {
-  const idle = () => canUpdateNow({ watching: watched !== null, queuedScans: scans.size, lastScanAt, pendingNotices: notices.ids().length, now: Date.now() });
+  // Une vente restée ouverte sans rien faire depuis dix minutes (« Vente terminée » oublié) ne bloque pas la mise à jour.
+  const sessionActive = () => watched !== null && Date.now() - watched.lastChange < SESSION_IDLE_MS;
+  const idle = () => canUpdateNow({ watching: sessionActive(), queuedScans: scans.size, lastScanAt, pendingNotices: sessionActive() ? notices.ids().length : 0, now: Date.now() });
   const restart = () => {
     log("Mise à jour automatique : redémarrage de l'agent.");
     notices.stop();
@@ -237,13 +239,14 @@ async function checkForUpdate(config: Config, scans: { size: number }): Promise<
 const IMAGES_DIR = join(dirname(CONFIG_PATH), "avis-images");
 
 /**
- * Le centre d'avis : la fenêtre du conseil (30 s, puis rangée près de l'horloge avec un compteur), mise à jour sur
- * place, qui ne reprend jamais le clavier. L'ancienne fenêtre reste le secours si la nouvelle ne démarre pas.
+ * Le centre d'avis : la fenêtre de la vente, ouverte du premier bip à « Vente terminée », mise à jour sur
+ * place, qui ne reprend jamais le clavier (sauf le champ e-mail du patient, sur un clic). L'ancienne fenêtre reste le secours si la nouvelle ne démarre pas.
  */
 const notices = new NoticeCenter({
   configDir: dirname(CONFIG_PATH),
   log: (message) => log(message),
   legacyShow: (content) => showToast(dirname(CONFIG_PATH), content, log),
+  onAction: (action) => { void handleAction(action); },
 });
 
 /** Applique les réglages du poste (durée, endroit) ; une valeur inconnue est ignorée, jamais une panne. */
@@ -255,25 +258,34 @@ function applyDisplayPreferences(config: Config): void {
     legacy: wanted?.ancienne === true,
   });
 }
-/** Après un bip, on attend l'analyse jusqu'à deux minutes ; au-delà, elle est à lire dans PharmaBoost. */
-const WATCH_MS = 120_000;
+/** Une vente reste suivie, fenêtre ouverte, jusqu'à « Vente terminée » — avec un plafond de trois heures si on l'oublie. */
+const SESSION_MAX_MS = 3 * 60 * 60_000;
+/** Sans rien de nouveau depuis dix minutes, la vente n'empêche plus la mise à jour de l'agent. */
+const SESSION_IDLE_MS = 10 * 60_000;
+/** Sans rien de nouveau depuis trois minutes, on interroge le serveur moins souvent. */
+const SESSION_CALM_MS = 3 * 60_000;
 
-/** La vente que ce poste vient d'ouvrir ou de compléter, dont on attend l'avis. */
-let watched: { prescriptionId: string; since: number; shownSignature: string | null } | null = null;
+/** La vente que ce poste vient d'ouvrir ou de compléter, dont la fenêtre est ouverte. */
+let watched: { prescriptionId: string; since: number; lastChange: number; shownSignature: string | null; body: NoticeBody | null; images: Map<string, string> } | null = null;
+/** La configuration en cours, pour les gestes du pharmacien dans la fenêtre. */
+let activeConfig: Config | null = null;
 
 function watchPrescription(prescriptionId: string): void {
-  watched = { prescriptionId, since: Date.now(), shownSignature: watched?.prescriptionId === prescriptionId ? watched.shownSignature : null };
+  const same = watched?.prescriptionId === prescriptionId;
+  if (watched && !same) notices.forget(watched.prescriptionId);
+  const now = Date.now();
+  watched = { prescriptionId, since: same ? watched!.since : now, lastChange: now, shownSignature: same ? watched!.shownSignature : null, body: same ? watched!.body : null, images: same ? watched!.images : new Map() };
 }
 
 /**
- * L'avis de comptoir : dès que l'analyse de la vente bipée est prête, il
- * s'affiche en coin d'écran, par-dessus le LGO. Une fois par état : une boîte
- * de plus change l'empreinte, l'avis se réaffiche ; sinon il se tait.
+ * L'avis de comptoir : dès que l'analyse de la vente bipée est prête, la fenêtre s'ouvre par-dessus le LGO et y reste, mise à
+ * jour à chaque changement (un bip de plus, une réponse), jusqu'à « Vente terminée ». Une fois par état : sans changement
+ * d'empreinte, rien n'est redessiné.
  */
 async function pollNotice(config: Config): Promise<void> {
   await dropClosedNotices(config);
   if (!watched) return;
-  if (Date.now() - watched.since > WATCH_MS) { watched = null; return; }
+  if (Date.now() - watched.since > SESSION_MAX_MS) { notices.remove(watched.prescriptionId); watched = null; return; }
   const response = await api(config, `/api/agent/conseil?prescription=${encodeURIComponent(watched.prescriptionId)}`, { method: "GET" });
   if (response.status === 404) { watched = null; return; }
   if (!response.ok) return;
@@ -282,20 +294,26 @@ async function pollNotice(config: Config): Promise<void> {
   if (body.state === "CLOSED") { notices.remove(watched.prescriptionId); watched = null; return; }
   if (body.state !== "READY" || body.signature === watched.shownSignature) return;
   watched.shownSignature = body.signature;
+  watched.lastChange = Date.now();
   applyDisplayPreferences(config);
-  const prescriptionId = watched.prescriptionId;
-  // Les photos déjà connues s'affichent tout de suite ; les autres arrivent après et complètent la fenêtre sur place.
-  const known = new Map<string, string>();
+  await showBody(config, watched.prescriptionId, body, {});
+  log(`Avis affiché : ${body.subject} — ${body.alerts.length} alerte(s), ${(body.items ?? []).length || body.advice.length} conseil(s).`);
+}
+
+/** Dessine la vente à partir de la réponse du serveur ; les photos déjà connues tout de suite, les autres ensuite, sur place. */
+async function showBody(config: Config, prescriptionId: string, body: NoticeBody, extras: { emailError?: string; problem?: string }): Promise<void> {
+  const current = watched?.prescriptionId === prescriptionId ? watched : null;
+  if (current) current.body = body;
+  const known = current ? current.images : new Map<string, string>();
   const missing: { imageUrl: string; source: string }[] = [];
   for (const item of body.items ?? []) {
     const source = imageSource(item.imageUrl, config.serverUrl);
-    if (!item.imageUrl || !source) continue;
+    if (!item.imageUrl || !source || known.has(item.imageUrl)) continue;
     const hit = cachedImage(IMAGES_DIR, source);
     if (hit) known.set(item.imageUrl, hit);
     else missing.push({ imageUrl: item.imageUrl, source });
   }
-  notices.show(buildHostEntry({ prescriptionId, serverUrl: config.serverUrl, body, images: known }));
-  log(`Avis affiché : ${body.subject} — ${body.alerts.length} alerte(s), ${(body.items ?? []).length || body.advice.length} conseil(s).`);
+  notices.show(buildHostEntry({ prescriptionId, serverUrl: config.serverUrl, body, images: known, ...extras }));
   if (missing.length > 0) void completeImages(config, prescriptionId, body, known, missing);
 }
 
@@ -306,7 +324,65 @@ async function completeImages(config: Config, prescriptionId: string, body: Noti
     const path = await fetchImage(source, config.serverUrl, IMAGES_DIR);
     if (path) { known.set(imageUrl, path); added += 1; }
   }
-  if (added > 0) notices.show(buildHostEntry({ prescriptionId, serverUrl: config.serverUrl, body, images: known }));
+  // La vente a pu changer pendant le téléchargement : on ne redessine que si c'est encore la même.
+  if (added > 0 && watched?.prescriptionId === prescriptionId && watched.body === body) notices.show(buildHostEntry({ prescriptionId, serverUrl: config.serverUrl, body, images: known }));
+}
+
+/** Rafraîchit la fenêtre depuis le serveur tout de suite (après un geste), sans attendre le prochain tour. */
+async function refreshNow(config: Config, extras: { emailError?: string; problem?: string } = {}): Promise<void> {
+  if (!watched) return;
+  const prescriptionId = watched.prescriptionId;
+  const response = await api(config, `/api/agent/conseil?prescription=${encodeURIComponent(prescriptionId)}`, { method: "GET" });
+  if (!response.ok) return;
+  const body = (await response.json()) as NoticeBody;
+  if (!body.ok || body.state !== "READY" || watched?.prescriptionId !== prescriptionId) return;
+  watched.shownSignature = body.signature;
+  watched.lastChange = Date.now();
+  await showBody(config, prescriptionId, body, extras);
+}
+
+async function postJson<T>(config: Config, path: string, payload: Record<string, unknown>): Promise<{ status: number; body: T | null }> {
+  const response = await api(config, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  return { status: response.status, body: (await response.json().catch(() => null)) as T | null };
+}
+
+type FinishBody = { ok: boolean; error?: string; proposed: number; sold: number; notSold: number; unanswered: number; soldToday: number | null; report: "SENT" | "SIMULATED" | "FAILED" | "NONE" };
+
+/**
+ * Ce que le pharmacien fait dans la fenêtre part au serveur. Rien n'est supposé : si le serveur refuse ou ne répond pas,
+ * la fenêtre est redessinée d'après ce que le serveur sait vraiment, avec une ligne qui le dit.
+ */
+async function handleAction(action: HostAction): Promise<void> {
+  const config = activeConfig;
+  if (!config || action.kind === "view") return;
+  if (watched) watched.lastChange = Date.now();
+  try {
+    if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {
+      const outcome = action.kind === "sold" ? "SOLD" : action.kind === "not_sold" ? "NOT_SOLD" : "NONE";
+      const result = await postJson<{ ok: boolean; error?: string }>(config, "/api/agent/conseil/decision", { prescription: action.saleId, recommendation: action.adviceId, outcome });
+      log(`Conseil ${action.adviceId} → ${outcome} : ${result.body?.ok ? "enregistré" : (result.body?.error ?? `HTTP ${result.status}`)}.`);
+      await refreshNow(config, result.body?.ok ? {} : { problem: result.body?.error ?? "La réponse n'a pas pu être enregistrée." });
+    } else if (action.kind === "email" || action.kind === "email_remove") {
+      const email = action.kind === "email" ? action.email : null;
+      const result = await postJson<{ ok: boolean; error?: string }>(config, "/api/agent/conseil/email", { prescription: action.saleId, email, consent: email !== null });
+      log(email ? `E-mail du patient : ${result.body?.ok ? "enregistré (avec son accord)" : (result.body?.error ?? `HTTP ${result.status}`)}.` : "E-mail du patient retiré.");
+      await refreshNow(config, result.body?.ok ? {} : { emailError: result.body?.error ?? "L'adresse n'a pas pu être enregistrée." });
+    } else if (action.kind === "finish") {
+      const emailWasSaved = watched?.body?.followUp?.emailSaved === true;
+      const result = await postJson<FinishBody>(config, "/api/agent/conseil/terminer", { prescription: action.saleId });
+      if (result.body?.ok) {
+        log(`Vente terminée : ${result.body.sold} vendu(s), ${result.body.notSold} non vendu(s), ${result.body.unanswered} sans réponse ; bilan : ${result.body.report}.`);
+        notices.done(buildDoneInfo({ saleId: action.saleId, result: result.body, emailWasSaved }));
+        if (watched?.prescriptionId === action.saleId) watched = null;
+      } else {
+        log(`Vente terminée impossible : ${result.body?.error ?? `HTTP ${result.status}`}.`);
+        await refreshNow(config, { problem: "La fin de la vente n'a pas pu être enregistrée. Réessayez dans un instant." });
+      }
+    }
+  } catch (error) {
+    log(`Action ${action.kind} : ${error instanceof Error ? error.message : String(error)}`);
+    await refreshNow(config, { problem: "Pas de connexion à PharmaBoost : ce geste n'a pas été enregistré." }).catch(() => undefined);
+  }
 }
 
 let lastClosedCheck = 0;
@@ -377,6 +453,7 @@ async function runPost(config: Config): Promise<void> {
     writeStatus(CONFIG_PATH, { etat, at: new Date().toISOString(), version: VERSION, poste: config.postLabel || hostname(), officine: config.pharmacyName ?? null, notice });
   for (;;) {
     try {
+      activeConfig = config;
       if (scans.size > 0) await scans.flush();
       await pollNotice(config);
       await checkForUpdate(config, scans);
@@ -412,7 +489,7 @@ async function runPost(config: Config): Promise<void> {
     } catch (error) {
       log(`Erreur : ${error instanceof Error ? error.message : String(error)}`);
     }
-    await new Promise((resolve) => setTimeout(resolve, watched ? 2000 : 3000));
+    await new Promise((resolve) => setTimeout(resolve, watched ? (Date.now() - watched.lastChange > SESSION_CALM_MS ? 8000 : 2000) : 3000));
   }
 }
 
@@ -455,8 +532,8 @@ function enableRobot(): void {
 }
 
 /**
- * Essai de l'affichage : un conseil d'exemple, sans bip ni serveur. Il reste 30 s à l'écran, puis se range près de
- * l'horloge pendant 30 s de plus (le compteur), pour que le pharmacien voie les deux.
+ * Essai de l'affichage : une vente d'exemple, sans bip ni serveur. Elle reste 75 secondes à l'écran ; les boutons
+ * « Vendu » / « Non vendu » y changent d'aspect, mais rien n'est envoyé nulle part.
  */
 function testAffichage(): void {
   let config: Config | null = null;
@@ -470,16 +547,18 @@ function testAffichage(): void {
     url: `${config?.serverUrl.replace(/\/$/, "") ?? "https://pharmaboost.app"}/vente/nouvelle`,
     signature: "essai",
     quiet: false,
+    emailSaved: false,
+    emailError: "",
     alerts: [],
     notes: [],
     items: [
-      { name: "PROBIOTIQUE 30 gélules", price: "14,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", image: "" },
-      { name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "", availability: "LOW_STOCK", image: "" },
+      { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", image: "" },
+      { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "", availability: "LOW_STOCK", image: "" },
     ],
   };
   notices.show(entry);
-  console.log("Un conseil d'exemple doit apparaître à droite de l'écran, à mi-hauteur (déplaçable à la souris).");
-  console.log("Au bout de 30 secondes il se range : une petite icône avec le nombre « 1 » apparaît près de l'horloge. Un clic la rouvre.");
+  console.log("Une vente d'exemple doit apparaître à droite de l'écran, à mi-hauteur (déplaçable à la souris).");
+  console.log("Elle reste ouverte : essayez « Vendu », « Non vendu », le bouton « – » qui la réduit. Rien n'est envoyé.");
   setTimeout(() => { notices.stop(); process.exit(0); }, 75_000);
 }
 

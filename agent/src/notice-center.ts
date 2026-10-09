@@ -2,9 +2,10 @@
  * Le centre d'avis du poste de caisse : il transforme l'avis du serveur en commande pour la fenêtre (notice-host.ts),
  * garde cette fenêtre en vie, récupère les photos, et se replie sur l'ancienne fenêtre si la nouvelle ne démarre pas.
  *
- * Le principe : l'avis ne se perd plus. La fenêtre reste 30 s, puis se range près de l'horloge avec un compteur ;
- * une vente n'a qu'une fenêtre, mise à jour sur place ; ce que le pharmacien a vu ou écarté ne revient pas.
- * Rien de tout cela ne dépend du réseau : seules les photos s'y rendent, et sans elles la fenêtre s'affiche pareil.
+ * Le principe : la fenêtre reste ouverte pendant toute la vente, mise à jour sur place à chaque bip, jusqu'à « Vente terminée ».
+ * Ce que le pharmacien y fait (Vendu, Non vendu, e-mail du patient, Vente terminée) remonte ici sous forme d'actions ;
+ * c'est l'agent qui les envoie au serveur. Seules les photos et ces actions passent par le réseau : sans elles la fenêtre
+ * s'affiche pareil.
  */
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -23,10 +24,25 @@ export type NoticeBody = {
   advice: string[];
   signature: string;
   detectedLabel?: string;
-  items?: { name: string; priceCents: number | null; reason: string | null; availability: string; quantity: number | null; imageUrl: string | null }[];
+  items?: {
+    id?: string | null;
+    drug?: string | null;
+    challenge?: string | null;
+    shortDateOn?: string | null;
+    outcome?: string;
+    name: string;
+    priceCents: number | null;
+    reason: string | null;
+    availability: string;
+    quantity: number | null;
+    imageUrl: string | null;
+  }[];
+  followUp?: { emailSaved: boolean; closed: boolean };
 };
 
-export type HostItem = { name: string; price: string; reason: string; availability: string; image: string };
+export type HostOutcome = "NONE" | "SOLD" | "NOT_SOLD";
+
+export type HostItem = { id: string; drug: string; challenge: string; shortDate: string; outcome: HostOutcome; name: string; price: string; reason: string; availability: string; image: string };
 
 /** Ce que la fenêtre reçoit pour une vente. */
 export type HostEntry = {
@@ -38,10 +54,25 @@ export type HostEntry = {
   signature: string;
   /** Rien à conseiller : un mot de huit secondes, jamais compté « en attente ». */
   quiet: boolean;
+  /** L'adresse du patient est enregistrée (avec son accord) : le champ e-mail se range. */
+  emailSaved: boolean;
+  /** Pourquoi l'adresse n'a pas été enregistrée, quand le serveur l'a refusée. */
+  emailError: string;
   alerts: string[];
   notes: string[];
   items: HostItem[];
 };
+
+/** Le message de fin de vente. */
+export type HostDone = { id: string; title: string; lines: string[]; badge: string; warning: boolean };
+
+/** Ce que le pharmacien a fait dans la fenêtre : l'agent le transmet au serveur. */
+export type HostAction =
+  | { kind: "sold" | "not_sold" | "undo"; saleId: string; adviceId: string }
+  | { kind: "email"; saleId: string; email: string }
+  | { kind: "email_remove"; saleId: string }
+  | { kind: "finish"; saleId: string }
+  | { kind: "view"; saleId: string };
 
 export const DEFAULT_NOTICE_SECONDS = 30;
 export const POSITIONS = ["milieu-droite", "bas-droite", "haut-droite"] as const;
@@ -62,11 +93,22 @@ function referenceOf(title: string): string {
 /** Une ligne, sans retour à la ligne : la commande est une ligne de JSON. */
 const oneLine = (text: string) => text.replace(/[\r\n\u2028\u2029]+/g, " ").trim();
 
-export function buildHostEntry(input: { prescriptionId: string; serverUrl: string; body: NoticeBody; images?: Map<string, string> }): HostEntry {
+/** « 2026-11-30 » → « 30/11/2026 » ; tout ce qui n'est pas une date exacte est écarté (jamais une date inventée). */
+export function frenchDate(iso: string | null | undefined): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
+}
+
+export function buildHostEntry(input: { prescriptionId: string; serverUrl: string; body: NoticeBody; images?: Map<string, string>; emailError?: string; problem?: string }): HostEntry {
   const { body } = input;
   const images = input.images ?? new Map<string, string>();
   const structured = body.items ?? [];
   const items: HostItem[] = structured.map((item) => ({
+    id: item.id ?? "",
+    drug: oneLine(item.drug ?? ""),
+    challenge: oneLine(item.challenge ?? ""),
+    shortDate: frenchDate(item.shortDateOn),
+    outcome: item.outcome === "SOLD" || item.outcome === "NOT_SOLD" ? item.outcome : "NONE",
     name: oneLine(item.name),
     price: euros(item.priceCents),
     reason: oneLine(item.reason ?? ""),
@@ -75,9 +117,9 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
   }));
   // Un serveur plus ancien n'envoie que des lignes de texte : on les montre telles quelles, sans photo ni badge de stock.
   const legacyOnly = body.items === undefined && body.advice.length > 0;
-  const alerts = body.alerts.map(oneLine);
+  const alerts = [...body.alerts.map(oneLine), ...(input.problem ? [oneLine(input.problem)] : [])];
   const notes = items.length === 0 && !legacyOnly ? body.advice.map(oneLine) : [];
-  const finalItems = legacyOnly ? body.advice.map((text) => ({ name: oneLine(text), price: "", reason: "", availability: "UNKNOWN", image: "" })) : items;
+  const finalItems: HostItem[] = legacyOnly ? body.advice.map((text) => ({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE" as const, name: oneLine(text), price: "", reason: "", availability: "UNKNOWN", image: "" })) : items;
   return {
     id: input.prescriptionId,
     reference: referenceOf(body.title),
@@ -86,9 +128,49 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     url: `${input.serverUrl.replace(/\/$/, "")}/vente/${input.prescriptionId}`,
     signature: body.signature,
     quiet: finalItems.length === 0 && alerts.length === 0,
+    emailSaved: body.followUp?.emailSaved === true,
+    emailError: oneLine(input.emailError ?? ""),
     alerts,
     notes,
     items: finalItems,
+  };
+}
+
+/** « 1er », « 2e », « 18e » : le rang du conseil vendu aujourd'hui. */
+export function ordinalFr(rank: number): string {
+  return rank === 1 ? "1er" : `${rank}e`;
+}
+
+const plural = (count: number, one: string, many: string) => `${count} ${count > 1 ? many : one}`;
+
+/**
+ * Ce que dit la fenêtre à la fin de la vente — seulement ce qui s'est vraiment passé. Le rang « 18e conseil vendu aujourd'hui »
+ * n'existe que si un conseil a été déclaré vendu dans CETTE vente ; le bilan n'est dit « envoyé » que si le serveur l'a confirmé.
+ */
+export function buildDoneInfo(input: {
+  saleId: string;
+  result: { proposed: number; sold: number; notSold: number; unanswered: number; soldToday: number | null; report: "SENT" | "SIMULATED" | "FAILED" | "NONE" };
+  emailWasSaved: boolean;
+}): HostDone {
+  const { result } = input;
+  const lines: string[] = [];
+  if (result.proposed === 0) lines.push("Aucun conseil à enregistrer.");
+  else {
+    lines.push([plural(result.sold, "vendu", "vendus"), `${result.notSold} non vendu${result.notSold > 1 ? "s" : ""}`, `${result.unanswered} sans réponse`].join(" · "));
+  }
+  let warning = false;
+  if (result.report === "SENT") lines.push("✓ Bilan envoyé au patient.");
+  else if (result.report === "SIMULATED") lines.push("Bilan préparé (l'envoi d'e-mails est en mode test).");
+  else if (result.report === "FAILED") {
+    lines.push("⚠ Le bilan n'a pas pu être envoyé au patient.");
+    warning = true;
+  } else if (input.emailWasSaved) lines.push("Aucun bilan envoyé : aucun produit n'a été vendu.");
+  return {
+    id: input.saleId,
+    title: "Vente terminée — résultats enregistrés",
+    lines,
+    badge: result.sold > 0 && result.soldToday && result.soldToday > 0 ? `${ordinalFr(result.soldToday)} conseil vendu aujourd'hui` : "",
+    warning,
   };
 }
 
@@ -204,10 +286,13 @@ export type NoticeCenterOptions = {
   legacyShow: (content: ToastContent) => void;
   platform?: NodeJS.Platform;
   spawnHost?: (scriptPath: string) => HostProcess;
+  /** Durée de l'ancienne fenêtre (secours) ; la nouvelle n'a pas de délai : elle reste jusqu'à « Vente terminée ». */
   seconds?: number;
   position?: NoticePosition;
   /** Combien de temps on attend que la fenêtre compile et dise « PRET ». */
   startTimeoutMs?: number;
+  /** Ce que le pharmacien fait dans la fenêtre (Vendu, Non vendu, e-mail, Vente terminée) : l'agent le transmet au serveur. */
+  onAction?: (action: HostAction) => void;
 };
 
 export class NoticeCenter {
@@ -218,7 +303,7 @@ export class NoticeCenter {
   private startTimer: ReturnType<typeof setTimeout> | null = null;
   private lastEntry: HostEntry | null = null;
   private stderrText = "";
-  /** Les ventes que la fenêtre garde en attente, d'après ce qu'elle a répondu. */
+  /** Les ventes que la fenêtre garde ouvertes (jusqu'à « Vente terminée »), d'après ce qu'elle a répondu. */
   private readonly held = new Map<string, string>();
 
   constructor(private readonly options: NoticeCenterOptions) {}
@@ -243,7 +328,7 @@ export class NoticeCenter {
     this.ensureHost();
   }
 
-  /** Les ventes dont un conseil attend près de l'horloge. */
+  /** Les ventes que la fenêtre garde ouvertes. */
   ids(): string[] { return [...this.held.keys()]; }
 
   /** Montre (ou met à jour) le conseil d'une vente. */
@@ -262,7 +347,22 @@ export class NoticeCenter {
       return;
     }
     if (!entry.quiet) this.held.set(entry.id, entry.signature);
-    this.send({ op: "show", entry, seconds: this.seconds, position: this.options.position ?? "milieu-droite", positionFile: join(this.options.configDir, "pharmaboost-avis-position.txt") });
+    this.send({ op: "show", entry, position: this.options.position ?? "milieu-droite", positionFile: join(this.options.configDir, "pharmaboost-avis-position.txt") });
+  }
+
+  /** « Vente terminée » est enregistrée : la fenêtre montre le message de fin, puis s'efface et attend la vente suivante. */
+  done(info: HostDone): void {
+    this.held.delete(info.id);
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy || !this.host) {
+      this.options.log(`Vente terminée : ${info.title} — ${info.lines.join(" / ")}${info.badge ? ` — ${info.badge}` : ""}`);
+      return;
+    }
+    this.send({ op: "done", info });
+  }
+
+  /** La fenêtre passe à une autre vente : l'ancienne n'est plus suivie ici (la fenêtre, elle, n'est pas touchée). */
+  forget(id: string): void {
+    this.held.delete(id);
   }
 
   /** La vente est close : son conseil n'a plus lieu d'être. */
@@ -329,16 +429,34 @@ export class NoticeCenter {
         this.ready = true;
         if (this.startTimer) clearTimeout(this.startTimer);
         this.options.log("Avis : fenêtre prête.");
-      } else if (line.startsWith("VOIR ") || line.startsWith("IGNORER ")) {
-        const [action, id] = line.split(" ");
-        this.held.delete(id);
-        this.options.log(`Avis ${action === "VOIR" ? "ouvert dans PharmaBoost" : "ignoré"} : ${id}.`);
-      } else if (line.startsWith("ATTENTE ")) {
-        this.options.log(`Avis rangé près de l'horloge : ${line.slice(8)}.`);
-      } else if (line.startsWith("ERREUR")) {
-        this.options.log(`Avis : ${line}`);
+      } else {
+        this.onWord(line);
       }
     }
+  }
+
+  /** Un mot de la fenêtre : la réponse du pharmacien à un geste. Un mot inconnu est ignoré, jamais une panne. */
+  private onWord(line: string): void {
+    const [word, saleId = "", argument = ""] = line.split(" ");
+    const act = (action: HostAction) => {
+      try {
+        this.options.onAction?.(action);
+      } catch (error) {
+        this.options.log(`Avis : action ${word} impossible (${error instanceof Error ? error.message : String(error)}).`);
+      }
+    };
+    if (!saleId && word !== "ERREUR") return;
+    if (word === "VENDU" && argument) act({ kind: "sold", saleId, adviceId: argument });
+    else if (word === "NONVENDU" && argument) act({ kind: "not_sold", saleId, adviceId: argument });
+    else if (word === "ANNULER" && argument) act({ kind: "undo", saleId, adviceId: argument });
+    else if (word === "EMAIL" && argument) {
+      const email = Buffer.from(argument, "base64").toString("utf8").trim();
+      if (email && email.length <= 200 && !/[\r\n\s]/.test(email)) act({ kind: "email", saleId, email });
+    } else if (word === "EMAIL_RETIRER") act({ kind: "email_remove", saleId });
+    else if (word === "TERMINER") act({ kind: "finish", saleId });
+    else if (word === "VOIR") act({ kind: "view", saleId });
+    else if (word === "FERMEE") this.held.delete(saleId);
+    else if (word === "ERREUR") this.options.log(`Avis : ${line}`);
   }
 
   private onError(text: string): void {

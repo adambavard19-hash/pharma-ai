@@ -283,3 +283,29 @@ onglet Technique, `src/app/(admin)/admin/pharmacies/[id]/assistance/`), réserv�
 connexion (`src/core/stock/connection-test.ts`), dossiers d'export et relecture du stock par poste, retrait d'un
 poste, code à six chiffres, réglages et déconnexion du serveur, paramètres techniques et diagnostic du robot, état de
 l'installateur Windows. Les statuts se calculent une seule fois (`src/core/stock/connection-overview.ts`).
+
+## La fenêtre de la vente (agent 0.7.0)
+
+La fenêtre du poste n'est plus un message de 30 secondes : elle **reste ouverte pendant toute la vente**, se met à jour à chaque
+bip, et ne se ferme qu'à « Vente terminée ».
+
+- **Conseils** (4 au plus, sans doublon) : produit, médicament concerné (« Pour : … »), photo, phrase courte, prix et stock quand
+  le stock est à jour. Pastille orange **Challenge** quand le produit est dans un challenge laboratoire actif ; pastille rouge
+  **Date courte** avec la vraie date du lot le plus proche. Jamais inventées : le serveur ne les envoie que si elles existent.
+- **Vendu / Non vendu** : une *déclaration* du pharmacien, enregistrée `COUNTER_DECLARED` avec le poste. Elle n'est jamais mêlée
+  aux « ventes confirmées » (ventes enregistrées dans PharmaBoost). Un conseil affiché n'est jamais compté vendu. Le logiciel de
+  gestion (LGPI) ne permet pas de lire de façon fiable les produits encaissés : la valeur `LGO_CONFIRMED` est réservée.
+- **Collaborateur** : le poste ne sait pas qui est au comptoir. On enregistre le poste (« Comptoir 2 »), pas un nom deviné.
+- **E-mail du patient** (facultatif) : saisi à la main, avec la case « Le patient accepte de recevoir son bilan par e-mail »,
+  chiffré. C'est le *seul* moment où la fenêtre prend le clavier : sur un clic dans le champ, puis elle le rend au logiciel de
+  gestion (Enregistrer, Plus tard, Échap, clic ailleurs, 40 s sans rien taper). Un code-barres tombé dans le champ est effacé.
+- **Vente terminée** : enregistre vendu / non vendu / sans réponse, envoie le **bilan au patient** s'il a donné son accord et
+  qu'au moins un produit est déclaré vendu (noms des produits ; la phrase « patient » seulement si la règle est validée ; jamais de
+  médicament ni de posologie), puis affiche « Vente terminée — résultats enregistrés » et, si un conseil a été vendu dans cette
+  vente, « 18e conseil vendu aujourd'hui ». La fenêtre s'efface après 7 s et attend la vente suivante.
+- **Résultats** : page « Ce que PharmaBoost vous rapporte » → section « Au comptoir » (proposés, vendus, non vendus, sans réponse,
+  par poste, produits, challenges, dates courtes). Bilan mensuel par e-mail au titulaire le 1er du mois
+  (`/api/cron/bilan-comptoir-mensuel`, protégé par `CRON_SECRET`, une fois par officine et par mois).
+
+Migration : `20261020090000_suivi_de_vente_au_comptoir`. Les postes passent en 0.7.0 par la mise à jour automatique (une fois la
+vente en cours terminée) ; la fenêtre n'a jamais été dessinée sur un vrai Windows à ce jour.

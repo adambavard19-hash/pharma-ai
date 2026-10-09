@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db/client";
 import { authenticateAgent } from "@/server/services/stock-sync";
-import { buildCounterNotice, type CounterNotice } from "@/core/counter/notice";
 import { hasSettled } from "@/core/counter/settle";
 import { analysePrescription } from "@/server/services/analysis";
 import { recordAudit } from "@/server/audit/log";
 import { getEnv } from "@/config/env";
-import { stockReminderLevel } from "@/core/stock-deposit/rules";
-import { ADVICE_RULES } from "@/core/ai/engines/advice";
-import { loadCentralAdvice } from "@/server/services/central-advice";
+import { readCounterNotice } from "@/server/services/counter-notice";
 
 export const dynamic = "force-dynamic";
 // L'analyse peut dépasser dix secondes : on le déclare à l'hébergeur.
@@ -36,59 +33,9 @@ async function settleAndAnalyse(agent: { scope: { pharmacyId: string; userId: st
 
 type Agent = { scope: { pharmacyId: string; userId: string; organizationId: string } };
 
-/** L'état de la vente et l'avis qui s'en déduit, lus en base ; `null` quand la vente n'est pas celle de ce poste. */
-async function readNotice(agent: Agent, id: string): Promise<{ status: string; notice: CounterNotice } | null> {
-  const prescription = await prisma.prescription.findFirst({
-    where: { id, pharmacyId: agent.scope.pharmacyId, source: "COUNTER_SCAN" },
-    select: {
-      reference: true,
-      status: true,
-      lines: { orderBy: { position: "asc" }, select: { drugName: true, drugSpecialtyId: true } },
-      analysisRuns: {
-        orderBy: { startedAt: "desc" },
-        take: 1,
-        select: { outcome: true, safetyFindings: { select: { severity: true, subjectType: true, code: true, message: true, acknowledgedAt: true } } },
-      },
-      recommendations: {
-        orderBy: { totalScore: "desc" },
-        select: { status: true, origin: true, opportunity: { select: { ruleKey: true } }, shortReason: true, justification: true, product: { select: { name: true, salePriceCents: true, imageUrl: true, stockItem: { select: { quantity: true, alertThreshold: true } } } }, presentation: { select: { priceCents: true, specialty: { select: { name: true } }, pharmacyStocks: { where: { pharmacyId: agent.scope.pharmacyId }, select: { priceCents: true, quantity: true } } } } },
-      },
-    },
-  });
-  if (!prescription) return null;
-  if (prescription.status === "NEEDS_VERIFICATION") {
-    return { status: prescription.status, notice: buildCounterNotice({ reference: prescription.reference, prescriptionStatus: "NEEDS_VERIFICATION", lineNames: [], alerts: [], recommendations: [], outcome: null }) };
-  }
-
-  const run = prescription.analysisRuns[0];
-  // Prix et « En stock » viennent du même export : un stock ancien ne s'affiche pas comme un fait.
-  const pharmacy = await prisma.pharmacy.findUnique({ where: { id: agent.scope.pharmacyId }, select: { stockSyncedAt: true } });
-  const stockReliable = stockReminderLevel(pharmacy?.stockSyncedAt ?? null, new Date()) === "none";
-  // Dans la fenêtre du poste comme sur l'écran de la vente, une règle supprimée dans la console de PharmaBoost n'existe plus :
-  // un conseil resté dans une analyse ancienne ne s'affiche pas. Les règles en ligne parlent, validées ou non.
-  const central = await loadCentralAdvice();
-  const removed = new Set(central.removed);
-  const known = new Set([...ADVICE_RULES.map((rule) => rule.key), ...central.custom.map((rule) => rule.key)]);
-  const notice = buildCounterNotice({
-    reference: prescription.reference,
-    prescriptionStatus: prescription.status,
-    lineNames: prescription.lines.map((line) => line.drugName ?? "").filter(Boolean),
-    lineKinds: prescription.lines.filter((line) => line.drugName).map((line) => (line.drugSpecialtyId ? ("DRUG" as const) : ("PRODUCT" as const))),
-    alerts: (run?.safetyFindings ?? []).map((finding) => ({ severity: finding.severity, subjectType: finding.subjectType, code: finding.code, message: finding.message, acknowledged: finding.acknowledgedAt !== null })),
-    recommendations: prescription.recommendations.map((rec) => ({
-      name: rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
-      priceCents: rec.product?.salePriceCents ?? rec.presentation?.pharmacyStocks[0]?.priceCents ?? rec.presentation?.priceCents ?? null,
-      reason: rec.shortReason ?? rec.justification,
-      status: rec.status,
-      trusted: rec.origin !== "AI" || (rec.opportunity?.ruleKey != null && known.has(rec.opportunity.ruleKey) && !removed.has(rec.opportunity.ruleKey)),
-      imageUrl: rec.product?.imageUrl ?? null,
-      quantity: rec.product ? (rec.product.stockItem?.quantity ?? null) : (rec.presentation?.pharmacyStocks[0]?.quantity ?? null),
-      alertThreshold: rec.product?.stockItem?.alertThreshold ?? null,
-    })),
-    outcome: run?.outcome ?? null,
-    stockReliable,
-  });
-  return { status: prescription.status, notice };
+/** L'état de la vente et l'avis qui s'en déduit, lu en base ; `null` quand la vente n'est pas celle de ce poste. */
+function readNotice(agent: Agent, id: string) {
+  return readCounterNotice(agent.scope.pharmacyId, id);
 }
 
 /**
@@ -116,5 +63,5 @@ export async function GET(request: Request) {
       console.error("[conseil] analyse depuis le poste de caisse", error);
     }
   }
-  return NextResponse.json({ ok: true, ...read.notice, url: `${getEnv().APP_URL}/vente/${id}` });
+  return NextResponse.json({ ok: true, ...read.notice, followUp: read.followUp, url: `${getEnv().APP_URL}/vente/${id}` });
 }

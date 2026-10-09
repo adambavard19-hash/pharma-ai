@@ -111,6 +111,8 @@ export const DISPATCH_KIND_LABELS: Record<string, string> = {
   INSTALL_GUIDE: "Guide d'installation",
   SUPPORT_ALERT: "Alerte support (une officine a écrit)",
   SUPPORT_REPLY: "Réponse du support à une officine",
+  PATIENT_REPORT: "Bilan de comptoir envoyé à un patient",
+  COUNTER_MONTHLY: "Bilan mensuel du comptoir au titulaire",
   TEMPLATE: "Modèle",
   CAMPAIGN: "Campagne",
 };

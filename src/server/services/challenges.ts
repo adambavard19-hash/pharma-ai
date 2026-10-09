@@ -620,3 +620,30 @@ export async function listChallengesForPlatform(now: Date = new Date(), limit = 
   }
   return result;
 }
+
+/**
+ * Le challenge actif auquel participe chaque produit demandé — son titre —, pour la fenêtre du poste de caisse.
+ * Un challenge compte quand il est ACTIF et que sa période couvre aujourd'hui (jour de l'officine) ; un produit y participe
+ * s'il est dans la liste choisie, ou, sans liste, s'il porte la marque du challenge. Jamais déduit d'autre chose.
+ * Plusieurs challenges pour un même produit : celui qui finit le premier.
+ */
+export async function activeChallengeTitlesFor(pharmacyId: string, productIds: string[], now: Date = new Date()): Promise<Map<string, string>> {
+  const titles = new Map<string, string>();
+  const wanted = [...new Set(productIds)];
+  if (wanted.length === 0) return titles;
+  const clock = await pharmacyClock(pharmacyId, now);
+  const today = dayKeyToDate(clock.today);
+  const challenges = await prisma.labChallenge.findMany({
+    where: { pharmacyId, status: "ACTIVE", startsAt: { lte: today }, endsAt: { gte: today } },
+    orderBy: [{ endsAt: "asc" }, { createdAt: "asc" }],
+    select: { title: true, productIds: true, brandKey: true },
+  });
+  if (challenges.length === 0) return titles;
+  const products = await prisma.product.findMany({ where: { pharmacyId, id: { in: wanted } }, select: { id: true, name: true, brand: true, deletedAt: true, isActive: true } });
+  for (const challenge of challenges) {
+    for (const product of coverage(challenge, products)) {
+      if (!titles.has(product.id)) titles.set(product.id, challenge.title);
+    }
+  }
+  return titles;
+}

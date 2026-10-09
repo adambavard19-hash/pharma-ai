@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NoticeCenter, buildHostEntry, cachedImage, encodeCommand, euros, fetchImage, imageSource, legacyContentOf, type HostEntry, type HostProcess, type NoticeBody } from "../notice-center";
+import { NoticeCenter, buildDoneInfo, buildHostEntry, cachedImage, encodeCommand, euros, fetchImage, frenchDate, imageSource, legacyContentOf, ordinalFr, type HostAction, type HostEntry, type HostProcess, type NoticeBody } from "../notice-center";
 
 /**
  * Le centre d'avis du poste : ce qu'il envoie à la fenêtre, comment il va chercher une photo, et ce qu'il fait quand
@@ -19,7 +19,7 @@ const body = (over: Partial<NoticeBody> = {}): NoticeBody => ({
   advice: ["ELUDAY GENCIVE 500 ml · 7,90 € · Sécheresse buccale"],
   signature: "sig-1",
   detectedLabel: "Médicament détecté",
-  items: [{ name: "ELUDAY GENCIVE 500 ml", priceCents: 790, reason: "Sécheresse buccale : effet fréquent de QUETIAPINE.", availability: "IN_STOCK", quantity: 6, imageUrl: "https://images.openbeautyfacts.org/images/products/1/front.jpg" }],
+  items: [{ id: "rec_1", drug: "QUETIAPINE VIATRIS LP 50 mg", challenge: null, shortDateOn: null, outcome: "NONE", name: "ELUDAY GENCIVE 500 ml", priceCents: 790, reason: "Sécheresse buccale : effet fréquent de QUETIAPINE.", availability: "IN_STOCK", quantity: 6, imageUrl: "https://images.openbeautyfacts.org/images/products/1/front.jpg" }],
   ...over,
 });
 
@@ -29,13 +29,13 @@ describe("ce que la fenêtre reçoit pour une vente", () => {
   it("porte la vente, ce qui a été détecté, et le conseil complet : nom, prix, raison, disponibilité, photo", () => {
     const photos = new Map([["https://images.openbeautyfacts.org/images/products/1/front.jpg", "C:\\x\\a.jpg"]]);
     const entry = build({}, photos);
-    expect(entry).toMatchObject({ id: "rx_1", reference: "ORD-0100", label: "Médicament détecté", subject: "QUETIAPINE VIATRIS LP 50 mg", url: "https://pharmaboost.app/vente/rx_1", signature: "sig-1", quiet: false, alerts: [], notes: [] });
-    expect(entry.items).toEqual([{ name: "ELUDAY GENCIVE 500 ml", price: "7,90 €", reason: "Sécheresse buccale : effet fréquent de QUETIAPINE.", availability: "IN_STOCK", image: "C:\\x\\a.jpg" }]);
+    expect(entry).toMatchObject({ id: "rx_1", reference: "ORD-0100", label: "Médicament détecté", subject: "QUETIAPINE VIATRIS LP 50 mg", url: "https://pharmaboost.app/vente/rx_1", signature: "sig-1", quiet: false, alerts: [], notes: [], emailSaved: false, emailError: "" });
+    expect(entry.items).toEqual([{ id: "rec_1", drug: "QUETIAPINE VIATRIS LP 50 mg", challenge: "", shortDate: "", outcome: "NONE", name: "ELUDAY GENCIVE 500 ml", price: "7,90 €", reason: "Sécheresse buccale : effet fréquent de QUETIAPINE.", availability: "IN_STOCK", image: "C:\\x\\a.jpg" }]);
   });
 
   it("n'invente rien : sans prix fiable, sans photo, sans stock connu, la fenêtre s'en passe", () => {
     const entry = build({ items: [{ name: "X", priceCents: null, reason: null, availability: "UNKNOWN", quantity: null, imageUrl: null }] });
-    expect(entry.items[0]).toEqual({ name: "X", price: "", reason: "", availability: "UNKNOWN", image: "" });
+    expect(entry.items[0]).toEqual({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: "X", price: "", reason: "", availability: "UNKNOWN", image: "" });
     expect(build({ items: [{ name: "X", priceCents: 100, reason: null, availability: "N'IMPORTE QUOI", quantity: 1, imageUrl: null }] }).items[0].availability).toBe("UNKNOWN");
   });
 
@@ -52,8 +52,22 @@ describe("ce que la fenêtre reçoit pour une vente", () => {
   it("lit encore un serveur plus ancien, qui n'envoie que des lignes de texte", () => {
     const old = build({ items: undefined, detectedLabel: undefined, advice: ["PROBIOTIQUE · 14,90 € · Antibiotique"] });
     expect(old.label).toBe("Détecté");
-    expect(old.items).toEqual([{ name: "PROBIOTIQUE · 14,90 € · Antibiotique", price: "", reason: "", availability: "UNKNOWN", image: "" }]);
+    expect(old.items).toEqual([{ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: "PROBIOTIQUE · 14,90 € · Antibiotique", price: "", reason: "", availability: "UNKNOWN", image: "" }]);
     expect(old.quiet).toBe(false);
+  });
+
+  it("porte le médicament concerné, le challenge actif et la vraie date courte, jamais inventés", () => {
+    const entry = build({ items: [{ id: "rec_2", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDateOn: "2026-11-30", outcome: "SOLD", name: "PROBIOTIQUE", priceCents: 1490, reason: null, availability: "IN_STOCK", quantity: 3, imageUrl: null }] });
+    expect(entry.items[0]).toMatchObject({ id: "rec_2", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "SOLD" });
+    expect(frenchDate("2026-11-30")).toBe("30/11/2026");
+    for (const bad of ["", "30/11/2026", "2026-13", "demain", null, undefined]) expect(frenchDate(bad as string)).toBe("");
+  });
+
+  it("garde l'état de l'e-mail et dit un problème dans la fenêtre, sans le cacher", () => {
+    const entry = buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app", body: body({ followUp: { emailSaved: true, closed: false } }), emailError: "Adresse refusée", problem: "La réponse n'a pas pu être enregistrée." });
+    expect(entry).toMatchObject({ emailSaved: true, emailError: "Adresse refusée" });
+    expect(entry.alerts).toEqual(["La réponse n'a pas pu être enregistrée."]);
+    expect(entry.quiet).toBe(false);
   });
 
   it("met les prix à la française, et rien quand il n'y en a pas", () => {
@@ -153,19 +167,23 @@ describe("la fenêtre et son processus", () => {
   });
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
+  let actions: HostAction[];
+  beforeEach(() => { actions = []; });
   const center = (over: { platform?: NodeJS.Platform; startTimeoutMs?: number } = {}) =>
-    new NoticeCenter({ configDir: dir, log: (message) => logs.push(message), legacyShow: (content) => legacy.push(content), platform: over.platform ?? "win32", startTimeoutMs: over.startTimeoutMs, spawnHost: () => { const host = fakeHost(); hosts.push(host); return host; } });
+    new NoticeCenter({ configDir: dir, log: (message) => logs.push(message), legacyShow: (content) => legacy.push(content), platform: over.platform ?? "win32", startTimeoutMs: over.startTimeoutMs, onAction: (action) => actions.push(action), spawnHost: () => { const host = fakeHost(); hosts.push(host); return host; } });
   const entry = (over: Partial<HostEntry> = {}): HostEntry => buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app", body: body() }) && { ...buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app", body: body() }), ...over };
   const commands = (host: FakeHost) => host.written.map((line) => JSON.parse(line));
 
-  it("lance la fenêtre une seule fois, lui parle en JSON, et lui passe la durée et l'endroit", () => {
+  it("lance la fenêtre une seule fois, lui parle en JSON, et lui passe l'endroit — sans aucun délai de fermeture", () => {
     const notices = center();
     notices.configure({ seconds: 30, position: "bas-droite" });
     notices.show(entry());
     notices.show(entry({ signature: "sig-2" }));
     expect(hosts).toHaveLength(1);
     const [first, second] = commands(hosts[0]);
-    expect(first).toMatchObject({ op: "show", seconds: 30, position: "bas-droite" });
+    expect(first).toMatchObject({ op: "show", position: "bas-droite" });
+    // La fenêtre de la vente reste ouverte jusqu'à « Vente terminée » : aucune durée ne lui est donnée.
+    expect(first).not.toHaveProperty("seconds");
     expect(first.positionFile).toBe(join(dir, "pharmaboost-avis-position.txt"));
     expect(first.entry).toMatchObject({ id: "rx_1", reference: "ORD-0100" });
     expect(second.entry.signature).toBe("sig-2");
@@ -173,31 +191,74 @@ describe("la fenêtre et son processus", () => {
     expect(legacy).toEqual([]);
   });
 
-  it("par défaut : trente secondes, à droite à mi-hauteur", () => {
-    center().show(entry());
-    // pas de `configure` : valeurs par défaut
+  it("par défaut : à droite à mi-hauteur", () => {
     const notices = center();
     notices.show(entry());
-    expect(commands(hosts[1])[0]).toMatchObject({ seconds: 30, position: "milieu-droite" });
+    expect(commands(hosts[0])[0]).toMatchObject({ position: "milieu-droite" });
   });
 
-  it("borne les réglages absurdes, et ignore un endroit inconnu", () => {
+  it("ignore un endroit inconnu", () => {
     const notices = center();
     notices.configure({ seconds: 9999, position: "ailleurs" as never });
     notices.show(entry());
-    expect(commands(hosts[0])[0]).toMatchObject({ seconds: 120, position: "milieu-droite" });
+    expect(commands(hosts[0])[0]).toMatchObject({ position: "milieu-droite" });
   });
 
-  it("compte les ventes en attente d'après les réponses de la fenêtre : « Voir » et « Ignorer » les retirent", () => {
+  it("garde la vente ouverte : « Voir le détail » ne la ferme pas, seul « fermée » la retire", () => {
     const notices = center();
     notices.show(entry());
-    notices.show(entry({ id: "rx_2" }));
-    expect(notices.ids()).toEqual(["rx_1", "rx_2"]);
+    expect(notices.ids()).toEqual(["rx_1"]);
     hosts[0].stdout.emit("data", "PRET\nVOIR rx_1\n");
-    hosts[0].stdout.emit("data", Buffer.from("IGNORER rx_2\r\n"));
+    expect(notices.ids()).toEqual(["rx_1"]);
+    expect(actions).toEqual([{ kind: "view", saleId: "rx_1" }]);
+    hosts[0].stdout.emit("data", Buffer.from("FERMEE rx_1\r\n"));
     expect(notices.ids()).toEqual([]);
-    expect(logs.join("\n")).toContain("ouvert dans PharmaBoost");
-    expect(logs.join("\n")).toContain("ignoré");
+  });
+
+  it("transmet chaque geste du pharmacien : Vendu, Non vendu, reprise, e-mail, fin de vente", () => {
+    const notices = center();
+    notices.show(entry());
+    const address = Buffer.from("Jean.Dupont@gmail.com", "utf8").toString("base64");
+    hosts[0].stdout.emit("data", `PRET\nVENDU rx_1 rec_1\nNONVENDU rx_1 rec_2\nANNULER rx_1 rec_1\nEMAIL rx_1 ${address}\nEMAIL_RETIRER rx_1\nTERMINER rx_1\n`);
+    expect(actions).toEqual([
+      { kind: "sold", saleId: "rx_1", adviceId: "rec_1" },
+      { kind: "not_sold", saleId: "rx_1", adviceId: "rec_2" },
+      { kind: "undo", saleId: "rx_1", adviceId: "rec_1" },
+      { kind: "email", saleId: "rx_1", email: "Jean.Dupont@gmail.com" },
+      { kind: "email_remove", saleId: "rx_1" },
+      { kind: "finish", saleId: "rx_1" },
+    ]);
+  });
+
+  it("ignore un mot incomplet, une adresse illisible ou trop longue, un mot inconnu : jamais une panne", () => {
+    const notices = center();
+    notices.show(entry());
+    hosts[0].stdout.emit("data", `PRET\nVENDU rx_1\nVENDU\nEMAIL rx_1\nEMAIL rx_1 ${Buffer.from("a b@c.fr").toString("base64")}\nEMAIL rx_1 ${Buffer.from("x".repeat(300)).toString("base64")}\nPIRATE rx_1 x\n`);
+    expect(actions).toEqual([]);
+  });
+
+  it("une action qui échoue côté agent est écrite au journal, la fenêtre continue", () => {
+    const failing = new NoticeCenter({ configDir: dir, log: (message) => logs.push(message), legacyShow: () => undefined, platform: "win32", onAction: () => { throw new Error("réseau coupé"); }, spawnHost: () => { const host = fakeHost(); hosts.push(host); return host; } });
+    failing.show(entry());
+    hosts[0].stdout.emit("data", "PRET\nTERMINER rx_1\n");
+    expect(logs.join("\n")).toContain("action TERMINER impossible (réseau coupé)");
+  });
+
+  it("annonce la fin de vente à la fenêtre et retire la vente du suivi", () => {
+    const notices = center();
+    notices.show(entry());
+    notices.done({ id: "rx_1", title: "Vente terminée — résultats enregistrés", lines: ["1 vendu"], badge: "18e conseil vendu aujourd'hui", warning: false });
+    expect(commands(hosts[0]).map((command) => command.op)).toEqual(["show", "done"]);
+    expect(commands(hosts[0])[1].info).toMatchObject({ id: "rx_1", badge: "18e conseil vendu aujourd'hui" });
+    expect(notices.ids()).toEqual([]);
+  });
+
+  it("oublie une vente quand la fenêtre passe à la suivante, sans toucher à la fenêtre", () => {
+    const notices = center();
+    notices.show(entry());
+    notices.forget("rx_1");
+    expect(notices.ids()).toEqual([]);
+    expect(commands(hosts[0]).map((command) => command.op)).toEqual(["show"]);
   });
 
   it("ne compte pas en attente un avis « rien à ajouter »", () => {
@@ -300,5 +361,40 @@ describe("la fenêtre et son processus", () => {
     notices.show(entry());
     expect(hosts).toHaveLength(0);
     expect(logs.join("\n")).toContain("non affiché hors Windows");
+  });
+});
+
+describe("le message de fin de vente", () => {
+  const result = (over: Partial<Parameters<typeof buildDoneInfo>[0]["result"]> = {}) => ({ proposed: 3, sold: 2, notSold: 1, unanswered: 0, soldToday: 18, report: "SENT" as const, ...over });
+
+  it("dit ce qui a été enregistré, le rang du jour et l'envoi du bilan", () => {
+    const info = buildDoneInfo({ saleId: "rx_1", result: result(), emailWasSaved: true });
+    expect(info).toEqual({ id: "rx_1", title: "Vente terminée — résultats enregistrés", lines: ["2 vendus · 1 non vendu · 0 sans réponse", "✓ Bilan envoyé au patient."], badge: "18e conseil vendu aujourd'hui", warning: false });
+  });
+
+  it("n'annonce aucun rang quand rien n'a été vendu dans cette vente", () => {
+    expect(buildDoneInfo({ saleId: "rx_1", result: result({ sold: 0, notSold: 2, unanswered: 1, soldToday: null, report: "NONE" }), emailWasSaved: false }).badge).toBe("");
+    expect(buildDoneInfo({ saleId: "rx_1", result: result({ sold: 0, soldToday: 18, report: "NONE" }), emailWasSaved: false }).badge).toBe("");
+  });
+
+  it("ne dit « bilan envoyé » que si le serveur l'a confirmé ; un échec est dit, en avertissement", () => {
+    expect(buildDoneInfo({ saleId: "rx_1", result: result({ report: "NONE" }), emailWasSaved: false }).lines.join(" ")).not.toContain("Bilan");
+    const failed = buildDoneInfo({ saleId: "rx_1", result: result({ report: "FAILED" }), emailWasSaved: true });
+    expect(failed.warning).toBe(true);
+    expect(failed.lines.join(" ")).toContain("n'a pas pu être envoyé");
+    expect(buildDoneInfo({ saleId: "rx_1", result: result({ report: "SIMULATED" }), emailWasSaved: true }).lines.join(" ")).toContain("mode test");
+  });
+
+  it("explique l'absence de bilan quand une adresse était donnée mais que rien n'a été vendu", () => {
+    const info = buildDoneInfo({ saleId: "rx_1", result: result({ sold: 0, soldToday: null, report: "NONE" }), emailWasSaved: true });
+    expect(info.lines.join(" ")).toContain("aucun produit n'a été vendu");
+  });
+
+  it("dit « aucun conseil » plutôt que des zéros quand rien n'a été proposé", () => {
+    expect(buildDoneInfo({ saleId: "rx_1", result: result({ proposed: 0, sold: 0, notSold: 0, unanswered: 0, soldToday: null, report: "NONE" }), emailWasSaved: false }).lines).toEqual(["Aucun conseil à enregistrer."]);
+  });
+
+  it("écrit le rang en français : 1er, 2e, 18e", () => {
+    expect([1, 2, 11, 18, 21].map(ordinalFr)).toEqual(["1er", "2e", "11e", "18e", "21e"]);
   });
 });
