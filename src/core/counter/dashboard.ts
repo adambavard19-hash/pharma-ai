@@ -1,4 +1,5 @@
 import { buildConnectionOverview, type OverviewPost } from "@/core/stock/connection-overview";
+import { noComptoirMessage, type MyComptoirs } from "@/core/counter/comptoirs";
 
 /**
  * Le tableau de bord du comptoir : ce que le pharmacien voit sur « Nouvelle vente ».
@@ -11,7 +12,7 @@ import { buildConnectionOverview, type OverviewPost } from "@/core/stock/connect
  * APPAIRÉ qui a donné signe de vie il y a moins de dix minutes. Module pur : aucune base, l'heure est un paramètre.
  */
 
-export type CounterState = "READY" | "OFFLINE" | "NOT_CONNECTED";
+export type CounterState = "READY" | "OFFLINE" | "NOT_CONNECTED" | "UNASSIGNED";
 export type PillTone = "success" | "warning" | "neutral";
 
 export type CounterStatus = {
@@ -19,8 +20,8 @@ export type CounterStatus = {
   pill: { label: string; tone: PillTone };
   title: string;
   subtitle: string;
-  /** Les postes appairés, avec leur état : « Poste comptoir 1 ✓ ». */
-  posts: { id: string; label: string; online: boolean }[];
+  /** Les comptoirs de CETTE personne, avec leur collaborateur et leur état : « Comptoir 2 · Léa Martin ✓ ». */
+  posts: { id: string; label: string; owner: string | null; online: boolean }[];
   /** Installations commencées, pas encore terminées. */
   waitingInstall: number;
   /** Un poste répond, mais aucun bip n'est encore arrivé : le suivi n'est pas prouvé. */
@@ -34,12 +35,27 @@ export function postDisplayName(label: string): string {
   return match ? `Poste comptoir${match[1] ?? ""}` : trimmed;
 }
 
-export function buildCounterStatus(input: { now: Date; posts: OverviewPost[] }): CounterStatus {
+export function buildCounterStatus(input: {
+  now: Date;
+  posts: OverviewPost[];
+  /** Ce que cette personne voit : ses comptoirs. Absent : tous les postes (comportement historique). */
+  mine?: Pick<MyComptoirs, "postIds" | "mode">;
+  /** Le collaborateur de chaque comptoir, par identifiant de poste. */
+  owners?: Record<string, string | null>;
+  /** Cette personne peut-elle attribuer les comptoirs ? (le message d'un comptoir manquant ne dit pas la même chose.) */
+  canAssign?: boolean;
+}): CounterStatus {
   // Les comptoirs et le suivi des ventes ne dépendent que des postes : la liaison du serveur de l'officine n'y entre pas.
   const overview = buildConnectionOverview({ now: input.now, lgo: null, connection: null, posts: input.posts, stockSyncedAt: null, stockLines: null, stockProblem: null });
-  const paired = overview.counters.filter((counter) => counter.state === "CONNECTED" || counter.state === "OFFLINE");
-  const posts = paired.map((counter) => ({ id: counter.id, label: postDisplayName(counter.label), online: counter.state === "CONNECTED" }));
+  const visible = input.mine ? new Set(input.mine.postIds) : null;
+  const paired = overview.counters.filter((counter) => (counter.state === "CONNECTED" || counter.state === "OFFLINE") && (!visible || visible.has(counter.id)));
+  const posts = paired.map((counter) => ({ id: counter.id, label: counter.label, owner: input.owners?.[counter.id] ?? null, online: counter.state === "CONNECTED" }));
   const waitingInstall = overview.counters.filter((counter) => counter.state === "TO_INSTALL").length;
+
+  // Plusieurs comptoirs dans la pharmacie et aucun pour cette personne : elle ne voit rien des autres, et on lui dit pourquoi.
+  if (input.mine?.mode === "NONE" && overview.counters.some((counter) => counter.state === "CONNECTED" || counter.state === "OFFLINE")) {
+    return { state: "UNASSIGNED", pill: { label: "Comptoir à choisir", tone: "neutral" }, title: "Aucun comptoir ne vous est attribué.", subtitle: noComptoirMessage("NONE", input.canAssign === true) ?? "", posts: [], waitingInstall, awaitingFirstScan: false };
+  }
 
   if (posts.some((post) => post.online)) {
     return {
@@ -154,13 +170,27 @@ export function describeWhen(date: Date, now: Date): string {
   return `${day} ${hour}`;
 }
 
+/** Les médicaments d'une ordonnance affichés sous son titre ; le reste se lit dans la vente. */
+export const ACTIVITY_LINES_SHOWN = 6;
+
+/** « ORD-0780 » se dit « Ordonnance 0780 » : le numéro, comme on le dirait au comptoir. */
+export function ordonnanceTitle(reference: string): string {
+  const number = reference.replace(/^ORD-?/i, "").trim();
+  return number ? `Ordonnance ${number}` : "Ordonnance";
+}
+
 export type ActivityItem = {
   id: string;
   /** « 14:32 », « hier 14:32 ». */
   when: string;
   /** Le patient, ou `null` tant qu'il n'est pas associé. */
   patient: string | null;
-  products: string;
+  /** Les médicaments de CETTE ordonnance, un par ligne : on voit ce qui est dans la même ordonnance. */
+  lines: { name: string; quantity: number }[];
+  /** Combien de lignes de plus que celles montrées. */
+  moreLines: number;
+  /** Le comptoir d'où elle vient, avec son collaborateur : « Comptoir 2 · Léa Martin » ; `null` pour une saisie à l'écran. */
+  comptoir: string | null;
   stage: { label: string; tone: StageTone };
   reference: string;
 };

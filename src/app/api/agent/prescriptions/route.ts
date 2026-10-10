@@ -27,6 +27,8 @@ export async function POST(request: Request) {
   const stored = await storePrescriptionFile({ scope: agent.scope, file });
   if (!stored.ok) return NextResponse.json({ ok: false, error: uploadErrorMessage(stored.error) }, { status: 422 });
 
+  // Le scanner d'un comptoir attribué dépose pour le collaborateur de ce comptoir.
+  const owner = agent.postId ? await prisma.counterPost.findUnique({ where: { id: agent.postId }, select: { assignedUserId: true } }) : null;
   const prescription = await createWithReference("prescription", agent.scope.pharmacyId, (reference) =>
     prisma.prescription.create({
       data: {
@@ -38,6 +40,8 @@ export async function POST(request: Request) {
         fileName: stored.data.fileName,
         fileMimeType: stored.data.mimeType,
         createdByUserId: agent.scope.userId,
+        counterPostId: agent.postId ?? null,
+        handledByUserId: owner?.assignedUserId ?? null,
         isDemo: recordIsDemo(agent.pharmacyIsDemo),
       },
     }),

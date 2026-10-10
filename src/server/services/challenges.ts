@@ -481,6 +481,7 @@ export type PilotageChallenge = {
   id: string;
   title: string;
   laboratory: string;
+  startsOn: DayKey;
   endsOn: DayKey;
   progress: Pick<ChallengeProgress, "units" | "target" | "targetIsImplicit" | "ratio" | "rewardMode" | "potentialCents" | "earnedCents" | "daysRemaining" | "manualUnits" | "salesUnits">;
   /** Ventes comptées par collaborateur (qui a enregistré la vente). Les saisies manuelles n'ont pas d'auteur de vente. */
@@ -524,6 +525,7 @@ export async function listRunningChallengesForPilotage(scope: ChallengeScope, no
       id: row.id,
       title: row.title,
       laboratory: row.laboratory,
+      startsOn: row.startsOn,
       endsOn: row.endsOn,
       progress: {
         units: row.progress.units,

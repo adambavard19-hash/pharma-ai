@@ -23,11 +23,12 @@ vi.mock("@/server/db/client", () => ({
 vi.mock("@/server/audit/log", () => ({ recordAudit: m.audit }));
 vi.mock("@/server/ai/registry", () => ({ getMessagingProvider: () => ({ info: { id: "test" }, sendEmail: m.sendEmail }) }));
 vi.mock("@/server/services/email-dispatch", () => ({ traceDispatch: m.trace }));
+vi.mock("@/server/services/comptoirs", () => ({ listMembers: async () => [{ id: "lea", name: "Léa Martin", role: "PHARMACIST" }] }));
 vi.mock("@/config/env", () => ({ getEnv: () => ({ APP_URL: "https://pharmaboost.app" }) }));
 
 const { loadCounterResults, sendMonthlyCounterReports } = await import("../counter-results");
 
-const followUp = (over = {}) => ({ prescriptionId: "p1", closedPost: "Comptoir 1", proposedCount: 3, soldCount: 1, notSoldCount: 1, unansweredCount: 1, emailEncrypted: null, consentAt: null, reportStatus: null, ...over });
+const followUp = (over = {}) => ({ prescriptionId: "p1", closedPost: "Comptoir 1", prescription: { handledByUserId: "lea" }, proposedCount: 3, soldCount: 1, notSoldCount: 1, unansweredCount: 1, emailEncrypted: null, consentAt: null, reportStatus: null, ...over });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,6 +46,8 @@ describe("les résultats du comptoir", () => {
     expect(m.followUps).toHaveBeenCalledWith(expect.objectContaining({ where: { pharmacyId: "ph1", closedAt: { gte: new Date("2026-10-01"), lt: new Date("2026-11-01") } } }));
     expect(m.recs).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ status: "PURCHASED", outcomeSource: "COUNTER_DECLARED", pharmacyId: "ph1" }) }));
     expect(results).toMatchObject({ salesClosed: 1, proposed: 3, sold: 1, challengeSold: 1, shortDateSold: 1, products: [{ name: "ELUDAY GENCIVE", sold: 1 }] });
+    // Chacun sous son nom : le collaborateur du comptoir ; sans collaborateur, le nom du comptoir.
+    expect(results.byPost[0].post).toBe("Léa Martin");
   });
 
   it("ne lit aucun conseil quand aucune vente n'est terminée", async () => {

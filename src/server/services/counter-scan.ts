@@ -155,9 +155,12 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
   // Le bip précédent de CE poste, lu avant que celui-ci ne le remplace : c'est
   // lui, et non la dernière écriture de la vente, qui dit si le patient est le même.
   let previousScanAt: Date | null = null;
+  let postOwnerId: string | null = null;
   if (agent.postId) {
-    const known = await prisma.counterPost.findUnique({ where: { id: agent.postId }, select: { lastScanAt: true } });
+    const known = await prisma.counterPost.findUnique({ where: { id: agent.postId }, select: { lastScanAt: true, assignedUserId: true } });
     previousScanAt = known?.lastScanAt ?? null;
+    // Le collaborateur à qui ce comptoir est attribué au moment du bip : la vente lui revient, pour de bon.
+    postOwnerId = known?.assignedUserId ?? null;
   }
   const withinWindow = previousScanAt !== null && Math.abs(at.getTime() - previousScanAt.getTime()) <= SAME_SALE_WINDOW_MS;
 
@@ -175,7 +178,8 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
         where: {
           pharmacyId: agent.scope.pharmacyId,
           source: "COUNTER_SCAN",
-          counterPost: post,
+          // Le comptoir se reconnaît à son identité, pas à son nom affiché : deux ordinateurs de même nom ne mélangent jamais leurs ventes.
+          ...(agent.postId ? { counterPostId: agent.postId } : { counterPost: post }),
           // Une vente déjà analysée mais pas encore encaissée reste celle du
           // patient au comptoir : un bip de plus la complète et la ré-analyse.
           status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
@@ -216,6 +220,8 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
           status: "NEEDS_VERIFICATION",
           source: "COUNTER_SCAN",
           counterPost: post,
+          counterPostId: agent.postId ?? null,
+          handledByUserId: postOwnerId,
           createdByUserId: agent.scope.userId,
           isDemo: recordIsDemo(agent.pharmacyIsDemo),
           lines: { create: { position: 1, ...lineData } },
@@ -245,9 +251,14 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
 }
 
 /** La délivrance en cours sur un poste (pour l'écran du comptoir), s'il y en a une. */
-export async function listLiveCounterSales(pharmacyId: string) {
+/**
+ * La délivrance en cours sur les comptoirs donnés (pour l'écran de la personne à qui ils sont), s'il y en a une. `postIds` est OBLIGATOIRE :
+ * chaque comptoir est un espace à part, jamais « toutes les ventes de la pharmacie » par défaut.
+ */
+export async function listLiveCounterSales(pharmacyId: string, postIds: string[]) {
+  if (postIds.length === 0) return [];
   return prisma.prescription.findMany({
-    where: { pharmacyId, source: "COUNTER_SCAN", status: { in: ["NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] }, sales: { none: {} }, NOT: { counterFollowUp: { closedAt: { not: null } } }, updatedAt: { gte: new Date(Date.now() - 6 * 60 * 60 * 1000) } },
+    where: { pharmacyId, source: "COUNTER_SCAN", counterPostId: { in: postIds }, status: { in: ["NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] }, sales: { none: {} }, NOT: { counterFollowUp: { closedAt: { not: null } } }, updatedAt: { gte: new Date(Date.now() - 6 * 60 * 60 * 1000) } },
     orderBy: { updatedAt: "desc" },
     take: 6,
     select: { id: true, reference: true, status: true, counterPost: true, updatedAt: true, createdAt: true, lines: { orderBy: { position: "asc" }, select: { drugName: true, quantity: true } }, _count: { select: { recommendations: true } } },
@@ -280,14 +291,18 @@ export async function attachBarcodeToProduct(scope: { pharmacyId: string; userId
  * encaissement) sont closes. L'écran redevient vierge et le bip suivant
  * ouvre une nouvelle vente, même moins d'une minute après le dernier.
  */
-export async function closeLiveCounterSales(scope: { pharmacyId: string; userId: string }, prescriptionId?: string): Promise<number> {
+export async function closeLiveCounterSales(scope: { pharmacyId: string; userId: string }, prescriptionId?: string, postIds?: string[]): Promise<number> {
   const result = await prisma.prescription.updateMany({
     where: {
       pharmacyId: scope.pharmacyId,
       source: "COUNTER_SCAN",
       ...(prescriptionId ? { id: prescriptionId } : {}),
+      // « Nouveau patient » ne ferme que les ventes de mes comptoirs, jamais celles d'un collègue.
+      ...(postIds ? { counterPostId: { in: postIds } } : {}),
       status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
       sales: { none: {} },
+      // Une vente que le pharmacien a déjà terminée (« Vente terminée ») est finie : « Nouveau patient » n'y touche pas.
+      NOT: { counterFollowUp: { closedAt: { not: null } } },
     },
     data: { status: "CANCELLED" },
   });

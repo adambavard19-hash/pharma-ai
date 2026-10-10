@@ -16,3 +16,17 @@ une nouvelle vente · les résultats ne comptent que chez la pharmacie concerné
 perdre un bip (`createWithReference`, `server/services/references.ts`, réessaie avec un nouveau numéro ; appliqué aux bips, au dépôt
 d'ordonnance, à l'ordonnance saisie et à l'encaissement) ; deux « Vente terminée » simultanés pouvaient envoyer deux bilans (la
 fermeture est réservée d'un seul coup). À rejouer après toute modification des ventes, du comptoir, des stocks ou des règles centrales.
+
+## Comptoirs attribués (10 oct. 2026)
+
+Chaque comptoir (poste de caisse) est un espace à part, attribué à un collaborateur dans « Mes connexions » (menu déroulant, nom modifiable).
+- **Écran « Nouvelle vente »** : chacun ne voit que SES comptoirs — leurs délivrances en direct, leurs chiffres du jour, leur activité (une
+  fiche par ordonnance, ses médicaments dessous, « Comptoir 2 · Léa Martin »). Une pharmacie qui n'a qu'un comptoir n'a rien à attribuer ;
+  une pharmacie à plusieurs comptoirs où rien n'est pour moi affiche « Comptoir à choisir » (le titulaire n'est jamais dérangé par les autres).
+- **Identité** : la vente garde l'identité du comptoir (`counterPostId`) et le collaborateur au moment du bip (`handledByUserId`) ; attribuer
+  le comptoir à un autre plus tard ne réécrit pas l'historique. « Nouveau patient » ne ferme que mes ventes.
+- **Déclarations « Vendu »** : attribuées au collaborateur du comptoir.
+- **Pilotage** (« Performances », puis « Mon équipe ») : classement simple — proposés, validés, taux, rang — pour le jour, la semaine, le mois,
+  l'année ; challenges en cours avec l'avancement de chacun (ventes enregistrées + produits du challenge déclarés vendus). Une vente de la
+  douchette ne propose que 3 conseils au plus, ceux que le pharmacien voit.
+`

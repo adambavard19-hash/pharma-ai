@@ -122,15 +122,15 @@ export const NAVIGATION: NavItem[] = [
     group: "pharmacie",
   },
   {
-    href: "/resultats",
+    href: "/pilotage",
     label: "Performances",
     icon: BarChart3,
     // Même permission que le pilotage par collaborateur : la valeur chiffrée reste une vue de titulaire.
-    // L'équipe au comptoir ne voit ni l'entrée ni la page. Deux pages, une entrée : « Ce que PharmaBoost vous
-    // rapporte » (ventes confirmées) mène au détail par collaborateur (Pilotage), qui y renvoie.
+    // L'équipe au comptoir ne voit ni l'entrée ni la page. Deux pages, une entrée : on arrive sur « Mon équipe » (le classement de
+    // chacun et les challenges, simple), qui mène à « Ce que PharmaBoost vous rapporte » (les ventes confirmées), qui y renvoie.
     permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
     match: ["/resultats", "/pilotage", "/performance", "/analytics", "/ventes"],
-    description: "Ce que les conseils ont rapporté, au global et par collaborateur",
+    description: "Le classement de l'équipe, les challenges, et ce que les conseils ont rapporté",
     group: "pharmacie",
   },
   {
@@ -250,9 +250,9 @@ export const OFF_MENU_DESTINATIONS: {
     reachableFrom: "le lien « Contact support », toujours visible en bas du menu",
   },
   {
-    href: "/pilotage",
-    label: "Pilotage de l'officine",
-    reachableFrom: "Performances (le lien « Pilotage par collaborateur »)",
+    href: "/resultats",
+    label: "Ce que PharmaBoost vous rapporte",
+    reachableFrom: "Performances (le lien « Les ventes et le chiffre d'affaires »)",
   },
   {
     href: "/performance",

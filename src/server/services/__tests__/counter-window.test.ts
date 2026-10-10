@@ -80,6 +80,14 @@ describe("« Vendu » / « Non vendu » dans la fenêtre", () => {
     expect(m.eventCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ metadata: expect.objectContaining({ source: "COUNTER_DECLARED", post: "Comptoir 2", challenge: "Challenge Avène", shortDateOn: "2026-11-30" }) }) });
   });
 
+  it("la déclaration revient au collaborateur à qui le comptoir est attribué", async () => {
+    m.prescriptionFindFirst.mockResolvedValue({ ...sale(), handledByUserId: "lea" });
+    m.recommendationFindFirst.mockResolvedValue({ id: "r1", status: "PROPOSED", outcomeSource: null, _count: { saleLines: 0 } });
+    await decideCounterAdvice(agent, { prescriptionId: "sale1", recommendationId: "r1", outcome: "SOLD" });
+    expect(m.recommendationUpdate).toHaveBeenCalledWith({ where: { id: "r1" }, data: expect.objectContaining({ status: "PURCHASED", decidedByUserId: "lea", outcomePost: "Comptoir 2" }) });
+    expect(m.eventCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ type: "PURCHASED", userId: "lea" }) });
+  });
+
   it("« Non vendu » marque le conseil refusé, sans le supprimer", async () => {
     m.recommendationFindFirst.mockResolvedValue({ id: "r1", status: "PROPOSED", outcomeSource: null, _count: { saleLines: 0 } });
     await decideCounterAdvice(agent, { prescriptionId: "sale1", recommendationId: "r1", outcome: "NOT_SOLD" });

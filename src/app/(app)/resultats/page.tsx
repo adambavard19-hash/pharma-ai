@@ -53,9 +53,9 @@ export default async function ResultatsPage({
       />
 
       <p className="text-[12.5px] text-text-tertiary">
-        Le détail du travail de chaque collaborateur est dans le{" "}
+        Le classement de l&apos;équipe et les challenges sont dans{" "}
         <Link href="/pilotage" className="inline-flex items-center gap-1 font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
-          Pilotage par collaborateur
+          Mon équipe
           <ArrowRight className="size-3" aria-hidden="true" />
         </Link>
         .

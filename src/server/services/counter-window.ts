@@ -34,7 +34,7 @@ const ANSWERABLE = new Set(["PROPOSED", "PRESENTED", "ACCEPTED", "MODIFIED", "PU
 async function ownedSale(agent: AgentContext, prescriptionId: string) {
   return prisma.prescription.findFirst({
     where: { id: prescriptionId, pharmacyId: agent.scope.pharmacyId, source: "COUNTER_SCAN" },
-    select: { id: true, counterPost: true, counterFollowUp: { select: { id: true, closedAt: true } } },
+    select: { id: true, counterPost: true, handledByUserId: true, counterFollowUp: { select: { id: true, closedAt: true } } },
   });
 }
 
@@ -104,9 +104,9 @@ export async function decideCounterAdvice(agent: AgentContext, input: { prescrip
       data:
         input.outcome === "NONE"
           ? { status, decidedByUserId: null, decidedAt: null, outcomeSource: null, outcomePost: null }
-          : { status, decidedByUserId: null, decidedAt: now, outcomeSource: COUNTER_DECLARED, outcomePost: post },
+          : { status, decidedByUserId: sale.handledByUserId ?? null, decidedAt: now, outcomeSource: COUNTER_DECLARED, outcomePost: post },
     });
-    await tx.recommendationEvent.create({ data: { recommendationId: rec.id, type: eventType, userId: null, metadata: { source: COUNTER_DECLARED, post, previousStatus: rec.status, ...context } as never } });
+    await tx.recommendationEvent.create({ data: { recommendationId: rec.id, type: eventType, userId: input.outcome === "NONE" ? null : (sale.handledByUserId ?? null), metadata: { source: COUNTER_DECLARED, post, previousStatus: rec.status, ...context } as never } });
   });
   await ensureFollowUp(agent.scope.pharmacyId, sale.id);
   await recordAudit({ action: "counter_window.advice_decided", entityType: "Recommendation", entityId: rec.id, pharmacyId: agent.scope.pharmacyId, metadata: { outcome: input.outcome, source: COUNTER_DECLARED, post, previousStatus: rec.status, prescriptionId: sale.id } });

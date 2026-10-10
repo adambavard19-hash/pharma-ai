@@ -36,14 +36,14 @@ describe("le menu, en quatre groupes", () => {
 
   it("rien n'a été retiré : toutes les adresses d'avant sont encore au menu ou atteignables", () => {
     const hrefs = new Set(NAVIGATION.map((item) => item.href));
-    for (const href of ["/vente/nouvelle", "/patients", "/connexion", "/stock", "/reglementation", "/formation", "/partenaires", "/nouveautes", "/assortiment", "/suivis", "/equipe", "/resultats", "/parametres"]) {
+    for (const href of ["/vente/nouvelle", "/patients", "/connexion", "/stock", "/reglementation", "/formation", "/partenaires", "/nouveautes", "/assortiment", "/suivis", "/equipe", "/pilotage", "/parametres"]) {
       expect(hrefs.has(href), href).toBe(true);
     }
-    // Pilotage a quitté le menu : il reste atteignable depuis Performances, et la page de Performances s'allume pour lui.
+    // « Ce que PharmaBoost vous rapporte » a quitté le menu : on y va depuis Performances (qui s'ouvre sur « Mon équipe »), et l'entrée s'allume pour elle.
     const performances = NAVIGATION.find((item) => item.label === "Performances");
     if (!performances) throw new Error("entrée absente");
-    expect(isNavItemActive(performances, "/pilotage")).toBe(true);
-    expect(OFF_MENU_DESTINATIONS.some((destination) => destination.href === "/pilotage")).toBe(true);
+    expect(isNavItemActive(performances, "/resultats")).toBe(true);
+    expect(OFF_MENU_DESTINATIONS.some((destination) => destination.href === "/resultats")).toBe(true);
   });
 });
 
@@ -96,12 +96,12 @@ describe("les intitulés", () => {
     expect(byHref("/connexion")).toBe("Mes connexions");
     expect(byHref("/suivis")).toBe("Suivis patients");
     expect(byHref("/formation")).toBe("Formations");
-    expect(byHref("/resultats")).toBe("Performances");
+    expect(byHref("/pilotage")).toBe("Performances");
   });
 });
 
 describe("l'entrée « Performances » (ex « Ce que ça rapporte » et « Pilotage »)", () => {
-  const entry = NAVIGATION.find((item) => item.href === "/resultats");
+  const entry = NAVIGATION.find((item) => item.href === "/pilotage");
 
   it("garde la permission de titulaire des deux anciennes entrées", () => {
     expect(entry?.permission).toBe(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);

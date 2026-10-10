@@ -201,6 +201,8 @@ export async function createPrescriptionAction(
         fileName,
         fileMimeType,
         createdByUserId: scope.userId,
+        // Une ordonnance saisie à l'écran est à celui qui la saisit.
+        handledByUserId: scope.userId,
         isDemo: recordIsDemo(session.pharmacy.isDemo),
       },
     }),

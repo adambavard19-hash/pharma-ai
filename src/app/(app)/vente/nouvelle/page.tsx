@@ -10,6 +10,7 @@ import { patientDataEnabled } from "@/config/env";
 import { StockReminderBanner } from "@/components/app/stock-reminder";
 import { listLiveCounterSales } from "@/server/services/counter-scan";
 import { loadCounterDashboard, startOfParisDay } from "@/server/services/counter-dashboard";
+import { myComptoirs } from "@/server/services/comptoirs";
 import { countCounterRequestsToday } from "@/server/services/counter-request";
 import { isCommercialDemoPharmacy } from "@/core/demo/identity";
 import { findDemoScenario } from "@/core/demo/scenarios";
@@ -47,10 +48,12 @@ export default async function NewPrescriptionPage({
   // Un scénario de démonstration « sans ordonnance » arrive avec sa demande déjà saisie (jamais lancée toute seule).
   const demoRequest = isCommercialDemoPharmacy(session.pharmacy) && params.demande ? (findDemoScenario(params.demande)?.request ?? null) : null;
 
+  // Chaque comptoir est un espace à part : cet écran ne montre que les délivrances des comptoirs de cette personne.
+  const mine = await myComptoirs(session.scope);
   const [dashboard, liveSalesRaw, requestsToday, pharmacy] = await Promise.all([
-    loadCounterDashboard(session.scope, now),
+    loadCounterDashboard(session.scope, now, { canAssign: session.permissions.has(PERMISSIONS.PRODUCT_IMPORT) }),
     // Les délivrances qui arrivent de la douchette du LGO : la carte se met à jour seule.
-    listLiveCounterSales(session.scope.pharmacyId),
+    listLiveCounterSales(session.scope.pharmacyId, mine.postIds),
     // Les demandes sans ordonnance traitées aujourd'hui : le comptoir voit ce qu'il a fait.
     countCounterRequestsToday(session.scope.pharmacyId, startOfParisDay(now)),
     prisma.pharmacy.findUnique({ where: { id: session.scope.pharmacyId }, select: { stockSyncedAt: true } }),

@@ -14,17 +14,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 type Line = { id: string; drugSpecialtyId: string | null; rawText: string | null; drugName: string; quantity: number | null; position: number };
-type Sale = { id: string; reference: string; pharmacyId: string; source: string; counterPost: string; status: string; createdAt: Date; updatedAt: Date; sales: unknown[]; lines: Line[]; followUpClosed?: boolean };
-type Post = { lastScanAt: Date | null; lastSeenAt: Date | null; scanCount: number };
+type Sale = { id: string; reference: string; pharmacyId: string; source: string; counterPost: string; counterPostId?: string | null; handledByUserId?: string | null; status: string; createdAt: Date; updatedAt: Date; sales: unknown[]; lines: Line[]; followUpClosed?: boolean };
+type Post = { lastScanAt: Date | null; lastSeenAt: Date | null; scanCount: number; assignedUserId?: string | null };
 
 type DateFilter = { gte?: Date; gt?: Date };
-type SaleWhere = { pharmacyId?: string; source?: string; counterPost?: string; id?: string; status?: { in: string[] }; updatedAt?: DateFilter; sales?: { none?: Record<string, never> }; NOT?: { counterFollowUp?: { closedAt?: { not: null } } } };
+type SaleWhere = { pharmacyId?: string; source?: string; counterPost?: string; counterPostId?: string; id?: string; status?: { in: string[] }; updatedAt?: DateFilter; sales?: { none?: Record<string, never> }; NOT?: { counterFollowUp?: { closedAt?: { not: null } } } };
 type OrderBy = { createdAt?: "asc" | "desc"; updatedAt?: "asc" | "desc" };
 
 const mem = vi.hoisted(() => ({ sales: [] as Sale[], posts: new Map<string, Post>(), next: 0 }));
 
 const db = vi.hoisted(() => {
-  const KNOWN_KEYS = ["pharmacyId", "source", "counterPost", "id", "status", "updatedAt", "sales", "NOT"];
+  const KNOWN_KEYS = ["pharmacyId", "source", "counterPost", "counterPostId", "id", "status", "updatedAt", "sales", "NOT"];
 
   /** Le filtre `where` de Prisma, appliqué pour de bon à une vente. */
   const matches = (sale: Sale, where: SaleWhere): boolean => {
@@ -33,6 +33,7 @@ const db = vi.hoisted(() => {
     if (where.pharmacyId !== undefined && sale.pharmacyId !== where.pharmacyId) return false;
     if (where.source !== undefined && sale.source !== where.source) return false;
     if (where.counterPost !== undefined && sale.counterPost !== where.counterPost) return false;
+    if (where.counterPostId !== undefined && sale.counterPostId !== where.counterPostId) return false;
     if (where.id !== undefined && sale.id !== where.id) return false;
     if (where.status !== undefined && !where.status.in.includes(sale.status)) return false;
     if (where.updatedAt !== undefined) {
@@ -80,7 +81,7 @@ const db = vi.hoisted(() => {
     counterPost: {
       findUnique: vi.fn(async ({ where }: { where: { id: string }; select?: unknown }) => {
         const post = mem.posts.get(where.id);
-        return post ? { lastScanAt: post.lastScanAt } : null;
+        return post ? { lastScanAt: post.lastScanAt, assignedUserId: post.assignedUserId ?? null } : null;
       }),
       update: vi.fn(async ({ where, data }: { where: { id: string }; data: { lastScanAt?: Date; lastSeenAt?: Date; scanCount?: { increment: number } } }) => {
         const post = mem.posts.get(where.id)!;
@@ -95,7 +96,7 @@ const db = vi.hoisted(() => {
         const found = sorted(mem.sales.filter((sale) => matches(sale, where)), orderBy);
         return found[0] ?? null;
       }),
-      create: vi.fn(async ({ data }: { data: { pharmacyId: string; reference: string; status: string; source: string; counterPost: string; lines: { create: Omit<Line, "id"> } } }) => {
+      create: vi.fn(async ({ data }: { data: { pharmacyId: string; reference: string; status: string; source: string; counterPost: string; counterPostId?: string | null; handledByUserId?: string | null; lines: { create: Omit<Line, "id"> } } }) => {
         mem.next += 1;
         const sale: Sale = {
           id: `rx_${mem.next}`,
@@ -103,6 +104,8 @@ const db = vi.hoisted(() => {
           pharmacyId: data.pharmacyId,
           source: data.source,
           counterPost: data.counterPost,
+          counterPostId: data.counterPostId ?? null,
+          handledByUserId: data.handledByUserId ?? null,
           status: data.status,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -184,8 +187,8 @@ beforeEach(() => {
   vi.useFakeTimers({ now: NOW });
   mem.sales = [];
   mem.posts = new Map([
-    ["post_1", { lastScanAt: null, lastSeenAt: null, scanCount: 0 }],
-    ["post_2", { lastScanAt: null, lastSeenAt: null, scanCount: 0 }],
+    ["post_1", { lastScanAt: null, lastSeenAt: null, scanCount: 0, assignedUserId: "usr_lea" }],
+    ["post_2", { lastScanAt: null, lastSeenAt: null, scanCount: 0, assignedUserId: "usr_marc" }],
   ]);
   mem.next = 0;
   db.drugPresentation.findUnique.mockImplementation(async ({ where }: { where: { cip13: string } }) =>
@@ -576,3 +579,37 @@ describe("« Nouveau patient » : inchangé", () => {
     expect(mem.sales[0].status).toBe("NEEDS_VERIFICATION");
   });
 });
+
+describe("chaque comptoir est un espace à part, avec son collaborateur", () => {
+  it("la vente porte l'identité du comptoir ET le collaborateur à qui il est attribué au moment du bip", async () => {
+    await scan(CIP_DOLIPRANE, "Comptoir 1", null, agentOf("post_1"));
+    await scan(CIP_DOLIPRANE, "Comptoir 2", null, agentOf("post_2"));
+    expect(mem.sales.map((sale) => [sale.counterPostId, sale.handledByUserId])).toEqual([["post_1", "usr_lea"], ["post_2", "usr_marc"]]);
+  });
+
+  it("deux ordinateurs qui portent le même nom ne mélangent jamais leurs ventes : le comptoir se reconnaît à son identité", async () => {
+    const first = await scan(CIP_DOLIPRANE, "Caisse", null, agentOf("post_1"));
+    wait(5);
+    const second = await scan(EAN_CREME, "Caisse", null, agentOf("post_2"));
+    expect(first.ok && second.ok && first.prescriptionId !== second.prescriptionId).toBe(true);
+    // Le bip suivant du premier ordinateur complète SA vente, pas celle de l'autre.
+    wait(5);
+    const third = await scan(EAN_PROBIOTIQUE, "Caisse", null, agentOf("post_1"));
+    expect(third.ok && first.ok && third.prescriptionId === first.prescriptionId).toBe(true);
+  });
+
+  it("un comptoir attribué à personne ne donne la vente à personne", async () => {
+    post("post_1").assignedUserId = null;
+    await scan(CIP_DOLIPRANE, "Comptoir 1", null, agentOf("post_1"));
+    expect(mem.sales[0].handledByUserId).toBeNull();
+  });
+
+  it("changer le collaborateur d'un comptoir ne réécrit pas les ventes déjà faites", async () => {
+    await scan(CIP_DOLIPRANE, "Comptoir 1", null, agentOf("post_1"));
+    post("post_1").assignedUserId = "usr_marc";
+    wait(120);
+    await scan(CIP_DOLIPRANE, "Comptoir 1", null, agentOf("post_1"));
+    expect(mem.sales.map((sale) => sale.handledByUserId)).toEqual(["usr_lea", "usr_marc"]);
+  });
+});
+

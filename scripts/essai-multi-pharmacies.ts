@@ -11,6 +11,11 @@ import { prisma } from "@/server/db/client";
 import { generateToken, hashToken } from "@/server/security/tokens";
 import { hashPassword } from "@/server/security/password";
 import { drugKey } from "@/core/ai/engines/associations";
+import { assignComptoir, myComptoirs } from "@/server/services/comptoirs";
+import { listLiveCounterSales, closeLiveCounterSales } from "@/server/services/counter-scan";
+import { loadCounterDashboard } from "@/server/services/counter-dashboard";
+import { loadTeamRanking } from "@/server/services/team-ranking";
+import { resolvePeriod } from "@/core/analytics/periods";
 
 const BASE = "http://localhost:3000";
 const CIP = "3400930234259"; // AMOXICILLINE KRKA 1 g
@@ -64,8 +69,21 @@ async function main() {
   // C : pharmacie neuve, sans aucun stock ni historique.
   await prisma.centralAssociation.create({ data: { triggerKind: "MEDICINE", triggerKey: drugKey("AMOXICILLINE KRKA 1 g, comprimé"), triggerLabel: "AMOXICILLINE KRKA 1 g", adviceEan: ASSOC_EAN, adviceLabel: "Produit associé central", sentence: "ZZ essai association centrale" } });
 
+  // Deux collaborateurs dans la pharmacie A, chacun à son comptoir.
+  const member = async (ph: Ph, first: string) => {
+    const user = await prisma.user.create({ data: { organizationId: ph.orgId, email: `zz-multi-${first.toLowerCase()}-${Date.now()}@pharma.test`, firstName: first, lastName: "ZZ", passwordHash: await hashPassword("x".repeat(24)), status: "ACTIVE" } });
+    await prisma.membership.create({ data: { userId: user.id, pharmacyId: ph.id, role: "PHARMACIST", isActive: true } });
+    return user.id;
+  };
+  const lea = await member(A, "Léa"), marc = await member(A, "Marc");
   const a1 = await poste(A, "A-caisse1"), a2 = await poste(A, "A-caisse2"), b1 = await poste(B, "B-caisse1"), c1 = await poste(C, "C-caisse1");
   const postes = [a1, a2, b1, c1];
+  const ownerScopeA = { pharmacyId: A.id, organizationId: A.orgId, userId: A.ownerId } as never;
+  const postId = async (p: { ph: Ph; label: string }) => (await prisma.counterPost.findFirstOrThrow({ where: { pharmacyId: p.ph.id, label: p.label } })).id;
+  const [a1Id, a2Id, b1Id] = [await postId(a1), await postId(a2), await postId(b1)];
+  check((await assignComptoir(ownerScopeA, a1Id, lea)).ok && (await assignComptoir(ownerScopeA, a2Id, marc)).ok, "le titulaire attribue le comptoir 1 à Léa et le comptoir 2 à Marc");
+  check(!(await assignComptoir(ownerScopeA, b1Id, lea)).ok, "le titulaire de A ne peut pas attribuer le comptoir d'une autre pharmacie");
+  check(!(await assignComptoir(ownerScopeA, a1Id, B.ownerId)).ok, "ni donner un comptoir à quelqu'un d'une autre pharmacie");
 
   console.log("\n— 4 postes de 3 pharmacies scannent EN MÊME TEMPS —");
   const scans = await Promise.all(postes.map(async (p) => (await (await api(p, "/api/agent/scans", { method: "POST", body: JSON.stringify({ code: CIP, post: p.label }) })).json()) as { ok: boolean; prescriptionId: string }));
@@ -106,6 +124,8 @@ async function main() {
   check(d1.status === 200 && d2.status === 200, "deux collaborateurs répondent en même temps, chacun sur sa vente");
   const after = await Promise.all([a1, a2].map(async (p, i) => (await (await api(p, `/api/agent/conseil?prescription=${scans[i].prescriptionId}`)).json()) as { items: { outcome: string }[] }));
   check(after[0].items[0].outcome === "SOLD" && after[1].items[0].outcome === "NOT_SOLD", "chaque vente garde SA réponse");
+  const declared = await prisma.recommendation.findMany({ where: { pharmacyId: A.id, outcomeSource: "COUNTER_DECLARED" }, select: { status: true, decidedByUserId: true } });
+  check(declared.some((r) => r.status === "PURCHASED" && r.decidedByUserId === lea) && declared.some((r) => r.status === "DECLINED" && r.decidedByUserId === marc), "chaque déclaration est attribuée au collaborateur de SON comptoir");
 
   const mail = await api(a1, "/api/agent/conseil/email", { method: "POST", body: JSON.stringify({ prescription: scans[0].prescriptionId, email: "zz-patient@exemple.test", consent: true }) });
   check(mail.status === 200, "e-mail du patient enregistré avec accord");
@@ -117,6 +137,33 @@ async function main() {
   check(a2state.state === "READY" && a2state.followUp.closed === false, "la vente de l'autre poste de A reste ouverte");
   const nextScan = await (await api(a1, "/api/agent/scans", { method: "POST", body: JSON.stringify({ code: CIP, post: a1.label }) })).json();
   check(nextScan.created === true && nextScan.prescriptionId !== scans[0].prescriptionId, "le patient suivant sur le même poste ouvre une NOUVELLE vente");
+
+  console.log("\n— chaque comptoir est un espace à part (même pharmacie, collaborateurs différents) —");
+  const scopeOf = (ph: Ph, userId: string) => ({ pharmacyId: ph.id, organizationId: ph.orgId, userId }) as never;
+  const leaMine = await myComptoirs({ pharmacyId: A.id, userId: lea }), marcMine = await myComptoirs({ pharmacyId: A.id, userId: marc }), ownerMine = await myComptoirs({ pharmacyId: A.id, userId: A.ownerId });
+  check(leaMine.postIds.join() === a1Id && marcMine.postIds.join() === a2Id, "Léa voit son comptoir, Marc le sien");
+  check(ownerMine.mode === "NONE", "le titulaire, qui n'a pas de comptoir attribué, n'est pas dérangé par ceux des autres", ownerMine.mode);
+  const leaLive = await listLiveCounterSales(A.id, leaMine.postIds), marcLive = await listLiveCounterSales(A.id, marcMine.postIds), ownerLive = await listLiveCounterSales(A.id, ownerMine.postIds);
+  check(leaLive.length === 1 && leaLive[0].id === nextScan.prescriptionId, "l'écran de Léa ne montre que SA délivrance en cours (le patient suivant)");
+  check(marcLive.length === 1 && marcLive[0].id === scans[1].prescriptionId, "l'écran de Marc ne montre que la sienne");
+  check(ownerLive.length === 0, "le titulaire ne voit aucune délivrance en direct des autres");
+  const bLive = await listLiveCounterSales(B.id, (await myComptoirs({ pharmacyId: B.id, userId: B.ownerId })).postIds);
+  check(bLive.length === 1 && bLive[0].id === scans[2].prescriptionId, "dans la pharmacie B (un seul comptoir), le titulaire voit sa délivrance, sans rien régler");
+  const leaBoard = await loadCounterDashboard(scopeOf(A, lea), new Date()), marcBoard = await loadCounterDashboard(scopeOf(A, marc), new Date()), ownerBoard = await loadCounterDashboard(scopeOf(A, A.ownerId), new Date());
+  check(leaBoard.stats.detected === 2 && marcBoard.stats.detected === 1, "chacun ne compte que ses délivrances du jour", `Léa ${leaBoard.stats.detected}, Marc ${marcBoard.stats.detected}`);
+  check(leaBoard.activity.length === 2 && leaBoard.activity.every((item) => item.id === nextScan.prescriptionId || item.id === scans[0].prescriptionId) && leaBoard.activity[0].lines.length >= 1, "l'activité de Léa : SES ordonnances seulement, avec leurs médicaments en dessous");
+  check((leaBoard.activity[0].comptoir ?? "").includes("A-caisse1") && (leaBoard.activity[0].comptoir ?? "").includes("Léa"), "l'ordonnance dit de quel comptoir elle vient et à qui il est", leaBoard.activity[0].comptoir ?? "");
+  check(ownerBoard.status.state === "UNASSIGNED" && ownerBoard.activity.length === 0, "le titulaire sans comptoir : « comptoir à choisir », aucune activité des autres");
+  const closed = await closeLiveCounterSales({ pharmacyId: A.id, userId: lea }, undefined, leaMine.postIds);
+  check(closed === 1 && (await listLiveCounterSales(A.id, marcMine.postIds)).length === 1, "« Nouveau patient » de Léa ne ferme que sa vente, jamais celle de Marc");
+
+  console.log("\n— classement de l'équipe —");
+  const board = await loadTeamRanking({ pharmacyId: A.id, isDemo: false }, resolvePeriod("today"));
+  const rowOf = (id: string) => board.rows.find((row) => row.userId === id);
+  check((rowOf(lea)?.proposed ?? 0) > 0 && (rowOf(marc)?.proposed ?? 0) > 0, "les conseils sont proposés à Léa et à Marc selon leur comptoir", `Léa ${rowOf(lea)?.proposed}, Marc ${rowOf(marc)?.proposed}`);
+  check(rowOf(lea)?.validated === 1 && rowOf(marc)?.validated === 0, "le « Vendu » déclaré au comptoir 1 est validé pour Léa, pas pour Marc", `Léa ${rowOf(lea)?.validated}, Marc ${rowOf(marc)?.validated}`);
+  const boardB = await loadTeamRanking({ pharmacyId: B.id, isDemo: false }, resolvePeriod("today"));
+  check(boardB.rows.every((row) => row.userId === B.ownerId || row.userId === null), "le classement de B ne contient personne de A");
 
   console.log("\n— résultats par pharmacie —");
   const rows = await prisma.counterSaleFollowUp.groupBy({ by: ["pharmacyId"], where: { pharmacyId: { in: [A.id, B.id, C.id] } }, _count: true });

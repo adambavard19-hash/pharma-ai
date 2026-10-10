@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { attachBarcodeToProduct, closeLiveCounterSales } from "@/server/services/counter-scan";
+import { myComptoirs } from "@/server/services/comptoirs";
 import { fail, ok, type ActionResult } from "./types";
 
 /** Rattacher un code-barres inconnu, lu par la douchette, à un produit du stock de l'officine. */
@@ -18,7 +19,9 @@ export async function attachBarcodeAction(payload: { lineId: string; productId: 
 /** « Nouveau patient » : clore la vente de la douchette en cours (ou toutes), l'écran repart vierge. */
 export async function resetCounterAction(payload: { prescriptionId?: string | null }): Promise<ActionResult<{ closed: number }>> {
   const session = await requirePermission(PERMISSIONS.PRESCRIPTION_CREATE);
-  const closed = await closeLiveCounterSales({ pharmacyId: session.scope.pharmacyId, userId: session.scope.userId }, payload.prescriptionId ?? undefined);
+  // Seulement les ventes de MES comptoirs : « Nouveau patient » ne ferme jamais la vente d'un collègue.
+  const mine = await myComptoirs(session.scope);
+  const closed = await closeLiveCounterSales({ pharmacyId: session.scope.pharmacyId, userId: session.scope.userId }, payload.prescriptionId ?? undefined, mine.postIds);
   revalidatePath("/vente/nouvelle");
   if (payload.prescriptionId) revalidatePath(`/vente/${payload.prescriptionId}`);
   return ok({ closed }, closed > 0 ? "Prêt pour le patient suivant : le prochain bip ouvre une nouvelle vente." : "Aucune vente en cours.");

@@ -79,6 +79,12 @@ export const RECOMMENDATION_MIN_RELEVANCE = 0.6;
 export const MAX_RECOMMENDATIONS_PER_PRESCRIPTION = 8;
 
 /**
+ * Une vente de la douchette : trois conseils au plus, ceux que le pharmacien voit dans la fenêtre du poste. Les chiffres du classement
+ * de l'équipe (« proposés ») comptent ce qui lui a été montré, pas des conseils gardés en réserve qu'il n'a jamais lus.
+ */
+export const MAX_RECOMMENDATIONS_COUNTER_SCAN = 3;
+
+/**
  * Nombre maximal d'autres références montrées sous un conseil retenu.
  *
  * Un plafond d'affichage, pas une promesse : deux ou trois alternatives quand

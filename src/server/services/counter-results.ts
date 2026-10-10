@@ -5,6 +5,7 @@ import { getMessagingProvider } from "@/server/ai/registry";
 import { traceDispatch } from "@/server/services/email-dispatch";
 import { getEnv } from "@/config/env";
 import { COUNTER_DECLARED } from "@/server/services/counter-window";
+import { listMembers } from "@/server/services/comptoirs";
 import { buildMonthlyReport, summariseCounterResults, type CounterResults, type SoldAdvice } from "@/core/counter/results";
 import { monthBoundsFor, zonedDateParts } from "@/core/performance/periods";
 
@@ -16,10 +17,12 @@ import { monthBoundsFor, zonedDateParts } from "@/core/performance/periods";
 export async function loadCounterResults(input: { pharmacyId: string; since: Date; until: Date }): Promise<CounterResults> {
   const followUps = await prisma.counterSaleFollowUp.findMany({
     where: { pharmacyId: input.pharmacyId, closedAt: { gte: input.since, lt: input.until } },
-    select: { prescriptionId: true, closedPost: true, proposedCount: true, soldCount: true, notSoldCount: true, unansweredCount: true, emailEncrypted: true, consentAt: true, reportStatus: true },
+    select: { prescriptionId: true, closedPost: true, prescription: { select: { handledByUserId: true } }, proposedCount: true, soldCount: true, notSoldCount: true, unansweredCount: true, emailEncrypted: true, consentAt: true, reportStatus: true },
   });
+  // Chacun sous son nom (le collaborateur du comptoir au moment de la vente) ; un comptoir attribué à personne garde son nom de comptoir.
+  const names = new Map((await listMembers(input.pharmacyId)).map((member) => [member.id, member.name]));
   const sales = followUps.map((followUp) => ({
-    post: followUp.closedPost ?? "poste",
+    post: (followUp.prescription.handledByUserId ? names.get(followUp.prescription.handledByUserId) : null) ?? followUp.closedPost ?? "poste",
     proposed: followUp.proposedCount,
     sold: followUp.soldCount,
     notSold: followUp.notSoldCount,

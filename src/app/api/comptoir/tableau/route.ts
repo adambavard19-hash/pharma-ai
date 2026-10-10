@@ -9,6 +9,6 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await getSession();
   if (!session || !session.permissions.has(PERMISSIONS.PRESCRIPTION_CREATE)) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-  const data = await loadCounterDashboard(session.scope);
+  const data = await loadCounterDashboard(session.scope, new Date(), { canAssign: session.permissions.has(PERMISSIONS.PRODUCT_IMPORT) });
   return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });
 }

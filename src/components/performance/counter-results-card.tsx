@@ -45,12 +45,12 @@ export function CounterResultsCard({ results, periodLabel }: { results: CounterR
 
             <div className="grid gap-5 lg:grid-cols-2">
               <div>
-                <h3 className="mb-2 text-[13px] font-semibold text-text-primary">Par poste de caisse</h3>
+                <h3 className="mb-2 text-[13px] font-semibold text-text-primary">Par collaborateur</h3>
                 <Table className="min-w-0">
-                  <caption className="sr-only">Les conseils proposés, vendus et non vendus par poste de caisse.</caption>
+                  <caption className="sr-only">Les conseils proposés, vendus et non vendus par collaborateur.</caption>
                   <THead>
                     <TR>
-                      <TH>Poste</TH>
+                      <TH>Collaborateur</TH>
                       <TH numeric>Ventes</TH>
                       <TH numeric>Proposés</TH>
                       <TH numeric>Vendus</TH>
@@ -69,7 +69,7 @@ export function CounterResultsCard({ results, periodLabel }: { results: CounterR
                     ))}
                   </TBody>
                 </Table>
-                <p className="mt-2 text-[11.5px] text-text-tertiary">Le logiciel de gestion ne dit pas qui est au comptoir : le détail est par poste, pas par collaborateur.</p>
+                <p className="mt-2 text-[11.5px] text-text-tertiary">Chaque comptoir est attribué à un collaborateur (Mes connexions) : ses ventes lui reviennent. Un comptoir sans collaborateur apparaît sous son nom.</p>
               </div>
 
               <div>

@@ -16,7 +16,7 @@ import { useLiveSnapshot } from "./use-live-snapshot";
  * La liste des comptoirs se relit toute seule (dix secondes, quatre pendant qu'une installation est attendue) : un
  * comptoir y apparaît « Connecté » sous les yeux de la personne, et seulement quand le poste s'est vraiment présenté.
  */
-export function ConnectionSetup({ initial, robot, installerAvailable }: { initial: OverviewSnapshot; robot: RobotSetup | null; installerAvailable: boolean }) {
+export function ConnectionSetup({ initial, robot, installerAvailable, members, assignments }: { initial: OverviewSnapshot; robot: RobotSetup | null; installerAvailable: boolean; members: { id: string; name: string }[]; assignments: Record<string, string | null> }) {
   const { snapshot, refresh } = useLiveSnapshot(initial);
   const { overview, lgo } = snapshot;
 
@@ -30,7 +30,7 @@ export function ConnectionSetup({ initial, robot, installerAvailable }: { initia
         <Badge tone="success" className="mt-2">Configuration</Badge>
       </header>
 
-      <CountersStep counters={overview.counters} installerAvailable={installerAvailable} onChanged={() => void refresh()} />
+      <CountersStep counters={overview.counters} installerAvailable={installerAvailable} members={members} assignments={assignments} onChanged={() => void refresh()} />
       <StockStep stock={overview.stock} />
       <RobotStep setup={robot} lgo={lgo} />
     </section>

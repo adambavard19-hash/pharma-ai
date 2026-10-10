@@ -15,7 +15,7 @@ describe("l'état du comptoir ne dit « connecté » que ce qui est prouvé", ()
     expect(status.state).toBe("READY");
     expect(status.pill).toEqual({ label: "Connecté", tone: "success" });
     expect(status.title).toBe("Votre comptoir est prêt.");
-    expect(status.posts).toEqual([{ id: "p1", label: "Poste comptoir 1", online: true }]);
+    expect(status.posts).toEqual([{ id: "p1", label: "Poste comptoir 1", owner: null, online: true }]);
   });
 
   it("dit « Poste comptoir N » d'un comptoir numéroté, et garde tel quel un nom choisi par le titulaire", () => {
@@ -114,3 +114,29 @@ describe("l'activité récente", () => {
     expect(describeWhen(new Date("2026-10-07T22:30:00.000Z"), NOW)).toBe("00:30");
   });
 });
+
+describe("chaque comptoir est un espace à part", () => {
+  const two = [post({ id: "p1", label: "Comptoir 1" }), post({ id: "p2", label: "Comptoir 2" })];
+
+  it("ne montre que MES comptoirs, avec leur collaborateur", () => {
+    const status = buildCounterStatus({ now: NOW, posts: two, mine: { postIds: ["p2"], mode: "MINE" }, owners: { p1: "Léa Martin", p2: "Marc Durand" } });
+    expect(status.posts).toEqual([{ id: "p2", label: "Comptoir 2", owner: "Marc Durand", online: true }]);
+  });
+
+  it("un comptoir hors ligne chez un collègue ne me rend pas « hors ligne »", () => {
+    const status = buildCounterStatus({ now: NOW, posts: [post({ id: "p1", lastSeenAt: ago(86_400) }), post({ id: "p2", label: "Comptoir 2" })], mine: { postIds: ["p2"], mode: "MINE" } });
+    expect(status.state).toBe("READY");
+  });
+
+  it("plusieurs comptoirs et aucun pour moi : « comptoir à choisir », jamais les ventes des autres", () => {
+    const status = buildCounterStatus({ now: NOW, posts: two, mine: { postIds: [], mode: "NONE" }, canAssign: false });
+    expect(status).toMatchObject({ state: "UNASSIGNED", posts: [], pill: { label: "Comptoir à choisir" } });
+    expect(status.subtitle).toContain("titulaire");
+    expect(buildCounterStatus({ now: NOW, posts: two, mine: { postIds: [], mode: "NONE" }, canAssign: true }).subtitle).toContain("Mes connexions");
+  });
+
+  it("une pharmacie sans aucun comptoir relié reste « non connectée », pas « à choisir »", () => {
+    expect(buildCounterStatus({ now: NOW, posts: [], mine: { postIds: [], mode: "NONE" } }).state).toBe("NOT_CONNECTED");
+  });
+});
+

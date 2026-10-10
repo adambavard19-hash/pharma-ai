@@ -42,7 +42,7 @@ import {
 import { getReferenceCatalogState } from "./reference";
 import { recordAudit } from "@/server/audit/log";
 import { createNotification } from "./notifications";
-import { ENGINE_VERSION } from "@/config/constants";
+import { ENGINE_VERSION, MAX_RECOMMENDATIONS_COUNTER_SCAN } from "@/config/constants";
 import type { TenantScope } from "@/server/db/tenant";
 import {
   deriveUnderstanding,
@@ -388,6 +388,7 @@ export async function analysePrescription(params: {
   );
 
   const result = runAnalysisPipeline({
+    ...(prescription.source === "COUNTER_SCAN" ? { maxRecommendations: MAX_RECOMMENDATIONS_COUNTER_SCAN } : {}),
     lines: prescription.lines.map((line) => ({
       lineIndex: line.position,
       drugName: line.drugName,

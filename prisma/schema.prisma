@@ -269,12 +269,15 @@ model CounterPost {
   lastExportAt     DateTime?
   lastExportError  String?
   revokedAt        DateTime?
+  /// Le collaborateur à qui appartient ce comptoir (membre de la pharmacie) ; vide : comptoir partagé / non attribué.
+  assignedUserId   String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
 
   @@index([pharmacyId])
+  @@index([assignedUserId])
   @@map("counter_posts")
 }
 
@@ -1741,6 +1744,11 @@ model Prescription {
   source      PrescriptionSource @default(MANUAL)
   /// Le poste de caisse dont viennent les bips (source COUNTER_SCAN).
   counterPost String?
+  /// Le comptoir (poste) d'où vient la vente : sa vraie identité, là où `counterPost` n'est que le nom affiché à ce moment-là.
+  counterPostId String?
+  /// Le collaborateur à qui la vente est attribuée : celui du comptoir au moment du bip, ou celui qui l'a saisie. Fixé une fois ;
+  /// attribuer plus tard le comptoir à quelqu'un d'autre ne réécrit pas l'historique.
+  handledByUserId String?
 
   prescriberName String?
   prescriberRpps String?
@@ -1780,6 +1788,8 @@ model Prescription {
 
   @@unique([pharmacyId, reference])
   @@index([pharmacyId, status])
+  @@index([pharmacyId, counterPostId])
+  @@index([pharmacyId, handledByUserId, createdAt])
   @@index([pharmacyId, createdAt])
   @@index([patientId])
   @@map("prescriptions")
