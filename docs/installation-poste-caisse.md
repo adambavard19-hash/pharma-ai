@@ -309,3 +309,31 @@ bip, et ne se ferme qu'à « Vente terminée ».
 
 Migration : `20261020090000_suivi_de_vente_au_comptoir`. Les postes passent en 0.7.0 par la mise à jour automatique (une fois la
 vente en cours terminée) ; la fenêtre n'a jamais été dessinée sur un vrai Windows à ce jour.
+
+## La bannière PharmaBoost (agent 0.8.0)
+
+La fenêtre à bordure est remplacée par une **bannière** permanente, en haut à droite de l'écran du pharmacien (sous la barre de titre du
+logiciel de gestion : ses boutons Réduire / Fermer restent libres). Le dessin vient de `agent/src/banner-design.ts` (couleurs, cotes,
+durées, phrases) ; le code Windows est `agent/src/notice-host.ts`.
+
+- **Toujours là** : elle apparaît à l'ouverture de session Windows (l'agent démarre à ce moment-là), « En attente de scan… », au-dessus
+  du logiciel de gestion, sans jamais prendre le clavier ni le focus. Une icône PharmaBoost reste près de l'horloge (menu : afficher,
+  réduire, masquer, verrouiller la position, Vente terminée) : c'est le moyen de retrouver une bannière masquée.
+- **Elle réagit** : au bip, « Scan détecté ! Analyse en cours… » (avant même la réponse du serveur) ; puis « 3 conseils disponibles »
+  et, au bout d'une seconde, elle s'agrandit toute seule. Pendant la vente : conseils avec pastilles Challenge / Date courte / En stock,
+  Vendu / Non vendu, « Pendant la vente 2/3 », e-mail du patient (avec accord), « Voir le détail », « Vente terminée ». Elle reste
+  ouverte jusqu'à « Vente terminée » (« Vente terminée ! » : coche verte animée, bilan, rang du jour), puis redevient « en attente ».
+- **Le patient ne la voit pas gêner** : on la déplace à la souris (l'endroit est retenu : `pharmaboost-banniere-position.txt`), on la
+  verrouille (épingle), on la réduit en pastille, on la masque (elle revient pour la prochaine vente qui porte un conseil).
+- **Dessin** : fenêtre « à calque » (transparence par pixel), coins arrondis, ombre douce, reflet de verre, mascotte vectorielle animée,
+  GDI+ anticrénelé, à l'échelle de l'affichage (100 %, 125 %, 150 %…) sur Windows 10 et 11.
+- **Secours en cascade** : si la bannière ne compile pas ou n'arrive pas à se dessiner, le poste passe tout seul à l'ancienne fenêtre à
+  bordure (`notice-host-classique.ts`) avec la même vente, puis à la notification Windows ; chaque étape est dite dans le journal. Pour
+  forcer l'ancienne fenêtre sur un poste : `affichage.fenetre = "classique"` dans `pharmaboost-connect.json`. Si la bannière s'arrête
+  en pleine vente, elle repart toute seule (5 fois au plus) et retrouve sa vente.
+- **Aperçu sans Windows** : `npm run apercu:banniere` écrit et ouvre `agent/apercu/banniere.html` — les six états de la maquette, un
+  scénario complet, les gestes (Vendu, e-mail, Vente terminée…), réglable à 100/125/150 %. C'est une reproduction fidèle du dessin
+  (mêmes valeurs), **pas une capture de Windows** : police, ombre et lissage y sont ceux du navigateur.
+- **Vérifié** : le code compile (C# 5, .NET Framework 4.8 : `PB_CSHARP_CHECK=1 npx vitest run agent/src/__tests__/notice-host.test.ts`) et
+  les garde-fous sont testés. La bannière n'a **jamais été dessinée sur un vrai Windows** : premier essai à faire au poste (icône près de
+  l'horloge → clic droit → « Essayer l'affichage d'un avis »).

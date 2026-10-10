@@ -169,8 +169,14 @@ describe("la fenêtre et son processus", () => {
 
   let actions: HostAction[];
   beforeEach(() => { actions = []; });
-  const center = (over: { platform?: NodeJS.Platform; startTimeoutMs?: number } = {}) =>
-    new NoticeCenter({ configDir: dir, log: (message) => logs.push(message), legacyShow: (content) => legacy.push(content), platform: over.platform ?? "win32", startTimeoutMs: over.startTimeoutMs, onAction: (action) => actions.push(action), spawnHost: () => { const host = fakeHost(); hosts.push(host); return host; } });
+  let scripts: string[];
+  beforeEach(() => { scripts = []; });
+  /** Par défaut ces essais portent sur l'ancienne fenêtre à bordure (secours) ; la bannière a sa propre série plus bas. */
+  const center = (over: { platform?: NodeJS.Platform; startTimeoutMs?: number; window?: "banniere" | "classique" } = {}) => {
+    const notices = new NoticeCenter({ configDir: dir, log: (message) => logs.push(message), legacyShow: (content) => legacy.push(content), platform: over.platform ?? "win32", startTimeoutMs: over.startTimeoutMs, onAction: (action) => actions.push(action), spawnHost: (scriptPath) => { scripts.push(scriptPath); const host = fakeHost(); hosts.push(host); return host; } });
+    notices.configure({ window: over.window ?? "classique" });
+    return notices;
+  };
   const entry = (over: Partial<HostEntry> = {}): HostEntry => buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app", body: body() }) && { ...buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app", body: body() }), ...over };
   const commands = (host: FakeHost) => host.written.map((line) => JSON.parse(line));
 
@@ -284,7 +290,7 @@ describe("la fenêtre et son processus", () => {
     hosts[0].stderr.emit("data", "Add-Type : error CS1002: ; expected");
     expect(legacy).toHaveLength(1);
     expect(legacy[0]).toMatchObject({ subject: "QUETIAPINE VIATRIS LP 50 mg", seconds: 15 });
-    expect(logs.join("\n")).toContain("retour à l'ancienne fenêtre");
+    expect(logs.join("\n")).toContain("retour à la notification Windows");
     // Et pour les avis suivants : l'ancienne fenêtre, sans relancer la nouvelle.
     notices.show(entry({ id: "rx_2" }));
     expect(legacy).toHaveLength(2);
@@ -396,5 +402,129 @@ describe("le message de fin de vente", () => {
 
   it("écrit le rang en français : 1er, 2e, 18e", () => {
     expect([1, 2, 11, 18, 21].map(ordinalFr)).toEqual(["1er", "2e", "11e", "18e", "21e"]);
+  });
+});
+
+describe("la bannière et son processus", () => {
+  let dir: string;
+  let hosts: FakeHost[];
+  let scripts: string[];
+  let legacy: unknown[];
+  let logs: string[];
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "pb-banniere-"));
+    hosts = [];
+    scripts = [];
+    legacy = [];
+    logs = [];
+  });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); vi.useRealTimers(); });
+
+  const center = (over: { platform?: NodeJS.Platform } = {}) =>
+    new NoticeCenter({ configDir: dir, log: (message) => logs.push(message), legacyShow: (content) => legacy.push(content), platform: over.platform ?? "win32", spawnHost: (scriptPath) => { scripts.push(scriptPath); const host = fakeHost(); hosts.push(host); return host; } });
+  const entry = (over: Partial<HostEntry> = {}): HostEntry => ({ ...buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app", body: body() }), ...over });
+  const commands = (host: FakeHost) => host.written.map((line) => JSON.parse(line));
+
+  it("apparaît dès le démarrage du poste : la bannière est lancée sans attendre un conseil, et reçoit son endroit", () => {
+    const notices = center();
+    notices.warmUp();
+    notices.warmUp();
+    expect(hosts).toHaveLength(1);
+    expect(scripts[0]).toBe(join(dir, "pharmaboost-banniere-hote.ps1"));
+    expect(readFileSync(scripts[0], "utf8")).toContain("class BannerForm");
+    expect(commands(hosts[0])).toEqual([{ op: "init", position: "haut-droite", positionFile: join(dir, "pharmaboost-banniere-position.txt") }]);
+  });
+
+  it("réagit au bip avant la réponse du serveur : « Scan détecté », puis les conseils sur place", () => {
+    const notices = center();
+    notices.scanning();
+    notices.show(entry());
+    expect(commands(hosts[0]).map((command) => command.op)).toEqual(["init", "scan", "show"]);
+    expect(commands(hosts[0])[2]).toMatchObject({ position: "haut-droite", positionFile: join(dir, "pharmaboost-banniere-position.txt") });
+    expect(hosts).toHaveLength(1);
+  });
+
+  it("ne fait rien hors Windows, ni sous l'ancienne fenêtre, ni sous la notification seule", () => {
+    center({ platform: "darwin" }).scanning();
+    const classic = center();
+    classic.configure({ window: "classique" });
+    classic.scanning();
+    const toast = center();
+    toast.configure({ legacy: true });
+    toast.scanning();
+    toast.warmUp();
+    expect(hosts).toHaveLength(0);
+  });
+
+  it("si la bannière ne compile pas, l'ancienne fenêtre prend le relais avec la même vente — jamais un avis perdu", () => {
+    const notices = center();
+    notices.show(entry());
+    hosts[0].stderr.emit("data", "Add-Type : error CS1002: ; expected");
+    expect(hosts).toHaveLength(2);
+    expect(hosts[0].killed).toBe(true);
+    expect(scripts[1]).toBe(join(dir, "pharmaboost-avis-hote.ps1"));
+    expect(commands(hosts[1])[0]).toMatchObject({ op: "show", position: "milieu-droite", positionFile: join(dir, "pharmaboost-avis-position.txt") });
+    expect(legacy).toEqual([]);
+    expect(logs.join("\n")).toContain("retour à l'ancienne fenêtre");
+  });
+
+  it("si l'ancienne fenêtre échoue à son tour, la notification Windows reste le dernier secours", () => {
+    const notices = center();
+    notices.show(entry());
+    hosts[0].stderr.emit("data", "Add-Type : error");
+    hosts[1].stderr.emit("data", "Add-Type : error");
+    expect(legacy).toHaveLength(1);
+    notices.show(entry({ id: "rx_2" }));
+    expect(legacy).toHaveLength(2);
+    expect(hosts).toHaveLength(2);
+  });
+
+  it("le processus remplacé ne perturbe plus rien : sa sortie tardive n'abat pas la nouvelle fenêtre", () => {
+    const notices = center();
+    notices.show(entry());
+    hosts[0].stderr.emit("data", "Add-Type : error");
+    hosts[0].emitter.emit("exit");
+    hosts[0].stderr.emit("data", "bruit tardif");
+    expect(legacy).toEqual([]);
+    notices.show(entry({ id: "rx_2" }));
+    expect(hosts).toHaveLength(2);
+    expect(commands(hosts[1]).map((command) => command.op)).toEqual(["show", "show"]);
+  });
+
+  it("une bannière qui n'arrive pas à se dessiner passe aussi à l'ancienne fenêtre", () => {
+    const notices = center();
+    notices.show(entry());
+    hosts[0].stdout.emit("data", "PRET\n");
+    hosts[0].stdout.emit("data", "ERREUR dessin ArgumentException Paramètre non valide\n");
+    expect(hosts).toHaveLength(2);
+    expect(scripts[1]).toBe(join(dir, "pharmaboost-avis-hote.ps1"));
+    expect(legacy).toEqual([]);
+  });
+
+  it("si la bannière s'arrête en pleine vente, elle repart toute seule et retrouve sa vente", () => {
+    vi.useFakeTimers();
+    const notices = center();
+    notices.show(entry());
+    hosts[0].stdout.emit("data", "PRET\n");
+    hosts[0].emitter.emit("exit");
+    expect(hosts).toHaveLength(1);
+    vi.advanceTimersByTime(3500);
+    expect(hosts).toHaveLength(2);
+    expect(scripts[1]).toBe(join(dir, "pharmaboost-banniere-hote.ps1"));
+    hosts[1].stdout.emit("data", "PRET\n");
+    expect(commands(hosts[1]).map((command) => command.op)).toEqual(["init", "show"]);
+    expect(commands(hosts[1])[1].entry).toMatchObject({ id: "rx_1" });
+  });
+
+  it("transmet les gestes du pharmacien comme l'ancienne fenêtre", () => {
+    const actions: HostAction[] = [];
+    const notices = new NoticeCenter({ configDir: dir, log: () => undefined, legacyShow: () => undefined, platform: "win32", onAction: (action) => actions.push(action), spawnHost: () => { const host = fakeHost(); hosts.push(host); return host; } });
+    notices.show(entry());
+    hosts[0].stdout.emit("data", "PRET\nVENDU rx_1 adv_1\nNONVENDU rx_1 adv_2\nTERMINER rx_1\n");
+    expect(actions).toEqual([
+      { kind: "sold", saleId: "rx_1", adviceId: "adv_1" },
+      { kind: "not_sold", saleId: "rx_1", adviceId: "adv_2" },
+      { kind: "finish", saleId: "rx_1" },
+    ]);
   });
 });

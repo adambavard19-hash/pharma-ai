@@ -1,8 +1,10 @@
 /**
- * Le centre d'avis du poste de caisse : il transforme l'avis du serveur en commande pour la fenêtre (notice-host.ts),
- * garde cette fenêtre en vie, récupère les photos, et se replie sur l'ancienne fenêtre si la nouvelle ne démarre pas.
+ * Le centre d'avis du poste de caisse : il transforme l'avis du serveur en commande pour la bannière (notice-host.ts),
+ * garde cette bannière en vie, récupère les photos, et se replie si elle ne démarre pas ou ne sait pas se dessiner :
+ * d'abord sur l'ancienne fenêtre (notice-host-classique.ts), puis sur la notification Windows (toast.ts).
  *
- * Le principe : la fenêtre reste ouverte pendant toute la vente, mise à jour sur place à chaque bip, jusqu'à « Vente terminée ».
+ * Le principe : la bannière est là dès l'ouverture de Windows (« En attente de scan… »), réagit à chaque bip, reste ouverte pendant
+ * toute la vente, mise à jour sur place, jusqu'à « Vente terminée ».
  * Ce que le pharmacien y fait (Vendu, Non vendu, e-mail du patient, Vente terminée) remonte ici sous forme d'actions ;
  * c'est l'agent qui les envoie au serveur. Seules les photos et ces actions passent par le réseau : sans elles la fenêtre
  * s'affiche pareil.
@@ -12,6 +14,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { NOTICE_HOST_SCRIPT } from "./notice-host";
+import { NOTICE_HOST_CLASSIC_SCRIPT } from "./notice-host-classique";
 import type { ToastContent } from "./toast";
 
 /** Ce que le serveur répond à /api/agent/conseil (les champs structurés manquent chez un serveur plus ancien). */
@@ -74,8 +77,12 @@ export type HostAction =
   | { kind: "finish"; saleId: string }
   | { kind: "view"; saleId: string };
 
+const MAX_RESTARTS = 5;
+
 export const DEFAULT_NOTICE_SECONDS = 30;
 export const POSITIONS = ["milieu-droite", "bas-droite", "haut-droite"] as const;
+/** La bannière (par défaut), ou l'ancienne fenêtre à bordure, gardée en secours. */
+export type NoticeWindow = "banniere" | "classique";
 export type NoticePosition = (typeof POSITIONS)[number];
 
 export function euros(cents: number | null | undefined): string {
@@ -282,11 +289,11 @@ export type HostProcess = {
 export type NoticeCenterOptions = {
   configDir: string;
   log: (message: string) => void;
-  /** L'ancienne fenêtre, pour le secours. */
+  /** La notification Windows, dernier secours. */
   legacyShow: (content: ToastContent) => void;
   platform?: NodeJS.Platform;
   spawnHost?: (scriptPath: string) => HostProcess;
-  /** Durée de l'ancienne fenêtre (secours) ; la nouvelle n'a pas de délai : elle reste jusqu'à « Vente terminée ». */
+  /** Durée de la notification Windows (secours) ; la bannière n'a pas de délai : elle reste jusqu'à « Vente terminée ». */
   seconds?: number;
   position?: NoticePosition;
   /** Combien de temps on attend que la fenêtre compile et dise « PRET ». */
@@ -300,6 +307,10 @@ export class NoticeCenter {
   private ready = false;
   private broken = false;
   private forcedLegacy = false;
+  /** Quelle fenêtre tourne : la bannière, ou — si elle n'a pas pu démarrer ou se dessiner — l'ancienne fenêtre. */
+  private window: NoticeWindow = "banniere";
+  private restarts = 0;
+  private resume: HostEntry | null = null;
   private startTimer: ReturnType<typeof setTimeout> | null = null;
   private lastEntry: HostEntry | null = null;
   private stderrText = "";
@@ -312,16 +323,19 @@ export class NoticeCenter {
   private get seconds(): number { return this.options.seconds ?? DEFAULT_NOTICE_SECONDS; }
 
   /** Les réglages du poste (durée, endroit), relus à chaque avis : le fichier de configuration peut changer. */
-  configure(preferences: { seconds?: number; position?: NoticePosition; legacy?: boolean }): void {
-    // L'interrupteur du poste : « ancienne fenêtre » reste possible en une ligne de configuration, sans attendre un correctif.
+  configure(preferences: { seconds?: number; position?: NoticePosition; legacy?: boolean; window?: NoticeWindow }): void {
+    // L'interrupteur du poste : « ancienne fenêtre » (affichage.fenetre = "classique") ou notification Windows seule (affichage.ancienne)
+    // restent possibles en une ligne de configuration, sans attendre un correctif.
     if (preferences.legacy !== undefined) this.forcedLegacy = preferences.legacy;
+    if (preferences.window !== undefined && preferences.window !== this.window && !this.host) this.window = preferences.window;
     if (preferences.seconds !== undefined) this.options.seconds = Math.max(5, Math.min(120, Math.round(preferences.seconds)));
     if (preferences.position !== undefined && (POSITIONS as readonly string[]).includes(preferences.position)) this.options.position = preferences.position;
   }
 
   /**
-   * Lance la fenêtre sans rien afficher. Sa préparation (PowerShell, compilation du code : quelques secondes) se fait
-   * alors pendant que le serveur analyse la vente, et non après : le premier conseil de la journée n'attend plus.
+   * Lance la bannière. Au démarrage du poste elle apparaît tout de suite, « En attente de scan… » ; sa préparation (PowerShell,
+   * compilation du code : quelques secondes) se fait ainsi bien avant le premier bip : le premier conseil de la journée n'attend plus.
+   * (L'ancienne fenêtre, elle, reste invisible tant qu'il n'y a rien à montrer.)
    */
   warmUp(): void {
     if (this.platform !== "win32" || this.broken || this.forcedLegacy) return;
@@ -330,6 +344,13 @@ export class NoticeCenter {
 
   /** Les ventes que la fenêtre garde ouvertes. */
   ids(): string[] { return [...this.held.keys()]; }
+
+  /** Un bip vient d'être lu : « Scan détecté ! Analyse en cours… », avant même que le serveur ait répondu. */
+  scanning(): void {
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy || this.window !== "banniere") return;
+    if (!this.ensureHost()) return;
+    this.send({ op: "scan" });
+  }
 
   /** Montre (ou met à jour) le conseil d'une vente. */
   show(entry: HostEntry): void {
@@ -347,7 +368,7 @@ export class NoticeCenter {
       return;
     }
     if (!entry.quiet) this.held.set(entry.id, entry.signature);
-    this.send({ op: "show", entry, position: this.options.position ?? "milieu-droite", positionFile: join(this.options.configDir, "pharmaboost-avis-position.txt") });
+    this.send({ op: "show", entry, ...this.placement() });
   }
 
   /** « Vente terminée » est enregistrée : la fenêtre montre le message de fin, puis s'efface et attend la vente suivante. */
@@ -381,6 +402,13 @@ export class NoticeCenter {
     this.ready = false;
   }
 
+  /** Où se pose la fenêtre : la bannière en haut à droite, l'ancienne fenêtre à mi-hauteur ; chacune retient sa position dans son fichier. */
+  private placement(): { position: string; positionFile: string } {
+    return this.window === "banniere"
+      ? { position: this.options.position ?? "haut-droite", positionFile: join(this.options.configDir, "pharmaboost-banniere-position.txt") }
+      : { position: this.options.position ?? "milieu-droite", positionFile: join(this.options.configDir, "pharmaboost-avis-position.txt") };
+  }
+
   private send(command: Record<string, unknown>): void {
     if (!this.host) return;
     try {
@@ -395,20 +423,24 @@ export class NoticeCenter {
     if (this.host) return true;
     try {
       mkdirSync(this.options.configDir, { recursive: true });
-      const scriptPath = join(this.options.configDir, "pharmaboost-avis-hote.ps1");
+      const banner = this.window === "banniere";
+      const scriptPath = join(this.options.configDir, banner ? "pharmaboost-banniere-hote.ps1" : "pharmaboost-avis-hote.ps1");
       // Le BOM : sans lui, Windows PowerShell lit le script en ANSI et les accents se cassent.
-      writeFileSync(scriptPath, `﻿${NOTICE_HOST_SCRIPT}`, "utf8");
+      writeFileSync(scriptPath, `﻿${banner ? NOTICE_HOST_SCRIPT : NOTICE_HOST_CLASSIC_SCRIPT}`, "utf8");
       const host = this.options.spawnHost ? this.options.spawnHost(scriptPath) : this.spawnReal(scriptPath);
       this.host = host;
       this.ready = false;
       this.stderrText = "";
       host.stdin.on("error", () => { /* la fenêtre est partie : l'événement « exit » s'en occupe */ });
-      host.stdout.on("data", (chunk) => this.onOutput(String(chunk)));
-      host.stderr.on("data", (chunk) => this.onError(String(chunk)));
-      host.on("exit", () => this.onExit());
-      host.on("error", (error: Error) => this.giveUp(`le processus n'a pas démarré (${error.message})`));
+      // Un processus déjà remplacé (la bannière laissant la place à l'ancienne fenêtre) ne parle plus : seul le processus en cours compte.
+      host.stdout.on("data", (chunk) => { if (this.host === host) this.onOutput(String(chunk)); });
+      host.stderr.on("data", (chunk) => { if (this.host === host) this.onError(String(chunk)); });
+      host.on("exit", () => { if (this.host === host) this.onExit(); });
+      host.on("error", (error: Error) => { if (this.host === host) this.giveUp(`le processus n'a pas démarré (${error.message})`); });
       this.startTimer = setTimeout(() => { if (!this.ready) this.giveUp("la fenêtre n'a pas démarré à temps"); }, this.options.startTimeoutMs ?? 60_000);
       this.startTimer.unref?.();
+      // La bannière apparaît dès qu'elle est prête, « En attente de scan… » : la commande l'attend dans le tuyau pendant la compilation.
+      if (banner) this.send({ op: "init", ...this.placement() });
       return true;
     } catch (error) {
       this.giveUp(error instanceof Error ? error.message : String(error));
@@ -428,7 +460,11 @@ export class NoticeCenter {
       if (line === "PRET") {
         this.ready = true;
         if (this.startTimer) clearTimeout(this.startTimer);
-        this.options.log("Avis : fenêtre prête.");
+        this.options.log(`Avis : ${this.window === "banniere" ? "bannière" : "fenêtre"} prête.`);
+        // Une bannière redémarrée en pleine vente retrouve sa vente.
+        const resume = this.resume;
+        this.resume = null;
+        if (resume) this.show(resume);
       } else {
         this.onWord(line);
       }
@@ -437,6 +473,10 @@ export class NoticeCenter {
 
   /** Un mot de la fenêtre : la réponse du pharmacien à un geste. Un mot inconnu est ignoré, jamais une panne. */
   private onWord(line: string): void {
+    if (line.startsWith("ERREUR dessin") && this.window === "banniere") {
+      this.fallBackToClassic(`la bannière n'arrive pas à se dessiner (${line.slice(14, 160)})`);
+      return;
+    }
     const [word, saleId = "", argument = ""] = line.split(" ");
     const act = (action: HostAction) => {
       try {
@@ -468,19 +508,47 @@ export class NoticeCenter {
 
   private onExit(): void {
     const wasReady = this.ready;
+    const resume = this.lastEntry && this.held.has(this.lastEntry.id) ? this.lastEntry : null;
     this.host = null;
     this.ready = false;
     this.held.clear();
     if (!wasReady && !this.broken) this.giveUp("la fenêtre s'est arrêtée avant d'être prête");
-    else if (wasReady) this.options.log("Avis : la fenêtre s'est arrêtée ; elle redémarrera au prochain conseil.");
+    else if (wasReady && this.window === "banniere" && !this.broken && this.restarts < MAX_RESTARTS) {
+      // La bannière doit rester là : si elle s'arrête sans qu'on le lui ait demandé, elle repart, avec sa vente.
+      this.restarts += 1;
+      this.options.log(`Avis : la bannière s'est arrêtée ; elle repart (${this.restarts}/${MAX_RESTARTS}).`);
+      this.resume = resume;
+      const timer = setTimeout(() => this.warmUp(), 3000);
+      timer.unref?.();
+    } else if (wasReady) this.options.log("Avis : la fenêtre s'est arrêtée ; elle redémarrera au prochain conseil.");
   }
 
-  /** La nouvelle fenêtre ne peut pas tourner sur ce poste : on garde l'ancienne, et on le dit. */
+  /** La bannière ne peut pas tourner sur ce poste : on passe à l'ancienne fenêtre à bordure, et on le dit. */
+  private fallBackToClassic(reason: string): void {
+    this.options.log(`Avis : ${reason} ; retour à l'ancienne fenêtre.`);
+    if (this.startTimer) clearTimeout(this.startTimer);
+    const host = this.host;
+    this.host = null;
+    this.ready = false;
+    this.held.clear();
+    if (host) { try { host.kill(); } catch { /* déjà parti */ } }
+    this.window = "classique";
+    // L'ancienne fenêtre n'a rien à montrer tant qu'il n'y a pas de vente : on ne la lance qu'avec elle.
+    const entry = this.resume ?? this.lastEntry;
+    this.resume = null;
+    if (entry && !entry.quiet) this.show(entry);
+  }
+
+  /** Plus aucune fenêtre ne peut tourner sur ce poste : la notification Windows prend le relais, et on le dit. */
   private giveUp(reason: string): void {
+    if (this.window === "banniere" && !this.broken) {
+      this.fallBackToClassic(`la bannière ne démarre pas (${reason})`);
+      return;
+    }
     if (this.broken) return;
     this.broken = true;
     if (this.startTimer) clearTimeout(this.startTimer);
-    this.options.log(`Avis : la nouvelle fenêtre ne démarre pas (${reason}) ; retour à l'ancienne fenêtre.`);
+    this.options.log(`Avis : la fenêtre ne démarre pas (${reason}) ; retour à la notification Windows.`);
     const host = this.host;
     this.host = null;
     this.ready = false;

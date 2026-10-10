@@ -41,7 +41,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.7.0";
+const VERSION = "0.8.0";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -73,7 +73,7 @@ type Config = {
   /** Un robot de dispensation à écouter, une fois observé chez cette officine (voir robot.ts). Absent : rien n'est lu. */
   robot?: RobotConfig;
   /** La fenêtre d'avis : où elle se pose (« milieu-droite » par défaut) et combien de secondes elle reste avant de se ranger. */
-  affichage?: { position?: NoticePosition; secondes?: number; ancienne?: boolean; miseAJourAuto?: boolean };
+  affichage?: { position?: NoticePosition; secondes?: number; ancienne?: boolean; fenetre?: "banniere" | "classique"; miseAJourAuto?: boolean };
 };
 
 /** Ce que l'agent constate et que PharmaBoost doit montrer ; vide quand tout va bien. */
@@ -240,7 +240,7 @@ const IMAGES_DIR = join(dirname(CONFIG_PATH), "avis-images");
 
 /**
  * Le centre d'avis : la fenêtre de la vente, ouverte du premier bip à « Vente terminée », mise à jour sur
- * place, qui ne reprend jamais le clavier (sauf le champ e-mail du patient, sur un clic). L'ancienne fenêtre reste le secours si la nouvelle ne démarre pas.
+ * place, qui ne reprend jamais le clavier (sauf le champ e-mail du patient, sur un clic). La bannière est la fenêtre du poste ; si elle ne démarre pas, l'ancienne fenêtre prend le relais.
  */
 const notices = new NoticeCenter({
   configDir: dirname(CONFIG_PATH),
@@ -254,8 +254,10 @@ function applyDisplayPreferences(config: Config): void {
   const wanted = config.affichage;
   notices.configure({
     seconds: typeof wanted?.secondes === "number" ? wanted.secondes : DEFAULT_NOTICE_SECONDS,
-    position: wanted?.position && (POSITIONS as readonly string[]).includes(wanted.position) ? wanted.position : "milieu-droite",
+    // Sans réglage du poste, chaque fenêtre garde sa place par défaut : la bannière en haut à droite, l'ancienne fenêtre à mi-hauteur.
+    ...(wanted?.position && (POSITIONS as readonly string[]).includes(wanted.position) ? { position: wanted.position } : {}),
     legacy: wanted?.ancienne === true,
+    window: wanted?.fenetre === "classique" ? ("classique" as const) : ("banniere" as const),
   });
 }
 /** Une vente reste suivie, fenêtre ouverte, jusqu'à « Vente terminée » — avec un plafond de trois heures si on l'oublie. */
@@ -425,6 +427,9 @@ async function postHeartbeat(config: Config): Promise<{ exportPath: string | nul
 /** Le poste de caisse : écouter la douchette, envoyer chaque bip, donner signe de vie, et relire l'export de stock si on le lui a confié. */
 async function runPost(config: Config): Promise<void> {
   log(`PharmaBoost Connect ${VERSION} — poste de caisse ${hostname()} — journal : ${LOG_PATH}`);
+  // La bannière apparaît dès l'ouverture de Windows (l'agent démarre à l'ouverture de session) : « En attente de scan… ».
+  applyDisplayPreferences(config);
+  notices.warmUp();
   // Les bips en file, vidangés un par un et dans l'ordre. Ceux qui n'ont pas pu
   // partir (coupure Internet) attendent en tête et repartent au tour suivant.
   // La vidange est monofil (voir scan-queue.ts) : un bip lu pendant un envoi en
@@ -439,6 +444,8 @@ async function runPost(config: Config): Promise<void> {
       log(`${source === "robot" ? "Robot" : "Bip"} ${code} ignoré : déjà annoncé à l'instant par ${source === "robot" ? "la douchette" : "le robot"}.`);
       return;
     }
+    // La bannière réagit au bip tout de suite : « Scan détecté ! Analyse en cours… », avant même la réponse du serveur.
+    notices.scanning();
     scans.push({ code, scannedAt: new Date(at).toISOString() });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
@@ -557,8 +564,8 @@ function testAffichage(): void {
     ],
   };
   notices.show(entry);
-  console.log("Une vente d'exemple doit apparaître à droite de l'écran, à mi-hauteur (déplaçable à la souris).");
-  console.log("Elle reste ouverte : essayez « Vendu », « Non vendu », le bouton « – » qui la réduit. Rien n'est envoyé.");
+  console.log("La bannière PharmaBoost doit apparaître en haut à droite de l'écran, avec une vente d'exemple (déplaçable à la souris).");
+  console.log("Elle reste ouverte : essayez « Vendu », « Non vendu », les petits boutons du haut (verrouiller, réduire, masquer). Rien n'est envoyé.");
   setTimeout(() => { notices.stop(); process.exit(0); }, 75_000);
 }
 

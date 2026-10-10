@@ -1,7 +1,7 @@
 /**
- * L'ANCIENNE fenêtre d'avis : du texte sur fond sombre, quinze secondes. Elle reste le SECOURS de la nouvelle fenêtre
- * (notice-host.ts) : si celle-ci ne démarre pas sur un poste, le centre d'avis (notice-center.ts) retombe ici plutôt
- * que de ne plus rien afficher.
+ * LA NOTIFICATION : du texte sur fond sombre, quinze secondes. Elle reste le dernier SECOURS de la bannière (notice-host.ts) et de
+ * l'ancienne fenêtre (notice-host-classique.ts) : si aucune des deux ne démarre sur un poste, le centre d'avis (notice-center.ts)
+ * retombe ici plutôt que de ne plus rien afficher.
  *
  * L'avis de comptoir affiché sur le poste de caisse, par-dessus le LGO.
  *

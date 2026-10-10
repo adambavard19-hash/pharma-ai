@@ -1,0 +1,571 @@
+import { BANNER } from "./banner-design";
+
+/**
+ * L'aperçu de la bannière PharmaBoost pour Mac (ou tout navigateur) : une page HTML autonome, générée à partir du MÊME design que la
+ * bannière Windows (banner-design.ts) — mêmes couleurs, mêmes tailles, mêmes phrases, mêmes durées.
+ *
+ *   npm run apercu:banniere     écrit agent/apercu/banniere.html et l'ouvre
+ *
+ * Ce que c'est : une reproduction fidèle du dessin, avec ses animations et ses gestes (Vendu / Non vendu, e-mail, Vente terminée…),
+ * pour juger le rendu sans Windows. Ce que ce n'est pas : une capture de Windows — la police, l'ombre et l'anticrénelage y sont ceux du
+ * navigateur. Un test garde la page à jour avec le design.
+ */
+
+/** Un arc d'ellipse comme dans GDI+ (angles en degrés, sens horaire, y vers le bas) → chemin SVG. */
+function arc(cx: number, cy: number, rx: number, ry: number, start: number, sweep: number): string {
+  const point = (deg: number) => {
+    const rad = (deg * Math.PI) / 180;
+    return [cx + rx * Math.cos(rad), cy + ry * Math.sin(rad)].map((n) => n.toFixed(2)).join(" ");
+  };
+  return `M ${point(start)} A ${rx} ${ry} 0 ${Math.abs(sweep) > 180 ? 1 : 0} ${sweep > 0 ? 1 : 0} ${point(start + sweep)}`;
+}
+
+/** La mascotte, en SVG : le même dessin que Mascot.Draw (notice-host.ts), dans la même boîte de 100 unités. */
+function mascotSvg(): string {
+  const C = BANNER.colors;
+  const eyes = (cx: number) => `<ellipse class="eye-open" cx="${cx}" cy="42" rx="4.5" ry="6" fill="${C.eye}"/><circle class="eye-open glint" cx="${cx - 1.4}" cy="39.6" r="1.6" fill="#fff" fill-opacity=".82"/><path class="eye-happy" d="${arc(cx, 43, 5.5, 5, 190, 160)}" fill="none" stroke="${C.eye}" stroke-width="3.2" stroke-linecap="round"/>`;
+  return `<svg class="mascot" viewBox="0 0 100 100" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-shell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${C.shellTop}"/><stop offset="1" stop-color="${C.shellBottom}"/></linearGradient>
+    <linearGradient id="g-screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${C.screenTop}"/><stop offset="1" stop-color="${C.screenBottom}"/></linearGradient>
+    <linearGradient id="g-ear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${C.ear}"/><stop offset="1" stop-color="#12968C"/></linearGradient>
+    <linearGradient id="g-badge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${C.accent}"/><stop offset="1" stop-color="${C.accentDark}"/></linearGradient>
+  </defs>
+  <g class="bob">
+    <line x1="50" y1="17" x2="50" y2="8" stroke="${C.shellEdge}" stroke-width="3" stroke-linecap="round"/>
+    <circle class="lamp-glow" cx="50" cy="6" r="8" fill="${C.eye}"/>
+    <circle class="lamp" cx="50" cy="6" r="3.6" fill="${C.eye}"/>
+    <path d="${arc(50, 44, 41, 35, 192, 156)}" fill="none" stroke="${C.ear}" stroke-width="5" stroke-linecap="round"/>
+    <rect x="3" y="36" width="15" height="28" rx="7" fill="url(#g-ear)"/>
+    <rect x="82" y="36" width="15" height="28" rx="7" fill="url(#g-ear)"/>
+    <rect x="14" y="16" width="72" height="58" rx="24" fill="url(#g-shell)" stroke="${C.shellEdge}" stroke-width="1.6"/>
+    <rect x="22" y="25" width="56" height="40" rx="17" fill="url(#g-screen)"/>
+    <g class="eyes">${eyes(38)}${eyes(62)}</g>
+    <path class="mouth mouth-idle" d="${arc(50, 51.5, 7, 4.5, 20, 140)}" fill="none" stroke="${C.eye}" stroke-width="2.6" stroke-linecap="round"/>
+    <path class="mouth mouth-happy" d="M 41 53 A 9 7 0 0 0 59 53 Z" fill="${C.eye}"/>
+    <ellipse class="mouth mouth-alert" cx="50" cy="55.5" rx="4" ry="4.5" fill="none" stroke="${C.eye}" stroke-width="2.4"/>
+    <line class="mouth mouth-think" x1="44" y1="55" x2="56" y2="55" stroke="${C.eye}" stroke-width="2.6" stroke-linecap="round"/>
+    <circle cx="74" cy="69" r="15" fill="#fff" fill-opacity=".92"/>
+    <circle cx="74" cy="69" r="13.5" fill="url(#g-badge)"/>
+    <rect x="72.2" y="61" width="3.6" height="16" fill="#fff"/><rect x="66" y="67.2" width="16" height="3.6" fill="#fff"/>
+    <path class="sparkle" d="M 80 7 L 82 12.5 L 87.5 14 L 82 15.5 L 80 21 L 78 15.5 L 72.5 14 L 78 12.5 Z" fill="#FFD65A"/>
+  </g>
+</svg>`;
+}
+
+export function bannerPreviewHtml(): string {
+  const { colors: C, sizes: Z, timing: M, text: T } = BANNER;
+  const cssVars = Object.entries(C)
+    .filter(([key]) => key !== "cardAlpha")
+    .map(([key, value]) => `--${key}: ${value};`)
+    .join(" ");
+  const spec = JSON.stringify({ sizes: Z, timing: M, text: T, cardAlpha: C.cardAlpha });
+  return `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bannière PharmaBoost</title>
+<style>
+:root { ${cssVars} --margin: ${Z.margin}px; --radius: ${Z.radius}px; --ease: cubic-bezier(.22,.8,.26,1); color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #0b1620; color: #dbe7ee; font: 14px/1.45 "Segoe UI", "Segoe UI Variable Text", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; min-height: 100vh; padding-block: 28px; padding-inline: 20px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 18px; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
+.lede { margin: 4px 0 0; color: #93a9b6; max-width: 70ch; }
+.steps { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.steps button, .steps select { font: inherit; font-weight: 600; font-size: 13px; color: #dbe7ee; background: #14283a; border: 1px solid #25425a; border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+.steps button:hover { border-color: var(--accent); }
+.steps button.on { background: var(--accent); border-color: var(--accent); color: #05261b; }
+.steps .play { background: #fff; color: #0b1620; border-color: #fff; }
+.note { font-size: 12.5px; color: #7f97a6; max-width: 90ch; }
+
+/* Le faux écran : un logiciel de gestion derrière la bannière, pour juger la transparence et l'ombre. */
+.screen { position: relative; height: 640px; border-radius: 16px; overflow: hidden; background: linear-gradient(135deg, #cfe3ee, #e9f1f5 55%, #d8e6ee); border: 1px solid #25425a; isolation: isolate; }
+.lgo { position: absolute; inset: 14px; background: #f4f6f8; border-radius: 10px; box-shadow: 0 2px 16px rgba(10,30,45,.18); overflow: hidden; color: #2b3a46; font-size: 13px; }
+.lgo .bar { height: 32px; background: #e6ebef; display: flex; align-items: center; padding: 0 12px; gap: 8px; border-bottom: 1px solid #d5dde3; font-weight: 600; color: #51616d; }
+.lgo .bar i { width: 11px; height: 11px; border-radius: 50%; background: #c3ccd3; display: inline-block; }
+.lgo .bar span { margin-left: auto; letter-spacing: .3em; color: #8a98a3; }
+.lgo .menu { height: 30px; background: #f9fafb; border-bottom: 1px solid #e3e8ec; display: flex; gap: 22px; align-items: center; padding: 0 16px; color: #6d7d89; }
+.lgo .grid { padding: 14px 16px; display: grid; gap: 8px; }
+.lgo .row { display: grid; grid-template-columns: 2.4fr 1fr 1fr 90px; gap: 12px; padding: 9px 12px; background: #fff; border: 1px solid #e3e8ec; border-radius: 6px; }
+.lgo .row b { color: #34495a; }
+.lgo .row.head { background: #eaf0f4; color: #6d7d89; font-weight: 600; }
+.lgo .total { position: absolute; left: 16px; right: 16px; bottom: 14px; display: flex; justify-content: flex-end; gap: 12px; }
+.lgo .total span { background: #2e7d5a; color: #fff; padding: 10px 22px; border-radius: 6px; font-weight: 700; }
+.lgo .total span.alt { background: #5a6b78; }
+
+/* La bannière : la carte est dessinée à sa taille, le reste suit. */
+.banner { position: absolute; right: 18px; top: 52px; z-index: 5; }
+.card { position: relative; border-radius: var(--radius); color: var(--text); overflow: hidden; width: 400px; height: 100px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cardTop) calc(${C.cardAlpha} * 100%), transparent), color-mix(in srgb, var(--cardBottom) calc(${C.cardAlpha} * 100%), transparent));
+  box-shadow: 0 0 0 1.2px color-mix(in srgb, var(--glow) 30%, transparent), inset 0 0 0 1px rgba(255,255,255,.1), 0 6px 14px rgba(3,24,38,.22), 0 16px 40px rgba(3,24,38,.30);
+  transition: width .38s var(--ease), height .38s var(--ease); }
+.card::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 60px 50px, color-mix(in srgb, var(--glow) 23%, transparent), transparent 130px), linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,0) 46px); }
+.card.dragging { cursor: grabbing; }
+.layer { position: absolute; inset: 0; animation: fadein .22s ease-out both; }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+.abs { position: absolute; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand { font-weight: 700; font-size: 17px; line-height: 24px; }
+.sub { font-size: 13.5px; line-height: 20px; color: var(--muted); }
+.mascot { position: absolute; overflow: visible; }
+.bob { animation: bob 2.86s ease-in-out infinite; transform-box: fill-box; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(2.2px); } 75% { transform: translateY(-2.2px); } }
+.alert .bob { animation: jitter .55s linear infinite; }
+@keyframes jitter { 0%, 100% { transform: translateY(-1.5px); } 50% { transform: translateY(-.2px); } }
+.lamp-glow { animation: glow 1.96s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.think .lamp-glow { animation-duration: .7s; }
+@keyframes glow { 0%, 100% { opacity: .15; transform: scale(.8); } 50% { opacity: .55; transform: scale(1.15); } }
+.alert .lamp, .alert .lamp-glow { fill: #F5B028; }
+.eyes { transform-box: fill-box; transform-origin: center; animation: blink 4.6s infinite; }
+@keyframes blink { 0%, 96%, 100% { transform: scaleY(1); } 97.5% { transform: scaleY(.12); } }
+.think .eyes { animation: look 2.4s ease-in-out infinite, blink 4.6s infinite; }
+@keyframes look { 0%, 100% { translate: -3.5px 0; } 50% { translate: 3.5px 0; } }
+.eye-happy, .mouth-happy, .mouth-alert, .mouth-think, .sparkle { display: none; }
+.happy .eye-open, .idea .eye-open { display: none; } .happy .eye-happy, .idea .eye-happy { display: inline; }
+.happy .mouth-idle, .idea .mouth-idle { display: none; } .happy .mouth-happy, .idea .mouth-happy { display: inline; }
+.alert .mouth-idle { display: none; } .alert .mouth-alert { display: inline; }
+.think .mouth-idle { display: none; } .think .mouth-think { display: inline; }
+.idea .sparkle { display: inline; animation: twinkle 1.05s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes twinkle { 0%, 100% { transform: scale(.8); opacity: .6; } 50% { transform: scale(1.25); opacity: 1; } }
+.alert .eye-open { transform-box: fill-box; transform-origin: center; scale: 1.2 1.25; }
+
+.dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: dot 2.1s ease-in-out infinite; }
+@keyframes dot { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+.icon { position: absolute; width: ${Z.iconButton}px; height: ${Z.iconButton}px; border-radius: 50%; border: 0; padding: 0; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; transition: background .15s, color .15s; }
+.icon:hover { background: rgba(255,255,255,.14); color: var(--text); }
+.icon svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon.pin.on { color: var(--accent); }
+.icon.pin.on svg { fill: currentColor; }
+.tip { position: absolute; top: 34px; left: 50%; translate: -50% 0; background: rgba(6,24,34,.92); color: #fff; font-size: 11.5px; padding: 4px 9px; border-radius: 8px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s; z-index: 4; }
+.icon:hover .tip { opacity: 1; }
+.progress { position: absolute; height: 6px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; }
+.progress i { position: absolute; inset: 0 auto 0 0; width: 40%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--glow)); animation: sweep 1.18s cubic-bezier(.45,0,.55,1) infinite; }
+@keyframes sweep { from { left: -40%; } to { left: 100%; } }
+.go { position: absolute; border: 0; cursor: pointer; font: 700 14px inherit; font-family: inherit; color: #fff; height: ${Z.buttonHeight}px; border-radius: 14px; background: linear-gradient(180deg, var(--accent), var(--accentDark)); display: flex; align-items: center; justify-content: center; gap: 9px; transition: filter .15s, transform .1s; }
+.go:hover { filter: brightness(1.1); } .go:active { transform: scale(.985); }
+
+/* Les conseils */
+.panel { position: absolute; left: 10px; right: 10px; top: ${Z.header - 4}px; bottom: 10px; background: var(--panel); border-radius: 18px; color: var(--ink); display: flex; flex-direction: column; animation: fadein .22s ease-out both; }
+.list { flex: 1; min-height: 0; overflow: hidden; padding: 8px 14px 0; }
+.label { display: flex; align-items: baseline; gap: 10px; height: 24px; padding-top: 1px; }
+.label small { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--inkSoft); text-transform: uppercase; }
+.label b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.warn { display: flex; gap: 10px; align-items: flex-start; background: var(--alertBg); color: var(--alertFg); border-radius: 12px; padding: 8px 12px 8px 12px; margin-bottom: 8px; font-weight: 700; font-size: 12.5px; }
+.item { display: grid; grid-template-columns: ${Z.thumb}px 1fr 88px; gap: 12px; padding: 12px 0 10px; border-bottom: 1px solid var(--line); min-height: 78px; }
+.item:last-child { border-bottom: 0; }
+.thumb { width: ${Z.thumb}px; height: ${Z.thumb}px; border-radius: 11px; background: #e6eef2; display: grid; place-items: center; }
+.body { min-width: 0; display: grid; align-content: space-between; }
+.l1 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; margin-top: -3px; }
+.name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.price { white-space: nowrap; flex: none; font-weight: 700; font-size: 12.5px; color: var(--stockFg); }
+.meta { font-size: 12px; color: var(--inkSoft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 16px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 10px 0 9px; border-radius: 11px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.pill svg { width: 11px; height: 11px; }
+.p-challenge { background: var(--challengeBg); color: var(--challengeFg); } .p-challenge svg { fill: var(--challengeIcon); }
+.p-date { background: var(--dateBg); color: var(--dateFg); } .p-date svg, .p-stock svg, .p-low svg, .p-out svg { stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.p-stock { background: var(--stockBg); color: var(--stockFg); } .p-low { background: var(--lowBg); color: var(--lowFg); } .p-out { background: var(--outBg); color: var(--outFg); } .p-unknown { background: var(--unknownBg); color: var(--unknownFg); }
+.answer { display: grid; align-content: center; gap: 4px; }
+.btn { height: 26px; border: 0; border-radius: 13px; font: 700 13px inherit; font-family: inherit; cursor: pointer; transition: filter .15s, transform .1s; }
+.btn:hover { filter: brightness(1.07); } .btn:active { transform: scale(.97); }
+.btn.sold { background: var(--soldBg); color: var(--soldFg); } .btn.not { background: var(--notSoldBg); color: var(--notSoldFg); font-size: 12.5px; }
+.chip { height: 28px; border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; font-size: 13px; }
+.chip.sold { background: var(--stockBg); color: var(--stockFg); } .chip.not { background: var(--notSoldBg); color: var(--notSoldFg); font-size: 12.5px; }
+.chip svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.change { background: none; border: 0; color: var(--inkSoft); font: 700 12px inherit; font-family: inherit; cursor: pointer; text-align: center; }
+.change:hover { color: var(--accentDark); }
+.foot { padding: 8px 14px 12px; border-top: 1px solid var(--line); margin: 0 0; display: grid; gap: 8px; }
+.foot .two { display: grid; grid-template-columns: 1fr 138px; gap: 8px; }
+.ghost { height: ${Z.buttonHeight}px; border-radius: 14px; border: 1.4px solid #bed0da; background: var(--panel); color: var(--ink); font: 700 13px inherit; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: border-color .15s, background .15s; }
+.ghost:hover { border-color: var(--accent); background: #fff; }
+.ghost svg { width: 16px; height: 16px; stroke: var(--inkSoft); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.saved { height: ${Z.buttonHeight}px; border-radius: 14px; background: var(--stockBg); color: var(--stockFg); font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 10px; padding: 0 14px; }
+.saved svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.saved button { margin-left: auto; background: none; border: 0; color: inherit; font: 700 12.5px inherit; font-family: inherit; cursor: pointer; }
+.finish { height: ${Z.finishHeight}px; border: 0; border-radius: 16px; background: linear-gradient(180deg, var(--accent), var(--accentDark)); color: #fff; font: 700 15px inherit; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: filter .15s, transform .1s; }
+.finish:hover { filter: brightness(1.08); } .finish:active { transform: scale(.985); }
+.finish svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+/* La fin de vente */
+.check { position: absolute; left: 24px; top: 20px; width: 72px; height: 72px; }
+.check .halo { animation: halo .9s ease-out both; transform-origin: center; }
+@keyframes halo { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.12); opacity: .35; } }
+.check .disc { animation: pop .42s cubic-bezier(.34,1.56,.64,1) both; transform-origin: center; }
+@keyframes pop { from { transform: scale(.05); } to { transform: scale(1); } }
+.check path { stroke-dasharray: 60; stroke-dashoffset: 60; animation: draw .42s .14s ease-out forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.spark { position: absolute; left: 60px; top: 56px; width: 6px; height: 6px; border-radius: 50%; animation: spark .9s ease-out both; }
+@keyframes spark { from { transform: translate(0,0); opacity: .9; } to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+.done-lines { position: absolute; left: 112px; right: 20px; top: 18px; }
+.done-lines h2 { margin: 0 0 4px; font-size: 19px; line-height: 28px; }
+.done-lines p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.done-lines .pill { margin-top: 8px; background: var(--stockBg); color: var(--stockFg); }
+
+/* La saisie de l'e-mail : une petite carte sous la bannière. */
+.mail { position: absolute; right: 18px; z-index: 6; width: 360px; background: var(--panel); color: var(--ink); border-radius: 18px; border: 2px solid var(--accent); padding: 16px; box-shadow: 0 14px 34px rgba(3,24,38,.3); animation: fadein .2s ease-out both; }
+.mail h3 { margin: 0 0 6px; font-size: 15px; }
+.mail input[type=email] { width: 100%; font: inherit; font-size: 14.5px; padding: 7px 8px; border: 1px solid #aebfc9; background: #fff; border-radius: 4px; }
+.mail label { display: flex; gap: 8px; align-items: center; font-size: 12.5px; margin: 10px 0 4px; }
+.mail .msg { min-height: 18px; color: var(--alertFg); font-weight: 700; font-size: 12.5px; }
+.mail .acts { display: grid; grid-template-columns: 1fr 96px; gap: 8px; margin-top: 6px; }
+.mail .acts button { height: 38px; border: 0; border-radius: 13px; font: 700 13.5px inherit; font-family: inherit; cursor: pointer; }
+.mail .acts .go2 { background: var(--accent); color: #fff; } .mail .acts .go2[disabled] { background: #e2e9ed; color: #78888f; cursor: default; }
+.mail .acts .later { background: var(--notSoldBg); color: var(--notSoldFg); }
+
+.hint { position: absolute; left: 22px; bottom: 76px; color: #6d7d89; font-size: 12.5px; max-width: 360px; z-index: 1; }
+@media (max-width: 760px) { .screen { height: 700px; } .banner { right: 8px; } .card { max-width: calc(100vw - 56px); } .lgo .row { grid-template-columns: 1.6fr 1fr; } .lgo .row span:nth-child(n+3) { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Bannière PharmaBoost · poste de caisse</h1>
+    <p class="lede">Le rendu de la nouvelle bannière Windows : en haut à droite, au-dessus du logiciel de gestion, sans jamais prendre le clavier. Cliquez dans la bannière comme au comptoir — ou suivez le scénario.</p>
+  </header>
+  <div class="steps" id="steps" role="toolbar" aria-label="Étapes de l'aperçu"></div>
+  <div class="screen" id="screen">
+    <div class="lgo" aria-hidden="true">
+      <div class="bar"><i></i><i></i><i></i>&nbsp;Logiciel de gestion de l'officine — Délivrance<span>– ☐ ✕</span></div>
+      <div class="menu"><span>Dossier</span><span>Délivrance</span><span>Stock</span><span>Commandes</span><span>Gestion</span></div>
+      <div class="grid">
+        <div class="row head"><span>Désignation</span><span>Quantité</span><span>Prix</span><span>Total</span></div>
+        <div class="row"><b>DOLIPRANE 1000 mg cp</b><span>1</span><span>2,18 €</span><b>2,18 €</b></div>
+        <div class="row"><b>AMOXICILLINE 1 g cp</b><span>1</span><span>6,42 €</span><b>6,42 €</b></div>
+        <div class="row"><b>ZYRTEC 10 mg cp</b><span>1</span><span>4,95 €</span><b>4,95 €</b></div>
+      </div>
+      <div class="total"><span class="alt">Annuler</span><span>Valider</span></div>
+    </div>
+    <div class="banner" id="banner"></div>
+  </div>
+  <p class="note" id="note"></p>
+</div>
+<script>
+(function () {
+  var SPEC = ${spec};
+  var T = SPEC.text, Z = SPEC.sizes, MS = SPEC.timing;
+  var MASCOT = ${JSON.stringify(mascotSvg())};
+  var ITEMS = [
+    { id: "a", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", drug: "AMOXICILLINE 1 g", reason: "Protéger la flore pendant l'antibiotique", challenge: true, shortDate: "30/11/26", availability: "IN_STOCK", tone: ["#BFE8D2", "#2F9E6B"] },
+    { id: "b", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", drug: "ZYRTEC 10 mg", reason: "", challenge: false, shortDate: "", availability: "IN_STOCK", tone: ["#CFE4F7", "#3B82C4"] },
+    { id: "c", name: "VITAMINE C 500 mg", price: "8,40 €", drug: "DOLIPRANE 1000 mg", reason: "", challenge: false, shortDate: "12/12/26", availability: "LOW_STOCK", tone: ["#FFE2B8", "#E08A12"] }
+  ];
+  var S = { view: "idle", reduced: false, hidden: false, pinned: false, answers: {}, emailSaved: false, finishing: false, mailOpen: false, analyzing: false, doneAt: 0 };
+  var timers = [];
+  var scenario = [];
+  var banner = document.getElementById("banner");
+  var note = document.getElementById("note");
+
+  function later(ms, fn) { var t = setTimeout(fn, ms); timers.push(t); return t; }
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+  function step(ms, fn) { var t = setTimeout(fn, ms); scenario.push(t); return t; }
+  function clearScenario() { scenario.forEach(clearTimeout); scenario = []; }
+  function plural(n, one, many) { return n > 1 ? many.replace("{n}", n) : one; }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function unanswered() { return ITEMS.filter(function (i) { return !S.answers[i.id]; }).length; }
+  function answered() { return ITEMS.length - unanswered(); }
+  function mascot(mood, style) { return '<div class="' + mood + '" style="position:absolute;' + style + '">' + MASCOT + '</div>'; }
+
+  var ICON = {
+    pin: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M12 13v8"/></svg>',
+    min: '<svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>',
+    close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+    tick: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    mail: '<svg viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M4 7.5l8 6 8-6"/></svg>',
+    star: '<svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.7 7.1L12 17.5 5.7 21.3l1.7-7.1L2 9.5l7.1-.6z" stroke="none"/></svg>',
+    clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 1.5"/></svg>',
+    bang: '<svg viewBox="0 0 24 24"><path d="M12 6v8M12 18.5v.5"/></svg>',
+    cross: '<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+    warn: '<svg viewBox="0 0 24 24" width="16" height="16" style="stroke:currentColor;fill:none;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round;flex:none;margin-top:1px"><path d="M12 3L2.5 20h19z"/><path d="M12 10v5M12 17.6v.4"/></svg>',
+    arrow: '<svg viewBox="0 0 24 24" width="16" height="16" style="stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M4 12h15M14 6l6 6-6 6"/></svg>'
+  };
+
+  function pill(cls, icon, text) { return '<span class="pill ' + cls + '">' + ICON[icon] + esc(text) + '</span>'; }
+  function stockPill(a) {
+    if (a === "IN_STOCK") return pill("p-stock", "tick", T.inStock);
+    if (a === "LOW_STOCK") return pill("p-low", "bang", T.lowStock);
+    if (a === "OUT_OF_STOCK") return pill("p-out", "cross", T.outOfStock);
+    return '<span class="pill p-unknown">' + esc(T.unknownStock) + '</span>';
+  }
+  function thumb(item) {
+    return '<div class="thumb"><svg viewBox="0 0 46 46" width="46" height="46"><rect width="46" height="46" rx="11" fill="' + item.tone[0] + '"/><rect x="13" y="9" width="20" height="30" rx="4" fill="#fff"/><rect x="13" y="9" width="20" height="9" rx="4" fill="' + item.tone[1] + '"/><rect x="17" y="23" width="12" height="3" rx="1.5" fill="' + item.tone[1] + '" opacity=".5"/><rect x="17" y="29" width="9" height="3" rx="1.5" fill="' + item.tone[1] + '" opacity=".35"/></svg></div>';
+  }
+
+  function headerButtons(full) {
+    var right = 12, size = Z.iconButton, top = 12, html = "";
+    function btn(kind, glyph, tip, off, on) {
+      return '<button class="icon ' + kind + (on ? " on" : "") + '" data-act="' + kind + '" style="top:' + top + 'px;right:' + off + 'px" aria-label="' + esc(tip) + '">' + ICON[glyph] + '<span class="tip">' + esc(tip) + '</span></button>';
+    }
+    html += btn("close", "close", T.closeTip, right, false);
+    if (full) {
+      html += btn("min", "min", T.minTip, right + size + 4, false);
+      html += btn("pin", "pin", S.pinned ? "Position verrouillée" : T.pinTip, right + 2 * (size + 4), S.pinned);
+    }
+    return html;
+  }
+
+  function moodOf() {
+    if (S.analyzing || S.view === "scan") return "think";
+    if (S.view === "ready") return "alert";
+    if (S.view === "done") return "happy";
+    if (S.view === "expanded") return unanswered() > 0 ? "idea" : "happy";
+    return "idle";
+  }
+
+  function view() {
+    if (S.reduced && S.view !== "done") return "reduced";
+    return S.view;
+  }
+
+  function sizeFor(v) {
+    if (v === "reduced") return [Z.widthReduced, Z.heightReduced];
+    if (v === "ready") return [Z.widthReady, Z.heightReady];
+    if (v === "expanded") return [Z.widthExpanded, null];
+    if (v === "done") return [Z.widthDone, null];
+    return [Z.widthIdle, Z.heightIdle];
+  }
+
+  function idleLike(title, sub, extra) {
+    return mascot(extra.mood, "left:8px;top:8px;width:" + Z.mascot + "px;height:" + Z.mascot + "px") +
+      '<div class="abs brand" style="left:104px;top:' + extra.top + 'px;right:110px">' + esc(title) + '</div>' + extra.sub + headerButtons(true) + (extra.after || "");
+  }
+
+  function html(v) {
+    if (v === "reduced") {
+      var label = S.analyzing || S.view === "scan" ? T.scanSub : (S.view === "expanded" || S.view === "ready") ? (unanswered() > 0 ? plural(unanswered(), T.reducedOne, T.reducedMany) : T.allDone) : T.reducedIdle;
+      return mascot(moodOf(), "left:8px;top:9px;width:46px;height:46px") +
+        '<div class="abs" style="left:62px;top:11px;width:130px;font-weight:700;font-size:14.5px;line-height:20px">' + T.brand + '</div>' +
+        '<div class="abs" style="left:62px;top:33px;width:130px;font-size:12.5px;line-height:18px;color:var(--muted)">' + esc(label) + '</div>' +
+        '<button class="icon" data-act="close" style="top:19px;right:10px"  aria-label="' + T.closeTip + '">' + ICON.close + '<span class="tip">' + T.closeTip + '</span></button>' +
+        '<button class="icon" data-act="expand" style="top:19px;right:40px" aria-label="Agrandir">' + ICON.down + '<span class="tip">Agrandir</span></button>';
+    }
+    if (v === "idle") {
+      return idleLike(T.brand, "", { mood: "idle", top: 17, sub: '<span class="dot" style="left:104px;top:54px"></span><div class="abs sub" style="left:119px;top:49px;right:20px">' + T.idle + '</div>' });
+    }
+    if (v === "scan") {
+      return mascot("think", "left:8px;top:8px;width:" + Z.mascot + "px;height:" + Z.mascot + "px") +
+        '<div class="abs brand" style="left:104px;top:15px;right:110px">' + T.scanTitle + '</div>' +
+        '<div class="abs sub" style="left:104px;top:43px;right:20px">' + T.scanSub + '</div>' +
+        '<div class="progress" style="left:104px;top:72px;right:22px"><i></i></div>' + headerButtons(true);
+    }
+    if (v === "quiet") {
+      return mascot("idle", "left:8px;top:8px;width:" + Z.mascot + "px;height:" + Z.mascot + "px") +
+        '<div class="abs brand" style="left:104px;top:15px;right:110px">' + T.quiet + '</div>' +
+        '<div class="abs sub" style="left:104px;top:43px;right:20px">' + T.quietSub + '</div>' + headerButtons(true);
+    }
+    if (v === "ready") {
+      var title = plural(ITEMS.length, T.readyOne, T.readyMany);
+      return mascot("alert", "left:8px;top:10px;width:" + Z.mascot + "px;height:" + Z.mascot + "px") +
+        '<div class="abs brand" style="left:104px;top:15px;right:110px">' + esc(title) + '</div>' +
+        '<div class="abs sub" style="left:104px;top:43px;right:20px;font-size:13px">DOLIPRANE 1000 mg · AMOXICILLINE 1 g</div>' +
+        '<button class="go" data-act="see" style="left:104px;top:78px;right:20px">' + T.readyButton + ICON.arrow + '</button>' + headerButtons(true);
+    }
+    if (v === "done") {
+      var sold = ITEMS.filter(function (i) { return S.answers[i.id] === "SOLD"; }).length;
+      var not = ITEMS.filter(function (i) { return S.answers[i.id] === "NOT_SOLD"; }).length;
+      var lines = [sold + " vendu" + (sold > 1 ? "s" : "") + " · " + not + " non vendu" + (not > 1 ? "s" : "") + " · " + unanswered() + " sans réponse"];
+      if (S.emailSaved && sold > 0) lines.push("✓ Bilan envoyé au patient.");
+      else if (S.emailSaved) lines.push("Aucun bilan envoyé : aucun produit n'a été vendu.");
+      var badge = sold > 0 ? '<div>' + pill("p-stock", "tick", "12e conseil vendu aujourd'hui") + '</div>' : "";
+      var sparks = "";
+      var cols = ["#FFD65A", "var(--glow)", "var(--accent)"];
+      for (var k = 0; k < 8; k++) {
+        var ang = k * Math.PI / 4 + 0.2;
+        sparks += '<i class="spark" style="--dx:' + Math.round(Math.cos(ang) * 64) + 'px;--dy:' + Math.round(Math.sin(ang) * 64) + 'px;background:' + cols[k % 3] + '"></i>';
+      }
+      return sparks +
+        '<svg class="check" viewBox="0 0 72 72"><defs><linearGradient id="g-done" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + "${C.accent}" + '"/><stop offset="1" stop-color="' + "${C.accentDark}" + '"/></linearGradient></defs>' +
+        '<circle class="halo" cx="36" cy="36" r="40" fill="' + "${C.accent}" + '" fill-opacity=".18"/><circle class="disc" cx="36" cy="36" r="34" fill="url(#g-done)"/>' +
+        '<path d="M22 37.5 L32 47 L51 26" fill="none" stroke="#fff" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '<div class="done-lines"><h2>' + T.doneTitle + '</h2>' + lines.map(function (l) { return "<p>" + esc(l) + "</p>"; }).join("") + badge + '</div>';
+    }
+    // expanded
+    var sub;
+    if (S.analyzing) sub = T.scanSub;
+    else if (answered() === 0) sub = plural(ITEMS.length, T.forSaleOne, T.forSaleMany);
+    else sub = T.duringSale + "  " + answered() + "/" + ITEMS.length;
+    var rows = ITEMS.map(function (item) {
+      var a = S.answers[item.id];
+      var pills = (item.challenge ? pill("p-challenge", "star", T.challenge) : "") + (item.shortDate ? pill("p-date", "clock", T.shortDate + " " + item.shortDate) : "") + stockPill(item.availability);
+      var right;
+      if (!a) right = '<div class="answer"><button class="btn sold" data-act="sold" data-id="' + item.id + '">' + T.sold + '</button><button class="btn not" data-act="not" data-id="' + item.id + '">' + T.notSold + '</button></div>';
+      else right = '<div class="answer"><div class="chip ' + (a === "SOLD" ? "sold" : "not") + '">' + (a === "SOLD" ? ICON.tick + T.sold : T.notSold) + '</div><button class="change" data-act="undo" data-id="' + item.id + '">' + T.change + '</button></div>';
+      return '<div class="item">' + thumb(item) + '<div class="body"><div class="l1"><span class="name">' + esc(item.name) + '</span><span class="price">' + esc(item.price) + '</span></div>' +
+        '<div class="meta">' + T.forDrug + esc(item.drug) + '</div>' + (item.reason ? '<div class="meta">' + esc(item.reason) + '</div>' : "") + '<div class="pills">' + pills + '</div></div>' + right + '</div>';
+    }).join("");
+    var mailRow = S.emailSaved
+      ? '<div class="saved">' + ICON.tick + T.emailSaved + '<button data-act="mailrm">' + T.emailRemove + '</button></div>'
+      : '<button class="ghost" data-act="mail">' + ICON.mail + T.emailAdd + '</button>';
+    return mascot(moodOf(), "left:8px;top:6px;width:76px;height:76px") +
+      '<div class="abs brand" style="left:96px;top:18px;width:200px">' + T.brand + '</div>' +
+      '<div class="abs sub" style="left:96px;top:45px;width:300px;' + (S.analyzing ? "color:var(--glow)" : "") + '">' + esc(sub) + '</div>' + headerButtons(true) +
+      '<div class="panel"><div class="list"><div class="label"><small>Détecté</small><b>DOLIPRANE 1000 mg · AMOXICILLINE 1 g</b></div>' + rows + '</div>' +
+      '<div class="foot"><div class="two">' + mailRow + '<button class="ghost" data-act="detail">' + T.detail + '</button></div>' +
+      '<button class="finish" data-act="finish">' + (S.finishing ? T.finishing : ICON.tick + T.finish) + '</button></div></div>';
+  }
+
+  var card = document.createElement("div");
+  card.className = "card";
+  banner.appendChild(card);
+  var layer = null;
+
+  function render(keepLayer) {
+    var v = view();
+    banner.style.display = S.hidden ? "none" : "";
+    var size = sizeFor(v);
+    var layerEl = document.createElement("div");
+    layerEl.className = "layer";
+    layerEl.innerHTML = html(v);
+    if (keepLayer && layer) layerEl.style.animation = "none";
+    if (layer) layer.remove();
+    layer = layerEl;
+    card.appendChild(layer);
+    var w = size[0], h = size[1];
+    if (h === null) {
+      if (v === "expanded") {
+        layer.style.visibility = "hidden";
+        card.style.transition = "none";
+        card.style.width = w + "px";
+        card.style.height = "auto";
+        // La hauteur naturelle : en-tête + liste + pied, comme la bannière Windows la calcule.
+        var list = layer.querySelector(".list"), foot = layer.querySelector(".foot");
+        var need = (Z.header - 4) + list.scrollHeight + 6 + foot.offsetHeight + 10;
+        h = Math.min(need, 660);
+        card.style.transition = "";
+        layer.style.visibility = "";
+      } else {
+        var lines = layer.querySelectorAll(".done-lines p").length;
+        h = Math.max(Z.heightDone, 18 + 28 + lines * 20 + (layer.querySelector(".done-lines .pill") ? 38 : 0) + 22);
+      }
+    }
+    card.style.width = w + "px";
+    card.style.height = h + "px";
+    card.classList.toggle("dragging", false);
+    var mail = document.getElementById("mail");
+    if (mail) { mail.style.top = (banner.offsetTop + h + 10) + "px"; }
+    markStep();
+  }
+
+  function setView(v) { clearTimers(); S.view = v; S.finishing = false; if (v === "scan") S.analyzing = false; render(); schedule(); }
+  function schedule() {
+    if (S.view === "ready") later(MS.readyPauseMs, function () { if (S.view === "ready") { S.view = "expanded"; render(); } });
+    if (S.view === "quiet") later(MS.quietMs, function () { setView("idle"); });
+    if (S.view === "done") later(MS.doneMs, function () { S.answers = {}; S.emailSaved = false; closeMail(); setView("idle"); });
+  }
+
+  function closeMail() { var m = document.getElementById("mail"); if (m) m.remove(); S.mailOpen = false; }
+  function openMail() {
+    if (document.getElementById("mail")) return;
+    var m = document.createElement("div");
+    m.className = "mail"; m.id = "mail";
+    m.innerHTML = '<h3>E-mail du patient</h3><input type="email" id="mailInput" placeholder="prenom.nom@exemple.fr" autocomplete="off"><label><input type="checkbox" id="mailOk"> Le patient accepte de recevoir son bilan par e-mail</label><div class="msg" id="mailMsg"></div><div class="acts"><button class="go2" id="mailSave" disabled>Enregistrer l\\'e-mail</button><button class="later" id="mailLater">Plus tard</button></div>';
+    document.getElementById("screen").appendChild(m);
+    m.style.top = (banner.offsetTop + card.offsetHeight + 10) + "px";
+    var input = m.querySelector("#mailInput"), ok = m.querySelector("#mailOk"), save = m.querySelector("#mailSave");
+    function valid() { var t = input.value.trim(); return /^[^@ ]+@[^@ ]+[.][^@ .]{2,}$/.test(t) && !/^[0-9]{8,}$/.test(t); }
+    function refresh() { save.disabled = !(ok.checked && valid()); }
+    input.addEventListener("input", function () { if (/^[0-9]{8,}$/.test(input.value)) input.value = ""; refresh(); });
+    ok.addEventListener("change", refresh);
+    save.addEventListener("click", function () { S.emailSaved = true; closeMail(); render(true); });
+    m.querySelector("#mailLater").addEventListener("click", closeMail);
+    input.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMail(); if (e.key === "Enter" && !save.disabled) save.click(); });
+    input.focus();
+  }
+
+  banner.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-act]");
+    if (!el) { if (S.reduced) { S.reduced = false; render(); } else if (S.view === "ready") { clearTimers(); S.view = "expanded"; render(); } return; }
+    var act = el.getAttribute("data-act"), id = el.getAttribute("data-id");
+    if (act === "pin") { S.pinned = !S.pinned; render(true); }
+    else if (act === "min") { S.reduced = true; render(); }
+    else if (act === "expand") { S.reduced = false; render(); }
+    else if (act === "close") { S.hidden = true; closeMail(); render(); showRestore(); }
+    else if (act === "see") { clearTimers(); S.view = "expanded"; render(); }
+    else if (act === "sold") { S.answers[id] = "SOLD"; render(true); }
+    else if (act === "not") { S.answers[id] = "NOT_SOLD"; render(true); }
+    else if (act === "undo") { delete S.answers[id]; render(true); }
+    else if (act === "mail") openMail();
+    else if (act === "mailrm") { S.emailSaved = false; render(true); }
+    else if (act === "detail") { note.textContent = "« Voir le détail » ouvre la vente dans PharmaBoost, dans le navigateur."; }
+    else if (act === "finish") { if (S.finishing) return; S.finishing = true; render(true); later(700, function () { closeMail(); S.finishing = false; setView("done"); }); }
+  });
+
+  // Déplacer la carte à la souris (sauf si la position est verrouillée).
+  var drag = null;
+  banner.addEventListener("pointerdown", function (e) {
+    if (e.target.closest("[data-act]") || S.pinned) return;
+    drag = { x: e.clientX, y: e.clientY, r: parseFloat(banner.style.right || "18"), t: parseFloat(banner.style.top || "52") };
+    card.classList.add("dragging");
+    banner.setPointerCapture(e.pointerId);
+  });
+  banner.addEventListener("pointermove", function (e) {
+    if (!drag) return;
+    banner.style.right = Math.max(0, drag.r - (e.clientX - drag.x)) + "px";
+    banner.style.top = Math.max(0, drag.t + (e.clientY - drag.y)) + "px";
+    var m = document.getElementById("mail"); if (m) { m.style.top = (banner.offsetTop + card.offsetHeight + 10) + "px"; m.style.right = banner.style.right; }
+  });
+  banner.addEventListener("pointerup", function () { drag = null; card.classList.remove("dragging"); });
+
+  function showRestore() {
+    var b = document.getElementById("restore");
+    if (!b) { b = document.createElement("button"); b.id = "restore"; b.className = "go"; b.style.cssText = "right:18px;top:14px;width:auto;padding:0 16px;height:34px;border-radius:12px;position:absolute;z-index:6"; b.textContent = "Icône près de l'horloge : Afficher PharmaBoost"; document.getElementById("screen").appendChild(b); b.addEventListener("click", function () { S.hidden = false; S.reduced = false; b.remove(); render(); }); }
+  }
+
+  // Les étapes de la maquette, et le scénario complet.
+  var STEPS = [
+    ["1", "En attente", function () { reset(); setView("idle"); }],
+    ["2", "Scan détecté", function () { reset(); setView("scan"); }],
+    ["3", "Conseils disponibles", function () { reset(); S.view = "ready"; clearTimers(); render(); }],
+    ["4", "Conseils ouverts", function () { reset(); setView("expanded"); }],
+    ["5", "Pendant la vente", function () { reset(); S.answers = { a: "SOLD", b: "NOT_SOLD" }; setView("expanded"); }],
+    ["6", "Vente terminée", function () { reset(); S.answers = { a: "SOLD", b: "SOLD" }; S.emailSaved = true; setView("done"); }]
+  ];
+  var stepsEl = document.getElementById("steps");
+  var current = -1;
+  function reset() { clearTimers(); clearScenario(); closeMail(); S.reduced = false; S.hidden = false; S.answers = {}; S.emailSaved = false; S.finishing = false; S.analyzing = false; var r = document.getElementById("restore"); if (r) r.remove(); }
+  STEPS.forEach(function (s, i) {
+    var b = document.createElement("button");
+    b.textContent = s[0] + " · " + s[1];
+    b.addEventListener("click", function () { current = i; s[2](); });
+    stepsEl.appendChild(b);
+  });
+  var play = document.createElement("button");
+  play.className = "play"; play.textContent = "▶ Scénario complet";
+  stepsEl.appendChild(play);
+  var quiet = document.createElement("button");
+  quiet.textContent = "Rien à ajouter";
+  quiet.addEventListener("click", function () { reset(); setView("quiet"); });
+  stepsEl.appendChild(quiet);
+  var zoom = document.createElement("select");
+  [["100 %", 1], ["125 %", 1.25], ["150 %", 1.5]].forEach(function (z) { var o = document.createElement("option"); o.value = z[1]; o.textContent = "Affichage Windows " + z[0]; zoom.appendChild(o); });
+  zoom.addEventListener("change", function () { banner.style.zoom = zoom.value; render(true); });
+  stepsEl.appendChild(zoom);
+  function markStep() {
+    var buttons = stepsEl.querySelectorAll("button");
+    var idx = { idle: 0, scan: 1, ready: 2, expanded: answered() > 0 ? 4 : 3, done: 5 }[S.view];
+    for (var i = 0; i < buttons.length - 2; i++) buttons[i].classList.toggle("on", i === idx);
+  }
+  play.addEventListener("click", function () {
+    reset(); setView("idle");
+    step(2200, function () { setView("scan"); });
+    step(4800, function () { S.view = "ready"; render(); schedule(); });
+    step(8200, function () { S.answers.a = "SOLD"; render(true); });
+    step(10200, function () { S.answers.b = "NOT_SOLD"; render(true); });
+    step(12000, function () { openMail(); });
+    step(14200, function () { var m = document.getElementById("mail"); if (m) { var i = m.querySelector("#mailInput"); i.value = "claire.martin@exemple.fr"; i.dispatchEvent(new Event("input")); m.querySelector("#mailOk").checked = true; m.querySelector("#mailOk").dispatchEvent(new Event("change")); } });
+    step(15800, function () { var s = document.getElementById("mailSave"); if (s && !s.disabled) s.click(); });
+    step(17400, function () { S.answers.c = "SOLD"; render(true); });
+    step(19200, function () { var f = banner.querySelector('[data-act="finish"]'); if (f) f.click(); });
+  });
+
+  note.textContent = "Aperçu fidèle du dessin de la bannière Windows (mêmes couleurs, tailles, phrases et durées) — ce n'est pas une capture de Windows : la police (Segoe UI sur Windows), l'ombre et le lissage sont ceux de votre navigateur. Les photos de produits sont des exemples.";
+  STEPS[0][2]();
+})();
+</script>
+</body>
+</html>
+`;
+}
