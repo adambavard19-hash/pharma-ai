@@ -4,6 +4,7 @@ import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import { ADVICE_RULES, type AdviceRule } from "@/core/ai/engines/advice";
 import { drugKey } from "@/core/ai/engines/associations";
+import { summariseRuleFeedback, type RuleFeedback } from "@/core/ai/rule-feedback";
 import { cleanSentence } from "@/core/associations/rules";
 import {
   centralAssociationError,
@@ -88,6 +89,8 @@ export type CentralRuleView = {
   reason: string;
   safetyNotes: string[];
   source: string;
+  /** Ce que les comptoirs de toutes les pharmacies en disent (indication, jamais une décision). Vide : pas encore proposée. */
+  feedback: RuleFeedback | null;
 };
 
 export type CentralAssociationView = {
@@ -129,6 +132,7 @@ function describeRule(rule: AdviceRule, status: CentralStatus, outdated: boolean
     reason: startSentence(rule.shortReasonTemplate.replaceAll("{drug}", "le médicament")),
     safetyNotes: rule.safetyNotes,
     source: rule.clinicalContext,
+    feedback: null,
   };
 }
 
@@ -148,7 +152,35 @@ export async function listCentralRules(categoryLabels: Record<string, string>): 
     if (!rule) continue;
     views.push(describeRule(rule, row.status, false, row, categoryLabels[rule.category] ?? rule.category));
   }
-  return views;
+  const feedback = await loadRuleFeedback();
+  return views.map((view) => ({ ...view, feedback: feedback.get(view.ruleKey) ?? null }));
+}
+
+/**
+ * Pour chaque règle, ce que les comptoirs en ont fait, toutes pharmacies réelles confondues (la démonstration ne compte pas).
+ * Aucune donnée de patient : seulement des comptes par règle et par statut.
+ */
+export async function loadRuleFeedback(): Promise<Map<string, RuleFeedback>> {
+  const [byStatus, byPharmacy] = await Promise.all([
+    prisma.$queryRaw<{ ruleKey: string; status: string; count: number }[]>`
+      SELECT o."ruleKey" AS "ruleKey", r."status"::text AS "status", COUNT(*)::int AS "count"
+      FROM "recommendations" r
+      JOIN "advice_opportunities" o ON o."id" = r."opportunityId"
+      JOIN "pharmacies" p ON p."id" = r."pharmacyId"
+      WHERE p."isDemo" = false AND r."isDemo" = false AND o."ruleKey" IS NOT NULL
+      GROUP BY o."ruleKey", r."status"`,
+    prisma.$queryRaw<{ ruleKey: string; pharmacies: number }[]>`
+      SELECT o."ruleKey" AS "ruleKey", COUNT(DISTINCT r."pharmacyId")::int AS "pharmacies"
+      FROM "recommendations" r
+      JOIN "advice_opportunities" o ON o."id" = r."opportunityId"
+      JOIN "pharmacies" p ON p."id" = r."pharmacyId"
+      WHERE p."isDemo" = false AND r."isDemo" = false AND o."ruleKey" IS NOT NULL
+      GROUP BY o."ruleKey"`,
+  ]);
+  const grouped = new Map<string, { status: string; count: number }[]>();
+  for (const row of byStatus) grouped.set(row.ruleKey, [...(grouped.get(row.ruleKey) ?? []), { status: row.status, count: row.count }]);
+  const pharmacies = new Map(byPharmacy.map((row) => [row.ruleKey, row.pharmacies]));
+  return new Map([...grouped].map(([ruleKey, counts]) => [ruleKey, summariseRuleFeedback(counts, pharmacies.get(ruleKey) ?? 0)]));
 }
 
 export async function listCentralAssociations(): Promise<CentralAssociationView[]> {

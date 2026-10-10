@@ -254,6 +254,8 @@ function RuleItem({ rule }: { rule: RuleCard }) {
             <dd className="text-text-primary">« {rule.script} »</dd>
           </dl>
 
+          <FeedbackLine feedback={rule.feedback} />
+
           <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex items-center gap-1 text-[12.5px] text-text-tertiary hover:text-text-secondary">
             <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
             Voir le détail (raison affichée, question au patient, précautions, source)
@@ -289,6 +291,30 @@ function RuleItem({ rule }: { rule: RuleCard }) {
         </CardContent>
       </Card>
     </li>
+  );
+}
+
+/** Ce que les comptoirs de toutes les pharmacies en disent : une indication pour décider, jamais une décision automatique. */
+function FeedbackLine({ feedback }: { feedback: RuleCard["feedback"] }) {
+  if (!feedback || feedback.decided === 0) {
+    return <p className="text-[12.5px] text-text-tertiary">Pas encore proposée au comptoir : aucun retour des pharmacies.</p>;
+  }
+  const percent = feedback.retainedRate === null ? null : Math.round(feedback.retainedRate * 100);
+  const verdict = {
+    WELL_RECEIVED: { tone: "success" as const, label: "Bien accueilli" },
+    RARELY_RETAINED: { tone: "warning" as const, label: "Peu retenu" },
+    NEUTRAL: { tone: "neutral" as const, label: "Accueil moyen" },
+    NOT_ENOUGH_DATA: null,
+  }[feedback.verdict];
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text-secondary">
+      {verdict && <Badge tone={verdict.tone}>{verdict.label}</Badge>}
+      <span>
+        Dans les pharmacies : {feedback.decided} proposé{feedback.decided > 1 ? "s" : ""}, {feedback.retained} retenu{feedback.retained > 1 ? "s" : ""}
+        {percent !== null ? ` (${percent} %)` : ""}, {feedback.bought} acheté{feedback.bought > 1 ? "s" : ""} · {feedback.pharmacies} pharmacie{feedback.pharmacies > 1 ? "s" : ""}.
+      </span>
+      {!verdict && <span className="text-text-tertiary">Pas assez de retours pour juger (il en faut 30 dans au moins 3 pharmacies). Indication seulement : rien ne change tout seul.</span>}
+    </p>
   );
 }
 
@@ -610,7 +636,7 @@ function NewAssociationForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-function SearchField<T>({
+export function SearchField<T>({
   label,
   endpoint,
   minLength,

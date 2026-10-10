@@ -123,7 +123,14 @@ export const ADMIN_NAV: AdminNavSpace[] = [
     label: "Gestion",
     href: "/admin/conseils",
     groups: [
-      { key: "conseils", label: "Conseils", items: [{ href: "/admin/conseils", label: "Conseils & associations", description: "Les règles, les conseils et les associations de PharmaBoost : valider, supprimer, ajouter, pour toutes les pharmacies." }] },
+      {
+        key: "conseils",
+        label: "Conseils",
+        items: [
+          { href: "/admin/conseils", label: "Conseils & associations", description: "Les règles, les conseils et les associations de PharmaBoost : valider, supprimer, ajouter, pour toutes les pharmacies." },
+          { href: "/admin/connaissances", label: "Base de connaissances", description: "Déposer des documents et des notes : le modèle les lit et propose des conseils, vous acceptez ou refusez." },
+        ],
+      },
       {
         key: "communication",
         label: "Communication",

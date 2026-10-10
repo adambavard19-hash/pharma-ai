@@ -10,11 +10,14 @@ import { SCORE_WEIGHTS } from "./scoring";
  * (même sécurité, même adéquation, mêmes précautions et vigilances, écart de
  * pertinence négligeable), les critères de l'officine départagent, dans cet
  * ordre : formule préférée par la règle, préférence déclarée, gamme
- * privilégiée, date courte, disponibilité, historique, marge.
+ * privilégiée, date courte, challenge laboratoire en cours, disponibilité,
+ * historique, marge.
  *
- * Une préférence, une gamme partenaire, une date courte ou une marge ne fait
- * donc jamais passer une référence moins adaptée, plus signalée ou moins sûre
- * devant une autre. Les challenges laboratoires n'entrent pas ici du tout.
+ * Une préférence, une gamme partenaire, une date courte, un challenge ou une
+ * marge ne fait donc jamais passer une référence moins adaptée, plus signalée
+ * ou moins sûre devant une autre. À niveau clinique égal, la boîte à date
+ * courte passe d'abord (on évite la perte), puis celle qui participe à un
+ * challenge en cours.
  */
 
 /** Écart de score clinique sous lequel deux références sont équivalentes. */
@@ -56,6 +59,7 @@ export type TiebreakCriterion =
   | "PREFERENCE_OFFICINE"
   | "GAMME_PRIVILEGIEE"
   | "DATE_COURTE"
+  | "CHALLENGE"
   | "DISPONIBILITE"
   | "HISTORIQUE"
   | "COMMERCIAL";
@@ -65,6 +69,7 @@ export const TIEBREAK_LABELS: Record<TiebreakCriterion, string> = {
   PREFERENCE_OFFICINE: "préférence déclarée par l'officine",
   GAMME_PRIVILEGIEE: "gamme privilégiée de l'officine",
   DATE_COURTE: "date courte",
+  CHALLENGE: "challenge laboratoire en cours",
   DISPONIBILITE: "disponibilité en rayon",
   HISTORIQUE: "historique de validation",
   COMMERCIAL: "marge",
@@ -77,6 +82,8 @@ export type TiebreakContext = {
   rangeRank: (item: ScoredRecommendation) => number | null;
   /** Date courte de la référence ; null si inconnue. */
   shortDate: (item: ScoredRecommendation) => ShortDate | null;
+  /** La référence participe-t-elle à un challenge laboratoire actif ? Absent : non. */
+  hasChallenge?: (item: ScoredRecommendation) => boolean;
 };
 
 /** Plus petit = favorisé. Une boîte périmée, lointaine ou trop courte ne départage rien. */
@@ -106,6 +113,7 @@ export function chooseAmongEquivalents(list: ScoredRecommendation[], context: Ti
     ["PREFERENCE_OFFICINE", (item) => -item.breakdown.pharmacistPreference],
     ["GAMME_PRIVILEGIEE", (item) => context.rangeRank(item) ?? Number.POSITIVE_INFINITY],
     ["DATE_COURTE", (item) => shortDateKey(context.shortDate(item))],
+    ["CHALLENGE", (item) => (context.hasChallenge?.(item) ? 0 : 1)],
     ["DISPONIBILITE", (item) => -item.breakdown.availability],
     ["HISTORIQUE", (item) => -item.breakdown.validationHistory],
     ["COMMERCIAL", (item) => -item.breakdown.commercial],

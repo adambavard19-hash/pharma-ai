@@ -89,6 +89,22 @@ describe("sécurité et pertinence avant toute préférence commerciale", () => 
     });
   }
 
+  it("un challenge laboratoire en cours départage des équivalents — après la date courte, jamais devant la clinique", () => {
+    const base = [product({ id: "sans", name: "AUTRE Flore", brand: "Autre" })];
+    const pick = (extra: Parameters<typeof product>[0], others = base) => runAnalysisPipeline(buildInput({ catalog: [...others, product(extra)] })).recommendations[0];
+    const chosen = pick({ id: "challenge", name: "CHALL Flore", brand: "Chall", activeChallenge: "Challenge probiotiques" });
+    expect(chosen?.productId).toBe("challenge");
+    expect(chosen?.tiebreak).toBe("CHALLENGE");
+    // La date courte passe avant le challenge.
+    const both = runAnalysisPipeline(
+      buildInput({ catalog: [product({ id: "challenge", name: "CHALL Flore", brand: "Chall", activeChallenge: "Challenge" }), product({ id: "court", name: "COURT Flore", brand: "Court", shortDate: short(40) })] }),
+    ).recommendations[0];
+    expect(both?.productId).toBe("court");
+    // Une référence en rupture, ou qui impose une précaution, ne passe pas devant même avec un challenge.
+    expect(pick({ id: "rupture", name: "RUPT Flore", brand: "Rupt", activeChallenge: "Challenge", stockQuantity: 0 })?.productId).toBe("sans");
+    expect(pick({ id: "precaution", name: "PREC Flore", brand: "Prec", activeChallenge: "Challenge", precautions: ["Déconseillé chez l'insuffisant rénal"] })?.productId).toBe("sans");
+  });
+
   it("une date courte départage des équivalents, jamais une boîte périmée ou qui périme pendant le traitement", () => {
     const base = [product({ id: "loin", name: "AUTRE Flore", brand: "Autre" })];
     const pick = (shortDate: ShortDate | null) =>

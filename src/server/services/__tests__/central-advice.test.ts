@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     centralAdviceRule: { findMany: vi.fn(), findUnique: vi.fn(), upsert: vi.fn(), create: vi.fn(), update: vi.fn(), deleteMany: vi.fn() },
     centralAssociation: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
     product: { findMany: vi.fn() },
+    $queryRaw: vi.fn(async (): Promise<unknown[]> => []),
   },
   recordAudit: vi.fn(),
 }));
@@ -53,6 +54,19 @@ describe("ce que l'analyse lit", () => {
     const central = await loadCentralAdvice();
     expect(central.removed).toEqual([RULE.key]);
     expect(central.custom.map((rule) => rule.key)).toEqual(["custom-1"]);
+  });
+});
+
+describe("l'accueil des règles dans les pharmacies (liste de la console)", () => {
+  it("joint à chaque règle ce que les comptoirs en disent, seulement quand elle a été proposée", async () => {
+    mocks.prisma.centralAdviceRule.findMany.mockResolvedValue([]);
+    const key = ADVICE_RULES[0].key;
+    mocks.prisma.$queryRaw
+      .mockResolvedValueOnce([{ ruleKey: key, status: "ACCEPTED", count: 50 }, { ruleKey: key, status: "REMOVED", count: 10 }])
+      .mockResolvedValueOnce([{ ruleKey: key, pharmacies: 4 }]);
+    const views = await listCentralRules({});
+    expect(views.find((view) => view.ruleKey === key)?.feedback).toMatchObject({ decided: 60, retained: 50, pharmacies: 4, verdict: "WELL_RECEIVED" });
+    expect(views.find((view) => view.ruleKey === ADVICE_RULES[1].key)?.feedback).toBeNull();
   });
 });
 

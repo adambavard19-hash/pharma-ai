@@ -2354,6 +2354,67 @@ model CentralAssociation {
   @@map("central_associations")
 }
 
+/// Un document déposé par la pharmacienne de PharmaBoost dans la console (fichier ou texte écrit à la main) : listes d'associations,
+/// recommandations, notes importantes. Seul le TEXTE est gardé (jamais le fichier d'origine) ; aucun document ne contient de donnée patient.
+/// Le modèle d'Anthropic le lit et en tire des PROPOSITIONS ; rien ne devient un conseil sans le clic de la pharmacienne.
+model KnowledgeDocument {
+  id               String   @id @default(cuid())
+  title            String
+  /// FILE ou TEXT.
+  sourceType       String
+  fileName         String?
+  mimeType         String?
+  sizeBytes        Int      @default(0)
+  textContent      String
+  /// Ce que la pharmacienne veut qu'on sache de ce document (contexte, limites).
+  note             String?
+  /// DEPOSITED (déposé), ANALYSED (lu), FAILED (analyse impossible : voir analysisError).
+  status           String   @default("DEPOSITED")
+  analysisError    String?
+  analysedAt       DateTime?
+  analysisModel    String?
+  /// Combien de propositions ont été écartées parce que leur citation n'existe pas dans le document, ou qu'elles ne respectaient pas les règles.
+  discardedCount   Int      @default(0)
+  createdByAdminId String?
+  createdByName    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  proposals KnowledgeProposal[]
+
+  @@index([createdAt])
+  @@map("knowledge_documents")
+}
+
+/// Ce que le modèle propose d'après un document : une association ou un conseil, avec LA PHRASE du document qui le justifie
+/// (vérifiée mot à mot). La pharmacienne l'accepte (il devient un conseil ou une association, en ligne partout) ou le refuse.
+model KnowledgeProposal {
+  id               String    @id @default(cuid())
+  documentId       String
+  /// ASSOCIATION ou RULE.
+  kind             String
+  title            String
+  /// La proposition, au format du centre de contrôle des conseils.
+  payload          Json
+  /// La citation exacte du document qui la justifie.
+  sourceQuote      String
+  /// PENDING, ACCEPTED, REJECTED.
+  status           String    @default("PENDING")
+  /// Pourquoi elle ne peut pas être acceptée telle quelle (produit introuvable dans les stocks…).
+  problem          String?
+  /// La clé du conseil ou l'identifiant de l'association créés à l'acceptation.
+  resultRef        String?
+  decidedAt        DateTime?
+  decidedByAdminId String?
+  decidedByName    String?
+  createdAt        DateTime  @default(now())
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, status])
+  @@map("knowledge_proposals")
+}
+
 /// Le suivi d'une vente au comptoir, tenu par la fenêtre PharmaBoost du poste de caisse : le bilan chiffré de la vente (conseils
 /// proposés, vendus, non vendus, sans réponse) et, si le patient l'a accepté, son e-mail — gardé CHIFFRÉ, avec l'instant du
 /// consentement — pour lui envoyer son bilan à la fin de la vente. Aucune donnée de santé n'est gardée ici.

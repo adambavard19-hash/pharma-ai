@@ -211,6 +211,11 @@ export type CatalogProduct = {
    * qu'au départage de références équivalentes — jamais au score.
    */
   shortDate?: ShortDate | null;
+  /**
+   * Le titre du challenge laboratoire actif auquel ce produit participe, quand il y en a un. Comme la date courte, il ne sert
+   * qu'au départage de références cliniquement équivalentes — jamais au score.
+   */
+  activeChallenge?: string | null;
   /** Vigilances patient déclarées par l'officine sur ce produit. */
   vigilances?: { population: string; level: VigilanceLevel; note: string | null }[];
 };

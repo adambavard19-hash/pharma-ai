@@ -8,6 +8,7 @@ import { normalizeSearchText } from "@/core/reference/search";
 import { classifyNationalDrug } from "@/core/catalog/product-vocabulary";
 import { engineRangesFrom, type PreferredRangeInput } from "@/core/catalog/preferred-ranges";
 import { nearestShortDatesFor } from "@/server/services/stock-lots";
+import { activeChallengeTitlesFor } from "@/server/services/challenges";
 import type { VigilanceLevel } from "@/config/vigilances";
 
 /**
@@ -250,13 +251,19 @@ export async function loadPreferredRanges(scope: TenantScope): Promise<Preferred
  * pur et ne lit jamais l'heure.
  */
 export async function enrichCatalog(scope: TenantScope, catalog: CatalogProduct[], today: Date = new Date()): Promise<CatalogProduct[]> {
-  const [shortDates, vigilances] = await Promise.all([
+  const [shortDates, vigilances, challenges] = await Promise.all([
     // Lots non périmés dans le seuil « bientôt » de l'officine (service des dates courtes).
     nearestShortDatesFor(scope.pharmacyId, today),
     prisma.productVigilance.findMany({
       where: { pharmacyId: scope.pharmacyId },
       select: { productId: true, population: true, level: true, note: true },
     }),
+    // Les challenges laboratoires actifs : un produit qui y participe passe devant, à niveau clinique égal (après la date courte).
+    activeChallengeTitlesFor(
+      scope.pharmacyId,
+      catalog.filter((product) => product.origin === "PHARMACY_CATALOG").map((product) => product.id),
+      today,
+    ),
   ]);
   const vigilancesByProduct = new Map<string, { population: string; level: VigilanceLevel; note: string | null }[]>();
   for (const v of vigilances) {
@@ -265,6 +272,7 @@ export async function enrichCatalog(scope: TenantScope, catalog: CatalogProduct[
   return catalog.map((product) => ({
     ...product,
     shortDate: shortDates.get(product.presentationId ? `d:${product.presentationId}` : `p:${product.id}`) ?? null,
+    activeChallenge: product.origin === "PHARMACY_CATALOG" ? (challenges.get(product.id) ?? null) : null,
     vigilances: product.origin === "PHARMACY_CATALOG" ? (vigilancesByProduct.get(product.id) ?? []) : [],
   }));
 }

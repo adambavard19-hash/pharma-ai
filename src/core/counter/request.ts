@@ -334,6 +334,7 @@ export function runRequestPipeline(params: {
             return product ? rangeRankFor(product, opportunity.category ?? null, params.preferredRanges ?? []) : null;
           },
           shortDate: (item) => catalogById.get(item.productId)?.shortDate ?? null,
+          hasChallenge: (item) => Boolean(catalogById.get(item.productId)?.activeChallenge),
         }).chosen
       : null;
     if (!best) {

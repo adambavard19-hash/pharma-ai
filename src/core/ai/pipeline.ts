@@ -700,6 +700,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
             return product ? rangeRankFor(product, opportunityCategory, input.preferredRanges ?? []) : null;
           },
           shortDate: (item) => catalogById.get(item.productId)?.shortDate ?? null,
+          hasChallenge: (item) => Boolean(catalogById.get(item.productId)?.activeChallenge),
         });
         const best = decision.best;
         list.sort((a, b) => (a === best ? -1 : b === best ? 1 : 0));
