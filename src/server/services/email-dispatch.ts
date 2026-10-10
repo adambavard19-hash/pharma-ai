@@ -35,6 +35,14 @@ export type DispatchKind =
   | "PATIENT_REPORT"
   /** Le bilan du mois écoulé au comptoir, envoyé au titulaire. */
   | "COUNTER_MONTHLY"
+  /** Le titulaire invite un collaborateur : lien personnel pour créer son compte. */
+  | "TEAM_INVITATION"
+  /** Un collaborateur demande à rejoindre l'officine : l'alerte au titulaire. */
+  | "JOIN_REQUEST_ALERT"
+  /** Le titulaire a approuvé ou refusé une demande de rattachement. */
+  | "JOIN_REQUEST_DECISION"
+  /** Une demande de rattachement vient d'une adresse qui a déjà un compte : on le lui dit, par e-mail seulement. */
+  | "ACCOUNT_EXISTS"
   /** Un modèle du centre de modèles (relance automatique, envoi manuel, test). */
   | "TEMPLATE"
   /** Une campagne de la console (offre bonus, parrainage, invitation des partenaires). */

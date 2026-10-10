@@ -40,6 +40,7 @@
     "lot:isolation": "node --env-file=.env --conditions=react-server --import tsx scripts/lot-pharmacienne/isolation.mts",
     "lot:isolation-partenaires": "node --env-file=.env --conditions=react-server --import tsx scripts/lot-partenaires/isolation.mts",
     "agent:build:journal": "node -e \"require('esbuild').buildSync({entryPoints:['agent/src/lire-journal.ts'],bundle:true,platform:'node',target:'node18',format:'cjs',outfile:'agent/dist/lire-journal.js'})\"",
+    "essai:equipe": "node --env-file=.env --conditions=react-server --import tsx scripts/essai-equipe.ts",
     "essai:multi": "node --env-file=.env --conditions=react-server --import tsx scripts/essai-multi-pharmacies.ts"
   },
   "dependencies": {

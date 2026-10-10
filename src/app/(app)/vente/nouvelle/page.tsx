@@ -17,6 +17,7 @@ import { findDemoScenario } from "@/core/demo/scenarios";
 import { CounterDashboard } from "./counter-dashboard";
 import { NewPrescriptionForm } from "./new-prescription-form";
 import { CounterRequestCard } from "./counter-request";
+import { WorkHere } from "./work-here";
 
 export const metadata: Metadata = { title: "Nouvelle vente" };
 
@@ -74,6 +75,8 @@ export default async function NewPrescriptionPage({
           : les boîtes arrivent comme si elles étaient passées à la caisse.
         </p>
       )}
+
+      <WorkHere comptoirs={mine.posts.map((post) => ({ id: post.id, name: post.name, assignee: post.assigneeName, mine: post.assignedUserId === session.scope.userId }))} />
 
       <CounterDashboard
         dateLabel={formatParisDate(now)}

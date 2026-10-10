@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getInstallState } from "@/server/services/install-state";
 import { LoginForm } from "./login-form";
 import { PharmaLogo, PharmaWordmark } from "@/components/app/logo";
@@ -98,6 +99,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           {defini === "1" && <Alert tone="success">Mot de passe enregistré. Connectez-vous avec votre adresse e-mail et ce nouveau mot de passe.</Alert>}
 
           <LoginForm install={install} initialError={null} />
+
+          <p className="text-center text-[13.5px] text-text-secondary">
+            Votre titulaire ne vous a pas encore invité ?{" "}
+            <Link href="/rejoindre" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">
+              Rejoindre mon officine
+            </Link>
+          </p>
         </div>
       </section>
     </main>

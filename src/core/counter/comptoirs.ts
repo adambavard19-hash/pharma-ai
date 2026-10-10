@@ -9,7 +9,7 @@
  *  - un comptoir attribué à quelqu'un est le sien ;
  *  - une pharmacie qui n'a qu'UN comptoir n'a rien à attribuer : il est à tout le monde ;
  *  - une pharmacie à plusieurs comptoirs dont aucun n'est attribué à la personne : elle ne voit aucune vente en direct, et on lui dit
- *    pourquoi (le titulaire attribue les comptoirs dans « Mes connexions »).
+ *    pourquoi (le titulaire attribue les comptoirs dans « Mes comptoirs »).
  *
  * Module pur.
  */
@@ -52,6 +52,6 @@ export function parseComptoirName(raw: unknown): { ok: true; value: string } | {
 export function noComptoirMessage(mode: MyComptoirs["mode"], canAssign: boolean): string | null {
   if (mode !== "NONE") return null;
   return canAssign
-    ? "Aucun comptoir ne vous est attribué. Attribuez-vous un comptoir dans « Mes connexions » : vous ne verrez que ses délivrances."
+    ? "Aucun comptoir ne vous est attribué. Attribuez-vous un comptoir dans « Mes comptoirs » : vous ne verrez que ses délivrances."
     : "Aucun comptoir ne vous est attribué. Demandez au titulaire de vous en attribuer un : vous verrez alors les délivrances de votre comptoir.";
 }

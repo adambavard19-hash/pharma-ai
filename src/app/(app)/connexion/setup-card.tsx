@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Une étape : une icône, un titre numéroté, une pastille d'état facultative, puis son contenu.
- * Toutes les étapes de « Mes connexions » ont la même forme : on les lit de la même façon.
+ * Toutes les étapes de « Mes comptoirs » ont la même forme : on les lit de la même façon.
  */
 export function SetupCard({ icon: Icon, title, badge, children, className }: { icon: LucideIcon; title: string; badge?: ReactNode; children: ReactNode; className?: string }) {
   return (

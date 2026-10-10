@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle2, Circle, type LucideIcon } from "lucide-react";
 
 /**
- * Les couleurs d'état de « Mes connexions » : un état se lit à sa couleur et à son
+ * Les couleurs d'état de « Mes comptoirs » : un état se lit à sa couleur et à son
  * icône avant de se lire à son texte. Vert = ça marche, orange = à faire ou à
  * surveiller, gris = pas encore. Jamais du rouge pour ce qui n'est pas dangereux.
  */

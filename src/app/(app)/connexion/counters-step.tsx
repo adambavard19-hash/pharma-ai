@@ -75,10 +75,13 @@ export function CountersStep({ counters, installerAvailable, members, assignment
     });
 
   return (
-    <SetupCard icon={Monitor} title="1. Installer sur mes comptoirs" badge={connected > 0 ? <Badge tone="success">{connected} connecté{connected > 1 ? "s" : ""}</Badge> : undefined}>
+    <SetupCard icon={Monitor} title="1. Mes comptoirs" badge={connected > 0 ? <Badge tone="success">{connected} connecté{connected > 1 ? "s" : ""}</Badge> : undefined}>
       <p className="text-[15px] leading-6 text-text-secondary">Téléchargez PharmaBoost sur chaque ordinateur Windows de votre pharmacie, puis ouvrez le fichier.</p>
       <p className="text-[13.5px] leading-5 text-text-secondary">
-        Chaque comptoir est un espace à part, attribué à une personne : elle ne voit que les délivrances de son comptoir, et personne ne voit les siennes. Choisissez qui travaille à quel comptoir.
+        Chaque comptoir est un espace à part, attribué à une personne : elle ne voit que les délivrances de son comptoir, et personne ne voit les siennes. Choisissez ici qui travaille à quel comptoir ; chacun peut aussi se l&apos;attribuer d&apos;un clic depuis « Nouvelle vente » (« Je travaille ici »), sans rien réinstaller.
+      </p>
+      <p className="text-[13px] leading-5 text-text-secondary">
+        Chaque ordinateur s&apos;installe une seule fois. Le fichier téléchargé porte un code à usage unique créé pour vous seul, valable sept jours : personne d&apos;autre ne peut relier un ordinateur à votre pharmacie.
       </p>
 
       {listed.length > 0 && (

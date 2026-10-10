@@ -44,7 +44,7 @@ describe("le nom d'un comptoir", () => {
   });
   it("explique, selon qui lit, pourquoi aucune vente n'est visible", () => {
     expect(noComptoirMessage("MINE", true)).toBeNull();
-    expect(noComptoirMessage("NONE", true)).toContain("Mes connexions");
+    expect(noComptoirMessage("NONE", true)).toContain("Mes comptoirs");
     expect(noComptoirMessage("NONE", false)).toContain("titulaire");
   });
 });

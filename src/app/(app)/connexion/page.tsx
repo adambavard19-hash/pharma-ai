@@ -8,7 +8,7 @@ import { listComptoirs, listMembers } from "@/server/services/comptoirs";
 import type { OverviewSnapshot } from "@/server/actions/stock-sync";
 import { ConnectionSetup } from "./setup";
 
-export const metadata: Metadata = { title: "Mes connexions" };
+export const metadata: Metadata = { title: "Mes comptoirs" };
 
 /**
  * « Installer PharmaBoost » — une page courte, trois blocs : installer sur mes comptoirs, envoyer mon stock,

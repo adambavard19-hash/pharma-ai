@@ -132,7 +132,7 @@ describe("chaque comptoir est un espace à part", () => {
     const status = buildCounterStatus({ now: NOW, posts: two, mine: { postIds: [], mode: "NONE" }, canAssign: false });
     expect(status).toMatchObject({ state: "UNASSIGNED", posts: [], pill: { label: "Comptoir à choisir" } });
     expect(status.subtitle).toContain("titulaire");
-    expect(buildCounterStatus({ now: NOW, posts: two, mine: { postIds: [], mode: "NONE" }, canAssign: true }).subtitle).toContain("Mes connexions");
+    expect(buildCounterStatus({ now: NOW, posts: two, mine: { postIds: [], mode: "NONE" }, canAssign: true }).subtitle).toContain("Mes comptoirs");
   });
 
   it("une pharmacie sans aucun comptoir relié reste « non connectée », pas « à choisir »", () => {

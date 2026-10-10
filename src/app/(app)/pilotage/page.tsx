@@ -92,7 +92,7 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
                       </span>
                       <span className="min-w-0 flex-1 basis-40">
                         <span className="block truncate text-[16px] font-semibold text-text-primary">{row.name}</span>
-                        {unassigned && <span className="block text-[12.5px] text-text-secondary">Ventes d&apos;un comptoir qui n&apos;était attribué à personne. Attribuez-le dans « Mes connexions ».</span>}
+                        {unassigned && <span className="block text-[12.5px] text-text-secondary">Ventes d&apos;un comptoir qui n&apos;était attribué à personne. Attribuez-le dans « Mes comptoirs ».</span>}
                         {!unassigned && <span className="mt-1 block h-1.5 max-w-xs overflow-hidden rounded-full bg-surface-sunken" aria-hidden><span className="block h-full rounded-full bg-brand-500" style={{ width: `${share}%` }} /></span>}
                       </span>
                       <dl className="flex shrink-0 gap-6 text-right">

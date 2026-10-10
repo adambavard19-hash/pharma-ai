@@ -168,6 +168,8 @@ model Pharmacy {
   cancellationRequests     CancellationRequest[]
   patientNewsSubscriptions PatientNewsSubscription[]
   patientNewsAnnouncements PatientNewsAnnouncement[]
+  teamInvitations          TeamInvitation[]
+  joinRequests             JoinRequest[]
 
   @@index([organizationId])
   @@map("pharmacies")
@@ -562,6 +564,66 @@ model Membership {
   @@unique([userId, pharmacyId])
   @@index([pharmacyId])
   @@map("memberships")
+}
+
+/// Une invitation du titulaire : un lien personnel, envoyé par e-mail, pour créer son compte et rejoindre CETTE officine avec le
+/// poste prévu. Seule l'empreinte du jeton est conservée ; le lien est daté et à usage unique.
+model TeamInvitation {
+  id              String    @id @default(cuid())
+  pharmacyId      String
+  email           String
+  role            UserRole
+  firstName       String?
+  lastName        String?
+  tokenHash       String    @unique
+  expiresAt       DateTime
+  invitedByUserId String?
+  /// Combien de fois le lien a été (ré)envoyé.
+  sentCount       Int       @default(1)
+  lastSentAt      DateTime  @default(now())
+  acceptedAt      DateTime?
+  acceptedUserId  String?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, email])
+  @@map("team_invitations")
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REFUSED
+  CANCELLED
+}
+
+/// Un collaborateur qui demande à rejoindre une officine (« Rejoindre mon officine »). Tant que le titulaire n'a pas approuvé, aucun compte
+/// n'existe et rien de l'officine n'est accessible : le mot de passe choisi n'est conservé (empreinte) que le temps de la décision.
+model JoinRequest {
+  id              String            @id @default(cuid())
+  pharmacyId      String
+  email           String
+  firstName       String
+  lastName        String
+  /// Le poste que la personne déclare ; le titulaire décide du poste réel à l'approbation.
+  suggestedRole   UserRole          @default(TECHNICIAN)
+  /// Effacé dès que la demande est décidée.
+  passwordHash    String?
+  status          JoinRequestStatus @default(PENDING)
+  requestedAt     DateTime          @default(now())
+  decidedAt       DateTime?
+  decidedByUserId String?
+  grantedRole     UserRole?
+  /// Le compte créé (ou retrouvé) à l'approbation.
+  userId          String?
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, status])
+  @@index([email])
+  @@map("join_requests")
 }
 
 model Session {

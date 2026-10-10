@@ -20,7 +20,7 @@ describe("le menu, en quatre groupes", () => {
     expect(labels("comptoir")).toEqual(["Patients", "Suivis patients", "Réglementation"]);
     expect(labels("pharmacie")).toEqual(["Mon stock", "Performances", "Mon assortiment", "Mes associations", "Mon équipe"]);
     expect(labels("decouvrir")).toEqual(["Formations", "Partenaires", "Actualités"]);
-    expect(labels("configuration")).toEqual(["Mes connexions", "Paramètres"]);
+    expect(labels("configuration")).toEqual(["Mes comptoirs", "Paramètres"]);
   });
 
   it("l'ordre du tableau est celui de l'écran : les groupes se suivent sans se mélanger", () => {
@@ -55,7 +55,7 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
   it("l'équipe au comptoir ne voit aucune entrée de gestion : ni Performances, ni assortiment, ni équipe, ni partenaires, ni actualités, ni connexions, ni paramètres", () => {
     for (const role of TEAM_ROLES) {
       const menu = menuOf(role);
-      for (const gone of ["Performances", "Mon assortiment", "Mon équipe", "Partenaires", "Actualités", "Mes connexions", "Paramètres"]) {
+      for (const gone of ["Performances", "Mon assortiment", "Mon équipe", "Partenaires", "Actualités", "Mes comptoirs", "Paramètres"]) {
         expect(menu, `${role} : ${gone}`).not.toContain(gone);
       }
     }
@@ -88,12 +88,12 @@ describe("les intitulés", () => {
     expect(entry).toMatchObject({ label: "Actualités", icon: Megaphone, permission: PERMISSIONS.NEWS_MANAGE, match: ["/nouveautes"], group: "decouvrir" });
   });
 
-  it("les nouveaux intitulés : Mon stock, Mon équipe, Mon assortiment, Mes connexions, Suivis patients, Formations, Performances", () => {
+  it("les nouveaux intitulés : Mon stock, Mon équipe, Mon assortiment, Mes comptoirs, Suivis patients, Formations, Performances", () => {
     const byHref = (href: string) => NAVIGATION.find((item) => item.href === href)?.label;
     expect(byHref("/stock")).toBe("Mon stock");
     expect(byHref("/equipe")).toBe("Mon équipe");
     expect(byHref("/assortiment")).toBe("Mon assortiment");
-    expect(byHref("/connexion")).toBe("Mes connexions");
+    expect(byHref("/connexion")).toBe("Mes comptoirs");
     expect(byHref("/suivis")).toBe("Suivis patients");
     expect(byHref("/formation")).toBe("Formations");
     expect(byHref("/pilotage")).toBe("Performances");
@@ -131,7 +131,7 @@ describe("reste active sur sa page et ses sous-adresses, sans déborder", () => 
     expect(isNavItemActive(entry, "/stock-autre")).toBe(false);
   });
 
-  it("Mes connexions couvre /connexion et son guide", () => {
+  it("Mes comptoirs couvre /connexion et son guide", () => {
     const entry = NAVIGATION.find((item) => item.href === "/connexion");
     if (!entry) throw new Error("entrée absente");
     expect(isNavItemActive(entry, "/connexion/guide")).toBe(true);

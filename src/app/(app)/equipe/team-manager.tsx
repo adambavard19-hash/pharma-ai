@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Check, KeyRound, Pencil, Plus, ShieldOff, UserPlus } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, KeyRound, Pencil, Plus, ShieldOff } from "lucide-react";
 import {
   createCollaboratorAction,
   moveCollaboratorAction,
@@ -12,6 +12,7 @@ import {
 } from "@/server/actions/team";
 import { TEAM_ROLES, TEAM_ROLE_LABELS, type TeamRole } from "@/core/team/rules";
 import { MemberEditModal } from "@/components/team/member-edit-modal";
+import { InvitationsPanel, InviteButton, InviteModal, JoinRequestsPanel, type InvitationItem, type JoinRequestItem } from "./access-panels";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,10 @@ export type TeamMember = {
   sharedAccount: boolean;
   lastLoginAt: string | null;
   isSelf: boolean;
+  /** Quand la personne a rejoint l'équipe. */
+  joinedAt: string;
+  /** Le comptoir où elle travaille (« Comptoir 2 »), s'il y en a un. */
+  comptoir: string | null;
 };
 
 type AssignableRole = "PHARMACIST" | "TECHNICIAN" | "STUDENT" | "VIEWER";
@@ -54,8 +59,9 @@ const ROLE_OPTIONS = TEAM_ROLES.filter((role): role is (typeof TEAM_ROLES)[numbe
  * permissions. Le serveur applique les règles (une officine garde toujours un titulaire actif et un titulaire principal) ;
  * l'écran n'offre que ce qui passera, et dit pourquoi quand un geste est refusé.
  */
-export function TeamManager({ members, canManageOwners }: { members: TeamMember[]; canManageOwners: boolean }) {
+export function TeamManager({ members, canManageOwners, requests, invitations }: { members: TeamMember[]; canManageOwners: boolean; requests: JoinRequestItem[]; invitations: InvitationItem[] }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [passwordFor, setPasswordFor] = useState<TeamMember | null>(null);
   const [editFor, setEditFor] = useState<TeamMember | null>(null);
   const [pending, startTransition] = useTransition();
@@ -75,15 +81,18 @@ export function TeamManager({ members, canManageOwners }: { members: TeamMember[
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
+      <JoinRequestsPanel requests={requests} />
+
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-[13.5px] text-text-secondary">
           {members.filter((m) => m.isActive).length} accès actif
           {members.filter((m) => m.isActive).length > 1 ? "s" : ""} sur {members.length}
+          {invitations.length > 0 ? ` · ${invitations.length} invitation${invitations.length > 1 ? "s" : ""} sans réponse` : ""}
         </p>
-        <Button onClick={() => setAddOpen(true)} leadingIcon={<UserPlus className="size-[18px]" />}>
-          Ajouter un collaborateur
-        </Button>
+        <InviteButton onClick={() => setInviteOpen(true)} />
       </div>
+
+      <InvitationsPanel invitations={invitations} />
 
       <Card>
         <CardContent className="p-0">
@@ -137,6 +146,10 @@ export function TeamManager({ members, canManageOwners }: { members: TeamMember[
                     {member.lastLoginAt
                       ? ` · vu ${formatRelative(member.lastLoginAt)}`
                       : " · jamais connecté"}
+                  </p>
+                  <p className="text-[12.5px] text-text-tertiary">
+                    A rejoint l&apos;équipe {formatRelative(member.joinedAt)}
+                    {member.comptoir ? <> · <span className="font-medium text-text-secondary">{member.comptoir}</span></> : " · aucun comptoir"}
                   </p>
                 </div>
 
@@ -204,6 +217,7 @@ export function TeamManager({ members, canManageOwners }: { members: TeamMember[
         </CardContent>
       </Card>
 
+      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onManual={() => { setInviteOpen(false); setAddOpen(true); }} />
       <AddMemberModal open={addOpen} onClose={() => setAddOpen(false)} />
       <PasswordModal member={passwordFor} onClose={() => setPasswordFor(null)} />
       <MemberEditModal

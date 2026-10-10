@@ -52,7 +52,7 @@ export function CounterDashboard({
   dateLabel: string;
   initial: CounterDashboardData;
   initialSales: LiveSale[];
-  /** Peut relier un comptoir (la page « Mes connexions »). */
+  /** Peut relier un comptoir (la page « Mes comptoirs »). */
   canConfigure: boolean;
   /** Ouvre la saisie manuelle d'emblée : un patient ou une demande de démonstration arrive déjà choisi. */
   manualOpen: boolean;

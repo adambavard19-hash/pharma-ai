@@ -38,7 +38,7 @@ describe("la page du lien d'installation d'un poste", () => {
     mocks.peekPostInstallLink.mockResolvedValue(null);
     const html = await render();
     expect(html).toContain("Ce lien n&#x27;est plus valable");
-    expect(html).toContain("Mes connexions");
+    expect(html).toContain("Mes comptoirs");
     expect(html).toContain("contact@pharmaboost.app");
     expect(html).not.toContain("/api/agent/installateur/");
   });

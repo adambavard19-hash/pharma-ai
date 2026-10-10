@@ -69,7 +69,7 @@ export function CounterResultsCard({ results, periodLabel }: { results: CounterR
                     ))}
                   </TBody>
                 </Table>
-                <p className="mt-2 text-[11.5px] text-text-tertiary">Chaque comptoir est attribué à un collaborateur (Mes connexions) : ses ventes lui reviennent. Un comptoir sans collaborateur apparaît sous son nom.</p>
+                <p className="mt-2 text-[11.5px] text-text-tertiary">Chaque comptoir est attribué à un collaborateur (Mes comptoirs) : ses ventes lui reviennent. Un comptoir sans collaborateur apparaît sous son nom.</p>
               </div>
 
               <div>

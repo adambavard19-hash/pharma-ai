@@ -163,7 +163,7 @@ export const NAVIGATION: NavItem[] = [
     // TEAM_VIEW ailleurs, mais n'a rien à faire dans cet écran au comptoir.
     permission: PERMISSIONS.TEAM_MANAGE,
     match: ["/equipe"],
-    description: "Comptes, accès et rôles de vos collaborateurs",
+    description: "Inviter vos collaborateurs, approuver les demandes, voir qui travaille où",
     group: "pharmacie",
   },
 
@@ -203,11 +203,11 @@ export const NAVIGATION: NavItem[] = [
   // --- Configuration
   {
     href: "/connexion",
-    label: "Mes connexions",
+    label: "Mes comptoirs",
     icon: Plug,
     permission: PERMISSIONS.PRODUCT_IMPORT,
     match: ["/connexion", "/installation"],
-    description: "Installer PharmaBoost sur vos comptoirs, envoyer votre stock, connecter votre robot",
+    description: "Vos comptoirs installés et qui y travaille, votre stock, votre robot",
     group: "configuration",
   },
   {

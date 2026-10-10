@@ -38,6 +38,8 @@ export const WIPED_MODELS = [
   "supportThread",
   // Une liaison logiciel créée pendant un rendez-vous (clé d'agent comprise) ne survit pas à la démo.
   "stockConnection",
+  // Invitations et demandes de rattachement : la démonstration n'en envoie ni n'en garde.
+  "teamInvitation", "joinRequest",
 ] as const;
 
 /** Ce qui porte un `pharmacyId` et que la réinitialisation conserve : la structure de l'officine, jamais son activité. */

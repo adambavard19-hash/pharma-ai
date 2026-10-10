@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: "Guide pas à pas" };
  */
 const TROUBLES: [string, string][] = [
   ["Windows affiche « Windows a protégé votre ordinateur »", "C'est normal pour un programme qu'il ne connaît pas encore. Cliquez « Informations complémentaires », puis « Exécuter quand même ». Dans le navigateur, si le fichier est signalé, choisissez « Conserver »."],
-  ["L'installateur dit « Ce lien d'installation n'est plus valable »", "Chaque téléchargement ne sert que pour un comptoir et dure sept jours. Dans Mes connexions, cliquez de nouveau « Télécharger PharmaBoost » sur ce comptoir."],
+  ["L'installateur dit « Ce lien d'installation n'est plus valable »", "Chaque téléchargement ne sert que pour un comptoir et dure sept jours. Dans Mes comptoirs, cliquez de nouveau « Télécharger PharmaBoost » sur ce comptoir."],
   ["L'installateur dit que PharmaBoost est injoignable", "Vérifiez que l'ordinateur a Internet (ouvrez pharmaboost.app dans un navigateur). Si un pare-feu filtre les sites, il doit laisser passer pharmaboost.app et nodejs.org."],
   ["Mon antivirus retire le programme", "Ajoutez une exception sur le dossier PharmaBoost, dans AppData\\Local (tapez %LOCALAPPDATA%\\PharmaBoost dans l'Explorateur), puis relancez l'installateur."],
   ["Le poste n'apparaît pas au bout de deux minutes", "Cherchez l'icône PharmaBoost près de l'horloge (flèche ^ à gauche des icônes). Absente : menu Démarrer, puis PharmaBoost. Point orange ou rouge : passez dessus, elle dit ce qui bloque."],
@@ -44,7 +44,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-3">
         <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
-          <Link href="/connexion">Retour à Mes connexions</Link>
+          <Link href="/connexion">Retour à Mes comptoirs</Link>
         </Button>
         <h1 className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary">Guide pas à pas</h1>
         <nav aria-label="Logiciel" className="flex flex-wrap gap-2">
@@ -65,13 +65,13 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         <h2 className="text-[20px] font-semibold text-text-primary">Étape 1 — Installer PharmaBoost sur un comptoir</h2>
         <p className="text-[14px] leading-6 text-text-secondary">Sur chaque ordinateur Windows du comptoir, un par un : ils apparaissent ensuite dans la liste « Comptoir 1 », « Comptoir 2 »…</p>
         <GuideStep n={1} title="Téléchargez PharmaBoost" illustration={<DownloadIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">Ouvrez PharmaBoost sur l&apos;ordinateur du comptoir, menu « Mes connexions », étape 1, et cliquez « Télécharger PharmaBoost ». Le fichier arrive dans « Téléchargements ».</p>
+          <p className="text-[14.5px] leading-6 text-text-primary">Ouvrez PharmaBoost sur l&apos;ordinateur du comptoir, menu « Mes comptoirs », étape 1, et cliquez « Télécharger PharmaBoost ». Le fichier arrive dans « Téléchargements ».</p>
         </GuideStep>
         <GuideStep n={2} title="Ouvrez le fichier" illustration={<InstallerIllustration />}>
           <p className="text-[14.5px] leading-6 text-text-primary">Double-cliquez dessus : l&apos;installation se fait toute seule, et le comptoir s&apos;associe à votre officine. Une minute, Internet requis, aucun mot de passe administrateur et rien à taper.</p>
         </GuideStep>
         <GuideStep n={3} title="Cherchez le point vert près de l'horloge" illustration={<TrayIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">L&apos;icône PharmaBoost apparaît avec un point vert quand le poste est relié. Dans Mes connexions, le comptoir s&apos;affiche « Connecté ».</p>
+          <p className="text-[14.5px] leading-6 text-text-primary">L&apos;icône PharmaBoost apparaît avec un point vert quand le poste est relié. Dans Mes comptoirs, le comptoir s&apos;affiche « Connecté ».</p>
         </GuideStep>
       </section>
 
@@ -87,8 +87,8 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           {guide.notice && <p className="text-[13px] leading-5 text-text-secondary">{guide.notice}</p>}
         </GuideStep>
         <GuideStep n={2} title="Envoyez le fichier à PharmaBoost" illustration={<FileIllustration />}>
-          <p className="text-[14.5px] leading-6 text-text-primary">Dans Mes connexions, étape 2, cliquez « Envoyer mon stock » et choisissez le fichier. PharmaBoost vous demande de confirmer : le fichier remplace votre stock. Le nom du fichier n&apos;a pas d&apos;importance.</p>
-          <Button asChild size="sm"><Link href="/connexion">Ouvrir Mes connexions</Link></Button>
+          <p className="text-[14.5px] leading-6 text-text-primary">Dans Mes comptoirs, étape 2, cliquez « Envoyer mon stock » et choisissez le fichier. PharmaBoost vous demande de confirmer : le fichier remplace votre stock. Le nom du fichier n&apos;a pas d&apos;importance.</p>
+          <Button asChild size="sm"><Link href="/connexion">Ouvrir Mes comptoirs</Link></Button>
         </GuideStep>
         <GuideStep n={3} title="Le stock se met à jour" illustration={<StockOkIllustration />}>
           <p className="text-[14.5px] leading-6 text-text-primary">PharmaBoost lit le fichier en une minute. La page affiche « Stock reçu » avec le nombre de produits et l&apos;heure de réception. Un fichier qui paraît incomplet n&apos;est pas appliqué : l&apos;équipe PharmaBoost le vérifie d&apos;abord, et votre stock ne change pas.</p>
