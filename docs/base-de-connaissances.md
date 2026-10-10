@@ -59,7 +59,13 @@ arrive dans cette liste, visible **seulement** de la console (le titulaire n'en 
 vaut pour **toutes** les pharmacies, présentes et à venir, et le sujet ne revient plus.
 
 **Quand le stock est lu** (`server/services/stock-learning.ts`) : dès qu'un stock est enregistré (import, logiciel de gestion, dépôt) —
-en arrière-plan, après la réponse —, puis **chaque nuit** (`/api/cron/connaissance-du-stock`, 02 h 30, `CRON_SECRET`) pour ce qui reste.
+en arrière-plan, après la réponse —, puis **chaque jour** pour ce qui reste. Notre hébergement (Vercel « Hobby ») n'autorise que
+**deux** tâches planifiées, une fois par jour : la connaissance du stock n'a donc pas la sienne, elle passe **en dernier** dans la
+tâche quotidienne existante (`/api/cron/automatisations`, après les relances, avec 230 s). Un passage est borné dans le temps (on ne
+commence pas un lot qu'on ne peut pas finir) ; s'il reste du travail, il **relance un autre passage** (`/api/cron/connaissance-du-stock`,
+avec son propre temps, dix relais au plus, `?pharmacie=` pour une seule pharmacie) : un gros stock est lu en quelques minutes, pas en
+plusieurs jours. Au pire, la tâche quotidienne reprend le lendemain. `core`: `src/app/api/cron/__tests__/hebergement.test.ts` garde
+la règle (2 tâches au plus, une fois par jour).
  1. **Produits** (crèmes, compléments, plantes…) : dictionnaire d'abord, puis modèle d'Anthropic, mémoire commune par nom.
  2. **Médicaments en stock** : substance, famille, code ATC, classés par le modèle (avec les substances officielles de la base publique)
     et mémorisés. Au scan, tout est déjà compris : l'analyse est locale.

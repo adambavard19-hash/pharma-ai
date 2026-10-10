@@ -75,6 +75,14 @@ describe("ce qui arrive dans « Produits à connaître »", () => {
     expect(m.recordGaps).toHaveBeenCalledWith([]);
   });
 
+  it("passé l'échéance, aucun lot n'est commencé : rien n'est signalé, tout est « à reprendre »", async () => {
+    m.products.mockResolvedValue(Array.from({ length: 80 }, (_, i) => item(`p${i}`, `ZORGLUB ${i}`)));
+    const summary = await classifyPharmacyProducts({ scope, deadlineAt: Date.now() - 1 });
+    expect(m.classifyProducts).not.toHaveBeenCalled();
+    expect(summary.remaining).toBe(80);
+    expect(m.recordGaps).toHaveBeenCalledWith([]);
+  });
+
   it("un produit pas encore traité (lot au-delà de la borne) n'est pas non plus un trou", async () => {
     m.products.mockResolvedValue(Array.from({ length: 50 }, (_, i) => item(`p${i}`, `ZORGLUB ${i}`)));
     const summary = await classifyPharmacyProducts({ scope, maxAiBatches: 1 });

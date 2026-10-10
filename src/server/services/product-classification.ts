@@ -65,6 +65,8 @@ export async function classifyPharmacyProducts(params: {
   /** Forcer le repassage de produits déjà classés (après une mise à jour du dictionnaire, par exemple). */
   force?: boolean;
   maxAiBatches?: number;
+  /** Instant (ms) après lequel on ne commence plus de lot : le temps d'une fonction est compté. Ce qui reste est repris au passage suivant. */
+  deadlineAt?: number;
 }): Promise<ClassificationRunSummary> {
   const products = await prisma.product.findMany({
     where: {
@@ -149,9 +151,15 @@ export async function classifyPharmacyProducts(params: {
   }
   const processed = batches.slice(0, maxBatches);
   summary.remaining = batches.slice(maxBatches).reduce((sum, batch) => sum + batch.length, 0);
+  const deadlineAt = params.deadlineAt ?? Number.POSITIVE_INFINITY;
 
   if (summary.aiAvailable) {
-    for (const batch of processed) {
+    for (const [position, batch] of processed.entries()) {
+      // Plus de temps pour un lot de plus : on s'arrête proprement, le reste est compté « à reprendre ».
+      if (Date.now() >= deadlineAt) {
+        summary.remaining += processed.slice(position).reduce((sum, rest) => sum + rest.length, 0);
+        break;
+      }
       const startedAt = Date.now();
       try {
         const response = await provider.classifyProducts({

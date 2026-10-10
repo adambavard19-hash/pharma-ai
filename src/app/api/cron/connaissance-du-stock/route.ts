@@ -1,42 +1,31 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/db/client";
-import { learnPharmacyStock } from "@/server/services/stock-learning";
+import { after } from "next/server";
+import { runStockLearningPass } from "@/server/services/stock-learning";
+import { MAX_CHAIN_DEPTH, scheduleLearningContinuation } from "@/server/services/stock-learning-chain";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-/** Le temps qu'on se donne par passage : on s'arrête proprement, la nuit suivante reprend là où on en était. */
+/** Le temps qu'on se donne par passage : on ne commence pas un lot qu'on ne peut pas finir avant la limite de la fonction. */
 const BUDGET_MS = 240_000;
 
 /**
- * Chaque nuit, PharmaBoost termine de « connaître » le stock des pharmacies : produits restés à ranger, médicaments pas encore classés
- * (stocks arrivés par le logiciel de gestion ou par dépôt, lots interrompus). Ce qui reste incompris est inscrit dans « Produits à
- * connaître » (console super admin). Protégé par CRON_SECRET ; rejouable sans effet de bord.
+ * Le passage qui apprend le stock des pharmacies : produits restés à ranger, médicaments pas encore classés. Ce qui reste incompris
+ * est inscrit dans « Produits à connaître » (console super admin).
+ *
+ * Déclenché par la tâche quotidienne (`/api/cron/automatisations`), par l'enregistrement d'un stock, et par lui-même quand il reste du
+ * travail (`?profondeur=` compte les relais). `?pharmacie=` limite le passage à une pharmacie. Protégé par CRON_SECRET ; rejouable.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ error: "CRON_SECRET non configuré" }, { status: 503 });
   if (request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-  const startedAt = Date.now();
-  const pharmacies = await prisma.pharmacy.findMany({
-    where: { isActive: true, isDemo: false },
-    select: { id: true, organizationId: true, memberships: { where: { role: "OWNER", isActive: true }, take: 1, select: { userId: true } } },
-    orderBy: { createdAt: "asc" },
-  });
-  let processed = 0;
-  let skipped = 0;
-  for (const pharmacy of pharmacies) {
-    if (Date.now() - startedAt > BUDGET_MS) { skipped += 1; continue; }
-    const owner = pharmacy.memberships[0];
-    if (!owner) { skipped += 1; continue; }
-    try {
-      await learnPharmacyStock({ pharmacyId: pharmacy.id, organizationId: pharmacy.organizationId, userId: owner.userId }, { maxProductBatches: 10, maxMedicineBatches: 10 });
-      processed += 1;
-    } catch (error) {
-      console.error("[cron connaissance-du-stock]", pharmacy.id, error instanceof Error ? error.message : error);
-      skipped += 1;
-    }
-  }
-  return NextResponse.json({ pharmacies: pharmacies.length, processed, skipped });
+  const params = new URL(request.url).searchParams;
+  const pharmacyId = params.get("pharmacie") ?? undefined;
+  const depth = Math.max(0, Math.min(MAX_CHAIN_DEPTH + 1, Number.parseInt(params.get("profondeur") ?? "0", 10) || 0));
+
+  const pass = await runStockLearningPass({ deadlineAt: Date.now() + BUDGET_MS, pharmacyId });
+  if (pass.moreToDo && depth < MAX_CHAIN_DEPTH) after(() => scheduleLearningContinuation({ pharmacyId, depth: depth + 1 }).then(() => undefined));
+  return NextResponse.json({ ...pass, depth });
 }

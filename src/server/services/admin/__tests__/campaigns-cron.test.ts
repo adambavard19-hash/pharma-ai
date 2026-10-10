@@ -15,12 +15,20 @@ const mocks = vi.hoisted(() => ({
   purgeStalePatientNews: vi.fn(),
   purgeExpiredDepositFiles: vi.fn(),
   closeStalledDeposits: vi.fn(),
+  sendMonthlyCounterReports: vi.fn(),
+  runStockLearningPass: vi.fn(),
+  scheduleLearningContinuation: vi.fn(),
+  after: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/services/admin/automations", () => ({ runAutomations: mocks.runAutomations }));
 vi.mock("@/server/services/admin/campaigns", () => ({ processDueCampaigns: mocks.processDueCampaigns }));
 vi.mock("@/server/services/patient-news", () => ({ resumeStuckAnnouncements: mocks.resumeStuckAnnouncements, purgeStalePatientNews: mocks.purgeStalePatientNews }));
+vi.mock("@/server/services/counter-results", () => ({ sendMonthlyCounterReports: mocks.sendMonthlyCounterReports }));
+vi.mock("@/server/services/stock-learning", () => ({ runStockLearningPass: mocks.runStockLearningPass }));
+vi.mock("@/server/services/stock-learning-chain", () => ({ scheduleLearningContinuation: mocks.scheduleLearningContinuation }));
+vi.mock("next/server", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/server")>()), after: mocks.after }));
 vi.mock("@/server/services/stock-deposits", () => ({ purgeExpiredDepositFiles: mocks.purgeExpiredDepositFiles, closeStalledDeposits: mocks.closeStalledDeposits }));
 
 const { GET } = await import("@/app/api/cron/automatisations/route");
@@ -38,6 +46,10 @@ beforeEach(() => {
   mocks.purgeStalePatientNews.mockResolvedValue(4);
   mocks.purgeExpiredDepositFiles.mockResolvedValue({ purged: 5 });
   mocks.closeStalledDeposits.mockResolvedValue({ failed: 2, superseded: 1, jobsClosed: 3 });
+  mocks.sendMonthlyCounterReports.mockResolvedValue({ month: "2026-09", pharmacies: 0, sent: 0, skipped: 0, failed: 0 });
+  mocks.runStockLearningPass.mockResolvedValue({ pharmacies: 3, processed: 3, skipped: 0, moreToDo: false });
+  mocks.scheduleLearningContinuation.mockResolvedValue(true);
+  mocks.after.mockImplementation((work: () => Promise<unknown>) => void work());
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
@@ -76,12 +88,14 @@ describe("passage complet", () => {
       news: { resumed: 3, purged: 4 },
       stockFiles: { purged: 5 },
       stalledDeposits: { failed: 2, superseded: 1, jobsClosed: 3 },
+      counterReports: { month: "2026-09", pharmacies: 0, sent: 0, skipped: 0, failed: 0 },
+      stockLearning: { pharmacies: 3, processed: 3, skipped: 0, moreToDo: false },
     });
   });
 
   it("dans l'ordre : relances, campagnes, annonces restées en plan, purge, fichiers de stock, dépôts bloqués — avec le même instant", async () => {
     await authorized();
-    const order = [mocks.runAutomations, mocks.processDueCampaigns, mocks.resumeStuckAnnouncements, mocks.purgeStalePatientNews, mocks.purgeExpiredDepositFiles, mocks.closeStalledDeposits].map((mock) => mock.mock.invocationCallOrder[0]);
+    const order = [mocks.runAutomations, mocks.processDueCampaigns, mocks.resumeStuckAnnouncements, mocks.purgeStalePatientNews, mocks.purgeExpiredDepositFiles, mocks.closeStalledDeposits, mocks.sendMonthlyCounterReports, mocks.runStockLearningPass].map((mock) => mock.mock.invocationCallOrder[0]);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(mocks.runAutomations).toHaveBeenCalledWith({ now: expect.any(Date), dryRun: false });
     const now = mocks.runAutomations.mock.calls[0][0].now as Date;
@@ -90,6 +104,42 @@ describe("passage complet", () => {
     expect(mocks.purgeStalePatientNews).toHaveBeenCalledWith(now);
     expect(mocks.purgeExpiredDepositFiles).toHaveBeenCalledWith(now);
     expect(mocks.closeStalledDeposits).toHaveBeenCalledWith(now);
+  });
+});
+
+describe("le bilan mensuel du comptoir et la connaissance du stock", () => {
+  it("passent EN DERNIER : les relances ne les attendent jamais, et la connaissance du stock reçoit une échéance", async () => {
+    await authorized();
+    expect(mocks.runStockLearningPass).toHaveBeenCalledWith({ deadlineAt: expect.any(Number) });
+    const deadline = mocks.runStockLearningPass.mock.calls[0][0].deadlineAt as number;
+    expect(deadline - Date.now()).toBeLessThan(231_000);
+    expect(deadline - Date.now()).toBeGreaterThan(200_000);
+  });
+
+  it("un échec du bilan mensuel n'empêche ni la connaissance du stock ni la réponse : « inconnu » (null)", async () => {
+    mocks.sendMonthlyCounterReports.mockRejectedValue(new Error("messagerie"));
+    const body = await (await authorized()).json();
+    expect(body).toMatchObject({ sent: 2, counterReports: null, stockLearning: { processed: 3 } });
+    expect(mocks.runStockLearningPass).toHaveBeenCalled();
+  });
+
+  it("un échec de la connaissance du stock ne touche pas les relances déjà parties", async () => {
+    mocks.runStockLearningPass.mockRejectedValue(new Error("modèle indisponible"));
+    expect(await (await authorized()).json()).toMatchObject({ sent: 2, stockLearning: null });
+  });
+
+  it("quand il reste du travail, un autre passage est demandé (avec son propre temps) ; sinon rien", async () => {
+    await authorized();
+    expect(mocks.scheduleLearningContinuation).not.toHaveBeenCalled();
+    mocks.runStockLearningPass.mockResolvedValue({ pharmacies: 3, processed: 1, skipped: 2, moreToDo: true });
+    await authorized();
+    expect(mocks.scheduleLearningContinuation).toHaveBeenCalledWith({ depth: 1 });
+  });
+
+  it("une erreur des relances remonte toujours, mais la connaissance du stock a tourné quand même", async () => {
+    mocks.runAutomations.mockRejectedValue(new Error("relances en panne"));
+    await expect(authorized()).rejects.toThrow("relances en panne");
+    expect(mocks.runStockLearningPass).toHaveBeenCalled();
   });
 });
 

@@ -304,8 +304,8 @@ bip, et ne se ferme qu'à « Vente terminée ».
   médicament ni de posologie), puis affiche « Vente terminée — résultats enregistrés » et, si un conseil a été vendu dans cette
   vente, « 18e conseil vendu aujourd'hui ». La fenêtre s'efface après 7 s et attend la vente suivante.
 - **Résultats** : page « Ce que PharmaBoost vous rapporte » → section « Au comptoir » (proposés, vendus, non vendus, sans réponse,
-  par poste, produits, challenges, dates courtes). Bilan mensuel par e-mail au titulaire le 1er du mois
-  (`/api/cron/bilan-comptoir-mensuel`, protégé par `CRON_SECRET`, une fois par officine et par mois).
+  par poste, produits, challenges, dates courtes). Bilan mensuel par e-mail au titulaire, une fois par officine et par mois,
+  envoyé par la tâche quotidienne (`/api/cron/automatisations`, rejouable sans double envoi ; `/api/cron/bilan-comptoir-mensuel` reste une porte manuelle).
 
 Migration : `20261020090000_suivi_de_vente_au_comptoir`. Les postes passent en 0.7.0 par la mise à jour automatique (une fois la
 vente en cours terminée) ; la fenêtre n'a jamais été dessinée sur un vrai Windows à ce jour.

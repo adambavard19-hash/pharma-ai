@@ -540,8 +540,14 @@ export async function commitStockImport(params: {
     try {
       const { after } = await import("next/server");
       after(async () => {
-        const { learnPharmacyStock } = await import("./stock-learning");
-        await learnPharmacyStock(scope).catch((error) => console.error("[stock-import] connaissance du stock impossible", error));
+        const { runStockLearningPass } = await import("./stock-learning");
+        const { scheduleLearningContinuation } = await import("./stock-learning-chain");
+        const pass = await runStockLearningPass({ deadlineAt: Date.now() + 230_000, pharmacyId: scope.pharmacyId }).catch((error) => {
+          console.error("[stock-import] connaissance du stock impossible", error);
+          return null;
+        });
+        // Un gros stock n'est pas fini dans le temps d'une fonction : un autre passage prend le relais, avec son propre temps.
+        if (pass?.moreToDo) await scheduleLearningContinuation({ pharmacyId: scope.pharmacyId, depth: 1 });
       });
     } catch {
       /* pas de requête en cours : le passage de nuit prendra le relais */
