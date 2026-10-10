@@ -3,6 +3,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { HAIRLINE, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
 import { HeroVisual, RequestVisual, StepConseil, StepScan, StepSuivi, StockMarginVisual } from "./_components/visuals";
 import { VideoButton } from "./_components/video-dialog";
+import { BannerDemo } from "./_components/banner-demo";
 import { loadLiveProof } from "@/server/services/site-leads";
 import { loadPublicPricing } from "@/server/services/public-pricing";
 import { formatEuros } from "@/core/billing/subscription";
@@ -89,6 +90,19 @@ export default async function SitePage() {
             </div>
           </div>
           <HeroVisual />
+        </div>
+      </section>
+
+      {/* ---- La bannière du comptoir, vivante -------------------------- */}
+      <section id="banniere" className="scroll-mt-20 border-t border-border-subtle">
+        <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
+          <SectionHead kicker="Au comptoir" title="Une petite bannière, à côté de votre logiciel.">
+            Elle attend votre prochain scan, réagit dès qu&apos;un médicament est lu, s&apos;ouvre sur les conseils, et reste là jusqu&apos;à la fin de la vente. Elle ne prend jamais la main sur votre logiciel de gestion.
+          </SectionHead>
+          <div className="mt-10">
+            <BannerDemo />
+          </div>
+          <p className="mt-4 text-center text-[13px] text-text-tertiary">Animation fidèle à la bannière du poste de caisse. Produits et prix : exemples.</p>
         </div>
       </section>
 

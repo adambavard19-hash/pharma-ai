@@ -66,6 +66,7 @@ export function bannerPreviewHtml(): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bannière PharmaBoost</title>
+<script>if (/[?&]integre=1/.test(location.search)) document.documentElement.classList.add("integre");</script>
 <style>
 :root { ${cssVars} --margin: ${Z.margin}px; --radius: ${Z.radius}px; --ease: cubic-bezier(.22,.8,.26,1); color-scheme: dark; }
 * { box-sizing: border-box; }
@@ -216,6 +217,20 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
 
 .hint { position: absolute; left: 22px; bottom: 76px; color: #6d7d89; font-size: 12.5px; max-width: 360px; z-index: 1; }
 @media (max-width: 760px) { .screen { height: 700px; } .banner { right: 8px; } .card { max-width: calc(100vw - 56px); } .lgo .row { grid-template-columns: 1.6fr 1fr; } .lgo .row span:nth-child(n+3) { display: none; } }
+/* Intégrée au site public (iframe ?integre=1) : sans titre ni note, fond transparent, la bannière s'adapte à la largeur disponible. */
+html.integre { color-scheme: light; }
+html.integre, html.integre body { background: transparent; }
+html.integre body { padding: 0; min-height: 0; color: #0f2b3a; }
+html.integre header, html.integre .note { display: none; }
+html.integre .wrap { gap: 14px; max-width: none; }
+html.integre .steps { justify-content: center; gap: 6px; }
+html.integre .steps button { background: #fff; color: #0f2b3a; border-color: #cddde6; font-size: 12.5px; padding: 7px 11px; }
+html.integre .steps button:hover { border-color: var(--accentDark); }
+html.integre .steps button.on { background: var(--accentDark); border-color: var(--accentDark); color: #fff; }
+html.integre .steps .play { background: #0f2b3a; color: #fff; border-color: #0f2b3a; }
+html.integre .steps .extra { display: none; }
+html.integre .screen { height: 590px; border-color: #d3e1e9; box-shadow: 0 18px 50px rgba(15,43,58,.12); }
+html.integre .banner { transform-origin: top right; }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 </style>
 </head>
@@ -523,6 +538,8 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
     ["5", "Pendant la vente", function () { reset(); S.answers = { a: "SOLD", b: "NOT_SOLD" }; setView("expanded"); }],
     ["6", "Vente terminée", function () { reset(); S.answers = { a: "SOLD", b: "SOLD" }; S.emailSaved = true; setView("done"); }]
   ];
+  var EMBED = document.documentElement.classList.contains("integre");
+  var userDriven = false;
   var stepsEl = document.getElementById("steps");
   var current = -1;
   function reset() { clearTimers(); clearScenario(); closeMail(); S.reduced = false; S.hidden = false; S.answers = {}; S.emailSaved = false; S.finishing = false; S.analyzing = false; var r = document.getElementById("restore"); if (r) r.remove(); }
@@ -536,10 +553,10 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
   play.className = "play"; play.textContent = "▶ Scénario complet";
   stepsEl.appendChild(play);
   var quiet = document.createElement("button");
-  quiet.textContent = "Rien à ajouter";
+  quiet.textContent = "Rien à ajouter"; quiet.className = "extra";
   quiet.addEventListener("click", function () { reset(); setView("quiet"); });
   stepsEl.appendChild(quiet);
-  var zoom = document.createElement("select");
+  var zoom = document.createElement("select"); zoom.className = "extra";
   [["100 %", 1], ["125 %", 1.25], ["150 %", 1.5]].forEach(function (z) { var o = document.createElement("option"); o.value = z[1]; o.textContent = "Affichage Windows " + z[0]; zoom.appendChild(o); });
   zoom.addEventListener("change", function () { banner.style.zoom = zoom.value; render(true); });
   stepsEl.appendChild(zoom);
@@ -548,7 +565,7 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
     var idx = { idle: 0, scan: 1, ready: 2, expanded: answered() > 0 ? 4 : 3, done: 5 }[S.view];
     for (var i = 0; i < buttons.length - 2; i++) buttons[i].classList.toggle("on", i === idx);
   }
-  play.addEventListener("click", function () {
+  function runScenario() {
     reset(); setView("idle");
     step(2200, function () { setView("scan"); });
     step(4800, function () { S.view = "ready"; render(); schedule(); });
@@ -559,10 +576,32 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
     step(15800, function () { var s = document.getElementById("mailSave"); if (s && !s.disabled) s.click(); });
     step(17400, function () { S.answers.c = "SOLD"; render(true); });
     step(19200, function () { var f = banner.querySelector('[data-act="finish"]'); if (f) f.click(); });
-  });
+      // Sur le site : le scénario recommence tout seul, tant que le visiteur ne prend pas la main.
+    if (EMBED) step(29000, function () { if (!userDriven) runScenario(); });
+  }
+  play.addEventListener("click", function () { userDriven = false; runScenario(); });
 
   note.textContent = "Aperçu fidèle du dessin de la bannière Windows (mêmes couleurs, tailles, phrases et durées) — ce n'est pas une capture de Windows : la police (Segoe UI sur Windows), l'ombre et le lissage sont ceux de votre navigateur. Les photos de produits sont des exemples.";
   STEPS[0][2]();
+
+  // Les gestes du visiteur reprennent la main : le scénario automatique s'arrête.
+  function takeOver() { if (!userDriven) { userDriven = true; clearScenario(); } }
+  stepsEl.addEventListener("click", function (e) { if (e.target.closest("button") && e.target !== play) takeOver(); });
+  banner.addEventListener("pointerdown", takeOver);
+
+  if (EMBED) {
+    // Une bannière plus étroite que sa place (téléphone) est réduite, jamais rognée.
+    var fit = function () { var scale = Math.min(1, (window.innerWidth - 12) / 560); banner.style.transform = scale < 1 ? "scale(" + scale.toFixed(3) + ")" : ""; };
+    window.addEventListener("resize", fit); fit();
+    // Le scénario ne joue que lorsque la page du site le montre : elle prévient quand l'animation entre ou sort de l'écran.
+    var running = false;
+    var visible = function (yes) {
+      if (yes && !running && !userDriven) { running = true; runScenario(); }
+      if (!yes && running) { running = false; clearScenario(); if (!userDriven) { reset(); setView("idle"); } }
+    };
+    window.addEventListener("message", function (e) { if (e.data === "pb-visible") visible(true); else if (e.data === "pb-hidden") visible(false); });
+    if (window.parent === window) setTimeout(function () { visible(true); }, 600);
+  }
 })();
 </script>
 </body>

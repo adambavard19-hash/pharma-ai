@@ -13,6 +13,19 @@ describe("l'aperçu de la bannière pour Mac", () => {
     expect(shipped === html).toBe(true);
   });
 
+  it("la copie du site public (public/site/banniere-demo.html) est la même page : le robot animé de la page d'accueil est à jour", () => {
+    const site = readFileSync(join(process.cwd(), "public/site/banniere-demo.html"), "utf8");
+    expect(site === html).toBe(true);
+  });
+
+  it("sait s'intégrer au site : fond transparent, scénario qui recommence tout seul, ne joue que lorsqu'elle est à l'écran", () => {
+    expect(html).toContain('classList.add("integre")');
+    expect(html).toContain("html.integre, html.integre body { background: transparent; }");
+    expect(html).toContain("if (EMBED) step(29000");
+    expect(html).toContain('"pb-visible"');
+    expect(html).toContain('"pb-hidden"');
+  });
+
   it("est une page autonome : aucune ressource extérieure, aucune image à part", () => {
     expect(html).not.toMatch(/<script[^>]+src=|<link[^>]+href=|@import|url\(http/);
     expect(html).toContain("<title>Bannière PharmaBoost</title>");

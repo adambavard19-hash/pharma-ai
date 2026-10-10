@@ -337,3 +337,8 @@ durées, phrases) ; le code Windows est `agent/src/notice-host.ts`.
 - **Vérifié** : le code compile (C# 5, .NET Framework 4.8 : `PB_CSHARP_CHECK=1 npx vitest run agent/src/__tests__/notice-host.test.ts`) et
   les garde-fous sont testés. La bannière n'a **jamais été dessinée sur un vrai Windows** : premier essai à faire au poste (icône près de
   l'horloge → clic droit → « Essayer l'affichage d'un avis »).
+
+**Sur le site public** : la page d'accueil (`/decouvrir`, section « Une petite bannière, à côté de votre logiciel ») montre la même bannière VIVANTE, qui rejoue toute seule
+le scénario complet (en attente → scan détecté → conseils → Vendu / Non vendu → e-mail → « Vente terminée ! », puis recommence), avec les six étapes cliquables. Même design que
+la bannière Windows. C'est `public/site/banniere-demo.html` (page identique à l'aperçu, ouverte en iframe avec `?integre=1`) ; `npm run apercu:banniere` régénère les deux copies,
+un test les garde à jour.
