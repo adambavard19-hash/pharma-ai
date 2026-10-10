@@ -12,6 +12,8 @@ import {
 import type { ProductCategoryCode } from "@/core/ai/types";
 import type { TenantScope } from "@/server/db/tenant";
 import { tagsFromName } from "@/core/stock-import/tags";
+import { productDecisionIsUncertain } from "@/core/knowledge/gaps";
+import { recordGaps, type GapInput } from "@/server/services/knowledge-gap-store";
 
 /**
  * Comprendre les produits de l'officine — pour que le moteur puisse les
@@ -97,7 +99,15 @@ export async function classifyPharmacyProducts(params: {
   const decisions = new Map<string, Decision>();
   const pendingForAi: ProductToClassify[] = [];
 
+  const attempted = new Set<string>();
   for (const product of products) {
+    // 0. La réponse de la pharmacienne de PharmaBoost (console « Produits à connaître ») passe avant tout : dictionnaire comme modèle.
+    const taught = cached.get(classificationKey(product.name));
+    if (taught?.source === "PHARMACIST") {
+      decisions.set(product.id, { category: taught.category as ProductCategoryCode, tags: taught.tags, confidence: taught.confidence, source: "PHARMACIST", ruleKeys: rulesServedBy(taught.category as ProductCategoryCode, taught.tags), fromCache: true });
+      summary.fromCache += 1;
+      continue;
+    }
     // 2. Le dictionnaire D'ABORD : il vit dans le code, versionné avec les
     // règles. Une nouvelle officine doit recevoir les étiquettes du jour, pas
     // celles qu'une autre officine a obtenues avant une mise à jour. Un motif
@@ -148,6 +158,7 @@ export async function classifyPharmacyProducts(params: {
           products: batch.map((p, index) => ({ index, name: p.name, brand: p.brand, description: p.description })),
         });
         if (!response) break;
+        for (const product of batch) attempted.add(product.id);
         summary.warnings.push(...response.warnings.slice(0, 5));
         for (const result of response.results) {
           const product = batch[result.index];
@@ -204,12 +215,18 @@ export async function classifyPharmacyProducts(params: {
 
   // 4. Écriture sur les produits. Le dictionnaire écrit aussi dans le cache :
   // la prochaine officine n'aura même pas à le relire.
+  const gaps: GapInput[] = [];
   for (const product of products) {
     const decision = decisions.get(product.id);
     if (!decision) {
       summary.unclassified += 1;
+      // Un produit que le modèle a bel et bien lu sans savoir le ranger : la pharmacienne de PharmaBoost le saura. Un produit seulement
+      // non traité (lot suivant, modèle momentanément indisponible) n'est pas un trou : il sera repris.
+      if (attempted.has(product.id)) gaps.push({ kind: "PRODUCT", key: classificationKey(product.name), label: product.name, reason: "UNCLASSIFIED", pharmacyId: params.scope.pharmacyId });
       continue;
     }
+    const doubt = productDecisionIsUncertain(decision);
+    if (doubt) gaps.push({ kind: "PRODUCT", key: classificationKey(product.name), label: product.name, reason: doubt, guess: { category: decision.category, tags: decision.tags, confidence: decision.confidence }, pharmacyId: params.scope.pharmacyId });
     if (decision.tags.length === 0) summary.withoutUsage += 1;
     const tags = [...new Set([...decision.tags, ...tagsFromName(product.name)])];
     await prisma.product.update({
@@ -218,7 +235,7 @@ export async function classifyPharmacyProducts(params: {
     });
     if (!decision.fromCache && decision.source === "HEURISTIC") {
       const key = classificationKey(product.name);
-      if (key) {
+      if (key && cached.get(key)?.source !== "PHARMACIST") {
         await prisma.productClassification.upsert({
           where: { key },
           create: { key, category: decision.category, tags: decision.tags, confidence: decision.confidence, source: "HEURISTIC" },
@@ -229,6 +246,7 @@ export async function classifyPharmacyProducts(params: {
     }
   }
 
+  await recordGaps(gaps).catch((error) => console.error("[product-classification] carnet des produits à connaître", error));
   return summary;
 }
 

@@ -8,6 +8,8 @@ import type {
   UnderstandingLine,
 } from "@/core/understanding";
 import type { TenantScope } from "@/server/db/tenant";
+import { drugClassificationIsUncertain } from "@/core/knowledge/gaps";
+import { recordGaps } from "@/server/services/knowledge-gap-store";
 
 /**
  * La classification des médicaments, avec sa mémoire.
@@ -69,6 +71,7 @@ export async function ensureClassifications(params: {
     }
   }
 
+  let unanswered: UnderstandingLine[] = [];
   let warnings: string[] = [];
   let usage: ClassificationResult["usage"] = null;
   let model = provider.info.id.split(":")[1] ?? "";
@@ -77,6 +80,9 @@ export async function ensureClassifications(params: {
     try {
       const result = await provider.classifyDrugs({ lines: missing });
       if (result) {
+        // Une ligne que le modèle a lue sans rien répondre : elle reste sans famille, donc à connaître.
+        const answered = new Set(result.drugs.map((drug) => drug.lineIndex));
+        unanswered = missing.filter((line) => !answered.has(line.lineIndex));
         warnings = result.warnings;
         usage = result.usage;
         model = result.model;
@@ -140,6 +146,23 @@ export async function ensureClassifications(params: {
   }
 
   drugs.sort((a, b) => a.lineIndex - b.lineIndex);
+
+  // Un médicament dont on ne sait pas dire la famille, ou dont le modèle doute : la pharmacienne de PharmaBoost le saura. Jamais le titulaire.
+  // Un médicament que la pharmacienne a confirmé n'est plus jamais signalé. Seul un échec du modèle (réseau) n'est pas un « trou ».
+  if (!warnings.some((warning) => warning.startsWith("Classification impossible"))) {
+    const validated = new Map(cached.map((row) => [row.key, row.validatedAt !== null]));
+    const lineByIndex = new Map(params.lines.map((line) => [line.lineIndex, line]));
+    const gaps = drugs.flatMap((drug) => {
+      const line = lineByIndex.get(drug.lineIndex);
+      if (!line) return [];
+      const key = classificationKey(line.drugName);
+      const doubt = drugClassificationIsUncertain({ atcCode: drug.atcCode, therapeuticClass: drug.therapeuticClass, confidence: drug.confidence, validated: validated.get(key) === true });
+      return doubt ? [{ kind: "MEDICINE" as const, key, label: line.drugName, reason: doubt, guess: { substance: drug.substance, atcCode: drug.atcCode, therapeuticClass: drug.therapeuticClass, confidence: drug.confidence }, pharmacyId: params.scope.pharmacyId }] : [];
+    });
+    for (const line of unanswered) gaps.push({ kind: "MEDICINE" as const, key: classificationKey(line.drugName), label: line.drugName, reason: "NO_FAMILY" as const, guess: undefined as never, pharmacyId: params.scope.pharmacyId });
+    await recordGaps(gaps).catch((error) => console.error("[classification] carnet des médicaments à connaître", error));
+  }
+
   return {
     drugs,
     providerId: provider.info.id,

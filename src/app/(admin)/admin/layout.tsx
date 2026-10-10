@@ -5,6 +5,7 @@ import { requirePlatformSession } from "@/server/auth/platform-session";
 import { platformLogoutAction } from "@/server/actions/platform";
 import { Dropdown, DropdownLabel, DropdownSeparator } from "@/components/ui/dropdown";
 import { AdminNav, AdminSectionNav } from "./admin-nav";
+import { countOpenGaps } from "@/server/services/knowledge-gap-store";
 import { AdminSearch } from "./admin-search";
 import { QuickActions } from "./quick-actions";
 import { countUnreadAdminNotifications } from "@/server/services/sales/notifications";
@@ -21,7 +22,7 @@ import { countSupportToAnswer } from "@/server/services/support";
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const session = await requirePlatformSession();
-  const [unread, supportOpen] = await Promise.all([countUnreadAdminNotifications(), countSupportToAnswer()]);
+  const [unread, supportOpen, gapsOpen] = await Promise.all([countUnreadAdminNotifications(), countSupportToAnswer(), countOpenGaps()]);
 
   return (
     <div className="min-h-dvh bg-surface-app">
@@ -72,7 +73,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       </header>
 
       <main className="mx-auto max-w-[1320px] space-y-6 px-6 py-6">
-        <AdminSectionNav badges={{ support: supportOpen }} />
+        <AdminSectionNav badges={{ support: supportOpen, conseils: gapsOpen }} />
         {children}
       </main>
     </div>

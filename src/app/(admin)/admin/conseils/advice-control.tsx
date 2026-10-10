@@ -478,7 +478,7 @@ function NewRuleForm({ categories, tags, onDone }: { categories: { code: string;
 }
 
 /** Les étiquettes du produit à conseiller, prises dans le vocabulaire que les règles connaissent : on ne peut pas en inventer. */
-function TagPicker({ tags, picked, onChange }: { tags: string[]; picked: string[]; onChange: (next: string[]) => void }) {
+export function TagPicker({ tags, picked, onChange }: { tags: string[]; picked: string[]; onChange: (next: string[]) => void }) {
   const [filter, setFilter] = useState("");
   const text = filter.trim().toLowerCase();
   const shown = tags.filter((tag) => !picked.includes(tag) && (!text || tag.includes(text))).slice(0, 60);

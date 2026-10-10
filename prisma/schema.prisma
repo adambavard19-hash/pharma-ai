@@ -113,40 +113,40 @@ model Pharmacy {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships         Membership[]
-  patients            Patient[]
-  supportThreads      SupportThread[]
-  reminders           Reminder[]
-  products            Product[]
-  stockItems          StockItem[]
-  stockMovements      StockMovement[]
-  drugStocks          PharmacyDrugStock[]
-  prescriptions       Prescription[]
-  analysisRuns        AnalysisRun[]
-  recommendations     Recommendation[]
-  pharmacyRules       PharmacyRule[]
-  productAssociations ProductAssociation[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships          Membership[]
+  patients             Patient[]
+  supportThreads       SupportThread[]
+  reminders            Reminder[]
+  products             Product[]
+  stockItems           StockItem[]
+  stockMovements       StockMovement[]
+  drugStocks           PharmacyDrugStock[]
+  prescriptions        Prescription[]
+  analysisRuns         AnalysisRun[]
+  recommendations      Recommendation[]
+  pharmacyRules        PharmacyRule[]
+  productAssociations  ProductAssociation[]
   counterSaleFollowUps CounterSaleFollowUp[]
-  documents           PatientDocument[]
-  sales               Sale[]
-  notifications       Notification[]
-  auditLogs           AuditLog[]
-  sessions            Session[]
-  imports             ImportJob[]
-  stockDeposits       StockDeposit[]
-  aiUsage             AiUsageRecord[]
+  documents            PatientDocument[]
+  sales                Sale[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+  sessions             Session[]
+  imports              ImportJob[]
+  stockDeposits        StockDeposit[]
+  aiUsage              AiUsageRecord[]
   /// Le dossier commercial dont cette officine est issue, s'il y en a un.
-  prospect            Prospect?
+  prospect             Prospect?
   /// La liaison avec le logiciel de gestion de l'officine, s'il y en a une.
-  stockConnection     StockConnection?
+  stockConnection      StockConnection?
   /// Les postes de caisse qui écoutent la douchette pour cette officine.
-  counterPosts        CounterPost[]
+  counterPosts         CounterPost[]
   /// Les codes-barres appris au comptoir.
-  productBarcodes     ProductBarcode[]
+  productBarcodes      ProductBarcode[]
   /// Contrats et liens d'activation rattachés directement à l'officine.
-  contracts           Contract[]
-  subscriptionInvites SubscriptionInvite[]
+  contracts            Contract[]
+  subscriptionInvites  SubscriptionInvite[]
 
   preferredRanges   PreferredRange[]
   labChallenges     LabChallenge[]
@@ -905,13 +905,13 @@ model Product {
   updatedAt            DateTime  @updatedAt
   deletedAt            DateTime?
 
-  pharmacy        Pharmacy         @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  stockItem       StockItem?
-  stockMovements  StockMovement[]
-  recommendations Recommendation[] @relation("RecommendationProduct")
-  replacedIn      Recommendation[] @relation("RecommendationReplacedProduct")
-  saleLines       SaleLine[]
-  pharmacyRules   PharmacyRule[]
+  pharmacy            Pharmacy             @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  stockItem           StockItem?
+  stockMovements      StockMovement[]
+  recommendations     Recommendation[]     @relation("RecommendationProduct")
+  replacedIn          Recommendation[]     @relation("RecommendationReplacedProduct")
+  saleLines           SaleLine[]
+  pharmacyRules       PharmacyRule[]
   /// Les associations où ce produit est le déclencheur, ou le produit conseillé.
   triggerAssociations ProductAssociation[] @relation("AssociationTrigger")
   adviceAssociations  ProductAssociation[] @relation("AssociationAdvice")
@@ -1284,7 +1284,7 @@ model DrugSpecialty {
   smrOpinions            DrugSmrOpinion[]
   prescriptionLines      PrescriptionLine[]
   /// Les associations de pharmacie qui partent de ce médicament (voir ProductAssociation).
-  associationTriggers    ProductAssociation[] @relation("AssociationTriggerSpecialty")
+  associationTriggers    ProductAssociation[]        @relation("AssociationTriggerSpecialty")
 
   @@index([name])
   @@index([marketingStatus])
@@ -1776,10 +1776,9 @@ model Prescription {
   documents       PatientDocument[]
   sales           Sale[]
   sealedDocuments SealedDocument[]
-
-  @@unique([pharmacyId, reference])
   counterFollowUp CounterSaleFollowUp?
 
+  @@unique([pharmacyId, reference])
   @@index([pharmacyId, status])
   @@index([pharmacyId, createdAt])
   @@index([patientId])
@@ -2250,8 +2249,8 @@ model PharmacyRule {
 /// écrite par le pharmacien ; elle passe par les mêmes garde-fous que tout conseil (stock, sécurité, patient) et ne les
 /// contourne jamais.
 model ProductAssociation {
-  id               String   @id @default(cuid())
-  pharmacyId       String
+  id                 String   @id @default(cuid())
+  pharmacyId         String
   /// Le déclencheur est SOIT un produit du stock (triggerProductId), SOIT un médicament du catalogue national
   /// (triggerSpecialtyId) — jamais les deux, jamais aucun (contrainte en base : product_associations_one_trigger).
   /// Un médicament conseil comme Coryzalia se lit par son code CIP : il est au catalogue national, pas dans le stock.
@@ -2259,15 +2258,15 @@ model ProductAssociation {
   triggerSpecialtyId String?
   adviceProductId    String
   /// Ce que le pharmacien dit au patient, écrit par lui — jamais généré. Vide : la carte n'affiche que l'association.
-  sentence         String?
-  isActive         Boolean  @default(true)
+  sentence           String?
+  isActive           Boolean  @default(true)
   /// L'ordre de proposition : le plus petit d'abord.
-  sortOrder        Int      @default(0)
-  createdByUserId  String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  sortOrder          Int      @default(0)
+  createdByUserId    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  pharmacy       Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  pharmacy         Pharmacy       @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   triggerProduct   Product?       @relation("AssociationTrigger", fields: [triggerProductId], references: [id], onDelete: Cascade)
   triggerSpecialty DrugSpecialty? @relation("AssociationTriggerSpecialty", fields: [triggerSpecialtyId], references: [id], onDelete: Cascade)
   adviceProduct    Product        @relation("AssociationAdvice", fields: [adviceProductId], references: [id], onDelete: Cascade)
@@ -2354,31 +2353,63 @@ model CentralAssociation {
   @@map("central_associations")
 }
 
+/// Ce que PharmaBoost ne sait pas ranger dans le stock d'une pharmacie : un produit sans catégorie ou dont le modèle doute, un médicament dont il
+/// ne sait pas dire la famille. Visible UNIQUEMENT dans la console super admin (« Produits à connaître ») : le titulaire n'en voit rien.
+/// La pharmacienne répond une fois ; la réponse est écrite dans la mémoire commune (`product_classifications` / `drug_classifications`,
+/// source « PHARMACIST ») et vaut pour toutes les pharmacies, présentes et à venir.
+model KnowledgeGap {
+  id                String    @id @default(cuid())
+  /// PRODUCT (produit de l'officine) ou MEDICINE (médicament du stock).
+  kind              String
+  /// Le nom normalisé : la clé des mémoires communes.
+  key               String
+  /// Le nom tel que la première pharmacie l'a écrit.
+  label             String
+  /// UNCLASSIFIED (rien trouvé), LOW_CONFIDENCE (le modèle doute), NO_FAMILY (médicament sans famille).
+  reason            String
+  /// Ce que le modèle a avancé, pour aider la pharmacienne : { category, tags, confidence } ou { substance, atcCode, therapeuticClass, confidence }.
+  guess             Json?
+  occurrences       Int       @default(1)
+  pharmacyIds       String[]  @default([])
+  /// OPEN, ANSWERED, DISMISSED.
+  status            String    @default("OPEN")
+  answer            Json?
+  answeredByAdminId String?
+  answeredByName    String?
+  answeredAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([kind, key])
+  @@index([status, createdAt])
+  @@map("knowledge_gaps")
+}
+
 /// Un document déposé par la pharmacienne de PharmaBoost dans la console (fichier ou texte écrit à la main) : listes d'associations,
 /// recommandations, notes importantes. Seul le TEXTE est gardé (jamais le fichier d'origine) ; aucun document ne contient de donnée patient.
 /// Le modèle d'Anthropic le lit et en tire des PROPOSITIONS ; rien ne devient un conseil sans le clic de la pharmacienne.
 model KnowledgeDocument {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   title            String
   /// FILE ou TEXT.
   sourceType       String
   fileName         String?
   mimeType         String?
-  sizeBytes        Int      @default(0)
+  sizeBytes        Int       @default(0)
   textContent      String
   /// Ce que la pharmacienne veut qu'on sache de ce document (contexte, limites).
   note             String?
   /// DEPOSITED (déposé), ANALYSED (lu), FAILED (analyse impossible : voir analysisError).
-  status           String   @default("DEPOSITED")
+  status           String    @default("DEPOSITED")
   analysisError    String?
   analysedAt       DateTime?
   analysisModel    String?
   /// Combien de propositions ont été écartées parce que leur citation n'existe pas dans le document, ou qu'elles ne respectaient pas les règles.
-  discardedCount   Int      @default(0)
+  discardedCount   Int       @default(0)
   createdByAdminId String?
   createdByName    String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   proposals KnowledgeProposal[]
 

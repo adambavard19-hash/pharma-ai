@@ -532,6 +532,22 @@ export async function commitStockImport(params: {
     }
   }
 
+  // Connaître le stock par cœur, en arrière-plan, sans que le titulaire attende ni n'en sache rien : ce qui reste de produits à ranger et
+  // chaque médicament en stock. Ce qui reste incompris part dans le carnet « Produits à connaître » de la console (jamais chez le titulaire).
+  // Hors d'une requête (essais, scripts), le passage de nuit s'en charge.
+  if (!params.pharmacyIsDemo) {
+    const scope = params.scope;
+    try {
+      const { after } = await import("next/server");
+      after(async () => {
+        const { learnPharmacyStock } = await import("./stock-learning");
+        await learnPharmacyStock(scope).catch((error) => console.error("[stock-import] connaissance du stock impossible", error));
+      });
+    } catch {
+      /* pas de requête en cours : le passage de nuit prendra le relais */
+    }
+  }
+
   await recordAudit({
     action: "product.imported",
     entityType: "ImportJob",

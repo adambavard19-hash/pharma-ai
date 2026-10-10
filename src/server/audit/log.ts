@@ -119,6 +119,8 @@ export type AuditAction =
   | "association.created"
   | "association.updated"
   | "association.deleted"
+  | "knowledge.gap_answered"
+  | "knowledge.gap_dismissed"
   | "knowledge.document_deposited"
   | "knowledge.document_analysed"
   | "knowledge.proposal_decided"

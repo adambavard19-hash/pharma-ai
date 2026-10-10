@@ -9,6 +9,7 @@ const reply = (items: unknown) => ({ content: [{ type: "tool_use", name: "propos
 
 describe("l'appel au modèle", () => {
   it("transmet le document et la consigne stricte, et rend les propositions brutes", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const create = vi.fn(async (_params: unknown) => reply([{ type: "RULE", quote: "x" }]));
     const result = await extractFromDocument({ title: "Fiche", note: "adulte", text: "Contenu du document." }, { create: create as never });
     expect(result).toEqual({ ok: true, items: [{ type: "RULE", quote: "x" }], model: "modele-test", parts: 1 });

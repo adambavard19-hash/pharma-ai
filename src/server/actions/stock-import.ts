@@ -101,15 +101,8 @@ export async function commitStockImportAction(
     });
     revalidatePath("/stock");
     revalidatePath("/bienvenue");
-    // Ce que l'import n'a pas eu le temps de comprendre continue après la
-    // réponse, par lots, jusqu'à épuisement : le titulaire n'attend pas.
-    if (outcome.classification && outcome.classification.remaining > 0) {
-      const scope = session.scope;
-      after(async () => {
-        const { classifyPharmacyProducts } = await import("@/server/services/product-classification");
-        await classifyPharmacyProducts({ scope, maxAiBatches: 60 }).catch((error) => console.error("[stock-import] classification différée impossible", error));
-      });
-    }
+    // Ce que l'import n'a pas eu le temps de comprendre (produits à ranger, médicaments à classer) continue après la réponse, par lots :
+    // `commitStockImport` le programme lui-même, le titulaire n'attend pas.
     // Les photos des boîtes, par code-barres, sans faire attendre : un premier
     // passage ici, le bouton de la page Stock fait le reste.
     {

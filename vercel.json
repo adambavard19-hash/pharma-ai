@@ -3,6 +3,7 @@
   "crons": [
     { "path": "/api/cron/relances-contrats", "schedule": "0 8 * * *" },
     { "path": "/api/cron/automatisations", "schedule": "15 8 * * *" },
-    { "path": "/api/cron/bilan-comptoir-mensuel", "schedule": "30 7 1 * *" }
+    { "path": "/api/cron/bilan-comptoir-mensuel", "schedule": "30 7 1 * *" },
+    { "path": "/api/cron/connaissance-du-stock", "schedule": "30 2 * * *" }
   ]
 }

@@ -51,3 +51,29 @@ Tables `knowledge_documents` et `knowledge_proposals` (migration `20261021090000
 `server/ai/knowledge-extractor.ts` (appel Anthropic, injectable pour les tests) ; `server/services/knowledge.ts`,
 `knowledge-files.ts` ; `server/actions/admin-knowledge.ts` (barrière `requirePlatformSession`, vérifiée par
 `admin-actions-session.test.ts`) ; audit `knowledge.*`.
+
+## Produits à connaître (console super admin → Gestion → Conseils → « Produits à connaître »)
+
+**Le principe :** PharmaBoost doit connaître tout le stock d'une nouvelle pharmacie sans l'aide de personne. Ce qu'il ne sait pas ranger
+arrive dans cette liste, visible **seulement** de la console (le titulaire n'en voit rien) ; la pharmacienne répond une fois, la réponse
+vaut pour **toutes** les pharmacies, présentes et à venir, et le sujet ne revient plus.
+
+**Quand le stock est lu** (`server/services/stock-learning.ts`) : dès qu'un stock est enregistré (import, logiciel de gestion, dépôt) —
+en arrière-plan, après la réponse —, puis **chaque nuit** (`/api/cron/connaissance-du-stock`, 02 h 30, `CRON_SECRET`) pour ce qui reste.
+ 1. **Produits** (crèmes, compléments, plantes…) : dictionnaire d'abord, puis modèle d'Anthropic, mémoire commune par nom.
+ 2. **Médicaments en stock** : substance, famille, code ATC, classés par le modèle (avec les substances officielles de la base publique)
+    et mémorisés. Au scan, tout est déjà compris : l'analyse est locale.
+ 3. Le même carnet se remplit au scan quand un médicament n'a pas de famille.
+
+**Ce qui est signalé :** un produit que le modèle a lu sans savoir le ranger, ou dont il doute (confiance < 60 %) ; un médicament sans
+famille (ni ATC ni classe) ou dont le modèle doute. Jamais : un échec du modèle (réseau) ou un lot pas encore traité — ce n'est pas un
+trou, le passage suivant reprend.
+
+**La réponse** : produit → catégorie + étiquettes du vocabulaire fermé des règles (« Pas un produit de conseil » = Autres, sans
+étiquette) ; médicament → substance, code ATC (ou début : J01) et/ou famille. Écrite dans `product_classifications` /
+`drug_classifications` (source « PHARMACIST », confiance 100 %, médicament « confirmé »), **avant** le dictionnaire et le modèle,
+et appliquée aussitôt aux produits déjà en stock de toutes les pharmacies. « Je ne sais pas » écarte le sujet sans rien apprendre.
+
+**L'alerte :** une pastille sur l'onglet « Conseils » de la console donne le nombre de sujets ouverts.
+
+Tables : `knowledge_gaps` (migration `20261022090000_produits_a_connaitre`). Audit : `knowledge.gap_answered | gap_dismissed`.

@@ -129,6 +129,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
         items: [
           { href: "/admin/conseils", label: "Conseils & associations", description: "Les règles, les conseils et les associations de PharmaBoost : valider, supprimer, ajouter, pour toutes les pharmacies." },
           { href: "/admin/connaissances", label: "Base de connaissances", description: "Déposer des documents et des notes : le modèle les lit et propose des conseils, vous acceptez ou refusez." },
+          { href: "/admin/a-connaitre", label: "Produits à connaître", description: "Ce que PharmaBoost n'a pas su ranger dans le stock des pharmacies : vous répondez une fois, c'est appris pour toutes." },
         ],
       },
       {
