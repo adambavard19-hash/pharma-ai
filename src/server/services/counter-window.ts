@@ -174,12 +174,6 @@ export async function finishCounterSale(agent: AgentContext, input: { prescripti
   const pharmacyId = agent.scope.pharmacyId;
   const post = (sale.counterPost ?? "poste").slice(0, 60);
 
-  const existing = await prisma.counterSaleFollowUp.findUnique({ where: { prescriptionId: sale.id } });
-  if (existing?.closedAt) {
-    const report = existing.reportStatus === "SENT" || existing.reportStatus === "SIMULATED" || existing.reportStatus === "FAILED" ? existing.reportStatus : "NONE";
-    return { ok: true, alreadyClosed: true, proposed: existing.proposedCount, sold: existing.soldCount, notSold: existing.notSoldCount, unanswered: existing.unansweredCount, soldToday: null, report };
-  }
-
   // Ce que le pharmacien avait sous les yeux : exactement les conseils de la fenêtre, pas ceux que le moteur a gardés en réserve.
   const read = await readCounterNotice(pharmacyId, sale.id, now);
   const items = read?.notice.items ?? [];
@@ -188,6 +182,16 @@ export async function finishCounterSale(agent: AgentContext, input: { prescripti
   const notSold = items.filter((item) => item.outcome === "NOT_SOLD");
   const unanswered = items.filter((item) => item.outcome === "NONE");
 
+  // La vente se ferme UNE seule fois, même si « Vente terminée » arrive deux fois en même temps (double clic, nouvel essai après une
+  // coupure, deux postes) : la fermeture est réservée d'un seul coup, et seul celui qui l'a obtenue enregistre et envoie le bilan.
+  await ensureFollowUp(pharmacyId, sale.id);
+  const claimed = await prisma.counterSaleFollowUp.updateMany({ where: { prescriptionId: sale.id, closedAt: null }, data: { closedAt: now, closedPost: post } });
+  if (claimed.count === 0) {
+    const existing = await prisma.counterSaleFollowUp.findUnique({ where: { prescriptionId: sale.id } });
+    const report = existing?.reportStatus === "SENT" || existing?.reportStatus === "SIMULATED" || existing?.reportStatus === "FAILED" ? existing.reportStatus : "NONE";
+    return { ok: true, alreadyClosed: true, proposed: existing?.proposedCount ?? 0, sold: existing?.soldCount ?? 0, notSold: existing?.notSoldCount ?? 0, unanswered: existing?.unansweredCount ?? 0, soldToday: null, report };
+  }
+
   await prisma.$transaction(async (tx) => {
     // Sans réponse : comme à la fin d'une vente enregistrée, c'est un résultat à part entière, distinct d'un refus.
     const pending = ids.length ? await tx.recommendation.findMany({ where: { id: { in: ids }, pharmacyId, status: "PROPOSED" }, select: { id: true } }) : [];
@@ -195,10 +199,9 @@ export async function finishCounterSale(agent: AgentContext, input: { prescripti
       await tx.recommendation.updateMany({ where: { id: { in: pending.map((rec) => rec.id) } }, data: { status: "IGNORED" } });
       await tx.recommendationEvent.createMany({ data: pending.map((rec) => ({ recommendationId: rec.id, type: "IGNORED" as const, userId: null, metadata: { source: COUNTER_DECLARED, post } as never })) });
     }
-    await tx.counterSaleFollowUp.upsert({
+    await tx.counterSaleFollowUp.update({
       where: { prescriptionId: sale.id },
-      create: { pharmacyId, prescriptionId: sale.id, closedAt: now, closedPost: post, proposedCount: items.length, soldCount: sold.length, notSoldCount: notSold.length, unansweredCount: unanswered.length },
-      update: { closedAt: now, closedPost: post, proposedCount: items.length, soldCount: sold.length, notSoldCount: notSold.length, unansweredCount: unanswered.length },
+      data: { closedPost: post, proposedCount: items.length, soldCount: sold.length, notSoldCount: notSold.length, unansweredCount: unanswered.length },
     });
   });
 

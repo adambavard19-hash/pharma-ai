@@ -23,7 +23,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/server/db/client", () => ({ prisma: mocks.prisma }));
 vi.mock("@/server/audit/log", () => ({ recordAudit: vi.fn() }));
 vi.mock("@/config/env", () => ({ isDemoMode: () => false, appEnvironment: () => "development" }));
-vi.mock("@/server/services/references", () => ({ nextReference: vi.fn(async () => "ORD-0001") }));
+vi.mock("@/server/services/references", () => ({ nextReference: vi.fn(async () => "ORD-0001"), createWithReference: async (_entity: string, _pharmacyId: string, create: (reference: string) => Promise<unknown>) => create("ORD-0001") }));
 vi.mock("@/server/services/product-images", () => ({ findOpenFactsName: mocks.findOpenFactsName }));
 
 const { recordCounterScan } = await import("../counter-scan");

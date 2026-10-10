@@ -11,7 +11,7 @@ import {
   persistExtraction,
 } from "@/server/services/analysis";
 import { formatSchedule, hasDoses, readSchedule } from "@/core/posology";
-import { nextReference } from "@/server/services/references";
+import { createWithReference } from "@/server/services/references";
 import { recordAudit } from "@/server/audit/log";
 import { recordInteraction } from "@/server/services/patients";
 import { getOCRProvider, getStorageProvider } from "@/server/ai/registry";
@@ -189,22 +189,22 @@ export async function createPrescriptionAction(
     fileMimeType = file.type;
   }
 
-  const reference = await nextReference("prescription", scope.pharmacyId);
-
-  const prescription = await prisma.prescription.create({
-    data: {
-      pharmacyId: scope.pharmacyId,
-      patientId: patientId || null,
-      reference,
-      status: "DRAFT",
-      source,
-      fileKey,
-      fileName,
-      fileMimeType,
-      createdByUserId: scope.userId,
-      isDemo: recordIsDemo(session.pharmacy.isDemo),
-    },
-  });
+  const prescription = await createWithReference("prescription", scope.pharmacyId, (reference) =>
+    prisma.prescription.create({
+      data: {
+        pharmacyId: scope.pharmacyId,
+        patientId: patientId || null,
+        reference,
+        status: "DRAFT",
+        source,
+        fileKey,
+        fileName,
+        fileMimeType,
+        createdByUserId: scope.userId,
+        isDemo: recordIsDemo(session.pharmacy.isDemo),
+      },
+    }),
+  );
 
   // Lecture déjà faite au dépôt : on l'écrit telle quelle, intégralement.
   // Pas de nouvel appel au lecteur — l'image a déjà été lue une fois, et tout
@@ -266,7 +266,7 @@ export async function createPrescriptionAction(
       patientId,
       scope,
       type: "PRESCRIPTION_RECEIVED",
-      summary: `Ordonnance ${reference} importée.`,
+      summary: `Ordonnance ${prescription.reference} importée.`,
       metadata: { prescriptionId: prescription.id },
     });
   }

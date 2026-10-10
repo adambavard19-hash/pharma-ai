@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/server/db/client";
-import { nextReference } from "./references";
+import { createWithReference } from "./references";
 import { applyStockMovement } from "./catalog";
 import { recordAudit } from "@/server/audit/log";
 import { recordInteraction } from "./patients";
@@ -156,9 +156,8 @@ export async function recordSale(params: {
     .filter((line) => line.recommendationId)
     .reduce((sum, line) => sum + line.marginCents, 0);
 
-  const reference = await nextReference("sale", params.scope.pharmacyId);
-
-  const sale = await prisma.$transaction(async (tx) => {
+  // Deux collaborateurs qui encaissent en même temps : la référence se recalcule en cas de collision (la transaction entière est rejouée).
+  const sale = await createWithReference("sale", params.scope.pharmacyId, (reference) => prisma.$transaction(async (tx) => {
     const created = await tx.sale.create({
       data: {
         pharmacyId: params.scope.pharmacyId,
@@ -241,7 +240,7 @@ export async function recordSale(params: {
     }
 
     return created;
-  });
+  }));
 
   // Le mouvement de stock est appliqué hors transaction principale afin que
   // l'échec d'un décrément (produit sans fiche stock) n'annule pas la vente.
@@ -263,7 +262,7 @@ export async function recordSale(params: {
       productId,
       quantityDelta: -line.quantity,
       type: "SALE",
-      reason: `Vente ${reference}`,
+      reason: `Vente ${sale.reference}`,
       saleId: sale.id,
     }).catch((error) => {
       console.error("[sales] mouvement de stock impossible", productId, error);
@@ -277,7 +276,7 @@ export async function recordSale(params: {
       patientId: params.patientId,
       scope: params.scope,
       type: "SALE_RECORDED",
-      summary: `Vente ${reference} enregistrée (${computed.length} produit(s)).`,
+      summary: `Vente ${sale.reference} enregistrée (${computed.length} produit(s)).`,
       metadata: { saleId: sale.id, attributedCents },
     });
   }
@@ -289,7 +288,7 @@ export async function recordSale(params: {
     pharmacyId: params.scope.pharmacyId,
     userId: params.scope.userId,
     metadata: {
-      reference,
+      reference: sale.reference,
       lines: computed.length,
       totalCents,
       attributedCents,

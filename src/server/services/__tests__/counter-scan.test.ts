@@ -148,7 +148,10 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/server/db/client", () => ({ prisma: db }));
 vi.mock("@/server/audit/log", () => ({ recordAudit: audit.recordAudit }));
 vi.mock("@/server/db/demo-scope", () => ({ recordIsDemo: () => false }));
-vi.mock("@/server/services/references", () => ({ nextReference: vi.fn(async () => `ORD-${String(mem.next + 1).padStart(4, "0")}`) }));
+vi.mock("@/server/services/references", () => ({
+  nextReference: vi.fn(async () => `ORD-${String(mem.next + 1).padStart(4, "0")}`),
+  createWithReference: async (_entity: string, _pharmacyId: string, create: (reference: string) => Promise<unknown>) => create(`ORD-${String(mem.next + 1).padStart(4, "0")}`),
+}));
 vi.mock("@/server/services/product-images", () => ({ findOpenFactsName: vi.fn(async () => null) }));
 
 const { SAME_SALE_WINDOW_MS, recordCounterScan, closeLiveCounterSales, scanInstant } = await import("../counter-scan");

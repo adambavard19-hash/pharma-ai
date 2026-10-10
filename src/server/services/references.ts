@@ -105,3 +105,33 @@ export async function reserveReferences(entity: Entity, pharmacyId: string, coun
   }
   return reserved;
 }
+
+/** Une collision sur la référence lisible de l'officine : deux créations simultanées ont calculé le même numéro. */
+export function isReferenceCollision(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || (error as { code?: string }).code !== "P2002") return false;
+  const target = JSON.stringify((error as { meta?: unknown }).meta ?? {});
+  return /reference/i.test(target) || target === "{}";
+}
+
+/**
+ * Crée une entité avec sa référence lisible, sans jamais échouer parce que deux postes (ou deux collaborateurs) créent en même temps.
+ *
+ * Le numéro suivant se calcule d'après ce qui existe ; deux créations simultanées peuvent donc calculer le MÊME numéro, et la base
+ * refuse la seconde (clé unique par officine). Plutôt qu'un bip perdu ou une vente en erreur, on recalcule (le concurrent est alors
+ * visible) et on réessaie, après une courte pause décalée. Les autres erreurs remontent telles quelles.
+ */
+export async function createWithReference<T>(entity: Entity, pharmacyId: string, create: (reference: string) => Promise<T>, options: { attempts?: number } = {}): Promise<T> {
+  const attempts = options.attempts ?? 8;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const reference = await nextReference(entity, pharmacyId);
+    try {
+      return await create(reference);
+    } catch (error) {
+      if (!isReferenceCollision(error)) throw error;
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 40 * (attempt + 1)) + 5));
+    }
+  }
+  throw lastError;
+}

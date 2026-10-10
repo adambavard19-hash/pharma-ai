@@ -38,7 +38,8 @@
     "onboarding:parcours": "EMAIL_PROVIDER=none SIGNATURE_PROVIDER=none node --env-file=.env --conditions=react-server --import tsx scripts/onboarding/parcours.mts",
     "lot:isolation": "node --env-file=.env --conditions=react-server --import tsx scripts/lot-pharmacienne/isolation.mts",
     "lot:isolation-partenaires": "node --env-file=.env --conditions=react-server --import tsx scripts/lot-partenaires/isolation.mts",
-    "agent:build:journal": "node -e \"require('esbuild').buildSync({entryPoints:['agent/src/lire-journal.ts'],bundle:true,platform:'node',target:'node18',format:'cjs',outfile:'agent/dist/lire-journal.js'})\""
+    "agent:build:journal": "node -e \"require('esbuild').buildSync({entryPoints:['agent/src/lire-journal.ts'],bundle:true,platform:'node',target:'node18',format:'cjs',outfile:'agent/dist/lire-journal.js'})\"",
+    "essai:multi": "node --env-file=.env --conditions=react-server --import tsx scripts/essai-multi-pharmacies.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",

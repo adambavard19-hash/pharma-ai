@@ -4,7 +4,7 @@ import { authenticateAgent } from "@/server/services/stock-sync";
 import { storePrescriptionFile, uploadErrorMessage } from "@/server/services/prescription-upload";
 import { persistExtraction } from "@/server/services/analysis";
 import { prewarmClassifications } from "@/server/services/classification";
-import { nextReference } from "@/server/services/references";
+import { createWithReference } from "@/server/services/references";
 import { recordIsDemo } from "@/server/db/demo-scope";
 import { recordAudit } from "@/server/audit/log";
 import { createNotification } from "@/server/services/notifications";
@@ -27,20 +27,21 @@ export async function POST(request: Request) {
   const stored = await storePrescriptionFile({ scope: agent.scope, file });
   if (!stored.ok) return NextResponse.json({ ok: false, error: uploadErrorMessage(stored.error) }, { status: 422 });
 
-  const reference = await nextReference("prescription", agent.scope.pharmacyId);
-  const prescription = await prisma.prescription.create({
-    data: {
-      pharmacyId: agent.scope.pharmacyId,
-      reference,
-      status: "DRAFT",
-      source: "SCAN",
-      fileKey: stored.data.fileKey,
-      fileName: stored.data.fileName,
-      fileMimeType: stored.data.mimeType,
-      createdByUserId: agent.scope.userId,
-      isDemo: recordIsDemo(agent.pharmacyIsDemo),
-    },
-  });
+  const prescription = await createWithReference("prescription", agent.scope.pharmacyId, (reference) =>
+    prisma.prescription.create({
+      data: {
+        pharmacyId: agent.scope.pharmacyId,
+        reference,
+        status: "DRAFT",
+        source: "SCAN",
+        fileKey: stored.data.fileKey,
+        fileName: stored.data.fileName,
+        fileMimeType: stored.data.mimeType,
+        createdByUserId: agent.scope.userId,
+        isDemo: recordIsDemo(agent.pharmacyIsDemo),
+      },
+    }),
+  );
   if (stored.data.extraction) {
     await persistExtraction({ scope: agent.scope, prescriptionId: prescription.id, extracted: stored.data.extraction });
   } else {
@@ -55,9 +56,9 @@ export async function POST(request: Request) {
     userId: null,
     type: "SYSTEM",
     severity: "INFO",
-    title: `Ordonnance ${reference} reçue du scanner`,
+    title: `Ordonnance ${prescription.reference} reçue du scanner`,
     body: drugNames.length > 0 ? `${drugNames.length} médicament(s) lu(s) : à confirmer au comptoir.` : "Aucune ligne lue : à saisir au comptoir.",
     linkUrl: `/vente/${prescription.id}`,
   });
-  return NextResponse.json({ ok: true, prescriptionId: prescription.id, reference, lines: drugNames.length });
+  return NextResponse.json({ ok: true, prescriptionId: prescription.id, reference: prescription.reference, lines: drugNames.length });
 }

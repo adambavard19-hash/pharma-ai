@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/server/db/client";
 import { readScannedCode } from "@/core/stock";
-import { nextReference } from "@/server/services/references";
+import { createWithReference } from "@/server/services/references";
 import { recordIsDemo } from "@/server/db/demo-scope";
 import { recordAudit } from "@/server/audit/log";
 import type { AgentContext } from "@/server/services/stock-sync";
@@ -207,20 +207,23 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
     // Retour à « à confirmer » : l'écran relance l'analyse avec la nouvelle boîte.
     await prisma.prescription.update({ where: { id: open.id }, data: { status: "NEEDS_VERIFICATION", verifiedAt: null } });
   } else {
-    reference = await nextReference("prescription", agent.scope.pharmacyId);
-    const prescription = await prisma.prescription.create({
-      data: {
-        pharmacyId: agent.scope.pharmacyId,
-        reference,
-        status: "NEEDS_VERIFICATION",
-        source: "COUNTER_SCAN",
-        counterPost: post,
-        createdByUserId: agent.scope.userId,
-        isDemo: recordIsDemo(agent.pharmacyIsDemo),
-        lines: { create: { position: 1, ...lineData } },
-      },
-      select: { id: true },
-    });
+    // Deux postes qui bipent en même temps : la référence se recalcule en cas de collision, aucun bip n'est perdu.
+    const prescription = await createWithReference("prescription", agent.scope.pharmacyId, (candidate) =>
+      prisma.prescription.create({
+        data: {
+          pharmacyId: agent.scope.pharmacyId,
+          reference: candidate,
+          status: "NEEDS_VERIFICATION",
+          source: "COUNTER_SCAN",
+          counterPost: post,
+          createdByUserId: agent.scope.userId,
+          isDemo: recordIsDemo(agent.pharmacyIsDemo),
+          lines: { create: { position: 1, ...lineData } },
+        },
+        select: { id: true, reference: true },
+      }),
+    );
+    reference = prescription.reference;
     prescriptionId = prescription.id;
     created = true;
   }
