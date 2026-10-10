@@ -32,6 +32,7 @@ __export(lire_journal_exports, {
   maskEntry: () => maskEntry,
   maskMessage: () => maskMessage,
   maskThread: () => maskThread,
+  matchDeliveries: () => matchDeliveries,
   parseEntry: () => parseEntry,
   readTail: () => readTail,
   recentJournals: () => recentJournals,
@@ -44,15 +45,94 @@ var import_node_child_process = require("node:child_process");
 var import_node_fs = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path = require("node:path");
+
+// agent/src/journal-line.ts
 var JOURNAL_DIRS = ["C:\\var\\log\\lgpi\\application", "D:\\var\\log\\lgpi\\application", "C:\\var\\log\\lgpi", "D:\\var\\log\\lgpi"];
-var MAX_FILES = 3;
-var TAIL_BYTES = 6 * 1024 * 1024;
-var ROBOT_LINE = /automate|robot|rowa|outputrequest|inputrequest|mach4|cdapi|wwks|code produit/i;
 var ENTRY = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})[,.]\d{3}\s+(\w+)\s+\[([^\]]*)\]\s+(\S+)\s+-\s+(.*)$/;
 function parseEntry(line) {
   const match = ENTRY.exec(line);
   return match ? { date: match[1], time: match[2], level: match[3], thread: match[4], logger: match[5], message: match[6] } : null;
 }
+
+// agent/src/robot.ts
+var MAX_READ_BYTES = 1024 * 1024;
+
+// agent/src/robot-lgpi.ts
+var CYCLE_START = /:\s*Demande\s+\S{1,3}\s+la\s/;
+var CYCLE_END = /\bFin de la demande\b/;
+var CYCLE_GIVEN_UP = /\bon n.en \S+ pas\b/;
+var PRODUCT_CODE = /Code produit\s+(\d{7}|\d{13})\b/;
+var RESPONSE_CODE = /\b[A-Za-z]+_13\s*=\s*(\d{13})\b/g;
+var MAX_CODES_PER_CYCLE = 50;
+var RESPONSE_WAIT_MS = 3e3;
+var LgpiRobotReader = class {
+  cycle = null;
+  pending = null;
+  /** Compteurs pour le rapport de lecture : combien de demandes ont abouti, combien ont été laissées de côté. */
+  finished = 0;
+  givenUp = 0;
+  /** Une ligne de plus. `now` : l'heure de ce poste en millisecondes (pas celle du journal). Rend les codes à annoncer, dans l'ordre. */
+  push(line, now) {
+    const entry = parseEntry(line);
+    if (!entry) return [];
+    const out = [];
+    const isResponse = /(?:AutomateMessageEventGenerator|ClientAutomates)$/.test(entry.logger) && entry.message.includes("StockOutputResponse(");
+    if (this.pending) {
+      if (isResponse) {
+        out.push(...this.settle(entry.message));
+        return out;
+      }
+      out.push(...this.settle(null));
+    }
+    if (!/ControlerAutomate$/.test(entry.logger)) return out;
+    const { message } = entry;
+    if (CYCLE_END.test(message)) {
+      const codes = this.cycle ?? [];
+      this.cycle = null;
+      if (codes.length > 0) {
+        this.finished += 1;
+        this.pending = { codes, since: now };
+      }
+    } else if (CYCLE_START.test(message)) {
+      if (this.cycle && this.cycle.length > 0) this.givenUp += 1;
+      this.cycle = [];
+    } else if (CYCLE_GIVEN_UP.test(message)) {
+      if (this.cycle && this.cycle.length > 0) this.givenUp += 1;
+      this.cycle = null;
+    } else if (this.cycle) {
+      const code = PRODUCT_CODE.exec(message)?.[1];
+      if (code && !this.cycle.includes(code) && this.cycle.length < MAX_CODES_PER_CYCLE) this.cycle.push(code);
+    }
+    return out;
+  }
+  /** À appeler régulièrement : la réponse du robot qui ne vient pas n'empêche pas d'annoncer. */
+  flush(now) {
+    return this.pending && now - this.pending.since >= RESPONSE_WAIT_MS ? this.settle(null) : [];
+  }
+  /**
+   * Annonce les produits du cycle terminé. Un code à 7 chiffres n'est pas toujours un CIP : LGPI en donne aux produits
+   * qu'il a lui-même numérotés (le journal montre un lecteur de glycémie demandé sous « 5162291 » alors que la réponse
+   * du robot porte son code-barres, 4015630063253). Quand le cycle n'a qu'un code à 7 chiffres et que la réponse en
+   * donne un seul à 13, c'est ce dernier que PharmaBoost sait retrouver.
+   */
+  settle(responseMessage) {
+    const pending = this.pending;
+    this.pending = null;
+    if (!pending) return [];
+    const { codes } = pending;
+    if (responseMessage && codes.length === 1 && codes[0].length === 7) {
+      const found = [...new Set([...responseMessage.matchAll(RESPONSE_CODE)].map((match) => match[1]))];
+      if (found.length === 1) return found;
+    }
+    return codes;
+  }
+};
+var MAX_READ_BYTES2 = 1024 * 1024;
+
+// agent/src/lire-journal.ts
+var MAX_FILES = 3;
+var TAIL_BYTES = 6 * 1024 * 1024;
+var ROBOT_LINE = /automate|robot|rowa|outputrequest|inputrequest|mach4|cdapi|wwks|code produit/i;
 var VOCABULARY = new Set(
   [
     "pick",
@@ -233,6 +313,21 @@ function findCodes(entry, candidate) {
   }
   return codes;
 }
+function isDelivery(entry) {
+  return /AutomateMessageEventGenerator$/.test(entry.logger) && entry.message.includes("StockOutputMessage(") && /packs=\[\s*StockOutputPack/.test(entry.message);
+}
+function matchDeliveries(announcedAt, deliveredAt, windowMs = 10 * 6e4) {
+  const free = [...deliveredAt].sort((a, b) => a - b);
+  let withDelivery = 0;
+  for (const at of [...announcedAt].sort((a, b) => a - b)) {
+    const index = free.findIndex((delivered) => delivered >= at - 2e3 && delivered <= at + windowMs);
+    if (index >= 0) {
+      withDelivery += 1;
+      free.splice(index, 1);
+    }
+  }
+  return { withDelivery, withoutDelivery: announcedAt.length - withDelivery };
+}
 function analyse(texts, options = {}) {
   const lastCount = options.lastCount ?? 40;
   const shapeCount = options.shapeCount ?? 30;
@@ -241,11 +336,18 @@ function analyse(texts, options = {}) {
   const robot = [];
   const days = /* @__PURE__ */ new Map();
   let entriesRead = 0;
+  const reader = new LgpiRobotReader();
+  const announced = [];
+  const delivered = [];
+  let lastAt = 0;
   for (const text of texts) {
     for (const line of text.split(/\r?\n/)) {
       const entry = parseEntry(line);
       if (!entry) continue;
       entriesRead += 1;
+      lastAt = Date.parse(`${entry.date}T${entry.time}`);
+      for (const code of reader.push(line, lastAt)) announced.push({ date: entry.date, time: entry.time, code, at: lastAt });
+      if (isDelivery(entry)) delivered.push(lastAt);
       if (!ROBOT_LINE.test(entry.message) && !ROBOT_LINE.test(entry.logger)) continue;
       robot.push(entry);
       days.set(entry.date, (days.get(entry.date) ?? 0) + 1);
@@ -265,9 +367,21 @@ function analyse(texts, options = {}) {
     for (const entry of robot) for (const code of findCodes(entry, candidate)) hits.push({ date: entry.date, time: entry.time, code });
     return { candidate, total: hits.length, distinct: new Set(hits.map((hit) => hit.code)).size, recent: hits.slice(-recentCodes) };
   });
+  for (const code of reader.flush(Number.MAX_SAFE_INTEGER)) {
+    const last = robot[robot.length - 1];
+    announced.push({ date: last?.date ?? "", time: last?.time ?? "", code, at: lastAt });
+  }
+  const followed = matchDeliveries(announced.map((hit) => hit.at), delivered);
   return {
     entriesRead,
     robotEntries: robot.length,
+    requests: {
+      finished: reader.finished,
+      givenUp: reader.givenUp,
+      announced: announced.length,
+      ...followed,
+      recent: announced.slice(-recentCodes).map(({ date, time, code }) => ({ date, time, code }))
+    },
     shapes: [...shapes.values()].sort((a, b) => b.count - a.count || a.first.localeCompare(b.first)).slice(0, shapeCount),
     lastLines: robot.slice(-lastCount).map((entry) => `${entry.date} ${maskEntry(entry)}`),
     candidates,
@@ -305,7 +419,13 @@ function renderReport(input) {
       out.push(`Motif ${result.candidate.id} \u2014 ${result.candidate.label} : ${result.total} code(s) trouv\xE9(s), ${result.distinct} diff\xE9rent(s).`);
       for (const hit of result.recent) out.push(`   ${hit.date} ${hit.time} \u2192 ${hit.code}`);
     }
-    out.push("", "=".repeat(70), "5. Ce que cela sugg\xE8re", "=".repeat(70));
+    out.push("", "=".repeat(70), "5. Ce que PharmaBoost annoncerait (le suivi en direct, appliqu\xE9 \xE0 ces journaux)", "=".repeat(70));
+    const requests = analysis.requests;
+    out.push(`Demandes de sortie termin\xE9es : ${requests.finished} \xB7 laiss\xE9es de c\xF4t\xE9 (le robot n'a pas la bo\xEEte, ou la demande n'a pas fini) : ${requests.givenUp}.`);
+    out.push(`Produits annonc\xE9s : ${requests.announced} \xB7 suivis d'une sortie de bo\xEEte dans les 10 minutes : ${requests.withDelivery} \xB7 sans sortie vue : ${requests.withoutDelivery}.`);
+    for (const hit of requests.recent) out.push(`   ${hit.date} ${hit.time} \u2192 ${hit.code}`);
+    out.push("Le dernier produit annonc\xE9 doit \xEAtre celui de la vente de test, \xE0 la minute pr\xE8s.");
+    out.push("", "=".repeat(70), "6. Ce que cela sugg\xE8re", "=".repeat(70));
     const best = analysis.candidates.filter((result) => result.total > 0).sort((a, b) => b.total - a.total)[0];
     if (analysis.robotEntries === 0) out.push(" - Aucune ligne du robot : ces journaux ne portent pas l'\xE9change. Le rapport du diagnostic complet reste la r\xE9f\xE9rence.");
     else if (!best) out.push(" - Le journal parle du robot, mais aucun motif ne trouve de code produit : la forme des lignes (section 2) dit o\xF9 chercher.");
@@ -313,7 +433,7 @@ function renderReport(input) {
     out.push(" - Une vente de test d'UNE bo\xEEte connue, faite juste avant cette lecture, doit appara\xEEtre en bas de la section 4, \xE0 la minute pr\xE8s.");
   }
   if (input.errors.length > 0) {
-    out.push("", "=".repeat(70), "6. Erreurs rencontr\xE9es pendant la lecture", "=".repeat(70), ...input.errors);
+    out.push("", "=".repeat(70), "7. Erreurs rencontr\xE9es pendant la lecture", "=".repeat(70), ...input.errors);
   }
   return out;
 }
@@ -422,6 +542,7 @@ if (process.env.PB_LIRE_JOURNAL_LANCER === "1") {
   maskEntry,
   maskMessage,
   maskThread,
+  matchDeliveries,
   parseEntry,
   readTail,
   recentJournals,

@@ -213,7 +213,49 @@ en réussite.
   en premier lieu un mot de passe ou un jeton, est refusée. L'audit ne retient ni adresse ni chemin. La liste des
   fabricants est une liste de **choix**, pas de compatibilités.
 
+## Le journal de LGPI lu en direct (agent 0.9.0, 10 octobre 2026)
+
+Source : le rapport de lecture de **POSTE3** du 9 octobre 2026 (trois jours de journaux, 65 791 lignes, 4 170 lignes du
+robot, puis une vente de test d'une boîte à 02:06).
+
+**Ce que le rapport établit.** LGPI écrit `C:\var\log\lgpi\application\lgpi.AAAA-MM-JJ.log` (un fichier par jour, en ANSI),
+et chaque demande faite au robot depuis CE poste y laisse un petit cycle de lignes de la classe `ControlerAutomate` :
+
+```
+Demande à la …            → début
+Code produit 3400935294227 … → le produit (CIP 13 chiffres ; 7 chiffres pour un produit numéroté par LGPI)
+… on en … K sur 999 …
+Fin de la demande à la …  → fin ; la réponse du robot (StockOutputResponse, avec le code à 13 chiffres) suit dans la seconde
+```
+
+D'autres cycles s'arrêtent à « on n'en … pas » et ne finissent jamais : le robot n'a pas la boîte, rien ne sort, et la
+même boîte peut y être redemandée cinq fois en vingt secondes (19:13 le 8 octobre). Le message de sortie réelle
+(`StockOutputMessage … packs=[StockOutputPack…`) arrive de 10 secondes à 2 minutes plus tard.
+
+**Ce que fait l'agent.** `agent/src/robot-lgpi.ts` suit le journal du jour (il change à minuit : la fin de la veille est
+lue, puis le nouveau fichier depuis son début) et annonce comme un bip **les produits d'un cycle terminé**, une fois chacun.
+Une ligne « Code produit » seule n'annonce rien (sinon la même boîte compterait cinq fois). Un code à 7 chiffres que
+la réponse du robot remplace sans ambiguïté par un code-barres à 13 chiffres est annoncé sous ce dernier (le lecteur de
+glycémie demandé sous « 5162291 » est sorti sous « 4015630063253 »). Le doublon avec la douchette reste écarté
+(`CrossSourceDedupe`, 45 s).
+
+- **Automatique** sur Windows dès l'agent 0.9.0 ; il ne dit rien tant qu'aucun cycle terminé ne passe. Éteindre :
+  `pharmaboost-connect --robot-aucun` ; rallumer : `--robot-lgpi`. L'ancien mode (un fichier + une expression, `--robot`)
+  reste possible.
+- Les codes de la vente de test (DOLIPRANE 1000 mg, 3400935294227) et ceux du soir du 8 octobre (MACROGOL, AZYTER,
+  DACUDOSES, DOLIPRANE 500 mg) sont tous des produits connus de la base.
+
+**Ce qui n'est PAS établi** (rien n'est inventé) : le sens des mots que le rapport masquait ; la quantité demandée (le
+chiffre qui suit le code n'est pas lu : une boîte par code et par demande) ; si certaines demandes terminées n'ont pas de ligne
+« Code produit » ; si une demande terminée est toujours suivie d'une sortie de boîte (131 messages de sortie sur 312 sont
+vides, tous avant le 8 octobre 13:24). Le rapport de lecture (`PharmaBoost-Lecture-Journal.cmd`) a une section 5 « Ce que
+PharmaBoost annoncerait » qui répond à ces questions sur les vrais journaux : produits annoncés, suivis ou non d'une sortie.
+Jamais lu sur un vrai Windows par l'agent lui-même ; seulement sur des lignes de la même forme.
+
 ## Suite
+
+0. Vente de test à trois cas (une boîte ; deux boîtes différentes ; la même boîte deux fois), puis le rapport de lecture : la
+   section 5 doit montrer exactement ces produits, à la minute près.
 
 1. Lancer le diagnostic à l'officine pilote (robot et serveur), lire les deux rapports ensemble.
 2. Selon la piste : brancher le journal (déjà prêt), ou écrire la lecture passive du réseau.

@@ -37,11 +37,12 @@ import { createScanQueue } from "./scan-queue";
 import { INSTALLER_EXIT, resolveInstallCode } from "./installer";
 import { stateForFailure, writeStatus, type PostState } from "./status";
 import { CrossSourceDedupe, compileRobotPattern, dryRunRobotFile, startRobotJournal, type RobotConfig } from "./robot";
+import { startLgpiJournal, type LgpiRobotConfig } from "./robot-lgpi";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.8.0";
+const VERSION = "0.9.0";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -70,8 +71,11 @@ type Config = {
   /** Pour l'icône près de l'horloge : l'officine et le nom du poste, tels que PharmaBoost les connaît. */
   pharmacyName?: string;
   postLabel?: string;
-  /** Un robot de dispensation à écouter, une fois observé chez cette officine (voir robot.ts). Absent : rien n'est lu. */
-  robot?: RobotConfig;
+  /**
+   * Le robot de dispensation. Absent : sur Windows, le journal de LGPI est suivi tout seul (voir robot-lgpi.ts) — il ne
+   * dit rien tant qu'aucune demande au robot n'y passe. « aucun » l'éteint ; un fichier + une expression (robot.ts) reste possible.
+   */
+  robot?: RobotConfig | LgpiRobotConfig | { kind: "aucun" };
   /** La fenêtre d'avis : où elle se pose (« milieu-droite » par défaut) et combien de secondes elle reste avant de se ranger. */
   affichage?: { position?: NoticePosition; secondes?: number; ancienne?: boolean; fenetre?: "banniere" | "classique"; miseAJourAuto?: boolean };
 };
@@ -450,7 +454,10 @@ async function runPost(config: Config): Promise<void> {
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
   startDouchette(dirname(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
-  if (config.robot) startRobotJournal(config.robot, { onScan: accept("robot"), onStatus: (message) => log(message) });
+  const robotHandlers = { onScan: accept("robot"), onStatus: (message: string) => log(message) };
+  const robot = config.robot ?? (process.platform === "win32" ? ({ kind: "lgpi" } as const) : undefined);
+  if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);
+  else if (robot?.kind === "lgpi") startLgpiJournal(robot, robotHandlers);
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let handledSyncRequest: string | null = null;
@@ -536,6 +543,19 @@ function enableRobot(): void {
   }
   writeConfig({ ...config, robot: { kind: "journal", path, pattern } });
   console.log(`Robot branché : ${path}. Quittez PharmaBoost (icône près de l'horloge) puis relancez-le.`);
+}
+
+/** Allume ou éteint le suivi du robot par le journal de LGPI : --robot-lgpi / --robot-aucun. Relancer l'icône PharmaBoost ensuite. */
+function setRobotLgpi(on: boolean): void {
+  const config = readConfig();
+  if (!config || config.role !== "poste") {
+    console.log("Ce poste n'est pas encore relié à PharmaBoost.");
+    process.exitCode = 1;
+    return;
+  }
+  writeConfig({ ...config, robot: on ? { kind: "lgpi" } : { kind: "aucun" } });
+  console.log(on ? "Suivi du robot (journal de LGPI) allumé." : "Suivi du robot éteint.");
+  console.log("Quittez PharmaBoost (icône près de l'horloge) puis relancez-le.");
 }
 
 /**
@@ -749,6 +769,10 @@ if (arg("appairer")) {
   testRobot();
 } else if (process.argv.includes("--robot")) {
   enableRobot();
+} else if (process.argv.includes("--robot-lgpi")) {
+  setRobotLgpi(true);
+} else if (process.argv.includes("--robot-aucun")) {
+  setRobotLgpi(false);
 } else if (process.argv.includes("--installer")) {
   installFromInstaller().then((code) => { process.exitCode = code; });
 } else if (arg("poste")) {

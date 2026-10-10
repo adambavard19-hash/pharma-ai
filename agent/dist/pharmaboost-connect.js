@@ -5055,26 +5055,196 @@ function dryRunRobotFile(path, pattern, maxBytes = 5 * 1024 * 1024) {
   return { ok: true, lines: lines.length, codes };
 }
 
-// agent/src/index.ts
+// agent/src/robot-lgpi.ts
 var import_node_fs7 = require("node:fs");
-var import_node_os = require("node:os");
 var import_node_path6 = require("node:path");
-var VERSION = "0.8.0";
-var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path6.join)(process.cwd(), "pharmaboost-connect.json");
-var LOG_PATH = (0, import_node_path6.join)((0, import_node_path6.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
+
+// agent/src/journal-line.ts
+var JOURNAL_DIRS = ["C:\\var\\log\\lgpi\\application", "D:\\var\\log\\lgpi\\application", "C:\\var\\log\\lgpi", "D:\\var\\log\\lgpi"];
+var ENTRY = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})[,.]\d{3}\s+(\w+)\s+\[([^\]]*)\]\s+(\S+)\s+-\s+(.*)$/;
+function parseEntry(line) {
+  const match = ENTRY.exec(line);
+  return match ? { date: match[1], time: match[2], level: match[3], thread: match[4], logger: match[5], message: match[6] } : null;
+}
+
+// agent/src/robot-lgpi.ts
+var CYCLE_START = /:\s*Demande\s+\S{1,3}\s+la\s/;
+var CYCLE_END = /\bFin de la demande\b/;
+var CYCLE_GIVEN_UP = /\bon n.en \S+ pas\b/;
+var PRODUCT_CODE = /Code produit\s+(\d{7}|\d{13})\b/;
+var RESPONSE_CODE = /\b[A-Za-z]+_13\s*=\s*(\d{13})\b/g;
+var MAX_CODES_PER_CYCLE = 50;
+var RESPONSE_WAIT_MS = 3e3;
+var LgpiRobotReader = class {
+  cycle = null;
+  pending = null;
+  /** Compteurs pour le rapport de lecture : combien de demandes ont abouti, combien ont été laissées de côté. */
+  finished = 0;
+  givenUp = 0;
+  /** Une ligne de plus. `now` : l'heure de ce poste en millisecondes (pas celle du journal). Rend les codes à annoncer, dans l'ordre. */
+  push(line, now) {
+    const entry = parseEntry(line);
+    if (!entry) return [];
+    const out = [];
+    const isResponse = /(?:AutomateMessageEventGenerator|ClientAutomates)$/.test(entry.logger) && entry.message.includes("StockOutputResponse(");
+    if (this.pending) {
+      if (isResponse) {
+        out.push(...this.settle(entry.message));
+        return out;
+      }
+      out.push(...this.settle(null));
+    }
+    if (!/ControlerAutomate$/.test(entry.logger)) return out;
+    const { message } = entry;
+    if (CYCLE_END.test(message)) {
+      const codes = this.cycle ?? [];
+      this.cycle = null;
+      if (codes.length > 0) {
+        this.finished += 1;
+        this.pending = { codes, since: now };
+      }
+    } else if (CYCLE_START.test(message)) {
+      if (this.cycle && this.cycle.length > 0) this.givenUp += 1;
+      this.cycle = [];
+    } else if (CYCLE_GIVEN_UP.test(message)) {
+      if (this.cycle && this.cycle.length > 0) this.givenUp += 1;
+      this.cycle = null;
+    } else if (this.cycle) {
+      const code = PRODUCT_CODE.exec(message)?.[1];
+      if (code && !this.cycle.includes(code) && this.cycle.length < MAX_CODES_PER_CYCLE) this.cycle.push(code);
+    }
+    return out;
+  }
+  /** À appeler régulièrement : la réponse du robot qui ne vient pas n'empêche pas d'annoncer. */
+  flush(now) {
+    return this.pending && now - this.pending.since >= RESPONSE_WAIT_MS ? this.settle(null) : [];
+  }
+  /**
+   * Annonce les produits du cycle terminé. Un code à 7 chiffres n'est pas toujours un CIP : LGPI en donne aux produits
+   * qu'il a lui-même numérotés (le journal montre un lecteur de glycémie demandé sous « 5162291 » alors que la réponse
+   * du robot porte son code-barres, 4015630063253). Quand le cycle n'a qu'un code à 7 chiffres et que la réponse en
+   * donne un seul à 13, c'est ce dernier que PharmaBoost sait retrouver.
+   */
+  settle(responseMessage) {
+    const pending = this.pending;
+    this.pending = null;
+    if (!pending) return [];
+    const { codes } = pending;
+    if (responseMessage && codes.length === 1 && codes[0].length === 7) {
+      const found = [...new Set([...responseMessage.matchAll(RESPONSE_CODE)].map((match) => match[1]))];
+      if (found.length === 1) return found;
+    }
+    return codes;
+  }
+};
+var POLL_MS2 = 1e3;
+var MAX_READ_BYTES2 = 1024 * 1024;
+function two(n) {
+  return String(n).padStart(2, "0");
+}
+function journalName(date) {
+  return `lgpi.${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}.log`;
+}
+function findJournalDir(dirs) {
+  return dirs.find((dir) => (0, import_node_fs7.existsSync)(dir)) ?? null;
+}
+function readChunk(path, offset, size) {
+  const length = Math.min(size - offset, MAX_READ_BYTES2);
+  const buffer = Buffer.alloc(length);
+  const fd = (0, import_node_fs7.openSync)(path, "r");
+  try {
+    (0, import_node_fs7.readSync)(fd, buffer, 0, length, offset);
+  } finally {
+    (0, import_node_fs7.closeSync)(fd);
+  }
+  return buffer;
+}
+function startLgpiJournal(config, handlers, clock = Date.now) {
+  const reader = new LgpiRobotReader();
+  let lines = new LineBuffer();
+  let current2 = null;
+  let firstPass = true;
+  let announcedMissing = false;
+  const announce = (codes, at) => {
+    for (const code of codes) {
+      handlers.onStatus(`Robot : demande de sortie du produit ${code}.`);
+      handlers.onScan(code, at);
+    }
+  };
+  const drain = (path, from) => {
+    let offset = from;
+    for (; ; ) {
+      const size = (0, import_node_fs7.statSync)(path).size;
+      if (size < offset) offset = 0;
+      if (size === offset) return offset;
+      const buffer = readChunk(path, offset, size);
+      offset += buffer.length;
+      const at = clock();
+      for (const line of lines.push(buffer.toString("latin1"))) announce(reader.push(line, at), at);
+    }
+  };
+  const poll = () => {
+    try {
+      const now = clock();
+      const dir = config.dir ?? findJournalDir(JOURNAL_DIRS);
+      if (!dir) {
+        if (!announcedMissing) handlers.onStatus("Robot : le journal de LGPI n'existe pas sur ce poste (rien \xE0 suivre).");
+        announcedMissing = true;
+        return;
+      }
+      const today = (0, import_node_path6.join)(dir, journalName(new Date(now)));
+      if (!current2) {
+        if (!(0, import_node_fs7.existsSync)(today)) {
+          if (!announcedMissing) handlers.onStatus(`Robot : le journal du jour de LGPI n'existe pas (encore) dans ${dir}.`);
+          announcedMissing = true;
+          firstPass = false;
+          return;
+        }
+        announcedMissing = false;
+        const offset = firstPass ? (0, import_node_fs7.statSync)(today).size : 0;
+        current2 = { path: today, offset };
+        firstPass = false;
+        handlers.onStatus(`Robot : suivi du journal de LGPI ${journalName(new Date(now))}${offset === 0 ? "" : " \xE0 partir de maintenant"}.`);
+        if (offset === 0) current2.offset = drain(today, 0);
+      } else if (current2.path !== today && (0, import_node_fs7.existsSync)(today)) {
+        if ((0, import_node_fs7.existsSync)(current2.path)) drain(current2.path, current2.offset);
+        lines = new LineBuffer();
+        current2 = { path: today, offset: 0 };
+        handlers.onStatus(`Robot : nouveau journal du jour ${journalName(new Date(now))}.`);
+        current2.offset = drain(today, 0);
+      } else if ((0, import_node_fs7.existsSync)(current2.path)) {
+        current2.offset = drain(current2.path, current2.offset);
+      }
+      announce(reader.flush(now), now);
+    } catch (error) {
+      handlers.onStatus(`Robot : ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  const timer = setInterval(poll, POLL_MS2);
+  poll();
+  return () => clearInterval(timer);
+}
+
+// agent/src/index.ts
+var import_node_fs8 = require("node:fs");
+var import_node_os = require("node:os");
+var import_node_path7 = require("node:path");
+var VERSION = "0.9.0";
+var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path7.join)(process.cwd(), "pharmaboost-connect.json");
+var LOG_PATH = (0, import_node_path7.join)((0, import_node_path7.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
 var SETTLE_MS = 1e4;
 var CHECK_MS = 3e4;
-var DEFAULT_EXPORT = process.platform === "win32" ? "C:\\PharmaBoost\\Export" : (0, import_node_path6.join)(process.cwd(), "export");
+var DEFAULT_EXPORT = process.platform === "win32" ? "C:\\PharmaBoost\\Export" : (0, import_node_path7.join)(process.cwd(), "export");
 var DEFAULT_SCANS = process.platform === "win32" ? "C:\\PharmaBoost\\Ordonnances" : null;
 var notice = null;
 function log(message) {
   const line = `${(/* @__PURE__ */ new Date()).toISOString()} ${message}`;
   console.log(line);
   try {
-    (0, import_node_fs7.mkdirSync)((0, import_node_path6.dirname)(LOG_PATH), { recursive: true });
-    if ((0, import_node_fs7.existsSync)(LOG_PATH) && (0, import_node_fs7.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs7.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
-    (0, import_node_fs7.appendFileSync)(LOG_PATH, `${line}
+    (0, import_node_fs8.mkdirSync)((0, import_node_path7.dirname)(LOG_PATH), { recursive: true });
+    if ((0, import_node_fs8.existsSync)(LOG_PATH) && (0, import_node_fs8.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs8.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
+    (0, import_node_fs8.appendFileSync)(LOG_PATH, `${line}
 `);
   } catch {
   }
@@ -5088,12 +5258,12 @@ function arg(name) {
   return i >= 0 ? process.argv[i + 1] : void 0;
 }
 function readConfig() {
-  if (!(0, import_node_fs7.existsSync)(CONFIG_PATH)) return null;
-  return JSON.parse((0, import_node_fs7.readFileSync)(CONFIG_PATH, "utf8"));
+  if (!(0, import_node_fs8.existsSync)(CONFIG_PATH)) return null;
+  return JSON.parse((0, import_node_fs8.readFileSync)(CONFIG_PATH, "utf8"));
 }
 function writeConfig(config) {
-  (0, import_node_fs7.mkdirSync)((0, import_node_path6.dirname)(CONFIG_PATH), { recursive: true });
-  (0, import_node_fs7.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
+  (0, import_node_fs8.mkdirSync)((0, import_node_path7.dirname)(CONFIG_PATH), { recursive: true });
+  (0, import_node_fs8.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 async function api(config, path, init) {
   return fetch(`${config.serverUrl.replace(/\/$/, "")}${path}`, {
@@ -5190,11 +5360,11 @@ async function checkForUpdate(config, scans) {
   restartWhenIdle = true;
   log("Elle prendra effet d\xE8s qu'aucune vente n'est en cours.");
 }
-var IMAGES_DIR = (0, import_node_path6.join)((0, import_node_path6.dirname)(CONFIG_PATH), "avis-images");
+var IMAGES_DIR = (0, import_node_path7.join)((0, import_node_path7.dirname)(CONFIG_PATH), "avis-images");
 var notices = new NoticeCenter({
-  configDir: (0, import_node_path6.dirname)(CONFIG_PATH),
+  configDir: (0, import_node_path7.dirname)(CONFIG_PATH),
   log: (message) => log(message),
-  legacyShow: (content) => showToast((0, import_node_path6.dirname)(CONFIG_PATH), content, log),
+  legacyShow: (content) => showToast((0, import_node_path7.dirname)(CONFIG_PATH), content, log),
   onAction: (action) => {
     void handleAction(action);
   }
@@ -5363,8 +5533,11 @@ async function runPost(config) {
     scans.push({ code, scannedAt: new Date(at).toISOString() });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
-  startDouchette((0, import_node_path6.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
-  if (config.robot) startRobotJournal(config.robot, { onScan: accept("robot"), onStatus: (message) => log(message) });
+  startDouchette((0, import_node_path7.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
+  const robotHandlers = { onScan: accept("robot"), onStatus: (message) => log(message) };
+  const robot = config.robot ?? (process.platform === "win32" ? { kind: "lgpi" } : void 0);
+  if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);
+  else if (robot?.kind === "lgpi") startLgpiJournal(robot, robotHandlers);
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let handledSyncRequest = null;
@@ -5440,6 +5613,17 @@ function enableRobot() {
   writeConfig({ ...config, robot: { kind: "journal", path, pattern } });
   console.log(`Robot branch\xE9 : ${path}. Quittez PharmaBoost (ic\xF4ne pr\xE8s de l'horloge) puis relancez-le.`);
 }
+function setRobotLgpi(on) {
+  const config = readConfig();
+  if (!config || config.role !== "poste") {
+    console.log("Ce poste n'est pas encore reli\xE9 \xE0 PharmaBoost.");
+    process.exitCode = 1;
+    return;
+  }
+  writeConfig({ ...config, robot: on ? { kind: "lgpi" } : { kind: "aucun" } });
+  console.log(on ? "Suivi du robot (journal de LGPI) allum\xE9." : "Suivi du robot \xE9teint.");
+  console.log("Quittez PharmaBoost (ic\xF4ne pr\xE8s de l'horloge) puis relancez-le.");
+}
 function testAffichage() {
   let config = null;
   try {
@@ -5474,7 +5658,7 @@ function testAffichage() {
 }
 function testDouchette() {
   console.log("Passez une bo\xEEte \xE0 la douchette. Chaque code lu s'affiche ci-dessous. Ctrl+C pour arr\xEAter.");
-  startDouchette((0, import_node_path6.dirname)(CONFIG_PATH), {
+  startDouchette((0, import_node_path7.dirname)(CONFIG_PATH), {
     onScan: (code) => console.log(`${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR")}  BIP  ${code}`),
     onStatus: (message) => console.log(`  ${message}`)
   });
@@ -5488,7 +5672,7 @@ async function pair() {
   for (const dir of [exportPath, scansPath]) {
     if (dir) {
       try {
-        (0, import_node_fs7.mkdirSync)(dir, { recursive: true });
+        (0, import_node_fs8.mkdirSync)(dir, { recursive: true });
       } catch {
       }
     }
@@ -5504,19 +5688,19 @@ async function pair() {
   log(`Appair\xE9 avec ${body.pharmacyName ?? "l'officine"}. Configuration \xE9crite dans ${CONFIG_PATH}. Export surveill\xE9 : ${exportPath}${scansPath ? ` \u2014 scans : ${scansPath}` : ""}.`);
 }
 function latestExport(dir) {
-  if (!(0, import_node_fs7.existsSync)(dir)) return null;
-  const st = (0, import_node_fs7.statSync)(dir);
+  if (!(0, import_node_fs8.existsSync)(dir)) return null;
+  const st = (0, import_node_fs8.statSync)(dir);
   if (st.isFile()) return { path: dir, mtime: st.mtimeMs, size: st.size };
-  const files = (0, import_node_fs7.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
-    const s = (0, import_node_fs7.statSync)((0, import_node_path6.join)(dir, name));
-    return { path: (0, import_node_path6.join)(dir, name), mtime: s.mtimeMs, size: s.size };
+  const files = (0, import_node_fs8.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
+    const s = (0, import_node_fs8.statSync)((0, import_node_path7.join)(dir, name));
+    return { path: (0, import_node_path7.join)(dir, name), mtime: s.mtimeMs, size: s.size };
   }).sort((a, b) => b.mtime - a.mtime);
   return files[0] ?? null;
 }
 var lastStamp = null;
 async function syncStock(config, force) {
   if (!config.exportPath) return config;
-  if (!(0, import_node_fs7.existsSync)(config.exportPath)) {
+  if (!(0, import_node_fs8.existsSync)(config.exportPath)) {
     setNotice(`Le dossier d'export ${config.exportPath} n'existe pas sur ${(0, import_node_os.hostname)()}.`);
     return config;
   }
@@ -5529,45 +5713,45 @@ async function syncStock(config, force) {
   const stamp = `${file.path}:${file.mtime}:${file.size}`;
   if (!force && stamp === lastStamp) return config;
   lastStamp = stamp;
-  const bytes = (0, import_node_fs7.readFileSync)(file.path);
+  const bytes = (0, import_node_fs8.readFileSync)(file.path);
   const hash = (0, import_node_crypto3.createHash)("sha256").update(bytes).digest("hex");
   if (hash === config.lastExportHash) {
     if (notice?.startsWith("Aucun export") || notice?.startsWith("Le dossier")) setNotice(null);
     return config;
   }
   const form = new FormData();
-  form.set("file", new Blob([bytes]), (0, import_node_path6.basename)(file.path));
+  form.set("file", new Blob([bytes]), (0, import_node_path7.basename)(file.path));
   const response = await api(config, "/api/agent/stock", { method: "POST", body: form });
   const body = await response.json().catch(() => ({}));
   if (!response.ok || !body.ok) {
-    setNotice(`Export refus\xE9 (${(0, import_node_path6.basename)(file.path)}) : ${body.error ?? `HTTP ${response.status}`}`);
+    setNotice(`Export refus\xE9 (${(0, import_node_path7.basename)(file.path)}) : ${body.error ?? `HTTP ${response.status}`}`);
     return config;
   }
   setNotice(null);
-  log(`Stock synchronis\xE9 : ${body.lines ?? "?"} ligne(s), ${body.created ?? 0} cr\xE9\xE9e(s), ${body.updated ?? 0} mise(s) \xE0 jour (${(0, import_node_path6.basename)(file.path)}).`);
+  log(`Stock synchronis\xE9 : ${body.lines ?? "?"} ligne(s), ${body.created ?? 0} cr\xE9\xE9e(s), ${body.updated ?? 0} mise(s) \xE0 jour (${(0, import_node_path7.basename)(file.path)}).`);
   return { ...config, lastExportHash: hash };
 }
 async function syncScans(config) {
-  if (!config.scansPath || !(0, import_node_fs7.existsSync)(config.scansPath)) return config;
+  if (!config.scansPath || !(0, import_node_fs8.existsSync)(config.scansPath)) return config;
   const sent = new Set(config.sentScans ?? []);
-  const files = (0, import_node_fs7.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path6.join)(config.scansPath, name), stat: (0, import_node_fs7.statSync)((0, import_node_path6.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
+  const files = (0, import_node_fs8.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path7.join)(config.scansPath, name), stat: (0, import_node_fs8.statSync)((0, import_node_path7.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
   let next = config;
   for (const { path, stat } of files) {
-    const key = `${(0, import_node_path6.basename)(path)}:${stat.size}`;
+    const key = `${(0, import_node_path7.basename)(path)}:${stat.size}`;
     if (sent.has(key)) continue;
-    const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path6.extname)(path).toLowerCase()] ?? "application/octet-stream";
+    const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path7.extname)(path).toLowerCase()] ?? "application/octet-stream";
     const form = new FormData();
-    form.set("file", new Blob([(0, import_node_fs7.readFileSync)(path)], { type: mime }), (0, import_node_path6.basename)(path));
+    form.set("file", new Blob([(0, import_node_fs8.readFileSync)(path)], { type: mime }), (0, import_node_path7.basename)(path));
     const response = await api(config, "/api/agent/prescriptions", { method: "POST", body: form });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.ok) {
-      log(`Scan refus\xE9 (${(0, import_node_path6.basename)(path)}) : ${body.error ?? `HTTP ${response.status}`}`);
+      log(`Scan refus\xE9 (${(0, import_node_path7.basename)(path)}) : ${body.error ?? `HTTP ${response.status}`}`);
       continue;
     }
     sent.add(key);
     next = { ...next, sentScans: [...sent].slice(-2e3) };
     writeConfig(next);
-    log(`Ordonnance envoy\xE9e : ${(0, import_node_path6.basename)(path)} \u2192 ${body.reference ?? "?"} (${body.lines ?? 0} ligne(s) lue(s)).`);
+    log(`Ordonnance envoy\xE9e : ${(0, import_node_path7.basename)(path)} \u2192 ${body.reference ?? "?"} (${body.lines ?? 0} ligne(s) lue(s)).`);
   }
   return next;
 }
@@ -5629,6 +5813,10 @@ if (arg("appairer")) {
   testRobot();
 } else if (process.argv.includes("--robot")) {
   enableRobot();
+} else if (process.argv.includes("--robot-lgpi")) {
+  setRobotLgpi(true);
+} else if (process.argv.includes("--robot-aucun")) {
+  setRobotLgpi(false);
 } else if (process.argv.includes("--installer")) {
   installFromInstaller().then((code) => {
     process.exitCode = code;

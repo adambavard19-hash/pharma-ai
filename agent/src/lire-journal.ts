@@ -20,9 +20,10 @@ import { execFileSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readdirSync, readSync, statSync, writeFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join } from "node:path";
+import { JOURNAL_DIRS, parseEntry, type Entry } from "./journal-line";
+import { LgpiRobotReader } from "./robot-lgpi";
 
-/** Les dossiers où LGPI tient son journal d'application. */
-export const JOURNAL_DIRS = ["C:\\var\\log\\lgpi\\application", "D:\\var\\log\\lgpi\\application", "C:\\var\\log\\lgpi", "D:\\var\\log\\lgpi"];
+export { JOURNAL_DIRS };
 /** Combien de journaux (les plus récents) on lit, et combien d'octets de la fin de chacun. */
 export const MAX_FILES = 3;
 export const TAIL_BYTES = 6 * 1024 * 1024;
@@ -30,15 +31,8 @@ export const TAIL_BYTES = 6 * 1024 * 1024;
 /** Ce qui désigne l'échange avec le robot dans une ligne de journal. */
 export const ROBOT_LINE = /automate|robot|rowa|outputrequest|inputrequest|mach4|cdapi|wwks|code produit/i;
 
-/** Une ligne de journal commence par sa date : tout le reste est la suite d'une trace d'erreur, jamais lue. */
-const ENTRY = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})[,.]\d{3}\s+(\w+)\s+\[([^\]]*)\]\s+(\S+)\s+-\s+(.*)$/;
-
-export type Entry = { date: string; time: string; level: string; thread: string; logger: string; message: string };
-
-export function parseEntry(line: string): Entry | null {
-  const match = ENTRY.exec(line);
-  return match ? { date: match[1], time: match[2], level: match[3], thread: match[4], logger: match[5], message: match[6] } : null;
-}
+export { parseEntry };
+export type { Entry };
 
 // ---------------------------------------------------------------------------------------------------------------
 // Le masquage : on voit la FORME d'une ligne, jamais une valeur
@@ -144,7 +138,28 @@ export type Analysis = {
   lastLines: string[];
   candidates: { candidate: Candidate; total: number; distinct: number; recent: CodeHit[] }[];
   days: { date: string; robotEntries: number }[];
+  /** Ce que le suivi en direct (`robot-lgpi.ts`) annoncerait sur ces mêmes journaux. */
+  requests: { finished: number; givenUp: number; announced: number; withDelivery: number; withoutDelivery: number; recent: CodeHit[] };
 };
+
+/** Un message du robot qui porte des boîtes réellement sorties : `StockOutputMessage(… packs=[StockOutputPack(…`. */
+function isDelivery(entry: Entry): boolean {
+  return /AutomateMessageEventGenerator$/.test(entry.logger) && entry.message.includes("StockOutputMessage(") && /packs=\[\s*StockOutputPack/.test(entry.message);
+}
+
+/** Une sortie de boîte suit-elle chaque produit annoncé, dans les dix minutes ? Chaque sortie ne sert qu'une fois. */
+export function matchDeliveries(announcedAt: number[], deliveredAt: number[], windowMs = 10 * 60_000): { withDelivery: number; withoutDelivery: number } {
+  const free = [...deliveredAt].sort((a, b) => a - b);
+  let withDelivery = 0;
+  for (const at of [...announcedAt].sort((a, b) => a - b)) {
+    const index = free.findIndex((delivered) => delivered >= at - 2000 && delivered <= at + windowMs);
+    if (index >= 0) {
+      withDelivery += 1;
+      free.splice(index, 1);
+    }
+  }
+  return { withDelivery, withoutDelivery: announcedAt.length - withDelivery };
+}
 
 /**
  * Ce que disent les journaux, sans une valeur. Les lignes sont celles de TOUS les fichiers lus, de la plus ancienne à la plus
@@ -158,12 +173,19 @@ export function analyse(texts: string[], options: { lastCount?: number; shapeCou
   const robot: Entry[] = [];
   const days = new Map<string, number>();
   let entriesRead = 0;
+  const reader = new LgpiRobotReader();
+  const announced: (CodeHit & { at: number })[] = [];
+  const delivered: number[] = [];
+  let lastAt = 0;
 
   for (const text of texts) {
     for (const line of text.split(/\r?\n/)) {
       const entry = parseEntry(line);
       if (!entry) continue;
       entriesRead += 1;
+      lastAt = Date.parse(`${entry.date}T${entry.time}`);
+      for (const code of reader.push(line, lastAt)) announced.push({ date: entry.date, time: entry.time, code, at: lastAt });
+      if (isDelivery(entry)) delivered.push(lastAt);
       if (!ROBOT_LINE.test(entry.message) && !ROBOT_LINE.test(entry.logger)) continue;
       robot.push(entry);
       days.set(entry.date, (days.get(entry.date) ?? 0) + 1);
@@ -185,9 +207,22 @@ export function analyse(texts: string[], options: { lastCount?: number; shapeCou
     return { candidate, total: hits.length, distinct: new Set(hits.map((hit) => hit.code)).size, recent: hits.slice(-recentCodes) };
   });
 
+  for (const code of reader.flush(Number.MAX_SAFE_INTEGER)) {
+    const last = robot[robot.length - 1];
+    announced.push({ date: last?.date ?? "", time: last?.time ?? "", code, at: lastAt });
+  }
+  const followed = matchDeliveries(announced.map((hit) => hit.at), delivered);
+
   return {
     entriesRead,
     robotEntries: robot.length,
+    requests: {
+      finished: reader.finished,
+      givenUp: reader.givenUp,
+      announced: announced.length,
+      ...followed,
+      recent: announced.slice(-recentCodes).map(({ date, time, code }) => ({ date, time, code })),
+    },
     shapes: [...shapes.values()].sort((a, b) => b.count - a.count || a.first.localeCompare(b.first)).slice(0, shapeCount),
     lastLines: robot.slice(-lastCount).map((entry) => `${entry.date} ${maskEntry(entry)}`),
     candidates,
@@ -232,7 +267,14 @@ export function renderReport(input: { computer: string; now: Date; dir: string |
       for (const hit of result.recent) out.push(`   ${hit.date} ${hit.time} → ${hit.code}`);
     }
 
-    out.push("", "=".repeat(70), "5. Ce que cela suggère", "=".repeat(70));
+    out.push("", "=".repeat(70), "5. Ce que PharmaBoost annoncerait (le suivi en direct, appliqué à ces journaux)", "=".repeat(70));
+    const requests = analysis.requests;
+    out.push(`Demandes de sortie terminées : ${requests.finished} · laissées de côté (le robot n'a pas la boîte, ou la demande n'a pas fini) : ${requests.givenUp}.`);
+    out.push(`Produits annoncés : ${requests.announced} · suivis d'une sortie de boîte dans les 10 minutes : ${requests.withDelivery} · sans sortie vue : ${requests.withoutDelivery}.`);
+    for (const hit of requests.recent) out.push(`   ${hit.date} ${hit.time} → ${hit.code}`);
+    out.push("Le dernier produit annoncé doit être celui de la vente de test, à la minute près.");
+
+    out.push("", "=".repeat(70), "6. Ce que cela suggère", "=".repeat(70));
     const best = analysis.candidates.filter((result) => result.total > 0).sort((a, b) => b.total - a.total)[0];
     if (analysis.robotEntries === 0) out.push(" - Aucune ligne du robot : ces journaux ne portent pas l'échange. Le rapport du diagnostic complet reste la référence.");
     else if (!best) out.push(" - Le journal parle du robot, mais aucun motif ne trouve de code produit : la forme des lignes (section 2) dit où chercher.");
@@ -240,7 +282,7 @@ export function renderReport(input: { computer: string; now: Date; dir: string |
     out.push(" - Une vente de test d'UNE boîte connue, faite juste avant cette lecture, doit apparaître en bas de la section 4, à la minute près.");
   }
   if (input.errors.length > 0) {
-    out.push("", "=".repeat(70), "6. Erreurs rencontrées pendant la lecture", "=".repeat(70), ...input.errors);
+    out.push("", "=".repeat(70), "7. Erreurs rencontrées pendant la lecture", "=".repeat(70), ...input.errors);
   }
   return out;
 }
