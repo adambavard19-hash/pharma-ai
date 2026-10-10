@@ -172,7 +172,7 @@ const PATTERNS: Pattern[] = [
     confidence: 0.85,
   },
   {
-    test: /\b(emollient|émollient|hydratant|creme hydratante|lait hydratant|baume|dexeryl|atoderm|lipikar|xemose|xeracalm|topialyse|peau seche|peaux? seches?|peau sensible|peaux? sensibles?|cold cream|cicalfate|cicaplast|apaisant|relipidant|nutritive|hydra repair)/,
+    test: /\b(emollient|émollient|hydratant|creme hydratante|lait hydratant|baume|dexeryl|atoderm|lipikar|xemose|xeracalm|topialyse|peau seche|peaux? seches?|peau sensible|peaux? sensibles?|cold cream|cicalfate|cicaplast|apaisant|relipidant|nutritive|hydra repair|dermallergo|toleriane (?:ultra|sensitive|riche|double))/,
     category: "DERMOCOSMETIQUE",
     tags: ["hydratation", "peau sensible", "émollient", "apaisant"],
     ruleKeys: ["hydration-dermato-topical"],
@@ -245,7 +245,7 @@ const PATTERNS: Pattern[] = [
     confidence: 0.9,
   },
   {
-    test: /^(?!.*(ophtalm|collyre|oculaire|nasal|\bnez\b))(?=.*(cicalfate|cicaplast|cicabio|cicavit|bepanthen|dexpanthenol|epitheliale|épithéliale|cicatris|cicaderma|sensicalm))/,
+    test: /^(?!.*(ophtalm|collyre|oculaire|nasal|\bnez\b|levres|lèvres))(?=.*(cicalfate|cicaplast|cicabio|cicavit|bepanthen|dexpanthenol|epitheliale|épithéliale|cicatris|cicaderma|sensicalm))/,
     category: "DERMOCOSMETIQUE",
     tags: ["cicatrisant", "apaisant", "peau sensible", "hydratation", "émollient"],
     ruleKeys: ["herpes-zona-skin-repair", "hydration-dermato-topical"],

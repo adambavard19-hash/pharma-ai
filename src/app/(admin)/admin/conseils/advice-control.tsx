@@ -12,6 +12,8 @@ import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { Modal } from "@/components/ui/modal";
 import { StatCard } from "@/components/ui/stat-card";
+import type { VigilanceView } from "@/core/ai/vigilance-catalog";
+import { AvoidList } from "./avoid-list";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -19,7 +21,7 @@ import { cn } from "@/lib/utils";
 export type RuleCard = Omit<CentralRuleView, "decidedAt"> & { decidedAt: string | null };
 export type AssociationCard = Omit<CentralAssociationView, "decidedAt" | "createdAt"> & { decidedAt: string | null; createdAt: string };
 
-type Section = "RULES" | "ASSOCIATIONS";
+type Section = "RULES" | "ASSOCIATIONS" | "AVOID";
 type Filter = CentralStatus | "ALL";
 type Decision = "VALIDATE" | "REMOVE" | "RESTORE";
 
@@ -39,13 +41,13 @@ const TONES: Record<CentralStatus, "warning" | "success" | "danger"> = { ACTIVE:
  * conseil de PharmaBoost partout (on peut le rétablir), ajouter le met en ligne partout. Un conseil non relu parle déjà : il
  * est simplement « à relire ».
  */
-export function AdviceControl({ rules, associations, categories, tags }: { rules: RuleCard[]; associations: AssociationCard[]; categories: { code: string; label: string }[]; tags: string[] }) {
+export function AdviceControl({ rules, associations, vigilances, categories, tags }: { rules: RuleCard[]; associations: AssociationCard[]; vigilances: VigilanceView[]; categories: { code: string; label: string }[]; tags: string[] }) {
   const [section, setSection] = useState<Section>("RULES");
   const [filter, setFilter] = useState<Filter>("ACTIVE");
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState<"RULE" | "ASSOCIATION" | null>(null);
 
-  const all = section === "RULES" ? rules : associations;
+  const all = section === "ASSOCIATIONS" ? associations : rules;
   const count = (status: CentralStatus) => all.filter((item) => item.status === status).length;
   const total = (status: CentralStatus) => rules.filter((item) => item.status === status).length + associations.filter((item) => item.status === status).length;
   const text = query.trim().toLowerCase();
@@ -61,21 +63,25 @@ export function AdviceControl({ rules, associations, categories, tags }: { rules
 
   return (
     <div className="space-y-6">
-      <Alert tone="info" title="Tout est déjà en ligne, dans toutes les pharmacies">
-        Les conseils et associations ci-dessous parlent déjà au comptoir de chaque pharmacie, dès l&apos;envoi de son stock : les titulaires n&apos;ont rien à régler. Ici, vous
-        <strong> validez</strong> ce que vous cautionnez, vous <strong>supprimez</strong> ce qui ne va pas (le conseil disparaît de PharmaBoost, partout, tout de suite — vous pouvez le rétablir) et vous{" "}
-        <strong>ajoutez</strong> les vôtres. Ce qui n&apos;est pas encore relu est simplement marqué « à relire ».
-      </Alert>
+      {section !== "AVOID" && (
+        <>
+        <Alert tone="info" title="Tout est déjà en ligne, dans toutes les pharmacies">
+          Les conseils et associations ci-dessous parlent déjà au comptoir de chaque pharmacie, dès l&apos;envoi de son stock : les titulaires n&apos;ont rien à régler. Ici, vous
+          <strong> validez</strong> ce que vous cautionnez, vous <strong>supprimez</strong> ce qui ne va pas (le conseil disparaît de PharmaBoost, partout, tout de suite — vous pouvez le rétablir) et vous{" "}
+          <strong>ajoutez</strong> les vôtres. Ce qui n&apos;est pas encore relu est simplement marqué « à relire ».
+        </Alert>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="À relire" value={total("ACTIVE")} sublabel="en ligne, pas encore relus" />
-        <StatCard label="Validés" value={total("VALIDATED")} sublabel="relus et validés" />
-        <StatCard label="Supprimés" value={total("REMOVED")} sublabel="retirés de PharmaBoost" />
-      </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard label="À relire" value={total("ACTIVE")} sublabel="en ligne, pas encore relus" />
+          <StatCard label="Validés" value={total("VALIDATED")} sublabel="relus et validés" />
+          <StatCard label="Supprimés" value={total("REMOVED")} sublabel="retirés de PharmaBoost" />
+        </div>
+        </>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label="Conseils ou associations" className="inline-flex rounded-lg bg-surface-sunken p-1 text-[13.5px] font-medium">
-          {([["RULES", `Conseils (${rules.length})`], ["ASSOCIATIONS", `Associations (${associations.length})`]] as const).map(([key, label]) => (
+        <div role="tablist" aria-label="Conseils, associations ou ce qu'il ne faut pas associer" className="inline-flex flex-wrap rounded-lg bg-surface-sunken p-1 text-[13.5px] font-medium">
+          {([["RULES", `Conseils (${rules.length})`], ["ASSOCIATIONS", `Associations (${associations.length})`], ["AVOID", `À ne pas associer (${vigilances.length})`]] as const).map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -88,6 +94,7 @@ export function AdviceControl({ rules, associations, categories, tags }: { rules
             </button>
           ))}
         </div>
+        {section !== "AVOID" && (
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setAdding("RULE")} leadingIcon={<Plus className="size-4" />}>
             Ajouter un conseil
@@ -96,45 +103,52 @@ export function AdviceControl({ rules, associations, categories, tags }: { rules
             Ajouter une association
           </Button>
         </div>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div role="group" aria-label="Filtrer par état" className="flex flex-wrap gap-2">
-          {FILTERS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              aria-pressed={filter === item.key}
-              onClick={() => setFilter(item.key)}
-              className={cn("rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors", filter === item.key ? "bg-brand-600 text-white" : "bg-surface-sunken text-text-secondary hover:text-text-primary")}
-            >
-              {item.label} <span className="tabular-nums opacity-80">{item.key === "ALL" ? all.length : count(item.key)}</span>
-            </button>
-          ))}
-        </div>
-        <div className="min-w-56 flex-1 sm:max-w-sm">
-          <Input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Chercher un médicament, un produit…" leadingIcon={<Search className="size-4" />} aria-label="Chercher dans la liste" />
-        </div>
-      </div>
-
-      {section === "RULES" ? (
-        shownRules.length === 0 ? (
-          <Empty filter={filter} />
-        ) : (
-          <ul className="space-y-3">
-            {shownRules.map((rule) => (
-              <RuleItem key={rule.id} rule={rule} />
-            ))}
-          </ul>
-        )
-      ) : shownAssociations.length === 0 ? (
-        <Empty filter={filter} noun="association" />
+      {section === "AVOID" ? (
+        <AvoidList vigilances={vigilances} />
       ) : (
-        <ul className="space-y-3">
-          {shownAssociations.map((association) => (
-            <AssociationItem key={association.id} association={association} />
-          ))}
-        </ul>
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <div role="group" aria-label="Filtrer par état" className="flex flex-wrap gap-2">
+              {FILTERS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  aria-pressed={filter === item.key}
+                  onClick={() => setFilter(item.key)}
+                  className={cn("rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors", filter === item.key ? "bg-brand-600 text-white" : "bg-surface-sunken text-text-secondary hover:text-text-primary")}
+                >
+                  {item.label} <span className="tabular-nums opacity-80">{item.key === "ALL" ? all.length : count(item.key)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="min-w-56 flex-1 sm:max-w-sm">
+              <Input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Chercher un médicament, un produit…" leadingIcon={<Search className="size-4" />} aria-label="Chercher dans la liste" />
+            </div>
+          </div>
+
+          {section === "RULES" ? (
+            shownRules.length === 0 ? (
+              <Empty filter={filter} />
+            ) : (
+              <ul className="space-y-3">
+                {shownRules.map((rule) => (
+                  <RuleItem key={rule.id} rule={rule} />
+                ))}
+              </ul>
+            )
+          ) : shownAssociations.length === 0 ? (
+            <Empty filter={filter} noun="association" />
+          ) : (
+            <ul className="space-y-3">
+              {shownAssociations.map((association) => (
+                <AssociationItem key={association.id} association={association} />
+              ))}
+            </ul>
+          )}
+        </>
       )}
 
       <Modal open={adding === "RULE"} onClose={() => setAdding(null)} title="Ajouter un conseil" description="Quand un médicament de ces classes est dans la vente, PharmaBoost propose ce type de produit — dans toutes les pharmacies qui l'ont en stock." size="lg">

@@ -1,5 +1,10 @@
 import type { PopulationVigilanceRule } from "./population-vigilance";
 import { SKIN_SERIES_2_ADVICE_RULES } from "./conseil-peau-serie-2";
+import { SKIN_SERIES_3_ADVICE_RULES } from "./conseil-peau-serie-3";
+import { SKIN_SERIES_4_ADVICE_RULES } from "./conseil-peau-serie-4";
+import { SKIN_SERIES_5_ADVICE_RULES } from "./conseil-peau-serie-5";
+import { SKIN_SERIES_1_ADVICE_RULES } from "./conseil-peau-serie-1";
+import { passesNameGate, type NameGate } from "./name-gate";
 import type {
   AdviceOpportunityResult,
   DrugKnowledge,
@@ -94,6 +99,11 @@ export type AdviceRule = {
    * hydratant, et la plus générale le ferait sans poser la question que la plus précise exige.
    */
   excludeAtcPrefixes?: string[];
+  /**
+   * Une porte sur le NOM du médicament, quand l'ATC ne suffit pas à le distinguer d'un autre (clobétasol crème ou
+   * shampooing : même code D07AD01). Voir `name-gate.ts`.
+   */
+  nameGate?: NameGate;
   /** Classes thérapeutiques (libellés du référentiel) déclenchant la règle. */
   therapeuticClasses: string[];
   /** Effets indésirables fréquents qui rendent le conseil pertinent. */
@@ -279,6 +289,8 @@ function chamberExcludeFor(ageYears: number | null): string[] {
 const CORE_ADVICE_RULES: AdviceRule[] = [
   {
     key: "digestive-tolerance-antibiotics",
+    // Première série du document de la pharmacienne (7 octobre 2026), ligne 6 : voir conseil-peau-serie-1.ts.
+    documentRows: { document: "peau-serie-1", rows: [6] },
     sourceRules: [1, 2],
     benefits: ["Accompagne la flore pendant la cure", "À distance de l'antibiotique", "Cure de la durée du traitement"],
     title: "Tolérance digestive pendant l'antibiothérapie",
@@ -362,8 +374,10 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     category: "DERMOCOSMETIQUE",
     atcPrefixes: ["D07", "D05", "D10"],
     // Dermocorticoïdes, rétinoïdes et peroxyde de benzoyle : « Conseil peau — Série 2 » écrit une règle
-    // précise, avec sa question, pour chacun (conseil-peau-serie-2.ts). Celle-ci garde le reste.
-    excludeAtcPrefixes: ["D07A", "D10AD", "D10AE"],
+    // précise, avec sa question, pour chacun (conseil-peau-serie-2.ts) ; les séries 3, 4 et 5 en font autant pour l'acide
+    // azélaïque (D10AX), l'érythromycine cutanée (D10AF), le calcipotriol et le calcitriol (D05AX) et l'acitrétine (D05BB).
+    // Celle-ci garde le reste.
+    excludeAtcPrefixes: ["D07A", "D10AD", "D10AE", "D10AF", "D10AX", "D05AX", "D05BB"],
     therapeuticClasses: ["Dermocorticoïde", "Traitement dermatologique"],
     sideEffectTriggers: ["sécheresse cutanée", "irritation"],
     basePriority: 68,
@@ -562,8 +576,9 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     category: "DERMOCOSMETIQUE",
     atcPrefixes: ["J01A", "C03", "L01"],
     // La doxycycline a sa règle (question sur l'exposition, produit pour peau à tendance acnéique) :
-    // « Conseil peau — Série 2 ». Les autres cyclines et les diurétiques restent ici.
-    excludeAtcPrefixes: ["J01AA02"],
+    // « Conseil peau — Série 2 ». Le fluorouracile cutané a la sienne (Série 5, avec sa question sur la peau érodée).
+    // Les autres cyclines et les diurétiques restent ici.
+    excludeAtcPrefixes: ["J01AA02", "L01BC02"],
     therapeuticClasses: ["Cycline", "Diurétique"],
     sideEffectTriggers: ["photosensibilisation", "photosensibilité"],
     basePriority: 88,
@@ -794,6 +809,9 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     category: "SOINS",
     // Antihistaminiques de l'allergie (R06AE, R06AX) : pas les phénothiazines antitussives (oxomémazine, R06AD).
     atcPrefixes: ["D10BA01", "R06AE", "R06AX"],
+    // L'isotrétinoïne orale a sa règle précise (larmes artificielles, lentilles, orientation ophtalmologique) :
+    // « Médicaments déclencheurs et produits conseil », première série, ligne 3 (conseil-peau-serie-1.ts).
+    excludeAtcPrefixes: ["D10BA01"],
     therapeuticClasses: [],
     sideEffectTriggers: [],
     basePriority: 52,
@@ -802,7 +820,10 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     // avec un collyre antiseptique ou antibiotique, qui ont d'autres
     // indications et sont écartés par leur nom.
     productExclude: [String.raw`nasal`, String.raw`\bnez\b`, String.raw`rhino`, String.raw`desomedine`, String.raw`desosept`, String.raw`pommade`, String.raw`vitamine a`, String.raw`vita ?pos`, String.raw`hexamidine`, String.raw`antiseptique`, String.raw`antibio`, String.raw`tobramycine`, String.raw`tobrex`, String.raw`rifamycine`, String.raw`azyter`, String.raw`chloramphenicol`, String.raw`ofloxacine`, String.raw`ciprofloxacine`, String.raw`dexamethasone`, String.raw`cortico`],
-    productPrefer: [String.raw`larmes`, String.raw`lavage`, String.raw`hydrat`, String.raw`serum phy`, String.raw`unidose`],
+    // Un motif préféré lève une exclusion : « AZYTER collyre unidose » ne doit pas être sauvé par « unidose ».
+    productPrefer: ["larmes", "lavage", "hydrat", "serum phy", "unidose"].map(
+      (pattern) => String.raw`^(?!.*(?:azyter|tobrex|tobramycine|rifamycine|chloramphenicol|ofloxacine|ciprofloxacine|dexamethasone|cortico|antiseptique|antibio|desomedine|desosept|hexamidine)).*${pattern}`,
+    ),
     excludeTags: [],
     shortReasonTemplate:
       "Contexte allergique ({drug}) : une irritation des yeux est fréquente.",
@@ -823,6 +844,11 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
   // ---------------------------------------------------------------------------
   {
     key: "isotretinoin-skin-routine",
+    // Première série du document de la pharmacienne (7 octobre 2026), ligne 2 : voir conseil-peau-serie-1.ts.
+    documentRows: { document: "peau-serie-1", rows: [2] },
+    // Les autres rétinoïdes oraux ont leur règle précise (Série 4) : le baume labial sous acitrétine (D05BB), le soin des mains
+    // sous alitrétinoïne (D11AH04, eczéma des mains) — pas la routine de VISAGE de l'acné.
+    excludeAtcPrefixes: ["D05BB", "D11AH04"],
     title: "Routine peau sous isotrétinoïne",
     kind: "TOLERANCE",
     version: "1.0",
@@ -862,7 +888,11 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
           label: "Hydrater et réparer",
           matchingTags: ["hydratation", "peau sensible", "apaisant", "émollient"],
           productExclude: [String.raw`\bcorps\b`, String.raw`\blait\b`, String.raw`pieds`, String.raw`mains`, String.raw`anti ?age`, String.raw`anti ?rides`, String.raw`solaire`, String.raw`\bspf`, String.raw`levres`, String.raw`lèvres`],
-          productPrefer: [String.raw`visag`, String.raw`reparat`, String.raw`repair`, String.raw`apais`, String.raw`ceramide`, String.raw`hydra`, String.raw`relipid`, String.raw`cicalfate`, String.raw`cicaplast`],
+          // Un motif préféré lève une exclusion (matching.ts) : « cicaplast » ne doit pas sauver « CICAPLAST MAINS » ni
+          // « CICAPLAST LEVRES », que l'étape écarte. Chaque préférence refuse donc d'abord ce que l'étape exclut.
+          productPrefer: ["visag", "reparat", "repair", "apais", "ceramide", "hydra", "relipid", "cicalfate", "cicaplast"].map(
+            (pattern) => String.raw`^(?!.*(?:\bcorps\b|\blait\b|pieds|mains|anti ?age|anti ?rides|solaire|\bspf|levres|lèvres)).*${pattern}`,
+          ),
           benefit: "Répare la barrière cutanée fragilisée",
         },
         {
@@ -894,6 +924,10 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "lip-care-isotretinoin",
+    // Première série du document de la pharmacienne (7 octobre 2026), ligne 1 : voir conseil-peau-serie-1.ts.
+    documentRows: { document: "peau-serie-1", rows: [1] },
+    // L'acitrétine (Soriatane, D05BB) a sa règle de baume labial, avec sa question (« Conseil peau — Série 4 »).
+    excludeAtcPrefixes: ["D05BB"],
     title: "Lèvres sous isotrétinoïne",
     kind: "COMFORT",
     version: "1.0",
@@ -1683,7 +1717,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
 ];
 
 /** Toutes les règles de conseil : le cœur, puis celles des documents de conseil reçus (Série 2 peau). */
-export const ADVICE_RULES: AdviceRule[] = [...CORE_ADVICE_RULES, ...SKIN_SERIES_2_ADVICE_RULES];
+export const ADVICE_RULES: AdviceRule[] = [...CORE_ADVICE_RULES, ...SKIN_SERIES_1_ADVICE_RULES, ...SKIN_SERIES_2_ADVICE_RULES, ...SKIN_SERIES_3_ADVICE_RULES, ...SKIN_SERIES_4_ADVICE_RULES, ...SKIN_SERIES_5_ADVICE_RULES];
 
 const norm = (value: string) => value.toLowerCase().trim();
 
@@ -1834,6 +1868,7 @@ export function detectAdviceOpportunities(params: {
           : classHitAny || sideEffectHit;
 
       if (!triggered) continue;
+      if (!passesNameGate(rule.nameGate, drug.drugName, drug.officialName)) continue;
 
       triggers.push({
         lineIndex: drug.lineIndex,

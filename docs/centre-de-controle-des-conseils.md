@@ -65,3 +65,8 @@ atteint une vraie officine par un bip. Espace titulaire : plus aucun écran de r
 - Créer le compte super admin de Donna en production (équipe PharmaBoost).
 - Les vigilances de sécurité (contre-indications, interactions) restent écrites dans le code : elles ne se suppriment pas depuis
   la console.
+
+## Ce qu'on déconseille, au même endroit (10 oct. 2026)
+
+L'onglet **« À ne pas associer »** de Conseils & associations liste toutes les vigilances du moteur (contre-indiqué, à éviter, à espacer, surveillance, bon
+usage), avec leur source et les produits qu'elles écartent des propositions. Lecture seule : elles sont écrites dans le code. Voir `conseil-peau-series-1-3-4-5.md`.

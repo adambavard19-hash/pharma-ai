@@ -1,5 +1,16 @@
 import type { AdviceRule } from "./advice";
 import type { VigilanceRule } from "./vigilance";
+import {
+  COMMON_MOISTURIZER,
+  EMOLLIENT_EXCLUDE,
+  EMOLLIENT_PREFER,
+  GENTLE_CLEANSER_EXCLUDE,
+  GENTLE_CLEANSER_PREFER,
+  PREGNANCY_BLOCK,
+  PROTECTION,
+  SUN_EXCLUDE,
+  SUN_PREFER,
+} from "./conseil-peau-motifs";
 
 /**
  * « Conseil peau — Série 2 » : acné, photoprotection, eczéma, cuir chevelu.
@@ -50,124 +61,6 @@ const RCP = {
   locoid: `RCP Locoid 0,1 % crème — ${BDPM}, CIS 66841235`,
   gerda: `RCP Ciclopirox olamine Gerda 1,5 % shampooing — ${BDPM}, CIS 60655327`,
 } as const;
-
-// -----------------------------------------------------------------------------
-// Ce que les rayons nomment, dit par motifs (nom du produit sans accents, en minuscules).
-// -----------------------------------------------------------------------------
-
-/** Un exfoliant, mécanique ou chimique : le document déconseille d'en ajouter à ces traitements. */
-const EXFOLIANT = [
-  String.raw`gommage`,
-  String.raw`exfoli`,
-  String.raw`peeling`,
-  String.raw`\bscrub\b`,
-  String.raw`\baha\b`,
-  String.raw`\bbha\b`,
-  String.raw`acides? (?:glycolique|salicylique|lactique|mandelique)`,
-  String.raw`dermo ?acides?`,
-  String.raw`effaclar serum`,
-];
-
-/**
- * Ce qui n'est pas un hydratant de VISAGE : soin du corps, des pieds, des lèvres, anti-âge, solaire, et tout ce qui
- * lave (le stock réel range « HLE LAVANTE », « LAIT », « CORP200 », « SYNDET » parmi les émollients).
- */
-const NOT_A_FACE_MOISTURIZER = [
-  String.raw`\bcorp`,
-  String.raw`\blav`,
-  String.raw`syndet`,
-  String.raw`nettoy`,
-  String.raw`\bdch?e?\b`,
-  String.raw`gel douche`,
-  String.raw`\bpain\b`,
-  String.raw`\bcorps\b`,
-  String.raw`\blait\b`,
-  String.raw`pieds`,
-  String.raw`mains`,
-  String.raw`anti ?age`,
-  String.raw`anti ?rides`,
-  String.raw`solaire`,
-  String.raw`\bspf`,
-  String.raw`levres`,
-  String.raw`lèvres`,
-];
-
-/**
- * Hydratant de visage, non comédogène : le descripteur d'abord (« non comédogène »,
- * « visage »), puis la référence citée par le document (Eucerin DermoPure Clinical
- * Hydra Repair). Un motif préféré lève une exclusion (matching.ts) : chacun refuse
- * donc d'abord les exfoliants, les soins du corps et les solaires.
- */
-const REFUSED_FIRST = `(?:${[...EXFOLIANT, ...NOT_A_FACE_MOISTURIZER].join("|")})`;
-const FACE_MOISTURIZER_PREFER = [
-  String.raw`^(?!.*${REFUSED_FIRST}).*dermopure.*hydra`,
-  String.raw`^(?!.*${REFUSED_FIRST}).*hydra repair`,
-  String.raw`^(?!.*${REFUSED_FIRST}).*non comedog`,
-  String.raw`^(?!.*${REFUSED_FIRST}).*visag`,
-];
-
-/** Même exclusion que l'étape « protéger » de la routine sous isotrétinoïne : un solaire de visage, indice élevé, pas un produit enfant, un spray ou une huile. */
-const SUN_EXCLUDE = [
-  String.raw`apres ?soleil`,
-  String.raw`après ?soleil`,
-  String.raw`autobronz`,
-  String.raw`\bhuile\b`,
-  String.raw`\bhle\b`,
-  String.raw`enfant`,
-  String.raw`dermoped`,
-  String.raw`\bkids\b`,
-  String.raw`junior`,
-  String.raw`\d+ ?mois`,
-  String.raw`bebe`,
-  String.raw`bébé`,
-  String.raw`\blait\b`,
-  String.raw`\bcorps\b`,
-  String.raw`\bcorp\b`,
-  String.raw`levre`,
-  String.raw`lèvre`,
-  String.raw`stick`,
-  String.raw`brume`,
-  String.raw`\bspr\b`,
-  String.raw`spray`,
-  String.raw`spf ?(15|20|30)\b`,
-];
-const SUN_PREFER = [String.raw`sun oil control`, String.raw`oil control`, String.raw`toucher sec`, String.raw`dry touch`, String.raw`non comedog`, String.raw`peau grasse`, String.raw`visag`, String.raw`\bvis\b`, String.raw`fluide`, String.raw`\bmat\b`];
-
-/** Un lavant doux, sans savon : le document cite le Lipikar Syndet AP+. Le gommage « purifiant » n'est pas un lavant. */
-const GENTLE_CLEANSER_EXCLUDE = [...EXFOLIANT, String.raw`purifiant`, String.raw`solaire`, String.raw`\bspf`];
-const CLEANSER_REFUSED = String.raw`(?:gommage|exfoli|peeling|scrub|purifiant|\baha\b|\bbha\b)`;
-const GENTLE_CLEANSER_PREFER = [
-  String.raw`^(?!.*${CLEANSER_REFUSED}).*lipikar syndet`,
-  String.raw`^(?!.*${CLEANSER_REFUSED}).*(?:syndet|sans savon|sans parfum|surgras|pain dermatologique)`,
-];
-
-/** Un émollient de peau atopique : pas un exfoliant, pas un solaire, pas un lavant (« HLE LAVANTE », « GEL LAVANT », « SYNDET »), pas un soin des lèvres. Le Lipikar AP+ est la référence citée. */
-const EMOLLIENT_EXCLUDE = [...EXFOLIANT, String.raw`solaire`, String.raw`\bspf`, String.raw`levres`, String.raw`lèvres`, String.raw`anti ?age`, String.raw`anti ?rides`, String.raw`\blav`, String.raw`syndet`, String.raw`nettoy`, String.raw`\bdch?e?\b`, String.raw`gel douche`, String.raw`\bpain\b`];
-// L'ORDRE est décisif au départage : la référence citée par le document d'abord, puis les descripteurs.
-const EMOLLIENT_REFUSED = String.raw`(?:gommage|exfoli|peeling|scrub|solaire|\bspf|\blav|syndet|nettoy|\bpain\b)`;
-const EMOLLIENT_PREFER = [String.raw`^(?!.*${EMOLLIENT_REFUSED}).*lipikar.*ap`, String.raw`^(?!.*${EMOLLIENT_REFUSED}).*(?:emollient|atopi|peau seche)`];
-
-const PREGNANCY_BLOCK = (drug: string) => (patient: { isPregnant: boolean | null }) =>
-  patient.isPregnant === true
-    ? `Grossesse : ${drug} est contre-indiqué pendant la grossesse et en cas de projet de grossesse (RCP, rubrique 4.3). Pas de conseil cosmétique : le traitement relève du prescripteur.`
-    : null;
-
-/** Un hydratant qui accompagne un traitement irritant : les trois lignes acné du document partagent leur forme. */
-const COMMON_MOISTURIZER = {
-  kind: "TOLERANCE" as const,
-  version: "1.0",
-  validation: { status: "PENDING" as const },
-  triggerMode: "CLASS_ONLY" as const,
-  category: "DERMOCOSMETIQUE" as const,
-  therapeuticClasses: [] as string[],
-  sideEffectTriggers: [] as string[],
-  basePriority: 72,
-  matchingTags: ["hydratation", "peau sensible", "apaisant"],
-  excludeTags: ["parfum"],
-  productExclude: [...NOT_A_FACE_MOISTURIZER, ...EXFOLIANT],
-  productPrefer: FACE_MOISTURIZER_PREFER,
-  benefits: ["Peau moins sèche, moins tiraillée", "Non comédogène à privilégier", "Pas d'exfoliant en plus"],
-};
 
 export const SKIN_SERIES_2_ADVICE_RULES: AdviceRule[] = [
   // ---- 1. Peroxyde de benzoyle (Cutacnyl) -------------------------------------------------------
@@ -275,6 +168,8 @@ export const SKIN_SERIES_2_ADVICE_RULES: AdviceRule[] = [
   // ---- 5. Dermocorticoïde cutané — émollient ----------------------------------------------------
   {
     key: "skin-corticoid-atopic-emollient",
+    // Le clobétasol (Dermoval, Clobex) a ses règles de psoriasis (Série 4) : la même question ne se pose pas deux fois.
+    excludeAtcPrefixes: ["D07AD"],
     title: "Émollient sous dermocorticoïde (eczéma atopique)",
     documentRows: rows(5),
     kind: "TOLERANCE",
@@ -311,6 +206,7 @@ export const SKIN_SERIES_2_ADVICE_RULES: AdviceRule[] = [
   // ---- 6. Dermocorticoïde cutané — hygiène ------------------------------------------------------
   {
     key: "skin-corticoid-atopic-cleanser",
+    excludeAtcPrefixes: ["D07AD"],
     title: "Lavant doux sous dermocorticoïde (eczéma atopique)",
     documentRows: rows(6),
     kind: "TOLERANCE",
@@ -426,7 +322,6 @@ export const SKIN_SERIES_2_ADVICE_RULES: AdviceRule[] = [
 // Les vigilances : ce qu'on n'associe pas, ce qu'on ne fait pas, ce qu'on espace.
 // -----------------------------------------------------------------------------
 
-const PROTECTION = "Évitez aussi l'exposition répétée au soleil et aux UV : ils irritent davantage la peau.";
 
 export const SKIN_SERIES_2_VIGILANCES: VigilanceRule[] = [
   // ---- 1. Peroxyde de benzoyle ------------------------------------------------------------------

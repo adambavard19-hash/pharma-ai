@@ -3,7 +3,12 @@ import { BASE_MAITRE_VIGILANCES } from "./vigilance-base-maitre";
 import { VETERINARY_VIGILANCES } from "./vigilance-veterinaire";
 import { isVeterinaryKnowledge } from "./veterinary";
 import { SKIN_SERIES_2_VIGILANCES } from "./conseil-peau-serie-2";
+import { SKIN_SERIES_3_VIGILANCES } from "./conseil-peau-serie-3";
+import { SKIN_SERIES_4_VIGILANCES } from "./conseil-peau-serie-4";
+import { SKIN_SERIES_5_VIGILANCES } from "./conseil-peau-serie-5";
+import { SKIN_SERIES_1_VIGILANCES } from "./conseil-peau-serie-1";
 import { ELECTROLYTE_VIGILANCES } from "./vigilance-electrolytes";
+import { passesNameGate, type NameGate } from "./name-gate";
 
 /**
  * Vigilances au comptoir : ce que le traitement prescrit impose de savoir
@@ -69,6 +74,8 @@ export type VigilanceRule = {
   atcPrefixes: string[];
   /** Substances (DCI) reconnues dans le nom ou la DCI, sans accents, minuscules. */
   substances: string[];
+  /** Une porte sur le NOM du médicament, quand l'ATC ne le distingue pas d'un autre (voir `name-gate.ts`). Elle s'ajoute à l'ATC et aux substances. */
+  nameGate?: NameGate;
   /** Règle d'un produit pour animaux : elle ignore ATC et substances, et ne lit que le libellé reconnu. */
   veterinary?: VeterinaryMatch;
   /** L'explication, `{drug}` remplacé par le nom prescrit. */
@@ -384,7 +391,7 @@ const CORE_VIGILANCES: VigilanceRule[] = [
 ];
 
 /** Toutes les vigilances : le cœur, la Base maître V1, les électrolytes, « Conseil peau — Série 2 », puis les antiparasitaires vétérinaires. */
-export const VIGILANCE_RULES: VigilanceRule[] = [...CORE_VIGILANCES, ...BASE_MAITRE_VIGILANCES, ...ELECTROLYTE_VIGILANCES, ...SKIN_SERIES_2_VIGILANCES, ...VETERINARY_VIGILANCES];
+export const VIGILANCE_RULES: VigilanceRule[] = [...CORE_VIGILANCES, ...BASE_MAITRE_VIGILANCES, ...ELECTROLYTE_VIGILANCES, ...SKIN_SERIES_1_VIGILANCES, ...SKIN_SERIES_2_VIGILANCES, ...SKIN_SERIES_3_VIGILANCES, ...SKIN_SERIES_4_VIGILANCES, ...SKIN_SERIES_5_VIGILANCES, ...VETERINARY_VIGILANCES];
 
 function norm(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -399,6 +406,7 @@ export function evaluateVigilances(drugs: DrugKnowledge[]): VigilanceResult[] {
       // vétérinaires, un médicament humain ne les déclenche pas (perméthrine contre la gale).
       if (rule.veterinary) return isVeterinaryKnowledge(drug) && matchesVeterinary(rule.veterinary, drug.veterinary!);
       if (isVeterinaryKnowledge(drug)) return false;
+      if (!passesNameGate(rule.nameGate, drug.name, drug.inn)) return false;
       const atc = drug.atcCode ?? "";
       if (rule.atcPrefixes.some((prefix) => atc.startsWith(prefix))) return true;
       if (rule.systemicOnly && atc) return false;

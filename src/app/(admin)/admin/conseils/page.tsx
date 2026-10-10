@@ -3,6 +3,8 @@ import { requirePlatformSession } from "@/server/auth/platform-session";
 import { listCentralAssociations, listCentralRules } from "@/server/services/central-advice";
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
 import { ADVICE_VOCABULARY } from "@/core/catalog/product-vocabulary";
+import { describeVigilances } from "@/core/ai/vigilance-catalog";
+import { SKIN_DOCUMENT_NAMES } from "@/core/ai/engines/conseil-peau-couverture";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdviceControl, type AssociationCard, type RuleCard } from "./advice-control";
 import { HowItWorks } from "./how-it-works";
@@ -27,16 +29,19 @@ export default async function AdminAdvicePage() {
     createdAt: association.createdAt.toISOString(),
   }));
 
+  const vigilances = describeVigilances(SKIN_DOCUMENT_NAMES);
+
   return (
     <>
       <AdminPageHeader
         space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Conseils & associations"
-        description="Tout ce que PharmaBoost conseille au comptoir, au même endroit. Ce que vous décidez ici vaut pour toutes les pharmacies, celles qui existent et celles à venir."
+        description="Tout ce que PharmaBoost conseille au comptoir — et tout ce qu'il déconseille — au même endroit. Ce que vous décidez ici vaut pour toutes les pharmacies, celles qui existent et celles à venir."
       />
       <AdviceControl
         rules={ruleCards}
         associations={associationCards}
+        vigilances={vigilances}
         categories={PRODUCT_CATEGORIES.map((code) => ({ code, label: PRODUCT_CATEGORY_LABELS[code] }))}
         tags={[...ADVICE_VOCABULARY]}
       />
