@@ -561,6 +561,8 @@ namespace PharmaBoostAvis
     public string Price = "";
     public string Reason = "";
     public string Availability = "UNKNOWN";
+    /// <summary>Le stock exact de l'officine (« 3 »), ou vide quand il n'est pas connu.</summary>
+    public string Quantity = "";
     public string Image = "";
   }
 
@@ -2019,7 +2021,7 @@ ${PHRASES}
       if (item.Challenge.Length > 0) { texts[count] = Txt.Challenge; backs[count] = Pal.ChallengeBg; fores[count] = Pal.ChallengeFg; icons[count] = 1; count++; }
       if (item.ShortDate.Length > 0) { texts[count] = Txt.ShortDate + " " + ShortDay(item.ShortDate); backs[count] = Pal.DateBg; fores[count] = Pal.DateFg; icons[count] = 2; count++; }
       string stock; Color stockBack; Color stockFore; int stockIcon;
-      Availability(item.Availability, out stock, out stockBack, out stockFore, out stockIcon);
+      Availability(item.Availability, item.Quantity, out stock, out stockBack, out stockFore, out stockIcon);
       texts[count] = stock; backs[count] = stockBack; fores[count] = stockFore; icons[count] = stockIcon; count++;
       return count;
     }
@@ -2238,10 +2240,10 @@ ${PHRASES}
       return rowH;
     }
 
-    private static void Availability(string code, out string text, out Color back, out Color fore, out int icon)
+    private static void Availability(string code, string quantity, out string text, out Color back, out Color fore, out int icon)
     {
-      if (code == "IN_STOCK") { text = Txt.InStock; back = Pal.StockBg; fore = Pal.StockFg; icon = 3; }
-      else if (code == "LOW_STOCK") { text = Txt.LowStock; back = Pal.LowBg; fore = Pal.LowFg; icon = 4; }
+      if (code == "IN_STOCK") { text = Txt.InStock + (quantity.Length > 0 ? " · " + quantity : ""); back = Pal.StockBg; fore = Pal.StockFg; icon = 3; }
+      else if (code == "LOW_STOCK") { text = Txt.LowStock + (quantity.Length > 0 ? " · " + quantity : ""); back = Pal.LowBg; fore = Pal.LowFg; icon = 4; }
       else if (code == "OUT_OF_STOCK") { text = Txt.OutOfStock; back = Pal.OutBg; fore = Pal.OutFg; icon = 5; }
       else { text = Txt.UnknownStock; back = Pal.UnknownBg; fore = Pal.UnknownFg; icon = 0; }
     }
@@ -2844,6 +2846,7 @@ ${PHRASES}
         item.Price = Str(raw, "price");
         item.Reason = Str(raw, "reason");
         item.Availability = Str(raw, "availability");
+        item.Quantity = Str(raw, "quantity");
         item.Image = Str(raw, "image");
         e.Items.Add(item);
       }
@@ -3052,6 +3055,7 @@ namespace PharmaBoostAvis
     public string Price = "";
     public string Reason = "";
     public string Availability = "UNKNOWN";
+    public string Quantity = "";
     public string Image = "";
   }
 
@@ -3121,10 +3125,10 @@ namespace PharmaBoostAvis
       }
     }
 
-    public static void Availability(string code, out string text, out Color back, out Color fore)
+    public static void Availability(string code, string quantity, out string text, out Color back, out Color fore)
     {
-      if (code == "IN_STOCK") { text = "En stock"; back = Color.FromArgb(220, 250, 230); fore = Color.FromArgb(6, 118, 71); }
-      else if (code == "LOW_STOCK") { text = "Stock faible"; back = Color.FromArgb(254, 240, 199); fore = Color.FromArgb(181, 71, 8); }
+      if (code == "IN_STOCK") { text = "En stock" + (quantity.Length > 0 ? " · " + quantity : ""); back = Color.FromArgb(220, 250, 230); fore = Color.FromArgb(6, 118, 71); }
+      else if (code == "LOW_STOCK") { text = "Stock faible" + (quantity.Length > 0 ? " · " + quantity : ""); back = Color.FromArgb(254, 240, 199); fore = Color.FromArgb(181, 71, 8); }
       else if (code == "OUT_OF_STOCK") { text = "Rupture"; back = Color.FromArgb(254, 228, 226); fore = Color.FromArgb(180, 35, 24); }
       else { text = "Stock à vérifier"; back = Color.FromArgb(242, 244, 247); fore = Color.FromArgb(71, 84, 103); }
     }
@@ -3714,7 +3718,7 @@ namespace PharmaBoostAvis
       int py = cy + S(3);
       if (item.Price.Length > 0) AddPill(card, colX, item.Price, Color.Transparent, Look.Green, true, colW, ref px, ref py);
       string availabilityText; Color availabilityBack; Color availabilityFore;
-      Look.Availability(item.Availability, out availabilityText, out availabilityBack, out availabilityFore);
+      Look.Availability(item.Availability, item.Quantity, out availabilityText, out availabilityBack, out availabilityFore);
       AddPill(card, colX, availabilityText, availabilityBack, availabilityFore, true, colW, ref px, ref py);
       if (item.Challenge.Length > 0) AddPill(card, colX, "Challenge", Look.ChallengeBack, Look.ChallengeFore, true, colW, ref px, ref py);
       if (item.ShortDate.Length > 0) AddPill(card, colX, "Date courte " + item.ShortDate, Look.DateBack, Look.DateFore, true, colW, ref px, ref py);
@@ -4230,6 +4234,7 @@ namespace PharmaBoostAvis
         item.Price = Str(raw, "price");
         item.Reason = Str(raw, "reason");
         item.Availability = Str(raw, "availability");
+        item.Quantity = Str(raw, "quantity");
         item.Image = Str(raw, "image");
         e.Items.Add(item);
       }
@@ -4485,12 +4490,13 @@ function buildHostEntry(input) {
     price: euros(item.priceCents),
     reason: oneLine(item.reason ?? ""),
     availability: AVAILABILITIES.has(item.availability) ? item.availability : "UNKNOWN",
+    quantity: Number.isInteger(item.quantity) && item.quantity >= 0 ? String(item.quantity) : "",
     image: item.imageUrl && images.get(item.imageUrl) || ""
   }));
   const legacyOnly = body.items === void 0 && body.advice.length > 0;
   const alerts = [...body.alerts.map(oneLine), ...input.problem ? [oneLine(input.problem)] : []];
   const notes = items.length === 0 && !legacyOnly ? body.advice.map(oneLine) : [];
-  const finalItems = legacyOnly ? body.advice.map((text) => ({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: oneLine(text), price: "", reason: "", availability: "UNKNOWN", image: "" })) : items;
+  const finalItems = legacyOnly ? body.advice.map((text) => ({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: oneLine(text), price: "", reason: "", availability: "UNKNOWN", quantity: "", image: "" })) : items;
   return {
     id: input.prescriptionId,
     reference: referenceOf(body.title),
@@ -5229,7 +5235,7 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
 var import_node_fs8 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path7 = require("node:path");
-var VERSION = "0.9.0";
+var VERSION = "0.9.1";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path7.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path7.join)((0, import_node_path7.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -5644,8 +5650,8 @@ function testAffichage() {
     alerts: [],
     notes: [],
     items: [
-      { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 g\xE9lules", price: "14,90 \u20AC", reason: "Prot\xE9ger la flore pendant l'antibiotique", availability: "IN_STOCK", image: "" },
-      { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "S\xC9RUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 \u20AC", reason: "", availability: "LOW_STOCK", image: "" }
+      { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 g\xE9lules", price: "14,90 \u20AC", reason: "Prot\xE9ger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
+      { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "S\xC9RUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 \u20AC", reason: "", availability: "LOW_STOCK", quantity: "3", image: "" }
     ]
   };
   notices.show(entry);

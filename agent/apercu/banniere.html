@@ -201,9 +201,9 @@ html.integre .banner { transform-origin: top right; }
   var T = SPEC.text, Z = SPEC.sizes, MS = SPEC.timing;
   var MASCOT = "<svg class=\"mascot\" viewBox=\"0 0 100 100\" aria-hidden=\"true\">\n  <defs>\n    <linearGradient id=\"g-shell\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#FFFFFF\"/><stop offset=\"1\" stop-color=\"#C4E1EC\"/></linearGradient>\n    <linearGradient id=\"g-screen\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#0A2234\"/><stop offset=\"1\" stop-color=\"#0E3550\"/></linearGradient>\n    <linearGradient id=\"g-ear\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#27C9B0\"/><stop offset=\"1\" stop-color=\"#12968C\"/></linearGradient>\n    <linearGradient id=\"g-badge\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#22C88F\"/><stop offset=\"1\" stop-color=\"#14A06F\"/></linearGradient>\n  </defs>\n  <g class=\"bob\">\n    <line x1=\"50\" y1=\"17\" x2=\"50\" y2=\"8\" stroke=\"#8FBCD0\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n    <circle class=\"lamp-glow\" cx=\"50\" cy=\"6\" r=\"8\" fill=\"#58F2D8\"/>\n    <circle class=\"lamp\" cx=\"50\" cy=\"6\" r=\"3.6\" fill=\"#58F2D8\"/>\n    <path d=\"M 9.90 36.72 A 41 35 0 0 1 90.10 36.72\" fill=\"none\" stroke=\"#27C9B0\" stroke-width=\"5\" stroke-linecap=\"round\"/>\n    <rect x=\"3\" y=\"36\" width=\"15\" height=\"28\" rx=\"7\" fill=\"url(#g-ear)\"/>\n    <rect x=\"82\" y=\"36\" width=\"15\" height=\"28\" rx=\"7\" fill=\"url(#g-ear)\"/>\n    <rect x=\"14\" y=\"16\" width=\"72\" height=\"58\" rx=\"24\" fill=\"url(#g-shell)\" stroke=\"#8FBCD0\" stroke-width=\"1.6\"/>\n    <rect x=\"22\" y=\"25\" width=\"56\" height=\"40\" rx=\"17\" fill=\"url(#g-screen)\"/>\n    <g class=\"eyes\"><ellipse class=\"eye-open\" cx=\"38\" cy=\"42\" rx=\"4.5\" ry=\"6\" fill=\"#58F2D8\"/><circle class=\"eye-open glint\" cx=\"36.6\" cy=\"39.6\" r=\"1.6\" fill=\"#fff\" fill-opacity=\".82\"/><path class=\"eye-happy\" d=\"M 32.58 42.13 A 5.5 5 0 0 1 43.42 42.13\" fill=\"none\" stroke=\"#58F2D8\" stroke-width=\"3.2\" stroke-linecap=\"round\"/><ellipse class=\"eye-open\" cx=\"62\" cy=\"42\" rx=\"4.5\" ry=\"6\" fill=\"#58F2D8\"/><circle class=\"eye-open glint\" cx=\"60.6\" cy=\"39.6\" r=\"1.6\" fill=\"#fff\" fill-opacity=\".82\"/><path class=\"eye-happy\" d=\"M 56.58 42.13 A 5.5 5 0 0 1 67.42 42.13\" fill=\"none\" stroke=\"#58F2D8\" stroke-width=\"3.2\" stroke-linecap=\"round\"/></g>\n    <path class=\"mouth mouth-idle\" d=\"M 56.58 53.04 A 7 4.5 0 0 1 43.42 53.04\" fill=\"none\" stroke=\"#58F2D8\" stroke-width=\"2.6\" stroke-linecap=\"round\"/>\n    <path class=\"mouth mouth-happy\" d=\"M 41 53 A 9 7 0 0 0 59 53 Z\" fill=\"#58F2D8\"/>\n    <ellipse class=\"mouth mouth-alert\" cx=\"50\" cy=\"55.5\" rx=\"4\" ry=\"4.5\" fill=\"none\" stroke=\"#58F2D8\" stroke-width=\"2.4\"/>\n    <line class=\"mouth mouth-think\" x1=\"44\" y1=\"55\" x2=\"56\" y2=\"55\" stroke=\"#58F2D8\" stroke-width=\"2.6\" stroke-linecap=\"round\"/>\n    <circle cx=\"74\" cy=\"69\" r=\"15\" fill=\"#fff\" fill-opacity=\".92\"/>\n    <circle cx=\"74\" cy=\"69\" r=\"13.5\" fill=\"url(#g-badge)\"/>\n    <rect x=\"72.2\" y=\"61\" width=\"3.6\" height=\"16\" fill=\"#fff\"/><rect x=\"66\" y=\"67.2\" width=\"16\" height=\"3.6\" fill=\"#fff\"/>\n    <path class=\"sparkle\" d=\"M 80 7 L 82 12.5 L 87.5 14 L 82 15.5 L 80 21 L 78 15.5 L 72.5 14 L 78 12.5 Z\" fill=\"#FFD65A\"/>\n  </g>\n</svg>";
   var ITEMS = [
-    { id: "a", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", drug: "AMOXICILLINE 1 g", reason: "Protéger la flore pendant l'antibiotique", challenge: true, shortDate: "30/11/26", availability: "IN_STOCK", tone: ["#BFE8D2", "#2F9E6B"] },
-    { id: "b", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", drug: "ZYRTEC 10 mg", reason: "", challenge: false, shortDate: "", availability: "IN_STOCK", tone: ["#CFE4F7", "#3B82C4"] },
-    { id: "c", name: "VITAMINE C 500 mg", price: "8,40 €", drug: "DOLIPRANE 1000 mg", reason: "", challenge: false, shortDate: "12/12/26", availability: "LOW_STOCK", tone: ["#FFE2B8", "#E08A12"] }
+    { id: "a", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", drug: "AMOXICILLINE 1 g", reason: "Protéger la flore pendant l'antibiotique", challenge: true, shortDate: "30/11/26", availability: "IN_STOCK", quantity: "12", tone: ["#BFE8D2", "#2F9E6B"] },
+    { id: "b", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", drug: "ZYRTEC 10 mg", reason: "", challenge: false, shortDate: "", availability: "IN_STOCK", quantity: "27", tone: ["#CFE4F7", "#3B82C4"] },
+    { id: "c", name: "VITAMINE C 500 mg", price: "8,40 €", drug: "DOLIPRANE 1000 mg", reason: "", challenge: false, shortDate: "12/12/26", availability: "LOW_STOCK", quantity: "3", tone: ["#FFE2B8", "#E08A12"] }
   ];
   var S = { view: "idle", reduced: false, hidden: false, pinned: false, answers: {}, emailSaved: false, finishing: false, mailOpen: false, analyzing: false, doneAt: 0 };
   var timers = [];
@@ -237,9 +237,10 @@ html.integre .banner { transform-origin: top right; }
   };
 
   function pill(cls, icon, text) { return '<span class="pill ' + cls + '">' + ICON[icon] + esc(text) + '</span>'; }
-  function stockPill(a) {
-    if (a === "IN_STOCK") return pill("p-stock", "tick", T.inStock);
-    if (a === "LOW_STOCK") return pill("p-low", "bang", T.lowStock);
+  function stockPill(a, q) {
+    var n = q ? " · " + q : "";
+    if (a === "IN_STOCK") return pill("p-stock", "tick", T.inStock + n);
+    if (a === "LOW_STOCK") return pill("p-low", "bang", T.lowStock + n);
     if (a === "OUT_OF_STOCK") return pill("p-out", "cross", T.outOfStock);
     return '<span class="pill p-unknown">' + esc(T.unknownStock) + '</span>';
   }
@@ -342,7 +343,7 @@ html.integre .banner { transform-origin: top right; }
     else sub = T.duringSale + "  " + answered() + "/" + ITEMS.length;
     var rows = ITEMS.map(function (item) {
       var a = S.answers[item.id];
-      var pills = (item.challenge ? pill("p-challenge", "star", T.challenge) : "") + (item.shortDate ? pill("p-date", "clock", T.shortDate + " " + item.shortDate) : "") + stockPill(item.availability);
+      var pills = (item.challenge ? pill("p-challenge", "star", T.challenge) : "") + (item.shortDate ? pill("p-date", "clock", T.shortDate + " " + item.shortDate) : "") + stockPill(item.availability, item.quantity);
       var right;
       if (!a) right = '<div class="answer"><button class="btn sold" data-act="sold" data-id="' + item.id + '">' + T.sold + '</button><button class="btn not" data-act="not" data-id="' + item.id + '">' + T.notSold + '</button></div>';
       else right = '<div class="answer"><div class="chip ' + (a === "SOLD" ? "sold" : "not") + '">' + (a === "SOLD" ? ICON.tick + T.sold : T.notSold) + '</div><button class="change" data-act="undo" data-id="' + item.id + '">' + T.change + '</button></div>';

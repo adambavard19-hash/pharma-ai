@@ -30,13 +30,16 @@ describe("ce que la fenêtre reçoit pour une vente", () => {
     const photos = new Map([["https://images.openbeautyfacts.org/images/products/1/front.jpg", "C:\\x\\a.jpg"]]);
     const entry = build({}, photos);
     expect(entry).toMatchObject({ id: "rx_1", reference: "ORD-0100", label: "Médicament détecté", subject: "QUETIAPINE VIATRIS LP 50 mg", url: "https://pharmaboost.app/vente/rx_1", signature: "sig-1", quiet: false, alerts: [], notes: [], emailSaved: false, emailError: "" });
-    expect(entry.items).toEqual([{ id: "rec_1", drug: "QUETIAPINE VIATRIS LP 50 mg", challenge: "", shortDate: "", outcome: "NONE", name: "ELUDAY GENCIVE 500 ml", price: "7,90 €", reason: "Sécheresse buccale : effet fréquent de QUETIAPINE.", availability: "IN_STOCK", image: "C:\\x\\a.jpg" }]);
+    expect(entry.items).toEqual([{ id: "rec_1", drug: "QUETIAPINE VIATRIS LP 50 mg", challenge: "", shortDate: "", outcome: "NONE", name: "ELUDAY GENCIVE 500 ml", price: "7,90 €", reason: "Sécheresse buccale : effet fréquent de QUETIAPINE.", availability: "IN_STOCK", quantity: "6", image: "C:\\x\\a.jpg" }]);
   });
 
   it("n'invente rien : sans prix fiable, sans photo, sans stock connu, la fenêtre s'en passe", () => {
     const entry = build({ items: [{ name: "X", priceCents: null, reason: null, availability: "UNKNOWN", quantity: null, imageUrl: null }] });
-    expect(entry.items[0]).toEqual({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: "X", price: "", reason: "", availability: "UNKNOWN", image: "" });
+    expect(entry.items[0]).toEqual({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: "X", price: "", reason: "", availability: "UNKNOWN", quantity: "", image: "" });
     expect(build({ items: [{ name: "X", priceCents: 100, reason: null, availability: "N'IMPORTE QUOI", quantity: 1, imageUrl: null }] }).items[0].availability).toBe("UNKNOWN");
+    // Le stock exact (« 3 ») voyage jusqu'à la fenêtre : la pastille dit « Stock faible · 3 », jamais « Stock faible » tout court.
+    expect(build({ items: [{ name: "X", priceCents: 100, reason: null, availability: "LOW_STOCK", quantity: 3, imageUrl: null }] }).items[0]).toMatchObject({ availability: "LOW_STOCK", quantity: "3" });
+    expect(build({ items: [{ name: "X", priceCents: 100, reason: null, availability: "LOW_STOCK", quantity: -1, imageUrl: null }] }).items[0].quantity).toBe("");
   });
 
   it("garde les alertes avant les conseils, sur une ligne chacune", () => {
@@ -52,7 +55,7 @@ describe("ce que la fenêtre reçoit pour une vente", () => {
   it("lit encore un serveur plus ancien, qui n'envoie que des lignes de texte", () => {
     const old = build({ items: undefined, detectedLabel: undefined, advice: ["PROBIOTIQUE · 14,90 € · Antibiotique"] });
     expect(old.label).toBe("Détecté");
-    expect(old.items).toEqual([{ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: "PROBIOTIQUE · 14,90 € · Antibiotique", price: "", reason: "", availability: "UNKNOWN", image: "" }]);
+    expect(old.items).toEqual([{ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: "PROBIOTIQUE · 14,90 € · Antibiotique", price: "", reason: "", availability: "UNKNOWN", quantity: "", image: "" }]);
     expect(old.quiet).toBe(false);
   });
 

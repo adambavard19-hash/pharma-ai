@@ -128,6 +128,8 @@ namespace PharmaBoostAvis
     public string Price = "";
     public string Reason = "";
     public string Availability = "UNKNOWN";
+    /// <summary>Le stock exact de l'officine (« 3 »), ou vide quand il n'est pas connu.</summary>
+    public string Quantity = "";
     public string Image = "";
   }
 
@@ -1586,7 +1588,7 @@ ${PHRASES}
       if (item.Challenge.Length > 0) { texts[count] = Txt.Challenge; backs[count] = Pal.ChallengeBg; fores[count] = Pal.ChallengeFg; icons[count] = 1; count++; }
       if (item.ShortDate.Length > 0) { texts[count] = Txt.ShortDate + " " + ShortDay(item.ShortDate); backs[count] = Pal.DateBg; fores[count] = Pal.DateFg; icons[count] = 2; count++; }
       string stock; Color stockBack; Color stockFore; int stockIcon;
-      Availability(item.Availability, out stock, out stockBack, out stockFore, out stockIcon);
+      Availability(item.Availability, item.Quantity, out stock, out stockBack, out stockFore, out stockIcon);
       texts[count] = stock; backs[count] = stockBack; fores[count] = stockFore; icons[count] = stockIcon; count++;
       return count;
     }
@@ -1805,10 +1807,10 @@ ${PHRASES}
       return rowH;
     }
 
-    private static void Availability(string code, out string text, out Color back, out Color fore, out int icon)
+    private static void Availability(string code, string quantity, out string text, out Color back, out Color fore, out int icon)
     {
-      if (code == "IN_STOCK") { text = Txt.InStock; back = Pal.StockBg; fore = Pal.StockFg; icon = 3; }
-      else if (code == "LOW_STOCK") { text = Txt.LowStock; back = Pal.LowBg; fore = Pal.LowFg; icon = 4; }
+      if (code == "IN_STOCK") { text = Txt.InStock + (quantity.Length > 0 ? " · " + quantity : ""); back = Pal.StockBg; fore = Pal.StockFg; icon = 3; }
+      else if (code == "LOW_STOCK") { text = Txt.LowStock + (quantity.Length > 0 ? " · " + quantity : ""); back = Pal.LowBg; fore = Pal.LowFg; icon = 4; }
       else if (code == "OUT_OF_STOCK") { text = Txt.OutOfStock; back = Pal.OutBg; fore = Pal.OutFg; icon = 5; }
       else { text = Txt.UnknownStock; back = Pal.UnknownBg; fore = Pal.UnknownFg; icon = 0; }
     }
@@ -2411,6 +2413,7 @@ ${PHRASES}
         item.Price = Str(raw, "price");
         item.Reason = Str(raw, "reason");
         item.Availability = Str(raw, "availability");
+        item.Quantity = Str(raw, "quantity");
         item.Image = Str(raw, "image");
         e.Items.Add(item);
       }

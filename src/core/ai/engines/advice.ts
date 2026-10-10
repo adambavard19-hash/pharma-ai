@@ -1355,6 +1355,9 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     confirmedReasonTemplate: "Douleur musculaire ou articulaire confirmée sous {drug} : le froid sur une entorse récente, le chaud sur une contracture, complètent l'antalgique.",
     category: "DISPOSITIFS_MEDICAUX",
     atcPrefixes: ["M01A", "M02AA", "M03B", "N02BE", "N02A"],
+    // Un traitement du rhume ou de la grippe (Fervex, Dolirhume, Actifed, Humex…) contient du paracétamol et porte le même code
+    // N02BE : il soigne un état grippal, pas une douleur musculaire — une poche chaud/froid n'a aucun rapport (retour d'officine, 10 oct. 2026).
+    nameGate: { exclude: ["fervex", "rhume", "grippe", "actifed", "humex", "dolirhume", "rhinadvil", "rhinureflex", "pheniramine", "pseudoephedrine", "rhinofebral", "nurofen rhume"] },
     therapeuticClasses: ["Anti-inflammatoire non stéroïdien", "Myorelaxant", "Antalgique"],
     sideEffectTriggers: [],
     basePriority: 44,

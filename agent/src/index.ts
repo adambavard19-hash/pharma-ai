@@ -42,7 +42,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.9.0";
+const VERSION = "0.9.1";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -579,8 +579,8 @@ function testAffichage(): void {
     alerts: [],
     notes: [],
     items: [
-      { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", image: "" },
-      { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "", availability: "LOW_STOCK", image: "" },
+      { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
+      { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "", availability: "LOW_STOCK", quantity: "3", image: "" },
     ],
   };
   notices.show(entry);

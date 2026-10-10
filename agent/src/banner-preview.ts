@@ -263,9 +263,9 @@ html.integre .banner { transform-origin: top right; }
   var T = SPEC.text, Z = SPEC.sizes, MS = SPEC.timing;
   var MASCOT = ${JSON.stringify(mascotSvg())};
   var ITEMS = [
-    { id: "a", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", drug: "AMOXICILLINE 1 g", reason: "Protéger la flore pendant l'antibiotique", challenge: true, shortDate: "30/11/26", availability: "IN_STOCK", tone: ["#BFE8D2", "#2F9E6B"] },
-    { id: "b", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", drug: "ZYRTEC 10 mg", reason: "", challenge: false, shortDate: "", availability: "IN_STOCK", tone: ["#CFE4F7", "#3B82C4"] },
-    { id: "c", name: "VITAMINE C 500 mg", price: "8,40 €", drug: "DOLIPRANE 1000 mg", reason: "", challenge: false, shortDate: "12/12/26", availability: "LOW_STOCK", tone: ["#FFE2B8", "#E08A12"] }
+    { id: "a", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", drug: "AMOXICILLINE 1 g", reason: "Protéger la flore pendant l'antibiotique", challenge: true, shortDate: "30/11/26", availability: "IN_STOCK", quantity: "12", tone: ["#BFE8D2", "#2F9E6B"] },
+    { id: "b", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", drug: "ZYRTEC 10 mg", reason: "", challenge: false, shortDate: "", availability: "IN_STOCK", quantity: "27", tone: ["#CFE4F7", "#3B82C4"] },
+    { id: "c", name: "VITAMINE C 500 mg", price: "8,40 €", drug: "DOLIPRANE 1000 mg", reason: "", challenge: false, shortDate: "12/12/26", availability: "LOW_STOCK", quantity: "3", tone: ["#FFE2B8", "#E08A12"] }
   ];
   var S = { view: "idle", reduced: false, hidden: false, pinned: false, answers: {}, emailSaved: false, finishing: false, mailOpen: false, analyzing: false, doneAt: 0 };
   var timers = [];
@@ -299,9 +299,10 @@ html.integre .banner { transform-origin: top right; }
   };
 
   function pill(cls, icon, text) { return '<span class="pill ' + cls + '">' + ICON[icon] + esc(text) + '</span>'; }
-  function stockPill(a) {
-    if (a === "IN_STOCK") return pill("p-stock", "tick", T.inStock);
-    if (a === "LOW_STOCK") return pill("p-low", "bang", T.lowStock);
+  function stockPill(a, q) {
+    var n = q ? " · " + q : "";
+    if (a === "IN_STOCK") return pill("p-stock", "tick", T.inStock + n);
+    if (a === "LOW_STOCK") return pill("p-low", "bang", T.lowStock + n);
     if (a === "OUT_OF_STOCK") return pill("p-out", "cross", T.outOfStock);
     return '<span class="pill p-unknown">' + esc(T.unknownStock) + '</span>';
   }
@@ -404,7 +405,7 @@ html.integre .banner { transform-origin: top right; }
     else sub = T.duringSale + "  " + answered() + "/" + ITEMS.length;
     var rows = ITEMS.map(function (item) {
       var a = S.answers[item.id];
-      var pills = (item.challenge ? pill("p-challenge", "star", T.challenge) : "") + (item.shortDate ? pill("p-date", "clock", T.shortDate + " " + item.shortDate) : "") + stockPill(item.availability);
+      var pills = (item.challenge ? pill("p-challenge", "star", T.challenge) : "") + (item.shortDate ? pill("p-date", "clock", T.shortDate + " " + item.shortDate) : "") + stockPill(item.availability, item.quantity);
       var right;
       if (!a) right = '<div class="answer"><button class="btn sold" data-act="sold" data-id="' + item.id + '">' + T.sold + '</button><button class="btn not" data-act="not" data-id="' + item.id + '">' + T.notSold + '</button></div>';
       else right = '<div class="answer"><div class="chip ' + (a === "SOLD" ? "sold" : "not") + '">' + (a === "SOLD" ? ICON.tick + T.sold : T.notSold) + '</div><button class="change" data-act="undo" data-id="' + item.id + '">' + T.change + '</button></div>';

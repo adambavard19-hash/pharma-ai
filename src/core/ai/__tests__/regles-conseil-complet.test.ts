@@ -286,3 +286,22 @@ describe("la sécurité passe toujours avant", () => {
     }
   });
 });
+
+describe("la poche chaud/froid : une douleur, pas un rhume (retour d'officine du 10 octobre 2026)", () => {
+  const keys = (name: string, atc: string) =>
+    detectAdviceOpportunities({
+      drugs: [{ lineIndex: 0, drugName: name, knowledge: drug({ name, inn: name.toUpperCase(), atcCode: atc, therapeuticClass: "Antalgique antipyrétique", commonSideEffects: [] }) }],
+      patient: patient(),
+    }).map((opportunity) => opportunity.key);
+
+  it("Fervex, Dolirhume et Actifed (même code N02BE que le paracétamol) n'ouvrent pas la règle", () => {
+    for (const [name, atc] of [["Fervex adulte sachet", "N02BE51"], ["Dolirhume paracétamol pseudoéphédrine", "N02BE51"], ["Actifed rhume jour et nuit", "N02BE51"]] as const) {
+      expect(keys(name, atc), name).not.toContain("pain-cold-hot-pack");
+    }
+  });
+
+  it("le paracétamol et l'ibuprofène, eux, l'ouvrent toujours", () => {
+    expect(keys("Doliprane 1000 mg", "N02BE01")).toContain("pain-cold-hot-pack");
+    expect(keys("Ibuprofène 400 mg", "M01AE01")).toContain("pain-cold-hot-pack");
+  });
+});

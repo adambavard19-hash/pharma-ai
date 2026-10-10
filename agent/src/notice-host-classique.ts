@@ -75,6 +75,7 @@ namespace PharmaBoostAvis
     public string Price = "";
     public string Reason = "";
     public string Availability = "UNKNOWN";
+    public string Quantity = "";
     public string Image = "";
   }
 
@@ -144,10 +145,10 @@ namespace PharmaBoostAvis
       }
     }
 
-    public static void Availability(string code, out string text, out Color back, out Color fore)
+    public static void Availability(string code, string quantity, out string text, out Color back, out Color fore)
     {
-      if (code == "IN_STOCK") { text = "En stock"; back = Color.FromArgb(220, 250, 230); fore = Color.FromArgb(6, 118, 71); }
-      else if (code == "LOW_STOCK") { text = "Stock faible"; back = Color.FromArgb(254, 240, 199); fore = Color.FromArgb(181, 71, 8); }
+      if (code == "IN_STOCK") { text = "En stock" + (quantity.Length > 0 ? " · " + quantity : ""); back = Color.FromArgb(220, 250, 230); fore = Color.FromArgb(6, 118, 71); }
+      else if (code == "LOW_STOCK") { text = "Stock faible" + (quantity.Length > 0 ? " · " + quantity : ""); back = Color.FromArgb(254, 240, 199); fore = Color.FromArgb(181, 71, 8); }
       else if (code == "OUT_OF_STOCK") { text = "Rupture"; back = Color.FromArgb(254, 228, 226); fore = Color.FromArgb(180, 35, 24); }
       else { text = "Stock à vérifier"; back = Color.FromArgb(242, 244, 247); fore = Color.FromArgb(71, 84, 103); }
     }
@@ -737,7 +738,7 @@ namespace PharmaBoostAvis
       int py = cy + S(3);
       if (item.Price.Length > 0) AddPill(card, colX, item.Price, Color.Transparent, Look.Green, true, colW, ref px, ref py);
       string availabilityText; Color availabilityBack; Color availabilityFore;
-      Look.Availability(item.Availability, out availabilityText, out availabilityBack, out availabilityFore);
+      Look.Availability(item.Availability, item.Quantity, out availabilityText, out availabilityBack, out availabilityFore);
       AddPill(card, colX, availabilityText, availabilityBack, availabilityFore, true, colW, ref px, ref py);
       if (item.Challenge.Length > 0) AddPill(card, colX, "Challenge", Look.ChallengeBack, Look.ChallengeFore, true, colW, ref px, ref py);
       if (item.ShortDate.Length > 0) AddPill(card, colX, "Date courte " + item.ShortDate, Look.DateBack, Look.DateFore, true, colW, ref px, ref py);
@@ -1253,6 +1254,7 @@ namespace PharmaBoostAvis
         item.Price = Str(raw, "price");
         item.Reason = Str(raw, "reason");
         item.Availability = Str(raw, "availability");
+        item.Quantity = Str(raw, "quantity");
         item.Image = Str(raw, "image");
         e.Items.Add(item);
       }

@@ -45,7 +45,7 @@ export type NoticeBody = {
 
 export type HostOutcome = "NONE" | "SOLD" | "NOT_SOLD";
 
-export type HostItem = { id: string; drug: string; challenge: string; shortDate: string; outcome: HostOutcome; name: string; price: string; reason: string; availability: string; image: string };
+export type HostItem = { id: string; drug: string; challenge: string; shortDate: string; outcome: HostOutcome; name: string; price: string; reason: string; availability: string; /** Le stock exact (« 3 »), ou vide quand il n'est pas connu. */ quantity: string; image: string };
 
 /** Ce que la fenêtre reçoit pour une vente. */
 export type HostEntry = {
@@ -120,13 +120,14 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     price: euros(item.priceCents),
     reason: oneLine(item.reason ?? ""),
     availability: AVAILABILITIES.has(item.availability) ? item.availability : "UNKNOWN",
+    quantity: Number.isInteger(item.quantity) && (item.quantity as number) >= 0 ? String(item.quantity) : "",
     image: (item.imageUrl && images.get(item.imageUrl)) || "",
   }));
   // Un serveur plus ancien n'envoie que des lignes de texte : on les montre telles quelles, sans photo ni badge de stock.
   const legacyOnly = body.items === undefined && body.advice.length > 0;
   const alerts = [...body.alerts.map(oneLine), ...(input.problem ? [oneLine(input.problem)] : [])];
   const notes = items.length === 0 && !legacyOnly ? body.advice.map(oneLine) : [];
-  const finalItems: HostItem[] = legacyOnly ? body.advice.map((text) => ({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE" as const, name: oneLine(text), price: "", reason: "", availability: "UNKNOWN", image: "" })) : items;
+  const finalItems: HostItem[] = legacyOnly ? body.advice.map((text) => ({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE" as const, name: oneLine(text), price: "", reason: "", availability: "UNKNOWN", quantity: "", image: "" })) : items;
   return {
     id: input.prescriptionId,
     reference: referenceOf(body.title),
