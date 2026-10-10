@@ -125,7 +125,8 @@ export type CounterNotice = {
 
 const MAX_ALERTS = 2;
 const RANK: Record<string, number> = { BLOCKING: 0, WARNING: 1, CAUTION: 2, INFO: 3 };
-const MAX_ADVICE = 4;
+/** Trois conseils au plus à l'écran du comptoir : on en propose en moyenne trois, un seul quand il n'y en a qu'un de pertinent. */
+const MAX_ADVICE = 3;
 /** Un conseil reste sous les yeux du pharmacien après sa réponse : « Vendu » et « Non vendu » le marquent, ils ne le font pas disparaître. */
 const SHOWN_STATUSES = new Set(["PROPOSED", "ACCEPTED", "MODIFIED", "PURCHASED", "DECLINED"]);
 

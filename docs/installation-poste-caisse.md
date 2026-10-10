@@ -289,7 +289,7 @@ l'installateur Windows. Les statuts se calculent une seule fois (`src/core/stock
 La fenêtre du poste n'est plus un message de 30 secondes : elle **reste ouverte pendant toute la vente**, se met à jour à chaque
 bip, et ne se ferme qu'à « Vente terminée ».
 
-- **Conseils** (4 au plus, sans doublon) : produit, médicament concerné (« Pour : … »), photo, phrase courte, prix et stock quand
+- **Conseils** (3 au plus, sans doublon ; un seul s'il n'y en a qu'un de pertinent) : produit, médicament concerné (« Pour : … »), photo, phrase courte, prix et stock quand
   le stock est à jour. Pastille orange **Challenge** quand le produit est dans un challenge laboratoire actif ; pastille rouge
   **Date courte** avec la vraie date du lot le plus proche. Jamais inventées : le serveur ne les envoie que si elles existent.
 - **Vendu / Non vendu** : une *déclaration* du pharmacien, enregistrée `COUNTER_DECLARED` avec le poste. Elle n'est jamais mêlée

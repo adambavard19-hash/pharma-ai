@@ -21,7 +21,7 @@ describe("l'avis de comptoir affiché sur le poste de caisse", () => {
     expect(buildCounterNotice({ ...base, prescriptionStatus: "DELIVERED" }).state).toBe("CLOSED");
   });
 
-  it("met les alertes avant les conseils, quatre conseils au plus, sans la forme galénique", () => {
+  it("met les alertes avant les conseils, trois conseils au plus, sans la forme galénique", () => {
     const notice = buildCounterNotice({
       ...base,
       alerts: [
@@ -43,7 +43,7 @@ describe("l'avis de comptoir affiché sur le poste de caisse", () => {
     expect(notice.state).toBe("READY");
     expect(notice.subject).toBe("DOLIPRANE 1000 mg · SPASFON LYOC 80 mg");
     expect(notice.alerts).toEqual(["Ligne illisible", "Interaction avec le millepertuis"]);
-    expect(notice.advice).toEqual(["VITAMINE C 1 g · 8,90 € · Fatigue hivernale", "PROBIOTIQUE 30 gélules · 14,90 € · Antibiotique en cours", "SÉRUM PHYSIOLOGIQUE · Lavage de nez", "Quatrième · 1,00 € · Dernier retenu"]);
+    expect(notice.advice).toEqual(["VITAMINE C 1 g · 8,90 € · Fatigue hivernale", "PROBIOTIQUE 30 gélules · 14,90 € · Antibiotique en cours", "SÉRUM PHYSIOLOGIQUE · Lavage de nez"]);
   });
 
   it("dit pourquoi il n'y a rien, plutôt que de ne rien dire", () => {
@@ -146,9 +146,9 @@ describe("seul parle dans la fenêtre du poste ce que la pharmacienne a validé"
     expect(notice.advice).toEqual(["Rien à ajouter pour cette délivrance."]);
   });
 
-  it("les quatre conseils de la fenêtre sont pris parmi ceux qui ont le droit d'y être", () => {
+  it("les trois conseils de la fenêtre sont pris parmi ceux qui ont le droit d'y être", () => {
     const notice = buildCounterNotice({ ...base, recommendations: [rec("A", false), rec("B", false), rec("C", true), rec("D", true), rec("E", true), rec("F", true), rec("G", true)] });
-    expect(notice.items.map((item) => item.name)).toEqual(["C", "D", "E", "F"]);
+    expect(notice.items.map((item) => item.name)).toEqual(["C", "D", "E"]);
   });
 });
 
