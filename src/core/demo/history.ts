@@ -83,7 +83,7 @@ const PROFILES: Profile[] = [
     key: "douleur", weight: 14, scans: ["ibuprofene-400", "ixprim", "spasfon"],
     proposals: [
       { ruleKey: "gastric-protection-nsaid", title: "Confort gastrique sous anti-inflammatoire", category: "SOINS", targets: [drug("gaviscon"), product("argile-gastrique")], reason: "Anti-inflammatoire : l'inconfort gastrique fait souvent arrêter le traitement.", shown: 0.8, appeal: 0.78 },
-      { ruleKey: "pain-cold-hot-pack", title: "Chaud ou froid sur la douleur", category: "DISPOSITIFS_MEDICAUX", targets: [product("poche-chaud-froid")], reason: "Douleur musculaire : le chaud ou le froid soulage en complément.", shown: 0.6, appeal: 0.6 },
+      { ruleKey: "pain-pack-other", title: "Chaud ou froid sur la douleur", category: "DISPOSITIFS_MEDICAUX", targets: [product("poche-chaud-froid")], reason: "Douleur musculaire : le chaud ou le froid soulage en complément.", shown: 0.6, appeal: 0.6 },
       { ruleKey: "opioid-transit", title: "Transit sous antalgique opioïde", category: "NUTRITION", targets: [product("fibres-transit")], reason: "Antalgique opioïde : la constipation est fréquente.", shown: 0.5, appeal: 0.58 },
     ],
   },

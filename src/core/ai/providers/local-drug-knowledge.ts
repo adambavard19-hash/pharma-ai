@@ -20,6 +20,9 @@ import type { DrugKnowledge } from "../types";
 
 export type DrugRecordLoader = () => Promise<DrugKnowledge[]>;
 
+/** Longueur minimale d'un nom pour qu'il en désigne un autre par son début. */
+const MIN_PREFIX = 6;
+
 export class LocalDrugKnowledgeProvider implements DrugKnowledgeProvider {
   readonly info: ProviderInfo;
 
@@ -70,8 +73,10 @@ export class LocalDrugKnowledgeProvider implements DrugKnowledgeProvider {
       const partial = index.get(firstWord);
       if (partial) return partial;
 
+      // Un préfixe ne vaut que s'il est assez long pour désigner UN médicament : « fervex » commence par « fer », la DCI du fumarate
+      // de fer, et un Fervex était lu comme un fer (retour d'officine du 10 octobre 2026). Six lettres au moins, des deux côtés.
       for (const [name, record] of index) {
-        if (name.startsWith(firstWord) || firstWord.startsWith(name)) return record;
+        if (name.length >= MIN_PREFIX && firstWord.length >= MIN_PREFIX && (name.startsWith(firstWord) || firstWord.startsWith(name))) return record;
       }
     }
 

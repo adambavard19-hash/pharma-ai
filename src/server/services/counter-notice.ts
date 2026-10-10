@@ -3,6 +3,7 @@ import { prisma } from "@/server/db/client";
 import { buildCounterNotice, type CounterNotice } from "@/core/counter/notice";
 import { stockReminderLevel } from "@/core/stock-deposit/rules";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
+import { answersFromRows, treeState } from "@/core/counter/tree-state";
 import { loadCentralAdvice } from "@/server/services/central-advice";
 import { activeChallengeTitlesFor } from "@/server/services/challenges";
 import { nearestShortDatesFor } from "@/server/services/stock-lots";
@@ -29,8 +30,13 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
       analysisRuns: {
         orderBy: { startedAt: "desc" },
         take: 1,
-        select: { outcome: true, safetyFindings: { select: { severity: true, subjectType: true, code: true, message: true, acknowledgedAt: true } } },
+        select: {
+          outcome: true,
+          safetyFindings: { select: { severity: true, subjectType: true, code: true, message: true, acknowledgedAt: true } },
+          opportunities: { select: { ruleKey: true, answer: true, triggeredLineIds: true } },
+        },
       },
+      questionAnswers: { select: { treeKey: true, nodeKey: true, choices: true } },
       recommendations: {
         orderBy: { totalScore: "desc" },
         select: {
@@ -74,6 +80,9 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     nearestShortDatesFor(pharmacyId, now).catch(() => new Map<string, { expiresOn: string }>()),
   ]);
   const lineName = new Map(prescription.lines.map((line) => [line.id, line.drugName ?? ""]));
+  // L'arbre de questions : pourquoi le patient prend son antalgique, où il a mal… Un conseil du bout d'une branche (la poche du dos,
+  // le thermomètre) ne se montre qu'une fois la question répondue : jamais un Thérapearl « dos » sur la foi d'un Fervex.
+  const tree = treeState({ opportunities: run?.opportunities ?? [], lineNames: lineName, answers: answersFromRows(prescription.questionAnswers) });
 
   const notice = buildCounterNotice({
     reference: prescription.reference,
@@ -81,7 +90,9 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     lineNames: prescription.lines.map((line) => line.drugName ?? "").filter(Boolean),
     lineKinds: prescription.lines.filter((line) => line.drugName).map((line) => (line.drugSpecialtyId ? ("DRUG" as const) : ("PRODUCT" as const))),
     alerts: (run?.safetyFindings ?? []).map((finding) => ({ severity: finding.severity, subjectType: finding.subjectType, code: finding.code, message: finding.message, acknowledged: finding.acknowledgedAt !== null })),
-    recommendations: prescription.recommendations.map((rec) => {
+    questions: tree.view.questions,
+    guidance: tree.view.guidance,
+    recommendations: prescription.recommendations.filter((rec) => tree.isVisible(rec.opportunity?.ruleKey)).map((rec) => {
       const triggered = rec.opportunity?.triggeredLineIds.map((lineId) => lineName.get(lineId) ?? "").find(Boolean) ?? null;
       const shortDate = rec.productId ? shortDates.get(`p:${rec.productId}`) : rec.presentationId ? shortDates.get(`d:${rec.presentationId}`) : undefined;
       return {

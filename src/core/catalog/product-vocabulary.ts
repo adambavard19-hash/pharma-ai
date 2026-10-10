@@ -296,13 +296,57 @@ const PATTERNS: Pattern[] = [
     ruleKeys: ["dry-eye-eyelid-care"],
     confidence: 0.9,
   },
+  // La gamme chaud/froid existe par zone (THERAPEARL DOS, GENOU, HANCHE, CHEVILLE…) : le nom dit la zone, et c'est la zone
+  // qui commande le conseil (`pain-zones.ts`). Un masque pour les yeux ou un produit enfant n'est jamais une poche de zone.
+  {
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(\bdos\b|lombaire|lombalg))/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["chaud froid", "douleur musculaire", "zone dos"],
+    ruleKeys: ["pain-pack-back"],
+    confidence: 0.9,
+  },
+  {
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(nuque|cervical|\bcou\b))/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["chaud froid", "douleur musculaire", "zone nuque"],
+    ruleKeys: ["pain-pack-neck"],
+    confidence: 0.9,
+  },
+  {
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(epaule))/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["chaud froid", "douleur musculaire", "zone épaule"],
+    ruleKeys: ["pain-pack-shoulder"],
+    confidence: 0.9,
+  },
+  {
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(genou))/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["chaud froid", "douleur musculaire", "zone genou"],
+    ruleKeys: ["pain-pack-knee"],
+    confidence: 0.9,
+  },
+  {
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(hanche))/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["chaud froid", "douleur musculaire", "zone hanche"],
+    ruleKeys: ["pain-pack-hip"],
+    confidence: 0.9,
+  },
+  {
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(cheville))/,
+    category: "DISPOSITIFS_MEDICAUX",
+    tags: ["chaud froid", "douleur musculaire", "zone cheville"],
+    ruleKeys: ["pain-pack-ankle"],
+    confidence: 0.9,
+  },
   // Douleur musculaire ou articulaire : poches chaud/froid, patchs chauffants.
   // Un masque pour les yeux de la même gamme (THERAPEARL MASQ OCUL) n'est pas une poche pour le dos.
   {
     test: /^(?!.*(masq(?:ue)? ocul|oculaire))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|bouillotte|pack froid|poche froid|poche chaud|compresse froide|chaud froid))/,
     category: "DISPOSITIFS_MEDICAUX",
     tags: ["chaud froid", "douleur musculaire"],
-    ruleKeys: ["pain-cold-hot-pack"],
+    ruleKeys: ["pain-pack-other"],
     confidence: 0.88,
   },
   // Hygiène intime et flore vaginale, en accompagnement d'une antibiothérapie.

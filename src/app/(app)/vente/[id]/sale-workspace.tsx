@@ -27,6 +27,8 @@ import { ChecksNote } from "./checks-note";
 import { SafetyZone, VigilanceCards } from "./safety-zone";
 import { RegulationZone } from "./regulation-zone";
 import { AdviceLocked, AdviceZone } from "./advice-zone";
+import { CounterQuestions } from "./counter-questions";
+import type { ViewQuestion } from "@/core/counter/question-tree";
 import { AlternativesList } from "./alternatives-list";
 import { MedicationAdvice } from "./medication-advice";
 import { CompleteAdviceBanner } from "./complete-advice";
@@ -95,6 +97,7 @@ export function SaleWorkspace({
   canImportStock,
   stockNotice,
   partnerCards = [],
+  counterQuestions,
 }: {
   prescription: {
     id: string;
@@ -112,6 +115,8 @@ export function SaleWorkspace({
   findings: SafetyFindingView[];
   blockedOpportunities: BlockedOpportunityView[];
   recommendations: AdviceView[];
+  /** L'arbre de questions du comptoir, quand le traitement l'ouvre (paracétamol, anti-inflammatoire…). */
+  counterQuestions?: { questions: ViewQuestion[]; guidance: string[] };
   analysisRunId: string | null;
   trace: {
     stages: PipelineStageTrace[];
@@ -597,6 +602,9 @@ export function SaleWorkspace({
                       )
                 }
               />
+              {counterQuestions && counterQuestions.questions.length > 0 && (
+                <CounterQuestions prescriptionId={prescription.id} questions={counterQuestions.questions} guidance={counterQuestions.guidance} canAnswer={permissions.decide} />
+              )}
               <AdviceZone
                 prescriptionId={prescription.id}
                 recommendations={general}

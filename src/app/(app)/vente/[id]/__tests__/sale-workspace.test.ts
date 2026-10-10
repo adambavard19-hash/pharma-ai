@@ -16,6 +16,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 vi.mock("@/components/ui/toast", () => ({ useToast: () => ({ push: vi.fn() }) }));
 vi.mock("@/server/actions/opportunities", () => ({ answerOpportunityAction: vi.fn() }));
+vi.mock("@/server/actions/counter-questions", () => ({ answerCounterQuestionAction: vi.fn() }));
 vi.mock("@/server/actions/prescriptions", () => ({
   acknowledgeSafetyFindingsAction: vi.fn(),
   addPrescriptionLineAction: vi.fn(),

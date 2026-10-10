@@ -113,40 +113,41 @@ model Pharmacy {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships          Membership[]
-  patients             Patient[]
-  supportThreads       SupportThread[]
-  reminders            Reminder[]
-  products             Product[]
-  stockItems           StockItem[]
-  stockMovements       StockMovement[]
-  drugStocks           PharmacyDrugStock[]
-  prescriptions        Prescription[]
-  analysisRuns         AnalysisRun[]
-  recommendations      Recommendation[]
-  pharmacyRules        PharmacyRule[]
-  productAssociations  ProductAssociation[]
-  counterSaleFollowUps CounterSaleFollowUp[]
-  documents            PatientDocument[]
-  sales                Sale[]
-  notifications        Notification[]
-  auditLogs            AuditLog[]
-  sessions             Session[]
-  imports              ImportJob[]
-  stockDeposits        StockDeposit[]
-  aiUsage              AiUsageRecord[]
+  organization           Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships            Membership[]
+  patients               Patient[]
+  supportThreads         SupportThread[]
+  reminders              Reminder[]
+  products               Product[]
+  stockItems             StockItem[]
+  stockMovements         StockMovement[]
+  drugStocks             PharmacyDrugStock[]
+  prescriptions          Prescription[]
+  analysisRuns           AnalysisRun[]
+  recommendations        Recommendation[]
+  pharmacyRules          PharmacyRule[]
+  productAssociations    ProductAssociation[]
+  counterSaleFollowUps   CounterSaleFollowUp[]
+  counterQuestionAnswers CounterQuestionAnswer[]
+  documents              PatientDocument[]
+  sales                  Sale[]
+  notifications          Notification[]
+  auditLogs              AuditLog[]
+  sessions               Session[]
+  imports                ImportJob[]
+  stockDeposits          StockDeposit[]
+  aiUsage                AiUsageRecord[]
   /// Le dossier commercial dont cette officine est issue, s'il y en a un.
-  prospect             Prospect?
+  prospect               Prospect?
   /// La liaison avec le logiciel de gestion de l'officine, s'il y en a une.
-  stockConnection      StockConnection?
+  stockConnection        StockConnection?
   /// Les postes de caisse qui écoutent la douchette pour cette officine.
-  counterPosts         CounterPost[]
+  counterPosts           CounterPost[]
   /// Les codes-barres appris au comptoir.
-  productBarcodes      ProductBarcode[]
+  productBarcodes        ProductBarcode[]
   /// Contrats et liens d'activation rattachés directement à l'officine.
-  contracts            Contract[]
-  subscriptionInvites  SubscriptionInvite[]
+  contracts              Contract[]
+  subscriptionInvites    SubscriptionInvite[]
 
   preferredRanges   PreferredRange[]
   labChallenges     LabChallenge[]
@@ -1798,16 +1799,16 @@ enum PrescriptionStatus {
 }
 
 model Prescription {
-  id          String             @id @default(cuid())
-  pharmacyId  String
-  patientId   String?
-  reference   String
-  status      PrescriptionStatus @default(DRAFT)
-  source      PrescriptionSource @default(MANUAL)
+  id              String             @id @default(cuid())
+  pharmacyId      String
+  patientId       String?
+  reference       String
+  status          PrescriptionStatus @default(DRAFT)
+  source          PrescriptionSource @default(MANUAL)
   /// Le poste de caisse dont viennent les bips (source COUNTER_SCAN).
-  counterPost String?
+  counterPost     String?
   /// Le comptoir (poste) d'où vient la vente : sa vraie identité, là où `counterPost` n'est que le nom affiché à ce moment-là.
-  counterPostId String?
+  counterPostId   String?
   /// Le collaborateur à qui la vente est attribuée : celui du comptoir au moment du bip, ou celui qui l'a saisie. Fixé une fois ;
   /// attribuer plus tard le comptoir à quelqu'un d'autre ne réécrit pas l'historique.
   handledByUserId String?
@@ -1847,6 +1848,7 @@ model Prescription {
   sales           Sale[]
   sealedDocuments SealedDocument[]
   counterFollowUp CounterSaleFollowUp?
+  questionAnswers CounterQuestionAnswer[]
 
   @@unique([pharmacyId, reference])
   @@index([pharmacyId, status])
@@ -2547,6 +2549,31 @@ model CounterSaleFollowUp {
 
   @@index([pharmacyId, closedAt])
   @@map("counter_sale_follow_ups")
+}
+
+/// Les réponses du pharmacien à l'arbre de questions du comptoir (« pourquoi le patient prend-il son antalgique ? », « où a-t-il
+/// mal ? »…) pour UNE vente : pour chaque question, les choix cochés. Aucune donnée de santé nominative : des clés de choix
+/// (« PAIN », « BACK »), jamais du texte libre. Elles débloquent les conseils du bout de la branche (voir core/counter/question-tree.ts).
+model CounterQuestionAnswer {
+  id               String   @id @default(cuid())
+  pharmacyId       String
+  prescriptionId   String
+  treeKey          String
+  nodeKey          String
+  /// Les choix cochés, dans l'ordre où ils l'ont été.
+  choices          String[] @default([])
+  /// D'où vient la réponse : « POSTE » (fenêtre du poste de caisse) ou « ECRAN » (écran de la vente).
+  source           String   @default("POSTE")
+  answeredByUserId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  pharmacy     Pharmacy     @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([prescriptionId, treeKey, nodeKey])
+  @@index([pharmacyId])
+  @@map("counter_question_answers")
 }
 
 // ===========================================================================

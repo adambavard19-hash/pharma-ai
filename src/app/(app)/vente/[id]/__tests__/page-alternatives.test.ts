@@ -31,6 +31,7 @@ vi.mock("@/server/db/client", () => ({
     patient: { findMany: async () => [] },
     stockConnection: { findUnique: async () => null },
     product: { findMany: mocks.productFindMany },
+    adviceOpportunity: { findMany: async () => [] },
   },
 }));
 vi.mock("@/server/auth/session", () => ({
@@ -173,6 +174,7 @@ function prescription(recommendations: ReturnType<typeof recommendation>[]) {
     recommendations,
     analysisRuns: [],
     sales: [],
+    questionAnswers: [],
   };
 }
 

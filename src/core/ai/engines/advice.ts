@@ -4,6 +4,7 @@ import { SKIN_SERIES_3_ADVICE_RULES } from "./conseil-peau-serie-3";
 import { SKIN_SERIES_4_ADVICE_RULES } from "./conseil-peau-serie-4";
 import { SKIN_SERIES_5_ADVICE_RULES } from "./conseil-peau-serie-5";
 import { SKIN_SERIES_1_ADVICE_RULES } from "./conseil-peau-serie-1";
+import { PAIN_ZONE_RULES } from "./pain-zones";
 import { passesNameGate, type NameGate } from "./name-gate";
 import type {
   AdviceOpportunityResult,
@@ -1345,47 +1346,6 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     safetyNotes: ["Paupière gonflée, douloureuse ou œil rouge : consultation."],
   },
   {
-    key: "pain-cold-hot-pack",
-    title: "Chaud ou froid sur la douleur",
-    kind: "COMFORT",
-    version: "1.0",
-    validation: { status: "PENDING" },
-    triggerMode: "CLASS_ONLY",
-    question: "La douleur est-elle musculaire ou articulaire (entorse, tendinite, lombalgie, contracture) ?",
-    confirmedReasonTemplate: "Douleur musculaire ou articulaire confirmée sous {drug} : le froid sur une entorse récente, le chaud sur une contracture, complètent l'antalgique.",
-    category: "DISPOSITIFS_MEDICAUX",
-    atcPrefixes: ["M01A", "M02AA", "M03B", "N02BE", "N02A"],
-    // Un traitement du rhume ou de la grippe (Fervex, Dolirhume, Actifed, Humex…) contient du paracétamol et porte le même code
-    // N02BE : il soigne un état grippal, pas une douleur musculaire — une poche chaud/froid n'a aucun rapport (retour d'officine, 10 oct. 2026).
-    nameGate: { exclude: ["fervex", "rhume", "grippe", "actifed", "humex", "dolirhume", "rhinadvil", "rhinureflex", "pheniramine", "pseudoephedrine", "rhinofebral", "nurofen rhume"] },
-    therapeuticClasses: ["Anti-inflammatoire non stéroïdien", "Myorelaxant", "Antalgique"],
-    sideEffectTriggers: [],
-    basePriority: 44,
-    matchingTags: ["chaud froid", "douleur musculaire"],
-    excludeTags: [],
-    // Un motif préféré LÈVE une exclusion (matching.ts) : « thera ?pearl » sauvait donc
-    // « THERAPEARL MASQ OCUL » et « chaud ?froid » le « MASQUE OCULAIRE chaud froid ».
-    // Chaque préférence refuse d'abord ce que la règle exclut, pour que l'exclusion tienne.
-    productPrefer: [
-      String.raw`^(?!.*(?:masq|ocul|\bkids?\b|enfant|bouillotte)).*chaud ?froid`,
-      String.raw`^(?!.*(?:masq|ocul|\bkids?\b|enfant|bouillotte)).*thera ?pearl`,
-      String.raw`^(?!.*(?:masq|ocul|\bkids?\b|enfant|bouillotte)).*thermcool`,
-      String.raw`^(?!.*(?:masq|ocul|\bkids?\b|enfant|bouillotte)).*poche`,
-    ],
-    productExclude: [String.raw`\bkids?\b`, String.raw`enfant`, String.raw`bouillotte`, String.raw`masq(?:ue)? ?ocul`, String.raw`oculaire`],
-    benefits: ["Froid les 48 premières heures d'une entorse", "Chaud sur une contracture", "Sans médicament, en plus du traitement"],
-    shortReasonTemplate:
-      "Antalgique ou anti-inflammatoire ({drug}) : sur une douleur musculaire ou articulaire, le froid ou le chaud local soulage en plus.",
-    rationaleTemplate:
-      "Sous {drug}, une douleur d'origine musculaire ou articulaire répond aussi au traitement local par la température : le froid limite l'œdème et la douleur d'une entorse ou d'un traumatisme récent, la chaleur détend une contracture ou une lombalgie. Une poche réutilisable sert aux deux.",
-    counterScriptTemplate:
-      "« En plus de {drug}, {product} : au froid les deux premiers jours sur une entorse, au chaud sur une contracture, vingt minutes, jamais directement sur la peau. »",
-    patientReasonTemplate:
-      "En complément de {drug}, {product} s'applique vingt minutes : froid sur une entorse récente, chaud sur une contracture, toujours à travers un linge.",
-    clinicalContext: "Traumatologie bénigne : protocole GREC (glace, repos, élévation, compression) ; thermothérapie des contractures. HAS — prise en charge des entorses de cheville.",
-    safetyNotes: ["Jamais directement sur la peau, vingt minutes au plus ; pas de chaud sur une inflammation aiguë ni sur une peau insensible."],
-  },
-  {
     key: "antibiotic-intimate-care",
     title: "Confort intime pendant l'antibiothérapie",
     kind: "COMFORT",
@@ -1720,7 +1680,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
 ];
 
 /** Toutes les règles de conseil : le cœur, puis celles des documents de conseil reçus (Série 2 peau). */
-export const ADVICE_RULES: AdviceRule[] = [...CORE_ADVICE_RULES, ...SKIN_SERIES_1_ADVICE_RULES, ...SKIN_SERIES_2_ADVICE_RULES, ...SKIN_SERIES_3_ADVICE_RULES, ...SKIN_SERIES_4_ADVICE_RULES, ...SKIN_SERIES_5_ADVICE_RULES];
+export const ADVICE_RULES: AdviceRule[] = [...CORE_ADVICE_RULES, ...PAIN_ZONE_RULES, ...SKIN_SERIES_1_ADVICE_RULES, ...SKIN_SERIES_2_ADVICE_RULES, ...SKIN_SERIES_3_ADVICE_RULES, ...SKIN_SERIES_4_ADVICE_RULES, ...SKIN_SERIES_5_ADVICE_RULES];
 
 const norm = (value: string) => value.toLowerCase().trim();
 

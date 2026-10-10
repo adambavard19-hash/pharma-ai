@@ -296,12 +296,12 @@ describe("la poche chaud/froid : une douleur, pas un rhume (retour d'officine du
 
   it("Fervex, Dolirhume et Actifed (même code N02BE que le paracétamol) n'ouvrent pas la règle", () => {
     for (const [name, atc] of [["Fervex adulte sachet", "N02BE51"], ["Dolirhume paracétamol pseudoéphédrine", "N02BE51"], ["Actifed rhume jour et nuit", "N02BE51"]] as const) {
-      expect(keys(name, atc), name).not.toContain("pain-cold-hot-pack");
+      expect(keys(name, atc).filter((key) => key.startsWith("pain-pack-")), name).toEqual([]);
     }
   });
 
   it("le paracétamol et l'ibuprofène, eux, l'ouvrent toujours", () => {
-    expect(keys("Doliprane 1000 mg", "N02BE01")).toContain("pain-cold-hot-pack");
-    expect(keys("Ibuprofène 400 mg", "M01AE01")).toContain("pain-cold-hot-pack");
+    expect(keys("Doliprane 1000 mg", "N02BE01")).toContain("pain-pack-back");
+    expect(keys("Ibuprofène 400 mg", "M01AE01")).toContain("pain-pack-knee");
   });
 });

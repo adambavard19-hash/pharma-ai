@@ -62,7 +62,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     situation: "Anti-inflammatoire, antalgique fort et antispasmodique pour un mal de dos.",
     group: "ordonnance",
     items: [{ drug: "ibuprofene-400" }, { drug: "ixprim" }, { drug: "spasfon" }],
-    expects: ["gastric-protection-nsaid", "pain-cold-hot-pack", "opioid-transit"],
+    expects: ["gastric-protection-nsaid", "pain-pack-back", "opioid-transit"],
     show: ["Le confort gastrique sous anti-inflammatoire", "La poche chaud-froid", "Le transit sous antalgique opioïde", "La question posée AVANT de proposer"],
     tip: "Répondez « oui » à la gêne gastrique : la proposition apparaît.",
   },

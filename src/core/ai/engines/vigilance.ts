@@ -114,6 +114,9 @@ export const VIGILANCE_TAGS = [
   "exfoliant", "antipelliculaire",
 ] as const;
 
+/** Les traitements du rhume et de la grippe qui contiennent du paracétamol (sans accents, en minuscules). */
+const PARACETAMOL_COLD_REMEDIES = ["fervex", "dolirhume", "humex", "actifed", "rhinofebral", "nurofen rhume"];
+
 const CORE_VIGILANCES: VigilanceRule[] = [
   {
     key: "levothyroxine-mineral-spacing",
@@ -288,20 +291,48 @@ const CORE_VIGILANCES: VigilanceRule[] = [
   },
   {
     key: "usage-paracetamol",
-    version: "1.0",
+    version: "1.1",
     kind: "USAGE",
     severity: "INFO",
     title: "Bon usage",
     subtitle: "Paracétamol",
     atcPrefixes: ["N02BE01", "N02BE51", "N02AJ"],
     substances: ["paracetamol"],
-    explanationTemplate: "Avec {drug}, la dose prescrite se respecte : au moins 4 heures entre deux prises, et aucun autre médicament contenant du paracétamol en même temps (le foie ne fait pas la différence).",
+    // Un traitement du rhume ou de la grippe au paracétamol (Fervex…) a sa propre mise en garde, plus précise.
+    nameGate: { exclude: PARACETAMOL_COLD_REMEDIES },
+    explanationTemplate:
+      "Avec {drug}, chez l'adulte : 3 g de paracétamol par jour au maximum, tous produits confondus (le foie ne fait pas la différence), 1 g par prise au plus, une prise toutes les 6 heures environ (4 heures au minimum, selon la notice) — et aucun autre médicament contenant du paracétamol en même temps.",
     concerned: [],
-    patientAdvice: "Respectez les doses : 4 heures minimum entre deux prises, et vérifiez qu'aucun autre médicament que vous prenez ne contient déjà du paracétamol.",
+    patientAdvice: "Pas plus de 3 g de paracétamol par jour, répartis dans la journée : 1 g par prise au plus, toutes les 6 heures environ. Vérifiez qu'aucun autre médicament que vous prenez ne contient déjà du paracétamol.",
     blockTags: [],
     cautionTags: [],
     precautionText: null,
-    sources: ["RCP Doliprane (ANSM) — posologie, mises en garde"],
+    sources: ["RCP Doliprane 1000 mg (ANSM), CIS 60234100 — posologie : 1 g par administration, 4 heures minimum, 3 g par jour", "Consigne du pharmacien fondateur, 10 octobre 2026 : 3 g par jour au maximum chez l'adulte, 1 g toutes les 6 heures"],
+  },
+  {
+    key: "paracetamol-combination-limit",
+    version: "1.0",
+    kind: "USAGE",
+    severity: "WARNING",
+    title: "Paracétamol : 3 g par jour au maximum",
+    subtitle: "Déjà du paracétamol dans la formule",
+    atcPrefixes: ["N02BE51"],
+    substances: PARACETAMOL_COLD_REMEDIES,
+    explanationTemplate:
+      "{drug} contient déjà du paracétamol (Fervex adultes : 500 mg par sachet, 3 sachets au plus par jour). Si le patient ajoute un autre produit au paracétamol (Doliprane, Dafalgan, Efferalgan…), le total ne doit pas dépasser 3 g par jour chez l'adulte : 1 g par prise au plus, une prise toutes les 6 heures environ (4 heures au minimum, selon la notice).",
+    concerned: [
+      "Fervex adultes : 500 mg de paracétamol par sachet",
+      "Un paracétamol en complément est possible, dans la limite de 3 g par jour au total, tous produits confondus",
+    ],
+    patientAdvice: "Ce médicament contient déjà du paracétamol : au total, pas plus de 3 g de paracétamol par jour (un sachet de Fervex en apporte 500 mg), répartis dans la journée — 1 g par prise au plus, toutes les 6 heures environ. Si vous ajoutez un Doliprane, comptez les deux.",
+    blockTags: [],
+    cautionTags: [],
+    precautionText: null,
+    sources: [
+      "RCP Fervex adultes (ANSM), CIS 69329731 — 500 mg de paracétamol par sachet, 3 sachets par jour au plus, « ne pas prendre d'autres médicaments contenant du paracétamol »",
+      "RCP Doliprane 1000 mg (ANSM), CIS 60234100 — dose journalière maximale 3 g",
+      "Consigne du pharmacien fondateur, 10 octobre 2026",
+    ],
   },
   {
     key: "usage-antitussive-dry-cough",
@@ -432,7 +463,43 @@ export function evaluateVigilances(drugs: DrugKnowledge[]): VigilanceResult[] {
       sources: rule.sources,
     });
   }
+  const doubled = paracetamolDouble(drugs);
+  if (doubled) results.push(doubled);
   return results;
+}
+
+/** Ce médicament contient-il du paracétamol ? Par son code ATC (N02BE, N02AJ), par sa substance ou par le nom d'une marque connue. */
+export function containsParacetamol(drug: DrugKnowledge): boolean {
+  if (isVeterinaryKnowledge(drug)) return false;
+  const atc = drug.atcCode ?? "";
+  if (atc.startsWith("N02BE") || atc.startsWith("N02AJ")) return true;
+  return /paracetamol|doliprane|dafalgan|efferalgan|fervex|dolirhume|humex|actifed|rhinofebral|ixprim|klipal|lamaline|izalgi|codoliprane|claradol|dolko/.test(norm(`${drug.inn ?? ""} ${drug.name}`));
+}
+
+/**
+ * Deux produits au paracétamol dans la MÊME vente (un Fervex et un Doliprane) : les doses s'additionnent. Une seule règle, pas une
+ * par médicament — elle ne se déclenche que si deux médicaments DIFFÉRENTS en contiennent.
+ */
+function paracetamolDouble(drugs: DrugKnowledge[]): VigilanceResult | null {
+  const withParacetamol = drugs.filter(containsParacetamol);
+  const names = [...new Set(withParacetamol.map((drug) => drug.name))];
+  if (names.length < 2) return null;
+  return {
+    key: "paracetamol-double-dose",
+    version: "1.0",
+    kind: "AVOID",
+    severity: "WARNING",
+    title: "Deux produits au paracétamol",
+    subtitle: "Les doses s'additionnent",
+    drugNames: names,
+    explanation: `${names.join(" et ")} contiennent tous du paracétamol : les doses s'additionnent. Le total ne doit pas dépasser 3 g par jour chez l'adulte (1 g par prise au plus, une prise toutes les 6 heures environ, 4 heures au minimum selon la notice). Un sachet de Fervex adultes en apporte 500 mg.`,
+    concerned: ["Total de paracétamol sur la journée, tous produits confondus : 3 g au plus chez l'adulte"],
+    patientAdvice: "Ces deux médicaments contiennent du paracétamol : comptez-les ensemble, pas plus de 3 g par jour au total.",
+    blockTags: [],
+    cautionTags: [],
+    precautionText: null,
+    sources: ["RCP Fervex adultes (ANSM), CIS 69329731 ; RCP Doliprane 1000 mg (ANSM), CIS 60234100", "Consigne du pharmacien fondateur, 10 octobre 2026"],
+  };
 }
 
 /** Vrai si une étiquette du produit ou du conseil tombe sous une vigilance. */

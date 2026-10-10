@@ -39,6 +39,8 @@ import { adviceFamilyOf } from "@/core/ai/family";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
 import { brandKey, brandLabelOf } from "@/core/catalog/brand";
 import { selectCounterCards } from "@/core/partners/counter-card";
+import { answersFromRows, treeState } from "@/core/counter/tree-state";
+import { TREE_RULE_KEYS } from "@/core/counter/question-tree";
 import { counterBrandsFor } from "@/server/services/partners/visibility";
 import type { PartnerCardView, PatientFactor, SpecialtyProposal } from "./types";
 
@@ -107,6 +109,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         },
       },
       sales: { select: { id: true } },
+      questionAnswers: { select: { treeKey: true, nodeKey: true, choices: true } },
     },
   });
 
@@ -120,6 +123,13 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   });
 
   const run = prescription.analysisRuns[0] ?? null;
+  // L'arbre de questions du comptoir (« pourquoi le patient prend-il son paracétamol ? », « où a-t-il mal ? ») : un conseil du bout d'une
+  // branche (la poche du dos, le thermomètre) ne se montre qu'une fois la question répondue.
+  const treeOpportunities = run
+    ? await prisma.adviceOpportunity.findMany({ where: { analysisRunId: run.id, ruleKey: { in: [...TREE_RULE_KEYS] } }, select: { ruleKey: true, answer: true, triggeredLineIds: true } })
+    : [];
+  const tree = treeState({ opportunities: treeOpportunities, lineNames: new Map(prescription.lines.map((line) => [line.id, line.drugName ?? ""])), answers: answersFromRows(prescription.questionAnswers) });
+  const visibleRecommendations = prescription.recommendations.filter((recommendation) => tree.isVisible(recommendation.opportunity?.ruleKey));
   // Le poste de caisse analyse la vente de lui-même : l'écran peut s'ouvrir pendant ce temps.
   const analysisInFlight = isAnalysisInFlight({ status: prescription.status, hasRun: run !== null, updatedAt: prescription.updatedAt, now: new Date() });
 
@@ -241,7 +251,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
     session.permissions.has(PERMISSIONS.TRAINING_VIEW)
       ? trainingsForProducts(
           session.scope,
-          prescription.recommendations.map((r) => r.product?.id).filter((id): id is string => Boolean(id)),
+          visibleRecommendations.map((r) => r.product?.id).filter((id): id is string => Boolean(id)),
         )
       : Promise.resolve(new Map<string, { id: string; title: string }[]>()),
   ]);
@@ -250,7 +260,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   // de l'analyse. Une référence disparue, inactive, hors stock ou d'une autre
   // officine est écartée sans bruit — une alternative qu'on ne peut plus
   // remettre au patient n'a pas à s'afficher.
-  const storedAlternatives = new Map(prescription.recommendations.map((r) => [r.id, parseStoredAlternatives(r.alternatives)]));
+  const storedAlternatives = new Map(visibleRecommendations.map((r) => [r.id, parseStoredAlternatives(r.alternatives)]));
   const alternativeProductIds = [...new Set([...storedAlternatives.values()].flatMap((list) => list.map((alternative) => alternative.productId)))];
   const alternativeProducts = new Map(
     (alternativeProductIds.length === 0
@@ -264,7 +274,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
 
   // Gammes partenaires : calculées APRÈS le moteur, à partir des conseils qu'il
   // a déjà rendus, et affichées à part. Rien ici ne retourne au moteur.
-  const orderedRecommendations = [...prescription.recommendations].sort(
+  const orderedRecommendations = [...visibleRecommendations].sort(
     (a, b) => (b.opportunity?.priority ?? 0) - (a.opportunity?.priority ?? 0) || b.totalScore - a.totalScore,
   );
   const partnerCards: PartnerCardView[] = session.permissions.has(PERMISSIONS.PARTNERS_VIEW)
@@ -292,6 +302,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
 
   return (
     <SaleWorkspace
+      counterQuestions={tree.active ? { questions: tree.view.questions, guidance: tree.view.guidance } : undefined}
       prescription={{
         id: prescription.id,
         reference: prescription.reference,
@@ -380,7 +391,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           blockReason: opportunity.blockReason,
         })) ?? []
       }
-      recommendations={[...prescription.recommendations]
+      recommendations={[...visibleRecommendations]
         // La priorité clinique de l'opportunité commande l'ordre des cartes ;
         // le score ne départage qu'à priorité égale. Un conseil de sécurité
         // ou de tolérance passe avant un conseil de confort, quel que soit le

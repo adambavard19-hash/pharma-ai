@@ -7,7 +7,7 @@ import type { StatusLabel } from "./statuses";
  * Doit rester égale à la constante `VERSION` de `agent/src/index.ts` : un test
  * relit le fichier de l'agent et échoue si les deux divergent.
  */
-export const LATEST_AGENT_VERSION = "0.9.1";
+export const LATEST_AGENT_VERSION = "0.9.2";
 
 type ParsedVersion = { core: number[]; prerelease: string | null };
 

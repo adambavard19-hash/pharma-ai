@@ -184,3 +184,47 @@ describe("la fenêtre qui reste ouverte pendant toute la vente", () => {
   });
 });
 
+
+describe("les questions de l'arbre du comptoir dans l'avis du poste", () => {
+  const question = (selected: string[]) => ({
+    id: "douleur-fievre:why",
+    node: "why",
+    text: "Pourquoi le patient prend-il DOLIPRANE 1000 mg ?",
+    mode: "MULTI" as const,
+    choices: ["FEVER", "PAIN"].map((key) => ({ key, label: key === "FEVER" ? "Fièvre" : "Douleur localisée", selected: selected.includes(key) })),
+    answered: selected.length > 0,
+  });
+  const ready = { ...base, recommendations: [], outcome: "PROPOSALS" };
+
+  it("une question à poser n'est PAS « rien à ajouter » : l'avis est prêt, avec la question", () => {
+    const notice = buildCounterNotice({ ...ready, questions: [question([])] });
+    expect(notice.state).toBe("READY");
+    expect(notice.questions).toHaveLength(1);
+    expect(notice.advice).toEqual([]);
+    expect(notice.advice.join(" ")).not.toMatch(/Rien à ajouter/);
+  });
+
+  it("sans question, rien ne change : l'avis dit pourquoi il n'y a rien", () => {
+    const notice = buildCounterNotice(ready);
+    expect(notice.questions).toEqual([]);
+    expect(notice.advice[0]).toMatch(/Rien à ajouter|Conseil possible|Conseils écartés/);
+  });
+
+  it("l'empreinte change quand une réponse est donnée : la fenêtre se redessine", () => {
+    const before = buildCounterNotice({ ...ready, questions: [question([])] });
+    const after = buildCounterNotice({ ...ready, questions: [question(["PAIN"])] });
+    expect(after.signature).not.toBe(before.signature);
+    // …et reste la même quand rien ne bouge.
+    expect(buildCounterNotice({ ...ready, questions: [question(["PAIN"])] }).signature).toBe(after.signature);
+  });
+
+  it("les phrases d'orientation (fièvre depuis plus de 3 jours) accompagnent les questions", () => {
+    const notice = buildCounterNotice({ ...ready, questions: [question(["FEVER"])], guidance: ["Fièvre depuis 3 jours ou plus : orienter vers le médecin."] });
+    expect(notice.guidance).toEqual(["Fièvre depuis 3 jours ou plus : orienter vers le médecin."]);
+  });
+
+  it("une vente close ou en attente n'a aucune question", () => {
+    expect(buildCounterNotice({ ...ready, prescriptionStatus: "CANCELLED", questions: [question([])] }).questions).toEqual([]);
+    expect(buildCounterNotice({ ...ready, prescriptionStatus: "NEEDS_VERIFICATION", questions: [question([])] }).questions).toEqual([]);
+  });
+});

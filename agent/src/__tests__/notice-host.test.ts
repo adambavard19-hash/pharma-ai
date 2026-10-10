@@ -279,6 +279,36 @@ describe("ce que la bannière montre et fait", () => {
   });
 });
 
+describe("l'arbre de questions dans la bannière", () => {
+  it("dessine les questions et un bouton par choix, et envoie REPONSE « question:choix » à l'agent", () => {
+    expect(NOTICE_HOST_CSHARP).toContain("class Question");
+    expect(NOTICE_HOST_CSHARP).toContain('Seq(d, "questions")');
+    expect(NOTICE_HOST_CSHARP).toContain('Say("REPONSE " + entry.Id + " " + tag)');
+    expect(NOTICE_HOST_CSHARP).toContain('h.Kind == "answer"');
+  });
+
+  it("un choix se coche tout de suite à l'écran (choix multiple : il bascule ; choix unique : il remplace), avant la réponse du serveur", () => {
+    const body = methodBody("Answer");
+    expect(body).toContain("c.Selected = !c.Selected");
+    expect(body).toContain("if (!q.Multi) c.Selected = false");
+  });
+
+  it("la hauteur de la liste compte les questions : la bannière s'agrandit pour les montrer", () => {
+    expect(methodBody("ListHeight")).toContain("QuestionsHeight(measure, inner)");
+    expect(methodBody("PaintList")).toContain("PaintQuestions(");
+  });
+
+  it("une vente sans conseil mais avec une question affiche « Une question à poser », pas « Rien à ajouter »", () => {
+    expect(methodBody("ReadyTitle")).toContain("Txt.QuestionTitle");
+    expect(BANNER.text.questionTitle).toBe("Une question à poser");
+  });
+
+  it("la pastille de stock porte le stock exact : « Stock faible · 3 »", () => {
+    expect(methodBody("Availability")).toContain('Txt.LowStock + (quantity.Length > 0 ? " · " + quantity : "")');
+    expect(methodBody("Availability")).toContain('Txt.InStock + (quantity.Length > 0 ? " · " + quantity : "")');
+  });
+});
+
 describe("le script PowerShell qui la lance", () => {
   it("compile le C# tel quel, avec les trois assemblages utiles, puis lance la bannière", () => {
     expect(NOTICE_HOST_SCRIPT.startsWith('$ErrorActionPreference = "Stop"\n$code = @\'\n')).toBe(true);

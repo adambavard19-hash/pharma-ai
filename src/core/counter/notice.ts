@@ -8,6 +8,8 @@
  * un clic sur l'avis l'ouvre.
  */
 
+import type { ViewQuestion } from "./question-tree";
+
 export type NoticeAlert = { severity: string; subjectType: string; code: string; message: string; acknowledged: boolean };
 
 /**
@@ -102,6 +104,13 @@ export type CounterNoticeInput = {
   stockReliable?: boolean;
   /** Ce que chaque ligne bipée est : un médicament du catalogue national, ou un produit de l'officine. */
   lineKinds?: ("DRUG" | "PRODUCT")[];
+  /**
+   * Les questions ouvertes de l'arbre du comptoir (« pourquoi le patient prend-il son paracétamol ? », « où a-t-il mal ? »)
+   * et les phrases d'orientation des réponses cochées. Les conseils qu'elles débloquent arrivent dans `recommendations` ;
+   * ceux qui attendent une réponse n'y sont pas.
+   */
+  questions?: ViewQuestion[];
+  guidance?: string[];
 };
 
 export type CounterNotice = {
@@ -115,6 +124,10 @@ export type CounterNotice = {
   advice: string[];
   /** Les mêmes conseils, structurés (photo, disponibilité, prix) : c'est ce que la fenêtre du poste dessine. */
   items: NoticeItem[];
+  /** Les questions ouvertes de l'arbre du comptoir, avec le choix coché. Vide : rien à demander. */
+  questions: ViewQuestion[];
+  /** Les phrases d'orientation des réponses cochées (« fièvre depuis 3 jours : voir le médecin »). */
+  guidance: string[];
   /** Les médicaments ou produits bipés, un par élément, sans la forme galénique. */
   drugs: string[];
   /** « Médicament détecté », « Produit détecté » ou « Détecté » : le titre au-dessus de ce qui a été bipé. */
@@ -158,7 +171,9 @@ export function detectedLabelOf(kinds: ("DRUG" | "PRODUCT")[] | undefined): stri
 export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
   const drugs = input.lineNames.map(shortName).filter(Boolean);
   const subject = drugs.join(" · ");
-  const base = { title: `PharmaBoost · ${input.reference}`, subject, drugs, detectedLabel: detectedLabelOf(input.lineKinds) };
+  const questions = input.questions ?? [];
+  const guidance = input.guidance ?? [];
+  const base = { title: `PharmaBoost · ${input.reference}`, subject, drugs, detectedLabel: detectedLabelOf(input.lineKinds), questions: [] as ViewQuestion[], guidance: [] as string[] };
   const reliable = input.stockReliable !== false;
   if (["CANCELLED", "DELIVERED", "FAILED"].includes(input.prescriptionStatus)) {
     return { ...base, state: "CLOSED", alerts: [], advice: [], items: [], signature: `closed:${input.reference}` };
@@ -197,7 +212,9 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
     imageUrl: rec.imageUrl ?? null,
   }));
   const advice = items.map((item) => [item.name, euros(item.priceCents), item.reason].filter(Boolean).join(" · "));
-  if (advice.length === 0 && alerts.length === 0) {
+  // Ce qui a été répondu fait partie de l'état : sans lui dans l'empreinte, la fenêtre ne se redessinerait pas après un choix.
+  const answered = questions.map((question) => `${question.node}=${question.choices.filter((choice) => choice.selected).map((choice) => choice.key).join("+")}`).join(",");
+  if (advice.length === 0 && alerts.length === 0 && questions.length === 0) {
     const why =
       input.outcome === "OUT_OF_STOCK" ? "Conseil possible mais produit absent du stock."
       : input.outcome === "SAFETY_FILTERED" ? "Conseils écartés par la sécurité."
@@ -205,5 +222,5 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
     return { ...base, state: "READY", alerts: [], advice: [why], items: [], signature: `ready:${input.reference}:${input.lineNames.length}:none` };
   }
   const marks = items.map((item) => `${item.outcome[0]}${item.challenge ? "c" : ""}${item.shortDateOn ? "d" : ""}`).join("");
-  return { ...base, state: "READY", alerts, advice, items, signature: `ready:${input.reference}:${input.lineNames.length}:${alerts.length}:${advice.join("|")}:${marks}` };
+  return { ...base, questions, guidance, state: "READY", alerts, advice, items, signature: `ready:${input.reference}:${input.lineNames.length}:${alerts.length}:${advice.join("|")}:${marks}:${answered}` };
 }

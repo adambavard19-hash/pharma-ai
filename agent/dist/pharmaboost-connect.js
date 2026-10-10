@@ -434,6 +434,8 @@ var BANNER = {
     forSaleMany: "{n} conseils pour cette d\xE9livrance",
     duringSale: "Pendant la vente",
     readFirst: "\xC0 lire avant de conseiller",
+    questionTitle: "Une question \xE0 poser",
+    questionSub: "Pour choisir le bon conseil",
     quiet: "Rien \xE0 ajouter",
     quietSub: "Aucun conseil pour cette vente",
     sold: "Vendu",
@@ -566,6 +568,23 @@ namespace PharmaBoostAvis
     public string Image = "";
   }
 
+  /// <summary>Un choix de réponse à une question du comptoir (« Dos », « Fièvre »…).</summary>
+  public class Choice
+  {
+    public string Key = "";
+    public string Label = "";
+    public bool Selected;
+  }
+
+  /// <summary>Une question de l'arbre du comptoir : « Pourquoi le patient prend-il DOLIPRANE ? », avec un bouton par choix.</summary>
+  public class Question
+  {
+    public string Node = "";
+    public string Text = "";
+    public bool Multi;
+    public List<Choice> Choices = new List<Choice>();
+  }
+
   /// <summary>Ce que la bannière affiche pour UNE vente, du premier bip à « Vente terminée ».</summary>
   public class Entry
   {
@@ -580,6 +599,8 @@ namespace PharmaBoostAvis
     public string EmailError = "";
     public List<string> Alerts = new List<string>();
     public List<string> Notes = new List<string>();
+    public List<Question> Questions = new List<Question>();
+    public List<string> Guidance = new List<string>();
     public List<Item> Items = new List<Item>();
     public List<string> Shown = new List<string>();
     public DateTime Since = DateTime.Now;
@@ -602,6 +623,8 @@ namespace PharmaBoostAvis
     public string Kind = "";
     public Item Item;
     public string Tip = "";
+    /// <summary>Pour un bouton de réponse : « question:choix ».</summary>
+    public string Tag = "";
   }
 
   /// <summary>Les couleurs du design (banner-design.ts).</summary>
@@ -1493,7 +1516,7 @@ ${PHRASES}
     private static bool Same(Hit a, Hit b)
     {
       if (a == null || b == null) return a == b;
-      return a.Kind == b.Kind && a.Item == b.Item;
+      return a.Kind == b.Kind && a.Item == b.Item && a.Tag == b.Tag;
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
@@ -1584,6 +1607,7 @@ ${PHRASES}
       else if (h.Kind == "vendu") Choose(h.Item, "SOLD");
       else if (h.Kind == "nonvendu") Choose(h.Item, "NOT_SOLD");
       else if (h.Kind == "modifier") Choose(h.Item, "NONE");
+      else if (h.Kind == "answer") Answer(h.Tag);
       else if (h.Kind == "detail") { if (entry != null) Say("VOIR " + entry.Id); }
       else if (h.Kind == "email") { if (EmailRequested != null) EmailRequested(); }
       else if (h.Kind == "emailRemove")
@@ -1596,6 +1620,27 @@ ${PHRASES}
         finishing = true;
         Say("TERMINER " + entry.Id);
       }
+    }
+
+    /// <summary>Un choix de réponse : il se coche (ou se décoche) tout de suite à l'écran, puis part à PharmaBoost, qui renvoie les questions suivantes.</summary>
+    private void Answer(string tag)
+    {
+      if (entry == null || tag == null) return;
+      int cut = tag.IndexOf(':');
+      if (cut <= 0) return;
+      string node = tag.Substring(0, cut);
+      string key = tag.Substring(cut + 1);
+      foreach (Question q in entry.Questions)
+      {
+        if (q.Node != node) continue;
+        foreach (Choice c in q.Choices)
+        {
+          if (c.Key == key) c.Selected = !c.Selected;
+          else if (!q.Multi) c.Selected = false;
+        }
+      }
+      Say("REPONSE " + entry.Id + " " + tag);
+      if (Changed != null) Changed();
     }
 
     private void Choose(Item item, string outcome)
@@ -1763,6 +1808,26 @@ ${PHRASES}
       hits.Add(hit);
     }
 
+    private void AddTagHit(RectangleF area, string kind, string tag, RectangleF? view)
+    {
+      RectangleF r = area;
+      if (view.HasValue)
+      {
+        r = RectangleF.Intersect(area, view.Value);
+        if (r.Width < 2f || r.Height < 2f) return;
+      }
+      Hit hit = new Hit();
+      hit.R = r;
+      hit.Kind = kind;
+      hit.Tag = tag;
+      hits.Add(hit);
+    }
+
+    private bool IsTagHover(string kind, string tag)
+    {
+      return hover != null && hover.Kind == kind && hover.Tag == tag;
+    }
+
     /// <summary>Un bouton plein ou à contour, avec son texte centré ; renvoie sa zone cliquable.</summary>
     private void Btn(Graphics g, string kind, Item item, float x, float y, float w, float h, string text, Color back, Color fore, Color edge, float radius, float font, RectangleF? view)
     {
@@ -1882,6 +1947,7 @@ ${PHRASES}
 
     private string ReadyTitle()
     {
+      if (entry.Items.Count == 0 && entry.Questions.Count > 0) return Txt.QuestionTitle;
       if (entry.Items.Count == 0) return entry.Alerts.Count > 0 ? Txt.ReadFirst : Txt.Quiet;
       return Plural(entry.Items.Count, Txt.ReadyOne, Txt.ReadyMany);
     }
@@ -2055,11 +2121,12 @@ ${PHRASES}
       float inner = width - 20f - 28f;
       float total = 24f;
       foreach (string alert in entry.Alerts) total += AlertHeight(measure, alert, inner) + 8f;
-      if (entry.Items.Count == 0)
+      if (entry.Items.Count == 0 && entry.Questions.Count == 0)
       {
         foreach (string note in entry.Notes) total += Gfx.MeasureHeight(measure, note, Gfx.Fnt(13f, FontStyle.Regular), inner) + 4f;
         total += 6f;
       }
+      total += QuestionsHeight(measure, inner);
       foreach (Item item in entry.Items) total += RowHeight(item, inner);
       return total + 6f;
     }
@@ -2075,6 +2142,7 @@ ${PHRASES}
     private string Subtitle()
     {
       if (analyzing) return Txt.ScanSub;
+      if (entry.Items.Count == 0 && entry.Questions.Count > 0) return Txt.QuestionSub;
       if (entry.Items.Count == 0) return entry.Alerts.Count > 0 ? Txt.ReadFirst : Txt.QuietSub;
       int answered = 0;
       foreach (Item item in entry.Items) { if (item.Outcome != "NONE") answered++; }
@@ -2125,6 +2193,96 @@ ${PHRASES}
       PaintFooter(g, panelX + 14f, footerTop + 8f, panelW - 28f);
     }
 
+    // ------------------------------------------------------------------------------------------------------------
+    // L'arbre de questions : « Pourquoi le patient prend-il … ? » → un bouton par choix ; les choix cochés ouvrent d'autres questions.
+    // ------------------------------------------------------------------------------------------------------------
+
+    private const float ChipH = 30f;
+    private const float ChipGap = 8f;
+
+    private float ChipWidth(Graphics g, string label)
+    {
+      return Math.Max(56f, Gfx.Measure(g, label, Gfx.Fnt(13f, FontStyle.Bold)) + 30f);
+    }
+
+    /// <summary>Les boutons d'une question, rangés ligne par ligne selon la largeur.</summary>
+    private int ChipLines(Graphics g, Question q, float width)
+    {
+      int lines = 1;
+      float x = 0f;
+      foreach (Choice c in q.Choices)
+      {
+        float cw = ChipWidth(g, c.Label);
+        if (x > 0f && x + cw > width) { lines++; x = 0f; }
+        x += cw + ChipGap;
+      }
+      return lines;
+    }
+
+    private float QuestionHeight(Graphics g, Question q, float width)
+    {
+      float textH = Gfx.MeasureHeight(g, q.Text, Gfx.Fnt(14f, FontStyle.Bold), width - 24f);
+      return 14f + textH + 10f + ChipLines(g, q, width - 24f) * (ChipH + ChipGap) + 4f;
+    }
+
+    private float QuestionsHeight(Graphics g, float width)
+    {
+      float total = 0f;
+      foreach (Question q in entry.Questions) total += QuestionHeight(g, q, width) + 8f;
+      foreach (string note in entry.Guidance) total += AlertHeight(g, note, width) + 8f;
+      return total;
+    }
+
+    private float PaintQuestions(Graphics g, float x, float y, float w, RectangleF view)
+    {
+      float cursor = y;
+      foreach (Question q in entry.Questions)
+      {
+        float qh = QuestionHeight(g, q, w);
+        if (cursor + qh > view.Top && cursor < view.Bottom)
+        {
+          Gfx.Fill(g, Gfx.Fx(Pal.StockBg), x, cursor, w, qh, 14f);
+          float textH = Gfx.MeasureHeight(g, q.Text, Gfx.Fnt(14f, FontStyle.Bold), w - 24f);
+          Gfx.Text(g, q.Text, Gfx.Fnt(14f, FontStyle.Bold), Pal.Ink, x + 12f, cursor + 12f, w - 24f, textH + 2f, Gfx.Wrap);
+          float cy = cursor + 14f + textH + 10f;
+          float cx = x + 12f;
+          foreach (Choice c in q.Choices)
+          {
+            float cw = ChipWidth(g, c.Label);
+            if (cx > x + 12f && cx + cw > x + w - 12f) { cx = x + 12f; cy += ChipH + ChipGap; }
+            string tag = q.Node + ":" + c.Key;
+            bool over = IsTagHover("answer", tag);
+            if (c.Selected)
+            {
+              Gfx.Gradient(g, Gfx.Fx(over ? Lighten(Pal.Accent, 0.1f) : Pal.Accent), Gfx.Fx(Pal.AccentDark), cx, cy, cw, ChipH, 15f);
+              Gfx.Text(g, c.Label, Gfx.Fnt(13f, FontStyle.Bold), Pal.SoldFg, cx, cy + 7f, cw, 18f, Gfx.Center);
+            }
+            else
+            {
+              Gfx.Fill(g, Gfx.Fx(over ? Lighten(Pal.StockBg, 0.5f) : Color.FromArgb(255, 255, 255, 255)), cx, cy, cw, ChipH, 15f);
+              Gfx.Stroke(g, Gfx.Fx(Pal.Accent), 1.3f, cx + 0.6f, cy + 0.6f, cw - 1.2f, ChipH - 1.2f, 15f);
+              Gfx.Text(g, c.Label, Gfx.Fnt(13f, FontStyle.Bold), Pal.AccentDark, cx, cy + 7f, cw, 18f, Gfx.Center);
+            }
+            AddTagHit(new RectangleF(cx, cy, cw, ChipH), "answer", tag, view);
+            cx += cw + ChipGap;
+          }
+        }
+        cursor += qh + 8f;
+      }
+      foreach (string note in entry.Guidance)
+      {
+        float ah = AlertHeight(g, note, w);
+        if (cursor + ah > view.Top && cursor < view.Bottom)
+        {
+          Gfx.Fill(g, Gfx.Fx(Pal.AlertBg), x, cursor, w, ah, 12f);
+          Gfx.Warning(g, Gfx.Fx(Pal.AlertFg), x + 17f, cursor + 14f, 13f);
+          Gfx.Text(g, note, Gfx.Fnt(12.5f, FontStyle.Bold), Pal.AlertFg, x + 34f, cursor + 8f, w - 44f, ah - 10f, Gfx.Wrap);
+        }
+        cursor += ah + 8f;
+      }
+      return cursor - y;
+    }
+
     private void PaintList(Graphics g, float x, float y, float w, RectangleF view)
     {
       float cursor = y;
@@ -2145,7 +2303,9 @@ ${PHRASES}
         cursor += ah + 8f;
       }
 
-      if (entry.Items.Count == 0)
+      cursor += PaintQuestions(g, x, cursor, w, view);
+
+      if (entry.Items.Count == 0 && entry.Questions.Count == 0)
       {
         foreach (string note in entry.Notes)
         {
@@ -2831,6 +2991,27 @@ ${PHRASES}
       e.EmailError = Str(d, "emailError");
       foreach (object a in Seq(d, "alerts")) e.Alerts.Add(Convert.ToString(a));
       foreach (object n in Seq(d, "notes")) e.Notes.Add(Convert.ToString(n));
+      foreach (object g in Seq(d, "guidance")) e.Guidance.Add(Convert.ToString(g));
+      foreach (object q in Seq(d, "questions"))
+      {
+        Dictionary<string, object> rq = q as Dictionary<string, object>;
+        if (rq == null) continue;
+        Question question = new Question();
+        question.Node = Str(rq, "node");
+        question.Text = Str(rq, "text");
+        question.Multi = Flag(rq, "multi");
+        foreach (object c in Seq(rq, "choices"))
+        {
+          Dictionary<string, object> rc = c as Dictionary<string, object>;
+          if (rc == null) continue;
+          Choice choice = new Choice();
+          choice.Key = Str(rc, "key");
+          choice.Label = Str(rc, "label");
+          choice.Selected = Flag(rc, "selected");
+          question.Choices.Add(choice);
+        }
+        if (question.Node.Length > 0 && question.Choices.Count > 0) e.Questions.Add(question);
+      }
       foreach (object o in Seq(d, "items"))
       {
         Dictionary<string, object> raw = o as Dictionary<string, object>;
@@ -4495,6 +4676,12 @@ function buildHostEntry(input) {
   }));
   const legacyOnly = body.items === void 0 && body.advice.length > 0;
   const alerts = [...body.alerts.map(oneLine), ...input.problem ? [oneLine(input.problem)] : []];
+  const questions = (body.questions ?? []).map((question) => ({
+    node: question.node,
+    text: oneLine(question.text),
+    multi: question.mode === "MULTI",
+    choices: question.choices.map((choice) => ({ key: choice.key, label: oneLine(choice.label), selected: choice.selected === true }))
+  }));
   const notes = items.length === 0 && !legacyOnly ? body.advice.map(oneLine) : [];
   const finalItems = legacyOnly ? body.advice.map((text) => ({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: oneLine(text), price: "", reason: "", availability: "UNKNOWN", quantity: "", image: "" })) : items;
   return {
@@ -4504,11 +4691,14 @@ function buildHostEntry(input) {
     subject: oneLine(body.subject),
     url: `${input.serverUrl.replace(/\/$/, "")}/vente/${input.prescriptionId}`,
     signature: body.signature,
-    quiet: finalItems.length === 0 && alerts.length === 0,
+    // Une question à poser n'est pas « rien à conseiller » : la fenêtre doit s'ouvrir.
+    quiet: finalItems.length === 0 && alerts.length === 0 && questions.length === 0,
     emailSaved: body.followUp?.emailSaved === true,
     emailError: oneLine(input.emailError ?? ""),
     alerts,
     notes,
+    questions,
+    guidance: (body.guidance ?? []).map(oneLine).filter(Boolean),
     items: finalItems
   };
 }
@@ -4796,7 +4986,10 @@ var NoticeCenter = class {
       if (email && email.length <= 200 && !/[\r\n\s]/.test(email)) act({ kind: "email", saleId, email });
     } else if (word === "EMAIL_RETIRER") act({ kind: "email_remove", saleId });
     else if (word === "TERMINER") act({ kind: "finish", saleId });
-    else if (word === "VOIR") act({ kind: "view", saleId });
+    else if (word === "REPONSE" && argument) {
+      const [node, choice] = argument.split(":");
+      if (node && choice && /^[\w-]+$/.test(node) && /^[\w-]+$/.test(choice)) act({ kind: "answer", saleId, node, choice });
+    } else if (word === "VOIR") act({ kind: "view", saleId });
     else if (word === "FERMEE") this.held.delete(saleId);
     else if (word === "ERREUR") this.options.log(`Avis : ${line}`);
   }
@@ -5235,7 +5428,7 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
 var import_node_fs8 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path7 = require("node:path");
-var VERSION = "0.9.1";
+var VERSION = "0.9.2";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path7.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path7.join)((0, import_node_path7.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -5475,6 +5668,10 @@ async function handleAction(action) {
       const result = await postJson(config, "/api/agent/conseil/decision", { prescription: action.saleId, recommendation: action.adviceId, outcome });
       log(`Conseil ${action.adviceId} \u2192 ${outcome} : ${result.body?.ok ? "enregistr\xE9" : result.body?.error ?? `HTTP ${result.status}`}.`);
       await refreshNow(config, result.body?.ok ? {} : { problem: result.body?.error ?? "La r\xE9ponse n'a pas pu \xEAtre enregistr\xE9e." });
+    } else if (action.kind === "answer") {
+      const result = await postJson(config, "/api/agent/conseil/question", { prescription: action.saleId, node: action.node, choice: action.choice });
+      log(`Question ${action.node} \u2192 ${action.choice} : ${result.body?.ok ? "enregistr\xE9" : result.body?.error ?? `HTTP ${result.status}`}.`);
+      await refreshNow(config, result.body?.ok ? {} : { problem: result.body?.error ?? "La r\xE9ponse n'a pas pu \xEAtre enregistr\xE9e." });
     } else if (action.kind === "email" || action.kind === "email_remove") {
       const email = action.kind === "email" ? action.email : null;
       const result = await postJson(config, "/api/agent/conseil/email", { prescription: action.saleId, email, consent: email !== null });
@@ -5649,6 +5846,8 @@ function testAffichage() {
     emailError: "",
     alerts: [],
     notes: [],
+    questions: [{ node: "why", text: "Pourquoi le patient prend-il DOLIPRANE 1000 mg ?", multi: true, choices: [{ key: "FEVER", label: "Fi\xE8vre", selected: false }, { key: "HEADACHE", label: "Mal de t\xEAte", selected: false }, { key: "PAIN", label: "Douleur localis\xE9e", selected: true }, { key: "OTHER", label: "Autre raison", selected: false }] }],
+    guidance: [],
     items: [
       { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 g\xE9lules", price: "14,90 \u20AC", reason: "Prot\xE9ger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
       { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "S\xC9RUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 \u20AC", reason: "", availability: "LOW_STOCK", quantity: "3", image: "" }

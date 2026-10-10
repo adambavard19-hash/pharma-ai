@@ -73,6 +73,9 @@ const PRINCIPAUX_AVANT: Record<string, string[]> = {
   ],
   "ibuprofene-protection-gastrique": [
     "gastric-protection-nsaid | gastric-a | 0.8895 | - | -",
+    // Le thermomètre de l'arbre de questions (fièvre sans thermomètre) : apparié au stock dès le bip, MONTRÉ seulement quand le
+    // pharmacien a répondu « fièvre » (core/counter/question-tree.ts).
+    "fever-thermometer-analgesic | thermo-b | 0.8895 | DISPONIBILITE | -",
   ],
   "allergie-collyres": [
     "nasal-hygiene-orl | nasal-hyper | 0.8905 | - | -",

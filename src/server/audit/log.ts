@@ -80,6 +80,7 @@ export type AuditAction =
   | "recommendation.declined"
   | "recommendation.reopened"
   | "opportunity.answered"
+  | "counter_question.answered"
   | "team.member_created"
   | "team.invitation_sent"
   | "team.invitation_resent"

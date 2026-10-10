@@ -41,11 +41,17 @@ export type NoticeBody = {
     imageUrl: string | null;
   }[];
   followUp?: { emailSaved: boolean; closed: boolean };
+  /** L'arbre de questions du comptoir : les questions ouvertes (avec le choix coché) et les phrases d'orientation. Absent chez un serveur plus ancien. */
+  questions?: { id: string; node: string; text: string; mode: string; choices: { key: string; label: string; selected: boolean }[]; answered: boolean }[];
+  guidance?: string[];
 };
 
 export type HostOutcome = "NONE" | "SOLD" | "NOT_SOLD";
 
 export type HostItem = { id: string; drug: string; challenge: string; shortDate: string; outcome: HostOutcome; name: string; price: string; reason: string; availability: string; /** Le stock exact (« 3 »), ou vide quand il n'est pas connu. */ quantity: string; image: string };
+
+/** Une question de l'arbre du comptoir, telle que la fenêtre la dessine : le texte, et un bouton par choix (le choix coché est plein). */
+export type HostQuestion = { node: string; text: string; multi: boolean; choices: { key: string; label: string; selected: boolean }[] };
 
 /** Ce que la fenêtre reçoit pour une vente. */
 export type HostEntry = {
@@ -63,6 +69,10 @@ export type HostEntry = {
   emailError: string;
   alerts: string[];
   notes: string[];
+  /** Les questions ouvertes, à poser au patient (pourquoi prend-il ce médicament ? où a-t-il mal ?). */
+  questions: HostQuestion[];
+  /** Les phrases d'orientation des réponses cochées. */
+  guidance: string[];
   items: HostItem[];
 };
 
@@ -75,6 +85,7 @@ export type HostAction =
   | { kind: "email"; saleId: string; email: string }
   | { kind: "email_remove"; saleId: string }
   | { kind: "finish"; saleId: string }
+  | { kind: "answer"; saleId: string; node: string; choice: string }
   | { kind: "view"; saleId: string };
 
 const MAX_RESTARTS = 5;
@@ -126,6 +137,12 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
   // Un serveur plus ancien n'envoie que des lignes de texte : on les montre telles quelles, sans photo ni badge de stock.
   const legacyOnly = body.items === undefined && body.advice.length > 0;
   const alerts = [...body.alerts.map(oneLine), ...(input.problem ? [oneLine(input.problem)] : [])];
+  const questions: HostQuestion[] = (body.questions ?? []).map((question) => ({
+    node: question.node,
+    text: oneLine(question.text),
+    multi: question.mode === "MULTI",
+    choices: question.choices.map((choice) => ({ key: choice.key, label: oneLine(choice.label), selected: choice.selected === true })),
+  }));
   const notes = items.length === 0 && !legacyOnly ? body.advice.map(oneLine) : [];
   const finalItems: HostItem[] = legacyOnly ? body.advice.map((text) => ({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE" as const, name: oneLine(text), price: "", reason: "", availability: "UNKNOWN", quantity: "", image: "" })) : items;
   return {
@@ -135,11 +152,14 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     subject: oneLine(body.subject),
     url: `${input.serverUrl.replace(/\/$/, "")}/vente/${input.prescriptionId}`,
     signature: body.signature,
-    quiet: finalItems.length === 0 && alerts.length === 0,
+    // Une question à poser n'est pas « rien à conseiller » : la fenêtre doit s'ouvrir.
+    quiet: finalItems.length === 0 && alerts.length === 0 && questions.length === 0,
     emailSaved: body.followUp?.emailSaved === true,
     emailError: oneLine(input.emailError ?? ""),
     alerts,
     notes,
+    questions,
+    guidance: (body.guidance ?? []).map(oneLine).filter(Boolean),
     items: finalItems,
   };
 }
@@ -495,7 +515,11 @@ export class NoticeCenter {
       if (email && email.length <= 200 && !/[\r\n\s]/.test(email)) act({ kind: "email", saleId, email });
     } else if (word === "EMAIL_RETIRER") act({ kind: "email_remove", saleId });
     else if (word === "TERMINER") act({ kind: "finish", saleId });
-    else if (word === "VOIR") act({ kind: "view", saleId });
+    else if (word === "REPONSE" && argument) {
+      // « question:choix » : deux mots d'identifiant, sans espace (la ligne de la fenêtre se coupe aux espaces).
+      const [node, choice] = argument.split(":");
+      if (node && choice && /^[\w-]+$/.test(node) && /^[\w-]+$/.test(choice)) act({ kind: "answer", saleId, node, choice });
+    } else if (word === "VOIR") act({ kind: "view", saleId });
     else if (word === "FERMEE") this.held.delete(saleId);
     else if (word === "ERREUR") this.options.log(`Avis : ${line}`);
   }

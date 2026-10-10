@@ -87,13 +87,20 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
 
 /* Les conseils */
 .panel { position: absolute; left: 10px; right: 10px; top: 84px; bottom: 10px; background: var(--panel); border-radius: 18px; color: var(--ink); display: flex; flex-direction: column; animation: fadein .22s ease-out both; }
-.list { flex: 1; min-height: 0; overflow: hidden; padding: 8px 14px 0; }
+.list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; padding: 8px 14px 0; }
 .label { display: flex; align-items: baseline; gap: 10px; height: 24px; padding-top: 1px; }
 .label small { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--inkSoft); text-transform: uppercase; }
 .label b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .warn { display: flex; gap: 10px; align-items: flex-start; background: var(--alertBg); color: var(--alertFg); border-radius: 12px; padding: 8px 12px 8px 12px; margin-bottom: 8px; font-weight: 700; font-size: 12.5px; }
 .item { display: grid; grid-template-columns: 46px 1fr 88px; gap: 12px; padding: 12px 0 10px; border-bottom: 1px solid var(--line); min-height: 78px; }
 .item:last-child { border-bottom: 0; }
+/* L'arbre de questions : une question, un bouton par choix (le choix coché est plein) */
+.qcard { background: var(--stockBg); border-radius: 14px; padding: 12px 12px 4px; margin-bottom: 8px; }
+.qtext { font-weight: 700; font-size: 14px; line-height: 19px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 8px; }
+.qchip { height: 30px; padding: 0 15px; border-radius: 15px; border: 1.3px solid var(--accent); background: #fff; color: var(--accentDark); font: 700 13px inherit; font-family: inherit; cursor: pointer; transition: filter .15s, transform .1s; }
+.qchip:hover { filter: brightness(.97); } .qchip:active { transform: scale(.97); }
+.qchip.on { background: linear-gradient(180deg, var(--accent), var(--accentDark)); color: var(--soldFg); border-color: transparent; }
 .thumb { width: 46px; height: 46px; border-radius: 11px; background: #e6eef2; display: grid; place-items: center; }
 .body { min-width: 0; display: grid; align-content: space-between; }
 .l1 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; margin-top: -3px; }
@@ -197,15 +204,78 @@ html.integre .banner { transform-origin: top right; }
 </div>
 <script>
 (function () {
-  var SPEC = {"sizes":{"margin":20,"radius":24,"widthIdle":400,"widthReady":400,"widthExpanded":520,"widthDone":420,"widthReduced":256,"heightIdle":100,"heightReady":134,"heightDone":132,"heightReduced":64,"header":88,"buttonHeight":40,"finishHeight":46,"mascot":84,"thumb":46,"iconButton":26},"timing":{"readyPauseMs":1100,"quietMs":8000,"doneMs":7000,"scanTimeoutMs":45000,"idleFps":15,"motionFps":40,"ease":0.22},"text":{"brand":"PharmaBoost","idle":"En attente de scan…","scanTitle":"Scan détecté !","scanSub":"Analyse en cours…","readyOne":"1 conseil disponible","readyMany":"{n} conseils disponibles","readyButton":"Voir les conseils","forSaleOne":"1 conseil pour cette délivrance","forSaleMany":"{n} conseils pour cette délivrance","duringSale":"Pendant la vente","readFirst":"À lire avant de conseiller","quiet":"Rien à ajouter","quietSub":"Aucun conseil pour cette vente","sold":"Vendu","notSold":"Non vendu","change":"Modifier","detail":"Voir le détail","emailAdd":"Ajouter l'e-mail du patient","emailSaved":"E-mail enregistré","emailRemove":"Retirer","finish":"Vente terminée","finishing":"Enregistrement…","doneTitle":"Vente terminée !","challenge":"Challenge","shortDate":"Date courte","inStock":"En stock","lowStock":"Stock faible","outOfStock":"Rupture","unknownStock":"Stock à vérifier","reducedIdle":"En attente","allDone":"Tous traités","reducedMany":"{n} conseils","reducedOne":"1 conseil","forDrug":"Pour : ","pinTip":"Verrouiller la position","minTip":"Réduire","closeTip":"Masquer"},"cardAlpha":0.94};
+  var SPEC = {"sizes":{"margin":20,"radius":24,"widthIdle":400,"widthReady":400,"widthExpanded":520,"widthDone":420,"widthReduced":256,"heightIdle":100,"heightReady":134,"heightDone":132,"heightReduced":64,"header":88,"buttonHeight":40,"finishHeight":46,"mascot":84,"thumb":46,"iconButton":26},"timing":{"readyPauseMs":1100,"quietMs":8000,"doneMs":7000,"scanTimeoutMs":45000,"idleFps":15,"motionFps":40,"ease":0.22},"text":{"brand":"PharmaBoost","idle":"En attente de scan…","scanTitle":"Scan détecté !","scanSub":"Analyse en cours…","readyOne":"1 conseil disponible","readyMany":"{n} conseils disponibles","readyButton":"Voir les conseils","forSaleOne":"1 conseil pour cette délivrance","forSaleMany":"{n} conseils pour cette délivrance","duringSale":"Pendant la vente","readFirst":"À lire avant de conseiller","questionTitle":"Une question à poser","questionSub":"Pour choisir le bon conseil","quiet":"Rien à ajouter","quietSub":"Aucun conseil pour cette vente","sold":"Vendu","notSold":"Non vendu","change":"Modifier","detail":"Voir le détail","emailAdd":"Ajouter l'e-mail du patient","emailSaved":"E-mail enregistré","emailRemove":"Retirer","finish":"Vente terminée","finishing":"Enregistrement…","doneTitle":"Vente terminée !","challenge":"Challenge","shortDate":"Date courte","inStock":"En stock","lowStock":"Stock faible","outOfStock":"Rupture","unknownStock":"Stock à vérifier","reducedIdle":"En attente","allDone":"Tous traités","reducedMany":"{n} conseils","reducedOne":"1 conseil","forDrug":"Pour : ","pinTip":"Verrouiller la position","minTip":"Réduire","closeTip":"Masquer"},"cardAlpha":0.94};
   var T = SPEC.text, Z = SPEC.sizes, MS = SPEC.timing;
   var MASCOT = "<svg class=\"mascot\" viewBox=\"0 0 100 100\" aria-hidden=\"true\">\n  <defs>\n    <linearGradient id=\"g-shell\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#FFFFFF\"/><stop offset=\"1\" stop-color=\"#C4E1EC\"/></linearGradient>\n    <linearGradient id=\"g-screen\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#0A2234\"/><stop offset=\"1\" stop-color=\"#0E3550\"/></linearGradient>\n    <linearGradient id=\"g-ear\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#27C9B0\"/><stop offset=\"1\" stop-color=\"#12968C\"/></linearGradient>\n    <linearGradient id=\"g-badge\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#22C88F\"/><stop offset=\"1\" stop-color=\"#14A06F\"/></linearGradient>\n  </defs>\n  <g class=\"bob\">\n    <line x1=\"50\" y1=\"17\" x2=\"50\" y2=\"8\" stroke=\"#8FBCD0\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n    <circle class=\"lamp-glow\" cx=\"50\" cy=\"6\" r=\"8\" fill=\"#58F2D8\"/>\n    <circle class=\"lamp\" cx=\"50\" cy=\"6\" r=\"3.6\" fill=\"#58F2D8\"/>\n    <path d=\"M 9.90 36.72 A 41 35 0 0 1 90.10 36.72\" fill=\"none\" stroke=\"#27C9B0\" stroke-width=\"5\" stroke-linecap=\"round\"/>\n    <rect x=\"3\" y=\"36\" width=\"15\" height=\"28\" rx=\"7\" fill=\"url(#g-ear)\"/>\n    <rect x=\"82\" y=\"36\" width=\"15\" height=\"28\" rx=\"7\" fill=\"url(#g-ear)\"/>\n    <rect x=\"14\" y=\"16\" width=\"72\" height=\"58\" rx=\"24\" fill=\"url(#g-shell)\" stroke=\"#8FBCD0\" stroke-width=\"1.6\"/>\n    <rect x=\"22\" y=\"25\" width=\"56\" height=\"40\" rx=\"17\" fill=\"url(#g-screen)\"/>\n    <g class=\"eyes\"><ellipse class=\"eye-open\" cx=\"38\" cy=\"42\" rx=\"4.5\" ry=\"6\" fill=\"#58F2D8\"/><circle class=\"eye-open glint\" cx=\"36.6\" cy=\"39.6\" r=\"1.6\" fill=\"#fff\" fill-opacity=\".82\"/><path class=\"eye-happy\" d=\"M 32.58 42.13 A 5.5 5 0 0 1 43.42 42.13\" fill=\"none\" stroke=\"#58F2D8\" stroke-width=\"3.2\" stroke-linecap=\"round\"/><ellipse class=\"eye-open\" cx=\"62\" cy=\"42\" rx=\"4.5\" ry=\"6\" fill=\"#58F2D8\"/><circle class=\"eye-open glint\" cx=\"60.6\" cy=\"39.6\" r=\"1.6\" fill=\"#fff\" fill-opacity=\".82\"/><path class=\"eye-happy\" d=\"M 56.58 42.13 A 5.5 5 0 0 1 67.42 42.13\" fill=\"none\" stroke=\"#58F2D8\" stroke-width=\"3.2\" stroke-linecap=\"round\"/></g>\n    <path class=\"mouth mouth-idle\" d=\"M 56.58 53.04 A 7 4.5 0 0 1 43.42 53.04\" fill=\"none\" stroke=\"#58F2D8\" stroke-width=\"2.6\" stroke-linecap=\"round\"/>\n    <path class=\"mouth mouth-happy\" d=\"M 41 53 A 9 7 0 0 0 59 53 Z\" fill=\"#58F2D8\"/>\n    <ellipse class=\"mouth mouth-alert\" cx=\"50\" cy=\"55.5\" rx=\"4\" ry=\"4.5\" fill=\"none\" stroke=\"#58F2D8\" stroke-width=\"2.4\"/>\n    <line class=\"mouth mouth-think\" x1=\"44\" y1=\"55\" x2=\"56\" y2=\"55\" stroke=\"#58F2D8\" stroke-width=\"2.6\" stroke-linecap=\"round\"/>\n    <circle cx=\"74\" cy=\"69\" r=\"15\" fill=\"#fff\" fill-opacity=\".92\"/>\n    <circle cx=\"74\" cy=\"69\" r=\"13.5\" fill=\"url(#g-badge)\"/>\n    <rect x=\"72.2\" y=\"61\" width=\"3.6\" height=\"16\" fill=\"#fff\"/><rect x=\"66\" y=\"67.2\" width=\"16\" height=\"3.6\" fill=\"#fff\"/>\n    <path class=\"sparkle\" d=\"M 80 7 L 82 12.5 L 87.5 14 L 82 15.5 L 80 21 L 78 15.5 L 72.5 14 L 78 12.5 Z\" fill=\"#FFD65A\"/>\n  </g>\n</svg>";
+  var TREE_DEF = {"key":"douleur-fievre","version":"1.0","root":"why","sources":["Règles de conseil « chaud / froid par zone » et « thermomètre » de PharmaBoost, à valider par le pharmacien","HAS — prise en charge des entorses de cheville (froid les premières heures) ; thermothérapie des contractures","Consigne du pharmacien fondateur, 10 octobre 2026 : demander POURQUOI, puis OÙ, avant toute poche ciblée"],"nodes":{"why":{"key":"why","question":"Pourquoi le patient prend-il {drug} ?","mode":"MULTI","choices":[{"key":"FEVER","label":"Fièvre","opens":["fever-thermometer","fever-duration"]},{"key":"HEADACHE","label":"Mal de tête","note":"Un mal de tête inhabituel, brutal ou qui revient souvent : orienter vers le médecin."},{"key":"PAIN","label":"Douleur localisée","opens":["where"]},{"key":"OTHER","label":"Autre raison"}]},"where":{"key":"where","question":"Où le patient a-t-il mal ?","mode":"MULTI","choices":[{"key":"BACK","label":"Dos","unlocks":["pain-pack-back"]},{"key":"NECK","label":"Nuque","unlocks":["pain-pack-neck"]},{"key":"SHOULDER","label":"Épaule","unlocks":["pain-pack-shoulder"]},{"key":"KNEE","label":"Genou","unlocks":["pain-pack-knee"]},{"key":"HIP","label":"Hanche","unlocks":["pain-pack-hip"]},{"key":"ANKLE","label":"Cheville","unlocks":["pain-pack-ankle"]},{"key":"ELSEWHERE","label":"Ailleurs","unlocks":["pain-pack-other"]}]},"fever-thermometer":{"key":"fever-thermometer","question":"Le patient a-t-il un thermomètre à la maison ?","mode":"SINGLE","choices":[{"key":"NO","label":"Non","unlocks":["fever-thermometer-analgesic"]},{"key":"YES","label":"Oui"}]},"fever-duration":{"key":"fever-duration","question":"Depuis combien de temps a-t-il de la fièvre ?","mode":"SINGLE","choices":[{"key":"SHORT","label":"Moins de 3 jours"},{"key":"LONG","label":"3 jours ou plus","note":"Fièvre depuis 3 jours ou plus, ou supérieure à 39 °C : orienter vers le médecin."}]}}};
+  var TREE_PRODUCTS = {
+    "pain-pack-back": { name: "THERAPEARL DOS", price: "13,90 €", reason: "Chaud ou froid sur le dos", tone: ["#CFE4F7", "#3B82C4"], quantity: "5" },
+    "pain-pack-neck": { name: "THERAPEARL NUQUE", price: "12,90 €", reason: "Chaud ou froid sur la nuque", tone: ["#CFE4F7", "#3B82C4"], quantity: "4" },
+    "pain-pack-shoulder": { name: "THERAPEARL ÉPAULE", price: "12,90 €", reason: "Chaud ou froid sur l'épaule", tone: ["#CFE4F7", "#3B82C4"], quantity: "3" },
+    "pain-pack-knee": { name: "THERAPEARL GENOU", price: "11,90 €", reason: "Chaud ou froid sur le genou", tone: ["#CFE4F7", "#3B82C4"], quantity: "2" },
+    "pain-pack-hip": { name: "THERAPEARL HANCHE", price: "12,90 €", reason: "Chaud ou froid sur la hanche", tone: ["#CFE4F7", "#3B82C4"], quantity: "3" },
+    "pain-pack-ankle": { name: "THERAPEARL CHEVILLE", price: "11,90 €", reason: "Chaud ou froid sur la cheville", tone: ["#CFE4F7", "#3B82C4"], quantity: "1" },
+    "pain-pack-other": { name: "THERAPEARL MULTI-ZONES", price: "10,90 €", reason: "Chaud ou froid, toutes zones", tone: ["#CFE4F7", "#3B82C4"], quantity: "6" },
+    "fever-thermometer-analgesic": { name: "THERMOMÈTRE FRONTAL", price: "24,90 €", reason: "Suivre la fièvre à la maison", tone: ["#FFE2B8", "#E08A12"], quantity: "4" }
+  };
   var ITEMS = [
     { id: "a", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", drug: "AMOXICILLINE 1 g", reason: "Protéger la flore pendant l'antibiotique", challenge: true, shortDate: "30/11/26", availability: "IN_STOCK", quantity: "12", tone: ["#BFE8D2", "#2F9E6B"] },
     { id: "b", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", drug: "ZYRTEC 10 mg", reason: "", challenge: false, shortDate: "", availability: "IN_STOCK", quantity: "27", tone: ["#CFE4F7", "#3B82C4"] },
     { id: "c", name: "VITAMINE C 500 mg", price: "8,40 €", drug: "DOLIPRANE 1000 mg", reason: "", challenge: false, shortDate: "12/12/26", availability: "LOW_STOCK", quantity: "3", tone: ["#FFE2B8", "#E08A12"] }
   ];
   var S = { view: "idle", reduced: false, hidden: false, pinned: false, answers: {}, emailSaved: false, finishing: false, mailOpen: false, analyzing: false, doneAt: 0 };
+  var BASE_ITEMS = ITEMS.slice();
+  // L'arbre du comptoir : mêmes questions et mêmes règles que le moteur (core/counter/question-tree.ts).
+  function treeOpen(ans) {
+    var open = [], queue = [TREE_DEF.root];
+    while (queue.length) {
+      var k = queue.shift();
+      if (open.indexOf(k) >= 0 || !TREE_DEF.nodes[k]) continue;
+      open.push(k);
+      TREE_DEF.nodes[k].choices.forEach(function (c) { if ((ans[k] || []).indexOf(c.key) >= 0) (c.opens || []).forEach(function (n) { queue.push(n); }); });
+    }
+    return open;
+  }
+  function treeView(ans) {
+    var out = { questions: [], guidance: [], unlocked: [] };
+    treeOpen(ans).forEach(function (k) {
+      var node = TREE_DEF.nodes[k], picked = ans[k] || [];
+      out.questions.push({ node: k, text: node.question.replace("{drug}", "DOLIPRANE 1000 mg"), choices: node.choices.map(function (c) { return { key: c.key, label: c.label, selected: picked.indexOf(c.key) >= 0 }; }) });
+      node.choices.forEach(function (c) {
+        if (picked.indexOf(c.key) < 0) return;
+        if (c.note) out.guidance.push(c.note);
+        (c.unlocks || []).forEach(function (u) { if (out.unlocked.indexOf(u) < 0) out.unlocked.push(u); });
+      });
+    });
+    return out;
+  }
+  function treeAnswer(node, choice) {
+    var ans = S.tree.answers;
+    if (treeOpen(ans).indexOf(node) < 0) return;
+    var def = TREE_DEF.nodes[node], cur = ans[node] || [], next;
+    if (def.mode === "SINGLE") next = cur.length === 1 && cur[0] === choice ? [] : [choice];
+    else next = cur.indexOf(choice) >= 0 ? cur.filter(function (c) { return c !== choice; }) : cur.concat([choice]);
+    ans[node] = next;
+    var still = treeOpen(ans);
+    Object.keys(ans).forEach(function (k) { if (still.indexOf(k) < 0 || !ans[k].length) delete ans[k]; });
+    syncTreeItems();
+  }
+  function syncTreeItems() {
+    var v = treeView(S.tree.answers);
+    ITEMS = v.unlocked.map(function (key) {
+      var p = TREE_PRODUCTS[key];
+      return { id: key, name: p.name, price: p.price, drug: "DOLIPRANE 1000 mg", reason: p.reason, challenge: false, shortDate: "", availability: "IN_STOCK", quantity: p.quantity, tone: p.tone };
+    });
+  }
+  function questionsHtml() {
+    if (!S.tree) return "";
+    var v = treeView(S.tree.answers);
+    return v.questions.map(function (q) {
+      return '<div class="qcard"><div class="qtext">' + esc(q.text) + '</div><div class="chips">' + q.choices.map(function (c) {
+        return '<button class="qchip' + (c.selected ? " on" : "") + '" data-act="qa" data-node="' + q.node + '" data-choice="' + c.key + '">' + esc(c.label) + '</button>';
+      }).join("") + '</div></div>';
+    }).join("") + v.guidance.map(function (g) { return '<div class="warn">' + ICON.warn + '<span>' + esc(g) + '</span></div>'; }).join("");
+  }
   var timers = [];
   var scenario = [];
   var banner = document.getElementById("banner");
@@ -339,6 +409,7 @@ html.integre .banner { transform-origin: top right; }
     // expanded
     var sub;
     if (S.analyzing) sub = T.scanSub;
+    else if (S.tree && ITEMS.length === 0) sub = T.questionSub;
     else if (answered() === 0) sub = plural(ITEMS.length, T.forSaleOne, T.forSaleMany);
     else sub = T.duringSale + "  " + answered() + "/" + ITEMS.length;
     var rows = ITEMS.map(function (item) {
@@ -356,7 +427,7 @@ html.integre .banner { transform-origin: top right; }
     return mascot(moodOf(), "left:8px;top:6px;width:76px;height:76px") +
       '<div class="abs brand" style="left:96px;top:18px;width:200px">' + T.brand + '</div>' +
       '<div class="abs sub" style="left:96px;top:45px;width:300px;' + (S.analyzing ? "color:var(--glow)" : "") + '">' + esc(sub) + '</div>' + headerButtons(true) +
-      '<div class="panel"><div class="list"><div class="label"><small>Détecté</small><b>DOLIPRANE 1000 mg · AMOXICILLINE 1 g</b></div>' + rows + '</div>' +
+      '<div class="panel"><div class="list"><div class="label"><small>Détecté</small><b>' + (S.tree ? "DOLIPRANE 1000 mg" : "DOLIPRANE 1000 mg · AMOXICILLINE 1 g") + '</b></div>' + questionsHtml() + rows + '</div>' +
       '<div class="foot"><div class="two">' + mailRow + '<button class="ghost" data-act="detail">' + T.detail + '</button></div>' +
       '<button class="finish" data-act="finish">' + (S.finishing ? T.finishing : ICON.tick + T.finish) + '</button></div></div>';
   }
@@ -438,6 +509,7 @@ html.integre .banner { transform-origin: top right; }
     else if (act === "expand") { S.reduced = false; render(); }
     else if (act === "close") { S.hidden = true; closeMail(); render(); showRestore(); }
     else if (act === "see") { clearTimers(); S.view = "expanded"; render(); }
+    else if (act === "qa") { treeAnswer(el.getAttribute("data-node"), el.getAttribute("data-choice")); render(true); }
     else if (act === "sold") { S.answers[id] = "SOLD"; render(true); }
     else if (act === "not") { S.answers[id] = "NOT_SOLD"; render(true); }
     else if (act === "undo") { delete S.answers[id]; render(true); }
@@ -481,7 +553,7 @@ html.integre .banner { transform-origin: top right; }
   var userDriven = false;
   var stepsEl = document.getElementById("steps");
   var current = -1;
-  function reset() { clearTimers(); clearScenario(); closeMail(); S.reduced = false; S.hidden = false; S.answers = {}; S.emailSaved = false; S.finishing = false; S.analyzing = false; var r = document.getElementById("restore"); if (r) r.remove(); }
+  function reset() { clearTimers(); clearScenario(); closeMail(); S.tree = null; ITEMS = BASE_ITEMS.slice(); S.reduced = false; S.hidden = false; S.answers = {}; S.emailSaved = false; S.finishing = false; S.analyzing = false; var r = document.getElementById("restore"); if (r) r.remove(); }
   STEPS.forEach(function (s, i) {
     var b = document.createElement("button");
     b.textContent = s[0] + " · " + s[1];
@@ -495,6 +567,10 @@ html.integre .banner { transform-origin: top right; }
   quiet.textContent = "Rien à ajouter"; quiet.className = "extra";
   quiet.addEventListener("click", function () { reset(); setView("quiet"); });
   stepsEl.appendChild(quiet);
+  var tree = document.createElement("button");
+  tree.textContent = "Arbre de questions"; tree.className = "extra";
+  tree.addEventListener("click", function () { reset(); S.tree = { answers: {} }; syncTreeItems(); setView("expanded"); });
+  stepsEl.appendChild(tree);
   var zoom = document.createElement("select"); zoom.className = "extra";
   [["100 %", 1], ["125 %", 1.25], ["150 %", 1.5]].forEach(function (z) { var o = document.createElement("option"); o.value = z[1]; o.textContent = "Affichage Windows " + z[0]; zoom.appendChild(o); });
   zoom.addEventListener("change", function () { banner.style.zoom = zoom.value; render(true); });
@@ -502,7 +578,7 @@ html.integre .banner { transform-origin: top right; }
   function markStep() {
     var buttons = stepsEl.querySelectorAll("button");
     var idx = { idle: 0, scan: 1, ready: 2, expanded: answered() > 0 ? 4 : 3, done: 5 }[S.view];
-    for (var i = 0; i < buttons.length - 2; i++) buttons[i].classList.toggle("on", i === idx);
+    for (var i = 0; i < buttons.length - 3; i++) buttons[i].classList.toggle("on", i === idx);
   }
   function runScenario() {
     reset(); setView("idle");

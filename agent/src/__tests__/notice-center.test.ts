@@ -26,6 +26,21 @@ const body = (over: Partial<NoticeBody> = {}): NoticeBody => ({
 describe("ce que la fenêtre reçoit pour une vente", () => {
   const build = (over: Partial<NoticeBody> = {}, images?: Map<string, string>) => buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app/", body: body(over), images });
 
+  it("porte l'arbre de questions : une question à poser n'est pas « rien à conseiller », la fenêtre s'ouvre", () => {
+    const withQuestion = build({
+      items: [],
+      advice: [],
+      questions: [{ id: "douleur-fievre:why", node: "why", text: "Pourquoi le patient prend-il DOLIPRANE 1000 mg ?", mode: "MULTI", answered: false, choices: [{ key: "FEVER", label: "Fièvre", selected: false }, { key: "PAIN", label: "Douleur localisée", selected: true }] }],
+      guidance: ["Fièvre depuis 3 jours ou plus : orienter vers le médecin."],
+    });
+    expect(withQuestion.quiet).toBe(false);
+    expect(withQuestion.questions).toEqual([{ node: "why", text: "Pourquoi le patient prend-il DOLIPRANE 1000 mg ?", multi: true, choices: [{ key: "FEVER", label: "Fièvre", selected: false }, { key: "PAIN", label: "Douleur localisée", selected: true }] }]);
+    expect(withQuestion.guidance).toEqual(["Fièvre depuis 3 jours ou plus : orienter vers le médecin."]);
+    // Sans question (serveur plus ancien, ou vente sans arbre) : rien de plus, rien de moins qu'avant.
+    expect(build().questions).toEqual([]);
+    expect(build({ items: [], advice: [] }).quiet).toBe(true);
+  });
+
   it("porte la vente, ce qui a été détecté, et le conseil complet : nom, prix, raison, disponibilité, photo", () => {
     const photos = new Map([["https://images.openbeautyfacts.org/images/products/1/front.jpg", "C:\\x\\a.jpg"]]);
     const entry = build({}, photos);
@@ -237,6 +252,24 @@ describe("la fenêtre et son processus", () => {
       { kind: "email_remove", saleId: "rx_1" },
       { kind: "finish", saleId: "rx_1" },
     ]);
+  });
+
+  it("transmet une réponse à l'arbre de questions : « REPONSE vente question:choix »", () => {
+    const notices = center();
+    notices.show(entry());
+    hosts[0].stdout.emit("data", "PRET\nREPONSE rx_1 why:PAIN\nREPONSE rx_1 where:BACK\nREPONSE rx_1 fever-duration:LONG\n");
+    expect(actions).toEqual([
+      { kind: "answer", saleId: "rx_1", node: "why", choice: "PAIN" },
+      { kind: "answer", saleId: "rx_1", node: "where", choice: "BACK" },
+      { kind: "answer", saleId: "rx_1", node: "fever-duration", choice: "LONG" },
+    ]);
+  });
+
+  it("ignore une réponse mal formée ou piégée : sans choix, sans deux-points, avec autre chose que des lettres", () => {
+    const notices = center();
+    notices.show(entry());
+    hosts[0].stdout.emit("data", "PRET\nREPONSE rx_1\nREPONSE rx_1 why\nREPONSE rx_1 :PAIN\nREPONSE rx_1 why:\nREPONSE rx_1 why/../x:PAIN\nREPONSE rx_1 why:PAIN;rm\n");
+    expect(actions).toEqual([]);
   });
 
   it("ignore un mot incomplet, une adresse illisible ou trop longue, un mot inconnu : jamais une panne", () => {

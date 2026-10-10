@@ -1,4 +1,5 @@
 import { BANNER } from "./banner-design";
+import { ANALGESIC_TREE } from "../../src/core/counter/question-tree";
 
 /**
  * L'aperçu de la bannière PharmaBoost pour Mac (ou tout navigateur) : une page HTML autonome, générée à partir du MÊME design que la
@@ -149,13 +150,20 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
 
 /* Les conseils */
 .panel { position: absolute; left: 10px; right: 10px; top: ${Z.header - 4}px; bottom: 10px; background: var(--panel); border-radius: 18px; color: var(--ink); display: flex; flex-direction: column; animation: fadein .22s ease-out both; }
-.list { flex: 1; min-height: 0; overflow: hidden; padding: 8px 14px 0; }
+.list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; padding: 8px 14px 0; }
 .label { display: flex; align-items: baseline; gap: 10px; height: 24px; padding-top: 1px; }
 .label small { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--inkSoft); text-transform: uppercase; }
 .label b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .warn { display: flex; gap: 10px; align-items: flex-start; background: var(--alertBg); color: var(--alertFg); border-radius: 12px; padding: 8px 12px 8px 12px; margin-bottom: 8px; font-weight: 700; font-size: 12.5px; }
 .item { display: grid; grid-template-columns: ${Z.thumb}px 1fr 88px; gap: 12px; padding: 12px 0 10px; border-bottom: 1px solid var(--line); min-height: 78px; }
 .item:last-child { border-bottom: 0; }
+/* L'arbre de questions : une question, un bouton par choix (le choix coché est plein) */
+.qcard { background: var(--stockBg); border-radius: 14px; padding: 12px 12px 4px; margin-bottom: 8px; }
+.qtext { font-weight: 700; font-size: 14px; line-height: 19px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 8px; }
+.qchip { height: 30px; padding: 0 15px; border-radius: 15px; border: 1.3px solid var(--accent); background: #fff; color: var(--accentDark); font: 700 13px inherit; font-family: inherit; cursor: pointer; transition: filter .15s, transform .1s; }
+.qchip:hover { filter: brightness(.97); } .qchip:active { transform: scale(.97); }
+.qchip.on { background: linear-gradient(180deg, var(--accent), var(--accentDark)); color: var(--soldFg); border-color: transparent; }
 .thumb { width: ${Z.thumb}px; height: ${Z.thumb}px; border-radius: 11px; background: #e6eef2; display: grid; place-items: center; }
 .body { min-width: 0; display: grid; align-content: space-between; }
 .l1 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; margin-top: -3px; }
@@ -262,12 +270,75 @@ html.integre .banner { transform-origin: top right; }
   var SPEC = ${spec};
   var T = SPEC.text, Z = SPEC.sizes, MS = SPEC.timing;
   var MASCOT = ${JSON.stringify(mascotSvg())};
+  var TREE_DEF = ${JSON.stringify(ANALGESIC_TREE)};
+  var TREE_PRODUCTS = {
+    "pain-pack-back": { name: "THERAPEARL DOS", price: "13,90 €", reason: "Chaud ou froid sur le dos", tone: ["#CFE4F7", "#3B82C4"], quantity: "5" },
+    "pain-pack-neck": { name: "THERAPEARL NUQUE", price: "12,90 €", reason: "Chaud ou froid sur la nuque", tone: ["#CFE4F7", "#3B82C4"], quantity: "4" },
+    "pain-pack-shoulder": { name: "THERAPEARL ÉPAULE", price: "12,90 €", reason: "Chaud ou froid sur l'épaule", tone: ["#CFE4F7", "#3B82C4"], quantity: "3" },
+    "pain-pack-knee": { name: "THERAPEARL GENOU", price: "11,90 €", reason: "Chaud ou froid sur le genou", tone: ["#CFE4F7", "#3B82C4"], quantity: "2" },
+    "pain-pack-hip": { name: "THERAPEARL HANCHE", price: "12,90 €", reason: "Chaud ou froid sur la hanche", tone: ["#CFE4F7", "#3B82C4"], quantity: "3" },
+    "pain-pack-ankle": { name: "THERAPEARL CHEVILLE", price: "11,90 €", reason: "Chaud ou froid sur la cheville", tone: ["#CFE4F7", "#3B82C4"], quantity: "1" },
+    "pain-pack-other": { name: "THERAPEARL MULTI-ZONES", price: "10,90 €", reason: "Chaud ou froid, toutes zones", tone: ["#CFE4F7", "#3B82C4"], quantity: "6" },
+    "fever-thermometer-analgesic": { name: "THERMOMÈTRE FRONTAL", price: "24,90 €", reason: "Suivre la fièvre à la maison", tone: ["#FFE2B8", "#E08A12"], quantity: "4" }
+  };
   var ITEMS = [
     { id: "a", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", drug: "AMOXICILLINE 1 g", reason: "Protéger la flore pendant l'antibiotique", challenge: true, shortDate: "30/11/26", availability: "IN_STOCK", quantity: "12", tone: ["#BFE8D2", "#2F9E6B"] },
     { id: "b", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", drug: "ZYRTEC 10 mg", reason: "", challenge: false, shortDate: "", availability: "IN_STOCK", quantity: "27", tone: ["#CFE4F7", "#3B82C4"] },
     { id: "c", name: "VITAMINE C 500 mg", price: "8,40 €", drug: "DOLIPRANE 1000 mg", reason: "", challenge: false, shortDate: "12/12/26", availability: "LOW_STOCK", quantity: "3", tone: ["#FFE2B8", "#E08A12"] }
   ];
   var S = { view: "idle", reduced: false, hidden: false, pinned: false, answers: {}, emailSaved: false, finishing: false, mailOpen: false, analyzing: false, doneAt: 0 };
+  var BASE_ITEMS = ITEMS.slice();
+  // L'arbre du comptoir : mêmes questions et mêmes règles que le moteur (core/counter/question-tree.ts).
+  function treeOpen(ans) {
+    var open = [], queue = [TREE_DEF.root];
+    while (queue.length) {
+      var k = queue.shift();
+      if (open.indexOf(k) >= 0 || !TREE_DEF.nodes[k]) continue;
+      open.push(k);
+      TREE_DEF.nodes[k].choices.forEach(function (c) { if ((ans[k] || []).indexOf(c.key) >= 0) (c.opens || []).forEach(function (n) { queue.push(n); }); });
+    }
+    return open;
+  }
+  function treeView(ans) {
+    var out = { questions: [], guidance: [], unlocked: [] };
+    treeOpen(ans).forEach(function (k) {
+      var node = TREE_DEF.nodes[k], picked = ans[k] || [];
+      out.questions.push({ node: k, text: node.question.replace("{drug}", "DOLIPRANE 1000 mg"), choices: node.choices.map(function (c) { return { key: c.key, label: c.label, selected: picked.indexOf(c.key) >= 0 }; }) });
+      node.choices.forEach(function (c) {
+        if (picked.indexOf(c.key) < 0) return;
+        if (c.note) out.guidance.push(c.note);
+        (c.unlocks || []).forEach(function (u) { if (out.unlocked.indexOf(u) < 0) out.unlocked.push(u); });
+      });
+    });
+    return out;
+  }
+  function treeAnswer(node, choice) {
+    var ans = S.tree.answers;
+    if (treeOpen(ans).indexOf(node) < 0) return;
+    var def = TREE_DEF.nodes[node], cur = ans[node] || [], next;
+    if (def.mode === "SINGLE") next = cur.length === 1 && cur[0] === choice ? [] : [choice];
+    else next = cur.indexOf(choice) >= 0 ? cur.filter(function (c) { return c !== choice; }) : cur.concat([choice]);
+    ans[node] = next;
+    var still = treeOpen(ans);
+    Object.keys(ans).forEach(function (k) { if (still.indexOf(k) < 0 || !ans[k].length) delete ans[k]; });
+    syncTreeItems();
+  }
+  function syncTreeItems() {
+    var v = treeView(S.tree.answers);
+    ITEMS = v.unlocked.map(function (key) {
+      var p = TREE_PRODUCTS[key];
+      return { id: key, name: p.name, price: p.price, drug: "DOLIPRANE 1000 mg", reason: p.reason, challenge: false, shortDate: "", availability: "IN_STOCK", quantity: p.quantity, tone: p.tone };
+    });
+  }
+  function questionsHtml() {
+    if (!S.tree) return "";
+    var v = treeView(S.tree.answers);
+    return v.questions.map(function (q) {
+      return '<div class="qcard"><div class="qtext">' + esc(q.text) + '</div><div class="chips">' + q.choices.map(function (c) {
+        return '<button class="qchip' + (c.selected ? " on" : "") + '" data-act="qa" data-node="' + q.node + '" data-choice="' + c.key + '">' + esc(c.label) + '</button>';
+      }).join("") + '</div></div>';
+    }).join("") + v.guidance.map(function (g) { return '<div class="warn">' + ICON.warn + '<span>' + esc(g) + '</span></div>'; }).join("");
+  }
   var timers = [];
   var scenario = [];
   var banner = document.getElementById("banner");
@@ -401,6 +472,7 @@ html.integre .banner { transform-origin: top right; }
     // expanded
     var sub;
     if (S.analyzing) sub = T.scanSub;
+    else if (S.tree && ITEMS.length === 0) sub = T.questionSub;
     else if (answered() === 0) sub = plural(ITEMS.length, T.forSaleOne, T.forSaleMany);
     else sub = T.duringSale + "  " + answered() + "/" + ITEMS.length;
     var rows = ITEMS.map(function (item) {
@@ -418,7 +490,7 @@ html.integre .banner { transform-origin: top right; }
     return mascot(moodOf(), "left:8px;top:6px;width:76px;height:76px") +
       '<div class="abs brand" style="left:96px;top:18px;width:200px">' + T.brand + '</div>' +
       '<div class="abs sub" style="left:96px;top:45px;width:300px;' + (S.analyzing ? "color:var(--glow)" : "") + '">' + esc(sub) + '</div>' + headerButtons(true) +
-      '<div class="panel"><div class="list"><div class="label"><small>Détecté</small><b>DOLIPRANE 1000 mg · AMOXICILLINE 1 g</b></div>' + rows + '</div>' +
+      '<div class="panel"><div class="list"><div class="label"><small>Détecté</small><b>' + (S.tree ? "DOLIPRANE 1000 mg" : "DOLIPRANE 1000 mg · AMOXICILLINE 1 g") + '</b></div>' + questionsHtml() + rows + '</div>' +
       '<div class="foot"><div class="two">' + mailRow + '<button class="ghost" data-act="detail">' + T.detail + '</button></div>' +
       '<button class="finish" data-act="finish">' + (S.finishing ? T.finishing : ICON.tick + T.finish) + '</button></div></div>';
   }
@@ -500,6 +572,7 @@ html.integre .banner { transform-origin: top right; }
     else if (act === "expand") { S.reduced = false; render(); }
     else if (act === "close") { S.hidden = true; closeMail(); render(); showRestore(); }
     else if (act === "see") { clearTimers(); S.view = "expanded"; render(); }
+    else if (act === "qa") { treeAnswer(el.getAttribute("data-node"), el.getAttribute("data-choice")); render(true); }
     else if (act === "sold") { S.answers[id] = "SOLD"; render(true); }
     else if (act === "not") { S.answers[id] = "NOT_SOLD"; render(true); }
     else if (act === "undo") { delete S.answers[id]; render(true); }
@@ -543,7 +616,7 @@ html.integre .banner { transform-origin: top right; }
   var userDriven = false;
   var stepsEl = document.getElementById("steps");
   var current = -1;
-  function reset() { clearTimers(); clearScenario(); closeMail(); S.reduced = false; S.hidden = false; S.answers = {}; S.emailSaved = false; S.finishing = false; S.analyzing = false; var r = document.getElementById("restore"); if (r) r.remove(); }
+  function reset() { clearTimers(); clearScenario(); closeMail(); S.tree = null; ITEMS = BASE_ITEMS.slice(); S.reduced = false; S.hidden = false; S.answers = {}; S.emailSaved = false; S.finishing = false; S.analyzing = false; var r = document.getElementById("restore"); if (r) r.remove(); }
   STEPS.forEach(function (s, i) {
     var b = document.createElement("button");
     b.textContent = s[0] + " · " + s[1];
@@ -557,6 +630,10 @@ html.integre .banner { transform-origin: top right; }
   quiet.textContent = "Rien à ajouter"; quiet.className = "extra";
   quiet.addEventListener("click", function () { reset(); setView("quiet"); });
   stepsEl.appendChild(quiet);
+  var tree = document.createElement("button");
+  tree.textContent = "Arbre de questions"; tree.className = "extra";
+  tree.addEventListener("click", function () { reset(); S.tree = { answers: {} }; syncTreeItems(); setView("expanded"); });
+  stepsEl.appendChild(tree);
   var zoom = document.createElement("select"); zoom.className = "extra";
   [["100 %", 1], ["125 %", 1.25], ["150 %", 1.5]].forEach(function (z) { var o = document.createElement("option"); o.value = z[1]; o.textContent = "Affichage Windows " + z[0]; zoom.appendChild(o); });
   zoom.addEventListener("change", function () { banner.style.zoom = zoom.value; render(true); });
@@ -564,7 +641,7 @@ html.integre .banner { transform-origin: top right; }
   function markStep() {
     var buttons = stepsEl.querySelectorAll("button");
     var idx = { idle: 0, scan: 1, ready: 2, expanded: answered() > 0 ? 4 : 3, done: 5 }[S.view];
-    for (var i = 0; i < buttons.length - 2; i++) buttons[i].classList.toggle("on", i === idx);
+    for (var i = 0; i < buttons.length - 3; i++) buttons[i].classList.toggle("on", i === idx);
   }
   function runScenario() {
     reset(); setView("idle");

@@ -103,6 +103,8 @@ export const BANNER = {
     forSaleMany: "{n} conseils pour cette délivrance",
     duringSale: "Pendant la vente",
     readFirst: "À lire avant de conseiller",
+    questionTitle: "Une question à poser",
+    questionSub: "Pour choisir le bon conseil",
     quiet: "Rien à ajouter",
     quietSub: "Aucun conseil pour cette vente",
     sold: "Vendu",
