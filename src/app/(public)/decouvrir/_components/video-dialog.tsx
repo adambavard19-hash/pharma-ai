@@ -24,7 +24,7 @@ export const FILMS = {
 
 export type FilmKey = keyof typeof FILMS;
 
-export function VideoButton({ film = "presentation", className, label = "Voir la présentation", tone = "light" }: { film?: FilmKey; className?: string; label?: string; tone?: "light" | "dark" }) {
+export function VideoButton({ film = "presentation", className, label = "Voir la présentation", tone = "light" }: { film?: FilmKey; className?: string; label?: string; tone?: "light" | "dark" | "brand" }) {
   const video = FILMS[film];
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -49,15 +49,17 @@ export function VideoButton({ film = "presentation", className, label = "Voir la
         onClick={() => setOpen(true)}
         className={cn(
           "group inline-flex h-12 items-center gap-3 rounded-full pr-5 pl-1.5 text-[15px] font-semibold transition-colors",
-          tone === "light" ? "border border-border-default bg-surface-card text-text-primary hover:border-brand-400" : "border border-white/25 text-white hover:bg-white/10",
+          tone === "light" && "border border-border-default bg-surface-card text-text-primary hover:border-brand-400",
+          tone === "dark" && "border border-white/25 text-white hover:bg-white/10",
+          tone === "brand" && "bg-brand-600 text-white shadow-sm hover:bg-brand-700",
           className,
         )}
       >
-        <span className="flex size-9 items-center justify-center rounded-full bg-brand-600 text-white transition-transform group-hover:scale-105">
+        <span className={cn("flex size-9 items-center justify-center rounded-full transition-transform group-hover:scale-105", tone === "brand" ? "bg-white text-brand-700" : "bg-brand-600 text-white")}>
           <Play className="size-4 translate-x-px fill-current" />
         </span>
         {label}
-        <span className={cn("font-mono text-[12px] font-medium", tone === "light" ? "text-text-tertiary" : "text-brand-200")}>{video.duration}</span>
+        <span className={cn("font-mono text-[12px] font-medium", tone === "light" ? "text-text-tertiary" : tone === "brand" ? "text-white/75" : "text-brand-200")}>{video.duration}</span>
       </button>
 
       {open && (

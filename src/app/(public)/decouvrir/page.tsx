@@ -126,11 +126,9 @@ export default async function SitePage() {
             <p className="mt-7 max-w-xl text-[17px] leading-7 text-text-secondary">
               Au comptoir, vous scannez les boîtes comme d&apos;habitude. La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller en plus, pris dans votre rayon. Et le patient repart avec ses conseils.
             </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link href="/decouvrir/demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white shadow-sm hover:bg-brand-700">
-                Réserver une démo <ArrowRight className="size-4" />
-              </Link>
-              <VideoButton />
+            {/* « Réserver une démo » est déjà en haut de page : ici, la présentation seule, en vert, comme bouton principal. */}
+            <div className="mt-9">
+              <VideoButton tone="brand" />
             </div>
           </div>
           <HeroVisual />
