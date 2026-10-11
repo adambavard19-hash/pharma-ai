@@ -6,6 +6,7 @@ import { loadChallengeBoard, loadMyObjectives } from "@/server/services/mobile/p
 import { canManageTeam } from "@/core/personal/bonuses";
 import { MCard, QuietState, ScreenTitle, SectionTitle } from "../../_components/ui";
 import { ChallengeCard, EndedChallengeRow, ObjectiveCard } from "./_components/cards";
+import { WebOnly } from "../../_components/native-app";
 
 export const metadata: Metadata = { title: "Challenges" };
 
@@ -26,6 +27,7 @@ export default async function ChallengesPage() {
           title="Réservé aux équipes des officines clientes"
           body="Quand votre titulaire vous invite dans l'équipe de l'officine, vos challenges, vos objectifs et vos résultats apparaissent ici. Vos formations, elles, restent les vôtres."
         />
+        <WebOnly>
         <a
           href="/decouvrir"
           className="group relative block overflow-hidden rounded-[24px] border border-brand-100 bg-white p-5 shadow-[0_6px_28px_-8px_oklch(0.45_0.07_183/0.18)] transition-transform active:scale-[0.985]"
@@ -42,6 +44,7 @@ export default async function ChallengesPage() {
             <ArrowUpRight className="size-5 shrink-0 text-brand-700" aria-hidden="true" />
           </div>
         </a>
+        </WebOnly>
       </div>
     );
   }

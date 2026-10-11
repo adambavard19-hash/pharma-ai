@@ -8,6 +8,7 @@ import { loadMobileRobotTip } from "@/server/services/robot-tips";
 import { RobotBubble } from "../_components/robot-bubble";
 import { MCard, MCardLink, Pill, QuietState, SectionTitle } from "../_components/ui";
 import { PartnerNewsRail } from "./decouvertes/_components/partner-news-rail";
+import { WebOnly } from "../_components/native-app";
 
 export const metadata: Metadata = { title: "Accueil" };
 
@@ -143,8 +144,9 @@ export default async function MobileHomePage() {
         </section>
       )}
 
-      {/* L'offre, pour les comptes gratuits */}
+      {/* L'offre, pour les comptes gratuits — dans un navigateur seulement : l'application de l'App Store ne la montre pas. */}
       {!session.isClientStaff && (
+        <WebOnly>
         <section className="m-rise" style={{ animationDelay: "180ms" }}>
           <a
             href="/decouvrir"
@@ -163,6 +165,7 @@ export default async function MobileHomePage() {
             </div>
           </a>
         </section>
+        </WebOnly>
       )}
     </div>
   );

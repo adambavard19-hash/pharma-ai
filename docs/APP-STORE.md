@@ -77,3 +77,21 @@ Aucune donnée de santé, aucune localisation, aucun suivi publicitaire.
 
 iPhone 6,9 pouces (1320 × 2868) obligatoires, 3 à 10. Les faire depuis le simulateur :
 `xcrun simctl io booted screenshot capture.png` sur un iPhone 17 Pro Max.
+
+## Audit avant vérification (11 oct. 2026)
+
+Corrigé :
+- Liens sortant de /m (site, confidentialité, mot de passe oublié) : ouverts dans Safari (côté site par
+  `NativeLinkGuard`, valable aussi pour la version déjà envoyée ; côté coque par la suppression d'`allowNavigation`).
+- Offre commerciale (« Découvrir PharmaBoost ») masquée dans l'application (règle 3.1.1) ; visible dans un navigateur.
+- Politique de confidentialité : section « L'application PharmaBoost Mobile » (#application-mobile).
+- Manifeste de confidentialité `PrivacyInfo.xcprivacy` (aucun suivi ; nom, e-mail, identifiant, contenus, interactions).
+- Barre d'état claire sur les écrans d'accueil à en-tête vert.
+- Agent utilisateur `PharmaBoostApp` (le site reconnaît l'application dès le rendu).
+
+Note pour le vérificateur (anglais) :
+> PharmaBoost is a professional app for French community-pharmacy teams (pharmacists, pharmacy technicians,
+> students): short trainings with quizzes, partner product news (sponsored items are labelled) and team challenges.
+> The demo account belongs to a fictitious demo pharmacy (sample data only). It is protected and cannot be deleted;
+> to test account deletion (Mon espace › Supprimer mon compte), create a free account from the login screen
+> ("Créer un compte gratuit"). The app collects no health or patient data.

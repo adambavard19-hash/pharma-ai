@@ -4,16 +4,25 @@
   "webDir": "www",
   "server": {
     "url": "https://pharmaboost.app/m",
-    "allowNavigation": ["pharmaboost.app", "*.pharmaboost.app"],
     "errorPath": "hors-ligne.html"
   },
   "ios": {
     "contentInset": "never",
     "backgroundColor": "#f6fafa",
-    "limitsNavigationsToAppBoundDomains": false
+    "limitsNavigationsToAppBoundDomains": false,
+    "appendUserAgent": "PharmaBoostApp"
   },
   "plugins": {
-    "SplashScreen": { "launchShowDuration": 900, "backgroundColor": "#f6fafa", "showSpinner": false, "launchAutoHide": true },
-    "StatusBar": { "style": "LIGHT", "backgroundColor": "#f6fafa", "overlaysWebView": true }
+    "SplashScreen": {
+      "launchShowDuration": 900,
+      "backgroundColor": "#f6fafa",
+      "showSpinner": false,
+      "launchAutoHide": true
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#f6fafa",
+      "overlaysWebView": true
+    }
   }
 }
