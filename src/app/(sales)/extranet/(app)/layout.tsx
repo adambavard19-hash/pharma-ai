@@ -9,13 +9,14 @@ import { SalesNav } from "./sales-nav";
 /**
  * L'extranet commercial : une coque légère, pensée pour le téléphone.
  * Navigation en haut sur grand écran, en bas du pouce sur mobile.
+ * À l'impression, la coque disparaît : seule la page imprimée part (la plaquette, en A4).
  */
 export default async function SalesLayout({ children }: { children: ReactNode }) {
   const session = await requireSalesSession();
   const unread = await countUnreadSalesNotifications(session.rep.id);
   return (
-    <div className="min-h-dvh bg-surface-app pb-20 sm:pb-0">
-      <header className="sticky top-0 z-30 border-b border-border-subtle bg-surface-card/95 backdrop-blur">
+    <div className="min-h-dvh bg-surface-app pb-20 sm:pb-0 print:min-h-0 print:bg-white print:pb-0">
+      <header className="sticky top-0 z-30 border-b border-border-subtle bg-surface-card/95 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/extranet" className="flex items-center gap-2.5">
             <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-[15px] font-semibold text-white">✚</span>
@@ -28,8 +29,8 @@ export default async function SalesLayout({ children }: { children: ReactNode })
         </div>
         <div className="mx-auto hidden max-w-[1100px] px-4 sm:block sm:px-6"><SalesNav unread={unread} /></div>
       </header>
-      <main className="mx-auto max-w-[1100px] space-y-6 px-4 py-5 sm:px-6 sm:py-8">{children}</main>
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border-subtle bg-surface-card/95 backdrop-blur sm:hidden"><SalesNav unread={unread} mobile /></div>
+      <main className="mx-auto max-w-[1100px] space-y-6 px-4 py-5 sm:px-6 sm:py-8 print:max-w-none print:space-y-0 print:p-0">{children}</main>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border-subtle bg-surface-card/95 backdrop-blur sm:hidden print:hidden"><SalesNav unread={unread} mobile /></div>
     </div>
   );
 }

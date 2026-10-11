@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CalendarClock, Euro, Home, KanbanSquare, Trophy } from "lucide-react";
+import { Bell, CalendarClock, Euro, FileText, Home, KanbanSquare, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
@@ -12,13 +12,15 @@ const ITEMS = [
   { href: "/extranet/commissions", label: "Commissions", icon: Euro },
   { href: "/extranet/challenges", label: "Challenges", icon: Trophy },
   { href: "/extranet/notifications", label: "Alertes", icon: Bell },
+  // Pas dans la barre du bas sur téléphone (six entrées la remplissent déjà) : l'accueil y mène par un bouton.
+  { href: "/extranet/plaquette", label: "Plaquette", icon: FileText, desktopOnly: true },
 ];
 
 export function SalesNav({ unread, mobile = false }: { unread: number; mobile?: boolean }) {
   const pathname = usePathname();
   return (
     <nav className={cn(mobile ? "flex" : "flex gap-1")} aria-label="Sections de l'extranet">
-      {ITEMS.map((item) => {
+      {ITEMS.filter((item) => !(mobile && "desktopOnly" in item && item.desktopOnly)).map((item) => {
         const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
         return (
           <Link

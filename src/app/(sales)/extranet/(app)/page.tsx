@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { requireSalesSession } from "@/server/auth/sales-session";
 import { salesRepStats } from "@/server/services/sales/reps";
 import { listProspects, listTasks } from "@/server/services/sales/prospects";
@@ -30,7 +30,11 @@ export default async function SalesHomePage() {
           <h1 className="text-[26px] leading-8 font-bold tracking-[-0.025em] text-text-primary">Bonjour {session.rep.firstName}</h1>
           <p className="mt-1 text-[13.5px] text-text-secondary">{toCall.length > 0 ? `${toCall.length} relance${toCall.length > 1 ? "s" : ""} à faire aujourd'hui.` : "Aucune relance en attente aujourd'hui."}</p>
         </div>
-        <Button asChild leadingIcon={<Plus className="size-[18px]" />}><Link href="/extranet/dossiers/nouveau">Nouvelle pharmacie</Link></Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* La plaquette à envoyer aux pharmacies : seul chemin vers elle sur téléphone (la barre du bas est pleine). */}
+          <Button asChild variant="secondary" leadingIcon={<FileText className="size-[18px]" />}><Link href="/extranet/plaquette">Plaquette</Link></Button>
+          <Button asChild leadingIcon={<Plus className="size-[18px]" />}><Link href="/extranet/dossiers/nouveau">Nouvelle pharmacie</Link></Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

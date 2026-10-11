@@ -14,7 +14,8 @@ import { SALES_SESSION_COOKIE_NAME, SESSION_DURATION_MS } from "@/config/constan
  * voit que ses dossiers ; chaque service revérifie `salesRepId` côté serveur.
  */
 export type SalesSession = {
-  rep: { id: string; email: string; firstName: string; lastName: string; fullName: string; initials: string };
+  /** `phone` : le numéro saisi sur la fiche du commercial, ou null (la plaquette ne l'affiche que s'il existe). */
+  rep: { id: string; email: string; firstName: string; lastName: string; fullName: string; initials: string; phone: string | null };
   sessionId: string;
 };
 
@@ -44,7 +45,7 @@ export const getSalesSession = cache(async (): Promise<SalesSession | null> => {
   if (!session || session.revokedAt || session.expiresAt < new Date() || !session.salesRep.isActive) return null;
   const rep = session.salesRep;
   return {
-    rep: { id: rep.id, email: rep.email, firstName: rep.firstName, lastName: rep.lastName, fullName: `${rep.firstName} ${rep.lastName}`, initials: `${rep.firstName[0] ?? ""}${rep.lastName[0] ?? ""}`.toUpperCase() },
+    rep: { id: rep.id, email: rep.email, firstName: rep.firstName, lastName: rep.lastName, fullName: `${rep.firstName} ${rep.lastName}`, initials: `${rep.firstName[0] ?? ""}${rep.lastName[0] ?? ""}`.toUpperCase(), phone: rep.phone?.trim() || null },
     sessionId: session.id,
   };
 });

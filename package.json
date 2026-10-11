@@ -35,6 +35,7 @@
     "publication:etat": "node scripts/etat-publication.mjs",
     "installateur:construire": "node scripts/construire-installateur.mjs",
     "apercu:banniere": "tsx scripts/apercu-banniere.ts",
+    "plaquette:pdf": "tsx scripts/plaquette-pdf.ts",
     "agent:build": "node -e \"require('esbuild').buildSync({entryPoints:['agent/src/index.ts'],bundle:true,platform:'node',target:'node18',format:'cjs',outfile:'agent/dist/pharmaboost-connect.js',banner:{js:'#!/usr/bin/env node'}})\" && npm run agent:build:journal",
     "onboarding:parcours": "EMAIL_PROVIDER=none SIGNATURE_PROVIDER=none node --env-file=.env --conditions=react-server --import tsx scripts/onboarding/parcours.mts",
     "lot:isolation": "node --env-file=.env --conditions=react-server --import tsx scripts/lot-pharmacienne/isolation.mts",
