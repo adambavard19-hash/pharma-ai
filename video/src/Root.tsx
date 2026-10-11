@@ -7,6 +7,8 @@ import { PRESENTATION } from "./films/presentation";
 import { POURQUOI } from "./films/pourquoi";
 import { AVANTAGES } from "./films/avantages";
 import { SANS_ORDONNANCE } from "./films/sans-ordonnance";
+import { PARTENAIRES } from "./films/partenaires";
+import { Reel, calculateReelMetadata } from "./films/reel";
 
 /** Les films de la série, 16:9, 60 images/s. L'identifiant sert au rendu (scripts/export.mjs). */
 export const FILMS: Record<string, FilmSpec> = {
@@ -16,6 +18,7 @@ export const FILMS: Record<string, FilmSpec> = {
   Pourquoi: POURQUOI,
   Avantages: AVANTAGES,
   SansOrdonnance: SANS_ORDONNANCE,
+  Partenaires: PARTENAIRES,
 };
 
 const components = Object.fromEntries(
@@ -32,6 +35,8 @@ export function Root() {
       {Object.entries(FILMS).map(([id, spec]) => (
         <Composition key={id} id={id} component={components[id]} durationInFrames={filmDuration(spec)} fps={OUT_FPS} width={1920} height={1080} />
       ))}
+      {/* Le reel Instagram, vertical : sa durée vient des fichiers de voix (scripts/reel.mjs pour le rendu). */}
+      <Composition id="Reel" component={Reel} calculateMetadata={calculateReelMetadata} defaultProps={{ voices: null }} durationInFrames={1700} fps={60} width={1080} height={1920} />
     </>
   );
 }

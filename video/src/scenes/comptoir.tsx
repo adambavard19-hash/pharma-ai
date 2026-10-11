@@ -87,7 +87,7 @@ export function BannerPlay({ sale, start, acts, place, highlight, children }: { 
 }
 
 /** Le fond de chaque plan : le logiciel de gestion, le lecteur et ses boîtes, la bannière, les légendes, le pointeur. */
-function CounterStage({
+export function CounterStage({
   intro,
   len,
   sale,

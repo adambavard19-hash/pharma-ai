@@ -87,6 +87,29 @@ const PRESETS = {
     risers: [[4, 5], [9, 10]],
     holdFrom: 10,
   },
+  // Partenaires (44 s) : 120 BPM, 22 mesures, pour les laboratoires et les marques (src/films/partenaires.tsx).
+  // Ouverture 0–2, comptoir 2–5, écran de vente 5–9 (le cœur : la carte « gamme partenaire »), vitrine 9–12,
+  // commande et chiffres 12–16,5, crédibilité 16,5–19 (relancée par un impact), carte de fin sur 19.
+  partenaires: {
+    bpm: 120, bars: 22,
+    layers: (b) => (b < 1 ? QUIET : b < 2 ? L({ arp: 0.45, bright: 0.45 }) : b < 5 ? L({ arp: 0.6, bass: 0.5, hat: 0.5, bright: 0.5 }) : b < 9 ? DRIVE : b < 12 ? L({ ...DRIVE, bright: 0.85 }) : b < 16 ? L({ arp: 0.7, bass: 0.6, hat: 0.6, bright: 0.6 }) : b < 17 ? BREATH : b < 19 ? PEAK : END),
+    chord: (b) => (b >= 21 ? C : b === 20 ? G : b === 19 ? F : MAJOR[b % 4]),
+    impacts: [{ at: 0.13, gain: 0.6 }, { at: 2, gain: 0.45 }, { at: 5, gain: 0.6 }, { at: 16.5, gain: 0.6 }, { at: 19, gain: 1 }],
+    risers: [[1, 2], [4, 5], [15.5, 16.5], [18, 19]],
+    holdFrom: 19,
+  },
+  // Le reel Instagram (≈ 28 s, vertical, voix off — src/films/reel.tsx) : 120 BPM, 16 mesures (32 s ; le film
+  // s'arrête avant, en fondu). Sous la voix, la piste reste à −18 dB : une pulsation continue, mineure sur le
+  // problème (0–8 s), majeure dès « Avec PharmaBoost » (8 s), au plus fort sur le chiffre d'affaires (18–22 s),
+  // accord tenu sur la carte de fin. Les impacts suivent la voix : ils sont posés par le montage, pas ici.
+  reel: {
+    bpm: 120, bars: 16,
+    layers: (b) => (b < 1 ? L({ arp: 0.6, bass: 0.6, kick: 0.7, hat: 0.5, bright: 0.55 }) : b < 4 ? L({ arp: 0.55, bass: 0.6, kick: 0.5, hat: 0.4, bright: 0.4 }) : b < 9 ? DRIVE : b < 11 ? PEAK : END),
+    chord: (b) => (b >= 13 ? C : b === 12 ? G : b === 11 ? F : b < 4 ? MINOR[b % 4] : MAJOR[b % 4]),
+    impacts: [{ at: 0, gain: 0.7 }],
+    risers: [[3.5, 4], [8.5, 9]],
+    holdFrom: 13,
+  },
 };
 
 function compose(name, p) {

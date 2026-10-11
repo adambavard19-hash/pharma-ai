@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, Building2, Check, Store, UserRound, X } from "lucide-react";
 import { HAIRLINE, Kicker, SectionHead } from "../_components/site-shell";
+import { VideoButton } from "../_components/video-dialog";
 import { PartnerApplicationForm } from "./partner-application-form";
 import { PharmaLogo } from "@/components/app/logo";
 import { INTEGRATION_MODE_LABELS, type IntegrationMode } from "@/core/partners/status";
@@ -17,7 +18,9 @@ export const metadata: Metadata = {
 /**
  * PharmaBoost Partenaires, côté laboratoires et marques : ce que c'est, ce
  * que ça ne change pas, comment candidater. Aucun partenaire, logo, chiffre
- * ni témoignage ici : rien de ce qui n'existe pas encore n'est affiché.
+ * ni témoignage ici : rien de ce qui n'existe pas encore n'est affiché. Le
+ * film (« Voir la vidéo ») montre une marque d'exemple, dite à l'écran, et
+ * aucun chiffre.
  */
 
 const FOR_PHARMACY = [
@@ -84,13 +87,15 @@ export default function PartnersPage() {
             <p className="mt-7 max-w-xl text-[17px] leading-7 text-text-secondary">
               PharmaBoost Partenaires permet à un laboratoire ou à une marque de présenter ses gammes aux officines qui utilisent PharmaBoost : catalogue, conditions professionnelles, formations, commande. Dans un espace à part, signalé comme tel. Le conseil au patient, lui, ne change pas.
             </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <Link href="#candidature" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white shadow-sm hover:bg-brand-700">
                 Déposer une candidature <ArrowRight className="size-4" />
               </Link>
               <Link href="#engagements" className="inline-flex h-12 items-center justify-center rounded-full border border-border-default px-7 text-[15px] font-semibold text-text-primary hover:border-brand-400">
                 Nos engagements
               </Link>
+              {/* Le film des partenaires (la marque et le laboratoire y sont des exemples, dits à l'écran) : à la suite des deux liens, sur une seconde ligne quand la colonne est étroite. */}
+              <VideoButton film="partenaires" label="Voir la vidéo" className="justify-center sm:justify-start" />
             </div>
           </div>
           <PartnerFlowVisual />

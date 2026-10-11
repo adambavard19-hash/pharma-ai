@@ -166,6 +166,56 @@ dessin de l'application : rayons 12 à 16 px, bouton « Conseiller » en dégrad
 Les besoins, questions et signaux d'alerte sont ceux de
 `src/core/understanding/needs.ts` et `src/core/counter/request.ts`.
 
+## Partenaires — `Partenaires`, 44 s, 120 BPM (22 mesures)
+
+Pour les laboratoires et les marques. Sur le site : page
+`decouvrir/partenaires`, bouton « Voir la vidéo » de l'accueil de la page
+(`FILMS.partenaires`, `public/video/pharmaboost-partenaires.mp4`, affiche image
+880). La promesse, décidée par le fondateur : de la **visibilité**, le conseil
+**intact**. Ce que la carte montre passe par le code de l'application : le
+besoin vient du moteur de conseil (`advice.ts`) sur la vente `antibiotique`, la
+carte du sélecteur `selectCounterCards` (`src/core/partners/counter-card.ts`),
+calculée APRÈS le moteur ; son texte par `universeLabel`
+(`src/config/universes.ts`). Si le sélecteur ne la montrait pas, le rendu
+échouerait. Les écrans (`src/ui/partner.tsx`) sont redessinés d'après
+`vente/[id]/partner-cards.tsx`, `advice-zone.tsx`, `delivery-zone.tsx`,
+`partenaires/[slug]/page.tsx`, `partner-actions.tsx` et les statistiques
+agrégées (`stats.ts`).
+
+| Temps | Image | Texte à l'écran |
+|---|---|---|
+| 0–4 | Fond bleu-vert | « Votre marque, **au comptoir des pharmacies.** » · « Pour les laboratoires et les marques. » |
+| 4–10 | Logiciel de gestion, AMOXICILLINE 1 g au scan ; la bannière « En attente de scan… » → « 1 conseil disponible » → ouverte : PROBIOTIQUE 30 gélules, raison du moteur ; le pointeur clique « Voir le détail » (qui ouvre la vente dans PharmaBoost). Aucune gamme partenaire sur la bannière : elle n'en montre jamais | « À chaque scan, le moteur **cherche un besoin.** » (aucune promesse de fréquence) · « Le moteur retient **le besoin.** » · « Ici : la flore intestinale, pendant l'antibiotique. » |
+| 10–18 | L'écran de vente sur ~700 px (une colonne, comme l'application sous 1 280 px) : la carte du conseil (« Conseil associé », PROBIOTIQUE 30 gélules 14,90 €, Proposer / Autre produit / Ignorer), « Délivrance », puis à part la carte « À découvrir · gamme partenaire » : « Marque A · Laboratoire A », « Une alternative existe dans cet univers : compléments alimentaires. », « Voir la gamme », la mention « …Elle n'entre jamais dans le choix des conseils. » ; le pointeur clique « Voir la gamme » | « Votre gamme **peut** apparaître, **au bon moment.** » · « Quand le besoin retenu entre dans votre univers, si l'officine ne l'a pas masquée : à part, sous les conseils. » |
+| 18–24 | La page de la marque : Gamme Ferments (3 produits, prix pro HT, prix public conseillé), Conditions professionnelles (Offre d'implantation), Formations | « Votre **vitrine.** » · Gammes et produits · Conditions professionnelles · Formations |
+| 24–29 | « Contacter ou commander » (lien B2B) : « Ouvrir le portail B2B » → « Portail ouvert dans un nouvel onglet, avec cet identifiant : PB-7K3M-Q9TD » ; à gauche : Lien B2B attribué, Formulaire, E-mail | « Commander, **simplement.** » |
+| 29–33 | « Bilan · Marque A », « Communiqué par l'équipe PharmaBoost. » (aucun espace partenaire n'existe), « Agrégats uniquement » ; les quatre compteurs réels SANS chiffre (une pastille à la place de chaque valeur, même largeur pour tous) | Surtitre « Ce que vous recevez » · « Des chiffres **d'ensemble.** » · « Rien sur les patients. Une demande ou une commande ne vous parvient que si l'officine la passe. » |
+| 33–38 | Fond bleu-vert, quatre cases courtes | « Ce qui fait votre crédibilité : le conseil reste **indépendant.** » · Votre gamme, à part, signalée comme partenaire · Une gamme ne remplace jamais un conseil · Le titulaire peut masquer une marque · Rien sur un patient n'est transmis |
+| 38–44 | Carte de fin | « Votre marque, visible. **Le conseil, indépendant.** » → « Devenir partenaire → » · pharmaboost.app |
+
+Ce qu'il ne faut pas promettre, et pourquoi :
+
+- **« peut » apparaître.** Le sélecteur garde UNE marque par besoin (la
+  première par ordre alphabétique) et deux cartes au plus par vente ; il n'en
+  montre pas pour une marque masquée ou refusée par l'officine, ni quand le
+  produit conseillé est déjà de cette marque.
+- **Aucun chiffre de statistiques.** Aucun partenaire n'existe encore ; des
+  nombres, même dits « exemple », se liraient comme des résultats.
+- **« aucune officine nommée » vaut pour les compteurs seulement** : une
+  demande de contact ou une commande transmet au laboratoire le nom, la ville,
+  le FINESS, l'e-mail et le téléphone de l'officine qui la passe
+  (`partner-actions.tsx`).
+
+Aucun partenaire réel : « Marque A », « Laboratoire A », produits, prix,
+conditions et formations d'exemple, dits à l'écran sur chaque plan. Jamais
+« recommandée », jamais « comme conseil », aucune promesse de ventes, aucun
+témoignage. Le produit conseillé (PROBIOTIQUE, sans marque) n'est pas de la
+marque partenaire : sinon la carte ne s'afficherait pas. Entre deux plans
+clairs, le plan qui sort s'efface dans son fond (`Veil`) avant que le suivant
+n'entre : jamais deux écrans ni deux mentions lisibles l'un sur l'autre. Les
+modules de l'application lus par ce film importent leurs types par « @/ » :
+d'où le `paths` de `tsconfig.json`.
+
 ## Les règles des films
 
 - **Ce qu'une vente montre, le moteur le ferait.** Chaque conseil d'une vente
@@ -206,8 +256,9 @@ Les besoins, questions et signaux d'alerte sont ceux de
   stocks d'exemple.
 - « Mon équipe » montre ce que l'écran du titulaire montre : rang, proposés,
   validés, taux, challenges en cours. Noms et chiffres d'exemple.
-- Pas de robot, de partenaires, de formations ni de nouvelles des patients.
-- Bouton principal : « Réserver une démo ».
+- Pas de robot, de partenaires, de formations ni de nouvelles des patients
+  (sauf le film `Partenaires`, qui en parle aux laboratoires).
+- Bouton principal : « Réserver une démo » (« Devenir partenaire » pour `Partenaires`).
 
 ## Affiches du site
 
@@ -217,7 +268,9 @@ les deux conseils, « Choisi dans votre stock. »), CommentCaMarche 574 (« 2
 conseils disponibles »), Pourquoi 910 (la bannière sur l'amoxicilline,
 probiotique « Vendu », « Le patient repart avec le bon conseil. »), Avantages
 1213 (05, Vendu / Non vendu et les pastilles), SansOrdonnance 800 (la demande
-comprise et les deux produits).
+comprise et les deux produits), Partenaires 880 (l'écran de vente : le conseil
+du moteur, « Délivrance », puis la carte « À découvrir · gamme partenaire »
+entourée).
 
 Le film de lancement (`Lancement`, 50 s, 1er octobre 2026) est archivé : il
 date d'avant la bannière (avis en coin d'écran, « bip ») et n'est plus sur le
@@ -231,7 +284,7 @@ npm run sons                         # effets et musiques (générés par code, 
 npm run studio                       # aperçu en direct sur http://localhost:3123
 npm run brouillon -- CommentCaMarche # 960×540 → out/brouillons/…-540p.mp4, pour relire le montage
 npm run web -- Presentation          # un film du site → ../public/video/<film>.mp4 + affiche <film>.jpg (≈ 2 min 30)
-npm run web                          # les cinq films du site, à la suite
+npm run web                          # les films du site et Partenaires, à la suite (sans Lancement)
 npm run final -- Presentation        # master 4K, puis out/…-4k.mp4 et out/…-1080p.mp4 (archives)
 ```
 

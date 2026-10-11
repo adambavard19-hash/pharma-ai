@@ -207,11 +207,11 @@ export function Cursor({ x, y, press = 0, click = -1, opacity = 1 }: { x: number
   );
 }
 
-/** Le bouton principal du site, « Réserver une démo » : une pilule, la flèche. Blanc sur les fonds sombres. */
-export function CtaButton({ shine, dark = true }: { shine: number; dark?: boolean }) {
+/** Le bouton principal du site, « Réserver une démo » : une pilule, la flèche. Blanc sur les fonds sombres. `label` le renomme (« Devenir partenaire »). */
+export function CtaButton({ shine, dark = true, label = "Réserver une démo" }: { shine: number; dark?: boolean; label?: string }) {
   return (
     <div style={{ position: "relative", overflow: "hidden", display: "inline-flex", alignItems: "center", gap: 16, height: 92, padding: "0 50px", borderRadius: 999, background: dark ? C.white : C.brand600, color: dark ? C.brand700 : C.white, fontSize: 36, fontWeight: 600, letterSpacing: "-0.01em", boxShadow: dark ? "0 30px 60px -24px rgba(0,0,0,.5)" : SHADOW.lift }}>
-      Réserver une démo <ArrowRight size={36} strokeWidth={2.4} />
+      {label} <ArrowRight size={36} strokeWidth={2.4} />
       <div style={{ position: "absolute", top: 0, bottom: 0, width: 120, left: -160 + shine * 760, background: "linear-gradient(100deg, transparent, rgba(255,255,255,.0) 20%, rgba(54,232,200,.3) 50%, transparent 80%)" }} />
     </div>
   );

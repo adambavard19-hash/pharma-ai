@@ -18,6 +18,8 @@ export const FILMS = {
   pourquoi: { src: "/video/pharmaboost-pourquoi.mp4", poster: "/video/pharmaboost-pourquoi.jpg", duration: "34 s", title: "Pourquoi PharmaBoost" },
   avantages: { src: "/video/pharmaboost-avantages.mp4", poster: "/video/pharmaboost-avantages.jpg", duration: "38 s", title: "Les avantages" },
   sansOrdonnance: { src: "/video/pharmaboost-sans-ordonnance.mp4", poster: "/video/pharmaboost-sans-ordonnance.jpg", duration: "25 s", title: "Sans ordonnance" },
+  // Pour les laboratoires et les marques (page Partenaires) : 2 640 images = 44 s.
+  partenaires: { src: "/video/pharmaboost-partenaires.mp4", poster: "/video/pharmaboost-partenaires.jpg", duration: "44 s", title: "PharmaBoost pour les partenaires" },
 } as const;
 
 export type FilmKey = keyof typeof FILMS;

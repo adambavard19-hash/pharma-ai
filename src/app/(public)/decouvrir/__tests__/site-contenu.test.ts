@@ -285,5 +285,7 @@ describe("les durées affichées des films", () => {
     expect(FILMS.presentation.duration).toBe("48 s");
     expect(FILMS.pourquoi.duration).toBe("34 s");
     expect(FILMS.sansOrdonnance.duration).toBe("25 s");
+    // Partenaires : 2 640 images à 60 i/s.
+    expect(FILMS.partenaires.duration).toBe("44 s");
   });
 });

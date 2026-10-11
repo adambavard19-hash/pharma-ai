@@ -3,7 +3,7 @@
 //   node scripts/export.mjs final [Film…]      → master 4K, puis out/<film>-4k.mp4 et out/<film>-1080p.mp4
 //   node scripts/export.mjs exports [Film…]    → seulement les fichiers finaux, depuis les masters existants
 //   node scripts/export.mjs web [Film…]        → les fichiers du site : ../public/video/<film>.mp4 et son affiche <film>.jpg
-// Sans nom de film : tous les films (en mode web : les cinq films du site, sans Lancement).
+// Sans nom de film : tous les films (en mode web : les films du site et Partenaires, sans Lancement).
 // Les noms sont les identifiants de src/Root.tsx.
 //
 // Netteté : le final est calculé en 4K (échelle 2, images JPEG qualité 100) puis
@@ -23,6 +23,7 @@ const FILES = {
   Pourquoi: "pharmaboost-pourquoi",
   Avantages: "pharmaboost-avantages",
   SansOrdonnance: "pharmaboost-sans-ordonnance",
+  Partenaires: "pharmaboost-partenaires",
 };
 /**
  * L'affiche de chaque film du site : une image du film (numéro d'image à 60/s),
@@ -40,6 +41,8 @@ const POSTERS = {
   Avantages: 1213,
   // La demande comprise : besoins reconnus, « À vérifier avant de proposer », deux produits en rayon avec prix et stock.
   SansOrdonnance: 800,
+  // L'écran de vente : le conseil du moteur, « Délivrance », puis à part la carte « À découvrir · gamme partenaire » entourée.
+  Partenaires: 880,
 };
 const SITE = "../public/video";
 

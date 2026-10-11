@@ -13,7 +13,7 @@ import { Sfx } from "./sfx";
  * nom, la promesse du site et le bouton principal (« Réserver une démo »).
  * Sur le bleu-vert profond de la bannière. ~6,5 s.
  */
-export function EndCard({ intro, lead }: { intro: number; lead: Word[][] }) {
+export function EndCard({ intro, lead, cta: ctaLabel, tagline = "Le copilote du comptoir officinal." }: { intro: number; lead: Word[][]; /** Le texte du bouton, « Réserver une démo » par défaut. */ cta?: string; tagline?: string }) {
   const f = useF();
   const enter = tw(f, [-intro, -2], [0, 1]);
   const flash = Math.max(0, tw(f, [-4, 0], [0, 0.35]) - tw(f, [0, 12], [0, 0.35]));
@@ -41,10 +41,10 @@ export function EndCard({ intro, lead }: { intro: number; lead: Word[][] }) {
           <Logo size={LOGO} />
         </At>
         <At x={0} y={600} w={1920}>
-          <Kinetic at={L0 + 40} size={56} color={C.brand100} weight={500} align="center" tracking="-0.015em" stagger={2} lines={[words("Le copilote du comptoir officinal.")]} />
+          <Kinetic at={L0 + 40} size={56} color={C.brand100} weight={500} align="center" tracking="-0.015em" stagger={2} lines={[words(tagline)]} />
         </At>
         <At x={0} y={730} w={1920} style={{ display: "flex", justifyContent: "center", opacity: Math.min(1, cta * 1.4), transform: `translateY(${(1 - cta) * 30}px) scale(${0.92 + 0.08 * cta})` }}>
-          <CtaButton shine={tw(f, [L0 + 96, L0 + 136], [0, 1])} />
+          <CtaButton shine={tw(f, [L0 + 96, L0 + 136], [0, 1])} label={ctaLabel} />
         </At>
         <At x={0} y={858} w={1920} style={{ textAlign: "center", fontSize: 30, fontWeight: 500, letterSpacing: "0.02em", color: C.brand200, opacity: tw(f, [L0 + 84, L0 + 100], [0, 1]) }}>
           pharmaboost.app

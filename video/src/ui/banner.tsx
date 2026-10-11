@@ -449,6 +449,8 @@ export function bannerTarget(b: BannerFrame, key: string): { x: number; y: numbe
   const { w, h, notice, s } = b;
   if (key === "see") return { x: 104 + (w - 124) / 2, y: 78 + Z.buttonHeight / 2 };
   if (key === "mail") return { x: 24 + (LIST_W - 138 - 8) / 2, y: h - 10 - FOOT_H + 1 + 8 + Z.buttonHeight / 2 };
+  // « Voir le détail » : la case de 138 px à droite de la ligne de l'e-mail (elle ouvre la vente dans PharmaBoost).
+  if (key === "detail") return { x: 24 + LIST_W - 138 / 2, y: h - 10 - FOOT_H + 1 + 8 + Z.buttonHeight / 2 };
   if (key === "finish") return { x: 24 + LIST_W / 2, y: h - 10 - 12 - Z.finishHeight / 2 };
   const mailTop = h - MAIL_H;
   if (key === "mailInput") return { x: -MAIL_W - 16 + 18 + 120, y: mailTop + 63 };
@@ -785,7 +787,7 @@ function Expanded({ b, highlight }: { b: BannerFrame; highlight?: (key: string) 
                 {T.emailAdd}
               </span>
             )}
-            <span style={{ height: Z.buttonHeight, borderRadius: 14, border: "1.4px solid #bed0da", background: K.panel, color: K.ink, fontWeight: 700, fontSize: 13, display: "grid", placeItems: "center", boxSizing: "border-box" }}>{T.detail}</span>
+            <span style={{ height: Z.buttonHeight, borderRadius: 14, border: "1.4px solid #bed0da", background: K.panel, color: K.ink, fontWeight: 700, fontSize: 13, display: "grid", placeItems: "center", boxSizing: "border-box", ...pressStyle(press("detail")) }}>{T.detail}</span>
           </div>
           <span style={{ height: Z.finishHeight, borderRadius: 16, background: GO, color: "#fff", fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, ...pressStyle(press("finish")) }}>
             {s.finishing ? T.finishing : <><Icon name="tick" size={18} color="#fff" width={2.4} />{T.finish}</>}
