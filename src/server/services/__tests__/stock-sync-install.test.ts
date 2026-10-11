@@ -35,6 +35,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.useFakeTimers({ now: NOW });
   db.counterPost.create.mockResolvedValue({ id: "post_1" });
+  db.counterPost.findMany.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -168,6 +169,7 @@ describe("l'audit nomme celui qui a émis le code, jamais le code", () => {
     expect(call).toMatchObject({ action: "stock.post_pairing_created", platformAdminId: "adm_1", userId: null, metadata: { label: "Comptoir 1", kind: "install-link", by: "console" } });
     expect(JSON.stringify(call)).not.toContain(link.token);
     expect(db.counterPost.create.mock.calls[0][0].data.pairingCodeHash).toBe(sha(link.token));
+    expect(db.counterPost.create.mock.calls[0][0].data.robotLook).toBe(0); // le premier robot libre de la pharmacie
     expect(link.postId).toBe("post_1");
 
     await service.createPostInstallLink(SCOPE, null);

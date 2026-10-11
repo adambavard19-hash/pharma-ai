@@ -8,6 +8,8 @@ import { useRobotSignal } from "./bus";
 import { robotCss } from "./robot-css";
 import { playRobotSound } from "./sound";
 import { soundFor, type SoundContext } from "@/core/robot/sound";
+import { robotLook } from "@/core/robot/counter-look";
+import { FaceAccessory, HeadAccessory } from "./accessories";
 
 /**
  * Le robot de PharmaBoost, vivant : un seul composant pour tout le web (site, application mobile, comptoir).
@@ -56,6 +58,8 @@ export type RobotProps = {
   motion?: "auto" | "reduce";
   /** Rend le robot lisible par un lecteur d'écran. Sans label : décoratif. */
   label?: string;
+  /** Le robot d'un comptoir (0 à 19, core/robot/counter-look.ts) : sa couleur et son accessoire. Sans valeur : le robot de la marque. */
+  look?: number | null;
 };
 
 // --- Réduire les animations : le réglage du système, lu sans scintillement au premier rendu ---
@@ -107,7 +111,11 @@ export function Robot({
   sound,
   motion = "auto",
   label,
+  look: lookIndex,
 }: RobotProps) {
+  const look = typeof lookIndex === "number" ? robotLook(lookIndex) : null;
+  const earTop = look ? look.palette.ear : C.ear;
+  const earBottom = look ? look.palette.earDark : "#12968C";
   const rawId = useId();
   const uid = `rbt${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
   const rootRef = useRef<HTMLSpanElement>(null);
@@ -287,7 +295,7 @@ export function Robot({
     <span
       ref={rootRef}
       className={cn("rbt", className)}
-      style={{ ...sizeStyle, ...style }}
+      style={{ ...sizeStyle, ...(look ? ({ "--rbt-lamp": look.palette.lamp } as CSSProperties) : null), ...style }}
       data-mood={shownMood}
       data-face={face}
       data-burst={activeBurst ?? undefined}
@@ -306,7 +314,7 @@ export function Robot({
         <defs>
           <linearGradient id={`${uid}-shell`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.shellTop} /><stop offset="1" stopColor={C.shellBottom} /></linearGradient>
           <linearGradient id={`${uid}-screen`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.screenTop} /><stop offset="1" stopColor={C.screenBottom} /></linearGradient>
-          <linearGradient id={`${uid}-ear`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.ear} /><stop offset="1" stopColor="#12968C" /></linearGradient>
+          <linearGradient id={`${uid}-ear`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={earTop} /><stop offset="1" stopColor={earBottom} /></linearGradient>
           <linearGradient id={`${uid}-badge`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent} /><stop offset="1" stopColor={C.accentDark} /></linearGradient>
         </defs>
         {floating && <ellipse className="rbt-shadow" cx={50} cy={110} rx={26} ry={4.5} fill={C.screenBottom} />}
@@ -322,11 +330,12 @@ export function Robot({
                 <line x1={50} y1={17} x2={50} y2={8} stroke={C.shellEdge} strokeWidth={tiny ? 4 : 3} strokeLinecap="round" />
                 <circle className="rbt-glow" cx={50} cy={6} r={8} />
                 <circle className="rbt-lamp" cx={50} cy={6} r={tiny ? 4.6 : 3.8} />
-                {!tiny && <path d="M 9.90 36.72 A 41 35 0 0 1 90.10 36.72" fill="none" stroke={C.ear} strokeWidth={5} strokeLinecap="round" />}
+                {!tiny && <path d="M 9.90 36.72 A 41 35 0 0 1 90.10 36.72" fill="none" stroke={earTop} strokeWidth={5} strokeLinecap="round" />}
                 <rect x={3} y={36} width={15} height={28} rx={7} fill={`url(#${uid}-ear)`} />
                 <rect x={82} y={36} width={15} height={28} rx={7} fill={`url(#${uid}-ear)`} />
                 <rect x={14} y={16} width={72} height={58} rx={24} fill={`url(#${uid}-shell)`} stroke={C.shellEdge} strokeWidth={1.6} />
                 <rect x={22} y={25} width={56} height={40} rx={17} fill={`url(#${uid}-screen)`} />
+                {look && <HeadAccessory look={look} />}
 
                 {/* Les sourcils de l'inquiétude : l'intérieur relevé, sérieux, jamais fâché. */}
                 <path className="rbt-brow" d="M 32.5 34.6 L 42.5 32.2 M 57.5 32.2 L 67.5 34.6" stroke={C.eye} strokeWidth={2.2} strokeLinecap="round" fill="none" />
@@ -356,6 +365,8 @@ export function Robot({
                 <path className="rbt-m rbt-m-worry" d="M 44 56.2 Q 50 53.4 56 56.2" fill="none" stroke={C.eye} strokeWidth={2.6} strokeLinecap="round" />
                 <line className="rbt-m rbt-m-sleep" x1={46.5} y1={55} x2={53.5} y2={55} stroke={C.eye} strokeWidth={2.4} strokeLinecap="round" />
                 <path className="rbt-m rbt-m-wave" d="M 42 55 q 2 -2.4 4 0 t 4 0 t 4 0 t 4 0" fill="none" stroke={C.eye} strokeWidth={2.2} strokeLinecap="round" />
+
+                {look && <FaceAccessory look={look} />}
 
                 <circle cx={74} cy={69} r={15} fill="#fff" fillOpacity={0.95} />
                 <circle cx={74} cy={69} r={13.5} fill={`url(#${uid}-badge)`} />

@@ -49,7 +49,7 @@ export function robotCss(): string {
 .rbt[data-blink] .rbt-lids{transform:scaleY(.08)}
 .rbt-eyescale{transition:transform .3s cubic-bezier(.3,1.4,.5,1)}
 .rbt-act{transition:transform .5s cubic-bezier(.3,1.25,.5,1)}
-.rbt-lamp,.rbt-glow{fill:${C.eye};transition:fill .4s}
+.rbt-lamp,.rbt-glow{fill:var(--rbt-lamp,${C.eye});transition:fill .4s}
 
 /* Les expressions : une seule paire d'yeux et une seule bouche visibles à la fois. */
 .rbt-eh,.rbt-es,.rbt-ez,.rbt-brow,.rbt-m,.rbt-dots,.rbt-z,.rbt-hand,.rbt-confetti,.rbt-pop{display:none}

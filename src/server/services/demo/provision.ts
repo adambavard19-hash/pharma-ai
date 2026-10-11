@@ -259,7 +259,7 @@ export async function installDemoPharmacy(options: InstallOptions = {}): Promise
   // Le poste est « relié » et son export du stock « configuré » : la page de mise en service n'a rien à réclamer.
   const postData = { label: DEMO_POST.label, version: "démo", pairedAt: now, lastSeenAt: now, lastScanAt: null, scanCount: 0, revokedAt: null, exportPath: "\\\\SERVEUR\\PharmaBoost\\Export", lastExportAt: now, lastExportError: null };
   if (existingPost) await prisma.counterPost.update({ where: { id: existingPost.id }, data: postData });
-  else await prisma.counterPost.create({ data: { pharmacyId: pharmacy.id, hostname: DEMO_POST.hostname, ...postData } });
+  else await prisma.counterPost.create({ data: { pharmacyId: pharmacy.id, hostname: DEMO_POST.hostname, robotLook: 0, ...postData } });
 
   const preferred = productIds.get("probio-flore-10");
   const excluded = productIds.get("echinacea-immunite");

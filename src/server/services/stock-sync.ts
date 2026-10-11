@@ -1,4 +1,5 @@
 import "server-only";
+import { nextLookIndex } from "@/core/robot/counter-look";
 import { randomInt } from "node:crypto";
 import { prisma } from "@/server/db/client";
 import { generateToken, hashToken } from "@/server/security/tokens";
@@ -144,6 +145,12 @@ export type AgentContext = {
   scansPath: string | null;
 };
 
+/** Le robot du nouveau comptoir : le premier libre de la pharmacie (voir core/robot/counter-look.ts). */
+async function nextRobotLook(pharmacyId: string): Promise<number> {
+  const posts = await prisma.counterPost.findMany({ where: { pharmacyId, revokedAt: null }, select: { robotLook: true } });
+  return nextLookIndex(posts.map((post) => post.robotLook));
+}
+
 const POST_PAIRING_TTL_MS = 1000 * 60 * 60;
 /** Un lien d'installation vit une semaine : le titulaire le fait quand il a le poste sous la main. */
 const POST_INSTALL_LINK_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -153,7 +160,7 @@ export async function createPostPairing(scope: TenantScope, label: string | null
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const expiresAt = new Date(Date.now() + POST_PAIRING_TTL_MS);
   const post = await prisma.counterPost.create({
-    data: { pharmacyId: scope.pharmacyId, hostname: "", label, pairingCodeHash: hashToken(code), pairingExpiresAt: expiresAt },
+    data: { pharmacyId: scope.pharmacyId, hostname: "", label, pairingCodeHash: hashToken(code), pairingExpiresAt: expiresAt, robotLook: await nextRobotLook(scope.pharmacyId) },
   });
   await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), metadata: { label, kind: "code", ...(actor ? { by: "console" } : {}) } });
   return { code, expiresAt, postId: post.id };
@@ -169,7 +176,7 @@ export async function createPostInstallLink(scope: TenantScope, label: string | 
   const token = generateToken(18);
   const expiresAt = new Date(Date.now() + POST_INSTALL_LINK_TTL_MS);
   const post = await prisma.counterPost.create({
-    data: { pharmacyId: scope.pharmacyId, hostname: "", label, pairingCodeHash: hashToken(token), pairingExpiresAt: expiresAt },
+    data: { pharmacyId: scope.pharmacyId, hostname: "", label, pairingCodeHash: hashToken(token), pairingExpiresAt: expiresAt, robotLook: await nextRobotLook(scope.pharmacyId) },
   });
   await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), metadata: { label, kind: "install-link", ...(actor ? { by: "console" } : {}) } });
   return { token, expiresAt, postId: post.id };

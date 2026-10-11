@@ -5,7 +5,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/server/db/client", () => ({ prisma: { membership: { findMany: m.membershipFindMany }, counterPost: { findMany: m.postFindMany, findFirst: m.postFindFirst, update: m.postUpdate, updateMany: m.postUpdateMany } } }));
 vi.mock("@/server/audit/log", () => ({ recordAudit: m.audit }));
 
-const { listMembers, listComptoirs, myComptoirs, assignComptoir, renameComptoir } = await import("../comptoirs");
+const { listMembers, listComptoirs, myComptoirs, assignComptoir, renameComptoir, myComptoirRobot } = await import("../comptoirs");
 const scope = { pharmacyId: "ph1", organizationId: "org1", userId: "titulaire" } as never;
 const members = [{ role: "OWNER", user: { id: "titulaire", firstName: "Anne", lastName: "Roux" } }, { role: "PHARMACIST", user: { id: "lea", firstName: "Léa", lastName: "Martin" } }];
 
@@ -33,6 +33,19 @@ describe("l'équipe et les comptoirs d'une pharmacie", () => {
   it("chacun voit les siens : Léa le comptoir 1, le titulaire aucun (plusieurs comptoirs, aucun pour lui)", async () => {
     expect((await myComptoirs({ pharmacyId: "ph1", userId: "lea" })).postIds).toEqual(["p1"]);
     expect(await myComptoirs({ pharmacyId: "ph1", userId: "titulaire" })).toMatchObject({ postIds: [], mode: "NONE" });
+  });
+});
+
+describe("le robot de mon comptoir", () => {
+  it("le robot du premier comptoir attribué à la personne, dans SA pharmacie, avec « Prénom · Comptoir »", async () => {
+    m.postFindFirst.mockResolvedValue({ label: "Comptoir 2", hostname: "PC-2", robotLook: 1 });
+    expect(await myComptoirRobot({ pharmacyId: "ph1", userId: "lea" })).toEqual({ look: 1, caption: "Pixel · Comptoir 2" });
+    expect(m.postFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ pharmacyId: "ph1", assignedUserId: "lea", revokedAt: null }) }));
+  });
+
+  it("aucun comptoir attribué : pas de robot de comptoir (le robot de la marque)", async () => {
+    m.postFindFirst.mockResolvedValue(null);
+    expect(await myComptoirRobot({ pharmacyId: "ph1", userId: "titulaire" })).toBeNull();
   });
 });
 

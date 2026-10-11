@@ -1,12 +1,13 @@
 "use client";
 
+import { Robot } from "@/components/robot";
 import { useTransition } from "react";
 import { Monitor } from "lucide-react";
 import { claimComptoirAction, releaseComptoirAction } from "@/server/actions/team-access";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
-export type WorkHereComptoir = { id: string; name: string; assignee: string | null; mine: boolean };
+export type WorkHereComptoir = { id: string; name: string; assignee: string | null; mine: boolean; robotLook?: number | null };
 
 /**
  * « Je travaille ici » : le collaborateur s'identifie au comptoir où il s'installe, d'un clic, sans rien réinstaller. Ses conseils et ses
@@ -42,7 +43,7 @@ export function WorkHere({ comptoirs }: { comptoirs: WorkHereComptoir[] }) {
                   comptoir.mine ? "border-brand-600 bg-brand-600 text-white" : "border-border-default bg-surface-card text-text-primary hover:bg-surface-sunken",
                 )}
               >
-                <Monitor className="size-3.5" aria-hidden />
+                {typeof comptoir.robotLook === "number" ? <Robot size={22} look={comptoir.robotLook} motion="reduce" /> : <Monitor className="size-3.5" aria-hidden />}
                 {comptoir.name}
                 {!comptoir.mine && <span className={cn("font-normal", comptoir.assignee ? "text-text-secondary" : "text-text-tertiary")}>· {comptoir.assignee ?? "libre"}</span>}
                 {comptoir.mine && <span className="font-normal opacity-90">· vous</span>}

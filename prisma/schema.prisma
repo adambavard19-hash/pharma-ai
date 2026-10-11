@@ -293,6 +293,9 @@ model CounterPost {
   revokedAt        DateTime?
   /// Le collaborateur à qui appartient ce comptoir (membre de la pharmacie) ; vide : comptoir partagé / non attribué.
   assignedUserId   String?
+  /// Le robot de ce comptoir (0 à 19, voir core/robot/counter-look.ts) : chaque comptoir a le sien, pour qu'on voie d'un
+  /// coup d'œil si l'on est sur son comptoir. Vide : le robot de la marque.
+  robotLook        Int?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

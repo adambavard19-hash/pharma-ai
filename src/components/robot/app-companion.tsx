@@ -1,5 +1,6 @@
 "use client";
 
+import { useCounterLook } from "./counter-look-context";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -55,6 +56,7 @@ export function AppRobotCompanion() {
   const [signal, setSignal] = useState<{ mood: RobotMood; at: number; holdMs: number } | null>(null);
   const [open, setOpen] = useState(false);
   const mini = useSyncExternalStore(subscribeMini, readMini, () => false);
+  const counterLook = useCounterLook();
   const [tips, setTips] = useState<RobotTip[] | null>(null);
   const [loading, setLoading] = useState(false);
   const dismissed = useDismissedTips();
@@ -204,11 +206,12 @@ export function AppRobotCompanion() {
         )}
       >
         {mini ? (
-          <Robot mood={mood} size={30} />
+          <Robot mood={mood} size={30} look={counterLook?.look} />
         ) : (
           <Robot
             mood={mood}
             cheerKey={signal?.at}
+            look={counterLook?.look}
             floating
             interactive
             sound="counter"

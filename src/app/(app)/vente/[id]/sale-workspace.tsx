@@ -1,5 +1,6 @@
 "use client";
 
+import { useCounterLook } from "@/components/robot/counter-look-context";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -458,6 +459,7 @@ export function SaleWorkspace({
 
   // Le robot du comptoir suit la vente, discret : curieux au bip, pensif pendant l'analyse, sérieux devant une mise en
   // garde (jamais un sourire à côté d'une alerte), content quand un conseil entre dans la délivrance.
+  const counterLook = useCounterLook();
   const robotMood = saleMood({
     analysing,
     editing,
@@ -676,7 +678,7 @@ export function SaleWorkspace({
 
       <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-surface-card p-3.5 shadow-lg sm:gap-4 sm:p-4">
         <span className="hidden shrink-0 sm:block">
-          <Robot mood={robotMood} cheerKey={basket.size} size={56} interactive sound="counter" listen="comptoir" />
+          <Robot mood={robotMood} cheerKey={basket.size} size={56} interactive sound="counter" listen="comptoir" look={counterLook?.look} />
         </span>
         {editing ? (
           <>

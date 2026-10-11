@@ -1,5 +1,7 @@
 "use client";
 
+import { Robot } from "@/components/robot";
+import { robotLook } from "@/core/robot/counter-look";
 import { useRef, useState, useTransition } from "react";
 import { Download, Monitor, Pencil, UserRound } from "lucide-react";
 import { revokePostAction, type OverviewSnapshot } from "@/server/actions/stock-sync";
@@ -26,7 +28,7 @@ type Counter = OverviewSnapshot["overview"]["counters"][number];
 
 const COOLDOWN_MS = 4000;
 
-export function CountersStep({ counters, installerAvailable, members, assignments, onChanged }: { counters: Counter[]; installerAvailable: boolean; members: { id: string; name: string }[]; assignments: Record<string, string | null>; onChanged: () => void }) {
+export function CountersStep({ counters, installerAvailable, members, assignments, robotLooks = {}, onChanged }: { counters: Counter[]; installerAvailable: boolean; members: { id: string; name: string }[]; assignments: Record<string, string | null>; robotLooks?: Record<string, number | null>; onChanged: () => void }) {
   const [started, setStarted] = useState(false);
   const [locked, setLocked] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -89,6 +91,13 @@ export function CountersStep({ counters, installerAvailable, members, assignment
           {listed.map((counter) => (
             <li key={counter.id} className="px-4 py-3">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {/* Le robot de ce comptoir : chacun le sien, pour ne pas se tromper de comptoir le matin. */}
+                {typeof robotLooks[counter.id] === "number" && (
+                  <span className="flex shrink-0 flex-col items-center" title={`Le robot de ce comptoir : ${robotLook(robotLooks[counter.id]!).name}`}>
+                    <Robot size={44} look={robotLooks[counter.id]} motion="reduce" />
+                    <span className="text-[11px] leading-4 font-semibold text-text-secondary">{robotLook(robotLooks[counter.id]!).name}</span>
+                  </span>
+                )}
                 <span className="min-w-0 flex-1 basis-40">
                   {renaming === counter.id ? (
                     <form

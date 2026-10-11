@@ -7,12 +7,20 @@ import { Sidebar } from "@/components/app/sidebar";
 import { Topbar } from "@/components/app/topbar";
 import { MobileNavProvider } from "@/components/app/mobile-nav";
 import { AppRobotCompanion } from "@/components/robot/app-companion";
+import { CounterLookProvider } from "@/components/robot/counter-look-context";
+import { myComptoirRobot } from "@/server/services/comptoirs";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
-  const [unread, supportUnread] = await Promise.all([countUnreadNotifications(session.scope), countPharmacyUnread(session.pharmacy.id)]);
+  const [unread, supportUnread, counterLook] = await Promise.all([
+    countUnreadNotifications(session.scope),
+    countPharmacyUnread(session.pharmacy.id),
+    // Le robot du comptoir de cette personne : le même partout dans le logiciel.
+    myComptoirRobot(session.scope).catch(() => null),
+  ]);
 
   return (
+    <CounterLookProvider value={counterLook}>
     <MobileNavProvider>
       <div className="min-h-dvh bg-surface-app">
         <a href="#contenu" className="skip-link">
@@ -48,5 +56,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <AppRobotCompanion />
       </div>
     </MobileNavProvider>
+    </CounterLookProvider>
   );
 }

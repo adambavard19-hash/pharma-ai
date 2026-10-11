@@ -4,6 +4,7 @@ import { recordAudit } from "@/server/audit/log";
 import type { TenantScope } from "@/server/db/tenant";
 import { createNotification } from "@/server/services/notifications";
 import { planClaim } from "@/core/team/access";
+import { robotLookCaption, type CounterRobotLook } from "@/core/robot/counter-look";
 import { comptoirName, parseComptoirName, resolveMyComptoirs, type ComptoirPost, type MyComptoirs } from "@/core/counter/comptoirs";
 
 /**
@@ -14,7 +15,7 @@ import { comptoirName, parseComptoirName, resolveMyComptoirs, type ComptoirPost,
 type Failure = { ok: false; error: string };
 
 export type PharmacyMember = { id: string; name: string; role: string };
-export type ComptoirView = ComptoirPost & { name: string; assigneeName: string | null; pairedAt: Date | null; lastSeenAt: Date | null; lastScanAt: Date | null };
+export type ComptoirView = ComptoirPost & { name: string; assigneeName: string | null; pairedAt: Date | null; lastSeenAt: Date | null; lastScanAt: Date | null; robotLook: number | null };
 
 const fullName = (user: { firstName: string; lastName: string }) => `${user.firstName} ${user.lastName}`.trim();
 
@@ -34,7 +35,7 @@ export async function listComptoirs(pharmacyId: string): Promise<ComptoirView[]>
     prisma.counterPost.findMany({
       where: { pharmacyId, revokedAt: null, pairedAt: { not: null } },
       orderBy: { createdAt: "asc" },
-      select: { id: true, label: true, hostname: true, assignedUserId: true, pairedAt: true, lastSeenAt: true, lastScanAt: true },
+      select: { id: true, label: true, hostname: true, assignedUserId: true, pairedAt: true, lastSeenAt: true, lastScanAt: true, robotLook: true },
     }),
     listMembers(pharmacyId),
   ]);
@@ -46,6 +47,20 @@ export async function listComptoirs(pharmacyId: string): Promise<ComptoirView[]>
 export async function myComptoirs(scope: Pick<TenantScope, "pharmacyId" | "userId">): Promise<MyComptoirs & { posts: ComptoirView[] }> {
   const posts = await listComptoirs(scope.pharmacyId);
   return { ...resolveMyComptoirs(posts, scope.userId), posts };
+}
+
+/**
+ * Le robot du comptoir de cette personne (son premier comptoir attribué) : sa couleur, son accessoire et « Bip · Comptoir 2 ».
+ * Rien si aucun comptoir ne lui est attribué : on garde le robot de la marque. Une seule petite requête (le menu de l'app la fait).
+ */
+export async function myComptoirRobot(scope: Pick<TenantScope, "pharmacyId" | "userId">): Promise<CounterRobotLook | null> {
+  const post = await prisma.counterPost.findFirst({
+    where: { pharmacyId: scope.pharmacyId, assignedUserId: scope.userId, revokedAt: null, pairedAt: { not: null }, robotLook: { not: null } },
+    orderBy: { createdAt: "asc" },
+    select: { label: true, hostname: true, robotLook: true },
+  });
+  if (!post || post.robotLook === null) return null;
+  return { look: post.robotLook, caption: robotLookCaption(post.robotLook, comptoirName(post)) };
 }
 
 export async function assignComptoir(scope: TenantScope, postId: string, userId: string | null): Promise<{ ok: true; name: string; assignee: string | null } | Failure> {

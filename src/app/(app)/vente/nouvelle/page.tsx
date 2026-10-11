@@ -84,7 +84,7 @@ export default async function NewPrescriptionPage({
         </p>
       )}
 
-      <WorkHere comptoirs={mine.posts.map((post) => ({ id: post.id, name: post.name, assignee: post.assigneeName, mine: post.assignedUserId === session.scope.userId }))} />
+      <WorkHere comptoirs={mine.posts.map((post) => ({ id: post.id, name: post.name, assignee: post.assigneeName, mine: post.assignedUserId === session.scope.userId, robotLook: post.robotLook }))} />
 
       <CounterDashboard
         dateLabel={formatParisDate(now)}
