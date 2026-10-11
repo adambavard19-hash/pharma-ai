@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "./_components/site-shell";
 import { SHARE_BASE } from "./_components/share-metadata";
+import { SiteRobotCompanion } from "./_components/site-companion";
 import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 /**
@@ -35,6 +36,8 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
       <SiteHeader />
       <main>{children}</main>
       <SiteFooter contactEmail={PUBLIC_CONTACT_EMAIL} />
+      {/* Le robot compagnon : il suit la lecture, en bas à droite. */}
+      <SiteRobotCompanion />
     </div>
   );
 }

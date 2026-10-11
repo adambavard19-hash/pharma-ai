@@ -45,7 +45,7 @@ export default async function MobileHomePage() {
             <p className="truncate text-[13px] text-white/85">{who}</p>
           </div>
           <div className="relative shrink-0">
-            <Robot floating track interactive greet="once" sound="mobile" className="h-[92px] w-[78px] drop-shadow-[0_12px_18px_rgba(0,0,0,0.2)]" />
+            <Robot floating track interactive greet="once" sound="mobile" className="h-[117px] w-[96px] drop-shadow-[0_12px_18px_rgba(0,0,0,0.2)]" />
             <RobotSoundToggle where="mobile" tone="dark" className="absolute -right-2 -bottom-2" />
           </div>
         </div>

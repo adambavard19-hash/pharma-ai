@@ -5,8 +5,7 @@ import { fr, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
 import { HeroVisual, QuestionVisual, RequestVisual, StockMarginVisual, TeamVisual, ExampleTag } from "./_components/visuals";
 import { BannerPillsInline } from "./_components/banner-mock";
 import { VideoButton } from "./_components/video-dialog";
-import { FloatingRobot } from "./_components/floating-robot";
-import { RobotSoundToggle } from "@/components/robot";
+import { HeroRobot } from "./_components/hero-robot";
 import { BannerDemo } from "./_components/banner-demo";
 import { loadLiveProof } from "@/server/services/site-leads";
 import { loadPublicPricing } from "@/server/services/public-pricing";
@@ -41,27 +40,27 @@ export default async function SitePage() {
   return (
     <>
       {/* ---- Accueil ------------------------------------------------- */}
-      <section className="relative overflow-hidden">
+      <section id="accueil" className="relative overflow-hidden">
         <div
           className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,var(--color-border-subtle)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-border-subtle)_1px,transparent_1px)] [mask-image:radial-gradient(70%_70%_at_30%_30%,black,transparent_75%)] bg-[size:64px_64px] opacity-70"
           aria-hidden="true"
         />
         <div className="mx-auto grid grid-cols-1 max-w-6xl items-center gap-14 px-5 pt-14 pb-16 md:pt-24 md:pb-24 lg:grid-cols-[1fr_1.05fr]">
           <div>
-            <div className="flex items-end gap-3">
-              <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-3 py-1.5 text-[13px] font-medium text-text-secondary">
-                <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
-              </p>
-              <FloatingRobot className="h-[58px] w-[50px]" track greet="once" sound="site" />
-              <RobotSoundToggle where="site" className="mb-1 -ml-2" />
+            <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-3 py-1.5 text-[13px] font-medium text-text-secondary">
+              <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
+            </p>
+            {/* Le robot au centre : grand, à côté du titre, il salue, suit la souris des yeux et parle dans sa bulle. */}
+            <div className="mt-5 flex items-end justify-between gap-2 sm:gap-6 lg:mt-4">
+              <h1 className="pb-1 text-[50px] leading-[0.98] font-bold tracking-[-0.04em] text-text-primary min-[390px]:text-[54px] md:text-[80px]">
+                Scan.
+                <br />
+                Conseil.
+                <br />
+                <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Bilan.</span>
+              </h1>
+              <HeroRobot className="shrink-0" />
             </div>
-            <h1 className="mt-7 text-[56px] leading-[0.98] font-bold tracking-[-0.04em] text-text-primary md:text-[80px]">
-              Scan.
-              <br />
-              Conseil.
-              <br />
-              <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Bilan.</span>
-            </h1>
             <p className="mt-7 max-w-xl text-[17px] leading-7 text-text-secondary">
               Au comptoir, vous scannez les boîtes comme d&apos;habitude. La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller en plus, pris dans votre rayon. Et le patient repart avec ses conseils.
             </p>
@@ -247,7 +246,7 @@ export default async function SitePage() {
       <PricingSection pricing={pricing} />
 
       {/* ---- Questions ------------------------------------------------ */}
-      <section className="border-y border-border-subtle bg-surface-card">
+      <section id="faq" className="scroll-mt-20 border-y border-border-subtle bg-surface-card">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
           <SectionHead kicker="Questions" title="L'essentiel, en bref." />
           <dl className="mt-12 grid gap-x-16 gap-y-10 md:grid-cols-2">
@@ -262,7 +261,7 @@ export default async function SitePage() {
       </section>
 
       {/* ---- Appel final ---------------------------------------------- */}
-      <section className="mx-auto max-w-6xl px-5 py-20 md:py-28">
+      <section id="appel-final" className="mx-auto max-w-6xl px-5 py-20 md:py-28">
         <div className="relative overflow-hidden rounded-[32px] border border-border-subtle bg-surface-card px-7 py-14 text-center sm:px-14">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_80%_at_50%_0%,var(--color-brand-100),transparent_70%)] opacity-70" aria-hidden="true" />
           <div className="relative">

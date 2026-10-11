@@ -33,13 +33,32 @@ L'ordre au comptoir : analyse → bip → mise en garde → joie. **Le robot ne 
 
 ## Où il est
 
-- **Site** : en-tête et accueil (`FloatingRobot`, qui est maintenant le robot partagé en mode flottant). Les yeux suivent
-  la souris. Un petit haut-parleur à côté du robot de l'accueil coupe les sons.
+**Au centre de l'expérience** depuis le 11 oct. 2026, à la demande du fondateur (« le robot n'est pas présent du tout ;
+je le veux vraiment vivant, présent, animé, avec des petits sons, au centre »).
+
+- **Site, accueil** : un grand robot (≈ 180 px sur ordinateur, ≈ 110 px sur téléphone) à côté de « Scan. Conseil.
+  Bilan. » (`hero-robot.tsx`). Coucou à l'arrivée (une fois par session), yeux qui suivent la souris, gloussement et
+  tournis au toucher, bulle qui change de phrase (« Bonjour ! Je suis le robot PharmaBoost. », « Au scan, je vous
+  montre le bon conseil. », « Cliquez-moi ! »), haut-parleur à côté de lui. L'en-tête garde le petit robot du logo.
+- **Site, compagnon** (`site-companion.tsx`, dans le layout de /decouvrir) : un robot flottant en bas à droite qui
+  apparaît quand le grand robot de l'accueil sort de l'écran, et suit la lecture : bannière → curieux (« Regardez,
+  c'est moi au comptoir ! »), questions → pensif, sécurité → sérieux et calme, tarif → content (« Faites le calcul ! »),
+  et la fête quand on clique « Réserver une démo ». Une bulle à la fois, qu'on ferme, dite une seule fois par visite ;
+  réductible (retenu pour la visite) ; haut-parleur visible. Il s'efface quand un lien ou un bouton passe sous lui, sur
+  téléphone pendant une saisie et dans les pages à formulaire (démo, abonnement, partenaires, commercial).
+- **Logiciel, « Nouvelle vente »** (l'accueil du logiciel : `/` y mène) : le robot en tête de page, grand (≈ 115 px),
+  « Bonjour Claire ! » (ou « Bonsoir » à partir de 18 h), sa phrase utile (`mascot-tips.ts`) ou, sans fait utile, ce
+  qu'il fait (« Au prochain scan, je vous montre le bon conseil. »), « Votre journée » et le haut-parleur. Coucou une
+  fois par session, yeux qui suivent le pointeur.
+- **Logiciel, compagnon** (`components/robot/app-companion.tsx`, dans le layout de l'application) : petit robot en bas
+  à droite de chaque page, sauf « Nouvelle vente » (le grand y est déjà) et l'écran de vente. Il reprend les humeurs
+  du fil (`emitRobotMood`, canaux `comptoir` et `app`), fait la fête sur la page de fin quand une vente est terminée sans
+  mise en garde, et s'ouvre d'un clic sur sa phrase du moment (`/api/robot/conseil`, même portée que « Nouvelle
+  vente »). Réductible (retenu dans le navigateur).
+- **Écran de vente** : le robot de la barre du bas, 56 px, qui suit la vente (curieux, pensif, sérieux, content).
 - **Application mobile** : la barre du haut (sur chaque onglet — c'est lui qui écoute les signaux), la connexion, et le
-  bonjour de l'Accueil (coucou à la première ouverture de la session, yeux qui suivent le doigt, bulle « prochaine
-  étape », haut-parleur).
-- **Comptoir web** : « Nouvelle vente » (un coin en haut, avec sa bulle) et l'écran de vente (barre du bas, 36 px).
-  Pas de suivi des yeux, pas de son par défaut, gestes sobres.
+  bonjour de l'Accueil (96 px ; coucou à la première ouverture de la session, yeux qui suivent le doigt, bulle
+  « prochaine étape », haut-parleur).
 
 ## Le code
 
@@ -76,7 +95,8 @@ Une phrase à la fois, écartable pour la journée (« Plus tard »), choisie pa
 
 ## Les règles
 
-1. **Discret au comptoir** : un patient est en face. Petit, dans un coin, pas de suivi des yeux, gestes courts.
+1. **Présent mais jamais dans le chemin** : au centre de l'accueil, mais jamais sur un bouton d'action (le compagnon
+   ne se pose pas sur l'écran de vente, s'efface sur le site quand un lien passe sous lui), gestes courts.
 2. **Pas de conseil médical** : le robot rappelle un challenge, une date courte, un stock, une formation. Le conseil au
    patient reste celui du moteur, relu, sous le médicament.
 3. **Aucune donnée de patient** dans ses phrases, et **aucun montant** de challenge (les paliers en unités).
@@ -94,9 +114,13 @@ grave et douce d'inquiétude (jamais une alarme).
 
 | Lieu | Par défaut | Volume | Particularité |
 |---|---|---|---|
-| Site | allumés | 0,25 | jamais avant un geste de la personne (règle des navigateurs) |
+| Site | allumés | 0,30 | jamais avant un geste de la personne (règle des navigateurs) |
 | Mobile | allumés | 0,25 | idem |
-| Comptoir | **éteints** | 0,10 | à activer soi-même (haut-parleur à côté de « Votre journée ») ; **jamais de son pour une mise en garde** |
+| Comptoir (logiciel) | **allumés** depuis le 11 oct. 2026 | 0,15 | sons **amicaux seulement** : bonjour, gloussement, tournis, blip d'un bip, joie, fête — ni réflexion ni inquiétude |
+
+**Une mise en garde ne sonne nulle part** (la note d'inquiétude n'est plus jouée ; l'humeur se lit au visage).
+Pourquoi le comptoir sonne maintenant : le fondateur l'a demandé le 11 oct. 2026 (« avec des petits sons ») ; on a
+gardé le volume très bas, les seuls sons amicaux et un haut-parleur visible à côté de chaque robot pour couper.
 
 Le choix est gardé dans le navigateur, par lieu (`pharmaboost:robot-sound:site|mobile|counter`). La clé
 `pharmaboost:robot-sound:tout` à `off` coupe tout, partout.

@@ -1,61 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarCheck, X } from "lucide-react";
 import { Robot, RobotSoundToggle } from "@/components/robot";
+import { dismissRobotTip, useDismissedTips } from "@/components/robot/tip-dismissal";
 import type { RobotMood } from "@/core/robot/mascot";
 import { recapIsDue, visibleTip, type RobotTip } from "@/core/robot/mascot-tips";
+import { counterMoodLine } from "@/core/robot/companion";
 import type { DayRecap } from "@/server/services/robot-tips";
 import { TIME_ZONE } from "@/config/constants";
 import { cn } from "@/lib/utils";
 
 /**
- * Le robot du comptoir, dans un coin de « Nouvelle vente » : petit, calme, sans suivre la souris, muet par défaut.
+ * Le robot de « Nouvelle vente », au centre de l'accueil du logiciel (demande du fondateur, 11 oct. 2026) : grand, en
+ * tête de page, il dit bonjour par le prénom, salue d'un coucou une fois par session, suit le pointeur des yeux, rit
+ * quand on le touche et a de petits sons amicaux (très bas, coupables d'un geste, jamais pour une mise en garde).
  *
  * Il dit au plus UNE chose utile (challenge proche d'un palier, dates courtes, stock à envoyer), qu'on peut écarter
  * pour la journée — sauf le stock, qui ne s'écarte pas (il remplace alors le bandeau du stock, pour ne pas le dire deux
- * fois). Il prépare aussi « Votre journée » : d'elle-même à partir de 18 h, sinon à la demande.
+ * fois). Sans phrase utile, il dit seulement ce qu'il fait (il guette le scan, il cherche). Il prépare aussi « Votre
+ * journée » : d'elle-même à partir de 18 h, sinon à la demande.
  */
 
-const DISMISS_EVENT = "pharmaboost:robot-ecarte";
-
-function parisDay(now = new Date()): string {
-  return new Intl.DateTimeFormat("fr-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
-}
 function parisHour(now = new Date()): number {
   return Number(new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(now));
 }
-const dismissKey = () => `pharmaboost:robot-ecarte:${parisDay()}`;
 
-// Ce qui a été écarté aujourd'hui, gardé dans ce navigateur seulement (une commodité, pas une donnée).
-function readDismissed(): string {
-  try {
-    return window.localStorage.getItem(dismissKey()) ?? "[]";
-  } catch {
-    return "[]";
-  }
-}
-function subscribeDismissed(onChange: () => void) {
-  window.addEventListener(DISMISS_EVENT, onChange);
-  return () => window.removeEventListener(DISMISS_EVENT, onChange);
-}
-function dismiss(key: string) {
-  try {
-    const current = new Set<string>(JSON.parse(readDismissed()) as string[]);
-    current.add(key);
-    window.localStorage.setItem(dismissKey(), JSON.stringify([...current]));
-  } catch {
-    // Stockage indisponible : la phrase reviendra au prochain chargement, rien de grave.
-  }
-  window.dispatchEvent(new Event(DISMISS_EVENT));
-}
-
-export function CounterRobot({ mood, tips, stockBanner }: { mood: RobotMood; tips: RobotTip[]; stockBanner: ReactNode }) {
-  const dismissedRaw = useSyncExternalStore(subscribeDismissed, readDismissed, () => "[]");
+export function CounterRobot({ mood, tips, stockBanner, greeting }: { mood: RobotMood; tips: RobotTip[]; stockBanner: ReactNode; greeting: string }) {
+  const dismissedNow = useDismissedTips();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const dismissed = new Set<string>([...safeParse(dismissedRaw), ...hidden]);
-  const tip = visibleTip(tips, dismissed);
+  const tip = visibleTip(tips, new Set<string>([...dismissedNow, ...hidden]));
 
   const [recap, setRecap] = useState<DayRecap | null>(null);
   const [recapOpen, setRecapOpen] = useState(false);
@@ -72,7 +47,7 @@ export function CounterRobot({ mood, tips, stockBanner }: { mood: RobotMood; tip
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setRecapOpen]);
 
   // À partir de 18 h, la journée se récapitule d'elle-même (une fois).
   useEffect(() => {
@@ -94,60 +69,69 @@ export function CounterRobot({ mood, tips, stockBanner }: { mood: RobotMood; tip
   return (
     <div className="space-y-3">
       {tip?.kind !== "stock" && stockBanner}
-      <div className="flex items-start gap-3">
-        <Robot mood={mood} listen="comptoir" size={44} sound="counter" className="mt-0.5" />
-        {tip ? (
-          <div className="relative min-w-0 flex-1 rounded-2xl rounded-tl-md border border-border-subtle bg-surface-card px-4 py-2.5 shadow-card" role="status">
-            <p className="pr-6 text-[14px] leading-5 text-text-primary">{tip.text}</p>
-            {tip.action && (
-              <Link href={tip.action.href} className="mt-1 inline-flex items-center gap-1 text-[13px] font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
-                {tip.action.label}
-                <ArrowRight className="size-3.5" aria-hidden="true" />
-              </Link>
-            )}
-            {tip.dismissible && (
-              <button
-                type="button"
-                onClick={() => {
-                  setHidden((current) => new Set(current).add(tip.key));
-                  dismiss(tip.key);
-                }}
-                className="absolute top-1.5 right-1.5 inline-flex size-7 items-center justify-center rounded-full text-text-tertiary hover:bg-surface-sunken hover:text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
-                aria-label="Plus tard"
-                title="Plus tard"
-              >
-                <X className="size-4" aria-hidden="true" />
-              </button>
-            )}
+      <section aria-label="Le robot PharmaBoost" data-robot-hero="" className="relative overflow-hidden rounded-2xl border border-border-subtle bg-surface-card px-4 py-4 shadow-card sm:px-6 sm:py-5">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_120%_at_0%_50%,var(--color-brand-100),transparent_70%)] opacity-60 dark:opacity-20" />
+        <div className="relative flex items-center gap-3 sm:gap-6">
+          <Robot
+            mood={mood}
+            listen="comptoir"
+            sound="counter"
+            floating
+            track
+            interactive
+            greet="once"
+            greetKey="comptoir"
+            className="h-[110px] w-[90px] shrink-0 sm:h-[140px] sm:w-[115px]"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <p className="text-[20px] leading-7 font-bold tracking-[-0.02em] text-text-primary sm:text-[24px] sm:leading-8">{greeting}</p>
+              <div className="flex shrink-0 items-center gap-1 max-sm:-ml-2.5">
+                <button
+                  type="button"
+                  onClick={() => (recapOpen ? setRecapOpen(false) : void openRecap())}
+                  aria-expanded={recapOpen}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-text-secondary hover:bg-surface-sunken hover:text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+                >
+                  <CalendarCheck className="size-4" aria-hidden="true" />
+                  Votre journée
+                </button>
+                <RobotSoundToggle where="counter" />
+              </div>
+            </div>
+            <div
+              className="rbt-bubble relative mt-2 rounded-2xl rounded-tl-md border border-border-subtle bg-surface-card/95 px-4 py-2.5 shadow-card before:absolute before:top-3 before:-left-[7px] before:size-3 before:rotate-45 before:border-b before:border-l before:border-border-subtle before:bg-surface-card max-sm:before:hidden"
+              role="status"
+              key={tip?.key ?? `humeur:${mood}`}
+            >
+              <p className={cn("text-[14px] leading-5 text-text-primary", tip?.dismissible && "pr-6")}>{tip ? tip.text : counterMoodLine(mood)}</p>
+              {tip?.action && (
+                <Link href={tip.action.href} className="mt-1 inline-flex items-center gap-1 text-[13px] font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
+                  {tip.action.label}
+                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                </Link>
+              )}
+              {tip?.dismissible && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHidden((current) => new Set(current).add(tip.key));
+                    dismissRobotTip(tip.key);
+                  }}
+                  className="absolute top-1.5 right-1.5 inline-flex size-7 items-center justify-center rounded-full text-text-tertiary hover:bg-surface-sunken hover:text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+                  aria-label="Plus tard"
+                  title="Plus tard"
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="flex-1" />
-        )}
-        <div className="flex shrink-0 items-center gap-1 pt-1.5">
-          <button
-            type="button"
-            onClick={() => (recapOpen ? setRecapOpen(false) : void openRecap())}
-            aria-expanded={recapOpen}
-            className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-text-secondary hover:bg-surface-sunken hover:text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
-          >
-            <CalendarCheck className="size-4" aria-hidden="true" />
-            Votre journée
-          </button>
-          <RobotSoundToggle where="counter" />
         </div>
-      </div>
+      </section>
       {recapOpen && <RecapCard recap={recap} loading={loading} onClose={() => setRecapOpen(false)} />}
     </div>
   );
-}
-
-function safeParse(raw: string): string[] {
-  try {
-    const value: unknown = JSON.parse(raw);
-    return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
-  } catch {
-    return [];
-  }
 }
 
 function RecapCard({ recap, loading, onClose }: { recap: DayRecap | null; loading: boolean; onClose: () => void }) {

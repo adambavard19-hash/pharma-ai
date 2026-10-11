@@ -112,6 +112,12 @@ export function robotCss(): string {
 .rbt[data-burst=wave] .rbt-hand{animation:rbt-hand ${BURST_MS.wave}ms ease-in-out both}
 ${bursts}
 
+/* La bulle d'une phrase, et le compagnon qui arrive : une entrée douce, rien de plus. */
+@keyframes rbt-bubble{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes rbt-arrive{from{opacity:0;transform:translateY(18px) scale(.9)}to{opacity:1;transform:none}}
+.rbt-bubble{animation:rbt-bubble .32s cubic-bezier(.2,.8,.3,1) both}
+.rbt-arrive{animation:rbt-arrive .45s cubic-bezier(.2,.9,.3,1.15) both}
+
 /* Tout petit (moins de 32 px) : un dessin plus simple, qui reste net. */
 .rbt[data-tiny] .rbt-glint,.rbt[data-tiny] .rbt-spark,.rbt[data-tiny] .rbt-dots,.rbt[data-tiny] .rbt-z,.rbt[data-tiny] .rbt-confetti,.rbt[data-tiny] .rbt-pop,.rbt[data-tiny] .rbt-brow{display:none}
 
@@ -120,7 +126,7 @@ ${bursts}
 .rbt[data-motion=reduce][data-mood=celebrate] .rbt-confetti{display:inline}
 .rbt[data-motion=reduce][data-mood=celebrate] .rbt-confetti>*{opacity:1}
 @media (prefers-reduced-motion:reduce){
-.rbt *{animation:none!important;transition:none!important}
+.rbt *,.rbt-bubble,.rbt-arrive{animation:none!important;transition:none!important}
 .rbt[data-mood=celebrate] .rbt-confetti{display:inline}
 .rbt[data-mood=celebrate] .rbt-confetti>*{opacity:1}
 }

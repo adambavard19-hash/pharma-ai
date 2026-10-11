@@ -6,6 +6,7 @@ import { countPharmacyUnread } from "@/server/services/support";
 import { Sidebar } from "@/components/app/sidebar";
 import { Topbar } from "@/components/app/topbar";
 import { MobileNavProvider } from "@/components/app/mobile-nav";
+import { AppRobotCompanion } from "@/components/robot/app-companion";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
@@ -42,6 +43,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             {children}
           </main>
         </div>
+
+        {/* Le robot compagnon, en bas à droite (hors « Nouvelle vente » et l'écran de vente, où il est déjà). */}
+        <AppRobotCompanion />
       </div>
     </MobileNavProvider>
   );

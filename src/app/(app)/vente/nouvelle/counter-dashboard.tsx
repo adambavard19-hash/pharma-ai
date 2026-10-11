@@ -52,6 +52,7 @@ export function CounterDashboard({
   canConfigure,
   manualOpen,
   robotTips,
+  robotGreeting,
   stockBanner,
   children,
 }: {
@@ -64,6 +65,8 @@ export function CounterDashboard({
   manualOpen: boolean;
   /** Ce que le robot du coin peut dire (une phrase à la fois). */
   robotTips: RobotTip[];
+  /** « Bonjour Paul ! » : l'heure de Paris, calculée par le serveur (pas d'écart à l'hydratation). */
+  robotGreeting: string;
   /** Le bandeau du stock : le robot le remplace quand c'est lui qui en parle. */
   stockBanner: ReactNode;
   /** La saisie à la main : ordonnance, médicament, demande sans ordonnance. */
@@ -156,7 +159,7 @@ export function CounterDashboard({
 
   return (
     <div className="space-y-5">
-      <CounterRobot mood={robotMood} tips={robotTips} stockBanner={stockBanner} />
+      <CounterRobot mood={robotMood} tips={robotTips} stockBanner={stockBanner} greeting={robotGreeting} />
       <section aria-labelledby="titre-comptoir" className="rounded-2xl border border-border-subtle bg-surface-card p-5 shadow-card sm:p-8">
         {/* Le titre garde au moins onze rem : en dessous, la pastille passe sous lui plutôt que de l'étrangler. */}
         <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-3">

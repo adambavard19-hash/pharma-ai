@@ -7,10 +7,13 @@ import type { RobotBurst, RobotMood } from "./mascot";
  *
  * Règles :
  *  - une famille cohérente : sinusoïdes et triangles doux, courts (moins de 400 ms), jamais stridents ;
- *  - site et application mobile : allumés par défaut, mais seulement après un geste de la personne (règle des
- *    navigateurs), et un bouton les coupe — le choix est retenu ;
- *  - comptoir : ÉTEINTS par défaut (un patient est en face), à activer soi-même, très bas, et JAMAIS de son pour une
- *    mise en garde ;
+ *  - partout allumés par défaut, mais seulement après un geste de la personne (règle des navigateurs), et un bouton
+ *    les coupe — le choix est retenu ;
+ *  - comptoir (le logiciel) : allumé par défaut DEPUIS LE 11 OCT. 2026, à la demande du fondateur (« je veux le robot
+ *    vivant, avec des petits sons ») — mais très bas (0,15), et seulement pour ce qui est amical : le bonjour, le
+ *    gloussement quand on le touche, le blip curieux d'un bip, la joie, la fête. Ni bourdonnement de réflexion, ni
+ *    note d'inquiétude : un patient est en face, et une mise en garde ne se sonorise JAMAIS ;
+ *  - une mise en garde ne sonne nulle part : sur le site, l'inquiétude du robot se lit à son visage seul ;
  *  - un « tout couper » global l'emporte sur tout.
  */
 
@@ -20,9 +23,12 @@ export type RobotSound = (typeof ROBOT_SOUNDS)[number];
 /** Là où le robot vit : chaque lieu a son réglage par défaut et son volume. */
 export type SoundContext = "site" | "mobile" | "counter";
 
-export const SOUND_DEFAULT_ON: Record<SoundContext, boolean> = { site: true, mobile: true, counter: false };
+export const SOUND_DEFAULT_ON: Record<SoundContext, boolean> = { site: true, mobile: true, counter: true };
 /** Volume maître (0 à 1) : bas partout, plus bas encore au comptoir. */
-export const SOUND_VOLUME: Record<SoundContext, number> = { site: 0.25, mobile: 0.25, counter: 0.1 };
+export const SOUND_VOLUME: Record<SoundContext, number> = { site: 0.3, mobile: 0.25, counter: 0.15 };
+
+/** Au comptoir, seuls les sons amicaux passent (jamais la réflexion, jamais l'inquiétude). */
+export const COUNTER_FRIENDLY_SOUNDS: ReadonlySet<RobotSound> = new Set<RobotSound>(["greet", "giggle", "dizzy", "curious", "happy", "celebrate"]);
 
 export const SOUND_STORAGE_PREFIX = "pharmaboost:robot-sound:";
 /** La clé du « tout couper », valable dans tous les lieux. */
@@ -45,14 +51,18 @@ export function soundIsOn(input: { context: SoundContext; stored: boolean | null
   return input.stored ?? SOUND_DEFAULT_ON[input.context];
 }
 
-/** Le son d'un geste ou d'une humeur qui arrive — null : rien à jouer. Au comptoir, jamais pour une mise en garde. */
+/**
+ * Le son d'un geste ou d'une humeur qui arrive — null : rien à jouer. Une mise en garde ne sonne jamais ; au comptoir,
+ * seuls les sons amicaux passent.
+ */
 export function soundFor(context: SoundContext, event: { burst?: RobotBurst | null; mood?: RobotMood | null }): RobotSound | null {
   const byBurst: Record<RobotBurst, RobotSound> = { jump: "happy", party: "celebrate", wave: "greet", giggle: "giggle", dizzy: "dizzy" };
-  if (event.burst) return byBurst[event.burst];
-  if (event.mood === "curious") return "curious";
-  if (event.mood === "thinking") return "thinking";
-  if (event.mood === "concerned") return context === "counter" ? null : "concerned";
-  return null;
+  let sound: RobotSound | null = null;
+  if (event.burst) sound = byBurst[event.burst];
+  else if (event.mood === "curious") sound = "curious";
+  else if (event.mood === "thinking") sound = "thinking";
+  if (sound && context === "counter" && !COUNTER_FRIENDLY_SOUNDS.has(sound)) return null;
+  return sound;
 }
 
 /** Une note : départ et durée en secondes, fréquence de début et de fin, timbre, niveau relatif (0 à 1), vibrato. */
@@ -86,7 +96,8 @@ export const SOUND_SCORE: Record<RobotSound, SoundNote[]> = {
     { at: 0.14, dur: 0.07, from: 1568, to: 1568, wave: "sine", gain: 0.6 },
     { at: 0.21, dur: 0.14, from: 2093, to: 2093, wave: "sine", gain: 0.45 },
   ],
-  // Le sérieux : une note basse qui descend un peu — douce, jamais une alarme.
+  // Le sérieux : une note basse qui descend un peu — douce, jamais une alarme. Plus jouée depuis le 11 oct. 2026 (une
+  // mise en garde ne se sonorise nulle part) ; gardée pour le banc d'essai.
   concerned: [{ at: 0, dur: 0.28, from: 330, to: 294, wave: "sine", gain: 0.45 }],
 };
 

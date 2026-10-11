@@ -14,10 +14,10 @@ import { soundFor, type SoundContext } from "@/core/robot/sound";
  *
  * Il respire, cligne des yeux au hasard, regarde parfois autour de lui ; il prend l'humeur qu'on lui donne (`mood`) et
  * joue un petit geste quand elle arrive (saut de joie, fête). Touché, il glousse ; touché quatre fois très vite, la tête
- * lui tourne, puis il se remet. Ses yeux peuvent suivre le pointeur (`track`) — à n'activer que là où ça ne distrait
- * personne : jamais au comptoir, devant un patient.
+ * lui tourne, puis il se remet. Ses yeux peuvent suivre le pointeur (`track`) — sur les pages d'accueil, pas sur
+ * l'écran de vente, où l'attention va au patient.
  *
- * Décoratif par défaut (aria-hidden). Muet par défaut. Immobile pour qui a demandé à réduire les animations : l'humeur
+ * Décoratif par défaut (aria-hidden). Muet sans `sound`. Immobile pour qui a demandé à réduire les animations : l'humeur
  * se lit alors à l'expression seule.
  */
 
@@ -33,12 +33,14 @@ export type RobotProps = {
   style?: CSSProperties;
   /** Flotte dans le vide, avec son ombre (site, accueil mobile). */
   floating?: boolean;
-  /** Les yeux suivent la souris ou le doigt. Jamais au comptoir. */
+  /** Les yeux suivent la souris ou le doigt (accueil du site, « Nouvelle vente », compagnon du site). */
   track?: boolean;
   /** Réagit quand on le touche (gloussement, tournis). */
   interactive?: boolean;
   /** Un petit coucou en arrivant — une seule fois par session de navigation quand `greet` vaut "once". */
   greet?: boolean | "once";
+  /** Le coucou « once » de ce robot-ci (le site et le logiciel saluent chacun une fois, sur la même adresse). */
+  greetKey?: string;
   /** S'endort après tant de millisecondes sans activité (souris, clavier, toucher). */
   sleepAfterMs?: number;
   /** Écoute les signaux d'un canal (`emitRobotMood`). `true` : le canal par défaut. */
@@ -46,8 +48,8 @@ export type RobotProps = {
   /** Change cette valeur pour rejouer le geste de l'humeur actuelle (un deuxième conseil vendu). */
   cheerKey?: string | number;
   /**
-   * Les sons, et le lieu dont ils suivent le réglage : "site" et "mobile" (allumés par défaut, après un geste),
-   * "counter" (éteints par défaut, jamais pour une mise en garde). Sans valeur : muet.
+   * Les sons, et le lieu dont ils suivent le réglage : "site", "mobile", "counter" (allumés par défaut, après un geste ;
+   * au comptoir très bas et amicaux seulement ; jamais pour une mise en garde). Sans valeur : muet.
    */
   sound?: SoundContext;
   /** "reduce" force l'immobilité (sinon : le réglage du système). */
@@ -98,6 +100,7 @@ export function Robot({
   track = false,
   interactive = false,
   greet = false,
+  greetKey,
   sleepAfterMs,
   listen,
   cheerKey,
@@ -149,15 +152,16 @@ export function Robot({
     if (!greet || reduced) return;
     if (greet === "once") {
       try {
-        if (window.sessionStorage.getItem(GREETED_KEY)) return;
-        window.sessionStorage.setItem(GREETED_KEY, "1");
+        const key = greetKey ? `${GREETED_KEY}:${greetKey}` : GREETED_KEY;
+        if (window.sessionStorage.getItem(key)) return;
+        window.sessionStorage.setItem(key, "1");
       } catch {
         // Stockage indisponible (navigation privée) : on salue quand même, ce n'est qu'un coucou.
       }
     }
     const id = setTimeout(() => setBurst({ name: "wave", seq: 0 }), 450);
     return () => clearTimeout(id);
-  }, [greet, reduced]);
+  }, [greet, greetKey, reduced]);
 
   // Le clignement : au hasard, parfois deux fois de suite, comme un vrai regard.
   useEffect(() => {

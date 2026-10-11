@@ -37,7 +37,7 @@ import { PartnerCards } from "./partner-cards";
 import type { EngineOutcome } from "@/core/ai/outcome";
 import { DeliveryZone, type DeliveryExtra } from "./delivery-zone";
 import { counterIsBlocked } from "@/core/ai/safety-gate";
-import { Robot } from "@/components/robot";
+import { cheerOnNextPage, Robot } from "@/components/robot";
 import { countWarnings, saleMood } from "@/core/robot/mascot";
 import { STAGE_LABELS, STAGE_ORDER, streamAnalysis } from "./analysis-stream";
 import type { AnalysisStage } from "@/server/services/analysis";
@@ -450,6 +450,8 @@ export function SaleWorkspace({
         push({ tone: "error", title: "Plan patient non généré", description: document.error });
       }
 
+      // La vente est terminée : le robot fera la fête sur la page de fin (jamais à côté d'une mise en garde).
+      if (!blocked && countWarnings(findings) === 0) cheerOnNextPage();
       router.push(`/vente/${prescription.id}/fin`);
     });
   };
@@ -674,7 +676,7 @@ export function SaleWorkspace({
 
       <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-surface-card p-3.5 shadow-lg sm:gap-4 sm:p-4">
         <span className="hidden shrink-0 sm:block">
-          <Robot mood={robotMood} cheerKey={basket.size} size={36} />
+          <Robot mood={robotMood} cheerKey={basket.size} size={56} interactive sound="counter" listen="comptoir" />
         </span>
         {editing ? (
           <>

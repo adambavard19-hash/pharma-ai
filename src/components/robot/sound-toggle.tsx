@@ -7,7 +7,7 @@ import { useRobotSound } from "./sound";
 
 /**
  * Le petit haut-parleur à côté du robot : un toucher coupe ou rallume ses sons, et le choix est retenu dans ce
- * navigateur. Au comptoir, il part éteint.
+ * navigateur. Partout, il part allumé (au comptoir, très bas et pour les sons amicaux seulement).
  */
 export function RobotSoundToggle({ where, className, tone = "light" }: { where: SoundContext; className?: string; tone?: "light" | "dark" }) {
   const { on, toggle } = useRobotSound(where);

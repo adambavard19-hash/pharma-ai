@@ -19,6 +19,7 @@ import { NewPrescriptionForm } from "./new-prescription-form";
 import { CounterRequestCard } from "./counter-request";
 import { WorkHere } from "./work-here";
 import { loadCounterRobotTips } from "@/server/services/robot-tips";
+import { robotGreeting } from "@/core/robot/companion";
 
 export const metadata: Metadata = { title: "Nouvelle vente" };
 
@@ -92,6 +93,7 @@ export default async function NewPrescriptionPage({
         canConfigure={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
         manualOpen={Boolean(params.patient || params.demande)}
         robotTips={robotTips}
+        robotGreeting={robotGreeting(parisHour(now), session.user.firstName)}
         // Le rappel du stock : seulement pour le titulaire, jamais pour l'équipe au comptoir. Le robot le reprend quand c'est sa phrase du moment.
         stockBanner={<StockReminderBanner stockSyncedAt={pharmacy?.stockSyncedAt ?? null} canImport={canUpdateStock} isDemo={session.pharmacy.isDemo} />}
       >
@@ -105,6 +107,10 @@ export default async function NewPrescriptionPage({
       </CounterDashboard>
     </div>
   );
+}
+
+function parisHour(date: Date): number {
+  return Number(new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(date));
 }
 
 function formatParisDate(date: Date): string {
