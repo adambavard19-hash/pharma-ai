@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { HAIRLINE, SectionHead } from "./site-shell";
 import { RevenueCalculator } from "./revenue-calculator";
+import { VideoButton } from "./video-dialog";
 import { formatPriceEuros, referrerPriceCents, type PublicPricing } from "@/core/pricing/official-offer";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,8 @@ const SUBSCRIPTION_INCLUDES = [
 
 /**
  * La section tarif : le simulateur de chiffre d'affaires d'abord (encadré, en
- * grand : ce que PharmaBoost rapporte), puis l'abonnement, plus discret — un seul
+ * grand : ce que PharmaBoost rapporte, précédé du film qui fait le calcul à voix
+ * haute), puis l'abonnement, plus discret — un seul
  * abonnement, engagement de 12 mois, une mise en service unique (et ce qu'elle
  * comprend) et le parrainage. Tous les montants viennent de `PublicPricing` (la console, ou
  * l'offre officielle) : aucun n'est écrit dans la page.
@@ -47,6 +49,10 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
         <p className="mx-auto mt-3 max-w-2xl text-[14px] leading-6 text-text-tertiary text-balance md:text-[14.5px]">
           Plus de conseils pertinents, plus d’opportunités au comptoir, sans changer vos habitudes.
         </p>
+        {/* Le film du calcul, au-dessus du simulateur : il finit sur « juste en dessous ». */}
+        <div className="mt-6 flex justify-center">
+          <VideoButton film="tarif" label="Voir le calcul en vidéo" />
+        </div>
       </div>
 
       <div className="mx-auto mt-10 grid max-w-5xl items-stretch gap-5 lg:grid-cols-[1.22fr_1fr]">

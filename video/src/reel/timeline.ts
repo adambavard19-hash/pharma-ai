@@ -61,8 +61,8 @@ const pauseWeight = (chunk: string) => {
   return !endsWithPause(chunk) ? 0 : t.endsWith(",") ? 1.4 : t.endsWith("…") ? 2.6 : 2;
 };
 
-/** Les débuts des sous-titres d'une phrase, en secondes depuis son début. */
-function chunkStarts(chunks: string[], voice: VoiceInfo): number[] {
+/** Les débuts des sous-titres d'une phrase, en secondes depuis son début (aussi pour le film « Tarif », src/tarif/timeline.ts). */
+export function chunkStarts(chunks: string[], voice: VoiceInfo): number[] {
   const n = chunks.length;
   const weights = chunks.map(chunkWeight);
   // 1. Une estimation à la syllabe, pauses de ponctuation comprises.

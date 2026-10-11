@@ -11,7 +11,8 @@
     "web": "node scripts/export.mjs web",
     "reel:voix": "node scripts/voix-reel.mjs",
     "reel:brouillon": "node scripts/reel.mjs brouillon",
-    "reel:final": "node scripts/reel.mjs final"
+    "reel:final": "node scripts/reel.mjs final",
+    "tarif:voix": "node scripts/voix-tarif.mjs"
   },
   "dependencies": {
     "@remotion/cli": "4.0.532",

@@ -20,6 +20,8 @@ export const FILMS = {
   sansOrdonnance: { src: "/video/pharmaboost-sans-ordonnance.mp4", poster: "/video/pharmaboost-sans-ordonnance.jpg", duration: "25 s", title: "Sans ordonnance" },
   // Pour les laboratoires et les marques (page Partenaires) : 2 640 images = 44 s.
   partenaires: { src: "/video/pharmaboost-partenaires.mp4", poster: "/video/pharmaboost-partenaires.jpg", duration: "44 s", title: "PharmaBoost pour les partenaires" },
+  // Le calcul de la section tarif, dit par la voix : 2 333 images = 39 s (la durée suit la voix, à revoir si elle est refaite).
+  tarif: { src: "/video/pharmaboost-tarif.mp4", poster: "/video/pharmaboost-tarif.jpg", duration: "39 s", title: "Le calcul, en vidéo" },
 } as const;
 
 export type FilmKey = keyof typeof FILMS;

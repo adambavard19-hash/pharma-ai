@@ -110,6 +110,19 @@ const PRESETS = {
     risers: [[3.5, 4], [8.5, 9]],
     holdFrom: 13,
   },
+  // Le film « Tarif » (≈ 39 s, 16:9, voix off — src/films/tarif.tsx) : 120 BPM, 20 mesures (40 s ; le film s'arrête
+  // avant, en fondu). Sous la voix, −13 dB : une pulsation qui monte avec le calcul — la question (0–4 s), les
+  // 200 clients, les 10 %, les pièces de 7 € (DRIVE, 14–18 s), au plus fort sur les 3 500 € par mois (20–24 s) —,
+  // se calme sans s'éteindre sur l'abonnement (24–28 s), repart sur le simulateur, et tient l'accord sur la carte de fin (34 s ; son
+  // impact suit celui de la carte). Les effets du calcul (montée, impact des 3 500 €) sont posés par le montage.
+  tarif: {
+    bpm: 120, bars: 20,
+    layers: (b) => (b < 2 ? L({ arp: 0.5, bright: 0.45 }) : b < 4 ? L({ arp: 0.6, bass: 0.5, hat: 0.4, bright: 0.5 }) : b < 7 ? L({ arp: 0.7, bass: 0.6, kick: 0.6, hat: 0.6, bright: 0.6 }) : b < 9 ? DRIVE : b < 10 ? L({ ...DRIVE, bright: 0.9 }) : b < 12 ? PEAK : b < 14 ? L({ arp: 0.55, bass: 0.5, hat: 0.45, bright: 0.5 }) : b < 16 ? L({ arp: 0.7, bass: 0.6, hat: 0.6, bright: 0.6 }) : b < 17 ? L({ arp: 0.5, bass: 0.5, bright: 0.6 }) : END),
+    chord: (b) => (b >= 19 ? C : b === 18 ? G : b === 17 ? F : MAJOR[b % 4]),
+    impacts: [{ at: 0.2, gain: 0.55 }, { at: 17.2, gain: 0.9 }],
+    risers: [[16.4, 17.2]],
+    holdFrom: 17,
+  },
 };
 
 function compose(name, p) {

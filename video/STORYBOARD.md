@@ -216,6 +216,39 @@ n'entre : jamais deux écrans ni deux mentions lisibles l'un sur l'autre. Les
 modules de l'application lus par ce film importent leurs types par « @/ » :
 d'où le `paths` de `tsconfig.json`.
 
+## Tarif — `Tarif`, ≈ 39 s, voix off (Yann, ElevenLabs)
+
+Section tarif du site : pourquoi PharmaBoost vaut son abonnement, avec LE calcul
+du simulateur (`src/core/pricing/revenue-estimate.ts`) et l'offre officielle
+(`src/core/pricing/official-offer.ts`), importés : aucun chiffre n'est écrit
+dans le film. Le texte est dans `src/tarif/script.ts` (une seule source : ce qui
+s'affiche en chiffres, ce que dit la voix en toutes lettres, les sous-titres) ;
+la voix, `npm run tarif:voix` (ElevenLabs, voix « Yann », clé lue dans
+`~/.pharmaboost-voix.env`, seules les phrases nouvelles ou changées sont
+demandées) → `public/voix/tarif/T1…T7.mp3` + `voix.json`. Comme le reel, le
+montage se cale sur la voix mesurée (`calculateMetadata`) ; le film refuse de
+se rendre si la voix ne dit plus le script (un chiffre du site a changé).
+
+| Voix | Image | Texte à l'écran |
+|---|---|---|
+| T1 « Combien PharmaBoost peut-il vous rapporter ? Faisons le calcul, simplement. » | Le robot du logo, les symboles du calcul autour ; ils plongent dans les quatre étapes (« ? ») | Les étapes du simulateur : Clients par jour · Clients conseillés (10 %) · × 7 € par produit en moyenne · × 25 jours d'ouverture |
+| T2 « …200 clients par jour. » | La croix de pharmacie, puis 200 clients qui se remplissent en vague, le compteur monte à 200 | Les étapes montent en haut de l'image et se remplissent au fil de la voix |
+| T3 « Si seulement 10 %… 20 clients par jour. » | « × 10 % » en grand, la foule s'assombrit, un client sur dix s'allume (+), le compteur passe à 20 | « clients conseillés par jour » |
+| T4 « À 7 € le produit en moyenne : 140 € par jour. » | Les 20 se rangent, chacun reçoit une pièce de 7 €, les pièces montent dans le compteur | « 20 × 7 € = 140 € » |
+| T5 « Sur 25 jours d'ouverture : 3 500 €… chaque mois. » | Un calendrier de 25 jours qui se remplit (+140 € chacun), le cumul « après N jours », puis « 3 500 € par mois » | « Chiffre d'affaires, pas une marge. » |
+| T6 « Pour un abonnement de 126 € HT par mois. » | Le résultat du simulateur : deux barres à la même échelle, 3 500 € et 126 € HT (entourée) | « À la même échelle » |
+| T7 « Faites le calcul avec votre propre nombre de clients, juste en dessous. » | Le simulateur du site (mêmes libellés) ; le pointeur mène le curseur de 200 à 300, tout se recalcule (5 250 €) ; deux flèches vers le bas | La note du site, mot pour mot |
+| — | Carte de fin, le robot à la place du symbole (`EndCard mark="robot"`) | « Un seul abonnement. Tout est inclus. » · « Réserver une démo → » · pharmaboost.app |
+
+Honnêteté, en bas de l'image de T2 à T6 : « Estimation indicative : ce n'est pas
+une promesse de résultat. Chiffre d'affaires, pas une marge. » ; les trois
+hypothèses restent écrites en haut pendant tout le calcul. C'est le seul film
+qui donne un chiffre commercial : celui du simulateur du site, avec ses
+hypothèses, jamais présenté comme un résultat. Le « 300 » du simulateur est un
+exemple de saisie, pas une hypothèse. Sur le site, le bouton « Voir le calcul
+en vidéo » (39 s) est posé sous le mot de réassurance, au-dessus du simulateur
+de la section tarif : « juste en dessous » le suppose.
+
 ## Les règles des films
 
 - **Ce qu'une vente montre, le moteur le ferait.** Chaque conseil d'une vente
@@ -270,7 +303,8 @@ probiotique « Vendu », « Le patient repart avec le bon conseil. »), Avantage
 1213 (05, Vendu / Non vendu et les pastilles), SansOrdonnance 800 (la demande
 comprise et les deux produits), Partenaires 880 (l'écran de vente : le conseil
 du moteur, « Délivrance », puis la carte « À découvrir · gamme partenaire »
-entourée).
+entourée), Tarif 1600 (les deux barres à la même échelle, 3 500 € et 126 € HT
+entourée ; la durée suit la voix : revérifier l'image après une nouvelle voix).
 
 Le film de lancement (`Lancement`, 50 s, 1er octobre 2026) est archivé : il
 date d'avant la bannière (avis en coin d'écran, « bip ») et n'est plus sur le
@@ -286,6 +320,7 @@ npm run brouillon -- CommentCaMarche # 960×540 → out/brouillons/…-540p.mp4,
 npm run web -- Presentation          # un film du site → ../public/video/<film>.mp4 + affiche <film>.jpg (≈ 2 min 30)
 npm run web                          # les films du site et Partenaires, à la suite (sans Lancement)
 npm run final -- Presentation        # master 4K, puis out/…-4k.mp4 et out/…-1080p.mp4 (archives)
+npm run tarif:voix                   # la voix du film Tarif (ElevenLabs, Yann) : seulement les phrases changées
 ```
 
 Une image fixe pour vérifier un plan : `npx remotion still src/index.ts

@@ -3,7 +3,7 @@
 //   node scripts/export.mjs final [Film…]      → master 4K, puis out/<film>-4k.mp4 et out/<film>-1080p.mp4
 //   node scripts/export.mjs exports [Film…]    → seulement les fichiers finaux, depuis les masters existants
 //   node scripts/export.mjs web [Film…]        → les fichiers du site : ../public/video/<film>.mp4 et son affiche <film>.jpg
-// Sans nom de film : tous les films (en mode web : les films du site et Partenaires, sans Lancement).
+// Sans nom de film : tous les films (en mode web : les films du site, Partenaires et Tarif, sans Lancement).
 // Les noms sont les identifiants de src/Root.tsx.
 //
 // Netteté : le final est calculé en 4K (échelle 2, images JPEG qualité 100) puis
@@ -24,6 +24,7 @@ const FILES = {
   Avantages: "pharmaboost-avantages",
   SansOrdonnance: "pharmaboost-sans-ordonnance",
   Partenaires: "pharmaboost-partenaires",
+  Tarif: "pharmaboost-tarif",
 };
 /**
  * L'affiche de chaque film du site : une image du film (numéro d'image à 60/s),
@@ -43,6 +44,9 @@ const POSTERS = {
   SansOrdonnance: 800,
   // L'écran de vente : le conseil du moteur, « Délivrance », puis à part la carte « À découvrir · gamme partenaire » entourée.
   Partenaires: 880,
+  // Les deux barres à la même échelle : 3 500 € de chiffre d'affaires estimé contre 126 € HT d'abonnement, la petite barre
+  // entourée · « de 126 € HT ». La durée du film suit la voix : après une nouvelle voix, revérifier cette image.
+  Tarif: 1600,
 };
 const SITE = "../public/video";
 

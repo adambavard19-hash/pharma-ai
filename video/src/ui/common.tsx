@@ -7,13 +7,17 @@ import { Kinetic, words, type Word } from "./kinetic";
 import { Ripple } from "./counter";
 import { CtaButton, Logo, Wordmark } from "./product";
 import { Sfx } from "./sfx";
+import { FloatingRobot } from "../reel/robot";
 
 /**
  * La carte de fin des films courts : une phrase-thème, puis le symbole, le
  * nom, la promesse du site et le bouton principal (« Réserver une démo »).
  * Sur le bleu-vert profond de la bannière. ~6,5 s.
+ *
+ * `mark="robot"` met le robot du nouveau logo (src/reel/robot.tsx, qui flotte) à
+ * la place du symbole ; sans elle, la carte reste celle des films déjà en ligne.
  */
-export function EndCard({ intro, lead, cta: ctaLabel, tagline = "Le copilote du comptoir officinal." }: { intro: number; lead: Word[][]; /** Le texte du bouton, « Réserver une démo » par défaut. */ cta?: string; tagline?: string }) {
+export function EndCard({ intro, lead, cta: ctaLabel, tagline = "Le copilote du comptoir officinal.", mark = "logo" }: { intro: number; lead: Word[][]; /** Le texte du bouton, « Réserver une démo » par défaut. */ cta?: string; tagline?: string; /** Le symbole : le logo des films en ligne, ou le robot. */ mark?: "logo" | "robot" }) {
   const f = useF();
   const enter = tw(f, [-intro, -2], [0, 1]);
   const flash = Math.max(0, tw(f, [-4, 0], [0, 0.35]) - tw(f, [0, 12], [0, 0.35]));
@@ -37,9 +41,16 @@ export function EndCard({ intro, lead, cta: ctaLabel, tagline = "Le copilote du 
         <At x={logoX + LOGO + GAP} y={420 - WORD * 0.62} w={WORD_W} style={{ clipPath: `inset(-20% ${(1 - open) * 100}% -20% 0)`, transform: `translateX(${(1 - open) * -70}px)`, opacity: tw(open, [0, 0.25], [0, 1]) }}>
           <Wordmark size={WORD} dark />
         </At>
-        <At x={logoX} y={420 - (LOGO * 1062) / 1098 / 2} style={{ transform: `scale(${0.35 + 0.65 * logo}) rotate(${(1 - logo) * -12}deg)`, opacity: Math.min(1, logo * 2), filter: "drop-shadow(0 30px 50px rgba(0,0,0,.35))" }}>
-          <Logo size={LOGO} />
-        </At>
+        {mark === "robot" ? (
+          // Le robot (viewBox 100 × 118) : la tête centrée sur la ligne du nom, l'ombre dessous.
+          <At x={logoX} y={420 - LOGO * 0.45} style={{ transform: `scale(${0.35 + 0.65 * logo}) rotate(${(1 - logo) * -12}deg)`, opacity: Math.min(1, logo * 2) }}>
+            <FloatingRobot size={LOGO} t={f / 30 + 0.6} happy={f >= L0 + 4 && f < L0 + 34} />
+          </At>
+        ) : (
+          <At x={logoX} y={420 - (LOGO * 1062) / 1098 / 2} style={{ transform: `scale(${0.35 + 0.65 * logo}) rotate(${(1 - logo) * -12}deg)`, opacity: Math.min(1, logo * 2), filter: "drop-shadow(0 30px 50px rgba(0,0,0,.35))" }}>
+            <Logo size={LOGO} />
+          </At>
+        )}
         <At x={0} y={600} w={1920}>
           <Kinetic at={L0 + 40} size={56} color={C.brand100} weight={500} align="center" tracking="-0.015em" stagger={2} lines={[words(tagline)]} />
         </At>

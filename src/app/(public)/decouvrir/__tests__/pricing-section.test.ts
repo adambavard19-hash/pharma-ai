@@ -6,6 +6,7 @@ import { resolvePublicPricing } from "@/core/pricing/official-offer";
 vi.mock("server-only", () => ({}));
 
 const { PricingSection, SETUP_INCLUDES } = await import("../_components/pricing-section");
+const { FILMS } = await import("../_components/video-dialog");
 
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&nbsp;| /g, " ").replace(/&#x27;|&#39;/g, "'").replace(/\s+/g, " ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")").trim();
 
@@ -74,6 +75,13 @@ describe("la section tarif du site : un seul abonnement", () => {
     expect(promiseTag).toContain("md:text-[26px]");
     expect(detailTag).toContain("text-text-tertiary");
     expect(detailTag).not.toContain("font-semibold");
+  });
+
+  it("propose le film du calcul, au-dessus du simulateur (il finit sur « juste en dessous »)", () => {
+    expect(t).toContain("Voir le calcul en vidéo 39 s");
+    expect(t.indexOf("Voir le calcul en vidéo")).toBeLessThan(t.indexOf("À combien estimez-vous"));
+    expect(FILMS.tarif.src).toBe("/video/pharmaboost-tarif.mp4");
+    expect(FILMS.tarif.poster).toBe("/video/pharmaboost-tarif.jpg");
   });
 
   it("garde les deux appels à l'action : s'abonner, réserver une démo", () => {
