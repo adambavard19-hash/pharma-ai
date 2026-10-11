@@ -152,8 +152,14 @@ export function reportProducts(products: ReportProduct[]): ReportProduct[] {
 }
 
 const DEFAULT_BRAND = "#0F766E";
-/** Le robot PharmaBoost, quand la pharmacie n'a pas de logo : une image légère, servie par le site. */
+/** Le robot PharmaBoost, fixe (ancienne version du bilan ; gardé pour les e-mails déjà partis). */
 export const REPORT_ROBOT_PATH = "/email/robot-192.png";
+/**
+ * Le robot VIVANT du bilan (demande du fondateur, 11 oct. 2026) : une image animée sur fond blanc — il flotte, cligne des yeux,
+ * sa lampe pulse. Gmail, Apple Mail et la plupart des messageries la jouent ; Outlook sur ordinateur montre la première image.
+ * Généré par `npx tsx scripts/logo-robot.ts --email`.
+ */
+export const REPORT_ROBOT_GIF_PATH = "/email/robot-vivant.gif";
 
 /** La couleur de la pharmacie, si c'est bien une couleur ; sinon celle de PharmaBoost. */
 export function brandColorOf(value: string | null | undefined): string {
@@ -197,7 +203,7 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
   const brand = brandColorOf(details.brandColor);
   const ink = inkOn(brand);
   const logo = emailImageUrl(details.logoUrl, base);
-  const mark = logo ?? `${base}${REPORT_ROBOT_PATH}`;
+  const robot = `${base}${REPORT_ROBOT_GIF_PATH}`;
   const tel = telLink(details.phone);
   const phone = clean(details.phone);
   const address = postalAddress(details);
@@ -262,10 +268,13 @@ ${buttons ? `<table role="presentation" cellpadding="0" cellspacing="0" style="m
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3f1"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #dfe8e4">
 <tr><td style="background:${brand};padding:22px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td width="56" valign="middle"><img src="${escape(mark)}" width="52" height="52" alt="" style="display:block;width:52px;height:52px;border-radius:14px;${logo ? "background:#ffffff;object-fit:contain" : ""}"></td>
-<td valign="middle" style="padding-left:14px"><div style="font-size:13px;font-weight:600;color:${ink};opacity:.85">${escape(pharmacy)}</div><div style="margin-top:2px;font-size:22px;line-height:28px;font-weight:800;color:${ink}">Votre bilan du jour</div></td>
+${logo ? `<td width="56" valign="middle"><img src="${escape(logo)}" width="52" height="52" alt="" style="display:block;width:52px;height:52px;border-radius:14px;background:#ffffff;object-fit:contain"></td>` : ""}
+<td valign="middle" style="padding-left:${logo ? 14 : 0}px"><div style="font-size:13px;font-weight:600;color:${ink};opacity:.85">${escape(pharmacy)}</div><div style="margin-top:2px;font-size:22px;line-height:28px;font-weight:800;color:${ink}">Votre bilan du jour</div></td>
 </tr></table></td></tr>
-<tr><td style="padding:24px 28px 6px;font-size:15.5px;line-height:23px;color:#344054">Bonjour,<br>voici le récapitulatif des produits que votre pharmacien vous a conseillés aujourd'hui.</td></tr>
+<tr><td style="padding:22px 28px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td width="76" valign="middle"><img src="${escape(robot)}" width="72" height="72" alt="Le robot PharmaBoost" style="display:block;width:72px;height:72px;border:0"></td>
+<td valign="middle" style="padding-left:12px"><div style="background:#f2f7f5;border-radius:16px;padding:12px 16px;font-size:15.5px;line-height:23px;color:#344054">Bonjour !<br>Voici le récapitulatif des produits que votre pharmacien vous a conseillés aujourd'hui.</div></td>
+</tr></table></td></tr>
 <tr><td style="padding:12px 28px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${products.map(card).join("")}</table></td></tr>
 ${contact}
 <tr><td style="padding:14px 28px 20px;font-size:12.5px;line-height:19px;color:#667085">${escape(closing)}</td></tr>

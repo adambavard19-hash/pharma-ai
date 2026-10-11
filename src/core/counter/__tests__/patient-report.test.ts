@@ -95,13 +95,13 @@ describe("l'adresse du patient", () => {
 describe("le bilan aux couleurs de la pharmacie", () => {
   const pharmacy = { name: "Pharmacie du Port", brandColor: "#1d4ed8", phone: "04 91 00 00 00", addressLine1: "8 quai des Belges", postalCode: "13001", city: "Marseille" };
 
-  it("en-tête à la couleur de la pharmacie, son logo s'il est public, sinon le robot PharmaBoost", () => {
+  it("en-tête à la couleur de la pharmacie, son logo s'il est public ; le robot vivant salue toujours le patient", () => {
     const withoutLogo = buildPatientReport({ pharmacy, products: [{ name: "ELUDAY", reason: null }], assetBaseUrl: "https://pharmaboost.app" });
     expect(withoutLogo?.html).toContain("background:#1D4ED8");
-    expect(withoutLogo?.html).toContain("https://pharmaboost.app/email/robot-192.png");
-    const withLogo = buildPatientReport({ pharmacy: { ...pharmacy, logoUrl: "https://cdn.exemple.fr/logo.png" }, products: [{ name: "ELUDAY", reason: null }] });
+    expect(withoutLogo?.html).toContain("https://pharmaboost.app/email/robot-vivant.gif");
+    const withLogo = buildPatientReport({ pharmacy: { ...pharmacy, logoUrl: "https://cdn.exemple.fr/logo.png" }, products: [{ name: "ELUDAY", reason: null }], assetBaseUrl: "https://pharmaboost.app" });
     expect(withLogo?.html).toContain("https://cdn.exemple.fr/logo.png");
-    expect(withLogo?.html).not.toContain("robot-192.png");
+    expect(withLogo?.html).toContain("robot-vivant.gif");
   });
 
   it("coordonnées et boutons : appeler et itinéraire, seulement avec ce que la fiche contient", () => {

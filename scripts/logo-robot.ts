@@ -12,7 +12,8 @@
  *
  *   npx tsx scripts/logo-robot.ts           tout
  *   npx tsx scripts/logo-robot.ts --pwa     seulement les icônes de l'application mobile
- *   npx tsx scripts/logo-robot.ts --email   le robot léger du bilan patient (public/email/robot-192.png, sans fond)
+ *   npx tsx scripts/logo-robot.ts --email   les robots du bilan patient : public/email/robot-192.png (fixe, sans fond) et
+ *                                           public/email/robot-vivant.gif (animé, sur fond blanc)
  *   npx tsx scripts/logo-robot.ts --ios     l'icône App Store (1024 px, sans transparence : Apple la refuse) et l'écran de
  *                                           lancement de l'application iPhone (application-mobile/ios)
  */
@@ -31,24 +32,29 @@ function arc(cx: number, cy: number, rx: number, ry: number, start: number, swee
 }
 
 /** Un œil ouvert, avec son reflet : lisible même à 16 pixels. */
-const eye = (cx: number) => `<ellipse cx="${cx}" cy="42" rx="4.8" ry="6.4" fill="${C.eye}"/><circle cx="${cx - 1.5}" cy="39.4" r="1.7" fill="#fff" fill-opacity=".85"/>`;
+const eye = (cx: number, open = 1) =>
+  open < 0.25
+    ? `<path d="M ${cx - 5} 42 Q ${cx} 44.5 ${cx + 5} 42" fill="none" stroke="${C.eye}" stroke-width="2.6" stroke-linecap="round"/>`
+    : `<ellipse cx="${cx}" cy="42" rx="4.8" ry="${(6.4 * open).toFixed(2)}" fill="${C.eye}"/><circle cx="${cx - 1.5}" cy="${(42 - 2.6 * open).toFixed(2)}" r="1.7" fill="#fff" fill-opacity=".85"/>`;
 
-/** Le robot dans sa boîte de 100 unités, comme la mascotte de la bannière. */
-const robot = `
+/** Le robot dans sa boîte de 100 unités, comme la mascotte de la bannière. `pose` anime le robot de l'e-mail (yeux, lampe, étoile). */
+type Pose = { open?: number; lamp?: number; spark?: number };
+const robotOf = ({ open = 1, lamp = 0.28, spark = 1 }: Pose = {}) => `
     <line x1="50" y1="17" x2="50" y2="8" stroke="${C.shellEdge}" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="50" cy="6" r="8" fill="${C.eye}" fill-opacity=".28"/>
+    <circle cx="50" cy="6" r="${(6 + 4 * lamp).toFixed(2)}" fill="${C.eye}" fill-opacity="${lamp.toFixed(2)}"/>
     <circle cx="50" cy="6" r="3.8" fill="${C.eye}"/>
     <path d="${arc(50, 44, 41, 35, 192, 156)}" fill="none" stroke="${C.ear}" stroke-width="5" stroke-linecap="round"/>
     <rect x="3" y="36" width="15" height="28" rx="7" fill="url(#g-ear)"/>
     <rect x="82" y="36" width="15" height="28" rx="7" fill="url(#g-ear)"/>
     <rect x="14" y="16" width="72" height="58" rx="24" fill="url(#g-shell)" stroke="${C.shellEdge}" stroke-width="1.6"/>
     <rect x="22" y="25" width="56" height="40" rx="17" fill="url(#g-screen)"/>
-    ${eye(38)}${eye(62)}
+    ${eye(38, open)}${eye(62, open)}
     <path d="M 41 52.5 A 9 7 0 0 0 59 52.5 Z" fill="${C.eye}"/>
     <circle cx="74" cy="69" r="15" fill="#fff" fill-opacity=".95"/>
     <circle cx="74" cy="69" r="13.5" fill="url(#g-badge)"/>
     <rect x="72.2" y="61" width="3.6" height="16" rx="1" fill="#fff"/><rect x="66" y="67.2" width="16" height="3.6" rx="1" fill="#fff"/>
-    <path d="M 80 7 L 82 12.5 L 87.5 14 L 82 15.5 L 80 21 L 78 15.5 L 72.5 14 L 78 12.5 Z" fill="#FFD65A"/>`;
+    <g transform="translate(80 14) scale(${spark.toFixed(2)}) translate(-80 -14)"><path d="M 80 7 L 82 12.5 L 87.5 14 L 82 15.5 L 80 21 L 78 15.5 L 72.5 14 L 78 12.5 Z" fill="#FFD65A"/></g>`;
+const robot = robotOf();
 
 /** L'icône : le carré arrondi bleu-vert de la bannière, une lueur derrière la tête, le robot centré. */
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="1024" height="1024">
@@ -86,11 +92,43 @@ const fullBleedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 1
 </svg>
 `;
 const pwaOnly = process.argv.includes("--pwa");
+
+/**
+ * Le robot VIVANT des e-mails (bilan patient) : une image animée (GIF), que Gmail, Apple Mail et la plupart des messageries
+ * jouent ; Outlook sur ordinateur montre la première image, un robot aux yeux ouverts. Sur fond blanc (un GIF n'a pas de
+ * transparence douce) : l'e-mail le pose dans une pastille blanche. Il flotte, cligne des yeux, sa lampe pulse, l'étoile scintille.
+ */
+async function emailRobotGif() {
+  const { execFileSync } = await import("node:child_process");
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const dir = mkdtempSync(`${tmpdir()}/robot-gif-`);
+  const FRAMES = 30; // 3 s à 10 images par seconde
+  for (let i = 0; i < FRAMES; i += 1) {
+    const t = i / FRAMES;
+    const bob = Math.sin(t * Math.PI * 2) * 3.2;
+    const open = i === 21 || i === 23 ? 0.15 : i === 22 ? 0 : 1;
+    const lamp = 0.2 + 0.3 * (0.5 + 0.5 * Math.sin(t * Math.PI * 4));
+    const spark = 0.75 + 0.35 * (0.5 + 0.5 * Math.sin(t * Math.PI * 6 + 1));
+    const frame = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -14 116 116" width="256" height="256">
+  ${robotDefs}
+  <rect x="-8" y="-14" width="116" height="116" fill="#ffffff"/>
+  <ellipse cx="50" cy="96" rx="${(24 - bob).toFixed(2)}" ry="3.2" fill="#0F3F54" fill-opacity="${(0.12 - bob * 0.01).toFixed(3)}"/>
+  <g transform="translate(0 ${(bob - 2).toFixed(2)})">${robotOf({ open, lamp, spark })}</g>
+</svg>`;
+    await sharp(Buffer.from(frame), { density: 144 }).resize(128, 128).flatten({ background: "#ffffff" }).png().toFile(`${dir}/f${String(i).padStart(2, "0")}.png`);
+  }
+  mkdirSync("public/email", { recursive: true });
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", "10", "-i", `${dir}/f%02d.png`, "-vf", "split[a][b];[a]palettegen=reserve_transparent=0:stats_mode=full[p];[b][p]paletteuse=dither=none", "-loop", "0", "public/email/robot-vivant.gif"]);
+  rmSync(dir, { recursive: true, force: true });
+  console.log("✓ public/email/robot-vivant.gif (128 px, 3 s en boucle)");
+}
 const iosOnly = process.argv.includes("--ios");
 const emailOnly = process.argv.includes("--email");
 
 /** Le robot du bilan envoyé au patient : petit (192 px pour un affichage à 52 px), sans fond, posé sur la couleur de la pharmacie. */
 async function emailRobot() {
+  await emailRobotGif();
   mkdirSync("public/email", { recursive: true });
   await sharp(Buffer.from(transparentSvg), { density: 72 }).resize(192, 192).png({ compressionLevel: 9, palette: true }).toFile("public/email/robot-192.png");
   console.log("✓ public/email/robot-192.png (192 px, sans fond)");
