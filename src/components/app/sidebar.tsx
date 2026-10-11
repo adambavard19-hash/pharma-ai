@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { LifeBuoy, X } from "lucide-react";
 import { NAVIGATION, groupNavigation, isNavItemActive, type NavItem } from "@/config/navigation";
 import { cn } from "@/lib/utils";
-import { PharmaWordmark } from "./logo";
+import { Robot } from "@/components/robot";
+import { useCounterLook } from "@/components/robot/counter-look-context";
 import { useMobileNav } from "./mobile-nav";
 
 export function Sidebar({
@@ -22,6 +23,7 @@ export function Sidebar({
   hiddenHrefs?: string[];
 }) {
   const { open: mobileOpen, closeNav } = useMobileNav();
+  const counterLook = useCounterLook();
   const pathname = usePathname();
   const granted = new Set(permissions);
 
@@ -52,9 +54,17 @@ export function Sidebar({
         aria-label="Navigation principale"
       >
         <div className="flex items-center justify-between px-4 py-4">
-          <Link href="/" className="min-w-0 rounded-md">
-            <PharmaWordmark subtitle={pharmacyName} />
-          </Link>
+          {/* Le robot vivant, aux couleurs du comptoir de la personne (le robot de la marque si elle n'en a pas) : il respire,
+              cligne des yeux, rit quand on le touche. Hors du lien, pour qu'on puisse le toucher sans changer de page. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <Robot size={42} interactive listen look={counterLook?.look} label={counterLook ? counterLook.caption : "Le robot PharmaBoost"} className="shrink-0" />
+            <Link href="/" className="min-w-0 rounded-md">
+              <p className="text-sm leading-5 font-bold tracking-[-0.025em] text-text-primary">
+                Pharma<span className="text-brand-700 dark:text-brand-400">Boost</span>
+              </p>
+              <p className="truncate text-xs leading-4 text-text-tertiary">{pharmacyName}</p>
+            </Link>
+          </div>
           <button
             type="button"
             onClick={closeNav}
