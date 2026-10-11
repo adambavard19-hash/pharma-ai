@@ -2,9 +2,10 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
- * Marque PharmaBoost : la croix d'officine et la flèche qui monte. Le fichier
- * source est `public/logo.png` ; les déclinaisons (`logo-256`, `icon`,
- * `apple-icon`) en sont tirées.
+ * Marque PharmaBoost : le petit robot de la bannière du comptoir. La source est
+ * `public/logo.svg`, générée par `scripts/logo-robot.ts` avec les couleurs de la
+ * bannière ; les déclinaisons PNG (`logo`, `logo-256`, `icon`, `apple-icon`) en
+ * sont tirées par le même script.
  */
 export function PharmaLogo({
   className,
@@ -21,6 +22,8 @@ export function PharmaLogo({
       height={size}
       className={cn("shrink-0 rounded-[22%]", className)}
       aria-hidden="true"
+      // Servi tel quel (25 Ko) : un logo changé apparaît aussitôt, sans copie optimisée gardée en cache.
+      unoptimized
       priority
     />
   );
