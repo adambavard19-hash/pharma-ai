@@ -1,8 +1,13 @@
 import "server-only";
 import { prisma } from "@/server/db/client";
-import type { NotificationSeverity, NotificationType } from "@/generated/prisma";
+import type { NotificationSeverity, NotificationType, Prisma } from "@/generated/prisma";
 import type { TenantScope } from "@/server/db/tenant";
 
+/**
+ * LE point d'entrée de toute notification de l'équipe : chaque écran, service ou tâche qui veut prévenir l'officine passe par
+ * ici (la cloche du logiciel la montre aussitôt). C'est l'endroit où brancher demain l'envoi sur le téléphone (notifications
+ * push de PharmaBoost Mobile) : un seul appel à ajouter, après l'écriture.
+ */
 export async function createNotification(params: {
   pharmacyId: string;
   userId?: string | null;
@@ -27,36 +32,50 @@ export async function createNotification(params: {
   });
 }
 
-export async function countUnreadNotifications(scope: TenantScope): Promise<number> {
-  return prisma.notification.count({
-    where: {
-      pharmacyId: scope.pharmacyId,
-      readAt: null,
-      OR: [{ userId: null }, { userId: scope.userId }],
-    },
-  });
+/** Ce que la personne connectée voit : les notifications de son officine qui sont à elle ou à toute l'équipe. */
+function visibleTo(scope: TenantScope): Prisma.NotificationWhereInput {
+  return { pharmacyId: scope.pharmacyId, OR: [{ userId: null }, { userId: scope.userId }] };
 }
 
-export async function listNotifications(scope: TenantScope, limit = 50) {
-  return prisma.notification.findMany({
-    where: {
-      pharmacyId: scope.pharmacyId,
-      OR: [{ userId: null }, { userId: scope.userId }],
-    },
+/**
+ * Non lue POUR CETTE PERSONNE : ni lue avant le « lu par personne » (`readAt`, ancien « lu pour tous »), ni lue par elle
+ * depuis. Une notification d'équipe lue par un collègue reste non lue pour les autres.
+ */
+function unreadFor(scope: TenantScope): Prisma.NotificationWhereInput {
+  return { ...visibleTo(scope), readAt: null, reads: { none: { userId: scope.userId } } };
+}
+
+export async function countUnreadNotifications(scope: TenantScope): Promise<number> {
+  return prisma.notification.count({ where: unreadFor(scope) });
+}
+
+export type NotificationRow = { id: string; type: NotificationType; severity: NotificationSeverity; title: string; body: string; linkUrl: string | null; createdAt: Date; read: boolean };
+
+export async function listNotifications(scope: TenantScope, limit = 50): Promise<NotificationRow[]> {
+  const rows = await prisma.notification.findMany({
+    where: visibleTo(scope),
     orderBy: { createdAt: "desc" },
     take: limit,
+    select: { id: true, type: true, severity: true, title: true, body: true, linkUrl: true, createdAt: true, readAt: true, reads: { where: { userId: scope.userId }, select: { userId: true } } },
   });
+  return rows.map(({ readAt, reads, ...row }) => ({ ...row, read: readAt !== null || reads.length > 0 }));
 }
 
-export async function markAllNotificationsRead(scope: TenantScope): Promise<void> {
-  await prisma.notification.updateMany({
-    where: {
-      pharmacyId: scope.pharmacyId,
-      readAt: null,
-      OR: [{ userId: null }, { userId: scope.userId }],
-    },
-    data: { readAt: new Date() },
-  });
+/** Marque lues, pour cette personne seulement, des notifications qu'elle voit (les autres identifiants sont ignorés). */
+export async function markNotificationsRead(scope: TenantScope, ids: string[]): Promise<number> {
+  const unique = [...new Set(ids)].slice(0, 200);
+  if (unique.length === 0) return 0;
+  const mine = await prisma.notification.findMany({ where: { ...unreadFor(scope), id: { in: unique } }, select: { id: true } });
+  if (mine.length === 0) return 0;
+  const result = await prisma.notificationRead.createMany({ data: mine.map(({ id }) => ({ notificationId: id, userId: scope.userId })), skipDuplicates: true });
+  return result.count;
+}
+
+export async function markAllNotificationsRead(scope: TenantScope): Promise<number> {
+  const unread = await prisma.notification.findMany({ where: unreadFor(scope), select: { id: true } });
+  if (unread.length === 0) return 0;
+  const result = await prisma.notificationRead.createMany({ data: unread.map(({ id }) => ({ notificationId: id, userId: scope.userId })), skipDuplicates: true });
+  return result.count;
 }
 
 /**

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Bell, LogOut, ScanLine, Settings, Store } from "lucide-react";
+import { LogOut, ScanLine, Settings, Store } from "lucide-react";
 import { GlobalSearch } from "./global-search";
+import { NotificationBell } from "./notifications/notification-bell";
 import { MobileNavTrigger } from "./mobile-nav";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -44,18 +45,7 @@ export function Topbar({
         </Link>
       )}
 
-      <Link
-        href="/notifications"
-        className="relative rounded-lg p-2 text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary"
-        aria-label={`Notifications${unreadNotifications > 0 ? ` — ${unreadNotifications} non lues` : ""}`}
-      >
-        <Bell className="size-[18px]" />
-        {unreadNotifications > 0 && (
-          <span className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-danger-600 text-[9.5px] font-semibold text-white tabular">
-            {unreadNotifications > 9 ? "9+" : unreadNotifications}
-          </span>
-        )}
-      </Link>
+      <NotificationBell unread={unreadNotifications} />
 
       <UserMenu session={session} />
     </header>

@@ -547,6 +547,8 @@ model User {
   declaredPharmacyName   String?
   /// Fin du premier parcours « Bienvenue » de l'application mobile (profil + consentements). Vide : à faire.
   mobileOnboardedAt      DateTime?
+  /// Le titulaire s'est désinscrit du résumé hebdomadaire (lien en bas de chaque résumé). Vide : il le reçoit.
+  weeklyDigestOptOutAt   DateTime?
   lastLoginAt            DateTime?
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
@@ -564,6 +566,7 @@ model User {
   stockMovements          StockMovement[]
   auditLogs               AuditLog[]
   notifications           Notification[]
+  notificationReads       NotificationRead[]
   pharmacyRules           PharmacyRule[]
   createdAssociations     ProductAssociation[]
   imports                 ImportJob[]
@@ -2921,12 +2924,28 @@ model Notification {
   readAt     DateTime?
   createdAt  DateTime             @default(now())
 
-  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pharmacy Pharmacy           @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  user     User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reads    NotificationRead[]
 
   @@index([pharmacyId, createdAt])
   @@index([pharmacyId, readAt])
   @@map("notifications")
+}
+
+/// « Lu » par personne. Une notification d'équipe (userId vide) lue par l'un reste non lue pour les autres : chacun a
+/// son compteur. `Notification.readAt` reste le « lu » des notifications d'avant (lues pour tout le monde).
+model NotificationRead {
+  notificationId String
+  userId         String
+  readAt         DateTime @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([notificationId, userId])
+  @@index([userId])
+  @@map("notification_reads")
 }
 
 model AuditLog {
