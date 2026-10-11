@@ -468,6 +468,15 @@ export function evaluateVigilances(drugs: DrugKnowledge[]): VigilanceResult[] {
   return results;
 }
 
+/**
+ * Le message d'une vigilance, tel que l'analyse l'enregistre et que la bannière du comptoir l'affiche (« Paracétamol : 3 g par jour
+ * au maximum — Déjà du paracétamol dans la formule : … »). Une seule écriture : la démonstration du site public le prend ici aussi,
+ * elle ne le recopie jamais.
+ */
+export function vigilanceMessage(vigilance: Pick<VigilanceResult, "title" | "subtitle" | "explanation">): string {
+  return `${vigilance.title} — ${vigilance.subtitle} : ${vigilance.explanation}`;
+}
+
 /** Ce médicament contient-il du paracétamol ? Par son code ATC (N02BE, N02AJ), par sa substance ou par le nom d'une marque connue. */
 export function containsParacetamol(drug: DrugKnowledge): boolean {
   if (isVeterinaryKnowledge(drug)) return false;

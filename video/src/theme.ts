@@ -1,42 +1,45 @@
 import { createContext, useContext } from "react";
 import { Easing, interpolate, spring, useCurrentFrame } from "remotion";
-import { loadFont as loadInter } from "@remotion/google-fonts/Inter";
+import { loadFont as loadJakarta } from "@remotion/google-fonts/PlusJakartaSans";
 import { loadFont as loadMono } from "@remotion/google-fonts/JetBrainsMono";
 
 /**
  * L'identité de PharmaBoost, reprise de src/app/globals.css (oklch converti
- * en hex sRGB). Teal pour l'action, ambre réservé à la valeur créée, un seul
- * quasi-noir : celui de l'avis en coin d'écran.
+ * en hex sRGB, jetons d'octobre 2026). Teal pour l'action, ambre réservé à la
+ * valeur créée. Plus de grand aplat vert foncé : les temps sombres prennent le
+ * bleu-vert profond de la bannière du comptoir (agent/src/banner-design.ts).
  */
 export const C = {
-  brand50: "#EAFCF8",
-  brand100: "#CDF7EE",
-  brand200: "#A0EEDE",
-  brand300: "#68DCC7",
-  brand400: "#21BEA8",
-  brand500: "#00A18D",
-  brand600: "#008474",
-  brand700: "#00685C",
-  brand800: "#005148",
-  brand900: "#00403B",
-  brand950: "#012421",
+  brand50: "#F2FAF9",
+  brand100: "#E2F3F0",
+  brand200: "#BFEAE3",
+  brand300: "#90D9CD",
+  brand400: "#55BEAE",
+  brand500: "#28A191",
+  brand600: "#1D8174",
+  brand700: "#207267",
+  brand800: "#1F6057",
+  brand900: "#1B4A44",
+  brand950: "#0C2A26",
+  /** L'arrivée du dégradé de marque (teal → vert) et des mots mis en valeur. */
+  leaf500: "#35A174",
   accent50: "#FFF8E9",
   accent100: "#FDEFCC",
   accent200: "#F7DF9E",
   accent300: "#EFCC6A",
   accent400: "#E7B62D",
   accent500: "#DDA100",
-  ink50: "#F8FAFC",
-  ink100: "#F2F5F7",
-  ink200: "#E3E8EC",
-  ink300: "#CED5DA",
-  ink400: "#98A1A9",
-  ink500: "#6B747C",
-  ink600: "#4D555D",
-  ink700: "#3A4149",
-  ink800: "#232930",
-  ink900: "#14191F",
-  ink950: "#05080E",
+  ink50: "#F8FBFB",
+  ink100: "#F0F5F5",
+  ink200: "#E2E9E9",
+  ink300: "#D2DBDC",
+  ink400: "#9BA7AA",
+  ink500: "#5B6A72",
+  ink600: "#46555C",
+  ink700: "#38454B",
+  ink800: "#222D33",
+  ink900: "#172126",
+  ink950: "#091114",
   success50: "#EBFCF0",
   success100: "#D4F7E0",
   success600: "#25975B",
@@ -44,30 +47,38 @@ export const C = {
   warning50: "#FFF7E5",
   warning300: "#FFCC69",
   warning600: "#DD881B",
-  warning700: "#B3621E",
+  warning700: "#A1551E",
   danger50: "#FFF1F2",
-  danger100: "#FFE1E2",
+  danger100: "#FFE3E3",
   danger600: "#DB2829",
   danger700: "#B91B1E",
-  // L'avis en coin d'écran (agent/src/toast.ts)
-  toastBg: "#18211F",
-  toastTitle: "#78C8B4",
-  toastFoot: "#A0AAA6",
+  /** Le fond des écrans de l'application (#f9fbfb). */
+  app: "#F9FBFB",
+  /** Le bleu du mot « Bilan. » du site (dégradé brand-600 → #0796b4). */
+  sky: "#0796B4",
   white: "#FFFFFF",
 } as const;
 
-const inter = loadInter("normal", { weights: ["400", "500", "600"], subsets: ["latin", "latin-ext"] });
+/** Le dégradé des boutons de l'application (bg-brand-gradient) : teal → vert. */
+export const BUTTON_GRADIENT = "linear-gradient(135deg, #1C796D, #22815B)";
+
+const jakarta = loadJakarta("normal", { weights: ["500", "600", "700"], subsets: ["latin", "latin-ext"] });
 const mono = loadMono("normal", { weights: ["400", "500"], subsets: ["latin", "latin-ext"] });
 
-export const FONT = inter.fontFamily;
+/** Plus Jakarta Sans, la police de l'application : titres en 700, interlettrage −0,025em. */
+export const FONT = jakarta.fontFamily;
+/** Seulement pour les petits surtitres, comme les `font-mono` du site. */
 export const MONO = mono.fontFamily;
-/** Les réglages de caractères déclarés par le site (a à un étage, chiffres ouverts). */
-export const FEATURES = '"cv02","cv03","cv04","cv11","ss01"';
+/**
+ * Les réglages de caractères : ceux d'Inter ne s'appliquent pas à Plus Jakarta
+ * Sans. Gardé pour FilmShell, à valeur neutre.
+ */
+export const FEATURES = "normal";
 
-/** Ombres slate très diffuses, comme l'interface. */
+/** Ombres teintées teal, comme les cartes de l'application ; « lift » pour ce qui flotte au-dessus. */
 export const SHADOW = {
-  card: "0 24px 60px -28px rgba(15,23,42,.35)",
-  lift: "0 40px 90px -30px rgba(15,23,42,.45)",
+  card: "0 4px 24px -4px rgba(30,133,120,.14), 0 1px 2px rgba(23,33,38,.05)",
+  lift: "0 30px 70px -28px rgba(23,33,38,.32), 0 8px 24px -10px rgba(30,133,120,.18)",
   toast: "0 25px 50px -12px rgba(0,0,0,.35)",
 };
 
@@ -119,6 +130,14 @@ export const ClockOffset = createContext({ from: 0, bound: 0, rate: RATE });
 export function useF() {
   const c = useContext(ClockOffset);
   return (useCurrentFrame() + c.from) * c.rate - c.bound;
+}
+/**
+ * Images de scène par seconde réelle du film (36 à 120 BPM, 40,8 à 136 BPM) :
+ * ce qui suit une durée de l'interface (la bannière s'agrandit en 0,38 s) se
+ * cale dessus, pas sur le tempo.
+ */
+export function usePerSecond() {
+  return useContext(ClockOffset).rate * OUT_FPS;
 }
 /** Image de scène → image de la séquence courante (pour poser un son). */
 export function useLocalVideo() {

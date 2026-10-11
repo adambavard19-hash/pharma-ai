@@ -5,11 +5,21 @@ import { cn } from "@/lib/utils";
 import { MobileMenu } from "./mobile-menu";
 
 const NAV = [
+  // La bannière du poste de caisse d'abord : c'est ce que l'équipe voit au comptoir.
+  { href: "/decouvrir#banniere", label: "Au comptoir" },
   { href: "/decouvrir#fonctionnement", label: "Fonctionnement" },
   { href: "/decouvrir#stock-marge", label: "Stock et marge" },
   { href: "/decouvrir/pourquoi", label: "Pourquoi" },
   { href: "/decouvrir#tarif", label: "Tarif" },
 ];
+
+/**
+ * La typographie française à l'écran : une espace insécable avant « ? ! : ; » et à l'intérieur des guillemets. Sans elle, à
+ * 320 px, le « ? » d'une question de la FAQ ou le « : » d'une ligne partait seul en début de ligne suivante.
+ */
+export function fr(text: string): string {
+  return text.replace(/ ([?!:;»])/g, "\u00a0$1").replace(/« /g, "«\u00a0");
+}
 
 /** Le filet de la marque : du vert au bleu du symbole. */
 export const HAIRLINE = "bg-gradient-to-r from-brand-500 via-[#0796b4] to-transparent";
@@ -18,13 +28,18 @@ export function SiteWordmark({ className }: { className?: string }) {
   return (
     <Link href="/decouvrir" className={cn("flex items-center gap-2.5 rounded-md", className)} aria-label="PharmaBoost, accueil">
       <PharmaLogo size={30} />
-      <span className="text-[17px] font-semibold tracking-[-0.01em] text-text-primary">
+      <span className="text-[17px] font-semibold tracking-[-0.01em] text-text-primary max-[389px]:text-[16px]">
         Pharma<span className="text-brand-600">Boost</span>
       </span>
     </Link>
   );
 }
 
+/**
+ * Sous 390 px, la marque, l'appel et le menu (361 px à eux trois, plus les marges) ne tenaient plus : la page défilait de côté
+ * et, à 320 px, le menu sortait de l'écran. De 360 à 389 px, l'appel et la marque se resserrent ; sous 360 px, l'appel se
+ * réduit à « Démo » (le lien garde son nom entier pour les lecteurs d'écran). À 390 px et au-delà, rien ne change.
+ */
 export function SiteHeader() {
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-border-subtle bg-surface-app/85 backdrop-blur-md">
@@ -37,15 +52,16 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-1.5 max-[389px]:gap-1">
           <Link href="/login" className="hidden rounded-full px-3 py-2 text-[13.5px] font-medium whitespace-nowrap text-text-secondary hover:bg-surface-sunken hover:text-text-primary xl:inline-block">
             Se connecter
           </Link>
           <Link href="/decouvrir/abonnement" className="hidden rounded-full border border-border-default px-4 py-2 text-[13.5px] font-semibold whitespace-nowrap text-text-primary hover:border-brand-400 md:inline-block">
             S&apos;abonner
           </Link>
-          <Link href="/decouvrir/demo" className="rounded-full bg-brand-600 px-4 py-2 text-[13.5px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-brand-700">
-            Réserver une démo
+          <Link href="/decouvrir/demo" className="rounded-full bg-brand-600 px-4 py-2 text-[13.5px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-brand-700 max-[389px]:px-3 max-[389px]:text-[12.5px]">
+            <span className="max-[359px]:sr-only">Réserver une </span>
+            <span className="max-[359px]:capitalize">démo</span>
           </Link>
           <MobileMenu>
             {NAV.map((item) => (
@@ -124,7 +140,7 @@ export function KeyCell({ label, value, className }: { label: string; value: str
   return (
     <div className={cn("p-5 sm:p-6", className)}>
       <p className="font-mono text-[11.5px] tracking-[0.14em] text-text-tertiary uppercase">{label}</p>
-      <p className="mt-2 text-[17px] leading-snug font-semibold text-text-primary">{value}</p>
+      <p className="mt-2 text-[17px] leading-snug font-semibold text-text-primary">{fr(value)}</p>
     </div>
   );
 }

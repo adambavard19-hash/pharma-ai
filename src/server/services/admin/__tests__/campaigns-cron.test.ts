@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Le passage quotidien : les relances d'abord (comportement et clés de réponse
  * inchangés), puis les campagnes, les annonces aux patients, la purge, celle des
- * fichiers de stock de plus de 90 jours et la fermeture des dépôts de stock restés
- * « en cours ». Chaque étape est isolée : un échec ne coupe pas les autres et ne
+ * fichiers de stock de plus de 90 jours, la fermeture des dépôts de stock restés
+ * « en cours » et l'effacement des adresses e-mail du bilan au comptoir restées en
+ * base. Chaque étape est isolée : un échec ne coupe pas les autres et ne
  * devient jamais un faux zéro.
  */
 
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   purgeExpiredDepositFiles: vi.fn(),
   closeStalledDeposits: vi.fn(),
   sendMonthlyCounterReports: vi.fn(),
+  purgeCounterEmails: vi.fn(),
   runStockLearningPass: vi.fn(),
   scheduleLearningContinuation: vi.fn(),
   after: vi.fn(),
@@ -26,6 +28,7 @@ vi.mock("@/server/services/admin/automations", () => ({ runAutomations: mocks.ru
 vi.mock("@/server/services/admin/campaigns", () => ({ processDueCampaigns: mocks.processDueCampaigns }));
 vi.mock("@/server/services/patient-news", () => ({ resumeStuckAnnouncements: mocks.resumeStuckAnnouncements, purgeStalePatientNews: mocks.purgeStalePatientNews }));
 vi.mock("@/server/services/counter-results", () => ({ sendMonthlyCounterReports: mocks.sendMonthlyCounterReports }));
+vi.mock("@/server/services/counter-window", () => ({ purgeCounterEmails: mocks.purgeCounterEmails }));
 vi.mock("@/server/services/stock-learning", () => ({ runStockLearningPass: mocks.runStockLearningPass }));
 vi.mock("@/server/services/stock-learning-chain", () => ({ scheduleLearningContinuation: mocks.scheduleLearningContinuation }));
 vi.mock("next/server", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/server")>()), after: mocks.after }));
@@ -47,6 +50,7 @@ beforeEach(() => {
   mocks.purgeExpiredDepositFiles.mockResolvedValue({ purged: 5 });
   mocks.closeStalledDeposits.mockResolvedValue({ failed: 2, superseded: 1, jobsClosed: 3 });
   mocks.sendMonthlyCounterReports.mockResolvedValue({ month: "2026-09", pharmacies: 0, sent: 0, skipped: 0, failed: 0 });
+  mocks.purgeCounterEmails.mockResolvedValue({ erased: 2, moreToDo: false });
   mocks.runStockLearningPass.mockResolvedValue({ pharmacies: 3, processed: 3, skipped: 0, moreToDo: false });
   mocks.scheduleLearningContinuation.mockResolvedValue(true);
   mocks.after.mockImplementation((work: () => Promise<unknown>) => void work());
@@ -88,14 +92,16 @@ describe("passage complet", () => {
       news: { resumed: 3, purged: 4 },
       stockFiles: { purged: 5 },
       stalledDeposits: { failed: 2, superseded: 1, jobsClosed: 3 },
+      counterEmails: { erased: 2, moreToDo: false },
       counterReports: { month: "2026-09", pharmacies: 0, sent: 0, skipped: 0, failed: 0 },
       stockLearning: { pharmacies: 3, processed: 3, skipped: 0, moreToDo: false },
     });
   });
 
-  it("dans l'ordre : relances, campagnes, annonces restées en plan, purge, fichiers de stock, dépôts bloqués — avec le même instant", async () => {
+  it("dans l'ordre : adresses du bilan, relances, campagnes, annonces restées en plan, purge, fichiers de stock, dépôts bloqués — avec le même instant", async () => {
     await authorized();
-    const order = [mocks.runAutomations, mocks.processDueCampaigns, mocks.resumeStuckAnnouncements, mocks.purgeStalePatientNews, mocks.purgeExpiredDepositFiles, mocks.closeStalledDeposits, mocks.sendMonthlyCounterReports, mocks.runStockLearningPass].map((mock) => mock.mock.invocationCallOrder[0]);
+    // L'effacement des adresses du bilan passe EN PREMIER : la promesse des 48 heures ne dépend d'aucune étape longue.
+    const order = [mocks.purgeCounterEmails, mocks.runAutomations, mocks.processDueCampaigns, mocks.resumeStuckAnnouncements, mocks.purgeStalePatientNews, mocks.purgeExpiredDepositFiles, mocks.closeStalledDeposits, mocks.sendMonthlyCounterReports, mocks.runStockLearningPass].map((mock) => mock.mock.invocationCallOrder[0]);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(mocks.runAutomations).toHaveBeenCalledWith({ now: expect.any(Date), dryRun: false });
     const now = mocks.runAutomations.mock.calls[0][0].now as Date;
@@ -104,6 +110,30 @@ describe("passage complet", () => {
     expect(mocks.purgeStalePatientNews).toHaveBeenCalledWith(now);
     expect(mocks.purgeExpiredDepositFiles).toHaveBeenCalledWith(now);
     expect(mocks.closeStalledDeposits).toHaveBeenCalledWith(now);
+    expect(mocks.purgeCounterEmails).toHaveBeenCalledWith(now);
+  });
+});
+
+describe("les adresses e-mail du bilan au comptoir", () => {
+  it("sont effacées à chaque passage, avant les étapes longues : la promesse des 48 heures ne dépend pas d'elles", async () => {
+    await authorized();
+    expect(mocks.purgeCounterEmails).toHaveBeenCalledTimes(1);
+    expect(mocks.purgeCounterEmails.mock.invocationCallOrder[0]).toBeLessThan(mocks.sendMonthlyCounterReports.mock.invocationCallOrder[0]);
+    expect(mocks.purgeCounterEmails.mock.invocationCallOrder[0]).toBeLessThan(mocks.runStockLearningPass.mock.invocationCallOrder[0]);
+  });
+
+  it("un échec de l'effacement est journalisé et dit « inconnu » (null) ; les autres étapes tournent", async () => {
+    mocks.purgeCounterEmails.mockRejectedValue(new Error("base occupée"));
+    const response = await authorized();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ sent: 2, stalledDeposits: { failed: 2 }, counterEmails: null, counterReports: { month: "2026-09" }, stockLearning: { processed: 3 } });
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("adresses e-mail du comptoir"), expect.any(Error));
+  });
+
+  it("une erreur des relances n'empêche pas l'effacement", async () => {
+    mocks.runAutomations.mockRejectedValue(new Error("relances en panne"));
+    await expect(authorized()).rejects.toThrow("relances en panne");
+    expect(mocks.purgeCounterEmails).toHaveBeenCalled();
   });
 });
 

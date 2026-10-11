@@ -1,23 +1,21 @@
-import { C, MONO, SHADOW, tw, sp, useF } from "../theme";
+import { C, FONT, SHADOW, tw, sp, useF } from "../theme";
 
 /**
- * La douchette, la boîte et son code-barres : dessinés à plat, dans la
- * palette. Le laser est menthe (brand-300) plutôt que rouge : la marque
- * n'utilise pas le rouge.
+ * Le lecteur de codes-barres, la boîte et son code-barres : dessinés à plat,
+ * dans la palette. Le faisceau est menthe (brand-300) plutôt que rouge : la
+ * marque n'utilise pas le rouge. À l'écran, on dit « scan », jamais autre chose.
  */
 
 const BARS = Array.from({ length: 46 }, (_, i) => 1 + ((i * 7919 + 13) % 4));
 
+/** Le bord gauche de chaque barre, calculé une fois (le rendu ne réassigne rien). */
+const BAR_X = BARS.map((_, i) => BARS.slice(0, i).reduce((s, b) => s + b + 1.4, 0));
+const BARS_W = BARS.reduce((s, b) => s + b + 1.4, 0);
+
 export function Barcode({ w, h, lit = 0 }: { w: number; h: number; lit?: number }) {
-  const total = BARS.reduce((s, b) => s + b + 1.4, 0);
-  let x = 0;
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${total} 100`} preserveAspectRatio="none">
-      {BARS.map((b, i) => {
-        const r = <rect key={i} x={x} y={0} width={b} height={100} fill={lit > 0 ? mix(C.ink900, C.brand500, lit) : C.ink900} />;
-        x += b + 1.4;
-        return r;
-      })}
+    <svg width={w} height={h} viewBox={`0 0 ${BARS_W} 100`} preserveAspectRatio="none">
+      {BARS.map((b, i) => <rect key={i} x={BAR_X[i]} y={0} width={b} height={100} fill={lit > 0 ? mix(C.ink900, C.brand500, lit) : C.ink900} />)}
     </svg>
   );
 }
@@ -41,7 +39,8 @@ export function MedBox({ name, form, w = 460, lit = 0, tilt = -16 }: { name: str
         <div style={{ position: "absolute", inset: 0, borderRadius: 14, background: C.white, boxShadow: SHADOW.lift, overflow: "hidden", border: `1px solid ${C.ink200}` }}>
           <div style={{ height: h * 0.07, background: `linear-gradient(90deg, ${C.brand600}, ${C.brand400})` }} />
           <div style={{ padding: `${h * 0.08}px ${w * 0.06}px` }}>
-            <div style={{ fontSize: w * 0.072, fontWeight: 600, color: C.ink900, letterSpacing: "-0.01em" }}>{name}</div>
+            {/* Plus Jakarta Sans a des espaces étroites : sans `wordSpacing`, « AMOXICILLINE 1 g » se lit d'un seul bloc. */}
+            <div style={{ fontSize: w * 0.072, fontWeight: 700, color: C.ink900, letterSpacing: "-0.01em", wordSpacing: "0.12em" }}>{name}</div>
             <div style={{ fontSize: w * 0.036, color: C.ink500, marginTop: 4 }}>{form}</div>
           </div>
           <div style={{ position: "absolute", right: w * 0.06, bottom: h * 0.1, padding: 8, background: C.white, borderRadius: 6, boxShadow: lit > 0 ? `0 0 0 ${4 * lit}px ${C.brand200}, 0 0 ${40 * lit}px ${C.brand300}` : "none" }}>
@@ -53,7 +52,7 @@ export function MedBox({ name, form, w = 460, lit = 0, tilt = -16 }: { name: str
   );
 }
 
-/** La douchette, vue de profil, nez à gauche. */
+/** Le lecteur de codes-barres, vu de profil, nez à gauche. */
 export function Scanner({ w = 300, led = 0 }: { w?: number; led?: number }) {
   return (
     <svg width={w} height={w * 0.88} viewBox="0 0 300 264">
@@ -79,7 +78,7 @@ export function Scanner({ w = 300, led = 0 }: { w?: number; led?: number }) {
   );
 }
 
-/** Le faisceau : du nez de la douchette à une ligne horizontale qui traverse les barres. */
+/** Le faisceau : du nez du lecteur à une ligne horizontale qui traverse les barres. */
 export function Laser({ from, to, spread, on }: { from: [number, number]; to: [number, number]; spread: number; on: number }) {
   if (on <= 0) return null;
   const [x1, y1] = from;
@@ -100,7 +99,7 @@ export function Laser({ from, to, spread, on }: { from: [number, number]; to: [n
   );
 }
 
-/** Une onde qui part du point bipé. */
+/** Une onde qui part du point scanné. */
 export function Ripple({ x, y, at, color = C.brand300, max = 520 }: { x: number; y: number; at: number; color?: string; max?: number }) {
   const f = useF();
   if (f < at || f > at + 40) return null;
@@ -116,61 +115,87 @@ export function Ripple({ x, y, at, color = C.brand300, max = 520 }: { x: number;
   );
 }
 
+/** Une ligne de la vente : la désignation, la quantité, le prix, et l'image où elle arrive (au scan). */
+export type LgoLine = { text: string; at: number; qty?: string; price?: string };
+
+/** « DOXYCYCLINE 100 mg cp séc. — 1 boîte » → la désignation et la quantité (l'ancienne écriture des lignes). */
+function splitLine(line: LgoLine) {
+  const m = line.text.match(/^(.*?)\s+—\s+(\d+)\s+boîtes?$/);
+  return { name: m ? m[1] : line.text, qty: line.qty ?? (m ? m[2] : "1"), price: line.price ?? "" };
+}
+
 /**
  * La fenêtre du logiciel de gestion : générique, sans marque d'éditeur, comme
- * la maquette du site. Les lignes arrivent au bip, avec la puce « bip ».
+ * le faux logiciel de l'aperçu de la bannière (agent/src/banner-preview.ts).
+ * Chaque ligne arrive au scan, entourée un instant. `w` fixe l'échelle (1100 px
+ * = la taille de référence).
  */
-export function LgoWindow({ w, lines, title = "Logiciel de gestion de l'officine — Vente", post = "Poste comptoir 1" }: { w: number; lines: { text: string; at: number }[]; title?: string; post?: string }) {
+export function LgoWindow({ w, h, lines, title = "Logiciel de gestion · Comptoir 1" }: { w: number; h?: number; lines: LgoLine[]; title?: string }) {
   const f = useF();
+  const k = w / 1100;
+  const col = `${2.6}fr ${0.8}fr ${0.9}fr ${0.9}fr`;
+  const total = lines.filter((l) => f >= l.at).reduce((s, l) => s + (parseFloat(splitLine(l).price.replace(",", ".")) || 0) * (parseInt(splitLine(l).qty, 10) || 1), 0);
   return (
-    <div style={{ width: w, borderRadius: 24, border: `1px solid ${C.ink200}`, background: C.ink100, padding: 16, boxShadow: SHADOW.card }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "2px 6px 14px" }}>
-        {[0, 1, 2].map((i) => <span key={i} style={{ width: 14, height: 14, borderRadius: 7, background: C.ink300 }} />)}
-        <span style={{ marginLeft: 12, fontSize: 19, color: C.ink500 }}>{title}</span>
-        <span style={{ marginLeft: "auto", fontSize: 17, color: C.ink400 }}>{post}</span>
+    <div style={{ position: "relative", width: w, height: h, borderRadius: 14 * k, background: "#F4F6F8", boxShadow: "0 2px 16px rgba(10,30,45,.14), 0 30px 70px -30px rgba(10,30,45,.3)", overflow: "hidden", color: "#2B3A46", fontFamily: FONT, border: "1px solid #D5DDE3" }}>
+      <div style={{ height: 50 * k, background: "#E6EBEF", display: "flex", alignItems: "center", padding: `0 ${18 * k}px`, gap: 10 * k, borderBottom: "1px solid #D5DDE3", fontWeight: 600, fontSize: 19 * k, color: "#51616D" }}>
+        {[0, 1, 2].map((i) => <span key={i} style={{ width: 15 * k, height: 15 * k, borderRadius: "50%", background: "#C3CCD3" }} />)}
+        <span style={{ marginLeft: 8 * k }}>{title}</span>
+        <span style={{ marginLeft: "auto", letterSpacing: "0.3em", color: "#8A98A3" }}>– ☐ ✕</span>
       </div>
-      <div style={{ borderRadius: 14, background: C.white, padding: 26, display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, letterSpacing: "0.1em", textTransform: "uppercase", color: C.ink400, fontWeight: 600, padding: "0 4px" }}>
-          <span>Délivrance</span>
-          <span>Code</span>
+      <div style={{ height: 46 * k, background: "#F9FAFB", borderBottom: "1px solid #E3E8EC", display: "flex", gap: 34 * k, alignItems: "center", padding: `0 ${24 * k}px`, fontSize: 18 * k, color: "#6D7D89" }}>
+        {["Dossier", "Délivrance", "Stock", "Commandes", "Gestion"].map((m) => <span key={m} style={{ color: m === "Délivrance" ? "#2B3A46" : undefined, fontWeight: m === "Délivrance" ? 600 : 400 }}>{m}</span>)}
+      </div>
+      <div style={{ padding: `${20 * k}px ${24 * k}px`, display: "flex", flexDirection: "column", gap: 11 * k }}>
+        <div style={{ display: "grid", gridTemplateColumns: col, gap: 16 * k, padding: `${12 * k}px ${16 * k}px`, background: "#EAF0F4", border: "1px solid #E3E8EC", borderRadius: 8 * k, color: "#6D7D89", fontWeight: 600, fontSize: 18 * k }}>
+          <span>Désignation</span><span>Quantité</span><span>Prix</span><span>Total</span>
         </div>
         {lines.map((line) => {
+          const { name, qty, price } = splitLine(line);
           const p = sp(f, line.at, { damping: 24, stiffness: 170 });
-          const ring = tw(f, [line.at, line.at + 36], [1, 0]);
-          if (f < line.at) return <div key={line.text} style={{ height: 66 }} />;
+          const ring = tw(f, [line.at, line.at + 40], [1, 0]);
+          // Une ligne n'existe qu'une fois scannée : la saisie descend à mesure.
+          if (f < line.at) return null;
           return (
             <div
               key={line.text}
               style={{
-                height: 66,
-                display: "flex",
+                height: 56 * k,
+                display: "grid",
+                gridTemplateColumns: col,
+                gap: 16 * k,
                 alignItems: "center",
-                justifyContent: "space-between",
-                borderRadius: 10,
-                border: `1.5px solid ${mix(C.ink200, C.brand400, ring)}`,
-                boxShadow: `0 0 0 ${5 * ring}px ${C.brand200}`,
-                padding: "0 22px",
-                transform: `translateY(${(1 - p) * 16}px)`,
+                padding: `0 ${16 * k}px`,
+                background: C.white,
+                borderRadius: 8 * k,
+                border: `1.5px solid ${mix("#E3E8EC", C.brand400, ring)}`,
+                boxShadow: `0 0 0 ${5 * ring * k}px ${C.brand100}`,
+                transform: `translateY(${(1 - p) * 14 * k}px)`,
                 opacity: p,
-                fontFamily: MONO,
-                fontSize: 25,
-                color: C.ink700,
+                fontSize: 21 * k,
               }}
             >
-              <span>{line.text}</span>
-              <span style={{ fontFamily: "inherit", fontSize: 17, color: C.ink500, background: C.ink100, borderRadius: 999, padding: "4px 14px" }}>bip</span>
+              <b style={{ color: "#34495A", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</b>
+              <span>{qty}</span>
+              <span>{price}</span>
+              <b style={{ color: "#34495A", fontWeight: 700 }}>{price}</b>
             </div>
           );
         })}
-        <div style={{ height: 96, borderRadius: 10, border: `1.5px dashed ${C.ink200}`, display: "flex", alignItems: "center", padding: "0 22px", fontFamily: MONO, fontSize: 20, color: C.ink300 }}>
+        <div style={{ height: 56 * k, borderRadius: 8 * k, border: `1.5px dashed ${C.ink300}`, display: "flex", alignItems: "center", padding: `0 ${16 * k}px`, fontSize: 19 * k, color: C.ink400 }}>
           Scanner un produit{Math.floor(f / 15) % 2 === 0 ? "▍" : " "}
         </div>
+      </div>
+      {/* Sans hauteur imposée, les boutons suivent les lignes ; sinon ils restent en bas de la fenêtre. */}
+      <div style={{ ...(h ? { position: "absolute", left: 24 * k, right: 24 * k, bottom: 20 * k } : { margin: `${4 * k}px ${24 * k}px ${20 * k}px` }), display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 14 * k, fontSize: 19 * k }}>
+        {total > 0 && <span style={{ marginRight: "auto", color: "#51616D", fontWeight: 600 }}>Total {total.toFixed(2).replace(".", ",")} €</span>}
+        <span style={{ background: "#5A6B78", color: C.white, padding: `${12 * k}px ${26 * k}px`, borderRadius: 7 * k, fontWeight: 700 }}>Annuler</span>
+        <span style={{ background: "#2E7D5A", color: C.white, padding: `${12 * k}px ${26 * k}px`, borderRadius: 7 * k, fontWeight: 700 }}>Valider</span>
       </div>
     </div>
   );
 }
 
-/** La douchette placée par son nez (nx, ny), tournée autour de lui. */
+/** Le lecteur placé par son nez (nx, ny), tourné autour de lui. */
 export function ScannerAt({ nx, ny, w, deg = 0, led = 0 }: { nx: number; ny: number; w: number; deg?: number; led?: number }) {
   const k = w / 300;
   return (

@@ -7,7 +7,8 @@
     "studio": "remotion studio src/index.ts --port=3123",
     "sons": "node scripts/sfx.mjs public/sfx && node scripts/musique.mjs",
     "brouillon": "node scripts/export.mjs brouillon",
-    "final": "node scripts/export.mjs final"
+    "final": "node scripts/export.mjs final",
+    "web": "node scripts/export.mjs web"
   },
   "dependencies": {
     "@remotion/cli": "4.0.532",

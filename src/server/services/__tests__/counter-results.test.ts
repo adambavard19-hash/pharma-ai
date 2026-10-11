@@ -50,6 +50,13 @@ describe("les résultats du comptoir", () => {
     expect(results.byPost[0].post).toBe("Léa Martin");
   });
 
+  it("compte les adresses recueillies sans relire l'adresse : elle est effacée à « Vente terminée », l'accord reste", async () => {
+    m.followUps.mockResolvedValue([followUp({ consentAt: new Date("2026-10-02T09:00:00Z"), reportStatus: "SENT" }), followUp({ prescriptionId: "p2" })]);
+    const results = await loadCounterResults({ pharmacyId: "ph1", since: new Date("2026-10-01"), until: new Date("2026-11-01") });
+    expect(results).toMatchObject({ salesClosed: 2, emailsSaved: 1, reportsSent: 1 });
+    expect(m.followUps.mock.calls[0][0].select).not.toHaveProperty("emailEncrypted");
+  });
+
   it("ne lit aucun conseil quand aucune vente n'est terminée", async () => {
     m.followUps.mockResolvedValue([]);
     const results = await loadCounterResults({ pharmacyId: "ph1", since: new Date("2026-10-01"), until: new Date("2026-11-01") });

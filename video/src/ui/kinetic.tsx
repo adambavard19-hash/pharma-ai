@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { C, EASE_IN_OUT, sp, tw, useF } from "../theme";
+import { C, EASE_IN_OUT, MONO, sp, tw, useF } from "../theme";
 
 export type Word = { t: string; c?: string };
 
@@ -16,7 +16,8 @@ export function words(text: string, accent?: string): Word[] {
 
 /**
  * Typographie cinétique : chaque mot monte de sous sa ligne, net, avec un
- * léger flou de vitesse. Sortie optionnelle vers le haut à `out`.
+ * léger flou de vitesse. Sortie optionnelle vers le haut à `out`. Titres en
+ * 700, −0,025em, comme ceux de l'application.
  */
 export function Kinetic({
   lines,
@@ -24,7 +25,7 @@ export function Kinetic({
   out,
   size,
   color = C.ink900,
-  weight = 600,
+  weight = 700,
   stagger = 3,
   lineGap = 6,
   align = "flex-start",
@@ -75,7 +76,7 @@ export function Kinetic({
   );
 }
 
-/** Un surtitre en capitales espacées, comme le site. */
+/** Un surtitre en capitales espacées, à chasse fixe comme les `font-mono` du site. */
 export function Eyebrow({ children, color = C.brand700, size = 22, style }: { children: string; color?: string; size?: number; style?: CSSProperties }) {
-  return <div style={{ fontSize: size, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color, ...style }}>{children}</div>;
+  return <div style={{ fontFamily: MONO, fontSize: size, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color, ...style }}>{children}</div>;
 }

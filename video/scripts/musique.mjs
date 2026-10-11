@@ -38,15 +38,16 @@ const PRESETS = {
     risers: [[5, 6], [20, 21]],
     holdFrom: 21,
   },
-  // Comment ça marche (35 s) : 136 BPM, 20 mesures.
-  // Comment ça marche (39 s) : 136 BPM, 22 mesures ; trois étapes, chacune relancée par un impact.
+  // Comment ça marche (44 s) : 136 BPM, 25 mesures ; trois étapes, chacune relancée par un impact.
+  // Les étapes tombent sur 0, 3,75 et 15,75 (src/films/comment.tsx) ; la bannière (conseils, question,
+  // mise en garde) porte la partie la plus dense, de 5 à 14 ; la carte de fin sur 22.
   comment: {
-    bpm: 136, bars: 22,
-    layers: (b) => (b < 1 ? QUIET : b < 5 ? L({ arp: 0.7, bass: 0.6, hat: 0.6, bright: 0.55 }) : b < 7 ? BREATH : b < 12 ? DRIVE : b < 14 ? PEAK : b < 16 ? BREATH : b < 19 ? L({ arp: 0.7, bass: 0.6, hat: 0.6, bright: 0.6 }) : END),
-    chord: (b) => (b >= 21 ? C : b === 20 ? G : b === 19 ? F : MAJOR[b % 4]),
-    impacts: [{ at: 0, gain: 0.6 }, { at: 5.5, gain: 0.5 }, { at: 14.5, gain: 0.5 }, { at: 19, gain: 1 }],
-    risers: [[4.5, 5.5], [13.5, 14.5], [18, 19]],
-    holdFrom: 19,
+    bpm: 136, bars: 25,
+    layers: (b) => (b < 1 ? QUIET : b < 4 ? L({ arp: 0.7, bass: 0.6, hat: 0.6, bright: 0.55 }) : b < 5 ? BREATH : b < 12 ? DRIVE : b < 14 ? PEAK : b < 15 ? L({ arp: 0.7, bass: 0.6, hat: 0.6, bright: 0.6 }) : b < 17 ? BREATH : b < 22 ? L({ arp: 0.7, bass: 0.6, hat: 0.6, bright: 0.6 }) : END),
+    chord: (b) => (b >= 24 ? C : b === 23 ? G : b === 22 ? F : MAJOR[b % 4]),
+    impacts: [{ at: 0, gain: 0.6 }, { at: 3.75, gain: 0.5 }, { at: 15.75, gain: 0.5 }, { at: 22, gain: 1 }],
+    risers: [[2.75, 3.75], [14.75, 15.75], [21, 22]],
+    holdFrom: 22,
   },
   // La présentation du site (48 s) : 120 BPM, 24 mesures. Six mesures
   // d'ouverture pour les trois questions et « PharmaBoost, oui. ».
@@ -67,14 +68,15 @@ const PRESETS = {
     risers: [[4, 5], [10, 11], [13, 14]],
     holdFrom: 14,
   },
-  // Les avantages (34 s) : 128 BPM, 18 mesures ; énergie continue.
+  // Les avantages (38 s) : 128 BPM, 20 mesures ; énergie continue. Une mesure d'intro, huit avantages
+  // de deux mesures (src/films/avantages.tsx), la carte de fin sur 17.
   avantages: {
-    bpm: 128, bars: 18,
-    layers: (b) => (b < 1 ? L({ bright: 0.4, arp: 0.5 }) : b < 15 ? (b % 4 === 0 ? PEAK : L({ ...PEAK, snare: 0.6, hat16: 0.4 })) : END),
-    chord: (b) => (b >= 17 ? C : b === 16 ? G : b === 15 ? F : MAJOR[b % 4]),
-    impacts: [{ at: 1, gain: 0.7 }, { at: 15, gain: 1 }],
-    risers: [[0, 1], [14, 15]],
-    holdFrom: 15,
+    bpm: 128, bars: 20,
+    layers: (b) => (b < 1 ? L({ bright: 0.4, arp: 0.5 }) : b < 17 ? (b % 4 === 0 ? PEAK : L({ ...PEAK, snare: 0.6, hat16: 0.4 })) : END),
+    chord: (b) => (b >= 19 ? C : b === 18 ? G : b === 17 ? F : MAJOR[b % 4]),
+    impacts: [{ at: 1, gain: 0.7 }, { at: 17, gain: 1 }],
+    risers: [[0, 1], [16, 17]],
+    holdFrom: 17,
   },
   // Sans ordonnance (25 s) : 124 BPM, 13 mesures ; tension sur le signal d'alerte.
   "sans-ordonnance": {

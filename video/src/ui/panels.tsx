@@ -4,10 +4,41 @@ import { C, FONT, SHADOW, sp, tw, useF } from "../theme";
 import { EXAMPLE, ProductTile } from "./product";
 
 /**
- * Le plan du patient tel qu'il s'ouvre sur son téléphone (/plan/[id]) : en-tête
- * de l'officine, bouton des rappels, tableau des prises. Posologie du scénario
- * de démonstration : doxycycline 100 mg, matin et soir, 10 jours.
+ * Le plan conseil d'une ordonnance d'exemple : ses lignes (posologie de
+ * l'ordonnance, indication), le conseil remis et le premier rappel de prise.
+ * Le plan d'une scène nomme les médicaments de la vente qu'elle vient de
+ * montrer : jamais une ordonnance qui change d'un plan à l'autre.
  */
+export type PlanLine = { name: string; why: string; days: string; slots: [boolean, boolean, boolean, boolean] };
+export type PatientPlan = { lines: PlanLine[]; advice: { tile: string; product: string; text: string }; reminder: { title: string; body: string; time: string } };
+
+const AMOXICILLINE_LINE: PlanLine = { name: "AMOXICILLINE 1 g", why: "Antibiotique : traite l'infection", days: "Pendant 6 jours", slots: [true, false, true, false] };
+/** Le probiotique remis avec l'antibiotique : les bénéfices de la règle « Tolérance digestive pendant l'antibiothérapie ». */
+const PROBIOTIQUE_ADVICE = { tile: "probio-flore-10", product: "PROBIOTIQUE 30 gélules", text: "à distance de l'antibiotique, pendant toute la cure." };
+const AMOXICILLINE_REMINDER = { title: "Matin — traitement", body: "AMOXICILLINE 1 g — 1 comprimé", time: "08:00" };
+
+export const PLANS = {
+  /** La vente de la bannière (Présentation, Comment ça marche) : AMOXICILLINE 1 g + VALACICLOVIR 500 mg. */
+  ordonnance: {
+    lines: [AMOXICILLINE_LINE, { name: "VALACICLOVIR 500 mg", why: "Antiviral : traite l'herpès", days: "Pendant 5 jours", slots: [true, false, true, false] }],
+    advice: PROBIOTIQUE_ADVICE,
+    reminder: AMOXICILLINE_REMINDER,
+  },
+  /** « Pourquoi » : l'antibiotique scanné au comptoir, et le paracétamol de la même ordonnance. */
+  antibiotique: {
+    lines: [AMOXICILLINE_LINE, { name: "PARACÉTAMOL 1000 mg", why: "Contre la douleur et la fièvre", days: "Si besoin", slots: [true, true, true, false] }],
+    advice: PROBIOTIQUE_ADVICE,
+    reminder: AMOXICILLINE_REMINDER,
+  },
+  /** « Les avantages » : la doxycycline et sa crème solaire (règle « Photoprotection sous doxycycline », après la question sur le soleil). */
+  doxycycline: {
+    lines: [{ name: "DOXYCYCLINE 100 mg", why: "Antibiotique : traite l'infection", days: "Pendant 10 jours", slots: [true, false, true, false] }],
+    advice: { tile: EXAMPLE.tile, product: EXAMPLE.product, text: EXAMPLE.planAdvice },
+    reminder: { title: "Matin — traitement", body: "DOXYCYCLINE 100 mg — 1 comprimé", time: "08:00" },
+  },
+} satisfies Record<string, PatientPlan>;
+
+/** Le plan du patient tel qu'il s'ouvre sur son téléphone (/plan/[id]) : en-tête de l'officine, bouton des rappels, tableau des prises, conseil. */
 export function Phone({ h = 860, children }: { h?: number; children: React.ReactNode }) {
   const w = h * 0.49;
   return (
@@ -20,10 +51,11 @@ export function Phone({ h = 860, children }: { h?: number; children: React.React
   );
 }
 
-export function PlanScreen({ show }: { show: (i: number) => number }) {
+export function PlanScreen({ show, plan }: { show: (i: number) => number; plan: PatientPlan }) {
   const b = (i: number): CSSProperties => ({ opacity: show(i), transform: `translateY(${(1 - show(i)) * 14}px)` });
-  const Dot = ({ on }: { on: boolean }) => (
-    <span style={{ width: 34, height: 26, borderRadius: 8, background: on ? C.brand100 : "transparent", color: on ? C.brand800 : C.ink300, fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{on ? "1" : "—"}</span>
+  // Des fonctions, pas des composants : un composant déclaré dans le rendu serait recréé à chaque image.
+  const dot = (on: boolean, key: number) => (
+    <span key={key} style={{ width: 34, height: 26, borderRadius: 8, background: on ? C.brand100 : "transparent", color: on ? C.brand800 : C.ink300, fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{on ? "1" : "—"}</span>
   );
   return (
     <div style={{ padding: "64px 18px 18px", fontFamily: FONT, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -40,20 +72,22 @@ export function PlanScreen({ show }: { show: (i: number) => number }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, 34px)", gap: 6, alignItems: "center", fontSize: 11.5, color: C.ink500, fontWeight: 500 }}>
           <span>Médicament</span><span>Matin</span><span>Midi</span><span>Soir</span><span>Couch.</span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, 34px)", gap: 6, alignItems: "center", ...b(2) }}>
-          <div>
-            <div style={{ fontSize: 14.5, fontWeight: 600, color: C.ink900 }}>DOXYCYCLINE 100 mg</div>
-            <div style={{ fontSize: 12.5, color: C.brand700 }}>Antibiotique : traite l&apos;infection</div>
-            <div style={{ fontSize: 12.5, color: C.ink500 }}>Pendant 10 jours</div>
+        {plan.lines.map((line, i) => (
+          <div key={line.name} style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, 34px)", gap: 6, alignItems: "center", paddingTop: i ? 10 : 0, borderTop: i ? `1px solid ${C.ink100}` : undefined, ...b(2) }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em", whiteSpace: "nowrap", color: C.ink900 }}>{line.name}</div>
+              <div style={{ fontSize: 12.5, color: C.brand700 }}>{line.why}</div>
+              <div style={{ fontSize: 12.5, color: C.ink500 }}>{line.days}</div>
+            </div>
+            {line.slots.map(dot)}
           </div>
-          <Dot on /><Dot on={false} /><Dot on /><Dot on={false} />
-        </div>
+        ))}
       </div>
       <div style={{ background: C.white, borderRadius: 16, padding: "14px", ...b(3) }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: C.ink900 }}>Les conseils de votre pharmacien</div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8 }}>
-          <ProductTile name={EXAMPLE.tile} size={46} />
-          <div style={{ fontSize: 13, color: C.ink700, lineHeight: 1.35 }}>{EXAMPLE.product} : {EXAMPLE.planAdvice}</div>
+          <ProductTile name={plan.advice.tile} size={46} />
+          <div style={{ fontSize: 13, color: C.ink700, lineHeight: 1.35 }}>{plan.advice.product} : {plan.advice.text}</div>
         </div>
       </div>
     </div>
@@ -88,8 +122,8 @@ export function QrMark({ size }: { size: number }) {
     if (finder(x, y)) continue;
     if (((x * 73 + y * 151 + x * y * 7) % 11) < 5) rects.push(<rect key={`${x}-${y}`} x={x * cell} y={y * cell} width={cell} height={cell} fill={C.ink900} />);
   }
-  const F = ({ x, y }: { x: number; y: number }) => (
-    <g>
+  const mark = (x: number, y: number) => (
+    <g key={`${x}-${y}`}>
       <rect x={x * cell} y={y * cell} width={7 * cell} height={7 * cell} rx={cell * 1.4} fill={C.ink900} />
       <rect x={(x + 1) * cell} y={(y + 1) * cell} width={5 * cell} height={5 * cell} rx={cell} fill={C.white} />
       <rect x={(x + 2) * cell} y={(y + 2) * cell} width={3 * cell} height={3 * cell} rx={cell * 0.6} fill={C.ink900} />
@@ -98,7 +132,7 @@ export function QrMark({ size }: { size: number }) {
   return (
     <svg width={size} height={size}>
       {rects}
-      <F x={0} y={0} /><F x={n - 7} y={0} /><F x={0} y={n - 7} />
+      {mark(0, 0)}{mark(n - 7, 0)}{mark(0, n - 7)}
     </svg>
   );
 }
@@ -209,6 +243,88 @@ export function PilotagePanel({ at }: { at: number }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * « Mon équipe » (/pilotage) : le classement des collaborateurs — rang, conseils
+ * proposés, validés, taux — et un challenge en cours avec sa barre
+ * d'avancement, comme l'écran du titulaire. Noms et chiffres : un exemple.
+ */
+export function TeamPanel({ at }: { at: number }) {
+  const f = useF();
+  const grow = sp(f, at + 16, { damping: 30, stiffness: 70 });
+  const people = [
+    { name: "Camille Martin", proposed: 22, validated: 15 },
+    { name: "Hugo Lambert", proposed: 16, validated: 10 },
+    { name: "Léa Dubois", proposed: 10, validated: 6 },
+  ];
+  const proposed = people.reduce((s, p) => s + p.proposed, 0);
+  const validated = people.reduce((s, p) => s + p.validated, 0);
+  const pct = (v: number) => `${Math.round(v * 100)} %`;
+  const n = (v: number) => Math.round(v * grow);
+  const label: CSSProperties = { fontSize: 15, color: C.ink500 };
+  const stat = (value: string, name: string, color: string = C.ink900) => (
+    <div style={{ textAlign: "right", minWidth: 92 }}>
+      <div style={{ fontSize: 30, lineHeight: 1.15, fontWeight: 600, color, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      <div style={label}>{name}</div>
+    </div>
+  );
+  return (
+    <div style={{ width: 900, background: C.white, borderRadius: 16, border: `1px solid ${C.ink200}`, boxShadow: SHADOW.card, fontFamily: FONT, padding: "26px 30px" }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <span style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.025em", color: C.ink900 }}>Mon équipe</span>
+        <span style={{ marginLeft: "auto", fontSize: 15, letterSpacing: "0.08em", textTransform: "uppercase", color: C.ink400 }}>exemple</span>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        {["Aujourd'hui", "Cette semaine", "Ce mois", "Cette année"].map((p) => {
+          const active = p === "Ce mois";
+          return <span key={p} style={{ fontSize: 17, fontWeight: 500, borderRadius: 999, padding: "8px 16px", background: active ? C.brand600 : C.white, color: active ? C.white : C.ink600, border: `1px solid ${active ? C.brand600 : C.ink200}` }}>{p}</span>;
+        })}
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", marginTop: 22 }}>
+        <span style={{ fontSize: 22, fontWeight: 600, color: C.ink900 }}>Classement</span>
+        <span style={{ marginLeft: "auto", fontSize: 17, color: C.ink500, fontVariantNumeric: "tabular-nums" }}>
+          {n(proposed)} conseils proposés · {n(validated)} validés ({pct(validated / proposed)})
+        </span>
+      </div>
+      <div style={{ marginTop: 10, border: `1px solid ${C.ink200}`, borderRadius: 12 }}>
+        {people.map((p, i) => {
+          const r = sp(f, at + 4 + i * 5, { damping: 24, stiffness: 170 });
+          const first = i === 0;
+          return (
+            <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 18, padding: "12px 18px", borderTop: i ? `1px solid ${C.ink100}` : undefined, opacity: r, transform: `translateX(${(1 - r) * 40}px)` }}>
+              <span style={{ width: 42, height: 42, borderRadius: 21, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, background: first ? C.accent100 : C.ink100, color: first ? C.warning700 : C.ink600 }}>{i + 1}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 21, fontWeight: 600, color: C.ink900 }}>{p.name}</div>
+                <div style={{ marginTop: 6, width: 280, height: 8, borderRadius: 4, background: C.ink100, overflow: "hidden" }}>
+                  <div style={{ width: `${(p.validated / validated) * 100 * grow}%`, height: "100%", borderRadius: 4, background: C.brand500 }} />
+                </div>
+              </div>
+              {stat(String(n(p.proposed)), "proposés")}
+              {stat(String(n(p.validated)), "validés", C.success700)}
+              {stat(pct(p.validated / p.proposed), "taux")}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 22, fontSize: 22, fontWeight: 600, color: C.ink900 }}>Challenges en cours</div>
+      <div style={{ marginTop: 10, border: `1px solid ${C.ink200}`, borderRadius: 12, padding: "16px 20px", opacity: sp(f, at + 22, { damping: 24, stiffness: 170 }) }}>
+        <div style={{ display: "flex", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: C.ink400 }}>Laboratoire A</div>
+            <div style={{ fontSize: 21, fontWeight: 600, color: C.ink900 }}>Challenge probiotiques</div>
+          </div>
+          <span style={{ marginLeft: "auto", fontSize: 16, color: C.ink500 }}>12 jours restants</span>
+        </div>
+        <div style={{ marginTop: 10, fontSize: 18, color: C.ink500 }}>
+          <span style={{ fontSize: 28, fontWeight: 600, color: C.ink900, fontVariantNumeric: "tabular-nums" }}>{n(34)}</span> sur 50 unités
+        </div>
+        <div style={{ marginTop: 8, height: 10, borderRadius: 5, background: C.ink100, overflow: "hidden" }}>
+          <div style={{ width: `${68 * grow}%`, height: "100%", borderRadius: 5, background: C.accent500 }} />
+        </div>
       </div>
     </div>
   );

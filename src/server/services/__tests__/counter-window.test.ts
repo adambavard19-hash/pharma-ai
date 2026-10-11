@@ -20,6 +20,8 @@ const m = vi.hoisted(() => ({
   audit: vi.fn(),
   trace: vi.fn(),
   validated: vi.fn(),
+  centralRows: vi.fn(),
+  lineFindMany: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -30,6 +32,7 @@ vi.mock("@/server/db/client", () => ({
     recommendationEvent: { create: m.eventCreate, createMany: m.eventCreateMany },
     counterSaleFollowUp: { upsert: m.followUpUpsert, findUnique: m.followUpFindUnique, update: m.followUpUpdate, updateMany: m.followUpUpdateMany },
     pharmacy: { findUnique: m.pharmacyFindUnique },
+    prescriptionLine: { findMany: m.lineFindMany },
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
         recommendation: { update: m.recommendationUpdate, findMany: m.recommendationFindMany, updateMany: m.recommendationUpdateMany },
@@ -42,12 +45,20 @@ vi.mock("@/server/audit/log", () => ({ recordAudit: m.audit }));
 vi.mock("@/server/security/encryption", () => ({ encryptField: (value: string) => `enc:${value}`, decryptField: (value: string | null) => (value ? value.replace(/^enc:/, "") : null) }));
 vi.mock("@/server/ai/registry", () => ({ getMessagingProvider: () => ({ info: { id: "test" }, sendEmail: m.sendEmail }) }));
 vi.mock("@/server/services/email-dispatch", () => ({ traceDispatch: m.trace }));
-vi.mock("@/server/services/central-advice", () => ({ validatedRuleKeys: m.validated }));
+vi.mock("@/server/services/central-advice", () => ({ validatedRuleKeys: m.validated, loadCentralRuleRows: m.centralRows }));
 vi.mock("@/server/services/counter-notice", () => ({ readCounterNotice: m.readNotice }));
 vi.mock("@/server/services/challenges", () => ({ activeChallengeTitlesFor: vi.fn(async () => new Map([["prod1", "Challenge Avène"]])) }));
 vi.mock("@/server/services/stock-lots", () => ({ nearestShortDatesFor: vi.fn(async () => new Map([["p:prod1", { expiresOn: "2026-11-30" }]])) }));
 
-import { decideCounterAdvice, finishCounterSale, saveCounterEmail } from "../counter-window";
+import { counterEmailPurgeWhere, decideCounterAdvice, finishCounterSale, purgeCounterEmails, saveCounterEmail } from "../counter-window";
+import { COUNTER_EMAIL_MAX_HOURS, COUNTER_EMAIL_PURGE_AFTER_HOURS, DAILY_PASS_MAX_GAP_HOURS } from "@/core/counter/email-retention";
+import { ADVICE_RULES } from "@/core/ai/engines/advice";
+import { PRODUCT_CATEGORIES } from "@/config/catalog";
+import { ADVICE_VOCABULARY } from "@/core/catalog/product-vocabulary";
+
+/** Une vraie règle du code dont la phrase patient ne cite pas le médicament, et une qui le cite (« Votre antibiotique ({drug})… »). */
+const DRUG_FREE = ADVICE_RULES.find((rule) => !rule.patientReasonTemplate.includes("{drug}"))!;
+const WITH_DRUG = ADVICE_RULES.find((rule) => rule.patientReasonTemplate.includes("{drug}"))!;
 
 const agent = { connectionId: null, postId: "post1", scope: { pharmacyId: "ph1", organizationId: "org1", userId: "owner1" }, pharmacyIsDemo: false, intervalSeconds: 300, exportPath: null, scansPath: null };
 const sale = (closedAt: Date | null = null) => ({ id: "sale1", counterPost: "Comptoir 2", counterFollowUp: closedAt ? { id: "f1", closedAt } : null });
@@ -59,7 +70,9 @@ beforeEach(() => {
   m.recommendationFindMany.mockResolvedValue([]);
   m.pharmacyFindUnique.mockResolvedValue({ name: "Pharmacie du Port", isDemo: false, timezone: "Europe/Paris" });
   m.followUpFindUnique.mockResolvedValue(null);
-  m.validated.mockResolvedValue(new Set(["rule-ok"]));
+  m.validated.mockResolvedValue(new Set([DRUG_FREE.key, WITH_DRUG.key]));
+  m.centralRows.mockResolvedValue([]);
+  m.lineFindMany.mockResolvedValue([]);
   m.sendEmail.mockResolvedValue({ status: "SENT", provider: "test", detail: "ok" });
   m.recommendationCount.mockResolvedValue(18);
   m.followUpUpdateMany.mockResolvedValue({ count: 1 });
@@ -221,7 +234,7 @@ describe("« Vente terminée »", () => {
   it("envoie le bilan seulement avec l'accord du patient, une adresse et au moins un produit vendu", async () => {
     m.readNotice.mockResolvedValue(read([item("a", "SOLD", "ELUDAY")]));
     m.followUpFindUnique.mockResolvedValue({ emailEncrypted: "enc:jean@gmail.com", consentAt: new Date() });
-    m.recommendationFindMany.mockResolvedValue([{ patientReason: "Apaise la bouche sèche.", opportunity: { ruleKey: "rule-ok" }, product: { name: "ELUDAY GENCIVE, flacon" }, presentation: null }]);
+    m.recommendationFindMany.mockResolvedValue([{ patientReason: "Apaise la bouche sèche.", opportunity: { ruleKey: DRUG_FREE.key }, product: { name: "ELUDAY GENCIVE, flacon" }, presentation: null }]);
     const result = await finishCounterSale(agent, { prescriptionId: "sale1" });
     expect(result).toMatchObject({ ok: true, report: "SENT" });
     expect(m.sendEmail).toHaveBeenCalledTimes(1);
@@ -268,5 +281,214 @@ describe("« Vente terminée »", () => {
     m.sendEmail.mockRejectedValue(new Error("boîte pleine"));
     const result = await finishCounterSale(agent, { prescriptionId: "sale1" });
     expect(result).toMatchObject({ ok: true, report: "FAILED" });
+  });
+});
+
+describe("le bilan ne nomme jamais ce que la pharmacie a délivré", () => {
+  const read = (items: ReturnType<typeof item>[]) => ({ status: "ANALYZED", followUp: { emailSaved: true, closed: false }, notice: { items } });
+  /** Une boîte d'amoxicilline passée au scan : le nom lu, la spécialité, ses substances publiées. */
+  const amoxicillin = { drugName: "AMOXICILLINE ARROW 1 g, comprimé dispersible", specialty: { name: "AMOXICILLINE ARROW 1 g, comprimé dispersible", compositions: [{ substanceLabel: "AMOXICILLINE TRIHYDRATÉE" }, { substanceLabel: "AMOXICILLINE" }] } };
+  const PRODUCT = "FLORE INTESTINALE 10 gélules";
+  const sold = (patientReason: string, ruleKey: string) => m.recommendationFindMany.mockResolvedValue([{ patientReason, opportunity: { ruleKey }, product: { name: PRODUCT }, presentation: null }]);
+  const sentMail = async () => {
+    expect(await finishCounterSale(agent, { prescriptionId: "sale1" })).toMatchObject({ ok: true, report: "SENT" });
+    return m.sendEmail.mock.calls[0][0] as { subject: string; text: string; html: string };
+  };
+  const customRow = (ruleKey: string, patientReason: string) => ({
+    ruleKey,
+    source: "CUSTOM",
+    status: "VALIDATED",
+    ruleVersion: null,
+    decidedAt: new Date("2026-10-09T10:00:00Z"),
+    decidedByName: "Pharmacienne PharmaBoost",
+    definition: { title: "Flore et antibiotique", kind: "TOLERANCE", atcPrefixes: ["J01"], therapeuticClasses: [], category: PRODUCT_CATEGORIES[0], matchingTags: [ADVICE_VOCABULARY[0]], question: null, shortReason: "Accompagne la flore pendant la cure.", counterScript: "Je vous conseille {product} pendant la cure.", patientReason, source: null, safetyNotes: [] },
+  });
+
+  beforeEach(() => {
+    m.readNotice.mockResolvedValue(read([item("a", "SOLD", "FLORE INTESTINALE")]));
+    m.followUpFindUnique.mockResolvedValue({ emailEncrypted: "enc:jean@gmail.com", consentAt: new Date() });
+    m.lineFindMany.mockResolvedValue([amoxicillin]);
+  });
+
+  it("une règle validée dont la phrase cite le médicament (« AMOXICILLINE ») : le produit part seul, ni le texte ni le HTML ne le nomment", async () => {
+    const rendered = WITH_DRUG.patientReasonTemplate.replaceAll("{drug}", "AMOXICILLINE").replaceAll("{product}", PRODUCT);
+    expect(rendered).toContain("AMOXICILLINE");
+    sold(rendered, WITH_DRUG.key);
+    const sent = await sentMail();
+    expect(sent.text).toContain("FLORE INTESTINALE");
+    for (const body of [sent.subject, sent.text, sent.html]) expect(body.toLowerCase()).not.toContain("amoxicilline");
+  });
+
+  it("une règle validée dont le modèle ne cite aucun médicament : sa phrase part telle quelle", async () => {
+    const rendered = DRUG_FREE.patientReasonTemplate.replaceAll("{product}", PRODUCT);
+    sold(rendered, DRUG_FREE.key);
+    const sent = await sentMail();
+    expect(sent.text).toContain(rendered);
+    // Le cas courant (règles du code) ne relit pas la table des conseils ajoutés.
+    expect(m.centralRows).not.toHaveBeenCalled();
+  });
+
+  it("filet : même sous un modèle sans `{drug}`, une phrase qui cite une substance de la vente ne part pas (casse et accents ignorés)", async () => {
+    sold("Pendant votre cure d'Amoxicilline, ce complément accompagne la flore.", DRUG_FREE.key);
+    const sent = await sentMail();
+    expect(sent.text).toContain("FLORE INTESTINALE");
+    expect(sent.text.toLowerCase()).not.toContain("amoxicilline");
+    expect(sent.html.toLowerCase()).not.toContain("amoxicilline");
+  });
+
+  it("une règle validée introuvable (ni dans le code, ni parmi les conseils ajoutés) : sa phrase ne part pas", async () => {
+    m.validated.mockResolvedValue(new Set(["regle-disparue"]));
+    sold("Une phrase dont personne ne connaît plus le modèle.", "regle-disparue");
+    expect((await sentMail()).text).not.toContain("Une phrase dont personne");
+  });
+
+  it("un conseil ajouté depuis la console (ou accepté depuis la base de connaissances) : c'est le modèle gardé en base qui décide", async () => {
+    m.validated.mockResolvedValue(new Set(["custom-avec", "custom-sans"]));
+    m.centralRows.mockResolvedValue([customRow("custom-avec", "Avec {drug}, ce complément accompagne la flore."), customRow("custom-sans", "Ce complément accompagne la flore intestinale.")]);
+    m.recommendationFindMany.mockResolvedValue([
+      { patientReason: "Avec votre traitement, ce complément accompagne la flore.", opportunity: { ruleKey: "custom-avec" }, product: { name: "PRODUIT A" }, presentation: null },
+      { patientReason: "Ce complément accompagne la flore intestinale.", opportunity: { ruleKey: "custom-sans" }, product: { name: "PRODUIT B" }, presentation: null },
+    ]);
+    const sent = await sentMail();
+    expect(sent.text).not.toContain("Avec votre traitement");
+    expect(sent.text).toContain("Ce complément accompagne la flore intestinale.");
+    expect(m.centralRows).toHaveBeenCalledTimes(1);
+  });
+
+  it("les lignes lues sont celles de CETTE vente, dans la pharmacie du poste", async () => {
+    sold(DRUG_FREE.patientReasonTemplate.replaceAll("{product}", PRODUCT), DRUG_FREE.key);
+    await sentMail();
+    expect(m.lineFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { prescriptionId: "sale1", prescription: { pharmacyId: "ph1" } } }));
+  });
+});
+
+describe("l'adresse du bilan ne survit pas à « Vente terminée »", () => {
+  const read = (items: ReturnType<typeof item>[]) => ({ status: "ANALYZED", followUp: { emailSaved: true, closed: false }, notice: { items } });
+  const withAddress = (consentAt: Date | null = new Date()) => m.followUpFindUnique.mockResolvedValue({ emailEncrypted: "enc:jean@gmail.com", consentAt });
+  const soldProduct = () => m.recommendationFindMany.mockResolvedValue([{ patientReason: null, opportunity: null, product: { name: "ELUDAY" }, presentation: null }]);
+  /** La seule écriture qui suit le bilan : son issue, et l'effacement de l'adresse. */
+  const finalWrite = () => m.followUpUpdate.mock.calls.map((call) => call[0]).find((args) => "reportStatus" in args.data);
+
+  it.each([
+    ["SENT", () => m.sendEmail.mockResolvedValue({ status: "SENT", provider: "test", detail: "ok" })],
+    ["SIMULATED", () => m.sendEmail.mockResolvedValue({ status: "SIMULATED", provider: "test", detail: "messagerie non branchée" })],
+    ["FAILED", () => m.sendEmail.mockRejectedValue(new Error("boîte pleine"))],
+  ] as const)("bilan %s : l'adresse est effacée dans la même écriture que l'issue, APRÈS l'envoi", async (status, arrange) => {
+    m.readNotice.mockResolvedValue(read([item("a", "SOLD", "ELUDAY")]));
+    withAddress();
+    soldProduct();
+    arrange();
+    const result = await finishCounterSale(agent, { prescriptionId: "sale1" });
+    expect(result).toMatchObject({ ok: true, report: status });
+    expect(finalWrite()).toEqual({ where: { prescriptionId: "sale1" }, data: { reportStatus: status, reportSentAt: expect.any(Date), emailEncrypted: null } });
+    // L'adresse est lue (et le bilan tenté) avant d'être effacée : l'effacement ne prive jamais le patient de son bilan.
+    expect(m.followUpFindUnique.mock.invocationCallOrder[0]).toBeLessThan(m.followUpUpdate.mock.invocationCallOrder[0]);
+    expect(m.sendEmail.mock.invocationCallOrder[0]).toBeLessThan(m.followUpUpdate.mock.invocationCallOrder[0]);
+  });
+
+  it("rien à envoyer (sans accord, sans produit vendu, sans adresse) : l'adresse est effacée quand même", async () => {
+    const cases: [ReturnType<typeof item>[], (() => void) | null][] = [
+      [[item("a", "SOLD")], () => withAddress(null)],
+      [[item("a", "NOT_SOLD"), item("b", "NONE")], () => withAddress()],
+      [[item("a", "SOLD")], null],
+    ];
+    for (const [items, arrange] of cases) {
+      vi.clearAllMocks();
+      m.followUpUpdateMany.mockResolvedValue({ count: 1 });
+      m.followUpFindUnique.mockResolvedValue(null);
+      m.readNotice.mockResolvedValue(read(items));
+      arrange?.();
+      expect(await finishCounterSale(agent, { prescriptionId: "sale1" })).toMatchObject({ ok: true, report: "NONE" });
+      expect(m.sendEmail).not.toHaveBeenCalled();
+      expect(finalWrite()).toEqual({ where: { prescriptionId: "sale1" }, data: { reportStatus: "NONE", reportSentAt: null, emailEncrypted: null } });
+    }
+  });
+
+  it("l'accord du patient (date et poste) reste : il ne désigne personne et dit que l'envoi était demandé", async () => {
+    m.readNotice.mockResolvedValue(read([item("a", "SOLD")]));
+    withAddress();
+    soldProduct();
+    await finishCounterSale(agent, { prescriptionId: "sale1" });
+    for (const [args] of [...m.followUpUpdate.mock.calls, ...m.followUpTxUpdate.mock.calls]) {
+      expect(args.data).not.toHaveProperty("consentAt");
+      expect(args.data).not.toHaveProperty("consentPost");
+    }
+  });
+
+  it("un envoi qui casse en route : la vente reste fermée, l'adresse est effacée, l'issue n'est pas devinée", async () => {
+    m.readNotice.mockResolvedValue(read([item("a", "SOLD")]));
+    withAddress();
+    soldProduct();
+    m.trace.mockRejectedValue(new Error("journal des e-mails indisponible"));
+    m.followUpUpdate.mockResolvedValue({});
+    await expect(finishCounterSale(agent, { prescriptionId: "sale1" })).rejects.toThrow("journal des e-mails indisponible");
+    expect(m.followUpUpdate).toHaveBeenCalledWith({ where: { prescriptionId: "sale1" }, data: { emailEncrypted: null } });
+    expect(finalWrite()).toBeUndefined();
+  });
+
+  it("rejouée sur une vente déjà terminée : rien n'est relu ni réécrit", async () => {
+    m.followUpUpdateMany.mockResolvedValue({ count: 0 });
+    m.followUpFindUnique.mockResolvedValue({ closedAt: new Date(), proposedCount: 1, soldCount: 1, notSoldCount: 0, unansweredCount: 0, reportStatus: "SENT" });
+    expect(await finishCounterSale(agent, { prescriptionId: "sale1" })).toMatchObject({ ok: true, alreadyClosed: true, report: "SENT" });
+    expect(m.followUpUpdate).not.toHaveBeenCalled();
+    expect(m.sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("le passage quotidien efface les adresses restées en base (vente jamais terminée)", () => {
+  const NOW = new Date("2026-10-12T08:59:00Z");
+  const hoursBefore = (date: Date, hours: number) => new Date(date.getTime() - hours * 3_600_000);
+  type Row = { emailEncrypted: string | null; consentAt: Date | null; updatedAt: Date; closedAt: Date | null };
+  type PurgeWhere = { emailEncrypted: { not: null }; OR: ({ consentAt: { lt: Date } } | { consentAt: null; updatedAt: { lt: Date } })[] };
+  /** Ce que la base ferait de cette condition-là, ligne par ligne (la forme exacte est vérifiée à part). */
+  const erases = (now: Date, row: Row) => {
+    const where = counterEmailPurgeWhere(now) as PurgeWhere;
+    if (row.emailEncrypted === null) return false;
+    return where.OR.some((clause) => ("updatedAt" in clause ? row.consentAt === null && row.updatedAt < clause.updatedAt.lt : row.consentAt !== null && row.consentAt < clause.consentAt.lt));
+  };
+  const row = (over: Partial<Row> = {}): Row => ({ emailEncrypted: "enc:jean@gmail.com", consentAt: hoursBefore(NOW, 30), updatedAt: hoursBefore(NOW, 30), closedAt: null, ...over });
+
+  it("la condition : une adresse encore là, donnée avant la limite (ou sans accord, d'après sa dernière écriture)", () => {
+    const cutoff = hoursBefore(NOW, COUNTER_EMAIL_PURGE_AFTER_HOURS);
+    expect(counterEmailPurgeWhere(NOW)).toEqual({ emailEncrypted: { not: null }, OR: [{ consentAt: { lt: cutoff } }, { consentAt: null, updatedAt: { lt: cutoff } }] });
+  });
+
+  it("efface une vieille adresse, vente terminée ou non ; garde celle d'une vente en cours ; ignore une adresse déjà effacée", () => {
+    expect(erases(NOW, row())).toBe(true);
+    expect(erases(NOW, row({ closedAt: hoursBefore(NOW, 29) }))).toBe(true);
+    expect(erases(NOW, row({ consentAt: hoursBefore(NOW, 1), updatedAt: hoursBefore(NOW, 1) }))).toBe(false);
+    expect(erases(NOW, row({ emailEncrypted: null }))).toBe(false);
+    expect(erases(NOW, row({ consentAt: null }))).toBe(true);
+    // Une adresse sans accord mais touchée il y a peu attend le passage suivant ; elle ne vit pas plus longtemps qu'une autre.
+    expect(erases(NOW, row({ consentAt: null, updatedAt: hoursBefore(NOW, 2) }))).toBe(false);
+  });
+
+  it("aucune adresse ne dépasse 48 heures, même avec deux passages espacés au maximum par l'hébergeur", () => {
+    expect(COUNTER_EMAIL_MAX_HOURS).toBe(48);
+    expect(COUNTER_EMAIL_PURGE_AFTER_HOURS + DAILY_PASS_MAX_GAP_HOURS).toBeLessThanOrEqual(COUNTER_EMAIL_MAX_HOURS);
+    // Jamais pendant une vente réelle : une vente au comptoir se ferme en minutes, le poste l'oublie au bout de 6 heures.
+    expect(COUNTER_EMAIL_PURGE_AFTER_HOURS).toBeGreaterThanOrEqual(12);
+    // Un passage à 8 h 00, le suivant à 8 h 59 le lendemain ; l'adresse est donnée à 9 h 01 la veille du premier.
+    const firstPass = new Date("2026-10-11T08:00:00Z");
+    const nextPass = new Date("2026-10-12T08:59:00Z");
+    const given = new Date("2026-10-10T09:01:00Z");
+    const address = row({ consentAt: given, updatedAt: given });
+    expect(erases(firstPass, address)).toBe(false);
+    expect(erases(nextPass, address)).toBe(true);
+    expect((nextPass.getTime() - given.getTime()) / 3_600_000).toBeLessThan(COUNTER_EMAIL_MAX_HOURS);
+  });
+
+  it("n'efface que l'adresse (l'accord et les résultats restent), sans rien lire, et se rejoue sans effet", async () => {
+    m.followUpUpdateMany.mockResolvedValueOnce({ count: 3 }).mockResolvedValueOnce({ count: 0 });
+    expect(await purgeCounterEmails(NOW)).toEqual({ erased: 3, moreToDo: false });
+    expect(m.followUpUpdateMany).toHaveBeenCalledWith({ where: counterEmailPurgeWhere(NOW), data: { emailEncrypted: null }, limit: 2_000 });
+    expect(m.followUpFindUnique).not.toHaveBeenCalled();
+    expect(await purgeCounterEmails(NOW)).toEqual({ erased: 0, moreToDo: false });
+  });
+
+  it("borné : une base très en retard est vidée par lots, et le reste attend le passage suivant", async () => {
+    m.followUpUpdateMany.mockResolvedValue({ count: 2_000 });
+    expect(await purgeCounterEmails(NOW)).toEqual({ erased: 20_000, moreToDo: true });
+    expect(m.followUpUpdateMany).toHaveBeenCalledTimes(10);
   });
 });

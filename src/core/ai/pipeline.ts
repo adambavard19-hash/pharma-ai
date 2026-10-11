@@ -26,7 +26,7 @@ import { deriveOutcome } from "./outcome";
 import { adviceFamilyOf, countByFamily, describeFamilyMix, FAMILY_LABELS } from "./family";
 import { reserveFamilies, type PortfolioProfile } from "./portfolio";
 import { matchesAny } from "./engines/product-name";
-import { evaluateVigilances, tagsIntersect } from "./engines/vigilance";
+import { evaluateVigilances, tagsIntersect, vigilanceMessage } from "./engines/vigilance";
 import { chooseAmongEquivalents, clinicalSignature, TIEBREAK_LABELS } from "./engines/tiebreak";
 import { declaredContraindicationFor, suggestionVigilances } from "./engines/population-vigilance";
 import { buildAssociationAdvice, type AssociationInput } from "./engines/associations";
@@ -384,7 +384,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
   const vigilanceFindings: SafetyFindingResult[] = vigilances.map((vigilance) => ({
     severity: vigilance.severity,
     code: `VIGILANCE_${vigilance.kind}`,
-    message: `${vigilance.title} — ${vigilance.subtitle} : ${vigilance.explanation}`,
+    message: vigilanceMessage(vigilance),
     subjectType: "PRESCRIPTION_LINE",
     subjectId: vigilance.drugNames.join(", "),
     source: `vigilance-rules@${vigilance.version}`,

@@ -1,16 +1,205 @@
 import { BANNER } from "./banner-design";
 import { ANALGESIC_TREE } from "../../src/core/counter/question-tree";
+import { buildCounterNotice, type NoticeItem, type NoticeRecommendation } from "../../src/core/counter/notice";
+import { treeState } from "../../src/core/counter/tree-state";
+import { runAnalysisPipeline } from "../../src/core/ai/pipeline";
+import { classifyProductByName } from "../../src/core/catalog/product-vocabulary";
+import type { CatalogProduct, DrugKnowledge, OfficialDrugFacts, PatientContext } from "../../src/core/ai/types";
 
 /**
  * L'aperçu de la bannière PharmaBoost pour Mac (ou tout navigateur) : une page HTML autonome, générée à partir du MÊME design que la
  * bannière Windows (banner-design.ts) — mêmes couleurs, mêmes tailles, mêmes phrases, mêmes durées.
  *
- *   npm run apercu:banniere     écrit agent/apercu/banniere.html et l'ouvre
+ *   npm run apercu:banniere     écrit agent/apercu/banniere.html (et sa copie du site, public/site/banniere-demo.html) et l'ouvre
  *
- * Ce que c'est : une reproduction fidèle du dessin, avec ses animations et ses gestes (Vendu / Non vendu, e-mail, Vente terminée…),
- * pour juger le rendu sans Windows. Ce que ce n'est pas : une capture de Windows — la police, l'ombre et l'anticrénelage y sont ceux du
- * navigateur. Un test garde la page à jour avec le design.
+ * Ce que c'est : une reproduction fidèle du dessin, avec ses animations et ses gestes (Vendu / Non vendu, e-mail, question à poser,
+ * Vente terminée…), pour juger le rendu sans Windows. Ce que ce n'est pas : une capture de Windows — la police, l'ombre et
+ * l'anticrénelage y sont ceux du navigateur. Un test garde la page à jour avec le design.
+ *
+ * Ce fichier n'est pas importé par l'agent (index.ts) : ce qu'il lit du moteur (src/core) ne grossit jamais le programme des postes.
  */
+
+/**
+ * Une ligne de la vente : le médicament tel que le référentiel le décrit au moteur (nom, DCI, code ATC), sa première substance telle
+ * que le catalogue national la publie (le moteur en tire le nom entre parenthèses de la raison : « Antibiothérapie (AMOXICILLINE) »),
+ * et ce que l'écran du faux logiciel de gestion affiche (désignation, quantité, prix).
+ */
+type DemoLine = { name: string; inn: string; atcCode: string; substance: string; lgo: [string, string, string] };
+/**
+ * Un produit du rayon de la démonstration. Le moteur le range par son nom, comme un fichier de stock (`classifyProductByName`) ;
+ * prix, stock, challenge et date courte sont ceux que le serveur lirait dans l'officine — ici, des exemples. `tone` : la couleur de
+ * la vignette, faute de photo.
+ */
+type DemoProduct = { id: string; name: string; priceCents: number; quantity: number; alertThreshold: number; challengeTitle?: string; shortDateOn?: string; tone: [string, string] };
+
+function euros(cents: number | null): string {
+  return cents === null ? "" : `${(cents / 100).toFixed(2).replace(".", ",")} €`;
+}
+
+/** « 2026-11-30 » → « 30/11/26 » : la pastille « Date courte » de la bannière Windows. */
+function shortDay(date: string | null): string {
+  return date ? `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(2, 4)}` : "";
+}
+
+/** Le client du comptoir : personne d'identifié, rien de déclaré — comme une vente bipée (counter-request.ts). */
+const COUNTER_PATIENT: PatientContext = { patientId: null, ageYears: null, sex: "UNSPECIFIED", isPregnant: null, isBreastfeeding: null, renalImpairment: null, hepaticImpairment: null, allergies: [], chronicConditions: [], currentTreatments: [], hasAdviceConsent: false };
+
+function demoKnowledge(line: DemoLine): DrugKnowledge {
+  return { id: `demo-${line.atcCode}`, name: line.name, inn: line.inn, atcCode: line.atcCode, therapeuticClass: null, form: null, commonSideEffects: [], interactionClasses: [], cautionPopulations: [], patientExplanation: null, intakeAdvice: null, sourceName: "démonstration", sourceVersion: "1", isDemoData: true };
+}
+
+function demoOfficial(line: DemoLine): OfficialDrugFacts {
+  return { cisCode: "", name: line.name, pharmaceuticalForm: null, administrationRoutes: [], substances: [line.substance], prescriptionConditions: [], marketed: true, sourceName: "démonstration", sourceUpdatedAt: null };
+}
+
+function demoCatalogProduct(product: DemoProduct): CatalogProduct {
+  const classified = classifyProductByName(product.name);
+  return {
+    id: product.id, origin: "PHARMACY_CATALOG", presentationId: null, substances: [], prescriptionConditions: [], name: product.name, brand: null,
+    category: classified?.category ?? "AUTRE", subCategory: null, reference: product.id, ean: null, imageUrl: null, description: null, commercialClaims: [],
+    precautions: [], matchingTags: classified?.tags ?? [], contraindications: [], salePriceCents: product.priceCents, purchasePriceCents: 0, vatRate: 5.5,
+    stockQuantity: product.quantity, alertThreshold: product.alertThreshold, availableInSiblingPharmacy: false, isActive: true,
+  };
+}
+
+/** Un conseil tel que l'avis du comptoir le donne à la bannière, mis en forme pour la page (prix en euros, pastilles, vignette). */
+function demoItem(item: NoticeItem, tone: [string, string] | undefined) {
+  return {
+    id: item.id,
+    name: item.name,
+    price: euros(item.priceCents),
+    drug: item.drug ?? "",
+    reason: item.reason ?? "",
+    challenge: item.challenge !== null,
+    shortDate: shortDay(item.shortDateOn),
+    availability: item.availability,
+    quantity: item.quantity === null ? "" : String(item.quantity),
+    tone: tone ?? (["#E6EEF2", "#5A7280"] as [string, string]),
+  };
+}
+
+/**
+ * Une vente de la démonstration, passée par le VRAI moteur au moment de la génération, et lue comme le serveur la lit pour le poste
+ * (readCounterNotice, counter-notice.ts) : l'analyse complète (`runAnalysisPipeline`) sur la vente et le rayon d'exemple, puis l'arbre
+ * de questions (`treeState`) et l'avis du comptoir (`buildCounterNotice` : avertissements seulement, deux au plus ; trois conseils au
+ * plus). Les mises en garde, les conseils retenus, leur raison (le `shortReasonTemplate` de la règle, rendu par le moteur), le
+ * médicament concerné, « Médicament détecté » et la pastille de stock en viennent tous. Rien n'est recopié à la main : une règle
+ * change, la démonstration suit — et le test de l'aperçu voit la page livrée périmée.
+ */
+function demoSale(lines: DemoLine[], shelf: DemoProduct[], rank: number) {
+  const result = runAnalysisPipeline({
+    lines: lines.map((line, index) => ({ lineIndex: index, drugName: line.name, posology: null, durationDays: null, confirmed: true })),
+    knowledge: new Map(lines.map((line) => [line.name.toLowerCase(), demoKnowledge(line)])),
+    official: new Map(lines.map((line) => [line.name.toLowerCase(), demoOfficial(line)])),
+    patient: COUNTER_PATIENT,
+    catalog: shelf.map(demoCatalogProduct),
+    rules: [],
+    history: {},
+    explanations: [],
+    extractionFindings: [],
+    usedSimulatedProviders: false,
+  });
+  const byId = new Map(shelf.map((product) => [product.id, product]));
+  const opportunities = new Map(result.opportunities.map((opportunity) => [opportunity.key, opportunity]));
+  // Les lignes de la vente sont désignées par leur position, comme le serveur les désigne par leur identifiant.
+  const lineNames = new Map(lines.map((line, index) => [String(index), line.name]));
+  const tree = treeState({
+    opportunities: result.opportunities.map((opportunity) => ({ ruleKey: opportunity.ruleKey ?? null, answer: null, triggeredLineIds: opportunity.triggeredBy.map((trigger) => String(trigger.lineIndex)) })),
+    lineNames,
+    answers: {},
+  });
+  const proposed = result.recommendations.flatMap((rec) => {
+    const product = byId.get(rec.productId);
+    const opportunity = opportunities.get(rec.opportunityKey);
+    if (!product || !opportunity) return [];
+    const advice: NoticeRecommendation = {
+      id: opportunity.ruleKey && !tree.isVisible(opportunity.ruleKey) ? opportunity.ruleKey : product.id,
+      name: product.name,
+      forDrug: opportunity.triggeredBy.map((trigger) => lines[trigger.lineIndex]?.name ?? "").find(Boolean) ?? null,
+      challengeTitle: product.challengeTitle ?? null,
+      shortDateOn: product.shortDateOn ?? null,
+      priceCents: product.priceCents,
+      reason: rec.shortReason,
+      status: "PROPOSED",
+      quantity: product.quantity,
+      alertThreshold: product.alertThreshold,
+    };
+    return [{ ruleKey: opportunity.ruleKey ?? null, advice, tone: product.tone }];
+  });
+  const tones = new Map(proposed.map((entry) => [entry.advice.id, entry.tone]));
+  const notice = (recommendations: NoticeRecommendation[]) =>
+    buildCounterNotice({
+      reference: "DEMO",
+      prescriptionStatus: "ANALYZED",
+      lineNames: lines.map((line) => line.name),
+      lineKinds: lines.map(() => "DRUG" as const),
+      alerts: result.safetyFindings.map((finding) => ({ severity: finding.severity, subjectType: finding.subjectType, code: finding.code, message: finding.message, acknowledged: false })),
+      questions: tree.view.questions,
+      guidance: tree.view.guidance,
+      recommendations,
+      outcome: result.outcome,
+    });
+  // Ce que la bannière montre au bip : les conseils hors de l'arbre. Ceux du bout d'une branche attendent la réponse à la question.
+  const shown = notice(proposed.filter((entry) => tree.isVisible(entry.ruleKey)).map((entry) => entry.advice));
+  // Les conseils du bout des branches, un par règle, mis en forme par le même avis (nom court, stock) : la page les montre une fois
+  // la question répondue, après ceux de la vente — comme le moteur.
+  const treeItems: Record<string, ReturnType<typeof demoItem>> = {};
+  for (const entry of proposed) if (entry.ruleKey && !tree.isVisible(entry.ruleKey)) treeItems[entry.ruleKey] = demoItem(notice([entry.advice]).items[0], entry.tone);
+  const treeDrug = result.opportunities.filter((opportunity) => opportunity.ruleKey && !tree.isVisible(opportunity.ruleKey)).flatMap((opportunity) => opportunity.triggeredBy)[0];
+  return {
+    lgo: lines.map((line) => line.lgo),
+    subject: shown.subject,
+    label: shown.detectedLabel,
+    alerts: shown.alerts,
+    tree: tree.active && treeDrug ? { drug: shown.drugs[treeDrug.lineIndex] ?? shown.drugs[0], items: treeItems } : null,
+    /** Le rang du conseil vendu, pour « 12e conseil vendu aujourd'hui » : un exemple. */
+    rank,
+    items: shown.items.map((item) => demoItem(item, tones.get(item.id ?? undefined))),
+  };
+}
+
+/**
+ * Les deux ventes courtes du scénario. Médicaments, produits, prix et quantités : des exemples (le site le dit sous l'animation) ;
+ * les produits portent des noms génériques, jamais une marque.
+ *  - « ordonnance » : AMOXICILLINE + FERVEX ADULTES + VALACICLOVIR — une infection ORL avec un bouton de fièvre. Une seule mise en garde
+ *    du moteur, celle des 3 g de paracétamol (le Fervex en contient déjà). Deux conseils que les règles proposent dès le bip, sans
+ *    question : un probiotique pour l'antibiotique (challenge, date courte) et un antiseptique cutané pour les lésions d'herpès (stock
+ *    faible). Pas d'antihistaminique en plus du Fervex (il contient déjà de la phéniramine) : deux anti-H1 dans la même vente, que
+ *    le moteur ne signale pas, choqueraient un pharmacien.
+ *  - « douleur » : DOLIPRANE 1000 mg seul — aucune mise en garde, une question à poser (pourquoi, puis où) avant tout conseil. Pas de
+ *    Doliprane dans l'ordonnance : avec un Fervex, la vraie bannière montrerait une seconde mise en garde (deux produits au paracétamol).
+ */
+export function demoSales() {
+  return {
+    ordonnance: demoSale(
+      [
+        { name: "AMOXICILLINE 1 g", inn: "amoxicilline", atcCode: "J01CA04", substance: "AMOXICILLINE TRIHYDRATÉE", lgo: ["AMOXICILLINE 1 g cp", "1", "6,42 €"] },
+        { name: "FERVEX ADULTES", inn: "paracétamol, phéniramine, acide ascorbique", atcCode: "N02BE51", substance: "PARACÉTAMOL", lgo: ["FERVEX ADULTES sachets", "1", "4,90 €"] },
+        { name: "VALACICLOVIR 500 mg", inn: "valaciclovir", atcCode: "J05AB11", substance: "CHLORHYDRATE DE VALACICLOVIR", lgo: ["VALACICLOVIR 500 mg cp", "1", "9,15 €"] },
+      ],
+      [
+        { id: "probiotique", name: "PROBIOTIQUE 30 gélules", priceCents: 1490, quantity: 12, alertThreshold: 4, challengeTitle: "Challenge flore intestinale", shortDateOn: "2026-11-30", tone: ["#BFE8D2", "#2F9E6B"] },
+        { id: "antiseptique", name: "ANTISEPTIQUE CUTANÉ 100 ml", priceCents: 520, quantity: 3, alertThreshold: 5, tone: ["#CFE4F7", "#3B82C4"] },
+      ],
+      12,
+    ),
+    douleur: demoSale(
+      [{ name: "DOLIPRANE 1000 mg", inn: "paracétamol", atcCode: "N02BE01", substance: "PARACÉTAMOL", lgo: ["DOLIPRANE 1000 mg cp", "1", "2,18 €"] }],
+      // Le rayon des poches chaud/froid (une par zone) et du thermomètre : le moteur les apparie au bip, la question les dévoile.
+      [
+        { id: "poche-dos", name: "POCHE CHAUD/FROID DOS", priceCents: 1390, quantity: 5, alertThreshold: 2, tone: ["#CFE4F7", "#3B82C4"] },
+        { id: "poche-nuque", name: "POCHE CHAUD/FROID NUQUE", priceCents: 1290, quantity: 4, alertThreshold: 2, tone: ["#CFE4F7", "#3B82C4"] },
+        { id: "poche-epaule", name: "POCHE CHAUD/FROID ÉPAULE", priceCents: 1290, quantity: 3, alertThreshold: 2, tone: ["#CFE4F7", "#3B82C4"] },
+        { id: "poche-genou", name: "POCHE CHAUD/FROID GENOU", priceCents: 1190, quantity: 2, alertThreshold: 1, tone: ["#CFE4F7", "#3B82C4"] },
+        { id: "poche-hanche", name: "POCHE CHAUD/FROID HANCHE", priceCents: 1290, quantity: 3, alertThreshold: 2, tone: ["#CFE4F7", "#3B82C4"] },
+        { id: "poche-cheville", name: "POCHE CHAUD/FROID CHEVILLE", priceCents: 1190, quantity: 1, alertThreshold: 0, tone: ["#CFE4F7", "#3B82C4"] },
+        { id: "poche-multi", name: "POCHE CHAUD/FROID MULTI-ZONES", priceCents: 1090, quantity: 6, alertThreshold: 2, tone: ["#CFE4F7", "#3B82C4"] },
+        { id: "thermometre", name: "THERMOMÈTRE FRONTAL", priceCents: 2490, quantity: 4, alertThreshold: 1, tone: ["#FFE2B8", "#E08A12"] },
+      ],
+      13,
+    ),
+  };
+}
 
 /** Un arc d'ellipse comme dans GDI+ (angles en degrés, sens horaire, y vers le bas) → chemin SVG. */
 function arc(cx: number, cy: number, rx: number, ry: number, start: number, sweep: number): string {
@@ -61,6 +250,8 @@ export function bannerPreviewHtml(): string {
     .map(([key, value]) => `--${key}: ${value};`)
     .join(" ");
   const spec = JSON.stringify({ sizes: Z, timing: M, text: T, cardAlpha: C.cardAlpha });
+  // Dans un <script>, un « </ » fermerait la balise : les textes du moteur passent échappés (le navigateur relit « < » comme « < »).
+  const sales = JSON.stringify(demoSales()).replace(/</g, "\\u003c");
   return `<!doctype html>
 <html lang="fr">
 <head>
@@ -84,9 +275,9 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
 .note { font-size: 12.5px; color: #7f97a6; max-width: 90ch; }
 
 /* Le faux écran : un logiciel de gestion derrière la bannière, pour juger la transparence et l'ombre. */
-.screen { position: relative; height: 640px; border-radius: 16px; overflow: hidden; background: linear-gradient(135deg, #cfe3ee, #e9f1f5 55%, #d8e6ee); border: 1px solid #25425a; isolation: isolate; }
+.screen { position: relative; height: 700px; border-radius: 16px; overflow: hidden; background: linear-gradient(135deg, #cfe3ee, #e9f1f5 55%, #d8e6ee); border: 1px solid #25425a; isolation: isolate; }
 .lgo { position: absolute; inset: 14px; background: #f4f6f8; border-radius: 10px; box-shadow: 0 2px 16px rgba(10,30,45,.18); overflow: hidden; color: #2b3a46; font-size: 13px; }
-.lgo .bar { height: 32px; background: #e6ebef; display: flex; align-items: center; padding: 0 12px; gap: 8px; border-bottom: 1px solid #d5dde3; font-weight: 600; color: #51616d; }
+.lgo .bar { height: 32px; background: #e6ebef; display: flex; align-items: center; padding: 0 12px; gap: 8px; border-bottom: 1px solid #d5dde3; font-weight: 600; color: #51616d; white-space: nowrap; overflow: hidden; }
 .lgo .bar i { width: 11px; height: 11px; border-radius: 50%; background: #c3ccd3; display: inline-block; }
 .lgo .bar span { margin-left: auto; letter-spacing: .3em; color: #8a98a3; }
 .lgo .menu { height: 30px; background: #f9fafb; border-bottom: 1px solid #e3e8ec; display: flex; gap: 22px; align-items: center; padding: 0 16px; color: #6d7d89; }
@@ -152,7 +343,7 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
 .panel { position: absolute; left: 10px; right: 10px; top: ${Z.header - 4}px; bottom: 10px; background: var(--panel); border-radius: 18px; color: var(--ink); display: flex; flex-direction: column; animation: fadein .22s ease-out both; }
 .list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; padding: 8px 14px 0; }
 .label { display: flex; align-items: baseline; gap: 10px; height: 24px; padding-top: 1px; }
-.label small { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--inkSoft); text-transform: uppercase; }
+.label small { flex: none; white-space: nowrap; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--inkSoft); text-transform: uppercase; }
 .label b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .warn { display: flex; gap: 10px; align-items: flex-start; background: var(--alertBg); color: var(--alertFg); border-radius: 12px; padding: 8px 12px 8px 12px; margin-bottom: 8px; font-weight: 700; font-size: 12.5px; }
 .item { display: grid; grid-template-columns: ${Z.thumb}px 1fr 88px; gap: 12px; padding: 12px 0 10px; border-bottom: 1px solid var(--line); min-height: 78px; }
@@ -164,6 +355,8 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
 .qchip { height: 30px; padding: 0 15px; border-radius: 15px; border: 1.3px solid var(--accent); background: #fff; color: var(--accentDark); font: 700 13px inherit; font-family: inherit; cursor: pointer; transition: filter .15s, transform .1s; }
 .qchip:hover { filter: brightness(.97); } .qchip:active { transform: scale(.97); }
 .qchip.on { background: linear-gradient(180deg, var(--accent), var(--accentDark)); color: var(--soldFg); border-color: transparent; }
+/* Le geste du scénario : le bouton que la démonstration « touche » s'enfonce un instant, pour que l'œil suive. */
+.qchip.tap, .btn.tap { transform: scale(.96); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 32%, transparent); }
 .thumb { width: ${Z.thumb}px; height: ${Z.thumb}px; border-radius: 11px; background: #e6eef2; display: grid; place-items: center; }
 .body { min-width: 0; display: grid; align-content: space-between; }
 .l1 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; margin-top: -3px; }
@@ -224,7 +417,7 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; color: #fff; }
 .mail .acts .later { background: var(--notSoldBg); color: var(--notSoldFg); }
 
 .hint { position: absolute; left: 22px; bottom: 76px; color: #6d7d89; font-size: 12.5px; max-width: 360px; z-index: 1; }
-@media (max-width: 760px) { .screen { height: 700px; } .banner { right: 8px; } .card { max-width: calc(100vw - 56px); } .lgo .row { grid-template-columns: 1.6fr 1fr; } .lgo .row span:nth-child(n+3) { display: none; } }
+@media (max-width: 760px) { .banner { right: 8px; } .card { max-width: calc(100vw - 56px); } .lgo .row { grid-template-columns: 1.6fr 1fr; } .lgo .row span:nth-child(n+3) { display: none; } }
 /* Intégrée au site public (iframe ?integre=1) : sans titre ni note, fond transparent, la bannière s'adapte à la largeur disponible. */
 html.integre { color-scheme: light; }
 html.integre, html.integre body { background: transparent; }
@@ -237,8 +430,18 @@ html.integre .steps button:hover { border-color: var(--accentDark); }
 html.integre .steps button.on { background: var(--accentDark); border-color: var(--accentDark); color: #fff; }
 html.integre .steps .play { background: #0f2b3a; color: #fff; border-color: #0f2b3a; }
 html.integre .steps .extra { display: none; }
-html.integre .screen { height: 590px; border-color: #d3e1e9; box-shadow: 0 18px 50px rgba(15,43,58,.12); }
-html.integre .banner { transform-origin: top right; }
+/* Sur téléphone : une seule rangée d'étapes qui glisse du doigt, le scénario complet en tête, plutôt que quatre rangées au-dessus de la bannière. */
+@media (max-width: 560px) {
+  html.integre .steps { position: relative; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding: 0 8px; }
+  html.integre .steps::-webkit-scrollbar { display: none; }
+  html.integre .steps button { flex: none; }
+  html.integre .steps .play { order: -1; }
+}
+/* Assez haut pour la plus grande carte du scénario (la mise en garde et deux conseils) ; sur téléphone, fit() réduit la bannière et
+   raccourcit l'écran d'autant. La carte garde sa largeur Windows : la réduire en plus de la mettre à l'échelle rendrait tout illisible. */
+html.integre .screen { height: 690px; border-color: #d3e1e9; box-shadow: 0 18px 50px rgba(15,43,58,.12); }
+html.integre .banner, html.integre .mail { transform-origin: top right; }
+html.integre .card { max-width: none; }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 </style>
 </head>
@@ -253,11 +456,8 @@ html.integre .banner { transform-origin: top right; }
     <div class="lgo" aria-hidden="true">
       <div class="bar"><i></i><i></i><i></i>&nbsp;Logiciel de gestion de l'officine — Délivrance<span>– ☐ ✕</span></div>
       <div class="menu"><span>Dossier</span><span>Délivrance</span><span>Stock</span><span>Commandes</span><span>Gestion</span></div>
-      <div class="grid">
+      <div class="grid" id="lgo">
         <div class="row head"><span>Désignation</span><span>Quantité</span><span>Prix</span><span>Total</span></div>
-        <div class="row"><b>DOLIPRANE 1000 mg cp</b><span>1</span><span>2,18 €</span><b>2,18 €</b></div>
-        <div class="row"><b>AMOXICILLINE 1 g cp</b><span>1</span><span>6,42 €</span><b>6,42 €</b></div>
-        <div class="row"><b>ZYRTEC 10 mg cp</b><span>1</span><span>4,95 €</span><b>4,95 €</b></div>
       </div>
       <div class="total"><span class="alt">Annuler</span><span>Valider</span></div>
     </div>
@@ -271,23 +471,10 @@ html.integre .banner { transform-origin: top right; }
   var T = SPEC.text, Z = SPEC.sizes, MS = SPEC.timing;
   var MASCOT = ${JSON.stringify(mascotSvg())};
   var TREE_DEF = ${JSON.stringify(ANALGESIC_TREE)};
-  var TREE_PRODUCTS = {
-    "pain-pack-back": { name: "THERAPEARL DOS", price: "13,90 €", reason: "Chaud ou froid sur le dos", tone: ["#CFE4F7", "#3B82C4"], quantity: "5" },
-    "pain-pack-neck": { name: "THERAPEARL NUQUE", price: "12,90 €", reason: "Chaud ou froid sur la nuque", tone: ["#CFE4F7", "#3B82C4"], quantity: "4" },
-    "pain-pack-shoulder": { name: "THERAPEARL ÉPAULE", price: "12,90 €", reason: "Chaud ou froid sur l'épaule", tone: ["#CFE4F7", "#3B82C4"], quantity: "3" },
-    "pain-pack-knee": { name: "THERAPEARL GENOU", price: "11,90 €", reason: "Chaud ou froid sur le genou", tone: ["#CFE4F7", "#3B82C4"], quantity: "2" },
-    "pain-pack-hip": { name: "THERAPEARL HANCHE", price: "12,90 €", reason: "Chaud ou froid sur la hanche", tone: ["#CFE4F7", "#3B82C4"], quantity: "3" },
-    "pain-pack-ankle": { name: "THERAPEARL CHEVILLE", price: "11,90 €", reason: "Chaud ou froid sur la cheville", tone: ["#CFE4F7", "#3B82C4"], quantity: "1" },
-    "pain-pack-other": { name: "THERAPEARL MULTI-ZONES", price: "10,90 €", reason: "Chaud ou froid, toutes zones", tone: ["#CFE4F7", "#3B82C4"], quantity: "6" },
-    "fever-thermometer-analgesic": { name: "THERMOMÈTRE FRONTAL", price: "24,90 €", reason: "Suivre la fièvre à la maison", tone: ["#FFE2B8", "#E08A12"], quantity: "4" }
-  };
-  var ITEMS = [
-    { id: "a", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", drug: "AMOXICILLINE 1 g", reason: "Protéger la flore pendant l'antibiotique", challenge: true, shortDate: "30/11/26", availability: "IN_STOCK", quantity: "12", tone: ["#BFE8D2", "#2F9E6B"] },
-    { id: "b", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", drug: "ZYRTEC 10 mg", reason: "", challenge: false, shortDate: "", availability: "IN_STOCK", quantity: "27", tone: ["#CFE4F7", "#3B82C4"] },
-    { id: "c", name: "VITAMINE C 500 mg", price: "8,40 €", drug: "DOLIPRANE 1000 mg", reason: "", challenge: false, shortDate: "12/12/26", availability: "LOW_STOCK", quantity: "3", tone: ["#FFE2B8", "#E08A12"] }
-  ];
-  var S = { view: "idle", reduced: false, hidden: false, pinned: false, answers: {}, emailSaved: false, finishing: false, mailOpen: false, analyzing: false, doneAt: 0 };
-  var BASE_ITEMS = ITEMS.slice();
+  // Les deux ventes du scénario (une ordonnance, puis un DOLIPRANE seul), calculées par le moteur à la génération : voir demoSales().
+  var SALES = ${sales};
+  var SALE = SALES.ordonnance, ITEMS = SALE.items.slice();
+  var S = { view: "idle", reduced: false, hidden: false, pinned: false, answers: {}, emailSaved: false, finishing: false, mailOpen: false, analyzing: false, doneAt: 0, tree: null };
   // L'arbre du comptoir : mêmes questions et mêmes règles que le moteur (core/counter/question-tree.ts).
   function treeOpen(ans) {
     var open = [], queue = [TREE_DEF.root];
@@ -303,7 +490,7 @@ html.integre .banner { transform-origin: top right; }
     var out = { questions: [], guidance: [], unlocked: [] };
     treeOpen(ans).forEach(function (k) {
       var node = TREE_DEF.nodes[k], picked = ans[k] || [];
-      out.questions.push({ node: k, text: node.question.replace("{drug}", "DOLIPRANE 1000 mg"), choices: node.choices.map(function (c) { return { key: c.key, label: c.label, selected: picked.indexOf(c.key) >= 0 }; }) });
+      out.questions.push({ node: k, text: node.question.replace("{drug}", SALE.tree.drug), choices: node.choices.map(function (c) { return { key: c.key, label: c.label, selected: picked.indexOf(c.key) >= 0 }; }) });
       node.choices.forEach(function (c) {
         if (picked.indexOf(c.key) < 0) return;
         if (c.note) out.guidance.push(c.note);
@@ -323,12 +510,16 @@ html.integre .banner { transform-origin: top right; }
     Object.keys(ans).forEach(function (k) { if (still.indexOf(k) < 0 || !ans[k].length) delete ans[k]; });
     syncTreeItems();
   }
+  // Les conseils débloqués par une réponse viennent APRÈS ceux de la vente, comme dans le moteur (ils ne leur prennent pas la place).
+  // Ce sont ceux que le moteur a appariés au bip (SALE.tree.items, une règle → un produit, avec la raison écrite par la règle) : une
+  // réponse sans produit en rayon ne montre rien, comme sur le poste.
   function syncTreeItems() {
     var v = treeView(S.tree.answers);
-    ITEMS = v.unlocked.map(function (key) {
-      var p = TREE_PRODUCTS[key];
-      return { id: key, name: p.name, price: p.price, drug: "DOLIPRANE 1000 mg", reason: p.reason, challenge: false, shortDate: "", availability: "IN_STOCK", quantity: p.quantity, tone: p.tone };
-    });
+    ITEMS = SALE.items.concat(v.unlocked.filter(function (key) { return SALE.tree.items[key]; }).map(function (key) { return SALE.tree.items[key]; }));
+  }
+  // Les mises en garde du moteur, en tête de liste et avant les questions : l'ordre de PaintList dans la bannière Windows.
+  function alertsHtml() {
+    return SALE.alerts.map(function (a) { return '<div class="warn">' + ICON.warn + '<span>' + esc(a) + '</span></div>'; }).join("");
   }
   function questionsHtml() {
     if (!S.tree) return "";
@@ -407,6 +598,21 @@ html.integre .banner { transform-origin: top right; }
     return S.view;
   }
 
+  // Le titre et la ligne d'état, choisis comme la bannière Windows les choisit (ReadyTitle et Subtitle, notice-host.ts) : une question
+  // sans conseil encore, c'est « Une question à poser » ; une mise en garde sans conseil, « À lire avant de conseiller ».
+  function readyTitle() {
+    if (ITEMS.length === 0 && S.tree) return T.questionTitle;
+    if (ITEMS.length === 0) return SALE.alerts.length ? T.readFirst : T.quiet;
+    return plural(ITEMS.length, T.readyOne, T.readyMany);
+  }
+  function expandedSub() {
+    if (S.analyzing) return T.scanSub;
+    if (ITEMS.length === 0 && S.tree) return T.questionSub;
+    if (ITEMS.length === 0) return SALE.alerts.length ? T.readFirst : T.quietSub;
+    if (answered() === 0) return plural(ITEMS.length, T.forSaleOne, T.forSaleMany);
+    return T.duringSale + "  " + answered() + "/" + ITEMS.length;
+  }
+
   function sizeFor(v) {
     if (v === "reduced") return [Z.widthReduced, Z.heightReduced];
     if (v === "ready") return [Z.widthReady, Z.heightReady];
@@ -444,10 +650,9 @@ html.integre .banner { transform-origin: top right; }
         '<div class="abs sub" style="left:104px;top:43px;right:20px">' + T.quietSub + '</div>' + headerButtons(true);
     }
     if (v === "ready") {
-      var title = plural(ITEMS.length, T.readyOne, T.readyMany);
       return mascot("alert", "left:8px;top:10px;width:" + Z.mascot + "px;height:" + Z.mascot + "px") +
-        '<div class="abs brand" style="left:104px;top:15px;right:110px">' + esc(title) + '</div>' +
-        '<div class="abs sub" style="left:104px;top:43px;right:20px;font-size:13px">DOLIPRANE 1000 mg · AMOXICILLINE 1 g</div>' +
+        '<div class="abs brand" style="left:104px;top:15px;right:110px">' + esc(readyTitle()) + '</div>' +
+        '<div class="abs sub" style="left:104px;top:43px;right:20px;font-size:13px">' + esc(SALE.subject) + '</div>' +
         '<button class="go" data-act="see" style="left:104px;top:78px;right:20px">' + T.readyButton + ICON.arrow + '</button>' + headerButtons(true);
     }
     if (v === "done") {
@@ -456,7 +661,7 @@ html.integre .banner { transform-origin: top right; }
       var lines = [sold + " vendu" + (sold > 1 ? "s" : "") + " · " + not + " non vendu" + (not > 1 ? "s" : "") + " · " + unanswered() + " sans réponse"];
       if (S.emailSaved && sold > 0) lines.push("✓ Bilan envoyé au patient.");
       else if (S.emailSaved) lines.push("Aucun bilan envoyé : aucun produit n'a été vendu.");
-      var badge = sold > 0 ? '<div>' + pill("p-stock", "tick", "12e conseil vendu aujourd'hui") + '</div>' : "";
+      var badge = sold > 0 ? '<div>' + pill("p-stock", "tick", SALE.rank + "e conseil vendu aujourd'hui") + '</div>' : "";
       var sparks = "";
       var cols = ["#FFD65A", "var(--glow)", "var(--accent)"];
       for (var k = 0; k < 8; k++) {
@@ -470,11 +675,7 @@ html.integre .banner { transform-origin: top right; }
         '<div class="done-lines"><h2>' + T.doneTitle + '</h2>' + lines.map(function (l) { return "<p>" + esc(l) + "</p>"; }).join("") + badge + '</div>';
     }
     // expanded
-    var sub;
-    if (S.analyzing) sub = T.scanSub;
-    else if (S.tree && ITEMS.length === 0) sub = T.questionSub;
-    else if (answered() === 0) sub = plural(ITEMS.length, T.forSaleOne, T.forSaleMany);
-    else sub = T.duringSale + "  " + answered() + "/" + ITEMS.length;
+    var sub = expandedSub();
     var rows = ITEMS.map(function (item) {
       var a = S.answers[item.id];
       var pills = (item.challenge ? pill("p-challenge", "star", T.challenge) : "") + (item.shortDate ? pill("p-date", "clock", T.shortDate + " " + item.shortDate) : "") + stockPill(item.availability, item.quantity);
@@ -490,7 +691,7 @@ html.integre .banner { transform-origin: top right; }
     return mascot(moodOf(), "left:8px;top:6px;width:76px;height:76px") +
       '<div class="abs brand" style="left:96px;top:18px;width:200px">' + T.brand + '</div>' +
       '<div class="abs sub" style="left:96px;top:45px;width:300px;' + (S.analyzing ? "color:var(--glow)" : "") + '">' + esc(sub) + '</div>' + headerButtons(true) +
-      '<div class="panel"><div class="list"><div class="label"><small>Détecté</small><b>' + (S.tree ? "DOLIPRANE 1000 mg" : "DOLIPRANE 1000 mg · AMOXICILLINE 1 g") + '</b></div>' + questionsHtml() + rows + '</div>' +
+      '<div class="panel"><div class="list"><div class="label"><small>' + esc(SALE.label) + '</small><b>' + esc(SALE.subject) + '</b></div>' + alertsHtml() + questionsHtml() + rows + '</div>' +
       '<div class="foot"><div class="two">' + mailRow + '<button class="ghost" data-act="detail">' + T.detail + '</button></div>' +
       '<button class="finish" data-act="finish">' + (S.finishing ? T.finishing : ICON.tick + T.finish) + '</button></div></div>';
   }
@@ -500,10 +701,21 @@ html.integre .banner { transform-origin: top right; }
   banner.appendChild(card);
   var layer = null;
 
+  // Comme MaxCardHeight() de la bannière Windows : la carte ne dépasse jamais la place qu'elle a ; au-delà, seule la liste défile —
+  // l'en-tête, l'e-mail et « Vente terminée » restent à l'écran, jamais rognés par le bord.
+  var screenEl = document.getElementById("screen");
+  var fitScale = 1;
+  function bannerScale() { return fitScale * (parseFloat(banner.style.zoom) || 1); }
+  // Le haut de la bannière tel qu'on le voit (le zoom « Affichage Windows 150 % » le déplace aussi).
+  function bannerTop() { return banner.getBoundingClientRect().top - screenEl.getBoundingClientRect().top - screenEl.clientTop; }
+  function maxCardHeight() { return Math.max(260, (screenEl.clientHeight - bannerTop() - 12) / bannerScale()); }
+
   function render(keepLayer) {
     var v = view();
     banner.style.display = S.hidden ? "none" : "";
     var size = sizeFor(v);
+    // Redessinée sur place (une réponse, un choix), la liste garde sa position, comme scrollY dans la bannière Windows.
+    var oldList = layer && layer.querySelector(".list"), kept = keepLayer && oldList ? oldList.scrollTop : 0;
     var layerEl = document.createElement("div");
     layerEl.className = "layer";
     layerEl.innerHTML = html(v);
@@ -521,7 +733,7 @@ html.integre .banner { transform-origin: top right; }
         // La hauteur naturelle : en-tête + liste + pied, comme la bannière Windows la calcule.
         var list = layer.querySelector(".list"), foot = layer.querySelector(".foot");
         var need = (Z.header - 4) + list.scrollHeight + 6 + foot.offsetHeight + 10;
-        h = Math.min(need, 660);
+        h = Math.min(need, maxCardHeight());
         card.style.transition = "";
         layer.style.visibility = "";
       } else {
@@ -532,9 +744,22 @@ html.integre .banner { transform-origin: top right; }
     card.style.width = w + "px";
     card.style.height = h + "px";
     card.classList.toggle("dragging", false);
-    var mail = document.getElementById("mail");
-    if (mail) { mail.style.top = (banner.offsetTop + h + 10) + "px"; }
+    var newList = layer.querySelector(".list");
+    if (newList && kept) newList.scrollTop = kept;
+    placeMail(h);
     markStep();
+  }
+
+  // Le champ e-mail se pose sous la carte ; s'il n'y tient pas, au-dessus, contre le haut de l'écran — comme EmailForm.Place() sur Windows.
+  function placeMail(h) {
+    var m = document.getElementById("mail");
+    if (!m) return;
+    var cardH = (h || card.offsetHeight) * bannerScale(), mailH = m.offsetHeight * fitScale;
+    var top = bannerTop() + cardH + 10;
+    if (top + mailH > screenEl.clientHeight - 8) top = Math.max(8, bannerTop() - mailH - 10);
+    m.style.top = top + "px";
+    m.style.right = getComputedStyle(banner).right;
+    m.style.transform = fitScale < 1 ? "scale(" + fitScale.toFixed(3) + ")" : "";
   }
 
   function setView(v) { clearTimers(); S.view = v; S.finishing = false; if (v === "scan") S.analyzing = false; render(); schedule(); }
@@ -545,13 +770,14 @@ html.integre .banner { transform-origin: top right; }
   }
 
   function closeMail() { var m = document.getElementById("mail"); if (m) m.remove(); S.mailOpen = false; }
-  function openMail() {
+  // Ouvert par le scénario, le champ ne prend pas le focus : il ferait défiler la page du site qui contient la démonstration.
+  function openMail(byScenario) {
     if (document.getElementById("mail")) return;
     var m = document.createElement("div");
     m.className = "mail"; m.id = "mail";
     m.innerHTML = '<h3>E-mail du patient</h3><input type="email" id="mailInput" placeholder="prenom.nom@exemple.fr" autocomplete="off"><label><input type="checkbox" id="mailOk"> Le patient accepte de recevoir son bilan par e-mail</label><div class="msg" id="mailMsg"></div><div class="acts"><button class="go2" id="mailSave" disabled>Enregistrer l\\'e-mail</button><button class="later" id="mailLater">Plus tard</button></div>';
     document.getElementById("screen").appendChild(m);
-    m.style.top = (banner.offsetTop + card.offsetHeight + 10) + "px";
+    placeMail(parseFloat(card.style.height));
     var input = m.querySelector("#mailInput"), ok = m.querySelector("#mailOk"), save = m.querySelector("#mailSave");
     function valid() { var t = input.value.trim(); return /^[^@ ]+@[^@ ]+[.][^@ .]{2,}$/.test(t) && !/^[0-9]{8,}$/.test(t); }
     function refresh() { save.disabled = !(ok.checked && valid()); }
@@ -560,7 +786,7 @@ html.integre .banner { transform-origin: top right; }
     save.addEventListener("click", function () { S.emailSaved = true; closeMail(); render(true); });
     m.querySelector("#mailLater").addEventListener("click", closeMail);
     input.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMail(); if (e.key === "Enter" && !save.disabled) save.click(); });
-    input.focus();
+    if (!byScenario) input.focus({ preventScroll: true });
   }
 
   banner.addEventListener("click", function (e) {
@@ -576,7 +802,7 @@ html.integre .banner { transform-origin: top right; }
     else if (act === "sold") { S.answers[id] = "SOLD"; render(true); }
     else if (act === "not") { S.answers[id] = "NOT_SOLD"; render(true); }
     else if (act === "undo") { delete S.answers[id]; render(true); }
-    else if (act === "mail") openMail();
+    else if (act === "mail") openMail(false);
     else if (act === "mailrm") { S.emailSaved = false; render(true); }
     else if (act === "detail") { note.textContent = "« Voir le détail » ouvre la vente dans PharmaBoost, dans le navigateur."; }
     else if (act === "finish") { if (S.finishing) return; S.finishing = true; render(true); later(700, function () { closeMail(); S.finishing = false; setView("done"); }); }
@@ -594,7 +820,7 @@ html.integre .banner { transform-origin: top right; }
     if (!drag) return;
     banner.style.right = Math.max(0, drag.r - (e.clientX - drag.x)) + "px";
     banner.style.top = Math.max(0, drag.t + (e.clientY - drag.y)) + "px";
-    var m = document.getElementById("mail"); if (m) { m.style.top = (banner.offsetTop + card.offsetHeight + 10) + "px"; m.style.right = banner.style.right; }
+    placeMail(parseFloat(card.style.height));
   });
   banner.addEventListener("pointerup", function () { drag = null; card.classList.remove("dragging"); });
 
@@ -603,64 +829,122 @@ html.integre .banner { transform-origin: top right; }
     if (!b) { b = document.createElement("button"); b.id = "restore"; b.className = "go"; b.style.cssText = "right:18px;top:14px;width:auto;padding:0 16px;height:34px;border-radius:12px;position:absolute;z-index:6"; b.textContent = "Icône près de l'horloge : Afficher PharmaBoost"; document.getElementById("screen").appendChild(b); b.addEventListener("click", function () { S.hidden = false; S.reduced = false; b.remove(); render(); }); }
   }
 
-  // Les étapes de la maquette, et le scénario complet.
+  // Les étapes de la maquette, et le scénario complet. 1 à 6 : la vente sur ordonnance ; 7 : un DOLIPRANE seul, la question à poser.
   var STEPS = [
-    ["1", "En attente", function () { reset(); setView("idle"); }],
-    ["2", "Scan détecté", function () { reset(); setView("scan"); }],
-    ["3", "Conseils disponibles", function () { reset(); S.view = "ready"; clearTimers(); render(); }],
-    ["4", "Conseils ouverts", function () { reset(); setView("expanded"); }],
-    ["5", "Pendant la vente", function () { reset(); S.answers = { a: "SOLD", b: "NOT_SOLD" }; setView("expanded"); }],
-    ["6", "Vente terminée", function () { reset(); S.answers = { a: "SOLD", b: "SOLD" }; S.emailSaved = true; setView("done"); }]
+    ["1", "En attente", function () { reset("ordonnance"); setView("idle"); }],
+    ["2", "Scan détecté", function () { reset("ordonnance"); setView("scan"); }],
+    ["3", "Conseils disponibles", function () { reset("ordonnance"); S.view = "ready"; clearTimers(); render(); }],
+    ["4", "Conseils ouverts", function () { reset("ordonnance"); setView("expanded"); }],
+    ["5", "Pendant la vente", function () { reset("ordonnance"); S.answers[ITEMS[0].id] = "SOLD"; setView("expanded"); }],
+    ["6", "Vente terminée", function () { reset("ordonnance"); S.answers[ITEMS[0].id] = "SOLD"; S.answers[ITEMS[1].id] = "NOT_SOLD"; S.emailSaved = true; setView("done"); }],
+    ["7", "Une question à poser", function () { reset("douleur"); setView("expanded"); }]
   ];
   var EMBED = document.documentElement.classList.contains("integre");
+  // « Réduire les animations » du système (macOS, Windows, iOS, Android) : le CSS raccourcit les transitions ; le scénario, lui, ne
+  // part pas tout seul, et les défilements se font d'un coup plutôt qu'en glissant.
+  var REDUCED_MOTION = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var GLIDE = REDUCED_MOTION ? "auto" : "smooth";
   var userDriven = false;
+  // Le scénario joue-t-il (sur le site, il ne joue que lorsque la page le montre) ?
+  var running = false;
   var stepsEl = document.getElementById("steps");
-  var current = -1;
-  function reset() { clearTimers(); clearScenario(); closeMail(); S.tree = null; ITEMS = BASE_ITEMS.slice(); S.reduced = false; S.hidden = false; S.answers = {}; S.emailSaved = false; S.finishing = false; S.analyzing = false; var r = document.getElementById("restore"); if (r) r.remove(); }
+  var lgoEl = document.getElementById("lgo");
+  var LGO_HEAD = lgoEl.innerHTML;
+  // Une vente arrive : le faux logiciel de gestion affiche ses lignes, la bannière repart de zéro. Le scénario, lui, continue.
+  function loadSale(key) {
+    clearTimers(); closeMail();
+    SALE = SALES[key]; ITEMS = SALE.items.slice(); S.tree = SALE.tree ? { answers: {} } : null;
+    S.reduced = false; S.hidden = false; S.answers = {}; S.emailSaved = false; S.finishing = false; S.analyzing = false;
+    var r = document.getElementById("restore"); if (r) r.remove();
+    lgoEl.innerHTML = LGO_HEAD + SALE.lgo.map(function (l) { return '<div class="row"><b>' + esc(l[0]) + '</b><span>' + esc(l[1]) + '</span><span>' + esc(l[2]) + '</span><b>' + esc(l[2]) + '</b></div>'; }).join("");
+  }
+  function reset(key) { clearScenario(); loadSale(key); }
   STEPS.forEach(function (s, i) {
     var b = document.createElement("button");
     b.textContent = s[0] + " · " + s[1];
-    b.addEventListener("click", function () { current = i; s[2](); });
+    b.setAttribute("data-step", String(i));
+    b.addEventListener("click", s[2]);
     stepsEl.appendChild(b);
   });
   var play = document.createElement("button");
   play.className = "play"; play.textContent = "▶ Scénario complet";
   stepsEl.appendChild(play);
+  // Les outils de l'aperçu pour Mac seulement (cachés sur le site) : l'état « Rien à ajouter » et l'échelle d'affichage de Windows.
   var quiet = document.createElement("button");
   quiet.textContent = "Rien à ajouter"; quiet.className = "extra";
-  quiet.addEventListener("click", function () { reset(); setView("quiet"); });
+  quiet.addEventListener("click", function () { reset("ordonnance"); setView("quiet"); });
   stepsEl.appendChild(quiet);
-  var tree = document.createElement("button");
-  tree.textContent = "Arbre de questions"; tree.className = "extra";
-  tree.addEventListener("click", function () { reset(); S.tree = { answers: {} }; syncTreeItems(); setView("expanded"); });
-  stepsEl.appendChild(tree);
   var zoom = document.createElement("select"); zoom.className = "extra";
   [["100 %", 1], ["125 %", 1.25], ["150 %", 1.5]].forEach(function (z) { var o = document.createElement("option"); o.value = z[1]; o.textContent = "Affichage Windows " + z[0]; zoom.appendChild(o); });
   zoom.addEventListener("change", function () { banner.style.zoom = zoom.value; render(true); });
   stepsEl.appendChild(zoom);
+  // L'étape allumée dit où en est la vente montrée, pas quel bouton a été cliqué.
   function markStep() {
-    var buttons = stepsEl.querySelectorAll("button");
     var idx = { idle: 0, scan: 1, ready: 2, expanded: answered() > 0 ? 4 : 3, done: 5 }[S.view];
-    for (var i = 0; i < buttons.length - 3; i++) buttons[i].classList.toggle("on", i === idx);
+    if (S.tree && (S.view === "ready" || S.view === "expanded") && answered() === 0) idx = 6;
+    Array.prototype.forEach.call(stepsEl.querySelectorAll("[data-step]"), function (b) {
+      var on = Number(b.getAttribute("data-step")) === idx;
+      b.classList.toggle("on", on);
+      // La rangée d'étapes du téléphone glisse jusqu'à l'étape en cours, tant que le visiteur ne la manie pas lui-même. Pas en
+      // mouvement réduit : la rangée reste immobile, « Scénario complet » (le premier bouton) en vue.
+      if (on && !userDriven && !REDUCED_MOTION && stepsEl.scrollWidth > stepsEl.clientWidth + 1) stepsEl.scrollTo({ left: b.offsetLeft - (stepsEl.clientWidth - b.offsetWidth) / 2, behavior: GLIDE });
+    });
   }
-  function runScenario() {
-    reset(); setView("idle");
-    step(2200, function () { setView("scan"); });
-    step(4800, function () { S.view = "ready"; render(); schedule(); });
-    step(8200, function () { S.answers.a = "SOLD"; render(true); });
-    step(10200, function () { S.answers.b = "NOT_SOLD"; render(true); });
-    step(12000, function () { openMail(); });
-    step(14200, function () { var m = document.getElementById("mail"); if (m) { var i = m.querySelector("#mailInput"); i.value = "claire.martin@exemple.fr"; i.dispatchEvent(new Event("input")); m.querySelector("#mailOk").checked = true; m.querySelector("#mailOk").dispatchEvent(new Event("change")); } });
-    step(15800, function () { var s = document.getElementById("mailSave"); if (s && !s.disabled) s.click(); });
-    step(17400, function () { S.answers.c = "SOLD"; render(true); });
-    step(19200, function () { var f = banner.querySelector('[data-act="finish"]'); if (f) f.click(); });
-      // Sur le site : le scénario recommence tout seul, tant que le visiteur ne prend pas la main.
-    if (EMBED) step(29000, function () { if (!userDriven) runScenario(); });
-  }
-  play.addEventListener("click", function () { userDriven = false; runScenario(); });
 
-  note.textContent = "Aperçu fidèle du dessin de la bannière Windows (mêmes couleurs, tailles, phrases et durées) — ce n'est pas une capture de Windows : la police (Segoe UI sur Windows), l'ombre et le lissage sont ceux de votre navigateur. Les photos de produits sont des exemples.";
+  // Les gestes du scénario : le bouton visé est d'abord amené dans la liste s'il est caché, s'enfonce, puis la réponse s'inscrit.
+  function reveal(el) {
+    var list = el.closest(".list");
+    if (!list) return;
+    var lr = list.getBoundingClientRect(), er = el.getBoundingClientRect(), k = lr.height / (list.clientHeight || 1) || 1;
+    var below = (er.bottom - lr.bottom) / k + 10, above = (lr.top - er.top) / k + 10;
+    if (below > 10) list.scrollTo({ top: list.scrollTop + below, behavior: GLIDE });
+    else if (above > 10) list.scrollTo({ top: list.scrollTop - above, behavior: GLIDE });
+  }
+  function press(selector, then) {
+    var el = banner.querySelector(selector);
+    if (!el) return;
+    reveal(el);
+    el.classList.add("tap");
+    step(450, then);
+  }
+  function tap(node, choice) { press('[data-act="qa"][data-node="' + node + '"][data-choice="' + choice + '"]', function () { treeAnswer(node, choice); render(true); }); }
+  function decide(id, outcome) { press('[data-act="' + (outcome === "SOLD" ? "sold" : "not") + '"][data-id="' + id + '"]', function () { S.answers[id] = outcome; render(true); }); }
+  function finish() { var f = banner.querySelector('[data-act="finish"]'); if (f) f.click(); }
+
+  // Le scénario : deux ventes courtes, comme au comptoir.
+  //  1. Une ordonnance (AMOXICILLINE, FERVEX, VALACICLOVIR) : la mise en garde du moteur en tête, deux conseils, Vendu / Non vendu,
+  //     l'e-mail du patient, « Vente terminée ».
+  //  2. Un DOLIPRANE seul : « Une question à poser » — pourquoi ? Douleur localisée ; où ? Dos — et la poche du dos apparaît.
+  function runScenario() {
+    reset("ordonnance"); setView("idle");
+    step(2000, function () { setView("scan"); });
+    step(4400, function () { S.view = "ready"; render(); schedule(); });
+    step(9400, function () { decide(SALES.ordonnance.items[0].id, "SOLD"); });
+    step(11000, function () { decide(SALES.ordonnance.items[1].id, "NOT_SOLD"); });
+    step(12400, function () { openMail(true); });
+    step(14200, function () { var m = document.getElementById("mail"); if (m) { var i = m.querySelector("#mailInput"); i.value = "claire.martin@exemple.fr"; i.dispatchEvent(new Event("input")); m.querySelector("#mailOk").checked = true; m.querySelector("#mailOk").dispatchEvent(new Event("change")); } });
+    step(15600, function () { var s = document.getElementById("mailSave"); if (s && !s.disabled) s.click(); });
+    step(17000, finish);
+    step(21200, function () { loadSale("douleur"); setView("idle"); });
+    step(22200, function () { setView("scan"); });
+    step(24600, function () { S.view = "ready"; render(); schedule(); });
+    step(28000, function () { tap("why", "PAIN"); });
+    step(30400, function () { tap("where", "BACK"); });
+    step(32800, function () { decide("pain-pack-back", "SOLD"); });
+    step(34600, finish);
+    // Sur le site : le scénario recommence tout seul, tant que le visiteur ne prend pas la main — sauf mouvement réduit, où il ne
+    // joue qu'une fois, à la demande.
+    if (EMBED && !REDUCED_MOTION) step(40800, function () { if (!userDriven) runScenario(); });
+  }
+  // Lancé par le visiteur, le scénario s'arrête aussi quand la page du site le fait sortir de l'écran (« pb-hidden »).
+  play.addEventListener("click", function () { userDriven = false; running = true; runScenario(); });
+
+  note.textContent = "Aperçu fidèle du dessin de la bannière Windows (mêmes couleurs, tailles, phrases et durées) — ce n'est pas une capture de Windows : la police (Segoe UI sur Windows), l'ombre et le lissage sont ceux de votre navigateur. Médicaments, produits et photos sont des exemples ; la mise en garde est celle du moteur.";
   STEPS[0][2]();
+  // Mouvement réduit demandé par le système, sur le site : rien ne joue tout seul ni ne boucle. La vente sur ordonnance est montrée
+  // ouverte, immobile (mise en garde, conseils, pastilles) ; « Scénario complet » la fait jouer une fois, si le visiteur le demande.
+  function still() { reset("ordonnance"); setView("expanded"); }
+  if (EMBED && REDUCED_MOTION) still();
 
   // Les gestes du visiteur reprennent la main : le scénario automatique s'arrête.
   function takeOver() { if (!userDriven) { userDriven = true; clearScenario(); } }
@@ -668,16 +952,25 @@ html.integre .banner { transform-origin: top right; }
   banner.addEventListener("pointerdown", takeOver);
 
   if (EMBED) {
-    // Une bannière plus étroite que sa place (téléphone) est réduite, jamais rognée.
-    var fit = function () { var scale = Math.min(1, (window.innerWidth - 12) / 560); banner.style.transform = scale < 1 ? "scale(" + scale.toFixed(3) + ")" : ""; };
-    window.addEventListener("resize", fit); fit();
-    // Le scénario ne joue que lorsque la page du site le montre : elle prévient quand l'animation entre ou sort de l'écran.
-    var running = false;
-    var visible = function (yes) {
-      if (yes && !running && !userDriven) { running = true; runScenario(); }
-      if (!yes && running) { running = false; clearScenario(); if (!userDriven) { reset(); setView("idle"); } }
+    // Une bannière plus large que sa place (téléphone) est réduite d'un bloc, jamais rognée ni tassée ; l'écran raccourcit d'autant.
+    var fit = function () {
+      fitScale = Math.min(1, (window.innerWidth - 16) / Z.widthExpanded);
+      banner.style.transform = fitScale < 1 ? "scale(" + fitScale.toFixed(3) + ")" : "";
+      screenEl.style.height = fitScale < 1 ? Math.round(64 + 640 * fitScale) + "px" : "";
     };
-    window.addEventListener("message", function (e) { if (e.data === "pb-visible") visible(true); else if (e.data === "pb-hidden") visible(false); });
+    window.addEventListener("resize", function () { fit(); render(true); }); fit(); render(true);
+    // La page du site prend la hauteur de la démonstration (barre d'étapes repliée sur téléphone, écran raccourci) : jamais de barre
+    // de défilement dans le cadre. Elle peut aussi la demander (« pb-mesure ») : chargée avant elle, la démonstration a parlé trop tôt.
+    var wrap = document.querySelector(".wrap");
+    var tell = function () { if (window.parent !== window) window.parent.postMessage({ type: "pb-height", height: Math.ceil(wrap.getBoundingClientRect().height) }, "*"); };
+    if (typeof ResizeObserver === "function") new ResizeObserver(tell).observe(wrap);
+    window.addEventListener("load", tell); tell();
+    // Le scénario ne joue que lorsque la page du site le montre : elle prévient quand l'animation entre ou sort de l'écran.
+    var visible = function (yes) {
+      if (yes && !running && !userDriven && !REDUCED_MOTION) { running = true; runScenario(); }
+      if (!yes && running) { running = false; clearScenario(); if (!userDriven) { if (REDUCED_MOTION) still(); else { reset("ordonnance"); setView("idle"); } } }
+    };
+    window.addEventListener("message", function (e) { if (e.data === "pb-visible") visible(true); else if (e.data === "pb-hidden") visible(false); else if (e.data === "pb-mesure") tell(); });
     if (window.parent === window) setTimeout(function () { visible(true); }, 600);
   }
 })();

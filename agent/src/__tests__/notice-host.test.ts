@@ -307,6 +307,21 @@ describe("l'arbre de questions dans la bannière", () => {
     expect(methodBody("Availability")).toContain('Txt.LowStock + (quantity.Length > 0 ? " · " + quantity : "")');
     expect(methodBody("Availability")).toContain('Txt.InStock + (quantity.Length > 0 ? " · " + quantity : "")');
   });
+
+  it("« MÉDICAMENT DÉTECTÉ » s'écrit en entier : mesuré puis dessiné à sa largeur, jamais dans une case fixe (« MÉDICAM… » puis un blanc)", () => {
+    const list = methodBody("PaintList");
+    // Plus aucune case de 70 points pour le titre.
+    expect(list).not.toMatch(/Gfx\.Text\(g, entry\.Label[^;]*, 70f,/);
+    expect(list).not.toMatch(/\b70f\b/);
+    // La mesure vient AVANT le dessin, et le dessin prend la largeur mesurée (bornée par la carte).
+    const measured = list.indexOf("float labelTextW = Math.Min(Gfx.Measure(g, label, labelFont) + 2f, w);");
+    const drawn = list.indexOf("Gfx.Text(g, label, labelFont, Pal.InkSoft, x, cursor + 3f, labelTextW, 14f, Gfx.Left);");
+    expect(measured).toBeGreaterThan(-1);
+    expect(drawn).toBeGreaterThan(measured);
+    // Ce qui a été scanné commence après le titre et prend le reste : c'est lui qui se termine par « … » s'il est trop long.
+    expect(list).toContain("float labelW = labelTextW + 8f;");
+    expect(list).toContain("Gfx.Text(g, entry.Subject, Gfx.Fnt(13f, FontStyle.Bold), Pal.Ink, x + labelW, cursor + 1f, w - labelW, 18f, Gfx.Left);");
+  });
 });
 
 describe("le script PowerShell qui la lance", () => {

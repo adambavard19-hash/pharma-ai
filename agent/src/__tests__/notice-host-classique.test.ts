@@ -147,6 +147,16 @@ describe("ce que la fenêtre montre", () => {
     expect(choose).toContain('"ANNULER "');
     expect([...NOTICE_HOST_CSHARP.matchAll(/Choose\(item, "/g)]).toHaveLength(3);
   });
+
+  it("« Médicament détecté » s'écrit en entier, sur toute la largeur et au-dessus de ce qui a été scanné (jamais dans une case fixe)", () => {
+    const labels = NOTICE_HOST_CSHARP.match(/Words\([^;]*entry\.Label[^;]*;/g) ?? [];
+    expect(labels).toEqual([
+      "Words(this, entry.Label, F(9.5f, FontStyle.Regular), Look.Faint, pad, y, width - 2 * pad);",
+      "Words(scroll, entry.Label, F(9.5f, FontStyle.Regular), Look.Faint, x, y, w);",
+    ]);
+    // Words mesure le texte avec retour à la ligne : un titre long passe à la ligne, il n'est jamais coupé.
+    expect(methodBody("Words")).toContain("TextFormatFlags.WordBreak");
+  });
 });
 
 describe("le script PowerShell qui la lance", () => {

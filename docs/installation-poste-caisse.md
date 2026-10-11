@@ -299,9 +299,14 @@ bip, et ne se ferme qu'à « Vente terminée ».
 - **E-mail du patient** (facultatif) : saisi à la main, avec la case « Le patient accepte de recevoir son bilan par e-mail »,
   chiffré. C'est le *seul* moment où la fenêtre prend le clavier : sur un clic dans le champ, puis elle le rend au logiciel de
   gestion (Enregistrer, Plus tard, Échap, clic ailleurs, 40 s sans rien taper). Un code-barres tombé dans le champ est effacé.
+  L'adresse ne sert qu'au bilan : « Vente terminée » l'efface, quelle que soit l'issue de l'envoi (l'accord, sa date et le poste
+  restent). Une vente jamais terminée ne la garde pas non plus : la tâche quotidienne efface les adresses données il y a plus de
+  23 h, soit 48 h au plus avec deux passages espacés au maximum (`src/core/counter/email-retention.ts`, page Confidentialité).
+  C'est la première étape de la tâche quotidienne, avant toute étape longue.
 - **Vente terminée** : enregistre vendu / non vendu / sans réponse, envoie le **bilan au patient** s'il a donné son accord et
-  qu'au moins un produit est déclaré vendu (noms des produits ; la phrase « patient » seulement si la règle est validée ; jamais de
-  médicament ni de posologie), puis affiche « Vente terminée — résultats enregistrés » et, si un conseil a été vendu dans cette
+  qu'au moins un produit est déclaré vendu (noms des produits ; la phrase « patient » seulement si la règle est validée, que son
+  modèle ne contient pas `{drug}` et qu'elle ne cite aucun nom ni aucune substance de la vente, sinon le produit part seul :
+  `patientSafeReason` dans `src/core/counter/patient-report.ts` ; jamais de médicament ni de posologie), puis affiche « Vente terminée — résultats enregistrés » et, si un conseil a été vendu dans cette
   vente, « 18e conseil vendu aujourd'hui ». La fenêtre s'efface après 7 s et attend la vente suivante.
 - **Résultats** : page « Ce que PharmaBoost vous rapporte » → section « Au comptoir » (proposés, vendus, non vendus, sans réponse,
   par poste, produits, challenges, dates courtes). Bilan mensuel par e-mail au titulaire, une fois par officine et par mois,
@@ -331,14 +336,23 @@ durées, phrases) ; le code Windows est `agent/src/notice-host.ts`.
   bordure (`notice-host-classique.ts`) avec la même vente, puis à la notification Windows ; chaque étape est dite dans le journal. Pour
   forcer l'ancienne fenêtre sur un poste : `affichage.fenetre = "classique"` dans `pharmaboost-connect.json`. Si la bannière s'arrête
   en pleine vente, elle repart toute seule (5 fois au plus) et retrouve sa vente.
-- **Aperçu sans Windows** : `npm run apercu:banniere` écrit et ouvre `agent/apercu/banniere.html` — les six états de la maquette, un
+- **Aperçu sans Windows** : `npm run apercu:banniere` écrit et ouvre `agent/apercu/banniere.html` — les sept états de la maquette, un
   scénario complet, les gestes (Vendu, e-mail, Vente terminée…), réglable à 100/125/150 %. C'est une reproduction fidèle du dessin
   (mêmes valeurs), **pas une capture de Windows** : police, ombre et lissage y sont ceux du navigateur.
 - **Vérifié** : le code compile (C# 5, .NET Framework 4.8 : `PB_CSHARP_CHECK=1 npx vitest run agent/src/__tests__/notice-host.test.ts`) et
   les garde-fous sont testés. La bannière n'a **jamais été dessinée sur un vrai Windows** : premier essai à faire au poste (icône près de
   l'horloge → clic droit → « Essayer l'affichage d'un avis »).
 
-**Sur le site public** : la page d'accueil (`/decouvrir`, section « Une petite bannière, à côté de votre logiciel ») montre la même bannière VIVANTE, qui rejoue toute seule
-le scénario complet (en attente → scan détecté → conseils → Vendu / Non vendu → e-mail → « Vente terminée ! », puis recommence), avec les six étapes cliquables. Même design que
-la bannière Windows. C'est `public/site/banniere-demo.html` (page identique à l'aperçu, ouverte en iframe avec `?integre=1`) ; `npm run apercu:banniere` régénère les deux copies,
-un test les garde à jour.
+**Sur le site public** : la page d'accueil (`/decouvrir`, section `#banniere`, « Au comptoir ») montre la même bannière VIVANTE, qui rejoue toute seule deux
+ventes courtes, avec sept étapes cliquables :
+1. une ordonnance (AMOXICILLINE, FERVEX ADULTES, VALACICLOVIR) : la mise en garde « Paracétamol : 3 g par jour au maximum » en tête de liste, un
+   probiotique (Challenge, Date courte, En stock · 12) et un antiseptique cutané (Stock faible · 3), Vendu / Non vendu, l'e-mail du patient,
+   « Vente terminée ! » ;
+2. un DOLIPRANE seul : « Une question à poser » → « Douleur localisée » → « Dos » → la poche chaud/froid du dos → Vendu → « Vente terminée ! ».
+
+Même design que la bannière Windows. La mise en garde, ce qui a été scanné (« Médicament détecté ») et les pastilles de stock passent par le
+vrai moteur au moment de la génération (`demoSales()` dans `agent/src/banner-preview.ts` : `evaluateVigilances`, `vigilanceMessage`,
+`buildCounterNotice`) : rien n'est recopié à la main. Médicaments, produits et prix sont des exemples, sous des noms génériques pour les
+produits conseil. La carte ne dépasse jamais la place visible (la liste défile, comme sur Windows) et la page annonce sa hauteur au site
+(message `pb-height`) : pas de barre de défilement dans le cadre. C'est `public/site/banniere-demo.html` (page identique à l'aperçu, ouverte
+en iframe avec `?integre=1`) ; `npm run apercu:banniere -- --sans-ouvrir` régénère les deux copies, un test les garde identiques.

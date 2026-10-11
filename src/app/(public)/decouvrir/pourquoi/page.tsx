@@ -1,16 +1,29 @@
-import type { Metadata } from "next";
+import type { Metadata, ResolvingMetadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, CalendarCheck, CheckCircle2, FileText, HelpCircle, Home, XCircle } from "lucide-react";
-import { KeyCell, SectionHead } from "../_components/site-shell";
+import { fr, KeyCell, SectionHead } from "../_components/site-shell";
 import { ExampleTag } from "../_components/visuals";
+import { BannerMock } from "../_components/banner-mock";
 import { VideoButton } from "../_components/video-dialog";
+import { pageShare } from "../_components/share-metadata";
+import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = {
-  title: "Pourquoi PharmaBoost",
-  description: "Et si chaque délivrance révélait tout son potentiel de conseil ? Au comptoir, PharmaBoost propose le bon conseil et le bon produit pour chaque ordonnance. À la maison, le patient a son plan conseil.",
-};
+// La question d'ouverture est celle de la page ; la suite dit ce que fait l'application, sans « chaque ordonnance » : toutes
+// n'appellent pas un conseil, et le plan conseil se remet depuis l'écran de vente, quand le pharmacien le décide.
+const DESCRIPTION =
+  "Et si chaque délivrance révélait tout son potentiel de conseil ? Au comptoir, PharmaBoost propose le conseil qui accompagne le traitement, pris dans votre rayon. À la maison, le patient peut retrouver son plan conseil.";
+
+export async function generateMetadata(_props: unknown, parent: ResolvingMetadata): Promise<Metadata> {
+  return {
+    // Absolu : « Pourquoi PharmaBoost · PharmaBoost » répétait la marque dans l'onglet.
+    title: { absolute: "Pourquoi PharmaBoost" },
+    description: DESCRIPTION,
+    // Sans cela, un lien vers cette page se partageait avec le titre et la phrase de l'accueil.
+    ...(await pageShare(parent, { path: "/decouvrir/pourquoi", title: "Pourquoi PharmaBoost", description: DESCRIPTION })),
+  };
+}
 
 /**
  * Pourquoi PharmaBoost : deux problèmes, chacun montré sur la même ordonnance
@@ -20,6 +33,18 @@ export const metadata: Metadata = {
  */
 
 const SOLAIRE = "/site/produits/creme-solaire-spf50.webp";
+const DOXY = "DOXYCYCLINE 100 mg";
+const SOLAIRE_NAME = "Crème solaire SPF 50+";
+
+/**
+ * La phrase à dire de la règle que montre la bannière (photoprotection sous doxycycline, « Conseil peau — Série 2 », RCP de
+ * la doxycycline), remplie comme le fait le moteur : `{drug}` par le nom de la ligne scannée, `{product}` par celui de la
+ * référence. Lue dans la règle et non recopiée : la phrase du site ne peut plus s'écarter de celle de l'écran de vente. Une règle
+ * disparue : pas de phrase.
+ */
+const DOXY_COUNTER_SCRIPT = ADVICE_RULES.find((rule) => rule.key === "skin-doxycycline-photoprotection")
+  ?.counterScriptTemplate.replaceAll("{drug}", DOXY)
+  .replaceAll("{product}", SOLAIRE_NAME);
 
 export default function WhyPage() {
   return (
@@ -55,23 +80,16 @@ export default function WhyPage() {
           }
           withPb={
             <>
-              <p className="text-[13.5px] text-text-secondary">Au scan, l&apos;écran affiche :</p>
-              <div className="mt-2 rounded-xl border border-border-subtle bg-surface-card p-3.5">
-                <p className="font-mono text-[10.5px] tracking-[0.12em] text-brand-700 uppercase">Conseil associé</p>
-                <div className="mt-2 flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille */}
-                  <img src={SOLAIRE} alt="" width={60} height={60} className="shrink-0 rounded-xl bg-surface-app object-contain" />
-                  <div className="min-w-0">
-                    <p className="text-[15px] leading-tight font-semibold text-text-primary">Crème solaire SPF 50+</p>
-                    <p className="mt-0.5 text-[13px] text-text-secondary">Protection solaire · avant chaque exposition</p>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-medium">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-1 text-success-700 ring-1 ring-success-100 ring-inset"><span className="size-1.5 rounded-full bg-success-600" /> En rayon · 18</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-brand-800 ring-1 ring-brand-200 ring-inset"><CheckCircle2 className="size-3.5" /> Précautions vérifiées</span>
-                </div>
-                <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-[13px] leading-5 text-brand-900">« Pendant tout le traitement, la doxycycline rend la peau plus sensible au soleil. Évitez l&apos;exposition directe : cette crème protège les zones découvertes. »</p>
-              </div>
+              {/* « propose », pas « affiche » : la bannière montre aussi ses mises en garde, que cette vignette ne reprend pas. */}
+              <p className="text-[13.5px] text-text-secondary">Au scan, la bannière propose :</p>
+              <BannerMock subject={DOXY} items={[{ name: SOLAIRE_NAME, price: "16,90 €", drug: DOXY, stock: "IN_STOCK", quantity: 18, image: SOLAIRE }]} footer={false} width={440} className="mt-2.5" />
+              {/* La bannière ne dit pas de phrase : celle-ci est sur l'écran de vente (« À dire au patient »). */}
+              {DOXY_COUNTER_SCRIPT && (
+                <>
+                  <p className="mt-4 text-[13.5px] text-text-secondary">Sur l&apos;écran de vente, la phrase à dire :</p>
+                  <p className="mt-1.5 rounded-lg bg-brand-50 px-3 py-2 text-[13px] leading-5 text-brand-900">{fr(DOXY_COUNTER_SCRIPT)}</p>
+                </>
+              )}
             </>
           }
           withoutResult="Le patient repart sans conseil."
@@ -133,7 +151,7 @@ export default function WhyPage() {
           <KeyCell label="Posologie" value="Matin, midi, soir et durée" className="bg-surface-card" />
           <KeyCell label="Explication" value="À quoi sert chaque médicament" className="bg-surface-card" />
           <KeyCell label="Rappels" value="Dans l'agenda du téléphone" className="bg-surface-card" />
-          <KeyCell label="Données" value="Aucune conservée" className="bg-surface-card" />
+          <KeyCell label="Données" value="Aucune fiche patient" className="bg-surface-card" />
         </dl>
       </section>
 
@@ -183,7 +201,8 @@ function Context({ icon, label, value }: { icon: ReactNode; label: string; value
       <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-800" aria-hidden="true">{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="font-mono text-[11px] tracking-[0.12em] text-text-tertiary uppercase">{label}</p>
-        <p className="truncate font-mono text-[13.5px] text-text-primary">{value}</p>
+        {/* Coupé seulement à partir de sm : sur téléphone, « … » cachait le second médicament de l'ordonnance. */}
+        <p className="font-mono text-[13.5px] text-text-primary sm:truncate">{value}</p>
       </div>
       <ExampleTag />
     </div>
@@ -195,7 +214,7 @@ function Questions({ items }: { items: string[] }) {
     <ul className="mt-2 space-y-2">
       {items.map((text) => (
         <li key={text} className="flex items-center gap-2.5 rounded-xl bg-surface-card px-3 py-2.5 text-[14px] text-text-secondary">
-          <HelpCircle className="size-4 shrink-0 text-warning-600" /> {text}
+          <HelpCircle className="size-4 shrink-0 text-warning-600" /> {fr(text)}
         </li>
       ))}
     </ul>

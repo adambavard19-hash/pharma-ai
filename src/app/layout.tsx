@@ -16,12 +16,14 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
+  // L'adresse publique : les images de partage et les liens absolus des métadonnées en partent (sans elle, une URL relative).
+  metadataBase: new URL("https://pharmaboost.app"),
   title: {
     default: `${APP_NAME} — ${APP_TAGLINE}`,
     template: `%s · ${APP_NAME}`,
   },
   description:
-    "PharmaBoost transforme la délivrance d'une ordonnance en parcours de conseil personnalisé : analyse assistée, recommandations justifiées, fiche patient et mesure de la valeur créée. Le pharmacien reste décisionnaire.",
+    "PharmaBoost transforme chaque délivrance en parcours de conseil : au scan, le conseil qui accompagne le traitement, des recommandations justifiées et la mesure de la valeur créée. Le pharmacien reste décisionnaire.",
   applicationName: APP_NAME,
   formatDetection: { telephone: false },
   robots: { index: false, follow: false },

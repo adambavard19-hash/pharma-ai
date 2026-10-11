@@ -1,6 +1,6 @@
 import { AbsoluteFill } from "remotion";
-import { AlertTriangle, MessageCircle } from "lucide-react";
-import { C, EASE_IN_OUT, beats, sp, tw, useF } from "../theme";
+import { AlertTriangle, MessageCircleQuestion } from "lucide-react";
+import { BUTTON_GRADIENT, C, EASE_IN_OUT, SHADOW, beats, sp, tw, useF } from "../theme";
 import type { FilmSpec } from "../FilmShell";
 import { DarkStage, LightStage, At } from "../ui/stage";
 import { Kinetic, words } from "../ui/kinetic";
@@ -9,10 +9,12 @@ import { EndCard, Panel } from "../ui/common";
 import { Sfx, Typing } from "../ui/sfx";
 
 /* ==========================================================================
- * « Sans ordonnance » — 25 s, 124 BPM. La demande décrite par le client :
- * besoins reconnus (liste fermée, src/core/understanding/needs.ts), questions
- * à poser, produits en rayon ; et le signal d'alerte qui oriente vers le
- * médecin (src/core/counter/request.ts). Produits et prix : catalogue de démo.
+ * « Sans ordonnance » — 25 s, 124 BPM. La carte « Demande sans ordonnance »
+ * de Nouvelle vente (vente/nouvelle/counter-request.tsx) : le client décrit,
+ * PharmaBoost reconnaît le besoin (liste fermée, src/core/understanding/needs.ts),
+ * dit quoi vérifier, propose des produits en rayon ; et le signal d'alerte qui
+ * oriente vers le médecin (src/core/counter/request.ts). Rayons 12 à 16 px,
+ * bouton en dégradé, comme l'application. Produits et prix : catalogue de démo.
  * ======================================================================== */
 
 const B = beats(124);
@@ -51,33 +53,39 @@ function Title({ intro }: { intro: number }) {
   );
 }
 
-/** La carte « Demande sans ordonnance » de l'accueil du comptoir (counter-request.tsx). */
+/** Un champ de saisie de l'application : rayon 12, bord ink-300, anneau teal quand il a le focus. */
+const field = (focus = 0) => ({ borderRadius: 12, border: `1.5px solid ${focus > 0.5 ? C.brand500 : C.ink300}`, boxShadow: focus > 0.5 ? "0 0 0 4px rgba(40,161,145,.16)" : "none", background: C.white, boxSizing: "border-box" as const });
+
+/**
+ * La carte « Demande sans ordonnance » de Nouvelle vente (counter-request.tsx) :
+ * ce que le client décrit, l'âge, enceinte / allaite, « Conseiller », puis le
+ * champ facultatif des traitements en cours.
+ */
 function RequestCard({ text, caret, age, focus, press }: { text: string; caret: boolean; age: string; focus: number; press: number }) {
   return (
     <Panel style={{ width: 1240, padding: "30px 36px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <span style={{ width: 48, height: 48, borderRadius: 14, background: C.brand50, color: C.brand700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <MessageCircle size={26} />
-        </span>
-        <span style={{ fontSize: 31, fontWeight: 600, color: C.ink900 }}>Demande sans ordonnance</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, height: 48 }}>
+        <MessageCircleQuestion size={34} color={C.brand600} />
+        <span style={{ fontSize: 31, fontWeight: 700, letterSpacing: "-0.02em", color: C.ink900 }}>Demande sans ordonnance</span>
       </div>
       <div style={{ marginTop: 10, fontSize: 19, lineHeight: 1.45, color: C.ink600, maxWidth: 1100 }}>
         Le client décrit ce qu&apos;il ressent. PharmaBoost reconnaît le besoin, pose les questions à vérifier, et propose parmi ce que l&apos;officine a en rayon — après le moteur de sécurité, comme pour une ordonnance.
       </div>
-      <div style={{ marginTop: 20, minHeight: 112, borderRadius: 14, border: `1.5px solid ${focus > 0.5 ? C.brand500 : C.ink300}`, boxShadow: focus > 0.5 ? "0 0 0 4px rgba(0,161,141,.15)" : "none", padding: "18px 22px", fontSize: 30, color: text ? C.ink900 : C.ink400 }}>
+      <div style={{ marginTop: 20, minHeight: 112, ...field(focus), padding: "18px 22px", fontSize: 30, color: text ? C.ink900 : C.ink400 }}>
         {text || "Ex. : nez bouché et mal à la tête depuis hier, adulte."}
         {caret && <span style={{ color: C.brand600 }}>▍</span>}
       </div>
       <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 18 }}>
         <span style={{ fontSize: 20, color: C.ink600 }}>Âge</span>
-        <span style={{ width: 96, height: 56, borderRadius: 12, border: `1.5px solid ${C.ink300}`, display: "flex", alignItems: "center", padding: "0 16px", fontSize: 24, color: C.ink900 }}>{age}</span>
+        <span style={{ width: 96, height: 56, ...field(), display: "flex", alignItems: "center", padding: "0 16px", fontSize: 24, color: C.ink900 }}>{age}</span>
         {["Enceinte", "Allaite"].map((l) => (
           <span key={l} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 21, color: C.ink700 }}>
-            <span style={{ width: 24, height: 24, borderRadius: 6, border: `1.5px solid ${C.ink300}` }} /> {l}
+            <span style={{ width: 24, height: 24, borderRadius: 6, border: `1.5px solid ${C.ink300}`, background: C.white }} /> {l}
           </span>
         ))}
-        <span style={{ marginLeft: "auto", padding: "16px 34px", borderRadius: 14, background: C.brand600, color: C.white, fontSize: 24, fontWeight: 600, transform: `scale(${1 - 0.05 * press})` }}>Conseiller</span>
+        <span style={{ marginLeft: "auto", height: 62, display: "flex", alignItems: "center", padding: "0 36px", borderRadius: 12, background: BUTTON_GRADIENT, color: C.white, fontSize: 24, fontWeight: 600, boxShadow: "0 1px 2px rgba(23,33,38,.12)", transform: `scale(${1 - 0.05 * press})`, filter: press > 0 ? `brightness(${1 - 0.1 * press})` : undefined }}>Conseiller</span>
       </div>
+      <div style={{ marginTop: 18, height: 58, ...field(), display: "flex", alignItems: "center", padding: "0 20px", fontSize: 21, color: C.ink400 }}>Traitements en cours, séparés par des virgules (facultatif)</div>
     </Panel>
   );
 }
@@ -96,13 +104,13 @@ function Ask({ intro }: { intro: number }) {
   return (
     <AbsoluteFill style={{ opacity: enter, transform: `translateY(${(1 - enter) * 80 - exit * 80}px) scale(${1 - 0.04 * exit})`, filter: `blur(${exit * 10}px)` }}>
       <LightStage>
-        <At x={340} y={96} w={1300}>
+        <At x={340} y={156} w={1300}>
           <Kinetic at={2} size={58} lines={[words("Vous tapez *ce que dit le client.*", C.brand600)]} stagger={2} />
         </At>
-        <At x={340} y={250}>
+        <At x={340} y={310}>
           <RequestCard text={text} caret={f >= T0 - 6 && f < AGE && Math.floor(f / 8) % 2 === 0} age={f >= AGE ? "34" : ""} focus={tw(f, [T0 - 8, T0 - 2], [0, 1])} press={press} />
         </At>
-        <Cursor x={1760 + (1440 - 1760) * p} y={1010 + (572 - 1010) * p} press={press} click={f >= CLICK && f < CLICK + 16 ? (f - CLICK) / 16 : -1} opacity={tw(f, [AGE + 4, AGE + 10], [0, 1])} />
+        <Cursor x={1760 + (1440 - 1760) * p} y={1040 + (632 - 1040) * p} press={press} click={f >= CLICK && f < CLICK + 16 ? (f - CLICK) / 16 : -1} opacity={tw(f, [AGE + 4, AGE + 10], [0, 1])} />
         <Typing at={T0} text={ASK} cps={CPS} volume={0.55} />
         <Typing at={AGE} text="34" cps={CPS} volume={0.55} />
         <Sfx at={CLICK} name="clic" volume={0.9} />
@@ -126,17 +134,17 @@ function Results({ intro }: { intro: number }) {
   return (
     <AbsoluteFill style={{ opacity: enter, transform: `translateY(${(1 - enter) * 80 - exit * 80}px)`, filter: `blur(${exit * 10}px)` }}>
       <LightStage>
-        <At x={120} y={96} w={1700}>
+        <At x={120} y={166} w={1700}>
           <Kinetic at={2} size={58} lines={[words("Besoin reconnu. *Questions à poser.* Produits en rayon.", C.brand600)]} stagger={2} />
         </At>
-        <At x={120} y={230} w={820}>
+        <At x={120} y={300} w={820}>
           <Panel style={{ padding: "28px 30px" }}>
-            <div style={{ borderRadius: 14, background: C.ink100, padding: "16px 20px", fontSize: 24, color: C.ink800 }}>« {ASK} » · 34 ans</div>
-            <div style={{ marginTop: 22, fontSize: 17, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: C.ink500 }}>Besoins reconnus</div>
-            <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ borderRadius: 12, background: C.ink100, padding: "16px 20px", fontSize: 24, color: C.ink800 }}>« {ASK} » · 34 ans</div>
+            {/* Les besoins reconnus : des pastilles seules, sans intitulé, comme dans l'application. */}
+            <div style={{ marginTop: 22, display: "flex", gap: 10, flexWrap: "wrap" }}>
               {needs.map((n, i) => {
                 const p = sp(f, NEED[i], { damping: 14, stiffness: 200 });
-                return <span key={n} style={{ fontSize: 22, fontWeight: 500, color: C.brand800, background: C.brand50, border: `1px solid ${C.brand200}`, borderRadius: 999, padding: "8px 18px", opacity: p, transform: `scale(${0.6 + 0.4 * p})` }}>{n}</span>;
+                return <span key={n} style={{ fontSize: 22, fontWeight: 500, color: C.brand700, background: C.brand50, boxShadow: `inset 0 0 0 1px ${C.brand200}`, borderRadius: 999, padding: "8px 18px", opacity: p, transform: `scale(${0.6 + 0.4 * p})` }}>{n}</span>;
               })}
             </div>
             <div style={{ marginTop: 26, fontSize: 17, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: C.ink500 }}>À vérifier avant de proposer</div>
@@ -148,12 +156,12 @@ function Results({ intro }: { intro: number }) {
             </div>
           </Panel>
         </At>
-        <At x={1000} y={230} w={800}>
+        <At x={1000} y={300} w={800}>
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {products.map((pr, i) => {
               const p = sp(f, P[i], { damping: 20, stiffness: 170 });
               return (
-                <Panel key={pr.name} style={{ padding: "22px 26px", display: "flex", alignItems: "center", gap: 20, opacity: p, transform: `translateX(${(1 - p) * 80}px)` }}>
+                <Panel key={pr.name} style={{ padding: "22px 26px", display: "flex", alignItems: "center", gap: 20, boxShadow: SHADOW.card, opacity: p, transform: `translateX(${(1 - p) * 80}px)` }}>
                   <ProductTile name={pr.tile} size={104} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 27, fontWeight: 600, color: C.ink900, lineHeight: 1.2 }}>{pr.name}</div>
@@ -186,17 +194,17 @@ function RedFlag({ intro }: { intro: number }) {
   return (
     <AbsoluteFill style={{ opacity: enter, transform: `translateX(${shake}px)` }}>
       <LightStage>
-        <At x={340} y={96} w={1300}>
+        <At x={340} y={196} w={1300}>
           <Kinetic at={HIT + 4} size={64} lines={[words("Quand il le faut, *le médecin d'abord.*", C.danger700)]} stagger={2} />
         </At>
-        <At x={340} y={250}>
+        <At x={340} y={350}>
           <Panel style={{ width: 1240, padding: "30px 36px" }}>
-            <div style={{ minHeight: 100, borderRadius: 14, border: `1.5px solid ${C.brand500}`, padding: "18px 22px", fontSize: 30, color: C.ink900 }}>
+            <div style={{ minHeight: 100, ...field(1), padding: "18px 22px", fontSize: 30, color: C.ink900 }}>
               {text}
               {f < HIT && <span style={{ color: C.brand600 }}>▍</span>}
             </div>
-            <div style={{ marginTop: 22, display: "flex", gap: 18, alignItems: "flex-start", borderRadius: 18, border: `1.5px solid ${C.danger600}`, background: C.danger50, padding: "22px 26px", opacity: alert, transform: `scale(${0.92 + 0.08 * alert})`, transformOrigin: "top center" }}>
-              <AlertTriangle size={40} color={C.danger700} style={{ flexShrink: 0 }} />
+            <div style={{ marginTop: 22, display: "flex", gap: 18, alignItems: "flex-start", borderRadius: 12, border: `1.5px solid ${C.danger100}`, background: C.danger50, padding: "22px 26px", opacity: alert, transform: `scale(${0.92 + 0.08 * alert})`, transformOrigin: "top center" }}>
+              <AlertTriangle size={40} color={C.danger600} style={{ flexShrink: 0 }} />
               <div>
                 <div style={{ fontSize: 32, fontWeight: 600, color: C.danger700 }}>Orienter vers le médecin</div>
                 <div style={{ marginTop: 4, fontSize: 24, color: C.ink800 }}>Gêne respiratoire signalée.</div>

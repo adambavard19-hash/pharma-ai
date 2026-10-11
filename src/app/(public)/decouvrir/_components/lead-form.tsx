@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ClipboardList, FileText, MessageCircleQuestion, PackageSearch, ScanLine } from "lucide-react";
+import { CircleHelp, ClipboardList, FileText, MessageCircleQuestion, PackageSearch, PanelTop, ScanLine, Trophy } from "lucide-react";
 import { submitSiteLeadAction } from "@/server/actions/site-leads";
 import { siteLeadSchema } from "@/core/site/lead-form";
 import { Flow, type FlowErrors, type FlowStep } from "@/components/flow/flow";
@@ -18,12 +18,20 @@ const SLOTS = [
 ];
 const ANY_SLOT = "__indifferent";
 const INTERESTS = [
+  { value: "banniere", label: "La bannière au comptoir", icon: <PanelTop className="size-[18px]" /> },
   { value: "scan", label: "Le conseil au scan d'un produit", icon: <ScanLine className="size-[18px]" /> },
+  { value: "questions", label: "Les questions avant le conseil", icon: <CircleHelp className="size-[18px]" /> },
   { value: "ordonnance", label: "L'analyse d'une ordonnance", icon: <FileText className="size-[18px]" /> },
   { value: "stock", label: "Stock et marge", icon: <PackageSearch className="size-[18px]" /> },
+  { value: "equipe", label: "Mon équipe et les challenges", icon: <Trophy className="size-[18px]" /> },
   { value: "sans-ordonnance", label: "La demande sans ordonnance", icon: <MessageCircleQuestion className="size-[18px]" /> },
   { value: "plan", label: "Le plan conseil patient", icon: <ClipboardList className="size-[18px]" /> },
 ];
+/**
+ * Le message libre est plafonné pour que, toutes les priorités cochées, « Priorités : … » plus le message tiennent dans les
+ * 1 000 caractères que le serveur accepte (siteLeadSchema) : le visiteur ne bute jamais sur une erreur qu'il ne voit pas venir.
+ */
+const MESSAGE_MAX = 760;
 const interestLabel = (value: string) => INTERESTS.find((i) => i.value === value)?.label ?? value;
 
 type Values = {
@@ -150,7 +158,7 @@ export function LeadForm() {
         render: ({ values, errors, set }) => (
           <div className="space-y-5">
             <MultiCards label="Priorités" options={INTERESTS} values={values.interests} onToggle={(value) => set("interests", values.interests.includes(value) ? values.interests.filter((i) => i !== value) : [...values.interests, value])} />
-            <LongTextAnswer srLabel="Autre chose" value={values.message} onValueChange={(v) => set("message", v)} error={errors.message} rows={3} maxLength={800} placeholder="Autre chose ? Une question, un contexte particulier…" className="[&_textarea]:min-h-24" />
+            <LongTextAnswer srLabel="Autre chose" value={values.message} onValueChange={(v) => set("message", v)} error={errors.message} rows={3} maxLength={MESSAGE_MAX} placeholder="Autre chose ? Une question, un contexte particulier…" className="[&_textarea]:min-h-24" />
           </div>
         ),
         recap: { label: "Priorités", value: (v) => [v.interests.map(interestLabel).join(", "), v.message.trim()].filter(Boolean).join(" · ") || null },

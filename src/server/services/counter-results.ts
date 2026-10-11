@@ -17,7 +17,7 @@ import { monthBoundsFor, zonedDateParts } from "@/core/performance/periods";
 export async function loadCounterResults(input: { pharmacyId: string; since: Date; until: Date }): Promise<CounterResults> {
   const followUps = await prisma.counterSaleFollowUp.findMany({
     where: { pharmacyId: input.pharmacyId, closedAt: { gte: input.since, lt: input.until } },
-    select: { prescriptionId: true, closedPost: true, prescription: { select: { handledByUserId: true } }, proposedCount: true, soldCount: true, notSoldCount: true, unansweredCount: true, emailEncrypted: true, consentAt: true, reportStatus: true },
+    select: { prescriptionId: true, closedPost: true, prescription: { select: { handledByUserId: true } }, proposedCount: true, soldCount: true, notSoldCount: true, unansweredCount: true, consentAt: true, reportStatus: true },
   });
   // Chacun sous son nom (le collaborateur du comptoir au moment de la vente) ; un comptoir attribué à personne garde son nom de comptoir.
   const names = new Map((await listMembers(input.pharmacyId)).map((member) => [member.id, member.name]));
@@ -27,7 +27,8 @@ export async function loadCounterResults(input: { pharmacyId: string; since: Dat
     sold: followUp.soldCount,
     notSold: followUp.notSoldCount,
     unanswered: followUp.unansweredCount,
-    emailSaved: Boolean(followUp.emailEncrypted && followUp.consentAt),
+    // L'adresse elle-même est effacée à « Vente terminée » : une vente terminée dit seulement qu'elle a été donnée, avec l'accord.
+    emailSaved: Boolean(followUp.consentAt),
     report: followUp.reportStatus,
   }));
   const soldRecs = followUps.length

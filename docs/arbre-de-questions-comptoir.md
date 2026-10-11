@@ -48,13 +48,20 @@ la consigne du pharmacien est 6 heures : la phrase garde les deux.
   débloqué est aussi marqué « oui » sur l'écran de la vente.
 - Poste : le mot `REPONSE vente question:choix` ; la bannière dessine les questions (un bouton par choix, le choix coché est plein) et se
   met à jour tout de suite ; l'ancienne fenêtre de secours ne dessine pas les questions (donc ne montre aucun produit ciblé).
-- Aperçu pour Mac et page du site : bouton « Arbre de questions » (aperçu seulement, pas sur le site).
+- Aperçu pour Mac et page du site : l'étape « 7 · Une question à poser » (un DOLIPRANE seul). Sur le site, le scénario la joue tout
+  seul : « Douleur localisée », puis « Dos », et la poche du dos apparaît (nom générique, « POCHE CHAUD/FROID DOS », jamais une marque).
+  Les phrases d'orientation (mal de tête, fièvre), encore à relire, ne s'affichent que si le visiteur touche ces choix lui-même.
+  Les poches et le thermomètre de la démonstration sont ceux que la vraie analyse apparie au bip sur un rayon d'exemple, avec la
+  raison écrite par leur règle (« Antalgique ou anti-inflammatoire (PARACETAMOL) : pour une douleur au dos… ») : rien n'est tapé à
+  la main (`demoSales()` dans `agent/src/banner-preview.ts`). Avec « réduire les animations » sur l'appareil du visiteur, rien ne
+  joue tout seul : la vente sur ordonnance est montrée ouverte, et « Scénario complet » la fait jouer une fois.
 
 ## Prouvé / pas prouvé
 
 Prouvé sur la vraie base locale (`npm run essai:arbre`) : un Doliprane bipé ne montre aucune poche ; « douleur localisée » puis « dos » fait apparaître
 la poche du dos seule ; décocher la referme ; une autre officine ne peut pas répondre ; un Fervex réel ne montre aucune poche et porte l'alerte des 3 g.
-Vu dans le navigateur : l'écran de la vente (question → zone → poche du dos) et l'aperçu de la bannière.
+Vu dans le navigateur : l'écran de la vente (question → zone → poche du dos), l'aperçu de la bannière et la démonstration du site (navigateur sans
+fenêtre, cadres de 1112, 700 et 350 px : rien de rogné, aucune barre de défilement dans le cadre).
 **Pas prouvé** : le dessin des questions sur un vrai Windows (la bannière n'a jamais été vue sur Windows) ; la phrase du mal de tête et celle de la fièvre
 sont à relire par la pharmacienne (toutes les règles restent « à relire »).
 

@@ -8,6 +8,7 @@ import { NEWS_MIN_INTERVAL_DAYS, NEWS_RETENTION_MONTHS, buildNewsOptInBlock, bui
 import { CAMPAIGN_KINDS, renderCampaignEmail, sampleCampaignValues, type CampaignKindKey, type CampaignSide } from "@/core/admin/campaigns";
 import { DEFAULT_EMAIL_CONTEXT } from "@/core/platform/email-layout";
 import PrivacyPage from "@/app/(public)/decouvrir/confidentialite/page";
+import { COUNTER_EMAIL_MAX_HOURS } from "@/core/counter/email-retention";
 
 /**
  * Trois garanties du lot « Notifications et campagnes », lues dans les sources :
@@ -443,5 +444,52 @@ describe("la page publique de confidentialité dit ce que le serveur applique", 
 
   it("garde la phrase sur l'e-mail du patient, qui reste vraie", () => {
     expect(text).toContain("Un e-mail envoyé à un patient ne contient aucune donnée de santé");
+  });
+
+  it("la phrase « aucune donnée de santé » vise l'e-mail du plan ; le bilan du comptoir est décrit à part, tel qu'il est", () => {
+    expect(text).toContain("ne contient aucune donnée de santé quand il lui transmet son plan conseil : seul un lien protégé mène à ce plan");
+    expect(text).toContain("Le bilan envoyé au patient après la vente");
+    expect(text).toContain("seulement s'il le demande au comptoir et donne son accord");
+    expect(text).toContain("les produits conseillés que le pharmacien a déclarés vendus");
+    expect(text).toContain("Il ne reprend jamais le médicament délivré, ni une posologie, ni le nom du patient");
+    expect(text).toContain("Aucune fiche patient n'est créée");
+  });
+
+  it("l'adresse du bilan : effacée à la fin de la vente, et au plus tard dans le délai que le serveur applique", () => {
+    expect(text).toContain("L'adresse e-mail du bilan est chiffrée et ne sert qu'à cet envoi");
+    expect(text).toContain("Elle est effacée après l'envoi, dès que la vente est terminée, même si rien n'est parti");
+    expect(text).toContain(`au plus tard ${COUNTER_EMAIL_MAX_HOURS} heures après avoir été donnée`);
+    // Une promesse qui n'est plus vraie depuis qu'une adresse peut être donnée au comptoir, même quelques heures.
+    expect(text).not.toContain("Aucune donnée patient conservée");
+  });
+
+  it("le bilan nomme son prestataire d'envoi, et ne promet pas plus que le journal masqué n'en garde", () => {
+    expect(text).toContain("Le bilan part par Resend, le prestataire qui envoie les e-mails de PharmaBoost");
+    expect(text).toContain("Resend tient son propre journal des envois, avec l'adresse du destinataire");
+    expect(text).toContain("la première lettre et le domaine (par exemple j***@exemple.fr)");
+    expect(text).toContain("seul le journal de PharmaBoost en conserve la forme masquée, rattachée à la vente");
+    // Faux : le journal garde « j***@domaine » sous l'identifiant de la vente.
+    expect(text).not.toContain("rien ne relie plus la vente au patient");
+  });
+
+  it("dans l'application : le mode sans patient, tel qu'il tourne en service (écrans désactivés, aucune fiche)", () => {
+    expect(text).toContain("les écrans de fiches patient et de suivis sont désactivés : aucune fiche patient n'est créée");
+    // Faux en service (PATIENT_DATA_MODE=none) : aucun écran ne permet de saisir des données patient.
+    expect(text).not.toContain("lorsque le pharmacien les saisit, des données patient");
+  });
+
+  it("ce que le modèle voit : le stock y passe (sans quantités ni prix), la photo d'ordonnance aussi, et rien n'est dit « relu »", () => {
+    expect(text).toContain("le nom des produits du stock de la pharmacie");
+    expect(text).toContain("Il ne reçoit ni le nom du patient, ni les quantités, ni les prix");
+    expect(text).toContain("c'est son image qui lui est transmise");
+    expect(text).toContain("l'image est effacée dès que le pharmacien a vérifié les lignes");
+    expect(text).toContain("Il ne choisit pas le produit conseillé");
+    expect(text).toContain("rien n'est appliqué sans son accord");
+    expect(text).toContain("leur relecture est en cours");
+    // Trois phrases fausses : le stock est lu pour être rangé, le modèle propose des règles (base de connaissances), et aucune
+    // règle n'est encore validée.
+    expect(text).not.toContain("ni le stock");
+    expect(text).not.toContain("ne rédige aucun conseil");
+    expect(text).not.toMatch(/relues par des pharmaciens|validée?s? par un pharmacien/);
   });
 });

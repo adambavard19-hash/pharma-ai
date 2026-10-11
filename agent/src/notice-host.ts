@@ -1851,8 +1851,14 @@ ${PHRASES}
     private void PaintList(Graphics g, float x, float y, float w, RectangleF view)
     {
       float cursor = y;
-      Gfx.Text(g, entry.Label.ToUpperInvariant(), Gfx.Fnt(10.5f, FontStyle.Bold), Pal.InkSoft, x, cursor + 3f, 70f, 14f, Gfx.Left);
-      float labelW = Gfx.Measure(g, entry.Label.ToUpperInvariant(), Gfx.Fnt(10.5f, FontStyle.Bold)) + 10f;
+      // Le titre (« MÉDICAMENT DÉTECTÉ ») est mesuré d'abord, puis dessiné dans sa propre largeur : dans une case fixe, il se coupait
+      // en « MÉDICAM… » suivi d'un blanc. Deux points de marge contre l'arrondi de la mesure. Trop long à côté, c'est ce qui a été
+      // scanné qui se termine par « … », jamais le titre ; et le titre ne déborde jamais de la carte.
+      string label = entry.Label.ToUpperInvariant();
+      Font labelFont = Gfx.Fnt(10.5f, FontStyle.Bold);
+      float labelTextW = Math.Min(Gfx.Measure(g, label, labelFont) + 2f, w);
+      Gfx.Text(g, label, labelFont, Pal.InkSoft, x, cursor + 3f, labelTextW, 14f, Gfx.Left);
+      float labelW = labelTextW + 8f;
       Gfx.Text(g, entry.Subject, Gfx.Fnt(13f, FontStyle.Bold), Pal.Ink, x + labelW, cursor + 1f, w - labelW, 18f, Gfx.Left);
       cursor += 24f;
 

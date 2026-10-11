@@ -2,9 +2,9 @@
  * Le bilan que le patient reçoit par e-mail à la fin de sa vente, s'il a donné son accord.
  *
  * Il ne dit que ce que le pharmacien a CONFIRMÉ au comptoir : les produits conseillés qu'il a marqués « Vendu », avec la phrase
- * écrite pour le patient quand la règle en porte une. Jamais un médicament, jamais une posologie : au comptoir, une boîte bipée
- * n'est pas une ordonnance validée, et rien ne remplace ce que le pharmacien a dit de vive voix. Jamais de donnée de santé ni
- * de nom : le message ne cite ni le patient, ni son traitement.
+ * écrite pour le patient quand la règle en porte une et qu'elle ne peut pas nommer le traitement (`patientSafeReason`). Jamais un
+ * médicament, jamais une posologie : au comptoir, une boîte bipée n'est pas une ordonnance validée, et rien ne remplace ce que le
+ * pharmacien a dit de vive voix. Jamais de nom : le message ne cite ni le patient, ni son traitement.
  *
  * Module pur : aucune base, aucune horloge, aucun envoi.
  */
@@ -16,6 +16,57 @@ export type PatientReport = { subject: string; text: string; html: string };
 const escape = (value: string): string => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const clean = (value: string | null | undefined): string => (value ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+
+/** Un mot plus court ne désigne pas un médicament à coup sûr (« fer », « gel », « 1 g ») : il ferait taire des phrases pour rien. */
+export const TREATMENT_WORD_MIN = 5;
+
+/** Minuscules, sans accents ni ligatures : « Paracétamol » et « PARACETAMOL » sont le même mot. */
+const fold = (value: string): string =>
+  value.toLowerCase().replace(/œ/g, "oe").replace(/æ/g, "ae").normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+const wordsOf = (value: string): string[] => fold(value).split(/[^a-z]+/).filter((word) => word.length >= TREATMENT_WORD_MIN);
+
+/** Une ligne de la vente : le nom lu au scan (ou celui de la spécialité) et ses substances publiées. */
+export type SaleTreatment = { names: (string | null | undefined)[]; substances: (string | null | undefined)[] };
+
+/**
+ * Les mots qui désignent un traitement de la vente : chaque mot d'au moins TREATMENT_WORD_MIN lettres de ses noms et de ses
+ * substances. Un nom perd sa forme (« DOLIPRANE 1000 mg, comprimé » → « doliprane ») : « comprimé » ou « solution » ne
+ * désignent personne, et les garder ferait taire toute phrase qui parle d'une crème ou d'une solution.
+ */
+export function treatmentWords(lines: SaleTreatment[]): string[] {
+  const words = new Set<string>();
+  for (const line of lines) {
+    for (const name of line.names) for (const word of wordsOf((name ?? "").replace(/,[\s\S]*$/, ""))) words.add(word);
+    for (const substance of line.substances) for (const word of wordsOf(substance ?? "")) words.add(word);
+  }
+  return [...words];
+}
+
+/**
+ * La phrase « patient » d'un produit vendu, seulement si elle ne peut pas nommer ce que la pharmacie a délivré ; sinon `null`, et
+ * le bilan donne le nom du produit seul.
+ *
+ * Deux verrous, parce que la phrase est un texte rendu : le moteur y a remplacé `{drug}` par le médicament de l'ordonnance
+ * (« Votre antibiotique ({drug}) peut… » devient « Votre antibiotique (AMOXICILLINE) peut… »).
+ *  1. Le modèle de la règle : s'il contient `{drug}`, ou s'il est inconnu (règle disparue, définition illisible), la phrase ne
+ *     part pas : rien ne prouve qu'elle ne nomme pas le médicament.
+ *  2. Le texte lui-même : s'il contient un mot d'un nom ou d'une substance de la vente (casse et accents ignorés), il ne part
+ *     pas non plus. C'est le filet d'une phrase rendue avant une réécriture de la règle, ou d'un modèle qui cite une substance.
+ * Les mots du produit conseillé sont permis : son nom est déjà écrit dans le bilan, juste au-dessus de la phrase, et une boîte du
+ * produit vendu passée au scan est elle-même une ligne de la vente.
+ */
+export function patientSafeReason(input: { reason: string | null | undefined; template: string | null | undefined; productName: string; sale: SaleTreatment[] }): string | null {
+  const reason = clean(input.reason);
+  if (!reason) return null;
+  if (!input.template || input.template.includes("{drug}")) return null;
+  const allowed = new Set(wordsOf(input.productName));
+  const text = ` ${fold(reason).replace(/[^a-z]+/g, " ")} `;
+  for (const word of treatmentWords(input.sale)) {
+    if (!allowed.has(word) && text.includes(word)) return null;
+  }
+  return reason;
+}
 
 /** Ce qui est retenu pour le patient : seulement des produits « Vendu », chacun une fois, avec une phrase courte ou rien. */
 export function reportProducts(products: ReportProduct[]): ReportProduct[] {

@@ -1,7 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, ResolvingMetadata } from "next";
 import { LeadForm } from "../_components/lead-form";
+import { pageShare } from "../_components/share-metadata";
 
-export const metadata: Metadata = { title: "Réserver une démo", description: "Une démonstration de PharmaBoost sur votre poste : analyse d'ordonnance, conseil au scan, stock et marge." };
+const DESCRIPTION = "Une démonstration de PharmaBoost sur votre poste : la bannière au comptoir, les questions avant le conseil, stock et marge, votre équipe.";
+
+export async function generateMetadata(_props: unknown, parent: ResolvingMetadata): Promise<Metadata> {
+  return {
+    title: "Réserver une démo",
+    description: DESCRIPTION,
+    // Le lien de cette page, partagé, disait « Scan. Conseil. Bilan. » comme l'accueil : il dit maintenant ce qu'il ouvre.
+    ...(await pageShare(parent, { path: "/decouvrir/demo", title: "Réserver une démo de PharmaBoost", description: DESCRIPTION })),
+  };
+}
 
 export default function DemoPage() {
   return (

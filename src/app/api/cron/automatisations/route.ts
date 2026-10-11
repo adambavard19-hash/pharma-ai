@@ -4,6 +4,7 @@ import { processDueCampaigns } from "@/server/services/admin/campaigns";
 import { purgeStalePatientNews, resumeStuckAnnouncements } from "@/server/services/patient-news";
 import { closeStalledDeposits, purgeExpiredDepositFiles } from "@/server/services/stock-deposits";
 import { sendMonthlyCounterReports } from "@/server/services/counter-results";
+import { purgeCounterEmails } from "@/server/services/counter-window";
 import { runStockLearningPass } from "@/server/services/stock-learning";
 import { scheduleLearningContinuation } from "@/server/services/stock-learning-chain";
 
@@ -30,11 +31,18 @@ async function attempt<T>(label: string, run: () => Promise<T>): Promise<T | nul
  * ouverte. Sûr par défaut : tant qu'aucune règle n'est activée dans la
  * console, le passage ne lit ni n'envoie rien.
  *
- * Après les relances : les campagnes programmées dont le jour est atteint,
+ * D'abord, l'effacement des adresses e-mail données au comptoir pour un bilan
+ * et restées en base (vente jamais terminée) : la page Confidentialité promet
+ * qu'aucune ne dépasse 48 heures, et cette promesse ne tient que si l'étape
+ * tourne CHAQUE jour. Elle est bornée et rapide (quelques écritures, rien de
+ * lu) ; placée après les relances, une journée trop longue (la fonction est
+ * coupée à maxDuration, ce qu'`attempt` ne rattrape pas) la sauterait.
+ *
+ * Puis les relances, les campagnes programmées dont le jour est atteint,
  * les annonces aux patients restées en plan, la purge des abonnements
  * expirés, celle des fichiers de stock de plus de 90 jours, et la fermeture
- * des dépôts de stock restés « en cours » (traitement interrompu), le bilan
- * mensuel du comptoir envoyé aux titulaires (une fois par mois et par
+ * des dépôts de stock restés « en cours » (traitement interrompu),
+ * le bilan mensuel du comptoir envoyé aux titulaires (une fois par mois et par
  * pharmacie : rejouable sans double envoi), puis — en dernier, avec le temps
  * qui reste — la connaissance du stock des pharmacies. Chaque étape est isolée.
  */
@@ -44,6 +52,9 @@ export async function GET(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   const startedAt = Date.now();
   const now = new Date();
+  // En premier, avant toute étape qui peut durer : c'est la promesse de la page Confidentialité (aucune adresse du bilan au-delà
+  // de 48 heures), et un échec ici est journalisé sans empêcher la suite.
+  const counterEmails = await attempt("adresses e-mail du comptoir", () => purgeCounterEmails(now));
   // Une erreur des relances remonte comme avant, mais après les autres étapes : elles ne l'attendent pas.
   const automations = await runAutomations({ now, dryRun: false }).then(
     (report) => ({ report }),
@@ -60,5 +71,5 @@ export async function GET(request: Request) {
   if ("error" in automations) throw automations.error;
   // Le détail par officine reste dans la console : la réponse ne porte que les compteurs.
   const { dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors } = automations.report;
-  return NextResponse.json({ dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors, campaigns, news: { resumed, purged }, stockFiles, stalledDeposits, counterReports, stockLearning });
+  return NextResponse.json({ dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors, campaigns, news: { resumed, purged }, stockFiles, stalledDeposits, counterEmails, counterReports, stockLearning });
 }

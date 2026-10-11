@@ -20,6 +20,13 @@ describe("la section tarif du site : un seul abonnement", () => {
     expect(t).toContain("290 € HT, une seule fois");
   });
 
+  it("dit ce que comprend l'abonnement, mois après mois", () => {
+    expect(t).toContain("Compris dans l'abonnement");
+    for (const item of ["Tous vos postes de comptoir", "Les mises à jour automatiques des postes", "La bibliothèque de conseils commune", "Le support, depuis PharmaBoost"]) {
+      expect(t).toContain(item);
+    }
+  });
+
   it("montre ce que comprend la mise en service, pour que le visiteur voie ce qu'il paie", () => {
     expect(SETUP_INCLUDES).toHaveLength(4);
     for (const item of ["Installation et configuration de PharmaBoost sur tous les postes de comptoir", "Paramétrage de l'officine et import du stock", "Tests de fonctionnement", "Formation de l'équipe"]) {

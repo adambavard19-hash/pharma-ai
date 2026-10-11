@@ -3,7 +3,7 @@ import { AbsoluteFill } from "remotion";
 import { C, EASE_IN_OUT, sp, tw, useF } from "../theme";
 import { LightStage, At } from "../ui/stage";
 import { Eyebrow, Kinetic, words } from "../ui/kinetic";
-import { CalendarBanner, Phone, PilotagePanel, PlanScreen, QrMark, StockPanel } from "../ui/panels";
+import { CalendarBanner, PLANS, Phone, PilotagePanel, PlanScreen, QrMark, StockPanel } from "../ui/panels";
 
 /* ==========================================================================
  * 5. APRÈS LE COMPTOIR (40,8 – 50,4 s)
@@ -71,7 +71,7 @@ function PlanVisual({ f }: { f: number }) {
     <>
       <At x={1230} y={110} style={{ transform: `translateY(${(1 - phone) * 80}px)`, opacity: phone }}>
         <Phone h={860}>
-          <PlanScreen show={show} />
+          <PlanScreen show={show} plan={PLANS.doxycycline} />
         </Phone>
       </At>
       <At x={1160} y={150} w={560} style={{ opacity: b1, transform: `translateY(${(1 - b1) * -40}px) scale(${0.96 + 0.04 * b1})` }}>

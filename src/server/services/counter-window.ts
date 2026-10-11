@@ -5,11 +5,15 @@ import type { AgentContext } from "@/server/services/stock-sync";
 import { encryptField, decryptField } from "@/server/security/encryption";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { traceDispatch } from "@/server/services/email-dispatch";
-import { validatedRuleKeys } from "@/server/services/central-advice";
+import { loadCentralRuleRows, validatedRuleKeys } from "@/server/services/central-advice";
 import { readCounterNotice } from "@/server/services/counter-notice";
 import { activeChallengeTitlesFor } from "@/server/services/challenges";
 import { nearestShortDatesFor } from "@/server/services/stock-lots";
-import { buildPatientReport, maskEmail, parsePatientEmail } from "@/core/counter/patient-report";
+import type { Prisma } from "@/generated/prisma";
+import { ADVICE_RULES } from "@/core/ai/engines/advice";
+import { customRulesFrom, isCustomRuleKey } from "@/core/ai/central-advice";
+import { buildPatientReport, maskEmail, parsePatientEmail, patientSafeReason } from "@/core/counter/patient-report";
+import { counterEmailPurgeCutoff } from "@/core/counter/email-retention";
 import { outcomeOf, type NoticeOutcome } from "@/core/counter/notice";
 import { zonedStartOfDay } from "@/core/performance/periods";
 
@@ -21,7 +25,8 @@ import { zonedStartOfDay } from "@/core/performance/periods";
  *   déclaration au comptoir, distincte d'une vente lue dans le logiciel de gestion (réservée : LGO_CONFIRMED) et d'une vente
  *   enregistrée dans PharmaBoost (Sale), que ce module ne touche jamais ;
  * - le collaborateur n'est pas identifiable depuis le poste : la décision porte le poste (« Comptoir 2 »), jamais un nom inventé ;
- * - rien ne part au patient sans son accord, saisi au comptoir, ni sans un produit retenu.
+ * - rien ne part au patient sans son accord, saisi au comptoir, ni sans un produit retenu ; et son adresse ne sert qu'à ce bilan :
+ *   effacée à « Vente terminée », ou par le passage quotidien si la vente n'est jamais terminée (voir core/counter/email-retention.ts).
  */
 
 export const COUNTER_DECLARED = "COUNTER_DECLARED";
@@ -117,7 +122,7 @@ export type EmailResult = { ok: true; saved: boolean } | Failure;
 
 /**
  * L'adresse e-mail du patient, saisie au comptoir. Elle n'est enregistrée qu'avec son accord explicite (`consent: true`), chiffrée,
- * et ne sert qu'au bilan de cette vente. Vide + accord : l'adresse est retirée.
+ * et ne sert qu'au bilan de cette vente : « Vente terminée » l'efface. Vide + accord : l'adresse est retirée.
  */
 export async function saveCounterEmail(agent: AgentContext, input: { prescriptionId: string; email: string | null; consent: boolean }): Promise<EmailResult> {
   const sale = await ownedSale(agent, input.prescriptionId);
@@ -164,8 +169,9 @@ export type FinishResult =
 
 /**
  * « Vente terminée » : tout est enregistré (vendu / non vendu / sans réponse), les conseils restés sans réponse passent « sans
- * réponse », et le bilan part au patient s'il a donné son accord, avec seulement les produits déclarés vendus. Rejouable sans effet :
- * une vente déjà terminée renvoie son résumé et n'envoie rien une seconde fois.
+ * réponse », et le bilan part au patient s'il a donné son accord, avec seulement les produits déclarés vendus ; puis son adresse
+ * est effacée, quelle que soit l'issue. Rejouable sans effet : une vente déjà terminée renvoie son résumé et n'envoie rien une
+ * seconde fois.
  */
 export async function finishCounterSale(agent: AgentContext, input: { prescriptionId: string }): Promise<FinishResult> {
   const sale = await ownedSale(agent, input.prescriptionId);
@@ -210,34 +216,73 @@ export async function finishCounterSale(agent: AgentContext, input: { prescripti
   const followUp = await prisma.counterSaleFollowUp.findUnique({ where: { prescriptionId: sale.id }, select: { emailEncrypted: true, consentAt: true } });
   const email = followUp?.consentAt ? decryptField(followUp.emailEncrypted) : null;
   if (email && sold.length > 0) {
-    report = await sendPatientReport({ agent, prescriptionId: sale.id, email, soldIds: sold.map((item) => item.id).filter((value): value is string => Boolean(value)), fallbackNames: sold.map((item) => item.name) });
+    try {
+      report = await sendPatientReport({ agent, prescriptionId: sale.id, email, soldIds: sold.map((item) => item.id).filter((value): value is string => Boolean(value)), fallbackNames: sold.map((item) => item.name) });
+    } catch (error) {
+      // Un envoi qui casse en route (base, journal) : la vente est déjà fermée et ne renverra jamais rien, l'adresse n'a plus
+      // aucun usage. Elle est effacée quand même ; l'issue du bilan, elle, reste inconnue plutôt que devinée.
+      await prisma.counterSaleFollowUp.update({ where: { prescriptionId: sale.id }, data: { emailEncrypted: null } }).catch(() => undefined);
+      throw error;
+    }
   }
-  await prisma.counterSaleFollowUp.update({ where: { prescriptionId: sale.id }, data: { reportStatus: report, reportSentAt: report === "NONE" ? null : now } });
+  // L'adresse n'a servi qu'à ce bilan : elle est effacée dans la même écriture que son issue, qu'il soit parti, simulé, en échec
+  // ou qu'il n'y ait rien eu à envoyer. L'accord (date et poste) reste : il ne désigne personne et dit que l'envoi était demandé.
+  await prisma.counterSaleFollowUp.update({ where: { prescriptionId: sale.id }, data: { reportStatus: report, reportSentAt: report === "NONE" ? null : now, emailEncrypted: null } });
 
   const soldToday = sold.length > 0 ? await soldTodayAtCounter(pharmacyId, now) : null;
-  await recordAudit({ action: "counter_window.sale_finished", entityType: "Prescription", entityId: sale.id, pharmacyId, metadata: { post, proposed: items.length, sold: sold.length, notSold: notSold.length, unanswered: unanswered.length, report } });
+  await recordAudit({ action: "counter_window.sale_finished", entityType: "Prescription", entityId: sale.id, pharmacyId, metadata: { post, proposed: items.length, sold: sold.length, notSold: notSold.length, unanswered: unanswered.length, report, emailErased: Boolean(followUp?.emailEncrypted) } });
   return { ok: true, alreadyClosed: false, proposed: items.length, sold: sold.length, notSold: notSold.length, unanswered: unanswered.length, soldToday, report };
 }
 
 /**
+ * Le modèle de la phrase « patient » de chaque règle demandée, tel que la règle l'écrit (avec `{drug}` et `{product}`) : celui du
+ * code, ou, pour un conseil ajouté depuis la console ou accepté depuis la base de connaissances, celui que sa définition garde en
+ * base (sa phrase patient, sinon sa raison courte : exactement ce que le moteur a rendu). Une règle introuvable n'a pas de
+ * modèle, et sa phrase ne part pas.
+ */
+async function patientReasonTemplates(ruleKeys: ReadonlySet<string>): Promise<Map<string, string>> {
+  const templates = new Map<string, string>();
+  for (const rule of ADVICE_RULES) if (ruleKeys.has(rule.key)) templates.set(rule.key, rule.patientReasonTemplate);
+  // La table des conseils ajoutés n'est relue que si un conseil ajouté est en jeu : le cas courant ne coûte aucune requête.
+  if ([...ruleKeys].some(isCustomRuleKey)) {
+    const rows = await loadCentralRuleRows();
+    for (const rule of customRulesFrom(rows.filter((row) => ruleKeys.has(row.ruleKey)))) templates.set(rule.key, rule.patientReasonTemplate);
+  }
+  return templates;
+}
+
+/**
  * Le bilan professionnel envoyé au patient. Les produits sont ceux déclarés vendus ; leur phrase « patient » n'est reprise que si
- * la règle qui les a proposés est validée par le pharmacien de PharmaBoost. Le journal des e-mails ne garde que l'adresse masquée.
+ * la règle qui les a proposés est validée par le pharmacien de PharmaBoost ET qu'elle ne peut pas nommer ce qui a été délivré
+ * (`patientSafeReason`) : sinon le produit part seul. Le journal des e-mails ne garde que l'adresse masquée.
  */
 async function sendPatientReport(input: { agent: AgentContext; prescriptionId: string; email: string; soldIds: string[]; fallbackNames: string[] }): Promise<"SENT" | "SIMULATED" | "FAILED" | "NONE"> {
   const { agent } = input;
   const pharmacyId = agent.scope.pharmacyId;
-  const [pharmacy, recs, validated] = await Promise.all([
+  const [pharmacy, recs, validated, lines] = await Promise.all([
     prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { name: true, isDemo: true } }),
     prisma.recommendation.findMany({
       where: { id: { in: input.soldIds }, pharmacyId },
       select: { patientReason: true, opportunity: { select: { ruleKey: true } }, product: { select: { name: true } }, presentation: { select: { specialty: { select: { name: true } } } } },
     }),
     validatedRuleKeys(),
+    // Ce que la vente a délivré, pour qu'aucune phrase du bilan ne le nomme : le nom lu au scan, la spécialité et ses substances.
+    prisma.prescriptionLine.findMany({
+      where: { prescriptionId: input.prescriptionId, prescription: { pharmacyId } },
+      select: { drugName: true, specialty: { select: { name: true, compositions: { select: { substanceLabel: true } } } } },
+    }),
   ]);
-  const products = recs.map((rec) => ({
-    name: (rec.product?.name ?? rec.presentation?.specialty.name ?? "").replace(/,.*$/, "").trim(),
-    reason: rec.opportunity?.ruleKey && validated.has(rec.opportunity.ruleKey) ? rec.patientReason : null,
-  }));
+  const sale = lines.map((line) => ({ names: [line.drugName, line.specialty?.name], substances: line.specialty?.compositions.map((composition) => composition.substanceLabel) ?? [] }));
+  const validatedKeys = new Set(recs.map((rec) => rec.opportunity?.ruleKey).filter((key): key is string => Boolean(key) && validated.has(key as string)));
+  const templates = validatedKeys.size > 0 ? await patientReasonTemplates(validatedKeys) : new Map<string, string>();
+  const products = recs.map((rec) => {
+    const fullName = rec.product?.name ?? rec.presentation?.specialty.name ?? "";
+    const ruleKey = rec.opportunity?.ruleKey ?? null;
+    return {
+      name: fullName.replace(/,.*$/, "").trim(),
+      reason: ruleKey && validatedKeys.has(ruleKey) ? patientSafeReason({ reason: rec.patientReason, template: templates.get(ruleKey), productName: fullName, sale }) : null,
+    };
+  });
   const mail = buildPatientReport({ pharmacyName: pharmacy?.name ?? "", products: products.length ? products : input.fallbackNames.map((name) => ({ name, reason: null })) });
   if (!mail) return "NONE";
   const messaging = getMessagingProvider({ demo: pharmacy?.isDemo === true });
@@ -247,4 +292,35 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
   await traceDispatch({ kind: "PATIENT_REPORT", recipient: maskEmail(input.email), outcome, subject: mail.subject, trigger: "SYSTEM", pharmacyId });
   await recordAudit({ action: "counter_window.patient_report_sent", entityType: "Prescription", entityId: input.prescriptionId, pharmacyId, metadata: { kind: "patient_report", to: maskEmail(input.email), status: outcome.status, provider: outcome.provider } });
   return outcome.status === "SENT" ? "SENT" : outcome.status === "SIMULATED" ? "SIMULATED" : "FAILED";
+}
+
+/**
+ * Les suivis dont l'adresse a fait son temps : donnée il y a plus de COUNTER_EMAIL_PURGE_AFTER_HOURS heures, vente terminée ou non.
+ * Une adresse sans accord ne devrait pas exister (l'adresse et l'accord s'écrivent ensemble) ; si elle existe, son âge se lit à la
+ * dernière écriture du suivi, et elle part aussi.
+ */
+export function counterEmailPurgeWhere(now: Date): Prisma.CounterSaleFollowUpWhereInput {
+  const cutoff = counterEmailPurgeCutoff(now);
+  return { emailEncrypted: { not: null }, OR: [{ consentAt: { lt: cutoff } }, { consentAt: null, updatedAt: { lt: cutoff } }] };
+}
+
+/** Une écriture du passage quotidien efface au plus ce nombre d'adresses ; quelques écritures suffisent à vider une journée. */
+const EMAIL_PURGE_BATCH = 2_000;
+const EMAIL_PURGE_MAX_BATCHES = 10;
+
+/**
+ * Le passage quotidien efface les adresses des ventes qui n'ont jamais été terminées, et en filet celles qu'un incident aurait
+ * laissées sur une vente terminée (effacement en échec, adresse arrivée au moment même de la fermeture) : sans lui, elles
+ * resteraient en base pour toujours. Rejouable : une adresse effacée ne correspond plus. Une seule requête par lot, sans rien lire
+ * ni déchiffrer ; une base très en retard est rattrapée au passage suivant, jamais dans une boucle sans fin.
+ */
+export async function purgeCounterEmails(now: Date): Promise<{ erased: number; moreToDo: boolean }> {
+  const where = counterEmailPurgeWhere(now);
+  let erased = 0;
+  for (let batch = 0; batch < EMAIL_PURGE_MAX_BATCHES; batch += 1) {
+    const { count } = await prisma.counterSaleFollowUp.updateMany({ where, data: { emailEncrypted: null }, limit: EMAIL_PURGE_BATCH });
+    erased += count;
+    if (count < EMAIL_PURGE_BATCH) return { erased, moreToDo: false };
+  }
+  return { erased, moreToDo: true };
 }
