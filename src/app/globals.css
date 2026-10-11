@@ -338,6 +338,51 @@ body {
 }
 
 /* ==========================================================================
+   PHARMABOOST MOBILE — l'application /m (src/app/(mobile)/m)
+   Zones sûres (encoche, barre d'accueil de l'iPhone) et transition d'écran.
+   Tout ce qui bouge s'arrête pour qui a demandé moins d'animations (règle
+   « prefers-reduced-motion » plus haut).
+   ========================================================================== */
+
+@keyframes m-page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes m-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* L'écran qui arrive : un glissement court, sans rebond. */
+.m-page {
+  animation: m-page-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* Les cartes de l'accueil arrivent l'une après l'autre (délai posé en style). */
+.m-rise {
+  animation: m-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.m-safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.m-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+/* La place de la barre d'onglets (64 px) + la barre d'accueil de l'iPhone, sous le contenu. */
+.m-tabbar-space { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 1024px) {
+  .m-tabbar-space { padding-bottom: 3rem; }
+}
+
+/* Défilement horizontal « carrousel » : aimanté, sans barre visible. */
+.m-rail {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.m-rail::-webkit-scrollbar { display: none; }
+.m-rail > * { scroll-snap-align: start; }
+
+/* Pas de surbrillance grise au toucher sur iOS : les éléments ont leur propre retour visuel. */
+.m-root { -webkit-tap-highlight-color: transparent; }
+
+/* ==========================================================================
    IMPRESSION — fiche patient A4 premium
    ========================================================================== */
 

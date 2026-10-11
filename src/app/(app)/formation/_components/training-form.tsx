@@ -90,6 +90,7 @@ const URL_LABELS: Record<TrainingKindCode, string> = {
   DOCUMENT: "Lien du document",
   SHEET: "Lien de la source (facultatif)",
   QUIZ: "Lien",
+  MICRO_VIDEO: "Lien de la vidéo",
 };
 
 type ProductResult = { id: string; name: string; brand: string | null };

@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /**
+   * Développement seulement : PharmaBoost Mobile s'essaie sur un vrai téléphone du même Wi-Fi
+   * (`npm run live -- --reseau` → http://<IP-du-Mac>:3000/m). Sans cette liste, Next.js refuse au téléphone le
+   * rechargement à chaud (et ses fichiers internes de développement), l'adresse n'étant pas « localhost ». Réseaux
+   * privés uniquement ; aucun effet en production.
+   */
+  allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.*.*.*", "*.local"],
   images: {
     // Les photos de boîtes viennent des bases ouvertes Open Beauty/Products/Food Facts.
     remotePatterns: [

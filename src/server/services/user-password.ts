@@ -2,7 +2,7 @@ import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 import "server-only";
 import { prisma } from "@/server/db/client";
 import { generateToken, hashToken } from "@/server/security/tokens";
-import { hashPassword, validatePasswordStrength } from "@/server/security/password";
+import { hashPassword, validatePasswordStrength, verifyPassword } from "@/server/security/password";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { buildUserPasswordEmail } from "@/core/platform/welcome-email";
 import { publicUrl } from "@/server/public-url";
@@ -103,5 +103,30 @@ export async function setUserPasswordByToken(token: string, password: string): P
     prisma.session.updateMany({ where: { userId: found.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
   ]);
   await recordAudit({ action: "auth.password_set", entityType: "User", entityId: found.userId, userId: found.userId });
+  return { ok: true };
+}
+
+export type OwnPasswordChange =
+  | { ok: true }
+  | { ok: false; field: "currentPassword" | "newPassword"; error: string };
+
+/**
+ * Changer SON mot de passe, depuis une session ouverte (comptoir « Mon compte » ou PharmaBoost Mobile « Mon espace ») :
+ * l'ancien mot de passe est exigé, les autres sessions sont fermées, la courante conservée. Les deux écrans appellent
+ * cette même fonction ; seule la façon d'obtenir la session diffère.
+ */
+export async function changeOwnPassword(identity: { userId: string; sessionId: string; pharmacyId: string | null }, currentPassword: string, newPassword: string): Promise<OwnPasswordChange> {
+  const user = await prisma.user.findUnique({ where: { id: identity.userId }, select: { passwordHash: true } });
+  if (!(await verifyPassword(currentPassword, user?.passwordHash))) return { ok: false, field: "currentPassword", error: "Mot de passe actuel incorrect." };
+
+  const weaknesses = validatePasswordStrength(newPassword);
+  if (weaknesses.length > 0) return { ok: false, field: "newPassword", error: `Mot de passe trop faible : ${weaknesses.join(", ")}.` };
+
+  const passwordHash = await hashPassword(newPassword);
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: identity.userId }, data: { passwordHash } });
+    await tx.session.updateMany({ where: { userId: identity.userId, revokedAt: null, id: { not: identity.sessionId } }, data: { revokedAt: new Date() } });
+  });
+  await recordAudit({ action: "auth.password_changed", entityType: "User", entityId: identity.userId, pharmacyId: identity.pharmacyId, userId: identity.userId });
   return { ok: true };
 }

@@ -25,6 +25,19 @@ import { INVITATION_TTL_MS, MAX_INVITES_AT_ONCE, MAX_PENDING_JOIN_REQUESTS, invi
  */
 
 type Failure = { ok: false; error: string };
+
+/** Le compte a changé entre la lecture et la transaction (déjà rattaché ailleurs) : il ne peut plus être déplacé. */
+class CommunityMoveRefused extends Error {}
+
+/**
+ * Qui peut entrer dans l'officine d'une organisation : un compte de cette organisation (groupe multi-officines), ou
+ * un compte gratuit de la Communauté PharmaBoost (PharmaBoost Mobile), qui sera alors déplacé vers elle. Un compte
+ * d'une AUTRE organisation cliente, jamais : il reste « indisponible », sans que l'écran dise pourquoi.
+ */
+export function canJoinOrganization(user: { organizationId: string; organization?: { kind: string } | null }, organizationId: string): boolean {
+  return user.organizationId === organizationId || user.organization?.kind === "COMMUNITY";
+}
+
 type Deps = { messaging?: MessagingProvider };
 
 const fullName = (user: { firstName: string; lastName: string }) => `${user.firstName} ${user.lastName}`.trim();
@@ -82,8 +95,8 @@ export async function inviteCollaborators(scope: TenantScope, input: { emails: s
   const results: InviteOutcome[] = [];
   for (const email of emails) {
     if (inTeam.has(email)) { results.push({ email, status: "ALREADY_MEMBER" }); continue; }
-    const known = await prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" }, deletedAt: null }, select: { organizationId: true } });
-    if (known && known.organizationId !== scope.organizationId) { results.push({ email, status: "UNAVAILABLE" }); continue; }
+    const known = await prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" }, deletedAt: null }, select: { organizationId: true, organization: { select: { kind: true } } } });
+    if (known && !canJoinOrganization(known, scope.organizationId)) { results.push({ email, status: "UNAVAILABLE" }); continue; }
     // Une seule invitation vivante par adresse et par officine : la précédente est annulée.
     await prisma.teamInvitation.updateMany({ where: { pharmacyId: scope.pharmacyId, email, acceptedAt: null, revokedAt: null }, data: { revokedAt: new Date() } });
     const created = await prisma.teamInvitation.create({
@@ -139,16 +152,18 @@ async function findLiveInvitation(token: string) {
 export async function previewInvitation(token: string): Promise<InvitationPreview | null> {
   const invitation = await findLiveInvitation(token);
   if (!invitation) return null;
-  const existing = await prisma.user.findFirst({ where: { email: { equals: invitation.email, mode: "insensitive" }, deletedAt: null }, select: { id: true, organizationId: true } });
-  if (existing && existing.organizationId !== invitation.pharmacy.organizationId) return null;
+  const existing = await prisma.user.findFirst({ where: { email: { equals: invitation.email, mode: "insensitive" }, deletedAt: null }, select: { id: true, organizationId: true, organization: { select: { kind: true } } } });
+  if (existing && !canJoinOrganization(existing, invitation.pharmacy.organizationId)) return null;
   return { pharmacyName: invitation.pharmacy.name, role: invitation.role as TeamRole, email: invitation.email, firstName: invitation.firstName ?? "", lastName: invitation.lastName ?? "", existingAccount: Boolean(existing) };
 }
 
 export async function acceptInvitation(token: string, input: { firstName: string; lastName: string; password: string }): Promise<{ ok: true; userId: string; pharmacyId: string } | Failure> {
   const invitation = await findLiveInvitation(token);
   if (!invitation) return { ok: false, error: "Ce lien n'est plus valable. Demandez une nouvelle invitation au titulaire." };
-  const existing = await prisma.user.findFirst({ where: { email: { equals: invitation.email, mode: "insensitive" }, deletedAt: null }, select: { id: true, organizationId: true, passwordHash: true, status: true } });
-  if (existing && existing.organizationId !== invitation.pharmacy.organizationId) return { ok: false, error: "Ce lien n'est plus valable. Demandez une nouvelle invitation au titulaire." };
+  const existing = await prisma.user.findFirst({ where: { email: { equals: invitation.email, mode: "insensitive" }, deletedAt: null }, select: { id: true, organizationId: true, passwordHash: true, status: true, organization: { select: { kind: true } } } });
+  if (existing && !canJoinOrganization(existing, invitation.pharmacy.organizationId)) return { ok: false, error: "Ce lien n'est plus valable. Demandez une nouvelle invitation au titulaire." };
+  // Un compte gratuit de PharmaBoost Mobile qui rejoint son officine : il quitte la Communauté pour l'organisation de l'officine.
+  const movesFromCommunity = Boolean(existing && existing.organizationId !== invitation.pharmacy.organizationId);
 
   let passwordHash: string | null = null;
   if (existing) {
@@ -167,6 +182,12 @@ export async function acceptInvitation(token: string, input: { firstName: string
     // L'usage unique se joue ici : une seule transaction « consomme » le lien.
     const claimed = await tx.teamInvitation.updateMany({ where: { id: invitation.id, acceptedAt: null, revokedAt: null }, data: { acceptedAt: new Date() } });
     if (claimed.count === 0) return null;
+    if (existing && movesFromCommunity) {
+      // Relu DANS la transaction : seul un compte encore dans la Communauté, et sans aucun rattachement, peut être déplacé.
+      const moved = await tx.user.updateMany({ where: { id: existing.id, organizationId: existing.organizationId, organization: { kind: "COMMUNITY" }, memberships: { none: {} } }, data: { organizationId: invitation.pharmacy.organizationId } });
+      // L'exception annule TOUTE la transaction (le lien n'est pas consommé) ; elle est rendue en refus plus bas.
+      if (moved.count === 0) throw new CommunityMoveRefused();
+    }
     const user = existing
       ? { id: existing.id }
       : await tx.user.create({ data: { organizationId: invitation.pharmacy.organizationId, email: invitation.email, firstName: input.firstName.trim(), lastName: input.lastName.trim(), passwordHash, status: "ACTIVE" }, select: { id: true } });
@@ -174,10 +195,14 @@ export async function acceptInvitation(token: string, input: { firstName: string
     if (!already) await tx.membership.create({ data: { userId: user.id, pharmacyId: invitation.pharmacyId, role: invitation.role, isActive: true, sortOrder: await nextSortOrder(tx, invitation.pharmacyId) } });
     await tx.teamInvitation.update({ where: { id: invitation.id }, data: { acceptedUserId: user.id } });
     return user.id;
+  }).catch((error: unknown) => {
+    if (error instanceof CommunityMoveRefused) return "REFUSED" as const;
+    throw error;
   });
+  if (userId === "REFUSED") return { ok: false, error: "Ce lien n'est plus valable. Demandez une nouvelle invitation au titulaire." };
   if (!userId) return { ok: false, error: "Ce lien a déjà été utilisé." };
 
-  await recordAudit({ action: "team.invitation_accepted", entityType: "TeamInvitation", entityId: invitation.id, pharmacyId: invitation.pharmacyId, userId, metadata: { role: invitation.role, existingAccount: Boolean(existing) } });
+  await recordAudit({ action: "team.invitation_accepted", entityType: "TeamInvitation", entityId: invitation.id, pharmacyId: invitation.pharmacyId, userId, metadata: { role: invitation.role, existingAccount: Boolean(existing), fromCommunity: movesFromCommunity } });
   const owners = await prisma.membership.findMany({ where: { pharmacyId: invitation.pharmacyId, role: "OWNER", isActive: true }, select: { userId: true } });
   const name = `${input.firstName.trim()} ${input.lastName.trim()}`.trim() || invitation.email;
   for (const owner of owners) await createNotification({ pharmacyId: invitation.pharmacyId, userId: owner.userId, type: "TEAM_EVENT", severity: "SUCCESS", title: `${name} a rejoint l'équipe`, body: `${invitation.email} a accepté votre invitation.`, linkUrl: "/equipe" }).catch(() => undefined);

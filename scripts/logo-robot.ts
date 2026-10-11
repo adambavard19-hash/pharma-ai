@@ -6,9 +6,14 @@
  * déjà utilisées par l'application : `public/logo.png`, `logo-1200.png`, `logo-256.png`, `src/app/icon.png`, `src/app/apple-icon.png`.
  * Et le robot seul, sans fond : `public/logo-robot.svg`, `logo-robot-2048.png`, `logo-robot-1080.png` (réseaux sociaux).
  *
- *   npx tsx scripts/logo-robot.ts
+ * PharmaBoost Mobile (application installable) : `public/mobile/icon-192.png`, `icon-512.png` (le carré arrondi),
+ * `maskable-512.png` (fond plein, robot dans la zone sûre centrale de 80 % que les lanceurs Android découpent en
+ * cercle ou en goutte) et `apple-touch-icon.png` (180 px, fond plein : iOS arrondit lui-même les coins).
+ *
+ *   npx tsx scripts/logo-robot.ts           tout
+ *   npx tsx scripts/logo-robot.ts --pwa     seulement les icônes de l'application mobile
  */
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import sharp from "sharp";
 import { BANNER } from "../agent/src/banner-design";
 
@@ -68,8 +73,19 @@ const transparentSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -15 
 </svg>
 `;
 
-writeFileSync("public/logo.svg", svg);
-writeFileSync("public/logo-robot.svg", transparentSvg);
+/** Fond plein bord à bord, robot réduit au centre : la version « maskable » et l'icône Apple. */
+const fullBleedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="1024" height="1024">
+  ${robotDefs}
+  <rect width="120" height="120" fill="url(#g-bg)"/>
+  <circle cx="60" cy="57" r="44" fill="url(#g-glow)"/>
+  <g transform="translate(29 28) scale(.62)">${robot}
+  </g>
+</svg>
+`;
+const pwaOnly = process.argv.includes("--pwa");
+
+if (!pwaOnly) writeFileSync("public/logo.svg", svg);
+if (!pwaOnly) writeFileSync("public/logo-robot.svg", transparentSvg);
 const outputs: [string, number][] = [
   ["public/logo.png", 1254],
   ["public/logo-1200.png", 1200],
@@ -77,7 +93,22 @@ const outputs: [string, number][] = [
   ["src/app/icon.png", 512],
   ["src/app/apple-icon.png", 180],
 ];
+async function render(source: string, file: string, size: number) {
+  await sharp(Buffer.from(source), { density: Math.ceil((72 * size) / 1024) * 2 }).resize(size, size).png().toFile(file);
+  console.log(`✓ ${file} (${size} px)`);
+}
+
+async function pwaIcons() {
+  mkdirSync("public/mobile", { recursive: true });
+  await render(svg, "public/mobile/icon-192.png", 192);
+  await render(svg, "public/mobile/icon-512.png", 512);
+  await render(fullBleedSvg, "public/mobile/maskable-512.png", 512);
+  await render(fullBleedSvg, "public/mobile/apple-touch-icon.png", 180);
+}
+
 async function main() {
+  if (pwaOnly) return pwaIcons();
+  await pwaIcons();
   for (const [file, size] of outputs) {
     await sharp(Buffer.from(svg), { density: Math.ceil((72 * size) / 1024) * 2 }).resize(size, size).png().toFile(file);
     console.log(`✓ ${file} (${size} px)`);

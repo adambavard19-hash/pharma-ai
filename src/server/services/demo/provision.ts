@@ -40,6 +40,8 @@ export const WIPED_MODELS = [
   "stockConnection",
   // Invitations et demandes de rattachement : la démonstration n'en envoie ni n'en garde.
   "teamInvitation", "joinRequest", "counterQuestionAnswer",
+  // PharmaBoost Mobile : quiz, demandes aux partenaires, objectifs, primes, suggestions du coach, signalements — de l'activité.
+  "quizAttempt", "partnerInfoRequest", "bonusAuthorization", "personalObjective", "trainingRecommendation", "clinicalReviewFlag",
 ] as const;
 
 /** Ce qui porte un `pharmacyId` et que la réinitialisation conserve : la structure de l'officine, jamais son activité. */

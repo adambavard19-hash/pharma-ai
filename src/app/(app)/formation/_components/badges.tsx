@@ -11,6 +11,7 @@ export const KIND_ICONS: Record<TrainingKindCode, LucideIcon> = {
   DOCUMENT: FileDown,
   EXTERNAL_LINK: ExternalLink,
   QUIZ: ListChecks,
+  MICRO_VIDEO: CirclePlay,
 };
 
 export function KindBadge({ kind }: { kind: TrainingKindCode }) {

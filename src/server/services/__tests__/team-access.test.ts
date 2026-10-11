@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => {
   const fn = () => vi.fn();
   return {
-    user: { findUnique: fn(), findFirst: fn(), create: fn() },
+    user: { findUnique: fn(), findFirst: fn(), create: fn(), updateMany: fn() },
     membership: { findMany: fn(), findUnique: fn(), findFirst: fn(), create: fn() },
     teamInvitation: { findUnique: fn(), findFirst: fn(), findMany: fn(), create: fn(), update: fn(), updateMany: fn() },
     joinRequest: { findFirst: fn(), findMany: fn(), count: fn(), create: fn(), update: fn(), updateMany: fn() },
@@ -160,6 +160,45 @@ describe("ouvrir son lien d'invitation", () => {
     expect(ok).toEqual({ ok: true, userId: "u-groupe", pharmacyId: "ph1" });
     expect(m.user.create).not.toHaveBeenCalled();
     expect(m.membership.create.mock.calls[0][0].data).toMatchObject({ userId: "u-groupe", pharmacyId: "ph1", role: "TECHNICIAN" });
+  });
+});
+
+describe("un compte gratuit de PharmaBoost Mobile rejoint son officine", () => {
+  const live = { id: "inv1", pharmacyId: "ph1", email: "ines@exemple.fr", role: "STUDENT", firstName: null, lastName: null, acceptedAt: null, revokedAt: null, expiresAt: new Date(Date.now() + 3_600_000), pharmacy };
+  const token = "c".repeat(43);
+  const communityUser = { id: "u-gratuit", organizationId: "org-communaute", organization: { kind: "COMMUNITY" }, passwordHash: "hash(SonMotDePasse12)", status: "ACTIVE" };
+
+  it("le titulaire peut l'inviter : l'adresse n'est pas « indisponible »", async () => {
+    m.user.findFirst.mockImplementation(async ({ where }: { where: { email: { equals: string } } }) => (where.email.equals === "ines@exemple.fr" ? communityUser : where.email.equals === "autre@exemple.fr" ? { organizationId: "org-autre", organization: { kind: "CLIENT" } } : null));
+    const result = await svc.inviteCollaborators(scope, { emails: ["ines@exemple.fr", "autre@exemple.fr"], role: "STUDENT" }, deps);
+    expect(result).toEqual({ ok: true, results: [{ email: "ines@exemple.fr", status: "SENT" }, { email: "autre@exemple.fr", status: "UNAVAILABLE" }] });
+  });
+
+  it("en acceptant (avec SON mot de passe), il quitte la Communauté pour l'organisation de l'officine, dans la même transaction", async () => {
+    m.teamInvitation.findUnique.mockResolvedValue(live);
+    m.user.findFirst.mockResolvedValue(communityUser);
+    m.user.updateMany.mockResolvedValue({ count: 1 });
+    expect(await svc.previewInvitation(token)).toMatchObject({ existingAccount: true });
+    const result = await svc.acceptInvitation(token, { firstName: "", lastName: "", password: "SonMotDePasse12" });
+    expect(result).toEqual({ ok: true, userId: "u-gratuit", pharmacyId: "ph1" });
+    // Le déplacement est conditionnel : encore dans la Communauté, et sans aucun rattachement.
+    expect(m.user.updateMany).toHaveBeenCalledWith({ where: { id: "u-gratuit", organizationId: "org-communaute", organization: { kind: "COMMUNITY" }, memberships: { none: {} } }, data: { organizationId: "org1" } });
+    expect(m.membership.create.mock.calls[0][0].data).toMatchObject({ userId: "u-gratuit", pharmacyId: "ph1", role: "STUDENT" });
+    expect(m.user.create).not.toHaveBeenCalled();
+  });
+
+  it("si le compte a changé entre-temps (déjà rattaché ailleurs), rien n'est fait et le refus est propre", async () => {
+    m.teamInvitation.findUnique.mockResolvedValue(live);
+    m.user.findFirst.mockResolvedValue(communityUser);
+    m.user.updateMany.mockResolvedValue({ count: 0 });
+    expect(await svc.acceptInvitation(token, { firstName: "", lastName: "", password: "SonMotDePasse12" })).toMatchObject({ ok: false, error: expect.stringContaining("plus valable") });
+    expect(m.membership.create).not.toHaveBeenCalled();
+  });
+
+  it("la règle ne s'ouvre QU'aux comptes de la Communauté : un compte d'une autre organisation cliente reste refusé", () => {
+    expect(svc.canJoinOrganization({ organizationId: "org-communaute", organization: { kind: "COMMUNITY" } }, "org1")).toBe(true);
+    expect(svc.canJoinOrganization({ organizationId: "org-autre", organization: { kind: "CLIENT" } }, "org1")).toBe(false);
+    expect(svc.canJoinOrganization({ organizationId: "org1" }, "org1")).toBe(true);
   });
 });
 

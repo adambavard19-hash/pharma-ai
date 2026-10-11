@@ -3,11 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
-import {
-  hashPassword,
-  validatePasswordStrength,
-  verifyPassword,
-} from "@/server/security/password";
+import { verifyPassword } from "@/server/security/password";
 import {
   createSession,
   destroySession,
@@ -16,11 +12,15 @@ import {
   switchPharmacy,
 } from "@/server/auth/session";
 import { recordAudit } from "@/server/audit/log";
+import { authenticateUser } from "@/server/auth/credentials";
 import { createPlatformSession } from "@/server/auth/platform-session";
-import { sendUserPasswordLink, setUserPasswordByToken } from "@/server/services/user-password";
+import { changeOwnPassword, peekUserPasswordToken, sendUserPasswordLink, setUserPasswordByToken } from "@/server/services/user-password";
 import { refuseInDemo } from "./demo-guard";
 import { markProspectActivatedForUser } from "@/server/services/sales/client-pharmacies";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
+
+/** Le refus du comptoir pour un compte sans officine cliente : il dit où aller, plutôt que « aucune officine ». */
+const NO_PHARMACY_MESSAGE = "Votre compte n'est rattaché à aucune officine cliente : ouvrez PharmaBoost Mobile (adresse /m) pour vous connecter.";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Adresse e-mail invalide"),
@@ -42,18 +42,8 @@ export async function loginAction(
 
   const { email, password } = parsed.data;
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: {
-      memberships: {
-        where: { isActive: true },
-        include: { pharmacy: { select: { id: true, isActive: true } } },
-        orderBy: { createdAt: "asc" },
-      },
-    },
-  });
-
-  const passwordValid = await verifyPassword(password, user?.passwordHash);
+  // La vérification du mot de passe est commune avec la connexion de PharmaBoost Mobile (src/server/auth/credentials.ts).
+  const check = await authenticateUser(email, password);
 
   // Message identique dans tous les cas : ne pas révéler quels comptes existent.
   const genericError = "Identifiants incorrects.";
@@ -61,7 +51,7 @@ export async function loginAction(
   // Le super administrateur se connecte ici aussi : même page, même geste.
   // Son compte vit dans une autre table ; s'il n'a pas de compte d'officine
   // sous cette adresse, c'est la console qui s'ouvre.
-  if (!user || !passwordValid) {
+  if (check.kind === "INVALID") {
     const admin = await prisma.platformAdmin.findUnique({ where: { email } });
     const adminValid = await verifyPassword(password, admin?.passwordHash);
     if (admin && adminValid && admin.isActive) {
@@ -70,50 +60,51 @@ export async function loginAction(
       await recordAudit({ action: "auth.login", entityType: "PlatformAdmin", entityId: admin.id, platformAdminId: admin.id, metadata: { scope: "platform", via: "login" } });
       redirect("/admin");
     }
-  }
 
-  if (!user) {
-    // Une base sans aucun compte n'a rien à protéger : le message générique
-    // ferait croire à une erreur de saisie alors que l'installation est
-    // incomplète. On le dit, et on donne la commande qui corrige.
-    const totalUsers = await prisma.user.count({ where: { deletedAt: null } }).catch(() => -1);
-    if (totalUsers === 0) {
-      return fail(
-        "Aucun compte n'existe encore dans la base. Lancez `npm run db:seed` pour installer le jeu de démonstration, puis rechargez cette page.",
-      );
+    if (!check.userExists) {
+      // Une base sans aucun compte n'a rien à protéger : le message générique
+      // ferait croire à une erreur de saisie alors que l'installation est
+      // incomplète. On le dit, et on donne la commande qui corrige.
+      const totalUsers = await prisma.user.count({ where: { deletedAt: null } }).catch(() => -1);
+      if (totalUsers === 0) {
+        return fail(
+          "Aucun compte n'existe encore dans la base. Lancez `npm run db:seed` pour installer le jeu de démonstration, puis rechargez cette page.",
+        );
+      }
+      if (totalUsers < 0) {
+        return fail(
+          "La base de données n'est pas joignable. Vérifiez que PostgreSQL est démarré, puis lancez `npm run doctor`.",
+        );
+      }
     }
-    if (totalUsers < 0) {
-      return fail(
-        "La base de données n'est pas joignable. Vérifiez que PostgreSQL est démarré, puis lancez `npm run doctor`.",
-      );
-    }
-  }
 
-  if (!user || !passwordValid || user.deletedAt) {
     await recordAudit({
       action: "auth.login_failed",
       entityType: "User",
-      entityId: user?.id ?? null,
+      entityId: check.userId,
       metadata: { email },
     });
     return fail(genericError);
   }
 
-  if (user.status !== "ACTIVE") {
+  if (check.kind === "INACTIVE") {
     return fail(
       "Ce compte n'est pas actif. Contactez le titulaire de votre officine.",
     );
   }
 
-  const membership = user.memberships.find((m) => m.pharmacy.isActive);
-  if (!membership) {
-    return fail("Aucune officine active n'est associée à ce compte.");
+  const user = check.user;
+  const pharmacyId = user.activePharmacyIds[0];
+  if (!pharmacyId) {
+    // Un compte gratuit de PharmaBoost Mobile (ou un collaborateur retiré de son officine) : le comptoir est réservé
+    // aux équipes des officines clientes, l'application mobile, elle, lui reste ouverte.
+    return fail(NO_PHARMACY_MESSAGE);
   }
 
   const meta = await getRequestMeta();
   await createSession({
     userId: user.id,
-    pharmacyId: membership.pharmacyId,
+    pharmacyId,
     ipAddress: meta.ipAddress,
     userAgent: meta.userAgent,
   });
@@ -122,7 +113,7 @@ export async function loginAction(
     action: "auth.login",
     entityType: "User",
     entityId: user.id,
-    pharmacyId: membership.pharmacyId,
+    pharmacyId,
     userId: user.id,
   });
 
@@ -225,42 +216,12 @@ export async function changeOwnPasswordAction(
     return fail("Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { passwordHash: true },
-  });
-  const valid = await verifyPassword(parsed.data.currentPassword, user?.passwordHash);
-  if (!valid) {
-    return fail("Mot de passe actuel incorrect.", {
-      currentPassword: "Mot de passe actuel incorrect.",
-    });
-  }
-
-  const weaknesses = validatePasswordStrength(parsed.data.newPassword);
-  if (weaknesses.length > 0) {
-    return fail(`Mot de passe trop faible : ${weaknesses.join(", ")}.`, {
-      newPassword: `Mot de passe trop faible : ${weaknesses.join(", ")}.`,
-    });
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: session.user.id },
-      data: { passwordHash: await hashPassword(parsed.data.newPassword) },
-    });
-    await tx.session.updateMany({
-      where: { userId: session.user.id, revokedAt: null, id: { not: session.sessionId } },
-      data: { revokedAt: new Date() },
-    });
-  });
-
-  await recordAudit({
-    action: "auth.password_changed",
-    entityType: "User",
-    entityId: session.user.id,
-    pharmacyId: session.scope.pharmacyId,
-    userId: session.user.id,
-  });
+  const result = await changeOwnPassword(
+    { userId: session.user.id, sessionId: session.sessionId, pharmacyId: session.scope.pharmacyId },
+    parsed.data.currentPassword,
+    parsed.data.newPassword,
+  );
+  if (!result.ok) return fail(result.error, { [result.field]: result.error });
 
   return ok(null, "Mot de passe modifié.");
 }
@@ -306,7 +267,11 @@ export async function setUserPasswordAction(
   });
   if (!parsed.success) return fail("Formulaire incomplet.");
   if (parsed.data.password !== parsed.data.confirm) return fail("Les deux mots de passe ne sont pas identiques.");
+  // Lu AVANT de consommer le lien : à qui appartient-il ? Un compte gratuit de PharmaBoost Mobile (sans officine) est
+  // renvoyé vers la connexion de l'application, pas vers celle du comptoir qui lui serait fermée.
+  const owner = await peekUserPasswordToken(parsed.data.token);
   const result = await setUserPasswordByToken(parsed.data.token, parsed.data.password);
   if (!result.ok) return fail(result.error);
-  redirect("/login?defini=1");
+  const memberships = owner ? await prisma.membership.count({ where: { userId: owner.userId, isActive: true } }) : 1;
+  redirect(memberships === 0 ? "/m/connexion?defini=1" : "/login?defini=1");
 }

@@ -64,6 +64,12 @@ export function LoginForm({
         {error && (
           <Alert tone="danger" icon={<AlertCircle className="size-[18px]" />}>
             {error}
+            {/* Un compte gratuit de PharmaBoost Mobile : le comptoir lui est fermé, l'application l'attend. */}
+            {error.includes("PharmaBoost Mobile") && (
+              <Link href="/m/connexion" className="mt-1.5 block font-semibold text-brand-700 underline underline-offset-2">
+                Ouvrir PharmaBoost Mobile
+              </Link>
+            )}
           </Alert>
         )}
 

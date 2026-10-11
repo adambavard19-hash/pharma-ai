@@ -14,7 +14,8 @@ import { normalizeProductCode } from "./match";
  * le moteur (voir __tests__/invariant.test.ts).
  */
 
-export const TRAINING_KINDS = ["VIDEO", "SHEET", "DOCUMENT", "EXTERNAL_LINK", "QUIZ"] as const;
+// MICRO_VIDEO : la vidéo courte de PharmaBoost Mobile, publiée par la console de l'Académie (pas par ces formulaires).
+export const TRAINING_KINDS = ["VIDEO", "SHEET", "DOCUMENT", "EXTERNAL_LINK", "QUIZ", "MICRO_VIDEO"] as const;
 export type TrainingKindCode = (typeof TRAINING_KINDS)[number];
 
 /** Les formats qu'on peut publier aujourd'hui. Le quiz est annoncé, pas encore construit. */
@@ -27,6 +28,7 @@ export const TRAINING_KIND_LABELS: Record<TrainingKindCode, string> = {
   DOCUMENT: "Document",
   EXTERNAL_LINK: "Lien officiel",
   QUIZ: "Quiz",
+  MICRO_VIDEO: "Micro-vidéo",
 };
 
 /** Les formats qui ne se lisent qu'à l'adresse indiquée. */

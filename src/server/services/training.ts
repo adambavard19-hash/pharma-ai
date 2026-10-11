@@ -433,7 +433,8 @@ export async function listGlobalTrainings(): Promise<GlobalTraining[]> {
   const ids = contents.map((content) => content.id);
   const [byStatus, byPharmacy] = await Promise.all([
     prisma.trainingProgress.groupBy({ by: ["contentId", "status"], where: { contentId: { in: ids } }, _count: { _all: true } }),
-    prisma.trainingProgress.groupBy({ by: ["contentId", "pharmacyId"], where: { contentId: { in: ids } } }),
+    // Les officines seulement : une progression hors officine (compte gratuit de PharmaBoost Mobile) n'en est pas une.
+    prisma.trainingProgress.groupBy({ by: ["contentId", "pharmacyId"], where: { contentId: { in: ids }, pharmacyId: { not: null } } }),
   ]);
   return contents.map((content) => {
     const rows = byStatus.filter((row) => row.contentId === content.id);

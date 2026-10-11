@@ -176,6 +176,6 @@ describe("liste des officines (lecture)", () => {
     expect(clients.userStatusWhere(null)).toEqual({});
     expect(clients.userStatusWhere("jamais-connectes")).toEqual({ lastLoginAt: null, status: { not: "DISABLED" } });
     expect(clients.userStatusWhere("suspendus")).toMatchObject({ status: { not: "DISABLED" } });
-    expect(clients.userBaseWhere({ q: null, role: "OWNER" })).toEqual({ AND: [{ deletedAt: null }, { memberships: { some: { role: "OWNER" } } }] });
+    expect(clients.userBaseWhere({ q: null, role: "OWNER" })).toEqual({ AND: [{ deletedAt: null }, { organization: { kind: "CLIENT" } }, { memberships: { some: { role: "OWNER" } } }] });
   });
 });

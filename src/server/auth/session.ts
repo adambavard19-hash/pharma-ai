@@ -56,10 +56,14 @@ export class AuthorizationError extends Error {
 /**
  * Crée une session serveur et pose le cookie correspondant.
  * Le jeton n'est stocké en base que sous forme d'empreinte SHA-256.
+ *
+ * `pharmacyId` vide : session d'un compte gratuit de PharmaBoost Mobile, sans officine. Le même cookie et la même
+ * table servent alors `getUserSession` (src/server/auth/user-session.ts) ; `getSession`, lui, continue de refuser
+ * toute session sans rattachement actif — le comptoir reste fermé à ces comptes.
  */
 export async function createSession(params: {
   userId: string;
-  pharmacyId: string;
+  pharmacyId: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
 }): Promise<string> {

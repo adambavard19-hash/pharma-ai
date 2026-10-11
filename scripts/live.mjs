@@ -13,6 +13,8 @@
  *
  *   npm run live            démarre (ou confirme) et affiche l'adresse
  *   npm run live -- --open  démarre puis ouvre le navigateur (macOS)
+ *   npm run live -- --reseau démarre puis donne l'adresse à ouvrir sur un téléphone
+ *                           du même Wi-Fi (http://<IP-du-Mac>:3000/m, PharmaBoost Mobile)
  *   npm run live:status     dit ce qui tourne, et depuis quand
  *   npm run live:stop       arrête proprement
  *
@@ -23,6 +25,7 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -171,6 +174,40 @@ async function start({ open }) {
   }
 }
 
+/** Les adresses IPv4 du Mac sur le réseau local (Wi-Fi, Ethernet) : celles qu'un téléphone peut joindre. */
+function lanAddresses() {
+  return Object.values(networkInterfaces())
+    .flat()
+    .filter((entry) => entry && entry.family === "IPv4" && !entry.internal)
+    .map((entry) => entry.address);
+}
+
+/**
+ * L'adresse à taper sur le téléphone. `next dev` écoute déjà sur toutes les interfaces (« Network » dans le
+ * journal) : rien à changer au démarrage par défaut, on vérifie seulement que le serveur répond bien par le réseau.
+ * Les cookies de session ne sont « Secure » qu'en production : la connexion marche en http sur le réseau local.
+ */
+async function network() {
+  const addresses = lanAddresses();
+  if (addresses.length === 0) {
+    console.log(`${WARN} Aucune adresse réseau : le Mac n'est relié à aucun Wi-Fi ni câble.\n`);
+    return;
+  }
+  console.log(`${BOLD}Sur un téléphone du même Wi-Fi${RESET} (PharmaBoost Mobile) :`);
+  for (const address of addresses) {
+    const url = `http://${address}:${PORT}`;
+    let reachable = false;
+    try {
+      const response = await fetch(`${url}/m/connexion`, { signal: AbortSignal.timeout(5000) });
+      reachable = response.status > 0;
+    } catch {
+      reachable = false;
+    }
+    console.log(`${reachable ? OK : KO} ${BOLD}${url}/m${RESET}${reachable ? "" : `${DIM} — ne répond pas sur cette adresse (pare-feu de macOS ?)${RESET}`}`);
+  }
+  console.log(`${DIM}  Le téléphone et le Mac doivent être sur le même réseau. Sur iPhone : Safari → Partager →\n  « Sur l'écran d'accueil » pour l'installer comme une application.${RESET}\n`);
+}
+
 async function status() {
   const pid = readPid();
   const up = await responds();
@@ -204,7 +241,11 @@ function stop() {
 
 const command = process.argv[2] ?? "start";
 const open = process.argv.includes("--open");
+const reseau = process.argv.includes("--reseau");
 
 if (command === "stop") stop();
 else if (command === "status") await status();
-else await start({ open });
+else {
+  await start({ open });
+  if (reseau) await network();
+}

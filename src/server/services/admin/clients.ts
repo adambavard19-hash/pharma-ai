@@ -133,7 +133,9 @@ export function userStatusWhere(filter: UserStatusFilter | null): Prisma.UserWhe
 }
 
 export function userBaseWhere(input: { q: string | null; role: UserRole | null }): Prisma.UserWhereInput {
-  const and: Prisma.UserWhereInput[] = [{ deletedAt: null }];
+  // Les comptes gratuits de PharmaBoost Mobile (Communauté PharmaBoost) ne sont pas des utilisateurs d'officine : ils
+  // ont leur propre liste dans la console (étape « admin » du chantier mobile).
+  const and: Prisma.UserWhereInput[] = [{ deletedAt: null }, { organization: { kind: "CLIENT" } }];
   if (input.q) {
     const contains = { contains: input.q, mode: "insensitive" as const };
     and.push({ OR: [{ email: contains }, { firstName: contains }, { lastName: contains }, { memberships: { some: { pharmacy: { name: contains } } } }] });

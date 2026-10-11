@@ -27,19 +27,31 @@ datasource db {
 // ===========================================================================
 
 model Organization {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   name      String
-  slug      String   @unique
+  slug      String           @unique
   siren     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  /// CLIENT : un groupement ou une officine cliente (toutes les organisations d'avant PharmaBoost Mobile).
+  /// COMMUNITY : la « Communauté PharmaBoost », organisation unique de la plateforme qui porte les comptes
+  /// gratuits de l'application mobile (aucune officine, aucun rattachement). Un compte qui rejoint ensuite une
+  /// officine cliente est déplacé vers l'organisation de cette officine (src/server/services/team-access.ts).
+  kind      OrganizationKind @default(CLIENT)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   pharmacies   Pharmacy[]
   users        User[]
   subscription Subscription?
   aiUsage      AiUsageRecord[]
 
+  @@index([kind])
   @@map("organizations")
+}
+
+/// Nature d'une organisation : cliente, ou la communauté gratuite de l'application mobile.
+enum OrganizationKind {
+  CLIENT
+  COMMUNITY
 }
 
 model Pharmacy {
@@ -171,6 +183,13 @@ model Pharmacy {
   patientNewsAnnouncements PatientNewsAnnouncement[]
   teamInvitations          TeamInvitation[]
   joinRequests             JoinRequest[]
+
+  // PharmaBoost Mobile
+  partnerInfoRequests     PartnerInfoRequest[]
+  personalObjectives      PersonalObjective[]
+  bonusAuthorizations     BonusAuthorization[]
+  trainingRecommendations TrainingRecommendation[]
+  clinicalReviewFlags     ClinicalReviewFlag[]
 
   @@index([organizationId])
   @@map("pharmacies")
@@ -500,24 +519,34 @@ enum UserStatus {
 }
 
 model User {
-  id                     String     @id @default(cuid())
+  id                     String          @id @default(cuid())
   organizationId         String
-  email                  String     @unique
+  email                  String          @unique
   passwordHash           String?
   /// Lien « définir / réinitialiser mon mot de passe » : empreinte du jeton,
   /// usage unique, durée limitée. Créé à l'accueil d'un titulaire ou sur demande.
-  passwordResetTokenHash String?    @unique
+  passwordResetTokenHash String?         @unique
   passwordResetExpiresAt DateTime?
   firstName              String
   lastName               String
   phone                  String?
   avatarUrl              String?
-  status                 UserStatus @default(ACTIVE)
+  status                 UserStatus      @default(ACTIVE)
   /// Numéro RPPS pour les professionnels de santé (pharmaciens).
   rppsNumber             String?
+  /// PharmaBoost Mobile — métier déclaré par la personne elle-même (inscription ou « Mon espace »). Distinct du
+  /// rôle dans une officine (`Membership.role`), qui est attribué par le titulaire.
+  profession             UserProfession?
+  /// RPPS saisi par la personne dans l'application mobile : 11 chiffres, format contrôlé, JAMAIS vérifié auprès de
+  /// l'annuaire. Toujours affiché « non vérifié ». Distinct de `rppsNumber`, renseigné par le titulaire ou la console.
+  rppsDeclared           String?
+  /// Nom d'officine déclaré librement à l'inscription (compte gratuit) : une information, pas un rattachement.
+  declaredPharmacyName   String?
+  /// Fin du premier parcours « Bienvenue » de l'application mobile (profil + consentements). Vide : à faire.
+  mobileOnboardedAt      DateTime?
   lastLoginAt            DateTime?
-  createdAt              DateTime   @default(now())
-  updatedAt              DateTime   @updatedAt
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
   deletedAt              DateTime?
 
   organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -537,8 +566,27 @@ model User {
   imports                 ImportJob[]
   stockDeposits           StockDeposit[]
 
+  // PharmaBoost Mobile
+  consents                UserConsent[]
+  favorites               UserFavorite[]
+  quizAttempts            QuizAttempt[]
+  skillBadges             SkillBadge[]
+  partnerInfoRequests     PartnerInfoRequest[]
+  personalObjectives      PersonalObjective[]
+  bonusAuthorizations     BonusAuthorization[]
+  trainingRecommendations TrainingRecommendation[]
+
   @@index([organizationId])
   @@map("users")
+}
+
+/// Métier déclaré dans PharmaBoost Mobile.
+enum UserProfession {
+  OWNER_PHARMACIST // Pharmacien titulaire
+  ASSISTANT_PHARMACIST // Pharmacien adjoint
+  TECHNICIAN // Préparateur en pharmacie
+  PHARMACY_STUDENT // Étudiant en pharmacie
+  OTHER // Autre
 }
 
 model Membership {
@@ -2212,6 +2260,9 @@ model Recommendation {
   outcomeSource     String?
   /// Le poste de caisse qui l'a déclaré (« Comptoir 2 ») : le collaborateur n'est pas identifiable depuis le logiciel de gestion.
   outcomePost       String?
+  /// PharmaBoost Mobile (futur coach) : pourquoi un conseil n'a pas été vendu, quand le pharmacien le dit. Vide : non
+  /// renseigné. Aucun écran du comptoir ne le demande encore ; le coach n'en lit que des agrégats.
+  declineReason     CounterRefusalReason?
   replacedProductId String?
   /// Note libre du pharmacien lors de la modification.
   pharmacistNote    String?
@@ -3637,6 +3688,10 @@ model LabChallenge {
   pharmacy Pharmacy            @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   entries  LabChallengeEntry[]
 
+  // PharmaBoost Mobile
+  personalObjectives  PersonalObjective[]
+  bonusAuthorizations BonusAuthorization[]
+
   @@index([pharmacyId, status])
   @@map("lab_challenges")
 }
@@ -3735,6 +3790,8 @@ enum TrainingKind {
   DOCUMENT
   EXTERNAL_LINK
   QUIZ
+  /// PharmaBoost Mobile : une vidéo courte (≤ 3 min), souvent verticale, lue dans l'application.
+  MICRO_VIDEO
 }
 
 enum TrainingStatus {
@@ -3770,20 +3827,60 @@ model TrainingContent {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  pharmacy Pharmacy?          @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  progress TrainingProgress[]
+  // --- PharmaBoost Mobile : l'Académie ------------------------------------------------------------
+  /// Sens de la vidéo (MICRO_VIDEO, VIDEO). Vide : sans objet.
+  orientation     VideoOrientation?
+  /// Clé de la vidéo dans le port de stockage (S3 / local / base, servie par /api/files). Vide : `url` fait foi.
+  videoAssetKey   String?
+  /// Image d'attente de la vidéo (première image, vignette).
+  posterUrl       String?
+  /// Durée exacte d'une vidéo, en secondes (`durationMinutes` reste l'estimation de lecture des autres formats).
+  durationSeconds Int?
+  /// Qui parle ou qui a écrit : « Dr Claire Martin », et sa qualité : « Pharmacienne, formatrice ».
+  authorName      String?
+  authorRole      String?
+  /// Partenaire qui parraine le contenu. Toujours affiché « Contenu sponsorisé par … » quand `isSponsored`.
+  partnerId       String?
+  isSponsored     Boolean               @default(false)
+  /// Ouvert aux comptes gratuits (sinon réservé aux équipes des officines clientes).
+  isFreeAccess    Boolean               @default(false)
+  /// Relecture scientifique : un contenu n'est montré dans l'application mobile qu'en APPROVED.
+  /// Les contenus d'avant PharmaBoost Mobile ont été passés à APPROVED par la migration (ils étaient déjà publiés).
+  reviewStatus    EditorialReviewStatus @default(DRAFT)
+  /// Nom et qualité du relecteur (« Dr Donna X, pharmacienne »), et la date de sa relecture.
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  /// Mise en ligne, et date au-delà de laquelle le contenu doit être relu ou retiré (réglementation, RCP…).
+  publishedAt     DateTime?
+  validUntil      DateTime?
+
+  pharmacy        Pharmacy?                @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  partner         Partner?                 @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  progress        TrainingProgress[]
+  quizQuestions   QuizQuestion[]
+  quizAttempts    QuizAttempt[]
+  moduleItems     TrainingModuleItem[]
+  recommendations TrainingRecommendation[]
 
   @@index([pharmacyId, isActive])
   @@index([brandKey])
+  @@index([reviewStatus, isActive])
+  @@index([partnerId])
   @@map("training_contents")
 }
 
-/// La progression d'un membre de l'équipe sur un contenu, dans une officine.
+/// La progression d'une personne sur un contenu. Dans une officine (pharmacyId renseigné : équipe cliente) ou
+/// hors de toute officine (pharmacyId vide : compte gratuit de PharmaBoost Mobile).
+///
+/// Unicité : (contentId, userId, pharmacyId) pour la progression d'officine ; pour la progression hors officine,
+/// un index unique PARTIEL écrit à la main dans la migration 20261027090000_mobile_fondations
+/// (`training_progress_content_user_personal_key` … WHERE "pharmacyId" IS NULL), que Prisma ne sait pas décrire.
+/// Écrire une progression hors officine : findFirst({ contentId, userId, pharmacyId: null }) puis create/update.
 model TrainingProgress {
   id              String         @id @default(cuid())
   contentId       String
   userId          String
-  pharmacyId      String
+  pharmacyId      String?
   status          TrainingStatus @default(IN_PROGRESS)
   progressPercent Int            @default(0)
   startedAt       DateTime       @default(now())
@@ -3794,7 +3891,158 @@ model TrainingProgress {
 
   @@unique([contentId, userId, pharmacyId])
   @@index([pharmacyId, userId])
+  @@index([userId])
   @@map("training_progress")
+}
+
+/// Sens d'une vidéo.
+enum VideoOrientation {
+  VERTICAL
+  HORIZONTAL
+}
+
+/// Relecture éditoriale et scientifique d'un contenu montré dans PharmaBoost Mobile (formation, nouveauté partenaire).
+enum EditorialReviewStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+/// À qui s'adresse un parcours.
+enum TrainingAudience {
+  ALL
+  NEW_STAFF // Nouveaux arrivants dans une équipe
+  STUDENT
+  TECHNICIAN
+  PHARMACIST
+  OWNER
+}
+
+/// Un parcours de l'Académie : une suite ordonnée de contenus (« Bien démarrer au comptoir », « Dermocosmétique »).
+model TrainingModule {
+  id               String                @id @default(cuid())
+  slug             String                @unique
+  title            String
+  summary          String?
+  coverUrl         String?
+  audience         TrainingAudience      @default(ALL)
+  /// Ouvert aux comptes gratuits.
+  isFreeAccess     Boolean               @default(false)
+  /// Parcours parrainé : partenaire affiché, jamais de mise en avant d'un produit dans un contenu de formation.
+  partnerId        String?
+  isSponsored      Boolean               @default(false)
+  reviewStatus     EditorialReviewStatus @default(DRAFT)
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  publishedAt      DateTime?
+  /// Ordre d'affichage dans l'onglet Formations (croissant).
+  sortOrder        Int                   @default(0)
+  isActive         Boolean               @default(true)
+  createdByAdminId String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  partner         Partner?                 @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  items           TrainingModuleItem[]
+  campaigns       SponsoredCampaign[]
+  recommendations TrainingRecommendation[]
+
+  @@index([reviewStatus, isActive, sortOrder])
+  @@map("training_modules")
+}
+
+/// Un contenu à sa place dans un parcours.
+model TrainingModuleItem {
+  id         String  @id @default(cuid())
+  moduleId   String
+  contentId  String
+  /// Rang dans le parcours (1 = premier).
+  position   Int
+  /// Un contenu facultatif ne compte pas pour terminer le parcours.
+  isRequired Boolean @default(true)
+
+  module  TrainingModule  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  content TrainingContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, contentId])
+  @@index([moduleId, position])
+  @@map("training_module_items")
+}
+
+/// Une question de quiz attachée à un contenu (le quiz de fin d'une micro-vidéo, ou un contenu QUIZ).
+model QuizQuestion {
+  id             String   @id @default(cuid())
+  contentId      String
+  /// Rang dans le quiz (1 = première).
+  position       Int
+  prompt         String
+  /// Les choix proposés, dans l'ordre : ["…", "…", …].
+  choices        Json
+  /// Index (à partir de 0) de la ou des bonnes réponses dans `choices`.
+  correctIndexes Int[]
+  /// L'explication montrée après la réponse, avec sa source.
+  explanation    String?
+  sourceLabel    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  content TrainingContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([contentId, position])
+  @@map("quiz_questions")
+}
+
+/// Une tentative de quiz. Propre à la personne ; `pharmacyId` dit seulement dans quelle officine elle était connectée.
+model QuizAttempt {
+  id           String   @id @default(cuid())
+  userId       String
+  contentId    String
+  pharmacyId   String?
+  /// Score en pourcentage (0 → 100).
+  score        Int
+  correctCount Int
+  totalCount   Int
+  /// Réponses données : [{ questionId, chosen: number[] , correct: boolean }].
+  answers      Json
+  passed       Boolean
+  createdAt    DateTime @default(now())
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content TrainingContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, contentId, createdAt])
+  @@index([contentId, createdAt])
+  @@map("quiz_attempts")
+}
+
+/// Nature d'une entrée du « passeport de compétences ».
+enum SkillBadgeKind {
+  CONTENT_COMPLETED
+  MODULE_COMPLETED
+  QUIZ_PASSED
+  STREAK
+}
+
+/// Le passeport de compétences : ce que la personne a acquis, à elle, quelle que soit l'officine (il la suit).
+model SkillBadge {
+  id        String         @id @default(cuid())
+  userId    String
+  kind      SkillBadgeKind
+  contentId String?
+  moduleId  String?
+  title     String
+  /// Clé d'unicité choisie par le code (« MODULE:<id> », « QUIZ:<contentId> ») : un badge ne se gagne qu'une fois.
+  dedupeKey String
+  metadata  Json?
+  earnedAt  DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, earnedAt])
+  @@map("skill_badges")
 }
 
 // ---------------------------------------------------------------------------
@@ -3968,6 +4216,13 @@ model Partner {
   leads        PartnerLead[]
   orders       PartnerOrder[]
 
+  // PharmaBoost Mobile
+  trainingContents   TrainingContent[]
+  trainingModules    TrainingModule[]
+  launches           PartnerLaunch[]
+  sponsoredCampaigns SponsoredCampaign[]
+  infoRequests       PartnerInfoRequest[]
+
   @@index([status])
   @@map("partners")
 }
@@ -4018,6 +4273,11 @@ model PartnerBrand {
   offers      PartnerOffer[]
   audiences   PartnerBrandAudience[]
   preferences PharmacyPartnerPreference[]
+
+  // PharmaBoost Mobile
+  launches           PartnerLaunch[]
+  sponsoredCampaigns SponsoredCampaign[]
+  infoRequests       PartnerInfoRequest[]
 
   @@index([partnerId])
   @@index([status])
@@ -4836,4 +5096,414 @@ model SupportMessage {
 
   @@index([threadId, createdAt])
   @@map("support_messages")
+}
+
+// ===========================================================================
+// PHARMABOOST MOBILE — consentements, découvertes, campagnes, objectifs, coach
+//
+// L'application mobile (src/app/(mobile)/m) sert deux publics avec UN seul
+// système de comptes : les comptes gratuits (organisation « Communauté
+// PharmaBoost », aucune officine) et les équipes des officines clientes. Les
+// tables ci-dessous servent toutes les étapes du chantier (cf.
+// docs/PHARMABOOST-MOBILE.md) : les étapes suivantes n'ont pas à modifier le
+// schéma.
+// ===========================================================================
+
+/// Ce à quoi une personne consent, à titre personnel.
+enum UserConsentKind {
+  /// Recevoir les nouveautés de PharmaBoost (e-mail, notifications).
+  PHARMABOOST_NEWS
+  /// Recevoir des communications des partenaires (laboratoires) via PharmaBoost.
+  PARTNER_COMMUNICATIONS
+  /// Accord donné au moment d'une demande d'information à un partenaire (ses coordonnées lui sont transmises).
+  PARTNER_INFO_REQUEST
+}
+
+/// Le journal des consentements : une ligne par décision, jamais modifiée ni effacée. L'état courant d'un
+/// consentement est la DERNIÈRE ligne de son type (granted vrai ou faux). Rien n'est coché par défaut.
+model UserConsent {
+  id          String          @id @default(cuid())
+  userId      String
+  kind        UserConsentKind
+  granted     Boolean
+  /// Date de l'accord (granted = vrai) ou du retrait (granted = faux).
+  grantedAt   DateTime?
+  revokedAt   DateTime?
+  /// D'où vient la décision : « MOBILE_SIGNUP », « MOBILE_WELCOME », « MOBILE_SETTINGS », « PARTNER_REQUEST »…
+  source      String
+  /// Le texte exact montré à la personne au moment de sa décision.
+  textVersion String?
+  createdAt   DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, createdAt])
+  @@map("user_consents")
+}
+
+/// Ce qu'on peut mettre de côté dans l'application.
+enum FavoriteTargetType {
+  BRAND
+  TRAINING
+  MODULE
+  PRODUCT
+  LAUNCH
+}
+
+/// Un favori. `targetId` désigne une ligne de la table du type (PartnerBrand, TrainingContent, TrainingModule,
+/// PartnerProduct, PartnerLaunch) : pas de clé étrangère (cible polymorphe), le code relit toujours la cible.
+model UserFavorite {
+  id         String             @id @default(cuid())
+  userId     String
+  targetType FavoriteTargetType
+  targetId   String
+  createdAt  DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([targetType, targetId])
+  @@map("user_favorites")
+}
+
+enum PartnerInfoRequestStatus {
+  NEW
+  TRANSMITTED
+  HANDLED
+  CANCELLED
+}
+
+/// « Être recontacté par la marque » : une demande d'information d'un professionnel. Rien n'est transmis au
+/// partenaire sans le consentement explicite enregistré ici (texte montré + date), en plus de la ligne
+/// UserConsent PARTNER_INFO_REQUEST correspondante.
+model PartnerInfoRequest {
+  id               String                   @id @default(cuid())
+  userId           String
+  partnerId        String
+  brandId          String
+  /// La nouveauté depuis laquelle la demande a été faite, le cas échéant.
+  launchId         String?
+  /// L'officine active au moment de la demande (équipe cliente). Vide : compte gratuit.
+  pharmacyId       String?
+  message          String?
+  /// Le texte de consentement exactement tel qu'affiché, et l'instant où la case a été cochée.
+  consentText      String
+  consentAt        DateTime
+  status           PartnerInfoRequestStatus @default(NEW)
+  transmittedAt    DateTime?
+  handledAt        DateTime?
+  handledByAdminId String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner  Partner        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  brand    PartnerBrand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  launch   PartnerLaunch? @relation(fields: [launchId], references: [id], onDelete: SetNull)
+  pharmacy Pharmacy?      @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId, status, createdAt])
+  @@index([userId, createdAt])
+  @@map("partner_info_requests")
+}
+
+/// Catégorie réglementaire d'un produit présenté : elle décide des mentions obligatoires et de qui peut voir
+/// la communication (un médicament ne se promeut pas comme un cosmétique).
+enum RegulatoryCategory {
+  MEDICINE
+  MEDICAL_DEVICE
+  PARAPHARMACY
+  COSMETIC
+  FOOD_SUPPLEMENT
+  OTHER
+}
+
+/// Une nouveauté de marque (lancement, nouvelle gamme, information) montrée dans l'onglet Découvertes.
+model PartnerLaunch {
+  id                    String                @id @default(cuid())
+  partnerId             String
+  brandId               String
+  title                 String
+  summary               String?
+  body                  String
+  /// Visuel ou vidéo : clé du port de stockage, ou adresse.
+  mediaAssetKey         String?
+  mediaUrl              String?
+  posterUrl             String?
+  orientation           VideoOrientation?
+  /// Codes produit (CIP13/EAN) concernés.
+  productCodes          String[]              @default([])
+  universe              String?
+  regulatoryCategory    RegulatoryCategory
+  /// Mentions légales obligatoires reproduites à l'écran (médicament, dispositif médical…).
+  regulatoryMentions    String?
+  /// Qui a validé la conformité réglementaire, et quand. Sans validation, pas de publication.
+  regulatoryValidatedBy String?
+  regulatoryValidatedAt DateTime?
+  reviewStatus          EditorialReviewStatus @default(DRAFT)
+  publishedAt           DateTime?
+  endsAt                DateTime?
+  createdByAdminId      String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  partner      Partner              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  brand        PartnerBrand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  campaigns    SponsoredCampaign[]
+  infoRequests PartnerInfoRequest[]
+
+  @@index([reviewStatus, publishedAt])
+  @@index([brandId])
+  @@map("partner_launches")
+}
+
+/// Ce que le partenaire achète.
+enum SponsoredFormat {
+  FICHE_PARTENAIRE
+  MISE_EN_AVANT
+  LANCEMENT
+  PROGRAMME_FORMATION
+}
+
+/// Où une campagne peut apparaître dans l'application.
+enum SponsoredPlacement {
+  HOME_HERO
+  HOME_FEED
+  DISCOVER_TOP
+  DISCOVER_CATEGORY
+  TRAINING_FEED
+  TRAINING_MODULE
+}
+
+/// Vie d'une campagne sponsorisée (distinct de CampaignStatus, qui sert aux campagnes d'e-mails).
+enum SponsoredCampaignStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ACTIVE
+  PAUSED
+  ENDED
+  REJECTED
+}
+
+/// Une campagne sponsorisée d'un partenaire : toujours signalée « Sponsorisé » à l'écran, validée sur le plan
+/// réglementaire avant toute diffusion. Aucun tarif n'est écrit en dur : `priceNote` est un texte libre
+/// (« tarif à définir ») et les montants restent vides tant qu'un contrat ne les fixe pas.
+model SponsoredCampaign {
+  id                   String                  @id @default(cuid())
+  partnerId            String
+  brandId              String?
+  /// Ce qui est mis en avant : une nouveauté, ou un parcours de formation.
+  launchId             String?
+  moduleId             String?
+  name                 String
+  format               SponsoredFormat
+  placements           SponsoredPlacement[]
+  /// Publics visés (vide : tous) — TrainingAudience en texte, pour combiner librement.
+  audiences            String[]                @default([])
+  startsAt             DateTime
+  endsAt               DateTime
+  status               SponsoredCampaignStatus @default(DRAFT)
+  regulatoryCategory   RegulatoryCategory?
+  regulatoryReviewedBy String?
+  regulatoryReviewedAt DateTime?
+  regulatoryNotes      String?
+  priceNote            String?
+  budgetCents          Int?
+  billedCents          Int?
+  billingReference     String?
+  contractReference    String?
+  createdByAdminId     String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  partner Partner                      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  brand   PartnerBrand?                @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  launch  PartnerLaunch?               @relation(fields: [launchId], references: [id], onDelete: SetNull)
+  module  TrainingModule?              @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  stats   SponsoredCampaignDailyStat[]
+
+  @@index([status, startsAt, endsAt])
+  @@index([partnerId])
+  @@map("sponsored_campaigns")
+}
+
+/// Les compteurs d'une campagne, AGRÉGÉS par jour et par emplacement. Aucune donnée personnelle : pas
+/// d'identifiant de personne ni d'officine, seulement des totaux (rapport partenaire).
+model SponsoredCampaignDailyStat {
+  id                 String             @id @default(cuid())
+  campaignId         String
+  placement          SponsoredPlacement
+  day                DateTime           @db.Date
+  impressions        Int                @default(0)
+  clicks             Int                @default(0)
+  views              Int                @default(0)
+  trainingsStarted   Int                @default(0)
+  trainingsCompleted Int                @default(0)
+  infoRequests       Int                @default(0)
+
+  campaign SponsoredCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, placement, day])
+  @@map("sponsored_campaign_daily_stats")
+}
+
+enum ObjectiveMetric {
+  ADVICE_PRESENTED
+  ADVICE_SOLD
+  UNITS_SOLD
+  TRAININGS_COMPLETED
+  CUSTOM
+}
+
+enum ObjectivePeriod {
+  WEEK
+  MONTH
+  QUARTER
+  CUSTOM
+}
+
+/// Un objectif personnel d'un collaborateur, dans SON officine (fixé par lui ou par le titulaire).
+model PersonalObjective {
+  id              String          @id @default(cuid())
+  pharmacyId      String
+  userId          String
+  title           String
+  metric          ObjectiveMetric
+  target          Int
+  period          ObjectivePeriod
+  startsOn        DateTime        @db.Date
+  endsOn          DateTime        @db.Date
+  /// L'objectif peut décliner un challenge de laboratoire de l'officine.
+  challengeId     String?
+  createdByUserId String
+  archivedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  pharmacy  Pharmacy             @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge LabChallenge?        @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+  bonuses   BonusAuthorization[]
+
+  @@index([pharmacyId, userId])
+  @@map("personal_objectives")
+}
+
+enum BonusStatus {
+  PROPOSED
+  VALIDATED
+  PAID
+  CANCELLED
+}
+
+/// Une prime que le titulaire accorde à un collaborateur (challenge, objectif). PharmaBoost ne verse rien : il
+/// consigne la décision du titulaire. Le collaborateur ne voit QUE les primes VALIDATED ou PAID — jamais une
+/// proposition en cours ni une prime annulée.
+model BonusAuthorization {
+  id                String      @id @default(cuid())
+  pharmacyId        String
+  userId            String
+  challengeId       String?
+  objectiveId       String?
+  label             String
+  amountCents       Int
+  status            BonusStatus @default(PROPOSED)
+  proposedByUserId  String?
+  /// Le titulaire qui valide (rôle OWNER de cette officine, vérifié par le code).
+  validatedByUserId String?
+  validatedAt       DateTime?
+  paidAt            DateTime?
+  cancelledAt       DateTime?
+  note              String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  pharmacy  Pharmacy           @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge LabChallenge?      @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+  objective PersonalObjective? @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+
+  @@index([pharmacyId, userId, status])
+  @@map("bonus_authorizations")
+}
+
+/// Pourquoi un conseil n'a pas été vendu (Recommendation.declineReason).
+enum CounterRefusalReason {
+  PATIENT_REFUSED
+  OUT_OF_STOCK
+  CLINICALLY_INAPPROPRIATE
+  PRICE
+  ALREADY_OWNED
+  OTHER
+}
+
+/// Pourquoi le coach suggère une formation.
+enum TrainingRecommendationReason {
+  ONBOARDING
+  REFUSAL_PATTERN
+  LOW_CONVERSION
+  NEW_LAUNCH
+  CHALLENGE
+  MANUAL
+}
+
+/// Une formation suggérée à une personne par le coach. `evidence` ne contient que des agrégats (« 6 refus
+/// « prix » sur 30 jours en solaire »), jamais un patient, une ordonnance ni une vente individuelle.
+model TrainingRecommendation {
+  id          String                       @id @default(cuid())
+  userId      String
+  /// L'officine dont les agrégats ont fondé la suggestion. Vide : compte gratuit.
+  pharmacyId  String?
+  contentId   String?
+  moduleId    String?
+  reason      TrainingRecommendationReason
+  evidence    Json                         @default("{}")
+  createdAt   DateTime                     @default(now())
+  seenAt      DateTime?
+  dismissedAt DateTime?
+  completedAt DateTime?
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pharmacy Pharmacy?        @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  content  TrainingContent? @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  module   TrainingModule?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dismissedAt, createdAt])
+  @@map("training_recommendations")
+}
+
+enum ClinicalReviewFlagStatus {
+  OPEN
+  UNDER_REVIEW
+  CONFIRMED_OK
+  RULE_CHANGED
+  DISMISSED
+}
+
+/// Une règle de conseil peut-être inadaptée, remontée à la validation clinique centrale (Donna) : par exemple
+/// des refus « cliniquement inadapté » répétés. Un signal agrégé, jamais le détail d'une vente.
+model ClinicalReviewFlag {
+  id                String                   @id @default(cuid())
+  /// La clé de la règle (CentralAdviceRule.key ou clé de règle du moteur).
+  ruleKey           String
+  /// L'officine d'où vient le signal. Vide : agrégé sur plusieurs officines.
+  pharmacyId        String?
+  count             Int                      @default(1)
+  reasonCode        CounterRefusalReason?
+  reason            String
+  periodStart       DateTime?
+  periodEnd         DateTime?
+  status            ClinicalReviewFlagStatus @default(OPEN)
+  reviewedByAdminId String?
+  reviewedAt        DateTime?
+  resolutionNote    String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  pharmacy Pharmacy? @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+
+  @@index([ruleKey, status])
+  @@index([status, createdAt])
+  @@map("clinical_review_flags")
 }

@@ -45,7 +45,8 @@
     "essai:equipe": "node --env-file=.env --conditions=react-server --import tsx scripts/essai-equipe.ts",
     "essai:multi": "node --env-file=.env --conditions=react-server --import tsx scripts/essai-multi-pharmacies.ts",
     "essai:commissions": "node --env-file=.env --conditions=react-server --import tsx scripts/essai-commissions-progressives.ts",
-    "commissions:progressives": "node --env-file=.env --conditions=react-server --import tsx scripts/commissions-progressives.ts"
+    "commissions:progressives": "node --env-file=.env --conditions=react-server --import tsx scripts/commissions-progressives.ts",
+    "mobile:demo": "node --env-file=.env --conditions=react-server --import tsx scripts/mobile-demo.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
