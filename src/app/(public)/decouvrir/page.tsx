@@ -5,6 +5,7 @@ import { fr, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
 import { HeroVisual, QuestionVisual, RequestVisual, StockMarginVisual, TeamVisual, ExampleTag } from "./_components/visuals";
 import { BannerPillsInline } from "./_components/banner-mock";
 import { VideoButton } from "./_components/video-dialog";
+import { FloatingRobot } from "./_components/floating-robot";
 import { BannerDemo } from "./_components/banner-demo";
 import { loadLiveProof } from "@/server/services/site-leads";
 import { loadPublicPricing } from "@/server/services/public-pricing";
@@ -109,9 +110,12 @@ export default async function SitePage() {
         />
         <div className="mx-auto grid grid-cols-1 max-w-6xl items-center gap-14 px-5 pt-14 pb-16 md:pt-24 md:pb-24 lg:grid-cols-[1fr_1.05fr]">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-3 py-1.5 text-[13px] font-medium text-text-secondary">
-              <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
-            </p>
+            <div className="flex items-end gap-3">
+              <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-3 py-1.5 text-[13px] font-medium text-text-secondary">
+                <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
+              </p>
+              <FloatingRobot className="h-[58px] w-[50px]" />
+            </div>
             <h1 className="mt-7 text-[56px] leading-[0.98] font-bold tracking-[-0.04em] text-text-primary md:text-[80px]">
               Scan.
               <br />
