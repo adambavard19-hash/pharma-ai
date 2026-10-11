@@ -95,3 +95,19 @@ Note pour le vérificateur (anglais) :
 > The demo account belongs to a fictitious demo pharmacy (sample data only). It is protected and cannot be deleted;
 > to test account deletion (Mon espace › Supprimer mon compte), create a free account from the login screen
 > ("Créer un compte gratuit"). The app collects no health or patient data.
+
+## Notifications push (11 oct. 2026)
+
+- Coque : module `@capacitor/push-notifications`, droit `aps-environment = production` (`ios/App/App/App.entitlements`).
+  La signature automatique ajoute la capacité « Push Notifications » à l'identifiant `app.pharmaboost.mobile`.
+- Application : encart « Activer les notifications » dans Mon espace (jamais de demande au démarrage) ; toucher une
+  notification ouvre l'écran annoncé.
+- Serveur : table `push_devices`, route `/api/mobile/push`, envoi APNs (`src/server/services/push.ts`) depuis
+  `createNotification`, la validation d'une prime et la création d'un challenge. Textes fixes, jamais de patient ni de
+  médicament ; une rafale de la même sorte ne sonne qu'une fois par demi-heure.
+- **Clé APNs** : developer.apple.com › Certificates, Identifiers & Profiles › Keys › « + » › cocher « Apple Push
+  Notifications service (APNs) » › environnement « Production » (ou « Sandbox & Production ») › télécharger le fichier
+  `AuthKey_XXXXXXXXXX.p8` (une seule fois possible). Variables Vercel (production) : `APNS_KEY_ID` (les 10 caractères de
+  la clé), `APNS_TEAM_ID` (identifiant d'équipe), `APNS_KEY` (tout le contenu du fichier .p8). Sans elles : aucun envoi.
+- Questionnaire de confidentialité App Store : rien de nouveau à déclarer (le jeton d'appareil sert au fonctionnement de
+  l'application, il n'est ni un identifiant publicitaire ni lié à un suivi).

@@ -567,6 +567,7 @@ model User {
   auditLogs               AuditLog[]
   notifications           Notification[]
   notificationReads       NotificationRead[]
+  pushDevices             PushDevice[]
   pharmacyRules           PharmacyRule[]
   createdAssociations     ProductAssociation[]
   imports                 ImportJob[]
@@ -2931,6 +2932,27 @@ model Notification {
   @@index([pharmacyId, createdAt])
   @@index([pharmacyId, readAt])
   @@map("notifications")
+}
+
+/// Un téléphone qui reçoit les notifications push de PharmaBoost Mobile (application iPhone). Le jeton vient d'Apple ;
+/// il n'identifie que l'installation de l'application, et part avec le compte (suppression, déconnexion). `disabledAt` :
+/// Apple a répondu que le jeton ne vaut plus (application désinstallée…), on n'y envoie plus rien.
+model PushDevice {
+  id          String    @id @default(cuid())
+  userId      String
+  token       String    @unique
+  /// « ios » (Android viendra avec Google Play).
+  platform    String    @default("ios")
+  /// « production » (TestFlight, App Store) ou « development » (application lancée depuis Xcode).
+  environment String    @default("production")
+  createdAt   DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  disabledAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_devices")
 }
 
 /// « Lu » par personne. Une notification d'équipe (userId vide) lue par l'un reste non lue pour les autres : chacun a

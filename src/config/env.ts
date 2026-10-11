@@ -117,6 +117,13 @@ const envSchema = z.object({
   // Envoi de la fiche patient et des suivis. « none » est un choix valide et
   // assumé : l'officine remet alors la fiche par impression ou QR code, et
   // l'application ne prétend jamais avoir envoyé quoi que ce soit.
+  // Notifications push de l'application iPhone (APNs, clé .p8 d'Apple). Sans elles : aucun push, rien ne casse.
+  APNS_KEY_ID: z.string().optional(),
+  APNS_TEAM_ID: z.string().optional(),
+  /** Le contenu du fichier AuthKey_XXXX.p8 (avec ses lignes BEGIN/END ; les « \n » écrits en clair sont acceptés). */
+  APNS_KEY: z.string().optional(),
+  APNS_BUNDLE_ID: z.string().default("app.pharmaboost.mobile"),
+
   /** Signature électronique des contrats : « none » tant qu'aucun prestataire n'est contractualisé. */
   SIGNATURE_PROVIDER: z.enum(["none", "yousign", "docuseal"]).default("none"),
   YOUSIGN_API_KEY: z.string().optional(),

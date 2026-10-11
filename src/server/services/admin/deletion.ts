@@ -186,6 +186,7 @@ export async function deleteUserAccount(input: { userId: string; adminId: string
   await prisma.$transaction([
     prisma.session.deleteMany({ where: { userId: user.id } }),
     prisma.notification.deleteMany({ where: { userId: user.id } }),
+    prisma.pushDevice.deleteMany({ where: { userId: user.id } }),
     prisma.membership.deleteMany({ where: { userId: user.id } }),
     prisma.user.update({
       where: { id: user.id },

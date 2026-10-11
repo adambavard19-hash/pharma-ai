@@ -12,6 +12,7 @@ import { throttled } from "@/server/security/throttle";
 import { createCommunityAccount } from "@/server/services/mobile/account";
 import { checkboxValue, isProfession } from "@/core/mobile/profile";
 import { fail, zodFieldErrors, type ActionResult } from "./types";
+import { removePushDevicesOf } from "@/server/services/push";
 
 /**
  * Les portes d'entrée de PharmaBoost Mobile : connexion, inscription gratuite, déconnexion, choix de l'officine.
@@ -110,6 +111,8 @@ export async function mobileSignupAction(_previous: ActionResult<null> | null, f
 export async function mobileLogoutAction(): Promise<void> {
   const session = await getUserSession();
   if (session) {
+    // Déconnecté de l'application : son téléphone ne reçoit plus les notifications de ce compte.
+    await removePushDevicesOf(session.user.id);
     await recordAudit({ action: "auth.logout", entityType: "User", entityId: session.user.id, pharmacyId: session.activePharmacy?.id ?? null, userId: session.user.id, metadata: { via: "mobile" } });
   }
   await destroySession();

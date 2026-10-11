@@ -29,6 +29,7 @@ const prismaMock = vi.hoisted(() => {
     billingPayment: { count: vi.fn() },
     session: { deleteMany: vi.fn() },
     notification: { deleteMany: vi.fn() },
+    pushDevice: { deleteMany: vi.fn() },
     organization: { delete: vi.fn() },
     user: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), deleteMany: vi.fn() },
     $transaction: vi.fn(),
@@ -74,6 +75,7 @@ beforeEach(() => {
   prismaMock.membership.deleteMany = track("membership.deleteMany", { count: 1 }) as never;
   prismaMock.membership.delete = track("membership.delete", {}) as never;
   prismaMock.notification.deleteMany = track("notification.deleteMany", { count: 0 }) as never;
+  prismaMock.pushDevice.deleteMany = track("pushDevice.deleteMany", { count: 0 }) as never;
   prismaMock.user.update = track("user.update", {}) as never;
   // Les deux formes de transaction : fonction (interactive) ou tableau d'opérations déjà lancées.
   prismaMock.$transaction.mockImplementation(async (arg: unknown) => (typeof arg === "function" ? (arg as (tx: unknown) => Promise<unknown>)(prismaMock) : Promise.all(arg as Promise<unknown>[])));
@@ -190,7 +192,7 @@ describe("supprimer un compte", () => {
     prismaMock.membership.findMany.mockResolvedValue([]);
     const result = await deleteUserAccount({ userId: "u9", adminId: "adm_1" });
     expect(result).toEqual({ ok: true, name: "Camille Durand", pharmacies: ["Pharmacie du Port"] });
-    expect(calls.log.map((entry) => entry.split(" ")[0])).toEqual(["session.deleteMany", "notification.deleteMany", "membership.deleteMany", "user.update"]);
+    expect(calls.log.map((entry) => entry.split(" ")[0])).toEqual(["session.deleteMany", "notification.deleteMany", "pushDevice.deleteMany", "membership.deleteMany", "user.update"]);
     const update = prismaMock.user.update.mock.calls[0][0];
     expect(update.data).toMatchObject({ status: "DISABLED", email: "supprime-u9@suppression.pharmaboost.invalid", passwordHash: null, passwordResetTokenHash: null, phone: null, rppsNumber: null });
     expect(update.data.deletedAt).toBeInstanceOf(Date);

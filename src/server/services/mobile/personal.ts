@@ -9,6 +9,7 @@ import { loadTeamChallenges, loadTeamRanking } from "@/server/services/team-rank
 import { resolvePeriod } from "@/core/analytics/periods";
 import { objectiveProgress, periodBounds, type ObjectiveInput, type ObjectiveProgress } from "@/core/personal/objectives";
 import { canManageTeam, COLLABORATOR_VISIBLE_BONUS_STATUSES, nextBonusStatus, type BonusDecision, type BonusStatusCode } from "@/core/personal/bonuses";
+import { sendPushToUsers } from "@/server/services/push";
 
 /**
  * « Mon espace » et « Challenges » de PharmaBoost Mobile : ce que la personne connectée voit d'ELLE-MÊME, et ce que le
@@ -407,5 +408,7 @@ export async function decideBonus(scope: Scope, id: string, decision: BonusDecis
         : { status: next, cancelledAt: now };
   const updated = await prisma.bonusAuthorization.updateMany({ where: { id, pharmacyId: scope.pharmacyId, status: bonus.status }, data });
   if (updated.count === 0) return { ok: false, error: "La prime vient d'être modifiée : rechargez la page." };
+  // Le collaborateur l'apprend sur son téléphone (application iPhone, s'il a activé les notifications).
+  if (next === "VALIDATED") await sendPushToUsers([bonus.userId], "BONUS_VALIDATED", "/m/moi");
   return { ok: true, data: { userId: bonus.userId, status: next, amountCents: bonus.amountCents, previous: bonus.status as BonusStatusCode } };
 }

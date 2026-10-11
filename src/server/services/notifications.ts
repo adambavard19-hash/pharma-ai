@@ -2,11 +2,12 @@ import "server-only";
 import { prisma } from "@/server/db/client";
 import type { NotificationSeverity, NotificationType, Prisma } from "@/generated/prisma";
 import type { TenantScope } from "@/server/db/tenant";
+import { pushForNotification } from "./push";
 
 /**
  * LE point d'entrée de toute notification de l'équipe : chaque écran, service ou tâche qui veut prévenir l'officine passe par
- * ici (la cloche du logiciel la montre aussitôt). C'est l'endroit où brancher demain l'envoi sur le téléphone (notifications
- * push de PharmaBoost Mobile) : un seul appel à ajouter, après l'écriture.
+ * ici (la cloche du logiciel la montre aussitôt). Juste après l'écriture, les téléphones de l'équipe sonnent (notifications
+ * push de PharmaBoost Mobile, services/push.ts) — avec un texte neutre, sans jamais le titre libre de la notification.
  */
 export async function createNotification(params: {
   pharmacyId: string;
@@ -18,7 +19,7 @@ export async function createNotification(params: {
   linkUrl?: string | null;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
-  await prisma.notification.create({
+  const created = await prisma.notification.create({
     data: {
       pharmacyId: params.pharmacyId,
       userId: params.userId ?? null,
@@ -29,7 +30,10 @@ export async function createNotification(params: {
       linkUrl: params.linkUrl ?? null,
       metadata: (params.metadata ?? {}) as never,
     },
+    select: { id: true, pharmacyId: true, userId: true, type: true, createdAt: true, linkUrl: true },
   });
+  // Les téléphones de l'équipe (application iPhone), s'ils ont activé les notifications. Ne lève jamais.
+  await pushForNotification(created);
 }
 
 /** Ce que la personne connectée voit : les notifications de son officine qui sont à elle ou à toute l'équipe. */

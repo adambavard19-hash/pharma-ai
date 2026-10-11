@@ -10,6 +10,7 @@ import { ConsentsPanel } from "./_components/consents-panel";
 import { PersonalSections } from "./_components/personal-sections";
 import { PasswordPanel } from "./_components/password-panel";
 import { DeleteAccountPanel } from "./_components/delete-account-panel";
+import { PushPanel } from "./_components/push-panel";
 
 export const metadata: Metadata = { title: "Mon espace" };
 
@@ -82,6 +83,8 @@ export default async function MyspacePage() {
           history={history.map((entry) => ({ id: entry.id, kind: entry.kind, granted: entry.granted, at: entry.at.toISOString(), source: entry.source }))}
         />
       </section>
+
+      <PushPanel />
 
       <section className="space-y-2.5">
         <h2 className="px-1 text-[13px] font-semibold tracking-wide text-ink-500 uppercase">Sécurité</h2>

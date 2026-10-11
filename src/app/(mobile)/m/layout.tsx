@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { NativeLinkGuard, NativeStatusBar } from "./_components/native-app";
+import { NativeLinkGuard, NativePushListener, NativeStatusBar } from "./_components/native-app";
 
 /**
  * PharmaBoost Mobile — la racine de /m.
@@ -35,6 +35,7 @@ export default function MobileRootLayout({ children }: { children: ReactNode }) 
     <div className="m-root min-h-dvh bg-[#f6fafa] text-text-primary">
       <NativeLinkGuard />
       <NativeStatusBar />
+      <NativePushListener />
       {children}
     </div>
   );

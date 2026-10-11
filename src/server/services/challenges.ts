@@ -7,6 +7,7 @@ import { brandKey as toBrandKey, brandLabelOf, productMatchesBrand } from "@/cor
 import { calendarDay, challengeWindow, dayKeyToDate, safeTimeZone, toDayKey, type DayKey } from "@/core/challenges/dates";
 import { computeChallengeProgress, type ChallengeProgress, type ChallengeSaleLine } from "@/core/challenges/progress";
 import { parseTiers, rewardModeOf, validateManualEntry, type ChallengeTier, type RewardMode } from "@/core/challenges/terms";
+import { pushChallengeStarted } from "@/server/services/push";
 
 /**
  * Les challenges laboratoires d'une officine.
@@ -410,6 +411,8 @@ export async function saveChallenge(scope: ChallengeScope, input: ChallengeInput
     data: { ...data, pharmacyId: scope.pharmacyId, status: "ACTIVE", dataSource: "PHARMABOOST", createdByUserId: scope.userId },
     select: { id: true },
   });
+  // L'équipe l'apprend sur son téléphone (application iPhone, pour qui a activé les notifications).
+  await pushChallengeStarted(scope.pharmacyId, scope.userId);
   return { ok: true, data: { id: created.id, created: true } };
 }
 
