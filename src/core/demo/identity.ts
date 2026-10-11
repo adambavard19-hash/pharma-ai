@@ -34,6 +34,13 @@ export const DEMO_TEAM: readonly DemoMember[] = [
 
 export const DEMO_LOGIN_EMAIL = DEMO_TEAM[0].email;
 
+/**
+ * Le compte des vérificateurs d'Apple (TestFlight, App Store) : un pharmacien adjoint de l'officine de démonstration, donc
+ * des données fictives seulement, aucun accès d'administration. Il survit à « Réinitialiser la démo » (comme l'équipe),
+ * et ses exemples (challenge, objectif, prime) sont remis à chaque réinitialisation.
+ */
+export const APP_REVIEW_MEMBER = { email: "revue-apple@pharmaboost.app", firstName: "Alex", lastName: "Revue", role: "PHARMACIST" as const, profession: "ASSISTANT_PHARMACIST" as const };
+
 /** Le mot de passe de développement. En production, il est tiré au hasard et donné une fois. */
 export const DEMO_DEV_PASSWORD = "Demo2026!Pharma";
 

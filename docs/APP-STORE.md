@@ -60,11 +60,16 @@ Aucune donnée de santé, aucune localisation, aucun suivi publicitaire.
 
 ## Vérification d'Apple
 
-- **Compte de démonstration exigé** (l'application commence par une connexion) : créer dans l'application un compte
-  gratuit dédié, par exemple `revue-apple@pharmaboost.app`, et le donner dans « Informations de connexion ».
+- **Compte de démonstration exigé** : `revue-apple@pharmaboost.app`, pharmacien adjoint de l'officine de démonstration
+  (données fictives, aucun accès d'administration). Créé par `npm run revue-apple` (production :
+  `--confirmer-production`, après publication) ; mot de passe gardé dans `~/.pharmaboost-revue-apple.txt`. Il survit à
+  « Réinitialiser la démo », qui remet aussi ses exemples (challenge, objectif, prime).
+- La suppression de compte n'est pas possible sur ce compte (mode démo) : la note invite à la tester sur un compte
+  gratuit créé depuis l'écran de connexion.
 - **Suppression du compte** : Mon espace › Supprimer mon compte (mot de passe + SUPPRIMER). Exigence 5.1.1(v).
-- Note pour le vérificateur : « Application professionnelle pour les équipes de pharmacie. Un compte gratuit peut être
-  créé depuis l'écran de connexion. »
+- Note pour le vérificateur : « Application professionnelle pour les équipes de pharmacie. Le compte fourni appartient à
+  une pharmacie de démonstration (données fictives). Pour tester la suppression de compte (Mon espace › Supprimer mon
+  compte), créez un compte gratuit depuis l'écran de connexion : le compte de démonstration est protégé. »
 - Risque connu : Apple refuse parfois une application qui n'est « qu'un site » (règle 4.2). Les arguments : compte,
   formations, challenges, écran hors connexion natif ; si refus, ajouter les notifications natives.
 

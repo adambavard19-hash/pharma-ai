@@ -67,6 +67,8 @@ describe("l'installation", () => {
     // L'équipe ajoutée pendant un rendez-vous disparaît, mais seulement dans le groupe de démonstration.
     const users = log.calls.find((call) => call.model === "user" && call.method === "deleteMany");
     expect(users?.args.where).toMatchObject({ organizationId: "org_demo" });
+    // Sauf le compte des vérificateurs d'Apple : une revue en cours ne perd jamais son accès.
+    expect((users?.args.where as { email: { notIn: string[] } }).email.notIn).toContain("revue-apple@pharmaboost.app");
   });
 
   it("n'écrit que des lignes de l'officine de démonstration", async () => {

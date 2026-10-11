@@ -48,6 +48,7 @@
     "commissions:progressives": "node --env-file=.env --conditions=react-server --import tsx scripts/commissions-progressives.ts",
     "mobile:demo": "node --env-file=.env --conditions=react-server --import tsx scripts/mobile-demo.ts",
     "mobile:demo:decouvertes": "node --env-file=.env --conditions=react-server --import tsx scripts/mobile-demo-decouvertes.ts",
+    "revue-apple": "node --env-file=.env --conditions=react-server --import tsx scripts/compte-revue-apple.ts",
     "mobile:demo:challenges": "node --env-file=.env --conditions=react-server --import tsx scripts/mobile-demo-challenges.ts"
   },
   "dependencies": {

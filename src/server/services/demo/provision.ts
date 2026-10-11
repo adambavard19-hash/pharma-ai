@@ -6,10 +6,11 @@ import { refreshStockNotifications } from "@/server/services/notifications";
 import { ENGINE_VERSION } from "@/config/constants";
 import { classifyProductByName, restrictToVocabulary } from "@/core/catalog/product-vocabulary";
 import { classificationKey } from "@/server/services/classification";
-import { DEMO_DEV_PASSWORD, DEMO_ORGANIZATION_SLUG, DEMO_PHARMACY, DEMO_PHARMACY_SLUG, DEMO_POST, DEMO_TEAM } from "@/core/demo/identity";
+import { APP_REVIEW_MEMBER, DEMO_DEV_PASSWORD, DEMO_ORGANIZATION_SLUG, DEMO_PHARMACY, DEMO_PHARMACY_SLUG, DEMO_POST, DEMO_TEAM } from "@/core/demo/identity";
 import { DEMO_DRUGS, DEMO_SHELF, DEMO_TAG_OVERRIDES, DEMO_VIGILANCES, type DemoDrug } from "@/core/demo/catalog";
 import { planHistory, type PlannedVisit } from "@/core/demo/history";
 import { appEnvironment } from "@/config/env";
+import { seedAppReviewExamples } from "./app-review";
 import type { Prisma } from "@/generated/prisma";
 
 /**
@@ -186,7 +187,8 @@ export async function installDemoPharmacy(options: InstallOptions = {}): Promise
     });
   }
   // Un collaborateur ajouté au cours d'un rendez-vous disparaît à la réinitialisation.
-  await prisma.user.deleteMany({ where: { organizationId: organization.id, email: { notIn: DEMO_TEAM.map((member) => member.email) } } });
+  // Le compte des vérificateurs d'Apple reste : une revue en cours ne doit pas perdre son accès.
+  await prisma.user.deleteMany({ where: { organizationId: organization.id, email: { notIn: [...DEMO_TEAM.map((member) => member.email), APP_REVIEW_MEMBER.email] } } });
 
   // --- Repartir d'une activité vide, puis le rayon -----------------------------------------------
   await wipeActivity(pharmacy.id);
@@ -279,6 +281,8 @@ export async function installDemoPharmacy(options: InstallOptions = {}): Promise
   log(`historique : ${history.sales} ventes, ${history.recommendations} conseils`);
 
   await refreshStockNotifications(pharmacy.id);
+  // Les exemples du compte des vérificateurs d'Apple, s'il existe (l'effacement de l'activité vient de les retirer).
+  await seedAppReviewExamples({ pharmacyId: pharmacy.id, ownerId: userIds.owner, now });
 
   return {
     pharmacyId: pharmacy.id,
