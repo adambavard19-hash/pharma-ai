@@ -4,6 +4,7 @@ import { getMessagingProvider } from "@/server/ai/registry";
 import type { MessagingProvider } from "@/core/ai/ports";
 import { publicUrl } from "@/server/public-url";
 import { traceDispatch } from "@/server/services/email-dispatch";
+import { platformEmailContext } from "@/server/services/email-context";
 import { createNotification } from "@/server/services/notifications";
 import { notifyAdmins } from "@/server/services/sales/notifications";
 import { DEFAULT_CONTACT_EMAIL } from "@/server/services/site-leads";
@@ -271,7 +272,7 @@ async function notifyPharmacy(input: { thread: { id: string; pharmacyId: string;
     // Seul un compte encore actif dans cette officine reçoit l'e-mail.
     const member = await prisma.membership.findFirst({ where: { userId, pharmacyId: input.thread.pharmacyId, isActive: true, user: { deletedAt: null } }, select: { user: { select: { email: true, firstName: true } } } });
     if (!member) return result;
-    const mail = buildSupportReplyEmail({ firstName: member.user.firstName, subject: input.thread.subject, excerpt: excerpt(input.body, 600), supportUrl: publicUrl(`/support/${input.thread.id}`) });
+    const mail = buildSupportReplyEmail({ firstName: member.user.firstName, subject: input.thread.subject, excerpt: excerpt(input.body, 600), supportUrl: publicUrl(`/support/${input.thread.id}`) }, await platformEmailContext());
     const messaging = deps.messaging ?? getMessagingProvider();
     const outcome = await messaging.sendEmail({ to: member.user.email, fromName: "PharmaBoost", subject: mail.subject, text: mail.text, html: mail.html });
     await traceDispatch({ kind: "SUPPORT_REPLY", recipient: member.user.email, outcome, subject: mail.subject, trigger: "MANUAL", pharmacyId: input.thread.pharmacyId, userId, sentByAdminId: input.adminId });

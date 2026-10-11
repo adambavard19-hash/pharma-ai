@@ -1,5 +1,6 @@
 import { escapeHtml } from "@/core/documents/email";
 import { button, shell } from "@/core/platform/sales-emails";
+import { DEFAULT_EMAIL_CONTEXT, renderEmail, type EmailContext } from "@/core/platform/email-layout";
 
 /**
  * Les e-mails du support : l'alerte à l'équipe quand une officine écrit, et la notification à l'officine quand l'équipe
@@ -42,14 +43,19 @@ export type SupportReplyInput = {
   supportUrl: string;
 };
 
-export function buildSupportReplyEmail(v: SupportReplyInput): { subject: string; text: string; html: string } {
-  const subject = `PharmaBoost vous a répondu — ${v.subject}`;
-  const text = [`Bonjour ${v.firstName},`, "", "L'équipe PharmaBoost a répondu à votre question :", "", `« ${v.excerpt} »`, "", `Lire la réponse et continuer la discussion : ${v.supportUrl}`, "", "Vous retrouvez toutes vos discussions dans PharmaBoost, menu « Contact support ».", "", "L'équipe PharmaBoost"].join("\n");
-  const html = shell(
-    subject,
-    "PharmaBoost vous a répondu",
-    `<p style="margin:0;font-size:18px;line-height:26px;font-weight:600">Bonjour ${escapeHtml(v.firstName)},</p><p style="margin:12px 0 0;font-size:16px;line-height:25px;color:#374151">L'équipe PharmaBoost a répondu à votre question « ${escapeHtml(v.subject)} » :</p><blockquote style="margin:16px 0 0;padding:12px 16px;border-left:3px solid #0F766E;background:#f3f4f6;font-size:15px;line-height:23px;color:#374151;white-space:pre-line">${escapeHtml(v.excerpt)}</blockquote>${button(v.supportUrl, "Lire la réponse")}<p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Pour continuer la discussion, répondez depuis PharmaBoost, menu « Contact support ».</p>`,
-    "#0F766E",
-  );
-  return { subject, text, html };
+export function buildSupportReplyEmail(v: SupportReplyInput, ctx: EmailContext = DEFAULT_EMAIL_CONTEXT): { subject: string; text: string; html: string } {
+  return renderEmail(ctx, {
+    subject: `PharmaBoost vous a répondu — ${v.subject}`,
+    preheader: v.excerpt.slice(0, 120),
+    eyebrow: "Contact support",
+    title: "PharmaBoost vous a répondu",
+    greeting: `Bonjour ${v.firstName},`,
+    blocks: [
+      { kind: "paragraph", text: `L'équipe PharmaBoost a répondu à votre question « ${v.subject} » :`, strong: [v.subject] },
+      { kind: "notice", text: v.excerpt },
+      { kind: "button", url: v.supportUrl, label: "Lire la réponse" },
+      { kind: "note", text: "Pour continuer la discussion, répondez depuis PharmaBoost, menu « Contact support »." },
+    ],
+    reason: "Vous recevez ce message parce que vous avez écrit au support PharmaBoost.",
+  });
 }

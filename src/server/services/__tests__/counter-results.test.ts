@@ -23,6 +23,7 @@ vi.mock("@/server/db/client", () => ({
 vi.mock("@/server/audit/log", () => ({ recordAudit: m.audit }));
 vi.mock("@/server/ai/registry", () => ({ getMessagingProvider: () => ({ info: { id: "test" }, sendEmail: m.sendEmail }) }));
 vi.mock("@/server/services/email-dispatch", () => ({ traceDispatch: m.trace }));
+vi.mock("@/server/services/email-context", () => ({ platformEmailContext: async () => ({ baseUrl: "https://pharmaboost.app", company: { legalName: "PharmaBoost", contactEmail: "contact@pharmaboost.app" } }) }));
 vi.mock("@/server/services/comptoirs", () => ({ listMembers: async () => [{ id: "lea", name: "Léa Martin", role: "PHARMACIST" }] }));
 vi.mock("@/config/env", () => ({ getEnv: () => ({ APP_URL: "https://pharmaboost.app" }) }));
 

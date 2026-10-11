@@ -163,6 +163,8 @@ export const ACTION_LABELS: Record<string, string> = {
   "platform.member_removed": "Membre retiré d'une officine",
   "platform.user_deleted": "Compte supprimé",
   "user.account_self_deleted": "Compte supprimé par la personne elle-même",
+  "user.weekly_digest_unsubscribed": "Désinscription du résumé hebdomadaire",
+  "user.weekly_digest_resubscribed": "Réinscription au résumé hebdomadaire",
   "platform.pharmacy_deleted": "Officine supprimée",
   "platform.support_replied": "Réponse du support envoyée",
   "platform.support_status_changed": "Discussion du support fermée ou rouverte",

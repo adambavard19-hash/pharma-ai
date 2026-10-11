@@ -1,3 +1,5 @@
+import { DEFAULT_EMAIL_CONTEXT, renderEmail, type EmailContext } from "@/core/platform/email-layout";
+
 /**
  * Les résultats de la fenêtre du poste de caisse, pour le titulaire : ce que la pharmacie a vu, vendu, laissé.
  *
@@ -88,8 +90,6 @@ export function summariseCounterResults(input: { sales: ClosedCounterSale[]; sol
 
 export type MonthlyReportMail = { subject: string; text: string; html: string };
 
-const escape = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
 /** « 12 conseils vendus sur 31 proposés » : une phrase vraie, sans pourcentage quand il n'y a rien à comparer. */
 export function describeResults(results: CounterResults): string[] {
   const lines = [`${results.salesClosed} vente${results.salesClosed > 1 ? "s" : ""} terminée${results.salesClosed > 1 ? "s" : ""} avec la fenêtre du poste de caisse.`];
@@ -101,10 +101,11 @@ export function describeResults(results: CounterResults): string[] {
 }
 
 /**
- * Le rapport mensuel du titulaire. Il rappelle que ce sont des déclarations de l'équipe au comptoir, et ne contient aucune donnée de patient.
+ * Le rapport mensuel du titulaire, dans le gabarit commun des e-mails PharmaBoost : les chiffres clés en tête, puis les produits
+ * et les comptoirs. Il rappelle que ce sont des déclarations de l'équipe au comptoir, et ne contient aucune donnée de patient.
  * `null` quand le mois n'a aucune vente terminée : pas d'e-mail vide.
  */
-export function buildMonthlyReport(input: { pharmacyName: string; monthLabel: string; results: CounterResults; resultsUrl: string }): MonthlyReportMail | null {
+export function buildMonthlyReport(input: { pharmacyName: string; monthLabel: string; results: CounterResults; resultsUrl: string }, ctx: EmailContext = DEFAULT_EMAIL_CONTEXT): MonthlyReportMail | null {
   const { results } = input;
   if (results.salesClosed === 0) return null;
   const pharmacy = input.pharmacyName.trim() || "votre pharmacie";
@@ -112,28 +113,30 @@ export function buildMonthlyReport(input: { pharmacyName: string; monthLabel: st
   const top = results.products.slice(0, 5).map((product) => `${product.name} — ${product.sold}`);
   const posts = results.byPost.slice(0, 6).map((post) => `${post.post} — ${post.sold} vendu${post.sold > 1 ? "s" : ""} sur ${post.proposed} proposé${post.proposed > 1 ? "s" : ""}`);
   const note = "Ces chiffres sont les réponses « Vendu » / « Non vendu » données par l'équipe au comptoir : ce ne sont pas des ventes lues dans votre logiciel de gestion.";
-  const subject = `Votre bilan du comptoir — ${input.monthLabel}`;
-  const text = [
-    `Bonjour,`,
-    "",
-    `Voici le bilan de ${input.monthLabel} pour ${pharmacy}.`,
-    "",
-    ...lines,
-    ...(top.length ? ["", "Produits les plus vendus :", ...top.map((line) => `• ${line}`)] : []),
-    ...(posts.length ? ["", "Par poste de caisse :", ...posts.map((line) => `• ${line}`)] : []),
-    "",
-    note,
-    "",
-    `Le détail : ${input.resultsUrl}`,
-  ].join("\n");
-  const list = (items: string[]) => (items.length ? `<ul style="margin:6px 0 14px;padding-left:18px">${items.map((item) => `<li>${escape(item)}</li>`).join("")}</ul>` : "");
-  const html = `<!doctype html><html lang="fr"><body style="margin:0;background:#f4f7f5;font-family:Segoe UI,Arial,sans-serif;color:#101828">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
-<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;border:1px solid #d6ebe0">
-<tr><td style="padding:24px 28px 4px"><div style="font-size:13px;font-weight:600;color:#12805c">PharmaBoost · ${escape(pharmacy)}</div><h1 style="margin:6px 0 0;font-size:21px">Bilan du comptoir — ${escape(input.monthLabel)}</h1></td></tr>
-<tr><td style="padding:10px 28px;font-size:15px;line-height:22px">${list(lines)}${top.length ? `<strong>Produits les plus vendus</strong>${list(top)}` : ""}${posts.length ? `<strong>Par poste de caisse</strong>${list(posts)}` : ""}</td></tr>
-<tr><td style="padding:0 28px 18px;font-size:12.5px;line-height:19px;color:#667085">${escape(note)}</td></tr>
-<tr><td style="padding:0 28px 24px"><a href="${escape(input.resultsUrl)}" style="display:inline-block;background:#12805c;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:11px 18px;border-radius:10px">Voir le détail</a></td></tr>
-</table></td></tr></table></body></html>`;
-  return { subject, text, html };
+  const plural = (count: number, word: string) => `${word}${count > 1 ? "s" : ""}`;
+  return renderEmail(ctx, {
+    subject: `Votre bilan du comptoir — ${input.monthLabel}`,
+    preheader: `${results.sold} ${plural(results.sold, "conseil")} ${plural(results.sold, "vendu")} en ${input.monthLabel} à ${pharmacy}.`,
+    eyebrow: `Bilan du comptoir · ${pharmacy}`,
+    title: `Votre mois de ${input.monthLabel}`,
+    greeting: "Bonjour,",
+    blocks: [
+      {
+        kind: "stats",
+        items: [
+          { value: String(results.salesClosed), label: `${plural(results.salesClosed, "vente")} ${plural(results.salesClosed, "terminée")}` },
+          { value: String(results.proposed), label: `${plural(results.proposed, "conseil")} ${plural(results.proposed, "proposé")}` },
+          { value: String(results.sold), label: `${plural(results.sold, "déclaré")} ${plural(results.sold, "vendu")}` },
+          ...(results.conversionRate !== null ? [{ value: `${Math.round(results.conversionRate * 100)} %`, label: "des réponses : « Vendu »" }] : []),
+        ],
+      },
+      // Les chiffres des cases ne sont pas répétés : la liste garde ce qu'elles ne disent pas (challenges, dates courtes).
+      ...(lines.slice(2).filter((line) => !line.includes("%")).length ? [{ kind: "list" as const, items: lines.slice(2).filter((line) => !line.includes("%")) }] : []),
+      ...(top.length ? [{ kind: "list" as const, title: "Produits les plus vendus", items: top }] : []),
+      ...(posts.length ? [{ kind: "list" as const, title: "Par comptoir", items: posts }] : []),
+      { kind: "button", url: input.resultsUrl, label: "Voir le détail" },
+      { kind: "note", text: note },
+    ],
+    reason: `Vous recevez ce bilan une fois par mois, en tant que titulaire de ${pharmacy}.`,
+  });
 }

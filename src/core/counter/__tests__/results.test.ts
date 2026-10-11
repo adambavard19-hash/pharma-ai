@@ -50,10 +50,13 @@ describe("le rapport mensuel du titulaire", () => {
   it("résume le mois avec des phrases vraies, sans aucune donnée de patient", () => {
     const report = mail();
     expect(report?.subject).toBe("Votre bilan du comptoir — septembre 2026");
-    expect(report?.text).toContain("1 vente terminée");
-    expect(report?.text).toContain("3 conseils proposés · 2 déclarés vendus · 1 non vendu · 0 sans réponse.");
-    expect(report?.text).toContain("67 % des conseils auxquels l'équipe a répondu ont été vendus.");
+    // Les chiffres clés en cases (et dans le texte brut), puis ce que les cases ne disent pas.
+    expect(report?.text).toContain("- vente terminée : 1");
+    expect(report?.text).toContain("- conseils proposés : 3");
+    expect(report?.text).toContain("- déclarés vendus : 2");
+    expect(report?.text).toContain("- des réponses : « Vendu » : 67 %");
     expect(report?.text).toContain("1 vente dans un challenge laboratoire en cours.");
+    expect(report?.text).toContain("1 produit à date courte écoulé.");
     expect(report?.text).toContain("ce ne sont pas des ventes lues dans votre logiciel de gestion");
     expect(report?.text).toContain("https://pharmaboost.app/resultats?periode=month");
   });

@@ -4,6 +4,7 @@ import { processDueCampaigns } from "@/server/services/admin/campaigns";
 import { purgeStalePatientNews, resumeStuckAnnouncements } from "@/server/services/patient-news";
 import { closeStalledDeposits, purgeExpiredDepositFiles } from "@/server/services/stock-deposits";
 import { sendMonthlyCounterReports } from "@/server/services/counter-results";
+import { sendWeeklyOwnerDigests } from "@/server/services/weekly-digest";
 import { purgeCounterEmails } from "@/server/services/counter-window";
 import { runStockLearningPass } from "@/server/services/stock-learning";
 import { scheduleLearningContinuation } from "@/server/services/stock-learning-chain";
@@ -66,10 +67,12 @@ export async function GET(request: Request) {
   const stockFiles = await attempt("fichiers de stock", () => purgeExpiredDepositFiles(now));
   const stalledDeposits = await attempt("dépôts de stock bloqués", () => closeStalledDeposits(now));
   const counterReports = await attempt("bilan mensuel du comptoir", () => sendMonthlyCounterReports(now));
+  // Le lundi (rattrapage jusqu'au mercredi) : une minute au plus ici, la suite reprend le lendemain sans double envoi.
+  const weeklyDigests = await attempt("résumé hebdomadaire des titulaires", () => sendWeeklyOwnerDigests(now, { deadlineAt: Date.now() + 60_000 }));
   const stockLearning = await attempt("connaissance du stock", () => runStockLearningPass({ deadlineAt: startedAt + LEARNING_BUDGET_MS }));
   if (stockLearning?.moreToDo) after(() => scheduleLearningContinuation({ depth: 1 }).then(() => undefined));
   if ("error" in automations) throw automations.error;
   // Le détail par officine reste dans la console : la réponse ne porte que les compteurs.
   const { dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors } = automations.report;
-  return NextResponse.json({ dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors, campaigns, news: { resumed, purged }, stockFiles, stalledDeposits, counterEmails, counterReports, stockLearning });
+  return NextResponse.json({ dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors, campaigns, news: { resumed, purged }, stockFiles, stalledDeposits, counterEmails, counterReports, weeklyDigests, stockLearning });
 }

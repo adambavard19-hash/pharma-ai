@@ -113,6 +113,7 @@ export const DISPATCH_KIND_LABELS: Record<string, string> = {
   SUPPORT_REPLY: "Réponse du support à une officine",
   PATIENT_REPORT: "Bilan de comptoir envoyé à un patient",
   COUNTER_MONTHLY: "Bilan mensuel du comptoir au titulaire",
+  OWNER_WEEKLY: "Résumé hebdomadaire au titulaire",
   TEAM_INVITATION: "Invitation d'un collaborateur",
   JOIN_REQUEST_ALERT: "Demande de rattachement (alerte au titulaire)",
   JOIN_REQUEST_DECISION: "Réponse à une demande de rattachement",

@@ -27,6 +27,7 @@ vi.mock("@/server/db/client", () => ({ prisma: prismaMock }));
 vi.mock("@/server/ai/registry", () => ({ getMessagingProvider: () => ({ info: { id: "test" }, sendEmail: mocks.sendEmail }) }));
 vi.mock("@/server/public-url", () => ({ publicUrl: (path: string) => `https://pharmaboost.test${path}` }));
 vi.mock("@/server/services/email-dispatch", () => ({ traceDispatch: mocks.traceDispatch }));
+vi.mock("@/server/services/email-context", () => ({ platformEmailContext: async () => ({ baseUrl: "https://pharmaboost.test", company: { legalName: "PharmaBoost", contactEmail: "contact@pharmaboost.app" } }) }));
 vi.mock("@/server/services/notifications", () => ({ createNotification: mocks.createNotification }));
 vi.mock("@/server/services/sales/notifications", () => ({ notifyAdmins: mocks.notifyAdmins }));
 vi.mock("@/server/services/site-leads", () => ({ DEFAULT_CONTACT_EMAIL: "contact@pharmaboost.app" }));

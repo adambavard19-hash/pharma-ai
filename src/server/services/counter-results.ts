@@ -3,6 +3,7 @@ import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { traceDispatch } from "@/server/services/email-dispatch";
+import { platformEmailContext } from "@/server/services/email-context";
 import { getEnv } from "@/config/env";
 import { COUNTER_DECLARED } from "@/server/services/counter-window";
 import { listMembers } from "@/server/services/comptoirs";
@@ -54,6 +55,12 @@ export async function loadCounterResults(input: { pharmacyId: string; since: Dat
   return summariseCounterResults({ sales, soldAdvice });
 }
 
+/** « 2026-09-30 » : le jour civil d'un instant, dans le fuseau de l'officine. */
+function isoDay(date: Date, timeZone: string): string {
+  const parts = zonedDateParts(date, timeZone);
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
 export type MonthlyReportRun = { month: string; pharmacies: number; sent: number; skipped: number; failed: number };
 
 /**
@@ -83,7 +90,7 @@ export async function sendMonthlyCounterReports(now: Date = new Date(), timeZone
     });
     if (!pharmacy || !pharmacy.isActive || pharmacy.isDemo || pharmacy.memberships.length === 0) { run.skipped += 1; continue; }
     const results = await loadCounterResults({ pharmacyId, since: previousMonthStart, until: thisMonthStart });
-    const mail = buildMonthlyReport({ pharmacyName: pharmacy.name, monthLabel, results, resultsUrl: `${getEnv().APP_URL}/resultats?periode=month` });
+    const mail = buildMonthlyReport({ pharmacyName: pharmacy.name, monthLabel, results, resultsUrl: `${getEnv().APP_URL}/resultats?periode=perso&du=${isoDay(previousMonthStart, timeZone)}&au=${isoDay(new Date(thisMonthStart.getTime() - 3_600_000), timeZone)}` }, await platformEmailContext());
     if (!mail) { run.skipped += 1; continue; }
     const messaging = getMessagingProvider({ demo: false });
     let delivered = false;

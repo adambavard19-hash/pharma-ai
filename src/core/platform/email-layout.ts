@@ -45,7 +45,11 @@ export type EmailBlock =
   | { kind: "steps"; title?: string; items: string[] }
   | { kind: "note"; text: string }
   | { kind: "notice"; text: string; tone?: "info" | "warning" }
-  | { kind: "link"; label: string; url: string };
+  | { kind: "link"; label: string; url: string }
+  /** Deux à quatre chiffres clés côte à côte (« 12 conseils vendus »), avec, s'il y en a une, la comparaison. */
+  | { kind: "stats"; items: Array<{ value: string; label: string; trend?: string | null; tone?: "up" | "down" | "flat" }> }
+  /** Une courte liste à puces, avec son titre. */
+  | { kind: "list"; title?: string; items: string[] };
 
 export type EmailContent = {
   subject: string;
@@ -65,6 +69,8 @@ export type EmailContent = {
    * message de service.
    */
   unsubscribeUrl?: string | null;
+  /** Le libellé de ce lien (« Ne plus recevoir ce résumé ») ; par défaut « Ne plus recevoir ces offres ». */
+  unsubscribeLabel?: string;
 };
 
 export type RenderedEmail = { subject: string; text: string; html: string };
@@ -108,6 +114,21 @@ function blockHtml(block: EmailBlock): string {
     }
     case "link":
       return `<p style="margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:20px;color:${BRAND.muted}">${escapeHtml(block.label)}<br><a href="${escapeHtml(block.url)}" style="color:${BRAND.primary};word-break:break-all">${escapeHtml(block.url)}</a></p>`;
+    case "stats": {
+      // Une cellule par chiffre ; sur un téléphone étroit, la table se resserre sans casser (largeurs en pourcentage).
+      const width = Math.floor(100 / Math.max(1, block.items.length));
+      const trendColor = (tone?: "up" | "down" | "flat") => (tone === "up" ? BRAND.primary : tone === "down" ? BRAND.warning : BRAND.muted);
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;border-collapse:separate;border-spacing:0"><tr>${block.items
+        .map(
+          (item, i) =>
+            `<td valign="top" width="${width}%" style="width:${width}%;padding:14px 12px;background:${BRAND.tint};${i === 0 ? "border-radius:8px 0 0 8px;" : ""}${i === block.items.length - 1 ? "border-radius:0 8px 8px 0;" : ""}${i > 0 ? "border-left:2px solid #FFFFFF;" : ""}"><div style="font-family:${FONT};font-size:24px;line-height:30px;font-weight:700;color:${BRAND.ink};letter-spacing:-.01em">${escapeHtml(item.value)}</div><div style="margin-top:2px;font-family:${FONT};font-size:12.5px;line-height:17px;color:${BRAND.body}">${escapeHtml(item.label)}</div>${item.trend ? `<div style="margin-top:4px;font-family:${FONT};font-size:12px;line-height:16px;font-weight:600;color:${trendColor(item.tone)}">${escapeHtml(item.trend)}</div>` : ""}</td>`,
+        )
+        .join("")}</tr></table>`;
+    }
+    case "list":
+      return `${block.title ? `<p style="margin:0 0 8px;font-family:${FONT};font-size:15px;line-height:22px;font-weight:600;color:${BRAND.ink}">${escapeHtml(block.title)}</p>` : ""}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px">${block.items
+        .map((item) => `<tr><td valign="top" style="width:18px;padding:0 0 6px;font-family:${FONT};font-size:15px;line-height:22px;color:${BRAND.primary}">&#8226;</td><td valign="top" style="padding:0 0 6px;font-family:${FONT};font-size:15px;line-height:22px;color:${BRAND.body}">${escapeHtml(item)}</td></tr>`)
+        .join("")}</table>`;
   }
 }
 
@@ -125,6 +146,10 @@ function blockText(block: EmailBlock): string {
       return [block.title ? `${block.title} :` : null, ...block.items.map((item, i) => `${i + 1}. ${item}`)].filter(Boolean).join("\n");
     case "link":
       return `${block.label}\n${block.url}`;
+    case "stats":
+      return block.items.map((item) => `- ${item.label} : ${item.value}${item.trend ? ` (${item.trend})` : ""}`).join("\n");
+    case "list":
+      return [block.title ? `${block.title} :` : null, ...block.items.map((item) => `• ${item}`)].filter(Boolean).join("\n");
   }
 }
 
@@ -133,7 +158,7 @@ export const DEFAULT_EMAIL_CONTEXT: EmailContext = {
   company: { legalName: "PharmaBoost", contactEmail: PUBLIC_CONTACT_EMAIL },
 };
 
-export type FrameInput = { subject: string; preheader?: string; eyebrow?: string; title: string; bodyHtml: string; reason?: string; unsubscribeUrl?: string | null };
+export type FrameInput = { subject: string; preheader?: string; eyebrow?: string; title: string; bodyHtml: string; reason?: string; unsubscribeUrl?: string | null; unsubscribeLabel?: string };
 
 /** L'enveloppe commune : en-tête, carte, pied de page légal. Le corps est déjà en HTML. */
 export function emailFrame(ctx: EmailContext, input: FrameInput): string {
@@ -176,7 +201,7 @@ ${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opaci
       </table>
     </td></tr>
     <tr><td class="pb-pad" style="padding:22px 16px 0;font-family:${FONT};font-size:12px;line-height:19px;color:${BRAND.muted}">
-      ${input.reason ? `<p style="margin:0 0 10px">${escapeHtml(input.reason)}</p>` : ""}${input.unsubscribeUrl ? `<p style="margin:0 0 10px">Ne plus recevoir ces offres : <a href="${escapeHtml(input.unsubscribeUrl)}" style="color:${BRAND.muted}">me désinscrire</a></p>` : ""}
+      ${input.reason ? `<p style="margin:0 0 10px">${escapeHtml(input.reason)}</p>` : ""}${input.unsubscribeUrl ? `<p style="margin:0 0 10px">${escapeHtml(input.unsubscribeLabel ?? "Ne plus recevoir ces offres")} : <a href="${escapeHtml(input.unsubscribeUrl)}" style="color:${BRAND.muted}">me désinscrire</a></p>` : ""}
       <p style="margin:0 0 10px">Une question ? Écrivez-nous à <a href="mailto:${escapeHtml(ctx.company.contactEmail)}" style="color:${BRAND.primary};text-decoration:none">${escapeHtml(ctx.company.contactEmail)}</a>.</p>
       <p style="margin:0 0 10px">${escapeHtml(companyLine)}</p>
       <p style="margin:0"><a href="${escapeHtml(legal)}" style="color:${BRAND.muted}">Mentions légales</a> &nbsp;·&nbsp; <a href="${escapeHtml(privacy)}" style="color:${BRAND.muted}">Confidentialité</a></p>
@@ -197,7 +222,7 @@ export function renderEmail(ctx: EmailContext, content: EmailContent): RenderedE
     ...content.blocks.map(blockHtml),
     `<p style="margin:8px 0 8px;font-family:${FONT};font-size:16px;line-height:26px;color:${BRAND.body}">${escapeHtml(signature)}</p>`,
   ].join("\n");
-  const html = emailFrame(ctx, { subject: content.subject, preheader: content.preheader, eyebrow: content.eyebrow, title: content.title, bodyHtml, reason: content.reason, unsubscribeUrl: content.unsubscribeUrl });
+  const html = emailFrame(ctx, { subject: content.subject, preheader: content.preheader, eyebrow: content.eyebrow, title: content.title, bodyHtml, reason: content.reason, unsubscribeUrl: content.unsubscribeUrl, unsubscribeLabel: content.unsubscribeLabel });
 
   const text = [
     content.title,
@@ -208,7 +233,7 @@ export function renderEmail(ctx: EmailContext, content: EmailContent): RenderedE
     "",
     "—",
     ...(content.reason ? [content.reason] : []),
-    ...(content.unsubscribeUrl ? [`Ne plus recevoir ces offres : ${content.unsubscribeUrl}`] : []),
+    ...(content.unsubscribeUrl ? [`${content.unsubscribeLabel ?? "Ne plus recevoir ces offres"} : ${content.unsubscribeUrl}`] : []),
     `Contact : ${ctx.company.contactEmail}`,
     companyLine,
     `Mentions légales : ${base}/decouvrir/mentions-legales`,
