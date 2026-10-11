@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { PharmaLogo } from "@/components/app/logo";
+import { FloatingRobot } from "./floating-robot";
 import { cn } from "@/lib/utils";
 import { MobileMenu } from "./mobile-menu";
 
@@ -26,7 +26,8 @@ export const HAIRLINE = "bg-gradient-to-r from-brand-500 via-[#0796b4] to-transp
 export function SiteWordmark({ className }: { className?: string }) {
   return (
     <Link href="/decouvrir" className={cn("flex items-center gap-2.5 rounded-md", className)} aria-label="PharmaBoost, accueil">
-      <PharmaLogo size={30} />
+      {/* Le robot du logo, sans son fond : il flotte, vivant, à côté du nom. */}
+      <FloatingRobot className="h-[40px] w-[34px]" />
       <span className="text-[17px] font-semibold tracking-[-0.01em] text-text-primary max-[389px]:text-[16px]">
         Pharma<span className="text-brand-600">Boost</span>
       </span>
