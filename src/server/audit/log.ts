@@ -108,6 +108,7 @@ export type AuditAction =
   | "platform.member_deleted"
   | "platform.member_removed"
   | "platform.user_deleted"
+  | "user.account_self_deleted"
   | "platform.pharmacy_deleted"
   | "platform.support_replied"
   | "platform.support_status_changed"

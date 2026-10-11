@@ -376,6 +376,7 @@ export const AUDIT_TIMELINE_RULES: Record<string, AuditTimelineRule> = {
   "platform.member_deleted": { kind: "acces", title: "Compte supprimé", tone: "warning" },
   "platform.member_removed": { kind: "acces", title: "Compte retiré de l'officine", tone: "warning" },
   "platform.user_deleted": { kind: "acces", title: "Compte supprimé", tone: "warning" },
+  "user.account_self_deleted": { kind: "acces", title: "Compte supprimé par son titulaire", tone: "warning" },
   "platform.pharmacy_deleted": { kind: "dossier", title: "Officine supprimée", tone: "danger" },
   "platform.support_replied": { kind: "dossier", title: "Réponse du support envoyée" },
   "platform.support_status_changed": { kind: "dossier", title: "Discussion du support fermée ou rouverte" },

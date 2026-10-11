@@ -1,19 +1,17 @@
 import type { Metadata } from "next";
-import { LogOut, Mail, Store } from "lucide-react";
+import { LogOut, Store } from "lucide-react";
 import { requireUser } from "@/server/auth/user-session";
 import { consentHistory, currentConsents } from "@/server/services/mobile/consents";
 import { mobileLogoutAction } from "@/server/actions/mobile-auth";
 import { PROFESSION_LABELS } from "@/core/mobile/profile";
-import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 import { ListRow, MCard, Pill, ScreenTitle } from "../../_components/ui";
 import { ProfileForm } from "./_components/profile-form";
 import { ConsentsPanel } from "./_components/consents-panel";
 import { PersonalSections } from "./_components/personal-sections";
 import { PasswordPanel } from "./_components/password-panel";
+import { DeleteAccountPanel } from "./_components/delete-account-panel";
 
 export const metadata: Metadata = { title: "Mon espace" };
-
-const DELETE_MAIL = `mailto:${PUBLIC_CONTACT_EMAIL.toLowerCase()}?subject=${encodeURIComponent("Suppression de mon compte PharmaBoost")}&body=${encodeURIComponent("Bonjour,\n\nJe souhaite la suppression de mon compte PharmaBoost.\nAdresse e-mail du compte : \n\nMerci.")}`;
 
 export default async function MyspacePage() {
   const session = await requireUser();
@@ -98,11 +96,8 @@ export default async function MyspacePage() {
               <span className="flex-1 text-[15px] font-medium text-ink-900">Se déconnecter</span>
             </button>
           </form>
-          <ListRow href={DELETE_MAIL} icon={<Mail className="size-[18px]" aria-hidden="true" />} label="Demander la suppression de mon compte" danger />
+          <DeleteAccountPanel />
         </div>
-        <p className="px-1 text-[12px] leading-5 text-text-tertiary">
-          La suppression est traitée par l&apos;équipe PharmaBoost ({PUBLIC_CONTACT_EMAIL}) : vos données personnelles sont effacées, l&apos;historique de votre officine reste anonymisé.
-        </p>
       </section>
     </div>
   );

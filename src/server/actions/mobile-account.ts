@@ -8,6 +8,10 @@ import { recordAudit } from "@/server/audit/log";
 import { updateMobileProfile } from "@/server/services/mobile/account";
 import { recordConsent } from "@/server/services/mobile/consents";
 import { changeOwnPassword } from "@/server/services/user-password";
+import { deleteUserAccount } from "@/server/services/admin/deletion";
+import { authenticateUser } from "@/server/auth/credentials";
+import { destroySession } from "@/server/auth/session";
+import { throttled } from "@/server/security/throttle";
 import { CONSENT_KINDS, checkboxValue, isConsentKind, isProfession } from "@/core/mobile/profile";
 import { refuseInDemo } from "./demo-guard";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
@@ -103,4 +107,32 @@ export async function changeMyPasswordAction(payload: z.input<typeof passwordSch
   const result = await changeOwnPassword({ userId: session.user.id, sessionId: session.sessionId, pharmacyId: session.activePharmacy?.id ?? null }, parsed.data.currentPassword, parsed.data.newPassword);
   if (!result.ok) return fail(result.error, { [result.field]: result.error });
   return ok(null, "Mot de passe modifié.");
+}
+
+const deleteSchema = z.object({
+  password: z.string().min(1, "Mot de passe requis").max(200),
+  confirmation: z.string().trim().refine((value) => value.toUpperCase() === "SUPPRIMER", "Tapez SUPPRIMER pour confirmer"),
+});
+
+/**
+ * « Supprimer mon compte » : la personne supprime ELLE-MÊME son compte, depuis l'application (exigence de l'App Store et
+ * de Google Play). Mot de passe redemandé, mot SUPPRIMER retapé ; même suppression que l'administrateur (compte anonymisé,
+ * adresse libérée, sessions fermées) et mêmes protections : le seul titulaire d'une officine ne peut pas partir seul.
+ */
+export async function deleteMyAccountAction(payload: z.input<typeof deleteSchema>): Promise<ActionResult<null>> {
+  const session = await getUserSession();
+  if (!session) return fail("Votre session a expiré : reconnectez-vous.");
+  const refused = refuseInDemo({ scope: { isDemo: session.activePharmacy?.isDemo } }, "Mode démo : le compte de démonstration ne se supprime pas.");
+  if (refused) return refused;
+  const parsed = deleteSchema.safeParse(payload);
+  if (!parsed.success) return fail("Vérifiez les informations saisies.", zodFieldErrors(parsed.error.issues));
+  if (throttled(`mobile-delete:${session.user.id}`, 5)) return fail("Trop de tentatives : patientez une minute avant de réessayer.");
+
+  const check = await authenticateUser(session.user.email, parsed.data.password);
+  if (check.kind !== "OK" || check.user.id !== session.user.id) return fail("Mot de passe incorrect.", { password: "Mot de passe incorrect." });
+
+  const result = await deleteUserAccount({ userId: session.user.id, bySelf: true });
+  if (!result.ok) return fail(result.error);
+  await destroySession();
+  redirect("/m/connexion?compte=supprime");
 }

@@ -12,6 +12,8 @@
  *
  *   npx tsx scripts/logo-robot.ts           tout
  *   npx tsx scripts/logo-robot.ts --pwa     seulement les icônes de l'application mobile
+ *   npx tsx scripts/logo-robot.ts --ios     l'icône App Store (1024 px, sans transparence : Apple la refuse) et l'écran de
+ *                                           lancement de l'application iPhone (application-mobile/ios)
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import sharp from "sharp";
@@ -83,6 +85,26 @@ const fullBleedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 1
 </svg>
 `;
 const pwaOnly = process.argv.includes("--pwa");
+const iosOnly = process.argv.includes("--ios");
+
+/** L'écran de lancement : fond clair de l'application, robot au centre (2732 px, carré : iOS le recadre au centre). */
+const splashSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="2732" height="2732">
+  ${robotDefs}
+  <rect width="1000" height="1000" fill="#f6fafa"/>
+  <g transform="translate(410 400) scale(1.8)">${robot}
+  </g>
+</svg>
+`;
+
+async function iosAssets() {
+  const assets = "application-mobile/ios/App/App/Assets.xcassets";
+  await sharp(Buffer.from(fullBleedSvg), { density: 144 }).resize(1024, 1024).flatten({ background: C.cardBottom }).removeAlpha().png().toFile(`${assets}/AppIcon.appiconset/AppIcon-512@2x.png`);
+  console.log("✓ icône App Store (1024 px, sans transparence)");
+  for (const name of ["splash-2732x2732.png", "splash-2732x2732-1.png", "splash-2732x2732-2.png"]) {
+    await sharp(Buffer.from(splashSvg), { density: 72 }).resize(2732, 2732).flatten({ background: "#f6fafa" }).png().toFile(`${assets}/Splash.imageset/${name}`);
+  }
+  console.log("✓ écran de lancement");
+}
 
 if (!pwaOnly) writeFileSync("public/logo.svg", svg);
 if (!pwaOnly) writeFileSync("public/logo-robot.svg", transparentSvg);
@@ -108,6 +130,7 @@ async function pwaIcons() {
 
 async function main() {
   if (pwaOnly) return pwaIcons();
+  if (iosOnly) return iosAssets();
   await pwaIcons();
   for (const [file, size] of outputs) {
     await sharp(Buffer.from(svg), { density: Math.ceil((72 * size) / 1024) * 2 }).resize(size, size).png().toFile(file);

@@ -1,0 +1,19 @@
+{
+  "name": "pharmaboost-mobile-natif",
+  "private": true,
+  "description": "PharmaBoost Mobile pour l'App Store et Google Play : l'application /m de pharmaboost.app dans une coque native (Capacitor).",
+  "scripts": {
+    "sync": "cap sync",
+    "ios": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3"
+  }
+}

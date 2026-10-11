@@ -199,6 +199,16 @@ describe("supprimer un compte", () => {
     expect(auditMock.recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "platform.user_deleted", entityId: "u9", platformAdminId: "adm_1" }));
   });
 
+  it("supprimé par la personne elle-même (Mon espace) : même effacement, journal à son nom, sans administrateur", async () => {
+    wireUser();
+    prismaMock.membership.findMany.mockResolvedValue([]);
+    const result = await deleteUserAccount({ userId: "u9", bySelf: true });
+    expect(result).toMatchObject({ ok: true });
+    expect(prismaMock.user.update.mock.calls[0][0].data).toMatchObject({ status: "DISABLED", passwordHash: null });
+    expect(auditMock.recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "user.account_self_deleted", entityId: "u9", userId: "u9" }));
+    expect(auditMock.recordAudit.mock.calls[0][0]).not.toHaveProperty("platformAdminId");
+  });
+
   it("le journal ne garde pas l'adresse e-mail effacée", async () => {
     wireUser();
     prismaMock.membership.findMany.mockResolvedValue([]);

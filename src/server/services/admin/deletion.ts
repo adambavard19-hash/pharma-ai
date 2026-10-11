@@ -172,7 +172,7 @@ export async function soleOwnerPharmaciesByUser(userIds: string[]): Promise<Map<
  * passe) : son adresse e-mail est LIBRE de nouveau, et rien ne permet plus de se connecter avec. Son nom reste sur
  * l'historique (qui a vérifié telle ordonnance), comme une signature : c'est une trace, pas un compte.
  */
-export async function deleteUserAccount(input: { userId: string; adminId: string }): Promise<{ ok: true; name: string; pharmacies: string[] } | Failure> {
+export async function deleteUserAccount(input: { userId: string; adminId: string } | { userId: string; bySelf: true }): Promise<{ ok: true; name: string; pharmacies: string[] } | Failure> {
   const user = await prisma.user.findFirst({
     where: { id: input.userId, deletedAt: null },
     select: { id: true, firstName: true, lastName: true, memberships: { select: { pharmacyId: true, pharmacy: { select: { name: true } } } } },
@@ -196,7 +196,9 @@ export async function deleteUserAccount(input: { userId: string; adminId: string
   // Si ce compte était le titulaire principal d'une officine, le suivant reprend le rôle.
   for (const membership of user.memberships) await ensurePrincipal(prisma, membership.pharmacyId);
   const pharmacies = user.memberships.map((membership) => membership.pharmacy.name);
-  await recordAudit({ action: "platform.user_deleted", entityType: "User", entityId: user.id, platformAdminId: input.adminId, metadata: { name, pharmacies } });
+  // Supprimé par l'administrateur, ou par la personne elle-même depuis « Mon espace » (exigence des stores).
+  if ("bySelf" in input) await recordAudit({ action: "user.account_self_deleted", entityType: "User", entityId: user.id, userId: user.id, metadata: { name, pharmacies } });
+  else await recordAudit({ action: "platform.user_deleted", entityType: "User", entityId: user.id, platformAdminId: input.adminId, metadata: { name, pharmacies } });
   return { ok: true, name, pharmacies };
 }
 

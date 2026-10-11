@@ -7,8 +7,8 @@ import { MobileLoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Connexion" };
 
-export default async function MobileLoginPage({ searchParams }: { searchParams: Promise<{ defini?: string }> }) {
-  const [session, { defini }] = await Promise.all([getUserSession(), searchParams]);
+export default async function MobileLoginPage({ searchParams }: { searchParams: Promise<{ defini?: string; compte?: string }> }) {
+  const [session, { defini, compte }] = await Promise.all([getUserSession(), searchParams]);
   if (session) redirect(session.user.mobileOnboardedAt ? "/m" : "/m/bienvenue");
 
   return (
@@ -25,6 +25,11 @@ export default async function MobileLoginPage({ searchParams }: { searchParams: 
       {defini === "1" && (
         <p className="rounded-2xl border border-success-200 bg-success-50 px-4 py-3 text-[13.5px] font-medium text-success-800">
           Mot de passe enregistré. Connectez-vous avec votre adresse e-mail et ce nouveau mot de passe.
+        </p>
+      )}
+      {compte === "supprime" && (
+        <p role="status" className="rounded-2xl border border-ink-200 bg-white px-4 py-3 text-[13.5px] font-medium text-ink-800">
+          Votre compte a été supprimé. Vos données personnelles ont été effacées.
         </p>
       )}
       <div className="space-y-1">

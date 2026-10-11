@@ -1,0 +1,5 @@
+node_modules
+build
+ios/App/App/public
+ios/App/App/capacitor.config.json
+ios/DerivedData
