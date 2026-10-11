@@ -32,10 +32,10 @@ export const BURST_MS: Record<RobotBurst, number> = { jump: 750, party: 1700, wa
 // « Toc toc » : quand on le touche
 // ---------------------------------------------------------------------------------------------------------------
 
-/** Au-delà de ce nombre de touchers rapprochés, la tête lui tourne. */
-export const POKES_TO_DIZZY = 4;
+/** À ce nombre de touchers rapprochés, la tête lui tourne (la règle du moteur, core/robot/motion.ts). */
+export const POKES_TO_DIZZY = 3;
 /** La fenêtre dans laquelle les touchers comptent comme « rapprochés ». */
-export const POKE_WINDOW_MS = 1600;
+export const POKE_WINDOW_MS = 1700;
 
 export type PokeState = {
   /** Les instants des derniers touchers encore dans la fenêtre. */
@@ -50,7 +50,7 @@ export const POKE_IDLE: PokeState = { taps: [], burst: null, until: 0 };
 export type PokeAction = { type: "poke"; now: number } | { type: "tick"; now: number };
 
 /**
- * Un toucher le fait glousser ; quatre en moins de 1,6 s lui donnent le tournis, puis il se remet. Pendant le tournis,
+ * Un toucher le fait glousser ; trois en moins de 1,7 s lui donnent le tournis, puis il se remet. Pendant le tournis,
  * les touchers sont ignorés (il ne s'enfonce pas dans le tournis à force d'insister), et après lui le compte repart de
  * zéro.
  */
