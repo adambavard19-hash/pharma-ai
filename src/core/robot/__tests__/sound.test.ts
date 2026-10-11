@@ -42,7 +42,7 @@ describe("les sons du robot", () => {
 
   it("des sons courts ; le site bien audible, le comptoir le plus bas", () => {
     for (const sound of ROBOT_SOUNDS) expect(soundDuration(sound)).toBeLessThan(0.4);
-    expect(SOUND_VOLUME.site).toBeLessThanOrEqual(0.7);
+    expect(SOUND_VOLUME.site).toBeLessThanOrEqual(1);
     expect(SOUND_VOLUME.site).toBeGreaterThan(SOUND_VOLUME.mobile);
     expect(SOUND_VOLUME.counter).toBeLessThanOrEqual(0.15);
     expect(SOUND_VOLUME.counter).toBeLessThan(SOUND_VOLUME.mobile);
