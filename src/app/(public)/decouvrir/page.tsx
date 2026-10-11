@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, Thermometer, TriangleAlert } from "lucide-react";
-import { fr, HAIRLINE, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
-import { HeroVisual, QuestionVisual, RequestVisual, StepBanner, StepScan, StepSuivi, StockMarginVisual, TeamVisual, ExampleTag } from "./_components/visuals";
+import { fr, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
+import { HeroVisual, QuestionVisual, RequestVisual, StockMarginVisual, TeamVisual, ExampleTag } from "./_components/visuals";
 import { BannerPillsInline } from "./_components/banner-mock";
 import { VideoButton } from "./_components/video-dialog";
 import { BannerDemo } from "./_components/banner-demo";
@@ -32,12 +32,6 @@ const EXAMPLES: { scan: string; context?: string; shows: string; note?: string; 
   { scan: "PARACÉTAMOL", context: "Le patient a mal au dos", shows: "Poche chaud/froid pour le dos", note: "Après « Où a-t-il mal ? »", why: "Le froid ou le chaud local complète le traitement." },
   { scan: "FERVEX", shows: "3 g de paracétamol par jour au maximum", warning: true, why: "Chaque sachet contient déjà du paracétamol." },
   { scan: "ANTIPARASITAIRE CHIEN", shows: "Danger pour le chat", warning: true, why: "Selon l'ANSES, la perméthrine des antiparasitaires pour chien est toxique pour le chat." },
-];
-
-const STEPS = [
-  { n: "01", title: "Vous scannez les boîtes", line: "Comme d'habitude, dans votre logiciel de gestion.", Visual: StepScan },
-  { n: "02", title: "La bannière propose", line: "Les produits qui accompagnent le traitement, pris dans votre rayon, avec la quantité en stock. Vendu ou Non vendu : un clic.", Visual: StepBanner },
-  { n: "03", title: "Le patient repart avec ses conseils", line: "Son bilan par e-mail, s'il le souhaite. Ou, depuis l'écran de vente, son plan conseil complet : posologie, indication, rappels — sur son téléphone, par e-mail ou imprimé.", Visual: StepSuivi },
 ];
 
 const STOCK_POINTS: { label: string; value: string; hint?: string }[] = [
@@ -218,29 +212,6 @@ export default async function SitePage() {
             </ul>
             <p className="border-t border-border-subtle px-6 py-3.5 text-[13px] text-text-tertiary">Au comptoir, vous notez Vendu ou Non vendu. Le conseil reste votre décision.</p>
           </div>
-        </div>
-      </section>
-
-      {/* ---- Comment ça marche -------------------------------------- */}
-      <section id="fonctionnement" className="scroll-mt-20 border-y border-border-subtle bg-surface-card">
-        <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-          <div className="flex flex-wrap items-end justify-between gap-6">
-            <SectionHead kicker="Comment ça marche" title="Du scan au conseil, en trois étapes." />
-            <VideoButton film="comment" label="Voir comment ça marche" />
-          </div>
-          <ol className="relative mt-14 grid gap-8 md:grid-cols-3 md:gap-5">
-            <div className={cn("absolute top-[-1px] right-0 left-0 hidden h-px md:block", HAIRLINE)} aria-hidden="true" />
-            {STEPS.map(({ n, title, line, Visual }) => (
-              <li key={n} className="flex flex-col">
-                <div className="flex aspect-[5/4] items-center justify-center overflow-hidden rounded-3xl border border-border-subtle bg-surface-app p-5 md:mt-6">
-                  <Visual />
-                </div>
-                <span className="mt-5 font-mono text-[13px] text-brand-700">{n}</span>
-                <h3 className="mt-1 text-[21px] leading-tight font-semibold tracking-[-0.02em] text-text-primary text-balance">{title}</h3>
-                <p className="mt-2 text-[15px] leading-6 text-text-secondary">{fr(line)}</p>
-              </li>
-            ))}
-          </ol>
         </div>
       </section>
 

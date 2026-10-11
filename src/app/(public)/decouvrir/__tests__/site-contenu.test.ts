@@ -107,7 +107,9 @@ describe("l'en-tête mène d'abord à la bannière du comptoir", () => {
     const nav = header.match(/<nav[\s\S]*?<\/nav>/)?.[0] ?? "";
     const links = [...nav.matchAll(/href="([^"]+)"[^>]*>([^<]+)</g)].map((match) => [match[1], match[2]]);
     expect(links[0]).toEqual(["/decouvrir#banniere", "Au comptoir"]);
-    expect(links).toHaveLength(5);
+    expect(links).toHaveLength(4);
+    // La rubrique « Comment ça marche » a été retirée de la page (demande du fondateur, 11 oct. 2026) : plus de lien vers elle.
+    expect(nav).not.toContain("#fonctionnement");
   });
 });
 
@@ -189,14 +191,14 @@ describe("les mots du site suivent le code, sans promesse", () => {
     expect(homeText.toLowerCase()).not.toContain("sans alerte");
   });
 
-  it("dit que le plan conseil se remet depuis l'écran de vente, pas depuis la bannière", () => {
-    expect(homeText).toContain("Son bilan par e-mail, s'il le souhaite. Ou, depuis l'écran de vente, son plan conseil complet : posologie, indication, rappels — sur son téléphone, par e-mail ou imprimé.");
+  it("n'a plus la rubrique « Comment ça marche »", () => {
+    expect(home).not.toContain('id="fonctionnement"');
+    expect(homeText).not.toContain("Comment ça marche");
   });
 
   it("parle de la quantité en stock, jamais d'un « stock exact » (le stock vient du dernier envoi)", () => {
     expect(homeText.toLowerCase()).not.toContain("stock exact");
     expect(homeText).toContain("Uniquement des produits en rayon, avec la quantité en stock sous chaque conseil");
-    expect(homeText).toContain("pris dans votre rayon, avec la quantité en stock.");
   });
 
   it("distingue les deux arrivées dans l'équipe : l'invitation, ou la demande que le titulaire approuve", () => {

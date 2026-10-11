@@ -7,7 +7,6 @@ import { MobileMenu } from "./mobile-menu";
 const NAV = [
   // La bannière du poste de caisse d'abord : c'est ce que l'équipe voit au comptoir.
   { href: "/decouvrir#banniere", label: "Au comptoir" },
-  { href: "/decouvrir#fonctionnement", label: "Fonctionnement" },
   { href: "/decouvrir#stock-marge", label: "Stock et marge" },
   { href: "/decouvrir/pourquoi", label: "Pourquoi" },
   { href: "/decouvrir#tarif", label: "Tarif" },
