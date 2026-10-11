@@ -40,9 +40,10 @@ describe("les sons du robot", () => {
     expect(soundFor("mobile", { mood: "idle" })).toBeNull();
   });
 
-  it("des sons courts et un volume bas, plus bas au comptoir", () => {
+  it("des sons courts ; le site bien audible, le comptoir le plus bas", () => {
     for (const sound of ROBOT_SOUNDS) expect(soundDuration(sound)).toBeLessThan(0.4);
-    expect(SOUND_VOLUME.site).toBeLessThanOrEqual(0.3);
+    expect(SOUND_VOLUME.site).toBeLessThanOrEqual(0.7);
+    expect(SOUND_VOLUME.site).toBeGreaterThan(SOUND_VOLUME.mobile);
     expect(SOUND_VOLUME.counter).toBeLessThanOrEqual(0.15);
     expect(SOUND_VOLUME.counter).toBeLessThan(SOUND_VOLUME.mobile);
   });

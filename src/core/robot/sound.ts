@@ -24,8 +24,8 @@ export type RobotSound = (typeof ROBOT_SOUNDS)[number];
 export type SoundContext = "site" | "mobile" | "counter";
 
 export const SOUND_DEFAULT_ON: Record<SoundContext, boolean> = { site: true, mobile: true, counter: true };
-/** Volume maître (0 à 1) : bas partout, plus bas encore au comptoir. */
-export const SOUND_VOLUME: Record<SoundContext, number> = { site: 0.3, mobile: 0.25, counter: 0.15 };
+/** Volume maître (0 à 1) : bien audible sur le site (demande du fondateur, 11 oct. 2026), bas dans l'application, plus bas encore au comptoir. */
+export const SOUND_VOLUME: Record<SoundContext, number> = { site: 0.65, mobile: 0.25, counter: 0.15 };
 
 /** Au comptoir, seuls les sons amicaux passent (jamais la réflexion, jamais l'inquiétude). */
 export const COUNTER_FRIENDLY_SOUNDS: ReadonlySet<RobotSound> = new Set<RobotSound>(["greet", "giggle", "dizzy", "curious", "happy", "celebrate"]);
