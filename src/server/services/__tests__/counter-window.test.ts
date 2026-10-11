@@ -336,6 +336,16 @@ describe("le bilan ne nomme jamais ce que la pharmacie a délivré", () => {
     expect(sent.html.toLowerCase()).not.toContain("amoxicilline");
   });
 
+  it("la photo du produit et ses précautions d'emploi partent, sauf une précaution qui cite le traitement délivré", async () => {
+    m.recommendationFindMany.mockResolvedValue([
+      { patientReason: null, opportunity: { ruleKey: DRUG_FREE.key }, product: { name: PRODUCT, imageUrl: "https://images.openbeautyfacts.org/flore.jpg", precautions: ["Conserver au frais.", "Prendre à distance de l'amoxicilline."] }, presentation: null },
+    ]);
+    const sent = await sentMail();
+    expect(sent.html).toContain("https://images.openbeautyfacts.org/flore.jpg");
+    expect(sent.text).toContain("Précaution d'emploi : Conserver au frais.");
+    for (const body of [sent.text, sent.html]) expect(body.toLowerCase()).not.toContain("amoxicilline");
+  });
+
   it("une règle validée introuvable (ni dans le code, ni parmi les conseils ajoutés) : sa phrase ne part pas", async () => {
     m.validated.mockResolvedValue(new Set(["regle-disparue"]));
     sold("Une phrase dont personne ne connaît plus le modèle.", "regle-disparue");

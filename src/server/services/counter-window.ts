@@ -12,7 +12,8 @@ import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import type { Prisma } from "@/generated/prisma";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { customRulesFrom, isCustomRuleKey } from "@/core/ai/central-advice";
-import { buildPatientReport, maskEmail, parsePatientEmail, patientSafeReason } from "@/core/counter/patient-report";
+import { buildPatientReport, maskEmail, parsePatientEmail, patientSafeLine, patientSafeReason } from "@/core/counter/patient-report";
+import { getEnv } from "@/config/env";
 import { counterEmailPurgeCutoff } from "@/core/counter/email-retention";
 import { outcomeOf, type NoticeOutcome } from "@/core/counter/notice";
 import { zonedStartOfDay } from "@/core/performance/periods";
@@ -240,15 +241,27 @@ export async function finishCounterSale(agent: AgentContext, input: { prescripti
  * base (sa phrase patient, sinon sa raison courte : exactement ce que le moteur a rendu). Une règle introuvable n'a pas de
  * modèle, et sa phrase ne part pas.
  */
-async function patientReasonTemplates(ruleKeys: ReadonlySet<string>): Promise<Map<string, string>> {
-  const templates = new Map<string, string>();
-  for (const rule of ADVICE_RULES) if (ruleKeys.has(rule.key)) templates.set(rule.key, rule.patientReasonTemplate);
+async function patientReasonTemplates(ruleKeys: ReadonlySet<string>): Promise<Map<string, { template: string; benefits: string[] }>> {
+  const templates = new Map<string, { template: string; benefits: string[] }>();
+  for (const rule of ADVICE_RULES) if (ruleKeys.has(rule.key)) templates.set(rule.key, { template: rule.patientReasonTemplate, benefits: rule.benefits ?? [] });
   // La table des conseils ajoutés n'est relue que si un conseil ajouté est en jeu : le cas courant ne coûte aucune requête.
   if ([...ruleKeys].some(isCustomRuleKey)) {
     const rows = await loadCentralRuleRows();
-    for (const rule of customRulesFrom(rows.filter((row) => ruleKeys.has(row.ruleKey)))) templates.set(rule.key, rule.patientReasonTemplate);
+    for (const rule of customRulesFrom(rows.filter((row) => ruleKeys.has(row.ruleKey)))) templates.set(rule.key, { template: rule.patientReasonTemplate, benefits: rule.benefits ?? [] });
   }
   return templates;
+}
+
+/** L'adresse publique du site, pour les images du bilan (une messagerie ne charge que du https). */
+function emailAssetBase(): string {
+  try {
+    const env = getEnv();
+    const url = env.PUBLIC_APP_URL ?? env.APP_URL;
+    return /^https:\/\//.test(url) ? url : "https://pharmaboost.app";
+  } catch {
+    // Configuration illisible : le bilan part quand même, avec les images du site public.
+    return "https://pharmaboost.app";
+  }
 }
 
 /**
@@ -260,10 +273,10 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
   const { agent } = input;
   const pharmacyId = agent.scope.pharmacyId;
   const [pharmacy, recs, validated, lines] = await Promise.all([
-    prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { name: true, isDemo: true } }),
+    prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { name: true, isDemo: true, brandColor: true, logoUrl: true, phone: true, addressLine1: true, addressLine2: true, postalCode: true, city: true } }),
     prisma.recommendation.findMany({
       where: { id: { in: input.soldIds }, pharmacyId },
-      select: { patientReason: true, opportunity: { select: { ruleKey: true } }, product: { select: { name: true } }, presentation: { select: { specialty: { select: { name: true } } } } },
+      select: { patientReason: true, opportunity: { select: { ruleKey: true } }, product: { select: { name: true, imageUrl: true, precautions: true } }, presentation: { select: { specialty: { select: { name: true } } } } },
     }),
     validatedRuleKeys(),
     // Ce que la vente a délivré, pour qu'aucune phrase du bilan ne le nomme : le nom lu au scan, la spécialité et ses substances.
@@ -274,16 +287,27 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
   ]);
   const sale = lines.map((line) => ({ names: [line.drugName, line.specialty?.name], substances: line.specialty?.compositions.map((composition) => composition.substanceLabel) ?? [] }));
   const validatedKeys = new Set(recs.map((rec) => rec.opportunity?.ruleKey).filter((key): key is string => Boolean(key) && validated.has(key as string)));
-  const templates = validatedKeys.size > 0 ? await patientReasonTemplates(validatedKeys) : new Map<string, string>();
+  const templates = validatedKeys.size > 0 ? await patientReasonTemplates(validatedKeys) : new Map<string, { template: string; benefits: string[] }>();
   const products = recs.map((rec) => {
     const fullName = rec.product?.name ?? rec.presentation?.specialty.name ?? "";
     const ruleKey = rec.opportunity?.ruleKey ?? null;
+    const rule = ruleKey && validatedKeys.has(ruleKey) ? templates.get(ruleKey) : undefined;
+    // Chaque ligne ajoutée passe le même verrou que la phrase patient : rien qui nomme ce que la pharmacie a délivré.
+    const safe = (line: string) => patientSafeLine({ line, productName: fullName, sale });
     return {
       name: fullName.replace(/,.*$/, "").trim(),
-      reason: ruleKey && validatedKeys.has(ruleKey) ? patientSafeReason({ reason: rec.patientReason, template: templates.get(ruleKey), productName: fullName, sale }) : null,
+      reason: rule ? patientSafeReason({ reason: rec.patientReason, template: rule.template, productName: fullName, sale }) : null,
+      imageUrl: rec.product?.imageUrl ?? null,
+      // Les mots-clés de la règle VALIDÉE (écrits et relus) ; les précautions d'emploi que la pharmacie a saisies sur sa fiche produit.
+      benefits: (rule?.benefits ?? []).map(safe).filter((line): line is string => line !== null),
+      precautions: (rec.product?.precautions ?? []).map(safe).filter((line): line is string => line !== null),
     };
   });
-  const mail = buildPatientReport({ pharmacyName: pharmacy?.name ?? "", products: products.length ? products : input.fallbackNames.map((name) => ({ name, reason: null })) });
+  const mail = buildPatientReport({
+    pharmacy: pharmacy ? { name: pharmacy.name, brandColor: pharmacy.brandColor, logoUrl: pharmacy.logoUrl, phone: pharmacy.phone, addressLine1: pharmacy.addressLine1, addressLine2: pharmacy.addressLine2, postalCode: pharmacy.postalCode, city: pharmacy.city } : { name: "" },
+    products: products.length ? products : input.fallbackNames.map((name) => ({ name, reason: null })),
+    assetBaseUrl: emailAssetBase(),
+  });
   if (!mail) return "NONE";
   const messaging = getMessagingProvider({ demo: pharmacy?.isDemo === true });
   const outcome = await messaging

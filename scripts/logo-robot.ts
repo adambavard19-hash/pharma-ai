@@ -12,6 +12,7 @@
  *
  *   npx tsx scripts/logo-robot.ts           tout
  *   npx tsx scripts/logo-robot.ts --pwa     seulement les icônes de l'application mobile
+ *   npx tsx scripts/logo-robot.ts --email   le robot léger du bilan patient (public/email/robot-192.png, sans fond)
  *   npx tsx scripts/logo-robot.ts --ios     l'icône App Store (1024 px, sans transparence : Apple la refuse) et l'écran de
  *                                           lancement de l'application iPhone (application-mobile/ios)
  */
@@ -86,6 +87,14 @@ const fullBleedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 1
 `;
 const pwaOnly = process.argv.includes("--pwa");
 const iosOnly = process.argv.includes("--ios");
+const emailOnly = process.argv.includes("--email");
+
+/** Le robot du bilan envoyé au patient : petit (192 px pour un affichage à 52 px), sans fond, posé sur la couleur de la pharmacie. */
+async function emailRobot() {
+  mkdirSync("public/email", { recursive: true });
+  await sharp(Buffer.from(transparentSvg), { density: 72 }).resize(192, 192).png({ compressionLevel: 9, palette: true }).toFile("public/email/robot-192.png");
+  console.log("✓ public/email/robot-192.png (192 px, sans fond)");
+}
 
 /** L'écran de lancement : fond clair de l'application, robot au centre (2732 px, carré : iOS le recadre au centre). */
 const splashSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="2732" height="2732">
@@ -131,7 +140,9 @@ async function pwaIcons() {
 async function main() {
   if (pwaOnly) return pwaIcons();
   if (iosOnly) return iosAssets();
+  if (emailOnly) return emailRobot();
   await pwaIcons();
+  await emailRobot();
   for (const [file, size] of outputs) {
     await sharp(Buffer.from(svg), { density: Math.ceil((72 * size) / 1024) * 2 }).resize(size, size).png().toFile(file);
     console.log(`✓ ${file} (${size} px)`);
