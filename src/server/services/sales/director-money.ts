@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/server/db/client";
+import { commissionSubject } from "@/core/sales/progressive-commission";
 import { recordAudit } from "@/server/audit/log";
 import { getStorageProvider } from "@/server/ai/registry";
 import { COMMISSION_STATUS_LABELS, type CommissionStatusCode } from "@/core/sales/pipeline";
@@ -127,7 +128,8 @@ export async function listDirectorCommissions(filters: CommissionFilters = {}) {
     dueAt: row.dueAt,
     paidAt: row.paidAt,
     note: row.note,
-    prospect: row.prospect,
+    // Un bonus de palier se lit « Bonus Bronze — Pharmacie… » : on ne le confond pas avec la commission du dossier.
+    prospect: { ...row.prospect, name: commissionSubject(row, row.prospect.name) },
     rep: { id: row.salesRep.id, name: repName(row.salesRep) },
     invoice: row.invoice ? { id: row.invoice.id, number: row.invoice.number, status: row.invoice.status as InvoiceStatus } : null,
   }));
@@ -259,15 +261,22 @@ export async function listDirectorInvoices(filters: InvoiceFilters = {}) {
 
 export type InvoiceCommissionLine = { id: string; amountCents: number; status: CommissionStatusCode; createdAt: Date; prospectName: string; city: string | null };
 
-/** Les commissions qu'une facture peut encore réclamer : acquises ou à payer, libres de toute facture. */
+/**
+ * Une commission de la grille progressive dont la pharmacie n'est pas encore activée n'a qu'un montant provisoire
+ * (la prévision du rang suivant) : une facture la figerait avant que son rang soit connu. Elle se facture une fois
+ * la pharmacie activée.
+ */
+const NOT_PROVISIONAL = { OR: [{ type: { not: "PROGRESSIVE" } }, { prospect: { activatedAt: { not: null } } }] } satisfies Prisma.CommissionWhereInput;
+
+/** Les commissions qu'une facture peut encore réclamer : acquises ou à payer, libres de toute facture, au montant définitif. */
 export async function listInvoiceableCommissions(): Promise<(InvoiceCommissionLine & { salesRepId: string })[]> {
   const rows = await prisma.commission.findMany({
-    where: { invoiceId: null, status: { in: ["EARNED", "PAYABLE"] } },
+    where: { invoiceId: null, status: { in: ["EARNED", "PAYABLE"] }, ...NOT_PROVISIONAL },
     orderBy: { createdAt: "asc" },
     take: 1000,
     include: { prospect: { select: { name: true, city: true } } },
   });
-  return rows.map((row) => ({ id: row.id, salesRepId: row.salesRepId, amountCents: row.amountCents, status: row.status as CommissionStatusCode, createdAt: row.createdAt, prospectName: row.prospect.name, city: row.prospect.city }));
+  return rows.map((row) => ({ id: row.id, salesRepId: row.salesRepId, amountCents: row.amountCents, status: row.status as CommissionStatusCode, createdAt: row.createdAt, prospectName: commissionSubject(row, row.prospect.name), city: row.prospect.city }));
 }
 
 /** Une facture, avec ses commissions rattachées et le rapprochement des montants. Rien si elle n'existe pas. */
@@ -280,7 +289,7 @@ export async function getDirectorInvoice(id: string) {
     },
   });
   if (!invoice) return null;
-  const commissions: InvoiceCommissionLine[] = invoice.commissions.map((row) => ({ id: row.id, amountCents: row.amountCents, status: row.status as CommissionStatusCode, createdAt: row.createdAt, prospectName: row.prospect.name, city: row.prospect.city }));
+  const commissions: InvoiceCommissionLine[] = invoice.commissions.map((row) => ({ id: row.id, amountCents: row.amountCents, status: row.status as CommissionStatusCode, createdAt: row.createdAt, prospectName: commissionSubject(row, row.prospect.name), city: row.prospect.city }));
   const commissionsCents = commissions.reduce((total, row) => total + row.amountCents, 0);
   return {
     id: invoice.id,
@@ -327,10 +336,10 @@ export async function createInvoice(
   if (sameNumber) return refuse(duplicateMessage, "number");
 
   const ids = [...new Set(input.commissionIds)];
-  let commissions: { id: string; prospectId: string; amountCents: number; status: string; invoiceId: string | null }[] = [];
+  let commissions: { id: string; prospectId: string; amountCents: number; status: string; invoiceId: string | null; type: string; prospect: { activatedAt: Date | null } }[] = [];
   if (ids.length > 0) {
-    commissions = await prisma.commission.findMany({ where: { id: { in: ids }, salesRepId: rep.id }, select: { id: true, prospectId: true, amountCents: true, status: true, invoiceId: true } });
-    if (commissions.length !== ids.length || commissions.some((commission) => !isInvoiceable(commission))) {
+    commissions = await prisma.commission.findMany({ where: { id: { in: ids }, salesRepId: rep.id }, select: { id: true, prospectId: true, amountCents: true, status: true, invoiceId: true, type: true, prospect: { select: { activatedAt: true } } } });
+    if (commissions.length !== ids.length || commissions.some((commission) => !isInvoiceable({ ...commission, activated: commission.prospect.activatedAt !== null }))) {
       return refuse("Une des commissions choisies n'est plus disponible pour cette facture. Rechargez la page et choisissez à nouveau.");
     }
   }
@@ -354,7 +363,7 @@ export async function createInvoice(
       });
       if (ids.length > 0) {
         // Le « invoiceId: null » protège d'une facture concurrente : une commission ne figure que sur une facture.
-        const linked = await tx.commission.updateMany({ where: { id: { in: ids }, salesRepId: rep.id, invoiceId: null, status: { in: ["EARNED", "PAYABLE"] } }, data: { invoiceId: created.id } });
+        const linked = await tx.commission.updateMany({ where: { id: { in: ids }, salesRepId: rep.id, invoiceId: null, status: { in: ["EARNED", "PAYABLE"] }, ...NOT_PROVISIONAL }, data: { invoiceId: created.id } });
         if (linked.count !== ids.length) throw new Error("COMMISSIONS_CHANGED");
       }
       return created.id;
@@ -456,6 +465,10 @@ export async function moveInvoice(params: { invoiceId: string; gesture: InvoiceG
       for (const change of changes) groups.set(`${change.from}>${change.to}`, { from: change.from, to: change.to });
       for (const group of groups.values()) {
         await tx.commission.updateMany({ where: { invoiceId: invoice.id, status: group.from }, data: { status: group.to, ...(group.to === "PAID" ? { paidAt: now } : {}) } });
+      }
+      // Une prévisionnelle qui devient acquise par la facture (validée ou payée d'un coup) : sa date d'acquisition (« Acquis ce mois »).
+      if (changes.some((change) => change.from === "FORECAST")) {
+        await tx.commission.updateMany({ where: { invoiceId: invoice.id, earnedAt: null, status: { in: ["EARNED", "PAYABLE", "PAID"] } }, data: { earnedAt: now } });
       }
       if (params.gesture === "REJECT") await tx.commission.updateMany({ where: { invoiceId: invoice.id }, data: { invoiceId: null } });
     });

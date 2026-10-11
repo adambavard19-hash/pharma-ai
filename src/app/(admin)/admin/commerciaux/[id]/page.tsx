@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { toCommissionTypeKey } from "@/core/sales/director/team";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Building2, CalendarCheck2, Euro, FileSignature, FolderOpen, Repeat, Send, Timer, Wallet } from "lucide-react";
@@ -37,7 +38,7 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-const COMMISSION_TYPE_LABELS: Record<string, string> = { FIXED: "Fixe", PERCENT: "Pourcentage", RECURRING: "Récurrente" };
+const COMMISSION_TYPE_LABELS: Record<string, string> = { PROGRESSIVE: "Grille progressive", BONUS: "Bonus de palier", FIXED: "Fixe", PERCENT: "Pourcentage", RECURRING: "Récurrente" };
 
 /** Nature d'un événement de dossier, pour l'icône de la frise. */
 function timelineKind(type: string): TimelineKind {
@@ -81,7 +82,7 @@ export default async function SalesRepPage({ params, searchParams }: { params: P
         actions={
           <>
             <InviteButton salesRepId={rep.id} invited={Boolean(rep.invitedAt)} />
-            <EditSalesRepButton salesRepId={rep.id} initial={{ firstName: rep.firstName, lastName: rep.lastName, email: rep.email, phone: rep.phone ?? "", zone: rep.zone ?? "", commissionType: rep.commissionType, commissionValue: (rep.commissionValue / 100).toString().replace(".", ","), isActive: rep.isActive }} />
+            <EditSalesRepButton salesRepId={rep.id} initial={{ firstName: rep.firstName, lastName: rep.lastName, email: rep.email, phone: rep.phone ?? "", zone: rep.zone ?? "", commissionType: toCommissionTypeKey(rep.commissionType), commissionValue: (rep.commissionValue / 100).toString().replace(".", ","), isActive: rep.isActive }} />
           </>
         }
       />

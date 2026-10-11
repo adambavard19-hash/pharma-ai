@@ -320,15 +320,17 @@ describe("transformer en commercial", () => {
     mocks.sendSalesInvitation.mockResolvedValue({ status: "SENT", detail: "envoyé" });
   });
 
-  it("crée le commercial avec les données de la candidature et la commission FIXE standard, le lie, écrit l'événement et l'audit", async () => {
+  // Depuis la grille progressive (octobre 2026), un commercial créé depuis une candidature suit la grille de tous les
+  // commerciaux, comme les nouveaux commerciaux créés à la main : plus de montant fixe tiré du réglage de la console.
+  it("crée le commercial avec les données de la candidature et la grille progressive, le lie, écrit l'événement et l'audit", async () => {
     const result = await admin.convertSalesApplication("app_1", ADMIN_ID, { invite: true });
 
-    expect(result).toEqual({ ok: true, salesRepId: "rep_1", name: "Marie Dupont", commissionCents: 25000, invitation: { status: "SENT", detail: "envoyé" } });
+    expect(result).toEqual({ ok: true, salesRepId: "rep_1", name: "Marie Dupont", commissionType: "PROGRESSIVE", invitation: { status: "SENT", detail: "envoyé" } });
     expect(mocks.createSalesRep).toHaveBeenCalledTimes(1);
-    expect(mocks.createSalesRep).toHaveBeenCalledWith({ firstName: "Marie", lastName: "Dupont", email: "marie@exemple.fr", phone: "06 12 34 56 78", zone: "Rhône et Isère", commissionType: "FIXED", commissionValue: 25000 }, ADMIN_ID);
+    expect(mocks.createSalesRep).toHaveBeenCalledWith({ firstName: "Marie", lastName: "Dupont", email: "marie@exemple.fr", phone: "06 12 34 56 78", zone: "Rhône et Isère", commissionType: "PROGRESSIVE", commissionValue: 0 }, ADMIN_ID);
     expect(db.salesApplication.updateMany).toHaveBeenCalledWith({ where: { id: "app_1", status: "ACCEPTED", salesRepId: null }, data: { salesRepId: "rep_1" } });
     expect(db.salesApplicationEvent.create).toHaveBeenCalledWith({
-      data: { applicationId: "app_1", kind: "CONVERTED", note: `Commercial créé : Marie Dupont. Commission fixe de ${formatPriceEuros(25000)} par pharmacie activée.`, platformAdminId: ADMIN_ID },
+      data: { applicationId: "app_1", kind: "CONVERTED", note: `Commercial créé : Marie Dupont. Grille progressive : ${formatPriceEuros(20000)} à ${formatPriceEuros(30000)} par pharmacie activée, + bonus de palier (10, 25, 50, 100).`, platformAdminId: ADMIN_ID },
     });
     expect(mocks.sendSalesInvitation).toHaveBeenCalledWith("rep_1", ADMIN_ID);
     const audit = mocks.recordAudit.mock.calls[0][0];
@@ -337,15 +339,16 @@ describe("transformer en commercial", () => {
       entityType: "SalesApplication",
       entityId: "app_1",
       platformAdminId: ADMIN_ID,
-      metadata: { salesRepId: "rep_1", commissionType: "FIXED", commissionCents: 25000, invitation: "SENT" },
+      metadata: { salesRepId: "rep_1", commissionType: "PROGRESSIVE", invitation: "SENT" },
     });
     expect(JSON.stringify(audit)).not.toContain("exemple.fr");
   });
 
-  it("la commission est celle du réglage de la console, pas un montant figé dans le code", async () => {
+  it("la commission standard de la console n'entre plus en jeu : la grille est la même pour tous", async () => {
     mocks.getStandardCommissionCents.mockResolvedValue(30000);
     await admin.convertSalesApplication("app_1", ADMIN_ID, { invite: false });
-    expect(mocks.createSalesRep).toHaveBeenCalledWith(expect.objectContaining({ commissionType: "FIXED", commissionValue: 30000 }), ADMIN_ID);
+    expect(mocks.createSalesRep).toHaveBeenCalledWith(expect.objectContaining({ commissionType: "PROGRESSIVE", commissionValue: 0 }), ADMIN_ID);
+    expect(mocks.getStandardCommissionCents).not.toHaveBeenCalled();
   });
 
   it("l'invitation est envoyée par défaut ; sans invitation, aucun e-mail ne part", async () => {

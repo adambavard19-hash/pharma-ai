@@ -6,9 +6,8 @@ import { recordAudit } from "@/server/audit/log";
 import { getStorageProvider } from "@/server/ai/registry";
 import { createSalesRep, sendSalesInvitation } from "@/server/services/sales/reps";
 import { applicationEventActorId, auditIdentity, splitEventActors, type RepActorInput } from "@/server/services/sales/rep-actor";
-import { getStandardCommissionCents } from "@/server/services/standard-commission";
+import { describeProgressiveGrid } from "@/core/sales/commission";
 import { SALES_APPLICATION_STATUSES, SALES_APPLICATION_STATUS_LABELS, SALES_APPLICATION_STATUS_TONES, type SalesApplicationStatusKey } from "@/core/sales-applications/status";
-import { formatPriceEuros } from "@/core/pricing/official-offer";
 import type { TimelineEntry } from "@/core/admin/timeline";
 
 /**
@@ -322,7 +321,7 @@ const repIdentity = z.object({
 });
 
 export type ConvertResult =
-  | { ok: true; salesRepId: string; name: string; commissionCents: number; invitation: { status: string; detail: string } | null }
+  | { ok: true; salesRepId: string; name: string; commissionType: "PROGRESSIVE"; invitation: { status: string; detail: string } | null }
   | { ok: false; reason: "NOT_FOUND" | "NOT_ACCEPTED" | "ALREADY_CONVERTED" | "EMAIL_TAKEN" | "INVALID" | "CONFLICT"; salesRepId?: string; detail?: string };
 
 function isUniqueViolation(error: unknown): boolean {
@@ -331,9 +330,9 @@ function isUniqueViolation(error: unknown): boolean {
 
 /**
  * Crée le commercial d'une candidature ACCEPTÉE : ses coordonnées et sa zone
- * viennent de la candidature, sa commission est FIXE au montant standard de la
- * console (`getStandardCommissionCents`, 250 € par pharmacie activée à
- * défaut). Le compte et l'invitation facultative passent par les fonctions
+ * viennent de la candidature, sa commission suit la GRILLE PROGRESSIVE, la règle
+ * de tous les commerciaux (200 € à 300 € par pharmacie activée, plus les bonus
+ * de palier : `core/sales/progressive-commission.ts`). Le compte et l'invitation facultative passent par les fonctions
  * existantes (`createSalesRep`, `sendSalesInvitation`) : même mot de passe
  * aléatoire inconnu, même lien d'invitation.
  *
@@ -359,10 +358,9 @@ export async function convertSalesApplication(id: string, actor: RepActorInput, 
   const existing = await prisma.salesRep.findUnique({ where: { email: identity.email }, select: { id: true } });
   if (existing) return { ok: false, reason: "EMAIL_TAKEN" };
 
-  const commissionCents = await getStandardCommissionCents();
   let created: { id: string };
   try {
-    created = await createSalesRep({ ...identity, commissionType: "FIXED", commissionValue: commissionCents }, actor);
+    created = await createSalesRep({ ...identity, commissionType: "PROGRESSIVE", commissionValue: 0 }, actor);
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
     // Deux gestes simultanés : l'adresse est le verrou. Le perdant lit ce que le gagnant a fait.
@@ -378,7 +376,7 @@ export async function convertSalesApplication(id: string, actor: RepActorInput, 
       data: {
         applicationId: id,
         kind: SALES_APPLICATION_EVENT_KINDS.CONVERTED,
-        note: `Commercial créé : ${name}. Commission fixe de ${formatPriceEuros(commissionCents)} par pharmacie activée.`,
+        note: `Commercial créé : ${name}. ${describeProgressiveGrid()}.`,
         platformAdminId: applicationEventActorId(actor),
       },
     });
@@ -405,9 +403,9 @@ export async function convertSalesApplication(id: string, actor: RepActorInput, 
     entityType: "SalesApplication",
     entityId: id,
     ...auditIdentity(actor),
-    metadata: { salesRepId: created.id, commissionType: "FIXED", commissionCents, invitation: invitation?.status ?? "NOT_REQUESTED" },
+    metadata: { salesRepId: created.id, commissionType: "PROGRESSIVE", invitation: invitation?.status ?? "NOT_REQUESTED" },
   });
-  return { ok: true, salesRepId: created.id, name, commissionCents, invitation };
+  return { ok: true, salesRepId: created.id, name, commissionType: "PROGRESSIVE", invitation };
 }
 
 // ---------------------------------------------------------------------------

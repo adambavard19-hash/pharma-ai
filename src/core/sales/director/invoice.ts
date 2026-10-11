@@ -106,8 +106,14 @@ export function commissionStatusAfterInvoiceGesture(gesture: InvoiceGesture, inv
   }
 }
 
-/** Une commission qu'une facture peut réclamer : acquise ou à payer, et pas déjà sur une autre facture. */
-export function isInvoiceable(commission: { status: string; invoiceId: string | null }): boolean {
+/**
+ * Une commission qu'une facture peut réclamer : acquise ou à payer, pas déjà
+ * sur une autre facture, et à son montant définitif. Une commission de la
+ * grille progressive dont la pharmacie n'est pas encore activée (`activated`
+ * faux) n'a qu'un montant provisoire : elle attend l'activation.
+ */
+export function isInvoiceable(commission: { status: string; invoiceId: string | null; type?: string; activated?: boolean }): boolean {
+  if (commission.type === "PROGRESSIVE" && commission.activated === false) return false;
   return commission.invoiceId === null && (commission.status === "EARNED" || commission.status === "PAYABLE");
 }
 

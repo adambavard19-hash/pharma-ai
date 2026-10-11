@@ -3,10 +3,12 @@ import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import { todayRange } from "@/core/admin/metrics";
 import type { ProspectStatusCode } from "@/core/sales/pipeline";
-import { ACTIVITY_EVENT_TYPES, ACTIVITY_LIMIT, REASSIGN_MAX, activitySince, deletionRefusal, parisMonthStart, teamSearchWhere, type RepFootprint, type TeamStatusFilter } from "@/core/sales/director/team";
+import { ACTIVITY_EVENT_TYPES, ACTIVITY_LIMIT, REASSIGN_MAX, activitySince, deletionRefusal, parisMonthStart, teamSearchWhere, toCommissionTypeKey, type CommissionTypeKey, type RepFootprint, type TeamStatusFilter } from "@/core/sales/director/team";
 import { recordProspectEvent } from "./events";
 import { countByRep, firstActivationByProspect, firstDemoDoneByProspect } from "./first-events";
 import { notifySalesRep } from "./notifications";
+import { syncProgressiveCommissionsSafely } from "./progressive-commissions";
+import { commissionSubject } from "@/core/sales/progressive-commission";
 import { createSalesRep, salesRepStats, sendSalesInvitation, updateSalesRep, type SalesRepInput } from "./reps";
 import type { RepActor } from "./rep-actor";
 import type { Prisma } from "@/generated/prisma";
@@ -48,7 +50,7 @@ export type TeamRow = {
   email: string;
   phone: string | null;
   zone: string | null;
-  commissionType: "FIXED" | "PERCENT" | "RECURRING";
+  commissionType: CommissionTypeKey;
   commissionValue: number;
   isActive: boolean;
   invitedAt: Date | null;
@@ -101,7 +103,7 @@ export async function listTeam(filter: { q: string; status: TeamStatusFilter | n
   const openBy = new Map(open.map((row) => [row.salesRepId, row._count._all]));
 
   return {
-    rows: reps.map((rep) => ({ ...rep, openProspects: openBy.get(rep.id) ?? 0, activationsThisMonth: activations.get(rep.id) ?? 0 })),
+    rows: reps.map((rep) => ({ ...rep, commissionType: toCommissionTypeKey(rep.commissionType), openProspects: openBy.get(rep.id) ?? 0, activationsThisMonth: activations.get(rep.id) ?? 0 })),
     counts: { all: active + inactive, active, inactive },
     grandTotal,
   };
@@ -158,7 +160,7 @@ export type TeamMember = {
   email: string;
   phone: string | null;
   zone: string | null;
-  commissionType: "FIXED" | "PERCENT" | "RECURRING";
+  commissionType: CommissionTypeKey;
   commissionValue: number;
   isActive: boolean;
   invitedAt: Date | null;
@@ -182,7 +184,7 @@ export async function getTeamMember(salesRepId: string): Promise<TeamMemberOverv
   });
   if (!rep) return null;
   const [stats, footprint] = await Promise.all([salesRepStats(rep.id), repFootprint(rep.id)]);
-  return { member: { ...rep, name: fullName(rep) }, stats, footprint, deletionRefusal: deletionRefusal(footprint) };
+  return { member: { ...rep, commissionType: toCommissionTypeKey(rep.commissionType), name: fullName(rep) }, stats, footprint, deletionRefusal: deletionRefusal(footprint) };
 }
 
 export type PortfolioProspect = {
@@ -274,7 +276,7 @@ export async function getMoney(salesRepId: string): Promise<TeamMemberMoney> {
       where: { salesRepId },
       orderBy: [{ createdAt: "desc" }],
       take: MONEY_LIMIT + 1,
-      select: { id: true, amountCents: true, status: true, type: true, createdAt: true, paidAt: true, invoiceId: true, prospect: { select: { name: true } } },
+      select: { id: true, amountCents: true, status: true, type: true, bonusTier: true, createdAt: true, paidAt: true, invoiceId: true, prospect: { select: { name: true } } },
     }),
     prisma.salesInvoice.findMany({
       where: { salesRepId },
@@ -284,7 +286,7 @@ export async function getMoney(salesRepId: string): Promise<TeamMemberMoney> {
     }),
   ]);
   return {
-    commissions: commissions.slice(0, MONEY_LIMIT).map((row) => ({ id: row.id, prospectName: row.prospect.name, amountCents: row.amountCents, status: row.status, type: row.type, createdAt: row.createdAt, paidAt: row.paidAt, invoiceId: row.invoiceId })),
+    commissions: commissions.slice(0, MONEY_LIMIT).map((row) => ({ id: row.id, prospectName: commissionSubject(row, row.prospect.name), amountCents: row.amountCents, status: row.status, type: row.type, createdAt: row.createdAt, paidAt: row.paidAt, invoiceId: row.invoiceId })),
     commissionsTruncated: commissions.length > MONEY_LIMIT,
     invoices: invoices.slice(0, MONEY_LIMIT),
     invoicesTruncated: invoices.length > MONEY_LIMIT,
@@ -362,7 +364,7 @@ export type TeamMemberPatch = {
   lastName?: string;
   phone?: string | null;
   zone?: string | null;
-  commissionType?: "FIXED" | "PERCENT" | "RECURRING";
+  commissionType?: CommissionTypeKey;
   commissionValue?: number;
 };
 
@@ -482,8 +484,14 @@ export async function reassignProspects(prospectIds: string[], toSalesRepId: str
   await prisma.$transaction([
     prisma.prospect.updateMany({ where: { id: { in: movableIds } }, data: { salesRepId: target.id } }),
     prisma.salesTask.updateMany({ where: { prospectId: { in: movableIds }, doneAt: null }, data: { salesRepId: target.id } }),
-    prisma.commission.updateMany({ where: { prospectId: { in: movableIds }, status: "FORECAST", invoiceId: null }, data: { salesRepId: target.id } }),
+    // Seule la commission prévisionnelle d'un dossier PAS ENCORE activé suit le dossier. Une activation est créditée une fois
+    // pour toutes au commercial qui suivait le dossier : sa commission et ses bonus de palier restent à lui.
+    prisma.commission.updateMany({ where: { prospectId: { in: movableIds }, status: "FORECAST", invoiceId: null, type: { not: "BONUS" }, prospect: { activatedAt: null } }, data: { salesRepId: target.id } }),
   ]);
+  // Les prévisions de la grille progressive suivent pour les commerciaux concernés (une activation déjà créditée ne bouge pas).
+  for (const repId of new Set([target.id, ...movable.flatMap((prospect) => (prospect.salesRepId ? [prospect.salesRepId] : []))])) {
+    await syncProgressiveCommissionsSafely(repId, "réaffectation par la direction commerciale");
+  }
 
   const name = fullName(target);
   for (const prospect of movable) {

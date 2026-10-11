@@ -20,7 +20,8 @@ type Created = { salesRepId: string; name: string; invitation: { status: string;
  */
 export function RepForm({ defaultCommissionCents }: { defaultCommissionCents: number }) {
   const [values, setValues] = useState({ firstName: "", lastName: "", email: "", phone: "", zone: "" });
-  const [commissionType, setCommissionType] = useState<CommissionTypeKey>("FIXED");
+  // La grille progressive est la règle par défaut ; le montant standard reste proposé si l'on choisit un montant fixe.
+  const [commissionType, setCommissionType] = useState<CommissionTypeKey>("PROGRESSIVE");
   const [commissionValue, setCommissionValue] = useState(commissionInputFromStored(defaultCommissionCents));
   const [invite, setInvite] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -32,7 +33,7 @@ export function RepForm({ defaultCommissionCents }: { defaultCommissionCents: nu
 
   const reset = () => {
     setValues({ firstName: "", lastName: "", email: "", phone: "", zone: "" });
-    setCommissionType("FIXED");
+    setCommissionType("PROGRESSIVE");
     setCommissionValue(commissionInputFromStored(defaultCommissionCents));
     setInvite(true);
     setErrors({});
@@ -107,7 +108,7 @@ export function RepForm({ defaultCommissionCents }: { defaultCommissionCents: nu
         </Field>
       </div>
 
-      <CommissionFields idPrefix="rep" type={commissionType} value={commissionValue} onType={setCommissionType} onValue={setCommissionValue} error={errors.commissionValue} />
+      <CommissionFields idPrefix="rep" type={commissionType} value={commissionValue} onType={setCommissionType} onValue={setCommissionValue} error={errors.commissionValue} defaults={{ FIXED: commissionInputFromStored(defaultCommissionCents) }} />
 
       <Checkbox id="rep-invite" checked={invite} onChange={(event) => setInvite(event.target.checked)} label="Envoyer l'invitation maintenant" description="Il reçoit un e-mail avec un lien personnel pour choisir son mot de passe." />
 

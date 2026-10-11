@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   notifyAdmins: vi.fn(),
   sendEmail: vi.fn(),
   traceDispatch: vi.fn(),
+  syncProgressiveCommissionsSafely: vi.fn(),
+  markProspectActivated: vi.fn(),
+  stampActivation: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -30,6 +33,7 @@ vi.mock("@/server/services/sales/notifications", () => ({ notifyAdmins: mocks.no
 vi.mock("@/server/services/sales/events", () => ({ recordProspectEvent: mocks.recordProspectEvent }));
 vi.mock("@/server/services/email-dispatch", () => ({ traceDispatch: mocks.traceDispatch }));
 vi.mock("@/server/services/platform-onboarding", () => ({ sendInstallationGuide: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/server/services/sales/progressive-commissions", () => ({ syncProgressiveCommissionsSafely: mocks.syncProgressiveCommissionsSafely, markProspectActivated: mocks.markProspectActivated, stampActivation: mocks.stampActivation }));
 
 const { announceSubscriptionStarted } = await import("../subscriptions");
 
@@ -54,17 +58,24 @@ beforeEach(() => {
 describe("announceSubscriptionStarted : le dossier", () => {
   it("passe le dossier en activé, écrit l'événement « activée » une fois et prévient le commercial", async () => {
     await announceSubscriptionStarted("org_1");
-    expect(prisma.prospect.update).toHaveBeenCalledWith({ where: { id: "pro_1" }, data: { status: "ACTIVATED" } });
+    // Statut « Activé » et première activation (date, commercial crédité) d'un seul bloc.
+    expect(mocks.markProspectActivated).toHaveBeenCalledWith("pro_1");
+    expect(mocks.stampActivation).not.toHaveBeenCalled();
     expect(mocks.recordProspectEvent).toHaveBeenCalledTimes(1);
     expect(mocks.recordProspectEvent).toHaveBeenCalledWith(expect.objectContaining({ prospectId: "pro_1", type: "STATUS_CHANGED", actor: { type: "SYSTEM", label: "Abonnement démarré" }, metadata: expect.objectContaining({ to: "ACTIVATED" }) }));
     expect(mocks.notifySalesRep).toHaveBeenCalledWith(expect.objectContaining({ salesRepId: "rep_1", type: "PHARMACY_ACTIVATED", linkUrl: "/extranet/dossiers/pro_1" }));
+    // La pharmacie compte aussitôt dans la grille progressive du commercial (rangs, montants, bonus).
+    expect(mocks.syncProgressiveCommissionsSafely).toHaveBeenCalledWith("rep_1", "démarrage de l'abonnement");
+    expect(mocks.syncProgressiveCommissionsSafely.mock.invocationCallOrder[0]).toBeGreaterThan(mocks.recordProspectEvent.mock.invocationCallOrder[0]);
   });
 
   it("un événement « activée » existe déjà (connexion du titulaire) : aucun doublon, aucune seconde notification", async () => {
     prisma.prospect.findUnique.mockResolvedValue({ id: "pro_1", name: "Pharmacie du Parc", status: "ACTIVATED", salesRepId: "rep_1" });
     prisma.prospectEvent.findFirst.mockResolvedValue({ id: "evt_1" });
     await announceSubscriptionStarted("org_1");
-    expect(prisma.prospect.update).not.toHaveBeenCalled();
+    expect(mocks.markProspectActivated).not.toHaveBeenCalled();
+    // Déjà activé : la première activation est posée si elle manque, jamais déplacée (l'écriture ne vise qu'un dossier sans date).
+    expect(mocks.stampActivation).toHaveBeenCalledWith("pro_1");
     expect(mocks.recordProspectEvent).not.toHaveBeenCalled();
     expect(mocks.notifySalesRep).not.toHaveBeenCalled();
   });
@@ -72,7 +83,7 @@ describe("announceSubscriptionStarted : le dossier", () => {
   it("dossier déjà activé mais sans événement (ancien cas) : l'événement manquant est écrit", async () => {
     prisma.prospect.findUnique.mockResolvedValue({ id: "pro_1", name: "Pharmacie du Parc", status: "ACTIVATED", salesRepId: null });
     await announceSubscriptionStarted("org_1");
-    expect(prisma.prospect.update).not.toHaveBeenCalled();
+    expect(mocks.markProspectActivated).not.toHaveBeenCalled();
     expect(mocks.recordProspectEvent).toHaveBeenCalledTimes(1);
     // Pas de commercial : personne à prévenir.
     expect(mocks.notifySalesRep).not.toHaveBeenCalled();

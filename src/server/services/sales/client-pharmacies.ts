@@ -7,6 +7,7 @@ import { sendUserPasswordLink } from "@/server/services/user-password";
 import { recordAudit } from "@/server/audit/log";
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
+import { markProspectActivated, syncProgressiveCommissionsSafely } from "./progressive-commissions";
 import { resolveReferralCode } from "@/server/services/referral";
 import { referralAmountForNewFilleul } from "@/server/services/referral-offers";
 import { recordLeadAttachment, referrerFromLead } from "@/server/services/referral-leads";
@@ -95,8 +96,11 @@ export async function markProspectActivatedForUser(userId: string): Promise<void
   if (memberships.length === 0) return;
   const prospects = await prisma.prospect.findMany({ where: { pharmacyId: { in: memberships.map((m) => m.pharmacyId) }, status: "PHARMACY_CREATED" }, select: { id: true, name: true, salesRepId: true } });
   for (const prospect of prospects) {
-    await prisma.prospect.update({ where: { id: prospect.id }, data: { status: "ACTIVATED" } });
+    // Statut et première activation (date, commercial crédité) d'un seul bloc : la grille progressive s'appuie sur elle.
+    await markProspectActivated(prospect.id);
     await recordProspectEvent({ prospectId: prospect.id, type: "STATUS_CHANGED", summary: "Le titulaire s'est connecté : officine activée.", actor: { type: "SYSTEM", label: "PharmaBoost" }, metadata: { from: "PHARMACY_CREATED", to: "ACTIVATED" } });
     if (prospect.salesRepId) await notifySalesRep({ salesRepId: prospect.salesRepId, type: "PHARMACY_ACTIVATED", title: `${prospect.name} est active`, body: "Le titulaire s'est connecté à son espace.", linkUrl: `/extranet/dossiers/${prospect.id}`, severity: "SUCCESS" });
+    // Une pharmacie activée de plus : rangs, montants et bonus de la grille progressive (jamais bloquant pour la connexion).
+    await syncProgressiveCommissionsSafely(prospect.salesRepId, "activation à la connexion du titulaire");
   }
 }

@@ -26,7 +26,7 @@ const repSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   phone: z.string().trim().max(30).optional().nullable(),
   zone: z.string().trim().max(120).optional().nullable(),
-  commissionType: z.enum(["FIXED", "PERCENT", "RECURRING"]),
+  commissionType: z.enum(["PROGRESSIVE", "FIXED", "PERCENT", "RECURRING"]),
   commissionValue: z.coerce.number().int().min(0).max(100_000_000),
   isActive: z.boolean().optional(),
 });

@@ -11,6 +11,7 @@ import { formatEuros } from "@/core/billing/subscription";
 import { readCheckoutSession, readInvoice, readSubscription, paymentStatusFromInvoice } from "@/core/billing/stripe-shapes";
 import { describeEvent } from "@/core/billing/webhook-summary";
 import { buildPaymentFailedEmail, buildTrialEndingEmail } from "@/core/platform/billing-emails";
+import { salesRepsOfOrganization, syncProgressiveCommissionsSafely } from "@/server/services/sales/progressive-commissions";
 import { announceSubscriptionStarted, syncSubscriptionFromStripe } from "./subscriptions";
 import { getStripe } from "./stripe-client";
 
@@ -88,6 +89,13 @@ async function recordInvoice(event: Stripe.Event): Promise<string | null> {
   await prisma.billingPayment.upsert({ where: { stripeInvoiceId: shape.id }, create: data, update: data });
   if (status === "PAID" && shape.amountPaidCents > 0) {
     await prisma.subscription.update({ where: { id: subscription.id }, data: { lastPaymentAt: shape.paidAt ?? new Date(event.created * 1000), lastPaymentCents: shape.amountPaidCents } });
+  }
+  // Un paiement reçu peut être le PREMIER de l'officine : le bonus de palier qui l'attendait devient acquis. Même critère
+  // que le recalcul (`FIRST_PAYMENT` : payée, datée, montant enregistré non nul) : jamais un paiement que l'un compte et
+  // l'autre pas. Idempotent et jamais bloquant : un webhook ne doit pas échouer pour une commission.
+  if (data.status === "PAID" && data.paidAt && data.amountCents > 0) {
+    const repIds = await salesRepsOfOrganization(subscription.organizationId).catch(() => [] as string[]);
+    for (const repId of repIds) await syncProgressiveCommissionsSafely(repId, "paiement reçu");
   }
   if (failed) {
     await prisma.subscription.update({ where: { id: subscription.id }, data: { lastPaymentFailedAt: new Date(event.created * 1000) } });

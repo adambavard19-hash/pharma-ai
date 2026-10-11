@@ -2907,6 +2907,13 @@ enum SalesCommissionType {
   FIXED
   PERCENT
   RECURRING
+  /// Grille progressive (src/core/sales/progressive-commission.ts) : 200 € par pharmacie
+  /// de la 1re à la 9e activée, 250 € de la 10e à la 19e, 300 € dès la 20e, sur le
+  /// total historique des activations, sans remise à zéro.
+  PROGRESSIVE
+  /// Bonus de palier (10, 25, 50, 100 pharmacies activées), versé une seule fois :
+  /// type d'une LIGNE de commission, jamais la règle d'un commercial.
+  BONUS
 }
 
 enum ProspectStatus {
@@ -2994,9 +3001,14 @@ model SalesRep {
   /// Zone commerciale libre : département, région, secteur ou ville.
   zone         String?
 
-  commissionType  SalesCommissionType @default(FIXED)
+  commissionType   SalesCommissionType @default(PROGRESSIVE)
   /// FIXED et RECURRING : centimes. PERCENT : centièmes de pour cent (1250 = 12,50 %).
-  commissionValue Int                 @default(0)
+  /// PROGRESSIVE : sans objet (0), la grille est dans le code.
+  commissionValue  Int                 @default(0)
+  /// Depuis quand le commercial est à la grille progressive. Les bonus d'un palier atteint
+  /// AVANT cette date ne sont pas créés d'office (rattrapage explicite seulement) ; les
+  /// activations d'avant comptent toujours dans le total historique.
+  progressiveSince DateTime?
 
   isActive    Boolean   @default(true)
   invitedAt   DateTime?
@@ -3072,6 +3084,14 @@ model Prospect {
   salesRepId String?
   status     ProspectStatus @default(PROSPECT)
 
+  /// La PREMIÈRE activation du dossier, posée une seule fois et jamais effacée : un dossier
+  /// perdu ensuite reste une pharmacie activée (grille progressive, « sans remise à zéro »).
+  /// Donne le rang de la pharmacie dans l'historique du commercial crédité.
+  activatedAt          DateTime?
+  /// Le commercial crédité de cette activation : celui qui suivait le dossier à cet instant.
+  /// Une réaffectation ultérieure ne le change pas : ni rang, ni montant, ni bonus ne bougent.
+  activationSalesRepId String?
+
   lastContactAt       DateTime?
   nextActionAt        DateTime?
   nextActionLabel     String?
@@ -3113,6 +3133,7 @@ model Prospect {
   @@index([status])
   @@index([siret])
   @@index([demoAt])
+  @@index([activationSalesRepId, activatedAt])
   @@map("prospects")
 }
 
@@ -3240,10 +3261,20 @@ model Commission {
   /// La facture du commercial qui réclame cette commission, s'il y en a une.
   invoiceId String?
 
+  /// Quand la commission est devenue acquise (acquise, à payer ou payée) : « Ce mois » de
+  /// l'extranet compte par cette date, pas par la création de la ligne (prévisionnelle).
+  earnedAt DateTime?
+
+  /// Type BONUS seulement : le palier atteint (10, 25, 50 ou 100 pharmacies activées).
+  /// Unique par commercial : un bonus ne peut jamais être créé deux fois. Le dossier
+  /// (`prospectId`) est la pharmacie dont l'activation a atteint le palier.
+  bonusTier Int?
+
   prospect Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
   salesRep SalesRep      @relation(fields: [salesRepId], references: [id])
   invoice  SalesInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
+  @@unique([salesRepId, bonusTier])
   @@index([salesRepId, status])
   @@index([invoiceId])
   @@map("commissions")

@@ -5,11 +5,12 @@ import { Field, Input, Select } from "@/components/ui/field";
 
 /**
  * Le type et le montant de la commission, avec l'aide du type choisi sous le
- * champ : « Montant fixe », « Pourcentage », « Montant mensuel ». La valeur est
- * saisie comme on la dit (« 250 », « 12,5 ») ; la conversion en centimes se fait
- * à l'envoi (`parseCommissionInput`).
+ * champ : « Grille progressive », « Montant fixe », « Pourcentage », « Montant
+ * mensuel ». La valeur est saisie comme on la dit (« 250 », « 12,5 ») ; la
+ * conversion en centimes se fait à l'envoi (`parseCommissionInput`). La grille
+ * progressive n'a pas de montant : le champ disparaît.
  */
-export function CommissionFields({ idPrefix, type, value, onType, onValue, error }: { idPrefix: string; type: CommissionTypeKey; value: string; onType: (type: CommissionTypeKey) => void; onValue: (value: string) => void; error?: string | null }) {
+export function CommissionFields({ idPrefix, type, value, onType, onValue, error, defaults }: { idPrefix: string; type: CommissionTypeKey; value: string; onType: (type: CommissionTypeKey) => void; onValue: (value: string) => void; error?: string | null; defaults?: Partial<Record<CommissionTypeKey, string>> }) {
   const option = COMMISSION_OPTIONS[type];
   return (
     <div className="space-y-4">
@@ -19,7 +20,8 @@ export function CommissionFields({ idPrefix, type, value, onType, onValue, error
             const next = event.target.value as CommissionTypeKey;
             if (next === type) return;
             onType(next);
-            onValue("");
+            // Le montant proposé pour ce type (la commission standard pour un montant fixe), sinon un champ vide.
+            onValue(defaults?.[next] ?? "");
           }}
         >
           {COMMISSION_TYPES.map((key) => (
@@ -29,9 +31,11 @@ export function CommissionFields({ idPrefix, type, value, onType, onValue, error
           ))}
         </Select>
       </Field>
-      <Field label={`Montant (${option.unit})`} htmlFor={`${idPrefix}-value`} required error={error}>
-        <Input id={`${idPrefix}-value`} inputMode="decimal" autoComplete="off" value={value} onChange={(event) => onValue(event.target.value)} aria-invalid={error ? true : undefined} />
-      </Field>
+      {type !== "PROGRESSIVE" && (
+        <Field label={`Montant (${option.unit})`} htmlFor={`${idPrefix}-value`} required error={error}>
+          <Input id={`${idPrefix}-value`} inputMode="decimal" autoComplete="off" value={value} onChange={(event) => onValue(event.target.value)} aria-invalid={error ? true : undefined} />
+        </Field>
+      )}
     </div>
   );
 }

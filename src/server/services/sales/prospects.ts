@@ -7,6 +7,7 @@ import { DEMO_TASK_CANCELED_LABEL, DEMO_TASK_LABEL, dropDecision, pickNextAction
 import { formatDate, formatDateTime } from "@/lib/format";
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
+import { markProspectActivated, syncProgressiveCommissionsSafely } from "./progressive-commissions";
 import { reconcileNewProspect } from "@/server/services/referral-leads";
 import type { Prisma, ProspectStatus } from "@/generated/prisma";
 
@@ -79,7 +80,8 @@ export async function getProspectFor(prospectId: string, viewer: { kind: "SALES"
       pharmacy: { select: { id: true, name: true, isActive: true, createdAt: true, memberships: { where: { role: "OWNER" }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { email: true, lastLoginAt: true } } } } } },
       contracts: { orderBy: { version: "desc" }, include: { plan: { select: { name: true } } } },
       plan: { select: { id: true, name: true, monthlyPriceCents: true, trialDays: true } },
-      commissions: { orderBy: { createdAt: "desc" } },
+      // La commission DU dossier : un bonus de palier rattaché à ce dossier vit dans la page Commissions du commercial.
+      commissions: { where: { type: { not: "BONUS" } }, orderBy: { createdAt: "desc" } },
       tasks: { orderBy: { dueAt: "asc" } },
       events: { orderBy: { createdAt: "desc" }, take: 60 },
     },
@@ -104,7 +106,7 @@ export async function listProspects(filter: { salesRepId?: string; status?: Pros
     include: {
       salesRep: { select: { id: true, firstName: true, lastName: true } },
       contracts: { orderBy: { version: "desc" }, take: 1, select: { status: true, sentAt: true, finalizedAt: true, signedArchivedAt: true } },
-      commissions: { select: { amountCents: true, status: true } },
+      commissions: { where: { type: { not: "BONUS" } }, select: { amountCents: true, status: true } },
       tasks: { where: { doneAt: null }, orderBy: { dueAt: "asc" }, take: 1, select: { label: true, dueAt: true } },
     },
   });
@@ -165,10 +167,15 @@ export async function setProspectStatus(prospectId: string, to: ProspectStatusCo
     await applyDemoDone(prospect, actor, to, clean(reason));
     return { ok: true };
   }
-  await prisma.prospect.update({ where: { id: prospectId }, data: { status: to, lastContactAt: new Date(), ...(to === "LOST" ? { lostReason: reason ?? null } : {}) } });
+  // « Activé » : statut et première activation (date, commercial crédité) d'un seul bloc, pour la grille progressive.
+  if (to === "ACTIVATED") await markProspectActivated(prospectId, { lastContactAt: new Date() });
+  else await prisma.prospect.update({ where: { id: prospectId }, data: { status: to, lastContactAt: new Date(), ...(to === "LOST" ? { lostReason: reason ?? null } : {}) } });
   await recordProspectEvent({ prospectId, type: "STATUS_CHANGED", summary: `${PROSPECT_STATUS_LABELS[from]} → ${PROSPECT_STATUS_LABELS[to]}${reason ? ` — ${reason}` : ""}.`, actor, metadata: { from, to } });
   await recordAudit({ action: "sales.prospect_status_changed", entityType: "Prospect", entityId: prospectId, salesRepId: actor.type === "SALES" ? actor.id : null, platformAdminId: actor.type === "ADMIN" ? actor.id : null, metadata: { from, to } });
   if (to === "LOST") await notifyAdmins({ type: "PROSPECT_LOST", title: `${prospect.name} : dossier perdu`, body: reason ?? "Sans motif précisé.", linkUrl: `/admin/dossiers/${prospectId}` });
+  // Activation posée par l'administrateur : la grille progressive du commercial en tient compte. Un passage à « perdu »
+  // ne retire rien (l'activation reste créditée, le total historique ne baisse jamais) : aucun recalcul n'est nécessaire.
+  if (to === "ACTIVATED") await syncProgressiveCommissionsSafely(prospect.salesRepId, "activation par l'administrateur");
   return { ok: true };
 }
 
@@ -216,11 +223,16 @@ export async function reassignProspect(prospectId: string, salesRepId: string, a
   await prisma.$transaction([
     prisma.prospect.update({ where: { id: prospectId }, data: { salesRepId } }),
     prisma.salesTask.updateMany({ where: { prospectId, doneAt: null }, data: { salesRepId } }),
-    prisma.commission.updateMany({ where: { prospectId, status: { in: ["FORECAST"] } }, data: { salesRepId } }),
+    // Seule la commission prévisionnelle d'un dossier PAS ENCORE activé suit le dossier. Une activation est créditée une fois
+    // pour toutes au commercial qui suivait le dossier : sa commission et ses bonus de palier restent à lui.
+    prisma.commission.updateMany({ where: { prospectId, status: { in: ["FORECAST"] }, type: { not: "BONUS" }, prospect: { activatedAt: null } }, data: { salesRepId } }),
   ]);
   await recordProspectEvent({ prospectId, type: "ASSIGNED", summary: `Dossier confié à ${rep.firstName} ${rep.lastName}.`, actor: { type: "ADMIN", id: adminId, label: adminLabel } });
   await recordAudit({ action: "sales.prospect_reassigned", entityType: "Prospect", entityId: prospectId, platformAdminId: adminId, metadata: { from: prospect.salesRepId, to: salesRepId } });
   await notifySalesRep({ salesRepId, type: "PROSPECT_ASSIGNED", title: `Nouveau dossier : ${prospect.name}`, body: "Ce dossier vous a été confié par l'administrateur.", linkUrl: `/extranet/dossiers/${prospectId}` });
+  // Les prévisions des deux commerciaux suivent (une activation déjà créditée ne bouge pas).
+  await syncProgressiveCommissionsSafely(prospect.salesRepId, "réaffectation (ancien commercial)");
+  await syncProgressiveCommissionsSafely(salesRepId, "réaffectation (nouveau commercial)");
 }
 
 export async function setProspectBlocked(prospectId: string, blocked: boolean, reason: string | null, adminId: string, adminLabel: string): Promise<void> {

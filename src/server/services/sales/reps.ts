@@ -8,6 +8,7 @@ import { buildSalesInvitationEmail } from "@/core/platform/sales-emails";
 import { publicUrl } from "@/server/public-url";
 import { recordAudit } from "@/server/audit/log";
 import { auditIdentity, type RepActorInput } from "./rep-actor";
+import { syncProgressiveCommissionsSafely } from "./progressive-commissions";
 import type { SalesCommissionType } from "@/generated/prisma";
 
 const LINK_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -38,6 +39,8 @@ export async function createSalesRep(input: SalesRepInput, actor: RepActorInput)
       phone: input.phone || null,
       zone: input.zone || null,
       isActive: input.isActive ?? true,
+      // La grille progressive commence à la création du commercial.
+      progressiveSince: input.commissionType === "PROGRESSIVE" ? new Date() : null,
       passwordHash: await hashPassword(randomBytes(32).toString("base64url")),
     },
   });
@@ -45,12 +48,23 @@ export async function createSalesRep(input: SalesRepInput, actor: RepActorInput)
   return { id: rep.id };
 }
 
+/**
+ * Modifie un commercial. Un changement de règle de commission est suivi d'un
+ * recalcul : passage à la grille progressive (qui commence à cet instant :
+ * les paliers atteints avant ne créent pas de bonus d'office), ou sortie de
+ * la grille (ses bonus déjà débloqués restent à lui et deviennent acquis au
+ * premier paiement ; rien d'autre n'est plus recalculé).
+ */
 export async function updateSalesRep(id: string, input: Partial<SalesRepInput>, actor: RepActorInput): Promise<void> {
-  await prisma.salesRep.update({ where: { id }, data: { ...input, ...(input.email ? { email: input.email.toLowerCase() } : {}) } });
+  const before = input.commissionType !== undefined ? await prisma.salesRep.findUnique({ where: { id }, select: { commissionType: true } }) : null;
+  const ruleChanged = before !== null && input.commissionType !== before.commissionType;
+  const joinsGrid = ruleChanged && input.commissionType === "PROGRESSIVE";
+  await prisma.salesRep.update({ where: { id }, data: { ...input, ...(input.email ? { email: input.email.toLowerCase() } : {}), ...(joinsGrid ? { progressiveSince: new Date() } : {}) } });
   if (input.isActive === false) {
     await prisma.salesRepSession.updateMany({ where: { salesRepId: id, revokedAt: null }, data: { revokedAt: new Date() } });
   }
-  await recordAudit({ action: "sales.rep_updated", entityType: "SalesRep", entityId: id, ...auditIdentity(actor), metadata: { fields: Object.keys(input) } });
+  await recordAudit({ action: "sales.rep_updated", entityType: "SalesRep", entityId: id, ...auditIdentity(actor), metadata: { fields: Object.keys(input), ...(ruleChanged ? { commissionType: { from: before.commissionType, to: input.commissionType } } : {}) } });
+  if (ruleChanged) await syncProgressiveCommissionsSafely(id, "changement de règle de commission");
 }
 
 export async function issueSalesPasswordLink(salesRepId: string): Promise<{ url: string; expiresAt: Date }> {

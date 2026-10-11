@@ -188,7 +188,7 @@ describe("les gestes sur une commission", () => {
 // ------------------------------------------------------------------- Factures
 
 describe("enregistrer une facture", () => {
-  const commission = (overrides: Record<string, unknown> = {}) => ({ id: "com_1", prospectId: "pro_1", amountCents: 25_000, status: "EARNED", invoiceId: null, ...overrides });
+  const commission = (overrides: Record<string, unknown> = {}) => ({ id: "com_1", prospectId: "pro_1", amountCents: 25_000, status: "EARNED", invoiceId: null, type: "PROGRESSIVE", prospect: { activatedAt: NOW }, ...overrides });
   const input = (overrides: Record<string, unknown> = {}) => ({ salesRepId: "rep_1", commissionIds: ["com_1", "com_2"], draft, ...overrides });
 
   beforeEach(() => {
@@ -226,8 +226,8 @@ describe("enregistrer une facture", () => {
     expect(db.salesInvoice.create).not.toHaveBeenCalled();
   });
 
-  it("refuse une commission déjà facturée, prévisionnelle, payée ou annulée", async () => {
-    for (const bad of [{ invoiceId: "inv_9" }, { status: "FORECAST" }, { status: "PAID" }, { status: "CANCELLED" }]) {
+  it("refuse une commission déjà facturée, prévisionnelle, payée ou annulée, ou de grille au montant encore provisoire (pharmacie pas activée)", async () => {
+    for (const bad of [{ invoiceId: "inv_9" }, { status: "FORECAST" }, { status: "PAID" }, { status: "CANCELLED" }, { prospect: { activatedAt: null } }]) {
       db.commission.findMany.mockResolvedValue([commission(bad), commission({ id: "com_2" })]);
       expect(await money.createInvoice(input(), null, DIRECTOR)).toMatchObject({ ok: false });
     }
@@ -246,7 +246,11 @@ describe("enregistrer une facture", () => {
       data: { salesRepId: "rep_1", number: "FA-014", amountCents: 75_000, issuedAt: draft.issuedAt, periodLabel: "Septembre 2026", note: null, createdByType: "DIRECTOR", createdById: "dir_1", createdByLabel: "Diane Directrice" },
       select: { id: true },
     });
-    expect(db.commission.updateMany).toHaveBeenCalledWith({ where: { id: { in: ["com_1", "com_2"] }, salesRepId: "rep_1", invoiceId: null, status: { in: ["EARNED", "PAYABLE"] } }, data: { invoiceId: "inv_1" } });
+    // Le rattachement relit les mêmes conditions, montant définitif compris (une commission de grille d'une pharmacie pas encore activée n'est pas prise).
+    expect(db.commission.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["com_1", "com_2"] }, salesRepId: "rep_1", invoiceId: null, status: { in: ["EARNED", "PAYABLE"] }, OR: [{ type: { not: "PROGRESSIVE" } }, { prospect: { activatedAt: { not: null } } }] },
+      data: { invoiceId: "inv_1" },
+    });
     expect(mocks.recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "sales.invoice_created", entityId: "inv_1", salesDirectorId: "dir_1", metadata: expect.objectContaining({ salesRepId: "rep_1", amountCents: 75_000, hasFile: false }) }));
     expect(mocks.recordAudit.mock.calls[0][0]).not.toHaveProperty("platformAdminId");
     expect(mocks.recordProspectEvent).toHaveBeenCalledTimes(2);
@@ -345,6 +349,14 @@ describe("faire avancer une facture", () => {
     expect(mocks.recordProspectEvent).toHaveBeenCalledTimes(1);
     expect(mocks.recordProspectEvent).toHaveBeenCalledWith(expect.objectContaining({ prospectId: "pro_1", type: "COMMISSION_PAID" }));
     expect(mocks.notifySalesRep).toHaveBeenCalledWith(expect.objectContaining({ type: "INVOICE_PAID" }));
+  });
+
+  it("une prévisionnelle qui devient à payer par la facture reçoit sa date d'acquisition (« Acquis ce mois »), et elle seule", async () => {
+    db.salesInvoice.findUnique.mockResolvedValue(invoice({ commissions: [{ id: "com_1", prospectId: "pro_1", amountCents: 25_000, status: "FORECAST" }, { id: "com_2", prospectId: "pro_2", amountCents: 50_000, status: "EARNED" }] }));
+    await money.moveInvoice({ invoiceId: "inv_1", gesture: "APPROVE" }, DIRECTOR);
+    const calls = db.commission.updateMany.mock.calls.map((call) => call[0]);
+    expect(calls).toContainEqual({ where: { invoiceId: "inv_1", status: "FORECAST" }, data: { status: "PAYABLE" } });
+    expect(calls.at(-1)).toEqual({ where: { invoiceId: "inv_1", earnedAt: null, status: { in: ["EARNED", "PAYABLE", "PAID"] } }, data: { earnedAt: expect.any(Date) } });
   });
 
   it("refuse les gestes que la machine interdit : payer avant de valider, tout geste sur une facture payée ou refusée", async () => {
@@ -554,7 +566,8 @@ describe("la liste et le détail des factures", () => {
   it("les commissions que l'on peut facturer : acquises ou à payer, libres de toute facture", async () => {
     db.commission.findMany.mockResolvedValue([{ id: "com_1", salesRepId: "rep_1", amountCents: 25_000, status: "EARNED", createdAt: NOW, prospect: { name: "Pharmacie du Parc", city: "Lyon" } }]);
     const rows = await money.listInvoiceableCommissions();
-    expect(db.commission.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { invoiceId: null, status: { in: ["EARNED", "PAYABLE"] } } }));
+    // Une commission de grille au montant encore provisoire (pharmacie pas encore activée) attend l'activation.
+    expect(db.commission.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { invoiceId: null, status: { in: ["EARNED", "PAYABLE"] }, OR: [{ type: { not: "PROGRESSIVE" } }, { prospect: { activatedAt: { not: null } } }] } }));
     expect(rows).toEqual([{ id: "com_1", salesRepId: "rep_1", amountCents: 25_000, status: "EARNED", createdAt: NOW, prospectName: "Pharmacie du Parc", city: "Lyon" }]);
   });
 });

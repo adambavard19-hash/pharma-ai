@@ -10,13 +10,16 @@ import { Checkbox, Field, Input, Select } from "@/components/ui/field";
 import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { useClearNewParam } from "../demonstrations/demo-dialog";
+import { COMMISSION_OPTIONS } from "@/core/sales/director/team";
 
-export type RepFormValues = { firstName: string; lastName: string; email: string; phone: string; zone: string; commissionType: "FIXED" | "PERCENT" | "RECURRING"; commissionValue: string; isActive: boolean };
+export type RepFormValues = { firstName: string; lastName: string; email: string; phone: string; zone: string; commissionType: "PROGRESSIVE" | "FIXED" | "PERCENT" | "RECURRING"; commissionValue: string; isActive: boolean };
 
-const EMPTY: RepFormValues = { firstName: "", lastName: "", email: "", phone: "", zone: "", commissionType: "FIXED", commissionValue: "250", isActive: true };
+// La grille progressive est la règle par défaut ; le montant reste prérempli si l'on choisit un montant fixe.
+const EMPTY: RepFormValues = { firstName: "", lastName: "", email: "", phone: "", zone: "", commissionType: "PROGRESSIVE", commissionValue: "250", isActive: true };
 
-/** La valeur saisie en euros ou en pour cent, convertie pour le stockage (centimes / centièmes de %). */
+/** La valeur saisie en euros ou en pour cent, convertie pour le stockage (centimes / centièmes de %). La grille progressive n'a pas de montant. */
 function toStored(type: RepFormValues["commissionType"], value: string): number {
+  if (type === "PROGRESSIVE") return 0;
   const n = Number(value.replace(",", "."));
   return Number.isFinite(n) ? Math.round(n * 100) : 0;
 }
@@ -33,8 +36,8 @@ function RepFields({ values, onChange }: { values: RepFormValues; onChange: (v: 
         <Field label="Zone" htmlFor="r-zone" hint="Département, région, secteur ou ville."><Input id="r-zone" value={values.zone} onChange={set("zone")} placeholder="Rhône, Lyon centre…" /></Field>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Type de commission" htmlFor="r-type"><Select id="r-type" value={values.commissionType} onChange={set("commissionType")}><option value="FIXED">Fixe par contrat</option><option value="PERCENT">Pourcentage de la première année</option><option value="RECURRING">Récurrente mensuelle (12 mois)</option></Select></Field>
-        <Field label={values.commissionType === "PERCENT" ? "Pourcentage" : "Montant (€)"} htmlFor="r-value" required><Input id="r-value" inputMode="decimal" value={values.commissionValue} onChange={set("commissionValue")} /></Field>
+        <Field label="Type de commission" htmlFor="r-type" hint={values.commissionType === "PROGRESSIVE" ? COMMISSION_OPTIONS.PROGRESSIVE.help : undefined} className={values.commissionType === "PROGRESSIVE" ? "sm:col-span-2" : undefined}><Select id="r-type" value={values.commissionType} onChange={set("commissionType")}><option value="PROGRESSIVE">Grille progressive (recommandée)</option><option value="FIXED">Fixe par contrat</option><option value="PERCENT">Pourcentage de la première année</option><option value="RECURRING">Récurrente mensuelle (12 mois)</option></Select></Field>
+        {values.commissionType !== "PROGRESSIVE" && <Field label={values.commissionType === "PERCENT" ? "Pourcentage" : "Montant (€)"} htmlFor="r-value" required><Input id="r-value" inputMode="decimal" value={values.commissionValue} onChange={set("commissionValue")} /></Field>}
       </div>
       <Checkbox label="Compte actif" checked={values.isActive} onChange={(e) => onChange({ ...values, isActive: e.target.checked })} />
     </div>

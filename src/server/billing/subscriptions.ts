@@ -8,6 +8,7 @@ import { recordAudit } from "@/server/audit/log";
 import { sendInstallationGuide } from "@/server/services/platform-onboarding";
 import { notifyAdmins, notifySalesRep } from "@/server/services/sales/notifications";
 import { recordProspectEvent } from "@/server/services/sales/events";
+import { markProspectActivated, stampActivation, syncProgressiveCommissionsSafely } from "@/server/services/sales/progressive-commissions";
 import { traceDispatch } from "@/server/services/email-dispatch";
 import { getStripe, stripeConfigState } from "./stripe-client";
 import { readSubscription, type SubscriptionShape } from "@/core/billing/stripe-shapes";
@@ -531,8 +532,12 @@ export async function announceSubscriptionStarted(organizationId: string): Promi
   await notifyAdmins({ type: "SUBSCRIPTION_STARTED", title: `${pharmacy.name} : abonnement démarré`, body: `${subscription.plan.name} — ${formatEuros(priceCents)}/mois${subscription.trialEndsAt ? `, essai jusqu'au ${formatFrenchDate(subscription.trialEndsAt)}` : ""}.`, linkUrl: `/admin/abonnements/${pharmacy.id}`, severity: "SUCCESS" });
   const prospect = await prisma.prospect.findUnique({ where: { pharmacyId: pharmacy.id }, select: { id: true, name: true, status: true, salesRepId: true } });
   if (!prospect) return;
-  if (prospect.status !== "ACTIVATED") await prisma.prospect.update({ where: { id: prospect.id }, data: { status: "ACTIVATED" } });
+  // Statut et première activation (date, commercial crédité) d'un seul bloc ; déjà activé : la date posée reste la première.
+  if (prospect.status !== "ACTIVATED") await markProspectActivated(prospect.id);
+  else await stampActivation(prospect.id);
   await recordActivation(prospect);
+  // Grille progressive du commercial : la pharmacie compte dès son activation (idempotent, jamais bloquant).
+  await syncProgressiveCommissionsSafely(prospect.salesRepId, "démarrage de l'abonnement");
 }
 
 /**

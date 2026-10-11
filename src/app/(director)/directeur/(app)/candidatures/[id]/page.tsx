@@ -4,9 +4,8 @@ import { notFound } from "next/navigation";
 import { Download, FileText } from "lucide-react";
 import { requireDirectorSession } from "@/server/auth/director-session";
 import { getSalesApplication } from "@/server/services/sales-applications/admin";
-import { getStandardCommissionCents } from "@/server/services/standard-commission";
 import { currentStatusLabel } from "@/core/sales-applications/status";
-import { formatPriceEuros } from "@/core/pricing/official-offer";
+import { describeProgressiveGrid } from "@/core/sales/commission";
 import { AdminPageHeader, AdminSection, FactList } from "@/components/admin/page-header";
 import { Timeline } from "@/components/admin/timeline";
 import { Button } from "@/components/ui/button";
@@ -40,7 +39,8 @@ export default async function SalesApplicationPage({ params }: { params: Promise
 
   const name = `${application.firstName} ${application.lastName}`.trim();
   const canConvert = application.status === "ACCEPTED" && !application.salesRep;
-  const commissionLabel = canConvert ? formatPriceEuros(await getStandardCommissionCents()) : null;
+  // La règle d'un commercial créé depuis une candidature : la grille progressive, la même pour tous.
+  const commissionLabel = canConvert ? describeProgressiveGrid() : null;
   const cvSize = application.cv ? formatFileSize(application.cv.sizeBytes) : null;
 
   return (

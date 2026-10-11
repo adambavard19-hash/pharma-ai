@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   sendSalesInvitation: vi.fn(),
   updateSalesRep: vi.fn(),
   salesRepStats: vi.fn(),
+  syncProgressiveCommissionsSafely: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -32,6 +33,7 @@ vi.mock("@/server/db/client", () => ({ prisma: db }));
 vi.mock("@/server/audit/log", () => ({ recordAudit: mocks.recordAudit }));
 vi.mock("../events", () => ({ recordProspectEvent: mocks.recordProspectEvent }));
 vi.mock("../notifications", () => ({ notifySalesRep: mocks.notifySalesRep }));
+vi.mock("../progressive-commissions", () => ({ syncProgressiveCommissionsSafely: mocks.syncProgressiveCommissionsSafely }));
 vi.mock("../reps", () => ({ createSalesRep: mocks.createSalesRep, sendSalesInvitation: mocks.sendSalesInvitation, updateSalesRep: mocks.updateSalesRep, salesRepStats: mocks.salesRepStats }));
 
 const team = await import("../director-team");
@@ -508,8 +510,12 @@ describe("réaffecter des dossiers", () => {
     expect(db.prospect.updateMany).toHaveBeenCalledWith({ where: { id: { in: ["p1", "p2"] } }, data: { salesRepId: "rep_2" } });
     // Les relances ouvertes suivent ; les commissions seulement prévisionnelles et pas encore facturées aussi.
     expect(db.salesTask.updateMany).toHaveBeenCalledWith({ where: { prospectId: { in: ["p1", "p2"] }, doneAt: null }, data: { salesRepId: "rep_2" } });
-    expect(db.commission.updateMany).toHaveBeenCalledWith({ where: { prospectId: { in: ["p1", "p2"] }, status: "FORECAST", invoiceId: null }, data: { salesRepId: "rep_2" } });
+    // Seule la prévision d'un dossier PAS ENCORE activé suit : une activation est créditée une fois pour toutes (sa commission
+    // reste au commercial crédité), et un bonus de palier ne suit jamais le dossier.
+    expect(db.commission.updateMany).toHaveBeenCalledWith({ where: { prospectId: { in: ["p1", "p2"] }, status: "FORECAST", invoiceId: null, type: { not: "BONUS" }, prospect: { activatedAt: null } }, data: { salesRepId: "rep_2" } });
     expect(db.$transaction).toHaveBeenCalledTimes(1);
+    // La grille progressive est recalculée pour le nouveau commercial et pour l'ancien (rep_1), une fois chacun.
+    expect(mocks.syncProgressiveCommissionsSafely.mock.calls.map((call) => call[0]).sort()).toEqual(["rep_1", "rep_2"]);
 
     expect(mocks.recordProspectEvent).toHaveBeenCalledTimes(2);
     expect(mocks.recordProspectEvent).toHaveBeenCalledWith({ prospectId: "p1", type: "ASSIGNED", summary: "Dossier confié à Paul Martin.", actor: ACTOR });

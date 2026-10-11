@@ -101,6 +101,14 @@ describe("l'effet d'un geste sur les commissions rattachées", () => {
     expect(isInvoiceable({ status: "CANCELLED", invoiceId: null })).toBe(false);
     expect(isInvoiceable({ status: "EARNED", invoiceId: "inv_1" })).toBe(false);
   });
+
+  it("une commission de grille au montant encore provisoire (pharmacie pas activée) attend l'activation ; les autres règles ne sont pas concernées", () => {
+    expect(isInvoiceable({ status: "EARNED", invoiceId: null, type: "PROGRESSIVE", activated: false })).toBe(false);
+    expect(isInvoiceable({ status: "PAYABLE", invoiceId: null, type: "PROGRESSIVE", activated: false })).toBe(false);
+    expect(isInvoiceable({ status: "EARNED", invoiceId: null, type: "PROGRESSIVE", activated: true })).toBe(true);
+    expect(isInvoiceable({ status: "EARNED", invoiceId: null, type: "FIXED", activated: false })).toBe(true);
+    expect(isInvoiceable({ status: "EARNED", invoiceId: null, type: "BONUS", activated: false })).toBe(true);
+  });
 });
 
 describe("le rapprochement avec les commissions", () => {

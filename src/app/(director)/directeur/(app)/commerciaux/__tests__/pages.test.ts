@@ -201,14 +201,19 @@ describe("l'ajout d'un commercial", () => {
     expect(mocks.getStandardCommissionCents).not.toHaveBeenCalled();
   });
 
-  it("propose la commission standard, l'aide du type, et l'invitation cochée par défaut", async () => {
+  it("propose la grille progressive par défaut, son aide, et l'invitation cochée par défaut", async () => {
     const html = await renderCreate();
     const content = text(html);
     expect(content).toContain("Ajouter un commercial");
     expect(content).toContain("Prénom");
     expect(content).toContain("Adresse e-mail");
-    expect(content).toContain("Une somme fixe, versée pour chaque officine qui s'abonne");
-    expect(html).toContain('value="250"'); // la commission standard de la plateforme
+    // La grille progressive est la règle par défaut des nouveaux commerciaux : pas de montant à saisir.
+    expect(html).toMatch(/<option value="PROGRESSIVE" selected="">Grille progressive \(recommandée\)<\/option>/);
+    expect(content).toContain("200 € par pharmacie activée de la 1re à la 9e, 250 € de la 10e à la 19e, 300 € dès la 20e");
+    expect(html).not.toContain('id="rep-value"');
+    // Le montant fixe reste proposé, prérempli avec la commission standard quand on le choisit.
+    expect(content).toContain("Montant fixe par officine");
+    expect(mocks.getStandardCommissionCents).toHaveBeenCalled();
     expect(html).toMatch(/id="rep-invite"[^>]*checked/);
     expect(content).toContain("Envoyer l'invitation maintenant");
     expect(content).toContain("Ajouter et inviter");

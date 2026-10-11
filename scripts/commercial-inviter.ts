@@ -5,6 +5,9 @@
  *   node --env-file=.env --conditions=react-server --import tsx scripts/commercial-inviter.ts \
  *     --email adresse --prenom Prénom --nom Nom [--zone Zone] [--fixe 300]
  *
+ * Sans --fixe, le commercial suit la grille progressive (la règle par défaut) ;
+ * --fixe 300 lui donne à la place un montant fixe de 300 € par contrat.
+ *
  * Idempotent : si l'adresse existe déjà, l'invitation est simplement renvoyée
  * (ce qui remplace tout lien précédent). Aucune donnée n'est supprimée.
  */
@@ -28,7 +31,9 @@ async function main() {
   let rep = await prisma.salesRep.findUnique({ where: { email }, select: { id: true } });
   if (!rep) {
     rep = await createSalesRep(
-      { email, firstName, lastName, zone: arg("zone") ?? null, commissionType: "FIXED", commissionValue: Math.round(Number(arg("fixe") ?? "300") * 100) },
+      arg("fixe")
+        ? { email, firstName, lastName, zone: arg("zone") ?? null, commissionType: "FIXED", commissionValue: Math.round(Number(arg("fixe")) * 100) }
+        : { email, firstName, lastName, zone: arg("zone") ?? null, commissionType: "PROGRESSIVE", commissionValue: 0 },
       admin.id,
     );
     console.log(`Commercial créé : ${rep.id}`);

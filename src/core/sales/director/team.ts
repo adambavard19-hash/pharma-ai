@@ -73,13 +73,24 @@ export function teamSearchWhere(q: string | null | undefined): Prisma.SalesRepWh
 
 // ---- Commission : saisie et aide ------------------------------------------------
 
-export const COMMISSION_TYPES = ["FIXED", "PERCENT", "RECURRING"] as const;
+/** Les règles qu'on peut donner à un commercial, la grille progressive (règle par défaut) d'abord. BONUS n'en est pas une. */
+export const COMMISSION_TYPES = ["PROGRESSIVE", "FIXED", "PERCENT", "RECURRING"] as const;
 export type CommissionTypeKey = (typeof COMMISSION_TYPES)[number];
 
-/** Les plafonds stockés : centimes (FIXED, RECURRING) ou centièmes de pour cent (PERCENT). */
-export const COMMISSION_MAX: Record<CommissionTypeKey, number> = { FIXED: 10_000_000, RECURRING: 10_000_000, PERCENT: 10_000 };
+/** La règle d'un commercial lue en base, ramenée aux règles possibles (une valeur inattendue retombe sur la grille). */
+export function toCommissionTypeKey(type: string): CommissionTypeKey {
+  return (COMMISSION_TYPES as readonly string[]).includes(type) ? (type as CommissionTypeKey) : "PROGRESSIVE";
+}
+
+/** Les plafonds stockés : centimes (FIXED, RECURRING) ou centièmes de pour cent (PERCENT). PROGRESSIVE : toujours 0, la grille est dans le code. */
+export const COMMISSION_MAX: Record<CommissionTypeKey, number> = { PROGRESSIVE: 0, FIXED: 10_000_000, RECURRING: 10_000_000, PERCENT: 10_000 };
 
 export const COMMISSION_OPTIONS: Record<CommissionTypeKey, { label: string; unit: string; help: string }> = {
+  PROGRESSIVE: {
+    label: "Grille progressive (recommandée)",
+    unit: "",
+    help: "200 € par pharmacie activée de la 1re à la 9e, 250 € de la 10e à la 19e, 300 € dès la 20e, plus les bonus de palier (10, 25, 50 et 100 pharmacies). Calculée sur le total historique, sans remise à zéro.",
+  },
   FIXED: { label: "Montant fixe par officine", unit: "€", help: "Une somme fixe, versée pour chaque officine qui s'abonne. Exemple : 250 €." },
   PERCENT: { label: "Pourcentage de la première année", unit: "%", help: "Une part de ce que paie l'officine la première année. Exemple : 10 %." },
   RECURRING: { label: "Montant mensuel pendant 12 mois", unit: "€ par mois", help: "Une somme versée chaque mois, pendant les 12 premiers mois. Exemple : 25 € par mois." },
@@ -91,6 +102,8 @@ export const COMMISSION_OPTIONS: Record<CommissionTypeKey, { label: string; unit
  * saisie est illisible, négative ou au-dessus du plafond.
  */
 export function parseCommissionInput(type: CommissionTypeKey, text: string): number | null {
+  // La grille progressive n'a pas de montant à saisir.
+  if (type === "PROGRESSIVE") return 0;
   const clean = text.trim().replace(/\s/g, "").replace(",", ".");
   if (!/^\d+(\.\d{1,2})?$/.test(clean)) return null;
   const stored = Math.round(Number(clean) * 100);

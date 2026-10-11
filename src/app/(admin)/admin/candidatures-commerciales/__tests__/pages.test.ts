@@ -231,12 +231,15 @@ describe("la fiche", () => {
     expect(html).not.toContain("/api/admin/candidatures-commerciales/app_1/cv");
   });
 
-  it("acceptée et pas encore convertie : « Transformer en commercial » avec la commission lue dans la console", async () => {
+  // Depuis la grille progressive, le commercial créé depuis une candidature suit la grille de tous : plus de montant fixe.
+  it("acceptée et pas encore convertie : « Transformer en commercial » avec la grille progressive", async () => {
     mocks.getSalesApplication.mockResolvedValue(detailOf({ status: "ACCEPTED" }));
     mocks.getStandardCommissionCents.mockResolvedValue(30000);
     const content = text(await renderDetail());
     expect(content).toContain("Transformer en commercial");
-    expect(content).toMatch(/commission est fixe : 300 € par pharmacie activée/);
+    expect(content).toMatch(/grille de tous les commerciaux — Grille progressive : 200 € à 300 € par pharmacie activée, \+ bonus de palier \(10, 25, 50, 100\)/);
+    expect(content).not.toContain("commission est fixe");
+    expect(mocks.getStandardCommissionCents).not.toHaveBeenCalled();
     expect(content).toContain("Envoyer l'invitation par e-mail");
   });
 
