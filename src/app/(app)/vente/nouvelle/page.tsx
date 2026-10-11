@@ -18,6 +18,7 @@ import { CounterDashboard } from "./counter-dashboard";
 import { NewPrescriptionForm } from "./new-prescription-form";
 import { CounterRequestCard } from "./counter-request";
 import { WorkHere } from "./work-here";
+import { loadCounterRobotTips } from "@/server/services/robot-tips";
 
 export const metadata: Metadata = { title: "Nouvelle vente" };
 
@@ -59,13 +60,19 @@ export default async function NewPrescriptionPage({
     countCounterRequestsToday(session.scope.pharmacyId, startOfParisDay(now)),
     prisma.pharmacy.findUnique({ where: { id: session.scope.pharmacyId }, select: { stockSyncedAt: true } }),
   ]);
+  // Ce que le robot du coin peut dire : challenge proche d'un palier, dates courtes, stock — pour cette officine et cette personne.
+  const canUpdateStock = session.permissions.has(PERMISSIONS.PRODUCT_IMPORT);
+  const robotTips = await loadCounterRobotTips(session.scope, {
+    canUpdateStock,
+    canSeeChallenges: session.permissions.has(PERMISSIONS.TEAM_MANAGE),
+    isDemo: session.pharmacy.isDemo,
+    stockSyncedAt: pharmacy?.stockSyncedAt ?? null,
+    now,
+  }).catch(() => []);
   const liveSales = liveSalesRaw.map((sale) => ({ id: sale.id, reference: sale.reference, status: sale.status, post: sale.counterPost, updatedAt: sale.updatedAt.toISOString(), lines: sale.lines.map((line) => ({ drugName: line.drugName ?? "", quantity: line.quantity ?? 1 })), recommendations: sale._count.recommendations }));
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      {/* Le rappel du stock : seulement pour le titulaire, jamais pour l'équipe au comptoir. */}
-      <StockReminderBanner stockSyncedAt={pharmacy?.stockSyncedAt ?? null} canImport={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)} isDemo={session.pharmacy.isDemo} />
-
       {isCommercialDemoPharmacy(session.pharmacy) && (
         <p className="rounded-xl border border-dashed border-brand-300 bg-brand-50/50 px-4 py-3 text-[13.5px] text-text-secondary dark:border-brand-800 dark:bg-brand-950/20">
           Pas de douchette dans cette démonstration.{" "}
@@ -84,6 +91,9 @@ export default async function NewPrescriptionPage({
         initialSales={liveSales}
         canConfigure={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
         manualOpen={Boolean(params.patient || params.demande)}
+        robotTips={robotTips}
+        // Le rappel du stock : seulement pour le titulaire, jamais pour l'équipe au comptoir. Le robot le reprend quand c'est sa phrase du moment.
+        stockBanner={<StockReminderBanner stockSyncedAt={pharmacy?.stockSyncedAt ?? null} canImport={canUpdateStock} isDemo={session.pharmacy.isDemo} />}
       >
         <NewPrescriptionForm
           patients={patientDataEnabled() ? patients : []}

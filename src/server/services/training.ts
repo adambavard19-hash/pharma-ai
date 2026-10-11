@@ -35,9 +35,19 @@ import {
 
 export type TrainingScope = { pharmacyId: string; userId: string };
 
-/** Ce qu'une officine voit : les contenus PharmaBoost actifs et ses propres contenus actifs. */
+/**
+ * Ce qu'une officine voit : les contenus PharmaBoost actifs et approuvés, et ses propres contenus actifs. Les contenus
+ * de l'Académie en cours de relecture (brouillon, en relecture, refusés, archivés) n'apparaissent pas au comptoir, ni
+ * les micro-vidéos, qui se regardent dans PharmaBoost Mobile.
+ */
 function visibleWhere(scope: TrainingScope, extra: Prisma.TrainingContentWhereInput = {}): Prisma.TrainingContentWhereInput {
-  return { AND: [{ isActive: true, OR: [{ pharmacyId: null }, { pharmacyId: scope.pharmacyId }] }, extra] };
+  return {
+    AND: [
+      { isActive: true, OR: [{ pharmacyId: null, reviewStatus: "APPROVED" }, { pharmacyId: scope.pharmacyId }] },
+      { kind: { not: "MICRO_VIDEO" } },
+      extra,
+    ],
+  };
 }
 
 const CARD_SELECT = {
@@ -425,7 +435,8 @@ export type GlobalTraining = Omit<ManagedTraining, "products" | "productIds"> & 
 
 export async function listGlobalTrainings(): Promise<GlobalTraining[]> {
   const contents = await prisma.trainingContent.findMany({
-    where: { pharmacyId: null },
+    // Les micro-vidéos de l'Académie se gèrent dans sa console (/admin/academie).
+    where: { pharmacyId: null, kind: { not: "MICRO_VIDEO" } },
     orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
     select: { ...MANAGED_SELECT, productIds: false },
   });
@@ -456,7 +467,10 @@ export async function saveGlobalTraining(id: string | null, data: TrainingConten
     await prisma.trainingContent.update({ where: { id }, data: fields });
     return { ok: true, id, created: false };
   }
-  const created = await prisma.trainingContent.create({ data: { ...fields, pharmacyId: null, createdByAdminId: adminId, isActive: true }, select: { id: true } });
+  // Cette console publie des liens officiels directement aux officines, comme avant l'Académie : le contenu naît
+  // « approuvé » et en ligne (il n'est ouvert aux comptes gratuits de l'application que si l'Académie le décide).
+  const now = new Date();
+  const created = await prisma.trainingContent.create({ data: { ...fields, pharmacyId: null, createdByAdminId: adminId, isActive: true, reviewStatus: "APPROVED", publishedAt: now }, select: { id: true } });
   return { ok: true, id: created.id, created: true };
 }
 

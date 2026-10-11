@@ -44,6 +44,7 @@ import { ScoreExplanation } from "./score-explanation";
 import { ShortDateBadge, VigilanceStrip } from "./vigilance-strip";
 import { ProductTrainingLink } from "../../formation/_components/product-training-link";
 import { countUndecided, splitAdvice } from "./group-advice";
+import { DeclineReasonPicker } from "./decline-reason";
 import { FamilyPill } from "./complete-advice";
 import type { AdviceFamily } from "@/core/ai/family";
 import type { AdviceView } from "./types";
@@ -339,6 +340,9 @@ function ClosedList({
               <span className="text-[12px] text-text-tertiary">
                 « {recommendation.pharmacistNote} »
               </span>
+            )}
+            {canDecide && recommendation.status === "DECLINED" && (
+              <DeclineReasonPicker recommendationId={recommendation.id} initial={recommendation.declineReason ?? null} />
             )}
             {canDecide && recommendation.status === "DECLINED" && (
               <ReopenButton recommendationId={recommendation.id} />

@@ -8,6 +8,7 @@ import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 import { ListRow, MCard, Pill, ScreenTitle } from "../../_components/ui";
 import { ProfileForm } from "./_components/profile-form";
 import { ConsentsPanel } from "./_components/consents-panel";
+import { PersonalSections } from "./_components/personal-sections";
 import { PasswordPanel } from "./_components/password-panel";
 
 export const metadata: Metadata = { title: "Mon espace" };
@@ -56,6 +57,9 @@ export default async function MyspacePage() {
           )}
         </div>
       </section>
+
+      {/* Mes résultats, mes primes, mes objectifs, le coach (équipes clientes) */}
+      {session.scope && <PersonalSections scope={session.scope} />}
 
       <section className="space-y-2.5">
         <h2 className="px-1 text-[13px] font-semibold tracking-wide text-ink-500 uppercase">Mon profil</h2>

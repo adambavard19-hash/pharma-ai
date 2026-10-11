@@ -161,6 +161,8 @@ export type AdviceView = {
   quantity: number;
   unitPriceCents: number;
   pharmacistNote: string | null;
+  /** Pourquoi le conseil n'a pas été vendu, quand le pharmacien l'a dit (facultatif). */
+  declineReason?: string | null;
   decidedBy: string | null;
   explanation: ScoreContribution[];
   opportunity: {

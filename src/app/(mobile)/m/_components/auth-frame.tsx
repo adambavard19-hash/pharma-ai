@@ -15,7 +15,7 @@ export function AuthFrame({ title, subtitle, children, footer }: { title: ReactN
         <div aria-hidden="true" className="pointer-events-none absolute -top-24 -right-20 size-72 rounded-full bg-white/10 blur-3xl lg:hidden" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-16 -left-16 size-56 rounded-full bg-leaf-500/30 blur-3xl lg:hidden" />
         <div className="relative mx-auto flex max-w-[440px] items-center gap-4">
-          <FloatingRobot className="h-[86px] w-[74px] drop-shadow-[0_10px_18px_rgba(0,0,0,0.18)]" />
+          <FloatingRobot className="h-[86px] w-[74px] drop-shadow-[0_10px_18px_rgba(0,0,0,0.18)]" track greet="once" />
           <div className="min-w-0 space-y-1.5">
             <p className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11.5px] font-semibold tracking-wide backdrop-blur">
               <Wordmark className="text-[12px] text-white [&>span]:text-[#9ff3e1]" /> <span className="opacity-80">Mobile</span>

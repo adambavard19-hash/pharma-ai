@@ -37,6 +37,8 @@ import { PartnerCards } from "./partner-cards";
 import type { EngineOutcome } from "@/core/ai/outcome";
 import { DeliveryZone, type DeliveryExtra } from "./delivery-zone";
 import { counterIsBlocked } from "@/core/ai/safety-gate";
+import { Robot } from "@/components/robot";
+import { countWarnings, saleMood } from "@/core/robot/mascot";
 import { STAGE_LABELS, STAGE_ORDER, streamAnalysis } from "./analysis-stream";
 import type { AnalysisStage } from "@/server/services/analysis";
 import type {
@@ -452,6 +454,17 @@ export function SaleWorkspace({
     });
   };
 
+  // Le robot du comptoir suit la vente, discret : curieux au bip, pensif pendant l'analyse, sérieux devant une mise en
+  // garde (jamais un sourire à côté d'une alerte), content quand un conseil entre dans la délivrance.
+  const robotMood = saleMood({
+    analysing,
+    editing,
+    fromScan: prescription.source === "COUNTER_SCAN",
+    warnings: blocked ? 1 : countWarnings(findings),
+    accepted: basket.size,
+    finished: hasSale,
+  });
+
   const alertFactors = patientFactors.filter((factor) => factor.tone === "warning");
   const neutralFactors = patientFactors.filter((factor) => factor.tone !== "warning");
 
@@ -660,9 +673,12 @@ export function SaleWorkspace({
       </div>
 
       <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-surface-card p-3.5 shadow-lg sm:gap-4 sm:p-4">
+        <span className="hidden shrink-0 sm:block">
+          <Robot mood={robotMood} cheerKey={basket.size} size={36} />
+        </span>
         {editing ? (
           <>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[13.5px] font-medium text-text-primary">
                 {confirmedCount} médicament{confirmedCount > 1 ? "s" : ""} à confirmer
                 {lines.length > confirmedCount ? ` · ${lines.length - confirmedCount} exclu${lines.length - confirmedCount > 1 ? "s" : ""}` : ""}
@@ -688,7 +704,7 @@ export function SaleWorkspace({
           </>
         ) : (
           <>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[13.5px] font-medium text-text-primary">
                 {basket.size + extras.size === 0
                   ? "Rien à encaisser"

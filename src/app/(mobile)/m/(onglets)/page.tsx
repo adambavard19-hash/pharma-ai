@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import { ArrowUpRight, BookOpenCheck, Compass, Play, Sparkles, Trophy } from "lucide-react";
+import { ArrowUpRight, BookOpenCheck, Compass, Play, Trophy } from "lucide-react";
 import { requireUser } from "@/server/auth/user-session";
 import { loadContinueCard, loadMyChallenges, loadPartnerLaunches } from "@/server/services/mobile/home";
 import { greetingFor, PROFESSION_LABELS } from "@/core/mobile/profile";
-import { FloatingRobot } from "@/app/(public)/decouvrir/_components/floating-robot";
+import { Robot, RobotSoundToggle } from "@/components/robot";
+import { loadMobileRobotTip } from "@/server/services/robot-tips";
+import { RobotBubble } from "../_components/robot-bubble";
 import { MCard, MCardLink, Pill, QuietState, SectionTitle } from "../_components/ui";
+import { PartnerNewsRail } from "./decouvertes/_components/partner-news-rail";
 
 export const metadata: Metadata = { title: "Accueil" };
 
@@ -17,9 +20,12 @@ export default async function MobileHomePage() {
   const now = new Date();
   const [continueCard, launches, challenges] = await Promise.all([
     loadContinueCard(session.user.id, session.scope, now),
-    loadPartnerLaunches(now),
+    loadPartnerLaunches(now, session),
     session.scope ? loadMyChallenges(session.scope) : Promise.resolve(null),
   ]);
+
+  // La bulle du robot : la prochaine étape la plus utile (prime validée, challenge tout proche, formation), ou rien.
+  const robotTip = await loadMobileRobotTip(session.scope ?? null, continueCard, now).catch(() => null);
 
   const who = session.activePharmacy
     ? `${session.roleLabel} · ${session.activePharmacy.name}`
@@ -38,15 +44,19 @@ export default async function MobileHomePage() {
             <h1 className="text-[28px] leading-none font-bold tracking-[-0.03em]">{session.user.firstName}</h1>
             <p className="truncate text-[13px] text-white/85">{who}</p>
           </div>
-          <FloatingRobot className="h-[92px] w-[78px] shrink-0 drop-shadow-[0_12px_18px_rgba(0,0,0,0.2)]" />
+          <div className="relative shrink-0">
+            <Robot floating track interactive greet="once" sound="mobile" className="h-[92px] w-[78px] drop-shadow-[0_12px_18px_rgba(0,0,0,0.2)]" />
+            <RobotSoundToggle where="mobile" tone="dark" className="absolute -right-2 -bottom-2" />
+          </div>
         </div>
+        {robotTip && <RobotBubble tip={robotTip} />}
       </section>
 
       {/* Continuer ma formation */}
       <section className="m-rise space-y-3" style={{ animationDelay: "60ms" }}>
         <SectionTitle title="Continuer ma formation" action={continueCard ? { href: "/m/formations", label: "Tout voir" } : undefined} />
         {continueCard ? (
-          <MCardLink href="/m/formations" className="flex items-center gap-4">
+          <MCardLink href={continueCard.href} className="flex items-center gap-4">
             <span className="relative flex size-16 shrink-0 items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-md">
               <Play className="size-7 fill-white" aria-hidden="true" />
             </span>
@@ -78,34 +88,9 @@ export default async function MobileHomePage() {
         )}
       </section>
 
-      {/* Nouveautés partenaires */}
+      {/* Nouveautés partenaires (étape Découvertes : campagnes « Sponsorisé » puis nouveautés « Partenaire ») */}
       <section className="m-rise space-y-3" style={{ animationDelay: "120ms" }}>
-        <SectionTitle title="Nouveautés partenaires" action={launches.length > 0 ? { href: "/m/decouvertes", label: "Découvrir" } : undefined} />
-        {launches.length > 0 ? (
-          <div className="m-rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 lg:-mx-8 lg:px-8">
-            {launches.map((launch) => (
-              <MCardLink key={launch.id} href="/m/decouvertes" className="w-[78%] max-w-[300px] shrink-0 space-y-2 p-0 sm:p-0">
-                <span className="relative block aspect-[16/10] overflow-hidden rounded-t-[20px] bg-[linear-gradient(135deg,var(--color-brand-100),var(--color-brand-50))]">
-                  {launch.posterUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element -- visuel fourni par le partenaire, domaine non connu à l'avance
-                    <img src={launch.posterUrl} alt="" className="size-full object-cover" />
-                  )}
-                </span>
-                <span className="block space-y-1 px-4 pb-4">
-                  <span className="block text-[12px] font-semibold text-brand-700">{launch.brandName}</span>
-                  <span className="line-clamp-2 block text-[15px] leading-snug font-semibold text-ink-900">{launch.title}</span>
-                </span>
-              </MCardLink>
-            ))}
-          </div>
-        ) : (
-          <QuietState
-            compact
-            icon={<Sparkles className="size-6" aria-hidden="true" />}
-            title="Rien de neuf pour l'instant"
-            body="Les lancements et les informations des laboratoires partenaires, vérifiés avant publication, s'afficheront ici."
-          />
-        )}
+        <PartnerNewsRail items={launches} />
       </section>
 
       {/* Mes challenges (équipes clientes) */}

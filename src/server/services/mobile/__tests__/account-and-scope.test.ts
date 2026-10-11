@@ -12,7 +12,10 @@ const m = vi.hoisted(() => {
     userConsent: { findFirst: fn(), findMany: fn(), create: fn() },
     trainingProgress: { findFirst: fn() },
     trainingContent: { findFirst: fn() },
+    trainingModuleItem: { findFirst: vi.fn(async () => null) },
     partnerLaunch: { findMany: fn() },
+    partnerBrand: { findMany: fn() },
+    sponsoredCampaign: { findMany: fn() },
     loadTeamChallenges: fn(),
   };
 });
@@ -127,6 +130,8 @@ describe("isolement des lectures de l'accueil", () => {
 
   it("les nouveautés partenaires exigent relecture, validation réglementaire et publication", async () => {
     m.partnerLaunch.findMany.mockResolvedValue([]);
+    m.partnerBrand.findMany.mockResolvedValue([]);
+    m.sponsoredCampaign.findMany.mockResolvedValue([]);
     await home.loadPartnerLaunches(now);
     expect(m.partnerLaunch.findMany.mock.calls[0][0].where).toMatchObject({ reviewStatus: "APPROVED", regulatoryValidatedAt: { not: null }, publishedAt: { lte: now } });
   });

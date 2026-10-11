@@ -8,6 +8,10 @@ import { counterFigures, describeSaleStage, ordonnanceTitle, type CounterDashboa
 import { formatCents, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CounterResetButton } from "../counter-reset-button";
+import { emitRobotMood } from "@/components/robot";
+import { dashboardMood } from "@/core/robot/mascot";
+import type { RobotTip } from "@/core/robot/mascot-tips";
+import { CounterRobot } from "./counter-robot";
 
 export type LiveSale = {
   id: string;
@@ -47,6 +51,8 @@ export function CounterDashboard({
   initialSales,
   canConfigure,
   manualOpen,
+  robotTips,
+  stockBanner,
   children,
 }: {
   dateLabel: string;
@@ -56,6 +62,10 @@ export function CounterDashboard({
   canConfigure: boolean;
   /** Ouvre la saisie manuelle d'emblée : un patient ou une demande de démonstration arrive déjà choisi. */
   manualOpen: boolean;
+  /** Ce que le robot du coin peut dire (une phrase à la fois). */
+  robotTips: RobotTip[];
+  /** Le bandeau du stock : le robot le remplace quand c'est lui qui en parle. */
+  stockBanner: ReactNode;
   /** La saisie à la main : ordonnance, médicament, demande sans ordonnance. */
   children: ReactNode;
 }) {
@@ -133,11 +143,20 @@ export function CounterDashboard({
     if (next) requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
+  // Un conseil accepté de plus aujourd'hui : le robot se réjouit un instant (le compteur du jour fait foi).
+  const acceptedRef = useRef(initial.stats.accepted);
+  useEffect(() => {
+    if (data.stats.accepted > acceptedRef.current) emitRobotMood("happy", { channel: "comptoir" });
+    acceptedRef.current = data.stats.accepted;
+  }, [data.stats.accepted]);
+  const robotMood = dashboardMood({ saleStatuses: sales.map((sale) => sale.status), acceptedRose: false });
+
   const { status, stats, activity } = data;
   const figures = counterFigures(stats, formatCents);
 
   return (
     <div className="space-y-5">
+      <CounterRobot mood={robotMood} tips={robotTips} stockBanner={stockBanner} />
       <section aria-labelledby="titre-comptoir" className="rounded-2xl border border-border-subtle bg-surface-card p-5 shadow-card sm:p-8">
         {/* Le titre garde au moins onze rem : en dessous, la pastille passe sous lui plutôt que de l'étrangler. */}
         <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-3">

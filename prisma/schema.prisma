@@ -3853,6 +3853,15 @@ model TrainingContent {
   /// Mise en ligne, et date au-delà de laquelle le contenu doit être relu ou retiré (réglementation, RCP…).
   publishedAt     DateTime?
   validUntil      DateTime?
+  /// Étape Formations (migration 20261028100000_mobile_academie) : le thème du catalogue (filtres de l'onglet).
+  /// MEDICINES = contenu sur le médicament : sa relecture doit être faite par un pharmacien (`reviewerIsPharmacist`).
+  academyTopic         AcademyTopic?
+  /// Le relecteur a déclaré relire en qualité de pharmacien (case « Relu par un pharmacien » de la console).
+  reviewerIsPharmacist Boolean       @default(false)
+  /// Le motif d'un refus de relecture, montré à l'auteur dans la console.
+  reviewNote           String?
+  /// Le seuil de réussite du quiz du contenu, en pourcentage.
+  quizPassPercent      Int           @default(70)
 
   pharmacy        Pharmacy?                @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   partner         Partner?                 @relation(fields: [partnerId], references: [id], onDelete: SetNull)
@@ -3893,6 +3902,15 @@ model TrainingProgress {
   @@index([pharmacyId, userId])
   @@index([userId])
   @@map("training_progress")
+}
+
+/// Le thème d'un contenu de l'Académie (filtres du catalogue de l'onglet Formations).
+enum AcademyTopic {
+  MEDICINES
+  PARAPHARMACY
+  PRODUCT_NEWS
+  LAB_NEWS
+  NEW_STAFF
 }
 
 /// Sens d'une vidéo.
@@ -5275,6 +5293,14 @@ enum SponsoredPlacement {
   TRAINING_MODULE
 }
 
+/// Facturation d'une campagne sponsorisée : DEVIS → SIGNÉ → FACTURÉ → PAYÉ.
+enum SponsoredBillingStatus {
+  QUOTE
+  SIGNED
+  INVOICED
+  PAID
+}
+
 /// Vie d'une campagne sponsorisée (distinct de CampaignStatus, qui sert aux campagnes d'e-mails).
 enum SponsoredCampaignStatus {
   DRAFT
@@ -5313,6 +5339,9 @@ model SponsoredCampaign {
   billedCents          Int?
   billingReference     String?
   contractReference    String?
+  /// Où en est la facturation : devis, signé, facturé, payé (étape Découvertes). Montants saisis par l'équipe.
+  billingStatus        SponsoredBillingStatus  @default(QUOTE)
+  paidAt               DateTime?
   createdByAdminId     String?
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt

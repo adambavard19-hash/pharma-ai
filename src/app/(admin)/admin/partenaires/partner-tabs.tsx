@@ -15,6 +15,9 @@ export function PartnerTabs() {
         { key: "integrations", label: "Intégrations", href: "/admin/partenaires/integrations" },
         { key: "offres", label: "Offres", href: "/admin/partenaires/offres" },
         { key: "commandes", label: "Commandes & leads", href: "/admin/partenaires/commandes" },
+        { key: "nouveautes", label: "Nouveautés", href: "/admin/partenaires/nouveautes" },
+        { key: "campagnes", label: "Campagnes", href: "/admin/partenaires/campagnes" },
+        { key: "demandes", label: "Demandes d'info", href: "/admin/partenaires/demandes" },
         { key: "statistiques", label: "Statistiques", href: "/admin/partenaires/statistiques" },
       ]}
     />

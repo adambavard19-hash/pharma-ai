@@ -6,6 +6,7 @@ import { HeroVisual, QuestionVisual, RequestVisual, StockMarginVisual, TeamVisua
 import { BannerPillsInline } from "./_components/banner-mock";
 import { VideoButton } from "./_components/video-dialog";
 import { FloatingRobot } from "./_components/floating-robot";
+import { RobotSoundToggle } from "@/components/robot";
 import { BannerDemo } from "./_components/banner-demo";
 import { loadLiveProof } from "@/server/services/site-leads";
 import { loadPublicPricing } from "@/server/services/public-pricing";
@@ -51,7 +52,8 @@ export default async function SitePage() {
               <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-3 py-1.5 text-[13px] font-medium text-text-secondary">
                 <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
               </p>
-              <FloatingRobot className="h-[58px] w-[50px]" />
+              <FloatingRobot className="h-[58px] w-[50px]" track greet="once" sound="site" />
+              <RobotSoundToggle where="site" className="mb-1 -ml-2" />
             </div>
             <h1 className="mt-7 text-[56px] leading-[0.98] font-bold tracking-[-0.04em] text-text-primary md:text-[80px]">
               Scan.

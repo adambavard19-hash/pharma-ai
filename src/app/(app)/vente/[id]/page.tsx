@@ -442,6 +442,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           quantity: recommendation.quantity,
           unitPriceCents: recommendation.unitPriceCents,
           pharmacistNote: recommendation.pharmacistNote,
+          declineReason: recommendation.declineReason,
           decidedBy: recommendation.decidedBy
             ? `${recommendation.decidedBy.firstName} ${recommendation.decidedBy.lastName}`
             : null,

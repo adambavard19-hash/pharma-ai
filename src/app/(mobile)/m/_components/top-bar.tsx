@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ChevronDown, Store } from "lucide-react";
 import type { UserSessionContext } from "@/server/auth/user-session";
-import { RobotMark, Wordmark } from "./ui";
+import { Robot } from "@/components/robot";
+import { Wordmark } from "./ui";
 
 /**
  * La barre du haut : la marque à gauche ; à droite, l'officine active (équipes clientes — un toucher ouvre le choix
@@ -14,7 +15,8 @@ export function TopBar({ session }: { session: UserSessionContext }) {
     <header className="m-safe-top sticky top-0 z-30 border-b border-ink-200/60 bg-[#f6fafa]/85 backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto flex h-14 max-w-2xl items-center gap-3 px-4 lg:max-w-3xl lg:px-8">
         <Link href="/m" className="flex items-center gap-2 lg:hidden" aria-label="PharmaBoost — accueil">
-          <RobotMark size={30} />
+          {/* Le robot vivant, présent sur chaque onglet : c'est lui qui fête un quiz réussi ou un badge (emitRobotMood). */}
+          <Robot size={30} listen sound="mobile" />
           {/* Au téléphone, l'officine passe avant le nom de la marque : le robot suffit à la reconnaître. */}
           <Wordmark className={pharmacy ? "hidden min-[440px]:inline" : undefined} />
         </Link>

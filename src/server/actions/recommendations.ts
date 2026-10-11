@@ -11,6 +11,8 @@ import { Prisma, type RecommendationEventType, type RecommendationStatus } from 
 import { parseSuggestionVigilances } from "@/config/vigilances";
 import { requiresPharmacistValidation } from "@/core/ai/engines/population-vigilance";
 import { alternativeFromRecommendation, parseStoredAlternatives } from "@/core/ai/alternatives";
+import { isRefusalReason } from "@/core/coach/rules";
+import { setDeclineReason } from "@/server/services/mobile/coach";
 
 /**
  * Décisions du pharmacien sur les recommandations.
@@ -742,4 +744,21 @@ export async function deletePharmacyRuleAction(ruleId: string): Promise<ActionRe
 
   revalidatePath("/parametres/regles");
   return ok(null, "Règle supprimée.");
+}
+
+/**
+ * Pourquoi un conseil refusé n'a pas été vendu, quand le pharmacien veut le dire (sélecteur « Pourquoi ? » de l'écran
+ * de la vente). Facultatif, modifiable, effaçable ; seulement sur un conseil refusé de l'officine de la session. Lu par
+ * le coach de formation de PharmaBoost Mobile (agrégats) et, pour « Pas adapté à ce patient », par la validation
+ * clinique centrale.
+ */
+export async function setDeclineReasonAction(payload: { recommendationId: string; reason: string | null }): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_DECIDE);
+  if (typeof payload?.recommendationId !== "string" || payload.recommendationId.length > 60) return fail("Conseil inconnu.");
+  const reason = payload.reason === null || payload.reason === "" ? null : isRefusalReason(payload.reason) ? payload.reason : undefined;
+  if (reason === undefined) return fail("Motif inconnu.");
+  const done = await setDeclineReason(session.scope, payload.recommendationId, reason);
+  if (!done) return fail("Ce conseil n'est plus refusé : le motif ne s'applique pas.");
+  await recordAudit({ action: "recommendation.decline_reason_set", entityType: "Recommendation", entityId: payload.recommendationId, pharmacyId: session.scope.pharmacyId, userId: session.scope.userId, metadata: { reason } });
+  return ok(null, reason ? "Motif noté." : "Motif retiré.");
 }

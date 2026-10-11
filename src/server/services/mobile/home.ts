@@ -4,6 +4,8 @@ import type { Prisma } from "@/generated/prisma";
 import type { TenantScope } from "@/server/db/tenant";
 import { loadTeamChallenges } from "@/server/services/team-ranking";
 import { formatDuration } from "@/core/training/content";
+import { contentVisibleWhere } from "@/core/academy/visibility";
+import { loadPartnerNews, type HomeViewer, type PartnerNewsItem } from "./discover-home";
 
 /**
  * L'écran d'accueil de PharmaBoost Mobile : ce qu'il lit, et rien de plus.
@@ -14,16 +16,13 @@ import { formatDuration } from "@/core/training/content";
  * par la portée de la session (`scope`), jamais par un identifiant reçu.
  */
 
-/** Ce que l'application mobile accepte de montrer d'un contenu : en ligne, relu, dans sa période de validité. */
+/**
+ * Ce que l'application mobile accepte de montrer d'un contenu : en ligne, relu et approuvé, PUBLIÉ (date de mise en
+ * ligne passée), dans sa période de validité, ouvert à ce public. La règle vit dans `core/academy/visibility` (étape
+ * Formations) ; ce nom reste pour les lecteurs existants.
+ */
 export function mobileVisibleTrainingWhere(scope: Pick<TenantScope, "pharmacyId"> | null, now: Date): Prisma.TrainingContentWhereInput {
-  return {
-    isActive: true,
-    reviewStatus: "APPROVED",
-    AND: [
-      { OR: [{ validUntil: null }, { validUntil: { gt: now } }] },
-      scope ? { OR: [{ pharmacyId: null }, { pharmacyId: scope.pharmacyId }] } : { pharmacyId: null, isFreeAccess: true },
-    ],
-  };
+  return contentVisibleWhere({ pharmacyId: scope ? scope.pharmacyId : null }, now);
 }
 
 export type ContinueCard = {
@@ -33,6 +32,8 @@ export type ContinueCard = {
   durationLabel: string | null;
   percent: number;
   mode: "continue" | "start";
+  /** Le détail du contenu dans l'onglet Formations. */
+  href: string;
 };
 
 const KIND_WORDS: Record<string, string> = { VIDEO: "Vidéo", MICRO_VIDEO: "Micro-vidéo", SHEET: "Fiche", DOCUMENT: "Document", EXTERNAL_LINK: "Lien officiel", QUIZ: "Quiz" };
@@ -53,6 +54,16 @@ export async function loadContinueCard(userId: string, scope: Pick<TenantScope, 
   });
   if (started) return card(started.content, started.progressPercent, "continue");
 
+  // À découvrir : d'abord la suite d'un parcours publié (dans son ordre), sinon le contenu le plus récent.
+  const inPath = await prisma.trainingModuleItem.findFirst({
+    where: {
+      module: { isActive: true, reviewStatus: "APPROVED", publishedAt: { lte: now }, ...(scope ? {} : { isFreeAccess: true }) },
+      content: { AND: [visible, { progress: { none: { userId } } }] },
+    },
+    orderBy: [{ module: { sortOrder: "asc" } }, { position: "asc" }],
+    select: { content: { select } },
+  });
+  if (inPath) return card(inPath.content, 0, "start");
   const next = await prisma.trainingContent.findFirst({
     where: { ...visible, progress: { none: { userId } } },
     orderBy: [{ publishedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
@@ -62,30 +73,19 @@ export async function loadContinueCard(userId: string, scope: Pick<TenantScope, 
 }
 
 function card(content: { id: string; title: string; kind: string; durationMinutes: number | null; durationSeconds: number | null }, percent: number, mode: ContinueCard["mode"]): ContinueCard {
-  return { contentId: content.id, title: content.title, kindLabel: KIND_WORDS[content.kind] ?? "Formation", durationLabel: durationOf(content), percent: Math.max(0, Math.min(100, percent)), mode };
+  return { contentId: content.id, title: content.title, kindLabel: KIND_WORDS[content.kind] ?? "Formation", durationLabel: durationOf(content), percent: Math.max(0, Math.min(100, percent)), mode, href: `/m/formations/${content.id}` };
 }
 
-export type LaunchCard = { id: string; title: string; summary: string | null; brandName: string; posterUrl: string | null; publishedAt: Date | null };
+export type LaunchCard = PartnerNewsItem;
 
 /**
- * « Nouveautés partenaires » : seulement ce qui est relu, validé sur le plan réglementaire, publié, pas échu, d'une
- * marque et d'un partenaire actifs. Vide tant que la console des partenaires (étape suivante) n'a rien publié.
+ * « Nouveautés partenaires » (étape Découvertes) : les campagnes sponsorisées de l'accueil (« Sponsorisé »), puis les
+ * nouveautés publiées des marques (« Partenaire ») — seulement ce qui est relu, validé sur le plan réglementaire (nom
+ * et date), publié, non échu, d'une marque et d'un partenaire visibles pour CETTE personne (préférences de son
+ * officine comprises). Sans session : le public le plus restreint (compte gratuit).
  */
-export async function loadPartnerLaunches(now = new Date(), limit = 8): Promise<LaunchCard[]> {
-  const rows = await prisma.partnerLaunch.findMany({
-    where: {
-      reviewStatus: "APPROVED",
-      regulatoryValidatedAt: { not: null },
-      publishedAt: { lte: now },
-      OR: [{ endsAt: null }, { endsAt: { gt: now } }],
-      brand: { status: "ACTIVE" },
-      partner: { status: "ACTIVE" },
-    },
-    orderBy: { publishedAt: "desc" },
-    take: limit,
-    select: { id: true, title: true, summary: true, posterUrl: true, publishedAt: true, brand: { select: { name: true } } },
-  });
-  return rows.map((row) => ({ id: row.id, title: row.title, summary: row.summary, brandName: row.brand.name, posterUrl: row.posterUrl, publishedAt: row.publishedAt }));
+export async function loadPartnerLaunches(now = new Date(), who: HomeViewer | null = null, limit = 8): Promise<LaunchCard[]> {
+  return loadPartnerNews(now, who, limit);
 }
 
 export type MyChallenge = { id: string; title: string; laboratory: string; daysRemaining: number; myUnits: number; teamUnits: number; target: number | null; rank: number | null; people: number };
