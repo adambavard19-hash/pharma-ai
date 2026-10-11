@@ -4,6 +4,7 @@
  * Même dessin que la mascotte (`mascotSvg` dans agent/src/banner-preview.ts, `Mascot.Draw` côté Windows), mêmes couleurs
  * (`BANNER.colors`), figé dans son expression souriante. Écrit `public/logo.svg` (la source) puis toutes les déclinaisons PNG
  * déjà utilisées par l'application : `public/logo.png`, `logo-1200.png`, `logo-256.png`, `src/app/icon.png`, `src/app/apple-icon.png`.
+ * Et le robot seul, sans fond : `public/logo-robot.svg`, `logo-robot-2048.png`, `logo-robot-1080.png` (réseaux sociaux).
  *
  *   npx tsx scripts/logo-robot.ts
  */
@@ -58,7 +59,17 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width
 </svg>
 `;
 
+/** Le robot seul, sans fond (transparent) : pour les réseaux sociaux, les documents, les fonds de couleur. Carré, robot centré. */
+const robotDefs = svg.slice(svg.indexOf("<defs>"), svg.indexOf("</defs>") + "</defs>".length);
+const transparentSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -15 112 112" width="1024" height="1024">
+  ${robotDefs}
+  <g>${robot}
+  </g>
+</svg>
+`;
+
 writeFileSync("public/logo.svg", svg);
+writeFileSync("public/logo-robot.svg", transparentSvg);
 const outputs: [string, number][] = [
   ["public/logo.png", 1254],
   ["public/logo-1200.png", 1200],
@@ -70,6 +81,10 @@ async function main() {
   for (const [file, size] of outputs) {
     await sharp(Buffer.from(svg), { density: Math.ceil((72 * size) / 1024) * 2 }).resize(size, size).png().toFile(file);
     console.log(`✓ ${file} (${size} px)`);
+  }
+  for (const [file, size] of [["public/logo-robot-2048.png", 2048], ["public/logo-robot-1080.png", 1080]] as const) {
+    await sharp(Buffer.from(transparentSvg), { density: Math.ceil((72 * size) / 1024) * 2 }).resize(size, size).png().toFile(file);
+    console.log(`✓ ${file} (${size} px, sans fond)`);
   }
 }
 
