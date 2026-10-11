@@ -35,13 +35,13 @@ function arc(cx: number, cy: number, rx: number, ry: number, start: number, swee
 const eye = (cx: number, open = 1) =>
   open < 0.25
     ? `<path d="M ${cx - 5} 42 Q ${cx} 44.5 ${cx + 5} 42" fill="none" stroke="${C.eye}" stroke-width="2.6" stroke-linecap="round"/>`
-    : `<ellipse cx="${cx}" cy="42" rx="4.8" ry="${(6.4 * open).toFixed(2)}" fill="${C.eye}"/><circle cx="${cx - 1.5}" cy="${(42 - 2.6 * open).toFixed(2)}" r="1.7" fill="#fff" fill-opacity=".85"/>`;
+    : `<ellipse cx="${cx}" cy="42" rx="4.8" ry="${+(6.4 * open).toFixed(2)}" fill="${C.eye}"/><circle cx="${cx - 1.5}" cy="${+(42 - 2.6 * open).toFixed(2)}" r="1.7" fill="#fff" fill-opacity=".85"/>`;
 
 /** Le robot dans sa boîte de 100 unités, comme la mascotte de la bannière. `pose` anime le robot de l'e-mail (yeux, lampe, étoile). */
 type Pose = { open?: number; lamp?: number; spark?: number };
 const robotOf = ({ open = 1, lamp = 0.28, spark = 1 }: Pose = {}) => `
     <line x1="50" y1="17" x2="50" y2="8" stroke="${C.shellEdge}" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="50" cy="6" r="${(6 + 4 * lamp).toFixed(2)}" fill="${C.eye}" fill-opacity="${lamp.toFixed(2)}"/>
+    <circle cx="50" cy="6" r="${+(5.2 + 10 * lamp).toFixed(2)}" fill="${C.eye}" fill-opacity="${lamp.toFixed(2).replace(/^0/, "")}"/>
     <circle cx="50" cy="6" r="3.8" fill="${C.eye}"/>
     <path d="${arc(50, 44, 41, 35, 192, 156)}" fill="none" stroke="${C.ear}" stroke-width="5" stroke-linecap="round"/>
     <rect x="3" y="36" width="15" height="28" rx="7" fill="url(#g-ear)"/>
@@ -53,7 +53,7 @@ const robotOf = ({ open = 1, lamp = 0.28, spark = 1 }: Pose = {}) => `
     <circle cx="74" cy="69" r="15" fill="#fff" fill-opacity=".95"/>
     <circle cx="74" cy="69" r="13.5" fill="url(#g-badge)"/>
     <rect x="72.2" y="61" width="3.6" height="16" rx="1" fill="#fff"/><rect x="66" y="67.2" width="16" height="3.6" rx="1" fill="#fff"/>
-    <g transform="translate(80 14) scale(${spark.toFixed(2)}) translate(-80 -14)"><path d="M 80 7 L 82 12.5 L 87.5 14 L 82 15.5 L 80 21 L 78 15.5 L 72.5 14 L 78 12.5 Z" fill="#FFD65A"/></g>`;
+    ${spark === 1 ? "" : `<g transform="translate(80 14) scale(${spark.toFixed(2)}) translate(-80 -14)">`}<path d="M 80 7 L 82 12.5 L 87.5 14 L 82 15.5 L 80 21 L 78 15.5 L 72.5 14 L 78 12.5 Z" fill="#FFD65A"/>${spark === 1 ? "" : "</g>"}`;
 const robot = robotOf();
 
 /** L'icône : le carré arrondi bleu-vert de la bannière, une lueur derrière la tête, le robot centré. */
@@ -108,7 +108,7 @@ async function emailRobotGif() {
     const t = i / FRAMES;
     const bob = Math.sin(t * Math.PI * 2) * 3.2;
     const open = i === 21 || i === 23 ? 0.15 : i === 22 ? 0 : 1;
-    const lamp = 0.2 + 0.3 * (0.5 + 0.5 * Math.sin(t * Math.PI * 4));
+    const lamp = 0.14 + 0.24 * (0.5 + 0.5 * Math.sin(t * Math.PI * 4));
     const spark = 0.75 + 0.35 * (0.5 + 0.5 * Math.sin(t * Math.PI * 6 + 1));
     const frame = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -14 116 116" width="256" height="256">
   ${robotDefs}
