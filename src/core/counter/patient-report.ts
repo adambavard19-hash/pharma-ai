@@ -17,7 +17,11 @@
  *  - `precautions` : les précautions d'emploi que la pharmacie a saisies sur sa fiche produit.
  * Les deux derniers passent par le même filtre que la phrase patient (`patientSafeLine`) avant d'arriver ici.
  */
-export type ReportProduct = { name: string; reason: string | null; imageUrl?: string | null; benefits?: string[]; precautions?: string[] };
+/**
+ * Un produit du bilan. `benefits` (« Pourquoi ce produit ? »), `usage` (« Comment l'utiliser ? ») et `precautions` ne viennent
+ * que de sources relues ; une colonne sans contenu ne s'affiche pas.
+ */
+export type ReportProduct = { name: string; reason: string | null; imageUrl?: string | null; benefits?: string[]; usage?: string[]; precautions?: string[] };
 
 /** Ce que le bilan dit de la pharmacie : le nom, et seulement ce que sa fiche contient (rien n'est deviné). */
 export type ReportPharmacy = {
@@ -144,7 +148,8 @@ export function reportProducts(products: ReportProduct[]): ReportProduct[] {
       name,
       reason: reason ? reason.slice(0, 300) : null,
       imageUrl: product.imageUrl ?? null,
-      benefits: lines(product.benefits, 3, 40),
+      benefits: lines(product.benefits, 3, 80),
+      usage: lines(product.usage, 2, 200),
       precautions: lines(product.precautions, 2, 160),
     });
   }
@@ -160,6 +165,15 @@ export const REPORT_ROBOT_PATH = "/email/robot-192.png";
  * Généré par `npx tsx scripts/logo-robot.ts --email`.
  */
 export const REPORT_ROBOT_GIF_PATH = "/email/robot-vivant.gif";
+/** Le grand robot vivant de l'accueil du bilan, entre des feuilles, sur le vert pâle de l'encart (EMAIL_HERO_BACKGROUND). */
+export const REPORT_HERO_ROBOT_PATH = "/email/robot-bilan.gif";
+const EMAIL_HERO_BACKGROUND = "#EAF5F0";
+
+/** « Dimanche 11 octobre 2026 », à l'heure de Paris. */
+export function reportDate(date: Date): string {
+  const text = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date);
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 /** La couleur de la pharmacie, si c'est bien une couleur ; sinon celle de PharmaBoost. */
 export function brandColorOf(value: string | null | undefined): string {
@@ -194,7 +208,7 @@ export function postalAddress(pharmacy: ReportPharmacy): string | null {
 }
 
 /** `null` quand il n'y a rien à dire : sans produit retenu, aucun e-mail ne part. */
-export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: ReportPharmacy; products: ReportProduct[]; assetBaseUrl?: string | null }): PatientReport | null {
+export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: ReportPharmacy; products: ReportProduct[]; assetBaseUrl?: string | null; date?: Date }): PatientReport | null {
   const products = reportProducts(input.products);
   if (products.length === 0) return null;
   const details: ReportPharmacy = input.pharmacy ?? { name: input.pharmacyName ?? "" };
@@ -203,7 +217,8 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
   const brand = brandColorOf(details.brandColor);
   const ink = inkOn(brand);
   const logo = emailImageUrl(details.logoUrl, base);
-  const robot = `${base}${REPORT_ROBOT_GIF_PATH}`;
+  const asset = (path: string) => `${base}${path}`;
+  const day = input.date ? reportDate(input.date) : null;
   const tel = telLink(details.phone);
   const phone = clean(details.phone);
   const address = postalAddress(details);
@@ -214,6 +229,8 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
   const consent = `Vous recevez ce message parce que vous avez donné votre accord au comptoir de ${pharmacy}. Votre adresse n'est utilisée que pour cet envoi.`;
 
   const text = [
+    `Votre bilan personnalisé — ${pharmacy}${day ? ` — ${day}` : ""}`,
+    "",
     "Bonjour,",
     "",
     `Voici le récapitulatif des produits que votre pharmacien vous a conseillés aujourd'hui à ${pharmacy}.`,
@@ -221,7 +238,8 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
     ...products.flatMap((product) => [
       `• ${product.name}`,
       ...(product.reason ? [`  ${product.reason}`] : []),
-      ...(product.benefits?.length ? [`  Ce que ça apporte : ${product.benefits.join(", ")}`] : []),
+      ...(product.benefits?.length ? [`  Pourquoi ce produit : ${product.benefits.join(", ")}`] : []),
+      ...(product.usage ?? []).map((line) => `  Comment l'utiliser : ${line}`),
       ...(product.precautions ?? []).map((line) => `  Précaution d'emploi : ${line}`),
       "",
     ]),
@@ -232,53 +250,113 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
   ].join("\n");
 
   const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif";
+  const DARK = "#0B3B47";
+  const icon = (name: string, size = 22) => `<img src="${escape(asset(`/email/icone-${name}.png`))}" width="${size}" height="${size}" alt="" style="display:block;width:${size}px;height:${size}px;border:0">`;
+  const city = clean(details.city);
+
+  // Une colonne d'une carte produit : icône, titre, lignes. Rien quand il n'y a rien à dire.
+  const column = (iconName: string, title: string, titleColor: string, body: string[]) =>
+    body.length
+      ? `<td class="stack" valign="top" style="padding:0 5px 10px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5F9F7;border-radius:12px"><tr><td style="padding:12px 12px 13px">
+<table role="presentation" cellpadding="0" cellspacing="0"><tr><td valign="middle" style="padding-right:8px">${icon(iconName, 20)}</td><td valign="middle" style="font-size:14px;line-height:19px;font-weight:700;color:${titleColor}">${title}</td></tr></table>
+${body.map((line) => `<div style="margin-top:6px;font-size:13.5px;line-height:20px;color:#475467">${escape(line)}</div>`).join("")}
+</td></tr></table></td>`
+      : "";
+
   const card = (product: ReportProduct) => {
     const image = emailImageUrl(product.imageUrl, base);
     const visual = image
-      ? `<img src="${escape(image)}" width="64" height="64" alt="" style="display:block;width:64px;height:64px;object-fit:contain;border-radius:12px;background:#ffffff;border:1px solid #e4ece9">`
-      : `<div style="width:64px;height:64px;border-radius:12px;background:${brand};opacity:.12"></div>`;
-    const benefits = product.benefits?.length
-      ? `<div style="margin-top:8px">${product.benefits.map((benefit) => `<span style="display:inline-block;margin:0 6px 6px 0;padding:3px 10px;border-radius:999px;background:#eef6f3;color:#0b5c49;font-size:12.5px;line-height:18px">${escape(benefit)}</span>`).join("")}</div>`
-      : "";
-    const precautions = (product.precautions ?? [])
-      .map((line) => `<div style="margin-top:6px;font-size:13px;line-height:19px;color:#475467"><strong style="color:#344054">Précaution d'emploi :</strong> ${escape(line)}</div>`)
-      .join("");
-    return `<tr><td style="padding:0 0 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fbfa;border:1px solid #e4ece9;border-radius:14px"><tr>
-<td width="64" valign="top" style="padding:14px 0 14px 14px">${visual}</td>
-<td valign="top" style="padding:14px 16px">
-<div style="font-size:15.5px;line-height:21px;font-weight:700;color:#101828">${escape(product.name)}</div>
-${product.reason ? `<div style="margin-top:4px;font-size:14px;line-height:21px;color:#344054">${escape(product.reason)}</div>` : ""}${benefits}${precautions}
+      ? `<img src="${escape(image)}" width="132" height="132" alt="" style="display:block;width:132px;height:132px;object-fit:contain;border:0">`
+      : `<table role="presentation" width="132" height="132" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle">${icon("produits", 44)}</td></tr></table>`;
+    const columns = [
+      column("pourquoi", "Pourquoi ce produit ?", DARK, product.benefits ?? []),
+      column("utiliser", "Comment l'utiliser ?", DARK, product.usage ?? []),
+      column("precaution", "Précautions", "#B42318", product.precautions ?? []),
+    ].join("");
+    return `<tr><td style="padding:0 0 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #E4ECE9;border-radius:16px"><tr>
+<td class="stack center" width="150" valign="top" style="padding:16px 0 16px 16px"><table role="presentation" width="148" cellpadding="0" cellspacing="0" style="background:#F4F8F7;border-radius:14px"><tr><td align="center" valign="middle" style="padding:8px">${visual}</td></tr></table></td>
+<td class="stack" valign="top" style="padding:16px 16px 6px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td valign="top" style="font-size:19px;line-height:25px;font-weight:800;color:#101828">${escape(product.name)}</td>
+<td class="hide-sm" valign="top" align="right" style="padding-left:10px;white-space:nowrap"><span style="display:inline-block;padding:4px 12px;border-radius:999px;background:#E3F4EC;color:#0B6B4F;font-size:12.5px;line-height:18px;font-weight:600">Conseillé aujourd'hui</span></td>
+</tr></table>
+${product.reason ? `<div style="margin-top:6px;font-size:14.5px;line-height:22px;color:#475467">${escape(product.reason)}</div>` : ""}
+${columns ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px"><tr>${columns}</tr></table>` : ""}
 </td></tr></table></td></tr>`;
   };
-  const button = (href: string, label: string, primary: boolean) =>
-    `<td style="padding:0 6px 8px 0"><a href="${escape(href)}" style="display:inline-block;padding:12px 16px;border-radius:12px;font-size:14.5px;font-weight:700;text-decoration:none;white-space:nowrap;${primary ? `background:${brand};color:${ink}` : `background:#ffffff;color:#101828;border:1px solid #d0d5dd`}">${label}</a></td>`;
-  const buttons = [tel ? button(tel, "Appeler ma pharmacie", true) : "", maps ? button(maps, "Itinéraire", !tel) : ""].join("");
-  const contact = address || phone
-    ? `<tr><td style="padding:8px 28px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eaecf0"><tr><td style="padding:18px 0 6px">
-<div style="font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#667085">Votre pharmacie</div>
-<div style="margin-top:6px;font-size:15px;line-height:22px;font-weight:700;color:#101828">${escape(pharmacy)}</div>
-${address ? `<div style="font-size:14px;line-height:21px;color:#475467">${escape(address)}</div>` : ""}${phone ? `<div style="font-size:14px;line-height:21px;color:#475467">${escape(phone)}</div>` : ""}
-${buttons ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:14px"><tr>${buttons}</tr></table>` : ""}
-</td></tr></table></td></tr>`
-    : "";
 
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${escape(subject)}</title></head>
-<body style="margin:0;padding:0;background:#eef3f1;font-family:${font};color:#101828;-webkit-text-size-adjust:100%">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0">Le récapitulatif des produits conseillés aujourd'hui par ${escape(pharmacy)}.</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3f1"><tr><td align="center" style="padding:24px 12px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #dfe8e4">
-<tr><td style="background:${brand};padding:22px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-${logo ? `<td width="56" valign="middle"><img src="${escape(logo)}" width="52" height="52" alt="" style="display:block;width:52px;height:52px;border-radius:14px;background:#ffffff;object-fit:contain"></td>` : ""}
-<td valign="middle" style="padding-left:${logo ? 14 : 0}px"><div style="font-size:13px;font-weight:600;color:${ink};opacity:.85">${escape(pharmacy)}</div><div style="margin-top:2px;font-size:22px;line-height:28px;font-weight:800;color:${ink}">Votre bilan du jour</div></td>
+  const gestures = ["Utilisez les produits selon les conseils de votre pharmacien.", "N'hésitez pas à nous recontacter en cas de question.", "En cas de doute ou de persistance des symptômes, demandez conseil à un professionnel de santé."];
+  const gesturesRow = `<tr><td class="pad" style="padding:6px 32px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${EMAIL_HERO_BACKGROUND};border-radius:16px"><tr><td style="padding:16px 18px 6px">
+<table role="presentation" cellpadding="0" cellspacing="0"><tr><td valign="middle" style="padding-right:8px">${icon("feuille", 22)}</td><td valign="middle" style="font-size:17px;font-weight:800;color:${DARK}">Les bons gestes à retenir</td></tr></table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px"><tr>
+${gestures.map((line) => `<td class="stack" valign="top" width="33%" style="padding:6px 8px 12px 0"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td valign="top" style="padding:1px 8px 0 0">${icon("coche", 20)}</td><td valign="top" style="font-size:13.5px;line-height:20px;color:#344054">${escape(line)}</td></tr></table></td>`).join("")}
+</tr></table></td></tr></table></td></tr>`;
+
+  const button = (href: string, label: string, primary: boolean, iconName: string) =>
+    `<td class="btn" style="padding:0 8px 8px 0"><a href="${escape(href)}" style="display:inline-block;padding:12px 18px;border-radius:12px;font-size:15px;font-weight:700;text-decoration:none;white-space:nowrap;${primary ? `background:${brand};color:${ink};border:1px solid ${brand}` : `background:#ffffff;color:#101828;border:1px solid #B9C7C2`}"><img src="${escape(asset(`/email/icone-${iconName}.png`))}" width="16" height="16" alt="" style="display:inline-block;width:16px;height:16px;vertical-align:-3px;margin-right:8px;border:0">${label}</a></td>`;
+  const buttons = [tel ? button(tel, "Appeler ma pharmacie", true, ink === "#FFFFFF" ? "appel" : "itineraire") : "", maps ? button(maps, "Itinéraire", false, "itineraire") : ""].join("");
+  const contact = `<tr><td class="pad" style="padding:0 32px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5F9F7;border-radius:16px">
+<tr><td style="padding:18px 18px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td class="stack" valign="top" style="padding-bottom:10px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td valign="top" style="padding:2px 12px 0 0">${icon("lieu", 30)}</td><td valign="top">
+<div style="font-size:16px;font-weight:800;color:#101828">Votre pharmacie</div>
+<div style="margin-top:4px;font-size:14.5px;line-height:21px;font-weight:700;color:#344054">${escape(pharmacy)}</div>
+${address ? `<div style="font-size:14px;line-height:21px;color:#475467">${escape(address)}</div>` : ""}${phone ? `<div style="font-size:14px;line-height:21px;color:#475467">${escape(phone)}</div>` : ""}
+</td></tr></table></td>
+${buttons ? `<td class="stack" valign="middle" align="right" style="padding-bottom:10px"><table role="presentation" cellpadding="0" cellspacing="0"><tr>${buttons}</tr></table></td>` : ""}
 </tr></table></td></tr>
-<tr><td style="padding:22px 28px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td width="76" valign="middle"><img src="${escape(robot)}" width="72" height="72" alt="Le robot PharmaBoost" style="display:block;width:72px;height:72px;border:0"></td>
-<td valign="middle" style="padding-left:12px"><div style="background:#f2f7f5;border-radius:16px;padding:12px 16px;font-size:15.5px;line-height:23px;color:#344054">Bonjour !<br>Voici le récapitulatif des produits que votre pharmacien vous a conseillés aujourd'hui.</div></td>
+<tr><td style="padding:0 18px 16px"><table role="presentation" cellpadding="0" cellspacing="0" style="border-top:1px solid #E1EAE6;width:100%"><tr><td valign="middle" width="32" style="padding:12px 8px 0 0">${icon("feuille", 24)}</td><td valign="middle" style="padding-top:12px;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:15.5px;line-height:22px;color:${DARK}">Toute l'équipe de ${escape(pharmacy)} reste à votre écoute !</td></tr></table></td></tr>
+</table></td></tr>`;
+
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${escape(subject)}</title>
+<style>
+@media only screen and (max-width:620px){
+  .stack{display:block!important;width:100%!important;box-sizing:border-box}
+  .center{text-align:center!important}
+  .center table{margin:0 auto}
+  .hide-sm{display:none!important}
+  .pad{padding-left:14px!important;padding-right:14px!important}
+  .hero-text{padding:22px 20px 8px!important}
+  .btn{display:inline-block!important}
+}
+</style></head>
+<body style="margin:0;padding:0;background:#EEF3F1;font-family:${font};color:#101828;-webkit-text-size-adjust:100%">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">Votre bilan personnalisé : les produits conseillés aujourd'hui par ${escape(pharmacy)}.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF3F1"><tr><td align="center" style="padding:20px 10px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #DFE8E4">
+
+<tr><td class="pad" style="padding:22px 32px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td class="stack" valign="middle"><table role="presentation" cellpadding="0" cellspacing="0"><tr>
+<td valign="middle" style="padding-right:14px"><img src="${escape(logo ?? asset("/email/croix-pharmacie.png"))}" width="56" height="56" alt="" style="display:block;width:56px;height:56px;border-radius:12px;object-fit:contain;border:0"></td>
+<td valign="middle"><div style="font-size:24px;line-height:30px;font-weight:800;color:${DARK}">${escape(pharmacy)}</div>${city ? `<div style="margin-top:2px;font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:#667085">${escape(city)}</div>` : ""}</td>
+</tr></table></td>
+${day ? `<td class="stack" valign="middle" align="right" style="padding-top:6px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td valign="middle" style="padding-right:10px">${icon("date", 28)}</td><td valign="middle"><div style="font-size:14px;font-weight:700;color:#101828">Bilan du conseil</div><div style="font-size:13.5px;color:#475467">${escape(day)}</div></td></tr></table></td>` : ""}
 </tr></table></td></tr>
-<tr><td style="padding:12px 28px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${products.map(card).join("")}</table></td></tr>
-${contact}
-<tr><td style="padding:14px 28px 20px;font-size:12.5px;line-height:19px;color:#667085">${escape(closing)}</td></tr>
-<tr><td style="padding:14px 28px 22px;border-top:1px solid #eaecf0;font-size:12px;line-height:18px;color:#98a2b3">${escape(consent)}</td></tr>
+
+<tr><td class="pad" style="padding:0 32px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${EMAIL_HERO_BACKGROUND};border-radius:18px"><tr>
+<td class="stack hero-text" valign="top" style="padding:26px 10px 22px 28px">
+<div style="font-size:28px;line-height:34px;font-weight:800;color:${DARK}">Votre bilan personnalisé</div>
+<div style="margin-top:14px;font-size:16px;line-height:24px;font-weight:700;color:#101828">Bonjour,</div>
+<div style="margin-top:4px;font-size:15.5px;line-height:24px;color:#344054">À la suite de votre passage à la pharmacie, retrouvez ci-dessous les produits que votre pharmacien vous a conseillés, avec quelques repères pour bien les utiliser.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;background:#D9EEE5;border-radius:12px"><tr><td valign="middle" width="30" style="padding:12px 0 12px 14px">${icon("soin", 26)}</td><td valign="middle" style="padding:12px 14px;font-size:14px;line-height:21px;color:#1D4D45">Ces conseils ont été choisis avec vous au comptoir. N'hésitez pas à nous recontacter si vous avez la moindre question.</td></tr></table>
+</td>
+<td class="stack center" valign="middle" width="210" align="center" style="padding:14px 18px 14px 0">
+<img src="${escape(asset(REPORT_HERO_ROBOT_PATH))}" width="170" height="170" alt="Le robot PharmaBoost" style="display:block;width:170px;height:170px;margin:0 auto;border:0">
+<img src="${escape(asset("/email/prenez-soin.png"))}" width="190" height="48" alt="Prenez soin de vous !" style="display:block;width:190px;height:48px;margin:0 auto;border:0">
+</td></tr></table></td></tr>
+
+<tr><td class="pad" style="padding:6px 32px 12px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td valign="top" style="padding:2px 12px 0 0">${icon("produits", 30)}</td><td valign="top">
+<div style="font-size:20px;line-height:26px;font-weight:800;color:${DARK}">Les produits conseillés par votre pharmacien</div>
+<div style="margin-top:4px;font-size:14.5px;line-height:21px;color:#475467">Voici les produits que nous vous avons recommandés aujourd'hui, avec quelques conseils pour bien les utiliser.</div>
+</td></tr></table></td></tr>
+
+<tr><td class="pad" style="padding:4px 32px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${products.map(card).join("")}</table></td></tr>
+${gesturesRow}
+${address || phone ? contact : ""}
+
+<tr><td class="pad" style="padding:6px 32px 24px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #EAECF0"><tr>
+<td class="stack" valign="top" width="55%" style="padding:16px 12px 0 0"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td valign="top" style="padding:1px 8px 0 0">${icon("cadenas", 18)}</td><td valign="top" style="font-size:12px;line-height:18px;color:#667085"><strong style="color:#344054">Confidentialité</strong><br>${escape(consent)}</td></tr></table></td>
+<td class="stack" valign="top" style="padding:16px 0 0"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td valign="top" style="padding:1px 8px 0 0">${icon("info", 18)}</td><td valign="top" style="font-size:12px;line-height:18px;color:#667085">${escape(closing)}</td></tr></table></td>
+</tr></table></td></tr>
 </table></td></tr></table></body></html>`;
   return { subject, text, html };
 }

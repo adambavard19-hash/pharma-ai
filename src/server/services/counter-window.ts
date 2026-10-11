@@ -307,6 +307,7 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
     pharmacy: pharmacy ? { name: pharmacy.name, brandColor: pharmacy.brandColor, logoUrl: pharmacy.logoUrl, phone: pharmacy.phone, addressLine1: pharmacy.addressLine1, addressLine2: pharmacy.addressLine2, postalCode: pharmacy.postalCode, city: pharmacy.city } : { name: "" },
     products: products.length ? products : input.fallbackNames.map((name) => ({ name, reason: null })),
     assetBaseUrl: emailAssetBase(),
+    date: new Date(),
   });
   if (!mail) return "NONE";
   const messaging = getMessagingProvider({ demo: pharmacy?.isDemo === true });

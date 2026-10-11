@@ -99,29 +99,46 @@ const pwaOnly = process.argv.includes("--pwa");
  * transparence douce) : l'e-mail le pose dans une pastille blanche. Il flotte, cligne des yeux, sa lampe pulse, l'étoile scintille.
  */
 async function emailRobotGif() {
+  await robotGif({ file: "public/email/robot-vivant.gif", background: "#ffffff", size: 128, leaves: false });
+  // Le grand robot de l'accueil du bilan, entre des feuilles, sur le vert pâle de l'encart (EMAIL_HERO_BACKGROUND du bilan).
+  await robotGif({ file: "public/email/robot-bilan.gif", background: "#EAF5F0", size: 300, leaves: true });
+}
+
+/** Des feuilles qui encadrent le robot (dessin du bilan proposé par le fondateur), légèrement balancées. */
+const leaf = (x: number, y: number, angle: number, scale: number, fill: string) =>
+  `<g transform="translate(${x} ${y}) rotate(${angle.toFixed(1)}) scale(${scale})"><path d="M 0 0 Q 9 -16 0 -34 Q -9 -16 0 0 Z" fill="${fill}"/><path d="M 0 -2 L 0 -30" stroke="#ffffff" stroke-opacity=".6" stroke-width="1"/></g>`;
+
+async function robotGif(options: { file: string; background: string; size: number; leaves: boolean }) {
   const { execFileSync } = await import("node:child_process");
   const { mkdtempSync, rmSync } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const dir = mkdtempSync(`${tmpdir()}/robot-gif-`);
   const FRAMES = 30; // 3 s à 10 images par seconde
+  const box = options.leaves ? "-34 -26 168 150" : "-8 -14 116 116";
+  const [bx, by, bw, bh] = box.split(" ").map(Number);
   for (let i = 0; i < FRAMES; i += 1) {
     const t = i / FRAMES;
     const bob = Math.sin(t * Math.PI * 2) * 3.2;
+    const sway = Math.sin(t * Math.PI * 2) * 4;
     const open = i === 21 || i === 23 ? 0.15 : i === 22 ? 0 : 1;
     const lamp = 0.14 + 0.24 * (0.5 + 0.5 * Math.sin(t * Math.PI * 4));
     const spark = 0.75 + 0.35 * (0.5 + 0.5 * Math.sin(t * Math.PI * 6 + 1));
-    const frame = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -14 116 116" width="256" height="256">
+    const leaves = options.leaves
+      ? [leaf(14, 80, -40 + sway, 1.6, "#BFE6D6"), leaf(10, 92, -72 + sway, 1.3, "#A6DCC6"), leaf(86, 80, 40 - sway, 1.6, "#BFE6D6"), leaf(90, 92, 72 - sway, 1.3, "#A6DCC6"), leaf(70, 12, 24 - sway / 2, 1.1, "#8FD3B8")].join("")
+      : "";
+    const frame = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box}" width="${options.size * 2}" height="${options.size * 2}">
   ${robotDefs}
-  <rect x="-8" y="-14" width="116" height="116" fill="#ffffff"/>
+  <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="${options.background}"/>
+  ${leaves}
   <ellipse cx="50" cy="96" rx="${(24 - bob).toFixed(2)}" ry="3.2" fill="#0F3F54" fill-opacity="${(0.12 - bob * 0.01).toFixed(3)}"/>
   <g transform="translate(0 ${(bob - 2).toFixed(2)})">${robotOf({ open, lamp, spark })}</g>
 </svg>`;
-    await sharp(Buffer.from(frame), { density: 144 }).resize(128, 128).flatten({ background: "#ffffff" }).png().toFile(`${dir}/f${String(i).padStart(2, "0")}.png`);
+    await sharp(Buffer.from(frame), { density: 144 }).resize(options.size, options.size).flatten({ background: options.background }).png().toFile(`${dir}/f${String(i).padStart(2, "0")}.png`);
   }
   mkdirSync("public/email", { recursive: true });
-  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", "10", "-i", `${dir}/f%02d.png`, "-vf", "split[a][b];[a]palettegen=reserve_transparent=0:stats_mode=full[p];[b][p]paletteuse=dither=none", "-loop", "0", "public/email/robot-vivant.gif"]);
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", "10", "-i", `${dir}/f%02d.png`, "-vf", "split[a][b];[a]palettegen=reserve_transparent=0:stats_mode=full[p];[b][p]paletteuse=dither=none", "-loop", "0", options.file]);
   rmSync(dir, { recursive: true, force: true });
-  console.log("✓ public/email/robot-vivant.gif (128 px, 3 s en boucle)");
+  console.log(`✓ ${options.file} (${options.size} px, 3 s en boucle)`);
 }
 const iosOnly = process.argv.includes("--ios");
 const emailOnly = process.argv.includes("--email");

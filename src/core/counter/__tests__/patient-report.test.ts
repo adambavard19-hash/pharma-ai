@@ -8,7 +8,7 @@ describe("le bilan envoyé au patient", () => {
     expect(mail?.text).toContain("• ELUDAY GENCIVE 500 ml");
     expect(mail?.text).toContain("Apaise la bouche sèche.");
     expect(mail?.text).toContain("• SÉRUM PHYSIOLOGIQUE");
-    expect(mail?.html).toContain("Votre bilan du jour");
+    expect(mail?.html).toContain("Votre bilan personnalisé");
   });
 
   it("n'envoie rien quand aucun produit n'est retenu", () => {
@@ -98,10 +98,21 @@ describe("le bilan aux couleurs de la pharmacie", () => {
   it("en-tête à la couleur de la pharmacie, son logo s'il est public ; le robot vivant salue toujours le patient", () => {
     const withoutLogo = buildPatientReport({ pharmacy, products: [{ name: "ELUDAY", reason: null }], assetBaseUrl: "https://pharmaboost.app" });
     expect(withoutLogo?.html).toContain("background:#1D4ED8");
-    expect(withoutLogo?.html).toContain("https://pharmaboost.app/email/robot-vivant.gif");
+    expect(withoutLogo?.html).toContain("https://pharmaboost.app/email/robot-bilan.gif");
+    expect(withoutLogo?.html).toContain("https://pharmaboost.app/email/croix-pharmacie.png");
     const withLogo = buildPatientReport({ pharmacy: { ...pharmacy, logoUrl: "https://cdn.exemple.fr/logo.png" }, products: [{ name: "ELUDAY", reason: null }], assetBaseUrl: "https://pharmaboost.app" });
     expect(withLogo?.html).toContain("https://cdn.exemple.fr/logo.png");
-    expect(withLogo?.html).toContain("robot-vivant.gif");
+    expect(withLogo?.html).toContain("robot-bilan.gif");
+    expect(withLogo?.html).not.toContain("croix-pharmacie.png");
+  });
+
+  it("cartes produit : « Pourquoi », « Comment l'utiliser », « Précautions » seulement quand elles ont un contenu ; la date du conseil", () => {
+    const mail = buildPatientReport({ pharmacy, products: [{ name: "Poche chaud/froid", reason: null, benefits: ["Détend les muscles"], usage: ["Chaud ou froid, 15 à 20 minutes."], precautions: [] }], date: new Date("2026-10-11T09:00:00Z") });
+    expect(mail?.html).toContain("Pourquoi ce produit ?");
+    expect(mail?.html).toContain("Comment l&#39;utiliser ?".replace("&#39;", "'"));
+    expect(mail?.html).not.toContain("Précautions</td>");
+    expect(mail?.html).toContain("Dimanche 11 octobre 2026");
+    expect(mail?.text).toContain("Comment l'utiliser : Chaud ou froid, 15 à 20 minutes.");
   });
 
   it("coordonnées et boutons : appeler et itinéraire, seulement avec ce que la fiche contient", () => {
