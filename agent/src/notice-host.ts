@@ -1,4 +1,5 @@
 import { BANNER, csColor } from "./banner-design";
+import { ROBOT_LOOK_COUNT, robotLook } from "../../src/core/robot/counter-look";
 
 /**
  * La bannière PharmaBoost du poste de caisse : le programme Windows qui la dessine, la garde en haut à droite de l'écran, la fait
@@ -11,6 +12,7 @@ import { BANNER, csColor } from "./banner-design";
  *   {"op":"show","entry":{…}}      la vente (ou sa mise à jour, sur place) : la bannière s'agrandit et montre les conseils
  *   {"op":"done","info":{…}}       « Vente terminée ! » : le message de fin, puis la bannière redevient « en attente »
  *   {"op":"remove","id":"…"}       la vente est close ailleurs
+ *   {"op":"look","look":3}        le robot de ce comptoir (0 à 19 ; -1 : celui de la marque), aussi passé dans « init »
  *   {"op":"quit"}
  * et il répond sur sa sortie standard par des mots seuls (les mêmes que l'ancienne fenêtre) :
  *   PRET · VENDU <vente> <conseil> · NONVENDU <vente> <conseil> · ANNULER <vente> <conseil> (reprendre sa réponse)
@@ -47,6 +49,10 @@ const PALETTE = Object.entries(C)
   .join("\n");
 const DIMENSIONS = Object.entries(Z).map(([key, value]) => `    public const int ${pascal(key)} = ${value};`).join("\n");
 const TIMINGS = Object.entries(M).map(([key, value]) => `    public const ${Number.isInteger(value) ? "int" : "double"} ${pascal(key)} = ${value};`).join("\n");
+/** Les 20 robots de comptoir (src/core/robot/counter-look.ts), une ligne C# par apparence : accessoire et couleurs. */
+const LOOKS = Array.from({ length: ROBOT_LOOK_COUNT }, (_, index) => robotLook(index));
+const LOOK_ACCESSORIES = LOOKS.map((look) => cs(look.accessory)).join(", ");
+const lookColors = (pick: (look: (typeof LOOKS)[number]) => string) => LOOKS.map((look) => csColor(pick(look))).join(", ");
 const PHRASES = Object.entries(T).map(([key, value]) => `    public const string ${pascal(key)} = ${cs(value)};`).join("\n");
 
 export const NOTICE_HOST_CSHARP = String.raw`
@@ -541,6 +547,16 @@ ${PHRASES}
   /// <summary>La mascotte PharmaBoost : un petit robot casqué, une croix verte, une antenne qui pulse. Dessinée en vectoriel, jamais une image.</summary>
   internal static class Mascot
   {
+    /// <summary>Le robot de ce comptoir (0 à 19, envoyé par l'agent) ; -1 : le robot de la marque. Même dessin que PharmaBoost (« Nouvelle vente »).</summary>
+    public static volatile int Look = -1;
+    private static readonly string[] Accessories = new string[] { ${LOOK_ACCESSORIES} };
+    private static readonly Color[] Ears = new Color[] { ${lookColors((look) => look.palette.ear)} };
+    private static readonly Color[] EarDarks = new Color[] { ${lookColors((look) => look.palette.earDark)} };
+    private static readonly Color[] Lamps = new Color[] { ${lookColors((look) => look.palette.lamp)} };
+    private static readonly Color[] Accents = new Color[] { ${lookColors((look) => look.palette.accent)} };
+    private static readonly Color Gold = Color.FromArgb(255, 255, 214, 90);
+    private static readonly Color GoldEdge = Color.FromArgb(255, 224, 168, 0);
+
     /// <summary>mood : idle, alert, think, idea, happy. x, y : coin haut-gauche de la boîte carrée de côté size.</summary>
     public static void Draw(Graphics g, float x, float y, float size, string mood, double t)
     {
@@ -557,7 +573,10 @@ ${PHRASES}
     private static void Body(Graphics g, string mood, double t)
     {
       float pulse = (float)(0.5 + 0.5 * Math.Sin(t * (mood == "think" ? 9.0 : 3.2)));
-      Color lamp = mood == "alert" ? Color.FromArgb(255, 245, 176, 40) : Pal.Eye;
+      int look = Look >= 0 && Look < Accessories.Length ? Look : -1;
+      Color ear = look >= 0 ? Ears[look] : Pal.Ear;
+      Color earDark = look >= 0 ? EarDarks[look] : Color.FromArgb(255, 18, 150, 140);
+      Color lamp = mood == "alert" ? Color.FromArgb(255, 245, 176, 40) : (look >= 0 ? Lamps[look] : Pal.Eye);
 
       // Antenne et sa petite lampe qui pulse.
       using (Pen stem = Gfx.Line(Pal.ShellEdge, 3f)) { g.DrawLine(stem, 50, 17, 50, 8); }
@@ -565,14 +584,15 @@ ${PHRASES}
       Gfx.Disc(g, lamp, 50, 6, 3.6f);
 
       // Le casque : arceau et deux écouteurs.
-      using (Pen band = Gfx.Line(Pal.Ear, 5f)) { g.DrawArc(band, 9, 9, 82, 70, 192, 156); }
-      Gfx.Gradient(g, Pal.Ear, Color.FromArgb(255, 18, 150, 140), 3, 36, 15, 28, 7);
-      Gfx.Gradient(g, Pal.Ear, Color.FromArgb(255, 18, 150, 140), 82, 36, 15, 28, 7);
+      using (Pen band = Gfx.Line(ear, 5f)) { g.DrawArc(band, 9, 9, 82, 70, 192, 156); }
+      Gfx.Gradient(g, ear, earDark, 3, 36, 15, 28, 7);
+      Gfx.Gradient(g, ear, earDark, 82, 36, 15, 28, 7);
 
       // La tête : coque claire, écran sombre.
       Gfx.Gradient(g, Pal.ShellTop, Pal.ShellBottom, 14, 16, 72, 58, 24);
       Gfx.Stroke(g, Pal.ShellEdge, 1.6f, 14, 16, 72, 58, 24);
       Gfx.Gradient(g, Pal.ScreenTop, Pal.ScreenBottom, 22, 25, 56, 40, 17);
+      if (look >= 0) HeadAccessory(g, look);
 
       // Les yeux : ils clignent de temps en temps.
       bool blink = (t % 4.6) > 4.46;
@@ -615,6 +635,8 @@ ${PHRASES}
         using (Pen smile = Gfx.Line(Pal.Eye, 2.6f)) { g.DrawArc(smile, 43, 47, 14, 9, 20, 140); }
       }
 
+      if (look >= 0) FaceAccessory(g, look);
+
       // Le badge : la croix verte de la pharmacie.
       Gfx.Disc(g, Color.FromArgb(235, 255, 255, 255), 74, 69, 15f);
       using (GraphicsPath badge = new GraphicsPath())
@@ -630,6 +652,112 @@ ${PHRASES}
       {
         float twinkle = (float)(0.6 + 0.4 * Math.Sin(t * 6));
         Gfx.Star(g, Color.FromArgb((int)(255 * twinkle), 255, 214, 90), 80, 14, 6f + 2f * twinkle);
+      }
+    }
+
+    // Les accessoires : les mêmes formes que src/components/robot/accessories.tsx (boîte de 100 unités du robot).
+
+    /// <summary>Une courbe « Q » du dessin web (quadratique), en courbe de Bézier GDI+.</summary>
+    private static void Quad(GraphicsPath p, float x0, float y0, float qx, float qy, float x1, float y1)
+    {
+      p.AddBezier(x0, y0, x0 + 2f / 3f * (qx - x0), y0 + 2f / 3f * (qy - y0), x1 + 2f / 3f * (qx - x1), y1 + 2f / 3f * (qy - y1), x1, y1);
+    }
+
+    private static void FillPath(Graphics g, GraphicsPath p, Color fill, Color edge, float width)
+    {
+      g.FillPath(Gfx.Brs(fill), p);
+      if (width > 0f) { using (Pen pen = Gfx.Line(edge, width)) { pen.LineJoin = LineJoin.Round; g.DrawPath(pen, p); } }
+    }
+
+    private static void Polygon(Graphics g, PointF[] points, Color fill, Color edge, float width)
+    {
+      using (GraphicsPath p = new GraphicsPath()) { p.AddPolygon(points); FillPath(g, p, fill, edge, width); }
+    }
+
+    private static void HeadAccessory(Graphics g, int look)
+    {
+      string kind = Accessories[look];
+      Color accent = Accents[look], lamp = Lamps[look], ear = Ears[look], earDark = EarDarks[look];
+      if (kind == "cap")
+      {
+        using (GraphicsPath p = new GraphicsPath()) { Quad(p, 25, 21, 27, 4, 50, 4); Quad(p, 50, 4, 73, 4, 75, 21); p.CloseFigure(); FillPath(g, p, accent, accent, 0f); }
+        using (GraphicsPath p = new GraphicsPath()) { Quad(p, 62, 19, 84, 15, 94, 21); Quad(p, 94, 21, 84, 25, 62, 23); p.CloseFigure(); FillPath(g, p, earDark, earDark, 0f); }
+        Gfx.Disc(g, lamp, 50, 4.5f, 2.6f);
+      }
+      else if (kind == "tophat")
+      {
+        Gfx.Fill(g, accent, 37, -2, 26, 19, 2.5f);
+        g.FillRectangle(Gfx.Brs(lamp), 37f, 10.5f, 26f, 4f);
+        Gfx.Fill(g, earDark, 29, 15, 42, 5, 2.5f);
+      }
+      else if (kind == "crown")
+      {
+        Polygon(g, new PointF[] { new PointF(32, 19), new PointF(32, 5), new PointF(41, 12), new PointF(50, 1), new PointF(59, 12), new PointF(68, 5), new PointF(68, 19) }, Gold, GoldEdge, 1.4f);
+        Gfx.Disc(g, accent, 50, 13.5f, 2.6f);
+        Gfx.Disc(g, accent, 39, 15, 1.9f);
+        Gfx.Disc(g, accent, 61, 15, 1.9f);
+      }
+      else if (kind == "beanie")
+      {
+        using (GraphicsPath p = new GraphicsPath()) { Quad(p, 21, 22, 22, 3, 50, 3); Quad(p, 50, 3, 78, 3, 79, 22); p.CloseFigure(); FillPath(g, p, accent, accent, 0f); }
+        Gfx.Fill(g, earDark, 19, 16.5f, 62, 7.5f, 3.75f);
+        Gfx.Disc(g, lamp, 50, 1.5f, 5f);
+      }
+      else if (kind == "star")
+      {
+        Polygon(g, new PointF[] { new PointF(50, -3), new PointF(52.8f, 3), new PointF(59.5f, 3.6f), new PointF(54.4f, 8), new PointF(56, 14.5f), new PointF(50, 11), new PointF(44, 14.5f), new PointF(45.6f, 8), new PointF(40.5f, 3.6f), new PointF(47.2f, 3) }, lamp, accent, 1.6f);
+      }
+      else if (kind == "leaf")
+      {
+        using (GraphicsPath p = new GraphicsPath()) { Quad(p, 50, 9, 39, -1, 32, 6); Quad(p, 32, 6, 40, 14, 50, 9); p.CloseFigure(); FillPath(g, p, ear, earDark, 1.2f); }
+        using (GraphicsPath p = new GraphicsPath()) { Quad(p, 50, 7, 61, -3, 68, 3); Quad(p, 68, 3, 60, 12, 50, 7); p.CloseFigure(); FillPath(g, p, ear, earDark, 1.2f); }
+      }
+    }
+
+    private static void FaceAccessory(Graphics g, int look)
+    {
+      string kind = Accessories[look];
+      Color accent = Accents[look], lamp = Lamps[look];
+      if (kind == "glasses")
+      {
+        using (Pen pen = Gfx.Line(accent, 2.8f))
+        {
+          g.DrawEllipse(pen, 28.5f, 32.5f, 19f, 19f);
+          g.DrawEllipse(pen, 52.5f, 32.5f, 19f, 19f);
+          using (GraphicsPath bridge = new GraphicsPath()) { Quad(bridge, 47.5f, 41, 50, 38.5f, 52.5f, 41); g.DrawPath(pen, bridge); }
+        }
+      }
+      else if (kind == "bowtie")
+      {
+        Polygon(g, new PointF[] { new PointF(50, 79), new PointF(37, 72), new PointF(37, 86) }, accent, Color.White, 1.2f);
+        Polygon(g, new PointF[] { new PointF(50, 79), new PointF(63, 72), new PointF(63, 86) }, accent, Color.White, 1.2f);
+        Gfx.Disc(g, lamp, 50, 79, 3.4f);
+        using (Pen ring = Gfx.Line(Color.White, 1f)) { g.DrawEllipse(ring, 46.6f, 75.6f, 6.8f, 6.8f); }
+      }
+      else if (kind == "heart")
+      {
+        using (GraphicsPath p = new GraphicsPath())
+        {
+          p.AddBezier(25, 76, 15, 69, 15, 61, 20.5f, 60);
+          p.AddBezier(20.5f, 60, 23, 59.6f, 24.4f, 61, 25, 62.6f);
+          p.AddBezier(25, 62.6f, 25.6f, 61, 27, 59.6f, 29.5f, 60);
+          p.AddBezier(29.5f, 60, 35, 61, 35, 69, 25, 76);
+          p.CloseFigure();
+          // Agrandi de 35 % autour de (25, 68), comme sur PharmaBoost.
+          using (Matrix grow = new Matrix()) { grow.Translate(25, 68); grow.Scale(1.35f, 1.35f); grow.Translate(-25, -68); p.Transform(grow); }
+          FillPath(g, p, accent, Color.White, 1.4f);
+        }
+      }
+      else if (kind == "flower")
+      {
+        for (int i = 0; i < 5; i++)
+        {
+          double rad = (i * 72 - 90) * Math.PI / 180.0;
+          float px = 22f + 5f * (float)Math.Cos(rad), py = 20f + 5f * (float)Math.Sin(rad);
+          Gfx.Disc(g, accent, px, py, 4.2f);
+          using (Pen petal = Gfx.Line(Color.White, 0.9f)) { g.DrawEllipse(petal, px - 4.2f, py - 4.2f, 8.4f, 8.4f); }
+        }
+        Gfx.Disc(g, Gold, 22, 20, 3.2f);
       }
     }
   }
@@ -2503,6 +2631,8 @@ ${PHRASES}
         if (where.Length > 0) position = where;
         string file = Str(command, "positionFile");
         if (file.Length > 0) positionFile = file;
+        // Le robot de ce comptoir : avec « init » (démarrage) ou seul (« look », quand PharmaBoost le change).
+        if (command.ContainsKey("look") && command["look"] != null) Mascot.Look = Convert.ToInt32(command["look"]);
         if (op == "init") Begin();
         else if (op == "scan") { Begin(); banner.BeginScan(); }
         else if (op == "show")

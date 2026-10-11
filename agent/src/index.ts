@@ -42,7 +42,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.9.3";
+const VERSION = "0.9.4";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -419,7 +419,7 @@ async function dropClosedNotices(config: Config): Promise<void> {
  * du stock que PharmaBoost lui a confié, et une éventuelle demande de mise à
  * jour immédiate (« Mettre à jour maintenant » dans PharmaBoost).
  */
-async function postHeartbeat(config: Config): Promise<{ exportPath: string | null; syncRequestedAt: string | null }> {
+async function postHeartbeat(config: Config): Promise<{ exportPath: string | null; syncRequestedAt: string | null; robotLook: number | null }> {
   const response = await api(config, "/api/agent/heartbeat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -428,8 +428,8 @@ async function postHeartbeat(config: Config): Promise<{ exportPath: string | nul
   if (response.status === 401) throw new Error("clé du poste révoquée");
   // Un serveur en panne (502, 503) n'est pas un signe de vie : l'icône du poste doit dire « hors ligne », pas « relié ».
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const body = (await response.json().catch(() => ({}))) as { exportPath?: string | null; syncRequestedAt?: string | null };
-  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null };
+  const body = (await response.json().catch(() => ({}))) as { exportPath?: string | null; syncRequestedAt?: string | null; robotLook?: number | null };
+  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null };
 }
 
 /** Le poste de caisse : écouter la douchette, envoyer chaque bip, donner signe de vie, et relire l'export de stock si on le lui a confié. */
@@ -487,6 +487,8 @@ async function runPost(config: Config): Promise<void> {
         }
         reportState("ok");
         lastHeartbeat = Date.now();
+        // Le robot de ce comptoir (couleur, accessoire) : la bannière le porte, comme « Nouvelle vente » dans PharmaBoost.
+        notices.setRobotLook(settings.robotLook);
         if (settings.exportPath !== (config.exportPath ?? null)) {
           config = { ...config, exportPath: settings.exportPath };
           writeConfig(config);

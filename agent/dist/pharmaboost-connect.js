@@ -473,6 +473,29 @@ function csColor(hex, alpha = 1) {
   return `Color.FromArgb(${Math.round(alpha * 255)}, ${r}, ${g}, ${b})`;
 }
 
+// src/core/robot/counter-look.ts
+var ROBOT_ACCESSORIES = ["cap", "tophat", "crown", "bowtie", "flower", "glasses", "beanie", "star", "heart", "leaf"];
+var ROBOT_PALETTES = [
+  { name: "corail", ear: "#FF7A6B", earDark: "#E0533F", lamp: "#FFB4A8", accent: "#E0533F" },
+  { name: "violet", ear: "#9B7BFF", earDark: "#6E4FE0", lamp: "#C9B8FF", accent: "#6E4FE0" },
+  { name: "ambre", ear: "#FFB938", earDark: "#E08E00", lamp: "#FFE08A", accent: "#E08E00" },
+  { name: "bleu ciel", ear: "#4FB3FF", earDark: "#1E86D6", lamp: "#A8DAFF", accent: "#1E86D6" },
+  { name: "rose", ear: "#FF77C0", earDark: "#E0449A", lamp: "#FFB8DE", accent: "#E0449A" },
+  { name: "citron vert", ear: "#8ED64A", earDark: "#5FAE1E", lamp: "#C9F09A", accent: "#5FAE1E" },
+  { name: "orange", ear: "#FF9248", earDark: "#E0651A", lamp: "#FFC49A", accent: "#E0651A" },
+  { name: "indigo", ear: "#5B6CFF", earDark: "#3442D6", lamp: "#AEB6FF", accent: "#3442D6" },
+  { name: "framboise", ear: "#E64568", earDark: "#B8213F", lamp: "#F59AAE", accent: "#B8213F" },
+  { name: "ardoise", ear: "#6F8798", earDark: "#4A6070", lamp: "#B4C4CF", accent: "#4A6070" }
+];
+var NAMES = ["Bip", "Pixel", "Nova", "Gizmo", "Z\xE9phyr", "Biscotte", "Lumen", "P\xE9pite", "\xC9cho", "Titan", "Plume", "Com\xE8te", "Flash", "Noisette", "Volt", "Myrtille", "Orbit", "Praline", "Turbo", "Opale"];
+var ROBOT_LOOK_COUNT = 20;
+function robotLook(index) {
+  const i = (Math.trunc(index) % ROBOT_LOOK_COUNT + ROBOT_LOOK_COUNT) % ROBOT_LOOK_COUNT;
+  const accessory = ROBOT_ACCESSORIES[i % 10];
+  const palette = ROBOT_PALETTES[i < 10 ? i : (i + 5) % 10];
+  return { index: i, name: NAMES[i], accessory, palette };
+}
+
 // agent/src/notice-host.ts
 var C = BANNER.colors;
 var Z = BANNER.sizes;
@@ -483,6 +506,9 @@ var cs = (value) => JSON.stringify(value);
 var PALETTE = Object.entries(C).filter(([key]) => key !== "cardAlpha").map(([key, value]) => `    public static readonly Color ${pascal(key)} = ${csColor(value)};`).join("\n");
 var DIMENSIONS = Object.entries(Z).map(([key, value]) => `    public const int ${pascal(key)} = ${value};`).join("\n");
 var TIMINGS = Object.entries(M).map(([key, value]) => `    public const ${Number.isInteger(value) ? "int" : "double"} ${pascal(key)} = ${value};`).join("\n");
+var LOOKS = Array.from({ length: ROBOT_LOOK_COUNT }, (_, index) => robotLook(index));
+var LOOK_ACCESSORIES = LOOKS.map((look) => cs(look.accessory)).join(", ");
+var lookColors = (pick) => LOOKS.map((look) => csColor(pick(look))).join(", ");
 var PHRASES = Object.entries(T).map(([key, value]) => `    public const string ${pascal(key)} = ${cs(value)};`).join("\n");
 var NOTICE_HOST_CSHARP = String.raw`
 using System;
@@ -976,6 +1002,16 @@ ${PHRASES}
   /// <summary>La mascotte PharmaBoost : un petit robot casqué, une croix verte, une antenne qui pulse. Dessinée en vectoriel, jamais une image.</summary>
   internal static class Mascot
   {
+    /// <summary>Le robot de ce comptoir (0 à 19, envoyé par l'agent) ; -1 : le robot de la marque. Même dessin que PharmaBoost (« Nouvelle vente »).</summary>
+    public static volatile int Look = -1;
+    private static readonly string[] Accessories = new string[] { ${LOOK_ACCESSORIES} };
+    private static readonly Color[] Ears = new Color[] { ${lookColors((look) => look.palette.ear)} };
+    private static readonly Color[] EarDarks = new Color[] { ${lookColors((look) => look.palette.earDark)} };
+    private static readonly Color[] Lamps = new Color[] { ${lookColors((look) => look.palette.lamp)} };
+    private static readonly Color[] Accents = new Color[] { ${lookColors((look) => look.palette.accent)} };
+    private static readonly Color Gold = Color.FromArgb(255, 255, 214, 90);
+    private static readonly Color GoldEdge = Color.FromArgb(255, 224, 168, 0);
+
     /// <summary>mood : idle, alert, think, idea, happy. x, y : coin haut-gauche de la boîte carrée de côté size.</summary>
     public static void Draw(Graphics g, float x, float y, float size, string mood, double t)
     {
@@ -992,7 +1028,10 @@ ${PHRASES}
     private static void Body(Graphics g, string mood, double t)
     {
       float pulse = (float)(0.5 + 0.5 * Math.Sin(t * (mood == "think" ? 9.0 : 3.2)));
-      Color lamp = mood == "alert" ? Color.FromArgb(255, 245, 176, 40) : Pal.Eye;
+      int look = Look >= 0 && Look < Accessories.Length ? Look : -1;
+      Color ear = look >= 0 ? Ears[look] : Pal.Ear;
+      Color earDark = look >= 0 ? EarDarks[look] : Color.FromArgb(255, 18, 150, 140);
+      Color lamp = mood == "alert" ? Color.FromArgb(255, 245, 176, 40) : (look >= 0 ? Lamps[look] : Pal.Eye);
 
       // Antenne et sa petite lampe qui pulse.
       using (Pen stem = Gfx.Line(Pal.ShellEdge, 3f)) { g.DrawLine(stem, 50, 17, 50, 8); }
@@ -1000,14 +1039,15 @@ ${PHRASES}
       Gfx.Disc(g, lamp, 50, 6, 3.6f);
 
       // Le casque : arceau et deux écouteurs.
-      using (Pen band = Gfx.Line(Pal.Ear, 5f)) { g.DrawArc(band, 9, 9, 82, 70, 192, 156); }
-      Gfx.Gradient(g, Pal.Ear, Color.FromArgb(255, 18, 150, 140), 3, 36, 15, 28, 7);
-      Gfx.Gradient(g, Pal.Ear, Color.FromArgb(255, 18, 150, 140), 82, 36, 15, 28, 7);
+      using (Pen band = Gfx.Line(ear, 5f)) { g.DrawArc(band, 9, 9, 82, 70, 192, 156); }
+      Gfx.Gradient(g, ear, earDark, 3, 36, 15, 28, 7);
+      Gfx.Gradient(g, ear, earDark, 82, 36, 15, 28, 7);
 
       // La tête : coque claire, écran sombre.
       Gfx.Gradient(g, Pal.ShellTop, Pal.ShellBottom, 14, 16, 72, 58, 24);
       Gfx.Stroke(g, Pal.ShellEdge, 1.6f, 14, 16, 72, 58, 24);
       Gfx.Gradient(g, Pal.ScreenTop, Pal.ScreenBottom, 22, 25, 56, 40, 17);
+      if (look >= 0) HeadAccessory(g, look);
 
       // Les yeux : ils clignent de temps en temps.
       bool blink = (t % 4.6) > 4.46;
@@ -1050,6 +1090,8 @@ ${PHRASES}
         using (Pen smile = Gfx.Line(Pal.Eye, 2.6f)) { g.DrawArc(smile, 43, 47, 14, 9, 20, 140); }
       }
 
+      if (look >= 0) FaceAccessory(g, look);
+
       // Le badge : la croix verte de la pharmacie.
       Gfx.Disc(g, Color.FromArgb(235, 255, 255, 255), 74, 69, 15f);
       using (GraphicsPath badge = new GraphicsPath())
@@ -1065,6 +1107,112 @@ ${PHRASES}
       {
         float twinkle = (float)(0.6 + 0.4 * Math.Sin(t * 6));
         Gfx.Star(g, Color.FromArgb((int)(255 * twinkle), 255, 214, 90), 80, 14, 6f + 2f * twinkle);
+      }
+    }
+
+    // Les accessoires : les mêmes formes que src/components/robot/accessories.tsx (boîte de 100 unités du robot).
+
+    /// <summary>Une courbe « Q » du dessin web (quadratique), en courbe de Bézier GDI+.</summary>
+    private static void Quad(GraphicsPath p, float x0, float y0, float qx, float qy, float x1, float y1)
+    {
+      p.AddBezier(x0, y0, x0 + 2f / 3f * (qx - x0), y0 + 2f / 3f * (qy - y0), x1 + 2f / 3f * (qx - x1), y1 + 2f / 3f * (qy - y1), x1, y1);
+    }
+
+    private static void FillPath(Graphics g, GraphicsPath p, Color fill, Color edge, float width)
+    {
+      g.FillPath(Gfx.Brs(fill), p);
+      if (width > 0f) { using (Pen pen = Gfx.Line(edge, width)) { pen.LineJoin = LineJoin.Round; g.DrawPath(pen, p); } }
+    }
+
+    private static void Polygon(Graphics g, PointF[] points, Color fill, Color edge, float width)
+    {
+      using (GraphicsPath p = new GraphicsPath()) { p.AddPolygon(points); FillPath(g, p, fill, edge, width); }
+    }
+
+    private static void HeadAccessory(Graphics g, int look)
+    {
+      string kind = Accessories[look];
+      Color accent = Accents[look], lamp = Lamps[look], ear = Ears[look], earDark = EarDarks[look];
+      if (kind == "cap")
+      {
+        using (GraphicsPath p = new GraphicsPath()) { Quad(p, 25, 21, 27, 4, 50, 4); Quad(p, 50, 4, 73, 4, 75, 21); p.CloseFigure(); FillPath(g, p, accent, accent, 0f); }
+        using (GraphicsPath p = new GraphicsPath()) { Quad(p, 62, 19, 84, 15, 94, 21); Quad(p, 94, 21, 84, 25, 62, 23); p.CloseFigure(); FillPath(g, p, earDark, earDark, 0f); }
+        Gfx.Disc(g, lamp, 50, 4.5f, 2.6f);
+      }
+      else if (kind == "tophat")
+      {
+        Gfx.Fill(g, accent, 37, -2, 26, 19, 2.5f);
+        g.FillRectangle(Gfx.Brs(lamp), 37f, 10.5f, 26f, 4f);
+        Gfx.Fill(g, earDark, 29, 15, 42, 5, 2.5f);
+      }
+      else if (kind == "crown")
+      {
+        Polygon(g, new PointF[] { new PointF(32, 19), new PointF(32, 5), new PointF(41, 12), new PointF(50, 1), new PointF(59, 12), new PointF(68, 5), new PointF(68, 19) }, Gold, GoldEdge, 1.4f);
+        Gfx.Disc(g, accent, 50, 13.5f, 2.6f);
+        Gfx.Disc(g, accent, 39, 15, 1.9f);
+        Gfx.Disc(g, accent, 61, 15, 1.9f);
+      }
+      else if (kind == "beanie")
+      {
+        using (GraphicsPath p = new GraphicsPath()) { Quad(p, 21, 22, 22, 3, 50, 3); Quad(p, 50, 3, 78, 3, 79, 22); p.CloseFigure(); FillPath(g, p, accent, accent, 0f); }
+        Gfx.Fill(g, earDark, 19, 16.5f, 62, 7.5f, 3.75f);
+        Gfx.Disc(g, lamp, 50, 1.5f, 5f);
+      }
+      else if (kind == "star")
+      {
+        Polygon(g, new PointF[] { new PointF(50, -3), new PointF(52.8f, 3), new PointF(59.5f, 3.6f), new PointF(54.4f, 8), new PointF(56, 14.5f), new PointF(50, 11), new PointF(44, 14.5f), new PointF(45.6f, 8), new PointF(40.5f, 3.6f), new PointF(47.2f, 3) }, lamp, accent, 1.6f);
+      }
+      else if (kind == "leaf")
+      {
+        using (GraphicsPath p = new GraphicsPath()) { Quad(p, 50, 9, 39, -1, 32, 6); Quad(p, 32, 6, 40, 14, 50, 9); p.CloseFigure(); FillPath(g, p, ear, earDark, 1.2f); }
+        using (GraphicsPath p = new GraphicsPath()) { Quad(p, 50, 7, 61, -3, 68, 3); Quad(p, 68, 3, 60, 12, 50, 7); p.CloseFigure(); FillPath(g, p, ear, earDark, 1.2f); }
+      }
+    }
+
+    private static void FaceAccessory(Graphics g, int look)
+    {
+      string kind = Accessories[look];
+      Color accent = Accents[look], lamp = Lamps[look];
+      if (kind == "glasses")
+      {
+        using (Pen pen = Gfx.Line(accent, 2.8f))
+        {
+          g.DrawEllipse(pen, 28.5f, 32.5f, 19f, 19f);
+          g.DrawEllipse(pen, 52.5f, 32.5f, 19f, 19f);
+          using (GraphicsPath bridge = new GraphicsPath()) { Quad(bridge, 47.5f, 41, 50, 38.5f, 52.5f, 41); g.DrawPath(pen, bridge); }
+        }
+      }
+      else if (kind == "bowtie")
+      {
+        Polygon(g, new PointF[] { new PointF(50, 79), new PointF(37, 72), new PointF(37, 86) }, accent, Color.White, 1.2f);
+        Polygon(g, new PointF[] { new PointF(50, 79), new PointF(63, 72), new PointF(63, 86) }, accent, Color.White, 1.2f);
+        Gfx.Disc(g, lamp, 50, 79, 3.4f);
+        using (Pen ring = Gfx.Line(Color.White, 1f)) { g.DrawEllipse(ring, 46.6f, 75.6f, 6.8f, 6.8f); }
+      }
+      else if (kind == "heart")
+      {
+        using (GraphicsPath p = new GraphicsPath())
+        {
+          p.AddBezier(25, 76, 15, 69, 15, 61, 20.5f, 60);
+          p.AddBezier(20.5f, 60, 23, 59.6f, 24.4f, 61, 25, 62.6f);
+          p.AddBezier(25, 62.6f, 25.6f, 61, 27, 59.6f, 29.5f, 60);
+          p.AddBezier(29.5f, 60, 35, 61, 35, 69, 25, 76);
+          p.CloseFigure();
+          // Agrandi de 35 % autour de (25, 68), comme sur PharmaBoost.
+          using (Matrix grow = new Matrix()) { grow.Translate(25, 68); grow.Scale(1.35f, 1.35f); grow.Translate(-25, -68); p.Transform(grow); }
+          FillPath(g, p, accent, Color.White, 1.4f);
+        }
+      }
+      else if (kind == "flower")
+      {
+        for (int i = 0; i < 5; i++)
+        {
+          double rad = (i * 72 - 90) * Math.PI / 180.0;
+          float px = 22f + 5f * (float)Math.Cos(rad), py = 20f + 5f * (float)Math.Sin(rad);
+          Gfx.Disc(g, accent, px, py, 4.2f);
+          using (Pen petal = Gfx.Line(Color.White, 0.9f)) { g.DrawEllipse(petal, px - 4.2f, py - 4.2f, 8.4f, 8.4f); }
+        }
+        Gfx.Disc(g, Gold, 22, 20, 3.2f);
       }
     }
   }
@@ -2938,6 +3086,8 @@ ${PHRASES}
         if (where.Length > 0) position = where;
         string file = Str(command, "positionFile");
         if (file.Length > 0) positionFile = file;
+        // Le robot de ce comptoir : avec « init » (démarrage) ou seul (« look », quand PharmaBoost le change).
+        if (command.ContainsKey("look") && command["look"] != null) Mascot.Look = Convert.ToInt32(command["look"]);
         if (op == "init") Begin();
         else if (op == "scan") { Begin(); banner.BeginScan(); }
         else if (op == "show")
@@ -4820,6 +4970,8 @@ var NoticeCenter = class {
   stderrText = "";
   /** Les ventes que la fenêtre garde ouvertes (jusqu'à « Vente terminée »), d'après ce qu'elle a répondu. */
   held = /* @__PURE__ */ new Map();
+  /** Le robot de ce comptoir (0 à 19), donné par le serveur ; null : le robot de la marque. */
+  robotLook = null;
   get platform() {
     return this.options.platform ?? process.platform;
   }
@@ -4841,6 +4993,13 @@ var NoticeCenter = class {
   warmUp() {
     if (this.platform !== "win32" || this.broken || this.forcedLegacy) return;
     this.ensureHost();
+  }
+  /** Le robot de ce comptoir : la bannière en change aussitôt (couleur, accessoire), sans redémarrer. */
+  setRobotLook(look) {
+    const next = typeof look === "number" && Number.isInteger(look) && look >= 0 ? look : null;
+    if (next === this.robotLook) return;
+    this.robotLook = next;
+    if (this.host && this.window === "banniere") this.send({ op: "look", look: next ?? -1 });
   }
   /** Les ventes que la fenêtre garde ouvertes. */
   ids() {
@@ -4942,7 +5101,7 @@ var NoticeCenter = class {
         if (!this.ready) this.giveUp("la fen\xEAtre n'a pas d\xE9marr\xE9 \xE0 temps");
       }, this.options.startTimeoutMs ?? 6e4);
       this.startTimer.unref?.();
-      if (banner) this.send({ op: "init", ...this.placement() });
+      if (banner) this.send({ op: "init", look: this.robotLook ?? -1, ...this.placement() });
       return true;
     } catch (error) {
       this.giveUp(error instanceof Error ? error.message : String(error));
@@ -5434,7 +5593,7 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
 var import_node_fs8 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path7 = require("node:path");
-var VERSION = "0.9.3";
+var VERSION = "0.9.4";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path7.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path7.join)((0, import_node_path7.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -5725,7 +5884,7 @@ async function postHeartbeat(config) {
   if (response.status === 401) throw new Error("cl\xE9 du poste r\xE9voqu\xE9e");
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = await response.json().catch(() => ({}));
-  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null };
+  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null };
 }
 async function runPost(config) {
   log(`PharmaBoost Connect ${VERSION} \u2014 poste de caisse ${(0, import_node_os.hostname)()} \u2014 journal : ${LOG_PATH}`);
@@ -5769,6 +5928,7 @@ async function runPost(config) {
         }
         reportState("ok");
         lastHeartbeat = Date.now();
+        notices.setRobotLook(settings.robotLook);
         if (settings.exportPath !== (config.exportPath ?? null)) {
           config = { ...config, exportPath: settings.exportPath };
           writeConfig(config);

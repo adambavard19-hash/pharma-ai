@@ -337,6 +337,8 @@ export class NoticeCenter {
   private stderrText = "";
   /** Les ventes que la fenêtre garde ouvertes (jusqu'à « Vente terminée »), d'après ce qu'elle a répondu. */
   private readonly held = new Map<string, string>();
+  /** Le robot de ce comptoir (0 à 19), donné par le serveur ; null : le robot de la marque. */
+  private robotLook: number | null = null;
 
   constructor(private readonly options: NoticeCenterOptions) {}
 
@@ -361,6 +363,14 @@ export class NoticeCenter {
   warmUp(): void {
     if (this.platform !== "win32" || this.broken || this.forcedLegacy) return;
     this.ensureHost();
+  }
+
+  /** Le robot de ce comptoir : la bannière en change aussitôt (couleur, accessoire), sans redémarrer. */
+  setRobotLook(look: number | null): void {
+    const next = typeof look === "number" && Number.isInteger(look) && look >= 0 ? look : null;
+    if (next === this.robotLook) return;
+    this.robotLook = next;
+    if (this.host && this.window === "banniere") this.send({ op: "look", look: next ?? -1 });
   }
 
   /** Les ventes que la fenêtre garde ouvertes. */
@@ -461,7 +471,7 @@ export class NoticeCenter {
       this.startTimer = setTimeout(() => { if (!this.ready) this.giveUp("la fenêtre n'a pas démarré à temps"); }, this.options.startTimeoutMs ?? 60_000);
       this.startTimer.unref?.();
       // La bannière apparaît dès qu'elle est prête, « En attente de scan… » : la commande l'attend dans le tuyau pendant la compilation.
-      if (banner) this.send({ op: "init", ...this.placement() });
+      if (banner) this.send({ op: "init", look: this.robotLook ?? -1, ...this.placement() });
       return true;
     } catch (error) {
       this.giveUp(error instanceof Error ? error.message : String(error));

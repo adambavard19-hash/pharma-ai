@@ -468,7 +468,17 @@ describe("la bannière et son processus", () => {
     expect(hosts).toHaveLength(1);
     expect(scripts[0]).toBe(join(dir, "pharmaboost-banniere-hote.ps1"));
     expect(readFileSync(scripts[0], "utf8")).toContain("class BannerForm");
-    expect(commands(hosts[0])).toEqual([{ op: "init", position: "haut-droite", positionFile: join(dir, "pharmaboost-banniere-position.txt") }]);
+    expect(commands(hosts[0])).toEqual([{ op: "init", look: -1, position: "haut-droite", positionFile: join(dir, "pharmaboost-banniere-position.txt") }]);
+  });
+
+  it("porte le robot de son comptoir : donné au démarrage, changé sur place, jamais renvoyé s'il ne change pas", () => {
+    const notices = center();
+    notices.setRobotLook(4);
+    notices.warmUp();
+    notices.setRobotLook(4);
+    notices.setRobotLook(7);
+    notices.setRobotLook(null);
+    expect(commands(hosts[0]).map((command) => [command.op, command.look])).toEqual([["init", 4], ["look", 7], ["look", -1]]);
   });
 
   it("réagit au bip avant la réponse du serveur : « Scan détecté », puis les conseils sur place", () => {
