@@ -35,6 +35,11 @@ const DISCARDED_CANDIDATE_CODES = new Set([
   "PRODUCT_CONTRAINDICATED_DECLARED",
   "VIGILANCE_PRODUCT_EXCLUDED",
 ]);
+/** Une mise en garde qui mérite la bannière du comptoir (et l'île) : ni une note de couverture des données, ni un produit écarté. */
+export function isCounterAlert(alert: Pick<NoticeAlert, "acknowledged" | "code" | "severity">): boolean {
+  return !alert.acknowledged && !COVERAGE_CODES.has(alert.code) && !DISCARDED_CANDIDATE_CODES.has(alert.code) && (alert.severity === "BLOCKING" || alert.severity === "WARNING");
+}
+
 export type NoticeRecommendation = {
   /** L'identifiant du conseil : les boutons « Vendu » / « Non vendu » de la fenêtre le désignent. */
   id?: string;
@@ -182,7 +187,7 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
     return { ...base, state: "PENDING", alerts: [], advice: [], items: [], signature: `pending:${input.reference}:${input.lineNames.length}` };
   }
   const alerts = [...input.alerts]
-    .filter((alert) => !alert.acknowledged && !COVERAGE_CODES.has(alert.code) && !DISCARDED_CANDIDATE_CODES.has(alert.code) && (alert.severity === "BLOCKING" || alert.severity === "WARNING"))
+    .filter(isCounterAlert)
     .sort((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9))
     .slice(0, MAX_ALERTS)
     .map((alert) => alert.message);

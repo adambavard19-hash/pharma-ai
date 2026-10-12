@@ -13,7 +13,8 @@ import { ROBOT_EVENT, type RobotSignal } from "./bus";
 import { Robot } from "./robot";
 import { RobotSoundToggle } from "./sound-toggle";
 import { dismissRobotTip, useDismissedTips } from "./tip-dismissal";
-import { AlertBadge, AlertBubble, useRobotAlerts } from "./robot-alerts";
+import { AlertBadge, useRobotAlerts } from "./robot-alerts";
+import { openIsland } from "@/components/island/platform-island";
 
 /**
  * Le petit robot compagnon du logiciel, posé en bas à droite de chaque page (sauf « Nouvelle vente », où le grand
@@ -110,6 +111,11 @@ export function AppRobotCompanion() {
   }, []);
 
   const toggle = () => {
+    // Ce que le robot signale se lit désormais dans l'île, en haut : le petit robot du coin l'ouvre.
+    if (alerts.length > 0) {
+      openIsland("home");
+      return;
+    }
     const next = !open;
     setOpen(next);
     if (next && tips === null && !loading) void loadTips();
@@ -142,11 +148,6 @@ export function AppRobotCompanion() {
 
   return (
     <div className="no-print pointer-events-none fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 flex flex-col items-end gap-2">
-      {open && robotAlerts && alerts.length > 0 && (
-        <div id="robot-compagnon-bulle" className="pointer-events-auto w-[min(20rem,calc(100vw-2rem))] origin-bottom-right">
-          <AlertBubble value={robotAlerts} onClose={() => setOpen(false)} className="rounded-br-md" />
-        </div>
-      )}
       {open && alerts.length === 0 && (
         <div
           id="robot-compagnon-bulle"

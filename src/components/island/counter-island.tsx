@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, Loader2, Mail, PartyPopper, ScanLine, Send, TriangleAlert } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Loader2, Mail, PartyPopper, ScanLine, Send, TriangleAlert } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { Robot } from "@/components/robot";
 import { analysisSteps, allAnswered, registerTap, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
@@ -47,6 +47,16 @@ export type CounterIslandProps = {
   onAddEmail: () => void;
   onFinish: () => void;
   onDismissAlert: () => void;
+  /** Le bilan par e-mail se propose dans l'île (poste). Faux sur l'écran de vente du logiciel, où le plan patient prend le relais. */
+  emailEnabled?: boolean;
+  /** Le libellé du bouton de fin (« Vente terminée » au poste). */
+  finishLabel?: string;
+  /** Le look du robot (le comptoir de la personne). */
+  look?: number | null;
+  /** L'île peut se replier en capsule (écran de vente : elle ne doit pas cacher la page). Elle se rouvre à chaque nouvelle étape. */
+  collapsible?: boolean;
+  /** La personne ne peut pas trancher les conseils (préparateur sans ce droit) : les cartes se lisent, sans boutons. */
+  readOnly?: boolean;
 };
 
 const STOCK: Record<NonNullable<IslandAdvice["stock"]>, { bg: string; fg: string; label: string }> = {
@@ -71,6 +81,7 @@ export function CounterIsland(props: CounterIslandProps) {
   const [taps, setTaps] = useState<number[]>([]);
   const [grumpy, setGrumpy] = useState(false);
   const [cheer, setCheer] = useState(0);
+  const [collapsedAt, setCollapsedAt] = useState<string | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // La fête du robot rejouée à chaque « Vente terminée ».
@@ -89,7 +100,7 @@ export function CounterIsland(props: CounterIslandProps) {
   const peek = resting && hover && props.hoverOpen !== false && !grumpy;
   const mood = grumpy ? "concerned" : STAGE_MOOD[state.stage];
   const tone = grumpy ? "warning" : stageTone(state.stage);
-  const width = grumpy ? 380 : peek ? 440 : STAGE_WIDTH[state.stage];
+  const width = grumpy ? 380 : peek ? 440 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 300 : STAGE_WIDTH[state.stage];
   const title = stageTitle(state, count);
 
   const onTap = () => {
@@ -103,12 +114,33 @@ export function CounterIsland(props: CounterIslandProps) {
 
   const robot = (size: number, style?: CSSProperties) => (
     <span className="relative shrink-0" style={style}>
-      <Robot size={size} mood={mood} cheerKey={cheer || undefined} interactive sound="counter" label="Le robot PharmaBoost" />
+      <Robot size={size} mood={mood} cheerKey={cheer || undefined} interactive sound="counter" look={props.look} label="Le robot PharmaBoost" />
     </span>
   );
 
+  // Repliée pour CETTE étape seulement : une nouvelle étape (conseils prêts, mise en garde…) rouvre l'île.
+  const collapsed = props.collapsible === true && collapsedAt === state.stage && state.stage !== "idle";
+  const toggle = props.collapsible && state.stage !== "idle" && !grumpy ? (
+    <button
+      type="button"
+      onClick={() => setCollapsedAt(collapsed ? null : state.stage)}
+      aria-label={collapsed ? "Déplier l'île" : "Replier l'île"}
+      className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-[#36E8C8]"
+    >
+      {collapsed ? <ChevronDown className="size-4" aria-hidden="true" /> : <ChevronUp className="size-4" aria-hidden="true" />}
+    </button>
+  ) : null;
+
   let body: ReactNode;
-  if (grumpy) {
+  if (collapsed) {
+    body = (
+      <div className="flex h-11 items-center gap-2.5 pr-2 pl-1.5">
+        {robot(32)}
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white/85">{title}</span>
+        {toggle}
+      </div>
+    );
+  } else if (grumpy) {
     body = (
       <Row robot={robot(34)} title="Doucement !" sub="Trop de clics d'un coup — je reprends dans 3 secondes." />
     );
@@ -179,15 +211,15 @@ export function CounterIsland(props: CounterIslandProps) {
             <Row robot={robot(34)} title={title} sub={allAnswered(state, count) ? T.allDone : `${T.forDrug}${props.drug}`} compact />
             <ul className="mt-2.5 space-y-2">
               {items.map((item, index) => (
-                <AdviceCard key={item.name} item={item} outcome={state.outcomes[index] ?? null} onAnswer={(outcome) => props.onAnswer(index, outcome)} />
+                <AdviceCard key={item.name} item={item} outcome={state.outcomes[index] ?? null} readOnly={props.readOnly} onAnswer={(outcome) => props.onAnswer(index, outcome)} />
               ))}
             </ul>
             <div className="mt-2.5 flex items-center gap-2">
-              <button type="button" onClick={props.onAddEmail} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.08] text-[12.5px] font-semibold text-white/90 transition-colors hover:bg-white/[0.14] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]">
+              {props.emailEnabled !== false && <button type="button" onClick={props.onAddEmail} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.08] text-[12.5px] font-semibold text-white/90 transition-colors hover:bg-white/[0.14] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]">
                 <Mail className="size-3.5" aria-hidden="true" /> {T.emailAdd}
-              </button>
+              </button>}
               <button type="button" onClick={props.onFinish} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl text-[12.5px] font-bold transition-[filter] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]" style={{ background: C.accent, color: "#04261A" }}>
-                <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> {T.finish}
+                <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> {props.finishLabel ?? T.finish}
               </button>
             </div>
           </div>
@@ -265,7 +297,7 @@ export function CounterIsland(props: CounterIslandProps) {
       <IslandShell
         width={width}
         tone={tone}
-        contentKey={grumpy ? "grumpy" : peek ? "peek" : state.stage}
+        contentKey={grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : state.stage}
         label="Bannière PharmaBoost du comptoir"
         onPointerEnter={() => {
           if (leaveTimer.current) clearTimeout(leaveTimer.current);
@@ -275,7 +307,14 @@ export function CounterIsland(props: CounterIslandProps) {
           leaveTimer.current = setTimeout(() => setHover(false), 350);
         }}
       >
-        {body}
+        {toggle && !collapsed ? (
+          <div className="relative pr-7">
+            {body}
+            <div className="absolute top-2 right-1.5">{toggle}</div>
+          </div>
+        ) : (
+          body
+        )}
       </IslandShell>
     </div>
   );
@@ -297,7 +336,7 @@ function Row({ robot, title, sub, trailing, icon, compact }: { robot: ReactNode;
   );
 }
 
-function AdviceCard({ item, outcome, onAnswer }: { item: IslandAdvice; outcome: IslandOutcome; onAnswer: (outcome: IslandOutcome) => void }) {
+function AdviceCard({ item, outcome, onAnswer, readOnly }: { item: IslandAdvice; outcome: IslandOutcome; onAnswer: (outcome: IslandOutcome) => void; readOnly?: boolean }) {
   const stock = item.stock ? STOCK[item.stock] : null;
   return (
     <li className="isl-line rounded-2xl p-2.5" style={{ background: C.panel, color: C.ink }}>
@@ -322,15 +361,21 @@ function AdviceCard({ item, outcome, onAnswer }: { item: IslandAdvice; outcome: 
         </div>
       </div>
       <div className="mt-2 flex items-center gap-1.5">
-        {outcome ? (
+        {readOnly && !outcome ? (
+          <span className="inline-flex h-8 flex-1 items-center justify-center rounded-lg text-[12px] font-medium" style={{ background: C.line, color: C.inkSoft }}>
+            À proposer · le pharmacien valide
+          </span>
+        ) : outcome ? (
           <>
             <span className="isl-pop inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg text-[12.5px] font-bold" style={outcome === "SOLD" ? { background: C.soldBg, color: C.soldFg } : { background: C.notSoldBg, color: C.notSoldFg }}>
               {outcome === "SOLD" && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}
               {outcome === "SOLD" ? T.sold : T.notSold}
             </span>
-            <button type="button" onClick={() => onAnswer(null)} className="h-8 rounded-lg px-2.5 text-[12px] font-semibold hover:bg-black/5" style={{ color: C.inkSoft }}>
-              {T.change}
-            </button>
+            {!readOnly && (
+              <button type="button" onClick={() => onAnswer(null)} className="h-8 rounded-lg px-2.5 text-[12px] font-semibold hover:bg-black/5" style={{ color: C.inkSoft }}>
+                {T.change}
+              </button>
+            )}
           </>
         ) : (
           <>

@@ -8,8 +8,10 @@ import { ArrowRight, Check, Loader2, Sparkles, User } from "lucide-react";
 import { verifyPrescriptionAction } from "@/server/actions/prescriptions";
 import {
   acceptRecommendationAction,
+  declineRecommendationAction,
   reopenRecommendationAction,
 } from "@/server/actions/recommendations";
+import { SaleIsland } from "./sale-island";
 import { recordSaleAction } from "@/server/actions/sales";
 import { generateDocumentAction } from "@/server/actions/documents";
 import { Button } from "@/components/ui/button";
@@ -516,6 +518,37 @@ export function SaleWorkspace({
 
   return (
     <div className="mx-auto max-w-6xl">
+      {/* La bannière du comptoir, en île : la vraie vente jouée en haut de l'écran, avec le robot du comptoir. */}
+      <SaleIsland
+        editing={editing}
+        analysing={analysing}
+        analysisStep={stage ? STAGE_ORDER.indexOf(stage) : null}
+        liveScan={liveCounter}
+        lineNames={lines.map((line) => line.drugName).filter((name) => name.trim())}
+        findings={findings}
+        advice={recommendations}
+        basketIds={new Set(basket.keys())}
+        hasSale={hasSale}
+        look={counterLook?.look ?? null}
+        canDecide={permissions.decide}
+        onSold={acceptAdvice}
+        onNotSold={(recommendation) =>
+          startTransition(async () => {
+            const result = await declineRecommendationAction(recommendation.id);
+            if (!result.ok) setError(result.error);
+            router.refresh();
+          })
+        }
+        onReopen={(recommendation) => {
+          if (basket.has(recommendation.id)) cancelAdvice(recommendation);
+          else
+            startTransition(async () => {
+              await reopenRecommendationAction(recommendation.id);
+              router.refresh();
+            });
+        }}
+        onFinish={finish}
+      />
       {/* ---- Le patient, en haut ------------------------------------------ */}
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-4">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">

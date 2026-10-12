@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { LogOut, ScanLine, Settings, Store } from "lucide-react";
 import { GlobalSearch } from "./global-search";
@@ -18,17 +19,22 @@ import { DEMO_MODE_HINT, DEMO_MODE_LABEL, isCommercialDemoPharmacy } from "@/cor
 export function Topbar({
   session,
   unreadNotifications,
+  island,
 }: {
   session: SessionContext;
   unreadNotifications: number;
+  /** L'île PharmaBoost, au milieu de la bannière. */
+  island?: ReactNode;
 }) {
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border-subtle bg-surface-app/80 px-4 backdrop-blur-xs lg:px-6">
       <MobileNavTrigger />
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 lg:max-w-sm">
         <GlobalSearch />
       </div>
+      {/* L'île, au milieu de la bannière. */}
+      {island && <div className="flex justify-center lg:flex-1">{island}</div>}
 
       {session.pharmacy.isDemo && (
         <span title={DEMO_MODE_HINT} className="hidden shrink-0 rounded-full border border-warning-300 bg-warning-50 px-2.5 py-0.5 text-[11.5px] font-medium text-warning-800 sm:inline dark:border-warning-800 dark:bg-warning-950/30 dark:text-warning-400">

@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { LifeBuoy, X } from "lucide-react";
 import { NAVIGATION, groupNavigation, isNavItemActive, type NavItem } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import { Robot } from "@/components/robot";
 import { useCounterLook } from "@/components/robot/counter-look-context";
-import { AlertBadge, AlertBubble, useRobotAlerts } from "@/components/robot/robot-alerts";
+import { AlertBadge, useRobotAlerts } from "@/components/robot/robot-alerts";
+import { openIsland } from "@/components/island/platform-island";
 import { useMobileNav } from "./mobile-nav";
 
 export function Sidebar({
@@ -28,15 +28,8 @@ export function Sidebar({
   const counterLook = useCounterLook();
   const robotAlerts = useRobotAlerts();
   const pathname = usePathname();
-  // La bulle du robot : elle s'ouvre d'elle-même pour une alerte jamais montrée ; replier la marque vue.
-  const [bubbleOpen, setBubbleOpen] = useState(false);
-  const unseenCount = robotAlerts?.unseen.length ?? 0;
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- une alerte neuve ouvre la bulle
-    if (unseenCount > 0) setBubbleOpen(true);
-  }, [unseenCount]);
+  // Ce que le robot signale se lit dans l'île, en haut de l'écran : toucher le robot du menu l'ouvre.
   const alerts = robotAlerts?.alerts ?? [];
-  const showBubble = bubbleOpen && alerts.length > 0;
   const granted = new Set(permissions);
 
   const items = NAVIGATION.filter((item) => granted.has(item.permission) && !hiddenHrefs.includes(item.href));
@@ -71,7 +64,7 @@ export function Sidebar({
           <div className="flex min-w-0 items-center gap-2">
             <div
               className="relative shrink-0"
-              onClick={() => alerts.length > 0 && setBubbleOpen((open) => !open)}
+              onClick={() => alerts.length > 0 && openIsland("home")}
               title={alerts.length > 0 ? `${alerts.length} chose${alerts.length > 1 ? "s" : ""} à vous dire` : undefined}
             >
               <Robot size={42} interactive listen mood={robotAlerts?.mood} look={counterLook?.look} label={counterLook ? counterLook.caption : "Le robot PharmaBoost"} />
@@ -94,13 +87,6 @@ export function Sidebar({
           </button>
         </div>
 
-        {/* Ce que le robot signale : l'alerte du moment, ses gestes en un clic, les suivantes. */}
-        {showBubble && robotAlerts && (
-          <div className="relative px-3 pb-3">
-            <span aria-hidden="true" className="absolute -top-[5px] left-[30px] size-3 rotate-45 border-t border-l border-border-subtle bg-surface-card" />
-            <AlertBubble value={robotAlerts} onClose={() => setBubbleOpen(false)} onNavigate={closeNav} />
-          </div>
-        )}
 
         {primary && (
           <div className="px-3 pb-3">

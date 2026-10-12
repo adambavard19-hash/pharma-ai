@@ -10,6 +10,11 @@ import { AppRobotCompanion } from "@/components/robot/app-companion";
 import { CounterLookProvider } from "@/components/robot/counter-look-context";
 import { RobotAlertsProvider } from "@/components/robot/robot-alerts";
 import { myComptoirRobot } from "@/server/services/comptoirs";
+import { AppIsland } from "@/components/island/app-island";
+import { IslandSlotProvider } from "@/components/island/platform-island";
+import { viewersOf } from "@/server/services/pharmacy-assistant/viewer";
+import { pharmacySuggestions } from "@/core/pharmacy-assistant/assistant";
+import { PERMISSIONS } from "@/server/rbac/permissions";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
@@ -24,6 +29,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <CounterLookProvider value={counterLook}>
     {/* Ce que le robot signale (menu et coin de l'écran), par personne et par officine. */}
     <RobotAlertsProvider viewerKey={`${session.scope.userId}:${session.scope.pharmacyId}`}>
+    <IslandSlotProvider>
     <MobileNavProvider>
       <div className="min-h-dvh bg-surface-app">
         <a href="#contenu" className="skip-link">
@@ -44,7 +50,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
         <div className="lg:pl-[256px] print:pl-0">
           <div className="no-print">
-            <Topbar session={session} unreadNotifications={unread} />
+            {/* L'île PharmaBoost au milieu de la bannière : le robot du comptoir de la personne, ce qu'il signale, la discussion. */}
+            <Topbar
+              session={session}
+              unreadNotifications={unread}
+              island={<AppIsland suggestions={pharmacySuggestions(viewersOf(session).viewer)} canImportStock={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)} />}
+            />
           </div>
 
           <main
@@ -59,6 +70,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <AppRobotCompanion />
       </div>
     </MobileNavProvider>
+    </IslandSlotProvider>
     </RobotAlertsProvider>
     </CounterLookProvider>
   );
