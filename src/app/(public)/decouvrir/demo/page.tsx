@@ -1,6 +1,8 @@
 import type { Metadata, ResolvingMetadata } from "next";
 import { LeadForm } from "../_components/lead-form";
 import { pageShare } from "../_components/share-metadata";
+import { connection } from "next/server";
+import { loadDemoSlots } from "@/server/services/site-leads";
 
 const DESCRIPTION = "Une démonstration de PharmaBoost sur votre poste : la bannière au comptoir, les questions avant le conseil, stock et marge, votre équipe.";
 
@@ -13,15 +15,19 @@ export async function generateMetadata(_props: unknown, parent: ResolvingMetadat
   };
 }
 
-export default function DemoPage() {
+export default async function DemoPage() {
+  // Les créneaux libres, lus à chaque visite : un créneau réservé par une autre officine disparaît aussitôt.
+  await connection();
+  const days = await loadDemoSlots();
+
   return (
     <div className="mx-auto max-w-6xl px-5 pt-10 pb-16 md:pt-14 md:pb-24">
       <div className="mb-7 max-w-2xl">
         <p className="font-mono text-[12px] tracking-[0.14em] text-brand-700 uppercase">Démonstration</p>
         <h1 className="mt-2 text-[30px] leading-[1.08] font-bold tracking-[-0.03em] text-text-primary text-balance md:text-[38px]">Réserver une démo.</h1>
-        <p className="mt-3 text-[15.5px] leading-7 text-text-secondary">Sept questions, une minute. En visio ou par téléphone, sur votre poste : nous vous rappelons sous un jour ouvré.</p>
+        <p className="mt-3 text-[15.5px] leading-7 text-text-secondary">Quelques questions, une minute, et vous choisissez le jour et l&apos;heure : votre démo est confirmée aussitôt par e-mail.</p>
       </div>
-      <LeadForm />
+      <LeadForm days={days} />
     </div>
   );
 }

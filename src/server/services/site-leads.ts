@@ -7,6 +7,8 @@ import { traceDispatch } from "@/server/services/email-dispatch";
 import { buildSiteLeadAcknowledgement, buildSiteLeadAlert, type SiteLeadKind, type SiteLeadSummary } from "@/core/platform/site-emails";
 import { resolveReferralCode } from "@/server/services/referral";
 import { reconcileNewProspect } from "@/server/services/referral-leads";
+import { withAdvisoryLock } from "@/server/db/advisory-lock";
+import { demoSlots, formatDemoSlot, isBookableDemoSlot, type DemoDay } from "@/core/site/demo-slots";
 
 export const DEFAULT_CONTACT_EMAIL = "contact@pharmaboost.app";
 
@@ -22,14 +24,48 @@ export type SiteLeadInput = {
   message: string | null;
   preferredSlot: string | null;
   referralCode: string | null;
+  /** Le créneau de démonstration choisi sur le site ; `null` : « rappelez-moi ». */
+  demoAt?: Date | null;
 };
+
+/** Le créneau choisi vient d'être pris par une autre officine (ou n'est plus proposable) : la personne en choisit un autre. */
+export class DemoSlotUnavailableError extends Error {
+  constructor() {
+    super("Ce créneau vient d'être réservé. Choisissez-en un autre.");
+  }
+}
+
+/** Les démonstrations déjà réservées et pas encore faites : leurs créneaux ne sont plus proposés. */
+async function takenDemoSlots(now: Date): Promise<Date[]> {
+  const rows = await prisma.prospect.findMany({ where: { demoAt: { gte: now }, demoDoneAt: null }, select: { demoAt: true } });
+  return rows.flatMap((row) => (row.demoAt ? [row.demoAt] : []));
+}
+
+/** Les créneaux libres proposés par la page « Réserver une démo ». */
+export async function loadDemoSlots(now = new Date()): Promise<DemoDay[]> {
+  return demoSlots(now, await takenDemoSlots(now));
+}
+
+/**
+ * Une demande de démonstration avec un créneau : il est réservé sous verrou (deux officines ne prennent pas le même),
+ * puis la demande suit le chemin habituel. Sans créneau, rien ne change.
+ */
+export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectId: string; acknowledged: boolean }> {
+  const demoAt = input.kind === "DEMO" ? (input.demoAt ?? null) : null;
+  if (!demoAt) return recordSiteLead({ ...input, demoAt: null });
+  return withAdvisoryLock("site:demo-slot", async () => {
+    const now = new Date();
+    if (!isBookableDemoSlot(demoAt, now, await takenDemoSlots(now))) throw new DemoSlotUnavailableError();
+    return recordSiteLead({ ...input, demoAt });
+  });
+}
 
 /**
  * Une demande venue du site public devient un dossier du pipeline, sans
  * commercial attribué : la console le voit, l'équipe est prévenue, le
  * pharmacien reçoit un accusé de réception. Aucune donnée de santé ici.
  */
-export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectId: string; acknowledged: boolean }> {
+async function recordSiteLead(input: SiteLeadInput & { demoAt: Date | null }): Promise<{ prospectId: string; acknowledged: boolean }> {
   const kindLabel = input.kind === "DEMO" ? "Démonstration demandée depuis le site" : "Abonnement demandé depuis le site";
   // Le code n'est gardé que s'il désigne une vraie officine : un code inventé ne parraine personne.
   const referrer = await resolveReferralCode(input.referralCode);
@@ -37,6 +73,7 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
     kindLabel,
     input.lgo ? `Logiciel : ${input.lgo}` : null,
     input.postCount !== null ? `Postes de comptoir : ${input.postCount}` : null,
+    input.demoAt ? `Démo réservée : ${formatDemoSlot(input.demoAt)} (heure de Paris)` : null,
     input.preferredSlot ? `Créneau souhaité : ${input.preferredSlot}` : null,
     input.message ? `Message : ${input.message}` : null,
     referrer ? `Parrainée par : ${referrer.name}` : input.referralCode ? `Code de parrainage inconnu : ${input.referralCode}` : null,
@@ -48,7 +85,7 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
   const prospect = existing
     ? await prisma.prospect.update({
         where: { id: existing.id },
-        data: { status: input.kind === "SUBSCRIBE" ? "INTERESTED" : undefined, lastContactAt: new Date(), notes: [existing.notes, notes].filter(Boolean).join("\n\n"), ...(referrer ? { referralCode: input.referralCode!.trim().toUpperCase() } : {}) },
+        data: { status: input.kind === "SUBSCRIBE" ? "INTERESTED" : undefined, lastContactAt: new Date(), ...demoPlanning(input.demoAt), notes: [existing.notes, notes].filter(Boolean).join("\n\n"), ...(referrer ? { referralCode: input.referralCode!.trim().toUpperCase() } : {}) },
         select: { id: true },
       })
     : await prisma.prospect.create({
@@ -66,6 +103,7 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
           lastContactAt: new Date(),
           nextActionAt: new Date(Date.now() + 24 * 3600 * 1000),
           nextActionLabel: input.kind === "DEMO" ? "Rappeler pour fixer la démonstration" : "Préparer le contrat et envoyer le lien d'activation",
+          ...demoPlanning(input.demoAt),
           notes,
           referralCode: referrer ? input.referralCode!.trim().toUpperCase() : null,
         },
@@ -77,7 +115,7 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
   // Un NOUVEAU dossier dont l'e-mail est celui d'un confrère proposé au parrainage lui est rattaché (casse ignorée).
   if (!existing) await reconcileNewProspect({ id: prospect.id, email: input.email, name: input.pharmacyName }, siteActor);
   const adminUrl = publicUrl(`/admin/dossiers/${prospect.id}`);
-  await notifyAdmins({ type: "SITE_LEAD", title: `${kindLabel} — ${input.pharmacyName}`, body: `${input.contactName} · ${input.email}${input.phone ? ` · ${input.phone}` : ""}`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO" });
+  await notifyAdmins({ type: "SITE_LEAD", title: `${input.demoAt ? `Démo réservée ${formatDemoSlot(input.demoAt)}` : kindLabel} — ${input.pharmacyName}`, body: `${input.contactName} · ${input.email}${input.phone ? ` · ${input.phone}` : ""}`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO" });
 
   const company = await prisma.companyProfile.findUnique({ where: { id: "default" }, select: { representativeEmail: true } });
   const contactEmail = company?.representativeEmail ?? DEFAULT_CONTACT_EMAIL;
@@ -90,6 +128,11 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
   // L'accusé au demandeur entre dans l'historique des communications, envoyé ou non (ne lève jamais).
   await traceDispatch({ kind: "SITE_LEAD_ACK", recipient: input.email, outcome, subject: ack.subject, trigger: "SYSTEM", prospectId: prospect.id });
   return { prospectId: prospect.id, acknowledged: outcome.status === "SENT" };
+}
+
+/** Une démo réservée : la date est posée sur le dossier, et la prochaine action est l'appel lui-même. */
+function demoPlanning(demoAt: Date | null) {
+  return demoAt ? { demoAt, nextActionAt: demoAt, nextActionLabel: `Appeler pour la démonstration (${formatDemoSlot(demoAt)})` } : {};
 }
 
 /**

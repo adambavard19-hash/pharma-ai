@@ -1,22 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CircleHelp, ClipboardList, FileText, MessageCircleQuestion, PackageSearch, PanelTop, ScanLine, Trophy } from "lucide-react";
 import { submitSiteLeadAction } from "@/server/actions/site-leads";
 import { siteLeadSchema } from "@/core/site/lead-form";
+import { formatDemoSlot, type DemoDay } from "@/core/site/demo-slots";
+import { cn } from "@/lib/utils";
 import { Flow, type FlowErrors, type FlowStep } from "@/components/flow/flow";
 import { ChoiceCards, CountAnswer, LiveCard, LiveRow, LongTextAnswer, MultiCards, TextAnswer } from "@/components/flow/controls";
 import { EmailAnswer } from "@/components/flow/email-answer";
 
 const LGOS = ["LGPI (Pharmagest)", "Winpharma", "Smart Rx (Cegedim)", "Léo (Isipharm)", "Périphar", "Alliance+", "Pharmaland", "Autre logiciel"];
-const SLOTS = [
-  { value: "Matin (9 h – 12 h)", label: "Le matin", description: "9 h – 12 h" },
-  { value: "Début d'après-midi (14 h – 16 h)", label: "Début d'après-midi", description: "14 h – 16 h" },
-  { value: "Fin d'après-midi (16 h – 19 h)", label: "Fin d'après-midi", description: "16 h – 19 h" },
-];
-const ANY_SLOT = "__indifferent";
+/** « Aucun créneau ne me convient » : l'équipe rappelle pour en fixer un. */
+const CALL_ME = "__rappel";
+const slotLabel = (value: string) => (value === CALL_ME ? "À fixer ensemble (nous vous rappelons)" : value ? formatDemoSlot(new Date(value)) : null);
 const INTERESTS = [
   { value: "banniere", label: "La bannière au comptoir", icon: <PanelTop className="size-[18px]" /> },
   { value: "scan", label: "Le conseil au scan d'un produit", icon: <ScanLine className="size-[18px]" /> },
@@ -42,7 +41,8 @@ type Values = {
   postCount: string;
   interests: string[];
   message: string;
-  preferredSlot: string;
+  /** L'instant ISO du créneau réservé, ou CALL_ME. */
+  demoAt: string;
   email: string;
   phone: string;
   website: string;
@@ -66,7 +66,8 @@ function toPayload(v: Values) {
     lgo: v.lgo,
     postCount: v.postCount && Number.isFinite(posts) && posts > 0 ? Math.round(posts) : null,
     message: composeMessage(v),
-    preferredSlot: v.preferredSlot === ANY_SLOT ? "" : v.preferredSlot,
+    preferredSlot: "",
+    demoAt: v.demoAt === CALL_ME ? "" : v.demoAt,
     referralCode: "",
     website: v.website,
   };
@@ -91,9 +92,9 @@ const firstName = (v: Values) => v.contactName.trim().split(/\s+/)[0] ?? "";
  * l'officine et ce qu'elle veut voir : aucune donnée de santé, aucune donnée
  * patient.
  */
-export function LeadForm() {
+export function LeadForm({ days }: { days: DemoDay[] }) {
   const router = useRouter();
-  const initialValues = useMemo<Values>(() => ({ contactName: "", pharmacyName: "", city: "", lgo: "", postCount: "", interests: [], message: "", preferredSlot: "", email: "", phone: "", website: "" }), []);
+  const initialValues = useMemo<Values>(() => ({ contactName: "", pharmacyName: "", city: "", lgo: "", postCount: "", interests: [], message: "", demoAt: "", email: "", phone: "", website: "" }), []);
 
   const steps = useMemo<FlowStep<Values>[]>(
     () => [
@@ -118,7 +119,7 @@ export function LeadForm() {
         render: ({ values, errors, set }) => (
           <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
             <TextAnswer label="Officine" value={values.pharmacyName} onValueChange={(v) => set("pharmacyName", v)} error={errors.pharmacyName} placeholder="Pharmacie du Centre" autoComplete="organization" />
-            <TextAnswer label="Ville" value={values.city} onValueChange={(v) => set("city", v)} error={errors.city} autoComplete="address-level2" hint="Facultatif." />
+            <TextAnswer label="Ville" value={values.city} onValueChange={(v) => set("city", v)} error={errors.city} autoComplete="address-level2" hint={values.demoAt && values.demoAt !== CALL_ME ? "Nous vous appelons à ce numéro." : "Facultatif."} />
           </div>
         ),
         recap: { label: "Officine", value: (v) => [v.pharmacyName.trim(), v.city.trim()].filter(Boolean).join(", ") || null },
@@ -166,12 +167,13 @@ export function LeadForm() {
       {
         id: "creneau",
         section: "Votre démo",
-        question: "Quel moment vous arrange pour l'appel ?",
-        fields: ["preferredSlot"],
-        optional: true,
-        seconds: 5,
-        render: ({ values, choose }) => <ChoiceCards label="Créneau" options={[...SLOTS, { value: ANY_SLOT, label: "Indifférent", description: "Quand vous voulez" }]} value={values.preferredSlot} onChoose={(v) => choose("preferredSlot", v)} />,
-        recap: { label: "Créneau", value: (v) => (v.preferredSlot === ANY_SLOT ? "Indifférent" : v.preferredSlot || null) },
+        question: "Choisissez le jour et l'heure de votre démo.",
+        help: "Un appel de 20 minutes, heure de Paris. Le créneau vous est confirmé aussitôt par e-mail.",
+        fields: ["demoAt"],
+        seconds: 10,
+        validate: (v) => (v.demoAt ? {} : { demoAt: "Choisissez un créneau, ou demandez à être rappelé." }),
+        render: ({ values, errors, set, choose }) => <DemoSlotPicker days={days} value={values.demoAt} error={errors.demoAt} onPick={(at) => set("demoAt", at)} onCallMe={() => choose("demoAt", CALL_ME)} />,
+        recap: { label: "Créneau", value: (v) => slotLabel(v.demoAt) },
       },
       {
         id: "contact",
@@ -184,13 +186,13 @@ export function LeadForm() {
         render: ({ values, errors, set }) => (
           <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
             <EmailAnswer label="E-mail" value={values.email} onValueChange={(v) => set("email", v)} error={errors.email} placeholder="vous@officine.fr" />
-            <TextAnswer label="Téléphone" type="tel" value={values.phone} onValueChange={(v) => set("phone", v)} error={errors.phone} autoComplete="tel" placeholder="06 …" hint="Facultatif." />
+            <TextAnswer label="Téléphone" type="tel" value={values.phone} onValueChange={(v) => set("phone", v)} error={errors.phone} autoComplete="tel" placeholder="06 …" hint={values.demoAt && values.demoAt !== CALL_ME ? "Nous vous appelons à ce numéro." : "Facultatif."} />
           </div>
         ),
         recap: { label: "Contact", value: (v) => [v.email.trim(), v.phone.trim()].filter(Boolean).join(" · ") || null },
       },
     ],
-    [],
+    [days],
   );
 
   return (
@@ -211,11 +213,11 @@ export function LeadForm() {
         </p>
       )}
       submitLabel="Réserver ma démo"
-      submitHint="En visio ou par téléphone, sur votre poste. Nous vous rappelons sous un jour ouvré."
+      submitHint="Le créneau vous est confirmé aussitôt par e-mail."
       onSubmit={async (v) => {
         const result = await submitSiteLeadAction(toPayload(v));
         if (!result.ok) return { ok: false, error: result.error };
-        router.push("/decouvrir/merci?type=demo");
+        router.push(v.demoAt && v.demoAt !== CALL_ME ? `/decouvrir/merci?type=demo&creneau=${encodeURIComponent(v.demoAt)}` : "/decouvrir/merci?type=demo");
         return { ok: true };
       }}
     />
@@ -224,7 +226,7 @@ export function LeadForm() {
 
 function DemoAside({ values }: { values: Values }) {
   return (
-    <LiveCard title="Votre démo" footer="En visio ou par téléphone, sur votre poste. Nous vous rappelons sous un jour ouvré.">
+    <LiveCard title="Votre démo" footer="Un appel de 20 minutes, sur votre poste de comptoir. Confirmé aussitôt par e-mail.">
       <div className="divide-y divide-border-subtle/70">
         <LiveRow label="Avec" value={values.contactName.trim()} />
         <LiveRow label="Officine" value={[values.pharmacyName.trim(), values.city.trim()].filter(Boolean).join(", ")} />
@@ -242,8 +244,72 @@ function DemoAside({ values }: { values: Values }) {
             ) : null
           }
         />
-        <LiveRow label="Créneau" value={values.preferredSlot === ANY_SLOT ? "Indifférent" : values.preferredSlot} />
+        <LiveRow label="Créneau" value={slotLabel(values.demoAt)} />
       </div>
     </LiveCard>
+  );
+}
+
+/**
+ * Le jour puis l'heure : les jours ouvrés à venir qui ont encore un créneau libre, et leurs heures. Un créneau pris par
+ * une autre officine n'apparaît pas ; s'il est pris entre-temps, l'envoi le dit et la personne en choisit un autre.
+ */
+function DemoSlotPicker({ days, value, error, onPick, onCallMe }: { days: DemoDay[]; value: string; error?: string; onPick: (at: string) => void; onCallMe: () => void }) {
+  const [dayIndex, setDayIndex] = useState(() => Math.max(0, days.findIndex((day) => day.slots.some((slot) => slot.at === value))));
+  const day = days[dayIndex];
+  return (
+    <div className="space-y-5">
+      {days.length > 0 ? (
+        <>
+          <div role="radiogroup" aria-label="Jour" className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">
+            {days.map((d, i) => {
+              const [weekday, ...rest] = d.label.split(" ");
+              return (
+                <button
+                  key={d.date}
+                  type="button"
+                  role="radio"
+                  aria-checked={i === dayIndex}
+                  onClick={() => setDayIndex(i)}
+                  className={cn(
+                    "flex min-w-[88px] shrink-0 snap-start flex-col items-center rounded-xl border px-3 py-2.5 text-center transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
+                    i === dayIndex ? "border-brand-600 bg-brand-600 text-white" : "border-border-default bg-surface-card text-text-primary hover:border-brand-300",
+                  )}
+                >
+                  <span className={cn("text-[12.5px] font-medium", i === dayIndex ? "text-white/85" : "text-text-secondary")}>{weekday}</span>
+                  <span className="text-[15px] leading-6 font-semibold">{rest.join(" ")}</span>
+                </button>
+              );
+            })}
+          </div>
+          {day && (
+            <div role="radiogroup" aria-label={`Heure, ${day.label}`} className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {day.slots.map((slot) => (
+                <button
+                  key={slot.at}
+                  type="button"
+                  role="radio"
+                  aria-checked={value === slot.at}
+                  onClick={() => onPick(slot.at)}
+                  className={cn(
+                    "h-11 rounded-xl border text-[15px] font-semibold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
+                    value === slot.at ? "border-brand-600 bg-brand-600 text-white" : "border-border-default bg-surface-card text-text-primary hover:border-brand-300",
+                  )}
+                >
+                  {slot.time}
+                </button>
+              ))}
+            </div>
+          )}
+          {value && value !== CALL_ME && <p className="text-[14.5px] font-medium text-brand-800">Votre démo : {slotLabel(value)}.</p>}
+        </>
+      ) : (
+        <p className="text-[14.5px] text-text-secondary">Aucun créneau libre en ce moment : nous vous rappelons pour en fixer un.</p>
+      )}
+      <button type="button" onClick={onCallMe} className={cn("text-[14px] font-medium underline underline-offset-2", value === CALL_ME ? "text-brand-800" : "text-text-secondary hover:text-text-primary")}>
+        {value === CALL_ME ? "Nous vous rappelons pour fixer le créneau ✓" : "Aucun créneau ne me convient : rappelez-moi"}
+      </button>
+      {error && <p className="text-[13.5px] text-danger-600" role="alert">{error}</p>}
+    </div>
   );
 }

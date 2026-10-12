@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { headers } from "next/headers";
-import { receiveSiteLead } from "@/server/services/site-leads";
+import { DemoSlotUnavailableError, receiveSiteLead } from "@/server/services/site-leads";
 import { confirmSubscription, normalizeSubscriptionRequest, requestSubscription, type SubscriptionRequestOutcome } from "@/server/services/subscription-requests";
 import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 import { SELF_SERVICE_TERMS_VERSION, selfServiceAvailability, startSelfServiceCheckout } from "@/server/billing/self-service";
@@ -45,9 +45,11 @@ export async function submitSiteLeadAction(payload: SiteLeadPayload): Promise<Ac
       message: input.message || null,
       preferredSlot: input.preferredSlot || null,
       referralCode: input.referralCode || null,
+      demoAt: input.demoAt ? new Date(input.demoAt) : null,
     });
     return ok({ acknowledged: result.acknowledged });
   } catch (error) {
+    if (error instanceof DemoSlotUnavailableError) return fail(error.message);
     console.error("[site] demande impossible", error);
     return fail(`Votre demande n'a pas pu être enregistrée. Écrivez-nous à ${PUBLIC_CONTACT_EMAIL}.`);
   }

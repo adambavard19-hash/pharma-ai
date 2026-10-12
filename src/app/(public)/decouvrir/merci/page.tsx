@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { formatDemoSlot } from "@/core/site/demo-slots";
 
 export const metadata: Metadata = { title: "Demande reçue", robots: { index: false, follow: false } };
 
@@ -29,9 +30,24 @@ const OUTCOMES: Record<string, Outcome> = {
   },
 };
 
-export default async function ThanksPage({ searchParams }: { searchParams: Promise<{ type?: string; etat?: string }> }) {
-  const { type, etat } = await searchParams;
-  const outcome = type === "abonnement" ? (OUTCOMES[etat ?? ""] ?? OUTCOMES.received) : OUTCOMES.demo;
+/** La démo réservée sur le site : le créneau est confirmé, on le redit. */
+function bookedDemo(when: string): Outcome {
+  return {
+    kicker: "Démonstration",
+    title: "Votre démo est confirmée.",
+    body: `${when}, heure de Paris. La confirmation vient de partir à l'adresse indiquée, avec un bouton pour l'ajouter à votre agenda.`,
+    steps: [
+      { title: `${when} : nous vous appelons`, body: "Au numéro indiqué, pour 20 minutes. Un empêchement ? Répondez simplement à l'e-mail de confirmation." },
+      { title: "La démonstration, sur votre poste", body: "Le conseil au scan, l'analyse d'ordonnance, le stock et la marge." },
+      { title: "Vous décidez", body: "Si PharmaBoost vous convient, la souscription se fait en ligne, en deux minutes." },
+    ],
+  };
+}
+
+export default async function ThanksPage({ searchParams }: { searchParams: Promise<{ type?: string; etat?: string; creneau?: string }> }) {
+  const { type, etat, creneau } = await searchParams;
+  const booked = creneau && !Number.isNaN(Date.parse(creneau)) ? formatDemoSlot(new Date(creneau)) : null;
+  const outcome = type === "abonnement" ? (OUTCOMES[etat ?? ""] ?? OUTCOMES.received) : booked ? bookedDemo(booked) : OUTCOMES.demo;
   return (
     <div className="mx-auto max-w-2xl px-5 py-16 md:py-24">
       <span className="flex size-14 items-center justify-center rounded-full bg-brand-600 text-white shadow-[0_12px_30px_-12px_rgba(13,148,136,0.7)] motion-safe:animate-slide-up" aria-hidden="true">
