@@ -58,9 +58,9 @@ describe("carte du titulaire : sans filleul actif", () => {
     expect(html).not.toMatch(/gratuit|Encore \d|retire .* par mois de votre abonnement, tant qu'elle est abonnée\. Jusqu'à/);
   });
 
-  it("dit que la remise est appliquée par l'équipe PharmaBoost, une seule fois, quel que soit le nombre de filleuls", () => {
+  it("dit que la remise s'applique d'elle-même dès le premier paiement du filleul, une seule fois, quel que soit le nombre de filleuls", () => {
     const html = render(base());
-    expect(html).toContain("appliquée à votre abonnement par l'équipe PharmaBoost");
+    expect(html).toContain("Dès son premier paiement, la remise s'applique d'elle-même à vos factures suivantes");
     expect(html).toContain("une seule fois : 20 % de moins, que vous ayez un ou plusieurs filleuls");
     expect(html).not.toContain("apparaît sur votre facture");
   });

@@ -250,7 +250,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
     defaults: {
       subject: "{{filleul}} a rejoint PharmaBoost avec votre code de parrainage",
       title: "Un nouveau filleul",
-      body: "Bonjour {{prenom}},\n\n{{filleul}} vient de rejoindre PharmaBoost avec votre code de parrainage. Merci de votre recommandation.\n\nTant que cette officine reste abonnée, votre abonnement passe à {{montant_remise}} de moins par mois. La remise est appliquée à votre abonnement par l'équipe PharmaBoost, et elle ne se cumule pas : un seul filleul suffit, plusieurs ne la changent pas. Vous retrouvez vos filleuls et votre remise dans votre espace.",
+      body: "Bonjour {{prenom}},\n\n{{filleul}} vient de rejoindre PharmaBoost avec votre code de parrainage. Merci de votre recommandation.\n\nTant que cette officine reste abonnée, votre abonnement passe à {{montant_remise}} de moins par mois. La remise s'applique d'elle-même à vos factures suivantes, et elle ne se cumule pas : un seul filleul suffit, plusieurs ne la changent pas. Vous retrouvez vos filleuls et votre remise dans votre espace.",
     },
     button: { label: "Voir mon parrainage", urlVariable: "lien_espace" },
     eyebrow: "Parrainage",

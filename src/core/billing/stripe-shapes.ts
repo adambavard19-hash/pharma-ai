@@ -31,6 +31,8 @@ export type SubscriptionShape = {
   customerId: string | null;
   status: string;
   priceId: string | null;
+  /** Le début de l'abonnement (`start_date`) : point de départ de l'engagement. */
+  startDate: Date | null;
   trialStart: Date | null;
   trialEnd: Date | null;
   currentPeriodStart: Date | null;
@@ -53,6 +55,7 @@ export function readSubscription(subscription: unknown): SubscriptionShape {
     customerId: idOf(sub.customer),
     status: typeof sub.status === "string" ? sub.status : "unknown",
     priceId: price && typeof price.id === "string" ? price.id : null,
+    startDate: stripeDate(sub.start_date),
     trialStart: stripeDate(sub.trial_start),
     trialEnd: stripeDate(sub.trial_end),
     currentPeriodStart: stripeDate(sub.current_period_start) ?? stripeDate(firstItem?.current_period_start),
@@ -114,6 +117,8 @@ export type CheckoutSessionShape = {
   subscriptionId: string | null;
   clientReferenceId: string | null;
   status: string;
+  /** `paid`, `unpaid` (prélèvement SEPA encore en cours) ou `no_payment_required`. */
+  paymentStatus: string;
   metadata: Record<string, string>;
 };
 
@@ -126,6 +131,7 @@ export function readCheckoutSession(session: unknown): CheckoutSessionShape {
     subscriptionId: idOf(s.subscription),
     clientReferenceId: typeof s.client_reference_id === "string" ? s.client_reference_id : null,
     status: typeof s.status === "string" ? s.status : "unknown",
+    paymentStatus: typeof s.payment_status === "string" ? s.payment_status : "unknown",
     metadata: Object.fromEntries(Object.entries(metadata).filter((entry): entry is [string, string] => typeof entry[1] === "string")),
   };
 }

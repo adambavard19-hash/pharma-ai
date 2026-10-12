@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * jamais partir le contrat. Le service est simulé : on vérifie ce que l'action lui
  * transmet, et ce qu'elle refuse avant de l'appeler.
  */
-const mocks = vi.hoisted(() => ({ requestSubscription: vi.fn(), confirmSubscription: vi.fn(), receiveSiteLead: vi.fn() }));
+const mocks = vi.hoisted(() => ({ requestSubscription: vi.fn(), confirmSubscription: vi.fn(), receiveSiteLead: vi.fn(), selfServiceAvailability: vi.fn(), startSelfServiceCheckout: vi.fn(), notifyAdmins: vi.fn() }));
 
 // Une adresse IP différente à chaque appel : la limite d'envois (trois par heure) ne s'en mêle pas.
 let ip = 0;
@@ -17,6 +17,9 @@ vi.mock("@/server/services/subscription-requests", async () => {
   const core = await vi.importActual<typeof import("@/core/contracts/subscription-request")>("@/core/contracts/subscription-request");
   return { normalizeSubscriptionRequest: core.normalizeSubscriptionRequest, requestSubscription: mocks.requestSubscription, confirmSubscription: mocks.confirmSubscription };
 });
+
+vi.mock("@/server/billing/self-service", () => ({ SELF_SERVICE_TERMS_VERSION: "conditions-test", selfServiceAvailability: mocks.selfServiceAvailability, startSelfServiceCheckout: mocks.startSelfServiceCheckout }));
+vi.mock("@/server/services/sales/notifications", () => ({ notifyAdmins: mocks.notifyAdmins }));
 
 const { submitSubscriptionRequestAction, confirmSubscriptionAction } = await import("../site-leads");
 
@@ -94,5 +97,44 @@ describe("action de confirmation : l'ancien lien ne fait plus partir le contrat"
   it("un jeton absurde est refusé avant tout appel", async () => {
     expect(await confirmSubscriptionAction("x".repeat(2001))).toMatchObject({ ok: false, error: "Lien invalide." });
     expect(mocks.confirmSubscription).not.toHaveBeenCalled();
+  });
+});
+
+describe("action de souscription : le paiement en ligne", () => {
+  const OPEN = { available: true, planId: "plan_officine", monthlyPriceCents: 12_600, setupFeeCents: 29_000, commitmentMonths: 12 };
+
+  it("sans les conditions acceptées, rien ne part au service", async () => {
+    const result = await submitSubscriptionRequestAction(payload({ payOnline: true, acceptTerms: false }));
+    expect(result).toMatchObject({ ok: false, fieldErrors: { acceptTerms: expect.any(String) } });
+    expect(mocks.requestSubscription).not.toHaveBeenCalled();
+  });
+
+  it("paiement ouvert : le dossier porte l'acceptation et l'offre du site, l'action rend l'adresse du paiement Stripe", async () => {
+    mocks.selfServiceAvailability.mockResolvedValue(OPEN);
+    mocks.requestSubscription.mockResolvedValue({ ok: true, outcome: { status: "CHECKOUT", prospectId: "p-9", reason: "souscription en ligne" } });
+    mocks.startSelfServiceCheckout.mockResolvedValue({ ok: true, url: "https://checkout.stripe.test/cs_9" });
+    const result = await submitSubscriptionRequestAction(payload({ payOnline: true, acceptTerms: true, planId: "autre" }));
+    expect(result).toMatchObject({ ok: true, data: { outcome: "CHECKOUT", checkoutUrl: "https://checkout.stripe.test/cs_9" } });
+    const [request, selfService] = mocks.requestSubscription.mock.calls[0];
+    expect(request.planId).toBe("plan_officine");
+    expect(selfService).toMatchObject({ termsVersion: "conditions-test", planId: "plan_officine", termsAcceptedAt: expect.any(Date) });
+    expect(mocks.startSelfServiceCheckout).toHaveBeenCalledWith("p-9");
+  });
+
+  it("paiement fermé (Stripe ou offre absents) : la demande suit le chemin de l'équipe", async () => {
+    mocks.selfServiceAvailability.mockResolvedValue({ available: false, reason: "Stripe n'est pas configuré" });
+    const result = await submitSubscriptionRequestAction(payload({ payOnline: true, acceptTerms: true }));
+    expect(result).toMatchObject({ ok: true, data: { outcome: "RECEIVED" } });
+    expect(mocks.requestSubscription.mock.calls[0][1]).toBeNull();
+    expect(mocks.startSelfServiceCheckout).not.toHaveBeenCalled();
+  });
+
+  it("la page de paiement ne s'ouvre pas : le dossier reste, l'équipe est prévenue", async () => {
+    mocks.selfServiceAvailability.mockResolvedValue(OPEN);
+    mocks.requestSubscription.mockResolvedValue({ ok: true, outcome: { status: "CHECKOUT", prospectId: "p-10", reason: "souscription en ligne" } });
+    mocks.startSelfServiceCheckout.mockResolvedValue({ ok: false, error: "Stripe indisponible" });
+    const result = await submitSubscriptionRequestAction(payload({ payOnline: true, acceptTerms: true }));
+    expect(result).toMatchObject({ ok: true, data: { outcome: "RECEIVED" } });
+    expect(mocks.notifyAdmins).toHaveBeenCalledWith(expect.objectContaining({ linkUrl: "/admin/dossiers/p-10" }));
   });
 });

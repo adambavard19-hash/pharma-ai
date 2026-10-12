@@ -26,6 +26,8 @@ import { SubscriptionAdminActions } from "../billing-actions";
 import { PrepareContractButton, SendContractButton } from "../contract-actions";
 import { DateText, StatusWithDetail, StripeNotConfigured, formatDateTimeParis } from "../billing-ui";
 import { ChangeContractPriceButton } from "./price-editor";
+import { SetupStatusActions } from "./setup-actions";
+import { commitmentRunning } from "@/core/billing/checkout";
 import { CreateCancellationButton } from "../../resiliations/create-cancellation";
 
 export const metadata: Metadata = { title: "Abonnement de l'officine" };
@@ -61,6 +63,16 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
   const openCancellation = detail.cancellations.find((c) => isOpenCancellation(c.status)) ?? null;
   const latestContract = detail.contracts[0] ?? null;
   const foundingContract = sub?.contractId ? detail.contracts.find((c) => c.id === sub.contractId) ?? null : null;
+  const now = new Date();
+  const inCommitment = Boolean(sub && commitmentRunning(sub.commitmentEndsAt, now));
+  // Fin programmée : en fin de période (`cancelAtPeriodEnd`) ou à une date (fin d'engagement, `cancelAt`).
+  const cancelScheduled = Boolean(sub && ongoing && (sub.cancelAtPeriodEnd || sub.cancelAt));
+  const defaultPlan = plans.find((p) => p.isDefault) ?? plans[0];
+  // La mise en service que le lien ajouterait : celle de l'offre du lien (contrat, sinon offre par défaut).
+  const invitePlanId = latestContract?.planId ?? defaultPlan?.id ?? null;
+  const setupPlan = invitePlanId ? await prisma.plan.findUnique({ where: { id: invitePlanId }, select: { setupFeeCents: true } }) : null;
+  const inviteSetupLabel = setupPlan?.setupFeeCents ? `${formatEuros(setupPlan.setupFeeCents)} HT` : null;
+  const SETUP_LABELS = { TO_SCHEDULE: { label: "À planifier", tone: "warning" as const }, SCHEDULED: { label: "Planifiée", tone: "info" as const }, DONE: { label: "Faite", tone: "success" as const } };
 
   // Ce que proposerait le lien d'activation (même règle que sendSubscriptionInviteAction) :
   //   - dernier contrat SIGNÉ : son offre, à son tarif et avec son essai, tels qu'imprimés ;
@@ -152,12 +164,15 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
             {sub ? (
               <FactList
                 items={[
-                  { label: "Statut", value: <div className="flex flex-wrap gap-1"><StatusBadge status={stage} />{sub.cancelAtPeriodEnd && <Badge tone="warning">Fin programmée</Badge>}</div> },
+                  { label: "Statut", value: <div className="flex flex-wrap gap-1"><StatusBadge status={stage} />{cancelScheduled && <Badge tone="warning">Fin programmée</Badge>}</div> },
                   { label: "Paiement", value: payment ? <StatusWithDetail status={payment} detail={payment.detail} /> : null },
                   { label: "Début", value: <DateText date={sub.trialStartsAt ?? sub.createdAt} /> },
                   { label: "Essai", value: sub.trialEndsAt ? `jusqu'au ${formatFrenchDate(sub.trialEndsAt)}` : "Aucun" },
                   { label: "Période en cours", value: `${formatFrenchDate(sub.currentPeriodStart)}${sub.currentPeriodEnd ? ` → ${formatFrenchDate(sub.currentPeriodEnd)}` : ""}` },
                   { label: "Prochaine échéance", value: sub.nextInvoiceAt && sub.status !== "CANCELED" ? formatFrenchDate(sub.nextInvoiceAt) : "—" },
+                  { label: "Engagement", value: sub.commitmentEndsAt ? `${sub.commitmentMonths ?? ""}${sub.commitmentMonths ? " mois, " : ""}jusqu'au ${formatFrenchDate(sub.commitmentEndsAt)}${inCommitment ? "" : " (terminé)"}` : "Aucun enregistré", hint: inCommitment ? "Une résiliation prend effet à la fin de l'engagement, jamais avant." : undefined },
+                  { label: "Mise en service", value: sub.setupFeeCents === null ? "Non facturée par Stripe" : sub.setupFeeCents === 0 ? "Offerte" : `${formatEuros(sub.setupFeeCents)} HT sur la première facture` },
+                  { label: "Remise parrainage", value: sub.referralDiscountCents ? `−${formatEuros(sub.referralDiscountCents)} HT/mois, appliquée chez Stripe` : "Aucune", hint: sub.referralSyncedAt ? `Vérifiée le ${formatDateTimeParis(sub.referralSyncedAt)}` : undefined },
                   { label: "Dernier paiement réussi", value: sub.lastPaymentAt ? `${sub.lastPaymentCents ? `${formatEuros(sub.lastPaymentCents)} ` : ""}le ${formatFrenchDate(sub.lastPaymentAt)}` : "Aucun" },
                   { label: "Dernier échec", value: sub.lastPaymentFailedAt ? formatDateTimeParis(sub.lastPaymentFailedAt) : "Aucun" },
                   ...(sub.cancelAt ? [{ label: "Fin programmée", value: formatFrenchDate(sub.cancelAt) }] : []),
@@ -296,11 +311,25 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
               stripeConfigured={stripe.configured}
               hasStripeSubscription={Boolean(sub?.stripeSubscriptionId)}
               subscriptionOngoing={ongoing}
-              cancelAtPeriodEnd={sub?.cancelAtPeriodEnd ?? false}
+              cancelAtPeriodEnd={cancelScheduled}
               periodEndLabel={sub?.currentPeriodEnd ? formatFrenchDate(sub.currentPeriodEnd) : null}
+              commitmentEndLabel={inCommitment && sub?.commitmentEndsAt ? formatFrenchDate(sub.commitmentEndsAt) : null}
+              cancelEndLabel={sub?.cancelAt ? formatFrenchDate(sub.cancelAt) : null}
               isActive={row.isActive}
               inviteSummary={inviteSummary}
+              inviteSetupLabel={inviteSetupLabel}
             />
+          </AdminSection>
+
+          <AdminSection title="Mise en service" description="Installation des postes, paramétrage, import du stock et formation : payée avec le premier mois.">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-[13.5px] text-text-secondary">
+                {row.setupStatus ? <Badge tone={SETUP_LABELS[row.setupStatus].tone}>{SETUP_LABELS[row.setupStatus].label}</Badge> : <Badge tone="neutral">Non suivie</Badge>}
+                {row.setupStatus === "SCHEDULED" && row.setupScheduledAt && <span>le {formatFrenchDate(row.setupScheduledAt)}</span>}
+                {row.setupStatus === "DONE" && row.setupDoneAt && <span>le {formatFrenchDate(row.setupDoneAt)}</span>}
+              </div>
+              <SetupStatusActions pharmacyId={row.id} status={row.setupStatus} scheduledAt={row.setupScheduledAt?.toISOString() ?? null} />
+            </div>
           </AdminSection>
 
           <AdminSection title="Résiliation" description="Les demandes de résiliation de cette officine. Rien n'est jamais coupé automatiquement.">

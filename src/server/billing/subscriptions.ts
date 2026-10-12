@@ -1,6 +1,5 @@
 import "server-only";
 import { prisma } from "@/server/db/client";
-import { getEnv } from "@/config/env";
 import { generateToken, hashToken } from "@/server/security/tokens";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
@@ -11,8 +10,14 @@ import { recordProspectEvent } from "@/server/services/sales/events";
 import { markProspectActivated, stampActivation, syncProgressiveCommissionsSafely } from "@/server/services/sales/progressive-commissions";
 import { traceDispatch } from "@/server/services/email-dispatch";
 import { getStripe, stripeConfigState } from "./stripe-client";
+import { ensurePortalConfiguration, ensureVatTaxRate, setupLineFor } from "./stripe-setup";
+import { syncReferralDiscountSafely, syncReferrerOfOrganization } from "./referral-discount";
+import { buildSubscriptionCheckout, cancellationTiming, commitmentEndDate, commitmentMonthsFromMetadata, firstInvoiceSentence, setupFeeFromMetadata } from "@/core/billing/checkout";
+import { OFFICIAL_OFFER } from "@/core/pricing/official-offer";
+import { resolveReferralCode } from "@/server/services/referral";
+import { referralAmountForNewFilleul } from "@/server/services/referral-offers";
 import { readSubscription, type SubscriptionShape } from "@/core/billing/stripe-shapes";
-import { SUBSCRIPTION_STATUSES, subscriptionStatusFromStripe, trialEndDate, trialSentence, formatEuros, formatFrenchDate, type SubscriptionStatusCode } from "@/core/billing/subscription";
+import { SUBSCRIPTION_STATUSES, subscriptionStatusFromStripe, trialEndDate, formatEuros, formatFrenchDate, type SubscriptionStatusCode } from "@/core/billing/subscription";
 import { contractualPrice, initialContractPriceCents } from "@/core/billing/contract-price";
 import { buildSubscriptionInviteEmail, buildSubscriptionStartedEmail } from "@/core/platform/billing-emails";
 import type { Plan, Prisma } from "@/generated/prisma";
@@ -149,7 +154,7 @@ async function loadInviteContext(pharmacyId: string, planId: string, contractId:
  * Crée le lien d'activation (ou réutilise celui en cours) et l'envoie au
  * titulaire. Le jeton en clair ne vit que le temps de l'e-mail.
  */
-export async function sendSubscriptionInvite(params: { pharmacyId: string; planId: string; contractId: string | null; adminId: string }): Promise<{ ok: true; inviteId: string; sentTo: string; emailStatus: string } | { ok: false; error: string }> {
+export async function sendSubscriptionInvite(params: { pharmacyId: string; planId: string; contractId: string | null; adminId: string; /** Mise en service sur la première facture ; absent : celle de l'offre. 0 : offerte. */ setupFeeCents?: number | null }): Promise<{ ok: true; inviteId: string; sentTo: string; emailStatus: string } | { ok: false; error: string }> {
   const loaded = await loadInviteContext(params.pharmacyId, params.planId, params.contractId);
   if (!loaded.ok) return loaded;
   const { pharmacy, owner, plan, contractId, contract } = loaded.context;
@@ -166,6 +171,8 @@ export async function sendSubscriptionInvite(params: { pharmacyId: string; planI
   const sentTo = owner?.email ?? pharmacy.email!;
   // Le prix et l'essai annoncés sont ceux qui seront facturés : ceux du contrat signé quand le lien en porte un.
   const terms = inviteTerms(plan, contract);
+  // La mise en service est figée sur le lien à l'envoi : celle de l'offre, sauf choix explicite de l'équipe (0 : offerte).
+  const setupFeeCents = Math.max(0, params.setupFeeCents ?? plan.setupFeeCents ?? 0);
   const token = generateToken(32);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + INVITE_TTL_MS);
@@ -173,8 +180,8 @@ export async function sendSubscriptionInvite(params: { pharmacyId: string; planI
   // un seul lien vivant à la fois, celui de l'e-mail le plus récent.
   const previous = await prisma.subscriptionInvite.findFirst({ where: { pharmacyId: pharmacy.id, completedAt: null }, orderBy: { createdAt: "desc" } });
   const invite = previous
-    ? await prisma.subscriptionInvite.update({ where: { id: previous.id }, data: { planId: plan.id, contractId, tokenHash: hashToken(token), sentTo, expiresAt, sentCount: { increment: 1 }, sentAt: now } })
-    : await prisma.subscriptionInvite.create({ data: { pharmacyId: pharmacy.id, organizationId: pharmacy.organizationId, planId: plan.id, contractId, tokenHash: hashToken(token), sentTo, expiresAt, sentCount: 1, sentAt: now, createdByAdminId: params.adminId } });
+    ? await prisma.subscriptionInvite.update({ where: { id: previous.id }, data: { planId: plan.id, contractId, tokenHash: hashToken(token), sentTo, expiresAt, sentCount: { increment: 1 }, sentAt: now, setupFeeCents } })
+    : await prisma.subscriptionInvite.create({ data: { pharmacyId: pharmacy.id, organizationId: pharmacy.organizationId, planId: plan.id, contractId, tokenHash: hashToken(token), sentTo, expiresAt, sentCount: 1, sentAt: now, setupFeeCents, createdByAdminId: params.adminId } });
 
   const message = buildSubscriptionInviteEmail({
     ownerName: owner ? `${owner.firstName} ${owner.lastName}` : pharmacy.name,
@@ -185,6 +192,8 @@ export async function sendSubscriptionInvite(params: { pharmacyId: string; planI
     url: publicUrl(`/abonnement/activer/${token}`),
     expiresAt,
     contactEmail: PUBLIC_CONTACT_EMAIL,
+    setupFeeCents,
+    commitmentMonths: OFFICIAL_OFFER.commitmentMonths,
   });
   const outcome = await getMessagingProvider().sendEmail({ to: sentTo, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
   // Le journal des e-mails garde chaque envoi, réussi ou non.
@@ -193,7 +202,7 @@ export async function sendSubscriptionInvite(params: { pharmacyId: string; planI
     await prisma.subscriptionInvite.update({ where: { id: invite.id }, data: { sentAt: previous?.sentAt ?? null, sentCount: { decrement: 1 } } });
     return { ok: false, error: `Le lien n'a pas pu être envoyé : ${outcome.detail}` };
   }
-  await recordAudit({ action: "billing.invite_sent", entityType: "SubscriptionInvite", entityId: invite.id, platformAdminId: params.adminId, metadata: { pharmacyId: pharmacy.id, planId: plan.id, contractId, sentTo } });
+  await recordAudit({ action: "billing.invite_sent", entityType: "SubscriptionInvite", entityId: invite.id, platformAdminId: params.adminId, metadata: { pharmacyId: pharmacy.id, planId: plan.id, contractId, sentTo, setupFeeCents } });
   return { ok: true, inviteId: invite.id, sentTo, emailStatus: outcome.status };
 }
 
@@ -201,7 +210,7 @@ async function findInviteByToken(token: string) {
   if (!token || token.length < 16) return null;
   return prisma.subscriptionInvite.findUnique({
     where: { tokenHash: hashToken(token) },
-    include: { plan: true, pharmacy: { select: { id: true, name: true, organizationId: true } }, contract: { select: { status: true, version: true, planId: true, monthlyPriceCents: true, trialDays: true } } },
+    include: { plan: true, pharmacy: { select: { id: true, name: true, organizationId: true, referredById: true } }, contract: { select: { status: true, version: true, planId: true, monthlyPriceCents: true, trialDays: true } } },
   });
 }
 
@@ -227,6 +236,9 @@ export async function peekInvite(token: string) {
     catalogTrialDays: found.plan.trialDays,
     billedMonthlyPriceCents: terms.monthlyPriceCents,
     billedTrialDays: terms.trialDays,
+    // Un lien envoyé avant la facturation de la mise en service n'en annonçait pas : il n'en facture pas.
+    billedSetupFeeCents: Math.max(0, found.setupFeeCents ?? 0),
+    commitmentMonths: OFFICIAL_OFFER.commitmentMonths,
   };
   if (invite.expiresAt < new Date() && !invite.completedAt) return { expired: true as const, invite };
   if (!invite.openedAt) await prisma.subscriptionInvite.update({ where: { id: invite.id }, data: { openedAt: new Date() } });
@@ -234,17 +246,58 @@ export async function peekInvite(token: string) {
 }
 
 /**
- * Ouvre le Checkout Stripe pour ce lien : un client Stripe par officine
- * (réutilisé), une session fraîche à chaque clic, l'essai du contrat signé
- * (sinon de l'offre), et
- * toutes les métadonnées qui rattachent la future Subscription à l'officine,
- * à l'offre et au contrat.
- *
- * Le prix facturé est celui du CONTRAT SIGNÉ quand le lien en porte un dont
- * le tarif diffère du catalogue (prix créé à la volée sur le produit Stripe
- * de l'offre) ; sinon le prix Stripe de l'offre.
+ * Le client Stripe d'une officine (ou d'un dossier en libre-service) : celui
+ * déjà connu s'il existe encore chez Stripe, sinon un nouveau. Un seul client
+ * par officine : pas de doublon à chaque clic.
  */
-export async function startCheckoutForInvite(token: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+export async function ensureStripeCustomer(known: string | null, create: { name: string; email: string; address: { line1: string; line2?: string | null; postalCode?: string | null; city?: string | null; country?: string | null } | null; phone?: string | null; metadata: Record<string, string> }): Promise<string> {
+  const stripe = getStripe();
+  if (known) {
+    try {
+      const customer = await stripe.customers.retrieve(known);
+      if (!("deleted" in customer && customer.deleted)) return known;
+    } catch {
+      // Client introuvable (autre compte Stripe, supprimé) : on en crée un.
+    }
+  }
+  const customer = await stripe.customers.create({
+    name: create.name,
+    email: create.email,
+    phone: create.phone ?? undefined,
+    address: create.address ? { line1: create.address.line1, line2: create.address.line2 ?? undefined, postal_code: create.address.postalCode ?? undefined, city: create.address.city ?? undefined, country: create.address.country || "FR" } : undefined,
+    preferred_locales: ["fr"],
+    metadata: create.metadata,
+  });
+  return customer.id;
+}
+
+/**
+ * Le parrain saisi sur le lien d'activation : relié à l'officine si elle n'en a
+ * pas encore, jamais à elle-même, jamais en remplacement d'un parrain déjà
+ * connu. Le montant d'offre éventuel est figé maintenant, comme à la création.
+ */
+async function attachReferrerFromInvite(pharmacyId: string, code: string | null | undefined): Promise<void> {
+  if (!code) return;
+  const referrer = await resolveReferralCode(code);
+  if (!referrer || referrer.id === pharmacyId) return;
+  const pharmacy = await prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { referredById: true } });
+  if (!pharmacy || pharmacy.referredById) return;
+  const referralAmountCents = await referralAmountForNewFilleul();
+  await prisma.pharmacy.updateMany({ where: { id: pharmacyId, referredById: null }, data: { referredById: referrer.id, referralAmountCents } });
+}
+
+/**
+ * Ouvre le Checkout Stripe pour ce lien : un client Stripe par officine
+ * (réutilisé), une session fraîche à chaque clic, et toutes les métadonnées
+ * qui rattachent la future Subscription à l'officine, à l'offre et au contrat.
+ *
+ * Ce qui est facturé : le tarif du CONTRAT SIGNÉ quand le lien en porte un dont
+ * le tarif diffère du catalogue (prix créé à la volée sur le produit Stripe de
+ * l'offre), sinon le prix Stripe de l'offre ; plus la mise en service figée sur
+ * le lien, en ligne unique de la première facture ; TVA 20 % en sus ;
+ * prélèvement SEPA ou carte.
+ */
+export async function startCheckoutForInvite(token: string, options: { referralCode?: string | null } = {}): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const peeked = await peekInvite(token);
   if (!peeked) return { ok: false, error: "Ce lien n'est pas valide." };
   if (peeked.expired) return { ok: false, error: "Ce lien a expiré. Demandez-nous un nouveau lien." };
@@ -254,70 +307,52 @@ export async function startCheckoutForInvite(token: string): Promise<{ ok: true;
   if (!state.configured) return { ok: false, error: "Le paiement n'est pas encore disponible. Réessayez plus tard ou contactez-nous." };
   const price = await ensurePlanStripePrice(invite.planId);
   if (!price.ok) return { ok: false, error: price.error };
+  await attachReferrerFromInvite(invite.pharmacyId, options.referralCode);
 
-  const stripe = getStripe();
   const pharmacy = await prisma.pharmacy.findUniqueOrThrow({
     where: { id: invite.pharmacyId },
-    select: { name: true, email: true, addressLine1: true, addressLine2: true, postalCode: true, city: true, country: true, siret: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
+    select: { name: true, email: true, phone: true, addressLine1: true, addressLine2: true, postalCode: true, city: true, country: true, siret: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
   });
   const owner = pharmacy.memberships[0]?.user ?? null;
   const existing = await prisma.subscription.findUnique({ where: { organizationId: invite.organizationId }, select: { externalCustomerId: true } });
-
-  let customerId = invite.stripeCustomerId ?? existing?.externalCustomerId ?? null;
-  if (customerId) {
-    try {
-      const customer = await stripe.customers.retrieve(customerId);
-      if ("deleted" in customer && customer.deleted) customerId = null;
-    } catch {
-      customerId = null;
-    }
-  }
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      name: pharmacy.name,
-      email: invite.sentTo,
-      address: pharmacy.addressLine1 ? { line1: pharmacy.addressLine1, line2: pharmacy.addressLine2 ?? undefined, postal_code: pharmacy.postalCode ?? undefined, city: pharmacy.city ?? undefined, country: pharmacy.country || "FR" } : undefined,
-      metadata: { pharmacyId: invite.pharmacyId, organizationId: invite.organizationId, ownerName: owner ? `${owner.firstName} ${owner.lastName}` : "", siret: pharmacy.siret ?? "" },
-    });
-    customerId = customer.id;
-  }
+  const customerId = await ensureStripeCustomer(invite.stripeCustomerId ?? existing?.externalCustomerId ?? null, {
+    name: pharmacy.name,
+    email: invite.sentTo,
+    phone: pharmacy.phone,
+    address: pharmacy.addressLine1 ? { line1: pharmacy.addressLine1, line2: pharmacy.addressLine2, postalCode: pharmacy.postalCode, city: pharmacy.city, country: pharmacy.country } : null,
+    metadata: { pharmacyId: invite.pharmacyId, organizationId: invite.organizationId, ownerName: owner ? `${owner.firstName} ${owner.lastName}` : "", siret: pharmacy.siret ?? "" },
+  });
 
   // L'essai du contrat signé quand le lien en porte un (tel qu'imprimé), sinon celui de l'offre.
   const trialDays = invite.billedTrialDays;
   const trialEndsAt = trialEndDate(new Date(), trialDays);
-  const metadata = { pharmacyId: invite.pharmacyId, organizationId: invite.organizationId, planId: invite.planId, contractId: invite.contractId ?? "", inviteId: invite.id };
   const billedCents = invite.billedMonthlyPriceCents;
-  let lineItem: { price: string; quantity: number } | { price_data: { currency: string; product: string; unit_amount: number; recurring: { interval: "month" } }; quantity: number } = { price: price.priceId, quantity: 1 };
+  const setupFeeCents = invite.billedSetupFeeCents;
+  const metadata = { pharmacyId: invite.pharmacyId, organizationId: invite.organizationId, planId: invite.planId, contractId: invite.contractId ?? "", inviteId: invite.id, source: "INVITE", commitmentMonths: String(invite.commitmentMonths), setupFeeCents: String(setupFeeCents) };
+  let recurring: { priceId: string } | { productId: string; unitAmountCents: number; currency: string } = { priceId: price.priceId };
   if (invite.contractId && billedCents !== invite.catalogMonthlyPriceCents) {
     // Tarif contractuel : même produit Stripe que l'offre, montant du contrat.
     const plan = await prisma.plan.findUnique({ where: { id: invite.planId }, select: { stripeProductId: true, currency: true } });
     if (!plan?.stripeProductId) return { ok: false, error: "Le produit Stripe de l'offre est introuvable. Contactez-nous." };
-    lineItem = { price_data: { currency: plan.currency, product: plan.stripeProductId, unit_amount: billedCents, recurring: { interval: "month" } }, quantity: 1 };
+    recurring = { productId: plan.stripeProductId, unitAmountCents: billedCents, currency: plan.currency };
   }
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    customer: customerId,
-    customer_update: { address: "auto", name: "auto" },
-    line_items: [lineItem],
-    payment_method_collection: "always",
-    subscription_data: {
-      ...(trialDays > 0 ? { trial_period_days: trialDays, trial_settings: { end_behavior: { missing_payment_method: "cancel" } } } : {}),
+  const [taxRateId, setup] = await Promise.all([ensureVatTaxRate(), setupLineFor(invite.planId, setupFeeCents)]);
+  const session = await getStripe().checkout.sessions.create(
+    buildSubscriptionCheckout({
+      customerId,
+      recurring,
+      setup,
+      taxRateId,
+      trialDays,
       metadata,
+      clientReferenceId: invite.id,
       description: `Abonnement PharmaBoost — ${pharmacy.name}`,
-    },
-    metadata,
-    client_reference_id: invite.id,
-    locale: "fr",
-    allow_promotion_codes: false,
-    billing_address_collection: "required",
-    tax_id_collection: { enabled: true },
-    custom_text: {
-      submit: { message: trialSentence({ monthlyPriceCents: billedCents, trialDays, trialEndsAt }) },
-    },
-    success_url: publicUrl(`/abonnement/merci?session_id={CHECKOUT_SESSION_ID}`),
-    cancel_url: publicUrl(`/abonnement/activer/${token}`),
-    expires_at: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-  });
+      submitMessage: firstInvoiceSentence({ monthlyCents: billedCents, setupFeeCents, trialDays, trialEndsAt, commitmentMonths: invite.commitmentMonths }),
+      successUrl: publicUrl(`/abonnement/merci?session_id={CHECKOUT_SESSION_ID}`),
+      cancelUrl: publicUrl(`/abonnement/activer/${token}`),
+      expiresAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+    }),
+  );
   if (!session.url) return { ok: false, error: "Stripe n'a pas fourni d'adresse de paiement." };
   await prisma.subscriptionInvite.update({ where: { id: invite.id }, data: { stripeCustomerId: customerId, checkoutSessionId: session.id, checkoutCreatedAt: new Date() } });
   return { ok: true, url: session.url };
@@ -335,6 +370,11 @@ async function resolveOrganizationForSubscription(shape: SubscriptionShape): Pro
   if (shape.metadata.organizationId) {
     const org = await prisma.organization.findUnique({ where: { id: shape.metadata.organizationId }, select: { id: true } });
     if (org) return org.id;
+  }
+  if (shape.metadata.prospectId) {
+    // Souscription en ligne : l'officine naît du dossier à la fin du paiement ; avant, rien n'est rattaché.
+    const prospect = await prisma.prospect.findUnique({ where: { id: shape.metadata.prospectId }, select: { pharmacy: { select: { organizationId: true } } } });
+    if (prospect?.pharmacy) return prospect.pharmacy.organizationId;
   }
   if (shape.id) {
     const known = await prisma.subscription.findUnique({ where: { stripeSubscriptionId: shape.id }, select: { organizationId: true } });
@@ -423,6 +463,13 @@ export async function syncSubscriptionFromStripe(shape: SubscriptionShape): Prom
     contractPriceCents = initialContractPriceCents({ contractMonthlyPriceCents: founding?.monthlyPriceCents ?? null, planMonthlyPriceCents });
   }
 
+  // L'engagement et la mise en service se fixent à la naissance (métadonnées posées au Checkout) ; une fiche
+  // ancienne sans engagement le reçoit une fois. Ensuite, plus rien ne les déplace.
+  const commitmentMonths = commitmentMonthsFromMetadata(shape.metadata);
+  const commitmentStart = shape.startDate ?? shape.currentPeriodStart;
+  const fixCommitment = Boolean(commitmentMonths && commitmentStart && (born || !existing!.commitmentEndsAt));
+  const setupFeeCents = setupFeeFromMetadata(shape.metadata);
+
   const data = {
     planId,
     status: existing?.suspendedAt ? ("SUSPENDED" as const) : status,
@@ -440,6 +487,10 @@ export async function syncSubscriptionFromStripe(shape: SubscriptionShape): Prom
     nextInvoiceAt: status === "CANCELED" ? null : shape.currentPeriodEnd,
     contractId,
     ...(freeze ? { contractPriceCents } : {}),
+    ...(fixCommitment ? { commitmentMonths, commitmentEndsAt: commitmentEndDate(commitmentStart!, commitmentMonths!) } : {}),
+    ...((born || existing!.setupFeeCents === null) && setupFeeCents !== null ? { setupFeeCents } : {}),
+    // Un nouvel abonnement Stripe n'a encore aucune remise de parrainage : elle est reposée par la synchronisation.
+    ...(existing && otherSubscription ? { referralDiscountCents: null, referralCouponId: null, referralSyncedAt: null } : {}),
     // Un nouvel abonnement n'hérite pas de l'échec de paiement de l'ancien.
     ...(existing && otherSubscription ? { lastPaymentFailedAt: null } : {}),
   };
@@ -516,20 +567,29 @@ export async function refreshSubscriptionFromStripe(organizationId: string): Pro
 
 /** Après la première synchronisation d'un abonnement, prévenir le titulaire et la console. */
 export async function announceSubscriptionStarted(organizationId: string): Promise<void> {
-  const subscription = await prisma.subscription.findUnique({ where: { organizationId }, include: { plan: true, organization: { select: { pharmacies: { take: 1, select: { id: true, name: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } } } } } } });
+  const subscription = await prisma.subscription.findUnique({ where: { organizationId }, include: { plan: true, organization: { select: { pharmacies: { take: 1, orderBy: { createdAt: "asc" }, select: { id: true, name: true, setupStatus: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } } } } } } });
   const pharmacy = subscription?.organization.pharmacies[0];
   if (!subscription || !pharmacy) return;
   // Le tarif annoncé est le tarif contractuel de l'officine, jamais le catalogue du jour.
   const priceCents = contractualPrice(subscription, subscription.plan).cents;
+  // La mise en service payée avec le premier mois entre au suivi de la console : « à planifier ». Une seule fois.
+  const setupToSchedule = (subscription.setupFeeCents ?? 0) > 0 && pharmacy.setupStatus === null;
+  if (setupToSchedule) await prisma.pharmacy.updateMany({ where: { id: pharmacy.id, setupStatus: null }, data: { setupStatus: "TO_SCHEDULE" } });
   const owner = pharmacy.memberships[0]?.user;
   if (owner) {
-    const message = buildSubscriptionStartedEmail({ ownerName: `${owner.firstName} ${owner.lastName}`, pharmacyName: pharmacy.name, planName: subscription.plan.name, monthlyPriceCents: priceCents, trialEndsAt: subscription.trialEndsAt, appUrl: publicUrl("/") });
+    const message = buildSubscriptionStartedEmail({ ownerName: `${owner.firstName} ${owner.lastName}`, pharmacyName: pharmacy.name, planName: subscription.plan.name, monthlyPriceCents: priceCents, trialEndsAt: subscription.trialEndsAt, appUrl: publicUrl("/"), commitmentEndsAt: subscription.commitmentEndsAt, setupToSchedule });
     const outcome = await getMessagingProvider().sendEmail({ to: owner.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
     await traceDispatch({ kind: "SUBSCRIPTION_STARTED", recipient: owner.email, outcome, subject: message.subject, trigger: "SYSTEM", pharmacyId: pharmacy.id, organizationId });
     // Puis le guide : les cinq étapes pour mettre l'officine en service, sans visite.
     await sendInstallationGuide(pharmacy.id, { reason: "SUBSCRIPTION_STARTED" }).catch((error) => console.error("[abonnement] guide d'installation non envoyé", error));
   }
-  await notifyAdmins({ type: "SUBSCRIPTION_STARTED", title: `${pharmacy.name} : abonnement démarré`, body: `${subscription.plan.name} — ${formatEuros(priceCents)}/mois${subscription.trialEndsAt ? `, essai jusqu'au ${formatFrenchDate(subscription.trialEndsAt)}` : ""}.`, linkUrl: `/admin/abonnements/${pharmacy.id}`, severity: "SUCCESS" });
+  await notifyAdmins({ type: "SUBSCRIPTION_STARTED", title: `${pharmacy.name} : abonnement démarré`, body: `${subscription.plan.name} — ${formatEuros(priceCents)}/mois${subscription.trialEndsAt ? `, essai jusqu'au ${formatFrenchDate(subscription.trialEndsAt)}` : ""}${subscription.commitmentEndsAt ? `, engagement jusqu'au ${formatFrenchDate(subscription.commitmentEndsAt)}` : ""}.`, linkUrl: `/admin/abonnements/${pharmacy.id}`, severity: "SUCCESS" });
+  if (setupToSchedule) {
+    await notifyAdmins({ type: "SETUP_TO_SCHEDULE", title: `${pharmacy.name} : mise en service à planifier`, body: `Mise en service de ${formatEuros(subscription.setupFeeCents ?? 0)} HT réglée avec le premier mois. Appelez le titulaire pour fixer la date d'installation des postes.`, linkUrl: `/admin/abonnements/${pharmacy.id}`, severity: "WARNING" });
+  }
+  // Parrainage : un parrain peut avoir des filleuls déjà actifs ; ce nouvel abonné peut être le filleul de quelqu'un.
+  await syncReferralDiscountSafely(pharmacy.id, "démarrage de l'abonnement");
+  await syncReferrerOfOrganization(organizationId, "démarrage de l'abonnement du filleul");
   const prospect = await prisma.prospect.findUnique({ where: { pharmacyId: pharmacy.id }, select: { id: true, name: true, status: true, salesRepId: true } });
   if (!prospect) return;
   // Statut et première activation (date, commercial crédité) d'un seul bloc ; déjà activé : la date posée reste la première.
@@ -569,23 +629,41 @@ export async function createPortalSession(organizationId: string, returnPath: st
   const session = await getStripe().billingPortal.sessions.create({
     customer: subscription.externalCustomerId,
     return_url: publicUrl(returnPath),
-    ...(getEnv().STRIPE_PORTAL_CONFIGURATION_ID ? { configuration: getEnv().STRIPE_PORTAL_CONFIGURATION_ID } : {}),
+    // Moyen de paiement, factures, coordonnées : oui ; résiliation en libre-service : non (engagement de 12 mois).
+    configuration: await ensurePortalConfiguration(),
     locale: "fr",
   });
   return { ok: true, url: session.url };
 }
 
-/** Programme (ou annule) la résiliation à la fin de la période en cours. Décision de l'administrateur, tracée. */
-export async function setCancelAtPeriodEnd(organizationId: string, cancel: boolean, adminId: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const subscription = await prisma.subscription.findUnique({ where: { organizationId }, select: { id: true, stripeSubscriptionId: true, cancelAtPeriodEnd: true } });
+/**
+ * Programme (ou annule) la résiliation. Décision de l'administrateur, tracée.
+ *
+ * Engagement : une résiliation demandée pendant l'engagement prend effet à SA
+ * fin (`cancel_at` à la date d'engagement, qui tombe sur une échéance : aucun
+ * prorata), jamais avant ; après l'engagement, à la fin de la période payée.
+ * L'annulation retire l'une ou l'autre.
+ */
+export async function setCancelAtPeriodEnd(organizationId: string, cancel: boolean, adminId: string): Promise<{ ok: true; effectiveAt: Date | null; atCommitmentEnd: boolean } | { ok: false; error: string }> {
+  const subscription = await prisma.subscription.findUnique({ where: { organizationId }, select: { id: true, stripeSubscriptionId: true, cancelAtPeriodEnd: true, cancelAt: true, commitmentEndsAt: true, currentPeriodEnd: true } });
   if (!subscription?.stripeSubscriptionId) return { ok: false, error: "Aucun abonnement Stripe rattaché." };
   const state = stripeConfigState();
   if (!state.configured) return { ok: false, error: `Stripe n'est pas configuré : ${state.detail}` };
-  const updated = await getStripe().subscriptions.update(subscription.stripeSubscriptionId, { cancel_at_period_end: cancel });
+  const timing = cancellationTiming({ commitmentEndsAt: subscription.commitmentEndsAt, currentPeriodEnd: subscription.currentPeriodEnd, now: new Date() });
+  const params = cancel
+    ? timing.kind === "COMMITMENT_END"
+      ? { cancel_at: Math.floor(timing.at.getTime() / 1000), proration_behavior: "none" as const }
+      : { cancel_at_period_end: true }
+    : subscription.cancelAt && !subscription.cancelAtPeriodEnd
+      ? { cancel_at: "" as const }
+      : { cancel_at_period_end: false };
+  const updated = await getStripe().subscriptions.update(subscription.stripeSubscriptionId, params);
   const shape = readSubscription(updated);
   await syncSubscriptionFromStripe(shape);
   // L'officine est retrouvée côté serveur : le geste apparaît dans son historique.
   const pharmacy = await prisma.pharmacy.findFirst({ where: { organizationId }, orderBy: { createdAt: "asc" }, select: { id: true } });
+  const before = { cancelAtPeriodEnd: subscription.cancelAtPeriodEnd, cancelAt: subscription.cancelAt?.toISOString() ?? null };
+  const after = { cancelAtPeriodEnd: shape.cancelAtPeriodEnd, cancelAt: shape.cancelAt?.toISOString() ?? null };
   await recordAudit({
     action: cancel ? "billing.cancel_scheduled" : "billing.cancel_revoked",
     entityType: "Subscription",
@@ -595,12 +673,16 @@ export async function setCancelAtPeriodEnd(organizationId: string, cancel: boole
     metadata: {
       organizationId,
       subscriptionId: subscription.id,
-      before: { cancelAtPeriodEnd: subscription.cancelAtPeriodEnd },
-      after: { cancelAtPeriodEnd: shape.cancelAtPeriodEnd },
-      changes: subscription.cancelAtPeriodEnd !== shape.cancelAtPeriodEnd ? { cancelAtPeriodEnd: { from: subscription.cancelAtPeriodEnd, to: shape.cancelAtPeriodEnd } } : {},
+      before,
+      after,
+      ...(cancel ? { effect: timing.kind === "COMMITMENT_END" ? `fin de l'engagement (${formatFrenchDate(timing.at)})` : "fin de la période en cours" } : {}),
+      changes: {
+        ...(before.cancelAtPeriodEnd !== after.cancelAtPeriodEnd ? { cancelAtPeriodEnd: { from: before.cancelAtPeriodEnd, to: after.cancelAtPeriodEnd } } : {}),
+        ...(before.cancelAt !== after.cancelAt ? { cancelAt: { from: before.cancelAt, to: after.cancelAt } } : {}),
+      },
     },
   });
-  return { ok: true };
+  return { ok: true, effectiveAt: cancel ? (shape.cancelAt ?? timing.at) : null, atCommitmentEnd: cancel && timing.kind === "COMMITMENT_END" };
 }
 
 const RESTORABLE_STATUSES = new Set<string>(SUBSCRIPTION_STATUSES.filter((status) => status !== "SUSPENDED"));
@@ -668,6 +750,8 @@ export async function setAccessSuspended(pharmacyId: string, suspended: boolean,
       platformAdminId: adminId,
       metadata: { reason, previousStatus, ...(subscription ? { changes: { status: { from: subscription.status, to: "SUSPENDED" } } } : {}) },
     });
+    // Un filleul suspendu ne compte plus pour son parrain.
+    await syncReferrerOfOrganization(pharmacy.organizationId, "accès suspendu");
     return { ok: true };
   }
 
@@ -703,6 +787,7 @@ export async function setAccessSuspended(pharmacyId: string, suspended: boolean,
       ...(subscription && finalStatus !== subscription.status ? { changes: { status: { from: subscription.status, to: finalStatus } } } : {}),
     },
   });
+  await syncReferrerOfOrganization(pharmacy.organizationId, "accès rétabli");
   return { ok: true };
 }
 
@@ -710,7 +795,7 @@ export async function setAccessSuspended(pharmacyId: string, suspended: boolean,
 
 export type PharmacyBillingRow = Prisma.PharmacyGetPayload<{
   select: {
-    id: true; name: true; city: true; isActive: true; organizationId: true; createdAt: true;
+    id: true; name: true; city: true; isActive: true; organizationId: true; createdAt: true; setupStatus: true; setupScheduledAt: true; setupDoneAt: true;
     organization: { select: { subscription: { include: { plan: true; payments: { orderBy: { createdAt: "desc" }; take: 1 } } } } };
     contracts: { orderBy: { version: "desc" }; take: 1; select: { id: true; status: true; version: true; sentAt: true; finalizedAt: true; monthlyPriceCents: true; trialDays: true; plan: { select: { name: true } } } };
     prospect: { select: { id: true; contracts: { orderBy: { version: "desc" }; take: 1; select: { id: true; status: true; version: true; sentAt: true; finalizedAt: true; monthlyPriceCents: true; trialDays: true; plan: { select: { name: true } } } } } };
@@ -720,7 +805,7 @@ export type PharmacyBillingRow = Prisma.PharmacyGetPayload<{
 }>;
 
 export const PHARMACY_BILLING_SELECT = {
-  id: true, name: true, city: true, isActive: true, organizationId: true, createdAt: true,
+  id: true, name: true, city: true, isActive: true, organizationId: true, createdAt: true, setupStatus: true, setupScheduledAt: true, setupDoneAt: true,
   organization: { select: { subscription: { include: { plan: true, payments: { orderBy: { createdAt: "desc" as const }, take: 1 } } } } },
   contracts: { orderBy: { version: "desc" as const }, take: 1, select: { id: true, status: true, version: true, sentAt: true, finalizedAt: true, monthlyPriceCents: true, trialDays: true, plan: { select: { name: true } } } },
   prospect: { select: { id: true, contracts: { orderBy: { version: "desc" as const }, take: 1, select: { id: true, status: true, version: true, sentAt: true, finalizedAt: true, monthlyPriceCents: true, trialDays: true, plan: { select: { name: true } } } } } },

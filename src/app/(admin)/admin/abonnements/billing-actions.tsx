@@ -19,8 +19,11 @@ export function SubscriptionAdminActions({
   subscriptionOngoing,
   cancelAtPeriodEnd,
   periodEndLabel,
+  commitmentEndLabel = null,
+  cancelEndLabel = null,
   isActive,
   inviteSummary,
+  inviteSetupLabel = null,
 }: {
   pharmacyId: string;
   pharmacyName: string;
@@ -31,9 +34,15 @@ export function SubscriptionAdminActions({
   subscriptionOngoing: boolean;
   cancelAtPeriodEnd: boolean;
   periodEndLabel: string | null;
+  /** L'engagement court jusqu'à cette date : une résiliation prend effet à cette date, jamais avant. */
+  commitmentEndLabel?: string | null;
+  /** La fin déjà programmée (fin d'engagement ou de période). */
+  cancelEndLabel?: string | null;
   isActive: boolean;
   /** Ce que proposera le lien d'activation (offre, tarif) ; nul : rien à proposer. */
   inviteSummary: string | null;
+  /** La mise en service que le lien ajoutera à la première facture (« 290 € HT ») ; nul : aucune. */
+  inviteSetupLabel?: string | null;
 }) {
   const stripeHint = !stripeConfigured ? "Stripe non configuré." : !hasStripeSubscription ? "Aucun abonnement Stripe rattaché." : null;
 
@@ -55,7 +64,15 @@ export function SubscriptionAdminActions({
       {hasStripeSubscription && subscriptionOngoing && (
         <Row
           title={cancelAtPeriodEnd ? "Fin programmée chez Stripe" : "Résilier en fin de période"}
-          description={!stripeConfigured ? "Stripe non configuré." : cancelAtPeriodEnd ? `L'abonnement s'arrêtera${periodEndLabel ? ` le ${periodEndLabel}` : " à la fin de la période"}. Vous pouvez encore l'annuler.` : "Programme l'arrêt de l'abonnement Stripe à la fin de la période en cours."}
+          description={
+            !stripeConfigured
+              ? "Stripe non configuré."
+              : cancelAtPeriodEnd
+                ? `L'abonnement s'arrêtera${cancelEndLabel ?? periodEndLabel ? ` le ${cancelEndLabel ?? periodEndLabel}` : " à la fin de la période"}. Vous pouvez encore l'annuler.`
+                : commitmentEndLabel
+                  ? `Engagement jusqu'au ${commitmentEndLabel} : une résiliation prendra effet à cette date, pas avant.`
+                  : "Programme l'arrêt de l'abonnement Stripe à la fin de la période en cours."
+          }
         >
           {cancelAtPeriodEnd ? (
             <ConfirmAction
@@ -72,10 +89,14 @@ export function SubscriptionAdminActions({
               label="Programmer la fin"
               icon={<CalendarX2 className="size-4" />}
               tone="danger"
-              title="Programmer la résiliation en fin de période"
-              description={`L'abonnement Stripe de ${pharmacyName} s'arrêtera à la fin de la période en cours.`}
+              title={commitmentEndLabel ? "Programmer la résiliation à la fin de l'engagement" : "Programmer la résiliation en fin de période"}
+              description={commitmentEndLabel ? `L'abonnement Stripe de ${pharmacyName} s'arrêtera à la fin de son engagement, le ${commitmentEndLabel}.` : `L'abonnement Stripe de ${pharmacyName} s'arrêtera à la fin de la période en cours.`}
               consequences={[
-                periodEndLabel ? `Fin de l'abonnement le ${periodEndLabel} ; aucun prélèvement après cette date.` : "Fin de l'abonnement à la fin de la période en cours ; aucun prélèvement ensuite.",
+                commitmentEndLabel
+                  ? `Fin de l'abonnement le ${commitmentEndLabel} ; les prélèvements continuent jusque-là (engagement), aucun ensuite.`
+                  : periodEndLabel
+                    ? `Fin de l'abonnement le ${periodEndLabel} ; aucun prélèvement après cette date.`
+                    : "Fin de l'abonnement à la fin de la période en cours ; aucun prélèvement ensuite.",
                 "L'accès reste ouvert jusque-là ; aucune donnée n'est supprimée.",
                 "Le geste est annulable tant que la date n'est pas passée.",
               ]}
@@ -95,11 +116,25 @@ export function SubscriptionAdminActions({
             icon={<Link2 className="size-4" />}
             title="Envoyer le lien d'activation"
             description="Le titulaire reçoit par e-mail un lien vers le paiement sécurisé Stripe."
-            consequences={[inviteSummary, "Un lien déjà envoyé et non utilisé est remplacé par le nouveau.", "Le lien est valable 30 jours ; l'abonnement démarre quand le titulaire l'a validé."]}
+            consequences={[inviteSummary, inviteSetupLabel ? `Mise en service de ${inviteSetupLabel} ajoutée à la première facture, avec le premier mois.` : "Aucune mise en service sur la première facture.", "Un lien déjà envoyé et non utilisé est remplacé par le nouveau.", "Le lien est valable 30 jours ; l'abonnement démarre quand le titulaire l'a validé."]}
             confirmLabel="Envoyer le lien"
             disabled={!stripeConfigured}
             onConfirm={() => sendSubscriptionInviteAction({ pharmacyId })}
           />
+          {inviteSetupLabel && (
+            <div className="mt-2">
+              <ConfirmAction
+                label="Sans mise en service"
+                variant="ghost"
+                title="Envoyer le lien, mise en service offerte"
+                description="Même lien, sans la mise en service sur la première facture."
+                consequences={[inviteSummary, `La mise en service (${inviteSetupLabel}) est offerte : la première facture ne porte que le premier mois.`, "Un lien déjà envoyé et non utilisé est remplacé par le nouveau."]}
+                confirmLabel="Envoyer sans mise en service"
+                disabled={!stripeConfigured}
+                onConfirm={() => sendSubscriptionInviteAction({ pharmacyId, waiveSetup: true })}
+              />
+            </div>
+          )}
         </Row>
       )}
 

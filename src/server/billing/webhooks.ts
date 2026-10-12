@@ -13,6 +13,8 @@ import { describeEvent } from "@/core/billing/webhook-summary";
 import { buildPaymentFailedEmail, buildTrialEndingEmail } from "@/core/platform/billing-emails";
 import { salesRepsOfOrganization, syncProgressiveCommissionsSafely } from "@/server/services/sales/progressive-commissions";
 import { announceSubscriptionStarted, syncSubscriptionFromStripe } from "./subscriptions";
+import { completeSelfServiceCheckout } from "./self-service";
+import { syncReferrerOfOrganization } from "./referral-discount";
 import { getStripe } from "./stripe-client";
 
 /**
@@ -26,6 +28,8 @@ import { getStripe } from "./stripe-client";
 
 export const HANDLED_EVENT_TYPES = [
   "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "checkout.session.async_payment_failed",
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
@@ -57,7 +61,16 @@ async function ownerOfOrganization(organizationId: string) {
 }
 
 async function recordInvoice(event: Stripe.Event): Promise<string | null> {
-  const shape = readInvoice(event.data.object);
+  return recordInvoiceObject(event.data.object, event.type, event.created);
+}
+
+/**
+ * Enregistre une facture Stripe (paiement, échec) sur l'abonnement de l'officine.
+ * Appelée par les webhooks de facture, et au rattrapage d'une souscription en
+ * ligne dont les factures ont pu arriver avant que l'officine existe.
+ */
+async function recordInvoiceObject(invoice: unknown, eventType: string, createdSeconds: number): Promise<string | null> {
+  const shape = readInvoice(invoice);
   if (!shape.id) return null;
   let subscription = shape.subscriptionId ? await prisma.subscription.findUnique({ where: { stripeSubscriptionId: shape.subscriptionId } }) : null;
   if (!subscription && shape.subscriptionId) {
@@ -70,7 +83,7 @@ async function recordInvoice(event: Stripe.Event): Promise<string | null> {
   }
   if (!subscription) return null;
   const status = paymentStatusFromInvoice(shape.status, shape.amountPaidCents);
-  const failed = event.type === "invoice.payment_failed" || event.type === "invoice.payment_action_required";
+  const failed = eventType === "invoice.payment_failed" || eventType === "invoice.payment_action_required";
   const data = {
     subscriptionId: subscription.id,
     organizationId: subscription.organizationId,
@@ -81,14 +94,14 @@ async function recordInvoice(event: Stripe.Event): Promise<string | null> {
     periodStart: shape.periodStart,
     periodEnd: shape.periodEnd,
     paidAt: shape.paidAt,
-    failedAt: failed ? new Date(event.created * 1000) : undefined,
+    failedAt: failed ? new Date(createdSeconds * 1000) : undefined,
     attemptCount: shape.attemptCount,
     hostedInvoiceUrl: shape.hostedInvoiceUrl,
     invoicePdfUrl: shape.invoicePdfUrl,
   };
   await prisma.billingPayment.upsert({ where: { stripeInvoiceId: shape.id }, create: data, update: data });
   if (status === "PAID" && shape.amountPaidCents > 0) {
-    await prisma.subscription.update({ where: { id: subscription.id }, data: { lastPaymentAt: shape.paidAt ?? new Date(event.created * 1000), lastPaymentCents: shape.amountPaidCents } });
+    await prisma.subscription.update({ where: { id: subscription.id }, data: { lastPaymentAt: shape.paidAt ?? new Date(createdSeconds * 1000), lastPaymentCents: shape.amountPaidCents } });
   }
   // Un paiement reçu peut être le PREMIER de l'officine : le bonus de palier qui l'attendait devient acquis. Même critère
   // que le recalcul (`FIRST_PAYMENT` : payée, datée, montant enregistré non nul) : jamais un paiement que l'un compte et
@@ -96,9 +109,11 @@ async function recordInvoice(event: Stripe.Event): Promise<string | null> {
   if (data.status === "PAID" && data.paidAt && data.amountCents > 0) {
     const repIds = await salesRepsOfOrganization(subscription.organizationId).catch(() => [] as string[]);
     for (const repId of repIds) await syncProgressiveCommissionsSafely(repId, "paiement reçu");
+    // Un filleul qui paie (son premier prélèvement SEPA confirmé, par exemple) fait baisser le prix de son parrain.
+    await syncReferrerOfOrganization(subscription.organizationId, "paiement du filleul");
   }
   if (failed) {
-    await prisma.subscription.update({ where: { id: subscription.id }, data: { lastPaymentFailedAt: new Date(event.created * 1000) } });
+    await prisma.subscription.update({ where: { id: subscription.id }, data: { lastPaymentFailedAt: new Date(createdSeconds * 1000) } });
     const found = await ownerOfOrganization(subscription.organizationId);
     if (found?.owner) {
       const message = buildPaymentFailedEmail({ ownerName: `${found.owner.firstName} ${found.owner.lastName}`, pharmacyName: found.pharmacy.name, amountCents: shape.amountDueCents, nextAttemptAt: shape.nextPaymentAttempt, manageUrl: publicUrl("/parametres?onglet=abonnement") });
@@ -130,15 +145,27 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<WebhookOut
   let handled = true;
   try {
     switch (event.type) {
-      case "checkout.session.completed": {
+      case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded": {
         const session = readCheckoutSession(event.data.object);
+        // Souscription en ligne : l'espace PharmaBoost naît du dossier avant que l'abonnement s'y rattache.
+        await completeSelfServiceCheckout(session);
         if (session.subscriptionId) {
           const stripeSubscription = await getStripe().subscriptions.retrieve(session.subscriptionId);
           const synced = await syncSubscriptionFromStripe(readSubscription(stripeSubscription));
           organizationId = synced?.organizationId ?? null;
           if (synced?.created) await announceSubscriptionStarted(synced.organizationId);
+          // Les factures arrivées avant le rattachement (souscription en ligne) sont reprises : aucun paiement perdu.
+          if (synced) await backfillInvoices(session.subscriptionId, event.created);
         }
-        if (session.clientReferenceId) await prisma.subscriptionInvite.updateMany({ where: { id: session.clientReferenceId, completedAt: null }, data: { completedAt: new Date(), checkoutSessionId: session.id ?? undefined } });
+        if (session.clientReferenceId && session.metadata.source !== "SELF_SERVICE") await prisma.subscriptionInvite.updateMany({ where: { id: session.clientReferenceId, completedAt: null }, data: { completedAt: new Date(), checkoutSessionId: session.id ?? undefined } });
+        break;
+      }
+      case "checkout.session.async_payment_failed": {
+        const session = readCheckoutSession(event.data.object);
+        organizationId = await organizationForCustomer(session.customerId);
+        const found = organizationId ? await ownerOfOrganization(organizationId) : null;
+        await notifyAdmins({ type: "PAYMENT_FAILED", title: `${found?.pharmacy.name ?? "Souscription en ligne"} : premier prélèvement rejeté`, body: "Le prélèvement SEPA de la souscription a été rejeté par la banque. L'abonnement suit le chemin des impayés ; contactez le titulaire avant la mise en service.", linkUrl: found ? `/admin/abonnements/${found.pharmacy.id}` : "/admin/abonnements", severity: "WARNING" });
         break;
       }
       case "customer.subscription.created":
@@ -149,6 +176,8 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<WebhookOut
         const synced = await syncSubscriptionFromStripe(readSubscription(event.data.object));
         organizationId = synced?.organizationId ?? null;
         if (synced?.created) await announceSubscriptionStarted(synced.organizationId);
+        // Un filleul qui ne paie plus, résilie ou repart : la remise de son parrain est recalculée.
+        else if (synced?.statusChanged) await syncReferrerOfOrganization(synced.organizationId, `abonnement du filleul : ${event.type}`);
         if (event.type === "customer.subscription.deleted" && organizationId) {
           const found = await ownerOfOrganization(organizationId);
           if (found) await notifyAdmins({ type: "SUBSCRIPTION_CANCELED", title: `${found.pharmacy.name} : abonnement résilié`, body: "L'abonnement Stripe est terminé.", linkUrl: `/admin/abonnements/${found.pharmacy.id}`, severity: "WARNING" });
@@ -199,5 +228,17 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<WebhookOut
   } catch (error) {
     await prisma.billingEvent.update({ where: { stripeEventId: event.id }, data: { error: error instanceof Error ? error.message : String(error) } });
     throw error;
+  }
+}
+
+/** Les dernières factures d'un abonnement, relues chez Stripe et enregistrées (idempotent : une facture par identifiant). */
+async function backfillInvoices(subscriptionId: string, createdSeconds: number): Promise<void> {
+  try {
+    const invoices = await getStripe().invoices.list({ subscription: subscriptionId, limit: 10 });
+    for (const invoice of invoices.data) {
+      if (invoice.status === "paid" || invoice.status === "open") await recordInvoiceObject(invoice, invoice.status === "paid" ? "invoice.paid" : "invoice.finalized", createdSeconds);
+    }
+  } catch (error) {
+    console.error("[stripe] reprise des factures impossible", error instanceof Error ? error.message : error);
   }
 }

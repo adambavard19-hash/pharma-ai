@@ -5,6 +5,8 @@ import { headers } from "next/headers";
 import { receiveSiteLead } from "@/server/services/site-leads";
 import { confirmSubscription, normalizeSubscriptionRequest, requestSubscription, type SubscriptionRequestOutcome } from "@/server/services/subscription-requests";
 import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
+import { SELF_SERVICE_TERMS_VERSION, selfServiceAvailability, startSelfServiceCheckout } from "@/server/billing/self-service";
+import { notifyAdmins } from "@/server/services/sales/notifications";
 import { siteLeadSchema, type SiteLeadPayload } from "@/core/site/lead-form";
 import { fail, ok, type ActionResult } from "./types";
 
@@ -78,6 +80,9 @@ const subscriptionSchema = z.object({
     .optional(),
   /** Confirmation explicite de la demande de souscription. */
   confirm: z.literal(true, { message: "Confirmez votre demande de souscription." }),
+  /** Souscription en ligne : payer maintenant ; exige l'acceptation des conditions d'abonnement. */
+  payOnline: z.boolean().optional(),
+  acceptTerms: z.boolean().optional(),
   website: z.string().max(500).optional(),
 });
 
@@ -88,11 +93,12 @@ const subscriptionSchema = z.object({
  * depuis la console. Le confrère à parrainer, s'il est indiqué, est enregistré et
  * contacté par l'équipe : rien ne lui est envoyé.
  */
-export async function submitSubscriptionRequestAction(payload: z.input<typeof subscriptionSchema>): Promise<ActionResult<{ outcome: SubscriptionRequestOutcome["status"] }>> {
+export async function submitSubscriptionRequestAction(payload: z.input<typeof subscriptionSchema>): Promise<ActionResult<{ outcome: SubscriptionRequestOutcome["status"]; checkoutUrl?: string }>> {
   const parsed = subscriptionSchema.safeParse(payload);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Vérifiez le formulaire.");
   const input = parsed.data;
   if (input.website) return ok({ outcome: "RECEIVED" });
+  if (input.payOnline && input.acceptTerms !== true) return fail("Acceptez les conditions d'abonnement pour passer au paiement.", { acceptTerms: "À cocher pour continuer." });
   const request = {
     pharmacyName: input.pharmacyName,
     legalName: input.legalName,
@@ -118,8 +124,18 @@ export async function submitSubscriptionRequestAction(payload: z.input<typeof su
   // Limite par adresse IP et par adresse e-mail, quel que soit le SIRET saisi (mémoire de l'instance).
   if (throttled(`souscription-ip:${ip}`) || throttled(`souscription-email:${checked.value.email}`)) return fail(`Nous avons déjà reçu plusieurs demandes : notre équipe revient vers vous. Pour toute urgence, écrivez à ${PUBLIC_CONTACT_EMAIL}.`);
   try {
-    const result = await requestSubscription(request);
+    // Le paiement en ligne n'est proposé que si Stripe et l'offre du site sont prêts ; sinon la demande suit le chemin habituel.
+    const availability = input.payOnline ? await selfServiceAvailability() : null;
+    const selfService = availability?.available ? { termsAcceptedAt: new Date(), termsVersion: SELF_SERVICE_TERMS_VERSION, planId: availability.planId } : null;
+    const result = await requestSubscription(selfService ? { ...request, planId: selfService.planId } : request, selfService);
     if (!result.ok) return fail("Certaines informations sont à corriger.", result.errors);
+    if (result.outcome.status === "CHECKOUT" && result.outcome.prospectId) {
+      const checkout = await startSelfServiceCheckout(result.outcome.prospectId).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : String(error) }));
+      if (checkout.ok) return ok({ outcome: "CHECKOUT", checkoutUrl: checkout.url });
+      console.error("[site] paiement en ligne impossible", checkout.error);
+      await notifyAdmins({ type: "DOSSIER_BLOCKED", title: "Paiement en ligne non ouvert", body: `Le dossier est créé, mais la page de paiement Stripe n'a pas pu s'ouvrir (${checkout.error}). Reprenez la souscription depuis le dossier.`, linkUrl: `/admin/dossiers/${result.outcome.prospectId}`, severity: "WARNING" });
+      return ok({ outcome: "RECEIVED" });
+    }
     return ok({ outcome: result.outcome.status });
   } catch (error) {
     console.error("[site] souscription impossible", error);

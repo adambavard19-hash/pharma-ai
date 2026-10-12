@@ -1,3 +1,4 @@
+import { firstInvoiceSentence } from "@/core/billing/checkout";
 import { escapeHtml } from "@/core/documents/email";
 import { button, dateTime, shell } from "./sales-emails";
 import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
@@ -17,13 +18,23 @@ export function buildSubscriptionInviteEmail(v: {
   url: string;
   expiresAt: Date;
   contactEmail: string;
+  /** Mise en service ajoutée à la première facture (0 ou absent : aucune). */
+  setupFeeCents?: number;
+  commitmentMonths?: number | null;
 }): { subject: string; text: string; html: string } {
-  const offer = v.trialDays > 0 ? `${v.trialDays === 30 || v.trialDays === 31 ? "Premier mois offert" : `${v.trialDays} jours offerts`}, puis ${formatEuros(v.monthlyPriceCents)} HT par mois.` : `${formatEuros(v.monthlyPriceCents)} HT par mois.`;
+  const setup = v.setupFeeCents ?? 0;
+  const offer =
+    setup > 0 || v.commitmentMonths
+      ? firstInvoiceSentence({ monthlyCents: v.monthlyPriceCents, setupFeeCents: setup, trialDays: v.trialDays, commitmentMonths: v.commitmentMonths ?? null })
+      : v.trialDays > 0
+        ? `${v.trialDays === 30 || v.trialDays === 31 ? "Premier mois offert" : `${v.trialDays} jours offerts`}, puis ${formatEuros(v.monthlyPriceCents)} HT par mois.`
+        : `${formatEuros(v.monthlyPriceCents)} HT par mois.`;
+  const trialNote = v.trialDays > 0 ? "Aucun débit d'abonnement pendant la période gratuite." : "Paiement par prélèvement SEPA ou par carte, au choix. Montants hors taxes, TVA 20 % en sus.";
   const text = [
     `Bonjour ${v.ownerName},`,
     "",
     `Votre espace PharmaBoost pour ${v.pharmacyName} est prêt. Il ne reste qu'à activer votre abonnement « ${v.planName} » : ${offer}`,
-    "Aucun débit pendant la période gratuite ; vous pouvez arrêter avant la fin de l'essai.",
+    trialNote,
     "",
     `Activer mon abonnement : ${v.url}`,
     "",
@@ -35,14 +46,15 @@ export function buildSubscriptionInviteEmail(v: {
   const html = shell(
     `Activez votre abonnement PharmaBoost — ${v.pharmacyName}`,
     "Activez votre abonnement",
-    `<p style="margin:0;font-size:18px;line-height:26px;font-weight:600">Bonjour ${escapeHtml(v.ownerName)},</p><p style="margin:12px 0 0;font-size:16px;line-height:25px;color:#374151">Votre espace PharmaBoost pour <strong>${escapeHtml(v.pharmacyName)}</strong> est prêt. Il ne reste qu'à activer votre abonnement « ${escapeHtml(v.planName)} » : <strong>${escapeHtml(offer)}</strong></p><p style="margin:10px 0 0;font-size:15px;line-height:23px;color:#374151">Aucun débit pendant la période gratuite ; vous pouvez arrêter avant la fin de l'essai.</p>${button(v.url, "Activer mon abonnement", "#0F766E")}<p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Ce lien est personnel et reste valable jusqu'au ${escapeHtml(dateTime(v.expiresAt))}. Le paiement est sécurisé par Stripe : PharmaBoost ne voit ni ne conserve votre numéro de carte.<br>Une question ? ${escapeHtml(v.contactEmail)}</p>`,
+    `<p style="margin:0;font-size:18px;line-height:26px;font-weight:600">Bonjour ${escapeHtml(v.ownerName)},</p><p style="margin:12px 0 0;font-size:16px;line-height:25px;color:#374151">Votre espace PharmaBoost pour <strong>${escapeHtml(v.pharmacyName)}</strong> est prêt. Il ne reste qu'à activer votre abonnement « ${escapeHtml(v.planName)} » : <strong>${escapeHtml(offer)}</strong></p><p style="margin:10px 0 0;font-size:15px;line-height:23px;color:#374151">${escapeHtml(trialNote)}</p>${button(v.url, "Activer mon abonnement", "#0F766E")}<p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Ce lien est personnel et reste valable jusqu'au ${escapeHtml(dateTime(v.expiresAt))}. Le paiement est sécurisé par Stripe : PharmaBoost ne voit ni ne conserve votre numéro de carte.<br>Une question ? ${escapeHtml(v.contactEmail)}</p>`,
     "#0F766E",
   );
   return { subject: `Activez votre abonnement PharmaBoost — ${v.pharmacyName}`, text, html };
 }
 
-export function buildSubscriptionStartedEmail(v: { ownerName: string; pharmacyName: string; planName: string; monthlyPriceCents: number; trialEndsAt: Date | null; appUrl: string }): { subject: string; text: string; html: string } {
-  const next = v.trialEndsAt ? `Votre premier mois est offert : le premier prélèvement de ${formatEuros(v.monthlyPriceCents)} HT aura lieu le ${formatFrenchDate(v.trialEndsAt)}.` : `Votre abonnement de ${formatEuros(v.monthlyPriceCents)} HT par mois est actif.`;
+export function buildSubscriptionStartedEmail(v: { ownerName: string; pharmacyName: string; planName: string; monthlyPriceCents: number; trialEndsAt: Date | null; appUrl: string; commitmentEndsAt?: Date | null; setupToSchedule?: boolean }): { subject: string; text: string; html: string } {
+  const base = v.trialEndsAt ? `Votre premier mois est offert : le premier prélèvement de ${formatEuros(v.monthlyPriceCents)} HT aura lieu le ${formatFrenchDate(v.trialEndsAt)}.` : `Votre abonnement de ${formatEuros(v.monthlyPriceCents)} HT par mois est actif.`;
+  const next = [base, v.commitmentEndsAt ? `Engagement jusqu'au ${formatFrenchDate(v.commitmentEndsAt)}.` : null, v.setupToSchedule ? "Notre équipe vous contacte pour planifier la mise en service de vos postes." : null].filter(Boolean).join(" ");
   const text = [`Bonjour ${v.ownerName},`, "", `Votre abonnement PharmaBoost « ${v.planName} » pour ${v.pharmacyName} est activé. ${next}`, "", `Ouvrir PharmaBoost : ${v.appUrl}`, "", "Vous pouvez gérer votre moyen de paiement et vos factures depuis Paramètres → Mon abonnement.", "", "PharmaBoost"].join("\n");
   const html = shell(
     `Abonnement activé — ${v.pharmacyName}`,

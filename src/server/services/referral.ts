@@ -1,7 +1,7 @@
 import { prisma } from "@/server/db/client";
 import { publicUrl } from "@/server/public-url";
 import { randomBytes } from "node:crypto";
-import { normalizeReferralCode, referralBenefit, referralOfferAmountFor, type ReferralBenefit } from "@/core/billing/referral";
+import { isActiveReferral, normalizeReferralCode, referralBenefit, referralOfferAmountFor, type ReferralBenefit } from "@/core/billing/referral";
 import { contractualPrice } from "@/core/billing/contract-price";
 import { activeReferralOffer } from "@/server/services/referral-offers";
 
@@ -16,9 +16,9 @@ export { normalizeReferralCode };
  * La règle vit dans core/billing/referral. Seule exception : le montant par
  * filleul d'une offre de parrainage de la console, figé sur la fiche du filleul
  * à son inscription ; le parrain a alors le plus avantageux des deux. La remise
- * est calculée et affichée ici, l'écran du titulaire et la console lisent le même
- * calcul ; elle est appliquée à l'abonnement par l'équipe PharmaBoost (aucune
- * remise Stripe n'est créée).
+ * est calculée ici (`referralState`) : l'écran du titulaire, la console et la
+ * synchronisation Stripe (`server/billing/referral-discount.ts`) lisent le même
+ * calcul.
  */
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -65,31 +65,50 @@ export type ReferralSummary = {
   referredBy: string | null;
 };
 
-/** Ce que le titulaire voit : son code, son lien, ses filleuls, et ce que ça lui fait gagner. */
-export async function referralSummary(pharmacyId: string): Promise<ReferralSummary> {
-  const code = await ensureReferralCode(pharmacyId);
+const FILLEUL_SELECT = {
+  name: true,
+  city: true,
+  isActive: true,
+  createdAt: true,
+  referralAmountCents: true,
+  organization: { select: { subscription: { select: { status: true, stripeSubscriptionId: true, lastPaymentAt: true } } } },
+} as const;
+
+/**
+ * Les filleuls d'une officine et la remise qu'ils lui valent aujourd'hui, plafonnée
+ * par son tarif contractuel (ce qu'elle paie), jamais par le catalogue. Une seule
+ * lecture pour l'écran du titulaire, la console et Stripe.
+ */
+export async function referralState(pharmacyId: string) {
   const pharmacy = await prisma.pharmacy.findUniqueOrThrow({
     where: { id: pharmacyId },
     select: {
       referredBy: { select: { name: true } },
-      referrals: { orderBy: { createdAt: "asc" }, select: { name: true, city: true, isActive: true, createdAt: true, referralAmountCents: true, organization: { select: { subscription: { select: { status: true } } } } } },
+      referrals: { orderBy: { createdAt: "asc" }, select: FILLEUL_SELECT },
       organization: { select: { subscription: { select: { contractPriceCents: true, plan: { select: { monthlyPriceCents: true } } } } } },
     },
   });
-  const referrals = pharmacy.referrals.map((r) => ({
-    name: r.name,
-    city: r.city,
-    // Un filleul compte quand son officine est active ; l'abonnement, s'il est suivi, doit l'être aussi.
-    active: r.isActive && (!r.organization.subscription || ["TRIALING", "ACTIVE", "PAST_DUE"].includes(r.organization.subscription.status)),
-    since: r.createdAt,
-    offerAmountCents: referralOfferAmountFor(r),
-  }));
-  // Le plafond de la remise est le tarif contractuel de l'officine (ce qu'elle paie), pas le prix catalogue de l'offre.
+  const referrals = pharmacy.referrals.map((r) => {
+    const sub = r.organization.subscription;
+    return {
+      name: r.name,
+      city: r.city,
+      active: isActiveReferral({ pharmacyActive: r.isActive, subscription: sub ? { status: sub.status, stripeLinked: Boolean(sub.stripeSubscriptionId), hasPayment: Boolean(sub.lastPaymentAt) } : null }),
+      since: r.createdAt,
+      offerAmountCents: referralOfferAmountFor(r),
+    };
+  });
   const subscription = pharmacy.organization.subscription;
   const monthlyPriceCents = subscription ? contractualPrice(subscription, subscription.plan).cents : null;
-  const offer = await activeReferralOffer();
-  // 20 % dès un filleul actif, ou la somme des montants d'offre si elle est plus avantageuse : ce que l'équipe applique.
+  // 20 % dès un filleul actif, ou la somme des montants d'offre si elle est plus avantageuse.
   const benefit = referralBenefit(referrals, monthlyPriceCents);
+  return { referrals, monthlyPriceCents, benefit, referredBy: pharmacy.referredBy?.name ?? null };
+}
+
+/** Ce que le titulaire voit : son code, son lien, ses filleuls, et ce que ça lui fait gagner. */
+export async function referralSummary(pharmacyId: string): Promise<ReferralSummary> {
+  const code = await ensureReferralCode(pharmacyId);
+  const [{ referrals, monthlyPriceCents, benefit, referredBy }, offer] = await Promise.all([referralState(pharmacyId), activeReferralOffer()]);
   return {
     code,
     link: publicUrl(`/decouvrir/abonnement?parrain=${encodeURIComponent(code)}`),
@@ -99,6 +118,6 @@ export async function referralSummary(pharmacyId: string): Promise<ReferralSumma
     activeCount: referrals.filter((r) => r.active).length,
     discountCents: benefit.discountCents,
     discountBasis: benefit.basis,
-    referredBy: pharmacy.referredBy?.name ?? null,
+    referredBy,
   };
 }

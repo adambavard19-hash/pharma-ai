@@ -29,6 +29,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/feedback";
 import { SettingsTabs } from "./settings-tabs";
+import { ManageSubscriptionButton } from "./manage-subscription-button";
 import { ReferralCard } from "./referral-card";
 import { referralSummary } from "@/server/services/referral";
 import { SUBSCRIPTION_STATUS_LABELS, type SubscriptionStatusCode } from "@/core/billing/subscription";
@@ -65,7 +66,7 @@ export default async function SettingsPage({
     }),
     prisma.subscription.findUnique({
       where: { organizationId: session.scope.organizationId },
-      include: { plan: true },
+      include: { plan: true, payments: { where: { status: { in: ["PAID", "OPEN", "FAILED"] } }, orderBy: { createdAt: "desc" }, take: 6, select: { id: true, status: true, amountCents: true, paidAt: true, createdAt: true, hostedInvoiceUrl: true, invoicePdfUrl: true } } },
     }),
     session.permissions.has(PERMISSIONS.AUDIT_VIEW)
       ? prisma.auditLog.findMany({
@@ -118,6 +119,10 @@ export default async function SettingsPage({
                   cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
                   cancelAt: subscription.cancelAt?.toISOString() ?? null,
                   stripeLinked: Boolean(subscription.externalCustomerId),
+                  commitmentEndsAt: subscription.commitmentEndsAt?.toISOString() ?? null,
+                  setupFeeCents: subscription.setupFeeCents,
+                  referralDiscountCents: subscription.referralDiscountCents,
+                  invoices: subscription.payments.map((p) => ({ id: p.id, status: p.status, amountCents: p.amountCents, date: (p.paidAt ?? p.createdAt).toISOString(), url: p.hostedInvoiceUrl ?? p.invoicePdfUrl })),
                 }
               : null
           }
@@ -538,6 +543,10 @@ function SubscriptionSettings({
     cancelAtPeriodEnd: boolean;
     cancelAt: string | null;
     stripeLinked: boolean;
+    commitmentEndsAt: string | null;
+    setupFeeCents: number | null;
+    referralDiscountCents: number | null;
+    invoices: { id: string; status: string; amountCents: number; date: string; url: string | null }[];
   } | null;
   organizationName: string;
   contract: { id: string; version: number; status: string; finalizedAt: string | null; monthlyPriceCents: number; trialDays: number } | null;
@@ -559,7 +568,7 @@ function SubscriptionSettings({
         />
         <CardContent>
           {!subscription || !status ? (
-            <p className="text-[13.5px] leading-5 text-text-secondary">Aucun abonnement n&apos;est encore rattaché à {organizationName}. Si vous avez reçu un lien d&apos;activation par e-mail, ouvrez-le pour démarrer votre premier mois offert.</p>
+            <p className="text-[13.5px] leading-5 text-text-secondary">Aucun abonnement n&apos;est encore rattaché à {organizationName}. Si vous avez reçu un lien d&apos;activation par e-mail, ouvrez-le pour activer votre abonnement.</p>
           ) : (
             <dl className="space-y-3.5">
               <DataItem label="Offre">
@@ -570,15 +579,45 @@ function SubscriptionSettings({
               </DataItem>
               {inTrial && <DataItem label="Premier mois offert">Fin de l&apos;essai le {formatDate(subscription.trialEndsAt)}</DataItem>}
               <DataItem label={inTrial ? "Puis" : "Tarif"}>{formatCents(subscription.monthlyPriceCents)} HT par mois</DataItem>
+              {subscription.referralDiscountCents ? (
+                <DataItem label="Remise parrainage">
+                  −{formatCents(subscription.referralDiscountCents)} HT par mois, soit {formatCents(Math.max(0, subscription.monthlyPriceCents - subscription.referralDiscountCents))} HT
+                </DataItem>
+              ) : null}
+              {subscription.commitmentEndsAt && <DataItem label="Engagement">Jusqu&apos;au {formatDate(subscription.commitmentEndsAt)}</DataItem>}
+              {subscription.setupFeeCents ? <DataItem label="Mise en service">{formatCents(subscription.setupFeeCents)} HT, réglée avec le premier mois</DataItem> : null}
               <DataItem label="Prochaine échéance">
-                {subscription.status === "CANCELED" ? "Aucune : abonnement résilié" : subscription.cancelAtPeriodEnd && subscription.cancelAt ? `Résiliation le ${formatDate(subscription.cancelAt)}` : subscription.nextInvoiceAt ? formatDate(subscription.nextInvoiceAt) : trialEndsAt ? formatDate(trialEndsAt) : "—"}
+                {subscription.status === "CANCELED" ? "Aucune : abonnement résilié" : subscription.cancelAt ? `Résiliation le ${formatDate(subscription.cancelAt)}` : subscription.nextInvoiceAt ? formatDate(subscription.nextInvoiceAt) : trialEndsAt ? formatDate(trialEndsAt) : "—"}
               </DataItem>
               {subscription.lastPaymentCents ? <DataItem label="Dernier paiement">{formatCents(subscription.lastPaymentCents)} le {formatDate(subscription.lastPaymentAt)}</DataItem> : null}
               <DataItem label="Statut">{status.patient}</DataItem>
             </dl>
           )}
-          <div className="mt-5">
-            <p className="text-[12.5px] leading-5 text-text-tertiary">Règlement par prélèvement bancaire mensuel, selon votre contrat. Pour une facture, un changement de coordonnées bancaires ou une résiliation : <a href="mailto:contact@pharmaboost.app" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">{PUBLIC_CONTACT_EMAIL}</a>.</p>
+          {subscription && subscription.invoices.length > 0 && (
+            <div className="mt-5">
+              <p className="mb-2 text-[12.5px] font-semibold tracking-[0.03em] text-text-tertiary uppercase">Factures</p>
+              <ul className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
+                {subscription.invoices.map((invoice) => (
+                  <li key={invoice.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13.5px]">
+                    <span className="tabular-nums text-text-primary">{formatDate(invoice.date)} · {formatCents(invoice.amountCents)} TTC</span>
+                    <span className="flex items-center gap-3">
+                      <Badge tone={invoice.status === "PAID" ? "success" : invoice.status === "FAILED" ? "danger" : "info"}>{invoice.status === "PAID" ? "Payée" : invoice.status === "FAILED" ? "Échec" : "En cours"}</Badge>
+                      {invoice.url && <a href={invoice.url} target="_blank" rel="noreferrer" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Voir</a>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="mt-5 space-y-2">
+            {subscription?.stripeLinked ? (
+              <>
+                <ManageSubscriptionButton />
+                <p className="text-[12.5px] leading-5 text-text-tertiary">Moyen de paiement (prélèvement SEPA ou carte), factures et coordonnées de facturation se gèrent sur le portail sécurisé Stripe. Pour une résiliation : <a href={`mailto:${PUBLIC_CONTACT_EMAIL}`} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">{PUBLIC_CONTACT_EMAIL}</a>{subscription.commitmentEndsAt ? ` ; elle prend effet au plus tôt à la fin de l'engagement.` : "."}</p>
+              </>
+            ) : (
+              <p className="text-[12.5px] leading-5 text-text-tertiary">Règlement par prélèvement bancaire mensuel, selon votre contrat. Pour une facture, un changement de coordonnées bancaires ou une résiliation : <a href={`mailto:${PUBLIC_CONTACT_EMAIL}`} className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">{PUBLIC_CONTACT_EMAIL}</a>.</p>
+            )}
           </div>
         </CardContent>
       </Card>

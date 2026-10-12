@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { recordAudit } from "@/server/audit/log";
-import { normalizePlanCode } from "@/core/billing/subscription";
+import { formatFrenchDate, normalizePlanCode } from "@/core/billing/subscription";
 import { SIGNED_CONTRACT_STATUS, ensurePlanStripePrice, refreshSubscriptionFromStripe, sendSubscriptionInvite, setAccessSuspended, setCancelAtPeriodEnd } from "@/server/billing/subscriptions";
 import { stripeConfigState } from "@/server/billing/stripe-client";
 import { ensureDossierForPharmacy, refreshDossierFromPharmacy } from "@/server/services/sales/pharmacy-dossier";
@@ -212,7 +212,7 @@ export async function sendContractForPharmacyAction(payload: z.input<typeof send
   return ok({ signature: result.signature }, `Contrat envoyé au titulaire.${result.signature ? ` ${result.signature}` : ""}`);
 }
 
-const inviteSchema = z.object({ pharmacyId: id, planId: id.optional().nullable(), contractId: id.optional().nullable() });
+const inviteSchema = z.object({ pharmacyId: id, planId: id.optional().nullable(), contractId: id.optional().nullable(), /** Mise en service offerte : rien de plus que le premier mois sur la première facture. */ waiveSetup: z.boolean().optional() });
 
 export async function sendSubscriptionInviteAction(payload: z.input<typeof inviteSchema>): Promise<ActionResult<{ sentTo: string }>> {
   const session = await requirePlatformSession();
@@ -235,7 +235,7 @@ export async function sendSubscriptionInviteAction(payload: z.input<typeof invit
     }
   }
   if (!planId) return fail("Aucune offre disponible : créez d'abord une offre dans Facturation → Offres & tarifs.");
-  const result = await sendSubscriptionInvite({ pharmacyId: parsed.data.pharmacyId, planId, contractId, adminId: session.admin.id });
+  const result = await sendSubscriptionInvite({ pharmacyId: parsed.data.pharmacyId, planId, contractId, adminId: session.admin.id, setupFeeCents: parsed.data.waiveSetup ? 0 : null });
   if (!result.ok) return fail(result.error);
   revalidateBilling(parsed.data.pharmacyId);
   return ok({ sentTo: result.sentTo }, `Lien d'abonnement envoyé à ${result.sentTo}.`);
@@ -268,7 +268,38 @@ export async function cancelAtPeriodEndAction(payload: z.input<typeof cancelSche
   const result = await setCancelAtPeriodEnd(pharmacy.organizationId, parsed.data.cancel, session.admin.id);
   if (!result.ok) return fail(result.error);
   revalidateBilling(parsed.data.pharmacyId);
-  return ok(null, parsed.data.cancel ? "Résiliation programmée à la fin de la période en cours." : "Résiliation annulée : l'abonnement continue.");
+  if (!parsed.data.cancel) return ok(null, "Résiliation annulée : l'abonnement continue.");
+  const when = result.effectiveAt ? ` le ${formatFrenchDate(result.effectiveAt)}` : "";
+  return ok(null, result.atCommitmentEnd ? `Résiliation programmée à la fin de l'engagement${when} : rien n'est avancé.` : `Résiliation programmée à la fin de la période en cours${when}.`);
+}
+
+const setupSchema = z.object({ pharmacyId: id, status: z.enum(["TO_SCHEDULE", "SCHEDULED", "DONE"]), scheduledAt: z.string().trim().max(40).optional().nullable() });
+
+/** La mise en service d'une officine : à planifier, planifiée (avec la date), faite. Tracé au journal. */
+export async function setSetupStatusAction(payload: z.input<typeof setupSchema>): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const parsed = setupSchema.safeParse(payload);
+  if (!parsed.success) return fail("Demande invalide.");
+  const { pharmacyId, status } = parsed.data;
+  const scheduledAt = parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null;
+  if (status === "SCHEDULED" && (!scheduledAt || Number.isNaN(scheduledAt.getTime()))) return fail("Indiquez la date prévue de la mise en service.", { scheduledAt: "Date requise." });
+  const pharmacy = await prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { setupStatus: true, setupScheduledAt: true } });
+  if (!pharmacy) return fail("Officine introuvable.");
+  const now = new Date();
+  await prisma.pharmacy.update({
+    where: { id: pharmacyId },
+    data: status === "DONE" ? { setupStatus: "DONE", setupDoneAt: now } : status === "SCHEDULED" ? { setupStatus: "SCHEDULED", setupScheduledAt: scheduledAt, setupDoneAt: null } : { setupStatus: "TO_SCHEDULE", setupScheduledAt: null, setupDoneAt: null },
+  });
+  await recordAudit({
+    action: "billing.setup_status_changed",
+    entityType: "Pharmacy",
+    entityId: pharmacyId,
+    pharmacyId,
+    platformAdminId: session.admin.id,
+    metadata: { changes: { setupStatus: { from: pharmacy.setupStatus, to: status } }, scheduledAt: scheduledAt?.toISOString() ?? null },
+  });
+  revalidateBilling(pharmacyId);
+  return ok(null, status === "DONE" ? "Mise en service marquée faite." : status === "SCHEDULED" ? `Mise en service planifiée le ${formatFrenchDate(scheduledAt!)}.` : "Mise en service remise à planifier.");
 }
 
 export async function refreshSubscriptionAction(payload: { pharmacyId: string }): Promise<ActionResult<{ status: string }>> {

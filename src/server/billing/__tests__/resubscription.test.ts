@@ -53,6 +53,9 @@ vi.mock("@/server/services/sales/pharmacy-dossier", () => ({ ensureDossierForPha
 vi.mock("@/server/services/sales/contracts", () => ({ generateContract: vi.fn(), sendContract: vi.fn() }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 vi.mock("@/app/(public)/abonnement/activer/[token]/activate-button", () => ({ ActivateButton: () => null }));
+// Ce que Stripe doit connaître une fois (TVA, mise en service, portail) et la remise de parrainage : testés à part.
+vi.mock("../stripe-setup", () => ({ ensureVatTaxRate: vi.fn().mockResolvedValue("txr_tva"), setupLineFor: vi.fn().mockResolvedValue(null), ensurePortalConfiguration: vi.fn().mockResolvedValue("bpc_1") }));
+vi.mock("../referral-discount", () => ({ syncReferralDiscountSafely: vi.fn(), syncReferrerOfOrganization: vi.fn() }));
 
 const subscriptions = await import("../subscriptions");
 const { sendInstallationGuide } = await import("@/server/services/platform-onboarding");
@@ -368,7 +371,8 @@ describe("lien d'activation : seul un contrat signé fonde le tarif, l'essai et 
     expect(result).toEqual({ ok: true, url: "https://checkout.stripe.test/cs_1" });
     const session = stripe.checkout.sessions.create.mock.calls[0][0];
     expect(session.subscription_data.trial_period_days).toBe(30);
-    expect(session.line_items[0]).toEqual({ price_data: { currency: "eur", product: "prod_1", unit_amount: 29_000, recurring: { interval: "month" } }, quantity: 1 });
+    expect(session.line_items[0]).toEqual({ price_data: { currency: "eur", product: "prod_1", unit_amount: 29_000, recurring: { interval: "month" } }, quantity: 1, tax_rates: ["txr_tva"] });
+    expect(session.payment_method_types).toEqual(["sepa_debit", "card"]);
     expect(session.metadata.contractId).toBe("contract_1");
   });
 
@@ -383,7 +387,7 @@ describe("lien d'activation : seul un contrat signé fonde le tarif, l'essai et 
     await subscriptions.startCheckoutForInvite("jeton-de-test-0123456789abcdef");
 
     const session = stripe.checkout.sessions.create.mock.calls[0][0];
-    expect(session.line_items[0]).toEqual({ price: "price_catalogue", quantity: 1 });
+    expect(session.line_items[0]).toEqual({ price: "price_catalogue", quantity: 1, tax_rates: ["txr_tva"] });
     expect(session.subscription_data).not.toHaveProperty("trial_period_days");
     expect(session.metadata.contractId).toBe("");
   });
@@ -479,7 +483,7 @@ describe("programmer ou annuler la fin d'abonnement", () => {
 
     const result = await subscriptions.setCancelAtPeriodEnd("org_1", true, "adm_1");
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toMatchObject({ ok: true, atCommitmentEnd: false });
     expect(prisma.pharmacy.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: "org_1" } }));
     expect(mocks.recordAudit.mock.calls[0][0]).toMatchObject({ action: "billing.cancel_scheduled", pharmacyId: "ph_1", platformAdminId: "adm_1", metadata: { organizationId: "org_1", subscriptionId: "row_1", changes: { cancelAtPeriodEnd: { from: false, to: true } } } });
   });
@@ -542,5 +546,68 @@ describe("page d'activation", () => {
     expect(html).toContain("Cet abonnement a déjà été activé");
     expect(html).not.toContain("349");
     expect(html).not.toContain("HT / mois");
+  });
+});
+
+// ================================================================ Engagement et mise en service
+
+describe("engagement de 12 mois et mise en service", () => {
+  beforeEach(() => {
+    prisma.organization.findUnique.mockResolvedValue({ id: "org_1" });
+    prisma.plan.findUnique.mockResolvedValue({ id: "plan_1", monthlyPriceCents: 12_600 });
+    prisma.subscription.create.mockResolvedValue({ id: "row_new", status: "ACTIVE" });
+    prisma.subscriptionInvite.updateMany.mockResolvedValue({ count: 0 });
+  });
+
+  it("à la naissance : fin d'engagement 12 mois après le début, mise en service retenue", async () => {
+    prisma.subscription.findUnique.mockResolvedValue(null);
+    const start = Math.floor(new Date("2026-10-11T14:30:00Z").getTime() / 1000);
+    const shape = readSubscription({ id: "sub_1", customer: "cus_1", status: "active", start_date: start, metadata: { organizationId: "org_1", planId: "plan_1", commitmentMonths: "12", setupFeeCents: "29000" }, items: { data: [{ price: { id: "price_x" }, current_period_start: start, current_period_end: start + 31 * DAY }] } });
+    await subscriptions.syncSubscriptionFromStripe(shape);
+    const data = prisma.subscription.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({ commitmentMonths: 12, setupFeeCents: 29_000, contractPriceCents: 12_600 });
+    expect(data.commitmentEndsAt.toISOString()).toBe("2027-10-11T14:30:00.000Z");
+  });
+
+  it("ensuite, la fin d'engagement ne bouge plus", async () => {
+    const start = Math.floor(new Date("2026-10-11T14:30:00Z").getTime() / 1000);
+    prisma.subscription.findUnique.mockResolvedValue({ ...canceledRow, status: "ACTIVE", stripeSubscriptionId: "sub_1", commitmentEndsAt: new Date("2027-10-11T14:30:00Z"), setupFeeCents: 29_000 });
+    prisma.subscription.update.mockResolvedValue({ id: "row_1", status: "ACTIVE" });
+    const shape = readSubscription({ id: "sub_1", customer: "cus_1", status: "active", start_date: start + 5 * DAY, metadata: { organizationId: "org_1", planId: "plan_1", commitmentMonths: "12", setupFeeCents: "0" }, items: { data: [{ price: { id: "price_x" }, current_period_start: start + 31 * DAY, current_period_end: start + 61 * DAY }] } });
+    await subscriptions.syncSubscriptionFromStripe(shape);
+    const data = prisma.subscription.update.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty("commitmentEndsAt");
+    expect(data).not.toHaveProperty("setupFeeCents");
+  });
+
+  it("résilier pendant l'engagement : fin posée à la date d'engagement, sans prorata — rien n'est avancé", async () => {
+    mocks.stripeConfigState.mockReturnValue(CONFIGURED);
+    const commitmentEndsAt = new Date(Date.now() + 200 * DAY * 1000);
+    const update = vi.fn().mockResolvedValue({ id: "sub_1", customer: "cus_1", status: "active", cancel_at: Math.floor(commitmentEndsAt.getTime() / 1000), cancel_at_period_end: false, metadata: { organizationId: "org_1", planId: "plan_1" }, items: { data: [{ price: { id: "price_x" }, current_period_start: NEW_START, current_period_end: NEW_START + 30 * DAY }] } });
+    mocks.getStripe.mockReturnValue({ subscriptions: { update } });
+    prisma.subscription.findUnique
+      .mockResolvedValueOnce({ id: "row_1", stripeSubscriptionId: "sub_1", cancelAtPeriodEnd: false, cancelAt: null, commitmentEndsAt, currentPeriodEnd: new Date(Date.now() + 10 * DAY * 1000) })
+      .mockResolvedValueOnce({ ...canceledRow, status: "ACTIVE", stripeSubscriptionId: "sub_1", currentPeriodStart: new Date(NEW_START * 1000) });
+    prisma.subscription.update.mockResolvedValue({ id: "row_1", status: "ACTIVE" });
+    prisma.pharmacy.findFirst.mockResolvedValue({ id: "ph_1" });
+
+    const result = await subscriptions.setCancelAtPeriodEnd("org_1", true, "adm_1");
+
+    expect(update).toHaveBeenCalledWith("sub_1", { cancel_at: Math.floor(commitmentEndsAt.getTime() / 1000), proration_behavior: "none" });
+    expect(result).toMatchObject({ ok: true, atCommitmentEnd: true });
+  });
+
+  it("annuler une fin posée à la date d'engagement : la date est retirée", async () => {
+    mocks.stripeConfigState.mockReturnValue(CONFIGURED);
+    const update = vi.fn().mockResolvedValue({ id: "sub_1", customer: "cus_1", status: "active", cancel_at: null, cancel_at_period_end: false, metadata: { organizationId: "org_1", planId: "plan_1" }, items: { data: [{ price: { id: "price_x" }, current_period_start: NEW_START, current_period_end: NEW_START + 30 * DAY }] } });
+    mocks.getStripe.mockReturnValue({ subscriptions: { update } });
+    prisma.subscription.findUnique
+      .mockResolvedValueOnce({ id: "row_1", stripeSubscriptionId: "sub_1", cancelAtPeriodEnd: false, cancelAt: new Date(Date.now() + 200 * DAY * 1000), commitmentEndsAt: new Date(Date.now() + 200 * DAY * 1000), currentPeriodEnd: null })
+      .mockResolvedValueOnce({ ...canceledRow, status: "ACTIVE", stripeSubscriptionId: "sub_1", currentPeriodStart: new Date(NEW_START * 1000) });
+    prisma.subscription.update.mockResolvedValue({ id: "row_1", status: "ACTIVE" });
+    prisma.pharmacy.findFirst.mockResolvedValue({ id: "ph_1" });
+
+    await subscriptions.setCancelAtPeriodEnd("org_1", false, "adm_1");
+    expect(update).toHaveBeenCalledWith("sub_1", { cancel_at: "" });
   });
 });

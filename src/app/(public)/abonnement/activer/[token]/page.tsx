@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { peekInvite } from "@/server/billing/subscriptions";
 import { stripeConfigState } from "@/server/billing/stripe-client";
-import { formatEuros, trialEndDate, trialSentence } from "@/core/billing/subscription";
+import { formatEuros, trialEndDate } from "@/core/billing/subscription";
+import { firstInvoiceSentence } from "@/core/billing/checkout";
 import { ActivateButton } from "./activate-button";
 
 export const metadata: Metadata = { title: { absolute: "Activer votre abonnement PharmaBoost" }, robots: { index: false, follow: false, nocache: true } };
@@ -26,6 +27,7 @@ export default async function ActivateSubscriptionPage({ params }: { params: Pro
   const trialDays = invite.billedTrialDays;
   const monthlyPriceCents = invite.billedMonthlyPriceCents;
   const trialEndsAt = trialEndDate(new Date(), trialDays);
+  const setupFeeCents = invite.billedSetupFeeCents;
   const ready = stripeConfigState().configured;
   const used = Boolean(invite.completedAt);
 
@@ -45,12 +47,18 @@ export default async function ActivateSubscriptionPage({ params }: { params: Pro
             {!used && trialDays > 0 && (
               <div className="flex items-baseline justify-between gap-4 px-4 py-3"><dt className="text-[13.5px] text-[#6b7280]">Essai</dt><dd className="text-[15px] font-semibold text-[#0F766E]">{trialDays === 30 || trialDays === 31 ? "Premier mois offert" : `${trialDays} jours offerts`}</dd></div>
             )}
+            {!used && setupFeeCents > 0 && (
+              <div className="flex items-baseline justify-between gap-4 px-4 py-3"><dt className="text-[13.5px] text-[#6b7280]">Mise en service</dt><dd className="text-[15px] font-semibold text-[#111827]">{formatEuros(setupFeeCents)} HT, une seule fois</dd></div>
+            )}
+            {!used && (
+              <div className="flex items-baseline justify-between gap-4 px-4 py-3"><dt className="text-[13.5px] text-[#6b7280]">Engagement</dt><dd className="text-[15px] text-[#111827]">{invite.commitmentMonths} mois</dd></div>
+            )}
             {invite.contract && (
               <div className="flex items-baseline justify-between gap-4 px-4 py-3"><dt className="text-[13.5px] text-[#6b7280]">Contrat</dt><dd className="text-[15px] text-[#111827]">Version {invite.contract.version}</dd></div>
             )}
           </dl>
 
-          {!used && <p className="mt-5 rounded-xl bg-[#ecfdf5] px-4 py-3 text-[14.5px] leading-6 text-[#065f46]">{trialSentence({ monthlyPriceCents, trialDays, trialEndsAt })}</p>}
+          {!used && <p className="mt-5 rounded-xl bg-[#ecfdf5] px-4 py-3 text-[14.5px] leading-6 text-[#065f46]">{firstInvoiceSentence({ monthlyCents: monthlyPriceCents, setupFeeCents, trialDays, trialEndsAt, commitmentMonths: invite.commitmentMonths })}</p>}
 
           {used ? (
             <p className="mt-5 rounded-xl bg-[#f3f4f6] px-4 py-3 text-[14px] leading-6 text-[#374151]">Cet abonnement a déjà été activé. Vous pouvez le gérer depuis PharmaBoost, Paramètres → Mon abonnement.</p>
@@ -59,10 +67,10 @@ export default async function ActivateSubscriptionPage({ params }: { params: Pro
           ) : !ready ? (
             <p className="mt-5 rounded-xl bg-[#fff7ed] px-4 py-3 text-[14px] leading-6 text-[#9a3412]">Le paiement en ligne n&apos;est pas encore ouvert. Nous vous préviendrons dès qu&apos;il le sera.</p>
           ) : (
-            <ActivateButton token={token} />
+            <ActivateButton token={token} askReferral={!invite.pharmacy.referredById} />
           )}
 
-          <p className="mt-5 text-[12.5px] leading-5 text-[#6b7280]">Le paiement est sécurisé par Stripe. PharmaBoost ne voit ni ne conserve votre numéro de carte. Vous renseignerez votre moyen de paiement sur la page Stripe ; rien n&apos;est prélevé pendant la période offerte.</p>
+          <p className="mt-5 text-[12.5px] leading-5 text-[#6b7280]">Le paiement est sécurisé par Stripe. PharmaBoost ne voit ni ne conserve votre numéro de carte. Vous choisirez sur la page Stripe le prélèvement SEPA ou la carte. Montants hors taxes, TVA 20 % en sus.{trialDays > 0 ? " Aucun abonnement n'est prélevé pendant la période offerte." : ""}</p>
         </section>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runContractReminders } from "@/server/services/sales/contracts";
 import { syncAllProgressiveCommissions } from "@/server/services/sales/progressive-commissions";
+import { syncAllReferralDiscounts } from "@/server/billing/referral-discount";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -15,6 +16,8 @@ export const maxDuration = 60;
  * reste pas « en attente du 1er paiement ». L'hébergement n'autorise que deux
  * tâches planifiées : celle-ci porte donc aussi ce passage. Une erreur de
  * l'étape est journalisée, sans faire échouer les relances.
+ *
+ * Enfin, le rattrapage des remises de parrainage chez Stripe (webhook manqué).
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -26,5 +29,9 @@ export async function GET(request: Request) {
     console.error("[cron] grille progressive : passage quotidien en échec", error instanceof Error ? error.message : "erreur inconnue");
     return null;
   });
-  return NextResponse.json({ ...report, commissions });
+  const referrals = await syncAllReferralDiscounts().catch((error: unknown) => {
+    console.error("[cron] remises de parrainage : passage quotidien en échec", error instanceof Error ? error.message : "erreur inconnue");
+    return null;
+  });
+  return NextResponse.json({ ...report, commissions, referrals });
 }

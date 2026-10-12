@@ -21,8 +21,12 @@ import { isLgoId } from "@/server/services/stock-sync";
  * l'organisation et le titulaire sont créés d'un bloc ; le titulaire reçoit
  * l'e-mail d'accueil avec le lien pour définir son mot de passe ; le dossier
  * garde le lien vers l'officine, et l'officine vers le dossier.
+ *
+ * Exception unique : la souscription EN LIGNE payée (`paidCheckout`). Le titulaire a
+ * accepté les conditions d'abonnement et validé son paiement chez Stripe : c'est ce
+ * qui tient lieu de contrat signé. Rien d'autre ne lève cette règle.
  */
-export async function createPharmacyFromProspect(prospectId: string, actor: SalesActor): Promise<{ ok: true; pharmacyId: string; welcome: { status: string; detail: string } } | { ok: false; error: string }> {
+export async function createPharmacyFromProspect(prospectId: string, actor: SalesActor, options: { paidCheckout?: boolean } = {}): Promise<{ ok: true; pharmacyId: string; welcome: { status: string; detail: string } } | { ok: false; error: string }> {
   const prospect = await prisma.prospect.findUnique({
     where: { id: prospectId },
     include: { contracts: { orderBy: { version: "desc" }, take: 1 }, salesRep: { select: { id: true, firstName: true, lastName: true } } },
@@ -31,7 +35,8 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
   if (prospect.pharmacyId) return { ok: false, error: "L'espace pharmacie de ce dossier existe déjà." };
   if (prospect.blockedAt) return { ok: false, error: "Ce dossier est suspendu par l'administrateur." };
   const contract = prospect.contracts[0];
-  if (!contract || contract.status !== "FINALIZED") {
+  const paidOnline = options.paidCheckout === true && Boolean(prospect.termsAcceptedAt);
+  if (!paidOnline && (!contract || contract.status !== "FINALIZED")) {
     return { ok: false, error: "Le contrat doit être signé par les deux parties (statut « Finalisé ») avant de créer l'espace pharmacie." };
   }
   if (!prospect.email || !prospect.ownerName) return { ok: false, error: "L'e-mail et le nom du titulaire sont requis sur le dossier." };

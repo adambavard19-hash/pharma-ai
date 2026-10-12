@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowRight, Ban, CreditCard, Hourglass, Wallet } from "l
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { prisma } from "@/server/db/client";
 import { stripeConfigState } from "@/server/billing/stripe-client";
+import { selfServiceAvailability } from "@/server/billing/self-service";
 import {
   DEFAULT_SUBSCRIPTION_PERIOD,
   SUBSCRIPTION_FILTERS,
@@ -44,7 +45,12 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
   const newPeriodLabel = (period ?? PERIODS.find((p) => p.value === DEFAULT_SUBSCRIPTION_PERIOD.value) ?? PERIODS[0]).label;
   const now = new Date();
 
-  const [rows, activePlans] = await Promise.all([listSubscriptionRows(), prisma.plan.count({ where: { isActive: true } })]);
+  const [rows, activePlans, setups, selfService] = await Promise.all([
+    listSubscriptionRows(),
+    prisma.plan.count({ where: { isActive: true } }),
+    prisma.pharmacy.findMany({ where: { isDemo: false, setupStatus: { in: ["TO_SCHEDULE", "SCHEDULED"] } }, orderBy: [{ setupStatus: "asc" }, { setupScheduledAt: "asc" }], select: { id: true, name: true, city: true, setupStatus: true, setupScheduledAt: true } }),
+    selfServiceAvailability(),
+  ]);
   const stripe = stripeConfigState();
 
   const searched = rows.filter((r) => matchesQuery(q, [r.pharmacyName, r.city, r.ownerName, r.ownerEmail, r.subscription?.planName]));
@@ -85,6 +91,29 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
       />
 
       {!stripe.configured && <StripeNotConfigured detail={stripe.detail}>Les abonnements affichés sont ceux connus en base ; la relecture chez Stripe, la résiliation programmée et le lien d&apos;activation sont indisponibles.</StripeNotConfigured>}
+      {stripe.configured && !stripe.webhookConfigured && <Alert tone="warning" title="Webhook Stripe non configuré">Les paiements et les nouveaux abonnements ne remontent pas tout seuls tant que STRIPE_WEBHOOK_SECRET n&apos;est pas renseigné.</Alert>}
+      {stripe.configured && (
+      <Alert tone={selfService.available ? "success" : "info"} title={selfService.available ? "Souscription en ligne ouverte" : "Souscription en ligne fermée"}>
+        {selfService.available
+          ? `Le bouton « S'abonner » du site mène au paiement : ${formatEuros(selfService.setupFeeCents)} HT de mise en service + ${formatEuros(selfService.monthlyPriceCents)} HT le premier mois, puis ${formatEuros(selfService.monthlyPriceCents)} HT par mois, engagement ${selfService.commitmentMonths} mois.`
+          : `${selfService.reason} En attendant, le formulaire du site crée une demande que l'équipe reprend.`}
+      </Alert>
+      )}
+      {setups.length > 0 && (
+        <AdminSection title="Mises en service" description="Payées avec le premier mois : à planifier avec le titulaire, puis à marquer faites.">
+          <ul className="divide-y divide-border-subtle">
+            {setups.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                <Link href={`/admin/abonnements/${p.id}`} className="min-w-0 truncate text-[13.5px] font-medium text-text-primary hover:underline">
+                  {p.name}
+                  {p.city ? <span className="font-normal text-text-tertiary"> · {p.city}</span> : null}
+                </Link>
+                {p.setupStatus === "SCHEDULED" ? <Badge tone="info">Planifiée{p.setupScheduledAt ? ` le ${formatFrenchDate(p.setupScheduledAt)}` : ""}</Badge> : <Badge tone="warning">À planifier</Badge>}
+              </li>
+            ))}
+          </ul>
+        </AdminSection>
+      )}
       {activePlans === 0 && (
         <Alert tone="info" title="Aucune offre active">
           Créez l&apos;offre PharmaBoost (prix mensuel, durée d&apos;essai) dans{" "}

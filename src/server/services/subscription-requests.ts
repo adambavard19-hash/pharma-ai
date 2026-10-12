@@ -34,21 +34,28 @@ export { normalizeSubscriptionRequest, type SubscriptionRequestInput };
  *    dossier seulement ; rien n'est envoyé à cette personne, l'équipe la contacte.
  *  - La réponse au visiteur est la même que l'officine soit connue ou non.
  */
-export type SubscriptionRequestOutcome = { status: "RECEIVED"; prospectId: string | null; reason: string };
+/**
+ * `CHECKOUT` : souscription EN LIGNE ouverte — nouveau dossier, conditions acceptées, offre du site publiée :
+ * l'appelant envoie le titulaire au paiement. Sinon `RECEIVED` : l'équipe reprend la main, comme avant.
+ */
+export type SubscriptionRequestOutcome = { status: "RECEIVED" | "CHECKOUT"; prospectId: string | null; reason: string };
+
+/** La souscription en ligne demandée : conditions acceptées (horodatage, version) et l'offre du site qui sera payée. */
+export type SelfServiceRequest = { termsAcceptedAt: Date; termsVersion: string; planId: string };
 
 const IN_PROGRESS = ["SENT", "OPENED", "SIGNED_PHARMACY", "SIGNED_COMPANY"];
 const GENERIC_NEXT_STEP = "Notre équipe vérifie votre demande et revient vers vous très rapidement, par e-mail ou par téléphone.";
 
-export async function requestSubscription(input: SubscriptionRequestInput): Promise<{ ok: true; outcome: SubscriptionRequestOutcome } | { ok: false; errors: Record<string, string> }> {
+export async function requestSubscription(input: SubscriptionRequestInput, selfService: SelfServiceRequest | null = null): Promise<{ ok: true; outcome: SubscriptionRequestOutcome } | { ok: false; errors: Record<string, string> }> {
   const normalized = normalizeSubscriptionRequest(input);
   if (!normalized.ok) return normalized;
   const v = normalized.value;
   // Un même SIRET n'est traité qu'une fois à la fois : deux envois du formulaire ne créent pas deux dossiers.
-  const outcome = await withAdvisoryLock(`subscription:${v.siret}`, () => handleRequest(v, input));
+  const outcome = await withAdvisoryLock(`subscription:${v.siret}`, () => handleRequest(v, input, selfService));
   return { ok: true, outcome };
 }
 
-async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInput): Promise<SubscriptionRequestOutcome> {
+async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInput, selfService: SelfServiceRequest | null): Promise<SubscriptionRequestOutcome> {
   const system = { type: "SYSTEM" as const, label: "Site PharmaBoost" };
   const submitted = `${v.ownerName} (${v.ownerTitle}) · ${v.email}${v.phone ? ` · ${v.phone}` : ""} · ${v.addressLine1}, ${v.postalCode} ${v.city}`;
   // L'offre cochée par le visiteur, et elle seule : si elle n'est plus proposée, rien ne part.
@@ -115,6 +122,7 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
       lastContactAt: now,
       duplicateWarning: warning,
       referralCode: referrer ? input.referralCode!.trim().toUpperCase() : null,
+      ...(selfService ? { termsAcceptedAt: selfService.termsAcceptedAt, termsVersion: selfService.termsVersion } : {}),
     },
     select: { id: true },
   });
@@ -138,6 +146,17 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
     await notifyAdmins({ type: "DOSSIER_BLOCKED", title: `Contrat retenu — ${v.name}`, body: "L'offre choisie sur le site n'est plus proposée : choisissez les conditions puis « Envoyer le contrat ».", linkUrl: `/admin/dossiers/${prospectId}`, severity: "WARNING" });
     await acknowledge(v, GENERIC_NEXT_STEP, { prospectId });
     return { status: "RECEIVED", prospectId, reason: "offre indisponible" };
+  }
+  // Souscription en ligne : l'offre payée est celle du site, et le compte du titulaire doit pouvoir être créé
+  // (adresse libre). Sinon l'équipe reprend la main, comme pour une demande ordinaire.
+  if (selfService && plan?.id === selfService.planId && !warning) {
+    const taken = await prisma.user.findFirst({ where: { email: { equals: v.email, mode: "insensitive" } }, select: { id: true } });
+    if (!taken) {
+      await recordProspectEvent({ prospectId, type: "NOTE", summary: `Conditions d'abonnement acceptées en ligne (${selfService.termsVersion}) ; paiement en cours chez Stripe.`, actor: system, metadata: { termsVersion: selfService.termsVersion, termsAcceptedAt: selfService.termsAcceptedAt.toISOString() } });
+      await notifyAdmins({ type: "SITE_SUBSCRIPTION", title: `Souscription en ligne commencée — ${v.name}`, body: `${submitted}. Abonnement à ${terms}. Le titulaire est envoyé au paiement : le compte se crée tout seul quand le paiement est validé.`, linkUrl: `/admin/dossiers/${prospectId}`, severity: "INFO" });
+      return { status: "CHECKOUT", prospectId, reason: "souscription en ligne" };
+    }
+    await recordProspectEvent({ prospectId, type: "NOTE", summary: "Souscription en ligne impossible : un compte PharmaBoost existe déjà avec cette adresse e-mail. L'équipe reprend la demande.", actor: system });
   }
   // Le contrat ne part JAMAIS tout seul pour une demande du site : la mise en service n'existe pas dans le contrat automatique,
   // l'équipe fixe les conditions. Jamais un contrat qui tairait un frais annoncé sur le site.

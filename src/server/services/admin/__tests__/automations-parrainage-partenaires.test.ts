@@ -191,7 +191,7 @@ describe("règle « filleul inscrit »", () => {
     expect(notification.title).toBe("Nouveau filleul : Pharmacie du Marché");
     expect(notification.body).toContain("Pharmacie du Marché");
     expect(notification.body).toContain("Votre abonnement passe à 20 % de moins par mois");
-    expect(notification.body).toContain("appliquée par l'équipe PharmaBoost");
+    expect(notification.body).toContain("s'applique d'elle-même à vos factures suivantes");
     // Plus aucun montant fixe par filleul.
     expect(notification.body).not.toMatch(/10\s?€/);
     // Pas de nom de personne, pas d'adresse : ni celle du parrain, ni celle du titulaire du filleul.

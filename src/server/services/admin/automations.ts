@@ -434,7 +434,7 @@ async function afterEmail(planned: PlannedAutomation, context: CandidateContext,
       type: "SYSTEM",
       severity: "SUCCESS",
       title: `Nouveau filleul : ${filleul.name}`,
-      body: `${filleul.name} a rejoint PharmaBoost avec votre code de parrainage. Votre abonnement passe à ${REFERRAL_DISCOUNT_PERCENT} % de moins par mois, tant que cette officine reste abonnée. La remise est appliquée par l'équipe PharmaBoost ; elle ne se cumule pas entre filleuls.`,
+      body: `${filleul.name} a rejoint PharmaBoost avec votre code de parrainage. Votre abonnement passe à ${REFERRAL_DISCOUNT_PERCENT} % de moins par mois, tant que cette officine reste abonnée. La remise s'applique d'elle-même à vos factures suivantes ; elle ne se cumule pas entre filleuls.`,
       linkUrl: "/parametres?onglet=abonnement",
     });
     inApp = true;

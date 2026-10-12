@@ -14,9 +14,31 @@ import { OFFICIAL_OFFER } from "@/core/pricing/official-offer";
  * `null` hors offre). Le parrain bénéficie alors du plus avantageux entre les 20 %
  * et la somme des montants d'offre de ses filleuls actifs, jamais plus que son prix.
  *
- * La remise est CALCULÉE et AFFICHÉE ici ; aucune remise Stripe n'est créée : elle
- * est appliquée à l'abonnement par l'équipe PharmaBoost.
+ * La remise est CALCULÉE ici, une seule fois pour tous : l'écran du titulaire, la
+ * console et Stripe lisent le même calcul. Quand le parrain a un abonnement Stripe,
+ * elle y est appliquée par un coupon `amount_off` permanent (synchronisation dans
+ * `server/billing/referral-discount.ts`), recalculée dès qu'un filleul devient
+ * actif, résilie ou ne paie plus. Le filleul, lui, paie le plein tarif.
  */
+
+/**
+ * Un filleul compte-t-il ? Son officine doit être ouverte, et son abonnement,
+ * quand il est suivi, en règle :
+ *   - en essai : oui ;
+ *   - actif : oui si l'abonnement n'est pas payé par Stripe (règlement hors Stripe),
+ *     sinon seulement après un premier paiement reçu — un prélèvement SEPA encore
+ *     « en cours » ne fait pas baisser le prix du parrain ;
+ *   - impayé, résilié, à finaliser, suspendu : non.
+ * Sans abonnement suivi (officine d'avant la facturation en ligne) : l'officine ouverte suffit.
+ */
+export function isActiveReferral(filleul: { pharmacyActive: boolean; subscription: { status: string; stripeLinked: boolean; hasPayment: boolean } | null }): boolean {
+  if (!filleul.pharmacyActive) return false;
+  const sub = filleul.subscription;
+  if (!sub) return true;
+  if (sub.status === "TRIALING") return true;
+  if (sub.status === "ACTIVE") return !sub.stripeLinked || sub.hasPayment;
+  return false;
+}
 
 /** Le pourcentage de la remise : celui de l'offre officielle, une seule source. */
 export const REFERRAL_DISCOUNT_PERCENT = OFFICIAL_OFFER.referralDiscountPercent;

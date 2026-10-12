@@ -39,6 +39,8 @@ type Values = {
   refereeEmail: string;
   refereePhone: string;
   confirm: boolean;
+  /** Souscription en ligne : conditions d'abonnement acceptées. */
+  acceptTerms: boolean;
   website: string;
   prefill: Prefill;
 };
@@ -84,7 +86,12 @@ function validate(v: Values, fields: string[]): FlowErrors {
  * dossier, du contrat et de l'espace PharmaBoost ; rien ne sera redemandé.
  * Aucune donnée patient.
  */
-export function SubscriptionForm({ planId, offer, offerLabel, referral, referralCode = "" }: { planId: string | null; offer: PublicOffer; offerLabel: string; referral: ReferralTerms; referralCode?: string }) {
+/**
+ * `payOnline` : la souscription se paie en ligne (prélèvement SEPA ou carte) et
+ * l'espace s'ouvre aussitôt ; `firstInvoice` dit la première facture. Absent : la
+ * demande part à l'équipe, qui envoie le contrat.
+ */
+export function SubscriptionForm({ planId, offer, offerLabel, referral, referralCode = "", payOnline = null }: { planId: string | null; offer: PublicOffer; offerLabel: string; referral: ReferralTerms; referralCode?: string; payOnline?: { firstInvoice: string } | null }) {
   const router = useRouter();
   const initialValues = useMemo<Values>(
     () => ({
@@ -109,6 +116,7 @@ export function SubscriptionForm({ planId, offer, offerLabel, referral, referral
       refereeEmail: "",
       refereePhone: "",
       confirm: false,
+      acceptTerms: false,
       website: "",
       prefill: {},
     }),
@@ -136,7 +144,7 @@ export function SubscriptionForm({ planId, offer, offerLabel, referral, referral
       {
         id: "signataire",
         section: "Le signataire",
-        question: "Qui signera le contrat ?",
+        question: payOnline ? "Qui souscrit pour l'officine ?" : "Qui signera le contrat ?",
         help: "Le ou la titulaire, ou la personne habilitée à engager l'officine.",
         fields: ["ownerFirstName", "ownerLastName"],
         seconds: 10,
@@ -180,8 +188,8 @@ export function SubscriptionForm({ planId, offer, offerLabel, referral, referral
       {
         id: "email",
         section: "Le signataire",
-        question: (v) => (first(v) ? `À quelle adresse envoyer le contrat, ${first(v)} ?` : "À quelle adresse envoyer le contrat ?"),
-        help: "Vous y recevrez d'abord un lien pour confirmer votre adresse, puis le contrat prérempli à signer.",
+        question: (v) => (payOnline ? (first(v) ? `Votre adresse e-mail, ${first(v)} ?` : "Votre adresse e-mail ?") : first(v) ? `À quelle adresse envoyer le contrat, ${first(v)} ?` : "À quelle adresse envoyer le contrat ?"),
+        help: payOnline ? "Elle sera votre identifiant PharmaBoost : vous y recevrez vos factures et le lien pour choisir votre mot de passe." : "Vous y recevrez d'abord un lien pour confirmer votre adresse, puis le contrat prérempli à signer.",
         fields: ["ownerEmail"],
         seconds: 10,
         validate: (v) => validate(v, ["ownerEmail"]),
@@ -260,7 +268,7 @@ export function SubscriptionForm({ planId, offer, offerLabel, referral, referral
         recap: { label: "Confrère parrainé", value: (v) => (v.hasReferee === "yes" ? [v.refereeName.trim(), v.refereeEmail.trim()].filter(Boolean).join(" · ") || null : null) },
       },
     ];
-  }, [referralCode, referral]);
+  }, [referralCode, referral, payOnline]);
 
   return (
     <Flow<Values>
@@ -268,24 +276,48 @@ export function SubscriptionForm({ planId, offer, offerLabel, referral, referral
       steps={steps}
       initialValues={initialValues}
       pinned={["referralCode", "hasReferral"]}
-      ephemeral={["confirm"]}
+      ephemeral={["confirm", "acceptTerms"]}
       honeypot="website"
       autoFocus
       recapTitle="Votre dossier est prêt."
       aside={(v) => <SubscriptionAside offer={offer} values={v} referralCode={referralCode} />}
-      final={({ values, set }) => (
-        <label className={cn("flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-[14.5px] leading-6 text-text-primary transition-colors", values.confirm ? "border-brand-400 bg-brand-50/70 dark:bg-brand-950/30" : "border-border-default bg-surface-app hover:border-brand-300")}>
-          <input type="checkbox" checked={values.confirm} onChange={(e) => set("confirm", e.target.checked)} className="mt-1 size-[18px] shrink-0 accent-brand-700" />
-          <span>
-            Je demande la souscription à l&apos;offre <strong>{offerLabel}</strong> pour cette officine et je souhaite recevoir le contrat d&apos;abonnement à signer électroniquement.
-          </span>
-        </label>
-      )}
-      canSubmit={(v) => v.confirm}
-      submitLabel="Recevoir mon contrat à signer"
-      submitHint="Notre équipe prépare votre contrat et vous l'envoie sous un jour ouvré. Rien n'est prélevé à cette étape."
+      final={({ values, set }) =>
+        payOnline ? (
+          <div className="space-y-3">
+            <p className="rounded-2xl bg-brand-50 px-4 py-3 text-[14px] leading-6 text-brand-900 dark:bg-brand-950/40 dark:text-brand-100">{payOnline.firstInvoice}</p>
+            <label className={cn("flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-[14.5px] leading-6 text-text-primary transition-colors", values.confirm && values.acceptTerms ? "border-brand-400 bg-brand-50/70 dark:bg-brand-950/30" : "border-border-default bg-surface-app hover:border-brand-300")}>
+              <input
+                type="checkbox"
+                checked={values.confirm && values.acceptTerms}
+                onChange={(e) => {
+                  set("confirm", e.target.checked);
+                  set("acceptTerms", e.target.checked);
+                }}
+                className="mt-1 size-[18px] shrink-0 accent-brand-700"
+              />
+              <span>
+                Je souscris à l&apos;offre <strong>{offerLabel}</strong> pour cette officine et j&apos;accepte les{" "}
+                <a href="/decouvrir/conditions" target="_blank" rel="noreferrer" className="font-medium text-brand-700 underline underline-offset-2">
+                  conditions d&apos;abonnement
+                </a>
+                .
+              </span>
+            </label>
+          </div>
+        ) : (
+          <label className={cn("flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-[14.5px] leading-6 text-text-primary transition-colors", values.confirm ? "border-brand-400 bg-brand-50/70 dark:bg-brand-950/30" : "border-border-default bg-surface-app hover:border-brand-300")}>
+            <input type="checkbox" checked={values.confirm} onChange={(e) => set("confirm", e.target.checked)} className="mt-1 size-[18px] shrink-0 accent-brand-700" />
+            <span>
+              Je demande la souscription à l&apos;offre <strong>{offerLabel}</strong> pour cette officine et je souhaite recevoir le contrat d&apos;abonnement à signer électroniquement.
+            </span>
+          </label>
+        )
+      }
+      canSubmit={(v) => v.confirm && (!payOnline || v.acceptTerms)}
+      submitLabel={payOnline ? "Continuer vers le paiement" : "Recevoir mon contrat à signer"}
+      submitHint={payOnline ? "Paiement sécurisé par Stripe : prélèvement SEPA ou carte. Votre espace PharmaBoost s'ouvre dès le paiement validé." : "Notre équipe prépare votre contrat et vous l'envoie sous un jour ouvré. Rien n'est prélevé à cette étape."}
       onSubmit={async (v) => {
-        const result = await submitSubscriptionRequestAction({ ...toRequest(v), planId: planId ?? "", confirm: v.confirm as true, website: v.website });
+        const result = await submitSubscriptionRequestAction({ ...toRequest(v), planId: planId ?? "", confirm: v.confirm as true, website: v.website, payOnline: Boolean(payOnline), acceptTerms: v.acceptTerms });
         if (!result.ok) {
           // Les erreurs du confrère reviennent sous les champs de sa question.
           const fieldErrors = { ...(result.fieldErrors ?? {}) };
@@ -293,7 +325,12 @@ export function SubscriptionForm({ planId, offer, offerLabel, referral, referral
           if (fieldErrors["referee.phone"]) fieldErrors.refereePhone = fieldErrors["referee.phone"];
           return { ok: false, error: result.error, fieldErrors };
         }
-        router.push(`/decouvrir/merci?type=abonnement&etat=${result.data.outcome.toLowerCase()}`);
+        if (result.data.checkoutUrl) {
+          // Vers la page de paiement Stripe (adresse fournie par le serveur, jamais composée ici).
+          window.location.assign(result.data.checkoutUrl);
+          return { ok: true };
+        }
+        router.push(`/decouvrir/merci?type=abonnement&etat=received`);
         return { ok: true };
       }}
     />
@@ -327,7 +364,7 @@ function SubscriptionAside({ offer, values, referralCode }: { offer: PublicOffer
           <LiveRow label="SIRET" value={values.siret.length === 14 ? formatSiret(values.siret) : null} />
           <LiveRow label="Adresse" value={place} />
           <LiveRow label="Signataire" value={signer ? `${signer}${values.ownerTitle ? `, ${values.ownerTitle.toLowerCase()}` : ""}` : null} />
-          <LiveRow label="Contrat envoyé à" value={values.ownerEmail.trim()} />
+          <LiveRow label="E-mail du titulaire" value={values.ownerEmail.trim()} />
         </div>
       </LiveCard>
     </div>

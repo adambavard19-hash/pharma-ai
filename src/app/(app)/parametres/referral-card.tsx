@@ -16,7 +16,7 @@ type CurrentOffer = { amountCents: number; endsAt: Date | string | null };
  * abonnement passe à 20 % de moins par mois, une seule fois (deux filleuls ne font
  * pas 40 %). Seule exception : une offre de parrainage en cours à l'inscription d'un
  * filleul lui fait apporter un montant fixe, et le titulaire a le plus avantageux.
- * La remise est appliquée à l'abonnement par l'équipe PharmaBoost.
+ * La remise est appliquée d'elle-même à l'abonnement payé en ligne (Stripe), sinon par l'équipe PharmaBoost.
  */
 export function ReferralCard({ referral }: { referral: { code: string; link: string; currentOffer: CurrentOffer | null; monthlyPriceCents: number | null; referrals: Referral[]; activeCount: number; discountCents: number; discountBasis: "PERCENT" | "OFFERS" | null; referredBy: string | null } }) {
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
@@ -73,7 +73,7 @@ export function ReferralCard({ referral }: { referral: { code: string; link: str
               </button>
             </div>
           </div>
-          <p className="text-[13px] leading-5 text-text-secondary">Un confrère s&apos;abonne avec votre code ou votre lien : il devient votre filleul dès que son espace est créé. La remise est appliquée à votre abonnement par l&apos;équipe PharmaBoost, une seule fois : {percent} % de moins, que vous ayez un ou plusieurs filleuls.</p>
+          <p className="text-[13px] leading-5 text-text-secondary">Un confrère s&apos;abonne avec votre code ou votre lien : il devient votre filleul dès que son espace est créé. Dès son premier paiement, la remise s&apos;applique d&apos;elle-même à vos factures suivantes, une seule fois : {percent} % de moins, que vous ayez un ou plusieurs filleuls. Elle cesse si plus aucun filleul n&apos;est abonné.</p>
           {offer && (
             <p className="rounded-xl border border-border-subtle bg-surface-sunken p-3 text-[13px] leading-5 text-text-secondary">
               Offre de parrainage en cours : chaque officine que vous parrainez et qui s&apos;inscrit{lastOfferDay ? ` jusqu'au ${formatDate(lastOfferDay)} inclus` : ""} retire {formatCents(offer.amountCents)} HT par mois de votre abonnement, tant qu&apos;elle est abonnée. Vous bénéficiez du plus avantageux entre la somme de ces montants et les {percent} % de moins.

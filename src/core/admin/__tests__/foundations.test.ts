@@ -599,7 +599,7 @@ describe("modèles d'e-mails : parrainage et partenaires", () => {
     const rendered = renderTemplateEmail(DEFAULT_EMAIL_CONTEXT, referral, referral.defaults, { prenom: "Camille", filleul: "Pharmacie du Marché", montant_remise: "20 %", lien_espace: "https://pharmaboost.app/parametres?onglet=abonnement" });
     expect(rendered.subject).toBe("Pharmacie du Marché a rejoint PharmaBoost avec votre code de parrainage");
     expect(rendered.text).toContain("votre abonnement passe à 20 % de moins par mois");
-    expect(rendered.text).toContain("appliquée à votre abonnement par l'équipe PharmaBoost");
+    expect(rendered.text).toContain("La remise s'applique d'elle-même à vos factures suivantes");
     expect(rendered.text).toContain("elle ne se cumule pas");
     expect(rendered.text).toContain("Voir mon parrainage : https://pharmaboost.app/parametres?onglet=abonnement");
     expect(rendered.text).not.toContain("{{");
