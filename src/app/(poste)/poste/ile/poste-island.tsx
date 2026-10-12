@@ -4,6 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, type ComponentProps } from 
 import { BANNER } from "../../../../../agent/src/banner-design";
 import type { HostEntry } from "../../../../../agent/src/notice-center";
 import { CounterIsland, type IslandAdvice } from "@/components/island/counter-island";
+import { STAGE_WIDTH } from "@/core/island/banner-flow";
 import { IslandShell, ISLAND_CSS } from "@/components/island/island-shell";
 import { Robot } from "@/components/robot";
 import {
@@ -200,26 +201,27 @@ export function PosteIsland() {
         {!questionsOnly && <CounterIsland {...islandProps} />}
 
         {showQuestions && entry && (
-          <IslandShell width={BANNER.sizes.widthExpanded + 40} contentKey={`q-${entry.signature}`} label={T.questionTitle}>
-            <div className="px-3.5 pt-3 pb-3.5">
-              <div className="flex items-center gap-3">
-                {questionsOnly && <Robot size={34} mood="curious" look={view.look} label="Le robot PharmaBoost" />}
+          <IslandShell width={STAGE_WIDTH.advice} contentKey={`q-${entry.signature}`} label={T.questionTitle}>
+            <div className="px-3 pt-2.5 pb-3">
+              <div className="flex items-center gap-2.5">
+                {questionsOnly && <Robot size={30} mood="curious" look={view.look} label="Le robot PharmaBoost" />}
                 <div className="min-w-0">
-                  <p className="text-[14.5px] leading-5 font-semibold">{T.questionTitle}</p>
-                  <p className="truncate text-[12.5px] leading-[18px] text-white/60">{T.questionSub}</p>
+                  <p className="text-[13.5px] leading-[18px] font-semibold">{T.questionTitle}</p>
+                  <p className="truncate text-[12px] leading-4 text-white/60">{T.questionSub}</p>
                 </div>
               </div>
-              <div className="mt-2.5 space-y-2.5">
+              {/* Hauteur bornée : les questions défilent dans l'île, le logiciel de gestion reste visible. */}
+              <div className="isl-scroll mt-2 max-h-[180px] space-y-2 overflow-y-auto overscroll-contain">
                 {questions.map((question) => (
-                  <div key={question.node} className="rounded-2xl bg-white/[0.06] px-3 py-2.5">
-                    <p className="text-[13px] leading-5 text-white/90">{question.text}</p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div key={question.node} className="rounded-xl bg-white/[0.06] px-2.5 py-2">
+                    <p className="text-[12.5px] leading-[18px] text-white/90">{question.text}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {question.choices.map((choice) => (
                         <button
                           key={choice.key}
                           type="button"
                           onClick={() => word(questionWord(entry.id, question.node, choice.key))}
-                          className="h-8 rounded-full px-3 text-[12.5px] font-semibold transition-colors"
+                          className="h-7 rounded-full px-3 text-[12px] font-semibold transition-colors"
                           style={choice.selected ? { background: C.accent, color: "#04261A" } : { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.9)" }}
                         >
                           {choice.label}
@@ -233,7 +235,7 @@ export function PosteIsland() {
                 ))}
               </div>
               {questionsOnly && (
-                <button type="button" onClick={() => word(finishWord(entry.id))} className="mt-2.5 h-9 w-full rounded-xl text-[12.5px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
+                <button type="button" onClick={() => word(finishWord(entry.id))} className="mt-2 h-8 w-full rounded-xl text-[12.5px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
                   {T.finish}
                 </button>
               )}
@@ -242,13 +244,13 @@ export function PosteIsland() {
         )}
 
         {island.stage === "email" && entry?.emailError && (
-          <IslandShell width={460} tone="warning" contentKey={`err-${entry.emailError}`} label="Adresse refusée">
+          <IslandShell width={STAGE_WIDTH.email} tone="warning" contentKey={`err-${entry.emailError}`} label="Adresse refusée">
             <p className="px-4 py-2.5 text-[12.5px] leading-[18px] text-[#FFE2B0]">{entry.emailError}</p>
           </IslandShell>
         )}
 
         {island.stage === "done" && view.done && (view.done.lines.length > 0 || view.done.badge) && (
-          <IslandShell width={BANNER.sizes.widthDone} tone={view.done.warning ? "warning" : "success"} contentKey={`done-${view.done.id}`} label="Résultat de la vente">
+          <IslandShell width={STAGE_WIDTH.done} tone={view.done.warning ? "warning" : "success"} contentKey={`done-${view.done.id}`} label="Résultat de la vente">
             <div className="space-y-0.5 px-4 py-2.5 text-[12.5px] leading-[18px] text-white/80">
               {view.done.lines.map((line) => <p key={line}>{line}</p>)}
               {view.done.badge && <p className="font-semibold" style={{ color: C.challengeIcon }}>★ {view.done.badge}</p>}

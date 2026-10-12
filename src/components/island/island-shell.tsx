@@ -58,7 +58,7 @@ export function IslandShell({
     width: `min(${width}px, calc(100vw - 24px))`,
     height: height ?? undefined,
     boxShadow: `${TONE_RING[tone]}, 0 18px 40px -14px rgba(0,0,0,0.55)`,
-    borderRadius: height !== null && height > 64 ? 28 : 999,
+    borderRadius: height !== null && height > 60 ? 22 : 999,
   };
 
   return (
@@ -94,5 +94,8 @@ export const ISLAND_CSS = `
 .isl-scanbar { animation: isl-scan 1.1s cubic-bezier(.65,0,.35,1) infinite; }
 @keyframes isl-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
 .isl-pop { animation: isl-pop .42s cubic-bezier(.3,1.5,.5,1) both; }
+.isl-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
+.isl-scroll::-webkit-scrollbar { width: 5px; }
+.isl-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 99px; }
 @media (prefers-reduced-motion: reduce) { .isl-in, .isl-line, .isl-pop { animation: none; } .isl-spin, .isl-scanbar { animation: none; } }
 `;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronUp, Loader2, Mail, PartyPopper, ScanLine, Send, TriangleAlert } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { Robot } from "@/components/robot";
@@ -57,7 +57,12 @@ export type CounterIslandProps = {
   collapsible?: boolean;
   /** La personne ne peut pas trancher les conseils (préparateur sans ce droit) : les cartes se lisent, sans boutons. */
   readOnly?: boolean;
+  /** La hauteur de la liste des conseils, en pixels : au-delà, on défile DANS l'île (elle ne masque pas le logiciel de gestion). */
+  listMaxHeight?: number;
 };
+
+/** Hauteur par défaut de la liste des conseils : une carte et demie visibles, le reste se fait défiler. */
+export const ADVICE_LIST_MAX_HEIGHT = 196;
 
 const STOCK: Record<NonNullable<IslandAdvice["stock"]>, { bg: string; fg: string; label: string }> = {
   IN_STOCK: { bg: C.stockBg, fg: C.stockFg, label: T.inStock },
@@ -68,7 +73,7 @@ const STOCK: Record<NonNullable<IslandAdvice["stock"]>, { bg: string; fg: string
 
 function Chip({ bg, fg, children }: { bg: string; fg: string; children: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap" style={{ background: bg, color: fg }}>
+    <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10.5px] font-semibold whitespace-nowrap" style={{ background: bg, color: fg }}>
       {children}
     </span>
   );
@@ -100,7 +105,7 @@ export function CounterIsland(props: CounterIslandProps) {
   const peek = resting && hover && props.hoverOpen !== false && !grumpy;
   const mood = grumpy ? "concerned" : STAGE_MOOD[state.stage];
   const tone = grumpy ? "warning" : stageTone(state.stage);
-  const width = grumpy ? 380 : peek ? 440 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 300 : STAGE_WIDTH[state.stage];
+  const width = grumpy ? 340 : peek ? 400 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 280 : STAGE_WIDTH[state.stage];
   const title = stageTitle(state, count);
 
   const onTap = () => {
@@ -134,21 +139,21 @@ export function CounterIsland(props: CounterIslandProps) {
   let body: ReactNode;
   if (collapsed) {
     body = (
-      <div className="flex h-11 items-center gap-2.5 pr-2 pl-1.5">
-        {robot(32)}
+      <div className="flex h-10 items-center gap-2 pr-2 pl-1.5">
+        {robot(28)}
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white/85">{title}</span>
         {toggle}
       </div>
     );
   } else if (grumpy) {
     body = (
-      <Row robot={robot(34)} title="Doucement !" sub="Trop de clics d'un coup — je reprends dans 3 secondes." />
+      <Row robot={robot(30)} title="Doucement !" sub="Trop de clics d'un coup — je reprends dans 3 secondes." />
     );
   } else if (peek) {
     body = (
-      <div className="px-3.5 pt-3 pb-3.5">
-        <Row robot={robot(34)} title={title} sub="Je surveille le comptoir. Scannez une boîte pour commencer." compact />
-        <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className="px-3 pt-2.5 pb-3">
+        <Row robot={robot(30)} title={title} sub="Je surveille le comptoir. Scannez une boîte pour commencer." compact />
+        <div className="mt-2.5 grid grid-cols-3 gap-1.5">
           {pills.map((pill) => (
             <div key={pill.key} className="rounded-2xl bg-white/[0.06] px-2.5 py-2">
               <p className="text-[10.5px] font-medium tracking-[0.04em] text-white/55 uppercase">{pill.label}</p>
@@ -165,8 +170,8 @@ export function CounterIsland(props: CounterIslandProps) {
     switch (state.stage) {
       case "idle":
         body = (
-          <div className="flex h-11 items-center gap-2.5 pr-4 pl-1.5">
-            {robot(32)}
+          <div className="flex h-10 items-center gap-2 pr-3.5 pl-1.5">
+            {robot(28)}
             <span className="min-w-0 flex-1 truncate text-[13px] text-white/80">{title}</span>
             <span className="size-2 shrink-0 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} aria-label="Poste connecté" />
           </div>
@@ -175,7 +180,7 @@ export function CounterIsland(props: CounterIslandProps) {
       case "scan":
         body = (
           <div className="relative">
-            <Row robot={robot(36)} title={T.scanTitle} sub={T.scanSub} icon={<ScanLine className="size-4" style={{ color: C.glow }} aria-hidden="true" />} />
+            <Row robot={robot(30)} title={T.scanTitle} sub={T.scanSub} icon={<ScanLine className="size-4" style={{ color: C.glow }} aria-hidden="true" />} />
             <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[2px] overflow-hidden">
               <span className="isl-scanbar block h-full w-1/3" style={{ background: `linear-gradient(90deg, transparent, ${C.glow}, transparent)` }} />
             </span>
@@ -185,10 +190,11 @@ export function CounterIsland(props: CounterIslandProps) {
       case "analyzing": {
         const steps = analysisSteps(props.drug, count);
         body = (
-          <div className="px-3.5 pt-3 pb-3.5">
-            <Row robot={robot(36)} title={title} sub={props.drug} compact />
-            <ol className="mt-2.5 space-y-1 rounded-2xl bg-white/[0.05] px-3 py-2.5 font-mono text-[12px] leading-5">
-              {steps.slice(0, Math.min(state.stepsDone + 1, steps.length)).map((step, i) => {
+          <div className="px-3 pt-2.5 pb-3">
+            <Row robot={robot(30)} title={title} sub={props.drug} compact />
+            <ol className="mt-2 space-y-0.5 rounded-xl bg-white/[0.05] px-2.5 py-2 font-mono text-[11.5px] leading-[18px]">
+              {/* Les trois dernières lignes seulement : l'île reste fine pendant que l'analyse se coche. */}
+              {steps.slice(0, Math.min(state.stepsDone + 1, steps.length)).map((step, i) => ({ step, i })).slice(-3).map(({ step, i }) => {
                 const done = i < state.stepsDone;
                 return (
                   <li key={step} className="isl-line flex items-center gap-2">
@@ -203,22 +209,22 @@ export function CounterIsland(props: CounterIslandProps) {
         break;
       }
       case "ready":
-        body = <Row robot={robot(38)} title={title} sub={`${T.forDrug}${props.drug}`} trailing={<span className="isl-pop rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: C.accent, color: "#04261A" }}>{count}</span>} />;
+        body = <Row robot={robot(32)} title={title} sub={`${T.forDrug}${props.drug}`} trailing={<span className="isl-pop rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: C.accent, color: "#04261A" }}>{count}</span>} />;
         break;
       case "advice":
         body = (
-          <div className="px-3 pt-3 pb-3">
-            <Row robot={robot(34)} title={title} sub={allAnswered(state, count) ? T.allDone : `${T.forDrug}${props.drug}`} compact />
-            <ul className="mt-2.5 space-y-2">
+          <div className="px-2.5 pt-2.5 pb-2.5">
+            <Row robot={robot(30)} title={title} sub={allAnswered(state, count) ? T.allDone : `${T.forDrug}${props.drug}`} compact />
+            <AdviceList maxHeight={props.listMaxHeight ?? ADVICE_LIST_MAX_HEIGHT} count={count}>
               {items.map((item, index) => (
                 <AdviceCard key={item.name} item={item} outcome={state.outcomes[index] ?? null} readOnly={props.readOnly} onAnswer={(outcome) => props.onAnswer(index, outcome)} />
               ))}
-            </ul>
-            <div className="mt-2.5 flex items-center gap-2">
-              {props.emailEnabled !== false && <button type="button" onClick={props.onAddEmail} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.08] text-[12.5px] font-semibold text-white/90 transition-colors hover:bg-white/[0.14] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]">
+            </AdviceList>
+            <div className="mt-2 flex items-center gap-2">
+              {props.emailEnabled !== false && <button type="button" onClick={props.onAddEmail} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.08] text-[12.5px] font-semibold text-white/90 transition-colors hover:bg-white/[0.14] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]">
                 <Mail className="size-3.5" aria-hidden="true" /> {T.emailAdd}
               </button>}
-              <button type="button" onClick={props.onFinish} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl text-[12.5px] font-bold transition-[filter] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]" style={{ background: C.accent, color: "#04261A" }}>
+              <button type="button" onClick={props.onFinish} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl text-[12.5px] font-bold transition-[filter] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]" style={{ background: C.accent, color: "#04261A" }}>
                 <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> {props.finishLabel ?? T.finish}
               </button>
             </div>
@@ -227,8 +233,8 @@ export function CounterIsland(props: CounterIslandProps) {
         break;
       case "email":
         body = (
-          <div className="px-3.5 pt-3 pb-3.5">
-            <Row robot={robot(34)} title="Bilan conseil par e-mail" sub="Le patient reçoit ses conseils et vos coordonnées." compact />
+          <div className="px-3 pt-2.5 pb-3">
+            <Row robot={robot(30)} title="Bilan conseil par e-mail" sub="Le patient reçoit ses conseils et vos coordonnées." compact />
             <form
               className="mt-3 flex items-center gap-2"
               onSubmit={(event) => {
@@ -253,13 +259,13 @@ export function CounterIsland(props: CounterIslandProps) {
         );
         break;
       case "emailSent":
-        body = <Row robot={robot(36)} title="E-mail envoyé" sub={state.email || "Le bilan est parti."} trailing={<span className="isl-pop flex size-7 items-center justify-center rounded-full" style={{ background: C.accent }}><Check className="size-4 text-[#04261A]" strokeWidth={3} aria-hidden="true" /></span>} />;
+        body = <Row robot={robot(30)} title="E-mail envoyé" sub={state.email || "Le bilan est parti."} trailing={<span className="isl-pop flex size-7 items-center justify-center rounded-full" style={{ background: C.accent }}><Check className="size-4 text-[#04261A]" strokeWidth={3} aria-hidden="true" /></span>} />;
         break;
       case "done": {
         const sold = items.filter((_, i) => state.outcomes[i] === "SOLD");
         body = (
           <Row
-            robot={robot(40)}
+            robot={robot(32)}
             title={T.doneTitle}
             sub={sold.length ? `${sold.length} conseil${sold.length > 1 ? "s" : ""} vendu${sold.length > 1 ? "s" : ""}${sold[0]?.price ? ` · ${sold.map((item) => item.price).filter(Boolean).join(" + ")}` : ""}` : "Merci, à la prochaine délivrance."}
             trailing={<PartyPopper className="isl-pop size-5" style={{ color: C.challengeIcon }} aria-hidden="true" />}
@@ -269,12 +275,12 @@ export function CounterIsland(props: CounterIslandProps) {
       }
       case "alert":
         body = (
-          <div className="px-3.5 pt-3 pb-3.5">
-            <Row robot={robot(36)} title={alert?.title ?? T.readFirst} sub={T.duringSale} compact icon={<TriangleAlert className="size-4 text-[#F5A623]" aria-hidden="true" />} />
-            <p className="mt-2.5 rounded-2xl px-3 py-2.5 text-[13px] leading-5" style={{ background: "rgba(245,166,35,0.12)", color: "#FFE2B0" }}>
+          <div className="px-3 pt-2.5 pb-3">
+            <Row robot={robot(30)} title={alert?.title ?? T.readFirst} sub={T.duringSale} compact icon={<TriangleAlert className="size-4 text-[#F5A623]" aria-hidden="true" />} />
+            <p className="isl-scroll mt-2 max-h-28 overflow-y-auto overscroll-contain rounded-xl px-3 py-2 text-[12.5px] leading-[18px]" style={{ background: "rgba(245,166,35,0.12)", color: "#FFE2B0" }}>
               {alert?.text}
             </p>
-            <div className="mt-2.5 flex justify-end">
+            <div className="mt-2 flex justify-end">
               <button type="button" onClick={props.onDismissAlert} className="h-8 rounded-lg bg-white/[0.08] px-3 text-[12.5px] font-semibold text-white/90 hover:bg-white/[0.14]">
                 Compris
               </button>
@@ -283,7 +289,7 @@ export function CounterIsland(props: CounterIslandProps) {
         );
         break;
       case "quiet":
-        body = <Row robot={robot(34)} title={T.quiet} sub={T.quietSub} />;
+        body = <Row robot={robot(30)} title={T.quiet} sub={T.quietSub} />;
         break;
     }
   }
@@ -322,14 +328,14 @@ export function CounterIsland(props: CounterIslandProps) {
 
 function Row({ robot, title, sub, trailing, icon, compact }: { robot: ReactNode; title: string; sub?: string; trailing?: ReactNode; icon?: ReactNode; compact?: boolean }) {
   return (
-    <div className={cn("flex items-center gap-3", compact ? "" : "px-3 py-2.5")}>
+    <div className={cn("flex items-center gap-2.5", compact ? "" : "px-2.5 py-2")}>
       {robot}
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1.5 truncate text-[14.5px] leading-5 font-semibold" aria-live="polite">
+        <p className="flex items-center gap-1.5 truncate text-[13.5px] leading-[18px] font-semibold" aria-live="polite">
           {icon}
           {title}
         </p>
-        {sub && <p className="truncate text-[12.5px] leading-[18px] text-white/60">{sub}</p>}
+        {sub && <p className="truncate text-[12px] leading-4 text-white/60">{sub}</p>}
       </div>
       {trailing}
     </div>
@@ -339,55 +345,119 @@ function Row({ robot, title, sub, trailing, icon, compact }: { robot: ReactNode;
 function AdviceCard({ item, outcome, onAnswer, readOnly }: { item: IslandAdvice; outcome: IslandOutcome; onAnswer: (outcome: IslandOutcome) => void; readOnly?: boolean }) {
   const stock = item.stock ? STOCK[item.stock] : null;
   return (
-    <li className="isl-line rounded-2xl p-2.5" style={{ background: C.panel, color: C.ink }}>
-      <div className="flex gap-2.5">
+    <li data-advice-card="" className="isl-line snap-start rounded-xl p-2" style={{ background: C.panel, color: C.ink }}>
+      <div className="flex gap-2">
         {item.image ? (
           // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
-          <img src={item.image} alt="" width={BANNER.sizes.thumb + 6} height={BANNER.sizes.thumb + 6} className="size-[52px] shrink-0 rounded-xl bg-white object-contain" />
+          <img src={item.image} alt="" width={40} height={40} className="size-10 shrink-0 rounded-lg bg-white object-contain" />
         ) : (
-          <span className="size-[52px] shrink-0 rounded-xl" style={{ background: C.line }} />
+          <span className="size-10 shrink-0 rounded-lg" style={{ background: C.line }} />
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <p className="truncate text-[13.5px] leading-5 font-bold">{item.name}</p>
-            {item.price && stock && item.stock !== "UNKNOWN" && <p className="shrink-0 text-[13px] font-bold tabular-nums">{item.price}</p>}
+            <p className="truncate text-[13px] leading-[18px] font-bold">{item.name}</p>
+            {item.price && stock && item.stock !== "UNKNOWN" && <p className="shrink-0 text-[12.5px] font-bold tabular-nums">{item.price}</p>}
           </div>
-          {item.reason && <p className="truncate text-[12px] leading-[17px]" style={{ color: C.inkSoft }}>{item.reason}</p>}
-          <div className="mt-1.5 flex flex-wrap gap-1">
+          {item.reason && <p className="truncate text-[11.5px] leading-4" style={{ color: C.inkSoft }}>{item.reason}</p>}
+          <div className="mt-1 flex flex-wrap gap-1">
             {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</Chip>}
             {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}
             {stock && <Chip bg={stock.bg} fg={stock.fg}>{stock.label}{item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}</Chip>}
           </div>
         </div>
       </div>
-      <div className="mt-2 flex items-center gap-1.5">
+      <div className="mt-1.5 flex items-center gap-1.5">
         {readOnly && !outcome ? (
-          <span className="inline-flex h-8 flex-1 items-center justify-center rounded-lg text-[12px] font-medium" style={{ background: C.line, color: C.inkSoft }}>
+          <span className="inline-flex h-7 flex-1 items-center justify-center rounded-lg text-[12px] font-medium" style={{ background: C.line, color: C.inkSoft }}>
             À proposer · le pharmacien valide
           </span>
         ) : outcome ? (
           <>
-            <span className="isl-pop inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg text-[12.5px] font-bold" style={outcome === "SOLD" ? { background: C.soldBg, color: C.soldFg } : { background: C.notSoldBg, color: C.notSoldFg }}>
+            <span className="isl-pop inline-flex h-7 flex-1 items-center justify-center gap-1 rounded-lg text-[12px] font-bold" style={outcome === "SOLD" ? { background: C.soldBg, color: C.soldFg } : { background: C.notSoldBg, color: C.notSoldFg }}>
               {outcome === "SOLD" && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}
               {outcome === "SOLD" ? T.sold : T.notSold}
             </span>
             {!readOnly && (
-              <button type="button" onClick={() => onAnswer(null)} className="h-8 rounded-lg px-2.5 text-[12px] font-semibold hover:bg-black/5" style={{ color: C.inkSoft }}>
+              <button type="button" onClick={() => onAnswer(null)} className="h-7 rounded-lg px-2.5 text-[12px] font-semibold hover:bg-black/5" style={{ color: C.inkSoft }}>
                 {T.change}
               </button>
             )}
           </>
         ) : (
           <>
-            <button type="button" onClick={() => onAnswer("SOLD")} className="h-8 flex-1 rounded-lg text-[12.5px] font-bold transition-[filter] hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
+            <button type="button" onClick={() => onAnswer("SOLD")} className="h-7 flex-1 rounded-lg text-[12px] font-bold transition-[filter] hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
               {T.sold}
             </button>
-            <button type="button" onClick={() => onAnswer("NOT_SOLD")} className="h-8 flex-1 rounded-lg text-[12.5px] font-bold transition-[filter] hover:brightness-95" style={{ background: C.notSoldBg, color: C.notSoldFg }}>
+            <button type="button" onClick={() => onAnswer("NOT_SOLD")} className="h-7 flex-1 rounded-lg text-[12px] font-bold transition-[filter] hover:brightness-95" style={{ background: C.notSoldBg, color: C.notSoldFg }}>
               {T.notSold}
             </button>
           </>
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * La liste des conseils, à hauteur fixe : au-delà, on DÉFILE dans l'île (molette, doigt, ou les flèches — un clic
+ * suffit, même quand le poste ne donne pas le clavier à l'île). Un dégradé en bas dit qu'il en reste ; « 2 / 3 » dit où
+ * l'on en est. L'île garde ainsi sa taille normale et ne masque pas le logiciel de gestion.
+ */
+function AdviceList({ maxHeight, count, children }: { maxHeight: number; count: number; children: ReactNode }) {
+  const list = useRef<HTMLUListElement>(null);
+  const [view, setView] = useState({ up: false, down: false, first: 1 });
+
+  const update = useCallback(() => {
+    const node = list.current;
+    if (!node) return;
+    const cards = [...node.querySelectorAll<HTMLElement>("[data-advice-card]")];
+    const top = node.scrollTop;
+    const index = cards.findIndex((card) => card.offsetTop + card.offsetHeight / 2 >= top);
+    setView({ up: top > 2, down: top + node.clientHeight < node.scrollHeight - 2, first: index < 0 ? 1 : index + 1 });
+  }, []);
+
+  useEffect(() => {
+    const node = list.current;
+    if (!node) return;
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [update, count]);
+
+  const scrollBy = (direction: 1 | -1) => {
+    const node = list.current;
+    if (!node) return;
+    const card = node.querySelector<HTMLElement>("[data-advice-card]");
+    node.scrollBy({ top: direction * ((card?.offsetHeight ?? 90) + 6), behavior: "smooth" });
+  };
+
+  const scrolls = view.up || view.down;
+  return (
+    <div className="relative mt-2">
+      <ul
+        ref={list}
+        onScroll={update}
+        aria-label={`${count} conseil${count > 1 ? "s" : ""}`}
+        className="isl-scroll snap-y snap-mandatory space-y-1.5 overflow-y-auto overscroll-contain"
+        style={{ maxHeight, paddingRight: scrolls ? 26 : 0 }}
+      >
+        {children}
+      </ul>
+      {view.down && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-7 rounded-b-xl bg-gradient-to-t from-[#0B0F14] to-transparent" />}
+      {scrolls && (
+        <div className="absolute top-0 right-0 bottom-0 flex w-6 flex-col items-center justify-between py-0.5">
+          <button type="button" onClick={() => scrollBy(-1)} disabled={!view.up} aria-label="Conseil précédent" className="flex size-6 items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-opacity hover:bg-white/[0.16] disabled:opacity-25">
+            <ChevronUp className="size-3.5" aria-hidden="true" />
+          </button>
+          <span className="text-[10px] font-semibold tabular-nums text-white/55" aria-live="polite">
+            {view.first}/{count}
+          </span>
+          <button type="button" onClick={() => scrollBy(1)} disabled={!view.down} aria-label="Conseil suivant" className="flex size-6 items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-opacity hover:bg-white/[0.16] disabled:opacity-25">
+            <ChevronDown className="size-3.5" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
