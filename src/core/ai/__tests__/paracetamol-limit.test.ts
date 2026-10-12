@@ -50,6 +50,34 @@ describe("Fervex : déjà du paracétamol dans la formule", () => {
   });
 });
 
+describe("une marque de rhume ne suffit pas : il faut du paracétamol dans la boîte", () => {
+  // Vu au comptoir le 12 oct. 2026 : un spray nasal Humex à la béclométasone déclenchait « déjà du paracétamol dans la formule ».
+  const humexFoins = (inn: string | null, atcCode: string | null) =>
+    drug({ name: "HUMEX RHUME DES FOINS A LA BECLOMETASONE 50 microgrammes/dose, suspension pour pulvérisation nasale en flacon", inn, atcCode, therapeuticClass: null, commonSideEffects: [] });
+
+  it("Humex Rhume des foins (béclométasone, spray nasal) : aucune alerte paracétamol, quelle que soit la fiche", () => {
+    for (const product of [humexFoins("BECLOMETASONE (DIPROPIONATE DE)", "R01AD01"), humexFoins(null, "R01AD01"), humexFoins(null, null)]) {
+      expect(containsParacetamol(product)).toBe(false);
+      expect(keys([product])).not.toContain("paracetamol-combination-limit");
+      expect(keys([product])).not.toContain("usage-paracetamol");
+      expect(keys([product, DOLIPRANE])).not.toContain("paracetamol-double-dose");
+    }
+  });
+
+  it("Nurofen Rhume (ibuprofène + pseudoéphédrine) : pas de paracétamol", () => {
+    const nurofen = drug({ name: "NUROFEN RHUME, comprimé pelliculé", inn: null, atcCode: null, therapeuticClass: null, commonSideEffects: [] });
+    expect(containsParacetamol(nurofen)).toBe(false);
+    expect(keys([nurofen])).not.toContain("paracetamol-combination-limit");
+  });
+
+  it("une composition connue fait foi : Humex Rhume au paracétamol oui, Humex sans paracétamol non", () => {
+    const humexRhume = drug({ name: "HUMEX RHUME, comprimé et gélule", inn: "PARACETAMOL, PSEUDOEPHEDRINE, CHLORPHENAMINE", atcCode: "R01BA52", therapeuticClass: null, commonSideEffects: [] });
+    expect(keys([humexRhume])).toContain("paracetamol-combination-limit");
+    const humexToux = drug({ name: "HUMEX TOUX SECHE OXOMEMAZINE", inn: "OXOMEMAZINE", atcCode: "R05DA", therapeuticClass: null, commonSideEffects: [] });
+    expect(keys([humexToux])).not.toContain("paracetamol-combination-limit");
+  });
+});
+
 describe("le paracétamol seul : le même plafond, en rappel", () => {
   it("Doliprane : 3 g par jour au maximum, 1 g par prise, 6 heures environ (4 heures minimum selon la notice) — en rappel, pas en alerte", () => {
     const usage = find([DOLIPRANE], "usage-paracetamol");

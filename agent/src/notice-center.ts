@@ -216,7 +216,11 @@ export function legacyContentOf(entry: HostEntry, seconds: number): ToastContent
 }
 
 export function encodeCommand(command: Record<string, unknown>): string {
-  return `${JSON.stringify(command).replace(/[\u2028\u2029]/g, " ")}\n`;
+  // Tout caractère hors ASCII part en échappement JSON (« é » → \u00e9) : la fenêtre Windows lit son entrée dans la page de
+  // code de la console (850, 437…), qui transformait « Paracétamol » en « Parac├®tamol » au comptoir (12 oct. 2026).
+  return `${JSON.stringify(command)
+    .replace(/[\u2028\u2029]/g, " ")
+    .replace(/[\u0080-\uffff]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)}\n`;
 }
 
 // ----------------------------------------------------------------------------------------------------------------

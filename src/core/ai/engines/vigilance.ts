@@ -76,6 +76,11 @@ export type VigilanceRule = {
   substances: string[];
   /** Une porte sur le NOM du médicament, quand l'ATC ne le distingue pas d'un autre (voir `name-gate.ts`). Elle s'ajoute à l'ATC et aux substances. */
   nameGate?: NameGate;
+  /**
+   * La règle ne vaut que si le médicament contient VRAIMENT du paracétamol (`containsParacetamol`) : une marque de
+   * rhume en a souvent, pas toujours (Humex Rhume des foins à la béclométasone est un spray nasal sans paracétamol).
+   */
+  paracetamolOnly?: boolean;
   /** Règle d'un produit pour animaux : elle ignore ATC et substances, et ne lit que le libellé reconnu. */
   veterinary?: VeterinaryMatch;
   /** L'explication, `{drug}` remplacé par le nom prescrit. */
@@ -115,7 +120,9 @@ export const VIGILANCE_TAGS = [
 ] as const;
 
 /** Les traitements du rhume et de la grippe qui contiennent du paracétamol (sans accents, en minuscules). */
-const PARACETAMOL_COLD_REMEDIES = ["fervex", "dolirhume", "humex", "actifed", "rhinofebral", "nurofen rhume"];
+// « Nurofen Rhume » n'y est plus : c'est de l'ibuprofène (avec de la pseudoéphédrine), sans paracétamol. Une marque ne suffit
+// jamais seule : la règle vérifie aussi que la boîte contient vraiment du paracétamol (`containsParacetamol`).
+const PARACETAMOL_COLD_REMEDIES = ["fervex", "dolirhume", "humex", "actifed", "rhinofebral"];
 
 const CORE_VIGILANCES: VigilanceRule[] = [
   {
@@ -318,6 +325,7 @@ const CORE_VIGILANCES: VigilanceRule[] = [
     subtitle: "Déjà du paracétamol dans la formule",
     atcPrefixes: ["N02BE51"],
     substances: PARACETAMOL_COLD_REMEDIES,
+    paracetamolOnly: true,
     explanationTemplate:
       "{drug} contient déjà du paracétamol (Fervex adultes : 500 mg par sachet, 3 sachets au plus par jour). Si le patient ajoute un autre produit au paracétamol (Doliprane, Dafalgan, Efferalgan…), le total ne doit pas dépasser 3 g par jour chez l'adulte : 1 g par prise au plus, une prise toutes les 6 heures environ (4 heures au minimum, selon la notice).",
     concerned: [
@@ -438,6 +446,7 @@ export function evaluateVigilances(drugs: DrugKnowledge[]): VigilanceResult[] {
       if (rule.veterinary) return isVeterinaryKnowledge(drug) && matchesVeterinary(rule.veterinary, drug.veterinary!);
       if (isVeterinaryKnowledge(drug)) return false;
       if (!passesNameGate(rule.nameGate, drug.name, drug.inn)) return false;
+      if (rule.paracetamolOnly && !containsParacetamol(drug)) return false;
       const atc = drug.atcCode ?? "";
       if (rule.atcPrefixes.some((prefix) => atc.startsWith(prefix))) return true;
       if (rule.systemicOnly && atc) return false;
@@ -477,12 +486,31 @@ export function vigilanceMessage(vigilance: Pick<VigilanceResult, "title" | "sub
   return `${vigilance.title} — ${vigilance.subtitle} : ${vigilance.explanation}`;
 }
 
-/** Ce médicament contient-il du paracétamol ? Par son code ATC (N02BE, N02AJ), par sa substance ou par le nom d'une marque connue. */
+/**
+ * Les classes ATC qui ne contiennent JAMAIS de paracétamol, même sous une marque de rhume : voie nasale (R01A), yeux (S01),
+ * peau (D), bouche et gorge (A01, R02). Humex Rhume des foins à la béclométasone (R01AD01) est un spray nasal.
+ */
+const NO_PARACETAMOL_ATC = ["R01A", "S01", "S02", "S03", "D", "A01", "R02"];
+
+/** Dans le libellé : une forme ou une substance qui exclut le paracétamol (spray nasal, collyre, corticoïde nasal, ibuprofène…). */
+const NO_PARACETAMOL_LABEL = /beclometasone|budesonide|fluticasone|mometasone|triamcinolone|des foins|nasal|pulv|spray|collyre|gouttes auriculaires|pastille|ibuprofene|nurofen/;
+
+/**
+ * Le médicament contient-il du paracétamol ? La composition fait foi quand on la connaît : une DCI renseignée sans
+ * paracétamol, c'est NON, quelle que soit la marque. Sinon, le code ATC du paracétamol, puis le nom — mais une marque de
+ * rhume (Humex, Actifed…) ne suffit pas si l'ATC ou le libellé montrent une autre voie ou une autre substance.
+ */
 export function containsParacetamol(drug: DrugKnowledge): boolean {
   if (isVeterinaryKnowledge(drug)) return false;
   const atc = drug.atcCode ?? "";
   if (atc.startsWith("N02BE") || atc.startsWith("N02AJ")) return true;
-  return /paracetamol|doliprane|dafalgan|efferalgan|fervex|dolirhume|humex|actifed|rhinofebral|ixprim|klipal|lamaline|izalgi|codoliprane|claradol|dolko/.test(norm(`${drug.inn ?? ""} ${drug.name}`));
+  const inn = norm(drug.inn ?? "").trim();
+  if (inn) return inn.includes("paracetamol");
+  const name = norm(drug.name);
+  if (name.includes("paracetamol")) return true;
+  if (atc && NO_PARACETAMOL_ATC.some((prefix) => atc.startsWith(prefix))) return false;
+  if (NO_PARACETAMOL_LABEL.test(name)) return false;
+  return /doliprane|dafalgan|efferalgan|fervex|dolirhume|humex|actifed|rhinofebral|ixprim|klipal|lamaline|izalgi|codoliprane|claradol|dolko/.test(name);
 }
 
 /**

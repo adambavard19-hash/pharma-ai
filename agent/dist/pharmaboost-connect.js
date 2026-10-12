@@ -4809,6 +4809,7 @@ var WEBVIEW2_SDK = {
   }
 };
 var ISLAND_WINDOW = { width: 600, height: 760, top: 6 };
+var ISLAND_OPEN_WIDTH = 420;
 var NOTICE_HOST_ILE_CSHARP = String.raw`
 using System;
 using System.Collections.Generic;
@@ -4868,6 +4869,13 @@ namespace PharmaBoostIle
     private readonly int processId;
     private NotifyIcon tray;
     private ToolStripMenuItem toggleItem;
+    // Le déplacement : la page dit « drag » quand on saisit l'île ; la fenêtre suit la souris tant que le bouton est tenu.
+    private readonly System.Windows.Forms.Timer dragTimer = new System.Windows.Forms.Timer();
+    private Point dragStart;
+    private Point dragOrigin;
+    private bool dragMoved;
+    private string positionFile = "";
+    private bool customPosition;
 
     public IleForm(string url, string loader, string userData)
     {
@@ -4893,6 +4901,8 @@ namespace PharmaBoostIle
 
       focusTimer.Interval = 250;
       focusTimer.Tick += delegate { GuardFocus(); };
+      dragTimer.Interval = 15;
+      dragTimer.Tick += delegate { DragStep(); };
       MakeTray();
     }
 
@@ -4932,6 +4942,75 @@ namespace PharmaBoostIle
       Bounds = new Rectangle(x, y, width, height);
       // Avant que la page dise sa forme : la capsule au repos (244 × 44 au centre), jamais un grand rectangle qui masquerait le logiciel.
       ApplyRegion(new List<float[]> { new float[] { (${ISLAND_WINDOW.width} - 250) / 2f, 5, 250, 50, 25 } });
+    }
+
+    /// <summary>La position choisie par l'équipe (fichier « x,y ») : vrai si elle a pu être reprise.</summary>
+    private bool PlaceSaved()
+    {
+      try
+      {
+        if (string.IsNullOrEmpty(positionFile) || !File.Exists(positionFile)) return false;
+        string[] parts = File.ReadAllText(positionFile).Trim().Split(',');
+        int x, y;
+        if (parts.Length != 2 || !int.TryParse(parts[0], out x) || !int.TryParse(parts[1], out y)) return false;
+        Location = Clamp(new Point(x, y));
+        customPosition = true;
+        return true;
+      }
+      catch (Exception) { return false; }
+    }
+
+    /// <summary>Garde l'île sur un écran : la partie centrale de la fenêtre (l'île ouverte, ${ISLAND_OPEN_WIDTH} px) reste visible.</summary>
+    private Point Clamp(Point p)
+    {
+      int width = Width, open = (int)Math.Round(${ISLAND_OPEN_WIDTH} * scale);
+      int side = Math.Max(0, (width - open) / 2);
+      Rectangle area = Screen.FromPoint(new Point(p.X + width / 2, p.Y + (int)(30 * scale))).WorkingArea;
+      int x = Math.Max(area.Left - side, Math.Min(p.X, area.Right - width + side));
+      int y = Math.Max(area.Top, Math.Min(p.Y, area.Bottom - (int)(120 * scale)));
+      return new Point(x, y);
+    }
+
+    private void SavePosition()
+    {
+      try { if (!string.IsNullOrEmpty(positionFile)) File.WriteAllText(positionFile, Location.X + "," + Location.Y); } catch (Exception) { }
+    }
+
+    private void BeginDrag()
+    {
+      dragStart = Cursor.Position;
+      dragOrigin = Location;
+      dragMoved = false;
+      dragTimer.Start();
+    }
+
+    /// <summary>Tant que le bouton gauche est tenu, la fenêtre suit la souris (au-delà de 4 pixels : en deçà, c'est un clic).</summary>
+    private void DragStep()
+    {
+      if ((Control.MouseButtons & MouseButtons.Left) == 0)
+      {
+        dragTimer.Stop();
+        if (dragMoved)
+        {
+          Location = Clamp(Location);
+          customPosition = true;
+          SavePosition();
+        }
+        if (!keyboard) GiveFocusBack();
+        return;
+      }
+      Point now = Cursor.Position;
+      int dx = now.X - dragStart.X, dy = now.Y - dragStart.Y;
+      if (!dragMoved && Math.Abs(dx) + Math.Abs(dy) < 4) return;
+      dragMoved = true;
+      Location = new Point(dragOrigin.X + dx, dragOrigin.Y + dy);
+    }
+
+    private void ResetPosition()
+    {
+      try { if (!string.IsNullOrEmpty(positionFile) && File.Exists(positionFile)) File.Delete(positionFile); } catch (Exception) { }
+      customPosition = false;
+      Place(rightSide ? "haut-droite" : "haut-centre");
     }
 
     public async void Start()
@@ -4994,7 +5073,18 @@ namespace PharmaBoostIle
       if (line.Contains("\"op\":\"init\""))
       {
         string position = line.Contains("\"position\":\"haut-droite\"") ? "haut-droite" : "haut-centre";
-        if ((position == "haut-droite") != rightSide) Place(position);
+        string file = "";
+        try
+        {
+          Dictionary<string, object> init = json.Deserialize<Dictionary<string, object>>(line);
+          if (init != null && init.ContainsKey("positionFile")) file = Convert.ToString(init["positionFile"]);
+        }
+        catch (Exception) { }
+        bool newFile = file.Length > 0 && file != positionFile;
+        if (newFile) positionFile = file;
+        // La position choisie à la main l'emporte, et ne se perd pas à chaque nouvelle commande.
+        if (newFile && PlaceSaved()) { }
+        else if (!customPosition && (position == "haut-droite") != rightSide) Place(position);
       }
       if (!pageReady)
       {
@@ -5045,6 +5135,10 @@ namespace PharmaBoostIle
           rects.Add(new float[] { ToF(r, "x"), ToF(r, "y"), ToF(r, "w"), ToF(r, "h"), ToF(r, "r") });
         }
         ApplyRegion(rects);
+      }
+      else if (type == "drag")
+      {
+        BeginDrag();
       }
       else if (type == "keyboard")
       {
@@ -5126,6 +5220,9 @@ namespace PharmaBoostIle
       toggleItem = new ToolStripMenuItem("Masquer la bannière");
       toggleItem.Click += delegate { ToggleVisible(); };
       menu.Items.Add(toggleItem);
+      ToolStripMenuItem resetItem = new ToolStripMenuItem("Remettre la bannière en haut au centre");
+      resetItem.Click += delegate { ResetPosition(); };
+      menu.Items.Add(resetItem);
       tray.ContextMenuStrip = menu;
       tray.DoubleClick += delegate { ToggleVisible(); };
       tray.Visible = true;
@@ -5158,8 +5255,10 @@ namespace PharmaBoostIle
       {
         try
         {
+          // Les commandes arrivent en UTF-8 (et l'agent n'y met plus que de l'ASCII) : jamais la page de code de la console.
+          StreamReader input = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false));
           string line;
-          while ((line = Console.In.ReadLine()) != null)
+          while ((line = input.ReadLine()) != null)
           {
             string copy = line;
             if (copy.Trim().Length == 0) continue;
@@ -5330,7 +5429,7 @@ function legacyContentOf(entry, seconds) {
   return { title: `PharmaBoost \xB7 ${entry.reference}`, subject: entry.subject, alerts: entry.alerts, advice, url: entry.url, seconds };
 }
 function encodeCommand(command) {
-  return `${JSON.stringify(command).replace(/[\u2028\u2029]/g, " ")}
+  return `${JSON.stringify(command).replace(/[\u2028\u2029]/g, " ").replace(/[\u0080-\uffff]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)}
 `;
 }
 var IMAGE_HOSTS = /* @__PURE__ */ new Set(["images.openbeautyfacts.org", "images.openfoodfacts.org", "images.openproductsfacts.org", "static.openfoodfacts.org"]);
@@ -6109,7 +6208,7 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
 var import_node_fs9 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path8 = require("node:path");
-var VERSION = "0.10.0";
+var VERSION = "0.10.1";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path8.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path8.join)((0, import_node_path8.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;

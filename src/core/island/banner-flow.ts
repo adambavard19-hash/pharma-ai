@@ -178,3 +178,23 @@ export function registerTap(taps: number[], now: number): { taps: number[]; tooM
   const recent = [...taps.filter((at) => now - at < TAP_WINDOW_MS), now];
   return { taps: recent, tooMany: recent.length >= RAPID_TAPS };
 }
+
+/** Une mise en garde lue en trois morceaux : le titre (« Paracétamol : 3 g par jour au maximum »), le sous-titre, le détail. */
+export type IslandAlertParts = { title: string; subtitle: string | null; detail: string };
+
+/**
+ * Les messages de mise en garde sont écrits « Titre — Sous-titre : Explication » (`vigilanceMessage`). L'île les remet en
+ * forme : titre en gras, sous-titre discret, explication lisible. Un message d'une autre forme reste entier dans le détail.
+ */
+export function splitAlert(message: string): IslandAlertParts {
+  const text = message.trim();
+  const dash = text.indexOf(" — ");
+  if (dash > 0) {
+    const title = text.slice(0, dash).trim();
+    const rest = text.slice(dash + 3);
+    const colon = rest.indexOf(" : ");
+    if (colon > 0 && colon < 90) return { title, subtitle: rest.slice(0, colon).trim(), detail: rest.slice(colon + 3).trim() };
+    return { title, subtitle: null, detail: rest.trim() };
+  }
+  return { title: "", subtitle: null, detail: text };
+}

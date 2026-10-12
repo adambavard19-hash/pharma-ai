@@ -106,6 +106,13 @@ describe("ce que la fenêtre reçoit pour une vente", () => {
     expect(line.slice(0, -1)).not.toMatch(/[\n\r\u2028\u2029]/);
     expect(JSON.parse(line).op).toBe("show");
   });
+
+  it("une commande ne contient que de l'ASCII : les accents arrivent intacts quelle que soit la page de code de Windows", () => {
+    const text = "Paracétamol : 3 g par jour au maximum — Déjà du paracétamol, à prendre à 2 h d'écart 💊";
+    const line = encodeCommand({ op: "show", text });
+    expect(line).toMatch(/^[\x00-\x7f]*$/);
+    expect(JSON.parse(line).text).toBe(text);
+  });
 });
 
 describe("d'où une photo peut venir", () => {

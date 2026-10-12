@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronUp, Loader2, Mail, PartyPopper, ScanLine, Send, TriangleAlert } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, GripVertical, Loader2, Mail, PartyPopper, ScanLine, Send, TriangleAlert } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { Robot } from "@/components/robot";
-import { analysisSteps, allAnswered, registerTap, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
+import { analysisSteps, allAnswered, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
 import { cn } from "@/lib/utils";
 import { IslandShell } from "./island-shell";
 
@@ -59,6 +59,10 @@ export type CounterIslandProps = {
   readOnly?: boolean;
   /** La hauteur de la liste des conseils, en pixels : au-delà, on défile DANS l'île (elle ne masque pas le logiciel de gestion). */
   listMaxHeight?: number;
+  /** Les mises en garde une par une (« Titre — Sous-titre : Explication ») : chacune mise en forme. À défaut, `alert.text`. */
+  alertItems?: string[];
+  /** L'île se déplace (poste Windows) : une poignée le montre au repos et au survol. */
+  movable?: boolean;
 };
 
 /** Hauteur par défaut de la liste des conseils : une carte et demie visibles, le reste se fait défiler. */
@@ -152,7 +156,7 @@ export function CounterIsland(props: CounterIslandProps) {
   } else if (peek) {
     body = (
       <div className="px-3 pt-2.5 pb-3">
-        <Row robot={robot(30)} title={title} sub="Je surveille le comptoir. Scannez une boîte pour commencer." compact />
+        <Row robot={robot(30)} title={title} sub={props.movable ? "Je surveille le comptoir. Glissez-moi pour me déplacer." : "Je surveille le comptoir. Scannez une boîte pour commencer."} compact />
         <div className="mt-2.5 grid grid-cols-3 gap-1.5">
           {pills.map((pill) => (
             <div key={pill.key} className="rounded-2xl bg-white/[0.06] px-2.5 py-2">
@@ -174,6 +178,7 @@ export function CounterIsland(props: CounterIslandProps) {
             {robot(28)}
             <span className="min-w-0 flex-1 truncate text-[13px] text-white/80">{title}</span>
             <span className="size-2 shrink-0 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} aria-label="Poste connecté" />
+            {props.movable && <GripVertical className="-mr-1.5 size-3.5 shrink-0 text-white/30" aria-hidden="true" />}
           </div>
         );
         break;
@@ -273,21 +278,29 @@ export function CounterIsland(props: CounterIslandProps) {
         );
         break;
       }
-      case "alert":
+      case "alert": {
+        const parts = (props.alertItems?.length ? props.alertItems : alert?.text ? [alert.text] : []).map(splitAlert);
         body = (
           <div className="px-3 pt-2.5 pb-3">
-            <Row robot={robot(30)} title={alert?.title ?? T.readFirst} sub={T.duringSale} compact icon={<TriangleAlert className="size-4 text-[#F5A623]" aria-hidden="true" />} />
-            <p className="isl-scroll mt-2 max-h-28 overflow-y-auto overscroll-contain rounded-xl px-3 py-2 text-[12.5px] leading-[18px]" style={{ background: "rgba(245,166,35,0.12)", color: "#FFE2B0" }}>
-              {alert?.text}
-            </p>
+            <Row robot={robot(30)} title={alert?.title ?? T.readFirst} sub={parts.length > 1 ? `${T.duringSale} · ${parts.length} points` : T.duringSale} compact icon={<TriangleAlert className="size-4 text-[#F5A623]" aria-hidden="true" />} />
+            <AdviceList maxHeight={176} count={parts.length} label={`${parts.length} point${parts.length > 1 ? "s" : ""} à lire`} noun="point">
+              {parts.map((part, index) => (
+                <li key={index} data-advice-card="" className="snap-start rounded-xl px-3 py-2" style={{ background: "rgba(245,166,35,0.10)", boxShadow: "inset 0 0 0 1px rgba(245,166,35,0.22)" }}>
+                  {part.title && <p className="text-[13px] leading-[18px] font-semibold text-[#FFD08A]">{part.title}</p>}
+                  {part.subtitle && <p className="text-[11.5px] leading-4 font-medium text-[#F5A623]/90">{part.subtitle}</p>}
+                  <p className={cn("text-[12.5px] leading-[18px] text-white/85", (part.title || part.subtitle) && "mt-1")}>{part.detail}</p>
+                </li>
+              ))}
+            </AdviceList>
             <div className="mt-2 flex justify-end">
-              <button type="button" onClick={props.onDismissAlert} className="h-8 rounded-lg bg-white/[0.08] px-3 text-[12.5px] font-semibold text-white/90 hover:bg-white/[0.14]">
+              <button type="button" onClick={props.onDismissAlert} className="h-8 rounded-lg px-3.5 text-[12.5px] font-bold" style={{ background: "#F5A623", color: "#2B1700" }}>
                 Compris
               </button>
             </div>
           </div>
         );
         break;
+      }
       case "quiet":
         body = <Row robot={robot(30)} title={T.quiet} sub={T.quietSub} />;
         break;
@@ -403,7 +416,7 @@ function AdviceCard({ item, outcome, onAnswer, readOnly }: { item: IslandAdvice;
  * suffit, même quand le poste ne donne pas le clavier à l'île). Un dégradé en bas dit qu'il en reste ; « 2 / 3 » dit où
  * l'on en est. L'île garde ainsi sa taille normale et ne masque pas le logiciel de gestion.
  */
-function AdviceList({ maxHeight, count, children }: { maxHeight: number; count: number; children: ReactNode }) {
+function AdviceList({ maxHeight, count, children, label, noun = "conseil" }: { maxHeight: number; count: number; children: ReactNode; label?: string; noun?: string }) {
   const list = useRef<HTMLUListElement>(null);
   const [view, setView] = useState({ up: false, down: false, first: 1 });
 
@@ -438,7 +451,7 @@ function AdviceList({ maxHeight, count, children }: { maxHeight: number; count: 
       <ul
         ref={list}
         onScroll={update}
-        aria-label={`${count} conseil${count > 1 ? "s" : ""}`}
+        aria-label={label ?? `${count} conseil${count > 1 ? "s" : ""}`}
         className="isl-scroll snap-y snap-mandatory space-y-1.5 overflow-y-auto overscroll-contain"
         style={{ maxHeight, paddingRight: scrolls ? 26 : 0 }}
       >
@@ -447,13 +460,13 @@ function AdviceList({ maxHeight, count, children }: { maxHeight: number; count: 
       {view.down && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-7 rounded-b-xl bg-gradient-to-t from-[#0B0F14] to-transparent" />}
       {scrolls && (
         <div className="absolute top-0 right-0 bottom-0 flex w-6 flex-col items-center justify-between py-0.5">
-          <button type="button" onClick={() => scrollBy(-1)} disabled={!view.up} aria-label="Conseil précédent" className="flex size-6 items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-opacity hover:bg-white/[0.16] disabled:opacity-25">
+          <button type="button" onClick={() => scrollBy(-1)} disabled={!view.up} aria-label={`${noun === "conseil" ? "Conseil" : "Point"} précédent`} className="flex size-6 items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-opacity hover:bg-white/[0.16] disabled:opacity-25">
             <ChevronUp className="size-3.5" aria-hidden="true" />
           </button>
           <span className="text-[10px] font-semibold tabular-nums text-white/55" aria-live="polite">
             {view.first}/{count}
           </span>
-          <button type="button" onClick={() => scrollBy(1)} disabled={!view.down} aria-label="Conseil suivant" className="flex size-6 items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-opacity hover:bg-white/[0.16] disabled:opacity-25">
+          <button type="button" onClick={() => scrollBy(1)} disabled={!view.down} aria-label={`${noun === "conseil" ? "Conseil" : "Point"} suivant`} className="flex size-6 items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-opacity hover:bg-white/[0.16] disabled:opacity-25">
             <ChevronDown className="size-3.5" aria-hidden="true" />
           </button>
         </div>

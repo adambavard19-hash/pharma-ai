@@ -35,7 +35,7 @@ import { ESSAI_LENGTH_MS, ESSAI_SEQUENCE } from "@/core/poste/island-fixtures";
  *  - seule dans un navigateur : rien n'arrive, sauf `?essai=1` qui joue une vente d'exemple.
  */
 
-type Outgoing = { type: "ready" } | { type: "word"; word: string } | { type: "region"; rects: RegionRect[] } | { type: "keyboard"; on: boolean };
+type Outgoing = { type: "ready" } | { type: "word"; word: string } | { type: "region"; rects: RegionRect[] } | { type: "keyboard"; on: boolean } | { type: "drag" } | { type: "dragEnd" };
 
 type WebViewBridge = { postMessage: (message: unknown) => void; addEventListener: (type: "message", listener: (event: { data: unknown }) => void) => void; removeEventListener: (type: "message", listener: (event: { data: unknown }) => void) => void };
 
@@ -106,6 +106,11 @@ const toAdvice = (entry: HostEntry): IslandAdvice[] =>
     image: item.image || undefined,
   }));
 
+/** Ce qu'on peut saisir pour déplacer l'île : tout, sauf les boutons, les champs, les liens et les listes qui défilent. */
+function isDragHandle(target: EventTarget | null): boolean {
+  return target instanceof Element && !target.closest("button, input, textarea, a, select, .isl-scroll");
+}
+
 export function PosteIsland() {
   const [view, dispatch] = useReducer(posteReducer, INITIAL_POSTE);
   const { send } = useBridge(useCallback((command: HostCommand) => dispatch({ type: "host", command, now: Date.now() }), []));
@@ -144,6 +149,7 @@ export function PosteIsland() {
 
   // La forme de l'île, envoyée à la fenêtre Windows à chaque changement (pendant les animations comprises).
   const root = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   useEffect(() => {
     let last: RegionRect[] = [];
     let frame = 0;
@@ -177,6 +183,8 @@ export function PosteIsland() {
     items,
     drug,
     alert,
+    alertItems: entry?.alerts ?? [],
+    movable: true,
     pills: [{ key: "poste", label: view.postLabel || "Comptoir", value: "Connecté", dot: C.accent }],
     look: view.look,
     onAnswer: (index, outcome) => {
@@ -197,7 +205,34 @@ export function PosteIsland() {
   return (
     <>
       <style>{`${ISLAND_CSS}\nhtml,body{background:transparent!important;overflow:hidden;}`}</style>
-      <div ref={root} data-ile-root="" className="flex w-full flex-col items-center gap-2 pt-[5px] select-none">
+      <div
+        ref={root}
+        data-ile-root=""
+        title="Glissez pour déplacer la bannière"
+        className="flex w-full cursor-grab flex-col items-center gap-2 pt-[5px] select-none active:cursor-grabbing [&_button]:cursor-pointer [&_input]:cursor-text"
+        onPointerDown={(event) => {
+          // Saisir l'île (hors bouton, champ ou liste qui défile) : la fenêtre Windows suit la souris tant que le bouton est tenu.
+          if (event.button !== 0 || !isDragHandle(event.target)) return;
+          drag.current = { x: event.screenX, y: event.screenY, moved: false };
+          send({ type: "drag" });
+        }}
+        onPointerMove={(event) => {
+          const start = drag.current;
+          if (start && !start.moved && Math.hypot(event.screenX - start.x, event.screenY - start.y) > 4) start.moved = true;
+        }}
+        onPointerUp={(event) => {
+          const start = drag.current;
+          if (start && !start.moved && Math.hypot(event.screenX - start.x, event.screenY - start.y) > 4) start.moved = true;
+        }}
+        onClickCapture={(event) => {
+          // Un déplacement n'est pas un clic : le robot ne rit pas, aucune carte ne s'ouvre.
+          if (drag.current?.moved) {
+            event.stopPropagation();
+            event.preventDefault();
+          }
+          drag.current = null;
+        }}
+      >
         {!questionsOnly && <CounterIsland {...islandProps} />}
 
         {showQuestions && entry && (
