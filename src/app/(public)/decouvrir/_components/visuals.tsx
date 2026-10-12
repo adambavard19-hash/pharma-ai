@@ -3,6 +3,7 @@ import { BannerMock, type BannerMockItem } from "./banner-mock";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { ANALGESIC_TREE, evaluateTree } from "@/core/counter/question-tree";
 import { cn } from "@/lib/utils";
+import { CounterIslandStill } from "@/components/island/counter-island-still";
 
 /**
  * Les écrans de PharmaBoost redessinés pour le site : textes et structure
@@ -106,9 +107,9 @@ export function HeroVisual() {
         </div>
       </div>
 
-      {/* La bannière PharmaBoost, par-dessus le logiciel */}
-      <div className="relative -mt-12 sm:-mt-14 sm:ml-auto sm:w-[90%]">
-        <BannerMock subject={DOXY} items={HERO_ITEMS} width={480} align="end" />
+      {/* La bannière PharmaBoost, en île, par-dessus le logiciel : notre robot dedans, les deux conseils du scan. */}
+      <div className="relative -mt-12 flex justify-center sm:-mt-14 sm:justify-end [&_section]:max-w-full">
+        <CounterIslandStill items={HERO_ITEMS} drug={DOXY} className="w-full max-w-[500px] [&>div]:flex [&>div]:justify-center sm:[&>div]:justify-end" />
       </div>
 
     </div>

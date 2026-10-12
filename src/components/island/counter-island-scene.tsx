@@ -67,9 +67,9 @@ export function CounterIslandScene({ items, drug, alert, framed = false }: { ite
       <style>{ISLAND_CSS}</style>
       <LgoBackdrop />
       <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center px-3 pt-4">
-        <div className="pointer-events-auto flex items-start gap-2.5">
+        <div className="pointer-events-auto flex max-w-full items-start gap-2.5">
           <ServicePill pill={PILLS[0]} className="mt-1.5 hidden lg:flex" />
-          {island}
+          <div className="max-w-full min-w-0 [&_section]:max-w-full">{island}</div>
           <div className="mt-1.5 hidden flex-col gap-1.5 lg:flex">
             <ServicePill pill={PILLS[1]} />
             <ServicePill pill={PILLS[2]} />

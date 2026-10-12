@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, Thermometer, TriangleAlert } from "lucide-react";
 import { fr, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
-import { HeroVisual, QuestionVisual, RequestVisual, StockMarginVisual, TeamVisual, ExampleTag } from "./_components/visuals";
+import { HERO_ITEMS, HeroVisual, QuestionVisual, RequestVisual, StockMarginVisual, TeamVisual, ExampleTag } from "./_components/visuals";
 import { BannerPillsInline } from "./_components/banner-mock";
 import { VideoButton } from "./_components/video-dialog";
 import { HeroRobot } from "./_components/hero-robot";
-import { BannerDemo } from "./_components/banner-demo";
+import { CounterIslandScene } from "@/components/island/counter-island-scene";
+import { VIGILANCE_RULES } from "@/core/ai/engines/vigilance";
 import { loadLiveProof } from "@/server/services/site-leads";
 import { loadPublicPricing } from "@/server/services/public-pricing";
 import { formatEuros } from "@/core/billing/subscription";
@@ -76,14 +77,14 @@ export default async function SitePage() {
       {/* ---- La bannière du comptoir, vivante -------------------------- */}
       <section id="banniere" className="scroll-mt-20 border-t border-border-subtle">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-          <SectionHead kicker="Au comptoir" title="Une petite bannière, à côté de votre logiciel.">
-            Elle attend votre prochain scan, pose la bonne question quand il le faut, rappelle les mises en garde — comme 3 g de paracétamol par jour au maximum — et reste là jusqu&apos;à la fin de la vente. Elle ne prend jamais la main sur votre logiciel de gestion.
+          <SectionHead kicker="Au comptoir" title="Une petite île, à côté de votre logiciel.">
+            Notre robot y vit : il attend votre prochain scan, coche son analyse, montre les conseils pris dans votre rayon, rappelle les mises en garde — comme les minéraux à prendre à distance d&apos;une cycline — et reste là jusqu&apos;à la fin de la vente. Elle ne prend jamais la main sur votre logiciel de gestion.
           </SectionHead>
           <div className="mt-10">
-            <BannerDemo />
+            <CounterIslandScene framed items={HERO_ITEMS} drug={HERO_DRUG} alert={heroAlert()} />
           </div>
-          {/* Pas « fidèle » : la bannière n'a pas encore été vue dessinée sur un poste Windows. */}
-          <p className="mt-4 text-center text-[13px] text-text-tertiary">Animation de la bannière du poste de caisse, reproduite pour le site. Médicaments, produits et prix : exemples.</p>
+          {/* Pas « fidèle » : l'île n'a pas encore été vue dessinée sur un poste Windows. */}
+          <p className="mt-4 text-center text-[13px] text-text-tertiary">Animation de la bannière PharmaBoost, reproduite pour le site. Touchez Vendu, Non vendu ou Vente terminée pour l&apos;essayer. Médicaments, produits et prix : exemples.</p>
         </div>
       </section>
 
@@ -286,4 +287,12 @@ function Figure({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-mono text-[11px] tracking-[0.12em] text-text-tertiary uppercase">{label}</p>
     </div>
   );
+}
+
+const HERO_DRUG = "DOXYCYCLINE 100 mg";
+
+/** La mise en garde jouée dans l'île : une vraie règle de vigilance du moteur (cyclines et minéraux). */
+function heroAlert(): { title: string; text: string } | null {
+  const rule = VIGILANCE_RULES.find((r) => r.key === "cycline-quinolone-chelation");
+  return rule ? { title: rule.title, text: rule.explanationTemplate.replaceAll("{drug}", HERO_DRUG) } : null;
 }

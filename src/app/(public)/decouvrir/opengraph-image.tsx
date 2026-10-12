@@ -6,8 +6,8 @@ import { BannerMascot } from "./_components/banner-mock";
 
 /**
  * L'image de partage du site (1200 × 630) : celle qu'affichent une messagerie, LinkedIn ou un e-mail quand on colle le lien
- * de pharmaboost.app. La promesse de l'accueil (« Scan. Conseil. Bilan. »), la marque, et la bannière du poste de caisse en
- * version simplifiée — ses couleurs et ses phrases viennent de BANNER, comme la vraie. Produits et prix : « exemple ».
+ * de pharmaboost.app. La promesse de l'accueil (« Scan. Conseil. Bilan. »), la marque, et la bannière du comptoir en île
+ * (capsule noire, le robot dedans), simplifiée — ses couleurs et ses phrases viennent de BANNER, comme la vraie. Produits et prix : « exemple ».
  *
  * Générée une fois au build (aucune donnée de requête). La police est Plus Jakarta Sans, celle du site, en TTF (le moteur
  * d'image ne lit pas le woff2) : deux graisses dans `_og/`, sous licence SIL OFL (`_og/OFL.txt`).
@@ -65,25 +65,25 @@ export default async function Image() {
           <div style={{ display: "flex", fontSize: 28, fontWeight: 500, color: SITE.inkSoft, lineHeight: 1.3 }}>Le copilote du comptoir officinal.</div>
         </div>
 
-        {/* La bannière du poste de caisse, simplifiée */}
+        {/* La bannière du comptoir en île (capsule noire, notre robot dedans), simplifiée */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "center", flex: 1, paddingRight: 64 }}>
           <div
             style={{
               display: "flex",
               flexDirection: "column",
               width: 480,
-              borderRadius: 26,
-              background: `linear-gradient(180deg, ${C.cardTop}, ${C.cardBottom})`,
-              boxShadow: "0 30px 60px rgba(3,24,38,0.28)",
+              borderRadius: 34,
+              background: "#0B0F14",
+              boxShadow: "0 0 0 1.5px rgba(54,232,200,0.35), 0 0 40px rgba(54,232,200,0.25), 0 30px 60px rgba(3,24,38,0.35)",
               padding: "0 12px 12px",
-              color: C.text,
+              color: "#FFFFFF",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", height: 96, gap: 14, paddingLeft: 4 }}>
               <BannerMascot uid="og" mood="idea" style={{ width: 80, height: 80 }} />
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: 24, fontWeight: 700 }}>{T.brand}</span>
-                <span style={{ fontSize: 17, fontWeight: 500, color: C.muted }}>{withCount(T.forSaleMany, ROWS.length)}</span>
+                <span style={{ fontSize: 21, fontWeight: 700 }}>{withCount(T.forSaleMany, ROWS.length)}</span>
+                <span style={{ fontSize: 17, fontWeight: 500, color: "rgba(255,255,255,0.6)" }}>{T.forDrug}DOXYCYCLINE 100 mg</span>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", background: C.panel, borderRadius: 20, padding: "14px 18px 16px", color: C.ink }}>

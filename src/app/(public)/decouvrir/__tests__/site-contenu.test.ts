@@ -147,7 +147,8 @@ describe("les mots du site suivent le code, sans promesse", () => {
     expect(homeText).not.toContain("aussitôt");
     expect(homeText).toContain("La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu'il est utile de conseiller en plus, pris dans votre rayon.");
     expect(homeText).not.toContain("fidèle");
-    expect(homeText).toContain("Animation de la bannière du poste de caisse, reproduite pour le site. Médicaments, produits et prix : exemples.");
+    expect(homeText).toContain("Animation de la bannière PharmaBoost, reproduite pour le site.");
+    expect(homeText).toContain("Médicaments, produits et prix : exemples.");
   });
 
   it("dit l'ordre du départage du moteur : les laboratoires préférés, puis la date courte, puis le challenge", () => {
