@@ -23,11 +23,11 @@ export function fr(text: string): string {
 /** Le filet de la marque : du vert au bleu du symbole. */
 export const HAIRLINE = "bg-gradient-to-r from-brand-500 via-[#0796b4] to-transparent";
 
-export function SiteWordmark({ className }: { className?: string }) {
+export function SiteWordmark({ className, robot = true }: { className?: string; robot?: boolean }) {
   return (
     <Link href="/decouvrir" className={cn("flex items-center gap-2.5 rounded-md", className)} aria-label="PharmaBoost, accueil">
-      {/* Le robot du logo, sans son fond : il flotte, vivant, à côté du nom. */}
-      <FloatingRobot className="h-[40px] w-[34px]" track />
+      {/* Le robot du logo, sans son fond : il flotte, vivant, à côté du nom (dans l'en-tête, il vit dans l'île). */}
+      {robot && <FloatingRobot className="h-[40px] w-[34px]" track />}
       <span className="text-[17px] font-semibold tracking-[-0.01em] text-text-primary max-[389px]:text-[16px]">
         Pharma<span className="text-brand-600">Boost</span>
       </span>
@@ -40,19 +40,21 @@ export function SiteWordmark({ className }: { className?: string }) {
  * et, à 320 px, le menu sortait de l'écran. De 360 à 389 px, l'appel et la marque se resserrent ; sous 360 px, l'appel se
  * réduit à « Démo » (le lien garde son nom entier pour les lecteurs d'écran). À 390 px et au-delà, rien ne change.
  */
-export function SiteHeader() {
+export function SiteHeader({ island }: { island?: ReactNode }) {
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-border-subtle bg-surface-app/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-5">
-        <SiteWordmark />
-        <nav className="ml-6 hidden items-center gap-0.5 xl:flex" aria-label="Sections">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-5 max-[389px]:px-3">
+        {/* L'île PharmaBoost : au milieu de l'en-tête, et devant le nom sur téléphone (le robot y vit, une seule fois). */}
+        {island && <div className="flex max-md:order-first md:order-2 md:mx-auto">{island}</div>}
+        <SiteWordmark robot={!island} className="md:order-1" />
+        <nav className="ml-6 hidden items-center gap-0.5 md:order-1 xl:flex" aria-label="Sections">
           {NAV.map((item) => (
             <Link key={item.href} href={item.href} className="rounded-full px-3 py-2 text-[13.5px] font-medium whitespace-nowrap text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary">
               {item.label}
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-1.5 max-[389px]:gap-1">
+        <div className="ml-auto flex items-center gap-1.5 md:order-3 md:ml-0 max-[389px]:gap-1">
           <Link href="/login" className="hidden rounded-full px-3 py-2 text-[13.5px] font-medium whitespace-nowrap text-text-secondary hover:bg-surface-sunken hover:text-text-primary xl:inline-block">
             Se connecter
           </Link>

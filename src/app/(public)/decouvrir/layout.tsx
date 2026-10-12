@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "./_components/site-shell";
 import { SHARE_BASE } from "./_components/share-metadata";
-import { SiteRobotCompanion } from "./_components/site-companion";
+import { PublicIslandLoader } from "@/components/island/public-island-loader";
+import { HERO_ITEMS } from "./_components/visuals";
+import { VIGILANCE_RULES } from "@/core/ai/engines/vigilance";
 import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 
 /**
@@ -33,11 +35,23 @@ export const metadata: Metadata = {
 export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh bg-surface-app text-text-primary">
-      <SiteHeader />
+      {/* L'île PharmaBoost dans l'en-tête : le comptoir en démonstration, les raccourcis, le robot qui répond. Elle remplace
+          le petit robot de l'en-tête et le compagnon d'en bas : un seul robot à l'écran (plus le grand de l'accueil). */}
+      <SiteHeader island={<PublicIslandLoader demo={islandDemo()} />} />
       <main>{children}</main>
       <SiteFooter contactEmail={PUBLIC_CONTACT_EMAIL} />
-      {/* Le robot compagnon : il suit la lecture, en bas à droite. */}
-      <SiteRobotCompanion />
     </div>
   );
+}
+
+const DOXY = "DOXYCYCLINE 100 mg";
+
+/** L'exemple joué dans l'île : les deux conseils de l'accueil (vraies règles du moteur) et une vraie mise en garde. */
+function islandDemo() {
+  const rule = VIGILANCE_RULES.find((r) => r.key === "cycline-quinolone-chelation");
+  return {
+    items: HERO_ITEMS.map(({ name, price, drug, reason, challenge, shortDate, stock, quantity, image }) => ({ name, price, drug, reason, challenge, shortDate, stock, quantity, image })),
+    drug: DOXY,
+    alert: rule ? { title: rule.title, text: rule.explanationTemplate.replaceAll("{drug}", DOXY) } : null,
+  };
 }

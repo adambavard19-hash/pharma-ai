@@ -81,7 +81,7 @@ const TONE_DOT: Record<IslandTone, string> = { warning: "#F5A623", todo: "#36E8C
 const OPEN_WIDTH = 540;
 const CHAT_WIDTH = 580;
 const RESTING_WIDTH = 236;
-const COMPACT_WIDTH = 64;
+const COMPACT_WIDTH = 52;
 
 export function PlatformIsland({
   label,

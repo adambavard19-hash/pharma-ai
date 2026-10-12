@@ -58,6 +58,12 @@ export type AssistantProfile = {
   runTool: (name: string, input: unknown) => Promise<{ ok: boolean; output: unknown }>;
   labels: Record<string, string>;
   maxSteps: number;
+  /** Un autre modèle que celui de la console (le robot du site public : un modèle économique), son effort, sa longueur. */
+  model?: string;
+  effort?: "low" | "medium" | "high";
+  maxTokens?: number;
+  /** Le repli automatique sur refus (beta) : seulement pour les modèles qui l'acceptent. Vrai par défaut. */
+  serverFallback?: boolean;
 };
 
 const ADMIN_PROFILE: AssistantProfile = {
@@ -103,15 +109,15 @@ export async function runAssistantLoop(
 
   for (let step = 1; step <= profile.maxSteps; step++) {
     if (deps.signal?.aborted) return;
+    const fallback = profile.serverFallback !== false;
     const call = stream({
-      model: env.ADMIN_ASSISTANT_MODEL,
-      max_tokens: 16_000,
+      model: profile.model ?? env.ADMIN_ASSISTANT_MODEL,
+      max_tokens: profile.maxTokens ?? 16_000,
       system,
-      tools,
+      ...(tools.length ? { tools } : {}),
       messages,
-      output_config: { effort: env.ADMIN_ASSISTANT_EFFORT },
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
+      output_config: { effort: profile.effort ?? env.ADMIN_ASSISTANT_EFFORT },
+      ...(fallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
       stream: true,
     });
     call.on("text", (delta) => emit({ type: "text", delta }));

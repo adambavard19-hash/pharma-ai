@@ -85,6 +85,8 @@ const envSchema = z.object({
   ADMIN_ASSISTANT_MODEL: z.string().default("claude-opus-5-5"),
   /** Effort du robot de la console : « low » répond vite, « medium » réfléchit davantage. */
   ADMIN_ASSISTANT_EFFORT: z.enum(["low", "medium", "high"]).default("low"),
+  /** Le robot du site public (questions des visiteurs sur PharmaBoost) : un modèle économique, réglable. */
+  PUBLIC_ASSISTANT_MODEL: z.string().default("claude-haiku-5-5"),
   /**
    * Autorisation EXPLICITE de transmettre l'image d'une ordonnance à un
    * fournisseur tiers.
