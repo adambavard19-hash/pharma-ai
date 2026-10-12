@@ -1,4 +1,4 @@
-import { cleanText, normalizeEmail, normalizePhone, normalizePostalCode, normalizeSiret, personName } from "./identity";
+import { cleanText, digitsOnly, normalizeEmail, normalizePhone, normalizePostalCode, normalizeSiret, personName } from "./identity";
 
 /**
  * Le formulaire de souscription du site, validé et normalisé avant tout
@@ -31,7 +31,8 @@ export type NormalizedReferee = { name: string | null; email: string; phone: str
 export type NormalizedRequest = {
   name: string;
   legalName: string;
-  siret: string;
+  /** Le SIRET tel que saisi (chiffres seuls), JAMAIS refusé : choix du fondateur. `null` si rien n'a été saisi ; l'équipe vérifie. */
+  siret: string | null;
   finessNumber: string | null;
   addressLine1: string;
   postalCode: string;
@@ -51,7 +52,8 @@ export function normalizeSubscriptionRequest(input: SubscriptionRequestInput): {
   const errors: Record<string, string> = {};
   const name = cleanText(input.pharmacyName);
   const legalName = cleanText(input.legalName);
-  const siret = normalizeSiret(input.siret);
+  // Le SIRET n'est jamais refusé (choix du fondateur) : valide, il est normalisé ; sinon gardé tel que saisi.
+  const siret = normalizeSiret(input.siret) ?? (digitsOnly(input.siret) || cleanText(input.siret));
   const postalCode = normalizePostalCode(input.postalCode);
   const email = normalizeEmail(input.ownerEmail);
   const first = personName(input.ownerFirstName);
@@ -59,7 +61,6 @@ export function normalizeSubscriptionRequest(input: SubscriptionRequestInput): {
   const phone = input.phone?.trim() ? normalizePhone(input.phone) : null;
   if (!name) errors.pharmacyName = "Indiquez le nom de la pharmacie.";
   if (!legalName) errors.legalName = "Indiquez la raison sociale.";
-  if (!siret) errors.siret = "Ce SIRET n'est pas valide (14 chiffres).";
   if (!cleanText(input.addressLine1)) errors.addressLine1 = "Indiquez l'adresse.";
   if (!postalCode) errors.postalCode = "Code postal à 5 chiffres.";
   if (!cleanText(input.city)) errors.city = "Indiquez la ville.";
@@ -75,7 +76,7 @@ export function normalizeSubscriptionRequest(input: SubscriptionRequestInput): {
     value: {
       name: name!,
       legalName: legalName!,
-      siret: siret!,
+      siret,
       finessNumber: cleanText(input.finessNumber),
       addressLine1: cleanText(input.addressLine1)!,
       postalCode: postalCode!,

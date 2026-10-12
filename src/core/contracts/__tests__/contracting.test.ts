@@ -106,7 +106,15 @@ describe("souscription depuis le site", () => {
     const r = normalizeSubscriptionRequest({ ...input, siret: "123", ownerEmail: "marc@", postalCode: "130" });
     expect(r.ok).toBe(false);
     if (r.ok) return;
-    expect(Object.keys(r.errors).sort()).toEqual(["ownerEmail", "postalCode", "siret"]);
+    expect(Object.keys(r.errors).sort()).toEqual(["ownerEmail", "postalCode"]);
+  });
+
+  it("accepte tout SIRET, même non conforme ou vide, gardé tel que saisi (choix du fondateur)", () => {
+    for (const [typed, kept] of [["123 456 789 00012", "12345678900012"], ["123", "123"], ["", null]] as const) {
+      const r = normalizeSubscriptionRequest({ ...input, siret: typed });
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.value.siret).toBe(kept);
+    }
   });
 });
 

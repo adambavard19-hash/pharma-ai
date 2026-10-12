@@ -36,15 +36,16 @@ export default async function SubscribePage({ searchParams }: { searchParams: Pr
             ? "Une question à la fois, environ deux minutes, puis le paiement sécurisé par prélèvement SEPA ou carte. Votre espace PharmaBoost s'ouvre aussitôt."
             : "Une question à la fois, environ deux minutes. Le contrat prérempli vous est ensuite envoyé pour une signature en ligne."}
         </p>
-        <p className="mt-4 inline-flex flex-wrap items-baseline gap-x-2 rounded-full border border-border-subtle bg-surface-card px-4 py-2 text-[13.5px] text-text-secondary lg:hidden">
+        <p className="mt-4 inline-flex flex-wrap items-baseline gap-x-2 rounded-2xl border border-border-subtle bg-surface-card px-4 py-2 text-[13.5px] text-text-secondary lg:hidden">
           <span className="font-semibold text-text-primary">{pricing.name}</span>
           <span className="tabular-nums">{offer.price}</span>
+          {setupFeeCents > 0 && <span className="tabular-nums">+ {formatPriceEuros(setupFeeCents)} HT de mise en service, une seule fois</span>}
           <span>· engagement de {commitmentMonths} mois</span>
         </p>
       </div>
       {params.paiement === "annule" && <p className="mb-5 max-w-2xl rounded-xl bg-warning-50 px-4 py-3 text-[13.5px] text-warning-900">Le paiement n&apos;a pas été finalisé : rien n&apos;a été prélevé. Vous pouvez reprendre le formulaire, ou nous écrire.</p>}
       {referralCode && <p className="mb-5 max-w-2xl rounded-xl bg-brand-50 px-4 py-3 text-[13.5px] text-brand-900">Vous venez de la part d&apos;une officine équipée : son code <strong className="tabular-nums">{referralCode}</strong> est déjà renseigné.</p>}
-      <SubscriptionForm planId={pricing.planId} offer={offer} offerLabel={`${offer.name} — ${offer.price}, engagement de ${commitmentMonths} mois`} referral={referral} referralCode={referralCode} payOnline={payOnline} />
+      <SubscriptionForm planId={pricing.planId} offer={offer} offerLabel={`${offer.name} — ${offer.price}${setupFeeCents > 0 ? ` + ${formatPriceEuros(setupFeeCents)} HT de mise en service` : ""}, engagement de ${commitmentMonths} mois`} referral={referral} referralCode={referralCode} payOnline={payOnline} />
     </div>
   );
 }

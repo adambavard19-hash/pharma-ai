@@ -126,7 +126,7 @@ export function SubscriptionForm({ planId, offer, offerLabel, referral, referral
   const steps = useMemo<FlowStep<Values>[]>(() => {
     const first = (v: Values) => personName(v.ownerFirstName) ?? "";
     return [
-      ...officineSteps<Values>({ keys: { siret: "siret", name: "pharmacyName", legalName: "legalName", addressLine1: "addressLine1", postalCode: "postalCode", city: "city", finessNumber: "finessNumber", phone: "phone" }, validate }),
+      ...officineSteps<Values>({ keys: { siret: "siret", name: "pharmacyName", legalName: "legalName", addressLine1: "addressLine1", postalCode: "postalCode", city: "city", finessNumber: "finessNumber", phone: "phone" }, validate, lenientSiret: true }),
       {
         id: "points-de-vente",
         section: "L'officine",

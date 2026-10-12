@@ -27,7 +27,7 @@ type Values = Record<string, unknown> & { prefill: Prefill };
 
 const text = (values: Values, key: string) => String(values[key] ?? "");
 
-export function officineSteps<V extends Values>({ keys, validate, section = "L'officine" }: { keys: OfficineKeys; validate: (values: V, fields: string[]) => FlowErrors; section?: string }): FlowStep<V>[] {
+export function officineSteps<V extends Values>({ keys, validate, section = "L'officine", lenientSiret = false }: { keys: OfficineKeys; validate: (values: V, fields: string[]) => FlowErrors; section?: string; /** Tout SIRET accepté, sans message de non-conformité. */ lenientSiret?: boolean }): FlowStep<V>[] {
   const fromRegistry = (values: V, key: string) => {
     const value = text(values, key).trim();
     return Boolean(value) && values.prefill?._siret === digitsOnly(text(values, keys.siret)) && values.prefill?.[key] === value;
@@ -49,6 +49,7 @@ export function officineSteps<V extends Values>({ keys, validate, section = "L'o
           value={text(values, keys.siret)}
           onValueChange={(value) => set(keys.siret as keyof V, value as V[keyof V])}
           error={errors[keys.siret]}
+          lenient={lenientSiret}
           prefill={values.prefill ?? {}}
           onApply={(company) => {
             const result = applyCompany(values, company, { name: keys.name, legalName: keys.legalName, addressLine1: keys.addressLine1, postalCode: keys.postalCode, city: keys.city, finessNumber: keys.finessNumber }, values.prefill ?? {});

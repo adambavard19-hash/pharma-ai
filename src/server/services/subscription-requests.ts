@@ -8,6 +8,7 @@ import { notifyAdmins, notifySalesRep } from "@/server/services/sales/notificati
 import { platformEmailContext } from "@/server/services/email-context";
 import { traceDispatch } from "@/server/services/email-dispatch";
 import { resolveReferralCode } from "@/server/services/referral";
+import { isValidSiret } from "@/core/contracts/identity";
 import { loadPublicPricing } from "@/server/services/public-pricing";
 import { proposeReferee, reconcileNewProspect } from "@/server/services/referral-leads";
 import { formatPriceEuros } from "@/core/pricing/official-offer";
@@ -51,7 +52,7 @@ export async function requestSubscription(input: SubscriptionRequestInput, selfS
   if (!normalized.ok) return normalized;
   const v = normalized.value;
   // Un même SIRET n'est traité qu'une fois à la fois : deux envois du formulaire ne créent pas deux dossiers.
-  const outcome = await withAdvisoryLock(`subscription:${v.siret}`, () => handleRequest(v, input, selfService));
+  const outcome = await withAdvisoryLock(`subscription:${v.siret && isValidSiret(v.siret) ? v.siret : `email:${v.email}`}`, () => handleRequest(v, input, selfService));
   return { ok: true, outcome };
 }
 
@@ -69,10 +70,14 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
   const terms = `${formatPriceEuros(pricing.monthlyPriceCents)} HT / mois, engagement ${pricing.commitmentMonths} mois, mise en service ${formatPriceEuros(pricing.setupFeeCents)} HT`;
 
   // 1. Officine déjà cliente, ou dossier déjà ouvert pour ce SIRET : on rattache, on ne touche à rien.
-  const [pharmacyBySiret, prospectsBySiret] = await Promise.all([
-    prisma.pharmacy.findFirst({ where: { siret: v.siret }, select: { id: true, name: true, prospect: { select: { id: true } } } }),
-    prisma.prospect.findMany({ where: { siret: v.siret }, select: { id: true, name: true, salesRepId: true }, orderBy: { createdAt: "asc" } }),
-  ]);
+  // Un SIRET non conforme est accepté tel quel (choix du fondateur) mais ne sert pas à rapprocher : il ne prouve rien.
+  const knownSiret = v.siret && isValidSiret(v.siret) ? v.siret : null;
+  const [pharmacyBySiret, prospectsBySiret] = knownSiret
+    ? await Promise.all([
+        prisma.pharmacy.findFirst({ where: { siret: knownSiret }, select: { id: true, name: true, prospect: { select: { id: true } } } }),
+        prisma.prospect.findMany({ where: { siret: knownSiret }, select: { id: true, name: true, salesRepId: true }, orderBy: { createdAt: "asc" } }),
+      ])
+    : [null, []];
   const existingIds = [...new Set([pharmacyBySiret?.prospect?.id, ...prospectsBySiret.map((p) => p.id)].filter((id): id is string => Boolean(id)))];
   if (pharmacyBySiret || existingIds.length) {
     // Le confrère indiqué n'est pas enregistré pour un dossier existant : on le dit, sans en recopier les coordonnées.
@@ -98,7 +103,9 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
   });
   const key = nameKey(v.name);
   const suspects = candidates.filter((c) => (c.email && c.email.toLowerCase() === v.email) || (key && nameKey(c.name) === key && c.postalCode === v.postalCode));
-  const warning = suspects.length ? `Doublon possible : ${suspects.map((s) => `« ${s.name} »${s.siret ? ` (SIRET ${s.siret})` : ""}`).join(", ")} — même e-mail ou même nom et code postal.` : null;
+  const duplicate = suspects.length ? `Doublon possible : ${suspects.map((s) => `« ${s.name} »${s.siret ? ` (SIRET ${s.siret})` : ""}`).join(", ")} — même e-mail ou même nom et code postal.` : null;
+  const siretNote = knownSiret ? null : `SIRET ${v.siret ? `« ${v.siret} » non conforme` : "non renseigné"} : accepté tel quel, à vérifier.`;
+  const warning = [duplicate, siretNote].filter(Boolean).join(" ") || null;
   const created = await prisma.prospect.create({
     data: {
       name: v.name,

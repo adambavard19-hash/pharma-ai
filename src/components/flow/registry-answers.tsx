@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 type Lookup = { state: "idle" } | { state: "loading"; siret: string } | { state: "found"; siret: string; company: CompanyLookup } | { state: "missing"; siret: string } | { state: "unavailable"; siret: string };
 
-export function SiretAnswer({ value, onValueChange, error, prefill, onApply, onReject }: { value: string; onValueChange: (value: string) => void; error?: string; prefill: Prefill; onApply: (company: CompanyLookup) => void; onReject: (siret: string) => void }) {
+export function SiretAnswer({ value, onValueChange, error, prefill, onApply, onReject, lenient = false }: { lenient?: boolean; value: string; onValueChange: (value: string) => void; error?: string; prefill: Prefill; onApply: (company: CompanyLookup) => void; onReject: (siret: string) => void }) {
   const digits = digitsOnly(value);
   const complete = digits.length === 14;
   const valid = complete && isValidSiret(digits);
@@ -53,7 +53,8 @@ export function SiretAnswer({ value, onValueChange, error, prefill, onApply, onR
   }, [valid, digits]);
 
   const current = "siret" in lookup && lookup.siret === digits ? lookup : null;
-  const localError = complete && !valid ? "Ce SIRET ne semble pas valide : vérifiez les 14 chiffres." : undefined;
+  // `lenient` : tout SIRET est accepté (souscription du site), aucun message de non-conformité.
+  const localError = !lenient && complete && !valid ? "Ce SIRET ne semble pas valide : vérifiez les 14 chiffres." : undefined;
   const applied = prefill._siret === digits;
 
   return (
