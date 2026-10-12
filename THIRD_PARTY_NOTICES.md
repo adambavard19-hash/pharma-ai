@@ -10,6 +10,11 @@ Seul le **code** est repris, sous la licence MIT ci-dessous. Le nom « Coucou »
 apparence, ses dessins et ses sons restent la propriété de Louis Raillé (voir le fichier LICENSE-ASSETS.md de Coucou)
 et ne sont **pas** utilisés : le robot de PharmaBoost a son propre dessin et ses propres sons.
 
+L'« île » de la bannière du comptoir (`src/core/island/banner-flow.ts`, `src/components/island/*`) reprend l'idée et le
+comportement de l'île de Coucou (capsule qui se transforme en ressort, activité qui se coche, pastilles de services,
+message d'humeur quand on tape trop vite). Le code est écrit pour PharmaBoost ; textes, couleurs et robot sont les
+nôtres (`agent/src/banner-design.ts`, `components/robot`).
+
 ```
 MIT License
 
