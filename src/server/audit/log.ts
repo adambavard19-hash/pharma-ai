@@ -117,6 +117,7 @@ export type AuditAction =
   | "platform.pharmacy_deleted"
   | "platform.support_replied"
   | "platform.assistant_question"
+  | "robot.assistant_question"
   | "platform.support_status_changed"
   | "platform.invitation_sent"
   | "platform.invitation_link_issued"

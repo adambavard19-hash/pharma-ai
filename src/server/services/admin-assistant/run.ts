@@ -42,12 +42,44 @@ export function assistantAvailable(): { ok: true } | { ok: false; reason: string
   return { ok: true };
 }
 
-type StreamFactory = (params: Anthropic.Beta.Messages.MessageCreateParamsStreaming) => {
+export type StreamFactory = (params: Anthropic.Beta.Messages.MessageCreateParamsStreaming) => {
   on: (event: "text", listener: (delta: string) => void) => unknown;
   finalMessage: () => Promise<Anthropic.Beta.Messages.BetaMessage>;
 };
 
+/**
+ * Ce qui distingue un robot d'un autre (console, officine) : sa consigne, ses outils (lecture seule), et qui les
+ * exécute. La boucle, elle, est commune : mêmes bornes, même réinjection des blocs, même flux d'événements.
+ */
+export type AssistantProfile = {
+  systemPrompt: string;
+  dateContext: (now: Date) => string;
+  tools: { name: string; description: string; input_schema: unknown }[];
+  runTool: (name: string, input: unknown) => Promise<{ ok: boolean; output: unknown }>;
+  labels: Record<string, string>;
+  maxSteps: number;
+};
+
+const ADMIN_PROFILE: AssistantProfile = {
+  systemPrompt: ASSISTANT_SYSTEM_PROMPT,
+  dateContext: assistantDateContext,
+  tools: ASSISTANT_TOOLS,
+  runTool: runAssistantTool,
+  labels: TOOL_LABELS,
+  maxSteps: ASSISTANT_MAX_STEPS,
+};
+
 export async function runAssistant(
+  turns: AssistantTurn[],
+  emit: (event: AssistantEvent) => void,
+  deps: { stream?: StreamFactory; now?: Date; signal?: AbortSignal } = {},
+): Promise<void> {
+  return runAssistantLoop(ADMIN_PROFILE, turns, emit, deps);
+}
+
+/** La boucle d'outils, pour n'importe quel profil de robot. */
+export async function runAssistantLoop(
+  profile: AssistantProfile,
   turns: AssistantTurn[],
   emit: (event: AssistantEvent) => void,
   deps: { stream?: StreamFactory; now?: Date; signal?: AbortSignal } = {},
@@ -63,13 +95,13 @@ export async function runAssistant(
 
   const messages: Anthropic.Beta.Messages.BetaMessageParam[] = history.map((turn) => ({ role: turn.role, content: turn.text }));
   const system: Anthropic.Beta.Messages.BetaTextBlockParam[] = [
-    { type: "text", text: ASSISTANT_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-    { type: "text", text: assistantDateContext(deps.now ?? new Date()) },
+    { type: "text", text: profile.systemPrompt, cache_control: { type: "ephemeral" } },
+    { type: "text", text: profile.dateContext(deps.now ?? new Date()) },
   ];
   // Les entrées sont relues par chaque outil (bornes, types) : un argument inattendu ne casse rien.
-  const tools = ASSISTANT_TOOLS as Anthropic.Beta.Messages.BetaTool[];
+  const tools = profile.tools as Anthropic.Beta.Messages.BetaTool[];
 
-  for (let step = 1; step <= ASSISTANT_MAX_STEPS; step++) {
+  for (let step = 1; step <= profile.maxSteps; step++) {
     if (deps.signal?.aborted) return;
     const call = stream({
       model: env.ADMIN_ASSISTANT_MODEL,
@@ -102,11 +134,11 @@ export async function runAssistant(
     }
 
     messages.push({ role: "assistant", content: message.content });
-    for (const use of toolUses) emit({ type: "tool", name: use.name, label: TOOL_LABELS[use.name] ?? "Je cherche…" });
+    for (const use of toolUses) emit({ type: "tool", name: use.name, label: profile.labels[use.name] ?? "Je cherche…" });
     // Les outils demandés ensemble s'exécutent ensemble ; tous les résultats repartent dans UN message.
     const results = await Promise.all(
       toolUses.map(async (use): Promise<Anthropic.Beta.Messages.BetaToolResultBlockParam> => {
-        const { ok, output } = await runAssistantTool(use.name, use.input);
+        const { ok, output } = await profile.runTool(use.name, use.input);
         const text = JSON.stringify(output);
         return { type: "tool_result", tool_use_id: use.id, is_error: !ok, content: text.length > MAX_TOOL_RESULT_CHARS ? `${text.slice(0, MAX_TOOL_RESULT_CHARS)}… (tronqué : demande moins de lignes)` : text };
       }),
@@ -114,5 +146,5 @@ export async function runAssistant(
     messages.push({ role: "user", content: results });
   }
   emit({ type: "text", delta: "\n\nJ'ai dû m'arrêter : la question demande trop de recherches. Essaie de la découper." });
-  emit({ type: "done", steps: ASSISTANT_MAX_STEPS });
+  emit({ type: "done", steps: profile.maxSteps });
 }

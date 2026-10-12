@@ -171,6 +171,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "platform.pharmacy_deleted": "Officine supprimée",
   "platform.support_replied": "Réponse du support envoyée",
   "platform.assistant_question": "Question posée au robot de la console",
+  "robot.assistant_question": "Question posée au robot du logiciel",
   "platform.support_status_changed": "Discussion du support fermée ou rouverte",
   "platform.invitation_sent": "Invitation envoyée",
   "platform.invitation_link_issued": "Lien d'invitation émis",
