@@ -70,6 +70,8 @@ export async function loadAdminIslandHome(now = new Date()): Promise<IslandHome>
     postsOffline: attention.technical.total,
     contractsToCountersign: attention.contractsToCountersign,
     gapsOpen,
+    followUpsLate: attention.followUpsLate,
+    prospectsNoReply: attention.prospectsNoReply,
     today: today.slice(0, 4).map((item) => ({ id: item.id, title: item.title, when: describeWhen(item.at, now), href: item.href })),
   });
 }

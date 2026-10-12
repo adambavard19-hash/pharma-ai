@@ -45,6 +45,9 @@ export type AdminHomeInput = {
   postsOffline: number;
   contractsToCountersign: number;
   gapsOpen: number;
+  /** Relances commerciales en retard, dossiers sans réponse (facultatifs : 0 par défaut). */
+  followUpsLate?: number;
+  prospectsNoReply?: number;
   today: { id: string; title: string; when: string; href: string }[];
 };
 
@@ -60,6 +63,8 @@ export function adminHome(input: AdminHomeInput): IslandHome {
   if (input.supportToAnswer) rows.push({ key: "support", title: plural(input.supportToAnswer, "message de support", "messages de support"), detail: "En attente de réponse", href: "/admin/support", tone: "todo" });
   if (input.setupsToDo) rows.push({ key: "mises-en-service", title: plural(input.setupsToDo, "mise en service", "mises en service"), detail: "À planifier ou à faire", href: "/admin/abonnements", tone: "todo" });
   if (input.contractsToCountersign) rows.push({ key: "contrats", title: plural(input.contractsToCountersign, "contrat à contresigner", "contrats à contresigner"), href: "/admin/contrats", tone: "todo" });
+  if (input.followUpsLate) rows.push({ key: "relances", title: plural(input.followUpsLate, "relance en retard", "relances en retard"), href: "/admin/relances-commerciales", tone: "todo" });
+  if (input.prospectsNoReply) rows.push({ key: "sans-reponse", title: plural(input.prospectsNoReply, "prospect sans réponse", "prospects sans réponse"), detail: "Depuis 14 jours", href: "/admin/prospects", tone: "info" });
   if (input.gapsOpen) rows.push({ key: "a-connaitre", title: plural(input.gapsOpen, "produit à connaître", "produits à connaître"), detail: "Attendent la pharmacienne", href: "/admin/a-connaitre", tone: "todo" });
   if (input.newProspects7d) rows.push({ key: "dossiers", title: plural(input.newProspects7d, "nouveau dossier", "nouveaux dossiers"), detail: "Ces 7 derniers jours", href: "/admin/prospects", tone: "info" });
   for (const item of input.today.slice(0, 4)) rows.push({ key: `jour-${item.id}`, title: item.title, detail: item.when, href: item.href, tone: "info" });

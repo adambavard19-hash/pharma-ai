@@ -6,7 +6,7 @@ import { platformLogoutAction } from "@/server/actions/platform";
 import { Dropdown, DropdownLabel, DropdownSeparator } from "@/components/ui/dropdown";
 import { AdminNav, AdminSectionNav } from "./admin-nav";
 import { countOpenGaps } from "@/server/services/knowledge-gap-store";
-import { AdminAssistant } from "./admin-assistant";
+import { AdminIsland } from "./admin-island";
 import { QuickActions } from "./quick-actions";
 import { countUnreadAdminNotifications } from "@/server/services/sales/notifications";
 import { countSupportToAnswer } from "@/server/services/support";
@@ -37,7 +37,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </Link>
 
           <div className="flex min-w-0 flex-1 justify-center px-2">
-            <AdminAssistant />
+            {/* L'île PharmaBoost, à la place de la barre de recherche : l'accueil du centre de contrôle et le robot (⌘K). */}
+            <AdminIsland />
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
