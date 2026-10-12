@@ -282,18 +282,18 @@ export function CounterIsland(props: CounterIslandProps) {
         const parts = (props.alertItems?.length ? props.alertItems : alert?.text ? [alert.text] : []).map(splitAlert);
         body = (
           <div className="px-3 pt-2.5 pb-3">
-            <Row robot={robot(30)} title={alert?.title ?? T.readFirst} sub={parts.length > 1 ? `${T.duringSale} · ${parts.length} points` : T.duringSale} compact icon={<TriangleAlert className="size-4 text-[#F5A623]" aria-hidden="true" />} />
+            <Row robot={robot(30)} title={alert?.title ?? T.readFirst} sub={parts.length > 1 ? `${T.duringSale} · ${parts.length} points` : T.duringSale} compact icon={<TriangleAlert className="size-4 text-white/60" aria-hidden="true" />} />
             <AdviceList maxHeight={176} count={parts.length} label={`${parts.length} point${parts.length > 1 ? "s" : ""} à lire`} noun="point">
               {parts.map((part, index) => (
-                <li key={index} data-advice-card="" className="snap-start rounded-xl px-3 py-2" style={{ background: "rgba(245,166,35,0.10)", boxShadow: "inset 0 0 0 1px rgba(245,166,35,0.22)" }}>
-                  {part.title && <p className="text-[13px] leading-[18px] font-semibold text-[#FFD08A]">{part.title}</p>}
-                  {part.subtitle && <p className="text-[11.5px] leading-4 font-medium text-[#F5A623]/90">{part.subtitle}</p>}
+                <li key={index} data-advice-card="" className="snap-start rounded-xl bg-white/[0.06] px-3 py-2">
+                  {part.title && <p className="text-[13px] leading-[18px] font-semibold text-white">{part.title}</p>}
+                  {part.subtitle && <p className="text-[11.5px] leading-4 font-medium text-white/65">{part.subtitle}</p>}
                   <p className={cn("text-[12.5px] leading-[18px] text-white/85", (part.title || part.subtitle) && "mt-1")}>{part.detail}</p>
                 </li>
               ))}
             </AdviceList>
             <div className="mt-2 flex justify-end">
-              <button type="button" onClick={props.onDismissAlert} className="h-8 rounded-lg px-3.5 text-[12.5px] font-bold" style={{ background: "#F5A623", color: "#2B1700" }}>
+              <button type="button" onClick={props.onDismissAlert} className="h-8 rounded-lg bg-white px-3.5 text-[12.5px] font-bold text-[#0B0F14]">
                 Compris
               </button>
             </div>

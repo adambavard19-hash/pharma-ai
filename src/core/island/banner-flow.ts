@@ -53,9 +53,11 @@ export const STAGE_WIDTH: Record<IslandStage, number> = {
   quiet: 320,
 };
 
-/** Le ton de l'île : son liseré et sa lueur (ambre pour une mise en garde, vert quand tout est fini). */
+/**
+ * Le ton de l'île : son liseré et sa lueur (vert quand tout est fini). Une mise en garde reste sobre, sans liseré ni texte
+ * orange : au comptoir, l'orange se lisait comme une alarme pendant les conseils (retour du fondateur, 13 oct. 2026).
+ */
 export function stageTone(stage: IslandStage): "neutral" | "accent" | "warning" | "success" {
-  if (stage === "alert") return "warning";
   if (stage === "done" || stage === "emailSent") return "success";
   if (stage === "scan" || stage === "analyzing" || stage === "ready") return "accent";
   return "neutral";

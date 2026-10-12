@@ -21,7 +21,7 @@ describe("l'île du comptoir", () => {
       expect(STAGE_WIDTH[stage]).toBeGreaterThan(200);
     }
     expect(STAGE_MOOD.alert).toBe("concerned");
-    expect(stageTone("alert")).toBe("warning");
+    expect(stageTone("alert")).toBe("neutral");
     expect(STAGE_MOOD.done).toBe("celebrate");
     expect(STAGE_WIDTH.idle).toBeLessThan(STAGE_WIDTH.advice);
   });
