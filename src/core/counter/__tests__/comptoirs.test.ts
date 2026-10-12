@@ -24,6 +24,20 @@ describe("à qui appartient un comptoir", () => {
   it("une pharmacie neuve sans comptoir : rien à voir, sans erreur", () => {
     expect(resolveMyComptoirs([], "lea")).toEqual({ postIds: [], mode: "NONE" });
   });
+
+  it("sur le navigateur lié à un poste : CE comptoir seulement, même si la personne en a un autre (même compte sur deux PC)", () => {
+    const posts = [post("1", "adam"), post("2", "adam"), post("3", "lea")];
+    expect(resolveMyComptoirs(posts, "adam", "1")).toEqual({ postIds: ["1"], mode: "MINE" });
+    expect(resolveMyComptoirs(posts, "adam", "2")).toEqual({ postIds: ["2"], mode: "MINE" });
+    // Ailleurs (Mac, téléphone) : tous les siens.
+    expect(resolveMyComptoirs(posts, "adam", null)).toEqual({ postIds: ["1", "2"], mode: "MINE" });
+  });
+
+  it("un poste lié absent de la liste de la pharmacie (autre pharmacie, retiré) ne compte pas : la règle habituelle s'applique", () => {
+    const posts = [post("1", "lea"), post("2", null)];
+    expect(resolveMyComptoirs(posts, "lea", "poste-ailleurs")).toEqual({ postIds: ["1"], mode: "MINE" });
+    expect(resolveMyComptoirs(posts, "paul", "poste-ailleurs")).toEqual({ postIds: [], mode: "NONE" });
+  });
 });
 
 describe("le nom d'un comptoir", () => {
@@ -42,9 +56,11 @@ describe("le nom d'un comptoir", () => {
     expect(parseComptoirName("x".repeat(41)).ok).toBe(false);
     expect(parseComptoirName(null).ok).toBe(false);
   });
-  it("explique, selon qui lit, pourquoi aucune vente n'est visible", () => {
+  it("explique comment avoir son comptoir : l'ouvrir depuis le PC du comptoir, jamais un comptoir à choisir", () => {
     expect(noComptoirMessage("MINE", true)).toBeNull();
+    expect(noComptoirMessage("ONLY_ONE", false)).toBeNull();
+    expect(noComptoirMessage("NONE", false)).toContain("« Ouvrir mon espace PharmaBoost »");
+    expect(noComptoirMessage("NONE", false)).not.toContain("Mes comptoirs");
     expect(noComptoirMessage("NONE", true)).toContain("Mes comptoirs");
-    expect(noComptoirMessage("NONE", false)).toContain("titulaire");
   });
 });

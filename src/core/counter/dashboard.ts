@@ -42,7 +42,7 @@ export function buildCounterStatus(input: {
   mine?: Pick<MyComptoirs, "postIds" | "mode">;
   /** Le collaborateur de chaque comptoir, par identifiant de poste. */
   owners?: Record<string, string | null>;
-  /** Cette personne peut-elle attribuer les comptoirs ? (le message d'un comptoir manquant ne dit pas la même chose.) */
+  /** Cette personne voit-elle « Mes comptoirs » ? (le message d'un comptoir manquant le mentionne alors.) */
   canAssign?: boolean;
 }): CounterStatus {
   // Les comptoirs et le suivi des ventes ne dépendent que des postes : la liaison du serveur de l'officine n'y entre pas.
@@ -54,7 +54,7 @@ export function buildCounterStatus(input: {
 
   // Plusieurs comptoirs dans la pharmacie et aucun pour cette personne : elle ne voit rien des autres, et on lui dit pourquoi.
   if (input.mine?.mode === "NONE" && overview.counters.some((counter) => counter.state === "CONNECTED" || counter.state === "OFFLINE")) {
-    return { state: "UNASSIGNED", pill: { label: "Comptoir à choisir", tone: "neutral" }, title: "Aucun comptoir ne vous est attribué.", subtitle: noComptoirMessage("NONE", input.canAssign === true) ?? "", posts: [], waitingInstall, awaitingFirstScan: false };
+    return { state: "UNASSIGNED", pill: { label: "Aucun comptoir", tone: "neutral" }, title: "Vous n'êtes connecté à aucun comptoir.", subtitle: noComptoirMessage("NONE", input.canAssign === true) ?? "", posts: [], waitingInstall, awaitingFirstScan: false };
   }
 
   if (posts.some((post) => post.online)) {

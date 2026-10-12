@@ -24,7 +24,7 @@ export default async function AssociationsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Mes associations"
-        description="Un produit conseil en appelle un autre. Quand le premier est dans la vente — même une vente spontanée, sans ordonnance — PharmaBoost propose le second."
+        description="Un produit ou un médicament en appelle d'autres. Quand il est dans la vente — même une vente spontanée, sans ordonnance — PharmaBoost propose les produits que vous avez choisis."
         actions={<Link2 className="size-6 text-brand-600 dark:text-brand-400" aria-hidden />}
       />
       <AssociationsManager

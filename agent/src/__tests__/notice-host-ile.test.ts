@@ -100,6 +100,12 @@ describe("le programme Windows de l'île", () => {
     expect(NOTICE_HOST_ILE_CSHARP).toMatch(/pageReady = true;\s*Out\.Word\("PRET"\)/);
   });
 
+  it("le menu de l'icône près de l'horloge propose « Ouvrir mon espace PharmaBoost » : un seul mot, ESPACE, pour l'agent", () => {
+    expect(NOTICE_HOST_ILE_CSHARP).toMatch(/new ToolStripMenuItem\("Ouvrir mon espace PharmaBoost"\);\s*spaceItem\.Click \+= delegate \{ Out\.Word\("ESPACE"\); \};/);
+    // Le menu garde ses autres gestes.
+    expect(NOTICE_HOST_ILE_CSHARP).toContain("Remettre la bannière en haut au centre");
+  });
+
   it("le script charge le kit et passe des chemins protégés (apostrophes doublées)", () => {
     const script = noticeHostIleScript({ sdkDir: "C:\\Users\\l'officine\\wv2", loaderDir: "C:\\wv2\\x64", userDataDir: "C:\\ile", url: "https://pharmaboost.app/poste/ile" });
     expect(script).toContain("$core = 'C:\\Users\\l''officine\\wv2\\Microsoft.Web.WebView2.Core.dll'");

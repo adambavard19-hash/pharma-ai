@@ -17,6 +17,7 @@ import { createPlatformSession } from "@/server/auth/platform-session";
 import { changeOwnPassword, peekUserPasswordToken, sendUserPasswordLink, setUserPasswordByToken } from "@/server/services/user-password";
 import { refuseInDemo } from "./demo-guard";
 import { markProspectActivatedForUser } from "@/server/services/sales/client-pharmacies";
+import { leaveThisPcComptoir } from "@/server/services/post-link";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /** Le refus du comptoir pour un compte sans officine cliente : il dit où aller, plutôt que « aucune officine ». */
@@ -126,6 +127,8 @@ export async function loginAction(
 export async function logoutAction(): Promise<void> {
   const session = await requireSession().catch(() => null);
   if (session) {
+    // Sur le PC d'un comptoir, se déconnecter, c'est quitter ce comptoir : ses prochains bips ne sont plus attribués à cette personne.
+    await leaveThisPcComptoir(session.pharmacy.id, session.user.id);
     await recordAudit({
       action: "auth.logout",
       entityType: "User",

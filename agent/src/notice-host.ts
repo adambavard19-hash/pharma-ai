@@ -2825,7 +2825,10 @@ ${PHRASES}
       title.Enabled = false;
       menu.Items.Add(title);
       menu.Items.Add(new ToolStripSeparator());
+      // L'espace PharmaBoost de la personne, dans le navigateur de ce PC : l'agent demande un lien à usage unique et l'ouvre.
+      menu.Items.Add("Ouvrir mon espace PharmaBoost", null, delegate { Say("ESPACE"); });
       if (banner == null || banner.IsDisposed) return;
+      menu.Items.Add(new ToolStripSeparator());
       menu.Items.Add("Afficher la bannière", null, delegate { banner.Reveal(); });
       menu.Items.Add(banner.Reduced ? "Agrandir la bannière" : "Réduire la bannière", null, delegate { banner.SetReduced(!banner.Reduced); });
       menu.Items.Add("Masquer la bannière", null, delegate { banner.HideByUser(); });

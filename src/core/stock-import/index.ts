@@ -38,3 +38,4 @@ export {
 } from "./classify";
 export { tagsFromName } from "./tags";
 export { UnreadableFileError } from "./errors";
+export { cleanLabel, decodeExportText, hasLostCharacter, isBinaryWorkbook, repairsDamagedLabel, type ExportEncoding } from "./encoding";

@@ -295,11 +295,18 @@ model CounterPost {
   lastExportAt     DateTime?
   lastExportError  String?
   revokedAt        DateTime?
-  /// Le collaborateur à qui appartient ce comptoir (membre de la pharmacie) ; vide : comptoir partagé / non attribué.
+  /// La personne connectée à PharmaBoost sur CE PC (membre de la pharmacie) : posée toute seule quand elle ouvre son espace
+  /// dans le navigateur lié à ce poste (core/counter/post-link.ts), ou en secours par le titulaire. Vide : personne.
   assignedUserId   String?
-  /// Le robot de ce comptoir (0 à 19, voir core/robot/counter-look.ts) : chaque comptoir a le sien, pour qu'on voie d'un
-  /// coup d'œil si l'on est sur son comptoir. Vide : le robot de la marque.
+  /// Le robot historique de ce comptoir (0 à 19). Plus montré : le robot est celui de la personne (core/robot/counter-look.ts).
   robotLook        Int?
+  /// La liaison du navigateur de ce PC à ce poste : empreinte SHA-256 du dernier lien demandé par le poste, à usage unique,
+  /// valable 10 minutes (jamais le lien en clair). Vide : aucun lien en attente.
+  linkTokenHash    String?   @unique
+  linkExpiresAt    DateTime?
+  /// Le dernier signe de vie où le poste DESSINAIT le robot (l'île ou la bannière) : sur le navigateur lié à ce poste, l'espace
+  /// n'en dessine pas un second tant qu'il date de moins de 3 minutes (core/robot/single-robot.ts). Vide : jamais, ou plus.
+  robotShownAt     DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

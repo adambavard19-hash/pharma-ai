@@ -9,7 +9,6 @@ import { createSession, getRequestMeta } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { throttled } from "@/server/security/throttle";
 import { recordAudit } from "@/server/audit/log";
-import { claimComptoir, releaseComptoir } from "@/server/services/comptoirs";
 import { acceptInvitation, approveJoinRequest, inviteCollaborators, refuseJoinRequest, requestToJoin, resendInvitation, revokeInvitation, searchPharmacies, type InviteOutcome, type PublicPharmacy } from "@/server/services/team-access";
 import { parseEmails } from "@/core/team/access";
 import { refuseInDemo } from "./demo-guard";
@@ -93,29 +92,6 @@ export async function refuseJoinRequestAction(payload: { id: string }): Promise<
   if (!result.ok) return fail(result.error);
   revalidatePath("/equipe");
   return ok(null, `Demande de ${result.name} refusée.`);
-}
-
-/** « Je travaille ici » : tout membre de l'équipe qui prend les ventes, ouvre cette action ; elle ne touche jamais qu'à SON attribution. */
-export async function claimComptoirAction(payload: { postId: string }): Promise<ActionResult<null>> {
-  const session = await requirePermission(PERMISSIONS.PRESCRIPTION_CREATE);
-  const parsed = z.object({ postId: z.string().min(1).max(64) }).safeParse(payload);
-  if (!parsed.success) return fail("Demande invalide.");
-  const result = await claimComptoir(session.scope, parsed.data.postId);
-  if (!result.ok) return fail(result.error);
-  revalidatePath("/vente/nouvelle");
-  revalidatePath("/connexion");
-  return ok(null, result.changed ? `Vous travaillez à « ${result.name} » : vos conseils et vos ventes y sont attribués.` : `Vous étiez déjà à « ${result.name} ».`);
-}
-
-export async function releaseComptoirAction(payload: { postId: string }): Promise<ActionResult<null>> {
-  const session = await requirePermission(PERMISSIONS.PRESCRIPTION_CREATE);
-  const parsed = z.object({ postId: z.string().min(1).max(64) }).safeParse(payload);
-  if (!parsed.success) return fail("Demande invalide.");
-  const result = await releaseComptoir(session.scope, parsed.data.postId);
-  if (!result.ok) return fail(result.error);
-  revalidatePath("/vente/nouvelle");
-  revalidatePath("/connexion");
-  return ok(null, `« ${result.name} » est libre.`);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------

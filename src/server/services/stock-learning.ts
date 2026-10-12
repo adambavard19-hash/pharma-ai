@@ -22,14 +22,14 @@ export type MedicineLearning = { inStock: number; alreadyKnown: number; processe
 export async function learnStockMedicines(scope: TenantScope, options: { maxBatches?: number; deadlineAt?: number } = {}): Promise<MedicineLearning> {
   const rows = await prisma.pharmacyDrugStock.findMany({
     where: { pharmacyId: scope.pharmacyId },
-    select: { presentation: { select: { specialty: { select: { id: true, name: true, pharmaceuticalForm: true, compositions: { where: { nature: "SA" }, select: { substanceLabel: true } } } } } } },
+    select: { presentation: { select: { specialty: { select: { id: true, cisCode: true, name: true, pharmaceuticalForm: true, compositions: { where: { nature: "SA" }, select: { substanceLabel: true } } } } } } },
   });
-  const specialties = new Map<string, { name: string; form: string | null; substances: string[] }>();
+  const specialties = new Map<string, { cisCode: string; name: string; form: string | null; substances: string[] }>();
   for (const row of rows) {
     const specialty = row.presentation.specialty;
-    if (!specialties.has(specialty.id)) specialties.set(specialty.id, { name: specialty.name, form: specialty.pharmaceuticalForm, substances: [...new Set(specialty.compositions.map((c) => c.substanceLabel))] });
+    if (!specialties.has(specialty.id)) specialties.set(specialty.id, { cisCode: specialty.cisCode, name: specialty.name, form: specialty.pharmaceuticalForm, substances: [...new Set(specialty.compositions.map((c) => c.substanceLabel))] });
   }
-  const byKey = new Map<string, { name: string; form: string | null; substances: string[] }>();
+  const byKey = new Map<string, { cisCode: string; name: string; form: string | null; substances: string[] }>();
   for (const specialty of specialties.values()) {
     const key = classificationKey(specialty.name);
     if (key && !byKey.has(key)) byKey.set(key, specialty);
@@ -50,7 +50,8 @@ export async function learnStockMedicines(scope: TenantScope, options: { maxBatc
     done = Math.min(batch.length, i + MEDICINE_BATCH);
     const lines: UnderstandingLine[] = batch.slice(i, i + MEDICINE_BATCH).map((key, index) => {
       const specialty = byKey.get(key)!;
-      return { lineIndex: index, drugName: specialty.name, dosage: null, form: specialty.form, posology: null, durationDays: null, officialName: specialty.name, officialSubstances: specialty.substances };
+      // Le CIS ne sert qu'au secours (famille officielle) si le modèle ne répond pas : rien n'est alors écrit, la nuit suivante reprendra.
+      return { lineIndex: index, drugName: specialty.name, dosage: null, form: specialty.form, posology: null, durationDays: null, officialName: specialty.name, officialSubstances: specialty.substances, officialCisCode: specialty.cisCode };
     });
     // Un lot qui échoue (modèle indisponible) n'arrête pas la suite : le passage de nuit reprendra ce qui manque.
     await ensureClassifications({ scope, lines }).catch((error) => console.error("[stock-learning] médicaments", error));

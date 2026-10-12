@@ -2,14 +2,15 @@
  * Les comptoirs d'une pharmacie, et à qui ils appartiennent.
  *
  * Un comptoir est un poste de caisse (un ordinateur avec sa douchette). Chaque comptoir est un espace à part : ses bips, ses ventes,
- * ses conseils ne regardent que lui — et la personne à qui il est attribué. Deux collaborateurs de la même pharmacie ne se voient pas
- * travailler ; le titulaire, qui a lui aussi son comptoir, n'est pas dérangé par les autres.
+ * ses conseils ne regardent que lui — et la personne connectée à PharmaBoost sur ce PC. Personne ne choisit de comptoir : il revient
+ * tout seul à la personne qui ouvre son espace dans le navigateur lié au poste (core/counter/post-link.ts). Deux collaborateurs de la
+ * même pharmacie ne se voient pas travailler ; le titulaire, qui a lui aussi son comptoir, n'est pas dérangé par les autres.
  *
  * Qui voit quoi, sans réglage :
- *  - un comptoir attribué à quelqu'un est le sien ;
+ *  - un comptoir où la personne est connectée est le sien ;
  *  - une pharmacie qui n'a qu'UN comptoir n'a rien à attribuer : il est à tout le monde ;
- *  - une pharmacie à plusieurs comptoirs dont aucun n'est attribué à la personne : elle ne voit aucune vente en direct, et on lui dit
- *    pourquoi (le titulaire attribue les comptoirs dans « Mes comptoirs »).
+ *  - une pharmacie à plusieurs comptoirs, aucun pour la personne : elle ne voit aucune vente en direct, et on lui dit comment
+ *    faire (ouvrir son espace depuis le PC de son comptoir).
  *
  * Module pur.
  */
@@ -27,7 +28,14 @@ export type MyComptoirs = {
   mode: "MINE" | "ONLY_ONE" | "NONE";
 };
 
-export function resolveMyComptoirs(posts: ComptoirPost[], userId: string): MyComptoirs {
+/**
+ * Sur le navigateur lié à un poste (`thisPcPostId`, core/counter/post-link.ts), l'écran est celui de CE comptoir et de lui
+ * seul — même si la personne est connectée sur un autre PC lié (le titulaire qui a installé chaque poste depuis son espace,
+ * un compte partagé) : chaque PC montre ses ventes, jamais celles de l'autre. Un poste absent de la liste (autre pharmacie,
+ * retiré) ne compte pas.
+ */
+export function resolveMyComptoirs(posts: ComptoirPost[], userId: string, thisPcPostId: string | null = null): MyComptoirs {
+  if (thisPcPostId && posts.some((post) => post.id === thisPcPostId)) return { postIds: [thisPcPostId], mode: "MINE" };
   const mine = posts.filter((post) => post.assignedUserId === userId);
   if (mine.length > 0) return { postIds: mine.map((post) => post.id), mode: "MINE" };
   if (posts.length === 1) return { postIds: [posts[0].id], mode: "ONLY_ONE" };
@@ -48,10 +56,9 @@ export function parseComptoirName(raw: unknown): { ok: true; value: string } | {
   return { ok: true, value };
 }
 
-/** Pourquoi une personne ne voit aucune vente en direct, dit simplement. */
+/** Pourquoi une personne ne voit aucune vente en direct, et comment faire, dit simplement. */
 export function noComptoirMessage(mode: MyComptoirs["mode"], canAssign: boolean): string | null {
   if (mode !== "NONE") return null;
-  return canAssign
-    ? "Aucun comptoir ne vous est attribué. Attribuez-vous un comptoir dans « Mes comptoirs » : vous ne verrez que ses délivrances."
-    : "Aucun comptoir ne vous est attribué. Demandez au titulaire de vous en attribuer un : vous verrez alors les délivrances de votre comptoir.";
+  const how = "Sur l'ordinateur de votre comptoir, cliquez sur l'icône PharmaBoost près de l'horloge, puis « Ouvrir mon espace PharmaBoost » : ce comptoir devient le vôtre, ses délivrances arrivent ici.";
+  return canAssign ? `${how} Vous voyez aussi qui est où dans « Mes comptoirs ».` : how;
 }

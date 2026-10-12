@@ -79,9 +79,10 @@ export function memberAccess(member: { isActive: boolean; lastLoginAt: Date | nu
 }
 
 /**
- * Identifier le collaborateur au comptoir sans réinstaller : « Je travaille ici ». Une personne ne peut être qu'à UN comptoir à la fois :
- * en prendre un libère ses autres comptoirs, pour que ses conseils et ses ventes ne soient jamais attribués à quelqu'un qui est parti.
- * Rend les comptoirs à libérer et dit qui occupait celui qu'on prend.
+ * Le comptoir revient à la personne connectée sur son PC (core/counter/post-link.ts), ou au choix du titulaire en secours. En
+ * prendre un libère ses autres comptoirs, pour que ses conseils et ses ventes ne soient jamais attribués à quelqu'un qui est
+ * parti — sauf, pour une prise depuis un PC lié, ceux d'un autre PC lié où sa session est ouverte (core/counter/post-link.ts,
+ * `releasedOnTake`). Rend les comptoirs candidats à la libération et dit qui occupait celui qu'on prend.
  */
 export function planClaim(posts: { id: string; assignedUserId: string | null }[], postId: string, userId: string): { ok: false; error: string } | { ok: true; release: string[]; previousUserId: string | null; alreadyMine: boolean } {
   const target = posts.find((post) => post.id === postId);

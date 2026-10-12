@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Bell, CheckCheck } from "lucide-react";
 import { Robot } from "@/components/robot";
 import { useCounterLook } from "@/components/robot/counter-look-context";
+import { useRobotInBrowser } from "@/components/robot/robot-presence";
 import { markAllReadAction } from "@/server/actions/notifications";
 import { badgeLabel } from "@/core/notifications/feed";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,8 @@ import { NotificationFeed, type FeedItemJson } from "./notification-feed";
 export function NotificationBell({ unread: initialUnread }: { unread: number }) {
   const router = useRouter();
   const counterLook = useCounterLook();
+  // Pas de second robot sur le PC où le logiciel PharmaBoost installé a le sien.
+  const robotHere = useRobotInBrowser();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(initialUnread);
   // Le compteur du serveur fait foi à chaque navigation (état dérivé, recalé pendant le rendu).
@@ -113,7 +116,7 @@ export function NotificationBell({ unread: initialUnread }: { unread: number }) 
             )}
             {items && items.length === 0 && (
               <div className="flex flex-col items-center gap-2 px-6 py-8 text-center">
-                <Robot size={64} interactive look={counterLook?.look} />
+                {robotHere && <Robot size={64} interactive look={counterLook?.look} />}
                 <p className="text-[14px] font-semibold text-text-primary">Rien de neuf pour l&apos;instant</p>
                 <p className="text-[12.5px] leading-5 text-text-secondary">Les alertes de stock, l&apos;équipe et les réponses du support apparaîtront ici.</p>
               </div>

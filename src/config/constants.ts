@@ -81,6 +81,10 @@ export const MAX_RECOMMENDATIONS_PER_PRESCRIPTION = 8;
 /**
  * Une vente de la douchette : trois conseils au plus, ceux que le pharmacien voit dans la fenêtre du poste. Les chiffres du classement
  * de l'équipe (« proposés ») comptent ce qui lui a été montré, pas des conseils gardés en réserve qu'il n'a jamais lus.
+ *
+ * Les associations écrites par le pharmacien (« Mes associations ») ne comptent pas dans ces trois : le moteur d'associations
+ * en ajoute jusqu'à trois de plus (`MAX_ASSOCIATION_ADVICE`), et la fenêtre du poste leur garde leurs propres places
+ * (core/counter/notice.ts) — six cartes au plus. Un conseil du moteur n'évince jamais une association du pharmacien.
  */
 export const MAX_RECOMMENDATIONS_COUNTER_SCAN = 3;
 

@@ -449,6 +449,11 @@ namespace PharmaBoostIle
       tray.Icon = Icon.FromHandle(bmp.GetHicon());
       tray.Text = "PharmaBoost";
       ContextMenuStrip menu = new ContextMenuStrip();
+      // L'espace PharmaBoost de la personne, dans le navigateur de ce PC : l'agent demande un lien à usage unique et l'ouvre.
+      ToolStripMenuItem spaceItem = new ToolStripMenuItem("Ouvrir mon espace PharmaBoost");
+      spaceItem.Click += delegate { Out.Word("ESPACE"); };
+      menu.Items.Add(spaceItem);
+      menu.Items.Add(new ToolStripSeparator());
       toggleItem = new ToolStripMenuItem("Masquer la bannière");
       toggleItem.Click += delegate { ToggleVisible(); };
       menu.Items.Add(toggleItem);

@@ -45,3 +45,16 @@ L'île du poste de caisse Windows s'affiche avec WebView2. Les bibliothèques du
 (`Microsoft.Web.WebView2.Core.dll`, `Microsoft.Web.WebView2.WinForms.dll`, `WebView2Loader.dll`) sont redistribuées telles
 quelles dans `public/poste/webview2/1.0.2903.40/`, avec leur licence (`LICENSE.txt`, licence de type BSD de Microsoft) et
 leurs mentions (`NOTICE.txt`). Copyright (C) Microsoft Corporation.
+
+## Données publiques des médicaments
+
+- **Base de données publique des médicaments** (ANSM, HAS, UNCAM) — https://base-donnees-publique.medicaments.gouv.fr :
+  spécialités, présentations, compositions, conditions de délivrance. La mention de source et la date de mise à jour
+  sont produites par `src/core/reference/attribution.ts` et affichées dans Paramètres et sur chaque fiche médicament.
+- **Open Medic, base complète 2025** (Caisse nationale de l'Assurance Maladie, publiée le 7 juillet 2026) —
+  https://open-data-assurance-maladie.ameli.fr/medicaments/index.php — **Licence Ouverte / Open Licence (Etalab)**.
+  Le code ATC de chaque boîte remboursée, joint à la BDPM par le CIP13, donne la famille officielle des spécialités
+  (`src/core/reference/atc/official-atc-data.ts`, généré par `npm run atc:officiel`) : le secours du moteur quand le
+  modèle ne répond pas. Les données ne sont pas modifiées ; le choix de l'ATC d'une spécialité non remboursée (mêmes
+  substances, même voie, même dosage, accord de toutes les remboursées) est le nôtre. Ni l'Assurance Maladie, ni l'ANSM,
+  ni la HAS ne cautionnent PharmaBoost.

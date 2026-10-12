@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import { normalizeSearchText } from "@/core/reference/search";
-import { associationError, cleanSentence, sentenceError } from "@/core/associations/rules";
+import { associationError, cleanSentence, MAX_ADVICE_PER_SAVE, sentenceError } from "@/core/associations/rules";
 import { drugKey, productKey, type AssociationInput } from "@/core/ai/engines/associations";
 import type { TenantScope } from "@/server/db/tenant";
 
@@ -218,64 +218,108 @@ async function ownProduct(scope: TenantScope, productId: string) {
 
 /**
  * Crée une association. Le déclencheur est un produit de CETTE officine, ou un médicament du catalogue national ; le
- * produit conseillé est toujours un produit de l'officine, actif.
+ * produit conseillé est toujours un produit de l'officine, actif. C'est l'enregistrement par lot réduit à un produit : un
+ * seul chemin d'écriture, donc les mêmes contrôles.
  */
 export async function createAssociation(
   scope: TenantScope,
   input: { triggerProductId?: string | null; triggerSpecialtyId?: string | null; adviceProductId: string; sentence?: string | null },
 ): Promise<{ ok: true; id: string; triggerName: string; adviceName: string } | Failure> {
+  const { adviceProductId, ...rest } = input;
+  if (!adviceProductId) return { ok: false, error: "Choisissez le produit à conseiller." };
+  const result = await createAssociations(scope, { ...rest, adviceProductIds: [adviceProductId] });
+  if (!result.ok) return result;
+  const [created] = result.created;
+  if (!created) return { ok: false, error: result.skipped[0]?.reason ?? "Association non enregistrée." };
+  return { ok: true, id: created.id, triggerName: result.triggerName, adviceName: created.adviceName };
+}
+
+export type BatchSkip = { adviceProductId: string; adviceName: string | null; reason: string };
+export type BatchCreated = { id: string; adviceProductId: string; adviceName: string };
+
+/**
+ * Plusieurs produits conseillés d'un coup pour UN déclencheur (« quand la cétirizine est dans la vente, proposer le spray,
+ * le collyre et les mouchoirs »). Chaque produit passe par les mêmes contrôles qu'une association seule ; un produit déjà
+ * associé, d'une autre officine, désactivé ou identique au déclencheur est écarté AVEC sa raison, sans bloquer les autres.
+ * L'écriture est une seule instruction : tout ce qui reste est créé, ou rien. Deux enregistrements simultanés ne créent pas
+ * de doublon — la contrainte d'unicité de la base départage, et le perdant est signalé « déjà associé ».
+ */
+export async function createAssociations(
+  scope: TenantScope,
+  input: { triggerProductId?: string | null; triggerSpecialtyId?: string | null; adviceProductIds: string[]; sentence?: string | null },
+): Promise<{ ok: true; triggerName: string; created: BatchCreated[]; skipped: BatchSkip[] } | Failure> {
   const sentence = cleanSentence(input.sentence);
-  const invalid = associationError({ triggerProductId: input.triggerProductId, triggerSpecialtyId: input.triggerSpecialtyId, adviceProductId: input.adviceProductId, sentence });
+  const adviceIds = [...new Set(input.adviceProductIds.filter(Boolean))];
+  if (adviceIds.length === 0) return { ok: false, error: "Choisissez au moins un produit à conseiller." };
+  if (adviceIds.length > MAX_ADVICE_PER_SAVE) return { ok: false, error: `${MAX_ADVICE_PER_SAVE} produits au plus en une fois.` };
+  // Le déclencheur et la phrase se vérifient une fois : seul le produit conseillé change d'une association à l'autre (le
+  // produit associé à lui-même est écarté plus bas, sans bloquer les autres — sauf s'il est le seul).
+  const invalid = associationError({ triggerProductId: input.triggerProductId, triggerSpecialtyId: input.triggerSpecialtyId, adviceProductId: adviceIds.find((id) => id !== input.triggerProductId) ?? adviceIds[0], sentence });
   if (invalid) return { ok: false, error: invalid };
 
-  const advice = await ownProduct(scope, input.adviceProductId);
-  if (!advice) return { ok: false, error: "Produit introuvable dans votre catalogue." };
-  if (!advice.isActive) return { ok: false, error: `« ${advice.name} » est désactivé : on ne peut pas le conseiller.` };
-
   let triggerName: string;
-  let data: { triggerProductId: string } | { triggerSpecialtyId: string };
+  let trigger: { triggerProductId: string } | { triggerSpecialtyId: string };
+  let existing: Set<string>;
   if (input.triggerProductId) {
-    const trigger = await ownProduct(scope, input.triggerProductId);
-    if (!trigger) return { ok: false, error: "Produit introuvable dans votre catalogue." };
-    const existing = await prisma.productAssociation.findUnique({
-      where: { pharmacyId_triggerProductId_adviceProductId: { pharmacyId: scope.pharmacyId, triggerProductId: trigger.id, adviceProductId: advice.id } },
-      select: { id: true },
-    });
-    if (existing) return { ok: false, error: "Cette association existe déjà." };
-    triggerName = trigger.name;
-    data = { triggerProductId: trigger.id };
+    const product = await ownProduct(scope, input.triggerProductId);
+    if (!product) return { ok: false, error: "Produit introuvable dans votre catalogue." };
+    triggerName = product.name;
+    trigger = { triggerProductId: product.id };
+    const rows = await prisma.productAssociation.findMany({ where: { pharmacyId: scope.pharmacyId, triggerProductId: product.id, adviceProductId: { in: adviceIds } }, select: { adviceProductId: true } });
+    existing = new Set(rows.map((row) => row.adviceProductId));
   } else {
     const specialty = await prisma.drugSpecialty.findUnique({ where: { id: input.triggerSpecialtyId as string }, select: { id: true, name: true } });
     if (!specialty) return { ok: false, error: "Médicament introuvable dans le catalogue national." };
-    // Toutes les formes d'un même nom se valent (« CORYZALIA, comprimé… » et « CORYZALIA, solution… ») : un doublon
-    // se reconnaît au nom, pas seulement à l'identifiant.
-    const same = await prisma.productAssociation.findMany({
-      where: { pharmacyId: scope.pharmacyId, adviceProductId: advice.id, triggerSpecialtyId: { not: null } },
-      select: { triggerSpecialty: { select: { name: true } } },
-    });
-    if (same.some((row) => row.triggerSpecialty && drugKey(row.triggerSpecialty.name) === drugKey(specialty.name))) return { ok: false, error: "Cette association existe déjà." };
     triggerName = specialty.name.split(",")[0].trim();
-    data = { triggerSpecialtyId: specialty.id };
+    trigger = { triggerSpecialtyId: specialty.id };
+    // Toutes les formes d'un même nom se valent : un doublon se reconnaît au nom, pas seulement à l'identifiant.
+    const rows = await prisma.productAssociation.findMany({
+      where: { pharmacyId: scope.pharmacyId, adviceProductId: { in: adviceIds }, triggerSpecialtyId: { not: null } },
+      select: { adviceProductId: true, triggerSpecialty: { select: { name: true } } },
+    });
+    existing = new Set(rows.filter((row) => row.triggerSpecialty && drugKey(row.triggerSpecialty.name) === drugKey(specialty.name)).map((row) => row.adviceProductId));
   }
 
-  const last = await prisma.productAssociation.findFirst({
-    where: { pharmacyId: scope.pharmacyId, ...("triggerProductId" in data ? { triggerProductId: data.triggerProductId } : { triggerSpecialtyId: data.triggerSpecialtyId }) },
-    orderBy: { sortOrder: "desc" },
-    select: { sortOrder: true },
+  const products = await prisma.product.findMany({ where: { id: { in: adviceIds }, pharmacyId: scope.pharmacyId, deletedAt: null }, select: { id: true, name: true, isActive: true } });
+  const byId = new Map(products.map((product) => [product.id, product]));
+  const skipped: BatchSkip[] = [];
+  const accepted: { id: string; name: string }[] = [];
+  for (const id of adviceIds) {
+    const product = byId.get(id);
+    if (!product) skipped.push({ adviceProductId: id, adviceName: null, reason: "Produit introuvable dans votre catalogue." });
+    else if (!product.isActive) skipped.push({ adviceProductId: id, adviceName: product.name, reason: `« ${product.name} » est désactivé : on ne peut pas le conseiller.` });
+    else if ("triggerProductId" in trigger && trigger.triggerProductId === id) skipped.push({ adviceProductId: id, adviceName: product.name, reason: "Un produit ne peut pas être associé à lui-même." });
+    else if (existing.has(id)) skipped.push({ adviceProductId: id, adviceName: product.name, reason: `« ${product.name} » est déjà associé à « ${triggerName} ».` });
+    else accepted.push(product);
+  }
+  if (accepted.length === 0) return { ok: true, triggerName, created: [], skipped };
+
+  const last = await prisma.productAssociation.findFirst({ where: { pharmacyId: scope.pharmacyId, ...trigger }, orderBy: { sortOrder: "desc" }, select: { sortOrder: true } });
+  const first = (last?.sortOrder ?? 0) + 1;
+  const rows = await prisma.productAssociation.createManyAndReturn({
+    // Dans l'ordre où le pharmacien les a choisis : c'est aussi l'ordre de proposition au comptoir.
+    data: accepted.map((product, index) => ({ pharmacyId: scope.pharmacyId, ...trigger, adviceProductId: product.id, sentence, sortOrder: first + index, createdByUserId: scope.userId })),
+    skipDuplicates: true,
+    select: { id: true, adviceProductId: true },
   });
-  const created = await prisma.productAssociation.create({
-    data: { pharmacyId: scope.pharmacyId, ...data, adviceProductId: advice.id, sentence, sortOrder: (last?.sortOrder ?? 0) + 1, createdByUserId: scope.userId },
-    select: { id: true },
-  });
-  await recordAudit({
-    action: "association.created",
-    entityType: "ProductAssociation",
-    entityId: created.id,
-    pharmacyId: scope.pharmacyId,
-    userId: scope.userId,
-    metadata: { ...data, adviceProductId: advice.id, trigger: "triggerProductId" in data ? "PRODUCT" : "DRUG", withSentence: sentence !== null },
-  });
-  return { ok: true, id: created.id, triggerName, adviceName: advice.name };
+  const createdIds = new Map(rows.map((row) => [row.adviceProductId, row.id]));
+  const created: BatchCreated[] = [];
+  for (const product of accepted) {
+    const id = createdIds.get(product.id);
+    if (id) created.push({ id, adviceProductId: product.id, adviceName: product.name });
+    else skipped.push({ adviceProductId: product.id, adviceName: product.name, reason: `« ${product.name} » est déjà associé à « ${triggerName} ».` });
+  }
+  for (const row of created) {
+    await recordAudit({
+      action: "association.created",
+      entityType: "ProductAssociation",
+      entityId: row.id,
+      pharmacyId: scope.pharmacyId,
+      userId: scope.userId,
+      metadata: { ...trigger, adviceProductId: row.adviceProductId, trigger: "triggerProductId" in trigger ? "PRODUCT" : "DRUG", withSentence: sentence !== null, batch: created.length },
+    });
+  }
+  return { ok: true, triggerName, created, skipped };
 }
 
 /** Modifie la phrase, ou suspend/réactive l'association. */

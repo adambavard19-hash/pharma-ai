@@ -11,13 +11,13 @@ import { StockReminderBanner } from "@/components/app/stock-reminder";
 import { listLiveCounterSales } from "@/server/services/counter-scan";
 import { loadCounterDashboard, startOfParisDay } from "@/server/services/counter-dashboard";
 import { myComptoirs } from "@/server/services/comptoirs";
+import { NOT_LINKED, thisPcComptoir } from "@/server/services/post-link";
 import { countCounterRequestsToday } from "@/server/services/counter-request";
 import { isCommercialDemoPharmacy } from "@/core/demo/identity";
 import { findDemoScenario } from "@/core/demo/scenarios";
 import { CounterDashboard } from "./counter-dashboard";
 import { NewPrescriptionForm } from "./new-prescription-form";
 import { CounterRequestCard } from "./counter-request";
-import { WorkHere } from "./work-here";
 import { loadCounterRobotTips } from "@/server/services/robot-tips";
 import { robotGreeting } from "@/core/robot/companion";
 
@@ -31,7 +31,7 @@ export const metadata: Metadata = { title: "Nouvelle vente" };
 export default async function NewPrescriptionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ patient?: string; demande?: string }>;
+  searchParams: Promise<{ patient?: string; demande?: string; lien?: string }>;
 }) {
   const session = await requirePermission(PERMISSIONS.PRESCRIPTION_CREATE);
   const params = await searchParams;
@@ -51,10 +51,13 @@ export default async function NewPrescriptionPage({
   // Un scénario de démonstration « sans ordonnance » arrive avec sa demande déjà saisie (jamais lancée toute seule).
   const demoRequest = isCommercialDemoPharmacy(session.pharmacy) && params.demande ? (findDemoScenario(params.demande)?.request ?? null) : null;
 
-  // Chaque comptoir est un espace à part : cet écran ne montre que les délivrances des comptoirs de cette personne.
-  const mine = await myComptoirs(session.scope);
+  // Chaque comptoir est un espace à part : cet écran ne montre que les délivrances des comptoirs de cette personne. Sur le
+  // PC d'un comptoir, le comptoir lui revient d'abord tout seul (la même vérification que la coquille, faite une fois), et
+  // l'écran est celui de CE comptoir seulement — même si la même personne est connectée sur un autre PC lié.
+  const thisPc = await thisPcComptoir(session.scope.pharmacyId, session.scope.userId, true).catch(() => NOT_LINKED);
+  const mine = await myComptoirs(session.scope, thisPc.postId);
   const [dashboard, liveSalesRaw, requestsToday, pharmacy] = await Promise.all([
-    loadCounterDashboard(session.scope, now, { canAssign: session.permissions.has(PERMISSIONS.PRODUCT_IMPORT) }),
+    loadCounterDashboard(session.scope, now, { canAssign: session.permissions.has(PERMISSIONS.PRODUCT_IMPORT), thisPcPostId: thisPc.postId }),
     // Les délivrances qui arrivent de la douchette du LGO : la carte se met à jour seule.
     listLiveCounterSales(session.scope.pharmacyId, mine.postIds),
     // Les demandes sans ordonnance traitées aujourd'hui : le comptoir voit ce qu'il a fait.
@@ -84,7 +87,11 @@ export default async function NewPrescriptionPage({
         </p>
       )}
 
-      <WorkHere comptoirs={mine.posts.map((post) => ({ id: post.id, name: post.name, assignee: post.assigneeName, mine: post.assignedUserId === session.scope.userId, robotLook: post.robotLook }))} />
+      {params.lien === "perime" && (
+        <p role="status" className="rounded-xl border border-border-subtle bg-surface-card px-4 py-3 text-[13.5px] leading-5 text-text-secondary">
+          Ce lien d&apos;ouverture a déjà servi ou a expiré. Sur l&apos;ordinateur du comptoir, cliquez sur l&apos;icône PharmaBoost près de l&apos;horloge, puis « Ouvrir mon espace PharmaBoost ».
+        </p>
+      )}
 
       <CounterDashboard
         dateLabel={formatParisDate(now)}

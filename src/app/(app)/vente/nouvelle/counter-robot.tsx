@@ -6,6 +6,7 @@ import { ArrowRight, CalendarCheck, X } from "lucide-react";
 import { Robot, RobotSoundToggle } from "@/components/robot";
 import { dismissRobotTip, useDismissedTips } from "@/components/robot/tip-dismissal";
 import { useCounterLook } from "@/components/robot/counter-look-context";
+import { useRobotInBrowser } from "@/components/robot/robot-presence";
 import { robotLook } from "@/core/robot/counter-look";
 import type { RobotMood } from "@/core/robot/mascot";
 import { recapIsDue, visibleTip, type RobotTip } from "@/core/robot/mascot-tips";
@@ -31,8 +32,11 @@ function parisHour(now = new Date()): number {
 
 export function CounterRobot({ mood, tips, stockBanner, greeting }: { mood: RobotMood; tips: RobotTip[]; stockBanner: ReactNode; greeting: string }) {
   const dismissedNow = useDismissedTips();
-  // Le robot de SON comptoir : on voit d'un coup d'œil si l'on est au bon endroit.
+  // SON robot (1 robot pour 1 espace) : le même que dans l'île du comptoir où l'on est connecté.
   const counterLook = useCounterLook();
+  // Sur le PC où le logiciel PharmaBoost installé a déjà son robot, la page garde le bonjour et la phrase utile, sans
+  // dessiner un second robot (ni ses sons).
+  const robotHere = useRobotInBrowser();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const tip = visibleTip(tips, new Set<string>([...dismissedNow, ...hidden]));
 
@@ -76,27 +80,29 @@ export function CounterRobot({ mood, tips, stockBanner, greeting }: { mood: Robo
       <section aria-label="Le robot PharmaBoost" data-robot-hero="" className="relative overflow-hidden rounded-2xl border border-border-subtle bg-surface-card px-4 py-4 shadow-card sm:px-6 sm:py-5">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_120%_at_0%_50%,var(--color-brand-100),transparent_70%)] opacity-60 dark:opacity-20" />
         <div className="relative flex items-center gap-3 sm:gap-6">
-          <div className="flex shrink-0 flex-col items-center gap-1">
-            <Robot
-              mood={mood}
-              listen="comptoir"
-              sound="counter"
-              floating
-              track
-              interactive
-              greet="once"
-              greetKey="comptoir"
-              look={counterLook?.look}
-              label={counterLook ? `Le robot de votre comptoir : ${counterLook.caption}` : undefined}
-              className="h-[110px] w-[90px] sm:h-[140px] sm:w-[115px]"
-            />
-            {counterLook && (
-              <p className="flex max-w-[150px] items-center gap-1.5 rounded-full border border-border-subtle bg-surface-card px-2.5 py-0.5 text-[12px] font-semibold whitespace-nowrap text-text-primary shadow-card" title="Le robot de votre comptoir : si ce n'est pas le vôtre, vous êtes sur le comptoir d'un collègue.">
-                <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: robotLook(counterLook.look).palette.ear }} />
-                <span className="truncate">{counterLook.caption}</span>
-              </p>
-            )}
-          </div>
+          {robotHere && (
+            <div className="flex shrink-0 flex-col items-center gap-1">
+              <Robot
+                mood={mood}
+                listen="comptoir"
+                sound="counter"
+                floating
+                track
+                interactive
+                greet="once"
+                greetKey="comptoir"
+                look={counterLook?.look}
+                label={counterLook ? `Votre robot : ${counterLook.caption}` : undefined}
+                className="h-[110px] w-[90px] sm:h-[140px] sm:w-[115px]"
+              />
+              {counterLook && (
+                <p className="flex max-w-[150px] items-center gap-1.5 rounded-full border border-border-subtle bg-surface-card px-2.5 py-0.5 text-[12px] font-semibold whitespace-nowrap text-text-primary shadow-card" title="Votre robot PharmaBoost : le même dans l'île du comptoir où vous êtes connecté.">
+                  <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: robotLook(counterLook.look).palette.ear }} />
+                  <span className="truncate">{counterLook.caption}</span>
+                </p>
+              )}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <p className="text-[20px] leading-7 font-bold tracking-[-0.02em] text-text-primary sm:text-[24px] sm:leading-8">{greeting}</p>
@@ -110,11 +116,14 @@ export function CounterRobot({ mood, tips, stockBanner, greeting }: { mood: Robo
                   <CalendarCheck className="size-4" aria-hidden="true" />
                   Votre journée
                 </button>
-                <RobotSoundToggle where="counter" />
+                {robotHere && <RobotSoundToggle where="counter" />}
               </div>
             </div>
             <div
-              className="rbt-bubble relative mt-2 rounded-2xl rounded-tl-md border border-border-subtle bg-surface-card/95 px-4 py-2.5 shadow-card before:absolute before:top-3 before:-left-[7px] before:size-3 before:rotate-45 before:border-b before:border-l before:border-border-subtle before:bg-surface-card max-sm:before:hidden"
+              className={cn(
+                "rbt-bubble relative mt-2 rounded-2xl rounded-tl-md border border-border-subtle bg-surface-card/95 px-4 py-2.5 shadow-card",
+                robotHere && "before:absolute before:top-3 before:-left-[7px] before:size-3 before:rotate-45 before:border-b before:border-l before:border-border-subtle before:bg-surface-card max-sm:before:hidden",
+              )}
               role="status"
               key={tip?.key ?? `humeur:${mood}`}
             >

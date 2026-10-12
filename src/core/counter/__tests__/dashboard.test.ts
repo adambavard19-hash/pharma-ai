@@ -128,14 +128,14 @@ describe("chaque comptoir est un espace à part", () => {
     expect(status.state).toBe("READY");
   });
 
-  it("plusieurs comptoirs et aucun pour moi : « comptoir à choisir », jamais les ventes des autres", () => {
+  it("plusieurs comptoirs et aucun pour moi : « aucun comptoir », comment l'ouvrir depuis son PC, jamais les ventes des autres", () => {
     const status = buildCounterStatus({ now: NOW, posts: two, mine: { postIds: [], mode: "NONE" }, canAssign: false });
-    expect(status).toMatchObject({ state: "UNASSIGNED", posts: [], pill: { label: "Comptoir à choisir" } });
-    expect(status.subtitle).toContain("titulaire");
+    expect(status).toMatchObject({ state: "UNASSIGNED", posts: [], pill: { label: "Aucun comptoir" } });
+    expect(status.subtitle).toContain("« Ouvrir mon espace PharmaBoost »");
     expect(buildCounterStatus({ now: NOW, posts: two, mine: { postIds: [], mode: "NONE" }, canAssign: true }).subtitle).toContain("Mes comptoirs");
   });
 
-  it("une pharmacie sans aucun comptoir relié reste « non connectée », pas « à choisir »", () => {
+  it("une pharmacie sans aucun comptoir relié reste « non connectée », pas « aucun comptoir »", () => {
     expect(buildCounterStatus({ now: NOW, posts: [], mine: { postIds: [], mode: "NONE" } }).state).toBe("NOT_CONNECTED");
   });
 });

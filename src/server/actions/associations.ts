@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { createAssociation, deleteAssociation, updateAssociation } from "@/server/services/product-associations";
-import { MAX_SENTENCE_LENGTH } from "@/core/associations/rules";
+import { createAssociations, deleteAssociation, updateAssociation } from "@/server/services/product-associations";
+import { MAX_ADVICE_PER_SAVE, MAX_SENTENCE_LENGTH } from "@/core/associations/rules";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /**
@@ -15,24 +15,43 @@ import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
  * associer à quoi. Le service ne laisse passer que les produits de l'officine du demandeur.
  */
 
-const createSchema = z.object({
+const batchSchema = z.object({
   /** Le déclencheur : un produit du stock… */
   triggerProductId: z.string().min(1).optional().nullable(),
-  /** …ou un médicament du catalogue national (un médicament conseil comme Coryzalia). Un seul des deux. */
+  /** …ou un médicament (du stock ou du catalogue national — Coryzalia, la cétirizine). Un seul des deux. */
   triggerSpecialtyId: z.string().min(1).optional().nullable(),
-  adviceProductId: z.string().min(1, "Choisissez le produit à conseiller."),
+  /** Les produits conseillés, dans l'ordre où le pharmacien les a choisis. */
+  adviceProductIds: z.array(z.string().min(1)).min(1, "Choisissez au moins un produit à conseiller.").max(MAX_ADVICE_PER_SAVE, `${MAX_ADVICE_PER_SAVE} produits au plus en une fois.`),
   sentence: z.string().max(MAX_SENTENCE_LENGTH + 200, "La phrase est trop longue.").optional().nullable(),
 });
 
-export async function createAssociationAction(payload: z.input<typeof createSchema>): Promise<ActionResult<null>> {
+const quoted = (names: string[]): string => {
+  const list = names.map((name) => `« ${name} »`);
+  return list.length <= 1 ? (list[0] ?? "") : `${list.slice(0, -1).join(", ")} et ${list[list.length - 1]}`;
+};
+
+export type BatchSaveResult = { created: number; skipped: { name: string | null; reason: string }[] };
+
+/**
+ * Plusieurs produits conseillés d'un coup pour un même déclencheur. Ce qui ne peut pas être créé (déjà associé, désactivé…)
+ * est dit, sans empêcher le reste : « 2 associations enregistrées », puis la raison de chaque produit écarté.
+ */
+export async function createAssociationsAction(payload: z.input<typeof batchSchema>): Promise<ActionResult<BatchSaveResult>> {
   const session = await requirePermission(PERMISSIONS.RECOMMENDATION_RULES_MANAGE);
-  const parsed = createSchema.safeParse(payload);
+  const parsed = batchSchema.safeParse(payload);
   if (!parsed.success) return fail("Vérifiez les produits choisis.", zodFieldErrors(parsed.error.issues));
 
-  const result = await createAssociation(session.scope, parsed.data);
+  const result = await createAssociations(session.scope, parsed.data);
   if (!result.ok) return fail(result.error);
+  const skipped = result.skipped.map((skip) => ({ name: skip.adviceName, reason: skip.reason }));
+  if (result.created.length === 0) return fail(skipped.map((skip) => skip.reason).join(" ") || "Aucune association enregistrée.");
   revalidatePath("/associations");
-  return ok(null, `Association enregistrée : « ${result.adviceName} » sera proposé avec « ${result.triggerName} », dès la prochaine vente.`);
+  const count = result.created.length;
+  const names = quoted(result.created.map((row) => row.adviceName));
+  return ok(
+    { created: count, skipped },
+    `${count === 1 ? "1 association enregistrée" : `${count} associations enregistrées`} : ${names} ${count === 1 ? "sera proposé" : "seront proposés"} avec « ${result.triggerName} », dès la prochaine vente.`,
+  );
 }
 
 const updateSchema = z.object({

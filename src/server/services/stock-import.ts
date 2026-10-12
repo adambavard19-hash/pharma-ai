@@ -8,9 +8,12 @@ import { refreshStockNotifications, createNotification } from "./notifications";
 import { recordAudit } from "@/server/audit/log";
 import {
   classifyRows,
+  decodeExportText,
+  isBinaryWorkbook,
   missingRequiredFields,
   normalizeName,
   readRows,
+  repairsDamagedLabel,
   suggestMapping,
   summarize,
   UnreadableFileError,
@@ -95,14 +98,18 @@ export async function parseImportFileAsync(name: string, bytes: Uint8Array): Pro
 
 export function parseImportFile(name: string, bytes: Uint8Array): ParsedFile {
   const lower = name.toLowerCase();
-  if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
-    const workbook = XLSX.read(bytes, { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    if (!sheet) return { headers: [], records: [], incomplete: false };
-    const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
-    return fromMatrix(matrix);
-  }
-  return fromMatrix(parseCsv(new TextDecoder("utf-8").decode(bytes)));
+  if ((lower.endsWith(".xlsx") || lower.endsWith(".xls")) && isBinaryWorkbook(bytes)) return fromWorkbook(XLSX.read(bytes, { type: "array" }));
+  // Un texte (CSV, TXT, ou « .xls » qui n'est que du texte) : l'encodage est reconnu ici — UTF-8, UTF-16, windows-1252 ou CP850.
+  const { text } = decodeExportText(bytes);
+  // Un tableau HTML ou XML sous le nom « .xls » : lu par la bibliothèque, valeurs gardées en texte (« 14,95 » ne devient pas 1 495).
+  if (/^\s*</.test(text)) return fromWorkbook(XLSX.read(text, { type: "string", raw: true }));
+  return fromMatrix(parseCsv(text));
+}
+
+function fromWorkbook(workbook: XLSX.WorkBook): ParsedFile {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) return { headers: [], records: [], incomplete: false };
+  return fromMatrix(XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null }));
 }
 
 function fromMatrix(matrix: unknown[][]): ParsedFile {
@@ -437,13 +444,15 @@ export async function commitStockImport(params: {
           touchedPresentationIds.add(item.targetId);
           outcome.drugsUpserted += 1;
         } else if (item.action === "PRODUCT") {
-          const product = await tx.product.findUnique({ where: { id: item.targetId }, select: { pharmacyId: true } });
+          const product = await tx.product.findUnique({ where: { id: item.targetId }, select: { pharmacyId: true, name: true } });
           if (!product || product.pharmacyId !== params.scope.pharmacyId) {
             throw new Error(`Ligne ${row.line} : produit introuvable dans cette officine.`);
           }
           await tx.product.update({
             where: { id: item.targetId },
             data: {
+              // Le nom n'est jamais réécrit par un import, sauf pour réparer un caractère perdu (« ERGYALLER¿ » → « ERGYALLER »).
+              ...(repairsDamagedLabel(product.name, row.name) ? { name: row.name as string } : {}),
               ...(row.salePriceCents !== null ? { salePriceCents: row.salePriceCents } : {}),
               ...(row.purchasePriceCents !== null ? { purchasePriceCents: row.purchasePriceCents } : {}),
               ...(row.vatRate !== null ? { vatRate: row.vatRate } : {}),

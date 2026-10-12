@@ -64,6 +64,11 @@ export type NoticeRecommendation = {
    * Absent : oui (comportement historique).
    */
   trusted?: boolean;
+  /**
+   * Une association écrite par le pharmacien (ou commune à toutes les officines), et non un conseil du moteur : elle a ses
+   * propres places dans la fenêtre, en plus des conseils du moteur — un conseil du moteur ne l'en chasse jamais.
+   */
+  association?: boolean;
 };
 
 /** Ce que le pharmacien lit sur la fenêtre : « En stock », « Stock faible », « Rupture », ou « Stock à vérifier ». */
@@ -125,7 +130,7 @@ export type CounterNotice = {
   /** Ce qui a été bipé, en une ligne. */
   subject: string;
   alerts: string[];
-  /** Jusqu'à trois conseils : « Produit · 8,90 € · pourquoi ». */
+  /** Jusqu'à trois conseils du moteur, puis jusqu'à trois associations du pharmacien : « Produit · 8,90 € · pourquoi ». */
   advice: string[];
   /** Les mêmes conseils, structurés (photo, disponibilité, prix) : c'est ce que la fenêtre du poste dessine. */
   items: NoticeItem[];
@@ -143,8 +148,16 @@ export type CounterNotice = {
 
 const MAX_ALERTS = 2;
 const RANK: Record<string, number> = { BLOCKING: 0, WARNING: 1, CAUTION: 2, INFO: 3 };
-/** Trois conseils au plus à l'écran du comptoir : on en propose en moyenne trois, un seul quand il n'y en a qu'un de pertinent. */
+/** Trois conseils du moteur au plus à l'écran du comptoir : on en propose en moyenne trois, un seul quand il n'y en a qu'un de pertinent. */
 const MAX_ADVICE = 3;
+/**
+ * Et, EN PLUS, jusqu'à trois associations du pharmacien — la limite du moteur d'associations (`MAX_ASSOCIATION_ADVICE`,
+ * core/ai/engines/associations.ts ; un test vérifie qu'elles restent égales, ce module ne dépendant de rien pour que la
+ * fenêtre du poste et le site l'embarquent seul) : ce sont ses choix, ils ne se disputent pas la place avec les conseils
+ * du moteur. Six cartes au plus, que l'île fait défiler.
+ */
+const MAX_ASSOCIATION_CARDS = 3;
+export const MAX_COUNTER_CARDS = MAX_ADVICE + MAX_ASSOCIATION_CARDS;
 /** Un conseil reste sous les yeux du pharmacien après sa réponse : « Vendu » et « Non vendu » le marquent, ils ne le font pas disparaître. */
 const SHOWN_STATUSES = new Set(["PROPOSED", "ACCEPTED", "MODIFIED", "PURCHASED", "DECLINED"]);
 
@@ -193,15 +206,19 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
     .map((alert) => alert.message);
   // Un produit n'est conseillé qu'une fois : le mieux classé reste, les doublons (même produit pour deux médicaments) s'effacent.
   const seenProducts = new Set<string>();
-  const shown = input.recommendations
+  const shownable = input.recommendations
     .filter((rec) => SHOWN_STATUSES.has(rec.status) && rec.trusted !== false)
     .filter((rec) => {
       const key = shortName(rec.name).toLowerCase();
       if (seenProducts.has(key)) return false;
       seenProducts.add(key);
       return true;
-    })
-    .slice(0, MAX_ADVICE);
+    });
+  // Deux files, deux plafonds : les conseils du moteur d'abord (la priorité clinique), puis les associations du pharmacien.
+  const shown = [
+    ...shownable.filter((rec) => !rec.association).slice(0, MAX_ADVICE),
+    ...shownable.filter((rec) => rec.association).slice(0, MAX_ASSOCIATION_CARDS),
+  ];
   // Le prix ne s'affiche que si le stock est fiable : les deux viennent du même export du logiciel de gestion.
   const items: NoticeItem[] = shown.map((rec) => ({
     id: rec.id ?? null,

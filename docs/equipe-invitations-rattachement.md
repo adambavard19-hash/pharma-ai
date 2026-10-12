@@ -15,9 +15,11 @@ Le parcours d'entrée dans une officine, sans aucun réglage de la console Pharm
    dit la même chose que l'adresse ait un compte ou non (c'est un e-mail qui prévient la personne concernée). Plafond : 25 demandes en attente par officine.
 4. **Mes comptoirs** : le téléchargement de PharmaBoost Connect (code d'appairage à usage unique, 7 jours, créé pour le titulaire seul), l'état de
    chaque ordinateur, et le collaborateur de chacun. Les anciens libellés « Mes connexions » y mènent désormais sous ce nom.
-5. **Identifier le collaborateur** : « Nouvelle vente » → « Je travaille ici » (un clic, sans réinstaller) attribue le comptoir à la personne
-   connectée ; elle n'est qu'à un comptoir à la fois (en prendre un libère l'autre) ; celui qui l'occupait en est prévenu ; le titulaire voit qui
-   est où. Les conseils et ventes sont attribués à la personne (instantané pris au bip), pas à l'ordinateur.
+5. **Identifier le collaborateur** (13 oct. 2026, « 1 robot pour 1 espace ») : plus aucun comptoir à choisir. Le poste ouvre une fois, dans le
+   navigateur de SON PC, un lien à usage unique (10 min) qui y pose un cookie signé ; la personne qui ouvre son espace dans ce navigateur prend
+   le comptoir, sans clic ; elle n'est qu'à un comptoir à la fois (en prendre un libère l'autre) ; le titulaire voit qui est où (« Mes
+   comptoirs », où il peut aussi choisir en secours). Icône près de l'horloge → « Ouvrir mon espace PharmaBoost » refait la liaison. Les
+   conseils et ventes sont attribués à la personne (instantané pris au bip), pas à l'ordinateur. Voir `src/core/counter/post-link.ts`.
 
 Isolation : tout geste du titulaire est borné à l'officine de **sa session** ; une demande, une invitation ou un comptoir d'une autre officine est
 « introuvable ». Essai sur la vraie base, deux officines, requêtes simultanées : `npm run essai:equipe` (nettoie tout ; `-- --garder` conserve les

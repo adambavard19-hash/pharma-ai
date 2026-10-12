@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Robot } from "@/components/robot";
 import { useCounterLook } from "@/components/robot/counter-look-context";
 import { AlertBadge, useRobotAlerts } from "@/components/robot/robot-alerts";
+import { useRobotInBrowser } from "@/components/robot/robot-presence";
 import { openIsland } from "@/components/island/platform-island";
 import { useMobileNav } from "./mobile-nav";
 
@@ -27,9 +28,12 @@ export function Sidebar({
   const { open: mobileOpen, closeNav } = useMobileNav();
   const counterLook = useCounterLook();
   const robotAlerts = useRobotAlerts();
+  // Sur le PC où le logiciel PharmaBoost installé a déjà son robot, le menu n'en montre pas un second.
+  const robotHere = useRobotInBrowser();
   const pathname = usePathname();
-  // Ce que le robot signale se lit dans l'île, en haut de l'écran : toucher le robot du menu l'ouvre.
+  // Ce que le robot signale se lit dans l'île, en haut de l'écran : toucher le robot du menu (ou son compte) l'ouvre.
   const alerts = robotAlerts?.alerts ?? [];
+  const alertsTitle = alerts.length > 0 ? `${alerts.length} chose${alerts.length > 1 ? "s" : ""} à vous dire` : undefined;
   const granted = new Set(permissions);
 
   const items = NAVIGATION.filter((item) => granted.has(item.permission) && !hiddenHrefs.includes(item.href));
@@ -62,20 +66,37 @@ export function Sidebar({
           {/* Le robot vivant, aux couleurs du comptoir de la personne (le robot de la marque si elle n'en a pas) : il respire,
               cligne des yeux, rit quand on le touche. Hors du lien, pour qu'on puisse le toucher sans changer de page. */}
           <div className="flex min-w-0 items-center gap-2">
-            <div
-              className="relative shrink-0"
-              onClick={() => alerts.length > 0 && openIsland("home")}
-              title={alerts.length > 0 ? `${alerts.length} chose${alerts.length > 1 ? "s" : ""} à vous dire` : undefined}
-            >
-              <Robot size={42} interactive listen mood={robotAlerts?.mood} look={counterLook?.look} label={counterLook ? counterLook.caption : "Le robot PharmaBoost"} />
-              <AlertBadge alerts={alerts} className="-top-1 -right-1.5" />
-            </div>
+            {robotHere && (
+              <div
+                className="relative shrink-0"
+                onClick={() => alerts.length > 0 && openIsland("home")}
+                title={alertsTitle}
+              >
+                <Robot size={42} interactive listen mood={robotAlerts?.mood} look={counterLook?.look} label={counterLook ? counterLook.caption : "Le robot PharmaBoost"} />
+                <AlertBadge alerts={alerts} className="-top-1 -right-1.5" />
+              </div>
+            )}
             <Link href="/" className="min-w-0 rounded-md">
               <p className="text-sm leading-5 font-bold tracking-[-0.025em] text-text-primary">
                 Pharma<span className="text-brand-700 dark:text-brand-400">Boost</span>
               </p>
               <p className="truncate text-xs leading-4 text-text-tertiary">{pharmacyName}</p>
             </Link>
+            {/* Sans robot sur ce PC, le compte de ce qu'il signale reste au menu : le toucher ouvre l'île (sans robot). */}
+            {!robotHere && alerts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  closeNav();
+                  openIsland("home");
+                }}
+                title={alertsTitle}
+                aria-label={`${alertsTitle} : ouvrir l'île PharmaBoost`}
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+              >
+                <AlertBadge alerts={alerts} className="static" />
+              </button>
+            )}
           </div>
           <button
             type="button"

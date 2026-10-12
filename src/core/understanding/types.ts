@@ -27,6 +27,11 @@ export type UnderstandingLine = {
    * celles que toutes les spécialités candidates ont en commun.
    */
   officialSubstances: string[];
+  /**
+   * Code CIS de la spécialité rattachée, quand la ligne l'est. Il ne part jamais au modèle : il sert, si le modèle ne
+   * répond pas, à lire la famille officielle (Open Medic, `src/core/reference/atc`). `null` sinon.
+   */
+  officialCisCode: string | null;
 };
 
 /**
@@ -56,8 +61,12 @@ export type DrugClassification = {
   therapeuticClass: string | null;
   commonSideEffects: string[];
   confidence: number;
-  /** `CACHE` : classé lors d'une ordonnance précédente ; `MODEL` : classé à l'instant. */
-  source: "MODEL" | "CACHE";
+  /**
+   * `CACHE` : classé lors d'une ordonnance précédente ; `MODEL` : classé à l'instant ; `OFFICIAL` : le modèle n'a pas
+   * répondu, la famille est celle que l'Assurance Maladie donne à la spécialité (Open Medic joint à la BDPM) — jamais
+   * écrite dans le cache, le modèle l'enrichira plus tard (effets indésirables).
+   */
+  source: "MODEL" | "CACHE" | "OFFICIAL";
 };
 
 export type ClassificationResult = {

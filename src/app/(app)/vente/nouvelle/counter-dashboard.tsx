@@ -183,7 +183,7 @@ export function CounterDashboard({
                 <span className="font-medium">{post.label}</span>
                 <span className="inline-flex items-center gap-1 text-text-secondary">
                   <UserRound className="size-3.5" aria-hidden />
-                  {post.owner ?? "non attribué"}
+                  {post.owner ?? "personne"}
                 </span>
                 <span className={cn("size-2 rounded-full", post.online ? "bg-success-500" : "bg-warning-500")} role="img" aria-label={post.online ? "en ligne" : "hors ligne"} />
               </li>
@@ -292,13 +292,13 @@ function Waiting({ status, canConfigure }: { status: CounterDashboardData["statu
         <Icon className="size-7" strokeWidth={1.75} />
       </span>
       <h2 className="text-[24px] leading-8 font-semibold tracking-[-0.01em] text-text-primary">
-        {ready ? "En attente d'une délivrance" : status.state === "OFFLINE" ? "Aucune délivrance suivie pour l'instant" : unassigned ? "Choisissez votre comptoir" : "Aucun poste relié"}
+        {ready ? "En attente d'une délivrance" : status.state === "OFFLINE" ? "Aucune délivrance suivie pour l'instant" : unassigned ? "Ouvrez PharmaBoost depuis votre comptoir" : "Aucun poste relié"}
       </h2>
       <p className="max-w-md text-[16px] leading-6 text-text-secondary">
         {ready
           ? "Continuez dans votre logiciel de pharmacie. Les conseils apparaîtront automatiquement lorsqu'une délivrance sera détectée."
           : unassigned
-            ? "Chaque comptoir est un espace à part : vous ne voyez que les délivrances du vôtre, et personne ne voit les vôtres."
+            ? "Le comptoir revient à la personne connectée sur son ordinateur : vous ne voyez que les délivrances du vôtre, et personne ne voit les vôtres."
             : status.state === "OFFLINE"
             ? "Vérifiez que l'ordinateur du comptoir est allumé et relié à Internet. En attendant, vous pouvez saisir une vente à la main."
             : "Sans poste relié, PharmaBoost ne voit pas vos délivrances. En attendant, vous pouvez saisir une vente à la main."}
@@ -317,7 +317,7 @@ function Waiting({ status, canConfigure }: { status: CounterDashboardData["statu
       {status.awaitingFirstScan && <p className="max-w-md text-[13.5px] leading-5 text-text-secondary">Aucun bip reçu pour l&apos;instant : bipez une boîte au comptoir pour vérifier que le suivi arrive.</p>}
       {(status.state === "UNASSIGNED" || status.state === "NOT_CONNECTED") && canConfigure && (
         <Link href="/connexion" className="inline-flex h-11 items-center gap-2 rounded-md bg-brand-gradient px-6 text-sm font-medium text-white shadow-xs transition-[filter] hover:brightness-[0.93] focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none">
-          {status.state === "UNASSIGNED" ? "Attribuer les comptoirs" : "Connecter mon comptoir"}
+          {status.state === "UNASSIGNED" ? "Voir qui est où" : "Connecter mon comptoir"}
           <ArrowRight className="size-4" />
         </Link>
       )}

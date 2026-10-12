@@ -10,7 +10,7 @@ vi.mock("@/server/services/product-classification", () => ({ classifyPharmacyPro
 const { learnStockMedicines, learnPharmacyStock, runStockLearningPass } = await import("../stock-learning");
 const scope = { pharmacyId: "ph1", organizationId: "org1", userId: "u1" } as never;
 
-const row = (id: string, name: string, substances: string[] = []) => ({ presentation: { specialty: { id, name, pharmaceuticalForm: "comprimé", compositions: substances.map((substanceLabel) => ({ substanceLabel })) } } });
+const row = (id: string, name: string, substances: string[] = []) => ({ presentation: { specialty: { id, cisCode: `cis-${id}`, name, pharmaceuticalForm: "comprimé", compositions: substances.map((substanceLabel) => ({ substanceLabel })) } } });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -27,7 +27,8 @@ describe("connaître chaque médicament du stock avant qu'on en ait besoin", () 
     expect(result).toEqual({ inStock: 2, alreadyKnown: 1, processed: 1, remaining: 0 });
     const lines = m.ensure.mock.calls[0][0].lines;
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatchObject({ drugName: "AMOXICILLINE KRKA 1 g", officialName: "AMOXICILLINE KRKA 1 g", officialSubstances: ["amoxicilline"], form: "comprimé" });
+    // Le CIS accompagne la ligne : si le modèle ne répond pas, la famille officielle (Open Medic) prend le relais.
+    expect(lines[0]).toMatchObject({ drugName: "AMOXICILLINE KRKA 1 g", officialName: "AMOXICILLINE KRKA 1 g", officialSubstances: ["amoxicilline"], form: "comprimé", officialCisCode: "cis-s1" });
   });
 
   it("ne rappelle jamais le modèle pour un stock déjà connu", async () => {

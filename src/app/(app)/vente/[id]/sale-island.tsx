@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CounterIsland, type IslandAdvice } from "@/components/island/counter-island";
 import { IslandPortal } from "@/components/island/platform-island";
+import { useRobotInBrowser } from "@/components/robot/robot-presence";
 import { adviceOutcome, saleIslandState } from "@/core/island/sale";
 import type { IslandOutcome } from "@/core/island/banner-flow";
 import { formatCents } from "@/lib/format";
@@ -13,6 +14,10 @@ import type { AdviceView, SafetyFindingView } from "./types";
  * L'île de l'écran de vente : la bannière du comptoir, jouée avec la VRAIE vente (scan, analyse étape par étape,
  * mises en garde, conseils avec Vendu / Non vendu, vente terminée). Elle prend la place de l'île du logiciel, en haut
  * de l'écran, le temps de la vente. Ses gestes passent par les mêmes fonctions que l'écran (mêmes actions serveur).
+ *
+ * Sur le PC où le logiciel PharmaBoost installé dessine le robot (core/robot/single-robot.ts), son île joue déjà cette
+ * vente avec son robot : celle-ci ne la rejoue pas (aucun geste perdu — l'écran garde tous les siens) et l'île de
+ * l'espace, sans robot, reste en haut avec ses alertes et la discussion.
  */
 export function SaleIsland({
   editing,
@@ -48,6 +53,7 @@ export function SaleIsland({
   onFinish: () => void;
 }) {
   const [alertDismissed, setAlertDismissed] = useState(false);
+  const robotHere = useRobotInBrowser();
   // Les conseils qu'on peut trancher d'un geste dans l'île : un produit, pas de question en attente, pas de validation exigée.
   const shown = advice.filter((r) => r.product && r.status !== "REMOVED" && !r.requiresValidation && !(r.opportunity?.question && r.opportunity.answer === null)).slice(0, 4);
   const outcomes: IslandOutcome[] = shown.map((r) => adviceOutcome(r.status, basketIds.has(r.id)));
@@ -65,6 +71,7 @@ export function SaleIsland({
     image: r.product!.imageUrl ?? undefined,
   }));
 
+  if (!robotHere) return null;
   return (
     <IslandPortal>
       <CounterIsland

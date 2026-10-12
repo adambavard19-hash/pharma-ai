@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { ArrowRight, Check, Loader2, Package, Pencil, Plus, Search, Trash2, X } from "lucide-react";
-import { createAssociationAction, deleteAssociationAction, updateAssociationAction } from "@/server/actions/associations";
-import { MAX_SENTENCE_LENGTH } from "@/core/associations/rules";
+import { createAssociationsAction, deleteAssociationAction, updateAssociationAction } from "@/server/actions/associations";
+import { MAX_ADVICE_PER_SAVE, MAX_SENTENCE_LENGTH } from "@/core/associations/rules";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,17 +12,15 @@ import { Alert, EmptyState } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/format";
 import type { ProductSearchResult } from "@/app/api/produits/recherche/route";
-import type { DrugSpecialtyResult } from "@/app/api/medicaments/specialites/route";
+import type { TriggerOption, TriggerSearch } from "@/app/api/associations/declencheurs/route";
 
 type ProductBrief = { id: string; name: string; brand: string | null; quantity: number; deleted: boolean };
 /** Ce qui déclenche : un produit du stock, ou un médicament du catalogue national (sans stock connu). */
 type TriggerBrief = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number | null; deleted: boolean };
 type AssociationRow = { id: string; trigger: TriggerBrief; advice: ProductBrief; sentence: string | null; isActive: boolean; createdBy: string | null; createdAt: string };
-/** Le déclencheur en cours de choix dans le formulaire. */
-type PickedTrigger = { kind: "PRODUCT"; product: ProductSearchResult } | { kind: "DRUG"; drug: DrugSpecialtyResult };
 
 /**
- * Les associations de produits : à gauche le produit qui déclenche, à droite celui qu'on propose.
+ * Les associations de produits : à gauche le produit ou le médicament qui déclenche, à droite ceux qu'on propose.
  *
  * Rien ici ne contourne un garde-fou : à l'analyse d'une vente, l'association passe par le stock (jamais un produit en
  * rupture), la sécurité du patient et la vente déjà en cours. L'écran le dit, pour que personne ne s'étonne d'une carte
@@ -88,9 +86,8 @@ export function AssociationsManager({ associations }: { associations: Associatio
 }
 
 function NewAssociation() {
-  const [mode, setMode] = useState<"PRODUCT" | "DRUG">("PRODUCT");
-  const [trigger, setTrigger] = useState<PickedTrigger | null>(null);
-  const [advice, setAdvice] = useState<ProductSearchResult | null>(null);
+  const [trigger, setTrigger] = useState<TriggerOption | null>(null);
+  const [advice, setAdvice] = useState<ProductSearchResult[]>([]);
   const [sentence, setSentence] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -98,63 +95,50 @@ function NewAssociation() {
 
   const submit = () => {
     setError(null);
-    if (!trigger || !advice) {
-      setError("Choisissez le produit déclencheur et le produit à conseiller.");
+    if (!trigger || advice.length === 0) {
+      setError("Choisissez le produit ou le médicament déclencheur, et au moins un produit à conseiller.");
       return;
     }
     startTransition(async () => {
-      const result = await createAssociationAction({
-        ...(trigger.kind === "PRODUCT" ? { triggerProductId: trigger.product.id } : { triggerSpecialtyId: trigger.drug.id }),
-        adviceProductId: advice.id,
+      const result = await createAssociationsAction({
+        ...(trigger.kind === "PRODUCT" ? { triggerProductId: trigger.productId } : { triggerSpecialtyId: trigger.specialtyId }),
+        adviceProductIds: advice.map((product) => product.id),
         sentence: sentence.trim() || null,
       });
       if (!result.ok) {
         setError(result.error);
         return;
       }
-      push({ tone: "success", title: result.message ?? "Association enregistrée" });
-      // On garde le déclencheur : on enchaîne souvent plusieurs produits conseillés pour un même produit.
-      setAdvice(null);
+      push({ tone: "success", title: result.message ?? "Associations enregistrées" });
+      // Un produit déjà associé n'empêche pas les autres : on dit lequel, et pourquoi.
+      const skipped = result.data.skipped.length;
+      if (skipped > 0) push({ tone: "warning", title: skipped === 1 ? "Un produit écarté" : `${skipped} produits écartés`, description: result.data.skipped.map((skip) => skip.reason).join(" ") });
+      // On garde le déclencheur : on enchaîne souvent d'autres produits conseillés pour un même produit.
+      setAdvice([]);
       setSentence("");
     });
   };
 
+  const count = advice.length;
   return (
     <Card>
-      <CardHeader title="Nouvelle association" description="Le produit de gauche appelle le produit de droite." />
+      <CardHeader title="Nouvelle association" description="Le produit ou le médicament de gauche appelle les produits de droite — un ou plusieurs." />
       <CardContent className="space-y-4">
         <div className="grid items-start gap-4 md:grid-cols-[1fr_auto_1fr]">
-          <div className="space-y-3">
-            <div role="tablist" aria-label="Ce qui déclenche l'association" className="inline-flex rounded-lg bg-surface-sunken p-1 text-[13px] font-medium">
-              {([["PRODUCT", "Un produit de mon stock"], ["DRUG", "Un médicament"]] as const).map(([kind, label]) => (
-                <button
-                  key={kind}
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === kind}
-                  onClick={() => { setMode(kind); setTrigger(null); }}
-                  className={mode === kind ? "rounded-md bg-surface-card px-3 py-1.5 text-text-primary shadow-sm" : "rounded-md px-3 py-1.5 text-text-secondary hover:text-text-primary"}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {mode === "PRODUCT" ? (
-              <ProductField label="Quand ce produit est dans la vente" value={trigger?.kind === "PRODUCT" ? trigger.product : null} onChange={(product) => setTrigger(product ? { kind: "PRODUCT", product } : null)} excludeId={advice?.id} />
-            ) : (
-              <DrugField label="Quand ce médicament est dans la vente" value={trigger?.kind === "DRUG" ? trigger.drug : null} onChange={(drug) => setTrigger(drug ? { kind: "DRUG", drug } : null)} />
-            )}
-          </div>
-          <ArrowRight className="mt-16 hidden size-5 shrink-0 text-text-tertiary md:block" aria-hidden />
-          <div className="md:pt-[3.1rem]">
-            <ProductField label="PharmaBoost propose ce produit" value={advice} onChange={setAdvice} excludeId={trigger?.kind === "PRODUCT" ? trigger.product.id : undefined} />
-          </div>
+          <TriggerField value={trigger} onChange={setTrigger} />
+          <ArrowRight className="mt-9 hidden size-5 shrink-0 text-text-tertiary md:block" aria-hidden />
+          <AdviceField
+            values={advice}
+            onAdd={(product) => setAdvice((current) => (current.some((item) => item.id === product.id) || current.length >= MAX_ADVICE_PER_SAVE ? current : [...current, product]))}
+            onRemove={(id) => setAdvice((current) => current.filter((item) => item.id !== id))}
+            excludeId={trigger?.kind === "PRODUCT" ? trigger.productId : undefined}
+          />
         </div>
 
         <Field
           label="Ce que vous dites au patient (facultatif)"
           htmlFor="association-sentence"
-          hint={`Vos mots, tels quels, sur la carte du comptoir. Sans phrase, PharmaBoost n'affiche qu'une formule neutre. ${sentence.length}/${MAX_SENTENCE_LENGTH}`}
+          hint={`Vos mots, tels quels, sur la carte du comptoir${count > 1 ? " — la même phrase pour chaque produit choisi, modifiable ensuite produit par produit" : ""}. Sans phrase, PharmaBoost n'affiche qu'une formule neutre. ${sentence.length}/${MAX_SENTENCE_LENGTH}`}
         >
           <Textarea id="association-sentence" value={sentence} maxLength={MAX_SENTENCE_LENGTH} onChange={(event) => setSentence(event.target.value)} placeholder="Par exemple : pour accompagner le lavage du nez quand la toux s'installe." className="min-h-16" />
         </Field>
@@ -166,52 +150,78 @@ function NewAssociation() {
         )}
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={submit} loading={pending} disabled={!trigger || !advice} leadingIcon={<Plus className="size-[18px]" />}>
-            Enregistrer l&apos;association
+          <Button onClick={submit} loading={pending} disabled={!trigger || count === 0} leadingIcon={<Plus className="size-[18px]" />}>
+            {count > 1 ? `Enregistrer les ${count} associations` : "Enregistrer l'association"}
           </Button>
-          <p className="text-[12.5px] text-text-tertiary">Le produit conseillé n&apos;est jamais proposé en rupture de stock, ni s&apos;il est écarté par la sécurité pour le patient.</p>
+          <p className="text-[12.5px] text-text-tertiary">Au comptoir, trois associations au plus par vente, en plus des conseils de PharmaBoost. Un produit conseillé n&apos;est jamais proposé en rupture de stock, ni s&apos;il est écarté par la sécurité pour le patient.</p>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-/** Recherche dans le catalogue national des médicaments (nom ou substance) : Coryzalia se lit par son code CIP, il n'est pas dans le stock. */
-function DrugField({ label, value, onChange }: { label: string; value: DrugSpecialtyResult | null; onChange: (drug: DrugSpecialtyResult | null) => void }) {
+/** Le délai avant d'interroger le serveur : on cherche quand la frappe se pose, pas à chaque lettre. */
+const SEARCH_DELAY_MS = 250;
+
+/** Ce qu'on lit d'un médicament : son nom sans la forme, puis la forme (ou le conditionnement détenu). */
+const drugTitle = (name: string) => name.split(",")[0].trim();
+const drugForm = (name: string) => (name.includes(",") ? name.slice(name.indexOf(",") + 1).trim() : "");
+
+function stockBadge(quantity: number | null, status?: ProductSearchResult["status"]) {
+  if (quantity === null) return null;
+  if (quantity <= 0) return <Badge tone="danger">Rupture</Badge>;
+  return <Badge tone={status === "LOW_STOCK" ? "warning" : "success"}>{`${quantity} en stock`}</Badge>;
+}
+
+/**
+ * Le déclencheur, en UN champ : les médicaments du stock de l'officine (avec la quantité), ses produits, puis le reste du
+ * catalogue national. La recherche ne tient compte ni des accents, ni de la casse, ni de l'ordre ou du nombre de mots :
+ * « cétirizine 10 mg boîte de 15 » trouve la boîte en stock.
+ */
+function TriggerField({ value, onChange }: { value: TriggerOption | null; onChange: (option: TriggerOption | null) => void }) {
+  const label = "Quand ce produit ou ce médicament est dans la vente";
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<DrugSpecialtyResult[]>([]);
+  const [results, setResults] = useState<TriggerSearch>({ stock: [], catalogue: [] });
   const [loading, setLoading] = useState(false);
+  const needle = query.trim();
 
   useEffect(() => {
-    if (value || query.trim().length < 3) return;
+    if (value || needle.length < 2) return;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/medicaments/specialites?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
-        if (response.ok) setResults(((await response.json()) as { results: DrugSpecialtyResult[] }).results);
+        const response = await fetch(`/api/associations/declencheurs?q=${encodeURIComponent(needle)}`, { signal: controller.signal });
+        if (response.ok) setResults((await response.json()) as TriggerSearch);
       } catch {
         // Requête annulée : on garde l'affichage précédent.
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
-    }, 250);
+    }, SEARCH_DELAY_MS);
     return () => {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [query, value]);
+  }, [needle, value]);
 
   if (value) {
+    const detail =
+      value.kind === "DRUG"
+        ? [drugForm(value.name), value.quantity !== null ? `${value.quantity} en stock` : "catalogue national"].filter(Boolean).join(" · ")
+        : [value.brand, value.quantity > 0 ? `${value.quantity} en stock` : "en rupture"].filter(Boolean).join(" · ");
     return (
-      <Field label={label} hint="L'association vaut pour toutes les formes de ce médicament (comprimé, solution buvable…).">
+      <Field label={label} hint={value.kind === "DRUG" ? "L'association vaut pour toutes les formes de ce médicament (comprimé, solution buvable…)." : undefined}>
         <div className="flex items-center gap-3 rounded-lg border border-brand-300 bg-brand-50/60 p-3 dark:border-brand-700 dark:bg-brand-950/30">
           <Check className="size-4 shrink-0 text-brand-700 dark:text-brand-300" aria-hidden />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[14px] font-medium text-text-primary">{value.name.split(",")[0].trim()}</span>
-            <span className="block truncate text-[12px] text-text-tertiary">{value.name.includes(",") ? value.name.slice(value.name.indexOf(",") + 1).trim() : (value.form ?? "")}</span>
+            <span className="flex items-center gap-2">
+              <span className="truncate text-[14px] font-medium text-text-primary">{value.kind === "DRUG" ? drugTitle(value.name) : value.name}</span>
+              {value.kind === "DRUG" && <Badge tone="info">Médicament</Badge>}
+            </span>
+            <span className="block truncate text-[12px] text-text-tertiary">{detail}</span>
           </span>
-          <button type="button" onClick={() => { onChange(null); setQuery(""); setResults([]); }} className="shrink-0 rounded-md p-1.5 text-text-tertiary hover:bg-surface-sunken hover:text-text-primary" aria-label={`Changer : ${label}`}>
+          <button type="button" onClick={() => { onChange(null); setQuery(""); setResults({ stock: [], catalogue: [] }); }} className="shrink-0 rounded-md p-1.5 text-text-tertiary hover:bg-surface-sunken hover:text-text-primary" aria-label={`Changer : ${label}`}>
             <X className="size-4" />
           </button>
         </div>
@@ -219,43 +229,70 @@ function DrugField({ label, value, onChange }: { label: string; value: DrugSpeci
     );
   }
 
+  const empty = results.stock.length === 0 && results.catalogue.length === 0;
   return (
     <Field label={label}>
       <div className="space-y-2">
-        <Input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom du médicament ou substance (3 lettres au moins)…" leadingIcon={loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />} aria-label={label} />
-        {query.trim().length >= 3 && (
-          <ul className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-border-subtle bg-surface-card p-1.5">
-            {results.length === 0 && !loading ? (
-              <li className="px-2 py-3 text-center text-[12.5px] text-text-tertiary">Aucun médicament trouvé au catalogue national.</li>
+        <Input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom, substance, dosage, code-barres… (cétirizine 10 mg)" leadingIcon={loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />} aria-label={label} />
+        {needle.length >= 2 && (
+          <div className="max-h-80 space-y-2 overflow-y-auto rounded-lg border border-border-subtle bg-surface-card p-1.5">
+            {empty ? (
+              <p className="px-2 py-3 text-center text-[12.5px] text-text-tertiary">{loading ? "Recherche…" : "Rien trouvé, ni dans votre stock ni au catalogue national."}</p>
             ) : (
-              results.map((drug) => (
-                <li key={drug.id}>
-                  <button type="button" onClick={() => onChange(drug)} className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-brand-50/70 dark:hover:bg-brand-950/40">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13.5px] font-medium text-text-primary">{drug.name}</span>
-                      <span className="block truncate text-[12px] text-text-tertiary">{drug.substances.join(", ") || "—"}</span>
-                    </span>
-                    {!drug.marketed && <Badge tone="warning">Non commercialisé</Badge>}
-                  </button>
-                </li>
-              ))
+              <>
+                <TriggerGroup title="Dans mon stock" options={results.stock} onPick={onChange} />
+                <TriggerGroup title="Autres médicaments" options={results.catalogue} onPick={onChange} />
+              </>
             )}
-          </ul>
+          </div>
         )}
       </div>
     </Field>
   );
 }
 
-/** Recherche dans le catalogue de l'officine (nom, marque, référence, EAN) ; un produit en rupture reste choisissable. */
-function ProductField({ label, value, onChange, excludeId }: { label: string; value: ProductSearchResult | null; onChange: (product: ProductSearchResult | null) => void; excludeId?: string }) {
+function TriggerGroup({ title, options, onPick }: { title: string; options: TriggerOption[]; onPick: (option: TriggerOption) => void }) {
+  if (options.length === 0) return null;
+  return (
+    <section aria-label={title}>
+      <h3 className="px-2.5 pt-1.5 pb-1 text-[11.5px] font-semibold tracking-wide text-text-tertiary uppercase">{title}</h3>
+      <ul className="space-y-0.5">
+        {options.map((option) => (
+          <li key={option.kind === "DRUG" ? `d:${option.specialtyId}` : `p:${option.productId}`}>
+            <button type="button" onClick={() => onPick(option)} className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-brand-50/70 dark:hover:bg-brand-950/40">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13.5px] font-medium text-text-primary">{option.kind === "DRUG" ? drugTitle(option.name) : option.name}</span>
+                <span className="block truncate text-[12px] text-text-tertiary">
+                  {option.kind === "DRUG" ? [drugForm(option.name), option.label ?? option.substances.join(", ")].filter(Boolean).join(" — ") || "—" : (option.brand ?? "Produit de l'officine")}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {option.kind === "DRUG" && <Badge tone="info">Médicament</Badge>}
+                {option.kind === "DRUG" && option.quantity === null && !option.marketed && <Badge tone="warning">Non commercialisé</Badge>}
+                {option.kind === "DRUG" ? stockBadge(option.quantity) : stockBadge(option.quantity, option.status)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Les produits conseillés : on en choisit un ou plusieurs (des puces qu'on retire d'un clic), « Enregistrer » crée toutes
+ * les associations d'un coup. La recherche est celle du catalogue de l'officine ; un produit en rupture reste choisissable.
+ */
+function AdviceField({ values, onAdd, onRemove, excludeId }: { values: ProductSearchResult[]; onAdd: (product: ProductSearchResult) => void; onRemove: (id: string) => void; excludeId?: string }) {
+  const label = values.length > 1 ? "PharmaBoost propose ces produits" : "PharmaBoost propose ce produit";
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProductSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState(false);
+  const full = values.length >= MAX_ADVICE_PER_SAVE;
 
   useEffect(() => {
-    if (!touched || value) return;
+    if (!touched) return;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       setLoading(true);
@@ -267,72 +304,58 @@ function ProductField({ label, value, onChange, excludeId }: { label: string; va
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
-    }, 220);
+    }, SEARCH_DELAY_MS);
     return () => {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [query, touched, value]);
+  }, [query, touched]);
 
-  if (value) {
-    return (
-      <Field label={label}>
-        <div className="flex items-center gap-3 rounded-lg border border-brand-300 bg-brand-50/60 p-3 dark:border-brand-700 dark:bg-brand-950/30">
-          <Check className="size-4 shrink-0 text-brand-700 dark:text-brand-300" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[14px] font-medium text-text-primary">{value.name}</span>
-            <span className="block truncate text-[12px] text-text-tertiary">
-              {value.brand ? `${value.brand} · ` : ""}
-              {value.quantity > 0 ? `${value.quantity} en stock` : "en rupture"}
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              onChange(null);
-              setQuery("");
-              setResults([]);
-              setTouched(true);
-            }}
-            className="shrink-0 rounded-md p-1.5 text-text-tertiary hover:bg-surface-sunken hover:text-text-primary"
-            aria-label={`Changer : ${label}`}
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      </Field>
-    );
-  }
-
-  const shown = results.filter((product) => product.id !== excludeId);
+  const chosen = new Set(values.map((product) => product.id));
+  const shown = results.filter((product) => product.id !== excludeId && !chosen.has(product.id));
   return (
-    <Field label={label}>
+    <Field label={label} hint={full ? `${MAX_ADVICE_PER_SAVE} produits au plus en une fois : enregistrez, puis continuez.` : values.length > 0 ? "Ajoutez-en d'autres si vous voulez : chacun devient une association." : undefined}>
       <div className="space-y-2">
+        {values.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5" aria-label="Produits choisis">
+            {values.map((product) => (
+              <li key={product.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-brand-300 bg-brand-50/60 py-1 pr-1 pl-3 text-[13px] text-text-primary dark:border-brand-700 dark:bg-brand-950/30">
+                <span className="truncate font-medium">{product.name}</span>
+                <span className="shrink-0 text-[11.5px] text-text-tertiary">{product.quantity > 0 ? `${product.quantity} en stock` : "rupture"}</span>
+                <button type="button" onClick={() => onRemove(product.id)} className="shrink-0 rounded-full p-1 text-text-tertiary hover:bg-surface-sunken hover:text-text-primary" aria-label={`Retirer ${product.name}`}>
+                  <X className="size-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <Input
           type="search"
           value={query}
+          disabled={full}
           onFocus={() => setTouched(true)}
           onChange={(event) => {
             setTouched(true);
             setQuery(event.target.value);
           }}
-          placeholder="Nom, marque, référence, EAN…"
+          placeholder={values.length > 0 ? "Ajouter un autre produit…" : "Nom, marque, référence, EAN…"}
           leadingIcon={loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-          aria-label={label}
+          aria-label={values.length > 0 ? "Ajouter un autre produit à conseiller" : label}
         />
-        {touched && (
+        {touched && !full && (
           <ul className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-border-subtle bg-surface-card p-1.5">
             {shown.length === 0 && !loading ? (
               <li className="px-2 py-3 text-center text-[12.5px] text-text-tertiary">Aucun produit trouvé dans votre catalogue.</li>
             ) : (
               shown.map((product) => (
                 <li key={product.id}>
-                  <button type="button" onClick={() => onChange(product)} className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-brand-50/70 dark:hover:bg-brand-950/40">
+                  <button type="button" onClick={() => onAdd(product)} className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-brand-50/70 dark:hover:bg-brand-950/40">
+                    <Plus className="size-4 shrink-0 text-text-tertiary" aria-hidden />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px] font-medium text-text-primary">{product.name}</span>
                       <span className="block truncate text-[12px] text-text-tertiary">{product.brand ?? "—"}</span>
                     </span>
-                    <Badge tone={product.status === "OUT_OF_STOCK" ? "danger" : product.status === "LOW_STOCK" ? "warning" : "success"}>{product.status === "OUT_OF_STOCK" ? "Rupture" : `${product.quantity} en stock`}</Badge>
+                    {stockBadge(product.quantity, product.status)}
                   </button>
                 </li>
               ))

@@ -1,11 +1,12 @@
 /**
- * Un robot par comptoir (demande du fondateur, 11 oct. 2026) : chaque comptoir d'une pharmacie a SON robot — même base,
- * couleur et accessoire différents, un petit prénom. En arrivant le matin, on voit tout de suite si l'on est sur son
- * comptoir ou sur celui d'un collègue (« ce n'est pas Bip, c'est Pixel : je me reconnecte »).
+ * Un robot par PERSONNE (demande du fondateur, 13 oct. 2026 : « 1 robot pour 1 espace ») : chaque membre de l'équipe a
+ * SON robot — même base, couleur et accessoire différents, un petit prénom. Il le retrouve partout : dans son espace
+ * PharmaBoost et, sur le PC du comptoir où il est connecté, dans l'île du logiciel installé. Le comptoir n'a plus de robot
+ * à lui : un comptoir sans personne connectée montre le robot de la marque.
  *
- * 20 apparences, assez pour la plus grande pharmacie (20 comptoirs) : 10 accessoires × 2 couleurs chacun. Deux
- * comptoirs voisins (index qui se suivent) n'ont jamais ni la même couleur ni le même accessoire. Le robot de la
- * marque (site, logo) n'est pas l'une d'elles : il reste tel quel.
+ * 20 apparences : 10 accessoires × 2 couleurs chacun. L'apparence d'une personne se dérive de son identifiant, toujours
+ * la même, sans réglage ni stockage (`personRobotLook`) : deux collègues peuvent tomber sur le même robot, le prénom de
+ * la personne reste affiché à côté. Le robot de la marque (site, logo) n'est pas l'une d'elles : il reste tel quel.
  */
 
 export const ROBOT_ACCESSORIES = ["cap", "tophat", "crown", "bowtie", "flower", "glasses", "beanie", "star", "heart", "leaf"] as const;
@@ -42,7 +43,7 @@ export function robotLook(index: number): RobotLook {
   return { index: i, name: NAMES[i], accessory, palette };
 }
 
-/** Le robot d'un comptoir à créer : le premier libre de la pharmacie ; au-delà de 20, le moins utilisé. */
+/** Le robot d'un comptoir à créer (colonne historique `CounterPost.robotLook`) : le premier libre ; au-delà de 20, le moins utilisé. */
 export function nextLookIndex(used: readonly (number | null | undefined)[]): number {
   const counts = new Array<number>(ROBOT_LOOK_COUNT).fill(0);
   for (const value of used) if (typeof value === "number" && value >= 0 && value < ROBOT_LOOK_COUNT) counts[value] += 1;
@@ -51,10 +52,23 @@ export function nextLookIndex(used: readonly (number | null | undefined)[]): num
   return best;
 }
 
-/** « Bip · Comptoir 2 » : ce que l'écran dit sous le robot du comptoir. */
-export function robotLookCaption(index: number, comptoirName: string): string {
-  return `${robotLook(index).name} · ${comptoirName}`;
+/**
+ * Le robot d'une personne (0 à 19), dérivé de son identifiant : FNV-1a 32 bits, modulo 20. Le même sur le serveur, dans
+ * le navigateur et pour l'île du poste, d'une session à l'autre, sans rien enregistrer.
+ */
+export function personRobotLook(userId: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < userId.length; i += 1) {
+    hash ^= userId.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash % ROBOT_LOOK_COUNT;
 }
 
-/** Le robot du comptoir de la personne connectée, tel que l'écran l'affiche. */
+/** Le robot de la personne connectée, tel que l'écran l'affiche : son apparence et son prénom (« Nova »). */
 export type CounterRobotLook = { look: number; caption: string };
+
+export function personRobot(userId: string): CounterRobotLook {
+  const look = personRobotLook(userId);
+  return { look, caption: robotLook(look).name };
+}

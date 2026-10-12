@@ -5,6 +5,7 @@ import { Check, FileUp, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCounterLook } from "@/components/robot/counter-look-context";
 import { useRobotAlerts } from "@/components/robot/robot-alerts";
+import { useRobotInBrowser } from "@/components/robot/robot-presence";
 import { emitRobotMood } from "@/components/robot";
 import { previewStockAction, sendStockAction } from "@/server/actions/stock-deposits";
 import { DEPOSIT_CONFIRMATION } from "@/core/stock-deposit/rules";
@@ -18,9 +19,14 @@ import { PlatformIsland } from "./platform-island";
  * L'île du logiciel officine : le robot du COMPTOIR de la personne (ses couleurs, son accessoire), les chiffres de sa
  * journée, ce que le robot signale avec ses gestes en un clic (les alertes d'avant, désormais dans l'île), la
  * discussion avec le robot de l'officine, et « + » pour déposer le fichier du stock (titulaire).
+ *
+ * Sur le PC où le logiciel PharmaBoost installé dessine déjà le robot (core/robot/single-robot.ts), l'île reste — c'est
+ * le seul endroit de l'espace où se lisent les alertes du robot (paiement, demandes d'accès, primes…) et la discussion —
+ * mais sans le dessin du robot.
  */
 export function AppIsland({ suggestions, canImportStock }: { suggestions: string[]; canImportStock: boolean }) {
   const counterLook = useCounterLook();
+  const robotHere = useRobotInBrowser();
   const robotAlerts = useRobotAlerts();
   const alerts = robotAlerts?.alerts ?? [];
   const firstUnseen = robotAlerts?.unseen[0]?.key ?? null;
@@ -29,6 +35,7 @@ export function AppIsland({ suggestions, canImportStock }: { suggestions: string
     <PlatformIsland
       label="L'île PharmaBoost"
       look={counterLook?.look}
+      robotless={!robotHere}
       mood={robotAlerts?.mood}
       homeEndpoint="/api/ile/officine"
       homeExtra={robotAlerts && alerts.length > 0 ? <AlertList value={robotAlerts} /> : null}

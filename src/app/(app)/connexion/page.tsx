@@ -22,14 +22,13 @@ export const metadata: Metadata = { title: "Mes comptoirs" };
 export default async function ConnectPage() {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   const [loaded, robot, installer, comptoirs, members] = await Promise.all([loadConnectionOverview(session.scope.pharmacyId), loadRobotSetup(session.scope.pharmacyId), installerStatus(), listComptoirs(session.scope.pharmacyId), listMembers(session.scope.pharmacyId)]);
-  // Qui travaille à quel comptoir : l'écran de chaque collaborateur en dépend.
+  // Qui est connecté à quel comptoir (posé tout seul depuis le PC du comptoir) : l'écran de chaque collaborateur en dépend.
   const assignments = Object.fromEntries(comptoirs.map((post) => [post.id, post.assignedUserId]));
-  const robotLooks = Object.fromEntries(comptoirs.map((post) => [post.id, post.robotLook]));
   const snapshot = JSON.parse(JSON.stringify({ overview: loaded.overview, lgo: loaded.lgo })) as OverviewSnapshot;
 
   return (
     <div className="mx-auto w-full max-w-2xl pb-20">
-      <ConnectionSetup initial={snapshot} robot={robot} installerAvailable={installer.available} members={members.map((member) => ({ id: member.id, name: member.name }))} assignments={assignments} robotLooks={robotLooks} />
+      <ConnectionSetup initial={snapshot} robot={robot} installerAvailable={installer.available} members={members.map((member) => ({ id: member.id, name: member.name }))} assignments={assignments} />
     </div>
   );
 }

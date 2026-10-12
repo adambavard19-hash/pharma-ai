@@ -105,6 +105,8 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
         reason: rec.shortReason ?? rec.justification,
         status: rec.status,
         trusted: rec.origin !== "AI" || (rec.opportunity?.ruleKey != null && known.has(rec.opportunity.ruleKey) && !removed.has(rec.opportunity.ruleKey)),
+        // Une association du pharmacien (règle « association:… ») a ses propres places dans la fenêtre, en plus des conseils du moteur.
+        association: rec.origin === "RULE" && (rec.opportunity?.ruleKey?.startsWith("association:") ?? false),
         imageUrl: rec.product?.imageUrl ?? null,
         quantity: rec.product ? (rec.product.stockItem?.quantity ?? null) : (rec.presentation?.pharmacyStocks[0]?.quantity ?? null),
         alertThreshold: rec.product?.stockItem?.alertThreshold ?? null,

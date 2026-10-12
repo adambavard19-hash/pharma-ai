@@ -1810,7 +1810,10 @@ export function detectAdviceOpportunities(params: {
       const sideEffects = knowledge.commonSideEffects.map(norm);
 
       const atcHit = rule.atcPrefixes.some((prefix) => atc.startsWith(prefix));
-      const classHit = rule.therapeuticClasses.some((c) => classNames(therapeuticClass, c));
+      // Une famille officielle (Open Medic) parle par son code. Son libellé est un intitulé de l'arbre ATC, pas une
+      // classe écrite pour nos règles : « antibiotiques a usage topique » (Fucidine crème) ouvrirait la règle des
+      // probiotiques sous antibiotique, « biguanides et amidines » (chlorhexidine) celle du pied diabétique.
+      const classHit = knowledge.origin !== "OFFICIAL_ATC" && rule.therapeuticClasses.some((c) => classNames(therapeuticClass, c));
       const sideEffectHit = rule.sideEffectTriggers.some((trigger) =>
         sideEffects.some((effect) => effect.includes(norm(trigger))),
       );

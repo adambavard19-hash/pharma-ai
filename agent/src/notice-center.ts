@@ -88,7 +88,9 @@ export type HostAction =
   | { kind: "email_remove"; saleId: string }
   | { kind: "finish"; saleId: string }
   | { kind: "answer"; saleId: string; node: string; choice: string }
-  | { kind: "view"; saleId: string };
+  | { kind: "view"; saleId: string }
+  /** L'icône près de l'horloge → « Ouvrir mon espace PharmaBoost » (le mot ESPACE, sans vente) : l'agent lie le navigateur du PC. */
+  | { kind: "open_space" };
 
 const MAX_RESTARTS = 5;
 
@@ -369,6 +371,17 @@ export class NoticeCenter {
   /** La fenêtre en service (pour le journal et l'état du poste). */
   currentWindow(): NoticeWindow { return this.window; }
 
+  /**
+   * Ce que le poste affiche vraiment, dit au serveur à chaque signe de vie : l'île ou la bannière (avec le robot),
+   * l'ancienne fenêtre, la notification Windows seule (interrupteur du poste, ou plus aucune fenêtre ne tourne), ou rien
+   * (hors Windows). Sur le navigateur lié à un poste qui dessine le robot, l'espace PharmaBoost n'en dessine pas un
+   * second (src/core/robot/single-robot.ts) ; sinon il garde le sien.
+   */
+  displayedWindow(): NoticeWindow | "notification" | "aucune" {
+    if (this.platform !== "win32") return "aucune";
+    return this.broken || this.forcedLegacy ? "notification" : this.window;
+  }
+
   /** Les fenêtres dessinées par nous (l'île, la bannière) : elles vivent toute la journée et suivent le bip et le robot. */
   private get banner(): boolean { return this.window === "ile" || this.window === "banniere"; }
 
@@ -586,6 +599,10 @@ export class NoticeCenter {
         this.options.log(`Avis : action ${word} impossible (${error instanceof Error ? error.message : String(error)}).`);
       }
     };
+    if (word === "ESPACE" && !saleId) {
+      act({ kind: "open_space" });
+      return;
+    }
     if (!saleId && word !== "ERREUR") return;
     if (word === "VENDU" && argument) act({ kind: "sold", saleId, adviceId: argument });
     else if (word === "NONVENDU" && argument) act({ kind: "not_sold", saleId, adviceId: argument });

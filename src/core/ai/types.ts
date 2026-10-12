@@ -115,8 +115,14 @@ export type DrugKnowledge = {
    * `VETERINARY_NAME` : le libellé désigne un produit pour animaux (« … chien »,
    * « … chat »). Aucune règle du médicament humain ne s'y applique ; seules les
    * vigilances vétérinaires (`engines/vigilance-veterinaire.ts`) le lisent.
+   * `OFFICIAL_ATC` : le modèle n'a pas répondu ; la famille (ATC, libellés de
+   * l'arbre ATC) est celle que l'Assurance Maladie donne à la spécialité
+   * rattachée (Open Medic joint à la BDPM, `src/core/reference/atc`). C'est un
+   * fait, pas une lecture : rien à confirmer, mais ni explication ni
+   * interaction, comme pour `AI_CLASSIFICATION`. Les règles ne s'y déclenchent
+   * que par le code ATC, jamais par le texte du libellé (`engines/advice.ts`).
    */
-  origin?: "EDITORIAL" | "AI_CLASSIFICATION" | "VETERINARY_NAME";
+  origin?: "EDITORIAL" | "AI_CLASSIFICATION" | "OFFICIAL_ATC" | "VETERINARY_NAME";
   /** Ce que le libellé dit d'un produit vétérinaire. Présent seulement pour `VETERINARY_NAME`. */
   veterinary?: VeterinaryInfo;
 };

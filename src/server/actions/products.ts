@@ -13,6 +13,7 @@ import { parseAmountToCents } from "@/lib/format";
 import { recordIsDemo } from "@/server/db/demo-scope";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 import { PRODUCT_CATEGORIES } from "@/config/catalog";
+import { decodeExportText } from "@/core/stock-import";
 
 const CATEGORY_ENUM = z.enum(
   PRODUCT_CATEGORIES as [string, ...string[]],
@@ -274,7 +275,8 @@ export async function importProductsAction(
     return fail("Le fichier dépasse 5 Mo.");
   }
 
-  const text = await file.text();
+  // UTF-8, UTF-16, windows-1252 ou CP850, comme l'import du stock : un CSV « ANSI » ne donne plus « CR�ME ».
+  const { text } = decodeExportText(new Uint8Array(await file.arrayBuffer()));
   const rows = parseCsv(text);
   if (rows.length === 0) {
     return fail("Le fichier ne contient aucune ligne exploitable.");

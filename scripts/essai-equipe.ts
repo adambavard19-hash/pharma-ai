@@ -1,15 +1,16 @@
 /**
  * Essai SaaS du parcours « équipe » : inscription, invitation, rattachement, comptoirs — sur la vraie base, avec DEUX officines
  * indépendantes (ZZ Equipe A et B). Vérifie qu'aucune ne voit, ne décide ni n'écrit chez l'autre, que les liens sont à usage unique même
- * sous requêtes simultanées, qu'une demande de rattachement n'ouvre rien tant que le titulaire n'a pas approuvé, et que « Je travaille ici »
- * attribue bien un comptoir à une personne. Puis supprime tout (ou le garde avec --garder, pour un essai à l'écran).
+ * sous requêtes simultanées, qu'une demande de rattachement n'ouvre rien tant que le titulaire n'a pas approuvé, que le comptoir revient
+ * bien à la personne connectée sur le PC lié (un PC, un comptoir, sans bascule pour un même compte sur deux PC), et que le lien du poste est à usage unique. Puis supprime tout (ou le garde avec --garder, pour un essai à l'écran).
  *
  * Prérequis : l'application tourne sur http://localhost:3000 (npm run live), pour les pages publiques.
  *   npm run essai:equipe
  */
 import { prisma } from "@/server/db/client";
 import { hashPassword } from "@/server/security/password";
-import { claimComptoir, listComptoirs, releaseComptoir } from "@/server/services/comptoirs";
+import { listComptoirs, takeComptoirOnThisPc } from "@/server/services/comptoirs";
+import { consumePostLink, issuePostLink } from "@/server/services/post-link";
 import { acceptInvitation, approveJoinRequest, inviteCollaborators, listInvitations, listJoinRequests, previewInvitation, refuseJoinRequest, requestToJoin, resendInvitation, revokeInvitation, searchPharmacies } from "@/server/services/team-access";
 import { myComptoirs } from "@/server/services/comptoirs";
 
@@ -127,22 +128,36 @@ async function main() {
   await refuseJoinRequest(B.scope, reqB[0].id, deps);
   check((await prisma.user.findUnique({ where: { email: "zz-inconnu@zz-essai.test" } })) === null, "refusée : aucun compte, jamais");
 
-  // 7. Comptoirs : « Je travaille ici ».
+  // 7. Comptoirs : le comptoir revient à la personne connectée sur le PC lié (plus de comptoir à choisir).
   const members = { hugo: hugo!.id, claire: claire.ok ? claire.userId : "", camille: camille!.id };
   const scopeOf = (userId: string) => ({ pharmacyId: A.id, organizationId: A.orgId, userId });
-  check((await claimComptoir(scopeOf(members.hugo), pa1.id)).ok, "Hugo prend le comptoir 1");
+  check((await takeComptoirOnThisPc(scopeOf(members.hugo), pa1.id)).changed, "Hugo ouvre son espace sur le PC du comptoir 1 : il est à lui");
   check((await myComptoirs(scopeOf(members.hugo))).postIds.join() === pa1.id, "il ne voit que le comptoir 1");
-  check((await claimComptoir(scopeOf(members.claire), pa2.id)).ok, "Claire prend le comptoir 2");
-  const swap = await claimComptoir(scopeOf(members.claire), pa1.id);
+  check(!(await takeComptoirOnThisPc(scopeOf(members.hugo), pa1.id)).changed, "une autre page du même espace n'écrit rien");
+  check((await takeComptoirOnThisPc(scopeOf(members.claire), pa2.id)).changed, "Claire, sur le PC du comptoir 2");
+  const swap = await takeComptoirOnThisPc(scopeOf(members.claire), pa1.id);
   const afterSwap = await listComptoirs(A.id);
-  check(swap.ok && afterSwap.find((p) => p.id === pa1.id)?.assignedUserId === members.claire && afterSwap.find((p) => p.id === pa2.id)?.assignedUserId === null, "Claire prend le comptoir 1 : il change de main, son ancien comptoir est libéré");
-  check((await prisma.notification.count({ where: { pharmacyId: A.id, userId: members.hugo, title: { contains: "a pris" } } })) === 1, "Hugo, délogé, en est prévenu");
-  check(!(await claimComptoir(scopeOf(members.claire), pb1.id)).ok, "un comptoir de B est introuvable pour A");
-  check(!(await claimComptoir({ pharmacyId: B.id, organizationId: B.orgId, userId: members.claire }, pb1.id)).ok, "Claire (équipe de A) ne peut rien prendre chez B");
-  const simultaneous = await Promise.all([claimComptoir(scopeOf(members.hugo), pa2.id), claimComptoir(scopeOf(members.camille), pa2.id)]);
+  check(swap.changed && afterSwap.find((p) => p.id === pa1.id)?.assignedUserId === members.claire && afterSwap.find((p) => p.id === pa2.id)?.assignedUserId === members.claire, "Claire ouvre aussi son espace sur le PC du comptoir 1 : il change de main (Hugo le perd) ; le comptoir 2, où sa session reste ouverte, reste à elle");
+  const back = await takeComptoirOnThisPc(scopeOf(members.claire), pa2.id);
+  const afterBack = await listComptoirs(A.id);
+  check(!back.changed && afterBack.find((p) => p.id === pa1.id)?.assignedUserId === members.claire && afterBack.find((p) => p.id === pa2.id)?.assignedUserId === members.claire, "un même compte sur deux PC liés : chaque page n'écrit rien, le comptoir ne passe plus d'un PC à l'autre");
+  check((await myComptoirs(scopeOf(members.claire), pa1.id)).postIds.join() === pa1.id && (await myComptoirs(scopeOf(members.claire), pa2.id)).postIds.join() === pa2.id, "sur chaque PC, l'écran ne montre que les ventes de CE comptoir");
+  check(!(await takeComptoirOnThisPc(scopeOf(members.claire), pb1.id)).changed && (await listComptoirs(B.id)).find((p) => p.id === pb1.id)?.assignedUserId === null, "un comptoir de B n'est jamais pris depuis A");
+  const simultaneous = await Promise.all([takeComptoirOnThisPc(scopeOf(members.hugo), pa2.id), takeComptoirOnThisPc(scopeOf(members.camille), pa2.id)]);
   const final = (await listComptoirs(A.id)).filter((p) => p.assignedUserId === members.hugo || p.assignedUserId === members.camille);
-  check(simultaneous.every((r) => r.ok) && (await listComptoirs(A.id)).find((p) => p.id === pa2.id)?.assignedUserId !== null && new Set(final.map((p) => p.assignedUserId)).size === final.length, "deux prises simultanées du même comptoir : un seul occupant, jamais un état incohérent");
-  check(!(await releaseComptoir(scopeOf(members.claire), pa2.id)).ok || true, "libérer");
+  check(simultaneous.some((r) => r.changed) && (await listComptoirs(A.id)).find((p) => p.id === pa2.id)?.assignedUserId !== null && new Set(final.map((p) => p.assignedUserId)).size === final.length, "deux prises simultanées du même comptoir : un seul occupant, jamais un état incohérent");
+
+  // 8. Le lien du poste (navigateur ↔ poste) : à usage unique, même ouvert trois fois en même temps ; jamais pour un poste d'une autre officine.
+  const link = await issuePostLink(pa1.id);
+  const opened = await Promise.all([consumePostLink(link?.token), consumePostLink(link?.token), consumePostLink(link?.token)]);
+  check(opened.filter(Boolean).length === 1 && opened.find(Boolean)?.postId === pa1.id && opened.find(Boolean)?.pharmacyId === A.id, "un lien ouvert trois fois en même temps : une seule liaison, au bon poste et à la bonne officine");
+  check((await consumePostLink(link?.token)) === null, "le lien a servi : il ne vaut plus rien");
+  const stored = await prisma.counterPost.findUnique({ where: { id: pa1.id }, select: { linkTokenHash: true } });
+  check(stored?.linkTokenHash === null, "rien du lien ne reste en base après usage");
+  const linkB = await issuePostLink(pb1.id);
+  check((await consumePostLink(linkB?.token))?.pharmacyId === B.id, "le lien d'un poste de B désigne B, jamais A");
+  await prisma.counterPost.update({ where: { id: pa2.id }, data: { revokedAt: new Date() } });
+  check((await issuePostLink(pa2.id)) === null, "un poste retiré n'obtient plus de lien");
 
   console.log(failures === 0 ? "\nTout passe." : `\n${failures} vérification(s) en échec.`);
   if (keep) {

@@ -1,4 +1,5 @@
 import type { ColumnMapping } from "./columns";
+import { cleanLabel } from "./encoding";
 
 /**
  * Une ligne du fichier, lue et normalisée — pas encore rattachée à un produit.
@@ -106,7 +107,8 @@ export function readRows(
   records.forEach((record, index) => {
     const issues: ImportIssue[] = [];
     const nameRaw = mapping.name ? record[mapping.name] : null;
-    const name = nameRaw !== null && nameRaw !== undefined ? String(nameRaw).trim() || null : null;
+    // Un caractère perdu en amont (« ¿ », « � ») n'entre pas en stock : il s'afficherait tel quel au comptoir.
+    const name = nameRaw !== null && nameRaw !== undefined ? cleanLabel(String(nameRaw).trim()) || null : null;
     const code = mapping.code ? normalizeCode(record[mapping.code]) : null;
 
     if (!name && !code) issues.push("NOM_ET_CODE_MANQUANTS");
@@ -124,7 +126,7 @@ export function readRows(
     const text = (field: keyof ColumnMapping) => {
       const column = mapping[field];
       const raw = column ? record[column] : null;
-      return raw !== null && raw !== undefined ? String(raw).trim() || null : null;
+      return raw !== null && raw !== undefined ? cleanLabel(String(raw).trim()) || null : null;
     };
 
     rows.push({

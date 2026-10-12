@@ -23,6 +23,7 @@
  * LGO. Voir douchette.ts.
  *   node pharmaboost-connect.js --poste 123456 --serveur https://pharmaboost.app
  *   node pharmaboost-connect.js --test-douchette   (affiche les bips, n'envoie rien)
+ *   node pharmaboost-connect.js --ouvrir-espace    (lie le navigateur de ce PC à ce poste, voir space-link.ts)
  *
  * Installé par PharmaBoost-Installation-<jeton>.exe (double-clic, sans terminal),
  * l'installateur relie le poste avec le jeton du nom de fichier :
@@ -38,11 +39,12 @@ import { INSTALLER_EXIT, resolveInstallCode } from "./installer";
 import { stateForFailure, writeStatus, type PostState } from "./status";
 import { CrossSourceDedupe, compileRobotPattern, dryRunRobotFile, startRobotJournal, type RobotConfig } from "./robot";
 import { startLgpiJournal, type LgpiRobotConfig } from "./robot-lgpi";
+import { isSpaceLinked, markSpaceLinked, openInBrowser, shouldOpenSpaceAtStartup, spaceUrl } from "./space-link";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.1";
+const VERSION = "0.10.2";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -363,7 +365,11 @@ type FinishBody = { ok: boolean; error?: string; proposed: number; sold: number;
  */
 async function handleAction(action: HostAction): Promise<void> {
   const config = activeConfig;
-  if (!config || action.kind === "view") return;
+  if (config && action.kind === "open_space") {
+    if (await openSpace(config, "à la demande")) markSpaceLinked(dirname(CONFIG_PATH), config.agentKey);
+    return;
+  }
+  if (!config || action.kind === "view" || action.kind === "open_space") return;
   if (watched) watched.lastChange = Date.now();
   try {
     if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {
@@ -420,19 +426,49 @@ async function dropClosedNotices(config: Config): Promise<void> {
 /**
  * Le signe de vie du poste rapporte aussi ses réglages : le dossier d'export
  * du stock que PharmaBoost lui a confié, et une éventuelle demande de mise à
- * jour immédiate (« Mettre à jour maintenant » dans PharmaBoost).
+ * jour immédiate (« Mettre à jour maintenant » dans PharmaBoost). Il dit aussi
+ * la fenêtre réellement affichée (île, bannière, ancienne fenêtre, notification) :
+ * le navigateur lié à ce poste ne dessine pas un second robot seulement si la
+ * fenêtre du poste en dessine un. En retour : le robot de la personne connectée.
  */
 async function postHeartbeat(config: Config): Promise<{ exportPath: string | null; syncRequestedAt: string | null; robotLook: number | null }> {
   const response = await api(config, "/api/agent/heartbeat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ version: VERSION, hostname: hostname(), notice }),
+    body: JSON.stringify({ version: VERSION, hostname: hostname(), notice, fenetre: notices.displayedWindow() }),
   });
   if (response.status === 401) throw new Error("clé du poste révoquée");
   // Un serveur en panne (502, 503) n'est pas un signe de vie : l'icône du poste doit dire « hors ligne », pas « relié ».
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = (await response.json().catch(() => ({}))) as { exportPath?: string | null; syncRequestedAt?: string | null; robotLook?: number | null };
   return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null };
+}
+
+/**
+ * « Ouvrir mon espace PharmaBoost » (voir space-link.ts) : PharmaBoost donne un lien à usage unique (10 minutes) pour CE
+ * poste, ouvert aussitôt dans le navigateur par défaut du PC. Le navigateur est alors lié au poste : la personne qui s'y
+ * connecte prend le comptoir, sans rien choisir. Vrai si le navigateur a été lancé.
+ */
+async function openSpace(config: Config, why: string): Promise<boolean> {
+  try {
+    const response = await api(config, "/api/agent/espace", { method: "POST" });
+    const body = (await response.json().catch(() => ({}))) as { ok?: boolean; jeton?: unknown; error?: string };
+    if (!response.ok || !body.ok) {
+      log(`Espace PharmaBoost (${why}) : lien refusé (${body.error ?? `HTTP ${response.status}`}).`);
+      return false;
+    }
+    const url = spaceUrl(config.serverUrl, body.jeton);
+    if (!url) {
+      log(`Espace PharmaBoost (${why}) : adresse refusée (serveur non sûr ou jeton illisible) — rien n'est ouvert.`);
+      return false;
+    }
+    const opened = openInBrowser(url);
+    log(opened ? `Espace PharmaBoost (${why}) : ouvert dans le navigateur de ce PC.` : `Espace PharmaBoost (${why}) : le navigateur n'a pas pu être lancé.`);
+    return opened;
+  } catch (error) {
+    log(`Espace PharmaBoost (${why}) : ${error instanceof Error ? error.message : String(error)}`);
+    return false;
+  }
 }
 
 /** Le poste de caisse : écouter la douchette, envoyer chaque bip, donner signe de vie, et relire l'export de stock si on le lui a confié. */
@@ -467,6 +503,7 @@ async function runPost(config: Config): Promise<void> {
   else if (robot?.kind === "lgpi") startLgpiJournal(robot, robotHandlers);
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
+  let spaceAttempts = 0;
   let handledSyncRequest: string | null = null;
   let forceSync = false;
   // L'état que l'icône près de l'horloge affiche : écrit à chaque signe de vie, réussi ou non.
@@ -490,7 +527,18 @@ async function runPost(config: Config): Promise<void> {
         }
         reportState("ok");
         lastHeartbeat = Date.now();
-        // Le robot de ce comptoir (couleur, accessoire) : la bannière le porte, comme « Nouvelle vente » dans PharmaBoost.
+        // Au démarrage (et donc après une mise à jour automatique), une fois par PC : le navigateur se lie à ce poste.
+        // Jamais pendant une vente : rien ne s'ouvre par-dessus le logiciel de gestion devant un patient.
+        const saleInProgress = !canUpdateNow({ watching: watched !== null, queuedScans: scans.size, lastScanAt, pendingNotices: notices.ids().length, now: Date.now() });
+        if (shouldOpenSpaceAtStartup({ platform: process.platform, linked: isSpaceLinked(dirname(CONFIG_PATH), config.agentKey), saleInProgress, attempts: spaceAttempts })) {
+          spaceAttempts += 1;
+          if (await openSpace(config, "démarrage")) {
+            markSpaceLinked(dirname(CONFIG_PATH), config.agentKey);
+            spaceAttempts = Number.POSITIVE_INFINITY;
+          }
+        }
+        // Le robot de la personne connectée à ce comptoir (couleur, accessoire), le même que dans son espace PharmaBoost ;
+        // personne : le robot de la marque.
         notices.setRobotLook(settings.robotLook);
         if (settings.exportPath !== (config.exportPath ?? null)) {
           config = { ...config, exportPath: settings.exportPath };
@@ -622,6 +670,18 @@ function testIle(): void {
     notices.done({ id: "essai", title: "Vente terminée — résultats enregistrés", lines: ["1 vendu · 1 non vendu · 0 sans réponse", "✓ Bilan envoyé au patient."], badge: "3e conseil vendu aujourd'hui", warning: false });
   }, 40_000);
   setTimeout(() => { log(`Fin de l'essai. Fenêtre en service : ${notices.currentWindow()}.`); notices.stop(); process.exit(0); }, 60_000);
+}
+
+/** Refait la liaison du navigateur de ce PC à la main (assistance) : --ouvrir-espace. Même chose que le menu de l'icône. */
+async function openSpaceFromCommand(): Promise<number> {
+  const config = readConfig();
+  if (!config || config.role !== "poste") {
+    console.log("Ce poste n'est pas encore relié à PharmaBoost.");
+    return 1;
+  }
+  const opened = await openSpace(config, "commande");
+  if (opened) markSpaceLinked(dirname(CONFIG_PATH), config.agentKey);
+  return opened ? 0 : 1;
 }
 
 /** Essai sans rien envoyer : chaque bip lu s'affiche à l'écran. Pour vérifier une installation. */
@@ -818,6 +878,8 @@ if (arg("appairer")) {
   testAffichage();
 } else if (process.argv.includes("--test-ile")) {
   testIle();
+} else if (process.argv.includes("--ouvrir-espace")) {
+  openSpaceFromCommand().then((code) => { process.exitCode = code; });
 } else if (process.argv.includes("--version")) {
   console.log(VERSION);
 } else {

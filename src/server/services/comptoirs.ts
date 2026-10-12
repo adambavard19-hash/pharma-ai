@@ -2,14 +2,15 @@ import "server-only";
 import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import type { TenantScope } from "@/server/db/tenant";
-import { createNotification } from "@/server/services/notifications";
 import { planClaim } from "@/core/team/access";
-import { robotLookCaption, type CounterRobotLook } from "@/core/robot/counter-look";
 import { comptoirName, parseComptoirName, resolveMyComptoirs, type ComptoirPost, type MyComptoirs } from "@/core/counter/comptoirs";
+import { COMPTOIR_ASSIGNMENT_ACTIONS, releasedOnTake } from "@/core/counter/post-link";
 
 /**
- * Les comptoirs de la pharmacie et leur collaborateur. Chaque comptoir est un espace à part : voir core/counter/comptoirs.ts.
- * Tout est borné à la pharmacie de la session : une pharmacie ne voit, n'attribue ni ne renomme jamais le comptoir d'une autre.
+ * Les comptoirs de la pharmacie et la personne connectée à chacun. Chaque comptoir est un espace à part : voir
+ * core/counter/comptoirs.ts. Le comptoir revient tout seul à la personne qui ouvre son espace sur le PC du comptoir
+ * (core/counter/post-link.ts) ; le titulaire peut, en secours, choisir qui est où dans « Mes comptoirs ». Tout est borné à la
+ * pharmacie de la session : une pharmacie ne voit, n'attribue ni ne renomme jamais le comptoir d'une autre.
  */
 
 type Failure = { ok: false; error: string };
@@ -43,26 +44,20 @@ export async function listComptoirs(pharmacyId: string): Promise<ComptoirView[]>
   return posts.map((post) => ({ ...post, name: comptoirName(post), assigneeName: post.assignedUserId ? (names.get(post.assignedUserId) ?? null) : null }));
 }
 
-/** Les comptoirs que cette personne voit : les siens, ou l'unique comptoir de la pharmacie. */
-export async function myComptoirs(scope: Pick<TenantScope, "pharmacyId" | "userId">): Promise<MyComptoirs & { posts: ComptoirView[] }> {
+/**
+ * Les comptoirs que cette personne voit : les siens, ou l'unique comptoir de la pharmacie. Sur le navigateur lié à un poste
+ * (`thisPcPostId`, lu par server/services/post-link.ts dans le cookie signé), celui de CE PC seulement.
+ */
+export async function myComptoirs(scope: Pick<TenantScope, "pharmacyId" | "userId">, thisPcPostId: string | null = null): Promise<MyComptoirs & { posts: ComptoirView[] }> {
   const posts = await listComptoirs(scope.pharmacyId);
-  return { ...resolveMyComptoirs(posts, scope.userId), posts };
+  return { ...resolveMyComptoirs(posts, scope.userId, thisPcPostId), posts };
 }
 
 /**
- * Le robot du comptoir de cette personne (son premier comptoir attribué) : sa couleur, son accessoire et « Bip · Comptoir 2 ».
- * Rien si aucun comptoir ne lui est attribué : on garde le robot de la marque. Une seule petite requête (le menu de l'app la fait).
+ * En secours, le titulaire choisit qui est à quel comptoir (« Mes comptoirs »). Même règle que la liaison automatique : une
+ * personne n'est qu'à UN comptoir à la fois — lui en donner un la retire des autres. Dès qu'elle ouvre son espace sur un PC
+ * lié, c'est ce PC qui fait foi.
  */
-export async function myComptoirRobot(scope: Pick<TenantScope, "pharmacyId" | "userId">): Promise<CounterRobotLook | null> {
-  const post = await prisma.counterPost.findFirst({
-    where: { pharmacyId: scope.pharmacyId, assignedUserId: scope.userId, revokedAt: null, pairedAt: { not: null }, robotLook: { not: null } },
-    orderBy: { createdAt: "asc" },
-    select: { label: true, hostname: true, robotLook: true },
-  });
-  if (!post || post.robotLook === null) return null;
-  return { look: post.robotLook, caption: robotLookCaption(post.robotLook, comptoirName(post)) };
-}
-
 export async function assignComptoir(scope: TenantScope, postId: string, userId: string | null): Promise<{ ok: true; name: string; assignee: string | null } | Failure> {
   const post = await prisma.counterPost.findFirst({ where: { id: postId, pharmacyId: scope.pharmacyId, revokedAt: null }, select: { id: true, label: true, hostname: true, assignedUserId: true } });
   if (!post) return { ok: false, error: "Comptoir introuvable." };
@@ -72,7 +67,10 @@ export async function assignComptoir(scope: TenantScope, postId: string, userId:
     if (!member) return { ok: false, error: "Cette personne ne fait pas partie de votre équipe." };
     assignee = member.name;
   }
-  await prisma.counterPost.update({ where: { id: post.id }, data: { assignedUserId: userId } });
+  await prisma.$transaction([
+    ...(userId ? [prisma.counterPost.updateMany({ where: { pharmacyId: scope.pharmacyId, assignedUserId: userId, id: { not: post.id } }, data: { assignedUserId: null } })] : []),
+    prisma.counterPost.update({ where: { id: post.id }, data: { assignedUserId: userId } }),
+  ]);
   await recordAudit({ action: "counter_post.assigned", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { from: post.assignedUserId, to: userId } });
   return { ok: true, name: comptoirName(post), assignee };
 }
@@ -87,36 +85,34 @@ export async function renameComptoir(scope: TenantScope, postId: string, raw: un
 }
 
 /**
- * « Je travaille ici » : un collaborateur prend le comptoir où il s'installe, sans rien réinstaller. Ses conseils et ses ventes lui sont alors
- * attribués. Il ne peut être qu'à un comptoir à la fois : prendre celui-ci libère ses autres comptoirs. Celui qui l'occupait en est prévenu,
- * et le titulaire voit toujours qui est où (« Mes comptoirs »).
+ * La personne connectée sur le PC lié à ce poste le prend, sans clic (appelé par server/services/post-link.ts, une fois la
+ * liaison vérifiée) ; la personne qui l'occupait le perd (elle le reprendra en ouvrant son espace sur ce PC). Ses autres
+ * comptoirs tenus d'une attribution de secours sont libérés ; pas ceux qu'elle a pris elle-même sur un autre PC lié, où sa
+ * session est ouverte (core/counter/post-link.ts, `releasedOnTake`) : un même compte sur deux PC garde un comptoir par PC,
+ * sans bascule à chaque page. N'écrit rien si rien ne change ; deux rendus simultanés n'écrivent qu'une trace (seule
+ * l'écriture qui change vraiment le comptoir compte).
  */
-export async function claimComptoir(scope: TenantScope, postId: string): Promise<{ ok: true; name: string; changed: boolean } | Failure> {
-  const members = await listMembers(scope.pharmacyId);
-  const me = members.find((member) => member.id === scope.userId);
-  if (!me) return { ok: false, error: "Vous ne faites pas partie de l'équipe de cette pharmacie." };
-  const posts = await prisma.counterPost.findMany({ where: { pharmacyId: scope.pharmacyId, revokedAt: null, pairedAt: { not: null } }, select: { id: true, label: true, hostname: true, assignedUserId: true } });
+export async function takeComptoirOnThisPc(scope: Pick<TenantScope, "pharmacyId" | "userId">, postId: string): Promise<{ changed: boolean }> {
+  const posts = await prisma.counterPost.findMany({ where: { pharmacyId: scope.pharmacyId, revokedAt: null, pairedAt: { not: null } }, select: { id: true, assignedUserId: true } });
   const plan = planClaim(posts, postId, scope.userId);
-  if (!plan.ok) return plan;
-  const target = posts.find((post) => post.id === postId)!;
-  const name = comptoirName(target);
-  if (plan.alreadyMine) return { ok: true, name, changed: false };
-  await prisma.$transaction([
-    ...(plan.release.length > 0 ? [prisma.counterPost.updateMany({ where: { id: { in: plan.release }, pharmacyId: scope.pharmacyId, assignedUserId: scope.userId }, data: { assignedUserId: null } })] : []),
-    prisma.counterPost.update({ where: { id: target.id }, data: { assignedUserId: scope.userId } }),
+  if (!plan.ok || plan.alreadyMine) return { changed: false };
+  const release = releasedOnTake(plan.release, await lastAssignmentTraces(scope.pharmacyId, plan.release), scope.userId);
+  if (release.length === 0 && posts.some((post) => post.id === postId && post.assignedUserId === scope.userId)) return { changed: false };
+  const [released, taken] = await prisma.$transaction([
+    prisma.counterPost.updateMany({ where: { id: { in: release }, pharmacyId: scope.pharmacyId, assignedUserId: scope.userId }, data: { assignedUserId: null } }),
+    prisma.counterPost.updateMany({ where: { id: postId, pharmacyId: scope.pharmacyId, revokedAt: null, OR: [{ assignedUserId: null }, { assignedUserId: { not: scope.userId } }] }, data: { assignedUserId: scope.userId } }),
   ]);
-  await recordAudit({ action: "counter_post.claimed", entityType: "CounterPost", entityId: target.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { previous: plan.previousUserId, released: plan.release } });
-  if (plan.previousUserId) {
-    await createNotification({ pharmacyId: scope.pharmacyId, userId: plan.previousUserId, type: "TEAM_EVENT", severity: "INFO", title: `${me.name} a pris ${name}`, body: "Vos prochaines ventes ne seront plus attribuées à ce comptoir. Reprenez-le ou choisissez-en un autre depuis « Nouvelle vente ».", linkUrl: "/vente/nouvelle" }).catch(() => undefined);
-  }
-  return { ok: true, name, changed: true };
+  if (taken.count === 0 && released.count === 0) return { changed: false };
+  await recordAudit({ action: "counter_post.taken", entityType: "CounterPost", entityId: postId, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { previous: plan.previousUserId, released: release, via: "pc" } });
+  return { changed: true };
 }
 
-/** « Je quitte ce comptoir » : seulement SON comptoir ; il redevient libre. */
-export async function releaseComptoir(scope: TenantScope, postId: string): Promise<{ ok: true; name: string } | Failure> {
-  const post = await prisma.counterPost.findFirst({ where: { id: postId, pharmacyId: scope.pharmacyId, revokedAt: null, assignedUserId: scope.userId }, select: { id: true, label: true, hostname: true } });
-  if (!post) return { ok: false, error: "Ce comptoir ne vous est pas attribué." };
-  await prisma.counterPost.updateMany({ where: { id: post.id, pharmacyId: scope.pharmacyId, assignedUserId: scope.userId }, data: { assignedUserId: null } });
-  await recordAudit({ action: "counter_post.released", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, userId: scope.userId });
-  return { ok: true, name: comptoirName(post) };
+/** La dernière trace qui a changé la personne de chacun de ces comptoirs, lue dans le journal de CETTE pharmacie seulement. */
+async function lastAssignmentTraces(pharmacyId: string, postIds: string[]): Promise<Map<string, { action: string; userId: string | null } | null>> {
+  const traces = await Promise.all(
+    postIds.map((postId) =>
+      prisma.auditLog.findFirst({ where: { pharmacyId, entityType: "CounterPost", entityId: postId, action: { in: [...COMPTOIR_ASSIGNMENT_ACTIONS] } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { action: true, userId: true } }),
+    ),
+  );
+  return new Map(postIds.map((postId, index) => [postId, traces[index]]));
 }

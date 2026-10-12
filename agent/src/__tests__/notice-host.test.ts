@@ -33,6 +33,14 @@ function classBody(name: string): string {
 const banner = classBody("BannerForm");
 const email = classBody("EmailForm");
 
+describe("le menu de l'icône près de l'horloge", () => {
+  it("propose toujours « Ouvrir mon espace PharmaBoost », même sans bannière : un seul mot, ESPACE, pour l'agent", () => {
+    const menu = methodBody("BuildMenu");
+    expect(menu).toContain(`menu.Items.Add("Ouvrir mon espace PharmaBoost", null, delegate { Say("ESPACE"); });`);
+    expect(menu.indexOf("Ouvrir mon espace PharmaBoost")).toBeLessThan(menu.indexOf("if (banner == null || banner.IsDisposed) return;"));
+  });
+});
+
 describe("la bannière ne gêne jamais le logiciel de gestion", () => {
   it("ne s'active jamais : style « sans activation », clic « ne pas activer », aucun appel qui prend le focus", () => {
     expect(banner).toContain("ShowWithoutActivation { get { return true; } }");

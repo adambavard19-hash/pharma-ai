@@ -27,13 +27,14 @@ export function startOfParisDay(now: Date): Date {
   return new Date(now.getTime() - ((get("hour") * 60 + get("minute")) * 60 + get("second")) * 1000);
 }
 
-export async function loadCounterDashboard(scope: TenantScope, now: Date = new Date(), options: { canAssign?: boolean } = {}): Promise<CounterDashboardData> {
+/** `thisPcPostId` : le poste du navigateur lié (server/services/post-link.ts) — l'écran du PC d'un comptoir est celui de CE comptoir. */
+export async function loadCounterDashboard(scope: TenantScope, now: Date = new Date(), options: { canAssign?: boolean; thisPcPostId?: string | null } = {}): Promise<CounterDashboardData> {
   const { pharmacyId } = scope;
   const startOfDay = startOfParisDay(now);
   const day = { pharmacyId, ...activityScope(scope), deletedAt: null };
 
   // Chaque comptoir est un espace à part : cette personne ne voit que SES comptoirs (voir core/counter/comptoirs.ts), pas le travail des autres.
-  const mine = await myComptoirs(scope);
+  const mine = await myComptoirs(scope, options.thisPcPostId ?? null);
   const owners = Object.fromEntries(mine.posts.map((post) => [post.id, post.assigneeName]));
   const titles = new Map(mine.posts.map((post) => [post.id, comptoirTitle(post, post.assigneeName)]));
   // « À moi » : une vente de l'un de mes comptoirs, ou une ordonnance que j'ai saisie moi-même à l'écran.

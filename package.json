@@ -24,6 +24,7 @@
     "demo:parcours": "node --env-file=.env --conditions=react-server --import tsx scripts/e2e-demo.ts",
     "demo:comptoir": "node --env-file=.env --import tsx scripts/mesure-comptoir.ts",
     "bdpm:sync": "node --env-file=.env --conditions=react-server --import tsx scripts/bdpm-sync.ts",
+    "atc:officiel": "tsx scripts/atc-officiel.ts",
     "interactions:sync": "node --env-file=.env --conditions=react-server --import tsx scripts/interactions-sync.ts",
     "reglementation:sync": "node --env-file=.env --conditions=react-server --import tsx scripts/reglementation-sync.ts",
     "followup:run": "node --env-file=.env --conditions=react-server --import tsx scripts/followup-run.ts",

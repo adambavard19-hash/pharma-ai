@@ -99,6 +99,7 @@ export function PlatformIsland({
   autoOpenKey,
   hotkey = false,
   restingText,
+  robotless = false,
   className,
 }: {
   label: string;
@@ -122,6 +123,12 @@ export function PlatformIsland({
   hotkey?: boolean;
   /** La phrase de la capsule au repos, si l'espace n'a pas d'accueil chiffré. */
   restingText?: string;
+  /**
+   * L'île sans le DESSIN du robot (le logiciel PharmaBoost installé sur ce PC dessine déjà le sien, voir
+   * core/robot/single-robot.ts) : une pastille sobre à sa place, et tout le reste — accueil, alertes et gestes,
+   * discussion, « + », compte en pastille.
+   */
+  robotless?: boolean;
   className?: string;
 }) {
   const router = useRouter();
@@ -250,6 +257,7 @@ export function PlatformIsland({
   const robotMood: RobotMood = grumpy ? "concerned" : conversation.pending ? "thinking" : tab === "chat" && open ? conversation.mood : (mood ?? "idle");
   const headline = restingText ?? home?.headline ?? "Je regarde ce qui se passe…";
   const count = badge ?? 0;
+  const face = (size: number, faceMood: RobotMood) => (robotless ? <IslandMark size={size} /> : <Robot size={size} mood={faceMood} look={look} label="Le robot PharmaBoost" />);
 
   const navigate = (href: string) => {
     close();
@@ -281,12 +289,12 @@ export function PlatformIsland({
 
   let body: ReactNode;
   if (grumpy) {
-    body = <CapsuleRow robot={<Robot size={32} mood="concerned" look={look} label="Le robot PharmaBoost" />} title="Doucement !" sub="Trop de clics d'un coup — je reprends dans 3 secondes." />;
+    body = <CapsuleRow robot={face(32, "concerned")} title="Doucement !" sub="Trop de clics d'un coup — je reprends dans 3 secondes." />;
   } else if (!open) {
     body = (
       <button type="button" data-island-toggle="" onClick={onCapsuleClick} aria-expanded={false} aria-label={`${label} : ${headline}${count ? ` (${count})` : ""}`} className="flex h-11 w-full items-center gap-2.5 pr-3.5 pl-1.5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]">
         <span className="relative shrink-0">
-          <Robot size={32} mood={robotMood} look={look} label="Le robot PharmaBoost" />
+          {face(32, robotMood)}
           {count > 0 && (
             <span className={cn("absolute -top-1 -right-1.5 flex min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] leading-4 font-bold text-[#04261A] tabular-nums ring-2 ring-[#0B0F14]", tone === "warning" ? "bg-[#F5A623]" : "bg-[#36E8C8]")}>{count > 9 ? "9+" : count}</span>
           )}
@@ -300,7 +308,7 @@ export function PlatformIsland({
       <div className="px-3 pt-2.5 pb-3">
         <div className="flex items-center gap-2.5">
           <button type="button" data-island-toggle="" onClick={onCapsuleClick} className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-[#36E8C8]" aria-label="Replier l'île">
-            <Robot size={34} mood={robotMood} look={look} label="Le robot PharmaBoost" />
+            {face(34, robotMood)}
           </button>
           <div role="tablist" aria-label={label} className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
             {tabs.map((t) => (
@@ -389,6 +397,15 @@ export function PlatformIsland({
 export const OPEN_EVENT = "pharmaboost:ile-ouvrir";
 export function openIsland(tab?: Tab) {
   window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { tab } }));
+}
+
+/** À la place du robot, quand il vit déjà dans le logiciel installé sur ce PC : une pastille, sans visage ni son. */
+function IslandMark({ size }: { size: number }) {
+  return (
+    <span aria-hidden="true" data-island-mark="" className="flex items-center justify-center rounded-full bg-white/[0.08] text-[#36E8C8]" style={{ width: size, height: size }}>
+      <Sparkles className="size-4" />
+    </span>
+  );
 }
 
 function CapsuleRow({ robot, title, sub }: { robot: ReactNode; title: string; sub?: string }) {

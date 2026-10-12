@@ -9,6 +9,7 @@ import type {
 } from "@/core/understanding";
 import type { TenantScope } from "@/server/db/tenant";
 import { drugClassificationIsUncertain } from "@/core/knowledge/gaps";
+import { officialAtcForCis } from "@/core/reference/atc/official-atc";
 import { recordGaps } from "@/server/services/knowledge-gap-store";
 
 /**
@@ -20,6 +21,14 @@ import { recordGaps } from "@/server/services/knowledge-gap-store";
  * inconnues déclenchent un appel — court, parce qu'il ne demande que la
  * classification — et l'appel est lancé dès le dépôt de l'ordonnance, pendant
  * que le pharmacien relit les lignes. Au moment de confirmer, tout est là.
+ *
+ * Quand le modèle ne répond pas (crédit épuisé, réseau, fournisseur sans
+ * modèle, ligne omise ou sans famille), une ligne rattachée au catalogue
+ * national reçoit la famille officielle de sa spécialité (Open Medic, voir
+ * `src/core/reference/atc`) : la famille d'un médicament courant ne dépend
+ * plus du crédit du modèle. Ce secours n'est jamais écrit dans le cache — le
+ * modèle classera la ligne plus tard, effets indésirables compris — et ne
+ * passe jamais devant une classification en cache ou validée.
  */
 
 export type ClassificationOutcome = {
@@ -29,6 +38,8 @@ export type ClassificationOutcome = {
   warnings: string[];
   usage: ClassificationResult["usage"];
   cachedCount: number;
+  /** Lignes classées d'après la famille officielle, faute de réponse du modèle. */
+  officialCount: number;
   /** Durée totale, appel compris s'il y en a eu un. */
   durationMs: number;
 };
@@ -145,6 +156,32 @@ export async function ensureClassifications(params: {
     }
   }
 
+  // Le secours : une ligne sans réponse utile du modèle (échec, fournisseur sans modèle, ligne omise, ni ATC ni
+  // classe) prend la famille officielle de sa spécialité. La réponse vide du modèle est remplacée, pas doublée.
+  const official = new Set<number>();
+  for (const line of missing) {
+    const at = drugs.findIndex((drug) => drug.lineIndex === line.lineIndex);
+    if (at >= 0 && (drugs[at].atcCode || drugs[at].therapeuticClass)) continue;
+    const family = officialAtcForCis(line.officialCisCode);
+    if (!family) continue;
+    const drug: DrugClassification = {
+      lineIndex: line.lineIndex,
+      substance: line.officialSubstances[0] ?? null,
+      atcCode: family.atcCode,
+      therapeuticClass: family.therapeuticClass,
+      commonSideEffects: [],
+      confidence: 1,
+      source: "OFFICIAL",
+    };
+    if (at >= 0) drugs[at] = drug;
+    else drugs.push(drug);
+    official.add(line.lineIndex);
+  }
+  if (official.size > 0) {
+    unanswered = unanswered.filter((line) => !official.has(line.lineIndex));
+    console.info(`[classification] ${official.size} ligne(s) classée(s) d'après la famille officielle (Open Medic), faute de réponse utile du modèle, sur ${missing.length} envoyée(s).`);
+  }
+
   drugs.sort((a, b) => a.lineIndex - b.lineIndex);
 
   // Un médicament dont on ne sait pas dire la famille, ou dont le modèle doute : la pharmacienne de PharmaBoost le saura. Jamais le titulaire.
@@ -154,7 +191,8 @@ export async function ensureClassifications(params: {
     const lineByIndex = new Map(params.lines.map((line) => [line.lineIndex, line]));
     const gaps = drugs.flatMap((drug) => {
       const line = lineByIndex.get(drug.lineIndex);
-      if (!line) return [];
+      // Une famille officielle n'est pas un « trou » : il n'y a rien à demander à la pharmacienne.
+      if (!line || drug.source === "OFFICIAL") return [];
       const key = classificationKey(line.drugName);
       const doubt = drugClassificationIsUncertain({ atcCode: drug.atcCode, therapeuticClass: drug.therapeuticClass, confidence: drug.confidence, validated: validated.get(key) === true });
       return doubt ? [{ kind: "MEDICINE" as const, key, label: line.drugName, reason: doubt, guess: { substance: drug.substance, atcCode: drug.atcCode, therapeuticClass: drug.therapeuticClass, confidence: drug.confidence }, pharmacyId: params.scope.pharmacyId }] : [];
@@ -170,6 +208,7 @@ export async function ensureClassifications(params: {
     warnings,
     usage,
     cachedCount: drugs.filter((drug) => drug.source === "CACHE").length,
+    officialCount: official.size,
     durationMs: Date.now() - startedAt,
   };
 }
@@ -196,6 +235,8 @@ export async function prewarmClassifications(params: {
       durationDays: null,
       officialName: null,
       officialSubstances: [],
+      // Le préchauffage n'a que des noms lus : pas de spécialité, donc pas de famille officielle. L'analyse l'aura.
+      officialCisCode: null,
     }));
   if (lines.length === 0) return;
   const outcome = await ensureClassifications({ scope: params.scope, lines });

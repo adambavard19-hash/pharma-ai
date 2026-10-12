@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const m = vi.hoisted(() => ({ membershipFindMany: vi.fn(), postFindMany: vi.fn(), postFindFirst: vi.fn(), postUpdate: vi.fn(), postUpdateMany: vi.fn(), audit: vi.fn() }));
+const m = vi.hoisted(() => ({ membershipFindMany: vi.fn(), postFindMany: vi.fn(), postFindFirst: vi.fn(), postUpdate: vi.fn(), postUpdateMany: vi.fn(), audit: vi.fn(), transaction: vi.fn() }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/server/db/client", () => ({ prisma: { membership: { findMany: m.membershipFindMany }, counterPost: { findMany: m.postFindMany, findFirst: m.postFindFirst, update: m.postUpdate, updateMany: m.postUpdateMany } } }));
+vi.mock("@/server/db/client", () => ({ prisma: { membership: { findMany: m.membershipFindMany }, counterPost: { findMany: m.postFindMany, findFirst: m.postFindFirst, update: m.postUpdate, updateMany: m.postUpdateMany }, $transaction: m.transaction } }));
 vi.mock("@/server/audit/log", () => ({ recordAudit: m.audit }));
 
-const { listMembers, listComptoirs, myComptoirs, assignComptoir, renameComptoir, myComptoirRobot } = await import("../comptoirs");
+const { listMembers, listComptoirs, myComptoirs, assignComptoir, renameComptoir } = await import("../comptoirs");
 const scope = { pharmacyId: "ph1", organizationId: "org1", userId: "titulaire" } as never;
 const members = [{ role: "OWNER", user: { id: "titulaire", firstName: "Anne", lastName: "Roux" } }, { role: "PHARMACIST", user: { id: "lea", firstName: "Léa", lastName: "Martin" } }];
 
 beforeEach(() => {
   vi.clearAllMocks();
+  m.transaction.mockImplementation(async (operations: unknown[]) => operations);
   m.membershipFindMany.mockResolvedValue(members);
   m.postFindMany.mockResolvedValue([
     { id: "p1", label: "Comptoir 1", hostname: "PC-1", assignedUserId: "lea", pairedAt: new Date(), lastSeenAt: null, lastScanAt: null },
@@ -34,26 +35,20 @@ describe("l'équipe et les comptoirs d'une pharmacie", () => {
     expect((await myComptoirs({ pharmacyId: "ph1", userId: "lea" })).postIds).toEqual(["p1"]);
     expect(await myComptoirs({ pharmacyId: "ph1", userId: "titulaire" })).toMatchObject({ postIds: [], mode: "NONE" });
   });
-});
 
-describe("le robot de mon comptoir", () => {
-  it("le robot du premier comptoir attribué à la personne, dans SA pharmacie, avec « Prénom · Comptoir »", async () => {
-    m.postFindFirst.mockResolvedValue({ label: "Comptoir 2", hostname: "PC-2", robotLook: 1 });
-    expect(await myComptoirRobot({ pharmacyId: "ph1", userId: "lea" })).toEqual({ look: 1, caption: "Pixel · Comptoir 2" });
-    expect(m.postFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ pharmacyId: "ph1", assignedUserId: "lea", revokedAt: null }) }));
-  });
-
-  it("aucun comptoir attribué : pas de robot de comptoir (le robot de la marque)", async () => {
-    m.postFindFirst.mockResolvedValue(null);
-    expect(await myComptoirRobot({ pharmacyId: "ph1", userId: "titulaire" })).toBeNull();
+  it("sur le navigateur lié au PC-2 : l'écran est celui du PC-2 seulement ; un poste d'ailleurs ne compte pas", async () => {
+    expect(await myComptoirs({ pharmacyId: "ph1", userId: "lea" }, "p2")).toMatchObject({ postIds: ["p2"], mode: "MINE" });
+    expect(await myComptoirs({ pharmacyId: "ph1", userId: "lea" }, "p-autre-pharmacie")).toMatchObject({ postIds: ["p1"], mode: "MINE" });
   });
 });
 
-describe("attribuer et renommer un comptoir", () => {
-  it("attribue un comptoir de la pharmacie à un membre de l'équipe, et garde la trace", async () => {
+describe("attribuer (en secours) et renommer un comptoir", () => {
+  it("attribue un comptoir de la pharmacie à un membre de l'équipe, la retire de ses autres comptoirs, et garde la trace", async () => {
     m.postFindFirst.mockResolvedValue({ id: "p2", label: null, hostname: "PC-2", assignedUserId: null });
     expect(await assignComptoir(scope, "p2", "lea")).toEqual({ ok: true, name: "PC-2", assignee: "Léa Martin" });
     expect(m.postFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: "p2", pharmacyId: "ph1", revokedAt: null }) }));
+    // Une personne, un comptoir : Léa quitte le comptoir 1 en recevant le 2 — dans SA pharmacie seulement.
+    expect(m.postUpdateMany).toHaveBeenCalledWith({ where: { pharmacyId: "ph1", assignedUserId: "lea", id: { not: "p2" } }, data: { assignedUserId: null } });
     expect(m.postUpdate).toHaveBeenCalledWith({ where: { id: "p2" }, data: { assignedUserId: "lea" } });
     expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "counter_post.assigned", pharmacyId: "ph1", metadata: { from: null, to: "lea" } }));
   });
@@ -70,6 +65,7 @@ describe("attribuer et renommer un comptoir", () => {
     m.postFindFirst.mockResolvedValue({ id: "p1", label: "Comptoir 1", hostname: "PC-1", assignedUserId: "lea" });
     expect(await assignComptoir(scope, "p1", null)).toEqual({ ok: true, name: "Comptoir 1", assignee: null });
     expect(m.postUpdate).toHaveBeenCalledWith({ where: { id: "p1" }, data: { assignedUserId: null } });
+    expect(m.postUpdateMany).not.toHaveBeenCalled();
   });
 
   it("renomme seulement un comptoir de SA pharmacie, avec un nom net", async () => {

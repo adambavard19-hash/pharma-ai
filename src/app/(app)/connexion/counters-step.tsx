@@ -1,7 +1,7 @@
 "use client";
 
 import { Robot } from "@/components/robot";
-import { robotLook } from "@/core/robot/counter-look";
+import { personRobotLook, robotLook } from "@/core/robot/counter-look";
 import { useRef, useState, useTransition } from "react";
 import { Download, Monitor, Pencil, UserRound } from "lucide-react";
 import { revokePostAction, type OverviewSnapshot } from "@/server/actions/stock-sync";
@@ -28,7 +28,7 @@ type Counter = OverviewSnapshot["overview"]["counters"][number];
 
 const COOLDOWN_MS = 4000;
 
-export function CountersStep({ counters, installerAvailable, members, assignments, robotLooks = {}, onChanged }: { counters: Counter[]; installerAvailable: boolean; members: { id: string; name: string }[]; assignments: Record<string, string | null>; robotLooks?: Record<string, number | null>; onChanged: () => void }) {
+export function CountersStep({ counters, installerAvailable, members, assignments, onChanged }: { counters: Counter[]; installerAvailable: boolean; members: { id: string; name: string }[]; assignments: Record<string, string | null>; onChanged: () => void }) {
   const [started, setStarted] = useState(false);
   const [locked, setLocked] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -80,7 +80,7 @@ export function CountersStep({ counters, installerAvailable, members, assignment
     <SetupCard icon={Monitor} title="1. Mes comptoirs" badge={connected > 0 ? <Badge tone="success">{connected} connecté{connected > 1 ? "s" : ""}</Badge> : undefined}>
       <p className="text-[15px] leading-6 text-text-secondary">Téléchargez PharmaBoost sur chaque ordinateur Windows de votre pharmacie, puis ouvrez le fichier.</p>
       <p className="text-[13.5px] leading-5 text-text-secondary">
-        Chaque comptoir est un espace à part, attribué à une personne : elle ne voit que les délivrances de son comptoir, et personne ne voit les siennes. Choisissez ici qui travaille à quel comptoir ; chacun peut aussi se l&apos;attribuer d&apos;un clic depuis « Nouvelle vente » (« Je travaille ici »), sans rien réinstaller.
+        Chaque comptoir revient tout seul à la personne qui ouvre son espace PharmaBoost sur cet ordinateur (au démarrage de PharmaBoost, ou par l&apos;icône près de l&apos;horloge → « Ouvrir mon espace PharmaBoost ») : elle ne voit que les délivrances de son comptoir, ses conseils lui sont attribués, et personne ne voit les siens. Vous voyez ici qui est où ; en secours, vous pouvez aussi le choisir.
       </p>
       <p className="text-[13px] leading-5 text-text-secondary">
         Chaque ordinateur s&apos;installe une seule fois. Le fichier téléchargé porte un code à usage unique créé pour vous seul, valable sept jours : personne d&apos;autre ne peut relier un ordinateur à votre pharmacie.
@@ -88,87 +88,92 @@ export function CountersStep({ counters, installerAvailable, members, assignment
 
       {listed.length > 0 && (
         <ul aria-label="Mes comptoirs" className="divide-y divide-border-subtle rounded-xl border border-border-subtle bg-surface-sunken/60">
-          {listed.map((counter) => (
-            <li key={counter.id} className="px-4 py-3">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                {/* Le robot de ce comptoir : chacun le sien, pour ne pas se tromper de comptoir le matin. */}
-                {typeof robotLooks[counter.id] === "number" && (
-                  <span className="flex shrink-0 flex-col items-center" title={`Le robot de ce comptoir : ${robotLook(robotLooks[counter.id]!).name}`}>
-                    <Robot size={44} look={robotLooks[counter.id]} motion="reduce" />
-                    <span className="text-[11px] leading-4 font-semibold text-text-secondary">{robotLook(robotLooks[counter.id]!).name}</span>
-                  </span>
-                )}
-                <span className="min-w-0 flex-1 basis-40">
-                  {renaming === counter.id ? (
-                    <form
-                      className="flex items-center gap-2"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        rename(counter.id);
-                      }}
-                    >
-                      <input
-                        autoFocus
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        maxLength={40}
-                        aria-label="Nom du comptoir"
-                        className="h-9 w-44 rounded-md border border-border-default bg-surface-card px-2.5 text-[15px] text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
-                      />
-                      <Button type="submit" size="sm" loading={pending}>Enregistrer</Button>
-                      <Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>Annuler</Button>
-                    </form>
-                  ) : (
-                    <span className="flex items-center gap-1.5">
-                      <span className="block text-[16px] leading-6 font-medium text-text-primary">{names[counter.id] ?? counter.label}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraft(names[counter.id] ?? counter.label);
-                          setRenaming(counter.id);
-                        }}
-                        aria-label={`Renommer ${names[counter.id] ?? counter.label}`}
-                        className="rounded-md p-1 text-text-tertiary hover:bg-surface-card hover:text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
-                      >
-                        <Pencil className="size-3.5" />
-                      </button>
+          {listed.map((counter) => {
+            // Le robot de la personne connectée à ce comptoir (1 robot pour 1 espace) ; personne : aucun.
+            const owner = owners[counter.id] ?? null;
+            const look = owner ? personRobotLook(owner) : null;
+            return (
+              <li key={counter.id} className="px-4 py-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {/* Le robot de la personne connectée à ce comptoir : chacun le sien, le même que dans l'île du comptoir. */}
+                  {look !== null && (
+                    <span className="flex shrink-0 flex-col items-center" title={`Le robot de la personne connectée ici : ${robotLook(look).name}`}>
+                      <Robot size={44} look={look} motion="reduce" />
+                      <span className="text-[11px] leading-4 font-semibold text-text-secondary">{robotLook(look).name}</span>
                     </span>
                   )}
-                  <span className="block text-[12.5px] leading-5 text-text-secondary">{counter.detail}</span>
-                </span>
-                <label className="flex items-center gap-1.5 text-[13px] text-text-secondary">
-                  <UserRound className="size-4 text-text-tertiary" aria-hidden />
-                  <span className="sr-only">Collaborateur de {names[counter.id] ?? counter.label}</span>
-                  <select
-                    value={owners[counter.id] ?? ""}
-                    onChange={(event) => assign(counter.id, event.target.value || null)}
-                    disabled={pending}
-                    className="h-9 max-w-[11rem] rounded-md border border-border-default bg-surface-card px-2 text-[14px] text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
-                  >
-                    <option value="">Non attribué</option>
-                    {members.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <Badge tone={counter.state === "CONNECTED" ? "success" : "warning"}>{counter.title}</Badge>
-                {removing !== counter.id && (
-                  <button type="button" onClick={() => setRemoving(counter.id)} className="rounded-md px-1 text-[12.5px] font-medium text-text-secondary underline underline-offset-2 hover:text-danger-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none">
-                    Retirer
-                  </button>
-                )}
-              </div>
-              {removing === counter.id && (
-                <div role="alert" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-warning-50/70 px-3 py-2 text-[13.5px] leading-5 text-text-primary dark:bg-warning-950/30">
-                  <span className="min-w-0 flex-1 basis-48">Retirer {counter.label} ? Cet ordinateur ne pourra plus utiliser PharmaBoost.</span>
-                  <Button size="sm" variant="danger" loading={pending} onClick={() => remove(counter.id)}>Retirer</Button>
-                  <Button size="sm" variant="ghost" disabled={pending} onClick={() => setRemoving(null)}>Annuler</Button>
+                  <span className="min-w-0 flex-1 basis-40">
+                    {renaming === counter.id ? (
+                      <form
+                        className="flex items-center gap-2"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          rename(counter.id);
+                        }}
+                      >
+                        <input
+                          autoFocus
+                          value={draft}
+                          onChange={(event) => setDraft(event.target.value)}
+                          maxLength={40}
+                          aria-label="Nom du comptoir"
+                          className="h-9 w-44 rounded-md border border-border-default bg-surface-card px-2.5 text-[15px] text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+                        />
+                        <Button type="submit" size="sm" loading={pending}>Enregistrer</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>Annuler</Button>
+                      </form>
+                    ) : (
+                      <span className="flex items-center gap-1.5">
+                        <span className="block text-[16px] leading-6 font-medium text-text-primary">{names[counter.id] ?? counter.label}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDraft(names[counter.id] ?? counter.label);
+                            setRenaming(counter.id);
+                          }}
+                          aria-label={`Renommer ${names[counter.id] ?? counter.label}`}
+                          className="rounded-md p-1 text-text-tertiary hover:bg-surface-card hover:text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+                        >
+                          <Pencil className="size-3.5" />
+                        </button>
+                      </span>
+                    )}
+                    <span className="block text-[12.5px] leading-5 text-text-secondary">{counter.detail}</span>
+                  </span>
+                  <label className="flex items-center gap-1.5 text-[13px] text-text-secondary">
+                    <UserRound className="size-4 text-text-tertiary" aria-hidden />
+                    <span className="sr-only">Personne connectée à {names[counter.id] ?? counter.label}</span>
+                    <select
+                      value={owners[counter.id] ?? ""}
+                      onChange={(event) => assign(counter.id, event.target.value || null)}
+                      disabled={pending}
+                      className="h-9 max-w-[11rem] rounded-md border border-border-default bg-surface-card px-2 text-[14px] text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+                    >
+                      <option value="">Personne</option>
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Badge tone={counter.state === "CONNECTED" ? "success" : "warning"}>{counter.title}</Badge>
+                  {removing !== counter.id && (
+                    <button type="button" onClick={() => setRemoving(counter.id)} className="rounded-md px-1 text-[12.5px] font-medium text-text-secondary underline underline-offset-2 hover:text-danger-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none">
+                      Retirer
+                    </button>
+                  )}
                 </div>
-              )}
-            </li>
-          ))}
+                {removing === counter.id && (
+                  <div role="alert" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-warning-50/70 px-3 py-2 text-[13.5px] leading-5 text-text-primary dark:bg-warning-950/30">
+                    <span className="min-w-0 flex-1 basis-48">Retirer {counter.label} ? Cet ordinateur ne pourra plus utiliser PharmaBoost.</span>
+                    <Button size="sm" variant="danger" loading={pending} onClick={() => remove(counter.id)}>Retirer</Button>
+                    <Button size="sm" variant="ghost" disabled={pending} onClick={() => setRemoving(null)}>Annuler</Button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 

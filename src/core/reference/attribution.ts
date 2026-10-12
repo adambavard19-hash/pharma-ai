@@ -26,6 +26,29 @@ export const BDPM_SOURCE = {
 } as const;
 
 /**
+ * La famille officielle (code ATC) d'une spécialité, quand le modèle ne répond pas : la base complète Open Medic de
+ * l'Assurance Maladie donne chaque boîte remboursée avec son code ATC ; jointe à la BDPM par le CIP13, elle donne la
+ * famille de la spécialité (`src/core/reference/atc`, `scripts/atc-officiel.ts`). La BDPM, elle, ne publie pas l'ATC.
+ *
+ * Licence Ouverte (Etalab) : nommer la source et la date de sa dernière mise à jour, ne pas en dénaturer le sens, et ne
+ * rien laisser croire d'un aval de l'Assurance Maladie.
+ */
+export const OPEN_MEDIC_SOURCE = {
+  name: "Open Medic (Assurance Maladie)",
+  publisher: "la Caisse nationale de l'Assurance Maladie",
+  licence: "Licence Ouverte / Open Licence (Etalab)",
+  url: "https://open-data-assurance-maladie.ameli.fr/medicaments/index.php",
+} as const;
+
+/** La mention des familles officielles : la source, son millésime, sa date de publication quand on la connaît, la licence. */
+export function officialAtcAttribution(source: { year: string; publishedOn: string | null }): string {
+  const published = source.publishedOn
+    ? `, publiée le ${new Date(`${source.publishedOn}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: TIME_ZONE })}`
+    : "";
+  return `Familles ATC : ${OPEN_MEDIC_SOURCE.name}, base complète ${source.year}${published} — ${OPEN_MEDIC_SOURCE.licence}, ${OPEN_MEDIC_SOURCE.url} — jointe à la ${BDPM_SOURCE.name}.`;
+}
+
+/**
  * La base est mise à jour tous les mois. Au-delà de cette ancienneté, le
  * référentiel est signalé comme à resynchroniser — la licence demande de
  * maintenir les données à jour.

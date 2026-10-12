@@ -55,6 +55,18 @@ que le modèle affirme passe par `validateUnderstanding` (seuils de confiance,
 code ATC contrôlé, clés inconnues écartées) et la trace de l'analyse consigne
 ce qui a été refusé.
 
+Quand le modèle ne répond pas (crédit épuisé, réseau, ligne omise ou sans
+famille), une ligne rattachée au catalogue national prend la **famille
+officielle** de sa spécialité : le code ATC que l'Assurance Maladie donne à ses
+boîtes remboursées (Open Medic 2025, Licence Ouverte), joint à la BDPM
+(`src/core/reference/atc`, régénéré par `npm run atc:officiel -- --from
+<dossier>`). Une spécialité non remboursée prend l'ATC unanime des remboursées
+de mêmes substances, même voie et même dosage, sinon rien. Ce secours
+(`source: "OFFICIAL"`, origine `OFFICIAL_ATC`) n'est jamais écrit dans le cache
+`drug_classifications`, ne passe jamais devant une classification en cache ou
+validée, n'est pas un « médicament à connaître » pour la pharmacienne, et les
+règles ne s'y déclenchent que par le code ATC, jamais par le texte du libellé.
+
 ### 1.2 Le score s'annule en cas de signal de sécurité
 
 `computeTotalScore` (`src/core/ai/engines/scoring.ts`) renvoie `0` dès que la

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/db/client";
 import { getSession } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { stockStatus } from "@/server/services/catalog";
+import { searchPharmacyProducts } from "@/server/services/stock-search";
 
 export type ProductSearchResult = {
   id: string;
@@ -17,7 +16,13 @@ export type ProductSearchResult = {
   claims: string[];
 };
 
-/** Recherche catalogue, utilisée par l'écran de vente pour ajouter un conseil. */
+/**
+ * Recherche catalogue, utilisée par l'écran de vente pour ajouter un conseil et par « Mes associations ».
+ *
+ * Tolérante (`core/search/tolerant-search.ts`) : sans accents ni casse, mot par mot, dosage collé à son unité, abréviations
+ * du logiciel de gestion — « crème mains » trouve « NEUTROGENA CR MAIN ». Un code lu à la douchette qui désigne exactement
+ * un produit ne rend que lui. Toujours bornée à l'officine de la session.
+ */
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session || !session.permissions.has(PERMISSIONS.PRODUCT_VIEW)) {
@@ -25,46 +30,21 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const query = (url.searchParams.get("q") ?? "").trim();
+  const query = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
   const category = url.searchParams.get("categorie");
 
-  const products = await prisma.product.findMany({
-    where: {
-      pharmacyId: session.scope.pharmacyId,
-      deletedAt: null,
-      isActive: true,
-      ...(category ? { category: category as never } : {}),
-      ...(query
-        ? {
-            OR: [
-              { name: { contains: query, mode: "insensitive" as const } },
-              { brand: { contains: query, mode: "insensitive" as const } },
-              { reference: { contains: query, mode: "insensitive" as const } },
-              { ean: { contains: query, mode: "insensitive" as const } },
-              { matchingTags: { has: query.toLowerCase() } },
-            ],
-          }
-        : {}),
-    },
-    include: { stockItem: true },
-    orderBy: { name: "asc" },
-    take: 20,
-  });
-
-  const results: ProductSearchResult[] = products.map((product) => ({
-    id: product.id,
-    name: product.name,
-    brand: product.brand,
-    category: product.category,
-    reference: product.reference,
-    imageUrl: product.imageUrl,
-    salePriceCents: product.salePriceCents,
-    quantity: product.stockItem?.quantity ?? 0,
-    status: stockStatus(
-      product.stockItem?.quantity ?? 0,
-      product.stockItem?.alertThreshold ?? 0,
-    ),
-    claims: product.commercialClaims,
+  const hits = await searchPharmacyProducts(session.scope.pharmacyId, query, { category, limit: 20 });
+  const results: ProductSearchResult[] = hits.map((hit) => ({
+    id: hit.id,
+    name: hit.name,
+    brand: hit.brand,
+    category: hit.category,
+    reference: hit.reference,
+    imageUrl: hit.imageUrl,
+    salePriceCents: hit.salePriceCents,
+    quantity: hit.quantity,
+    status: hit.status,
+    claims: hit.claims,
   }));
 
   return NextResponse.json({ results }, { headers: { "Cache-Control": "no-store" } });

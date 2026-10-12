@@ -286,6 +286,13 @@ describe("la fenêtre et son processus", () => {
     expect(actions).toEqual([]);
   });
 
+  it("« Ouvrir mon espace PharmaBoost » (icône près de l'horloge) : le mot ESPACE, seul, sans vente — jamais avec un argument", () => {
+    const notices = center();
+    notices.show(entry());
+    hosts[0].stdout.emit("data", "PRET\nESPACE\nESPACE rx_1\nESPACE   \nespace\n");
+    expect(actions).toEqual([{ kind: "open_space" }, { kind: "open_space" }]);
+  });
+
   it("une action qui échoue côté agent est écrite au journal, la fenêtre continue", () => {
     const failing = new NoticeCenter({ configDir: dir, log: (message) => logs.push(message), legacyShow: () => undefined, platform: "win32", onAction: () => { throw new Error("réseau coupé"); }, spawnHost: () => { const host = fakeHost(); hosts.push(host); return host; } });
     failing.show(entry());
@@ -579,5 +586,28 @@ describe("la bannière et son processus", () => {
       { kind: "not_sold", saleId: "rx_1", adviceId: "adv_2" },
       { kind: "finish", saleId: "rx_1" },
     ]);
+  });
+
+  it("dit au serveur la fenêtre réellement affichée : avec robot (île, bannière) ou sans (ancienne fenêtre, notification, rien)", () => {
+    // L'île, tant qu'elle se prépare puis tourne.
+    const island = new NoticeCenter({ configDir: dir, log: () => undefined, legacyShow: () => undefined, platform: "win32", serverUrl: "https://pharmaboost.app", prepareIsland: () => new Promise(() => undefined), spawnHost: () => fakeHost() });
+    expect(island.displayedWindow()).toBe("ile");
+    // La bannière ; puis, si elle ne compile pas, l'ancienne fenêtre ; puis, si elle échoue aussi, la notification seule.
+    const notices = center();
+    expect(notices.displayedWindow()).toBe("banniere");
+    notices.show(entry());
+    hosts[0].stderr.emit("data", "Add-Type : error");
+    expect(notices.displayedWindow()).toBe("classique");
+    hosts[1].stderr.emit("data", "Add-Type : error");
+    expect(notices.displayedWindow()).toBe("notification");
+    // Réglages du poste : l'ancienne fenêtre, ou la notification Windows seule.
+    const classic = center();
+    classic.configure({ window: "classique" });
+    expect(classic.displayedWindow()).toBe("classique");
+    const toast = center();
+    toast.configure({ legacy: true });
+    expect(toast.displayedWindow()).toBe("notification");
+    // Hors Windows (essais sur Mac) : rien n'est affiché.
+    expect(center({ platform: "darwin" }).displayedWindow()).toBe("aucune");
   });
 });

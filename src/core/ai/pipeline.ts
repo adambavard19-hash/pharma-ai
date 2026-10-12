@@ -306,6 +306,9 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         notes.push(
           `Compréhension par ${understanding.providerId} : ${understanding.drugs.length} médicament(s) classé(s), ${understanding.needs.length} besoin(s) complémentaire(s) identifié(s).`,
         );
+        // Le modèle n'a pas répondu pour ces lignes : la trace ne doit pas lui attribuer leur famille.
+        const official = understanding.drugs.filter((drug) => drug.source === "OFFICIAL").length;
+        if (official > 0) notes.push(`Dont ${official} d'après la famille officielle (Open Medic, Assurance Maladie), faute de réponse du modèle.`);
         if (understanding.context.summary) notes.push(understanding.context.summary);
         for (const need of understanding.needs) {
           notes.push(`Besoin ${need.key} (${Math.round(need.confidence * 100)} %) : ${need.justification}`);

@@ -64,6 +64,10 @@ describe("le comptage du jour", () => {
     // Seulement MES comptoirs : jamais les délivrances d'un collègue.
     expect(where).toMatchObject({ pharmacyId: "ph_1", source: "COUNTER_SCAN", deletedAt: null, isDemo: false, counterPostId: { in: ["p1"] } });
     expect(where.createdAt.gte.toISOString()).toBe("2026-10-07T22:00:00.000Z");
+    // Hors navigateur lié : tous mes comptoirs ; sur le PC d'un comptoir : CE comptoir (passé tel quel).
+    expect(mocks.myComptoirs).toHaveBeenLastCalledWith(scope, null);
+    await loadCounterDashboard(scope, NOW, { thisPcPostId: "p1" });
+    expect(mocks.myComptoirs).toHaveBeenLastCalledWith(scope, "p1");
   });
 
   it("les conseils acceptés (ou achetés) et refusés sont ceux d'aujourd'hui seulement", async () => {

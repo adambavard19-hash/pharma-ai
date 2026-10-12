@@ -50,6 +50,7 @@ import {
   type UnderstandingLine,
 } from "@/core/understanding";
 import { ensureClassifications } from "./classification";
+import { classifiedDrugKnowledge } from "@/core/ai/classified-knowledge";
 import { loadAssociationInput } from "./product-associations";
 import { loadCentralAdvice } from "./central-advice";
 
@@ -663,7 +664,7 @@ export async function analysePrescription(params: {
   console.info(
     `[analysis] ${prescription.reference} en ${durationMs} ms — ${Object.entries(timings)
       .map(([label, ms]) => `${label} ${ms} ms`)
-      .join(", ")} — compréhension ${understanding ? `${understanding.cachedCount}/${understanding.drugs.length} en cache` : "absente"} — ${result.recommendations.length} recommandation(s).`,
+      .join(", ")} — compréhension ${understanding ? `${understanding.cachedCount}/${understanding.drugs.length} en cache${officialFamilies(understanding)}` : "absente"} — ${result.recommendations.length} recommandation(s).`,
   );
 
   await recordAudit({
@@ -852,6 +853,8 @@ async function understandTreatment(params: {
         durationDays: line.durationDays,
         officialName: facts?.name ?? null,
         officialSubstances: substances,
+        // La spécialité rattachée : si le modèle ne répond pas, sa famille officielle (Open Medic) prend le relais.
+        officialCisCode: facts?.cisCode ?? null,
       };
     }),
   );
@@ -901,11 +904,19 @@ async function commonCandidateSubstances(line: {
   }
 }
 
+/** Pour le journal : les lignes classées d'après la famille officielle, faute de réponse du modèle. */
+function officialFamilies(understanding: TreatmentUnderstanding): string {
+  const count = understanding.drugs.filter((drug) => drug.source === "OFFICIAL").length;
+  return count > 0 ? `, ${count} d'après la famille officielle (Open Medic)` : "";
+}
+
 /**
  * Une ligne sans fiche éditoriale reçoit la classification du modèle, marquée
  * comme telle. Elle suffit à déclencher une règle de conseil par code ATC ou
  * classe ; elle ne porte ni explication patient ni interaction — et le moteur
- * de sécurité le signale sur la ligne.
+ * de sécurité le signale sur la ligne. Une famille officielle (le modèle n'a
+ * pas répondu) garde sa propre origine et sa source, Open Medic : voir
+ * `classifiedDrugKnowledge`.
  */
 function mergeClassifications(
   knowledge: Map<string, DrugKnowledge | null>,
@@ -921,26 +932,16 @@ function mergeClassifications(
     if (knowledge.get(key)) continue;
     if (!classification.atcCode && !classification.therapeuticClass) continue;
 
-    // La substance publiée par le catalogue national prime toujours sur celle
-    // que le modèle croit reconnaître : l'une est un fait, l'autre une lecture.
-    const published = official.get(key)?.substances[0] ?? null;
-
-    knowledge.set(key, {
-      id: `ai:${key}`,
-      name: line.drugName,
-      inn: published ?? classification.substance,
-      atcCode: classification.atcCode,
-      therapeuticClass: classification.therapeuticClass,
-      form: line.form,
-      commonSideEffects: classification.commonSideEffects,
-      interactionClasses: [],
-      cautionPopulations: [],
-      patientExplanation: null,
-      intakeAdvice: null,
-      sourceName: "Classification IA",
-      sourceVersion: understanding.model,
-      isDemoData: false,
-      origin: "AI_CLASSIFICATION",
-    });
+    knowledge.set(
+      key,
+      classifiedDrugKnowledge({
+        key,
+        drugName: line.drugName,
+        form: line.form,
+        classification,
+        publishedSubstance: official.get(key)?.substances[0] ?? null,
+        model: understanding.model,
+      }),
+    );
   }
 }
