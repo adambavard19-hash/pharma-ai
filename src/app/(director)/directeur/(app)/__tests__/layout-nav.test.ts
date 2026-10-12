@@ -10,7 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 const mocks = vi.hoisted(() => ({ requireDirectorSession: vi.fn(), pathname: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/navigation", () => ({ usePathname: mocks.pathname }));
+vi.mock("next/navigation", () => ({ usePathname: mocks.pathname, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/server/auth/director-session", () => ({ requireDirectorSession: mocks.requireDirectorSession }));
 vi.mock("@/server/actions/director-auth", () => ({ directorLogoutAction: vi.fn() }));
 

@@ -5,7 +5,7 @@ import { countUnreadSalesNotifications } from "@/server/services/sales/notificat
 import { salesLogoutAction } from "@/server/actions/extranet";
 import { Button } from "@/components/ui/button";
 import { SalesNav } from "./sales-nav";
-import { Robot } from "@/components/robot";
+import { PlatformIsland } from "@/components/island/platform-island";
 
 /**
  * L'extranet commercial : une coque légère, pensée pour le téléphone.
@@ -19,13 +19,11 @@ export default async function SalesLayout({ children }: { children: ReactNode })
     <div className="min-h-dvh bg-surface-app pb-20 sm:pb-0 print:min-h-0 print:bg-white print:pb-0">
       <header className="sticky top-0 z-30 border-b border-border-subtle bg-surface-card/95 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2">
-            {/* Le robot PharmaBoost, vivant : il salue, réagit au toucher (hors du lien pour ne pas ramener à l'accueil). */}
-            <Robot size={36} interactive listen greet="once" greetKey="extranet" label="Le robot PharmaBoost" className="shrink-0" />
-            <Link href="/extranet" className="rounded-lg">
-              <span className="block text-[14px] leading-4 font-semibold text-text-primary">PharmaBoost</span><span className="block text-[11.5px] text-text-tertiary">Extranet commercial</span>
-            </Link>
-          </div>
+          <Link href="/extranet" className="rounded-lg">
+            <span className="block text-[14px] leading-4 font-semibold text-text-primary">PharmaBoost</span><span className="block text-[11.5px] text-text-tertiary">Extranet commercial</span>
+          </Link>
+          {/* L'île PharmaBoost : les tâches du jour, les démos à venir, les commissions du commercial. */}
+          <PlatformIsland label="L'île du commercial" homeEndpoint="/api/ile/extranet" />
           <div className="flex items-center gap-2">
             <span className="hidden text-[13px] text-text-secondary sm:block">{session.rep.fullName}</span>
             <form action={salesLogoutAction}><Button type="submit" variant="ghost" size="sm">Déconnexion</Button></form>
