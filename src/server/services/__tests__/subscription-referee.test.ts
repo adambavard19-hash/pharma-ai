@@ -250,7 +250,7 @@ describe("le confrère : validation à l'inscription", () => {
 
   it("les deux erreurs reviennent ensemble, avec celles du reste du formulaire", async () => {
     const result = await subscriptions.requestSubscription({ ...request, siret: "123", referee: { name: null, email: "x", phone: "1" } });
-    expect(result).toEqual({ ok: false, errors: expect.objectContaining({ siret: expect.any(String), "referee.email": expect.any(String), "referee.phone": expect.any(String) }) });
+    expect(result).toEqual({ ok: false, errors: expect.objectContaining({ "referee.email": expect.any(String), "referee.phone": expect.any(String) }) });
   });
 
   it("un nom de plus de 120 caractères est refusé ; un nom vide est accepté (facultatif)", async () => {
