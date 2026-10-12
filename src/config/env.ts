@@ -81,6 +81,10 @@ const envSchema = z.object({
   OCR_MODEL: z.string().default("claude-opus-5"),
   /** Modèle utilisé pour comprendre le traitement (classification, besoins). */
   AI_MODEL: z.string().default("claude-opus-5"),
+  /** Modèle du robot de la console Super Admin (questions sur les données de la plateforme, lecture seule). */
+  ADMIN_ASSISTANT_MODEL: z.string().default("claude-opus-5-5"),
+  /** Effort du robot de la console : « low » répond vite, « medium » réfléchit davantage. */
+  ADMIN_ASSISTANT_EFFORT: z.enum(["low", "medium", "high"]).default("low"),
   /**
    * Autorisation EXPLICITE de transmettre l'image d'une ordonnance à un
    * fournisseur tiers.
