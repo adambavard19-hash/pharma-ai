@@ -11,10 +11,12 @@
  */
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { NOTICE_HOST_SCRIPT } from "./notice-host";
 import { NOTICE_HOST_CLASSIC_SCRIPT } from "./notice-host-classique";
+import { noticeHostIleScript } from "./notice-host-ile";
+import { ensureWebView2Sdk, type SdkPaths } from "./webview2-sdk";
 import type { ToastContent } from "./toast";
 
 /** Ce que le serveur répond à /api/agent/conseil (les champs structurés manquent chez un serveur plus ancien). */
@@ -91,9 +93,14 @@ export type HostAction =
 const MAX_RESTARTS = 5;
 
 export const DEFAULT_NOTICE_SECONDS = 30;
-export const POSITIONS = ["milieu-droite", "bas-droite", "haut-droite"] as const;
-/** La bannière (par défaut), ou l'ancienne fenêtre à bordure, gardée en secours. */
-export type NoticeWindow = "banniere" | "classique";
+export const POSITIONS = ["milieu-droite", "bas-droite", "haut-droite", "haut-centre"] as const;
+/**
+ * L'île (par défaut : la bannière en capsule, affichée par WebView2 depuis la page /poste/ile), la bannière GDI+ (son
+ * premier secours), ou l'ancienne fenêtre à bordure (le second).
+ */
+export type NoticeWindow = "ile" | "banniere" | "classique";
+/** Le secours de chaque fenêtre ; après l'ancienne fenêtre, la notification Windows. */
+const FALLBACK: Record<NoticeWindow, NoticeWindow | null> = { ile: "banniere", banniere: "classique", classique: null };
 export type NoticePosition = (typeof POSITIONS)[number];
 
 export function euros(cents: number | null | undefined): string {
@@ -321,6 +328,12 @@ export type NoticeCenterOptions = {
   startTimeoutMs?: number;
   /** Ce que le pharmacien fait dans la fenêtre (Vendu, Non vendu, e-mail, Vente terminée) : l'agent le transmet au serveur. */
   onAction?: (action: HostAction) => void;
+  /** L'adresse de PharmaBoost : la page de l'île et le kit WebView2 en viennent. Sans elle, pas d'île (bannière GDI+). */
+  serverUrl?: string;
+  /** Prépare le kit WebView2 (remplaçable dans les essais). */
+  prepareIsland?: () => Promise<SdkPaths>;
+  /** Le nom du comptoir, montré dans l'île au survol. */
+  postLabel?: string;
 };
 
 export class NoticeCenter {
@@ -328,8 +341,13 @@ export class NoticeCenter {
   private ready = false;
   private broken = false;
   private forcedLegacy = false;
-  /** Quelle fenêtre tourne : la bannière, ou — si elle n'a pas pu démarrer ou se dessiner — l'ancienne fenêtre. */
-  private window: NoticeWindow = "banniere";
+  /** Quelle fenêtre tourne : l'île, ou — si elle n'a pas pu démarrer ou se dessiner — la bannière GDI+, puis l'ancienne fenêtre. */
+  private window: NoticeWindow = "ile";
+  /** Le kit WebView2 prêt (chemins), sa préparation en cours, ou rien. */
+  private sdk: SdkPaths | null = null;
+  private preparing: Promise<void> | null = null;
+  /** Les fenêtres qui n'ont pas pu tourner sur ce poste depuis le démarrage de l'agent. */
+  private readonly failed = new Set<NoticeWindow>();
   private restarts = 0;
   private resume: HostEntry | null = null;
   private startTimer: ReturnType<typeof setTimeout> | null = null;
@@ -340,17 +358,51 @@ export class NoticeCenter {
   /** Le robot de ce comptoir (0 à 19), donné par le serveur ; null : le robot de la marque. */
   private robotLook: number | null = null;
 
-  constructor(private readonly options: NoticeCenterOptions) {}
+  constructor(private readonly options: NoticeCenterOptions) {
+    if (!options.serverUrl && !options.prepareIsland) this.window = "banniere";
+  }
+
+  /** La fenêtre en service (pour le journal et l'état du poste). */
+  currentWindow(): NoticeWindow { return this.window; }
+
+  /** Les fenêtres dessinées par nous (l'île, la bannière) : elles vivent toute la journée et suivent le bip et le robot. */
+  private get banner(): boolean { return this.window === "ile" || this.window === "banniere"; }
+
+  /**
+   * L'île a besoin de son kit WebView2 (une fois par poste, vérifié à chaque démarrage). Tant qu'il se prépare, rien ne
+   * s'affiche ; s'il ne peut pas l'être, on passe à la bannière GDI+ sans attendre.
+   */
+  private prepare(): boolean {
+    if (this.window !== "ile" || this.sdk) return true;
+    if (!this.preparing) {
+      const prepare = this.options.prepareIsland ?? (() => ensureWebView2Sdk({ serverUrl: this.options.serverUrl ?? "", configDir: this.options.configDir }));
+      this.preparing = prepare()
+        .then((paths) => {
+          this.sdk = paths;
+          this.preparing = null;
+          if (this.window === "ile" && !this.broken && !this.forcedLegacy) this.ensureHost();
+        })
+        .catch((error: unknown) => {
+          this.preparing = null;
+          this.fallBack(`l'île ne peut pas se préparer (${error instanceof Error ? error.message : String(error)})`);
+        });
+    }
+    return false;
+  }
 
   private get platform(): NodeJS.Platform { return this.options.platform ?? process.platform; }
   private get seconds(): number { return this.options.seconds ?? DEFAULT_NOTICE_SECONDS; }
 
   /** Les réglages du poste (durée, endroit), relus à chaque avis : le fichier de configuration peut changer. */
-  configure(preferences: { seconds?: number; position?: NoticePosition; legacy?: boolean; window?: NoticeWindow }): void {
+  configure(preferences: { seconds?: number; position?: NoticePosition; legacy?: boolean; window?: NoticeWindow; serverUrl?: string; postLabel?: string }): void {
+    if (preferences.serverUrl) this.options.serverUrl = preferences.serverUrl;
+    if (preferences.postLabel !== undefined) this.options.postLabel = preferences.postLabel;
     // L'interrupteur du poste : « ancienne fenêtre » (affichage.fenetre = "classique") ou notification Windows seule (affichage.ancienne)
     // restent possibles en une ligne de configuration, sans attendre un correctif.
     if (preferences.legacy !== undefined) this.forcedLegacy = preferences.legacy;
-    if (preferences.window !== undefined && preferences.window !== this.window && !this.host) this.window = preferences.window;
+    // Une fenêtre qui a déjà échoué sur ce poste n'est pas redemandée (sinon l'île et la bannière se relaieraient sans fin).
+    const wanted = preferences.window === "ile" && !this.options.serverUrl && !this.options.prepareIsland ? "banniere" : preferences.window;
+    if (wanted !== undefined && wanted !== this.window && !this.host && !this.preparing && !this.failed.has(wanted)) this.window = wanted;
     if (preferences.seconds !== undefined) this.options.seconds = Math.max(5, Math.min(120, Math.round(preferences.seconds)));
     if (preferences.position !== undefined && (POSITIONS as readonly string[]).includes(preferences.position)) this.options.position = preferences.position;
   }
@@ -362,6 +414,7 @@ export class NoticeCenter {
    */
   warmUp(): void {
     if (this.platform !== "win32" || this.broken || this.forcedLegacy) return;
+    if (!this.prepare()) return;
     this.ensureHost();
   }
 
@@ -370,7 +423,7 @@ export class NoticeCenter {
     const next = typeof look === "number" && Number.isInteger(look) && look >= 0 ? look : null;
     if (next === this.robotLook) return;
     this.robotLook = next;
-    if (this.host && this.window === "banniere") this.send({ op: "look", look: next ?? -1 });
+    if (this.host && this.banner) this.send({ op: "look", look: next ?? -1 });
   }
 
   /** Les ventes que la fenêtre garde ouvertes. */
@@ -378,7 +431,8 @@ export class NoticeCenter {
 
   /** Un bip vient d'être lu : « Scan détecté ! Analyse en cours… », avant même que le serveur ait répondu. */
   scanning(): void {
-    if (this.platform !== "win32" || this.broken || this.forcedLegacy || this.window !== "banniere") return;
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy || !this.banner) return;
+    if (!this.prepare()) return;
     if (!this.ensureHost()) return;
     this.send({ op: "scan" });
   }
@@ -394,12 +448,17 @@ export class NoticeCenter {
       this.options.legacyShow(legacyContentOf(entry, 15));
       return;
     }
+    if (!this.prepare()) {
+      // Le kit de l'île se prépare (premier démarrage) : la vente s'affichera dès qu'il est prêt.
+      this.resume = entry;
+      return;
+    }
     if (!this.ensureHost()) {
       this.options.legacyShow(legacyContentOf(entry, 15));
       return;
     }
     if (!entry.quiet) this.held.set(entry.id, entry.signature);
-    this.send({ op: "show", entry, ...this.placement() });
+    this.send({ op: "show", entry: this.window === "ile" ? withInlineImages(entry) : entry, ...this.placement() });
   }
 
   /** « Vente terminée » est enregistrée : la fenêtre montre le message de fin, puis s'efface et attend la vente suivante. */
@@ -435,6 +494,7 @@ export class NoticeCenter {
 
   /** Où se pose la fenêtre : la bannière en haut à droite, l'ancienne fenêtre à mi-hauteur ; chacune retient sa position dans son fichier. */
   private placement(): { position: string; positionFile: string } {
+    if (this.window === "ile") return { position: this.options.position ?? "haut-centre", positionFile: join(this.options.configDir, "pharmaboost-ile-position.txt") };
     return this.window === "banniere"
       ? { position: this.options.position ?? "haut-droite", positionFile: join(this.options.configDir, "pharmaboost-banniere-position.txt") }
       : { position: this.options.position ?? "milieu-droite", positionFile: join(this.options.configDir, "pharmaboost-avis-position.txt") };
@@ -454,10 +514,16 @@ export class NoticeCenter {
     if (this.host) return true;
     try {
       mkdirSync(this.options.configDir, { recursive: true });
-      const banner = this.window === "banniere";
-      const scriptPath = join(this.options.configDir, banner ? "pharmaboost-banniere-hote.ps1" : "pharmaboost-avis-hote.ps1");
+      const banner = this.banner;
+      const scriptPath = join(this.options.configDir, this.window === "ile" ? "pharmaboost-ile-hote.ps1" : this.window === "banniere" ? "pharmaboost-banniere-hote.ps1" : "pharmaboost-avis-hote.ps1");
+      const script =
+        this.window === "ile" && this.sdk
+          ? noticeHostIleScript({ ...this.sdk, userDataDir: join(this.options.configDir, "ile-webview"), url: islandPageUrl(this.options.serverUrl ?? "") })
+          : this.window === "banniere" || this.window === "ile"
+            ? NOTICE_HOST_SCRIPT
+            : NOTICE_HOST_CLASSIC_SCRIPT;
       // Le BOM : sans lui, Windows PowerShell lit le script en ANSI et les accents se cassent.
-      writeFileSync(scriptPath, `﻿${banner ? NOTICE_HOST_SCRIPT : NOTICE_HOST_CLASSIC_SCRIPT}`, "utf8");
+      writeFileSync(scriptPath, `﻿${script}`, "utf8");
       const host = this.options.spawnHost ? this.options.spawnHost(scriptPath) : this.spawnReal(scriptPath);
       this.host = host;
       this.ready = false;
@@ -471,7 +537,7 @@ export class NoticeCenter {
       this.startTimer = setTimeout(() => { if (!this.ready) this.giveUp("la fenêtre n'a pas démarré à temps"); }, this.options.startTimeoutMs ?? 60_000);
       this.startTimer.unref?.();
       // La bannière apparaît dès qu'elle est prête, « En attente de scan… » : la commande l'attend dans le tuyau pendant la compilation.
-      if (banner) this.send({ op: "init", look: this.robotLook ?? -1, ...this.placement() });
+      if (banner) this.send({ op: "init", look: this.robotLook ?? -1, ...(this.options.postLabel ? { postLabel: this.options.postLabel } : {}), ...this.placement() });
       return true;
     } catch (error) {
       this.giveUp(error instanceof Error ? error.message : String(error));
@@ -491,7 +557,7 @@ export class NoticeCenter {
       if (line === "PRET") {
         this.ready = true;
         if (this.startTimer) clearTimeout(this.startTimer);
-        this.options.log(`Avis : ${this.window === "banniere" ? "bannière" : "fenêtre"} prête.`);
+        this.options.log(`Avis : ${this.window === "ile" ? "île" : this.window === "banniere" ? "bannière" : "fenêtre"} prête.`);
         // Une bannière redémarrée en pleine vente retrouve sa vente.
         const resume = this.resume;
         this.resume = null;
@@ -504,8 +570,8 @@ export class NoticeCenter {
 
   /** Un mot de la fenêtre : la réponse du pharmacien à un geste. Un mot inconnu est ignoré, jamais une panne. */
   private onWord(line: string): void {
-    if (line.startsWith("ERREUR dessin") && this.window === "banniere") {
-      this.fallBackToClassic(`la bannière n'arrive pas à se dessiner (${line.slice(14, 160)})`);
+    if (line.startsWith("ERREUR dessin") && this.banner) {
+      this.fallBack(`${this.window === "ile" ? "l'île" : "la bannière"} n'arrive pas à se dessiner (${line.slice(14, 160)})`);
       return;
     }
     const [word, saleId = "", argument = ""] = line.split(" ");
@@ -548,7 +614,7 @@ export class NoticeCenter {
     this.ready = false;
     this.held.clear();
     if (!wasReady && !this.broken) this.giveUp("la fenêtre s'est arrêtée avant d'être prête");
-    else if (wasReady && this.window === "banniere" && !this.broken && this.restarts < MAX_RESTARTS) {
+    else if (wasReady && this.banner && !this.broken && this.restarts < MAX_RESTARTS) {
       // La bannière doit rester là : si elle s'arrête sans qu'on le lui ait demandé, elle repart, avec sa vente.
       this.restarts += 1;
       this.options.log(`Avis : la bannière s'est arrêtée ; elle repart (${this.restarts}/${MAX_RESTARTS}).`);
@@ -558,26 +624,38 @@ export class NoticeCenter {
     } else if (wasReady) this.options.log("Avis : la fenêtre s'est arrêtée ; elle redémarrera au prochain conseil.");
   }
 
-  /** La bannière ne peut pas tourner sur ce poste : on passe à l'ancienne fenêtre à bordure, et on le dit. */
-  private fallBackToClassic(reason: string): void {
-    this.options.log(`Avis : ${reason} ; retour à l'ancienne fenêtre.`);
+  /** Cette fenêtre ne peut pas tourner sur ce poste : on passe à son secours (île → bannière → ancienne fenêtre), et on le dit. */
+  private fallBack(reason: string): void {
+    const next = FALLBACK[this.window];
+    if (!next) {
+      this.giveUp(reason);
+      return;
+    }
+    this.options.log(`Avis : ${reason} ; ${next === "banniere" ? "retour à la bannière" : "retour à l'ancienne fenêtre"}.`);
     if (this.startTimer) clearTimeout(this.startTimer);
     const host = this.host;
     this.host = null;
     this.ready = false;
     this.held.clear();
     if (host) { try { host.kill(); } catch { /* déjà parti */ } }
-    this.window = "classique";
-    // L'ancienne fenêtre n'a rien à montrer tant qu'il n'y a pas de vente : on ne la lance qu'avec elle.
+    this.failed.add(this.window);
+    this.window = next;
     const entry = this.resume ?? this.lastEntry;
     this.resume = null;
+    if (next === "banniere") {
+      // La bannière est là toute la journée : elle démarre tout de suite, avec la vente en cours s'il y en a une.
+      this.ensureHost();
+      if (entry && !entry.quiet) this.show(entry);
+      return;
+    }
+    // L'ancienne fenêtre n'a rien à montrer tant qu'il n'y a pas de vente : on ne la lance qu'avec elle.
     if (entry && !entry.quiet) this.show(entry);
   }
 
   /** Plus aucune fenêtre ne peut tourner sur ce poste : la notification Windows prend le relais, et on le dit. */
   private giveUp(reason: string): void {
-    if (this.window === "banniere" && !this.broken) {
-      this.fallBackToClassic(`la bannière ne démarre pas (${reason})`);
+    if (this.banner && !this.broken) {
+      this.fallBack(`${this.window === "ile" ? "l'île" : "la bannière"} ne démarre pas (${reason})`);
       return;
     }
     if (this.broken) return;
@@ -590,4 +668,33 @@ export class NoticeCenter {
     if (host) { try { host.kill(); } catch { /* déjà parti */ } }
     if (this.lastEntry) this.options.legacyShow(legacyContentOf(this.lastEntry, 15));
   }
+}
+
+/** La page de l'île sur PharmaBoost (la même que l'aperçu). */
+export function islandPageUrl(serverUrl: string): string {
+  return `${serverUrl.replace(/\/$/, "")}/poste/ile`;
+}
+
+const INLINE_IMAGE_MAX_BYTES = 600_000;
+
+/**
+ * L'île est une page web : elle ne lit pas les fichiers du poste. Les photos déjà téléchargées (avis-images) lui
+ * parviennent donc incluses dans la commande (« data: »), jpeg ou png seulement, taille bornée ; sans photo, la carte
+ * garde sa place grise, comme sur la bannière.
+ */
+export function withInlineImages(entry: HostEntry, read: (path: string) => Uint8Array = (path) => readFileSync(path)): HostEntry {
+  return {
+    ...entry,
+    items: entry.items.map((item) => {
+      if (!item.image || item.image.startsWith("data:")) return item;
+      try {
+        const bytes = read(item.image);
+        const kind = sniff(bytes);
+        if (!kind || bytes.length > INLINE_IMAGE_MAX_BYTES) return { ...item, image: "" };
+        return { ...item, image: `data:image/${kind === "jpg" ? "jpeg" : "png"};base64,${Buffer.from(bytes).toString("base64")}` };
+      } catch {
+        return { ...item, image: "" };
+      }
+    }),
+  };
 }

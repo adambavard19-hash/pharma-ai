@@ -38,3 +38,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Microsoft Edge WebView2 SDK (1.0.2903.40)
+
+L'île du poste de caisse Windows s'affiche avec WebView2. Les bibliothèques du kit
+(`Microsoft.Web.WebView2.Core.dll`, `Microsoft.Web.WebView2.WinForms.dll`, `WebView2Loader.dll`) sont redistribuées telles
+quelles dans `public/poste/webview2/1.0.2903.40/`, avec leur licence (`LICENSE.txt`, licence de type BSD de Microsoft) et
+leurs mentions (`NOTICE.txt`). Copyright (C) Microsoft Corporation.

@@ -2,7 +2,7 @@
 "use strict";
 
 // agent/src/index.ts
-var import_node_crypto3 = require("node:crypto");
+var import_node_crypto4 = require("node:crypto");
 
 // agent/src/douchette.ts
 var import_node_child_process = require("node:child_process");
@@ -334,9 +334,9 @@ async function selfUpdate(options) {
 
 // agent/src/notice-center.ts
 var import_node_child_process3 = require("node:child_process");
-var import_node_crypto2 = require("node:crypto");
-var import_node_fs4 = require("node:fs");
-var import_node_path4 = require("node:path");
+var import_node_crypto3 = require("node:crypto");
+var import_node_fs5 = require("node:fs");
+var import_node_path5 = require("node:path");
 
 // agent/src/banner-design.ts
 var BANNER = {
@@ -4796,10 +4796,451 @@ Add-Type -TypeDefinition $code -ReferencedAssemblies System.Windows.Forms,System
 [PharmaBoostAvis.Program]::Run()
 `;
 
+// agent/src/notice-host-ile.ts
+var WEBVIEW2_SDK = {
+  version: "1.0.2903.40",
+  /** Chemin relatif → SHA-256. Microsoft, licence BSD (public/poste/webview2/<version>/LICENSE.txt). */
+  files: {
+    "Microsoft.Web.WebView2.Core.dll": "88a3b62f45225a811cdb85df6dfd95c2bff9a0e43e3b04f813b125eaca56cc9f",
+    "Microsoft.Web.WebView2.WinForms.dll": "29fc954c3fde1749817d158f3dd5ebe9efd3b3ce9708d86092fb1e9f023a1cb0",
+    "x64/WebView2Loader.dll": "462b36fd1be6ca9f7563466a89e57c41ef4a4def3e0a84fa885d203aea4a3aaf",
+    "x86/WebView2Loader.dll": "6f59ad578fde1f65c44b6935dab0901f014b5268e056b930fb34c0919f1bf4b9",
+    "arm64/WebView2Loader.dll": "cb561ae4537e39bba5dd8af1f648f189d9562b1003fd110a9e889ace527fb4e8"
+  }
+};
+var ISLAND_WINDOW = { width: 600, height: 760, top: 6 };
+var NOTICE_HOST_ILE_CSHARP = String.raw`
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web.Script.Serialization;
+using System.Windows.Forms;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
+
+namespace PharmaBoostIle
+{
+  internal static class Native
+  {
+    public const int WM_MOUSEACTIVATE = 0x0021;
+    public const int MA_NOACTIVATE = 3;
+    public const int WS_EX_TOPMOST = 0x00000008;
+    public const int WS_EX_TOOLWINDOW = 0x00000080;
+    public const int WS_EX_NOACTIVATE = 0x08000000;
+    public const uint GA_ROOT = 2;
+
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetProcessDPIAware();
+  }
+
+  /// <summary>Ce que la fenêtre écrit pour l'agent : une ligne par mot, jamais deux fils à la fois.</summary>
+  internal static class Out
+  {
+    private static readonly object Gate = new object();
+    public static void Word(string line) { lock (Gate) { Console.Out.WriteLine(line); Console.Out.Flush(); } }
+    public static void Error(string line) { lock (Gate) { Console.Error.WriteLine(line); Console.Error.Flush(); } }
+  }
+
+  public sealed class IleForm : Form
+  {
+    private readonly string pageUrl;
+    private readonly string allowedPrefix;
+    private readonly string loaderDir;
+    private readonly string userDataDir;
+    private readonly WebView2 web;
+    private readonly List<string> pending = new List<string>();
+    private readonly System.Windows.Forms.Timer focusTimer = new System.Windows.Forms.Timer();
+    private readonly JavaScriptSerializer json = new JavaScriptSerializer();
+    private bool pageReady;
+    private bool keyboard;
+    private bool rightSide;
+    private IntPtr lastExternal = IntPtr.Zero;
+    private float scale = 1f;
+    private readonly int processId;
+    private NotifyIcon tray;
+    private ToolStripMenuItem toggleItem;
+
+    public IleForm(string url, string loader, string userData)
+    {
+      pageUrl = url;
+      Uri parsed = new Uri(url);
+      allowedPrefix = parsed.GetLeftPart(UriPartial.Path);
+      loaderDir = loader;
+      userDataDir = userData;
+      processId = System.Diagnostics.Process.GetCurrentProcess().Id;
+      json.MaxJsonLength = 16 * 1024 * 1024;
+
+      FormBorderStyle = FormBorderStyle.None;
+      ShowInTaskbar = false;
+      TopMost = true;
+      StartPosition = FormStartPosition.Manual;
+      BackColor = Color.FromArgb(11, 15, 20);
+      Text = "PharmaBoost";
+
+      web = new WebView2();
+      web.Dock = DockStyle.Fill;
+      web.DefaultBackgroundColor = Color.Transparent;
+      Controls.Add(web);
+
+      focusTimer.Interval = 250;
+      focusTimer.Tick += delegate { GuardFocus(); };
+      MakeTray();
+    }
+
+    protected override bool ShowWithoutActivation { get { return true; } }
+
+    protected override CreateParams CreateParams
+    {
+      get
+      {
+        CreateParams p = base.CreateParams;
+        p.ExStyle |= Native.WS_EX_NOACTIVATE | Native.WS_EX_TOOLWINDOW | Native.WS_EX_TOPMOST;
+        return p;
+      }
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+      // Un clic ne prend jamais le premier plan au logiciel de gestion (sauf pendant la saisie de l'e-mail du patient).
+      if (m.Msg == Native.WM_MOUSEACTIVATE && !keyboard)
+      {
+        m.Result = (IntPtr)Native.MA_NOACTIVATE;
+        return;
+      }
+      base.WndProc(ref m);
+    }
+
+    /// <summary>Place la fenêtre (en haut au centre, ou à droite) et lui donne d'abord la forme de la capsule au repos.</summary>
+    public void Place(string position)
+    {
+      rightSide = position == "haut-droite";
+      using (Graphics g = Graphics.FromHwnd(IntPtr.Zero)) { scale = g.DpiX / 96f; }
+      Rectangle area = Screen.PrimaryScreen.WorkingArea;
+      int width = (int)Math.Round(${ISLAND_WINDOW.width} * scale);
+      int height = Math.Min((int)Math.Round(${ISLAND_WINDOW.height} * scale), area.Height - 16);
+      int x = rightSide ? area.Right - width - (int)(12 * scale) : area.Left + (area.Width - width) / 2;
+      int y = area.Top + (int)(${ISLAND_WINDOW.top} * scale);
+      Bounds = new Rectangle(x, y, width, height);
+      // Avant que la page dise sa forme : la capsule au repos (244 × 44 au centre), jamais un grand rectangle qui masquerait le logiciel.
+      ApplyRegion(new List<float[]> { new float[] { (${ISLAND_WINDOW.width} - 250) / 2f, 5, 250, 50, 25 } });
+    }
+
+    public async void Start()
+    {
+      try
+      {
+        CoreWebView2Environment.SetLoaderDllFolderPath(loaderDir);
+        string version = CoreWebView2Environment.GetAvailableBrowserVersionString();
+        if (string.IsNullOrEmpty(version)) throw new InvalidOperationException("moteur WebView2 absent");
+        CoreWebView2EnvironmentOptions options = new CoreWebView2EnvironmentOptions("--disable-features=msSmartScreenProtection --autoplay-policy=no-user-gesture-required");
+        CoreWebView2Environment env = await CoreWebView2Environment.CreateAsync(null, userDataDir, options);
+        await web.EnsureCoreWebView2Async(env);
+        CoreWebView2 core = web.CoreWebView2;
+        CoreWebView2Settings s = core.Settings;
+        s.AreDevToolsEnabled = false;
+        s.AreDefaultContextMenusEnabled = false;
+        s.AreDefaultScriptDialogsEnabled = false;
+        s.IsZoomControlEnabled = false;
+        s.IsStatusBarEnabled = false;
+        s.AreBrowserAcceleratorKeysEnabled = false;
+        s.IsPasswordAutosaveEnabled = false;
+        s.IsGeneralAutofillEnabled = false;
+        core.NavigationStarting += OnNavigationStarting;
+        core.NewWindowRequested += delegate(object sender, CoreWebView2NewWindowRequestedEventArgs e) { e.Handled = true; };
+        core.NavigationCompleted += OnNavigationCompleted;
+        core.WebMessageReceived += OnWebMessage;
+        core.ProcessFailed += delegate(object sender, CoreWebView2ProcessFailedEventArgs e)
+        {
+          if (pageReady) Out.Word("ERREUR dessin ile : moteur arrêté (" + e.ProcessFailedKind + ")");
+          else Out.Error("ERREUR ile : moteur arrêté au démarrage (" + e.ProcessFailedKind + ")");
+        };
+        core.Navigate(pageUrl);
+        focusTimer.Start();
+      }
+      catch (Exception ex)
+      {
+        Out.Error("ERREUR ile : " + ex.GetType().Name + " — " + ex.Message);
+      }
+    }
+
+    private void OnNavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e)
+    {
+      // Seule la page de l'île de PharmaBoost s'ouvre ici.
+      if (!e.Uri.StartsWith(allowedPrefix, StringComparison.Ordinal)) e.Cancel = true;
+    }
+
+    private void OnNavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
+    {
+      if (!e.IsSuccess && !pageReady) Out.Error("ERREUR ile : page injoignable (" + e.WebErrorStatus + ")");
+    }
+
+    /// <summary>Une commande de l'agent : transmise telle quelle à la page (gardée tant que la page n'est pas prête).</summary>
+    public void Command(string line)
+    {
+      if (line.Contains("\"op\":\"quit\""))
+      {
+        Quit();
+        return;
+      }
+      if (line.Contains("\"op\":\"init\""))
+      {
+        string position = line.Contains("\"position\":\"haut-droite\"") ? "haut-droite" : "haut-centre";
+        if ((position == "haut-droite") != rightSide) Place(position);
+      }
+      if (!pageReady)
+      {
+        pending.Add(line);
+        return;
+      }
+      Post(line);
+    }
+
+    private void Post(string line)
+    {
+      try { web.CoreWebView2.PostWebMessageAsString(line); }
+      catch (Exception ex) { Out.Error("ERREUR ile : envoi impossible (" + ex.Message + ")"); }
+    }
+
+    private void OnWebMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+      if (!e.Source.StartsWith(allowedPrefix, StringComparison.Ordinal)) return;
+      Dictionary<string, object> message;
+      try { message = json.Deserialize<Dictionary<string, object>>(e.WebMessageAsJson); }
+      catch (Exception) { return; }
+      if (message == null || !message.ContainsKey("type")) return;
+      string type = Convert.ToString(message["type"]);
+      if (type == "ready")
+      {
+        if (pageReady) return;
+        pageReady = true;
+        Out.Word("PRET");
+        foreach (string line in pending) Post(line);
+        pending.Clear();
+      }
+      else if (type == "word" && message.ContainsKey("word"))
+      {
+        string word = Convert.ToString(message["word"]).Replace("\r", " ").Replace("\n", " ").Trim();
+        if (word.Length > 0 && word.Length <= 400) Out.Word(word);
+        if (!keyboard) GiveFocusBack();
+      }
+      else if (type == "region" && message.ContainsKey("rects"))
+      {
+        List<float[]> rects = new List<float[]>();
+        object[] list = message["rects"] as object[];
+        if (list == null) { System.Collections.ArrayList al = message["rects"] as System.Collections.ArrayList; if (al != null) list = al.ToArray(); }
+        if (list == null) return;
+        foreach (object item in list)
+        {
+          Dictionary<string, object> r = item as Dictionary<string, object>;
+          if (r == null) continue;
+          rects.Add(new float[] { ToF(r, "x"), ToF(r, "y"), ToF(r, "w"), ToF(r, "h"), ToF(r, "r") });
+        }
+        ApplyRegion(rects);
+      }
+      else if (type == "keyboard")
+      {
+        bool on = message.ContainsKey("on") && Convert.ToBoolean(message["on"]);
+        keyboard = on;
+        if (on)
+        {
+          Activate();
+          web.Focus();
+        }
+        else GiveFocusBack();
+      }
+    }
+
+    private static float ToF(Dictionary<string, object> r, string key)
+    {
+      return r.ContainsKey(key) ? Convert.ToSingle(r[key]) : 0f;
+    }
+
+    /// <summary>La forme de la fenêtre : l'union des rectangles arrondis de l'île (pixels CSS → pixels de l'écran).</summary>
+    private void ApplyRegion(List<float[]> rects)
+    {
+      GraphicsPath path = new GraphicsPath();
+      foreach (float[] r in rects)
+      {
+        float x = r[0] * scale, y = r[1] * scale, w = r[2] * scale, h = r[3] * scale;
+        float d = Math.Min(Math.Min(w, h), Math.Max(0f, r[4] * scale * 2f));
+        if (w <= 0 || h <= 0) continue;
+        if (d < 1f) { path.AddRectangle(new RectangleF(x, y, w, h)); continue; }
+        path.AddArc(x, y, d, d, 180, 90);
+        path.AddArc(x + w - d, y, d, d, 270, 90);
+        path.AddArc(x + w - d, y + h - d, d, d, 0, 90);
+        path.AddArc(x, y + h - d, d, d, 90, 90);
+        path.CloseFigure();
+      }
+      Region previous = Region;
+      Region = new Region(path);
+      if (previous != null) previous.Dispose();
+      path.Dispose();
+    }
+
+    private bool IsOurs(IntPtr hwnd)
+    {
+      if (hwnd == IntPtr.Zero) return false;
+      if (hwnd == Handle || Native.GetAncestor(hwnd, Native.GA_ROOT) == Handle) return true;
+      uint pid;
+      Native.GetWindowThreadProcessId(hwnd, out pid);
+      return pid == (uint)processId;
+    }
+
+    /// <summary>Retient la fenêtre au premier plan (le logiciel de gestion) ; si l'île l'a prise par mégarde, la rend.</summary>
+    private void GuardFocus()
+    {
+      IntPtr fg = Native.GetForegroundWindow();
+      if (!IsOurs(fg)) { lastExternal = fg; return; }
+      if (!keyboard) GiveFocusBack();
+    }
+
+    private void GiveFocusBack()
+    {
+      IntPtr fg = Native.GetForegroundWindow();
+      if (lastExternal != IntPtr.Zero && IsOurs(fg)) Native.SetForegroundWindow(lastExternal);
+    }
+
+    private void MakeTray()
+    {
+      tray = new NotifyIcon();
+      Bitmap bmp = new Bitmap(16, 16);
+      using (Graphics g = Graphics.FromImage(bmp))
+      {
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(Color.Transparent);
+        using (SolidBrush dark = new SolidBrush(Color.FromArgb(11, 15, 20))) g.FillEllipse(dark, 0, 0, 15, 15);
+        using (SolidBrush eye = new SolidBrush(Color.FromArgb(88, 242, 216))) { g.FillEllipse(eye, 4, 6, 3, 4); g.FillEllipse(eye, 9, 6, 3, 4); }
+      }
+      tray.Icon = Icon.FromHandle(bmp.GetHicon());
+      tray.Text = "PharmaBoost";
+      ContextMenuStrip menu = new ContextMenuStrip();
+      toggleItem = new ToolStripMenuItem("Masquer la bannière");
+      toggleItem.Click += delegate { ToggleVisible(); };
+      menu.Items.Add(toggleItem);
+      tray.ContextMenuStrip = menu;
+      tray.DoubleClick += delegate { ToggleVisible(); };
+      tray.Visible = true;
+    }
+
+    private void ToggleVisible()
+    {
+      if (Visible) { Hide(); toggleItem.Text = "Afficher la bannière"; }
+      else { Show(); toggleItem.Text = "Masquer la bannière"; }
+    }
+
+    public void Quit()
+    {
+      focusTimer.Stop();
+      if (tray != null) { tray.Visible = false; tray.Dispose(); }
+      Application.ExitThread();
+    }
+  }
+
+  public static class Program
+  {
+    public static void Run(string url, string loaderDir, string userDataDir)
+    {
+      try { Native.SetProcessDPIAware(); } catch (Exception) { }
+      Application.EnableVisualStyles();
+      IleForm form = new IleForm(url, loaderDir, userDataDir);
+      form.Place("haut-centre");
+      // L'entrée standard (les commandes de l'agent) est lue sur un fil à part, puis passée au fil de la fenêtre.
+      Thread reader = new Thread(delegate ()
+      {
+        try
+        {
+          string line;
+          while ((line = Console.In.ReadLine()) != null)
+          {
+            string copy = line;
+            if (copy.Trim().Length == 0) continue;
+            try { form.BeginInvoke((MethodInvoker)delegate { form.Command(copy); }); } catch (Exception) { }
+          }
+        }
+        catch (Exception) { }
+        try { form.BeginInvoke((MethodInvoker)delegate { form.Quit(); }); } catch (Exception) { }
+      });
+      reader.IsBackground = true;
+      // Les commandes ne sont lues qu'une fois la fenêtre créée (BeginInvoke en a besoin) ; elles attendent dans le tuyau.
+      form.Shown += delegate { form.Start(); reader.Start(); };
+      Application.Run(form);
+    }
+  }
+}
+`;
+var psQuote = (value) => `'${value.replace(/'/g, "''")}'`;
+function noticeHostIleScript(input) {
+  const core = `${input.sdkDir}\\Microsoft.Web.WebView2.Core.dll`;
+  const winforms = `${input.sdkDir}\\Microsoft.Web.WebView2.WinForms.dll`;
+  return `$ErrorActionPreference = "Stop"
+$core = ${psQuote(core)}
+$winforms = ${psQuote(winforms)}
+Add-Type -Path $core
+Add-Type -Path $winforms
+$code = @'
+${NOTICE_HOST_ILE_CSHARP}
+'@
+Add-Type -TypeDefinition $code -ReferencedAssemblies System.Windows.Forms,System.Drawing,System.Web.Extensions,$core,$winforms
+[PharmaBoostIle.Program]::Run(${psQuote(input.url)}, ${psQuote(input.loaderDir)}, ${psQuote(input.userDataDir)})
+`;
+}
+function loaderArch(arch) {
+  if (arch === "arm64") return "arm64";
+  if (arch === "ia32" || arch === "x86") return "x86";
+  return "x64";
+}
+
+// agent/src/webview2-sdk.ts
+var import_node_crypto2 = require("node:crypto");
+var import_node_fs4 = require("node:fs");
+var import_node_path4 = require("node:path");
+var sha2562 = (bytes) => (0, import_node_crypto2.createHash)("sha256").update(bytes).digest("hex");
+function sdkFilesFor(arch) {
+  const loader = `${loaderArch(arch)}/WebView2Loader.dll`;
+  return ["Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll", loader];
+}
+function intact(path, expected) {
+  try {
+    return (0, import_node_fs4.existsSync)(path) && sha2562((0, import_node_fs4.readFileSync)(path)) === expected;
+  } catch {
+    return false;
+  }
+}
+async function ensureWebView2Sdk(input) {
+  const arch = input.arch ?? process.arch;
+  const sdkDir = (0, import_node_path4.join)(input.configDir, "webview2", WEBVIEW2_SDK.version);
+  const base = `${input.serverUrl.replace(/\/$/, "")}/poste/webview2/${WEBVIEW2_SDK.version}`;
+  const fetchImpl = input.fetchImpl ?? fetch;
+  for (const name of sdkFilesFor(arch)) {
+    const expected = WEBVIEW2_SDK.files[name];
+    const path = (0, import_node_path4.join)(sdkDir, ...name.split("/"));
+    if (intact(path, expected)) continue;
+    const response = await fetchImpl(`${base}/${name}`, { signal: AbortSignal.timeout(6e4) });
+    if (!response.ok) throw new Error(`kit WebView2 : ${name} introuvable (HTTP ${response.status})`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (sha2562(bytes) !== expected) throw new Error(`kit WebView2 : empreinte inattendue pour ${name}`);
+    (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(path), { recursive: true });
+    const temporary = `${path}.part`;
+    (0, import_node_fs4.writeFileSync)(temporary, bytes);
+    (0, import_node_fs4.renameSync)(temporary, path);
+  }
+  return { sdkDir, loaderDir: (0, import_node_path4.join)(sdkDir, loaderArch(arch)) };
+}
+
 // agent/src/notice-center.ts
 var MAX_RESTARTS = 5;
 var DEFAULT_NOTICE_SECONDS = 30;
-var POSITIONS = ["milieu-droite", "bas-droite", "haut-droite"];
+var POSITIONS = ["milieu-droite", "bas-droite", "haut-droite", "haut-centre"];
+var FALLBACK = { ile: "banniere", banniere: "classique", classique: null };
 function euros(cents) {
   if (cents === null || cents === void 0 || cents <= 0) return "";
   return `${(cents / 100).toFixed(2).replace(".", ",")} \u20AC`;
@@ -4915,18 +5356,18 @@ function sniff(bytes) {
   if (bytes.length > 8 && bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71) return "png";
   return null;
 }
-var cacheKey = (source) => (0, import_node_crypto2.createHash)("sha1").update(source).digest("hex").slice(0, 20);
+var cacheKey = (source) => (0, import_node_crypto3.createHash)("sha1").update(source).digest("hex").slice(0, 20);
 function cachedImage(dir, source) {
   for (const extension of ["jpg", "png"]) {
-    const path = (0, import_node_path4.join)(dir, `${cacheKey(source)}.${extension}`);
-    if ((0, import_node_fs4.existsSync)(path)) return path;
+    const path = (0, import_node_path5.join)(dir, `${cacheKey(source)}.${extension}`);
+    if ((0, import_node_fs5.existsSync)(path)) return path;
   }
   return null;
 }
 function pruneCache(dir) {
   try {
-    const files = (0, import_node_fs4.readdirSync)(dir).map((name) => ({ name, at: (0, import_node_fs4.statSync)((0, import_node_path4.join)(dir, name)).mtimeMs })).sort((a, b) => b.at - a.at);
-    for (const old of files.slice(IMAGE_CACHE_MAX_FILES)) (0, import_node_fs4.unlinkSync)((0, import_node_path4.join)(dir, old.name));
+    const files = (0, import_node_fs5.readdirSync)(dir).map((name) => ({ name, at: (0, import_node_fs5.statSync)((0, import_node_path5.join)(dir, name)).mtimeMs })).sort((a, b) => b.at - a.at);
+    for (const old of files.slice(IMAGE_CACHE_MAX_FILES)) (0, import_node_fs5.unlinkSync)((0, import_node_path5.join)(dir, old.name));
   } catch {
   }
 }
@@ -4943,9 +5384,9 @@ async function fetchImage(source, serverUrl, dir, fetchImpl = fetch) {
     if (bytes.length === 0 || bytes.length > IMAGE_MAX_BYTES) return null;
     const kind = sniff(bytes);
     if (!kind) return null;
-    (0, import_node_fs4.mkdirSync)(dir, { recursive: true });
-    const path = (0, import_node_path4.join)(dir, `${cacheKey(source)}.${kind}`);
-    (0, import_node_fs4.writeFileSync)(path, bytes);
+    (0, import_node_fs5.mkdirSync)(dir, { recursive: true });
+    const path = (0, import_node_path5.join)(dir, `${cacheKey(source)}.${kind}`);
+    (0, import_node_fs5.writeFileSync)(path, bytes);
     pruneCache(dir);
     return path;
   } catch {
@@ -4955,14 +5396,20 @@ async function fetchImage(source, serverUrl, dir, fetchImpl = fetch) {
 var NoticeCenter = class {
   constructor(options) {
     this.options = options;
+    if (!options.serverUrl && !options.prepareIsland) this.window = "banniere";
   }
   options;
   host = null;
   ready = false;
   broken = false;
   forcedLegacy = false;
-  /** Quelle fenêtre tourne : la bannière, ou — si elle n'a pas pu démarrer ou se dessiner — l'ancienne fenêtre. */
-  window = "banniere";
+  /** Quelle fenêtre tourne : l'île, ou — si elle n'a pas pu démarrer ou se dessiner — la bannière GDI+, puis l'ancienne fenêtre. */
+  window = "ile";
+  /** Le kit WebView2 prêt (chemins), sa préparation en cours, ou rien. */
+  sdk = null;
+  preparing = null;
+  /** Les fenêtres qui n'ont pas pu tourner sur ce poste depuis le démarrage de l'agent. */
+  failed = /* @__PURE__ */ new Set();
   restarts = 0;
   resume = null;
   startTimer = null;
@@ -4972,6 +5419,33 @@ var NoticeCenter = class {
   held = /* @__PURE__ */ new Map();
   /** Le robot de ce comptoir (0 à 19), donné par le serveur ; null : le robot de la marque. */
   robotLook = null;
+  /** La fenêtre en service (pour le journal et l'état du poste). */
+  currentWindow() {
+    return this.window;
+  }
+  /** Les fenêtres dessinées par nous (l'île, la bannière) : elles vivent toute la journée et suivent le bip et le robot. */
+  get banner() {
+    return this.window === "ile" || this.window === "banniere";
+  }
+  /**
+   * L'île a besoin de son kit WebView2 (une fois par poste, vérifié à chaque démarrage). Tant qu'il se prépare, rien ne
+   * s'affiche ; s'il ne peut pas l'être, on passe à la bannière GDI+ sans attendre.
+   */
+  prepare() {
+    if (this.window !== "ile" || this.sdk) return true;
+    if (!this.preparing) {
+      const prepare = this.options.prepareIsland ?? (() => ensureWebView2Sdk({ serverUrl: this.options.serverUrl ?? "", configDir: this.options.configDir }));
+      this.preparing = prepare().then((paths) => {
+        this.sdk = paths;
+        this.preparing = null;
+        if (this.window === "ile" && !this.broken && !this.forcedLegacy) this.ensureHost();
+      }).catch((error) => {
+        this.preparing = null;
+        this.fallBack(`l'\xEEle ne peut pas se pr\xE9parer (${error instanceof Error ? error.message : String(error)})`);
+      });
+    }
+    return false;
+  }
   get platform() {
     return this.options.platform ?? process.platform;
   }
@@ -4980,8 +5454,11 @@ var NoticeCenter = class {
   }
   /** Les réglages du poste (durée, endroit), relus à chaque avis : le fichier de configuration peut changer. */
   configure(preferences) {
+    if (preferences.serverUrl) this.options.serverUrl = preferences.serverUrl;
+    if (preferences.postLabel !== void 0) this.options.postLabel = preferences.postLabel;
     if (preferences.legacy !== void 0) this.forcedLegacy = preferences.legacy;
-    if (preferences.window !== void 0 && preferences.window !== this.window && !this.host) this.window = preferences.window;
+    const wanted = preferences.window === "ile" && !this.options.serverUrl && !this.options.prepareIsland ? "banniere" : preferences.window;
+    if (wanted !== void 0 && wanted !== this.window && !this.host && !this.preparing && !this.failed.has(wanted)) this.window = wanted;
     if (preferences.seconds !== void 0) this.options.seconds = Math.max(5, Math.min(120, Math.round(preferences.seconds)));
     if (preferences.position !== void 0 && POSITIONS.includes(preferences.position)) this.options.position = preferences.position;
   }
@@ -4992,6 +5469,7 @@ var NoticeCenter = class {
    */
   warmUp() {
     if (this.platform !== "win32" || this.broken || this.forcedLegacy) return;
+    if (!this.prepare()) return;
     this.ensureHost();
   }
   /** Le robot de ce comptoir : la bannière en change aussitôt (couleur, accessoire), sans redémarrer. */
@@ -4999,7 +5477,7 @@ var NoticeCenter = class {
     const next = typeof look === "number" && Number.isInteger(look) && look >= 0 ? look : null;
     if (next === this.robotLook) return;
     this.robotLook = next;
-    if (this.host && this.window === "banniere") this.send({ op: "look", look: next ?? -1 });
+    if (this.host && this.banner) this.send({ op: "look", look: next ?? -1 });
   }
   /** Les ventes que la fenêtre garde ouvertes. */
   ids() {
@@ -5007,7 +5485,8 @@ var NoticeCenter = class {
   }
   /** Un bip vient d'être lu : « Scan détecté ! Analyse en cours… », avant même que le serveur ait répondu. */
   scanning() {
-    if (this.platform !== "win32" || this.broken || this.forcedLegacy || this.window !== "banniere") return;
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy || !this.banner) return;
+    if (!this.prepare()) return;
     if (!this.ensureHost()) return;
     this.send({ op: "scan" });
   }
@@ -5022,12 +5501,16 @@ var NoticeCenter = class {
       this.options.legacyShow(legacyContentOf(entry, 15));
       return;
     }
+    if (!this.prepare()) {
+      this.resume = entry;
+      return;
+    }
     if (!this.ensureHost()) {
       this.options.legacyShow(legacyContentOf(entry, 15));
       return;
     }
     if (!entry.quiet) this.held.set(entry.id, entry.signature);
-    this.send({ op: "show", entry, ...this.placement() });
+    this.send({ op: "show", entry: this.window === "ile" ? withInlineImages(entry) : entry, ...this.placement() });
   }
   /** « Vente terminée » est enregistrée : la fenêtre montre le message de fin, puis s'efface et attend la vente suivante. */
   done(info) {
@@ -5061,7 +5544,8 @@ var NoticeCenter = class {
   }
   /** Où se pose la fenêtre : la bannière en haut à droite, l'ancienne fenêtre à mi-hauteur ; chacune retient sa position dans son fichier. */
   placement() {
-    return this.window === "banniere" ? { position: this.options.position ?? "haut-droite", positionFile: (0, import_node_path4.join)(this.options.configDir, "pharmaboost-banniere-position.txt") } : { position: this.options.position ?? "milieu-droite", positionFile: (0, import_node_path4.join)(this.options.configDir, "pharmaboost-avis-position.txt") };
+    if (this.window === "ile") return { position: this.options.position ?? "haut-centre", positionFile: (0, import_node_path5.join)(this.options.configDir, "pharmaboost-ile-position.txt") };
+    return this.window === "banniere" ? { position: this.options.position ?? "haut-droite", positionFile: (0, import_node_path5.join)(this.options.configDir, "pharmaboost-banniere-position.txt") } : { position: this.options.position ?? "milieu-droite", positionFile: (0, import_node_path5.join)(this.options.configDir, "pharmaboost-avis-position.txt") };
   }
   send(command) {
     if (!this.host) return;
@@ -5075,10 +5559,11 @@ var NoticeCenter = class {
   ensureHost() {
     if (this.host) return true;
     try {
-      (0, import_node_fs4.mkdirSync)(this.options.configDir, { recursive: true });
-      const banner = this.window === "banniere";
-      const scriptPath = (0, import_node_path4.join)(this.options.configDir, banner ? "pharmaboost-banniere-hote.ps1" : "pharmaboost-avis-hote.ps1");
-      (0, import_node_fs4.writeFileSync)(scriptPath, `\uFEFF${banner ? NOTICE_HOST_SCRIPT : NOTICE_HOST_CLASSIC_SCRIPT}`, "utf8");
+      (0, import_node_fs5.mkdirSync)(this.options.configDir, { recursive: true });
+      const banner = this.banner;
+      const scriptPath = (0, import_node_path5.join)(this.options.configDir, this.window === "ile" ? "pharmaboost-ile-hote.ps1" : this.window === "banniere" ? "pharmaboost-banniere-hote.ps1" : "pharmaboost-avis-hote.ps1");
+      const script = this.window === "ile" && this.sdk ? noticeHostIleScript({ ...this.sdk, userDataDir: (0, import_node_path5.join)(this.options.configDir, "ile-webview"), url: islandPageUrl(this.options.serverUrl ?? "") }) : this.window === "banniere" || this.window === "ile" ? NOTICE_HOST_SCRIPT : NOTICE_HOST_CLASSIC_SCRIPT;
+      (0, import_node_fs5.writeFileSync)(scriptPath, `\uFEFF${script}`, "utf8");
       const host = this.options.spawnHost ? this.options.spawnHost(scriptPath) : this.spawnReal(scriptPath);
       this.host = host;
       this.ready = false;
@@ -5101,7 +5586,7 @@ var NoticeCenter = class {
         if (!this.ready) this.giveUp("la fen\xEAtre n'a pas d\xE9marr\xE9 \xE0 temps");
       }, this.options.startTimeoutMs ?? 6e4);
       this.startTimer.unref?.();
-      if (banner) this.send({ op: "init", look: this.robotLook ?? -1, ...this.placement() });
+      if (banner) this.send({ op: "init", look: this.robotLook ?? -1, ...this.options.postLabel ? { postLabel: this.options.postLabel } : {}, ...this.placement() });
       return true;
     } catch (error) {
       this.giveUp(error instanceof Error ? error.message : String(error));
@@ -5119,7 +5604,7 @@ var NoticeCenter = class {
       if (line === "PRET") {
         this.ready = true;
         if (this.startTimer) clearTimeout(this.startTimer);
-        this.options.log(`Avis : ${this.window === "banniere" ? "banni\xE8re" : "fen\xEAtre"} pr\xEAte.`);
+        this.options.log(`Avis : ${this.window === "ile" ? "\xEEle" : this.window === "banniere" ? "banni\xE8re" : "fen\xEAtre"} pr\xEAte.`);
         const resume = this.resume;
         this.resume = null;
         if (resume) this.show(resume);
@@ -5130,8 +5615,8 @@ var NoticeCenter = class {
   }
   /** Un mot de la fenêtre : la réponse du pharmacien à un geste. Un mot inconnu est ignoré, jamais une panne. */
   onWord(line) {
-    if (line.startsWith("ERREUR dessin") && this.window === "banniere") {
-      this.fallBackToClassic(`la banni\xE8re n'arrive pas \xE0 se dessiner (${line.slice(14, 160)})`);
+    if (line.startsWith("ERREUR dessin") && this.banner) {
+      this.fallBack(`${this.window === "ile" ? "l'\xEEle" : "la banni\xE8re"} n'arrive pas \xE0 se dessiner (${line.slice(14, 160)})`);
       return;
     }
     const [word, saleId = "", argument = ""] = line.split(" ");
@@ -5170,7 +5655,7 @@ var NoticeCenter = class {
     this.ready = false;
     this.held.clear();
     if (!wasReady && !this.broken) this.giveUp("la fen\xEAtre s'est arr\xEAt\xE9e avant d'\xEAtre pr\xEAte");
-    else if (wasReady && this.window === "banniere" && !this.broken && this.restarts < MAX_RESTARTS) {
+    else if (wasReady && this.banner && !this.broken && this.restarts < MAX_RESTARTS) {
       this.restarts += 1;
       this.options.log(`Avis : la banni\xE8re s'est arr\xEAt\xE9e ; elle repart (${this.restarts}/${MAX_RESTARTS}).`);
       this.resume = resume;
@@ -5178,9 +5663,14 @@ var NoticeCenter = class {
       timer.unref?.();
     } else if (wasReady) this.options.log("Avis : la fen\xEAtre s'est arr\xEAt\xE9e ; elle red\xE9marrera au prochain conseil.");
   }
-  /** La bannière ne peut pas tourner sur ce poste : on passe à l'ancienne fenêtre à bordure, et on le dit. */
-  fallBackToClassic(reason) {
-    this.options.log(`Avis : ${reason} ; retour \xE0 l'ancienne fen\xEAtre.`);
+  /** Cette fenêtre ne peut pas tourner sur ce poste : on passe à son secours (île → bannière → ancienne fenêtre), et on le dit. */
+  fallBack(reason) {
+    const next = FALLBACK[this.window];
+    if (!next) {
+      this.giveUp(reason);
+      return;
+    }
+    this.options.log(`Avis : ${reason} ; ${next === "banniere" ? "retour \xE0 la banni\xE8re" : "retour \xE0 l'ancienne fen\xEAtre"}.`);
     if (this.startTimer) clearTimeout(this.startTimer);
     const host = this.host;
     this.host = null;
@@ -5192,15 +5682,21 @@ var NoticeCenter = class {
       } catch {
       }
     }
-    this.window = "classique";
+    this.failed.add(this.window);
+    this.window = next;
     const entry = this.resume ?? this.lastEntry;
     this.resume = null;
+    if (next === "banniere") {
+      this.ensureHost();
+      if (entry && !entry.quiet) this.show(entry);
+      return;
+    }
     if (entry && !entry.quiet) this.show(entry);
   }
   /** Plus aucune fenêtre ne peut tourner sur ce poste : la notification Windows prend le relais, et on le dit. */
   giveUp(reason) {
-    if (this.window === "banniere" && !this.broken) {
-      this.fallBackToClassic(`la banni\xE8re ne d\xE9marre pas (${reason})`);
+    if (this.banner && !this.broken) {
+      this.fallBack(`${this.window === "ile" ? "l'\xEEle" : "la banni\xE8re"} ne d\xE9marre pas (${reason})`);
       return;
     }
     if (this.broken) return;
@@ -5219,6 +5715,26 @@ var NoticeCenter = class {
     if (this.lastEntry) this.options.legacyShow(legacyContentOf(this.lastEntry, 15));
   }
 };
+function islandPageUrl(serverUrl) {
+  return `${serverUrl.replace(/\/$/, "")}/poste/ile`;
+}
+var INLINE_IMAGE_MAX_BYTES = 6e5;
+function withInlineImages(entry, read = (path) => (0, import_node_fs5.readFileSync)(path)) {
+  return {
+    ...entry,
+    items: entry.items.map((item) => {
+      if (!item.image || item.image.startsWith("data:")) return item;
+      try {
+        const bytes = read(item.image);
+        const kind = sniff(bytes);
+        if (!kind || bytes.length > INLINE_IMAGE_MAX_BYTES) return { ...item, image: "" };
+        return { ...item, image: `data:image/${kind === "jpg" ? "jpeg" : "png"};base64,${Buffer.from(bytes).toString("base64")}` };
+      } catch {
+        return { ...item, image: "" };
+      }
+    })
+  };
+}
 
 // agent/src/scan-queue.ts
 function createScanQueue(send) {
@@ -5280,11 +5796,11 @@ function resolveInstallCode(input) {
 }
 
 // agent/src/status.ts
-var import_node_fs5 = require("node:fs");
-var import_node_path5 = require("node:path");
+var import_node_fs6 = require("node:fs");
+var import_node_path6 = require("node:path");
 var STATUS_FILE_NAME = "pharmaboost-statut.json";
 function statusFilePath(configPath) {
-  return (0, import_node_path5.join)((0, import_node_path5.dirname)(configPath), STATUS_FILE_NAME);
+  return (0, import_node_path6.join)((0, import_node_path6.dirname)(configPath), STATUS_FILE_NAME);
 }
 function stateForFailure(error) {
   const message = error instanceof Error ? error.message : String(error);
@@ -5293,16 +5809,16 @@ function stateForFailure(error) {
 function writeStatus(configPath, status) {
   const target = statusFilePath(configPath);
   try {
-    (0, import_node_fs5.mkdirSync)((0, import_node_path5.dirname)(target), { recursive: true });
+    (0, import_node_fs6.mkdirSync)((0, import_node_path6.dirname)(target), { recursive: true });
     const temporary = `${target}.tmp`;
-    (0, import_node_fs5.writeFileSync)(temporary, JSON.stringify(status));
-    (0, import_node_fs5.renameSync)(temporary, target);
+    (0, import_node_fs6.writeFileSync)(temporary, JSON.stringify(status));
+    (0, import_node_fs6.renameSync)(temporary, target);
   } catch {
   }
 }
 
 // agent/src/robot.ts
-var import_node_fs6 = require("node:fs");
+var import_node_fs7 = require("node:fs");
 function compileRobotPattern(pattern) {
   if (!pattern.trim()) return { ok: false, error: "Indiquez l'expression qui d\xE9signe le code produit." };
   let regex;
@@ -5347,14 +5863,14 @@ function startRobotJournal(config, handlers) {
   let announcedMissing = false;
   const poll = () => {
     try {
-      if (!(0, import_node_fs6.existsSync)(config.path)) {
+      if (!(0, import_node_fs7.existsSync)(config.path)) {
         if (!announcedMissing) handlers.onStatus(`Robot : le fichier ${config.path} n'existe pas (encore).`);
         announcedMissing = true;
         offset = null;
         return;
       }
       announcedMissing = false;
-      const size = (0, import_node_fs6.statSync)(config.path).size;
+      const size = (0, import_node_fs7.statSync)(config.path).size;
       if (offset === null) {
         offset = size;
         handlers.onStatus(`Robot : lecture de ${config.path} \xE0 partir de maintenant.`);
@@ -5364,11 +5880,11 @@ function startRobotJournal(config, handlers) {
       if (size === offset) return;
       const length = Math.min(size - offset, MAX_READ_BYTES);
       const buffer = Buffer.alloc(length);
-      const fd = (0, import_node_fs6.openSync)(config.path, "r");
+      const fd = (0, import_node_fs7.openSync)(config.path, "r");
       try {
-        (0, import_node_fs6.readSync)(fd, buffer, 0, length, offset);
+        (0, import_node_fs7.readSync)(fd, buffer, 0, length, offset);
       } finally {
-        (0, import_node_fs6.closeSync)(fd);
+        (0, import_node_fs7.closeSync)(fd);
       }
       offset += length;
       const at = Date.now();
@@ -5403,15 +5919,15 @@ var CrossSourceDedupe = class {
 function dryRunRobotFile(path, pattern, maxBytes = 5 * 1024 * 1024) {
   const compiled = compileRobotPattern(pattern);
   if (!compiled.ok) return compiled;
-  if (!(0, import_node_fs6.existsSync)(path)) return { ok: false, error: `Le fichier ${path} n'existe pas.` };
-  const size = (0, import_node_fs6.statSync)(path).size;
+  if (!(0, import_node_fs7.existsSync)(path)) return { ok: false, error: `Le fichier ${path} n'existe pas.` };
+  const size = (0, import_node_fs7.statSync)(path).size;
   const length = Math.min(size, maxBytes);
   const buffer = Buffer.alloc(length);
-  const fd = (0, import_node_fs6.openSync)(path, "r");
+  const fd = (0, import_node_fs7.openSync)(path, "r");
   try {
-    (0, import_node_fs6.readSync)(fd, buffer, 0, length, size - length);
+    (0, import_node_fs7.readSync)(fd, buffer, 0, length, size - length);
   } finally {
-    (0, import_node_fs6.closeSync)(fd);
+    (0, import_node_fs7.closeSync)(fd);
   }
   const lines = buffer.toString("latin1").split(/\r?\n/);
   const codes = [];
@@ -5420,8 +5936,8 @@ function dryRunRobotFile(path, pattern, maxBytes = 5 * 1024 * 1024) {
 }
 
 // agent/src/robot-lgpi.ts
-var import_node_fs7 = require("node:fs");
-var import_node_path6 = require("node:path");
+var import_node_fs8 = require("node:fs");
+var import_node_path7 = require("node:path");
 
 // agent/src/journal-line.ts
 var JOURNAL_DIRS = ["C:\\var\\log\\lgpi\\application", "D:\\var\\log\\lgpi\\application", "C:\\var\\log\\lgpi", "D:\\var\\log\\lgpi"];
@@ -5510,16 +6026,16 @@ function journalName(date) {
   return `lgpi.${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}.log`;
 }
 function findJournalDir(dirs) {
-  return dirs.find((dir) => (0, import_node_fs7.existsSync)(dir)) ?? null;
+  return dirs.find((dir) => (0, import_node_fs8.existsSync)(dir)) ?? null;
 }
 function readChunk(path, offset, size) {
   const length = Math.min(size - offset, MAX_READ_BYTES2);
   const buffer = Buffer.alloc(length);
-  const fd = (0, import_node_fs7.openSync)(path, "r");
+  const fd = (0, import_node_fs8.openSync)(path, "r");
   try {
-    (0, import_node_fs7.readSync)(fd, buffer, 0, length, offset);
+    (0, import_node_fs8.readSync)(fd, buffer, 0, length, offset);
   } finally {
-    (0, import_node_fs7.closeSync)(fd);
+    (0, import_node_fs8.closeSync)(fd);
   }
   return buffer;
 }
@@ -5538,7 +6054,7 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
   const drain = (path, from) => {
     let offset = from;
     for (; ; ) {
-      const size = (0, import_node_fs7.statSync)(path).size;
+      const size = (0, import_node_fs8.statSync)(path).size;
       if (size < offset) offset = 0;
       if (size === offset) return offset;
       const buffer = readChunk(path, offset, size);
@@ -5556,27 +6072,27 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
         announcedMissing = true;
         return;
       }
-      const today = (0, import_node_path6.join)(dir, journalName(new Date(now)));
+      const today = (0, import_node_path7.join)(dir, journalName(new Date(now)));
       if (!current2) {
-        if (!(0, import_node_fs7.existsSync)(today)) {
+        if (!(0, import_node_fs8.existsSync)(today)) {
           if (!announcedMissing) handlers.onStatus(`Robot : le journal du jour de LGPI n'existe pas (encore) dans ${dir}.`);
           announcedMissing = true;
           firstPass = false;
           return;
         }
         announcedMissing = false;
-        const offset = firstPass ? (0, import_node_fs7.statSync)(today).size : 0;
+        const offset = firstPass ? (0, import_node_fs8.statSync)(today).size : 0;
         current2 = { path: today, offset };
         firstPass = false;
         handlers.onStatus(`Robot : suivi du journal de LGPI ${journalName(new Date(now))}${offset === 0 ? "" : " \xE0 partir de maintenant"}.`);
         if (offset === 0) current2.offset = drain(today, 0);
-      } else if (current2.path !== today && (0, import_node_fs7.existsSync)(today)) {
-        if ((0, import_node_fs7.existsSync)(current2.path)) drain(current2.path, current2.offset);
+      } else if (current2.path !== today && (0, import_node_fs8.existsSync)(today)) {
+        if ((0, import_node_fs8.existsSync)(current2.path)) drain(current2.path, current2.offset);
         lines = new LineBuffer();
         current2 = { path: today, offset: 0 };
         handlers.onStatus(`Robot : nouveau journal du jour ${journalName(new Date(now))}.`);
         current2.offset = drain(today, 0);
-      } else if ((0, import_node_fs7.existsSync)(current2.path)) {
+      } else if ((0, import_node_fs8.existsSync)(current2.path)) {
         current2.offset = drain(current2.path, current2.offset);
       }
       announce(reader.flush(now), now);
@@ -5590,25 +6106,25 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
 }
 
 // agent/src/index.ts
-var import_node_fs8 = require("node:fs");
+var import_node_fs9 = require("node:fs");
 var import_node_os = require("node:os");
-var import_node_path7 = require("node:path");
-var VERSION = "0.9.4";
-var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path7.join)(process.cwd(), "pharmaboost-connect.json");
-var LOG_PATH = (0, import_node_path7.join)((0, import_node_path7.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
+var import_node_path8 = require("node:path");
+var VERSION = "0.10.0";
+var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path8.join)(process.cwd(), "pharmaboost-connect.json");
+var LOG_PATH = (0, import_node_path8.join)((0, import_node_path8.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
 var SETTLE_MS = 1e4;
 var CHECK_MS = 3e4;
-var DEFAULT_EXPORT = process.platform === "win32" ? "C:\\PharmaBoost\\Export" : (0, import_node_path7.join)(process.cwd(), "export");
+var DEFAULT_EXPORT = process.platform === "win32" ? "C:\\PharmaBoost\\Export" : (0, import_node_path8.join)(process.cwd(), "export");
 var DEFAULT_SCANS = process.platform === "win32" ? "C:\\PharmaBoost\\Ordonnances" : null;
 var notice = null;
 function log(message) {
   const line = `${(/* @__PURE__ */ new Date()).toISOString()} ${message}`;
   console.log(line);
   try {
-    (0, import_node_fs8.mkdirSync)((0, import_node_path7.dirname)(LOG_PATH), { recursive: true });
-    if ((0, import_node_fs8.existsSync)(LOG_PATH) && (0, import_node_fs8.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs8.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
-    (0, import_node_fs8.appendFileSync)(LOG_PATH, `${line}
+    (0, import_node_fs9.mkdirSync)((0, import_node_path8.dirname)(LOG_PATH), { recursive: true });
+    if ((0, import_node_fs9.existsSync)(LOG_PATH) && (0, import_node_fs9.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs9.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
+    (0, import_node_fs9.appendFileSync)(LOG_PATH, `${line}
 `);
   } catch {
   }
@@ -5622,12 +6138,12 @@ function arg(name) {
   return i >= 0 ? process.argv[i + 1] : void 0;
 }
 function readConfig() {
-  if (!(0, import_node_fs8.existsSync)(CONFIG_PATH)) return null;
-  return JSON.parse((0, import_node_fs8.readFileSync)(CONFIG_PATH, "utf8"));
+  if (!(0, import_node_fs9.existsSync)(CONFIG_PATH)) return null;
+  return JSON.parse((0, import_node_fs9.readFileSync)(CONFIG_PATH, "utf8"));
 }
 function writeConfig(config) {
-  (0, import_node_fs8.mkdirSync)((0, import_node_path7.dirname)(CONFIG_PATH), { recursive: true });
-  (0, import_node_fs8.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
+  (0, import_node_fs9.mkdirSync)((0, import_node_path8.dirname)(CONFIG_PATH), { recursive: true });
+  (0, import_node_fs9.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 async function api(config, path, init) {
   return fetch(`${config.serverUrl.replace(/\/$/, "")}${path}`, {
@@ -5724,11 +6240,11 @@ async function checkForUpdate(config, scans) {
   restartWhenIdle = true;
   log("Elle prendra effet d\xE8s qu'aucune vente n'est en cours.");
 }
-var IMAGES_DIR = (0, import_node_path7.join)((0, import_node_path7.dirname)(CONFIG_PATH), "avis-images");
+var IMAGES_DIR = (0, import_node_path8.join)((0, import_node_path8.dirname)(CONFIG_PATH), "avis-images");
 var notices = new NoticeCenter({
-  configDir: (0, import_node_path7.dirname)(CONFIG_PATH),
+  configDir: (0, import_node_path8.dirname)(CONFIG_PATH),
   log: (message) => log(message),
-  legacyShow: (content) => showToast((0, import_node_path7.dirname)(CONFIG_PATH), content, log),
+  legacyShow: (content) => showToast((0, import_node_path8.dirname)(CONFIG_PATH), content, log),
   onAction: (action) => {
     void handleAction(action);
   }
@@ -5740,7 +6256,10 @@ function applyDisplayPreferences(config) {
     // Sans réglage du poste, chaque fenêtre garde sa place par défaut : la bannière en haut à droite, l'ancienne fenêtre à mi-hauteur.
     ...wanted?.position && POSITIONS.includes(wanted.position) ? { position: wanted.position } : {},
     legacy: wanted?.ancienne === true,
-    window: wanted?.fenetre === "classique" ? "classique" : "banniere"
+    // L'île par défaut ; « banniere » (GDI+) ou « classique » restent possibles en une ligne de configuration.
+    window: wanted?.fenetre === "classique" ? "classique" : wanted?.fenetre === "banniere" ? "banniere" : "ile",
+    serverUrl: config.serverUrl,
+    postLabel: config.postLabel ?? ""
   });
 }
 var SESSION_MAX_MS = 3 * 60 * 6e4;
@@ -5901,7 +6420,7 @@ async function runPost(config) {
     scans.push({ code, scannedAt: new Date(at).toISOString() });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
-  startDouchette((0, import_node_path7.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
+  startDouchette((0, import_node_path8.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
   const robotHandlers = { onScan: accept("robot"), onStatus: (message) => log(message) };
   const robot = config.robot ?? (process.platform === "win32" ? { kind: "lgpi" } : void 0);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);
@@ -5993,6 +6512,25 @@ function setRobotLgpi(on) {
   console.log(on ? "Suivi du robot (journal de LGPI) allum\xE9." : "Suivi du robot \xE9teint.");
   console.log("Quittez PharmaBoost (ic\xF4ne pr\xE8s de l'horloge) puis relancez-le.");
 }
+var SAMPLE_ENTRY = {
+  id: "essai",
+  reference: "ESSAI",
+  label: "M\xE9dicament d\xE9tect\xE9",
+  subject: "DOLIPRANE 1000 mg \xB7 AMOXICILLINE 1 g",
+  url: "https://pharmaboost.app/vente/nouvelle",
+  signature: "essai",
+  quiet: false,
+  emailSaved: false,
+  emailError: "",
+  alerts: [],
+  notes: [],
+  questions: [{ node: "why", text: "Pourquoi le patient prend-il DOLIPRANE 1000 mg ?", multi: true, choices: [{ key: "FEVER", label: "Fi\xE8vre", selected: false }, { key: "HEADACHE", label: "Mal de t\xEAte", selected: false }, { key: "PAIN", label: "Douleur localis\xE9e", selected: true }, { key: "OTHER", label: "Autre raison", selected: false }] }],
+  guidance: [],
+  items: [
+    { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 g\xE9lules", price: "14,90 \u20AC", reason: "Prot\xE9ger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
+    { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "S\xC9RUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 \u20AC", reason: "", availability: "LOW_STOCK", quantity: "3", image: "" }
+  ]
+};
 function testAffichage() {
   let config = null;
   try {
@@ -6000,25 +6538,7 @@ function testAffichage() {
   } catch {
   }
   if (config) applyDisplayPreferences(config);
-  const entry = {
-    id: "essai",
-    reference: "ESSAI",
-    label: "M\xE9dicament d\xE9tect\xE9",
-    subject: "DOLIPRANE 1000 mg \xB7 AMOXICILLINE 1 g",
-    url: `${config?.serverUrl.replace(/\/$/, "") ?? "https://pharmaboost.app"}/vente/nouvelle`,
-    signature: "essai",
-    quiet: false,
-    emailSaved: false,
-    emailError: "",
-    alerts: [],
-    notes: [],
-    questions: [{ node: "why", text: "Pourquoi le patient prend-il DOLIPRANE 1000 mg ?", multi: true, choices: [{ key: "FEVER", label: "Fi\xE8vre", selected: false }, { key: "HEADACHE", label: "Mal de t\xEAte", selected: false }, { key: "PAIN", label: "Douleur localis\xE9e", selected: true }, { key: "OTHER", label: "Autre raison", selected: false }] }],
-    guidance: [],
-    items: [
-      { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 g\xE9lules", price: "14,90 \u20AC", reason: "Prot\xE9ger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
-      { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "S\xC9RUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 \u20AC", reason: "", availability: "LOW_STOCK", quantity: "3", image: "" }
-    ]
-  };
+  const entry = { ...SAMPLE_ENTRY, url: `${config?.serverUrl.replace(/\/$/, "") ?? "https://pharmaboost.app"}/vente/nouvelle` };
   notices.show(entry);
   console.log("La banni\xE8re PharmaBoost doit appara\xEEtre en haut \xE0 droite de l'\xE9cran, avec une vente d'exemple (d\xE9pla\xE7able \xE0 la souris).");
   console.log("Elle reste ouverte : essayez \xAB Vendu \xBB, \xAB Non vendu \xBB, les petits boutons du haut (verrouiller, r\xE9duire, masquer). Rien n'est envoy\xE9.");
@@ -6027,9 +6547,34 @@ function testAffichage() {
     process.exit(0);
   }, 75e3);
 }
+function testIle() {
+  let config = null;
+  try {
+    config = readConfig();
+  } catch {
+  }
+  if (config) applyDisplayPreferences(config);
+  notices.configure({ window: "ile", serverUrl: arg("serveur") ?? config?.serverUrl ?? "https://pharmaboost.app" });
+  log(`Essai de l'\xEEle \u2014 PharmaBoost Connect ${VERSION}, Windows ${process.arch}. Fen\xEAtre demand\xE9e : \xEEle.`);
+  notices.warmUp();
+  setTimeout(() => {
+    log(`Fen\xEAtre en service : ${notices.currentWindow()}. Scan d'exemple\u2026`);
+    notices.scanning();
+  }, 6e3);
+  setTimeout(() => notices.show({ ...SAMPLE_ENTRY, url: `${config?.serverUrl.replace(/\/$/, "") ?? "https://pharmaboost.app"}/vente/nouvelle` }), 9e3);
+  setTimeout(() => {
+    log(`Fen\xEAtre en service : ${notices.currentWindow()}. \xAB Vente termin\xE9e \xBB d'exemple\u2026`);
+    notices.done({ id: "essai", title: "Vente termin\xE9e \u2014 r\xE9sultats enregistr\xE9s", lines: ["1 vendu \xB7 1 non vendu \xB7 0 sans r\xE9ponse", "\u2713 Bilan envoy\xE9 au patient."], badge: "3e conseil vendu aujourd'hui", warning: false });
+  }, 4e4);
+  setTimeout(() => {
+    log(`Fin de l'essai. Fen\xEAtre en service : ${notices.currentWindow()}.`);
+    notices.stop();
+    process.exit(0);
+  }, 6e4);
+}
 function testDouchette() {
   console.log("Passez une bo\xEEte \xE0 la douchette. Chaque code lu s'affiche ci-dessous. Ctrl+C pour arr\xEAter.");
-  startDouchette((0, import_node_path7.dirname)(CONFIG_PATH), {
+  startDouchette((0, import_node_path8.dirname)(CONFIG_PATH), {
     onScan: (code) => console.log(`${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR")}  BIP  ${code}`),
     onStatus: (message) => console.log(`  ${message}`)
   });
@@ -6043,7 +6588,7 @@ async function pair() {
   for (const dir of [exportPath, scansPath]) {
     if (dir) {
       try {
-        (0, import_node_fs8.mkdirSync)(dir, { recursive: true });
+        (0, import_node_fs9.mkdirSync)(dir, { recursive: true });
       } catch {
       }
     }
@@ -6059,19 +6604,19 @@ async function pair() {
   log(`Appair\xE9 avec ${body.pharmacyName ?? "l'officine"}. Configuration \xE9crite dans ${CONFIG_PATH}. Export surveill\xE9 : ${exportPath}${scansPath ? ` \u2014 scans : ${scansPath}` : ""}.`);
 }
 function latestExport(dir) {
-  if (!(0, import_node_fs8.existsSync)(dir)) return null;
-  const st = (0, import_node_fs8.statSync)(dir);
+  if (!(0, import_node_fs9.existsSync)(dir)) return null;
+  const st = (0, import_node_fs9.statSync)(dir);
   if (st.isFile()) return { path: dir, mtime: st.mtimeMs, size: st.size };
-  const files = (0, import_node_fs8.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
-    const s = (0, import_node_fs8.statSync)((0, import_node_path7.join)(dir, name));
-    return { path: (0, import_node_path7.join)(dir, name), mtime: s.mtimeMs, size: s.size };
+  const files = (0, import_node_fs9.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
+    const s = (0, import_node_fs9.statSync)((0, import_node_path8.join)(dir, name));
+    return { path: (0, import_node_path8.join)(dir, name), mtime: s.mtimeMs, size: s.size };
   }).sort((a, b) => b.mtime - a.mtime);
   return files[0] ?? null;
 }
 var lastStamp = null;
 async function syncStock(config, force) {
   if (!config.exportPath) return config;
-  if (!(0, import_node_fs8.existsSync)(config.exportPath)) {
+  if (!(0, import_node_fs9.existsSync)(config.exportPath)) {
     setNotice(`Le dossier d'export ${config.exportPath} n'existe pas sur ${(0, import_node_os.hostname)()}.`);
     return config;
   }
@@ -6084,45 +6629,45 @@ async function syncStock(config, force) {
   const stamp = `${file.path}:${file.mtime}:${file.size}`;
   if (!force && stamp === lastStamp) return config;
   lastStamp = stamp;
-  const bytes = (0, import_node_fs8.readFileSync)(file.path);
-  const hash = (0, import_node_crypto3.createHash)("sha256").update(bytes).digest("hex");
+  const bytes = (0, import_node_fs9.readFileSync)(file.path);
+  const hash = (0, import_node_crypto4.createHash)("sha256").update(bytes).digest("hex");
   if (hash === config.lastExportHash) {
     if (notice?.startsWith("Aucun export") || notice?.startsWith("Le dossier")) setNotice(null);
     return config;
   }
   const form = new FormData();
-  form.set("file", new Blob([bytes]), (0, import_node_path7.basename)(file.path));
+  form.set("file", new Blob([bytes]), (0, import_node_path8.basename)(file.path));
   const response = await api(config, "/api/agent/stock", { method: "POST", body: form });
   const body = await response.json().catch(() => ({}));
   if (!response.ok || !body.ok) {
-    setNotice(`Export refus\xE9 (${(0, import_node_path7.basename)(file.path)}) : ${body.error ?? `HTTP ${response.status}`}`);
+    setNotice(`Export refus\xE9 (${(0, import_node_path8.basename)(file.path)}) : ${body.error ?? `HTTP ${response.status}`}`);
     return config;
   }
   setNotice(null);
-  log(`Stock synchronis\xE9 : ${body.lines ?? "?"} ligne(s), ${body.created ?? 0} cr\xE9\xE9e(s), ${body.updated ?? 0} mise(s) \xE0 jour (${(0, import_node_path7.basename)(file.path)}).`);
+  log(`Stock synchronis\xE9 : ${body.lines ?? "?"} ligne(s), ${body.created ?? 0} cr\xE9\xE9e(s), ${body.updated ?? 0} mise(s) \xE0 jour (${(0, import_node_path8.basename)(file.path)}).`);
   return { ...config, lastExportHash: hash };
 }
 async function syncScans(config) {
-  if (!config.scansPath || !(0, import_node_fs8.existsSync)(config.scansPath)) return config;
+  if (!config.scansPath || !(0, import_node_fs9.existsSync)(config.scansPath)) return config;
   const sent = new Set(config.sentScans ?? []);
-  const files = (0, import_node_fs8.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path7.join)(config.scansPath, name), stat: (0, import_node_fs8.statSync)((0, import_node_path7.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
+  const files = (0, import_node_fs9.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path8.join)(config.scansPath, name), stat: (0, import_node_fs9.statSync)((0, import_node_path8.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
   let next = config;
   for (const { path, stat } of files) {
-    const key = `${(0, import_node_path7.basename)(path)}:${stat.size}`;
+    const key = `${(0, import_node_path8.basename)(path)}:${stat.size}`;
     if (sent.has(key)) continue;
-    const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path7.extname)(path).toLowerCase()] ?? "application/octet-stream";
+    const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path8.extname)(path).toLowerCase()] ?? "application/octet-stream";
     const form = new FormData();
-    form.set("file", new Blob([(0, import_node_fs8.readFileSync)(path)], { type: mime }), (0, import_node_path7.basename)(path));
+    form.set("file", new Blob([(0, import_node_fs9.readFileSync)(path)], { type: mime }), (0, import_node_path8.basename)(path));
     const response = await api(config, "/api/agent/prescriptions", { method: "POST", body: form });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.ok) {
-      log(`Scan refus\xE9 (${(0, import_node_path7.basename)(path)}) : ${body.error ?? `HTTP ${response.status}`}`);
+      log(`Scan refus\xE9 (${(0, import_node_path8.basename)(path)}) : ${body.error ?? `HTTP ${response.status}`}`);
       continue;
     }
     sent.add(key);
     next = { ...next, sentScans: [...sent].slice(-2e3) };
     writeConfig(next);
-    log(`Ordonnance envoy\xE9e : ${(0, import_node_path7.basename)(path)} \u2192 ${body.reference ?? "?"} (${body.lines ?? 0} ligne(s) lue(s)).`);
+    log(`Ordonnance envoy\xE9e : ${(0, import_node_path8.basename)(path)} \u2192 ${body.reference ?? "?"} (${body.lines ?? 0} ligne(s) lue(s)).`);
   }
   return next;
 }
@@ -6201,6 +6746,8 @@ if (arg("appairer")) {
   testDouchette();
 } else if (process.argv.includes("--test-affichage")) {
   testAffichage();
+} else if (process.argv.includes("--test-ile")) {
+  testIle();
 } else if (process.argv.includes("--version")) {
   console.log(VERSION);
 } else {

@@ -42,7 +42,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.9.4";
+const VERSION = "0.10.0";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -77,7 +77,7 @@ type Config = {
    */
   robot?: RobotConfig | LgpiRobotConfig | { kind: "aucun" };
   /** La fenêtre d'avis : où elle se pose (« milieu-droite » par défaut) et combien de secondes elle reste avant de se ranger. */
-  affichage?: { position?: NoticePosition; secondes?: number; ancienne?: boolean; fenetre?: "banniere" | "classique"; miseAJourAuto?: boolean };
+  affichage?: { position?: NoticePosition; secondes?: number; ancienne?: boolean; fenetre?: "ile" | "banniere" | "classique"; miseAJourAuto?: boolean };
 };
 
 /** Ce que l'agent constate et que PharmaBoost doit montrer ; vide quand tout va bien. */
@@ -261,7 +261,10 @@ function applyDisplayPreferences(config: Config): void {
     // Sans réglage du poste, chaque fenêtre garde sa place par défaut : la bannière en haut à droite, l'ancienne fenêtre à mi-hauteur.
     ...(wanted?.position && (POSITIONS as readonly string[]).includes(wanted.position) ? { position: wanted.position } : {}),
     legacy: wanted?.ancienne === true,
-    window: wanted?.fenetre === "classique" ? ("classique" as const) : ("banniere" as const),
+    // L'île par défaut ; « banniere » (GDI+) ou « classique » restent possibles en une ligne de configuration.
+    window: wanted?.fenetre === "classique" ? ("classique" as const) : wanted?.fenetre === "banniere" ? ("banniere" as const) : ("ile" as const),
+    serverUrl: config.serverUrl,
+    postLabel: config.postLabel ?? "",
   });
 }
 /** Une vente reste suivie, fenêtre ouverte, jusqu'à « Vente terminée » — avec un plafond de trois heures si on l'oublie. */
@@ -564,6 +567,27 @@ function setRobotLgpi(on: boolean): void {
   console.log("Quittez PharmaBoost (icône près de l'horloge) puis relancez-le.");
 }
 
+/** La vente d'exemple des essais d'affichage (aucune donnée réelle). */
+const SAMPLE_ENTRY: HostEntry = {
+  id: "essai",
+  reference: "ESSAI",
+  label: "Médicament détecté",
+  subject: "DOLIPRANE 1000 mg · AMOXICILLINE 1 g",
+  url: "https://pharmaboost.app/vente/nouvelle",
+  signature: "essai",
+  quiet: false,
+  emailSaved: false,
+  emailError: "",
+  alerts: [],
+  notes: [],
+  questions: [{ node: "why", text: "Pourquoi le patient prend-il DOLIPRANE 1000 mg ?", multi: true, choices: [{ key: "FEVER", label: "Fièvre", selected: false }, { key: "HEADACHE", label: "Mal de tête", selected: false }, { key: "PAIN", label: "Douleur localisée", selected: true }, { key: "OTHER", label: "Autre raison", selected: false }] }],
+  guidance: [],
+  items: [
+    { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
+    { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "", availability: "LOW_STOCK", quantity: "3", image: "" },
+  ],
+};
+
 /**
  * Essai de l'affichage : une vente d'exemple, sans bip ni serveur. Elle reste 75 secondes à l'écran ; les boutons
  * « Vendu » / « Non vendu » y changent d'aspect, mais rien n'est envoyé nulle part.
@@ -572,29 +596,32 @@ function testAffichage(): void {
   let config: Config | null = null;
   try { config = readConfig(); } catch { /* sans configuration lisible, l'essai garde les réglages par défaut */ }
   if (config) applyDisplayPreferences(config);
-  const entry: HostEntry = {
-    id: "essai",
-    reference: "ESSAI",
-    label: "Médicament détecté",
-    subject: "DOLIPRANE 1000 mg · AMOXICILLINE 1 g",
-    url: `${config?.serverUrl.replace(/\/$/, "") ?? "https://pharmaboost.app"}/vente/nouvelle`,
-    signature: "essai",
-    quiet: false,
-    emailSaved: false,
-    emailError: "",
-    alerts: [],
-    notes: [],
-    questions: [{ node: "why", text: "Pourquoi le patient prend-il DOLIPRANE 1000 mg ?", multi: true, choices: [{ key: "FEVER", label: "Fièvre", selected: false }, { key: "HEADACHE", label: "Mal de tête", selected: false }, { key: "PAIN", label: "Douleur localisée", selected: true }, { key: "OTHER", label: "Autre raison", selected: false }] }],
-    guidance: [],
-    items: [
-      { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
-      { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "", availability: "LOW_STOCK", quantity: "3", image: "" },
-    ],
-  };
+  const entry: HostEntry = { ...SAMPLE_ENTRY, url: `${config?.serverUrl.replace(/\/$/, "") ?? "https://pharmaboost.app"}/vente/nouvelle` };
   notices.show(entry);
   console.log("La bannière PharmaBoost doit apparaître en haut à droite de l'écran, avec une vente d'exemple (déplaçable à la souris).");
   console.log("Elle reste ouverte : essayez « Vendu », « Non vendu », les petits boutons du haut (verrouiller, réduire, masquer). Rien n'est envoyé.");
   setTimeout(() => { notices.stop(); process.exit(0); }, 75_000);
+}
+
+/**
+ * Essai de l'île (WebView2) sur ce poste, sans bip ni vente réelle : prépare le kit, ouvre l'île en haut de l'écran,
+ * joue un scan, une vente d'exemple avec deux conseils, puis « Vente terminée ». Tout ce qui se passe s'écrit ici (et
+ * dans le journal) ; si l'île ne peut pas tourner, on voit pourquoi et la bannière GDI+ prend sa place. Rien n'est envoyé.
+ */
+function testIle(): void {
+  let config: Config | null = null;
+  try { config = readConfig(); } catch { /* sans configuration, l'essai prend pharmaboost.app */ }
+  if (config) applyDisplayPreferences(config);
+  notices.configure({ window: "ile", serverUrl: arg("serveur") ?? config?.serverUrl ?? "https://pharmaboost.app" });
+  log(`Essai de l'île — PharmaBoost Connect ${VERSION}, Windows ${process.arch}. Fenêtre demandée : île.`);
+  notices.warmUp();
+  setTimeout(() => { log(`Fenêtre en service : ${notices.currentWindow()}. Scan d'exemple…`); notices.scanning(); }, 6000);
+  setTimeout(() => notices.show({ ...SAMPLE_ENTRY, url: `${config?.serverUrl.replace(/\/$/, "") ?? "https://pharmaboost.app"}/vente/nouvelle` }), 9000);
+  setTimeout(() => {
+    log(`Fenêtre en service : ${notices.currentWindow()}. « Vente terminée » d'exemple…`);
+    notices.done({ id: "essai", title: "Vente terminée — résultats enregistrés", lines: ["1 vendu · 1 non vendu · 0 sans réponse", "✓ Bilan envoyé au patient."], badge: "3e conseil vendu aujourd'hui", warning: false });
+  }, 40_000);
+  setTimeout(() => { log(`Fin de l'essai. Fenêtre en service : ${notices.currentWindow()}.`); notices.stop(); process.exit(0); }, 60_000);
 }
 
 /** Essai sans rien envoyer : chaque bip lu s'affiche à l'écran. Pour vérifier une installation. */
@@ -789,6 +816,8 @@ if (arg("appairer")) {
   testDouchette();
 } else if (process.argv.includes("--test-affichage")) {
   testAffichage();
+} else if (process.argv.includes("--test-ile")) {
+  testIle();
 } else if (process.argv.includes("--version")) {
   console.log(VERSION);
 } else {
