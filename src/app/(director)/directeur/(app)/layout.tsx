@@ -7,6 +7,7 @@ import { directorLogoutAction } from "@/server/actions/director-auth";
 import { Dropdown, DropdownLabel, DropdownSeparator } from "@/components/ui/dropdown";
 import { DIRECTOR_HOME } from "@/core/sales/director/nav";
 import { DirectorNav } from "./director-nav";
+import { Robot } from "@/components/robot";
 
 export const metadata: Metadata = {
   title: { default: "Direction commerciale — PharmaBoost", template: "%s · Direction commerciale" },
@@ -29,12 +30,13 @@ export default async function DirectorLayout({ children }: { children: ReactNode
     <div className="min-h-dvh bg-surface-app">
       <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-border-subtle bg-surface-card/95 backdrop-blur supports-[backdrop-filter]:bg-surface-card/85">
         <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-3 px-4 pt-3 pb-2 sm:px-6 sm:pb-0">
-          <Link href={DIRECTOR_HOME} className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
-            <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-[15px] font-semibold text-white">✚</span>
-            <span className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            {/* Le robot PharmaBoost, vivant : il salue, réagit au toucher (hors du lien pour ne pas ramener à l'accueil). */}
+            <Robot size={36} interactive listen greet="once" greetKey="directeur" label="Le robot PharmaBoost" className="shrink-0" />
+            <Link href={DIRECTOR_HOME} className="flex min-w-0 items-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
               <span className="block truncate text-[14px] leading-4 font-semibold text-text-primary">PharmaBoost · Direction commerciale</span>
-            </span>
-          </Link>
+            </Link>
+          </div>
           <Dropdown
             triggerLabel="Mon compte"
             trigger={<span className="flex size-8 items-center justify-center rounded-full bg-brand-100 text-[12px] font-semibold text-brand-800 dark:bg-brand-900 dark:text-brand-100">{session.director.initials}</span>}

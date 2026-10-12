@@ -55,7 +55,8 @@ describe("la coquille", () => {
 
   it("n'offre aucun lien vers la console, l'extranet ni l'application d'une officine", async () => {
     const html = await renderLayout();
-    const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
+    // Seuls les liens de navigation comptent : les références internes du dessin du robot n'en sont pas.
+    const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]).filter((href) => href.startsWith("/") || href.includes("://"));
     expect(hrefs.length).toBeGreaterThan(5);
     for (const href of hrefs) expect(href.startsWith("/directeur"), href).toBe(true);
     expect(html).not.toMatch(/recherche|search|patient|ordonnance/i);
