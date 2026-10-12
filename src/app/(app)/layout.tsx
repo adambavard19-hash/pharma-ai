@@ -8,6 +8,7 @@ import { Topbar } from "@/components/app/topbar";
 import { MobileNavProvider } from "@/components/app/mobile-nav";
 import { AppRobotCompanion } from "@/components/robot/app-companion";
 import { CounterLookProvider } from "@/components/robot/counter-look-context";
+import { RobotAlertsProvider } from "@/components/robot/robot-alerts";
 import { myComptoirRobot } from "@/server/services/comptoirs";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -21,6 +22,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <CounterLookProvider value={counterLook}>
+    {/* Ce que le robot signale (menu et coin de l'écran), par personne et par officine. */}
+    <RobotAlertsProvider viewerKey={`${session.scope.userId}:${session.scope.pharmacyId}`}>
     <MobileNavProvider>
       <div className="min-h-dvh bg-surface-app">
         <a href="#contenu" className="skip-link">
@@ -56,6 +59,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <AppRobotCompanion />
       </div>
     </MobileNavProvider>
+    </RobotAlertsProvider>
     </CounterLookProvider>
   );
 }

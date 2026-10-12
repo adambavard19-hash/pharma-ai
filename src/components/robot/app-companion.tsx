@@ -13,6 +13,7 @@ import { ROBOT_EVENT, type RobotSignal } from "./bus";
 import { Robot } from "./robot";
 import { RobotSoundToggle } from "./sound-toggle";
 import { dismissRobotTip, useDismissedTips } from "./tip-dismissal";
+import { AlertBadge, AlertBubble, useRobotAlerts } from "./robot-alerts";
 
 /**
  * Le petit robot compagnon du logiciel, posé en bas à droite de chaque page (sauf « Nouvelle vente », où le grand
@@ -60,6 +61,9 @@ export function AppRobotCompanion() {
   const [tips, setTips] = useState<RobotTip[] | null>(null);
   const [loading, setLoading] = useState(false);
   const dismissed = useDismissedTips();
+  // Ce que le robot signale (partagé avec le robot du menu) : prioritaire sur la phrase du moment.
+  const robotAlerts = useRobotAlerts();
+  const alerts = robotAlerts?.alerts ?? [];
 
   // Le fil : un bip, une analyse, une mise en garde, un conseil vendu.
   useEffect(() => {
@@ -140,11 +144,16 @@ export function AppRobotCompanion() {
   if (!allowed) return null;
 
   const tip = tips ? visibleTip(tips, new Set(dismissed)) : null;
-  const mood: RobotMood = signal?.mood ?? "idle";
+  const mood: RobotMood = signal?.mood ?? robotAlerts?.mood ?? "idle";
 
   return (
     <div className="no-print pointer-events-none fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 flex flex-col items-end gap-2">
-      {open && (
+      {open && robotAlerts && alerts.length > 0 && (
+        <div id="robot-compagnon-bulle" className="pointer-events-auto w-[min(20rem,calc(100vw-2rem))] origin-bottom-right">
+          <AlertBubble value={robotAlerts} onClose={() => setOpen(false)} className="rounded-br-md" />
+        </div>
+      )}
+      {open && alerts.length === 0 && (
         <div
           id="robot-compagnon-bulle"
           role="dialog"
@@ -201,7 +210,7 @@ export function AppRobotCompanion() {
         aria-label={mini ? "Afficher le robot PharmaBoost" : open ? "Fermer la bulle du robot" : "Ouvrir le robot PharmaBoost"}
         title={mini ? "Afficher le robot" : undefined}
         className={cn(
-          "rbt-arrive pointer-events-auto rounded-full focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none",
+          "rbt-arrive pointer-events-auto relative rounded-full focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none",
           mini && "flex size-11 items-center justify-center border border-border-subtle bg-surface-card shadow-md",
         )}
       >
@@ -218,6 +227,8 @@ export function AppRobotCompanion() {
             className="h-[60px] w-[50px] drop-shadow-[0_8px_14px_rgba(15,60,70,0.22)] sm:h-[68px] sm:w-[56px]"
           />
         )}
+        {/* Sur grand écran, le robot du menu porte déjà le compte. */}
+        <AlertBadge alerts={alerts} className="-top-1 -right-1 ring-surface-app lg:hidden" />
       </button>
     </div>
   );
