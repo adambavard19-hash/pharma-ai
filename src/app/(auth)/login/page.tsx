@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getInstallState } from "@/server/services/install-state";
 import { LoginForm } from "./login-form";
-import { PharmaLogo, PharmaWordmark } from "@/components/app/logo";
 import { ShieldCheck, Sparkles, Stethoscope } from "lucide-react";
 import { Alert } from "@/components/ui/feedback";
+import { AUTH_LINK_STRONG, HelixAuthLayout } from "@/components/app/helix/helix-auth-layout";
 
 export const metadata: Metadata = { title: "Connexion" };
 
@@ -30,84 +30,26 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const [install, { defini }] = await Promise.all([getInstallState(), searchParams]);
 
   return (
-    <main className="grid min-h-dvh lg:grid-cols-[1fr_minmax(0,52ch)]">
-      <section className="relative hidden flex-col justify-between overflow-hidden bg-brand-800 p-10 text-white lg:flex xl:p-14">
-        <div
-          className="absolute inset-0 opacity-[0.14]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 18% 22%, white 0, transparent 42%), radial-gradient(circle at 82% 78%, white 0, transparent 38%)",
-          }}
-          aria-hidden="true"
-        />
+    // L'espace pharmacie (globals.css : vert de marque, boutons en pilule, verre) et, en fond de toute la fenêtre,
+    // l'hélice d'ADN de Dantora qui suit la souris — le gabarit commun des pages d'accès.
+    <HelixAuthLayout
+      headline="Le copilote intelligent de l'officine."
+      lead="De l'ordonnance au conseil personnalisé : PharmaBoost assiste votre équipe, structure l'information remise au patient et mesure précisément ce que cela apporte à votre officine."
+      highlights={HIGHLIGHTS}
+      footnote="PharmaBoost est un outil d'assistance. Il ne prescrit pas et ne se substitue à aucun avis médical ou pharmaceutique."
+      cardTitle="Connexion à votre officine"
+      cardIntro="Accédez au comptoir, au catalogue et au pilotage de votre pharmacie."
+    >
+      {defini === "1" && <Alert tone="success">Mot de passe enregistré. Connectez-vous avec votre adresse e-mail et ce nouveau mot de passe.</Alert>}
 
-        <div className="relative flex items-center gap-2.5">
-          <PharmaLogo size={36} className="rounded-[10px]" />
-          <p className="text-[17px] font-semibold tracking-[-0.01em]">
-            Pharma<span className="text-accent-300">Boost</span>
-          </p>
-        </div>
+      <LoginForm install={install} initialError={null} />
 
-        <div className="relative max-w-lg space-y-8">
-          <div className="space-y-4">
-            <h1 className="text-[34px] leading-[1.15] font-bold tracking-[-0.025em] xl:text-[40px]">
-              Le copilote intelligent de l&apos;officine.
-            </h1>
-            <p className="text-[15px] leading-6 text-brand-100">
-              De l&apos;ordonnance au conseil personnalisé : PharmaBoost assiste votre
-              équipe, structure l&apos;information remise au patient et mesure
-              précisément ce que cela apporte à votre officine.
-            </p>
-          </div>
-
-          <ul className="space-y-5">
-            {HIGHLIGHTS.map((item) => (
-              <li key={item.title} className="flex gap-3.5">
-                <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/12 backdrop-blur">
-                  <item.icon className="size-[17px]" aria-hidden="true" />
-                </span>
-                <div className="space-y-0.5">
-                  <p className="text-[14px] font-medium">{item.title}</p>
-                  <p className="text-[13px] leading-5 text-brand-200">{item.body}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <p className="relative text-[12px] text-brand-300">
-          PharmaBoost est un outil d&apos;assistance. Il ne prescrit pas et ne se
-          substitue à aucun avis médical ou pharmaceutique.
-        </p>
-      </section>
-
-      <section className="flex flex-col justify-center px-6 py-12 sm:px-10 lg:px-12">
-        <div className="mx-auto w-full max-w-sm space-y-8">
-          <div className="space-y-6 lg:hidden">
-            <PharmaWordmark size={36} />
-          </div>
-
-          <div className="space-y-1.5">
-            <h2 className="text-[22px] font-semibold tracking-[-0.015em] text-text-primary">
-              Connexion à votre officine
-            </h2>
-            <p className="text-[13.5px] text-text-secondary">
-              Accédez au comptoir, au catalogue et au pilotage de votre pharmacie.
-            </p>
-          </div>
-
-          {defini === "1" && <Alert tone="success">Mot de passe enregistré. Connectez-vous avec votre adresse e-mail et ce nouveau mot de passe.</Alert>}
-
-          <LoginForm install={install} initialError={null} />
-
-          <p className="text-center text-[13.5px] text-text-secondary">
-            Votre titulaire ne vous a pas encore invité ?{" "}
-            <Link href="/rejoindre" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">
-              Rejoindre mon officine
-            </Link>
-          </p>
-        </div>
-      </section>
-    </main>
+      <p className="text-center text-[13.5px] text-text-secondary">
+        Votre titulaire ne vous a pas encore invité ?{" "}
+        <Link href="/rejoindre" className={AUTH_LINK_STRONG}>
+          Rejoindre mon officine
+        </Link>
+      </p>
+    </HelixAuthLayout>
   );
 }

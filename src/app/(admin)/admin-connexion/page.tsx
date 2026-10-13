@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getPlatformSession } from "@/server/auth/platform-session";
+import { Alert } from "@/components/ui/feedback";
+import { AdminAuthShell } from "./admin-auth-shell";
 import { PlatformLoginForm } from "./form";
 
 export const metadata: Metadata = { title: "Administration PharmaBoost" };
@@ -11,26 +13,12 @@ export default async function PlatformLoginPage({ searchParams }: { searchParams
   const { defini } = await searchParams;
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-ink-950 px-6 py-12">
-      <div className="w-full max-w-sm space-y-8">
-        <div className="space-y-2 text-center">
-          <span className="mx-auto flex size-11 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white">
-            ✚
-          </span>
-          <h1 className="text-[19px] font-bold text-ink-50">
-            Administration PharmaBoost
-          </h1>
-          <p className="text-[13px] leading-5 text-ink-400">
-            Espace réservé à l&apos;éditeur du logiciel. Aucun accès aux données médicales des
-            patients des officines clientes.
-          </p>
-        </div>
-
-        {defini === "1" && (
-          <p className="rounded-lg bg-success-700/20 px-3.5 py-3 text-center text-[13.5px] text-success-300">Mot de passe enregistré. Connectez-vous.</p>
-        )}
-        <PlatformLoginForm />
-      </div>
-    </main>
+    <AdminAuthShell
+      title="Administration PharmaBoost"
+      intro="Espace réservé à l'éditeur du logiciel. Aucun accès aux données médicales des patients des officines clientes."
+    >
+      {defini === "1" && <Alert tone="success">Mot de passe enregistré. Connectez-vous.</Alert>}
+      <PlatformLoginForm />
+    </AdminAuthShell>
   );
 }

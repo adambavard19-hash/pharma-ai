@@ -71,11 +71,11 @@ export function LinkTabs({
 
   return (
     <div className={cn("-mx-1 overflow-x-auto px-1 pb-1", className)}>
-      <div ref={listRef} className="relative inline-flex min-w-max items-center gap-0.5 rounded-xl border border-border-subtle bg-surface-sunken/70 p-1" role="tablist">
+      <div ref={listRef} className="relative inline-flex min-w-max items-center gap-0.5 rounded-(--ui-radius-tabs) border border-border-subtle bg-surface-sunken/70 p-1" role="tablist">
         {indicator && (
           <span
             aria-hidden="true"
-            className="absolute top-1 bottom-1 left-0 rounded-lg bg-surface-card shadow-sm ring-1 ring-border-subtle transition-[transform,width] duration-200 ease-out"
+            className="absolute top-1 bottom-1 left-0 rounded-(--ui-radius-tab) bg-surface-card shadow-sm ring-1 ring-border-subtle transition-[transform,width] duration-200 ease-out"
             style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width }}
           />
         )}
@@ -95,7 +95,7 @@ export function LinkTabs({
               role="tab"
               aria-selected={isActive}
               className={cn(
-                "relative z-10 flex h-9 items-center gap-2 rounded-lg px-3.5 text-[13.5px] font-medium whitespace-nowrap transition-colors duration-150",
+                "relative z-10 flex h-9 items-center gap-2 rounded-(--ui-radius-tab) px-3.5 text-[13.5px] font-medium whitespace-nowrap transition-colors duration-150",
                 "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-500",
                 isActive
                   ? cn("text-brand-800 dark:text-brand-300", !indicator && "bg-surface-card shadow-sm")

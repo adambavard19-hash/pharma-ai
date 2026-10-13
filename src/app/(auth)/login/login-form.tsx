@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { AlertCircle, LogIn, Terminal } from "lucide-react";
+import { AlertCircle, Terminal } from "lucide-react";
 import { loginAction } from "@/server/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
@@ -112,7 +112,7 @@ export function LoginForm({
           size="lg"
           className="w-full"
           loading={pending}
-          leadingIcon={pending ? undefined : <LogIn className="size-[18px]" />}
+          arrow
         >
           Se connecter
         </Button>

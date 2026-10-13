@@ -28,8 +28,9 @@ describe("pied de page « Ne plus recevoir ces offres »", () => {
   it("sans l'option, la sortie est identique à celle d'avant son ajout (empreintes relevées avant la modification)", () => {
     const out = renderEmail(ctx, content);
     // Si le gabarit change volontairement, ces deux empreintes se mettent à jour : elles prouvent que l'option n'a rien déplacé.
+    // (13 oct. 2026 : empreinte HTML relevée après l'ajout du bandeau de l'hélice d'ADN en tête ; le texte n'a pas bougé.)
     expect(sha(out.text)).toBe("ae21432685980ec74ab708469e7dd41a879bb141dabbc7a8318acd9eeed4c4cc");
-    expect(sha(out.html)).toBe("25470e386392d3a8c4ca4e40bd797f38bb1ef904ffb4e7dd2fdd9225f4950944");
+    expect(sha(out.html)).toBe("b075780855426cc6e8405a1803deb38401936fe99b9b28e413fd51e116e7bee4");
   });
 
   it("une option absente, nulle ou vide ne change rien", () => {

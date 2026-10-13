@@ -5,7 +5,6 @@ import { fr, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
 import { HERO_ITEMS, HeroVisual, QuestionVisual, RequestVisual, StockMarginVisual, TeamVisual, ExampleTag } from "./_components/visuals";
 import { BannerPillsInline } from "./_components/banner-mock";
 import { VideoButton } from "./_components/video-dialog";
-import { HeroRobot } from "./_components/hero-robot";
 import { CounterIslandScene } from "@/components/island/counter-island-scene";
 import { VIGILANCE_RULES } from "@/core/ai/engines/vigilance";
 import { loadLiveProof } from "@/server/services/site-leads";
@@ -14,6 +13,7 @@ import { formatEuros } from "@/core/billing/subscription";
 import { PricingSection } from "./_components/pricing-section";
 import { EXAMPLES, FAQ, SAFETY, STOCK_POINTS, TEAM_POINTS } from "./_components/site-content";
 import { cn } from "@/lib/utils";
+import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 
 /**
  * Le site public. Peu de texte : des mots-clés, les vrais écrans, de l’air.
@@ -41,27 +41,29 @@ export default async function SitePage() {
   return (
     <>
       {/* ---- Accueil ------------------------------------------------- */}
-      <section id="accueil" className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,var(--color-border-subtle)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-border-subtle)_1px,transparent_1px)] [mask-image:radial-gradient(70%_70%_at_30%_30%,black,transparent_75%)] bg-[size:64px_64px] opacity-70"
-          aria-hidden="true"
-        />
-        <div className="mx-auto grid grid-cols-1 max-w-6xl items-center gap-14 px-5 pt-14 pb-16 md:pt-24 md:pb-24 lg:grid-cols-[1fr_1.05fr]">
+      {/* L'encre ADN de Dantora en fond du héros, comme sur la page de connexion : l'hélice à droite, son nuage qui déborde
+          derrière le texte et les visuels, déformée par la souris. La section remonte sous l'en-tête translucide (-mt-16)
+          pour que le fond commence en haut de la fenêtre ; `isolate` garde la couche (z-index négatif) dans la section.
+          Le fond menthe est celui de la scène : rien ne bouge quand elle apparaît, après la première peinture. `lazy` :
+          libérée à plus d'un écran de distance, elle ne coexiste jamais avec celle du bas de page. Sur téléphone, une
+          image fixe allégée. */}
+      <section id="accueil" className="relative isolate -mt-16 overflow-hidden bg-mint-50 pt-16 lg:flex lg:min-h-[min(100dvh,1000px)] lg:flex-col lg:justify-center dark:bg-transparent">
+        <HelixBackdrop framing="hero" position="contained" lazy lightWhenStill className="max-lg:opacity-70" />
+        {/* Le bas du héros se fond dans la page (pas de coupure nette de l'encre sur la section suivante). */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-32 bg-gradient-to-b from-transparent to-surface-app dark:hidden" aria-hidden="true" />
+        <div className="mx-auto grid w-full grid-cols-1 max-w-6xl items-center gap-14 px-5 pt-14 pb-16 md:pt-24 md:pb-24 lg:grid-cols-[1fr_1.05fr]">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-3 py-1.5 text-[13px] font-medium text-text-secondary">
+            <p className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-3 py-1.5 text-[13px] font-medium text-text-secondary backdrop-blur-md dark:border-border-subtle dark:bg-surface-card">
               <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
             </p>
-            {/* Le robot au centre : grand, à côté du titre, il salue, suit la souris des yeux et parle dans sa bulle. */}
-            <div className="mt-5 flex items-end justify-between gap-2 sm:gap-6 lg:mt-4">
-              <h1 className="pb-1 text-[50px] leading-[0.98] font-bold tracking-[-0.04em] text-text-primary min-[390px]:text-[54px] md:text-[80px]">
-                Scan.
-                <br />
-                Conseil.
-                <br />
-                <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Bilan.</span>
-              </h1>
-              <HeroRobot className="shrink-0" />
-            </div>
+            {/* Le robot vit désormais à côté du nom « PharmaBoost », dans l'en-tête : le titre se lit seul. */}
+            <h1 className="mt-5 pb-1 text-[50px] leading-[0.98] font-bold tracking-[-0.04em] text-text-primary min-[390px]:text-[54px] md:text-[80px] lg:mt-4">
+              Scan.
+              <br />
+              Conseil.
+              <br />
+              <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Bilan.</span>
+            </h1>
             <p className="mt-7 max-w-xl text-[17px] leading-7 text-text-secondary">
               Au comptoir, vous scannez les boîtes comme d&apos;habitude. La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller en plus, pris dans votre rayon. Et le patient repart avec ses conseils.
             </p>
@@ -70,7 +72,7 @@ export default async function SitePage() {
               <VideoButton tone="brand" />
             </div>
           </div>
-          <HeroVisual />
+          <HeroVisual glass />
         </div>
       </section>
 
@@ -80,7 +82,8 @@ export default async function SitePage() {
           <SectionHead kicker="Au comptoir" title="Une petite île, à côté de votre logiciel.">
             Notre robot y vit : il attend votre prochain scan, coche son analyse, montre les conseils pris dans votre rayon, rappelle les mises en garde — comme les minéraux à prendre à distance d&apos;une cycline — et reste là jusqu&apos;à la fin de la vente. Elle ne prend jamais la main sur votre logiciel de gestion.
           </SectionHead>
-          <div className="mt-10">
+          {/* Réduite d'un cinquième à partir de la tablette (`zoom` : tout rétrécit ensemble, rien n'est coupé), centrée. */}
+          <div className="mx-auto mt-10 max-w-[1100px] md:[zoom:0.78]">
             <CounterIslandScene framed items={HERO_ITEMS} drug={HERO_DRUG} alert={heroAlert()} />
           </div>
           {/* Pas « fidèle » : l'île n'a pas encore été vue dessinée sur un poste Windows. */}
@@ -262,16 +265,24 @@ export default async function SitePage() {
       </section>
 
       {/* ---- Appel final ---------------------------------------------- */}
-      <section id="appel-final" className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-        <div className="relative overflow-hidden rounded-[32px] border border-border-subtle bg-surface-card px-7 py-14 text-center sm:px-14">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_80%_at_50%_0%,var(--color-brand-100),transparent_70%)] opacity-70" aria-hidden="true" />
-          <div className="relative">
-            <Kicker className="justify-center">PharmaBoost</Kicker>
-            <h2 className="mx-auto mt-4 max-w-2xl text-[34px] leading-[1.05] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[48px]">Voyez-le sur votre comptoir.</h2>
-            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/decouvrir/demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white hover:bg-brand-700">
-                Réserver une démo <ArrowRight className="size-4" />
-              </Link>
+      {/* La seconde apparition de l'encre, sur grand écran seulement (comme le bloc Contact de Dantora) : la scène ne se
+          monte qu'à moins d'un écran de la vue et se démonte en s'éloignant — elle ne coexiste jamais avec celle du héros.
+          La carte, en verre dépoli, se range à gauche : l'hélice se tient à sa droite, son encre passe derrière. */}
+      <section id="appel-final" className="relative isolate overflow-hidden">
+        <HelixBackdrop framing="hero" position="contained" lazy desktopOnly className="max-lg:hidden" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 hidden h-32 bg-gradient-to-t from-transparent to-surface-app lg:block dark:hidden" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 hidden h-32 bg-gradient-to-b from-transparent to-surface-app lg:block dark:hidden" aria-hidden="true" />
+        <div className="mx-auto max-w-6xl px-5 py-20 md:py-28 lg:py-36">
+          <div className="relative overflow-hidden rounded-[32px] border border-border-subtle bg-surface-card px-7 py-14 text-center sm:px-14 lg:max-w-[38rem] lg:border-white/70 lg:text-left lg:bg-white/55 lg:backdrop-blur-xl dark:lg:border-border-subtle dark:lg:bg-surface-card">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_80%_at_50%_0%,var(--color-brand-100),transparent_70%)] opacity-70" aria-hidden="true" />
+            <div className="relative">
+              <Kicker className="justify-center lg:justify-start">PharmaBoost</Kicker>
+              <h2 className="mx-auto mt-4 max-w-2xl text-[34px] lg:mx-0 leading-[1.05] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[48px]">Voyez-le sur votre comptoir.</h2>
+              <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+                <Link href="/decouvrir/demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white hover:bg-brand-700">
+                  Réserver une démo <ArrowRight className="size-4" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>

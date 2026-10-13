@@ -12,7 +12,8 @@ type Tone =
 
 const TONES: Record<Tone, string> = {
   neutral:
-    "bg-ink-100 text-ink-700 dark:bg-ink-800 dark:text-ink-300 ring-ink-200 dark:ring-ink-700",
+    // Neutre d'origine partout ; verre dépoli (blanc à 60 %, anneau fin) dans l'espace pharmacie.
+    "bg-(--ui-badge-neutral-bg) text-ink-700 dark:bg-ink-800 dark:text-ink-300 ring-(--ui-badge-neutral-ring) dark:ring-ink-700",
   brand:
     "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300 ring-brand-200 dark:ring-brand-800",
   accent:

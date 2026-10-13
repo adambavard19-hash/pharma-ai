@@ -53,8 +53,9 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[320px] flex-col border-r border-border-subtle bg-surface-sidebar",
-          "transition-transform duration-250 lg:translate-x-0",
+          // Le verre dépoli (blanc à 80 %, flou 10 px) au-dessus du fond menthe de l'espace.
+          "fixed inset-y-0 left-0 z-40 flex w-[320px] flex-col border-r border-border-subtle bg-surface-sidebar backdrop-blur-[10px]",
+          "transition-transform duration-250 ease-[cubic-bezier(0.2,0,0,1)] lg:translate-x-0",
           // `invisible` et non `hidden` : la transition reste fluide, mais le
           // tiroir fermé sort du parcours de tabulation et de l'arbre
           // d'accessibilité. Sans cela, sur mobile, la première tabulation
@@ -119,14 +120,14 @@ export function Sidebar({
               aria-current={isNavItemActive(primary, pathname) ? "page" : undefined}
               className={cn(
                 // L'entrée principale, claire et élégante : fond doux de la teinte de marque, texte foncé, l'icône porte le vert.
-                "group relative flex h-11 items-center gap-2.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 text-sm font-semibold text-brand-900 transition-colors duration-150",
+                "group relative flex h-11 items-center gap-2.5 rounded-full border border-brand-200 bg-brand-50 pr-3 pl-1.5 text-sm font-semibold text-brand-900 transition-colors duration-150 ease-[cubic-bezier(0.2,0,0,1)]",
                 "hover:border-brand-300 hover:bg-brand-100",
                 "aria-[current=page]:border-brand-300 aria-[current=page]:bg-brand-100",
                 "dark:border-brand-800 dark:bg-brand-950/60 dark:text-brand-100 dark:hover:bg-brand-950 dark:aria-[current=page]:bg-brand-950",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
               )}
             >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-brand-gradient text-white shadow-xs">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-white shadow-xs">
                 <primary.icon className="size-4" aria-hidden="true" />
               </span>
               {primary.label}
@@ -140,7 +141,7 @@ export function Sidebar({
         <nav aria-label="Menu" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
           {groups.map((group, index) => (
             <div key={group.key} className={cn(index > 0 && "mt-4 border-t border-border-subtle pt-4")}>
-              <p className="px-3 pb-2 text-[11px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">{group.label}</p>
+              <p className="pb-surtitre px-3 pb-2 text-[11px]">{group.label}</p>
               <ul className="space-y-0.5">
                 {group.items.map((item) => (
                   <li key={item.href}>
@@ -159,7 +160,7 @@ export function Sidebar({
             onClick={closeNav}
             aria-current={pathname === "/support" || pathname.startsWith("/support/") ? "page" : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-md border px-2.5 py-2 text-sm transition-colors",
+              "flex items-center gap-3 rounded-full border px-3 py-2 text-sm transition-colors duration-150",
               pathname === "/support" || pathname.startsWith("/support/") ? "border-brand-200 bg-brand-100 font-medium text-brand-800 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300" : "border-border-default bg-surface-card text-text-primary hover:bg-surface-sunken",
             )}
           >
@@ -199,7 +200,7 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }
       aria-current={isActive ? "page" : undefined}
       aria-describedby={hintId}
       className={cn(
-        "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1 text-sm transition-colors duration-150",
+        "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1 text-sm transition-colors duration-150 ease-[cubic-bezier(0.2,0,0,1)]",
         "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-500",
         isActive
           ? "bg-brand-100/80 font-semibold text-brand-900 dark:bg-brand-950 dark:text-brand-200"

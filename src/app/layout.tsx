@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Google_Sans_Flex, Plus_Jakarta_Sans } from "next/font/google";
 import { ToastProvider } from "@/components/ui/toast";
 import { APP_NAME, APP_TAGLINE } from "@/config/constants";
 import "./globals.css";
@@ -13,6 +13,19 @@ const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin", "latin-ext"],
   display: "swap",
   variable: "--font-jakarta",
+});
+
+/**
+ * Google Sans Flex : la police de l'espace pharmacie seulement (src/app/(app), habillage « ESPACE PHARMACIE » de
+ * globals.css). Déclarée ici pour que sa variable vaille aussi dans ce qui s'ouvre hors de l'arbre (fenêtres, île) ;
+ * sans préchargement, le fichier n'est téléchargé que là où la police sert — jamais sur le site ni dans la console.
+ * Police variable : un fichier pour les graisses 300 (titres), 400 (texte), 500 (surtitres, noms) et 600.
+ */
+const googleSans = Google_Sans_Flex({
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+  preload: false,
+  variable: "--font-gsans",
 });
 
 export const metadata: Metadata = {
@@ -40,7 +53,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={jakarta.variable} suppressHydrationWarning>
+    <html lang="fr" className={`${jakarta.variable} ${googleSans.variable}`} suppressHydrationWarning>
       <body className="min-h-dvh antialiased">
         <ToastProvider>{children}</ToastProvider>
       </body>

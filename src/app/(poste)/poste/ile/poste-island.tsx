@@ -6,6 +6,7 @@ import type { HostEntry } from "../../../../../agent/src/notice-center";
 import { CounterIsland, type IslandAdvice } from "@/components/island/counter-island";
 import { STAGE_WIDTH } from "@/core/island/banner-flow";
 import { IslandShell, ISLAND_CSS } from "@/components/island/island-shell";
+import { IslandQuestions } from "@/components/island/island-questions";
 import { Robot } from "@/components/robot";
 import {
   adviceLink,
@@ -278,46 +279,20 @@ export function PosteIsland() {
         )}
 
         {showQuestions && entry && (
-          <IslandShell width={STAGE_WIDTH.advice} contentKey={`q-${entry.signature}`} label={T.questionTitle}>
-            <div className="px-3 pt-2.5 pb-3">
-              <div className="flex items-center gap-2.5">
-                {questionsOnly && <Robot size={30} mood="curious" look={view.look} label="Le robot PharmaBoost" />}
-                <div className="min-w-0">
-                  <p className="text-[13.5px] leading-[18px] font-semibold">{T.questionTitle}</p>
-                  <p className="truncate text-[12px] leading-4 text-white/60">{T.questionSub}</p>
-                </div>
-              </div>
-              {/* Hauteur bornée : les questions défilent dans l'île, le logiciel de gestion reste visible. */}
-              <div className="isl-scroll mt-2 max-h-[180px] space-y-2 overflow-y-auto overscroll-contain">
-                {questions.map((question) => (
-                  <div key={question.node} className="rounded-xl bg-white/[0.06] px-2.5 py-2">
-                    <p className="text-[12.5px] leading-[18px] text-white/90">{question.text}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {question.choices.map((choice) => (
-                        <button
-                          key={choice.key}
-                          type="button"
-                          onClick={() => word(questionWord(entry.id, question.node, choice.key))}
-                          className="h-7 rounded-full px-3 text-[12px] font-semibold transition-colors"
-                          style={choice.selected ? { background: C.accent, color: "#04261A" } : { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.9)" }}
-                        >
-                          {choice.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {entry.guidance.map((line) => (
-                  <p key={line} className="rounded-2xl px-3 py-2 text-[12.5px] leading-[18px]" style={{ background: "rgba(54,232,200,0.10)", color: "#BFF7EA" }}>{line}</p>
-                ))}
-              </div>
-              {questionsOnly && (
+          <IslandQuestions
+            questions={questions}
+            contentKey={`q-${entry.signature}`}
+            robot={questionsOnly ? <Robot size={30} mood="curious" look={view.look} label="Le robot PharmaBoost" /> : undefined}
+            guidance={entry.guidance}
+            onChoose={(node, choice) => word(questionWord(entry.id, node, choice))}
+            footer={
+              questionsOnly ? (
                 <button type="button" onClick={() => word(finishWord(entry.id))} className="mt-2 h-8 w-full rounded-xl text-[12.5px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
                   {T.finish}
                 </button>
-              )}
-            </div>
-          </IslandShell>
+              ) : undefined
+            }
+          />
         )}
 
         {island.stage === "email" && entry?.emailError && (

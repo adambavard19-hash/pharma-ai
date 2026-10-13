@@ -1,3 +1,4 @@
+import { PageTitle } from "@/components/ui/page-title";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Camera, Hourglass, History, Sparkles, Tag, Upload, type LucideIcon } from "lucide-react";
@@ -47,7 +48,7 @@ export default async function CatalogQualityPage() {
       </Button>
 
       <header className="space-y-1">
-        <h1 className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary">Qualité du catalogue</h1>
+        <PageTitle text="Qualité du catalogue" className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary" />
         <p className="text-[15px] leading-6 text-text-secondary">Ce qui rend les conseils plus justes. Aucun de ces sujets n&apos;est une rupture de stock : ces produits sont bien en rayon.</p>
       </header>
 

@@ -77,6 +77,11 @@ describe("le site dit ce que fait l'application, et rien de plus", () => {
       for (const choice of question.choices) expect(homeText).toContain(choice.label);
     }
     expect(homeText).toContain("Poche chaud/froid dos");
+    // La bannière ACTUELLE (l'île noire, notre robot, la capsule des questions), plus l'ancienne maquette.
+    const questions = home.slice(home.indexOf('id="questions"'));
+    expect(questions).toContain('aria-label="Une question à poser"');
+    expect(questions).toContain('aria-label="Bannière PharmaBoost du comptoir"');
+    expect(questions.slice(0, questions.indexOf("</section>"))).not.toContain("pbm-fit");
     // Les phrases d'orientation (mal de tête, fièvre) attendent la relecture de la pharmacienne : elles ne sont pas sur le site.
     for (const choice of Object.values(ANALGESIC_TREE.nodes).flatMap((node) => node.choices)) {
       if (choice.note) expect(homeText).not.toContain(choice.note);
@@ -110,6 +115,16 @@ describe("l'en-tête mène d'abord à la bannière du comptoir", () => {
     expect(links).toHaveLength(4);
     // La rubrique « Comment ça marche » a été retirée de la page (demande du fondateur, 11 oct. 2026) : plus de lien vers elle.
     expect(nav).not.toContain("#fonctionnement");
+  });
+
+  it("le robot vivant se tient à côté du nom « PharmaBoost », même avec l'île ; le titre de l'accueil n'en a plus", () => {
+    const header = renderToStaticMarkup(createElement(SiteHeader, { island: createElement("span", { "data-ile": "" }) }));
+    const brand = header.match(/<a[^>]*aria-label="PharmaBoost, accueil"[\s\S]*?<\/a>/)?.[0] ?? "";
+    expect(brand).toMatch(/class="rbt[^"]*"/);
+    expect(brand).toContain("data-interactive");
+    expect(brand).not.toMatch(/<img/);
+    // Demande du fondateur (13 oct. 2026) : le grand robot n'est plus à côté de « Scan. Conseil. Bilan. ».
+    expect(home).not.toContain("data-robot-hero");
   });
 });
 
@@ -248,11 +263,11 @@ describe("le simulateur : les barres sont un dessin, pas une liste de définitio
 });
 
 describe("l'en-tête sur un petit téléphone", () => {
-  it("l'appel garde son nom entier « Réserver une démo », même réduit à « Démo » sous 360 px", () => {
+  it("l'appel garde son nom entier « Réserver une démo », même réduit à « Démo » sous 390 px (l’en-tête débordait de 10 px à 390 px, de 7 px à 360 px)", () => {
     const header = renderToStaticMarkup(createElement(SiteHeader));
     const cta = header.match(/<a[^>]*href="\/decouvrir\/demo"[^>]*>([\s\S]*?)<\/a>/)?.[1] ?? "";
     expect(visible(cta).trim()).toBe("Réserver une démo");
-    expect(cta).toContain("max-[359px]:sr-only");
+    expect(cta).toContain("max-[389px]:sr-only");
   });
 });
 

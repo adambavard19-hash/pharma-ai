@@ -4,6 +4,8 @@ import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { ANALGESIC_TREE, evaluateTree } from "@/core/counter/question-tree";
 import { cn } from "@/lib/utils";
 import { CounterIslandStill } from "@/components/island/counter-island-still";
+import { IslandQuestions } from "@/components/island/island-questions";
+import type { IslandAdvice } from "@/components/island/counter-island";
 
 /**
  * Les écrans de PharmaBoost redessinés pour le site : textes et structure
@@ -85,14 +87,24 @@ function ProductTile({ size, tile, className }: { size: number; tile: string; cl
  * Le logiciel de gestion, inchangé, et la bannière PharmaBoost par-dessus, à droite — comme sur le poste de caisse. Le logiciel est
  * générique (aucune marque) ; la bannière est le vrai dessin, avec ses deux conseils d'exemple.
  */
-export function HeroVisual() {
+/**
+ * `glass` : posé sur l'encre ADN du héros du site, le halo vert s'efface (il voilait l'encre) et la fenêtre du logiciel
+ * passe en verre dépoli — l'encre se devine derrière, le texte reste net. Sans l'option (plaquette), rien ne change.
+ */
+export function HeroVisual({ glass = false }: { glass?: boolean }) {
   return (
     <div className="relative mx-auto w-full max-w-[580px] lg:max-w-none">
       <style>{SCAN_CSS}</style>
-      <div className="absolute -inset-x-10 -inset-y-12 -z-10 bg-[radial-gradient(55%_55%_at_65%_45%,var(--color-brand-100),transparent_72%)] opacity-90" aria-hidden="true" />
+      {!glass && <div className="absolute -inset-x-10 -inset-y-12 -z-10 bg-[radial-gradient(55%_55%_at_65%_45%,var(--color-brand-100),transparent_72%)] opacity-90" aria-hidden="true" />}
 
       {/* Le logiciel de gestion de l'officine, inchangé */}
-      <div className="rounded-[22px] border border-border-subtle bg-surface-card p-3 shadow-[0_30px_80px_-44px_rgba(15,23,42,0.45)]" aria-hidden="true">
+      <div
+        className={cn(
+          "rounded-[22px] border p-3 shadow-[0_30px_80px_-44px_rgba(15,23,42,0.45)]",
+          glass ? "border-white/70 bg-white/55 backdrop-blur-xl dark:border-border-subtle dark:bg-surface-card" : "border-border-subtle bg-surface-card",
+        )}
+        aria-hidden="true"
+      >
         <div className="flex items-center gap-1.5 px-1.5 pb-2.5">
           <span className="size-2.5 rounded-full bg-ink-200" />
           <span className="size-2.5 rounded-full bg-ink-200" />
@@ -212,9 +224,21 @@ const ANALGESIC = "DOLIPRANE 1000 mg";
  */
 export function QuestionVisual() {
   const view = evaluateTree(ANALGESIC_TREE, { why: ["PAIN"], where: ["BACK"] }, ANALGESIC);
-  const questions = view.questions.map((question) => ({ text: question.text, choices: question.choices.map((choice) => ({ label: choice.label, selected: choice.selected })) }));
-  const items: BannerMockItem[] = view.unlocked.map((key) => ({ name: "Poche chaud/froid dos", price: "12,90 €", drug: ANALGESIC, reason: ruleReason(key, ANALGESIC), stock: "IN_STOCK", quantity: 6 }));
-  return <BannerMock subject={ANALGESIC} questions={questions} items={items} align="center" />;
+  const questions = view.questions.map((question) => ({ node: question.node, text: question.text, choices: question.choices.map(({ key, label, selected }) => ({ key, label, selected })) }));
+  const items: IslandAdvice[] = view.unlocked.map((key) => ({ name: "Poche chaud/froid dos", price: "12,90 €", drug: ANALGESIC, reason: ruleReason(key, ANALGESIC), stock: "IN_STOCK", quantity: 6 }));
+  // La bannière ACTUELLE, avec ses vrais composants : l'île noire et notre robot (le conseil débloqué), puis la capsule des
+  // questions, comme au poste de caisse. Les phrases d'orientation attendent la relecture de la pharmacienne : pas ici.
+  return (
+    <div
+      className="relative flex flex-col items-center gap-2 overflow-hidden rounded-[26px] border border-black/10 px-3 py-6 shadow-xl sm:py-8 [&_section]:max-w-full"
+      style={{ background: "radial-gradient(120% 90% at 20% 10%, #2A2F4A 0%, #171A2B 45%, #0E1020 100%)" }}
+      aria-label="Bannière PharmaBoost, exemple : la question, puis le conseil"
+      role="group"
+    >
+      <CounterIslandStill items={items} drug={ANALGESIC} className="flex w-full justify-center [&>div]:max-w-full" />
+      <IslandQuestions questions={questions} contentKey="exemple-dos" maxHeight={null} />
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */

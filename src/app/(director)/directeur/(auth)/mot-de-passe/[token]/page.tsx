@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { peekDirectorPasswordToken } from "@/server/services/sales/director-auth";
+import { AUTH_LINK_STRONG } from "@/components/app/helix/helix-auth-layout";
 import { DirectorAuthShell } from "../../auth-shell";
 import { SetDirectorPasswordForm } from "./form";
 
@@ -14,9 +15,9 @@ export default async function DirectorSetPasswordPage({ params }: { params: Prom
       title={`Bienvenue${account ? ` ${account.firstName}` : ""}`}
       intro={
         account ? (
-          <>Compte <span className="text-white">{account.email}</span>. Choisissez un mot de passe : douze caractères au minimum, avec une majuscule et un chiffre.</>
+          <>Compte <span className="font-medium text-text-primary">{account.email}</span>. Choisissez un mot de passe : douze caractères au minimum, avec une majuscule et un chiffre.</>
         ) : (
-          <>Ce lien n&apos;est plus valide. <Link href="/directeur/oubli" className="text-brand-300 underline underline-offset-2">Demander un nouveau lien</Link></>
+          <>Ce lien n&apos;est plus valide. <Link href="/directeur/oubli" className={AUTH_LINK_STRONG}>Demander un nouveau lien</Link></>
         )
       }
     >

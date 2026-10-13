@@ -9,9 +9,9 @@ const facts = { ownerName: "Marc Delaunay", pharmacyName: "Pharmacie du Port", l
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
 
 describe("gabarit e-mail PharmaBoost", () => {
-  it("porte logo, pied de page légal, liens légaux et version texte", () => {
+  it("porte le bandeau de l'hélice d'ADN, pied de page légal, liens légaux et version texte", () => {
     const email = renderEmail(ctx, { subject: "Test", preheader: "Aperçu", title: "Titre", blocks: [{ kind: "paragraph", text: "Bonjour <script>" }, { kind: "button", url: "https://x.test/a?b=1&c=2", label: "Agir" }] });
-    expect(email.html).toContain('src="https://pharmaboost.app/logo-256.png"');
+    expect(email.html).toContain('src="https://pharmaboost.app/email/bandeau-adn.gif"');
     expect(email.html).toContain("PharmaBoost SAS · 10 rue de la Santé, 75013 Paris · SIREN 123456789");
     expect(email.html).toContain("/decouvrir/mentions-legales");
     expect(email.html).toContain("/decouvrir/confidentialite");
@@ -23,7 +23,7 @@ describe("gabarit e-mail PharmaBoost", () => {
 
   it("habille aussi les anciens e-mails (enveloppe commune)", () => {
     const html = shell("Objet", "Titre", "<p>corps</p>");
-    expect(html).toContain("logo-256.png");
+    expect(html).toContain("/email/bandeau-adn.gif");
     expect(html).toContain("Mentions légales");
     const legacy = buildContractEmail({ ownerName: "A", pharmacyName: "B", salesRepName: "C", salesRepEmail: "c@x.fr", salesRepPhone: null, url: "https://x/c", signingUrl: null, expiresAt: new Date() });
     expect(legacy.html).toContain("Mentions légales");

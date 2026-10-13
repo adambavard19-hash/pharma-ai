@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
+import { PageTitle } from "./page-title";
 
 export function PageHeader({
   title,
@@ -15,13 +16,12 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <header className={cn("space-y-3 pb-1", className)}>
+    // `data-page-header` : dans l'espace pharmacie, l'en-tête devient un panneau menthe aux grands coins (globals.css).
+    <header data-page-header="" className={cn("space-y-3 pb-1", className)}>
       {breadcrumb}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div className="min-w-0 flex-1 basis-[28rem] space-y-2">
-          <h1 className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary sm:text-[30px]">
-            {title}
-          </h1>
+          <PageTitle text={title} className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary sm:text-[30px]" />
           {description && (
             <p className="max-w-3xl text-[15px] leading-6 text-pretty text-text-secondary">
               {description}

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSalesSession } from "@/server/auth/sales-session";
+import { Alert } from "@/components/ui/feedback";
+import { AUTH_LINK } from "@/components/app/helix/helix-auth-layout";
+import { SalesAuthShell } from "../sales-auth-shell";
 import { SalesLoginForm } from "./form";
 
 export const metadata: Metadata = { title: { absolute: "Extranet commercial — PharmaBoost" } };
@@ -10,21 +13,14 @@ export default async function SalesLoginPage({ searchParams }: { searchParams: P
   const [session, { defini }] = await Promise.all([getSalesSession(), searchParams]);
   if (session) redirect("/extranet");
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[#0b1f1c] px-5 py-12">
-      <div className="w-full max-w-sm space-y-8">
-        <div className="space-y-2 text-center">
-          <span className="mx-auto flex size-11 items-center justify-center rounded-xl bg-brand-500 text-lg font-semibold text-white">✚</span>
-          <h1 className="text-[20px] font-bold text-white">Extranet commercial</h1>
-          <p className="text-[13px] leading-5 text-white/60">PharmaBoost — vos dossiers, vos contrats, vos commissions.</p>
-        </div>
-        {defini === "1" && <p className="rounded-lg bg-success-700/30 px-3.5 py-3 text-center text-[13.5px] text-success-200">Mot de passe enregistré. Connectez-vous.</p>}
-        <SalesLoginForm />
-        <p className="text-center text-[13px]">
-          <Link href="/extranet/oubli" className="text-white/60 underline underline-offset-2 hover:text-white">
-            Mot de passe oublié ou premier accès
-          </Link>
-        </p>
-      </div>
-    </main>
+    <SalesAuthShell title="Extranet commercial" intro="PharmaBoost — vos dossiers, vos contrats, vos commissions.">
+      {defini === "1" && <Alert tone="success">Mot de passe enregistré. Connectez-vous.</Alert>}
+      <SalesLoginForm />
+      <p className="text-center text-[13px]">
+        <Link href="/extranet/oubli" className={AUTH_LINK}>
+          Mot de passe oublié ou premier accès
+        </Link>
+      </p>
+    </SalesAuthShell>
   );
 }

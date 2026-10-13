@@ -1,11 +1,14 @@
-import Image from "next/image";
+import { Robot } from "@/components/robot";
 import { cn } from "@/lib/utils";
 
 /**
- * Marque PharmaBoost : le petit robot de la bannière du comptoir. La source est
- * `public/logo.svg`, générée par `scripts/logo-robot.ts` avec les couleurs de la
- * bannière ; les déclinaisons PNG (`logo`, `logo-256`, `icon`, `apple-icon`) en
- * sont tirées par le même script.
+ * Marque PharmaBoost à l'écran : le robot VIVANT (`components/robot`, celui du menu de l'espace), sans carré ni fond.
+ * Il respire, cligne des yeux et, touché, il s'écrase et rit (deux fois : agacé ; trois fois très vite : le tournis).
+ * La réaction part du `pointerdown` sans l'empêcher : dans un lien vers l'accueil, la navigation suit normalement.
+ * Pour qui a demandé à réduire les animations, il reste immobile (le composant lit `prefers-reduced-motion`).
+ *
+ * L'image à fond bleu nuit (les PNG et SVG tirés par `scripts/logo-robot.ts`) ne sert plus qu'où rien ne peut
+ * bouger : icône d'onglet, icône d'application, images de partage, e-mails, installateur Windows. Un écran n'importe pas ces fichiers (test `brand-robot-only.test.ts`).
  */
 export function PharmaLogo({
   className,
@@ -14,19 +17,7 @@ export function PharmaLogo({
   className?: string;
   size?: number;
 }) {
-  return (
-    <Image
-      src="/logo-256.png"
-      alt=""
-      width={size}
-      height={size}
-      className={cn("shrink-0 rounded-[22%]", className)}
-      aria-hidden="true"
-      // Servi tel quel (25 Ko) : un logo changé apparaît aussitôt, sans copie optimisée gardée en cache.
-      unoptimized
-      priority
-    />
-  );
+  return <Robot size={size} interactive className={cn("shrink-0", className)} />;
 }
 
 export function PharmaWordmark({

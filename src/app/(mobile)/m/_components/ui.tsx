@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Robot } from "@/components/robot";
 
 /**
  * Les pièces de base de PharmaBoost Mobile, partagées par tous les onglets. Elles ne dépendent d'aucun composant de
@@ -9,10 +10,12 @@ import { cn } from "@/lib/utils";
  * plusieurs onglets vient ici.
  */
 
-/** Le robot de la marque, immobile (les en-têtes) : le dessin `public/logo-robot.svg`. */
+/**
+ * Le robot de la marque dans les en-têtes : le robot VIVANT (`components/robot`), sans fond. Touché, il rit ; la
+ * navigation du lien qui l'entoure suit normalement. Immobile pour qui a demandé à réduire les animations.
+ */
 export function RobotMark({ size = 28, className }: { size?: number; className?: string }) {
-  // eslint-disable-next-line @next/next/no-img-element -- SVG statique de 2 Ko, servi tel quel : l'optimiseur d'images n'apporte rien.
-  return <img src="/logo-robot.svg" alt="" width={size} height={size} className={cn("shrink-0", className)} aria-hidden="true" />;
+  return <Robot size={size} interactive className={cn("shrink-0", className)} />;
 }
 
 export function Wordmark({ className }: { className?: string }) {

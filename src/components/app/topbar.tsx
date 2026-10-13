@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { LogOut, ScanLine, Settings, Store } from "lucide-react";
-import { GlobalSearch } from "./global-search";
-import { NotificationBell } from "./notifications/notification-bell";
 import { MobileNavTrigger } from "./mobile-nav";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -16,44 +14,45 @@ import { logoutAction, switchPharmacyAction } from "@/server/actions/auth";
 import type { SessionContext } from "@/server/auth/session";
 import { DEMO_MODE_HINT, DEMO_MODE_LABEL, isCommercialDemoPharmacy } from "@/core/demo/identity";
 
+/**
+ * La barre du haut : l'île du robot au milieu, le menu de la personne à droite. Ni recherche ni cloche (demande du
+ * fondateur, 13 oct. 2026) : le robot de l'île cherche, répond et signale tout — sa Discussion garde le raccourci ⌘K.
+ * La page /notifications reste accessible.
+ */
 export function Topbar({
   session,
-  unreadNotifications,
   island,
 }: {
   session: SessionContext;
-  unreadNotifications: number;
   /** L'île PharmaBoost, au milieu de la bannière. */
   island?: ReactNode;
 }) {
+  // Le verre dépoli (blanc à 50 %, flou 10 px) au-dessus du fond menthe : la feuille blanche passe dessous au défilement.
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border-subtle bg-surface-app/80 px-4 backdrop-blur-xs lg:px-6">
+    <header className="espace-verre-doux sticky top-0 z-20 flex h-14 items-center gap-3 px-4 lg:px-6">
       <MobileNavTrigger />
 
-      <div className="min-w-0 flex-1 lg:max-w-sm">
-        <GlobalSearch />
+      {/* L'île, au milieu de la bannière (deux cales égales de part et d'autre). */}
+      <div className="min-w-0 flex-1" />
+      {island && <div className="flex shrink-0 justify-center">{island}</div>}
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+        {session.pharmacy.isDemo && (
+          <span title={DEMO_MODE_HINT} className="hidden shrink-0 rounded-full border border-warning-300 bg-warning-50 px-2.5 py-0.5 text-[11.5px] font-medium text-warning-800 sm:inline dark:border-warning-800 dark:bg-warning-950/30 dark:text-warning-400">
+            {DEMO_MODE_LABEL}
+          </span>
+        )}
+        {isCommercialDemoPharmacy(session.pharmacy) && (
+          <Link
+            href="/demo"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-brand-300 bg-brand-50 px-3 py-1.5 text-[12.5px] font-medium text-brand-800 transition-colors hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300"
+          >
+            <ScanLine className="size-3.5" aria-hidden="true" />
+            Simuler une délivrance
+          </Link>
+        )}
+
+        <UserMenu session={session} />
       </div>
-      {/* L'île, au milieu de la bannière. */}
-      {island && <div className="flex justify-center lg:flex-1">{island}</div>}
-
-      {session.pharmacy.isDemo && (
-        <span title={DEMO_MODE_HINT} className="hidden shrink-0 rounded-full border border-warning-300 bg-warning-50 px-2.5 py-0.5 text-[11.5px] font-medium text-warning-800 sm:inline dark:border-warning-800 dark:bg-warning-950/30 dark:text-warning-400">
-          {DEMO_MODE_LABEL}
-        </span>
-      )}
-      {isCommercialDemoPharmacy(session.pharmacy) && (
-        <Link
-          href="/demo"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50 px-3 py-1.5 text-[12.5px] font-medium text-brand-800 transition-colors hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300"
-        >
-          <ScanLine className="size-3.5" aria-hidden="true" />
-          Simuler une délivrance
-        </Link>
-      )}
-
-      <NotificationBell unread={unreadNotifications} />
-
-      <UserMenu session={session} />
     </header>
   );
 }
@@ -64,7 +63,7 @@ function UserMenu({ session }: { session: SessionContext }) {
   return (
     <Dropdown
       triggerLabel="Menu utilisateur"
-      triggerClassName="flex items-center gap-2.5 rounded-lg py-1 pr-1 pl-2 transition-colors hover:bg-surface-sunken"
+      triggerClassName="flex items-center gap-2.5 rounded-full py-1 pr-1 pl-3 transition-colors duration-150 hover:bg-white/70 dark:hover:bg-white/10"
       trigger={
         <>
           <span className="hidden text-right sm:block">

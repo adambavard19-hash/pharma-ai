@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDirectorSession } from "@/server/auth/director-session";
 import { DIRECTOR_HOME } from "@/core/sales/director/nav";
+import { AUTH_LINK } from "@/components/app/helix/helix-auth-layout";
 import { DirectorAuthShell } from "../auth-shell";
 import { DirectorLoginForm } from "./form";
 
@@ -15,7 +16,7 @@ export default async function DirectorLoginPage() {
     <DirectorAuthShell title="Direction commerciale" intro="PharmaBoost — votre équipe, ses commissions, ses factures, ses challenges.">
       <DirectorLoginForm />
       <p className="text-center text-[13px]">
-        <Link href="/directeur/oubli" className="text-white/60 underline underline-offset-2 hover:text-white">
+        <Link href="/directeur/oubli" className={AUTH_LINK}>
           Mot de passe oublié ou premier accès
         </Link>
       </p>

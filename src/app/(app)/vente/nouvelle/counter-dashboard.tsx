@@ -9,6 +9,7 @@ import { ADVICE_OUTCOME_LABEL, describeAdviceCount, type AdviceOutcome, type Fin
 import { formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CounterResetButton } from "../counter-reset-button";
+import { PageTitle } from "@/components/ui/page-title";
 
 export type { LiveSale, FinishedSale } from "@/core/counter/board";
 
@@ -24,6 +25,12 @@ const STAGE: Record<StageTone, string> = {
   success: "bg-success-50 text-success-800 dark:bg-success-950/50 dark:text-success-300",
   warning: "bg-warning-50 text-warning-800 dark:bg-warning-950/40 dark:text-warning-400",
 };
+
+/**
+ * Le verre dépoli posé sur l'hélice d'ADN du fond (page.tsx) : blanc à 45-50 %, flou de 10 px — l'encre se voit
+ * nettement derrière, le texte reste net.
+ */
+const GLASS = "rounded-[24px] border border-white/70 bg-(--glass-soft) p-4 shadow-[0_12px_32px_-20px_rgb(5_64_56/0.35)] backdrop-blur-[10px] sm:p-5 dark:border-white/10";
 
 const OUTCOME: Record<AdviceOutcome, string> = {
   PROPOSED: "bg-brand-50 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300",
@@ -150,20 +157,25 @@ export function CounterDashboard({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0 space-y-1">
-          <p className="text-[12.5px] font-medium tracking-[0.08em] text-text-secondary uppercase">{dateLabel}</p>
-          <h1 className="text-[28px] leading-[34px] font-bold tracking-[-0.025em] text-text-primary">Au comptoir</h1>
+      {/* L'en-tête, posé directement sur l'hélice du fond (page.tsx) : le titre en grand et léger, sur une ligne, et l'état
+          du comptoir sur une pastille de verre. */}
+      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 pt-2 sm:pt-6">
+        <div className="min-w-0 space-y-2">
+          <p className="pb-surtitre">{dateLabel}</p>
+          <PageTitle text="Au comptoir" className="text-[40px] leading-[1.1] font-light tracking-[-0.03em] whitespace-nowrap text-text-primary sm:text-[52px]" />
         </div>
-        <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[13.5px] font-medium whitespace-nowrap", PILL[status.pill.tone])}>
-          {status.pill.tone === "success" ? <CircleCheck className="size-4" /> : status.pill.tone === "warning" ? <TriangleAlert className="size-4" /> : <Unplug className="size-4" />}
-          {status.pill.label}
-        </span>
+        <div className="espace-verre-doux rounded-full border border-white/70 p-1.5 shadow-[0_8px_24px_-12px_rgb(5_64_56/0.25)] dark:border-white/10">
+          <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[13.5px] font-medium whitespace-nowrap", PILL[status.pill.tone])}>
+            {status.pill.tone === "success" ? <CircleCheck className="size-4" /> : status.pill.tone === "warning" ? <TriangleAlert className="size-4" /> : <Unplug className="size-4" />}
+            {status.pill.label}
+          </span>
+        </div>
       </header>
 
-      {notice}
+      {/* Le bandeau du stock passe lui aussi au verre léger (sa bordure et son icône gardent la couleur d'alerte). */}
+      <div className="empty:hidden [&>div]:bg-(--glass-soft) [&>div]:backdrop-blur-[10px]">{notice}</div>
 
-      <section aria-labelledby="titre-en-cours" className="space-y-3">
+      <section aria-labelledby="titre-en-cours" className={cn(GLASS, "space-y-3")}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="titre-en-cours" className="flex items-center gap-2.5 text-[20px] leading-7 font-semibold text-text-primary">
             {sales.length > 0 && (
@@ -189,7 +201,7 @@ export function CounterDashboard({
         </div>
       </section>
 
-      <section aria-labelledby="titre-terminees" className="space-y-3">
+      <section aria-labelledby="titre-terminees" className={cn(GLASS, "space-y-3")}>
         <h2 id="titre-terminees" className="text-[20px] leading-7 font-semibold text-text-primary">
           Terminées aujourd&apos;hui
         </h2>
@@ -213,7 +225,7 @@ export function CounterDashboard({
         )}
       </section>
 
-      <section aria-label="Saisie à la main" className="border-t border-border-subtle pt-4">
+      <section aria-label="Saisie à la main" className={GLASS}>
         <button
           type="button"
           onClick={toggleManual}

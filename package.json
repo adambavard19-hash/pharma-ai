@@ -38,6 +38,7 @@
     "installateur:construire": "node scripts/construire-installateur.mjs",
     "apercu:banniere": "tsx scripts/apercu-banniere.ts",
     "plaquette:pdf": "tsx scripts/plaquette-pdf.ts",
+    "emails:bandeau-adn": "tsx scripts/email-bandeau-adn.ts",
     "agent:build": "node -e \"require('esbuild').buildSync({entryPoints:['agent/src/index.ts'],bundle:true,platform:'node',target:'node18',format:'cjs',outfile:'agent/dist/pharmaboost-connect.js',banner:{js:'#!/usr/bin/env node'}})\" && npm run agent:build:journal",
     "onboarding:parcours": "EMAIL_PROVIDER=none SIGNATURE_PROVIDER=none node --env-file=.env --conditions=react-server --import tsx scripts/onboarding/parcours.mts",
     "lot:isolation": "node --env-file=.env --conditions=react-server --import tsx scripts/lot-pharmacienne/isolation.mts",
@@ -74,6 +75,7 @@
     "server-only": "^0.0.1",
     "stripe": "^22.6.2",
     "tailwind-merge": "^3.6.0",
+    "three": "0.185.0",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
@@ -85,6 +87,7 @@
     "@types/pngjs": "^6.0.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.185.4",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",

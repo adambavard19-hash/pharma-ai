@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { requireSession } from "@/server/auth/session";
 import { patientDataEnabled } from "@/config/env";
-import { countUnreadNotifications } from "@/server/services/notifications";
 import { countPharmacyUnread } from "@/server/services/support";
 import { Sidebar } from "@/components/app/sidebar";
 import { Topbar } from "@/components/app/topbar";
@@ -20,8 +19,7 @@ import { RobotPresenceProvider } from "@/components/robot/robot-presence";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
-  const [unread, supportUnread, thisPc] = await Promise.all([
-    countUnreadNotifications(session.scope),
+  const [supportUnread, thisPc] = await Promise.all([
     countPharmacyUnread(session.pharmacy.id),
     // 1 robot pour 1 espace : sur le navigateur lié à un poste de CETTE pharmacie (le lien ouvert par le logiciel
     // PharmaBoost installé), le poste revient à la personne connectée, sans clic ; et si le logiciel y dessine déjà le
@@ -40,7 +38,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <RobotAlertsProvider viewerKey={`${session.scope.userId}:${session.scope.pharmacyId}`}>
     <IslandSlotProvider>
     <MobileNavProvider>
-      <div className="min-h-dvh bg-surface-app">
+      {/* L'habillage de l'espace pharmacie (globals.css, ESPACE PHARMACIE) : fond menthe, verre dépoli, feuille blanche. */}
+      {/* Google Sans Flex, déclarée par le layout racine (--font-gsans), n'est utilisée — donc téléchargée — qu'ici. */}
+      <div className="espace-pharmacie espace-fond min-h-dvh">
         <a href="#contenu" className="skip-link">
           Aller au contenu principal
         </a>
@@ -63,17 +63,19 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                 Partout, même sur le PC où le logiciel installé a son robot : elle y perd seulement le dessin du robot. */}
             <Topbar
               session={session}
-              unreadNotifications={unread}
               island={<AppIsland suggestions={pharmacySuggestions(viewersOf(session).viewer)} canImportStock={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)} />}
             />
           </div>
 
-          <main
-            id="contenu"
-            className="mx-auto max-w-[1400px] px-4 py-6 lg:px-10 lg:py-10 print:max-w-none print:p-0"
-          >
-            {children}
-          </main>
+          {/* La feuille blanche, aux grands coins arrondis, posée sur le fond menthe ; les pages y vivent telles quelles. */}
+          <div className="espace-feuille mx-2 mb-2 min-h-[calc(100dvh-4rem)] rounded-[24px] sm:mx-3 sm:mb-3 lg:rounded-[48px] print:m-0 print:min-h-0 print:rounded-none print:border-0">
+            <main
+              id="contenu"
+              className="mx-auto max-w-[1400px] px-4 py-6 lg:px-10 lg:py-10 print:max-w-none print:p-0"
+            >
+              {children}
+            </main>
+          </div>
         </div>
 
         {/* Le robot compagnon, en bas à droite (hors « Nouvelle vente » et l'écran de vente, où il est déjà ; nulle part

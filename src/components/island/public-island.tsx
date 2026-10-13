@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowRight, CalendarCheck, Receipt, Sparkles } from "lucide-react";
 import { PUBLIC_SUGGESTIONS, safePublicHref } from "@/core/public-assistant/assistant";
 import { CounterIslandScene } from "./counter-island-scene";
@@ -20,9 +21,11 @@ const SHORTCUTS = [
  * boucle) et les raccourcis ; Discussion : le robot qui répond sur PharmaBoost à partir des seules pages du site.
  */
 export function PublicIsland({ demo }: { demo: PublicIslandDemo }) {
+  const autoOpenKey = useWelcomeOpen();
   return (
     <PlatformIsland
       label="L'île PharmaBoost"
+      autoOpenKey={autoOpenKey}
       restingText="Demandez-moi comment ça marche"
       homeLead={
         <div className="space-y-2.5">
@@ -54,4 +57,55 @@ export function PublicIsland({ demo }: { demo: PublicIslandDemo }) {
       }}
     />
   );
+}
+
+/** Une fois par visite (onglet) : la clé de la mémoire de session. */
+export const WELCOME_KEY = "pharmaboost:ile-site-accueil";
+/** Le temps de laisser la page se poser avant que l'île s'ouvre. */
+export const WELCOME_DELAY_MS = 700;
+
+/**
+ * Faut-il ouvrir l'île d'elle-même, à l'arrivée ? Oui, une seule fois par visite, sauf pour qui a demandé à réduire les
+ * animations (la démonstration est une animation). Mémoire illisible (navigation privée stricte) : on ouvre quand même, une
+ * fois par chargement.
+ */
+export function shouldWelcome(storage: Pick<Storage, "getItem"> | null, reducedMotion: boolean): boolean {
+  if (reducedMotion) return false;
+  try {
+    return !storage?.getItem(WELCOME_KEY);
+  } catch {
+    return true; // Mémoire refusée : l'ouverture reste possible, sans souvenir.
+  }
+}
+
+/** L'île s'est ouverte : retenu pour la visite (écrit à l'ouverture, pas avant : un effet rejoué ne la perd pas). */
+export function rememberWelcome(storage: Pick<Storage, "setItem"> | null) {
+  try {
+    storage?.setItem(WELCOME_KEY, "1");
+  } catch {
+    // Mémoire refusée : rien à retenir.
+  }
+}
+
+/**
+ * À l'arrivée sur le site, l'île s'ouvre sur son Accueil et joue la démonstration du comptoir, sans attendre un clic.
+ * L'ouverture ne prend jamais le focus (l'Accueil n'a pas de champ) ; un clic ailleurs ou Échap la referme.
+ */
+function useWelcomeOpen(): string | null {
+  const [key, setKey] = useState<string | null>(null);
+  useEffect(() => {
+    let storage: Storage | null = null;
+    try {
+      storage = window.sessionStorage;
+    } catch {
+      storage = null;
+    }
+    if (!shouldWelcome(storage, window.matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+    const id = setTimeout(() => {
+      rememberWelcome(storage);
+      setKey("accueil-site");
+    }, WELCOME_DELAY_MS);
+    return () => clearTimeout(id);
+  }, []);
+  return key;
 }

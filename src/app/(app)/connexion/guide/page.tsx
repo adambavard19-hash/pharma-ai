@@ -1,3 +1,4 @@
+import { PageTitle } from "@/components/ui/page-title";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -46,7 +47,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
           <Link href="/parametres/postes">Retour aux postes du comptoir</Link>
         </Button>
-        <h1 className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary">Guide pas à pas</h1>
+        <PageTitle text="Guide pas à pas" className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary" />
         <nav aria-label="Logiciel" className="flex flex-wrap gap-2">
           {LGO_DEFINITIONS.map((candidate) => (
             <Link

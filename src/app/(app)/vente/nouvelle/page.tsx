@@ -14,6 +14,7 @@ import { countCounterRequestsToday } from "@/server/services/counter-request";
 import { isCommercialDemoPharmacy } from "@/core/demo/identity";
 import { findDemoScenario } from "@/core/demo/scenarios";
 import { CounterDashboard } from "./counter-dashboard";
+import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { NewPrescriptionForm } from "./new-prescription-form";
 import { CounterRequestCard } from "./counter-request";
 import { TIME_ZONE } from "@/config/constants";
@@ -64,7 +65,9 @@ export default async function NewPrescriptionPage({
   const canUpdateStock = session.permissions.has(PERMISSIONS.PRODUCT_IMPORT);
 
   return (
+    // L'hélice d'ADN en fond de toute la fenêtre (fixe, z-index négatif) : ce conteneur ne doit pas l'isoler.
     <div className="mx-auto max-w-3xl space-y-4">
+      <HelixBackdrop />
       {isCommercialDemoPharmacy(session.pharmacy) && (
         <p className="rounded-xl border border-dashed border-brand-300 bg-brand-50/50 px-4 py-3 text-[13.5px] text-text-secondary dark:border-brand-800 dark:bg-brand-950/20">
           Pas de douchette dans cette démonstration.{" "}

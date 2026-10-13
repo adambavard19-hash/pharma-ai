@@ -125,6 +125,13 @@
   --shadow-lg: 0 12px 28px -6px rgb(23 33 38 / 0.10), 0 4px 10px -4px rgb(23 33 38 / 0.05);
   --shadow-xl: 0 24px 48px -12px rgb(23 33 38 / 0.16);
 
+  /* --- Matière « Dantora » de l'espace pharmacie (voir ESPACE PHARMACIE plus bas) --- */
+  --color-mint-50: #eff4f2;
+  --color-mint-100: #e5f1ed;
+  --color-citron-200: #f8ffb4;
+  --color-citron-400: #e5ed9b;
+  --color-deep-900: #054038;
+
   --animate-fade-in: fade-in 0.25s ease-out;
   --animate-slide-up: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-shimmer: shimmer 1.6s linear infinite;
@@ -201,6 +208,267 @@
   color-scheme: dark;
 }
 
+/*
+ * Habillage des composants partagés (src/components/ui) : chaque réglage a ici sa valeur d'origine, celle que gardent
+ * la console, le site public et les autres espaces ; seul l'espace pharmacie (plus bas) les remplace.
+ */
+:root {
+  --ui-radius-btn: var(--radius-md);
+  --ui-radius-btn-xl: var(--radius-xl);
+  --ui-btn-primary-ring: transparent;
+  --ui-btn-secondary-bg: var(--surface-raised);
+  --ui-btn-secondary-hover: var(--surface-sunken);
+  --ui-btn-secondary-border: var(--border-default);
+  --ui-btn-secondary-text: var(--text-primary);
+  --ui-radius-tabs: var(--radius-xl);
+  --ui-radius-tab: var(--radius-lg);
+  --ui-badge-neutral-bg: var(--color-ink-100);
+  --ui-badge-neutral-ring: var(--color-ink-200);
+}
+
+/* ==========================================================================
+   ESPACE PHARMACIE — habillage menthe (inspiré de « Dantora »)
+   Le logiciel où les pharmaciens sont connectés : la classe `espace-pharmacie`
+   est posée par src/app/(app)/layout.tsx. `:root:has(…)` porte les jetons
+   jusqu'à ce qui s'ouvre hors de l'arbre (fenêtres, île, menus déroulants).
+   Page blanche, panneaux menthe, verre dépoli, vert de marque #246f65, vert
+   profond #054038, citron pour l'action secondaire. Contrastes AA vérifiés :
+   blanc sur #246f65 5,9:1 ; #246f65 sur menthe 5,3:1 ; texte discret
+   #636a68 sur menthe 5:1, sur blanc 5,5:1 ; vert profond sur citron 11:1.
+   ========================================================================== */
+
+.espace-pharmacie,
+:root:has(.espace-pharmacie) {
+  /* Le vert de marque, par rôle : 700 = l'action principale (#246f65), 800 = son survol, le vert profond. */
+  --color-brand-50: #eff4f2;
+  --color-brand-100: #e5f1ed;
+  --color-brand-200: #cde4dc;
+  --color-brand-300: #9fcbbb;
+  --color-brand-400: #5fa594;
+  --color-brand-500: #2f8073;
+  --color-brand-600: #297669;
+  --color-brand-700: #246f65;
+  --color-brand-800: #054038;
+  --color-brand-900: #04362f;
+  --color-brand-950: #022622;
+
+  --surface-app: #ffffff;
+  --surface-card: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: var(--color-mint-50);
+  --surface-sidebar: rgb(255 255 255 / 0.8);
+  /* Le fond derrière le verre (menu, barre du haut) et les panneaux d'en-tête. */
+  --surface-mint: var(--color-mint-50);
+  --surface-mint-deep: var(--color-mint-100);
+  --glass-strong: rgb(255 255 255 / 0.9);
+  --glass: rgb(255 255 255 / 0.8);
+  --glass-soft: rgb(255 255 255 / 0.5);
+
+  --border-subtle: rgb(0 0 0 / 0.1);
+  --border-default: rgb(0 0 0 / 0.16);
+  --border-strong: rgb(0 0 0 / 0.32);
+
+  --text-primary: #111a18;
+  --text-secondary: #4f5755;
+  --text-tertiary: #636a68;
+
+  --focus-ring: #246f65;
+
+  /* Des cartes plates : une bordure fine fait le travail, l'ombre n'apparaît qu'au survol. */
+  --card-shadow: 0 1px 2px 0 rgb(5 64 56 / 0.04);
+  --card-shadow-hover: 0 12px 32px -8px rgb(5 64 56 / 0.14);
+
+  /* Formes : 8 px les champs et petits panneaux, 24 px les cartes, 48 px les grands panneaux, pilule pour les boutons. */
+  --radius-md: 0.5rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 3rem;
+  --ui-radius-btn: 46px;
+  --ui-radius-btn-xl: 46px;
+  --ui-btn-primary-ring: #054038;
+  --ui-btn-secondary-bg: var(--color-citron-200);
+  --ui-btn-secondary-hover: var(--color-citron-400);
+  --ui-btn-secondary-border: var(--color-citron-400);
+  --ui-btn-secondary-text: #054038;
+  --ui-radius-tabs: 46px;
+  --ui-radius-tab: 46px;
+  --ui-badge-neutral-bg: rgb(255 255 255 / 0.6);
+  --ui-badge-neutral-ring: rgb(0 0 0 / 0.1);
+
+  /* Google Sans Flex (chargée par le layout de l'espace), plus légère : le gras devient demi-gras, le demi-gras moyen. */
+  --font-sans:
+    var(--font-gsans), "Google Sans Flex", "Google Sans", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-weight-semibold: 500;
+  --font-weight-bold: 600;
+
+  --ease-espace: cubic-bezier(0.2, 0, 0, 1);
+  /* Le dégradé des pastilles : du vert de marque au vert profond (blanc à 5,1:1 au moins). */
+  --brand-grad-a: #2a7a6e;
+  --brand-grad-b: #054038;
+}
+
+/* Le mode sombre existant garde ses jetons ; seules les nouvelles surfaces reçoivent une variante. */
+:root.dark:has(.espace-pharmacie),
+.dark .espace-pharmacie {
+  --color-brand-400: #6fbfa6;
+  --color-brand-300: #a8d6c6;
+  --surface-app: var(--color-ink-950);
+  --surface-card: oklch(0.215 0.015 200);
+  --surface-raised: var(--color-ink-800);
+  --surface-sunken: oklch(0.17 0.014 190);
+  --surface-sidebar: rgb(16 26 24 / 0.8);
+  --surface-mint: oklch(0.19 0.018 180);
+  --surface-mint-deep: oklch(0.23 0.022 180);
+  --glass-strong: rgb(16 26 24 / 0.9);
+  --glass: rgb(16 26 24 / 0.8);
+  --glass-soft: rgb(16 26 24 / 0.5);
+  --border-subtle: rgb(255 255 255 / 0.1);
+  --border-default: rgb(255 255 255 / 0.16);
+  --border-strong: rgb(255 255 255 / 0.3);
+  --text-primary: var(--color-ink-100);
+  --text-secondary: oklch(0.78 0.015 190);
+  --text-tertiary: oklch(0.7 0.018 190);
+  --focus-ring: #6fbfa6;
+  --card-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --card-shadow-hover: 0 12px 32px -8px rgb(0 0 0 / 0.5);
+  --ui-btn-secondary-text: #054038;
+  --ui-badge-neutral-bg: rgb(255 255 255 / 0.06);
+  --ui-badge-neutral-ring: rgb(255 255 255 / 0.12);
+}
+
+/* Le fond menthe derrière le verre : un lavis très doux, une lueur citron en haut à droite. */
+.espace-fond {
+  background-color: var(--surface-mint);
+  background-image:
+    radial-gradient(60rem 30rem at 100% -10%, rgb(248 255 180 / 0.45), transparent 70%),
+    radial-gradient(50rem 40rem at -10% 110%, rgb(229 241 237 / 0.9), transparent 70%);
+  background-attachment: fixed;
+}
+.dark .espace-fond {
+  background-image: none;
+}
+
+/* Le verre dépoli : menu, barre du haut, panneau posé sur l'hélice. */
+.espace-verre {
+  background-color: var(--glass);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.espace-verre-doux {
+  background-color: var(--glass-soft);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+/* La feuille blanche où vivent les pages, posée sur le fond menthe. */
+.espace-feuille {
+  background-color: var(--surface-app);
+  border: 1px solid var(--border-subtle);
+}
+
+/*
+ * L'hélice d'ADN en fond de fenêtre (HelixBackdrop : « Au comptoir », connexion). La scène est un canvas fixe sous tout
+ * le reste ; dès qu'elle est là (attribut `hidden` levé), le fond menthe et la feuille blanche s'effacent pour la
+ * laisser voir, et le menu, la barre du haut et la feuille deviennent un verre léger (blanc à 45 %, flou 10 px, comme
+ * les panneaux de la page).
+ */
+.espace-pharmacie:has([data-helix-fond]:not([hidden])) {
+  --surface-sidebar: rgb(255 255 255 / 0.45);
+  --glass-soft: rgb(255 255 255 / 0.45);
+  background: transparent;
+}
+.espace-pharmacie:has([data-helix-fond]:not([hidden])) .espace-feuille {
+  background-color: transparent;
+  border-color: rgb(255 255 255 / 0.7);
+}
+/* Le menu et la barre du haut au même verre que les panneaux de la page ; un halo blanc garde leurs entrées nettes. */
+.espace-pharmacie:has([data-helix-fond]:not([hidden])) .espace-verre-doux,
+.espace-pharmacie:has([data-helix-fond]:not([hidden])) aside.fixed {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  text-shadow: 0 0 8px rgb(255 255 255 / 0.9);
+}
+
+/* En-tête de page : un panneau menthe aux grands coins arrondis. */
+.espace-pharmacie [data-page-header] {
+  background-color: var(--surface-mint);
+  border-radius: 1.5rem;
+  padding: 1.5rem 1.25rem;
+}
+@media (min-width: 640px) {
+  .espace-pharmacie [data-page-header] {
+    border-radius: 3rem;
+    padding: 2rem 2.5rem;
+  }
+}
+
+/* Titres de page : légers (300), interligne 1,1, un peu plus grands pour garder leur présence. */
+.espace-pharmacie .pb-titre {
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-size: clamp(1.875rem, 1.2rem + 1.4vw, 2.5rem);
+}
+
+/* Surtitre : petites capitales vert de marque, moyen (500). */
+.pb-surtitre {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-brand-700);
+}
+.dark .pb-surtitre {
+  color: var(--color-brand-400);
+}
+
+/*
+ * Les mots du titre sortent d'un flou, l'un après l'autre (ressort doux, ~50 ms d'écart), sur un calque décoratif posé
+ * devant le texte du titre (src/components/ui/page-title.tsx) ; seulement dans l'espace pharmacie.
+ */
+@keyframes mot-flou {
+  from {
+    opacity: 0;
+    filter: blur(12px);
+    transform: translateY(0.3em);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+/* Hors de l'espace pharmacie, le calque n'existe pas à l'écran : le titre reste le texte simple. */
+.mot-calque {
+  display: none;
+}
+.espace-pharmacie .pb-titre-boite {
+  position: relative;
+}
+.espace-pharmacie .pb-titre-boite > h1 {
+  color: transparent;
+}
+.espace-pharmacie .mot-calque {
+  display: block;
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  pointer-events: none;
+}
+.espace-pharmacie .mot-flou {
+  display: inline-block;
+  animation: mot-flou 0.9s
+    linear(0, 0.06 3%, 0.22 7.5%, 0.5 14%, 0.77 22%, 0.93 31%, 1.01 41%, 1.02 52%, 1.005 70%, 1) both;
+  animation-delay: calc(var(--mot, 0) * 50ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .espace-pharmacie .mot-flou {
+    animation: none;
+  }
+}
+
 @theme inline {
   /* Plus Jakarta Sans, chargée dans le layout racine (next/font) ; la pile système prend le relais pendant le chargement. */
   --font-sans:
@@ -250,7 +518,7 @@
  * reste lisible (5,3:1 et 4,8:1 ; le teal et le vert d'origine, plus clairs, tombent à 4,3:1 et 3,2:1).
  */
 @utility bg-brand-gradient {
-  background-image: linear-gradient(135deg, oklch(0.52 0.085 182), oklch(0.54 0.106 162));
+  background-image: linear-gradient(135deg, var(--brand-grad-a, oklch(0.52 0.085 182)), var(--brand-grad-b, oklch(0.54 0.106 162)));
 }
 /*
  * Le même dégradé, en profondeur : pour un grand bloc qui porte du PETIT texte blanc (« Gains cumulés » des

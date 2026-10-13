@@ -33,7 +33,10 @@ export type EmailCompany = {
 export type EmailContext = {
   /** URL publique de l'application, sans barre finale (https://pharmaboost.app). */
   baseUrl: string;
-  /** Logo hébergé publiquement (une adresse locale ne s'affiche pas dans une messagerie). */
+  /**
+   * Logo hébergé publiquement (une adresse locale ne s'affiche pas dans une messagerie). L'en-tête est désormais le
+   * bandeau de l'hélice d'ADN (robot et nom compris) : le logo n'y est plus dessiné ; le champ reste pour les appelants.
+   */
   logoUrl?: string;
   company: EmailCompany;
 };
@@ -158,6 +161,38 @@ export const DEFAULT_EMAIL_CONTEXT: EmailContext = {
   company: { legalName: "PharmaBoost", contactEmail: PUBLIC_CONTACT_EMAIL },
 };
 
+/** Le site public : là où sont servies les images des e-mails quand l'adresse de l'application n'est pas publique. */
+const PUBLIC_SITE = "https://pharmaboost.app";
+
+/**
+ * Le bandeau d'en-tête : l'hélice d'ADN vivante des pages de connexion, filmée en GIF (scripts/email-bandeau-adn.ts),
+ * le robot et « PharmaBoost » dessinés dedans. Gmail, Apple Mail et iOS l'animent ; Outlook bureau, qui ne montre que la
+ * première image d'un GIF, reçoit l'image fixe en 2× (commentaires conditionnels « mso »). Toujours en adresse absolue
+ * https : depuis un poste de développement (http://localhost), les images viennent du site public.
+ */
+export const EMAIL_BANNER = {
+  gif: "/email/bandeau-adn.gif",
+  png: "/email/bandeau-adn.png",
+  alt: "PharmaBoost — le copilote intelligent de l'officine",
+  width: 600,
+  height: 200,
+} as const;
+
+export function emailBannerUrls(baseUrl: string): { gif: string; png: string } {
+  const base = baseUrl.replace(/\/+$/, "");
+  const origin = /^https:\/\//.test(base) ? base : PUBLIC_SITE;
+  return { gif: `${origin}${EMAIL_BANNER.gif}`, png: `${origin}${EMAIL_BANNER.png}` };
+}
+
+function bannerHtml(baseUrl: string): string {
+  const { gif, png } = emailBannerUrls(baseUrl);
+  const alt = escapeHtml(EMAIL_BANNER.alt);
+  // Le texte de remplacement prend la place de l'image quand la messagerie bloque les images : sur le menthe, en vert profond.
+  const style = `display:block;width:100%;max-width:${EMAIL_BANNER.width}px;height:auto;border:0;outline:none;text-decoration:none;border-radius:12px;background:#EFF4F2;font-family:${FONT};font-size:20px;line-height:28px;font-weight:700;color:#054038`;
+  const img = (src: string) => `<img src="${escapeHtml(src)}" width="${EMAIL_BANNER.width}" height="${EMAIL_BANNER.height}" alt="${alt}" style="${style}">`;
+  return `<!--[if mso]>${img(png)}<![endif]--><!--[if !mso]><!-->${img(gif)}<!--<![endif]-->`;
+}
+
 export type FrameInput = { subject: string; preheader?: string; eyebrow?: string; title: string; bodyHtml: string; reason?: string; unsubscribeUrl?: string | null; unsubscribeLabel?: string };
 
 /** L'enveloppe commune : en-tête, carte, pied de page légal. Le corps est déjà en HTML. */
@@ -176,7 +211,7 @@ export function emailFrame(ctx: EmailContext, input: FrameInput): string {
 <meta name="supported-color-schemes" content="light">
 <title>${escapeHtml(input.subject)}</title>
 <style>
-  @media (max-width:620px){ .pb-card{border-radius:0!important} .pb-pad{padding-left:22px!important;padding-right:22px!important} .pb-title{font-size:22px!important;line-height:30px!important} }
+  @media (max-width:620px){ .pb-card{border-radius:0!important} .pb-pad{padding-left:22px!important;padding-right:22px!important} .pb-title{font-size:22px!important;line-height:30px!important} .pb-banner img{border-radius:0!important} }
   a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}
 </style>
 </head>
@@ -185,12 +220,7 @@ ${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opaci
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.canvas}" style="background:${BRAND.canvas}">
 <tr><td align="center" style="padding:32px 12px">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px">
-    <tr><td class="pb-pad" style="padding:0 8px 18px">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td style="padding-right:10px"><img src="${escapeHtml(ctx.logoUrl ?? `${base}/logo-256.png`)}" width="36" height="36" alt="PharmaBoost" style="display:block;border:0;border-radius:8px"></td>
-        <td style="font-family:${FONT};font-size:18px;line-height:24px;font-weight:700;color:${BRAND.ink};letter-spacing:-.01em">PharmaBoost</td>
-      </tr></table>
-    </td></tr>
+    <tr><td class="pb-banner" style="padding:0 0 16px">${bannerHtml(base)}</td></tr>
     <tr><td class="pb-card" bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:12px;border:1px solid ${BRAND.line};border-top:4px solid ${BRAND.primary}">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr><td class="pb-pad" style="padding:34px 40px 22px">
