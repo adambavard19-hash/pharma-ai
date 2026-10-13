@@ -1,0 +1,190 @@
+# La publication automatique de PharmaBoost sur pharmaboost.app.
+#
+# Se déclenche UNIQUEMENT quand une version est envoyée sur la branche `main` (la version validée), ou à la main depuis
+# l'onglet Actions (« Run workflow »), jamais sur une autre branche ni sur une proposition venue d'un dépôt copié.
+#
+#   1. Vérifier  : contrôle du code, des types et tous les tests. Un seul échec et rien n'est publié.
+#   2. Publier   : récupère l'adresse de la base DEPUIS Vercel (aucun mot de passe dans ce dépôt), applique les migrations
+#                  avec leur verrou (scripts/ci/migrations-production.mjs), puis déploie sur le projet Vercel existant
+#                  Woorld / pharma-ai — Vercel construit le site lui-même avec SES variables de production, exactement comme
+#                  aujourd'hui — et vérifie enfin que pharmaboost.app montre bien cette version.
+#
+# Une seule publication à la fois (les suivantes attendent leur tour, aucune n'est annulée en cours de route).
+# L'historique : onglet Actions (chaque publication et son compte rendu) et Environments → production.
+#
+# Secrets nécessaires, rangés dans GitHub → Settings → Environments → production (jamais dans le code) :
+#   VERCEL_TOKEN       jeton créé sur le compte Vercel adam@woorld.app, limité à l'équipe Woorld
+#   VERCEL_ORG_ID      identifiant de l'équipe Woorld sur Vercel
+#   VERCEL_PROJECT_ID  identifiant du projet pharma-ai
+#   DATABASE_URL       SEULEMENT si Vercel refuse de la communiquer (variable « sensible ») : l'adresse de la base de prod
+
+name: Publication production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24"
+  VERCEL_CLI: vercel@64.0.1
+  SITE_URL: https://pharmaboost.app
+
+jobs:
+  verifier:
+    name: 1. Vérifier la version
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Une adresse factice : les tests ne touchent jamais une vraie base.
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Installer
+        id: installer
+        run: npm ci
+      - name: Préparer le client de base de données
+        run: npx prisma generate
+      - name: Contrôle du code
+        id: lint
+        run: npx eslint src agent/src
+      - name: Contrôle des types
+        id: types
+        run: npx tsc --noEmit
+      - name: Tests
+        id: tests
+        run: npx vitest run
+      - name: Expliquer l'échec
+        if: failure()
+        run: |
+          {
+            echo "## ❌ Version refusée avant publication"
+            echo ""
+            if [ "${{ steps.installer.outcome }}" = "failure" ]; then echo "L'installation des dépendances a échoué (fichier package-lock.json ?)."; fi
+            if [ "${{ steps.lint.outcome }}" = "failure" ]; then echo "Le contrôle du code a trouvé une erreur."; fi
+            if [ "${{ steps.types.outcome }}" = "failure" ]; then echo "Le contrôle des types a trouvé une erreur."; fi
+            if [ "${{ steps.tests.outcome }}" = "failure" ]; then echo "Au moins un test échoue."; fi
+            echo ""
+            echo "Rien n'a été publié : pharmaboost.app reste sur la version précédente. Le détail est dans l'étape en rouge."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publier:
+    name: 2. Publier sur pharmaboost.app
+    needs: verifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ env.SITE_URL }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Vérifier les autorisations
+        id: secrets
+        run: |
+          missing=""
+          [ -n "$VERCEL_TOKEN" ] || missing="$missing VERCEL_TOKEN"
+          [ -n "$VERCEL_ORG_ID" ] || missing="$missing VERCEL_ORG_ID"
+          [ -n "$VERCEL_PROJECT_ID" ] || missing="$missing VERCEL_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error title=Autorisation manquante::Secret(s) absent(s) dans GitHub → Settings → Environments → production :$missing"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Installer
+        run: npm ci
+
+      - name: Récupérer la configuration de production depuis Vercel
+        id: pull
+        run: |
+          npx --yes "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN" > /dev/null
+          # Toutes les valeurs récupérées sont masquées dans l'historique (dépôt public) avant toute autre commande.
+          while IFS= read -r line; do
+            case "$line" in ''|\#*) continue ;; esac
+            value="${line#*=}"; value="${value%\"}"; value="${value#\"}"
+            [ ${#value} -ge 4 ] && echo "::add-mask::$value"
+          done < .vercel/.env.production.local
+          echo "Configuration de production récupérée (valeurs masquées)."
+
+      - name: Migrations de la base de données
+        id: migrations
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          DATABASE_URL_SECRET: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -a
+          . ./.vercel/.env.production.local
+          set +a
+          # Une variable « sensible » ne sort jamais de Vercel : on prend alors le secret GitHub, s'il a été ajouté.
+          if [ -z "${DATABASE_URL:-}" ] && [ -n "$DATABASE_URL_SECRET" ]; then export DATABASE_URL="$DATABASE_URL_SECRET"; fi
+          node scripts/ci/migrations-production.mjs
+
+      - name: Déployer sur le projet Vercel Woorld / pharma-ai
+        id: deploy
+        run: |
+          # Vercel construit lui-même, avec ses variables de production ; la version est notée pour la vérification.
+          rm -rf .vercel/.env.production.local
+          url=$(npx --yes "$VERCEL_CLI" deploy --prod --yes --build-env NEXT_PUBLIC_PB_RELEASE="$GITHUB_SHA" --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Déploiement : $url"
+
+      - name: Vérifier que pharmaboost.app montre cette version
+        id: verify
+        run: |
+          for attempt in $(seq 1 30); do
+            body=$(curl -fsS --max-time 10 "$SITE_URL/api/sante" || true)
+            case "$body" in
+              *"\"version\":\"$GITHUB_SHA\""*) echo "pharmaboost.app répond avec la nouvelle version."; exit 0 ;;
+            esac
+            sleep 10
+          done
+          echo "::error title=Nouvelle version pas encore visible::Le déploiement est fait, mais pharmaboost.app ne montre pas cette version après 5 minutes. Vérifiez dans Vercel que le domaine est bien rattaché à la production du projet."
+          exit 1
+
+      - name: Compte rendu
+        if: always()
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          AUTHOR: ${{ github.actor }}
+        run: |
+          first_line=$(printf '%s' "$COMMIT_MESSAGE" | head -n 1 | cut -c1-200)
+          {
+            echo ""
+            echo "## Publication"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`${GITHUB_SHA::7}\` — ${first_line:-lancée à la main} |"
+            echo "| Par | $AUTHOR |"
+            echo "| Déploiement | ${{ steps.deploy.outputs.url || '—' }} |"
+            echo ""
+            if [ "${{ job.status }}" = "success" ]; then
+              echo "### ✅ En ligne sur pharmaboost.app"
+            else
+              echo "### ❌ Publication arrêtée"
+              echo ""
+              if [ "${{ steps.secrets.outcome }}" = "failure" ]; then echo "Une autorisation manque (secrets Vercel dans GitHub). Rien n'a été touché."; fi
+              if [ "${{ steps.pull.outcome }}" = "failure" ]; then echo "Vercel a refusé l'accès : le jeton est peut-être expiré ou n'a pas accès à l'équipe Woorld. Rien n'a été touché."; fi
+              if [ "${{ steps.migrations.outcome }}" = "failure" ]; then echo "Les migrations ont été refusées ou ont échoué (détail ci-dessus). Le site reste sur la version précédente."; fi
+              if [ "${{ steps.deploy.outcome }}" = "failure" ]; then echo "La construction ou le déploiement a échoué chez Vercel (détail dans l'étape « Déployer »). Les migrations éventuelles sont faites (elles ne font qu'ajouter) ; le site reste sur la version précédente."; fi
+              if [ "${{ steps.verify.outcome }}" = "failure" ]; then echo "Le déploiement est fait mais pharmaboost.app ne montre pas encore cette version : vérifier le domaine dans Vercel."; fi
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
