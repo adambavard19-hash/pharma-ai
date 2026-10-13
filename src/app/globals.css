@@ -390,6 +390,20 @@
   text-shadow: 0 0 8px rgb(255 255 255 / 0.9);
 }
 
+/*
+ * Le site public avec l'encre en fond (accueil) : la couche fixe reste visible tout le long de la page. Le fond du site
+ * s'efface, et les sections pleines deviennent un verre léger, comme les panneaux de l'espace.
+ */
+.site-public:has([data-helix-fond]:not([hidden])) {
+  background: transparent;
+}
+.site-public:has([data-helix-fond]:not([hidden])) main section.bg-surface-card,
+.site-public:has([data-helix-fond]:not([hidden])) footer {
+  background-color: rgb(255 255 255 / 0.5);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
 /* En-tête de page : un panneau menthe aux grands coins arrondis. */
 .espace-pharmacie [data-page-header] {
   background-color: var(--surface-mint);

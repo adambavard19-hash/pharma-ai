@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 /** Le site public : aucune session, aucune donnée d'officine, aucun compteur. */
 export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh bg-surface-app text-text-primary">
+    <div className="site-public min-h-dvh bg-surface-app text-text-primary">
       {/* L'île PharmaBoost dans l'en-tête : le comptoir en démonstration, les raccourcis, le robot qui répond. Le robot
           vivant de la marque se tient, lui, à côté du nom « PharmaBoost ». */}
       <SiteHeader island={<PublicIslandLoader demo={islandDemo()} />} />

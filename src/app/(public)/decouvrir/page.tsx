@@ -47,10 +47,10 @@ export default async function SitePage() {
           Le fond menthe est celui de la scène : rien ne bouge quand elle apparaît, après la première peinture. `lazy` :
           libérée à plus d'un écran de distance, elle ne coexiste jamais avec celle du bas de page. Sur téléphone, une
           image fixe allégée. */}
-      <section id="accueil" className="relative isolate -mt-16 overflow-hidden bg-mint-50 pt-16 lg:flex lg:min-h-[min(100dvh,1000px)] lg:flex-col lg:justify-center dark:bg-transparent">
-        <HelixBackdrop framing="hero" position="contained" lazy lightWhenStill className="max-lg:opacity-70" />
+      <section id="accueil" className="relative -mt-16 overflow-hidden pt-16 lg:flex lg:min-h-[min(100dvh,1000px)] lg:flex-col lg:justify-center dark:bg-transparent">
+        {/* Une seule encre pour tout le site (consigne du fondateur, 13 oct. 2026) : fixe sous la page, elle reste derrière chaque section jusqu'au bas ; globals.css rend les sections translucides. */}
+        <HelixBackdrop framing="hero" lightWhenStill className="max-lg:opacity-70" />
         {/* Le bas du héros se fond dans la page (pas de coupure nette de l'encre sur la section suivante). */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-32 bg-gradient-to-b from-transparent to-surface-app dark:hidden" aria-hidden="true" />
         <div className="mx-auto grid w-full grid-cols-1 max-w-6xl items-center gap-14 px-5 pt-14 pb-16 md:pt-24 md:pb-24 lg:grid-cols-[1fr_1.05fr]">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-3 py-1.5 text-[13px] font-medium text-text-secondary backdrop-blur-md dark:border-border-subtle dark:bg-surface-card">
@@ -82,8 +82,8 @@ export default async function SitePage() {
           <SectionHead kicker="Au comptoir" title="Une petite île, à côté de votre logiciel.">
             Notre robot y vit : il attend votre prochain scan, coche son analyse, montre les conseils pris dans votre rayon, rappelle les mises en garde — comme les minéraux à prendre à distance d&apos;une cycline — et reste là jusqu&apos;à la fin de la vente. Elle ne prend jamais la main sur votre logiciel de gestion.
           </SectionHead>
-          {/* Réduite d'un cinquième à partir de la tablette (`zoom` : tout rétrécit ensemble, rien n'est coupé), centrée. */}
-          <div className="mx-auto mt-10 max-w-[1100px] md:[zoom:0.78]">
+          {/* Réduite de près de moitié à partir de la tablette (`zoom` : tout rétrécit ensemble, rien n'est coupé), centrée. */}
+          <div className="mx-auto mt-10 max-w-[1100px] md:[zoom:0.6]">
             <CounterIslandScene framed items={HERO_ITEMS} drug={HERO_DRUG} alert={heroAlert()} />
           </div>
           {/* Pas « fidèle » : l'île n'a pas encore été vue dessinée sur un poste Windows. */}
@@ -268,10 +268,7 @@ export default async function SitePage() {
       {/* La seconde apparition de l'encre, sur grand écran seulement (comme le bloc Contact de Dantora) : la scène ne se
           monte qu'à moins d'un écran de la vue et se démonte en s'éloignant — elle ne coexiste jamais avec celle du héros.
           La carte, en verre dépoli, se range à gauche : l'hélice se tient à sa droite, son encre passe derrière. */}
-      <section id="appel-final" className="relative isolate overflow-hidden">
-        <HelixBackdrop framing="hero" position="contained" lazy desktopOnly className="max-lg:hidden" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 hidden h-32 bg-gradient-to-t from-transparent to-surface-app lg:block dark:hidden" aria-hidden="true" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 hidden h-32 bg-gradient-to-b from-transparent to-surface-app lg:block dark:hidden" aria-hidden="true" />
+      <section id="appel-final" className="relative overflow-hidden">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28 lg:py-36">
           <div className="relative overflow-hidden rounded-[32px] border border-border-subtle bg-surface-card px-7 py-14 text-center sm:px-14 lg:max-w-[38rem] lg:border-white/70 lg:text-left lg:bg-white/55 lg:backdrop-blur-xl dark:lg:border-border-subtle dark:lg:bg-surface-card">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_80%_at_50%_0%,var(--color-brand-100),transparent_70%)] opacity-70" aria-hidden="true" />
