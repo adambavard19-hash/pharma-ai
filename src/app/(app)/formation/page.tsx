@@ -14,7 +14,7 @@ import { TrainingCard } from "./_components/training-card";
 import { TeamProgress } from "./_components/team-progress";
 import { PharmacyTrainingsManager } from "./_components/pharmacy-trainings-manager";
 
-export const metadata: Metadata = { title: "Formation" };
+export const metadata: Metadata = { title: "Formations" };
 
 /**
  * Le centre de formation de l'équipe.
@@ -41,7 +41,7 @@ export default async function FormationPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Formation"
+        title="Formations"
         description="Vidéos, fiches courtes et liens officiels des laboratoires pour bien connaître les produits de l'officine. À son rythme, entre deux patients."
       />
 

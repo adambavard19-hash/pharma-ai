@@ -3,25 +3,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronDown, CircleCheck, Clock, Monitor, NotebookPen, PlugZap, ScanLine, ShieldCheck, TriangleAlert, Unplug, UserRound } from "lucide-react";
-import { counterFigures, describeSaleStage, ordonnanceTitle, type CounterDashboardData, type PillTone, type StageTone } from "@/core/counter/dashboard";
-import { formatCents, formatTime } from "@/lib/format";
+import { ArrowRight, ChevronDown, CircleCheck, Monitor, NotebookPen, TriangleAlert, Unplug } from "lucide-react";
+import { describeSaleStage, ordonnanceTitle, summarizeProducts, type CounterDashboardData, type PillTone, type StageTone } from "@/core/counter/dashboard";
+import { ADVICE_OUTCOME_LABEL, describeAdviceCount, type AdviceOutcome, type FinishedSale, type LiveSale } from "@/core/counter/board";
+import { formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CounterResetButton } from "../counter-reset-button";
-import { emitRobotMood } from "@/components/robot";
-import { dashboardMood } from "@/core/robot/mascot";
-import type { RobotTip } from "@/core/robot/mascot-tips";
-import { CounterRobot } from "./counter-robot";
 
-export type LiveSale = {
-  id: string;
-  reference: string;
-  status: string;
-  post: string | null;
-  updatedAt: string;
-  lines: { drugName: string; quantity: number }[];
-  recommendations: number;
-};
+export type { LiveSale, FinishedSale } from "@/core/counter/board";
 
 const PILL: Record<PillTone, string> = {
   success: "border-success-200 bg-success-50 text-success-800 dark:border-success-800 dark:bg-success-950/50 dark:text-success-300",
@@ -36,60 +25,71 @@ const STAGE: Record<StageTone, string> = {
   warning: "bg-warning-50 text-warning-800 dark:bg-warning-950/40 dark:text-warning-400",
 };
 
+const OUTCOME: Record<AdviceOutcome, string> = {
+  PROPOSED: "bg-brand-50 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300",
+  SOLD: "bg-success-50 text-success-800 dark:bg-success-950/50 dark:text-success-300",
+  NOT_SOLD: "bg-surface-sunken text-text-secondary",
+  UNANSWERED: "bg-surface-sunken text-text-tertiary",
+};
+
 /**
- * « Nouvelle vente » : le second écran du comptoir.
- *
- * Le pharmacien travaille dans son logiciel de pharmacie et bipe ses boîtes ; PharmaBoost intervient au bon
- * moment. L'écran dit donc si le poste est branché, attend la prochaine délivrance, et montre ce que la
- * journée a donné. Il se met à jour seul : les ventes de la douchette toutes les 2,5 secondes, l'état du
- * comptoir et les chiffres toutes les 15 secondes (et dès qu'une vente change). La saisie à la main reste
- * disponible derrière « Saisie manuelle » : elle n'est plus le point de départ, elle est le secours.
+ * « Au comptoir » (adresse /vente/nouvelle) : au comptoir, c'est la bannière du poste Windows qui fait tout ; cette page
+ * sert à SUIVRE (demande du fondateur, 13 oct. 2026). Dans l'ordre :
+ *  1. « Délivrances en cours » : chaque vente ouverte de mes comptoirs, ce qui a été scanné, les conseils proposés et
+ *     leur état (Proposé / Vendu / Non vendu), en direct (toutes les 2,5 secondes) ;
+ *  2. « Terminées aujourd'hui » : pour retrouver un patient (toutes les 15 secondes, et dès qu'une vente change) ;
+ *  3. « Saisie à la main », repliée : le secours d'une pharmacie sans poste relié ou en panne.
+ * Pas de robot, pas de bonjour, pas de liste d'ordonnances : un patient qui pose une question se conseille depuis la
+ * « Discussion » du robot, dans l'île en haut de l'écran.
  */
 export function CounterDashboard({
   dateLabel,
   initial,
   initialSales,
+  initialFinished,
   canConfigure,
   manualOpen,
-  robotTips,
-  robotGreeting,
-  stockBanner,
+  notice,
   children,
 }: {
   dateLabel: string;
+  /** L'état des comptoirs (pastille Connecté / Hors ligne). */
   initial: CounterDashboardData;
   initialSales: LiveSale[];
+  initialFinished: FinishedSale[];
   /** Peut relier un comptoir (la page « Mes comptoirs »). */
   canConfigure: boolean;
-  /** Ouvre la saisie manuelle d'emblée : un patient ou une demande de démonstration arrive déjà choisi. */
+  /** Ouvre la saisie à la main d'emblée : un patient ou une demande de démonstration arrive déjà choisi. */
   manualOpen: boolean;
-  /** Ce que le robot du coin peut dire (une phrase à la fois). */
-  robotTips: RobotTip[];
-  /** « Bonjour Paul ! » : l'heure de Paris, calculée par le serveur (pas d'écart à l'hydratation). */
-  robotGreeting: string;
-  /** Le bandeau du stock : le robot le remplace quand c'est lui qui en parle. */
-  stockBanner: ReactNode;
+  /** Un bandeau sous le titre (rappel du stock pour le titulaire). */
+  notice?: ReactNode;
   /** La saisie à la main : ordonnance, médicament, demande sans ordonnance. */
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   const [data, setData] = useState(initial);
   const [sales, setSales] = useState(initialSales);
+  const [finished, setFinished] = useState(initialFinished);
   const [manual, setManual] = useState(manualOpen);
   const openedRef = useRef<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
+  // L'état des comptoirs et les ventes terminées : plus rarement que les délivrances en cours.
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch("/api/comptoir/tableau", { cache: "no-store" });
-      if (!response.ok) return;
-      setData((await response.json()) as CounterDashboardData);
+      const [board, done] = await Promise.all([fetch("/api/comptoir/tableau", { cache: "no-store" }), fetch("/api/comptoir/en-cours?terminees=1", { cache: "no-store" })]);
+      if (board.ok) setData((await board.json()) as CounterDashboardData);
+      if (done.ok) {
+        const body = (await done.json()) as { sales: LiveSale[]; finished?: FinishedSale[] };
+        setSales(body.sales);
+        if (body.finished) setFinished(body.finished);
+      }
     } catch {
       // Une interruption réseau n'a rien à afficher : la prochaine lecture reprendra.
     }
   }, []);
 
-  // Les ventes de la douchette, en direct.
+  // Les délivrances en cours, en direct.
   useEffect(() => {
     let active = true;
     const poll = async () => {
@@ -109,12 +109,12 @@ export function CounterDashboard({
     };
   }, []);
 
-  // L'état du comptoir et les chiffres : plus rarement, et tout de suite quand une vente apparaît ou change d'état.
   useEffect(() => {
     const id = setInterval(refresh, 15_000);
     return () => clearInterval(id);
   }, [refresh]);
-  const signature = sales.map((sale) => `${sale.id}:${sale.status}:${sale.recommendations}`).join("|");
+  // Une vente apparaît, change d'état ou disparaît (terminée) : les terminées et la pastille se relisent tout de suite.
+  const signature = sales.map((sale) => `${sale.id}:${sale.status}:${sale.advice.map((a) => a.outcome).join(",")}`).join("|");
   const firstSignature = useRef(signature);
   useEffect(() => {
     if (signature === firstSignature.current) return;
@@ -146,226 +146,166 @@ export function CounterDashboard({
     if (next) requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
-  // Un conseil accepté de plus aujourd'hui : le robot se réjouit un instant (le compteur du jour fait foi).
-  const acceptedRef = useRef(initial.stats.accepted);
-  useEffect(() => {
-    if (data.stats.accepted > acceptedRef.current) emitRobotMood("happy", { channel: "comptoir" });
-    acceptedRef.current = data.stats.accepted;
-  }, [data.stats.accepted]);
-  const robotMood = dashboardMood({ saleStatuses: sales.map((sale) => sale.status), acceptedRose: false });
-
-  const { status, stats, activity } = data;
-  const figures = counterFigures(stats, formatCents);
+  const { status } = data;
 
   return (
-    <div className="space-y-5">
-      <CounterRobot mood={robotMood} tips={robotTips} stockBanner={stockBanner} greeting={robotGreeting} />
-      <section aria-labelledby="titre-comptoir" className="rounded-2xl border border-border-subtle bg-surface-card p-5 shadow-card sm:p-8">
-        {/* Le titre garde au moins onze rem : en dessous, la pastille passe sous lui plutôt que de l'étrangler. */}
-        <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-3">
-          <div className="min-w-0 grow basis-44 space-y-2">
-            <p className="text-[12.5px] font-medium tracking-[0.08em] text-text-secondary uppercase">{dateLabel}</p>
-            <h1 id="titre-comptoir" className="text-[28px] leading-[34px] font-bold tracking-[-0.025em] text-balance text-text-primary sm:text-[32px] sm:leading-10">
-              {status.title}
-            </h1>
-          </div>
-          <span className={cn("mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[14px] font-medium whitespace-nowrap", PILL[status.pill.tone])}>
-            {status.pill.tone === "success" ? <CircleCheck className="size-4" /> : status.pill.tone === "warning" ? <TriangleAlert className="size-4" /> : <Unplug className="size-4" />}
-            {status.pill.label}
-          </span>
-        </header>
-        <p className="mt-3 max-w-xl text-[15px] leading-6 text-text-secondary">{status.subtitle}</p>
-        {status.posts.length > 0 && (
-          <ul aria-label="Vos comptoirs" className="mt-4 flex flex-wrap gap-2">
-            {status.posts.map((post) => (
-              <li key={post.id} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-sunken/70 py-1.5 pr-3 pl-2.5 text-[13.5px] text-text-primary">
-                <Monitor className="size-4 text-text-tertiary" aria-hidden />
-                <span className="font-medium">{post.label}</span>
-                <span className="inline-flex items-center gap-1 text-text-secondary">
-                  <UserRound className="size-3.5" aria-hidden />
-                  {post.owner ?? "personne"}
-                </span>
-                <span className={cn("size-2 rounded-full", post.online ? "bg-success-500" : "bg-warning-500")} role="img" aria-label={post.online ? "en ligne" : "hors ligne"} />
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="mt-6 rounded-2xl bg-surface-sunken/70 px-5 py-8 sm:px-8" aria-live="polite">
-          {sales.length > 0 ? <InProgress sales={sales} /> : <Waiting status={status} canConfigure={canConfigure} />}
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0 space-y-1">
+          <p className="text-[12.5px] font-medium tracking-[0.08em] text-text-secondary uppercase">{dateLabel}</p>
+          <h1 className="text-[28px] leading-[34px] font-bold tracking-[-0.025em] text-text-primary">Au comptoir</h1>
         </div>
+        <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[13.5px] font-medium whitespace-nowrap", PILL[status.pill.tone])}>
+          {status.pill.tone === "success" ? <CircleCheck className="size-4" /> : status.pill.tone === "warning" ? <TriangleAlert className="size-4" /> : <Unplug className="size-4" />}
+          {status.pill.label}
+        </span>
+      </header>
 
-        <dl className="mt-4 grid grid-cols-3 gap-2.5 sm:gap-4">
-          <Figure label="Délivrances détectées" value={figures.detected} />
-          <Figure label="Conseils acceptés" value={figures.accepted} />
-          <Figure label="Ventes additionnelles" value={figures.additional} />
-        </dl>
+      {notice}
 
-        <div className="mt-8 flex items-baseline justify-between gap-3">
-          <h2 className="text-[20px] leading-7 font-semibold tracking-[-0.01em] text-text-primary">Activité récente</h2>
-          <span className="text-[14px] text-text-secondary">Votre comptoir, aujourd&apos;hui</span>
+      <section aria-labelledby="titre-en-cours" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="titre-en-cours" className="flex items-center gap-2.5 text-[20px] leading-7 font-semibold text-text-primary">
+            {sales.length > 0 && (
+              <span className="relative flex size-2.5" aria-hidden>
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand-500 opacity-60 motion-reduce:animate-none" />
+                <span className="relative inline-flex size-2.5 rounded-full bg-brand-600" />
+              </span>
+            )}
+            Délivrances en cours
+          </h2>
+          {sales.length > 0 && <CounterResetButton />}
         </div>
-        {activity.length === 0 ? (
-          <div className="mt-3 flex flex-col items-center gap-3 rounded-xl border border-border-subtle px-5 py-8 text-center">
-            <Clock className="size-5 text-text-tertiary" />
-            <p className="text-[15px] text-text-secondary">Les dernières ordonnances de votre comptoir apparaîtront ici.</p>
-          </div>
+        <div aria-live="polite">
+          {sales.length > 0 ? (
+            <ul className="space-y-2.5">
+              {sales.map((sale) => (
+                <LiveSaleCard key={sale.id} sale={sale} />
+              ))}
+            </ul>
+          ) : (
+            <NothingLive status={status} canConfigure={canConfigure} />
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="titre-terminees" className="space-y-3">
+        <h2 id="titre-terminees" className="text-[20px] leading-7 font-semibold text-text-primary">
+          Terminées aujourd&apos;hui
+        </h2>
+        {finished.length === 0 ? (
+          <p className="rounded-xl border border-border-subtle px-4 py-4 text-[14px] text-text-secondary">Aucune vente terminée aujourd&apos;hui.</p>
         ) : (
-          <ul className="mt-3 space-y-2.5">
-            {activity.map((item) => (
-              <li key={item.id}>
-                <Link href={`/vente/${item.id}`} className="block rounded-xl border border-border-subtle bg-surface-card px-4 py-3.5 shadow-card transition-colors hover:border-brand-400 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none sm:px-5">
-                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="text-[15px] font-semibold text-text-primary">{ordonnanceTitle(item.reference)}</span>
-                    <span className="text-[13px] text-text-secondary tabular">{item.when}</span>
-                    <span className={cn("ml-auto shrink-0 rounded-full px-2.5 py-1 text-[12px] font-medium", STAGE[item.stage.tone])}>{item.stage.label}</span>
+          <ul className="divide-y divide-border-subtle overflow-hidden rounded-xl border border-border-subtle bg-surface-card">
+            {finished.map((sale) => (
+              <li key={sale.id}>
+                <Link href={`/vente/${sale.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none focus-visible:ring-inset">
+                  <span className="w-12 shrink-0 text-[14px] font-medium text-text-primary tabular">{formatTime(sale.finishedAt)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14.5px] text-text-primary">{summarizeProducts(sale.lines.map((line) => line.drugName))}</span>
+                    <span className="block truncate text-[12.5px] text-text-secondary">{[describeAdviceCount(sale.soldCount, sale.adviceCount), sale.comptoir].filter(Boolean).join(" · ")}</span>
                   </span>
-                  <span className="mt-0.5 block text-[12.5px] text-text-secondary">
-                    {[item.comptoir, item.patient].filter(Boolean).join(" · ") || "Saisie à l'écran"}
-                  </span>
-                  {item.lines.length > 0 && (
-                    <ul className="mt-2.5 space-y-1 border-l-2 border-border-subtle pl-3">
-                      {item.lines.map((line, index) => (
-                        <li key={`${line.name}-${index}`} className="text-[14px] leading-5 text-text-primary">
-                          {line.quantity > 1 && <span className="mr-1 text-text-secondary tabular">{line.quantity} ×</span>}
-                          {line.name}
-                        </li>
-                      ))}
-                      {item.moreLines > 0 && <li className="text-[13px] text-text-secondary">et {item.moreLines} autre{item.moreLines > 1 ? "s" : ""}</li>}
-                    </ul>
-                  )}
+                  <ArrowRight className="size-4 shrink-0 text-text-tertiary" />
                 </Link>
               </li>
             ))}
           </ul>
         )}
-        <p className="mt-2 text-right text-[12.5px]">
-          <Link href="/ordonnances" className="text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
-            Toutes les ordonnances
-          </Link>
-        </p>
-
-        <footer className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-          <button
-            type="button"
-            onClick={toggleManual}
-            aria-expanded={manual}
-            aria-controls="saisie-manuelle"
-            className="inline-flex h-11 items-center gap-2.5 rounded-md border border-border-default bg-surface-card px-6 text-sm font-medium text-text-primary transition-colors hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
-          >
-            <NotebookPen className="size-4 text-text-secondary" />
-            Saisie manuelle
-            <ChevronDown className={cn("size-4 text-text-tertiary transition-transform", manual && "rotate-180")} />
-          </button>
-          <p className="inline-flex items-center gap-2 text-[14px] text-text-secondary">
-            <ShieldCheck className="size-4.5 text-text-tertiary" />
-            Conseils soumis à validation
-          </p>
-        </footer>
       </section>
 
-      {/* Toujours monté, seulement masqué : le formulaire garde ses réglages et sait recevoir une ordonnance glissée. */}
-      <div id="saisie-manuelle" ref={panelRef} hidden={!manual} className="scroll-mt-4 space-y-6">
-        {children}
-      </div>
+      <section aria-label="Saisie à la main" className="border-t border-border-subtle pt-4">
+        <button
+          type="button"
+          onClick={toggleManual}
+          aria-expanded={manual}
+          aria-controls="saisie-manuelle"
+          className="inline-flex items-center gap-2 rounded-md px-1 py-1 text-[14px] text-text-secondary transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+        >
+          <NotebookPen className="size-4" />
+          Saisie à la main
+          <ChevronDown className={cn("size-4 transition-transform", manual && "rotate-180")} />
+        </button>
+        <p className="mt-0.5 px-1 text-[12.5px] text-text-tertiary">Pour une pharmacie sans poste relié, ou en cas de panne.</p>
+        {/* Toujours monté, seulement masqué : le formulaire garde ses réglages et sait recevoir une ordonnance glissée. */}
+        <div id="saisie-manuelle" ref={panelRef} hidden={!manual} className="mt-4 scroll-mt-4 space-y-6">
+          {children}
+        </div>
+      </section>
     </div>
   );
 }
 
-function Figure({ label, value }: { label: string; value: string }) {
+/** Une délivrance en cours : le comptoir, l'heure, l'étape, ce qui a été scanné, les conseils et leur état. */
+function LiveSaleCard({ sale }: { sale: LiveSale }) {
+  const stage = describeSaleStage(sale.status, sale.recommendations);
   return (
-    <div className="flex flex-col-reverse justify-end gap-1 rounded-xl border border-border-subtle px-4 py-4 shadow-card sm:px-5">
-      <dt className="text-[13.5px] leading-[18px] text-text-secondary">{label}</dt>
-      <dd className="text-[26px] leading-8 font-semibold tabular text-text-primary">{value}</dd>
-    </div>
+    <li>
+      <Link href={`/vente/${sale.id}`} className="block rounded-2xl border border-border-subtle bg-surface-card px-4 py-3.5 shadow-card transition-colors hover:border-brand-400 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none sm:px-5">
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-[13.5px] text-text-secondary">
+            <span className="font-medium text-text-primary">{sale.comptoir ?? ordonnanceTitle(sale.reference)}</span> · <span className="tabular">{formatTime(sale.updatedAt)}</span>
+          </span>
+          <span className={cn("ml-auto shrink-0 rounded-full px-2.5 py-1 text-[12px] font-medium", STAGE[stage.tone])}>{stage.label}</span>
+          <ArrowRight className="size-4 shrink-0 text-text-tertiary" />
+        </span>
+        {sale.lines.length > 0 && (
+          <span className="mt-2 block space-y-0.5">
+            {sale.lines.map((line, index) => (
+              <span key={`${line.drugName}-${index}`} className="block truncate text-[15px] font-medium text-text-primary">
+                {line.quantity > 1 ? `${line.quantity} × ` : ""}
+                {line.drugName || "Produit non reconnu"}
+              </span>
+            ))}
+          </span>
+        )}
+        {sale.advice.length > 0 && (
+          <span className="mt-2.5 block border-t border-border-subtle pt-2.5">
+            <span className="block text-[12px] font-medium tracking-[0.04em] text-text-tertiary uppercase">Conseils</span>
+            <span className="mt-1 block space-y-1">
+              {sale.advice.map((advice) => (
+                <span key={advice.name} className="flex items-center gap-2 text-[14px] text-text-primary">
+                  <span className="min-w-0 flex-1 truncate">{advice.name}</span>
+                  <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium", OUTCOME[advice.outcome])}>{ADVICE_OUTCOME_LABEL[advice.outcome]}</span>
+                </span>
+              ))}
+            </span>
+          </span>
+        )}
+      </Link>
+    </li>
   );
 }
 
-/** L'attente : ce que le comptoir fait quand rien n'arrive — et, honnêtement, ce qui l'empêche de voir arriver. */
-function Waiting({ status, canConfigure }: { status: CounterDashboardData["status"]; canConfigure: boolean }) {
-  const ready = status.state === "READY";
-  const unassigned = status.state === "UNASSIGNED";
-  const Icon = ready ? ScanLine : status.state === "OFFLINE" ? Unplug : unassigned ? UserRound : PlugZap;
+/** Rien en cours : ce que fait le comptoir — et, honnêtement, ce qui l'empêche de voir arriver les délivrances. */
+function NothingLive({ status, canConfigure }: { status: CounterDashboardData["status"]; canConfigure: boolean }) {
+  const text =
+    status.state === "READY"
+      ? "Aucune délivrance en cours. Elles apparaissent ici dès qu'une boîte est scannée au comptoir."
+      : status.state === "UNASSIGNED"
+        ? "Ouvrez PharmaBoost depuis l'ordinateur de votre comptoir : vous voyez les délivrances du vôtre, et personne ne voit les vôtres."
+        : status.state === "OFFLINE"
+          ? "L'ordinateur du comptoir ne répond pas : vérifiez qu'il est allumé et relié à Internet. En attendant, la saisie à la main reste possible."
+          : "Aucun poste relié : PharmaBoost ne voit pas vos délivrances. En attendant, la saisie à la main reste possible.";
   return (
-    <div className="flex flex-col items-center gap-4 text-center">
-      <span className={cn("flex size-16 items-center justify-center rounded-full", ready ? "bg-brand-100/70 text-brand-600 dark:bg-brand-900/50 dark:text-brand-400" : status.state === "OFFLINE" ? "bg-warning-100/70 text-warning-700 dark:bg-warning-900/40 dark:text-warning-400" : "bg-surface-card text-text-tertiary")}>
-        <Icon className="size-7" strokeWidth={1.75} />
-      </span>
-      <h2 className="text-[24px] leading-8 font-semibold tracking-[-0.01em] text-text-primary">
-        {ready ? "En attente d'une délivrance" : status.state === "OFFLINE" ? "Aucune délivrance suivie pour l'instant" : unassigned ? "Ouvrez PharmaBoost depuis votre comptoir" : "Aucun poste relié"}
-      </h2>
-      <p className="max-w-md text-[16px] leading-6 text-text-secondary">
-        {ready
-          ? "Continuez dans votre logiciel de pharmacie. Les conseils apparaîtront automatiquement lorsqu'une délivrance sera détectée."
-          : unassigned
-            ? "Le comptoir revient à la personne connectée sur son ordinateur : vous ne voyez que les délivrances du vôtre, et personne ne voit les vôtres."
-            : status.state === "OFFLINE"
-            ? "Vérifiez que l'ordinateur du comptoir est allumé et relié à Internet. En attendant, vous pouvez saisir une vente à la main."
-            : "Sans poste relié, PharmaBoost ne voit pas vos délivrances. En attendant, vous pouvez saisir une vente à la main."}
-      </p>
+    <div className="rounded-xl border border-border-subtle px-4 py-4">
+      <p className="text-[14px] leading-5 text-text-secondary">{text}</p>
       {status.posts.length > 0 && (
-        <ul className="space-y-1.5">
+        <ul aria-label="Vos comptoirs" className="mt-3 flex flex-wrap gap-2">
           {status.posts.map((post) => (
-            <li key={post.id} className="flex items-center justify-center gap-2.5 text-[16px] text-text-secondary">
-              <Monitor className="size-5 text-text-tertiary" />
+            <li key={post.id} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-sunken/70 py-1 pr-3 pl-2.5 text-[13px] text-text-primary">
+              <Monitor className="size-3.5 text-text-tertiary" aria-hidden />
               <span>{post.label}{post.owner ? ` · ${post.owner}` : ""}</span>
-              {post.online ? <CircleCheck className="size-5 text-success-600 dark:text-success-400" aria-label="en ligne" /> : <span className="inline-flex items-center gap-1 text-[13.5px] text-warning-700 dark:text-warning-400"><TriangleAlert className="size-4" />hors ligne</span>}
+              <span className={cn("size-2 rounded-full", post.online ? "bg-success-500" : "bg-warning-500")} role="img" aria-label={post.online ? "en ligne" : "hors ligne"} />
             </li>
           ))}
         </ul>
       )}
-      {status.awaitingFirstScan && <p className="max-w-md text-[13.5px] leading-5 text-text-secondary">Aucun bip reçu pour l&apos;instant : bipez une boîte au comptoir pour vérifier que le suivi arrive.</p>}
       {(status.state === "UNASSIGNED" || status.state === "NOT_CONNECTED") && canConfigure && (
-        <Link href="/connexion" className="inline-flex h-11 items-center gap-2 rounded-md bg-brand-gradient px-6 text-sm font-medium text-white shadow-xs transition-[filter] hover:brightness-[0.93] focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none">
+        <Link href="/connexion" className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
           {status.state === "UNASSIGNED" ? "Voir qui est où" : "Connecter mon comptoir"}
           <ArrowRight className="size-4" />
         </Link>
       )}
-    </div>
-  );
-}
-
-/** Une délivrance est arrivée : la carte la montre, et mène aux conseils. */
-function InProgress({ sales }: { sales: LiveSale[] }) {
-  return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2.5 text-[20px] leading-7 font-semibold text-text-primary">
-          <span className="relative flex size-2.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand-500 opacity-60 motion-reduce:animate-none" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-brand-600" />
-          </span>
-          {sales.length > 1 ? "Délivrances en cours" : "Délivrance en cours"}
-        </h2>
-        <CounterResetButton />
-      </div>
-      <ul className="mt-4 space-y-2.5">
-        {sales.map((sale) => {
-          const stage = describeSaleStage(sale.status, sale.recommendations);
-          return (
-            <li key={sale.id}>
-              <Link href={`/vente/${sale.id}`} className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-surface-card px-4 py-3.5 transition-colors hover:border-brand-400 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] text-text-secondary">
-                    <span className="font-medium text-text-primary">{ordonnanceTitle(sale.reference)}</span> · {sale.post ? `${sale.post} · ` : ""}
-                    {formatTime(sale.updatedAt)}
-                  </span>
-                  <span className="mt-1 block space-y-0.5">
-                    {sale.lines.map((line, index) => (
-                      <span key={`${line.drugName}-${index}`} className="block truncate text-[15px] font-medium text-text-primary">
-                        {line.quantity > 1 ? `${line.quantity} × ` : ""}
-                        {line.drugName}
-                      </span>
-                    ))}
-                  </span>
-                </span>
-                <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-[12px] font-medium", STAGE[stage.tone])}>{stage.label}</span>
-                <ArrowRight className="size-4 shrink-0 text-text-tertiary" />
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
     </div>
   );
 }

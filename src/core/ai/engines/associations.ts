@@ -15,6 +15,9 @@ import { suggestionVigilances } from "./population-vigilance";
  *  • l'ordonnance : un médicament à prescription obligatoire ne se propose jamais en vente additionnelle ;
  *  • la vente elle-même : ce qui y est déjà n'est pas reproposé, ni ce que le moteur propose déjà par ailleurs.
  *
+ * Le PRODUIT PROPOSÉ est un produit de l'officine, ou un médicament SANS ordonnance de son stock (« presentation:<id> », la
+ * boîte la mieux fournie de la spécialité choisie) : il passe par les mêmes contrôles, prescription d'abord.
+ *
  * Le DÉCLENCHEUR est soit un produit du stock (« product:<id> »), soit un médicament du catalogue national, reconnu par
  * son nom sans la forme (« drug:CORYZALIA » pour « CORYZALIA, comprimé orodispersible » comme pour « CORYZALIA, solution
  * buvable ») : un médicament conseil se lit par son code CIP, il n'est pas dans le stock de l'officine.
@@ -118,6 +121,8 @@ export function buildAssociationAdvice(args: {
     for (const key of keys) triggersByKey.set(key, [...(triggersByKey.get(key) ?? []), { lineIndex, name, productId: productId ?? "" }]);
   }
   const inSale = new Set(args.association.lines.map((line) => line.productId).filter((id): id is string => id !== null));
+  // Un médicament proposé déjà dans la vente, sous cette forme ou une autre (même nom sans la forme) : pas reproposé.
+  const drugsInSale = new Set(args.lines.flatMap((line) => (line.drugName ? [drugKey(line.drugName)] : [])));
 
   const skipped: AssociationSkip[] = [];
   const notes: string[] = [];
@@ -133,9 +138,10 @@ export function buildAssociationAdvice(args: {
       skipped.push({ ruleId: rule.id, reason });
       notes.push(`Association ${listNames(triggers.map((t) => t.name))} → ${listNames([advice?.name ?? "produit inconnu"])} non proposée : ${ASSOCIATION_SKIP_LABELS[reason]}.`);
     };
-    if (!advice || !advice.isActive || advice.origin !== "PHARMACY_CATALOG") { note("NOT_IN_CATALOG"); continue; }
+    // Un produit de l'officine, ou un médicament SANS ordonnance de son stock (« presentation:… », choisi dans « Mes associations »).
+    if (!advice || !advice.isActive) { note("NOT_IN_CATALOG"); continue; }
     if (advice.prescriptionConditions.length > 0) { note("PRESCRIPTION_ONLY"); continue; }
-    if (inSale.has(advice.id)) { note("ALREADY_IN_SALE"); continue; }
+    if (inSale.has(advice.id) || (advice.origin === "NATIONAL_DRUG" && drugsInSale.has(drugKey(advice.name)))) { note("ALREADY_IN_SALE"); continue; }
     if (args.blockedProductIds.has(advice.id)) { note("SAFETY"); continue; }
     if (advice.stockQuantity <= 0) { note("OUT_OF_STOCK"); continue; }
     if (args.alreadyProposedProductIds.has(advice.id)) { note("ALREADY_PROPOSED"); continue; }

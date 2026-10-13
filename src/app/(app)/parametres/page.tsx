@@ -93,6 +93,7 @@ export default async function SettingsPage({
         canSeeRules={session.permissions.has(PERMISSIONS.RECOMMENDATION_VIEW)}
         canSeeAudit={session.permissions.has(PERMISSIONS.AUDIT_VIEW)}
         auditCount={auditLogs.length}
+        canSeePosts={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
       />
 
       {tab === "moteur" ? (

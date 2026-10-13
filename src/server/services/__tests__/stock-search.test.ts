@@ -10,11 +10,12 @@ const m = vi.hoisted(() => ({
   queryRaw: vi.fn(),
   product: { findMany: vi.fn() },
   drugPresentation: { findFirst: vi.fn(), findMany: vi.fn() },
+  drugPrescriptionCondition: { findMany: vi.fn() },
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/server/db/client", () => ({ prisma: { $queryRaw: m.queryRaw, product: m.product, drugPresentation: m.drugPresentation } }));
+vi.mock("@/server/db/client", () => ({ prisma: { $queryRaw: m.queryRaw, product: m.product, drugPresentation: m.drugPresentation, drugPrescriptionCondition: m.drugPrescriptionCondition } }));
 
-const { searchAssociationTriggers, searchCatalogDrugs, searchPharmacyProducts, searchStockDrugs } = await import("../stock-search");
+const { liveQuery, searchAssociationAdvice, searchAssociationTriggers, searchCatalogDrugs, searchPharmacyProducts, searchStockDrugs } = await import("../stock-search");
 const { parseSearchQuery } = await import("@/core/search/tolerant-search");
 
 /** La requête SQL telle que la base la reçoit : le texte, avec ses paramètres liés. */
@@ -58,6 +59,7 @@ beforeEach(() => {
   m.product.findMany.mockResolvedValue([]);
   m.drugPresentation.findMany.mockResolvedValue([]);
   m.drugPresentation.findFirst.mockResolvedValue(null);
+  m.drugPrescriptionCondition.findMany.mockResolvedValue([]);
 });
 
 describe("les médicaments du stock de l'officine", () => {
@@ -315,5 +317,83 @@ describe("le déclencheur d'une association : un champ, trois sources", () => {
     expect(bound.filter((sql) => sql.values.includes("ph_A"))).toHaveLength(2);
     expect(bound.filter((sql) => sql.values.includes("ph_B"))).toHaveLength(2);
     expect(bound.every((sql) => !(sql.values.includes("ph_A") && sql.values.includes("ph_B")))).toBe(true);
+  });
+});
+
+describe("« Mes associations » propose dès la première lettre", () => {
+  it("une ou deux lettres, même un mot vide (« d », « la ») : le début d'un nom ; la lettre en cours de frappe ne vide pas la liste", () => {
+    expect(liveQuery("d").prefix?.text).toBe("D");
+    expect(liveQuery("Do").prefix?.text).toBe("DO");
+    expect(liveQuery("la").prefix?.text).toBe("LA");
+    expect(liveQuery("dol").prefix).toBeNull();
+    expect(liveQuery("creme m").query.terms.map((term) => term.text)).toEqual(["CREME"]);
+    expect(liveQuery("doliprane 1").query.terms.map((term) => term.text)).toEqual(["DOLIPRANE"]);
+    expect(liveQuery("doliprane 1000").query.terms.map((term) => term.text)).toEqual(["DOLIPRANE", "1000"]);
+  });
+
+  /** La base simulée en mode « première lettre » : médicaments détenus, produits, catalogue national. */
+  const prefixBase = (drugs: unknown[], productIds: string[], catalogue: unknown[]) =>
+    m.queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+      const text = strings.join("?");
+      if (text.includes("split_part")) return [];
+      if (text.includes('FROM "pharmacy_drug_stocks"')) return drugs;
+      if (text.includes('FROM "products"')) return productIds.map((id) => ({ id }));
+      return catalogue;
+    });
+
+  it("« d » : ce qui est en stock d'abord (médicaments et produits mêlés), puis les ruptures ; requêtes bornées à l'officine", async () => {
+    prefixBase(
+      [
+        { specialtyId: "sp_dafa", name: "DAFALGAN 1 g, comprimé", marketingStatus: "Commercialisée", label: "boîte de 8", quantity: 0 },
+        { specialtyId: "sp_doli", name: "DOLIPRANE 1000 mg, gélule", marketingStatus: "Commercialisée", label: "boîte de 8", quantity: 414 },
+      ],
+      ["p_dent"],
+      [{ id: "sp_dex", name: "DEXERYL, crème", marketingStatus: "Commercialisée" }],
+    );
+    m.product.findMany.mockResolvedValue([productRow("p_dent", "Dentifrice dents sensibles", 55)]);
+    const result = await searchAssociationTriggers("ph_1", "d");
+    expect(result.stock.map((option) => (option.kind === "DRUG" ? option.specialtyId : option.productId))).toEqual(["p_dent", "sp_doli", "sp_dafa"]);
+    expect(result.catalogue.map((option) => (option.kind === "DRUG" ? option.specialtyId : null))).toEqual(["sp_dex"]);
+    const sqls = m.queryRaw.mock.calls.map((call) => sqlOf(call));
+    const drugSql = sqls.find((sql) => sql.text.includes('FROM "pharmacy_drug_stocks"') && !sql.text.includes("split_part")) as Prisma.Sql;
+    const productSql = sqls.find((sql) => sql.text.includes('FROM "products"')) as Prisma.Sql;
+    expectBoundTo(drugSql, 's."pharmacyId"', "ph_1");
+    expectBoundTo(productSql, 'p."pharmacyId"', "ph_1");
+    // La lettre tapée n'entre jamais dans le texte SQL : un motif « commence par », passé en paramètre lié.
+    expect(productSql.values).toContain("^D");
+    expect(productSql.text).not.toContain("'D");
+    // Le catalogue national ne dépend d'aucune officine.
+    const catalogSql = sqls.find((sql) => sql.text.includes('FROM "drug_specialties" sp') && !sql.text.includes("pharmacy_drug_stocks")) as Prisma.Sql;
+    expect(catalogSql.values).not.toContain("ph_1");
+  });
+
+  it("« PharmaBoost propose » : produits et médicaments SANS ordonnance du stock, en stock d'abord, les ruptures à part", async () => {
+    m.queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+      const text = strings.join("?");
+      if (text.includes('FROM "pharmacy_drug_stocks"'))
+        return [
+          { specialtyId: "sp_cet", name: "CETIRIZINE VIATRIS CONSEIL 10 mg, comprimé", marketingStatus: "Commercialisée", label: "boîte de 7", cip13: "1", cip7: "1", quantity: 37, substances: "CÉTIRIZINE" },
+          { specialtyId: "sp_amox", name: "CETIRAMOX 1 g, comprimé", marketingStatus: "Commercialisée", label: "boîte de 6", cip13: "2", cip7: "2", quantity: 9, substances: null },
+        ];
+      if (text.includes('FROM "products"')) return [{ id: "p_spray", name: "CETISPRAY NEZ", brand: null, reference: "R", ean: null, tags: [], quantity: 0 }];
+      return [];
+    });
+    m.product.findMany.mockResolvedValue([productRow("p_spray", "CETISPRAY NEZ", 0)]);
+    // CETIRAMOX est soumis à prescription : il n'est jamais proposé.
+    m.drugPrescriptionCondition.findMany.mockResolvedValue([{ specialtyId: "sp_amox" }]);
+    const result = await searchAssociationAdvice("ph_1", "ceti");
+    expect(result.stock.map((option) => [option.kind, option.id])).toEqual([["DRUG", "sp_cet"]]);
+    expect(result.empty.map((option) => [option.kind, option.id])).toEqual([["PRODUCT", "p_spray"]]);
+    for (const sql of m.queryRaw.mock.calls.map((call) => sqlOf(call))) {
+      if (sql.text.includes('FROM "pharmacy_drug_stocks"')) expectBoundTo(sql, 's."pharmacyId"', "ph_1");
+      if (sql.text.includes('FROM "products"')) expectBoundTo(sql, 'p."pharmacyId"', "ph_1");
+    }
+  });
+
+  it("en mode « première lettre », les médicaments sur ordonnance sont écartés par la base elle-même", async () => {
+    await searchAssociationAdvice("ph_1", "d");
+    const drugSql = m.queryRaw.mock.calls.map((call) => sqlOf(call)).find((sql) => sql.text.includes('FROM "pharmacy_drug_stocks"')) as Prisma.Sql;
+    expect(drugSql.text).toContain('NOT EXISTS (SELECT 1 FROM "drug_prescription_conditions"');
+    expect(drugSql.values).toContain(true);
   });
 });

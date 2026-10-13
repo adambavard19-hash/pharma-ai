@@ -9,7 +9,7 @@ import { NewsStateCard } from "./news-state-card";
 import { AnnouncementComposer } from "./announcement-composer";
 import { AnnouncementHistory } from "./announcement-history";
 
-export const metadata: Metadata = { title: "Nouveautés" };
+export const metadata: Metadata = { title: "Actualités" };
 
 // Un envoi aux abonnés dure jusqu'à 45 secondes avant de reprendre la main : on
 // le déclare à l'hébergeur plutôt que d'être coupé en route. Les actions de la
@@ -41,7 +41,7 @@ export default async function NewsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
-        title="Nouveautés pour vos patients"
+        title="Actualités pour vos patients"
         description="Les patients qui l'ont choisi sont prévenus des nouvelles gammes de votre pharmacie. Une annonce est un geste du titulaire : rien ne part tout seul."
       />
 

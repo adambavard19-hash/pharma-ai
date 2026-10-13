@@ -3,6 +3,7 @@ import { prisma } from "@/server/db/client";
 import { authenticateAgent, recordHeartbeat } from "@/server/services/stock-sync";
 import { postDrawsRobot } from "@/core/robot/single-robot";
 import { personRobotLook } from "@/core/robot/counter-look";
+import { cleanFirstName } from "../../../../../agent/src/greeting-text";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,9 @@ export const dynamic = "force-dynamic";
  *    le navigateur lié à ce poste n'en dessine pas un second (core/robot/single-robot.ts). Ancienne fenêtre, notification
  *    seule, ancien agent : effacé, l'espace garde son robot ;
  *  - le robot qu'il reçoit est celui de la PERSONNE connectée à ce poste (1 robot pour 1 espace) ; personne : le robot de
- *    la marque (null).
+ *    la marque (null) ;
+ *  - avec son PRÉNOM seul (jamais le nom de famille) : le bonjour du robot au démarrage du poste (agent/src/greeting.ts).
+ *    Personne, ou prénom illisible : vide, le robot dit « Bonjour » sans prénom.
  */
 export async function POST(request: Request) {
   const agent = await authenticateAgent(request.headers.get("authorization"));
@@ -38,7 +41,19 @@ export async function POST(request: Request) {
     // `robotShownAt` est un confort : s'il ne s'écrit pas (code en ligne avant la migration), le signe de vie passe quand
     // même — sans lui, tous les postes se diraient « hors ligne ». Une vraie erreur échoue aussi au second essai.
     const post = await save(true).catch(() => save(false));
-    return NextResponse.json({ ok: true, intervalSeconds: 300, exportPath: post.exportPath, scansPath: null, syncRequestedAt: post.syncRequestedAt?.toISOString() ?? null, robotLook: post.assignedUserId ? personRobotLook(post.assignedUserId) : null });
+    // Le prénom est un confort : une lecture qui échoue ne fait jamais échouer le signe de vie.
+    const person = post.assignedUserId
+      ? await prisma.user.findUnique({ where: { id: post.assignedUserId }, select: { firstName: true } }).catch(() => null)
+      : null;
+    return NextResponse.json({
+      ok: true,
+      intervalSeconds: 300,
+      exportPath: post.exportPath,
+      scansPath: null,
+      syncRequestedAt: post.syncRequestedAt?.toISOString() ?? null,
+      robotLook: post.assignedUserId ? personRobotLook(post.assignedUserId) : null,
+      firstName: cleanFirstName(person?.firstName),
+    });
   }
   await recordHeartbeat(agent, { version: body.version, hostname: body.hostname, notice: typeof body.notice === "string" || body.notice === null ? body.notice : undefined });
   const connection = await prisma.stockConnection.findUniqueOrThrow({ where: { id: agent.connectionId! }, select: { intervalSeconds: true, exportPath: true, scansPath: true } });

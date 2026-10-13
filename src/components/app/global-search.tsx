@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Loader2,
   Package,
+  Pill,
   Search,
   User,
   UsersRound,
@@ -17,6 +18,7 @@ const ICONS = {
   patient: User,
   prescription: ClipboardList,
   product: Package,
+  drug: Pill,
   user: UsersRound,
 } as const;
 
@@ -24,6 +26,7 @@ const GROUP_LABELS: Record<SearchResult["type"], string> = {
   patient: "Patients",
   prescription: "Ordonnances",
   product: "Produits",
+  drug: "Médicaments",
   user: "Équipe",
 };
 
@@ -137,7 +140,7 @@ export function GlobalSearch() {
         )}
       >
         <Search className="size-4 shrink-0" />
-        <span className="flex-1 text-left">Rechercher un patient, une ordonnance…</span>
+        <span className="min-w-0 flex-1 truncate text-left">Rechercher un produit, un médicament…</span>
         <kbd className="hidden shrink-0 rounded border border-border-default bg-surface-card px-1.5 py-0.5 font-mono text-[10px] text-text-tertiary sm:block">
           ⌘K
         </kbd>
@@ -163,7 +166,7 @@ export function GlobalSearch() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={onInputKeyDown}
-                placeholder="Patient, ordonnance, produit, référence, collaborateur…"
+                placeholder="Produit, médicament, ordonnance, référence, collaborateur…"
                 className="h-13 flex-1 bg-transparent py-4 text-sm text-text-primary outline-none placeholder:text-text-tertiary"
                 aria-label="Recherche globale"
                 autoComplete="off"

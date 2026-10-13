@@ -381,6 +381,12 @@ export async function analysePrescription(params: {
   // Second axe du conseil : les associations de produits de l'officine (un produit conseil en appelle un autre) et
   // les lignes de la vente qui SONT un produit du stock. Aucune requête de plus si l'officine n'en a pas écrit.
   const associations = await loadAssociationInput(params.scope, prescription.lines);
+  // Un médicament sans ordonnance choisi comme produit proposé (« Mes associations ») entre au catalogue du moteur AVANT
+  // l'analyse : il passe par les mêmes contrôles de sécurité que tout conseil (prescription, substance en double, vigilances).
+  if (associations?.products.length) {
+    const known = new Set(catalog.map((product) => product.id));
+    for (const product of associations.products) if (!known.has(product.id)) catalog.push(product);
+  }
   // Le centre de contrôle de PharmaBoost, commun à toutes les officines : les règles supprimées ne se déclenchent nulle
   // part, les conseils ajoutés depuis la console s'ajoutent à ceux du code.
   const central = await loadCentralAdvice();

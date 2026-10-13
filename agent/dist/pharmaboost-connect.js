@@ -5729,6 +5729,19 @@ var NoticeCenter = class {
   ids() {
     return [...this.held.keys()];
   }
+  /**
+   * Le bonjour du robot peut-il être montré ? Seulement par l'île, déjà prête (« PRET ») : ni la bannière GDI+, ni
+   * l'ancienne fenêtre, ni la notification Windows ne le montrent (voir greeting.ts).
+   */
+  canGreet() {
+    return this.platform === "win32" && !this.broken && !this.forcedLegacy && this.window === "ile" && this.host !== null && this.ready;
+  }
+  /** Le bonjour du robot (voir greeting.ts). Vrai s'il est parti vers l'île ; elle ne prend jamais le clavier pour lui. */
+  greet(text) {
+    if (!this.canGreet()) return false;
+    this.send({ op: "greet", text: oneLine(text).slice(0, 300) });
+    return true;
+  }
   /** Un bip vient d'être lu : « Scan détecté ! Analyse en cours… », avant même que le serveur ait répondu. */
   scanning() {
     if (this.platform !== "win32" || this.broken || this.forcedLegacy || !this.banner) return;
@@ -6456,26 +6469,67 @@ function saleAdviceUrl(serverUrl, candidate) {
   return rebuilt ? `${server.origin}${rebuilt}` : null;
 }
 
-// agent/src/index.ts
+// agent/src/greeting.ts
 var import_node_fs10 = require("node:fs");
-var import_node_os = require("node:os");
 var import_node_path9 = require("node:path");
-var VERSION = "0.10.4";
-var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path9.join)(process.cwd(), "pharmaboost-connect.json");
-var LOG_PATH = (0, import_node_path9.join)((0, import_node_path9.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
+
+// agent/src/greeting-text.ts
+var GREETING_STARTUP_WINDOW_MS = 2 * 60 * 6e4;
+var GREETING_NAME_MAX = 40;
+function cleanFirstName(value) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ").replace(/\s+/g, " ").trim().slice(0, GREETING_NAME_MAX).trim();
+}
+function greetingText(firstName) {
+  const name = cleanFirstName(firstName);
+  return `Bonjour${name ? ` ${name}` : ""}, comment vas-tu ? Bon courage pour faire le plus de conseils possibles. N'h\xE9site pas \xE0 me demander ce que tu veux si tu as besoin.`;
+}
+
+// agent/src/greeting.ts
+var GREETING_FILE = "pharmaboost-bonjour.txt";
+function localDay(now = /* @__PURE__ */ new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+function greetedToday(configDir, now = /* @__PURE__ */ new Date()) {
+  try {
+    const path = (0, import_node_path9.join)(configDir, GREETING_FILE);
+    return (0, import_node_fs10.existsSync)(path) && (0, import_node_fs10.readFileSync)(path, "utf8").split(/\s+/)[0] === localDay(now);
+  } catch {
+    return false;
+  }
+}
+function markGreeted(configDir, now = /* @__PURE__ */ new Date()) {
+  try {
+    (0, import_node_fs10.writeFileSync)((0, import_node_path9.join)(configDir, GREETING_FILE), `${localDay(now)} ${now.toISOString()}
+`);
+  } catch {
+  }
+}
+function shouldGreet(state) {
+  return !state.greetedToday && state.islandReady && !state.saleInProgress && state.heartbeatOk && state.sinceStartMs >= 0 && state.sinceStartMs <= GREETING_STARTUP_WINDOW_MS;
+}
+
+// agent/src/index.ts
+var import_node_fs11 = require("node:fs");
+var import_node_os = require("node:os");
+var import_node_path10 = require("node:path");
+var VERSION = "0.10.5";
+var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
+var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
 var SETTLE_MS = 1e4;
 var CHECK_MS = 3e4;
-var DEFAULT_EXPORT = process.platform === "win32" ? "C:\\PharmaBoost\\Export" : (0, import_node_path9.join)(process.cwd(), "export");
+var DEFAULT_EXPORT = process.platform === "win32" ? "C:\\PharmaBoost\\Export" : (0, import_node_path10.join)(process.cwd(), "export");
 var DEFAULT_SCANS = process.platform === "win32" ? "C:\\PharmaBoost\\Ordonnances" : null;
 var notice = null;
 function log(message) {
   const line = `${(/* @__PURE__ */ new Date()).toISOString()} ${message}`;
   console.log(line);
   try {
-    (0, import_node_fs10.mkdirSync)((0, import_node_path9.dirname)(LOG_PATH), { recursive: true });
-    if ((0, import_node_fs10.existsSync)(LOG_PATH) && (0, import_node_fs10.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs10.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
-    (0, import_node_fs10.appendFileSync)(LOG_PATH, `${line}
+    (0, import_node_fs11.mkdirSync)((0, import_node_path10.dirname)(LOG_PATH), { recursive: true });
+    if ((0, import_node_fs11.existsSync)(LOG_PATH) && (0, import_node_fs11.statSync)(LOG_PATH).size > LOG_MAX_BYTES) (0, import_node_fs11.renameSync)(LOG_PATH, `${LOG_PATH}.1`);
+    (0, import_node_fs11.appendFileSync)(LOG_PATH, `${line}
 `);
   } catch {
   }
@@ -6489,12 +6543,12 @@ function arg(name) {
   return i >= 0 ? process.argv[i + 1] : void 0;
 }
 function readConfig() {
-  if (!(0, import_node_fs10.existsSync)(CONFIG_PATH)) return null;
-  return JSON.parse((0, import_node_fs10.readFileSync)(CONFIG_PATH, "utf8"));
+  if (!(0, import_node_fs11.existsSync)(CONFIG_PATH)) return null;
+  return JSON.parse((0, import_node_fs11.readFileSync)(CONFIG_PATH, "utf8"));
 }
 function writeConfig(config) {
-  (0, import_node_fs10.mkdirSync)((0, import_node_path9.dirname)(CONFIG_PATH), { recursive: true });
-  (0, import_node_fs10.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
+  (0, import_node_fs11.mkdirSync)((0, import_node_path10.dirname)(CONFIG_PATH), { recursive: true });
+  (0, import_node_fs11.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 async function api(config, path, init) {
   return fetch(`${config.serverUrl.replace(/\/$/, "")}${path}`, {
@@ -6591,11 +6645,11 @@ async function checkForUpdate(config, scans) {
   restartWhenIdle = true;
   log("Elle prendra effet d\xE8s qu'aucune vente n'est en cours.");
 }
-var IMAGES_DIR = (0, import_node_path9.join)((0, import_node_path9.dirname)(CONFIG_PATH), "avis-images");
+var IMAGES_DIR = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "avis-images");
 var notices = new NoticeCenter({
-  configDir: (0, import_node_path9.dirname)(CONFIG_PATH),
+  configDir: (0, import_node_path10.dirname)(CONFIG_PATH),
   log: (message) => log(message),
-  legacyShow: (content) => showToast((0, import_node_path9.dirname)(CONFIG_PATH), content, log),
+  legacyShow: (content) => showToast((0, import_node_path10.dirname)(CONFIG_PATH), content, log),
   onAction: (action) => {
     void handleAction(action);
   }
@@ -6696,7 +6750,7 @@ async function postJson(config, path, payload) {
 async function handleAction(action) {
   const config = activeConfig;
   if (config && action.kind === "open_space") {
-    if (await openSpace(config, "\xE0 la demande")) markSpaceLinked((0, import_node_path9.dirname)(CONFIG_PATH), config.agentKey);
+    if (await openSpace(config, "\xE0 la demande")) markSpaceLinked((0, import_node_path10.dirname)(CONFIG_PATH), config.agentKey);
     return;
   }
   if (config && action.kind === "open_sale") {
@@ -6764,7 +6818,7 @@ async function postHeartbeat(config) {
   if (response.status === 401) throw new Error("cl\xE9 du poste r\xE9voqu\xE9e");
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = await response.json().catch(() => ({}));
-  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null };
+  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null, firstName: cleanFirstName(body.firstName) };
 }
 async function openSpace(config, why) {
   try {
@@ -6802,7 +6856,7 @@ async function runPost(config) {
     scans.push({ code, scannedAt: new Date(at).toISOString() });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
-  startDouchette((0, import_node_path9.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
+  startDouchette((0, import_node_path10.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
   const robotHandlers = { onScan: accept("robot"), onStatus: (message) => log(message) };
   const robot = config.robot ?? (process.platform === "win32" ? { kind: "lgpi" } : void 0);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);
@@ -6810,6 +6864,10 @@ async function runPost(config) {
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let spaceAttempts = 0;
+  const startedAt = Date.now();
+  let heartbeatOk = false;
+  let firstName = "";
+  let greetingDone = false;
   let handledSyncRequest = null;
   let forceSync = false;
   const reportState = (etat) => writeStatus(CONFIG_PATH, { etat, at: (/* @__PURE__ */ new Date()).toISOString(), version: VERSION, poste: config.postLabel || (0, import_node_os.hostname)(), officine: config.pharmacyName ?? null, notice });
@@ -6831,14 +6889,16 @@ async function runPost(config) {
         reportState("ok");
         lastHeartbeat = Date.now();
         const saleInProgress = !canUpdateNow({ watching: watched !== null, queuedScans: scans.size, lastScanAt, pendingNotices: notices.ids().length, now: Date.now() });
-        if (shouldOpenSpaceAtStartup({ platform: process.platform, linked: isSpaceLinked((0, import_node_path9.dirname)(CONFIG_PATH), config.agentKey), saleInProgress, attempts: spaceAttempts })) {
+        if (shouldOpenSpaceAtStartup({ platform: process.platform, linked: isSpaceLinked((0, import_node_path10.dirname)(CONFIG_PATH), config.agentKey), saleInProgress, attempts: spaceAttempts })) {
           spaceAttempts += 1;
           if (await openSpace(config, "d\xE9marrage")) {
-            markSpaceLinked((0, import_node_path9.dirname)(CONFIG_PATH), config.agentKey);
+            markSpaceLinked((0, import_node_path10.dirname)(CONFIG_PATH), config.agentKey);
             spaceAttempts = Number.POSITIVE_INFINITY;
           }
         }
         notices.setRobotLook(settings.robotLook);
+        heartbeatOk = true;
+        firstName = settings.firstName;
         if (settings.exportPath !== (config.exportPath ?? null)) {
           config = { ...config, exportPath: settings.exportPath };
           writeConfig(config);
@@ -6849,6 +6909,18 @@ async function runPost(config) {
           handledSyncRequest = settings.syncRequestedAt;
           forceSync = true;
           lastStockCheck = 0;
+        }
+      }
+      if (!greetingDone) {
+        const configDir = (0, import_node_path10.dirname)(CONFIG_PATH);
+        if (greetedToday(configDir) || Date.now() - startedAt > GREETING_STARTUP_WINDOW_MS) greetingDone = true;
+        else {
+          const saleInProgress = !canUpdateNow({ watching: watched !== null, queuedScans: scans.size, lastScanAt, pendingNotices: notices.ids().length, now: Date.now() });
+          if (shouldGreet({ greetedToday: false, islandReady: notices.canGreet(), saleInProgress, heartbeatOk, sinceStartMs: Date.now() - startedAt }) && notices.greet(greetingText(firstName))) {
+            markGreeted(configDir);
+            greetingDone = true;
+            log(`Bonjour du robot montr\xE9 dans l'\xEEle${firstName ? " (avec le pr\xE9nom)" : ""}.`);
+          }
         }
       }
       if (config.exportPath && Date.now() - lastStockCheck > CHECK_MS) {
@@ -6963,6 +7035,31 @@ function testIle() {
     process.exit(0);
   }, 6e4);
 }
+function testBonjour() {
+  let config = null;
+  try {
+    config = readConfig();
+  } catch {
+  }
+  if (config) applyDisplayPreferences(config);
+  notices.configure({ window: "ile", serverUrl: arg("serveur") ?? config?.serverUrl ?? "https://pharmaboost.app" });
+  log(`Essai du bonjour \u2014 PharmaBoost Connect ${VERSION}. Fen\xEAtre demand\xE9e : \xEEle.`);
+  notices.warmUp();
+  const started = Date.now();
+  const timer = setInterval(() => {
+    if (notices.greet(greetingText(arg("prenom") ?? ""))) {
+      clearInterval(timer);
+      log("Bonjour envoy\xE9 \xE0 l'\xEEle : il doit rester une dizaine de secondes, puis l'\xEEle revient au repos (un clic le ferme).");
+    } else if (Date.now() - started > 6e4) {
+      clearInterval(timer);
+      log(`L'\xEEle n'est pas pr\xEAte apr\xE8s une minute (fen\xEAtre en service : ${notices.currentWindow()}) : le bonjour n'est pas montr\xE9 ailleurs.`);
+    }
+  }, 500);
+  setTimeout(() => {
+    notices.stop();
+    process.exit(0);
+  }, 8e4);
+}
 async function openSpaceFromCommand() {
   const config = readConfig();
   if (!config || config.role !== "poste") {
@@ -6970,12 +7067,12 @@ async function openSpaceFromCommand() {
     return 1;
   }
   const opened = await openSpace(config, "commande");
-  if (opened) markSpaceLinked((0, import_node_path9.dirname)(CONFIG_PATH), config.agentKey);
+  if (opened) markSpaceLinked((0, import_node_path10.dirname)(CONFIG_PATH), config.agentKey);
   return opened ? 0 : 1;
 }
 function testDouchette() {
   console.log("Passez une bo\xEEte \xE0 la douchette. Chaque code lu s'affiche ci-dessous. Ctrl+C pour arr\xEAter.");
-  startDouchette((0, import_node_path9.dirname)(CONFIG_PATH), {
+  startDouchette((0, import_node_path10.dirname)(CONFIG_PATH), {
     onScan: (code) => console.log(`${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR")}  BIP  ${code}`),
     onStatus: (message) => console.log(`  ${message}`)
   });
@@ -6989,7 +7086,7 @@ async function pair() {
   for (const dir of [exportPath, scansPath]) {
     if (dir) {
       try {
-        (0, import_node_fs10.mkdirSync)(dir, { recursive: true });
+        (0, import_node_fs11.mkdirSync)(dir, { recursive: true });
       } catch {
       }
     }
@@ -7005,19 +7102,19 @@ async function pair() {
   log(`Appair\xE9 avec ${body.pharmacyName ?? "l'officine"}. Configuration \xE9crite dans ${CONFIG_PATH}. Export surveill\xE9 : ${exportPath}${scansPath ? ` \u2014 scans : ${scansPath}` : ""}.`);
 }
 function latestExport(dir) {
-  if (!(0, import_node_fs10.existsSync)(dir)) return null;
-  const st = (0, import_node_fs10.statSync)(dir);
+  if (!(0, import_node_fs11.existsSync)(dir)) return null;
+  const st = (0, import_node_fs11.statSync)(dir);
   if (st.isFile()) return { path: dir, mtime: st.mtimeMs, size: st.size };
-  const files = (0, import_node_fs10.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
-    const s = (0, import_node_fs10.statSync)((0, import_node_path9.join)(dir, name));
-    return { path: (0, import_node_path9.join)(dir, name), mtime: s.mtimeMs, size: s.size };
+  const files = (0, import_node_fs11.readdirSync)(dir).filter((name) => /\.(csv|txt|xlsx|xls|pdf)$/i.test(name) && !name.startsWith("~$")).map((name) => {
+    const s = (0, import_node_fs11.statSync)((0, import_node_path10.join)(dir, name));
+    return { path: (0, import_node_path10.join)(dir, name), mtime: s.mtimeMs, size: s.size };
   }).sort((a, b) => b.mtime - a.mtime);
   return files[0] ?? null;
 }
 var lastStamp = null;
 async function syncStock(config, force) {
   if (!config.exportPath) return config;
-  if (!(0, import_node_fs10.existsSync)(config.exportPath)) {
+  if (!(0, import_node_fs11.existsSync)(config.exportPath)) {
     setNotice(`Le dossier d'export ${config.exportPath} n'existe pas sur ${(0, import_node_os.hostname)()}.`);
     return config;
   }
@@ -7030,45 +7127,45 @@ async function syncStock(config, force) {
   const stamp = `${file.path}:${file.mtime}:${file.size}`;
   if (!force && stamp === lastStamp) return config;
   lastStamp = stamp;
-  const bytes = (0, import_node_fs10.readFileSync)(file.path);
+  const bytes = (0, import_node_fs11.readFileSync)(file.path);
   const hash = (0, import_node_crypto5.createHash)("sha256").update(bytes).digest("hex");
   if (hash === config.lastExportHash) {
     if (notice?.startsWith("Aucun export") || notice?.startsWith("Le dossier")) setNotice(null);
     return config;
   }
   const form = new FormData();
-  form.set("file", new Blob([bytes]), (0, import_node_path9.basename)(file.path));
+  form.set("file", new Blob([bytes]), (0, import_node_path10.basename)(file.path));
   const response = await api(config, "/api/agent/stock", { method: "POST", body: form });
   const body = await response.json().catch(() => ({}));
   if (!response.ok || !body.ok) {
-    setNotice(`Export refus\xE9 (${(0, import_node_path9.basename)(file.path)}) : ${body.error ?? `HTTP ${response.status}`}`);
+    setNotice(`Export refus\xE9 (${(0, import_node_path10.basename)(file.path)}) : ${body.error ?? `HTTP ${response.status}`}`);
     return config;
   }
   setNotice(null);
-  log(`Stock synchronis\xE9 : ${body.lines ?? "?"} ligne(s), ${body.created ?? 0} cr\xE9\xE9e(s), ${body.updated ?? 0} mise(s) \xE0 jour (${(0, import_node_path9.basename)(file.path)}).`);
+  log(`Stock synchronis\xE9 : ${body.lines ?? "?"} ligne(s), ${body.created ?? 0} cr\xE9\xE9e(s), ${body.updated ?? 0} mise(s) \xE0 jour (${(0, import_node_path10.basename)(file.path)}).`);
   return { ...config, lastExportHash: hash };
 }
 async function syncScans(config) {
-  if (!config.scansPath || !(0, import_node_fs10.existsSync)(config.scansPath)) return config;
+  if (!config.scansPath || !(0, import_node_fs11.existsSync)(config.scansPath)) return config;
   const sent = new Set(config.sentScans ?? []);
-  const files = (0, import_node_fs10.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path9.join)(config.scansPath, name), stat: (0, import_node_fs10.statSync)((0, import_node_path9.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
+  const files = (0, import_node_fs11.readdirSync)(config.scansPath).filter((name) => /\.(pdf|jpe?g|png|webp)$/i.test(name)).map((name) => ({ path: (0, import_node_path10.join)(config.scansPath, name), stat: (0, import_node_fs11.statSync)((0, import_node_path10.join)(config.scansPath, name)) })).filter(({ stat }) => Date.now() - stat.mtimeMs > SETTLE_MS).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
   let next = config;
   for (const { path, stat } of files) {
-    const key = `${(0, import_node_path9.basename)(path)}:${stat.size}`;
+    const key = `${(0, import_node_path10.basename)(path)}:${stat.size}`;
     if (sent.has(key)) continue;
-    const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path9.extname)(path).toLowerCase()] ?? "application/octet-stream";
+    const mime = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" }[(0, import_node_path10.extname)(path).toLowerCase()] ?? "application/octet-stream";
     const form = new FormData();
-    form.set("file", new Blob([(0, import_node_fs10.readFileSync)(path)], { type: mime }), (0, import_node_path9.basename)(path));
+    form.set("file", new Blob([(0, import_node_fs11.readFileSync)(path)], { type: mime }), (0, import_node_path10.basename)(path));
     const response = await api(config, "/api/agent/prescriptions", { method: "POST", body: form });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.ok) {
-      log(`Scan refus\xE9 (${(0, import_node_path9.basename)(path)}) : ${body.error ?? `HTTP ${response.status}`}`);
+      log(`Scan refus\xE9 (${(0, import_node_path10.basename)(path)}) : ${body.error ?? `HTTP ${response.status}`}`);
       continue;
     }
     sent.add(key);
     next = { ...next, sentScans: [...sent].slice(-2e3) };
     writeConfig(next);
-    log(`Ordonnance envoy\xE9e : ${(0, import_node_path9.basename)(path)} \u2192 ${body.reference ?? "?"} (${body.lines ?? 0} ligne(s) lue(s)).`);
+    log(`Ordonnance envoy\xE9e : ${(0, import_node_path10.basename)(path)} \u2192 ${body.reference ?? "?"} (${body.lines ?? 0} ligne(s) lue(s)).`);
   }
   return next;
 }
@@ -7149,6 +7246,8 @@ if (arg("appairer")) {
   testAffichage();
 } else if (process.argv.includes("--test-ile")) {
   testIle();
+} else if (process.argv.includes("--test-bonjour")) {
+  testBonjour();
 } else if (process.argv.includes("--ouvrir-espace")) {
   openSpaceFromCommand().then((code) => {
     process.exitCode = code;

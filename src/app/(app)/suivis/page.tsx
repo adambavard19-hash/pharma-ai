@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { FollowUpWorklist } from "./worklist";
 
-export const metadata: Metadata = { title: "Suivis" };
+export const metadata: Metadata = { title: "Suivis patients" };
 
 /**
  * Suivis — la liste de travail de l'équipe.
@@ -35,7 +35,7 @@ export default async function FollowUpsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader title="Suivis" description="Les patients dont votre officine prend des nouvelles. Rien ne part sans votre clic." />
+      <PageHeader title="Suivis patients" description="Les patients dont votre officine prend des nouvelles. Rien ne part sans votre clic." />
 
       <div className="grid grid-cols-3 gap-3">
         <Kpi label="Aujourd'hui" value={board.today} unit={board.today > 1 ? "patients à suivre" : "patient à suivre"} tone="brand" />

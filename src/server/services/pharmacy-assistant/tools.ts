@@ -10,15 +10,19 @@ import { listLots, searchStockItems } from "@/server/services/stock-lots";
 import { loadRobotAlerts, type AlertViewer } from "@/server/services/robot-alerts";
 import { clampDays, PHARMACY_TOOL_NAMES, pharmacyToolsFor, type PharmacyViewer } from "@/core/pharmacy-assistant/assistant";
 import { ordonnanceTitle } from "@/core/counter/dashboard";
+import { adviseCounterRequest } from "@/server/services/counter-request";
 
 /**
  * Les outils du robot du logiciel officine : LECTURE SEULE, et toujours par la PORTÉE DE LA SESSION (officine active,
  * personne connectée). Aucun outil ne prend d'identifiant d'officine ou de personne venu du modèle : il ne peut lire
  * qu'ici. Aucun nom de patient, aucun contenu d'ordonnance (ni médicament, ni posologie) ne sort : une vente se dit
  * par son numéro, son heure, son étape et son nombre de produits.
+ *
+ * Seule exception à la lecture : `conseil_comptoir` conserve la demande sans ordonnance (sans patient identifié), comme le
+ * fait la « Demande sans ordonnance » de l'écran — c'est le même service, `adviseCounterRequest`.
  */
 
-export type PharmacyToolContext = { scope: TenantScope; viewer: PharmacyViewer; alertViewer: AlertViewer; now?: Date };
+export type PharmacyToolContext = { scope: TenantScope; viewer: PharmacyViewer; alertViewer: AlertViewer; now?: Date; pharmacyIsDemo?: boolean };
 type Input = Record<string, unknown>;
 type ToolOutput = Record<string, unknown>;
 
@@ -148,7 +152,57 @@ async function equipe(ctx: PharmacyToolContext): Promise<ToolOutput> {
   };
 }
 
+/** Les paramètres du patient, relus : le modèle peut envoyer n'importe quoi, et rien n'est supposé (absent = non dit). */
+export function counterAdviceInput(input: Input): { text: string; ageYears: number | null; isPregnant: boolean; isBreastfeeding: boolean; treatments: string[] } | null {
+  const text = typeof input.demande === "string" ? input.demande.replace(/\s+/g, " ").trim().slice(0, 600) : "";
+  if (text.length < 5) return null;
+  const age = typeof input.age_ans === "number" && Number.isFinite(input.age_ans) ? Math.round(input.age_ans) : null;
+  const treatments = Array.isArray(input.traitements)
+    ? [...new Set(input.traitements.filter((t): t is string => typeof t === "string").map((t) => t.trim().slice(0, 80)).filter(Boolean))].slice(0, 10)
+    : [];
+  return { text, ageYears: age !== null && age >= 0 && age <= 120 ? age : null, isPregnant: input.enceinte === true, isBreastfeeding: input.allaitement === true, treatments };
+}
+
+/**
+ * Le conseil au comptoir depuis la Discussion : le service de la demande sans ordonnance (compréhension, règles validées,
+ * stock de CETTE officine, sécurité), et rien d'autre. Seuls ses produits sortent, avec le lien de leur fiche quand c'est
+ * un produit du stock de l'officine.
+ */
+async function conseilComptoir(ctx: PharmacyToolContext, input: Input): Promise<ToolOutput> {
+  const parsed = counterAdviceInput(input);
+  if (!parsed) return { erreur: "Décris la demande du patient en quelques mots (5 caractères au moins)." };
+  const answer = await adviseCounterRequest({ scope: ctx.scope, pharmacyIsDemo: ctx.pharmacyIsDemo ?? ctx.scope.isDemo === true, input: parsed });
+  const ids = answer.proposals.map((proposal) => proposal.productId);
+  const inStock = ids.length
+    ? new Set((await prisma.product.findMany({ where: { id: { in: ids }, pharmacyId: ctx.scope.pharmacyId, deletedAt: null }, select: { id: true } })).map((product) => product.id))
+    : new Set<string>();
+  return {
+    demande_comprise: answer.summary,
+    orienter_vers_un_medecin: answer.referToDoctor,
+    raison_orientation: answer.referReason,
+    besoins: answer.needs.map((need) => need.label),
+    questions_a_poser: answer.questions,
+    produits_proposes: answer.proposals.map((proposal) => ({
+      produit: proposal.name,
+      marque: proposal.brand,
+      raison: proposal.shortReason,
+      phrase_au_comptoir: proposal.counterScript || null,
+      question_avant: proposal.question,
+      precautions: proposal.precautions,
+      vigilances: (proposal.vigilances ?? []).map((vigilance) => vigilance.text),
+      prix: proposal.salePriceCents > 0 ? euros(proposal.salePriceCents) : null,
+      en_stock: proposal.stockQuantity,
+      lien: inStock.has(proposal.productId) ? `/stock/${proposal.productId}` : null,
+    })),
+    ecartes_par_securite: answer.blocked,
+    remarques: answer.notes,
+    avertissements: answer.warnings,
+    rappel: "Conseils du moteur PharmaBoost (règles validées par la pharmacienne, stock de l'officine). La décision revient au pharmacien.",
+  };
+}
+
 const HANDLERS: Record<string, (ctx: PharmacyToolContext, input: Input) => Promise<ToolOutput>> = {
+  conseil_comptoir: conseilComptoir,
   ma_journee: maJournee,
   conseils_et_ventes: conseilsEtVentes,
   challenges,

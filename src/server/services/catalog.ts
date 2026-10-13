@@ -1,4 +1,5 @@
 import "server-only";
+import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/server/db/client";
 import { siblingPharmacyIds, type TenantScope } from "@/server/db/tenant";
 import type { CatalogProduct, PharmacyRuleInput, ProductValidationHistory } from "@/core/ai/types";
@@ -156,27 +157,7 @@ export async function loadNationalDrugCandidates(
     },
     // Toutes les colonnes de la ligne (quantité, seuil, prix de vente, prix d'achat HT, TVA) : quelques champs de plus
     // qu'une sélection, et un client Prisma pas encore régénéré lit ses colonnes connues au lieu de refuser la requête.
-    include: {
-      presentation: {
-        select: {
-          id: true,
-          cip13: true,
-          label: true,
-          priceCents: true,
-          reimbursementRate: true,
-          coverageStatus: { select: { notReimbursable: true } },
-          specialty: {
-            select: {
-              name: true,
-              pharmaceuticalForm: true,
-              administrationRoutes: true,
-              compositions: { where: { nature: "SA" }, select: { substanceLabel: true } },
-              prescriptionConditions: { select: { label: true } },
-            },
-          },
-        },
-      },
-    },
+    include: drugStockInclude,
     // Les boîtes en rayon d'abord ; celles à zéro restent chargées pour que le
     // moteur puisse dire « adapté mais en rupture » — jamais les proposer.
     orderBy: { quantity: "desc" },
@@ -190,64 +171,122 @@ export async function loadNationalDrugCandidates(
   const candidates: CatalogProduct[] = [];
   for (const line of lines) {
     if (line.presentation.specialty.prescriptionConditions.length > 0) continue;
-    const { presentation } = line;
-    const substances = [...new Set(presentation.specialty.compositions.map((c) => c.substanceLabel))];
-    // Le catalogue national ne classe pas les médicaments dans les catégories
-    // de l'officine : c'est le dictionnaire d'usage (substances, forme, voie,
-    // nom) qui le fait, avec le même vocabulaire fermé que pour les produits.
-    const understood = classifyNationalDrug({
-      name: presentation.specialty.name,
-      substances,
-      form: presentation.specialty.pharmaceuticalForm,
-      routes: presentation.specialty.administrationRoutes,
-      label: presentation.label,
-    });
-    const haystack = normalizeSearchText([presentation.specialty.name, ...substances].join(" "));
+    const { product, understood } = nationalDrugProduct(line);
+    const haystack = normalizeSearchText([product.name, ...product.substances].join(" "));
     const termHit = terms.some((term) => haystack.includes(term));
     // Une boîte que ni le dictionnaire ni les mots des règles ne relient à un
     // conseil n'est pas candidate : elle n'encombre pas le moteur.
     if (!understood?.tags.length && !termHit) continue;
-    // Le remboursement vient de la BDPM, à défaut de la TVA lue sur l'export (2,1 % : remboursable). La TVA d'une boîte
-    // dont l'export ne dit rien se déduit du remboursement connu (2,1 % ou 10 %) ; sinon, marge inconnue.
-    const reimbursement =
-      reimbursementFromBdpm({ reimbursementRate: presentation.reimbursementRate, priceCents: presentation.priceCents, notReimbursable: presentation.coverageStatus?.notReimbursable }) ??
-      reimbursementFromVat(line.vatRate);
-    const vatRate = line.vatRate ?? (reimbursement ? (reimbursement.reimbursed ? REIMBURSABLE_DRUG_VAT : NON_REIMBURSABLE_DRUG_VAT) : null);
-    candidates.push({
-        id: `presentation:${presentation.id}`,
-        origin: "NATIONAL_DRUG" as const,
-        presentationId: presentation.id,
-        substances,
-        prescriptionConditions: [],
-        name: presentation.specialty.name,
-        brand: null,
-        category: understood?.category ?? ("AUTRE" as const),
-        subCategory: presentation.specialty.pharmaceuticalForm,
-        reference: presentation.cip13,
-        ean: presentation.cip13,
-        imageUrl: null,
-        description: presentation.label,
-        // Aucune allégation commerciale : la source n'en publie pas, et en
-        // inventer une serait exactement ce que le produit s'interdit.
-        commercialClaims: [],
-        precautions: [],
-        matchingTags: [...(understood?.tags ?? []), ...substances, presentation.specialty.name],
-        contraindications: [],
-        // Le prix de l'officine prime sur le prix public quand elle l'a fixé.
-        salePriceCents: line.priceCents ?? presentation.priceCents ?? 0,
-        // Le prix d'achat HT de l'export ; inconnu (ou TVA inconnue) : la marge reste neutre au départage.
-        purchasePriceCents: vatRate !== null ? (line.purchasePriceCents ?? 0) : 0,
-        vatRate: vatRate ?? 0,
-        reimbursed: reimbursement?.reimbursed ?? null,
-        reimbursementSource: reimbursement?.source ?? null,
-        stockQuantity: line.quantity,
-        alertThreshold: line.alertThreshold,
-        availableInSiblingPharmacy: false,
-        isActive: true,
-      });
+    candidates.push(product);
     if (candidates.length >= NATIONAL_CANDIDATE_LIMIT) break;
   }
   return candidates;
+}
+
+/**
+ * Les médicaments que « Mes associations » propose (un médicament SANS ordonnance du stock, choisi par le pharmacien),
+ * retrouvés dans le stock de CETTE officine : pour chaque spécialité, la boîte la mieux fournie. Contrairement aux candidats
+ * du moteur, rien n'est écarté ici — les conditions de prescription sont lues TELLES QUELLES, pour que le moteur des
+ * associations refuse lui-même un médicament soumis à prescription (« jamais en vente additionnelle ») et le dise dans la
+ * trace. Une spécialité que l'officine ne détient pas n'apparaît pas : l'association ne s'applique pas chez elle.
+ */
+export async function loadAssociationDrugProducts(scope: TenantScope, specialtyIds: string[]): Promise<Map<string, CatalogProduct>> {
+  const bySpecialty = new Map<string, CatalogProduct>();
+  if (specialtyIds.length === 0) return bySpecialty;
+  const lines = await prisma.pharmacyDrugStock.findMany({
+    where: { pharmacyId: scope.pharmacyId, presentation: { withdrawnAt: null, specialtyId: { in: specialtyIds } } },
+    include: drugStockInclude,
+    orderBy: [{ quantity: "desc" }, { id: "asc" }],
+  });
+  for (const line of lines) {
+    const specialtyId = line.presentation.specialtyId;
+    if (bySpecialty.has(specialtyId)) continue;
+    const { product } = nationalDrugProduct(line);
+    bySpecialty.set(specialtyId, { ...product, prescriptionConditions: line.presentation.specialty.prescriptionConditions.map((condition) => condition.label) });
+  }
+  return bySpecialty;
+}
+
+const drugStockInclude = {
+  presentation: {
+    select: {
+      id: true,
+      specialtyId: true,
+      cip13: true,
+      label: true,
+      priceCents: true,
+      reimbursementRate: true,
+      coverageStatus: { select: { notReimbursable: true } },
+      specialty: {
+        select: {
+          name: true,
+          pharmaceuticalForm: true,
+          administrationRoutes: true,
+          compositions: { where: { nature: "SA" }, select: { substanceLabel: true } },
+          prescriptionConditions: { select: { label: true } },
+        },
+      },
+    },
+  },
+} as const;
+
+type DrugStockLine = Prisma.PharmacyDrugStockGetPayload<{ include: typeof drugStockInclude }>;
+
+/** Une boîte du stock médicament, telle que le moteur la lit (sans conditions de prescription : l'appelant décide). */
+function nationalDrugProduct(line: DrugStockLine): { product: CatalogProduct; understood: ReturnType<typeof classifyNationalDrug> } {
+  const { presentation } = line;
+  const substances = [...new Set(presentation.specialty.compositions.map((c) => c.substanceLabel))];
+  // Le catalogue national ne classe pas les médicaments dans les catégories
+  // de l'officine : c'est le dictionnaire d'usage (substances, forme, voie,
+  // nom) qui le fait, avec le même vocabulaire fermé que pour les produits.
+  const understood = classifyNationalDrug({
+    name: presentation.specialty.name,
+    substances,
+    form: presentation.specialty.pharmaceuticalForm,
+    routes: presentation.specialty.administrationRoutes,
+    label: presentation.label,
+  });
+  // Le remboursement vient de la BDPM, à défaut de la TVA lue sur l'export (2,1 % : remboursable). La TVA d'une boîte
+  // dont l'export ne dit rien se déduit du remboursement connu (2,1 % ou 10 %) ; sinon, marge inconnue.
+  const reimbursement =
+    reimbursementFromBdpm({ reimbursementRate: presentation.reimbursementRate, priceCents: presentation.priceCents, notReimbursable: presentation.coverageStatus?.notReimbursable }) ??
+    reimbursementFromVat(line.vatRate);
+  const vatRate = line.vatRate ?? (reimbursement ? (reimbursement.reimbursed ? REIMBURSABLE_DRUG_VAT : NON_REIMBURSABLE_DRUG_VAT) : null);
+  return {
+    understood,
+    product: {
+      id: `presentation:${presentation.id}`,
+      origin: "NATIONAL_DRUG" as const,
+      presentationId: presentation.id,
+      substances,
+      prescriptionConditions: [],
+      name: presentation.specialty.name,
+      brand: null,
+      category: understood?.category ?? ("AUTRE" as const),
+      subCategory: presentation.specialty.pharmaceuticalForm,
+      reference: presentation.cip13,
+      ean: presentation.cip13,
+      imageUrl: null,
+      description: presentation.label,
+      // Aucune allégation commerciale : la source n'en publie pas, et en
+      // inventer une serait exactement ce que le produit s'interdit.
+      commercialClaims: [],
+      precautions: [],
+      matchingTags: [...(understood?.tags ?? []), ...substances, presentation.specialty.name],
+      contraindications: [],
+      // Le prix de l'officine prime sur le prix public quand elle l'a fixé.
+      salePriceCents: line.priceCents ?? presentation.priceCents ?? 0,
+      // Le prix d'achat HT de l'export ; inconnu (ou TVA inconnue) : la marge reste neutre au départage.
+      purchasePriceCents: vatRate !== null ? (line.purchasePriceCents ?? 0) : 0,
+      vatRate: vatRate ?? 0,
+      reimbursed: reimbursement?.reimbursed ?? null,
+      reimbursementSource: reimbursement?.source ?? null,
+      stockQuantity: line.quantity,
+      alertThreshold: line.alertThreshold,
+      availableInSiblingPharmacy: false,
+      isActive: true,
+    },
+  };
 }
 
 export async function loadPharmacyRules(scope: TenantScope): Promise<PharmacyRuleInput[]> {

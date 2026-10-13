@@ -4,9 +4,10 @@ import { prisma } from "@/server/db/client";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import type { SessionContext } from "@/server/auth/session";
 import { formatCents } from "@/lib/format";
+import { normalizeSearchText } from "@/core/reference/search";
 
 export type SearchResult = {
-  type: "patient" | "prescription" | "product" | "user";
+  type: "patient" | "prescription" | "product" | "drug" | "user";
   id: string;
   title: string;
   subtitle: string | null;
@@ -151,6 +152,34 @@ export async function globalSearch(
               subtitle: product.brand ?? product.reference,
               badge: formatCents(product.salePriceCents),
               href: `/stock/${product.id}`,
+            });
+          }
+        }),
+    );
+  }
+
+  // Les médicaments du catalogue national : un médicament ouvre sa fiche, avec ses conditions de délivrance (ce qu'était la
+  // page « Réglementation » du menu). Le catalogue est commun à toutes les officines : rien de propre à l'une d'elles n'y est lu.
+  if (session.permissions.has(PERMISSIONS.PRESCRIPTION_VIEW)) {
+    const normalized = normalizeSearchText(query);
+    tasks.push(
+      prisma.drugSpecialty
+        .findMany({
+          where: { withdrawnAt: null, OR: [{ name: { startsWith: query, mode: "insensitive" } }, ...(normalized ? [{ searchName: { startsWith: normalized } }] : [])] },
+          take: 5,
+          orderBy: [{ marketingStatus: "asc" }, { name: "asc" }],
+          select: { cisCode: true, name: true, prescriptionConditions: { select: { label: true }, take: 1 } },
+        })
+        .then((drugs) => {
+          for (const drug of drugs) {
+            results.push({
+              type: "drug",
+              id: drug.cisCode,
+              title: drug.name.split(",")[0].trim(),
+              // La forme (« comprimé », « gélule ») départage deux boîtes du même nom.
+              subtitle: drug.name.includes(",") ? `${drug.name.slice(drug.name.indexOf(",") + 1).trim()} · conditions de délivrance` : "Fiche et conditions de délivrance",
+              badge: drug.prescriptionConditions.length > 0 ? "Sur ordonnance" : null,
+              href: `/medicaments/${drug.cisCode}`,
             });
           }
         }),

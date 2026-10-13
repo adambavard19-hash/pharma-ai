@@ -13,11 +13,12 @@ import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SuggestLabForm } from "./suggest-lab-form";
 
-export const metadata: Metadata = { title: "Assortiment" };
+export const metadata: Metadata = { title: "Produits manquants" };
 
 /**
- * « Votre assortiment » : les besoins de conseil que les produits en stock n'ont
- * pas pu couvrir, et ce qui existe chez les laboratoires partenaires.
+ * « Produits manquants » (ex « Mon assortiment », que personne ne comprenait) : les
+ * conseils que PharmaBoost aurait proposés mais que le stock n'a pas pu servir — produit
+ * absent ou en rupture —, et ce qui existe chez les laboratoires partenaires.
  *
  * Réservé au TITULAIRE (permission des partenaires : c'est une décision d'achat).
  * Ce n'est volontairement pas dans l'écran de l'équipe : à la fin de la journée,
@@ -32,12 +33,12 @@ export default async function AssortmentPage({ searchParams }: { searchParams: P
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Votre assortiment"
-        description="Les besoins de conseil que vos produits en stock n'ont pas pu couvrir, et ce qui existe chez nos laboratoires partenaires que vous ne référencez pas encore."
+        title="Produits manquants"
+        description="Les conseils que PharmaBoost aurait proposés à vos patients, mais que votre stock n'a pas pu servir : aucun produit adapté, ou en rupture. Ce sont les produits à référencer (ou à recommander) en priorité."
         actions={
           <nav className="flex items-center gap-1" aria-label="Période">
             {GAP_PERIODS.map((p) => (
-              <Link key={p.key} href={`/assortiment?periode=${p.key}`} aria-current={p.key === period.key ? "page" : undefined} className={cn("rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors", p.key === period.key ? "bg-brand-600 text-white" : "text-text-secondary hover:bg-surface-sunken hover:text-text-primary")}>
+              <Link key={p.key} href={`/assortiment?periode=${p.key}`} aria-current={p.key === period.key ? "page" : undefined} className={cn("rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors", p.key === period.key ? "bg-brand-700 text-white" : "text-text-secondary hover:bg-surface-sunken hover:text-text-primary")}>
                 {p.label}
               </Link>
             ))}
@@ -51,7 +52,7 @@ export default async function AssortmentPage({ searchParams }: { searchParams: P
 
       {view.analysedPrescriptions === 0 ? (
         <Card>
-          <EmptyState icon={<PackageSearch className="size-5" />} title="Aucune ordonnance analysée sur cette période." description="Dès que l'équipe analysera des ordonnances, vous verrez ici les besoins que votre stock ne couvre pas." />
+          <EmptyState icon={<PackageSearch className="size-5" />} title="Aucune vente analysée sur cette période." description="Dès que l'équipe passera des ventes au comptoir, vous verrez ici les conseils que votre stock n'a pas pu servir." />
         </Card>
       ) : view.detected === 0 ? (
         <Card>
@@ -64,17 +65,17 @@ export default async function AssortmentPage({ searchParams }: { searchParams: P
       ) : (
         <>
           <section aria-label="Les chiffres de la période" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Kpi label="Situations de conseil détectées" value={String(view.detected)} hint={`sur ${view.analysedPrescriptions} ordonnance${view.analysedPrescriptions > 1 ? "s" : ""} analysée${view.analysedPrescriptions > 1 ? "s" : ""}`} />
-            <Kpi label="Couvertes par votre stock" value={view.coveredRate === null ? "—" : `${view.coveredRate} %`} hint={`${view.covered} situation${view.covered > 1 ? "s" : ""}`} />
-            <Kpi label="Non couvertes" value={String(view.unmet)} hint="vos produits n'ont pas pu répondre" tone={view.unmet > 0 ? "warning" : "success"} />
+            <Kpi label="Conseils possibles" value={String(view.detected)} hint={`sur ${view.analysedPrescriptions} ordonnance${view.analysedPrescriptions > 1 ? "s" : ""} analysée${view.analysedPrescriptions > 1 ? "s" : ""}`} />
+            <Kpi label="Servis par votre stock" value={view.coveredRate === null ? "—" : `${view.coveredRate} %`} hint={`${view.covered} situation${view.covered > 1 ? "s" : ""}`} />
+            <Kpi label="Manqués faute de produit" value={String(view.unmet)} hint="aucun produit adapté en stock, ou en rupture" tone={view.unmet > 0 ? "warning" : "success"} />
           </section>
           {view.withoutCoverage > 0 && <p className="text-[12.5px] text-text-tertiary">{view.withoutCoverage} analyse{view.withoutCoverage > 1 ? "s" : ""} de la période (antérieure{view.withoutCoverage > 1 ? "s" : ""} à cette fonction) ne portent pas l&apos;information et ne sont pas comptées.</p>}
 
           <section className="space-y-3" aria-labelledby="manques">
-            <SectionHeader title="Ce que votre assortiment ne couvre pas" description="Du besoin le plus fréquent au moins fréquent." />
+            <SectionHeader title="Ce qui vous a manqué" description="Du conseil le plus souvent manqué au moins fréquent, avec la raison : rien d'adapté en stock, ou en rupture." />
             {view.groups.length === 0 ? (
               <Card>
-                <EmptyState icon={<Handshake className="size-5" />} title="Tous les besoins détectés ont été couverts par votre stock." description="Rien à ajouter à votre assortiment sur cette période." />
+                <EmptyState icon={<Handshake className="size-5" />} title="Aucun conseil manqué sur cette période." description="Votre stock a pu servir chaque conseil proposé par PharmaBoost : rien à référencer." />
               </Card>
             ) : (
               <ul id="manques" className="space-y-3">

@@ -22,6 +22,8 @@ export type HostCommand =
   | { op: "done"; info: HostDone }
   | { op: "remove"; id: string }
   | { op: "look"; look: number }
+  /** Le bonjour du robot au démarrage du poste (agent/src/greeting.ts) : le texte complet, accents relus par JSON.parse. */
+  | { op: "greet"; text: string }
   | { op: "quit" };
 
 /** Ce que l'île affiche, déduit des commandes de l'agent et des gestes du pharmacien. */
@@ -40,9 +42,14 @@ export type PosteView = {
   postLabel: string;
   /** Un nouveau scan pendant l'analyse : le compteur de temps de l'analyse repart. */
   scanAt: number;
+  /** Le bonjour du robot, affiché au repos ; null : rien. Un scan ou une vente le remplace aussitôt. */
+  greeting: string | null;
 };
 
-export const INITIAL_POSTE: PosteView = { island: INITIAL_ISLAND, entry: null, alertRead: false, emailPending: false, done: null, look: null, postLabel: "", scanAt: 0 };
+export const INITIAL_POSTE: PosteView = { island: INITIAL_ISLAND, entry: null, alertRead: false, emailPending: false, done: null, look: null, postLabel: "", scanAt: 0, greeting: null };
+
+/** Le plus long bonjour accepté de l'agent (le message en fait moins de 200). */
+export const GREETING_MAX_CHARS = 300;
 
 export type PosteEvent =
   | { type: "host"; command: HostCommand; now: number }
@@ -59,7 +66,9 @@ export type PosteEvent =
   | { type: "closeEmail" }
   | { type: "typeEmail"; value: string }
   | { type: "sendEmail" }
-  | { type: "readAlert" };
+  | { type: "readAlert" }
+  /** Le bonjour a assez duré, ou la personne l'a fermé d'un clic : l'île revient au repos. */
+  | { type: "dismissGreeting" };
 
 const lookOf = (value: unknown): number | null => (typeof value === "number" && Number.isInteger(value) && value >= 0 && value < 20 ? value : null);
 
@@ -124,6 +133,8 @@ export function posteReducer(view: PosteView, event: PosteEvent): PosteView {
     case "readAlert":
       if (!view.entry) return { ...view, island: INITIAL_ISLAND };
       return { ...view, alertRead: true, island: { ...view.island, stage: stageForEntry(view.entry, true) } };
+    case "dismissGreeting":
+      return view.greeting === null ? view : { ...view, greeting: null };
   }
 }
 
@@ -139,6 +150,10 @@ function onHost(view: PosteView, command: HostCommand, now: number): PosteView {
       return { ...view, look: lookOf(command.look), postLabel: typeof command.postLabel === "string" ? command.postLabel.slice(0, 60) : view.postLabel };
     case "look":
       return { ...view, look: lookOf(command.look) };
+    case "greet":
+      // Jamais par-dessus une vente : seulement l'île au repos, sans vente à l'écran (sinon le bonjour est abandonné).
+      if (view.island.stage !== "idle" || view.entry) return view;
+      return { ...view, greeting: command.text };
     case "scan":
       // Un bip : nouvelle vente. L'ancienne (si elle était encore ouverte) laisse la place, comme sur la bannière.
       return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel, scanAt: now, island: { ...INITIAL_ISLAND, stage: "scan" } };
@@ -146,7 +161,7 @@ function onHost(view: PosteView, command: HostCommand, now: number): PosteView {
       const entry = { ...command.entry, items: itemsOf(command.entry) };
       const sameSale = view.entry?.id === entry.id;
       const alertRead = sameSale ? view.alertRead : false;
-      const base: PosteView = { ...view, entry, alertRead, done: null };
+      const base: PosteView = { ...view, entry, alertRead, done: null, greeting: null };
       const outcomes = outcomesOf(entry);
       // Le serveur a enregistré l'adresse : « E-mail envoyé », puis retour aux conseils.
       if (view.emailPending && entry.emailSaved) return { ...base, emailPending: false, island: { ...view.island, outcomes, stage: "emailSent" } };
@@ -164,7 +179,7 @@ function onHost(view: PosteView, command: HostCommand, now: number): PosteView {
       return { ...base, island: { ...INITIAL_ISLAND, outcomes, stepsDone: analysisSteps("", entry.items.length).length, stage: stageForEntry(entry, alertRead) } };
     }
     case "done":
-      return { ...view, done: command.info, emailPending: false, island: { ...view.island, stage: "done" } };
+      return { ...view, done: command.info, emailPending: false, greeting: null, island: { ...view.island, stage: "done" } };
     case "remove":
       if (view.entry && view.entry.id !== command.id) return view;
       return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel };
@@ -260,6 +275,10 @@ export function parseCommand(raw: unknown): HostCommand | null {
       return command as HostCommand;
     case "look":
       return { op: "look", look: typeof command.look === "number" ? command.look : -1 };
+    case "greet": {
+      const text = typeof command.text === "string" ? command.text.replace(/\s+/g, " ").trim() : "";
+      return text && text.length <= GREETING_MAX_CHARS ? { op: "greet", text } : null;
+    }
     case "remove":
       return typeof command.id === "string" ? { op: "remove", id: command.id } : null;
     case "show":

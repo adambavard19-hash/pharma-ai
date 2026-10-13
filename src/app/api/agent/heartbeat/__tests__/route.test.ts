@@ -8,11 +8,11 @@ import { personRobotLook } from "@/core/robot/counter-look";
  * vie du serveur de stock, lui, ne change pas.
  */
 
-const mocks = vi.hoisted(() => ({ authenticateAgent: vi.fn(), recordHeartbeat: vi.fn(), postUpdate: vi.fn(), connectionFind: vi.fn() }));
+const mocks = vi.hoisted(() => ({ authenticateAgent: vi.fn(), recordHeartbeat: vi.fn(), postUpdate: vi.fn(), connectionFind: vi.fn(), userFind: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/services/stock-sync", () => ({ authenticateAgent: mocks.authenticateAgent, recordHeartbeat: mocks.recordHeartbeat }));
-vi.mock("@/server/db/client", () => ({ prisma: { counterPost: { update: mocks.postUpdate }, stockConnection: { findUniqueOrThrow: mocks.connectionFind } } }));
+vi.mock("@/server/db/client", () => ({ prisma: { user: { findUnique: mocks.userFind }, counterPost: { update: mocks.postUpdate }, stockConnection: { findUniqueOrThrow: mocks.connectionFind } } }));
 
 const route = await import("../route");
 
@@ -27,9 +27,29 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.postUpdate.mockResolvedValue({ exportPath: null, syncRequestedAt: null, assignedUserId: "lea" });
   mocks.connectionFind.mockResolvedValue({ intervalSeconds: 300, exportPath: "D:\\export", scansPath: null });
+  mocks.userFind.mockResolvedValue({ firstName: "Léa" });
 });
 
 describe("POST /api/agent/heartbeat — poste de caisse", () => {
+  it("renvoie le PRÉNOM seul de la personne attribuée au poste (le bonjour du robot), jamais le nom de famille", async () => {
+    mocks.authenticateAgent.mockResolvedValue(POST_AGENT);
+    const json = await (await beat()).json();
+    expect(json.firstName).toBe("Léa");
+    expect(mocks.userFind).toHaveBeenCalledWith({ where: { id: "lea" }, select: { firstName: true } });
+    expect(JSON.stringify(json)).not.toMatch(/lastName/);
+  });
+
+  it("personne au poste, ou lecture du prénom en échec : prénom vide, le signe de vie passe", async () => {
+    mocks.authenticateAgent.mockResolvedValue(POST_AGENT);
+    mocks.userFind.mockRejectedValueOnce(new Error("base lente"));
+    const failed = await beat();
+    expect(failed.status).toBe(200);
+    expect((await failed.json()).firstName).toBe("");
+    mocks.postUpdate.mockResolvedValue({ exportPath: null, syncRequestedAt: null, assignedUserId: null });
+    expect((await (await beat()).json()).firstName).toBe("");
+    expect(mocks.userFind).toHaveBeenCalledTimes(1);
+  });
+
   it("poste dans l'île : note l'instant où il dessine le robot ; renvoie le robot de la personne connectée", async () => {
     mocks.authenticateAgent.mockResolvedValue(POST_AGENT);
     const response = await beat();

@@ -131,7 +131,7 @@ export function UpdateFlow({ previous = null }: { previous?: { fileName: string;
           const current = !finished && number === step;
           return (
             <li key={label} aria-current={current ? "step" : undefined} className="flex min-w-0 flex-1 items-center gap-2">
-              <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold", done ? "bg-success-600 text-white" : current ? "bg-brand-600 text-white" : "bg-surface-sunken text-text-tertiary")}>
+              <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold", done ? "bg-success-600 text-white" : current ? "bg-brand-700 text-white" : "bg-surface-sunken text-text-tertiary")}>
                 {done ? <Check className="size-4" aria-hidden="true" /> : number}
               </span>
               <span className={cn("hidden truncate text-[13.5px] sm:block", current || done ? "font-medium text-text-primary" : "text-text-tertiary")}>{label}</span>
@@ -193,7 +193,7 @@ export function UpdateFlow({ previous = null }: { previous?: { fileName: string;
             className={cn("flex flex-col items-center gap-3 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors", dragging ? "border-success-600 bg-success-50/60 dark:bg-success-950/20" : "border-border-default bg-surface-sunken/40")}
           >
             <FileSpreadsheet className="size-8 text-text-tertiary" aria-hidden="true" />
-            <Button variant="success" size="xl" className="w-full max-w-xs rounded-full" onClick={() => input.current?.click()} leadingIcon={<Upload className="size-5" />}>
+            <Button variant="primary" size="xl" className="w-full max-w-xs rounded-full" onClick={() => input.current?.click()} leadingIcon={<Upload className="size-5" />}>
               Choisir mes fichiers
             </Button>
             <p className="text-[13px] text-text-tertiary">ou glissez-les ici</p>
@@ -287,7 +287,7 @@ export function UpdateFlow({ previous = null }: { previous?: { fileName: string;
             </p>
           )}
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="success" size="lg" className="rounded-full sm:flex-1" onClick={() => setPhase({ name: "confirm", files: phase.files, preview: phase.preview })}>
+            <Button variant="primary" size="lg" className="rounded-full sm:flex-1" onClick={() => setPhase({ name: "confirm", files: phase.files, preview: phase.preview })}>
               Continuer
             </Button>
             <Button variant="outline" size="lg" className="rounded-full" onClick={restart} leadingIcon={<ArrowLeft className="size-4" />}>
@@ -311,7 +311,7 @@ export function UpdateFlow({ previous = null }: { previous?: { fileName: string;
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
-              variant="success"
+              variant="primary"
               size="lg"
               className="rounded-full sm:flex-1"
               loading={phase.name === "sending"}
@@ -333,7 +333,7 @@ export function UpdateFlow({ previous = null }: { previous?: { fileName: string;
             {phase.outcome.detail}
           </Alert>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button asChild variant="success" size="lg" className="rounded-full sm:flex-1">
+            <Button asChild variant="primary" size="lg" className="rounded-full sm:flex-1">
               <Link href="/stock">Voir mon stock</Link>
             </Button>
             <Button variant="outline" size="lg" className="rounded-full" onClick={restart}>

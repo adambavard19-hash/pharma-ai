@@ -46,8 +46,8 @@ export function AppIsland({ suggestions, canImportStock }: { suggestions: string
         endpoint: "/api/robot/assistant",
         suggestions,
         safeHref: safeAppHref,
-        placeholder: "Résume ma journée, où en est le challenge…",
-        footnote: "Je lis les chiffres de votre officine, sans rien modifier. Aucune donnée de patient, aucun conseil médical : pour ça, il y a la pharmacienne.",
+        placeholder: "Le patient a mal à la gorge, résume ma journée…",
+        footnote: "Un patient a une question ? Décrivez-la sans son nom : je propose les conseils validés de votre stock, la décision vous revient. Je lis aussi les chiffres de votre officine, sans rien modifier.",
       }}
       plus={canImportStock ? <StockDrop /> : undefined}
       plusLabel="Stock"

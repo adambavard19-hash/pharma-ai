@@ -16,7 +16,8 @@ type Size = "sm" | "md" | "lg" | "xl" | "icon";
 const VARIANTS: Record<Variant, string> = {
   // Le dégradé de marque (teal → vert) : le bouton principal, comme sur le site de référence.
   primary:
-    "bg-brand-gradient text-white shadow-xs hover:brightness-[0.93] active:brightness-[0.88] disabled:saturate-50",
+    // LE vert des actions principales, partout (un seul jeton : brand-700, blanc à plus de 5:1 en clair comme en sombre).
+    "bg-brand-700 text-white shadow-xs hover:bg-brand-800 active:bg-brand-900 disabled:bg-brand-700/50",
   secondary:
     "bg-surface-raised text-text-primary border border-border-default shadow-xs hover:bg-surface-sunken active:bg-ink-200 dark:active:bg-ink-700",
   outline:

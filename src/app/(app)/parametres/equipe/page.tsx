@@ -68,6 +68,7 @@ export default async function TeamPage() {
 
       <SettingsTabs
         canSeeTeam
+        canSeePosts={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
         canSeeRules={session.permissions.has(PERMISSIONS.RECOMMENDATION_VIEW)}
         canSeeAudit={session.permissions.has(PERMISSIONS.AUDIT_VIEW)}
       />

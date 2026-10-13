@@ -26,7 +26,7 @@ beforeEach(() => {
   mocks.loadTeamChallenges.mockResolvedValue([]);
 });
 
-describe("la page « Mon équipe »", () => {
+describe("la page « Performances » — onglet « Classement de l'équipe »", () => {
   it("n'est lue que par le titulaire, pour SA pharmacie", async () => {
     await render();
     expect(mocks.requirePermission).toHaveBeenCalledWith(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
@@ -35,7 +35,8 @@ describe("la page « Mon équipe »", () => {
 
   it("montre le classement : rang, nom, proposés, validés, taux — et le total", async () => {
     const page = text(await render());
-    expect(page).toContain("Mon équipe");
+    expect(page).toContain("Performances");
+    expect(page).toContain("Classement de l'équipe");
     expect(page.indexOf("Marc Durand")).toBeLessThan(page.indexOf("Léa Martin"));
     expect(page).toContain("8 conseils proposés · 7 validés");
     expect(page).toContain("proposés");
@@ -78,8 +79,10 @@ describe("la page « Mon équipe »", () => {
     expect(page.lastIndexOf("Léa Martin")).toBeLessThan(page.lastIndexOf("Marc Durand"));
   });
 
-  it("garde un seul lien vers « Ce que PharmaBoost vous rapporte » (/resultats)", async () => {
+  it("mène à « Ce que PharmaBoost rapporte » (/resultats) : l'onglet, et le lien du bas vers le mois", async () => {
     const html = await render();
-    expect(html.match(/href="\/resultats[?"]/g)).toHaveLength(1);
+    expect(html.match(/href="\/resultats"/g)).toHaveLength(1);
+    expect(html.match(/href="\/resultats\?periode=month"/g)).toHaveLength(1);
+    expect(html).toMatch(/<a(?=[^>]*href="\/pilotage")(?=[^>]*aria-selected="true")/);
   });
 });

@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { loadPerformanceReport, loadSubscriptionReturn } from "@/server/services/performance";
 import { parsePeriodParams } from "@/core/performance/periods";
 import { TIME_ZONE } from "@/config/constants";
+import { PerformanceTabs } from "../pilotage/performance-tabs";
 import { PageHeader } from "@/components/ui/page";
 import { PerformanceDashboard } from "@/components/performance/performance-dashboard";
 import { CounterResultsCard } from "@/components/performance/counter-results-card";
 import { loadCounterResults } from "@/server/services/counter-results";
 
-export const metadata: Metadata = { title: "Ce que PharmaBoost vous rapporte" };
+export const metadata: Metadata = { title: "Performances — ce que PharmaBoost rapporte" };
 
 /**
  * « Ce que PharmaBoost vous rapporte » : la valeur mesurée des conseils, pour le titulaire.
@@ -48,18 +47,10 @@ export default async function ResultatsPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Ce que PharmaBoost vous rapporte"
+        title="Performances"
         description="Les conseils proposés à votre équipe, ceux qu'elle a retenus, et les ventes confirmées qui en découlent. Ces chiffres sont réservés au titulaire de l'officine et à l'équipe PharmaBoost qui vous accompagne."
       />
-
-      <p className="text-[12.5px] text-text-tertiary">
-        Le classement de l&apos;équipe et les challenges sont dans{" "}
-        <Link href="/pilotage" className="inline-flex items-center gap-1 font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
-          Mon équipe
-          <ArrowRight className="size-3" aria-hidden="true" />
-        </Link>
-        .
-      </p>
+      <PerformanceTabs active="rapporte" />
 
       <PerformanceDashboard report={report} roi={roi} basePath="/resultats" audience="owner" now={now} />
 

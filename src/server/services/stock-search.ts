@@ -1,7 +1,7 @@
 import "server-only";
 import { ProductCategory, type Prisma } from "@/generated/prisma";
 import { prisma } from "@/server/db/client";
-import { parseSearchQuery, scoreMatch, sqlStartPattern, sqlTermPattern, sqlTypedPattern, sqlWordPattern, type ParsedQuery } from "@/core/search/tolerant-search";
+import { parseSearchQuery, scoreMatch, searchableText, wordsOf, sqlStartPattern, sqlTermPattern, sqlTypedPattern, sqlWordPattern, type ParsedQuery, type SearchTerm } from "@/core/search/tolerant-search";
 import { drugKey } from "@/core/ai/engines/associations";
 import { stockStatus } from "./catalog";
 
@@ -282,15 +282,87 @@ const CATALOGUE_SHOWN = 8;
 /** Les spécialités du catalogue lues pour en garder huit : celles que l'officine détient en sortent. */
 const CATALOGUE_READ = 40;
 
-/** « Quand ce produit ou ce médicament est dans la vente » : une recherche, les résultats groupés. */
-export async function searchAssociationTriggers(pharmacyId: string, raw: string): Promise<TriggerSearch> {
+/**
+ * Ce que tape le pharmacien dans un champ qui propose « à chaque lettre ». Une ou deux lettres seules : on cherche les noms
+ * qui COMMENCENT par elles (« d » → DAFALGAN, DOLIPRANE…) — la recherche mot à mot, elle, ne prend une lettre seule que
+ * comme mot entier (« vitamine C »). Une dernière lettre seule après d'autres mots (« creme m ») est le mot en cours de
+ * frappe : on cherche sur les mots déjà finis, la liste ne se vide pas entre deux touches.
+ */
+export function liveQuery(raw: string): { query: ParsedQuery; prefix: SearchTerm | null } {
+  // Une ou deux lettres seules, même un mot vide de la recherche mot à mot (« d », « de », « la ») : le début d'un nom.
+  const words = wordsOf(searchableText(raw.slice(0, 120)));
+  if (words.length === 1 && /^[A-Z]{1,2}$/.test(words[0])) {
+    const prefix: SearchTerm = { text: words[0], numeric: false, bareNumber: false, wholeWords: [], expansions: [] };
+    return { query: { terms: [prefix], code: null }, prefix };
+  }
   const query = parseSearchQuery(raw);
+  const last = query.terms[query.terms.length - 1];
+  // Le dernier mot en cours de frappe : une lettre seule, ou un seul chiffre (« doliprane 1 » vise 1000 mg, pas « 1 »).
+  if (query.terms.length > 1 && ((!last.numeric && last.text.length === 1) || /^\d$/.test(last.text))) return { query: { ...query, terms: query.terms.slice(0, -1) }, prefix: null };
+  return { query, prefix: null };
+}
+
+/** Ce qui est en stock d'abord, puis le plus pertinent, puis le nom le plus court. */
+const inStockFirst = <T extends { score: number; quantity: number | null; name: string }>(a: T, b: T): number =>
+  Number((b.quantity ?? 0) > 0) - Number((a.quantity ?? 0) > 0) || b.score - a.score || a.name.length - b.name.length || a.name.localeCompare(b.name, "fr");
+
+/** Les produits actifs de l'officine dont le NOM commence par une ou deux lettres : en stock d'abord, puis par nom. */
+async function productsStartingWith(pharmacyId: string, term: SearchTerm, limit: number): Promise<ProductHit[]> {
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT p."id"
+    FROM "products" p
+    LEFT JOIN "stock_items" si ON si."productId" = p."id"
+    WHERE p."pharmacyId" = ${pharmacyId} AND p."deletedAt" IS NULL AND p."isActive" = true
+      AND p."name" ~* ${sqlStartPattern(term)}
+    ORDER BY (coalesce(si."quantity", 0) > 0) DESC, p."name" ASC
+    LIMIT ${limit}`;
+  if (rows.length === 0) return [];
+  const products = await prisma.product.findMany({ where: { pharmacyId, id: { in: rows.map((row) => row.id) } }, include: productInclude });
+  const byId = new Map(products.map((product) => [product.id, product]));
+  return rows.flatMap((row) => {
+    const product = byId.get(row.id);
+    return product ? [hitOf(product, 1)] : [];
+  });
+}
+
+/** Les médicaments détenus par l'officine dont le nom commence par une ou deux lettres, une ligne par spécialité. */
+async function stockDrugsStartingWith(pharmacyId: string, term: SearchTerm, limit: number, otcOnly = false): Promise<DrugHit[]> {
+  const rows = await prisma.$queryRaw<{ specialtyId: string; name: string; marketingStatus: string | null; label: string; quantity: number }[]>`
+    SELECT DISTINCT ON (sp."id") sp."id" AS "specialtyId", sp."name", sp."marketingStatus", pr."label",
+           (sum(s."quantity") OVER (PARTITION BY sp."id"))::int AS "quantity"
+    FROM "pharmacy_drug_stocks" s
+    JOIN "drug_presentations" pr ON pr."id" = s."presentationId"
+    JOIN "drug_specialties" sp ON sp."id" = pr."specialtyId"
+    WHERE s."pharmacyId" = ${pharmacyId} AND sp."name" ~* ${sqlStartPattern(term)}
+      AND (${otcOnly}::boolean = false OR NOT EXISTS (SELECT 1 FROM "drug_prescription_conditions" c WHERE c."specialtyId" = sp."id"))
+    ORDER BY sp."id", s."quantity" DESC`;
+  return rows
+    .map((row) => ({ specialtyId: row.specialtyId, name: row.name, label: row.label, substances: [], quantity: row.quantity, marketed: row.marketingStatus === MARKETED_SPECIALTY, score: 1 }))
+    .sort(inStockFirst)
+    .slice(0, limit);
+}
+
+/** Les spécialités du catalogue national dont le nom commence par une ou deux lettres (commercialisées d'abord). */
+async function catalogDrugsStartingWith(term: SearchTerm, limit: number): Promise<DrugHit[]> {
+  const rows = await prisma.$queryRaw<{ id: string; name: string; marketingStatus: string | null }[]>`
+    SELECT sp."id", sp."name", sp."marketingStatus"
+    FROM "drug_specialties" sp
+    WHERE sp."withdrawnAt" IS NULL AND sp."name" ~* ${sqlStartPattern(term)}
+    ORDER BY (sp."marketingStatus" = ${MARKETED_SPECIALTY}) DESC, sp."name" ASC
+    LIMIT ${limit}`;
+  return rows.map((row) => ({ specialtyId: row.id, name: row.name, label: null, substances: [], quantity: null, marketed: row.marketingStatus === MARKETED_SPECIALTY, score: 1 }));
+}
+
+/**
+ * « Quand ce produit ou ce médicament est dans la vente » : une recherche dès la PREMIÈRE lettre, les résultats groupés —
+ * d'abord ce que l'officine détient (en stock avant les ruptures), puis le reste du catalogue national.
+ */
+export async function searchAssociationTriggers(pharmacyId: string, raw: string): Promise<TriggerSearch> {
+  const { query, prefix } = liveQuery(raw);
   if (query.terms.length === 0) return { stock: [], catalogue: [] };
-  const [found, products, catalogue] = await Promise.all([
-    rankStockDrugs(pharmacyId, query),
-    searchPharmacyProducts(pharmacyId, raw, { limit: STOCK_SHOWN }),
-    searchCatalogDrugs(query, CATALOGUE_READ),
-  ]);
+  const [found, products, catalogue] = prefix
+    ? await Promise.all([stockDrugsStartingWith(pharmacyId, prefix, 60), productsStartingWith(pharmacyId, prefix, STOCK_SHOWN), catalogDrugsStartingWith(prefix, CATALOGUE_READ)])
+    : await Promise.all([rankStockDrugs(pharmacyId, query), searchParsedProducts(pharmacyId, raw, query, STOCK_SHOWN), searchCatalogDrugs(query, CATALOGUE_READ)]);
   // Une association vaut pour toutes les formes d'un médicament (`drugKey` : le nom sans la forme) : « Autres médicaments »
   // ne repropose ni un médicament détenu, sous cette forme ou une autre, ni deux fois le même nom. « Détenu » se juge sur
   // TOUT ce que le stock a rendu (pas seulement les douze affichés), puis, pour ce qui reste du catalogue, dans le stock
@@ -310,8 +382,67 @@ export async function searchAssociationTriggers(pharmacyId: string, raw: string)
     ...products.map((hit) => ({ option: productOption(hit), score: hit.score, quantity: hit.quantity, name: hit.name })),
   ];
   return {
-    stock: stock.sort(byRelevance).slice(0, STOCK_SHOWN).map((entry) => entry.option),
+    stock: stock.sort(prefix ? inStockFirstByName : inStockFirst).slice(0, STOCK_SHOWN).map((entry) => entry.option),
     catalogue: others.slice(0, CATALOGUE_SHOWN).map(drugOption),
+  };
+}
+
+/** En mode « première lettre », tout commence par les lettres tapées : en stock d'abord, puis l'ordre alphabétique. */
+const inStockFirstByName = <T extends { quantity: number | null; name: string }>(a: T, b: T): number =>
+  Number((b.quantity ?? 0) > 0) - Number((a.quantity ?? 0) > 0) || a.name.localeCompare(b.name, "fr");
+
+/** La recherche de produits, sur une saisie déjà découpée (la dernière lettre en cours de frappe a pu être mise de côté). */
+async function searchParsedProducts(pharmacyId: string, raw: string, query: ParsedQuery, limit: number): Promise<ProductHit[]> {
+  const full = parseSearchQuery(raw);
+  if (full.terms.length === query.terms.length) return searchPharmacyProducts(pharmacyId, raw, { limit });
+  const ranked = await rankPharmacyProducts(pharmacyId, query, null, limit);
+  if (ranked.length === 0) return [];
+  const products = await prisma.product.findMany({ where: { pharmacyId, id: { in: ranked.map((hit) => hit.id) } }, include: productInclude });
+  const byId = new Map(products.map((product) => [product.id, product]));
+  return ranked.flatMap((hit) => {
+    const product = byId.get(hit.id);
+    return product ? [hitOf(product, hit.score)] : [];
+  });
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Le produit proposé d'une association : un produit de l'officine, ou un médicament SANS ordonnance de son stock
+// ---------------------------------------------------------------------------------------------------------------
+
+export type AdviceOption =
+  | { kind: "PRODUCT"; id: string; name: string; brand: string | null; quantity: number; status: ProductHit["status"] }
+  | { kind: "DRUG"; id: string; name: string; label: string | null; quantity: number };
+
+export type AdviceSearch = {
+  /** En stock : produits et médicaments sans ordonnance, mêlés, les plus pertinents d'abord. */
+  stock: AdviceOption[];
+  /** Détenus mais à zéro : choisissables (l'association attendra le réassort), jamais proposés en rupture au comptoir. */
+  empty: AdviceOption[];
+};
+
+const ADVICE_SHOWN = 15;
+
+/**
+ * « PharmaBoost propose » : dès la première lettre, ce que l'officine peut remettre — ses produits et ses médicaments SANS
+ * ordonnance (un médicament soumis à prescription n'est jamais proposé en vente additionnelle : il n'apparaît pas). En stock
+ * d'abord ; ce qui est à zéro ensuite, à part. Le catalogue national non détenu n'y est pas : on ne propose que ce qu'on a.
+ */
+export async function searchAssociationAdvice(pharmacyId: string, raw: string): Promise<AdviceSearch> {
+  const { query, prefix } = liveQuery(raw);
+  if (query.terms.length === 0) return { stock: [], empty: [] };
+  const [drugs, products] = prefix
+    ? await Promise.all([stockDrugsStartingWith(pharmacyId, prefix, 60, true), productsStartingWith(pharmacyId, prefix, 40)])
+    : await Promise.all([rankStockDrugs(pharmacyId, query), searchParsedProducts(pharmacyId, raw, query, 40)]);
+  const prescribed = drugs.length
+    ? new Set((await prisma.drugPrescriptionCondition.findMany({ where: { specialtyId: { in: drugs.map((hit) => hit.specialtyId) } }, select: { specialtyId: true } })).map((row) => row.specialtyId))
+    : new Set<string>();
+  const entries = [
+    ...drugs.filter((hit) => !prescribed.has(hit.specialtyId)).map((hit) => ({ option: { kind: "DRUG", id: hit.specialtyId, name: hit.name, label: hit.label, quantity: hit.quantity ?? 0 } as AdviceOption, score: hit.score, quantity: hit.quantity ?? 0, name: hit.name })),
+    ...products.map((hit) => ({ option: { kind: "PRODUCT", id: hit.id, name: hit.name, brand: hit.brand, quantity: hit.quantity, status: hit.status } as AdviceOption, score: hit.score, quantity: hit.quantity, name: hit.name })),
+  ].sort(prefix ? inStockFirstByName : inStockFirst);
+  return {
+    stock: entries.filter((entry) => entry.quantity > 0).slice(0, ADVICE_SHOWN).map((entry) => entry.option),
+    empty: entries.filter((entry) => entry.quantity <= 0).slice(0, 6).map((entry) => entry.option),
   };
 }
 

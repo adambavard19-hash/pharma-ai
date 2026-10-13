@@ -1,10 +1,6 @@
 import { redirect } from "next/navigation";
 
-/**
- * « Mise en service » est devenue « Connecter ma pharmacie » : un seul parcours
- * pour le logiciel, le stock et le poste de comptoir. Les anciens liens (e-mails,
- * favoris) arrivent ici et sont renvoyés à la page unique.
- */
+/** L'ancienne « Mise en service » (liens d'e-mails, favoris) : l'installation d'un poste vit dans Paramètres → « Postes du comptoir ». */
 export default function InstallationPage() {
-  redirect("/connexion");
+  redirect("/parametres/postes");
 }

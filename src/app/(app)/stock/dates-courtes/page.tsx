@@ -95,7 +95,7 @@ export default async function ShortDatesPage({ searchParams }: { searchParams: P
                     className={cn(
                       "rounded-full border px-3 py-1 text-[12.5px] transition-colors",
                       filter.key === item.key
-                        ? "border-brand-600 bg-brand-600 text-white"
+                        ? "border-brand-700 bg-brand-700 text-white"
                         : alert
                           ? "border-danger-200 text-danger-700 hover:border-danger-300"
                           : "border-border-default text-text-secondary hover:border-border-strong",

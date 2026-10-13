@@ -13,14 +13,17 @@ const mocks = vi.hoisted(() => ({
     productBarcode: { findMany: vi.fn() },
     product: { findMany: vi.fn(), findFirst: vi.fn() },
     drugSpecialty: { findMany: vi.fn(), findUnique: vi.fn() },
+    pharmacyDrugStock: { findMany: vi.fn() },
   },
   recordAudit: vi.fn(),
+  loadAssociationDrugProducts: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/db/client", () => ({ prisma: mocks.prisma }));
 vi.mock("@/server/audit/log", () => ({ recordAudit: mocks.recordAudit }));
+vi.mock("../catalog", () => ({ loadAssociationDrugProducts: mocks.loadAssociationDrugProducts }));
 
-import { createAssociation, createAssociations, deleteAssociation, listAssociations, loadAssociationInput, resolveLineTriggers, updateAssociation } from "../product-associations";
+import { createAssociation, createAssociationGrid, createAssociations, deleteAssociation, listAssociations, loadAssociationInput, resolveLineTriggers, updateAssociation } from "../product-associations";
 
 const SCOPE = { pharmacyId: "ph_1", organizationId: "org_1", userId: "u_1" };
 const line = (position: number, drugName: string, rawText: string | null = null, extra: { status?: string; drugSpecialtyId?: string | null } = {}) => ({ position, status: extra.status ?? "CONFIRMED", drugName, rawText, drugSpecialtyId: extra.drugSpecialtyId ?? null });
@@ -32,6 +35,8 @@ beforeEach(() => {
   mocks.prisma.productBarcode.findMany.mockResolvedValue([]);
   mocks.prisma.product.findMany.mockResolvedValue([]);
   mocks.prisma.drugSpecialty.findMany.mockResolvedValue([]);
+  mocks.prisma.pharmacyDrugStock.findMany.mockResolvedValue([]);
+  mocks.loadAssociationDrugProducts.mockResolvedValue(new Map());
 });
 
 describe("ce que chaque ligne de la vente est", () => {
@@ -103,8 +108,25 @@ describe("ce que le moteur reçoit", () => {
       { lineIndex: 1, keys: ["drug:CORYZALIA"], productId: null },
     ]);
     const where = mocks.prisma.productAssociation.findMany.mock.calls[0][0].where;
-    expect(where).toMatchObject({ pharmacyId: "ph_1", isActive: true, adviceProduct: { deletedAt: null } });
-    expect(where.OR).toEqual([{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }]);
+    expect(where).toMatchObject({ pharmacyId: "ph_1", isActive: true });
+    expect(where.AND).toEqual([
+      { OR: [{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }] },
+      { OR: [{ adviceProductId: { not: null }, adviceProduct: { deletedAt: null } }, { adviceSpecialtyId: { not: null } }] },
+    ]);
+  });
+
+  it("un médicament proposé est retrouvé dans le stock de l'officine et rendu au moteur ; absent du stock, le moteur dira pourquoi", async () => {
+    mocks.prisma.productAssociation.findMany.mockResolvedValue([
+      { id: "a1", triggerProductId: "p1", triggerSpecialty: null, adviceProductId: null, adviceSpecialtyId: "sp_doli", sentence: null, sortOrder: 1 },
+      { id: "a2", triggerProductId: "p1", triggerSpecialty: null, adviceProductId: null, adviceSpecialtyId: "sp_absent", sentence: null, sortOrder: 2 },
+    ]);
+    const doliprane = { id: "presentation:pr_doli", origin: "NATIONAL_DRUG", name: "DOLIPRANE 500 mg, gélule" };
+    mocks.loadAssociationDrugProducts.mockResolvedValue(new Map([["sp_doli", doliprane]]));
+    mocks.prisma.product.findMany.mockResolvedValue([{ id: "p1", name: "Spray nasal" }]);
+    const input = await loadAssociationInput(SCOPE, [line(0, "Spray nasal")]);
+    expect(mocks.loadAssociationDrugProducts).toHaveBeenCalledWith(SCOPE, ["sp_doli", "sp_absent"]);
+    expect(input?.rules.map((rule) => [rule.id, rule.adviceProductId])).toEqual([["a1", "presentation:pr_doli"], ["a2", "specialty:sp_absent"]]);
+    expect(input?.products).toEqual([doliprane]);
   });
 });
 
@@ -289,6 +311,101 @@ describe("plusieurs produits conseillés d'un coup", () => {
     expect(mocks.prisma.productAssociation.createManyAndReturn).not.toHaveBeenCalled();
     expect(await createAssociations(SCOPE, { triggerProductId: "p1", adviceProductIds: [] })).toEqual({ ok: false, error: "Choisissez au moins un produit à conseiller." });
     expect((await createAssociations(SCOPE, { triggerProductId: "p1", adviceProductIds: Array.from({ length: 11 }, (_, index) => `x${index}`) })).ok).toBe(false);
+  });
+});
+
+describe("un médicament sans ordonnance du stock comme produit proposé", () => {
+  beforeEach(() => {
+    mocks.prisma.product.findFirst.mockResolvedValue({ id: "p1", name: "Spray nasal", isActive: true });
+    mocks.prisma.product.findMany.mockResolvedValue([]);
+    mocks.prisma.productAssociation.findMany.mockResolvedValue([]);
+    mocks.prisma.productAssociation.findFirst.mockResolvedValue(null);
+    mocks.prisma.productAssociation.createManyAndReturn.mockImplementation(async ({ data }: { data: { adviceSpecialtyId?: string; adviceProductId?: string }[] }) => data.map((row, index) => ({ id: `a${index}`, adviceProductId: row.adviceProductId ?? null, adviceSpecialtyId: row.adviceSpecialtyId ?? null })));
+    mocks.prisma.drugSpecialty.findMany.mockResolvedValue([
+      { id: "sp_doli", name: "DOLIPRANE 500 mg, gélule", withdrawnAt: null, prescriptionConditions: [] },
+      { id: "sp_amox", name: "AMOXICILLINE 1 g, comprimé", withdrawnAt: null, prescriptionConditions: [{ label: "Liste I" }] },
+      { id: "sp_absent", name: "HUMEX RHUME, comprimé", withdrawnAt: null, prescriptionConditions: [] },
+    ]);
+    // L'officine détient le Doliprane et l'amoxicilline, pas Humex.
+    mocks.prisma.pharmacyDrugStock.findMany.mockResolvedValue([
+      { quantity: 10, presentation: { specialtyId: "sp_doli" } },
+      { quantity: 4, presentation: { specialtyId: "sp_doli" } },
+      { quantity: 3, presentation: { specialtyId: "sp_amox" } },
+    ]);
+  });
+
+  it("crée l'association vers le médicament détenu ; refuse, avec la raison, celui sur ordonnance et celui hors stock", async () => {
+    const result = await createAssociations(SCOPE, { triggerProductId: "p1", adviceSpecialtyIds: ["sp_doli", "sp_amox", "sp_absent"] });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.created).toEqual([{ id: "a0", adviceSpecialtyId: "sp_doli", adviceName: "DOLIPRANE 500 mg" }]);
+    expect(result.skipped.map((skip) => skip.reason)).toEqual([
+      "« AMOXICILLINE 1 g » est soumis à prescription : jamais proposé en vente additionnelle.",
+      "« HUMEX RHUME » n'est pas dans votre stock : on ne propose que ce que l'officine peut remettre.",
+    ]);
+    const [row] = mocks.prisma.productAssociation.createManyAndReturn.mock.calls[0][0].data;
+    expect(row).toMatchObject({ pharmacyId: "ph_1", triggerProductId: "p1", adviceSpecialtyId: "sp_doli" });
+    expect(row).not.toHaveProperty("adviceProductId");
+    // Le stock lu est celui de l'officine du demandeur.
+    expect(mocks.prisma.pharmacyDrugStock.findMany.mock.calls[0][0].where).toMatchObject({ pharmacyId: "ph_1" });
+  });
+
+  it("un médicament ne s'associe pas à lui-même, même sous une autre forme", async () => {
+    mocks.prisma.drugSpecialty.findUnique.mockResolvedValue({ id: "sp_doli_cp", name: "DOLIPRANE 500 mg, comprimé" });
+    const result = await createAssociations(SCOPE, { triggerSpecialtyId: "sp_doli_cp", adviceSpecialtyIds: ["sp_doli"] });
+    expect(result).toMatchObject({ ok: true, created: [], skipped: [{ reason: "Un médicament ne peut pas être associé à lui-même." }] });
+  });
+
+  it("la liste dit qu'il s'agit d'un médicament, avec toutes ses boîtes en stock", async () => {
+    mocks.prisma.productAssociation.findMany.mockResolvedValue([
+      { id: "a1", sentence: null, isActive: true, createdAt: new Date(), triggerProduct: { id: "p1", name: "Spray nasal", brand: null, deletedAt: null, stockItem: { quantity: 3 } }, triggerSpecialty: null, adviceProduct: null, adviceSpecialty: { id: "sp_doli", name: "DOLIPRANE 500 mg, gélule" }, createdBy: null },
+    ]);
+    const [row] = await listAssociations(SCOPE);
+    expect(row.advice).toEqual({ kind: "DRUG", id: "sp_doli", name: "DOLIPRANE 500 mg, gélule", brand: null, quantity: 14, deleted: false });
+  });
+});
+
+describe("plusieurs déclencheurs × plusieurs produits", () => {
+  const catalog: Record<string, { id: string; name: string; isActive: boolean }> = { p1: { id: "p1", name: "Spray nasal", isActive: true }, p2: { id: "p2", name: "Olioseptil", isActive: true }, p3: { id: "p3", name: "Sirop", isActive: true } };
+  beforeEach(() => {
+    mocks.prisma.product.findFirst.mockImplementation(async ({ where }: { where: { id: string; pharmacyId: string } }) => (where.pharmacyId === "ph_1" ? (catalog[where.id] ?? null) : null));
+    mocks.prisma.product.findMany.mockImplementation(async ({ where }: { where: { id: { in: string[] }; pharmacyId: string } }) => (where.pharmacyId === "ph_1" ? where.id.in.flatMap((id) => (catalog[id] ? [catalog[id]] : [])) : []));
+    mocks.prisma.productAssociation.findFirst.mockResolvedValue(null);
+    mocks.prisma.drugSpecialty.findUnique.mockResolvedValue({ id: "sp_cet", name: "CETIRIZINE 10 mg, comprimé" });
+    let n = 0;
+    mocks.prisma.productAssociation.createManyAndReturn.mockImplementation(async ({ data }: { data: { adviceProductId: string }[] }) => data.map((row) => ({ id: `a${(n += 1)}`, adviceProductId: row.adviceProductId, adviceSpecialtyId: null })));
+  });
+
+  it("deux déclencheurs et deux produits : les quatre combinaisons, chacune une fois", async () => {
+    const result = await createAssociationGrid(SCOPE, {
+      triggers: [{ kind: "PRODUCT", id: "p1" }, { kind: "DRUG", id: "sp_cet" }, { kind: "PRODUCT", id: "p1" }],
+      advice: [{ kind: "PRODUCT", id: "p2" }, { kind: "PRODUCT", id: "p3" }],
+    });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.result.created.map((row) => [row.triggerName, row.adviceName])).toEqual([
+      ["Spray nasal", "Olioseptil"],
+      ["Spray nasal", "Sirop"],
+      ["CETIRIZINE 10 mg", "Olioseptil"],
+      ["CETIRIZINE 10 mg", "Sirop"],
+    ]);
+    expect(mocks.prisma.productAssociation.createManyAndReturn).toHaveBeenCalledTimes(2);
+  });
+
+  it("une combinaison qui existe déjà est écartée avec sa raison, le reste est créé", async () => {
+    mocks.prisma.productAssociation.findMany.mockImplementation(async ({ where }: { where: { triggerProductId?: string } }) => (where.triggerProductId === "p1" ? [{ adviceProductId: "p2", adviceSpecialtyId: null }] : []));
+    const result = await createAssociationGrid(SCOPE, { triggers: [{ kind: "PRODUCT", id: "p1" }, { kind: "DRUG", id: "sp_cet" }], advice: [{ kind: "PRODUCT", id: "p2" }] });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.result.created.map((row) => row.triggerName)).toEqual(["CETIRIZINE 10 mg"]);
+    expect(result.result.skipped).toEqual([{ adviceProductId: "p2", adviceName: "Olioseptil", reason: "« Olioseptil » est déjà associé à « Spray nasal ».", triggerName: "Spray nasal" }]);
+  });
+
+  it("un déclencheur d'une autre officine n'empêche pas les autres ; rien choisi ou trop de déclencheurs : refusé", async () => {
+    const result = await createAssociationGrid(SCOPE, { triggers: [{ kind: "PRODUCT", id: "autre_officine" }, { kind: "PRODUCT", id: "p1" }], advice: [{ kind: "PRODUCT", id: "p2" }] });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.result.created).toHaveLength(1);
+    expect(result.result.skipped[0].reason).toBe("Produit introuvable dans votre catalogue.");
+    expect((await createAssociationGrid(SCOPE, { triggers: [], advice: [{ kind: "PRODUCT", id: "p2" }] })).ok).toBe(false);
+    expect((await createAssociationGrid(SCOPE, { triggers: [{ kind: "PRODUCT", id: "p1" }], advice: [] })).ok).toBe(false);
+    expect((await createAssociationGrid(SCOPE, { triggers: Array.from({ length: 11 }, (_, i) => ({ kind: "PRODUCT" as const, id: `t${i}` })), advice: [{ kind: "PRODUCT", id: "p2" }] })).ok).toBe(false);
   });
 });
 

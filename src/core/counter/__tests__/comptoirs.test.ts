@@ -60,7 +60,7 @@ describe("le nom d'un comptoir", () => {
     expect(noComptoirMessage("MINE", true)).toBeNull();
     expect(noComptoirMessage("ONLY_ONE", false)).toBeNull();
     expect(noComptoirMessage("NONE", false)).toContain("« Ouvrir mon espace PharmaBoost »");
-    expect(noComptoirMessage("NONE", false)).not.toContain("Mes comptoirs");
-    expect(noComptoirMessage("NONE", true)).toContain("Mes comptoirs");
+    expect(noComptoirMessage("NONE", false)).not.toContain("Postes du comptoir");
+    expect(noComptoirMessage("NONE", true)).toContain("Postes du comptoir");
   });
 });

@@ -132,7 +132,7 @@ describe("chaque comptoir est un espace à part", () => {
     const status = buildCounterStatus({ now: NOW, posts: two, mine: { postIds: [], mode: "NONE" }, canAssign: false });
     expect(status).toMatchObject({ state: "UNASSIGNED", posts: [], pill: { label: "Aucun comptoir" } });
     expect(status.subtitle).toContain("« Ouvrir mon espace PharmaBoost »");
-    expect(buildCounterStatus({ now: NOW, posts: two, mine: { postIds: [], mode: "NONE" }, canAssign: true }).subtitle).toContain("Mes comptoirs");
+    expect(buildCounterStatus({ now: NOW, posts: two, mine: { postIds: [], mode: "NONE" }, canAssign: true }).subtitle).toContain("Postes du comptoir");
   });
 
   it("une pharmacie sans aucun comptoir relié reste « non connectée », pas « aucun comptoir »", () => {

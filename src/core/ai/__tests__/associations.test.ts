@@ -93,7 +93,6 @@ describe("une association ne contourne aucun garde-fou", () => {
     ["un produit absent du catalogue", { catalog: [spray] }, "NOT_IN_CATALOG"],
     ["un produit désactivé", { catalog: [spray, { ...olioseptil, isActive: false }] }, "NOT_IN_CATALOG"],
     ["un médicament à prescription obligatoire", { catalog: [spray, { ...olioseptil, prescriptionConditions: ["liste I"] }] }, "PRESCRIPTION_ONLY"],
-    ["un produit du catalogue national (jamais une vente additionnelle d'office)", { catalog: [spray, { ...olioseptil, origin: "NATIONAL_DRUG" }] }, "NOT_IN_CATALOG"],
     ["un produit déjà dans la vente", { lines: [inSale(0, "spray"), inSale(1, "olio")] }, "ALREADY_IN_SALE"],
     ["un produit que le moteur propose déjà", { proposed: ["olio"] }, "ALREADY_PROPOSED"],
   ];
@@ -258,5 +257,72 @@ describe("un médicament du catalogue national comme déclencheur (Coryzalia)", 
     });
     expect(result.recommendations.map((r) => [r.productId, r.source])).toEqual([["olio", "ASSOCIATION"]]);
     expect(result.outcome).toBe("PROPOSALS");
+  });
+});
+
+describe("un médicament SANS ordonnance du stock comme produit proposé (« Mes associations »)", () => {
+  // La boîte la mieux fournie de la spécialité choisie, telle que `loadAssociationDrugProducts` la rend au moteur.
+  const doliprane = product({ id: "presentation:pr_doli", name: "DOLIPRANE 500 mg, gélule", category: "AUTRE", stockQuantity: 14, substances: ["PARACÉTAMOL"], matchingTags: ["PARACÉTAMOL", "DOLIPRANE 500 mg, gélule"] });
+  const national = { ...doliprane, origin: "NATIONAL_DRUG" as const, presentationId: "pr_doli" };
+
+  it("est proposé comme un produit de l'officine : même carte, même source", () => {
+    const { recommendations, skipped } = build({ rules: [rule("r1", "spray", national.id)], catalog: [spray, national] });
+    expect(skipped).toEqual([]);
+    expect(recommendations.map((r) => [r.productId, r.source])).toEqual([["presentation:pr_doli", "ASSOCIATION"]]);
+  });
+
+  const cases: [string, Parameters<typeof build>[0], keyof typeof ASSOCIATION_SKIP_LABELS][] = [
+    ["soumis à prescription : jamais", { catalog: [spray, { ...national, prescriptionConditions: ["Liste II"] }] }, "PRESCRIPTION_ONLY"],
+    ["en rupture", { catalog: [spray, { ...national, stockQuantity: 0 }] }, "OUT_OF_STOCK"],
+    ["écarté par la sécurité du patient", { catalog: [spray, national], blocked: [national.id] }, "SAFETY"],
+    ["plus détenu par l'officine", { catalog: [spray] }, "NOT_IN_CATALOG"],
+    ["déjà dans la vente, sous une autre forme", { catalog: [spray, national], lineNames: [{ lineIndex: 0, drugName: "Spray nasal eau de mer" }, { lineIndex: 1, drugName: "DOLIPRANE 500 mg, comprimé" }] }, "ALREADY_IN_SALE"],
+  ];
+  for (const [label, over, reason] of cases) {
+    it(`n'est pas proposé ${label}`, () => {
+      const { recommendations, skipped } = build({ rules: [rule("r1", "spray", national.id)], ...over });
+      expect(recommendations).toEqual([]);
+      expect(skipped).toEqual([{ ruleId: "r1", reason }]);
+    });
+  }
+
+  it("dans la pipeline complète : le moteur de sécurité l'écarte quand sa substance est déjà délivrée", () => {
+    const result = runAnalysisPipeline({
+      lines: [
+        { lineIndex: 0, drugName: "Spray nasal eau de mer", posology: null, durationDays: null, confirmed: true },
+        { lineIndex: 1, drugName: "DAFALGAN 1 g", posology: null, durationDays: null, confirmed: true },
+      ],
+      knowledge: new Map(),
+      official: new Map([["dafalgan 1 g", { substances: ["PARACÉTAMOL"] } as never]]),
+      patient: patient({ patientId: null }),
+      catalog: [spray, national],
+      rules: [],
+      history: {},
+      explanations: [],
+      extractionFindings: [],
+      usedSimulatedProviders: false,
+      associations: { rules: [rule("r1", "spray", national.id)], lines: [inSale(0, "spray")] },
+    });
+    expect(result.recommendations.filter((r) => r.productId === national.id)).toEqual([]);
+    const stage = result.trace.find((entry) => entry.stage === "PRODUCT_ASSOCIATIONS");
+    expect(stage?.notes.join(" ")).toContain("écarté par la sécurité");
+  });
+
+  it("dans la pipeline complète : soumis à prescription, il est écarté deux fois (sécurité, puis association)", () => {
+    const result = runAnalysisPipeline({
+      lines: [{ lineIndex: 0, drugName: "Spray nasal eau de mer", posology: null, durationDays: null, confirmed: true }],
+      knowledge: new Map(),
+      patient: patient({ patientId: null }),
+      catalog: [spray, { ...national, prescriptionConditions: ["Liste I"] }],
+      rules: [],
+      history: {},
+      explanations: [],
+      extractionFindings: [],
+      usedSimulatedProviders: false,
+      associations: { rules: [rule("r1", "spray", national.id)], lines: [inSale(0, "spray")] },
+    });
+    expect(result.recommendations).toEqual([]);
+    const stage = result.trace.find((entry) => entry.stage === "PRODUCT_ASSOCIATIONS");
+    expect(stage?.notes.join(" ")).toContain("soumis à prescription");
   });
 });

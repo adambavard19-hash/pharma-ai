@@ -10,8 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { PerformanceTabs } from "./performance-tabs";
 
-export const metadata: Metadata = { title: "Mon équipe" };
+export const metadata: Metadata = { title: "Performances" };
 
 const PERIODS: { key: FixedPeriodKey; label: string; param: string }[] = [
   { key: "today", label: "Aujourd'hui", param: "jour" },
@@ -40,7 +41,8 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Mon équipe" description="Les conseils proposés et validés par chacun, et où il en est dans les challenges. Ces chiffres ne sont visibles que de vous." />
+      <PageHeader title="Performances" description="Les conseils proposés et validés par chacun, et où il en est dans les challenges. Ces chiffres ne sont visibles que de vous." />
+      <PerformanceTabs active="equipe" />
 
       <nav aria-label="Période" className="flex flex-wrap gap-1.5">
         {PERIODS.map((period) => (
@@ -50,7 +52,7 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
             aria-current={period.key === chosen.key ? "page" : undefined}
             className={cn(
               "rounded-full border px-4 py-2 text-[14px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none",
-              period.key === chosen.key ? "border-brand-600 bg-brand-600 text-white" : "border-border-default bg-surface-card text-text-secondary hover:bg-surface-sunken hover:text-text-primary",
+              period.key === chosen.key ? "border-brand-700 bg-brand-700 text-white" : "border-border-default bg-surface-card text-text-secondary hover:bg-surface-sunken hover:text-text-primary",
             )}
           >
             {period.label}
@@ -70,7 +72,7 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
 
         {rows.length === 0 ? (
           <Card>
-            <EmptyState title="Pas encore d'équipe" description="Ajoutez vos collaborateurs dans « Équipe » : leur classement apparaîtra ici." />
+            <EmptyState title="Pas encore d'équipe" description="Invitez vos collaborateurs dans « Mon équipe » : leur classement apparaîtra ici." />
           </Card>
         ) : (
           <Card>
@@ -92,7 +94,7 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
                       </span>
                       <span className="min-w-0 flex-1 basis-40">
                         <span className="block truncate text-[16px] font-semibold text-text-primary">{row.name}</span>
-                        {unassigned && <span className="block text-[12.5px] text-text-secondary">Ventes d&apos;un comptoir qui n&apos;était attribué à personne. Attribuez-le dans « Mes comptoirs ».</span>}
+                        {unassigned && <span className="block text-[12.5px] text-text-secondary">Ventes d&apos;un comptoir qui n&apos;était attribué à personne. Attribuez-le dans Paramètres → « Postes du comptoir ».</span>}
                         {!unassigned && <span className="mt-1 block h-1.5 max-w-xs overflow-hidden rounded-full bg-surface-sunken" aria-hidden><span className="block h-full rounded-full bg-brand-500" style={{ width: `${share}%` }} /></span>}
                       </span>
                       <dl className="flex shrink-0 gap-6 text-right">

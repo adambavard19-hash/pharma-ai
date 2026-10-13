@@ -29,7 +29,7 @@ describe("l'action « Retirer » d'un comptoir", () => {
     expect(mocks.requirePermission).toHaveBeenCalledWith(PERMISSIONS.PRODUCT_IMPORT);
     expect(mocks.revoke).toHaveBeenCalledWith(SESSION.scope, "post_1");
     expect(result.ok).toBe(true);
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/connexion");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/parametres/postes");
   });
 
   it("sans permission, rien n'est retiré", async () => {

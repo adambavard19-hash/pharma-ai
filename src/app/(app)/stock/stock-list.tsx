@@ -83,7 +83,7 @@ export function StockList({
             aria-current={filter === state ? "true" : undefined}
             className={cn(
               "rounded-full border px-3 py-1 text-[13px] transition-colors",
-              filter === state ? "border-brand-600 bg-brand-600 text-white" : "border-border-default text-text-secondary hover:border-border-strong",
+              filter === state ? "border-brand-700 bg-brand-700 text-white" : "border-border-default text-text-secondary hover:border-border-strong",
             )}
           >
             {FILTER_LABELS[state]} <span className="tabular opacity-80">{formatNumber(counts[state])}</span>

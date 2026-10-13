@@ -25,6 +25,7 @@ import {
 } from "@/core/poste/island-bridge";
 import { ESSAI_LENGTH_MS, ESSAI_SEQUENCE, isEssaiSale } from "@/core/poste/island-fixtures";
 import { readCounterSheet } from "../../../../../agent/src/counter-sheet";
+import { GREETING_SHOW_MS } from "../../../../../agent/src/greeting-text";
 
 /**
  * L'île du poste de caisse : la bannière validée (`CounterIsland`, les mêmes composants que l'aperçu), pilotée par
@@ -43,6 +44,8 @@ type WebViewBridge = { postMessage: (message: unknown) => void; addEventListener
 
 const C = BANNER.colors;
 const T = BANNER.text;
+/** La largeur de l'île pendant le bonjour : assez pour trois lignes lisibles, sans masquer le logiciel de gestion. */
+const GREETING_WIDTH = 380;
 
 function webview(): WebViewBridge | null {
   const chrome = (window as unknown as { chrome?: { webview?: WebViewBridge } }).chrome;
@@ -140,6 +143,13 @@ export function PosteIsland() {
     return () => clearTimeout(id);
   }, [island.stage, island.stepsDone, entry]);
 
+  // Le bonjour du robot reste une dizaine de secondes, puis l'île revient au repos (un clic le ferme avant).
+  useEffect(() => {
+    if (!view.greeting) return;
+    const id = setTimeout(() => dispatch({ type: "dismissGreeting" }), GREETING_SHOW_MS);
+    return () => clearTimeout(id);
+  }, [view.greeting]);
+
   // Une analyse sans réponse ne reste pas affichée indéfiniment (même délai que la bannière).
   useEffect(() => {
     if (!view.scanAt) return;
@@ -182,6 +192,8 @@ export function PosteIsland() {
     return () => cancelAnimationFrame(frame);
   }, [send]);
 
+  // Le bonjour ne se montre qu'au repos (le reducer l'efface déjà à chaque scan ou vente).
+  const greeting = island.stage === "idle" && !entry ? view.greeting : null;
   const items = entry ? toAdvice(entry) : [];
   const questions = entry?.questions ?? [];
   const questionsOnly = Boolean(entry) && items.length === 0 && questions.length > 0 && island.stage === "advice";
@@ -245,7 +257,25 @@ export function PosteIsland() {
           drag.current = null;
         }}
       >
-        {!questionsOnly && <CounterIsland {...islandProps} />}
+        {greeting ? (
+          <IslandShell width={GREETING_WIDTH} tone="accent" contentKey="bonjour" label="Bonjour du robot PharmaBoost">
+            {/* Un bouton : un clic ferme le message. Jamais de champ, jamais de focus demandé : le clavier reste au logiciel de gestion. */}
+            <button
+              type="button"
+              data-ile-bonjour=""
+              onClick={() => dispatch({ type: "dismissGreeting" })}
+              title="Fermer le message"
+              className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
+            >
+              <span className="isl-pop shrink-0">
+                <Robot size={40} mood="happy" look={view.look} label="Le robot PharmaBoost" />
+              </span>
+              <span className="min-w-0 text-[13px] leading-[18px] text-white/90">{greeting}</span>
+            </button>
+          </IslandShell>
+        ) : (
+          !questionsOnly && <CounterIsland {...islandProps} />
+        )}
 
         {showQuestions && entry && (
           <IslandShell width={STAGE_WIDTH.advice} contentKey={`q-${entry.signature}`} label={T.questionTitle}>

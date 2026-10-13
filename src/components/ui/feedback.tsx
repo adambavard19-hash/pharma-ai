@@ -101,17 +101,17 @@ export function EmptyState({
       )}
     >
       {icon && (
-        <div className="flex size-12 items-center justify-center rounded-xl bg-surface-sunken text-text-tertiary">
+        <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-700 ring-8 ring-brand-50/50 dark:bg-brand-950 dark:text-brand-300 dark:ring-brand-950/40">
           {icon}
         </div>
       )}
-      <div className="max-w-sm space-y-1">
-        <p className="text-[15px] font-semibold text-text-primary">{title}</p>
+      <div className="max-w-md space-y-1.5 pt-1">
+        <p className="text-[15.5px] font-semibold text-text-primary">{title}</p>
         {description && (
-          <p className="text-[13px] leading-5 text-text-secondary">{description}</p>
+          <p className="text-[13.5px] leading-5 text-pretty text-text-secondary">{description}</p>
         )}
       </div>
-      {action && <div className="pt-1">{action}</div>}
+      {action && <div className="pt-2">{action}</div>}
     </div>
   );
 }

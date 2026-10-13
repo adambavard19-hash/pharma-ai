@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       let steps = 0;
       try {
         await runPharmacyAssistant(
-          { scope: session.scope, viewer, alertViewer, pharmacyName: session.pharmacy.name, firstName: session.user.firstName, roleLabel: session.roleLabel },
+          { scope: session.scope, viewer, alertViewer, pharmacyIsDemo: session.pharmacy.isDemo, pharmacyName: session.pharmacy.name, firstName: session.user.firstName, roleLabel: session.roleLabel },
           turns,
           (event) => {
             if (event.type === "done") steps = event.steps;

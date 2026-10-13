@@ -59,7 +59,7 @@ function Chip({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors",
         isActive
-          ? "border-brand-600 bg-brand-600 text-white"
+          ? "border-brand-700 bg-brand-700 text-white"
           : "border-border-default bg-surface-card text-text-secondary hover:border-border-strong hover:text-text-primary",
       )}
     >

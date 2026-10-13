@@ -16,6 +16,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
   const query = (new URL(request.url).searchParams.get("q") ?? "").trim().slice(0, 120);
-  const result: TriggerSearch = query.length < 2 ? { stock: [], catalogue: [] } : await searchAssociationTriggers(session.scope.pharmacyId, query);
+  const result: TriggerSearch = query.length === 0 ? { stock: [], catalogue: [] } : await searchAssociationTriggers(session.scope.pharmacyId, query);
   return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
 }

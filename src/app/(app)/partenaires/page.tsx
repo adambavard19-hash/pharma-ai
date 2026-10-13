@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { BrandLogo } from "./_components/brand-logo";
 import { PreferenceActions } from "./_components/preference-actions";
 
-export const metadata: Metadata = { title: "Gammes partenaires" };
+export const metadata: Metadata = { title: "Partenaires" };
 
 /**
  * Les gammes que des laboratoires partenaires de PharmaBoost proposent à
@@ -34,7 +34,7 @@ export default async function PartnersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Gammes partenaires"
+        title="Partenaires"
         description="Présentation, conditions professionnelles, documentation et contact des laboratoires partenaires qui proposent leurs gammes à votre officine."
       />
 

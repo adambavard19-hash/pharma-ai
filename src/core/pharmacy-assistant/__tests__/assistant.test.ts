@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { clampDays, pharmacySuggestions, pharmacySystemPrompt, pharmacyToolsFor, safeAppHref, type PharmacyViewer } from "../assistant";
 
-const OWNER: PharmacyViewer = { role: "OWNER", manageTeam: true, teamPerformance: true, stock: true };
-const TECH: PharmacyViewer = { role: "TECHNICIAN", manageTeam: false, teamPerformance: false, stock: true };
-const VIEWER: PharmacyViewer = { role: "VIEWER", manageTeam: false, teamPerformance: false, stock: false };
+const OWNER: PharmacyViewer = { role: "OWNER", manageTeam: true, teamPerformance: true, stock: true, counter: true };
+const TECH: PharmacyViewer = { role: "TECHNICIAN", manageTeam: false, teamPerformance: false, stock: true, counter: true };
+const VIEWER: PharmacyViewer = { role: "VIEWER", manageTeam: false, teamPerformance: false, stock: false, counter: false };
 
 describe("le robot de l'officine", () => {
   it("ne propose au modèle que les outils permis par le rôle", () => {
-    expect(pharmacyToolsFor(OWNER).map((t) => t.name)).toEqual(["ma_journee", "conseils_et_ventes", "challenges", "dates_courtes", "stock_produit", "equipe"]);
+    expect(pharmacyToolsFor(OWNER).map((t) => t.name)).toEqual(["conseil_comptoir", "ma_journee", "conseils_et_ventes", "challenges", "dates_courtes", "stock_produit", "equipe"]);
     expect(pharmacyToolsFor(TECH).map((t) => t.name)).not.toContain("equipe");
     expect(pharmacyToolsFor(VIEWER).map((t) => t.name)).toEqual(["ma_journee", "conseils_et_ventes", "challenges"]);
   });
@@ -42,5 +42,16 @@ describe("le robot de l'officine", () => {
     expect(clampDays("x")).toBe(7);
     expect(pharmacySuggestions(VIEWER)).not.toContain("Qu'est-ce qui périme bientôt ?");
     expect(pharmacySuggestions(OWNER)).toContain("Qui a le meilleur taux ce mois-ci ?");
+  });
+
+  it("propose le conseil au comptoir dans la Discussion à qui conseille, et sa consigne interdit d'inventer", () => {
+    expect(pharmacySuggestions(TECH).slice(0, 3)).toEqual(["Le patient a mal à la gorge", "Conseil pour un voyage", "Le patient tousse"]);
+    expect(pharmacySuggestions(VIEWER)).not.toContain("Le patient a mal à la gorge");
+    expect(pharmacyToolsFor(VIEWER).map((t) => t.name)).not.toContain("conseil_comptoir");
+    const prompt = pharmacySystemPrompt({ pharmacyName: "Pharmacie du Port", firstName: "Léa", roleLabel: "Préparateur" });
+    expect(prompt).toMatch(/UNIQUEMENT par l'outil conseil_comptoir/);
+    expect(prompt).toMatch(/N'ajoute aucun produit/);
+    expect(prompt).toMatch(/ne suppose rien/);
+    expect(prompt).toMatch(/jamais de nom/);
   });
 });

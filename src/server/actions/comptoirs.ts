@@ -20,7 +20,7 @@ export async function assignComptoirAction(payload: { postId: string; userId: st
   if (!parsed.success) return fail("Demande invalide.");
   const result = await assignComptoir(session.scope, parsed.data.postId, parsed.data.userId);
   if (!result.ok) return fail(result.error);
-  revalidatePath("/connexion");
+  revalidatePath("/parametres/postes");
   revalidatePath("/vente/nouvelle");
   return ok(null, result.assignee ? `${result.name} est maintenant le comptoir de ${result.assignee}.` : `${result.name} n'est plus attribué.`);
 }
@@ -31,6 +31,6 @@ export async function renameComptoirAction(payload: { postId: string; name: stri
   if (!parsed.success) return fail("Demande invalide.");
   const result = await renameComptoir(session.scope, parsed.data.postId, parsed.data.name);
   if (!result.ok) return fail(result.error);
-  revalidatePath("/connexion");
+  revalidatePath("/parametres/postes");
   return ok({ name: result.name }, `Comptoir renommé : ${result.name}.`);
 }

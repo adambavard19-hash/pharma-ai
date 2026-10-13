@@ -13,6 +13,7 @@ export function viewersOf(session: SessionContext): { viewer: PharmacyViewer; al
       manageTeam: has(PERMISSIONS.TEAM_MANAGE),
       teamPerformance: has(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE),
       stock: has(PERMISSIONS.STOCK_VIEW),
+      counter: has(PERMISSIONS.PRESCRIPTION_CREATE),
     },
     alertViewer: {
       scope: session.scope,

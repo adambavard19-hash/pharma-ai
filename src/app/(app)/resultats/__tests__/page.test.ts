@@ -111,7 +111,7 @@ describe("l'accès : une vue de titulaire", () => {
   });
 
   it("le titulaire entre", async () => {
-    await expect(render()).resolves.toContain("Ce que PharmaBoost vous rapporte");
+    await expect(render()).resolves.toContain("Ce que PharmaBoost rapporte");
   });
 
   it.each(["PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const)("%s est refusé : rien n'est lu, rien n'est affiché", async (role) => {
@@ -233,7 +233,8 @@ describe("ce qui part vers l'écran", () => {
 
   it("le titre et le sous-titre de la page, sans chiffre ni collaborateur", async () => {
     const html = await render();
-    expect(html).toMatch(/<h1[^>]*>Ce que PharmaBoost vous rapporte<\/h1>/);
+    expect(html).toMatch(/<h1[^>]*>Performances<\/h1>/);
+    expect(html).toMatch(/<a(?=[^>]*href="\/resultats")(?=[^>]*aria-selected="true")/);
     const shown = html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'");
     expect(shown).toContain("ventes confirmées");
     expect(shown).not.toMatch(/\d/);
@@ -247,7 +248,7 @@ describe("ce qui part vers l'écran", () => {
   });
 
   it("le titre de l'onglet", () => {
-    expect(page.metadata).toEqual({ title: "Ce que PharmaBoost vous rapporte" });
+    expect(page.metadata).toEqual({ title: "Performances — ce que PharmaBoost rapporte" });
   });
 });
 

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Link2 } from "lucide-react";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { listAssociations } from "@/server/services/product-associations";
@@ -24,8 +23,7 @@ export default async function AssociationsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Mes associations"
-        description="Un produit ou un médicament en appelle d'autres. Quand il est dans la vente — même une vente spontanée, sans ordonnance — PharmaBoost propose les produits que vous avez choisis."
-        actions={<Link2 className="size-6 text-brand-600 dark:text-brand-400" aria-hidden />}
+        description="Quand un produit ou un médicament est dans la vente — même une vente spontanée, sans ordonnance — PharmaBoost propose les produits de votre stock que vous avez choisis. Un médicament peut en appeler plusieurs."
       />
       <AssociationsManager
         associations={associations.map((association) => ({

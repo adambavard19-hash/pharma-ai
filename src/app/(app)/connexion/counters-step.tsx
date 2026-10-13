@@ -77,7 +77,7 @@ export function CountersStep({ counters, installerAvailable, members, assignment
     });
 
   return (
-    <SetupCard icon={Monitor} title="1. Mes comptoirs" badge={connected > 0 ? <Badge tone="success">{connected} connecté{connected > 1 ? "s" : ""}</Badge> : undefined}>
+    <SetupCard icon={Monitor} title="Postes du comptoir" badge={connected > 0 ? <Badge tone="success">{connected} connecté{connected > 1 ? "s" : ""}</Badge> : undefined}>
       <p className="text-[15px] leading-6 text-text-secondary">Téléchargez PharmaBoost sur chaque ordinateur Windows de votre pharmacie, puis ouvrez le fichier.</p>
       <p className="text-[13.5px] leading-5 text-text-secondary">
         Chaque comptoir revient tout seul à la personne qui ouvre son espace PharmaBoost sur cet ordinateur (au démarrage de PharmaBoost, ou par l&apos;icône près de l&apos;horloge → « Ouvrir mon espace PharmaBoost ») : elle ne voit que les délivrances de son comptoir, ses conseils lui sont attribués, et personne ne voit les siens. Vous voyez ici qui est où ; en secours, vous pouvez aussi le choisir.
@@ -87,7 +87,7 @@ export function CountersStep({ counters, installerAvailable, members, assignment
       </p>
 
       {listed.length > 0 && (
-        <ul aria-label="Mes comptoirs" className="divide-y divide-border-subtle rounded-xl border border-border-subtle bg-surface-sunken/60">
+        <ul aria-label="Postes du comptoir" className="divide-y divide-border-subtle rounded-xl border border-border-subtle bg-surface-sunken/60">
           {listed.map((counter) => {
             // Le robot de la personne connectée à ce comptoir (1 robot pour 1 espace) ; personne : aucun.
             const owner = owners[counter.id] ?? null;

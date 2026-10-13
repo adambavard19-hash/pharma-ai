@@ -119,6 +119,9 @@ export default async function DrugSheetPage({ params }: { params: Promise<{ cis:
             </ul>
           )}
           {!coverage && <p className="mt-2 text-[12.5px] text-text-tertiary">La base tarifaire de l&apos;Assurance Maladie n&apos;a pas encore été lue pour ce médicament : le statut de médicament d&apos;exception est inconnu.</p>}
+          <Link href="/reglementation" className="mt-3 inline-block text-[13px] font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
+            Toutes les règles de délivrance et les dernières évolutions
+          </Link>
         </CardContent>
       </Card>
 

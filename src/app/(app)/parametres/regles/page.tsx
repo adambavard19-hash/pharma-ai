@@ -46,6 +46,7 @@ export default async function PharmacyPreferencesPage() {
       <SettingsTabs
         canSeeTeam={session.permissions.has(PERMISSIONS.TEAM_VIEW)}
         canSeeRules
+        canSeePosts={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
         canSeeAudit={session.permissions.has(PERMISSIONS.AUDIT_VIEW)}
       />
 

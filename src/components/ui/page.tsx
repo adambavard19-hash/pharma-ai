@@ -15,20 +15,20 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <header className={cn("space-y-3", className)}>
+    <header className={cn("space-y-3 pb-1", className)}>
       {breadcrumb}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1.5">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0 flex-1 basis-[28rem] space-y-2">
           <h1 className="text-[28px] leading-9 font-bold tracking-[-0.025em] text-text-primary sm:text-[30px]">
             {title}
           </h1>
           {description && (
-            <p className="max-w-2xl text-[15px] leading-6 text-text-secondary">
+            <p className="max-w-3xl text-[15px] leading-6 text-pretty text-text-secondary">
               {description}
             </p>
           )}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-2.5">{actions}</div>}
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2.5">{actions}</div>}
       </div>
     </header>
   );

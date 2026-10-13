@@ -1,18 +1,15 @@
 import {
   BarChart3,
   Box,
-  Boxes,
-  CalendarCheck,
   FlaskConical,
   GraduationCap,
   Handshake,
   Link2,
+  MailCheck,
   Megaphone,
-  Plug,
+  PackageSearch,
   ScanLine,
-  ScrollText,
   Settings,
-  Users,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -26,11 +23,23 @@ import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
  * du système (ordonnances, produits, stocks, ventes, analytics…) : c'était la
  * carte d'un ERP.
  *
- * Quatre groupes, dans l'ordre d'une journée : AU COMPTOIR (le patient devant
- * soi), MA PHARMACIE (le stock, ce que ça rapporte, l'assortiment, l'équipe),
+ * Trois groupes, sous l'action principale « Au comptoir » : MA PHARMACIE (le
+ * stock, ce que ça rapporte, les e-mails partis aux patients, les produits
+ * manquants, les associations, l'équipe),
  * DÉCOUVRIR (se former, les partenaires, les actualités) et CONFIGURATION (les
- * connexions, les paramètres). Seuls les intitulés et les regroupements ont
- * changé : aucune page n'a été retirée.
+ * paramètres). Chaque entrée porte une phrase (`description`) que le menu
+ * montre au survol : on sait ce qu'il y a derrière avant de cliquer.
+ *
+ * Retours du fondateur du 13 oct. 2026 : « Patients » et « Suivis patients »
+ * quittent le menu (au comptoir, seul le bilan part au patient, par e-mail :
+ * c'est « E-mails aux patients ») ; « Mes comptoirs » aussi (le robot se
+ * connecte seul, le stock s'envoie depuis « Mon stock ») — les postes vivent
+ * dans Paramètres → « Postes du comptoir » ; « Mon assortiment », que personne
+ * ne comprenait, devient « Produits manquants » ; « Réglementation » sort du
+ * menu : ses conditions de délivrance sont sur la fiche de chaque médicament
+ * (trouvée par la recherche ⌘K), qui mène aux « Dernières évolutions ».
+ * Aucune page n'a été supprimée :
+ * les anciennes adresses répondent toujours ou redirigent.
  *
  * Elle se plie au rôle, et c'est une décision de produit autant que de droits :
  * un collaborateur voit peu d'entrées — vendre, patients, suivis, stock — et
@@ -43,11 +52,10 @@ import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
  * mentale, pas la fonctionnalité.
  */
 
-export type NavGroupKey = "comptoir" | "pharmacie" | "decouvrir" | "configuration";
+export type NavGroupKey = "pharmacie" | "decouvrir" | "configuration";
 
-/** Les groupes du menu, dans l'ordre où ils s'affichent. */
+/** Les groupes du menu, dans l'ordre où ils s'affichent (l'action principale « Au comptoir » est au-dessus, hors groupe). */
 export const NAV_GROUPS: { key: NavGroupKey; label: string }[] = [
-  { key: "comptoir", label: "Au comptoir" },
   { key: "pharmacie", label: "Ma pharmacie" },
   { key: "decouvrir", label: "Découvrir" },
   { key: "configuration", label: "Configuration" },
@@ -78,50 +86,34 @@ export type NavItem = {
 export const NAVIGATION: NavItem[] = [
   {
     href: "/vente/nouvelle",
-    label: "Nouvelle vente",
+    label: "Au comptoir",
     icon: ScanLine,
     permission: PERMISSIONS.PRESCRIPTION_CREATE,
-    match: ["/vente", "/ordonnances"],
-    description: "Scanner une ordonnance et conseiller le patient",
+    match: ["/vente", "/ordonnances", "/au-comptoir"],
+    description: "Les délivrances en cours et les ventes terminées du jour",
     primary: true,
   },
 
-  // --- Au comptoir
-  {
-    href: "/patients",
-    label: "Patients",
-    icon: Users,
-    permission: PERMISSIONS.PATIENT_VIEW,
-    match: ["/patients"],
-    description: "Fiches, historique et consentements",
-    group: "comptoir",
-  },
-  {
-    href: "/suivis",
-    label: "Suivis patients",
-    icon: CalendarCheck,
-    permission: PERMISSIONS.FOLLOWUP_VIEW,
-    match: ["/suivis"],
-    description: "Les patients à recontacter aujourd'hui",
-    group: "comptoir",
-  },
-  {
-    href: "/reglementation",
-    label: "Réglementation",
-    icon: ScrollText,
-    permission: PERMISSIONS.PRESCRIPTION_VIEW,
-    description: "Ordonnances d'exception, sécurisées, dernières évolutions",
-    group: "comptoir",
-  },
-
   // --- Ma pharmacie
+  {
+    href: "/associations",
+    label: "Mes associations",
+    icon: Link2,
+    // Deuxième entrée du menu, juste après « Au comptoir » (consigne du fondateur, 13 oct. 2026 : rubrique importante).
+    // Décider quel produit en appelle quel autre est un acte de pharmacien (ou de titulaire) : la même permission que
+    // les règles de conseil de l'officine. L'équipe au comptoir voit le résultat sur la carte, pas l'écran.
+    permission: PERMISSIONS.RECOMMENDATION_RULES_MANAGE,
+    match: ["/associations"],
+    description: "Quand un produit ou un médicament est dans la vente, les produits de votre stock que PharmaBoost propose avec",
+    group: "pharmacie",
+  },
   {
     href: "/stock",
     label: "Mon stock",
     icon: Box,
     permission: PERMISSIONS.STOCK_VIEW,
     match: ["/stock", "/stocks", "/produits"],
-    description: "Ce qui est en rayon — et ce qui manque",
+    description: "Ce que vous avez en rayon, la mise à jour du stock, les dates courtes",
     group: "pharmacie",
   },
   {
@@ -133,29 +125,28 @@ export const NAVIGATION: NavItem[] = [
     // chacun et les challenges, simple), qui mène à « Ce que PharmaBoost vous rapporte » (les ventes confirmées), qui y renvoie.
     permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
     match: ["/resultats", "/pilotage", "/performance", "/analytics", "/ventes"],
-    description: "Le classement de l'équipe, les challenges, et ce que les conseils ont rapporté",
+    description: "Le classement de l'équipe, les challenges, et ce que les conseils PharmaBoost ont rapporté",
+    group: "pharmacie",
+  },
+  {
+    href: "/emails-patients",
+    label: "E-mails aux patients",
+    icon: MailCheck,
+    // Toute l'officine, tous comptoirs confondus : une vue de titulaire (les chiffres de l'équipe aussi).
+    permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
+    match: ["/emails-patients"],
+    description: "Les bilans envoyés par e-mail depuis le comptoir : quand, par qui, quels produits, envoyé ou non",
     group: "pharmacie",
   },
   {
     href: "/assortiment",
-    label: "Mon assortiment",
-    icon: Boxes,
+    label: "Produits manquants",
+    icon: PackageSearch,
     // Réservé au titulaire, comme les partenaires : les besoins que le stock n'a pas couverts
     // ne remontent pas de l'équipe au comptoir, le titulaire les consulte ici.
     permission: PERMISSIONS.PARTNERS_MANAGE,
     match: ["/assortiment"],
-    description: "Les besoins que votre stock n'a pas couverts, et ce qui existe chez nos partenaires",
-    group: "pharmacie",
-  },
-  {
-    href: "/associations",
-    label: "Mes associations",
-    icon: Link2,
-    // Décider quel produit en appelle quel autre est un acte de pharmacien (ou de titulaire) : la même permission que
-    // les règles de conseil de l'officine. L'équipe au comptoir voit le résultat sur la carte, pas l'écran.
-    permission: PERMISSIONS.RECOMMENDATION_RULES_MANAGE,
-    match: ["/associations"],
-    description: "Quand un produit est vendu, quel autre produit PharmaBoost propose avec",
+    description: "Les conseils que PharmaBoost n'a pas pu proposer faute de produit en stock : ce qu'il faudrait référencer",
     group: "pharmacie",
   },
   {
@@ -177,7 +168,7 @@ export const NAVIGATION: NavItem[] = [
     // TEAM_VIEW ailleurs, mais n'a rien à faire dans cet écran au comptoir.
     permission: PERMISSIONS.TEAM_MANAGE,
     match: ["/equipe"],
-    description: "Inviter vos collaborateurs, approuver les demandes, voir qui travaille où",
+    description: "Inviter vos collaborateurs, approuver leurs demandes, voir qui travaille à quel comptoir",
     group: "pharmacie",
   },
 
@@ -188,7 +179,7 @@ export const NAVIGATION: NavItem[] = [
     icon: GraduationCap,
     permission: PERMISSIONS.TRAINING_VIEW,
     match: ["/formation"],
-    description: "Les formations utiles sur les produits et les gammes de l'officine",
+    description: "Vidéos et fiches courtes pour bien connaître les produits et les gammes de l'officine",
     group: "decouvrir",
   },
   {
@@ -199,7 +190,7 @@ export const NAVIGATION: NavItem[] = [
     // au comptoir atteint une gamme depuis la carte « À découvrir ».
     permission: PERMISSIONS.PARTNERS_MANAGE,
     match: ["/partenaires"],
-    description: "Les gammes partenaires disponibles pour l'officine",
+    description: "Les gammes des laboratoires partenaires : présentation, conditions, contact",
     group: "decouvrir",
   },
   {
@@ -210,20 +201,11 @@ export const NAVIGATION: NavItem[] = [
     // l'entrée n'apparaît pas au comptoir.
     permission: PERMISSIONS.NEWS_MANAGE,
     match: ["/nouveautes"],
-    description: "Prévenir vos patients abonnés des nouvelles gammes",
+    description: "Prévenir vos patients abonnés des nouvelles gammes de la pharmacie",
     group: "decouvrir",
   },
 
   // --- Configuration
-  {
-    href: "/connexion",
-    label: "Mes comptoirs",
-    icon: Plug,
-    permission: PERMISSIONS.PRODUCT_IMPORT,
-    match: ["/connexion", "/installation"],
-    description: "Vos comptoirs installés et qui y travaille, votre stock, votre robot",
-    group: "configuration",
-  },
   {
     href: "/parametres",
     label: "Paramètres",
@@ -234,7 +216,7 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.SETTINGS_MANAGE,
     match: ["/parametres", "/conseils"],
     except: ["/parametres/laboratoires"],
-    description: "Officine, règles de conseil, conformité",
+    description: "Officine, postes du comptoir, préférences de conseil, abonnement, conformité",
     group: "configuration",
   },
 ];
@@ -251,14 +233,34 @@ export function groupNavigation(items: NavItem[]): { key: NavGroupKey; label: st
  * cloche de la barre supérieure, une fiche patient). Les lister ici évite
  * qu'ils deviennent des pages orphelines que plus rien n'atteint.
  *
- * L'équipe et les règles de conseil n'y figurent pas : elles sont devenues des
- * onglets de Paramètres, donc atteignables depuis le menu.
+ * L'équipe, les règles de conseil et les postes du comptoir n'y figurent qu'en
+ * rappel : ce sont des onglets de Paramètres, donc atteignables depuis le menu.
  */
 export const OFF_MENU_DESTINATIONS: {
   href: string;
   label: string;
   reachableFrom: string;
 }[] = [
+  {
+    href: "/patients",
+    label: "Patients",
+    reachableFrom: "une vente (la fiche du patient, quand il en a une) — sorti du menu le 13 oct. 2026 : au comptoir, seul le bilan part au patient",
+  },
+  {
+    href: "/suivis",
+    label: "Suivis patients",
+    reachableFrom: "la fin d'une vente (proposer un suivi) et la cloche — sorti du menu le 13 oct. 2026",
+  },
+  {
+    href: "/parametres/postes",
+    label: "Postes du comptoir",
+    reachableFrom: "Paramètres (onglet « Postes du comptoir ») ; /connexion et /installation y redirigent",
+  },
+  {
+    href: "/reglementation",
+    label: "Réglementation",
+    reachableFrom: "la fiche d'un médicament (recherche ⌘K → un médicament), encart « Réglementation » → « Toutes les règles et les dernières évolutions »",
+  },
   {
     href: "/support",
     label: "Contact support",

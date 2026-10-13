@@ -145,7 +145,7 @@ export default async function StockPage({
             <p className="text-[14.5px] text-text-secondary">{age ?? "Aucun stock reçu"}</p>
           </div>
           {canImport && (
-            <Button asChild variant="success" size="xl" className="w-full rounded-full" leadingIcon={<RefreshCw className="size-5" />}>
+            <Button asChild size="xl" className="w-full rounded-full" leadingIcon={<RefreshCw className="size-5" />}>
               <Link href="/stock/mise-a-jour">{syncedAt ? "Mettre à jour mon stock" : "Envoyer mon stock"}</Link>
             </Button>
           )}

@@ -9,6 +9,9 @@ export const MAX_SENTENCE_LENGTH = 240;
 /** Combien de produits conseillés au plus en un seul enregistrement, pour un même déclencheur. */
 export const MAX_ADVICE_PER_SAVE = 10;
 
+/** Combien de déclencheurs au plus en un seul enregistrement : chacun reçoit tous les produits choisis. */
+export const MAX_TRIGGERS_PER_SAVE = 10;
+
 export type AssociationDraft = {
   /** Le déclencheur est un produit du stock… */
   triggerProductId?: string | null;

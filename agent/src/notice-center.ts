@@ -462,6 +462,21 @@ export class NoticeCenter {
   /** Les ventes que la fenêtre garde ouvertes. */
   ids(): string[] { return [...this.held.keys()]; }
 
+  /**
+   * Le bonjour du robot peut-il être montré ? Seulement par l'île, déjà prête (« PRET ») : ni la bannière GDI+, ni
+   * l'ancienne fenêtre, ni la notification Windows ne le montrent (voir greeting.ts).
+   */
+  canGreet(): boolean {
+    return this.platform === "win32" && !this.broken && !this.forcedLegacy && this.window === "ile" && this.host !== null && this.ready;
+  }
+
+  /** Le bonjour du robot (voir greeting.ts). Vrai s'il est parti vers l'île ; elle ne prend jamais le clavier pour lui. */
+  greet(text: string): boolean {
+    if (!this.canGreet()) return false;
+    this.send({ op: "greet", text: oneLine(text).slice(0, 300) });
+    return true;
+  }
+
   /** Un bip vient d'être lu : « Scan détecté ! Analyse en cours… », avant même que le serveur ait répondu. */
   scanning(): void {
     if (this.platform !== "win32" || this.broken || this.forcedLegacy || !this.banner) return;

@@ -2,9 +2,11 @@ import "server-only";
 import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import { normalizeSearchText } from "@/core/reference/search";
-import { associationError, cleanSentence, MAX_ADVICE_PER_SAVE, sentenceError } from "@/core/associations/rules";
+import { associationError, cleanSentence, MAX_ADVICE_PER_SAVE, MAX_TRIGGERS_PER_SAVE, sentenceError } from "@/core/associations/rules";
 import { drugKey, productKey, type AssociationInput } from "@/core/ai/engines/associations";
+import type { CatalogProduct } from "@/core/ai/types";
 import type { TenantScope } from "@/server/db/tenant";
+import { loadAssociationDrugProducts } from "./catalog";
 
 /**
  * Les associations de produits de l'officine : lecture pour le moteur, et gestion par le pharmacien.
@@ -123,28 +125,40 @@ async function loadCentralRules(pharmacyId: string): Promise<{ rules: Associatio
   return { rules, triggerProductIds };
 }
 
+/** La clé, côté moteur, d'un médicament proposé que l'officine ne détient pas (plus) : le moteur dira « plus au catalogue ». */
+const missingDrugAdvice = (specialtyId: string): string => `specialty:${specialtyId}`;
+
 /**
  * Ce que le moteur reçoit : les associations actives — celles de l'officine, puis celles communes à toutes les officines —
  * et ce que chaque ligne de la vente est. `undefined` quand il n'y en a aucune (aucune requête de plus, aucune étape dans
  * la trace).
+ *
+ * Un médicament proposé (médicament sans ordonnance du stock) est retrouvé dans le stock de CETTE officine — la boîte la mieux
+ * fournie de la spécialité — et rendu dans `products`, que l'appelant ajoute au catalogue du moteur AVANT l'analyse : il passe
+ * ainsi par les mêmes contrôles de sécurité que tout conseil (prescription, doublon de substance, vigilances, stock).
  */
-export async function loadAssociationInput(scope: TenantScope, lines: LineForAssociations[]): Promise<AssociationInput | undefined> {
+export async function loadAssociationInput(scope: TenantScope, lines: LineForAssociations[]): Promise<(AssociationInput & { products: CatalogProduct[] }) | undefined> {
   const [rows, common] = await Promise.all([
     prisma.productAssociation.findMany({
       where: {
         pharmacyId: scope.pharmacyId,
         isActive: true,
-        adviceProduct: { deletedAt: null },
-        OR: [{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }],
+        AND: [
+          { OR: [{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }] },
+          { OR: [{ adviceProductId: { not: null }, adviceProduct: { deletedAt: null } }, { adviceSpecialtyId: { not: null } }] },
+        ],
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-      select: { id: true, triggerProductId: true, triggerSpecialty: { select: { name: true } }, adviceProductId: true, sentence: true, sortOrder: true },
+      select: { id: true, triggerProductId: true, triggerSpecialty: { select: { name: true } }, adviceProductId: true, adviceSpecialtyId: true, sentence: true, sortOrder: true },
     }),
     loadCentralRules(scope.pharmacyId),
   ]);
+  const drugSpecialtyIds = [...new Set(rows.map((row) => row.adviceSpecialtyId).filter((id): id is string => id !== null))];
+  const drugProducts = await loadAssociationDrugProducts(scope, drugSpecialtyIds);
   const own = rows.flatMap((row) => {
     const triggerKey = row.triggerProductId ? productKey(row.triggerProductId) : row.triggerSpecialty ? drugKey(row.triggerSpecialty.name) : null;
-    return triggerKey ? [{ id: row.id, triggerKey, adviceProductId: row.adviceProductId, sentence: row.sentence, sortOrder: row.sortOrder }] : [];
+    const adviceProductId = row.adviceProductId ?? (row.adviceSpecialtyId ? (drugProducts.get(row.adviceSpecialtyId)?.id ?? missingDrugAdvice(row.adviceSpecialtyId)) : null);
+    return triggerKey && adviceProductId ? [{ id: row.id, triggerKey, adviceProductId, sentence: row.sentence, sortOrder: row.sortOrder }] : [];
   });
   const rules = [...own, ...common.rules];
   if (rules.length === 0) return undefined;
@@ -153,14 +167,15 @@ export async function loadAssociationInput(scope: TenantScope, lines: LineForAss
     productIds: [...new Set([...rows.map((row) => row.triggerProductId).filter((id): id is string => id !== null), ...common.triggerProductIds])],
     drugKeys: new Set(rules.map((rule) => rule.triggerKey).filter((key) => key.startsWith("drug:"))),
   };
-  return { rules, lines: await resolveLineTriggers(scope.pharmacyId, lines, wanted) };
+  return { rules, lines: await resolveLineTriggers(scope.pharmacyId, lines, wanted), products: [...drugProducts.values()] };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
 // L'écran « Mes associations »
 // ---------------------------------------------------------------------------------------------------------------
 
-export type ProductBrief = { id: string; name: string; brand: string | null; quantity: number; deleted: boolean };
+/** Ce qui est proposé : un produit de l'officine, ou un médicament sans ordonnance de son stock (toutes ses boîtes). */
+export type ProductBrief = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number; deleted: boolean };
 
 /** Ce qui déclenche une association, tel que l'écran le montre. `quantity` n'existe que pour un produit du stock. */
 export type TriggerView = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number | null; deleted: boolean };
@@ -176,6 +191,7 @@ export type AssociationView = {
 };
 
 const briefOf = (product: { id: string; name: string; brand: string | null; deletedAt: Date | null; stockItem: { quantity: number } | null }): ProductBrief => ({
+  kind: "PRODUCT",
   id: product.id,
   name: product.name,
   brand: product.brand,
@@ -184,6 +200,18 @@ const briefOf = (product: { id: string; name: string; brand: string | null; dele
 });
 
 const productSelect = { id: true, name: true, brand: true, deletedAt: true, stockItem: { select: { quantity: true } } } as const;
+
+/** Le nombre de boîtes que l'officine détient de chaque spécialité (toutes présentations confondues). */
+async function heldQuantities(pharmacyId: string, specialtyIds: string[]): Promise<Map<string, number>> {
+  const held = new Map<string, number>();
+  if (specialtyIds.length === 0) return held;
+  const lines = await prisma.pharmacyDrugStock.findMany({
+    where: { pharmacyId, presentation: { specialtyId: { in: specialtyIds } } },
+    select: { quantity: true, presentation: { select: { specialtyId: true } } },
+  });
+  for (const line of lines) held.set(line.presentation.specialtyId, (held.get(line.presentation.specialtyId) ?? 0) + line.quantity);
+  return held;
+}
 
 /** Toutes les associations de l'officine, les plus récentes d'abord. */
 export async function listAssociations(scope: TenantScope): Promise<AssociationView[]> {
@@ -198,17 +226,24 @@ export async function listAssociations(scope: TenantScope): Promise<AssociationV
       triggerProduct: { select: productSelect },
       triggerSpecialty: { select: { id: true, name: true } },
       adviceProduct: { select: productSelect },
+      adviceSpecialty: { select: { id: true, name: true } },
       createdBy: { select: { firstName: true, lastName: true } },
     },
   });
+  const held = await heldQuantities(scope.pharmacyId, [...new Set(rows.flatMap((row) => (row.adviceSpecialty ? [row.adviceSpecialty.id] : [])))]);
   return rows.flatMap((row) => {
     const trigger: TriggerView | null = row.triggerProduct
       ? { kind: "PRODUCT", id: row.triggerProduct.id, name: row.triggerProduct.name, brand: row.triggerProduct.brand, quantity: row.triggerProduct.stockItem?.quantity ?? 0, deleted: row.triggerProduct.deletedAt !== null }
       : row.triggerSpecialty
         ? { kind: "DRUG", id: row.triggerSpecialty.id, name: row.triggerSpecialty.name, brand: null, quantity: null, deleted: false }
         : null;
-    if (!trigger) return [];
-    return [{ id: row.id, trigger, advice: briefOf(row.adviceProduct), sentence: row.sentence, isActive: row.isActive, createdAt: row.createdAt, createdBy: row.createdBy ? `${row.createdBy.firstName} ${row.createdBy.lastName}` : null }];
+    const advice: ProductBrief | null = row.adviceProduct
+      ? briefOf(row.adviceProduct)
+      : row.adviceSpecialty
+        ? { kind: "DRUG", id: row.adviceSpecialty.id, name: row.adviceSpecialty.name, brand: null, quantity: held.get(row.adviceSpecialty.id) ?? 0, deleted: false }
+        : null;
+    if (!trigger || !advice) return [];
+    return [{ id: row.id, trigger, advice, sentence: row.sentence, isActive: row.isActive, createdAt: row.createdAt, createdBy: row.createdBy ? `${row.createdBy.firstName} ${row.createdBy.lastName}` : null }];
   });
 }
 
@@ -234,63 +269,105 @@ export async function createAssociation(
   return { ok: true, id: created.id, triggerName: result.triggerName, adviceName: created.adviceName };
 }
 
-export type BatchSkip = { adviceProductId: string; adviceName: string | null; reason: string };
-export type BatchCreated = { id: string; adviceProductId: string; adviceName: string };
+/** Un produit proposé écarté : `adviceProductId` pour un produit, `adviceSpecialtyId` pour un médicament. */
+export type BatchSkip = { adviceProductId?: string; adviceSpecialtyId?: string; adviceName: string | null; reason: string };
+export type BatchCreated = { adviceProductId?: string; adviceSpecialtyId?: string; id: string; adviceName: string };
+
+type AdviceRef = { kind: "PRODUCT" | "DRUG"; id: string };
+const refKey = (ref: AdviceRef): string => `${ref.kind}:${ref.id}`;
+const refField = (ref: AdviceRef): { adviceProductId: string } | { adviceSpecialtyId: string } => (ref.kind === "PRODUCT" ? { adviceProductId: ref.id } : { adviceSpecialtyId: ref.id });
 
 /**
- * Plusieurs produits conseillés d'un coup pour UN déclencheur (« quand la cétirizine est dans la vente, proposer le spray,
- * le collyre et les mouchoirs »). Chaque produit passe par les mêmes contrôles qu'une association seule ; un produit déjà
- * associé, d'une autre officine, désactivé ou identique au déclencheur est écarté AVEC sa raison, sans bloquer les autres.
- * L'écriture est une seule instruction : tout ce qui reste est créé, ou rien. Deux enregistrements simultanés ne créent pas
- * de doublon — la contrainte d'unicité de la base départage, et le perdant est signalé « déjà associé ».
+ * Plusieurs produits proposés d'un coup pour UN déclencheur (« quand la cétirizine est dans la vente, proposer le spray,
+ * le collyre et les mouchoirs »). Un produit proposé est un produit de l'officine (`adviceProductIds`) ou un médicament SANS
+ * ordonnance de son stock (`adviceSpecialtyIds`). Chacun passe par les mêmes contrôles qu'une association seule ; un produit
+ * déjà associé, d'une autre officine, désactivé, soumis à prescription, absent du stock ou identique au déclencheur est
+ * écarté AVEC sa raison, sans bloquer les autres. L'écriture est une seule instruction : tout ce qui reste est créé, ou rien.
+ * Deux enregistrements simultanés ne créent pas de doublon — la contrainte d'unicité de la base départage, et le perdant
+ * est signalé « déjà associé ».
  */
 export async function createAssociations(
   scope: TenantScope,
-  input: { triggerProductId?: string | null; triggerSpecialtyId?: string | null; adviceProductIds: string[]; sentence?: string | null },
+  input: { triggerProductId?: string | null; triggerSpecialtyId?: string | null; adviceProductIds?: string[]; adviceSpecialtyIds?: string[]; sentence?: string | null },
 ): Promise<{ ok: true; triggerName: string; created: BatchCreated[]; skipped: BatchSkip[] } | Failure> {
   const sentence = cleanSentence(input.sentence);
-  const adviceIds = [...new Set(input.adviceProductIds.filter(Boolean))];
-  if (adviceIds.length === 0) return { ok: false, error: "Choisissez au moins un produit à conseiller." };
-  if (adviceIds.length > MAX_ADVICE_PER_SAVE) return { ok: false, error: `${MAX_ADVICE_PER_SAVE} produits au plus en une fois.` };
-  // Le déclencheur et la phrase se vérifient une fois : seul le produit conseillé change d'une association à l'autre (le
+  const refs: AdviceRef[] = [];
+  const seen = new Set<string>();
+  for (const ref of [...(input.adviceProductIds ?? []).map((id) => ({ kind: "PRODUCT" as const, id })), ...(input.adviceSpecialtyIds ?? []).map((id) => ({ kind: "DRUG" as const, id }))]) {
+    if (!ref.id || seen.has(refKey(ref))) continue;
+    seen.add(refKey(ref));
+    refs.push(ref);
+  }
+  if (refs.length === 0) return { ok: false, error: "Choisissez au moins un produit à conseiller." };
+  if (refs.length > MAX_ADVICE_PER_SAVE) return { ok: false, error: `${MAX_ADVICE_PER_SAVE} produits au plus en une fois.` };
+  // Le déclencheur et la phrase se vérifient une fois : seul le produit proposé change d'une association à l'autre (le
   // produit associé à lui-même est écarté plus bas, sans bloquer les autres — sauf s'il est le seul).
-  const invalid = associationError({ triggerProductId: input.triggerProductId, triggerSpecialtyId: input.triggerSpecialtyId, adviceProductId: adviceIds.find((id) => id !== input.triggerProductId) ?? adviceIds[0], sentence });
+  const firstOther = refs.find((ref) => !(ref.kind === "PRODUCT" && ref.id === input.triggerProductId)) ?? refs[0];
+  const invalid = associationError({ triggerProductId: input.triggerProductId, triggerSpecialtyId: input.triggerSpecialtyId, adviceProductId: firstOther.id, sentence });
   if (invalid) return { ok: false, error: invalid };
 
+  const productIds = refs.filter((ref) => ref.kind === "PRODUCT").map((ref) => ref.id);
+  const specialtyIds = refs.filter((ref) => ref.kind === "DRUG").map((ref) => ref.id);
+
   let triggerName: string;
+  let triggerDrugKey: string | null = null;
   let trigger: { triggerProductId: string } | { triggerSpecialtyId: string };
-  let existing: Set<string>;
+  const existing = new Set<string>();
   if (input.triggerProductId) {
     const product = await ownProduct(scope, input.triggerProductId);
     if (!product) return { ok: false, error: "Produit introuvable dans votre catalogue." };
     triggerName = product.name;
     trigger = { triggerProductId: product.id };
-    const rows = await prisma.productAssociation.findMany({ where: { pharmacyId: scope.pharmacyId, triggerProductId: product.id, adviceProductId: { in: adviceIds } }, select: { adviceProductId: true } });
-    existing = new Set(rows.map((row) => row.adviceProductId));
+    const rows = await prisma.productAssociation.findMany({
+      where: { pharmacyId: scope.pharmacyId, triggerProductId: product.id, OR: [...(productIds.length ? [{ adviceProductId: { in: productIds } }] : []), ...(specialtyIds.length ? [{ adviceSpecialtyId: { in: specialtyIds } }] : [])] },
+      select: { adviceProductId: true, adviceSpecialtyId: true },
+    });
+    for (const row of rows) existing.add(row.adviceProductId ? `PRODUCT:${row.adviceProductId}` : `DRUG:${row.adviceSpecialtyId}`);
   } else {
     const specialty = await prisma.drugSpecialty.findUnique({ where: { id: input.triggerSpecialtyId as string }, select: { id: true, name: true } });
     if (!specialty) return { ok: false, error: "Médicament introuvable dans le catalogue national." };
     triggerName = specialty.name.split(",")[0].trim();
+    triggerDrugKey = drugKey(specialty.name);
     trigger = { triggerSpecialtyId: specialty.id };
     // Toutes les formes d'un même nom se valent : un doublon se reconnaît au nom, pas seulement à l'identifiant.
     const rows = await prisma.productAssociation.findMany({
-      where: { pharmacyId: scope.pharmacyId, adviceProductId: { in: adviceIds }, triggerSpecialtyId: { not: null } },
-      select: { adviceProductId: true, triggerSpecialty: { select: { name: true } } },
+      where: { pharmacyId: scope.pharmacyId, triggerSpecialtyId: { not: null }, OR: [...(productIds.length ? [{ adviceProductId: { in: productIds } }] : []), ...(specialtyIds.length ? [{ adviceSpecialtyId: { in: specialtyIds } }] : [])] },
+      select: { adviceProductId: true, adviceSpecialtyId: true, triggerSpecialty: { select: { name: true } } },
     });
-    existing = new Set(rows.filter((row) => row.triggerSpecialty && drugKey(row.triggerSpecialty.name) === drugKey(specialty.name)).map((row) => row.adviceProductId));
+    for (const row of rows) {
+      if (!row.triggerSpecialty || drugKey(row.triggerSpecialty.name) !== triggerDrugKey) continue;
+      existing.add(row.adviceProductId ? `PRODUCT:${row.adviceProductId}` : `DRUG:${row.adviceSpecialtyId}`);
+    }
   }
 
-  const products = await prisma.product.findMany({ where: { id: { in: adviceIds }, pharmacyId: scope.pharmacyId, deletedAt: null }, select: { id: true, name: true, isActive: true } });
-  const byId = new Map(products.map((product) => [product.id, product]));
+  const [products, specialties, held] = await Promise.all([
+    productIds.length ? prisma.product.findMany({ where: { id: { in: productIds }, pharmacyId: scope.pharmacyId, deletedAt: null }, select: { id: true, name: true, isActive: true } }) : Promise.resolve([]),
+    specialtyIds.length ? prisma.drugSpecialty.findMany({ where: { id: { in: specialtyIds } }, select: { id: true, name: true, withdrawnAt: true, prescriptionConditions: { select: { label: true } } } }) : Promise.resolve([]),
+    heldQuantities(scope.pharmacyId, specialtyIds),
+  ]);
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const specialtyById = new Map(specialties.map((specialty) => [specialty.id, specialty]));
   const skipped: BatchSkip[] = [];
-  const accepted: { id: string; name: string }[] = [];
-  for (const id of adviceIds) {
-    const product = byId.get(id);
-    if (!product) skipped.push({ adviceProductId: id, adviceName: null, reason: "Produit introuvable dans votre catalogue." });
-    else if (!product.isActive) skipped.push({ adviceProductId: id, adviceName: product.name, reason: `« ${product.name} » est désactivé : on ne peut pas le conseiller.` });
-    else if ("triggerProductId" in trigger && trigger.triggerProductId === id) skipped.push({ adviceProductId: id, adviceName: product.name, reason: "Un produit ne peut pas être associé à lui-même." });
-    else if (existing.has(id)) skipped.push({ adviceProductId: id, adviceName: product.name, reason: `« ${product.name} » est déjà associé à « ${triggerName} ».` });
-    else accepted.push(product);
+  const accepted: { ref: AdviceRef; name: string }[] = [];
+  for (const ref of refs) {
+    const skip = (adviceName: string | null, reason: string) => skipped.push({ ...refField(ref), adviceName, reason });
+    if (ref.kind === "PRODUCT") {
+      const product = productById.get(ref.id);
+      if (!product) skip(null, "Produit introuvable dans votre catalogue.");
+      else if (!product.isActive) skip(product.name, `« ${product.name} » est désactivé : on ne peut pas le conseiller.`);
+      else if ("triggerProductId" in trigger && trigger.triggerProductId === ref.id) skip(product.name, "Un produit ne peut pas être associé à lui-même.");
+      else if (existing.has(refKey(ref))) skip(product.name, `« ${product.name} » est déjà associé à « ${triggerName} ».`);
+      else accepted.push({ ref, name: product.name });
+      continue;
+    }
+    const specialty = specialtyById.get(ref.id);
+    const name = specialty ? specialty.name.split(",")[0].trim() : null;
+    // Un médicament proposé en vente additionnelle : jamais sur ordonnance, toujours une boîte que l'officine détient.
+    if (!specialty || specialty.withdrawnAt || !held.has(ref.id)) skip(name, name ? `« ${name} » n'est pas dans votre stock : on ne propose que ce que l'officine peut remettre.` : "Médicament introuvable dans votre stock.");
+    else if (specialty.prescriptionConditions.length > 0) skip(name, `« ${name} » est soumis à prescription : jamais proposé en vente additionnelle.`);
+    else if (triggerDrugKey && drugKey(specialty.name) === triggerDrugKey) skip(name, "Un médicament ne peut pas être associé à lui-même.");
+    else if (existing.has(refKey(ref))) skip(name, `« ${name} » est déjà associé à « ${triggerName} ».`);
+    else accepted.push({ ref, name: name as string });
   }
   if (accepted.length === 0) return { ok: true, triggerName, created: [], skipped };
 
@@ -298,16 +375,16 @@ export async function createAssociations(
   const first = (last?.sortOrder ?? 0) + 1;
   const rows = await prisma.productAssociation.createManyAndReturn({
     // Dans l'ordre où le pharmacien les a choisis : c'est aussi l'ordre de proposition au comptoir.
-    data: accepted.map((product, index) => ({ pharmacyId: scope.pharmacyId, ...trigger, adviceProductId: product.id, sentence, sortOrder: first + index, createdByUserId: scope.userId })),
+    data: accepted.map(({ ref }, index) => ({ pharmacyId: scope.pharmacyId, ...trigger, ...refField(ref), sentence, sortOrder: first + index, createdByUserId: scope.userId })),
     skipDuplicates: true,
-    select: { id: true, adviceProductId: true },
+    select: { id: true, adviceProductId: true, adviceSpecialtyId: true },
   });
-  const createdIds = new Map(rows.map((row) => [row.adviceProductId, row.id]));
+  const createdIds = new Map(rows.map((row) => [row.adviceProductId ? `PRODUCT:${row.adviceProductId}` : `DRUG:${row.adviceSpecialtyId}`, row.id]));
   const created: BatchCreated[] = [];
-  for (const product of accepted) {
-    const id = createdIds.get(product.id);
-    if (id) created.push({ id, adviceProductId: product.id, adviceName: product.name });
-    else skipped.push({ adviceProductId: product.id, adviceName: product.name, reason: `« ${product.name} » est déjà associé à « ${triggerName} ».` });
+  for (const { ref, name } of accepted) {
+    const id = createdIds.get(refKey(ref));
+    if (id) created.push({ id, ...refField(ref), adviceName: name });
+    else skipped.push({ ...refField(ref), adviceName: name, reason: `« ${name} » est déjà associé à « ${triggerName} ».` });
   }
   for (const row of created) {
     await recordAudit({
@@ -316,10 +393,52 @@ export async function createAssociations(
       entityId: row.id,
       pharmacyId: scope.pharmacyId,
       userId: scope.userId,
-      metadata: { ...trigger, adviceProductId: row.adviceProductId, trigger: "triggerProductId" in trigger ? "PRODUCT" : "DRUG", withSentence: sentence !== null, batch: created.length },
+      metadata: { ...trigger, ...(row.adviceProductId ? { adviceProductId: row.adviceProductId } : { adviceSpecialtyId: row.adviceSpecialtyId }), trigger: "triggerProductId" in trigger ? "PRODUCT" : "DRUG", withSentence: sentence !== null, batch: created.length },
     });
   }
   return { ok: true, triggerName, created, skipped };
+}
+
+export type GridSaveResult = {
+  /** Toutes les associations créées, déclencheur par déclencheur. */
+  created: (BatchCreated & { triggerName: string })[];
+  skipped: (BatchSkip & { triggerName: string | null })[];
+};
+
+/**
+ * Plusieurs déclencheurs × plusieurs produits proposés : « quand la cétirizine OU la desloratadine est dans la vente,
+ * proposer le spray ET le collyre » crée les quatre associations. Chaque déclencheur passe par `createAssociations` (mêmes
+ * contrôles, doublons écartés avec leur raison) ; un déclencheur refusé (introuvable…) ne bloque pas les autres.
+ */
+export async function createAssociationGrid(
+  scope: TenantScope,
+  input: { triggers: { kind: "PRODUCT" | "DRUG"; id: string }[]; advice: { kind: "PRODUCT" | "DRUG"; id: string }[]; sentence?: string | null },
+): Promise<{ ok: true; result: GridSaveResult } | Failure> {
+  const triggers = [...new Map(input.triggers.filter((trigger) => trigger.id).map((trigger) => [`${trigger.kind}:${trigger.id}`, trigger])).values()];
+  if (triggers.length === 0) return { ok: false, error: "Choisissez au moins un produit ou un médicament déclencheur." };
+  if (triggers.length > MAX_TRIGGERS_PER_SAVE) return { ok: false, error: `${MAX_TRIGGERS_PER_SAVE} déclencheurs au plus en une fois.` };
+  const adviceProductIds = input.advice.filter((ref) => ref.kind === "PRODUCT").map((ref) => ref.id);
+  const adviceSpecialtyIds = input.advice.filter((ref) => ref.kind === "DRUG").map((ref) => ref.id);
+  if (adviceProductIds.length + adviceSpecialtyIds.length === 0) return { ok: false, error: "Choisissez au moins un produit à conseiller." };
+
+  const result: GridSaveResult = { created: [], skipped: [] };
+  for (const trigger of triggers) {
+    const saved = await createAssociations(scope, {
+      ...(trigger.kind === "PRODUCT" ? { triggerProductId: trigger.id } : { triggerSpecialtyId: trigger.id }),
+      adviceProductIds,
+      adviceSpecialtyIds,
+      sentence: input.sentence,
+    });
+    if (!saved.ok) {
+      // Une erreur commune à tous (phrase trop longue, trop de produits) : inutile de la répéter pour chaque déclencheur.
+      if (triggers.length === 1 || saved.error.includes("au plus") || saved.error.includes("phrase")) return saved;
+      result.skipped.push({ adviceName: null, reason: saved.error, triggerName: null });
+      continue;
+    }
+    for (const row of saved.created) result.created.push({ ...row, triggerName: saved.triggerName });
+    for (const row of saved.skipped) result.skipped.push({ ...row, triggerName: saved.triggerName });
+  }
+  return { ok: true, result };
 }
 
 /** Modifie la phrase, ou suspend/réactive l'association. */

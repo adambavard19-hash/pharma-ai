@@ -83,7 +83,7 @@ describe("le contenu de l'écran", () => {
   it("l'en-tête, le nombre d'abonnés (le nombre seul) et l'interrupteur", async () => {
     const html = await render();
     const shown = text(html);
-    expect(shown).toContain("Nouveautés pour vos patients");
+    expect(shown).toContain("Actualités pour vos patients");
     expect(shown).toContain("Abonnés actifs 12");
     expect(shown).toContain("Seul le nombre est affiché : vous ne voyez jamais leurs adresses.");
     expect(html).toMatch(/<input[^>]*id="news-enabled"[^>]*checked/);

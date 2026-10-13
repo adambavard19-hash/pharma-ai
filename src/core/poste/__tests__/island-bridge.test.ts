@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { HostEntry } from "../../../../agent/src/notice-center";
 import { answerWord, emailWord, finishWord, INITIAL_POSTE, parseCommand, posteReducer, questionWord, regionRects, sameRegion, stageForEntry, type PosteEvent, type PosteView } from "../island-bridge";
 import { ESSAI_SEQUENCE } from "../island-fixtures";
+import { encodeCommand } from "../../../../agent/src/notice-center";
+import { greetingText } from "../../../../agent/src/greeting-text";
 
 const ENTRY: HostEntry = {
   id: "vente1", reference: "ORD-1", label: "Détecté", subject: "DOLIPRANE", url: "", signature: "s1",
@@ -89,6 +91,49 @@ describe("l'île du poste, pilotée par les commandes de l'agent", () => {
 
   it("le scénario d'essai ne contient que des commandes valides de l'agent", () => {
     for (const step of ESSAI_SEQUENCE) expect(parseCommand(JSON.stringify(step.command)), step.command.op).not.toBeNull();
+  });
+});
+
+describe("le bonjour du robot au démarrage du poste", () => {
+  const TEXT = greetingText("Léa");
+  // Exactement ce que l'hôte Windows transmet à la page (PostWebMessageAsString) : la ligne ASCII de l'agent.
+  const fromAgent = (text: string): PosteEvent => ({ type: "host", command: parseCommand(encodeCommand({ op: "greet", text }).trim())!, now: 1000 });
+
+  it("relit la ligne ASCII de l'agent avec ses accents, mot pour mot", () => {
+    expect(parseCommand(encodeCommand({ op: "greet", text: TEXT }).trim())).toEqual({ op: "greet", text: TEXT });
+    expect(TEXT).toBe("Bonjour Léa, comment vas-tu ? Bon courage pour faire le plus de conseils possibles. N'hésite pas à me demander ce que tu veux si tu as besoin.");
+  });
+
+  it("s'affiche au repos, puis se range (délai écoulé ou clic) : l'île revient à la capsule", () => {
+    const view = run([host({ op: "init", look: 4 }), fromAgent(TEXT)]);
+    expect(view.greeting).toBe(TEXT);
+    expect(view.island.stage).toBe("idle");
+    const after = run([{ type: "dismissGreeting" }], view);
+    expect(after.greeting).toBeNull();
+    expect(after.look).toBe(4);
+  });
+
+  it("un scan passe devant : le bonjour est abandonné, la vente se joue normalement", () => {
+    const view = run([fromAgent(TEXT), host({ op: "scan" })]);
+    expect(view.greeting).toBeNull();
+    expect(view.island.stage).toBe("scan");
+    expect(run([fromAgent(TEXT), host({ op: "show", entry: ENTRY })]).greeting).toBeNull();
+  });
+
+  it("jamais par-dessus une vente en cours", () => {
+    const during = run([host({ op: "scan" }), fromAgent(TEXT)]);
+    expect(during.greeting).toBeNull();
+    expect(during.island.stage).toBe("scan");
+    const open = run([host({ op: "show", entry: ENTRY }), fromAgent(TEXT)]);
+    expect(open.greeting).toBeNull();
+  });
+
+  it("une commande douteuse est ignorée, jamais une panne", () => {
+    expect(parseCommand({ op: "greet" })).toBeNull();
+    expect(parseCommand({ op: "greet", text: 42 })).toBeNull();
+    expect(parseCommand({ op: "greet", text: "   " })).toBeNull();
+    expect(parseCommand({ op: "greet", text: "x".repeat(301) })).toBeNull();
+    expect(parseCommand({ op: "greet", text: "Bonjour\ntoi" })).toEqual({ op: "greet", text: "Bonjour toi" });
   });
 });
 

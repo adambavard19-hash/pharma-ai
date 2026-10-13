@@ -260,8 +260,20 @@ export async function listLiveCounterSales(pharmacyId: string, postIds: string[]
   return prisma.prescription.findMany({
     where: { pharmacyId, source: "COUNTER_SCAN", counterPostId: { in: postIds }, status: { in: ["NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] }, sales: { none: {} }, NOT: { counterFollowUp: { closedAt: { not: null } } }, updatedAt: { gte: new Date(Date.now() - 6 * 60 * 60 * 1000) } },
     orderBy: { updatedAt: "desc" },
-    take: 6,
-    select: { id: true, reference: true, status: true, counterPost: true, updatedAt: true, createdAt: true, lines: { orderBy: { position: "asc" }, select: { drugName: true, quantity: true } }, _count: { select: { recommendations: true } } },
+    take: 10,
+    select: {
+      id: true,
+      reference: true,
+      status: true,
+      counterPost: true,
+      counterPostId: true,
+      updatedAt: true,
+      createdAt: true,
+      lines: { orderBy: { position: "asc" }, select: { drugName: true, quantity: true } },
+      // Les conseils proposés et leur état (page « Au comptoir ») : le nom du produit, jamais la phrase dite au patient.
+      recommendations: { orderBy: { totalScore: "desc" }, take: 8, select: { status: true, product: { select: { name: true } }, presentation: { select: { specialty: { select: { name: true } } } } } },
+      _count: { select: { recommendations: true } },
+    },
   });
 }
 

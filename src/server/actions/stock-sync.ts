@@ -21,7 +21,7 @@ import { ok, type ActionResult } from "./types";
 export async function revokePostAction(payload: { postId: string }): Promise<ActionResult<null>> {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   await revokeCounterPost(session.scope, payload.postId);
-  revalidatePath("/connexion");
+  revalidatePath("/parametres/postes");
   return ok(null, "Comptoir retiré : cet ordinateur ne peut plus utiliser PharmaBoost.");
 }
 

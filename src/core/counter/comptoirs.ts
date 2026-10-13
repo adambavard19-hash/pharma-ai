@@ -60,5 +60,5 @@ export function parseComptoirName(raw: unknown): { ok: true; value: string } | {
 export function noComptoirMessage(mode: MyComptoirs["mode"], canAssign: boolean): string | null {
   if (mode !== "NONE") return null;
   const how = "Sur l'ordinateur de votre comptoir, cliquez sur l'icône PharmaBoost près de l'horloge, puis « Ouvrir mon espace PharmaBoost » : ce comptoir devient le vôtre, ses délivrances arrivent ici.";
-  return canAssign ? `${how} Vous voyez aussi qui est où dans « Mes comptoirs ».` : how;
+  return canAssign ? `${how} Vous voyez aussi qui est où dans Paramètres → « Postes du comptoir ».` : how;
 }

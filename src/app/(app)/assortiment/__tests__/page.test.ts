@@ -23,7 +23,7 @@ beforeEach(() => {
   session.requirePermission.mockResolvedValue({ scope: { pharmacyId: "ph-1", userId: "u-1" } });
 });
 
-describe("la page « Votre assortiment »", () => {
+describe("la page « Produits manquants » (ex « Mon assortiment »)", () => {
   it("exige la permission du titulaire avant de lire quoi que ce soit, et ne lit que l'officine de la session", async () => {
     service.loadAssortment.mockResolvedValue({ ...base, detected: 0, covered: 0, unmet: 0, coveredRate: null, groups: [] });
     await render();
@@ -47,10 +47,11 @@ describe("la page « Votre assortiment »", () => {
       groups: [{ key: "digestive", title: "Tolérance digestive pendant l'antibiothérapie", category: "PROBIOTIQUES", count: 3, causes: { NOT_REFERENCED: 2, OUT_OF_STOCK: 1, NO_SUITABLE: 0 }, market: [{ id: "b1", slug: "marque-test", name: "Marque Test", partnerName: "Laboratoire Test", logoUrl: null }] }],
     });
     const t = await render();
+    expect(t).toContain("Produits manquants");
     expect(t).toContain("Cette page est réservée au titulaire : l'équipe au comptoir ne la voit pas.");
-    expect(t).toContain("Situations de conseil détectées 18 sur 11 ordonnances analysées");
-    expect(t).toContain("Couvertes par votre stock 78 %");
-    expect(t).toContain("Non couvertes 4");
+    expect(t).toContain("Conseils possibles 18 sur 11 ordonnances analysées");
+    expect(t).toContain("Servis par votre stock 78 %");
+    expect(t).toContain("Manqués faute de produit 4");
     expect(t).toContain("Tolérance digestive pendant l'antibiothérapie 3 fois");
     expect(t).toContain("Aucune référence en stock · 2");
     expect(t).toContain("Référence en rupture · 1");
@@ -68,7 +69,7 @@ describe("la page « Votre assortiment »", () => {
 
   it("états honnêtes : aucune ordonnance analysée, ou analyses sans l'information", async () => {
     service.loadAssortment.mockResolvedValue({ ...base, analysedPrescriptions: 0, detected: 0, covered: 0, unmet: 0, coveredRate: null, groups: [] });
-    expect(await render()).toContain("Aucune ordonnance analysée sur cette période.");
+    expect(await render()).toContain("Aucune vente analysée sur cette période.");
     service.loadAssortment.mockResolvedValue({ ...base, detected: 0, covered: 0, unmet: 0, coveredRate: null, groups: [] });
     expect(await render()).toContain("aucune ne porte encore l'information de couverture du stock");
   });

@@ -21,13 +21,13 @@ export async function saveRobotSetupAction(payload: RobotIdentityInput): Promise
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   const result = await saveRobotIdentity(session.scope, payload);
   if (!result.ok) return fail(result.error, result.fieldErrors);
-  revalidatePath("/connexion");
+  revalidatePath("/parametres/postes");
   return ok(result.setup, "Robot enregistré. L'intégration n'est pas encore disponible : rien n'est lu du robot.");
 }
 
 export async function clearRobotSetupAction(): Promise<ActionResult<null>> {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
   await clearRobotSetup(session.scope);
-  revalidatePath("/connexion");
+  revalidatePath("/parametres/postes");
   return ok(null, "Robot retiré.");
 }

@@ -24,6 +24,7 @@
  *   node pharmaboost-connect.js --poste 123456 --serveur https://pharmaboost.app
  *   node pharmaboost-connect.js --test-douchette   (affiche les bips, n'envoie rien)
  *   node pharmaboost-connect.js --ouvrir-espace    (lie le navigateur de ce PC à ce poste, voir space-link.ts)
+ *   node pharmaboost-connect.js --test-bonjour     (montre le bonjour du robot dans l'île, sans témoin ni serveur)
  *
  * Installé par PharmaBoost-Installation-<jeton>.exe (double-clic, sans terminal),
  * l'installateur relie le poste avec le jeton du nom de fichier :
@@ -41,11 +42,12 @@ import { CrossSourceDedupe, compileRobotPattern, dryRunRobotFile, startRobotJour
 import { startLgpiJournal, type LgpiRobotConfig } from "./robot-lgpi";
 import { isSpaceLinked, markSpaceLinked, openInBrowser, shouldOpenSpaceAtStartup, spaceUrl } from "./space-link";
 import { saleAdviceUrl } from "./sale-link";
+import { GREETING_STARTUP_WINDOW_MS, cleanFirstName, greetedToday, greetingText, markGreeted, shouldGreet } from "./greeting";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.4";
+const VERSION = "0.10.5";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -438,9 +440,9 @@ async function dropClosedNotices(config: Config): Promise<void> {
  * jour immédiate (« Mettre à jour maintenant » dans PharmaBoost). Il dit aussi
  * la fenêtre réellement affichée (île, bannière, ancienne fenêtre, notification) :
  * le navigateur lié à ce poste ne dessine pas un second robot seulement si la
- * fenêtre du poste en dessine un. En retour : le robot de la personne connectée.
+ * fenêtre du poste en dessine un. En retour : le robot de la personne connectée, et son prénom (le bonjour du matin).
  */
-async function postHeartbeat(config: Config): Promise<{ exportPath: string | null; syncRequestedAt: string | null; robotLook: number | null }> {
+async function postHeartbeat(config: Config): Promise<{ exportPath: string | null; syncRequestedAt: string | null; robotLook: number | null; firstName: string }> {
   const response = await api(config, "/api/agent/heartbeat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -449,8 +451,8 @@ async function postHeartbeat(config: Config): Promise<{ exportPath: string | nul
   if (response.status === 401) throw new Error("clé du poste révoquée");
   // Un serveur en panne (502, 503) n'est pas un signe de vie : l'icône du poste doit dire « hors ligne », pas « relié ».
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const body = (await response.json().catch(() => ({}))) as { exportPath?: string | null; syncRequestedAt?: string | null; robotLook?: number | null };
-  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null };
+  const body = (await response.json().catch(() => ({}))) as { exportPath?: string | null; syncRequestedAt?: string | null; robotLook?: number | null; firstName?: unknown };
+  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null, firstName: cleanFirstName(body.firstName) };
 }
 
 /**
@@ -513,6 +515,11 @@ async function runPost(config: Config): Promise<void> {
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let spaceAttempts = 0;
+  // Le bonjour du robot (greeting.ts) : une fois par jour, au démarrage, dès que l'île est prête et qu'aucune vente n'est en cours.
+  const startedAt = Date.now();
+  let heartbeatOk = false;
+  let firstName = "";
+  let greetingDone = false;
   let handledSyncRequest: string | null = null;
   let forceSync = false;
   // L'état que l'icône près de l'horloge affiche : écrit à chaque signe de vie, réussi ou non.
@@ -549,6 +556,8 @@ async function runPost(config: Config): Promise<void> {
         // Le robot de la personne connectée à ce comptoir (couleur, accessoire), le même que dans son espace PharmaBoost ;
         // personne : le robot de la marque.
         notices.setRobotLook(settings.robotLook);
+        heartbeatOk = true;
+        firstName = settings.firstName;
         if (settings.exportPath !== (config.exportPath ?? null)) {
           config = { ...config, exportPath: settings.exportPath };
           writeConfig(config);
@@ -559,6 +568,18 @@ async function runPost(config: Config): Promise<void> {
           handledSyncRequest = settings.syncRequestedAt;
           forceSync = true;
           lastStockCheck = 0;
+        }
+      }
+      if (!greetingDone) {
+        const configDir = dirname(CONFIG_PATH);
+        if (greetedToday(configDir) || Date.now() - startedAt > GREETING_STARTUP_WINDOW_MS) greetingDone = true;
+        else {
+          const saleInProgress = !canUpdateNow({ watching: watched !== null, queuedScans: scans.size, lastScanAt, pendingNotices: notices.ids().length, now: Date.now() });
+          if (shouldGreet({ greetedToday: false, islandReady: notices.canGreet(), saleInProgress, heartbeatOk, sinceStartMs: Date.now() - startedAt }) && notices.greet(greetingText(firstName))) {
+            markGreeted(configDir);
+            greetingDone = true;
+            log(`Bonjour du robot montré dans l'île${firstName ? " (avec le prénom)" : ""}.`);
+          }
         }
       }
       if (config.exportPath && Date.now() - lastStockCheck > CHECK_MS) {
@@ -679,6 +700,30 @@ function testIle(): void {
     notices.done({ id: "essai", title: "Vente terminée — résultats enregistrés", lines: ["1 vendu · 1 non vendu · 0 sans réponse", "✓ Bilan envoyé au patient."], badge: "3e conseil vendu aujourd'hui", warning: false });
   }, 40_000);
   setTimeout(() => { log(`Fin de l'essai. Fenêtre en service : ${notices.currentWindow()}.`); notices.stop(); process.exit(0); }, 60_000);
+}
+
+/**
+ * Essai du bonjour du robot (greeting.ts) : ouvre l'île, et dès qu'elle est prête lui fait dire bonjour — sans regarder ni
+ * écrire le témoin du jour, sans serveur. `--prenom Léa` pour voir le message avec un prénom. Rien n'est envoyé.
+ */
+function testBonjour(): void {
+  let config: Config | null = null;
+  try { config = readConfig(); } catch { /* sans configuration, l'essai prend pharmaboost.app */ }
+  if (config) applyDisplayPreferences(config);
+  notices.configure({ window: "ile", serverUrl: arg("serveur") ?? config?.serverUrl ?? "https://pharmaboost.app" });
+  log(`Essai du bonjour — PharmaBoost Connect ${VERSION}. Fenêtre demandée : île.`);
+  notices.warmUp();
+  const started = Date.now();
+  const timer = setInterval(() => {
+    if (notices.greet(greetingText(arg("prenom") ?? ""))) {
+      clearInterval(timer);
+      log("Bonjour envoyé à l'île : il doit rester une dizaine de secondes, puis l'île revient au repos (un clic le ferme).");
+    } else if (Date.now() - started > 60_000) {
+      clearInterval(timer);
+      log(`L'île n'est pas prête après une minute (fenêtre en service : ${notices.currentWindow()}) : le bonjour n'est pas montré ailleurs.`);
+    }
+  }, 500);
+  setTimeout(() => { notices.stop(); process.exit(0); }, 80_000);
 }
 
 /** Refait la liaison du navigateur de ce PC à la main (assistance) : --ouvrir-espace. Même chose que le menu de l'icône. */
@@ -887,6 +932,8 @@ if (arg("appairer")) {
   testAffichage();
 } else if (process.argv.includes("--test-ile")) {
   testIle();
+} else if (process.argv.includes("--test-bonjour")) {
+  testBonjour();
 } else if (process.argv.includes("--ouvrir-espace")) {
   openSpaceFromCommand().then((code) => { process.exitCode = code; });
 } else if (process.argv.includes("--version")) {

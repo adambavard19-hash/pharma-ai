@@ -5,12 +5,10 @@ import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { getOCRProvider } from "@/server/ai/registry";
-import { TIME_ZONE } from "@/config/constants";
 import { patientDataEnabled } from "@/config/env";
 import { StockReminderBanner } from "@/components/app/stock-reminder";
-import { listLiveCounterSales } from "@/server/services/counter-scan";
+import { loadFinishedToday, loadLiveBoard } from "@/server/services/counter-board";
 import { loadCounterDashboard, startOfParisDay } from "@/server/services/counter-dashboard";
-import { myComptoirs } from "@/server/services/comptoirs";
 import { NOT_LINKED, thisPcComptoir } from "@/server/services/post-link";
 import { countCounterRequestsToday } from "@/server/services/counter-request";
 import { isCommercialDemoPharmacy } from "@/core/demo/identity";
@@ -18,15 +16,14 @@ import { findDemoScenario } from "@/core/demo/scenarios";
 import { CounterDashboard } from "./counter-dashboard";
 import { NewPrescriptionForm } from "./new-prescription-form";
 import { CounterRequestCard } from "./counter-request";
-import { loadCounterRobotTips } from "@/server/services/robot-tips";
-import { robotGreeting } from "@/core/robot/companion";
+import { TIME_ZONE } from "@/config/constants";
 
-export const metadata: Metadata = { title: "Nouvelle vente" };
+export const metadata: Metadata = { title: "Au comptoir" };
 
 /**
- * « Nouvelle vente » est le tableau de bord du comptoir : le pharmacien travaille dans son logiciel de
- * pharmacie, bipe ses boîtes, et PharmaBoost intervient de lui-même. La saisie à la main (ordonnance,
- * médicament, demande sans ordonnance) reste derrière « Saisie manuelle ».
+ * « Au comptoir » (adresse historique /vente/nouvelle, alias /comptoir) : au comptoir, c'est la bannière du poste Windows
+ * qui fait tout ; cette page suit les délivrances en cours de MES comptoirs, retrouve les ventes terminées du jour, et
+ * garde la saisie à la main (ordonnance, médicament, demande sans ordonnance) repliée, en secours.
  */
 export default async function NewPrescriptionPage({
   searchParams,
@@ -55,25 +52,16 @@ export default async function NewPrescriptionPage({
   // PC d'un comptoir, le comptoir lui revient d'abord tout seul (la même vérification que la coquille, faite une fois), et
   // l'écran est celui de CE comptoir seulement — même si la même personne est connectée sur un autre PC lié.
   const thisPc = await thisPcComptoir(session.scope.pharmacyId, session.scope.userId, true).catch(() => NOT_LINKED);
-  const mine = await myComptoirs(session.scope, thisPc.postId);
-  const [dashboard, liveSalesRaw, requestsToday, pharmacy] = await Promise.all([
+  const [dashboard, liveSales, finished, requestsToday, pharmacy] = await Promise.all([
     loadCounterDashboard(session.scope, now, { canAssign: session.permissions.has(PERMISSIONS.PRODUCT_IMPORT), thisPcPostId: thisPc.postId }),
-    // Les délivrances qui arrivent de la douchette du LGO : la carte se met à jour seule.
-    listLiveCounterSales(session.scope.pharmacyId, mine.postIds),
+    // Les délivrances qui arrivent de la douchette du LGO : la liste se met à jour seule.
+    loadLiveBoard(session.scope, thisPc.postId),
+    loadFinishedToday(session.scope, thisPc.postId, now),
     // Les demandes sans ordonnance traitées aujourd'hui : le comptoir voit ce qu'il a fait.
     countCounterRequestsToday(session.scope.pharmacyId, startOfParisDay(now)),
     prisma.pharmacy.findUnique({ where: { id: session.scope.pharmacyId }, select: { stockSyncedAt: true } }),
   ]);
-  // Ce que le robot du coin peut dire : challenge proche d'un palier, dates courtes, stock — pour cette officine et cette personne.
   const canUpdateStock = session.permissions.has(PERMISSIONS.PRODUCT_IMPORT);
-  const robotTips = await loadCounterRobotTips(session.scope, {
-    canUpdateStock,
-    canSeeChallenges: session.permissions.has(PERMISSIONS.TEAM_MANAGE),
-    isDemo: session.pharmacy.isDemo,
-    stockSyncedAt: pharmacy?.stockSyncedAt ?? null,
-    now,
-  }).catch(() => []);
-  const liveSales = liveSalesRaw.map((sale) => ({ id: sale.id, reference: sale.reference, status: sale.status, post: sale.counterPost, updatedAt: sale.updatedAt.toISOString(), lines: sale.lines.map((line) => ({ drugName: line.drugName ?? "", quantity: line.quantity ?? 1 })), recommendations: sale._count.recommendations }));
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -97,12 +85,11 @@ export default async function NewPrescriptionPage({
         dateLabel={formatParisDate(now)}
         initial={dashboard}
         initialSales={liveSales}
-        canConfigure={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
+        initialFinished={finished}
+        canConfigure={canUpdateStock}
         manualOpen={Boolean(params.patient || params.demande)}
-        robotTips={robotTips}
-        robotGreeting={robotGreeting(parisHour(now), session.user.firstName)}
-        // Le rappel du stock : seulement pour le titulaire, jamais pour l'équipe au comptoir. Le robot le reprend quand c'est sa phrase du moment.
-        stockBanner={<StockReminderBanner stockSyncedAt={pharmacy?.stockSyncedAt ?? null} canImport={canUpdateStock} isDemo={session.pharmacy.isDemo} />}
+        // Le rappel du stock : seulement pour le titulaire, jamais pour l'équipe au comptoir.
+        notice={<StockReminderBanner stockSyncedAt={pharmacy?.stockSyncedAt ?? null} canImport={canUpdateStock} isDemo={session.pharmacy.isDemo} />}
       >
         <NewPrescriptionForm
           patients={patientDataEnabled() ? patients : []}
@@ -114,10 +101,6 @@ export default async function NewPrescriptionPage({
       </CounterDashboard>
     </div>
   );
-}
-
-function parisHour(date: Date): number {
-  return Number(new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(date));
 }
 
 function formatParisDate(date: Date): string {

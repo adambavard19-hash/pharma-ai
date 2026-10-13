@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 
 /**
- * « Connecter mon logiciel » est devenue « Installer PharmaBoost » (menu « Mes comptoirs »). Les anciens liens
+ * « Connecter mon logiciel » est devenue « Installer PharmaBoost » (aujourd’hui Paramètres → « Postes du comptoir »). Les anciens liens
  * arrivent ici ; les réglages techniques sont dans l'espace d'assistance de la console.
  */
 export default function StockConnectionPage() {
-  redirect("/connexion");
+  redirect("/parametres/postes");
 }

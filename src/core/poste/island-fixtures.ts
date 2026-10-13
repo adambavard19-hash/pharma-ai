@@ -1,5 +1,6 @@
 import type { HostEntry } from "../../../agent/src/notice-center";
 import type { HostCommand } from "./island-bridge";
+import { greetingText } from "../../../agent/src/greeting-text";
 
 /**
  * Une vente d'exemple, écrite EXACTEMENT comme l'agent l'envoie (commandes de agent/src/notice-center.ts) : pour voir
@@ -44,16 +45,18 @@ export const isEssaiSale = (id: string) => id === ENTRY.id || id === ALERT_ENTRY
 
 export type TimedCommand = { at: number; command: HostCommand };
 
-/** Le scénario : repos, scan, analyse, conseils (une réponse donnée au comptoir), fin de vente, puis une mise en garde. */
+/** Le scénario : bonjour du robot, repos, scan, analyse, conseils (une réponse donnée au comptoir), fin de vente, puis une mise en garde. */
 export const ESSAI_SEQUENCE: TimedCommand[] = [
   { at: 0, command: { op: "init", look: 3, position: "haut-centre", postLabel: "Comptoir 1" } },
-  { at: 2500, command: { op: "scan" } },
-  { at: 4200, command: { op: "show", entry: ENTRY } },
-  { at: 9000, command: { op: "show", entry: { ...ENTRY, signature: "essai-2", items: [{ ...ENTRY.items[0], outcome: "SOLD" }, ENTRY.items[1]] } } },
-  { at: 14000, command: { op: "done", info: { id: "essai", title: "Vente terminée — résultats enregistrés", lines: ["1 vendu · 0 non vendu · 1 sans réponse", "✓ Bilan envoyé au patient."], badge: "3e conseil vendu aujourd'hui", warning: false } } },
-  { at: 23000, command: { op: "scan" } },
-  { at: 24500, command: { op: "show", entry: ALERT_ENTRY } },
-  { at: 31000, command: { op: "remove", id: "essai-garde" } },
+  // Le bonjour du robot à l'ouverture de session (agent/src/greeting.ts), avec un prénom d'exemple ; il se range seul.
+  { at: 600, command: { op: "greet", text: greetingText("Léa") } },
+  { at: 12500, command: { op: "scan" } },
+  { at: 14200, command: { op: "show", entry: ENTRY } },
+  { at: 19000, command: { op: "show", entry: { ...ENTRY, signature: "essai-2", items: [{ ...ENTRY.items[0], outcome: "SOLD" }, ENTRY.items[1]] } } },
+  { at: 24000, command: { op: "done", info: { id: "essai", title: "Vente terminée — résultats enregistrés", lines: ["1 vendu · 0 non vendu · 1 sans réponse", "✓ Bilan envoyé au patient."], badge: "3e conseil vendu aujourd'hui", warning: false } } },
+  { at: 33000, command: { op: "scan" } },
+  { at: 34500, command: { op: "show", entry: ALERT_ENTRY } },
+  { at: 41000, command: { op: "remove", id: "essai-garde" } },
 ];
 
-export const ESSAI_LENGTH_MS = 34000;
+export const ESSAI_LENGTH_MS = 44000;

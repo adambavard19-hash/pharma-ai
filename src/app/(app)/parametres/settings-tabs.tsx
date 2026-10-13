@@ -15,6 +15,7 @@ export function SettingsTabs({
   canSeeAudit,
   auditCount,
   canSeePrograms = false,
+  canSeePosts = false,
 }: {
   canSeeTeam: boolean;
   canSeeRules: boolean;
@@ -22,12 +23,15 @@ export function SettingsTabs({
   auditCount?: number;
   /** Gammes privilégiées et challenges (titulaire) : l'onglet Laboratoires y mène. */
   canSeePrograms?: boolean;
+  /** Les ordinateurs du comptoir (installer, nommer, retirer) : le titulaire. */
+  canSeePosts?: boolean;
 }) {
   return (
     <LinkTabs
       basePath="/parametres"
       items={[
         { key: "officine", label: "Officine" },
+        ...(canSeePosts ? [{ key: "postes", label: "Postes du comptoir", href: "/parametres/postes" }] : []),
         ...(canSeeTeam ? [{ key: "equipe", label: "Équipe", href: "/parametres/equipe" }] : []),
         ...(canSeeRules ? [{ key: "regles", label: "Mes préférences", href: "/parametres/regles" }] : []),
         { key: "moteur", label: "Moteur PharmaBoost" },

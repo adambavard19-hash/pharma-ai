@@ -8,19 +8,37 @@ const visibleFor = (role: Role) => NAVIGATION.filter((item) => ROLE_PERMISSIONS[
 const menuOf = (role: Role) => visibleFor(role).map((item) => item.label);
 const TEAM_ROLES = ["PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const;
 
-describe("le menu, en quatre groupes", () => {
-  it("« Nouvelle vente » d'abord, puis Au comptoir, Ma pharmacie, Découvrir, Configuration", () => {
-    expect(NAVIGATION[0]).toMatchObject({ label: "Nouvelle vente", href: "/vente/nouvelle", primary: true });
+describe("le menu, en trois groupes", () => {
+  it("« Au comptoir » (l'action principale) d'abord, puis les groupes Ma pharmacie, Découvrir, Configuration", () => {
+    expect(NAVIGATION[0]).toMatchObject({ label: "Au comptoir", href: "/vente/nouvelle", primary: true });
     expect(NAVIGATION[0].group).toBeUndefined();
-    expect(NAV_GROUPS.map((group) => group.label)).toEqual(["Au comptoir", "Ma pharmacie", "Découvrir", "Configuration"]);
+    expect(NAV_GROUPS.map((group) => group.label)).toEqual(["Ma pharmacie", "Découvrir", "Configuration"]);
+  });
+
+  it("« Mes associations » vient tout de suite après « Au comptoir » (rubrique importante)", () => {
+    expect(NAVIGATION.slice(0, 2).map((item) => item.label)).toEqual(["Au comptoir", "Mes associations"]);
+    expect(menuOf("OWNER").slice(0, 2)).toEqual(["Au comptoir", "Mes associations"]);
+    expect(menuOf("PHARMACIST").slice(0, 2)).toEqual(["Au comptoir", "Mes associations"]);
+  });
+
+  it("jamais deux fois le même nom : aucun groupe ne porte le nom d'une entrée", () => {
+    const labels = new Set(NAVIGATION.map((item) => item.label));
+    for (const group of NAV_GROUPS) expect(labels.has(group.label), group.label).toBe(false);
+    expect(new Set(NAVIGATION.map((item) => item.label)).size).toBe(NAVIGATION.length);
+  });
+
+  it("chaque entrée dit en une phrase ce qu'il y a derrière (montrée au survol)", () => {
+    for (const item of NAVIGATION) {
+      expect(item.description.length, item.label).toBeGreaterThan(20);
+      expect(item.description, item.label).not.toMatch(/assortiment/i);
+    }
   });
 
   it("chaque groupe contient les entrées prévues, dans cet ordre", () => {
     const labels = (key: string) => NAVIGATION.filter((item) => item.group === key).map((item) => item.label);
-    expect(labels("comptoir")).toEqual(["Patients", "Suivis patients", "Réglementation"]);
-    expect(labels("pharmacie")).toEqual(["Mon stock", "Performances", "Mon assortiment", "Mes associations", "Laboratoires & gammes", "Mon équipe"]);
+    expect(labels("pharmacie")).toEqual(["Mes associations", "Mon stock", "Performances", "E-mails aux patients", "Produits manquants", "Laboratoires & gammes", "Mon équipe"]);
     expect(labels("decouvrir")).toEqual(["Formations", "Partenaires", "Actualités"]);
-    expect(labels("configuration")).toEqual(["Mes comptoirs", "Paramètres"]);
+    expect(labels("configuration")).toEqual(["Paramètres"]);
   });
 
   it("l'ordre du tableau est celui de l'écran : les groupes se suivent sans se mélanger", () => {
@@ -36,9 +54,14 @@ describe("le menu, en quatre groupes", () => {
 
   it("rien n'a été retiré : toutes les adresses d'avant sont encore au menu ou atteignables", () => {
     const hrefs = new Set(NAVIGATION.map((item) => item.href));
-    for (const href of ["/vente/nouvelle", "/patients", "/connexion", "/stock", "/reglementation", "/formation", "/partenaires", "/nouveautes", "/assortiment", "/suivis", "/equipe", "/pilotage", "/parametres"]) {
+    for (const href of ["/vente/nouvelle", "/stock", "/formation", "/partenaires", "/nouveautes", "/assortiment", "/equipe", "/pilotage", "/parametres"]) {
       expect(hrefs.has(href), href).toBe(true);
     }
+    // Patients et Suivis ont quitté le menu (retour du fondateur du 13 oct. 2026) mais restent atteignables ; « Mes comptoirs »
+    // est devenu l'onglet « Postes du comptoir » de Paramètres.
+    const offMenu = new Set(OFF_MENU_DESTINATIONS.map((destination) => destination.href));
+    for (const href of ["/patients", "/suivis", "/parametres/postes", "/reglementation"]) expect(offMenu.has(href), href).toBe(true);
+    for (const href of ["/patients", "/suivis", "/connexion", "/reglementation"]) expect(hrefs.has(href), href).toBe(false);
     // « Ce que PharmaBoost vous rapporte » a quitté le menu : on y va depuis Performances (qui s'ouvre sur « Mon équipe »), et l'entrée s'allume pour elle.
     const performances = NAVIGATION.find((item) => item.label === "Performances");
     if (!performances) throw new Error("entrée absente");
@@ -48,14 +71,14 @@ describe("le menu, en quatre groupes", () => {
 });
 
 describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas affiché", () => {
-  it("le titulaire voit les quatre groupes", () => {
-    expect(groupNavigation(visibleFor("OWNER")).map((group) => group.label)).toEqual(["Au comptoir", "Ma pharmacie", "Découvrir", "Configuration"]);
+  it("le titulaire voit les trois groupes", () => {
+    expect(groupNavigation(visibleFor("OWNER")).map((group) => group.label)).toEqual(["Ma pharmacie", "Découvrir", "Configuration"]);
   });
 
   it("l'équipe au comptoir ne voit aucune entrée de gestion : ni Performances, ni assortiment, ni équipe, ni partenaires, ni actualités, ni connexions, ni paramètres", () => {
     for (const role of TEAM_ROLES) {
       const menu = menuOf(role);
-      for (const gone of ["Performances", "Mon assortiment", "Mon équipe", "Partenaires", "Actualités", "Mes comptoirs", "Paramètres"]) {
+      for (const gone of ["Performances", "Produits manquants", "Mon équipe", "Partenaires", "Actualités", "E-mails aux patients", "Paramètres"]) {
         expect(menu, `${role} : ${gone}`).not.toContain(gone);
       }
     }
@@ -69,7 +92,7 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
 
   it("le pharmacien garde le comptoir, le stock et les formations", () => {
     const menu = menuOf("PHARMACIST");
-    for (const kept of ["Nouvelle vente", "Patients", "Suivis patients", "Mon stock", "Formations"]) expect(menu).toContain(kept);
+    for (const kept of ["Au comptoir", "Mon stock", "Mes associations", "Formations"]) expect(menu).toContain(kept);
   });
 
   it("les entrées du titulaire restent gardées par des permissions qu'aucun rôle de l'équipe ne détient", () => {
@@ -88,15 +111,20 @@ describe("les intitulés", () => {
     expect(entry).toMatchObject({ label: "Actualités", icon: Megaphone, permission: PERMISSIONS.NEWS_MANAGE, match: ["/nouveautes"], group: "decouvrir" });
   });
 
-  it("les nouveaux intitulés : Mon stock, Mon équipe, Mon assortiment, Mes comptoirs, Suivis patients, Formations, Performances", () => {
+  it("les intitulés : Mon stock, Mon équipe, Produits manquants (ex Mon assortiment), E-mails aux patients, Formations, Performances", () => {
     const byHref = (href: string) => NAVIGATION.find((item) => item.href === href)?.label;
     expect(byHref("/stock")).toBe("Mon stock");
     expect(byHref("/equipe")).toBe("Mon équipe");
-    expect(byHref("/assortiment")).toBe("Mon assortiment");
-    expect(byHref("/connexion")).toBe("Mes comptoirs");
-    expect(byHref("/suivis")).toBe("Suivis patients");
+    expect(byHref("/assortiment")).toBe("Produits manquants");
+    expect(byHref("/emails-patients")).toBe("E-mails aux patients");
     expect(byHref("/formation")).toBe("Formations");
     expect(byHref("/pilotage")).toBe("Performances");
+  });
+
+  it("« E-mails aux patients » et « Produits manquants » restent des vues de titulaire", () => {
+    expect(NAVIGATION.find((item) => item.href === "/emails-patients")?.permission).toBe(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
+    expect(NAVIGATION.find((item) => item.href === "/assortiment")?.permission).toBe(PERMISSIONS.PARTNERS_MANAGE);
+    expect(menuOf("OWNER")).toEqual(expect.arrayContaining(["E-mails aux patients", "Produits manquants"]));
   });
 });
 
@@ -131,11 +159,11 @@ describe("reste active sur sa page et ses sous-adresses, sans déborder", () => 
     expect(isNavItemActive(entry, "/stock-autre")).toBe(false);
   });
 
-  it("Mes comptoirs couvre /connexion et son guide", () => {
-    const entry = NAVIGATION.find((item) => item.href === "/connexion");
+  it("Paramètres couvre l'onglet « Postes du comptoir », pas « Laboratoires & gammes »", () => {
+    const entry = NAVIGATION.find((item) => item.href === "/parametres");
     if (!entry) throw new Error("entrée absente");
-    expect(isNavItemActive(entry, "/connexion/guide")).toBe(true);
-    expect(isNavItemActive(entry, "/installation")).toBe(true);
+    expect(isNavItemActive(entry, "/parametres/postes")).toBe(true);
+    expect(isNavItemActive(entry, "/parametres/laboratoires/gammes")).toBe(false);
   });
 
   it("Actualités ne s'allume pas sur Partenaires", () => {
