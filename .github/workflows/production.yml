@@ -162,12 +162,32 @@ jobs:
             return 1
           }
 
-          echo "1/2 — Promotion officielle du déploiement en production du projet…"
-          if timeout 240 npx --yes "$VERCEL_CLI" promote "$url" --yes --scope "$VERCEL_ORG_ID" --token="$VERCEL_TOKEN"; then
-            echo "Promotion acceptée par Vercel."
-          else
-            echo "::notice title=Promotion sans effet::Vercel n'a rien promu (normal si ce déploiement est déjà la production du projet). Passage à la bascule de pharmaboost.app."
+          # L'API officielle de Vercel, avec l'équipe et le projet donnés directement (l'outil en ligne de commande, avec
+          # --scope, cherchait un « utilisateur » qu'un jeton d'équipe n'a pas : « User not found »).
+          api() { curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" -w '\n%{http_code}' "$@"; }
+          code_of() { printf '%s' "$1" | tail -n 1; }
+          body_of() { printf '%s' "$1" | sed '$d'; }
+
+          echo "Vérification du déploiement…"
+          resp=$(api "https://api.vercel.com/v13/deployments/${url#https://}?teamId=$VERCEL_ORG_ID")
+          id=$(body_of "$resp" | jq -r '.id // empty')
+          state=$(body_of "$resp" | jq -r '.readyState // empty')
+          if [ -z "$id" ]; then
+            echo "::error title=Déploiement introuvable::Vercel ne retrouve pas le déploiement (code $(code_of "$resp") : $(body_of "$resp" | jq -r '.error.message // "réponse inattendue"')). Le site reste sur la version précédente."
+            exit 1
           fi
+          if [ "$state" != "READY" ]; then
+            echo "::error title=Déploiement pas prêt::Le déploiement est à l'état « $state », pas « READY ». Le site reste sur la version précédente."
+            exit 1
+          fi
+          echo "Déploiement prêt (READY)."
+
+          echo "1/2 — Promotion officielle du déploiement en production du projet…"
+          resp=$(api -X POST "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/promote/$id?teamId=$VERCEL_ORG_ID")
+          case "$(code_of "$resp")" in
+            2*) echo "Promotion acceptée par Vercel." ;;
+            *) echo "::notice title=Promotion sans effet::Vercel n'a rien promu (code $(code_of "$resp") : $(body_of "$resp" | jq -r '.error.message // "—"')). Passage à la bascule de pharmaboost.app." ;;
+          esac
           if live 6; then
             echo "pharmaboost.app répond avec la nouvelle version (promotion)."
             echo "via=promotion" >> "$GITHUB_OUTPUT"
@@ -175,10 +195,14 @@ jobs:
           fi
 
           echo "2/2 — Bascule de pharmaboost.app sur ce déploiement (ce que faisait l'ancien script)…"
-          if ! npx --yes "$VERCEL_CLI" alias set "$url" pharmaboost.app --scope "$VERCEL_ORG_ID" --token="$VERCEL_TOKEN"; then
-            echo "::error title=Bascule refusée::Vercel a refusé de mettre pharmaboost.app sur le nouveau déploiement. Le site reste sur la version précédente. Vérifiez que le jeton a bien accès à l'équipe Woorld et au domaine."
-            exit 1
-          fi
+          resp=$(api -X POST "https://api.vercel.com/v2/deployments/$id/aliases?teamId=$VERCEL_ORG_ID" -d '{"alias":"pharmaboost.app"}')
+          case "$(code_of "$resp")" in
+            2*) echo "Bascule acceptée par Vercel." ;;
+            *)
+              echo "::error title=Bascule refusée::Vercel a refusé de mettre pharmaboost.app sur le nouveau déploiement (code $(code_of "$resp") : $(body_of "$resp" | jq -r '.error.message // "réponse inattendue"')). Le site reste sur la version précédente."
+              exit 1
+              ;;
+          esac
           if live 18; then
             echo "pharmaboost.app répond avec la nouvelle version (bascule)."
             echo "via=bascule" >> "$GITHUB_OUTPUT"
