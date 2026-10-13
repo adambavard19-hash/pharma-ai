@@ -56,10 +56,10 @@ describe("l'aperçu de la bannière pour Mac", () => {
     expect(html).toContain("ce n'est pas une capture de Windows");
   });
 
-  it("la mise en garde affichée est celle du moteur, mot pour mot, filtrée comme la bannière les reçoit (avertissements seulement)", () => {
+  it("aucune mise en garde n'est montrée : la bannière ne pousse que des produits conseils (fondateur, 13 oct. 2026)", () => {
     const fervex = evaluateVigilances([drug("FERVEX ADULTES", "paracétamol, phéniramine, acide ascorbique", "N02BE51")]).find((v) => v.key === "paracetamol-combination-limit");
     expect(fervex?.severity).toBe("WARNING");
-    expect(html).toContain(embedded(vigilanceMessage(fervex!)));
+    expect(html).not.toContain(embedded(vigilanceMessage(fervex!)));
     // Le simple « bon usage » de l'antibiotique (INFO) ne monte jamais dans la bannière : la démonstration ne le montre pas non plus.
     const info = evaluateVigilances([drug("AMOXICILLINE 1 g", "amoxicilline", "J01CA04")]).find((v) => v.severity === "INFO");
     expect(info).toBeDefined();
@@ -124,10 +124,9 @@ describe("les ventes de la démonstration sont celles du moteur", () => {
     expect(html).not.toMatch(/ZYRTEC/);
   });
 
-  it("l'ordonnance montre une seule mise en garde, celle des 3 g de paracétamol, puis deux conseils que les règles proposent dès le bip, sans question", () => {
+  it("l'ordonnance ne montre aucune mise en garde, puis deux conseils que les règles proposent dès le bip, sans question", () => {
     const { ordonnance } = sales;
-    expect(ordonnance.alerts).toHaveLength(1);
-    expect(ordonnance.alerts[0]).toMatch(/^Paracétamol : 3 g par jour au maximum/);
+    expect(ordonnance.alerts).toHaveLength(0);
     expect(ordonnance.tree).toBeNull();
     expect(ordonnance.items.map((item) => item.name)).toEqual(["PROBIOTIQUE 30 gélules", "ANTISEPTIQUE CUTANÉ 100 ml"]);
     expect(ordonnance.items.map((item) => item.drug)).toEqual(["AMOXICILLINE 1 g", "VALACICLOVIR 500 mg"]);

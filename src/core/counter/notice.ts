@@ -117,6 +117,8 @@ export type CounterNoticeInput = {
   prescriptionStatus: string;
   lineNames: string[];
   alerts: NoticeAlert[];
+  /** Envoyer les mises en garde à la bannière. Absent : `SHOW_ALERTS_ON_BANNER` (coupé pour l'instant). */
+  showAlerts?: boolean;
   recommendations: NoticeRecommendation[];
   outcome: string | null;
   /**
@@ -198,6 +200,9 @@ export function detectedLabelOf(kinds: ("DRUG" | "PRODUCT")[] | undefined): stri
   return "Détecté";
 }
 
+/** Les mises en garde sur la bannière du poste : coupées pour l'instant (voir `buildCounterNotice`). */
+export const SHOW_ALERTS_ON_BANNER = false;
+
 export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
   const drugs = input.lineNames.map(shortName).filter(Boolean);
   const subject = drugs.join(" · ");
@@ -211,7 +216,10 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
   if (!["ANALYZED", "VALIDATED"].includes(input.prescriptionStatus)) {
     return { ...base, state: "PENDING", alerts: [], advice: [], items: [], signature: `pending:${input.reference}:${input.lineNames.length}` };
   }
-  const alerts = [...input.alerts]
+  // Pour l'instant, la bannière ne pousse QUE des produits conseils (fondateur, 13 oct. 2026 : « personne ne lit les
+  // contre-indications, trop de mots ») : aucune mise en garde n'y est envoyée. La sécurité, elle, tourne toujours — un
+  // produit dangereux reste écarté des conseils — et les mises en garde restent sur la page de la vente.
+  const alerts = ((input.showAlerts ?? SHOW_ALERTS_ON_BANNER) ? [...input.alerts] : [])
     .filter(isCounterAlert)
     .sort((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9))
     .slice(0, MAX_ALERTS)

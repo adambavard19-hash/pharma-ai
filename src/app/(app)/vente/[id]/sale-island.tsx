@@ -7,7 +7,7 @@ import { useRobotInBrowser } from "@/components/robot/robot-presence";
 import { adviceOutcome, saleIslandState } from "@/core/island/sale";
 import type { IslandOutcome } from "@/core/island/banner-flow";
 import { formatCents } from "@/lib/format";
-import { isCounterAlert } from "@/core/counter/notice";
+import { isCounterAlert, SHOW_ALERTS_ON_BANNER } from "@/core/counter/notice";
 import { adviceAnchor } from "../../../../../agent/src/sale-link";
 import { useAdviceFocus } from "./advice-sheet-view";
 import { counterSheetOf } from "./advice-sheet";
@@ -62,7 +62,8 @@ export function SaleIsland({
   const shown = advice.filter((r) => r.product && r.status !== "REMOVED" && !r.requiresValidation && !(r.opportunity?.question && r.opportunity.answer === null)).slice(0, 4);
   const outcomes: IslandOutcome[] = shown.map((r) => adviceOutcome(r.status, basketIds.has(r.id)));
   // Comme la bannière du poste : seules les vraies mises en garde passent dans l'île (pas les notes de couverture des données).
-  const alerts = findings.filter(isCounterAlert);
+  // Comme au poste : l'île ne pousse que des produits conseils, aucune mise en garde (elles restent sur la page).
+  const alerts = SHOW_ALERTS_ON_BANNER ? findings.filter(isCounterAlert) : [];
   const state = saleIslandState({ editing, analysing, analysisStep, liveScan, lineCount: lineNames.length, warnings: alerts.length, alertDismissed, outcomes, hasSale, emailStage: null, emailValue: "" });
   const first = alerts[0];
   const items: IslandAdvice[] = shown.map((r) => ({

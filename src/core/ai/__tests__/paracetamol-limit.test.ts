@@ -119,6 +119,7 @@ describe("la fenêtre du poste : la limite est lue en alerte, pas seulement sur 
     const finding = result.safetyFindings.find((f) => f.code === "VIGILANCE_USAGE" && /3 g par jour/.test(f.message));
     expect(finding?.severity).toBe("WARNING");
     const notice = buildCounterNotice({
+      showAlerts: true,
       reference: "ORD-1",
       prescriptionStatus: "ANALYZED",
       lineNames: ["Fervex adultes sachet"],

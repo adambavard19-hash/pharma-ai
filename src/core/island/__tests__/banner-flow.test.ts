@@ -49,10 +49,11 @@ describe("l'île du comptoir", () => {
     expect(islandReducer(busy, { type: "go", stage: "scan" }, 2)).toEqual({ ...INITIAL_ISLAND, stage: "scan" });
   });
 
-  it("joue un scénario complet : vente avec conseils, mise en garde, puis vente sans conseil", () => {
+  it("joue un scénario complet : vente avec conseils, puis vente sans conseil — aucune mise en garde (produits seulement)", () => {
     const steps = demoScenario(2);
     const stages = steps.flatMap((s) => (s.action.type === "go" ? [s.action.stage] : []));
-    for (const stage of ["scan", "analyzing", "ready", "advice", "email", "emailSent", "done", "alert", "quiet"] as const) expect(stages).toContain(stage);
+    for (const stage of ["scan", "analyzing", "ready", "advice", "email", "emailSent", "done", "quiet"] as const) expect(stages).toContain(stage);
+    expect(stages).not.toContain("alert");
     expect(steps.every((s) => s.wait > 0)).toBe(true);
   });
 

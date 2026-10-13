@@ -157,14 +157,8 @@ export function demoScenario(adviceCount: number): ScenarioStep[] {
     { wait: 900, action: { type: "go", stage: "emailSent" } },
     { wait: 1800, action: { type: "go", stage: "done" } },
     { wait: 3600, action: { type: "go", stage: "idle" } },
-    // Deuxième vente : une mise en garde à lire avant de conseiller.
-    { wait: 2200, action: { type: "go", stage: "scan" } },
-    { wait: 650, action: { type: "go", stage: "analyzing" } },
-    { wait: 700, action: { type: "tick" } },
-    { wait: 700, action: { type: "tick" } },
-    { wait: 700, action: { type: "go", stage: "alert" } },
-    { wait: 4200, action: { type: "go", stage: "idle" } },
-    // Troisième vente : rien à ajouter.
+    // (Plus de vente « mise en garde » : la bannière ne pousse que des produits conseils — fondateur, 13 oct. 2026.)
+    // Deuxième vente : rien à ajouter.
     { wait: 2000, action: { type: "go", stage: "scan" } },
     { wait: 650, action: { type: "go", stage: "quiet" } },
     { wait: 3000, action: { type: "go", stage: "idle" } },

@@ -21,9 +21,15 @@ describe("l'avis de comptoir affiché sur le poste de caisse", () => {
     expect(buildCounterNotice({ ...base, prescriptionStatus: "DELIVERED" }).state).toBe("CLOSED");
   });
 
+  it("pour l'instant, aucune mise en garde n'est envoyée à la bannière : seulement les produits conseils", () => {
+    const notice = buildCounterNotice({ ...base, alerts: [{ severity: "WARNING", subjectType: "PRODUCT", code: "DOCUMENTED_INTERACTION", message: "Interaction avec le millepertuis", acknowledged: false }] });
+    expect(notice.alerts).toEqual([]);
+  });
+
   it("met les alertes avant les conseils, trois conseils au plus, sans la forme galénique", () => {
     const notice = buildCounterNotice({
       ...base,
+      showAlerts: true,
       alerts: [
         { severity: "INFO", subjectType: "PRESCRIPTION_LINE", code: "VIGILANCE_USAGE", message: "Info", acknowledged: false },
         { severity: "WARNING", subjectType: "ANALYSIS", code: "INTERACTION_NO_REFERENTIAL", message: "Référentiel absent", acknowledged: false },
@@ -125,7 +131,7 @@ describe("l'avis ne montre pas les explications sur nos propres propositions éc
   ];
 
   it("garde les vraies alertes sur ce qui est délivré, retire les « écarté »", () => {
-    const notice = buildCounterNotice({ ...base, alerts });
+    const notice = buildCounterNotice({ ...base, alerts, showAlerts: true });
     expect(notice.alerts).toEqual(["Interaction avec le millepertuis"]);
   });
 
