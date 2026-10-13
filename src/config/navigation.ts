@@ -3,6 +3,7 @@ import {
   Box,
   Boxes,
   CalendarCheck,
+  FlaskConical,
   GraduationCap,
   Handshake,
   Link2,
@@ -62,6 +63,8 @@ export type NavItem = {
    * transition : `/vente/...` et `/ordonnances/...` désignent le même travail.
    */
   match?: string[];
+  /** Sous-chemins qui appartiennent à une autre entrée (Paramètres sans « Laboratoires & gammes »). */
+  except?: string[];
   description: string;
   /**
    * L'action principale de l'application. Rendue comme une ligne mise en avant
@@ -156,6 +159,17 @@ export const NAVIGATION: NavItem[] = [
     group: "pharmacie",
   },
   {
+    href: "/parametres/laboratoires/gammes",
+    label: "Laboratoires & gammes",
+    icon: FlaskConical,
+    // Les gammes privilégiées, les challenges et les marques : des choix de titulaire, en entrée directe (retour du
+    // fondateur du 13 oct. 2026 : « pas dans les paramètres »). Seul le titulaire a LAB_PROGRAMS_MANAGE.
+    permission: PERMISSIONS.LAB_PROGRAMS_MANAGE,
+    match: ["/parametres/laboratoires"],
+    description: "Vos gammes privilégiées, les challenges des laboratoires, les marques mises en avant",
+    group: "pharmacie",
+  },
+  {
     href: "/equipe",
     label: "Mon équipe",
     icon: UsersRound,
@@ -219,6 +233,7 @@ export const NAVIGATION: NavItem[] = [
     // dans « Mon compte », depuis le menu utilisateur.
     permission: PERMISSIONS.SETTINGS_MANAGE,
     match: ["/parametres", "/conseils"],
+    except: ["/parametres/laboratoires"],
     description: "Officine, règles de conseil, conformité",
     group: "configuration",
   },
@@ -268,6 +283,7 @@ export const OFF_MENU_DESTINATIONS: {
 /** Vrai si l'URL courante appartient à l'entrée de menu donnée. */
 export function isNavItemActive(item: NavItem, pathname: string): boolean {
   const prefixes = item.match ?? [item.href];
+  if (item.except?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return false;
   return prefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );

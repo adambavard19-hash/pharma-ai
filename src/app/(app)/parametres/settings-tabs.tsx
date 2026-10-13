@@ -29,9 +29,6 @@ export function SettingsTabs({
       items={[
         { key: "officine", label: "Officine" },
         ...(canSeeTeam ? [{ key: "equipe", label: "Équipe", href: "/parametres/equipe" }] : []),
-        ...(canSeeRules || canSeePrograms
-          ? [{ key: "laboratoires", label: "Laboratoires & gammes", href: canSeeRules ? "/parametres/laboratoires" : "/parametres/laboratoires/gammes" }]
-          : []),
         ...(canSeeRules ? [{ key: "regles", label: "Mes préférences", href: "/parametres/regles" }] : []),
         { key: "moteur", label: "Moteur PharmaBoost" },
         { key: "conformite", label: "Conformité" },

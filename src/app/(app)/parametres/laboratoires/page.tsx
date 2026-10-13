@@ -3,7 +3,6 @@ import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { PageHeader, SectionHeader } from "@/components/ui/page";
-import { SettingsTabs } from "../settings-tabs";
 import { BrandsManager, type BrandRow } from "./brands-manager";
 import { LabTabs } from "./lab-tabs";
 import { brandLabelOf } from "@/core/catalog/brand";
@@ -62,8 +61,7 @@ export default async function LaboratoiresPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Paramètres" description="Officine, équipe, règles de conseil, moteur et conformité — tout ce qui se règle une fois, pas à chaque patient." />
-      <SettingsTabs canSeeTeam={session.permissions.has(PERMISSIONS.TEAM_VIEW)} canSeeRules canSeePrograms={session.permissions.has(PERMISSIONS.LAB_PROGRAMS_MANAGE)} canSeeAudit={session.permissions.has(PERMISSIONS.AUDIT_VIEW)} />
+      <PageHeader title="Laboratoires & gammes" description="Vos gammes privilégiées, les challenges des laboratoires et les marques que PharmaBoost met en avant ou écarte." />
       <LabTabs canManagePrograms={session.permissions.has(PERMISSIONS.LAB_PROGRAMS_MANAGE)} canManageBrands />
       <SectionHeader
         title="Laboratoires"

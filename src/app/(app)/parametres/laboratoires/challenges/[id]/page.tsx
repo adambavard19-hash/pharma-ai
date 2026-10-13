@@ -16,7 +16,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatCents } from "@/lib/format";
-import { SettingsTabs } from "../../../settings-tabs";
 import { LabTabs } from "../../lab-tabs";
 import { ChallengeMeter, RewardFigures, StatusBadge, TierList, coverageLabel, formatDay, formatPeriod, timingLabel, unitsWord } from "../challenge-display";
 import { DetailActions } from "./detail-actions";
@@ -41,8 +40,7 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Paramètres" description="Officine, équipe, règles de conseil, moteur et conformité — tout ce qui se règle une fois, pas à chaque patient." />
-      <SettingsTabs canSeeTeam={session.permissions.has(PERMISSIONS.TEAM_VIEW)} canSeeRules={session.permissions.has(PERMISSIONS.RECOMMENDATION_RULES_MANAGE)} canSeePrograms canSeeAudit={session.permissions.has(PERMISSIONS.AUDIT_VIEW)} />
+      <PageHeader title="Laboratoires & gammes" description="Vos gammes privilégiées, les challenges des laboratoires et les marques que PharmaBoost met en avant ou écarte." />
       <LabTabs canManagePrograms canManageBrands={session.permissions.has(PERMISSIONS.RECOMMENDATION_RULES_MANAGE)} />
 
       <div className="space-y-3">
