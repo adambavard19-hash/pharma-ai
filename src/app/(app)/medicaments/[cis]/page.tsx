@@ -15,6 +15,8 @@ import { Alert } from "@/components/ui/feedback";
 import { formatCents, formatDate } from "@/lib/format";
 import { evaluateRegulation } from "@/core/regulation/rules";
 import { loadCoverageBySpecialty } from "@/server/services/regulation";
+import { RCP_SIDE_EFFECTS_SOURCE } from "@/core/reference/rcp/side-effects";
+import { loadOfficialSideEffectsSheet } from "@/server/services/official-side-effects";
 
 export const metadata: Metadata = { title: "Fiche médicament" };
 
@@ -48,6 +50,10 @@ export default async function DrugSheetPage({ params }: { params: Promise<{ cis:
     getReferenceCatalogState(),
   ]);
   if (!specialty) notFound();
+
+  // Les effets indésirables fréquents lus dans le RCP (donnée publique commune, `npm run effets:sync`). Une lecture
+  // impossible (migration pas encore passée) n'empêche jamais la fiche de s'afficher.
+  const sideEffects = await loadOfficialSideEffectsSheet(specialty.cisCode);
 
   const stocks = await prisma.pharmacyDrugStock.findMany({
     where: { pharmacyId: session.scope.pharmacyId, presentation: { specialtyId: specialty.id } },
@@ -172,6 +178,29 @@ export default async function DrugSheetPage({ params }: { params: Promise<{ cis:
                 </li>
               ))}
             </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {sideEffects && (
+        <Card>
+          <CardHeader
+            title="Effets indésirables fréquents"
+            description={`Source : ${RCP_SIDE_EFFECTS_SOURCE.label}, rubrique 4.8, lue le ${formatDate(sideEffects.fetchedAt)}. Seuls les effets que PharmaBoost sait accompagner au comptoir sont repris : ce n'est pas la liste complète.`}
+          />
+          <CardContent className="pt-0">
+            <ul className="flex flex-wrap gap-1.5">
+              {sideEffects.rows.map((row) => (
+                <li key={row.label}>
+                  <Badge tone="neutral">
+                    {row.label} · {row.frequency === "VERY_COMMON" ? "très fréquent" : "fréquent"}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+            <a href={sideEffects.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium underline underline-offset-2">
+              Lire la rubrique 4.8 du RCP <ExternalLink className="size-3.5" />
+            </a>
           </CardContent>
         </Card>
       )}

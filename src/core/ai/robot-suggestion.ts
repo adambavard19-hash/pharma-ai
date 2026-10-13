@@ -701,5 +701,5 @@ export function robotCentralDraft(facts: RobotProposalFacts): RobotCentralDraft 
     const sentence = shorten(facts.counterScript.replaceAll("{product}", facts.productName.replace(/,.*$/, "").trim()).replaceAll("{drug}", drugShort), 280);
     return { kind: "ASSOCIATION", trigger: facts.drugLabel, ean, sentence, summary: `Association commune : ${drugShort} → ${facts.productName} (code ${ean}).` };
   }
-  return { kind: "MANUAL", summary: "Ni étiquette d'usage ni code-barres : à écrire à la main dans « Conseils & associations »." };
+  return { kind: "MANUAL", summary: "Ni étiquette d'usage ni code-barres : à écrire à la main dans « Conseils »." };
 }

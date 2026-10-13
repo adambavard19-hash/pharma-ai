@@ -121,8 +121,14 @@ export type DrugKnowledge = {
    * fait, pas une lecture : rien à confirmer, mais ni explication ni
    * interaction, comme pour `AI_CLASSIFICATION`. Les règles ne s'y déclenchent
    * que par le code ATC, jamais par le texte du libellé (`engines/advice.ts`).
+   * `OFFICIAL_RCP` : ni le modèle ni la famille officielle n'ont répondu ; la fiche ne porte que les effets indésirables
+   * fréquents lus dans le RCP de la spécialité (BDPM, rubrique 4.8). Ni famille, ni explication, ni interaction.
    */
-  origin?: "EDITORIAL" | "AI_CLASSIFICATION" | "OFFICIAL_ATC" | "VETERINARY_NAME";
+  origin?: "EDITORIAL" | "AI_CLASSIFICATION" | "OFFICIAL_ATC" | "OFFICIAL_RCP" | "VETERINARY_NAME";
+  /**
+   * « RCP (BDPM) » quand `commonSideEffects` vient du RCP officiel de la spécialité et non du modèle. Absent sinon.
+   */
+  sideEffectsSource?: string;
   /** Ce que le libellé dit d'un produit vétérinaire. Présent seulement pour `VETERINARY_NAME`. */
   veterinary?: VeterinaryInfo;
 };

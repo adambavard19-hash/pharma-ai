@@ -924,7 +924,8 @@ function officialFamilies(understanding: TreatmentUnderstanding): string {
  * comme telle. Elle suffit à déclencher une règle de conseil par code ATC ou
  * classe ; elle ne porte ni explication patient ni interaction — et le moteur
  * de sécurité le signale sur la ligne. Une famille officielle (le modèle n'a
- * pas répondu) garde sa propre origine et sa source, Open Medic : voir
+ * pas répondu) garde sa propre origine et sa source, Open Medic ; des effets
+ * indésirables lus dans le RCP officiel sont dits « RCP (BDPM) » : voir
  * `classifiedDrugKnowledge`.
  */
 function mergeClassifications(
@@ -939,7 +940,9 @@ function mergeClassifications(
     if (!line?.drugName) continue;
     const key = line.drugName.toLowerCase();
     if (knowledge.get(key)) continue;
-    if (!classification.atcCode && !classification.therapeuticClass) continue;
+    // Ni famille ni classe : rien à en tirer, sauf des effets indésirables lus dans le RCP officiel (une règle
+    // « sécheresse buccale » s'ouvre sur eux, même sans modèle).
+    if (!classification.atcCode && !classification.therapeuticClass && !(classification.sideEffectsSource === "RCP_BDPM" && classification.commonSideEffects.length > 0)) continue;
 
     knowledge.set(
       key,

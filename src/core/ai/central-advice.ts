@@ -1,4 +1,6 @@
-import type { AdviceRule } from "./engines/advice";
+import { ADVICE_RULES, type AdviceRule } from "./engines/advice";
+import { applyRuleEdit, editContextOf, exclusionReason, escapeWord, parseRuleEdit } from "./central-advice-edit";
+import { NO_EXCLUSIONS, type RuleEditValues, type RuleExclusions } from "./central-advice-edit-constants";
 import type { ProductCategoryCode } from "./types";
 import { PRODUCT_CATEGORIES } from "@/config/catalog";
 import { ADVICE_VOCABULARY } from "@/core/catalog/product-vocabulary";
@@ -39,9 +41,12 @@ export type CentralRuleRow = {
   definition: unknown;
   decidedAt: Date | null;
   decidedByName: string | null;
+  /** Règle du code modifiée depuis la console : `{ edit: RuleEditValues }` (voir central-advice-edit.ts). */
+  override?: unknown;
+  overrideRevision?: number;
 };
 
-export function rowsByKey(rows: CentralRuleRow[]): Map<string, CentralRuleRow> {
+export function rowsByKey<T extends CentralRuleRow>(rows: T[]): Map<string, T> {
   return new Map(rows.map((row) => [row.ruleKey, row]));
 }
 
@@ -83,6 +88,10 @@ export type CustomRuleDefinition = {
   /** D'où vient ce conseil (recommandation, RCP, retour du comptoir…). */
   source: string | null;
   safetyNotes: string[];
+  /** Ajouts de la console « Modifier » (facultatifs pour les conseils écrits avant) : préférences, exclusions, priorité. */
+  preferWords?: string[];
+  exclusions?: RuleExclusions;
+  priority?: number;
 };
 
 
@@ -154,7 +163,20 @@ export function parseCustomRuleDefinition(raw: unknown): { ok: true; value: Cust
   const safetyNotes = cleanList(input.safetyNotes);
   if (safetyNotes.length > CUSTOM_LIMITS.notes || safetyNotes.some((note) => note.length > CUSTOM_LIMITS.note)) return { ok: false, error: `${CUSTOM_LIMITS.notes} précautions au plus, de ${CUSTOM_LIMITS.note} caractères.` };
 
-  return { ok: true, value: { title, kind, atcPrefixes, therapeuticClasses, category, matchingTags, question, shortReason, counterScript, patientReason, source, safetyNotes } };
+  // Les ajouts de « Modifier » : vérifiés par les mêmes règles que pour une règle du code.
+  const extras: Pick<CustomRuleDefinition, "preferWords" | "exclusions" | "priority"> = {};
+  if (input.preferWords !== undefined || input.exclusions !== undefined || input.priority !== undefined) {
+    const checked = parseRuleEdit(
+      { title, counterScript, patientReason: patientReason ?? shortReason, shortReason, question, atcPrefixes, therapeuticClasses, category, matchingTags, preferWords: input.preferWords ?? [], exclusions: input.exclusions ?? NO_EXCLUSIONS, priority: input.priority ?? CUSTOM_PRIORITY[kind], safetyNotes, source, confirmNoExclusions: true },
+      { requiresProduct: true, hasRoutine: false, previousExclusions: NO_EXCLUSIONS },
+    );
+    if (!checked.ok) return checked;
+    if (checked.value.preferWords.length > 0) extras.preferWords = checked.value.preferWords;
+    if (checked.value.exclusions.minAgeYears !== null || checked.value.exclusions.pregnancy || checked.value.exclusions.breastfeeding || checked.value.exclusions.conditions.length > 0) extras.exclusions = checked.value.exclusions;
+    if (input.priority !== undefined) extras.priority = checked.value.priority;
+  }
+
+  return { ok: true, value: { title, kind, atcPrefixes, therapeuticClasses, category, matchingTags, question, shortReason, counterScript, patientReason, source, safetyNotes, ...extras } };
 }
 
 export const customRuleKey = (id: string): string => `custom-${id}`;
@@ -178,8 +200,10 @@ export function buildCustomRule(row: Pick<CentralRuleRow, "ruleKey" | "status" |
     therapeuticClasses: definition.therapeuticClasses,
     sideEffectTriggers: [],
     ...(definition.question ? { question: definition.question } : {}),
-    basePriority: CUSTOM_PRIORITY[definition.kind],
+    basePriority: definition.priority ?? CUSTOM_PRIORITY[definition.kind],
     matchingTags: definition.matchingTags,
+    ...(definition.preferWords?.length ? { productPrefer: definition.preferWords.map(escapeWord) } : {}),
+    ...(definition.exclusions ? { blockedFor: (patient) => exclusionReason(definition.exclusions!, patient) } : {}),
     excludeTags: [],
     benefits: [],
     shortReasonTemplate: definition.shortReason,
@@ -189,6 +213,35 @@ export function buildCustomRule(row: Pick<CentralRuleRow, "ruleKey" | "status" |
     clinicalContext: definition.source ? `Conseil ajouté par l'équipe PharmaBoost. Source : ${definition.source}` : "Conseil ajouté par l'équipe PharmaBoost.",
     safetyNotes: definition.safetyNotes,
   };
+}
+
+/** Ce que la base garde d'une règle du code modifiée : la modification, lue et revérifiée. `null` : rien, ou illisible. */
+export function readOverride(row: Pick<CentralRuleRow, "override">, rule: AdviceRule): RuleEditValues | null {
+  const stored = row.override && typeof row.override === "object" ? (row.override as { edit?: unknown }).edit : undefined;
+  if (!stored) return null;
+  // Revérifiée à chaque lecture : une surcharge abîmée (ou devenue invalide) ne parle pas, la règle du code reprend.
+  const parsed = parseRuleEdit({ ...(stored as object), confirmNoExclusions: true }, editContextOf(rule, NO_EXCLUSIONS));
+  return parsed.ok ? parsed.value : null;
+}
+
+/** La règle du code telle qu'elle parle : modifiée depuis la console si elle l'a été, sinon celle du code. */
+export function effectiveCodeRule(rule: AdviceRule, row: CentralRuleRow | undefined): AdviceRule {
+  if (!row) return rule;
+  const edit = readOverride(row, rule);
+  return edit ? applyRuleEdit(rule, edit, row.overrideRevision ?? 1) : rule;
+}
+
+/** Les règles du code modifiées depuis la console (et non supprimées), prêtes pour le moteur : elles remplacent celles du code. */
+export function overriddenRulesFrom(rows: CentralRuleRow[]): AdviceRule[] {
+  const byKey = rowsByKey(rows);
+  const rules: AdviceRule[] = [];
+  for (const rule of ADVICE_RULES) {
+    const row = byKey.get(rule.key);
+    if (!row || row.source !== "BUILT_IN" || row.status === "REMOVED") continue;
+    const edit = readOverride(row, rule);
+    if (edit) rules.push(applyRuleEdit(rule, edit, row.overrideRevision ?? 1));
+  }
+  return rules;
 }
 
 /** Les conseils ajoutés qui sont en ligne (ni supprimés, ni illisibles), prêts pour le moteur. Une définition abîmée est ignorée. */

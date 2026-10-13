@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePlatformSession } from "@/server/auth/platform-session";
-import { addCentralAssociation, addCustomRule, decideCentralAssociation, decideRule } from "@/server/services/central-advice";
+import { addCentralAssociation, addCustomRule, decideCentralAssociation, decideRule, editCentralAssociation, editRule, revertCentralAssociation, revertRule } from "@/server/services/central-advice";
+import { previewMedicineAdvice, resolveMedicineSearch, type AdvicePreview, type MedicineSearch } from "@/server/services/advice-hub";
 import { fail, ok, type ActionResult } from "./types";
 
 /**
@@ -66,4 +67,69 @@ export async function decideCentralAssociationAction(payload: { id: string; deci
   if (!result.ok) return fail(result.error);
   revalidatePath("/admin/conseils");
   return ok(null, DECISION_MESSAGES[parsed.data.decision](result.label));
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Modifier, revenir à l'origine
+// ---------------------------------------------------------------------------------------------------------------
+
+export async function editCentralRuleAction(payload: { ruleKey: string; values: unknown }): Promise<ActionResult<{ needsConfirmation: boolean }>> {
+  const session = await requirePlatformSession();
+  const parsed = z.object({ ruleKey: z.string().min(1).max(120), values: z.record(z.string(), z.unknown()) }).safeParse(payload);
+  if (!parsed.success) return fail("Modification invalide.");
+  const result = await editRule({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.ruleKey, parsed.data.values);
+  if (!result.ok) return result.needsConfirmation ? { ok: true, data: { needsConfirmation: true }, message: result.error } : fail(result.error);
+  revalidatePath("/admin/conseils");
+  return ok({ needsConfirmation: false }, `« ${result.title} » est modifié pour toutes les pharmacies. ${result.message}`);
+}
+
+export async function revertCentralRuleAction(payload: { ruleKey: string }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const parsed = z.object({ ruleKey: z.string().min(1).max(120) }).safeParse(payload);
+  if (!parsed.success) return fail("Demande invalide.");
+  const result = await revertRule({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.ruleKey);
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/conseils");
+  return ok(null, `« ${result.title} » est revenu à sa version d'origine, pour toutes les pharmacies. Il est « à relire ».`);
+}
+
+const associationEditSchema = z.object({ id: z.string().min(1).max(64), advice: z.object({ ean: z.string().trim().min(7).max(20), name: z.string().trim().min(1).max(200) }), sentence: z.string().max(600).nullable() });
+
+export async function editCentralAssociationAction(payload: z.input<typeof associationEditSchema>): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const parsed = associationEditSchema.safeParse(payload);
+  if (!parsed.success) return fail("Vérifiez le produit proposé et la phrase.");
+  const result = await editCentralAssociation({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.id, { advice: parsed.data.advice, sentence: parsed.data.sentence });
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/conseils");
+  return ok(null, `« ${result.label} » est modifié pour toutes les pharmacies. Il repasse « à relire ».`);
+}
+
+export async function revertCentralAssociationAction(payload: { id: string }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const parsed = z.object({ id: z.string().min(1).max(64) }).safeParse(payload);
+  if (!parsed.success) return fail("Demande invalide.");
+  const result = await revertCentralAssociation({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.id);
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/conseils");
+  return ok(null, `« ${result.label} » est revenu à sa version d'origine. Il est « à relire ».`);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Partir d'un médicament
+// ---------------------------------------------------------------------------------------------------------------
+
+export async function searchMedicinesAction(payload: { query: string }): Promise<ActionResult<MedicineSearch>> {
+  await requirePlatformSession();
+  const parsed = z.object({ query: z.string().max(120) }).safeParse(payload);
+  if (!parsed.success) return fail("Recherche invalide.");
+  return ok(await resolveMedicineSearch(parsed.data.query));
+}
+
+export async function previewMedicineAdviceAction(payload: { pharmacyId: string; specialtyId: string }): Promise<ActionResult<AdvicePreview>> {
+  await requirePlatformSession();
+  const parsed = z.object({ pharmacyId: z.string().min(1).max(64), specialtyId: z.string().min(1).max(64) }).safeParse(payload);
+  if (!parsed.success) return fail("Choisissez une pharmacie.");
+  const result = await previewMedicineAdvice(parsed.data.pharmacyId, parsed.data.specialtyId);
+  return result.ok ? ok(result.preview) : fail(result.error);
 }

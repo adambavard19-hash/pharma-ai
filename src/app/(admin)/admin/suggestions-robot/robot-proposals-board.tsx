@@ -62,7 +62,7 @@ export function RobotProposalsBoard({ pending, recent }: { pending: RobotProposa
   );
 }
 
-function ProposalCard({ proposal }: { proposal: RobotProposalCard }) {
+export function ProposalCard({ proposal }: { proposal: RobotProposalCard }) {
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
   const run = (action: () => Promise<{ ok: boolean; message?: string; error?: string }>) =>

@@ -11,6 +11,8 @@ import type { TenantScope } from "@/server/db/tenant";
 import { drugClassificationIsUncertain } from "@/core/knowledge/gaps";
 import { officialAtcForCis } from "@/core/reference/atc/official-atc";
 import { recordGaps } from "@/server/services/knowledge-gap-store";
+import { applyOfficialSideEffects } from "@/core/understanding/official-side-effects";
+import { loadOfficialSideEffects } from "@/server/services/official-side-effects";
 
 /**
  * La classification des médicaments, avec sa mémoire.
@@ -29,6 +31,11 @@ import { recordGaps } from "@/server/services/knowledge-gap-store";
  * plus du crédit du modèle. Ce secours n'est jamais écrit dans le cache — le
  * modèle classera la ligne plus tard, effets indésirables compris — et ne
  * passe jamais devant une classification en cache ou validée.
+ *
+ * Les effets indésirables, eux, viennent d'abord du RCP officiel de la spécialité (BDPM, rubrique 4.8, lu par
+ * `npm run effets:sync`) : quand il en donne, ils remplacent ceux du modèle — en cache comme à l'instant — et suffisent
+ * quand le modèle ne répond pas. Ils ne sont jamais écrits dans le cache : le cache garde la réponse du modèle, le RCP
+ * est relu à chaque analyse (une requête, par CIS). Aucun effet officiel enregistré : rien ne change.
  */
 
 export type ClassificationOutcome = {
@@ -40,6 +47,8 @@ export type ClassificationOutcome = {
   cachedCount: number;
   /** Lignes classées d'après la famille officielle, faute de réponse du modèle. */
   officialCount: number;
+  /** Lignes dont les effets indésirables viennent du RCP officiel (BDPM). */
+  officialSideEffectsCount: number;
   /** Durée totale, appel compris s'il y en a eu un. */
   durationMs: number;
 };
@@ -182,6 +191,11 @@ export async function ensureClassifications(params: {
     console.info(`[classification] ${official.size} ligne(s) classée(s) d'après la famille officielle (Open Medic), faute de réponse utile du modèle, sur ${missing.length} envoyée(s).`);
   }
 
+  // Les effets indésirables officiels (RCP, BDPM) priment sur ceux du modèle, et suffisent quand il n'a rien dit.
+  const officialEffects = applyOfficialSideEffects(drugs, params.lines, await loadOfficialSideEffects(params.lines.map((line) => line.officialCisCode)));
+  drugs.splice(0, drugs.length, ...officialEffects.drugs);
+  if (officialEffects.applied > 0) console.info(`[classification] ${officialEffects.applied} ligne(s) avec les effets indésirables du RCP officiel (BDPM).`);
+
   drugs.sort((a, b) => a.lineIndex - b.lineIndex);
 
   // Un médicament dont on ne sait pas dire la famille, ou dont le modèle doute : la pharmacienne de PharmaBoost le saura. Jamais le titulaire.
@@ -191,8 +205,9 @@ export async function ensureClassifications(params: {
     const lineByIndex = new Map(params.lines.map((line) => [line.lineIndex, line]));
     const gaps = drugs.flatMap((drug) => {
       const line = lineByIndex.get(drug.lineIndex);
-      // Une famille officielle n'est pas un « trou » : il n'y a rien à demander à la pharmacienne.
-      if (!line || drug.source === "OFFICIAL") return [];
+      // Une famille officielle n'est pas un « trou » : il n'y a rien à demander à la pharmacienne. Une ligne qui n'a que
+      // ses effets officiels reste sans famille : elle est signalée plus bas, avec les lignes sans réponse.
+      if (!line || drug.source === "OFFICIAL" || drug.source === "OFFICIAL_RCP") return [];
       const key = classificationKey(line.drugName);
       const doubt = drugClassificationIsUncertain({ atcCode: drug.atcCode, therapeuticClass: drug.therapeuticClass, confidence: drug.confidence, validated: validated.get(key) === true });
       return doubt ? [{ kind: "MEDICINE" as const, key, label: line.drugName, reason: doubt, guess: { substance: drug.substance, atcCode: drug.atcCode, therapeuticClass: drug.therapeuticClass, confidence: drug.confidence }, pharmacyId: params.scope.pharmacyId }] : [];
@@ -209,6 +224,7 @@ export async function ensureClassifications(params: {
     usage,
     cachedCount: drugs.filter((drug) => drug.source === "CACHE").length,
     officialCount: official.size,
+    officialSideEffectsCount: officialEffects.applied,
     durationMs: Date.now() - startedAt,
   };
 }

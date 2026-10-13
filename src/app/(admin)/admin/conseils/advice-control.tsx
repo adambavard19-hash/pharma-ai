@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
-import { ArrowRight, Check, ChevronDown, Loader2, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { ArrowRight, Check, ChevronDown, Loader2, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { addCentralAssociationAction, addCentralRuleAction, decideCentralAssociationAction, decideCentralRuleAction } from "@/server/actions/admin-central-advice";
 import type { CentralAssociationView, CentralRuleView } from "@/server/services/central-advice";
 import { CENTRAL_STATUS_LABELS, CUSTOM_KINDS, CUSTOM_KIND_LABELS, CUSTOM_LIMITS, type CentralStatus } from "@/core/ai/central-advice-constants";
@@ -9,168 +9,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
-import { Alert, EmptyState } from "@/components/ui/feedback";
+import { Alert } from "@/components/ui/feedback";
 import { Modal } from "@/components/ui/modal";
-import { StatCard } from "@/components/ui/stat-card";
-import type { VigilanceView } from "@/core/ai/vigilance-catalog";
-import { AvoidList } from "./avoid-list";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-export type RuleCard = Omit<CentralRuleView, "decidedAt"> & { decidedAt: string | null };
-export type AssociationCard = Omit<CentralAssociationView, "decidedAt" | "createdAt"> & { decidedAt: string | null; createdAt: string };
-
-type Section = "RULES" | "ASSOCIATIONS" | "AVOID";
-type Filter = CentralStatus | "ALL";
-type Decision = "VALIDATE" | "REMOVE" | "RESTORE";
-
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "ACTIVE", label: "À relire" },
-  { key: "VALIDATED", label: "Validés" },
-  { key: "REMOVED", label: "Supprimés" },
-  { key: "ALL", label: "Tous" },
-];
-
-const TONES: Record<CentralStatus, "warning" | "success" | "danger"> = { ACTIVE: "warning", VALIDATED: "success", REMOVED: "danger" };
+import { AssociationEditForm, EditHistory, MedicineTriggerPicker, RevertButton, RuleEditForm, type HistoryLine } from "./edit-forms";
 
 /**
- * Le centre de contrôle des conseils : les règles, les conseils ajoutés et les associations, au même endroit.
- *
- * Chaque geste vaut pour toutes les pharmacies, tout de suite : valider note l'accord de la pharmacienne, supprimer retire le
- * conseil de PharmaBoost partout (on peut le rétablir), ajouter le met en ligne partout. Un conseil non relu parle déjà : il
- * est simplement « à relire ».
+ * Les cartes de « Conseils » : un conseil déclenché par un médicament (règle du moteur, conseil ajouté, suggestion du robot
+ * validée) ou par un produit (anciennement « association »). Chaque geste vaut pour toutes les pharmacies, tout de suite :
+ * valider, modifier, supprimer (on peut rétablir), revenir à la version d'origine.
  */
-export function AdviceControl({ rules, associations, vigilances, categories, tags }: { rules: RuleCard[]; associations: AssociationCard[]; vigilances: VigilanceView[]; categories: { code: string; label: string }[]; tags: string[] }) {
-  const [section, setSection] = useState<Section>("RULES");
-  const [filter, setFilter] = useState<Filter>("ACTIVE");
-  const [query, setQuery] = useState("");
-  const [adding, setAdding] = useState<"RULE" | "ASSOCIATION" | null>(null);
 
-  const all = section === "ASSOCIATIONS" ? associations : rules;
-  const count = (status: CentralStatus) => all.filter((item) => item.status === status).length;
-  const total = (status: CentralStatus) => rules.filter((item) => item.status === status).length + associations.filter((item) => item.status === status).length;
-  const text = query.trim().toLowerCase();
+export type RuleCard = Omit<CentralRuleView, "decidedAt" | "modified"> & { decidedAt: string | null; modified: { by: string | null; at: string | null; codeChangedSince: boolean } | null; history: HistoryLine[]; fromRobot: boolean };
+export type AssociationCard = Omit<CentralAssociationView, "decidedAt" | "createdAt"> & { decidedAt: string | null; createdAt: string; modified: { by: string | null; at: string } | null; history: HistoryLine[]; fromRobot: boolean };
 
-  const shownRules = useMemo(
-    () => rules.filter((rule) => (filter === "ALL" || rule.status === filter) && (!text || `${rule.title} ${rule.when} ${rule.proposes} ${rule.script}`.toLowerCase().includes(text))),
-    [rules, filter, text],
-  );
-  const shownAssociations = useMemo(
-    () => associations.filter((item) => (filter === "ALL" || item.status === filter) && (!text || `${item.triggerLabel} ${item.adviceLabel} ${item.sentence ?? ""}`.toLowerCase().includes(text))),
-    [associations, filter, text],
-  );
+type Decision = "VALIDATE" | "REMOVE" | "RESTORE";
+type Choices = { categories: { code: string; label: string }[]; tags: string[] };
 
-  return (
-    <div className="space-y-6">
-      {section !== "AVOID" && (
-        <>
-        <Alert tone="info" title="Tout est déjà en ligne, dans toutes les pharmacies">
-          Les conseils et associations ci-dessous parlent déjà au comptoir de chaque pharmacie, dès l&apos;envoi de son stock : les titulaires n&apos;ont rien à régler. Ici, vous
-          <strong> validez</strong> ce que vous cautionnez, vous <strong>supprimez</strong> ce qui ne va pas (le conseil disparaît de PharmaBoost, partout, tout de suite — vous pouvez le rétablir) et vous{" "}
-          <strong>ajoutez</strong> les vôtres. Ce qui n&apos;est pas encore relu est simplement marqué « à relire ».
-        </Alert>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard label="À relire" value={total("ACTIVE")} sublabel="en ligne, pas encore relus" />
-          <StatCard label="Validés" value={total("VALIDATED")} sublabel="relus et validés" />
-          <StatCard label="Supprimés" value={total("REMOVED")} sublabel="retirés de PharmaBoost" />
-        </div>
-        </>
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label="Conseils, associations ou ce qu'il ne faut pas associer" className="inline-flex flex-wrap rounded-lg bg-surface-sunken p-1 text-[13.5px] font-medium">
-          {([["RULES", `Conseils (${rules.length})`], ["ASSOCIATIONS", `Associations (${associations.length})`], ["AVOID", `À ne pas associer (${vigilances.length})`]] as const).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={section === key}
-              onClick={() => setSection(key)}
-              className={section === key ? "rounded-md bg-surface-card px-4 py-1.5 text-text-primary shadow-sm" : "rounded-md px-4 py-1.5 text-text-secondary hover:text-text-primary"}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {section !== "AVOID" && (
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setAdding("RULE")} leadingIcon={<Plus className="size-4" />}>
-            Ajouter un conseil
-          </Button>
-          <Button variant="outline" onClick={() => setAdding("ASSOCIATION")} leadingIcon={<Plus className="size-4" />}>
-            Ajouter une association
-          </Button>
-        </div>
-        )}
-      </div>
-
-      {section === "AVOID" ? (
-        <AvoidList vigilances={vigilances} />
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-3">
-            <div role="group" aria-label="Filtrer par état" className="flex flex-wrap gap-2">
-              {FILTERS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  aria-pressed={filter === item.key}
-                  onClick={() => setFilter(item.key)}
-                  className={cn("rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors", filter === item.key ? "bg-brand-600 text-white" : "bg-surface-sunken text-text-secondary hover:text-text-primary")}
-                >
-                  {item.label} <span className="tabular-nums opacity-80">{item.key === "ALL" ? all.length : count(item.key)}</span>
-                </button>
-              ))}
-            </div>
-            <div className="min-w-56 flex-1 sm:max-w-sm">
-              <Input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Chercher un médicament, un produit…" leadingIcon={<Search className="size-4" />} aria-label="Chercher dans la liste" />
-            </div>
-          </div>
-
-          {section === "RULES" ? (
-            shownRules.length === 0 ? (
-              <Empty filter={filter} />
-            ) : (
-              <ul className="space-y-3">
-                {shownRules.map((rule) => (
-                  <RuleItem key={rule.id} rule={rule} />
-                ))}
-              </ul>
-            )
-          ) : shownAssociations.length === 0 ? (
-            <Empty filter={filter} noun="association" />
-          ) : (
-            <ul className="space-y-3">
-              {shownAssociations.map((association) => (
-                <AssociationItem key={association.id} association={association} />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-
-      <Modal open={adding === "RULE"} onClose={() => setAdding(null)} title="Ajouter un conseil" description="Quand un médicament de ces classes est dans la vente, PharmaBoost propose ce type de produit — dans toutes les pharmacies qui l'ont en stock." size="lg">
-        {adding === "RULE" && <NewRuleForm categories={categories} tags={tags} onDone={() => setAdding(null)} />}
-      </Modal>
-      <Modal open={adding === "ASSOCIATION"} onClose={() => setAdding(null)} title="Ajouter une association" description="Un médicament ou un produit en appelle un autre. Chaque pharmacie ne le propose que si elle a le produit conseillé en stock." size="lg">
-        {adding === "ASSOCIATION" && <NewAssociationForm onDone={() => setAdding(null)} />}
-      </Modal>
-    </div>
-  );
-}
-
-function Empty({ filter, noun = "conseil" }: { filter: Filter; noun?: string }) {
-  return (
-    <Card>
-      <EmptyState
-        title={filter === "ACTIVE" ? `Tout est relu. Merci.` : `Aucun ${noun} dans cette liste`}
-        description={filter === "ACTIVE" ? `Il ne reste aucun ${noun} à relire.` : "Changez de filtre pour voir le reste."}
-      />
-    </Card>
-  );
-}
+const TONES: Record<CentralStatus, "warning" | "success" | "danger"> = { ACTIVE: "warning", VALIDATED: "success", REMOVED: "danger" };
 
 // ---------------------------------------------------------------------------------------------------------------
 // Les gestes : valider, supprimer (avec confirmation), rétablir
@@ -233,8 +91,9 @@ function StatusLine({ status, outdated, decidedBy, decidedAt, extra }: { status:
   );
 }
 
-function RuleItem({ rule }: { rule: RuleCard }) {
+export function RuleItem({ rule, choices }: { rule: RuleCard; choices: Choices }) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
 
@@ -251,19 +110,46 @@ function RuleItem({ rule }: { rule: RuleCard }) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
               <h3 className="text-[15px] font-semibold text-text-primary">{rule.title}</h3>
-              <StatusLine status={rule.status} outdated={rule.outdated} decidedBy={rule.decidedBy} decidedAt={rule.decidedAt} extra={rule.origin === "ADDED" ? <Badge tone="info">Ajouté par l&apos;équipe</Badge> : undefined} />
+              <StatusLine
+                status={rule.status}
+                outdated={rule.outdated}
+                decidedBy={rule.decidedBy}
+                decidedAt={rule.decidedAt}
+                extra={
+                  <>
+                    <Badge tone="neutral">Déclenché par un médicament</Badge>
+                    {rule.origin === "ADDED" && <Badge tone="info">{rule.fromRobot ? "Proposé par le robot, validé" : "Ajouté par l'équipe"}</Badge>}
+                    {rule.modified && <Badge tone="info">Modifié{rule.modified.by ? ` par ${rule.modified.by}` : ""}{rule.modified.at ? ` le ${formatDate(rule.modified.at)}` : ""}</Badge>}
+                    {rule.modified?.codeChangedSince && <Badge tone="warning">La règle d&apos;origine a changé depuis votre modification</Badge>}
+                  </>
+                }
+              />
             </div>
-            <Decisions status={rule.status} onDecide={decide} pending={pending} />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setEditing(true)} leadingIcon={<Pencil className="size-4" />}>
+                Modifier
+              </Button>
+              <Decisions status={rule.status} onDecide={decide} pending={pending} />
+            </div>
           </div>
 
           <dl className="grid gap-x-6 gap-y-2.5 text-[13px] leading-5 sm:grid-cols-[9.5rem_1fr]">
-            <dt className="font-medium text-text-secondary">Quand elle se déclenche</dt>
+            <dt className="font-medium text-text-secondary">Quand il se déclenche</dt>
             <dd className="text-text-primary">
               Quand le patient prend : {rule.when}
               {rule.sideEffects.length > 0 && <span className="text-text-secondary"> — ou signale : {rule.sideEffects.join(", ")}</span>}
             </dd>
-            <dt className="font-medium text-text-secondary">Ce qu&apos;elle propose</dt>
-            <dd className="text-text-primary">{rule.proposes}</dd>
+            <dt className="font-medium text-text-secondary">Ce qu&apos;il propose</dt>
+            <dd className="text-text-primary">
+              {rule.proposes}
+              {rule.edit.preferWords.length > 0 && <span className="text-text-secondary"> — de préférence : {rule.edit.preferWords.join(", ")}</span>}
+            </dd>
+            {rule.question && (
+              <>
+                <dt className="font-medium text-text-secondary">Question avant</dt>
+                <dd className="text-text-primary">{rule.question}</dd>
+              </>
+            )}
             <dt className="font-medium text-text-secondary">Ce que dit le pharmacien</dt>
             <dd className="text-text-primary">« {rule.script} »</dd>
           </dl>
@@ -272,18 +158,28 @@ function RuleItem({ rule }: { rule: RuleCard }) {
 
           <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex items-center gap-1 text-[12.5px] text-text-tertiary hover:text-text-secondary">
             <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
-            Voir le détail (raison affichée, question au patient, précautions, source)
+            Voir le détail (phrase du patient, personnes exclues, précautions, source)
           </button>
           {open && (
             <div className="space-y-2 rounded-lg bg-surface-sunken px-3.5 py-3 text-[12.5px] leading-5 text-text-secondary">
               <p>
+                <strong className="text-text-primary">Phrase pour le patient : </strong>
+                {rule.patientReason}
+              </p>
+              <p>
                 <strong className="text-text-primary">Raison affichée : </strong>
                 {rule.reason}
               </p>
-              {rule.question && (
+              {(rule.codeExclusions.length > 0 || rule.addedExclusions.length > 0) && (
                 <p>
-                  <strong className="text-text-primary">Question au patient : </strong>
-                  {rule.question}
+                  <strong className="text-text-primary">Personnes exclues : </strong>
+                  {[...rule.codeExclusions, ...rule.addedExclusions].join(" · ")}
+                </p>
+              )}
+              {rule.populations.length > 0 && (
+                <p>
+                  <strong className="text-text-primary">Vigilances : </strong>
+                  {rule.populations.join(" · ")}
                 </p>
               )}
               {rule.safetyNotes.length > 0 && (
@@ -298,12 +194,21 @@ function RuleItem({ rule }: { rule: RuleCard }) {
                 {rule.source}
               </p>
               <p className="text-text-tertiary">
-                Version {rule.version} · {rule.origin === "ADDED" ? "ajouté depuis la console" : "règle du moteur"}.
+                Version {rule.version} · {rule.origin === "ADDED" ? "ajouté depuis la console" : "règle du moteur"} · priorité {rule.edit.priority}.
               </p>
             </div>
           )}
+          <div className="flex flex-wrap items-center gap-3">
+            {rule.modified && <RevertButton target={{ kind: "RULE", ruleKey: rule.ruleKey }} />}
+            <EditHistory history={rule.history} />
+          </div>
         </CardContent>
       </Card>
+      <Modal open={editing} onClose={() => setEditing(false)} title={`Modifier « ${rule.title} »`} description="La modification vaut pour toutes les pharmacies, dès la vente suivante. La version d'origine reste à un clic." size="lg">
+        {editing && (
+          <RuleEditForm ruleKey={rule.ruleKey} initial={rule.edit} requiresProduct={rule.requiresProduct} hasRoutine={rule.hasRoutine} codeExclusions={rule.codeExclusions} categories={choices.categories} tags={choices.tags} onDone={() => setEditing(false)} />
+        )}
+      </Modal>
     </li>
   );
 }
@@ -332,7 +237,8 @@ function FeedbackLine({ feedback }: { feedback: RuleCard["feedback"] }) {
   );
 }
 
-function AssociationItem({ association }: { association: AssociationCard }) {
+export function AssociationItem({ association }: { association: AssociationCard }) {
+  const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
 
@@ -350,19 +256,42 @@ function AssociationItem({ association }: { association: AssociationCard }) {
             <div className="min-w-0 space-y-1.5">
               <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] font-semibold text-text-primary">
                 <span>{association.triggerLabel}</span>
-                <ArrowRight className="size-4 shrink-0 text-text-tertiary" aria-label="appelle" />
+                <ArrowRight className="size-4 shrink-0 text-text-tertiary" aria-label="propose" />
                 <span>{association.adviceLabel}</span>
               </h3>
-              <StatusLine status={association.status} decidedBy={association.decidedBy} decidedAt={association.decidedAt} extra={<Badge tone="info">{association.triggerKind === "MEDICINE" ? "Médicament" : "Produit"}</Badge>} />
+              <StatusLine
+                status={association.status}
+                decidedBy={association.decidedBy}
+                decidedAt={association.decidedAt}
+                extra={
+                  <>
+                    <Badge tone="neutral">{association.triggerKind === "MEDICINE" ? "Déclenché par un médicament" : "Déclenché par un produit"}</Badge>
+                    {association.fromRobot && <Badge tone="info">Proposé par le robot, validé</Badge>}
+                    {association.modified && <Badge tone="info">Modifié{association.modified.by ? ` par ${association.modified.by}` : ""} le {formatDate(association.modified.at)}</Badge>}
+                  </>
+                }
+              />
             </div>
-            <Decisions status={association.status} onDecide={decide} pending={pending} />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setEditing(true)} leadingIcon={<Pencil className="size-4" />}>
+                Modifier
+              </Button>
+              <Decisions status={association.status} onDecide={decide} pending={pending} />
+            </div>
           </div>
-          <p className="text-[13px] leading-5 text-text-primary">{association.sentence ? <>« {association.sentence} »</> : <span className="text-text-tertiary">Aucune phrase : la carte n&apos;affiche que l&apos;association.</span>}</p>
+          <p className="text-[13px] leading-5 text-text-primary">{association.sentence ? <>« {association.sentence} »</> : <span className="text-text-tertiary">Aucune phrase : la carte n&apos;affiche que le produit proposé.</span>}</p>
           <p className="text-[12px] text-text-tertiary">
-            Ajoutée{association.createdBy ? ` par ${association.createdBy}` : ""} le {formatDate(association.createdAt)} · code-barres du produit conseillé : {association.adviceEan}
+            Ajouté{association.createdBy ? ` par ${association.createdBy}` : ""} le {formatDate(association.createdAt)} · code-barres du produit proposé : {association.adviceEan} · proposé seulement dans les pharmacies qui l&apos;ont en stock
           </p>
+          <div className="flex flex-wrap items-center gap-3">
+            {association.modified && <RevertButton target={{ kind: "ASSOCIATION", id: association.id }} />}
+            <EditHistory history={association.history} />
+          </div>
         </CardContent>
       </Card>
+      <Modal open={editing} onClose={() => setEditing(false)} title="Modifier ce conseil" description={`Quand « ${association.triggerLabel} » est dans la vente. La modification vaut pour toutes les pharmacies.`} size="lg">
+        {editing && <AssociationEditForm id={association.id} advice={{ ean: association.adviceEan, name: association.adviceLabel, brand: null }} sentence={association.sentence} onDone={() => setEditing(false)} />}
+      </Modal>
     </li>
   );
 }
@@ -371,10 +300,10 @@ function AssociationItem({ association }: { association: AssociationCard }) {
 // Ajouter un conseil
 // ---------------------------------------------------------------------------------------------------------------
 
-function NewRuleForm({ categories, tags, onDone }: { categories: { code: string; label: string }[]; tags: string[]; onDone: () => void }) {
-  const [title, setTitle] = useState("");
+export function NewRuleForm({ categories, tags, onDone, initialAtc = [], initialTitle = "" }: { categories: { code: string; label: string }[]; tags: string[]; onDone: () => void; initialAtc?: string[]; initialTitle?: string }) {
+  const [title, setTitle] = useState(initialTitle);
   const [kind, setKind] = useState<(typeof CUSTOM_KINDS)[number]>("COMFORT");
-  const [atc, setAtc] = useState("");
+  const [atc, setAtc] = useState(initialAtc.join(", "));
   const [classes, setClasses] = useState("");
   const [category, setCategory] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
@@ -442,6 +371,7 @@ function NewRuleForm({ categories, tags, onDone }: { categories: { code: string;
           </Select>
         </Field>
       </div>
+      <MedicineTriggerPicker onAdd={(code) => setAtc((current) => [...new Set([...split(current), code])].join(", "))} />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Codes ATC des médicaments concernés" htmlFor="rule-atc" hint="Séparés par des virgules : J01 (antibiotiques), N02AA… Le début du code suffit.">
           <Input id="rule-atc" value={atc} onChange={(event) => setAtc(event.target.value)} placeholder="J01, R05DA" />
@@ -451,7 +381,7 @@ function NewRuleForm({ categories, tags, onDone }: { categories: { code: string;
         </Field>
       </div>
       <TagPicker tags={tags} picked={picked} onChange={setPicked} />
-      <Field label="Question à poser au patient (facultatif)" htmlFor="rule-question" hint="Posée AVANT de proposer le produit. Vide : aucune question.">
+      <Field label="Question à poser avant de proposer (facultatif)" htmlFor="rule-question" hint="Oui / non, posée AVANT de proposer le produit. Vide : aucune question.">
         <Input id="rule-question" value={question} maxLength={CUSTOM_LIMITS.question} onChange={(event) => setQuestion(event.target.value)} />
       </Field>
       <Field label="Pourquoi ce conseil, en une ligne" htmlFor="rule-reason" required hint="{drug} sera remplacé par le médicament. Dites le POURQUOI pour ce traitement, jamais ce que fait le produit.">
@@ -492,12 +422,12 @@ function NewRuleForm({ categories, tags, onDone }: { categories: { code: string;
 }
 
 /** Les étiquettes du produit à conseiller, prises dans le vocabulaire que les règles connaissent : on ne peut pas en inventer. */
-export function TagPicker({ tags, picked, onChange }: { tags: string[]; picked: string[]; onChange: (next: string[]) => void }) {
+export function TagPicker({ tags, picked, onChange, max = CUSTOM_LIMITS.tags, label = "Ce qu'il faut proposer — mots qui décrivent le besoin" }: { tags: string[]; picked: string[]; onChange: (next: string[]) => void; max?: number; label?: string }) {
   const [filter, setFilter] = useState("");
   const text = filter.trim().toLowerCase();
   const shown = tags.filter((tag) => !picked.includes(tag) && (!text || tag.includes(text))).slice(0, 60);
   return (
-    <Field label={`Étiquettes du produit à conseiller (${picked.length}/${CUSTOM_LIMITS.tags})`} required hint="Ce sont les mots que PharmaBoost a reconnus sur les produits du stock. Choisissez ceux qui décrivent le produit.">
+    <Field label={`${label} (${picked.length}/${max})`} required hint="Les mots que PharmaBoost reconnaît sur les produits du stock de chaque pharmacie : décrivez le besoin (« collyre anti-allergique », « pastille gorge »), pas une marque.">
       <div className="space-y-2">
         {picked.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -518,7 +448,7 @@ export function TagPicker({ tags, picked, onChange }: { tags: string[]; picked: 
               <button
                 key={tag}
                 type="button"
-                disabled={picked.length >= CUSTOM_LIMITS.tags}
+                disabled={picked.length >= max}
                 onClick={() => onChange([...picked, tag])}
                 className="rounded-full bg-surface-sunken px-2.5 py-1 text-[12.5px] text-text-secondary transition-colors hover:bg-brand-50 hover:text-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -539,7 +469,7 @@ export function TagPicker({ tags, picked, onChange }: { tags: string[]; picked: 
 type Medicine = { id: string; name: string; substances: string[]; marketed: boolean };
 type KnownProduct = { ean: string; name: string; brand: string | null };
 
-function NewAssociationForm({ onDone }: { onDone: () => void }) {
+export function NewAssociationForm({ onDone }: { onDone: () => void }) {
   const [mode, setMode] = useState<"MEDICINE" | "PRODUCT">("MEDICINE");
   const [medicine, setMedicine] = useState<Medicine | null>(null);
   const [product, setProduct] = useState<KnownProduct | null>(null);

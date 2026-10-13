@@ -57,7 +57,7 @@ export async function decideKnowledgeProposalAction(payload: { id: string; decis
   if (!result.ok) return fail(result.error);
   revalidatePath("/admin/connaissances");
   revalidatePath("/admin/conseils");
-  return ok(null, result.accepted ? `« ${result.title} » est en ligne dans toutes les pharmacies, « à relire » jusqu'à votre validation dans Conseils & associations.` : `« ${result.title} » est refusé.`);
+  return ok(null, result.accepted ? `« ${result.title} » est en ligne dans toutes les pharmacies, « à relire » jusqu'à votre validation dans Conseils.` : `« ${result.title} » est refusé.`);
 }
 
 export async function resolveKnowledgeProductAction(payload: { id: string; which: "trigger" | "advice"; ean: string; name: string }): Promise<ActionResult<null>> {
@@ -77,5 +77,5 @@ export async function deleteKnowledgeDocumentAction(payload: z.input<typeof idSc
   const result = await deleteDocument({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.id);
   if (!result.ok) return fail(result.error);
   revalidatePath("/admin/connaissances");
-  return ok(null, `« ${result.title} » est supprimé. Ce qui en a déjà été accepté reste dans Conseils & associations.`);
+  return ok(null, `« ${result.title} » est supprimé. Ce qui en a déjà été accepté reste dans Conseils.`);
 }

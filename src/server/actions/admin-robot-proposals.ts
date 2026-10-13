@@ -16,7 +16,7 @@ export async function validateRobotProposalAction(payload: z.input<typeof idSche
   if (!parsed.success) return fail("Proposition invalide.");
   const result = await validateRobotProposal({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.id);
   if (!result.ok) return fail(result.error);
-  revalidatePath("/admin/suggestions-robot");
+  revalidatePath("/admin/conseils");
   revalidatePath("/admin/conseils");
   return ok(null, `« ${result.label} » est validé pour toutes les pharmacies. ${result.summary}`);
 }
@@ -27,6 +27,6 @@ export async function refuseRobotProposalAction(payload: z.input<typeof idSchema
   if (!parsed.success) return fail("Proposition invalide.");
   const result = await refuseRobotProposal({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.id);
   if (!result.ok) return fail(result.error);
-  revalidatePath("/admin/suggestions-robot");
+  revalidatePath("/admin/conseils");
   return ok(null, `« ${result.label} » est refusé : le robot ne le proposera plus pour ce médicament.`);
 }

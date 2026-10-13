@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   prisma: {
     centralAdviceRule: { findMany: vi.fn(), findUnique: vi.fn(), upsert: vi.fn(), create: vi.fn(), update: vi.fn(), deleteMany: vi.fn() },
     centralAssociation: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+    centralAdviceEdit: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
     product: { findMany: vi.fn() },
     $queryRaw: vi.fn(async (): Promise<unknown[]> => []),
   },
@@ -39,6 +40,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.prisma.centralAdviceRule.findMany.mockResolvedValue([]);
   mocks.prisma.centralAdviceRule.findUnique.mockResolvedValue(null);
+  mocks.prisma.centralAdviceEdit.findMany.mockResolvedValue([]);
 });
 
 describe("ce que l'analyse lit", () => {

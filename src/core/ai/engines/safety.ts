@@ -208,7 +208,7 @@ export function evaluateKnowledgeCoverage(
       findings.push({
         severity: "INFO",
         code: "DRUG_CLASSIFIED_BY_AI",
-        message: `« ${line.drugName} » classé par l'IA${facts ? ` : ${facts}` : ""} — classification à confirmer, aucune interaction vérifiée.`,
+        message: `« ${line.drugName} » classé par l'IA${facts ? ` : ${facts}` : ""} — classification à confirmer, aucune interaction vérifiée.${advisory.sideEffectsSource ? ` Effets indésirables fréquents : ${advisory.sideEffectsSource}.` : ""}`,
         subjectType: "PRESCRIPTION_LINE",
         subjectId,
         source: SOURCE,

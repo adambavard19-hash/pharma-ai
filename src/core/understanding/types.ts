@@ -64,9 +64,16 @@ export type DrugClassification = {
   /**
    * `CACHE` : classé lors d'une ordonnance précédente ; `MODEL` : classé à l'instant ; `OFFICIAL` : le modèle n'a pas
    * répondu, la famille est celle que l'Assurance Maladie donne à la spécialité (Open Medic joint à la BDPM) — jamais
-   * écrite dans le cache, le modèle l'enrichira plus tard (effets indésirables).
+   * écrite dans le cache, le modèle l'enrichira plus tard (effets indésirables). `OFFICIAL_RCP` : ni le modèle ni la
+   * famille officielle n'ont répondu, mais le RCP de la spécialité donne ses effets indésirables fréquents — la ligne ne
+   * porte qu'eux (ni ATC ni classe), assez pour une règle qui se déclenche sur un effet.
    */
-  source: "MODEL" | "CACHE" | "OFFICIAL";
+  source: "MODEL" | "CACHE" | "OFFICIAL" | "OFFICIAL_RCP";
+  /**
+   * Présent quand `commonSideEffects` vient du RCP officiel de la spécialité (BDPM, rubrique 4.8) et non du modèle :
+   * les effets officiels priment toujours (`applyOfficialSideEffects`). Absent : effets du modèle, ou aucun.
+   */
+  sideEffectsSource?: "RCP_BDPM";
 };
 
 export type ClassificationResult = {

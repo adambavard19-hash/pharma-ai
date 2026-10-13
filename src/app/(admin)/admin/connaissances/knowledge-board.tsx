@@ -24,7 +24,7 @@ const SOURCES: { name: string; state: "LIVE" | "AFTER" | "OFF"; text: string }[]
   { name: "Le modèle d'Anthropic", state: "LIVE", text: "Il classe les médicaments d'une vente (famille, code ATC) et lit vos documents ici pour vous proposer des conseils. Il ne décide de rien et n'écrit jamais ce qui est dit au patient." },
   { name: "La base publique des médicaments", state: "LIVE", text: "Le catalogue officiel (BDPM / ANSM) : noms, substances, présentations, conditions de délivrance." },
   { name: "Le stock de chaque pharmacie", state: "LIVE", text: "Un conseil n'est proposé que pour un produit que la pharmacie a en rayon." },
-  { name: "Vos règles et associations", state: "LIVE", text: "Écrites dans « Conseils & associations » : en ligne dans toutes les pharmacies." },
+  { name: "Vos règles et associations", state: "LIVE", text: "Écrites dans « Conseils » : en ligne dans toutes les pharmacies." },
   { name: "Vos documents déposés ici", state: "AFTER", text: "Ils ne deviennent des conseils qu'après votre acceptation, proposition par proposition." },
   { name: "Vidal", state: "OFF", text: "Pas branché à ce jour : c'est une base sous licence payante, avec un accès qu'il faut souscrire. Tant qu'il ne l'est pas, rien n'est lu dedans." },
 ];

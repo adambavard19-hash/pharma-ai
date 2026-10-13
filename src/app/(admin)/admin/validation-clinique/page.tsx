@@ -30,7 +30,7 @@ export default async function ClinicalReviewPage() {
       <AdminPageHeader
         space={{ label: "Gestion", href: "/admin/conseils" }}
         title="Validation clinique"
-        description="Les règles de conseil jugées inadaptées au comptoir, par plusieurs refus « pas adapté à ce patient ». Relisez la règle dans Conseils & associations, puis tranchez ici."
+        description="Les règles de conseil jugées inadaptées au comptoir, par plusieurs refus « pas adapté à ce patient ». Relisez la règle dans Conseils, puis tranchez ici."
       />
 
       <Alert tone="info" title="Agrégats uniquement" icon={<ShieldOff className="size-[18px]" />}>

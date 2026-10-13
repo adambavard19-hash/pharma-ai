@@ -1,5 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
+import { Prisma } from "@/generated/prisma";
 import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import { ADVICE_RULES, type AdviceRule } from "@/core/ai/engines/advice";
@@ -11,6 +12,9 @@ import {
   centralState,
   customRuleKey,
   customRulesFrom,
+  effectiveCodeRule,
+  overriddenRulesFrom,
+  readOverride,
   parseCustomRuleDefinition,
   removedRuleKeys,
   rowsByKey,
@@ -18,6 +22,8 @@ import {
   type CentralStatus,
   type CustomRuleDefinition,
 } from "@/core/ai/central-advice";
+import { changedEditFields, describeCodeExclusions, describeExclusions, editContextOf, editValuesOf, hasExclusions, parseRuleEdit } from "@/core/ai/central-advice-edit";
+import { EDIT_FIELD_LABELS, NO_EXCLUSIONS, type RuleEditValues } from "@/core/ai/central-advice-edit-constants";
 
 /**
  * Le centre de contrôle des conseils — la partie serveur.
@@ -34,17 +40,22 @@ type Failure = { ok: false; error: string };
 // Ce que l'analyse lit
 // ---------------------------------------------------------------------------------------------------------------
 
-export async function loadCentralRuleRows(): Promise<CentralRuleRow[]> {
+type StoredRuleRow = CentralRuleRow & { overrideBaseVersion?: string | null; overriddenAt?: Date | null; overriddenByName?: string | null };
+
+export async function loadCentralRuleRows(): Promise<StoredRuleRow[]> {
   const rows = await prisma.centralAdviceRule.findMany({
-    select: { ruleKey: true, source: true, status: true, ruleVersion: true, definition: true, decidedAt: true, decidedByName: true },
+    select: { ruleKey: true, source: true, status: true, ruleVersion: true, definition: true, decidedAt: true, decidedByName: true, override: true, overrideRevision: true, overrideBaseVersion: true, overriddenAt: true, overriddenByName: true },
   });
   return rows;
 }
 
-/** Ce que le moteur applique à toute vente : les règles supprimées, et les conseils ajoutés qui sont en ligne. */
+/**
+ * Ce que le moteur applique à toute vente : les règles supprimées, les conseils ajoutés qui sont en ligne, et les règles du
+ * code MODIFIÉES depuis la console (même clé : elles remplacent la règle d'origine dans le moteur).
+ */
 export async function loadCentralAdvice(): Promise<{ removed: string[]; custom: AdviceRule[] }> {
   const rows = await loadCentralRuleRows();
-  return { removed: removedRuleKeys(rows), custom: customRulesFrom(rows) };
+  return { removed: removedRuleKeys(rows), custom: [...customRulesFrom(rows), ...overriddenRulesFrom(rows)] };
 }
 
 /**
@@ -56,7 +67,7 @@ export async function validatedRuleKeys(): Promise<Set<string>> {
   const byKey = rowsByKey(rows);
   const keys = new Set<string>();
   for (const rule of ADVICE_RULES) {
-    const state = centralState(rule, byKey);
+    const state = centralState(effectiveCodeRule(rule, byKey.get(rule.key)), byKey);
     if (state.status === "VALIDATED" && !state.outdated) keys.add(rule.key);
   }
   for (const row of rows) if (row.source === "CUSTOM" && row.status === "VALIDATED") keys.add(row.ruleKey);
@@ -91,6 +102,24 @@ export type CentralRuleView = {
   source: string;
   /** Ce que les comptoirs de toutes les pharmacies en disent (indication, jamais une décision). Vide : pas encore proposée. */
   feedback: RuleFeedback | null;
+  /** Le texte que lit le patient, `{drug}` / `{product}` remplacés par des mots génériques. */
+  patientReason: string;
+  /** Ce qui se modifie, tel que le formulaire « Modifier » le pré-remplit. */
+  edit: RuleEditValues;
+  /** La phrase de comptoir doit garder {product}. */
+  requiresProduct: boolean;
+  /** Une routine (plusieurs étapes) : ses produits restent ceux du code. */
+  hasRoutine: boolean;
+  /** Les exclusions écrites dans le code, en clair : toujours appliquées, jamais retirées depuis la console. */
+  codeExclusions: string[];
+  /** Les exclusions ajoutées depuis la console, en clair. */
+  addedExclusions: string[];
+  /** Les vigilances par population de la règle (grossesse, enfant…), en clair. */
+  populations: string[];
+  atcPrefixes: string[];
+  matchingTags: string[];
+  /** Modifiée depuis la console : par qui, quand. `null` : telle qu'à l'origine. */
+  modified: { by: string | null; at: Date | null; codeChangedSince: boolean } | null;
 };
 
 export type CentralAssociationView = {
@@ -112,7 +141,7 @@ export function startSentence(text: string): string {
   return text.replace(/(^|[.!?]\s+|«\s*)([a-zà-ÿ])/g, (_match, before: string, letter: string) => before + letter.toUpperCase());
 }
 
-function describeRule(rule: AdviceRule, status: CentralStatus, outdated: boolean, row: CentralRuleRow | undefined, categoryLabel: string): CentralRuleView {
+function describeRule(rule: AdviceRule, status: CentralStatus, outdated: boolean, row: CentralRuleRow | undefined, categoryLabel: string, extra: { edit: RuleEditValues; codeExclusions: string[]; modified: CentralRuleView["modified"]; requiresProduct: boolean }): CentralRuleView {
   const triggers = [...rule.therapeuticClasses, ...(rule.atcPrefixes.length > 0 ? [`codes ATC ${rule.atcPrefixes.slice(0, 8).join(", ")}${rule.atcPrefixes.length > 8 ? "…" : ""}`] : [])];
   return {
     id: `rule:${rule.key}`,
@@ -133,6 +162,16 @@ function describeRule(rule: AdviceRule, status: CentralStatus, outdated: boolean
     safetyNotes: rule.safetyNotes,
     source: rule.clinicalContext,
     feedback: null,
+    patientReason: startSentence(rule.patientReasonTemplate.replaceAll("{drug}", "le médicament").replaceAll("{product}", "le produit")),
+    edit: extra.edit,
+    requiresProduct: extra.requiresProduct,
+    hasRoutine: Boolean(rule.routine),
+    codeExclusions: extra.codeExclusions,
+    addedExclusions: describeExclusions(extra.edit.exclusions),
+    populations: (rule.populations ?? []).map((population) => population.text),
+    atcPrefixes: rule.atcPrefixes,
+    matchingTags: rule.routine ? rule.routine.steps.flatMap((step) => step.matchingTags) : rule.matchingTags,
+    modified: extra.modified,
   };
 }
 
@@ -140,9 +179,18 @@ function describeRule(rule: AdviceRule, status: CentralStatus, outdated: boolean
 export async function listCentralRules(categoryLabels: Record<string, string>): Promise<CentralRuleView[]> {
   const rows = await loadCentralRuleRows();
   const byKey = rowsByKey(rows);
-  const views: CentralRuleView[] = ADVICE_RULES.map((rule) => {
+  const overriddenBy = await lastEdits("RULE");
+  const views: CentralRuleView[] = ADVICE_RULES.map((code) => {
+    const row = byKey.get(code.key);
+    const override = row ? readOverride(row, code) : null;
+    const rule = effectiveCodeRule(code, row);
     const state = centralState(rule, byKey);
-    return describeRule(rule, state.status, state.outdated, byKey.get(rule.key), categoryLabels[rule.category] ?? rule.category);
+    return describeRule(rule, state.status, state.outdated, row, categoryLabels[rule.category] ?? rule.category, {
+      edit: override ?? editValuesOf(code),
+      codeExclusions: describeCodeExclusions(code),
+      requiresProduct: code.counterScriptTemplate.includes("{product}"),
+      modified: override && row ? { by: row.overriddenByName ?? null, at: row.overriddenAt ?? null, codeChangedSince: Boolean(row.overrideBaseVersion) && row.overrideBaseVersion !== code.version } : null,
+    });
   });
   for (const row of rows) {
     if (row.source !== "CUSTOM") continue;
@@ -150,7 +198,15 @@ export async function listCentralRules(categoryLabels: Record<string, string>): 
     if (!parsed.ok) continue;
     const rule = customRulesFrom([{ ...row, status: row.status === "REMOVED" ? "ACTIVE" : row.status }])[0];
     if (!rule) continue;
-    views.push(describeRule(rule, row.status, false, row, categoryLabels[rule.category] ?? rule.category));
+    const definition = parsed.value;
+    views.push(
+      describeRule(rule, row.status, false, row, categoryLabels[rule.category] ?? rule.category, {
+        edit: customEditValues(definition),
+        codeExclusions: [],
+        requiresProduct: true,
+        modified: overriddenBy.has(row.ruleKey) ? { by: overriddenBy.get(row.ruleKey)!.by, at: overriddenBy.get(row.ruleKey)!.at, codeChangedSince: false } : null,
+      }),
+    );
   }
   const feedback = await loadRuleFeedback();
   return views.map((view) => ({ ...view, feedback: feedback.get(view.ruleKey) ?? null }));
@@ -211,17 +267,23 @@ const DECISION_STATUS: Record<Decision, CentralStatus> = { VALIDATE: "VALIDATED"
 /** Valide, supprime ou rétablit une règle — du code ou ajoutée — pour toutes les officines. */
 export async function decideRule(admin: Admin, ruleKey: string, decision: Decision): Promise<{ ok: true; title: string } | Failure> {
   const builtIn = ADVICE_RULES.find((candidate) => candidate.key === ruleKey);
-  const existing = await prisma.centralAdviceRule.findUnique({ where: { ruleKey }, select: { source: true, definition: true } });
+  const existing = await prisma.centralAdviceRule.findUnique({ where: { ruleKey }, select: { source: true, definition: true, override: true, overrideRevision: true } });
   if (!builtIn && existing?.source !== "CUSTOM") return { ok: false, error: "Règle de conseil inconnue." };
 
   const status = DECISION_STATUS[decision];
   let title = builtIn?.title ?? "";
   if (builtIn) {
-    if (decision === "RESTORE") {
+    // Une règle modifiée depuis la console se valide sur SA version (la modification), pas sur celle du code.
+    const modified = existing ? readOverride(existing, builtIn) : null;
+    const version = modified ? effectiveCodeRule(builtIn, { ruleKey, source: "BUILT_IN", status: "ACTIVE", ruleVersion: null, definition: null, decidedAt: null, decidedByName: null, override: existing?.override, overrideRevision: existing?.overrideRevision }).version : builtIn.version;
+    if (decision === "RESTORE" && modified) {
+      // La modification reste : seule la décision s'efface.
+      await prisma.centralAdviceRule.update({ where: { ruleKey }, data: { status: "ACTIVE", decidedAt: null, decidedByAdminId: null, decidedByName: null } });
+    } else if (decision === "RESTORE") {
       // Une règle du code sans décision est « en ligne, à relire » : on efface simplement la ligne.
       await prisma.centralAdviceRule.deleteMany({ where: { ruleKey } });
     } else {
-      const data = { status, ruleVersion: builtIn.version, decidedAt: new Date(), decidedByAdminId: admin.id, decidedByName: admin.fullName };
+      const data = { status, ruleVersion: version, decidedAt: new Date(), decidedByAdminId: admin.id, decidedByName: admin.fullName };
       await prisma.centralAdviceRule.upsert({ where: { ruleKey }, create: { ruleKey, source: "BUILT_IN", ...data }, update: data });
     }
   } else {
@@ -322,3 +384,159 @@ export async function searchKnownProducts(query: string): Promise<ProductHit[]> 
   });
   return found.flatMap((product) => (product.ean ? [{ ean: product.ean, name: product.name, brand: product.brand }] : []));
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Modifier un conseil — et revenir à la version d'origine
+// ---------------------------------------------------------------------------------------------------------------
+
+export type EditHistoryEntry = { id: string; action: "EDIT" | "REVERT"; changed: string[]; by: string | null; at: Date };
+
+/** Les valeurs modifiables d'un conseil ajouté (sa définition), dans la forme du formulaire. */
+export function customEditValues(definition: CustomRuleDefinition): RuleEditValues {
+  return {
+    title: definition.title,
+    counterScript: definition.counterScript,
+    patientReason: definition.patientReason ?? definition.shortReason,
+    shortReason: definition.shortReason,
+    question: definition.question,
+    atcPrefixes: definition.atcPrefixes,
+    therapeuticClasses: definition.therapeuticClasses,
+    category: definition.category,
+    matchingTags: definition.matchingTags,
+    preferWords: definition.preferWords ?? [],
+    exclusions: definition.exclusions ?? NO_EXCLUSIONS,
+    priority: definition.priority ?? (definition.kind === "TOLERANCE" ? 70 : 55),
+    safetyNotes: definition.safetyNotes,
+    source: definition.source,
+  };
+}
+
+/** La dernière modification de chaque conseil (ou association), si elle n'a pas été annulée par un retour à l'origine. */
+async function lastEdits(targetKind: "RULE" | "ASSOCIATION"): Promise<Map<string, { by: string | null; at: Date }>> {
+  const rows = await prisma.centralAdviceEdit.findMany({ where: { targetKind }, orderBy: { createdAt: "asc" }, select: { targetKey: true, action: true, adminName: true, createdAt: true } });
+  const last = new Map<string, { by: string | null; at: Date }>();
+  for (const row of rows) {
+    if (row.action === "REVERT") last.delete(row.targetKey);
+    else last.set(row.targetKey, { by: row.adminName, at: row.createdAt });
+  }
+  return last;
+}
+
+/** L'historique de toutes les modifications, par conseil : qui, quand, quels champs. Le plus récent d'abord. */
+export async function loadEditHistory(): Promise<Map<string, EditHistoryEntry[]>> {
+  const rows = await prisma.centralAdviceEdit.findMany({ orderBy: { createdAt: "desc" }, take: 2000, select: { id: true, targetKind: true, targetKey: true, action: true, changed: true, adminName: true, createdAt: true } });
+  const history = new Map<string, EditHistoryEntry[]>();
+  for (const row of rows) {
+    const key = `${row.targetKind === "RULE" ? "rule" : "association"}:${row.targetKey}`;
+    history.set(key, [...(history.get(key) ?? []), { id: row.id, action: row.action === "REVERT" ? "REVERT" : "EDIT", changed: row.changed, by: row.adminName, at: row.createdAt }]);
+  }
+  return history;
+}
+
+const RULE_EDITED_MESSAGE = "Il repasse « à relire » : validez-le quand vous l'avez relu.";
+
+/**
+ * Modifie un conseil pour toutes les pharmacies. Règle du code : la modification est gardée à part (surcharge), la règle
+ * d'origine reste intacte et l'on peut y revenir. Conseil ajouté : sa définition est réécrite, l'ancienne gardée dans
+ * l'historique. Dans les deux cas : vérification stricte, « à relire » ensuite, trace dans le journal d'audit.
+ */
+export async function editRule(admin: Admin, ruleKey: string, raw: unknown): Promise<{ ok: true; title: string; message: string } | (Failure & { needsConfirmation?: boolean })> {
+  const builtIn = ADVICE_RULES.find((candidate) => candidate.key === ruleKey);
+  const existing = await prisma.centralAdviceRule.findUnique({ where: { ruleKey }, select: { source: true, status: true, definition: true, override: true, overrideRevision: true } });
+  if (!builtIn && existing?.source !== "CUSTOM") return { ok: false, error: "Conseil inconnu." };
+
+  if (builtIn) {
+    const previous = (existing ? readOverride(existing, builtIn) : null) ?? editValuesOf(builtIn);
+    const parsed = parseRuleEdit(raw, editContextOf(builtIn, previous.exclusions));
+    if (!parsed.ok) return parsed;
+    const changed = changedEditFields(previous, parsed.value, EDIT_FIELD_LABELS);
+    if (changed.length === 0) return { ok: false, error: "Rien n'a changé." };
+    const revision = (existing?.overrideRevision ?? 0) + 1;
+    const data = { override: { edit: parsed.value } as never, overrideRevision: revision, overrideBaseVersion: builtIn.version, overriddenAt: new Date(), overriddenByName: admin.fullName, status: existing?.status === "REMOVED" ? ("REMOVED" as const) : ("ACTIVE" as const), decidedAt: null, decidedByAdminId: null, decidedByName: null };
+    await prisma.centralAdviceRule.upsert({ where: { ruleKey }, create: { ruleKey, source: "BUILT_IN", ...data }, update: data });
+    await prisma.centralAdviceEdit.create({ data: { targetKind: "RULE", targetKey: ruleKey, action: "EDIT", changed, before: previous as never, after: parsed.value as never, adminId: admin.id, adminName: admin.fullName } });
+    await recordAudit({ action: "central_advice.rule_edited", entityType: "AdviceRule", entityId: ruleKey, platformAdminId: admin.id, metadata: { ruleKey, revision, changed, before: previous, after: parsed.value } });
+    return { ok: true, title: parsed.value.title, message: RULE_EDITED_MESSAGE };
+  }
+
+  const current = parseCustomRuleDefinition(existing?.definition);
+  if (!current.ok) return { ok: false, error: "Ce conseil est illisible : il ne peut pas être modifié." };
+  const previous = customEditValues(current.value);
+  const parsed = parseRuleEdit(raw, { requiresProduct: true, hasRoutine: false, previousExclusions: previous.exclusions });
+  if (!parsed.ok) return parsed;
+  const changed = changedEditFields(previous, parsed.value, EDIT_FIELD_LABELS);
+  if (changed.length === 0) return { ok: false, error: "Rien n'a changé." };
+  const next = parseCustomRuleDefinition({ ...parsed.value, kind: current.value.kind, patientReason: parsed.value.patientReason });
+  if (!next.ok) return next;
+  await prisma.centralAdviceRule.update({ where: { ruleKey }, data: { definition: next.value as never, ...(existing?.status === "REMOVED" ? {} : { status: "ACTIVE" as const }), decidedAt: null, decidedByAdminId: null, decidedByName: null } });
+  await prisma.centralAdviceEdit.create({ data: { targetKind: "RULE", targetKey: ruleKey, action: "EDIT", changed, before: current.value as never, after: next.value as never, adminId: admin.id, adminName: admin.fullName } });
+  await recordAudit({ action: "central_advice.rule_edited", entityType: "AdviceRule", entityId: ruleKey, platformAdminId: admin.id, metadata: { ruleKey, added: true, changed, before: current.value, after: next.value } });
+  return { ok: true, title: next.value.title, message: RULE_EDITED_MESSAGE };
+}
+
+/** « Revenir à la version d'origine » : la règle du code telle qu'écrite, ou le conseil ajouté tel qu'il a été créé. */
+export async function revertRule(admin: Admin, ruleKey: string): Promise<{ ok: true; title: string } | Failure> {
+  const builtIn = ADVICE_RULES.find((candidate) => candidate.key === ruleKey);
+  const existing = await prisma.centralAdviceRule.findUnique({ where: { ruleKey }, select: { source: true, status: true, definition: true, override: true, overrideRevision: true } });
+  if (builtIn) {
+    const current = existing ? readOverride(existing, builtIn) : null;
+    if (!existing || !existing.override) return { ok: false, error: "Ce conseil n'a pas été modifié : il est déjà dans sa version d'origine." };
+    await prisma.centralAdviceRule.update({ where: { ruleKey }, data: { override: Prisma.DbNull, overrideBaseVersion: null, overriddenAt: null, overriddenByName: null, ...(existing.status === "REMOVED" ? {} : { status: "ACTIVE" as const }), decidedAt: null, decidedByAdminId: null, decidedByName: null } });
+    await prisma.centralAdviceEdit.create({ data: { targetKind: "RULE", targetKey: ruleKey, action: "REVERT", changed: ["Version d'origine"], before: (current ?? null) as never, after: editValuesOf(builtIn) as never, adminId: admin.id, adminName: admin.fullName } });
+    await recordAudit({ action: "central_advice.rule_reverted", entityType: "AdviceRule", entityId: ruleKey, platformAdminId: admin.id, metadata: { ruleKey, before: current } });
+    return { ok: true, title: builtIn.title };
+  }
+  if (existing?.source !== "CUSTOM") return { ok: false, error: "Conseil inconnu." };
+  const first = await prisma.centralAdviceEdit.findFirst({ where: { targetKind: "RULE", targetKey: ruleKey, action: "EDIT" }, orderBy: { createdAt: "asc" }, select: { before: true } });
+  const origin = parseCustomRuleDefinition(first?.before);
+  if (!first || !origin.ok) return { ok: false, error: "Ce conseil n'a pas été modifié : il est déjà dans sa version d'origine." };
+  await prisma.centralAdviceRule.update({ where: { ruleKey }, data: { definition: origin.value as never, ...(existing.status === "REMOVED" ? {} : { status: "ACTIVE" as const }), decidedAt: null, decidedByAdminId: null, decidedByName: null } });
+  await prisma.centralAdviceEdit.create({ data: { targetKind: "RULE", targetKey: ruleKey, action: "REVERT", changed: ["Version d'origine"], before: existing.definition as never, after: origin.value as never, adminId: admin.id, adminName: admin.fullName } });
+  await recordAudit({ action: "central_advice.rule_reverted", entityType: "AdviceRule", entityId: ruleKey, platformAdminId: admin.id, metadata: { ruleKey, added: true } });
+  return { ok: true, title: origin.value.title };
+}
+
+type AssociationSnapshot = { adviceEan: string; adviceLabel: string; sentence: string | null };
+
+/** Modifie une association commune (la phrase, le produit proposé) pour toutes les pharmacies ; « à relire » ensuite. */
+export async function editCentralAssociation(admin: Admin, id: string, draft: { advice: { ean: string; name: string }; sentence: string | null }): Promise<{ ok: true; label: string } | Failure> {
+  const row = await prisma.centralAssociation.findUnique({ where: { id }, select: { triggerKey: true, triggerLabel: true, adviceEan: true, adviceLabel: true, sentence: true, status: true } });
+  if (!row) return { ok: false, error: "Association introuvable." };
+  const after: AssociationSnapshot = { adviceEan: draft.advice.ean.replace(/\D/g, ""), adviceLabel: draft.advice.name.trim().slice(0, 160), sentence: cleanSentence(draft.sentence) };
+  const problem = centralAssociationError({ triggerKey: row.triggerKey, adviceEan: after.adviceEan, sentence: after.sentence });
+  if (problem) return { ok: false, error: problem };
+  if (!after.adviceLabel) return { ok: false, error: "Choisissez le produit à proposer." };
+  const before: AssociationSnapshot = { adviceEan: row.adviceEan, adviceLabel: row.adviceLabel, sentence: row.sentence };
+  const changed = [...(before.adviceEan !== after.adviceEan ? ["Produit proposé"] : []), ...(before.sentence !== after.sentence ? ["Ce que dit le pharmacien"] : [])];
+  if (changed.length === 0) return { ok: false, error: "Rien n'a changé." };
+  try {
+    await prisma.centralAssociation.update({ where: { id }, data: { ...after, ...(row.status === "REMOVED" ? {} : { status: "ACTIVE" as const }), decidedAt: null, decidedByAdminId: null, decidedByName: null } });
+  } catch (error) {
+    if (typeof error === "object" && error !== null && (error as { code?: string }).code === "P2002") return { ok: false, error: "Cette association existe déjà avec ce produit." };
+    throw error;
+  }
+  await prisma.centralAdviceEdit.create({ data: { targetKind: "ASSOCIATION", targetKey: id, action: "EDIT", changed, before: before as never, after: after as never, adminId: admin.id, adminName: admin.fullName } });
+  await recordAudit({ action: "central_advice.association_edited", entityType: "CentralAssociation", entityId: id, platformAdminId: admin.id, metadata: { changed, before, after } });
+  return { ok: true, label: `${row.triggerLabel} → ${after.adviceLabel}` };
+}
+
+/** Remet une association commune telle qu'elle a été créée (le tout premier « avant » de son historique). */
+export async function revertCentralAssociation(admin: Admin, id: string): Promise<{ ok: true; label: string } | Failure> {
+  const row = await prisma.centralAssociation.findUnique({ where: { id }, select: { triggerLabel: true, adviceEan: true, adviceLabel: true, sentence: true, status: true } });
+  if (!row) return { ok: false, error: "Association introuvable." };
+  const first = await prisma.centralAdviceEdit.findFirst({ where: { targetKind: "ASSOCIATION", targetKey: id, action: "EDIT" }, orderBy: { createdAt: "asc" }, select: { before: true } });
+  const origin = first?.before as AssociationSnapshot | null | undefined;
+  if (!origin || typeof origin.adviceEan !== "string") return { ok: false, error: "Cette association n'a pas été modifiée : elle est déjà dans sa version d'origine." };
+  const snapshot: AssociationSnapshot = { adviceEan: origin.adviceEan, adviceLabel: origin.adviceLabel, sentence: origin.sentence ?? null };
+  await prisma.centralAssociation.update({ where: { id }, data: { ...snapshot, ...(row.status === "REMOVED" ? {} : { status: "ACTIVE" as const }), decidedAt: null, decidedByAdminId: null, decidedByName: null } });
+  await prisma.centralAdviceEdit.create({ data: { targetKind: "ASSOCIATION", targetKey: id, action: "REVERT", changed: ["Version d'origine"], before: { adviceEan: row.adviceEan, adviceLabel: row.adviceLabel, sentence: row.sentence } as never, after: snapshot as never, adminId: admin.id, adminName: admin.fullName } });
+  await recordAudit({ action: "central_advice.association_reverted", entityType: "CentralAssociation", entityId: id, platformAdminId: admin.id, metadata: { after: snapshot } });
+  return { ok: true, label: `${row.triggerLabel} → ${snapshot.adviceLabel}` };
+}
+
+/** Les associations modifiées depuis leur création (par qui, quand) : la console propose d'y revenir. */
+export async function modifiedAssociations(): Promise<Map<string, { by: string | null; at: Date }>> {
+  return lastEdits("ASSOCIATION");
+}
+
+export { hasExclusions };

@@ -21,6 +21,7 @@ export {
 } from "./schema";
 export { CLASSIFICATION_MIN_CONFIDENCE, validateClassification } from "./validate";
 export { CONTEXT_RULES, deriveUnderstanding, needLabel } from "./context";
+export { applyOfficialSideEffects, type OfficialSideEffectsByCis } from "./official-side-effects";
 export type {
   ClaimedClassification,
   ClassificationRequest,

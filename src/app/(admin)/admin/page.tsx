@@ -20,7 +20,7 @@ const QUICK_LINKS = [
   { href: "/admin/pharmacies", label: "Mes officines", icon: Store },
   { href: "/admin/pipeline?nouveau=prospect", label: "Ajouter un prospect", icon: Briefcase },
   { href: "/admin/pharmacies?nouveau=officine", label: "Nouvelle officine", icon: Building2 },
-  { href: "/admin/conseils", label: "Conseils & associations", icon: Sparkles },
+  { href: "/admin/conseils", label: "Conseils", icon: Sparkles },
   { href: "/admin/campagnes/nouvelle", label: "Nouvelle campagne", icon: Megaphone },
 ];
 

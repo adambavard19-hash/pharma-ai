@@ -210,7 +210,7 @@ export async function decideProposal(admin: Admin, id: string, decision: "ACCEPT
   return { ok: true, title: row.title, accepted: decision === "ACCEPT" };
 }
 
-/** Supprime le document et ses propositions en attente. Les conseils et associations déjà acceptés restent : ils ont leur propre vie dans « Conseils & associations ». */
+/** Supprime le document et ses propositions en attente. Les conseils et associations déjà acceptés restent : ils ont leur propre vie dans « Conseils ». */
 export async function deleteDocument(admin: Admin, id: string): Promise<{ ok: true; title: string } | Failure> {
   const doc = await prisma.knowledgeDocument.findUnique({ where: { id }, select: { title: true } });
   if (!doc) return { ok: false, error: "Document introuvable." };

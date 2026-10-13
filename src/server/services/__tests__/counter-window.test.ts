@@ -53,6 +53,7 @@ vi.mock("@/server/services/stock-lots", () => ({ nearestShortDatesFor: vi.fn(asy
 import { counterEmailPurgeWhere, decideCounterAdvice, finishCounterSale, purgeCounterEmails, saveCounterEmail } from "../counter-window";
 import { COUNTER_EMAIL_MAX_HOURS, COUNTER_EMAIL_PURGE_AFTER_HOURS, DAILY_PASS_MAX_GAP_HOURS } from "@/core/counter/email-retention";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
+import { editValuesOf } from "@/core/ai/central-advice-edit";
 import { PRODUCT_CATEGORIES } from "@/config/catalog";
 import { ADVICE_VOCABULARY } from "@/core/catalog/product-vocabulary";
 
@@ -324,8 +325,18 @@ describe("le bilan ne nomme jamais ce que la pharmacie a délivré", () => {
     sold(rendered, DRUG_FREE.key);
     const sent = await sentMail();
     expect(sent.text).toContain(rendered);
-    // Le cas courant (règles du code) ne relit pas la table des conseils ajoutés.
-    expect(m.centralRows).not.toHaveBeenCalled();
+    // La table centrale est relue UNE fois (une règle du code peut avoir été modifiée depuis la console) ; sans modification,
+    // la phrase du code part telle quelle.
+    expect(m.centralRows).toHaveBeenCalledTimes(1);
+  });
+
+  it("une règle du code MODIFIÉE depuis la console : c'est la phrase patient modifiée qui part (celle que le moteur a rendue)", async () => {
+    const edit = { ...editValuesOf(DRUG_FREE), patientReason: "Phrase patient modifiée par Donna : {product} vous aidera." };
+    m.centralRows.mockResolvedValue([{ ruleKey: DRUG_FREE.key, source: "BUILT_IN", status: "VALIDATED", ruleVersion: null, definition: null, decidedAt: null, decidedByName: null, override: { edit }, overrideRevision: 1 }]);
+    const rendered = `Phrase patient modifiée par Donna : ${PRODUCT} vous aidera.`;
+    sold(rendered, DRUG_FREE.key);
+    const sent = await sentMail();
+    expect(sent.text).toContain(rendered);
   });
 
   it("filet : même sous un modèle sans `{drug}`, une phrase qui cite une substance de la vente ne part pas (casse et accents ignorés)", async () => {

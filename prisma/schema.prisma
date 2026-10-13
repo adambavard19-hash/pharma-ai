@@ -1837,6 +1837,40 @@ model DrugClassification {
   @@map("drug_classifications")
 }
 
+/// Les effets indésirables FRÉQUENTS d'une spécialité, lus dans son RCP officiel (BDPM, rubrique 4.8 « Effets
+/// indésirables »). Donnée publique et commune à toutes les pharmacies : aucune colonne d'officine, aucune donnée
+/// patient. Rempli par `npm run effets:sync` (scripts/effets-sync.ts) ; lu par la classification des médicaments, où
+/// ces effets PRIMENT sur ceux que le modèle propose (src/server/services/official-side-effects.ts).
+///
+/// Une ligne par CIS, même quand rien n'a été retenu : `status` dit pourquoi (rubrique sans fréquence, RCP hors BDPM…)
+/// et évite de retélécharger. Seuls « très fréquent » et « fréquent » sont lus, ramenés à la liste fermée de
+/// `src/core/reference/rcp/side-effects.ts` — jamais un effet deviné.
+model DrugOfficialSideEffects {
+  id            String   @id @default(cuid())
+  /// Code Identifiant de Spécialité. Pas de clé étrangère : la ligne survit au retrait d'une spécialité du catalogue.
+  cisCode       String   @unique
+  /// `READ` (rubrique lue, `effects` éventuellement vide) · `NO_FREQUENCY` (rubrique sans fréquences) · `NO_SECTION`
+  /// (pas de rubrique 4.8 sur la BDPM : RCP européen sur le site de l'EMA, page mal formée) · `NOT_FOUND` (CIS inconnu).
+  status        String
+  /// Les libellés de la liste fermée (« sécheresse buccale », « nausées »…), tels qu'écrits dans `commonSideEffects`.
+  effects       String[] @default([])
+  /// Pour la trace : [{ key, label, frequency: VERY_COMMON|COMMON, evidence }] — `evidence` est le passage du RCP lu.
+  details       Json     @default("[]")
+  /// La page lue (onglet RCP de la fiche BDPM de la spécialité).
+  sourceUrl     String
+  /// Empreinte SHA-256 de la rubrique 4.8 lue : un RCP modifié se voit à la relecture suivante.
+  sectionHash   String?
+  /// Version du lecteur : un lecteur amélioré relit les pages en cache sans les retélécharger.
+  readerVersion Int
+  /// Quand la page a été téléchargée de la BDPM.
+  fetchedAt     DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status])
+  @@map("drug_official_side_effects")
+}
+
 model DrugReference {
   id                 String   @id @default(cuid())
   /// Code CIS (base de données publique des médicaments) lorsqu'il existe.
@@ -2489,11 +2523,42 @@ model CentralAdviceRule {
   decidedByAdminId String?
   /// Le nom de la personne qui a décidé, tel qu'il était à ce moment-là.
   decidedByName    String?
+  /// Règle du code MODIFIÉE depuis la console : ce qui remplace ses textes, déclencheurs, produits et exclusions (voir
+  /// core/ai/central-advice.ts, `RuleEditValues`). Vide : la règle du code telle qu'écrite. Les exclusions du code restent toujours.
+  override            Json?
+  /// Le numéro de la modification (1, 2, …) : la règle modifiée a sa propre version, une validation ancienne redevient « à relire ».
+  overrideRevision    Int               @default(0)
+  /// La version de la règle du code au moment de la modification : si le code change depuis, la console le signale.
+  overrideBaseVersion String?
+  overriddenAt        DateTime?
+  overriddenByName    String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
   @@index([status])
   @@map("central_advice_rules")
+}
+
+/// L'historique des modifications des conseils dans la console : qui a modifié quoi, quand, avec l'avant et l'après. Sert
+/// aussi à « Revenir à la version d'origine » d'un conseil ajouté ou d'une association (le tout premier « avant »).
+model CentralAdviceEdit {
+  id         String   @id @default(cuid())
+  /// RULE (une règle du code ou un conseil ajouté) ou ASSOCIATION (déclenché par un produit ou un médicament nommé).
+  targetKind String
+  /// La clé de la règle, ou l'identifiant de l'association.
+  targetKey  String
+  /// EDIT (modification) ou REVERT (retour à la version d'origine).
+  action     String
+  /// Les libellés des champs changés, en clair (« Phrase pour le patient », « Produits proposés »…).
+  changed    String[] @default([])
+  before     Json?
+  after      Json?
+  adminId    String?
+  adminName  String?
+  createdAt  DateTime @default(now())
+
+  @@index([targetKind, targetKey, createdAt])
+  @@map("central_advice_edits")
 }
 
 enum CentralTriggerKind {

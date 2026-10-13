@@ -11,7 +11,7 @@ import { activeChallengeTitlesFor } from "@/server/services/challenges";
 import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import type { Prisma } from "@/generated/prisma";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
-import { customRulesFrom, isCustomRuleKey } from "@/core/ai/central-advice";
+import { customRulesFrom, overriddenRulesFrom } from "@/core/ai/central-advice";
 import { buildPatientReport, maskEmail, parsePatientEmail, patientSafeLine, patientSafeReason } from "@/core/counter/patient-report";
 import { getEnv } from "@/config/env";
 import { counterEmailPurgeCutoff } from "@/core/counter/email-retention";
@@ -244,10 +244,11 @@ export async function finishCounterSale(agent: AgentContext, input: { prescripti
 async function patientReasonTemplates(ruleKeys: ReadonlySet<string>): Promise<Map<string, { template: string; benefits: string[] }>> {
   const templates = new Map<string, { template: string; benefits: string[] }>();
   for (const rule of ADVICE_RULES) if (ruleKeys.has(rule.key)) templates.set(rule.key, { template: rule.patientReasonTemplate, benefits: rule.benefits ?? [] });
-  // La table des conseils ajoutés n'est relue que si un conseil ajouté est en jeu : le cas courant ne coûte aucune requête.
-  if ([...ruleKeys].some(isCustomRuleKey)) {
-    const rows = await loadCentralRuleRows();
-    for (const rule of customRulesFrom(rows.filter((row) => ruleKeys.has(row.ruleKey)))) templates.set(rule.key, { template: rule.patientReasonTemplate, benefits: rule.benefits ?? [] });
+  // La table centrale est relue dès qu'une règle est en jeu : un conseil ajouté, ou une règle du code MODIFIÉE depuis la console
+  // (sa phrase patient est celle de la modification — exactement ce que le moteur a rendu).
+  if (ruleKeys.size > 0) {
+    const rows = (await loadCentralRuleRows()).filter((row) => ruleKeys.has(row.ruleKey));
+    for (const rule of [...customRulesFrom(rows), ...overriddenRulesFrom(rows)]) templates.set(rule.key, { template: rule.patientReasonTemplate, benefits: rule.benefits ?? [] });
   }
   return templates;
 }

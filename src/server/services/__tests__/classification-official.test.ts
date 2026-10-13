@@ -7,11 +7,11 @@ import type { UnderstandingLine } from "@/core/understanding";
  * national prend la famille officielle de sa spécialité (Open Medic) ; rien n'est écrit dans la mémoire commune, et la
  * réponse du modèle, le cache et la pharmacienne gardent la priorité.
  */
-const m = vi.hoisted(() => ({ cache: vi.fn(), upsert: vi.fn(), usage: vi.fn(), classify: vi.fn(), recordGaps: vi.fn() }));
+const m = vi.hoisted(() => ({ cache: vi.fn(), upsert: vi.fn(), usage: vi.fn(), classify: vi.fn(), recordGaps: vi.fn(), official: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/db/client", () => ({
-  prisma: { drugClassification: { findMany: m.cache, upsert: m.upsert }, aiUsageRecord: { create: m.usage } },
+  prisma: { drugClassification: { findMany: m.cache, upsert: m.upsert }, aiUsageRecord: { create: m.usage }, drugOfficialSideEffects: { findMany: m.official } },
 }));
 vi.mock("@/server/ai/registry", () => ({ getAIProvider: () => ({ info: { id: "anthropic:test", capability: "LIVE" }, classifyDrugs: m.classify }) }));
 vi.mock("@/server/services/knowledge-gap-store", () => ({ recordGaps: m.recordGaps }));
@@ -48,6 +48,7 @@ beforeEach(() => {
   m.upsert.mockResolvedValue({});
   m.usage.mockResolvedValue({});
   m.recordGaps.mockResolvedValue(0);
+  m.official.mockResolvedValue([]);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
@@ -119,5 +120,77 @@ describe("sans régression quand le modèle répond", () => {
     expect(m.classify).not.toHaveBeenCalled();
     expect(outcome.drugs).toEqual([expect.objectContaining({ source: "CACHE", therapeuticClass: "Antihistaminique" })]);
     expect(outcome).toMatchObject({ cachedCount: 1, officialCount: 0 });
+  });
+});
+
+describe("effets indésirables lus dans le RCP officiel (BDPM)", () => {
+  // Tels que `npm run effets:sync` les a lus dans le RCP de CETIRIZINE BIOGARAN 10 mg (CIS 61665908) le 13 oct. 2026.
+  const rcpRow = { cisCode: "61665908", effects: ["sécheresse buccale", "diarrhée", "somnolence", "fatigue (asthénie)"], fetchedAt: new Date("2026-10-13T04:30:47Z"), sourceUrl: "https://base-donnees-publique.medicaments.gouv.fr/medicament/61665908/extrait#tab-rcp" };
+  const modelAnswer = {
+    drugs: [{ lineIndex: 0, substance: "CÉTIRIZINE", atcCode: "R06AE07", therapeuticClass: "Antihistaminique H1", commonSideEffects: ["céphalées"], confidence: 0.95, source: "MODEL" }],
+    providerId: "anthropic:test",
+    model: "test",
+    warnings: [],
+    usage: null,
+  };
+
+  it("priment sur ceux du modèle — et le cache garde la réponse du modèle, pas le RCP", async () => {
+    m.official.mockResolvedValue([rcpRow]);
+    m.classify.mockResolvedValue(modelAnswer);
+    const outcome = await ensureClassifications({ scope, lines: [cetirizine] });
+    expect(outcome.drugs).toEqual([expect.objectContaining({ source: "MODEL", therapeuticClass: "Antihistaminique H1", commonSideEffects: rcpRow.effects, sideEffectsSource: "RCP_BDPM" })]);
+    expect(outcome.officialSideEffectsCount).toBe(1);
+    expect(m.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ commonSideEffects: ["céphalées"] }) }));
+  });
+
+  it("priment aussi sur une classification en cache", async () => {
+    m.official.mockResolvedValue([rcpRow]);
+    m.cache.mockResolvedValue([{ key: classificationKey(cetirizine.drugName), substance: "CÉTIRIZINE", atcCode: "R06AE07", therapeuticClass: "Antihistaminique", commonSideEffects: ["céphalées"], confidence: 1, validatedAt: null }]);
+    const outcome = await ensureClassifications({ scope, lines: [cetirizine] });
+    expect(outcome.drugs).toEqual([expect.objectContaining({ source: "CACHE", commonSideEffects: rcpRow.effects, sideEffectsSource: "RCP_BDPM" })]);
+  });
+
+  it("le modèle ne répond pas : famille officielle et effets du RCP suffisent", async () => {
+    m.official.mockResolvedValue([rcpRow]);
+    m.classify.mockRejectedValue(new Error("Your credit balance is too low"));
+    const outcome = await ensureClassifications({ scope, lines: [cetirizine] });
+    expect(outcome.drugs).toEqual([{ ...officialCetirizine, commonSideEffects: rcpRow.effects, sideEffectsSource: "RCP_BDPM" }]);
+  });
+
+  it("ni modèle ni famille officielle : une classification réduite aux effets du RCP, et la ligne reste à connaître", async () => {
+    m.official.mockResolvedValue([{ ...rcpRow, cisCode: "00000000" }]);
+    // Le modèle lit la ligne et l'omet.
+    m.classify.mockResolvedValue({ ...modelAnswer, drugs: [] });
+    const unknown = line(1, "SPECIALITE SANS FAMILLE", "00000000", ["SUBSTANCE X"]);
+    const outcome = await ensureClassifications({ scope, lines: [unknown] });
+    expect(outcome.drugs).toEqual([{ lineIndex: 1, substance: "SUBSTANCE X", atcCode: null, therapeuticClass: null, commonSideEffects: rcpRow.effects, confidence: 1, source: "OFFICIAL_RCP", sideEffectsSource: "RCP_BDPM" }]);
+    expect(m.recordGaps).toHaveBeenCalledWith([expect.objectContaining({ reason: "NO_FAMILY", label: "SPECIALITE SANS FAMILLE" })]);
+  });
+
+  it("aucun effet officiel enregistré : rien ne change (pas de champ ajouté)", async () => {
+    m.classify.mockResolvedValue(modelAnswer);
+    const outcome = await ensureClassifications({ scope, lines: [cetirizine] });
+    expect(outcome.drugs).toEqual([modelAnswer.drugs[0]]);
+    expect(outcome.officialSideEffectsCount).toBe(0);
+  });
+
+  it("table illisible (migration pas encore passée en production) : la classification continue comme avant", async () => {
+    m.official.mockRejectedValue(new Error('relation "drug_official_side_effects" does not exist'));
+    m.classify.mockResolvedValue(modelAnswer);
+    const outcome = await ensureClassifications({ scope, lines: [cetirizine] });
+    expect(outcome.drugs).toEqual([modelAnswer.drugs[0]]);
+  });
+
+  it("donnée publique commune : lue par CIS seulement, la même pour deux pharmacies", async () => {
+    m.official.mockResolvedValue([rcpRow]);
+    m.classify.mockResolvedValue(null);
+    const other = { pharmacyId: "ph2", organizationId: "org2", userId: "u2" } as never;
+    const first = await ensureClassifications({ scope, lines: [cetirizine] });
+    const second = await ensureClassifications({ scope: other, lines: [cetirizine] });
+    expect(second.drugs).toEqual(first.drugs);
+    for (const [query] of m.official.mock.calls) {
+      expect(query.where).toEqual({ cisCode: { in: ["61665908"] }, status: "READ", NOT: { effects: { isEmpty: true } } });
+      expect(JSON.stringify(query)).not.toMatch(/pharmacy|organization/i);
+    }
   });
 });

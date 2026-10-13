@@ -2132,15 +2132,21 @@ export function detectAdviceOpportunities(params: {
    * jamais, dans aucune officine.
    */
   disabledRuleKeys?: ReadonlySet<string>;
-  /** Les conseils ajoutés depuis la console de PharmaBoost (central-advice.ts) : ils s'ajoutent aux règles du code. */
+  /**
+   * Les conseils de la console de PharmaBoost (central-advice.ts) : un conseil AJOUTÉ s'ajoute aux règles du code ; une règle du
+   * code MODIFIÉE (même clé) remplace la règle d'origine, garde-fous du code compris (central-advice-edit.ts).
+   */
   extraRules?: AdviceRule[];
 }): AdviceOpportunityResult[] {
   const { drugs, patient, needs = [], disabledRuleKeys, extraRules = [] } = params;
   const byKey = new Map<string, AdviceOpportunityResult>();
+  const edited = new Map(extraRules.map((rule) => [rule.key, rule]));
+  const codeKeys = new Set(ADVICE_RULES.map((rule) => rule.key));
+  const allRules = [...ADVICE_RULES.map((rule) => edited.get(rule.key) ?? rule), ...extraRules.filter((rule) => !codeKeys.has(rule.key))];
 
   // Les règles qu'un conseil écrit pour un médicament fait taire, médicament par médicament (`silences`).
   const silencedByLine = new Map<number, Set<string>>();
-  for (const rule of [...ADVICE_RULES, ...extraRules]) {
+  for (const rule of allRules) {
     if (!rule.silences?.length || disabledRuleKeys?.has(rule.key)) continue;
     for (const drug of drugs) {
       const atc = drug.knowledge?.atcCode ?? "";
@@ -2150,7 +2156,7 @@ export function detectAdviceOpportunities(params: {
   }
   const silenced = (rule: AdviceRule, lineIndex: number) => silencedByLine.get(lineIndex)?.has(rule.key) === true;
 
-  for (const rule of [...ADVICE_RULES, ...extraRules]) {
+  for (const rule of allRules) {
     if (disabledRuleKeys?.has(rule.key)) continue;
     const triggers: {
       lineIndex: number;
