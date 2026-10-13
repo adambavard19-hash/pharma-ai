@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
 import { LifeBuoy, X } from "lucide-react";
 import { NAVIGATION, groupNavigation, isNavItemActive, type NavItem } from "@/config/navigation";
 import { cn } from "@/lib/utils";
@@ -37,7 +36,6 @@ export function Sidebar({
   const alertsTitle = alerts.length > 0 ? `${alerts.length} chose${alerts.length > 1 ? "s" : ""} à vous dire` : undefined;
   const granted = new Set(permissions);
   // La phrase de l'entrée survolée (ou atteinte au clavier), en bulle à droite du menu, sur grand écran.
-  const [hint, setHint] = useState<{ text: string; top: number } | null>(null);
 
   const items = NAVIGATION.filter((item) => granted.has(item.permission) && !hiddenHrefs.includes(item.href));
   const primary = items.find((item) => item.primary);
@@ -55,7 +53,7 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[256px] flex-col border-r border-border-subtle bg-surface-sidebar",
+          "fixed inset-y-0 left-0 z-40 flex w-[288px] flex-col border-r border-border-subtle bg-surface-sidebar",
           "transition-transform duration-250 lg:translate-x-0",
           // `invisible` et non `hidden` : la transition reste fluide, mais le
           // tiroir fermé sort du parcours de tabulation et de l'arbre
@@ -146,7 +144,7 @@ export function Sidebar({
               <ul className="space-y-0.5">
                 {group.items.map((item) => (
                   <li key={item.href}>
-                    <NavLink item={item} onNavigate={closeNav} onHint={setHint} />
+                    <NavLink item={item} onNavigate={closeNav} />
                   </li>
                 ))}
               </ul>
@@ -184,42 +182,20 @@ export function Sidebar({
         </div>
       </aside>
 
-      {/* La bulle d'explication : décorative (le lecteur d'écran lit la même phrase par aria-describedby), jamais sur mobile. */}
-      {hint && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed left-[264px] z-50 hidden max-w-[260px] -translate-y-1/2 animate-fade-in rounded-lg border border-border-subtle bg-surface-card px-3 py-2 text-[12.5px] leading-[18px] text-text-secondary shadow-lg lg:block"
-          style={{ top: hint.top }}
-        >
-          <span className="absolute top-1/2 -left-1.5 size-3 -translate-y-1/2 rotate-45 border-b border-l border-border-subtle bg-surface-card" />
-          <span className="relative">{hint.text}</span>
-        </div>
-      )}
     </>
   );
 }
 
-function NavLink({ item, onNavigate, onHint }: { item: NavItem; onNavigate: () => void; onHint: (hint: { text: string; top: number } | null) => void }) {
+function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }) {
   const pathname = usePathname();
   const isActive = isNavItemActive(item, pathname);
   const Icon = item.icon;
   const hintId = `nav-hint-${item.href.replace(/[^a-z0-9]+/gi, "-")}`;
-  const show = (element: HTMLElement) => {
-    const box = element.getBoundingClientRect();
-    onHint({ text: item.description, top: box.top + box.height / 2 });
-  };
 
   return (
     <Link
       href={item.href}
-      onClick={() => {
-        onHint(null);
-        onNavigate();
-      }}
-      onMouseEnter={(event) => show(event.currentTarget)}
-      onMouseLeave={() => onHint(null)}
-      onFocus={(event) => show(event.currentTarget)}
-      onBlur={() => onHint(null)}
+      onClick={onNavigate}
       aria-current={isActive ? "page" : undefined}
       aria-describedby={hintId}
       className={cn(
@@ -248,7 +224,7 @@ function NavLink({ item, onNavigate, onHint }: { item: NavItem; onNavigate: () =
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate">{item.label}</span>
-        {item.subtitle && <span className="block truncate text-[12px] leading-4 font-normal text-text-tertiary">{item.subtitle}</span>}
+        {item.subtitle && <span className="block text-[12px] leading-4 font-normal text-text-tertiary">{item.subtitle}</span>}
       </span>
       <span id={hintId} hidden>
         {item.description}
