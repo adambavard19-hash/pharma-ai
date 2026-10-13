@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { listCentralAssociations, listCentralRules, loadEditHistory, modifiedAssociations, type EditHistoryEntry } from "@/server/services/central-advice";
 import { listRobotProposals } from "@/server/services/robot-proposals";
+import { listTriggerFamilies } from "@/server/services/trigger-families";
 import { associationFacets, listPreviewPharmacies, questionTreeSummaries, robotFacets, robotOriginKeys, ruleFacets } from "@/server/services/advice-hub";
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
 import { ADVICE_VOCABULARY } from "@/core/catalog/product-vocabulary";
@@ -27,7 +28,7 @@ const lines = (entries: EditHistoryEntry[] | undefined): HistoryLine[] => (entri
 export default async function AdminAdvicePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePlatformSession();
   const query = await searchParams;
-  const [rules, associations, robot, history, associationEdits, robotKeys, pharmacies] = await Promise.all([
+  const [rules, associations, robot, history, associationEdits, robotKeys, pharmacies, families] = await Promise.all([
     listCentralRules(PRODUCT_CATEGORY_LABELS),
     listCentralAssociations(),
     listRobotProposals(),
@@ -35,6 +36,7 @@ export default async function AdminAdvicePage({ searchParams }: { searchParams: 
     modifiedAssociations(),
     robotOriginKeys(),
     listPreviewPharmacies(),
+    listTriggerFamilies(),
   ]);
 
   const items: HubItem[] = [
@@ -80,6 +82,7 @@ export default async function AdminAdvicePage({ searchParams }: { searchParams: 
         tags={[...ADVICE_VOCABULARY]}
         trees={questionTreeSummaries()}
         pharmacies={pharmacies}
+        families={families}
         initialFilter={filterFromParam(query.filtre)}
         initialQuery={typeof query.q === "string" ? query.q.slice(0, 120) : ""}
       />

@@ -1,3 +1,4 @@
+import { studioPhotoUrl } from "@/core/catalog/studio-photo";
 import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
 import { isAnalysisInFlight, isEngineOutcome } from "@/core/ai/outcome";
@@ -288,7 +289,7 @@ export default async function SalePage({
       ? []
       : await prisma.product.findMany({
           where: { id: { in: alternativeProductIds }, pharmacyId: session.scope.pharmacyId, isActive: true },
-          select: { id: true, name: true, brand: true, imageUrl: true, salePriceCents: true, stockItem: { select: { quantity: true } } },
+          select: { id: true, name: true, brand: true, ean: true, salePriceCents: true, stockItem: { select: { quantity: true } } },
         })
     ).map((product) => [product.id, product]),
   );
@@ -442,7 +443,7 @@ export default async function SalePage({
                   productId: found.id,
                   name: found.name,
                   brand: found.brand,
-                  imageUrl: found.imageUrl,
+                  imageUrl: studioPhotoUrl(found.ean),
                   salePriceCents: found.salePriceCents,
                   quantity,
                   shortReason: alternative.shortReason || null,
@@ -493,8 +494,8 @@ export default async function SalePage({
                 presentationId: null,
                 name: recommendation.product.name,
                 brand: recommendation.product.brand,
-                imageUrl: recommendation.product.imageUrl,
-                imageSource: recommendation.product.imageSource,
+                imageUrl: studioPhotoUrl(recommendation.product.ean),
+                imageSource: studioPhotoUrl(recommendation.product.ean) ? recommendation.product.imageSource : null,
                 salePriceCents: recommendation.product.salePriceCents,
                 purchasePriceCents: recommendation.product.purchasePriceCents,
                 quantity: recommendation.product.stockItem?.quantity ?? 0,
@@ -513,8 +514,9 @@ export default async function SalePage({
                   presentationId: recommendation.presentation.id,
                   name: recommendation.presentation.specialty.name,
                   brand: null,
-                  imageUrl: recommendation.presentation.imageUrl,
-                  imageSource: recommendation.presentation.imageSource,
+                  // Pas de photo d'amateur : seulement une photo studio (aucune pour un médicament, pour l'instant).
+                  imageUrl: null,
+                  imageSource: null,
                   salePriceCents: recommendation.presentation.pharmacyStocks[0]?.priceCents ?? recommendation.presentation.priceCents ?? 0,
                   quantity: recommendation.presentation.pharmacyStocks[0]?.quantity ?? 0,
                   alertThreshold: recommendation.presentation.pharmacyStocks[0]?.alertThreshold ?? 0,

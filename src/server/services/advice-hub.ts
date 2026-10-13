@@ -76,7 +76,7 @@ export function associationFacets(association: CentralAssociationView, robotKeys
     robot: robotKeys.has(`association:${association.id}`),
     removed: association.status === "REMOVED",
     atcPrefixes: [],
-    searchText: join([association.triggerLabel, association.adviceLabel, association.sentence, association.adviceEan, association.triggerKind === "MEDICINE" ? "médicament" : "produit association", CENTRAL_STATUS_LABELS[association.status], association.createdBy, association.decidedBy]),
+    searchText: join([association.triggerLabel, association.adviceLabel, association.sentence, association.adviceEan, association.triggerKind === "MEDICINE" ? "médicament" : association.triggerKind === "FAMILY" ? "famille produit association" : "produit association", CENTRAL_STATUS_LABELS[association.status], association.createdBy, association.decidedBy]),
   };
 }
 

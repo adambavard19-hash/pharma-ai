@@ -2574,6 +2574,42 @@ enum CentralTriggerKind {
   MEDICINE
   /// Un produit, reconnu par son code-barres dans le stock de chaque officine (clé « ean:<code> »).
   PRODUCT
+  /// Une famille déclencheuse (« Shampoings anti-chute ») : tout produit ou médicament de la famille déclenche (clé « family:<id> »).
+  FAMILY
+}
+
+/// Une famille déclencheuse, commune à toutes les officines : « Shampoings anti-chute », « Crèmes hydratantes visage »…
+/// Un produit en fait partie quand son libellé contient l'un des mots de `includeTerms` (et aucun de `excludeTerms`), ou
+/// quand la pharmacienne l'y a ajouté à la main ; elle peut aussi en retirer un (membre `included = false`). Le libellé
+/// suffit : la famille se remplit seule dans chaque nouvelle pharmacie, quel que soit son stock.
+model TriggerFamily {
+  id            String                @id @default(cuid())
+  name          String                @unique
+  description   String?
+  /// Chaque ligne : des mots qui doivent TOUS figurer dans le libellé, en début de mot ; « shamp/shp » = l'un ou l'autre.
+  includeTerms  String[]              @default([])
+  excludeTerms  String[]              @default([])
+  status        CentralStatus         @default(ACTIVE)
+  createdByName String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  members       TriggerFamilyMember[]
+
+  @@map("trigger_families")
+}
+
+/// Un produit (« ean:<code> ») ou un médicament (« drug:<nom> ») ajouté à une famille, ou retiré (`included = false`).
+model TriggerFamilyMember {
+  id        String        @id @default(cuid())
+  familyId  String
+  key       String
+  label     String
+  included  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  family    TriggerFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, key])
+  @@map("trigger_family_members")
 }
 
 /// Une association commune à toutes les officines : un médicament ou un produit en appelle un autre. Le produit conseillé est

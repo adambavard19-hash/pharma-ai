@@ -17,7 +17,7 @@ const ENTRIES = [
 
 describe("les filtres en mots simples", () => {
   it("dans cet ordre, sans nom technique", () => {
-    expect(HUB_FILTERS.map((filter) => filter.label)).toEqual(["Tous", "Déclenchés par un médicament", "Déclenchés par un produit", "À relire", "Proposés par le robot", "Retirés", "À ne pas associer"]);
+    expect(HUB_FILTERS.map((filter) => filter.label)).toEqual(["Tous", "Déclenchés par un médicament", "Déclenchés par un produit", "À relire", "Proposés par le robot", "Retirés", "Familles déclencheuses", "À ne pas associer"]);
   });
 
   it("regroupent règles, conseils déclenchés par un produit et suggestions du robot ; « Retirés » à part", () => {

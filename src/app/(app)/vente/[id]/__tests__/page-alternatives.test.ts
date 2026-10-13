@@ -223,7 +223,7 @@ describe("les alternatives d'un conseil", () => {
       recommendation("rec_1", { alternatives: [stored("p2", "Raison de B"), stored("p3", "")] }),
     ]);
     expect(advice.alternatives).toEqual([
-      { productId: "p2", name: "Probiotique B", brand: "Vitalys", imageUrl: "https://images.example/b.png", salePriceCents: 1690, quantity: 3, shortReason: "Raison de B" },
+      { productId: "p2", name: "Probiotique B", brand: "Vitalys", imageUrl: null, salePriceCents: 1690, quantity: 3, shortReason: "Raison de B" },
       { productId: "p3", name: "Probiotique C", brand: null, imageUrl: null, salePriceCents: 990, quantity: 40, shortReason: null },
     ]);
   });

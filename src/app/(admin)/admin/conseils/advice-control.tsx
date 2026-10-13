@@ -265,7 +265,7 @@ export function AssociationItem({ association }: { association: AssociationCard 
                 decidedAt={association.decidedAt}
                 extra={
                   <>
-                    <Badge tone="neutral">{association.triggerKind === "MEDICINE" ? "Déclenché par un médicament" : "Déclenché par un produit"}</Badge>
+                    <Badge tone="neutral">{association.triggerKind === "MEDICINE" ? "Déclenché par un médicament" : association.triggerKind === "FAMILY" ? "Déclenché par une famille" : "Déclenché par un produit"}</Badge>
                     {association.fromRobot && <Badge tone="info">Proposé par le robot, validé</Badge>}
                     {association.modified && <Badge tone="info">Modifié{association.modified.by ? ` par ${association.modified.by}` : ""} le {formatDate(association.modified.at)}</Badge>}
                   </>
@@ -469,8 +469,11 @@ export function TagPicker({ tags, picked, onChange, max = CUSTOM_LIMITS.tags, la
 type Medicine = { id: string; name: string; substances: string[]; marketed: boolean };
 type KnownProduct = { ean: string; name: string; brand: string | null };
 
-export function NewAssociationForm({ onDone }: { onDone: () => void }) {
-  const [mode, setMode] = useState<"MEDICINE" | "PRODUCT">("MEDICINE");
+export type FamilyChoice = { id: string; name: string; count: number };
+
+export function NewAssociationForm({ onDone, families = [], initialFamilyId = null }: { onDone: () => void; families?: FamilyChoice[]; initialFamilyId?: string | null }) {
+  const [mode, setMode] = useState<"MEDICINE" | "PRODUCT" | "FAMILY">(initialFamilyId ? "FAMILY" : "MEDICINE");
+  const [familyId, setFamilyId] = useState<string>(initialFamilyId ?? "");
   const [medicine, setMedicine] = useState<Medicine | null>(null);
   const [product, setProduct] = useState<KnownProduct | null>(null);
   const [advice, setAdvice] = useState<KnownProduct | null>(null);
@@ -481,7 +484,18 @@ export function NewAssociationForm({ onDone }: { onDone: () => void }) {
 
   const submit = () => {
     setError(null);
-    const trigger = mode === "MEDICINE" ? (medicine ? ({ kind: "MEDICINE", name: medicine.name } as const) : null) : product ? ({ kind: "PRODUCT", ean: product.ean, name: product.name } as const) : null;
+    const trigger =
+      mode === "MEDICINE"
+        ? medicine
+          ? ({ kind: "MEDICINE", name: medicine.name } as const)
+          : null
+        : mode === "FAMILY"
+          ? familyId
+            ? ({ kind: "FAMILY", familyId } as const)
+            : null
+          : product
+            ? ({ kind: "PRODUCT", ean: product.ean, name: product.name } as const)
+            : null;
     if (!trigger || !advice) {
       setError("Choisissez ce qui déclenche l'association et le produit à conseiller.");
       return;
@@ -502,7 +516,7 @@ export function NewAssociationForm({ onDone }: { onDone: () => void }) {
       <div className="grid items-start gap-4 md:grid-cols-[1fr_auto_1fr]">
         <div className="space-y-3">
           <div role="tablist" aria-label="Ce qui déclenche l'association" className="inline-flex rounded-lg bg-surface-sunken p-1 text-[13px] font-medium">
-            {([["MEDICINE", "Un médicament"], ["PRODUCT", "Un produit"]] as const).map(([key, label]) => (
+            {([["MEDICINE", "Un médicament"], ["PRODUCT", "Un produit"], ["FAMILY", "Une famille"]] as const).map(([key, label]) => (
               <button
                 key={key}
                 type="button"
@@ -515,7 +529,18 @@ export function NewAssociationForm({ onDone }: { onDone: () => void }) {
               </button>
             ))}
           </div>
-          {mode === "MEDICINE" ? (
+          {mode === "FAMILY" ? (
+            <Field label="Quand un produit de cette famille est dans la vente" htmlFor="central-family" hint={families.length === 0 ? "Créez d'abord une famille (filtre « Familles déclencheuses »)." : "Tout produit de la famille déclenche le conseil, dans chaque pharmacie."}>
+              <Select id="central-family" value={familyId} onChange={(event) => setFamilyId(event.target.value)}>
+                <option value="">Choisir une famille…</option>
+                {families.map((family) => (
+                  <option key={family.id} value={family.id}>
+                    {family.name} ({family.count} produit{family.count > 1 ? "s" : ""})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : mode === "MEDICINE" ? (
             <SearchField<Medicine>
               label="Quand ce médicament est dans la vente"
               endpoint="/api/admin/conseils/medicaments"

@@ -1,4 +1,5 @@
 import "server-only";
+import { studioPhotoUrl } from "@/core/catalog/studio-photo";
 import { prisma } from "@/server/db/client";
 import { buildCounterNotice, type CounterNotice } from "@/core/counter/notice";
 import { stockReminderLevel } from "@/core/stock-deposit/rules";
@@ -71,7 +72,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
               salePriceCents: true,
               purchasePriceCents: true,
               vatRate: true,
-              imageUrl: true,
+              ean: true,
               stockItem: { select: { quantity: true, alertThreshold: true } },
               description: true,
               contraindications: true,
@@ -149,7 +150,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
           trusted: rec.origin !== "AI" || (rec.opportunity?.ruleKey != null && known.has(rec.opportunity.ruleKey) && !removed.has(rec.opportunity.ruleKey)),
           // Une association du pharmacien (règle « association:… ») a ses propres places dans la fenêtre, en plus des conseils du moteur.
           association: rec.origin === "RULE" && (rec.opportunity?.ruleKey?.startsWith("association:") ?? false),
-          imageUrl: rec.product?.imageUrl ?? null,
+          imageUrl: studioPhotoUrl(rec.product?.ean),
           quantity: rec.product ? (rec.product.stockItem?.quantity ?? null) : (rec.presentation?.pharmacyStocks[0]?.quantity ?? null),
           alertThreshold: rec.product?.stockItem?.alertThreshold ?? null,
           sheet: counterSheetOf(

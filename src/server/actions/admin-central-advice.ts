@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { addCentralAssociation, addCustomRule, decideCentralAssociation, decideRule, editCentralAssociation, editRule, revertCentralAssociation, revertRule } from "@/server/services/central-advice";
 import { previewMedicineAdvice, resolveMedicineSearch, type AdvicePreview, type MedicineSearch } from "@/server/services/advice-hub";
+import { createTriggerFamily, previewFamilyTerms, setTriggerFamilyMember, setTriggerFamilyRemoved, updateTriggerFamily, type FamilyProduct } from "@/server/services/trigger-families";
 import { fail, ok, type ActionResult } from "./types";
 
 /**
@@ -44,6 +45,7 @@ const associationSchema = z.object({
   trigger: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("MEDICINE"), name: z.string().trim().min(2).max(200) }),
     z.object({ kind: z.literal("PRODUCT"), ean: z.string().trim().min(7).max(20), name: z.string().trim().min(1).max(200) }),
+    z.object({ kind: z.literal("FAMILY"), familyId: z.string().trim().min(1).max(40) }),
   ]),
   advice: z.object({ ean: z.string().trim().min(7).max(20), name: z.string().trim().min(1).max(200) }),
   sentence: z.string().max(600).nullable().optional(),
@@ -132,4 +134,54 @@ export async function previewMedicineAdviceAction(payload: { pharmacyId: string;
   if (!parsed.success) return fail("Choisissez une pharmacie.");
   const result = await previewMedicineAdvice(parsed.data.pharmacyId, parsed.data.specialtyId);
   return result.ok ? ok(result.preview) : fail(result.error);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Les familles déclencheuses
+// ---------------------------------------------------------------------------------------------------------------
+
+const familyDraftSchema = z.object({
+  name: z.string().max(200),
+  description: z.string().max(600).nullable().optional(),
+  includeTerms: z.array(z.string().max(200)).max(80),
+  excludeTerms: z.array(z.string().max(200)).max(80),
+});
+
+export async function saveTriggerFamilyAction(payload: { id?: string | null } & z.input<typeof familyDraftSchema>): Promise<ActionResult<{ id: string }>> {
+  const session = await requirePlatformSession();
+  const parsed = familyDraftSchema.extend({ id: z.string().max(40).nullable().optional() }).safeParse(payload);
+  if (!parsed.success) return fail("Vérifiez le nom et les mots de la famille.");
+  const admin = { id: session.admin.id, fullName: session.admin.fullName };
+  const draft = { ...parsed.data, description: parsed.data.description ?? null };
+  const result = parsed.data.id ? await updateTriggerFamily(admin, parsed.data.id, draft).then((r) => (r.ok ? { ok: true as const, id: parsed.data.id as string } : r)) : await createTriggerFamily(admin, draft);
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/conseils");
+  return ok({ id: result.id }, parsed.data.id ? "Famille enregistrée, pour toutes les pharmacies." : "Famille créée. Vous pouvez maintenant vous en servir comme déclencheur.");
+}
+
+export async function previewTriggerFamilyAction(payload: { includeTerms: string[]; excludeTerms: string[] }): Promise<ActionResult<FamilyProduct[]>> {
+  await requirePlatformSession();
+  const parsed = familyDraftSchema.pick({ includeTerms: true, excludeTerms: true }).safeParse(payload);
+  if (!parsed.success) return fail("Mots invalides.");
+  return ok(await previewFamilyTerms(parsed.data.includeTerms, parsed.data.excludeTerms));
+}
+
+export async function setTriggerFamilyMemberAction(payload: { familyId: string; ean: string; label: string; included: boolean | null }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const parsed = z.object({ familyId: z.string().min(1).max(40), ean: z.string().min(7).max(20), label: z.string().max(200), included: z.boolean().nullable() }).safeParse(payload);
+  if (!parsed.success) return fail("Produit invalide.");
+  const result = await setTriggerFamilyMember({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.familyId, { ean: parsed.data.ean, label: parsed.data.label }, parsed.data.included);
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/conseils");
+  return ok(null, parsed.data.included === false ? "Produit retiré de la famille." : parsed.data.included ? "Produit ajouté à la famille." : "Choix annulé.");
+}
+
+export async function setTriggerFamilyRemovedAction(payload: { id: string; removed: boolean }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const parsed = z.object({ id: z.string().min(1).max(40), removed: z.boolean() }).safeParse(payload);
+  if (!parsed.success) return fail("Famille invalide.");
+  const result = await setTriggerFamilyRemoved({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.id, parsed.data.removed);
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/conseils");
+  return ok(null, parsed.data.removed ? `« ${result.name} » est supprimée : ses associations ne se déclenchent plus.` : `« ${result.name} » est rétablie.`);
 }

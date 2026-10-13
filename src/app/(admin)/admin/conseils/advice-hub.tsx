@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 import { ProposalCard, type RobotProposalCard } from "../suggestions-robot/robot-proposals-board";
 import { AssociationItem, NewAssociationForm, NewRuleForm, RuleItem, type AssociationCard, type RuleCard } from "./advice-control";
 import { AvoidList } from "./avoid-list";
+import { FamiliesPanel } from "./families-panel";
+import type { FamilyView } from "@/server/services/trigger-families";
 import { MedicinePanel } from "./medicine-panel";
 
 export type HubItem = { facets: HubFacets } & ({ type: "rule"; rule: RuleCard } | { type: "association"; association: AssociationCard } | { type: "robot"; proposal: RobotProposalCard });
@@ -34,6 +36,7 @@ export function AdviceHub({
   tags,
   trees,
   pharmacies,
+  families,
   initialFilter,
   initialQuery,
 }: {
@@ -43,6 +46,7 @@ export function AdviceHub({
   tags: string[];
   trees: TreeSummary[];
   pharmacies: PreviewPharmacy[];
+  families: FamilyView[];
   initialFilter: HubFilter;
   initialQuery: string;
 }) {
@@ -53,7 +57,7 @@ export function AdviceHub({
   const [query, setQuery] = useState(initialQuery);
   const [found, setFound] = useState<{ lookup: string; result: MedicineSearch } | null>(null);
   const [resolving, setResolving] = useState(false);
-  const [adding, setAdding] = useState<{ kind: "RULE"; atc: string[]; title: string } | { kind: "ASSOCIATION" } | null>(null);
+  const [adding, setAdding] = useState<{ kind: "RULE"; atc: string[]; title: string } | { kind: "ASSOCIATION"; familyId?: string } | null>(null);
 
   const parsed = useMemo(() => parseHubQuery(query), [query]);
   const lookup = useMemo(() => medicineTerms(parsed).join(" "), [parsed]);
@@ -134,12 +138,12 @@ export function AdviceHub({
             onClick={() => choose(item.key)}
             className={cn("rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors", filter === item.key ? "bg-brand-600 text-white" : "bg-surface-sunken text-text-secondary hover:text-text-primary")}
           >
-            {item.label} <span className="tabular-nums opacity-80">{item.key === "AVOID" ? vigilances.length : counts[item.key]}</span>
+            {item.label} <span className="tabular-nums opacity-80">{item.key === "AVOID" ? vigilances.length : item.key === "FAMILIES" ? families.filter((family) => family.status !== "REMOVED").length : counts[item.key]}</span>
           </button>
         ))}
       </div>
 
-      {medicines.medicines.length > 0 && filter !== "AVOID" && (
+      {medicines.medicines.length > 0 && filter !== "AVOID" && filter !== "FAMILIES" && (
         <MedicinePanel
           medicines={medicines.medicines}
           items={items}
@@ -149,7 +153,9 @@ export function AdviceHub({
         />
       )}
 
-      {filter === "AVOID" ? (
+      {filter === "FAMILIES" ? (
+        <FamiliesPanel families={families} onAssociate={(familyId) => setAdding({ kind: "ASSOCIATION", familyId })} />
+      ) : filter === "AVOID" ? (
         <AvoidList vigilances={vigilances} />
       ) : shown.length === 0 ? (
         <Card>
@@ -188,7 +194,13 @@ export function AdviceHub({
         {adding?.kind === "RULE" && <NewRuleForm categories={categories} tags={tags} initialAtc={adding.atc} initialTitle={adding.title} onDone={() => setAdding(null)} />}
       </Modal>
       <Modal open={adding?.kind === "ASSOCIATION"} onClose={() => setAdding(null)} title="Ajouter un conseil déclenché par un produit" description="Un produit (ou un médicament précis) en appelle un autre. Chaque pharmacie ne le propose que si elle a le produit en stock." size="lg">
-        {adding?.kind === "ASSOCIATION" && <NewAssociationForm onDone={() => setAdding(null)} />}
+        {adding?.kind === "ASSOCIATION" && (
+          <NewAssociationForm
+            onDone={() => setAdding(null)}
+            families={families.filter((family) => family.status !== "REMOVED").map((family) => ({ id: family.id, name: family.name, count: family.products.length }))}
+            initialFamilyId={adding.familyId ?? null}
+          />
+        )}
       </Modal>
     </div>
   );

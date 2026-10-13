@@ -124,7 +124,7 @@ export type CentralRuleView = {
 
 export type CentralAssociationView = {
   id: string;
-  triggerKind: "MEDICINE" | "PRODUCT";
+  triggerKind: "MEDICINE" | "PRODUCT" | "FAMILY";
   triggerLabel: string;
   adviceLabel: string;
   adviceEan: string;
@@ -311,18 +311,25 @@ export async function addCustomRule(admin: Admin, raw: unknown): Promise<{ ok: t
 // ---------------------------------------------------------------------------------------------------------------
 
 export type AssociationDraft = {
-  trigger: { kind: "MEDICINE"; name: string } | { kind: "PRODUCT"; ean: string; name: string };
+  trigger: { kind: "MEDICINE"; name: string } | { kind: "PRODUCT"; ean: string; name: string } | { kind: "FAMILY"; familyId: string };
   advice: { ean: string; name: string };
   sentence: string | null;
 };
 
 export async function addCentralAssociation(admin: Admin, draft: AssociationDraft): Promise<{ ok: true; id: string } | Failure> {
-  const triggerKey = draft.trigger.kind === "MEDICINE" ? drugKey(draft.trigger.name) : `ean:${draft.trigger.ean.replace(/\D/g, "")}`;
+  let familyName: string | null = null;
+  if (draft.trigger.kind === "FAMILY") {
+    const family = await prisma.triggerFamily.findFirst({ where: { id: draft.trigger.familyId, status: { not: "REMOVED" } }, select: { name: true } });
+    if (!family) return { ok: false, error: "Famille introuvable." };
+    familyName = family.name;
+  }
+  const triggerKey =
+    draft.trigger.kind === "MEDICINE" ? drugKey(draft.trigger.name) : draft.trigger.kind === "FAMILY" ? `family:${draft.trigger.familyId}` : `ean:${draft.trigger.ean.replace(/\D/g, "")}`;
   const adviceEan = draft.advice.ean.replace(/\D/g, "");
   const sentence = cleanSentence(draft.sentence);
   const problem = centralAssociationError({ triggerKey: triggerKey === "drug:" ? "" : triggerKey, adviceEan, sentence });
   if (problem) return { ok: false, error: problem };
-  const triggerLabel = draft.trigger.kind === "MEDICINE" ? draft.trigger.name.split(",")[0].trim() : draft.trigger.name;
+  const triggerLabel = draft.trigger.kind === "MEDICINE" ? draft.trigger.name.split(",")[0].trim() : draft.trigger.kind === "FAMILY" ? (familyName as string) : draft.trigger.name;
   try {
     const created = await prisma.centralAssociation.create({
       data: {

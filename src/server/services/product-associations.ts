@@ -4,6 +4,7 @@ import { recordAudit } from "@/server/audit/log";
 import { normalizeSearchText } from "@/core/reference/search";
 import { associationError, cleanSentence, MAX_ADVICE_PER_SAVE, MAX_TRIGGERS_PER_SAVE, sentenceError } from "@/core/associations/rules";
 import { drugKey, productKey, type AssociationInput } from "@/core/ai/engines/associations";
+import { belongsToFamily, familyKey, type FamilyDefinition } from "@/core/associations/families";
 import type { CatalogProduct } from "@/core/ai/types";
 import type { TenantScope } from "@/server/db/tenant";
 import { loadAssociationDrugProducts } from "./catalog";
@@ -35,7 +36,7 @@ export type LineForAssociations = { position: number; status: string; drugName: 
 export async function resolveLineTriggers(
   pharmacyId: string,
   lines: LineForAssociations[],
-  wanted: { productIds: string[]; drugKeys: Set<string> },
+  wanted: { productIds: string[]; drugKeys: Set<string>; families?: FamilyDefinition[] },
 ): Promise<AssociationInput["lines"]> {
   const confirmed = lines.filter((line) => line.status === "CONFIRMED" && line.drugName);
   if (confirmed.length === 0) return [];
@@ -50,7 +51,7 @@ export async function resolveLineTriggers(
       ? prisma.product.findMany({ where: { pharmacyId, id: { in: wanted.productIds }, ean: { in: codes }, deletedAt: null }, select: { id: true, ean: true } })
       : Promise.resolve([]),
     wanted.productIds.length ? prisma.product.findMany({ where: { pharmacyId, id: { in: wanted.productIds }, deletedAt: null }, select: { id: true, name: true } }) : Promise.resolve([]),
-    wanted.drugKeys.size && specialtyIds.length ? prisma.drugSpecialty.findMany({ where: { id: { in: specialtyIds } }, select: { id: true, name: true } }) : Promise.resolve([]),
+    (wanted.drugKeys.size || wanted.families?.length) && specialtyIds.length ? prisma.drugSpecialty.findMany({ where: { id: { in: specialtyIds } }, select: { id: true, name: true } }) : Promise.resolve([]),
   ]);
 
   const productByCode = new Map<string, string>();
@@ -80,6 +81,12 @@ export async function resolveLineTriggers(
       if (wanted.drugKeys.has(key) && !keys.includes(key)) keys.push(key);
     }
 
+    // Les familles déclencheuses : le libellé de la ligne (et le nom officiel du médicament), son code-barres, son nom de médicament.
+    if (wanted.families?.length) {
+      const candidate = { labels: names, keys: [...(code ? [`ean:${code}`] : []), ...names.map(drugKey)] };
+      for (const family of wanted.families) if (belongsToFamily(family, candidate)) keys.push(familyKey(family.id));
+    }
+
     if (keys.length > 0) found.push({ lineIndex: line.position, keys, productId });
   }
   return found;
@@ -90,13 +97,13 @@ export async function resolveLineTriggers(
  * produit conseillé et, pour un produit déclencheur, ce produit sont retrouvés dans son stock par leur code-barres. Une
  * association dont le produit conseillé n'est pas dans le stock de l'officine ne s'applique simplement pas chez elle.
  */
-async function loadCentralRules(pharmacyId: string): Promise<{ rules: AssociationInput["rules"]; triggerProductIds: string[] }> {
+async function loadCentralRules(pharmacyId: string): Promise<{ rules: AssociationInput["rules"]; triggerProductIds: string[]; families: FamilyDefinition[] }> {
   const central = await prisma.centralAssociation.findMany({
     where: { status: { not: "REMOVED" } },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     select: { id: true, triggerKind: true, triggerKey: true, adviceEan: true, sentence: true, sortOrder: true },
   });
-  if (central.length === 0) return { rules: [], triggerProductIds: [] };
+  if (central.length === 0) return { rules: [], triggerProductIds: [], families: [] };
 
   const eans = [...new Set(central.flatMap((row) => (row.triggerKind === "PRODUCT" ? [row.adviceEan, row.triggerKey.slice("ean:".length)] : [row.adviceEan])))];
   const [products, barcodes] = await Promise.all([
@@ -107,9 +114,14 @@ async function loadCentralRules(pharmacyId: string): Promise<{ rules: Associatio
   for (const barcode of barcodes) productByEan.set(barcode.code, barcode.productId);
   for (const product of products) if (product.ean) productByEan.set(product.ean, product.id);
 
+  const familyIds = [...new Set(central.filter((row) => row.triggerKind === "FAMILY").map((row) => row.triggerKey.slice("family:".length)))];
+  const families = await loadTriggerFamilies(familyIds);
+  const liveFamilies = new Set(families.map((family) => family.id));
+
   const rules: AssociationInput["rules"] = [];
   const triggerProductIds: string[] = [];
   for (const row of central) {
+    if (row.triggerKind === "FAMILY" && !liveFamilies.has(row.triggerKey.slice("family:".length))) continue;
     const adviceProductId = productByEan.get(row.adviceEan);
     if (!adviceProductId) continue;
     let triggerKey = row.triggerKey;
@@ -122,7 +134,17 @@ async function loadCentralRules(pharmacyId: string): Promise<{ rules: Associatio
     // Les associations de l'officine passent avant : elles sont la voix du pharmacien de cette officine.
     rules.push({ id: `central:${row.id}`, triggerKey, adviceProductId, sentence: row.sentence, sortOrder: 1_000_000 + row.sortOrder });
   }
-  return { rules, triggerProductIds };
+  return { rules, triggerProductIds, families };
+}
+
+/** Les familles déclencheuses en ligne (non supprimées), avec leurs ajouts et retraits faits à la main. */
+export async function loadTriggerFamilies(ids: string[]): Promise<FamilyDefinition[]> {
+  if (ids.length === 0) return [];
+  const rows = await prisma.triggerFamily.findMany({
+    where: { id: { in: ids }, status: { not: "REMOVED" } },
+    select: { id: true, includeTerms: true, excludeTerms: true, members: { select: { key: true, included: true } } },
+  });
+  return rows.map((row) => ({ id: row.id, includeTerms: row.includeTerms, excludeTerms: row.excludeTerms, members: new Map(row.members.map((member) => [member.key, member.included])) }));
 }
 
 /** La clé, côté moteur, d'un médicament proposé que l'officine ne détient pas (plus) : le moteur dira « plus au catalogue ». */
@@ -166,6 +188,7 @@ export async function loadAssociationInput(scope: TenantScope, lines: LineForAss
   const wanted = {
     productIds: [...new Set([...rows.map((row) => row.triggerProductId).filter((id): id is string => id !== null), ...common.triggerProductIds])],
     drugKeys: new Set(rules.map((rule) => rule.triggerKey).filter((key) => key.startsWith("drug:"))),
+    families: common.families,
   };
   return { rules, lines: await resolveLineTriggers(scope.pharmacyId, lines, wanted), products: [...drugProducts.values()] };
 }

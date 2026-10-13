@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   prisma: {
     productAssociation: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), createManyAndReturn: vi.fn(), update: vi.fn(), delete: vi.fn() },
     centralAssociation: { findMany: vi.fn() },
+    triggerFamily: { findMany: vi.fn() },
     productBarcode: { findMany: vi.fn() },
     product: { findMany: vi.fn(), findFirst: vi.fn() },
     drugSpecialty: { findMany: vi.fn(), findUnique: vi.fn() },
@@ -32,6 +33,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.prisma.productAssociation.findMany.mockResolvedValue([]);
   mocks.prisma.centralAssociation.findMany.mockResolvedValue([]);
+  mocks.prisma.triggerFamily.findMany.mockResolvedValue([]);
   mocks.prisma.productBarcode.findMany.mockResolvedValue([]);
   mocks.prisma.product.findMany.mockResolvedValue([]);
   mocks.prisma.drugSpecialty.findMany.mockResolvedValue([]);
@@ -170,6 +172,22 @@ describe("les associations communes à toutes les officines", () => {
     mocks.prisma.centralAssociation.findMany.mockResolvedValue([central({ triggerKind: "PRODUCT", triggerKey: "ean:3401111111111" })]);
     mocks.prisma.product.findMany.mockResolvedValueOnce([{ id: "p_same", ean: "3401111111111" }]);
     expect(await loadAssociationInput(SCOPE, [line(0, "Spray nasal")])).toBeUndefined();
+  });
+
+  it("une famille déclencheuse : tout produit dont le libellé en fait partie déclenche, sauf un produit retiré à la main", async () => {
+    mocks.prisma.centralAssociation.findMany.mockResolvedValue([central({ id: "ca4", triggerKind: "FAMILY", triggerKey: "family:f1" })]);
+    mocks.prisma.product.findMany.mockResolvedValueOnce([{ id: "p_advice", ean: "3401111111111" }]);
+    mocks.prisma.triggerFamily.findMany.mockResolvedValue([{ id: "f1", includeTerms: ["shamp/shp chute"], excludeTerms: [], members: [{ key: "ean:3400555555555", included: false }] }]);
+    const input = await loadAssociationInput(SCOPE, [line(0, "PHYTOCYANE SHP ANTI-CHUTE 200ML", "3400222222222"), line(1, "KLORANE SHAMPOOING QUININE ANTICHUTE", "3400555555555"), line(2, "SHAMPOOING DOUX")]);
+    expect(mocks.prisma.triggerFamily.findMany.mock.calls[0][0].where).toEqual({ id: { in: ["f1"] }, status: { not: "REMOVED" } });
+    expect(input?.rules).toEqual([{ id: "central:ca4", triggerKey: "family:f1", adviceProductId: "p_advice", sentence: "Pour accompagner.", sortOrder: 1_000_000 }]);
+    expect(input?.lines).toEqual([{ lineIndex: 0, keys: ["family:f1"], productId: null }]);
+  });
+
+  it("une famille supprimée ne déclenche plus rien", async () => {
+    mocks.prisma.centralAssociation.findMany.mockResolvedValue([central({ id: "ca4", triggerKind: "FAMILY", triggerKey: "family:f1" })]);
+    mocks.prisma.product.findMany.mockResolvedValueOnce([{ id: "p_advice", ean: "3401111111111" }]);
+    expect(await loadAssociationInput(SCOPE, [line(0, "PHYTOCYANE SHP ANTI-CHUTE 200ML")])).toBeUndefined();
   });
 
   it("les associations de l'officine passent avant les communes", async () => {

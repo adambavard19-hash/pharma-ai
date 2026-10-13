@@ -11,7 +11,7 @@ import { parseSearchQuery, searchableText, wordsOf, type ParsedQuery, type Searc
  *    grâce aux codes de famille que le serveur a retrouvés pour ce mot (`medicineCodes`).
  */
 
-export type HubFilter = "ALL" | "MEDICINE" | "PRODUCT" | "REVIEW" | "ROBOT" | "REMOVED" | "AVOID";
+export type HubFilter = "ALL" | "MEDICINE" | "PRODUCT" | "REVIEW" | "ROBOT" | "REMOVED" | "FAMILIES" | "AVOID";
 
 export const HUB_FILTERS: { key: HubFilter; label: string }[] = [
   { key: "ALL", label: "Tous" },
@@ -20,11 +20,12 @@ export const HUB_FILTERS: { key: HubFilter; label: string }[] = [
   { key: "REVIEW", label: "À relire" },
   { key: "ROBOT", label: "Proposés par le robot" },
   { key: "REMOVED", label: "Retirés" },
+  { key: "FAMILIES", label: "Familles déclencheuses" },
   { key: "AVOID", label: "À ne pas associer" },
 ];
 
 /** Les filtres dans l'adresse (`?filtre=robot`) : les anciennes adresses y mènent, et un lien se partage. */
-export const FILTER_PARAMS: Record<HubFilter, string> = { ALL: "tous", MEDICINE: "medicament", PRODUCT: "produit", REVIEW: "a-relire", ROBOT: "robot", REMOVED: "retires", AVOID: "a-ne-pas-associer" };
+export const FILTER_PARAMS: Record<HubFilter, string> = { ALL: "tous", MEDICINE: "medicament", PRODUCT: "produit", REVIEW: "a-relire", ROBOT: "robot", REMOVED: "retires", FAMILIES: "familles", AVOID: "a-ne-pas-associer" };
 
 /** `?filtre=robot` → ROBOT. Un filtre inconnu (ou absent) montre « Tous ». */
 export function filterFromParam(value: string | string[] | undefined): HubFilter {
@@ -69,7 +70,7 @@ export function matchesFilter(entry: HubFacets, filter: HubFilter): boolean {
   }
 }
 
-export function countByFilter(entries: HubFacets[]): Record<Exclude<HubFilter, "AVOID">, number> {
+export function countByFilter(entries: HubFacets[]): Record<Exclude<HubFilter, "AVOID" | "FAMILIES">, number> {
   const count = (filter: HubFilter) => entries.filter((entry) => matchesFilter(entry, filter)).length;
   return { ALL: count("ALL"), MEDICINE: count("MEDICINE"), PRODUCT: count("PRODUCT"), REVIEW: count("REVIEW"), ROBOT: count("ROBOT"), REMOVED: count("REMOVED") };
 }

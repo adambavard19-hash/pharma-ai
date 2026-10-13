@@ -423,11 +423,10 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, outside, open, o
   const name = (open && item.sheet?.name) || item.name;
   const summary = (
     <>
-      {item.image ? (
+      {/* Seulement une photo studio (fond uni, la même pour tous) ; sans elle, rien : ni carré vide, ni photo d'amateur. */}
+      {item.image && (
         // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
         <img src={item.image} alt="" width={40} height={40} draggable={false} className="size-10 shrink-0 rounded-lg bg-white object-contain" />
-      ) : (
-        <span className="size-10 shrink-0 rounded-lg" style={{ background: C.line }} />
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
