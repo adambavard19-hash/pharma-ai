@@ -116,11 +116,12 @@ jobs:
         id: pull
         run: |
           npx --yes "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN" > /dev/null
-          # Toutes les valeurs récupérées sont masquées dans l'historique (dépôt public) avant toute autre commande.
+          # Les valeurs secrètes récupérées sont masquées dans l'historique (dépôt public) avant toute autre commande. Seules
+          # les valeurs longues (mots de passe, adresses, jetons) : masquer « production » ou « true » rendait l'historique illisible.
           while IFS= read -r line; do
             case "$line" in ''|\#*) continue ;; esac
             value="${line#*=}"; value="${value%\"}"; value="${value#\"}"
-            [ ${#value} -ge 4 ] && echo "::add-mask::$value"
+            if [ ${#value} -ge 16 ]; then echo "::add-mask::$value"; fi
           done < .vercel/.env.production.local
           echo "Configuration de production récupérée (valeurs masquées)."
 
@@ -146,17 +147,44 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Déploiement : $url"
 
-      - name: Vérifier que pharmaboost.app montre cette version
+      - name: Mettre pharmaboost.app sur cette version
         id: verify
         run: |
-          for attempt in $(seq 1 30); do
-            body=$(curl -fsS --max-time 10 "$SITE_URL/api/sante" || true)
-            case "$body" in
-              *"\"version\":\"$GITHUB_SHA\""*) echo "pharmaboost.app répond avec la nouvelle version."; exit 0 ;;
-            esac
-            sleep 10
-          done
-          echo "::error title=Nouvelle version pas encore visible::Le déploiement est fait, mais pharmaboost.app ne montre pas cette version après 5 minutes. Vérifiez dans Vercel que le domaine est bien rattaché à la production du projet."
+          # pharmaboost.app n'est pas basculé tout seul par Vercel (seule l'adresse technique du projet l'est) : on le bascule
+          # ici, puis on vérifie que le site répond avec CETTE version (/api/sante). Aucun réglage de domaine ni de DNS n'est changé.
+          url="${{ steps.deploy.outputs.url }}"
+          live() {
+            for attempt in $(seq 1 "$1"); do
+              body=$(curl -fsS --max-time 10 "$SITE_URL/api/sante" || true)
+              case "$body" in *"\"version\":\"$GITHUB_SHA\""*) return 0 ;; esac
+              sleep 10
+            done
+            return 1
+          }
+
+          echo "1/2 — Promotion officielle du déploiement en production du projet…"
+          if timeout 240 npx --yes "$VERCEL_CLI" promote "$url" --yes --scope "$VERCEL_ORG_ID" --token="$VERCEL_TOKEN"; then
+            echo "Promotion acceptée par Vercel."
+          else
+            echo "::notice title=Promotion sans effet::Vercel n'a rien promu (normal si ce déploiement est déjà la production du projet). Passage à la bascule de pharmaboost.app."
+          fi
+          if live 6; then
+            echo "pharmaboost.app répond avec la nouvelle version (promotion)."
+            echo "via=promotion" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "2/2 — Bascule de pharmaboost.app sur ce déploiement (ce que faisait l'ancien script)…"
+          if ! npx --yes "$VERCEL_CLI" alias set "$url" pharmaboost.app --scope "$VERCEL_ORG_ID" --token="$VERCEL_TOKEN"; then
+            echo "::error title=Bascule refusée::Vercel a refusé de mettre pharmaboost.app sur le nouveau déploiement. Le site reste sur la version précédente. Vérifiez que le jeton a bien accès à l'équipe Woorld et au domaine."
+            exit 1
+          fi
+          if live 18; then
+            echo "pharmaboost.app répond avec la nouvelle version (bascule)."
+            echo "via=bascule" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error title=Nouvelle version pas encore visible::La bascule a été acceptée mais pharmaboost.app ne montre pas cette version après 3 minutes. Regardez dans Vercel quel déploiement sert pharmaboost.app."
           exit 1
 
       - name: Compte rendu
@@ -178,6 +206,8 @@ jobs:
             echo ""
             if [ "${{ job.status }}" = "success" ]; then
               echo "### ✅ En ligne sur pharmaboost.app"
+              echo ""
+              if [ "${{ steps.verify.outputs.via }}" = "bascule" ]; then echo "Mise en ligne par bascule de pharmaboost.app sur le nouveau déploiement."; else echo "Mise en ligne par promotion du déploiement."; fi
             else
               echo "### ❌ Publication arrêtée"
               echo ""
@@ -185,6 +215,6 @@ jobs:
               if [ "${{ steps.pull.outcome }}" = "failure" ]; then echo "Vercel a refusé l'accès : le jeton est peut-être expiré ou n'a pas accès à l'équipe Woorld. Rien n'a été touché."; fi
               if [ "${{ steps.migrations.outcome }}" = "failure" ]; then echo "Les migrations ont été refusées ou ont échoué (détail ci-dessus). Le site reste sur la version précédente."; fi
               if [ "${{ steps.deploy.outcome }}" = "failure" ]; then echo "La construction ou le déploiement a échoué chez Vercel (détail dans l'étape « Déployer »). Les migrations éventuelles sont faites (elles ne font qu'ajouter) ; le site reste sur la version précédente."; fi
-              if [ "${{ steps.verify.outcome }}" = "failure" ]; then echo "Le déploiement est fait mais pharmaboost.app ne montre pas encore cette version : vérifier le domaine dans Vercel."; fi
+              if [ "${{ steps.verify.outcome }}" = "failure" ]; then echo "Le déploiement est prêt mais pharmaboost.app n'a pas pu être mis sur cette version (détail dans l'étape « Mettre pharmaboost.app sur cette version »). Le site reste sur la version précédente."; fi
             fi
           } >> "$GITHUB_STEP_SUMMARY"
