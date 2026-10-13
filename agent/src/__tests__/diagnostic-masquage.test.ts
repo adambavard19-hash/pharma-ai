@@ -141,7 +141,7 @@ New-Report | ForEach-Object { $_ }`);
     expect(out).toContain("192.168.0.2:3050 (autre ordinateur du réseau local)");
     expect(out).toContain("Cet ordinateur est relié à un autre ordinateur de la pharmacie");
     expect(out).not.toContain("MOTDEPASSESECRET");
-  });
+  }, 30_000); // Simulation complète d'un poste : près de 6 s sur les machines de GitHub (limite de 5 s par défaut).
 });
 
 describe.skipIf(!pwsh)("la version complète : programmes, fichiers et journaux qui parlent du robot", () => {
