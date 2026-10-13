@@ -8,6 +8,7 @@ import { STAGE_WIDTH } from "@/core/island/banner-flow";
 import { IslandShell, ISLAND_CSS } from "@/components/island/island-shell";
 import { Robot } from "@/components/robot";
 import {
+  adviceLink,
   answerWord,
   emailWord,
   finishWord,
@@ -22,7 +23,8 @@ import {
   type HostCommand,
   type RegionRect,
 } from "@/core/poste/island-bridge";
-import { ESSAI_LENGTH_MS, ESSAI_SEQUENCE } from "@/core/poste/island-fixtures";
+import { ESSAI_LENGTH_MS, ESSAI_SEQUENCE, isEssaiSale } from "@/core/poste/island-fixtures";
+import { readCounterSheet } from "../../../../../agent/src/counter-sheet";
 
 /**
  * L'île du poste de caisse : la bannière validée (`CounterIsland`, les mêmes composants que l'aperçu), pilotée par
@@ -93,6 +95,11 @@ function useBridge(onCommand: (command: HostCommand) => void): { send: (message:
   return { send: useCallback((message: Outgoing) => sendRef.current(message), []) };
 }
 
+/**
+ * Les conseils de la vente, tels que l'île les dessine. Chaque carte mène à la page PharmaBoost de la vente, ouverte sur
+ * ce conseil (agent/src/sale-link.ts) : un lien relatif, donc toujours vers le serveur qui sert cette page. Au poste,
+ * l'hôte Windows l'envoie au navigateur par défaut du PC ; ailleurs, c'est un lien normal (nouvel onglet).
+ */
 const toAdvice = (entry: HostEntry): IslandAdvice[] =>
   entry.items.map((item) => ({
     name: item.name,
@@ -104,11 +111,15 @@ const toAdvice = (entry: HostEntry): IslandAdvice[] =>
     stock: item.availability as IslandAdvice["stock"],
     quantity: item.quantity !== "" && Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : undefined,
     image: item.image || undefined,
+    href: isEssaiSale(entry.id) ? undefined : adviceLink(entry.id, item),
+    // La carte déployée : relue une dernière fois (forme, bornes) — une commande d'une autre version ne casse pas l'île.
+    sheet: readCounterSheet(item.sheet) ?? undefined,
   }));
 
 /** Ce qu'on peut saisir pour déplacer l'île : tout, sauf les boutons, les champs, les liens et les listes qui défilent. */
 function isDragHandle(target: EventTarget | null): boolean {
-  return target instanceof Element && !target.closest("button, input, textarea, a, select, .isl-scroll");
+  // Une carte de conseil se déploie d'un appui : jamais une prise (elle est aussi dans la liste qui défile).
+  return target instanceof Element && !target.closest("button, input, textarea, a, select, .isl-scroll, [data-advice-card]");
 }
 
 export function PosteIsland() {
@@ -185,6 +196,7 @@ export function PosteIsland() {
     alert,
     alertItems: entry?.alerts ?? [],
     movable: true,
+    adviceLinksOutside: true,
     pills: [{ key: "poste", label: view.postLabel || "Comptoir", value: "Connecté", dot: C.accent }],
     look: view.look,
     onAnswer: (index, outcome) => {

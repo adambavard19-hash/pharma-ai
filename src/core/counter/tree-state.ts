@@ -46,3 +46,22 @@ export function answersFromRows(rows: { treeKey: string; nodeKey: string; choice
   for (const row of rows) if (row.treeKey === ANALGESIC_TREE.key && row.choices.length > 0) answers[row.nodeKey] = row.choices;
   return answers;
 }
+
+/**
+ * Une carte par produit parmi les conseils de l'arbre débloqués. La question « Où le patient a-t-il mal ? » se coche à
+ * plusieurs (épaule ET genou) et chaque zone garde sa propre recommandation, souvent la même poche multi-zones : sans ce
+ * tri, l'écran de la vente montrerait deux cartes pour un seul produit (deux places, deux lignes de panier). La fenêtre du
+ * poste fait déjà ce tri (core/counter/notice.ts). Une carte déjà tranchée (acceptée, refusée…) passe avant une carte
+ * neuve pour que la décision du pharmacien reste visible ; sinon la première dans l'ordre reçu garde la place. Les
+ * conseils hors de l'arbre et les recommandations sans produit ne sont jamais touchés.
+ */
+export function oneTreeCardPerProduct<T extends { productId: string | null; status: string; opportunity?: { ruleKey: string | null } | null }>(recommendations: readonly T[]): T[] {
+  const isTree = (recommendation: T) => Boolean(recommendation.productId && recommendation.opportunity?.ruleKey && TREE_RULE_KEYS.has(recommendation.opportunity.ruleKey));
+  const kept = new Map<string, T>();
+  for (const recommendation of recommendations) {
+    if (!isTree(recommendation)) continue;
+    const current = kept.get(recommendation.productId as string);
+    if (!current || (current.status === "PROPOSED" && recommendation.status !== "PROPOSED")) kept.set(recommendation.productId as string, recommendation);
+  }
+  return recommendations.filter((recommendation) => !isTree(recommendation) || kept.get(recommendation.productId as string) === recommendation);
+}

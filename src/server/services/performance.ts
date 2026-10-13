@@ -1,6 +1,7 @@
 import "server-only";
 import { TIME_ZONE } from "@/config/constants";
 import type { Prisma } from "@/generated/prisma";
+import { COUNTED_ADVICE } from "@/server/db/counted-advice";
 import {
   ACCEPTED_STATUSES,
   PENDING_GRACE_HOURS,
@@ -117,7 +118,7 @@ function toAdviceRow(row: AdviceRecord): AdviceRow {
 /** Les conseils créés dans `[start, end[`, ajouts manuels et ordonnances supprimées compris (le calcul les écarte et les compte à part). */
 async function readAdvice(pharmacyId: string, start: Date, end: Date, demo = false): Promise<AdviceRow[]> {
   const rows = await prisma.recommendation.findMany({
-    where: { pharmacyId, ...activityScope({ isDemo: demo }), createdAt: { gte: start, lt: end } },
+    where: { pharmacyId, ...activityScope({ isDemo: demo }), createdAt: { gte: start, lt: end }, AND: [COUNTED_ADVICE] },
     select: ADVICE_SELECT,
   });
   return rows.map(toAdviceRow);
@@ -138,6 +139,7 @@ async function readRhythmAdvice(pharmacyId: string, now: Date, demo = false): Pr
       origin: { in: [...PHARMABOOST_ORIGINS] },
       prescription: { deletedAt: null },
       createdAt: { gte: since, lt: now },
+      AND: [COUNTED_ADVICE],
     },
     select: ADVICE_SELECT,
   });
@@ -449,6 +451,8 @@ export async function loadPortfolioForPlatform(params: { now?: Date } = {}): Pro
     ...activityScope(),
     origin: { in: [...PHARMABOOST_ORIGINS] },
     prescription: { deletedAt: null },
+    // Un conseil caché de l'arbre de questions, jamais tranché, n'entre pas dans le taux (server/db/counted-advice.ts).
+    AND: [COUNTED_ADVICE],
   } satisfies Prisma.RecommendationWhereInput;
 
   const [byStatus, pending, lastProposals, lastSales, analyses, lines] = await Promise.all([

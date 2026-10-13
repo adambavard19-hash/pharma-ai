@@ -3,7 +3,18 @@ import { MAX_RECOMMENDATIONS_PER_PRESCRIPTION } from "@/config/constants";
 import { adviceFamilyOf, type AdviceFamily } from "../family";
 import type { AnalysisResult, CatalogProduct } from "../types";
 import { product } from "./fixtures";
-import { analyse, probioticShelf, nasalShelf } from "./scenarios-conseils";
+import { analyse as analyseAll, probioticShelf, nasalShelf } from "./scenarios-conseils";
+import { TREE_RULE_KEYS } from "../../counter/question-tree";
+
+/**
+ * Le plafond compte les conseils MONTRÉS. Ceux du bout de l'arbre de questions du comptoir (la poche d'une zone, le thermomètre
+ * de la fièvre) restent cachés tant que le pharmacien n'a pas répondu : le moteur les garde hors plafond (pipeline.ts), et ces
+ * tests, qui portent sur ce que le plafond retient, ne les regardent pas.
+ */
+const analyse = (...args: Parameters<typeof analyseAll>): AnalysisResult => {
+  const result = analyseAll(...args);
+  return { ...result, recommendations: result.recommendations.filter((r) => !TREE_RULE_KEYS.has(r.opportunityKey)) };
+};
 
 /**
  * Le conseil complet, de bout en bout : une ordonnance de plusieurs médicaments,
@@ -31,6 +42,11 @@ const SPIRONOLACTONE = treatment("Spironolactone 25", "C03DA01", "Diurétique é
 
 /** Dix médicaments : bien plus de besoins que de places. */
 const ORDONNANCE_CHARGEE = [AMOXICILLINE, IBUPROFENE, CORTICOIDE_CREME, TRAMADOL, ESOMEPRAZOLE, ANTIHISTAMINIQUE, ANTITUSSIF, VALACICLOVIR, SPIRONOLACTONE];
+/**
+ * La même sans le valaciclovir : ses huit médicaments sont couverts par sept conseils, la huitième place est un deuxième conseil
+ * pour un médicament déjà servi — c'est elle, et elle seule, qu'une famille absente peut reprendre (répartition, pipeline.ts).
+ */
+const ORDONNANCE_CHARGEE_HUIT = ORDONNANCE_CHARGEE.filter((treatment) => treatment !== VALACICLOVIR);
 
 const stocked = (id: string, name: string, category: CatalogProduct["category"], tags: string[], overrides: Partial<CatalogProduct> = {}) =>
   product({ id, name, category, subCategory: null, matchingTags: tags, commercialClaims: [], stockQuantity: 6, ...overrides });
@@ -212,17 +228,28 @@ describe("le conseil complet de la trace compte une routine pour UN conseil", ()
 
 describe("une place est gardée à chaque famille présente", () => {
   it("le médicament conseil, de faible priorité, passe malgré huit conseils mieux classés", () => {
-    const full = unlimited(ORDONNANCE_CHARGEE, withMedicament);
+    const full = unlimited(ORDONNANCE_CHARGEE_HUIT, withMedicament);
     const firstEight = full.recommendations.slice(0, 8);
     expect(firstEight.some((r) => familyOf(withMedicament, r.productId) === "MEDICAMENT")).toBe(false);
     expect(full.recommendations.some((r) => familyOf(withMedicament, r.productId) === "MEDICAMENT")).toBe(true);
 
-    const result = analyse(ORDONNANCE_CHARGEE, withMedicament);
+    const result = analyse(ORDONNANCE_CHARGEE_HUIT, withMedicament);
     expect(result.recommendations).toHaveLength(8);
     expect(keys(result)).toContain("sore-throat-orl");
     expect(families(result, withMedicament)).toEqual(new Set(["MEDICAMENT", "COMPLEMENT", "PARAPHARMACIE"]));
     expect(traceNotes(result)).toContain("Un conseil de la famille « Médicament conseil » a été gardé malgré la limite.");
     expect(traceNotes(result).find((note) => note.startsWith("Conseil complet : "))).toMatch(/^Conseil complet : 1 médicament conseil · \d+ compléments? alimentaires? · \d+ produits? de parapharmacie\.$/);
+  });
+
+  it("la famille ne reprend jamais à un médicament son seul conseil : neuf médicaments, huit places, chacun garde le sien", () => {
+    // Retour du fondateur, 13 oct. 2026 : du conseil sur chaque médicament de la vente avant un deuxième pour l'un d'eux.
+    const result = analyse(ORDONNANCE_CHARGEE, withMedicament);
+    expect(result.recommendations).toHaveLength(8);
+    const covered = new Set(result.recommendations.flatMap((r) => result.opportunities.find((o) => o.key === r.opportunityKey)?.triggeredBy.map((t) => t.lineIndex) ?? []));
+    expect([...covered].sort()).toEqual(ORDONNANCE_CHARGEE.map((_, index) => index));
+    expect(keys(result)).toContain("herpes-lysine");
+    expect(families(result, withMedicament).has("MEDICAMENT")).toBe(false);
+    expect(traceNotes(result).some((note) => note.includes("gardé malgré la limite"))).toBe(false);
   });
 
   it("le conseil gardé est celui que le moteur aurait retenu sans limite : même produit, même score", () => {
@@ -292,7 +319,7 @@ describe("jamais le seul de sa famille", () => {
 
 describe("l'ordre de sortie reste celui de la priorité clinique", () => {
   it("les conseils gardés se suivent par priorité décroissante, le conseil réservé à sa place d'origine", () => {
-    const result = analyse(ORDONNANCE_CHARGEE, withMedicament);
+    const result = analyse(ORDONNANCE_CHARGEE_HUIT, withMedicament);
     const priorities = keys(result).map((key) => priorityOf(result, key));
     expect(priorities).toEqual([...priorities].sort((a, b) => b - a));
     // Le médicament conseil (priorité 48) vient après tout ce qui le précède dans la liste complète.

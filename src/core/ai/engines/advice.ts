@@ -8,6 +8,7 @@ import { PAIN_ZONE_RULES } from "./pain-zones";
 import { passesNameGate, type NameGate } from "./name-gate";
 import type {
   AdviceOpportunityResult,
+  CatalogProduct,
   DrugKnowledge,
   PatientContext,
   ProductCategoryCode,
@@ -100,6 +101,32 @@ export type AdviceRule = {
    * hydratant, et la plus générale le ferait sans poser la question que la plus précise exige.
    */
   excludeAtcPrefixes?: string[];
+  /**
+   * Les règles dont ce conseil n'est que le REPLI : il s'efface dès que l'une d'elles a retenu une référence pour la même
+   * vente (pipeline, étape 7). Sans elle — rien en rayon, règle bloquée pour ce patient, supprimée depuis la console —, le
+   * repli reste proposé : c'est sa raison d'être. Le lavage oculaire ne s'affiche pas à côté du collyre anti-allergique ; il
+   * le remplace quand l'officine n'en a pas.
+   */
+  fallbackFor?: string[];
+  /**
+   * Des formules préférées selon le CONTEXTE de la vente : quand un médicament déclencheur porte l'un de ces préfixes ATC,
+   * ces motifs passent devant `productPrefer`. Le même lavage nasal se choisit « allergie » sous antihistaminique ; dans un
+   * contexte infectieux, l'ordre de la règle reste le seul.
+   */
+  contextPrefer?: { atcPrefixes: string[]; productPrefer: string[] }[];
+  /**
+   * La règle s'efface quand une ligne de la VENTE (pas seulement celles qui l'ont ouverte) porte l'un de ces préfixes ATC :
+   * le produit qu'elle propose y est déjà. Sans quoi un collyre anti-allergique viendrait s'ajouter à celui de l'ordonnance
+   * (doublement thérapeutique) — le garde-fou des substances identiques ne compare pas deux substances différentes.
+   */
+  blockedWhenSaleHas?: { atcPrefixes: string[]; reason: string };
+  /**
+   * Un médicament proposé par cette règle doit être une boîte reconnue du catalogue national, dont les conditions de
+   * délivrance sont lues (et la liste I ou II écartée, au chargement comme au moteur de sécurité). Un produit de l'officine
+   * qui porte un code CIP (3400…) n'a pas ces conditions lues : il n'est pas proposé par cette règle, quelles que soient ses
+   * étiquettes (dictionnaire, modèle ou anciennes étiquettes en base).
+   */
+  verifiedMedicinesOnly?: boolean;
   /**
    * Une porte sur le NOM du médicament, quand l'ATC ne suffit pas à le distinguer d'un autre (clobétasol crème ou
    * shampooing : même code D07AD01). Voir `name-gate.ts`.
@@ -227,6 +254,14 @@ export type AdviceRule = {
    */
   durationGate?: { atcPrefixes: string[]; minDays: number };
   /**
+   * Les règles qui se TAISENT pour le médicament qui ouvre celle-ci par son code ATC, et pour lui seul : le conseil écrit pour
+   * ce médicament remplace le conseil générique. Après une métopimazine, le pharmacien fondateur veut les huiles essentielles
+   * digestives et la réhydratation, pas le substitut salivaire (13 oct. 2026). Un autre médicament de la vente qui ouvre la
+   * règle tue la garde (un antidépresseur garde sa sécheresse buccale) ; la garde tient même si ce conseil-ci est écarté pour
+   * le patient : elle dit ce qui n'est pas pertinent pour ce médicament, pas ce qui le remplace.
+   */
+  silences?: string[];
+  /**
    * Les vigilances par population (grossesse, allaitement, asthme, épilepsie,
    * enfant) que la règle porte, écrites à partir de ses propres sources. Elles
    * s'affichent sur la carte ; elles ne remplacent pas `blockedFor`, qui reste
@@ -255,6 +290,26 @@ export type AdviceRule = {
 export function isFragileForRehydration(patient: PatientContext): boolean {
   return patient.ageYears !== null && (patient.ageYears < 6 || patient.ageYears >= 75);
 }
+
+/** Des comprimés effervescents ou des pastilles d'électrolytes, par leur libellé de stock (« PAST EFF 20 », « PAST EFFV »). */
+const EFFERVESCENT_TABLETS = String.raw`(?:efferv|\beffv?\d*\b|\bpast\b|pastill)`;
+
+/**
+ * Les gammes d'aromathérapie, par leur nom de gamme : CHOIX ASSUMÉ, et LISTE À MAINTENIR. Un libellé d'export de stock ne dit
+ * souvent rien de la composition — « OLISEPTIL GASTRO GELU 15 » (la faute d'un export réel) ne porte aucune mention « huile
+ * essentielle », et un produit de parapharmacie n'a pas de composition en base : sans le nom de sa gamme, il n'est pas
+ * reconnu. Une gamme absente de cette liste n'est reconnue que si son libellé dit « huiles essentielles » ou « HE ». Le même
+ * choix existait déjà pour les gélules respiratoires (core/catalog/product-vocabulary.ts). La règle, elle, ne nomme aucune
+ * marque : ni ses étiquettes, ni ses textes au comptoir — le produit proposé est celui du stock de l'officine.
+ */
+export const AROMATHERAPY_RANGES = String.raw`olio?septil|aromaforce|aromatherap|pranarom|puressentiel|phytosun|arkoessentiel`;
+
+/**
+ * Un complexe d'huiles essentielles à visée digestive, par son libellé de stock : une mention d'huiles essentielles ou une gamme
+ * d'aromathérapie (`AROMATHERAPY_RANGES`), ET un mot de la sphère digestive. Ni une tisane, ni une boisson digestive, ni une
+ * gamme d'huiles essentielles pour les bronches ou la gorge.
+ */
+export const DIGESTIVE_ESSENTIAL_OIL = String.raw`^(?=.*(?:huiles? essentielles?|\bhe\b|\bhle ess|${AROMATHERAPY_RANGES}))(?=.*(?:gastro|intestin|digest|ventre|transit|ballonn))`;
 
 /**
  * Une chambre d'inhalation, par son nom de fichier de stock : « chambre d'inhalation »,
@@ -286,6 +341,84 @@ function chamberExcludeFor(ageYears: number | null): string[] {
   if (ageYears < 12) return [String.raw`bebe`, String.raw`nourr?iss`, String.raw`babyhaler`];
   return [String.raw`bebe`, String.raw`nourr?iss`, String.raw`babyhaler`, String.raw`^(?!.*adulte).*(?:enfant|pediatr)`];
 }
+
+// ---------------------------------------------------------------------------
+// Contexte allergique — retour du fondateur, pharmacien, 13 octobre 2026 : après une CÉTIRIZINE 10 mg, le conseil réussi
+// est le produit de L'ALLERGIE (collyre anti-allergique, eau de mer « nez allergique », comprimé à sucer pour la gorge),
+// pas un gel lubrifiant ni un substitut salivaire remboursé. Tout ce qui suit le reconnaît par les données — substances du
+// catalogue national, étiquettes du dictionnaire d'usage, libellés du stock —, jamais par une marque.
+// ---------------------------------------------------------------------------
+
+/** Antihistaminiques H1 de l'allergie (cétirizine R06AE07, desloratadine R06AX27…) : pas les phénothiazines antitussives (R06AD). */
+const ALLERGY_ANTIHISTAMINES = ["R06AE", "R06AX"];
+
+/**
+ * Un produit aux huiles essentielles, par son nom de fichier de stock : la mention (« huiles essentielles », « HE »,
+ * « Hle ess »), une plante ou un composé terpénique courant, une gamme d'aromathérapie que le dictionnaire reconnaît déjà
+ * (core/catalog/product-vocabulary.ts), ou un nom en « …force » (« AROMAFORCE »). Large exprès : il n'écarte qu'un patient
+ * à risque, et à tort il écarte un produit de trop, jamais un de moins. Le nom ne dit pas tout : la fiche produit
+ * (« enfant », « grossesse ») et les vigilances déclarées par l'officine écartent aussi (safety.ts, population-vigilance.ts).
+ */
+export const ESSENTIAL_OIL_NAME = String.raw`(?:huiles? essentielles?|\bhe\b|\bhle ess|essentiel|aroma|eucalypt|ravintsar|niaouli|menthol|camphr|terpen|olioseptil|pranarom|phytosun|force\b)`;
+
+const ESSENTIAL_OIL_SOURCE = "ANSM — huiles essentielles, précautions d'emploi";
+
+/** Les contre-indications des huiles essentielles (règle « confort respiratoire pendant la toux », même source). */
+const ESSENTIAL_OIL_POPULATIONS: PopulationVigilanceRule[] = [
+  { population: "ASTHMA", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées en cas d'asthme.", sources: [ESSENTIAL_OIL_SOURCE] },
+  { population: "EPILEPSY", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées en cas d'épilepsie ou d'antécédent de convulsions.", sources: [ESSENTIAL_OIL_SOURCE] },
+  { population: "PREGNANCY", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées pendant la grossesse.", sources: [ESSENTIAL_OIL_SOURCE] },
+  { population: "BREASTFEEDING", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées pendant l'allaitement.", sources: [ESSENTIAL_OIL_SOURCE] },
+  { population: "CHILD", level: "CONTRAINDICATION", maxAgeYears: 12, text: "Huiles essentielles : contre-indiquées avant 12 ans.", sources: [ESSENTIAL_OIL_SOURCE] },
+];
+
+/**
+ * Les mêmes, pour une règle qui propose AUSSI des produits sans huile essentielle (une eau de mer, une pastille au miel) :
+ * elles ne s'affichent que sur la référence dont le nom en porte (population-vigilance.ts, `productPattern`).
+ */
+const ESSENTIAL_OIL_POPULATIONS_BY_NAME: PopulationVigilanceRule[] = ESSENTIAL_OIL_POPULATIONS.map((rule) => ({ ...rule, productPattern: ESSENTIAL_OIL_NAME }));
+
+/**
+ * Asthme ou épilepsie déclarés, grossesse, allaitement, moins de 12 ans : un produit aux huiles essentielles ne se propose
+ * pas (mêmes situations que la règle de la toux, qui s'efface alors entièrement). Un âge inconnu n'écarte rien : la carte
+ * porte alors la vigilance, à valider par le pharmacien.
+ */
+function essentialOilExcludeFor(patient: PatientContext): string[] {
+  const atRisk =
+    patient.chronicConditions.some((c) => /asthm|epilep|épilep|convuls/i.test(c)) ||
+    patient.isPregnant ||
+    patient.isBreastfeeding ||
+    (patient.ageYears !== null && patient.ageYears < 12);
+  return atRisk ? [ESSENTIAL_OIL_NAME] : [];
+}
+
+/** Un médicament ACTIF du nez (corticoïde, antihistaminique, vasoconstricteur) : un traitement, pas un lavage. */
+const NASAL_ACTIVE = String.raw`(?:beclomet|mometason|fluticason|budesonid|triamcinolon|cortico|azelastin|olopatadin|cromoglic|levocabastin|oxymetazolin|xylometazolin|naphazolin|tuaminoheptan|phenylephrin|pseudoephedrin|ipratropium|vasoconstric)`;
+
+/** Un nom de collyre (ou de solution pour les yeux). */
+const EYE_DROP_WORDS = String.raw`(?:collyre|opht|oculaire|\byeux\b|\boeil\b|unidose)`;
+/** Ce qui, dans un nom qui parle des yeux, n'est pas un collyre : un soin du contour, un démaquillant, un produit du nez. */
+const NOT_EYE_DROP_WORDS = String.raw`(?:creme|\bcr\b|contour|demaquill|maquill|mascara|lingette|baume|nasal|\bnez\b|rhin|\bnas\b|auricul|oreille)`;
+
+/**
+ * Ce qu'un comprimé à sucer pour la gorge ne doit pas être : un antiseptique ou un anesthésique local (médicament « maux de
+ * gorge »), reconnu à sa substance, ou à la marque quand une officine le range en parapharmacie sans substance — celles que
+ * le dictionnaire d'usage met déjà au rayon gorge (core/catalog/product-vocabulary.ts).
+ */
+const THROAT_MEDICINE = String.raw`(?:maux de gorge|mal de gorge|lidoca|tetraca|benzoca|ambroxol|amylmetacres|dichlorobenz|cetylpyrid|chlorhex|hexamid|biclotymol|lysozym|flurbiprof|amylase|benzalkon|tyrothricin|strepsils|lysopa|\bdrill\b|hexaspray|colludol|maxilase)`;
+/** Les mêmes, telles que le catalogue national les publie (substances en minuscules, accents compris) : lues dans les étiquettes. */
+const THROAT_MEDICINE_SUBSTANCES = ["lidocaïne", "tétracaïne", "benzocaïne", "ambroxol", "amylmétacrésol", "dichlorobenzyl", "cétylpyridinium", "chlorhexidine", "hexamidine", "biclotymol", "lysozyme", "flurbiprofène", "amylase", "benzalkonium", "tyrothricine"];
+/** Une pastille, une gomme, un comprimé à sucer — et leurs abréviations de fichier de stock (« CPR SUC », « PAST »). */
+const LOZENGE_WORDS = String.raw`(?:sucer|\bsuc\b|pastill|\bpast\b|gommes?\b|\bgom\b|\bcpr\b|comprim|tablette)`;
+/**
+ * Ce qui, dans un nom, dit la GORGE : le dictionnaire range toute « pastille » au rayon gorge, y compris une pastille de
+ * fleurs de Bach contre le stress. Un comprimé à sucer ne se propose pour la gorge que si son nom en parle (gorge, miel,
+ * adoucissant, apaisant, voix…). La propolis seule n'y suffit pas : des gommes « propolis » ne disent pas la gorge, et un
+ * produit de la ruche chez un patient allergique mérite le regard du pharmacien plutôt qu'une proposition d'office.
+ */
+const THROAT_WORDS = String.raw`(?:gorge|miel|adouc|apais|larynx|pharyn|\bvoix\b|enrou)`;
+/** Ce qui porte « miel » sans se mettre en bouche : un savon, un bain, un soin du corps ou des lèvres. */
+const THROAT_NOT_FOR_MOUTH = String.raw`(?:\bsav\b|savon|\bbain\b|douche|shampo|creme|\bcr\b|baume|levre|corps|visage|masque|\blait\b)`;
 
 const CORE_ADVICE_RULES: AdviceRule[] = [
   {
@@ -511,11 +644,19 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     key: "dry-mouth-hygiene",
     title: "Sécheresse buccale",
     kind: "COMFORT",
-    version: "1.0",
+    // 1.1 (13 oct. 2026) : repli de « antihistamine-dry-throat ». Textes et déclencheurs inchangés ; le comportement change,
+    // d'où la version, pour relecture par la pharmacienne.
+    version: "1.1",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_OR_SIDE_EFFECT",
     needTriggers: ["DRY_MOUTH"],
     question: "Le patient a-t-il la bouche sèche depuis le début du traitement ?",
+    // Sous antihistaminique de l'allergie (R06AE, R06AX) SEUL, le comprimé à sucer pour la gorge
+    // (« antihistamine-dry-throat ») passe devant le substitut salivaire : celui-ci ne revient que si l'officine n'en a pas
+    // (retour du fondateur, 13 oct. 2026). Un antidépresseur, un neuroleptique ou un antihistaminique anticholinergique
+    // (R06AA, R06AB, R06AD) sur la même vente garde le substitut salivaire : le repli ne s'efface que si TOUTES les lignes qui
+    // l'ont ouvert ont aussi ouvert la règle de la gorge (pipeline, étape 7).
+    fallbackFor: ["antihistamine-dry-throat"],
     category: "HYGIENE",
     atcPrefixes: ["N06A", "R06A", "N05A"],
     therapeuticClasses: ["Antihistaminique", "Antidépresseur", "Neuroleptique"],
@@ -605,10 +746,14 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
   // ---------------------------------------------------------------------------
   {
     key: "nasal-hygiene-orl",
-    benefits: ["Lave et dégage le nez", "Sans principe actif", "Compatible avec le traitement"],
+    // « Sans principe actif » a quitté les bénéfices (1.1) : un spray aux huiles essentielles, que la règle préfère quand
+    // le nez est bouché, en contient.
+    benefits: ["Lave et dégage le nez", "Compatible avec le traitement"],
     title: "Hygiène nasale en contexte ORL",
     kind: "COMFORT",
-    version: "1.0",
+    // 1.1 (13 oct. 2026) : la référence « allergie » d'abord sous antihistaminique, les médicaments actifs du nez écartés,
+    // les huiles essentielles écartées pour un patient à risque et signalées sinon.
+    version: "1.1",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_ONLY",
     needTriggers: ["NASAL_CONGESTION"],
@@ -621,9 +766,23 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     matchingTags: ["nez", "nasal", "lavage", "eau de mer", "orl", "spray nasal"],
     // « Lavage » est un mot partagé : un collyre ou un produit auriculaire ne
     // lave pas le nez. Écartés par leur nom.
-    // Nez bouché confirmé : l'eau de mer hypertonique décongestionne, l'isotonique lave.
-    productPrefer: [String.raw`hypertoni`, String.raw`decongestion`, String.raw`décongestion`, String.raw`actirub`, String.raw`aromaforce`, String.raw`\bforce\b`, String.raw`rhume`],
-    productExclude: [String.raw`collyre`, String.raw`oculaire`, String.raw`ophtalm`, String.raw`\byeux\b`, String.raw`larmes`, String.raw`auriculaire`, String.raw`oreille`],
+    // Nez bouché confirmé : l'eau de mer hypertonique décongestionne, l'isotonique lave. Un motif préféré lève une
+    // exclusion (matching.ts) : chacun refuse d'abord un médicament actif du nez.
+    productPrefer: [String.raw`hypertoni`, String.raw`decongestion`, String.raw`décongestion`, String.raw`actirub`, String.raw`aromaforce`, String.raw`\bforce\b`, String.raw`rhume`].map(
+      (pattern) => String.raw`^(?!.*(?:${NASAL_ACTIVE}|${LOZENGE_WORDS})).*${pattern}`,
+    ),
+    // Sous antihistaminique, le nez est celui de l'allergie : l'eau de mer « nez allergique », le spray « rhinite
+    // allergique » passent devant l'eau de mer générique et le produit du rhume. Reconnus à leur libellé, quelle que soit
+    // la marque ; sans eux en rayon, l'ordre de la règle reste.
+    contextPrefer: [{ atcPrefixes: ALLERGY_ANTIHISTAMINES, productPrefer: [String.raw`^(?!.*(?:${NASAL_ACTIVE}|${LOZENGE_WORDS})).*allerg`] }],
+    // Un corticoïde, un antihistaminique ou un vasoconstricteur nasal est un traitement, pas un lavage : la phrase de la
+    // règle (« lave le nez ») serait fausse, et le vasoconstricteur relève d'un autre conseil. Une pastille non plus (le
+    // dictionnaire lui donne « orl ») : sans quoi « AROMAFORCE pastilles », sauvée par « aromaforce », passait pour un lavage.
+    productExclude: [String.raw`collyre`, String.raw`oculaire`, String.raw`ophtalm`, String.raw`\byeux\b`, String.raw`larmes`, String.raw`auriculaire`, String.raw`oreille`, NASAL_ACTIVE, LOZENGE_WORDS],
+    // Les huiles essentielles (un spray « rhume » ou « allergie » en contient souvent) : écartées pour un patient à risque,
+    // signalées sur la carte quand on ne sait pas.
+    productExcludeFor: essentialOilExcludeFor,
+    populations: ESSENTIAL_OIL_POPULATIONS_BY_NAME,
     // Un flacon de sérum physiologique ne se lave pas le nez tout seul : il
     // faut une seringue ou une poire de lavage. Le spray et la dosette, eux,
     // se suffisent.
@@ -688,6 +847,58 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     productExcludeFor: (patient) => (patient.ageYears !== null && patient.ageYears < 6 ? [String.raw`pastille`, String.raw`gomme`, String.raw`a sucer`] : []),
   },
   {
+    // Retour du fondateur, 13 octobre 2026 : après une cétirizine, la bouche et la gorge se conseillent avec un comprimé à
+    // sucer adoucissant (non remboursé), pas un substitut salivaire remboursé. « dry-mouth-hygiene » devient le repli de
+    // cette règle : il revient si l'officine n'a rien pour la gorge.
+    key: "antihistamine-dry-throat",
+    benefits: ["Adoucit la gorge", "En complément du traitement"],
+    title: "Bouche ou gorge sèche sous antihistaminique",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    question: "Le patient a-t-il la bouche ou la gorge sèche, ou la gorge qui gratte ?",
+    // Dans un contexte ORL (antibiotique, antitussif), la règle de la gorge irritée s'en charge déjà : une seule carte.
+    fallbackFor: ["sore-throat-orl"],
+    category: "SOINS",
+    atcPrefixes: ALLERGY_ANTIHISTAMINES,
+    therapeuticClasses: [],
+    sideEffectTriggers: [],
+    basePriority: 46,
+    // Sans « pastilles » : le dictionnaire la donne à toute pastille, pas à un « CPR A SUCER MIEL » — l'étiquette
+    // départagerait sur la façon dont le fichier abrège, pas sur le produit. La forme se lit au nom (`productPrefer`).
+    matchingTags: ["gorge", "irritation", "miel"],
+    // Un sirop ou une gélule ne se suce pas ; la toux a sa règle ; un antiseptique ou un anesthésique local (médicament
+    // « maux de gorge ») n'adoucit pas une gorge sèche — écarté par son nom et, pour une boîte du catalogue national, par sa
+    // substance (`excludeTags`). Un nom qui ne dit rien de la gorge (une pastille contre le stress) est écarté aussi.
+    productExclude: [String.raw`sirop`, String.raw`toux`, String.raw`gelu`, String.raw`\bgel\b`, String.raw`\bcaps?\b`, String.raw`nasal`, THROAT_MEDICINE, String.raw`^(?:(?!${THROAT_WORDS}).)*$`, THROAT_NOT_FOR_MOUTH],
+    excludeTags: THROAT_MEDICINE_SUBSTANCES,
+    // Le comprimé à sucer, la pastille, la gomme d'abord. Gardé : un motif préféré lève une exclusion (matching.ts).
+    productPrefer: [String.raw`^(?=.*${THROAT_WORDS})(?!.*(?:${THROAT_MEDICINE}|${THROAT_NOT_FOR_MOUTH}|sirop|toux|gelu|\bgel\b|\bcaps?\b|nasal)).*${LOZENGE_WORDS}`],
+    shortReasonTemplate: "Antihistaminique ({drug}) : une bouche ou une gorge sèche peut survenir.",
+    rationaleTemplate:
+      "Sous antihistaminique ({drug}), une sécheresse de la bouche est décrite (fréquente sous cétirizine d'après son RCP). Si le patient signale une bouche ou une gorge sèche, ou une gorge qui gratte, un comprimé à sucer adoucissant peut apporter du confort, en complément du traitement.",
+    counterScriptTemplate:
+      "« Vous avez la bouche ou la gorge sèche, ou la gorge qui gratte ? Cela peut arriver avec {drug}. {product} adoucit la gorge, en complément de votre traitement. »",
+    confirmedReasonTemplate: "Bouche ou gorge sèche confirmée sous {drug}.",
+    patientReasonTemplate:
+      "{drug} peut donner la bouche ou la gorge sèche. {product} adoucit la gorge, en complément de votre traitement.",
+    clinicalContext:
+      "RCP CETIRIZINE BIOGARAN 10 mg, comprimé pelliculé sécable — Base de données publique des médicaments (ANSM), CIS 61665908, mis à jour le 10/11/2022, rubrique 4.8 : « sécheresse de la bouche » fréquente (2,09 % sous cétirizine contre 0,82 % sous placebo) ; « pharyngite (maux de gorge) » fréquente, à un taux proche du placebo (1,29 % contre 1,34 %). Le choix d'un comprimé à sucer adoucissant non remboursé plutôt que d'un substitut salivaire vient du pharmacien fondateur (13 octobre 2026). Douleur intense ou difficulté à avaler : orienter vers le médecin.",
+    safetyNotes: ["Pastilles à éviter avant 6 ans (risque de fausse route).", "Douleur intense ou difficulté à avaler : orienter vers le médecin."],
+    populations: ESSENTIAL_OIL_POPULATIONS_BY_NAME,
+    // Les huiles essentielles, écartées pour un patient à risque ; un âge inconnu n'écarte rien, la carte porte la vigilance.
+    productExcludeFor: essentialOilExcludeFor,
+    // Avant 12 ans, la règle s'efface. Ce qu'elle propose se suce (pastille, bonbon au miel), et l'âge minimal d'un comprimé
+    // à sucer est écrit sur sa boîte, jamais dans un fichier de stock (fiche produit sans contre-indication après un
+    // import) : souvent « dès 12 ans » pour les comprimés à sucer adoucissants. Choix PRUDENT, sans source réglementaire, en
+    // attendant la validation de la pharmacienne. Le substitut salivaire, son repli, reste proposé. Un âge inconnu n'écarte rien.
+    blockedFor: (patient) =>
+      patient.ageYears !== null && patient.ageYears < 12
+        ? "Avant 12 ans : pas de comprimé à sucer proposé d'office (l'âge minimal du produit n'est pas connu du stock) — le substitut salivaire reste proposé."
+        : null,
+  },
+  {
     key: "cough-throat-comfort",
     title: "Toux irritante",
     kind: "COMFORT",
@@ -749,7 +960,10 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     key: "rehydration-digestive",
     title: "Réhydratation",
     kind: "TOLERANCE",
-    version: "1.1",
+    // 1.2 — consigne du pharmacien fondateur, 13 octobre 2026 : sous métopimazine, la réhydratation se conseille en comprimés
+    // effervescents (`contextPrefer`) ; le nourrisson, le jeune enfant et la personne âgée gardent le vrai soluté, et un
+    // comprimé effervescent ou une pastille d'électrolytes leur est écarté quelle que soit sa marque. Textes inchangés.
+    version: "1.2",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_ONLY",
     needTriggers: ["REHYDRATION"],
@@ -777,7 +991,11 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     // réhydratation orale (Adiaril, Fanolyte, Viatol), pas un complément de
     // confort comme Hydratis ou Hydrafizz.
     productPreferFor: (patient) => (isFragileForRehydration(patient) ? ["adiaril", "fanolyte", "viatol", "solute de rehydratation", "solution de rehydratation", "\\bsro\\b"] : []),
-    productExcludeFor: (patient) => (isFragileForRehydration(patient) ? ["hydratis", "hydrafizz", "pastille"] : []),
+    productExcludeFor: (patient) => (isFragileForRehydration(patient) ? ["hydratis", "hydrafizz", "pastille", EFFERVESCENT_TABLETS] : []),
+    // Sous métopimazine (nausées, vomissements), l'adulte reçoit des comprimés effervescents d'électrolytes plutôt qu'un soluté en
+    // sachets : consigne du pharmacien fondateur (13 oct. 2026). Sans elle, l'étiquette « diarrhée » du soluté le rendait plus
+    // pertinent d'un cran, et la marge ne départageait jamais (tiebreak.ts) ; entre comprimés équivalents, elle départage.
+    contextPrefer: [{ atcPrefixes: ["A04AD05"], productPrefer: [EFFERVESCENT_TABLETS] }],
     benefits: ["Compense l'eau et les sels perdus", "Dès les premières selles liquides", "À distance des autres produits oraux"],
     shortReasonTemplate:
       "Diarrhée ou vomissements plausibles dans ce contexte ({drug}) : la réhydratation compte.",
@@ -798,15 +1016,80 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     adjustPriority: (patient) => (isFragileForRehydration(patient) ? 10 : 0),
   },
   {
-    key: "eye-irritation-allergy",
-    benefits: ["Apaise et lubrifie l'œil", "Sans principe actif", "Unidoses à privilégier"],
-    title: "Yeux irrités en contexte allergique",
+    // Retour du fondateur, 13 octobre 2026 : sous antihistaminique, le collyre de l'ALLERGIE d'abord ; le lavage ou le
+    // lubrifiant (« eye-irritation-allergy ») n'est que son repli. Une règle à part, parce que ce n'est pas le même produit :
+    // un médicament avec ses propres faits (RCP), que la phrase du lavage (« sans principe actif ») rendrait faux.
+    key: "eye-allergy-antiallergic-drops",
+    benefits: ["Contre l'allergie des yeux", "En complément du comprimé", "Unidoses à privilégier"],
+    title: "Collyre anti-allergique en contexte allergique",
     kind: "COMFORT",
     version: "1.0",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_ONLY",
+    // Pas de `needTriggers` : l'antihistaminique de l'ordonnance (son code ATC) ouvre seul la règle. Une demande spontanée
+    // au comptoir (core/counter/request.ts) n'a pas de médicament : elle garde le lavage, sans médicament proposé d'office.
+    question: "Les yeux du patient piquent-ils ou pleurent-ils ?",
+    category: "SOINS",
+    atcPrefixes: ALLERGY_ANTIHISTAMINES,
+    therapeuticClasses: [],
+    sideEffectTriggers: [],
+    // Devant le lavage (52) : à la même question, la même carte, avec le collyre de l'allergie.
+    basePriority: 54,
+    // « anti-allergique » : l'étiquette que le dictionnaire d'usage donne au collyre par sa SUBSTANCE (lévocabastine,
+    // cromoglicate…, catalogue national) ou par son libellé (« collyre » et « allerg… ») — jamais à un lubrifiant. Un gel ou
+    // des larmes n'ont aucune de ces deux étiquettes : ils ne passent pas le seuil de pertinence de cette règle.
+    matchingTags: ["anti-allergique", "allergie"],
+    // Seul un collyre se propose sous la phrase « collyre contre l'allergie des yeux » : un nom qui ne parle pas des yeux,
+    // ou qui parle d'un soin du contour, d'un démaquillant ou du nez, est écarté.
+    productExclude: [String.raw`^(?:(?!${EYE_DROP_WORDS}).)*$`, NOT_EYE_DROP_WORDS],
+    // L'unidose sans conservateur d'abord. Gardée : un motif préféré lève une exclusion (matching.ts).
+    productPrefer: [String.raw`^(?=.*${EYE_DROP_WORDS})(?!.*${NOT_EYE_DROP_WORDS}).*(?:unidose|sans conservateur)`],
+    excludeTags: [],
+    // Un collyre anti-allergique (S01GX : cromoglicate, lévocabastine, olopatadine, kétotifène…) déjà sur la vente : pas
+    // un second. Le lavage, son repli, reste proposé.
+    blockedWhenSaleHas: { atcPrefixes: ["S01GX"], reason: "Un collyre anti-allergique est déjà sur la vente : pas de second collyre anti-allergique — le lavage oculaire reste proposé." },
+    // Un collyre sur liste (azélastine, olopatadine, kétotifène en collyre…) rangé parmi les produits de l'officine n'a pas
+    // ses conditions de délivrance lues : seule une boîte du catalogue national, vérifiée, est proposée.
+    verifiedMedicinesOnly: true,
+    shortReasonTemplate: "Contexte allergique ({drug}) : une irritation des yeux est fréquente, et rien ne la soulage localement.",
+    rationaleTemplate:
+      "Le traitement ({drug}) s'inscrit dans un contexte allergique. Si le patient signale des yeux qui piquent ou pleurent, un collyre anti-allergique sans ordonnance (lévocabastine, cromoglicate) est indiqué dans la conjonctivite allergique, en complément du comprimé. Sans collyre anti-allergique en rayon, le lavage oculaire reste proposé.",
+    counterScriptTemplate:
+      "« Vos yeux piquent ou pleurent ? {product} est un collyre contre l'allergie des yeux, en complément de votre traitement. Si la gêne persiste, parlez-en à votre médecin. »",
+    confirmedReasonTemplate: "Yeux qui piquent ou pleurent confirmés dans ce contexte allergique.",
+    patientReasonTemplate:
+      "Avec l'allergie, les yeux piquent ou pleurent souvent. {product} est un collyre contre l'allergie des yeux, en complément de votre traitement ({drug}).",
+    clinicalContext:
+      "RCP ALLERGIFLASH 0,05 %, collyre en récipient unidose (lévocabastine) — Base de données publique des médicaments (ANSM), CIS 69456091, mis à jour le 17/02/2023 : « Conjonctivites allergiques » ; « Adulte et enfant âgé d'au moins 6 ans » ; « Le traitement ne devra pas être prolongé au-delà de 5 jours sans avis médical » ; « Le port des lentilles de contact est déconseillé pendant le traitement » ; allaitement : « l'utilisation de la lévocabastine n'est pas recommandée » ; « Médicament non soumis à prescription médicale ». RCP CROMABAK 20 mg/ml, collyre (cromoglicate de sodium) — BDPM, CIS 67898381, mis à jour le 19/03/2024 : « Traitement symptomatique de la conjonctivite allergique » ; « Chez l'enfant, un avis médical est nécessaire » ; utilisable pendant la grossesse et l'allaitement. Le choix du collyre anti-allergique avant le lavage vient du pharmacien fondateur (13 octobre 2026). Œil rouge et douloureux, baisse de vision : orienter vers le médecin.",
+    safetyNotes: [
+      "Lentilles de contact : port déconseillé sous lévocabastine ; sous cromoglicate, avis médical chez l'allergique (RCP).",
+      "Lévocabastine : pas plus de 5 jours sans avis médical (RCP).",
+      "Œil rouge et douloureux, baisse de vision : orienter vers le médecin.",
+    ],
+    populations: [
+      { population: "BREASTFEEDING", level: "CAUTION", text: "Lévocabastine : non recommandée pendant l'allaitement ; le cromoglicate peut être utilisé (RCP).", sources: ["RCP Allergiflash 0,05 % (BDPM, CIS 69456091)", "RCP Cromabak 20 mg/ml (BDPM, CIS 67898381)"] },
+      { population: "PREGNANCY", level: "CAUTION", text: "Lévocabastine : envisageable avec précaution pendant la grossesse ; le cromoglicate peut être utilisé (RCP).", sources: ["RCP Allergiflash 0,05 % (BDPM, CIS 69456091)", "RCP Cromabak 20 mg/ml (BDPM, CIS 67898381)"] },
+    ],
+    // Lévocabastine à partir de 6 ans, cromoglicate sur avis médical chez l'enfant (RCP) : avant 12 ans, le choix d'un
+    // collyre médicamenteux revient au pharmacien, et le lavage (le repli) reste proposé. Un âge inconnu n'écarte rien.
+    blockedFor: (patient) =>
+      patient.ageYears !== null && patient.ageYears < 12
+        ? "Avant 12 ans : collyre anti-allergique sur avis (RCP : lévocabastine à partir de 6 ans, cromoglicate sur avis médical chez l'enfant) — le lavage oculaire reste proposé."
+        : null,
+  },
+  {
+    key: "eye-irritation-allergy",
+    benefits: ["Apaise et lubrifie l'œil", "Sans principe actif", "Unidoses à privilégier"],
+    title: "Yeux irrités en contexte allergique",
+    kind: "COMFORT",
+    // 1.1 (13 oct. 2026) : repli du collyre anti-allergique, qu'elle ne propose plus elle-même (sa phrase — « sans principe
+    // actif », « lave l'œil » — serait fausse pour lui).
+    version: "1.1",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
     needTriggers: ["ALLERGIC_EYE_IRRITATION"],
     question: "Les yeux du patient piquent-ils ou pleurent-ils ?",
+    fallbackFor: ["eye-allergy-antiallergic-drops"],
     category: "SOINS",
     // Antihistaminiques de l'allergie (R06AE, R06AX) : pas les phénothiazines antitussives (oxomémazine, R06AD).
     atcPrefixes: ["D10BA01", "R06AE", "R06AX"],
@@ -820,12 +1103,15 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     // Une irritation allergique se lave et s'hydrate ; elle ne se traite pas
     // avec un collyre antiseptique ou antibiotique, qui ont d'autres
     // indications et sont écartés par leur nom.
-    productExclude: [String.raw`nasal`, String.raw`\bnez\b`, String.raw`rhino`, String.raw`desomedine`, String.raw`desosept`, String.raw`pommade`, String.raw`vitamine a`, String.raw`vita ?pos`, String.raw`hexamidine`, String.raw`antiseptique`, String.raw`antibio`, String.raw`tobramycine`, String.raw`tobrex`, String.raw`rifamycine`, String.raw`azyter`, String.raw`chloramphenicol`, String.raw`ofloxacine`, String.raw`ciprofloxacine`, String.raw`dexamethasone`, String.raw`cortico`],
+    // Le collyre anti-allergique a sa règle, dont celle-ci est le repli : écarté ici par son libellé (« allerg… ») et par son
+    // étiquette (`excludeTags`, posée par le dictionnaire d'après sa substance), pour qu'il ne soit jamais présenté comme un
+    // lavage — y compris quand sa règle est bloquée (enfant) ou supprimée depuis la console.
+    productExclude: [String.raw`nasal`, String.raw`\bnez\b`, String.raw`rhino`, String.raw`rhinit`, String.raw`\bnas\b`, String.raw`desomedine`, String.raw`desosept`, String.raw`pommade`, String.raw`vitamine a`, String.raw`vita ?pos`, String.raw`hexamidine`, String.raw`antiseptique`, String.raw`antibio`, String.raw`tobramycine`, String.raw`tobrex`, String.raw`rifamycine`, String.raw`azyter`, String.raw`chloramphenicol`, String.raw`ofloxacine`, String.raw`ciprofloxacine`, String.raw`dexamethasone`, String.raw`cortico`, String.raw`allerg`, String.raw`antihistamin`],
     // Un motif préféré lève une exclusion : « AZYTER collyre unidose » ne doit pas être sauvé par « unidose ».
     productPrefer: ["larmes", "lavage", "hydrat", "serum phy", "unidose"].map(
-      (pattern) => String.raw`^(?!.*(?:azyter|tobrex|tobramycine|rifamycine|chloramphenicol|ofloxacine|ciprofloxacine|dexamethasone|cortico|antiseptique|antibio|desomedine|desosept|hexamidine)).*${pattern}`,
+      (pattern) => String.raw`^(?!.*(?:azyter|tobrex|tobramycine|rifamycine|chloramphenicol|ofloxacine|ciprofloxacine|dexamethasone|cortico|antiseptique|antibio|desomedine|desosept|hexamidine|allerg|antihistamin)).*${pattern}`,
     ),
-    excludeTags: [],
+    excludeTags: ["anti-allergique"],
     shortReasonTemplate:
       "Contexte allergique ({drug}) : une irritation des yeux est fréquente.",
     rationaleTemplate:
@@ -1204,7 +1490,8 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     key: "cough-bronchial-essential-oils",
     title: "Confort respiratoire pendant la toux",
     kind: "COMFORT",
-    version: "1.0",
+    // 1.1 — 13 oct. 2026 : un complexe d'huiles essentielles DIGESTIF (« … GASTRO GELU ») n'est pas un conseil de la toux.
+    version: "1.1",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_ONLY",
     needTriggers: ["COUGH_COMFORT"],
@@ -1216,7 +1503,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     matchingTags: ["huiles essentielles", "bronches"],
     excludeTags: [],
     productPrefer: [String.raw`bronch`, String.raw`respir`],
-    productExclude: [String.raw`diffus`, String.raw`roll`, String.raw`piqure`, String.raw`tete`, String.raw`urin`, String.raw`gorge`, String.raw`nasal`, String.raw`\bnez\b`, String.raw`lotion`, String.raw`spray`, String.raw`assainiss`],
+    productExclude: [String.raw`diffus`, String.raw`roll`, String.raw`piqure`, String.raw`tete`, String.raw`urin`, String.raw`gorge`, String.raw`nasal`, String.raw`\bnez\b`, String.raw`lotion`, String.raw`spray`, String.raw`assainiss`, String.raw`gastro`, String.raw`intestin`, String.raw`digest`],
     benefits: ["Complément du sirop, pas un remplaçant", "Cure courte, le temps de la toux", "Jamais chez l'asthmatique ni l'épileptique"],
     shortReasonTemplate:
       "Toux traitée ({drug}) : en aromathérapie, les huiles essentielles sont traditionnellement utilisées pour le confort respiratoire.",
@@ -1229,13 +1516,57 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     clinicalContext:
       "Aromathérapie à visée respiratoire : usage traditionnel, sans preuve clinique ; ANSM — huiles essentielles, précautions d'emploi (asthme, épilepsie, grossesse, enfant).",
     safetyNotes: ["Contre-indiqué en cas d'asthme, d'épilepsie, de grossesse, d'allaitement et avant 12 ans."],
-    populations: [
-      { population: "ASTHMA", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées en cas d'asthme.", sources: ["ANSM — huiles essentielles, précautions d'emploi"] },
-      { population: "EPILEPSY", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées en cas d'épilepsie ou d'antécédent de convulsions.", sources: ["ANSM — huiles essentielles, précautions d'emploi"] },
-      { population: "PREGNANCY", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées pendant la grossesse.", sources: ["ANSM — huiles essentielles, précautions d'emploi"] },
-      { population: "BREASTFEEDING", level: "CONTRAINDICATION", text: "Huiles essentielles : contre-indiquées pendant l'allaitement.", sources: ["ANSM — huiles essentielles, précautions d'emploi"] },
-      { population: "CHILD", level: "CONTRAINDICATION", maxAgeYears: 12, text: "Huiles essentielles : contre-indiquées avant 12 ans.", sources: ["ANSM — huiles essentielles, précautions d'emploi"] },
+    populations: ESSENTIAL_OIL_POPULATIONS,
+    blockedFor: (patient) =>
+      patient.chronicConditions.some((c) => /asthm|epilep|épilep|convuls/i.test(c))
+        ? "Asthme ou épilepsie déclarés : les huiles essentielles sont contre-indiquées."
+        : patient.isPregnant || patient.isBreastfeeding
+          ? "Grossesse ou allaitement : les huiles essentielles sont contre-indiquées."
+          : patient.ageYears !== null && patient.ageYears < 12
+            ? "Avant 12 ans, les huiles essentielles sont contre-indiquées."
+            : null,
+  },
+  {
+    // Consigne du pharmacien fondateur, 13 octobre 2026, après une MÉTOPIMAZINE 7,5 mg conseil scannée au comptoir (avec un
+    // MAALOX) : le conseil pertinent est un complexe d'huiles essentielles à visée digestive, en gélules — « le patient a
+    // probablement une diarrhée, et il vomit ou a envie de vomir » — et une solution de réhydratation, que la règle
+    // « rehydration-digestive » porte déjà (le besoin de réhydratation de la métopimazine : core/understanding/context.ts).
+    // Le produit se reconnaît à son libellé (`DIGESTIVE_ESSENTIAL_OIL`) : une mention d'huiles essentielles, ou le nom d'une gamme
+    // d'aromathérapie de la liste à maintenir `AROMATHERAPY_RANGES` ; la règle ne nomme aucune marque. L'effet des huiles essentielles n'est
+    // pas démontré par des essais cliniques : la règle le dit, et elle s'efface devant leurs contre-indications.
+    key: "nausea-digestive-essential-oils",
+    title: "Huiles essentielles digestives pendant les nausées",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "PHYTOTHERAPIE",
+    // La métopimazine (A04AD05), antiémétique vendu au comptoir pour des nausées et vomissements. Ni la scopolamine (A04AD01,
+    // mal des transports), ni les antiémétiques de la chimiothérapie (A04AA, A04AD12) : la consigne ne les vise pas.
+    atcPrefixes: ["A04AD05"],
+    therapeuticClasses: [],
+    sideEffectTriggers: [],
+    // Même consigne : pour ce médicament, le substitut salivaire (souvent remboursé, marge très faible) n'est pas le conseil.
+    silences: ["dry-mouth-hygiene"],
+    basePriority: 56,
+    matchingTags: ["huiles essentielles", "gastro-intestinal"],
+    excludeTags: [],
+    productExclude: [`^(?!${DIGESTIVE_ESSENTIAL_OIL})`, String.raw`diffus`, String.raw`inhal`, String.raw`assainiss`],
+    benefits: ["En complément de la réhydratation", "Cure courte, le temps des troubles digestifs", "Jamais chez l'enfant, la femme enceinte ni l'épileptique"],
+    shortReasonTemplate: "Nausées ou vomissements ({drug}) : une diarrhée les accompagne probablement.",
+    rationaleTemplate:
+      "Le patient prend {drug} pour des nausées ou des vomissements ; une diarrhée les accompagne probablement. Consigne du pharmacien fondateur : en plus de la réhydratation, proposer un complexe d'huiles essentielles à visée digestive, conseil classique de l'officine pour la sphère gastro-intestinale. Leur effet n'est pas démontré par des essais cliniques, et leurs contre-indications sont strictes : asthme, épilepsie, grossesse, allaitement, enfant.",
+    counterScriptTemplate:
+      "« En plus de {drug} et de bien vous réhydrater, {product} est souvent conseillé le temps des troubles digestifs, en cure courte. Pas si vous êtes enceinte ou si vous allaitez, ni en cas d'épilepsie ou d'asthme. »",
+    patientReasonTemplate:
+      "Pendant vos troubles digestifs, {product} accompagne {drug}, en cure courte. Contre-indiqué pendant la grossesse et l'allaitement, en cas d'épilepsie ou d'asthme, et chez l'enfant.",
+    clinicalContext:
+      "Consigne du pharmacien fondateur, 13 octobre 2026 (métopimazine : huiles essentielles digestives et réhydratation). Aromathérapie à visée digestive : usage traditionnel, sans preuve clinique ; ANSM — huiles essentielles, précautions d'emploi (asthme, épilepsie, grossesse, allaitement, enfant). L'âge minimal de la notice du produit s'applique s'il est plus élevé.",
+    safetyNotes: [
+      "Contre-indiqué en cas d'asthme, d'épilepsie ou d'antécédent de convulsions, de grossesse, d'allaitement et avant 12 ans.",
+      "Vomissements ou diarrhée au-delà de 48 heures, fièvre ou sang : consulter.",
     ],
+    populations: ESSENTIAL_OIL_POPULATIONS,
     blockedFor: (patient) =>
       patient.chronicConditions.some((c) => /asthm|epilep|épilep|convuls/i.test(c))
         ? "Asthme ou épilepsie déclarés : les huiles essentielles sont contre-indiquées."
@@ -1682,6 +2013,24 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
 /** Toutes les règles de conseil : le cœur, puis celles des documents de conseil reçus (Série 2 peau). */
 export const ADVICE_RULES: AdviceRule[] = [...CORE_ADVICE_RULES, ...PAIN_ZONE_RULES, ...SKIN_SERIES_1_ADVICE_RULES, ...SKIN_SERIES_2_ADVICE_RULES, ...SKIN_SERIES_3_ADVICE_RULES, ...SKIN_SERIES_4_ADVICE_RULES, ...SKIN_SERIES_5_ADVICE_RULES];
 
+const FALLBACKS = new Map(ADVICE_RULES.filter((rule) => rule.fallbackFor?.length).map((rule) => [rule.key, rule.fallbackFor as string[]]));
+
+/** Les règles dont celle-ci n'est que le repli (`fallbackFor`) ; vide pour une règle qui n'en est pas un. */
+export function fallbackFor(ruleKey: string): readonly string[] {
+  return FALLBACKS.get(ruleKey) ?? [];
+}
+
+const VERIFIED_MEDICINES_ONLY = new Set(ADVICE_RULES.filter((rule) => rule.verifiedMedicinesOnly).map((rule) => rule.key));
+
+/**
+ * Ce produit peut-il être proposé par cette règle ? Toujours, sauf pour une règle `verifiedMedicinesOnly` : un produit de
+ * l'officine portant un code CIP (3400…) — un médicament dont les conditions de délivrance ne sont pas lues — en est écarté.
+ */
+export function acceptsProductForRule(ruleKey: string, product: Pick<CatalogProduct, "origin" | "ean">): boolean {
+  if (!VERIFIED_MEDICINES_ONLY.has(ruleKey)) return true;
+  return !(product.origin === "PHARMACY_CATALOG" && /^3400/.test(product.ean ?? ""));
+}
+
 const norm = (value: string) => value.toLowerCase().trim();
 
 /**
@@ -1789,6 +2138,18 @@ export function detectAdviceOpportunities(params: {
   const { drugs, patient, needs = [], disabledRuleKeys, extraRules = [] } = params;
   const byKey = new Map<string, AdviceOpportunityResult>();
 
+  // Les règles qu'un conseil écrit pour un médicament fait taire, médicament par médicament (`silences`).
+  const silencedByLine = new Map<number, Set<string>>();
+  for (const rule of [...ADVICE_RULES, ...extraRules]) {
+    if (!rule.silences?.length || disabledRuleKeys?.has(rule.key)) continue;
+    for (const drug of drugs) {
+      const atc = drug.knowledge?.atcCode ?? "";
+      if (!atc || !rule.atcPrefixes.some((prefix) => atc.startsWith(prefix))) continue;
+      silencedByLine.set(drug.lineIndex, new Set([...(silencedByLine.get(drug.lineIndex) ?? []), ...rule.silences]));
+    }
+  }
+  const silenced = (rule: AdviceRule, lineIndex: number) => silencedByLine.get(lineIndex)?.has(rule.key) === true;
+
   for (const rule of [...ADVICE_RULES, ...extraRules]) {
     if (disabledRuleKeys?.has(rule.key)) continue;
     const triggers: {
@@ -1801,7 +2162,7 @@ export function detectAdviceOpportunities(params: {
 
     for (const drug of drugs) {
       const knowledge = drug.knowledge;
-      if (!knowledge) continue;
+      if (!knowledge || silenced(rule, drug.lineIndex)) continue;
 
       const atc = knowledge.atcCode ?? "";
       // Une règle plus précise s'en charge (voir `excludeAtcPrefixes`).
@@ -1863,7 +2224,10 @@ export function detectAdviceOpportunities(params: {
       const cited = drugs.filter((drug) => need.lineIndexes.includes(drug.lineIndex));
       // Une durée connue et trop courte écarte aussi le besoin compris par l'IA (`durationGate`).
       const pool = (cited.length > 0 ? cited : drugs).filter(
-        (drug) => !isTooShortForRule(rule, drug.knowledge?.atcCode ?? "", drug.durationDays) && !rule.excludeAtcPrefixes?.some((prefix) => (drug.knowledge?.atcCode ?? "").startsWith(prefix)),
+        (drug) =>
+          !isTooShortForRule(rule, drug.knowledge?.atcCode ?? "", drug.durationDays) &&
+          !rule.excludeAtcPrefixes?.some((prefix) => (drug.knowledge?.atcCode ?? "").startsWith(prefix)) &&
+          !silenced(rule, drug.lineIndex),
       );
       for (const drug of pool) {
         triggers.push({
@@ -1878,7 +2242,11 @@ export function detectAdviceOpportunities(params: {
 
     if (triggers.length === 0) continue;
 
-    const blockReason = rule.blockedFor?.(patient) ?? null;
+    // Le produit de la règle est déjà sur la vente (`blockedWhenSaleHas`) : lu sur TOUTES les lignes.
+    const saleBlock = rule.blockedWhenSaleHas && drugs.some((drug) => rule.blockedWhenSaleHas!.atcPrefixes.some((prefix) => (drug.knowledge?.atcCode ?? "").startsWith(prefix)))
+      ? rule.blockedWhenSaleHas.reason
+      : null;
+    const blockReason = rule.blockedFor?.(patient) ?? saleBlock;
     const adjustment = rule.adjustPriority?.(patient) ?? 0;
 
     // La nature du conseil borne sa priorité : un conseil de sécurité ne peut
@@ -1894,15 +2262,30 @@ export function detectAdviceOpportunities(params: {
     // soluté de réhydratation) s'ajoutent aux motifs fixes de la règle.
     const patientPrefer = rule.productPreferFor?.(patient) ?? [];
     const patientExclude = rule.productExcludeFor?.(patient) ?? [];
+    // Les formules que le CONTEXTE fait préférer (`contextPrefer`), lues sur les médicaments qui ont ouvert la règle : elles
+    // passent devant celles de la règle.
+    const triggerAtcs = drugs.filter((drug) => triggers.some((t) => t.lineIndex === drug.lineIndex)).map((drug) => drug.knowledge?.atcCode ?? "");
+    const contextPrefer = (rule.contextPrefer ?? [])
+      .filter((context) => triggerAtcs.some((atc) => context.atcPrefixes.some((prefix) => atc.startsWith(prefix))))
+      .flatMap((context) => context.productPrefer);
+    // Une formule de CONTEXTE ne lève jamais une exclusion fixe de la règle (un motif préféré en lève une, matching.ts) :
+    // « COLLYRE … ALLERGIES » n'est pas une hygiène nasale « allergie ». Elle refuse d'abord ces exclusions.
+    const contextGuarded = (patterns: string[], fixedExclude: string[]) =>
+      fixedExclude.length === 0 ? patterns : patterns.map((pattern) => String.raw`^${fixedExclude.map((exclude) => String.raw`(?!.*?(?:${exclude}))`).join("")}(?=.*?(?:${pattern}))`);
+    // Une exclusion due au PATIENT (un enfant, une grossesse) est absolue : aucune formule préférée ne la lève — un motif
+    // préféré lève une exclusion fixe (matching.ts), et « AROMAFORCE », préféré quand le nez est bouché, reviendrait alors
+    // chez un enfant de 2 ans malgré ses huiles essentielles.
+    const guarded = (patterns: string[]) =>
+      patientExclude.length === 0 ? patterns : patterns.map((pattern) => String.raw`^(?!.*(?:${patientExclude.join("|")}))(?=.*?(?:${pattern}))`);
     const variants: { suffix: string; tags: string[]; exclude: string[]; prefer: string[]; routine: AdviceOpportunityResult["routine"] }[] = rule.routine
       ? rule.routine.steps.map((step, index) => ({
           suffix: `:${step.key}`,
           tags: step.matchingTags,
           exclude: [...(rule.productExclude ?? []), ...(step.productExclude ?? []), ...patientExclude],
-          prefer: [...(step.productPrefer ?? rule.productPrefer ?? []), ...patientPrefer],
+          prefer: guarded([...contextGuarded(contextPrefer, [...(rule.productExclude ?? []), ...(step.productExclude ?? [])]), ...(step.productPrefer ?? rule.productPrefer ?? []), ...patientPrefer]),
           routine: { key: rule.key, title: rule.routine!.title, stepKey: step.key, stepLabel: step.label, stepIndex: index, stepCount: rule.routine!.steps.length, benefit: step.benefit },
         }))
-      : [{ suffix: "", tags: rule.matchingTags, exclude: [...(rule.productExclude ?? []), ...patientExclude], prefer: [...(rule.productPrefer ?? []), ...patientPrefer], routine: null }];
+      : [{ suffix: "", tags: rule.matchingTags, exclude: [...(rule.productExclude ?? []), ...patientExclude], prefer: guarded([...contextGuarded(contextPrefer, rule.productExclude ?? []), ...(rule.productPrefer ?? []), ...patientPrefer]), routine: null }];
 
     for (const variant of variants) byKey.set(rule.key + variant.suffix, {
       key: rule.key + variant.suffix,

@@ -11,7 +11,7 @@ import { Alert } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { RecentDeposits } from "./recent-deposits";
 import { UpdateFlow } from "./update-flow";
-import { HELD_NOTICE, REJECTED_NOTICE, linesOfLastStock, stockState } from "./view";
+import { HELD_NOTICE, REJECTED_NOTICE, describeReceived, linesOfLastStock, stockState } from "./view";
 
 export const metadata: Metadata = { title: "Mettre à jour mon stock" };
 
@@ -45,6 +45,9 @@ export default async function StockUpdatePage() {
   const state = stockState({ syncedAt, lines: linesOfLastStock(syncedAt, deposits), now });
   const look = STATE_STYLES[state.tone];
   const latest = deposits[0] ?? null;
+  // Le dernier fichier appliqué : l'écran montre que le nouveau s'y AJOUTE (ses prix restent quand le nouveau n'en a pas).
+  const lastApplied = deposits.find((deposit) => deposit.status === "APPLIED") ?? null;
+  const previous = lastApplied ? { fileName: lastApplied.fileName, received: describeReceived(lastApplied.appliedAt ?? lastApplied.receivedAt, now) } : null;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5 pb-20">
@@ -85,7 +88,7 @@ export default async function StockUpdatePage() {
         </Alert>
       )}
 
-      <UpdateFlow />
+      <UpdateFlow previous={previous} />
 
       <RecentDeposits deposits={deposits} />
     </div>

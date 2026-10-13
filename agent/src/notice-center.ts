@@ -17,6 +17,7 @@ import { NOTICE_HOST_SCRIPT } from "./notice-host";
 import { NOTICE_HOST_CLASSIC_SCRIPT } from "./notice-host-classique";
 import { noticeHostIleScript } from "./notice-host-ile";
 import { ensureWebView2Sdk, type SdkPaths } from "./webview2-sdk";
+import { readCounterSheet, type CounterSheet } from "./counter-sheet";
 import type { ToastContent } from "./toast";
 
 /** Ce que le serveur répond à /api/agent/conseil (les champs structurés manquent chez un serveur plus ancien). */
@@ -41,6 +42,8 @@ export type NoticeBody = {
     availability: string;
     quantity: number | null;
     imageUrl: string | null;
+    /** La carte déployée (fiche complète du conseil, bornée) : relue par `readCounterSheet`. Absente chez un serveur plus ancien. */
+    sheet?: unknown;
   }[];
   followUp?: { emailSaved: boolean; closed: boolean };
   /** L'arbre de questions du comptoir : les questions ouvertes (avec le choix coché) et les phrases d'orientation. Absent chez un serveur plus ancien. */
@@ -50,7 +53,12 @@ export type NoticeBody = {
 
 export type HostOutcome = "NONE" | "SOLD" | "NOT_SOLD";
 
-export type HostItem = { id: string; drug: string; challenge: string; shortDate: string; outcome: HostOutcome; name: string; price: string; reason: string; availability: string; /** Le stock exact (« 3 »), ou vide quand il n'est pas connu. */ quantity: string; image: string };
+export type HostItem = {
+  id: string; drug: string; challenge: string; shortDate: string; outcome: HostOutcome; name: string; price: string; reason: string; availability: string;
+  /** Le stock exact (« 3 »), ou vide quand il n'est pas connu. */ quantity: string; image: string;
+  /** Ce que la carte montre une fois déployée dans l'île (counter-sheet.ts). Absente : la carte se déploie sans ces rubriques. */
+  sheet?: CounterSheet;
+};
 
 /** Une question de l'arbre du comptoir, telle que la fenêtre la dessine : le texte, et un bouton par choix (le choix coché est plein). */
 export type HostQuestion = { node: string; text: string; multi: boolean; choices: { key: string; label: string; selected: boolean }[] };
@@ -90,7 +98,9 @@ export type HostAction =
   | { kind: "answer"; saleId: string; node: string; choice: string }
   | { kind: "view"; saleId: string }
   /** L'icône près de l'horloge → « Ouvrir mon espace PharmaBoost » (le mot ESPACE, sans vente) : l'agent lie le navigateur du PC. */
-  | { kind: "open_space" };
+  | { kind: "open_space" }
+  /** Clic sur la carte d'un conseil de l'île (« OUVRIR <adresse> ») : la page de la vente, dans le navigateur du PC — adresse revérifiée par l'agent (sale-link.ts). */
+  | { kind: "open_sale"; url: string };
 
 const MAX_RESTARTS = 5;
 
@@ -120,6 +130,9 @@ function referenceOf(title: string): string {
 /** Une ligne, sans retour à la ligne : la commande est une ligne de JSON. */
 const oneLine = (text: string) => text.replace(/[\r\n\u2028\u2029]+/g, " ").trim();
 
+/** Pas de clé `sheet` du tout quand il n'y a pas de fiche : la commande reste aussi courte qu'avant. */
+const withSheet = (sheet: CounterSheet | null): { sheet?: CounterSheet } => (sheet ? { sheet } : {});
+
 /** « 2026-11-30 » → « 30/11/2026 » ; tout ce qui n'est pas une date exacte est écarté (jamais une date inventée). */
 export function frenchDate(iso: string | null | undefined): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
@@ -142,6 +155,9 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     availability: AVAILABILITIES.has(item.availability) ? item.availability : "UNKNOWN",
     quantity: Number.isInteger(item.quantity) && (item.quantity as number) >= 0 ? String(item.quantity) : "",
     image: (item.imageUrl && images.get(item.imageUrl)) || "",
+    // Relue et bornée ici aussi : un serveur d'une autre version ne casse pas l'île. Les accents passent tels quels — c'est
+    // `encodeCommand` qui les échappe en ASCII pour la fenêtre Windows.
+    ...withSheet(readCounterSheet(item.sheet)),
   }));
   // Un serveur plus ancien n'envoie que des lignes de texte : on les montre telles quelles, sans photo ni badge de stock.
   const legacyOnly = body.items === undefined && body.advice.length > 0;
@@ -601,6 +617,11 @@ export class NoticeCenter {
     };
     if (word === "ESPACE" && !saleId) {
       act({ kind: "open_space" });
+      return;
+    }
+    // Une seule adresse, sans espace ni retour à la ligne ; l'agent la revérifie avant d'ouvrir quoi que ce soit.
+    if (word === "OUVRIR") {
+      if (saleId && !argument && saleId.length <= 400) act({ kind: "open_sale", url: saleId });
       return;
     }
     if (!saleId && word !== "ERREUR") return;

@@ -205,3 +205,27 @@ Série 2 (acné, photoprotection, eczéma, cuir chevelu, 7 octobre 2026) : voir
 `docs/conseil-peau-serie-2.md`. Vidal et Claude Bernard, sous licence, ne sont
 pas interrogés : ce qui n'en vient que par le document est étiqueté « référence du
 document » et reste à confirmer par le pharmacien qui signe.
+
+## 8. Consignes du pharmacien fondateur au comptoir (13 octobre 2026)
+
+Retours après des scans réels. Règles **en attente de validation** (`PENDING`).
+
+- **`nausea-digestive-essential-oils`** (nouvelle, v1.0) — MÉTOPIMAZINE (A04AD05, table
+  Open Medic) : un complexe d'huiles essentielles à visée digestive, reconnu au libellé du
+  stock (mention d'huiles essentielles ou gamme d'aromathérapie, et un mot de la sphère
+  digestive ; jamais une marque). Source : la consigne du fondateur ; ANSM — huiles
+  essentielles, précautions d'emploi. Écartée en cas d'asthme, d'épilepsie, de grossesse,
+  d'allaitement et avant 12 ans ; l'âge minimal de la notice du produit s'applique s'il est
+  plus élevé (fiche produit de l'officine). Pour la métopimazine, la sécheresse buccale
+  (`dry-mouth-hygiene`) se tait (`silences`).
+- **`rehydration-digestive`** (v1.2) — sous métopimazine, comprimés effervescents
+  d'électrolytes préférés au soluté en sachets chez l'adulte ; entre comprimés équivalents,
+  la marge HT départage. Nourrisson, jeune enfant, personne âgée : le vrai soluté, jamais un
+  comprimé effervescent.
+- **Antiacides (MAALOX, A02AD01)** : aucune règle de conseil n'existe — ni dans `advice.ts`,
+  ni dans la Base maître V1 (lignes 94 et 95 : l'antiacide y est un *complément espacé* de
+  la gabapentine et du mycophénolate, pas un déclencheur), ni dans les séries peau. Rien
+  n'est inventé : la consigne du fondateur est attendue.
+- **Arbre de questions** (`pain-pack-*` v1.2) : les conseils du bout de l'arbre sont gardés
+  hors du plafond du comptoir ; chaque zone propose sa poche, sinon une poche multi-zones,
+  un patch chauffant ou un gel de froid étiquetés « chaud froid » (la marge départage).

@@ -40,11 +40,12 @@ import { stateForFailure, writeStatus, type PostState } from "./status";
 import { CrossSourceDedupe, compileRobotPattern, dryRunRobotFile, startRobotJournal, type RobotConfig } from "./robot";
 import { startLgpiJournal, type LgpiRobotConfig } from "./robot-lgpi";
 import { isSpaceLinked, markSpaceLinked, openInBrowser, shouldOpenSpaceAtStartup, spaceUrl } from "./space-link";
+import { saleAdviceUrl } from "./sale-link";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.2";
+const VERSION = "0.10.4";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -369,7 +370,15 @@ async function handleAction(action: HostAction): Promise<void> {
     if (await openSpace(config, "à la demande")) markSpaceLinked(dirname(CONFIG_PATH), config.agentKey);
     return;
   }
-  if (!config || action.kind === "view" || action.kind === "open_space") return;
+  if (config && action.kind === "open_sale") {
+    // Un conseil de l'île, lu en entier : la page de la vente dans le navigateur du PC. L'adresse est réécrite à partir
+    // du serveur de l'agent ; une autre adresse n'ouvre rien.
+    const url = saleAdviceUrl(config.serverUrl, action.url);
+    if (!url) log("Conseil : adresse refusée (autre serveur ou autre page) — rien n'est ouvert.");
+    else log(openInBrowser(url) ? "Conseil : page de la vente ouverte dans le navigateur de ce PC." : "Conseil : le navigateur n'a pas pu être lancé.");
+    return;
+  }
+  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale") return;
   if (watched) watched.lastChange = Date.now();
   try {
     if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {

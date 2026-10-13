@@ -67,7 +67,7 @@ describe("les conseils structurés de la fenêtre du poste (photo, disponibilit�
   it("porte pour chaque conseil son nom, son prix, sa raison, sa photo et sa disponibilité", () => {
     const { items, drugs } = notice([rec()]);
     expect(drugs).toEqual(["QUETIAPINE VIATRIS LP 50 mg"]);
-    expect(items).toEqual([{ id: null, drug: null, challenge: null, shortDateOn: null, outcome: "NONE", name: "ELUDAY GENCIVE 500 ml", priceCents: 790, reason: "Sécheresse buccale", availability: "IN_STOCK", quantity: 6, imageUrl: "https://images.openbeautyfacts.org/x.jpg" }]);
+    expect(items).toEqual([{ id: null, drug: null, challenge: null, shortDateOn: null, outcome: "NONE", name: "ELUDAY GENCIVE 500 ml", priceCents: 790, reason: "Sécheresse buccale", availability: "IN_STOCK", quantity: 6, imageUrl: "https://images.openbeautyfacts.org/x.jpg", sheet: null }]);
   });
 
   it("dit la disponibilité telle qu'elle est : en stock, stock faible, rupture, inconnue", () => {

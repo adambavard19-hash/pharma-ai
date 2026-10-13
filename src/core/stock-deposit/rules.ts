@@ -58,8 +58,19 @@ export const DEPOSIT_SUPERSEDED_MESSAGE = "Remplacé par un envoi plus récent."
 export const DEPOSIT_SUPERSEDED_ERROR = "Un envoi plus récent a déjà mis le stock à jour : écartez ce fichier.";
 export const DEPOSIT_INTERRUPTED_MESSAGE = "Le traitement a été interrompu avant la fin. Le stock n'a pas changé : renvoyez le fichier.";
 
-/** Ce que l'écran envoie pour dire « oui, ce fichier remplace mon stock » : sans lui, le serveur refuse l'envoi du titulaire. */
+/** Ce que l'écran envoie pour dire « oui, je confirme la mise à jour » : sans lui, le serveur refuse l'envoi du titulaire. Jeton interne, jamais affiché. */
 export const DEPOSIT_CONFIRMATION = "remplacer";
+
+/**
+ * Un envoi « Ce fichier complète seulement mes prix » : il n'écrit QUE les prix (achat, vente, TVA, remboursement) des
+ * produits déjà connus — aucune quantité, aucun produit créé, rien à 0. Le mode est porté par le nom gardé du dépôt
+ * (pas de colonne en base) : une relance par l'équipe le rejoue dans le même mode, jamais en stock complet.
+ */
+export const DEPOSIT_PRICES_ONLY_PREFIX = "Prix seulement — ";
+
+export function isPricesOnlyDeposit(fileName: string): boolean {
+  return fileName.startsWith(DEPOSIT_PRICES_ONLY_PREFIX);
+}
 
 export type DepositAssessment = { verdict: "APPLY" } | { verdict: "HOLD"; reason: string };
 

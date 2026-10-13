@@ -1,3 +1,5 @@
+import { formatCents } from "@/lib/format";
+import { unitMarginHt } from "../../catalog/margin";
 import { matchesAny, nameCarriesBrand } from "./product-name";
 import type {
   AdviceOpportunityResult,
@@ -58,6 +60,13 @@ export const DIMENSION_LABELS: Record<keyof ScoreBreakdown, string> = {
 
 const norm = (value: string) => value.toLowerCase().trim();
 
+/**
+ * Des mots qui qualifient une étiquette sans la distinguer : « zone » est commun aux six étiquettes de zone des poches chaud/froid
+ * (« zone dos », « zone épaule »…). Lu seul dans un nom (« THERMCOOL HOT POCHE GEL MULTI ZONE », stock réel), il faisait passer
+ * une poche multi-zones pour la poche de CHAQUE zone, devant la vraie poche de la nuque ou de l'épaule (13 oct. 2026).
+ */
+const NON_DISTINCTIVE_TAG_WORDS = new Set(["zone"]);
+
 function scoreRelevance(
   product: CatalogProduct,
   opportunity: AdviceOpportunityResult,
@@ -71,7 +80,7 @@ function scoreRelevance(
   const matched = opportunity.matchingTags.filter((tag) =>
     norm(tag)
       .split(/\s+/)
-      .some((word) => productTags.has(word)),
+      .some((word) => !NON_DISTINCTIVE_TAG_WORDS.has(word) && productTags.has(word)),
   );
 
   const categoryMatch = product.category === opportunity.category;
@@ -250,21 +259,21 @@ function scoreValidationHistory(
 }
 
 /**
- * Dimension commerciale — délibérément la dernière et la plus faible.
- * Elle ne sert qu'à départager deux références cliniquement équivalentes.
+ * Dimension commerciale — délibérément la dernière et la plus faible dans le score.
+ * C'est au départage de références cliniquement équivalentes que la marge HT, en euros, tranche (engines/tiebreak.ts).
+ * Prix de vente TTC ramené au HT, moins le prix d'achat HT : la TVA n'est pas de la marge (core/catalog/margin.ts).
  */
-function scoreCommercial(product: CatalogProduct): { value: number; detail: string } {
-  if (product.salePriceCents <= 0) {
-    return { value: 0.5, detail: "prix non renseigné" };
+function scoreCommercial(product: CatalogProduct): { value: number; detail: string; marginCents: number | null } {
+  const reimbursed = product.reimbursed === true ? " · référence remboursée" : "";
+  const margin = unitMarginHt(product);
+  if (!margin) {
+    const missing = product.salePriceCents <= 0 ? "prix de vente non renseigné" : "marge non calculable (prix d'achat inconnu)";
+    return { value: 0.5, detail: missing + reimbursed, marginCents: null };
   }
-  const margin = product.salePriceCents - product.purchasePriceCents;
-  if (product.purchasePriceCents <= 0 || margin <= 0) {
-    return { value: 0.5, detail: "marge non calculable" };
-  }
-  const marginRate = margin / product.salePriceCents;
   return {
-    value: Math.max(0, Math.min(1, marginRate / 0.6)),
-    detail: `marge ${Math.round(marginRate * 100)} %`,
+    value: Math.max(0, Math.min(1, margin.rate / 0.6)),
+    detail: `marge ${formatCents(margin.marginCents)} HT par unité (${Math.round(margin.rate * 100)} %)${reimbursed}`,
+    marginCents: margin.marginCents,
   };
 }
 
@@ -388,5 +397,8 @@ export function scoreProductForOpportunity(params: {
     counterScript,
     precautions: [...product.precautions, ...opportunity.safetyNotes],
     explanation,
+    // Pour le départage entre équivalentes et la justification du pharmacien — jamais pour le patient.
+    marginCents: commercial.marginCents,
+    reimbursed: product.reimbursed ?? null,
   };
 }

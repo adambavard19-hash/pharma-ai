@@ -31,6 +31,7 @@ import { ChecksNote } from "./checks-note";
 import { SafetyZone, VigilanceCards } from "./safety-zone";
 import { RegulationZone } from "./regulation-zone";
 import { AdviceLocked, AdviceZone } from "./advice-zone";
+import { AdviceFocusProvider } from "./advice-sheet-view";
 import { CounterQuestions } from "./counter-questions";
 import type { ViewQuestion } from "@/core/counter/question-tree";
 import { AlternativesList } from "./alternatives-list";
@@ -104,6 +105,8 @@ export function SaleWorkspace({
   stockNotice,
   partnerCards = [],
   counterQuestions,
+  focusAdviceId = null,
+  canOpenProduct = false,
 }: {
   prescription: {
     id: string;
@@ -150,6 +153,10 @@ export function SaleWorkspace({
   stockNotice: { tone: "ok" | "warning"; text: string } | null;
   /** Gammes partenaires à découvrir : à part, jamais des conseils. */
   partnerCards?: PartnerCardView[];
+  /** Le conseil sur lequel on a cliqué dans la bannière du comptoir (`?conseil=`) : sa carte s'ouvre dépliée, en entier. */
+  focusAdviceId?: string | null;
+  /** La personne peut ouvrir la fiche produit depuis la fiche complète d'un conseil. */
+  canOpenProduct?: boolean;
 }) {
   const alreadyVerified = Boolean(prescription.verifiedAt);
   const [lines, setLines] = useState(() => withDefaultConfirmation(initialLines, alreadyVerified));
@@ -520,6 +527,7 @@ export function SaleWorkspace({
   );
 
   return (
+    <AdviceFocusProvider initialId={focusAdviceId} canOpenProduct={canOpenProduct}>
     <div className="mx-auto max-w-6xl">
       {/* La bannière du comptoir, en île : la vraie vente jouée en haut de l'écran, avec le robot du comptoir. */}
       <SaleIsland
@@ -783,5 +791,6 @@ export function SaleWorkspace({
         )}
       </div>
     </div>
+    </AdviceFocusProvider>
   );
 }

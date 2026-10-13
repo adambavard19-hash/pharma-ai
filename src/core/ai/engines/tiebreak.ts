@@ -10,14 +10,24 @@ import { SCORE_WEIGHTS } from "./scoring";
  * (même sécurité, même adéquation, mêmes précautions et vigilances, écart de
  * pertinence négligeable), les critères de l'officine départagent, dans cet
  * ordre : formule préférée par la règle, préférence déclarée, gamme
- * privilégiée, date courte, challenge laboratoire en cours, disponibilité,
- * historique, marge.
+ * privilégiée, référence non remboursée, date courte, challenge laboratoire en
+ * cours, historique, marge HT, disponibilité.
  *
  * Une préférence, une gamme partenaire, une date courte, un challenge ou une
  * marge ne fait donc jamais passer une référence moins adaptée, plus signalée
- * ou moins sûre devant une autre. À niveau clinique égal, la boîte à date
- * courte passe d'abord (on évite la perte), puis celle qui participe à un
- * challenge en cours.
+ * ou moins sûre devant une autre. À niveau clinique égal :
+ *   • ce que l'officine a choisi elle-même (préférence, gamme) passe d'abord ;
+ *   • une référence remboursée — prix et marge encadrés — ne passe jamais devant
+ *     une équivalente non remboursée (retour du fondateur, 13 oct. 2026 :
+ *     AEQUASYAL, inscrit à la LPP, proposé après une cétirizine) ;
+ *   • la boîte à date courte (on évite la perte), puis celle d'un challenge ;
+ *   • l'historique de validation de l'équipe ;
+ *   • la meilleure marge HT par unité, en euros : la référence qui rapporte le
+ *     plus à l'officine. Avant la disponibilité : deux boîtes en rayon, l'une à
+ *     2 unités, l'autre à 30, répondent pareil au patient — la marge, elle, est
+ *     ce que l'officine attend du départage. Une marge inconnue (prix
+ *     manquants) n'est ni favorisée ni pénalisée : elle prend la médiane des
+ *     marges connues de ses équivalentes.
  */
 
 /** Écart de score clinique sous lequel deux références sont équivalentes. */
@@ -58,21 +68,23 @@ export type TiebreakCriterion =
   | "FORMULE"
   | "PREFERENCE_OFFICINE"
   | "GAMME_PRIVILEGIEE"
+  | "NON_REMBOURSE"
   | "DATE_COURTE"
   | "CHALLENGE"
-  | "DISPONIBILITE"
   | "HISTORIQUE"
-  | "COMMERCIAL";
+  | "COMMERCIAL"
+  | "DISPONIBILITE";
 
 export const TIEBREAK_LABELS: Record<TiebreakCriterion, string> = {
   FORMULE: "formule préférée par la règle",
   PREFERENCE_OFFICINE: "préférence déclarée par l'officine",
   GAMME_PRIVILEGIEE: "gamme privilégiée de l'officine",
+  NON_REMBOURSE: "référence non remboursée préférée à une remboursée",
   DATE_COURTE: "date courte",
   CHALLENGE: "challenge laboratoire en cours",
-  DISPONIBILITE: "disponibilité en rayon",
   HISTORIQUE: "historique de validation",
-  COMMERCIAL: "marge",
+  COMMERCIAL: "meilleure marge HT",
+  DISPONIBILITE: "disponibilité en rayon",
 };
 
 export type TiebreakContext = {
@@ -108,20 +120,23 @@ export function chooseAmongEquivalents(list: ScoredRecommendation[], context: Ti
   const equivalents = ordered.filter((item) => clinicallyEquivalent(item, best));
   if (equivalents.length < 2) return { chosen: best, best, equivalents, criterion: null };
 
-  const steps: [TiebreakCriterion, (item: ScoredRecommendation) => number][] = [
+  const steps: [TiebreakCriterion, (item: ScoredRecommendation, pool: ScoredRecommendation[]) => number][] = [
     ["FORMULE", (item) => context.formulaRank(item)],
     ["PREFERENCE_OFFICINE", (item) => -item.breakdown.pharmacistPreference],
     ["GAMME_PRIVILEGIEE", (item) => context.rangeRank(item) ?? Number.POSITIVE_INFINITY],
+    // Seule une référence CONNUE comme remboursée recule : « on ne sait pas » ne vaut pas « remboursée ».
+    ["NON_REMBOURSE", (item) => (item.reimbursed === true ? 1 : 0)],
     ["DATE_COURTE", (item) => shortDateKey(context.shortDate(item))],
     ["CHALLENGE", (item) => (context.hasChallenge?.(item) ? 0 : 1)],
-    ["DISPONIBILITE", (item) => -item.breakdown.availability],
     ["HISTORIQUE", (item) => -item.breakdown.validationHistory],
-    ["COMMERCIAL", (item) => -item.breakdown.commercial],
+    ["COMMERCIAL", (item, pool) => -marginKey(item, pool)],
+    ["DISPONIBILITE", (item) => -item.breakdown.availability],
   ];
   let pool = equivalents;
   let decisive: TiebreakCriterion | null = null;
   for (const [criterion, key] of steps) {
-    const values = pool.map(key);
+    const current = pool;
+    const values = current.map((item) => key(item, current));
     const min = Math.min(...values);
     const next = pool.filter((_, index) => values[index] === min);
     if (next.length < pool.length) {
@@ -131,4 +146,38 @@ export function chooseAmongEquivalents(list: ScoredRecommendation[], context: Ti
     }
   }
   return { chosen: pool[0], best, equivalents, criterion: decisive };
+}
+
+/**
+ * La marge HT d'une référence pour le départage. Inconnue (prix manquants), elle prend la médiane des marges connues
+ * de ses équivalentes : ni inventée en sa faveur, ni comptée contre elle. Aucune marge connue : toutes à égalité.
+ */
+export function marginKey(item: ScoredRecommendation, pool: ScoredRecommendation[]): number {
+  if (typeof item.marginCents === "number") return item.marginCents;
+  const known = pool.map((other) => other.marginCents).filter((value): value is number => typeof value === "number").sort((a, b) => a - b);
+  if (known.length === 0) return 0;
+  const middle = Math.floor(known.length / 2);
+  return known.length % 2 ? known[middle] : (known[middle - 1] + known[middle]) / 2;
+}
+
+/**
+ * Ce que le pharmacien lit du départage commercial, à la fin de la justification — jamais sur la fiche du patient.
+ * Rien quand la clinique a suffi ou qu'un autre critère a tranché, sauf pour dire qu'une référence remboursée est
+ * proposée faute d'équivalente non remboursée.
+ */
+export function commercialJustification(result: TiebreakResult, formatCents: (cents: number) => string): string | null {
+  const { chosen, equivalents, criterion } = result;
+  const margin = typeof chosen.marginCents === "number" ? `${formatCents(chosen.marginCents)} HT par unité` : null;
+  if (criterion === "COMMERCIAL" && margin) return `Meilleure marge parmi les ${equivalents.length} références équivalentes en stock : ${margin}.`;
+  if (criterion === "NON_REMBOURSE") {
+    const reimbursed = equivalents.filter((item) => item.reimbursed === true).length;
+    return `Préférée à ${reimbursed} référence${reimbursed > 1 ? "s" : ""} équivalente${reimbursed > 1 ? "s" : ""} remboursée${reimbursed > 1 ? "s" : ""}${margin ? ` ; marge ${margin}` : ""}.`;
+  }
+  if (chosen.reimbursed === true) {
+    // Seuls la formule préférée par la règle (un critère clinique) et le choix de l'officine (préférence, gamme)
+    // passent avant le remboursement : ce sont les seules raisons pour lesquelles une remboursée peut être en tête.
+    if (!equivalents.some((item) => item.reimbursed !== true)) return "Référence remboursée : aucune référence équivalente non remboursée en stock pour ce conseil.";
+    return criterion === "FORMULE" ? "Référence remboursée, retenue pour sa formule, préférée par la règle." : "Référence remboursée, retenue par le choix de l'officine.";
+  }
+  return null;
 }

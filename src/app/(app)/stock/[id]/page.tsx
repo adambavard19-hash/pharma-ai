@@ -15,7 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { StatCard } from "@/components/ui/stat-card";
 import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { computeMargin, formatCents, formatDateTime, formatPercent } from "@/lib/format";
+import { formatCents, formatDateTime, formatPercent } from "@/lib/format";
+import { unitMarginHt } from "@/core/catalog/margin";
 import { StockAdjustForm } from "./stock-form";
 import { listLots } from "@/server/services/stock-lots";
 import { ProductLots } from "../dates-courtes/product-lots";
@@ -81,10 +82,9 @@ export default async function ProductDetailPage({
   const threshold = product.stockItem?.alertThreshold ?? 0;
   const status = stockStatus(quantity, threshold);
   const canManage = session.permissions.has(PERMISSIONS.PRODUCT_MANAGE);
-  const { marginCents, marginRate } = computeMargin(
-    product.purchasePriceCents,
-    product.salePriceCents,
-  );
+  // Hors taxe des deux côtés : le prix de vente est TTC, le prix d'achat HT. Sans l'un des deux prix, la marge est inconnue
+  // (et non le prix de vente entier) : le fichier de stock ne donne souvent qu'un seul prix à la fois.
+  const margin = unitMarginHt({ salePriceCents: product.salePriceCents, purchasePriceCents: product.purchasePriceCents, vatRate: product.vatRate });
 
   return (
     <div className="space-y-6">
@@ -160,9 +160,9 @@ export default async function ProductDetailPage({
         />
         {canManage ? (
           <StatCard
-            label="Marge unitaire"
-            value={formatCents(marginCents)}
-            sublabel={marginRate !== null ? formatPercent(marginRate) : "Non calculable"}
+            label="Marge unitaire HT"
+            value={margin ? formatCents(margin.marginCents) : "Non calculable"}
+            sublabel={margin ? `${formatPercent(margin.rate)} du prix HT` : product.purchasePriceCents > 0 ? "Prix de vente manquant" : "Prix d'achat manquant"}
             icon={<TrendingUp className="size-4" />}
           />
         ) : (

@@ -130,6 +130,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
           { href: "/admin/conseils", label: "Conseils & associations", description: "Les règles, les conseils et les associations de PharmaBoost : valider, supprimer, ajouter, pour toutes les pharmacies." },
           { href: "/admin/connaissances", label: "Base de connaissances", description: "Déposer des documents et des notes : le modèle les lit et propose des conseils, vous acceptez ou refusez." },
           { href: "/admin/a-connaitre", label: "Produits à connaître", description: "Ce que PharmaBoost n'a pas su ranger dans le stock des pharmacies : vous répondez une fois, c'est appris pour toutes." },
+          { href: "/admin/suggestions-robot", label: "Suggestions du robot", description: "Ce que le robot a proposé au comptoir faute de règle pour un médicament : valider pour toutes les pharmacies, ou refuser pour toujours." },
           { href: "/admin/validation-clinique", label: "Validation clinique", description: "Les règles jugées « pas adaptées à ce patient » au comptoir, comptées par officine : relire, confirmer ou modifier la règle." },
         ],
       },

@@ -129,7 +129,7 @@ describe("le parcours en trois étapes", () => {
     expect(t).toContain("Vérifier");
     expect(t).toContain("Confirmer");
     expect(t).toContain("Choisissez le fichier de votre stock");
-    expect(t).toContain("Choisir mon fichier");
+    expect(t).toContain("Choisir mes fichiers");
     expect(t).toContain("Comment récupérer mon stock dans LGPI ?");
     expect(html).toContain("/connexion/guide?logiciel=lgpi");
     // Rien ne s'applique à ce stade : pas de bouton de confirmation avant d'avoir vérifié le fichier.

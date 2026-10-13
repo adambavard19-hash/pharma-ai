@@ -1,4 +1,5 @@
 import "server-only";
+import { COUNTED_ADVICE } from "@/server/db/counted-advice";
 import { prisma } from "@/server/db/client";
 import { adminSearch } from "@/server/services/admin/search";
 import { loadAttention, loadKpis, loadToday } from "@/server/services/admin/cockpit";
@@ -186,7 +187,7 @@ async function pharmacySheet(input: Input): Promise<ToolOutput> {
         prospect: { select: { id: true, status: true, salesRep: { select: { firstName: true, lastName: true } }, activatedAt: true } },
       },
     }),
-    prisma.recommendation.count({ where: { pharmacyId: found.id, createdAt: { gte: since } } }),
+    prisma.recommendation.count({ where: { pharmacyId: found.id, createdAt: { gte: since }, AND: [COUNTED_ADVICE] } }),
     prisma.recommendation.count({ where: { pharmacyId: found.id, createdAt: { gte: since }, status: { in: ["ACCEPTED", "MODIFIED", "REPLACED", "PRESENTED", "PURCHASED"] } } }),
     prisma.recommendation.count({ where: { pharmacyId: found.id, createdAt: { gte: since }, status: "PURCHASED" } }),
     prisma.sale.aggregate({ where: { pharmacyId: found.id, createdAt: { gte: since } }, _count: true, _sum: { attributedCents: true } }),
@@ -402,9 +403,9 @@ async function usage(input: Input): Promise<ToolOutput> {
   if (ref && !one) return { erreur: `Aucune officine ne correspond à « ${ref} ».` };
   const scope = { isDemo: false, createdAt: { gte: since }, ...(one ? { pharmacyId: one.id } : {}) };
   const [byStatus, sales, perPharmacy] = await Promise.all([
-    prisma.recommendation.groupBy({ by: ["status"], _count: true, where: scope }),
+    prisma.recommendation.groupBy({ by: ["status"], _count: true, where: { ...scope, AND: [COUNTED_ADVICE] } }),
     prisma.sale.aggregate({ where: scope, _count: true, _sum: { totalCents: true, attributedCents: true, attributedMarginCents: true } }),
-    one ? Promise.resolve([]) : prisma.recommendation.groupBy({ by: ["pharmacyId"], _count: true, where: scope, orderBy: { _count: { pharmacyId: "desc" } }, take: limit }),
+    one ? Promise.resolve([]) : prisma.recommendation.groupBy({ by: ["pharmacyId"], _count: true, where: { ...scope, AND: [COUNTED_ADVICE] }, orderBy: { _count: { pharmacyId: "desc" } }, take: limit }),
   ]);
   const count = (statuses: readonly string[]) => byStatus.filter((g) => statuses.includes(g.status)).reduce((s, g) => s + g._count, 0);
   const proposed = byStatus.reduce((s, g) => s + g._count, 0);

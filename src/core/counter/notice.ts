@@ -9,6 +9,7 @@
  */
 
 import type { ViewQuestion } from "./question-tree";
+import type { CounterSheet } from "../../../agent/src/counter-sheet";
 
 export type NoticeAlert = { severity: string; subjectType: string; code: string; message: string; acknowledged: boolean };
 
@@ -69,6 +70,11 @@ export type NoticeRecommendation = {
    * propres places dans la fenêtre, en plus des conseils du moteur — un conseil du moteur ne l'en chasse jamais.
    */
   association?: boolean;
+  /**
+   * Ce que la carte montre une fois DÉPLOYÉE (nom complet, raison complète, phrase du comptoir, contre-indications,
+   * conseils d'utilisation) : la fiche complète de la page de vente, bornée (core/counter/advice-sheet.ts, `counterSheetOf`).
+   */
+  sheet?: CounterSheet | null;
 };
 
 /** Ce que le pharmacien lit sur la fenêtre : « En stock », « Stock faible », « Rupture », ou « Stock à vérifier ». */
@@ -98,6 +104,8 @@ export type NoticeItem = {
   availability: NoticeAvailability;
   quantity: number | null;
   imageUrl: string | null;
+  /** La carte déployée : la fiche complète du conseil, bornée. Null : rien à déployer au-delà du nom et de la raison. */
+  sheet: CounterSheet | null;
 };
 
 export type CounterNoticeInput = {
@@ -232,6 +240,7 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
     availability: availabilityOf(rec.quantity, rec.alertThreshold, reliable),
     quantity: reliable ? (rec.quantity ?? null) : null,
     imageUrl: rec.imageUrl ?? null,
+    sheet: rec.sheet ?? null,
   }));
   const advice = items.map((item) => [item.name, euros(item.priceCents), item.reason].filter(Boolean).join(" · "));
   // Ce qui a été répondu fait partie de l'état : sans lui dans l'empreinte, la fenêtre ne se redessinerait pas après un choix.

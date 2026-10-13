@@ -85,3 +85,40 @@ describe("ce qui va se passer, dit sans détour", () => {
     expect(confirmButtonLabel(preview({ verdict: "HOLD", reason: "x" }))).toBe("Envoyer pour vérification");
   });
 });
+
+describe("plusieurs fichiers, et « Ce fichier complète seulement mes prix »", () => {
+  const MERGED = preview({
+    products: 4306,
+    withBothPrices: 4120,
+    merge: { files: [{ fileName: "pamp.pdf", priceKind: "PURCHASE", priceLabel: "PAMP Net" }, { fileName: "pv.pdf", priceKind: "SALE", priceLabel: "PV TTC" }], quantityConflicts: 3 },
+  });
+
+  it("dit en clair ce que donnent les fichiers réunis", async () => {
+    const { mergeHeadline } = await import("../preview-view");
+    expect(norm(mergeHeadline(MERGED) ?? "")).toBe("2 fichiers réunis : prix d'achat (PAMP Net) + prix de vente (PV TTC) — 4 306 produits, dont 4 120 avec les deux prix");
+    expect(mergeHeadline(preview())).toBeNull();
+  });
+
+  it("compte les produits avec leurs deux prix, et les quantités qui diffèrent entre fichiers", () => {
+    const facts = previewFacts(MERGED);
+    const both = facts.find((fact) => fact.key === "both")!;
+    expect(norm(both.value)).toBe("4 120");
+    expect(both.hint).toContain("marge");
+    expect(facts.find((fact) => fact.key === "conflicts")).toMatchObject({ value: "3", tone: "warning", hint: "La quantité du fichier le plus récent est retenue." });
+  });
+
+  it("un envoi ordinaire : les quantités sont mises à jour, les prix absents conservés — jamais « remplacer » ni « écraser »", () => {
+    const text = norm(confirmationText(preview({ products: 4306 })));
+    expect(text).toBe("Les quantités de 4 306 produits seront mises à jour. Les prix que ce fichier ne contient pas sont conservés (vos prix d'achat restent).");
+    expect(text).not.toMatch(/rempla|écras/i);
+  });
+
+  it("mode « prix seulement » : seuls des prix, aucune quantité, aucune case « passera à 0 »", () => {
+    const prices = preview({ mode: "PRICES", absent: null, pricesUpdated: 4100, withBothPrices: 4100 });
+    expect(norm(confirmationText(prices))).toBe("Seuls les prix de 4 100 produits seront complétés ; aucune quantité ne change, aucun produit n'est ajouté ni mis à 0.");
+    expect(needsZeroConsent({ ...prices, absent: 12 })).toBe(false);
+    expect(confirmButtonLabel(prices)).toBe("Compléter mes prix");
+    expect(previewFacts(prices).map((fact) => fact.key)).toEqual(["prices", "both", "unknown"]);
+    expect(JSON.stringify(previewFacts(prices))).not.toMatch(/rempla|écras/i);
+  });
+});

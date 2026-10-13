@@ -25,8 +25,10 @@ type Zone = { key: string; tag: string; label: string; /** Avec son article : «
 /** `words` : ce que le libellé du stock dit de la zone (sans accents, en minuscules). */
 export const PAIN_ZONES: Zone[] = [
   { key: "back", tag: "zone dos", label: "dos", the: "le dos", ask: "Le patient a-t-il mal au dos ?", words: String.raw`\bdos\b|lombaire|lombalg`, mention: "au dos" },
-  { key: "neck", tag: "zone nuque", label: "nuque", the: "la nuque", ask: "Le patient a-t-il mal à la nuque ou aux cervicales ?", words: String.raw`nuque|cervical|\bcou\b`, mention: "à la nuque" },
-  { key: "shoulder", tag: "zone épaule", label: "épaule", the: "l'épaule", ask: "Le patient a-t-il mal à l'épaule ?", words: String.raw`epaule`, mention: "à l'épaule" },
+  // « EPAU/CER » : l'abréviation d'un export réel (THERA PEARL EPAU/CER, épaule et cervicales) — sans elle, la poche de l'épaule
+  // passait pour une poche sans zone et n'était jamais proposée à « Épaule ». « ÉPA » : THERM-O-HOT Patch chauff cou/dos/épa/poi.
+  { key: "neck", tag: "zone nuque", label: "nuque", the: "la nuque", ask: "Le patient a-t-il mal à la nuque ou aux cervicales ?", words: String.raw`nuque|cervical|\bcou\b|\bcer\b`, mention: "à la nuque" },
+  { key: "shoulder", tag: "zone épaule", label: "épaule", the: "l'épaule", ask: "Le patient a-t-il mal à l'épaule ?", words: String.raw`epaule|\bepau\b|\bepa\b`, mention: "à l'épaule" },
   { key: "knee", tag: "zone genou", label: "genou", the: "le genou", ask: "Le patient a-t-il mal au genou ?", words: String.raw`genou`, mention: "au genou" },
   { key: "hip", tag: "zone hanche", label: "hanche", the: "la hanche", ask: "Le patient a-t-il mal à la hanche ?", words: String.raw`hanche`, mention: "à la hanche" },
   { key: "ankle", tag: "zone cheville", label: "cheville", the: "la cheville", ask: "Le patient a-t-il mal à la cheville ?", words: String.raw`cheville`, mention: "à la cheville" },
@@ -37,7 +39,9 @@ export const ANY_ZONE_WORDS = PAIN_ZONES.map((zone) => zone.words).join("|");
 
 /** Ce qu'une poche chaud/froid n'est jamais : un produit d'enfant, une bouillotte, un masque pour les yeux. */
 const NEVER = String.raw`masq|ocul|\bkids?\b|enfant|bouillotte`;
-const PACK_EXCLUDE = [String.raw`\bkids?\b`, String.raw`enfant`, String.raw`bouillotte`, String.raw`masq(?:ue)? ?ocul`, String.raw`oculaire`];
+// Un masque, même sans « oculaire » dans le nom (THERMCOOL HOT POCHE BILLE MASQUE, export réel), n'est pas une poche pour une
+// douleur : depuis que chaque zone peut retomber sur une poche sans zone, il passait pour une poche multi-zones.
+const PACK_EXCLUDE = [String.raw`\bkids?\b`, String.raw`enfant`, String.raw`bouillotte`, String.raw`masq(?:ue)? ?ocul`, String.raw`oculaire`, String.raw`\bmasq`];
 
 const PACK_TERMS = [String.raw`chaud ?froid`, String.raw`thera ?pearl`, String.raw`thermcool`, String.raw`poche`];
 
@@ -46,7 +50,9 @@ const preferring = (refused: string, ...patterns: string[]) => patterns.map((pat
 
 const COMMON = {
   kind: "COMFORT" as const,
-  version: "1.1",
+  // 1.2 — 13 oct. 2026 : abréviations de zone des exports réels (« EPAU », « CER »), un produit qui nomme plusieurs zones dont
+  // celle demandée la sert, un masque n'est jamais une poche ; textes inchangés.
+  version: "1.2",
   validation: { status: "PENDING" as const },
   triggerMode: "CLASS_ONLY" as const,
   category: "DISPOSITIFS_MEDICAUX" as const,
@@ -60,9 +66,9 @@ const COMMON = {
 };
 
 function zoneRule(zone: Zone): AdviceRule {
-  // Une poche d'une AUTRE zone ne sert pas : la zone demandée garde ses mots, les autres sont refusées.
-  const otherZones = PAIN_ZONES.filter((candidate) => candidate.key !== zone.key).map((candidate) => candidate.words).join("|");
-  const refused = `${NEVER}|${otherZones}`;
+  // Une poche d'une AUTRE zone ne sert pas (`productExclude`). Les formules préférées exigent les mots de la zone demandée : elles
+  // ne refusent que ce qui n'est jamais une poche — « EPAU/CER » (épaule et cervicales) est la poche de l'épaule.
+  const refused = NEVER;
   return {
     ...COMMON,
     key: `pain-pack-${zone.key}`,
@@ -71,7 +77,10 @@ function zoneRule(zone: Zone): AdviceRule {
     confirmedReasonTemplate: `Douleur ${zone.mention} confirmée sous {drug} : le froid sur une entorse récente, le chaud sur une contracture, complètent l'antalgique.`,
     matchingTags: ["chaud froid", zone.tag],
     productPrefer: preferring(refused, `(?:${zone.words}).*(?:${PACK_TERMS.join("|")})`, `(?:${PACK_TERMS.join("|")}).*(?:${zone.words})`, `(?:${zone.words})`),
-    productExclude: [...PACK_EXCLUDE, ...PAIN_ZONES.filter((candidate) => candidate.key !== zone.key).map((candidate) => candidate.words)],
+    // Le produit d'une autre zone est refusé, sauf s'il nomme AUSSI celle-ci (« patch chauffant cou/dos/épaule ») : il la sert.
+    // Une poche sans zone (multi-zones), un patch chauffant ou un gel de froid sans médicament, étiquetés « chaud froid », restent
+    // candidats : faute de produit de la zone, c'est eux que la zone propose — la marge départage entre équivalents (tiebreak.ts).
+    productExclude: [...PACK_EXCLUDE, ...PAIN_ZONES.filter((candidate) => candidate.key !== zone.key).map((candidate) => `^(?!.*(?:${zone.words})).*(?:${candidate.words})`)],
     benefits: ["Froid les 48 premières heures d'une entorse", "Chaud sur une contracture", `Poche pour ${zone.the}`],
     shortReasonTemplate: `Antalgique ou anti-inflammatoire ({drug}) : pour une douleur ${zone.mention}, le froid ou le chaud local complète le traitement.`,
     rationaleTemplate: `Sous {drug}, une douleur ${zone.mention} d'origine musculaire ou articulaire répond aussi à la température : le froid limite l'œdème et la douleur d'une entorse ou d'un traumatisme récent, la chaleur détend une contracture ou une lombalgie. Le pharmacien a demandé où le patient a mal : la poche proposée est celle de cette zone.`,

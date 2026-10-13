@@ -336,3 +336,62 @@ describe("la famille d'un conseil, calculée côté serveur", () => {
     expect([first.family, second.family]).toEqual(["PARAPHARMACIE", "COMPLEMENT"]);
   });
 });
+
+describe("le conseil cliqué dans la bannière du comptoir, et sa fiche produit", () => {
+  type Rendered = { props: { recommendations: AdviceView[]; focusAdviceId: string | null; canOpenProduct: boolean } };
+  const open = async (conseil: string | string[] | undefined, recommendations: ReturnType<typeof recommendation>[]) => {
+    mocks.prescriptionFindUnique.mockResolvedValue(prescription(recommendations));
+    return ((await SalePage({ params: Promise.resolve({ id: "rx_1" }), searchParams: Promise.resolve({ conseil }) })) as Rendered).props;
+  };
+
+  it("`?conseil=` d'un conseil de CETTE vente : la page l'ouvre déplié", async () => {
+    const props = await open("rec_2", [recommendation("rec_1"), recommendation("rec_2", { productId: "p2", product: catalogProduct("p2") })]);
+    expect(props.focusAdviceId).toBe("rec_2");
+  });
+
+  it("un conseil d'une autre vente, un identifiant piégé, plusieurs valeurs ou rien : la page s'ouvre normalement", async () => {
+    for (const conseil of ["rec_autre_vente", "../admin", "<script>", ["rec_1", "rec_1"], undefined, ""]) {
+      expect((await open(conseil, [recommendation("rec_1")])).focusAdviceId, String(conseil)).toBeNull();
+    }
+    // Sans `searchParams` du tout (appel direct) : pareil.
+    mocks.prescriptionFindUnique.mockResolvedValue(prescription([recommendation("rec_1")]));
+    expect(((await SalePage({ params: Promise.resolve({ id: "rx_1" }) })) as Rendered).props.focusAdviceId).toBeNull();
+  });
+
+  it("la fiche produit de l'officine passe telle quelle : contre-indications, précautions, description, vigilances déclarées", async () => {
+    const product = catalogProduct("p1", {
+      description: "Gel ophtalmique 10 g.",
+      contraindications: ["hypersensibilité"],
+      precautions: ["Ne pas toucher l'œil avec l'embout."],
+      vigilances: [{ population: "CHILD", level: "CAUTION", note: "Avant 3 ans : avis du pharmacien." }],
+    });
+    const [advice] = (await open("rec_1", [recommendation("rec_1", { product })])).recommendations;
+    expect(advice.product?.sheet).toEqual({
+      description: "Gel ophtalmique 10 g.",
+      contraindications: ["hypersensibilité"],
+      precautions: ["Ne pas toucher l'œil avec l'embout."],
+      vigilances: [{ population: "CHILD", level: "CAUTION", note: "Avant 3 ans : avis du pharmacien." }],
+    });
+  });
+
+  it("une fiche produit vide : des listes vides, rien d'inventé ; un médicament du catalogue national n'a pas de fiche d'officine", async () => {
+    const [empty] = (await open(undefined, [recommendation("rec_1")])).recommendations;
+    expect(empty.product?.sheet).toEqual({ description: null, contraindications: [], precautions: [], vigilances: [] });
+    const presentation = { id: "pres_1", priceCents: 520, imageUrl: null, imageSource: null, specialty: { name: "SPASFON LYOC" }, pharmacyStocks: [{ quantity: 4, alertThreshold: 1, priceCents: 520 }] };
+    const [national] = (await open(undefined, [recommendation("rec_2", { productId: null, product: null, presentation })])).recommendations;
+    expect(national.product?.sheet).toBeUndefined();
+  });
+
+  it("les vigilances de la fiche sont lues pour l'officine de la session seulement ; le lien vers la fiche suit le droit de consultation", async () => {
+    const props = await open("rec_1", [recommendation("rec_1")]);
+    const [{ where, include }] = mocks.prescriptionFindUnique.mock.calls.at(-1)!;
+    expect(where).toEqual({ id: "rx_1" });
+    expect(include.recommendations.include.product.include.vigilances.where).toEqual({ pharmacyId: "ph_1" });
+    expect(props.canOpenProduct).toBe(false);
+  });
+
+  it("une vente d'une autre officine reste introuvable, conseil visé ou non", async () => {
+    mocks.prescriptionFindUnique.mockResolvedValue({ ...prescription([recommendation("rec_1")]), pharmacyId: "ph_autre" });
+    await expect(SalePage({ params: Promise.resolve({ id: "rx_1" }), searchParams: Promise.resolve({ conseil: "rec_1" }) })).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+});

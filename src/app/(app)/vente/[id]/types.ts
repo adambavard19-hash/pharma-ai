@@ -1,4 +1,5 @@
 import type { SuggestionVigilance } from "@/config/vigilances";
+import type { ProductSheetView } from "@/core/counter/advice-sheet";
 import type { ScoreContribution, RoutineStepInfo, VigilanceDetails } from "@/core/ai/types";
 import type { AdviceFamily } from "@/core/ai/family";
 import type { PosologySchedule } from "@/core/posology";
@@ -215,8 +216,16 @@ export type AdviceView = {
     quantity: number;
     alertThreshold: number;
     claims: string[];
+    /**
+     * Ce que la fiche produit de l'officine dit de ce produit, lu à l'affichage (jamais rédigé ici) : la fiche complète
+     * du conseil s'en sert (contre-indications, conseils d'utilisation). Absente pour un médicament du catalogue national.
+     */
+    sheet?: ProductSheetView;
   } | null;
 };
+
+/** La fiche produit de l'officine, telle que le comptoir la lit pour un conseil (définie avec la fiche complète, core/counter/advice-sheet.ts). */
+export type { ProductSheetView };
 
 /**
  * Ce qui, dans le dossier du patient, a RÉELLEMENT pesé sur cette analyse.

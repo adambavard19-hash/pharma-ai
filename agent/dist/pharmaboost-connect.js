@@ -4821,6 +4821,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
@@ -4838,12 +4839,14 @@ namespace PharmaBoostIle
     public const int WS_EX_TOOLWINDOW = 0x00000080;
     public const int WS_EX_NOACTIVATE = 0x08000000;
     public const uint GA_ROOT = 2;
+    public const int ASFW_ANY = -1;
 
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool AllowSetForegroundWindow(int processId);
   }
 
   /// <summary>Ce que la fenêtre écrit pour l'agent : une ligne par mot, jamais deux fils à la fois.</summary>
@@ -4857,6 +4860,7 @@ namespace PharmaBoostIle
   public sealed class IleForm : Form
   {
     private readonly string pageUrl;
+    private readonly Uri pageUri;
     private readonly string allowedPrefix;
     private readonly string loaderDir;
     private readonly string userDataDir;
@@ -4879,11 +4883,16 @@ namespace PharmaBoostIle
     private bool dragMoved;
     private string positionFile = "";
     private bool customPosition;
+    // L'ouverture d'un conseil dans le navigateur : jamais juste après un glisser, jamais deux fois d'un double-clic.
+    private DateTime dragEndedAt = DateTime.MinValue;
+    private DateTime lastOpenAt = DateTime.MinValue;
+    private string lastOpenUrl = "";
 
     public IleForm(string url, string loader, string userData)
     {
       pageUrl = url;
       Uri parsed = new Uri(url);
+      pageUri = parsed;
       allowedPrefix = parsed.GetLeftPart(UriPartial.Path);
       loaderDir = loader;
       userDataDir = userData;
@@ -4998,6 +5007,7 @@ namespace PharmaBoostIle
           Location = Clamp(Location);
           customPosition = true;
           SavePosition();
+          dragEndedAt = DateTime.UtcNow;
         }
         if (!keyboard) GiveFocusBack();
         return;
@@ -5037,7 +5047,7 @@ namespace PharmaBoostIle
         s.IsPasswordAutosaveEnabled = false;
         s.IsGeneralAutofillEnabled = false;
         core.NavigationStarting += OnNavigationStarting;
-        core.NewWindowRequested += delegate(object sender, CoreWebView2NewWindowRequestedEventArgs e) { e.Handled = true; };
+        core.NewWindowRequested += OnNewWindowRequested;
         core.NavigationCompleted += OnNavigationCompleted;
         core.WebMessageReceived += OnWebMessage;
         core.ProcessFailed += delegate(object sender, CoreWebView2ProcessFailedEventArgs e)
@@ -5058,6 +5068,61 @@ namespace PharmaBoostIle
     {
       // Seule la page de l'île de PharmaBoost s'ouvre ici.
       if (!e.Uri.StartsWith(allowedPrefix, StringComparison.Ordinal)) e.Cancel = true;
+    }
+
+    /// <summary>
+    /// Jamais de nouvelle fenêtre dans l'île. Seule exception : le clic sur la carte d'un conseil (un lien de la page vers
+    /// /vente/...) ouvre la page de la vente dans le NAVIGATEUR par défaut du PC. L'adresse est vérifiée ici (même serveur
+    /// que l'île, chemin attendu), réécrite, puis l'agent la revérifie et l'ouvre par l'ouverture sûre (space-link.ts :
+    /// rundll32, jamais une invite de commandes). Toute autre adresse est ignorée.
+    /// </summary>
+    private void OnNewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs e)
+    {
+      e.Handled = true;
+      if (!e.IsUserInitiated) return;
+      string link = SaleLinkFor(pageUri, e.Uri);
+      if (link == null) return;
+      DateTime now = DateTime.UtcNow;
+      // Un glisser de l'île n'est pas un clic ; un double-clic n'ouvre pas deux onglets.
+      if ((dragTimer.Enabled && dragMoved) || (now - dragEndedAt).TotalMilliseconds < 400) return;
+      if (link == lastOpenUrl && (now - lastOpenAt).TotalMilliseconds < 1500) return;
+      lastOpenUrl = link;
+      lastOpenAt = now;
+      // L'île vient de recevoir le clic : elle laisse le navigateur passer au premier plan (elle-même ne le prend jamais).
+      try { Native.AllowSetForegroundWindow(Native.ASFW_ANY); } catch (Exception) { }
+      Out.Word("OUVRIR " + link);
+    }
+
+    /// <summary>
+    /// L'adresse d'une page de vente du serveur de l'île — « /vente/id », puis « ?conseil=id » et « #conseil-id » s'ils
+    /// sont là, identifiants [A-Za-z0-9_-] —, réécrite à partir de ces seuls morceaux ; toute autre adresse : null.
+    /// </summary>
+    public static string SaleLinkFor(Uri page, string candidate)
+    {
+      if (page == null || string.IsNullOrEmpty(candidate) || candidate.Length > 400) return null;
+      Uri u;
+      if (!Uri.TryCreate(candidate, UriKind.Absolute, out u)) return null;
+      if (u.Scheme != page.Scheme || !string.Equals(u.Authority, page.Authority, StringComparison.OrdinalIgnoreCase)) return null;
+      if (u.UserInfo.Length > 0) return null;
+      if (u.Scheme != Uri.UriSchemeHttps && !(u.Scheme == Uri.UriSchemeHttp && u.IsLoopback)) return null;
+      Match path = Regex.Match(u.AbsolutePath, @"^/vente/([A-Za-z0-9_-]{1,64})\z");
+      if (!path.Success) return null;
+      string advice = "";
+      if (u.Query.Length > 0)
+      {
+        Match query = Regex.Match(u.Query, @"^\?conseil=([A-Za-z0-9_-]{1,64})\z");
+        if (!query.Success) return null;
+        advice = query.Groups[1].Value;
+      }
+      if (u.Fragment.Length > 0)
+      {
+        Match anchor = Regex.Match(u.Fragment, @"^#conseil-([A-Za-z0-9_-]{1,64})\z");
+        if (!anchor.Success || (advice.Length > 0 && advice != anchor.Groups[1].Value)) return null;
+        advice = anchor.Groups[1].Value;
+      }
+      string link = u.GetLeftPart(UriPartial.Authority) + "/vente/" + path.Groups[1].Value;
+      if (advice.Length > 0) link = link + "?conseil=" + advice + "#conseil-" + advice;
+      return link;
     }
 
     private void OnNavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
@@ -5343,6 +5408,66 @@ async function ensureWebView2Sdk(input) {
   return { sdkDir, loaderDir: (0, import_node_path4.join)(sdkDir, loaderArch(arch)) };
 }
 
+// agent/src/counter-sheet.ts
+var COUNTER_SHEET_LIMITS = {
+  name: 160,
+  reasons: 3,
+  reason: 280,
+  script: 360,
+  lines: 6,
+  lineText: 140,
+  lineDetail: 240,
+  description: 360
+};
+var PATIENTS = /* @__PURE__ */ new Set(["CONCERNED", "NOT_CONCERNED", "UNKNOWN"]);
+function boundText(raw, max) {
+  const text = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
+  if (text.length <= max) return { text, cut: false };
+  const head = text.slice(0, max - 1);
+  const space = head.lastIndexOf(" ");
+  return { text: `${(space > max * 0.6 ? head.slice(0, space) : head).replace(/[\s,;:.–—-]+$/, "")}\u2026`, cut: true };
+}
+function readCounterSheet(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const value = raw;
+  const L = COUNTER_SHEET_LIMITS;
+  let cut = value.cut === true;
+  const take = (input, max) => {
+    const bounded = boundText(input, max);
+    if (bounded.cut) cut = true;
+    return bounded.text;
+  };
+  const list = (input) => Array.isArray(input) ? input : [];
+  const lines = (input, previous) => {
+    const valid = list(input).flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const line = entry;
+      const text = take(line.text, L.lineText);
+      if (!text) return [];
+      const detail = take(line.detail, L.lineDetail);
+      const patient = PATIENTS.has(line.patient) ? line.patient : void 0;
+      return [{ text, ...detail ? { detail } : {}, ...patient ? { patient } : {} }];
+    });
+    const already = typeof previous === "number" && Number.isInteger(previous) && previous > 0 ? Math.min(previous, 999) : 0;
+    return { lines: valid.slice(0, L.lines), more: already + Math.max(0, valid.length - L.lines) };
+  };
+  const reasons = list(value.reasons).map((reason) => take(reason, L.reason)).filter(Boolean);
+  if (reasons.length > L.reasons) cut = true;
+  const more = value.more && typeof value.more === "object" ? value.more : {};
+  const contraindications = lines(value.contraindications, more.contraindications);
+  const usage = lines(value.usage, more.usage);
+  return {
+    name: take(value.name, L.name),
+    reasons: reasons.slice(0, L.reasons),
+    script: take(value.script, L.script),
+    contraindications: contraindications.lines,
+    usage: usage.lines,
+    description: take(value.description, L.description),
+    more: { contraindications: contraindications.more, usage: usage.more },
+    cut
+  };
+}
+
 // agent/src/notice-center.ts
 var MAX_RESTARTS = 5;
 var DEFAULT_NOTICE_SECONDS = 30;
@@ -5357,6 +5482,7 @@ function referenceOf(title) {
   return title.replace(/^PharmaBoost\s*·\s*/, "").trim();
 }
 var oneLine = (text) => text.replace(/[\r\n\u2028\u2029]+/g, " ").trim();
+var withSheet = (sheet) => sheet ? { sheet } : {};
 function frenchDate(iso) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
   return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
@@ -5376,7 +5502,10 @@ function buildHostEntry(input) {
     reason: oneLine(item.reason ?? ""),
     availability: AVAILABILITIES.has(item.availability) ? item.availability : "UNKNOWN",
     quantity: Number.isInteger(item.quantity) && item.quantity >= 0 ? String(item.quantity) : "",
-    image: item.imageUrl && images.get(item.imageUrl) || ""
+    image: item.imageUrl && images.get(item.imageUrl) || "",
+    // Relue et bornée ici aussi : un serveur d'une autre version ne casse pas l'île. Les accents passent tels quels — c'est
+    // `encodeCommand` qui les échappe en ASCII pour la fenêtre Windows.
+    ...withSheet(readCounterSheet(item.sheet))
   }));
   const legacyOnly = body.items === void 0 && body.advice.length > 0;
   const alerts = [...body.alerts.map(oneLine), ...input.problem ? [oneLine(input.problem)] : []];
@@ -5746,6 +5875,10 @@ var NoticeCenter = class {
     };
     if (word === "ESPACE" && !saleId) {
       act({ kind: "open_space" });
+      return;
+    }
+    if (word === "OUVRIR") {
+      if (saleId && !argument && saleId.length <= 400) act({ kind: "open_sale", url: saleId });
       return;
     }
     if (!saleId && word !== "ERREUR") return;
@@ -6284,11 +6417,50 @@ function openInBrowser(url, platform = process.platform, spawner = import_node_c
   }
 }
 
+// agent/src/sale-link.ts
+var LINK_ID = /^[A-Za-z0-9_-]{1,64}$/;
+var ADVICE_ANCHOR_PREFIX = "conseil-";
+var isLinkId = (value) => typeof value === "string" && LINK_ID.test(value);
+var adviceAnchor = (adviceId) => `${ADVICE_ANCHOR_PREFIX}${adviceId}`;
+function saleAdvicePath(saleId, adviceId) {
+  if (!isLinkId(saleId)) return null;
+  if (adviceId === void 0 || adviceId === null || adviceId === "") return `/vente/${saleId}`;
+  if (!isLinkId(adviceId)) return null;
+  return `/vente/${saleId}?conseil=${adviceId}#${adviceAnchor(adviceId)}`;
+}
+function adviceIdFromHash(hash) {
+  const match = /^#conseil-([A-Za-z0-9_-]{1,64})$/.exec(hash ?? "");
+  return match ? match[1] : null;
+}
+function trusted(server) {
+  return server.protocol === "https:" || server.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(server.hostname);
+}
+function saleAdviceUrl(serverUrl, candidate) {
+  if (typeof candidate !== "string" || candidate.length > 400) return null;
+  let server;
+  let url;
+  try {
+    server = new URL(serverUrl);
+    url = new URL(candidate);
+  } catch {
+    return null;
+  }
+  if (!trusted(server) || server.username || server.password || server.pathname !== "/" || server.search || server.hash) return null;
+  if (url.protocol !== server.protocol || url.host !== server.host || url.username || url.password) return null;
+  const path = /^\/vente\/([A-Za-z0-9_-]{1,64})$/.exec(url.pathname);
+  if (!path) return null;
+  const query = url.search === "" ? null : /^\?conseil=([A-Za-z0-9_-]{1,64})$/.exec(url.search)?.[1] ?? void 0;
+  const hash = url.hash === "" ? null : adviceIdFromHash(url.hash) ?? void 0;
+  if (query === void 0 || hash === void 0 || query && hash && query !== hash) return null;
+  const rebuilt = saleAdvicePath(path[1], query ?? hash);
+  return rebuilt ? `${server.origin}${rebuilt}` : null;
+}
+
 // agent/src/index.ts
 var import_node_fs10 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path9 = require("node:path");
-var VERSION = "0.10.2";
+var VERSION = "0.10.4";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path9.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path9.join)((0, import_node_path9.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -6527,7 +6699,13 @@ async function handleAction(action) {
     if (await openSpace(config, "\xE0 la demande")) markSpaceLinked((0, import_node_path9.dirname)(CONFIG_PATH), config.agentKey);
     return;
   }
-  if (!config || action.kind === "view" || action.kind === "open_space") return;
+  if (config && action.kind === "open_sale") {
+    const url = saleAdviceUrl(config.serverUrl, action.url);
+    if (!url) log("Conseil : adresse refus\xE9e (autre serveur ou autre page) \u2014 rien n'est ouvert.");
+    else log(openInBrowser(url) ? "Conseil : page de la vente ouverte dans le navigateur de ce PC." : "Conseil : le navigateur n'a pas pu \xEAtre lanc\xE9.");
+    return;
+  }
+  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale") return;
   if (watched) watched.lastChange = Date.now();
   try {
     if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {

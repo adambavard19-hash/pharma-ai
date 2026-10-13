@@ -8,6 +8,9 @@ import { adviceOutcome, saleIslandState } from "@/core/island/sale";
 import type { IslandOutcome } from "@/core/island/banner-flow";
 import { formatCents } from "@/lib/format";
 import { isCounterAlert } from "@/core/counter/notice";
+import { adviceAnchor } from "../../../../../agent/src/sale-link";
+import { useAdviceFocus } from "./advice-sheet-view";
+import { counterSheetOf } from "./advice-sheet";
 import type { AdviceView, SafetyFindingView } from "./types";
 
 /**
@@ -54,6 +57,7 @@ export function SaleIsland({
 }) {
   const [alertDismissed, setAlertDismissed] = useState(false);
   const robotHere = useRobotInBrowser();
+  const { focus } = useAdviceFocus();
   // Les conseils qu'on peut trancher d'un geste dans l'île : un produit, pas de question en attente, pas de validation exigée.
   const shown = advice.filter((r) => r.product && r.status !== "REMOVED" && !r.requiresValidation && !(r.opportunity?.question && r.opportunity.answer === null)).slice(0, 4);
   const outcomes: IslandOutcome[] = shown.map((r) => adviceOutcome(r.status, basketIds.has(r.id)));
@@ -69,6 +73,10 @@ export function SaleIsland({
     stock: r.product!.quantity <= 0 ? "OUT_OF_STOCK" : r.product!.quantity <= r.product!.alertThreshold ? "LOW_STOCK" : "IN_STOCK",
     quantity: r.product!.quantity,
     image: r.product!.imageUrl ?? undefined,
+    // Comme au poste : un clic sur la carte ouvre le conseil en entier — ici, sur cette même page (sa carte se déplie).
+    href: `#${adviceAnchor(r.id)}`,
+    // Un appui sur la carte la déploie : la même fiche que la carte de la page (une seule fonction, core/counter/advice-sheet.ts).
+    sheet: counterSheetOf(r, r.product!.name),
   }));
 
   if (!robotHere) return null;
@@ -97,6 +105,7 @@ export function SaleIsland({
         onSendEmail={() => undefined}
         onAddEmail={() => undefined}
         onFinish={onFinish}
+        onOpenAdvice={(index) => { if (shown[index]) focus(shown[index].id); }}
         onDismissAlert={() => setAlertDismissed(true)}
       />
     </IslandPortal>

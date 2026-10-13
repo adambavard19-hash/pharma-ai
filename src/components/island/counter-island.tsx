@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronUp, GripVertical, Loader2, Mail, PartyPopper, ScanLine, Send, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Check, ChevronDown, ChevronUp, ExternalLink, FileText, GripVertical, Loader2, Mail, PartyPopper, ScanLine, Send, TriangleAlert } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
+import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
-import { analysisSteps, allAnswered, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
+import { analysisSteps, allAnswered, followAdviceLink, isTap, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
 import { cn } from "@/lib/utils";
 import { IslandShell } from "./island-shell";
 
@@ -29,6 +30,17 @@ export type IslandAdvice = {
   stock?: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
   quantity?: number;
   image?: string;
+  /**
+   * La page PharmaBoost de ce conseil, lu en entier (agent/src/sale-link.ts) : le bouton « Fiche complète » de la carte
+   * déployée. Absent : pas de bouton (vente d'exemple, site public).
+   */
+  href?: string;
+  /**
+   * Ce que la carte montre une fois DÉPLOYÉE (un appui sur elle) : nom complet, raison complète, phrase du comptoir,
+   * contre-indications, conseils d'utilisation — la fiche complète de la page de vente, bornée (core/counter/advice-sheet.ts).
+   * Absente (agent plus ancien) : la carte se déploie sur le nom et la raison complets, et la fiche complète.
+   */
+  sheet?: CounterSheet;
 };
 
 export type IslandPill = { key: string; label: string; value: string; dot?: string };
@@ -63,7 +75,32 @@ export type CounterIslandProps = {
   alertItems?: string[];
   /** L'île se déplace (poste Windows) : une poignée le montre au repos et au survol. */
   movable?: boolean;
+  /**
+   * « Fiche complète » s'ouvre ailleurs (poste Windows : l'hôte l'envoie au navigateur par défaut du PC). Faux : sur la
+   * même page (écran de vente, où la carte du conseil se déplie).
+   */
+  adviceLinksOutside?: boolean;
+  /** Un vrai clic sur « Fiche complète » (pas un glisser) : la page peut viser ce conseil elle-même. */
+  onOpenAdvice?: (index: number) => void;
 };
+
+/** La carte déployée, retenue avec la liste des conseils affichés : une autre vente (d'autres conseils) repart repliée. */
+export type UnfoldedAdvice = { name: string; among: string } | null;
+
+const amongOf = (items: Pick<IslandAdvice, "name">[]) => items.map((item) => item.name).join("\n");
+
+/** Le nom de la carte déployée parmi ces conseils, ou null : une seule à la fois. */
+export function unfoldedName(unfolded: UnfoldedAdvice, items: Pick<IslandAdvice, "name">[]): string | null {
+  return unfolded && unfolded.among === amongOf(items) ? unfolded.name : null;
+}
+
+/** Un appui sur une carte : elle se déploie (et replie l'autre) ; un second appui sur elle la replie. */
+export function toggleAdvice(unfolded: UnfoldedAdvice, items: Pick<IslandAdvice, "name">[], name: string): UnfoldedAdvice {
+  return unfoldedName(unfolded, items) === name ? null : { name, among: amongOf(items) };
+}
+
+/** Ce que dit le bouton « Fiche complète » (survol, lecteur d'écran). */
+const OPEN_ADVICE = "Lire le conseil en entier dans PharmaBoost : contre-indications, conseils d'utilisation";
 
 /** Hauteur par défaut de la liste des conseils : une carte et demie visibles, le reste se fait défiler. */
 export const ADVICE_LIST_MAX_HEIGHT = 196;
@@ -91,7 +128,10 @@ export function CounterIsland(props: CounterIslandProps) {
   const [grumpy, setGrumpy] = useState(false);
   const [cheer, setCheer] = useState(0);
   const [collapsedAt, setCollapsedAt] = useState<string | null>(null);
+  // La carte DÉPLOYÉE (une seule à la fois), retenue avec les conseils affichés : une autre vente repart repliée.
+  const [unfolded, setUnfolded] = useState<UnfoldedAdvice>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openName = unfoldedName(unfolded, items);
 
   // La fête du robot rejouée à chaque « Vente terminée ».
   useEffect(() => {
@@ -220,9 +260,19 @@ export function CounterIsland(props: CounterIslandProps) {
         body = (
           <div className="px-2.5 pt-2.5 pb-2.5">
             <Row robot={robot(30)} title={title} sub={allAnswered(state, count) ? T.allDone : `${T.forDrug}${props.drug}`} compact />
-            <AdviceList maxHeight={props.listMaxHeight ?? ADVICE_LIST_MAX_HEIGHT} count={count}>
+            <AdviceList maxHeight={props.listMaxHeight ?? ADVICE_LIST_MAX_HEIGHT} count={count} unfolded={openName}>
               {items.map((item, index) => (
-                <AdviceCard key={item.name} item={item} outcome={state.outcomes[index] ?? null} readOnly={props.readOnly} onAnswer={(outcome) => props.onAnswer(index, outcome)} />
+                <AdviceCard
+                  key={item.name}
+                  item={item}
+                  outcome={state.outcomes[index] ?? null}
+                  readOnly={props.readOnly}
+                  outside={props.adviceLinksOutside}
+                  open={openName === item.name}
+                  onToggle={() => setUnfolded(toggleAdvice(unfolded, items, item.name))}
+                  onOpen={() => props.onOpenAdvice?.(index)}
+                  onAnswer={(outcome) => props.onAnswer(index, outcome)}
+                />
               ))}
             </AdviceList>
             <div className="mt-2 flex items-center gap-2">
@@ -310,7 +360,8 @@ export function CounterIsland(props: CounterIslandProps) {
   return (
     <div
       onClick={(event) => {
-        if (!(event.target as Element).closest("button, input, form, a")) onTap();
+        // Appuyer sur une carte de conseil la déploie : ce n'est pas taquiner le robot.
+        if (!(event.target as Element).closest("button, input, form, a, [data-advice-card]")) onTap();
       }}
     >
       <IslandShell
@@ -355,29 +406,70 @@ function Row({ robot, title, sub, trailing, icon, compact }: { robot: ReactNode;
   );
 }
 
-function AdviceCard({ item, outcome, onAnswer, readOnly }: { item: IslandAdvice; outcome: IslandOutcome; onAnswer: (outcome: IslandOutcome) => void; readOnly?: boolean }) {
+/** Ce que disent la carte repliée et la carte déployée (survol, lecteur d'écran). */
+const UNFOLD = "Appuyer pour déployer le conseil : contre-indications, conseils d'utilisation";
+const FOLD = "Appuyer pour replier le conseil";
+/** La carte déployée sans fiche (serveur plus ancien) : le détail se lit dans la fiche complète. */
+const IN_FULL_SHEET = "À lire dans la fiche complète.";
+
+export function AdviceCard({ item, outcome, onAnswer, readOnly, outside, open, onToggle, onOpen }: { item: IslandAdvice; outcome: IslandOutcome; onAnswer: (outcome: IslandOutcome) => void; readOnly?: boolean; outside?: boolean; open: boolean; onToggle: () => void; onOpen?: () => void }) {
   const stock = item.stock ? STOCK[item.stock] : null;
-  return (
-    <li data-advice-card="" className="isl-line snap-start rounded-xl p-2" style={{ background: C.panel, color: C.ink }}>
-      <div className="flex gap-2">
-        {item.image ? (
-          // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
-          <img src={item.image} alt="" width={40} height={40} className="size-10 shrink-0 rounded-lg bg-white object-contain" />
-        ) : (
-          <span className="size-10 shrink-0 rounded-lg" style={{ background: C.line }} />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <p className="truncate text-[13px] leading-[18px] font-bold">{item.name}</p>
-            {item.price && stock && item.stock !== "UNKNOWN" && <p className="shrink-0 text-[12.5px] font-bold tabular-nums">{item.price}</p>}
-          </div>
-          {item.reason && <p className="truncate text-[11.5px] leading-4" style={{ color: C.inkSoft }}>{item.reason}</p>}
-          <div className="mt-1 flex flex-wrap gap-1">
-            {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</Chip>}
-            {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}
-            {stock && <Chip bg={stock.bg} fg={stock.fg}>{stock.label}{item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}</Chip>}
-          </div>
+  const press = useRef<{ x: number; y: number } | null>(null);
+  const detailsId = useId();
+  // Repliée, le nom et la raison tiennent sur deux lignes ; déployée, le nom COMPLET (la carte l'abrège) et la raison
+  // passent dans le détail, en entier.
+  const name = (open && item.sheet?.name) || item.name;
+  const summary = (
+    <>
+      {item.image ? (
+        // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
+        <img src={item.image} alt="" width={40} height={40} draggable={false} className="size-10 shrink-0 rounded-lg bg-white object-contain" />
+      ) : (
+        <span className="size-10 shrink-0 rounded-lg" style={{ background: C.line }} />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <p className={cn("text-[13px] leading-[18px] font-bold break-words", !open && "line-clamp-2")}>{name}</p>
+          <span className="flex shrink-0 items-center gap-1 pt-px">
+            {item.price && stock && item.stock !== "UNKNOWN" && <span className="text-[12.5px] font-bold tabular-nums">{item.price}</span>}
+            <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} style={{ color: C.inkSoft }} aria-hidden="true" />
+          </span>
         </div>
+        {item.reason && !open && <p className="line-clamp-2 text-[11.5px] leading-4 break-words" style={{ color: C.inkSoft }}>{item.reason}</p>}
+        <div className="mt-1 flex flex-wrap gap-1">
+          {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</Chip>}
+          {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}
+          {stock && <Chip bg={stock.bg} fg={stock.fg}>{stock.label}{item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}</Chip>}
+        </div>
+      </div>
+    </>
+  );
+  return (
+    <li data-advice-card="" data-open={open ? "" : undefined} className="isl-line snap-start rounded-xl p-2" style={{ background: C.panel, color: C.ink }}>
+      {/* Toute la carte, hors boutons : un appui la DÉPLOIE sur place (un second la replie). Un appui suivi d'un mouvement
+          (défilement de la liste) ne déploie rien. Elle est dans la liste qui défile : jamais une prise pour déplacer l'île. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        aria-controls={open ? detailsId : undefined}
+        title={open ? FOLD : UNFOLD}
+        data-advice-toggle=""
+        className="-m-1 flex cursor-pointer gap-2 rounded-lg p-1 transition-colors hover:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-[#36E8C8]"
+        onPointerDown={(event) => { press.current = { x: event.screenX, y: event.screenY }; }}
+        onClick={(event) => {
+          const tap = isTap(press.current, { x: event.screenX, y: event.screenY });
+          press.current = null;
+          if (tap) onToggle();
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          onToggle();
+        }}
+      >
+        {summary}
+        <span className="sr-only">{` — ${open ? FOLD : UNFOLD}`}</span>
       </div>
       <div className="mt-1.5 flex items-center gap-1.5">
         {readOnly && !outcome ? (
@@ -407,8 +499,100 @@ function AdviceCard({ item, outcome, onAnswer, readOnly }: { item: IslandAdvice;
           </>
         )}
       </div>
+      {open && <AdviceDetails id={detailsId} item={item} outside={outside} onOpen={onOpen} />}
     </li>
   );
+}
+
+/**
+ * La carte déployée : la raison complète, ce que le pharmacien peut dire, les contre-indications et les conseils
+ * d'utilisation — la fiche complète de la page de vente, bornée (core/counter/advice-sheet.ts). Rien n'est rédigé ici :
+ * une rubrique vide le dit et renvoie à la notice. « Fiche complète » ouvre la page de la vente sur ce conseil.
+ */
+function AdviceDetails({ id, item, outside, onOpen }: { id: string; item: IslandAdvice; outside?: boolean; onOpen?: () => void }) {
+  const sheet = item.sheet;
+  const press = useRef<{ x: number; y: number } | null>(null);
+  const reasons = sheet?.reasons.length ? sheet.reasons : item.reason ? [item.reason] : [];
+  // Sans fiche (serveur plus ancien) on ne sait pas : on renvoie à la fiche complète quand elle existe, jamais « rien ».
+  const unknown = !sheet && item.href ? IN_FULL_SHEET : null;
+  const usageEmpty = !sheet || (sheet.usage.length === 0 && !sheet.description);
+  return (
+    <div id={id} data-advice-details="" className="mt-2 space-y-2 border-t pt-2 text-[12px] leading-[17px]" style={{ borderColor: C.line }}>
+      <SheetPart title="Pourquoi ce conseil">
+        {reasons.length > 0 ? reasons.map((reason) => <p key={reason} className="break-words">{reason}</p>) : <Missing>{SHEET_MISSING.reasons}</Missing>}
+      </SheetPart>
+      {sheet?.script && (
+        <SheetPart title="À dire au patient">
+          <p className="break-words">« {sheet.script} »</p>
+        </SheetPart>
+      )}
+      <SheetPart title="Contre-indications">
+        {sheet && sheet.contraindications.length > 0 ? <SheetLines lines={sheet.contraindications} /> : <Missing>{unknown ?? SHEET_MISSING.contraindications}</Missing>}
+        {sheet && sheet.more.contraindications > 0 && <More count={sheet.more.contraindications} />}
+      </SheetPart>
+      <SheetPart title="Conseils d'utilisation">
+        {sheet && sheet.usage.length > 0 && <SheetLines lines={sheet.usage} />}
+        {sheet?.description && <p className="break-words">{sheet.description}</p>}
+        {usageEmpty && <Missing>{unknown ?? SHEET_MISSING.usage}</Missing>}
+        {sheet && sheet.more.usage > 0 && <More count={sheet.more.usage} />}
+      </SheetPart>
+      {sheet?.cut && <p className="text-[11px]" style={{ color: C.inkSoft }}>Texte abrégé : la suite se lit dans la fiche complète.</p>}
+      {item.href && (
+        // La page de la vente, ouverte sur ce conseil : au poste, l'hôte Windows l'envoie au navigateur du PC (lien vérifié
+        // deux fois) ; sur l'écran de vente, sa carte se déplie sur la même page. Après un glisser, rien ne s'ouvre.
+        <a
+          href={item.href}
+          target={outside ? "_blank" : undefined}
+          rel={outside ? "noopener" : undefined}
+          draggable={false}
+          title={OPEN_ADVICE}
+          data-advice-link=""
+          className="inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg text-[12px] font-semibold transition-colors hover:bg-black/[0.08] focus-visible:outline-2 focus-visible:outline-[#36E8C8]"
+          style={{ background: C.line, color: C.ink }}
+          onPointerDown={(event) => { press.current = { x: event.screenX, y: event.screenY }; }}
+          onClick={(event) => {
+            followAdviceLink(press.current, event, onOpen);
+            press.current = null;
+          }}
+        >
+          <FileText className="size-3.5" aria-hidden="true" /> Fiche complète
+          {outside && <ExternalLink className="size-3" aria-hidden="true" />}
+          <span className="sr-only">{` — ${OPEN_ADVICE}${outside ? " (s'ouvre dans le navigateur)" : ""}`}</span>
+        </a>
+      )}
+    </div>
+  );
+}
+
+function SheetPart({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <p className="text-[10.5px] font-bold tracking-[0.04em] uppercase" style={{ color: C.inkSoft }}>{title}</p>
+      <div className="mt-0.5 space-y-1">{children}</div>
+    </section>
+  );
+}
+
+function SheetLines({ lines }: { lines: CounterSheetLine[] }) {
+  return (
+    <ul className="space-y-1">
+      {lines.map((line, index) => (
+        <li key={`${line.text}-${index}`} className="break-words">
+          <span className="font-semibold">{line.text}</span>
+          {line.patient && <span className={cn("ml-1 text-[11px]", line.patient === "CONCERNED" && "font-bold")} style={{ color: line.patient === "CONCERNED" ? C.ink : C.inkSoft }}>· {SHEET_PATIENT_LABELS[line.patient]}</span>}
+          {line.detail && <span className="block" style={{ color: C.inkSoft }}>{line.detail}</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Missing({ children }: { children: ReactNode }) {
+  return <p className="break-words italic" style={{ color: C.inkSoft }}>{children}</p>;
+}
+
+function More({ count }: { count: number }) {
+  return <p className="text-[11px] font-medium" style={{ color: C.inkSoft }}>+ {count} dans la fiche complète</p>;
 }
 
 /**
@@ -416,7 +600,7 @@ function AdviceCard({ item, outcome, onAnswer, readOnly }: { item: IslandAdvice;
  * suffit, même quand le poste ne donne pas le clavier à l'île). Un dégradé en bas dit qu'il en reste ; « 2 / 3 » dit où
  * l'on en est. L'île garde ainsi sa taille normale et ne masque pas le logiciel de gestion.
  */
-function AdviceList({ maxHeight, count, children, label, noun = "conseil" }: { maxHeight: number; count: number; children: ReactNode; label?: string; noun?: string }) {
+function AdviceList({ maxHeight, count, children, label, noun = "conseil", unfolded = null }: { maxHeight: number; count: number; children: ReactNode; label?: string; noun?: string; unfolded?: string | null }) {
   const list = useRef<HTMLUListElement>(null);
   const [view, setView] = useState({ up: false, down: false, first: 1 });
 
@@ -438,6 +622,16 @@ function AdviceList({ maxHeight, count, children, label, noun = "conseil" }: { m
     return () => observer.disconnect();
   }, [update, count]);
 
+  // Une carte vient de se déployer : la liste la ramène en haut (son détail se lit en défilant DANS l'île), puis les
+  // flèches et « 2/3 » se recalculent — la liste a grandi ou rétréci sans changer de taille.
+  useEffect(() => {
+    const node = list.current;
+    if (!node) return;
+    const card = unfolded ? node.querySelector<HTMLElement>("[data-advice-card][data-open]") : null;
+    if (card) node.scrollTo({ top: card.offsetTop, behavior: "smooth" });
+    update();
+  }, [update, unfolded]);
+
   const scrollBy = (direction: 1 | -1) => {
     const node = list.current;
     if (!node) return;
@@ -452,7 +646,7 @@ function AdviceList({ maxHeight, count, children, label, noun = "conseil" }: { m
         ref={list}
         onScroll={update}
         aria-label={label ?? `${count} conseil${count > 1 ? "s" : ""}`}
-        className="isl-scroll snap-y snap-mandatory space-y-1.5 overflow-y-auto overscroll-contain"
+        className={cn("isl-scroll snap-y space-y-1.5 overflow-y-auto overscroll-contain", unfolded ? "snap-proximity" : "snap-mandatory")}
         style={{ maxHeight, paddingRight: scrolls ? 26 : 0 }}
       >
         {children}

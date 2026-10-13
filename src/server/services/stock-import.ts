@@ -59,6 +59,9 @@ export type ParsedFile = {
   incomplete: boolean;
   /** Ce qui n'a pas été lu, en une phrase sans majuscule ni point (« 3 pages du fichier n'ont pas pu être lues »). */
   incompleteReason?: string;
+  /** Édition d'inventaire LGPI : sa date (« 12/09/2026 04h26 ») et son critère de prix (« PAMP net », « PV TTC ») — pour réunir plusieurs fichiers. */
+  editedAt?: string | null;
+  priceBasis?: string | null;
 };
 
 /** Pages max lues dans un PDF d'inventaire (le plafond de `extractPdfLayoutText`). */
@@ -91,7 +94,7 @@ export async function parseImportFileAsync(name: string, bytes: Uint8Array): Pro
     if (!/vente|\bPV\b|PVTTC|TTC/i.test(inventory.priceBasis ?? "")) {
       warnings.push(`Inventaire valorisé « ${inventory.priceBasis ?? "sans mention"} » : ce sont des prix d'achat. Pour des prix de vente au comptoir, choisissez « Prix de vente » dans les critères d'édition de LGPI.`);
     }
-    return { ...lgpiInventoryToRecords(inventory), warnings, incomplete: notRead.length > 0, ...(notRead.length > 0 ? { incompleteReason: notRead.join(" ; ") } : {}) };
+    return { ...lgpiInventoryToRecords(inventory), warnings, incomplete: notRead.length > 0, ...(notRead.length > 0 ? { incompleteReason: notRead.join(" ; ") } : {}), editedAt: inventory.editedAt, priceBasis: inventory.priceBasis };
   }
   return parseImportFile(name, bytes);
 }
@@ -349,6 +352,8 @@ export type ImportOutcome = {
   invalid: number;
   /** Produits absents du fichier remis à zéro (`zeroAbsent`) ; 0 quand la remise à zéro n'est pas demandée. */
   zeroed: number;
+  /** Mode `pricesOnly` : produits déjà connus dont les prix ont été écrits ; 0 sinon. */
+  pricesUpdated: number;
   /** Ce que le moteur a compris des produits créés : combien il pourra relier à un besoin. */
   classification: ClassificationRunSummary | null;
 };
@@ -375,6 +380,12 @@ export async function commitStockImport(params: {
    */
   zeroAbsent?: boolean;
   /**
+   * « Ce fichier complète seulement mes prix » : seuls les prix (achat, vente, TVA, remboursement) des produits DÉJÀ
+   * connus de l'officine sont écrits. Aucune quantité ne change, aucun produit n'est créé, rien ne passe à 0
+   * (`zeroAbsent` est ignoré), et la date du stock ne bouge pas : ce n'est pas un inventaire.
+   */
+  pricesOnly?: boolean;
+  /**
    * L'administrateur de la console qui agit au nom du titulaire (dépôt, décision,
    * relance) : il est nommé dans le journal et les mouvements ne sont pas
    * attribués au titulaire, qui n'a rien fait. Sans lui, c'est le membre du scope.
@@ -394,6 +405,8 @@ export async function commitStockImport(params: {
     if (row.status === "MEDICAMENT") return { row, action: "DRUG" as const, targetId: row.targetId as string };
     if (row.status === "PRODUIT_EXISTANT") return { row, action: "PRODUCT" as const, targetId: row.targetId as string };
     if (decision?.kind === "RATTACHER") return { row, action: "PRODUCT" as const, targetId: decision.targetId };
+    // Compléter des prix ne crée jamais de produit : une ligne inconnue est ignorée.
+    if (params.pricesOnly) return { row, action: "IGNORE" as const };
     if (decision?.kind === "CREER_PRODUIT" || (row.status === "NON_RECONNU" && params.createUnknownByDefault)) {
       return { row, action: "CREATE" as const };
     }
@@ -414,6 +427,7 @@ export async function commitStockImport(params: {
     ignored: plan.filter((item) => item.action === "IGNORE").length,
     invalid: plan.filter((item) => item.action === "INVALID").length,
     zeroed: 0,
+    pricesUpdated: 0,
     classification: null,
   };
   const createdProductIds: string[] = [];
@@ -428,6 +442,30 @@ export async function commitStockImport(params: {
         const { row } = item;
         const quantity = Math.max(0, row.quantity ?? 0);
 
+        if (params.pricesOnly && (item.action === "DRUG" || item.action === "PRODUCT")) {
+          // Les prix seuls, sur ce qui existe déjà dans CETTE officine : ni quantité, ni création, ni mouvement de stock.
+          const prices = {
+            ...(row.purchasePriceCents !== null ? { purchasePriceCents: row.purchasePriceCents } : {}),
+            ...(row.vatRate !== null ? { vatRate: row.vatRate } : {}),
+          };
+          if (item.action === "DRUG") {
+            const data = { ...prices, ...(row.salePriceCents !== null ? { priceCents: row.salePriceCents } : {}) };
+            if (Object.keys(data).length === 0) continue;
+            const written = await tx.pharmacyDrugStock.updateMany({ where: { pharmacyId: params.scope.pharmacyId, presentationId: item.targetId }, data });
+            if (written.count > 0) outcome.pricesUpdated += 1;
+          } else {
+            const data = {
+              ...prices,
+              ...(row.salePriceCents !== null ? { salePriceCents: row.salePriceCents } : {}),
+              ...(row.reimbursed != null ? { reimbursed: row.reimbursed, reimbursementSource: row.reimbursementSource ?? null } : {}),
+            };
+            if (Object.keys(data).length === 0) continue;
+            const written = await tx.product.updateMany({ where: { id: item.targetId, pharmacyId: params.scope.pharmacyId, deletedAt: null }, data });
+            if (written.count > 0) outcome.pricesUpdated += 1;
+          }
+          continue;
+        }
+
         if (item.action === "DRUG") {
           await tx.pharmacyDrugStock.upsert({
             where: { pharmacyId_presentationId: { pharmacyId: params.scope.pharmacyId, presentationId: item.targetId } },
@@ -436,10 +474,20 @@ export async function commitStockImport(params: {
               presentationId: item.targetId,
               quantity,
               priceCents: row.salePriceCents,
+              // Le prix d'achat HT et la TVA de l'export : la marge d'un médicament conseil se calcule comme celle d'un produit.
+              purchasePriceCents: row.purchasePriceCents,
+              vatRate: row.vatRate,
               source: "IMPORT",
               lastCountedAt: new Date(),
             },
-            update: { quantity, priceCents: row.salePriceCents ?? undefined, source: "IMPORT", lastCountedAt: new Date() },
+            update: {
+              quantity,
+              priceCents: row.salePriceCents ?? undefined,
+              purchasePriceCents: row.purchasePriceCents ?? undefined,
+              vatRate: row.vatRate ?? undefined,
+              source: "IMPORT",
+              lastCountedAt: new Date(),
+            },
           });
           touchedPresentationIds.add(item.targetId);
           outcome.drugsUpserted += 1;
@@ -456,6 +504,8 @@ export async function commitStockImport(params: {
               ...(row.salePriceCents !== null ? { salePriceCents: row.salePriceCents } : {}),
               ...(row.purchasePriceCents !== null ? { purchasePriceCents: row.purchasePriceCents } : {}),
               ...(row.vatRate !== null ? { vatRate: row.vatRate } : {}),
+              // Un fichier qui ne dit rien du remboursement n'efface pas ce qu'un précédent en disait.
+              ...(row.reimbursed != null ? { reimbursed: row.reimbursed, reimbursementSource: row.reimbursementSource ?? null } : {}),
               ...(row.brand ? { brand: row.brand } : {}),
               ...(row.code && row.code.length === 13 ? { ean: row.code } : {}),
             },
@@ -480,6 +530,7 @@ export async function commitStockImport(params: {
               salePriceCents: row.salePriceCents ?? 0,
               purchasePriceCents: row.purchasePriceCents ?? 0,
               ...(row.vatRate !== null ? { vatRate: row.vatRate } : {}),
+              ...(row.reimbursed != null ? { reimbursed: row.reimbursed, reimbursementSource: row.reimbursementSource ?? null } : {}),
               // Les mots du nom servent d'étiquettes de recherche en attendant.
               matchingTags: tagsFromName(name),
               isDemo: recordIsDemo(params.pharmacyIsDemo),
@@ -504,7 +555,7 @@ export async function commitStockImport(params: {
         }
       }
 
-      if (params.zeroAbsent) {
+      if (params.zeroAbsent && !params.pricesOnly) {
         outcome.zeroed = await zeroAbsentInTx(tx, params.scope, movementUserId, { presentationIds: touchedPresentationIds, productIds: touchedProductIds }, `Absent du stock envoyé (${job.fileName})`);
       }
 
@@ -513,7 +564,7 @@ export async function commitStockImport(params: {
         data: {
           status: "COMPLETED",
           createdRows: outcome.productsCreated,
-          updatedRows: outcome.productsUpdated + outcome.drugsUpserted,
+          updatedRows: outcome.productsUpdated + outcome.drugsUpserted + outcome.pricesUpdated,
           errorRows: outcome.invalid,
           errors: rows.filter((row) => row.status === "INVALIDE").slice(0, 200).map((row) => ({ line: row.line, issues: row.issues })) as never,
           summary: { ...((job.summary as object) ?? {}), outcome } as never,
@@ -525,7 +576,7 @@ export async function commitStockImport(params: {
 
       // Le stock est désormais synchronisé : c'est cette date que voit le
       // titulaire (« Stock synchronisé aujourd'hui à… »).
-      await tx.pharmacy.update({ where: { id: params.scope.pharmacyId }, data: { stockSyncedAt: new Date() } });
+      if (!params.pricesOnly) await tx.pharmacy.update({ where: { id: params.scope.pharmacyId }, data: { stockSyncedAt: new Date() } });
     },
     { timeout: 120_000, maxWait: 10_000 },
   );
@@ -579,8 +630,8 @@ export async function commitStockImport(params: {
       userId: params.scope.userId,
       type: "IMPORT_COMPLETED",
       severity: outcome.invalid > 0 ? "WARNING" : "SUCCESS",
-      title: "Import du stock terminé",
-      body: `${outcome.productsCreated} produit(s) créé(s), ${outcome.productsUpdated + outcome.drugsUpserted} mis à jour, ${outcome.ignored} ignoré(s), ${outcome.invalid} ligne(s) invalide(s)${outcome.zeroed > 0 ? `, ${outcome.zeroed} remis à zéro` : ""}.`,
+      title: params.pricesOnly ? "Prix complétés" : "Import du stock terminé",
+      body: params.pricesOnly ? `Prix complétés pour ${outcome.pricesUpdated} produit(s) ; aucune quantité modifiée.` : `${outcome.productsCreated} produit(s) créé(s), ${outcome.productsUpdated + outcome.drugsUpserted} mis à jour, ${outcome.ignored} ignoré(s), ${outcome.invalid} ligne(s) invalide(s)${outcome.zeroed > 0 ? `, ${outcome.zeroed} remis à zéro` : ""}.`,
       linkUrl: "/stock",
     });
     await refreshStockNotifications(params.scope.pharmacyId);

@@ -24,6 +24,7 @@ import {
   DEPOSIT_SUPERSEDED_ERROR,
   DEPOSIT_SUPERSEDED_MESSAGE,
   DEPOSIT_HOLD_MIN_KNOWN,
+  DEPOSIT_PRICES_ONLY_PREFIX,
   assessDeposit,
   type DepositAssessment,
   cleanDepositFileName,
@@ -34,8 +35,10 @@ import {
   describeDepositResult,
   isDepositStalled,
   isDepositStorageKey,
+  isPricesOnlyDeposit,
   retentionCutoff,
 } from "@/core/stock-deposit/rules";
+import { priceKindOf } from "@/core/stock-import/merge-files";
 import { DEPOSIT_DECISIONS, DEPOSIT_SOURCES, type DepositDecision, type DepositSource, type DepositStatus, type DepositView, type StockPreview } from "@/core/stock-deposit/types";
 import type { TenantScope } from "@/server/db/tenant";
 
@@ -283,10 +286,12 @@ export async function receiveStockDeposit(params: {
   bytes: Uint8Array;
   source: DepositSource;
   adminId?: string | null;
+  /** « Ce fichier complète seulement mes prix » (envoi du titulaire) : voir `DEPOSIT_PRICES_ONLY_PREFIX`. */
+  pricesOnly?: boolean;
 }): Promise<ReceiveResult> {
   const { scope, bytes, source } = params;
   const adminId = params.adminId ?? null;
-  const fileName = cleanDepositFileName(params.fileName ?? "");
+  const fileName = depositFileName(params.fileName ?? "", params.pricesOnly === true);
 
   if (!DEPOSIT_ACCEPTED.test(fileName)) return { ok: false, error: `Format non accepté. Envoyez un fichier ${DEPOSIT_ACCEPTED_LABEL}.` };
   if (bytes.byteLength === 0) return { ok: false, error: "Le fichier est vide." };
@@ -387,8 +392,17 @@ const PREVIEW_HOURLY_LIMIT = 30;
  *
  * C'est l'étape « Vérifier » de la mise à jour : la personne voit ce qui va se passer, puis confirme (ou pas).
  */
-export async function previewStockDeposit(params: { scope: TenantScope; fileName: string; bytes: Uint8Array }): Promise<PreviewResult> {
+export async function previewStockDeposit(params: {
+  scope: TenantScope;
+  fileName: string;
+  bytes: Uint8Array;
+  /** « Ce fichier complète seulement mes prix » : aucun contrôle de stock complet, seuls les prix des produits connus comptent. */
+  pricesOnly?: boolean;
+  /** Plusieurs fichiers réunis (`combineStockFiles`) : ce que l'aperçu en dit. */
+  merge?: StockPreview["merge"];
+}): Promise<PreviewResult> {
   const { scope, bytes } = params;
+  const pricesOnly = params.pricesOnly === true;
   const fileName = cleanDepositFileName(params.fileName ?? "");
   if (!DEPOSIT_ACCEPTED.test(fileName)) return { ok: false, error: `Format non accepté. Envoyez un fichier ${DEPOSIT_ACCEPTED_LABEL}.` };
   if (bytes.byteLength === 0) return { ok: false, error: "Le fichier est vide." };
@@ -406,9 +420,11 @@ export async function previewStockDeposit(params: { scope: TenantScope; fileName
       const names = analysed.missing.map((field) => labels[field] ?? field).join(", ");
       return { ok: false, error: `Colonnes non reconnues : ${names}. Envoyez l'édition d'inventaire complète de votre logiciel.` };
     }
-    const evaluation = await evaluateFile(scope.pharmacyId, analysed, { zeroAbsent: true, enforce: true, showAbsent: true });
+    // Compléter des prix ne remet rien à 0 : aucun contrôle de stock complet, aucun produit absent à compter.
+    const evaluation = await evaluateFile(scope.pharmacyId, analysed, { zeroAbsent: !pricesOnly, enforce: !pricesOnly, showAbsent: !pricesOnly });
     if (evaluation.validLines === 0) return { ok: false, error: "Aucune ligne de stock lisible dans ce fichier : vérifiez qu'il contient bien les quantités en stock." };
     const count = (...statuses: string[]) => analysed.rows.filter((line) => statuses.includes(line.status)).length;
+    const prices = await priceFacts(scope.pharmacyId, analysed.rows, pricesOnly);
     return {
       ok: true,
       preview: {
@@ -418,10 +434,16 @@ export async function previewStockDeposit(params: { scope: TenantScope; fileName
         created: count("A_VERIFIER", "NON_RECONNU"),
         invalid: evaluation.invalid,
         knownStock: evaluation.knownLines,
-        absent: evaluation.absentLines,
+        absent: pricesOnly ? null : evaluation.absentLines,
         verdict: evaluation.verdict.verdict,
         reason: evaluation.verdict.verdict === "HOLD" ? evaluation.verdict.reason : null,
         warnings: analysed.warnings ?? [],
+        mode: pricesOnly ? "PRICES" : "FULL",
+        priceKind: prices.kind,
+        pricesUpdated: prices.updated,
+        withBothPrices: prices.both,
+        suggestPricesOnly: prices.suggestion,
+        merge: params.merge ?? null,
       },
     };
   } catch (error) {
@@ -434,6 +456,66 @@ export async function previewStockDeposit(params: { scope: TenantScope; fileName
       await quietly("suppression de l'analyse", () => prisma.importJob.deleteMany({ where: { id, pharmacyId: scope.pharmacyId, status: "PENDING" } }));
     }
   }
+}
+
+// ---------------------------------------------------------------- Prix seulement, prix réunis
+
+/** Un envoi « prix seulement » n'est pas un stock : il ne rend jamais caduc un stock complet plus ancien. */
+const NOT_PRICES_ONLY: Prisma.StockDepositWhereInput = { NOT: { fileName: { startsWith: DEPOSIT_PRICES_ONLY_PREFIX } } };
+
+/** Le nom gardé du dépôt : nettoyé, préfixé en mode « prix seulement » (borné, l'extension reste), jamais préfixé sinon. */
+function depositFileName(name: string, pricesOnly: boolean): string {
+  let base = cleanDepositFileName(name);
+  if (isPricesOnlyDeposit(base)) base = cleanDepositFileName(base.slice(DEPOSIT_PRICES_ONLY_PREFIX.length));
+  if (!pricesOnly) return base;
+  return `${DEPOSIT_PRICES_ONLY_PREFIX}${base.slice(Math.max(0, base.length - (200 - DEPOSIT_PRICES_ONLY_PREFIX.length)))}`;
+}
+
+const PRICE_CHUNK = 5_000;
+
+type PricedRow = { status: string; targetId: string | null; purchasePriceCents: number | null; salePriceCents: number | null };
+
+/**
+ * Les prix après l'envoi, en lecture seule : pour chaque produit du fichier, le prix du fichier, sinon celui que
+ * l'officine a déjà (un prix absent du fichier est conservé). On en tire combien de produits auront leurs deux prix —
+ * donc une marge —, combien de prix seront écrits, et s'il faut proposer « Ce fichier complète seulement mes prix ».
+ */
+async function priceFacts(pharmacyId: string, rows: PricedRow[], pricesOnly: boolean): Promise<{ kind: ReturnType<typeof priceKindOf>; updated: number; both: number; suggestion: string | null }> {
+  const valid = rows.filter((row) => row.status !== "INVALIDE");
+  const kind = priceKindOf(valid);
+  const drugIds = [...new Set(valid.filter((row) => row.status === "MEDICAMENT" && row.targetId).map((row) => row.targetId as string))];
+  const productIds = [...new Set(valid.filter((row) => row.status === "PRODUIT_EXISTANT" && row.targetId).map((row) => row.targetId as string))];
+  const known = new Map<string, { purchase: number | null; sale: number | null }>();
+  for (let i = 0; i < drugIds.length; i += PRICE_CHUNK) {
+    const found = await prisma.pharmacyDrugStock.findMany({ where: { pharmacyId, presentationId: { in: drugIds.slice(i, i + PRICE_CHUNK) } }, select: { presentationId: true, priceCents: true, purchasePriceCents: true } });
+    for (const drug of found) known.set(`d:${drug.presentationId}`, { purchase: drug.purchasePriceCents, sale: drug.priceCents });
+  }
+  for (let i = 0; i < productIds.length; i += PRICE_CHUNK) {
+    const found = await prisma.product.findMany({ where: { pharmacyId, deletedAt: null, id: { in: productIds.slice(i, i + PRICE_CHUNK) } }, select: { id: true, salePriceCents: true, purchasePriceCents: true } });
+    for (const product of found) known.set(`p:${product.id}`, { purchase: product.purchasePriceCents, sale: product.salePriceCents });
+  }
+  const has = (cents: number | null | undefined) => cents !== null && cents !== undefined && cents > 0;
+  let updated = 0;
+  let both = 0;
+  let knownPurchase = 0;
+  let knownSale = 0;
+  for (const row of valid) {
+    const existing = row.targetId ? known.get(`${row.status === "MEDICAMENT" ? "d" : "p"}:${row.targetId}`) : undefined;
+    if (has(existing?.purchase)) knownPurchase += 1;
+    if (has(existing?.sale)) knownSale += 1;
+    // En mode « prix seulement », seuls les produits déjà connus de l'officine sont écrits.
+    if (pricesOnly && !existing) continue;
+    if (row.purchasePriceCents != null || row.salePriceCents != null) updated += 1;
+    if (has(row.purchasePriceCents ?? existing?.purchase) && has(row.salePriceCents ?? existing?.sale)) both += 1;
+  }
+  const n = (count: number) => count.toLocaleString("fr-FR");
+  const suggestion =
+    kind === "SALE" && knownPurchase > 0
+      ? `Ce fichier ne contient que des prix de vente, et PharmaBoost connaît déjà le prix d'achat de ${n(knownPurchase)} de ces produits. S'il sert seulement à compléter vos prix, cochez « Ce fichier complète seulement mes prix » : aucune quantité ne changera.`
+      : kind === "PURCHASE" && knownSale > 0
+        ? `Ce fichier ne contient que des prix d'achat, et PharmaBoost connaît déjà le prix de vente de ${n(knownSale)} de ces produits. S'il sert seulement à compléter vos prix, cochez « Ce fichier complète seulement mes prix » : aucune quantité ne changera.`
+        : null;
+  return { kind, updated, both, suggestion };
 }
 
 // ---------------------------------------------------------------- Trancher, relancer
@@ -465,7 +547,7 @@ export async function decideHeldDeposit(id: string, adminId: string, decision: D
 
   const ready = await prepareReplay(row, adminId, "HELD", decidedAt);
   if (!ready.ok) return ready;
-  const done = await processDeposit({ row: ready.row, scope: ready.owner.scope, pharmacyIsDemo: ready.owner.pharmacyIsDemo, bytes: ready.bytes, decided: true, zeroAbsent: decision === "APPLY_FULL", adminId });
+  const done = await processDeposit({ row: ready.row, scope: ready.owner.scope, pharmacyIsDemo: ready.owner.pharmacyIsDemo, bytes: ready.bytes, decided: true, zeroAbsent: decision === "APPLY_FULL" && !isPricesOnlyDeposit(row.fileName), adminId });
   await recordAudit({ action: "stock.deposit_decided", entityType: "StockDeposit", entityId: id, pharmacyId: row.pharmacyId, platformAdminId: adminId, metadata: { decision, status: done.status } });
   await syncConnectionAfterReplay(done);
   await announce(done, { scope: ready.owner.scope, adminId, notifyTeam: false, pharmacyName: ready.owner.pharmacyName });
@@ -498,7 +580,7 @@ type Replay = { ok: true; row: StockDeposit; bytes: Uint8Array; owner: NonNullab
  * n'appliquent pas le fichier deux fois.
  */
 async function prepareReplay(row: StockDeposit, adminId: string, from: "HELD" | "FAILED" | "RECEIVED", decidedAt: Date): Promise<Replay> {
-  const newer = await prisma.stockDeposit.findFirst({ where: { pharmacyId: row.pharmacyId, status: "APPLIED", receivedAt: { gt: row.receivedAt } }, select: { id: true } });
+  const newer = await prisma.stockDeposit.findFirst({ where: { pharmacyId: row.pharmacyId, status: "APPLIED", receivedAt: { gt: row.receivedAt }, ...NOT_PRICES_ONLY }, select: { id: true } });
   if (newer) return { ok: false, error: DEPOSIT_SUPERSEDED_ERROR };
   const owner = await ownerScopeForPharmacy(row.pharmacyId);
   if (!owner) return { ok: false, error: "Cette officine n'a pas de titulaire actif : le stock ne peut pas être appliqué." };
@@ -564,7 +646,7 @@ export async function closeStalledDeposits(now: Date): Promise<{ failed: number;
   let failed = 0;
   let superseded = 0;
   for (const row of stalled) {
-    const newer = await prisma.stockDeposit.findFirst({ where: { pharmacyId: row.pharmacyId, status: "APPLIED", receivedAt: { gt: row.receivedAt } }, select: { id: true } });
+    const newer = await prisma.stockDeposit.findFirst({ where: { pharmacyId: row.pharmacyId, status: "APPLIED", receivedAt: { gt: row.receivedAt }, ...NOT_PRICES_ONLY }, select: { id: true } });
     const claimed = await prisma.stockDeposit.updateMany({
       where: { id: row.id, status: "RECEIVED", ...unclaimed },
       data: newer ? { status: "REJECTED", message: DEPOSIT_SUPERSEDED_MESSAGE } : { status: "FAILED", message: DEPOSIT_INTERRUPTED_MESSAGE },
@@ -679,6 +761,9 @@ async function discardStoredFile(row: StockDeposit): Promise<Prisma.StockDeposit
  */
 async function processDeposit(params: { row: StockDeposit; scope: TenantScope; pharmacyIsDemo: boolean; bytes: Uint8Array; decided: boolean; zeroAbsent: boolean; adminId: string | null }): Promise<StockDeposit> {
   const { row, scope } = params;
+  // Le mode « prix seulement » suit le dépôt partout (réception, relance, décision) : jamais de quantité, de création ni de remise à 0.
+  const pricesOnly = isPricesOnlyDeposit(row.fileName);
+  const zeroAbsent = params.zeroAbsent && !pricesOnly;
   const settle = (data: Prisma.StockDepositUncheckedUpdateInput) => prisma.stockDeposit.update({ where: { id: row.id }, data });
   let jobId: string | null = null;
   try {
@@ -700,8 +785,8 @@ async function processDeposit(params: { row: StockDeposit; scope: TenantScope; p
     }
 
     // Les mêmes contrôles que l'aperçu montre avant l'envoi (voir `previewStockDeposit`) : un seul endroit les décide.
-    const { knownLines, verdict } = await evaluateFile(scope.pharmacyId, preview, { zeroAbsent: params.zeroAbsent, enforce: !params.decided, showAbsent: false });
-    if (!params.decided) {
+    const { knownLines, verdict } = await evaluateFile(scope.pharmacyId, preview, { zeroAbsent, enforce: !params.decided && !pricesOnly, showAbsent: false });
+    if (!params.decided && !pricesOnly) {
       if (verdict.verdict === "HOLD") {
         await closeImportJob(jobId);
         return await settle({ status: "HELD", importJobId: jobId, lines: validLines, invalid, knownLines, message: verdict.reason });
@@ -710,14 +795,15 @@ async function processDeposit(params: { row: StockDeposit; scope: TenantScope; p
 
     // Sans personne pour trancher, une piste incertaine devient un produit à part entière : au prochain fichier, son nom exact le retrouvera.
     const decisions: Record<string, RowDecision> = {};
-    for (const line of preview.rows) if (line.status === "A_VERIFIER") decisions[String(line.line)] = { kind: "CREER_PRODUIT" };
+    if (!pricesOnly) for (const line of preview.rows) if (line.status === "A_VERIFIER") decisions[String(line.line)] = { kind: "CREER_PRODUIT" };
     const outcome = await commitStockImport({
       scope,
       pharmacyIsDemo: params.pharmacyIsDemo,
       jobId,
       decisions,
-      createUnknownByDefault: true,
-      zeroAbsent: params.zeroAbsent,
+      createUnknownByDefault: !pricesOnly,
+      zeroAbsent,
+      ...(pricesOnly ? { pricesOnly: true } : {}),
       ...(params.adminId ? { actor: { platformAdminId: params.adminId } } : {}),
     });
     const applied = await settle({
@@ -725,14 +811,15 @@ async function processDeposit(params: { row: StockDeposit; scope: TenantScope; p
       importJobId: jobId,
       lines: validLines,
       created: outcome.productsCreated,
-      updated: outcome.productsUpdated + outcome.drugsUpserted,
+      updated: outcome.productsUpdated + outcome.drugsUpserted + (outcome.pricesUpdated ?? 0),
       invalid: outcome.invalid,
       zeroed: outcome.zeroed,
       knownLines,
       message: null,
       appliedAt: new Date(),
     });
-    await closeSupersededDeposits(applied);
+    // Des prix complétés ne remplacent pas un stock complet resté en attente : l'équipe peut toujours le trancher.
+    if (!pricesOnly) await closeSupersededDeposits(applied);
     return applied;
   } catch (error) {
     console.error(`[stock-deposit] traitement du dépôt ${row.id} en échec : ${error instanceof Error ? error.message : String(error)}`);

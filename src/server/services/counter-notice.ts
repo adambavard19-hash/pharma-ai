@@ -4,9 +4,13 @@ import { buildCounterNotice, type CounterNotice } from "@/core/counter/notice";
 import { stockReminderLevel } from "@/core/stock-deposit/rules";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { answersFromRows, treeState } from "@/core/counter/tree-state";
+import { TREE_RULE_KEYS } from "@/core/counter/question-tree";
+import { counterSheetOf, routineStepOf, withoutOriginLabel } from "@/core/counter/advice-sheet";
+import { parseSuggestionVigilances } from "@/config/vigilances";
 import { loadCentralAdvice } from "@/server/services/central-advice";
 import { activeChallengeTitlesFor } from "@/server/services/challenges";
 import { nearestShortDatesFor } from "@/server/services/stock-lots";
+import { trustedRobotRuleKeys } from "@/server/services/robot-trust";
 
 /**
  * Ce que la fenêtre du poste de caisse affiche pour une vente bipée, lu en base : les alertes, les conseils (avec le médicament
@@ -45,10 +49,28 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
           origin: true,
           productId: true,
           presentationId: true,
-          opportunity: { select: { ruleKey: true, triggeredLineIds: true } },
+          opportunity: { select: { ruleKey: true, triggeredLineIds: true, answer: true, confirmedReason: true, rationale: true, clinicalContext: true, safetyNotes: true, benefits: true } },
           shortReason: true,
           justification: true,
-          product: { select: { name: true, salePriceCents: true, imageUrl: true, stockItem: { select: { quantity: true, alertThreshold: true } } } },
+          // La carte déployée de la bannière : la même fiche complète que la page de vente (core/counter/advice-sheet.ts).
+          counterScript: true,
+          patientReason: true,
+          precautions: true,
+          vigilances: true,
+          routine: true,
+          product: {
+            select: {
+              name: true,
+              salePriceCents: true,
+              imageUrl: true,
+              stockItem: { select: { quantity: true, alertThreshold: true } },
+              description: true,
+              contraindications: true,
+              precautions: true,
+              // Les vigilances que CETTE officine a déclarées sur le produit, jamais celles d'une autre.
+              vigilances: { where: { pharmacyId }, select: { population: true, level: true, note: true }, orderBy: { population: "asc" } },
+            },
+          },
           presentation: { select: { priceCents: true, specialty: { select: { name: true } }, pharmacyStocks: { where: { pharmacyId }, select: { priceCents: true, quantity: true } } } },
         },
       },
@@ -73,6 +95,8 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
   const central = await loadCentralAdvice();
   const removed = new Set(central.removed);
   const known = new Set([...ADVICE_RULES.map((rule) => rule.key), ...central.custom.map((rule) => rule.key)]);
+  // Une suggestion du robot parle tant que sa proposition n'a pas été refusée dans la console de PharmaBoost.
+  for (const key of await trustedRobotRuleKeys(prescription.recommendations.map((rec) => rec.opportunity?.ruleKey))) known.add(key);
 
   const productIds = prescription.recommendations.map((rec) => rec.productId).filter((value): value is string => Boolean(value));
   const [challenges, shortDates] = await Promise.all([
@@ -92,26 +116,47 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     alerts: (run?.safetyFindings ?? []).map((finding) => ({ severity: finding.severity, subjectType: finding.subjectType, code: finding.code, message: finding.message, acknowledged: finding.acknowledgedAt !== null })),
     questions: tree.view.questions,
     guidance: tree.view.guidance,
-    recommendations: prescription.recommendations.filter((rec) => tree.isVisible(rec.opportunity?.ruleKey)).map((rec) => {
-      const triggered = rec.opportunity?.triggeredLineIds.map((lineId) => lineName.get(lineId) ?? "").find(Boolean) ?? null;
-      const shortDate = rec.productId ? shortDates.get(`p:${rec.productId}`) : rec.presentationId ? shortDates.get(`d:${rec.presentationId}`) : undefined;
-      return {
-        id: rec.id,
-        name: rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
-        forDrug: triggered,
-        challengeTitle: rec.productId ? (challenges.get(rec.productId) ?? null) : null,
-        shortDateOn: shortDate?.expiresOn ?? null,
-        priceCents: rec.product?.salePriceCents ?? rec.presentation?.pharmacyStocks[0]?.priceCents ?? rec.presentation?.priceCents ?? null,
-        reason: rec.shortReason ?? rec.justification,
-        status: rec.status,
-        trusted: rec.origin !== "AI" || (rec.opportunity?.ruleKey != null && known.has(rec.opportunity.ruleKey) && !removed.has(rec.opportunity.ruleKey)),
-        // Une association du pharmacien (règle « association:… ») a ses propres places dans la fenêtre, en plus des conseils du moteur.
-        association: rec.origin === "RULE" && (rec.opportunity?.ruleKey?.startsWith("association:") ?? false),
-        imageUrl: rec.product?.imageUrl ?? null,
-        quantity: rec.product ? (rec.product.stockItem?.quantity ?? null) : (rec.presentation?.pharmacyStocks[0]?.quantity ?? null),
-        alertThreshold: rec.product?.stockItem?.alertThreshold ?? null,
-      };
-    }),
+    // Le conseil que le pharmacien vient de débloquer d'un clic (la poche de l'épaule, le thermomètre) passe devant : la fenêtre
+    // n'a que trois places, et c'est la réponse qu'il attend à l'écran — tri stable, les autres gardent leur ordre.
+    recommendations: prescription.recommendations
+      .filter((rec) => tree.isVisible(rec.opportunity?.ruleKey))
+      .sort((a, b) => Number(TREE_RULE_KEYS.has(b.opportunity?.ruleKey ?? "")) - Number(TREE_RULE_KEYS.has(a.opportunity?.ruleKey ?? "")))
+      .map((rec) => {
+        const triggered = rec.opportunity?.triggeredLineIds.map((lineId) => lineName.get(lineId) ?? "").find(Boolean) ?? null;
+        const shortDate = rec.productId ? shortDates.get(`p:${rec.productId}`) : rec.presentationId ? shortDates.get(`d:${rec.presentationId}`) : undefined;
+        return {
+          id: rec.id,
+          name: rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
+          forDrug: triggered,
+          challengeTitle: rec.productId ? (challenges.get(rec.productId) ?? null) : null,
+          shortDateOn: shortDate?.expiresOn ?? null,
+          priceCents: rec.product?.salePriceCents ?? rec.presentation?.pharmacyStocks[0]?.priceCents ?? rec.presentation?.priceCents ?? null,
+          // Jamais l'origine du conseil sur la carte (« Suggestion du robot… ») : décision du fondateur, 13 oct. 2026.
+          reason: withoutOriginLabel(rec.shortReason ?? rec.justification) || null,
+          status: rec.status,
+          trusted: rec.origin !== "AI" || (rec.opportunity?.ruleKey != null && known.has(rec.opportunity.ruleKey) && !removed.has(rec.opportunity.ruleKey)),
+          // Une association du pharmacien (règle « association:… ») a ses propres places dans la fenêtre, en plus des conseils du moteur.
+          association: rec.origin === "RULE" && (rec.opportunity?.ruleKey?.startsWith("association:") ?? false),
+          imageUrl: rec.product?.imageUrl ?? null,
+          quantity: rec.product ? (rec.product.stockItem?.quantity ?? null) : (rec.presentation?.pharmacyStocks[0]?.quantity ?? null),
+          alertThreshold: rec.product?.stockItem?.alertThreshold ?? null,
+          sheet: counterSheetOf(
+            {
+              shortReason: rec.shortReason,
+              counterScript: rec.counterScript,
+              patientReason: rec.patientReason,
+              precautions: rec.precautions,
+              vigilances: parseSuggestionVigilances(rec.vigilances),
+              routine: routineStepOf(rec.routine),
+              opportunity: rec.opportunity,
+              product: rec.product
+                ? { sheet: { description: rec.product.description ?? null, contraindications: rec.product.contraindications ?? [], precautions: rec.product.precautions ?? [], vigilances: rec.product.vigilances ?? [] } }
+                : null,
+            },
+            rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
+          ),
+        };
+      }),
     outcome: run?.outcome ?? null,
     stockReliable,
   });

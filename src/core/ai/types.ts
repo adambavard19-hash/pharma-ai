@@ -203,9 +203,19 @@ export type CatalogProduct = {
   precautions: string[];
   matchingTags: string[];
   contraindications: string[];
+  /** Prix de vente TTC, en centimes (0 : inconnu). */
   salePriceCents: number;
+  /** Prix d'achat HT, en centimes (0 : inconnu). La marge se calcule hors taxe (core/catalog/margin.ts). */
   purchasePriceCents: number;
   vatRate: number;
+  /**
+   * Référence remboursable (médicament remboursable, dispositif inscrit à la LPP) ? null ou absent : on ne sait pas.
+   * Lu sur l'export, la BDPM ou une TVA à 2,1 % — jamais deviné au nom. Ne sert qu'au départage commercial : une
+   * référence remboursée ne passe jamais devant une équivalente non remboursée.
+   */
+  reimbursed?: boolean | null;
+  /** D'où vient l'information de remboursement (« BDPM : remboursé à 65 % », « export : prestation AAD (LPP) »…). */
+  reimbursementSource?: string | null;
   /** Stock de l'officine courante. */
   stockQuantity: number;
   alertThreshold: number;
@@ -432,6 +442,10 @@ export type ScoredRecommendation = {
   shortDate?: ShortDate | null;
   /** Ce qui a départagé des références cliniquement équivalentes (trace). */
   tiebreak?: string | null;
+  /** Marge HT par unité de la référence, en centimes ; null : prix inconnus. Pour le pharmacien, jamais le patient. */
+  marginCents?: number | null;
+  /** La référence est-elle remboursable (null : on ne sait pas) ? Reprise du catalogue pour le départage. */
+  reimbursed?: boolean | null;
   /**
    * Les autres références du stock adaptées au MÊME besoin. Elles suivent le
    * choix du conseil sans jamais l'influencer : calculées une fois le conseil

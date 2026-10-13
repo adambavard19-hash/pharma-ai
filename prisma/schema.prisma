@@ -194,6 +194,8 @@ model Pharmacy {
   bonusAuthorizations     BonusAuthorization[]
   trainingRecommendations TrainingRecommendation[]
   clinicalReviewFlags     ClinicalReviewFlag[]
+  /// Suggestions du robot (secours sans règle), mises en cache par médicament.
+  robotSuggestions        RobotSuggestion[]
 
   @@index([organizationId])
   @@map("pharmacies")
@@ -1044,6 +1046,12 @@ model Product {
   salePriceCents     Int   @default(0)
   /// Taux de TVA en points de pourcentage (ex. 5.5, 10, 20).
   vatRate            Float @default(20)
+  /// Référence remboursable (médicament remboursable, dispositif inscrit à la LPP) ; vide : on ne sait pas. Lu sur
+  /// l'export (taux, code prestation PH7/PHN/AAD, code LPP) ou déduit d'une TVA à 2,1 % — jamais deviné au nom. Une
+  /// référence remboursée ne passe jamais devant une équivalente non remboursée au départage du moteur.
+  reimbursed          Boolean?
+  /// D'où vient l'information : « export : prestation AAD (LPP) », « TVA 2,1 % (médicament remboursable) »…
+  reimbursementSource String?
 
   isActive Boolean @default(true)
   isDemo   Boolean @default(false)
@@ -1758,6 +1766,10 @@ model PharmacyDrugStock {
   /// Prix de vente TTC pratiqué par CETTE officine, en centimes. Absent = le
   /// prix public du catalogue national fait foi.
   priceCents     Int?
+  /// Prix d'achat HT de CETTE officine, en centimes, lu sur l'export de stock (« PA HT »). Absent : marge inconnue.
+  purchasePriceCents Int?
+  /// Taux de TVA lu sur l'export, en points (2,1 : remboursable ; 10 : non remboursable).
+  vatRate            Float?
   location       String?
   source         DrugStockSource @default(MANUAL)
   lastCountedAt  DateTime?
@@ -5615,4 +5627,101 @@ model ClinicalReviewFlag {
   @@index([ruleKey, status])
   @@index([status, createdAt])
   @@map("clinical_review_flags")
+}
+
+// ===========================================================================
+// SUGGESTION DU ROBOT — le secours quand aucune règle ne couvre un médicament
+// ===========================================================================
+
+enum RobotSuggestionStatus {
+  /// Un appel au modèle est en cours (posé avant l'appel : deux comptoirs ne paient pas deux fois la même question).
+  PENDING
+  /// Réponse reçue et validée (`items` peut être vide : « aucun produit » est une réponse).
+  READY
+  /// Le modèle n'a pas répondu (crédit épuisé, délai, refus) : on ne redemande pas avant `expiresAt`.
+  FAILED
+}
+
+/// Ce que le robot a choisi pour UN médicament dans le stock d'UNE officine (voir core/ai/robot-suggestion.ts). Une ligne par
+/// (officine, médicament) : le scan suivant du même médicament lit la réponse au lieu de rappeler le modèle. Aucune donnée
+/// patient : le médicament (sa famille), la liste fermée envoyée et les produits choisis.
+model RobotSuggestion {
+  id           String                @id @default(cuid())
+  pharmacyId   String
+  /// « atc:A02AD01 », à défaut « classe:<classe normalisée> ».
+  drugKey      String
+  /// Le médicament tel qu'il a été bipé la première fois (pour la lecture).
+  drugLabel    String
+  status       RobotSuggestionStatus @default(PENDING)
+  /// Les choix validés : [{ proposalId, productId, need, reason, counterScript }].
+  items        Json?
+  /// La liste fermée envoyée (identifiants produit) : un stock qui a notablement changé fait redemander.
+  candidateIds String[]              @default([])
+  providerId   String?
+  model        String?
+  inputTokens  Int                   @default(0)
+  outputTokens Int                   @default(0)
+  durationMs   Int                   @default(0)
+  /// Le motif d'un échec, ou les réserves du validateur.
+  error        String?
+  requestedAt  DateTime              @default(now())
+  /// Au-delà, on redemande : 30 jours pour une réponse, 30 minutes après un échec.
+  expiresAt    DateTime
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@unique([pharmacyId, drugKey])
+  @@index([pharmacyId, expiresAt])
+  @@map("robot_suggestions")
+}
+
+enum RobotProposalStatus {
+  /// À relire par la pharmacienne de PharmaBoost. La suggestion continue d'être proposée, marquée « à confirmer ».
+  PENDING
+  /// Validée : devenue un conseil central (ou une association commune), pour toutes les pharmacies.
+  VALIDATED
+  /// Refusée : ce produit n'est plus jamais suggéré pour ce médicament, dans aucune pharmacie.
+  REFUSED
+}
+
+/// Une suggestion du robot devenue PROPOSITION de règle pour la console de la pharmacienne de PharmaBoost : « tel médicament (sa
+/// famille) → tel produit, pour telle raison ». Une ligne par (médicament, produit), quel que soit le nombre de pharmacies. Aucune
+/// donnée patient : le médicament, le produit, le besoin, la raison et la phrase de comptoir proposés par le modèle.
+model RobotRuleProposal {
+  id               String              @id @default(cuid())
+  drugKey          String
+  drugLabel        String
+  atcCode          String?
+  therapeuticClass String?
+  substance        String?
+  /// « ean:<code> », à défaut « nom:<nom normalisé> » : la même clé dans toutes les pharmacies.
+  productKey       String
+  productName      String
+  productBrand     String?
+  productEan       String?
+  productCategory  String
+  productTags      String[]            @default([])
+  need             String
+  reason           String
+  counterScript    String
+  status           RobotProposalStatus @default(PENDING)
+  /// Les officines où le robot l'a proposée (30 au plus) et leur nombre.
+  pharmacyIds      String[]            @default([])
+  occurrences      Int                 @default(1)
+  providerId       String?
+  model            String?
+  /// Ce qu'elle est devenue à la validation : CUSTOM_RULE (conseil ajouté) ou ASSOCIATION, et sa référence.
+  centralKind      String?
+  centralRef       String?
+  decidedAt        DateTime?
+  decidedByAdminId String?
+  decidedByName    String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([drugKey, productKey])
+  @@index([status, createdAt])
+  @@map("robot_rule_proposals")
 }

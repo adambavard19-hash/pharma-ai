@@ -3,9 +3,10 @@
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Check, CheckCircle2, FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, CheckCircle2, FileSpreadsheet, Loader2, Plus, Upload } from "lucide-react";
 import { previewStockAction, sendStockAction } from "@/server/actions/stock-deposits";
 import { DEPOSIT_ACCEPTED_LABEL, DEPOSIT_CONFIRMATION, DEPOSIT_MAX_BYTES } from "@/core/stock-deposit/rules";
+import { MERGE_MAX_FILES } from "@/core/stock-import/merge-files";
 import type { StockPreview } from "@/core/stock-deposit/types";
 import { Alert } from "@/components/ui/feedback";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Checkbox } from "@/components/ui/field";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SEND_FAILED, checkDepositFile, formatFileSize, uploadSummary, type SendOutcome } from "./view";
-import { UPDATE_STEPS, confirmButtonLabel, confirmationText, needsZeroConsent, previewFacts, zeroConsentLabel } from "./preview-view";
+import { UPDATE_STEPS, confirmButtonLabel, confirmationText, mergeHeadline, needsZeroConsent, previewFacts, priceKindLabel, zeroConsentLabel } from "./preview-view";
 
 /**
  * Mettre à jour mon stock, en trois étapes : choisir le fichier, vérifier ce qu'il contient, confirmer.
@@ -22,22 +23,36 @@ import { UPDATE_STEPS, confirmButtonLabel, confirmationText, needsZeroConsent, p
  * l'envoi réel (fichier incomplet, lignes illisibles, trop de produits à zéro) et dit en clair ce qui va se passer ; si
  * des produits doivent passer à 0, une case à cocher demande la confirmation. Le serveur refait ces contrôles à
  * l'envoi et exige la confirmation : l'écran les montre, il ne les remplace pas.
+ *
+ * Plusieurs fichiers (3 au plus) : choisis d'un coup ou ajoutés avant de confirmer (« Ajouter un autre fichier »), ils
+ * sont RÉUNIS par le serveur — le prix d'achat de l'un, le prix de vente de l'autre — et l'aperçu dit ce qu'ils donnent
+ * ensemble. Un nouvel envoi s'AJOUTE au précédent : les prix qu'il ne contient pas restent. « Ce fichier complète
+ * seulement mes prix » n'écrit que des prix, jamais une quantité.
  */
 
 type Phase =
   | { name: "choose" }
-  | { name: "checking"; file: File }
-  | { name: "review"; file: File; preview: StockPreview }
-  | { name: "confirm"; file: File; preview: StockPreview }
-  | { name: "sending"; file: File; preview: StockPreview }
+  | { name: "checking"; files: File[] }
+  | { name: "review"; files: File[]; preview: StockPreview }
+  | { name: "confirm"; files: File[]; preview: StockPreview }
+  | { name: "sending"; files: File[]; preview: StockPreview }
   | { name: "done"; outcome: SendOutcome };
+
+const formOf = (files: File[], pricesOnly: boolean) => {
+  const body = new FormData();
+  for (const file of files) body.append("file", file);
+  if (pricesOnly) body.set("mode", "prix");
+  return body;
+};
 
 const stepOf = (phase: Phase): 1 | 2 | 3 => (phase.name === "choose" ? 1 : phase.name === "checking" || phase.name === "review" ? 2 : 3);
 
-export function UpdateFlow() {
+export function UpdateFlow({ previous = null }: { previous?: { fileName: string; received: string } | null }) {
   const [phase, setPhase] = useState<Phase>({ name: "choose" });
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
+  const [pricesOnly, setPricesOnly] = useState(false);
+  const addInput = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [, start] = useTransition();
   const router = useRouter();
@@ -46,45 +61,54 @@ export function UpdateFlow() {
   const restart = () => {
     setPhase({ name: "choose" });
     setConsent(false);
+    setPricesOnly(false);
     if (input.current) input.current.value = "";
+    if (addInput.current) addInput.current.value = "";
   };
 
-  const pick = (file: File | null) => {
-    if (!file) return;
+  /** Vérifie l'envoi (un ou plusieurs fichiers, dans un mode) ; en cas d'échec, revient là où l'on était. */
+  const check = (files: File[], mode: boolean, back: Phase) => {
     setError(null);
-    const problem = checkDepositFile(file);
-    if (problem) {
-      setError(problem);
-      if (input.current) input.current.value = "";
+    if (files.length === 0) return;
+    if (files.length > MERGE_MAX_FILES) {
+      setError(`${MERGE_MAX_FILES} fichiers au plus en un envoi.`);
       return;
     }
-    setPhase({ name: "checking", file });
+    const problem = files.map((file) => checkDepositFile(file)).find(Boolean);
+    if (problem) {
+      setError(files.length > 1 ? `${problem} Aucun fichier n'a été envoyé.` : problem);
+      if (input.current) input.current.value = "";
+      if (addInput.current) addInput.current.value = "";
+      return;
+    }
+    setPhase({ name: "checking", files });
     start(async () => {
       try {
-        const body = new FormData();
-        body.set("file", file);
-        const result = await previewStockAction(body);
+        const result = await previewStockAction(formOf(files, mode));
+        if (addInput.current) addInput.current.value = "";
         if (!result.ok) {
           setError(result.error);
-          setPhase({ name: "choose" });
+          setPhase(back);
           if (input.current) input.current.value = "";
           return;
         }
         setConsent(false);
-        setPhase({ name: "review", file, preview: result.data });
+        setPricesOnly(mode);
+        setPhase({ name: "review", files, preview: result.data });
       } catch {
         setError("Le fichier n'a pas pu être vérifié. Vérifiez votre connexion et réessayez.");
-        setPhase({ name: "choose" });
+        setPhase(back);
       }
     });
   };
 
-  const send = (file: File, preview: StockPreview) => {
-    setPhase({ name: "sending", file, preview });
+  const pick = (list: FileList | null | undefined) => check(Array.from(list ?? []), false, { name: "choose" });
+
+  const send = (files: File[], preview: StockPreview) => {
+    setPhase({ name: "sending", files, preview });
     start(async () => {
       try {
-        const body = new FormData();
-        body.set("file", file);
+        const body = formOf(files, preview.mode === "PRICES");
         body.set("confirmation", DEPOSIT_CONFIRMATION);
         const result = await sendStockAction(body);
         setPhase({ name: "done", outcome: uploadSummary(result, new Date()) });
@@ -127,7 +151,21 @@ export function UpdateFlow() {
         accept=".csv,.txt,.xlsx,.xls,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="sr-only"
         tabIndex={-1}
-        onChange={(event) => pick(event.target.files?.[0] ?? null)}
+        multiple
+        onChange={(event) => pick(event.target.files)}
+      />
+      <input
+        ref={addInput}
+        type="file"
+        aria-label="Ajouter un fichier de stock"
+        accept=".csv,.txt,.xlsx,.xls,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        className="sr-only"
+        tabIndex={-1}
+        multiple
+        onChange={(event) => {
+          if (phase.name !== "review") return;
+          check([...phase.files, ...Array.from(event.target.files ?? [])], pricesOnly, phase);
+        }}
       />
 
       {phase.name === "choose" && (
@@ -135,6 +173,10 @@ export function UpdateFlow() {
           <div>
             <h2 className="text-[20px] leading-7 font-semibold tracking-[-0.01em] text-text-primary">Choisissez le fichier de votre stock</h2>
             <p className="text-[14.5px] leading-6 text-text-secondary">Le fichier exporté de votre logiciel de pharmacie ({DEPOSIT_ACCEPTED_LABEL}, {DEPOSIT_MAX_BYTES / (1024 * 1024)} Mo au plus).</p>
+            <p className="mt-1 text-[13.5px] leading-5 text-text-secondary">
+              Vous pouvez en choisir jusqu&apos;à {MERGE_MAX_FILES} (par exemple l&apos;édition « PAMP Net » et l&apos;édition « PV TTC ») : PharmaBoost les réunit pour connaître vos prix d&apos;achat et de vente.
+              {previous ? " Un nouveau fichier s'ajoute aux précédents : les prix qu'il ne contient pas sont conservés." : ""}
+            </p>
           </div>
           {error && <Alert tone="danger" title="Ce fichier ne peut pas être utilisé">{error}</Alert>}
           <div
@@ -146,15 +188,15 @@ export function UpdateFlow() {
             onDrop={(event) => {
               event.preventDefault();
               setDragging(false);
-              pick(event.dataTransfer.files?.[0] ?? null);
+              pick(event.dataTransfer.files);
             }}
             className={cn("flex flex-col items-center gap-3 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors", dragging ? "border-success-600 bg-success-50/60 dark:bg-success-950/20" : "border-border-default bg-surface-sunken/40")}
           >
             <FileSpreadsheet className="size-8 text-text-tertiary" aria-hidden="true" />
             <Button variant="success" size="xl" className="w-full max-w-xs rounded-full" onClick={() => input.current?.click()} leadingIcon={<Upload className="size-5" />}>
-              Choisir mon fichier
+              Choisir mes fichiers
             </Button>
-            <p className="text-[13px] text-text-tertiary">ou glissez-le ici</p>
+            <p className="text-[13px] text-text-tertiary">ou glissez-les ici</p>
           </div>
           <Link href="/connexion/guide?logiciel=lgpi" className="inline-block text-[13.5px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-400">
             Comment récupérer mon stock dans LGPI ?
@@ -166,7 +208,7 @@ export function UpdateFlow() {
         <div role="status" aria-live="polite" className="flex flex-col items-center gap-3 py-8 text-center">
           <Loader2 className="size-8 animate-spin text-brand-600" aria-hidden="true" />
           <p className="text-[16px] font-medium text-text-primary">Lecture de votre fichier…</p>
-          <p className="min-w-0 max-w-full truncate text-[13.5px] text-text-secondary">{phase.file.name} · cela peut prendre jusqu&apos;à une minute</p>
+          <p className="min-w-0 max-w-full truncate text-[13.5px] text-text-secondary">{phase.files.map((file) => file.name).join(" + ")} · cela peut prendre jusqu&apos;à une minute</p>
         </div>
       )}
 
@@ -174,14 +216,48 @@ export function UpdateFlow() {
         <div className="space-y-4">
           <div>
             <h2 className="text-[20px] leading-7 font-semibold tracking-[-0.01em] text-text-primary">
-              {formatNumber(phase.preview.products)} produit{phase.preview.products > 1 ? "s" : ""} dans ce fichier
+              {formatNumber(phase.preview.products)} produit{phase.preview.products > 1 ? "s" : ""} {phase.files.length > 1 ? "dans vos fichiers réunis" : "dans ce fichier"}
             </h2>
-            <p className="flex items-center gap-2 text-[13.5px] text-text-secondary">
-              <FileSpreadsheet className="size-4 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 truncate">{phase.file.name}</span>
-              <span className="shrink-0 text-text-tertiary">{formatFileSize(phase.file.size)}</span>
-            </p>
+            {mergeHeadline(phase.preview) && <p className="text-[14px] leading-5 font-medium text-success-700 dark:text-success-400">{mergeHeadline(phase.preview)}</p>}
           </div>
+          {error && <Alert tone="danger" title="Ce fichier ne peut pas être ajouté">{error}</Alert>}
+          <section aria-labelledby="vos-fichiers" className="space-y-2">
+            <h3 id="vos-fichiers" className="text-[14px] font-semibold text-text-primary">Vos fichiers</h3>
+            <ul className="divide-y divide-border-subtle rounded-xl border border-border-subtle text-[13.5px]">
+              {previous && (
+                <li className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-4 py-2.5 text-text-secondary">
+                  <FileSpreadsheet className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{previous.fileName}</span>
+                  <span className="shrink-0 text-text-tertiary">déjà reçu {previous.received} · ses prix restent</span>
+                </li>
+              )}
+              {phase.files.map((file, index) => {
+                const merged = phase.preview.merge?.files[index];
+                return (
+                  <li key={`${file.name}-${index}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-4 py-2.5 text-text-primary">
+                    <Plus className="size-4 shrink-0 text-success-600" aria-hidden="true" />
+                    <span className="min-w-0 truncate font-medium">{file.name}</span>
+                    <span className="shrink-0 text-text-tertiary">
+                      {formatFileSize(file.size)}
+                      {merged ? ` · ${priceKindLabel(merged.priceKind, merged.priceLabel)}` : phase.preview.priceKind ? ` · ${priceKindLabel(phase.preview.priceKind, null)}` : ""} · s&apos;ajoute
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            {phase.files.length < MERGE_MAX_FILES && (
+              <Button variant="outline" size="sm" className="rounded-full" onClick={() => addInput.current?.click()} leadingIcon={<Plus className="size-4" />}>
+                Ajouter un autre fichier
+              </Button>
+            )}
+          </section>
+          {phase.preview.suggestPricesOnly && !pricesOnly && <Alert tone="info" title="Ce fichier sert-il seulement à compléter vos prix ?">{phase.preview.suggestPricesOnly}</Alert>}
+          <Checkbox
+            id="prix-seulement"
+            checked={pricesOnly}
+            onChange={(event) => check(phase.files, event.target.checked, phase)}
+            label="Ce fichier complète seulement mes prix (aucune quantité ne change, aucun produit ajouté ni mis à 0)"
+          />
           <ul className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
             {previewFacts(phase.preview).map((fact) => (
               <li key={fact.key} className="flex items-start justify-between gap-3 px-4 py-3">
@@ -200,7 +276,7 @@ export function UpdateFlow() {
               ))}
             </ul>
           )}
-          {phase.preview.verdict === "HOLD" ? (
+          {phase.preview.verdict === "HOLD" && phase.preview.mode !== "PRICES" ? (
             <Alert tone="warning" title="Ce fichier ne sera pas appliqué tout de suite">
               {phase.preview.reason} Vous pouvez choisir un autre fichier, ou l&apos;envoyer à l&apos;équipe PharmaBoost qui le vérifiera.
             </Alert>
@@ -211,11 +287,11 @@ export function UpdateFlow() {
             </p>
           )}
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="success" size="lg" className="rounded-full sm:flex-1" onClick={() => setPhase({ name: "confirm", file: phase.file, preview: phase.preview })}>
+            <Button variant="success" size="lg" className="rounded-full sm:flex-1" onClick={() => setPhase({ name: "confirm", files: phase.files, preview: phase.preview })}>
               Continuer
             </Button>
             <Button variant="outline" size="lg" className="rounded-full" onClick={restart} leadingIcon={<ArrowLeft className="size-4" />}>
-              Choisir un autre fichier
+              Recommencer
             </Button>
           </div>
         </div>
@@ -240,11 +316,11 @@ export function UpdateFlow() {
               className="rounded-full sm:flex-1"
               loading={phase.name === "sending"}
               disabled={needsZeroConsent(phase.preview) && !consent}
-              onClick={() => send(phase.file, phase.preview)}
+              onClick={() => send(phase.files, phase.preview)}
             >
               {phase.name === "sending" ? "Mise à jour en cours…" : confirmButtonLabel(phase.preview)}
             </Button>
-            <Button variant="outline" size="lg" className="rounded-full" disabled={phase.name === "sending"} onClick={() => setPhase({ name: "review", file: phase.file, preview: phase.preview })} leadingIcon={<ArrowLeft className="size-4" />}>
+            <Button variant="outline" size="lg" className="rounded-full" disabled={phase.name === "sending"} onClick={() => setPhase({ name: "review", files: phase.files, preview: phase.preview })} leadingIcon={<ArrowLeft className="size-4" />}>
               Retour
             </Button>
           </div>

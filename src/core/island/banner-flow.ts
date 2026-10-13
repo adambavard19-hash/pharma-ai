@@ -181,6 +181,30 @@ export function registerTap(taps: number[], now: number): { taps: number[]; tooM
   return { taps: recent, tooMany: recent.length >= RAPID_TAPS };
 }
 
+/** Au-delà de ce déplacement (pixels d'écran) entre l'appui et le clic, c'est un glisser : même seuil que l'hôte Windows. */
+export const TAP_SLOP_PX = 4;
+
+/**
+ * Le clic sur la carte d'un conseil ouvre-t-il sa page ? Oui pour un vrai clic ; non si la souris a bougé entre l'appui
+ * et le relâché (on faisait défiler la liste, ou glisser l'île). Sans appui connu (clavier) : c'est un clic.
+ */
+export function isTap(down: { x: number; y: number } | null, up: { x: number; y: number }): boolean {
+  return down === null || Math.hypot(up.x - down.x, up.y - down.y) <= TAP_SLOP_PX;
+}
+
+/**
+ * Le clic sur le lien d'une carte de conseil : un vrai clic suit le lien (et prévient la page, qui peut viser ce conseil) ;
+ * après un glisser, le lien ne s'ouvre pas — ni dans l'île, ni, au poste, dans le navigateur du PC. Vrai si le lien suit.
+ */
+export function followAdviceLink(down: { x: number; y: number } | null, event: { screenX: number; screenY: number; preventDefault: () => void }, onOpen?: () => void): boolean {
+  if (!isTap(down, { x: event.screenX, y: event.screenY })) {
+    event.preventDefault();
+    return false;
+  }
+  onOpen?.();
+  return true;
+}
+
 /** Une mise en garde lue en trois morceaux : le titre (« Paracétamol : 3 g par jour au maximum »), le sous-titre, le détail. */
 export type IslandAlertParts = { title: string; subtitle: string | null; detail: string };
 

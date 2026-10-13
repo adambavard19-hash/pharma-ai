@@ -8,7 +8,7 @@
  * sert à l'analyse — jamais la seule devinette.
  */
 
-export type ImportField = "name" | "code" | "quantity" | "salePrice" | "purchasePrice" | "vatRate" | "brand" | "category";
+export type ImportField = "name" | "code" | "quantity" | "salePrice" | "purchasePrice" | "vatRate" | "reimbursement" | "brand" | "category";
 
 export type ColumnMapping = Partial<Record<ImportField, string>>;
 
@@ -19,6 +19,7 @@ export const FIELD_LABELS: Record<ImportField, string> = {
   salePrice: "Prix TTC",
   purchasePrice: "Prix d'achat",
   vatRate: "TVA",
+  reimbursement: "Remboursement (taux, prestation ou code LPP)",
   brand: "Marque / laboratoire",
   category: "Catégorie / rayon",
 };
@@ -33,6 +34,9 @@ const HINTS: Record<ImportField, RegExp[]> = {
   salePrice: [/prix.*ttc/i, /prix.*vente/i, /^pv/i, /^ttc/i, /^prix$/i, /^price/i, /vente/i, /^pvc/i, /public/i],
   purchasePrice: [/prix.*achat/i, /^pa\b/i, /^ht$/i, /achat/i, /^cost/i, /pamp/i, /^pa\s*ht/i],
   vatRate: [/^tva/i, /taux.*tva/i, /\btva\b/i, /^vat/i],
+  // « Taux remb. », « Remboursement », « Prest. » (PH7, PHN, AAD…), « Code LPP », « TIPS » — jamais une colonne de
+  // montant (« Base de remboursement », « Tarif LPP ») : c'est un prix, pas un statut.
+  reimbursement: [/^(?!.*(base|prix|montant|tarif)).*rembours/i, /^tx\.?\s*remb/i, /^taux.*remb/i, /^prest/i, /^(?!.*(base|prix|montant|tarif)).*\blpp\b/i, /^tips\b/i],
   brand: [/^marque/i, /laboratoire/i, /^labo/i, /fabricant/i, /^brand/i],
   category: [/cat[ée]gorie/i, /^rayon/i, /^famille/i, /^classe/i, /^category/i],
 };
@@ -56,7 +60,7 @@ export function normalizeHeader(value: string): string {
 export function suggestMapping(headers: string[]): ColumnMapping {
   const mapping: ColumnMapping = {};
   const taken = new Set<string>();
-  const order: ImportField[] = ["code", "quantity", "purchasePrice", "vatRate", "salePrice", "name", "brand", "category"];
+  const order: ImportField[] = ["code", "quantity", "purchasePrice", "vatRate", "reimbursement", "salePrice", "name", "brand", "category"];
 
   for (const field of order) {
     const match = headers.find(

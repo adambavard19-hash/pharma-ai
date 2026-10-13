@@ -1,4 +1,5 @@
 import type { CatalogProduct, PatientContext } from "../types";
+import { matchesAny } from "./product-name";
 import {
   VIGILANCE_LEVEL_RANK,
   populationLabel,
@@ -33,6 +34,11 @@ export type PopulationVigilanceRule = {
   sources: string[];
   /** Pour CHILD : âge (en années) sous lequel le patient est concerné. */
   maxAgeYears?: number;
+  /**
+   * La vigilance ne vaut que pour une référence dont le nom porte ce motif (sans accents, minuscules) : les huiles
+   * essentielles d'un spray nasal, pas l'eau de mer que la même règle propose. Nom inconnu : la vigilance reste.
+   */
+  productPattern?: string;
 };
 
 const CONDITION_PATTERNS: Partial<Record<VigilancePopulation, RegExp>> = {
@@ -118,11 +124,13 @@ export function declaredContraindicationFor(product: Pick<CatalogProduct, "vigil
  */
 export function suggestionVigilances(
   ruleRules: PopulationVigilanceRule[],
-  product: Pick<CatalogProduct, "contraindications" | "vigilances">,
+  product: Pick<CatalogProduct, "contraindications" | "vigilances"> & { name?: string },
   patient: PatientContext,
 ): SuggestionVigilance[] {
   const candidates = [
-    ...ruleRules.map((rule) => ({ ...rule, origin: "RULE" as const })),
+    ...ruleRules
+      .filter((rule) => !rule.productPattern || product.name === undefined || matchesAny([rule.productPattern], product.name))
+      .map((rule) => ({ ...rule, origin: "RULE" as const })),
     ...productPopulationRules(product),
   ];
   const byPopulation = new Map<string, SuggestionVigilance>();

@@ -293,6 +293,14 @@ describe("la fenêtre et son processus", () => {
     expect(actions).toEqual([{ kind: "open_space" }, { kind: "open_space" }]);
   });
 
+  it("clic sur la carte d'un conseil de l'île : « OUVRIR <adresse> », une seule adresse — l'agent la revérifie avant d'ouvrir", () => {
+    const notices = center();
+    notices.show(entry());
+    const link = "https://pharmaboost.app/vente/rx_1?conseil=rec_1#conseil-rec_1";
+    hosts[0].stdout.emit("data", `PRET\nOUVRIR ${link}\nOUVRIR\nOUVRIR ${link} calc.exe\nOUVRIR https://pharmaboost.app/vente/${"x".repeat(420)}\nouvrir ${link}\n`);
+    expect(actions).toEqual([{ kind: "open_sale", url: link }]);
+  });
+
   it("une action qui échoue côté agent est écrite au journal, la fenêtre continue", () => {
     const failing = new NoticeCenter({ configDir: dir, log: (message) => logs.push(message), legacyShow: () => undefined, platform: "win32", onAction: () => { throw new Error("réseau coupé"); }, spawnHost: () => { const host = fakeHost(); hosts.push(host); return host; } });
     failing.show(entry());

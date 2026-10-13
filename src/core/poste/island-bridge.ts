@@ -1,5 +1,6 @@
 import type { HostDone, HostEntry, HostItem } from "../../../agent/src/notice-center";
 import { BANNER } from "../../../agent/src/banner-design";
+import { saleAdvicePath } from "../../../agent/src/sale-link";
 import { analysisSteps, INITIAL_ISLAND, type IslandOutcome, type IslandStage, type IslandState } from "@/core/island/banner-flow";
 
 /**
@@ -234,6 +235,16 @@ export function questionWord(saleId: string, node: string, choice: string): stri
 
 export function viewWord(saleId: string): string | null {
   return ID.test(saleId) ? `VOIR ${saleId}` : null;
+}
+
+/**
+ * La page PharmaBoost d'un conseil de la vente, ouverte sur lui (agent/src/sale-link.ts) : « /vente/<vente>?conseil=<id>
+ * #conseil-<id> ». Un lien RELATIF, donc toujours vers le serveur qui sert l'île — au poste, l'hôte Windows le vérifie
+ * puis le confie au navigateur par défaut du PC. Pas de lien sans identifiant de conseil (serveur ancien) ni pour un
+ * identifiant douteux.
+ */
+export function adviceLink(saleId: string, item: Pick<HostItem, "id">): string | undefined {
+  return (item.id && saleAdvicePath(saleId, item.id)) || undefined;
 }
 
 /** Une ligne de commande reçue de l'agent, vérifiée : une commande inconnue ou malformée est ignorée, jamais une panne. */

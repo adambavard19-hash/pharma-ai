@@ -130,6 +130,15 @@ const PATTERNS: Pattern[] = [
     confidence: 0.86,
   },
   {
+    // Un collyre contre l'allergie, par son libellé (« COLLYRE … ALLERGIES », « … ANTIHISTAMINIQUE OPHT ») : il sert le
+    // collyre anti-allergique, dont le lavage n'est que le repli. Pas un soin du contour des yeux ni un démaquillant.
+    test: /^(?!.*(creme|\bcr\b|contour|demaquill|maquill|mascara|lingette|baume|nasal|\bnez\b|rhin))(?=.*(collyre|\bopht|oculaire|unidoses? (ophtalmiques?|yeux)))(?=.*(allerg|antihistamin))/,
+    category: "SOINS",
+    tags: ["yeux", "oculaire", "collyre", "anti-allergique", "allergie"],
+    ruleKeys: ["eye-allergy-antiallergic-drops"],
+    confidence: 0.95,
+  },
+  {
     test: /\b(bouche seche|bouche sèche|artisial|aequasyal|xerostom|bioxtra|biotene|salive|substitut salivaire|hydratant buccal)/,
     category: "HYGIENE",
     tags: ["bouche sèche", "salive", "hygiène bucco-dentaire"],
@@ -267,12 +276,23 @@ const PATTERNS: Pattern[] = [
     confidence: 0.9,
   },
   {
-    // Capsules ou gélules d'huiles essentielles à visée respiratoire ; ni diffuseur, ni roll-on, ni spray.
-    test: /^(?!.*(diffus|roll|piqure|piqûre|tete|tête|urin|intest|digest|lotion|spray|assainiss|\bnez\b|nasal|past|pastille|gorge|\bsol\b|solution|\bhle\b|huile de))(?=.*(olioseptil|aromaforce|puressentiel|phytosun|pranarom|arkoessentiel|huiles? essentielles?|gouttes aux essences))(?=.*(bronch|respir|toux|inhal|caps|gelu|gélu|defense|défense|coups? de froid))/,
+    // Capsules ou gélules d'huiles essentielles à visée respiratoire ; ni diffuseur, ni roll-on, ni spray, ni gamme digestive.
+    test: /^(?!.*(diffus|roll|piqure|piqûre|tete|tête|urin|intest|digest|gastro|lotion|spray|assainiss|\bnez\b|nasal|past|pastille|gorge|\bsol\b|solution|\bhle\b|huile de))(?=.*(olioseptil|aromaforce|puressentiel|phytosun|pranarom|arkoessentiel|huiles? essentielles?|gouttes aux essences))(?=.*(bronch|respir|toux|inhal|caps|gelu|gélu|defense|défense|coups? de froid))/,
     category: "PHYTOTHERAPIE",
     tags: ["huiles essentielles", "bronches"],
     ruleKeys: ["cough-bronchial-essential-oils"],
     confidence: 0.85,
+  },
+  {
+    // Un complexe d'huiles essentielles à visée DIGESTIVE (gélules, capsules) : le conseil du pharmacien fondateur après une
+    // métopimazine (13 oct. 2026, « nausea-digestive-essential-oils »). « OLISEPTIL GASTRO GELU 15 » : la faute d'un export
+    // réel, restée sans classement. Ni tisane, ni boisson digestive, ni diffuseur. Les noms de gamme sont une liste À MAINTENIR,
+    // la même que `AROMATHERAPY_RANGES` (core/ai/engines/advice.ts) : ce libellé ne dit rien d'autre de sa composition.
+    test: /^(?!.*(diffus|inhal|assainiss|\bnez\b|nasal|gorge|bronch|respir|urin|tisane|infusion))(?=.*(olio?septil|aromaforce|aromatherap|puressentiel|phytosun|pranarom|arkoessentiel|huiles? essentielles?|\bhle ess|\bhe\b))(?=.*(gastro|intestin|digest|ventre|transit|ballonn))/,
+    category: "PHYTOTHERAPIE",
+    tags: ["huiles essentielles", "gastro-intestinal"],
+    ruleKeys: ["nausea-digestive-essential-oils"],
+    confidence: 0.9,
   },
   {
     test: /^(?!.*(\b\d+ ?ch\b|cheveux|ongles|solaire|bronzage|minceur))(?=.*(multivit|berocca|supradyn|azinc|vitamine 22|immun|bion ?3|alvityl|endomune|vitascorbol|vitamine c\b|vit c\b|endurol|defenses? naturelles|défenses? naturelles))/,
@@ -299,51 +319,51 @@ const PATTERNS: Pattern[] = [
   // La gamme chaud/froid existe par zone (THERAPEARL DOS, GENOU, HANCHE, CHEVILLE…) : le nom dit la zone, et c'est la zone
   // qui commande le conseil (`pain-zones.ts`). Un masque pour les yeux ou un produit enfant n'est jamais une poche de zone.
   {
-    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(\bdos\b|lombaire|lombalg))/,
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patchs? chauff|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(\bdos\b|lombaire|lombalg))/,
     category: "DISPOSITIFS_MEDICAUX",
     tags: ["chaud froid", "douleur musculaire", "zone dos"],
     ruleKeys: ["pain-pack-back"],
     confidence: 0.9,
   },
   {
-    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(nuque|cervical|\bcou\b))/,
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patchs? chauff|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(nuque|cervical|\bcou\b))/,
     category: "DISPOSITIFS_MEDICAUX",
     tags: ["chaud froid", "douleur musculaire", "zone nuque"],
     ruleKeys: ["pain-pack-neck"],
     confidence: 0.9,
   },
   {
-    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(epaule))/,
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patchs? chauff|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(epaule))/,
     category: "DISPOSITIFS_MEDICAUX",
     tags: ["chaud froid", "douleur musculaire", "zone épaule"],
     ruleKeys: ["pain-pack-shoulder"],
     confidence: 0.9,
   },
   {
-    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(genou))/,
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patchs? chauff|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(genou))/,
     category: "DISPOSITIFS_MEDICAUX",
     tags: ["chaud froid", "douleur musculaire", "zone genou"],
     ruleKeys: ["pain-pack-knee"],
     confidence: 0.9,
   },
   {
-    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(hanche))/,
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patchs? chauff|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(hanche))/,
     category: "DISPOSITIFS_MEDICAUX",
     tags: ["chaud froid", "douleur musculaire", "zone hanche"],
     ruleKeys: ["pain-pack-hip"],
     confidence: 0.9,
   },
   {
-    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(cheville))/,
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire|\bkids?\b|enfant|bouillotte))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patchs? chauff|thermacare|pack froid|poche froid|poche chaud|compresse froide|chaud froid))(?=.*(cheville))/,
     category: "DISPOSITIFS_MEDICAUX",
     tags: ["chaud froid", "douleur musculaire", "zone cheville"],
     ruleKeys: ["pain-pack-ankle"],
     confidence: 0.9,
   },
-  // Douleur musculaire ou articulaire : poches chaud/froid, patchs chauffants.
+  // Douleur musculaire ou articulaire : poches chaud/froid, patchs chauffants (« Patch chauff », abréviation d'un export réel).
   // Un masque pour les yeux de la même gamme (THERAPEARL MASQ OCUL) n'est pas une poche pour le dos.
   {
-    test: /^(?!.*(masq(?:ue)? ocul|oculaire))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patch chauffant|patchs? chauffants?|thermacare|bouillotte|pack froid|poche froid|poche chaud|compresse froide|chaud froid))/,
+    test: /^(?!.*(masq(?:ue)? ocul|oculaire))(?=.*(thermcool|thera ?pearl|biofreeze|poche de gel|cold ?hot|actipoche|nexcare cold|coussin thermique|patchs? chauff|thermacare|bouillotte|pack froid|poche froid|poche chaud|compresse froide|chaud froid))/,
     category: "DISPOSITIFS_MEDICAUX",
     tags: ["chaud froid", "douleur musculaire"],
     ruleKeys: ["pain-pack-other"],
@@ -491,6 +511,14 @@ const SUBSTANCE_PATTERNS: (Pattern & { requires?: RegExp })[] = [
   { test: /glucose.*chlorure de sodium|citrate.*glucose|rehydratation|réhydratation/, category: "NUTRITION", tags: ["réhydratation", "diarrhée", "sels minéraux"], ruleKeys: ["rehydration-digestive"], confidence: 0.9 },
   { test: /hyaluronate|hyaluronique|carmellose|trehalose|tréhalose/, requires: /collyre|ophtalm|oculaire|yeux|unidose/, category: "SOINS", tags: ["yeux", "oculaire", "larmes", "sécheresse oculaire"], ruleKeys: ["dry-eye-screen-lubricant"], confidence: 0.92 },
   { test: /hyaluronate|hypromellose|carbomere|carbomère|povidone|acide borique|borate/, requires: /collyre|ophtalm|oculaire|yeux|unidose/, category: "SOINS", tags: ["yeux", "oculaire", "collyre", "lavage", "larmes"], ruleKeys: ["eye-irritation-allergy"], confidence: 0.85 },
+  // Les deux substances anti-allergiques d'un collyre dont les RCP ont été lus et sont cités par la règle (lévocabastine,
+  // cromoglicate) : le collyre de l'allergie, pas un lavage. Les autres (acide N-acétyl-aspartyl-glutamique, lodoxamide,
+  // nédocromil, kétotifène — certaines boîtes sans ordonnance —, épinastine, émédastine…) ne sont pas reconnues tant que leurs
+  // RCP n'ont pas été lus, avec leurs propres faits et vigilances, et validés par la pharmacienne.
+  { test: /levocabastin|cromoglic/, requires: /^(?!.*(nasal|\bnez\b|rhin))(?=.*(collyre|ophtalm|oculaire|\byeux\b))/, category: "SOINS", tags: ["yeux", "oculaire", "collyre", "anti-allergique", "allergie"], ruleKeys: ["eye-allergy-antiallergic-drops"], confidence: 0.95 },
+  // Un médicament ACTIF du nez (corticoïde, antihistaminique, cromoglicate, vasoconstricteur) : un traitement, pas un
+  // lavage. Rangé sans étiquette — il ne sert aucune règle de conseil, et surtout pas « l'hygiène nasale » (lave le nez).
+  { test: /beclomet|mometason|fluticason|budesonid|triamcinolon|dexamethason|tixocortol|azelastin|olopatadin|levocabastin|cromoglic|oxymetazolin|xylometazolin|naphazolin|tuaminoheptan|phenylephrin|pseudoephedrin|ipratropium/, requires: /^(?!.*(collyre|ophtalm|oculaire))(?=.*(nasal|\bnez\b|rhin))/, category: "AUTRE", tags: [], ruleKeys: [], confidence: 0.96 },
   { test: /magnesium|magnésium/, category: "MAGNESIUM", tags: ["magnésium", "fatigue", "crampes", "vitamine b6"], ruleKeys: ["magnesium-fatigue"], confidence: 0.9 },
   { test: /colecalciferol|cholecalciferol|ergocalciferol|calcifediol/, category: "VITAMINES", tags: ["vitamine d", "os", "calcium"], ruleKeys: ["vitamin-d-elderly"], confidence: 0.9 },
   { test: /alginate|hydroxyde d aluminium|hydroxyde de magnesium|carbonate de calcium|magaldrate|diosmectite|hydrotalcite/, category: "SOINS", tags: ["confort gastrique", "estomac", "digestion"], ruleKeys: ["gastric-protection-nsaid"], confidence: 0.85 },
@@ -543,7 +571,11 @@ export function classifyNationalDrug(input: {
   }
   if (best) return { category: best.category, tags: [...best.tags], confidence: best.confidence, source: "HEURISTIC", ruleKeys: [...best.ruleKeys] };
 
-  return classifyProductByName(input.name, { description: input.label ?? null });
+  // Une boîte du catalogue national n'est « anti-allergique » que par sa SUBSTANCE (ci-dessus) : son libellé
+  // (« ALLERGO… collyre ») ne suffit pas, il pourrait nommer une substance dont le RCP n'a pas été lu.
+  const byName = classifyProductByName(input.name, { description: input.label ?? null });
+  if (!byName?.tags.includes("anti-allergique")) return byName;
+  return { ...byName, tags: byName.tags.filter((tag) => tag !== "anti-allergique" && tag !== "allergie"), ruleKeys: byName.ruleKeys.filter((key) => key !== "eye-allergy-antiallergic-drops") };
 }
 
 /** Les étiquettes d'un produit ne sont retenues que si elles appartiennent au vocabulaire fermé. */

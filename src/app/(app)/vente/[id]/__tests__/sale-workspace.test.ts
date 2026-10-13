@@ -504,3 +504,27 @@ describe("alerte bloquante, saisie et analyse en cours", () => {
     expect(html).not.toContain("Conseils pour ce patient");
   });
 });
+
+describe("arrivé depuis la bannière du comptoir : le conseil cliqué s'ouvre déplié", () => {
+  it("la carte visée (`?conseil=`) porte l'ancre, se signale et montre sa fiche complète ; l'autre reste repliée", () => {
+    const html = render({ recommendations: [flore, gorge], focusAdviceId: "r_gorge" });
+    const tree = parseHtml(html);
+    const anchorOf = (id: string) => descendants(tree).find((node) => node.attrs.includes(`id="conseil-${id}"`))!.parent!;
+    const visee = anchorOf("r_gorge");
+    expect(visee.attrs).toContain("data-advice-focused");
+    expect(textOf(visee)).toContain("Pastilles gorge miel");
+    expect(textOf(visee)).toContain("Contre-indications");
+    expect(textOf(visee)).toContain("Conseils d'utilisation");
+    const autre = anchorOf("r_flore");
+    expect(autre.attrs).not.toContain("data-advice-focused");
+    expect(textOf(autre)).not.toContain("Contre-indications Aucune");
+    expect(count(html, 'aria-expanded="true" aria-controls="fiche-')).toBe(1);
+  });
+
+  it("sans conseil visé, la page s'ouvre comme avant : fiches repliées, aucune carte signalée", () => {
+    const html = render({ recommendations: [flore, gorge] });
+    expect(html).not.toContain("data-advice-focused");
+    expect(count(html, 'aria-expanded="true" aria-controls="fiche-')).toBe(0);
+    expect(count(html, 'aria-controls="fiche-')).toBe(2);
+  });
+});

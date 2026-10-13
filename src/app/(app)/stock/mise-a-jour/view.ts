@@ -6,6 +6,7 @@ import {
   DEPOSIT_MAX_BYTES,
   DEPOSIT_STATUS_LABELS,
   describeDepositResult,
+  isPricesOnlyDeposit,
   stockAgeDays,
   stockReminderLevel,
 } from "@/core/stock-deposit/rules";
@@ -175,6 +176,9 @@ export function sendOutcome(result: ActionResult<DepositView>): SendOutcome {
  * Un fichier en vérification ou refusé garde les mots de `sendOutcome` : le stock n'a pas changé, et ça se dit.
  */
 export function uploadSummary(result: ActionResult<DepositView>, now: Date): SendOutcome {
+  if (result.ok && result.data.status === "APPLIED" && isPricesOnlyDeposit(result.data.fileName)) {
+    return { tone: "success", title: "Prix complétés", detail: `${pricesLine(result.data.updated ?? 0)} ${describeReceived(result.data.appliedAt ?? result.data.receivedAt, now)}.` };
+  }
   if (result.ok && result.data.status === "APPLIED") {
     const deposit = result.data;
     const products = deposit.lines ?? 0;
@@ -206,9 +210,12 @@ export function depositBadge(deposit: Pick<DepositView, "status" | "stalled">): 
 }
 
 /** Le résultat d'un envoi en une ligne. */
-export function describeDepositLine(deposit: Pick<DepositView, "status" | "lines" | "created" | "updated" | "zeroed" | "invalid" | "message" | "stalled">): string {
+const pricesLine = (n: number) => `Prix complétés pour ${formatNumber(n)} produit${n > 1 ? "s" : ""}, aucune quantité modifiée,`;
+
+export function describeDepositLine(deposit: Pick<DepositView, "status" | "lines" | "created" | "updated" | "zeroed" | "invalid" | "message" | "stalled"> & { fileName?: string }): string {
   switch (deposit.status) {
     case "APPLIED":
+      if (deposit.fileName && isPricesOnlyDeposit(deposit.fileName)) return `${pricesLine(deposit.updated ?? 0).replace(/,$/, "")}.`;
       return describeDepositResult(deposit) || "Stock mis à jour.";
     case "RECEIVED":
       return deposit.stalled ? INTERRUPTED_LINE : "Lecture en cours…";

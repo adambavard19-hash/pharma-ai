@@ -53,6 +53,7 @@ import { ensureClassifications } from "./classification";
 import { classifiedDrugKnowledge } from "@/core/ai/classified-knowledge";
 import { loadAssociationInput } from "./product-associations";
 import { loadCentralAdvice } from "./central-advice";
+import { withRobotSuggestions } from "./robot-suggestions";
 
 /**
  * Orchestration de l'analyse d'une ordonnance.
@@ -388,7 +389,7 @@ export async function analysePrescription(params: {
     prescription.lines.map((line) => rebuildExtractedLine(line)),
   );
 
-  const result = runAnalysisPipeline({
+  const pipelineInput: Parameters<typeof runAnalysisPipeline>[0] = {
     ...(prescription.source === "COUNTER_SCAN" ? { maxRecommendations: MAX_RECOMMENDATIONS_COUNTER_SCAN } : {}),
     lines: prescription.lines.map((line) => ({
       lineIndex: line.position,
@@ -432,9 +433,15 @@ export async function analysePrescription(params: {
       // pas une panne, la compréhension n'avait rien à comprendre.
       (understoodLineCount > 0 && !understanding) ||
       Boolean(understanding?.warnings.some((warning) => warning.startsWith("Classification impossible"))),
-  });
+  };
+  const engineResult = runAnalysisPipeline(pipelineInput);
 
   lap("moteur");
+  // Suggestion du robot : le secours quand aucune règle ne couvre un médicament de la vente (robot-suggestions.ts). Ses
+  // choix passent par le même moteur ; il n'attend jamais plus de 1,5 s et ne bloque rien (échec ou démonstration : rien).
+  const robot = await withRobotSuggestions({ scope: params.scope, prescriptionId: prescription.id, isDemo: prescription.isDemo, input: pipelineInput, result: engineResult });
+  const result = robot.result;
+  lap("robot");
   params.onStage?.("PERSIST");
 
   const analysisRun = await prisma.$transaction(async (tx) => {
@@ -658,6 +665,8 @@ export async function analysePrescription(params: {
 
     return run;
   });
+  // Ce que le robot n'a pas rendu à temps rejoindra la vente dès son arrivée (la fenêtre du comptoir la relit).
+  robot.settle(analysisRun.id);
 
   lap("enregistrement");
   const durationMs = Date.now() - startedAt;

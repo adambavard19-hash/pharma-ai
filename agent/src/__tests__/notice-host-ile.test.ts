@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { islandPageUrl, NoticeCenter, withInlineImages, type HostEntry, type HostProcess } from "../notice-center";
 import { loaderArch, NOTICE_HOST_ILE_CSHARP, noticeHostIleScript, WEBVIEW2_SDK } from "../notice-host-ile";
 import { ensureWebView2Sdk, sdkFilesFor } from "../webview2-sdk";
+import { saleAdviceUrl } from "../sale-link";
 
 const SDK_PUBLIC = join(process.cwd(), "public", "poste", "webview2", WEBVIEW2_SDK.version);
 
@@ -98,6 +99,25 @@ describe("le programme Windows de l'île", () => {
     for (const off of ["AreDevToolsEnabled = false", "AreDefaultContextMenusEnabled = false", "AreBrowserAcceleratorKeysEnabled = false"]) expect(NOTICE_HOST_ILE_CSHARP).toContain(off);
     // « PRET » n'est dit qu'une fois la page prête ; toute panne avant passe par la sortie d'erreur (repli de l'agent).
     expect(NOTICE_HOST_ILE_CSHARP).toMatch(/pageReady = true;\s*Out\.Word\("PRET"\)/);
+  });
+
+  it("un clic sur la carte d'un conseil : jamais de fenêtre dans l'île ; la page de la vente part au navigateur du PC (mot OUVRIR), après vérification", () => {
+    expect(NOTICE_HOST_ILE_CSHARP).toContain("core.NewWindowRequested += OnNewWindowRequested;");
+    const handler = NOTICE_HOST_ILE_CSHARP.slice(NOTICE_HOST_ILE_CSHARP.indexOf("private void OnNewWindowRequested("), NOTICE_HOST_ILE_CSHARP.indexOf("public static string SaleLinkFor("));
+    // Aucune fenêtre, quoi qu'il arrive ; seul un clic de la personne (pas un script) ouvre quelque chose.
+    expect(handler).toMatch(/\{\s*e\.Handled = true;\s*if \(!e\.IsUserInitiated\) return;/);
+    expect(handler).toContain("SaleLinkFor(pageUri, e.Uri)");
+    expect(handler).toContain("if (link == null) return;");
+    // Un glisser de l'île n'est pas un clic ; un double-clic n'ouvre pas deux onglets.
+    expect(handler).toMatch(/dragTimer\.Enabled && dragMoved\) \|\| \(now - dragEndedAt\)\.TotalMilliseconds < 400\) return;/);
+    expect(handler).toMatch(/link == lastOpenUrl && \(now - lastOpenAt\)\.TotalMilliseconds < 1500\) return;/);
+    expect(NOTICE_HOST_ILE_CSHARP).toMatch(/SavePosition\(\);\s*dragEndedAt = DateTime\.UtcNow;/);
+    // Le navigateur peut passer devant (l'île, elle, ne prend jamais le premier plan) ; l'agent revérifie et ouvre.
+    expect(handler).toContain("Native.AllowSetForegroundWindow(Native.ASFW_ANY)");
+    expect(handler).toContain('Out.Word("OUVRIR " + link);');
+    expect(handler).not.toMatch(/Process\.Start|cmd/);
+    // Les navigations dans l'île restent bornées à sa page.
+    expect(NOTICE_HOST_ILE_CSHARP).toMatch(/if \(!e\.Uri\.StartsWith\(allowedPrefix, StringComparison\.Ordinal\)\) e\.Cancel = true;/);
   });
 
   it("le menu de l'icône près de l'horloge propose « Ouvrir mon espace PharmaBoost » : un seul mot, ESPACE, pour l'agent", () => {
@@ -229,6 +249,69 @@ describe.skipIf(process.env.PB_CSHARP_CHECK !== "1")("la compilation du programm
       const result = spawnSync("dotnet", ["build", "-nologo", "-v", "q"], { cwd: dir, encoding: "utf8" });
       expect(`${result.stdout}${result.stderr}`).not.toMatch(/error CS\d+/);
       expect(result.status).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 240_000);
+});
+
+/**
+ * La vérification de l'adresse par l'hôte Windows, EXÉCUTÉE (le C# de `SaleLinkFor`, tel quel, dans un petit programme
+ * .NET) et comparée à celle de l'agent : les deux acceptent et refusent les mêmes adresses.
+ * PB_CSHARP_CHECK=1 npx vitest run agent/src/__tests__/notice-host-ile.test.ts
+ */
+describe.skipIf(process.env.PB_CSHARP_CHECK !== "1")("l'adresse d'un conseil vue par l'hôte Windows (C# exécuté)", () => {
+  it("accepte la page d'une vente du serveur de l'île, refuse tout le reste — comme l'agent", () => {
+    const start = NOTICE_HOST_ILE_CSHARP.indexOf("public static string SaleLinkFor(");
+    let depth = 0;
+    let end = NOTICE_HOST_ILE_CSHARP.indexOf("{", start);
+    for (; end < NOTICE_HOST_ILE_CSHARP.length; end += 1) {
+      if (NOTICE_HOST_ILE_CSHARP[end] === "{") depth += 1;
+      if (NOTICE_HOST_ILE_CSHARP[end] === "}" && --depth === 0) break;
+    }
+    const method = NOTICE_HOST_ILE_CSHARP.slice(start, end + 1);
+    const server = "https://pharmaboost.app";
+    const sale = "cmg1vente0001abcd";
+    const advice = "cmg1conseil002xyz";
+    const candidates = [
+      `${server}/vente/${sale}?conseil=${advice}#conseil-${advice}`,
+      `${server}/vente/${sale}?conseil=${advice}`,
+      `${server}/vente/${sale}#conseil-${advice}`,
+      `${server}/vente/${sale}`,
+      `https://PharmaBoost.app/vente/${sale}`,
+      `https://pharmaboost.app.evil.fr/vente/${sale}`,
+      `https://evil.fr/vente/${sale}`,
+      `https://pharmaboost.app:8443/vente/${sale}`,
+      `http://pharmaboost.app/vente/${sale}`,
+      `https://user:pass@pharmaboost.app/vente/${sale}`,
+      `${server}/admin`,
+      `${server}/vente/${sale}/fin`,
+      `${server}/vente/../admin`,
+      `${server}/vente/${sale}%2F..%2Fadmin`,
+      `${server}/vente/${sale}?conseil=${advice}&next=https://evil.fr`,
+      `${server}/vente/${sale}?conseil=${advice}#conseil-autre`,
+      `${server}/vente/${sale}#ailleurs`,
+      "javascript:alert(1)",
+      "file:///C:/Windows/System32/cmd.exe",
+      `${server}/vente/${sale} & calc.exe`,
+      "/vente/relative",
+      `${server}/vente/${"x".repeat(400)}`,
+    ];
+    const dir = mkdtempSync(join(tmpdir(), "pb-cs-lien-"));
+    try {
+      writeFileSync(
+        join(dir, "Lien.cs"),
+        `using System;\nusing System.Text.RegularExpressions;\npublic static class Lien\n{\n${method}\n  public static void Main(string[] args)\n  {\n    Uri page = new Uri(args[0]);\n    string line;\n    while ((line = Console.ReadLine()) != null) { string link = SaleLinkFor(page, line); Console.WriteLine(link == null ? "NULL" : link); }\n  }\n}\n`,
+      );
+      writeFileSync(join(dir, "Lien.csproj"), `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><LangVersion>5</LangVersion><ImplicitUsings>disable</ImplicitUsings><Nullable>disable</Nullable></PropertyGroup></Project>`);
+      const result = spawnSync("dotnet", ["run", "-v", "q", "--", `${server}/poste/ile`], { cwd: dir, encoding: "utf8", input: `${candidates.join("\n")}\n` });
+      expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
+      const lines = result.stdout.trim().split(/\r?\n/).slice(-candidates.length);
+      const fromCsharp = Object.fromEntries(candidates.map((candidate, index) => [candidate, lines[index] === "NULL" ? null : lines[index]]));
+      const fromAgent = Object.fromEntries(candidates.map((candidate) => [candidate, saleAdviceUrl(server, candidate)]));
+      expect(fromCsharp).toEqual(fromAgent);
+      // Et ce n'est pas « tout refusé » : les quatre premières (et le nom en majuscules) passent, réécrites.
+      expect(Object.values(fromCsharp).filter(Boolean)).toHaveLength(5);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

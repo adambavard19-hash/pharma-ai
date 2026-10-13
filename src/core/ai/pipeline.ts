@@ -5,7 +5,7 @@ import {
   RECOMMENDATION_MIN_RELEVANCE,
   RECOMMENDATION_MIN_SCORE,
 } from "@/config/constants";
-import { detectAdviceOpportunities, type AdviceRule } from "./engines/advice";
+import { acceptsProductForRule, detectAdviceOpportunities, fallbackFor, type AdviceRule } from "./engines/advice";
 import { findCandidateProducts } from "./engines/matching";
 import {
   evaluateKnowledgeCoverage,
@@ -25,9 +25,11 @@ import type { TreatmentUnderstanding } from "../understanding";
 import { deriveOutcome } from "./outcome";
 import { adviceFamilyOf, countByFamily, describeFamilyMix, FAMILY_LABELS } from "./family";
 import { reserveFamilies, type PortfolioProfile } from "./portfolio";
+import { TREE_RULE_KEYS } from "../counter/question-tree";
 import { matchesAny } from "./engines/product-name";
 import { evaluateVigilances, tagsIntersect, vigilanceMessage } from "./engines/vigilance";
-import { chooseAmongEquivalents, clinicalSignature, TIEBREAK_LABELS } from "./engines/tiebreak";
+import { chooseAmongEquivalents, clinicalSignature, commercialJustification, TIEBREAK_LABELS, type TiebreakContext } from "./engines/tiebreak";
+import { formatCents } from "@/lib/format";
 import { declaredContraindicationFor, suggestionVigilances } from "./engines/population-vigilance";
 import { buildAssociationAdvice, type AssociationInput } from "./engines/associations";
 import { rangeRankFor, type PreferredRangeInput } from "../catalog/preferred-ranges";
@@ -521,13 +523,17 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       const safeCatalog = input.catalog.filter((p) => !productSafety.blockedProductIds.has(p.id));
 
       for (const opportunity of eligibleOpportunities) {
-        const candidates = findCandidateProducts({ opportunity, catalog: safeCatalog });
+        // Une règle qui ne propose que des médicaments vérifiés (advice.ts, `verifiedMedicinesOnly`) ne voit pas les
+        // produits de l'officine portant un code CIP : leurs conditions de délivrance ne sont pas lues.
+        const ruleKey = opportunity.ruleKey ?? opportunity.key;
+        const ruleCatalog = safeCatalog.filter((product) => acceptsProductForRule(ruleKey, product));
+        const candidates = findCandidateProducts({ opportunity, catalog: ruleCatalog });
         if (candidates.length === 0) {
           // Distinguer « rien ne correspond » de « ça correspond mais c'est à
           // zéro » : ce n'est pas la même information pour le titulaire.
           const outOfStock = findCandidateProducts({
             opportunity,
-            catalog: safeCatalog,
+            catalog: ruleCatalog,
             includeOutOfStock: true,
           }).filter((c) => c.product.stockQuantity <= 0);
           matchingSignals.outOfStockCandidates += outOfStock.length;
@@ -683,13 +689,11 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         }
       }
 
-      for (const [key, list] of byOpportunity) {
-        // La clinique seule désigne la meilleure référence ; les critères de
-        // l'officine ne départagent que des références cliniquement
-        // équivalentes (même sécurité, même adéquation, mêmes vigilances).
+      // Le contexte du départage d'un conseil : le même pour retenir sa référence et pour ordonner ses autres choix.
+      const tiebreakContextFor = (key: string): TiebreakContext => {
         const preferPatterns = opportunityByKey.get(key)?.productPrefer ?? [];
         const opportunityCategory = opportunityByKey.get(key)?.category ?? null;
-        const decision = chooseAmongEquivalents(list, {
+        return {
           // L'ordre des formules préférées par la règle : le premier motif qui
           // reconnaît la référence l'emporte (« écran » avant « acide
           // hyaluronique » pour un œil sec devant un écran).
@@ -704,10 +708,30 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
           },
           shortDate: (item) => catalogById.get(item.productId)?.shortDate ?? null,
           hasChallenge: (item) => Boolean(catalogById.get(item.productId)?.activeChallenge),
-        });
+        };
+      };
+
+      // Les conseils dont la seule référence (aucune équivalente non remboursée) est remboursée.
+      const reimbursedOnlyKeys = new Set<string>();
+      for (const [key, list] of byOpportunity) {
+        // La clinique seule désigne la meilleure référence ; les critères de
+        // l'officine ne départagent que des références cliniquement
+        // équivalentes (même sécurité, même adéquation, mêmes vigilances).
+        const decision = chooseAmongEquivalents(list, tiebreakContextFor(key));
         const best = decision.best;
         list.sort((a, b) => (a === best ? -1 : b === best ? 1 : 0));
-        const chosen = { ...decision.chosen, tiebreak: decision.criterion };
+        // Le départage commercial se lit dans la justification du pharmacien (marge HT, référence remboursée), jamais
+        // dans ce que lit le patient : `patientReason` et la phrase de comptoir restent ceux de la règle.
+        const commercialNote = commercialJustification(decision, formatCents);
+        const chosen = {
+          ...decision.chosen,
+          tiebreak: decision.criterion,
+          ...(commercialNote ? { justification: `${decision.chosen.justification} ${commercialNote}` } : {}),
+        };
+        if (chosen.reimbursed === true && !decision.equivalents.some((item) => item.reimbursed !== true)) {
+          reimbursedOnlyKeys.add(key);
+          notes.push(`« ${key} » : seule une référence remboursée répond à ce conseil — aucune équivalente non remboursée en stock.`);
+        }
 
         // La note est émise dès qu'un départage a eu lieu, même lorsqu'il
         // confirme la référence déjà en tête : la trace doit refléter ce qui
@@ -758,7 +782,29 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       for (const item of selected) {
         if (coveredByRoutine(item)) notes.push(`« ${item.opportunityKey} » : besoin déjà couvert par une étape de routine, non répété.`);
       }
-      const deduplicated = selected.filter((item) => !coveredByRoutine(item));
+      // Un conseil de repli s'efface devant celui qu'il remplace quand celui-ci a retenu une référence (advice.ts,
+      // `fallbackFor`) : le lavage oculaire ne s'affiche pas à côté du collyre anti-allergique. Sans lui, il reste. Il reste
+      // aussi quand une ligne qui l'a ouvert n'a pas ouvert la règle principale : sous AMITRIPTYLINE + CÉTIRIZINE, la bouche
+      // sèche de l'antidépresseur garde son substitut salivaire, le comprimé à sucer ne parlant que de la cétirizine.
+      const linesByRule = new Map<string, Set<number>>();
+      for (const item of selected) {
+        const opportunity = opportunityByKey.get(item.opportunityKey);
+        const key = opportunity?.ruleKey ?? item.opportunityKey;
+        linesByRule.set(key, new Set([...(linesByRule.get(key) ?? []), ...(opportunity?.triggeredBy ?? []).map((t) => t.lineIndex)]));
+      }
+      const replacedBy = (item: ScoredRecommendation) => {
+        const opportunity = opportunityByKey.get(item.opportunityKey);
+        const lines = (opportunity?.triggeredBy ?? []).map((t) => t.lineIndex);
+        return fallbackFor(opportunity?.ruleKey ?? item.opportunityKey).find((key) => {
+          const covered = linesByRule.get(key);
+          return covered !== undefined && lines.every((line) => covered.has(line));
+        });
+      };
+      for (const item of selected) {
+        const main = replacedBy(item);
+        if (main) notes.push(`« ${item.opportunityKey} » : repli non proposé, « ${main} » a sa référence en rayon.`);
+      }
+      const deduplicated = selected.filter((item) => !coveredByRoutine(item) && !replacedBy(item));
       selected.length = 0;
       selected.push(...deduplicated);
 
@@ -772,7 +818,19 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         if (item.routine) routineScore.set(item.routine.key, Math.max(routineScore.get(item.routine.key) ?? 0, item.totalScore));
       }
       const rankScore = (item: ScoredRecommendation) => (item.routine ? (routineScore.get(item.routine.key) ?? item.totalScore) : item.totalScore);
+      const isSafetyAdvice = (item: ScoredRecommendation) => opportunityByKey.get(item.opportunityKey)?.kind === "SAFETY";
+      // Un conseil dont la seule référence en stock est remboursée (aucune équivalente non remboursée n'a pu la
+      // remplacer au départage) reste proposé, mais en dernier : le plafond le retire d'abord, sauf s'il est le seul
+      // de sa famille de produit (portfolio.ts). On ne le
+      // supprime pas — le besoin du patient est réel et la référence lui convient —, mais il ne prend plus la place
+      // d'un conseil qui rapporte à l'officine. Un conseil de sécurité et une étape de routine ne bougent jamais.
+      // Une remboursée retenue pour sa formule ou par le choix de l'officine devant des équivalentes non remboursées
+      // garde sa place : seule la remboursée faute de mieux recule.
+      const reimbursedOnly = (item: ScoredRecommendation) =>
+        item.reimbursed === true && reimbursedOnlyKeys.has(item.opportunityKey) && !item.routine && !isSafetyAdvice(item);
       selected.sort((a, b) => {
+        const reimbursedDelta = Number(reimbursedOnly(a)) - Number(reimbursedOnly(b));
+        if (reimbursedDelta !== 0) return reimbursedDelta;
         const priorityDelta =
           (priorityByKey.get(b.opportunityKey) ?? 0) -
           (priorityByKey.get(a.opportunityKey) ?? 0);
@@ -782,8 +840,6 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         return b.totalScore - a.totalScore;
       });
 
-      const isSafetyAdvice = (item: ScoredRecommendation) => opportunityByKey.get(item.opportunityKey)?.kind === "SAFETY";
-
       // Une même référence ne se propose qu'UNE fois par ordonnance : deux cartes
       // pour le même produit prendraient deux places, compteraient double dans le
       // conseil complet et feraient deux lignes de panier (acheter « MAG 2 » deux
@@ -791,43 +847,99 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       // conseil de sécurité passant avant tout autre ; l'autre besoin n'est pas
       // reporté sur une référence moins adaptée. Les étapes d'une routine ne sont
       // pas touchées : une référence de routine n'est déjà plus proposée seule.
+      // Un conseil du bout de l'arbre de questions du comptoir (la poche de l'épaule, le thermomètre : `TREE_RULE_KEYS`) reste
+      // caché tant que le pharmacien n'a pas cliqué la réponse qui le débloque (core/counter/tree-state.ts). Il ne compte donc
+      // pas dans le plafond, et les zones ne se disputent pas une même poche : retenu au bip parmi des conseils qu'on ne voit
+      // pas, il prenait la place des autres zones — ORD-0337, « Douleur localisée » → « Épaule » : rien, la poche de l'épaule
+      // avait été coupée par le plafond de trois au profit de « dos », « genou » et « ailleurs », cachés eux aussi. Deux zones
+      // cochées qui retiennent la même poche multi-zones ne la montrent qu'une fois (core/counter/notice.ts) ; une référence
+      // déjà montrée par un conseil visible ne revient pas par l'arbre.
+      const isTreeAdvice = (item: ScoredRecommendation) => TREE_RULE_KEYS.has(opportunityByKey.get(item.opportunityKey)?.ruleKey ?? item.opportunityKey);
       const owners = new Map<string, ScoredRecommendation>();
       for (const item of selected) {
-        if (item.routine) continue;
+        if (item.routine || isTreeAdvice(item)) continue;
         const owner = owners.get(item.productId);
         if (!owner || (isSafetyAdvice(item) && !isSafetyAdvice(owner))) owners.set(item.productId, item);
       }
       const distinct = selected.filter((item) => {
-        if (item.routine || owners.get(item.productId) === item) return true;
+        if (item.routine || isTreeAdvice(item) || owners.get(item.productId) === item) return true;
         notes.push(`« ${item.opportunityKey} » : référence déjà proposée pour un autre conseil, non répétée.`);
         return false;
       });
+      const visible = distinct.filter((item) => !isTreeAdvice(item));
+
+      // Répartition (retour du fondateur, 13 oct. 2026, MÉTOPIMAZINE + MAALOX : « je veux du conseil sur les deux médicaments
+      // scannés ») : avant le plafond, chaque médicament de la vente qui a un conseil possible reçoit son meilleur conseil, dans
+      // l'ordre de la priorité clinique ; un deuxième conseil pour un même médicament ne vient qu'après. Un conseil de sécurité
+      // reste en tête, et un conseil ouvert par plusieurs médicaments les couvre tous ; une routine compte pour un conseil.
+      const linesOf = (item: ScoredRecommendation) => opportunityByKey.get(item.opportunityKey)?.triggeredBy.map((trigger) => trigger.lineIndex) ?? [];
+      const covered = new Set<number>();
+      const leading = new Set<ScoredRecommendation>();
+      const routineLeads = new Map<string, boolean>();
+      for (const item of visible) {
+        const routineKey = item.routine?.key;
+        if (routineKey && routineLeads.has(routineKey)) {
+          if (routineLeads.get(routineKey)) leading.add(item);
+          continue;
+        }
+        const lines = routineKey ? visible.filter((other) => other.routine?.key === routineKey).flatMap(linesOf) : linesOf(item);
+        const leads = isSafetyAdvice(item) || lines.some((line) => !covered.has(line));
+        if (routineKey) routineLeads.set(routineKey, leads);
+        if (!leads) continue;
+        leading.add(item);
+        for (const line of lines) covered.add(line);
+      }
+      const spread = [...visible.filter((item) => leading.has(item)), ...visible.filter((item) => !leading.has(item))];
 
       // La limite compte les conseils, et une routine en est un. Avant de
       // tronquer, chaque famille de produit présente dans la liste mérite une
       // place pour son meilleur conseil (src/core/ai/portfolio.ts) : un conseil
-      // de sécurité n'est jamais déplacé, ni le seul de sa famille, et sous le
-      // plafond rien ne change. La famille se lit sur le produit, elle ne
-      // modifie aucun score.
+      // de sécurité n'est jamais déplacé, ni le premier conseil d'un médicament,
+      // ni le seul de sa famille, et sous le plafond rien ne change. La famille
+      // se lit sur le produit, elle ne modifie aucun score.
       const profileOf = (item: ScoredRecommendation): PortfolioProfile => {
         const product = catalogById.get(item.productId);
         return {
           family: product ? adviceFamilyOf(product) : "PARAPHARMACIE",
           safety: isSafetyAdvice(item),
+          keep: leading.has(item),
           routineKey: item.routine?.key ?? null,
         };
       };
-      const { limited, reservations } = reserveFamilies(distinct, maxRecommendations, profileOf);
-      if (distinct.length > limited.length) {
+      const balanced = reserveFamilies(spread, maxRecommendations, profileOf);
+      const { reservations } = balanced;
+      // Ce que la répartition a changé, pour la trace : un conseil gardé au-delà du rang que le plafond seul lui laissait.
+      const unitRank = new Map<ScoredRecommendation, number>();
+      const routineRank = new Map<string, number>();
+      for (const item of visible) {
+        const routineKey = item.routine?.key;
+        const rank = routineKey && routineRank.has(routineKey) ? (routineRank.get(routineKey) as number) : new Set([...unitRank.values()]).size;
+        if (routineKey) routineRank.set(routineKey, rank);
+        unitRank.set(item, rank);
+      }
+      for (const item of balanced.limited) {
+        if (leading.has(item) && !item.routine && (unitRank.get(item) ?? 0) >= maxRecommendations) notes.push(`« ${item.opportunityKey} » : gardé pour que chaque médicament de la vente ait son conseil.`);
+      }
+      const shownProducts = new Set(balanced.limited.map((item) => item.productId));
+      const hidden = distinct.filter((item) => {
+        if (!isTreeAdvice(item)) return false;
+        if (!shownProducts.has(item.productId)) return true;
+        notes.push(`« ${item.opportunityKey} » : conseil de l'arbre de questions non gardé, sa référence est déjà montrée par un autre conseil.`);
+        return false;
+      });
+      // L'ordre affiché reste celui de la priorité clinique ; les conseils cachés de l'arbre suivent, hors plafond.
+      const limited = [...balanced.limited.sort((a, b) => visible.indexOf(a) - visible.indexOf(b)), ...hidden];
+      if (visible.length > balanced.limited.length) {
         notes.push(
-          `${distinct.length - limited.length} proposition(s) non affichée(s) : limite de ${maxRecommendations} conseils par ordonnance.`,
+          `${visible.length - balanced.limited.length} proposition(s) non affichée(s) : limite de ${maxRecommendations} conseils par ordonnance.`,
         );
       }
+      if (hidden.length > 0) notes.push(`${hidden.length} conseil(s) de l'arbre de questions gardé(s) hors plafond : chacun ne se montre qu'après sa réponse.`);
       // Le mélange se compte par conseil, comme le plafond et le bandeau de
       // l'écran : une routine, quel que soit son nombre d'étapes, est UN conseil,
       // de la famille de sa première étape.
       const countedRoutines = new Set<string>();
-      const adviceFamilies = limited.flatMap((item) => {
+      const adviceFamilies = balanced.limited.flatMap((item) => {
         if (item.routine) {
           if (countedRoutines.has(item.routine.key)) return [];
           countedRoutines.add(item.routine.key);
@@ -891,16 +1003,27 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       // conseil — celui-ci ou un autre — n'est pas reproposée à côté.
       const retainedProducts = new Set(withCompanions.map((item) => item.productId));
       const productName = (productId: string) => catalogById.get(productId)?.name ?? "";
-      const withAlternatives = withCompanions.map((item) => {
-        const alternatives = (byOpportunity.get(item.opportunityKey) ?? [])
+      // Leur ordre est celui dans lequel le départage les aurait retenues, une à une : la clinique d'abord (pertinence,
+      // sécurité, adéquation au patient, vigilances), puis, entre références cliniquement équivalentes SEULEMENT, les
+      // critères de l'officine (formule, préférence, gamme, non remboursée, date courte, challenge, historique, marge
+      // HT, stock). Une référence remboursée ne recule donc que devant une équivalente : jamais une alternative moins
+      // sûre ou moins pertinente ne lui passe devant parce qu'elle n'est pas remboursée. À égalité parfaite, l'ordre
+      // alphabétique tranche, quel que soit l'ordre du catalogue.
+      const orderedAlternatives = (opportunityKey: string): ScoredRecommendation[] => {
+        const remaining = (byOpportunity.get(opportunityKey) ?? [])
           .filter((candidate) => !retainedProducts.has(candidate.productId))
-          .sort(
-            (a, b) =>
-              b.totalScore - a.totalScore ||
-              productName(a.productId).localeCompare(productName(b.productId), "fr") ||
-              a.productId.localeCompare(b.productId),
-          )
-          .slice(0, MAX_ALTERNATIVES_PER_ADVICE)
+          .sort((a, b) => productName(a.productId).localeCompare(productName(b.productId), "fr") || a.productId.localeCompare(b.productId));
+        const context = tiebreakContextFor(opportunityKey);
+        const ordered: ScoredRecommendation[] = [];
+        while (ordered.length < MAX_ALTERNATIVES_PER_ADVICE && remaining.length > 0) {
+          const { chosen } = chooseAmongEquivalents(remaining, context);
+          ordered.push(chosen);
+          remaining.splice(remaining.indexOf(chosen), 1);
+        }
+        return ordered;
+      };
+      const withAlternatives = withCompanions.map((item) => {
+        const alternatives = orderedAlternatives(item.opportunityKey)
           .map((candidate): ScoredAlternative => {
             // Elle porte son propre produit associé : choisie à la place du
             // conseil, elle doit apparaître comme le moteur l'aurait produite.

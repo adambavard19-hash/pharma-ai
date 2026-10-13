@@ -81,7 +81,7 @@ describe("la confirmation : un fichier remplace le stock", () => {
   it("sans confirmation explicite, rien n'est lu ni écrit", async () => {
     const data = new FormData();
     data.set("file", new File(["a;b\n1;2"], "stock.csv"));
-    expect(await actions.sendStockAction(data)).toMatchObject({ ok: false, error: "Confirmez d'abord que ce fichier remplace votre stock." });
+    expect(await actions.sendStockAction(data)).toMatchObject({ ok: false, error: "Confirmez d'abord la mise à jour de votre stock." });
     expect(mocks.receive).not.toHaveBeenCalled();
   });
 
@@ -101,13 +101,13 @@ describe("le fichier", () => {
 
   it("de plus de 8 Mo : refusé avant d'être lu", async () => {
     const big = new File([new Uint8Array(8 * 1024 * 1024 + 1)], "stock.csv");
-    expect(await actions.sendStockAction(form(big))).toMatchObject({ ok: false, error: "Le fichier dépasse 8 Mo." });
+    expect(await actions.sendStockAction(form(big))).toMatchObject({ ok: false, error: "Un fichier dépasse 8 Mo." });
     expect(mocks.receive).not.toHaveBeenCalled();
   });
 
   it("un fichier invalide aux yeux du moteur : son message, tel quel", async () => {
     mocks.receive.mockResolvedValue({ ok: false, error: "Format non accepté. Envoyez un fichier CSV, Excel (.xlsx) ou PDF d'inventaire." });
-    expect(await actions.sendStockAction(form(new File(["x"], "photo.jpg")))).toMatchObject({ ok: false, error: expect.stringContaining("Format non accepté") });
+    expect(await actions.sendStockAction(form(new File(["x"], "photo.jpg")))).toMatchObject({ ok: false, error: expect.stringContaining("format non accepté") });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });
@@ -202,7 +202,7 @@ describe("previewStockAction : « Vérifier » avant de confirmer", () => {
     expect(await actions.previewStockAction(empty)).toMatchObject({ ok: false });
     const big = new FormData();
     big.set("file", new File([new Uint8Array(8 * 1024 * 1024 + 1)], "stock.csv"));
-    expect(await actions.previewStockAction(big)).toMatchObject({ ok: false, error: "Le fichier dépasse 8 Mo." });
+    expect(await actions.previewStockAction(big)).toMatchObject({ ok: false, error: "Un fichier dépasse 8 Mo." });
     expect(mocks.preview).not.toHaveBeenCalled();
   });
 

@@ -22,6 +22,11 @@ export type PortfolioProfile = {
   family: AdviceFamily;
   /** Un conseil de sécurité : jamais déplacé, jamais retiré au profit d'un autre. */
   safety: boolean;
+  /**
+   * Le premier conseil d'un médicament de la vente (répartition, pipeline.ts) : comme un conseil de sécurité, il n'est jamais
+   * cédé à une famille absente. Sans lui, la famille « gardée » pouvait reprendre au deuxième médicament son seul conseil.
+   */
+  keep?: boolean;
   /** La routine dont l'élément est une étape ; `null` pour un conseil seul. */
   routineKey: string | null;
 };
@@ -61,7 +66,7 @@ function unitsOf<T>(sorted: readonly T[], profileOf: (item: T) => PortfolioProfi
     }
     unit.indexes.push(index);
     unit.families.add(profile.family);
-    unit.safety = unit.safety || profile.safety;
+    unit.safety = unit.safety || profile.safety || profile.keep === true;
   });
   return units;
 }
@@ -73,7 +78,8 @@ function unitsOf<T>(sorted: readonly T[], profileOf: (item: T) => PortfolioProfi
  * 2. Pour chaque famille présente dans la liste complète mais absente de ces
  *    `limit` premiers, son meilleur conseil (le premier dans l'ordre reçu)
  *    remplace le DERNIER conseil retenu qui peut l'être : ni un conseil de
- *    sécurité, ni le seul de sa famille, et une routine ne se déplace qu'entière.
+ *    sécurité, ni le premier d'un médicament (`keep`), ni le seul de sa famille,
+ *    et une routine ne se déplace qu'entière.
  *    Si aucun conseil ne peut l'être, la famille reste absente : rien n'est
  *    retiré de force.
  * 3. L'ordre final est celui de la liste reçue : la priorité clinique.

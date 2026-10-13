@@ -1237,3 +1237,30 @@ describe("confidentialité et lecture seule", () => {
     expect(source).not.toMatch(/\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|DROP\s+|TRUNCATE|ALTER\s+TABLE|CREATE\s+TABLE)/i);
   });
 });
+
+describe("conseils cachés de l'arbre de questions : hors du taux tant qu'ils n'ont pas été tranchés", () => {
+  it("une vente de Doliprane avec poches en rayon ne fait pas entrer de « sans réponse » jamais montrés", async () => {
+    const tree = (id: string, ruleKey: string, status: string) =>
+      adviceRow({ id, status, createdAt: hoursBefore(NOW, 30), opportunityId: `opp-${id}`, opportunity: { ruleKey } });
+    fakeDb.reset({
+      pharmacies: [pharmacyRow(A)],
+      recommendations: [
+        adviceRow({ id: "visible", status: "ACCEPTED", createdAt: hoursBefore(NOW, 30), opportunityId: "opp-visible", opportunity: { ruleKey: "pain-analgesic-hydration" } }),
+        // Cachés, jamais débloqués : toujours PROPOSED, ou IGNORED à la fin de la vente.
+        tree("dos", "pain-pack-back", "IGNORED"),
+        tree("nuque", "pain-pack-neck", "PROPOSED"),
+        // Débloqué puis accepté : il a été montré, il compte.
+        tree("epaule", "pain-pack-back", "ACCEPTED"),
+        // Un conseil ordinaire sans réponse compte toujours, avec ou sans opportunité.
+        adviceRow({ id: "sans-reponse", status: "IGNORED", createdAt: hoursBefore(NOW, 30), opportunityId: "opp-x", opportunity: { ruleKey: null } }),
+        adviceRow({ id: "sans-opportunite", status: "IGNORED", createdAt: hoursBefore(NOW, 30), opportunityId: null }),
+      ],
+      sales: [],
+    });
+    const report = await loadPerformanceReport({ pharmacyId: A, period: PERIOD, now: NOW });
+    expect(report.funnel.proposed.value).toBe(4);
+    expect(report.funnel.accepted.value).toBe(2);
+    expect(report.funnel.unanswered).toBe(2);
+    expect(report.funnel.acceptanceRate.value).toBe(0.5);
+  });
+});

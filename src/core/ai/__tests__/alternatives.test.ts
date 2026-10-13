@@ -4,6 +4,7 @@ import type { PipelineInput } from "../pipeline";
 import type { AnalysisResult, CatalogProduct, ScoredRecommendation } from "../types";
 import { officialFacts, patient, product } from "./fixtures";
 import { AMOXICILLINE, ROXITHROMYCINE, SCENARIOS, SPIRONOLACTONE, analyse, nasalShelf, probioticShelf } from "./scenarios-conseils";
+import { TREE_RULE_KEYS } from "../../counter/question-tree";
 
 /**
  * Les autres références montrées sous chaque conseil.
@@ -15,8 +16,9 @@ import { AMOXICILLINE, ROXITHROMYCINE, SCENARIOS, SPIRONOLACTONE, analyse, nasal
  * ordonnances types, à partir de valeurs relevées sur le moteur d'avant.
  */
 
+/** Les conseils MONTRÉS : ceux du bout de l'arbre de questions restent cachés jusqu'à la réponse, hors plafond (pipeline.ts). */
 const principalsOf = (result: AnalysisResult) =>
-  result.recommendations.map(
+  result.recommendations.filter((r) => !TREE_RULE_KEYS.has(r.opportunityKey)).map(
     (r) => `${r.opportunityKey} | ${r.productId} | ${r.totalScore} | ${r.tiebreak ?? "-"} | ${r.companion?.productId ?? "-"}`,
   );
 
@@ -29,38 +31,42 @@ const scenario = (name: string) => {
   return found.run();
 };
 
-/** Valeurs relevées sur le moteur AVANT l'ajout des alternatives : « conseil | produit | score | départage | produit associé ». */
+/**
+ * Valeurs relevées sur le moteur AVANT l'ajout des alternatives : « conseil | produit | score | départage | produit associé ».
+ * Scores relevés à nouveau le 13 oct. 2026, quand la dimension commerciale est passée à la marge HORS TAXE (prix TTC
+ * ramené au HT, moins le prix d'achat HT) : chaque score a perdu moins de 0,002, aucun produit, ordre ni départage n'a bougé.
+ */
 const PRINCIPAUX_AVANT: Record<string, string[]> = {
   "orl-antibiotique-rayon-complet": [
-    "digestive-tolerance-antibiotics | probio-a | 0.8895 | COMMERCIAL | -",
-    "nasal-hygiene-orl | nasal-hyper | 0.8905 | - | -",
-    "sore-throat-orl | gorge-a | 0.8255 | - | -",
-    "fever-thermometer | thermo-b | 0.8895 | DISPONIBILITE | -",
+    "digestive-tolerance-antibiotics | probio-a | 0.8887 | COMMERCIAL | -",
+    "nasal-hygiene-orl | nasal-hyper | 0.8891 | - | -",
+    "sore-throat-orl | gorge-a | 0.8247 | - | -",
+    "fever-thermometer | thermo-b | 0.8887 | DISPONIBILITE | -",
   ],
   "antibiotique-seul-references-equivalentes": [
-    "digestive-tolerance-antibiotics | probio-a | 0.8895 | COMMERCIAL | -",
+    "digestive-tolerance-antibiotics | probio-a | 0.8887 | COMMERCIAL | -",
   ],
   "antibiotique-preference-officine-produit": [
-    "digestive-tolerance-antibiotics | probio-b | 0.9232 | PREFERENCE_OFFICINE | -",
+    "digestive-tolerance-antibiotics | probio-b | 0.9221 | PREFERENCE_OFFICINE | -",
   ],
   "antibiotique-marque-et-exclusion": [
-    "digestive-tolerance-antibiotics | probio-b | 0.9112 | - | -",
+    "digestive-tolerance-antibiotics | probio-b | 0.9101 | - | -",
   ],
   "antibiotique-historique-de-validation": [
-    "digestive-tolerance-antibiotics | probio-b | 0.8992 | HISTORIQUE | -",
+    "digestive-tolerance-antibiotics | probio-b | 0.8981 | HISTORIQUE | -",
   ],
   "antibiotique-date-courte": [
-    "digestive-tolerance-antibiotics | probio-b | 0.8832 | DATE_COURTE | -",
+    "digestive-tolerance-antibiotics | probio-b | 0.8821 | DATE_COURTE | -",
   ],
   "antibiotique-patient-allergique": [
-    "digestive-tolerance-antibiotics | probio-a | 0.8995 | COMMERCIAL | -",
+    "digestive-tolerance-antibiotics | probio-a | 0.8987 | COMMERCIAL | -",
   ],
   "antibiotique-contre-indication-declaree": [
-    "digestive-tolerance-antibiotics | probio-b | 0.8832 | - | -",
+    "digestive-tolerance-antibiotics | probio-b | 0.8821 | - | -",
   ],
   "serum-flacon-principal-d-un-besoin-candidat-d-un-autre": [
-    "nasal-hygiene-orl | nasal-flacon | 0.8772 | - | nasal-seringue",
-    "eye-irritation-allergy | eyes-a | 0.8975 | - | -",
+    "nasal-hygiene-orl | nasal-flacon | 0.8757 | - | nasal-seringue",
+    "eye-irritation-allergy | eyes-a | 0.8967 | - | -",
   ],
   // Seule valeur qui diffère du moteur d'avant, volontairement (lot « conseil complet ») : ce rayon
   // n'a aucun collyre, et le sérum physiologique, retenu pour l'hygiène nasale, était AUSSI proposé
@@ -69,70 +75,72 @@ const PRINCIPAUX_AVANT: Record<string, string[]> = {
   // et deux lignes de panier pour le même flacon. Le besoin des yeux, moins prioritaire, n'est pas
   // reporté sur une référence moins adaptée : il n'a pas de carte.
   "nasal-flacon-avec-seringue-associee": [
-    "nasal-hygiene-orl | nasal-flacon | 0.8772 | - | nasal-seringue",
+    "nasal-hygiene-orl | nasal-flacon | 0.8757 | - | nasal-seringue",
   ],
   "ibuprofene-protection-gastrique": [
-    "gastric-protection-nsaid | gastric-a | 0.8895 | - | -",
-    // Le thermomètre de l'arbre de questions (fièvre sans thermomètre) : apparié au stock dès le bip, MONTRÉ seulement quand le
-    // pharmacien a répondu « fièvre » (core/counter/question-tree.ts).
-    "fever-thermometer-analgesic | thermo-b | 0.8895 | DISPONIBILITE | -",
+    "gastric-protection-nsaid | gastric-a | 0.8887 | - | -",
+    // Le thermomètre de l'arbre de questions (fièvre sans thermomètre) reste retenu, apparié au stock dès le bip, mais il n'est
+    // MONTRÉ qu'une fois la réponse « fièvre » donnée : hors plafond, il n'est plus compté parmi les conseils principaux.
   ],
+  // Changé le 13 oct. 2026, volontairement (retour du fondateur) : sous antihistaminique, la gorge sèche se conseille avec
+  // un comprimé à sucer — le rayon de ce scénario en a un. Le nez et les yeux n'ont pas bougé.
   "allergie-collyres": [
-    "nasal-hygiene-orl | nasal-hyper | 0.8905 | - | -",
-    "eye-irritation-allergy | eyes-a | 0.8975 | - | -",
+    "nasal-hygiene-orl | nasal-hyper | 0.8891 | - | -",
+    "eye-irritation-allergy | eyes-a | 0.8967 | - | -",
+    "antihistamine-dry-throat | gorge-a | 0.8754 | - | -",
   ],
   // Changé le 2026-10-07, volontairement : la règle précise « Conseil peau — Série 2 » (avec sa question) remplace
   // la règle générale pour les dermocorticoïdes. Même produit ; le score gagne le bonus de la référence préférée.
   "dermatologie-emollients": [
-    "skin-corticoid-atopic-emollient | emol-a | 0.9295 | - | -",
+    "skin-corticoid-atopic-emollient | emol-a | 0.9287 | - | -",
   ],
   "levothyroxine-ipp-magnesium": [
-    "magnesium-ppi-longterm | mag-a | 0.8801 | COMMERCIAL | -",
+    "magnesium-ppi-longterm | mag-a | 0.8789 | COMMERCIAL | -",
   ],
   "spironolactone-potassium-ecarte": [],
   "isotretinoine-routine": [
-    "isotretinoin-skin-routine:cleanse | l1 | 0.9273 | - | -",
-    "isotretinoin-skin-routine:hydrate | l2 | 0.9273 | - | -",
-    "isotretinoin-skin-routine:protect | l3 | 0.9273 | - | -",
-    "lip-care-isotretinoin | lip | 0.9273 | - | -",
+    "isotretinoin-skin-routine:cleanse | l1 | 0.9264 | - | -",
+    "isotretinoin-skin-routine:hydrate | l2 | 0.9264 | - | -",
+    "isotretinoin-skin-routine:protect | l3 | 0.9264 | - | -",
+    "lip-care-isotretinoin | lip | 0.9264 | - | -",
   ],
   "isotretinoine-gamme-eucerin": [
-    "isotretinoin-skin-routine:cleanse | e1 | 0.9153 | - | -",
-    "isotretinoin-skin-routine:hydrate | e2 | 0.9553 | - | -",
-    "isotretinoin-skin-routine:protect | e3 | 0.9553 | - | -",
-    "lip-care-isotretinoin | lip | 0.9273 | - | -",
+    "isotretinoin-skin-routine:cleanse | e1 | 0.9144 | - | -",
+    "isotretinoin-skin-routine:hydrate | e2 | 0.9544 | - | -",
+    "isotretinoin-skin-routine:protect | e3 | 0.9544 | - | -",
+    "lip-care-isotretinoin | lip | 0.9264 | - | -",
   ],
   "isotretinoine-gamme-la-roche-posay": [
-    "isotretinoin-skin-routine:cleanse | l1 | 0.9553 | - | -",
-    "isotretinoin-skin-routine:hydrate | l2 | 0.9553 | - | -",
-    "isotretinoin-skin-routine:protect | l3 | 0.9553 | - | -",
-    "lip-care-isotretinoin | lip | 0.9553 | PREFERENCE_OFFICINE | -",
+    "isotretinoin-skin-routine:cleanse | l1 | 0.9544 | - | -",
+    "isotretinoin-skin-routine:hydrate | l2 | 0.9544 | - | -",
+    "isotretinoin-skin-routine:protect | l3 | 0.9544 | - | -",
+    "lip-care-isotretinoin | lip | 0.9544 | PREFERENCE_OFFICINE | -",
   ],
   "isotretinoine-etape-sans-reference": [
-    "isotretinoin-skin-routine:cleanse | l1 | 0.9273 | - | -",
-    "isotretinoin-skin-routine:hydrate | l2 | 0.9273 | - | -",
-    "lip-care-isotretinoin | lip | 0.9273 | - | -",
+    "isotretinoin-skin-routine:cleanse | l1 | 0.9264 | - | -",
+    "isotretinoin-skin-routine:hydrate | l2 | 0.9264 | - | -",
+    "lip-care-isotretinoin | lip | 0.9264 | - | -",
   ],
   // Le plafond est passé de cinq à huit conseils (lot « conseil complet ») : les cinq premiers
   // sont exactement ceux d'avant, les deux suivants ne faisaient que passer sous la coupe.
   "ordonnance-chargee-limite-par-defaut": [
-    "digestive-tolerance-antibiotics | probio-a | 0.8895 | COMMERCIAL | -",
-    "skin-corticoid-atopic-emollient | emol-a | 0.9295 | - | -",
-    "gastric-protection-nsaid | gastric-a | 0.8895 | - | -",
-    "nasal-hygiene-orl | nasal-hyper | 0.8905 | - | -",
-    "eye-irritation-allergy | eyes-a | 0.8975 | - | -",
-    "sore-throat-orl | gorge-a | 0.8255 | - | -",
-    "fever-thermometer | thermo-b | 0.8895 | DISPONIBILITE | -",
+    "digestive-tolerance-antibiotics | probio-a | 0.8887 | COMMERCIAL | -",
+    "skin-corticoid-atopic-emollient | emol-a | 0.9287 | - | -",
+    "gastric-protection-nsaid | gastric-a | 0.8887 | - | -",
+    "nasal-hygiene-orl | nasal-hyper | 0.8891 | - | -",
+    "eye-irritation-allergy | eyes-a | 0.8967 | - | -",
+    "sore-throat-orl | gorge-a | 0.8247 | - | -",
+    "fever-thermometer | thermo-b | 0.8887 | DISPONIBILITE | -",
   ],
   "ordonnance-chargee-limite-deux": [
-    "digestive-tolerance-antibiotics | probio-a | 0.8895 | COMMERCIAL | -",
-    "gastric-protection-nsaid | gastric-a | 0.8895 | - | -",
+    "digestive-tolerance-antibiotics | probio-a | 0.8887 | COMMERCIAL | -",
+    "gastric-protection-nsaid | gastric-a | 0.8887 | - | -",
   ],
   "deux-antibiotiques-meme-besoin": [
-    "digestive-tolerance-antibiotics | probio-a | 0.8895 | COMMERCIAL | -",
+    "digestive-tolerance-antibiotics | probio-a | 0.8887 | COMMERCIAL | -",
   ],
   "rayon-en-rupture-partielle": [
-    "digestive-tolerance-antibiotics | probio-b | 0.8832 | - | -",
+    "digestive-tolerance-antibiotics | probio-b | 0.8821 | - | -",
   ],
 };
 

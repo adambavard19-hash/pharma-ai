@@ -1,5 +1,6 @@
 import type { ColumnMapping } from "./columns";
 import { cleanLabel } from "./encoding";
+import { parseReimbursement, reimbursementFromVat } from "../catalog/margin";
 
 /**
  * Une ligne du fichier, lue et normalisée — pas encore rattachée à un produit.
@@ -38,6 +39,12 @@ export type ImportRow = {
   purchasePriceCents: number | null;
   /** Taux de TVA en points (5.5, 10, 20), quand la colonne existe et se lit. */
   vatRate: number | null;
+  /**
+   * Remboursable ? Lu sur la colonne de remboursement (taux, prestation PH7/PHN/AAD, code LPP), sinon déduit d'une TVA
+   * à 2,1 % (médicaments remboursables). Absent ou null : on ne sait pas — un import n'efface jamais ce qui est connu.
+   */
+  reimbursed?: boolean | null;
+  reimbursementSource?: string | null;
   brand: string | null;
   /** La catégorie ou le rayon tel qu'écrit par le logiciel de l'officine. */
   categoryLabel: string | null;
@@ -129,6 +136,9 @@ export function readRows(
       return raw !== null && raw !== undefined ? cleanLabel(String(raw).trim()) || null : null;
     };
 
+    const vatRate = mapping.vatRate ? parseVatRate(record[mapping.vatRate]) : null;
+    const reimbursement = (mapping.reimbursement ? parseReimbursement(record[mapping.reimbursement]) : null) ?? reimbursementFromVat(vatRate);
+
     rows.push({
       line: index + 1,
       name,
@@ -136,7 +146,9 @@ export function readRows(
       quantity: quantity.value,
       salePriceCents: sale.value,
       purchasePriceCents: purchase.issue ? null : purchase.value,
-      vatRate: mapping.vatRate ? parseVatRate(record[mapping.vatRate]) : null,
+      vatRate,
+      reimbursed: reimbursement?.reimbursed ?? null,
+      reimbursementSource: reimbursement?.source ?? null,
       brand: text("brand"),
       categoryLabel: text("category"),
       issues,
@@ -168,6 +180,10 @@ export function mergeDuplicates(rows: ImportRow[]): ImportRow[] {
       existing.salePriceCents = existing.salePriceCents ?? row.salePriceCents;
       existing.purchasePriceCents = existing.purchasePriceCents ?? row.purchasePriceCents;
       existing.vatRate = existing.vatRate ?? row.vatRate;
+      if (existing.reimbursed == null && row.reimbursed != null) {
+        existing.reimbursed = row.reimbursed;
+        existing.reimbursementSource = row.reimbursementSource ?? null;
+      }
       existing.brand = existing.brand ?? row.brand;
       existing.categoryLabel = existing.categoryLabel ?? row.categoryLabel;
       existing.name = existing.name ?? row.name;

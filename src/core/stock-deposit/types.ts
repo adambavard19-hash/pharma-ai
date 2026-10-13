@@ -65,4 +65,16 @@ export type StockPreview = {
   verdict: "APPLY" | "HOLD";
   reason: string | null;
   warnings: string[];
+  /** « FULL » : quantités et prix (stock complet) ; « PRICES » : « Ce fichier complète seulement mes prix ». Absent : FULL. */
+  mode?: "FULL" | "PRICES";
+  /** Les prix que porte l'envoi (après réunion des fichiers). */
+  priceKind?: "PURCHASE" | "SALE" | "BOTH" | "NONE";
+  /** Produits dont au moins un prix sera écrit (en mode PRICES : seulement les produits déjà connus). */
+  pricesUpdated?: number;
+  /** Produits qui auront, après l'envoi, un prix d'achat ET un prix de vente (ceux du fichier, sinon ceux déjà connus) : leur marge se calcule. */
+  withBothPrices?: number;
+  /** La phrase qui propose « Ce fichier complète seulement mes prix », ou null : le choix reste au pharmacien. */
+  suggestPricesOnly?: string | null;
+  /** Plusieurs fichiers réunis en un envoi ; null pour un fichier seul. */
+  merge?: { files: { fileName: string; priceKind: "PURCHASE" | "SALE" | "BOTH" | "NONE"; priceLabel: string | null }[]; quantityConflicts: number } | null;
 };

@@ -1,4 +1,5 @@
 import "server-only";
+import { COUNTED_ADVICE } from "@/server/db/counted-advice";
 import { prisma } from "@/server/db/client";
 import type { TenantScope } from "@/server/db/tenant";
 import { calendarDay, challengeWindow, dayKeyToDate, safeTimeZone, toDayKey } from "@/core/challenges/dates";
@@ -107,6 +108,8 @@ async function measure(scope: Scope, record: ObjectiveRecord, clock: Clock, chal
     createdAt: { gte: window.from, lt: window.until },
     prescription: { handledByUserId: record.userId, deletedAt: null },
     ...(scope.isDemo ? {} : { isDemo: false }),
+    // Un conseil caché de l'arbre de questions, jamais montré, n'est pas un conseil présenté (server/db/counted-advice.ts).
+    AND: [COUNTED_ADVICE],
   };
   switch (record.metric) {
     case "ADVICE_PRESENTED":

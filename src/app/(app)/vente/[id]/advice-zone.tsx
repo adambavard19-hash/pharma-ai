@@ -46,6 +46,7 @@ import { ProductTrainingLink } from "../../formation/_components/product-trainin
 import { countUndecided, splitAdvice } from "./group-advice";
 import { DeclineReasonPicker } from "./decline-reason";
 import { FamilyPill } from "./complete-advice";
+import { AdviceAnchor, AdviceSheet, AdviceSheetToggle, useAdviceFocus } from "./advice-sheet-view";
 import type { AdviceFamily } from "@/core/ai/family";
 import type { AdviceView } from "./types";
 import { OUTCOME_MESSAGES, type EngineOutcome } from "@/core/ai/outcome";
@@ -241,35 +242,46 @@ export function AdviceStack({
   renderAlternatives?: (recommendation: AdviceView) => React.ReactNode;
 }) {
   const { cards, unavailable, closed } = split;
+  const { focusedId } = useAdviceFocus();
   if (cards.length + unavailable.length + closed.length === 0) return null;
+  // Le conseil visé depuis la bannière peut être déjà tranché (« Non vendu ») ou en rupture : il n'a plus de carte, sa
+  // fiche complète se lit quand même, en tête du groupe.
+  const focusedElsewhere = focusedId ? [...closed, ...unavailable].find((recommendation) => recommendation.id === focusedId) : undefined;
   return (
     <div className="space-y-3.5">
+      {focusedElsewhere && (
+        <AdviceAnchor ids={[focusedElsewhere.id]}>
+          <FocusedSheetCard recommendation={focusedElsewhere} unavailable={unavailable.includes(focusedElsewhere)} />
+        </AdviceAnchor>
+      )}
       {cards.map((card, index) =>
         card.kind === "routine" ? (
-          <RoutineCard
-            key={card.key}
-            index={numbered ? index + 1 : undefined}
-            steps={card.steps}
-            canDecide={canDecide}
-            canVerify={canVerify}
-            inBasket={inBasket}
-            onAccept={onAccept}
-            onCancelAccept={onCancelAccept}
-          />
+          <AdviceAnchor key={card.key} ids={card.steps.map((step) => step.id)}>
+            <RoutineCard
+              index={numbered ? index + 1 : undefined}
+              steps={card.steps}
+              canDecide={canDecide}
+              canVerify={canVerify}
+              inBasket={inBasket}
+              onAccept={onAccept}
+              onCancelAccept={onCancelAccept}
+            />
+          </AdviceAnchor>
         ) : (
-          <AdviceCard
-            key={card.recommendation.id}
-            index={numbered ? index + 1 : undefined}
-            prescriptionId={prescriptionId}
-            recommendation={card.recommendation}
-            canDecide={canDecide}
-            canVerify={canVerify}
-            accepted={inBasket(card.recommendation.id)}
-            presentProductIds={presentProductIds}
-            onAccept={() => onAccept(card.recommendation)}
-            onCancelAccept={() => onCancelAccept(card.recommendation)}
-            alternatives={renderAlternatives?.(card.recommendation)}
-          />
+          <AdviceAnchor key={card.recommendation.id} ids={[card.recommendation.id]}>
+            <AdviceCard
+              index={numbered ? index + 1 : undefined}
+              prescriptionId={prescriptionId}
+              recommendation={card.recommendation}
+              canDecide={canDecide}
+              canVerify={canVerify}
+              accepted={inBasket(card.recommendation.id)}
+              presentProductIds={presentProductIds}
+              onAccept={() => onAccept(card.recommendation)}
+              onCancelAccept={() => onCancelAccept(card.recommendation)}
+              alternatives={renderAlternatives?.(card.recommendation)}
+            />
+          </AdviceAnchor>
         ),
       )}
 
@@ -282,6 +294,45 @@ export function AdviceStack({
 
       {closed.length > 0 && <ClosedList recommendations={closed} canDecide={canDecide} />}
     </div>
+  );
+}
+
+/**
+ * La fiche complète d'un conseil visé depuis la bannière qui n'a plus de carte à décider : déjà tranché (vendu, non
+ * vendu, retiré) ou en rupture. Le produit, ce qui en a été décidé, puis tout le conseil.
+ */
+function FocusedSheetCard({ recommendation, unavailable }: { recommendation: AdviceView; unavailable: boolean }) {
+  const product = recommendation.product;
+  const price = recommendation.unitPriceCents || (product?.salePriceCents ?? 0);
+  const state = unavailable
+    ? "Non proposé faute de stock"
+    : recommendation.status === "PURCHASED"
+      ? "Acheté"
+      : recommendation.status === "DECLINED"
+        ? "Non vendu"
+        : recommendation.pharmacistNote === NOT_NEEDED_NOTE
+          ? "Pas ce besoin"
+          : "Retiré du comptoir";
+  return (
+    <CardFrame accent="brand">
+      <CardBand kind="Conseil" title={recommendation.opportunity?.title ?? "Conseil"} family={recommendation.family} />
+      <div className="flex items-start gap-3.5 rounded-xl border border-border-subtle bg-surface-card px-3.5 py-3">
+        <ProductVisual product={product} size={64} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[17px] leading-6 font-semibold tracking-[-0.01em] text-text-primary">{product?.name ?? "Produit supprimé"}</p>
+          {product?.brand && <p className="mt-0.5 text-[13px] text-text-secondary">{product.brand}</p>}
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            {price > 0 && <span className="text-[18px] font-semibold tabular text-text-primary">{formatCents(price)}</span>}
+            <StockBadge quantity={product?.quantity ?? 0} low={product ? product.quantity > 0 && product.quantity <= product.alertThreshold : false} />
+            <span className="rounded-full bg-surface-sunken px-2.5 py-0.5 text-[12.5px] font-medium text-text-secondary">
+              {state}
+              {recommendation.decidedBy ? ` · ${recommendation.decidedBy}` : ""}
+            </span>
+          </p>
+        </div>
+      </div>
+      <AdviceSheet recommendation={recommendation} withScript />
+    </CardFrame>
   );
 }
 
@@ -654,6 +705,9 @@ function QuestionCard({
           </button>
         </div>
       )}
+
+      {/* Ce que le produit proposé implique, lisible avant même de poser la question. */}
+      <AdviceSheetToggle recommendation={recommendation} withScript />
     </CardFrame>
   );
 }
@@ -854,6 +908,9 @@ function ProductCard({
           ⚠ {recommendation.precautions.join(" · ")}
         </p>
       )}
+
+      {/* Le conseil en entier (contre-indications, conseils d'utilisation) : déplié quand on arrive de la bannière. */}
+      <AdviceSheetToggle recommendation={recommendation} />
 
       {canDecide && !accepted && (
         <div className="grid gap-2.5 sm:grid-cols-[1.4fr_1fr_1fr]">
@@ -1313,6 +1370,13 @@ function RoutineCard({
           <p className="mt-1 text-[16px] leading-[1.5] text-text-primary">{first.counterScript.replace(/\.\s*[^.]*est adapté à cette étape\.\s*»$/, ". »")}</p>
         </div>
       )}
+
+      {/* La fiche complète de chaque produit de la routine : celle du produit visé depuis la bannière s'ouvre seule. */}
+      <div className="space-y-2">
+        {steps.map((step) => (
+          <AdviceSheetToggle key={step.id} recommendation={step} label={`${(step.routine?.stepIndex ?? 0) + 1}. ${step.routine?.stepLabel ?? "Étape"} — ${step.product?.name ?? "Produit supprimé"}`} />
+        ))}
+      </div>
 
       {canDecide && (
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -49,7 +49,8 @@ const db = vi.hoisted(() => {
       upsert: vi.fn(async ({ where, create, update }: { where: { pharmacyId_presentationId: { pharmacyId: string; presentationId: string } }; create: Json; update: Json }) => {
         const { pharmacyId, presentationId } = where.pharmacyId_presentationId;
         const found = state.drugs.find((drug) => drug.pharmacyId === pharmacyId && drug.presentationId === presentationId);
-        if (found) Object.assign(found, update);
+        // Comme Prisma : une valeur `undefined` ne touche pas le champ.
+        if (found) Object.assign(found, Object.fromEntries(Object.entries(update).filter(([, value]) => value !== undefined)));
         else state.drugs.push({ id: `ds_new_${++state.sequence}`, ...create });
       }),
       findMany: vi.fn(async ({ where }: { where: Json }) => state.drugs.filter((drug) => matches(drug, where))),
@@ -63,6 +64,11 @@ const db = vi.hoisted(() => {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => state.products.find((product) => product.id === where.id) ?? null),
       update: vi.fn(async ({ where, data }: { where: { id: string }; data: Json }) => {
         Object.assign(state.products.find((product) => product.id === where.id)!, data);
+      }),
+      updateMany: vi.fn(async ({ where, data }: { where: Json; data: Json }) => {
+        const targets = state.products.filter((product) => matches(product, where));
+        for (const product of targets) Object.assign(product, data);
+        return { count: targets.length };
       }),
       create: vi.fn(async ({ data }: { data: Json & { stockItem: { create: Json } } }) => {
         const { stockItem, ...rest } = data;
@@ -356,5 +362,64 @@ describe("commitStockImport au nom de l'équipe PharmaBoost", () => {
     expect(audit).not.toHaveProperty("platformAdminId");
     expect(audit.metadata).not.toHaveProperty("by");
     expect(written().every((movement) => movement.userId === "u_owner")).toBe(true);
+  });
+});
+
+describe("commitStockImport en mode « Ce fichier complète seulement mes prix »", () => {
+  /** Un fichier PV TTC : des prix de vente seulement, avec des quantités qui ne doivent RIEN changer. */
+  const PRICE_ROWS = [
+    row(1, { status: "MEDICAMENT", targetId: "pres_A", quantity: 99, salePriceCents: 218 }),
+    row(2, { status: "PRODUIT_EXISTANT", targetId: "pr_1", quantity: 99, salePriceCents: 690, vatRate: 20 }),
+    row(3, { status: "NON_RECONNU", name: "Inconnu", quantity: 3, salePriceCents: 500 }),
+    row(4, { status: "MEDICAMENT", targetId: "pres_Z", quantity: 5, salePriceCents: 300 }), // pas dans le stock de l'officine
+    row(5, { status: "PRODUIT_EXISTANT", targetId: "pr_6", quantity: 5, salePriceCents: 1 }), // produit d'une autre officine
+  ];
+  beforeEach(() => {
+    db.state.jobs[0].payload = { rows: PRICE_ROWS };
+    Object.assign(db.state.drugs.find((drug) => drug.id === "ds_A")!, { priceCents: null, purchasePriceCents: 150 });
+    Object.assign(db.state.products.find((item) => item.id === "pr_1")!, { salePriceCents: 0, purchasePriceCents: 320 });
+  });
+  const run = () => commitStockImport({ scope: SCOPE, pharmacyIsDemo: false, jobId: "job_1", decisions: {}, createUnknownByDefault: true, zeroAbsent: true, pricesOnly: true });
+
+  it("écrit les prix de vente des produits connus, garde leurs prix d'achat", async () => {
+    const outcome = await run();
+    expect(outcome.pricesUpdated).toBe(2);
+    expect(db.state.drugs.find((drug) => drug.id === "ds_A")).toMatchObject({ priceCents: 218, purchasePriceCents: 150 });
+    expect(db.state.products.find((item) => item.id === "pr_1")).toMatchObject({ salePriceCents: 690, purchasePriceCents: 320, vatRate: 20 });
+  });
+
+  it("aucune quantité modifiée, aucun produit créé, rien à 0 (même avec zeroAbsent), aucun mouvement, date du stock inchangée", async () => {
+    const before = { drugs: db.state.drugs.map((drug) => drug.quantity), items: db.state.stockItems.map((item) => item.quantity), products: db.state.products.length, movements: db.state.movements.length };
+    const outcome = await run();
+    expect(db.state.drugs.map((drug) => drug.quantity)).toEqual(before.drugs);
+    expect(db.state.stockItems.map((item) => item.quantity)).toEqual(before.items);
+    expect(db.state.products).toHaveLength(before.products);
+    expect(db.state.movements).toHaveLength(before.movements);
+    expect(outcome).toMatchObject({ productsCreated: 0, drugsUpserted: 0, productsUpdated: 0, zeroed: 0 });
+    expect(db.tx.pharmacyDrugStock.upsert).not.toHaveBeenCalled();
+    expect(db.state.pharmacySynced).toEqual([]);
+  });
+
+  it("ne touche jamais une autre officine", async () => {
+    await run();
+    expect(db.state.products.find((item) => item.id === "pr_6")!.salePriceCents).toBeUndefined();
+    expect(db.state.drugs.find((drug) => drug.id === "ds_X")!.priceCents).toBeUndefined();
+  });
+});
+
+describe("le fichier automatique du poste (PAMP net) après un envoi PV TTC", () => {
+  it("met à jour quantités et prix d'achat sans vider les prix de vente déjà envoyés à la main", async () => {
+    Object.assign(db.state.drugs.find((drug) => drug.id === "ds_A")!, { priceCents: 218, purchasePriceCents: 140 });
+    Object.assign(db.state.products.find((item) => item.id === "pr_1")!, { salePriceCents: 690, purchasePriceCents: 300 });
+    db.state.jobs[0].payload = {
+      rows: [
+        row(1, { status: "MEDICAMENT", targetId: "pres_A", quantity: 7, purchasePriceCents: 150 }),
+        row(2, { status: "PRODUIT_EXISTANT", targetId: "pr_1", quantity: 11, purchasePriceCents: 320 }),
+      ],
+    };
+    await commitStockImport({ scope: SCOPE, pharmacyIsDemo: false, jobId: "job_1", decisions: {}, createUnknownByDefault: true, zeroAbsent: true });
+    expect(db.state.drugs.find((drug) => drug.id === "ds_A")).toMatchObject({ quantity: 7, priceCents: 218, purchasePriceCents: 150 });
+    expect(db.state.products.find((item) => item.id === "pr_1")).toMatchObject({ salePriceCents: 690, purchasePriceCents: 320 });
+    expect(quantityOf("si_1")).toBe(11);
   });
 });

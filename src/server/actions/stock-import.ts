@@ -52,6 +52,7 @@ const mappingSchema = z.object({
     salePrice: z.string().optional(),
     purchasePrice: z.string().optional(),
     vatRate: z.string().optional(),
+    reimbursement: z.string().optional(),
     brand: z.string().optional(),
     category: z.string().optional(),
   }),

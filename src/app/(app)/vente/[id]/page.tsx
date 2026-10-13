@@ -39,9 +39,11 @@ import { adviceFamilyOf } from "@/core/ai/family";
 import type { PipelineStageTrace, ScoreContribution } from "@/core/ai/types";
 import { brandKey, brandLabelOf } from "@/core/catalog/brand";
 import { selectCounterCards } from "@/core/partners/counter-card";
-import { answersFromRows, treeState } from "@/core/counter/tree-state";
+import { answersFromRows, treeState, oneTreeCardPerProduct } from "@/core/counter/tree-state";
 import { TREE_RULE_KEYS } from "@/core/counter/question-tree";
 import { counterBrandsFor } from "@/server/services/partners/visibility";
+import { isLinkId } from "../../../../../agent/src/sale-link";
+import { withoutOriginLabel } from "../../../../../agent/src/counter-sheet";
 import type { PartnerCardView, PatientFactor, SpecialtyProposal } from "./types";
 
 export const metadata: Metadata = { title: "Vente" };
@@ -54,8 +56,16 @@ export const metadata: Metadata = { title: "Vente" };
  * parcours sont chargées ici en une fois : au comptoir, un aller-retour serveur
  * de plus est une seconde de perdue.
  */
-export default async function SalePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SalePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  /** `?conseil=<id>` : le conseil cliqué dans la bannière du comptoir, à ouvrir déplié (agent/src/sale-link.ts). */
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const requestedAdvice = searchParams ? (await searchParams).conseil : undefined;
   const session = await requirePermission(PERMISSIONS.PRESCRIPTION_VIEW);
 
   const prescription = await prisma.prescription.findUnique({
@@ -85,7 +95,14 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
       recommendations: {
         orderBy: [{ totalScore: "desc" }],
         include: {
-          product: { include: { stockItem: true } },
+          // La fiche produit entière (contre-indications, précautions, description) et les vigilances que CETTE officine y
+          // a déclarées : la fiche complète du conseil les montre telles quelles.
+          product: {
+            include: {
+              stockItem: true,
+              vigilances: { where: { pharmacyId: session.scope.pharmacyId }, select: { population: true, level: true, note: true }, orderBy: { population: "asc" } },
+            },
+          },
           // Un médicament conseil du catalogue national : son nom officiel,
           // et la ligne de stock de CETTE officine pour le prix et la quantité.
           presentation: {
@@ -129,7 +146,11 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
     ? await prisma.adviceOpportunity.findMany({ where: { analysisRunId: run.id, ruleKey: { in: [...TREE_RULE_KEYS] } }, select: { ruleKey: true, answer: true, triggeredLineIds: true } })
     : [];
   const tree = treeState({ opportunities: treeOpportunities, lineNames: new Map(prescription.lines.map((line) => [line.id, line.drugName ?? ""])), answers: answersFromRows(prescription.questionAnswers) });
-  const visibleRecommendations = prescription.recommendations.filter((recommendation) => tree.isVisible(recommendation.opportunity?.ruleKey));
+  // Deux zones cochées (épaule ET genou) qui retiennent la même poche multi-zones ne la montrent qu'une fois, comme sur le poste.
+  const visibleRecommendations = oneTreeCardPerProduct(prescription.recommendations.filter((recommendation) => tree.isVisible(recommendation.opportunity?.ruleKey)));
+  // Le conseil cliqué dans la bannière : seulement s'il appartient à CETTE vente et s'affiche ; sinon la page s'ouvre normalement.
+  const focusAdviceId =
+    typeof requestedAdvice === "string" && isLinkId(requestedAdvice) && visibleRecommendations.some((recommendation) => recommendation.id === requestedAdvice) ? requestedAdvice : null;
   // Le poste de caisse analyse la vente de lui-même : l'écran peut s'ouvrir pendant ce temps.
   const analysisInFlight = isAnalysisInFlight({ status: prescription.status, hasRun: run !== null, updatedAt: prescription.updatedAt, now: new Date() });
 
@@ -434,8 +455,9 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           // Une présentation du catalogue national est un médicament conseil ; sinon la catégorie du produit décide, et sans produit : parapharmacie.
           family: adviceFamilyOf({ presentationId: recommendation.presentation?.id ?? null, category: recommendation.product?.category ?? "AUTRE" }),
           totalScore: recommendation.totalScore,
-          justification: recommendation.justification,
-          shortReason: recommendation.shortReason,
+          // L'origine du conseil (« Suggestion du robot… ») ne se lit jamais sur une carte : elle reste en base et dans la console.
+          justification: withoutOriginLabel(recommendation.justification),
+          shortReason: withoutOriginLabel(recommendation.shortReason) || null,
           patientReason: recommendation.patientReason,
           counterScript: recommendation.counterScript,
           precautions: recommendation.precautions,
@@ -450,9 +472,9 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           opportunity: recommendation.opportunity
             ? {
                 id: recommendation.opportunity.id,
-                title: recommendation.opportunity.title,
-                rationale: recommendation.opportunity.rationale,
-                clinicalContext: recommendation.opportunity.clinicalContext,
+                title: withoutOriginLabel(recommendation.opportunity.title),
+                rationale: withoutOriginLabel(recommendation.opportunity.rationale),
+                clinicalContext: withoutOriginLabel(recommendation.opportunity.clinicalContext) || null,
                 priority: recommendation.opportunity.priority,
                 safetyNotes: recommendation.opportunity.safetyNotes,
                 question: recommendation.opportunity.question,
@@ -478,6 +500,12 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                 quantity: recommendation.product.stockItem?.quantity ?? 0,
                 alertThreshold: recommendation.product.stockItem?.alertThreshold ?? 0,
                 claims: recommendation.product.commercialClaims,
+                sheet: {
+                  description: recommendation.product.description ?? null,
+                  contraindications: recommendation.product.contraindications ?? [],
+                  precautions: recommendation.product.precautions ?? [],
+                  vigilances: (recommendation.product.vigilances ?? []).map((vigilance) => ({ population: vigilance.population, level: vigilance.level, note: vigilance.note })),
+                },
               }
             : recommendation.presentation
               ? {
@@ -547,6 +575,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
       stockNotice={stockNotice}
       canImportStock={session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)}
       partnerCards={partnerCards}
+      focusAdviceId={focusAdviceId}
+      canOpenProduct={session.permissions.has(PERMISSIONS.PRODUCT_VIEW)}
     />
   );
 }

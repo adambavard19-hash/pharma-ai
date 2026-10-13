@@ -43,6 +43,8 @@ export const WIPED_MODELS = [
   "teamInvitation", "joinRequest", "counterQuestionAnswer",
   // PharmaBoost Mobile : quiz, demandes aux partenaires, objectifs, primes, suggestions du coach, signalements — de l'activité.
   "quizAttempt", "partnerInfoRequest", "bonusAuthorization", "personalObjective", "trainingRecommendation", "clinicalReviewFlag",
+  // Le robot n'est jamais sollicité pour la démonstration ; une ligne de cache n'y survivrait pas.
+  "robotSuggestion",
 ] as const;
 
 /** Ce qui porte un `pharmacyId` et que la réinitialisation conserve : la structure de l'officine, jamais son activité. */

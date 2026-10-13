@@ -21,7 +21,10 @@ const ENTRY: HostEntry = {
   questions: [],
   guidance: [],
   items: [
-    { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
+    { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "",
+      // La carte déployée d'exemple : sans contre-indication ni conseil d'utilisation écrits (aucun texte médical inventé) —
+      // l'île dit alors qu'ils ne sont pas renseignés et renvoie à la notice.
+      sheet: { name: "PROBIOTIQUE 30 gélules", reasons: ["Protéger la flore pendant l'antibiotique"], script: "", contraindications: [], usage: [], description: "", more: { contraindications: 0, usage: 0 }, cut: false } },
     { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "Hygiène du nez pendant le rhume", availability: "LOW_STOCK", quantity: "3", image: "" },
   ],
 };
@@ -35,6 +38,9 @@ const ALERT_ENTRY: HostEntry = {
   alerts: ["Doxycycline et minéraux (fer, calcium, magnésium, zinc) : à prendre à 2 heures d'écart."],
   items: [],
 };
+
+/** Une vente d'exemple n'a pas de page dans PharmaBoost : ses cartes se lisent sans s'ouvrir. */
+export const isEssaiSale = (id: string) => id === ENTRY.id || id === ALERT_ENTRY.id;
 
 export type TimedCommand = { at: number; command: HostCommand };
 

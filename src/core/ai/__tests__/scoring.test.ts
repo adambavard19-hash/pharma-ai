@@ -183,9 +183,11 @@ describe("séparation médical / commercial", () => {
     expect(candidats.map((c) => c.product.id)).toEqual(["in-stock"]);
   });
 
-  it("ne laisse pas la marge départager avant la disponibilité", () => {
-    // À pertinence clinique égale, c'est le rayon qui tranche en premier. La
-    // marge n'intervient qu'ensuite — jamais pour faire monter un produit.
+  it("ne laisse pas la marge peser dans le score au-delà de son plafond", () => {
+    // Depuis le 13 oct. 2026, la marge HT départage AVANT la disponibilité entre
+    // références cliniquement équivalentes (engines/tiebreak.ts, testé dans
+    // marge-et-remboursement.test.ts). Dans le SCORE, elle reste plafonnée :
+    // la disponibilité est montrée, et la marge ne fait monter aucun produit.
     const abondantPeuRentable = scoreProductForOpportunity({
       ...baseArgs,
       product: product({ id: "abondant", stockQuantity: 30, salePriceCents: 1000, purchasePriceCents: 900 }),

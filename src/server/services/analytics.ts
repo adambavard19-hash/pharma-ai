@@ -1,4 +1,5 @@
 import "server-only";
+import { COUNTED_ADVICE } from "@/server/db/counted-advice";
 import { activityScope } from "@/server/db/demo-scope";
 import { prisma } from "@/server/db/client";
 import { dayRange, type PeriodRange } from "@/core/analytics/periods";
@@ -107,6 +108,8 @@ export async function getRecommendationFunnel(
     pharmacyId: scope.pharmacyId,
     ...activityScope(scope),
     createdAt: { gte: period.start, lte: period.end },
+    // Les conseils cachés de l'arbre de questions, jamais tranchés, ne sont pas des conseils « générés » (server/db/counted-advice.ts).
+    AND: [COUNTED_ADVICE],
   };
 
   const [byStatus, byOrigin] = await Promise.all([
@@ -214,6 +217,7 @@ export async function getProductPerformance(
         ...activityScope(scope),
         createdAt: { gte: period.start, lte: period.end },
         productId: { not: null },
+        AND: [COUNTED_ADVICE],
       },
       select: {
         productId: true,
@@ -494,7 +498,7 @@ export async function getCounterPerformance(
     }),
     prisma.recommendation.groupBy({
       by: ["status"],
-      where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window },
+      where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window, AND: [COUNTED_ADVICE] },
       _count: true,
     }),
     prisma.sale.groupBy({
@@ -600,7 +604,7 @@ export async function getActivitySummary(
         },
       }),
       prisma.recommendation.count({
-        where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window },
+        where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window, AND: [COUNTED_ADVICE] },
       }),
       prisma.patientDocument.count({
         where: { pharmacyId: scope.pharmacyId, ...activityScope(scope), createdAt: window },

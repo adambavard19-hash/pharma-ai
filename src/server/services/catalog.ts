@@ -6,6 +6,7 @@ import { PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { normalizeSearchText } from "@/core/reference/search";
 import { classifyNationalDrug } from "@/core/catalog/product-vocabulary";
+import { NON_REIMBURSABLE_DRUG_VAT, REIMBURSABLE_DRUG_VAT, reimbursementFromBdpm, reimbursementFromVat, type Reimbursement } from "@/core/catalog/margin";
 import { engineRangesFrom, type PreferredRangeInput } from "@/core/catalog/preferred-ranges";
 import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import { activeChallengeTitlesFor } from "@/server/services/challenges";
@@ -69,34 +70,58 @@ export async function loadCatalogSnapshot(
     }
   }
 
-  return products.map((product) => ({
-    id: product.id,
-    origin: "PHARMACY_CATALOG" as const,
-    presentationId: null,
-    // Un produit de parapharmacie ne déclare ni substance ni condition de
-    // délivrance : ces deux champs n'ont de sens que pour un médicament.
-    substances: [],
-    prescriptionConditions: [],
-    name: product.name,
-    brand: product.brand,
-    category: product.category,
-    subCategory: product.subCategory,
-    reference: product.reference,
-    ean: product.ean,
-    imageUrl: product.imageUrl,
-    description: product.description,
-    commercialClaims: product.commercialClaims,
-    precautions: product.precautions,
-    matchingTags: product.matchingTags,
-    contraindications: product.contraindications,
-    salePriceCents: product.salePriceCents,
-    purchasePriceCents: product.purchasePriceCents,
-    vatRate: product.vatRate,
-    stockQuantity: product.stockItem?.quantity ?? 0,
-    alertThreshold: product.stockItem?.alertThreshold ?? 0,
-    availableInSiblingPharmacy: product.ean ? siblingEans.has(product.ean) : false,
-    isActive: product.isActive,
-  }));
+  // Le remboursement d'un produit de l'officine : ce que l'import a lu (colonne de l'export, TVA 2,1 %), sinon la BDPM
+  // quand son code est celui d'une boîte du catalogue national. Jamais le nom.
+  const bdpmCodes = products.filter((p) => p.reimbursed == null && p.ean?.startsWith("3400")).map((p) => p.ean as string);
+  const bdpm = new Map<string, Reimbursement>();
+  if (bdpmCodes.length > 0) {
+    const presentations = await prisma.drugPresentation.findMany({
+      where: { cip13: { in: bdpmCodes } },
+      select: { cip13: true, reimbursementRate: true, priceCents: true, coverageStatus: { select: { notReimbursable: true } } },
+    });
+    for (const p of presentations) {
+      const known = reimbursementFromBdpm({ reimbursementRate: p.reimbursementRate, priceCents: p.priceCents, notReimbursable: p.coverageStatus?.notReimbursable });
+      if (known) bdpm.set(p.cip13, known);
+    }
+  }
+  const reimbursementOf = (product: (typeof products)[number]): Reimbursement | null =>
+    product.reimbursed != null
+      ? { reimbursed: product.reimbursed, source: product.reimbursementSource ?? "import" }
+      : ((product.ean ? bdpm.get(product.ean) : undefined) ?? reimbursementFromVat(product.vatRate));
+
+  return products.map((product) => {
+    const reimbursement = reimbursementOf(product);
+    return {
+      id: product.id,
+      origin: "PHARMACY_CATALOG" as const,
+      presentationId: null,
+      // Un produit de parapharmacie ne déclare ni substance ni condition de
+      // délivrance : ces deux champs n'ont de sens que pour un médicament.
+      substances: [],
+      prescriptionConditions: [],
+      name: product.name,
+      brand: product.brand,
+      category: product.category,
+      subCategory: product.subCategory,
+      reference: product.reference,
+      ean: product.ean,
+      imageUrl: product.imageUrl,
+      description: product.description,
+      commercialClaims: product.commercialClaims,
+      precautions: product.precautions,
+      matchingTags: product.matchingTags,
+      contraindications: product.contraindications,
+      salePriceCents: product.salePriceCents,
+      purchasePriceCents: product.purchasePriceCents,
+      vatRate: product.vatRate,
+      reimbursed: reimbursement?.reimbursed ?? null,
+      reimbursementSource: reimbursement?.source ?? null,
+      stockQuantity: product.stockItem?.quantity ?? 0,
+      alertThreshold: product.stockItem?.alertThreshold ?? 0,
+      availableInSiblingPharmacy: product.ean ? siblingEans.has(product.ean) : false,
+      isActive: product.isActive,
+    };
+  });
 }
 
 /**
@@ -129,16 +154,17 @@ export async function loadNationalDrugCandidates(
       pharmacyId: scope.pharmacyId,
       presentation: { withdrawnAt: null },
     },
-    select: {
-      quantity: true,
-      alertThreshold: true,
-      priceCents: true,
+    // Toutes les colonnes de la ligne (quantité, seuil, prix de vente, prix d'achat HT, TVA) : quelques champs de plus
+    // qu'une sélection, et un client Prisma pas encore régénéré lit ses colonnes connues au lieu de refuser la requête.
+    include: {
       presentation: {
         select: {
           id: true,
           cip13: true,
           label: true,
           priceCents: true,
+          reimbursementRate: true,
+          coverageStatus: { select: { notReimbursable: true } },
           specialty: {
             select: {
               name: true,
@@ -181,6 +207,12 @@ export async function loadNationalDrugCandidates(
     // Une boîte que ni le dictionnaire ni les mots des règles ne relient à un
     // conseil n'est pas candidate : elle n'encombre pas le moteur.
     if (!understood?.tags.length && !termHit) continue;
+    // Le remboursement vient de la BDPM, à défaut de la TVA lue sur l'export (2,1 % : remboursable). La TVA d'une boîte
+    // dont l'export ne dit rien se déduit du remboursement connu (2,1 % ou 10 %) ; sinon, marge inconnue.
+    const reimbursement =
+      reimbursementFromBdpm({ reimbursementRate: presentation.reimbursementRate, priceCents: presentation.priceCents, notReimbursable: presentation.coverageStatus?.notReimbursable }) ??
+      reimbursementFromVat(line.vatRate);
+    const vatRate = line.vatRate ?? (reimbursement ? (reimbursement.reimbursed ? REIMBURSABLE_DRUG_VAT : NON_REIMBURSABLE_DRUG_VAT) : null);
     candidates.push({
         id: `presentation:${presentation.id}`,
         origin: "NATIONAL_DRUG" as const,
@@ -203,9 +235,11 @@ export async function loadNationalDrugCandidates(
         contraindications: [],
         // Le prix de l'officine prime sur le prix public quand elle l'a fixé.
         salePriceCents: line.priceCents ?? presentation.priceCents ?? 0,
-        // Prix d'achat inconnu : la dimension commerciale restera neutre.
-        purchasePriceCents: 0,
-        vatRate: 0,
+        // Le prix d'achat HT de l'export ; inconnu (ou TVA inconnue) : la marge reste neutre au départage.
+        purchasePriceCents: vatRate !== null ? (line.purchasePriceCents ?? 0) : 0,
+        vatRate: vatRate ?? 0,
+        reimbursed: reimbursement?.reimbursed ?? null,
+        reimbursementSource: reimbursement?.source ?? null,
         stockQuantity: line.quantity,
         alertThreshold: line.alertThreshold,
         availableInSiblingPharmacy: false,

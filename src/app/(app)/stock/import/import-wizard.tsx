@@ -17,7 +17,7 @@ import { Select } from "@/components/ui/field";
 import { formatCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const FIELDS: ImportField[] = ["code", "name", "quantity", "salePrice", "purchasePrice", "vatRate", "brand", "category"];
+const FIELDS: ImportField[] = ["code", "name", "quantity", "salePrice", "purchasePrice", "vatRate", "reimbursement", "brand", "category"];
 
 const STATUS_LABELS: Record<ClassifiedRow["status"], string> = {
   MEDICAMENT: "Médicament reconnu",

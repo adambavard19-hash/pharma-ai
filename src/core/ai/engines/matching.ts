@@ -34,9 +34,8 @@ export function findCandidateProducts(params: {
   catalog: CatalogProduct[];
   /** Inclure les produits en rupture (signalés, mais non retenus par défaut). */
   includeOutOfStock?: boolean;
-  maxCandidates?: number;
 }): MatchCandidate[] {
-  const { opportunity, catalog, includeOutOfStock = false, maxCandidates = 20 } = params;
+  const { opportunity, catalog, includeOutOfStock = false } = params;
 
   const opportunityTokens = tokenize(opportunity.matchingTags);
 
@@ -81,17 +80,22 @@ export function findCandidateProducts(params: {
     candidates.push({ product, tagHits, categoryMatch, preferred: matchesAny(opportunity.productPrefer, product.name) });
   }
 
-  // Une formule préférée par la règle passe avant le stock : sinon, dans un
-  // rayon fourni, la référence la plus adaptée reste derrière les plus
-  // nombreuses et n'atteint jamais le classement.
-  return candidates
-    .sort((a, b) => {
-      if (a.categoryMatch !== b.categoryMatch) return a.categoryMatch ? -1 : 1;
-      if (b.tagHits !== a.tagHits) return b.tagHits - a.tagHits;
-      if (a.preferred !== b.preferred) return a.preferred ? -1 : 1;
-      return b.product.stockQuantity - a.product.stockQuantity;
-    })
-    .slice(0, maxCandidates);
+  // TOUTES les candidates passent au score : aucune coupe ici. Une coupe
+  // (autrefois les 20 premières, triées par stock) écartait avant le score et
+  // le départage une référence équivalente plus rentable, ou non remboursée,
+  // parce qu'elle avait moins de boîtes en rayon — la disponibilité passait
+  // alors devant la marge, et « meilleure marge parmi les 20 équivalentes »
+  // était faux (vrai stock local, amoxicilline : LACTIBIANE DLR, 10,43 € HT,
+  // 7 boîtes, coupée au profit de LACTIBIANE TOLERANCE, 9,75 € HT, 14 boîtes).
+  // Elle pouvait aussi couper une référence plus sûre : le niveau d'appariement
+  // ne dit rien des précautions. Le plafond d'affichage vient après le choix
+  // (pipeline.ts). L'ordre ci-dessous ne fait que rendre le résultat stable.
+  return candidates.sort((a, b) => {
+    if (a.categoryMatch !== b.categoryMatch) return a.categoryMatch ? -1 : 1;
+    if (b.tagHits !== a.tagHits) return b.tagHits - a.tagHits;
+    if (a.preferred !== b.preferred) return a.preferred ? -1 : 1;
+    return b.product.stockQuantity - a.product.stockQuantity;
+  });
 }
 
 /** Recherche libre dans le catalogue, pour l'ajout manuel d'un conseil. */

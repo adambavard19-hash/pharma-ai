@@ -115,8 +115,8 @@ const db = vi.hoisted(() => {
           })),
       ),
     },
-    pharmacyDrugStock: { count: vi.fn() },
-    product: { count: vi.fn() },
+    pharmacyDrugStock: { count: vi.fn(), findMany: vi.fn(async () => [] as unknown[]) },
+    product: { count: vi.fn(), findMany: vi.fn(async () => [] as unknown[]) },
     importJob: { updateMany: vi.fn(), deleteMany: vi.fn() },
     stockConnection: { updateMany: vi.fn() },
   };
@@ -1552,5 +1552,50 @@ describe("un état impossible à écrire ne fait jamais lever le dépôt", () =>
     db.prisma.stockDeposit.update.mockRejectedValue(new Error("base indisponible"));
     const result = await send();
     expect(result).toMatchObject({ ok: true, deposit: { status: "FAILED" } });
+  });
+});
+
+describe("« Ce fichier complète seulement mes prix »", () => {
+  const OUTCOME_PRICES = { ...OUTCOME, drugsUpserted: 0, productsUpdated: 0, productsCreated: 0, zeroed: 0, pricesUpdated: 2 };
+
+  it("un fichier bien plus petit que le stock est appliqué (rien ne passe à 0), en prix seulement, sous un nom qui le dit", async () => {
+    db.prisma.pharmacyDrugStock.count.mockResolvedValue(4000);
+    mocks.analyse.mockResolvedValue(preview({ valid: 2, toVerify: 1 }));
+    mocks.commit.mockResolvedValue(OUTCOME_PRICES);
+    const result = await send({ pricesOnly: true });
+    expect(result.ok && result.deposit).toMatchObject({ status: "APPLIED", fileName: "Prix seulement — stock.csv", updated: 2, created: 0, zeroed: 0 });
+    expect(mocks.commit).toHaveBeenCalledWith({ scope: SCOPE, pharmacyIsDemo: false, jobId: "job_1", decisions: {}, createUnknownByDefault: false, zeroAbsent: false, pricesOnly: true });
+  });
+
+  it("un envoi ordinaire n'emprunte jamais le mode, même si le fichier porte le même préfixe", async () => {
+    const result = await send({ fileName: "Prix seulement — stock.csv" });
+    expect(result.ok && result.deposit.fileName).toBe("stock.csv");
+    expect(mocks.commit.mock.calls[0][0]).toMatchObject({ zeroAbsent: true });
+    expect(mocks.commit.mock.calls[0][0]).not.toHaveProperty("pricesOnly");
+  });
+
+  it("la relance par l'équipe d'un envoi « prix seulement » le rejoue en prix seulement, jamais en stock complet", async () => {
+    db.state.deposits = [deposit({ id: "dep_p", status: "FAILED", fileName: "Prix seulement — stock.csv", storageKey: "stock-deposits/ph_1/dep_p/Prix_seulement_stock.csv", receivedAt: new Date(Date.now() - 60_000) })];
+    mocks.commit.mockResolvedValue(OUTCOME_PRICES);
+    const result = await service.retryDeposit("dep_p", "adm_1");
+    expect(result.ok).toBe(true);
+    expect(mocks.commit.mock.calls[0][0]).toMatchObject({ zeroAbsent: false, pricesOnly: true, createUnknownByDefault: false });
+  });
+
+  it("l'aperçu : aucun produit à 0, et il propose le mode quand le fichier n'a que des prix de vente alors que les prix d'achat sont connus", async () => {
+    const rows = [
+      { line: 1, status: "MEDICAMENT", targetId: "pres_1", purchasePriceCents: null, salePriceCents: 218 },
+      { line: 2, status: "PRODUIT_EXISTANT", targetId: "pr_1", purchasePriceCents: null, salePriceCents: 690 },
+      { line: 3, status: "NON_RECONNU", targetId: null, purchasePriceCents: null, salePriceCents: 500 },
+    ];
+    mocks.analyse.mockResolvedValue({ ...preview(), rows });
+    db.prisma.pharmacyDrugStock.findMany.mockResolvedValue([{ presentationId: "pres_1", priceCents: null, purchasePriceCents: 150 }]);
+    db.prisma.product.findMany.mockResolvedValue([{ id: "pr_1", salePriceCents: 0, purchasePriceCents: 320 }]);
+
+    const full = await service.previewStockDeposit({ scope: SCOPE, fileName: "inventaire-pv.pdf", bytes: BYTES });
+    expect(full.ok && full.preview).toMatchObject({ mode: "FULL", priceKind: "SALE", withBothPrices: 2, pricesUpdated: 3, suggestPricesOnly: expect.stringContaining("prix d'achat de 2") });
+
+    const prices = await service.previewStockDeposit({ scope: SCOPE, fileName: "inventaire-pv.pdf", bytes: BYTES, pricesOnly: true });
+    expect(prices.ok && prices.preview).toMatchObject({ mode: "PRICES", absent: null, verdict: "APPLY", pricesUpdated: 2, withBothPrices: 2 });
   });
 });

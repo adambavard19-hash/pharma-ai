@@ -16,7 +16,8 @@
  *  • sa FORME suit l'île : la page envoie les rectangles arrondis qu'elle occupe, la fenêtre se découpe à cette forme
  *    (Region) ; ailleurs, les clics passent au logiciel de gestion en dessous ;
  *  • elle n'ouvre que la page de l'île de PharmaBoost : toute autre navigation, nouvelle fenêtre, menu contextuel, outils
- *    de développement ou raccourcis du navigateur sont coupés.
+ *    de développement ou raccourcis du navigateur sont coupés. Seule exception : un clic sur la carte d'un conseil ouvre la
+ *    page de la vente (sale-link.ts) dans le navigateur par défaut du PC — mot OUVRIR pour l'agent, qui revérifie l'adresse.
  *
  * Les secours : moteur WebView2 absent, page injoignable ou plantage → l'agent repasse à la bannière GDI+, puis à l'ancienne
  * fenêtre, puis à la notification Windows (notice-center.ts).
@@ -50,6 +51,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
@@ -67,12 +69,14 @@ namespace PharmaBoostIle
     public const int WS_EX_TOOLWINDOW = 0x00000080;
     public const int WS_EX_NOACTIVATE = 0x08000000;
     public const uint GA_ROOT = 2;
+    public const int ASFW_ANY = -1;
 
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool AllowSetForegroundWindow(int processId);
   }
 
   /// <summary>Ce que la fenêtre écrit pour l'agent : une ligne par mot, jamais deux fils à la fois.</summary>
@@ -86,6 +90,7 @@ namespace PharmaBoostIle
   public sealed class IleForm : Form
   {
     private readonly string pageUrl;
+    private readonly Uri pageUri;
     private readonly string allowedPrefix;
     private readonly string loaderDir;
     private readonly string userDataDir;
@@ -108,11 +113,16 @@ namespace PharmaBoostIle
     private bool dragMoved;
     private string positionFile = "";
     private bool customPosition;
+    // L'ouverture d'un conseil dans le navigateur : jamais juste après un glisser, jamais deux fois d'un double-clic.
+    private DateTime dragEndedAt = DateTime.MinValue;
+    private DateTime lastOpenAt = DateTime.MinValue;
+    private string lastOpenUrl = "";
 
     public IleForm(string url, string loader, string userData)
     {
       pageUrl = url;
       Uri parsed = new Uri(url);
+      pageUri = parsed;
       allowedPrefix = parsed.GetLeftPart(UriPartial.Path);
       loaderDir = loader;
       userDataDir = userData;
@@ -227,6 +237,7 @@ namespace PharmaBoostIle
           Location = Clamp(Location);
           customPosition = true;
           SavePosition();
+          dragEndedAt = DateTime.UtcNow;
         }
         if (!keyboard) GiveFocusBack();
         return;
@@ -266,7 +277,7 @@ namespace PharmaBoostIle
         s.IsPasswordAutosaveEnabled = false;
         s.IsGeneralAutofillEnabled = false;
         core.NavigationStarting += OnNavigationStarting;
-        core.NewWindowRequested += delegate(object sender, CoreWebView2NewWindowRequestedEventArgs e) { e.Handled = true; };
+        core.NewWindowRequested += OnNewWindowRequested;
         core.NavigationCompleted += OnNavigationCompleted;
         core.WebMessageReceived += OnWebMessage;
         core.ProcessFailed += delegate(object sender, CoreWebView2ProcessFailedEventArgs e)
@@ -287,6 +298,61 @@ namespace PharmaBoostIle
     {
       // Seule la page de l'île de PharmaBoost s'ouvre ici.
       if (!e.Uri.StartsWith(allowedPrefix, StringComparison.Ordinal)) e.Cancel = true;
+    }
+
+    /// <summary>
+    /// Jamais de nouvelle fenêtre dans l'île. Seule exception : le clic sur la carte d'un conseil (un lien de la page vers
+    /// /vente/...) ouvre la page de la vente dans le NAVIGATEUR par défaut du PC. L'adresse est vérifiée ici (même serveur
+    /// que l'île, chemin attendu), réécrite, puis l'agent la revérifie et l'ouvre par l'ouverture sûre (space-link.ts :
+    /// rundll32, jamais une invite de commandes). Toute autre adresse est ignorée.
+    /// </summary>
+    private void OnNewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs e)
+    {
+      e.Handled = true;
+      if (!e.IsUserInitiated) return;
+      string link = SaleLinkFor(pageUri, e.Uri);
+      if (link == null) return;
+      DateTime now = DateTime.UtcNow;
+      // Un glisser de l'île n'est pas un clic ; un double-clic n'ouvre pas deux onglets.
+      if ((dragTimer.Enabled && dragMoved) || (now - dragEndedAt).TotalMilliseconds < 400) return;
+      if (link == lastOpenUrl && (now - lastOpenAt).TotalMilliseconds < 1500) return;
+      lastOpenUrl = link;
+      lastOpenAt = now;
+      // L'île vient de recevoir le clic : elle laisse le navigateur passer au premier plan (elle-même ne le prend jamais).
+      try { Native.AllowSetForegroundWindow(Native.ASFW_ANY); } catch (Exception) { }
+      Out.Word("OUVRIR " + link);
+    }
+
+    /// <summary>
+    /// L'adresse d'une page de vente du serveur de l'île — « /vente/id », puis « ?conseil=id » et « #conseil-id » s'ils
+    /// sont là, identifiants [A-Za-z0-9_-] —, réécrite à partir de ces seuls morceaux ; toute autre adresse : null.
+    /// </summary>
+    public static string SaleLinkFor(Uri page, string candidate)
+    {
+      if (page == null || string.IsNullOrEmpty(candidate) || candidate.Length > 400) return null;
+      Uri u;
+      if (!Uri.TryCreate(candidate, UriKind.Absolute, out u)) return null;
+      if (u.Scheme != page.Scheme || !string.Equals(u.Authority, page.Authority, StringComparison.OrdinalIgnoreCase)) return null;
+      if (u.UserInfo.Length > 0) return null;
+      if (u.Scheme != Uri.UriSchemeHttps && !(u.Scheme == Uri.UriSchemeHttp && u.IsLoopback)) return null;
+      Match path = Regex.Match(u.AbsolutePath, @"^/vente/([A-Za-z0-9_-]{1,64})\z");
+      if (!path.Success) return null;
+      string advice = "";
+      if (u.Query.Length > 0)
+      {
+        Match query = Regex.Match(u.Query, @"^\?conseil=([A-Za-z0-9_-]{1,64})\z");
+        if (!query.Success) return null;
+        advice = query.Groups[1].Value;
+      }
+      if (u.Fragment.Length > 0)
+      {
+        Match anchor = Regex.Match(u.Fragment, @"^#conseil-([A-Za-z0-9_-]{1,64})\z");
+        if (!anchor.Success || (advice.Length > 0 && advice != anchor.Groups[1].Value)) return null;
+        advice = anchor.Groups[1].Value;
+      }
+      string link = u.GetLeftPart(UriPartial.Authority) + "/vente/" + path.Groups[1].Value;
+      if (advice.Length > 0) link = link + "?conseil=" + advice + "#conseil-" + advice;
+      return link;
     }
 
     private void OnNavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
