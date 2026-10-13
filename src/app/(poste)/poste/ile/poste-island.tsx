@@ -214,6 +214,8 @@ export function PosteIsland() {
     alertItems: entry?.alerts ?? [],
     movable: true,
     adviceLinksOutside: true,
+    // Au poste, les conseils arrivent en mode compact (un à la fois) : la bannière ne masque pas le logiciel de gestion.
+    compactAdvice: true,
     pills: [{ key: "poste", label: view.postLabel || "Comptoir", value: "Connecté", dot: C.accent }],
     look: view.look,
     onAnswer: (index, outcome) => {

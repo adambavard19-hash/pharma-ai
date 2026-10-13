@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronUp, ExternalLink, FileText, GripVertical, Loader2, Mail, PartyPopper, ScanLine, Send, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Loader2, Mail, Maximize2, Minimize2, PartyPopper, ScanLine, Send, TriangleAlert, X } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
@@ -84,7 +84,42 @@ export type CounterIslandProps = {
   adviceLinksOutside?: boolean;
   /** Un vrai clic sur « Fiche complète » (pas un glisser) : la page peut viser ce conseil elle-même. */
   onOpenAdvice?: (index: number) => void;
+  /**
+   * Les conseils s'affichent d'abord en mode COMPACT (poste) : un conseil à la fois, sur une ligne, qui passe tout seul au
+   * suivant une fois tranché ; un bouton agrandit la bannière (la liste complète) ou la réduit, et le choix est retenu.
+   */
+  compactAdvice?: boolean;
 };
+
+/** Le choix « bannière agrandie » du pharmacien, retenu sur ce poste. */
+const SIZE_KEY = "pb-ile-agrandie";
+function readExpanded(): boolean {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(SIZE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function saveExpanded(value: boolean) {
+  try {
+    window.localStorage.setItem(SIZE_KEY, value ? "1" : "0");
+  } catch {
+    // Stockage indisponible : le choix vaut pour cette vente seulement.
+  }
+}
+
+/** Le conseil montré en mode compact : celui qu'on a choisi avec les flèches, sinon le premier qui attend une réponse. */
+export function compactIndex(outcomes: readonly (IslandOutcome | undefined)[], count: number, chosen: number | null): number {
+  if (chosen !== null && chosen >= 0 && chosen < count) return chosen;
+  for (let index = 0; index < count; index += 1) if (!outcomes[index]) return index;
+  return Math.max(0, count - 1);
+}
+
+/** Largeur de l'île compacte : la plus fine qui garde nom, prix et boutons lisibles. */
+export const COMPACT_WIDTH = 330;
+/** Sans geste pendant ce délai, l'île compacte se replie en capsule ; le survol la rouvre. */
+export const COMPACT_SLEEP_MS = 25_000;
+const COMPACT_SLEEP_WIDTH = 250;
 
 /** La carte déployée, retenue avec la liste des conseils affichés : une autre vente (d'autres conseils) repart repliée. */
 export type UnfoldedAdvice = { name: string; among: string } | null;
@@ -132,6 +167,18 @@ export function CounterIsland(props: CounterIslandProps) {
   const [collapsedAt, setCollapsedAt] = useState<string | null>(null);
   // La carte DÉPLOYÉE (une seule à la fois), retenue avec les conseils affichés : une autre vente repart repliée.
   const [unfolded, setUnfolded] = useState<UnfoldedAdvice>(null);
+  // Mode compact : agrandie ou non (retenu), et le conseil choisi avec les flèches (retenu avec la liste affichée).
+  const [expanded, setExpandedState] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- préférence lue après le rendu serveur
+    setExpandedState(readExpanded());
+  }, []);
+  const setExpanded = (value: boolean) => {
+    setExpandedState(value);
+    saveExpanded(value);
+  };
+  const [chosen, setChosen] = useState<{ index: number; among: string } | null>(null);
+  const [asleep, setAsleep] = useState<string | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openName = unfoldedName(unfolded, items);
 
@@ -151,7 +198,16 @@ export function CounterIsland(props: CounterIslandProps) {
   const peek = resting && hover && props.hoverOpen !== false && !grumpy;
   const mood = grumpy ? "concerned" : STAGE_MOOD[state.stage];
   const tone = grumpy ? "warning" : stageTone(state.stage);
-  const width = grumpy ? 340 : peek ? 400 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 280 : STAGE_WIDTH[state.stage];
+  const compact = props.compactAdvice === true && !expanded && state.stage === "advice" && count > 0;
+  // Sans geste pendant 25 s, l'île compacte se replie en capsule (« 2 conseils ») ; le survol la rouvre.
+  const adviceKey = compact ? amongOf(items) : "";
+  useEffect(() => {
+    if (!adviceKey || hover) return;
+    const id = setTimeout(() => setAsleep(adviceKey), COMPACT_SLEEP_MS);
+    return () => clearTimeout(id);
+  }, [adviceKey, hover]);
+  const sleeping = compact && !hover && asleep === adviceKey;
+  const width = grumpy ? 340 : peek ? 400 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 280 : sleeping ? COMPACT_SLEEP_WIDTH : compact ? COMPACT_WIDTH : STAGE_WIDTH[state.stage];
   const title = stageTitle(state, count);
 
   const onTap = () => {
@@ -259,9 +315,88 @@ export function CounterIsland(props: CounterIslandProps) {
         body = <Row robot={robot(32)} title={title} sub={`${T.forDrug}${props.drug}`} trailing={<span className="isl-pop rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: C.accent, color: "#04261A" }}>{count}</span>} />;
         break;
       case "advice":
+        if (sleeping) {
+          body = (
+            <div className="flex h-10 items-center gap-2 pr-3 pl-1.5">
+              {robot(26)}
+              <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-white/90">
+                {allAnswered(state, count) ? T.allDone : count > 1 ? T.reducedMany.replace("{n}", String(count)) : T.reducedOne}
+              </span>
+              <span className="isl-pop rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: C.accent, color: "#04261A" }}>{count}</span>
+            </div>
+          );
+          break;
+        }
+        if (compact) {
+          const among = amongOf(items);
+          const index = compactIndex(state.outcomes, count, chosen && chosen.among === among ? chosen.index : null);
+          const go = (next: number) => setChosen({ index: (next + count) % count, among });
+          body = (
+            <div className="px-2 pt-1.5 pb-2">
+              <div className="flex items-center gap-1.5">
+                {robot(22)}
+                <p className="min-w-0 flex-1 truncate text-[12.5px] leading-4 font-semibold" aria-live="polite">
+                  {allAnswered(state, count) ? T.allDone : count > 1 ? T.reducedMany.replace("{n}", String(count)) : T.reducedOne}
+                  <span className="font-normal text-white/50"> · {props.drug}</span>
+                </p>
+                {count > 1 && (
+                  <span className="flex shrink-0 items-center text-white/60">
+                    <button type="button" onClick={() => go(index - 1)} aria-label="Conseil précédent" className="inline-flex size-6 items-center justify-center rounded-full hover:bg-white/[0.1] hover:text-white">
+                      <ChevronLeft className="size-3.5" aria-hidden="true" />
+                    </button>
+                    <span className="text-[10.5px] font-semibold tabular-nums">{index + 1}/{count}</span>
+                    <button type="button" onClick={() => go(index + 1)} aria-label="Conseil suivant" className="inline-flex size-6 items-center justify-center rounded-full hover:bg-white/[0.1] hover:text-white">
+                      <ChevronRight className="size-3.5" aria-hidden="true" />
+                    </button>
+                  </span>
+                )}
+                {!allAnswered(state, count) && (
+                  <button type="button" onClick={props.onFinish} aria-label={props.finishLabel ?? T.finish} title={props.finishLabel ?? T.finish} className="inline-flex size-6 shrink-0 items-center justify-center rounded-full transition-[filter] hover:brightness-110" style={{ background: C.accent, color: "#04261A" }}>
+                    <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
+                  </button>
+                )}
+                <button type="button" onClick={() => setExpanded(true)} aria-label="Agrandir la bannière" title="Agrandir la bannière" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.1] hover:text-white">
+                  <Maximize2 className="size-3.5" aria-hidden="true" />
+                </button>
+              </div>
+              <CompactCard
+                key={`${among}#${index}`}
+                item={items[index]}
+                outcome={state.outcomes[index] ?? null}
+                readOnly={props.readOnly}
+                onOpen={() => {
+                  setUnfolded({ name: items[index].name, among });
+                  setExpanded(true);
+                }}
+                onAnswer={(outcome) => {
+                  setChosen(null);
+                  props.onAnswer(index, outcome);
+                }}
+              />
+              {allAnswered(state, count) && (
+                <button type="button" onClick={props.onFinish} className="isl-pop mt-1.5 inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg text-[11.5px] font-bold transition-[filter] hover:brightness-110" style={{ background: C.accent, color: "#04261A" }}>
+                  <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> {props.finishLabel ?? T.finish}
+                </button>
+              )}
+            </div>
+          );
+          break;
+        }
         body = (
           <div className="px-2 pt-2 pb-2">
-            <Row robot={robot(24)} title={title} sub={allAnswered(state, count) ? T.allDone : `${T.forDrug}${props.drug}`} compact />
+            <Row
+              robot={robot(24)}
+              title={title}
+              sub={allAnswered(state, count) ? T.allDone : `${T.forDrug}${props.drug}`}
+              compact
+              trailing={
+                props.compactAdvice ? (
+                  <button type="button" onClick={() => setExpanded(false)} aria-label="Réduire la bannière" title="Réduire la bannière" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.1] hover:text-white">
+                    <Minimize2 className="size-3.5" aria-hidden="true" />
+                  </button>
+                ) : undefined
+              }
+            />
             <AdviceList maxHeight={props.listMaxHeight ?? ADVICE_LIST_MAX_HEIGHT} count={count} unfolded={openName}>
               {items.map((item, index) => (
                 <AdviceCard
@@ -369,7 +504,7 @@ export function CounterIsland(props: CounterIslandProps) {
       <IslandShell
         width={width}
         tone={tone}
-        contentKey={grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : state.stage}
+        contentKey={grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : sleeping ? "advice-capsule" : compact ? "advice-compact" : state.stage}
         label="Bannière PharmaBoost du comptoir"
         onPointerEnter={() => {
           if (leaveTimer.current) clearTimeout(leaveTimer.current);
@@ -404,6 +539,52 @@ function Row({ robot, title, sub, trailing, icon, compact }: { robot: ReactNode;
         {sub && <p className="truncate text-[12px] leading-4 text-white/60">{sub}</p>}
       </div>
       {trailing}
+    </div>
+  );
+}
+
+/**
+ * Le conseil en mode compact : une ligne — photo studio, nom, prix, et dessous marge et stock en petit — et les deux
+ * boutons ✓ / ✕. Un appui sur la carte agrandit la bannière, ce conseil déployé.
+ */
+function CompactCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: IslandAdvice; outcome: IslandOutcome; readOnly?: boolean; onOpen: () => void; onAnswer: (outcome: IslandOutcome) => void }) {
+  const stock = item.stock ? STOCK[item.stock] : null;
+  const details = [
+    item.margin ? `Marge ${item.margin} HT` : null,
+    stock ? `${stock.label}${item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}` : null,
+    item.challenge ? `★ ${T.challenge}` : null,
+    item.shortDate ? `${T.shortDate} ${item.shortDate.replace(/\/\d{4}$/, "")}` : null,
+  ].filter(Boolean);
+  return (
+    <div data-advice-card="" className="isl-line mt-1.5 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: C.panel, color: C.ink }}>
+      <button type="button" onClick={onOpen} title={UNFOLD} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        {item.image && (
+          // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
+          <img src={item.image} alt="" width={28} height={28} draggable={false} className="size-7 shrink-0 rounded-md bg-white object-contain" />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline gap-1.5">
+            <span className="min-w-0 flex-1 truncate text-[12px] leading-4 font-bold">{item.name}</span>
+            {item.price && stock && item.stock !== "UNKNOWN" && <span className="shrink-0 text-[11.5px] leading-4 font-bold tabular-nums">{item.price}</span>}
+          </span>
+          {details.length > 0 && <span className="block truncate text-[10.5px] leading-[14px] font-semibold" style={{ color: item.stock === "LOW_STOCK" || item.stock === "OUT_OF_STOCK" ? stock?.fg : "#0B6B57" }}>{details.join(" · ")}</span>}
+        </span>
+      </button>
+      {readOnly && !outcome ? null : outcome ? (
+        <button type="button" onClick={() => !readOnly && onAnswer(null)} title={readOnly ? undefined : T.change} className="isl-pop inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] font-bold" style={outcome === "SOLD" ? { background: C.soldBg, color: C.soldFg } : { background: C.notSoldBg, color: C.notSoldFg }}>
+          {outcome === "SOLD" && <Check className="size-3" strokeWidth={3} aria-hidden="true" />}
+          {outcome === "SOLD" ? T.sold : T.notSold}
+        </button>
+      ) : (
+        <span className="flex shrink-0 gap-1">
+          <button type="button" onClick={() => onAnswer("SOLD")} aria-label={T.sold} title={T.sold} className="inline-flex h-6 w-8 items-center justify-center rounded-md transition-[filter] hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
+            <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
+          </button>
+          <button type="button" onClick={() => onAnswer("NOT_SOLD")} aria-label={T.notSold} title={T.notSold} className="inline-flex h-6 w-8 items-center justify-center rounded-md transition-[filter] hover:brightness-95" style={{ background: C.notSoldBg, color: C.notSoldFg }}>
+            <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
+          </button>
+        </span>
+      )}
     </div>
   );
 }
