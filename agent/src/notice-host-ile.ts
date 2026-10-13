@@ -459,7 +459,8 @@ namespace PharmaBoostIle
     /// <summary>La forme de la fenêtre : l'union des rectangles arrondis de l'île (pixels CSS → pixels de l'écran).</summary>
     private void ApplyRegion(List<float[]> rects)
     {
-      GraphicsPath path = new GraphicsPath();
+      // Remplissage « Winding » : des formes qui se chevauchent s'additionnent au lieu de s'annuler (sinon, trou).
+      GraphicsPath path = new GraphicsPath(FillMode.Winding);
       foreach (float[] r in rects)
       {
         float x = r[0] * scale, y = r[1] * scale, w = r[2] * scale, h = r[3] * scale;

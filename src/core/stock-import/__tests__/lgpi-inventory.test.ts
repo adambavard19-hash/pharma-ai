@@ -96,3 +96,23 @@ describe("base de valorisation", () => {
   });
 });
 
+
+describe("un total de 1 000 € et plus (espace des milliers)", () => {
+  // Synthétique, dans la mise en page de l'édition « valorisé par PV TTC » : 52 × 26,95 € = 1 401,40 €.
+  const PV = `                                       Inventaire du 13/10/2026 02h35 valorisé par PV TTC
+  Code Produit   Désignation                       Nb unité   Zone Géo.       Dépôt                Qté Qté         Prix        Total          Taux
+                                                    / boite   principale                          boite unité                                  TVA
+3401560000001    PROBIOTIQUE TEST GELU BT30                                   PHARMACIE             52            26,950          1 401,40     5,5%
+3401560000002    PROBIOTIQUE TEST GELU BT10                                   PHARMACIE              3            11,500             34,50     5,5%
+3401560000003    GROS VOLUME TEST                                             PHARMACIE            400        12   30,000         12 000,00     20%
+`;
+
+  it("lit le prix, pas le « 1 » des milliers du total", () => {
+    const { lines } = parseLgpiInventoryText(PV);
+    expect(lines.map((line) => [line.code, line.quantity, line.priceCents, line.vatRate])).toEqual([
+      ["3401560000001", 52, 2695, 5.5],
+      ["3401560000002", 3, 1150, 5.5],
+      ["3401560000003", 400, 3000, 20],
+    ]);
+  });
+});

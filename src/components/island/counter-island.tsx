@@ -23,6 +23,8 @@ const T = BANNER.text;
 export type IslandAdvice = {
   name: string;
   price?: string;
+  /** La marge HT par unité (« 11,10 € ») : pour le pharmacien, jamais pour le patient. */
+  margin?: string;
   drug?: string;
   reason?: string;
   challenge?: boolean;
@@ -439,6 +441,7 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, outside, open, o
         <div className="mt-1 flex flex-wrap gap-1">
           {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</Chip>}
           {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}
+          {item.margin && <Chip bg="rgba(54,232,200,0.14)" fg="#0B6B57">Marge {item.margin} HT</Chip>}
           {stock && <Chip bg={stock.bg} fg={stock.fg}>{stock.label}{item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}</Chip>}
         </div>
       </div>

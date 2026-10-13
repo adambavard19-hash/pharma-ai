@@ -108,6 +108,7 @@ const toAdvice = (entry: HostEntry): IslandAdvice[] =>
   entry.items.map((item) => ({
     name: item.name,
     price: item.price || undefined,
+    margin: item.margin || undefined,
     drug: item.drug || undefined,
     reason: item.reason || undefined,
     challenge: Boolean(item.challenge),
@@ -179,7 +180,10 @@ export function PosteIsland() {
     const measure = (time: number) => {
       frame = requestAnimationFrame(measure);
       if (time - lastSent < 33) return;
-      const sections = root.current ? [...root.current.querySelectorAll("section")] : [];
+      // Seulement les blocs de premier niveau : Windows découpe la fenêtre en alternant (deux formes qui se chevauchent
+      // s'annulent). Une rubrique <section> de la carte dépliée, comptée en plus de l'île qui la contient, trouait la
+      // bannière à cet endroit — le logiciel de gestion apparaissait au travers (poste du 13 oct. 2026).
+      const sections = root.current ? [...root.current.querySelectorAll("section")].filter((section) => !section.parentElement?.closest("section")) : [];
       const rects = regionRects(sections.map((section) => {
         const box = section.getBoundingClientRect();
         return { x: box.left, y: box.top, width: box.width, height: box.height, radius: parseFloat(getComputedStyle(section).borderTopLeftRadius) || 0 };

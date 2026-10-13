@@ -38,6 +38,7 @@ export type NoticeBody = {
     outcome?: string;
     name: string;
     priceCents: number | null;
+    marginCents?: number | null;
     reason: string | null;
     availability: string;
     quantity: number | null;
@@ -55,6 +56,7 @@ export type HostOutcome = "NONE" | "SOLD" | "NOT_SOLD";
 
 export type HostItem = {
   id: string; drug: string; challenge: string; shortDate: string; outcome: HostOutcome; name: string; price: string; reason: string; availability: string;
+  /** La marge HT par unité (« 11,10 € »), ou vide. */ margin?: string;
   /** Le stock exact (« 3 »), ou vide quand il n'est pas connu. */ quantity: string; image: string;
   /** Ce que la carte montre une fois déployée dans l'île (counter-sheet.ts). Absente : la carte se déploie sans ces rubriques. */
   sheet?: CounterSheet;
@@ -151,6 +153,7 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     outcome: item.outcome === "SOLD" || item.outcome === "NOT_SOLD" ? item.outcome : "NONE",
     name: oneLine(item.name),
     price: euros(item.priceCents),
+    ...(typeof item.marginCents === "number" && item.marginCents > 0 ? { margin: euros(item.marginCents) } : {}),
     reason: oneLine(item.reason ?? ""),
     availability: AVAILABILITIES.has(item.availability) ? item.availability : "UNKNOWN",
     quantity: Number.isInteger(item.quantity) && (item.quantity as number) >= 0 ? String(item.quantity) : "",

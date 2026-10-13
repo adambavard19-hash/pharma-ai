@@ -52,6 +52,8 @@ export type NoticeRecommendation = {
   /** La date de péremption (AAAA-MM-JJ) du lot le plus proche, quand elle est courte. Jamais inventée. */
   shortDateOn?: string | null;
   priceCents: number | null;
+  /** La marge HT par unité, quand les deux prix sont connus. Jamais montrée au patient. */
+  marginCents?: number | null;
   reason: string | null;
   status: string;
   /** La photo du produit, quand l'officine en a une. Jamais indispensable : la fenêtre s'en passe. */
@@ -100,6 +102,8 @@ export type NoticeItem = {
   name: string;
   /** Le prix de vente, seulement quand le prix ET le stock sont fiables. */
   priceCents: number | null;
+  /** La marge HT par unité (prix connus et cohérents), sinon `null`. */
+  marginCents?: number | null;
   reason: string | null;
   availability: NoticeAvailability;
   quantity: number | null;
@@ -236,6 +240,8 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
     outcome: outcomeOf(rec.status),
     name: shortName(rec.name),
     priceCents: reliable && rec.priceCents !== null && rec.priceCents > 0 ? rec.priceCents : null,
+    // Une marge négative ou nulle trahit un prix mal lu : on ne l'affiche pas plutôt que d'afficher un chiffre faux.
+    ...(rec.marginCents != null && rec.marginCents > 0 ? { marginCents: rec.marginCents } : {}),
     reason: rec.reason,
     availability: availabilityOf(rec.quantity, rec.alertThreshold, reliable),
     quantity: reliable ? (rec.quantity ?? null) : null,

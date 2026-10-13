@@ -11,6 +11,7 @@ import { loadCentralAdvice } from "@/server/services/central-advice";
 import { activeChallengeTitlesFor } from "@/server/services/challenges";
 import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import { trustedRobotRuleKeys } from "@/server/services/robot-trust";
+import { unitMarginHt } from "@/core/catalog/margin";
 
 /**
  * Ce que la fenêtre du poste de caisse affiche pour une vente bipée, lu en base : les alertes, les conseils (avec le médicament
@@ -62,6 +63,8 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
             select: {
               name: true,
               salePriceCents: true,
+              purchasePriceCents: true,
+              vatRate: true,
               imageUrl: true,
               stockItem: { select: { quantity: true, alertThreshold: true } },
               description: true,
@@ -131,6 +134,8 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
           challengeTitle: rec.productId ? (challenges.get(rec.productId) ?? null) : null,
           shortDateOn: shortDate?.expiresOn ?? null,
           priceCents: rec.product?.salePriceCents ?? rec.presentation?.pharmacyStocks[0]?.priceCents ?? rec.presentation?.priceCents ?? null,
+          // La marge HT d'un produit du stock (prix de vente TTC ramené au HT, moins le prix d'achat HT) : pour le pharmacien seul.
+          marginCents: rec.product ? (unitMarginHt({ salePriceCents: rec.product.salePriceCents, purchasePriceCents: rec.product.purchasePriceCents, vatRate: rec.product.vatRate })?.marginCents ?? null) : null,
           // Jamais l'origine du conseil sur la carte (« Suggestion du robot… ») : décision du fondateur, 13 oct. 2026.
           reason: withoutOriginLabel(rec.shortReason ?? rec.justification) || null,
           status: rec.status,
