@@ -71,6 +71,8 @@ export type NavItem = {
    * transition : `/vente/...` et `/ordonnances/...` désignent le même travail.
    */
   match?: string[];
+  /** Une courte ligne sous le titre dans le menu (« Disponibilités et produits »). */
+  subtitle?: string;
   /** Sous-chemins qui appartiennent à une autre entrée (Paramètres sans « Laboratoires & gammes »). */
   except?: string[];
   description: string;
@@ -98,6 +100,7 @@ export const NAVIGATION: NavItem[] = [
   {
     href: "/associations",
     label: "Mes associations",
+    subtitle: "Conseils et associations personnalisés",
     icon: Link2,
     // Deuxième entrée du menu, juste après « Au comptoir » (consigne du fondateur, 13 oct. 2026 : rubrique importante).
     // Décider quel produit en appelle quel autre est un acte de pharmacien (ou de titulaire) : la même permission que
@@ -110,6 +113,7 @@ export const NAVIGATION: NavItem[] = [
   {
     href: "/stock",
     label: "Mon stock",
+    subtitle: "Disponibilités et produits",
     icon: Box,
     permission: PERMISSIONS.STOCK_VIEW,
     match: ["/stock", "/stocks", "/produits"],
@@ -119,6 +123,7 @@ export const NAVIGATION: NavItem[] = [
   {
     href: "/pilotage",
     label: "Performances",
+    subtitle: "Résultats et chiffre d'affaires",
     icon: BarChart3,
     // Même permission que le pilotage par collaborateur : la valeur chiffrée reste une vue de titulaire.
     // L'équipe au comptoir ne voit ni l'entrée ni la page. Deux pages, une entrée : on arrive sur « Mon équipe » (le classement de
@@ -129,8 +134,21 @@ export const NAVIGATION: NavItem[] = [
     group: "pharmacie",
   },
   {
+    href: "/equipe",
+    label: "Mon équipe",
+    subtitle: "Collaborateurs et challenges",
+    icon: UsersRound,
+    // Gérer l'équipe est un acte de titulaire. Un pharmacien adjoint garde
+    // TEAM_VIEW ailleurs, mais n'a rien à faire dans cet écran au comptoir.
+    permission: PERMISSIONS.TEAM_MANAGE,
+    match: ["/equipe"],
+    description: "Inviter vos collaborateurs, approuver leurs demandes, voir qui travaille à quel comptoir",
+    group: "pharmacie",
+  },
+  {
     href: "/emails-patients",
     label: "E-mails aux patients",
+    subtitle: "Suivis et communications",
     icon: MailCheck,
     // Toute l'officine, tous comptoirs confondus : une vue de titulaire (les chiffres de l'équipe aussi).
     permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
@@ -139,19 +157,9 @@ export const NAVIGATION: NavItem[] = [
     group: "pharmacie",
   },
   {
-    href: "/assortiment",
-    label: "Produits manquants",
-    icon: PackageSearch,
-    // Réservé au titulaire, comme les partenaires : les besoins que le stock n'a pas couverts
-    // ne remontent pas de l'équipe au comptoir, le titulaire les consulte ici.
-    permission: PERMISSIONS.PARTNERS_MANAGE,
-    match: ["/assortiment"],
-    description: "Les conseils que PharmaBoost n'a pas pu proposer faute de produit en stock : ce qu'il faudrait référencer",
-    group: "pharmacie",
-  },
-  {
     href: "/parametres/laboratoires/gammes",
     label: "Laboratoires & gammes",
+    subtitle: "Catalogues et partenaires commerciaux",
     icon: FlaskConical,
     // Les gammes privilégiées, les challenges et les marques : des choix de titulaire, en entrée directe (retour du
     // fondateur du 13 oct. 2026 : « pas dans les paramètres »). Seul le titulaire a LAB_PROGRAMS_MANAGE.
@@ -161,14 +169,15 @@ export const NAVIGATION: NavItem[] = [
     group: "pharmacie",
   },
   {
-    href: "/equipe",
-    label: "Mon équipe",
-    icon: UsersRound,
-    // Gérer l'équipe est un acte de titulaire. Un pharmacien adjoint garde
-    // TEAM_VIEW ailleurs, mais n'a rien à faire dans cet écran au comptoir.
-    permission: PERMISSIONS.TEAM_MANAGE,
-    match: ["/equipe"],
-    description: "Inviter vos collaborateurs, approuver leurs demandes, voir qui travaille à quel comptoir",
+    href: "/assortiment",
+    label: "Produits manquants",
+    subtitle: "Besoins et ruptures",
+    icon: PackageSearch,
+    // Réservé au titulaire, comme les partenaires : les besoins que le stock n'a pas couverts
+    // ne remontent pas de l'équipe au comptoir, le titulaire les consulte ici.
+    permission: PERMISSIONS.PARTNERS_MANAGE,
+    match: ["/assortiment"],
+    description: "Les conseils que PharmaBoost n'a pas pu proposer faute de produit en stock : ce qu'il faudrait référencer",
     group: "pharmacie",
   },
 

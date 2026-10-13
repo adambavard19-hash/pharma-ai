@@ -246,7 +246,10 @@ function NavLink({ item, onNavigate, onHint }: { item: NavItem; onNavigate: () =
       >
         <Icon className="size-4" aria-hidden="true" />
       </span>
-      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">{item.label}</span>
+        {item.subtitle && <span className="block truncate text-[12px] leading-4 font-normal text-text-tertiary">{item.subtitle}</span>}
+      </span>
       <span id={hintId} hidden>
         {item.description}
       </span>

@@ -36,7 +36,7 @@ describe("le menu, en trois groupes", () => {
 
   it("chaque groupe contient les entrées prévues, dans cet ordre", () => {
     const labels = (key: string) => NAVIGATION.filter((item) => item.group === key).map((item) => item.label);
-    expect(labels("pharmacie")).toEqual(["Mes associations", "Mon stock", "Performances", "E-mails aux patients", "Produits manquants", "Laboratoires & gammes", "Mon équipe"]);
+    expect(labels("pharmacie")).toEqual(["Mes associations", "Mon stock", "Performances", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants"]);
     expect(labels("decouvrir")).toEqual(["Formations", "Partenaires", "Actualités"]);
     expect(labels("configuration")).toEqual(["Paramètres"]);
   });
