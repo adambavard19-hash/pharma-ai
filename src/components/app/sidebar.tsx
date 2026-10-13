@@ -53,7 +53,7 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[288px] flex-col border-r border-border-subtle bg-surface-sidebar",
+          "fixed inset-y-0 left-0 z-40 flex w-[320px] flex-col border-r border-border-subtle bg-surface-sidebar",
           "transition-transform duration-250 lg:translate-x-0",
           // `invisible` et non `hidden` : la transition reste fluide, mais le
           // tiroir fermé sort du parcours de tabulation et de l'arbre

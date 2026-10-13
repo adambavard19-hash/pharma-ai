@@ -57,7 +57,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           />
         </div>
 
-        <div className="lg:pl-[288px] print:pl-0">
+        <div className="lg:pl-[320px] print:pl-0">
           <div className="no-print">
             {/* L'île PharmaBoost au milieu de la bannière : le robot de la personne, ce qu'il signale, la discussion.
                 Partout, même sur le PC où le logiciel installé a son robot : elle y perd seulement le dessin du robot. */}
