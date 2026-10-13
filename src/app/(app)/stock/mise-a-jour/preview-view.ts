@@ -49,7 +49,7 @@ export function confirmationText(preview: StockPreview): string {
     return "Ce fichier ne sera pas appliqué tout de suite. Il part à l'équipe PharmaBoost, qui le vérifie : votre stock ne change pas en attendant.";
   }
   const zero = preview.absent !== null && preview.absent > 0 ? ` ${plural(preview.absent, "produit absent du fichier passera", "produits absents du fichier passeront")} à 0.` : "";
-  return `Votre stock va être remplacé par ce fichier : ${plural(preview.products, "produit", "produits")}.${zero}`;
+  return `Les quantités de ${plural(preview.products, "produit", "produits")} seront mises à jour. Les prix que ce fichier ne contient pas sont conservés (vos prix d'achat restent).${zero}`;
 }
 
 /** Le texte de la case à cocher quand des produits passent à zéro. */

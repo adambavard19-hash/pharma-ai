@@ -70,8 +70,8 @@ describe("la confirmation explicite d'un passage à zéro", () => {
 
 describe("ce qui va se passer, dit sans détour", () => {
   it("un fichier appliqué remplace le stock, et dit combien passent à 0", () => {
-    expect(norm(confirmationText(preview({ absent: 12 })))).toBe("Votre stock va être remplacé par ce fichier : 4 306 produits. 12 produits absents du fichier passeront à 0.");
-    expect(norm(confirmationText(preview({ absent: 0 })))).toBe("Votre stock va être remplacé par ce fichier : 4 306 produits.");
+    expect(norm(confirmationText(preview({ absent: 12 })))).toBe("Les quantités de 4 306 produits seront mises à jour. Les prix que ce fichier ne contient pas sont conservés (vos prix d'achat restent). 12 produits absents du fichier passeront à 0.");
+    expect(norm(confirmationText(preview({ absent: 0 })))).toBe("Les quantités de 4 306 produits seront mises à jour. Les prix que ce fichier ne contient pas sont conservés (vos prix d'achat restent).");
   });
 
   it("un fichier retenu part à l'équipe : le stock ne change pas", () => {
