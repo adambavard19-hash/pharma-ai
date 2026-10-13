@@ -116,3 +116,15 @@ describe("un total de 1 000 € et plus (espace des milliers)", () => {
     ]);
   });
 });
+
+describe("un prix que le total ne confirme pas n'est jamais enregistré", () => {
+  it("quantité gardée, prix laissé vide (l'ancien prix reste en base)", () => {
+    const LINE = `                                       Inventaire du 13/10/2026 02h35 valorisé par PV TTC
+  Code Produit   Désignation                       Nb unité   Zone Géo.       Dépôt                Qté Qté         Prix        Total          Taux
+                                                    / boite   principale                          boite unité                                  TVA
+3401560000009    PRODUIT INCOHERENT                                           PHARMACIE              5            10,000            99,00     5,5%
+`;
+    const { lines } = parseLgpiInventoryText(LINE);
+    expect(lines[0]).toMatchObject({ code: "3401560000009", quantity: 5, priceCents: null });
+  });
+});

@@ -13,6 +13,12 @@ import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import { trustedRobotRuleKeys } from "@/server/services/robot-trust";
 import { unitMarginHt } from "@/core/catalog/margin";
 
+/** Vrai quand le prix de vente HT est sous le prix d'achat HT : le fichier de stock a été mal lu, pas une vraie vente à perte. */
+function salePriceLooksWrong(product: { salePriceCents: number; purchasePriceCents: number; vatRate: number | null }): boolean {
+  const margin = unitMarginHt(product);
+  return margin !== null && margin.marginCents < 0;
+}
+
 /**
  * Ce que la fenêtre du poste de caisse affiche pour une vente bipée, lu en base : les alertes, les conseils (avec le médicament
  * concerné, la photo, le stock, un éventuel challenge, une date courte réelle) et l'état du suivi de la vente (adresse du
@@ -133,7 +139,8 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
           forDrug: triggered,
           challengeTitle: rec.productId ? (challenges.get(rec.productId) ?? null) : null,
           shortDateOn: shortDate?.expiresOn ?? null,
-          priceCents: rec.product?.salePriceCents ?? rec.presentation?.pharmacyStocks[0]?.priceCents ?? rec.presentation?.priceCents ?? null,
+          // Un prix de vente sous le prix d'achat est un prix mal reçu : il n'est pas affiché (rien plutôt qu'un chiffre faux).
+          priceCents: rec.product && salePriceLooksWrong(rec.product) ? null : (rec.product?.salePriceCents ?? rec.presentation?.pharmacyStocks[0]?.priceCents ?? rec.presentation?.priceCents ?? null),
           // La marge HT d'un produit du stock (prix de vente TTC ramené au HT, moins le prix d'achat HT) : pour le pharmacien seul.
           marginCents: rec.product ? (unitMarginHt({ salePriceCents: rec.product.salePriceCents, purchasePriceCents: rec.product.purchasePriceCents, vatRate: rec.product.vatRate })?.marginCents ?? null) : null,
           // Jamais l'origine du conseil sur la carte (« Suggestion du robot… ») : décision du fondateur, 13 oct. 2026.

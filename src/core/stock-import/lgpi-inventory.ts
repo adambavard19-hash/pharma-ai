@@ -76,8 +76,12 @@ function readTail(tokens: string[]): Tail | null {
   }
   if (readings.length === 0) return null;
   const plain = readings[0];
-  const agreeing = readings.filter((reading) => reading.price > 0 && reading.gap <= Math.max(0.05, Math.abs(reading.quantity * reading.price) * 0.01));
-  const best = agreeing.sort((a, b) => a.gap - b.gap)[0] ?? plain;
+  const agreeing = readings.filter((reading) => reading.gap <= Math.max(0.05, Math.abs(reading.quantity * reading.price) * 0.01));
+  const best = agreeing.sort((a, b) => a.gap - b.gap)[0];
+  // Aucune lecture où quantité × prix = total : la quantité de la lecture simple est gardée, mais le prix n'est PAS
+  // enregistré (le prix déjà connu reste). Un prix douteux ne doit jamais arriver sur le comptoir d'un client.
+  if (!best) return { quantity: Math.trunc(plain.quantity), price: null };
+  // Quantité nulle : le total (0) ne prouve rien du prix ; on le garde tel que lu, comme avant.
   return { quantity: Math.trunc(best.quantity), price: best.price };
 }
 

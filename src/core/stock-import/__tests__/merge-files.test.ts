@@ -23,8 +23,10 @@ const edition = (basis: string, at: string, lines: string[]) => ` PHARMACIE TEST
                                                     / boite   principale                          boite unité                                  TVA
 ${lines.join("\n")}
 `;
+// Le total d'une ligne, comme LGPI l'écrit : quantité × prix, virgule décimale (le lecteur vérifie qu'il concorde).
+const total = (qty: number, price: string) => (qty * Number(price.replace(",", "."))).toFixed(2).replace(".", ",");
 const line = (code: string, name: string, qty: number, price: string, vat: string) =>
-  `${code}    ${name.padEnd(34)}                           PHARMACIE              ${String(qty).padStart(2)}             ${price.padStart(6)}         ${price.padStart(6)}      ${vat}`;
+  `${code}    ${name.padEnd(34)}                           PHARMACIE              ${String(qty).padStart(2)}             ${price.padStart(6)}         ${total(qty, price).padStart(6)}      ${vat}`;
 
 const lgpi = (fileName: string, basis: string, at: string, lines: string[]) => {
   const inventory = parseLgpiInventoryText(edition(basis, at, lines));
