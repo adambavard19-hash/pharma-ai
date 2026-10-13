@@ -43,7 +43,7 @@ beforeEach(() => {
     },
   ]);
   m.findMany.mockResolvedValue([
-    { id: "rx0", reference: "ORD-0041", updatedAt: new Date("2026-10-13T08:00:00Z"), counterPost: "POSTE1", counterPostId: "post_1", counterFollowUp: { closedAt: new Date("2026-10-13T08:05:00Z") }, lines: [{ drugName: "DOLIPRANE 1000", quantity: 1 }], recommendations: [{ status: "PURCHASED" }, { status: "DECLINED" }, { status: "REMOVED" }] },
+    { id: "rx0", reference: "ORD-0041", updatedAt: new Date("2026-10-13T08:00:00Z"), counterPost: "POSTE1", counterPostId: "post_1", counterFollowUp: { closedAt: new Date("2026-10-13T08:05:00Z") }, lines: [{ drugName: "DOLIPRANE 1000", quantity: 1 }], recommendations: [{ status: "PURCHASED", product: { name: "Poche chaud/froid dos" }, presentation: null }, { status: "DECLINED", product: { name: "Patch chauffant" }, presentation: null }, { status: "REMOVED", product: { name: "Gel arnica" }, presentation: null }] },
   ]);
 });
 
@@ -85,6 +85,6 @@ describe("les ventes terminées aujourd'hui", () => {
 
   it("donne l'heure de fin, les médicaments et les conseils vendus sur proposés (sans les retirés)", async () => {
     const [sale] = await loadFinishedToday(SCOPE, null);
-    expect(sale).toEqual({ id: "rx0", reference: "ORD-0041", finishedAt: "2026-10-13T08:05:00.000Z", comptoir: "Comptoir 1 · Léa Martin", lines: [{ drugName: "DOLIPRANE 1000", quantity: 1 }], soldCount: 1, adviceCount: 2 });
+    expect(sale).toEqual({ id: "rx0", reference: "ORD-0041", finishedAt: "2026-10-13T08:05:00.000Z", comptoir: "Comptoir 1 · Léa Martin", lines: [{ drugName: "DOLIPRANE 1000", quantity: 1 }], soldCount: 1, adviceCount: 2, sold: ["Poche chaud/froid dos"] });
   });
 });

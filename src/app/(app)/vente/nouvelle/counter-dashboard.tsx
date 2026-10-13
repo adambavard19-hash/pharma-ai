@@ -216,6 +216,9 @@ export function CounterDashboard({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14.5px] text-text-primary">{summarizeProducts(sale.lines.map((line) => line.drugName))}</span>
                     <span className="block truncate text-[12.5px] text-text-secondary">{[describeAdviceCount(sale.soldCount, sale.adviceCount), sale.comptoir].filter(Boolean).join(" · ")}</span>
+                    {sale.sold && sale.sold.length > 0 && (
+                      <span className="mt-0.5 block truncate text-[12.5px] font-medium text-success-700 dark:text-success-400">Vendu : {sale.sold.join(", ")}</span>
+                    )}
                   </span>
                   <ArrowRight className="size-4 shrink-0 text-text-tertiary" />
                 </Link>

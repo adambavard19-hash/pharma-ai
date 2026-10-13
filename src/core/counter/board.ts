@@ -62,6 +62,8 @@ export type FinishedSale = {
   lines: { drugName: string; quantity: number }[];
   soldCount: number;
   adviceCount: number;
+  /** Les produits vendus (conseils déclarés vendus), dans l'ordre de la vente, sans doublon. */
+  sold?: string[];
 };
 
 /** Les conseils montrés d'une vente : sans les retirés, sans doublon de nom, dans l'ordre reçu. */

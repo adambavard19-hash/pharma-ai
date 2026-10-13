@@ -76,11 +76,12 @@ export async function loadFinishedToday(scope: TenantScope, thisPcPostId: string
       counterPostId: true,
       counterFollowUp: { select: { closedAt: true } },
       lines: { orderBy: { position: "asc" }, take: 6, select: { drugName: true, quantity: true } },
-      recommendations: { select: { status: true } },
+      recommendations: { orderBy: { totalScore: "desc" }, select: { status: true, product: { select: { name: true } }, presentation: { select: { specialty: { select: { name: true } } } } } },
     },
   });
   return rows.map((row) => {
     const outcomes = row.recommendations.map((rec) => adviceOutcome(rec.status)).filter((outcome) => outcome !== null);
+    const sold = [...new Set(row.recommendations.filter((rec) => adviceOutcome(rec.status) === "SOLD").map(recName).filter((name): name is string => Boolean(name)))];
     return {
       id: row.id,
       reference: row.reference,
@@ -89,6 +90,7 @@ export async function loadFinishedToday(scope: TenantScope, thisPcPostId: string
       lines: row.lines.map((line) => ({ drugName: line.drugName ?? "", quantity: line.quantity ?? 1 })).filter((line) => line.drugName.trim().length > 0),
       soldCount: outcomes.filter((outcome) => outcome === "SOLD").length,
       adviceCount: outcomes.length,
+      sold,
     };
   });
 }
