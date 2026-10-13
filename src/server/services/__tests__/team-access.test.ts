@@ -29,6 +29,8 @@ const svc = await import("../team-access");
 const scope = { pharmacyId: "ph1", organizationId: "org1", userId: "titulaire" } as never;
 const sent: { to: string; subject: string; text: string }[] = [];
 const deps = { messaging: { info: { id: "test" }, sendEmail: async (mail: { to: string; subject: string; text: string }) => { sent.push(mail); return { status: "SENT", provider: "test", detail: "ok" }; } } as never };
+/** Des personnes à inviter : le prénom et le nom sont obligatoires, on en donne d'office. */
+const people = (...emails: string[]) => emails.map((email, i) => ({ firstName: `Prénom${i}`, lastName: `Nom${i}`, email }));
 const pharmacy = { id: "ph1", name: "Pharmacie du Port", organizationId: "org1", isDemo: false, isActive: true };
 
 beforeEach(() => {
@@ -56,7 +58,7 @@ beforeEach(() => {
 
 describe("inviter des collaborateurs", () => {
   it("envoie un lien personnel par adresse, au poste choisi, dans l'officine de la session", async () => {
-    const result = await svc.inviteCollaborators(scope, { emails: ["Claire@Exemple.fr", "hugo@exemple.fr"], role: "TECHNICIAN" }, deps);
+    const result = await svc.inviteCollaborators(scope, { invitees: people("Claire@Exemple.fr", "hugo@exemple.fr"), role: "TECHNICIAN" }, deps);
     expect(result).toEqual({ ok: true, results: [{ email: "claire@exemple.fr", status: "SENT" }, { email: "hugo@exemple.fr", status: "SENT" }] });
     expect(m.teamInvitation.create).toHaveBeenCalledTimes(2);
     expect(m.teamInvitation.create.mock.calls[0][0].data).toMatchObject({ pharmacyId: "ph1", email: "claire@exemple.fr", role: "TECHNICIAN", invitedByUserId: "titulaire" });
@@ -66,34 +68,68 @@ describe("inviter des collaborateurs", () => {
   });
 
   it("n'écrit que le jeton haché : le lien en clair n'est jamais stocké", async () => {
-    await svc.inviteCollaborators(scope, { emails: ["claire@exemple.fr"], role: "PHARMACIST" }, deps);
+    await svc.inviteCollaborators(scope, { invitees: people("claire@exemple.fr"), role: "PHARMACIST" }, deps);
     const link = sent[0].text.match(/invitation\/([\w-]+)/)![1];
     const stored = JSON.stringify([...m.teamInvitation.create.mock.calls, ...m.teamInvitation.update.mock.calls]);
     expect(stored).not.toContain(link);
   });
 
   it("refuse de nommer un titulaire par invitation, et un poste inconnu", async () => {
-    expect(await svc.inviteCollaborators(scope, { emails: ["a@exemple.fr"], role: "OWNER" }, deps)).toMatchObject({ ok: false });
-    expect(await svc.inviteCollaborators(scope, { emails: ["a@exemple.fr"], role: "ADMIN" }, deps)).toMatchObject({ ok: false });
+    expect(await svc.inviteCollaborators(scope, { invitees: people("a@exemple.fr"), role: "OWNER" }, deps)).toMatchObject({ ok: false });
+    expect(await svc.inviteCollaborators(scope, { invitees: people("a@exemple.fr"), role: "ADMIN" }, deps)).toMatchObject({ ok: false });
     expect(m.teamInvitation.create).not.toHaveBeenCalled();
   });
 
   it("signale ceux qui sont déjà dans l'équipe, et ne dit rien d'une adresse connue d'une AUTRE organisation (« indisponible »)", async () => {
     m.membership.findMany.mockResolvedValue([{ user: { email: "Lea@exemple.fr" } }]);
     m.user.findFirst.mockImplementation(async ({ where }: { where: { email: { equals: string } } }) => (where.email.equals === "autre@exemple.fr" ? { organizationId: "org-autre" } : null));
-    const result = await svc.inviteCollaborators(scope, { emails: ["lea@exemple.fr", "autre@exemple.fr", "neuf@exemple.fr"], role: "STUDENT" }, deps);
+    const result = await svc.inviteCollaborators(scope, { invitees: people("lea@exemple.fr", "autre@exemple.fr", "neuf@exemple.fr"), role: "STUDENT" }, deps);
     expect(result).toEqual({ ok: true, results: [{ email: "lea@exemple.fr", status: "ALREADY_MEMBER" }, { email: "autre@exemple.fr", status: "UNAVAILABLE" }, { email: "neuf@exemple.fr", status: "SENT" }] });
     expect(sent.map((mail) => mail.to)).toEqual(["neuf@exemple.fr"]);
   });
 
   it("une nouvelle invitation annule la précédente pour la même adresse, dans la même officine seulement", async () => {
-    await svc.inviteCollaborators(scope, { emails: ["claire@exemple.fr"], role: "TECHNICIAN" }, deps);
+    await svc.inviteCollaborators(scope, { invitees: people("claire@exemple.fr"), role: "TECHNICIAN" }, deps);
     expect(m.teamInvitation.updateMany).toHaveBeenCalledWith({ where: { pharmacyId: "ph1", email: "claire@exemple.fr", acceptedAt: null, revokedAt: null }, data: { revokedAt: expect.any(Date) } });
   });
 
   it("limite le nombre d'adresses à la fois", async () => {
     const many = Array.from({ length: 21 }, (_, index) => `p${index}@exemple.fr`);
-    expect(await svc.inviteCollaborators(scope, { emails: many, role: "TECHNICIAN" }, deps)).toMatchObject({ ok: false });
+    expect(await svc.inviteCollaborators(scope, { invitees: people(...many), role: "TECHNICIAN" }, deps)).toMatchObject({ ok: false });
+  });
+
+  it("enregistre le prénom et le nom (nettoyés) de CHAQUE personne, et l'e-mail la salue par son prénom", async () => {
+    const stored = new Map<string, Record<string, unknown>>();
+    m.teamInvitation.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => { stored.set(data.email as string, data); return { id: data.email }; });
+    m.teamInvitation.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({ id: where.id, ...stored.get(where.id) }));
+    const result = await svc.inviteCollaborators(scope, { invitees: [{ firstName: "  Léa\u200b ", lastName: " Martin ", email: "Lea@Exemple.fr" }, { firstName: "Hugo", lastName: "Petit", email: "hugo@exemple.fr" }], role: "TECHNICIAN" }, deps);
+    expect(result).toMatchObject({ ok: true });
+    expect(m.teamInvitation.create.mock.calls[0][0].data).toMatchObject({ pharmacyId: "ph1", email: "lea@exemple.fr", firstName: "Léa", lastName: "Martin" });
+    expect(m.teamInvitation.create.mock.calls[1][0].data).toMatchObject({ email: "hugo@exemple.fr", firstName: "Hugo", lastName: "Petit" });
+    expect(sent[0]).toMatchObject({ to: "lea@exemple.fr" });
+    expect(sent[0].text.startsWith("Bonjour Léa,")).toBe(true);
+    expect(sent[0].text).toContain("Anne Roux vous a ouvert un accès à PharmaBoost pour Pharmacie du Port");
+    expect(sent[1].text.startsWith("Bonjour Hugo,")).toBe(true);
+    // Le film de présentation, en adresse absolue sur le domaine public.
+    expect(sent[0].text).toContain("https://pharmaboost.test/decouvrir/video");
+    expect((sent[0] as unknown as { html: string }).html).toContain('src="https://pharmaboost.test/video/pharmaboost-presentation.jpg"');
+  });
+
+  it("sans prénom ou sans nom, rien n'est créé ni envoyé", async () => {
+    expect(await svc.inviteCollaborators(scope, { invitees: [{ firstName: "", lastName: "Martin", email: "lea@exemple.fr" }], role: "TECHNICIAN" }, deps)).toEqual({ ok: false, error: "Indiquez le prénom." });
+    expect(await svc.inviteCollaborators(scope, { invitees: [{ firstName: "Léa", lastName: "Martin", email: "lea@exemple.fr" }, { firstName: "Hugo", lastName: "  ", email: "hugo@exemple.fr" }], role: "TECHNICIAN" }, deps)).toEqual({ ok: false, error: "Indiquez le nom (personne n° 2)." });
+    expect(m.teamInvitation.create).not.toHaveBeenCalled();
+    expect(sent).toHaveLength(0);
+  });
+
+  it("la liste des invitations est celle de SON officine, avec le nom complet (rien pour une ancienne invitation sans nom)", async () => {
+    m.teamInvitation.findMany.mockResolvedValue([
+      { id: "i1", email: "lea@exemple.fr", firstName: "Léa", lastName: "Martin", role: "TECHNICIAN", acceptedAt: null, revokedAt: null, expiresAt: new Date(Date.now() + 1000), lastSentAt: new Date(), sentCount: 1 },
+      { id: "i2", email: "ancien@exemple.fr", firstName: null, lastName: null, role: "STUDENT", acceptedAt: null, revokedAt: null, expiresAt: new Date(Date.now() + 1000), lastSentAt: new Date(), sentCount: 1 },
+    ]);
+    const rows = await svc.listInvitations("ph1");
+    expect(m.teamInvitation.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ pharmacyId: "ph1" }) }));
+    expect(rows.map((row) => [row.firstName, row.lastName, row.email])).toEqual([["Léa", "Martin", "lea@exemple.fr"], [null, null, "ancien@exemple.fr"]]);
   });
 
   it("renvoyer ou annuler ne touche qu'une invitation de SON officine", async () => {
@@ -128,6 +164,32 @@ describe("ouvrir son lien d'invitation", () => {
     expect(m.user.create.mock.calls[0][0].data).toMatchObject({ organizationId: "org1", email: "claire@exemple.fr", firstName: "Claire", passwordHash: "hash(MotDePasse1234)", status: "ACTIVE" });
     expect(m.membership.create.mock.calls[0][0].data).toMatchObject({ pharmacyId: "ph1", userId: "new-user", role: "TECHNICIAN", sortOrder: 4 });
     expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ pharmacyId: "ph1", userId: "titulaire", title: "Claire Martin a rejoint l'équipe" }));
+  });
+
+  it("le lien pré-remplit le prénom et le nom donnés par le titulaire ; le compte reçoit ce que la personne a gardé ou corrigé, nettoyé", async () => {
+    m.teamInvitation.findUnique.mockResolvedValue({ ...live, firstName: "Léa", lastName: "Martin" });
+    expect(await svc.previewInvitation(token)).toMatchObject({ firstName: "Léa", lastName: "Martin", email: "claire@exemple.fr" });
+    m.membership.findMany.mockResolvedValue([{ userId: "titulaire" }]);
+    const result = await svc.acceptInvitation(token, { firstName: " Léa-Rose\u200b ", lastName: "Martin  ", password: "MotDePasse1234" });
+    expect(result).toMatchObject({ ok: true });
+    expect(m.user.create.mock.calls[0][0].data).toMatchObject({ firstName: "Léa-Rose", lastName: "Martin" });
+    expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "Léa-Rose Martin a rejoint l'équipe" }));
+  });
+
+  it("une ANCIENNE invitation, envoyée sans prénom ni nom, s'accepte toujours : la personne les saisit", async () => {
+    m.teamInvitation.findUnique.mockResolvedValue(live);
+    expect(await svc.previewInvitation(token)).toMatchObject({ firstName: "", lastName: "" });
+    expect(await svc.acceptInvitation(token, { firstName: "", lastName: "", password: "MotDePasse1234" })).toEqual({ ok: false, error: "Indiquez votre prénom et votre nom." });
+    expect(m.user.create).not.toHaveBeenCalled();
+    const result = await svc.acceptInvitation(token, { firstName: "Claire", lastName: "Martin", password: "MotDePasse1234" });
+    expect(result).toMatchObject({ ok: true });
+    expect(m.user.create.mock.calls[0][0].data).toMatchObject({ firstName: "Claire", lastName: "Martin" });
+  });
+
+  it("un prénom ou un nom de plus de 80 caractères est refusé avant d'écrire quoi que ce soit", async () => {
+    m.teamInvitation.findUnique.mockResolvedValue(live);
+    expect(await svc.acceptInvitation(token, { firstName: "C".repeat(81), lastName: "Martin", password: "MotDePasse1234" })).toMatchObject({ ok: false });
+    expect(m.teamInvitation.updateMany).not.toHaveBeenCalled();
   });
 
   it("l'usage est unique : si une autre requête a déjà consommé le lien, rien n'est créé", async () => {
@@ -170,7 +232,7 @@ describe("un compte gratuit de PharmaBoost Mobile rejoint son officine", () => {
 
   it("le titulaire peut l'inviter : l'adresse n'est pas « indisponible »", async () => {
     m.user.findFirst.mockImplementation(async ({ where }: { where: { email: { equals: string } } }) => (where.email.equals === "ines@exemple.fr" ? communityUser : where.email.equals === "autre@exemple.fr" ? { organizationId: "org-autre", organization: { kind: "CLIENT" } } : null));
-    const result = await svc.inviteCollaborators(scope, { emails: ["ines@exemple.fr", "autre@exemple.fr"], role: "STUDENT" }, deps);
+    const result = await svc.inviteCollaborators(scope, { invitees: people("ines@exemple.fr", "autre@exemple.fr"), role: "STUDENT" }, deps);
     expect(result).toEqual({ ok: true, results: [{ email: "ines@exemple.fr", status: "SENT" }, { email: "autre@exemple.fr", status: "UNAVAILABLE" }] });
   });
 

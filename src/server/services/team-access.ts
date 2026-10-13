@@ -3,6 +3,7 @@ import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
+import { presentationVideoLinks } from "@/core/platform/presentation-video";
 import { generateToken, hashToken } from "@/server/security/tokens";
 import { hashPassword, validatePasswordStrength, verifyPassword } from "@/server/security/password";
 import { recordDispatch, type DispatchKind } from "@/server/services/email-dispatch";
@@ -12,7 +13,7 @@ import type { TenantScope } from "@/server/db/tenant";
 import type { MessagingProvider } from "@/core/ai/ports";
 import { TEAM_ROLE_LABELS, type TeamRole } from "@/core/team/rules";
 import { buildAccountExistsEmail, buildJoinDecisionEmail, buildJoinRequestAlertEmail, buildTeamInvitationEmail } from "@/core/team/access-emails";
-import { INVITATION_TTL_MS, MAX_INVITES_AT_ONCE, MAX_PENDING_JOIN_REQUESTS, invitationState, isDeclarableRole, isEmail, isInvitableRole, normalizeEmail, publicPharmacyLabel, searchTerm, type InvitationState, type InvitableRole } from "@/core/team/access";
+import { INVITATION_TTL_MS, MAX_PENDING_JOIN_REQUESTS, PERSON_NAME_MAX, cleanPersonName, invitationState, isDeclarableRole, isEmail, isInvitableRole, normalizeEmail, validateInvitees, publicPharmacyLabel, searchTerm, type InvitationState, type InvitableRole } from "@/core/team/access";
 
 /**
  * Entrer dans une officine : le titulaire invite par e-mail, ou le collaborateur demande à rejoindre et le titulaire approuve.
@@ -71,21 +72,20 @@ async function sendInvitationLink(invitationId: string, inviterName: string, dep
   const token = generateToken(32);
   const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
   await prisma.teamInvitation.update({ where: { id: invitation.id }, data: { tokenHash: hashToken(token), expiresAt, lastSentAt: new Date(), sentCount: { increment: 1 } } });
-  const message = buildTeamInvitationEmail({ firstName: invitation.firstName, pharmacyName: pharmacy.name, inviterName, roleLabel: TEAM_ROLE_LABELS[invitation.role as TeamRole].toLowerCase(), url: publicUrl(`/invitation/${token}`), expiresAt });
+  const message = buildTeamInvitationEmail({ firstName: invitation.firstName, pharmacyName: pharmacy.name, inviterName, roleLabel: TEAM_ROLE_LABELS[invitation.role as TeamRole].toLowerCase(), url: publicUrl(`/invitation/${token}`), expiresAt, video: presentationVideoLinks(publicUrl) });
   const outcome = await deliver({ to: invitation.email, message, kind: "TEAM_INVITATION", pharmacy }, deps);
   return outcome.status === "FAILED" ? "FAILED" : outcome.status === "SIMULATED" ? "SIMULATED" : "SENT";
 }
 
 /**
- * Invite plusieurs personnes d'un coup, au même poste. Les adresses déjà dans l'équipe sont signalées ; une adresse connue d'une autre
- * organisation reste « indisponible » (confirmer qu'elle existe renseignerait sur la clientèle de PharmaBoost).
+ * Invite plusieurs personnes d'un coup, au même poste, chacune avec SON prénom et SON nom (l'e-mail la salue, son compte les reçoit). Les
+ * adresses déjà dans l'équipe sont signalées ; une adresse connue d'une autre organisation reste « indisponible » (confirmer qu'elle existe
+ * renseignerait sur la clientèle de PharmaBoost).
  */
-export async function inviteCollaborators(scope: TenantScope, input: { emails: string[]; role: string; firstName?: string; lastName?: string }, deps?: Deps): Promise<{ ok: true; results: InviteOutcome[] } | Failure> {
+export async function inviteCollaborators(scope: TenantScope, input: { invitees: unknown; role: string }, deps?: Deps): Promise<{ ok: true; results: InviteOutcome[] } | Failure> {
   if (!isInvitableRole(input.role)) return { ok: false, error: "Choisissez un poste pour les personnes invitées." };
-  const emails = [...new Set(input.emails.map(normalizeEmail))].filter(Boolean);
-  if (emails.length === 0) return { ok: false, error: "Saisissez au moins une adresse e-mail." };
-  if (emails.length > MAX_INVITES_AT_ONCE) return { ok: false, error: `${MAX_INVITES_AT_ONCE} invitations à la fois au plus.` };
-  if (emails.some((email) => !isEmail(email))) return { ok: false, error: "Une adresse e-mail n'est pas valide." };
+  const checked = validateInvitees(input.invitees);
+  if (!checked.ok) return checked;
 
   const inviter = await prisma.user.findUnique({ where: { id: scope.userId }, select: { firstName: true, lastName: true } });
   const inviterName = inviter ? fullName(inviter) : "Le titulaire";
@@ -93,14 +93,14 @@ export async function inviteCollaborators(scope: TenantScope, input: { emails: s
   const inTeam = new Set(members.map((member) => member.user.email.toLowerCase()));
 
   const results: InviteOutcome[] = [];
-  for (const email of emails) {
+  for (const { email, firstName, lastName } of checked.invitees) {
     if (inTeam.has(email)) { results.push({ email, status: "ALREADY_MEMBER" }); continue; }
     const known = await prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" }, deletedAt: null }, select: { organizationId: true, organization: { select: { kind: true } } } });
     if (known && !canJoinOrganization(known, scope.organizationId)) { results.push({ email, status: "UNAVAILABLE" }); continue; }
     // Une seule invitation vivante par adresse et par officine : la précédente est annulée.
     await prisma.teamInvitation.updateMany({ where: { pharmacyId: scope.pharmacyId, email, acceptedAt: null, revokedAt: null }, data: { revokedAt: new Date() } });
     const created = await prisma.teamInvitation.create({
-      data: { pharmacyId: scope.pharmacyId, email, role: input.role as InvitableRole, firstName: emails.length === 1 ? input.firstName?.trim() || null : null, lastName: emails.length === 1 ? input.lastName?.trim() || null : null, tokenHash: hashToken(generateToken(32)), expiresAt: new Date(Date.now() + INVITATION_TTL_MS), invitedByUserId: scope.userId, sentCount: 0 },
+      data: { pharmacyId: scope.pharmacyId, email, role: input.role as InvitableRole, firstName, lastName, tokenHash: hashToken(generateToken(32)), expiresAt: new Date(Date.now() + INVITATION_TTL_MS), invitedByUserId: scope.userId, sentCount: 0 },
       select: { id: true },
     });
     const status = await sendInvitationLink(created.id, inviterName, deps);
@@ -110,12 +110,12 @@ export async function inviteCollaborators(scope: TenantScope, input: { emails: s
   return { ok: true, results };
 }
 
-export type InvitationRow = { id: string; email: string; role: TeamRole; state: InvitationState; sentAt: Date; sentCount: number; expiresAt: Date };
+export type InvitationRow = { id: string; email: string; firstName: string | null; lastName: string | null; role: TeamRole; state: InvitationState; sentAt: Date; sentCount: number; expiresAt: Date };
 
 /** Les invitations de CETTE officine qui n'ont été ni acceptées ni annulées (les expirées y restent, pour pouvoir les renvoyer). */
 export async function listInvitations(pharmacyId: string, now = new Date()): Promise<InvitationRow[]> {
   const rows = await prisma.teamInvitation.findMany({ where: { pharmacyId, acceptedAt: null, revokedAt: null }, orderBy: { lastSentAt: "desc" }, take: 100 });
-  return rows.map((row) => ({ id: row.id, email: row.email, role: row.role as TeamRole, state: invitationState(row, now), sentAt: row.lastSentAt, sentCount: row.sentCount, expiresAt: row.expiresAt }));
+  return rows.map((row) => ({ id: row.id, email: row.email, firstName: row.firstName, lastName: row.lastName, role: row.role as TeamRole, state: invitationState(row, now), sentAt: row.lastSentAt, sentCount: row.sentCount, expiresAt: row.expiresAt }));
 }
 
 export async function resendInvitation(scope: TenantScope, id: string, deps?: Deps): Promise<{ ok: true; email: string; status: InviteStatus } | Failure> {
@@ -164,15 +164,17 @@ export async function acceptInvitation(token: string, input: { firstName: string
   if (existing && !canJoinOrganization(existing, invitation.pharmacy.organizationId)) return { ok: false, error: "Ce lien n'est plus valable. Demandez une nouvelle invitation au titulaire." };
   // Un compte gratuit de PharmaBoost Mobile qui rejoint son officine : il quitte la Communauté pour l'organisation de l'officine.
   const movesFromCommunity = Boolean(existing && existing.organizationId !== invitation.pharmacy.organizationId);
+  // Ce que la personne a saisi (pré-rempli avec le prénom et le nom donnés par le titulaire), nettoyé ; à défaut, ceux de l'invitation.
+  const firstName = cleanPersonName(input.firstName) || cleanPersonName(invitation.firstName);
+  const lastName = cleanPersonName(input.lastName) || cleanPersonName(invitation.lastName);
 
   let passwordHash: string | null = null;
   if (existing) {
     // Un compte existe déjà (un collaborateur de plusieurs officines du même groupe) : on vérifie son mot de passe, on ne le change pas.
     if (!(await verifyPassword(input.password, existing.passwordHash)) || existing.status !== "ACTIVE") return { ok: false, error: "Mot de passe incorrect." };
   } else {
-    const firstName = input.firstName.trim();
-    const lastName = input.lastName.trim();
     if (!firstName || !lastName) return { ok: false, error: "Indiquez votre prénom et votre nom." };
+    if (firstName.length > PERSON_NAME_MAX || lastName.length > PERSON_NAME_MAX) return { ok: false, error: `Prénom et nom : ${PERSON_NAME_MAX} caractères au plus.` };
     const weaknesses = validatePasswordStrength(input.password);
     if (weaknesses.length > 0) return { ok: false, error: `Mot de passe trop faible : ${weaknesses.join(", ")}.` };
     passwordHash = await hashPassword(input.password);
@@ -190,7 +192,7 @@ export async function acceptInvitation(token: string, input: { firstName: string
     }
     const user = existing
       ? { id: existing.id }
-      : await tx.user.create({ data: { organizationId: invitation.pharmacy.organizationId, email: invitation.email, firstName: input.firstName.trim(), lastName: input.lastName.trim(), passwordHash, status: "ACTIVE" }, select: { id: true } });
+      : await tx.user.create({ data: { organizationId: invitation.pharmacy.organizationId, email: invitation.email, firstName, lastName, passwordHash, status: "ACTIVE" }, select: { id: true } });
     const already = await tx.membership.findUnique({ where: { userId_pharmacyId: { userId: user.id, pharmacyId: invitation.pharmacyId } }, select: { id: true } });
     if (!already) await tx.membership.create({ data: { userId: user.id, pharmacyId: invitation.pharmacyId, role: invitation.role, isActive: true, sortOrder: await nextSortOrder(tx, invitation.pharmacyId) } });
     await tx.teamInvitation.update({ where: { id: invitation.id }, data: { acceptedUserId: user.id } });
@@ -204,7 +206,7 @@ export async function acceptInvitation(token: string, input: { firstName: string
 
   await recordAudit({ action: "team.invitation_accepted", entityType: "TeamInvitation", entityId: invitation.id, pharmacyId: invitation.pharmacyId, userId, metadata: { role: invitation.role, existingAccount: Boolean(existing), fromCommunity: movesFromCommunity } });
   const owners = await prisma.membership.findMany({ where: { pharmacyId: invitation.pharmacyId, role: "OWNER", isActive: true }, select: { userId: true } });
-  const name = `${input.firstName.trim()} ${input.lastName.trim()}`.trim() || invitation.email;
+  const name = `${firstName} ${lastName}`.trim() || invitation.email;
   for (const owner of owners) await createNotification({ pharmacyId: invitation.pharmacyId, userId: owner.userId, type: "TEAM_EVENT", severity: "SUCCESS", title: `${name} a rejoint l'équipe`, body: `${invitation.email} a accepté votre invitation.`, linkUrl: "/equipe" }).catch(() => undefined);
   return { ok: true, userId, pharmacyId: invitation.pharmacyId };
 }

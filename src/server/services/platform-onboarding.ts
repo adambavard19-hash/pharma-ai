@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db/client";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
+import { presentationVideoLinks } from "@/core/platform/presentation-video";
 import { recordAudit } from "@/server/audit/log";
 import { traceDispatch } from "@/server/services/email-dispatch";
 import { buildInstallationGuideEmail } from "@/core/platform/onboarding-emails";
@@ -33,6 +34,7 @@ export async function sendInstallationGuide(pharmacyId: string, actor: { adminId
     contactEmail: company?.representativeEmail ?? DEFAULT_CONTACT_EMAIL,
     lgoLabel: lgo && lgo.id !== "autre" ? lgo.label : null,
     exportSteps: lgo?.exportSteps ?? [],
+    video: presentationVideoLinks(publicUrl),
   });
   const outcome = await getMessagingProvider().sendEmail({ to, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
   // Le journal des e-mails garde chaque envoi du guide, réussi ou non.

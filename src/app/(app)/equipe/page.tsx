@@ -58,7 +58,7 @@ export default async function TeamPage() {
         members={members}
         canManageOwners={session.role === "OWNER"}
         requests={requests.map((request) => ({ id: request.id, name: request.name, email: request.email, suggestedRole: request.suggestedRole, requestedAt: request.requestedAt.toISOString() }))}
-        invitations={invitations.map((invitation) => ({ id: invitation.id, email: invitation.email, role: invitation.role, state: invitation.state, sentAt: invitation.sentAt.toISOString(), sentCount: invitation.sentCount }))}
+        invitations={invitations.map((invitation) => ({ id: invitation.id, email: invitation.email, firstName: invitation.firstName, lastName: invitation.lastName, role: invitation.role, state: invitation.state, sentAt: invitation.sentAt.toISOString(), sentCount: invitation.sentCount }))}
       />
     </div>
   );

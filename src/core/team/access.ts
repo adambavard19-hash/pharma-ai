@@ -30,20 +30,50 @@ const EMAIL = /^[^\s@,;<>()[\]]+@[^\s@,;<>()[\]]+\.[^\s@,;<>()[\]]{2,}$/;
 export const isEmail = (value: string): boolean => value.length <= 160 && EMAIL.test(value);
 export const normalizeEmail = (value: string): string => value.trim().toLowerCase();
 
-/** Des adresses collées en vrac (virgules, points-virgules, retours à la ligne, « Nom <adresse> ») : celles qui sont valides, sans doublon, et celles qui ne le sont pas. */
-export function parseEmails(text: string): { valid: string[]; invalid: string[] } {
-  const valid: string[] = [];
-  const invalid: string[] = [];
+/** Un prénom ou un nom : 80 caractères au plus, comme partout ailleurs dans PharmaBoost. */
+export const PERSON_NAME_MAX = 80;
+
+/** Un prénom ou un nom tel qu'on l'enregistre : sans caractère de contrôle ni invisible, espaces resserrés, bords nets. */
+export function cleanPersonName(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw
+    .normalize("NFC")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u2064\ufeff]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Une personne invitée : son prénom et son nom — ce sont eux qui la saluent dans l'e-mail, nomment son espace et ses résultats. */
+export type Invitee = { firstName: string; lastName: string; email: string };
+
+/**
+ * Les lignes du formulaire « Inviter des collaborateurs » : une personne par ligne, prénom, nom et adresse obligatoires. Les lignes
+ * entièrement vides sont ignorées ; la première erreur est rendue avec le numéro de la ligne, pour que le titulaire la retrouve.
+ */
+export function validateInvitees(rows: unknown): { ok: true; invitees: Invitee[] } | { ok: false; error: string } {
+  if (!Array.isArray(rows)) return { ok: false, error: "Ajoutez au moins une personne à inviter." };
+  const filled = rows
+    .map((row) => (row && typeof row === "object" ? (row as Record<string, unknown>) : {}))
+    .map((row) => ({ firstName: cleanPersonName(row.firstName), lastName: cleanPersonName(row.lastName), email: normalizeEmail(typeof row.email === "string" ? row.email : "") }))
+    .filter((row) => row.firstName || row.lastName || row.email);
+  if (filled.length === 0) return { ok: false, error: "Ajoutez au moins une personne à inviter." };
+  if (filled.length > MAX_INVITES_AT_ONCE) return { ok: false, error: `${MAX_INVITES_AT_ONCE} invitations à la fois au plus.` };
   const seen = new Set<string>();
-  for (const raw of text.split(/[\n\r,;\t ]+/)) {
-    const token = raw.replace(/^[<"'(]+|[>"')]+$/g, "").trim();
-    if (!token) continue;
-    const email = normalizeEmail(token);
-    if (seen.has(email)) continue;
-    seen.add(email);
-    (isEmail(email) ? valid : invalid).push(email);
+  for (const [index, row] of filled.entries()) {
+    const where = filled.length > 1 ? ` (personne n° ${index + 1})` : "";
+    if (!row.firstName) return { ok: false, error: `Indiquez le prénom${where}.` };
+    if (!row.lastName) return { ok: false, error: `Indiquez le nom${where}.` };
+    if (row.firstName.length > PERSON_NAME_MAX || row.lastName.length > PERSON_NAME_MAX) return { ok: false, error: `Prénom et nom : ${PERSON_NAME_MAX} caractères au plus${where}.` };
+    if (!isEmail(row.email)) return { ok: false, error: `L'adresse e-mail n'est pas valide${where}.` };
+    if (seen.has(row.email)) return { ok: false, error: `L'adresse ${row.email} figure deux fois.` };
+    seen.add(row.email);
   }
-  return { valid, invalid };
+  return { ok: true, invitees: filled };
+}
+
+/** « Léa Martin », ou l'adresse e-mail pour une invitation envoyée avant qu'on demande le nom. */
+export function inviteeLabel(invitation: { firstName: string | null; lastName: string | null; email: string }): string {
+  return [invitation.firstName, invitation.lastName].filter(Boolean).join(" ").trim() || invitation.email;
 }
 
 export type InvitationState = "PENDING" | "EXPIRED" | "ACCEPTED" | "REVOKED";

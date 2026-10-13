@@ -2,6 +2,7 @@ import { DEFAULT_EMAIL_CONTEXT, emailButtonHtml, emailFrame } from "./email-layo
 import { escapeHtml } from "@/core/documents/email";
 import { TIME_ZONE } from "@/config/constants";
 import { INSTALLATION_STEPS } from "./onboarding-emails";
+import { presentationVideoHtml, presentationVideoText, type PresentationVideoLinks } from "./presentation-video";
 
 /**
  * L'e-mail d'accueil d'un titulaire d'officine.
@@ -24,6 +25,8 @@ export type UserPasswordEmailVariables = {
    * d'export de stock.
    */
   onboarding?: { lgoLabel: string | null; exportSteps: string[]; contactEmail: string } | null;
+  /** Au premier accès : le film de présentation (vignette cliquable + bouton vers la page qui le lit). */
+  video?: PresentationVideoLinks | null;
 };
 
 function formatDateTime(date: Date): string {
@@ -62,6 +65,7 @@ export function buildUserPasswordEmail(v: UserPasswordEmailVariables): { subject
       : welcome
         ? ["PharmaBoost vous accompagne au comptoir : ordonnance lue, conseils issus de votre stock, plan remis au patient."]
         : ["Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : rien ne sera modifié."]),
+    ...(welcome && v.video ? ["", ...presentationVideoText(v.video)] : []),
     "",
     "L'équipe PharmaBoost",
   ].join("\n");
@@ -87,7 +91,7 @@ export function buildUserPasswordEmail(v: UserPasswordEmailVariables): { subject
     ${emailButtonHtml(v.url, welcome ? "Définir mon mot de passe" : "Choisir un nouveau mot de passe")}
     ${onboardingHtml}
     <p style="margin:18px 0 0;font-size:13px;line-height:20px;color:#64748B">Ce lien est personnel, à usage unique, et reste valable jusqu'au ${escapeHtml(until)}.<br>Ensuite, connectez-vous sur <a href="${escapeHtml(v.loginUrl)}" style="color:#0F766E">${escapeHtml(v.loginUrl)}</a>.</p>
-    <p style="margin:10px 0 0;font-size:12px;line-height:18px;color:#94A3B8">${welcome ? "" : "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : rien ne sera modifié.<br>"}Ou copiez ce lien : ${escapeHtml(v.url)}</p>`,
+    <p style="margin:10px 0 0;font-size:12px;line-height:18px;color:#94A3B8">${welcome ? "" : "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : rien ne sera modifié.<br>"}Ou copiez ce lien : ${escapeHtml(v.url)}</p>${welcome && v.video ? presentationVideoHtml(v.video) : ""}`,
     reason: welcome ? "Vous recevez ce message parce qu'un accès PharmaBoost vient d'être ouvert à votre nom." : "Vous recevez ce message à la suite d'une demande de nouveau mot de passe.",
   });
 

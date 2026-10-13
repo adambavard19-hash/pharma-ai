@@ -1,21 +1,21 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Clock, MailPlus, RefreshCw, Send, UserCheck, X } from "lucide-react";
+import { Check, Clock, MailPlus, RefreshCw, Send, Trash2, UserCheck, UserPlus, X } from "lucide-react";
 import { approveJoinRequestAction, inviteCollaboratorsAction, refuseJoinRequestAction, resendInvitationAction, revokeInvitationAction } from "@/server/actions/team-access";
 import { TEAM_ROLES, TEAM_ROLE_LABELS, type TeamRole } from "@/core/team/rules";
-import { INVITABLE_ROLES, MAX_INVITES_AT_ONCE, parseEmails } from "@/core/team/access";
+import { INVITABLE_ROLES, MAX_INVITES_AT_ONCE, PERSON_NAME_MAX, inviteeLabel, isEmail, normalizeEmail, validateInvitees } from "@/core/team/access";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
-import { Field, Select, Textarea } from "@/components/ui/field";
+import { Field, Input, Select } from "@/components/ui/field";
 import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { formatRelative } from "@/lib/format";
 
 export type JoinRequestItem = { id: string; name: string; email: string; suggestedRole: TeamRole; requestedAt: string };
-export type InvitationItem = { id: string; email: string; role: TeamRole; state: "PENDING" | "EXPIRED" | "ACCEPTED" | "REVOKED"; sentAt: string; sentCount: number };
+export type InvitationItem = { id: string; email: string; firstName: string | null; lastName: string | null; role: TeamRole; state: "PENDING" | "EXPIRED" | "ACCEPTED" | "REVOKED"; sentAt: string; sentCount: number };
 
 const ROLE_CHOICES = TEAM_ROLES.filter((role) => (INVITABLE_ROLES as readonly string[]).includes(role.value));
 
@@ -90,8 +90,9 @@ export function InvitationsPanel({ invitations }: { invitations: InvitationItem[
           {invitations.map((invitation) => (
             <li key={invitation.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
               <span className="min-w-0 flex-1 basis-48">
-                <span className="block truncate text-[14px] font-medium text-text-primary">{invitation.email}</span>
-                <span className="block text-[12.5px] text-text-tertiary">
+                <span className="block truncate text-[14px] font-medium text-text-primary">{inviteeLabel(invitation)}</span>
+                <span className="block truncate text-[12.5px] text-text-tertiary">
+                  {invitation.firstName || invitation.lastName ? `${invitation.email} · ` : ""}
                   {TEAM_ROLE_LABELS[invitation.role]} · envoyée {formatRelative(invitation.sentAt)}
                   {invitation.sentCount > 1 ? ` (${invitation.sentCount} fois)` : ""}
                 </span>
@@ -120,23 +121,40 @@ export function InvitationsPanel({ invitations }: { invitations: InvitationItem[
   );
 }
 
-/** Inviter : on colle les adresses (une ou toute l'équipe), on choisit le poste, chacun reçoit son lien personnel. */
+type InviteeDraft = { key: number; firstName: string; lastName: string; email: string };
+const blankInvitee = (key: number): InviteeDraft => ({ key, firstName: "", lastName: "", email: "" });
+
+/**
+ * Inviter : une ligne par personne — prénom, nom, adresse e-mail —, un poste pour toutes, chacune reçoit son lien personnel. Le prénom
+ * et le nom saluent la personne dans l'e-mail, nomment son compte, son comptoir et ses résultats : ils sont obligatoires.
+ */
 export function InviteModal({ open, onClose, onManual }: { open: boolean; onClose: () => void; onManual: () => void }) {
-  const [emails, setEmails] = useState("");
+  const [rows, setRows] = useState<InviteeDraft[]>([blankInvitee(0)]);
+  const [nextKey, setNextKey] = useState(1);
   const [role, setRole] = useState<string>("PHARMACIST");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const { push } = useToast();
-  const parsed = parseEmails(emails);
+  const filled = rows.filter((row) => row.firstName.trim() || row.lastName.trim() || row.email.trim());
+  const complete = filled.length > 0 && filled.every((row) => row.firstName.trim() && row.lastName.trim() && isEmail(normalizeEmail(row.email)));
+
+  const update = (key: number, patch: Partial<InviteeDraft>) => setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  const addRow = () => {
+    setRows((current) => [...current, blankInvitee(nextKey)]);
+    setNextKey(nextKey + 1);
+  };
+  const removeRow = (key: number) => setRows((current) => (current.length > 1 ? current.filter((row) => row.key !== key) : current));
 
   const submit = () => {
     setError(null);
-    if (parsed.valid.length === 0) return setError("Saisissez au moins une adresse e-mail.");
+    const checked = validateInvitees(rows);
+    if (!checked.ok) return setError(checked.error);
     start(async () => {
-      const result = await inviteCollaboratorsAction({ emails, role });
+      const result = await inviteCollaboratorsAction({ invitees: checked.invitees, role });
       if (!result.ok) return setError(result.error);
       push({ tone: "success", title: result.message ?? "Invitations envoyées" });
-      setEmails("");
+      setRows([blankInvitee(nextKey)]);
+      setNextKey(nextKey + 1);
       onClose();
     });
   };
@@ -146,24 +164,55 @@ export function InviteModal({ open, onClose, onManual }: { open: boolean; onClos
     <Modal
       open={open}
       onClose={onClose}
+      size="lg"
       title="Inviter des collaborateurs"
-      description="Chacun reçoit un lien personnel pour créer son compte et rejoindre votre officine avec le poste que vous choisissez."
+      description="Chacun reçoit un e-mail à son prénom, avec un lien personnel pour créer son compte et rejoindre votre officine au poste que vous choisissez."
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Annuler
           </Button>
-          <Button onClick={submit} loading={pending} disabled={parsed.valid.length === 0} leadingIcon={<Send className="size-4" />}>
-            {parsed.valid.length > 1 ? `Envoyer ${parsed.valid.length} invitations` : "Envoyer l'invitation"}
+          <Button onClick={submit} loading={pending} disabled={!complete} leadingIcon={<Send className="size-4" />}>
+            {filled.length > 1 ? `Envoyer ${filled.length} invitations` : "Envoyer l'invitation"}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         {error && <Alert tone="danger">{error}</Alert>}
-        <Field label="Adresses e-mail" htmlFor="invite-emails" required hint={`Une par ligne, ou séparées par des virgules (${MAX_INVITES_AT_ONCE} au plus).${parsed.invalid.length > 0 ? ` À corriger : ${parsed.invalid.slice(0, 2).join(", ")}` : ""}`}>
-          <Textarea id="invite-emails" rows={4} value={emails} onChange={(event) => setEmails(event.target.value)} placeholder={"claire@exemple.fr\nhugo@exemple.fr"} />
-        </Field>
+        <ul className="space-y-3">
+          {rows.map((row, index) => {
+            const label = rows.length > 1 ? ` (personne ${index + 1})` : "";
+            return (
+              <li key={row.key} className="rounded-xl border border-border-subtle p-3">
+                {rows.length > 1 && (
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[12.5px] font-medium text-text-secondary">Personne {index + 1}</span>
+                    <Button size="sm" variant="ghost" aria-label={`Retirer la personne ${index + 1}`} leadingIcon={<Trash2 className="size-4" />} onClick={() => removeRow(row.key)}>
+                      Retirer
+                    </Button>
+                  </div>
+                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Prénom" htmlFor={`invite-first-${row.key}`} required>
+                    <Input id={`invite-first-${row.key}`} aria-label={`Prénom${label}`} autoComplete="off" maxLength={PERSON_NAME_MAX} value={row.firstName} onChange={(event) => update(row.key, { firstName: event.target.value })} placeholder="Léa" />
+                  </Field>
+                  <Field label="Nom" htmlFor={`invite-last-${row.key}`} required>
+                    <Input id={`invite-last-${row.key}`} aria-label={`Nom${label}`} autoComplete="off" maxLength={PERSON_NAME_MAX} value={row.lastName} onChange={(event) => update(row.key, { lastName: event.target.value })} placeholder="Martin" />
+                  </Field>
+                  <Field label="Adresse e-mail" htmlFor={`invite-email-${row.key}`} required className="sm:col-span-2">
+                    <Input id={`invite-email-${row.key}`} aria-label={`Adresse e-mail${label}`} type="email" autoComplete="off" maxLength={160} value={row.email} onChange={(event) => update(row.key, { email: event.target.value })} placeholder="lea.martin@exemple.fr" />
+                  </Field>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {rows.length < MAX_INVITES_AT_ONCE && (
+          <Button size="sm" variant="secondary" leadingIcon={<UserPlus className="size-4" />} onClick={addRow}>
+            Ajouter une personne
+          </Button>
+        )}
         <Field label="Poste" htmlFor="invite-role" hint={hint}>
           <Select id="invite-role" value={role} onChange={(event) => setRole(event.target.value)}>
             {ROLE_CHOICES.map((option) => (

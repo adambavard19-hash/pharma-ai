@@ -1,19 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { DECLARABLE_ROLES, INVITABLE_ROLES, INVITATION_TTL_DAYS, invitationState, isDeclarableRole, isEmail, isInvitableRole, memberAccess, parseEmails, planClaim, publicPharmacyLabel, searchTerm } from "../access";
+import { DECLARABLE_ROLES, INVITABLE_ROLES, INVITATION_TTL_DAYS, invitationState, isDeclarableRole, isEmail, isInvitableRole, MAX_INVITES_AT_ONCE, PERSON_NAME_MAX, cleanPersonName, inviteeLabel, memberAccess, planClaim, validateInvitees, publicPharmacyLabel, searchTerm } from "../access";
 import { buildAccountExistsEmail, buildJoinDecisionEmail, buildJoinRequestAlertEmail, buildTeamInvitationEmail } from "../access-emails";
 
-describe("les adresses collées en vrac", () => {
-  it("sépare virgules, points-virgules, espaces, retours à la ligne ; retire les doublons et les chevrons", () => {
-    const { valid, invalid } = parseEmails("Claire@Exemple.fr, hugo@exemple.fr;\n<lea@exemple.fr>  claire@exemple.fr\n");
-    expect(valid).toEqual(["claire@exemple.fr", "hugo@exemple.fr", "lea@exemple.fr"]);
-    expect(invalid).toEqual([]);
+describe("inviter : prénom, nom et adresse de chaque personne", () => {
+  it("nettoie le prénom et le nom : caractères invisibles ou de contrôle retirés, espaces resserrés", () => {
+    expect(cleanPersonName("  Léa\u200b   Rose \n")).toBe("Léa Rose");
+    expect(cleanPersonName("Mar\u0000tin")).toBe("Mar tin");
+    expect(cleanPersonName(42)).toBe("");
   });
 
-  it("garde à part ce qui n'est pas une adresse", () => {
-    expect(parseEmails("claire@exemple.fr pas-une-adresse a@b").invalid).toEqual(["pas-une-adresse", "a@b"]);
+  it("rend les personnes nettoyées, adresses en minuscules ; ignore les lignes entièrement vides", () => {
+    const result = validateInvitees([{ firstName: " Léa ", lastName: "  Martin", email: " Lea.Martin@Exemple.fr " }, { firstName: "", lastName: "", email: "  " }]);
+    expect(result).toEqual({ ok: true, invitees: [{ firstName: "Léa", lastName: "Martin", email: "lea.martin@exemple.fr" }] });
+  });
+
+  it("prénom et nom sont obligatoires, pour chaque personne, et bornés à 80 caractères", () => {
+    expect(validateInvitees([{ firstName: "", lastName: "Martin", email: "lea@exemple.fr" }])).toEqual({ ok: false, error: "Indiquez le prénom." });
+    expect(validateInvitees([{ firstName: "Léa", lastName: " \u200b ", email: "lea@exemple.fr" }])).toEqual({ ok: false, error: "Indiquez le nom." });
+    expect(validateInvitees([{ firstName: "Léa", lastName: "Martin", email: "lea@exemple.fr" }, { firstName: "Hugo", lastName: "", email: "hugo@exemple.fr" }])).toEqual({ ok: false, error: "Indiquez le nom (personne n° 2)." });
+    expect(validateInvitees([{ firstName: "L".repeat(PERSON_NAME_MAX + 1), lastName: "Martin", email: "lea@exemple.fr" }])).toMatchObject({ ok: false });
+    expect(validateInvitees([{ firstName: "L".repeat(PERSON_NAME_MAX), lastName: "Martin", email: "lea@exemple.fr" }])).toMatchObject({ ok: true });
+  });
+
+  it("refuse une adresse invalide, une adresse en double, aucune personne, ou plus de 20 à la fois", () => {
+    expect(validateInvitees([{ firstName: "Léa", lastName: "Martin", email: "lea@exemple" }])).toMatchObject({ ok: false, error: expect.stringContaining("pas valide") });
+    expect(validateInvitees([{ firstName: "Léa", lastName: "Martin", email: "lea@exemple.fr" }, { firstName: "Léa", lastName: "M", email: "LEA@exemple.fr" }])).toMatchObject({ ok: false, error: expect.stringContaining("deux fois") });
+    expect(validateInvitees([])).toMatchObject({ ok: false });
+    expect(validateInvitees("lea@exemple.fr")).toMatchObject({ ok: false });
+    const many = Array.from({ length: MAX_INVITES_AT_ONCE + 1 }, (_, i) => ({ firstName: "A", lastName: "B", email: `p${i}@exemple.fr` }));
+    expect(validateInvitees(many)).toMatchObject({ ok: false });
     expect(isEmail("x@y.fr")).toBe(true);
     expect(isEmail("x@y")).toBe(false);
     expect(isEmail(`${"a".repeat(160)}@y.fr`)).toBe(false);
+  });
+
+  it("une invitation affiche le nom complet ; une ancienne, envoyée sans nom, son adresse", () => {
+    expect(inviteeLabel({ firstName: "Léa", lastName: "Martin", email: "lea@exemple.fr" })).toBe("Léa Martin");
+    expect(inviteeLabel({ firstName: null, lastName: null, email: "lea@exemple.fr" })).toBe("lea@exemple.fr");
   });
 });
 
@@ -92,6 +115,12 @@ describe("les messages d'entrée dans l'officine", () => {
     }
     expect(message.text).toContain("à usage unique");
     expect(message.text).not.toMatch(/mot de passe (initial|provisoire)/i);
+    // La personne est saluée par son prénom ; on lui dit qui l'invite, et dans quelle pharmacie.
+    expect(message.text.startsWith("Bonjour Claire,")).toBe(true);
+    expect(message.html).toContain("Bonjour Claire,");
+    expect(message.text).toContain("Anne Roux vous a ouvert un accès à PharmaBoost pour Pharmacie du Port");
+    // Une ancienne invitation sans prénom reste polie.
+    expect(buildTeamInvitationEmail({ firstName: null, pharmacyName: "P", inviterName: "A", roleLabel: "r", url: "u", expiresAt: new Date() }).text.startsWith("Bonjour,")).toBe(true);
   });
 
   it("l'alerte au titulaire dit que rien n'est ouvert tant qu'il n'a pas approuvé", () => {

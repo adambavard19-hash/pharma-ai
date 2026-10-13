@@ -6,6 +6,7 @@ import { hashPassword, validatePasswordStrength, verifyPassword } from "@/server
 import { getMessagingProvider } from "@/server/ai/registry";
 import { buildUserPasswordEmail } from "@/core/platform/welcome-email";
 import { publicUrl } from "@/server/public-url";
+import { presentationVideoLinks } from "@/core/platform/presentation-video";
 import { recordAudit } from "@/server/audit/log";
 import { recordDispatch } from "@/server/services/email-dispatch";
 import type { MessagingProvider } from "@/core/ai/ports";
@@ -62,6 +63,7 @@ export async function sendUserPasswordLink(
     expiresAt,
     kind,
     onboarding,
+    video: kind === "welcome" ? presentationVideoLinks(publicUrl) : null,
   });
   const messaging = deps?.messaging ?? getMessagingProvider({ demo: user.memberships[0]?.pharmacy.isDemo === true });
   const outcome = await messaging

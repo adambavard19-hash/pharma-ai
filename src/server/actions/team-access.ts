@@ -10,7 +10,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { throttled } from "@/server/security/throttle";
 import { recordAudit } from "@/server/audit/log";
 import { acceptInvitation, approveJoinRequest, inviteCollaborators, refuseJoinRequest, requestToJoin, resendInvitation, revokeInvitation, searchPharmacies, type InviteOutcome, type PublicPharmacy } from "@/server/services/team-access";
-import { parseEmails } from "@/core/team/access";
+import { MAX_INVITES_AT_ONCE } from "@/core/team/access";
 import { refuseInDemo } from "./demo-guard";
 import { fail, ok, type ActionResult } from "./types";
 
@@ -28,7 +28,8 @@ const STATUS_WORDS: Record<InviteOutcome["status"], string> = {
   UNAVAILABLE: "adresse indisponible",
 };
 
-const inviteSchema = z.object({ emails: z.string().max(4000), role: z.string().max(20), firstName: z.string().trim().max(80).optional(), lastName: z.string().trim().max(80).optional() });
+const inviteeSchema = z.object({ firstName: z.string().max(200), lastName: z.string().max(200), email: z.string().max(200) });
+const inviteSchema = z.object({ invitees: z.array(inviteeSchema).max(MAX_INVITES_AT_ONCE * 2), role: z.string().max(20) });
 
 export async function inviteCollaboratorsAction(payload: z.input<typeof inviteSchema>): Promise<ActionResult<{ results: InviteOutcome[] }>> {
   const session = await requirePermission(PERMISSIONS.TEAM_MANAGE);
@@ -36,9 +37,8 @@ export async function inviteCollaboratorsAction(payload: z.input<typeof inviteSc
   if (refused) return refused;
   const parsed = inviteSchema.safeParse(payload);
   if (!parsed.success) return fail("Demande invalide.");
-  const { valid, invalid } = parseEmails(parsed.data.emails);
-  if (invalid.length > 0) return fail(`Adresse e-mail invalide : ${invalid.slice(0, 3).join(", ")}.`);
-  const result = await inviteCollaborators(session.scope, { emails: valid, role: parsed.data.role, firstName: parsed.data.firstName, lastName: parsed.data.lastName });
+  // Prénom, nom, adresse : vérifiés (et nettoyés) par le service, qui seul écrit.
+  const result = await inviteCollaborators(session.scope, { invitees: parsed.data.invitees, role: parsed.data.role });
   if (!result.ok) return fail(result.error);
   revalidatePath("/equipe");
   const sent = result.results.filter((entry) => entry.status === "SENT" || entry.status === "SIMULATED").length;

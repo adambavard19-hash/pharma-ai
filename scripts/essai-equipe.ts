@@ -57,9 +57,13 @@ async function main() {
 
   // 1. Le titulaire de A invite quatre collaborateurs d'un coup.
   const mailsOf = ["claire", "hugo", "lea", "marc"].map((n) => `zz-${n}@zz-essai.test`);
-  const invited = await inviteCollaborators(A.scope, { emails: mailsOf, role: "TECHNICIAN" }, deps);
+  const names: Record<string, [string, string]> = { claire: ["Claire", "Martin"], hugo: ["Hugo", "Lambert"], lea: ["Léa", "Roux"], marc: ["Marc", "Petit"] };
+  const invitees = mailsOf.map((email) => { const [firstName, lastName] = names[email.slice(3, email.indexOf("@"))]; return { firstName, lastName, email }; });
+  const invited = await inviteCollaborators(A.scope, { invitees, role: "TECHNICIAN" }, deps);
   check(invited.ok && invited.results.every((r) => r.status === "SENT"), "quatre invitations envoyées d'un coup", invited.ok ? invited.results.map((r) => r.status).join(",") : invited.error);
   check(mails.length === 4 && mails.every((m) => m.text.includes("/invitation/")), "chaque collaborateur a reçu un lien personnel");
+  check(mails.find((m) => m.to === mailsOf[2])?.text.startsWith("Bonjour Léa,") === true && mails.every((m) => m.text.includes("Titulaire A vous a ouvert un accès à PharmaBoost pour ZZ Equipe A")), "chaque e-mail salue la personne par son prénom et dit qui l'invite, dans quelle pharmacie");
+  check((await listInvitations(A.id)).every((row) => row.firstName && row.lastName), "les invitations de A portent le prénom et le nom");
   const links = Object.fromEntries(mailsOf.map((email) => [email, linkOf(email)]));
   check(new Set(Object.values(links)).size === 4, "les quatre liens sont différents");
   check((await listInvitations(A.id)).length === 4 && (await listInvitations(B.id)).length === 0, "A voit ses quatre invitations, B n'en voit aucune");
@@ -67,13 +71,14 @@ async function main() {
   // 2. Isolation : B ne peut ni renvoyer, ni annuler, ni lire les invitations de A.
   const aInv = (await listInvitations(A.id))[0];
   check(!(await resendInvitation(B.scope, aInv.id, deps)).ok && !(await revokeInvitation(B.scope, aInv.id)).ok, "B ne peut ni renvoyer ni annuler une invitation de A");
-  const unavailable = await inviteCollaborators(B.scope, { emails: ["zz-claire@zz-essai.test"], role: "TECHNICIAN" }, deps);
+  const unavailable = await inviteCollaborators(B.scope, { invitees: [{ firstName: "Claire", lastName: "Martin", email: "zz-claire@zz-essai.test" }], role: "TECHNICIAN" }, deps);
   check(unavailable.ok && unavailable.results[0].status === "SENT", "B peut inviter la même adresse (aucun compte n'existe encore : rien n'est divulgué)");
 
   // 3. Les pages publiques, sur le vrai serveur.
   const claireToken = links[mailsOf[0]];
   const page = await fetch(`${BASE}/invitation/${claireToken}`).then((r) => r.text());
   check(page.includes("ZZ Equipe A") && page.includes("préparateur"), "la page du lien montre la bonne officine et le bon poste");
+  check(page.includes('value="Claire"') && page.includes('value="Martin"'), "la page du lien pré-remplit le prénom et le nom donnés par le titulaire");
   const dead = await fetch(`${BASE}/invitation/${"x".repeat(43)}`).then((r) => r.text());
   check(dead.includes("n&#x27;est plus valable") || dead.includes("n'est plus valable"), "un lien inconnu donne « plus valable »");
   const rejoindre = await fetch(`${BASE}/rejoindre`).then((r) => r.status);
@@ -85,6 +90,7 @@ async function main() {
   check(race.filter((r) => r.ok).length === 1, "cinq acceptations simultanées → un seul compte", `${race.filter((r) => r.ok).length} réussie(s)`);
   const hugo = await prisma.user.findUnique({ where: { email: mailsOf[1] }, include: { memberships: true } });
   check(Boolean(hugo) && hugo!.organizationId === A.orgId && hugo!.memberships.length === 1 && hugo!.memberships[0].pharmacyId === A.id && hugo!.memberships[0].role === "TECHNICIAN", "Hugo est dans l'organisation et l'officine de A, préparateur, et nulle part ailleurs");
+  check(hugo?.firstName === "Hugo" && hugo?.lastName === "Lambert", "le compte de Hugo porte son prénom et son nom");
   check((await previewInvitation(hugoToken)) === null, "le lien utilisé ne marche plus");
   const claire = await acceptInvitation(claireToken, { firstName: "Claire", lastName: "Martin", password: PASSWORD });
   check(claire.ok, "Claire accepte son invitation");

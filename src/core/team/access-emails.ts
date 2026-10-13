@@ -1,6 +1,7 @@
 import { DEFAULT_EMAIL_CONTEXT, emailButtonHtml, emailFrame } from "@/core/platform/email-layout";
 import { escapeHtml } from "@/core/documents/email";
 import { TIME_ZONE } from "@/config/constants";
+import { presentationVideoHtml, presentationVideoText, type PresentationVideoLinks } from "@/core/platform/presentation-video";
 
 /**
  * Les messages de l'entrée dans une officine : l'invitation du titulaire, l'alerte quand un collaborateur demande à rejoindre, la réponse du
@@ -14,10 +15,10 @@ const greet = (firstName: string | null) => (firstName ? `Bonjour ${firstName},`
 const para = (text: string) => `<p style="margin:0 0 16px;font-size:16px;line-height:26px;color:#334155">${escapeHtml(text)}</p>`;
 const hello = (firstName: string | null) => `<p style="margin:0 0 16px;font-size:16px;line-height:26px;color:#0F172A">${escapeHtml(greet(firstName))}</p>`;
 
-export function buildTeamInvitationEmail(v: { firstName: string | null; pharmacyName: string; inviterName: string; roleLabel: string; url: string; expiresAt: Date }): Message {
+export function buildTeamInvitationEmail(v: { firstName: string | null; pharmacyName: string; inviterName: string; roleLabel: string; url: string; expiresAt: Date; video?: PresentationVideoLinks | null }): Message {
   const subject = `${v.inviterName} vous invite à rejoindre ${v.pharmacyName} sur PharmaBoost`;
   const intro = `${v.inviterName} vous a ouvert un accès à PharmaBoost pour ${v.pharmacyName}, en tant que ${v.roleLabel}. Créez votre compte en une minute :`;
-  const text = [greet(v.firstName), "", intro, v.url, "", `Ce lien est personnel, à usage unique, et reste valable jusqu'au ${day(v.expiresAt)}. Vous choisirez votre mot de passe vous-même.`, "Si vous ne connaissez pas cette officine, ignorez ce message : rien ne sera créé.", "", "L'équipe PharmaBoost"].join("\n");
+  const text = [greet(v.firstName), "", intro, v.url, "", `Ce lien est personnel, à usage unique, et reste valable jusqu'au ${day(v.expiresAt)}. Vous choisirez votre mot de passe vous-même.`, "Si vous ne connaissez pas cette officine, ignorez ce message : rien ne sera créé.", ...(v.video ? ["", ...presentationVideoText(v.video)] : []), "", "L'équipe PharmaBoost"].join("\n");
   const html = emailFrame(DEFAULT_EMAIL_CONTEXT, {
     subject,
     preheader: `Créez votre compte pour rejoindre ${v.pharmacyName}.`,
@@ -25,7 +26,7 @@ export function buildTeamInvitationEmail(v: { firstName: string | null; pharmacy
     title: "Vous êtes invité(e) sur PharmaBoost",
     bodyHtml: `${hello(v.firstName)}${para(intro)}${emailButtonHtml(v.url, "Créer mon compte")}
     <p style="margin:18px 0 0;font-size:13px;line-height:20px;color:#64748B">Ce lien est personnel, à usage unique, et reste valable jusqu'au ${escapeHtml(day(v.expiresAt))}. Vous choisirez votre mot de passe vous-même.</p>
-    <p style="margin:10px 0 0;font-size:12px;line-height:18px;color:#94A3B8">Si vous ne connaissez pas cette officine, ignorez ce message : rien ne sera créé.<br>Ou copiez ce lien : ${escapeHtml(v.url)}</p>`,
+    <p style="margin:10px 0 0;font-size:12px;line-height:18px;color:#94A3B8">Si vous ne connaissez pas cette officine, ignorez ce message : rien ne sera créé.<br>Ou copiez ce lien : ${escapeHtml(v.url)}</p>${v.video ? presentationVideoHtml(v.video) : ""}`,
     reason: `Vous recevez ce message parce que le titulaire de ${v.pharmacyName} vous a invité(e).`,
   });
   return { subject, text, html };

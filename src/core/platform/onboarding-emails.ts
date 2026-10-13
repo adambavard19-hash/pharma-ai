@@ -1,5 +1,6 @@
 import { escapeHtml } from "@/core/documents/email";
 import { button, shell } from "./sales-emails";
+import { presentationVideoHtml, presentationVideoText, type PresentationVideoLinks } from "./presentation-video";
 
 /**
  * Le guide d'installation, envoyé au titulaire quand son espace est activé :
@@ -29,7 +30,7 @@ export const INSTALLATION_STEPS: { title: string; body: string }[] = [
   },
 ];
 
-export function buildInstallationGuideEmail(v: { ownerName: string; pharmacyName: string; appUrl: string; contactEmail: string; lgoLabel?: string | null; exportSteps?: string[] }): { subject: string; text: string; html: string } {
+export function buildInstallationGuideEmail(v: { ownerName: string; pharmacyName: string; appUrl: string; contactEmail: string; lgoLabel?: string | null; exportSteps?: string[]; video?: PresentationVideoLinks | null }): { subject: string; text: string; html: string } {
   const lgoText = v.lgoLabel && v.exportSteps?.length ? [`Votre logiciel : ${v.lgoLabel}. Pour sortir le stock :`, ...v.exportSteps.map((line) => `   • ${line}`), ""] : [];
   const lgoHtml = v.lgoLabel && v.exportSteps?.length ? `<div style="margin:6px 0 0;background:#f6f7f9;border-radius:12px;padding:14px 16px"><p style="margin:0;font-size:14px;line-height:21px;font-weight:600;color:#111827">Votre logiciel : ${escapeHtml(v.lgoLabel)}. Pour sortir le stock :</p><ul style="margin:8px 0 0;padding-left:20px;font-size:14px;line-height:21px;color:#374151">${v.exportSteps.map((line) => `<li style="margin:0 0 4px">${escapeHtml(line)}</li>`).join("")}</ul></div>` : "";
   const text = [
@@ -42,6 +43,7 @@ export function buildInstallationGuideEmail(v: { ownerName: string; pharmacyName
     `Ouvrir PharmaBoost : ${v.appUrl}`,
     "",
     `Une question, un blocage ? Répondez à ce message ou écrivez à ${v.contactEmail} : nous vous rappelons.`,
+    ...(v.video ? ["", ...presentationVideoText(v.video)] : []),
     "",
     "PharmaBoost",
   ].join("\n");
@@ -53,7 +55,7 @@ export function buildInstallationGuideEmail(v: { ownerName: string; pharmacyName
 <ol style="margin:18px 0 0;padding-left:22px;font-size:15px;line-height:23px;color:#374151">${INSTALLATION_STEPS.map((step) => `<li style="margin:0 0 12px"><strong style="color:#111827">${escapeHtml(step.title)}</strong><br>${escapeHtml(step.body)}</li>`).join("")}</ol>
 ${lgoHtml}
 ${button(v.appUrl, "Ouvrir PharmaBoost", "#0F766E")}
-<p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Une question, un blocage ? Répondez à ce message ou écrivez à ${escapeHtml(v.contactEmail)} : nous vous rappelons.</p>`,
+<p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Une question, un blocage ? Répondez à ce message ou écrivez à ${escapeHtml(v.contactEmail)} : nous vous rappelons.</p>${v.video ? presentationVideoHtml(v.video) : ""}`,
     "#0F766E",
   );
   return { subject: `Mettre PharmaBoost en service — ${v.pharmacyName}`, text, html };
