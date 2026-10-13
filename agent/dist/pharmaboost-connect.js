@@ -445,7 +445,7 @@ var BANNER = {
     emailAdd: "Ajouter l'e-mail du patient",
     emailSaved: "E-mail enregistr\xE9",
     emailRemove: "Retirer",
-    finish: "Vente termin\xE9e",
+    finish: "Terminer la vente",
     finishing: "Enregistrement\u2026",
     doneTitle: "Vente termin\xE9e !",
     challenge: "Challenge",

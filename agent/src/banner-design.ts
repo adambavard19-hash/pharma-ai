@@ -114,7 +114,7 @@ export const BANNER = {
     emailAdd: "Ajouter l'e-mail du patient",
     emailSaved: "E-mail enregistré",
     emailRemove: "Retirer",
-    finish: "Vente terminée",
+    finish: "Terminer la vente",
     finishing: "Enregistrement…",
     doneTitle: "Vente terminée !",
     challenge: "Challenge",

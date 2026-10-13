@@ -93,7 +93,7 @@ export function SaleIsland({
         emailEnabled={false}
         collapsible
         readOnly={!canDecide}
-        finishLabel="Valider la vente"
+        finishLabel="Terminer la vente"
         onAnswer={(index, outcome) => {
           const r = shown[index];
           if (!r || !canDecide) return;
