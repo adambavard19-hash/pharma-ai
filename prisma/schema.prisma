@@ -2576,6 +2576,8 @@ enum CentralTriggerKind {
   PRODUCT
   /// Une famille déclencheuse (« Shampoings anti-chute ») : tout produit ou médicament de la famille déclenche (clé « family:<id> »).
   FAMILY
+  /// Un code ATC officiel (ou son début) : tout médicament de la vente classé sous ce code déclenche (clé « atc:D10BA01 »).
+  ATC
 }
 
 /// Une famille déclencheuse, commune à toutes les officines : « Shampoings anti-chute », « Crèmes hydratantes visage »…

@@ -29,6 +29,9 @@ import { suggestionVigilances } from "./population-vigilance";
 /** La clé d'un produit du stock comme déclencheur. */
 export const productKey = (productId: string): string => `product:${productId}`;
 
+/** La clé d'un déclencheur par code ATC (« atc:D10BA01 ») ; un code plus court (« D10AD ») vaut pour tous ceux qu'il commence. */
+export const atcKey = (code: string): string => `atc:${code.replace(/\s+/g, "").toUpperCase()}`;
+
 /**
  * La clé d'un médicament comme déclencheur : son nom sans la forme galénique, sans accents ni casse.
  * « CORYZALIA, comprimé orodispersible » et « Coryzalia » donnent la même clé ; « DOLIPRANE 500 mg » et

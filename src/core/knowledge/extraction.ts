@@ -40,8 +40,9 @@ export const EXTRACTION_SCHEMA = {
             type: "object",
             description: "Pour type ASSOCIATION : un médicament ou un produit en appelle un autre.",
             properties: {
-              trigger_kind: { type: "string", enum: ["MEDICINE", "PRODUCT"] },
-              trigger_name: { type: "string", description: "Le médicament ou produit déclencheur, tel que le document le nomme." },
+              trigger_kind: { type: "string", enum: ["MEDICINE", "PRODUCT", "ATC", "FAMILY"] },
+              trigger_name: { type: "string", description: "Le médicament, le produit, la classe (pour ATC) ou la catégorie de produits (pour FAMILY) déclencheur, tel que le document le nomme." },
+              trigger_atc_code: { type: "string", description: "Pour trigger_kind ATC : le code ATC exact écrit dans le document (« D10BA01 »). Un seul code par association." },
               advice_product_name: { type: "string", description: "Le produit conseillé, tel que le document le nomme." },
               sentence: { type: "string", description: "Ce que le pharmacien dit, seulement si le document l'écrit. Sinon vide." },
             },
@@ -81,6 +82,8 @@ export const EXTRACTION_SYSTEM_PROMPT = [
   "- N'ajoute AUCUNE connaissance médicale qui ne soit pas écrite dans le document. Ne complète pas, ne déduis pas, ne généralise pas.",
   "- Chaque proposition porte une `quote` : la phrase exacte du document qui la justifie, recopiée mot pour mot (15 à 400 caractères). Si tu ne peux pas citer, ne propose pas.",
   "- ASSOCIATION : le document dit qu'un médicament ou un produit appelle un autre produit. Nomme-les comme le document les nomme.",
+  "- Quand le déclencheur est donné par un CODE ATC écrit dans le document, trigger_kind = ATC et trigger_atc_code = ce code recopié tel quel. « D10AD03 ou D10AD53 » = deux associations, une par code. Quand le déclencheur est une catégorie de produits de parapharmacie (« nettoyant pour peau sous traitement antiacnéique »), trigger_kind = FAMILY.",
+  "- La phrase du conseil associé (`sentence`) est recopiée du document. Les conditions écrites à côté du déclencheur (« + sécheresse oculaire ») ne sont pas des déclencheurs : ignore-les.",
   "- RULE : seulement un conseil de TOLÉRANCE (un effet attendu d'un traitement) ou de CONFORT (un inconfort possible), pour une famille de médicaments que le document nomme. Les codes ATC ne sont donnés que s'ils sont certains ; sinon la classe thérapeutique, avec les mots du document.",
   "- JAMAIS de contre-indication, d'interaction, de posologie ou de règle de sécurité : elles restent écrites dans le logiciel et ne se proposent pas. Ignore-les.",
   "- Les étiquettes (`matching_tags`) et la catégorie sont prises dans les listes fournies par l'outil ; n'en invente pas.",
@@ -142,7 +145,10 @@ export function nameIsInDocument(name: string, documentText: string): boolean {
   return words.every((word) => haystack.includes(` ${word}`));
 }
 
-export type ProposedAssociation = { triggerKind: "MEDICINE" | "PRODUCT"; triggerName: string; adviceName: string; sentence: string | null };
+export type ProposedAssociation = { triggerKind: "MEDICINE" | "PRODUCT" | "ATC" | "FAMILY"; triggerName: string; triggerAtcCode?: string | null; adviceName: string; sentence: string | null };
+
+/** Un code ATC officiel, complet ou son début : « D10BA01 », « D10AD », « J01 ». */
+export const ATC_CODE_PATTERN = /^[A-Z]\d{2}([A-Z]{1,2}(\d{2})?)?$/;
 export type ValidProposal =
   | { kind: "RULE"; title: string; quote: string; payload: CustomRuleDefinition }
   | { kind: "ASSOCIATION"; title: string; quote: string; payload: ProposedAssociation };
@@ -171,8 +177,14 @@ export function validateExtraction(claimed: unknown, documentText: string, docum
 
     if (item.type === "ASSOCIATION") {
       const raw = (item.association ?? {}) as Record<string, unknown>;
-      const triggerKind = raw.trigger_kind === "PRODUCT" ? "PRODUCT" : raw.trigger_kind === "MEDICINE" ? "MEDICINE" : null;
+      const triggerKind = raw.trigger_kind === "PRODUCT" || raw.trigger_kind === "MEDICINE" || raw.trigger_kind === "ATC" || raw.trigger_kind === "FAMILY" ? raw.trigger_kind : null;
       const triggerName = text(raw.trigger_name);
+      const triggerAtcCode = triggerKind === "ATC" ? text(raw.trigger_atc_code).replace(/\s+/g, "").toUpperCase() : null;
+      // Un code ATC doit être un vrai code ET être écrit dans le document : jamais un code deviné.
+      if (triggerKind === "ATC" && (!triggerAtcCode || !ATC_CODE_PATTERN.test(triggerAtcCode) || !normalizeText(documentText).split(" ").includes(triggerAtcCode.toLowerCase()))) {
+        discarded.push({ reason: "code ATC absent du document ou invalide" });
+        continue;
+      }
       const adviceName = text(raw.advice_product_name);
       const sentence = text(raw.sentence) || null;
       if (!triggerKind || triggerName.length < 2 || adviceName.length < 2) {
@@ -187,10 +199,15 @@ export function validateExtraction(claimed: unknown, documentText: string, docum
         discarded.push({ reason: "phrase trop longue" });
         continue;
       }
-      const key = `A|${normalizeText(triggerName)}|${normalizeText(adviceName)}`;
+      const key = `A|${triggerAtcCode ?? normalizeText(triggerName)}|${normalizeText(adviceName)}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      proposals.push({ kind: "ASSOCIATION", title: `${triggerName} → ${adviceName}`, quote, payload: { triggerKind, triggerName, adviceName, sentence } });
+      proposals.push({
+        kind: "ASSOCIATION",
+        title: `${triggerAtcCode ? `${triggerAtcCode} · ` : ""}${triggerName} → ${adviceName}`,
+        quote,
+        payload: { triggerKind, triggerName, ...(triggerAtcCode ? { triggerAtcCode } : {}), adviceName, sentence },
+      });
     } else if (item.type === "RULE") {
       const raw = (item.rule ?? {}) as Record<string, unknown>;
       const parsed = parseCustomRuleDefinition({

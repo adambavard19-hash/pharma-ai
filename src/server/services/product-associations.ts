@@ -4,6 +4,7 @@ import { recordAudit } from "@/server/audit/log";
 import { normalizeSearchText } from "@/core/reference/search";
 import { associationError, cleanSentence, MAX_ADVICE_PER_SAVE, MAX_TRIGGERS_PER_SAVE, sentenceError } from "@/core/associations/rules";
 import { drugKey, productKey, type AssociationInput } from "@/core/ai/engines/associations";
+export { atcKey } from "@/core/ai/engines/associations";
 import { belongsToFamily, familyKey, type FamilyDefinition } from "@/core/associations/families";
 import type { CatalogProduct } from "@/core/ai/types";
 import type { TenantScope } from "@/server/db/tenant";
@@ -26,7 +27,7 @@ const digitsOf = (text: string | null | undefined): string | null => {
   return digits.length >= 7 ? digits : null;
 };
 
-export type LineForAssociations = { position: number; status: string; drugName: string | null; rawText: string | null; drugSpecialtyId?: string | null };
+export type LineForAssociations = { position: number; status: string; drugName: string | null; rawText: string | null; drugSpecialtyId?: string | null; atcCode?: string | null };
 
 /**
  * Ce que chaque ligne de la vente EST : un médicament (par son nom, ou par la spécialité à laquelle elle est rattachée) et,
@@ -36,7 +37,7 @@ export type LineForAssociations = { position: number; status: string; drugName: 
 export async function resolveLineTriggers(
   pharmacyId: string,
   lines: LineForAssociations[],
-  wanted: { productIds: string[]; drugKeys: Set<string>; families?: FamilyDefinition[] },
+  wanted: { productIds: string[]; drugKeys: Set<string>; families?: FamilyDefinition[]; atcKeys?: Set<string> },
 ): Promise<AssociationInput["lines"]> {
   const confirmed = lines.filter((line) => line.status === "CONFIRMED" && line.drugName);
   if (confirmed.length === 0) return [];
@@ -79,6 +80,12 @@ export async function resolveLineTriggers(
     for (const name of names) {
       const key = drugKey(name);
       if (wanted.drugKeys.has(key) && !keys.includes(key)) keys.push(key);
+    }
+
+    // Les codes ATC : le code officiel du médicament de la ligne commence par celui de l'association.
+    const atc = (line.atcCode ?? "").replace(/\s+/g, "").toUpperCase();
+    if (atc && wanted.atcKeys?.size) {
+      for (const key of wanted.atcKeys) if (atc.startsWith(key.slice("atc:".length)) && !keys.includes(key)) keys.push(key);
     }
 
     // Les familles déclencheuses : le libellé de la ligne (et le nom officiel du médicament), son code-barres, son nom de médicament.
@@ -189,6 +196,7 @@ export async function loadAssociationInput(scope: TenantScope, lines: LineForAss
     productIds: [...new Set([...rows.map((row) => row.triggerProductId).filter((id): id is string => id !== null), ...common.triggerProductIds])],
     drugKeys: new Set(rules.map((rule) => rule.triggerKey).filter((key) => key.startsWith("drug:"))),
     families: common.families,
+    atcKeys: new Set(rules.map((rule) => rule.triggerKey).filter((key) => key.startsWith("atc:"))),
   };
   return { rules, lines: await resolveLineTriggers(scope.pharmacyId, lines, wanted), products: [...drugProducts.values()] };
 }

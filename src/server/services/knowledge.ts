@@ -48,10 +48,30 @@ export async function findProductByName(name: string): Promise<ProductMatch> {
   return matching.length === 0 ? { status: "NONE" } : { status: "AMBIGUOUS", count: matching.length };
 }
 
+/**
+ * La famille déclencheuse que le document nomme : celle dont tous les mots significatifs du nom sont dans la phrase du
+ * document (« Nettoyants peaux grasses » ⊂ « nettoyant pour peau grasse… »), sinon celle qui en partage le plus (au moins deux).
+ */
+export async function findFamilyByName(name: string): Promise<{ id: string; name: string } | null> {
+  const stem = (word: string) => word.replace(/(s|x)$/, "");
+  const wanted = new Set(normalizeText(name).split(" ").filter((word) => word.length >= 4).map(stem));
+  if (wanted.size === 0) return null;
+  const families = await prisma.triggerFamily.findMany({ where: { status: { not: "REMOVED" } }, select: { id: true, name: true } });
+  let best: { id: string; name: string; score: number } | null = null;
+  for (const family of families) {
+    const words = normalizeText(family.name).split(" ").filter((word) => word.length >= 4).map(stem);
+    const shared = words.filter((word) => wanted.has(word)).length;
+    const score = shared === words.length ? shared + 100 : shared;
+    if (shared >= 2 && (!best || score > best.score)) best = { ...family, score };
+  }
+  return best ? { id: best.id, name: best.name } : null;
+}
+
 /** Pourquoi une association ne peut pas encore être acceptée (vide quand tout est prêt). */
 export function associationProblem(payload: StoredAssociation): string | null {
   const missing: string[] = [];
   if (payload.triggerKind === "PRODUCT" && !payload.triggerEan) missing.push(`le produit « ${payload.triggerName} »`);
+  if (payload.triggerKind === "FAMILY" && !payload.triggerFamilyId) missing.push(`la famille « ${payload.triggerName} » (créez-la dans Conseils → Familles déclencheuses)`);
   if (!payload.adviceEan) missing.push(`le produit conseillé « ${payload.adviceName} »`);
   return missing.length ? `À compléter : choisissez ${missing.join(" et ")} dans les produits des pharmacies (aucun résultat sûr n'a été trouvé tout seul).` : null;
 }
@@ -61,6 +81,10 @@ async function resolveAssociation(payload: ProposedAssociation, find: (name: str
   if (payload.triggerKind === "PRODUCT") {
     const match = await find(payload.triggerName);
     if (match.status === "FOUND") { stored.triggerEan = match.ean; stored.triggerResolvedName = match.name; }
+  }
+  if (payload.triggerKind === "FAMILY") {
+    const family = await findFamilyByName(payload.triggerName);
+    if (family) { stored.triggerFamilyId = family.id; stored.triggerResolvedName = family.name; }
   }
   const advice = await find(payload.adviceName);
   if (advice.status === "FOUND") { stored.adviceEan = advice.ean; stored.adviceResolvedName = advice.name; }
@@ -197,7 +221,14 @@ export async function decideProposal(admin: Admin, id: string, decision: "ACCEPT
       const problem = associationProblem(payload);
       if (problem) return { ok: false, error: problem };
       const created = await addCentralAssociation(admin, {
-        trigger: payload.triggerKind === "MEDICINE" ? { kind: "MEDICINE", name: payload.triggerName } : { kind: "PRODUCT", ean: payload.triggerEan!, name: payload.triggerResolvedName ?? payload.triggerName },
+        trigger:
+          payload.triggerKind === "MEDICINE"
+            ? { kind: "MEDICINE", name: payload.triggerName }
+            : payload.triggerKind === "ATC"
+              ? { kind: "ATC", code: payload.triggerAtcCode ?? "", label: payload.triggerName }
+              : payload.triggerKind === "FAMILY"
+                ? { kind: "FAMILY", familyId: payload.triggerFamilyId! }
+                : { kind: "PRODUCT", ean: payload.triggerEan!, name: payload.triggerResolvedName ?? payload.triggerName },
         advice: { ean: payload.adviceEan!, name: payload.adviceResolvedName ?? payload.adviceName },
         sentence: payload.sentence,
       });

@@ -380,7 +380,11 @@ export async function analysePrescription(params: {
   params.onStage?.("ENGINE");
   // Second axe du conseil : les associations de produits de l'officine (un produit conseil en appelle un autre) et
   // les lignes de la vente qui SONT un produit du stock. Aucune requête de plus si l'officine n'en a pas écrit.
-  const associations = await loadAssociationInput(params.scope, prescription.lines);
+  // Le code ATC de chaque ligne (référentiel, classification) : une association peut être déclenchée par un code ATC.
+  const associations = await loadAssociationInput(
+    params.scope,
+    prescription.lines.map((line) => ({ ...line, atcCode: line.drugName ? (knowledge.get(line.drugName.toLowerCase())?.atcCode ?? null) : null })),
+  );
   // Un médicament sans ordonnance choisi comme produit proposé (« Mes associations ») entre au catalogue du moteur AVANT
   // l'analyse : il passe par les mêmes contrôles de sécurité que tout conseil (prescription, substance en double, vigilances).
   if (associations?.products.length) {

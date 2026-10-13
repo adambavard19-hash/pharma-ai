@@ -71,12 +71,12 @@ export function ruleFacets(rule: CentralRuleView, robotKeys: ReadonlySet<string>
 export function associationFacets(association: CentralAssociationView, robotKeys: ReadonlySet<string>): HubFacets {
   return {
     id: `association:${association.id}`,
-    trigger: association.triggerKind === "MEDICINE" ? "MEDICINE" : "PRODUCT",
+    trigger: association.triggerKind === "MEDICINE" || association.triggerKind === "ATC" ? "MEDICINE" : "PRODUCT",
     review: association.status === "ACTIVE",
     robot: robotKeys.has(`association:${association.id}`),
     removed: association.status === "REMOVED",
     atcPrefixes: [],
-    searchText: join([association.triggerLabel, association.adviceLabel, association.sentence, association.adviceEan, association.triggerKind === "MEDICINE" ? "médicament" : association.triggerKind === "FAMILY" ? "famille produit association" : "produit association", CENTRAL_STATUS_LABELS[association.status], association.createdBy, association.decidedBy]),
+    searchText: join([association.triggerLabel, association.adviceLabel, association.sentence, association.adviceEan, association.triggerKind === "MEDICINE" ? "médicament" : association.triggerKind === "FAMILY" ? "famille produit association" : association.triggerKind === "ATC" ? "code atc médicament" : "produit association", CENTRAL_STATUS_LABELS[association.status], association.createdBy, association.decidedBy]),
   };
 }
 

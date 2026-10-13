@@ -184,6 +184,24 @@ describe("les associations communes à toutes les officines", () => {
     expect(input?.lines).toEqual([{ lineIndex: 0, keys: ["family:f1"], productId: null }]);
   });
 
+  it("un code ATC : tout médicament de la vente classé sous ce code (ou ce début de code) déclenche", async () => {
+    mocks.prisma.centralAssociation.findMany.mockResolvedValue([
+      central({ id: "ca5", triggerKind: "ATC", triggerKey: "atc:D10BA01" }),
+      central({ id: "ca6", triggerKind: "ATC", triggerKey: "atc:D07A", adviceEan: "3401111111111" }),
+    ]);
+    mocks.prisma.product.findMany.mockResolvedValueOnce([{ id: "p_advice", ean: "3401111111111" }]);
+    const input = await loadAssociationInput(SCOPE, [
+      { ...line(0, "CONTRACNE 20 mg, capsule"), atcCode: "D10BA01" },
+      { ...line(1, "LOCOID 0,1 %, crème"), atcCode: "d07ab02" },
+      { ...line(2, "DOLIPRANE 1000 mg"), atcCode: "N02BE01" },
+    ]);
+    expect(input?.rules.map((rule) => rule.triggerKey)).toEqual(["atc:D10BA01", "atc:D07A"]);
+    expect(input?.lines).toEqual([
+      { lineIndex: 0, keys: ["atc:D10BA01"], productId: null },
+      { lineIndex: 1, keys: ["atc:D07A"], productId: null },
+    ]);
+  });
+
   it("une famille supprimée ne déclenche plus rien", async () => {
     mocks.prisma.centralAssociation.findMany.mockResolvedValue([central({ id: "ca4", triggerKind: "FAMILY", triggerKey: "family:f1" })]);
     mocks.prisma.product.findMany.mockResolvedValueOnce([{ id: "p_advice", ean: "3401111111111" }]);

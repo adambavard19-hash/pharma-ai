@@ -3,6 +3,8 @@ import type { ProposedAssociation } from "@/core/knowledge/extraction";
 /** La proposition d'association telle qu'on la garde : ce que le document dit, et les produits retrouvés dans les stocks des pharmacies. */
 export type StoredAssociation = ProposedAssociation & {
   triggerEan?: string | null;
+  /** Pour un déclencheur FAMILY : la famille déclencheuse retrouvée par son nom (Console → Conseils → Familles). */
+  triggerFamilyId?: string | null;
   triggerResolvedName?: string | null;
   adviceEan?: string | null;
   adviceResolvedName?: string | null;

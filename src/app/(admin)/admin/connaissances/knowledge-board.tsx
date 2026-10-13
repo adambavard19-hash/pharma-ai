@@ -253,7 +253,7 @@ function ProposalItem({ proposal }: { proposal: ProposalCard }) {
   const [association, setAssociation] = useState(proposal.kind === "ASSOCIATION" ? (proposal.payload as StoredAssociation) : null);
   const { push } = useToast();
   const rule = proposal.kind === "RULE" ? (proposal.payload as CustomRuleDefinition) : null;
-  const problem = association && ((association.triggerKind === "PRODUCT" && !association.triggerEan) || !association.adviceEan) ? proposal.problem ?? "À compléter." : null;
+  const problem = association && ((association.triggerKind === "PRODUCT" && !association.triggerEan) || (association.triggerKind === "FAMILY" && !association.triggerFamilyId) || !association.adviceEan) ? proposal.problem ?? "À compléter." : null;
 
   const decide = (decision: "ACCEPT" | "REJECT") =>
     startTransition(async () => {
@@ -294,8 +294,8 @@ function ProposalItem({ proposal }: { proposal: ProposalCard }) {
       {association && (
         <div className="space-y-3 text-[13px]">
           <p className="text-text-secondary">
-            <strong className="text-text-primary">{association.triggerResolvedName ?? association.triggerName}</strong>
-            {association.triggerKind === "MEDICINE" ? " (médicament)" : " (produit)"} appelle <strong className="text-text-primary">{association.adviceResolvedName ?? association.adviceName}</strong>
+            <strong className="text-text-primary">{association.triggerKind === "ATC" && association.triggerAtcCode ? `${association.triggerAtcCode} · ` : ""}{association.triggerResolvedName ?? association.triggerName}</strong>
+            {association.triggerKind === "MEDICINE" ? " (médicament)" : association.triggerKind === "ATC" ? " (code ATC : tous les médicaments de ce code)" : association.triggerKind === "FAMILY" ? " (famille de produits)" : " (produit)"} appelle <strong className="text-text-primary">{association.adviceResolvedName ?? association.adviceName}</strong>
             {association.sentence ? <> — « {association.sentence} »</> : null}
           </p>
           {association.triggerKind === "PRODUCT" && !association.triggerEan && (

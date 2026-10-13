@@ -105,3 +105,31 @@ describe("le découpage d'un long document", () => {
     expect(chunkText("court")).toEqual(["court"]);
   });
 });
+
+describe("un document d'associations par code ATC (série ATC 01 du fondateur)", () => {
+  const DOC = [
+    "1. D10BA01 - Isotrétinoïne orale | Avène Cleanance Hydra Soin réparateur ultra-apaisant | Ce traitement peut dessécher la peau. Un soin hydratant adapté aide à limiter les tiraillements dès le début du traitement.",
+    "11. Catégorie para : nettoyant pour peau sous traitement antiacnéique | Avène Cleanance Hydra Soin réparateur ultra-apaisant | Votre nettoyant peut être complété par un hydratant si le traitement dessèche votre peau.",
+  ].join("\n");
+  const item = (association: Record<string, unknown>, quote = "D10BA01 - Isotrétinoïne orale | Avène Cleanance Hydra Soin réparateur ultra-apaisant") => ({ type: "ASSOCIATION", quote, association });
+
+  it("garde le code ATC écrit dans le document, et la phrase du conseil associé", () => {
+    const { proposals } = validateExtraction({ items: [item({ trigger_kind: "ATC", trigger_name: "Isotrétinoïne orale", trigger_atc_code: "d10ba01", advice_product_name: "Avène Cleanance Hydra Soin réparateur", sentence: "Ce traitement peut dessécher la peau." })] }, DOC, "Série ATC 01");
+    expect(proposals[0]).toMatchObject({ kind: "ASSOCIATION", title: "D10BA01 · Isotrétinoïne orale → Avène Cleanance Hydra Soin réparateur", payload: { triggerKind: "ATC", triggerAtcCode: "D10BA01" } });
+  });
+
+  it("écarte un code ATC que le document n'écrit pas (jamais un code deviné)", () => {
+    const { proposals, discarded } = validateExtraction({ items: [item({ trigger_kind: "ATC", trigger_name: "Isotrétinoïne orale", trigger_atc_code: "D10BA02", advice_product_name: "Avène Cleanance Hydra Soin réparateur" })] }, DOC, "Série ATC 01");
+    expect(proposals).toHaveLength(0);
+    expect(discarded[0].reason).toMatch(/code ATC/);
+  });
+
+  it("une catégorie de parapharmacie devient un déclencheur FAMILY", () => {
+    const { proposals } = validateExtraction(
+      { items: [item({ trigger_kind: "FAMILY", trigger_name: "nettoyant pour peau sous traitement antiacnéique", advice_product_name: "Avène Cleanance Hydra Soin réparateur" }, "nettoyant pour peau sous traitement antiacnéique | Avène Cleanance Hydra")] },
+      DOC,
+      "Série ATC 01",
+    );
+    expect(proposals[0]).toMatchObject({ payload: { triggerKind: "FAMILY", triggerName: "nettoyant pour peau sous traitement antiacnéique" } });
+  });
+});

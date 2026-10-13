@@ -46,6 +46,7 @@ const associationSchema = z.object({
     z.object({ kind: z.literal("MEDICINE"), name: z.string().trim().min(2).max(200) }),
     z.object({ kind: z.literal("PRODUCT"), ean: z.string().trim().min(7).max(20), name: z.string().trim().min(1).max(200) }),
     z.object({ kind: z.literal("FAMILY"), familyId: z.string().trim().min(1).max(40) }),
+    z.object({ kind: z.literal("ATC"), code: z.string().trim().min(3).max(10), label: z.string().trim().max(120).nullable() }),
   ]),
   advice: z.object({ ean: z.string().trim().min(7).max(20), name: z.string().trim().min(1).max(200) }),
   sentence: z.string().max(600).nullable().optional(),

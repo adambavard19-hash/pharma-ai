@@ -4,7 +4,7 @@ import { Prisma } from "@/generated/prisma";
 import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import { ADVICE_RULES, type AdviceRule } from "@/core/ai/engines/advice";
-import { drugKey } from "@/core/ai/engines/associations";
+import { atcKey, drugKey } from "@/core/ai/engines/associations";
 import { summariseRuleFeedback, type RuleFeedback } from "@/core/ai/rule-feedback";
 import { cleanSentence } from "@/core/associations/rules";
 import {
@@ -124,7 +124,7 @@ export type CentralRuleView = {
 
 export type CentralAssociationView = {
   id: string;
-  triggerKind: "MEDICINE" | "PRODUCT" | "FAMILY";
+  triggerKind: "MEDICINE" | "PRODUCT" | "FAMILY" | "ATC";
   triggerLabel: string;
   adviceLabel: string;
   adviceEan: string;
@@ -310,8 +310,11 @@ export async function addCustomRule(admin: Admin, raw: unknown): Promise<{ ok: t
 // Les associations communes
 // ---------------------------------------------------------------------------------------------------------------
 
+/** Un code ATC officiel, complet ou son début : « D10BA01 », « D10AD », « J01 ». */
+const ATC_CODE = /^[A-Z]\d{2}([A-Z]{1,2}(\d{2})?)?$/;
+
 export type AssociationDraft = {
-  trigger: { kind: "MEDICINE"; name: string } | { kind: "PRODUCT"; ean: string; name: string } | { kind: "FAMILY"; familyId: string };
+  trigger: { kind: "MEDICINE"; name: string } | { kind: "PRODUCT"; ean: string; name: string } | { kind: "FAMILY"; familyId: string } | { kind: "ATC"; code: string; label: string | null };
   advice: { ean: string; name: string };
   sentence: string | null;
 };
@@ -323,13 +326,29 @@ export async function addCentralAssociation(admin: Admin, draft: AssociationDraf
     if (!family) return { ok: false, error: "Famille introuvable." };
     familyName = family.name;
   }
+  if (draft.trigger.kind === "ATC" && !ATC_CODE.test(draft.trigger.code.replace(/\s+/g, "").toUpperCase())) {
+    return { ok: false, error: "Code ATC invalide : une lettre, deux chiffres, puis la suite (« D10BA01 », « D10AD »)." };
+  }
   const triggerKey =
-    draft.trigger.kind === "MEDICINE" ? drugKey(draft.trigger.name) : draft.trigger.kind === "FAMILY" ? `family:${draft.trigger.familyId}` : `ean:${draft.trigger.ean.replace(/\D/g, "")}`;
+    draft.trigger.kind === "MEDICINE"
+      ? drugKey(draft.trigger.name)
+      : draft.trigger.kind === "FAMILY"
+        ? `family:${draft.trigger.familyId}`
+        : draft.trigger.kind === "ATC"
+          ? atcKey(draft.trigger.code)
+          : `ean:${draft.trigger.ean.replace(/\D/g, "")}`;
   const adviceEan = draft.advice.ean.replace(/\D/g, "");
   const sentence = cleanSentence(draft.sentence);
   const problem = centralAssociationError({ triggerKey: triggerKey === "drug:" ? "" : triggerKey, adviceEan, sentence });
   if (problem) return { ok: false, error: problem };
-  const triggerLabel = draft.trigger.kind === "MEDICINE" ? draft.trigger.name.split(",")[0].trim() : draft.trigger.kind === "FAMILY" ? (familyName as string) : draft.trigger.name;
+  const triggerLabel =
+    draft.trigger.kind === "MEDICINE"
+      ? draft.trigger.name.split(",")[0].trim()
+      : draft.trigger.kind === "FAMILY"
+        ? (familyName as string)
+        : draft.trigger.kind === "ATC"
+          ? [triggerKey.slice("atc:".length), draft.trigger.label?.trim()].filter(Boolean).join(" · ")
+          : draft.trigger.name;
   try {
     const created = await prisma.centralAssociation.create({
       data: {

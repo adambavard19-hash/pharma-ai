@@ -265,7 +265,7 @@ export function AssociationItem({ association }: { association: AssociationCard 
                 decidedAt={association.decidedAt}
                 extra={
                   <>
-                    <Badge tone="neutral">{association.triggerKind === "MEDICINE" ? "Déclenché par un médicament" : association.triggerKind === "FAMILY" ? "Déclenché par une famille" : "Déclenché par un produit"}</Badge>
+                    <Badge tone="neutral">{association.triggerKind === "MEDICINE" ? "Déclenché par un médicament" : association.triggerKind === "FAMILY" ? "Déclenché par une famille" : association.triggerKind === "ATC" ? "Déclenché par un code ATC" : "Déclenché par un produit"}</Badge>
                     {association.fromRobot && <Badge tone="info">Proposé par le robot, validé</Badge>}
                     {association.modified && <Badge tone="info">Modifié{association.modified.by ? ` par ${association.modified.by}` : ""} le {formatDate(association.modified.at)}</Badge>}
                   </>
@@ -472,7 +472,9 @@ type KnownProduct = { ean: string; name: string; brand: string | null };
 export type FamilyChoice = { id: string; name: string; count: number };
 
 export function NewAssociationForm({ onDone, families = [], initialFamilyId = null }: { onDone: () => void; families?: FamilyChoice[]; initialFamilyId?: string | null }) {
-  const [mode, setMode] = useState<"MEDICINE" | "PRODUCT" | "FAMILY">(initialFamilyId ? "FAMILY" : "MEDICINE");
+  const [mode, setMode] = useState<"MEDICINE" | "PRODUCT" | "FAMILY" | "ATC">(initialFamilyId ? "FAMILY" : "MEDICINE");
+  const [atcCode, setAtcCode] = useState("");
+  const [atcLabel, setAtcLabel] = useState("");
   const [familyId, setFamilyId] = useState<string>(initialFamilyId ?? "");
   const [medicine, setMedicine] = useState<Medicine | null>(null);
   const [product, setProduct] = useState<KnownProduct | null>(null);
@@ -493,6 +495,10 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
           ? familyId
             ? ({ kind: "FAMILY", familyId } as const)
             : null
+          : mode === "ATC"
+            ? atcCode.trim()
+              ? ({ kind: "ATC", code: atcCode.trim(), label: atcLabel.trim() || null } as const)
+              : null
           : product
             ? ({ kind: "PRODUCT", ean: product.ean, name: product.name } as const)
             : null;
@@ -516,7 +522,7 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
       <div className="grid items-start gap-4 md:grid-cols-[1fr_auto_1fr]">
         <div className="space-y-3">
           <div role="tablist" aria-label="Ce qui déclenche l'association" className="inline-flex rounded-lg bg-surface-sunken p-1 text-[13px] font-medium">
-            {([["MEDICINE", "Un médicament"], ["PRODUCT", "Un produit"], ["FAMILY", "Une famille"]] as const).map(([key, label]) => (
+            {([["MEDICINE", "Un médicament"], ["ATC", "Un code ATC"], ["PRODUCT", "Un produit"], ["FAMILY", "Une famille"]] as const).map(([key, label]) => (
               <button
                 key={key}
                 type="button"
@@ -529,7 +535,16 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
               </button>
             ))}
           </div>
-          {mode === "FAMILY" ? (
+          {mode === "ATC" ? (
+            <div className="space-y-3">
+              <Field label="Quand un médicament de ce code ATC est dans la vente" htmlFor="central-atc" hint="Le code officiel (« D10BA01 »), ou son début pour toute une classe (« D10AD »).">
+                <Input id="central-atc" value={atcCode} maxLength={10} onChange={(event) => setAtcCode(event.target.value.toUpperCase())} placeholder="D10BA01" />
+              </Field>
+              <Field label="Nom de la classe (facultatif)" htmlFor="central-atc-label">
+                <Input id="central-atc-label" value={atcLabel} maxLength={120} onChange={(event) => setAtcLabel(event.target.value)} placeholder="Isotrétinoïne orale" />
+              </Field>
+            </div>
+          ) : mode === "FAMILY" ? (
             <Field label="Quand un produit de cette famille est dans la vente" htmlFor="central-family" hint={families.length === 0 ? "Créez d'abord une famille (filtre « Familles déclencheuses »)." : "Tout produit de la famille déclenche le conseil, dans chaque pharmacie."}>
               <Select id="central-family" value={familyId} onChange={(event) => setFamilyId(event.target.value)}>
                 <option value="">Choisir une famille…</option>
