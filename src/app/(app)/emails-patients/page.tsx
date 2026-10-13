@@ -17,14 +17,17 @@ const when = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "
 
 /**
  * « E-mails aux patients » : les bilans envoyés par e-mail depuis le comptoir. Au comptoir, c'est la seule chose qui part au
- * patient. Réservé au titulaire (une vue de toute l'officine, tous comptoirs confondus). Aucune adresse : elle est effacée après
- * l'envoi ; aucune ouverture : elle n'est pas suivie.
+ * patient. Le titulaire voit toute l'officine, tous comptoirs confondus ; un collaborateur, les bilans de SES ventes seulement
+ * (consigne du fondateur du 13 oct. 2026), jamais ceux des collègues. Aucune adresse : elle est effacée après l'envoi ; aucune
+ * ouverture : elle n'est pas suivie.
  */
 export default async function PatientEmailsPage({ searchParams }: { searchParams: Promise<{ periode?: string; etat?: string }> }) {
-  const session = await requirePermission(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
+  const session = await requirePermission(PERMISSIONS.PATIENT_EMAILS_VIEW);
+  // Toute l'officine : la vue de titulaire (les chiffres de l'équipe). Sinon, les ventes de la personne connectée.
+  const seesWholePharmacy = session.permissions.has(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
   const params = await searchParams;
   const { period, state } = resolveEmailFilters(params);
-  const { rows, truncated } = await listPatientEmails(session.scope, { days: period.days, states: state.states });
+  const { rows, truncated } = await listPatientEmails(session.scope, { days: period.days, states: state.states, ...(seesWholePharmacy ? {} : { handledBy: session.scope.userId }) });
   const href = (next: { periode?: string; etat?: string }) => {
     const query = new URLSearchParams({ periode: next.periode ?? period.key, etat: next.etat ?? state.key });
     return `/emails-patients?${query.toString()}`;
@@ -34,7 +37,11 @@ export default async function PatientEmailsPage({ searchParams }: { searchParams
     <div className="space-y-6">
       <PageHeader
         title="E-mails aux patients"
-        description="Les bilans envoyés par e-mail à vos patients depuis le comptoir, avec leur accord : quand, par quel comptoir, avec quels produits, et si l'envoi a réussi. L'adresse du patient est effacée après l'envoi : elle n'apparaît jamais ici."
+        description={
+          seesWholePharmacy
+            ? "Les bilans envoyés par e-mail à vos patients depuis le comptoir, avec leur accord : quand, par quel comptoir, avec quels produits, et si l'envoi a réussi. L'adresse du patient est effacée après l'envoi : elle n'apparaît jamais ici."
+            : "Les bilans envoyés par e-mail depuis vos ventes, avec l'accord du patient : quand, par quel comptoir, avec quels produits, et si l'envoi a réussi. Ceux de vos collègues n'apparaissent pas ici. L'adresse du patient est effacée après l'envoi."
+        }
       />
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">

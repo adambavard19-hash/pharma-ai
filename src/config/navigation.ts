@@ -41,11 +41,14 @@ import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
  * Aucune page n'a été supprimée :
  * les anciennes adresses répondent toujours ou redirigent.
  *
- * Elle se plie au rôle, et c'est une décision de produit autant que de droits :
- * un collaborateur voit peu d'entrées — vendre, patients, suivis, stock — et
- * rien de la gestion. Le titulaire voit les mêmes, plus ses vues de gestion. Un
- * groupe sans entrée visible n'est pas affiché. Personne n'a à traverser des
- * écrans qui ne le concernent pas pour atteindre le sien.
+ * Elle se plie au rôle, et c'est une décision de produit autant que de droits.
+ * Consigne du fondateur (13 oct. 2026) : « Tout ce qui n'est pas le titulaire
+ * comme espace doit avoir seulement comme onglets : Au comptoir, Mes
+ * associations, E-mails aux patients, l'espace Découvrir, et Contact support. »
+ * C'est `COLLABORATOR_MENU`, une liste blanche explicite ; le titulaire voit tout
+ * le menu. « Contact support » n'est pas une entrée de ce tableau : c'est le lien
+ * toujours visible en bas du menu, pour tout le monde. Un groupe sans entrée
+ * visible n'est pas affiché.
  *
  * Tout ce qui a quitté ce menu reste atteignable (cf. `OFF_MENU_DESTINATIONS`) :
  * retirer du menu n'est pas supprimer. Ce qui disparaît, c'est la charge
@@ -103,9 +106,9 @@ export const NAVIGATION: NavItem[] = [
     subtitle: "Conseils et associations personnalisés",
     icon: Link2,
     // Deuxième entrée du menu, juste après « Au comptoir » (consigne du fondateur, 13 oct. 2026 : rubrique importante).
-    // Décider quel produit en appelle quel autre est un acte de pharmacien (ou de titulaire) : la même permission que
-    // les règles de conseil de l'officine. L'équipe au comptoir voit le résultat sur la carte, pas l'écran.
-    permission: PERMISSIONS.RECOMMENDATION_RULES_MANAGE,
+    // Ouverte à toute l'équipe (consigne du 13 oct. 2026) : la voir demande ASSOCIATIONS_VIEW, l'écrire ASSOCIATIONS_MANAGE
+    // (pharmacien, préparateur, titulaire) — une permission à part, qui n'ouvre pas les règles de conseil de l'officine.
+    permission: PERMISSIONS.ASSOCIATIONS_VIEW,
     match: ["/associations"],
     description: "Quand un produit ou un médicament est dans la vente, les produits de votre stock que PharmaBoost propose avec",
     group: "pharmacie",
@@ -115,7 +118,9 @@ export const NAVIGATION: NavItem[] = [
     label: "Mon stock",
     subtitle: "Disponibilités et produits",
     icon: Box,
-    permission: PERMISSIONS.STOCK_VIEW,
+    // Espace du titulaire (consigne du 13 oct. 2026). STOCK_VIEW, que toute l'équipe détient, garde toujours la PAGE
+    // (une carte du comptoir peut mener à la fiche d'un produit) ; l'ENTRÉE de menu, elle, est celle du titulaire.
+    permission: PERMISSIONS.MANAGEMENT_MENU,
     match: ["/stock", "/stocks", "/produits"],
     description: "Ce que vous avez en rayon, la mise à jour du stock, les dates courtes",
     group: "pharmacie",
@@ -150,8 +155,9 @@ export const NAVIGATION: NavItem[] = [
     label: "E-mails aux patients",
     subtitle: "Suivis et communications",
     icon: MailCheck,
-    // Toute l'officine, tous comptoirs confondus : une vue de titulaire (les chiffres de l'équipe aussi).
-    permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
+    // Ouverte à l'équipe (consigne du 13 oct. 2026) : un collaborateur voit les bilans de SES ventes ; le titulaire
+    // (ANALYTICS_VIEW_TEAM_PERFORMANCE) voit toute l'officine, tous comptoirs confondus.
+    permission: PERMISSIONS.PATIENT_EMAILS_VIEW,
     match: ["/emails-patients"],
     description: "Les bilans envoyés par e-mail depuis le comptoir : quand, par qui, quels produits, envoyé ou non",
     group: "pharmacie",
@@ -195,9 +201,9 @@ export const NAVIGATION: NavItem[] = [
     href: "/partenaires",
     label: "Partenaires",
     icon: Handshake,
-    // Décision d'achat : l'entrée de menu est celle du titulaire. L'équipe
-    // au comptoir atteint une gamme depuis la carte « À découvrir ».
-    permission: PERMISSIONS.PARTNERS_MANAGE,
+    // L'équipe consulte (PARTNERS_VIEW) ; masquer, contacter, commander restent au titulaire (PARTNERS_MANAGE),
+    // boutons masqués à l'écran et refusés par le serveur.
+    permission: PERMISSIONS.PARTNERS_VIEW,
     match: ["/partenaires"],
     description: "Les gammes des laboratoires partenaires : présentation, conditions, contact",
     group: "decouvrir",
@@ -206,9 +212,9 @@ export const NAVIGATION: NavItem[] = [
     href: "/nouveautes",
     label: "Actualités",
     icon: Megaphone,
-    // Écrire aux patients abonnés est un acte du titulaire, comme Partenaires :
-    // l'entrée n'apparaît pas au comptoir.
-    permission: PERMISSIONS.NEWS_MANAGE,
+    // L'équipe lit l'historique des annonces (NEWS_VIEW) ; écrire aux patients abonnés reste un acte du titulaire
+    // (NEWS_MANAGE), boutons masqués à l'écran et refusés par le serveur.
+    permission: PERMISSIONS.NEWS_VIEW,
     match: ["/nouveautes"],
     description: "Prévenir vos patients abonnés des nouvelles gammes de la pharmacie",
     group: "decouvrir",
@@ -229,6 +235,24 @@ export const NAVIGATION: NavItem[] = [
     group: "configuration",
   },
 ];
+
+/**
+ * Le menu d'un collaborateur (tout rôle autre que le titulaire) : ces entrées, et rien d'autre — plus le lien
+ * « Contact support », toujours en bas du menu. Consigne du fondateur du 13 oct. 2026.
+ */
+export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/associations", "/emails-patients", "/formation", "/partenaires", "/nouveautes"];
+
+/**
+ * Les entrées que voit une personne : celles dont elle détient la permission, et, hors de l'espace du titulaire
+ * (MANAGEMENT_MENU), seulement celles du menu d'un collaborateur. Les permissions des entrées sont choisies pour que le
+ * filtre par permission seul donne déjà ce résultat pour chaque rôle (vérifié par les tests) ; la liste blanche le
+ * garantit même si une permission de gestion était accordée individuellement.
+ */
+export function navigationFor(permissions: Iterable<string>): NavItem[] {
+  const granted = new Set(permissions);
+  const owner = granted.has(PERMISSIONS.MANAGEMENT_MENU);
+  return NAVIGATION.filter((item) => granted.has(item.permission) && (owner || COLLABORATOR_MENU.includes(item.href)));
+}
 
 /** Les entrées visibles, rangées par groupe (dans l'ordre du menu) ; un groupe vide n'est pas rendu. */
 export function groupNavigation(items: NavItem[]): { key: NavGroupKey; label: string; items: NavItem[] }[] {

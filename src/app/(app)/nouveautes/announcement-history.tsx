@@ -31,7 +31,7 @@ export type HistoryEntry = {
  * épuisé avant la fin de la liste) se reprend d'ici, sans doublon pour les
  * abonnés déjà servis.
  */
-export function AnnouncementHistory({ announcements }: { announcements: HistoryEntry[] }) {
+export function AnnouncementHistory({ announcements, readOnly = false }: { announcements: HistoryEntry[]; /** L'équipe : lecture seule, sans reprise d'envoi (réservée au titulaire). */ readOnly?: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const { push } = useToast();
@@ -54,7 +54,7 @@ export function AnnouncementHistory({ announcements }: { announcements: HistoryE
           <EmptyState
             icon={<Megaphone className="size-5" />}
             title="Aucune annonce pour l'instant"
-            description="Quand vous en enverrez une, elle apparaîtra ici avec son état et le nombre de messages remis."
+            description={readOnly ? "Quand le titulaire en enverra une, elle apparaîtra ici." : "Quand vous en enverrez une, elle apparaîtra ici avec son état et le nombre de messages remis."}
           />
         ) : (
           <ul className="divide-y divide-border-subtle">
@@ -77,9 +77,9 @@ export function AnnouncementHistory({ announcements }: { announcements: HistoryE
                       {announcementTally(announcement)}
                       {announcement.simulated && " · aucun message n'est parti"}
                     </p>
-                    {sending && <p className="text-[12.5px] text-text-secondary">Une partie des abonnés reste à servir. Reprenez l&apos;envoi d&apos;ici : ceux qui ont déjà reçu l&apos;annonce ne la reçoivent pas une seconde fois.</p>}
+                    {sending && !readOnly && <p className="text-[12.5px] text-text-secondary">Une partie des abonnés reste à servir. Reprenez l&apos;envoi d&apos;ici : ceux qui ont déjà reçu l&apos;annonce ne la reçoivent pas une seconde fois.</p>}
                   </div>
-                  {sending && (
+                  {sending && !readOnly && (
                     <Button size="sm" variant="outline" loading={busy === announcement.id} disabled={pending} onClick={() => resume(announcement.id)} leadingIcon={<RotateCw className="size-3.5" />}>
                       Reprendre l&apos;envoi
                     </Button>

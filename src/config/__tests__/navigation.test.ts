@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Megaphone } from "lucide-react";
-import { NAVIGATION, NAV_GROUPS, OFF_MENU_DESTINATIONS, groupNavigation, isNavItemActive } from "../navigation";
-import { PERMISSIONS, ROLE_PERMISSIONS, type Role } from "@/server/rbac/permissions";
+import { COLLABORATOR_MENU, NAVIGATION, NAV_GROUPS, OFF_MENU_DESTINATIONS, groupNavigation, isNavItemActive, navigationFor } from "../navigation";
+import { PERMISSIONS, ROLE_PERMISSIONS, resolvePermissions, type Role } from "@/server/rbac/permissions";
 
 /** Le menu que voit chaque rôle : exactement les entrées dont il détient la permission, comme le fait la barre latérale. */
 const visibleFor = (role: Role) => NAVIGATION.filter((item) => ROLE_PERMISSIONS[role].includes(item.permission));
@@ -70,15 +70,51 @@ describe("le menu, en trois groupes", () => {
   });
 });
 
+/** Le menu d'un collaborateur, mot pour mot (consigne du fondateur du 13 oct. 2026) ; « Contact support » est le lien du bas, hors tableau. */
+const COLLABORATOR_LABELS = ["Au comptoir", "Mes associations", "E-mails aux patients", "Formations", "Partenaires", "Actualités"];
+
 describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas affiché", () => {
-  it("le titulaire voit les trois groupes", () => {
+  it("le titulaire voit les trois groupes et tout son menu, inchangé", () => {
     expect(groupNavigation(visibleFor("OWNER")).map((group) => group.label)).toEqual(["Ma pharmacie", "Découvrir", "Configuration"]);
+    expect(menuOf("OWNER")).toEqual(["Au comptoir", "Mes associations", "Mon stock", "Performances", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants", "Formations", "Partenaires", "Actualités", "Paramètres"]);
+    expect(navigationFor(resolvePermissions("OWNER")).map((item) => item.label)).toEqual(menuOf("OWNER"));
   });
 
-  it("l'équipe au comptoir ne voit aucune entrée de gestion : ni Performances, ni assortiment, ni équipe, ni partenaires, ni actualités, ni connexions, ni paramètres", () => {
+  it("pharmacien, préparateur et étudiant : exactement Au comptoir, Mes associations, E-mails aux patients et Découvrir (Formations, Partenaires, Actualités)", () => {
+    for (const role of ["PHARMACIST", "TECHNICIAN", "STUDENT"] as const) {
+      expect(menuOf(role), role).toEqual(COLLABORATOR_LABELS);
+      expect(groupNavigation(visibleFor(role)).map((group) => group.label), role).toEqual(["Ma pharmacie", "Découvrir"]);
+    }
+  });
+
+  it("le rôle « Consultation » (lecture seule, il ne vend pas) n'a que la part lisible du même menu : ni comptoir ni bilans", () => {
+    expect(menuOf("VIEWER")).toEqual(["Mes associations", "Formations", "Partenaires", "Actualités"]);
+  });
+
+  it("la liste blanche du collaborateur est explicite, et le filtre par permission du menu (barre latérale) y aboutit pour chaque rôle", () => {
+    expect(NAVIGATION.filter((item) => COLLABORATOR_MENU.includes(item.href)).map((item) => item.label)).toEqual(COLLABORATOR_LABELS);
+    for (const role of TEAM_ROLES) {
+      const viaWhitelist = navigationFor(resolvePermissions(role)).map((item) => item.label);
+      expect(menuOf(role), role).toEqual(viaWhitelist);
+      for (const label of menuOf(role)) expect(COLLABORATOR_LABELS, `${role} : ${label}`).toContain(label);
+    }
+  });
+
+  it("une permission de gestion accordée individuellement n'ajoute pas d'entrée hors de la liste blanche", () => {
+    const granted = resolvePermissions("TECHNICIAN", [PERMISSIONS.LAB_PROGRAMS_MANAGE, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.TEAM_MANAGE]);
+    expect(navigationFor(granted).map((item) => item.label)).toEqual(COLLABORATOR_LABELS);
+  });
+
+  it("toute entrée hors du menu collaborateur est gardée par une permission qu'aucun rôle de l'équipe ne détient", () => {
+    for (const item of NAVIGATION.filter((entry) => !COLLABORATOR_MENU.includes(entry.href))) {
+      for (const role of TEAM_ROLES) expect(ROLE_PERMISSIONS[role], `${role} : ${item.label}`).not.toContain(item.permission);
+    }
+  });
+
+  it("l'équipe au comptoir ne voit aucune entrée de gestion : ni Mon stock, ni Performances, ni Mon équipe, ni Laboratoires & gammes, ni Produits manquants, ni Paramètres", () => {
     for (const role of TEAM_ROLES) {
       const menu = menuOf(role);
-      for (const gone of ["Performances", "Produits manquants", "Mon équipe", "Partenaires", "Actualités", "E-mails aux patients", "Paramètres"]) {
+      for (const gone of ["Mon stock", "Performances", "Produits manquants", "Mon équipe", "Laboratoires & gammes", "Paramètres"]) {
         expect(menu, `${role} : ${gone}`).not.toContain(gone);
       }
     }
@@ -90,10 +126,6 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
     }
   });
 
-  it("le pharmacien garde le comptoir, le stock et les formations", () => {
-    const menu = menuOf("PHARMACIST");
-    for (const kept of ["Au comptoir", "Mon stock", "Mes associations", "Formations"]) expect(menu).toContain(kept);
-  });
 
   it("les entrées du titulaire restent gardées par des permissions qu'aucun rôle de l'équipe ne détient", () => {
     for (const role of TEAM_ROLES) {
@@ -108,7 +140,8 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
 describe("les intitulés", () => {
   it("« Actualités » (ex-Nouveautés) garde l'icône, la permission et l'adresse", () => {
     const entry = NAVIGATION.find((item) => item.href === "/nouveautes");
-    expect(entry).toMatchObject({ label: "Actualités", icon: Megaphone, permission: PERMISSIONS.NEWS_MANAGE, match: ["/nouveautes"], group: "decouvrir" });
+    // Lisible par l'équipe (NEWS_VIEW) ; l'envoi reste NEWS_MANAGE, côté serveur.
+    expect(entry).toMatchObject({ label: "Actualités", icon: Megaphone, permission: PERMISSIONS.NEWS_VIEW, match: ["/nouveautes"], group: "decouvrir" });
   });
 
   it("les intitulés : Mon stock, Mon équipe, Produits manquants (ex Mon assortiment), E-mails aux patients, Formations, Performances", () => {
@@ -121,8 +154,8 @@ describe("les intitulés", () => {
     expect(byHref("/pilotage")).toBe("Performances");
   });
 
-  it("« E-mails aux patients » et « Produits manquants » restent des vues de titulaire", () => {
-    expect(NAVIGATION.find((item) => item.href === "/emails-patients")?.permission).toBe(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
+  it("« E-mails aux patients » s'ouvre à l'équipe (ses propres bilans), « Produits manquants » reste une vue de titulaire", () => {
+    expect(NAVIGATION.find((item) => item.href === "/emails-patients")?.permission).toBe(PERMISSIONS.PATIENT_EMAILS_VIEW);
     expect(NAVIGATION.find((item) => item.href === "/assortiment")?.permission).toBe(PERMISSIONS.PARTNERS_MANAGE);
     expect(menuOf("OWNER")).toEqual(expect.arrayContaining(["E-mails aux patients", "Produits manquants"]));
   });

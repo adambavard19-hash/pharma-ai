@@ -16,7 +16,10 @@ export const metadata: Metadata = { title: "Mes associations" };
  * mêmes garde-fous que tout conseil (stock, sécurité, patient).
  */
 export default async function AssociationsPage() {
-  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_RULES_MANAGE);
+  // Toute l'équipe voit les associations de SA pharmacie ; les écrire demande ASSOCIATIONS_MANAGE (titulaire, pharmacien,
+  // préparateur). Sans elle (étudiant, consultation), l'écran est en lecture seule et le serveur refuse toute écriture.
+  const session = await requirePermission(PERMISSIONS.ASSOCIATIONS_VIEW);
+  const canEdit = session.permissions.has(PERMISSIONS.ASSOCIATIONS_MANAGE);
   const associations = await listAssociations(session.scope);
 
   return (
@@ -26,6 +29,7 @@ export default async function AssociationsPage() {
         description="Quand un produit ou un médicament est dans la vente — même une vente spontanée, sans ordonnance — PharmaBoost propose les produits de votre stock que vous avez choisis. Un médicament peut en appeler plusieurs."
       />
       <AssociationsManager
+        canEdit={canEdit}
         associations={associations.map((association) => ({
           id: association.id,
           trigger: association.trigger,

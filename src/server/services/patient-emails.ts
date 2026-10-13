@@ -23,13 +23,17 @@ export type PatientEmailRow = {
 
 const LIMIT = 200;
 
-export async function listPatientEmails(scope: TenantScope, options: { days: number; states: readonly PatientEmailState[] | null; now?: Date }): Promise<{ rows: PatientEmailRow[]; total: number; truncated: boolean }> {
+/**
+ * `handledBy` : ne garder que les ventes de cette personne (un collaborateur voit les bilans de SES ventes — celles qu'il a
+ * traitées, ou bipées au comptoir qui lui est attribué). Absent : toute l'officine (le titulaire).
+ */
+export async function listPatientEmails(scope: TenantScope, options: { days: number; states: readonly PatientEmailState[] | null; now?: Date; handledBy?: string }): Promise<{ rows: PatientEmailRow[]; total: number; truncated: boolean }> {
   const followUps = await prisma.counterSaleFollowUp.findMany({
     where: {
       pharmacyId: scope.pharmacyId,
       OR: [{ consentAt: { not: null } }, { reportStatus: { in: ["SENT", "SIMULATED", "FAILED"] } }],
       updatedAt: { gte: new Date((options.now ?? new Date()).getTime() - options.days * 86_400_000) },
-      prescription: { pharmacyId: scope.pharmacyId, deletedAt: null, ...activityScope(scope) },
+      prescription: { pharmacyId: scope.pharmacyId, deletedAt: null, ...activityScope(scope), ...(options.handledBy !== undefined ? { handledByUserId: options.handledBy } : {}) },
     },
     orderBy: { updatedAt: "desc" },
     take: LIMIT + 1,

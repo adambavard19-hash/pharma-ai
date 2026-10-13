@@ -8,11 +8,11 @@ export type { TriggerOption, TriggerSearch };
 /**
  * « Quand ce produit ou ce médicament est dans la vente » (écran « Mes associations ») : un seul champ, qui cherche d'un
  * coup dans les médicaments du stock de l'officine (avec la quantité), ses produits, puis le reste du catalogue national.
- * Réservée à qui gère les règles de conseil de l'officine ; le stock interrogé est celui de la session, jamais un autre.
+ * Réservée à qui écrit les associations de l'officine (ASSOCIATIONS_MANAGE) ; le stock interrogé est celui de la session, jamais un autre.
  */
 export async function GET(request: Request) {
   const session = await getSession();
-  if (!session || !session.permissions.has(PERMISSIONS.RECOMMENDATION_RULES_MANAGE)) {
+  if (!session || !session.permissions.has(PERMISSIONS.ASSOCIATIONS_MANAGE)) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
   const query = (new URL(request.url).searchParams.get("q") ?? "").trim().slice(0, 120);

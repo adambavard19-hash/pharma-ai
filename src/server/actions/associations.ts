@@ -11,8 +11,9 @@ import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 /**
  * Les associations de produits : un produit conseil en appelle un autre.
  *
- * Même permission que les règles de conseil de l'officine : c'est le pharmacien (ou le titulaire) qui décide quoi
- * associer à quoi. Le service ne laisse passer que les produits de l'officine du demandeur.
+ * ASSOCIATIONS_MANAGE : le titulaire, le pharmacien et le préparateur (consigne du fondateur du 13 oct. 2026 : l'onglet
+ * est ouvert à l'équipe, c'est un acte de conseil). Permission distincte des règles de conseil de l'officine, qui
+ * restent fermées à l'équipe. Le service ne laisse passer que les produits de l'officine du demandeur.
  */
 
 const quoted = (names: string[]): string => {
@@ -38,7 +39,7 @@ export type BatchSaveResult = { created: number; skipped: { name: string | null;
  * la raison de chaque combinaison écartée.
  */
 export async function createAssociationsAction(payload: z.input<typeof gridSchema>): Promise<ActionResult<BatchSaveResult>> {
-  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_RULES_MANAGE);
+  const session = await requirePermission(PERMISSIONS.ASSOCIATIONS_MANAGE);
   const parsed = gridSchema.safeParse(payload);
   if (!parsed.success) return fail("Vérifiez les produits choisis.", zodFieldErrors(parsed.error.issues));
 
@@ -65,7 +66,7 @@ const updateSchema = z.object({
 });
 
 export async function updateAssociationAction(payload: z.input<typeof updateSchema>): Promise<ActionResult<null>> {
-  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_RULES_MANAGE);
+  const session = await requirePermission(PERMISSIONS.ASSOCIATIONS_MANAGE);
   const parsed = updateSchema.safeParse(payload);
   if (!parsed.success) return fail("Modification invalide.", zodFieldErrors(parsed.error.issues));
 
@@ -77,7 +78,7 @@ export async function updateAssociationAction(payload: z.input<typeof updateSche
 }
 
 export async function deleteAssociationAction(associationId: string): Promise<ActionResult<null>> {
-  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_RULES_MANAGE);
+  const session = await requirePermission(PERMISSIONS.ASSOCIATIONS_MANAGE);
   if (!associationId) return fail("Association introuvable.");
   const result = await deleteAssociation(session.scope, associationId);
   if (!result.ok) return fail(result.error);

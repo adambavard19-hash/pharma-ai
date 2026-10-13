@@ -50,6 +50,14 @@ export const PERMISSIONS = {
   RECOMMENDATION_DECIDE: "recommendation:decide",
   RECOMMENDATION_RULES_MANAGE: "recommendation:rules:manage",
 
+  // « Mes associations » : un produit conseil en appelle un autre. Distinct des règles de conseil de l'officine
+  // (RECOMMENDATION_RULES_MANAGE, qui ouvre aussi les règles et les vigilances) : ouvrir les associations à l'équipe au
+  // comptoir n'ouvre rien d'autre.
+  /// Voir les associations de l'officine.
+  ASSOCIATIONS_VIEW: "associations:view",
+  /// Créer, modifier, suspendre et supprimer une association — un acte de conseil.
+  ASSOCIATIONS_MANAGE: "associations:manage",
+
   // Documents patient
   DOCUMENT_GENERATE: "document:generate",
   DOCUMENT_SEND: "document:send",
@@ -91,6 +99,17 @@ export const PERMISSIONS = {
   // Nouveautés pour les patients : annoncer une gamme aux patients qui l'ont demandé.
   /// Décision commerciale du titulaire, au nom de l'officine ; il peut la confier.
   NEWS_MANAGE: "news:manage",
+  /// Lire les actualités annoncées aux patients (l'historique), sans pouvoir en envoyer.
+  NEWS_VIEW: "news:view",
+
+  // E-mails aux patients : les bilans envoyés depuis le comptoir.
+  /// Voir les bilans de SES ventes ; voir ceux de toute l'officine demande en plus ANALYTICS_VIEW_TEAM_PERFORMANCE.
+  PATIENT_EMAILS_VIEW: "patient-emails:view",
+
+  // Le menu.
+  /// L'espace du titulaire : les entrées de gestion du menu (Mon stock, Performances, Mon équipe, Paramètres…).
+  /// Ne garde que l'entrée de menu « Mon stock » : chaque page garde sa propre permission (cf. config/navigation.ts).
+  MANAGEMENT_MENU: "menu:management",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -116,6 +135,8 @@ const PHARMACIST_PERMISSIONS: Permission[] = [
   PERMISSIONS.RECOMMENDATION_VIEW,
   PERMISSIONS.RECOMMENDATION_DECIDE,
   PERMISSIONS.RECOMMENDATION_RULES_MANAGE,
+  PERMISSIONS.ASSOCIATIONS_VIEW,
+  PERMISSIONS.ASSOCIATIONS_MANAGE,
   PERMISSIONS.DOCUMENT_GENERATE,
   PERMISSIONS.DOCUMENT_SEND,
   PERMISSIONS.FOLLOWUP_VIEW,
@@ -126,6 +147,8 @@ const PHARMACIST_PERMISSIONS: Permission[] = [
   PERMISSIONS.ANALYTICS_VIEW,
   PERMISSIONS.TRAINING_VIEW,
   PERMISSIONS.PARTNERS_VIEW,
+  PERMISSIONS.NEWS_VIEW,
+  PERMISSIONS.PATIENT_EMAILS_VIEW,
 ];
 
 const TECHNICIAN_PERMISSIONS: Permission[] = [
@@ -140,6 +163,8 @@ const TECHNICIAN_PERMISSIONS: Permission[] = [
   PERMISSIONS.PRESCRIPTION_VIEW,
   PERMISSIONS.PRESCRIPTION_CREATE,
   PERMISSIONS.RECOMMENDATION_VIEW,
+  PERMISSIONS.ASSOCIATIONS_VIEW,
+  PERMISSIONS.ASSOCIATIONS_MANAGE,
   PERMISSIONS.FOLLOWUP_VIEW,
   PERMISSIONS.FOLLOWUP_SCHEDULE,
   PERMISSIONS.FOLLOWUP_SEND,
@@ -147,6 +172,8 @@ const TECHNICIAN_PERMISSIONS: Permission[] = [
   PERMISSIONS.SALE_CREATE,
   PERMISSIONS.TRAINING_VIEW,
   PERMISSIONS.PARTNERS_VIEW,
+  PERMISSIONS.NEWS_VIEW,
+  PERMISSIONS.PATIENT_EMAILS_VIEW,
 ];
 
 const STUDENT_PERMISSIONS: Permission[] = [
@@ -157,8 +184,13 @@ const STUDENT_PERMISSIONS: Permission[] = [
   PERMISSIONS.PRESCRIPTION_VIEW,
   PERMISSIONS.PRESCRIPTION_CREATE,
   PERMISSIONS.RECOMMENDATION_VIEW,
+  // Voir les associations sans les écrire : l'étudiant n'a pas de validation professionnelle.
+  PERMISSIONS.ASSOCIATIONS_VIEW,
   PERMISSIONS.FOLLOWUP_VIEW,
   PERMISSIONS.TRAINING_VIEW,
+  PERMISSIONS.PARTNERS_VIEW,
+  PERMISSIONS.NEWS_VIEW,
+  PERMISSIONS.PATIENT_EMAILS_VIEW,
 ];
 
 const VIEWER_PERMISSIONS: Permission[] = [
@@ -167,6 +199,11 @@ const VIEWER_PERMISSIONS: Permission[] = [
   PERMISSIONS.STOCK_VIEW,
   PERMISSIONS.PRESCRIPTION_VIEW,
   PERMISSIONS.RECOMMENDATION_VIEW,
+  // Lecture seule : l'espace Découvrir et les associations, à lire. Ni comptoir ni bilans (ce rôle ne vend pas).
+  PERMISSIONS.ASSOCIATIONS_VIEW,
+  PERMISSIONS.TRAINING_VIEW,
+  PERMISSIONS.PARTNERS_VIEW,
+  PERMISSIONS.NEWS_VIEW,
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -235,6 +272,11 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [PERMISSIONS.PARTNERS_VIEW]: "Consulter les gammes partenaires",
   [PERMISSIONS.PARTNERS_MANAGE]: "Masquer, contacter et commander auprès des marques partenaires",
   [PERMISSIONS.NEWS_MANAGE]: "Annoncer les nouveautés aux patients abonnés",
+  [PERMISSIONS.NEWS_VIEW]: "Lire les actualités annoncées aux patients",
+  [PERMISSIONS.ASSOCIATIONS_VIEW]: "Voir les associations de produits",
+  [PERMISSIONS.ASSOCIATIONS_MANAGE]: "Créer, modifier et supprimer les associations de produits",
+  [PERMISSIONS.PATIENT_EMAILS_VIEW]: "Voir les bilans envoyés par e-mail depuis ses ventes",
+  [PERMISSIONS.MANAGEMENT_MENU]: "Voir l'espace de gestion du titulaire dans le menu",
 };
 
 /** Permissions effectives = rôle + accordées − retirées. */

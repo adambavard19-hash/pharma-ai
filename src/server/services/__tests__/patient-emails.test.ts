@@ -49,3 +49,17 @@ describe("la liste des bilans envoyés", () => {
     expect(rows.map((item) => [item.saleId, item.state, item.person])).toEqual([["s2", "FAILED", null]]);
   });
 });
+
+describe("un collaborateur ne voit que les bilans de ses ventes", () => {
+  it("handledBy : la requête ne lit que les ventes de cette personne, dans l'officine de la session", async () => {
+    m.followUp.findMany.mockResolvedValue([]);
+    await listPatientEmails(SCOPE, { days: 30, states: null, handledBy: "lea" });
+    expect(m.followUp.findMany.mock.calls[0][0].where).toMatchObject({ pharmacyId: "ph_1", prescription: { pharmacyId: "ph_1", handledByUserId: "lea" } });
+  });
+
+  it("sans handledBy (le titulaire) : toute l'officine, aucun filtre par personne", async () => {
+    m.followUp.findMany.mockResolvedValue([]);
+    await listPatientEmails(SCOPE, { days: 30, states: null });
+    expect(m.followUp.findMany.mock.calls[0][0].where.prescription).not.toHaveProperty("handledByUserId");
+  });
+});

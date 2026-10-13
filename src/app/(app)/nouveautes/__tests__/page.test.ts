@@ -29,7 +29,9 @@ vi.mock("@/components/ui/toast", () => ({ useToast: () => ({ push: vi.fn() }) })
 
 const page = await import("../page");
 
-const SESSION = { scope: { pharmacyId: "ph_a", organizationId: "org_1", userId: "user_a" }, pharmacy: { name: "Pharmacie Saint-Michel" }, user: { email: "titulaire@pharma.ai" } };
+const SESSION = { scope: { pharmacyId: "ph_a", organizationId: "org_1", userId: "user_a" }, pharmacy: { name: "Pharmacie Saint-Michel" }, user: { email: "titulaire@pharma.ai" }, permissions: new Set(["news:view", "news:manage"]) };
+/** Un collaborateur : il lit l'historique, il n'annonce rien. */
+const TEAM_SESSION = { ...SESSION, user: { email: "preparateur@pharma.ai" }, permissions: new Set(["news:view"]) };
 
 const OVERVIEW = {
   enabled: true,
@@ -60,10 +62,10 @@ beforeEach(() => {
 });
 
 describe("l'accès et l'isolation", () => {
-  it("exige la permission d'annoncer aux patients, avant toute lecture", async () => {
+  it("exige la permission de lire les actualités, avant toute lecture", async () => {
     mocks.requirePermission.mockRejectedValue(new Error("NEXT_FORBIDDEN"));
     await expect(render()).rejects.toThrow("NEXT_FORBIDDEN");
-    expect(mocks.requirePermission).toHaveBeenCalledWith("news:manage");
+    expect(mocks.requirePermission).toHaveBeenCalledWith("news:view");
     expect(mocks.getNewsOverview).not.toHaveBeenCalled();
     expect(mocks.pharmacyFind).not.toHaveBeenCalled();
   });
@@ -72,6 +74,20 @@ describe("l'accès et l'isolation", () => {
     await render();
     expect(mocks.getNewsOverview).toHaveBeenCalledWith(SESSION.scope);
     expect(mocks.pharmacyFind).toHaveBeenCalledWith({ where: { id: "ph_a" }, select: { isDemo: true } });
+  });
+
+  it("un collaborateur lit l'historique, sans interrupteur, sans composeur, sans reprise d'envoi, ni adresse du titulaire", async () => {
+    mocks.requirePermission.mockResolvedValue(TEAM_SESSION);
+    mocks.getNewsOverview.mockResolvedValue({ ...OVERVIEW, announcements: [announcement({ id: "a2", title: "Gamme en cours", status: "SENDING", sentCount: 4 })] });
+    const html = await render();
+    const t = text(html);
+    expect(t).toContain("Historique des annonces");
+    expect(t).toContain("Gamme en cours");
+    expect(t).toContain("envoyées par le titulaire");
+    expect(button(html, "Reprendre")).toBeNull();
+    expect(t).not.toContain("Proposer l'abonnement");
+    expect(t).not.toContain("Aperçu");
+    expect(t).not.toContain("titulaire@pharma.ai");
   });
 
   it("déclare la durée d'un envoi à l'hébergeur : il peut durer jusqu'à 45 secondes", () => {

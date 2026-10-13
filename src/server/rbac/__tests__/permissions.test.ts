@@ -44,7 +44,8 @@ const EXPECTED: Record<Role, Partial<Record<Permission, boolean>>> = {
     [PERMISSIONS.PRESCRIPTION_VERIFY]: false,
   },
   STUDENT: {
-    [PERMISSIONS.PARTNERS_VIEW]: false,
+    // L'espace Découvrir est ouvert à toute l'équipe (consigne du 13 oct. 2026) : consulter, pas gérer.
+    [PERMISSIONS.PARTNERS_VIEW]: true,
     [PERMISSIONS.PARTNERS_MANAGE]: false,
     [PERMISSIONS.LAB_PROGRAMS_MANAGE]: false,
     [PERMISSIONS.TRAINING_VIEW]: true,
@@ -52,7 +53,7 @@ const EXPECTED: Record<Role, Partial<Record<Permission, boolean>>> = {
     [PERMISSIONS.PRESCRIPTION_VERIFY]: false,
   },
   VIEWER: {
-    [PERMISSIONS.PARTNERS_VIEW]: false,
+    [PERMISSIONS.PARTNERS_VIEW]: true,
     [PERMISSIONS.PARTNERS_MANAGE]: false,
     [PERMISSIONS.LAB_PROGRAMS_MANAGE]: false,
     [PERMISSIONS.TRAINING_MANAGE]: false,
@@ -60,6 +61,28 @@ const EXPECTED: Record<Role, Partial<Record<Permission, boolean>>> = {
     [PERMISSIONS.PRESCRIPTION_VERIFY]: false,
   },
 };
+
+/** Le menu d'un collaborateur (13 oct. 2026) : associations, bilans, actualités — voir sans gérer, sauf les associations. */
+const TEAM_MENU: Record<Exclude<Role, "OWNER">, Partial<Record<Permission, boolean>>> = {
+  PHARMACIST: { "associations:view": true, "associations:manage": true, "patient-emails:view": true, "news:view": true, "news:manage": false, "menu:management": false, "analytics:team-performance:view": false },
+  TECHNICIAN: { "associations:view": true, "associations:manage": true, "patient-emails:view": true, "news:view": true, "news:manage": false, "menu:management": false, "recommendation:rules:manage": false },
+  STUDENT: { "associations:view": true, "associations:manage": false, "patient-emails:view": true, "news:view": true, "news:manage": false, "menu:management": false, "partners:manage": false },
+  VIEWER: { "associations:view": true, "associations:manage": false, "patient-emails:view": false, "news:view": true, "training:view": true, "prescription:create": false, "menu:management": false },
+};
+
+describe("le menu d'un collaborateur : ce que chaque rôle peut voir et écrire", () => {
+  for (const [role, expected] of Object.entries(TEAM_MENU)) {
+    it(role, () => {
+      const effective = resolvePermissions(role as Role);
+      for (const [permission, allowed] of Object.entries(expected)) expect(effective.has(permission as Permission), `${role} → ${permission}`).toBe(allowed);
+    });
+  }
+
+  it("seul le titulaire a l'espace de gestion du menu", () => {
+    expect(resolvePermissions("OWNER").has(PERMISSIONS.MANAGEMENT_MENU)).toBe(true);
+    for (const role of ROLES.filter((r) => r !== "OWNER")) expect(resolvePermissions(role).has(PERMISSIONS.MANAGEMENT_MENU), role).toBe(false);
+  });
+});
 
 describe("permissions des nouvelles briques", () => {
   for (const role of ROLES) {

@@ -29,7 +29,7 @@ type Ref = { kind: "PRODUCT" | "DRUG"; id: string };
  * rupture), l'ordonnance (jamais un médicament sur ordonnance), la sécurité du patient et la vente déjà en cours. L'écran le
  * dit, pour que personne ne s'étonne d'une carte qui ne s'affiche pas.
  */
-export function AssociationsManager({ associations }: { associations: AssociationRow[] }) {
+export function AssociationsManager({ associations, canEdit = true }: { associations: AssociationRow[]; /** Faux : lecture seule (le serveur refuse de toute façon). */ canEdit?: boolean }) {
   // Les associations groupées par déclencheur, dans l'ordre d'arrivée.
   const groups: { trigger: TriggerBrief; items: AssociationRow[] }[] = [];
   for (const association of associations) {
@@ -49,7 +49,13 @@ export function AssociationsManager({ associations }: { associations: Associatio
         </span>
       </Alert>
 
-      <NewAssociation />
+      {canEdit ? (
+        <NewAssociation />
+      ) : (
+        <Alert tone="neutral" title="Lecture seule">
+          Vous voyez les associations de votre pharmacie ; les créer ou les modifier est réservé au titulaire, au pharmacien et au préparateur.
+        </Alert>
+      )}
 
       <section aria-labelledby="mes-associations" className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -67,13 +73,17 @@ export function AssociationsManager({ associations }: { associations: Associatio
             <EmptyState
               icon={<Package className="size-5" />}
               title="Aucune association pour l'instant"
-              description="Tapez la première lettre d'un produit ou d'un médicament à gauche, puis celle du produit à proposer à droite. L'association s'appliquera dès la prochaine vente où le premier est scanné."
+              description={
+                canEdit
+                  ? "Tapez la première lettre d'un produit ou d'un médicament à gauche, puis celle du produit à proposer à droite. L'association s'appliquera dès la prochaine vente où le premier est scanné."
+                  : "Votre pharmacie n'a pas encore d'association : elles apparaîtront ici dès qu'elles seront créées."
+              }
             />
           </Card>
         ) : (
           <div className="space-y-4">
             {groups.map((group) => (
-              <TriggerGroupCard key={`${group.trigger.kind}:${group.trigger.id}`} trigger={group.trigger} items={group.items} />
+              <TriggerGroupCard key={`${group.trigger.kind}:${group.trigger.id}`} trigger={group.trigger} items={group.items} canEdit={canEdit} />
             ))}
           </div>
         )}
@@ -83,7 +93,7 @@ export function AssociationsManager({ associations }: { associations: Associatio
 }
 
 /** Un déclencheur et tout ce qu'il appelle ; « Ajouter un produit » en ajoute d'autres sans repasser par le formulaire. */
-function TriggerGroupCard({ trigger, items }: { trigger: TriggerBrief; items: AssociationRow[] }) {
+function TriggerGroupCard({ trigger, items, canEdit }: { trigger: TriggerBrief; items: AssociationRow[]; canEdit: boolean }) {
   const [adding, setAdding] = useState(false);
   const [advice, setAdvice] = useState<AdviceOption[]>([]);
   const [pending, startTransition] = useTransition();
@@ -113,6 +123,7 @@ function TriggerGroupCard({ trigger, items }: { trigger: TriggerBrief; items: As
         }
         description={`${trigger.kind === "DRUG" ? "Toutes les formes de ce médicament" : (trigger.brand ?? "Produit de l'officine")} · ${items.length} produit${items.length > 1 ? "s" : ""} proposé${items.length > 1 ? "s" : ""}`}
         action={
+          canEdit &&
           !adding && (
             <Button size="sm" variant="secondary" leadingIcon={<Plus className="size-4" />} onClick={() => setAdding(true)}>
               Ajouter un produit
@@ -143,7 +154,7 @@ function TriggerGroupCard({ trigger, items }: { trigger: TriggerBrief; items: As
         )}
         <ul className="divide-y divide-border-subtle">
           {items.map((association) => (
-            <AssociationItem key={association.id} association={association} />
+            <AssociationItem key={association.id} association={association} canEdit={canEdit} />
           ))}
         </ul>
       </CardContent>
@@ -479,7 +490,7 @@ function AdviceField({ values, onChange, label, exclude, excludeTrigger }: { val
   );
 }
 
-function AssociationItem({ association }: { association: AssociationRow }) {
+function AssociationItem({ association, canEdit }: { association: AssociationRow; canEdit: boolean }) {
   const [editing, setEditing] = useState(false);
   const [sentence, setSentence] = useState(association.sentence ?? "");
   const [confirming, setConfirming] = useState(false);
@@ -516,6 +527,7 @@ function AssociationItem({ association }: { association: AssociationRow }) {
           </p>
         </div>
 
+        {canEdit && (
         <div className="flex shrink-0 items-center gap-3">
           <Switch checked={association.isActive} disabled={pending} aria-label={association.isActive ? "Suspendre l'association" : "Réactiver l'association"} onChange={(event) => run(() => updateAssociationAction({ associationId: association.id, isActive: event.target.checked }))} />
           {confirming ? (
@@ -533,6 +545,7 @@ function AssociationItem({ association }: { association: AssociationRow }) {
             </button>
           )}
         </div>
+        )}
       </div>
 
       {editing ? (
@@ -566,10 +579,12 @@ function AssociationItem({ association }: { association: AssociationRow }) {
       ) : (
         <div className="flex items-start gap-2 pl-7">
           <p className="min-w-0 flex-1 text-[13px] leading-5 text-text-secondary">{association.sentence ? <>« {association.sentence} »</> : <span className="text-text-tertiary">Pas de phrase : la carte affichera une formule neutre.</span>}</p>
+          {canEdit && (
           <button type="button" onClick={() => setEditing(true)} className="flex shrink-0 items-center gap-1 text-[12.5px] text-text-tertiary underline-offset-2 hover:text-text-secondary hover:underline">
             <Pencil className="size-3.5" aria-hidden />
             {association.sentence ? "Modifier" : "Ajouter une phrase"}
           </button>
+          )}
         </div>
       )}
     </li>
