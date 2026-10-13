@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronUp, ExternalLink, FileText, GripVertical, Loader2, Mail, PartyPopper, ScanLine, Send, TriangleAlert } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, ExternalLink, FileText, GripVertical, Loader2, Mail, PartyPopper, ScanLine, Send, TriangleAlert, X } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
@@ -105,7 +105,7 @@ export function toggleAdvice(unfolded: UnfoldedAdvice, items: Pick<IslandAdvice,
 const OPEN_ADVICE = "Lire le conseil en entier dans PharmaBoost : contre-indications, conseils d'utilisation";
 
 /** Hauteur par défaut de la liste des conseils : une carte et demie visibles, le reste se fait défiler. */
-export const ADVICE_LIST_MAX_HEIGHT = 196;
+export const ADVICE_LIST_MAX_HEIGHT = 156;
 
 const STOCK: Record<NonNullable<IslandAdvice["stock"]>, { bg: string; fg: string; label: string }> = {
   IN_STOCK: { bg: C.stockBg, fg: C.stockFg, label: T.inStock },
@@ -260,8 +260,8 @@ export function CounterIsland(props: CounterIslandProps) {
         break;
       case "advice":
         body = (
-          <div className="px-2.5 pt-2.5 pb-2.5">
-            <Row robot={robot(30)} title={title} sub={allAnswered(state, count) ? T.allDone : `${T.forDrug}${props.drug}`} compact />
+          <div className="px-2 pt-2 pb-2">
+            <Row robot={robot(24)} title={title} sub={allAnswered(state, count) ? T.allDone : `${T.forDrug}${props.drug}`} compact />
             <AdviceList maxHeight={props.listMaxHeight ?? ADVICE_LIST_MAX_HEIGHT} count={count} unfolded={openName}>
               {items.map((item, index) => (
                 <AdviceCard
@@ -277,11 +277,11 @@ export function CounterIsland(props: CounterIslandProps) {
                 />
               ))}
             </AdviceList>
-            <div className="mt-2 flex items-center gap-2">
-              {props.emailEnabled !== false && <button type="button" onClick={props.onAddEmail} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.08] text-[12.5px] font-semibold text-white/90 transition-colors hover:bg-white/[0.14] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]">
+            <div className="mt-1.5 flex items-center gap-1.5">
+              {props.emailEnabled !== false && <button type="button" onClick={props.onAddEmail} className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/[0.08] text-[11.5px] font-semibold text-white/90 transition-colors hover:bg-white/[0.14] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]">
                 <Mail className="size-3.5" aria-hidden="true" /> {T.emailAdd}
               </button>}
-              <button type="button" onClick={props.onFinish} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl text-[12.5px] font-bold transition-[filter] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]" style={{ background: C.accent, color: "#04261A" }}>
+              <button type="button" onClick={props.onFinish} className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11.5px] font-bold transition-[filter] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]" style={{ background: C.accent, color: "#04261A" }}>
                 <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> {props.finishLabel ?? T.finish}
               </button>
             </div>
@@ -418,36 +418,40 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, outside, open, o
   const stock = item.stock ? STOCK[item.stock] : null;
   const press = useRef<{ x: number; y: number } | null>(null);
   const detailsId = useId();
-  // Repliée, le nom et la raison tiennent sur deux lignes ; déployée, le nom COMPLET (la carte l'abrège) et la raison
-  // passent dans le détail, en entier.
+  // Repliée, la carte est COMPACTE (retour des pharmacies, 13 oct. 2026 : la bannière prenait trop de place pendant une
+  // délivrance) : le nom et la raison sur UNE ligne chacun, puis les étiquettes et Vendu / Non vendu sur la même ligne.
+  // Déployée, le nom COMPLET et la raison entière passent dans le détail.
   const name = (open && item.sheet?.name) || item.name;
   const summary = (
     <>
       {/* Seulement une photo studio (fond uni, la même pour tous) ; sans elle, rien : ni carré vide, ni photo d'amateur. */}
       {item.image && (
         // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
-        <img src={item.image} alt="" width={40} height={40} draggable={false} className="size-10 shrink-0 rounded-lg bg-white object-contain" />
+        <img src={item.image} alt="" width={34} height={34} draggable={false} className="size-[34px] shrink-0 rounded-md bg-white object-contain" />
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className={cn("text-[13px] leading-[18px] font-bold break-words", !open && "line-clamp-2")}>{name}</p>
-          <span className="flex shrink-0 items-center gap-1 pt-px">
-            {item.price && stock && item.stock !== "UNKNOWN" && <span className="text-[12.5px] font-bold tabular-nums">{item.price}</span>}
+          <p className={cn("text-[12.5px] leading-4 font-bold break-words", !open && "truncate")}>{name}</p>
+          <span className="flex shrink-0 items-center gap-1">
+            {item.price && stock && item.stock !== "UNKNOWN" && <span className="text-[12px] leading-4 font-bold tabular-nums">{item.price}</span>}
             <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} style={{ color: C.inkSoft }} aria-hidden="true" />
           </span>
         </div>
-        {item.reason && !open && <p className="line-clamp-2 text-[11.5px] leading-4 break-words" style={{ color: C.inkSoft }}>{item.reason}</p>}
-        <div className="mt-1 flex flex-wrap gap-1">
-          {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</Chip>}
-          {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}
-          {item.margin && <Chip bg="rgba(54,232,200,0.14)" fg="#0B6B57">Marge {item.margin} HT</Chip>}
-          {stock && <Chip bg={stock.bg} fg={stock.fg}>{stock.label}{item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}</Chip>}
-        </div>
+        {item.reason && !open && <p className="truncate text-[11px] leading-[15px]" style={{ color: C.inkSoft }}>{item.reason}</p>}
       </div>
     </>
   );
+  const chips = (
+    <>
+      {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</Chip>}
+      {/* La date sans l'année : la carte compacte garde ses étiquettes sur la ligne des boutons. */}
+      {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate.replace(/\/\d{4}$/, "")}</Chip>}
+      {item.margin && <Chip bg="rgba(54,232,200,0.14)" fg="#0B6B57">Marge {item.margin} HT</Chip>}
+      {stock && <Chip bg={stock.bg} fg={stock.fg}>{stock.label}{item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}</Chip>}
+    </>
+  );
   return (
-    <li data-advice-card="" data-open={open ? "" : undefined} className="isl-line snap-start rounded-xl p-2" style={{ background: C.panel, color: C.ink }}>
+    <li data-advice-card="" data-open={open ? "" : undefined} className="isl-line snap-start rounded-xl px-2 py-1.5" style={{ background: C.panel, color: C.ink }}>
       {/* Toute la carte, hors boutons : un appui la DÉPLOIE sur place (un second la replie). Un appui suivi d'un mouvement
           (défilement de la liste) ne déploie rien. Elle est dans la liste qui défile : jamais une prise pour déplacer l'île. */}
       <div
@@ -473,30 +477,32 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, outside, open, o
         {summary}
         <span className="sr-only">{` — ${open ? FOLD : UNFOLD}`}</span>
       </div>
-      <div className="mt-1.5 flex items-center gap-1.5">
+      <div className="mt-1 flex items-end gap-1">
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1">{chips}</div>
         {readOnly && !outcome ? (
-          <span className="inline-flex h-7 flex-1 items-center justify-center rounded-lg text-[12px] font-medium" style={{ background: C.line, color: C.inkSoft }}>
+          <span className="inline-flex h-6 items-center rounded-md px-2 text-[11px] font-medium" style={{ background: C.line, color: C.inkSoft }}>
             À proposer · le pharmacien valide
           </span>
         ) : outcome ? (
           <>
-            <span className="isl-pop inline-flex h-7 flex-1 items-center justify-center gap-1 rounded-lg text-[12px] font-bold" style={outcome === "SOLD" ? { background: C.soldBg, color: C.soldFg } : { background: C.notSoldBg, color: C.notSoldFg }}>
-              {outcome === "SOLD" && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}
+            <span className="isl-pop inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-bold" style={outcome === "SOLD" ? { background: C.soldBg, color: C.soldFg } : { background: C.notSoldBg, color: C.notSoldFg }}>
+              {outcome === "SOLD" && <Check className="size-3" strokeWidth={3} aria-hidden="true" />}
               {outcome === "SOLD" ? T.sold : T.notSold}
             </span>
             {!readOnly && (
-              <button type="button" onClick={() => onAnswer(null)} className="h-7 rounded-lg px-2.5 text-[12px] font-semibold hover:bg-black/5" style={{ color: C.inkSoft }}>
+              <button type="button" onClick={() => onAnswer(null)} className="h-6 rounded-md px-1.5 text-[11px] font-semibold hover:bg-black/5" style={{ color: C.inkSoft }}>
                 {T.change}
               </button>
             )}
           </>
         ) : (
           <>
-            <button type="button" onClick={() => onAnswer("SOLD")} className="h-7 flex-1 rounded-lg text-[12px] font-bold transition-[filter] hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
-              {T.sold}
+            {/* Deux petits boutons ✓ / ✕ (vert : vendu ; gris : non vendu) : la carte tient sur deux lignes. */}
+            <button type="button" onClick={() => onAnswer("SOLD")} aria-label={T.sold} title={T.sold} className="inline-flex h-6 w-8 items-center justify-center rounded-md transition-[filter] hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
+              <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
             </button>
-            <button type="button" onClick={() => onAnswer("NOT_SOLD")} className="h-7 flex-1 rounded-lg text-[12px] font-bold transition-[filter] hover:brightness-95" style={{ background: C.notSoldBg, color: C.notSoldFg }}>
-              {T.notSold}
+            <button type="button" onClick={() => onAnswer("NOT_SOLD")} aria-label={T.notSold} title={T.notSold} className="inline-flex h-6 w-8 items-center justify-center rounded-md transition-[filter] hover:brightness-95" style={{ background: C.notSoldBg, color: C.notSoldFg }}>
+              <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
             </button>
           </>
         )}

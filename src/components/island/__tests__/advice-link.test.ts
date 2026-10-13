@@ -66,13 +66,13 @@ describe("la carte d'un conseil dans l'île", () => {
     const html = render({ outside: true });
     expect(linkOf(html)).toBeNull();
     expect(html).toMatch(/<div role="button" tabindex="0" aria-expanded="false"[^>]*data-advice-toggle=""/);
-    expect(html).toContain(">Vendu</button>");
+    expect(html).toContain('aria-label="Vendu"');
   });
 
-  it("le nom et la raison tiennent sur deux lignes, points de suspension compris — plus une ligne tronquée sèche", () => {
+  it("carte compacte : le nom et la raison tiennent sur UNE ligne chacun, points de suspension compris", () => {
     const html = render({ outside: true });
-    expect(html).toMatch(/<p class="[^"]*line-clamp-2[^"]*">GEL LARMES/);
-    expect(html).toMatch(/<p class="line-clamp-2[^"]*"[^>]*>Les antihistaminiques/);
+    expect(html).toMatch(/<p class="[^"]*truncate[^"]*">GEL LARMES/);
+    expect(html).toMatch(/<p class="truncate[^"]*"[^>]*>Les antihistaminiques/);
   });
 
   it("une carte sans page (vente d'exemple, site public) se lit sans lien, comme avant", () => {

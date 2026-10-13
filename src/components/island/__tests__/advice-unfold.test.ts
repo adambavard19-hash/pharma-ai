@@ -53,8 +53,8 @@ describe("la carte repliée", () => {
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain("data-advice-details");
     expect(html).not.toContain("data-advice-link");
-    expect(html).toContain(">Vendu</button>");
-    expect(html).toContain(">Non vendu</button>");
+    expect(html).toContain('aria-label="Vendu"');
+    expect(html).toContain('aria-label="Non vendu"');
   });
 });
 
@@ -63,7 +63,7 @@ describe("la carte déployée", () => {
   it("nom complet, raison complète, phrase du comptoir, contre-indications (patient concerné dit), conseils d'utilisation", () => {
     expect(html).toContain('aria-expanded="true"');
     expect(html).toContain("GEL LARMES ARTIFICIELLES HYDRATANT SANS CONSERVATEUR 10 G");
-    expect(html).not.toMatch(/line-clamp-2[^"]*">GEL LARMES/);
+    expect(html).not.toMatch(/truncate[^"]*">GEL LARMES/);
     expect(html).toContain("La cétirizine peut assécher les yeux.");
     expect(html).toContain("« Un gel pour les yeux, si vous les sentez secs. »");
     expect(html).toContain("Contre-indications");
@@ -88,7 +88,7 @@ describe("la carte déployée", () => {
     expect(web).not.toContain('target="_blank"');
   });
   it("Vendu / Non vendu / Modifier restent utilisables déployée", () => {
-    expect(html).toContain(">Vendu</button>");
+    expect(html).toContain('aria-label="Vendu"');
     expect(card({ open: true, outcome: "SOLD" })).toContain(">Modifier</button>");
   });
   it("rubriques vides : dites non renseignées, renvoi à la notice ; sans fiche (serveur ancien) : renvoi à la fiche complète", () => {
@@ -117,7 +117,7 @@ describe("dans l'île : liste bornée, glisser, robot", () => {
     }),
   );
   it("la carte est dans la liste qui défile, à hauteur bornée", () => {
-    expect(island).toMatch(/<ul[^>]*class="isl-scroll[^"]*"[^>]*style="max-height:196px/);
+    expect(island).toMatch(/<ul[^>]*class="isl-scroll[^"]*"[^>]*style="max-height:156px/);
     expect(island).toContain("data-advice-card");
   });
   it("au poste, une carte n'est jamais une prise pour déplacer l'île, et appuyer dessus n'agace pas le robot", () => {

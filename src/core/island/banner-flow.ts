@@ -45,7 +45,8 @@ export const STAGE_WIDTH: Record<IslandStage, number> = {
   scan: 300,
   analyzing: 340,
   ready: 320,
-  advice: 420,
+  // 360 : la bannière masquait trop le logiciel pendant une délivrance (retour des pharmacies, 13 oct. 2026).
+  advice: 360,
   email: 400,
   emailSent: 320,
   done: 340,
