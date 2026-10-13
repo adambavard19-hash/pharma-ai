@@ -23,15 +23,15 @@ export function fr(text: string): string {
 /** Le filet de la marque : du vert au bleu du symbole. */
 export const HAIRLINE = "bg-gradient-to-r from-brand-500 via-[#0796b4] to-transparent";
 
-export function SiteWordmark({ className, robot = true, besideIsland = false }: { className?: string; robot?: boolean; besideIsland?: boolean }) {
+export function SiteWordmark({ className, robot = true }: { className?: string; robot?: boolean }) {
   return (
     <Link href="/decouvrir" className={cn("flex items-center gap-2.5 rounded-md", className)} aria-label="PharmaBoost, accueil">
       {/* Le robot du logo, sans son fond : il flotte, vivant, à côté du nom, salue une fois par visite et rit quand on le
-          touche (la réaction part du pointerdown : le lien vers l'accueil fonctionne toujours). Sur téléphone, à côté de
-          l'île, c'est le robot de l'île qui se tient juste devant le nom : un second ne tiendrait pas dans la largeur. */}
+          touche (la réaction part du pointerdown : le lien vers l'accueil fonctionne toujours). Sur téléphone aussi : c'est lui,
+          transparent, qui se tient devant le nom (la capsule de l'île n'y est pas montrée). */}
       {robot && (
         // Le masquage sur une enveloppe : la feuille du robot (hors couches) fixe son `display` et l'emporterait sur `hidden`.
-        <span className={cn("flex shrink-0", besideIsland && "max-md:hidden")}>
+        <span className="flex shrink-0">
           <FloatingRobot className="h-[40px] w-[34px]" track greet="once" greetKey="site" />
         </span>
       )}
@@ -52,10 +52,11 @@ export function SiteHeader({ island }: { island?: ReactNode }) {
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-border-subtle bg-surface-app/70 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-5 max-[419px]:px-3">
-        {/* L'île PharmaBoost : au milieu de l'en-tête, et devant le nom sur téléphone (le robot y vit, une seule fois). */}
-        {island && <div className="flex max-md:order-first md:order-2 md:mx-auto">{island}</div>}
+        {/* L'île PharmaBoost : au milieu de l'en-tête sur tablette et ordinateur. Sur téléphone, sa capsule noire n'est pas
+            montrée (retour du fondateur, 13 oct. 2026) : seul le robot vivant, transparent, se tient devant le nom. */}
+        {island && <div className="flex max-md:hidden md:order-2 md:mx-auto">{island}</div>}
         {/* Le robot vivant à côté du nom, comme le fondateur l'a demandé : la marque se lit « robot + PharmaBoost ». */}
-        <SiteWordmark besideIsland={Boolean(island)} className="md:order-1" />
+        <SiteWordmark className="md:order-1" />
         <nav className="ml-6 hidden items-center gap-0.5 md:order-1 xl:flex" aria-label="Sections">
           {NAV.map((item) => (
             <Link key={item.href} href={item.href} className="rounded-full px-3 py-2 text-[13.5px] font-medium whitespace-nowrap text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary">
