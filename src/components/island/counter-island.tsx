@@ -130,6 +130,9 @@ export function groupByDrug(items: readonly Pick<IslandAdvice, "drug">[]): { dru
 /** Au plus trois boîtes à l'écran en mode compact ; au-delà, « Agrandir » montre tout. */
 export const COMPACT_MAX_GROUPS = 3;
 
+/** Largeur de l'île en colonnes : deux ou trois boîtes côte à côte, toujours dans la fenêtre du poste (600 px). */
+export const COLUMNS_WIDTH: Record<number, number> = { 2: 540, 3: 588 };
+
 /** Largeur de l'île compacte : la plus fine qui garde nom, prix et boutons lisibles. */
 export const COMPACT_WIDTH = 330;
 /** Sans geste pendant ce délai, l'île compacte se replie en capsule ; le survol la rouvre. */
@@ -215,6 +218,8 @@ export function CounterIsland(props: CounterIslandProps) {
   const mood = grumpy ? "concerned" : STAGE_MOOD[state.stage];
   const tone = grumpy ? "warning" : stageTone(state.stage);
   const compact = props.compactAdvice === true && !expanded && state.stage === "advice" && count > 0;
+  // Plusieurs boîtes scannées : la bannière se divise en colonnes côte à côte (une par boîte), dans la fenêtre du poste.
+  const columns = compact ? Math.min(groupByDrug(items).length, COMPACT_MAX_GROUPS) : 1;
   // Sans geste pendant 25 s, l'île compacte se replie en capsule (« 2 conseils ») ; le survol la rouvre.
   const adviceKey = compact ? amongOf(items) : "";
   useEffect(() => {
@@ -223,7 +228,7 @@ export function CounterIsland(props: CounterIslandProps) {
     return () => clearTimeout(id);
   }, [adviceKey, hover]);
   const sleeping = compact && !hover && asleep === adviceKey;
-  const width = grumpy ? 340 : peek ? 400 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 280 : sleeping ? COMPACT_SLEEP_WIDTH : compact ? COMPACT_WIDTH : STAGE_WIDTH[state.stage];
+  const width = grumpy ? 340 : peek ? 400 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 280 : sleeping ? COMPACT_SLEEP_WIDTH : compact ? (columns > 1 ? COLUMNS_WIDTH[columns] : COMPACT_WIDTH) : STAGE_WIDTH[state.stage];
   const title = stageTitle(state, count);
 
   const onTap = () => {
@@ -367,7 +372,34 @@ export function CounterIsland(props: CounterIslandProps) {
                   <Maximize2 className="size-3.5" aria-hidden="true" />
                 </button>
               </div>
-              {shownGroups.map((group) => {
+              {shownGroups.length > 1 ? (
+                // Deux boîtes ou plus : une colonne par boîte — en haut la boîte, en dessous le ou les conseils qui en découlent.
+                <div className="mt-1.5 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${shownGroups.length}, minmax(0, 1fr))` }}>
+                  {shownGroups.map((group) => (
+                    <div key={group.drug || "-"} data-advice-group="" className="min-w-0 rounded-xl bg-white/[0.06] p-1.5">
+                      <p className="truncate px-0.5 text-[11px] leading-4 font-semibold text-white/80" title={group.drug || props.drug}>
+                        {group.drug || props.drug}
+                      </p>
+                      <div className="mt-1 space-y-1">
+                        {group.indexes.map((index) => (
+                          <ColumnCard
+                            key={`${among}#${index}`}
+                            item={items[index]}
+                            outcome={state.outcomes[index] ?? null}
+                            readOnly={props.readOnly}
+                            onOpen={() => {
+                              setUnfolded({ name: items[index].name, among });
+                              setExpanded(true);
+                            }}
+                            onAnswer={(outcome) => props.onAnswer(index, outcome)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                shownGroups.map((group) => {
                 const local = compactIndex(group.indexes.map((at) => state.outcomes[at]), group.indexes.length, picked[group.drug] ?? null);
                 const index = group.indexes[local];
                 const go = (next: number) => setChosen({ among, byGroup: { ...picked, [group.drug]: (next + group.indexes.length) % group.indexes.length } });
@@ -405,7 +437,8 @@ export function CounterIsland(props: CounterIslandProps) {
                     />
                   </div>
                 );
-              })}
+              })
+              )}
               {groups.length > COMPACT_MAX_GROUPS && (
                 <button type="button" onClick={() => setExpanded(true)} className="mt-1.5 w-full text-center text-[11px] font-semibold text-white/60 hover:text-white">
                   + {groups.length - COMPACT_MAX_GROUPS} autre{groups.length - COMPACT_MAX_GROUPS > 1 ? "s" : ""} boîte{groups.length - COMPACT_MAX_GROUPS > 1 ? "s" : ""} — agrandir
@@ -630,6 +663,51 @@ function CompactCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: Isla
           </button>
         </span>
       )}
+    </div>
+  );
+}
+
+/**
+ * Un conseil dans une colonne (plusieurs boîtes côte à côte) : le nom sur deux lignes, prix et stock en petit, puis ✓ / ✕
+ * sur toute la largeur. Un appui sur la carte agrandit la bannière, ce conseil déployé.
+ */
+function ColumnCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: IslandAdvice; outcome: IslandOutcome; readOnly?: boolean; onOpen: () => void; onAnswer: (outcome: IslandOutcome) => void }) {
+  const stock = item.stock ? STOCK[item.stock] : null;
+  const details = [
+    item.price && stock && item.stock !== "UNKNOWN" ? item.price : null,
+    item.margin ? `Marge ${item.margin}` : null,
+    stock ? `${stock.label}${item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}` : null,
+    item.challenge ? `★ ${T.challenge}` : null,
+  ].filter(Boolean);
+  return (
+    <div data-advice-card="" className="isl-line rounded-lg px-1.5 py-1.5" style={{ background: C.panel, color: C.ink }}>
+      <button type="button" onClick={onOpen} title={UNFOLD} className="flex w-full min-w-0 items-start gap-1.5 text-left">
+        {item.image && (
+          // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
+          <img src={item.image} alt="" width={26} height={26} draggable={false} className="size-[26px] shrink-0 rounded-md bg-white object-contain" />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 text-[11.5px] leading-[14px] font-bold break-words">{item.name}</span>
+          {details.length > 0 && <span className="mt-0.5 block truncate text-[10px] leading-[13px] font-semibold" style={{ color: item.stock === "LOW_STOCK" || item.stock === "OUT_OF_STOCK" ? stock?.fg : "#0B6B57" }}>{details.join(" · ")}</span>}
+        </span>
+      </button>
+      <div className="mt-1 flex gap-1">
+        {readOnly && !outcome ? null : outcome ? (
+          <button type="button" onClick={() => !readOnly && onAnswer(null)} title={readOnly ? undefined : T.change} className="isl-pop inline-flex h-6 flex-1 items-center justify-center gap-1 rounded-md text-[11px] font-bold" style={outcome === "SOLD" ? { background: C.soldBg, color: C.soldFg } : { background: C.notSoldBg, color: C.notSoldFg }}>
+            {outcome === "SOLD" && <Check className="size-3" strokeWidth={3} aria-hidden="true" />}
+            {outcome === "SOLD" ? T.sold : T.notSold}
+          </button>
+        ) : (
+          <>
+            <button type="button" onClick={() => onAnswer("SOLD")} aria-label={T.sold} title={T.sold} className="inline-flex h-6 flex-1 items-center justify-center rounded-md transition-[filter] hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
+              <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={() => onAnswer("NOT_SOLD")} aria-label={T.notSold} title={T.notSold} className="inline-flex h-6 flex-1 items-center justify-center rounded-md transition-[filter] hover:brightness-95" style={{ background: C.notSoldBg, color: C.notSoldFg }}>
+              <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

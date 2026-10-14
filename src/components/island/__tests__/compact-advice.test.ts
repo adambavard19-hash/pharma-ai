@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { INITIAL_ISLAND } from "@/core/island/banner-flow";
-import { COMPACT_WIDTH, compactIndex, CounterIsland, groupByDrug, type IslandAdvice } from "../counter-island";
+import { COLUMNS_WIDTH, COMPACT_WIDTH, compactIndex, CounterIsland, groupByDrug, type IslandAdvice } from "../counter-island";
 
 /**
  * « La bannière prend trop de place quand elle affiche les conseils » (fondateur, 13 oct. 2026) : au poste, les conseils
@@ -81,15 +81,18 @@ describe("plusieurs boîtes scannées : la bannière se divise, un bloc par boî
     ]);
   });
 
-  it("compact : un bloc par boîte, chacun avec SON conseil — le peigne n'est plus caché derrière le Gaviscon", () => {
+  it("compact : la bannière se divise en colonnes côte à côte — à gauche une boîte et ses conseils, à droite l'autre", () => {
     const html = render({ compactAdvice: true, items: SALE, outcomes: [null, null, null] });
     expect(html.match(/data-advice-group=""/g)).toHaveLength(2);
-    expect(html).toContain("Pour : GAVISCONELL MENTHE");
-    expect(html).toContain("Pour : PURESSENT POUXDOUX SHP");
+    expect(html).toContain("grid-template-columns:repeat(2, minmax(0, 1fr))");
+    expect(html).toContain("GAVISCONELL MENTHE");
+    expect(html).toContain("PURESSENT POUXDOUX SHP");
+    // Chaque colonne montre le ou les conseils de SA boîte : les deux Neobianacid à gauche, le peigne à droite.
     expect(html).toContain("NEOBIANACID CITRON CPR 70");
+    expect(html).toContain("NEOBIANACID MENTHE B/45");
     expect(html).toContain("ZAP'X PEIGNE A/LENTE");
-    expect(html).not.toContain("NEOBIANACID MENTHE B/45");
-    expect(html).toContain("1/2");
+    expect(html.indexOf("NEOBIANACID MENTHE B/45")).toBeLessThan(html.indexOf("PURESSENT POUXDOUX SHP"));
+    expect(html).toContain(`min(${COLUMNS_WIDTH[2]}px`);
     expect(html).toContain("2 boîtes");
   });
 
