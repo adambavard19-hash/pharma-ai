@@ -165,12 +165,12 @@ const RANK: Record<string, number> = { BLOCKING: 0, WARNING: 1, CAUTION: 2, INFO
 /** Trois conseils du moteur au plus à l'écran du comptoir : on en propose en moyenne trois, un seul quand il n'y en a qu'un de pertinent. */
 const MAX_ADVICE = 3;
 /**
- * Et, EN PLUS, jusqu'à trois associations du pharmacien — la limite du moteur d'associations (`MAX_ASSOCIATION_ADVICE`,
+ * Et, EN PLUS, jusqu'à six associations du pharmacien (deux par boîte scannée) — la limite du moteur d'associations (`MAX_ASSOCIATION_ADVICE`,
  * core/ai/engines/associations.ts ; un test vérifie qu'elles restent égales, ce module ne dépendant de rien pour que la
  * fenêtre du poste et le site l'embarquent seul) : ce sont ses choix, ils ne se disputent pas la place avec les conseils
- * du moteur. Six cartes au plus, que l'île fait défiler.
+ * du moteur. Neuf cartes au plus, que l'île fait défiler, rangées par boîte scannée.
  */
-const MAX_ASSOCIATION_CARDS = 3;
+const MAX_ASSOCIATION_CARDS = 6;
 export const MAX_COUNTER_CARDS = MAX_ADVICE + MAX_ASSOCIATION_CARDS;
 /** Un conseil reste sous les yeux du pharmacien après sa réponse : « Vendu » et « Non vendu » le marquent, ils ne le font pas disparaître. */
 const SHOWN_STATUSES = new Set(["PROPOSED", "ACCEPTED", "MODIFIED", "PURCHASED", "DECLINED"]);

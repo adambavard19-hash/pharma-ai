@@ -65,8 +65,12 @@ export type AssociationInput = {
   lines: { lineIndex: number; keys: string[]; productId: string | null }[];
 };
 
-/** Combien d'associations au plus se proposent sur une vente : au-delà, le comptoir est noyé. */
-export const MAX_ASSOCIATION_ADVICE = 3;
+/**
+ * Combien d'associations au plus se proposent : par BOÎTE scannée (chaque boîte a les siennes — une boîte qui en a beaucoup
+ * ne prend plus la place des autres, fondateur, 13 oct. 2026), et sur toute la vente (au-delà, le comptoir est noyé).
+ */
+export const MAX_ASSOCIATION_PER_LINE = 2;
+export const MAX_ASSOCIATION_ADVICE = 6;
 
 export type AssociationSkipReason = "NOT_IN_CATALOG" | "PRESCRIPTION_ONLY" | "ALREADY_IN_SALE" | "SAFETY" | "OUT_OF_STOCK" | "ALREADY_PROPOSED" | "LIMIT";
 
@@ -78,7 +82,7 @@ export const ASSOCIATION_SKIP_LABELS: Record<AssociationSkipReason, string> = {
   SAFETY: "le produit conseillé est écarté par la sécurité pour ce patient",
   OUT_OF_STOCK: "le produit conseillé est en rupture de stock",
   ALREADY_PROPOSED: "le produit conseillé est déjà proposé pour un autre conseil",
-  LIMIT: `limite de ${MAX_ASSOCIATION_ADVICE} associations par vente`,
+  LIMIT: `limite de ${MAX_ASSOCIATION_PER_LINE} associations par boîte scannée (${MAX_ASSOCIATION_ADVICE} par vente)`,
 };
 
 export type AssociationSkip = { ruleId: string; reason: AssociationSkipReason };
@@ -158,8 +162,24 @@ export function buildAssociationAdvice(args: {
     }
   }
 
-  const retained = [...groups.values()].slice(0, max);
-  for (const dropped of [...groups.values()].slice(max)) {
+  // Chaque boîte scannée a sa file (une association va à la première boîte qui la déclenche) ; on sert les boîtes à tour
+  // de rôle — la première association de chaque boîte, puis la deuxième… — jusqu'aux plafonds.
+  const queues = new Map<number, Group[]>();
+  for (const group of groups.values()) {
+    const line = Math.min(...group.triggers.map((trigger) => trigger.lineIndex));
+    queues.set(line, [...(queues.get(line) ?? []), group]);
+  }
+  const lineOrder = [...queues.keys()].sort((a, b) => a - b);
+  const retainedSet = new Set<Group>();
+  for (let round = 0; round < MAX_ASSOCIATION_PER_LINE; round += 1) {
+    for (const line of lineOrder) {
+      const group = queues.get(line)?.[round];
+      if (group && retainedSet.size < max) retainedSet.add(group);
+    }
+  }
+  // L'ordre d'origine (celui choisi par le pharmacien) est gardé pour l'affichage.
+  const retained = [...groups.values()].filter((group) => retainedSet.has(group));
+  for (const dropped of [...groups.values()].filter((group) => !retainedSet.has(group))) {
     for (const rule of dropped.rules) {
       skipped.push({ ruleId: rule.id, reason: "LIMIT" });
       notes.push(`Association vers ${listNames([dropped.advice.name])} non proposée : ${ASSOCIATION_SKIP_LABELS.LIMIT}.`);

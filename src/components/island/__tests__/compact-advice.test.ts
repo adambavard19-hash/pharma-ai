@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { INITIAL_ISLAND } from "@/core/island/banner-flow";
-import { COMPACT_WIDTH, compactIndex, CounterIsland, type IslandAdvice } from "../counter-island";
+import { COMPACT_WIDTH, compactIndex, CounterIsland, groupByDrug, type IslandAdvice } from "../counter-island";
 
 /**
  * « La bannière prend trop de place quand elle affiche les conseils » (fondateur, 13 oct. 2026) : au poste, les conseils
@@ -15,11 +15,11 @@ const ITEMS: IslandAdvice[] = [
   { name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", stock: "LOW_STOCK", quantity: 3 },
 ];
 
-const render = (props: { compactAdvice?: boolean; outcomes?: ("SOLD" | "NOT_SOLD" | null)[] } = {}) =>
+const render = (props: { compactAdvice?: boolean; outcomes?: ("SOLD" | "NOT_SOLD" | null)[]; items?: IslandAdvice[] } = {}) =>
   renderToStaticMarkup(
     createElement(CounterIsland, {
       state: { ...INITIAL_ISLAND, stage: "advice", outcomes: props.outcomes ?? [null, null] },
-      items: ITEMS,
+      items: props.items ?? ITEMS,
       drug: "GASTROCYNESINE",
       alert: null,
       pills: [],
@@ -64,5 +64,37 @@ describe("le mode compact des conseils (poste)", () => {
     expect(compactIndex(["SOLD", "NOT_SOLD"], 2, null)).toBe(1);
     expect(compactIndex(["SOLD", null], 2, 0)).toBe(0);
     expect(compactIndex([null], 1, 5)).toBe(0);
+  });
+});
+
+describe("plusieurs boîtes scannées : la bannière se divise, un bloc par boîte", () => {
+  const SALE: IslandAdvice[] = [
+    { name: "NEOBIANACID CITRON CPR 70", drug: "GAVISCONELL MENTHE", price: "8,90 €", stock: "IN_STOCK", quantity: 10 },
+    { name: "NEOBIANACID MENTHE B/45", drug: "GAVISCONELL MENTHE", price: "7,50 €", stock: "IN_STOCK", quantity: 4 },
+    { name: "ZAP'X PEIGNE A/LENTE", drug: "PURESSENT POUXDOUX SHP", price: "6,90 €", stock: "IN_STOCK", quantity: 3 },
+  ];
+
+  it("regroupe par boîte, dans l'ordre d'arrivée", () => {
+    expect(groupByDrug(SALE)).toEqual([
+      { drug: "GAVISCONELL MENTHE", indexes: [0, 1] },
+      { drug: "PURESSENT POUXDOUX SHP", indexes: [2] },
+    ]);
+  });
+
+  it("compact : un bloc par boîte, chacun avec SON conseil — le peigne n'est plus caché derrière le Gaviscon", () => {
+    const html = render({ compactAdvice: true, items: SALE, outcomes: [null, null, null] });
+    expect(html.match(/data-advice-group=""/g)).toHaveLength(2);
+    expect(html).toContain("Pour : GAVISCONELL MENTHE");
+    expect(html).toContain("Pour : PURESSENT POUXDOUX SHP");
+    expect(html).toContain("NEOBIANACID CITRON CPR 70");
+    expect(html).toContain("ZAP'X PEIGNE A/LENTE");
+    expect(html).not.toContain("NEOBIANACID MENTHE B/45");
+    expect(html).toContain("1/2");
+    expect(html).toContain("2 boîtes");
+  });
+
+  it("agrandie : un intitulé « Pour : … » avant les conseils de chaque boîte", () => {
+    const html = render({ items: SALE, outcomes: [null, null, null] });
+    expect(html.match(/data-advice-group=""/g)).toHaveLength(2);
   });
 });

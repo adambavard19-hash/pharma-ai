@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ASSOCIATION_SKIP_LABELS, buildAssociationAdvice, drugKey, MAX_ASSOCIATION_ADVICE, productKey, type AssociationInput, type ProductAssociationRule } from "../engines/associations";
+import { ASSOCIATION_SKIP_LABELS, buildAssociationAdvice, drugKey, MAX_ASSOCIATION_ADVICE, MAX_ASSOCIATION_PER_LINE, productKey, type AssociationInput, type ProductAssociationRule } from "../engines/associations";
 import { runAnalysisPipeline, type PipelineInput } from "../pipeline";
 import { patient, product } from "./fixtures";
 import type { CatalogProduct } from "../types";
@@ -14,6 +14,8 @@ const spray = product({ id: "spray", name: "Spray nasal eau de mer", category: "
 const olioseptil = product({ id: "olio", name: "OLIOSEPTIL BRONCHE", category: "AUTRE", stockQuantity: 5, precautions: ["Ne pas utiliser chez l'enfant de moins de 6 ans."] });
 const miel = product({ id: "miel", name: "Sirop au miel", category: "AUTRE", stockQuantity: 8 });
 const pastilles = product({ id: "pastilles", name: "Pastilles gorge", category: "AUTRE", stockQuantity: 20 });
+const miel2 = product({ id: "miel2", name: "Shampooing anti-poux", category: "AUTRE", stockQuantity: 4 });
+const mouchoirs = product({ id: "mouchoirs", name: "Peigne anti-lentes", category: "AUTRE", stockQuantity: 6 });
 
 /** Un déclencheur : un identifiant de produit du stock (« spray »), ou « drug:NOM » pour un médicament. */
 const keyOf = (trigger: string) => (trigger.startsWith("drug:") ? trigger : productKey(trigger));
@@ -124,14 +126,23 @@ describe("plusieurs associations", () => {
     expect(recommendations[0].shortReason).toContain("et");
   });
 
-  it("respecte l'ordre choisi par le pharmacien, puis la limite par vente", () => {
+  it("respecte l'ordre choisi par le pharmacien, puis la limite par boîte scannée (deux)", () => {
     const rules = [rule("r3", "spray", "pastilles", { sortOrder: 3 }), rule("r1", "spray", "olio", { sortOrder: 1 }), rule("r2", "spray", "miel", { sortOrder: 2 })];
     const full = build({ rules });
-    expect(full.recommendations.map((r) => r.productId)).toEqual(["olio", "miel", "pastilles"]);
-    const limited = build({ rules, max: 2 });
-    expect(limited.recommendations.map((r) => r.productId)).toEqual(["olio", "miel"]);
-    expect(limited.skipped).toEqual([{ ruleId: "r3", reason: "LIMIT" }]);
-    expect(MAX_ASSOCIATION_ADVICE).toBe(3);
+    expect(full.recommendations.map((r) => r.productId)).toEqual(["olio", "miel"]);
+    expect(full.skipped).toEqual([{ ruleId: "r3", reason: "LIMIT" }]);
+    expect(MAX_ASSOCIATION_PER_LINE).toBe(2);
+    expect(MAX_ASSOCIATION_ADVICE).toBe(6);
+  });
+
+  it("une boîte qui a beaucoup d'associations ne prend plus la place des autres boîtes scannées", () => {
+    // Le Gaviscon (3 associations) puis le shampoing anti-poux (1) : avant, les 3 places partaient au Gaviscon.
+    const { recommendations } = build({
+      rules: [rule("g1", "spray", "olio", { sortOrder: 1 }), rule("g2", "spray", "miel", { sortOrder: 2 }), rule("g3", "spray", "pastilles", { sortOrder: 3 }), rule("p1", "miel2", "mouchoirs", { sortOrder: 4 })],
+      lines: [inSale(0, "spray"), inSale(1, "miel2")],
+      catalog: [spray, olioseptil, miel, pastilles, miel2, mouchoirs],
+    });
+    expect(recommendations.map((r) => r.productId)).toEqual(["olio", "miel", "mouchoirs"]);
   });
 
   it("classe les cartes dans l'ordre : la première association garde le meilleur score", () => {

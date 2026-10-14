@@ -63,12 +63,12 @@ describe("au comptoir, plusieurs associations s'affichent vraiment", () => {
     expect(notice.items.slice(3).map((item) => item.name)).toEqual(["Brosse à dents souple", "Mouchoirs doux"]);
   });
 
-  it("le total reste raisonnable : six cartes au plus, trois associations au plus", () => {
-    expect(MAX_ASSOCIATION_ADVICE).toBe(3);
+  it("le total reste raisonnable : neuf cartes au plus, six associations au plus (deux par boîte)", () => {
+    expect(MAX_ASSOCIATION_ADVICE).toBe(6);
     expect(MAX_COUNTER_CARDS).toBe(MAX_RECOMMENDATIONS_COUNTER_SCAN + MAX_ASSOCIATION_ADVICE);
     const many = Array.from({ length: 5 }, (_, index) => ({ id: `e${index}`, name: `Conseil ${index}`, priceCents: null, reason: null, status: "PROPOSED" }));
-    const assoc = Array.from({ length: 5 }, (_, index) => ({ id: `a${index}`, name: `Association ${index}`, priceCents: null, reason: null, status: "PROPOSED", association: true }));
+    const assoc = Array.from({ length: 8 }, (_, index) => ({ id: `a${index}`, name: `Association ${index}`, priceCents: null, reason: null, status: "PROPOSED", association: true }));
     const notice = buildCounterNotice({ reference: "ORD-1", prescriptionStatus: "ANALYZED", lineNames: ["X"], alerts: [], outcome: "PROPOSALS", recommendations: [...assoc, ...many] });
-    expect(notice.items.map((item) => item.name)).toEqual(["Conseil 0", "Conseil 1", "Conseil 2", "Association 0", "Association 1", "Association 2"]);
+    expect(notice.items.map((item) => item.name)).toEqual(["Conseil 0", "Conseil 1", "Conseil 2", "Association 0", "Association 1", "Association 2", "Association 3", "Association 4", "Association 5"]);
   });
 });

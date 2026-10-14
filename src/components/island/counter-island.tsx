@@ -115,6 +115,21 @@ export function compactIndex(outcomes: readonly (IslandOutcome | undefined)[], c
   return Math.max(0, count - 1);
 }
 
+/** Les conseils rangés par boîte scannée (« Pour : GAVISCON »), dans l'ordre où elles apparaissent : un bloc par boîte. */
+export function groupByDrug(items: readonly Pick<IslandAdvice, "drug">[]): { drug: string; indexes: number[] }[] {
+  const groups: { drug: string; indexes: number[] }[] = [];
+  items.forEach((item, index) => {
+    const drug = item.drug?.trim() || "";
+    const group = groups.find((known) => known.drug === drug);
+    if (group) group.indexes.push(index);
+    else groups.push({ drug, indexes: [index] });
+  });
+  return groups;
+}
+
+/** Au plus trois boîtes à l'écran en mode compact ; au-delà, « Agrandir » montre tout. */
+export const COMPACT_MAX_GROUPS = 3;
+
 /** Largeur de l'île compacte : la plus fine qui garde nom, prix et boutons lisibles. */
 export const COMPACT_WIDTH = 330;
 /** Sans geste pendant ce délai, l'île compacte se replie en capsule ; le survol la rouvre. */
@@ -177,7 +192,8 @@ export function CounterIsland(props: CounterIslandProps) {
     setExpandedState(value);
     saveExpanded(value);
   };
-  const [chosen, setChosen] = useState<{ index: number; among: string } | null>(null);
+  // Le conseil choisi avec les flèches, boîte par boîte (retenu avec la liste affichée).
+  const [chosen, setChosen] = useState<{ byGroup: Record<string, number>; among: string } | null>(null);
   const [asleep, setAsleep] = useState<string | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openName = unfoldedName(unfolded, items);
@@ -329,27 +345,19 @@ export function CounterIsland(props: CounterIslandProps) {
         }
         if (compact) {
           const among = amongOf(items);
-          const index = compactIndex(state.outcomes, count, chosen && chosen.among === among ? chosen.index : null);
-          const go = (next: number) => setChosen({ index: (next + count) % count, among });
+          // Un bloc par boîte scannée : chaque boîte montre SON conseil (le premier qui attend une réponse), ses flèches
+          // parcourent les siens. Plusieurs boîtes, plusieurs blocs — la bannière se divise au lieu de tout empiler.
+          const groups = groupByDrug(items);
+          const picked = chosen && chosen.among === among ? chosen.byGroup : {};
+          const shownGroups = groups.slice(0, COMPACT_MAX_GROUPS);
           body = (
             <div className="px-2 pt-1.5 pb-2">
               <div className="flex items-center gap-1.5">
                 {robot(22)}
                 <p className="min-w-0 flex-1 truncate text-[12.5px] leading-4 font-semibold" aria-live="polite">
                   {allAnswered(state, count) ? T.allDone : count > 1 ? T.reducedMany.replace("{n}", String(count)) : T.reducedOne}
-                  <span className="font-normal text-white/50"> · {props.drug}</span>
+                  {groups.length > 1 && <span className="font-normal text-white/50"> · {groups.length} boîtes</span>}
                 </p>
-                {count > 1 && (
-                  <span className="flex shrink-0 items-center text-white/60">
-                    <button type="button" onClick={() => go(index - 1)} aria-label="Conseil précédent" className="inline-flex size-6 items-center justify-center rounded-full hover:bg-white/[0.1] hover:text-white">
-                      <ChevronLeft className="size-3.5" aria-hidden="true" />
-                    </button>
-                    <span className="text-[10.5px] font-semibold tabular-nums">{index + 1}/{count}</span>
-                    <button type="button" onClick={() => go(index + 1)} aria-label="Conseil suivant" className="inline-flex size-6 items-center justify-center rounded-full hover:bg-white/[0.1] hover:text-white">
-                      <ChevronRight className="size-3.5" aria-hidden="true" />
-                    </button>
-                  </span>
-                )}
                 {!allAnswered(state, count) && (
                   <button type="button" onClick={props.onFinish} aria-label={props.finishLabel ?? T.finish} title={props.finishLabel ?? T.finish} className="inline-flex size-6 shrink-0 items-center justify-center rounded-full transition-[filter] hover:brightness-110" style={{ background: C.accent, color: "#04261A" }}>
                     <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
@@ -359,20 +367,50 @@ export function CounterIsland(props: CounterIslandProps) {
                   <Maximize2 className="size-3.5" aria-hidden="true" />
                 </button>
               </div>
-              <CompactCard
-                key={`${among}#${index}`}
-                item={items[index]}
-                outcome={state.outcomes[index] ?? null}
-                readOnly={props.readOnly}
-                onOpen={() => {
-                  setUnfolded({ name: items[index].name, among });
-                  setExpanded(true);
-                }}
-                onAnswer={(outcome) => {
-                  setChosen(null);
-                  props.onAnswer(index, outcome);
-                }}
-              />
+              {shownGroups.map((group) => {
+                const local = compactIndex(group.indexes.map((at) => state.outcomes[at]), group.indexes.length, picked[group.drug] ?? null);
+                const index = group.indexes[local];
+                const go = (next: number) => setChosen({ among, byGroup: { ...picked, [group.drug]: (next + group.indexes.length) % group.indexes.length } });
+                return (
+                  <div key={group.drug || "-"} data-advice-group="" className="mt-1.5">
+                    <div className="flex h-4 items-center gap-1 px-1 text-[10.5px] font-semibold text-white/55">
+                      <span className="min-w-0 flex-1 truncate">{group.drug ? `${T.forDrug}${group.drug}` : props.drug}</span>
+                      {group.indexes.length > 1 && (
+                        <span className="flex shrink-0 items-center">
+                          <button type="button" onClick={() => go(local - 1)} aria-label="Conseil précédent" className="inline-flex size-4 items-center justify-center rounded-full hover:bg-white/[0.1] hover:text-white">
+                            <ChevronLeft className="size-3" aria-hidden="true" />
+                          </button>
+                          <span className="tabular-nums">{local + 1}/{group.indexes.length}</span>
+                          <button type="button" onClick={() => go(local + 1)} aria-label="Conseil suivant" className="inline-flex size-4 items-center justify-center rounded-full hover:bg-white/[0.1] hover:text-white">
+                            <ChevronRight className="size-3" aria-hidden="true" />
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                    <CompactCard
+                      key={`${among}#${index}`}
+                      item={items[index]}
+                      outcome={state.outcomes[index] ?? null}
+                      readOnly={props.readOnly}
+                      onOpen={() => {
+                        setUnfolded({ name: items[index].name, among });
+                        setExpanded(true);
+                      }}
+                      onAnswer={(outcome) => {
+                        const rest = { ...picked };
+                        delete rest[group.drug];
+                        setChosen({ among, byGroup: rest });
+                        props.onAnswer(index, outcome);
+                      }}
+                    />
+                  </div>
+                );
+              })}
+              {groups.length > COMPACT_MAX_GROUPS && (
+                <button type="button" onClick={() => setExpanded(true)} className="mt-1.5 w-full text-center text-[11px] font-semibold text-white/60 hover:text-white">
+                  + {groups.length - COMPACT_MAX_GROUPS} autre{groups.length - COMPACT_MAX_GROUPS > 1 ? "s" : ""} boîte{groups.length - COMPACT_MAX_GROUPS > 1 ? "s" : ""} — agrandir
+                </button>
+              )}
               {allAnswered(state, count) && (
                 <button type="button" onClick={props.onFinish} className="isl-pop mt-1.5 inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg text-[11.5px] font-bold transition-[filter] hover:brightness-110" style={{ background: C.accent, color: "#04261A" }}>
                   <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> {props.finishLabel ?? T.finish}
@@ -398,7 +436,14 @@ export function CounterIsland(props: CounterIslandProps) {
               }
             />
             <AdviceList maxHeight={props.listMaxHeight ?? ADVICE_LIST_MAX_HEIGHT} count={count} unfolded={openName}>
-              {items.map((item, index) => (
+              {items.map((item, index) => [
+                // Plusieurs boîtes scannées : un intitulé « Pour : … » avant les conseils de chaque boîte.
+                groupByDrug(items).length > 1 && item.drug && items.findIndex((other) => (other.drug?.trim() || "") === (item.drug?.trim() || "")) === index ? (
+                  <li key={`boite-${item.drug}`} data-advice-group="" className="truncate px-1 pt-1 text-[10.5px] font-semibold text-white/55">
+                    {T.forDrug}
+                    {item.drug}
+                  </li>
+                ) : null,
                 <AdviceCard
                   key={item.name}
                   item={item}
@@ -409,8 +454,8 @@ export function CounterIsland(props: CounterIslandProps) {
                   onToggle={() => setUnfolded(toggleAdvice(unfolded, items, item.name))}
                   onOpen={() => props.onOpenAdvice?.(index)}
                   onAnswer={(outcome) => props.onAnswer(index, outcome)}
-                />
-              ))}
+                />,
+              ])}
             </AdviceList>
             <div className="mt-1.5 flex items-center gap-1.5">
               {props.emailEnabled !== false && <button type="button" onClick={props.onAddEmail} className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/[0.08] text-[11.5px] font-semibold text-white/90 transition-colors hover:bg-white/[0.14] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]">
@@ -556,7 +601,7 @@ function CompactCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: Isla
     item.shortDate ? `${T.shortDate} ${item.shortDate.replace(/\/\d{4}$/, "")}` : null,
   ].filter(Boolean);
   return (
-    <div data-advice-card="" className="isl-line mt-1.5 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: C.panel, color: C.ink }}>
+    <div data-advice-card="" className="isl-line mt-0.5 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: C.panel, color: C.ink }}>
       <button type="button" onClick={onOpen} title={UNFOLD} className="flex min-w-0 flex-1 items-center gap-2 text-left">
         {item.image && (
           // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
