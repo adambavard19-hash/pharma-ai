@@ -179,6 +179,27 @@ const STOCK: Record<NonNullable<IslandAdvice["stock"]>, { bg: string; fg: string
   UNKNOWN: { bg: C.unknownBg, fg: C.unknownFg, label: T.unknownStock },
 };
 
+/** Prix en gras, puis le stock avec sa pastille de couleur (vert, orange, rouge), le challenge en doré. */
+function AdviceMeta({ item, small }: { item: IslandAdvice; small?: boolean }) {
+  const stock = item.stock ? STOCK[item.stock] : null;
+  const showPrice = item.price && stock && item.stock !== "UNKNOWN";
+  const dot = item.stock === "IN_STOCK" ? "#16B88A" : item.stock === "LOW_STOCK" ? "#F2A516" : item.stock === "OUT_OF_STOCK" ? "#E5484D" : "#9AA7B0";
+  return (
+    <span className={cn("flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap font-semibold", small ? "text-[10.5px] leading-[14px]" : "text-[11px] leading-4")}>
+      {showPrice && <span className="shrink-0 font-bold tabular-nums" style={{ color: C.ink }}>{item.price}</span>}
+      {stock && (
+        <span className="inline-flex min-w-0 items-center gap-1 truncate" style={{ color: item.stock === "IN_STOCK" ? "#0B6B57" : stock.fg }}>
+          <span className="size-1.5 shrink-0 rounded-full" style={{ background: dot }} aria-hidden="true" />
+          {stock.label}
+          {item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}
+        </span>
+      )}
+      {item.margin && <span className="shrink-0 text-[#4B5F6C]">Marge {item.margin} HT</span>}
+      {item.challenge && <span className="shrink-0" style={{ color: "#B7791F" }}>★ {T.challenge}</span>}
+    </span>
+  );
+}
+
 function Chip({ bg, fg, children }: { bg: string; fg: string; children: ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10.5px] font-semibold whitespace-nowrap" style={{ background: bg, color: fg }}>
@@ -331,11 +352,13 @@ export function CounterIsland(props: CounterIslandProps) {
         );
         break;
       case "analyzing": {
-        const steps = analysisSteps(props.drug, count);
+        // Tant que la boîte n'est pas lue, pas de « lecture en cours… » répété : le robot dit ce qu'il fait.
+        const known = !/lecture en cours/i.test(props.drug);
+        const steps = analysisSteps(known ? props.drug : "", count).map((step, i) => (i === 0 && !known ? "Lecture de la boîte" : step));
         body = (
           <div className="px-3 pt-2.5 pb-3">
-            <Row robot={robot(30)} title={title} sub={props.drug} compact />
-            <ol className="mt-2 space-y-0.5 rounded-xl bg-white/[0.05] px-2.5 py-2 font-mono text-[11.5px] leading-[18px]">
+            <Row robot={robot(30)} title={title} sub={known ? props.drug : "Le robot lit la boîte scannée"} compact />
+            <ol className="mt-2 space-y-1 rounded-xl bg-white/[0.05] px-3 py-2 text-[12.5px] leading-[18px] font-medium">
               {/* Les trois dernières lignes seulement : l'île reste fine pendant que l'analyse se coche. */}
               {steps.slice(0, Math.min(state.stepsDone + 1, steps.length)).map((step, i) => ({ step, i })).slice(-3).map(({ step, i }) => {
                 const done = i < state.stepsDone;
@@ -713,7 +736,11 @@ function CompactCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: Isla
             <span className="min-w-0 flex-1 truncate text-[12px] leading-4 font-bold">{item.name}</span>
             {item.price && stock && item.stock !== "UNKNOWN" && <span className="shrink-0 text-[11.5px] leading-4 font-bold tabular-nums">{item.price}</span>}
           </span>
-          {details.length > 0 && <span className="block truncate text-[10.5px] leading-[14px] font-semibold" style={{ color: item.stock === "LOW_STOCK" || item.stock === "OUT_OF_STOCK" ? stock?.fg : "#0B6B57" }}>{details.join(" · ")}</span>}
+          {details.length > 0 && (
+            <span className="block">
+              <AdviceMeta item={{ ...item, price: undefined }} small />
+            </span>
+          )}
         </span>
       </button>
       {readOnly && !outcome ? null : outcome ? (
@@ -726,7 +753,7 @@ function CompactCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: Isla
           <button type="button" onClick={() => onAnswer("SOLD")} aria-label={T.sold} title={T.sold} className="inline-flex h-6 w-8 items-center justify-center rounded-md transition-[filter] hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
             <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
           </button>
-          <button type="button" onClick={() => onAnswer("NOT_SOLD")} aria-label={T.notSold} title={T.notSold} className="inline-flex h-6 w-8 items-center justify-center rounded-md transition-[filter] hover:brightness-95" style={{ background: C.notSoldBg, color: C.notSoldFg }}>
+          <button type="button" onClick={() => onAnswer("NOT_SOLD")} aria-label={T.notSold} title={T.notSold} className="inline-flex h-6 w-8 items-center justify-center rounded-md border bg-white transition-colors hover:bg-[#F1F5F7]" style={{ borderColor: "#C9D5DC", color: C.notSoldFg }}>
             <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
           </button>
         </span>
@@ -756,7 +783,7 @@ function ColumnCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: Islan
         )}
         <span className="min-w-0 flex-1">
           <span className="line-clamp-2 text-[11.5px] leading-[14px] font-bold break-words">{item.name}</span>
-          {details.length > 0 && <span className="mt-0.5 block truncate text-[10px] leading-[13px] font-semibold" style={{ color: item.stock === "LOW_STOCK" || item.stock === "OUT_OF_STOCK" ? stock?.fg : "#0B6B57" }}>{details.join(" · ")}</span>}
+          {details.length > 0 && <span className="mt-0.5 block"><AdviceMeta item={item} small /></span>}
         </span>
       </button>
       <div className="mt-1 flex gap-1">
@@ -767,11 +794,13 @@ function ColumnCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: Islan
           </button>
         ) : (
           <>
-            <button type="button" onClick={() => onAnswer("SOLD")} aria-label={T.sold} title={T.sold} className="inline-flex h-6 flex-1 items-center justify-center rounded-md transition-[filter] hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
+            <button type="button" onClick={() => onAnswer("SOLD")} aria-label={T.sold} title={T.sold} className="inline-flex h-6 flex-1 items-center justify-center gap-1 rounded-md text-[11px] font-bold transition-[filter] hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
               <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
+              {T.sold}
             </button>
-            <button type="button" onClick={() => onAnswer("NOT_SOLD")} aria-label={T.notSold} title={T.notSold} className="inline-flex h-6 flex-1 items-center justify-center rounded-md transition-[filter] hover:brightness-95" style={{ background: C.notSoldBg, color: C.notSoldFg }}>
+            <button type="button" onClick={() => onAnswer("NOT_SOLD")} aria-label={T.notSold} title={T.notSold} className="inline-flex h-6 flex-1 items-center justify-center gap-1 rounded-md border bg-white text-[11px] font-bold transition-colors hover:bg-[#F1F5F7]" style={{ borderColor: "#C9D5DC", color: C.notSoldFg }}>
               <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
+              {T.notSold}
             </button>
           </>
         )}
@@ -873,7 +902,7 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, outside, open, o
             <button type="button" onClick={() => onAnswer("SOLD")} aria-label={T.sold} title={T.sold} className="inline-flex h-6 w-8 items-center justify-center rounded-md transition-[filter] hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
               <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
             </button>
-            <button type="button" onClick={() => onAnswer("NOT_SOLD")} aria-label={T.notSold} title={T.notSold} className="inline-flex h-6 w-8 items-center justify-center rounded-md transition-[filter] hover:brightness-95" style={{ background: C.notSoldBg, color: C.notSoldFg }}>
+            <button type="button" onClick={() => onAnswer("NOT_SOLD")} aria-label={T.notSold} title={T.notSold} className="inline-flex h-6 w-8 items-center justify-center rounded-md border bg-white transition-colors hover:bg-[#F1F5F7]" style={{ borderColor: "#C9D5DC", color: C.notSoldFg }}>
               <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
             </button>
           </>
