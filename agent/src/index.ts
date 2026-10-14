@@ -47,7 +47,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.8";
+const VERSION = "0.10.9";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -442,7 +442,7 @@ async function dropClosedNotices(config: Config): Promise<void> {
  * le navigateur lié à ce poste ne dessine pas un second robot seulement si la
  * fenêtre du poste en dessine un. En retour : le robot de la personne connectée, et son prénom (le bonjour du matin).
  */
-async function postHeartbeat(config: Config): Promise<{ exportPath: string | null; syncRequestedAt: string | null; robotLook: number | null; firstName: string }> {
+async function postHeartbeat(config: Config): Promise<{ exportPath: string | null; syncRequestedAt: string | null; robotLook: number | null; firstName: string; postLabel: string | null }> {
   const response = await api(config, "/api/agent/heartbeat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -451,8 +451,9 @@ async function postHeartbeat(config: Config): Promise<{ exportPath: string | nul
   if (response.status === 401) throw new Error("clé du poste révoquée");
   // Un serveur en panne (502, 503) n'est pas un signe de vie : l'icône du poste doit dire « hors ligne », pas « relié ».
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const body = (await response.json().catch(() => ({}))) as { exportPath?: string | null; syncRequestedAt?: string | null; robotLook?: number | null; firstName?: unknown };
-  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null, firstName: cleanFirstName(body.firstName) };
+  const body = (await response.json().catch(() => ({}))) as { exportPath?: string | null; syncRequestedAt?: string | null; robotLook?: number | null; firstName?: unknown; postLabel?: unknown };
+  const postLabel = typeof body.postLabel === "string" ? body.postLabel.replace(/[\r\n]+/g, " ").trim().slice(0, 60) || null : null;
+  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null, firstName: cleanFirstName(body.firstName), postLabel };
 }
 
 /**
@@ -556,6 +557,13 @@ async function runPost(config: Config): Promise<void> {
         // Le robot de la personne connectée à ce comptoir (couleur, accessoire), le même que dans son espace PharmaBoost ;
         // personne : le robot de la marque.
         notices.setRobotLook(settings.robotLook);
+        // Le nom du poste suit celui de PharmaBoost (le titulaire le renomme dans Paramètres) : retenu et montré par la bannière.
+        if (settings.postLabel && settings.postLabel !== (config.postLabel ?? "")) {
+          config = { ...config, postLabel: settings.postLabel };
+          writeConfig(config);
+          notices.setPostLabel(settings.postLabel);
+          log(`Nom du poste : ${settings.postLabel}`);
+        }
         heartbeatOk = true;
         firstName = settings.firstName;
         if (settings.exportPath !== (config.exportPath ?? null)) {

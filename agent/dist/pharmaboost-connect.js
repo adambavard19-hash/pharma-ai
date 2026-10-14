@@ -5729,6 +5729,12 @@ var NoticeCenter = class {
     this.ensureHost();
   }
   /** Le robot de ce comptoir : la bannière en change aussitôt (couleur, accessoire), sans redémarrer. */
+  /** Le nom du poste a changé dans PharmaBoost : la bannière (l'île) l'affiche aussitôt. */
+  setPostLabel(label) {
+    if (this.options.postLabel === label) return;
+    this.options.postLabel = label;
+    if (this.host && this.banner && this.window === "ile") this.send({ op: "init", look: this.robotLook ?? -1, postLabel: label, ...this.placement() });
+  }
   setRobotLook(look) {
     const next = typeof look === "number" && Number.isInteger(look) && look >= 0 ? look : null;
     if (next === this.robotLook) return;
@@ -6524,7 +6530,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.8";
+var VERSION = "0.10.9";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -6828,7 +6834,8 @@ async function postHeartbeat(config) {
   if (response.status === 401) throw new Error("cl\xE9 du poste r\xE9voqu\xE9e");
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = await response.json().catch(() => ({}));
-  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null, firstName: cleanFirstName(body.firstName) };
+  const postLabel = typeof body.postLabel === "string" ? body.postLabel.replace(/[\r\n]+/g, " ").trim().slice(0, 60) || null : null;
+  return { exportPath: body.exportPath ?? null, syncRequestedAt: body.syncRequestedAt ?? null, robotLook: typeof body.robotLook === "number" ? body.robotLook : null, firstName: cleanFirstName(body.firstName), postLabel };
 }
 async function openSpace(config, why) {
   try {
@@ -6907,6 +6914,12 @@ async function runPost(config) {
           }
         }
         notices.setRobotLook(settings.robotLook);
+        if (settings.postLabel && settings.postLabel !== (config.postLabel ?? "")) {
+          config = { ...config, postLabel: settings.postLabel };
+          writeConfig(config);
+          notices.setPostLabel(settings.postLabel);
+          log(`Nom du poste : ${settings.postLabel}`);
+        }
         heartbeatOk = true;
         firstName = settings.firstName;
         if (settings.exportPath !== (config.exportPath ?? null)) {

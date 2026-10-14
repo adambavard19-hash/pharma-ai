@@ -455,6 +455,14 @@ export class NoticeCenter {
   }
 
   /** Le robot de ce comptoir : la bannière en change aussitôt (couleur, accessoire), sans redémarrer. */
+  /** Le nom du poste a changé dans PharmaBoost : la bannière (l'île) l'affiche aussitôt. */
+  setPostLabel(label: string): void {
+    if (this.options.postLabel === label) return;
+    this.options.postLabel = label;
+    // Seulement l'île : l'ancienne bannière (GDI+) repart de zéro à chaque « init ».
+    if (this.host && this.banner && this.window === "ile") this.send({ op: "init", look: this.robotLook ?? -1, postLabel: label, ...this.placement() });
+  }
+
   setRobotLook(look: number | null): void {
     const next = typeof look === "number" && Number.isInteger(look) && look >= 0 ? look : null;
     if (next === this.robotLook) return;

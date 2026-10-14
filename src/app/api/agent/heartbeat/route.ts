@@ -36,7 +36,7 @@ export async function POST(request: Request) {
           ...(withRobot ? { robotShownAt: postDrawsRobot(body.fenetre) ? now : null } : {}),
           ...(typeof body.notice === "string" || body.notice === null ? { lastExportError: body.notice } : {}),
         },
-        select: { exportPath: true, syncRequestedAt: true, assignedUserId: true },
+        select: { exportPath: true, syncRequestedAt: true, assignedUserId: true, label: true },
       });
     // `robotShownAt` est un confort : s'il ne s'écrit pas (code en ligne avant la migration), le signe de vie passe quand
     // même — sans lui, tous les postes se diraient « hors ligne ». Une vraie erreur échoue aussi au second essai.
@@ -53,6 +53,8 @@ export async function POST(request: Request) {
       syncRequestedAt: post.syncRequestedAt?.toISOString() ?? null,
       robotLook: post.assignedUserId ? personRobotLook(post.assignedUserId) : null,
       firstName: cleanFirstName(person?.firstName),
+      // Le nom ACTUEL du poste (renommé par le titulaire dans Paramètres) : la bannière l'affiche, au lieu de celui de l'installation.
+      postLabel: post.label?.trim().slice(0, 60) || null,
     });
   }
   await recordHeartbeat(agent, { version: body.version, hostname: body.hostname, notice: typeof body.notice === "string" || body.notice === null ? body.notice : undefined });
