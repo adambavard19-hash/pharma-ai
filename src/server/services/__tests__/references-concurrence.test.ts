@@ -15,14 +15,14 @@ beforeEach(() => {
 
 describe("deux créations simultanées dans la même pharmacie", () => {
   it("la seconde, refusée par la base, recalcule sa référence et réussit : aucun bip, aucune vente perdus", async () => {
-    // Le concurrent a pris ORD-0001 pendant que ce poste calculait : la base refuse, puis le numéro suivant est libre.
+    // Le concurrent a pris V-0001 pendant que ce poste calculait : la base refuse, puis le numéro suivant est libre.
     let competitorWrote = false;
     const create = vi.fn(async (reference: string) => { if (create.mock.calls.length === 1) { competitorWrote = true; throw collision(); } return { id: "x", reference }; });
-    m.count.mockImplementation(async ({ where }: { where: { reference?: string } }) => (where.reference ? (competitorWrote && where.reference === "ORD-0001" ? 1 : 0) : competitorWrote ? 1 : 0));
+    m.count.mockImplementation(async ({ where }: { where: { reference?: string } }) => (where.reference ? (competitorWrote && where.reference === "V-0001" ? 1 : 0) : competitorWrote ? 1 : 0));
     const result = await createWithReference("prescription", "ph1", create);
     expect(create).toHaveBeenCalledTimes(2);
-    expect(create.mock.calls.map((call) => call[0])).toEqual(["ORD-0001", "ORD-0002"]);
-    expect(result.reference).toBe("ORD-0002");
+    expect(create.mock.calls.map((call) => call[0])).toEqual(["V-0001", "V-0002"]);
+    expect(result.reference).toBe("V-0002");
   });
 
   it("vingt créations en même temps finissent toutes, avec vingt références différentes", async () => {

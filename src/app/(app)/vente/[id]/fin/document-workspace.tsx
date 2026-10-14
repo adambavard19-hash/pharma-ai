@@ -628,7 +628,7 @@ export function SalePanel({
     <Card id="vente" className="border-accent-200 dark:border-accent-800/60">
       <CardHeader
         title="Vente non enregistrée"
-        description="Ces conseils ont été acceptés mais aucune délivrance ne les porte. Cochez ce que le patient emporte."
+        description="Ces conseils ont été acceptés mais aucune vente ne les porte. Cochez ce que le patient emporte."
         action={<Receipt className="size-[18px] text-accent-600 dark:text-accent-400" />}
       />
       <CardContent className="space-y-4">
@@ -760,7 +760,7 @@ function AttachPatientBlock({ prescriptionId, patients, canCreate, canAttach }: 
     <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 px-4 py-3.5 dark:border-brand-800 dark:bg-brand-950/20">
       <div>
         <p className="text-[13.5px] font-semibold text-text-primary">Nouveau patient ? Prenez son adresse maintenant.</p>
-        <p className="text-[12.5px] leading-5 text-text-secondary">Le plan partira par e-mail, et cette délivrance sera dans son historique. Sinon, il s&apos;imprime ou se scanne.</p>
+        <p className="text-[12.5px] leading-5 text-text-secondary">Le plan partira par e-mail, et cette vente sera dans son historique. Sinon, il s&apos;imprime ou se scanne.</p>
       </div>
       {canCreate && canAttach && (
         <div className="flex gap-3 text-[12.5px]">

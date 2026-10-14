@@ -62,7 +62,7 @@ export function buildCounterStatus(input: {
       state: "READY",
       pill: { label: "Connecté", tone: "success" },
       title: "Votre comptoir est prêt.",
-      subtitle: "PharmaBoost vous accompagne pendant les délivrances.",
+      subtitle: "PharmaBoost vous accompagne pendant les ventes.",
       posts,
       waitingInstall,
       awaitingFirstScan: overview.sales.state === "WAITING_SCAN",
@@ -173,11 +173,9 @@ export function describeWhen(date: Date, now: Date): string {
 /** Les médicaments d'une ordonnance affichés sous son titre ; le reste se lit dans la vente. */
 export const ACTIVITY_LINES_SHOWN = 6;
 
-/** « ORD-0780 » se dit « Ordonnance 0780 » : le numéro, comme on le dirait au comptoir. */
-export function ordonnanceTitle(reference: string): string {
-  const number = reference.replace(/^ORD-?/i, "").trim();
-  return number ? `Ordonnance ${number}` : "Ordonnance";
-}
+export { saleTitle } from "./sale-title";
+/** Ancien nom, gardé pour les appels existants : une vente ne se dit plus « ordonnance ». */
+export { saleTitle as ordonnanceTitle } from "./sale-title";
 
 export type ActivityItem = {
   id: string;

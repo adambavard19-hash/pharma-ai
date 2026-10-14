@@ -72,7 +72,7 @@ export function FollowUpPanel({
   if (!patientId) {
     return (
       <Card>
-        <CardHeader title="Suivi automatique" description="Rattachez l'ordonnance à un patient pour pouvoir prendre de ses nouvelles." />
+        <CardHeader title="Suivi automatique" description="Rattachez la vente à un patient pour pouvoir prendre de ses nouvelles." />
       </Card>
     );
   }

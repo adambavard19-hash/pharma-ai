@@ -430,8 +430,8 @@ var BANNER = {
     readyOne: "1 conseil disponible",
     readyMany: "{n} conseils disponibles",
     readyButton: "Voir les conseils",
-    forSaleOne: "1 conseil pour cette d\xE9livrance",
-    forSaleMany: "{n} conseils pour cette d\xE9livrance",
+    forSaleOne: "1 conseil pour cette vente",
+    forSaleMany: "{n} conseils pour cette vente",
     duringSale: "Pendant la vente",
     readFirst: "\xC0 lire avant de conseiller",
     questionTitle: "Une question \xE0 poser",
@@ -6530,7 +6530,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.9";
+var VERSION = "0.10.10";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;

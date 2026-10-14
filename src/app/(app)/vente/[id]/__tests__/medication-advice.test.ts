@@ -181,10 +181,10 @@ describe("les autres références possibles", () => {
   it("une alternative n'a jamais l'air d'un conseil accepté : le geste d'accepter reste celui de la carte principale", () => {
     const part = alternativesPart(render([advice({ alternatives: three })]));
     expect(part).not.toContain("bg-success-600");
-    expect(part).not.toContain("Ajouté à la délivrance");
+    expect(part).not.toContain("Ajouté à la vente");
     expect(part).not.toContain("Proposer ce produit");
     // Le texte l'explique : choisir ne l'ajoute pas à la délivrance.
-    expect(text(part)).toContain("sans l'ajouter à la délivrance");
+    expect(text(part)).toContain("sans l'ajouter à la vente");
   });
 
   it("chaque bouton se distingue pour un lecteur d'écran", () => {
@@ -216,7 +216,7 @@ describe("les autres références possibles", () => {
     const withAlternatives = render([advice({ id: "a", alternatives: three })], { inBasket: (id) => id === "a" });
     expect(withAlternatives).not.toContain("Autres références possibles");
     expect(withAlternatives).not.toContain("Choisir celle-ci");
-    expect(text(withAlternatives)).toContain("Ajouté à la délivrance");
+    expect(text(withAlternatives)).toContain("Ajouté à la vente");
     expect(text(withAlternatives)).toContain("Annuler");
 
     const without = render([advice({ id: "a", alternatives: [] })], { inBasket: (id) => id === "a" });

@@ -102,7 +102,7 @@ export function TreatmentPanel({
         {canEdit && (
           <button type="button" onClick={onEdit} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px] font-medium text-brand-700 transition-colors hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950">
             <Pencil className="size-3.5" />
-            Corriger l&apos;ordonnance
+            Corriger la vente
           </button>
         )}
       </div>

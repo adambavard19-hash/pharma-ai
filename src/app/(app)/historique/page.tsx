@@ -4,7 +4,8 @@ import { Mail } from "lucide-react";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { loadClosedSales } from "@/server/services/counter-history";
-import { buildSalesReport, euros, periodFromParam, reportWindow, SALES_REPORT_PERIODS, toSalesReportView, type SalesReportPeriod } from "@/core/counter/sales-report";
+import { buildSalesReport, euros, parisMidnight, periodFromParam, reportWindow, SALES_REPORT_PERIODS, toSalesReportView, type SalesReportPeriod } from "@/core/counter/sales-report";
+import { saleTitle } from "@/core/counter/sale-title";
 import { TIME_ZONE } from "@/config/constants";
 import { PageHeader } from "@/components/ui/page";
 import { Card } from "@/components/ui/card";
@@ -21,17 +22,43 @@ const PAGE_SIZE = 50;
  * faite, les boîtes scannées, les conseils proposés, vendus ou non, le chiffre d'affaires qu'ils ont ajouté, le bilan e-mail.
  * Réservé au titulaire (même permission que les performances). L'officine vient de la session, jamais de l'adresse.
  */
-export default async function HistoriquePage({ searchParams }: { searchParams: Promise<{ periode?: string | string[]; page?: string | string[] }> }) {
+type Query = { periode?: string | string[]; page?: string | string[]; jour?: string | string[]; de?: string | string[]; a?: string | string[]; numero?: string | string[] };
+const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? "";
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const TIME = /^\d{2}:\d{2}$/;
+
+export default async function HistoriquePage({ searchParams }: { searchParams: Promise<Query> }) {
   const session = await requirePermission(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
   const query = await searchParams;
   const period = periodFromParam(query.periode);
-  const pageNumber = Math.max(1, Math.min(200, Number(Array.isArray(query.page) ? query.page[0] : query.page) || 1));
+  const pageNumber = Math.max(1, Math.min(200, Number(one(query.page)) || 1));
   const now = new Date();
-  const { from, to } = reportWindow(period, now, TIME_ZONE);
-  const sales = await loadClosedSales({ pharmacyId: session.scope.pharmacyId, from, to });
-  const report = buildSalesReport({ period, sales, now, timeZone: TIME_ZONE });
+  // Les filtres pour retrouver une vente vite : un jour précis, une plage d'heures, un numéro de vente.
+  const day = DAY.test(one(query.jour)) ? one(query.jour) : "";
+  const fromTime = TIME.test(one(query.de)) ? one(query.de) : "";
+  const toTime = TIME.test(one(query.a)) ? one(query.a) : "";
+  const number = one(query.numero).replace(/\D/g, "").slice(0, 8);
+  const filtered = Boolean(day || fromTime || toTime || number);
+  const window = reportWindow(period, now, TIME_ZONE);
+  const listFrom = day ? parisMidnight(new Date(`${day}T12:00:00Z`), TIME_ZONE) : number ? new Date(now.getTime() - 366 * 24 * 60 * 60 * 1000) : window.from;
+  const listTo = day ? new Date(listFrom.getTime() + 24 * 60 * 60 * 1000 - 1) : now;
+  const [periodSales, listed] = await Promise.all([
+    loadClosedSales({ pharmacyId: session.scope.pharmacyId, from: window.from, to: window.to }),
+    filtered ? loadClosedSales({ pharmacyId: session.scope.pharmacyId, from: listFrom, to: listTo }) : Promise.resolve(null),
+  ]);
+  const report = buildSalesReport({ period, sales: periodSales, now, timeZone: TIME_ZONE });
+  const clock = new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const sales = (listed ?? periodSales).filter((sale) => {
+    const at = clock.format(sale.closedAt);
+    if (fromTime && at < fromTime) return false;
+    if (toTime && at > toTime) return false;
+    if (number && (sale.reference ?? "").replace(/\D/g, "").replace(/^0+/, "") !== (number.replace(/^0+/, "") || "0")) return false;
+    return true;
+  });
   const shown = sales.slice((pageNumber - 1) * PAGE_SIZE, pageNumber * PAGE_SIZE);
   const pages = Math.max(1, Math.ceil(sales.length / PAGE_SIZE));
+  const keep = new URLSearchParams(Object.entries({ periode: one(query.periode), jour: day, de: fromTime, a: toTime, numero: number }).filter(([, value]) => value));
+  const pageHref = (target: number) => `/historique?${new URLSearchParams([...keep.entries(), ["page", String(target)]]).toString()}`;
   const param = (key: SalesReportPeriod) => SALES_REPORT_PERIODS.find((entry) => entry.key === key)?.param ?? "semaine";
   const time = new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -46,13 +73,43 @@ export default async function HistoriquePage({ searchParams }: { searchParams: P
       />
 
       <Card>
+        <form method="get" action="/historique" className="flex flex-wrap items-end gap-3 border-b border-border-subtle px-4 py-3.5">
+          {one(query.periode) && <input type="hidden" name="periode" value={one(query.periode)} />}
+          <label className="flex flex-col gap-1 text-[12px] font-medium text-text-secondary">
+            Jour
+            <input type="date" name="jour" defaultValue={day} className="h-9 rounded-lg border border-border-default bg-surface-card px-2.5 text-[13px] text-text-primary" />
+          </label>
+          <label className="flex flex-col gap-1 text-[12px] font-medium text-text-secondary">
+            De
+            <input type="time" name="de" defaultValue={fromTime} className="h-9 rounded-lg border border-border-default bg-surface-card px-2.5 text-[13px] text-text-primary" />
+          </label>
+          <label className="flex flex-col gap-1 text-[12px] font-medium text-text-secondary">
+            À
+            <input type="time" name="a" defaultValue={toTime} className="h-9 rounded-lg border border-border-default bg-surface-card px-2.5 text-[13px] text-text-primary" />
+          </label>
+          <label className="flex flex-col gap-1 text-[12px] font-medium text-text-secondary">
+            N° de vente
+            <input type="text" inputMode="numeric" name="numero" defaultValue={number} placeholder="ex. 12" className="h-9 w-28 rounded-lg border border-border-default bg-surface-card px-2.5 text-[13px] text-text-primary" />
+          </label>
+          <button type="submit" className="h-9 rounded-lg bg-brand-600 px-4 text-[13px] font-semibold text-white hover:bg-brand-700">Rechercher</button>
+          {filtered && (
+            <Link href={one(query.periode) ? `/historique?periode=${one(query.periode)}` : "/historique"} className="h-9 px-2 text-[13px] leading-9 font-medium text-brand-700 hover:underline">
+              Effacer
+            </Link>
+          )}
+          <span className="ml-auto self-center text-[12.5px] text-text-tertiary">
+            {sales.length} vente{sales.length > 1 ? "s" : ""}
+            {filtered ? " trouvée" + (sales.length > 1 ? "s" : "") : ""}
+          </span>
+        </form>
         {sales.length === 0 ? (
-          <EmptyState title="Aucune vente terminée sur la période" description="Chaque « Vente terminée » au poste du comptoir apparaîtra ici, avec ses conseils." />
+          <EmptyState title={filtered ? "Aucune vente ne correspond" : "Aucune vente terminée sur la période"} description={filtered ? "Changez le jour, la plage d'heures ou le numéro." : "Chaque « Vente terminée » au poste du comptoir apparaîtra ici, avec ses conseils."} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-[13px]">
               <thead className="border-b border-border-subtle text-[11.5px] font-semibold tracking-wide text-text-tertiary uppercase">
                 <tr>
+                  <th className="px-4 py-3">Vente</th>
                   <th className="px-4 py-3">Fin de la vente</th>
                   <th className="px-4 py-3">Par</th>
                   <th className="px-4 py-3">Boîtes scannées</th>
@@ -66,6 +123,11 @@ export default async function HistoriquePage({ searchParams }: { searchParams: P
                   const revenue = sale.soldItems.reduce((sum, item) => sum + item.priceCents, 0);
                   return (
                     <tr key={sale.id} className="align-top hover:bg-surface-sunken/50">
+                      <td className="px-4 py-3 font-semibold whitespace-nowrap text-text-primary">
+                        <Link href={`/vente/${sale.id}`} className="hover:underline">
+                          {saleTitle(sale.reference)}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-text-secondary">{time.format(sale.closedAt)}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-text-primary">{sale.who}</td>
                       <td className="max-w-[260px] px-4 py-3 text-text-primary">
@@ -109,8 +171,8 @@ export default async function HistoriquePage({ searchParams }: { searchParams: P
               {sales.length} ventes · page {pageNumber}/{pages}
             </span>
             <span className="flex gap-2">
-              {pageNumber > 1 && <Link href={`/historique?periode=${param(period)}&page=${pageNumber - 1}`} className="font-medium text-brand-700 hover:underline">Précédentes</Link>}
-              {pageNumber < pages && <Link href={`/historique?periode=${param(period)}&page=${pageNumber + 1}`} className="font-medium text-brand-700 hover:underline">Suivantes</Link>}
+              {pageNumber > 1 && <Link href={pageHref(pageNumber - 1)} className="font-medium text-brand-700 hover:underline">Précédentes</Link>}
+              {pageNumber < pages && <Link href={pageHref(pageNumber + 1)} className="font-medium text-brand-700 hover:underline">Suivantes</Link>}
             </span>
           </div>
         )}

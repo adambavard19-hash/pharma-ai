@@ -38,7 +38,7 @@ describe("la page « Au comptoir »", () => {
   it("s'appelle « Au comptoir » et montre, dans l'ordre, les délivrances en cours, les terminées du jour, la saisie à la main", () => {
     const html = render();
     expect(html).toContain(">Au comptoir</h1>");
-    const order = ["Délivrances en cours", "Terminées aujourd&#x27;hui", "Saisie à la main"].map((label) => html.indexOf(label));
+    const order = ["Ventes en cours", "Terminées aujourd&#x27;hui", "Saisie à la main"].map((label) => html.indexOf(label));
     expect(order.every((index) => index >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(html).toContain("Connecté");
@@ -77,7 +77,7 @@ describe("la page « Au comptoir »", () => {
 
   it("rien en cours : une phrase sobre, sans robot", () => {
     const html = render({ initialSales: [], initialFinished: [] });
-    expect(html).toContain("Aucune délivrance en cours.");
+    expect(html).toContain("Aucune vente en cours.");
     expect(html).toContain("Aucune vente terminée aujourd&#x27;hui.");
   });
 

@@ -170,7 +170,7 @@ describe("PerformanceDashboard : un rapport plein", () => {
     expect(out).toContain("1 ligne de vente issue d'un conseil n'a pas de prix : aucun chiffre d'affaires n'est compté pour elle.");
     expect(out).not.toMatch(/comptées? comme ventes?/);
     expect(out).toContain("1 produit ajouté à la main par l'équipe n'est pas compté");
-    expect(out).toContain("1 conseil d'une ordonnance supprimée est ignoré.");
+    expect(out).toContain("1 conseil d'une vente supprimée est ignoré.");
     expect(out).toContain("Seules les ventes enregistrées dans PharmaBoost sont comptées, pas la caisse de votre logiciel de gestion.");
   });
 
@@ -539,7 +539,7 @@ describe("qualityNotes : les remarques en clair, avec les accords", () => {
       "1 conseil proposé depuis moins de 24 h attend encore une décision : il ne compte pas encore dans le taux d'acceptation.",
       "1 ligne de vente issue d'un conseil n'a pas de prix : aucun chiffre d'affaires n'est compté pour elle.",
       "1 produit ajouté à la main par l'équipe n'est pas compté : ce n'est pas un conseil PharmaBoost.",
-      "1 conseil d'une ordonnance supprimée est ignoré.",
+      "1 conseil d'une vente supprimée est ignoré.",
     ]);
   });
 
@@ -548,7 +548,7 @@ describe("qualityNotes : les remarques en clair, avec les accords", () => {
       "5 conseils proposés depuis moins de 24 h attendent encore une décision : ils ne comptent pas encore dans le taux d'acceptation.",
       "3 lignes de vente issues d'un conseil n'ont pas de prix : aucun chiffre d'affaires n'est compté pour elles.",
       "2 produits ajoutés à la main par l'équipe ne sont pas comptés : ce ne sont pas des conseils PharmaBoost.",
-      "4 conseils d'ordonnances supprimées sont ignorés.",
+      "4 conseils de ventes supprimées sont ignorés.",
     ]);
   });
 

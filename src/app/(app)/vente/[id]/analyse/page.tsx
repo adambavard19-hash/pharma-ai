@@ -13,6 +13,7 @@ import { formatDateTime } from "@/lib/format";
 import { PipelineTrace } from "../pipeline-trace";
 import { ReanalyseButton } from "../reanalyse-button";
 import type { PipelineStageTrace } from "@/core/ai/types";
+import { saleTitle } from "@/core/counter/dashboard";
 
 export const metadata: Metadata = { title: "Journal de l'analyse" };
 
@@ -55,17 +56,17 @@ export default async function AnalysisJournalPage({ params }: { params: Promise<
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
-        <Link href={`/vente/${prescription.id}`}>Retour à la délivrance</Link>
+        <Link href={`/vente/${prescription.id}`}>Retour à la vente</Link>
       </Button>
       <PageHeader
         title="Comment l'analyse s'est déroulée"
-        description={`${prescription.reference} — trace complète, pour vérification ou audit. Rien ici n'est nécessaire au comptoir.`}
+        description={`${saleTitle(prescription.reference)} — trace complète, pour vérification ou audit. Rien ici n'est nécessaire au comptoir.`}
       />
 
       {!latest ? (
         <>
           <Card>
-            <CardContent className="py-6 text-[13.5px] text-text-secondary">Aucune analyse n&apos;a encore été lancée pour cette ordonnance.</CardContent>
+            <CardContent className="py-6 text-[13.5px] text-text-secondary">Aucune analyse n&apos;a encore été lancée pour cette vente.</CardContent>
           </Card>
           {session.permissions.has(PERMISSIONS.PRESCRIPTION_VERIFY) && <ReanalyseButton prescriptionId={prescription.id} />}
         </>

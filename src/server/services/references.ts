@@ -2,7 +2,8 @@ import "server-only";
 import { prisma } from "@/server/db/client";
 
 /**
- * Génération des références lisibles (`ORD-0042`, `PAT-0007`…).
+ * Génération des références lisibles (`V-0042` pour une vente au comptoir, `PAT-0007`…). Une vente se dit « Vente 042 »
+ * partout (comptoir, historique, PDF) : plus de « ordonnance » ni de « délivrance » (fondateur, 14 oct. 2026).
  *
  * Le compteur est dérivé du nombre d'entités existantes de l'officine, dans une
  * transaction sérialisable pour éviter deux références identiques en cas de
@@ -13,7 +14,7 @@ type Entity = "patient" | "prescription" | "sale" | "product";
 
 const PREFIXES: Record<Entity, string> = {
   patient: "PAT",
-  prescription: "ORD",
+  prescription: "V",
   sale: "VTE",
   product: "REF",
 };

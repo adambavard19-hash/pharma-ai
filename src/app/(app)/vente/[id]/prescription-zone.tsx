@@ -107,7 +107,7 @@ export function PrescriptionZone({
           ))}
           {lines.length === 0 && (
             <li className="px-4 py-6 text-center text-[13.5px] text-text-secondary">
-              Aucun médicament sur cette délivrance. Ajoutez-les ci-dessous.
+              Aucun médicament sur cette vente. Ajoutez-les ci-dessous.
             </li>
           )}
         </ul>

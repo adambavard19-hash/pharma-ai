@@ -51,7 +51,7 @@ export const METHOD_SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: "Ce qui n'est pas compté",
-    body: "Les produits ajoutés à la main par l'équipe (ce ne sont pas des conseils PharmaBoost : la page Pilotage, elle, les inclut dans son « CA additionnel », d'où un écart possible), les conseils d'ordonnances supprimées, les propositions spontanées du comptoir sans ordonnance (leur acceptation n'est pas suivie) et les ventes sans lien avec un conseil.",
+    body: "Les produits ajoutés à la main par l'équipe (ce ne sont pas des conseils PharmaBoost : la page Pilotage, elle, les inclut dans son « CA additionnel », d'où un écart possible), les conseils de ventes supprimées, les conseils donnés au comptoir sans boîte scannée (leur acceptation n'est pas suivie) et les ventes sans lien avec un conseil.",
   },
   {
     title: "Deux calendriers",

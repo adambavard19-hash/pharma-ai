@@ -184,7 +184,7 @@ export function CounterDashboard({
                 <span className="relative inline-flex size-2.5 rounded-full bg-brand-600" />
               </span>
             )}
-            Délivrances en cours
+            Ventes en cours
           </h2>
           {sales.length > 0 && <CounterResetButton />}
         </div>
@@ -295,12 +295,12 @@ function LiveSaleCard({ sale }: { sale: LiveSale }) {
 function NothingLive({ status, canConfigure }: { status: CounterDashboardData["status"]; canConfigure: boolean }) {
   const text =
     status.state === "READY"
-      ? "Aucune délivrance en cours. Elles apparaissent ici dès qu'une boîte est scannée au comptoir."
+      ? "Aucune vente en cours. Elles apparaissent ici dès qu'une boîte est scannée au comptoir."
       : status.state === "UNASSIGNED"
-        ? "Ouvrez PharmaBoost depuis l'ordinateur de votre comptoir : vous voyez les délivrances du vôtre, et personne ne voit les vôtres."
+        ? "Ouvrez PharmaBoost depuis l'ordinateur de votre comptoir : vous voyez les ventes du vôtre, et personne ne voit les vôtres."
         : status.state === "OFFLINE"
           ? "L'ordinateur du comptoir ne répond pas : vérifiez qu'il est allumé et relié à Internet. En attendant, la saisie à la main reste possible."
-          : "Aucun poste relié : PharmaBoost ne voit pas vos délivrances. En attendant, la saisie à la main reste possible.";
+          : "Aucun poste relié : PharmaBoost ne voit pas vos ventes. En attendant, la saisie à la main reste possible.";
   return (
     <div className="rounded-xl border border-border-subtle px-4 py-4">
       <p className="text-[14px] leading-5 text-text-secondary">{text}</p>

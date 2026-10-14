@@ -10,6 +10,7 @@
 
 import type { ViewQuestion } from "./question-tree";
 import type { CounterSheet } from "../../../agent/src/counter-sheet";
+import { saleTitle } from "./sale-title";
 
 export type NoticeAlert = { severity: string; subjectType: string; code: string; message: string; acknowledged: boolean };
 
@@ -208,7 +209,7 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
   const subject = drugs.join(" · ");
   const questions = input.questions ?? [];
   const guidance = input.guidance ?? [];
-  const base = { title: `PharmaBoost · ${input.reference}`, subject, drugs, detectedLabel: detectedLabelOf(input.lineKinds), questions: [] as ViewQuestion[], guidance: [] as string[] };
+  const base = { title: `PharmaBoost · ${saleTitle(input.reference)}`, subject, drugs, detectedLabel: detectedLabelOf(input.lineKinds), questions: [] as ViewQuestion[], guidance: [] as string[] };
   const reliable = input.stockReliable !== false;
   if (["CANCELLED", "DELIVERED", "FAILED"].includes(input.prescriptionStatus)) {
     return { ...base, state: "CLOSED", alerts: [], advice: [], items: [], signature: `closed:${input.reference}` };

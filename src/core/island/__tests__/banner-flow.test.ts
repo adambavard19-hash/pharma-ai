@@ -10,7 +10,7 @@ describe("l'île du comptoir", () => {
     expect(stageTitle({ ...INITIAL_ISLAND, stage: "scan" }, 2)).toBe(BANNER.text.scanTitle);
     expect(stageTitle({ ...INITIAL_ISLAND, stage: "ready" }, 2)).toBe("2 conseils disponibles");
     expect(stageTitle({ ...INITIAL_ISLAND, stage: "ready" }, 1)).toBe("1 conseil disponible");
-    expect(stageTitle({ ...INITIAL_ISLAND, stage: "advice" }, 2)).toBe("2 conseils pour cette délivrance");
+    expect(stageTitle({ ...INITIAL_ISLAND, stage: "advice" }, 2)).toBe("2 conseils pour cette vente");
     expect(stageTitle({ ...INITIAL_ISLAND, stage: "done" }, 2)).toBe(BANNER.text.doneTitle);
     expect(stageTitle({ ...INITIAL_ISLAND, stage: "alert" }, 2)).toBe(BANNER.text.readFirst);
   });

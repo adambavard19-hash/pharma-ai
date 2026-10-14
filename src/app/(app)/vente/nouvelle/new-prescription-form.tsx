@@ -191,7 +191,7 @@ export function NewPrescriptionForm({
     startTransition(async () => {
       const result = await createPrescriptionAction(null, data);
       if (!result?.ok) {
-        setError(result?.error ?? "La délivrance n'a pas pu être ouverte.");
+        setError(result?.error ?? "La vente n'a pas pu être ouverte.");
         return;
       }
       router.push(`/vente/${result.data.prescriptionId}`);
@@ -386,7 +386,7 @@ export function NewPrescriptionForm({
       {upload && !canReadPrescriptions && !upload.extraction && lines.length === 0 && (
         <p className="text-[12.5px] leading-5 text-text-tertiary">
           La lecture automatique n&apos;est pas activée : ajoutez les médicaments avec
-          « Scanner » ou « Saisir ». L&apos;ordonnance reste jointe à la délivrance.
+          « Scanner » ou « Saisir ». L&apos;ordonnance reste jointe à la vente.
         </p>
       )}
 

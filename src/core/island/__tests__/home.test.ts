@@ -4,7 +4,7 @@ import { adminHome, directorHome, officineHome, salesHome } from "../home";
 describe("l'accueil de l'île", () => {
   it("officine : chiffres du jour, challenge, poste ; un poste hors ligne met l'île en attention", () => {
     const home = officineHome({ scanned: 3, accepted: 2, salesCount: 1, attributedCents: 1490, counter: { label: "Comptoir 1", online: false }, challenge: { title: "Solaires", teamUnits: 34, target: 50, toNext: 2 }, shortDates: 4, lastSale: { title: "Ordonnance 0775", when: "14:32", stage: "Conseils", href: "/vente/x" } });
-    expect(home.headline).toBe("3 délivrances aujourd'hui");
+    expect(home.headline).toBe("3 ventes aujourd'hui");
     expect(home.attention).toBe(true);
     expect(home.pills.map((p) => p.value)).toEqual(["2 conseils · 1 vente", "34 / 50", "Hors ligne"]);
     expect(home.rows[0]).toMatchObject({ title: "Ordonnance 0775", href: "/vente/x" });

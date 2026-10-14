@@ -25,7 +25,7 @@ export async function loadClosedSales(input: { pharmacyId: string; from: Date; t
       notSoldCount: true,
       unansweredCount: true,
       reportStatus: true,
-      prescription: { select: { handledByUserId: true, lines: { orderBy: { position: "asc" }, select: { drugName: true, status: true } } } },
+      prescription: { select: { reference: true, handledByUserId: true, lines: { orderBy: { position: "asc" }, select: { drugName: true, status: true } } } },
     },
   });
   if (followUps.length === 0) return [];
@@ -57,6 +57,7 @@ export async function loadClosedSales(input: { pharmacyId: string; from: Date; t
   }
   return followUps.map((followUp) => ({
     id: followUp.prescriptionId,
+    reference: followUp.prescription.reference,
     closedAt: followUp.closedAt as Date,
     who: (followUp.prescription.handledByUserId ? names.get(followUp.prescription.handledByUserId) : null) ?? followUp.closedPost ?? "Comptoir",
     boxes: followUp.prescription.lines.filter((line) => line.status === "CONFIRMED" && line.drugName).map((line) => (line.drugName as string).replace(/,.*$/, "").trim()),

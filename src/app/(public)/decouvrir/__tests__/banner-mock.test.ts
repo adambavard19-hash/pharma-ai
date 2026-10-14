@@ -35,7 +35,7 @@ describe("la bannière des visuels du site : le dessin de la bannière du poste 
     }
     // Une image qui se lit : le lecteur d'écran entend un résumé, marqué « exemple ».
     expect(html).toContain('role="img"');
-    expect(html).toMatch(/aria-label="Bannière PharmaBoost, exemple : 2 conseils pour cette délivrance\./);
+    expect(html).toMatch(/aria-label="Bannière PharmaBoost, exemple : 2 conseils pour cette vente\./);
   });
 
   it("dessine la même mascotte que l'aperçu Mac de la bannière (mêmes arcs, mêmes couleurs)", () => {

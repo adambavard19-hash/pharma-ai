@@ -145,5 +145,5 @@ export function officineHome(input: OfficineHomeInput): IslandHome {
   else if (input.shortDates !== null) pills.push({ key: "dates", label: "Dates courtes", value: String(input.shortDates), href: "/stock/dates-courtes", tone: input.shortDates > 0 ? "todo" : undefined });
   const rows: IslandHomeRow[] = [];
   if (input.lastSale) rows.push({ key: "derniere-vente", title: input.lastSale.title, detail: `${input.lastSale.stage} · ${input.lastSale.when}`, href: input.lastSale.href, tone: "info" });
-  return { headline: input.scanned > 0 ? `${plural(input.scanned, "délivrance", "délivrances")} aujourd'hui` : "En attente de scan…", attention: input.counter !== null && !input.counter.online, pills: pills.slice(0, 3), rows };
+  return { headline: input.scanned > 0 ? `${plural(input.scanned, "vente", "ventes")} aujourd'hui` : "En attente de scan…", attention: input.counter !== null && !input.counter.online, pills: pills.slice(0, 3), rows };
 }

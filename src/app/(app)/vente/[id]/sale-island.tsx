@@ -86,7 +86,7 @@ export function SaleIsland({
       <CounterIsland
         state={state}
         items={items}
-        drug={lineNames[lineNames.length - 1] ?? "Ordonnance"}
+        drug={lineNames[lineNames.length - 1] ?? "Vente"}
         alert={first ? { title: first.details?.title ?? "À lire avant de conseiller", text: first.details?.explanation ?? first.message } : null}
         pills={[]}
         hoverOpen={false}

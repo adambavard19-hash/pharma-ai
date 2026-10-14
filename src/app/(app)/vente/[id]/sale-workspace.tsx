@@ -56,6 +56,7 @@ import type {
 } from "./types";
 import type { PipelineStageTrace } from "@/core/ai/types";
 import type { ProductSearchResult } from "@/app/api/produits/recherche/route";
+import { saleTitle } from "@/core/counter/dashboard";
 
 type BasketLine = { productId: string | null; presentationId: string | null; quantity: number; unitPriceCents: number };
 
@@ -501,7 +502,7 @@ export function SaleWorkspace({
         <ol className="space-y-2">
           <li className="flex items-center gap-3 text-[14px] text-text-secondary">
             <Check className="size-[18px] shrink-0 text-success-600 dark:text-success-500" />
-            Ordonnance confirmée
+            Vente confirmée
           </li>
           {STAGE_ORDER.filter((step) => step !== "PERSIST").map((step) => {
             const position = STAGE_ORDER.indexOf(step);
@@ -577,7 +578,7 @@ export function SaleWorkspace({
           {neutralFactors.map((factor) => (
             <span key={factor.label}>{factor.label}</span>
           ))}
-          <span className="tabular">{prescription.reference}</span>
+          <span className="tabular">{saleTitle(prescription.reference)}</span>
           {prescription.source === "COUNTER_SCAN" && !hasSale && <CounterResetButton prescriptionId={prescription.id} />}
           {prescription.patientId && (
             <Link href={`/patients/${prescription.patientId}`} className="flex items-center gap-1 text-brand-700 hover:underline dark:text-brand-400">
@@ -771,8 +772,8 @@ export function SaleWorkspace({
               </p>
               <p className="hidden text-[12px] text-text-tertiary sm:block">
                 {hasSale
-                  ? "Une vente est déjà enregistrée pour cette ordonnance."
-                  : "Valider enregistre la délivrance et prépare le plan du patient."}
+                  ? "Cette vente est déjà enregistrée."
+                  : "Valider enregistre la vente et prépare le plan du patient."}
               </p>
             </div>
             <Button

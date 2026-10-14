@@ -179,7 +179,7 @@ describe("les conseils se lisent sous leur médicament", () => {
     const accepted = { ...flore, status: "ACCEPTED", alternatives: [alternative()] } satisfies AdviceView;
     const html = render({ recommendations: [accepted] });
     expect(html).not.toContain("Choisir celle-ci");
-    expect(text(html)).toContain("Ajouté à la délivrance");
+    expect(text(html)).toContain("Ajouté à la vente");
     expect(text(html)).toContain("1 vente additionnelle");
   });
 });

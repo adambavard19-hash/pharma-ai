@@ -22,6 +22,7 @@ import {
   suggestFollowUp,
 } from "@/core/followup";
 import type { DocumentContent } from "@/core/documents/types";
+import { saleTitle } from "@/core/counter/dashboard";
 
 export const metadata: Metadata = { title: "Fin de vente" };
 
@@ -75,9 +76,9 @@ export default async function DocumentPage({
     return (
       <div className="space-y-6">
         <Button asChild variant="ghost" size="sm" className="no-print" leadingIcon={<ArrowLeft className="size-4" />}>
-          <Link href={`/vente/${prescription.id}`}>Retour à la délivrance</Link>
+          <Link href={`/vente/${prescription.id}`}>Retour à la vente</Link>
         </Button>
-        <PageHeader className="no-print" title="Remettre le plan au patient" description={`${prescription.reference} — préparé à partir des posologies confirmées et des conseils acceptés. Aucune donnée sur le patient n'est conservée.`} />
+        <PageHeader className="no-print" title="Remettre le plan au patient" description={`${saleTitle(prescription.reference)} — préparé à partir des posologies confirmées et des conseils acceptés. Aucune donnée sur le patient n'est conservée.`} />
         <SealedWorkspace
           prescriptionId={prescription.id}
           canSend={session.permissions.has(PERMISSIONS.DOCUMENT_SEND)}
@@ -177,13 +178,13 @@ export default async function DocumentPage({
         className="no-print"
         leadingIcon={<ArrowLeft className="size-4" />}
       >
-        <Link href={`/vente/${prescription.id}`}>Retour à la délivrance</Link>
+        <Link href={`/vente/${prescription.id}`}>Retour à la vente</Link>
       </Button>
 
       <PageHeader
         className="no-print"
         title="Remettre le plan au patient"
-        description={`${prescription.reference} — préparé à partir des posologies que vous avez confirmées et des conseils que le patient a acceptés. Rien n'a été ressaisi.`}
+        description={`${saleTitle(prescription.reference)} — préparé à partir des posologies que vous avez confirmées et des conseils que le patient a acceptés. Rien n'a été ressaisi.`}
       />
 
       {prescription.recommendations.length === 0 && !latestDocument && (

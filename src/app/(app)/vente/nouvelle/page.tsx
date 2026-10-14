@@ -72,7 +72,7 @@ export default async function NewPrescriptionPage({
         <p className="rounded-xl border border-dashed border-brand-300 bg-brand-50/50 px-4 py-3 text-[13.5px] text-text-secondary dark:border-brand-800 dark:bg-brand-950/20">
           Pas de douchette dans cette démonstration.{" "}
           <Link href="/demo" className="font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
-            Simuler une délivrance
+            Simuler une vente
           </Link>{" "}
           : les boîtes arrivent comme si elles étaient passées à la caisse.
         </p>

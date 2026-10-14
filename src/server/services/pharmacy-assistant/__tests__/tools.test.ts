@@ -97,7 +97,7 @@ describe("outils du robot de l'officine", () => {
     expect(ok).toBe(true);
     const text = JSON.stringify(output);
     expect(text).not.toMatch(/DUPONT|Marie|DOXYCYCLINE/);
-    expect(text).toMatch(/Ordonnance 0780/);
+    expect(text).toMatch(/Vente 780/);
     expect(text).toMatch(/"produits":2/);
   });
 

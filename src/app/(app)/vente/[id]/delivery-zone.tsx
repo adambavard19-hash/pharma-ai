@@ -49,7 +49,7 @@ export function DeliveryZone({
       <h2 id="zone-delivrance" className="flex items-center gap-2">
         <ShoppingBag className="size-[18px] shrink-0 text-text-tertiary" />
         <span className="text-[15px] font-semibold tracking-wide text-text-primary uppercase">
-          Délivrance
+          Vente
         </span>
       </h2>
 

@@ -811,7 +811,7 @@ function ProductCard({
                 })
               }
             >
-              Ajouter à la délivrance
+              Ajouter à la vente
             </Button>
           )}
         </div>
@@ -918,7 +918,7 @@ function ProductCard({
             tone="accept"
             icon={<Check className="size-6" strokeWidth={2.75} />}
             label="Proposer ce produit"
-            hint={recommendation.requiresValidation && !canVerify ? "Validation pharmacien requise" : "Ajouté à la délivrance"}
+            hint={recommendation.requiresValidation && !canVerify ? "Validation pharmacien requise" : "Ajouté à la vente"}
             disabled={pending || (recommendation.requiresValidation && !canVerify)}
             onClick={onAccept}
           />
@@ -977,7 +977,7 @@ function ProductCard({
         <div className="flex flex-wrap items-center gap-3 rounded-xl bg-success-100/70 px-3.5 py-3 dark:bg-success-900/25">
           <Check className="size-6 shrink-0 text-success-700 dark:text-success-400" strokeWidth={2.5} />
           <p className="min-w-0 flex-1 text-[15px] font-semibold text-success-900 dark:text-success-200">
-            Ajouté à la délivrance
+            Ajouté à la vente
           </p>
           <button
             type="button"
@@ -1396,7 +1396,7 @@ function RoutineCard({
               </>
             ) : (
               <span className="flex items-center gap-2 rounded-xl bg-success-100/70 px-4 py-2.5 text-[14px] font-semibold text-success-900 dark:bg-success-900/25 dark:text-success-200">
-                <Check className="size-5" strokeWidth={2.5} /> Routine ajoutée à la délivrance
+                <Check className="size-5" strokeWidth={2.5} /> Routine ajoutée à la vente
               </span>
             )}
           </div>

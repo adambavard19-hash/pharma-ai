@@ -69,7 +69,7 @@ export function AlternativesList({
     <div className="space-y-2">
       <div>
         <p className="text-[12px] font-semibold tracking-[0.06em] text-text-tertiary uppercase">Autres références possibles</p>
-        <p className="text-[12.5px] leading-5 text-text-tertiary">Choisir une référence la met à la place du conseil ci-dessus, sans l&apos;ajouter à la délivrance.</p>
+        <p className="text-[12.5px] leading-5 text-text-tertiary">Choisir une référence la met à la place du conseil ci-dessus, sans l&apos;ajouter à la vente.</p>
       </div>
 
       <ul className="space-y-1.5">

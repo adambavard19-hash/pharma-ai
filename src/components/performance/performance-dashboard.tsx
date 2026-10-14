@@ -50,8 +50,8 @@ export function qualityNotes(quality: DataQuality): string[] {
   if (deleted > 0) {
     notes.push(
       deleted > 1
-        ? `${formatNumber(deleted)} conseils d'ordonnances supprimées sont ignorés.`
-        : "1 conseil d'une ordonnance supprimée est ignoré.",
+        ? `${formatNumber(deleted)} conseils de ventes supprimées sont ignorés.`
+        : "1 conseil d'une vente supprimée est ignoré.",
     );
   }
   return notes;

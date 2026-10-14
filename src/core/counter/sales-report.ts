@@ -8,6 +8,8 @@
 /** Une vente terminée, telle que la base la garde. */
 export type ClosedSale = {
   id: string;
+  /** La référence de la vente (« V-0007 », lue « Vente 007 »). */
+  reference?: string;
   closedAt: Date;
   /** Qui l'a faite : le collaborateur du comptoir, à défaut le nom du comptoir. */
   who: string;
