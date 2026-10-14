@@ -47,7 +47,7 @@ export type TeamMember = {
   comptoir: string | null;
 };
 
-type AssignableRole = "PHARMACIST" | "TECHNICIAN" | "STUDENT" | "VIEWER";
+type AssignableRole = "PHARMACIST" | "TECHNICIAN" | "STUDENT" | "SUBSTITUTE";
 
 /** Les postes qu'on peut donner à quelqu'un qu'on AJOUTE : devenir titulaire passe par « Modifier ». */
 const ROLE_OPTIONS = TEAM_ROLES.filter((role): role is (typeof TEAM_ROLES)[number] & { value: AssignableRole } => role.value !== "OWNER");
@@ -171,7 +171,7 @@ export function TeamManager({ teamPassword, members, canManageOwners, requests, 
                     value={member.role}
                     disabled={pending}
                     onChange={(event) => run(() => setCollaboratorRoleAction({ userId: member.userId, role: event.target.value as TeamRole }))}
-                    className="w-[150px]"
+                    className="w-[270px] max-w-full"
                   >
                     {roleChoices.map((option) => (
                       <option key={option.value} value={option.value}>

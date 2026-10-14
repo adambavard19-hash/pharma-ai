@@ -41,13 +41,14 @@ describe("inviter : prénom, nom et adresse de chaque personne", () => {
 });
 
 describe("les postes qu'on peut donner", () => {
-  it("jamais titulaire par invitation ni par demande ; jamais « consultation » à l'initiative du demandeur", () => {
-    expect(INVITABLE_ROLES).toEqual(["PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"]);
-    expect(DECLARABLE_ROLES).toEqual(["PHARMACIST", "TECHNICIAN", "STUDENT"]);
+  it("jamais titulaire par invitation ni par demande ; « consultation » n'est plus proposé, « remplaçant » l'est", () => {
+    expect(INVITABLE_ROLES).toEqual(["PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE"]);
+    expect(DECLARABLE_ROLES).toEqual(["PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE"]);
     expect(isInvitableRole("OWNER")).toBe(false);
     expect(isDeclarableRole("OWNER")).toBe(false);
     expect(isDeclarableRole("VIEWER")).toBe(false);
-    expect(isInvitableRole("VIEWER")).toBe(true);
+    expect(isInvitableRole("VIEWER")).toBe(false);
+    expect(isInvitableRole("SUBSTITUTE")).toBe(true);
     expect(isInvitableRole(undefined)).toBe(false);
   });
 });

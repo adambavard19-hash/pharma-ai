@@ -551,7 +551,8 @@ enum UserRole {
   PHARMACIST // Pharmacien adjoint
   TECHNICIAN // Préparateur
   STUDENT // Étudiant / stagiaire
-  VIEWER // Consultation seule
+  VIEWER // Consultation seule (n'est plus proposé)
+  SUBSTITUTE // Remplaçant : les droits d'un pharmacien adjoint
 }
 
 enum UserStatus {

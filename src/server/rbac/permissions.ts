@@ -116,7 +116,7 @@ export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS);
 
-export type Role = "OWNER" | "PHARMACIST" | "TECHNICIAN" | "STUDENT" | "VIEWER";
+export type Role = "OWNER" | "PHARMACIST" | "TECHNICIAN" | "STUDENT" | "VIEWER" | "SUBSTITUTE";
 
 const PHARMACIST_PERMISSIONS: Permission[] = [
   PERMISSIONS.PHARMACY_VIEW,
@@ -212,22 +212,26 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   TECHNICIAN: TECHNICIAN_PERMISSIONS,
   STUDENT: STUDENT_PERMISSIONS,
   VIEWER: VIEWER_PERMISSIONS,
+  // Le remplaçant tient l'officine comme un pharmacien adjoint, le temps de son remplacement.
+  SUBSTITUTE: PHARMACIST_PERMISSIONS,
 };
 
 export const ROLE_LABELS: Record<Role, string> = {
-  OWNER: "Titulaire",
-  PHARMACIST: "Pharmacien",
-  TECHNICIAN: "Préparateur",
+  OWNER: "Pharmacien titulaire",
+  PHARMACIST: "Pharmacien adjoint",
+  TECHNICIAN: "Préparateur / Préparatrice en pharmacie",
   STUDENT: "Étudiant",
-  VIEWER: "Consultation",
+  VIEWER: "Consultation (n'est plus proposé)",
+  SUBSTITUTE: "Remplaçant",
 };
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   OWNER: "Accès complet, y compris paramètres, équipe et chiffre d'affaires.",
-  PHARMACIST: "Acte professionnel : vérification des ordonnances et validation des conseils.",
+  PHARMACIST: "Acte professionnel : vérification des ventes et validation des conseils.",
   TECHNICIAN: "Comptoir, catalogue et stock. Permissions ajustables par le titulaire.",
   STUDENT: "Consultation et préparation, sans validation professionnelle.",
   VIEWER: "Lecture seule.",
+  SUBSTITUTE: "Remplace un pharmacien : les mêmes droits qu'un pharmacien adjoint.",
 };
 
 export const PERMISSION_LABELS: Record<Permission, string> = {

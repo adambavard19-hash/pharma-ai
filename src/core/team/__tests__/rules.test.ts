@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailEditBlock, identityEditBlock, moveInOrder, planTeamChange, positionsFor, principalOf, removalBlock, TEAM_ROLE_LABELS, type TeamActor, type TeamMemberState } from "../rules";
+import { emailEditBlock, identityEditBlock, moveInOrder, planTeamChange, positionsFor, principalOf, removalBlock, TEAM_ROLE_LABELS, TEAM_ROLES, type TeamActor, type TeamMemberState } from "../rules";
 
 const owner: TeamActor = { kind: "member", userId: "adam", role: "OWNER" };
 const adjoint: TeamActor = { kind: "member", userId: "donna", role: "PHARMACIST" };
@@ -15,7 +15,9 @@ const team = (): TeamMemberState[] => [
 
 describe("les postes", () => {
   it("se lisent comme l'équipe les dit", () => {
-    expect(TEAM_ROLE_LABELS).toMatchObject({ OWNER: "Titulaire", PHARMACIST: "Pharmacien", TECHNICIAN: "Préparateur", STUDENT: "Étudiant", VIEWER: "Consultation" });
+    expect(TEAM_ROLE_LABELS).toMatchObject({ OWNER: "Pharmacien titulaire", PHARMACIST: "Pharmacien adjoint", TECHNICIAN: "Préparateur / Préparatrice en pharmacie", STUDENT: "Étudiant", SUBSTITUTE: "Remplaçant" });
+    // « Consultation » n'est plus proposé (il ne reste que pour lire un compte ancien).
+    expect(TEAM_ROLES.map((role) => role.value)).toEqual(["OWNER", "PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE"]);
   });
 });
 

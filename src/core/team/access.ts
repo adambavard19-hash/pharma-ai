@@ -17,12 +17,12 @@ export const MAX_INVITES_AT_ONCE = 20;
 export const MAX_PENDING_JOIN_REQUESTS = 25;
 
 /** Les postes qu'on peut donner par invitation : devenir titulaire passe par « Modifier » (règles de l'équipe). */
-export const INVITABLE_ROLES = ["PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const;
+export const INVITABLE_ROLES = ["PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE"] as const;
 export type InvitableRole = (typeof INVITABLE_ROLES)[number];
 export const isInvitableRole = (value: unknown): value is InvitableRole => typeof value === "string" && (INVITABLE_ROLES as readonly string[]).includes(value);
 
 /** Les postes qu'un collaborateur peut déclarer en demandant à rejoindre : jamais titulaire, jamais « consultation » d'office. */
-export const DECLARABLE_ROLES = ["PHARMACIST", "TECHNICIAN", "STUDENT"] as const;
+export const DECLARABLE_ROLES = ["PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE"] as const;
 export type DeclarableRole = (typeof DECLARABLE_ROLES)[number];
 export const isDeclarableRole = (value: unknown): value is DeclarableRole => typeof value === "string" && (DECLARABLE_ROLES as readonly string[]).includes(value);
 
@@ -98,7 +98,7 @@ export function publicPharmacyLabel(pharmacy: { name: string; postalCode: string
 
 /** Le poste en toutes lettres, pour les messages. */
 export function roleSentence(role: TeamRole): string {
-  return { OWNER: "titulaire", PHARMACIST: "pharmacien", TECHNICIAN: "préparateur", STUDENT: "étudiant", VIEWER: "en consultation" }[role];
+  return { OWNER: "pharmacien titulaire", PHARMACIST: "pharmacien adjoint", TECHNICIAN: "préparateur / préparatrice en pharmacie", STUDENT: "étudiant", SUBSTITUTE: "remplaçant", VIEWER: "en consultation" }[role];
 }
 
 /** Une personne, d'un coup d'œil : où elle en est avec son accès. */

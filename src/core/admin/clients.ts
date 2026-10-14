@@ -258,14 +258,15 @@ export function counterPostInError(post: CounterPostFacts): boolean {
 // ---------------------------------------------------------------- Comptes d'officine
 
 export const ROLE_LABELS: Record<string, string> = {
-  OWNER: "Titulaire",
-  PHARMACIST: "Pharmacien",
-  TECHNICIAN: "Préparateur",
+  OWNER: "Pharmacien titulaire",
+  PHARMACIST: "Pharmacien adjoint",
+  TECHNICIAN: "Préparateur / Préparatrice en pharmacie",
   STUDENT: "Étudiant",
+  SUBSTITUTE: "Remplaçant",
   VIEWER: "Consultation",
 };
 
-export const USER_ROLES = ["OWNER", "PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const;
+export const USER_ROLES = ["OWNER", "PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE"] as const;
 
 export function parseUserRole(value: string | null): (typeof USER_ROLES)[number] | null {
   const upper = (value ?? "").toUpperCase();

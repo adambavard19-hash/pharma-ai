@@ -23,7 +23,7 @@ import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
  */
 
 /** Les postes qu'on peut donner à quelqu'un qu'on AJOUTE ; devenir titulaire passe par « Modifier » (règles de l'équipe). */
-const ASSIGNABLE_ROLES = ["PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const;
+const ASSIGNABLE_ROLES = ["PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE"] as const;
 
 const createSchema = z.object({
   firstName: z.string().trim().min(1, "Le prénom est obligatoire").max(80),
@@ -194,7 +194,8 @@ export async function setCollaboratorAccessAction(
   );
 }
 
-const TEAM_ROLE_VALUES = ["OWNER", "PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const;
+// VIEWER (« Consultation ») n'est plus proposé, mais un compte ancien garde le sien quand on modifie autre chose.
+const TEAM_ROLE_VALUES = ["OWNER", "PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE", "VIEWER"] as const;
 
 /** Qui agit, pour les règles de l'équipe : un membre de l'officine, avec son poste. */
 const memberActor = (session: { scope: { userId: string }; role: string }): TeamActor => ({ kind: "member", userId: session.scope.userId, role: session.role as TeamRole });

@@ -21,7 +21,7 @@ const schema = z.object({
   email: z.string().trim().toLowerCase().email("Adresse e-mail invalide").max(160).optional(),
   phone: z.string().trim().max(30).regex(/^[0-9+().\s-]*$/, "Numéro de téléphone invalide").nullable().optional(),
   rppsNumber: z.string().trim().max(20).regex(/^[0-9]*$/, "Le numéro RPPS ne contient que des chiffres").nullable().optional(),
-  role: z.enum(["OWNER", "PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"]).optional(),
+  role: z.enum(["OWNER", "PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE", "VIEWER"]).optional(),
   isPrincipal: z.boolean().optional(),
 });
 

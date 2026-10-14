@@ -2,7 +2,7 @@
  * L'équipe d'une officine : les règles, sans base ni session.
  *
  * Trois notions, que l'écran de l'équipe ne mélange pas :
- *   • le POSTE (le rôle) — Titulaire, Pharmacien, Préparateur, Étudiant, Consultation : ce que la personne est, et ce
+ *   • le POSTE (le rôle) — Pharmacien titulaire, Pharmacien adjoint, Préparateur, Étudiant, Remplaçant : ce que la personne est, et ce
  *     qu'elle peut faire dans PharmaBoost ;
  *   • le TITULAIRE PRINCIPAL — parmi les titulaires (il peut y en avoir plusieurs : associés), celui que PharmaBoost
  *     contacte pour le contrat, la facture et l'accès. Un seul par officine, et il est titulaire ;
@@ -12,18 +12,24 @@
  * passera. Aucune officine ne doit jamais se retrouver sans titulaire actif, ni sans titulaire principal.
  */
 
-export type TeamRole = "OWNER" | "PHARMACIST" | "TECHNICIAN" | "STUDENT" | "VIEWER";
+export type TeamRole = "OWNER" | "PHARMACIST" | "TECHNICIAN" | "STUDENT" | "SUBSTITUTE" | "VIEWER";
 
-/** Le poste, tel que l'équipe le lit — et ce qu'il autorise, en une ligne. */
+/**
+ * Les postes proposés, tels que l'équipe les lit — et ce qu'ils autorisent, en une ligne (fondateur, 15 oct. 2026). « Consultation »
+ * (VIEWER) n'est plus proposé : il ne reste que pour lire un compte ancien.
+ */
 export const TEAM_ROLES: { value: TeamRole; label: string; hint: string }[] = [
-  { value: "OWNER", label: "Titulaire", hint: "Accès complet : paramètres, équipe, facturation" },
-  { value: "PHARMACIST", label: "Pharmacien", hint: "Vérifie les ventes et valide les conseils" },
-  { value: "TECHNICIAN", label: "Préparateur", hint: "Comptoir, patients et stock" },
+  { value: "OWNER", label: "Pharmacien titulaire", hint: "Accès complet : paramètres, équipe, facturation" },
+  { value: "PHARMACIST", label: "Pharmacien adjoint", hint: "Vérifie les ventes et valide les conseils" },
+  { value: "TECHNICIAN", label: "Préparateur / Préparatrice en pharmacie", hint: "Comptoir, patients et stock" },
   { value: "STUDENT", label: "Étudiant", hint: "Consultation et préparation, sans validation" },
-  { value: "VIEWER", label: "Consultation", hint: "Lecture seule" },
+  { value: "SUBSTITUTE", label: "Remplaçant", hint: "Remplace un pharmacien : les mêmes droits qu'un adjoint" },
 ];
 
-export const TEAM_ROLE_LABELS: Record<TeamRole, string> = Object.fromEntries(TEAM_ROLES.map((role) => [role.value, role.label])) as Record<TeamRole, string>;
+export const TEAM_ROLE_LABELS: Record<TeamRole, string> = {
+  ...(Object.fromEntries(TEAM_ROLES.map((role) => [role.value, role.label])) as Record<Exclude<TeamRole, "VIEWER">, string>),
+  VIEWER: "Consultation",
+};
 
 export function isTeamRole(value: string): value is TeamRole {
   return TEAM_ROLES.some((role) => role.value === value);
