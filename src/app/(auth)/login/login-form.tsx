@@ -94,6 +94,7 @@ export function LoginForm({
           label="Mot de passe"
           htmlFor="password"
           required
+          hint="Équipe : le mot de passe de l'officine, donné par votre titulaire."
           error={fieldErrors.password}
         >
           <Input

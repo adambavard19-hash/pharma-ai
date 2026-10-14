@@ -4,6 +4,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { loadTeam } from "@/server/services/team-management";
 import { listInvitations, listJoinRequests } from "@/server/services/team-access";
 import { listComptoirs } from "@/server/services/comptoirs";
+import { ensureTeamPassword } from "@/server/services/team-password";
 import { prisma } from "@/server/db/client";
 import { PageHeader } from "@/components/ui/page";
 import { TeamManager, type TeamMember } from "./team-manager";
@@ -27,6 +28,8 @@ export default async function TeamPage() {
     listComptoirs(session.scope.pharmacyId),
     prisma.membership.findMany({ where: { pharmacyId: session.scope.pharmacyId }, select: { userId: true, createdAt: true } }),
   ]);
+  // Le mot de passe de l'officine : seul un titulaire le voit (créé ici pour une officine d'avant qui n'en a pas encore).
+  const teamPassword = session.role === "OWNER" ? await ensureTeamPassword(session.scope.pharmacyId) : null;
   const joinedAt = new Map(joined.map((row) => [row.userId, row.createdAt]));
   // Qui travaille à quel comptoir : une personne, ses comptoirs.
   const comptoirOf = new Map<string, string[]>();
@@ -52,9 +55,10 @@ export default async function TeamPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         title="Mon équipe"
-        description={`Qui travaille à ${session.pharmacy.name}, qui a rejoint l'équipe, qui n'a pas encore répondu, et qui attend votre accord.`}
+        description={`Qui travaille à ${session.pharmacy.name}, et comment chacun se connecte sur son poste.`}
       />
       <TeamManager
+        teamPassword={teamPassword ? { password: teamPassword.password, updatedAt: teamPassword.updatedAt.toISOString() } : null}
         members={members}
         canManageOwners={session.role === "OWNER"}
         requests={requests.map((request) => ({ id: request.id, name: request.name, email: request.email, suggestedRole: request.suggestedRole, requestedAt: request.requestedAt.toISOString() }))}

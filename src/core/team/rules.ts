@@ -17,7 +17,7 @@ export type TeamRole = "OWNER" | "PHARMACIST" | "TECHNICIAN" | "STUDENT" | "VIEW
 /** Le poste, tel que l'équipe le lit — et ce qu'il autorise, en une ligne. */
 export const TEAM_ROLES: { value: TeamRole; label: string; hint: string }[] = [
   { value: "OWNER", label: "Titulaire", hint: "Accès complet : paramètres, équipe, facturation" },
-  { value: "PHARMACIST", label: "Pharmacien", hint: "Vérifie les ordonnances et valide les conseils" },
+  { value: "PHARMACIST", label: "Pharmacien", hint: "Vérifie les ventes et valide les conseils" },
   { value: "TECHNICIAN", label: "Préparateur", hint: "Comptoir, patients et stock" },
   { value: "STUDENT", label: "Étudiant", hint: "Consultation et préparation, sans validation" },
   { value: "VIEWER", label: "Consultation", hint: "Lecture seule" },

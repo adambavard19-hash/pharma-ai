@@ -51,6 +51,7 @@ vi.mock("@/server/db/client", () => ({ prisma: db.prisma }));
 vi.mock("@/server/audit/log", () => ({ recordAudit: vi.fn() }));
 vi.mock("@/server/security/password", () => ({ hashPassword: vi.fn(async () => "hash") }));
 vi.mock("@/server/security/tokens", () => ({ generateToken: vi.fn(() => "jeton") }));
+vi.mock("@/server/services/team-password", () => ({ newTeamPasswordData: vi.fn(async () => ({ password: "AAAA-BBBB-CCCC", data: {} })) }));
 vi.mock("@/server/services/slugs", () => ({ uniqueSlug: vi.fn(async (name: string) => name.toLowerCase().replace(/\W+/g, "-")) }));
 vi.mock("@/server/services/stock-sync", () => ({ isLgoId: vi.fn(() => false) }));
 vi.mock("@/server/services/user-password", () => ({ sendUserPasswordLink: vi.fn(async () => ({ status: "SENT", detail: "Remis.", url: "" })) }));

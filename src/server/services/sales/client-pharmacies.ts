@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/server/db/client";
+import { newTeamPasswordData } from "@/server/services/team-password";
 import { hashPassword } from "@/server/security/password";
 import { uniqueSlug } from "@/server/services/slugs";
 import { sendUserPasswordLink } from "@/server/services/user-password";
@@ -56,10 +57,13 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
   // Ce que ce filleul apportera à son parrain est figé maintenant : une offre de parrainage qui change ensuite ne le modifie pas.
   const referralAmountCents = referrer ? await referralAmountForNewFilleul() : null;
 
+  // Le mot de passe de l'officine, créé avec elle : le titulaire le donne à son équipe (Mon équipe).
+  const teamPassword = await newTeamPasswordData();
   const { pharmacy, ownerId } = await prisma.$transaction(async (tx) => {
     const organization = await tx.organization.create({ data: { name: prospect.name, slug: organizationSlug } });
     const pharmacy = await tx.pharmacy.create({
       data: {
+        ...teamPassword.data,
         organizationId: organization.id,
         name: prospect.name,
         slug: pharmacySlug,

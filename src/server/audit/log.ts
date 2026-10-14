@@ -88,6 +88,7 @@ export type AuditAction =
   | "opportunity.answered"
   | "counter_question.answered"
   | "team.member_created"
+  | "team.password_regenerated"
   | "team.invitation_sent"
   | "team.invitation_resent"
   | "team.invitation_revoked"

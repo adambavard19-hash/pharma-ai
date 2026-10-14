@@ -117,6 +117,12 @@ model Pharmacy {
   /// Nombre de postes de comptoir déclarés : base du futur calcul de l'abonnement. Historique dans pharmacy_post_count_changes.
   postCount Int?
 
+  /// Le mot de passe de l'officine : l'équipe (hors titulaires) se connecte avec SON e-mail et ce mot de passe commun.
+  /// Chiffré (le titulaire le relit dans Mon équipe) et haché (la connexion ne déchiffre jamais rien).
+  teamPasswordEncrypted String?
+  teamPasswordHash      String?
+  teamPasswordUpdatedAt DateTime?
+
   onboardingCompletedAt DateTime?
   /// La mise en service payée avec le premier mois : à planifier, planifiée, faite. Vide : rien à suivre (officine d'avant).
   setupStatus           SetupStatus?

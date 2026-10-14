@@ -116,6 +116,7 @@ export async function loginAction(
     entityId: user.id,
     pharmacyId,
     userId: user.id,
+    metadata: user.viaTeamPassword ? { via: "team_password" } : undefined,
   });
 
   // Première connexion d'un titulaire issu d'un dossier commercial : l'officine passe « Activée ».

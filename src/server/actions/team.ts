@@ -8,6 +8,7 @@ import { refuseInDemo } from "./demo-guard";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { hashPassword, validatePasswordStrength } from "@/server/security/password";
 import { recordAudit } from "@/server/audit/log";
+import { regenerateTeamPassword } from "@/server/services/team-password";
 import { moveTeamMember, nextSortOrder, updateTeamMember, type MemberChanges } from "@/server/services/team-management";
 import { removalBlock, type TeamActor, type TeamRole } from "@/core/team/rules";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
@@ -30,7 +31,8 @@ const createSchema = z.object({
   email: z.string().trim().toLowerCase().email("Adresse e-mail invalide"),
   role: z.enum(ASSIGNABLE_ROLES),
   rppsNumber: z.string().trim().max(20).optional(),
-  password: z.string().min(1, "Mot de passe requis"),
+  /** Facultatif : sans lui, la personne se connecte avec le mot de passe de l'officine. */
+  password: z.string().optional(),
 });
 
 /** Retrouve l'adhésion d'un collaborateur DANS l'officine de la session. */
@@ -51,7 +53,7 @@ export async function createCollaboratorAction(
   }
 
   const input = parsed.data;
-  const weaknesses = validatePasswordStrength(input.password);
+  const weaknesses = input.password ? validatePasswordStrength(input.password) : [];
   if (weaknesses.length > 0) {
     return fail(`Mot de passe trop faible : ${weaknesses.join(", ")}.`, {
       password: `Mot de passe trop faible : ${weaknesses.join(", ")}.`,
@@ -81,7 +83,7 @@ export async function createCollaboratorAction(
     }
   }
 
-  const passwordHash = await hashPassword(input.password);
+  const passwordHash = input.password ? await hashPassword(input.password) : undefined;
 
   const user = await prisma.$transaction(async (tx) => {
     const created = existing
@@ -132,7 +134,12 @@ export async function createCollaboratorAction(
   });
 
   revalidatePath("/equipe");
-  return ok({ userId: user.id }, `${input.firstName} ${input.lastName} peut se connecter.`);
+  return ok(
+    { userId: user.id },
+    input.password
+      ? `${input.firstName} ${input.lastName} peut se connecter.`
+      : `${input.firstName} ${input.lastName} peut se connecter avec son adresse e-mail et le mot de passe de l'officine.`,
+  );
 }
 
 const accessSchema = z.object({
@@ -352,4 +359,15 @@ export async function removeCollaboratorAction(payload: z.input<typeof removeSch
   await recordAudit({ action: "team.member_removed", entityType: "User", entityId: membership.userId, pharmacyId, userId: session.scope.userId });
   revalidatePath("/equipe");
   return ok(null, `${membership.user.firstName} ${membership.user.lastName} ne fait plus partie de l'équipe.`);
+}
+
+/** Un nouveau mot de passe d'officine (quelqu'un part, le mot de passe a circulé) : titulaire seulement. */
+export async function regenerateTeamPasswordAction(): Promise<ActionResult<{ password: string }>> {
+  const session = await requirePermission(PERMISSIONS.TEAM_MANAGE);
+  if (session.role !== "OWNER") return fail("Seul un titulaire peut changer le mot de passe de l'officine.");
+  const demo = refuseInDemo(session);
+  if (demo) return demo;
+  const { password } = await regenerateTeamPassword(session.scope);
+  revalidatePath("/equipe");
+  return ok({ password }, "Nouveau mot de passe créé. L'ancien ne marche plus : donnez celui-ci à votre équipe.");
 }

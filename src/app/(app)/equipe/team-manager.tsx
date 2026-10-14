@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Check, KeyRound, Pencil, Plus, ShieldOff, UserMinus } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Copy, KeyRound, Pencil, Plus, RefreshCw, ShieldOff, UserMinus } from "lucide-react";
 import {
   createCollaboratorAction,
   moveCollaboratorAction,
+  regenerateTeamPasswordAction,
   removeCollaboratorAction,
   resetCollaboratorPasswordAction,
   setCollaboratorAccessAction,
@@ -13,7 +14,7 @@ import {
 } from "@/server/actions/team";
 import { TEAM_ROLES, TEAM_ROLE_LABELS, type TeamRole } from "@/core/team/rules";
 import { MemberEditModal } from "@/components/team/member-edit-modal";
-import { InvitationsPanel, InviteButton, InviteModal, JoinRequestsPanel, type InvitationItem, type JoinRequestItem } from "./access-panels";
+import { InvitationsPanel, JoinRequestsPanel, type InvitationItem, type JoinRequestItem } from "./access-panels";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -60,9 +61,8 @@ const ROLE_OPTIONS = TEAM_ROLES.filter((role): role is (typeof TEAM_ROLES)[numbe
  * permissions. Le serveur applique les règles (une officine garde toujours un titulaire actif et un titulaire principal) ;
  * l'écran n'offre que ce qui passera, et dit pourquoi quand un geste est refusé.
  */
-export function TeamManager({ members, canManageOwners, requests, invitations }: { members: TeamMember[]; canManageOwners: boolean; requests: JoinRequestItem[]; invitations: InvitationItem[] }) {
+export function TeamManager({ teamPassword, members, canManageOwners, requests, invitations }: { teamPassword: { password: string; updatedAt: string } | null; members: TeamMember[]; canManageOwners: boolean; requests: JoinRequestItem[]; invitations: InvitationItem[] }) {
   const [addOpen, setAddOpen] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
   const [passwordFor, setPasswordFor] = useState<TeamMember | null>(null);
   const [editFor, setEditFor] = useState<TeamMember | null>(null);
   // Retirer quelqu'un de l'équipe demande une confirmation, sur sa ligne.
@@ -84,6 +84,8 @@ export function TeamManager({ members, canManageOwners, requests, invitations }:
 
   return (
     <div className="space-y-4">
+      {teamPassword && <TeamPasswordCard password={teamPassword.password} />}
+
       <JoinRequestsPanel requests={requests} />
 
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -92,7 +94,9 @@ export function TeamManager({ members, canManageOwners, requests, invitations }:
           {members.filter((m) => m.isActive).length > 1 ? "s" : ""} sur {members.length}
           {invitations.length > 0 ? ` · ${invitations.length} invitation${invitations.length > 1 ? "s" : ""} sans réponse` : ""}
         </p>
-        <InviteButton onClick={() => setInviteOpen(true)} />
+        <Button onClick={() => setAddOpen(true)} leadingIcon={<Plus className="size-4" />}>
+          Ajouter un membre
+        </Button>
       </div>
 
       <InvitationsPanel invitations={invitations} />
@@ -243,7 +247,6 @@ export function TeamManager({ members, canManageOwners, requests, invitations }:
         </CardContent>
       </Card>
 
-      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onManual={() => { setInviteOpen(false); setAddOpen(true); }} />
       <AddMemberModal open={addOpen} onClose={() => setAddOpen(false)} />
       <PasswordModal member={passwordFor} onClose={() => setPasswordFor(null)} />
       <MemberEditModal
@@ -262,7 +265,6 @@ function AddMemberModal({ open, onClose }: { open: boolean; onClose: () => void 
     lastName: "",
     email: "",
     role: "PHARMACIST" as AssignableRole,
-    password: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -277,7 +279,7 @@ function AddMemberModal({ open, onClose }: { open: boolean; onClose: () => void 
         return;
       }
       push({ tone: "success", title: result.message ?? "Collaborateur ajouté" });
-      setForm({ firstName: "", lastName: "", email: "", role: "PHARMACIST", password: "" });
+      setForm({ firstName: "", lastName: "", email: "", role: "PHARMACIST" });
       onClose();
     });
   };
@@ -288,15 +290,15 @@ function AddMemberModal({ open, onClose }: { open: boolean; onClose: () => void 
     <Modal
       open={open}
       onClose={onClose}
-      title="Ajouter un collaborateur"
-      description="Il se connectera avec son adresse et le mot de passe que vous lui remettez."
+      title="Ajouter un membre de l'équipe"
+      description="Il se connectera sur son poste avec cette adresse e-mail et le mot de passe de l'officine."
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Annuler
           </Button>
           <Button onClick={submit} loading={pending} leadingIcon={<Plus className="size-4" />}>
-            Créer l&apos;accès
+            Ajouter
           </Button>
         </>
       }
@@ -321,7 +323,7 @@ function AddMemberModal({ open, onClose }: { open: boolean; onClose: () => void 
           </Field>
         </div>
 
-        <Field label="Adresse e-mail" htmlFor="email" required hint="Son identifiant de connexion.">
+        <Field label="Adresse e-mail" htmlFor="email" required hint="Celle qu'il tapera sur son poste pour se connecter.">
           <Input
             id="email"
             type="email"
@@ -344,19 +346,6 @@ function AddMemberModal({ open, onClose }: { open: boolean; onClose: () => void 
           </Select>
         </Field>
 
-        <Field
-          label="Mot de passe initial"
-          htmlFor="password"
-          required
-          hint="12 caractères minimum, avec majuscule et chiffre. À lui remettre en main propre."
-        >
-          <Input
-            id="password"
-            type="text"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-          />
-        </Field>
       </div>
     </Modal>
   );
@@ -424,5 +413,71 @@ function PasswordModal({
         </Field>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Le mot de passe de l'officine, en haut de Mon équipe : le titulaire le lit, le copie, le change. Chaque membre de l'équipe se
+ * connecte sur son poste avec SON adresse e-mail et ce mot de passe ; les titulaires gardent leur mot de passe personnel.
+ */
+function TeamPasswordCard({ password }: { password: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const { push } = useToast();
+
+  const copy = () => {
+    navigator.clipboard
+      ?.writeText(password)
+      .then(() => push({ tone: "success", title: "Mot de passe copié" }))
+      .catch(() => push({ tone: "error", title: "Copie impossible : recopiez-le à la main." }));
+  };
+  const regenerate = () =>
+    startTransition(async () => {
+      const result = await regenerateTeamPasswordAction();
+      setConfirming(false);
+      push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Nouveau mot de passe créé") : (result.error ?? "Erreur") });
+    });
+
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-5">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300">
+            <KeyRound className="size-4.5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[16px] font-semibold text-text-primary">Mot de passe de l&apos;officine</h2>
+            <p className="mt-0.5 text-[13.5px] text-text-secondary">
+              Sur chaque poste, chaque membre de l&apos;équipe se connecte avec <strong>son adresse e-mail</strong> et <strong>ce mot de passe</strong>. Ajoutez
+              d&apos;abord son adresse ci-dessous. Vous, titulaire, gardez votre mot de passe personnel.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <code aria-label="Mot de passe de l'officine" className="rounded-lg border border-border-default bg-surface-sunken px-4 py-2 font-mono text-[20px] font-semibold tracking-[0.12em] text-text-primary select-all">
+            {password}
+          </code>
+          <Button variant="secondary" onClick={copy} leadingIcon={<Copy className="size-4" />}>
+            Copier
+          </Button>
+          {confirming ? (
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-[13px] text-text-secondary">L&apos;ancien ne marchera plus, l&apos;équipe devra se reconnecter.</span>
+              <Button variant="danger" onClick={regenerate} loading={pending}>
+                Confirmer
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirming(false)} disabled={pending}>
+                Annuler
+              </Button>
+            </span>
+          ) : (
+            <Button variant="ghost" onClick={() => setConfirming(true)} leadingIcon={<RefreshCw className="size-4" />}>
+              Changer le mot de passe
+            </Button>
+          )}
+        </div>
+        <p className="text-[12.5px] text-text-tertiary">Quelqu&apos;un quitte l&apos;équipe ? Retirez-le de la liste : il ne peut plus se connecter. Changez le mot de passe s&apos;il l&apos;a noté ailleurs.</p>
+      </CardContent>
+    </Card>
   );
 }
