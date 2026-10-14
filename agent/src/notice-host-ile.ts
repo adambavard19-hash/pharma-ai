@@ -77,6 +77,9 @@ namespace PharmaBoostIle
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool AllowSetForegroundWindow(int processId);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLong")] public static extern int GetWindowLong(IntPtr hWnd, int index);
+    [DllImport("user32.dll", EntryPoint = "SetWindowLong")] public static extern int SetWindowLong(IntPtr hWnd, int index, int value);
+    public const int GWL_EXSTYLE = -20;
   }
 
   /// <summary>Ce que la fenêtre écrit pour l'agent : une ligne par mot, jamais deux fils à la fois.</summary>
@@ -442,8 +445,13 @@ namespace PharmaBoostIle
       {
         bool on = message.ContainsKey("on") && Convert.ToBoolean(message["on"]);
         keyboard = on;
+        // WS_EX_NOACTIVATE empêche la fenêtre de devenir active : les touches tapées dans le champ de l'e-mail partaient au
+        // logiciel de gestion (poste du 14 oct. 2026). Levé seulement le temps de l'e-mail, remis dès qu'on en sort.
+        int style = Native.GetWindowLong(Handle, Native.GWL_EXSTYLE);
+        Native.SetWindowLong(Handle, Native.GWL_EXSTYLE, on ? (style & ~Native.WS_EX_NOACTIVATE) : (style | Native.WS_EX_NOACTIVATE));
         if (on)
         {
+          Native.SetForegroundWindow(Handle);
           Activate();
           web.Focus();
         }

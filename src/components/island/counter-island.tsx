@@ -59,6 +59,8 @@ export type CounterIslandProps = {
   onEmail: (value: string) => void;
   onSendEmail: () => void;
   onAddEmail: () => void;
+  /** Quitter l'écran de l'e-mail sans l'envoyer (un bouton : on ne dépend jamais du clavier pour en sortir). */
+  onCloseEmail?: () => void;
   onFinish: () => void;
   onDismissAlert: () => void;
   /** Le bilan par e-mail se propose dans l'île (poste). Faux sur l'écran de vente du logiciel, où le plan patient prend le relais. */
@@ -524,6 +526,11 @@ export function CounterIsland(props: CounterIslandProps) {
               <button type="submit" className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-[13px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
                 <Send className="size-3.5" aria-hidden="true" /> Envoyer
               </button>
+              {props.onCloseEmail && (
+                <button type="button" onClick={props.onCloseEmail} aria-label="Annuler l'e-mail" title="Annuler" className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-white/80 hover:bg-white/[0.14] hover:text-white">
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              )}
             </form>
           </div>
         );

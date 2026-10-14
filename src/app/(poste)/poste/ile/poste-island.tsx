@@ -255,6 +255,7 @@ export function PosteIsland() {
       if (entry?.items[index]) word(answerWord(entry.id, entry.items[index], outcome));
     },
     onEmail: (value) => dispatch({ type: "typeEmail", value }),
+    onCloseEmail: () => dispatch({ type: "closeEmail" }),
     onSendEmail: () => {
       if (!entry) return;
       word(emailWord(entry.id, island.email));

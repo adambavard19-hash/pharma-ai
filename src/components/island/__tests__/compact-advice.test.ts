@@ -101,3 +101,20 @@ describe("plusieurs boîtes scannées : la bannière se divise, un bloc par boî
     expect(html.match(/data-advice-group=""/g)).toHaveLength(2);
   });
 });
+
+describe("l'écran de l'e-mail du patient", () => {
+  it("a un bouton pour en sortir : on ne dépend jamais du clavier (Échap) pour quitter", () => {
+    const html = renderToStaticMarkup(
+      createElement(CounterIsland, {
+        state: { ...INITIAL_ISLAND, stage: "email", outcomes: [] },
+        items: [],
+        drug: "DOLIPRANE 1000 mg",
+        alert: null,
+        pills: [],
+        onAnswer: vi.fn(), onEmail: vi.fn(), onSendEmail: vi.fn(), onAddEmail: vi.fn(), onFinish: vi.fn(), onDismissAlert: vi.fn(),
+        onCloseEmail: vi.fn(),
+      }),
+    ).replaceAll("&#x27;", "'");
+    expect(html).toContain('aria-label="Annuler l\'e-mail"');
+  });
+});
