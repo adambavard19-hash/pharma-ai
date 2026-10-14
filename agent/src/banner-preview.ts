@@ -178,7 +178,7 @@ export function demoSales() {
         { name: "VALACICLOVIR 500 mg", inn: "valaciclovir", atcCode: "J05AB11", substance: "CHLORHYDRATE DE VALACICLOVIR", lgo: ["VALACICLOVIR 500 mg cp", "1", "9,15 €"] },
       ],
       [
-        { id: "probiotique", name: "PROBIOTIQUE 30 gélules", priceCents: 1490, quantity: 12, alertThreshold: 4, challengeTitle: "Challenge flore intestinale", shortDateOn: "2026-11-30", tone: ["#BFE8D2", "#2F9E6B"] },
+        { id: "probiotique", name: "ULTRA-LEVURE 200 mg 30 gélules", priceCents: 890, quantity: 12, alertThreshold: 4, challengeTitle: "Challenge Ultra-Levure", shortDateOn: "2026-11-30", tone: ["#BFE8D2", "#2F9E6B"] },
         { id: "antiseptique", name: "ANTISEPTIQUE CUTANÉ 100 ml", priceCents: 520, quantity: 3, alertThreshold: 5, tone: ["#CFE4F7", "#3B82C4"] },
       ],
       12,

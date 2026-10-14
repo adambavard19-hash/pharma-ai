@@ -31,6 +31,9 @@ export type CounterSaleRead = {
   followUp: { emailSaved: boolean; closed: boolean };
 };
 
+/** Les boîtes bipées, pour « Retirer » sur la bannière du poste : dès le bip, analyse finie ou non. */
+const boxesOf = (lines: { id: string; drugName: string | null }[]) => lines.filter((line) => line.drugName).map((line) => ({ id: line.id, name: line.drugName ?? "" }));
+
 export async function readCounterNotice(pharmacyId: string, id: string, now: Date = new Date()): Promise<CounterSaleRead | null> {
   const prescription = await prisma.prescription.findFirst({
     where: { id, pharmacyId, source: "COUNTER_SCAN" },
@@ -93,7 +96,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     return { status: prescription.status, followUp, notice: buildCounterNotice({ reference: prescription.reference, prescriptionStatus: "DELIVERED", lineNames: [], alerts: [], recommendations: [], outcome: null }) };
   }
   if (prescription.status === "NEEDS_VERIFICATION") {
-    return { status: prescription.status, followUp, notice: buildCounterNotice({ reference: prescription.reference, prescriptionStatus: "NEEDS_VERIFICATION", lineNames: [], alerts: [], recommendations: [], outcome: null }) };
+    return { status: prescription.status, followUp, notice: buildCounterNotice({ reference: prescription.reference, prescriptionStatus: "NEEDS_VERIFICATION", lineNames: [], lines: boxesOf(prescription.lines), alerts: [], recommendations: [], outcome: null }) };
   }
 
   const run = prescription.analysisRuns[0];
@@ -123,6 +126,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     prescriptionStatus: prescription.status,
     lineNames: prescription.lines.map((line) => line.drugName ?? "").filter(Boolean),
     lineKinds: prescription.lines.filter((line) => line.drugName).map((line) => (line.drugSpecialtyId ? ("DRUG" as const) : ("PRODUCT" as const))),
+    lines: boxesOf(prescription.lines),
     alerts: (run?.safetyFindings ?? []).map((finding) => ({ severity: finding.severity, subjectType: finding.subjectType, code: finding.code, message: finding.message, acknowledged: finding.acknowledgedAt !== null })),
     questions: tree.view.questions,
     guidance: tree.view.guidance,

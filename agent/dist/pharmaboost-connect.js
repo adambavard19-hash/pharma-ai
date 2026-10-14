@@ -5542,7 +5542,8 @@ function buildHostEntry(input) {
     notes,
     questions,
     guidance: (body.guidance ?? []).map(oneLine).filter(Boolean),
-    items: finalItems
+    items: finalItems,
+    boxes: (body.boxes ?? []).filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id)).map((box) => ({ id: box.id, name: oneLine(box.name ?? "") })).filter((box) => box.name).slice(0, 20)
   };
 }
 function ordinalFr(rank) {
@@ -5919,6 +5920,7 @@ var NoticeCenter = class {
       if (email && email.length <= 200 && !/[\r\n\s]/.test(email)) act({ kind: "email", saleId, email });
     } else if (word === "EMAIL_RETIRER") act({ kind: "email_remove", saleId });
     else if (word === "TERMINER") act({ kind: "finish", saleId });
+    else if (word === "RETIRER" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "remove_line", saleId, lineId: argument });
     else if (word === "REPONSE" && argument) {
       const [node, choice] = argument.split(":");
       if (node && choice && /^[\w-]+$/.test(node) && /^[\w-]+$/.test(choice)) act({ kind: "answer", saleId, node, choice });
@@ -6530,7 +6532,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.11";
+var VERSION = "0.10.12";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -6792,6 +6794,10 @@ async function handleAction(action) {
       const result = await postJson(config, "/api/agent/conseil/email", { prescription: action.saleId, email, consent: email !== null });
       log(email ? `E-mail du patient : ${result.body?.ok ? "enregistr\xE9 (avec son accord)" : result.body?.error ?? `HTTP ${result.status}`}.` : "E-mail du patient retir\xE9.");
       await refreshNow(config, result.body?.ok ? {} : { emailError: result.body?.error ?? "L'adresse n'a pas pu \xEAtre enregistr\xE9e." });
+    } else if (action.kind === "remove_line") {
+      const result = await postJson(config, "/api/agent/conseil/retirer", { prescription: action.saleId, line: action.lineId });
+      log(`Bo\xEEte retir\xE9e de la vente : ${result.body?.ok ? `${result.body.remaining ?? "?"} restante(s)` : result.body?.error ?? `HTTP ${result.status}`}.`);
+      await refreshNow(config, result.body?.ok ? {} : { problem: result.body?.error ?? "La bo\xEEte n'a pas pu \xEAtre retir\xE9e." });
     } else if (action.kind === "finish") {
       const emailWasSaved = watched?.body?.followUp?.emailSaved === true;
       const result = await postJson(config, "/api/agent/conseil/terminer", { prescription: action.saleId });
@@ -7013,7 +7019,7 @@ var SAMPLE_ENTRY = {
   questions: [{ node: "why", text: "Pourquoi le patient prend-il DOLIPRANE 1000 mg ?", multi: true, choices: [{ key: "FEVER", label: "Fi\xE8vre", selected: false }, { key: "HEADACHE", label: "Mal de t\xEAte", selected: false }, { key: "PAIN", label: "Douleur localis\xE9e", selected: true }, { key: "OTHER", label: "Autre raison", selected: false }] }],
   guidance: [],
   items: [
-    { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 g\xE9lules", price: "14,90 \u20AC", reason: "Prot\xE9ger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
+    { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge Ultra-Levure", shortDate: "30/11/2026", outcome: "NONE", name: "ULTRA-LEVURE 200 mg 30 g\xE9lules", price: "8,90 \u20AC", reason: "Prot\xE9ger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
     { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "S\xC9RUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 \u20AC", reason: "", availability: "LOW_STOCK", quantity: "3", image: "" }
   ]
 };

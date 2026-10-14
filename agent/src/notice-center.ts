@@ -50,6 +50,8 @@ export type NoticeBody = {
   /** L'arbre de questions du comptoir : les questions ouvertes (avec le choix coché) et les phrases d'orientation. Absent chez un serveur plus ancien. */
   questions?: { id: string; node: string; text: string; mode: string; choices: { key: string; label: string; selected: boolean }[]; answered: boolean }[];
   guidance?: string[];
+  /** Les boîtes bipées de la vente, avec leur identifiant (« Retirer » sur la bannière). Absent chez un serveur plus ancien. */
+  boxes?: { id: string; name: string }[];
 };
 
 export type HostOutcome = "NONE" | "SOLD" | "NOT_SOLD";
@@ -86,6 +88,8 @@ export type HostEntry = {
   /** Les phrases d'orientation des réponses cochées. */
   guidance: string[];
   items: HostItem[];
+  /** Les boîtes bipées (identifiant de ligne, nom court) : chacune se retire de la bannière. Vide : rien à retirer (serveur ancien). */
+  boxes?: { id: string; name: string }[];
 };
 
 /** Le message de fin de vente. */
@@ -97,6 +101,8 @@ export type HostAction =
   | { kind: "email"; saleId: string; email: string }
   | { kind: "email_remove"; saleId: string }
   | { kind: "finish"; saleId: string }
+  /** « RETIRER <vente> <boîte> » : le patient a reposé cette boîte, elle quitte la vente. */
+  | { kind: "remove_line"; saleId: string; lineId: string }
   | { kind: "answer"; saleId: string; node: string; choice: string }
   | { kind: "view"; saleId: string }
   /** L'icône près de l'horloge → « Ouvrir mon espace PharmaBoost » (le mot ESPACE, sans vente) : l'agent lie le navigateur du PC. */
@@ -189,6 +195,7 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     questions,
     guidance: (body.guidance ?? []).map(oneLine).filter(Boolean),
     items: finalItems,
+    boxes: (body.boxes ?? []).filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id)).map((box) => ({ id: box.id, name: oneLine(box.name ?? "") })).filter((box) => box.name).slice(0, 20),
   };
 }
 
@@ -659,6 +666,7 @@ export class NoticeCenter {
       if (email && email.length <= 200 && !/[\r\n\s]/.test(email)) act({ kind: "email", saleId, email });
     } else if (word === "EMAIL_RETIRER") act({ kind: "email_remove", saleId });
     else if (word === "TERMINER") act({ kind: "finish", saleId });
+    else if (word === "RETIRER" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "remove_line", saleId, lineId: argument });
     else if (word === "REPONSE" && argument) {
       // « question:choix » : deux mots d'identifiant, sans espace (la ligne de la fenêtre se coupe aux espaces).
       const [node, choice] = argument.split(":");

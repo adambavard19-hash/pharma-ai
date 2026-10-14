@@ -47,7 +47,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.11";
+const VERSION = "0.10.12";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -397,6 +397,10 @@ async function handleAction(action: HostAction): Promise<void> {
       const result = await postJson<{ ok: boolean; error?: string }>(config, "/api/agent/conseil/email", { prescription: action.saleId, email, consent: email !== null });
       log(email ? `E-mail du patient : ${result.body?.ok ? "enregistré (avec son accord)" : (result.body?.error ?? `HTTP ${result.status}`)}.` : "E-mail du patient retiré.");
       await refreshNow(config, result.body?.ok ? {} : { emailError: result.body?.error ?? "L'adresse n'a pas pu être enregistrée." });
+    } else if (action.kind === "remove_line") {
+      const result = await postJson<{ ok: boolean; remaining?: number; error?: string }>(config, "/api/agent/conseil/retirer", { prescription: action.saleId, line: action.lineId });
+      log(`Boîte retirée de la vente : ${result.body?.ok ? `${result.body.remaining ?? "?"} restante(s)` : (result.body?.error ?? `HTTP ${result.status}`)}.`);
+      await refreshNow(config, result.body?.ok ? {} : { problem: result.body?.error ?? "La boîte n'a pas pu être retirée." });
     } else if (action.kind === "finish") {
       const emailWasSaved = watched?.body?.followUp?.emailSaved === true;
       const result = await postJson<FinishBody>(config, "/api/agent/conseil/terminer", { prescription: action.saleId });
@@ -669,7 +673,7 @@ const SAMPLE_ENTRY: HostEntry = {
   questions: [{ node: "why", text: "Pourquoi le patient prend-il DOLIPRANE 1000 mg ?", multi: true, choices: [{ key: "FEVER", label: "Fièvre", selected: false }, { key: "HEADACHE", label: "Mal de tête", selected: false }, { key: "PAIN", label: "Douleur localisée", selected: true }, { key: "OTHER", label: "Autre raison", selected: false }] }],
   guidance: [],
   items: [
-    { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge probiotiques", shortDate: "30/11/2026", outcome: "NONE", name: "PROBIOTIQUE 30 gélules", price: "14,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
+    { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge Ultra-Levure", shortDate: "30/11/2026", outcome: "NONE", name: "ULTRA-LEVURE 200 mg 30 gélules", price: "8,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "" },
     { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "", availability: "LOW_STOCK", quantity: "3", image: "" },
   ],
 };

@@ -22,13 +22,13 @@ describe("la section « Stock et marge »", () => {
   it("montre un autre produit que la crème solaire, avec son stock et sa marge d'exemple", () => {
     const html = renderToStaticMarkup(createElement(StockMarginVisual));
     const shown = text(html);
-    expect(shown).toContain("Flore Équilibre 10 milliards");
-    expect(shown).toContain("Ferments lactiques pendant un antibiotique");
-    expect(shown).toContain("14,90 €");
-    expect(shown).toContain("Marge 8,70 €");
+    expect(shown).toContain("Ultra-Levure 200 mg");
+    expect(shown).toContain("Levure probiotique pendant un antibiotique");
+    expect(shown).toContain("8,90 €");
+    expect(shown).toContain("Marge 3,60 €");
     expect(shown).toContain("En stock · 29");
     expect(shown).toContain("exemple");
-    expect(html).toContain("/site/produits/flore-equilibre-10-milliards.webp");
+    expect(html).toContain("/site/produits/ultra-levure-200-mg.webp");
     expect(shown).not.toMatch(/solaire/i);
     expect(html).not.toContain("creme-solaire");
   });

@@ -70,6 +70,9 @@ export type CounterIslandProps = {
   /** Quitter l'écran de l'e-mail sans l'envoyer (un bouton : on ne dépend jamais du clavier pour en sortir). */
   onCloseEmail?: () => void;
   onFinish: () => void;
+  /** Les boîtes bipées de la vente : chacune se retire (le patient l'a reposée). Absent : pas de « Retirer ». */
+  boxes?: { id: string; name: string }[];
+  onRemoveBox?: (id: string) => void;
   onDismissAlert: () => void;
   /** Le bilan par e-mail se propose dans l'île (poste). Faux sur l'écran de vente du logiciel, où le plan patient prend le relais. */
   emailEnabled?: boolean;
@@ -197,6 +200,39 @@ function AdviceMeta({ item, small }: { item: IslandAdvice; small?: boolean }) {
       {item.margin && <span className="shrink-0 text-[#4B5F6C]">Marge {item.margin} HT</span>}
       {item.challenge && <span className="shrink-0" style={{ color: "#B7791F" }}>★ {T.challenge}</span>}
     </span>
+  );
+}
+
+/**
+ * Les boîtes de la vente, en petites pastilles sous la capsule : le patient en repose une, le pharmacien la retire (✕, puis « Oui »).
+ * Tant que « Vente terminée » n'est pas cliqué, chaque nouvelle boîte bipée s'ajoute ici ; une boîte retirée emporte ses conseils.
+ */
+function BoxTray({ boxes, onRemove }: { boxes: { id: string; name: string }[]; onRemove: (id: string) => void }) {
+  const [asking, setAsking] = useState<string | null>(null);
+  return (
+    <ul className="mt-1.5 flex flex-wrap gap-1" aria-label="Boîtes de la vente" data-ile-boites="">
+      {boxes.map((box) =>
+        asking === box.id ? (
+          <li key={box.id} className="isl-pop inline-flex max-w-full items-center gap-1 rounded-full py-0.5 pr-0.5 pl-2.5 text-[11px] font-semibold text-white" style={{ background: "rgba(229,72,77,0.22)" }}>
+            <span className="truncate">Retirer {box.name} ?</span>
+            <button type="button" onClick={() => { setAsking(null); onRemove(box.id); }} className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold text-white" style={{ background: "#E5484D" }}>
+              Oui
+            </button>
+            <button type="button" onClick={() => setAsking(null)} className="shrink-0 rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold text-white/75 hover:text-white">
+              Non
+            </button>
+          </li>
+        ) : (
+          <li key={box.id} className="isl-line inline-flex max-w-full items-center gap-1 rounded-full bg-white/[0.08] py-0.5 pr-0.5 pl-2 text-[11px] font-medium text-white/85">
+            <Pill className="size-3 shrink-0" style={{ color: C.accent }} aria-hidden="true" />
+            <span className="max-w-[170px] truncate" title={box.name}>{box.name}</span>
+            <button type="button" onClick={() => setAsking(box.id)} aria-label={`Retirer ${box.name} de la vente`} title="Retirer de la vente (le patient l'a reposée)" className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/15 hover:text-white">
+              <X className="size-3" strokeWidth={2.5} aria-hidden="true" />
+            </button>
+          </li>
+        ),
+      )}
+    </ul>
   );
 }
 
@@ -490,6 +526,7 @@ export function CounterIsland(props: CounterIslandProps) {
                   <Maximize2 className="size-3.5" aria-hidden="true" />
                 </button>}
               </div>
+              {props.boxes && props.boxes.length > 0 && props.onRemoveBox && <BoxTray boxes={props.boxes} onRemove={props.onRemoveBox} />}
               {shownGroups.length > 1 ? null : (
                 shownGroups.map((group) => {
                 const local = compactIndex(group.indexes.map((at) => state.outcomes[at]), group.indexes.length, picked[group.drug] ?? null);

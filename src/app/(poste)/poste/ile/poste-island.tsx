@@ -13,6 +13,7 @@ import {
   answerWord,
   emailWord,
   finishWord,
+  removeBoxWord,
   INITIAL_POSTE,
   parseCommand,
   posteReducer,
@@ -263,6 +264,9 @@ export function PosteIsland() {
     },
     onAddEmail: () => dispatch({ type: "openEmail" }),
     onFinish: () => { if (entry) word(finishWord(entry.id)); },
+    // Les boîtes de la vente (agent récent seulement) : le patient en repose une, elle quitte la vente et la bannière.
+    boxes: entry?.boxes ?? [],
+    onRemoveBox: (lineId) => { if (entry) word(removeBoxWord(entry.id, lineId)); },
     onDismissAlert: () => dispatch({ type: "readAlert" }),
   };
 

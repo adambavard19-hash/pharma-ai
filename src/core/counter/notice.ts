@@ -129,6 +129,8 @@ export type CounterNoticeInput = {
   stockReliable?: boolean;
   /** Ce que chaque ligne bipée est : un médicament du catalogue national, ou un produit de l'officine. */
   lineKinds?: ("DRUG" | "PRODUCT")[];
+  /** Les boîtes bipées, avec leur identifiant : la bannière du poste peut en retirer une. Absent (appel ancien) : aucune. */
+  lines?: { id: string; name: string }[];
   /**
    * Les questions ouvertes de l'arbre du comptoir (« pourquoi le patient prend-il son paracétamol ? », « où a-t-il mal ? »)
    * et les phrases d'orientation des réponses cochées. Les conseils qu'elles débloquent arrivent dans `recommendations` ;
@@ -155,6 +157,8 @@ export type CounterNotice = {
   guidance: string[];
   /** Les médicaments ou produits bipés, un par élément, sans la forme galénique. */
   drugs: string[];
+  /** Les mêmes boîtes, avec leur identifiant (pour « Retirer » sur la bannière du poste). */
+  boxes: { id: string; name: string }[];
   /** « Médicament détecté », « Produit détecté » ou « Détecté » : le titre au-dessus de ce qui a été bipé. */
   detectedLabel: string;
   /** Une empreinte : si elle ne change pas, on ne réaffiche pas. */
@@ -209,13 +213,14 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
   const subject = drugs.join(" · ");
   const questions = input.questions ?? [];
   const guidance = input.guidance ?? [];
-  const base = { title: `PharmaBoost · ${saleTitle(input.reference)}`, subject, drugs, detectedLabel: detectedLabelOf(input.lineKinds), questions: [] as ViewQuestion[], guidance: [] as string[] };
+  const boxes = (input.lines ?? []).map((line) => ({ id: line.id, name: shortName(line.name) })).filter((box) => box.name);
+  const base = { title: `PharmaBoost · ${saleTitle(input.reference)}`, subject, drugs, boxes, detectedLabel: detectedLabelOf(input.lineKinds), questions: [] as ViewQuestion[], guidance: [] as string[] };
   const reliable = input.stockReliable !== false;
   if (["CANCELLED", "DELIVERED", "FAILED"].includes(input.prescriptionStatus)) {
     return { ...base, state: "CLOSED", alerts: [], advice: [], items: [], signature: `closed:${input.reference}` };
   }
   if (!["ANALYZED", "VALIDATED"].includes(input.prescriptionStatus)) {
-    return { ...base, state: "PENDING", alerts: [], advice: [], items: [], signature: `pending:${input.reference}:${input.lineNames.length}` };
+    return { ...base, state: "PENDING", alerts: [], advice: [], items: [], signature: `pending:${input.reference}:${boxes.map((box) => box.id).join(",") || input.lineNames.length}` };
   }
   // Pour l'instant, la bannière ne pousse QUE des produits conseils (fondateur, 13 oct. 2026 : « personne ne lit les
   // contre-indications, trop de mots ») : aucune mise en garde n'y est envoyée. La sécurité, elle, tourne toujours — un
@@ -265,8 +270,8 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
       input.outcome === "OUT_OF_STOCK" ? "Conseil possible mais produit absent du stock."
       : input.outcome === "SAFETY_FILTERED" ? "Conseils écartés par la sécurité."
       : "Rien à ajouter pour cette délivrance.";
-    return { ...base, state: "READY", alerts: [], advice: [why], items: [], signature: `ready:${input.reference}:${input.lineNames.length}:none` };
+    return { ...base, state: "READY", alerts: [], advice: [why], items: [], signature: `ready:${input.reference}:${boxes.map((box) => box.id).join(",") || input.lineNames.length}:none` };
   }
   const marks = items.map((item) => `${item.outcome[0]}${item.challenge ? "c" : ""}${item.shortDateOn ? "d" : ""}`).join("");
-  return { ...base, questions, guidance, state: "READY", alerts, advice, items, signature: `ready:${input.reference}:${input.lineNames.length}:${alerts.length}:${advice.join("|")}:${marks}:${answered}` };
+  return { ...base, questions, guidance, state: "READY", alerts, advice, items, signature: `ready:${input.reference}:${boxes.map((box) => box.id).join(",") || input.lineNames.length}:${alerts.length}:${advice.join("|")}:${marks}:${answered}` };
 }

@@ -13,7 +13,7 @@
  */
 export const EXAMPLES: { scan: string; context?: string; shows: string; note?: string; warning?: boolean; why: string }[] = [
   { scan: "DOXYCYCLINE", shows: "Protection solaire SPF 50+", why: "Ce traitement rend la peau plus sensible au soleil." },
-  { scan: "AMOXICILLINE", shows: "Probiotique", note: "À distance de l'antibiotique", why: "L'antibiotique peut perturber la flore intestinale." },
+  { scan: "AMOXICILLINE", shows: "Ultra-Levure 200 mg", note: "À distance de l'antibiotique", why: "L'antibiotique peut perturber la flore intestinale." },
   { scan: "ISOTRÉTINOÏNE", shows: "Routine : nettoyer, hydrater, protéger", note: "À éviter : gommages et peelings", why: "Ce traitement assèche et fragilise la peau." },
   { scan: "PARACÉTAMOL", context: "Le patient a mal au dos", shows: "Poche chaud/froid pour le dos", note: "Après « Où a-t-il mal ? »", why: "Le froid ou le chaud local complète le traitement." },
   { scan: "FERVEX", shows: "3 g de paracétamol par jour au maximum", warning: true, why: "Chaque sachet contient déjà du paracétamol." },

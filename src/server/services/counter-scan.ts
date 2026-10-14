@@ -20,18 +20,16 @@ import { findOpenFactsName } from "@/server/services/product-images";
  */
 
 /**
- * Deux bips d'un même poste séparés de plus d'une minute sont deux patients.
+ * Une vente reste ouverte sur son poste jusqu'à « Vente terminée » : chaque boîte bipée ensuite s'ajoute à la même bannière,
+ * même trois minutes plus tard (le patient discute, repose une boîte, en ajoute une autre). Fondateur, 14 oct. 2026.
  *
- * La fenêtre glisse et se mesure sur l'horloge du POSTE : l'écart entre ce bip
- * et le bip précédent du même poste (`CounterPost.lastScanAt`, lu avant sa
- * mise à jour). Elle ne se mesure PAS depuis `Prescription.updatedAt`, que
- * l'analyse fait avancer : un patient dont l'analyse a duré trente secondes
- * aurait sinon prolongé la fenêtre du suivant. Un patient qui passe dix
- * boîtes, une toutes les quarante secondes, reste une seule vente ; un bip
- * soixante et une secondes après le dernier ouvre la vente d'un autre patient,
- * analyse ou pas entre les deux.
+ * Le garde-fou : trente minutes sans aucun bip sur ce poste, et le bip suivant ouvre une nouvelle vente — un « Vente terminée »
+ * oublié ne mélange pas deux patients pour la journée.
+ *
+ * La fenêtre glisse et se mesure sur l'horloge du POSTE : l'écart entre ce bip et le bip précédent du même poste
+ * (`CounterPost.lastScanAt`, lu avant sa mise à jour), jamais depuis `Prescription.updatedAt`, que l'analyse fait avancer.
  */
-export const SAME_SALE_WINDOW_MS = 60 * 1000;
+export const SAME_SALE_WINDOW_MS = 30 * 60 * 1000;
 
 /** Un horodatage de bip plus ancien que cela n'est pas crédible (horloge du poste fausse) : on retient l'instant de réception. */
 const MAX_SCAN_AGE_MS = 6 * 60 * 60 * 1000;
@@ -322,3 +320,65 @@ export async function closeLiveCounterSales(scope: { pharmacyId: string; userId:
   return result.count;
 }
 
+
+export type RemoveLineResult = { ok: true; remaining: number } | { ok: false; error: string };
+
+/**
+ * Le patient repose une boîte (« finalement, je ne prends pas celui-là ») : le pharmacien la retire de la bannière.
+ *
+ *  - La boîte quitte la vente ; son unité revient au stock quand on sait laquelle c'était (un produit, ou un médicament présent
+ *    sous une seule présentation dans le stock de l'officine).
+ *  - Les conseils qu'ELLE seule déclenchait disparaissent (retirés, jamais reproposés pour cette vente) ; ceux d'une autre boîte restent.
+ *  - La vente repart à l'analyse avec les boîtes qui restent, comme après un bip : la bannière se met à jour seule.
+ *  - Plus aucune boîte : la vente est annulée, la bannière se ferme.
+ *
+ * Seulement sur une vente de CE poste (ou de cette pharmacie pour une clé de serveur), encore ouverte : jamais une vente terminée ou encaissée.
+ */
+export async function removeCounterLine(agent: AgentContext, input: { prescriptionId: string; lineId: string }): Promise<RemoveLineResult> {
+  const sale = await prisma.prescription.findFirst({
+    where: {
+      id: input.prescriptionId,
+      pharmacyId: agent.scope.pharmacyId,
+      source: "COUNTER_SCAN",
+      ...(agent.postId ? { counterPostId: agent.postId } : {}),
+      status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
+      sales: { none: {} },
+      NOT: { counterFollowUp: { closedAt: { not: null } } },
+    },
+    select: { id: true, lines: { select: { id: true, drugName: true, drugSpecialtyId: true, rawText: true, quantity: true } } },
+  });
+  if (!sale) return { ok: false, error: "Cette vente n'est plus ouverte sur ce poste." };
+  const line = sale.lines.find((candidate) => candidate.id === input.lineId);
+  if (!line) return { ok: false, error: "Cette boîte n'est plus dans la vente." };
+  const remaining = sale.lines.length - 1;
+
+  // Les conseils que cette boîte SEULE déclenchait : retirés (une autre boîte qui les déclenche aussi les garde).
+  const linked = await prisma.recommendation.findMany({
+    where: { prescriptionId: sale.id, opportunity: { triggeredLineIds: { has: line.id } } },
+    select: { id: true, opportunity: { select: { triggeredLineIds: true } } },
+  });
+  const onlyThisBox = linked.filter((rec) => (rec.opportunity?.triggeredLineIds ?? []).every((id) => id === line.id)).map((rec) => rec.id);
+
+  await prisma.$transaction(async (tx) => {
+    if (onlyThisBox.length > 0) await tx.recommendation.updateMany({ where: { id: { in: onlyThisBox } }, data: { status: "REMOVED" } });
+    await tx.prescriptionLine.delete({ where: { id: line.id } });
+    await tx.prescription.update({
+      where: { id: sale.id },
+      // Plus de boîte : la vente est annulée (la bannière se ferme). Sinon, elle repart à l'analyse avec ce qui reste.
+      data: remaining === 0 ? { status: "CANCELLED" } : { status: "NEEDS_VERIFICATION", verifiedAt: null },
+    });
+  });
+
+  // L'unité revient au stock, seulement quand on sait exactement laquelle c'était.
+  const units = Math.max(1, line.quantity ?? 1);
+  if (line.rawText && !line.drugSpecialtyId) {
+    const product = await prisma.product.findFirst({ where: { pharmacyId: agent.scope.pharmacyId, ean: line.rawText }, select: { id: true } });
+    if (product) await prisma.stockItem.updateMany({ where: { pharmacyId: agent.scope.pharmacyId, productId: product.id }, data: { quantity: { increment: units } } });
+  } else if (line.drugSpecialtyId) {
+    const stocks = await prisma.pharmacyDrugStock.findMany({ where: { pharmacyId: agent.scope.pharmacyId, presentation: { specialtyId: line.drugSpecialtyId } }, select: { id: true }, take: 2 });
+    if (stocks.length === 1) await prisma.pharmacyDrugStock.update({ where: { id: stocks[0].id }, data: { quantity: { increment: units } } });
+  }
+
+  await recordAudit({ action: "prescription.counter_line_removed", entityType: "Prescription", entityId: sale.id, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { line: line.drugName, remaining, removedAdvice: onlyThisBox.length } });
+  return { ok: true, remaining };
+}

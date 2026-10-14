@@ -24,7 +24,7 @@ describe("la bannière des visuels du site : le dessin de la bannière du poste 
         subject: "DOXYCYCLINE 100 mg",
         items: [
           { name: "Crème solaire SPF 50+", price: "16,90 €", drug: "DOXYCYCLINE 100 mg", stock: "IN_STOCK", quantity: 18 },
-          { name: "Flore Équilibre 10 milliards", price: "14,90 €", drug: "DOXYCYCLINE 100 mg", challenge: true, shortDate: "30/11/26", stock: "LOW_STOCK", quantity: 3 },
+          { name: "Ultra-Levure 200 mg", price: "8,90 €", drug: "DOXYCYCLINE 100 mg", challenge: true, shortDate: "30/11/26", stock: "LOW_STOCK", quantity: 3 },
         ],
       }),
     );

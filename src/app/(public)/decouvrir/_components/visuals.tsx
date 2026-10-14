@@ -17,7 +17,7 @@ import type { IslandAdvice } from "@/components/island/counter-island";
 /**
  * L'exemple de l'accueil suit de vraies règles du moteur : protection solaire
  * sous doxycycline (« Conseil peau — Série 2 », RCP de la doxycycline) et
- * ferments lactiques pendant un antibiotique. Produits, prix et stocks :
+ * levure probiotique (Ultra-Levure) pendant un antibiotique. Produits, prix et stocks :
  * catalogue de démonstration.
  */
 const DOXY = "DOXYCYCLINE 100 mg";
@@ -29,11 +29,11 @@ const SOLAIRE = { name: "Crème solaire SPF 50+", price: "16,90 €", image: "/s
  * (prix de vente moins prix d'achat) et stock : catalogue de démonstration.
  */
 const STOCK_EXAMPLE = {
-  need: "Ferments lactiques pendant un antibiotique",
-  product: "Flore Équilibre 10 milliards",
-  tile: "/site/produits/flore-equilibre-10-milliards.webp",
-  price: "14,90 €",
-  margin: "8,70 €",
+  need: "Levure probiotique pendant un antibiotique",
+  product: "Ultra-Levure 200 mg",
+  tile: "/site/produits/ultra-levure-200-mg.webp",
+  price: "8,90 €",
+  margin: "3,60 €",
   stock: 29,
 };
 

@@ -239,6 +239,11 @@ export function emailWord(saleId: string, value: string): string | null {
   return `EMAIL ${saleId} ${btoa(binary)}`;
 }
 
+/** « RETIRER <vente> <boîte> » : le patient a reposé cette boîte, elle quitte la vente. */
+export function removeBoxWord(saleId: string, lineId: string): string | null {
+  return ID.test(saleId) && ID.test(lineId) ? `RETIRER ${saleId} ${lineId}` : null;
+}
+
 export function finishWord(saleId: string): string | null {
   return ID.test(saleId) ? `TERMINER ${saleId}` : null;
 }

@@ -128,7 +128,7 @@ describe("les ventes de la démonstration sont celles du moteur", () => {
     const { ordonnance } = sales;
     expect(ordonnance.alerts).toHaveLength(0);
     expect(ordonnance.tree).toBeNull();
-    expect(ordonnance.items.map((item) => item.name)).toEqual(["PROBIOTIQUE 30 gélules", "ANTISEPTIQUE CUTANÉ 100 ml"]);
+    expect(ordonnance.items.map((item) => item.name)).toEqual(["ULTRA-LEVURE 200 mg 30 gélules", "ANTISEPTIQUE CUTANÉ 100 ml"]);
     expect(ordonnance.items.map((item) => item.drug)).toEqual(["AMOXICILLINE 1 g", "VALACICLOVIR 500 mg"]);
     for (const key of ["digestive-tolerance-antibiotics", "herpes-zona-antiseptic"]) expect(ADVICE_RULES.find((rule) => rule.key === key)?.question, key).toBeUndefined();
     // Les pastilles de la maquette restent toutes à l'écran : Challenge, Date courte, En stock · 12, Stock faible · 3.

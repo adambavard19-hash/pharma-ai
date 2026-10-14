@@ -27,8 +27,8 @@ const SITE = { ground: "#f8fbfb", tint: "#e2f3f0", ink: "#172126", inkSoft: "#46
 const ROWS = [
   { name: "Crème solaire SPF 50+", price: "16,90 €", pills: [{ text: `${T.inStock} · 18`, bg: C.stockBg, fg: C.stockFg }] },
   {
-    name: "Flore Équilibre 10 milliards",
-    price: "14,90 €",
+    name: "Ultra-Levure 200 mg",
+    price: "8,90 €",
     pills: [
       { text: T.challenge, bg: C.challengeBg, fg: C.challengeFg },
       { text: `${T.shortDate} 30/11/26`, bg: C.dateBg, fg: C.dateFg },

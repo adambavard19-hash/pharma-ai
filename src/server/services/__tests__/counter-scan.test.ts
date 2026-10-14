@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * La fenêtre de la douchette : des bips d'un même poste, à moins d'une minute
- * l'un de l'autre, sont UNE vente — donc une seule ordonnance, celle du patient
- * au comptoir. Au-delà, c'est un autre patient.
+ * La fenêtre de la douchette : les bips d'un même poste sont UNE vente, celle du
+ * patient au comptoir, jusqu'à « Vente terminée » — ou trente minutes sans bip,
+ * le garde-fou d'un « Vente terminée » oublié. Au-delà, c'est un autre patient.
  *
  * Prisma est simulé par une petite base en mémoire qui INTERPRÈTE les requêtes
  * du code (poste, statut, `sales: { none }`, `updatedAt` gte/gt, `orderBy`, et
@@ -158,6 +158,8 @@ vi.mock("@/server/services/references", () => ({
 vi.mock("@/server/services/product-images", () => ({ findOpenFactsName: vi.fn(async () => null) }));
 
 const { SAME_SALE_WINDOW_MS, recordCounterScan, closeLiveCounterSales, scanInstant } = await import("../counter-scan");
+/** La fenêtre, en secondes : une vente reste ouverte jusqu'à « Vente terminée », avec trente minutes sans bip pour garde-fou. */
+const W = SAME_SALE_WINDOW_MS / 1000;
 
 const NOW = new Date("2026-10-06T09:00:00.000Z");
 const agentOf = (postId: string | null) => ({ connectionId: null, postId, scope: { pharmacyId: "ph_1", organizationId: "org_1", userId: "usr_1" }, pharmacyIsDemo: false, intervalSeconds: 60, exportPath: null, scansPath: null });
@@ -206,9 +208,9 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("la fenêtre de scan : une minute", () => {
-  it("la constante vaut soixante secondes", () => {
-    expect(SAME_SALE_WINDOW_MS).toBe(60_000);
+describe("la fenêtre de scan : la vente reste ouverte (trente minutes sans bip pour garde-fou)", () => {
+  it("la constante vaut trente minutes", () => {
+    expect(SAME_SALE_WINDOW_MS).toBe(30 * 60_000);
   });
 
   it("deux bips à 59 secondes : la même vente, la même ordonnance", async () => {
@@ -224,9 +226,16 @@ describe("la fenêtre de scan : une minute", () => {
     expect(mem.sales).toHaveLength(1);
   });
 
-  it("deux bips à 61 secondes : deux patients, deux ventes", async () => {
+  it("trois minutes plus tard (le patient discute) : toujours la même vente", async () => {
     const first = await scan(CIP_DOLIPRANE);
-    wait(61);
+    wait(180);
+    const second = await scan(EAN_CREME);
+    expect(first.ok && second.ok && second.created === false && second.prescriptionId === first.prescriptionId).toBe(true);
+  });
+
+  it("au-delà de trente minutes sans bip : deux patients, deux ventes", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    wait(W + 1);
     const second = await scan(EAN_CREME);
     expect(first.ok && second.ok).toBe(true);
     if (!first.ok || !second.ok) return;
@@ -236,9 +245,9 @@ describe("la fenêtre de scan : une minute", () => {
     expect(mem.sales).toHaveLength(2);
   });
 
-  it("à la minute pile : encore la même vente (au-delà d'une minute seulement, c'est un autre patient)", async () => {
+  it("à trente minutes pile : encore la même vente (au-delà seulement, c'est un autre patient)", async () => {
     const first = await scan(CIP_DOLIPRANE);
-    wait(60);
+    wait(W);
     const second = await scan(EAN_CREME);
     expect(second.ok && first.ok && second.prescriptionId === first.prescriptionId).toBe(true);
   });
@@ -301,14 +310,14 @@ describe("la fenêtre de scan : une minute", () => {
 });
 
 describe("la fenêtre se mesure depuis le dernier BIP du poste, jamais depuis l'écriture de la vente", () => {
-  it("l'analyse entre deux bips ne prolonge pas la fenêtre : le patient B, 70 secondes après le dernier bip de A, est une nouvelle vente", async () => {
+  it("l'analyse entre deux bips ne prolonge pas la fenêtre : le patient B, juste au-delà de la fenêtre après le dernier bip de A, est une nouvelle vente", async () => {
     const a = await scan(CIP_DOLIPRANE);
     wait(7);
     // L'analyse démarre au calme du poste et dure une demi-minute : `updatedAt` avance jusqu'à +40 s.
     analyse(mem.sales[0], 33);
     expect(mem.sales[0].updatedAt.getTime()).toBe(at(40).getTime());
-    wait(30);
-    // +70 s : 70 s après le dernier bip de A, mais 30 s seulement après la dernière écriture de sa vente.
+    wait(W - 30);
+    // W + 10 s après le dernier bip de A, mais moins que la fenêtre après la dernière écriture de sa vente.
     const b = await scan(EAN_CREME);
     expect(a.ok && b.ok).toBe(true);
     if (!a.ok || !b.ok) return;
@@ -347,8 +356,8 @@ describe("la fenêtre se mesure depuis le dernier BIP du poste, jamais depuis l'
     expect(mem.sales).toHaveLength(1);
   });
 
-  it("une file rejouée après une coupure : deux bips datés à 5 minutes d'écart, reçus à 100 ms d'écart, sont deux ventes", async () => {
-    const early = await scan(CIP_DOLIPRANE, "Comptoir 1", at(-300));
+  it("une file rejouée après une coupure : deux bips datés à plus de trente minutes d'écart, reçus à 100 ms d'écart, sont deux ventes", async () => {
+    const early = await scan(CIP_DOLIPRANE, "Comptoir 1", at(-(W + 300)));
     wait(0.1);
     const late = await scan(EAN_CREME, "Comptoir 1", at(0));
     expect(early.ok && late.ok).toBe(true);
@@ -410,10 +419,10 @@ describe("la fenêtre se mesure depuis le dernier BIP du poste, jamais depuis l'
     expect(late.ok && late.created).toBe(false);
   });
 
-  it("un bip daté plus d'une minute avant le dernier bip du poste n'est pas de la même vente (arrivé en retard, il garde son écart réel)", async () => {
+  it("un bip daté de plus de trente minutes avant le dernier bip du poste n'est pas de la même vente (arrivé en retard, il garde son écart réel)", async () => {
     const recent = await scan(CIP_DOLIPRANE, "Comptoir 1", at(0));
     wait(1);
-    const old = await scan(EAN_CREME, "Comptoir 1", at(-300));
+    const old = await scan(EAN_CREME, "Comptoir 1", at(-(W + 300)));
     expect(recent.ok && old.ok).toBe(true);
     if (!recent.ok || !old.ok) return;
     expect(old.created).toBe(true);
@@ -436,8 +445,8 @@ describe("la fenêtre se mesure depuis le dernier BIP du poste, jamais depuis l'
     // Patient A : jamais encaissé dans PharmaBoost, il reste « analysé ».
     await scan(CIP_DOLIPRANE);
     analyse(mem.sales[0], 10);
-    wait(90);
-    // Patient B, 100 s après A, encaissé tout de suite.
+    wait(W + 30);
+    // Patient B, au-delà de la fenêtre après A, encaissé tout de suite.
     const b = await scan(EAN_CREME);
     expect(b.ok && b.created).toBe(true);
     mem.sales[1].sales = [{ id: "sale_b" }];
@@ -453,7 +462,7 @@ describe("la fenêtre se mesure depuis le dernier BIP du poste, jamais depuis l'
 
   it("c'est la vente que le poste a ouverte en dernier qui reçoit le bip, même si l'analyse tardive d'une plus ancienne vient de l'écrire", async () => {
     const a = await scan(CIP_DOLIPRANE);
-    wait(70);
+    wait(W + 10);
     const b = await scan(EAN_CREME);
     // L'analyse de A se termine en retard : `updatedAt` de A dépasse celui de B.
     wait(5);
@@ -469,14 +478,14 @@ describe("la fenêtre se mesure depuis le dernier BIP du poste, jamais depuis l'
     expect(mem.sales[1].lines).toHaveLength(2);
   });
 
-  it("sans poste connu (clé d'un serveur), repli sur la dernière écriture de la vente : 59 s oui, 60 s oui, 61 s non", async () => {
+  it("sans poste connu (clé d'un serveur), repli sur la dernière écriture de la vente : W − 1 s oui, W s oui, W + 1 s non", async () => {
     const server = agentOf(null);
     const first = await scan(CIP_DOLIPRANE, "SERVEUR", null, server);
-    wait(59);
+    wait(W - 1);
     const second = await scan(EAN_CREME, "SERVEUR", null, server);
-    wait(60);
+    wait(W);
     const third = await scan(EAN_PROBIOTIQUE, "SERVEUR", null, server);
-    wait(61);
+    wait(W + 1);
     const fourth = await scan(CIP_DOLIPRANE, "SERVEUR", null, server);
     expect(first.ok && second.ok && third.ok && fourth.ok).toBe(true);
     if (!first.ok || !second.ok || !third.ok || !fourth.ok) return;
@@ -501,10 +510,10 @@ describe("plusieurs postes", () => {
 
   it("chaque poste a sa propre fenêtre : le bip d'un poste ne prolonge pas celle de l'autre", async () => {
     const one = await scan(CIP_DOLIPRANE, "Comptoir 1");
-    wait(40);
+    wait(W - 30);
     const two = await scan(EAN_CREME, "Comptoir 2", null, poste2);
-    wait(30);
-    // +70 s : 70 s après le bip du poste 1 (nouveau patient), 30 s après celui du poste 2 (même patient).
+    wait(40);
+    // Au-delà de la fenêtre après le bip du poste 1 (nouveau patient), 40 s après celui du poste 2 (même patient).
     const oneAgain = await scan(EAN_PROBIOTIQUE, "Comptoir 1");
     const twoAgain = await scan(CIP_DOLIPRANE, "Comptoir 2", null, poste2);
     expect(one.ok && two.ok && oneAgain.ok && twoAgain.ok).toBe(true);
@@ -607,7 +616,7 @@ describe("chaque comptoir est un espace à part, avec son collaborateur", () => 
   it("changer le collaborateur d'un comptoir ne réécrit pas les ventes déjà faites", async () => {
     await scan(CIP_DOLIPRANE, "Comptoir 1", null, agentOf("post_1"));
     post("post_1").assignedUserId = "usr_marc";
-    wait(120);
+    wait(W + 60);
     await scan(CIP_DOLIPRANE, "Comptoir 1", null, agentOf("post_1"));
     expect(mem.sales.map((sale) => sale.handledByUserId)).toEqual(["usr_lea", "usr_marc"]);
   });
