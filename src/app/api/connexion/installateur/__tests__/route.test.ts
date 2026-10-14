@@ -45,7 +45,7 @@ describe("POST /api/connexion/installateur", () => {
   it("prépare « Comptoir 1 » pour l'officine de la session et rend l'installateur, le jeton dans le nom du fichier", async () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
-    expect(mocks.createLink).toHaveBeenCalledWith(SCOPE, "Comptoir 1");
+    expect(mocks.createLink).toHaveBeenCalledWith(SCOPE, "Comptoir 1", undefined, { assignTo: null });
     expect(response.headers.get("content-disposition")).toBe(`attachment; filename="PharmaBoost-Installation-${TOKEN}.exe"`);
     expect((await response.arrayBuffer()).byteLength).toBe(BYTES.length);
   });
@@ -54,10 +54,17 @@ describe("POST /api/connexion/installateur", () => {
     mocks.listPosts.mockResolvedValue([{ label: "Comptoir 1", hostname: "A" }, { label: null, hostname: "CAISSE2" }]);
     await POST(request());
     expect(mocks.listPosts).toHaveBeenCalledWith("ph_1");
-    expect(mocks.createLink).toHaveBeenCalledWith(SCOPE, "Comptoir 3");
+    expect(mocks.createLink).toHaveBeenCalledWith(SCOPE, "Comptoir 3", undefined, { assignTo: null });
   });
 
-  it("sans session, ou sans la permission d'importer : 403, rien n'est préparé", async () => {
+  it("un membre de l'équipe (préparatrice) télécharge pour SON ordinateur : le comptoir lui est attribué dès le départ", async () => {
+    mocks.getSession.mockResolvedValue({ scope: SCOPE, permissions: new Set([PERMISSIONS.PRESCRIPTION_CREATE]) });
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect(mocks.createLink).toHaveBeenCalledWith(SCOPE, expect.any(String), undefined, { assignTo: SCOPE.userId });
+  });
+
+  it("sans session, ou sans travailler au comptoir : 403, rien n'est préparé", async () => {
     mocks.getSession.mockResolvedValue(null);
     expect((await POST(request())).status).toBe(403);
     mocks.getSession.mockResolvedValue({ scope: SCOPE, permissions: new Set() });

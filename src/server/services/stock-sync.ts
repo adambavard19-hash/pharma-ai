@@ -172,11 +172,12 @@ export async function createPostPairing(scope: TenantScope, label: string | null
  * tient dans une commande PowerShell. Le poste s'appaire avec ce jeton comme
  * avec un code à six chiffres ; il n'y a rien d'autre à taper.
  */
-export async function createPostInstallLink(scope: TenantScope, label: string | null, actor?: IssueActor): Promise<{ token: string; expiresAt: Date; postId: string }> {
+export async function createPostInstallLink(scope: TenantScope, label: string | null, actor?: IssueActor, options: { assignTo?: string | null } = {}): Promise<{ token: string; expiresAt: Date; postId: string }> {
   const token = generateToken(18);
   const expiresAt = new Date(Date.now() + POST_INSTALL_LINK_TTL_MS);
   const post = await prisma.counterPost.create({
-    data: { pharmacyId: scope.pharmacyId, hostname: "", label, pairingCodeHash: hashToken(token), pairingExpiresAt: expiresAt, robotLook: await nextRobotLook(scope.pharmacyId) },
+    // Un membre de l'équipe qui installe SON ordinateur : le comptoir est à lui dès le départ.
+    data: { pharmacyId: scope.pharmacyId, hostname: "", label, pairingCodeHash: hashToken(token), pairingExpiresAt: expiresAt, robotLook: await nextRobotLook(scope.pharmacyId), assignedUserId: options.assignTo ?? null },
   });
   await recordAudit({ action: "stock.post_pairing_created", entityType: "CounterPost", entityId: post.id, pharmacyId: scope.pharmacyId, ...auditActor(scope, actor), metadata: { label, kind: "install-link", ...(actor ? { by: "console" } : {}) } });
   return { token, expiresAt, postId: post.id };

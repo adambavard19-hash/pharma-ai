@@ -38,7 +38,9 @@ export function resolveMyComptoirs(posts: ComptoirPost[], userId: string, thisPc
   if (thisPcPostId && posts.some((post) => post.id === thisPcPostId)) return { postIds: [thisPcPostId], mode: "MINE" };
   const mine = posts.filter((post) => post.assignedUserId === userId);
   if (mine.length > 0) return { postIds: mine.map((post) => post.id), mode: "MINE" };
-  if (posts.length === 1) return { postIds: [posts[0].id], mode: "ONLY_ONE" };
+  // Un seul comptoir dans la pharmacie : il est à tout le monde seulement s'il n'est à personne. Celui d'un collègue
+  // (« Poste 01 · Donna ») reste le sien : on ne le montre pas, ni son nom (fondateur, 15 oct. 2026).
+  if (posts.length === 1 && !posts[0].assignedUserId) return { postIds: [posts[0].id], mode: "ONLY_ONE" };
   return { postIds: [], mode: "NONE" };
 }
 

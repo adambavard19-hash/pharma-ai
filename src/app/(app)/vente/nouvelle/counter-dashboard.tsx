@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronDown, CircleCheck, Monitor, NotebookPen, TriangleAlert, Unplug } from "lucide-react";
+import { ArrowRight, ChevronDown, CircleCheck, Download, Monitor, NotebookPen, TriangleAlert, Unplug } from "lucide-react";
 import { describeSaleStage, ordonnanceTitle, summarizeProducts, type CounterDashboardData, type PillTone, type StageTone } from "@/core/counter/dashboard";
 import { ADVICE_OUTCOME_LABEL, describeAdviceCount, type AdviceOutcome, type FinishedSale, type LiveSale } from "@/core/counter/board";
 import { formatTime } from "@/lib/format";
@@ -314,6 +314,16 @@ function NothingLive({ status, canConfigure }: { status: CounterDashboardData["s
             </li>
           ))}
         </ul>
+      )}
+      {(status.state === "UNASSIGNED" || status.state === "NOT_CONNECTED") && (
+        // Un nouvel ordinateur au comptoir : chacun télécharge PharmaBoost pour LE SIEN, sans passer par le titulaire.
+        <form method="post" action="/api/connexion/installateur" className="mt-3 flex flex-wrap items-center gap-3" data-installer-comptoir="">
+          <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-600 px-4 text-[14px] font-semibold text-white transition-colors hover:bg-brand-700">
+            <Download className="size-4" aria-hidden />
+            Télécharger PharmaBoost pour mon ordinateur
+          </button>
+          <span className="text-[12.5px] leading-4 text-text-tertiary">Sur l&apos;ordinateur de votre comptoir : ouvrez le fichier, il devient votre comptoir. Windows 10 ou 11.</span>
+        </form>
       )}
       {(status.state === "UNASSIGNED" || status.state === "NOT_CONNECTED") && canConfigure && (
         <Link href="/connexion" className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">

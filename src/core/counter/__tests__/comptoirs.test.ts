@@ -10,10 +10,13 @@ describe("à qui appartient un comptoir", () => {
     expect(resolveMyComptoirs(posts, "marc")).toEqual({ postIds: ["2"], mode: "MINE" });
   });
 
-  it("une pharmacie qui n'a qu'un comptoir n'a rien à attribuer : il est à tout le monde", () => {
+  it("une pharmacie qui n'a qu'un comptoir, à personne : il est à tout le monde", () => {
     expect(resolveMyComptoirs([post("1", null)], "n-importe-qui")).toEqual({ postIds: ["1"], mode: "ONLY_ONE" });
-    // Même attribué à un autre, c'est le seul comptoir : personne n'est laissé sans écran.
-    expect(resolveMyComptoirs([post("1", "lea")], "marc")).toEqual({ postIds: ["1"], mode: "ONLY_ONE" });
+  });
+
+  it("le seul comptoir de la pharmacie, attribué à une collègue : il reste le sien, on ne le voit pas (« Poste 01 · Donna »)", () => {
+    expect(resolveMyComptoirs([post("1", "donna")], "christelle")).toEqual({ postIds: [], mode: "NONE" });
+    expect(resolveMyComptoirs([post("1", "donna")], "donna")).toEqual({ postIds: ["1"], mode: "MINE" });
   });
 
   it("plusieurs comptoirs et aucun pour moi : je n'en vois aucun (jamais ceux des autres)", () => {
