@@ -127,11 +127,43 @@ function isDragHandle(target: EventTarget | null): boolean {
   return target instanceof Element && !target.closest("button, input, textarea, a, select, .isl-scroll, [data-advice-card]");
 }
 
+/** La version de cette page, fixée au build (publication) ; absente en développement. */
+const PAGE_RELEASE = process.env.NEXT_PUBLIC_PB_RELEASE || null;
+/** Toutes les 2 minutes, la bannière regarde si une nouvelle version est en ligne. */
+const RELEASE_CHECK_MS = 2 * 60 * 1000;
+
 export function PosteIsland() {
   const [view, dispatch] = useReducer(posteReducer, INITIAL_POSTE);
   const { send } = useBridge(useCallback((command: HostCommand) => dispatch({ type: "host", command, now: Date.now() }), []));
   const word = useCallback((text: string | null) => { if (text) send({ type: "word", word: text }); }, [send]);
   const { island, entry } = view;
+
+  // La bannière du poste est une page chargée une fois, au démarrage de PharmaBoost Connect : sans cela, elle gardait
+  // l'ancienne version jusqu'au redémarrage du poste (13 oct. 2026). Une nouvelle version en ligne la recharge — seulement
+  // au repos, jamais pendant une vente.
+  const resting = island.stage === "idle" && !entry;
+  const newRelease = useRef(false);
+  useEffect(() => {
+    if (!PAGE_RELEASE) return;
+    const check = async () => {
+      try {
+        const response = await fetch("/api/sante", { cache: "no-store" });
+        const body = (await response.json()) as { version?: string | null };
+        if (body.version && body.version !== PAGE_RELEASE) newRelease.current = true;
+      } catch {
+        // Réseau coupé : on réessaiera au prochain tour.
+      }
+    };
+    const id = setInterval(check, RELEASE_CHECK_MS);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (!resting) return;
+    const id = setInterval(() => {
+      if (newRelease.current) window.location.reload();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [resting]);
 
   // Le temps qui passe : scan → analyse, lignes cochées, pause « N conseils », fin de « Rien à ajouter » et de « Vente terminée ».
   useEffect(() => {
