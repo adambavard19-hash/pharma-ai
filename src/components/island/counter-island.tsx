@@ -219,7 +219,10 @@ export function CounterIsland(props: CounterIslandProps) {
   const peek = resting && hover && props.hoverOpen !== false && !grumpy;
   const mood = grumpy ? "concerned" : STAGE_MOOD[state.stage];
   const tone = grumpy ? "warning" : stageTone(state.stage);
-  const compact = props.compactAdvice === true && !expanded && state.stage === "advice" && count > 0;
+  // Plusieurs boîtes scannées : TOUJOURS des colonnes (même si la grande version a été choisie), sauf le temps de lire le détail
+  // d'un conseil touché. Une seule boîte : compacte ou grande, au choix du pharmacien.
+  const multiBox = groupByDrug(items).length > 1;
+  const compact = props.compactAdvice === true && state.stage === "advice" && count > 0 && (multiBox ? !openName : !expanded);
   // Plusieurs boîtes scannées : la bannière se divise en colonnes côte à côte (une par boîte), dans la fenêtre du poste.
   const columns = compact ? Math.min(groupByDrug(items).length, COMPACT_MAX_GROUPS) : 1;
   // Sans geste pendant 25 s, l'île compacte se replie en capsule (« 2 conseils ») ; le survol la rouvre.
@@ -370,9 +373,9 @@ export function CounterIsland(props: CounterIslandProps) {
                     <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
                   </button>
                 )}
-                <button type="button" onClick={() => setExpanded(true)} aria-label="Agrandir la bannière" title="Agrandir la bannière" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.1] hover:text-white">
+                {!multiBox && <button type="button" onClick={() => setExpanded(true)} aria-label="Agrandir la bannière" title="Agrandir la bannière" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.1] hover:text-white">
                   <Maximize2 className="size-3.5" aria-hidden="true" />
-                </button>
+                </button>}
               </div>
               {shownGroups.length > 1 ? (
                 // Deux boîtes ou plus : une colonne par boîte — en haut la boîte, en dessous le ou les conseils qui en découlent.
@@ -389,10 +392,8 @@ export function CounterIsland(props: CounterIslandProps) {
                             item={items[index]}
                             outcome={state.outcomes[index] ?? null}
                             readOnly={props.readOnly}
-                            onOpen={() => {
-                              setUnfolded({ name: items[index].name, among });
-                              setExpanded(true);
-                            }}
+                            // Le détail de ce conseil, le temps de le lire ; « Réduire » revient aux colonnes.
+                            onOpen={() => setUnfolded({ name: items[index].name, among })}
                             onAnswer={(outcome) => props.onAnswer(index, outcome)}
                           />
                         ))}
@@ -464,7 +465,7 @@ export function CounterIsland(props: CounterIslandProps) {
               compact
               trailing={
                 props.compactAdvice ? (
-                  <button type="button" onClick={() => setExpanded(false)} aria-label="Réduire la bannière" title="Réduire la bannière" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.1] hover:text-white">
+                  <button type="button" onClick={() => { setExpanded(false); setUnfolded(null); }} aria-label="Réduire la bannière" title="Réduire la bannière" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.1] hover:text-white">
                     <Minimize2 className="size-3.5" aria-hidden="true" />
                   </button>
                 ) : undefined
