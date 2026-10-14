@@ -84,7 +84,8 @@ describe("plusieurs boîtes scannées : la bannière se divise, un bloc par boî
   it("compact : la bannière se divise en colonnes côte à côte — à gauche une boîte et ses conseils, à droite l'autre", () => {
     const html = render({ compactAdvice: true, items: SALE, outcomes: [null, null, null] });
     expect(html.match(/data-advice-group=""/g)).toHaveLength(2);
-    expect(html).toContain("grid-template-columns:repeat(2, minmax(0, 1fr))");
+    // Un bloc par boîte, chacun à sa hauteur, sous la capsule du haut : trois blocs en tout.
+    expect(html.match(/<section/g)).toHaveLength(3);
     expect(html).toContain("GAVISCONELL MENTHE");
     expect(html).toContain("PURESSENT POUXDOUX SHP");
     // Chaque colonne montre le ou les conseils de SA boîte : les deux Neobianacid à gauche, le peigne à droite.

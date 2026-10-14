@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Loader2, Mail, Maximize2, Minimize2, PartyPopper, ScanLine, Send, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Loader2, Mail, Maximize2, Minimize2, PartyPopper, Pill, ScanLine, Send, TriangleAlert, X } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
@@ -134,6 +134,8 @@ export const COMPACT_MAX_GROUPS = 3;
 
 /** Largeur de l'île en colonnes : deux ou trois boîtes côte à côte, toujours dans la fenêtre du poste (600 px). */
 export const COLUMNS_WIDTH: Record<number, number> = { 2: 540, 3: 588 };
+/** Plusieurs boîtes : la capsule du haut (robot, nombre de conseils, terminer) reste fine ; les blocs des boîtes sont dessous. */
+const MULTI_CAPSULE_WIDTH = 300;
 
 /** Largeur de l'île compacte : la plus fine qui garde nom, prix et boutons lisibles. */
 export const COMPACT_WIDTH = 330;
@@ -233,7 +235,7 @@ export function CounterIsland(props: CounterIslandProps) {
     return () => clearTimeout(id);
   }, [adviceKey, hover]);
   const sleeping = compact && !hover && asleep === adviceKey;
-  const width = grumpy ? 340 : peek ? 400 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 280 : sleeping ? COMPACT_SLEEP_WIDTH : compact ? (columns > 1 ? COLUMNS_WIDTH[columns] : COMPACT_WIDTH) : STAGE_WIDTH[state.stage];
+  const width = grumpy ? 340 : peek ? 400 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 280 : sleeping ? COMPACT_SLEEP_WIDTH : compact ? (columns > 1 ? MULTI_CAPSULE_WIDTH : COMPACT_WIDTH) : STAGE_WIDTH[state.stage];
   const title = stageTitle(state, count);
 
   const onTap = () => {
@@ -265,6 +267,8 @@ export function CounterIsland(props: CounterIslandProps) {
   ) : null;
 
   let body: ReactNode;
+  // Les blocs des boîtes, posés SOUS la capsule (plusieurs boîtes scannées) ; null sinon.
+  let columnsBlock: ReactNode = null;
   if (collapsed) {
     body = (
       <div className="flex h-10 items-center gap-2 pr-2 pl-1.5">
@@ -360,6 +364,60 @@ export function CounterIsland(props: CounterIslandProps) {
           const groups = groupByDrug(items);
           const picked = chosen && chosen.among === among ? chosen.byGroup : {};
           const shownGroups = groups.slice(0, COMPACT_MAX_GROUPS);
+          // Deux boîtes ou plus : un BLOC par boîte, côte à côte, chacun à sa hauteur (plus de fond noir vide sous une boîte
+          // qui a moins de conseils) — en titre le médicament, bien lisible, en dessous le ou les conseils qui en découlent.
+          if (shownGroups.length > 1) {
+            columnsBlock = (
+              <div
+                className="flex items-start gap-2"
+                style={{ width: `min(${COLUMNS_WIDTH[shownGroups.length]}px, calc(100vw - 24px))` }}
+                onPointerEnter={() => {
+                  if (leaveTimer.current) clearTimeout(leaveTimer.current);
+                  setHover(true);
+                }}
+                onPointerLeave={() => {
+                  leaveTimer.current = setTimeout(() => setHover(false), 350);
+                }}
+              >
+                {shownGroups.map((group) => (
+                  <section
+                    key={group.drug || "-"}
+                    data-advice-group=""
+                    aria-label={`Conseils pour ${group.drug || props.drug}`}
+                    className="isl-in min-w-0 flex-1 overflow-hidden rounded-[20px] bg-[#0B0F14] p-2 text-white"
+                    style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.08), 0 18px 40px -14px rgba(0,0,0,0.55)" }}
+                  >
+                    <div className="flex items-start gap-2 px-1 pt-0.5 pb-1.5">
+                      <span className="mt-px inline-flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(54,232,200,0.16)", color: C.accent }}>
+                        <Pill className="size-3.5" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 text-[12.5px] leading-4 font-bold tracking-tight text-white" title={group.drug || props.drug}>
+                          {group.drug || props.drug}
+                        </span>
+                        <span className="block text-[10.5px] leading-4 font-medium" style={{ color: C.accent }}>
+                          {group.indexes.length > 1 ? `${group.indexes.length} conseils` : "1 conseil"}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {group.indexes.map((index) => (
+                        <ColumnCard
+                          key={`${among}#${index}`}
+                          item={items[index]}
+                          outcome={state.outcomes[index] ?? null}
+                          readOnly={props.readOnly}
+                          // Le détail de ce conseil, le temps de le lire ; « Réduire » revient aux colonnes.
+                          onOpen={() => setUnfolded({ name: items[index].name, among })}
+                          onAnswer={(outcome) => props.onAnswer(index, outcome)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            );
+          }
           body = (
             <div className="px-2 pt-1.5 pb-2">
               <div className="flex items-center gap-1.5">
@@ -377,31 +435,7 @@ export function CounterIsland(props: CounterIslandProps) {
                   <Maximize2 className="size-3.5" aria-hidden="true" />
                 </button>}
               </div>
-              {shownGroups.length > 1 ? (
-                // Deux boîtes ou plus : une colonne par boîte — en haut la boîte, en dessous le ou les conseils qui en découlent.
-                <div className="mt-1.5 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${shownGroups.length}, minmax(0, 1fr))` }}>
-                  {shownGroups.map((group) => (
-                    <div key={group.drug || "-"} data-advice-group="" className="min-w-0 rounded-xl bg-white/[0.06] p-1.5">
-                      <p className="truncate px-0.5 text-[11px] leading-4 font-semibold text-white/80" title={group.drug || props.drug}>
-                        {group.drug || props.drug}
-                      </p>
-                      <div className="mt-1 space-y-1">
-                        {group.indexes.map((index) => (
-                          <ColumnCard
-                            key={`${among}#${index}`}
-                            item={items[index]}
-                            outcome={state.outcomes[index] ?? null}
-                            readOnly={props.readOnly}
-                            // Le détail de ce conseil, le temps de le lire ; « Réduire » revient aux colonnes.
-                            onOpen={() => setUnfolded({ name: items[index].name, among })}
-                            onAnswer={(outcome) => props.onAnswer(index, outcome)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
+              {shownGroups.length > 1 ? null : (
                 shownGroups.map((group) => {
                 const local = compactIndex(group.indexes.map((at) => state.outcomes[at]), group.indexes.length, picked[group.drug] ?? null);
                 const index = group.indexes[local];
@@ -582,6 +616,7 @@ export function CounterIsland(props: CounterIslandProps) {
 
   return (
     <div
+      className={columnsBlock ? "flex flex-col items-center gap-2" : undefined}
       onClick={(event) => {
         // Appuyer sur une carte de conseil la déploie : ce n'est pas taquiner le robot.
         if (!(event.target as Element).closest("button, input, form, a, [data-advice-card]")) onTap();
@@ -609,6 +644,7 @@ export function CounterIsland(props: CounterIslandProps) {
           body
         )}
       </IslandShell>
+      {columnsBlock}
     </div>
   );
 }

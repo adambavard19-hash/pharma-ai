@@ -27,6 +27,7 @@ const ENTRY: HostEntry = {
       // l'île dit alors qu'ils ne sont pas renseignés et renvoie à la notice.
       sheet: { name: "PROBIOTIQUE 30 gélules", reasons: ["Protéger la flore pendant l'antibiotique"], script: "", contraindications: [], usage: [], description: "", more: { contraindications: 0, usage: 0 }, cut: false } },
     { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "Hygiène du nez pendant le rhume", availability: "LOW_STOCK", quantity: "3", image: "" },
+    { id: "essai-3", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "MOUCHOIRS DOUX x 10", price: "2,50 €", reason: "Pour le rhume", availability: "IN_STOCK", quantity: "40", image: "" },
   ],
 };
 
