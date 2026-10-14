@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Check, KeyRound, Pencil, Plus, ShieldOff } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, KeyRound, Pencil, Plus, ShieldOff, UserMinus } from "lucide-react";
 import {
   createCollaboratorAction,
   moveCollaboratorAction,
+  removeCollaboratorAction,
   resetCollaboratorPasswordAction,
   setCollaboratorAccessAction,
   setCollaboratorRoleAction,
@@ -64,6 +65,8 @@ export function TeamManager({ members, canManageOwners, requests, invitations }:
   const [inviteOpen, setInviteOpen] = useState(false);
   const [passwordFor, setPasswordFor] = useState<TeamMember | null>(null);
   const [editFor, setEditFor] = useState<TeamMember | null>(null);
+  // Retirer quelqu'un de l'équipe demande une confirmation, sur sa ligne.
+  const [removing, setRemoving] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
 
@@ -210,6 +213,29 @@ export function TeamManager({ members, canManageOwners, requests, invitations }:
                       {member.isActive ? "Suspendre" : "Rétablir"}
                     </Button>
                   )}
+                  {!member.isSelf && (member.role !== "OWNER" || canManageOwners) &&
+                    (removing === member.userId ? (
+                      <span className="flex items-center gap-1.5">
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() => {
+                            setRemoving(null);
+                            run(() => removeCollaboratorAction({ userId: member.userId }));
+                          }}
+                        >
+                          Confirmer le retrait
+                        </Button>
+                        <Button variant="ghost" size="sm" disabled={pending} onClick={() => setRemoving(null)}>
+                          Annuler
+                        </Button>
+                      </span>
+                    ) : (
+                      <Button variant="ghost" size="sm" disabled={pending} onClick={() => setRemoving(member.userId)} leadingIcon={<UserMinus className="size-4" />}>
+                        Retirer
+                      </Button>
+                    ))}
                 </div>
               </li>
             ))}

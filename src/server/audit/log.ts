@@ -97,6 +97,7 @@ export type AuditAction =
   | "team.join_refused"
   | "team.member_enabled"
   | "team.member_disabled"
+  | "team.member_removed"
   | "team.member_role_changed"
   | "team.member_updated"
   | "team.member_reordered"

@@ -80,6 +80,21 @@ export function planTeamChange(team: TeamMemberState[], change: TeamChange, acto
 }
 
 /**
+ * Retirer quelqu'un de l'équipe (son adhésion à CETTE officine ; son compte, ses ventes passées restent) : pourquoi c'est
+ * refusé, ou null. Jamais soi-même, jamais le titulaire principal, jamais le dernier titulaire actif ; un titulaire ne se
+ * retire que par un titulaire (ou PharmaBoost).
+ */
+export function removalBlock(team: TeamMemberState[], targetUserId: string, actor: TeamActor): string | null {
+  const target = team.find((member) => member.userId === targetUserId);
+  if (!target) return "Ce collaborateur ne fait pas partie de l'équipe.";
+  if (actor.kind === "member" && actor.userId === targetUserId) return "Vous ne pouvez pas vous retirer vous-même de l'équipe.";
+  if (target.role === "OWNER" && actor.kind === "member" && actor.role !== "OWNER") return "Seul un titulaire peut retirer un titulaire.";
+  if (target.isPrincipal) return "C'est le titulaire principal : désignez d'abord un autre titulaire principal.";
+  if (target.role === "OWNER" && target.isActive && activeOwners(team).length <= 1) return "L'officine doit garder au moins un titulaire actif.";
+  return null;
+}
+
+/**
  * Le nom, l'adresse, le téléphone et le RPPS sont ceux d'un COMPTE, pas d'une officine : un compte qui travaille aussi
  * dans une autre officine ne se renomme pas depuis celle-ci (cela le renommerait chez l'autre). Soi-même, on le peut ;
  * PharmaBoost aussi.

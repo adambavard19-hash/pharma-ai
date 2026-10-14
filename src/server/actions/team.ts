@@ -9,7 +9,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { hashPassword, validatePasswordStrength } from "@/server/security/password";
 import { recordAudit } from "@/server/audit/log";
 import { moveTeamMember, nextSortOrder, updateTeamMember, type MemberChanges } from "@/server/services/team-management";
-import type { TeamActor, TeamRole } from "@/core/team/rules";
+import { removalBlock, type TeamActor, type TeamRole } from "@/core/team/rules";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /**
@@ -318,4 +318,38 @@ export async function resetCollaboratorPasswordAction(
 
   revalidatePath("/equipe");
   return ok(null, `Nouveau mot de passe défini pour ${membership.user.firstName}.`);
+}
+
+const removeSchema = z.object({ userId: z.string().min(1) });
+
+/**
+ * Retirer quelqu'un de l'équipe : son adhésion à CETTE officine disparaît (il n'y a plus accès, ses sessions sont coupées), les
+ * comptoirs qui lui étaient attribués redeviennent libres. Son compte (il peut travailler ailleurs) et l'historique de ses ventes
+ * restent. Passe par les règles de l'équipe (`removalBlock`).
+ */
+export async function removeCollaboratorAction(payload: z.input<typeof removeSchema>): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.TEAM_MANAGE);
+  const blocked = refuseInDemo(session);
+  if (blocked) return blocked;
+  const parsed = removeSchema.safeParse(payload);
+  if (!parsed.success) return fail("Requête invalide.");
+  const { pharmacyId } = session.scope;
+  const membership = await membershipInScope(parsed.data.userId, pharmacyId);
+  if (!membership) return fail("Collaborateur introuvable dans votre équipe.");
+
+  const team = await prisma.membership.findMany({ where: { pharmacyId }, select: { userId: true, role: true, isActive: true, isPrincipal: true } });
+  const refusal = removalBlock(team.map((member) => ({ ...member, role: member.role as TeamRole })), membership.userId, memberActor(session));
+  if (refusal) return fail(refusal);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.counterPost.updateMany({ where: { pharmacyId, assignedUserId: membership.userId }, data: { assignedUserId: null } });
+    await tx.membership.delete({ where: { id: membership.id } });
+    // Plus aucune officine : ses sessions ouvertes sont coupées tout de suite.
+    const others = await tx.membership.count({ where: { userId: membership.userId, isActive: true } });
+    if (others === 0) await tx.session.updateMany({ where: { userId: membership.userId, revokedAt: null }, data: { revokedAt: new Date() } });
+  });
+
+  await recordAudit({ action: "team.member_removed", entityType: "User", entityId: membership.userId, pharmacyId, userId: session.scope.userId });
+  revalidatePath("/equipe");
+  return ok(null, `${membership.user.firstName} ${membership.user.lastName} ne fait plus partie de l'équipe.`);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailEditBlock, identityEditBlock, moveInOrder, planTeamChange, positionsFor, principalOf, TEAM_ROLE_LABELS, type TeamActor, type TeamMemberState } from "../rules";
+import { emailEditBlock, identityEditBlock, moveInOrder, planTeamChange, positionsFor, principalOf, removalBlock, TEAM_ROLE_LABELS, type TeamActor, type TeamMemberState } from "../rules";
 
 const owner: TeamActor = { kind: "member", userId: "adam", role: "OWNER" };
 const adjoint: TeamActor = { kind: "member", userId: "donna", role: "PHARMACIST" };
@@ -156,5 +156,27 @@ describe("qui PharmaBoost contacte", () => {
     const suspended = team().map((m) => (m.userId === "adam" ? { ...m, isActive: false } : m));
     expect(principalOf(suspended)?.userId).toBe("sam");
     expect(principalOf(team().filter((m) => m.role !== "OWNER"))).toBeNull();
+  });
+});
+
+describe("retirer quelqu'un de l'équipe", () => {
+  const team = [
+    { userId: "donna", role: "OWNER" as const, isActive: true, isPrincipal: true },
+    { userId: "adam", role: "OWNER" as const, isActive: true, isPrincipal: false },
+    { userId: "lea", role: "PHARMACIST" as const, isActive: true, isPrincipal: false },
+  ];
+  const owner = { kind: "member" as const, userId: "donna", role: "OWNER" as const };
+  it("le titulaire retire un collaborateur, ou un autre titulaire (il en reste un)", () => {
+    expect(removalBlock(team, "lea", owner)).toBeNull();
+    expect(removalBlock(team, "adam", owner)).toBeNull();
+  });
+  it("jamais soi-même, jamais le titulaire principal, jamais un titulaire par un adjoint", () => {
+    expect(removalBlock(team, "donna", owner)).toMatch(/vous-même/);
+    expect(removalBlock(team, "donna", { kind: "member", userId: "adam", role: "OWNER" })).toMatch(/principal/);
+    expect(removalBlock(team, "adam", { kind: "member", userId: "lea", role: "PHARMACIST" })).toMatch(/Seul un titulaire/);
+  });
+  it("jamais le dernier titulaire actif", () => {
+    const solo = [{ userId: "a", role: "OWNER" as const, isActive: true, isPrincipal: false }, { userId: "b", role: "PHARMACIST" as const, isActive: true, isPrincipal: false }];
+    expect(removalBlock(solo, "a", { kind: "admin" })).toMatch(/au moins un titulaire/);
   });
 });
