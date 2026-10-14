@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Loader2, Mail, Maximize2, Minimize2, PartyPopper, Pill, ScanLine, Send, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Mail, Maximize2, Minimize2, PartyPopper, Pill, ScanLine, Send, TriangleAlert, X } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
@@ -200,6 +200,18 @@ function AdviceMeta({ item, small }: { item: IslandAdvice; small?: boolean }) {
   );
 }
 
+/** Le code-barres de la boîte, balayé par le laser pendant le scan. */
+function Barcode() {
+  return (
+    <span className="isl-barcode" aria-hidden="true">
+      {[2, 1, 3, 1, 2, 1, 1, 3, 1, 2, 1, 2].map((width, index) => (
+        <i key={index} style={{ width }} />
+      ))}
+      <b />
+    </span>
+  );
+}
+
 function Chip({ bg, fg, children }: { bg: string; fg: string; children: ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10.5px] font-semibold whitespace-nowrap" style={{ background: bg, color: fg }}>
@@ -344,7 +356,7 @@ export function CounterIsland(props: CounterIslandProps) {
       case "scan":
         body = (
           <div className="relative">
-            <Row robot={robot(30)} title={T.scanTitle} sub={T.scanSub} icon={<ScanLine className="size-4" style={{ color: C.glow }} aria-hidden="true" />} />
+            <Row robot={robot(30)} title={T.scanTitle} sub={T.scanSub} icon={<ScanLine className="size-4" style={{ color: C.glow }} aria-hidden="true" />} trailing={<Barcode />} />
             <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[2px] overflow-hidden">
               <span className="isl-scanbar block h-full w-1/3" style={{ background: `linear-gradient(90deg, transparent, ${C.glow}, transparent)` }} />
             </span>
@@ -358,14 +370,24 @@ export function CounterIsland(props: CounterIslandProps) {
         body = (
           <div className="px-3 pt-2.5 pb-3">
             <Row robot={robot(30)} title={title} sub={known ? props.drug : "Le robot lit la boîte scannée"} compact />
+            {/* La barre qui avance avec les étapes, et sa lueur qui file. */}
+            <div className="isl-progress mt-2.5" aria-hidden="true">
+              <span style={{ width: `${Math.round(((Math.min(state.stepsDone, steps.length) + 0.5) / steps.length) * 100)}%` }} />
+            </div>
             <ol className="mt-2 space-y-1 rounded-xl bg-white/[0.05] px-3 py-2 text-[12.5px] leading-[18px] font-medium">
               {/* Les trois dernières lignes seulement : l'île reste fine pendant que l'analyse se coche. */}
               {steps.slice(0, Math.min(state.stepsDone + 1, steps.length)).map((step, i) => ({ step, i })).slice(-3).map(({ step, i }) => {
                 const done = i < state.stepsDone;
                 return (
                   <li key={step} className="isl-line flex items-center gap-2">
-                    {done ? <Check className="size-3.5 shrink-0" style={{ color: C.accent }} strokeWidth={3} aria-hidden="true" /> : <Loader2 className="isl-spin size-3.5 shrink-0 text-white/60" aria-hidden="true" />}
-                    <span className={cn("truncate", done ? "text-white/85" : "text-white/60")}>{step}</span>
+                    {done ? (
+                      <span className="isl-pop flex size-4 shrink-0 items-center justify-center rounded-full" style={{ background: C.accent }}>
+                        <Check className="size-2.5 text-[#04261A]" strokeWidth={4} aria-hidden="true" />
+                      </span>
+                    ) : (
+                      <span className="isl-pulse size-4 shrink-0" aria-hidden="true" />
+                    )}
+                    <span className={cn("truncate", done ? "text-white/85" : "isl-shimmer")}>{step}</span>
                   </li>
                 );
               })}

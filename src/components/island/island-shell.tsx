@@ -92,6 +92,21 @@ export const ISLAND_CSS = `
 .isl-spin { animation: isl-spin .9s linear infinite; }
 @keyframes isl-scan { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
 .isl-scanbar { animation: isl-scan 1.1s cubic-bezier(.65,0,.35,1) infinite; }
+/* La recherche : le laser sur le code-barres, la barre d'avancement, l'étape en cours qui scintille, le point qui pulse. */
+.isl-barcode { position: relative; display: inline-flex; align-items: stretch; gap: 1.5px; height: 22px; padding: 0 4px; border-radius: 4px; background: rgba(255,255,255,.92); overflow: hidden; }
+.isl-barcode i { display: block; background: #0B0F14; margin: 3px 0; }
+.isl-barcode b { position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #FF4D5E; box-shadow: 0 0 6px 1px rgba(255,77,94,.85); animation: isl-laser 1.1s ease-in-out infinite alternate; }
+@keyframes isl-laser { from { transform: translateY(1px); } to { transform: translateY(19px); } }
+.isl-progress { position: relative; height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
+.isl-progress span { position: relative; display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #1FBF8F, #58F2D8); transition: width .55s cubic-bezier(.3,.8,.3,1); overflow: hidden; }
+.isl-progress span::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent); transform: translateX(-100%); animation: isl-glint 1.2s ease-in-out infinite; }
+@keyframes isl-glint { to { transform: translateX(100%); } }
+.isl-shimmer { color: rgba(255,255,255,.55); background: linear-gradient(90deg, rgba(255,255,255,.5) 0%, rgba(255,255,255,.5) 40%, #fff 50%, rgba(255,255,255,.5) 60%, rgba(255,255,255,.5) 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: isl-shimmer 1.4s linear infinite; }
+@keyframes isl-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.isl-pulse { position: relative; display: inline-block; }
+.isl-pulse::before, .isl-pulse::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: #58F2D8; }
+.isl-pulse::after { inset: 2px; background: transparent; border: 2px solid #58F2D8; animation: isl-ring 1.1s ease-out infinite; }
+@keyframes isl-ring { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
 @keyframes isl-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
 .isl-pop { animation: isl-pop .42s cubic-bezier(.3,1.5,.5,1) both; }
 /* La fête d'une vente avec conseil vendu : le robot saute deux fois, les confettis partent de lui. */
@@ -104,5 +119,5 @@ export const ISLAND_CSS = `
 .isl-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
 .isl-scroll::-webkit-scrollbar { width: 5px; }
 .isl-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 99px; }
-@media (prefers-reduced-motion: reduce) { .isl-in, .isl-line, .isl-pop, .isl-cheer { animation: none; } .isl-burst { display: none; } .isl-spin, .isl-scanbar { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .isl-in, .isl-line, .isl-pop, .isl-cheer { animation: none; } .isl-burst { display: none; } .isl-spin, .isl-scanbar, .isl-barcode b, .isl-progress span::after, .isl-shimmer, .isl-pulse::after { animation: none; } .isl-shimmer { -webkit-text-fill-color: currentColor; } }
 `;
