@@ -94,8 +94,15 @@ export const ISLAND_CSS = `
 .isl-scanbar { animation: isl-scan 1.1s cubic-bezier(.65,0,.35,1) infinite; }
 @keyframes isl-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
 .isl-pop { animation: isl-pop .42s cubic-bezier(.3,1.5,.5,1) both; }
+/* La fête d'une vente avec conseil vendu : le robot saute deux fois, les confettis partent de lui. */
+@keyframes isl-cheer { 0% { transform: scale(.5) translateY(6px); } 30% { transform: scale(1.08) translateY(-8px); } 50% { transform: scale(1) translateY(0); } 68% { transform: translateY(-5px); } 84%, 100% { transform: none; } }
+.isl-cheer { animation: isl-cheer 1.3s cubic-bezier(.3,1.4,.5,1) both; }
+.isl-burst { position: absolute; left: 50%; top: 45%; pointer-events: none; }
+.isl-burst i { position: absolute; width: 6px; height: 6px; margin: -3px; border-radius: 2px; background: var(--c); opacity: 0; animation: isl-burst 1.1s cubic-bezier(.2,.8,.3,1) .15s both; }
+.isl-burst i:nth-child(2n) { border-radius: 50%; }
+@keyframes isl-burst { 0% { opacity: 1; transform: rotate(var(--a)) translateX(0) scale(.4); } 70% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(1) rotate(120deg); } }
 .isl-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
 .isl-scroll::-webkit-scrollbar { width: 5px; }
 .isl-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 99px; }
-@media (prefers-reduced-motion: reduce) { .isl-in, .isl-line, .isl-pop { animation: none; } .isl-spin, .isl-scanbar { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .isl-in, .isl-line, .isl-pop, .isl-cheer { animation: none; } .isl-burst { display: none; } .isl-spin, .isl-scanbar { animation: none; } }
 `;

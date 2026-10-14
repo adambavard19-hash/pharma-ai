@@ -18,6 +18,14 @@ import { IslandShell } from "./island-shell";
  */
 
 const C = BANNER.colors;
+
+/** Les confettis de la fête d'une vente avec conseil vendu : dix éclats autour du robot, chacun sa direction. */
+const BURST_PIECES = [0, 36, 72, 108, 144, 180, 216, 252, 288, 324].map((angle, index) => ({
+  angle,
+  distance: 30 + (index % 3) * 7,
+  color: ["#FFD65A", "#58F2D8", "#FF8FA3", "#FFFFFF"][index % 4],
+  delay: (index % 4) * 40,
+}));
 const T = BANNER.text;
 
 export type IslandAdvice = {
@@ -205,11 +213,12 @@ export function CounterIsland(props: CounterIslandProps) {
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openName = unfoldedName(unfolded, items);
 
-  // La fête du robot rejouée à chaque « Vente terminée ».
+  // La fête du robot : seulement quand la vente se termine avec au moins un conseil vendu.
+  const soldAtEnd = state.stage === "done" && items.some((_, i) => state.outcomes[i] === "SOLD");
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- la fête suit l'étape
-    if (state.stage === "done") setCheer(Date.now());
-  }, [state.stage]);
+    if (soldAtEnd) setCheer(Date.now());
+  }, [soldAtEnd]);
 
   useEffect(() => {
     if (!grumpy) return;
@@ -219,7 +228,8 @@ export function CounterIsland(props: CounterIslandProps) {
 
   const resting = state.stage === "idle";
   const peek = resting && hover && props.hoverOpen !== false && !grumpy;
-  const mood = grumpy ? "concerned" : STAGE_MOOD[state.stage];
+  // Une vente terminée sans conseil vendu : un robot content, sans fête.
+  const mood = grumpy ? "concerned" : state.stage === "done" && !soldAtEnd ? "happy" : STAGE_MOOD[state.stage];
   const tone = grumpy ? "warning" : stageTone(state.stage);
   // Plusieurs boîtes scannées : TOUJOURS des colonnes (même si la grande version a été choisie), sauf le temps de lire le détail
   // d'un conseil touché. Une seule boîte : compacte ou grande, au choix du pharmacien.
@@ -575,13 +585,27 @@ export function CounterIsland(props: CounterIslandProps) {
         break;
       case "done": {
         const sold = items.filter((_, i) => state.outcomes[i] === "SOLD");
-        body = (
-          <Row
-            robot={robot(32)}
-            title={T.doneTitle}
-            sub={sold.length ? `${sold.length} conseil${sold.length > 1 ? "s" : ""} vendu${sold.length > 1 ? "s" : ""}${sold[0]?.price ? ` · ${sold.map((item) => item.price).filter(Boolean).join(" + ")}` : ""}` : "Merci, à la prochaine délivrance."}
-            trailing={<PartyPopper className="isl-pop size-5" style={{ color: C.challengeIcon }} aria-hidden="true" />}
-          />
+        const soldLine = `${sold.length} conseil${sold.length > 1 ? "s" : ""} vendu${sold.length > 1 ? "s" : ""}${sold[0]?.price ? ` · ${sold.map((item) => item.price).filter(Boolean).join(" + ")}` : ""}`;
+        body = sold.length ? (
+          // Au moins un conseil vendu : le robot en blouse, plus grand, saute et lance ses confettis — « Bravo ! ».
+          <div className="flex items-center gap-3 px-3 py-2" data-ile-fete="">
+            <span className="isl-cheer relative shrink-0">
+              {robot(60)}
+              <span className="isl-burst" aria-hidden="true">
+                {BURST_PIECES.map((piece, index) => (
+                  <i key={`${cheer}-${index}`} style={{ "--a": `${piece.angle}deg`, "--d": `${piece.distance}px`, "--c": piece.color, animationDelay: `${piece.delay}ms` } as CSSProperties} />
+                ))}
+              </span>
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="isl-pop text-[17px] leading-[22px] font-bold" style={{ color: C.challengeIcon }} aria-live="polite">Bravo !</p>
+              <p className="truncate text-[12.5px] leading-[18px] text-white/80">{soldLine}</p>
+              <p className="text-[11.5px] leading-4 text-white/55">{T.doneTitle}</p>
+            </div>
+            <PartyPopper className="isl-pop size-6 shrink-0" style={{ color: C.challengeIcon }} aria-hidden="true" />
+          </div>
+        ) : (
+          <Row robot={robot(32)} title={T.doneTitle} sub="Merci, à la prochaine vente." />
         );
         break;
       }
