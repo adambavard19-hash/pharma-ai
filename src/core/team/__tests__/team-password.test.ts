@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canUseTeamPassword, generateTeamPassword, looksLikeTeamPassword, normalizeTeamPassword, TEAM_PASSWORD_ALPHABET } from "../team-password";
+import { canUseTeamPassword, generateTeamPassword, looksLikeTeamPassword, normalizeTeamPassword, TEAM_PASSWORD_WORDS } from "../team-password";
 
 const seq = (bytes: number[]) => {
   let index = 0;
@@ -7,22 +7,25 @@ const seq = (bytes: number[]) => {
 };
 
 describe("le mot de passe de l'officine", () => {
-  it("trois groupes de quatre, sans caractère ambigu", () => {
+  it("un mot simple et quatre chiffres", () => {
     const password = generateTeamPassword(() => Math.floor(Math.random() * 256));
-    expect(password).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
-    expect(password).not.toMatch(/[01OIL]/);
+    expect(password).toMatch(/^[A-Z][a-z]+-\d{4}$/);
+    expect(TEAM_PASSWORD_WORDS).toContain(password.split("-")[0]);
   });
 
-  it("chaque symbole a la même chance : les octets au-delà du dernier multiple sont écartés", () => {
-    // 248 = 8 × 31 : 248 à 255 sont rejetés, 0 donne la première lettre.
-    expect(generateTeamPassword(seq([255, 250, 248, 0]))).toBe("AAAA-AAAA-AAAA");
-    expect(generateTeamPassword(seq([30]))).toBe(`${TEAM_PASSWORD_ALPHABET[30].repeat(4)}-${TEAM_PASSWORD_ALPHABET[30].repeat(4)}-${TEAM_PASSWORD_ALPHABET[30].repeat(4)}`);
+  it("64 mots tous différents, et les octets 250 à 255 écartés pour les chiffres", () => {
+    expect(new Set(TEAM_PASSWORD_WORDS.map((word) => word.toUpperCase())).size).toBe(64);
+    expect(generateTeamPassword(seq([0, 255, 251, 1, 2, 3, 4]))).toBe("Menthe-1234");
+    expect(generateTeamPassword(seq([65, 9, 9, 9, 9]))).toBe(`${TEAM_PASSWORD_WORDS[1]}-9999`);
   });
 
   it("la saisie est tolérante : minuscules, espaces, tirets", () => {
-    expect(normalizeTeamPassword(" k7mp q3xa-9rtd ")).toBe("K7MPQ3XA9RTD");
-    expect(looksLikeTeamPassword("k7mp q3xa 9rtd")).toBe(true);
-    expect(looksLikeTeamPassword("K7MP-Q3XA-9RT")).toBe(false);
+    expect(normalizeTeamPassword(" menthe 4827 ")).toBe("MENTHE4827");
+    expect(normalizeTeamPassword("Menthe-4827")).toBe("MENTHE4827");
+    expect(looksLikeTeamPassword("menthe 4827")).toBe(true);
+    // Les mots de passe déjà donnés (ancienne forme) restent valables.
+    expect(looksLikeTeamPassword("K7MP-Q3XA-9RTD")).toBe(true);
+    expect(looksLikeTeamPassword("menthe")).toBe(false);
     expect(looksLikeTeamPassword("Demo2026!Pharma")).toBe(false);
   });
 

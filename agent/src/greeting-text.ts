@@ -27,5 +27,5 @@ export function cleanFirstName(value: unknown): string {
 /** Le message du robot, avec le prénom quand le serveur le connaît. */
 export function greetingText(firstName?: string | null): string {
   const name = cleanFirstName(firstName);
-  return `Bonjour${name ? ` ${name}` : ""}, comment vas-tu ? Bon courage pour faire le plus de conseils possibles. N'hésite pas à me demander ce que tu veux si tu as besoin.`;
+  return `Bonjour${name ? ` ${name}` : ""}, comment vas-tu ? Bon courage pour tes conseils ! N’hésite pas si tu as besoin de quoi que ce soit 😊`;
 }

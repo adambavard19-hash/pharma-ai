@@ -101,7 +101,7 @@ describe("le bonjour du robot au démarrage du poste", () => {
 
   it("relit la ligne ASCII de l'agent avec ses accents, mot pour mot", () => {
     expect(parseCommand(encodeCommand({ op: "greet", text: TEXT }).trim())).toEqual({ op: "greet", text: TEXT });
-    expect(TEXT).toBe("Bonjour Léa, comment vas-tu ? Bon courage pour faire le plus de conseils possibles. N'hésite pas à me demander ce que tu veux si tu as besoin.");
+    expect(TEXT).toBe("Bonjour Léa, comment vas-tu ? Bon courage pour tes conseils ! N’hésite pas si tu as besoin de quoi que ce soit 😊");
   });
 
   it("s'affiche au repos, puis se range (délai écoulé ou clic) : l'île revient à la capsule", () => {

@@ -6498,7 +6498,7 @@ function cleanFirstName(value) {
 }
 function greetingText(firstName) {
   const name = cleanFirstName(firstName);
-  return `Bonjour${name ? ` ${name}` : ""}, comment vas-tu ? Bon courage pour faire le plus de conseils possibles. N'h\xE9site pas \xE0 me demander ce que tu veux si tu as besoin.`;
+  return `Bonjour${name ? ` ${name}` : ""}, comment vas-tu ? Bon courage pour tes conseils ! N\u2019h\xE9site pas si tu as besoin de quoi que ce soit \u{1F60A}`;
 }
 
 // agent/src/greeting.ts
@@ -6530,7 +6530,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.10";
+var VERSION = "0.10.11";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;

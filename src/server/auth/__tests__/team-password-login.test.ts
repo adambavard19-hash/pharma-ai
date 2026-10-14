@@ -79,7 +79,7 @@ describe("connexion avec le mot de passe de l'officine", () => {
   it("freine les essais en boucle sur une même adresse", async () => {
     const address = email();
     findUnique.mockResolvedValue(user([{ pharmacyId: "A", role: "TECHNICIAN", hash: officeA.data.teamPasswordHash }]));
-    for (let attempt = 0; attempt < 8; attempt++) await authenticateUser(address, "AAAA-AAAA-AAAA");
+    for (let attempt = 0; attempt < 8; attempt++) await authenticateUser(address, "Faux-0000");
     expect((await authenticateUser(address, officeA.password)).kind).toBe("INVALID");
   });
 });

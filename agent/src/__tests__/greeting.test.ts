@@ -11,8 +11,8 @@ import { NoticeCenter, encodeCommand, type HostProcess } from "../notice-center"
  * une seule fois par jour et par poste (fichier témoin), jamais pendant une vente, seulement par l'île, en ASCII sur le tuyau.
  */
 
-const WITH_NAME = "Bonjour Léa, comment vas-tu ? Bon courage pour faire le plus de conseils possibles. N'hésite pas à me demander ce que tu veux si tu as besoin.";
-const WITHOUT_NAME = "Bonjour, comment vas-tu ? Bon courage pour faire le plus de conseils possibles. N'hésite pas à me demander ce que tu veux si tu as besoin.";
+const WITH_NAME = "Bonjour Léa, comment vas-tu ? Bon courage pour tes conseils ! N’hésite pas si tu as besoin de quoi que ce soit 😊";
+const WITHOUT_NAME = "Bonjour, comment vas-tu ? Bon courage pour tes conseils ! N’hésite pas si tu as besoin de quoi que ce soit 😊";
 
 describe("le texte du bonjour", () => {
   it("dit le prénom quand le serveur le connaît, et rien d'autre sinon", () => {
@@ -115,7 +115,9 @@ describe("le bonjour part vers l'île, et seulement vers elle", () => {
     // Sur le tuyau : uniquement de l'ASCII (la console Windows lit en 850/437), « é » voyage en \u00e9.
     expect(/^[\x00-\x7f]*$/.test(line)).toBe(true);
     expect(line).toContain("L\\u00e9a");
-    expect(line).toContain("N'h\\u00e9site pas \\u00e0 me demander");
+    expect(line).toContain("N\\u2019h\\u00e9site pas si tu as besoin");
+    // L'émoji voyage aussi en ASCII (deux \u de la paire UTF-16) et revient entier.
+    expect(line).toContain("\\ud83d\\ude0a");
     // L'île (JSON.parse, comme PostWebMessageAsString → parseCommand) relit le texte exact.
     expect(JSON.parse(line)).toEqual({ op: "greet", text: WITH_NAME });
   });
