@@ -235,7 +235,7 @@ function NewAssociation() {
               {triggers.length} déclencheur{triggers.length > 1 ? "s" : ""} × {advice.length} produit{advice.length > 1 ? "s" : ""} proposé{advice.length > 1 ? "s" : ""} = {total} association{total > 1 ? "s" : ""}. Celles qui existent déjà sont simplement ignorées.
             </p>
           ) : (
-            <p className="text-[12.5px] text-text-tertiary">Au comptoir, trois associations au plus par vente, en plus des conseils de PharmaBoost. Jamais un produit en rupture, jamais un médicament sur ordonnance, jamais ce que la sécurité du patient écarte.</p>
+            <p className="text-[12.5px] text-text-tertiary">Au comptoir, deux associations au plus par boîte scannée (six par vente), en plus des conseils de PharmaBoost. Jamais un produit en rupture, jamais un médicament sur ordonnance, jamais ce que la sécurité du patient écarte.</p>
           )}
         </div>
       </CardContent>

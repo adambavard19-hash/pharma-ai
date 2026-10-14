@@ -144,7 +144,7 @@ export type CounterNotice = {
   /** Ce qui a été bipé, en une ligne. */
   subject: string;
   alerts: string[];
-  /** Jusqu'à trois conseils du moteur, puis jusqu'à trois associations du pharmacien : « Produit · 8,90 € · pourquoi ». */
+  /** Jusqu'à trois conseils du moteur, puis jusqu'à six associations du pharmacien (deux par boîte scannée) : « Produit · 8,90 € · pourquoi ». */
   advice: string[];
   /** Les mêmes conseils, structurés (photo, disponibilité, prix) : c'est ce que la fenêtre du poste dessine. */
   items: NoticeItem[];
