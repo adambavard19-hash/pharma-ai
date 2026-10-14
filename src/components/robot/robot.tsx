@@ -393,6 +393,8 @@ export function Robot({
   const onHover = interactive || track ? (on: boolean) => () => motionRef.current?.hover(on) : null;
 
   const tiny = size !== undefined && size < 32;
+  // En petit (icône, capsule), la tête seule : la blouse n'y serait qu'une tache.
+  const bust = size === undefined || size >= 48;
   const sizeStyle: CSSProperties | undefined = size ? { width: size, height: Math.round(size * (floating ? 1.22 : 0.92)) } : undefined;
   const pair = (render: (cx: number) => ReactNode) => [38, 62].map((cx) => <g key={cx}>{render(cx)}</g>);
   const ink = { fill: "none", stroke: C.eye, strokeLinecap: "round" as const };
@@ -421,35 +423,69 @@ export function Robot({
       </style>
       <svg viewBox={floating ? "0 -4 100 122" : "0 -4 100 92"} focusable="false">
         <defs>
-          <linearGradient id={`${uid}-shell`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.shellTop} /><stop offset="1" stopColor={C.shellBottom} /></linearGradient>
-          <linearGradient id={`${uid}-screen`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.screenTop} /><stop offset="1" stopColor={C.screenBottom} /></linearGradient>
+          <linearGradient id={`${uid}-shell`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#D9E4E9" /></linearGradient>
+          <linearGradient id={`${uid}-screen`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#13232B" /><stop offset="1" stopColor="#060D11" /></linearGradient>
+          <filter id={`${uid}-glow`} x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
           <linearGradient id={`${uid}-ear`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={earTop} /><stop offset="1" stopColor={earBottom} /></linearGradient>
-          <linearGradient id={`${uid}-badge`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent} /><stop offset="1" stopColor={C.accentDark} /></linearGradient>
         </defs>
         {floating && <ellipse className="rbt-shadow" cx={50} cy={110} rx={26} ry={4.5} fill={C.screenBottom} />}
         <g className="rbt-float">
           <g className="rbt-act">
             <g ref={bodyRef} className="rbt-burst">
               <g className="rbt-breath">
-                {/* La main du coucou, cachée derrière l'oreille droite le reste du temps. */}
+                {/* Le pharmacien en blouse : épaules, chemise turquoise, stylo dans la poche, tablette en main (pas en tout petit). */}
+                {bust && (
+                  <g className="rbt-coat">
+                    <rect x={44} y={44} width={12} height={10} rx={3} fill={C.screenTop} />
+                    <path d="M 13 88 C 13 67 23 55 40 52 L 60 52 C 77 55 87 67 87 88 Z" fill={`url(#${uid}-shell)`} stroke={C.shellEdge} strokeWidth={1.4} strokeLinejoin="round" />
+                    <path d="M 40 52 L 50 69 L 60 52 Z" fill={earTop} />
+                    <path d="M 40 52 L 50 69 L 43.5 75 L 35 56 Z M 60 52 L 50 69 L 56.5 75 L 65 56 Z" fill={C.shellTop} stroke={C.shellEdge} strokeWidth={1.2} strokeLinejoin="round" />
+                    <path d="M 50 69 L 50 88" stroke={C.shellEdge} strokeWidth={1.2} />
+                    <rect x={60} y={73} width={13} height={10} rx={2} fill="none" stroke={C.shellEdge} strokeWidth={1.2} />
+                    <rect x={64} y={66} width={2.6} height={10} rx={1.2} fill="#8C9AA4" />
+                    <rect x={63.6} y={67.5} width={3.4} height={3} rx={0.8} fill={earBottom} />
+                    <g transform="rotate(-8 28 76)">
+                      <rect x={16} y={63} width={24} height={27} rx={3.5} fill="#16242C" stroke="#0B1418" strokeWidth={1} />
+                      <rect x={18.5} y={65.5} width={19} height={4} rx={2} fill="#ffffff" fillOpacity={0.08} />
+                    </g>
+                    <ellipse cx={39} cy={79} rx={4} ry={5.4} fill={C.shellTop} stroke={C.shellEdge} strokeWidth={1.2} />
+                  </g>
+                )}
+                {/* La main du coucou : le bras droit se lève, l'index en l'air ; cachée le reste du temps. */}
                 <g ref={handRef} className="rbt-hand">
-                  <rect x={95} y={33} width={5} height={18} rx={2.5} fill={`url(#${uid}-ear)`} />
-                  <circle cx={99} cy={29} r={6} fill={C.shellTop} stroke={C.shellEdge} strokeWidth={1.4} />
+                  {bust ? (
+                    <>
+                      <rect x={84} y={42} width={9} height={26} rx={4.5} fill={C.shellTop} stroke={C.shellEdge} strokeWidth={1.2} />
+                      <rect x={88} y={25} width={3.4} height={10} rx={1.7} fill={C.shellTop} stroke={C.shellEdge} strokeWidth={1.1} />
+                      <circle cx={89} cy={38} r={6} fill={C.shellTop} stroke={C.shellEdge} strokeWidth={1.2} />
+                    </>
+                  ) : (
+                    <>
+                      <rect x={95} y={33} width={5} height={18} rx={2.5} fill={C.shellTop} stroke={C.shellEdge} strokeWidth={1} />
+                      <circle cx={99} cy={29} r={6} fill={C.shellTop} stroke={C.shellEdge} strokeWidth={1.4} />
+                    </>
+                  )}
                 </g>
-                <line x1={50} y1={17} x2={50} y2={8} stroke={C.shellEdge} strokeWidth={tiny ? 4 : 3} strokeLinecap="round" />
-                <circle className="rbt-glow" cx={50} cy={6} r={8} />
-                <circle className="rbt-lamp" cx={50} cy={6} r={tiny ? 4.6 : 3.8} />
-                {!tiny && <path d="M 9.90 36.72 A 41 35 0 0 1 90.10 36.72" fill="none" stroke={earTop} strokeWidth={5} strokeLinecap="round" />}
-                <rect x={3} y={36} width={15} height={28} rx={7} fill={`url(#${uid}-ear)`} />
-                <rect x={82} y={36} width={15} height={28} rx={7} fill={`url(#${uid}-ear)`} />
-                <rect x={14} y={16} width={72} height={58} rx={24} fill={`url(#${uid}-shell)`} stroke={C.shellEdge} strokeWidth={1.6} />
+                <g transform={bust ? "translate(10 -9) scale(0.8)" : undefined}>
+                {/* Les écouteurs : un anneau lumineux (la couleur du comptoir), qui pulse doucement. */}
+                {[10, 90].map((cx) => (
+                  <g key={cx}>
+                    <circle className="rbt-glow" cx={cx} cy={45} r={10} />
+                    <circle cx={cx} cy={45} r={11} fill={`url(#${uid}-shell)`} stroke={C.shellEdge} strokeWidth={1.6} />
+                    <circle className="rbt-lamp" cx={cx} cy={45} r={7} />
+                    <circle cx={cx} cy={45} r={4.4} fill={C.screenTop} />
+                  </g>
+                ))}
+                <rect x={12} y={13} width={76} height={63} rx={29} fill={`url(#${uid}-shell)`} stroke={C.shellEdge} strokeWidth={1.6} />
+                {!tiny && <path d="M 26 20 Q 50 11 74 20" fill="none" stroke="#ffffff" strokeWidth={3} strokeLinecap="round" strokeOpacity={0.9} />}
                 <g ref={screenRef}>
-                  <rect x={22} y={25} width={56} height={40} rx={17} fill={`url(#${uid}-screen)`} />
+                  <rect x={20} y={24} width={60} height={42} rx={19} fill={`url(#${uid}-screen)`} />
+                  {!tiny && <path d="M 27 33 Q 30 27 38 26.5" fill="none" stroke="#ffffff" strokeWidth={2.2} strokeLinecap="round" strokeOpacity={0.16} />}
                 </g>
                 {look && <HeadAccessory look={look} />}
 
                 {/* Le visage : il glisse sur l'écran quand la tête tourne. */}
-                <g ref={faceRef}>
+                <g ref={faceRef} filter={tiny ? undefined : `url(#${uid}-glow)`}>
                   {/* Les joues, qui rosissent de joie. */}
                   <g ref={blushRef} className="rbt-blush" style={{ opacity: 0 }} fill="#FF8FA3">
                     <ellipse cx={29.5} cy={52} rx={4.2} ry={2.4} />
@@ -520,10 +556,6 @@ export function Robot({
                   {look && <FaceAccessory look={look} />}
                 </g>
 
-                <circle cx={74} cy={69} r={15} fill="#fff" fillOpacity={0.95} />
-                <circle cx={74} cy={69} r={13.5} fill={`url(#${uid}-badge)`} />
-                <rect x={72.2} y={61} width={3.6} height={16} rx={1} fill="#fff" />
-                <rect x={66} y={67.2} width={16} height={3.6} rx={1} fill="#fff" />
                 <path className="rbt-spark" d="M 80 7 L 82 12.5 L 87.5 14 L 82 15.5 L 80 21 L 78 15.5 L 72.5 14 L 78 12.5 Z" fill="#FFD65A" />
 
                 {/* Réfléchir : trois points ; un point d'interrogation quand il est curieux ; un « z » immobile si rien ne bouge. */}
@@ -534,6 +566,7 @@ export function Robot({
                 </g>
                 <path className="rbt-q" d="M 86 12 q 0 -5 5 -5 q 5 0 5 4.5 q 0 3 -4 4.5 v 2.5 M 92 24.5 v 0.5" fill="none" stroke={C.accent} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
                 <path className="rbt-z" d="M 80 14 h 7 l -7 8 h 7" fill="none" stroke={C.shellEdge} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+                </g>
               </g>
             </g>
           </g>
