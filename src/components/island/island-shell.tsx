@@ -92,7 +92,7 @@ export const ISLAND_CSS = `
 .isl-spin { animation: isl-spin .9s linear infinite; }
 @keyframes isl-scan { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
 .isl-scanbar { animation: isl-scan 1.1s cubic-bezier(.65,0,.35,1) infinite; }
-/* La recherche : le laser sur le code-barres, la barre d'avancement, l'étape en cours qui scintille, le point qui pulse. */
+/* Le scan : le laser sur le code-barres, la barre d'avancement, l'étape en cours qui scintille, le point qui pulse. */
 .isl-barcode { position: relative; display: inline-flex; align-items: stretch; gap: 1.5px; height: 22px; padding: 0 4px; border-radius: 4px; background: rgba(255,255,255,.92); overflow: hidden; }
 .isl-barcode i { display: block; background: #0B0F14; margin: 3px 0; }
 .isl-barcode b { position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #FF4D5E; box-shadow: 0 0 6px 1px rgba(255,77,94,.85); animation: isl-laser 1.1s ease-in-out infinite alternate; }
