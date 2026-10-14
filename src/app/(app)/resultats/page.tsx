@@ -9,6 +9,9 @@ import { PageHeader } from "@/components/ui/page";
 import { PerformanceDashboard } from "@/components/performance/performance-dashboard";
 import { CounterResultsCard } from "@/components/performance/counter-results-card";
 import { loadCounterResults } from "@/server/services/counter-results";
+import { loadSalesReport } from "@/server/services/counter-history";
+import { CounterSalesReport } from "@/components/performance/counter-sales-report";
+import { periodFromParam, SALES_REPORT_PERIODS, toSalesReportView, type SalesReportPeriod } from "@/core/counter/sales-report";
 
 export const metadata: Metadata = { title: "Performances — ce que PharmaBoost rapporte" };
 
@@ -28,17 +31,20 @@ export const metadata: Metadata = { title: "Performances — ce que PharmaBoost 
 export default async function ResultatsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periode?: string | string[]; du?: string | string[]; au?: string | string[] }>;
+  searchParams: Promise<{ periode?: string | string[]; du?: string | string[]; au?: string | string[]; comptoir?: string | string[] }>;
 }) {
   const session = await requirePermission(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
   const now = new Date();
-  const period = parsePeriodParams(await searchParams, now, TIME_ZONE);
+  const query = await searchParams;
+  const period = parsePeriodParams(query, now, TIME_ZONE);
+  const counterPeriod = periodFromParam(query.comptoir);
   const { pharmacyId } = session.scope;
 
   // L'officine de démonstration commerciale lit sa propre activité marquée démo ; une vraie officine, jamais.
   const demo = session.scope.isDemo ? { pharmacyIsDemo: true } : {};
 
-  const [report, roi, counter] = await Promise.all([
+  const [sales, report, roi, counter] = await Promise.all([
+    loadSalesReport({ pharmacyId, period: counterPeriod, now }),
     loadPerformanceReport({ pharmacyId, period, now, ...demo }),
     loadSubscriptionReturn({ pharmacyId, now, ...demo }),
     loadCounterResults({ pharmacyId, since: period.start, until: period.end }),
@@ -51,6 +57,12 @@ export default async function ResultatsPage({
         description="Les conseils proposés à votre équipe, ceux qu'elle a retenus, et les ventes confirmées qui en découlent. Ces chiffres sont réservés au titulaire de l'officine et à l'équipe PharmaBoost qui vous accompagne."
       />
       <PerformanceTabs active="rapporte" />
+
+      <CounterSalesReport
+        report={toSalesReportView(sales)}
+        hrefs={Object.fromEntries(SALES_REPORT_PERIODS.map((entry) => [entry.key, `/resultats?comptoir=${entry.param}`])) as Record<SalesReportPeriod, string>}
+        pdfHref={`/api/performance/comptoir-pdf?periode=${SALES_REPORT_PERIODS.find((entry) => entry.key === counterPeriod)?.param ?? "semaine"}`}
+      />
 
       <PerformanceDashboard report={report} roi={roi} basePath="/resultats" audience="owner" now={now} />
 

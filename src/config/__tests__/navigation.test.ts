@@ -36,7 +36,7 @@ describe("le menu, en trois groupes", () => {
 
   it("chaque groupe contient les entrées prévues, dans cet ordre", () => {
     const labels = (key: string) => NAVIGATION.filter((item) => item.group === key).map((item) => item.label);
-    expect(labels("pharmacie")).toEqual(["Mes associations", "Mon stock", "Performances", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants"]);
+    expect(labels("pharmacie")).toEqual(["Mes associations", "Mon stock", "Performances", "Historique", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants"]);
     expect(labels("decouvrir")).toEqual(["Formations", "Partenaires", "Actualités"]);
     expect(labels("configuration")).toEqual(["Paramètres"]);
   });
@@ -76,7 +76,7 @@ const COLLABORATOR_LABELS = ["Au comptoir", "Mes associations", "E-mails aux pat
 describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas affiché", () => {
   it("le titulaire voit les trois groupes et tout son menu, inchangé", () => {
     expect(groupNavigation(visibleFor("OWNER")).map((group) => group.label)).toEqual(["Ma pharmacie", "Découvrir", "Configuration"]);
-    expect(menuOf("OWNER")).toEqual(["Au comptoir", "Mes associations", "Mon stock", "Performances", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants", "Formations", "Partenaires", "Actualités", "Paramètres"]);
+    expect(menuOf("OWNER")).toEqual(["Au comptoir", "Mes associations", "Mon stock", "Performances", "Historique", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants", "Formations", "Partenaires", "Actualités", "Paramètres"]);
     expect(navigationFor(resolvePermissions("OWNER")).map((item) => item.label)).toEqual(menuOf("OWNER"));
   });
 
@@ -114,7 +114,7 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
   it("l'équipe au comptoir ne voit aucune entrée de gestion : ni Mon stock, ni Performances, ni Mon équipe, ni Laboratoires & gammes, ni Produits manquants, ni Paramètres", () => {
     for (const role of TEAM_ROLES) {
       const menu = menuOf(role);
-      for (const gone of ["Mon stock", "Performances", "Produits manquants", "Mon équipe", "Laboratoires & gammes", "Paramètres"]) {
+      for (const gone of ["Mon stock", "Performances", "Historique", "Produits manquants", "Mon équipe", "Laboratoires & gammes", "Paramètres"]) {
         expect(menu, `${role} : ${gone}`).not.toContain(gone);
       }
     }

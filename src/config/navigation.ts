@@ -1,18 +1,4 @@
-import {
-  BarChart3,
-  Box,
-  FlaskConical,
-  GraduationCap,
-  Handshake,
-  Link2,
-  MailCheck,
-  Megaphone,
-  PackageSearch,
-  ScanLine,
-  Settings,
-  UsersRound,
-  type LucideIcon,
-} from "lucide-react";
+import { BarChart3, Box, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 
 /**
@@ -136,6 +122,17 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
     match: ["/resultats", "/pilotage", "/performance", "/analytics", "/ventes"],
     description: "Le classement de l'équipe, les challenges, et ce que les conseils PharmaBoost ont rapporté",
+    group: "pharmacie",
+  },
+  {
+    href: "/historique",
+    label: "Historique",
+    subtitle: "Toutes les ventes terminées",
+    icon: History,
+    // Chaque vente terminée au comptoir, une par une, avec ses conseils et ce qu'ils ont rapporté : une vue de titulaire.
+    permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
+    match: ["/historique"],
+    description: "Chaque vente terminée au comptoir : les boîtes scannées, les conseils proposés et vendus, le chiffre d'affaires ajouté",
     group: "pharmacie",
   },
   {

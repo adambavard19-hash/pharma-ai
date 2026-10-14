@@ -7,6 +7,9 @@ import { parsePeriodParams } from "@/core/performance/periods";
 import { loadPerformanceForPlatform } from "@/server/services/performance";
 import { isDemoMode } from "@/config/env";
 import { TIME_ZONE } from "@/config/constants";
+import { loadSalesReport } from "@/server/services/counter-history";
+import { CounterSalesReport } from "@/components/performance/counter-sales-report";
+import { periodFromParam, SALES_REPORT_PERIODS, toSalesReportView, type SalesReportPeriod } from "@/core/counter/sales-report";
 
 /**
  * Ce que PharmaBoost rapporte à cette officine : le même tableau de bord que
@@ -23,7 +26,8 @@ import { TIME_ZONE } from "@/config/constants";
 export async function PerformanceTab({ pharmacyId, query, now }: { pharmacyId: string; query: Record<string, string | string[] | undefined>; now: Date }) {
   // Seuls les trois paramètres de période sont lus ; toute valeur douteuse retombe sur « 7 jours ».
   const period = parsePeriodParams({ periode: query.periode, du: query.du, au: query.au }, now, TIME_ZONE);
-  const data = await loadPerformanceForPlatform({ pharmacyId, period, now });
+  const counterPeriod = periodFromParam(query.comptoir);
+  const [data, sales] = await Promise.all([loadPerformanceForPlatform({ pharmacyId, period, now }), loadSalesReport({ pharmacyId, period: counterPeriod, now })]);
   if (!data) notFound();
 
   const demoExcluded = data.pharmacy.isDemo && !isDemoMode();
@@ -37,6 +41,12 @@ export async function PerformanceTab({ pharmacyId, query, now }: { pharmacyId: s
           Toutes les officines
         </Link>
       </div>
+      {/* La performance du comptoir (ventes terminées) et son PDF : la preuve des conseils en plus. */}
+      <CounterSalesReport
+        report={toSalesReportView(sales)}
+        hrefs={Object.fromEntries(SALES_REPORT_PERIODS.map((entry) => [entry.key, `/admin/pharmacies/${data.pharmacy.id}?onglet=performance&comptoir=${entry.param}`])) as Record<SalesReportPeriod, string>}
+        pdfHref={`/api/admin/pharmacies/${data.pharmacy.id}/comptoir-pdf?periode=${SALES_REPORT_PERIODS.find((entry) => entry.key === counterPeriod)?.param ?? "semaine"}`}
+      />
       {demoExcluded ? (
         <Alert tone="info" title="Officine de démonstration : ses données ne sont pas comptées ici." />
       ) : (
