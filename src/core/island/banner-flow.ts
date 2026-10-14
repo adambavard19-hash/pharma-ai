@@ -66,7 +66,7 @@ export function stageTone(stage: IslandStage): "neutral" | "accent" | "warning" 
 
 /** Les lignes d'analyse qui se cochent l'une après l'autre (comme l'activité d'un agent dans Coucou). */
 export function analysisSteps(drug: string, adviceCount: number): string[] {
-  return [`Boîte lue : ${drug}`, "Stock de l'officine vérifié", "Règles validées par la pharmacienne consultées", adviceCount > 0 ? withCount(adviceCount > 1 ? BANNER.text.readyMany : BANNER.text.readyOne, adviceCount) : BANNER.text.quiet];
+  return [`Boîte lue : ${drug}`, "Stock de l'officine vérifié", "Règles validées par l'équipe officinale", adviceCount > 0 ? withCount(adviceCount > 1 ? BANNER.text.readyMany : BANNER.text.readyOne, adviceCount) : BANNER.text.quiet];
 }
 
 /** Le titre de la capsule à chaque étape (repris des phrases de la bannière). */

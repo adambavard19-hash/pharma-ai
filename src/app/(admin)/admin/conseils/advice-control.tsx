@@ -478,7 +478,8 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
   const [familyId, setFamilyId] = useState<string>(initialFamilyId ?? "");
   const [medicine, setMedicine] = useState<Medicine | null>(null);
   const [product, setProduct] = useState<KnownProduct | null>(null);
-  const [advice, setAdvice] = useState<KnownProduct | null>(null);
+  // Plusieurs produits conseillés pour le même déclencheur : une association par produit, la même phrase pour tous.
+  const [advices, setAdvices] = useState<KnownProduct[]>([]);
   const [sentence, setSentence] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -502,17 +503,25 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
           : product
             ? ({ kind: "PRODUCT", ean: product.ean, name: product.name } as const)
             : null;
-    if (!trigger || !advice) {
-      setError("Choisissez ce qui déclenche l'association et le produit à conseiller.");
+    if (!trigger || advices.length === 0) {
+      setError("Choisissez ce qui déclenche l'association et au moins un produit à conseiller.");
       return;
     }
     startTransition(async () => {
-      const result = await addCentralAssociationAction({ trigger, advice: { ean: advice.ean, name: advice.name }, sentence: sentence.trim() || null });
-      if (!result.ok) {
-        setError(result.error);
+      const failed: string[] = [];
+      let created = 0;
+      for (const advice of advices) {
+        const result = await addCentralAssociationAction({ trigger, advice: { ean: advice.ean, name: advice.name }, sentence: sentence.trim() || null });
+        if (result.ok) created += 1;
+        else failed.push(`${advice.name} : ${result.error}`);
+      }
+      if (failed.length > 0) {
+        // Ceux qui sont passés restent en ligne ; on ne garde dans la liste que ceux à corriger.
+        setAdvices((list) => list.filter((advice) => failed.some((line) => line.startsWith(`${advice.name} :`))));
+        setError(`${created > 0 ? `${created} association(s) mise(s) en ligne. ` : ""}Non ajouté : ${failed.join(" · ")}`);
         return;
       }
-      push({ tone: "success", title: result.message ?? "Association ajoutée" });
+      push({ tone: "success", title: created > 1 ? `${created} associations en ligne dans toutes les pharmacies qui ont le produit en stock. Elles restent « à relire » jusqu'à votre validation.` : "Association en ligne dans toutes les pharmacies qui ont le produit conseillé en stock. Elle reste « à relire » jusqu'à votre validation." });
       onDone();
     });
   };
@@ -585,16 +594,37 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
         <ArrowRight className="mt-16 hidden size-5 shrink-0 text-text-tertiary md:block" aria-hidden />
         <div className="md:pt-[3.1rem]">
           <SearchField<KnownProduct>
-            label="PharmaBoost propose ce produit"
+            label={advices.length === 0 ? "PharmaBoost propose ce produit" : "Ajouter un autre produit"}
             endpoint="/api/admin/conseils/produits"
             minLength={2}
             placeholder="Nom, marque ou code-barres…"
-            value={advice}
-            onChange={setAdvice}
+            value={null}
+            onChange={(item) => item && setAdvices((list) => (list.some((known) => known.ean === item.ean) ? list : [...list, item]))}
             keyOf={(item) => item.ean}
             title={(item) => item.name}
             subtitle={(item) => [item.brand, item.ean].filter(Boolean).join(" · ")}
           />
+          {advices.length > 0 && (
+            <ul className="mt-2 space-y-1.5" aria-label="Produits proposés">
+              {advices.map((item) => (
+                <li key={item.ean} className="flex items-center gap-3 rounded-lg border border-brand-300 bg-brand-50/60 p-2.5 dark:border-brand-700 dark:bg-brand-950/30">
+                  <Check className="size-4 shrink-0 text-brand-700 dark:text-brand-300" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13.5px] font-medium text-text-primary">{item.name}</span>
+                    <span className="block truncate text-[12px] text-text-tertiary">{[item.brand, item.ean].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAdvices((list) => list.filter((known) => known.ean !== item.ean))}
+                    className="shrink-0 rounded-md p-1.5 text-text-tertiary hover:bg-surface-sunken hover:text-text-primary"
+                    aria-label={`Retirer ${item.name}`}
+                  >
+                    <X className="size-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
       <Field label="Ce que dit le pharmacien (facultatif)" htmlFor="central-sentence" hint="Vos mots, tels quels, sur la carte du comptoir. Sans phrase, la carte n'affiche que l'association.">
@@ -613,7 +643,7 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
           Annuler
         </Button>
         <Button onClick={submit} loading={pending} leadingIcon={<Plus className="size-4" />}>
-          Mettre en ligne
+          {advices.length > 1 ? `Mettre en ligne (${advices.length})` : "Mettre en ligne"}
         </Button>
       </div>
     </div>
