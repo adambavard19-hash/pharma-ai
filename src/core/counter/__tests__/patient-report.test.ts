@@ -168,3 +168,20 @@ describe("le bilan aux couleurs de la pharmacie", () => {
     expect(patientSafeLine({ line: "Usage externe.", productName: "Crème", sale })).toBe("Usage externe.");
   });
 });
+
+describe("la notice officielle d'un produit conseillé dans le bilan", () => {
+  it("indications, posologie, durée et la source, en clair comme en HTML ; rien quand il n'y a pas de notice vérifiée", () => {
+    const report = buildPatientReport({
+      pharmacyName: "Pharmacie du Docteur Nicolas",
+      products: [
+        { name: "Lactibiane Référence", reason: null, leaflet: { indications: "Équilibre de la flore intestinale.", posology: "1 gélule par jour.", duration: "Cure de 30 jours.", sourceUrl: "https://www.pileje.fr/lactibiane", sourceLabel: "site officiel du fabricant" } },
+        { name: "Spray nasal", reason: null, leaflet: { indications: null, posology: null, duration: null, sourceLabel: "x" } },
+      ],
+    });
+    expect(report?.text).toContain("Posologie : 1 gélule par jour.");
+    expect(report?.text).toContain("Durée : Cure de 30 jours.");
+    expect(report?.html).toContain("D'après la notice officielle");
+    expect(report?.html).toContain("https://www.pileje.fr/lactibiane");
+    expect(report?.html.match(/D'après la notice officielle/g)).toHaveLength(1);
+  });
+});

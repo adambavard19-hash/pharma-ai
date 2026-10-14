@@ -5836,3 +5836,29 @@ model RobotRuleProposal {
   @@index([status, createdAt])
   @@map("robot_rule_proposals")
 }
+
+/// Ce que dit la NOTICE OFFICIELLE d'un produit conseillé — indications, posologie, durée — pour le bilan envoyé au patient.
+/// Commune à toutes les pharmacies (une ligne par produit : « ean:<code> » ou, pour un médicament, « cis:<code> »). Chaque
+/// rubrique n'est gardée que si sa phrase d'appui a été retrouvée MOT POUR MOT dans la notice lue (base publique des
+/// médicaments, ou page officielle du fabricant) : sinon rien n'est affiché. `status` dit pourquoi une notice manque.
+model ProductLeaflet {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  productName String
+  indications String?
+  posology    String?
+  duration    String?
+  /// Les phrases de la notice qui appuient chaque rubrique : { indications, posology, duration }.
+  quotes      Json     @default("{}")
+  sourceUrl   String?
+  /// « BDPM » (notice officielle d'un médicament) ou « FABRICANT » (page officielle du fabricant).
+  sourceKind  String?
+  /// « FOUND », « NOT_FOUND » (aucune notice vérifiable), « ERROR » (réessayé plus tard).
+  status      String
+  model       String?
+  fetchedAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@map("product_leaflets")
+}

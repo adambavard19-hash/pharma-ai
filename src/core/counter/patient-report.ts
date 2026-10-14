@@ -3,7 +3,8 @@
  *
  * Il ne dit que ce que le pharmacien a CONFIRMÉ au comptoir : les produits conseillés qu'il a marqués « Vendu », avec la phrase
  * écrite pour le patient quand la règle en porte une et qu'elle ne peut pas nommer le traitement (`patientSafeReason`). Jamais un
- * médicament, jamais une posologie : au comptoir, une boîte bipée n'est pas une ordonnance validée, et rien ne remplace ce que le
+ * médicament délivré, jamais SA posologie : au comptoir, une boîte bipée n'est pas une ordonnance validée (la posologie d'un produit
+ * CONSEILLÉ, elle, vient de sa notice officielle, vérifiée mot pour mot), et rien ne remplace ce que le
  * pharmacien a dit de vive voix. Jamais de nom : le message ne cite ni le patient, ni son traitement.
  *
  * Module pur : aucune base, aucune horloge, aucun envoi.
@@ -21,7 +22,13 @@
  * Un produit du bilan. `benefits` (« Pourquoi ce produit ? »), `usage` (« Comment l'utiliser ? ») et `precautions` ne viennent
  * que de sources relues ; une colonne sans contenu ne s'affiche pas.
  */
-export type ReportProduct = { name: string; reason: string | null; imageUrl?: string | null; benefits?: string[]; usage?: string[]; precautions?: string[] };
+export type ReportProduct = { name: string; reason: string | null; imageUrl?: string | null; benefits?: string[]; usage?: string[]; precautions?: string[]; leaflet?: ReportLeaflet | null };
+
+/**
+ * Ce que dit la NOTICE OFFICIELLE du produit conseillé (jamais du médicament délivré) : indications, posologie, durée — chaque
+ * rubrique vérifiée mot pour mot dans la notice lue (core/leaflet/leaflet.ts). `sourceLabel` dit d'où elle vient.
+ */
+export type ReportLeaflet = { indications?: string | null; posology?: string | null; duration?: string | null; sourceUrl?: string | null; sourceLabel: string };
 
 /** Ce que le bilan dit de la pharmacie : le nom, et seulement ce que sa fiche contient (rien n'est deviné). */
 export type ReportPharmacy = {
@@ -135,6 +142,19 @@ const lines = (values: (string | null | undefined)[] | undefined, max: number, l
   return kept.slice(0, max);
 };
 
+/** La notice, nettoyée et bornée ; rien quand aucune rubrique ne reste. */
+function leafletOf(leaflet: ReportLeaflet | null | undefined): ReportLeaflet | null {
+  if (!leaflet) return null;
+  const field = (value: string | null | undefined) => {
+    const line = clean(value);
+    return line ? line.slice(0, 320) : null;
+  };
+  const kept = { indications: field(leaflet.indications), posology: field(leaflet.posology), duration: field(leaflet.duration) };
+  if (!kept.indications && !kept.posology && !kept.duration) return null;
+  const url = leaflet.sourceUrl && /^https:\/\/[^\s"<>]+$/.test(leaflet.sourceUrl) ? leaflet.sourceUrl : null;
+  return { ...kept, sourceUrl: url, sourceLabel: clean(leaflet.sourceLabel) || "Notice officielle" };
+}
+
 /** Ce qui est retenu pour le patient : seulement des produits « Vendu », chacun une fois, avec une phrase courte ou rien. */
 export function reportProducts(products: ReportProduct[]): ReportProduct[] {
   const seen = new Set<string>();
@@ -151,6 +171,7 @@ export function reportProducts(products: ReportProduct[]): ReportProduct[] {
       benefits: lines(product.benefits, 3, 80),
       usage: lines(product.usage, 2, 200),
       precautions: lines(product.precautions, 2, 160),
+      leaflet: leafletOf(product.leaflet),
     });
   }
   return kept.slice(0, 8);
@@ -241,6 +262,15 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
       ...(product.benefits?.length ? [`  Pourquoi ce produit : ${product.benefits.join(", ")}`] : []),
       ...(product.usage ?? []).map((line) => `  Comment l'utiliser : ${line}`),
       ...(product.precautions ?? []).map((line) => `  Précaution d'emploi : ${line}`),
+      ...(product.leaflet
+        ? [
+            `  D'après la notice officielle (${product.leaflet.sourceLabel}) :`,
+            ...(product.leaflet.indications ? [`    Indications : ${product.leaflet.indications}`] : []),
+            ...(product.leaflet.posology ? [`    Posologie : ${product.leaflet.posology}`] : []),
+            ...(product.leaflet.duration ? [`    Durée : ${product.leaflet.duration}`] : []),
+            ...(product.leaflet.sourceUrl ? [`    Notice : ${product.leaflet.sourceUrl}`] : []),
+          ]
+        : []),
       "",
     ]),
     ...(address || phone ? [`${pharmacy}`, ...(address ? [address] : []), ...(phone ? [`Téléphone : ${phone}`] : []), ""] : []),
@@ -263,6 +293,18 @@ ${body.map((line) => `<div style="margin-top:6px;font-size:13.5px;line-height:20
 </td></tr></table></td>`
       : "";
 
+  // La notice officielle du produit : indications, posologie, durée, et d'où elles viennent.
+  const leafletBlock = (leaflet: ReportLeaflet | null | undefined) => {
+    if (!leaflet) return "";
+    const row = (label: string, value: string | null | undefined) =>
+      value ? `<tr><td valign="top" style="padding:4px 10px 4px 0;font-size:13px;line-height:19px;font-weight:700;color:${DARK};white-space:nowrap">${label}</td><td valign="top" style="padding:4px 0;font-size:13.5px;line-height:20px;color:#344054">${escape(value)}</td></tr>` : "";
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 10px;border:1px solid #D7E6E0;border-radius:12px"><tr><td style="padding:12px 14px">
+<div style="font-size:12px;line-height:16px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#0B6B4F">D'après la notice officielle</div>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:6px">${row("Indications", leaflet.indications)}${row("Posologie", leaflet.posology)}${row("Durée", leaflet.duration)}</table>
+<div style="margin-top:6px;font-size:12px;line-height:17px;color:#667085">Source : ${escape(leaflet.sourceLabel)}${leaflet.sourceUrl ? ` · <a href="${escape(leaflet.sourceUrl)}" style="color:#0B6B4F">voir la notice</a>` : ""}. Suivez toujours les conseils de votre pharmacien.</div>
+</td></tr></table>`;
+  };
+
   const card = (product: ReportProduct) => {
     const image = emailImageUrl(product.imageUrl, base);
     const visual = image
@@ -282,6 +324,7 @@ ${body.map((line) => `<div style="margin-top:6px;font-size:13.5px;line-height:20
 </tr></table>
 ${product.reason ? `<div style="margin-top:6px;font-size:14.5px;line-height:22px;color:#475467">${escape(product.reason)}</div>` : ""}
 ${columns ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px"><tr>${columns}</tr></table>` : ""}
+${leafletBlock(product.leaflet)}
 </td></tr></table></td></tr>`;
   };
 

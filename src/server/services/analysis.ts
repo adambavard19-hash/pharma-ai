@@ -52,6 +52,7 @@ import {
 import { ensureClassifications } from "./classification";
 import { classifiedDrugKnowledge } from "@/core/ai/classified-knowledge";
 import { loadAssociationInput } from "./product-associations";
+import { prefetchLeafletsForRun } from "./product-leaflets";
 import { loadCentralAdvice } from "./central-advice";
 import { withRobotSuggestions } from "./robot-suggestions";
 
@@ -720,6 +721,9 @@ export async function analysePrescription(params: {
       linkUrl: `/vente/${prescription.id}`,
     });
   }
+
+  // Les notices officielles des produits proposés, lues en arrière-plan : prêtes quand le pharmacien enverra le bilan.
+  if (result.recommendations.length > 0 && !params.scope.isDemo) prefetchLeafletsForRun(analysisRun.id);
 
   return { analysisRunId: analysisRun.id, result };
 }

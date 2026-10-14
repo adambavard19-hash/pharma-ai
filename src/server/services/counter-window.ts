@@ -12,7 +12,9 @@ import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import type { Prisma } from "@/generated/prisma";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { customRulesFrom, overriddenRulesFrom } from "@/core/ai/central-advice";
-import { buildPatientReport, maskEmail, parsePatientEmail, patientSafeLine, patientSafeReason } from "@/core/counter/patient-report";
+import { buildPatientReport, maskEmail, parsePatientEmail, patientSafeLine, patientSafeReason, type ReportLeaflet } from "@/core/counter/patient-report";
+import { ensureLeaflet, leafletsFor } from "@/server/services/product-leaflets";
+import { leafletKey } from "@/core/leaflet/leaflet";
 import { getEnv } from "@/config/env";
 import { counterEmailPurgeCutoff } from "@/core/counter/email-retention";
 import { outcomeOf, type NoticeOutcome } from "@/core/counter/notice";
@@ -265,6 +267,13 @@ function emailAssetBase(): string {
   }
 }
 
+/** La notice d'un produit pour le bilan, passée au même verrou que le reste (rien qui nomme ce que la pharmacie a délivré). */
+function leafletForReport(row: { indications: string | null; posology: string | null; duration: string | null; sourceUrl: string | null; sourceKind: string | null } | undefined, safe: (line: string) => string | null): ReportLeaflet | null {
+  if (!row) return null;
+  const pass = (value: string | null) => (value ? safe(value) : null);
+  return { indications: pass(row.indications), posology: pass(row.posology), duration: pass(row.duration), sourceUrl: row.sourceUrl, sourceLabel: row.sourceKind === "BDPM" ? "base de données publique des médicaments" : "site officiel du fabricant" };
+}
+
 /**
  * Le bilan professionnel envoyé au patient. Les produits sont ceux déclarés vendus ; leur phrase « patient » n'est reprise que si
  * la règle qui les a proposés est validée par le pharmacien de PharmaBoost ET qu'elle ne peut pas nommer ce qui a été délivré
@@ -277,7 +286,7 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
     prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { name: true, isDemo: true, brandColor: true, logoUrl: true, phone: true, addressLine1: true, addressLine2: true, postalCode: true, city: true } }),
     prisma.recommendation.findMany({
       where: { id: { in: input.soldIds }, pharmacyId },
-      select: { patientReason: true, opportunity: { select: { ruleKey: true } }, product: { select: { name: true, imageUrl: true, precautions: true } }, presentation: { select: { specialty: { select: { name: true } } } } },
+      select: { patientReason: true, opportunity: { select: { ruleKey: true } }, product: { select: { name: true, imageUrl: true, precautions: true, ean: true } }, presentation: { select: { specialty: { select: { name: true, cisCode: true } } } } },
     }),
     validatedRuleKeys(),
     // Ce que la vente a délivré, pour qu'aucune phrase du bilan ne le nomme : le nom lu au scan, la spécialité et ses substances.
@@ -289,7 +298,21 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
   const sale = lines.map((line) => ({ names: [line.drugName, line.specialty?.name], substances: line.specialty?.compositions.map((composition) => composition.substanceLabel) ?? [] }));
   const validatedKeys = new Set(recs.map((rec) => rec.opportunity?.ruleKey).filter((key): key is string => Boolean(key) && validated.has(key as string)));
   const templates = validatedKeys.size > 0 ? await patientReasonTemplates(validatedKeys) : new Map<string, { template: string; benefits: string[] }>();
-  const products = recs.map((rec) => {
+  // Les notices officielles des produits vendus : lues d'avance après l'analyse ; une notice qui manque est cherchée maintenant,
+  // 20 secondes au plus, pour que le bilan parte toujours.
+  const leafletTargets = recs.map((rec) => ({ name: rec.product?.name ?? rec.presentation?.specialty.name ?? "", ean: rec.product?.ean ?? null, cisCode: rec.presentation?.specialty.cisCode ?? null }));
+  let leaflets: Awaited<ReturnType<typeof leafletsFor>> = new Map();
+  try {
+    leaflets = await leafletsFor(leafletTargets);
+    const missing = leafletTargets.filter((target) => { const key = leafletKey(target); return key && !leaflets.has(key); });
+    if (missing.length > 0) {
+      await Promise.race([Promise.all(missing.map((target) => ensureLeaflet(target).catch(() => undefined))), new Promise((resolve) => setTimeout(resolve, 20_000))]);
+      leaflets = await leafletsFor(leafletTargets);
+    }
+  } catch {
+    // Une notice est un plus : le bilan part toujours, sans elle si besoin.
+  }
+  const products = recs.map((rec, index) => {
     const fullName = rec.product?.name ?? rec.presentation?.specialty.name ?? "";
     const ruleKey = rec.opportunity?.ruleKey ?? null;
     const rule = ruleKey && validatedKeys.has(ruleKey) ? templates.get(ruleKey) : undefined;
@@ -302,6 +325,7 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
       // Les mots-clés de la règle VALIDÉE (écrits et relus) ; les précautions d'emploi que la pharmacie a saisies sur sa fiche produit.
       benefits: (rule?.benefits ?? []).map(safe).filter((line): line is string => line !== null),
       precautions: (rec.product?.precautions ?? []).map(safe).filter((line): line is string => line !== null),
+      leaflet: leafletForReport(leaflets.get(leafletKey(leafletTargets[index]) ?? ""), safe),
     };
   });
   const mail = buildPatientReport({
