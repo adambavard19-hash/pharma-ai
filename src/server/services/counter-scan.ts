@@ -31,6 +31,9 @@ import { findOpenFactsName } from "@/server/services/product-images";
  */
 export const SAME_SALE_WINDOW_MS = 5 * 60 * 1000;
 
+/** Au-delà de ce nombre de boîtes, une vente n'est plus reprise par un nouveau bip : ce n'est plus un seul client. */
+export const MAX_BOXES_PER_SALE = 15;
+
 /** Un horodatage de bip plus ancien que cela n'est pas crédible (horloge du poste fausse) : on retient l'instant de réception. */
 const MAX_SCAN_AGE_MS = 6 * 60 * 60 * 1000;
 
@@ -171,7 +174,7 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
   //   ne reprend pas un patient parce que la vente suivante vient d'être encaissée.
   // - Poste inconnu (clé d'un serveur) : repli sur la dernière écriture de la vente.
   const writtenSince = agent.postId ? (withinWindow ? previousScanAt : null) : new Date(now.getTime() - SAME_SALE_WINDOW_MS);
-  const open = writtenSince
+  let open = writtenSince
     ? await prisma.prescription.findFirst({
         where: {
           pharmacyId: agent.scope.pharmacyId,
@@ -197,6 +200,9 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
   let prescriptionId: string;
   let reference: string;
   let created = false;
+  // Une vente qui a déjà beaucoup de boîtes n'est plus celle d'un seul client (les ventes géantes du 15 oct. 2026) :
+  // le bip suivant en ouvre une nouvelle, et la vente géante n'est plus jamais reprise.
+  if (open && open.lines.length >= MAX_BOXES_PER_SALE) open = null;
   if (open) {
     prescriptionId = open.id;
     reference = open.reference;
