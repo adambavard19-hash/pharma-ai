@@ -412,3 +412,70 @@ export async function removeCounterLine(agent: AgentContext, input: { prescripti
   await recordAudit({ action: "prescription.counter_line_removed", entityType: "Prescription", entityId: sale.id, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { line: line.drugName, remaining, removedAdvice: onlyThisBox.length } });
   return { ok: true, remaining };
 }
+
+export type SplitLineResult = { ok: true; prescriptionId: string; reference: string } | { ok: false; error: string };
+
+/**
+ * « C'est un autre client ? » (fondateur, 15 oct. 2026) : la dernière boîte bipée a rejoint la vente en cours alors qu'elle est
+ * celle du client suivant. D'un clic, elle quitte cette vente et en ouvre une nouvelle, à elle seule ; la vente précédente se
+ * termine (comme « Vente terminée », ses conseils sans réponse le restent). Rien ne bouge dans le stock : la boîte est bien sortie.
+ *
+ *  - Les conseils que cette boîte SEULE déclenchait quittent la vente précédente ; la nouvelle vente est analysée pour elle.
+ *  - Une vente d'une seule boîte ne se sépare pas (elle est déjà « un client »).
+ */
+export async function splitCounterLine(agent: AgentContext, input: { prescriptionId: string; lineId: string }): Promise<SplitLineResult> {
+  const sale = await prisma.prescription.findFirst({
+    where: {
+      id: input.prescriptionId,
+      pharmacyId: agent.scope.pharmacyId,
+      source: "COUNTER_SCAN",
+      ...(agent.postId ? { counterPostId: agent.postId } : {}),
+      status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
+      sales: { none: {} },
+      NOT: { counterFollowUp: { closedAt: { not: null } } },
+    },
+    select: { id: true, counterPost: true, counterPostId: true, handledByUserId: true, isDemo: true, lines: { select: { id: true, drugName: true } } },
+  });
+  if (!sale) return { ok: false, error: "Cette vente n'est plus ouverte sur ce poste." };
+  const line = sale.lines.find((candidate) => candidate.id === input.lineId);
+  if (!line) return { ok: false, error: "Cette boîte n'est plus dans la vente." };
+  if (sale.lines.length < 2) return { ok: false, error: "Cette boîte est déjà seule dans sa vente." };
+
+  const linked = await prisma.recommendation.findMany({
+    where: { prescriptionId: sale.id, opportunity: { triggeredLineIds: { has: line.id } } },
+    select: { id: true, opportunity: { select: { triggeredLineIds: true } } },
+  });
+  const onlyThisBox = linked.filter((rec) => (rec.opportunity?.triggeredLineIds ?? []).every((id) => id === line.id)).map((rec) => rec.id);
+
+  // La nouvelle vente, au même comptoir, pour la même personne ; la boîte y passe, en première position.
+  const created = await createWithReference("prescription", agent.scope.pharmacyId, (candidate) =>
+    prisma.prescription.create({
+      data: {
+        pharmacyId: agent.scope.pharmacyId,
+        reference: candidate,
+        status: "NEEDS_VERIFICATION",
+        source: "COUNTER_SCAN",
+        counterPost: sale.counterPost,
+        counterPostId: sale.counterPostId,
+        handledByUserId: sale.handledByUserId,
+        createdByUserId: agent.scope.userId,
+        isDemo: sale.isDemo,
+      },
+      select: { id: true, reference: true },
+    }),
+  );
+  await prisma.$transaction(async (tx) => {
+    if (onlyThisBox.length > 0) await tx.recommendation.updateMany({ where: { id: { in: onlyThisBox } }, data: { status: "REMOVED" } });
+    await tx.prescriptionLine.update({ where: { id: line.id }, data: { prescriptionId: created.id, position: 1 } });
+  });
+
+  // La vente précédente est celle d'un client parti : elle se termine, comme « Vente terminée ».
+  try {
+    const { finishCounterSale } = await import("@/server/services/counter-window");
+    await finishCounterSale(agent, { prescriptionId: sale.id });
+  } catch (error) {
+    console.error("[scan] fin de la vente précédente après séparation", error);
+  }
+  await recordAudit({ action: "prescription.counter_line_split", entityType: "Prescription", entityId: created.id, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { from: sale.id, line: line.drugName, removedAdvice: onlyThisBox.length } });
+  return { ok: true, prescriptionId: created.id, reference: created.reference };
+}

@@ -51,7 +51,7 @@ export type NoticeBody = {
   questions?: { id: string; node: string; text: string; mode: string; choices: { key: string; label: string; selected: boolean }[]; answered: boolean }[];
   guidance?: string[];
   /** Les boîtes bipées de la vente, avec leur identifiant (« Retirer » sur la bannière). Absent chez un serveur plus ancien. */
-  boxes?: { id: string; name: string; challenge?: string; reward?: string }[];
+  boxes?: { id: string; name: string; challenge?: string; reward?: string; late?: boolean }[];
 };
 
 export type HostOutcome = "NONE" | "SOLD" | "NOT_SOLD";
@@ -89,7 +89,7 @@ export type HostEntry = {
   guidance: string[];
   items: HostItem[];
   /** Les boîtes bipées (identifiant de ligne, nom court) : chacune se retire de la bannière. Vide : rien à retirer (serveur ancien). */
-  boxes?: { id: string; name: string; challenge?: string; reward?: string }[];
+  boxes?: { id: string; name: string; challenge?: string; reward?: string; late?: boolean }[];
 };
 
 /** Le message de fin de vente. */
@@ -103,6 +103,8 @@ export type HostAction =
   | { kind: "finish"; saleId: string }
   /** « RETIRER <vente> <boîte> » : le patient a reposé cette boîte, elle quitte la vente. */
   | { kind: "remove_line"; saleId: string; lineId: string }
+  /** « SEPARER <vente> <boîte> » : cette boîte est celle du client suivant ; elle ouvre une nouvelle vente, la précédente se termine. */
+  | { kind: "split_line"; saleId: string; lineId: string }
   | { kind: "answer"; saleId: string; node: string; choice: string }
   | { kind: "view"; saleId: string }
   /** L'icône près de l'horloge → « Ouvrir mon espace PharmaBoost » (le mot ESPACE, sans vente) : l'agent lie le navigateur du PC. */
@@ -198,7 +200,7 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     items: finalItems,
     boxes: (body.boxes ?? [])
       .filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id))
-      .map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...(box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {}) }))
+      .map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...(box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {}), ...(box.late === true ? { late: true } : {}) }))
       .filter((box) => box.name)
       .slice(0, 20),
   };
@@ -672,6 +674,7 @@ export class NoticeCenter {
     } else if (word === "EMAIL_RETIRER") act({ kind: "email_remove", saleId });
     else if (word === "TERMINER") act({ kind: "finish", saleId });
     else if (word === "RETIRER" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "remove_line", saleId, lineId: argument });
+    else if (word === "SEPARER" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "split_line", saleId, lineId: argument });
     else if (word === "REPONSE" && argument) {
       // « question:choix » : deux mots d'identifiant, sans espace (la ligne de la fenêtre se coupe aux espaces).
       const [node, choice] = argument.split(":");

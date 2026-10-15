@@ -31,9 +31,21 @@ export type CounterSaleRead = {
   followUp: { emailSaved: boolean; closed: boolean };
 };
 
-/** Les boîtes bipées, pour « Retirer » sur la bannière du poste : dès le bip, analyse finie ou non. */
-const boxesOf = (lines: { id: string; drugName: string | null }[], challenges: Map<string, { title: string; reward: string }> = new Map()) =>
-  lines.filter((line) => line.drugName).map((line) => ({ id: line.id, name: line.drugName ?? "", challenge: challenges.get(line.id)?.title ?? null, reward: challenges.get(line.id)?.reward ?? null }));
+/** Une boîte arrivée plus tard que cela après la précédente : peut-être le client suivant (« C'est un autre client ? »). */
+export const LATE_BOX_MS = 30 * 1000;
+
+/**
+ * Les boîtes bipées, pour « Retirer » sur la bannière du poste : dès le bip, analyse finie ou non. La DERNIÈRE boîte, arrivée plus
+ * de 30 secondes après la précédente, est marquée `late` : la bannière demande si c'est un autre client.
+ */
+const boxesOf = (lines: { id: string; drugName: string | null; createdAt: Date }[], challenges: Map<string, { title: string; reward: string }> = new Map()) => {
+  const named = lines.filter((line) => line.drugName);
+  const byTime = [...named].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const last = byTime[byTime.length - 1];
+  const before = byTime[byTime.length - 2];
+  const lateId = last && before && last.createdAt.getTime() - before.createdAt.getTime() > LATE_BOX_MS ? last.id : null;
+  return named.map((line) => ({ id: line.id, name: line.drugName ?? "", challenge: challenges.get(line.id)?.title ?? null, reward: challenges.get(line.id)?.reward ?? null, late: line.id === lateId }));
+};
 
 /** Les boîtes scannées qui sont en challenge (un produit du stock, retrouvé par son code-barres) : ligne → challenge. */
 async function boxChallenges(pharmacyId: string, lines: { id: string; rawText: string | null; drugSpecialtyId: string | null }[], now: Date): Promise<Map<string, { title: string; reward: string }>> {
@@ -57,7 +69,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
       reference: true,
       status: true,
       counterFollowUp: { select: { emailEncrypted: true, consentAt: true, closedAt: true } },
-      lines: { orderBy: { position: "asc" }, select: { id: true, drugName: true, drugSpecialtyId: true, rawText: true } },
+      lines: { orderBy: { position: "asc" }, select: { id: true, drugName: true, drugSpecialtyId: true, rawText: true, createdAt: true } },
       analysisRuns: {
         orderBy: { startedAt: "desc" },
         take: 1,

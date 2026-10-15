@@ -14,6 +14,7 @@ import {
   emailWord,
   finishWord,
   removeBoxWord,
+  splitBoxWord,
   INITIAL_POSTE,
   parseCommand,
   posteReducer,
@@ -286,6 +287,12 @@ export function PosteIsland() {
   useEffect(() => () => { if (foldTimer.current) clearTimeout(foldTimer.current); }, []);
   const folded = Boolean(entry) && island.stage === "advice" && !hovered && !finishAfterEmail;
 
+  // « C'est un autre client ? » : la dernière boîte est arrivée plus de 30 secondes après la précédente (le serveur la marque).
+  // « Non » range la question pour cette boîte ; « Oui » la sépare : elle ouvre une nouvelle vente, la précédente se termine.
+  const [keptBox, setKeptBox] = useState<string | null>(null);
+  const lateBox = entry && island.stage === "advice" ? (entry.boxes ?? []).find((box) => box.late) ?? null : null;
+  const askOtherClient = lateBox !== null && lateBox.id !== keptBox && (entry?.boxes ?? []).length > 1;
+
   // Le bonjour ne se montre qu'au repos (le reducer l'efface déjà à chaque scan ou vente).
   const greeting = island.stage === "idle" && !entry ? view.greeting : null;
   const items = entry ? toAdvice(entry) : [];
@@ -352,7 +359,13 @@ export function PosteIsland() {
         }}
         onPointerMove={(event) => {
           // Sur l'île (une de ses capsules) : déployée ; à côté (le reste de la fenêtre, transparent) : repliée bientôt.
-          if (event.target instanceof Element && event.target.closest("section")) openIsland();
+          // Le bouton « Client suivant » et la question « C'est un autre client ? » ne déploient rien : la bannière ne bouge pas
+          // sous la souris au moment de cliquer.
+          const target = event.target instanceof Element ? event.target : null;
+          if (target?.closest("[data-ile-sans-deploiement]")) {
+            if (foldTimer.current) clearTimeout(foldTimer.current);
+            foldTimer.current = null;
+          } else if (target?.closest("section")) openIsland();
           else foldSoon();
           const start = drag.current;
           if (start && !start.moved && Math.hypot(event.screenX - start.x, event.screenY - start.y) > 4) start.moved = true;
@@ -401,16 +414,52 @@ export function PosteIsland() {
           </IslandShell>
         ) : folded && entry ? (
           <IslandShell width={FOLDED_WIDTH} tone="accent" contentKey="replie" label="Conseils de la vente (survolez pour les voir)">
-            <button type="button" data-ile-replie="" onClick={openIsland} className="flex w-full items-center gap-2.5 py-1.5 pr-4 pl-2 text-left">
-              <Robot size={34} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] leading-[18px] font-bold" style={{ color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
-                <span className="block truncate text-[11.5px] leading-[15px] text-white/55">Passez la souris pour voir</span>
-              </span>
-            </button>
+            <div className="flex w-full items-center gap-2 py-1.5 pr-1.5 pl-2">
+              <button type="button" data-ile-replie="" onClick={openIsland} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                <Robot size={34} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] leading-[18px] font-bold" style={{ color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
+                  <span className="block truncate text-[11.5px] leading-[15px] text-white/55">Passez la souris pour voir</span>
+                </span>
+              </button>
+              {/* Le client est parti : la vente se termine d'un clic, sans la question de l'e-mail, et le prochain scan est un nouveau client. */}
+              <button
+                type="button"
+                data-ile-client-suivant=""
+                data-ile-sans-deploiement=""
+                onClick={() => word(finishWord(entry.id))}
+                className="h-8 shrink-0 rounded-xl px-2.5 text-[12px] font-bold transition-[filter] hover:brightness-110"
+                style={{ background: C.accent, color: "#04261A" }}
+              >
+                Client suivant
+              </button>
+            </div>
           </IslandShell>
         ) : (
           !questionsOnly && <CounterIsland {...islandProps} />
+        )}
+
+        {askOtherClient && entry && lateBox && (
+          <IslandShell width={FOLDED_WIDTH + 30} tone="warning" contentKey={`autre-${lateBox.id}`} label="C'est un autre client ?">
+            <div data-ile-autre-client="" data-ile-sans-deploiement="" className="px-3.5 py-2.5 text-left">
+              <p className="truncate text-[12px] leading-[16px] text-white/70">« {lateBox.name} » ajouté à cette vente</p>
+              <p className="mt-0.5 text-[14px] leading-[18px] font-bold text-[#FFE2B0]">C&apos;est un autre client ?</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  data-ile-autre-client-oui=""
+                  onClick={() => word(splitBoxWord(entry.id, lateBox.id))}
+                  className="h-8 flex-1 rounded-xl text-[12.5px] font-bold transition-[filter] hover:brightness-110"
+                  style={{ background: C.accent, color: "#04261A" }}
+                >
+                  Oui, nouveau client
+                </button>
+                <button type="button" onClick={() => setKeptBox(lateBox.id)} className="h-8 rounded-xl bg-white/10 px-3 text-[12.5px] font-semibold text-white hover:bg-white/15">
+                  Non
+                </button>
+              </div>
+            </div>
+          </IslandShell>
         )}
 
         {showQuestions && entry && (

@@ -246,6 +246,11 @@ export function removeBoxWord(saleId: string, lineId: string): string | null {
   return ID.test(saleId) && ID.test(lineId) ? `RETIRER ${saleId} ${lineId}` : null;
 }
 
+/** « SEPARER <vente> <boîte> » : cette boîte est celle du client suivant (agent 0.10.15 et suivants). */
+export function splitBoxWord(saleId: string, lineId: string): string | null {
+  return ID.test(saleId) && ID.test(lineId) ? `SEPARER ${saleId} ${lineId}` : null;
+}
+
 export function finishWord(saleId: string): string | null {
   return ID.test(saleId) ? `TERMINER ${saleId}` : null;
 }

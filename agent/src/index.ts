@@ -47,7 +47,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.14";
+const VERSION = "0.10.15";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -401,6 +401,17 @@ async function handleAction(action: HostAction): Promise<void> {
       const result = await postJson<{ ok: boolean; remaining?: number; error?: string }>(config, "/api/agent/conseil/retirer", { prescription: action.saleId, line: action.lineId });
       log(`Boîte retirée de la vente : ${result.body?.ok ? `${result.body.remaining ?? "?"} restante(s)` : (result.body?.error ?? `HTTP ${result.status}`)}.`);
       await refreshNow(config, result.body?.ok ? {} : { problem: result.body?.error ?? "La boîte n'a pas pu être retirée." });
+    } else if (action.kind === "split_line") {
+      // « C'est un autre client ? » : la boîte ouvre une nouvelle vente, la précédente se termine ; la fenêtre suit la nouvelle.
+      const result = await postJson<{ ok: boolean; prescriptionId?: string; reference?: string; error?: string }>(config, "/api/agent/conseil/separer", { prescription: action.saleId, line: action.lineId });
+      log(`Boîte séparée (client suivant) : ${result.body?.ok ? `nouvelle vente ${result.body.reference ?? "?"}` : (result.body?.error ?? `HTTP ${result.status}`)}.`);
+      if (result.body?.ok && result.body.prescriptionId) {
+        notices.remove(action.saleId);
+        watchPrescription(result.body.prescriptionId);
+        await pollNotice(config);
+      } else {
+        await refreshNow(config, { problem: result.body?.error ?? "La boîte n'a pas pu être séparée." });
+      }
     } else if (action.kind === "finish") {
       const emailWasSaved = watched?.body?.followUp?.emailSaved === true;
       const result = await postJson<FinishBody>(config, "/api/agent/conseil/terminer", { prescription: action.saleId });
