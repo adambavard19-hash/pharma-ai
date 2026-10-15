@@ -24,6 +24,7 @@ import {
   SCAN_TIMEOUT_MS,
   stageDelay,
   type HostCommand,
+  type IslandSide,
   type RegionRect,
 } from "@/core/poste/island-bridge";
 import { ESSAI_LENGTH_MS, ESSAI_SEQUENCE, isEssaiSale } from "@/core/poste/island-fixtures";
@@ -50,6 +51,17 @@ const T = BANNER.text;
 const GREETING_WIDTH = 420;
 /** L'île repliée : le robot et « N conseils suggérés », rien d'autre. */
 const FOLDED_WIDTH = 340;
+/** L'île repliée debout, contre le bord gauche ou droit de l'écran : le robot, le nombre et le bouton, l'un sous l'autre. */
+const SIDE_FOLDED_WIDTH = 132;
+/** Où l'île se range dans la fenêtre Windows (600 × 760), selon la place choisie au poste : collée au bord de l'écran. */
+const ROOT_LAYOUT: Record<IslandSide, string> = {
+  haut: "w-full flex-col items-center pt-[5px]",
+  // En bas, l'île touche le bas de l'écran et ce qui s'y ajoute (questions, « autre client ? ») se pose au-dessus.
+  bas: "h-dvh w-full flex-col-reverse items-center pb-[5px]",
+  gauche: "h-dvh w-full flex-col items-start justify-center pl-[5px]",
+  droite: "h-dvh w-full flex-col items-end justify-center pr-[5px]",
+};
+
 /** La souris sortie de l'île, elle se replie après ce délai (un aller-retour rapide ne la fait pas clignoter). */
 const FOLD_DELAY_MS = 600;
 
@@ -350,7 +362,8 @@ export function PosteIsland() {
         ref={root}
         data-ile-root=""
         title="Glissez pour déplacer la bannière"
-        className="flex w-full cursor-grab flex-col items-center gap-2 pt-[5px] select-none active:cursor-grabbing [&_button]:cursor-pointer [&_input]:cursor-text"
+        data-ile-place={view.side}
+        className={`flex ${ROOT_LAYOUT[view.side]} cursor-grab gap-2 select-none active:cursor-grabbing [&_button]:cursor-pointer [&_input]:cursor-text`}
         onPointerDown={(event) => {
           // Saisir l'île (hors bouton, champ ou liste qui défile) : la fenêtre Windows suit la souris tant que le bouton est tenu.
           if (event.button !== 0 || !isDragHandle(event.target)) return;
@@ -412,6 +425,27 @@ export function PosteIsland() {
               </button>
             </div>
           </IslandShell>
+        ) : folded && entry && (view.side === "gauche" || view.side === "droite") ? (
+          <IslandShell width={SIDE_FOLDED_WIDTH} tone="accent" contentKey="replie-cote" label="Conseils de la vente (survolez pour les voir)">
+            {/* Debout contre le bord de l'écran : tout est empilé, rien n'est coupé. */}
+            <div className="flex w-full flex-col items-center gap-1.5 px-2 pt-2.5 pb-2 text-center">
+              <button type="button" data-ile-replie="" onClick={openIsland} className="flex flex-col items-center gap-1">
+                <Robot size={40} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
+                <span className="block text-[14px] leading-[17px] font-bold" style={{ color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
+                <span className="block text-[11px] leading-[14px] text-white/55">Survolez pour voir</span>
+              </button>
+              <button
+                type="button"
+                data-ile-client-suivant=""
+                data-ile-sans-deploiement=""
+                onClick={() => word(finishWord(entry.id))}
+                className="mt-0.5 h-8 w-full rounded-xl text-[12px] font-bold transition-[filter] hover:brightness-110"
+                style={{ background: C.accent, color: "#04261A" }}
+              >
+                Client suivant
+              </button>
+            </div>
+          </IslandShell>
         ) : folded && entry ? (
           <IslandShell width={FOLDED_WIDTH} tone="accent" contentKey="replie" label="Conseils de la vente (survolez pour les voir)">
             <div className="flex w-full items-center gap-2 py-1.5 pr-1.5 pl-2">
@@ -440,7 +474,7 @@ export function PosteIsland() {
         )}
 
         {askOtherClient && entry && lateBox && (
-          <IslandShell width={FOLDED_WIDTH + 30} tone="warning" contentKey={`autre-${lateBox.id}`} label="C'est un autre client ?">
+          <IslandShell width={view.side === "gauche" || view.side === "droite" ? 240 : FOLDED_WIDTH + 30} tone="warning" contentKey={`autre-${lateBox.id}`} label="C'est un autre client ?">
             <div data-ile-autre-client="" data-ile-sans-deploiement="" className="px-3.5 py-2.5 text-left">
               <p className="truncate text-[12px] leading-[16px] text-white/70">« {lateBox.name} » ajouté à cette vente</p>
               <p className="mt-0.5 text-[14px] leading-[18px] font-bold text-[#FFE2B0]">C&apos;est un autre client ?</p>

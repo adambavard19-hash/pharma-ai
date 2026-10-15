@@ -169,3 +169,21 @@ describe("la forme de la fenêtre Windows", () => {
     expect(regionRects([{ x: 0, y: 0, width: 0, height: 10, radius: 4 }])).toEqual([]);
   });
 });
+
+describe("la place de la bannière (menu de l'icône au poste)", () => {
+  it("lit les quatre places et ignore le reste", async () => {
+    const { parseCommand } = await import("../island-bridge");
+    for (const side of ["haut", "bas", "gauche", "droite"]) expect(parseCommand(JSON.stringify({ op: "place", side }))).toEqual({ op: "place", side });
+    expect(parseCommand(JSON.stringify({ op: "place", side: "milieu" }))).toBeNull();
+    expect(parseCommand({ op: "place" })).toBeNull();
+  });
+
+  it("la place reste d'une vente à l'autre", async () => {
+    const { INITIAL_POSTE, posteReducer } = await import("../island-bridge");
+    const placed = posteReducer(INITIAL_POSTE, { type: "host", command: { op: "place", side: "gauche" }, now: 0 });
+    expect(placed.side).toBe("gauche");
+    const scanned = posteReducer(placed, { type: "host", command: { op: "scan" }, now: 1 });
+    expect(scanned.side).toBe("gauche");
+    expect(posteReducer(scanned, { type: "host", command: { op: "remove", id: "x" }, now: 2 }).side).toBe("gauche");
+  });
+});

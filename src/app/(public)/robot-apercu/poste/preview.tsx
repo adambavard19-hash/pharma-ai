@@ -2,8 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ISLAND_WINDOW } from "../../../../../agent/src/notice-host-ile";
-import type { RegionRect } from "@/core/poste/island-bridge";
+import { ISLAND_SIDES, type IslandSide, type RegionRect } from "@/core/poste/island-bridge";
 import { ESSAI_LENGTH_MS, ESSAI_SEQUENCE } from "@/core/poste/island-fixtures";
+
+const SIDE_LABEL: Record<IslandSide, string> = { haut: "En haut", bas: "En bas", gauche: "À gauche", droite: "À droite" };
+/** Où Windows pose la fenêtre de l'île sur l'écran, pour chaque place (agent/src/notice-host-ile.ts, Place). */
+const WINDOW_PLACE: Record<IslandSide, string> = {
+  haut: "top-[6px] left-1/2 -translate-x-1/2",
+  bas: "bottom-[6px] left-1/2 -translate-x-1/2",
+  gauche: "left-[4px] top-1/2 -translate-y-1/2",
+  droite: "right-[4px] top-1/2 -translate-y-1/2",
+};
 
 /**
  * L'aperçu de la fenêtre Windows de l'île : le cadre a la taille de la fenêtre WebView2 (à 100 %), joue la vente
@@ -16,6 +25,7 @@ export function PosteWindowPreview() {
   const [words, setWords] = useState<string[]>([]);
   const [keyboard, setKeyboard] = useState(false);
   const [ready, setReady] = useState(false);
+  const [side, setSide] = useState<IslandSide>("haut");
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -43,10 +53,31 @@ export function PosteWindowPreview() {
     return () => timers.forEach(clearTimeout);
   }, [ready]);
 
+  // Le menu « Place de la bannière » de l'icône PharmaBoost, au poste : la fenêtre se range contre ce bord, l'île s'y adapte.
+  useEffect(() => {
+    if (ready) frame.current?.contentWindow?.postMessage({ pbIsland: JSON.stringify({ op: "place", side }) }, window.location.origin);
+  }, [ready, side]);
+
   return (
     <div className="min-h-dvh bg-[#2B3540] p-6 text-white">
       <div className="mx-auto max-w-[1100px]">
         <p className="text-[13px] text-white/60">Aperçu de la fenêtre Windows de l&apos;île ({ISLAND_WINDOW.width} × {ISLAND_WINDOW.height} à 100 %), pilotée par les commandes de l&apos;agent.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]" role="radiogroup" aria-label="Place de la bannière">
+          <span className="text-white/70">Place de la bannière :</span>
+          {ISLAND_SIDES.map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={side === value}
+              data-place={value}
+              onClick={() => setSide(value)}
+              className={`h-8 rounded-lg px-3 font-semibold ${side === value ? "bg-[#58F2D8] text-[#04261A]" : "bg-white/10 text-white hover:bg-white/15"}`}
+            >
+              {SIDE_LABEL[value]}
+            </button>
+          ))}
+        </div>
         <div className="relative mt-4 overflow-hidden rounded-xl border border-white/10" style={{ height: ISLAND_WINDOW.height + 40, background: "linear-gradient(#DCE3E8 0 38px, #F4F6F8 38px)" }}>
           {/* Le faux logiciel de gestion, derrière. */}
           <div className="absolute inset-x-0 top-0 flex h-[38px] items-center gap-4 bg-[#1F4E79] px-4 text-[12px] text-white/90">
@@ -55,7 +86,7 @@ export function PosteWindowPreview() {
           <div className="absolute top-[60px] left-6 right-6 space-y-2 text-[12px] text-[#33414D]">
             {Array.from({ length: 14 }, (_, i) => <div key={i} className="h-6 rounded bg-white shadow-sm" />)}
           </div>
-          <div className="absolute top-[6px] left-1/2 -translate-x-1/2" style={{ width: ISLAND_WINDOW.width, height: ISLAND_WINDOW.height }}>
+          <div className={`absolute ${WINDOW_PLACE[side]}`} style={{ width: ISLAND_WINDOW.width, height: ISLAND_WINDOW.height }}>
             <iframe ref={frame} src="/poste/ile" title="Île du poste" className="absolute inset-0 size-full border-0" style={{ background: "transparent", colorScheme: "normal" }} />
             {/* La forme que Windows gardera : rien en dehors ne cache le logiciel ni ne prend ses clics. */}
             <svg className="pointer-events-none absolute inset-0" width={ISLAND_WINDOW.width} height={ISLAND_WINDOW.height} aria-hidden="true">

@@ -24,7 +24,14 @@ export type HostCommand =
   | { op: "look"; look: number }
   /** Le bonjour du robot au démarrage du poste (agent/src/greeting.ts) : le texte complet, accents relus par JSON.parse. */
   | { op: "greet"; text: string }
+  /** La place de la bannière sur l'écran, choisie au poste (menu de l'icône PharmaBoost) : l'île s'y range et s'y adapte. */
+  | { op: "place"; side: IslandSide }
   | { op: "quit" };
+
+/** Les quatre places possibles : en haut (par défaut), en bas, ou debout contre le bord gauche ou droit de l'écran. */
+export const ISLAND_SIDES = ["haut", "bas", "gauche", "droite"] as const;
+export type IslandSide = (typeof ISLAND_SIDES)[number];
+export const isIslandSide = (value: unknown): value is IslandSide => typeof value === "string" && (ISLAND_SIDES as readonly string[]).includes(value);
 
 /** Ce que l'île affiche, déduit des commandes de l'agent et des gestes du pharmacien. */
 export type PosteView = {
@@ -44,9 +51,11 @@ export type PosteView = {
   scanAt: number;
   /** Le bonjour du robot, affiché au repos ; null : rien. Un scan ou une vente le remplace aussitôt. */
   greeting: string | null;
+  /** La place de la bannière (en haut par défaut) : gardée d'une vente à l'autre. */
+  side: IslandSide;
 };
 
-export const INITIAL_POSTE: PosteView = { island: INITIAL_ISLAND, entry: null, alertRead: false, emailPending: false, done: null, look: null, postLabel: "", scanAt: 0, greeting: null };
+export const INITIAL_POSTE: PosteView = { island: INITIAL_ISLAND, entry: null, alertRead: false, emailPending: false, done: null, look: null, postLabel: "", scanAt: 0, greeting: null, side: "haut" };
 
 /** Le plus long bonjour accepté de l'agent (le message en fait moins de 200). */
 export const GREETING_MAX_CHARS = 300;
@@ -95,7 +104,7 @@ export function posteReducer(view: PosteView, event: PosteEvent): PosteView {
     case "host":
       return onHost(view, event.command, event.now);
     case "timeout":
-      return ANALYSING.includes(view.island.stage) && !view.entry ? { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel } : view;
+      return ANALYSING.includes(view.island.stage) && !view.entry ? { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel, side: view.side } : view;
     case "tick": {
       if (view.island.stage === "scan") return { ...view, island: { ...view.island, stage: "analyzing", stepsDone: 0 } };
       if (view.island.stage !== "analyzing") return view;
@@ -112,7 +121,7 @@ export function posteReducer(view: PosteView, event: PosteEvent): PosteView {
     case "settle": {
       const stage = view.island.stage;
       if (stage === "emailSent" && view.entry) return { ...view, island: { ...view.island, stage: "advice" } };
-      if (stage === "quiet" || stage === "done") return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel };
+      if (stage === "quiet" || stage === "done") return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel, side: view.side };
       return view;
     }
     case "answer": {
@@ -157,7 +166,7 @@ function onHost(view: PosteView, command: HostCommand, now: number): PosteView {
       return { ...view, greeting: command.text };
     case "scan":
       // Un bip : nouvelle vente. L'ancienne (si elle était encore ouverte) laisse la place, comme sur la bannière.
-      return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel, scanAt: now, island: { ...INITIAL_ISLAND, stage: "scan" } };
+      return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel, side: view.side, scanAt: now, island: { ...INITIAL_ISLAND, stage: "scan" } };
     case "show": {
       const entry = { ...command.entry, items: itemsOf(command.entry) };
       const sameSale = view.entry?.id === entry.id;
@@ -183,7 +192,9 @@ function onHost(view: PosteView, command: HostCommand, now: number): PosteView {
       return { ...view, done: command.info, emailPending: false, greeting: null, island: { ...view.island, stage: "done" } };
     case "remove":
       if (view.entry && view.entry.id !== command.id) return view;
-      return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel };
+      return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel, side: view.side };
+    case "place":
+      return { ...view, side: command.side };
     case "quit":
       return view;
   }
@@ -285,6 +296,8 @@ export function parseCommand(raw: unknown): HostCommand | null {
     case "scan":
     case "quit":
       return command as HostCommand;
+    case "place":
+      return isIslandSide(command.side) ? { op: "place", side: command.side } : null;
     case "look":
       return { op: "look", look: typeof command.look === "number" ? command.look : -1 };
     case "greet": {

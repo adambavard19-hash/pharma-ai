@@ -123,7 +123,15 @@ describe("le programme Windows de l'île", () => {
   it("le menu de l'icône près de l'horloge propose « Ouvrir mon espace PharmaBoost » : un seul mot, ESPACE, pour l'agent", () => {
     expect(NOTICE_HOST_ILE_CSHARP).toMatch(/new ToolStripMenuItem\("Ouvrir mon espace PharmaBoost"\);\s*spaceItem\.Click \+= delegate \{ Out\.Word\("ESPACE"\); \};/);
     // Le menu garde ses autres gestes.
-    expect(NOTICE_HOST_ILE_CSHARP).toContain("Remettre la bannière en haut au centre");
+    expect(NOTICE_HOST_ILE_CSHARP).toContain("Masquer la bannière");
+  });
+
+  it("le menu de l'icône choisit la place de la bannière (en haut, en bas, à gauche, à droite), gardée et dite à la page", () => {
+    expect(NOTICE_HOST_ILE_CSHARP).toContain("Place de la bannière");
+    for (const label of ["En haut", "En bas", "À gauche", "À droite"]) expect(NOTICE_HOST_ILE_CSHARP).toContain(`"${label}"`);
+    // La page reçoit la même commande que dans l'aperçu : { op: "place", side }.
+    expect(NOTICE_HOST_ILE_CSHARP).toContain(`Post("{\\"op\\":\\"place\\",\\"side\\":\\"" + side + "\\"}")`);
+    expect(NOTICE_HOST_ILE_CSHARP).toContain('File.WriteAllText(positionFile + ".place", side)');
   });
 
   it("le script charge le kit et passe des chemins protégés (apostrophes doublées)", () => {

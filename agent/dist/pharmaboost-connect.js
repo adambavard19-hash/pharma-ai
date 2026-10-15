@@ -4873,6 +4873,9 @@ namespace PharmaBoostIle
     private bool pageReady;
     private bool keyboard;
     private bool rightSide;
+    // La place choisie au poste (menu de l'icône) : « haut », « bas », « gauche » ou « droite ». Gardée dans un fichier.
+    private string side = "haut";
+    private ToolStripMenuItem[] sideItems = new ToolStripMenuItem[0];
     private IntPtr lastExternal = IntPtr.Zero;
     private float scale = 1f;
     private readonly int processId;
@@ -4943,7 +4946,10 @@ namespace PharmaBoostIle
       base.WndProc(ref m);
     }
 
-    /// <summary>Place la fenêtre (en haut au centre, ou à droite) et lui donne d'abord la forme de la capsule au repos.</summary>
+    /// <summary>
+    /// Place la fenêtre contre le bord choisi (en haut au centre — ou à droite —, en bas au centre, debout à gauche ou à
+    /// droite, centrée en hauteur) et lui donne d'abord la forme de la capsule au repos, à ce bord.
+    /// </summary>
     public void Place(string position)
     {
       rightSide = position == "haut-droite";
@@ -4951,11 +4957,68 @@ namespace PharmaBoostIle
       Rectangle area = Screen.PrimaryScreen.WorkingArea;
       int width = (int)Math.Round(${ISLAND_WINDOW.width} * scale);
       int height = Math.Min((int)Math.Round(${ISLAND_WINDOW.height} * scale), area.Height - 16);
-      int x = rightSide ? area.Right - width - (int)(12 * scale) : area.Left + (area.Width - width) / 2;
-      int y = area.Top + (int)(${ISLAND_WINDOW.top} * scale);
+      int edge = (int)(4 * scale);
+      int x, y;
+      if (side == "bas") { x = area.Left + (area.Width - width) / 2; y = area.Bottom - height - edge; }
+      else if (side == "gauche") { x = area.Left + edge; y = area.Top + (area.Height - height) / 2; }
+      else if (side == "droite") { x = area.Right - width - edge; y = area.Top + (area.Height - height) / 2; }
+      else
+      {
+        x = rightSide ? area.Right - width - (int)(12 * scale) : area.Left + (area.Width - width) / 2;
+        y = area.Top + (int)(${ISLAND_WINDOW.top} * scale);
+      }
       Bounds = new Rectangle(x, y, width, height);
-      // Avant que la page dise sa forme : la capsule au repos (244 × 44 au centre), jamais un grand rectangle qui masquerait le logiciel.
-      ApplyRegion(new List<float[]> { new float[] { (${ISLAND_WINDOW.width} - 250) / 2f, 5, 250, 50, 25 } });
+      // Avant que la page dise sa forme : la capsule au repos (250 × 50 contre le bord), jamais un grand rectangle qui
+      // masquerait le logiciel.
+      float h = height / scale;
+      float[] rest;
+      if (side == "bas") rest = new float[] { (${ISLAND_WINDOW.width} - 250) / 2f, h - 55, 250, 50, 25 };
+      else if (side == "gauche") rest = new float[] { 5, h / 2 - 25, 250, 50, 25 };
+      else if (side == "droite") rest = new float[] { ${ISLAND_WINDOW.width} - 255, h / 2 - 25, 250, 50, 25 };
+      else rest = new float[] { (${ISLAND_WINDOW.width} - 250) / 2f, 5, 250, 50, 25 };
+      ApplyRegion(new List<float[]> { rest });
+    }
+
+    private static bool IsSide(string value)
+    {
+      return value == "haut" || value == "bas" || value == "gauche" || value == "droite";
+    }
+
+    /// <summary>La place choisie au menu : la fenêtre s'y range (une position glissée à la main est oubliée), la page s'y adapte.</summary>
+    private void ChooseSide(string value)
+    {
+      if (!IsSide(value)) return;
+      side = value;
+      try { if (!string.IsNullOrEmpty(positionFile) && File.Exists(positionFile)) File.Delete(positionFile); } catch (Exception) { }
+      try { if (!string.IsNullOrEmpty(positionFile)) File.WriteAllText(positionFile + ".place", side); } catch (Exception) { }
+      customPosition = false;
+      Place(rightSide ? "haut-droite" : "haut-centre");
+      PostSide();
+      CheckSideItems();
+    }
+
+    /// <summary>La place gardée de la dernière fois (fichier « .place » à côté de la position) : relue à l'ouverture.</summary>
+    private void LoadSide()
+    {
+      try
+      {
+        string file = positionFile + ".place";
+        if (string.IsNullOrEmpty(positionFile) || !File.Exists(file)) return;
+        string value = File.ReadAllText(file).Trim();
+        if (IsSide(value)) side = value;
+      }
+      catch (Exception) { }
+      CheckSideItems();
+    }
+
+    private void PostSide()
+    {
+      if (pageReady) Post("{\"op\":\"place\",\"side\":\"" + side + "\"}");
+    }
+
+    private void CheckSideItems()
+    {
+      foreach (ToolStripMenuItem item in sideItems) item.Checked = Convert.ToString(item.Tag) == side;
     }
 
     /// <summary>La position choisie par l'équipe (fichier « x,y ») : vrai si elle a pu être reprise.</summary>
@@ -5025,7 +5088,11 @@ namespace PharmaBoostIle
     {
       try { if (!string.IsNullOrEmpty(positionFile) && File.Exists(positionFile)) File.Delete(positionFile); } catch (Exception) { }
       customPosition = false;
+      side = "haut";
+      try { if (!string.IsNullOrEmpty(positionFile) && File.Exists(positionFile + ".place")) File.Delete(positionFile + ".place"); } catch (Exception) { }
       Place(rightSide ? "haut-droite" : "haut-centre");
+      PostSide();
+      CheckSideItems();
     }
 
     public async void Start()
@@ -5151,7 +5218,13 @@ namespace PharmaBoostIle
         }
         catch (Exception) { }
         bool newFile = file.Length > 0 && file != positionFile;
-        if (newFile) positionFile = file;
+        if (newFile)
+        {
+          positionFile = file;
+          string before = side;
+          LoadSide();
+          if (side != before) { Place(position); PostSide(); }
+        }
         // La position choisie à la main l'emporte, et ne se perd pas à chaque nouvelle commande.
         if (newFile && PlaceSaved()) { }
         else if (!customPosition && (position == "haut-droite") != rightSide) Place(position);
@@ -5185,6 +5258,7 @@ namespace PharmaBoostIle
         Out.Word("PRET");
         foreach (string line in pending) Post(line);
         pending.Clear();
+        if (side != "haut") PostSide();
       }
       else if (type == "word" && message.ContainsKey("word"))
       {
@@ -5301,9 +5375,23 @@ namespace PharmaBoostIle
       toggleItem = new ToolStripMenuItem("Masquer la bannière");
       toggleItem.Click += delegate { ToggleVisible(); };
       menu.Items.Add(toggleItem);
-      ToolStripMenuItem resetItem = new ToolStripMenuItem("Remettre la bannière en haut au centre");
-      resetItem.Click += delegate { ResetPosition(); };
-      menu.Items.Add(resetItem);
+      // La place de la bannière, comme la pilule de Coucou : en haut, en bas, ou debout contre un bord, pour ne jamais
+      // cacher les boutons du logiciel de gestion. « En haut » remet aussi la bannière à sa place après un glisser.
+      ToolStripMenuItem placeMenu = new ToolStripMenuItem("Place de la bannière");
+      string[][] places = new string[][] { new string[] { "haut", "En haut" }, new string[] { "bas", "En bas" }, new string[] { "gauche", "À gauche" }, new string[] { "droite", "À droite" } };
+      List<ToolStripMenuItem> items = new List<ToolStripMenuItem>();
+      foreach (string[] place in places)
+      {
+        string value = place[0];
+        ToolStripMenuItem item = new ToolStripMenuItem(place[1]);
+        item.Tag = value;
+        item.Click += delegate { if (value == "haut") ResetPosition(); else ChooseSide(value); };
+        placeMenu.DropDownItems.Add(item);
+        items.Add(item);
+      }
+      sideItems = items.ToArray();
+      CheckSideItems();
+      menu.Items.Add(placeMenu);
       tray.ContextMenuStrip = menu;
       tray.DoubleClick += delegate { ToggleVisible(); };
       tray.Visible = true;
@@ -6533,7 +6621,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.15";
+var VERSION = "0.10.16";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
