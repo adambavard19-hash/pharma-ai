@@ -487,13 +487,12 @@ var ROBOT_PALETTES = [
   { name: "framboise", ear: "#E64568", earDark: "#B8213F", lamp: "#F59AAE", accent: "#B8213F" },
   { name: "ardoise", ear: "#6F8798", earDark: "#4A6070", lamp: "#B4C4CF", accent: "#4A6070" }
 ];
-var NAMES = ["Bip", "Pixel", "Nova", "Gizmo", "Z\xE9phyr", "Biscotte", "Lumen", "P\xE9pite", "\xC9cho", "Titan", "Plume", "Com\xE8te", "Flash", "Noisette", "Volt", "Myrtille", "Orbit", "Praline", "Turbo", "Opale"];
 var ROBOT_LOOK_COUNT = 20;
 function robotLook(index) {
   const i = (Math.trunc(index) % ROBOT_LOOK_COUNT + ROBOT_LOOK_COUNT) % ROBOT_LOOK_COUNT;
   const accessory = ROBOT_ACCESSORIES[i % 10];
   const palette = ROBOT_PALETTES[i < 10 ? i : (i + 5) % 10];
-  return { index: i, name: NAMES[i], accessory, palette };
+  return { index: i, accessory, palette };
 }
 
 // agent/src/notice-host.ts
