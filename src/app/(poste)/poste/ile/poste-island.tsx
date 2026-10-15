@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, type ComponentProps } from "react";
+import { useCallback, useEffect, useReducer, useRef, type ComponentProps, type CSSProperties } from "react";
 import { BANNER } from "../../../../../agent/src/banner-design";
 import type { HostEntry } from "../../../../../agent/src/notice-center";
-import { CounterIsland, type IslandAdvice } from "@/components/island/counter-island";
+import { BURST_PIECES, CounterIsland, type IslandAdvice } from "@/components/island/counter-island";
 import { STAGE_WIDTH } from "@/core/island/banner-flow";
 import { IslandShell, ISLAND_CSS } from "@/components/island/island-shell";
 import { IslandQuestions } from "@/components/island/island-questions";
@@ -46,7 +46,15 @@ type WebViewBridge = { postMessage: (message: unknown) => void; addEventListener
 const C = BANNER.colors;
 const T = BANNER.text;
 /** La largeur de l'île pendant le bonjour : assez pour trois lignes lisibles, sans masquer le logiciel de gestion. */
-const GREETING_WIDTH = 380;
+const GREETING_WIDTH = 420;
+
+/** « Bonjour Léa, comment vas-tu ? … » → le titre doré « Bonjour Léa ! » et le reste en dessous (« Comment vas-tu ? … »). */
+export function greetingParts(text: string): { title: string; body: string } {
+  const match = /^(Bonjour[^,!?]*)[,!]\s*(.*)$/s.exec(text.trim());
+  if (!match) return { title: text.trim(), body: "" };
+  const body = match[2].trim();
+  return { title: `${match[1].trim()} !`, body: body ? body.charAt(0).toUpperCase() + body.slice(1) : "" };
+}
 
 function webview(): WebViewBridge | null {
   const chrome = (window as unknown as { chrome?: { webview?: WebViewBridge } }).chrome;
@@ -296,18 +304,27 @@ export function PosteIsland() {
         }}
       >
         {greeting ? (
-          <IslandShell width={GREETING_WIDTH} tone="accent" contentKey="bonjour" label="Bonjour du robot PharmaBoost">
-            {/* Seul « OK » ferme le message. Jamais de champ, jamais de focus demandé : le clavier reste au logiciel de gestion. */}
-            <div data-ile-bonjour="" className="flex w-full items-center gap-3 px-3.5 py-3 text-left">
-              <span className="isl-pop shrink-0">
-                <Robot size={40} mood="happy" look={view.look} label="Le robot PharmaBoost" />
+          <IslandShell width={GREETING_WIDTH} tone="success" contentKey="bonjour" label="Bonjour du robot PharmaBoost">
+            {/* Le même habit que « Bravo ! » en fin de vente : le robot en blouse qui saute, le titre doré, le texte bien lisible.
+                Seul « OK » ferme le message. Jamais de champ, jamais de focus demandé : le clavier reste au logiciel de gestion. */}
+            <div data-ile-bonjour="" className="flex w-full items-center gap-3 px-3 py-2.5 text-left">
+              <span className="isl-cheer relative shrink-0">
+                <Robot size={60} mood="happy" look={view.look} label="Le robot PharmaBoost" />
+                <span className="isl-burst" aria-hidden="true">
+                  {BURST_PIECES.map((piece, index) => (
+                    <i key={index} style={{ "--a": `${piece.angle}deg`, "--d": `${piece.distance}px`, "--c": piece.color, animationDelay: `${piece.delay}ms` } as CSSProperties} />
+                  ))}
+                </span>
               </span>
-              <span className="min-w-0 flex-1 text-[13px] leading-[18px] text-white/90">{greeting}</span>
+              <span className="min-w-0 flex-1">
+                <span className="isl-pop block text-[17px] leading-[22px] font-bold" style={{ color: C.challengeIcon }}>{greetingParts(greeting).title}</span>
+                {greetingParts(greeting).body && <span className="mt-0.5 block text-[13.5px] leading-[19px] text-white">{greetingParts(greeting).body}</span>}
+              </span>
               <button
                 type="button"
                 data-ile-bonjour-ok=""
                 onClick={() => dispatch({ type: "dismissGreeting" })}
-                className="h-8 shrink-0 rounded-xl px-4 text-[13px] font-bold transition-[filter] hover:brightness-110"
+                className="h-9 shrink-0 self-center rounded-xl px-4 text-[13.5px] font-bold transition-[filter] hover:brightness-110"
                 style={{ background: C.accent, color: "#04261A" }}
               >
                 OK

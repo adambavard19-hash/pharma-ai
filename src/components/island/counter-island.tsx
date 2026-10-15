@@ -20,7 +20,7 @@ import { IslandShell } from "./island-shell";
 const C = BANNER.colors;
 
 /** Les confettis de la fête d'une vente avec conseil vendu : dix éclats autour du robot, chacun sa direction. */
-const BURST_PIECES = [0, 36, 72, 108, 144, 180, 216, 252, 288, 324].map((angle, index) => ({
+export const BURST_PIECES = [0, 36, 72, 108, 144, 180, 216, 252, 288, 324].map((angle, index) => ({
   angle,
   distance: 30 + (index % 3) * 7,
   color: ["#FFD65A", "#58F2D8", "#FF8FA3", "#FFFFFF"][index % 4],
