@@ -10,7 +10,13 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   const agent = await authenticateAgent(request.headers.get("authorization"));
-  if (!agent) return NextResponse.json({ ok: false, error: "Clé inconnue ou révoquée." }, { status: 401 });
+  if (!agent) {
+    // Un poste dont la clé n'existe plus (comptoir supprimé, poste réinstallé) bipe dans le vide : son nom dans le journal
+    // permet de retrouver l'ordinateur à relier de nouveau. Le nom de l'ordinateur seulement, jamais la clé ni le code.
+    const lost = (await request.json().catch(() => null)) as { post?: string } | null;
+    console.warn(`[scan] clé inconnue ou révoquée — ordinateur « ${String(lost?.post ?? "?").replace(/[^\w .-]/g, "").slice(0, 40)} »`);
+    return NextResponse.json({ ok: false, error: "Clé inconnue ou révoquée." }, { status: 401 });
+  }
   const body = (await request.json().catch(() => null)) as { code?: string; post?: string; scannedAt?: string } | null;
   const code = (body?.code ?? "").replace(/\D/g, "");
   if (!code) return NextResponse.json({ ok: false, error: "Code manquant." }, { status: 400 });
