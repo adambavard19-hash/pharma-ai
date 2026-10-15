@@ -47,6 +47,16 @@ const C = BANNER.colors;
 const T = BANNER.text;
 /** La largeur de l'île pendant le bonjour : assez pour trois lignes lisibles, sans masquer le logiciel de gestion. */
 const GREETING_WIDTH = 420;
+/** L'île repliée : le robot et « N conseils trouvés », rien d'autre. */
+const FOLDED_WIDTH = 270;
+/** La souris sortie de l'île, elle se replie après ce délai (un aller-retour rapide ne la fait pas clignoter). */
+const FOLD_DELAY_MS = 600;
+
+/** « 3 conseils trouvés », « 1 conseil trouvé », « Aucun conseil ». */
+export function foldedLabel(count: number): string {
+  if (count <= 0) return "Aucun conseil";
+  return count === 1 ? "1 conseil trouvé" : `${count} conseils trouvés`;
+}
 
 /** « Bonjour Léa, comment vas-tu ? … » → le titre doré « Bonjour Léa ! » et le reste en dessous (« Comment vas-tu ? … »). */
 export function greetingParts(text: string): { title: string; body: string } {
@@ -256,12 +266,32 @@ export function PosteIsland() {
     return () => cancelAnimationFrame(frame);
   }, [send]);
 
+  // L'île repliée (fondateur, 15 oct. 2026 : « la bannière prend beaucoup trop de place quand il y a beaucoup de scans ») :
+  // pendant la vente, seuls le robot et « N conseils trouvés » restent à l'écran ; les conseils se déploient quand la souris
+  // passe sur l'île (ou d'un appui, sur un écran tactile) et se replient quand elle en sort.
+  const [hovered, setHovered] = useState(false);
+  const foldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openIsland = useCallback(() => {
+    if (foldTimer.current) clearTimeout(foldTimer.current);
+    foldTimer.current = null;
+    setHovered(true);
+  }, []);
+  const foldSoon = useCallback(() => {
+    if (foldTimer.current) return;
+    foldTimer.current = setTimeout(() => {
+      foldTimer.current = null;
+      setHovered(false);
+    }, FOLD_DELAY_MS);
+  }, []);
+  useEffect(() => () => { if (foldTimer.current) clearTimeout(foldTimer.current); }, []);
+  const folded = Boolean(entry) && island.stage === "advice" && !hovered && !finishAfterEmail;
+
   // Le bonjour ne se montre qu'au repos (le reducer l'efface déjà à chaque scan ou vente).
   const greeting = island.stage === "idle" && !entry ? view.greeting : null;
   const items = entry ? toAdvice(entry) : [];
   const questions = entry?.questions ?? [];
   const questionsOnly = Boolean(entry) && items.length === 0 && questions.length > 0 && island.stage === "advice";
-  const showQuestions = Boolean(entry) && questions.length > 0 && (island.stage === "advice" || island.stage === "email");
+  const showQuestions = !folded && Boolean(entry) && questions.length > 0 && (island.stage === "advice" || island.stage === "email");
   // Avant la réponse du serveur, la boîte est « en cours de lecture » : jamais un nom deviné.
   const drug = entry ? entry.items[0]?.drug || entry.subject : "lecture en cours…";
   const alert = entry && entry.alerts.length > 0 ? { title: T.readFirst, text: entry.alerts.join(" ") } : null;
@@ -321,6 +351,9 @@ export function PosteIsland() {
           send({ type: "drag" });
         }}
         onPointerMove={(event) => {
+          // Sur l'île (une de ses capsules) : déployée ; à côté (le reste de la fenêtre, transparent) : repliée bientôt.
+          if (event.target instanceof Element && event.target.closest("section")) openIsland();
+          else foldSoon();
           const start = drag.current;
           if (start && !start.moved && Math.hypot(event.screenX - start.x, event.screenY - start.y) > 4) start.moved = true;
         }}
@@ -328,6 +361,7 @@ export function PosteIsland() {
           const start = drag.current;
           if (start && !start.moved && Math.hypot(event.screenX - start.x, event.screenY - start.y) > 4) start.moved = true;
         }}
+        onPointerLeave={foldSoon}
         onClickCapture={(event) => {
           // Un déplacement n'est pas un clic : le robot ne rit pas, aucune carte ne s'ouvre.
           if (drag.current?.moved) {
@@ -364,6 +398,16 @@ export function PosteIsland() {
                 OK
               </button>
             </div>
+          </IslandShell>
+        ) : folded && entry ? (
+          <IslandShell width={FOLDED_WIDTH} tone="accent" contentKey="replie" label="Conseils de la vente (survolez pour les voir)">
+            <button type="button" data-ile-replie="" onClick={openIsland} className="flex w-full items-center gap-2.5 py-1.5 pr-4 pl-2 text-left">
+              <Robot size={34} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] leading-[18px] font-bold" style={{ color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
+                <span className="block truncate text-[11.5px] leading-[15px] text-white/55">Passez la souris pour voir</span>
+              </span>
+            </button>
           </IslandShell>
         ) : (
           !questionsOnly && <CounterIsland {...islandProps} />

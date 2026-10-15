@@ -209,8 +209,8 @@ afterEach(() => {
 });
 
 describe("la fenêtre de scan : la vente reste ouverte (trente minutes sans bip pour garde-fou)", () => {
-  it("la constante vaut cinq minutes", () => {
-    expect(SAME_SALE_WINDOW_MS).toBe(5 * 60_000);
+  it("la constante vaut une minute", () => {
+    expect(SAME_SALE_WINDOW_MS).toBe(60_000);
   });
 
   it("deux bips à 59 secondes : la même vente, la même ordonnance", async () => {
@@ -226,14 +226,14 @@ describe("la fenêtre de scan : la vente reste ouverte (trente minutes sans bip 
     expect(mem.sales).toHaveLength(1);
   });
 
-  it("trois minutes plus tard (le patient discute) : toujours la même vente", async () => {
+  it("une minute et demie plus tard (le client suivant) : une nouvelle vente", async () => {
     const first = await scan(CIP_DOLIPRANE);
-    wait(180);
+    wait(90);
     const second = await scan(EAN_CREME);
-    expect(first.ok && second.ok && second.created === false && second.prescriptionId === first.prescriptionId).toBe(true);
+    expect(first.ok && second.ok && second.created === true && second.prescriptionId !== first.prescriptionId).toBe(true);
   });
 
-  it("au-delà de cinq minutes sans bip : deux patients, deux ventes", async () => {
+  it("au-delà d'une minute sans bip : deux patients, deux ventes", async () => {
     const first = await scan(CIP_DOLIPRANE);
     wait(W + 1);
     const second = await scan(EAN_CREME);
@@ -245,7 +245,7 @@ describe("la fenêtre de scan : la vente reste ouverte (trente minutes sans bip 
     expect(mem.sales).toHaveLength(2);
   });
 
-  it("à cinq minutes pile : encore la même vente (au-delà seulement, c'est un autre patient)", async () => {
+  it("à une minute pile : encore la même vente (au-delà seulement, c'est un autre patient)", async () => {
     const first = await scan(CIP_DOLIPRANE);
     wait(W);
     const second = await scan(EAN_CREME);

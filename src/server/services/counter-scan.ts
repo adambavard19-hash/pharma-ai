@@ -23,13 +23,15 @@ import { findOpenFactsName } from "@/server/services/product-images";
  * Une vente reste ouverte sur son poste jusqu'à « Vente terminée » : chaque boîte bipée ensuite s'ajoute à la même bannière,
  * même trois minutes plus tard (le patient discute, repose une boîte, en ajoute une autre). Fondateur, 14 oct. 2026.
  *
- * Le garde-fou : cinq minutes sans aucun bip sur ce poste, et le bip suivant ouvre une nouvelle vente — un « Vente terminée »
- * oublié ne mélange pas deux clients (trente minutes, le 15 oct. 2026, empilaient 22 boîtes de plusieurs clients dans une vente).
+ * Le garde-fou : une minute sans aucun bip sur ce poste, et le bip suivant ouvre une nouvelle vente — un « Vente terminée »
+ * oublié ne mélange pas deux clients. Mesuré en pharmacie le 15 oct. 2026 : les boîtes d'un même client se suivent à moins
+ * de 45 secondes, deux clients sont séparés d'une minute et demie ou plus ; à cinq minutes, une vente empilait encore 8 boîtes
+ * de trois clients (trente minutes, le matin, en empilaient 22).
  *
  * La fenêtre glisse et se mesure sur l'horloge du POSTE : l'écart entre ce bip et le bip précédent du même poste
  * (`CounterPost.lastScanAt`, lu avant sa mise à jour), jamais depuis `Prescription.updatedAt`, que l'analyse fait avancer.
  */
-export const SAME_SALE_WINDOW_MS = 5 * 60 * 1000;
+export const SAME_SALE_WINDOW_MS = 60 * 1000;
 
 /** Au-delà de ce nombre de boîtes, une vente n'est plus reprise par un nouveau bip : ce n'est plus un seul client. */
 export const MAX_BOXES_PER_SALE = 15;
