@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Briefcase, Building2, Megaphone, ShieldOff, Sparkles, Store } from "lucide-react";
+import { Briefcase, Building2, Eye, Megaphone, ShieldOff, Sparkles, Store } from "lucide-react";
 import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { loadCockpit } from "@/server/services/admin/cockpit";
 import { countSupportToAnswer } from "@/server/services/support";
 import { countDepositsNeedingAttention } from "@/server/services/stock-deposits";
+import { countSiteVisitors, type SiteVisitorCounts } from "@/server/services/site-visitors";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { resolvePeriod } from "@/components/admin/filters";
 import { attentionHeadline, attentionTotal, formatLongDate } from "@/core/admin/metrics";
@@ -37,11 +38,12 @@ export default async function AdminCockpitPage({ searchParams }: { searchParams:
   const params = await searchParams;
   const period = resolvePeriod(typeof params.periode === "string" ? params.periode : null);
 
-  const [admin, cockpit, supportToAnswer, stockToDecide] = await Promise.all([
+  const [admin, cockpit, supportToAnswer, stockToDecide, visitors] = await Promise.all([
     prisma.platformAdmin.findUnique({ where: { id: session.admin.id }, select: { firstName: true } }),
     loadCockpit(period),
     countSupportToAnswer(),
     countDepositsNeedingAttention(),
+    countSiteVisitors(),
   ]);
 
   const firstName = admin?.firstName.trim() || session.admin.fullName.split(" ")[0];
@@ -53,6 +55,7 @@ export default async function AdminCockpitPage({ searchParams }: { searchParams:
     <>
       <AdminPageHeader
         title={`Bonjour ${firstName}`}
+        actions={<SiteVisitorsCounter counts={visitors} />}
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span>{formatLongDate(cockpit.now)}</span>
@@ -99,5 +102,24 @@ export default async function AdminCockpitPage({ searchParams }: { searchParams:
         Aucun accès aux données médicales : cette console ne lit que des données de compte, d&apos;abonnement et d&apos;activité.
       </p>
     </>
+  );
+}
+
+const NUMBER = new Intl.NumberFormat("fr-FR");
+
+/** Le compteur des visiteurs du site public : une personne par adresse IP, les visites répétées ne comptent pas deux fois. */
+function SiteVisitorsCounter({ counts }: { counts: SiteVisitorCounts }) {
+  return (
+    <div data-compteur-visiteurs="" className="flex items-center gap-3 rounded-2xl bg-surface-card px-4 py-2.5 shadow-xs ring-1 ring-border-subtle">
+      <span className="grid size-9 place-items-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+        <Eye className="size-4" aria-hidden="true" />
+      </span>
+      <div>
+        <p className="text-[24px] leading-7 font-bold tabular-nums text-text-primary">{NUMBER.format(counts.total)}</p>
+        <p className="text-[12px] leading-4 text-text-secondary">
+          {counts.total > 1 ? "visiteurs" : "visiteur"} du site{counts.today > 0 ? ` · ${NUMBER.format(counts.today)} aujourd\u2019hui` : ""}
+        </p>
+      </div>
+    </div>
   );
 }

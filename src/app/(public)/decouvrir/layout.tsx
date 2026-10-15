@@ -6,6 +6,7 @@ import { PublicIslandLoader } from "@/components/island/public-island-loader";
 import { HERO_ITEMS } from "./_components/visuals";
 import { VIGILANCE_RULES } from "@/core/ai/engines/vigilance";
 import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
+import { VisitBeacon } from "./_components/visit-beacon";
 
 /**
  * Le titre de l'accueil est ABSOLU : sans cela, le modèle « %s · PharmaBoost » de la racine s'y ajoutait et l'onglet affichait
@@ -40,6 +41,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
       <SiteHeader island={<PublicIslandLoader demo={islandDemo()} />} />
       <main>{children}</main>
       <SiteFooter contactEmail={PUBLIC_CONTACT_EMAIL} />
+      <VisitBeacon />
     </div>
   );
 }

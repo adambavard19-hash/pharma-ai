@@ -5869,3 +5869,18 @@ model ProductLeaflet {
   @@index([status])
   @@map("product_leaflets")
 }
+
+/// Les visiteurs du site public (/decouvrir), UN par adresse IP : c'est le compteur « Visiteurs du site » de l'accueil du
+/// super admin. L'adresse n'est jamais gardée en clair : seule son empreinte (HMAC-SHA256 avec le secret de session) l'est,
+/// assez pour reconnaître le même visiteur, pas pour retrouver son adresse.
+model SiteVisitor {
+  id          String   @id @default(cuid())
+  ipHash      String   @unique
+  /// Pages vues par cette adresse (une par ouverture du site, pas une par clic).
+  visits      Int      @default(1)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  @@index([firstSeenAt])
+  @@map("site_visitors")
+}
