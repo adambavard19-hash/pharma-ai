@@ -28,11 +28,10 @@ export const ROBOT_PALETTES: readonly RobotPalette[] = [
   { name: "ardoise", ear: "#6F8798", earDark: "#4A6070", lamp: "#B4C4CF", accent: "#4A6070" },
 ];
 
-const NAMES = ["Bip", "Pixel", "Nova", "Gizmo", "Zéphyr", "Biscotte", "Lumen", "Pépite", "Écho", "Titan", "Plume", "Comète", "Flash", "Noisette", "Volt", "Myrtille", "Orbit", "Praline", "Turbo", "Opale"] as const;
-
 export const ROBOT_LOOK_COUNT = 20;
 
-export type RobotLook = { index: number; name: string; accessory: RobotAccessory; palette: RobotPalette };
+/** Une apparence de robot : un accessoire et une couleur. Les robots n'ont pas de prénom (fondateur, 15 oct. 2026). */
+export type RobotLook = { index: number; accessory: RobotAccessory; palette: RobotPalette };
 
 /** L'apparence n° `index` (0 à 19 ; au-delà, on reprend au début). */
 export function robotLook(index: number): RobotLook {
@@ -40,7 +39,7 @@ export function robotLook(index: number): RobotLook {
   const accessory = ROBOT_ACCESSORIES[i % 10];
   // Les 10 premiers : couleur n° i ; les 10 suivants : la couleur « d'en face » (i + 5), pour que chaque accessoire ait deux couleurs.
   const palette = ROBOT_PALETTES[i < 10 ? i : (i + 5) % 10];
-  return { index: i, name: NAMES[i], accessory, palette };
+  return { index: i, accessory, palette };
 }
 
 /** Le robot d'un comptoir à créer (colonne historique `CounterPost.robotLook`) : le premier libre ; au-delà de 20, le moins utilisé. */
@@ -65,10 +64,10 @@ export function personRobotLook(userId: string): number {
   return hash % ROBOT_LOOK_COUNT;
 }
 
-/** Le robot de la personne connectée, tel que l'écran l'affiche : son apparence et son prénom (« Nova »). */
+/** Le robot de la personne connectée, tel que l'écran l'affiche : son apparence, et ce qu'en dit un lecteur d'écran (jamais un prénom). */
 export type CounterRobotLook = { look: number; caption: string };
 
 export function personRobot(userId: string): CounterRobotLook {
   const look = personRobotLook(userId);
-  return { look, caption: robotLook(look).name };
+  return { look, caption: "Le robot PharmaBoost" };
 }

@@ -571,7 +571,7 @@ export function TeamScene({ t, P, tracks }: { t: number; P: Plan; tracks: Tracks
             <Mascot track={tracks.team[k]} t={t} size={size} look={r.look} />
             <div style={{ marginTop: lerp(18, 8, shift), display: "flex", justifyContent: "center" }}>
               <span style={{ whiteSpace: "nowrap", borderRadius: 999, background: "rgba(11,15,20,.6)", border: "1px solid rgba(255,255,255,.14)", padding: `${lerp(8, 4, shift)}px ${lerp(18, 10, shift)}px`, fontFamily: FONT, fontSize: lerp(27, 17, shift), fontWeight: 700, color: "#fff" }}>
-                {r.caption.split(" · ")[0]} <span style={{ fontWeight: 500, color: K.muted }}>· {r.caption.split(" · ")[1]}</span>
+                {r.caption}
               </span>
             </div>
           </div>

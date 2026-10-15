@@ -1,7 +1,7 @@
 "use client";
 
 import { Robot } from "@/components/robot";
-import { personRobotLook, robotLook } from "@/core/robot/counter-look";
+import { personRobotLook } from "@/core/robot/counter-look";
 import { useRef, useState, useTransition } from "react";
 import { Download, Monitor, Pencil, UserRound } from "lucide-react";
 import { revokePostAction, type OverviewSnapshot } from "@/server/actions/stock-sync";
@@ -97,9 +97,8 @@ export function CountersStep({ counters, installerAvailable, members, assignment
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   {/* Le robot de la personne connectée à ce comptoir : chacun le sien, le même que dans l'île du comptoir. */}
                   {look !== null && (
-                    <span className="flex shrink-0 flex-col items-center" title={`Le robot de la personne connectée ici : ${robotLook(look).name}`}>
+                    <span className="flex shrink-0 flex-col items-center" title="Le robot de la personne connectée ici">
                       <Robot size={44} look={look} motion="reduce" />
-                      <span className="text-[11px] leading-4 font-semibold text-text-secondary">{robotLook(look).name}</span>
                     </span>
                   )}
                   <span className="min-w-0 flex-1 basis-40">

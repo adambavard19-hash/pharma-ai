@@ -29,9 +29,9 @@ export const PATIENT_EMAIL = "patient@exemple.fr";
 export const LOOK = 1;
 export const COUNTER = "Comptoir 2";
 export const PIXEL = robotLook(LOOK);
-/** Les robots des autres comptoirs, dans l'ordre (counter-look.ts) : Nova, Gizmo, Zéphyr, Biscotte. */
-export const OTHER_LOOKS = [2, 3, 4, 5].map((i, k) => ({ index: i, caption: `${robotLook(i).name} · Comptoir ${k + 3}` }));
-export const PIXEL_CAPTION = `${PIXEL.name} · ${COUNTER}`;
+/** Les robots des autres comptoirs (counter-look.ts). Les robots n'ont pas de prénom (fondateur, 15 oct. 2026) : seul le comptoir. */
+export const OTHER_LOOKS = [2, 3, 4, 5].map((i, k) => ({ index: i, caption: `Comptoir ${k + 3}` }));
+export const PIXEL_CAPTION = COUNTER;
 
 export const PREALABLES = {
   /** Préalable 2 : banner-flow.ts:65 dit encore « Règles validées par la pharmacienne consultées ». */

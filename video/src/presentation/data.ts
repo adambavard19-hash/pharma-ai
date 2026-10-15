@@ -187,9 +187,8 @@ export const CHAT_ANSWER = "13 délivrances, 6 conseils acceptés. Challenge à 
 
 // ---- 5. L'équipe -------------------------------------------------------------------------------------------
 
-/** Les robots de quatre comptoirs : Pixel (Comptoir 2), Nova, Gizmo, Zéphyr. */
-export const TEAM_ROBOTS = [1, 2, 3, 4].map((index) => ({ look: index, caption: `${robotLook(index).name} · Comptoir ${index + 1}` }));
-if (TEAM_ROBOTS[0].caption !== "Pixel · Comptoir 2") throw new Error("Film « Présentation » : le robot du Comptoir 2 n'est plus Pixel.");
+/** Les robots de quatre comptoirs. Les robots n'ont pas de prénom (fondateur, 15 oct. 2026) : seul le comptoir. */
+export const TEAM_ROBOTS = [1, 2, 3, 4].map((index) => ({ look: index, caption: `Comptoir ${index + 1}` }));
 
 export const CHALLENGE_TITLE = CHALLENGE.title;
 export const CHALLENGE_UNITS = CHALLENGE.teamUnits;

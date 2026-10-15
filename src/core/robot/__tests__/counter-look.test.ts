@@ -5,7 +5,8 @@ describe("un robot par comptoir", () => {
   it("20 apparences toutes différentes (accessoire + couleur), avec 20 prénoms différents", () => {
     const looks = Array.from({ length: ROBOT_LOOK_COUNT }, (_, i) => robotLook(i));
     expect(new Set(looks.map((look) => `${look.accessory}/${look.palette.name}`)).size).toBe(20);
-    expect(new Set(looks.map((look) => look.name)).size).toBe(20);
+    // Les robots n'ont pas de prénom (fondateur, 15 oct. 2026).
+    expect(looks.every((look) => !("name" in look))).toBe(true);
   });
 
   it("deux comptoirs qui se suivent n'ont ni la même couleur ni le même accessoire", () => {
@@ -52,7 +53,7 @@ describe("un robot par personne (1 robot pour 1 espace)", () => {
 
   it("ce que l'écran affiche : l'apparence et le prénom du robot, jamais un nom de comptoir", () => {
     const robot = personRobot("lea");
-    expect(robot).toEqual({ look: 9, caption: robotLook(9).name });
+    expect(robot).toEqual({ look: 9, caption: "Le robot PharmaBoost" });
     expect(robot.caption).not.toMatch(/comptoir/i);
   });
 });
