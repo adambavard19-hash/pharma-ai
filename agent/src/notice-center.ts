@@ -51,7 +51,7 @@ export type NoticeBody = {
   questions?: { id: string; node: string; text: string; mode: string; choices: { key: string; label: string; selected: boolean }[]; answered: boolean }[];
   guidance?: string[];
   /** Les boîtes bipées de la vente, avec leur identifiant (« Retirer » sur la bannière). Absent chez un serveur plus ancien. */
-  boxes?: { id: string; name: string }[];
+  boxes?: { id: string; name: string; challenge?: string; reward?: string }[];
 };
 
 export type HostOutcome = "NONE" | "SOLD" | "NOT_SOLD";
@@ -89,7 +89,7 @@ export type HostEntry = {
   guidance: string[];
   items: HostItem[];
   /** Les boîtes bipées (identifiant de ligne, nom court) : chacune se retire de la bannière. Vide : rien à retirer (serveur ancien). */
-  boxes?: { id: string; name: string }[];
+  boxes?: { id: string; name: string; challenge?: string; reward?: string }[];
 };
 
 /** Le message de fin de vente. */
@@ -187,7 +187,8 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     url: `${input.serverUrl.replace(/\/$/, "")}/vente/${input.prescriptionId}`,
     signature: body.signature,
     // Une question à poser n'est pas « rien à conseiller » : la fenêtre doit s'ouvrir.
-    quiet: finalItems.length === 0 && alerts.length === 0 && questions.length === 0,
+    // Une boîte en challenge non plus : le pharmacien doit le savoir dès le scan.
+    quiet: finalItems.length === 0 && alerts.length === 0 && questions.length === 0 && !(body.boxes ?? []).some((box) => box?.challenge),
     emailSaved: body.followUp?.emailSaved === true,
     emailError: oneLine(input.emailError ?? ""),
     alerts,
@@ -195,7 +196,11 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     questions,
     guidance: (body.guidance ?? []).map(oneLine).filter(Boolean),
     items: finalItems,
-    boxes: (body.boxes ?? []).filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id)).map((box) => ({ id: box.id, name: oneLine(box.name ?? "") })).filter((box) => box.name).slice(0, 20),
+    boxes: (body.boxes ?? [])
+      .filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id))
+      .map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...(box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {}) }))
+      .filter((box) => box.name)
+      .slice(0, 20),
   };
 }
 

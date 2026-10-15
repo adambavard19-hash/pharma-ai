@@ -9,7 +9,7 @@ import { TREE_RULE_KEYS } from "@/core/counter/question-tree";
 import { counterSheetOf, routineStepOf, withoutOriginLabel } from "@/core/counter/advice-sheet";
 import { parseSuggestionVigilances } from "@/config/vigilances";
 import { loadCentralAdvice } from "@/server/services/central-advice";
-import { activeChallengeTitlesFor } from "@/server/services/challenges";
+import { activeChallengeTitlesFor, activeChallengesFor } from "@/server/services/challenges";
 import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import { trustedRobotRuleKeys } from "@/server/services/robot-trust";
 import { unitMarginHt } from "@/core/catalog/margin";
@@ -32,7 +32,23 @@ export type CounterSaleRead = {
 };
 
 /** Les boîtes bipées, pour « Retirer » sur la bannière du poste : dès le bip, analyse finie ou non. */
-const boxesOf = (lines: { id: string; drugName: string | null }[]) => lines.filter((line) => line.drugName).map((line) => ({ id: line.id, name: line.drugName ?? "" }));
+const boxesOf = (lines: { id: string; drugName: string | null }[], challenges: Map<string, { title: string; reward: string }> = new Map()) =>
+  lines.filter((line) => line.drugName).map((line) => ({ id: line.id, name: line.drugName ?? "", challenge: challenges.get(line.id)?.title ?? null, reward: challenges.get(line.id)?.reward ?? null }));
+
+/** Les boîtes scannées qui sont en challenge (un produit du stock, retrouvé par son code-barres) : ligne → challenge. */
+async function boxChallenges(pharmacyId: string, lines: { id: string; rawText: string | null; drugSpecialtyId: string | null }[], now: Date): Promise<Map<string, { title: string; reward: string }>> {
+  const byEan = lines.filter((line) => line.rawText && !line.drugSpecialtyId);
+  if (byEan.length === 0) return new Map();
+  const products = await prisma.product.findMany({ where: { pharmacyId, ean: { in: byEan.map((line) => line.rawText as string) } }, select: { id: true, ean: true } });
+  const challenges = await activeChallengesFor(pharmacyId, products.map((product) => product.id), now).catch(() => new Map<string, { title: string; reward: string }>());
+  const found = new Map<string, { title: string; reward: string }>();
+  for (const line of byEan) {
+    const product = products.find((candidate) => candidate.ean === line.rawText);
+    const challenge = product ? challenges.get(product.id) : undefined;
+    if (challenge) found.set(line.id, challenge);
+  }
+  return found;
+}
 
 export async function readCounterNotice(pharmacyId: string, id: string, now: Date = new Date()): Promise<CounterSaleRead | null> {
   const prescription = await prisma.prescription.findFirst({
@@ -41,7 +57,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
       reference: true,
       status: true,
       counterFollowUp: { select: { emailEncrypted: true, consentAt: true, closedAt: true } },
-      lines: { orderBy: { position: "asc" }, select: { id: true, drugName: true, drugSpecialtyId: true } },
+      lines: { orderBy: { position: "asc" }, select: { id: true, drugName: true, drugSpecialtyId: true, rawText: true } },
       analysisRuns: {
         orderBy: { startedAt: "desc" },
         take: 1,
@@ -126,7 +142,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     prescriptionStatus: prescription.status,
     lineNames: prescription.lines.map((line) => line.drugName ?? "").filter(Boolean),
     lineKinds: prescription.lines.filter((line) => line.drugName).map((line) => (line.drugSpecialtyId ? ("DRUG" as const) : ("PRODUCT" as const))),
-    lines: boxesOf(prescription.lines),
+    lines: boxesOf(prescription.lines, await boxChallenges(pharmacyId, prescription.lines, now)),
     alerts: (run?.safetyFindings ?? []).map((finding) => ({ severity: finding.severity, subjectType: finding.subjectType, code: finding.code, message: finding.message, acknowledged: finding.acknowledgedAt !== null })),
     questions: tree.view.questions,
     guidance: tree.view.guidance,

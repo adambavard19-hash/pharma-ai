@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, type ComponentProps, type CSSProperties } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type ComponentProps, type CSSProperties } from "react";
 import { BANNER } from "../../../../../agent/src/banner-design";
 import type { HostEntry } from "../../../../../agent/src/notice-center";
 import { BURST_PIECES, CounterIsland, type IslandAdvice } from "@/components/island/counter-island";
@@ -194,6 +194,30 @@ export function PosteIsland() {
     return () => clearTimeout(id);
   }, [view.scanAt]);
 
+  // « Vente terminée » demande d'abord l'e-mail du bilan (s'il n'est pas déjà enregistré) ; envoyé, la vente se termine seule.
+  const [finishAfterEmail, setFinishAfterEmail] = useState(false);
+  const finish = () => {
+    if (!entry) return;
+    if (!entry.emailSaved && !finishAfterEmail) {
+      setFinishAfterEmail(true);
+      dispatch({ type: "openEmail" });
+      return;
+    }
+    setFinishAfterEmail(false);
+    word(finishWord(entry.id));
+  };
+  useEffect(() => {
+    if (!finishAfterEmail || !entry?.emailSaved) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- l'adresse est enregistrée : la vente se termine, une fois
+    setFinishAfterEmail(false);
+    word(finishWord(entry.id));
+  }, [finishAfterEmail, entry?.emailSaved, entry?.id, word]);
+  useEffect(() => {
+    // Une autre vente (nouveau bip) : la demande de fin de la précédente est oubliée.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- suit la vente affichée
+    setFinishAfterEmail(false);
+  }, [entry?.id]);
+
   // Le clavier n'est demandé que pour l'e-mail du patient ; il est rendu au logiciel de gestion dès qu'on en sort.
   const emailOpen = island.stage === "email";
   useEffect(() => {
@@ -258,14 +282,24 @@ export function PosteIsland() {
       if (entry?.items[index]) word(answerWord(entry.id, entry.items[index], outcome));
     },
     onEmail: (value) => dispatch({ type: "typeEmail", value }),
-    onCloseEmail: () => dispatch({ type: "closeEmail" }),
+    onCloseEmail: () => {
+      setFinishAfterEmail(false);
+      dispatch({ type: "closeEmail" });
+    },
+    onFinishWithoutEmail: finishAfterEmail
+      ? () => {
+          setFinishAfterEmail(false);
+          dispatch({ type: "closeEmail" });
+          if (entry) word(finishWord(entry.id));
+        }
+      : undefined,
     onSendEmail: () => {
       if (!entry) return;
       word(emailWord(entry.id, island.email));
       dispatch({ type: "sendEmail" });
     },
     onAddEmail: () => dispatch({ type: "openEmail" }),
-    onFinish: () => { if (entry) word(finishWord(entry.id)); },
+    onFinish: finish,
     // Les boîtes de la vente (agent récent seulement) : le patient en repose une, elle quitte la vente et la bannière.
     boxes: entry?.boxes ?? [],
     onRemoveBox: (lineId) => { if (entry) word(removeBoxWord(entry.id, lineId)); },
@@ -344,7 +378,7 @@ export function PosteIsland() {
             onChoose={(node, choice) => word(questionWord(entry.id, node, choice))}
             footer={
               questionsOnly ? (
-                <button type="button" onClick={() => word(finishWord(entry.id))} className="mt-2 h-8 w-full rounded-xl text-[12.5px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
+                <button type="button" onClick={finish} className="mt-2 h-8 w-full rounded-xl text-[12.5px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
                   {T.finish}
                 </button>
               ) : undefined

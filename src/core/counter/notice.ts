@@ -130,7 +130,7 @@ export type CounterNoticeInput = {
   /** Ce que chaque ligne bipée est : un médicament du catalogue national, ou un produit de l'officine. */
   lineKinds?: ("DRUG" | "PRODUCT")[];
   /** Les boîtes bipées, avec leur identifiant : la bannière du poste peut en retirer une. Absent (appel ancien) : aucune. */
-  lines?: { id: string; name: string }[];
+  lines?: { id: string; name: string; challenge?: string | null; reward?: string | null }[];
   /**
    * Les questions ouvertes de l'arbre du comptoir (« pourquoi le patient prend-il son paracétamol ? », « où a-t-il mal ? »)
    * et les phrases d'orientation des réponses cochées. Les conseils qu'elles débloquent arrivent dans `recommendations` ;
@@ -158,7 +158,7 @@ export type CounterNotice = {
   /** Les médicaments ou produits bipés, un par élément, sans la forme galénique. */
   drugs: string[];
   /** Les mêmes boîtes, avec leur identifiant (pour « Retirer » sur la bannière du poste). */
-  boxes: { id: string; name: string }[];
+  boxes: { id: string; name: string; challenge?: string; reward?: string }[];
   /** « Médicament détecté », « Produit détecté » ou « Détecté » : le titre au-dessus de ce qui a été bipé. */
   detectedLabel: string;
   /** Une empreinte : si elle ne change pas, on ne réaffiche pas. */
@@ -213,7 +213,10 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
   const subject = drugs.join(" · ");
   const questions = input.questions ?? [];
   const guidance = input.guidance ?? [];
-  const boxes = (input.lines ?? []).map((line) => ({ id: line.id, name: shortName(line.name) })).filter((box) => box.name);
+  // La boîte scannée elle-même peut être en challenge (toute la gamme Olioseptil) : la bannière le dit dès le scan.
+  const boxes = (input.lines ?? [])
+    .map((line) => ({ id: line.id, name: shortName(line.name), ...(line.challenge ? { challenge: line.challenge, reward: line.reward ?? "" } : {}) }))
+    .filter((box) => box.name);
   const base = { title: `PharmaBoost · ${saleTitle(input.reference)}`, subject, drugs, boxes, detectedLabel: detectedLabelOf(input.lineKinds), questions: [] as ViewQuestion[], guidance: [] as string[] };
   const reliable = input.stockReliable !== false;
   if (["CANCELLED", "DELIVERED", "FAILED"].includes(input.prescriptionStatus)) {
@@ -265,7 +268,7 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
   const advice = items.map((item) => [item.name, euros(item.priceCents), item.reason].filter(Boolean).join(" · "));
   // Ce qui a été répondu fait partie de l'état : sans lui dans l'empreinte, la fenêtre ne se redessinerait pas après un choix.
   const answered = questions.map((question) => `${question.node}=${question.choices.filter((choice) => choice.selected).map((choice) => choice.key).join("+")}`).join(",");
-  if (advice.length === 0 && alerts.length === 0 && questions.length === 0) {
+  if (advice.length === 0 && alerts.length === 0 && questions.length === 0 && !boxes.some((box) => box.challenge)) {
     const why =
       input.outcome === "OUT_OF_STOCK" ? "Conseil possible mais produit absent du stock."
       : input.outcome === "SAFETY_FILTERED" ? "Conseils écartés par la sécurité."

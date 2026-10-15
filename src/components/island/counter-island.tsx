@@ -69,9 +69,11 @@ export type CounterIslandProps = {
   onAddEmail: () => void;
   /** Quitter l'écran de l'e-mail sans l'envoyer (un bouton : on ne dépend jamais du clavier pour en sortir). */
   onCloseEmail?: () => void;
+  /** L'e-mail demandé au moment de « Vente terminée » (poste) : « Envoyer et terminer », ou « Terminer sans e-mail » ici. */
+  onFinishWithoutEmail?: () => void;
   onFinish: () => void;
   /** Les boîtes bipées de la vente : chacune se retire (le patient l'a reposée). Absent : pas de « Retirer ». */
-  boxes?: { id: string; name: string }[];
+  boxes?: { id: string; name: string; challenge?: string; reward?: string }[];
   onRemoveBox?: (id: string) => void;
   onDismissAlert: () => void;
   /** Le bilan par e-mail se propose dans l'île (poste). Faux sur l'écran de vente du logiciel, où le plan patient prend le relais. */
@@ -221,6 +223,25 @@ function AdviceMeta({ item, small }: { item: IslandAdvice; small?: boolean }) {
  * Les boîtes de la vente, en petites pastilles sous la capsule : le patient en repose une, le pharmacien la retire (✕, puis « Oui »).
  * Tant que « Vente terminée » n'est pas cliqué, chaque nouvelle boîte bipée s'ajoute ici ; une boîte retirée emporte ses conseils.
  */
+/** La boîte de ce bloc, si elle est en challenge (le bloc porte le nom court de la boîte). */
+function challengeOfBox(boxes: CounterIslandProps["boxes"], drug: string): { challenge?: string; reward?: string } | null {
+  const box = (boxes ?? []).find((candidate) => candidate.name.trim() === drug.trim());
+  return box?.challenge ? box : null;
+}
+
+/** Le challenge d'une boîte scannée (toute la gamme Olioseptil…) : doré, dès le scan, avec sa récompense. */
+function BoxChallenge({ title, reward, compact }: { title: string; reward?: string; compact?: boolean }) {
+  return (
+    <span data-ile-challenge="" className={cn("isl-pop flex items-start gap-1.5 rounded-lg font-semibold", compact ? "mt-1 px-2 py-1 text-[11px] leading-[14px]" : "mt-1.5 px-2.5 py-1.5 text-[12px] leading-4")} style={{ background: "rgba(242,165,22,0.14)", color: C.challengeIcon }}>
+      <span aria-hidden="true">★</span>
+      <span className="min-w-0">
+        <span className="block">{title}</span>
+        {reward && <span className="block font-medium text-white/80">{reward}</span>}
+      </span>
+    </span>
+  );
+}
+
 function BoxTray({ boxes, onRemove }: { boxes: { id: string; name: string }[]; onRemove: (id: string) => void }) {
   const [asking, setAsking] = useState<string | null>(null);
   return (
@@ -450,6 +471,30 @@ export function CounterIsland(props: CounterIslandProps) {
         body = <Row robot={robot(32)} title={title} sub={`${T.forDrug}${props.drug}`} trailing={<span className="isl-pop rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: C.accent, color: "#04261A" }}>{count}</span>} />;
         break;
       case "advice":
+        if (count === 0 && (props.boxes ?? []).some((box) => box.challenge)) {
+          const challenged = (props.boxes ?? []).filter((box) => box.challenge);
+          body = (
+            <div className="px-3 pt-2.5 pb-3" data-ile-challenge-seul="">
+              <div className="flex items-center gap-2.5">
+                {robot(32)}
+                <p className="min-w-0 flex-1 text-[15px] leading-5 font-bold" style={{ color: C.challengeIcon }} aria-live="polite">
+                  {challenged.length > 1 ? `${challenged.length} produits en challenge` : "Produit en challenge"}
+                </p>
+              </div>
+              {challenged.map((box) => (
+                <div key={box.id} className="mt-1.5">
+                  <p className="truncate px-0.5 text-[11.5px] font-semibold text-white/60">{box.name}</p>
+                  <BoxChallenge title={box.challenge as string} reward={box.reward} />
+                </div>
+              ))}
+              {props.boxes && props.boxes.length > 0 && props.onRemoveBox && <BoxTray boxes={props.boxes} onRemove={props.onRemoveBox} />}
+              <button type="button" onClick={props.onFinish} className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-[12.5px] font-bold transition-[filter] hover:brightness-110" style={{ background: C.accent, color: "#04261A" }}>
+                <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> {props.finishLabel ?? T.finish}
+              </button>
+            </div>
+          );
+          break;
+        }
         if (sleeping) {
           body = (
             <div className="flex h-10 items-center gap-2 pr-3 pl-1.5">
@@ -503,6 +548,7 @@ export function CounterIsland(props: CounterIslandProps) {
                         <span className="block text-[10.5px] leading-4 font-medium" style={{ color: group.indexes.length ? C.accent : "rgba(255,255,255,0.5)" }}>
                           {group.indexes.length > 1 ? `${group.indexes.length} conseils` : group.indexes.length === 1 ? "1 conseil" : "Aucun conseil"}
                         </span>
+                        {challengeOfBox(props.boxes, group.drug) && <BoxChallenge compact title={challengeOfBox(props.boxes, group.drug)!.challenge as string} reward={challengeOfBox(props.boxes, group.drug)!.reward} />}
                       </span>
                     </div>
                     <div className="space-y-1.5">
@@ -562,6 +608,7 @@ export function CounterIsland(props: CounterIslandProps) {
                         </span>
                       )}
                     </div>
+                    {challengeOfBox(props.boxes, group.drug) && <BoxChallenge compact title={challengeOfBox(props.boxes, group.drug)!.challenge as string} reward={challengeOfBox(props.boxes, group.drug)!.reward} />}
                     <CompactCard
                       key={`${among}#${index}`}
                       item={items[index]}
@@ -647,7 +694,12 @@ export function CounterIsland(props: CounterIslandProps) {
       case "email":
         body = (
           <div className="px-3 pt-2.5 pb-3">
-            <Row robot={robot(30)} title="Bilan conseil par e-mail" sub="Le patient reçoit ses conseils et vos coordonnées." compact />
+            <Row
+              robot={robot(30)}
+              title={props.onFinishWithoutEmail ? "Avant de terminer : le bilan au patient ?" : "Bilan conseil par e-mail"}
+              sub="Le patient reçoit ses conseils et vos coordonnées."
+              compact
+            />
             <form
               className="mt-3 flex items-center gap-2"
               onSubmit={(event) => {
@@ -665,7 +717,7 @@ export function CounterIsland(props: CounterIslandProps) {
                 className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-[13.5px] text-white placeholder:text-white/35 focus:border-[#36E8C8] focus:outline-none"
               />
               <button type="submit" className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-[13px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
-                <Send className="size-3.5" aria-hidden="true" /> Envoyer
+                <Send className="size-3.5" aria-hidden="true" /> {props.onFinishWithoutEmail ? "Envoyer et terminer" : "Envoyer"}
               </button>
               {props.onCloseEmail && (
                 <button type="button" onClick={props.onCloseEmail} aria-label="Annuler l'e-mail" title="Annuler" className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-white/80 hover:bg-white/[0.14] hover:text-white">
@@ -673,6 +725,11 @@ export function CounterIsland(props: CounterIslandProps) {
                 </button>
               )}
             </form>
+            {props.onFinishWithoutEmail && (
+              <button type="button" onClick={props.onFinishWithoutEmail} data-ile-sans-email="" className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-white/[0.08] text-[12.5px] font-semibold text-white/85 transition-colors hover:bg-white/[0.14] hover:text-white">
+                <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> Terminer sans e-mail
+              </button>
+            )}
           </div>
         );
         break;

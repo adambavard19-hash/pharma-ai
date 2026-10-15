@@ -5535,7 +5535,8 @@ function buildHostEntry(input) {
     url: `${input.serverUrl.replace(/\/$/, "")}/vente/${input.prescriptionId}`,
     signature: body.signature,
     // Une question à poser n'est pas « rien à conseiller » : la fenêtre doit s'ouvrir.
-    quiet: finalItems.length === 0 && alerts.length === 0 && questions.length === 0,
+    // Une boîte en challenge non plus : le pharmacien doit le savoir dès le scan.
+    quiet: finalItems.length === 0 && alerts.length === 0 && questions.length === 0 && !(body.boxes ?? []).some((box) => box?.challenge),
     emailSaved: body.followUp?.emailSaved === true,
     emailError: oneLine(input.emailError ?? ""),
     alerts,
@@ -5543,7 +5544,7 @@ function buildHostEntry(input) {
     questions,
     guidance: (body.guidance ?? []).map(oneLine).filter(Boolean),
     items: finalItems,
-    boxes: (body.boxes ?? []).filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id)).map((box) => ({ id: box.id, name: oneLine(box.name ?? "") })).filter((box) => box.name).slice(0, 20)
+    boxes: (body.boxes ?? []).filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id)).map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {} })).filter((box) => box.name).slice(0, 20)
   };
 }
 function ordinalFr(rank) {
@@ -6532,7 +6533,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.13";
+var VERSION = "0.10.14";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;

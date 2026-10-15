@@ -80,7 +80,8 @@ function outcomesOf(entry: HostEntry): IslandOutcome[] {
 /** L'étape où la vente doit s'afficher une fois l'analyse finie : la mise en garde d'abord, puis les conseils. */
 export function stageForEntry(entry: HostEntry, alertRead: boolean): IslandStage {
   if (entry.alerts.length > 0 && !alertRead) return "alert";
-  if (entry.items.length > 0 || entry.questions.length > 0) return "advice";
+  // Une boîte en challenge, même sans conseil : la vente s'affiche (le challenge doit se voir dès le scan).
+  if (entry.items.length > 0 || entry.questions.length > 0 || (entry.boxes ?? []).some((box) => box.challenge)) return "advice";
   return "quiet";
 }
 

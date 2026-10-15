@@ -6,7 +6,7 @@ import { activityScope } from "@/server/db/demo-scope";
 import { brandKey as toBrandKey, brandLabelOf, productMatchesBrand } from "@/core/catalog/brand";
 import { calendarDay, challengeWindow, dayKeyToDate, safeTimeZone, toDayKey, type DayKey } from "@/core/challenges/dates";
 import { computeChallengeProgress, type ChallengeProgress, type ChallengeSaleLine } from "@/core/challenges/progress";
-import { parseTiers, rewardModeOf, validateManualEntry, type ChallengeTier, type RewardMode } from "@/core/challenges/terms";
+import { parseTiers, rewardModeOf, rewardShortLabel, validateManualEntry, type ChallengeTier, type RewardMode } from "@/core/challenges/terms";
 import { pushChallengeStarted } from "@/server/services/push";
 
 /**
@@ -632,6 +632,32 @@ export async function listChallengesForPlatform(now: Date = new Date(), limit = 
  * s'il est dans la liste choisie, ou, sans liste, s'il porte la marque du challenge. Jamais déduit d'autre chose.
  * Plusieurs challenges pour un même produit : celui qui finit le premier.
  */
+/**
+ * Les challenges en cours sur ces produits, avec leur récompense en quelques mots : la bannière du comptoir le dit dès le scan
+ * d'une boîte de la gamme (fondateur, 15 oct. 2026 : « Olioseptil, 1 € par boîte dès 200 boîtes »).
+ */
+export async function activeChallengesFor(pharmacyId: string, productIds: string[], now: Date = new Date()): Promise<Map<string, { title: string; reward: string }>> {
+  const found = new Map<string, { title: string; reward: string }>();
+  const wanted = [...new Set(productIds)];
+  if (wanted.length === 0) return found;
+  const clock = await pharmacyClock(pharmacyId, now);
+  const today = dayKeyToDate(clock.today);
+  const challenges = await prisma.labChallenge.findMany({
+    where: { pharmacyId, status: "ACTIVE", startsAt: { lte: today }, endsAt: { gte: today } },
+    orderBy: [{ endsAt: "asc" }, { createdAt: "asc" }],
+    select: { title: true, productIds: true, brandKey: true, targetUnits: true, bonusPerUnitCents: true, tiers: true },
+  });
+  if (challenges.length === 0) return found;
+  const products = await prisma.product.findMany({ where: { pharmacyId, id: { in: wanted } }, select: { id: true, name: true, brand: true, deletedAt: true, isActive: true } });
+  for (const challenge of challenges) {
+    const reward = rewardShortLabel({ bonusPerUnitCents: challenge.bonusPerUnitCents, targetUnits: challenge.targetUnits, tiers: parseTiers(challenge.tiers) });
+    for (const product of coverage(challenge, products)) {
+      if (!found.has(product.id)) found.set(product.id, { title: challenge.title, reward });
+    }
+  }
+  return found;
+}
+
 export async function activeChallengeTitlesFor(pharmacyId: string, productIds: string[], now: Date = new Date()): Promise<Map<string, string>> {
   const titles = new Map<string, string>();
   const wanted = [...new Set(productIds)];

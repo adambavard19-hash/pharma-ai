@@ -169,3 +169,21 @@ export function validateManualEntry(
   }
   return errors;
 }
+
+/**
+ * La récompense d'un challenge en quelques mots, pour la bannière du comptoir : « 1 € par boîte dès 200 boîtes vendues »,
+ * « jusqu'à 150 € par palier », « objectif 200 boîtes ». Vide quand rien n'est précisé.
+ */
+export function rewardShortLabel(terms: { bonusPerUnitCents: number | null; targetUnits: number | null; tiers: ChallengeTier[] | null }): string {
+  const euros = (cents: number) => `${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2).replace(".", ",")} €`;
+  const mode = rewardModeOf({ bonusPerUnitCents: terms.bonusPerUnitCents, tiers: terms.tiers });
+  if (mode === "PER_UNIT" && terms.bonusPerUnitCents) {
+    return `${euros(terms.bonusPerUnitCents)} par boîte${terms.targetUnits ? ` dès ${terms.targetUnits} boîtes vendues` : ""}`;
+  }
+  if (mode === "TIERS" && terms.tiers && terms.tiers.length > 0) {
+    const first = [...terms.tiers].sort((a, b) => a.units - b.units)[0];
+    const best = Math.max(...terms.tiers.map((tier) => tier.bonusCents));
+    return `Prime dès ${first.units} boîtes, jusqu'à ${euros(best)}`;
+  }
+  return terms.targetUnits ? `Objectif ${terms.targetUnits} boîtes` : "";
+}
