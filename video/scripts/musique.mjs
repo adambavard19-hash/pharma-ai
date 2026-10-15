@@ -52,7 +52,7 @@ const PRESETS = {
   // La présentation du site (48 s) : 120 BPM, 24 mesures. Six mesures
   // d'ouverture pour les trois questions et « PharmaBoost, oui. ».
   presentation: {
-    bpm: 120, bars: 24,
+    bpm: 120, bars: 29,
     layers: (b) => (b < 6 ? (b < 1 ? QUIET : L({ arp: 0.45, bright: 0.45 })) : b < 10 ? L({ arp: 0.6, bass: 0.5, hat: 0.5, bright: 0.5 }) : b < 15 ? DRIVE : b < 18 ? L({ arp: 0.6, bass: 0.6, hat: 0.6, bright: 0.6 }) : b < 21 ? PEAK : END),
     chord: (b) => (b >= 23 ? C : b === 22 ? G : b === 21 ? F : MAJOR[b % 4]),
     impacts: [{ at: 0.1, gain: 0.6 }, { at: 1.6, gain: 0.4 }, { at: 3, gain: 0.4 }, { at: 4.58, gain: 0.7 }, { at: 18, gain: 0.6 }, { at: 21, gain: 1 }],
@@ -122,6 +122,18 @@ const PRESETS = {
     impacts: [{ at: 0.2, gain: 0.55 }, { at: 17.2, gain: 0.9 }],
     risers: [[16.4, 17.2]],
     holdFrom: 17,
+  },
+  // Le film « Robot » (≈ 55,8 s, façon Coucou, voix off — src/films/robot.tsx) : 120 BPM, 29 mesures (58 s ; le film
+  // s'arrête avant, en fondu). Léger et rebondi, pulsation douce ; presque rien sur la mise en garde (8–12 s, mineur) ;
+  // un peu plus de corps sur la fête (22–24 s) ; une montée dans la carte de fin (51 s), accord tenu ensuite. Le niveau
+  // (0,7 dans les temps muets, 0,25 sous la voix, creux sur la mise en garde) est réglé par le montage.
+  robot: {
+    bpm: 120, bars: 29,
+    layers: (b) => (b < 1 ? L({ arp: 0.5, hat: 0.3, bright: 0.45 }) : b < 4 ? L({ arp: 0.65, bass: 0.5, kick: 0.35, hat: 0.45, bright: 0.5 }) : b < 6 ? L({ pad: 0.7, arp: 0.15, bright: 0.25 }) : b < 9 ? L({ arp: 0.7, bass: 0.55, kick: 0.4, hat: 0.5, bright: 0.55 }) : b === 11 ? L({ arp: 0.85, bass: 0.65, kick: 0.5, hat: 0.6, hat16: 0.4, bright: 0.85 }) : b < 13 ? L({ arp: 0.8, bass: 0.65, kick: 0.5, hat: 0.6, bright: 0.65 }) : b < 22 ? L({ arp: 0.75, bass: 0.6, kick: 0.45, hat: 0.55, bright: 0.6 }) : b < 23 ? L({ arp: 0.75, bass: 0.6, kick: 0.45, hat: 0.55, bright: 0.72 }) : b < 25 ? L({ arp: 0.6, bass: 0.5, hat: 0.4, bright: 0.6 }) : END),
+    chord: (b) => (b >= 27 ? C : b === 26 ? G : b === 25 ? F : b === 4 || b === 5 ? MINOR[b % 4] : MAJOR[b % 4]),
+    impacts: [{ at: 0.05, gain: 0.35 }],
+    risers: [[25, 25.52]],
+    holdFrom: 26,
   },
 };
 

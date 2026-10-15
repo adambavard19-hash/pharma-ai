@@ -1,18 +1,28 @@
 {
-  "voix": "voix humaine",
+  "voix": "Yann (ElevenLabs, eleven_multilingual_v2)",
   "lignes": {
     "P1": "Au comptoir, tout va très vite.",
-    "P2": "Un patient, une boîte, une file qui attend.",
-    "P3": "Et le conseil qui aurait tout changé… on n'a pas eu le temps d'y penser.",
+    "P2": "Une boîte. Une autre. La file s'allonge.",
+    "P3": "Et le bon conseil ? Pas le temps d'y penser.",
     "P4": "Le patient repart sans ce qui l'aurait aidé. Et la pharmacie passe à côté.",
-    "P5": "Voici Pharma Boost : un robot pharmacien, sur l'écran de votre comptoir.",
-    "P6": "Vous scannez une boîte. En une seconde, il trouve le bon conseil.",
-    "P7": "Un produit de votre stock, avec son prix et le challenge du moment.",
-    "P8": "Vous le proposez. Vendu !",
-    "P9": "Le patient le souhaite ? Il reçoit son bilan par e-mail.",
-    "P10": "Et à la fin de la vente, le robot fête chaque conseil vendu.",
-    "P11": "Chacun son comptoir, son historique, ses challenges. Et le titulaire suit toute l'équipe.",
-    "P12": "Des règles validées par l'équipe officinale. Aucune fiche patient. Et le dernier mot reste au pharmacien.",
-    "P13": "Pharma Boost. Le bon conseil, à chaque vente."
+    "P5": "Et si quelqu'un y pensait… pour vous ?",
+    "P6": "Voici Pharma Boost : le robot pharmacien de votre comptoir.",
+    "P7": "Vous scannez une boîte…",
+    "P8": "En une seconde : le bon conseil.",
+    "P9": "Un produit de votre stock, son prix, et le challenge du moment.",
+    "P10": "Vous le proposez… et hop, vendu !",
+    "P11": "Le patient le souhaite ? Son bilan part par e-mail.",
+    "P12": "Vente terminée… et le robot fait la fête !",
+    "P13": "Chacun son comptoir, ses ventes, ses challenges.",
+    "P14": "Et le titulaire suit toute l'équipe.",
+    "P15": "Chaque règle est relue par une pharmacienne.",
+    "P16": "Aucune fiche patient.",
+    "P17": "Et le dernier mot reste au pharmacien.",
+    "P18": "Pharma Boost. Le bon conseil, à chaque vente.",
+    "P19": "Rendez-vous sur Pharma Boost point app."
+  },
+  "marks": {
+    "drop": 0.66,
+    "sign": 0.77
   }
 }

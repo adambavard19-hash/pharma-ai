@@ -54,3 +54,7 @@ yarn-error.log*
 /video/out
 /video/public/music
 /video/public/sfx
+.env*
+
+# Pages RCP de la BDPM mises en cache par `npm run effets:sync`
+/.cache
