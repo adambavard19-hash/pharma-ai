@@ -136,29 +136,7 @@ export const SCRIPT: PresentationLine[] = [
     text: "Et le titulaire suit toute l'équipe.",
     say: "Et le titulaire suit toute l'équipe.",
     chunks: ["Et le *titulaire*", "suit *toute l'équipe*."],
-    gapAfter: 0.45,
-  },
-  {
-    id: "P15",
-    text: "Chaque règle est relue par une pharmacienne.",
-    say: "Chaque règle est relue par une pharmacienne.",
-    chunks: ["Chaque *règle*", "est *relue*", "par *une pharmacienne*."],
-    gapAfter: 0.25,
-  },
-  {
-    id: "P16",
-    text: "Aucune fiche patient.",
-    say: "Aucune fiche patient.",
-    chunks: ["*Aucune fiche* patient."],
-    gapAfter: 0.3,
-    silentCaptions: true,
-  },
-  {
-    id: "P17",
-    text: "Et le dernier mot reste au pharmacien.",
-    say: "Et le dernier mot reste au pharmacien.",
-    chunks: ["Et le *dernier mot*", "reste *au pharmacien*."],
-    gapAfter: 0.6,
+    gapAfter: 0.7,
   },
   {
     id: "P18",
@@ -189,4 +167,4 @@ export const VOICE_DIR = "voix/presentation";
 export const VOICE = TARIF_VOICE;
 
 /** Les durées de la voix « Yann » du 12 octobre 2026, si un fichier manque : le film reste calculable. */
-export const FALLBACK_DURATIONS = [2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5];
+export const FALLBACK_DURATIONS = [2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5];

@@ -25,14 +25,13 @@ export const END_INTRO = 0.4;
  * sans pause (P13, P15 : fermetures de consonnes). Ne s'appliquent que si la durée du fichier est celle qui a été relevée :
  * une nouvelle voix repasse d'elle-même au calage automatique.
  */
-const MEASURED_DUR: Record<string, number> = { P2: 3.1, P3: 2.06, P9: 3.16, P11: 3.16, P13: 2.73, P15: 2.23 };
+const MEASURED_DUR: Record<string, number> = { P2: 3.1, P3: 2.06, P9: 3.16, P11: 3.16, P13: 2.73 };
 const MEASURED_CHUNKS: Record<string, number[]> = {
   P2: [0, 0.84, 1.65],
   P3: [0, 1.07, 1.3],
   P9: [0, 0.54, 1.03, 1.89, 2.53],
   P11: [0, 1.48, 2.03], // pauses 1,14-1,48 s (« souhaite ? ») et 1,96-2,03 s (« bilan »), silencedetect −32 dB
   P13: [0, 1.25, 1.88],
-  P15: [0, 0.72, 1.22],
 };
 
 export type ChunkTime = { text: string; start: number; end: number };

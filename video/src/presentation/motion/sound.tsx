@@ -63,18 +63,16 @@ const up = (t: number, a: number, b: number) => (b <= a ? (t >= b ? 1 : 0) : cla
 const M1_CUT = 12.05;
 /** M1 : la bouffée trop forte (+12 dB) de 7,65 à 9,25 s du fichier, ramenée au niveau du reste. */
 const M1_HOT: [number, number, number] = [7.65, 9.25, 0.32];
-/** Délai de l'attaque dans les fichiers (décodeur mp3 + pré-attaque) : M2 25 ms, confiance 45 ms, final 25 ms. */
+/** Délai de l'attaque dans les fichiers (décodeur mp3 + pré-attaque) : M2 25 ms, final 25 ms. */
 const M2_ATTACK = 0.025;
-const TRUST_ATTACK = 0.045;
 const FINAL_ATTACK = 0.025;
 
 /* ---------------------------------------------------------------------------- niveaux */
 
-const LEVEL = { m1: 0.75, m2: 0.72, trust: 0.7, final: 0.72 };
+const LEVEL = { m1: 0.75, m2: 0.72, final: 0.72 };
 /** Musique sous la voix : −9 dB (direction) ; M1 « Tension » −7 dB (sinon baissée sans interruption de 0,7 à 12,6 s). */
 const DUCK = 0.36;
 const DUCK_M1 = 0.45;
-const DUCK_TRUST = 0.36;
 const SFX_BUS = 0.75;
 /** Effets sous la voix : × 0,4 pour les sons longs ou denses, × 0,6 pour les clics et tintements (ils masquent moins). */
 const FX_DUCK = 0.4;
@@ -184,10 +182,9 @@ function anchors(time: Time, fx: Fx[]) {
   // Même formule que la scène 3 (scene-03-ce-qui-se-perd.tsx, anchorsOf) : l'ARRÊT SUR IMAGE.
   const FZ = Math.min(time.seg(4, 5) + 0.55, p4.end - 0.05);
   const D = time.DROP;
-  const P15 = time.A("P15");
-  // La confiance entre sur le temps de grille (120 BPM ancrés au DROP) le plus proche du début de P15.
-  const trust = time.beat(Math.round((P15 - D) / 0.5));
   const logo = time.marks.logo;
+  // « La confiance » est retirée du film (15 oct. 2026) : le groove s'efface dans les 0,45 s avant le logo, où le final attaque.
+  const trust = logo - 0.45;
   const vendu = time.marks.vendu;
   // La boule d'or : l'instant RÉEL de sa frappe (avancée par markHits, ou par la scène 9), sinon « et le robot » − HIT_LEAD.
   const word = time.A("P12", 1);
@@ -226,12 +223,6 @@ function m2Volume(t: number, a: Anchors, spans: Span[]) {
   // La chute et la reprise de la boule d'or passent au-dessus de la voix (× 0,7 au lieu de × 0,36 pendant 0,3 s).
   const duck = lift(duckOf(t, spans, DUCK), MUSIC_HIT_DEPTH, Math.max(hitWeight(t, a.D, MUSIC_HIT_HOLD), hitWeight(t, a.boom, MUSIC_HIT_HOLD)));
   return LEVEL.m2 * duck * stop * hold * out;
-}
-
-function trustVolume(t: number, a: Anchors, spans: Span[]) {
-  const fadeIn = smooth((t - a.trust) / 0.45);
-  const cut = 1 - up(t, a.logo - 2 / FPS, a.logo);
-  return LEVEL.trust * duckOf(t, spans, DUCK_TRUST) * fadeIn * cut;
 }
 
 function finalVolume(t: number, a: Anchors, spans: Span[]) {
@@ -317,28 +308,6 @@ const FALLBACK: Partial<Record<SceneId, (time: Time) => Fx[]>> = {
       { ...cue("reverse_riser", w.end - 0.6, 0.4), skip: 1.4 }, // ses 0,6 dernières secondes avant les piliers
     ];
   },
-  // S11 · La confiance — règles, sceau, signature ; dossier en lamelles, bouclier, cadenas ; Vendu / Non vendu.
-  S11: (time) => {
-    const w = time.win.S11;
-    const a1 = time.seg(15, 1);
-    const a2 = time.seg(15, 2);
-    const a3 = time.seg(15, 3);
-    const b = time.seg(16, 1);
-    const c1 = time.seg(17, 1);
-    const c2 = time.seg(17, 2);
-    return [
-      cue("paper_fold", a1 + 0.05, 0.4), // éventail de règles
-      ...[0, 1, 2].map((i) => cue("ui_click", a2 + 0.1 + i * 0.15, 0.3, 1.2)), // coches
-      cue("stamp_slam", a3 + 0.3, 0.4, 1.1), // sceau VALIDÉE
-      cue("pen_signature", a3 + 0.6, 0.4),
-      cue("pixel_dissolve", b, 0.5), // le dossier patient part en lamelles
-      cue("lock_shield", b + 0.55, 0.55),
-      cue("ui_click", c1 + 0.1, 0.35), // Vendu / Non vendu
-      cue("whoosh_fast", c2, 0.35, 0.8), // projecteur
-      cue("reverse_riser", w.end - 2.0, 0.45), // plongée dans la visière
-      cue("whoosh_heavy", w.end - 0.35, 0.5),
-    ];
-  },
   // S12 · Signature — yeux → « oo », logo, orbite des gadgets, « à chaque vente », pharmaboost.app au laser, croix menthe.
   S12: (time) => {
     const logo = time.marks.logo;
@@ -368,7 +337,7 @@ const FALLBACK: Partial<Record<SceneId, (time: Time) => Fx[]>> = {
  * les L DERNIÈRES secondes (le système de repères ne sait pas rogner) — sans rognage, la crête du fichier de 2 s tomberait
  * 1,1 à 1,4 s APRÈS la cible (sur le logo pour S11). On rogne donc le début ici.
  */
-const RISER_TAIL: Partial<Record<SceneId, number>> = { S9: 0.9, S10: 0.6, S11: 0.6 };
+const RISER_TAIL: Partial<Record<SceneId, number>> = { S9: 0.9, S10: 0.6 };
 
 /** Les effets recommandés par les comptes rendus des scènes mais non exportés dans leurs `cues` (assemblage, 15 oct.). */
 function assemblyExtras(time: Time): Fx[] {
@@ -473,7 +442,6 @@ export function soundPlan(time: Time, sceneCues: Cue[]): PlannedTrack[] {
   const music: PlannedTrack[] = [
     { name: "M1 Tension", file: "music/presentation-m1.mp3", at: a.m1Start, until: a.FZ, rate: 1, skip: 0, gain: LEVEL.m1, volume: (t) => m1Volume(t, a, spans) },
     { name: "M2 Groove", file: "music/presentation-m2.mp3", at: a.D - M2_ATTACK, until: a.trust + 0.5, rate: 1, skip: 0, gain: LEVEL.m2, volume: (t) => m2Volume(t, a, spans) },
-    { name: "M2 Confiance", file: "music/presentation-m2-confiance.mp3", at: a.trust - TRUST_ATTACK, until: a.logo, rate: 1, skip: 0, gain: LEVEL.trust, volume: (t) => trustVolume(t, a, spans) },
     { name: "M2 Final", file: "music/presentation-m2-final.mp3", at: a.logo - FINAL_ATTACK, until: a.end, rate: 1, skip: 0, gain: LEVEL.final, volume: (t) => finalVolume(t, a, spans) },
   ];
   const fx = cues

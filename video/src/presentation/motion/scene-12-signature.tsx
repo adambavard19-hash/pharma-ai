@@ -1631,7 +1631,7 @@ export const cues: SceneCues = (time) => {
   const b = beats(time);
   const orbitRate = Math.min(1.8, Math.max(0.6, 1.5 / (b.VENTE - b.SIGN)));
   return [
-    // la charge des yeux, dès le relais : plus de vide entre la fin de la montée de S11 et la frappe ; coupée 80 ms avant
+    // la charge des yeux, dès le relais : plus de vide entre la fin de la scène précédente et la frappe ; coupée 80 ms avant
     // la frappe (l'aspiration fait claquer le logo)
     { ...cue("robot_boot_rev", b.start + F, 0.6), until: b.LOGO - 0.08, fade: 0.04 } satisfies Fx,
     cue("whoosh_fast", b.morph, 0.4, 0.9),
@@ -1640,8 +1640,9 @@ export const cues: SceneCues = (time) => {
     cue("sparkle_shimmer", b.shine, 0.5),
     cue("orbit_whoosh", b.SIGN, 0.5, orbitRate),
     cue("impact_clean", b.VENTE, 0.35, 1.4),
-    cue("whoosh_fast", b.settle, 0.25, 1.2),
-    cue("robot_boing", b.robotIn, 0.4),
+    // Le saut du robot reste muet et le souffle discret : ils tombent 0,15 s avant « Rendez-vous », et le « boing » faisait
+    // entendre un « Ren… Rendez-vous » (fondateur, 15 oct. 2026).
+    cue("whoosh_fast", b.settle, 0.1, 1.2),
     cue("ui_pop", b.penOut + 0.04, 0.25, 1.3),
     cue("laser_write", b.write, 0.3),
     cue("ui_pop", b.fill, 0.4),

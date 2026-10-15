@@ -34,17 +34,17 @@ import { MIN_PAUSE, presentationTimeline, type LineTime, type PresentationTimeli
  *   S1  0                 → P3.start              S7  P9.start − 0,1    → P10.start
  *   S2  P3.start − 0,05   → P4.start              S8  P10.start − 0,15  → P12.start
  *   S3  P4.start          → P5.start              S9  P12.start − 0,1   → P13.start
- *   S4  P5.start − 0,1    → DROP                  S10 P13.start − 0,05  → P15.start
- *   S5  DROP              → P7.start              S11 P15.start − 0,05  → P18.start − 0,35
+ *   S4  P5.start − 0,1    → DROP                  S10 P13.start − 0,05  → P18.start − 0,35
+ *   S5  DROP              → P7.start              (S11 « La confiance » retirée le 15 oct. 2026)
  *   S6  P6.end + 0,05     → P9.start              S12 P18.start − 0,35  → fin du film
  * Pendant un chevauchement, LA SCÈNE QUI SORT EST DESSINÉE AU-DESSUS (sa sortie — plongée, fouet, compression — se
  * voit) ; la scène qui entre attend dessous dans son état de relais. Une scène sort de l'écran à `win.end`.
  * ======================================================================== */
 
-export const LINE_IDS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19"] as const;
+export const LINE_IDS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14", "P18", "P19"] as const;
 export type LineId = (typeof LINE_IDS)[number];
 
-export const SCENE_IDS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12"] as const;
+export const SCENE_IDS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S12"] as const;
 export type SceneId = (typeof SCENE_IDS)[number];
 
 /** Les repères exacts, relatifs au fichier de leur phrase (voix.json → marks). */
@@ -95,7 +95,6 @@ const META: Record<SceneId, { name: string; file: string; lines: LineId[] }> = {
   S8: { name: "Vendu !", file: "scene-08-vendu.tsx", lines: ["P10", "P11"] },
   S9: { name: "La fête", file: "scene-09-la-fete.tsx", lines: ["P12"] },
   S10: { name: "L'équipe", file: "scene-10-equipe.tsx", lines: ["P13", "P14"] },
-  S11: { name: "La confiance", file: "scene-11-confiance.tsx", lines: ["P15", "P16", "P17"] },
   S12: { name: "Signature", file: "scene-12-signature.tsx", lines: ["P18", "P19"] },
 };
 
@@ -159,8 +158,8 @@ export function makeTime(voices: VoiceInfo[] | null | undefined, voiceMarks?: Vo
     S7: [S("P9") - 0.1, S("P10")],
     S8: [S("P10") - 0.15, S("P12")],
     S9: [S("P12") - 0.1, S("P13")],
-    S10: [S("P13") - 0.05, S("P15")],
-    S11: [S("P15") - 0.05, S("P18") - 0.35],
+    // « La confiance » (S11, P15 à P17) est retirée du film (fondateur, 15 oct. 2026) : l'équipe passe directement à la signature.
+    S10: [S("P13") - 0.05, S("P18") - 0.35],
     S12: [S("P18") - 0.35, tl.total],
   };
   const win = {} as Record<SceneId, SceneWindow>;

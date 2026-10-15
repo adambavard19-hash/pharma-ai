@@ -11,7 +11,6 @@ import { Scene07, cues as cues07 } from "./scene-07-a-la-loupe";
 import { Scene08, cues as cues08 } from "./scene-08-vendu";
 import { Scene09, cues as cues09 } from "./scene-09-la-fete";
 import { Scene10, cues as cues10 } from "./scene-10-equipe";
-import { Scene11, cues as cues11 } from "./scene-11-confiance";
 import { Scene12, cues as cues12 } from "./scene-12-signature";
 
 /** Les 12 scènes du film, dans l'ordre : composant et effets sonores. (Orchestrateur : src/films/presentation.tsx.) */
@@ -26,6 +25,5 @@ export const SCENES: Record<SceneId, { Component: ComponentType<SceneProps>; cue
   S8: { Component: Scene08, cues: cues08 },
   S9: { Component: Scene09, cues: cues09 },
   S10: { Component: Scene10, cues: cues10 },
-  S11: { Component: Scene11, cues: cues11 },
   S12: { Component: Scene12, cues: cues12 },
 };
