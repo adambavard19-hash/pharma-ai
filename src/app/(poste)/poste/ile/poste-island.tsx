@@ -48,15 +48,15 @@ const C = BANNER.colors;
 const T = BANNER.text;
 /** La largeur de l'île pendant le bonjour : assez pour trois lignes lisibles, sans masquer le logiciel de gestion. */
 const GREETING_WIDTH = 420;
-/** L'île repliée : le robot et « N conseils trouvés », rien d'autre. */
-const FOLDED_WIDTH = 270;
+/** L'île repliée : le robot et « N conseils suggérés », rien d'autre. */
+const FOLDED_WIDTH = 340;
 /** La souris sortie de l'île, elle se replie après ce délai (un aller-retour rapide ne la fait pas clignoter). */
 const FOLD_DELAY_MS = 600;
 
-/** « 3 conseils trouvés », « 1 conseil trouvé », « Aucun conseil ». */
+/** « 3 conseils suggérés », « 1 conseil suggéré », « Aucun conseil ». */
 export function foldedLabel(count: number): string {
   if (count <= 0) return "Aucun conseil";
-  return count === 1 ? "1 conseil trouvé" : `${count} conseils trouvés`;
+  return count === 1 ? "1 conseil suggéré" : `${count} conseils suggérés`;
 }
 
 /** « Bonjour Léa, comment vas-tu ? … » → le titre doré « Bonjour Léa ! » et le reste en dessous (« Comment vas-tu ? … »). */
@@ -268,7 +268,7 @@ export function PosteIsland() {
   }, [send]);
 
   // L'île repliée (fondateur, 15 oct. 2026 : « la bannière prend beaucoup trop de place quand il y a beaucoup de scans ») :
-  // pendant la vente, seuls le robot et « N conseils trouvés » restent à l'écran ; les conseils se déploient quand la souris
+  // pendant la vente, seuls le robot et « N conseils suggérés » restent à l'écran ; les conseils se déploient quand la souris
   // passe sur l'île (ou d'un appui, sur un écran tactile) et se replient quand elle en sort.
   const [hovered, setHovered] = useState(false);
   const foldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -418,8 +418,8 @@ export function PosteIsland() {
               <button type="button" data-ile-replie="" onClick={openIsland} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
                 <Robot size={34} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] leading-[18px] font-bold" style={{ color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
-                  <span className="block truncate text-[11.5px] leading-[15px] text-white/55">Passez la souris pour voir</span>
+                  <span className="block whitespace-nowrap text-[14px] leading-[18px] font-bold" style={{ color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
+                  <span className="block whitespace-nowrap text-[11.5px] leading-[15px] text-white/55">Passez la souris pour voir</span>
                 </span>
               </button>
               {/* Le client est parti : la vente se termine d'un clic, sans la question de l'e-mail, et le prochain scan est un nouveau client. */}
