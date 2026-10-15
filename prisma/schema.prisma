@@ -5880,7 +5880,13 @@ model SiteVisitor {
   visits      Int      @default(1)
   firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @default(now())
+  /// La ville, la région et le pays devinés par Vercel d'après l'adresse (approximatifs : souvent la ville du fournisseur
+  /// d'accès). Rien quand Vercel ne sait pas, ou pour les visiteurs comptés avant le 15 oct. 2026.
+  city        String?
+  region      String?
+  country     String?
 
   @@index([firstSeenAt])
+  @@index([city])
   @@map("site_visitors")
 }

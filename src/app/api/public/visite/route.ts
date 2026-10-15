@@ -1,5 +1,5 @@
 import { DIRECTOR_SESSION_COOKIE_NAME, PLATFORM_SESSION_COOKIE_NAME, SALES_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/config/constants";
-import { isBot, recordSiteVisit, visitorIp } from "@/server/services/site-visitors";
+import { isBot, recordSiteVisit, visitorIp, visitorPlace } from "@/server/services/site-visitors";
 
 const SESSIONS = [SESSION_COOKIE_NAME, PLATFORM_SESSION_COOKIE_NAME, SALES_SESSION_COOKIE_NAME, DIRECTOR_SESSION_COOKIE_NAME];
 
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const cookies = request.headers.get("cookie") ?? "";
   const loggedIn = SESSIONS.some((name) => cookies.includes(`${name}=`));
   if (ip && !loggedIn && !isBot(request.headers.get("user-agent"))) {
-    await recordSiteVisit(ip).catch((error) => console.error("[visite] non comptée :", error instanceof Error ? error.message : error));
+    await recordSiteVisit(ip, visitorPlace(request.headers)).catch((error) => console.error("[visite] non comptée :", error instanceof Error ? error.message : error));
   }
   return new Response(null, { status: 204 });
 }
