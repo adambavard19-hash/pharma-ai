@@ -23,8 +23,9 @@ import { findOpenFactsName } from "@/server/services/product-images";
  * Une vente reste ouverte sur son poste jusqu'à « Vente terminée » : chaque boîte bipée ensuite s'ajoute à la même bannière,
  * même trois minutes plus tard (le patient discute, repose une boîte, en ajoute une autre). Fondateur, 14 oct. 2026.
  *
- * Le garde-fou : une minute sans aucun bip sur ce poste, et le bip suivant ouvre une nouvelle vente — un « Vente terminée »
- * oublié ne mélange pas deux clients. Mesuré en pharmacie le 15 oct. 2026 : les boîtes d'un même client se suivent à moins
+ * Sans aucune réponse Vendu / Non vendu, une minute sans bip sur ce poste termine la vente d'elle-même, et le bip suivant ouvre
+ * la vente suivante ; dès qu'un conseil a reçu une réponse, la vente reste ouverte jusqu'à « Vente terminée » (fondateur,
+ * 15 oct. 2026). Mesuré en pharmacie le 15 oct. 2026 : les boîtes d'un même client se suivent à moins
  * de 45 secondes, deux clients sont séparés d'une minute et demie ou plus ; à cinq minutes, une vente empilait encore 8 boîtes
  * de trois clients (trente minutes, le matin, en empilaient 22).
  *
@@ -35,6 +36,12 @@ export const SAME_SALE_WINDOW_MS = 60 * 1000;
 
 /** Au-delà de ce nombre de boîtes, une vente n'est plus reprise par un nouveau bip : ce n'est plus un seul client. */
 export const MAX_BOXES_PER_SALE = 15;
+
+/** Une vente ouverte plus ancienne que cela (dernière écriture) n'est plus reprise, même avec des réponses. */
+const OPEN_SALE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+/** Une réponse Vendu / Non vendu donnée au poste (même valeur que `COUNTER_DECLARED`, server/services/counter-window.ts). */
+const COUNTER_ANSWERED = "COUNTER_DECLARED";
 
 /** Un horodatage de bip plus ancien que cela n'est pas crédible (horloge du poste fausse) : on retient l'instant de réception. */
 const MAX_SCAN_AGE_MS = 6 * 60 * 60 * 1000;
@@ -167,38 +174,51 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
   }
   const withinWindow = previousScanAt !== null && Math.abs(at.getTime() - previousScanAt.getTime()) <= SAME_SALE_WINDOW_MS;
 
-  // Où chercher la vente de ce patient, et depuis quand elle doit avoir été écrite.
-  // - Poste connu : au-delà d'une minute depuis son dernier bip (ou sans bip
-  //   antérieur), c'est un autre patient : aucune vente n'est cherchée. Sinon,
-  //   la vente qui a reçu le bip précédent a été écrite depuis ce bip. Ce n'est
-  //   pas une fenêtre, c'est un garde-fou : une vente restée ouverte depuis
-  //   longtemps (une vente bipée n'est presque jamais encaissée dans PharmaBoost)
-  //   ne reprend pas un patient parce que la vente suivante vient d'être encaissée.
-  // - Poste inconnu (clé d'un serveur) : repli sur la dernière écriture de la vente.
-  const writtenSince = agent.postId ? (withinWindow ? previousScanAt : null) : new Date(now.getTime() - SAME_SALE_WINDOW_MS);
-  let open = writtenSince
-    ? await prisma.prescription.findFirst({
-        where: {
-          pharmacyId: agent.scope.pharmacyId,
-          source: "COUNTER_SCAN",
-          // Le comptoir se reconnaît à son identité, pas à son nom affiché : deux ordinateurs de même nom ne mélangent jamais leurs ventes.
-          ...(agent.postId ? { counterPostId: agent.postId } : { counterPost: post }),
-          // Une vente déjà analysée mais pas encore encaissée reste celle du
-          // patient au comptoir : un bip de plus la complète et la ré-analyse.
-          status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
-          updatedAt: { gte: writtenSince },
-          sales: { none: {} },
-          // « Vente terminée » dans la fenêtre du poste : le bip suivant est un autre patient.
-          NOT: { counterFollowUp: { closedAt: { not: null } } },
-        },
-        // La vente que ce poste a ouverte en dernier, jamais une plus ancienne
-        // encore ouverte : l'ordre est celui de la création, pas de l'écriture
-        // (une analyse tardive d'une vente ancienne la ferait remonter).
-        orderBy: { createdAt: "desc" },
-        select: { id: true, reference: true, lines: { select: { id: true, drugSpecialtyId: true, rawText: true, drugName: true, quantity: true, position: true } } },
-      })
-    : null;
-
+  // La vente ouverte de ce poste, et la règle du fondateur (15 oct. 2026) pour savoir si ce bip est le même client :
+  //  - quelqu'un a déjà répondu Vendu ou Non vendu à un de ses conseils : la vente reste ouverte jusqu'à « Vente terminée »,
+  //    chaque bip s'y ajoute, quel que soit le temps écoulé ;
+  //  - personne n'a répondu : une minute sans bip suffit, la vente se termine d'elle-même et ce bip ouvre la suivante.
+  // Poste inconnu (clé d'un serveur) : repli sur la dernière écriture de la vente, dans la même minute.
+  const openWhere = {
+    pharmacyId: agent.scope.pharmacyId,
+    source: "COUNTER_SCAN" as const,
+    // Le comptoir se reconnaît à son identité, pas à son nom affiché : deux ordinateurs de même nom ne mélangent jamais leurs ventes.
+    ...(agent.postId ? { counterPostId: agent.postId } : { counterPost: post }),
+    // Une vente déjà analysée mais pas encore encaissée reste celle du patient au comptoir : un bip de plus la complète et la ré-analyse.
+    status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] as ("DRAFT" | "NEEDS_VERIFICATION" | "VERIFIED" | "ANALYZING" | "ANALYZED")[] },
+    // Au-delà, une vente oubliée n'est plus reprise (même plafond que l'écran « Au comptoir »).
+    updatedAt: { gte: agent.postId ? new Date(now.getTime() - OPEN_SALE_MAX_AGE_MS) : new Date(now.getTime() - SAME_SALE_WINDOW_MS) },
+    sales: { none: {} },
+    // « Vente terminée » : le bip suivant est un autre patient.
+    NOT: { counterFollowUp: { closedAt: { not: null } } },
+  };
+  let open = await prisma.prescription.findFirst({
+    where: openWhere,
+    // La vente que ce poste a ouverte en dernier, jamais une plus ancienne encore ouverte : l'ordre est celui de la création,
+    // pas de l'écriture (une analyse tardive d'une vente ancienne la ferait remonter).
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      reference: true,
+      lines: { select: { id: true, drugSpecialtyId: true, rawText: true, drugName: true, quantity: true, position: true } },
+      _count: { select: { recommendations: { where: { outcomeSource: COUNTER_ANSWERED, decidedAt: { not: null } } } } },
+    },
+  });
+  if (open && agent.postId) {
+    const answered = open._count.recommendations > 0;
+    if (!answered && !withinWindow) {
+      // Personne n'a répondu et le poste est resté une minute sans bip : la vente se termine toute seule (conseils « sans
+      // réponse », comme un « Vente terminée »), et ce bip est le client suivant.
+      const closing = open.id;
+      open = null;
+      try {
+        const { finishCounterSale } = await import("@/server/services/counter-window");
+        await finishCounterSale(agent, { prescriptionId: closing });
+      } catch (error) {
+        console.error("[scan] fin automatique de la vente", error);
+      }
+    }
+  }
   let prescriptionId: string;
   let reference: string;
   let created = false;

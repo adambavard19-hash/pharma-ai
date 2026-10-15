@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 type Line = { id: string; drugSpecialtyId: string | null; rawText: string | null; drugName: string; quantity: number | null; position: number };
-type Sale = { id: string; reference: string; pharmacyId: string; source: string; counterPost: string; counterPostId?: string | null; handledByUserId?: string | null; status: string; createdAt: Date; updatedAt: Date; sales: unknown[]; lines: Line[]; followUpClosed?: boolean };
+type Sale = { id: string; reference: string; pharmacyId: string; source: string; counterPost: string; counterPostId?: string | null; handledByUserId?: string | null; status: string; createdAt: Date; updatedAt: Date; sales: unknown[]; lines: Line[]; followUpClosed?: boolean; answered?: number };
 type Post = { lastScanAt: Date | null; lastSeenAt: Date | null; scanCount: number; assignedUserId?: string | null };
 
 type DateFilter = { gte?: Date; gt?: Date };
@@ -94,7 +94,8 @@ const db = vi.hoisted(() => {
     prescription: {
       findFirst: vi.fn(async ({ where, orderBy }: { where: SaleWhere; orderBy?: OrderBy; select?: unknown }) => {
         const found = sorted(mem.sales.filter((sale) => matches(sale, where)), orderBy);
-        return found[0] ?? null;
+        // `_count.recommendations` : les conseils auxquels le poste a répondu Vendu ou Non vendu.
+        return found[0] ? { ...found[0], _count: { recommendations: found[0].answered ?? 0 } } : null;
       }),
       create: vi.fn(async ({ data }: { data: { pharmacyId: string; reference: string; status: string; source: string; counterPost: string; counterPostId?: string | null; handledByUserId?: string | null; lines: { create: Omit<Line, "id"> } } }) => {
         mem.next += 1;
@@ -156,6 +157,14 @@ vi.mock("@/server/services/references", () => ({
   createWithReference: async (_entity: string, _pharmacyId: string, create: (reference: string) => Promise<unknown>) => create(`ORD-${String(mem.next + 1).padStart(4, "0")}`),
 }));
 vi.mock("@/server/services/product-images", () => ({ findOpenFactsName: vi.fn(async () => null) }));
+const finish = vi.hoisted(() => ({
+  finishCounterSale: vi.fn(async (_agent: unknown, input: { prescriptionId: string }) => {
+    const sale = mem.sales.find((candidate) => candidate.id === input.prescriptionId);
+    if (sale) sale.followUpClosed = true;
+    return { ok: true };
+  }),
+}));
+vi.mock("@/server/services/counter-window", () => ({ finishCounterSale: finish.finishCounterSale }));
 
 const { SAME_SALE_WINDOW_MS, recordCounterScan, closeLiveCounterSales, scanInstant } = await import("../counter-scan");
 /** La fenêtre, en secondes : une vente reste ouverte jusqu'à « Vente terminée », avec trente minutes sans bip pour garde-fou. */
@@ -622,3 +631,42 @@ describe("chaque comptoir est un espace à part, avec son collaborateur", () => 
   });
 });
 
+
+describe("la règle du fondateur (15 oct. 2026) : une réponse garde la vente ouverte, sans réponse elle se termine seule", () => {
+  it("un conseil répondu (Vendu ou Non vendu) : cinq minutes plus tard, le bip s'ajoute encore à la même vente", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    mem.sales[0].answered = 1;
+    wait(5 * 60);
+    const second = await scan(EAN_CREME);
+    expect(first.ok && second.ok && second.created === false && second.prescriptionId === first.prescriptionId).toBe(true);
+    expect(finish.finishCounterSale).not.toHaveBeenCalled();
+  });
+
+  it("un conseil répondu puis « Vente terminée » : le bip suivant est un autre client", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    mem.sales[0].answered = 1;
+    mem.sales[0].followUpClosed = true;
+    wait(10);
+    const second = await scan(EAN_CREME);
+    expect(first.ok && second.ok && second.created === true && second.prescriptionId !== first.prescriptionId).toBe(true);
+  });
+
+  it("aucune réponse et plus d'une minute sans bip : la vente se termine toute seule, le bip ouvre la vente suivante", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    wait(61);
+    const second = await scan(EAN_CREME);
+    expect(first.ok && second.ok && second.created === true).toBe(true);
+    if (!first.ok) return;
+    expect(finish.finishCounterSale).toHaveBeenCalledTimes(1);
+    expect(finish.finishCounterSale.mock.calls[0][1]).toEqual({ prescriptionId: first.prescriptionId });
+    expect(mem.sales[0].followUpClosed).toBe(true);
+  });
+
+  it("aucune réponse mais un bip dans la minute : même vente, rien n'est terminé", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    wait(40);
+    const second = await scan(EAN_CREME);
+    expect(first.ok && second.ok && second.prescriptionId === first.prescriptionId).toBe(true);
+    expect(finish.finishCounterSale).not.toHaveBeenCalled();
+  });
+});
