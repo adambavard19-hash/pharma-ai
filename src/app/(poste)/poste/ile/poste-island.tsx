@@ -175,7 +175,7 @@ export function PosteIsland() {
 
   // Le temps qui passe : scan → analyse, lignes cochées, pause « N conseils », fin de « Rien à ajouter » et de « Vente terminée ».
   useEffect(() => {
-    const delay = stageDelay(island.stage);
+    const delay = stageDelay(island.stage, Boolean(entry));
     if (delay === null) return;
     const id = setTimeout(() => {
       if (island.stage === "scan" || island.stage === "analyzing") dispatch({ type: "tick" });

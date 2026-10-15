@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db/client";
 import { authenticateAgent } from "@/server/services/stock-sync";
-import { hasSettled } from "@/core/counter/settle";
+import { hasSettled, SETTLE_MS } from "@/core/counter/settle";
 import { analysePrescription } from "@/server/services/analysis";
 import { recordAudit } from "@/server/audit/log";
 import { getEnv } from "@/config/env";
@@ -58,7 +58,18 @@ export async function GET(request: Request) {
   if (!read) return NextResponse.json({ ok: false, error: "Vente inconnue pour ce poste." }, { status: 404 });
   if (read.status === "NEEDS_VERIFICATION") {
     try {
-      if (await settleAndAnalyse(agent, id)) read = (await readNotice(agent, id)) ?? read;
+      let analysed = await settleAndAnalyse(agent, id);
+      if (!analysed) {
+        // Pas encore le calme après le dernier bip : plutôt que de répondre « pas prêt » et d'attendre la prochaine question du poste,
+        // on attend ici les quelques centaines de millisecondes qui manquent, puis on analyse — le conseil part dans CETTE réponse.
+        const fresh = await prisma.prescription.findUnique({ where: { id }, select: { status: true, updatedAt: true } });
+        const remaining = fresh?.status === "NEEDS_VERIFICATION" ? SETTLE_MS - (Date.now() - fresh.updatedAt.getTime()) : -1;
+        if (remaining > 0 && remaining <= SETTLE_MS) {
+          await new Promise((resolve) => setTimeout(resolve, remaining + 30));
+          analysed = await settleAndAnalyse(agent, id);
+        }
+      }
+      if (analysed) read = (await readNotice(agent, id)) ?? read;
     } catch (error) {
       console.error("[conseil] analyse depuis le poste de caisse", error);
     }

@@ -79,7 +79,7 @@ export const BANNER = {
   },
   timing: {
     /** Le temps où « 3 conseils disponibles » reste seul, avant que la bannière s'agrandisse d'elle-même. */
-    readyPauseMs: 1100,
+    readyPauseMs: 700,
     /** « Rien à ajouter » reste affiché ce temps, puis la bannière redevient « en attente ». */
     quietMs: 8000,
     /** « Vente terminée ! » reste affiché ce temps. */

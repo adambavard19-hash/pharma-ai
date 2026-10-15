@@ -189,12 +189,13 @@ function onHost(view: PosteView, command: HostCommand, now: number): PosteView {
 }
 
 /** Combien de temps l'étape courante reste seule avant le pas suivant ; null : elle attend un geste ou l'agent. */
-export function stageDelay(stage: IslandStage): number | null {
+export function stageDelay(stage: IslandStage, hasResult = false): number | null {
   switch (stage) {
     case "scan":
-      return 650;
+      return 400;
     case "analyzing":
-      return 650;
+      // Le résultat est là : les dernières lignes se cochent vite, le conseil n'attend pas l'animation.
+      return hasResult ? 200 : 550;
     case "ready":
       return BANNER.timing.readyPauseMs;
     case "emailSent":

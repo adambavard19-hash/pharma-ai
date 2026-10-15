@@ -47,7 +47,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.12";
+const VERSION = "0.10.13";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -602,7 +602,10 @@ async function runPost(config: Config): Promise<void> {
     } catch (error) {
       log(`Erreur : ${error instanceof Error ? error.message : String(error)}`);
     }
-    await new Promise((resolve) => setTimeout(resolve, watched ? (Date.now() - watched.lastChange > SESSION_CALM_MS ? 8000 : 2000) : 3000));
+    // Juste après un bip, tant que le conseil n'est pas arrivé : on redemande vite (le serveur attend lui-même le calme et analyse).
+    // Aussi quelques secondes après une boîte ajoutée à une vente déjà affichée : la bannière se met à jour aussitôt.
+    const waitingAdvice = watched !== null && ((watched.shownSignature === null && Date.now() - watched.since < 20_000) || Date.now() - watched.lastChange < 6_000);
+    await new Promise((resolve) => setTimeout(resolve, watched ? (waitingAdvice ? 700 : Date.now() - watched.lastChange > SESSION_CALM_MS ? 8000 : 2000) : 3000));
   }
 }
 

@@ -410,7 +410,7 @@ var BANNER = {
   },
   timing: {
     /** Le temps où « 3 conseils disponibles » reste seul, avant que la bannière s'agrandisse d'elle-même. */
-    readyPauseMs: 1100,
+    readyPauseMs: 700,
     /** « Rien à ajouter » reste affiché ce temps, puis la bannière redevient « en attente ». */
     quietMs: 8e3,
     /** « Vente terminée ! » reste affiché ce temps. */
@@ -6532,7 +6532,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.12";
+var VERSION = "0.10.13";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -6960,7 +6960,8 @@ async function runPost(config) {
     } catch (error) {
       log(`Erreur : ${error instanceof Error ? error.message : String(error)}`);
     }
-    await new Promise((resolve) => setTimeout(resolve, watched ? Date.now() - watched.lastChange > SESSION_CALM_MS ? 8e3 : 2e3 : 3e3));
+    const waitingAdvice = watched !== null && (watched.shownSignature === null && Date.now() - watched.since < 2e4 || Date.now() - watched.lastChange < 6e3);
+    await new Promise((resolve) => setTimeout(resolve, watched ? waitingAdvice ? 700 : Date.now() - watched.lastChange > SESSION_CALM_MS ? 8e3 : 2e3 : 3e3));
   }
 }
 function testRobot() {
