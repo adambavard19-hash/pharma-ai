@@ -23,13 +23,13 @@ import { findOpenFactsName } from "@/server/services/product-images";
  * Une vente reste ouverte sur son poste jusqu'à « Vente terminée » : chaque boîte bipée ensuite s'ajoute à la même bannière,
  * même trois minutes plus tard (le patient discute, repose une boîte, en ajoute une autre). Fondateur, 14 oct. 2026.
  *
- * Le garde-fou : trente minutes sans aucun bip sur ce poste, et le bip suivant ouvre une nouvelle vente — un « Vente terminée »
- * oublié ne mélange pas deux patients pour la journée.
+ * Le garde-fou : cinq minutes sans aucun bip sur ce poste, et le bip suivant ouvre une nouvelle vente — un « Vente terminée »
+ * oublié ne mélange pas deux clients (trente minutes, le 15 oct. 2026, empilaient 22 boîtes de plusieurs clients dans une vente).
  *
  * La fenêtre glisse et se mesure sur l'horloge du POSTE : l'écart entre ce bip et le bip précédent du même poste
  * (`CounterPost.lastScanAt`, lu avant sa mise à jour), jamais depuis `Prescription.updatedAt`, que l'analyse fait avancer.
  */
-export const SAME_SALE_WINDOW_MS = 30 * 60 * 1000;
+export const SAME_SALE_WINDOW_MS = 5 * 60 * 1000;
 
 /** Un horodatage de bip plus ancien que cela n'est pas crédible (horloge du poste fausse) : on retient l'instant de réception. */
 const MAX_SCAN_AGE_MS = 6 * 60 * 60 * 1000;
