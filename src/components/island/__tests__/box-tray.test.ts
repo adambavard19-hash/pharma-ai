@@ -42,3 +42,24 @@ describe("retirer une boîte de la bannière", () => {
     expect(removeBoxWord("vente1", "ligne 1; rm")).toBeNull();
   });
 });
+
+describe("un bloc par boîte, même sans conseil (POSTE4, 15 oct. 2026)", () => {
+  it("une boîte retirée puis une autre scannée, sans conseil : la séparation reste, la nouvelle boîte dit « Aucun conseil »", () => {
+    const html = renderToStaticMarkup(
+      createElement(CounterIsland, {
+        state: { ...INITIAL_ISLAND, stage: "advice", outcomes: [null] },
+        items: [{ name: "NEOBIANACID CITRON", price: "6,90 €", stock: "IN_STOCK", drug: "GAVISCONELL MENTHE SANS SUCRE" }],
+        drug: "GAVISCONELL MENTHE SANS SUCRE",
+        alert: null,
+        pills: [],
+        compactAdvice: true,
+        boxes: [{ id: "l1", name: "GAVISCONELL MENTHE SANS SUCRE" }, { id: "l2", name: "BABYBIANE IMEDIA Pdr 7Sach/1" }],
+        onRemoveBox: vi.fn(),
+        onAnswer: vi.fn(), onEmail: vi.fn(), onSendEmail: vi.fn(), onAddEmail: vi.fn(), onFinish: vi.fn(), onDismissAlert: vi.fn(),
+      }),
+    );
+    expect(html.match(/data-advice-group=""/g)?.length).toBe(2);
+    expect(html).toContain("Aucun conseil");
+    expect(html).toContain("2 boîtes");
+  });
+});

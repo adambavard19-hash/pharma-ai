@@ -204,7 +204,9 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
     if (same) {
       await prisma.prescriptionLine.update({ where: { id: same.id }, data: { quantity: (same.quantity ?? 1) + 1 } });
     } else {
-      await prisma.prescriptionLine.create({ data: { prescriptionId: open.id, position: open.lines.length + 1, ...lineData } });
+      // Après la position la plus haute, jamais « nombre de boîtes + 1 » : une boîte retirée laisse un trou, et le numéro serait déjà pris.
+      const next = open.lines.reduce((max, line) => Math.max(max, line.position ?? 0), 0) + 1;
+      await prisma.prescriptionLine.create({ data: { prescriptionId: open.id, position: next, ...lineData } });
     }
     // Retour à « à confirmer » : l'écran relance l'analyse avec la nouvelle boîte.
     await prisma.prescription.update({ where: { id: open.id }, data: { status: "NEEDS_VERIFICATION", verifiedAt: null } });

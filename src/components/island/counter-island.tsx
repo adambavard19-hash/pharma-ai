@@ -140,6 +140,20 @@ export function groupByDrug(items: readonly Pick<IslandAdvice, "drug">[]): { dru
   return groups;
 }
 
+/**
+ * Les blocs de la bannière : un par boîte de la vente, dans l'ordre des boîtes — même une boîte sans conseil (« Aucun conseil »).
+ * Sans la liste des boîtes (poste ancien), les blocs des conseils seuls. Une boîte ajoutée après un retrait, sans conseil, ne fait
+ * plus disparaître la séparation (POSTE4, 15 oct. 2026).
+ */
+export function boxGroups(items: readonly Pick<IslandAdvice, "drug">[], boxes?: readonly { name: string }[]): { drug: string; indexes: number[] }[] {
+  const groups = groupByDrug(items);
+  if (!boxes || boxes.length === 0) return groups;
+  const ordered = boxes.map((box) => groups.find((group) => group.drug === box.name.trim()) ?? { drug: box.name.trim(), indexes: [] as number[] });
+  // Un conseil dont la boîte n'est pas (ou plus) dans la liste garde son bloc, à la suite.
+  const rest = groups.filter((group) => !ordered.some((known) => known.drug === group.drug));
+  return [...ordered, ...rest];
+}
+
 /** Au plus trois boîtes à l'écran en mode compact ; au-delà, « Agrandir » montre tout. */
 export const COMPACT_MAX_GROUPS = 3;
 
@@ -302,10 +316,10 @@ export function CounterIsland(props: CounterIslandProps) {
   const tone = grumpy ? "warning" : stageTone(state.stage);
   // Plusieurs boîtes scannées : TOUJOURS des colonnes (même si la grande version a été choisie), sauf le temps de lire le détail
   // d'un conseil touché. Une seule boîte : compacte ou grande, au choix du pharmacien.
-  const multiBox = groupByDrug(items).length > 1;
+  const multiBox = boxGroups(items, props.boxes).length > 1;
   const compact = props.compactAdvice === true && state.stage === "advice" && count > 0 && (multiBox ? !openName : !expanded);
   // Plusieurs boîtes scannées : la bannière se divise en colonnes côte à côte (une par boîte), dans la fenêtre du poste.
-  const columns = compact ? Math.min(groupByDrug(items).length, COMPACT_MAX_GROUPS) : 1;
+  const columns = compact ? Math.min(boxGroups(items, props.boxes).length, COMPACT_MAX_GROUPS) : 1;
   // Sans geste pendant 25 s, l'île compacte se replie en capsule (« 2 conseils ») ; le survol la rouvre.
   const adviceKey = compact ? amongOf(items) : "";
   useEffect(() => {
@@ -452,7 +466,7 @@ export function CounterIsland(props: CounterIslandProps) {
           const among = amongOf(items);
           // Un bloc par boîte scannée : chaque boîte montre SON conseil (le premier qui attend une réponse), ses flèches
           // parcourent les siens. Plusieurs boîtes, plusieurs blocs — la bannière se divise au lieu de tout empiler.
-          const groups = groupByDrug(items);
+          const groups = boxGroups(items, props.boxes);
           const picked = chosen && chosen.among === among ? chosen.byGroup : {};
           const shownGroups = groups.slice(0, COMPACT_MAX_GROUPS);
           // Deux boîtes ou plus : un BLOC par boîte, côte à côte, chacun à sa hauteur (plus de fond noir vide sous une boîte
@@ -486,8 +500,8 @@ export function CounterIsland(props: CounterIslandProps) {
                         <span className="line-clamp-2 text-[12.5px] leading-4 font-bold tracking-tight text-white" title={group.drug || props.drug}>
                           {group.drug || props.drug}
                         </span>
-                        <span className="block text-[10.5px] leading-4 font-medium" style={{ color: C.accent }}>
-                          {group.indexes.length > 1 ? `${group.indexes.length} conseils` : "1 conseil"}
+                        <span className="block text-[10.5px] leading-4 font-medium" style={{ color: group.indexes.length ? C.accent : "rgba(255,255,255,0.5)" }}>
+                          {group.indexes.length > 1 ? `${group.indexes.length} conseils` : group.indexes.length === 1 ? "1 conseil" : "Aucun conseil"}
                         </span>
                       </span>
                     </div>
