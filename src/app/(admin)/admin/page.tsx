@@ -110,7 +110,7 @@ const NUMBER = new Intl.NumberFormat("fr-FR");
 /** Le compteur des visiteurs du site public : une personne par adresse IP, les visites répétées ne comptent pas deux fois. */
 function SiteVisitorsCounter({ counts }: { counts: SiteVisitorCounts }) {
   return (
-    <div data-compteur-visiteurs="" className="flex items-center gap-3 rounded-2xl bg-surface-card px-4 py-2.5 shadow-xs ring-1 ring-border-subtle">
+    <Link href="/admin/visiteurs" data-compteur-visiteurs="" title="Voir de quelles villes ils viennent" className="flex items-center gap-3 rounded-2xl bg-surface-card px-4 py-2.5 shadow-xs ring-1 ring-border-subtle transition-all hover:-translate-y-px hover:ring-brand-300 motion-reduce:transform-none">
       <span className="grid size-9 place-items-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300">
         <Eye className="size-4" aria-hidden="true" />
       </span>
@@ -120,6 +120,6 @@ function SiteVisitorsCounter({ counts }: { counts: SiteVisitorCounts }) {
           {counts.total > 1 ? "visiteurs" : "visiteur"} du site{counts.today > 0 ? ` · ${NUMBER.format(counts.today)} aujourd\u2019hui` : ""}
         </p>
       </div>
-    </div>
+    </Link>
   );
 }
