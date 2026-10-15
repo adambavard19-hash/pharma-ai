@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
  * survole jour par jour (ou heure par heure), par collaborateur, par produit — et le PDF à télécharger. Même écran pour le
  * titulaire et pour la console de PharmaBoost.
  */
-export function CounterSalesReport({ report, hrefs, pdfHref }: { report: SalesReportView; /** L'adresse de chaque période (calculée côté serveur). */ hrefs: Record<SalesReportPeriod, string>; pdfHref: string }) {
+export function CounterSalesReport({ report, hrefs, pdfHref }: { report: SalesReportView; /** L'adresse de chaque période (calculée côté serveur). */ hrefs: Record<SalesReportPeriod, string>; /** Absent : pas de PDF (l'historique d'un membre de l'équipe). */ pdfHref?: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...report.buckets.map((bucket) => bucket.sales));
   const focus = hover !== null ? report.buckets[hover] : null;
@@ -42,9 +42,11 @@ export function CounterSalesReport({ report, hrefs, pdfHref }: { report: SalesRe
                 </Link>
               ))}
             </div>
+            {pdfHref && (
             <a href={pdfHref} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border-default px-3.5 text-[13px] font-semibold text-text-primary hover:border-brand-400">
               <Download className="size-4" aria-hidden="true" /> Télécharger le PDF
             </a>
+            )}
           </div>
         </div>
 

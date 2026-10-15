@@ -71,7 +71,8 @@ describe("le menu, en trois groupes", () => {
 });
 
 /** Le menu d'un collaborateur, mot pour mot (consigne du fondateur du 13 oct. 2026) ; « Contact support » est le lien du bas, hors tableau. */
-const COLLABORATOR_LABELS = ["Au comptoir", "Mes associations", "E-mails aux patients", "Formations", "Partenaires", "Actualités"];
+// Historique pour toute l'équipe, Partenaires pour les titulaires seulement (fondateur, 15 oct. 2026).
+const COLLABORATOR_LABELS = ["Au comptoir", "Mes associations", "Historique", "E-mails aux patients", "Formations", "Actualités"];
 
 describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas affiché", () => {
   it("le titulaire voit les trois groupes et tout son menu, inchangé", () => {
@@ -80,15 +81,15 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
     expect(navigationFor(resolvePermissions("OWNER")).map((item) => item.label)).toEqual(menuOf("OWNER"));
   });
 
-  it("pharmacien, préparateur et étudiant : exactement Au comptoir, Mes associations, E-mails aux patients et Découvrir (Formations, Partenaires, Actualités)", () => {
-    for (const role of ["PHARMACIST", "TECHNICIAN", "STUDENT"] as const) {
+  it("pharmacien adjoint, préparateur, étudiant et remplaçant : exactement Au comptoir, Mes associations, Historique, E-mails aux patients et Découvrir (Formations, Actualités)", () => {
+    for (const role of ["PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE"] as const) {
       expect(menuOf(role), role).toEqual(COLLABORATOR_LABELS);
       expect(groupNavigation(visibleFor(role)).map((group) => group.label), role).toEqual(["Ma pharmacie", "Découvrir"]);
     }
   });
 
   it("le rôle « Consultation » (lecture seule, il ne vend pas) n'a que la part lisible du même menu : ni comptoir ni bilans", () => {
-    expect(menuOf("VIEWER")).toEqual(["Mes associations", "Formations", "Partenaires", "Actualités"]);
+    expect(menuOf("VIEWER")).toEqual(["Mes associations", "Formations", "Actualités"]);
   });
 
   it("la liste blanche du collaborateur est explicite, et le filtre par permission du menu (barre latérale) y aboutit pour chaque rôle", () => {
@@ -111,10 +112,10 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
     }
   });
 
-  it("l'équipe au comptoir ne voit aucune entrée de gestion : ni Mon stock, ni Performances, ni Mon équipe, ni Laboratoires & gammes, ni Produits manquants, ni Paramètres", () => {
+  it("l'équipe au comptoir ne voit aucune entrée de gestion : ni Mon stock, ni Performances, ni Partenaires, ni Mon équipe, ni Laboratoires & gammes, ni Produits manquants, ni Paramètres", () => {
     for (const role of TEAM_ROLES) {
       const menu = menuOf(role);
-      for (const gone of ["Mon stock", "Performances", "Historique", "Produits manquants", "Mon équipe", "Laboratoires & gammes", "Paramètres"]) {
+      for (const gone of ["Mon stock", "Performances", "Partenaires", "Produits manquants", "Mon équipe", "Laboratoires & gammes", "Paramètres"]) {
         expect(menu, `${role} : ${gone}`).not.toContain(gone);
       }
     }

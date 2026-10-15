@@ -4,6 +4,7 @@ import { Mail } from "lucide-react";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { loadClosedSales } from "@/server/services/counter-history";
+import { myComptoirs } from "@/server/services/comptoirs";
 import { buildSalesReport, euros, parisMidnight, periodFromParam, reportWindow, SALES_REPORT_PERIODS, toSalesReportView, type SalesReportPeriod } from "@/core/counter/sales-report";
 import { saleTitle } from "@/core/counter/sale-title";
 import { TIME_ZONE } from "@/config/constants";
@@ -20,7 +21,8 @@ const PAGE_SIZE = 50;
 /**
  * L'historique : CHAQUE vente terminée au comptoir (« Vente terminée » au poste), la plus récente d'abord — l'heure, qui l'a
  * faite, les boîtes scannées, les conseils proposés, vendus ou non, le chiffre d'affaires qu'ils ont ajouté, le bilan e-mail.
- * Réservé au titulaire (même permission que les performances). L'officine vient de la session, jamais de l'adresse.
+ * Le titulaire voit toutes les ventes ; un membre de l'équipe, seulement les SIENNES (chaque comptoir est un espace à part).
+ * L'officine vient de la session, jamais de l'adresse.
  */
 type Query = { periode?: string | string[]; page?: string | string[]; jour?: string | string[]; de?: string | string[]; a?: string | string[]; numero?: string | string[] };
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? "";
@@ -28,7 +30,9 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^\d{2}:\d{2}$/;
 
 export default async function HistoriquePage({ searchParams }: { searchParams: Promise<Query> }) {
-  const session = await requirePermission(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
+  const session = await requirePermission(PERMISSIONS.PRESCRIPTION_CREATE);
+  const everyone = session.permissions.has(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
+  const onlyFor = everyone ? undefined : { userId: session.scope.userId, postIds: (await myComptoirs(session.scope)).postIds };
   const query = await searchParams;
   const period = periodFromParam(query.periode);
   const pageNumber = Math.max(1, Math.min(200, Number(one(query.page)) || 1));
@@ -43,8 +47,8 @@ export default async function HistoriquePage({ searchParams }: { searchParams: P
   const listFrom = day ? parisMidnight(new Date(`${day}T12:00:00Z`), TIME_ZONE) : number ? new Date(now.getTime() - 366 * 24 * 60 * 60 * 1000) : window.from;
   const listTo = day ? new Date(listFrom.getTime() + 24 * 60 * 60 * 1000 - 1) : now;
   const [periodSales, listed] = await Promise.all([
-    loadClosedSales({ pharmacyId: session.scope.pharmacyId, from: window.from, to: window.to }),
-    filtered ? loadClosedSales({ pharmacyId: session.scope.pharmacyId, from: listFrom, to: listTo }) : Promise.resolve(null),
+    loadClosedSales({ pharmacyId: session.scope.pharmacyId, onlyFor, from: window.from, to: window.to }),
+    filtered ? loadClosedSales({ pharmacyId: session.scope.pharmacyId, onlyFor, from: listFrom, to: listTo }) : Promise.resolve(null),
   ]);
   const report = buildSalesReport({ period, sales: periodSales, now, timeZone: TIME_ZONE });
   const clock = new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
@@ -64,12 +68,12 @@ export default async function HistoriquePage({ searchParams }: { searchParams: P
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Historique" description="Toutes les ventes terminées au comptoir, une par une : les boîtes scannées, les conseils proposés et vendus, et ce qu'ils ont rapporté." />
+      <PageHeader title="Historique" description={everyone ? "Toutes les ventes terminées au comptoir, une par une : les boîtes scannées, les conseils proposés et vendus, et ce qu'ils ont rapporté." : "Vos ventes terminées au comptoir, une par une : les boîtes scannées, les conseils proposés et vendus, et ce qu'ils ont rapporté."} />
 
       <CounterSalesReport
         report={toSalesReportView(report)}
         hrefs={Object.fromEntries(SALES_REPORT_PERIODS.map((entry) => [entry.key, `/historique?periode=${entry.param}`])) as Record<SalesReportPeriod, string>}
-        pdfHref={`/api/performance/comptoir-pdf?periode=${param(period)}`}
+        pdfHref={everyone ? `/api/performance/comptoir-pdf?periode=${param(period)}` : undefined}
       />
 
       <Card>

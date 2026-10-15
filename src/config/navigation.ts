@@ -127,10 +127,11 @@ export const NAVIGATION: NavItem[] = [
   {
     href: "/historique",
     label: "Historique",
-    subtitle: "Toutes les ventes terminées",
+    subtitle: "Les ventes terminées",
     icon: History,
-    // Chaque vente terminée au comptoir, une par une, avec ses conseils et ce qu'ils ont rapporté : une vue de titulaire.
-    permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
+    // Chaque vente terminée au comptoir, une par une : toute l'équipe l'a (fondateur, 15 oct. 2026) — le titulaire voit toutes les
+    // ventes, un membre de l'équipe seulement les siennes (la page filtre).
+    permission: PERMISSIONS.PRESCRIPTION_CREATE,
     match: ["/historique"],
     description: "Chaque vente terminée au comptoir : les boîtes scannées, les conseils proposés et vendus, le chiffre d'affaires ajouté",
     group: "pharmacie",
@@ -198,9 +199,8 @@ export const NAVIGATION: NavItem[] = [
     href: "/partenaires",
     label: "Partenaires",
     icon: Handshake,
-    // L'équipe consulte (PARTNERS_VIEW) ; masquer, contacter, commander restent au titulaire (PARTNERS_MANAGE),
-    // boutons masqués à l'écran et refusés par le serveur.
-    permission: PERMISSIONS.PARTNERS_VIEW,
+    // Titulaires seulement (fondateur, 15 oct. 2026) : l'équipe garde les gammes partenaires sur la page de la vente, pas l'onglet.
+    permission: PERMISSIONS.PARTNERS_MANAGE,
     match: ["/partenaires"],
     description: "Les gammes des laboratoires partenaires : présentation, conditions, contact",
     group: "decouvrir",
@@ -237,7 +237,7 @@ export const NAVIGATION: NavItem[] = [
  * Le menu d'un collaborateur (tout rôle autre que le titulaire) : ces entrées, et rien d'autre — plus le lien
  * « Contact support », toujours en bas du menu. Consigne du fondateur du 13 oct. 2026.
  */
-export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/associations", "/emails-patients", "/formation", "/partenaires", "/nouveautes"];
+export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/historique", "/associations", "/emails-patients", "/formation", "/nouveautes"];
 
 /**
  * Les entrées que voit une personne : celles dont elle détient la permission, et, hors de l'espace du titulaire

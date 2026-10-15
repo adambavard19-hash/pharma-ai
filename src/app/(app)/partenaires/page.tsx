@@ -26,7 +26,8 @@ export const metadata: Metadata = { title: "Partenaires" };
  * définitif. Sans marque proposée, la page le dit simplement.
  */
 export default async function PartnersPage() {
-  const session = await requirePermission(PERMISSIONS.PARTNERS_VIEW);
+  // Titulaires seulement (fondateur, 15 oct. 2026) : l'équipe garde les gammes partenaires sur la page de la vente.
+  const session = await requirePermission(PERMISSIONS.PARTNERS_MANAGE);
   const canManage = session.permissions.has(PERMISSIONS.PARTNERS_MANAGE);
   const catalog = await partnerCatalog(session.scope);
   const nothingOffered = catalog.visibleCount === 0 && catalog.hidden.length === 0;

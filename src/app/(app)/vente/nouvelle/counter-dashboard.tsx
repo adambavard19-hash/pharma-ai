@@ -228,6 +228,19 @@ export function CounterDashboard({
         )}
       </section>
 
+      {/* Le fichier d'installation, toujours à portée de chacun (nouvel ordinateur, réinstallation) : quand l'écran ne le propose pas déjà plus haut. */}
+      {(status.state === "READY" || status.state === "OFFLINE") && (
+        <section aria-label="Installer PharmaBoost sur un ordinateur" className={GLASS}>
+          <p className="flex items-center gap-2 px-1 text-[14px] font-medium text-text-primary">
+            <Monitor className="size-4 text-text-tertiary" aria-hidden />
+            Un nouvel ordinateur au comptoir ?
+          </p>
+          <div className="px-1">
+            <InstallComptoirButton />
+          </div>
+        </section>
+      )}
+
       <section aria-label="Saisie à la main" className={GLASS}>
         <button
           type="button"
@@ -291,6 +304,22 @@ function LiveSaleCard({ sale }: { sale: LiveSale }) {
   );
 }
 
+/**
+ * Le fichier d'installation de PharmaBoost pour l'ordinateur du comptoir : chacun le télécharge pour le sien (le comptoir lui est
+ * attribué dès le départ), le titulaire pour n'importe lequel. Le jeton voyage dans le nom du fichier : rien à copier.
+ */
+function InstallComptoirButton() {
+  return (
+    <form method="post" action="/api/connexion/installateur" className="mt-3 flex flex-wrap items-center gap-3" data-installer-comptoir="">
+      <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-600 px-4 text-[14px] font-semibold text-white transition-colors hover:bg-brand-700">
+        <Download className="size-4" aria-hidden />
+        Télécharger PharmaBoost pour mon ordinateur
+      </button>
+      <span className="text-[12.5px] leading-4 text-text-tertiary">Sur l&apos;ordinateur de votre comptoir : ouvrez le fichier, il devient votre comptoir. Windows 10 ou 11.</span>
+    </form>
+  );
+}
+
 /** Rien en cours : ce que fait le comptoir — et, honnêtement, ce qui l'empêche de voir arriver les délivrances. */
 function NothingLive({ status, canConfigure }: { status: CounterDashboardData["status"]; canConfigure: boolean }) {
   const text =
@@ -317,13 +346,7 @@ function NothingLive({ status, canConfigure }: { status: CounterDashboardData["s
       )}
       {(status.state === "UNASSIGNED" || status.state === "NOT_CONNECTED") && (
         // Un nouvel ordinateur au comptoir : chacun télécharge PharmaBoost pour LE SIEN, sans passer par le titulaire.
-        <form method="post" action="/api/connexion/installateur" className="mt-3 flex flex-wrap items-center gap-3" data-installer-comptoir="">
-          <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-600 px-4 text-[14px] font-semibold text-white transition-colors hover:bg-brand-700">
-            <Download className="size-4" aria-hidden />
-            Télécharger PharmaBoost pour mon ordinateur
-          </button>
-          <span className="text-[12.5px] leading-4 text-text-tertiary">Sur l&apos;ordinateur de votre comptoir : ouvrez le fichier, il devient votre comptoir. Windows 10 ou 11.</span>
-        </form>
+        <InstallComptoirButton />
       )}
       {(status.state === "UNASSIGNED" || status.state === "NOT_CONNECTED") && canConfigure && (
         <Link href="/connexion" className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">

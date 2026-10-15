@@ -11,9 +11,13 @@ import { TIME_ZONE } from "@/config/constants";
  * rapport de performance (titulaire et console) et le PDF qui en fait la preuve. Toujours borné à UNE officine. Aucune donnée
  * de patient : les boîtes scannées, les conseils, les montants.
  */
-export async function loadClosedSales(input: { pharmacyId: string; from: Date; to: Date; take?: number }): Promise<ClosedSale[]> {
+export async function loadClosedSales(input: { pharmacyId: string; from: Date; to: Date; take?: number; /** Un membre de l'équipe : seulement SES ventes (les siennes, ou celles de ses comptoirs). */ onlyFor?: { userId: string; postIds: string[] } }): Promise<ClosedSale[]> {
   const followUps = await prisma.counterSaleFollowUp.findMany({
-    where: { pharmacyId: input.pharmacyId, closedAt: { gte: input.from, lte: input.to } },
+    where: {
+      pharmacyId: input.pharmacyId,
+      closedAt: { gte: input.from, lte: input.to },
+      ...(input.onlyFor ? { prescription: { OR: [{ handledByUserId: input.onlyFor.userId }, { counterPostId: { in: input.onlyFor.postIds } }] } } : {}),
+    },
     orderBy: { closedAt: "desc" },
     take: input.take ?? 5000,
     select: {
