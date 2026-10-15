@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LifeBuoy, X } from "lucide-react";
+import { LifeBuoy, MessageCircle, X } from "lucide-react";
 import { NAVIGATION, groupNavigation, isNavItemActive, type NavItem } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import { Robot } from "@/components/robot";
@@ -70,9 +70,14 @@ export function Sidebar({
           <div className="flex min-w-0 items-center gap-2">
             {robotHere && (
               <div
-                className="relative shrink-0"
-                onClick={() => alerts.length > 0 && openIsland("home")}
-                title={alertsTitle}
+                className="relative shrink-0 cursor-pointer"
+                data-robot-menu=""
+                // Un clic sur la tête du robot ouvre sa bannière : ce qu'il signale s'il y a quelque chose, sinon la discussion.
+                onClick={() => {
+                  closeNav();
+                  openIsland(alerts.length > 0 ? "home" : "chat");
+                }}
+                title={alerts.length > 0 ? alertsTitle : "Discuter avec le robot PharmaBoost"}
               >
                 <Robot size={42} interactive listen mood={robotAlerts?.mood} look={counterLook?.look} label={counterLook ? counterLook.caption : "Le robot PharmaBoost"} />
                 <AlertBadge alerts={alerts} className="-top-1 -right-1.5" />
@@ -85,18 +90,19 @@ export function Sidebar({
               <p className="truncate text-xs leading-4 text-text-tertiary">{pharmacyName}</p>
             </Link>
             {/* Sans robot sur ce PC, le compte de ce qu'il signale reste au menu : le toucher ouvre l'île (sans robot). */}
-            {!robotHere && alerts.length > 0 && (
+            {!robotHere && (
               <button
                 type="button"
+                data-robot-menu=""
                 onClick={() => {
                   closeNav();
-                  openIsland("home");
+                  openIsland(alerts.length > 0 ? "home" : "chat");
                 }}
-                title={alertsTitle}
-                aria-label={`${alertsTitle} : ouvrir l'île PharmaBoost`}
+                title={alerts.length > 0 ? alertsTitle : "Discuter avec PharmaBoost"}
+                aria-label={alerts.length > 0 ? `${alertsTitle} : ouvrir l'île PharmaBoost` : "Discuter avec PharmaBoost"}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
               >
-                <AlertBadge alerts={alerts} className="static" />
+                {alerts.length > 0 ? <AlertBadge alerts={alerts} className="static" /> : <MessageCircle className="size-4 text-brand-700 dark:text-brand-400" aria-hidden />}
               </button>
             )}
           </div>

@@ -131,10 +131,11 @@ export function PlatformIsland({
    */
   robotless?: boolean;
   /**
-   * Où vit le robot : en haut au centre (l'île), ou en bas à droite (l'espace de la pharmacie, fondateur 15 oct. 2026) — un
-   * robot rond au repos ; un clic ouvre le robot et sa bannière juste au-dessus. Un clic, jamais le survol.
+   * Où vit le robot : en haut au centre (l'île) ; en bas à droite (un robot rond au repos, un clic ouvre sa bannière au-dessus) ;
+   * ou rien à l'écran au repos (« logo », l'espace de la pharmacie, fondateur 15 oct. 2026) : la bannière s'ouvre d'un clic sur la
+   * tête du robot du menu (`openIsland`), sous elle. Jamais au survol.
    */
-  dock?: "top" | "bottom-right";
+  dock?: "top" | "bottom-right" | "logo";
   className?: string;
 }) {
   const router = useRouter();
@@ -296,7 +297,7 @@ export function PlatformIsland({
   let body: ReactNode;
   if (grumpy) {
     body = <CapsuleRow robot={face(32, "concerned")} title="Doucement !" sub="Trop de clics d'un coup — je reprends dans 3 secondes." />;
-  } else if (!open && dock === "bottom-right") {
+  } else if (!open && dock !== "top") {
     body = null;
   } else if (!open) {
     body = (
@@ -369,12 +370,12 @@ export function PlatformIsland({
     <div
       ref={panelRef}
       onPointerEnter={(event) => {
-        if (event.pointerType !== "mouse" || dock === "bottom-right") return;
+        if (event.pointerType !== "mouse" || dock !== "top") return;
         if (leaveTimer.current) clearTimeout(leaveTimer.current);
         if (!open && !grumpy) enterTimer.current = setTimeout(() => setOpen(true), 160);
       }}
       onPointerLeave={(event) => {
-        if (event.pointerType !== "mouse" || dock === "bottom-right") return;
+        if (event.pointerType !== "mouse" || dock !== "top") return;
         if (enterTimer.current) clearTimeout(enterTimer.current);
         if (!pinned) leaveTimer.current = setTimeout(() => setOpen(false), 380);
       }}
@@ -407,6 +408,12 @@ export function PlatformIsland({
           {!open && !grumpy && dockButton}
         </div>
       )}
+      {!claimed && dock === "logo" && (open || grumpy) && (
+        // Sous la tête du robot du menu, en haut à gauche : la bannière qu'elle vient d'ouvrir.
+        <div className="z-[60] max-h-[calc(100vh-96px)] overflow-y-auto" style={{ position: "fixed", left: 16, top: 72, maxWidth: "calc(100vw - 32px)" }}>
+          {island}
+        </div>
+      )}
       {!claimed && dock === "top" && (
         <div
           className={cn("z-[60] transition-[left] duration-[560ms] ease-[cubic-bezier(.3,1.45,.5,1)] motion-reduce:transition-none", !rect && "absolute top-0 left-1/2 -translate-x-1/2")}
@@ -419,7 +426,7 @@ export function PlatformIsland({
   );
 
   return (
-    <div ref={anchor} className={cn("relative h-11 shrink-0", className)} style={{ width: dock === "bottom-right" ? 0 : restWidth }}>
+    <div ref={anchor} className={cn("relative h-11 shrink-0", className)} style={{ width: dock === "top" ? restWidth : 0 }}>
       <style>{ISLAND_CSS}</style>
       {rect ? createPortal(floating, document.body) : floating}
     </div>

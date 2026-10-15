@@ -42,31 +42,23 @@ beforeEach(() => {
   mocks.counterIsland.mockClear();
 });
 
-describe("l'île de l'en-tête", () => {
-  it("ailleurs : le robot du comptoir, avec le compte des alertes", () => {
-    const html = island(true);
-    expect(html).toContain("data-mood=");
-    expect(html).not.toContain("data-island-mark");
-    expect(html).toContain("L&#x27;île PharmaBoost : ");
-    expect(html).toMatch(/\(2\)"/);
-  });
-
-  it("sur le PC du comptoir : l'île reste, sans dessin du robot, avec le compte des alertes (paiement, demandes d'accès)", () => {
-    const html = island(false);
-    expect(html).not.toContain("data-mood=");
-    expect(html).not.toContain("Le robot PharmaBoost");
-    expect(html).toContain("data-island-mark");
-    // La capsule et son compte : c'est elle qui ouvre l'accueil (alertes et gestes) et la discussion.
-    expect(html).toContain("data-island-toggle");
-    expect(html).toMatch(/\(2\)"/);
-    expect(html).toMatch(/>2<\/span>/);
+describe("la bannière du robot de discussion", () => {
+  // Fondateur, 15 oct. 2026 : plus de bannière posée à l'écran ; elle s'ouvre d'un clic sur la tête du robot, dans le menu.
+  it("au repos, rien à l'écran : ni capsule, ni robot, ni rond dans un coin", () => {
+    for (const robotHere of [true, false]) {
+      const html = island(robotHere);
+      expect(html, String(robotHere)).not.toContain("data-island-toggle");
+      expect(html, String(robotHere)).not.toContain("data-ile-robot-coin");
+      expect(html, String(robotHere)).not.toContain("data-mood=");
+    }
   });
 });
 
 describe("le menu", () => {
-  it("ailleurs : le robot, et le compte des alertes sur lui", () => {
+  it("ailleurs : le robot, et le compte des alertes sur lui ; sa tête ouvre la bannière", () => {
     const html = menu(true);
     expect(html).toContain("data-mood=");
+    expect(html).toContain("data-robot-menu");
     expect(html).toContain('data-temoin="compte"');
     expect(html).not.toContain("ouvrir l&#x27;île PharmaBoost");
   });
@@ -76,6 +68,12 @@ describe("le menu", () => {
     expect(html).not.toContain("data-mood=");
     expect(html).toContain('aria-label="2 choses à vous dire : ouvrir l&#x27;île PharmaBoost"');
     expect(html).toContain('data-temoin="compte"');
+  });
+
+  it("sur le PC du comptoir, sans alerte : un bouton « Discuter avec PharmaBoost » à la place de la tête du robot", () => {
+    mocks.alerts = [];
+    const html = menu(false);
+    expect(html).toContain('aria-label="Discuter avec PharmaBoost"');
   });
 
   it("sur le PC du comptoir, sans alerte : ni robot ni bouton vide", () => {
