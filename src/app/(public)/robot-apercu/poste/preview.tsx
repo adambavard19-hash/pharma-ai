@@ -26,6 +26,7 @@ export function PosteWindowPreview() {
   const [keyboard, setKeyboard] = useState(false);
   const [ready, setReady] = useState(false);
   const [side, setSide] = useState<IslandSide>("haut");
+  const [style, setStyle] = useState<"aurore" | "actuel">("aurore");
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -77,6 +78,22 @@ export function PosteWindowPreview() {
               {SIDE_LABEL[value]}
             </button>
           ))}
+          <span className="ml-4 text-white/70">Style :</span>
+          {(["aurore", "actuel"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              data-style={value}
+              onClick={() => {
+                if (value === style) return;
+                setReady(false);
+                setStyle(value);
+              }}
+              className={`h-8 rounded-lg px-3 font-semibold ${style === value ? "bg-[#E8FF9C] text-[#03171A]" : "bg-white/10 text-white hover:bg-white/15"}`}
+            >
+              {value === "aurore" ? "Nouveau" : "Actuel"}
+            </button>
+          ))}
         </div>
         <div className="relative mt-4 overflow-hidden rounded-xl border border-white/10" style={{ height: ISLAND_WINDOW.height + 40, background: "linear-gradient(#DCE3E8 0 38px, #F4F6F8 38px)" }}>
           {/* Le faux logiciel de gestion, derrière. */}
@@ -87,7 +104,7 @@ export function PosteWindowPreview() {
             {Array.from({ length: 14 }, (_, i) => <div key={i} className="h-6 rounded bg-white shadow-sm" />)}
           </div>
           <div className={`absolute ${WINDOW_PLACE[side]}`} style={{ width: ISLAND_WINDOW.width, height: ISLAND_WINDOW.height }}>
-            <iframe ref={frame} src="/poste/ile" title="Île du poste" className="absolute inset-0 size-full border-0" style={{ background: "transparent", colorScheme: "normal" }} />
+            <iframe key={style} ref={frame} src={style === "actuel" ? "/poste/ile?style=actuel" : "/poste/ile"} title="Île du poste" className="absolute inset-0 size-full border-0" style={{ background: "transparent", colorScheme: "normal" }} />
             {/* La forme que Windows gardera : rien en dehors ne cache le logiciel ni ne prend ses clics. */}
             <svg className="pointer-events-none absolute inset-0" width={ISLAND_WINDOW.width} height={ISLAND_WINDOW.height} aria-hidden="true">
               <rect x={0.5} y={0.5} width={ISLAND_WINDOW.width - 1} height={ISLAND_WINDOW.height - 1} fill="none" stroke="rgba(31,78,121,0.35)" strokeDasharray="2 6" />

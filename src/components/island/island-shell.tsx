@@ -64,6 +64,7 @@ export function IslandShell({
   return (
     <section
       aria-label={label}
+      data-tone={tone}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       className={cn(

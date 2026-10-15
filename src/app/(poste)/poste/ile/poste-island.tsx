@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, useState, type ComponentProps, type CSSProperties } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ComponentProps, type CSSProperties } from "react";
 import { BANNER } from "../../../../../agent/src/banner-design";
 import type { HostEntry } from "../../../../../agent/src/notice-center";
 import { BURST_PIECES, CounterIsland, type IslandAdvice } from "@/components/island/counter-island";
@@ -61,6 +61,29 @@ const ROOT_LAYOUT: Record<IslandSide, string> = {
   gauche: "h-dvh w-full flex-col items-start justify-center pl-[5px]",
   droite: "h-dvh w-full flex-col items-end justify-center pr-[5px]",
 };
+
+/**
+ * Le style « Aurore » de la bannière du poste (fondateur, 15 oct. 2026 : « plus minimaliste, moderne, futuriste, aux
+ * couleurs du site ») : verre vert très profond, liseré d'un pixel en dégradé teal → vert → citron (le dégradé de marque du
+ * site) qui s'éclaire lentement, moins de texte, boutons fins. Seulement sur le poste : l'île du site garde son habit.
+ * `?style=actuel` remet l'ancien (comparaison dans l'aperçu).
+ */
+const AURORE_CSS = `
+[data-ile-style=aurore] section{background:linear-gradient(180deg,#072A25 0%,#03171A 100%)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 14px 34px -14px rgba(0,0,0,.65)!important;isolation:isolate}
+[data-ile-style=aurore] section::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;
+  background:linear-gradient(110deg,rgba(95,165,148,.55),rgba(116,214,160,.35) 35%,rgba(232,255,156,.85) 50%,rgba(116,214,160,.35) 65%,rgba(95,165,148,.55));background-size:250% 100%;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:aur-sweep 6s linear infinite}
+[data-ile-style=aurore] section[data-tone=warning]::before{background:linear-gradient(110deg,rgba(245,166,35,.55),rgba(255,214,140,.9) 50%,rgba(245,166,35,.55));background-size:250% 100%}
+[data-ile-style=aurore] section[data-tone=success]::before{background:linear-gradient(110deg,rgba(116,214,160,.6),rgba(232,255,156,.95) 50%,rgba(116,214,160,.6));background-size:250% 100%}
+@keyframes aur-sweep{from{background-position:100% 0}to{background-position:-150% 0}}
+@keyframes aur-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+.aur-dot{width:6px;height:6px;border-radius:999px;background:#E8FF9C;box-shadow:0 0 8px rgba(232,255,156,.9);animation:aur-pulse 2.4s ease-in-out infinite}
+.aur-btn{border:1px solid rgba(159,203,187,.45);background:rgba(255,255,255,.04);color:#DDF7EA;transition:background .2s,border-color .2s,color .2s}
+.aur-btn:hover{background:rgba(232,255,156,.12);border-color:rgba(232,255,156,.7);color:#F4FFD6}
+@media (prefers-reduced-motion:reduce){[data-ile-style=aurore] section::before,.aur-dot{animation:none}}
+`;
+
+const noSubscribe = () => () => {};
 
 /** La souris sortie de l'île, elle se replie après ce délai (un aller-retour rapide ne la fait pas clignoter). */
 const FOLD_DELAY_MS = 600;
@@ -283,6 +306,8 @@ export function PosteIsland() {
   // pendant la vente, seuls le robot et « N conseils suggérés » restent à l'écran ; les conseils se déploient quand la souris
   // passe sur l'île (ou d'un appui, sur un écran tactile) et se replient quand elle en sort.
   const [hovered, setHovered] = useState(false);
+  // Le nouveau style par défaut ; l'ancien reste joignable pour comparer (aperçu).
+  const aurore = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get("style") !== "actuel", () => true);
   const foldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openIsland = useCallback(() => {
     if (foldTimer.current) clearTimeout(foldTimer.current);
@@ -357,12 +382,13 @@ export function PosteIsland() {
 
   return (
     <>
-      <style>{`${ISLAND_CSS}\nhtml,body{background:transparent!important;overflow:hidden;}`}</style>
+      <style>{`${ISLAND_CSS}\n${aurore ? AURORE_CSS : ""}\nhtml,body{background:transparent!important;overflow:hidden;}`}</style>
       <div
         ref={root}
         data-ile-root=""
         title="Glissez pour déplacer la bannière"
         data-ile-place={view.side}
+        data-ile-style={aurore ? "aurore" : "actuel"}
         className={`flex ${ROOT_LAYOUT[view.side]} cursor-grab gap-2 select-none active:cursor-grabbing [&_button]:cursor-pointer [&_input]:cursor-text`}
         onPointerDown={(event) => {
           // Saisir l'île (hors bouton, champ ou liste qui défile) : la fenêtre Windows suit la souris tant que le bouton est tenu.
@@ -430,17 +456,18 @@ export function PosteIsland() {
             {/* Debout contre le bord de l'écran : tout est empilé, rien n'est coupé. */}
             <div className="flex w-full flex-col items-center gap-1.5 px-2 pt-2.5 pb-2 text-center">
               <button type="button" data-ile-replie="" onClick={openIsland} className="flex flex-col items-center gap-1">
-                <Robot size={40} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
-                <span className="block text-[14px] leading-[17px] font-bold" style={{ color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
-                <span className="block text-[11px] leading-[14px] text-white/55">Survolez pour voir</span>
+                <Robot size={aurore ? 36 : 40} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
+                {aurore && items.length > 0 && <span className="aur-dot" aria-hidden="true" />}
+                <span className={aurore ? "block text-[13.5px] leading-[17px] font-semibold text-[#ECFFF6]" : "block text-[14px] leading-[17px] font-bold"} style={aurore ? undefined : { color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
+                <span className={aurore ? "block text-[9.5px] leading-[13px] font-semibold tracking-[0.14em] text-[#9FCBBB]/70 uppercase" : "block text-[11px] leading-[14px] text-white/55"}>Survolez pour voir</span>
               </button>
               <button
                 type="button"
                 data-ile-client-suivant=""
                 data-ile-sans-deploiement=""
                 onClick={() => word(finishWord(entry.id))}
-                className="mt-0.5 h-8 w-full rounded-xl text-[12px] font-bold transition-[filter] hover:brightness-110"
-                style={{ background: C.accent, color: "#04261A" }}
+                className={aurore ? "aur-btn mt-0.5 h-8 w-full rounded-full text-[12px] font-semibold" : "mt-0.5 h-8 w-full rounded-xl text-[12px] font-bold transition-[filter] hover:brightness-110"}
+                style={aurore ? undefined : { background: C.accent, color: "#04261A" }}
               >
                 Client suivant
               </button>
@@ -450,11 +477,21 @@ export function PosteIsland() {
           <IslandShell width={FOLDED_WIDTH} tone="accent" contentKey="replie" label="Conseils de la vente (survolez pour les voir)">
             <div className="flex w-full items-center gap-2 py-1.5 pr-1.5 pl-2">
               <button type="button" data-ile-replie="" onClick={openIsland} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                <Robot size={34} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
-                <span className="min-w-0 flex-1">
-                  <span className="block whitespace-nowrap text-[14px] leading-[18px] font-bold" style={{ color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
-                  <span className="block whitespace-nowrap text-[11.5px] leading-[15px] text-white/55">Passez la souris pour voir</span>
-                </span>
+                <Robot size={aurore ? 30 : 34} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
+                {aurore ? (
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2 whitespace-nowrap text-[13.5px] leading-[18px] font-semibold tracking-[-0.01em] text-[#ECFFF6]">
+                      {items.length > 0 && <span className="aur-dot shrink-0" aria-hidden="true" />}
+                      {foldedLabel(items.length)}
+                    </span>
+                    <span className="block whitespace-nowrap text-[9.5px] leading-[14px] font-semibold tracking-[0.16em] text-[#9FCBBB]/70 uppercase">Survolez pour voir</span>
+                  </span>
+                ) : (
+                  <span className="min-w-0 flex-1">
+                    <span className="block whitespace-nowrap text-[14px] leading-[18px] font-bold" style={{ color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
+                    <span className="block whitespace-nowrap text-[11.5px] leading-[15px] text-white/55">Passez la souris pour voir</span>
+                  </span>
+                )}
               </button>
               {/* Le client est parti : la vente se termine d'un clic, sans la question de l'e-mail, et le prochain scan est un nouveau client. */}
               <button
@@ -462,10 +499,10 @@ export function PosteIsland() {
                 data-ile-client-suivant=""
                 data-ile-sans-deploiement=""
                 onClick={() => word(finishWord(entry.id))}
-                className="h-8 shrink-0 rounded-xl px-2.5 text-[12px] font-bold transition-[filter] hover:brightness-110"
-                style={{ background: C.accent, color: "#04261A" }}
+                className={aurore ? "aur-btn h-8 shrink-0 rounded-full px-3 text-[12px] font-semibold" : "h-8 shrink-0 rounded-xl px-2.5 text-[12px] font-bold transition-[filter] hover:brightness-110"}
+                style={aurore ? undefined : { background: C.accent, color: "#04261A" }}
               >
-                Client suivant
+                {aurore ? "Client suivant →" : "Client suivant"}
               </button>
             </div>
           </IslandShell>
@@ -483,12 +520,12 @@ export function PosteIsland() {
                   type="button"
                   data-ile-autre-client-oui=""
                   onClick={() => word(splitBoxWord(entry.id, lateBox.id))}
-                  className="h-8 flex-1 rounded-xl text-[12.5px] font-bold transition-[filter] hover:brightness-110"
-                  style={{ background: C.accent, color: "#04261A" }}
+                  className={aurore ? "aur-btn h-8 flex-1 rounded-full text-[12.5px] font-semibold" : "h-8 flex-1 rounded-xl text-[12.5px] font-bold transition-[filter] hover:brightness-110"}
+                  style={aurore ? undefined : { background: C.accent, color: "#04261A" }}
                 >
                   Oui, nouveau client
                 </button>
-                <button type="button" onClick={() => setKeptBox(lateBox.id)} className="h-8 rounded-xl bg-white/10 px-3 text-[12.5px] font-semibold text-white hover:bg-white/15">
+                <button type="button" onClick={() => setKeptBox(lateBox.id)} className={aurore ? "h-8 rounded-full px-3 text-[12.5px] font-semibold text-white/70 hover:text-white" : "h-8 rounded-xl bg-white/10 px-3 text-[12.5px] font-semibold text-white hover:bg-white/15"}>
                   Non
                 </button>
               </div>
