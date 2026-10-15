@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * 2 250 images = 38 s. Un film refait change de durée : la changer ici dans le même temps.
  */
 export const FILMS = {
-  presentation: { src: "/video/pharmaboost-presentation.mp4", poster: "/video/pharmaboost-presentation.jpg", duration: "48 s", title: "Présentation de PharmaBoost" },
+  presentation: { src: "/video/pharmaboost-presentation.mp4", poster: "/video/pharmaboost-presentation.jpg", duration: "50 s", title: "Présentation de PharmaBoost" },
   comment: { src: "/video/pharmaboost-comment-ca-marche.mp4", poster: "/video/pharmaboost-comment-ca-marche.jpg", duration: "44 s", title: "Comment ça marche" },
   pourquoi: { src: "/video/pharmaboost-pourquoi.mp4", poster: "/video/pharmaboost-pourquoi.jpg", duration: "34 s", title: "Pourquoi PharmaBoost" },
   avantages: { src: "/video/pharmaboost-avantages.mp4", poster: "/video/pharmaboost-avantages.jpg", duration: "38 s", title: "Les avantages" },
