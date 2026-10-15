@@ -27,7 +27,6 @@ import {
 } from "@/core/poste/island-bridge";
 import { ESSAI_LENGTH_MS, ESSAI_SEQUENCE, isEssaiSale } from "@/core/poste/island-fixtures";
 import { readCounterSheet } from "../../../../../agent/src/counter-sheet";
-import { GREETING_SHOW_MS } from "../../../../../agent/src/greeting-text";
 
 /**
  * L'île du poste de caisse : la bannière validée (`CounterIsland`, les mêmes composants que l'aperçu), pilotée par
@@ -178,12 +177,7 @@ export function PosteIsland() {
     return () => clearTimeout(id);
   }, [island.stage, island.stepsDone, entry]);
 
-  // Le bonjour du robot reste une dizaine de secondes, puis l'île revient au repos (un clic le ferme avant).
-  useEffect(() => {
-    if (!view.greeting) return;
-    const id = setTimeout(() => dispatch({ type: "dismissGreeting" }), GREETING_SHOW_MS);
-    return () => clearTimeout(id);
-  }, [view.greeting]);
+  // Le bonjour du robot reste jusqu'à « OK » (fondateur, 15 oct. 2026) ; un scan le remplace (le reducer l'efface), il ne bloque jamais une vente.
 
   // Une analyse sans réponse ne reste pas affichée indéfiniment (même délai que la bannière).
   useEffect(() => {
@@ -303,19 +297,22 @@ export function PosteIsland() {
       >
         {greeting ? (
           <IslandShell width={GREETING_WIDTH} tone="accent" contentKey="bonjour" label="Bonjour du robot PharmaBoost">
-            {/* Un bouton : un clic ferme le message. Jamais de champ, jamais de focus demandé : le clavier reste au logiciel de gestion. */}
-            <button
-              type="button"
-              data-ile-bonjour=""
-              onClick={() => dispatch({ type: "dismissGreeting" })}
-              title="Fermer le message"
-              className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
-            >
+            {/* Seul « OK » ferme le message. Jamais de champ, jamais de focus demandé : le clavier reste au logiciel de gestion. */}
+            <div data-ile-bonjour="" className="flex w-full items-center gap-3 px-3.5 py-3 text-left">
               <span className="isl-pop shrink-0">
                 <Robot size={40} mood="happy" look={view.look} label="Le robot PharmaBoost" />
               </span>
-              <span className="min-w-0 text-[13px] leading-[18px] text-white/90">{greeting}</span>
-            </button>
+              <span className="min-w-0 flex-1 text-[13px] leading-[18px] text-white/90">{greeting}</span>
+              <button
+                type="button"
+                data-ile-bonjour-ok=""
+                onClick={() => dispatch({ type: "dismissGreeting" })}
+                className="h-8 shrink-0 rounded-xl px-4 text-[13px] font-bold transition-[filter] hover:brightness-110"
+                style={{ background: C.accent, color: "#04261A" }}
+              >
+                OK
+              </button>
+            </div>
           </IslandShell>
         ) : (
           !questionsOnly && <CounterIsland {...islandProps} />

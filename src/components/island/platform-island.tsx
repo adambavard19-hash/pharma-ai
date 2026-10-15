@@ -100,6 +100,7 @@ export function PlatformIsland({
   hotkey = false,
   restingText,
   robotless = false,
+  dock = "top",
   className,
 }: {
   label: string;
@@ -129,6 +130,11 @@ export function PlatformIsland({
    * discussion, « + », compte en pastille.
    */
   robotless?: boolean;
+  /**
+   * Où vit le robot : en haut au centre (l'île), ou en bas à droite (l'espace de la pharmacie, fondateur 15 oct. 2026) — un
+   * robot rond au repos ; un clic ouvre le robot et sa bannière juste au-dessus. Un clic, jamais le survol.
+   */
+  dock?: "top" | "bottom-right";
   className?: string;
 }) {
   const router = useRouter();
@@ -290,6 +296,8 @@ export function PlatformIsland({
   let body: ReactNode;
   if (grumpy) {
     body = <CapsuleRow robot={face(32, "concerned")} title="Doucement !" sub="Trop de clics d'un coup — je reprends dans 3 secondes." />;
+  } else if (!open && dock === "bottom-right") {
+    body = null;
   } else if (!open) {
     body = (
       <button type="button" data-island-toggle="" onClick={onCapsuleClick} aria-expanded={false} aria-label={`${label} : ${headline}${count ? ` (${count})` : ""}`} className="flex h-11 w-full items-center gap-2.5 pr-3.5 pl-1.5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8]">
@@ -338,16 +346,35 @@ export function PlatformIsland({
     );
   }
 
+  // En bas à droite, au repos : le robot seul, dans un rond, avec sa pastille. Un clic ouvre la bannière au-dessus de lui.
+  const dockButton = (
+    <button
+      type="button"
+      data-island-toggle=""
+      data-ile-robot-coin=""
+      onClick={onCapsuleClick}
+      aria-expanded={false}
+      aria-label={`${label} : ${headline}${count ? ` (${count})` : ""}`}
+      title="Discuter avec PharmaBoost"
+      className="relative flex size-16 items-center justify-center rounded-full bg-[#0B0F14] shadow-[0_14px_34px_-10px_rgba(0,0,0,0.55)] ring-1 ring-white/10 transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#36E8C8] motion-reduce:transition-none"
+    >
+      {face(46, robotMood)}
+      {count > 0 && (
+        <span className={cn("absolute -top-0.5 -right-0.5 flex min-w-[18px] items-center justify-center rounded-full px-1 text-[10.5px] leading-[18px] font-bold text-[#04261A] tabular-nums ring-2 ring-[#0B0F14]", tone === "warning" ? "bg-[#F5A623]" : "bg-[#36E8C8]")}>{count > 9 ? "9+" : count}</span>
+      )}
+    </button>
+  );
+
   const island = (
     <div
       ref={panelRef}
       onPointerEnter={(event) => {
-        if (event.pointerType !== "mouse") return;
+        if (event.pointerType !== "mouse" || dock === "bottom-right") return;
         if (leaveTimer.current) clearTimeout(leaveTimer.current);
         if (!open && !grumpy) enterTimer.current = setTimeout(() => setOpen(true), 160);
       }}
       onPointerLeave={(event) => {
-        if (event.pointerType !== "mouse") return;
+        if (event.pointerType !== "mouse" || dock === "bottom-right") return;
         if (enterTimer.current) clearTimeout(enterTimer.current);
         if (!pinned) leaveTimer.current = setTimeout(() => setOpen(false), 380);
       }}
@@ -374,7 +401,13 @@ export function PlatformIsland({
         className={cn("z-[60]", !rect && "absolute top-0 left-1/2 -translate-x-1/2", claimed ? "" : "hidden")}
         style={rect ? { position: "fixed", top: rect.top, left: slotLeft ?? rect.cx, transform: "translateX(-50%)", width: "max-content" } : undefined}
       />
-      {!claimed && (
+      {!claimed && dock === "bottom-right" && (
+        <div className="z-[60] flex flex-col items-end gap-3" style={{ position: "fixed", right: 20, bottom: 20, maxWidth: "calc(100vw - 24px)" }}>
+          {(open || grumpy) && <div className="max-h-[calc(100vh-120px)] overflow-y-auto">{island}</div>}
+          {!open && !grumpy && dockButton}
+        </div>
+      )}
+      {!claimed && dock === "top" && (
         <div
           className={cn("z-[60] transition-[left] duration-[560ms] ease-[cubic-bezier(.3,1.45,.5,1)] motion-reduce:transition-none", !rect && "absolute top-0 left-1/2 -translate-x-1/2")}
           style={rect ? { position: "fixed", top: rect.top, left: left ?? rect.cx, transform: "translateX(-50%)", width: "max-content" } : undefined}
@@ -386,7 +419,7 @@ export function PlatformIsland({
   );
 
   return (
-    <div ref={anchor} className={cn("relative h-11 shrink-0", className)} style={{ width: restWidth }}>
+    <div ref={anchor} className={cn("relative h-11 shrink-0", className)} style={{ width: dock === "bottom-right" ? 0 : restWidth }}>
       <style>{ISLAND_CSS}</style>
       {rect ? createPortal(floating, document.body) : floating}
     </div>

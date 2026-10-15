@@ -34,6 +34,8 @@ export function AppIsland({ suggestions, canImportStock }: { suggestions: string
   return (
     <PlatformIsland
       label="L'île PharmaBoost"
+      // Le robot de la discussion vit en bas à droite de l'espace : un clic l'ouvre (le robot du scan, lui, reste sur le poste).
+      dock="bottom-right"
       look={counterLook?.look}
       robotless={!robotHere}
       mood={robotAlerts?.mood}
