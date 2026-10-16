@@ -28,6 +28,7 @@ const FILES = {
   Partenaires: "pharmaboost-partenaires",
   Tarif: "pharmaboost-tarif",
   Robot: "pharmaboost-robot",
+  PriseEnMain: "pharmaboost-prise-en-main",
 };
 /**
  * L'affiche de chaque film du site : une image du film (numéro d'image à 60/s),

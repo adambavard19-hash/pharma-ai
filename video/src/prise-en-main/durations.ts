@@ -1,0 +1,2 @@
+// Durées des fichiers de voix (secondes), relevées par ffprobe après scripts/voix-prise-en-main.mjs.
+export const DURATIONS: Record<string, number> = {"G1": 4.702, "G2": 8.545, "G3": 6.175, "G4": 6.163, "G5": 8.046, "G6": 4.241, "G7": 7.373, "G8": 6.738, "G9": 6.819, "G10": 2.055, "G11": 8.666, "G12": 7.477, "G13": 4.922, "G14": 5.08, "G15": 5.429, "G16": 6.587, "G17": 7.803, "G18": 6.954, "G19": 7.749, "G20": 7.1};

@@ -1,0 +1,25 @@
+{
+  "voix": "Yann (ElevenLabs, eleven_multilingual_v2)",
+  "lignes": {
+    "G1": "Bienvenue sur Pharma Boost. Voici, en quelques minutes, comment l'utiliser au quotidien.",
+    "G2": "Votre logiciel de pharmacie, votre L.G.O., reste exactement le même. Pharma Boost s'installe à côté, sur chaque poste de comptoir.",
+    "G3": "Vous scannez les boîtes comme d'habitude. Pharma Boost voit le même scan, et vous montre le bon conseil.",
+    "G4": "Dès le scan, la bannière apparaît en haut de l'écran : elle lit la boîte, et vérifie votre stock.",
+    "G5": "Repliée, elle reste discrète, sans jamais prendre la main sur votre logiciel. Passez la souris dessus pour voir les conseils.",
+    "G6": "Pour chaque conseil : le produit, son prix, et la raison, en une phrase.",
+    "G7": "Les pastilles disent l'essentiel : en stock, une date courte à écouler, ou un challenge en cours avec un laboratoire.",
+    "G8": "Vous proposez le produit. Si le client le prend, scannez-le : le conseil passe en « vendu », tout seul.",
+    "G9": "À la fin de la vente, le patient peut recevoir ses conseils par e-mail. Avec L.G.P.I., la fin de la vente est même reconnue toute seule.",
+    "G10": "Et chaque conseil vendu est célébré.",
+    "G11": "Passons au logiciel en ligne. L'onglet « Au comptoir » montre, en direct, les ventes en cours, et celles terminées aujourd'hui.",
+    "G12": "L'historique reprend chaque vente : les boîtes scannées, les conseils proposés, ceux vendus, et ce qu'ils ont rapporté.",
+    "G13": "Dans « Performances », le classement de l'équipe : qui propose, et qui vend.",
+    "G14": "Et le chiffre d'affaires que Pharma Boost vous apporte, jour par jour, à télécharger en P.D.F.",
+    "G15": "« Mon stock » tient Pharma Boost à jour : il ne propose que ce que vous avez en rayon.",
+    "G16": "Dans « Dates courtes », scannez une boîte proche de sa date : elle sera proposée en priorité au comptoir.",
+    "G17": "Avec « Mes associations », ajoutez vos propres conseils : quand ce produit est dans la vente, Pharma Boost propose celui-ci.",
+    "G18": "Dans « Mon équipe », ajoutez vos collaborateurs : chacun se connecte sur son poste, et retrouve ses résultats.",
+    "G19": "Chaque matin, vous recevez par e-mail le bilan de la veille, avec son P.D.F. Et chaque collaborateur reçoit le sien.",
+    "G20": "Une question ? Cliquez sur « Contact support », en bas du menu. Pharma Boost : le bon conseil, à chaque vente."
+  }
+}

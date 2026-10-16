@@ -13,6 +13,7 @@ import { PARTENAIRES } from "./films/partenaires";
 import { Reel, calculateReelMetadata } from "./films/reel";
 import { Tarif, calculateTarifMetadata } from "./films/tarif";
 import { RobotFilm, RobotVertical, calculateRobotMetadata } from "./films/robot";
+import { PriseEnMain, PRISE_EN_MAIN_FRAMES, PEM_FPS } from "./films/prise-en-main";
 
 /** Les films de la série, 16:9, 60 images/s. L'identifiant sert au rendu (scripts/export.mjs). */
 export const FILMS: Record<string, FilmSpec> = {
@@ -50,6 +51,7 @@ export function Root() {
       {/* Le film « Robot », façon Coucou, avec la voix (public/voix/robot) ; sa déclinaison verticale pour Instagram (scripts/robot.mjs). */}
       <Composition id="Robot" component={RobotFilm} calculateMetadata={calculateRobotMetadata} defaultProps={{ voices: null, stale: [] }} durationInFrames={3360} fps={OUT_FPS} width={1920} height={1080} />
       {/* La publication Instagram « Qu'est-ce que PharmaBoost ? », carrousel 4:5 : une image par page (--props='{"slide":1}'). */}
+      <Composition id="PriseEnMain" component={PriseEnMain} durationInFrames={PRISE_EN_MAIN_FRAMES} fps={PEM_FPS} width={1920} height={1080} />
       <Composition id="InstaPost" component={InstaPost} defaultProps={{ slide: 1 }} durationInFrames={1} fps={OUT_FPS} width={1080} height={1350} />
       <Composition id="RobotVertical" component={RobotVertical} calculateMetadata={calculateRobotMetadata} defaultProps={{ voices: null, stale: [] }} durationInFrames={3360} fps={OUT_FPS} width={1080} height={1920} />
     </>
