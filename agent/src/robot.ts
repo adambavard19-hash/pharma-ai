@@ -86,6 +86,8 @@ export class LineBuffer {
 export type RobotHandlers = {
   onScan: (code: string, at: number) => void;
   onStatus: (message: string) => void;
+  /** LGPI vient de valider une vente sur ce poste (« FIN Valider ») : voir `isSaleValidatedLine` (robot-lgpi.ts). */
+  onSaleValidated?: (at: number) => void;
 };
 
 const POLL_MS = 1000;

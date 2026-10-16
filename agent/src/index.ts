@@ -47,7 +47,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.18";
+const VERSION = "0.10.19";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -190,6 +190,9 @@ async function installFromInstaller(): Promise<number> {
 }
 
 async function sendScan(config: Config, code: string, scannedAt: string, expiresOn?: string | null): Promise<void> {
+  // Le client suivant est bipé pendant le compte à rebours de la vente validée dans LGPI : elle se termine d'abord, pour que
+  // ce bip ouvre bien une nouvelle vente.
+  if (validatedSale) await finishValidated(validatedSale);
   const response = await api(config, "/api/agent/scans", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -210,6 +213,36 @@ async function sendScan(config: Config, code: string, scannedAt: string, expires
   // La fenêtre d'avis se prépare pendant que le serveur analyse : le conseil n'attend pas sa compilation.
   notices.warmUp();
   if (body.prescriptionId) watchPrescription(body.prescriptionId);
+}
+
+/** La vente que LGPI a validée et que la bannière termine après son compte à rebours (e-mail du bilan). */
+let validatedSale: string | null = null;
+/** Au-delà, l'agent termine lui-même une vente validée que la bannière n'a pas terminée (île ancienne, plantage). */
+const VALIDATED_FALLBACK_MS = 90_000;
+
+/**
+ * LGPI a validé une vente sur ce poste (« FIN Valider ») : c'est la fin de la vente PharmaBoost ouverte. La bannière propose
+ * l'e-mail du bilan avec un compte à rebours, puis la termine ; sans île, l'agent la termine tout de suite.
+ */
+function onSaleValidated(): void {
+  const saleId = watched?.prescriptionId;
+  const config = activeConfig;
+  if (!saleId || !config) return;
+  log(`LGPI a validé la vente : fin de la vente PharmaBoost ${saleId}.`);
+  validatedSale = saleId;
+  if (!notices.saleValidated(saleId)) {
+    void finishValidated(saleId);
+    return;
+  }
+  setTimeout(() => { if (validatedSale === saleId) void finishValidated(saleId); }, VALIDATED_FALLBACK_MS);
+}
+
+/** Termine une vente validée dans LGPI, une seule fois. */
+async function finishValidated(saleId: string): Promise<void> {
+  if (validatedSale !== saleId) return;
+  validatedSale = null;
+  if (watched?.prescriptionId !== saleId) return;
+  await handleAction({ kind: "finish", saleId });
 }
 
 /** Le dernier bip envoyé au serveur : on ne remplace jamais l'agent dans les secondes qui suivent (voir self-update.ts). */
@@ -416,6 +449,7 @@ async function handleAction(action: HostAction): Promise<void> {
         await refreshNow(config, { problem: result.body?.error ?? "La boîte n'a pas pu être séparée." });
       }
     } else if (action.kind === "finish") {
+      if (validatedSale === action.saleId) validatedSale = null;
       const emailWasSaved = watched?.body?.followUp?.emailSaved === true;
       const result = await postJson<FinishBody>(config, "/api/agent/conseil/terminer", { prescription: action.saleId });
       if (result.body?.ok) {
@@ -527,10 +561,12 @@ async function runPost(config: Config): Promise<void> {
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
   startDouchette(dirname(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
-  const robotHandlers = { onScan: accept("robot"), onStatus: (message: string) => log(message) };
+  const robotHandlers = { onScan: accept("robot"), onStatus: (message: string) => log(message), onSaleValidated };
   const robot = config.robot ?? (process.platform === "win32" ? ({ kind: "lgpi" } as const) : undefined);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);
   else if (robot?.kind === "lgpi") startLgpiJournal(robot, robotHandlers);
+  // La validation des ventes se lit dans le journal de LGPI même quand le robot est suivi autrement (ou pas du tout).
+  if (process.platform === "win32" && robot?.kind !== "lgpi") startLgpiJournal({ kind: "lgpi" }, { onScan: () => undefined, onStatus: () => undefined, onSaleValidated });
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let spaceAttempts = 0;

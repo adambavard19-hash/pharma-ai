@@ -204,3 +204,15 @@ describe("un conseil bipé : la bannière revient à la vente (« keep »)", () 
     expect(posteReducer(INITIAL_POSTE, { type: "host", command: { op: "keep" }, now: 3 })).toEqual(INITIAL_POSTE);
   });
 });
+
+describe("la vente validée dans LGPI (« validated »)", () => {
+  it("ne concerne que la vente à l'écran", async () => {
+    const { INITIAL_POSTE, posteReducer, parseCommand } = await import("../island-bridge");
+    expect(parseCommand(JSON.stringify({ op: "validated", id: "rx_1" }))).toEqual({ op: "validated", id: "rx_1" });
+    expect(parseCommand(JSON.stringify({ op: "validated", id: "pas un id !" }))).toBeNull();
+    const entry = { id: "rx_1", reference: "V-1", label: "", subject: "", url: "", signature: "s", quiet: false, emailSaved: false, emailError: "", alerts: [], notes: [], questions: [], guidance: [], items: [] };
+    const open = { ...INITIAL_POSTE, entry, island: { ...INITIAL_POSTE.island, stage: "advice" as const } };
+    expect(posteReducer(open, { type: "host", command: { op: "validated", id: "rx_1" }, now: 5 }).validated).toEqual({ id: "rx_1", at: 5 });
+    expect(posteReducer(open, { type: "host", command: { op: "validated", id: "rx_2" }, now: 5 }).validated).toBeUndefined();
+  });
+});

@@ -529,6 +529,17 @@ export class NoticeCenter {
     this.send({ op: "keep" });
   }
 
+  /**
+   * LGPI vient de valider la vente (« FIN Valider ») : la bannière propose l'e-mail du bilan avec un compte à rebours, puis
+   * termine la vente d'elle-même. Faux quand l'île n'est pas là pour le faire (l'agent termine alors la vente lui-même).
+   */
+  saleValidated(saleId: string): boolean {
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy || !this.banner) return false;
+    if (!this.ensureHost()) return false;
+    this.send({ op: "validated", id: saleId });
+    return true;
+  }
+
   /** Montre (ou met à jour) le conseil d'une vente. */
   show(entry: HostEntry): void {
     this.lastEntry = entry;

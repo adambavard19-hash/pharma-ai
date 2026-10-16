@@ -154,8 +154,23 @@ function readChunk(path: string, offset: number, size: number): Buffer {
  * d'abord la fin de la veille). Au démarrage on part de la fin du fichier du jour ; un fichier qui paraît ensuite est lu
  * depuis son début, car rien n'y a été lu avant nous. Rend la fonction d'arrêt.
  */
+/**
+ * La validation d'une vente dans LGPI (« FIN Valider », au clavier ou à la souris), lue dans son journal : diagnostic « fin de
+ * vente » de POSTE5, 16 oct. 2026. À chaque validation, et seulement là, LGPI écrit dans la seconde, avant la confirmation du
+ * règlement, une ligne de `FacturationProcessusImpl` : « … des lignes de vente par type de facturation - ok ». Ni un scan, ni
+ * l'ajout d'un produit, ni la reprise d'une vente en attente ne l'écrivent.
+ */
+export function isSaleValidatedLine(line: string): boolean {
+  const entry = parseEntry(line);
+  return entry !== null && /FacturationProcessusImpl$/.test(entry.logger) && /lignes de vente par type de facturation\s*-\s*ok\b/i.test(entry.message);
+}
+
+/** Deux lignes de validation à moins de cinq secondes sont la même validation. */
+const VALIDATION_DEBOUNCE_MS = 5000;
+
 export function startLgpiJournal(config: LgpiRobotConfig, handlers: RobotHandlers, clock: () => number = Date.now): () => void {
   const reader = new LgpiRobotReader();
+  let lastValidation = -Infinity;
   let lines = new LineBuffer();
   let current: { path: string; offset: number } | null = null;
   let firstPass = true;
@@ -178,7 +193,14 @@ export function startLgpiJournal(config: LgpiRobotConfig, handlers: RobotHandler
       offset += buffer.length;
       const at = clock();
       // Les journaux Windows sont en ANSI : latin1 garde chaque octet, et les codes sont des chiffres.
-      for (const line of lines.push(buffer.toString("latin1"))) announce(reader.push(line, at), at);
+      for (const line of lines.push(buffer.toString("latin1"))) {
+        announce(reader.push(line, at), at);
+        if (handlers.onSaleValidated && isSaleValidatedLine(line) && at - lastValidation > VALIDATION_DEBOUNCE_MS) {
+          lastValidation = at;
+          handlers.onStatus("LGPI : vente validée sur ce poste.");
+          handlers.onSaleValidated(at);
+        }
+      }
     }
   };
 

@@ -28,6 +28,8 @@ export type HostCommand =
   | { op: "place"; side: IslandSide }
   /** Le bip était un conseil de la vente (il passe en « Vendu ») : la bannière revient à la vente, sans rejouer d'analyse. */
   | { op: "keep" }
+  /** LGPI a validé cette vente (« FIN Valider ») : la bannière propose l'e-mail du bilan, puis la termine d'elle-même. */
+  | { op: "validated"; id: string }
   | { op: "quit" };
 
 /** Les quatre places possibles : en haut (par défaut), en bas, ou debout contre le bord gauche ou droit de l'écran. */
@@ -60,6 +62,8 @@ export type PosteView = {
    * quelle — le conseil y passe en « Vendu » — au lieu de rejouer « Scan détecté, analyse en cours ».
    */
   kept?: { entry: HostEntry; island: IslandState; alertRead: boolean } | null;
+  /** La vente que LGPI vient de valider, et quand : la bannière ouvre l'e-mail du bilan avec son compte à rebours. */
+  validated?: { id: string; at: number } | null;
 };
 
 export const INITIAL_POSTE: PosteView = { island: INITIAL_ISLAND, entry: null, alertRead: false, emailPending: false, done: null, look: null, postLabel: "", scanAt: 0, greeting: null, side: "haut" };
@@ -177,6 +181,10 @@ function onHost(view: PosteView, command: HostCommand, now: number): PosteView {
       const kept = view.entry && OPEN.includes(view.island.stage) ? { entry: view.entry, island: view.island, alertRead: view.alertRead } : (view.kept ?? null);
       return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel, side: view.side, scanAt: now, island: { ...INITIAL_ISLAND, stage: "scan" }, kept };
     }
+    case "validated":
+      // Seulement la vente à l'écran : une validation qui arrive pour une autre vente (déjà remplacée) ne fait rien.
+      if (view.entry?.id !== command.id && view.kept?.entry.id !== command.id) return view;
+      return { ...view, validated: { id: command.id, at: now } };
     case "keep":
       if (!view.kept) return view;
       return { ...view, entry: view.kept.entry, island: { ...view.kept.island, stage: view.kept.island.stage === "ready" ? "advice" : view.kept.island.stage }, alertRead: view.kept.alertRead, kept: null };
@@ -313,6 +321,8 @@ export function parseCommand(raw: unknown): HostCommand | null {
       return isIslandSide(command.side) ? { op: "place", side: command.side } : null;
     case "keep":
       return { op: "keep" };
+    case "validated":
+      return typeof command.id === "string" && ID.test(command.id) ? { op: "validated", id: command.id } : null;
     case "look":
       return { op: "look", look: typeof command.look === "number" ? command.look : -1 };
     case "greet": {

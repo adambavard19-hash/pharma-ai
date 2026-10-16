@@ -5887,6 +5887,16 @@ var NoticeCenter = class {
     if (!this.ensureHost()) return;
     this.send({ op: "keep" });
   }
+  /**
+   * LGPI vient de valider la vente (« FIN Valider ») : la bannière propose l'e-mail du bilan avec un compte à rebours, puis
+   * termine la vente d'elle-même. Faux quand l'île n'est pas là pour le faire (l'agent termine alors la vente lui-même).
+   */
+  saleValidated(saleId) {
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy || !this.banner) return false;
+    if (!this.ensureHost()) return false;
+    this.send({ op: "validated", id: saleId });
+    return true;
+  }
   /** Montre (ou met à jour) le conseil d'une vente. */
   show(entry) {
     this.lastEntry = entry;
@@ -6446,8 +6456,14 @@ function readChunk(path, offset, size) {
   }
   return buffer;
 }
+function isSaleValidatedLine(line) {
+  const entry = parseEntry(line);
+  return entry !== null && /FacturationProcessusImpl$/.test(entry.logger) && /lignes de vente par type de facturation\s*-\s*ok\b/i.test(entry.message);
+}
+var VALIDATION_DEBOUNCE_MS = 5e3;
 function startLgpiJournal(config, handlers, clock = Date.now) {
   const reader = new LgpiRobotReader();
+  let lastValidation = -Infinity;
   let lines = new LineBuffer();
   let current2 = null;
   let firstPass = true;
@@ -6467,7 +6483,14 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
       const buffer = readChunk(path, offset, size);
       offset += buffer.length;
       const at = clock();
-      for (const line of lines.push(buffer.toString("latin1"))) announce(reader.push(line, at), at);
+      for (const line of lines.push(buffer.toString("latin1"))) {
+        announce(reader.push(line, at), at);
+        if (handlers.onSaleValidated && isSaleValidatedLine(line) && at - lastValidation > VALIDATION_DEBOUNCE_MS) {
+          lastValidation = at;
+          handlers.onStatus("LGPI : vente valid\xE9e sur ce poste.");
+          handlers.onSaleValidated(at);
+        }
+      }
     }
   };
   const poll = () => {
@@ -6654,7 +6677,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.18";
+var VERSION = "0.10.19";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -6744,6 +6767,7 @@ async function installFromInstaller() {
   }
 }
 async function sendScan(config, code, scannedAt, expiresOn) {
+  if (validatedSale) await finishValidated(validatedSale);
   const response = await api(config, "/api/agent/scans", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -6762,6 +6786,28 @@ async function sendScan(config, code, scannedAt, expiresOn) {
   if (body.adviceSold) notices.adviceScanned();
   notices.warmUp();
   if (body.prescriptionId) watchPrescription(body.prescriptionId);
+}
+var validatedSale = null;
+var VALIDATED_FALLBACK_MS = 9e4;
+function onSaleValidated() {
+  const saleId = watched?.prescriptionId;
+  const config = activeConfig;
+  if (!saleId || !config) return;
+  log(`LGPI a valid\xE9 la vente : fin de la vente PharmaBoost ${saleId}.`);
+  validatedSale = saleId;
+  if (!notices.saleValidated(saleId)) {
+    void finishValidated(saleId);
+    return;
+  }
+  setTimeout(() => {
+    if (validatedSale === saleId) void finishValidated(saleId);
+  }, VALIDATED_FALLBACK_MS);
+}
+async function finishValidated(saleId) {
+  if (validatedSale !== saleId) return;
+  validatedSale = null;
+  if (watched?.prescriptionId !== saleId) return;
+  await handleAction({ kind: "finish", saleId });
 }
 var lastScanAt = null;
 var nextUpdateCheck = Date.now() + 45e3;
@@ -6933,6 +6979,7 @@ async function handleAction(action) {
         await refreshNow(config, { problem: result.body?.error ?? "La bo\xEEte n'a pas pu \xEAtre s\xE9par\xE9e." });
       }
     } else if (action.kind === "finish") {
+      if (validatedSale === action.saleId) validatedSale = null;
       const emailWasSaved = watched?.body?.followUp?.emailSaved === true;
       const result = await postJson(config, "/api/agent/conseil/terminer", { prescription: action.saleId });
       if (result.body?.ok) {
@@ -7014,10 +7061,11 @@ async function runPost(config) {
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
   startDouchette((0, import_node_path10.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
-  const robotHandlers = { onScan: accept("robot"), onStatus: (message) => log(message) };
+  const robotHandlers = { onScan: accept("robot"), onStatus: (message) => log(message), onSaleValidated };
   const robot = config.robot ?? (process.platform === "win32" ? { kind: "lgpi" } : void 0);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);
   else if (robot?.kind === "lgpi") startLgpiJournal(robot, robotHandlers);
+  if (process.platform === "win32" && robot?.kind !== "lgpi") startLgpiJournal({ kind: "lgpi" }, { onScan: () => void 0, onStatus: () => void 0, onSaleValidated });
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let spaceAttempts = 0;

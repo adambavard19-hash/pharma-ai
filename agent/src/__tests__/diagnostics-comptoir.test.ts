@@ -35,7 +35,10 @@ describe("diagnostic « fin de vente »", () => {
   });
 
   it("le crochet n'écrit jamais la valeur d'une touche de caractère", () => {
-    expect(OBSERVER_SCRIPT).toContain('return "caractère";');
+    expect(OBSERVER_SCRIPT).toContain('return "caractere";');
+    // Le C# reste en ASCII : les noms de touches arrivent intacts, traduits côté Node.
+    expect(OBSERVER_SCRIPT).not.toMatch(/[^\x00-\x7F]/);
+    expect(parseHookLine("KEY\t5\tEntree")).toEqual({ at: 5, kind: "touche", key: "Entrée" });
     expect(OBSERVER_SCRIPT).not.toMatch(/ToUnicode|MapVirtualKey/);
   });
 });

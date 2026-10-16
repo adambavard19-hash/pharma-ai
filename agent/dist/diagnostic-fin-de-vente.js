@@ -632,11 +632,12 @@ var SALE_VOCABULARY = new Set(
 );
 var MAX_DURATION_MS = 20 * 6e4;
 var AFTER_ACTION_MS = 3e3;
+var KEY_FR = { Entree: "Entr\xE9e", Echap: "\xC9chap", "Retour arriere": "Retour arri\xE8re", "Page prec.": "Page pr\xE9c.", "Page suiv.": "Page suiv.", caractere: "caract\xE8re" };
 function parseHookLine(line) {
   const parts = line.split("	");
   const at = Number(parts[1]);
   if (!Number.isFinite(at)) return null;
-  if (parts[0] === "KEY" && parts[2]) return { at, kind: "touche", key: parts[2].slice(0, 20) };
+  if (parts[0] === "KEY" && parts[2]) return { at, kind: "touche", key: KEY_FR[parts[2]] ?? parts[2].slice(0, 20) };
   if (parts[0] === "CLIC" && parts[2]) return { at, kind: "clic", button: parts[2].slice(0, 10) };
   if (parts[0] === "WIN") return { at, kind: "fenetre", process: maskMessage(parts[2] ?? "", SALE_VOCABULARY).slice(0, 40), title: maskMessage(parts[3] ?? "", SALE_VOCABULARY).slice(0, 120) };
   return null;
@@ -759,15 +760,15 @@ public static class PharmaBoostObserver {
   private static string KeyName(int vk) {
     if (vk >= 0x70 && vk <= 0x7B) return "F" + (vk - 0x6F);
     switch (vk) {
-      case 0x0D: return "Entrée";
-      case 0x1B: return "Échap";
+      case 0x0D: return "Entree";
+      case 0x1B: return "Echap";
       case 0x23: return "Fin";
       case 0x24: return "Origine";
       case 0x2E: return "Suppr";
       case 0x2D: return "Inser";
       case 0x09: return "Tab";
-      case 0x08: return "Retour arrière";
-      case 0x21: return "Page préc.";
+      case 0x08: return "Retour arriere";
+      case 0x21: return "Page prec.";
       case 0x22: return "Page suiv.";
       case 0x25: return "Gauche";
       case 0x26: return "Haut";
@@ -777,7 +778,7 @@ public static class PharmaBoostObserver {
     }
     bool ctrl = Down(0x11), alt = Down(0x12);
     if ((ctrl || alt) && ((vk >= 0x41 && vk <= 0x5A) || (vk >= 0x30 && vk <= 0x39))) return (ctrl ? "Ctrl+" : "Alt+") + (char)vk;
-    return "caractère";
+    return "caractere";
   }
   private static IntPtr KeyHook(int nCode, IntPtr wParam, IntPtr lParam) {
     if (nCode >= 0 && (wParam == (IntPtr)0x0100 || wParam == (IntPtr)0x0104)) {

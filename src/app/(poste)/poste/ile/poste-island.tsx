@@ -86,6 +86,9 @@ const AURORE_CSS = `
 
 const noSubscribe = () => () => {};
 
+/** Le temps laissé au pharmacien pour donner l'e-mail du bilan après la validation dans LGPI. */
+const VALIDATED_EMAIL_MS = 12_000;
+
 /** La souris sortie de l'île, elle se replie après ce délai (un aller-retour rapide ne la fait pas clignoter). */
 const FOLD_DELAY_MS = 600;
 
@@ -270,14 +273,50 @@ export function PosteIsland() {
     setFinishAfterEmail(false);
     word(finishWord(entry.id));
   }, [finishAfterEmail, entry?.emailSaved, entry?.id, word]);
+  // LGPI a validé la vente (« FIN Valider ») : l'e-mail du bilan est proposé, avec un compte à rebours ; sans réponse, la vente
+  // se termine d'elle-même (fondateur, 16 oct. 2026). Le clavier N'EST PAS pris : le pharmacien confirme encore le règlement
+  // dans LGPI avec Entrée. Il ne l'est qu'au clic dans l'île, qui arrête aussi le compte à rebours.
+  const [autoClose, setAutoClose] = useState<{ id: string; until: number } | null>(null);
+  const [clock, setClock] = useState(0);
+  const validatedAt = view.validated?.id === entry?.id ? view.validated?.at : undefined;
+  useEffect(() => {
+    if (!entry || validatedAt === undefined) return;
+    if (entry.emailSaved) {
+      word(finishWord(entry.id));
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- la validation dans LGPI ouvre l'étape de l'e-mail, une fois
+    setFinishAfterEmail(true);
+    dispatch({ type: "openEmail" });
+    const now = Date.now();
+    setClock(now);
+    setAutoClose({ id: entry.id, until: now + VALIDATED_EMAIL_MS });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- une fois par validation
+  }, [validatedAt]);
+  useEffect(() => {
+    if (!autoClose) return;
+    const tick = setInterval(() => {
+      const now = Date.now();
+      setClock(now);
+      if (now < autoClose.until) return;
+      setAutoClose(null);
+      setFinishAfterEmail(false);
+      dispatch({ type: "closeEmail" });
+      word(finishWord(autoClose.id));
+    }, 250);
+    return () => clearInterval(tick);
+  }, [autoClose, word]);
+  const stopAutoClose = useCallback(() => setAutoClose(null), []);
   useEffect(() => {
     // Une autre vente (nouveau bip) : la demande de fin de la précédente est oubliée.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- suit la vente affichée
     setFinishAfterEmail(false);
+    setAutoClose(null);
   }, [entry?.id]);
 
   // Le clavier n'est demandé que pour l'e-mail du patient ; il est rendu au logiciel de gestion dès qu'on en sort.
-  const emailOpen = island.stage === "email";
+  // Pendant le compte à rebours d'une vente validée dans LGPI, le clavier reste au logiciel de gestion.
+  const emailOpen = island.stage === "email" && !autoClose;
   useEffect(() => {
     send({ type: "keyboard", on: emailOpen });
     if (!emailOpen) return;
@@ -410,6 +449,8 @@ export function PosteIsland() {
         data-ile-style={aurore ? "aurore" : "actuel"}
         className={`flex ${ROOT_LAYOUT[view.side]} cursor-grab gap-2 select-none active:cursor-grabbing [&_button]:cursor-pointer [&_input]:cursor-text`}
         onPointerDown={(event) => {
+          // Un geste dans l'île pendant le compte à rebours : le pharmacien s'en occupe, la vente ne se termine plus seule.
+          if (autoClose) stopAutoClose();
           // Saisir l'île (hors bouton, champ ou liste qui défile) : la fenêtre Windows suit la souris tant que le bouton est tenu.
           if (event.button !== 0 || !isDragHandle(event.target)) return;
           drag.current = { x: event.screenX, y: event.screenY, moved: false };
@@ -536,6 +577,21 @@ export function PosteIsland() {
           </IslandShell>
         ) : (
           !questionsOnly && <CounterIsland {...islandProps} />
+        )}
+
+        {autoClose && autoClose.id === entry?.id && (
+          <IslandShell width={STAGE_WIDTH.email} tone="success" contentKey={`valide-${autoClose.id}`} label="Vente validée dans LGPI">
+            {/* LGPI a validé la vente : la bannière se termine seule à la fin du compte à rebours, sauf si le pharmacien clique. */}
+            <div data-ile-validee="" className="px-4 py-2.5 text-left">
+              <p className="text-[13.5px] leading-[18px] font-bold" style={{ color: aurore ? "#E8FF9C" : C.accent }}>✓ Vente validée dans LGPI</p>
+              <p className="mt-0.5 text-[12px] leading-[16px] text-white/70">
+                Le bilan au patient ? Cliquez dans le champ e-mail. Sinon, la vente se termine dans {Math.max(0, Math.ceil((autoClose.until - clock) / 1000))} s.
+              </p>
+              <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/10">
+                <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, ((autoClose.until - clock) / VALIDATED_EMAIL_MS) * 100))}%`, background: aurore ? "#E8FF9C" : C.accent, transition: "width 250ms linear" }} />
+              </span>
+            </div>
+          </IslandShell>
         )}
 
         {expiryBox?.expiry && (

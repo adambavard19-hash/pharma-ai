@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LgpiRobotReader, findJournalDir, journalName, startLgpiJournal } from "../robot-lgpi";
+import { LgpiRobotReader, findJournalDir, isSaleValidatedLine, journalName, startLgpiJournal } from "../robot-lgpi";
 import { analyse, matchDeliveries, renderReport } from "../lire-journal";
 
 /**
@@ -176,6 +176,27 @@ describe("le journal du jour", () => {
     vi.advanceTimersByTime(seconds * 1000);
   };
   const append = (name: string, lines: string[]) => appendFileSync(join(dir, name), lines.join("\r\n") + "\r\n", "latin1");
+
+  const VALIDATION = (time: string) => `2026-10-09 ${time},120 INFO [AWT-EventQueue-0] f.a.s.m.p.facturation.FacturationProcessusImpl - Tri des lignes de vente par type de facturation - ok`;
+
+  it("la validation d'une vente dans LGPI (FIN Valider) : une seule annonce, ni le début du tri ni une autre ligne ne comptent", () => {
+    expect(isSaleValidatedLine(VALIDATION("08:00:03"))).toBe(true);
+    expect(isSaleValidatedLine("2026-10-09 08:00:03,120 INFO [AWT-EventQueue-0] f.a.s.m.p.facturation.FacturationProcessusImpl - Tri des lignes de vente par type de facturation - début")).toBe(false);
+    expect(isSaleValidatedLine("2026-10-09 08:00:03,120 INFO [AWT-EventQueue-0] f.a.s.m.p.stock.HistoriqueVenteProcessusImpl - lignes de vente par type de facturation - ok")).toBe(false);
+    writeFileSync(join(dir, "lgpi.2026-10-09.log"), "");
+    const validated: number[] = [];
+    const stop = startLgpiJournal({ kind: "lgpi", dir }, { onScan: () => undefined, onStatus: () => undefined, onSaleValidated: (at) => validated.push(at) }, () => clock);
+    tick();
+    append("lgpi.2026-10-09.log", [VALIDATION("08:00:03"), VALIDATION("08:00:03")]);
+    tick();
+    expect(validated).toHaveLength(1);
+    // La vente suivante, validée une minute plus tard : une nouvelle annonce.
+    tick(60);
+    append("lgpi.2026-10-09.log", [VALIDATION("08:01:04")]);
+    tick();
+    expect(validated).toHaveLength(2);
+    stop();
+  });
 
   it("le nom du journal est celui du jour, à l'heure du poste", () => {
     expect(journalName(new Date(2026, 9, 9, 23, 59))).toBe("lgpi.2026-10-09.log");
