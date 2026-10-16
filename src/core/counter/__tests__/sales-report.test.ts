@@ -68,3 +68,25 @@ describe("le PDF du rapport", () => {
     expect(empty.length).toBeGreaterThan(1000);
   });
 });
+
+describe("les périodes du rapport de performance (console)", async () => {
+  const { resolveReportRange } = await import("../sales-report");
+  const now = new Date("2026-10-16T10:00:00Z"); // un vendredi, 12 h à Paris
+  it("hier : de minuit à minuit, à Paris", () => {
+    const range = resolveReportRange("hier", now, "Europe/Paris");
+    expect(range.from.toISOString()).toBe("2026-10-14T22:00:00.000Z");
+    expect(range.to.toISOString()).toBe("2026-10-15T21:59:59.999Z");
+    expect(range.byHour).toBe(true);
+  });
+  it("cette semaine commence le lundi ; ce mois-ci le 1er", () => {
+    expect(resolveReportRange("semaine-en-cours", now, "Europe/Paris").from.toISOString()).toBe("2026-10-11T22:00:00.000Z");
+    expect(resolveReportRange("mois-en-cours", now, "Europe/Paris").from.toISOString()).toBe("2026-09-30T22:00:00.000Z");
+  });
+  it("un jour ou un mois dans le futur, ou impossible, retombe sur les 7 derniers jours", () => {
+    expect(resolveReportRange("2026-10-20", now, "Europe/Paris").param).toBe("semaine");
+    expect(resolveReportRange("2026-02-30", now, "Europe/Paris").param).toBe("semaine");
+    expect(resolveReportRange("2026-13", now, "Europe/Paris").param).toBe("semaine");
+    expect(resolveReportRange("2026-10-14", now, "Europe/Paris").label).toBe("Le 14 octobre 2026");
+    expect(resolveReportRange("2026-09", now, "Europe/Paris").label).toBe("Septembre 2026");
+  });
+});

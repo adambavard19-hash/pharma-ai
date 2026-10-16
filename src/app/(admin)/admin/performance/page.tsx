@@ -1,121 +1,131 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Building2, Euro, LifeBuoy, LineChart, Sparkles } from "lucide-react";
+import { ArrowUpRight, Check, Euro, Percent, Sparkles } from "lucide-react";
+import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
-import { loadPortfolioForPlatform } from "@/server/services/performance";
-import { HEALTH_LABELS } from "@/core/performance/portfolio";
-import { searchParam } from "@/core/admin/clients";
-import { LOCALE, TIME_ZONE } from "@/config/constants";
+import { loadSalesReport } from "@/server/services/counter-history";
+import { euros, percent, RANGE_CHIPS, resolveReportRange, type SalesReport } from "@/core/counter/sales-report";
+import { isDemoMode } from "@/config/env";
+import { TIME_ZONE } from "@/config/constants";
 import { AdminPageHeader } from "@/components/admin/page-header";
-import { FilterChips } from "@/components/admin/filters";
-import { KpiTile } from "@/components/admin/kpis";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Alert, EmptyState } from "@/components/ui/feedback";
-import { formatCentsCompact, formatDateTime, formatNumber } from "@/lib/format";
-import { countByHealth, ETAT_FILTERS, etatFromParam } from "./_components/etat";
-import { PortfolioCards, PortfolioTable } from "./_components/portfolio-list";
+import { AutoRefresh } from "@/components/app/auto-refresh";
+import { PeriodPicker } from "@/components/admin/performance/period-picker";
+import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Performance des officines" };
+export const metadata: Metadata = { title: "Performance des pharmacies" };
 
 const BASE_PATH = "/admin/performance";
 
 /**
- * Ce que PharmaBoost rapporte, officine par officine, sur le mois en cours :
- * pour repérer celles qui en tirent beaucoup et celles qui ont besoin d'un
- * coup de main. Uniquement des ventes enregistrées dans PharmaBoost, au prix
- * saisi ; aucune donnée patient, aucune ventilation par collaborateur.
- * La période se règle par la fiche de l'officine (onglet Performance).
+ * La performance de chaque pharmacie, sur la période choisie (fondateur, 16 oct. 2026 : « simple, on comprend tout
+ * directement ») : les quatre chiffres de toutes les pharmacies réunies, puis une ligne par pharmacie — conseils
+ * proposés, vendus, taux de vente, chiffre d'affaires ajouté. Un clic ouvre son rapport (liste des conseils, PDF).
+ * Source : les ventes terminées au comptoir. Les pharmacies de démonstration ne sont pas comptées. Rafraîchi chaque minute.
  */
-export default async function PerformancePortfolioPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function PerformancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePlatformSession();
   const params = await searchParams;
-  const etat = etatFromParam(searchParam(params, "etat"));
+  const now = new Date();
+  const range = resolveReportRange(params.periode, now, TIME_ZONE);
 
-  const { rows: all, totals, generatedAt } = await loadPortfolioForPlatform({ now: new Date() });
-  // L'ordre est celui du calcul (à voir en premier d'abord) : le filtre le garde.
-  const rows = etat ? all.filter((row) => row.health === etat.health) : all;
-  const counts = countByHealth(all);
-  const monthLabel = new Intl.DateTimeFormat(LOCALE, { timeZone: TIME_ZONE, month: "long", year: "numeric" }).format(generatedAt);
+  const pharmacies = await prisma.pharmacy.findMany({
+    where: { isActive: true, ...(isDemoMode() ? {} : { isDemo: false }) },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, city: true },
+  });
+  const reports: { id: string; name: string; city: string | null; report: SalesReport }[] = await Promise.all(
+    pharmacies.map(async (pharmacy) => ({ ...pharmacy, report: await loadSalesReport({ pharmacyId: pharmacy.id, range, now }) })),
+  );
+  // Les pharmacies actives d'abord (le plus de chiffre d'affaires ajouté), celles sans vente ensuite.
+  reports.sort((a, b) => b.report.revenueCents - a.report.revenueCents || b.report.sold - a.report.sold || b.report.sales - a.report.sales || a.name.localeCompare(b.name, "fr"));
+  const total = reports.reduce((sum, { report }) => ({ sales: sum.sales + report.sales, proposed: sum.proposed + report.proposed, sold: sum.sold + report.sold, revenue: sum.revenue + report.revenueCents }), { sales: 0, proposed: 0, sold: 0, revenue: 0 });
+  const today = new Intl.DateTimeFormat("fr-CA", { timeZone: TIME_ZONE }).format(now);
+  const time = new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" }).format(now);
+  const href = (periode: string) => `${BASE_PATH}?periode=${encodeURIComponent(periode)}`;
+
+  const figures = [
+    { label: "Conseils proposés", value: String(total.proposed), hint: `dans ${total.sales} vente${total.sales > 1 ? "s" : ""} terminée${total.sales > 1 ? "s" : ""}`, icon: <Sparkles className="size-4" /> },
+    { label: "Conseils vendus", value: String(total.sold), hint: `sur ${total.proposed} proposé${total.proposed > 1 ? "s" : ""}`, icon: <Check className="size-4" />, success: true },
+    { label: "Taux de vente", value: percent(total.proposed > 0 ? total.sold / total.proposed : null), hint: "conseils vendus ÷ conseils proposés", icon: <Percent className="size-4" /> },
+    { label: "Chiffre d'affaires ajouté", value: euros(total.revenue), hint: "TTC, toutes pharmacies", icon: <Euro className="size-4" />, success: true },
+  ];
 
   return (
     <>
-      <AdminPageHeader
-        space={{ label: "Officines", href: "/admin/pharmacies" }}
-        title="Performance"
-        description="La valeur générée par PharmaBoost, officine par officine : qui en tire beaucoup, qui a besoin d'accompagnement. Chiffres du mois en cours, à partir des ventes enregistrées dans PharmaBoost."
-      />
+      <AutoRefresh intervalMs={60_000} />
+      <AdminPageHeader space={{ label: "Officines", href: "/admin/pharmacies" }} title="Performance" description={`Ce que PharmaBoost rapporte à chaque pharmacie · ${range.label}. Mis à jour à ${time}, toutes les minutes.`} />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiTile
-          label="Officines mesurées"
-          value={formatNumber(totals.withConfirmedSales)}
-          hint={`sur ${formatNumber(totals.pharmacies)} officine${totals.pharmacies > 1 ? "s" : ""} cliente${totals.pharmacies > 1 ? "s" : ""}, avec au moins une vente confirmée en ${monthLabel}`}
-          icon={<Building2 className="size-4" />}
-        />
-        <KpiTile label={`CA confirmé en ${monthLabel}`} value={formatCentsCompact(totals.confirmedTtcCents)} hint="TTC, ventes confirmées au prix saisi" icon={<Euro className="size-4" />} />
-        <KpiTile
-          label={HEALTH_LABELS.high_value}
-          value={formatNumber(totals.highValue)}
-          tone={totals.highValue > 0 ? "success" : "default"}
-          hint="Les officines qui en tirent le plus"
-          href={`${BASE_PATH}?etat=forte-valeur`}
-          icon={<Sparkles className="size-4" />}
-        />
-        <KpiTile
-          label={HEALTH_LABELS.needs_support}
-          value={formatNumber(totals.needsSupport)}
-          tone={totals.needsSupport > 0 ? "warning" : "default"}
-          hint={totals.needsSupport > 0 ? "Un appel ou un coup de main peut aider" : "Aucune officine ne demande d'aide"}
-          href={`${BASE_PATH}?etat=a-accompagner`}
-          icon={<LifeBuoy className="size-4" />}
-        />
+      <PeriodPicker current={range.param} today={today} hrefFor={{ base: BASE_PATH, ...Object.fromEntries(RANGE_CHIPS.map((chip) => [chip.param, href(chip.param)])) }} />
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-totaux="">
+        {figures.map((figure) => (
+          <div key={figure.label} className="rounded-2xl bg-surface-card p-5 ring-1 ring-border-subtle">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[13px] font-medium text-text-secondary">{figure.label}</p>
+              <span className="grid size-8 place-items-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300">{figure.icon}</span>
+            </div>
+            <p className={cn("mt-3 text-[34px] leading-10 font-bold tracking-[-0.03em] tabular-nums", figure.success ? "text-success-700 dark:text-success-400" : "text-text-primary")}>{figure.value}</p>
+            <p className="mt-1 text-[12.5px] text-text-tertiary">{figure.hint}</p>
+          </div>
+        ))}
       </div>
 
-      {all.length > 0 && totals.withConfirmedSales === 0 && (
-        <Alert tone="info" title={`Aucune vente confirmée en ${monthLabel} pour l'instant`}>
-          PharmaBoost ne compte que les ventes enregistrées depuis un conseil. Tant qu&apos;aucune équipe n&apos;en a enregistré, aucune valeur n&apos;est affichée : rien n&apos;est estimé.
-        </Alert>
-      )}
-
-      <FilterChips
-        label="Filtrer les officines"
-        basePath={BASE_PATH}
-        param="etat"
-        current={etat?.value ?? null}
-        options={[
-          { value: null, label: "Toutes", count: all.length },
-          ...ETAT_FILTERS.map((filter) => ({ value: filter.value, label: HEALTH_LABELS[filter.health], count: counts[filter.health] })),
-        ]}
-      />
-
-      {all.length === 0 ? (
-        <Card>
-          <EmptyState icon={<LineChart className="size-5" />} title="Aucune officine cliente pour l'instant" description="La valeur générée apparaît ici dès qu'une officine cliente utilise PharmaBoost." />
-        </Card>
-      ) : rows.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon={<LineChart className="size-5" />}
-            title="Aucune officine dans cette catégorie"
-            description="Aucune officine ne correspond à ce filtre pour l'instant."
-            action={
-              <Button asChild variant="outline" size="sm">
-                <Link href={BASE_PATH}>Voir toutes les officines</Link>
-              </Button>
-            }
-          />
-        </Card>
-      ) : (
-        <>
-          <PortfolioTable rows={rows} />
-          <PortfolioCards rows={rows} />
-        </>
-      )}
+      <section className="overflow-hidden rounded-2xl bg-surface-card ring-1 ring-border-subtle" aria-labelledby="pharmacies-perf">
+        <div className="border-b border-border-subtle px-5 py-4">
+          <h2 id="pharmacies-perf" className="text-[15px] font-semibold text-text-primary">Chaque pharmacie · {range.label}</h2>
+          <p className="text-[12.5px] text-text-tertiary">Cliquez sur une pharmacie pour voir ses conseils un par un et télécharger son PDF.</p>
+        </div>
+        {reports.length === 0 ? (
+          <p className="px-5 py-10 text-center text-[13.5px] text-text-tertiary">Aucune pharmacie cliente pour l&apos;instant.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-[13.5px]" data-tableau-pharmacies="">
+              <thead>
+                <tr className="text-left text-[12px] font-semibold tracking-wide text-text-tertiary uppercase">
+                  <th className="px-5 py-3">Pharmacie</th>
+                  <th className="px-3 py-3 text-right">Ventes</th>
+                  <th className="px-3 py-3 text-right">Proposés</th>
+                  <th className="px-3 py-3 text-right">Vendus</th>
+                  <th className="px-3 py-3">Taux de vente</th>
+                  <th className="px-5 py-3 text-right">CA ajouté</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                {reports.map(({ id, name, city, report }) => {
+                  const rate = report.proposed > 0 ? report.sold / report.proposed : null;
+                  const link = `/admin/pharmacies/${id}?onglet=performance&periode=${encodeURIComponent(range.param)}`;
+                  return (
+                    <tr key={id} className="group hover:bg-surface-sunken/60">
+                      <td className="px-5 py-3">
+                        <Link href={link} className="flex items-center gap-1.5 font-semibold text-text-primary group-hover:text-brand-700 dark:group-hover:text-brand-400">
+                          {name}
+                          <ArrowUpRight className="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+                        </Link>
+                        {city && <span className="text-[12px] text-text-tertiary">{city}</span>}
+                      </td>
+                      <td className="px-3 py-3 text-right text-text-secondary tabular-nums">{report.sales}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{report.proposed}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-success-700 tabular-nums dark:text-success-400">{report.sold}</td>
+                      <td className="px-3 py-3">
+                        <span className="flex items-center gap-2">
+                          <span className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-sunken">
+                            <span className="block h-full rounded-full bg-brand-500" style={{ width: `${Math.round((rate ?? 0) * 100)}%` }} />
+                          </span>
+                          <span className="tabular-nums text-text-secondary">{percent(rate)}</span>
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right font-semibold text-text-primary tabular-nums">{euros(report.revenueCents)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <p className="text-[12.5px] leading-5 text-text-tertiary">
-        Du 1er du mois à maintenant ({monthLabel}), calculé le {formatDateTime(generatedAt)}. À voir en premier : les officines à accompagner, puis celles qui n&apos;ont rien mesuré. Le retour sur abonnement compare le chiffre d&apos;affaires HT confirmé au prix mensuel HT de l&apos;abonnement ;
-        « Non mesurable » veut dire qu&apos;il manque des ventes ou des prix, jamais qu&apos;il est faible. « Conseils achetés » compte les conseils qui ont donné lieu à une vente ; le chiffre d&apos;affaires ne compte que les lignes de vente au prix saisi. PharmaBoost ne lit pas la caisse du logiciel de gestion. Les officines de démonstration ne sont pas comptées.
+        Compté sur les ventes terminées au comptoir. Un conseil est « vendu » quand il est bipé (ou déclaré vendu au comptoir) ; le chiffre d&apos;affaires est celui de ces conseils, au prix de vente TTC de la pharmacie. Les pharmacies de démonstration ne sont pas comptées.
       </p>
     </>
   );

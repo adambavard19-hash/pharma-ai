@@ -35,7 +35,13 @@ export const ATTACH_TARGET = 0.1;
 export type ReportBucket = { key: string; label: string; sales: number; withAdvice: number; sold: number; revenueCents: number };
 
 export type SalesReport = {
-  period: SalesReportPeriod;
+  period: SalesReportPeriod | "range";
+  /** « Aujourd'hui », « Cette semaine », « Le 16 octobre 2026 », « Octobre 2026 »… */
+  label: string;
+  /** La période telle qu'elle passe dans l'adresse (« jour », « 2026-10-16 », « 2026-10 »). */
+  param: string;
+  /** Les cases du détail : par heure (un jour), sinon par jour. */
+  byHour: boolean;
   from: Date;
   to: Date;
   sales: number;
@@ -91,13 +97,16 @@ const dayLabel = (day: string) => {
   return `${date}/${month}`;
 };
 
-export function buildSalesReport(input: { period: SalesReportPeriod; sales: ClosedSale[]; now: Date; timeZone: string }): SalesReport {
-  const { from, to } = reportWindow(input.period, input.now, input.timeZone);
+export function buildSalesReport(input: { period?: SalesReportPeriod; range?: ReportRange; sales: ClosedSale[]; now: Date; timeZone: string }): SalesReport {
+  const period = input.period ?? "week";
+  const range = input.range ?? resolveReportRange(SALES_REPORT_PERIODS.find((entry) => entry.key === period)?.param ?? "semaine", input.now, input.timeZone);
+  const { from, to } = range;
+  const byHour = range.byHour;
   const inWindow = input.sales.filter((sale) => sale.closedAt >= from && sale.closedAt <= to);
 
   // Les cases du graphique : les heures d'ouverture pour « aujourd'hui », sinon un jour par case.
   const buckets = new Map<string, ReportBucket>();
-  if (input.period === "day") {
+  if (byHour) {
     for (let hour = 7; hour <= 21; hour += 1) buckets.set(String(hour), { key: String(hour), label: `${hour} h`, sales: 0, withAdvice: 0, sold: 0, revenueCents: 0 });
   } else {
     for (let at = from.getTime() + 12 * 60 * 60 * 1000; at <= to.getTime() + 12 * 60 * 60 * 1000; at += DAY_MS) {
@@ -130,7 +139,7 @@ export function buildSalesReport(input: { period: SalesReportPeriod; sales: Clos
     if (sale.emailSent) emailsSent += 1;
 
     const parts = parisParts(sale.closedAt, input.timeZone);
-    let key = input.period === "day" ? String(Math.min(21, Math.max(7, parts.hour))) : parts.day;
+    let key = byHour ? String(Math.min(21, Math.max(7, parts.hour))) : parts.day;
     if (!buckets.has(key)) key = [...buckets.keys()].at(-1) ?? key;
     const bucket = buckets.get(key);
     if (bucket) {
@@ -159,7 +168,10 @@ export function buildSalesReport(input: { period: SalesReportPeriod; sales: Clos
   const attachRate = sales > 0 ? withAdvice / sales : null;
   const decided = sold + notSold;
   return {
-    period: input.period,
+    period: input.range ? "range" : period,
+    label: range.label,
+    param: range.param,
+    byHour,
     from,
     to,
     sales,
@@ -194,6 +206,76 @@ export function percent(rate: number | null): string {
 /** « 1 234,50 € ». */
 export function euros(cents: number): string {
   return (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Les périodes du rapport (console de PharmaBoost, 16 oct. 2026) : aujourd'hui, hier, cette semaine, ce mois-ci, 7 et
+// 30 derniers jours, un jour précis (« 2026-10-16 »), un mois précis (« 2026-10 »). Toujours à l'heure de Paris, jamais
+// au-delà de maintenant.
+// ---------------------------------------------------------------------------------------------------------------------
+
+export type ReportRange = { param: string; label: string; from: Date; to: Date; byHour: boolean };
+
+export const RANGE_CHIPS: { param: string; label: string }[] = [
+  { param: "jour", label: "Aujourd'hui" },
+  { param: "hier", label: "Hier" },
+  { param: "semaine-en-cours", label: "Cette semaine" },
+  { param: "mois-en-cours", label: "Ce mois-ci" },
+  { param: "semaine", label: "7 derniers jours" },
+  { param: "mois", label: "30 derniers jours" },
+];
+
+const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+
+/** Minuit (Paris) d'une date du calendrier « AAAA-MM-JJ ». */
+function midnightOf(day: string, timeZone: string): Date {
+  return parisMidnight(new Date(`${day}T12:00:00Z`), timeZone);
+}
+
+function addDays(day: string, days: number): string {
+  const date = new Date(`${day}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** La période d'une adresse ; une valeur inconnue ou douteuse retombe sur les 7 derniers jours. */
+export function resolveReportRange(raw: string | string[] | undefined | null, now: Date, timeZone: string): ReportRange {
+  const param = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
+  const today = parisParts(now, timeZone).day;
+  const chip = (key: string) => RANGE_CHIPS.find((entry) => entry.param === key)?.label ?? key;
+  const clamp = (to: Date) => (to.getTime() > now.getTime() ? now : to);
+  switch (param) {
+    case "jour":
+      return { param, label: chip(param), from: midnightOf(today, timeZone), to: now, byHour: true };
+    case "hier": {
+      const day = addDays(today, -1);
+      return { param, label: chip(param), from: midnightOf(day, timeZone), to: new Date(midnightOf(today, timeZone).getTime() - 1), byHour: true };
+    }
+    case "semaine-en-cours": {
+      // Lundi de cette semaine (à Paris).
+      const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
+      const monday = addDays(today, -((weekday + 6) % 7));
+      return { param, label: chip(param), from: midnightOf(monday, timeZone), to: now, byHour: false };
+    }
+    case "mois-en-cours":
+      return { param, label: chip(param), from: midnightOf(`${today.slice(0, 7)}-01`, timeZone), to: now, byHour: false };
+    case "mois":
+      return { param, label: chip(param), ...reportWindow("month", now, timeZone), byHour: false };
+    case "semaine":
+      return { param, label: chip(param), ...reportWindow("week", now, timeZone), byHour: false };
+  }
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(param);
+  if (day && param <= today && !Number.isNaN(Date.parse(`${param}T12:00:00Z`)) && new Date(`${param}T12:00:00Z`).toISOString().slice(0, 10) === param) {
+    const label = `Le ${Number(day[3])} ${MONTHS[Number(day[2]) - 1]} ${day[1]}`;
+    return { param, label, from: midnightOf(param, timeZone), to: clamp(new Date(midnightOf(addDays(param, 1), timeZone).getTime() - 1)), byHour: true };
+  }
+  const month = /^(\d{4})-(\d{2})$/.exec(param);
+  if (month && Number(month[2]) >= 1 && Number(month[2]) <= 12 && param <= today.slice(0, 7)) {
+    const next = Number(month[2]) === 12 ? `${Number(month[1]) + 1}-01-01` : `${month[1]}-${String(Number(month[2]) + 1).padStart(2, "0")}-01`;
+    const label = `${MONTHS[Number(month[2]) - 1].replace(/^./, (c) => c.toUpperCase())} ${month[1]}`;
+    return { param, label, from: midnightOf(`${param}-01`, timeZone), to: clamp(new Date(midnightOf(next, timeZone).getTime() - 1)), byHour: false };
+  }
+  return resolveReportRange("semaine", now, timeZone);
 }
 
 export function periodFromParam(value: string | string[] | undefined): SalesReportPeriod {

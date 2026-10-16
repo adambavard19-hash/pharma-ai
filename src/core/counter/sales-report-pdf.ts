@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import { ATTACH_TARGET, euros, percent, SALES_REPORT_PERIODS, type SalesReport } from "./sales-report";
+import { ATTACH_TARGET, euros, percent, type SalesReport } from "./sales-report";
 
 /**
  * Le rapport PDF de performance du comptoir : la preuve, imprimable et transmissible, de ce que PharmaBoost apporte à une
@@ -31,7 +31,7 @@ const fmtDate = (date: Date, timeZone: string, style: Intl.DateTimeFormatOptions
 export async function renderSalesReportPdf(input: { pharmacyName: string; report: SalesReport; generatedAt: Date; timeZone: string }): Promise<Uint8Array> {
   const { report, timeZone } = input;
   const pdf = await PDFDocument.create();
-  const periodLabel = SALES_REPORT_PERIODS.find((period) => period.key === report.period)?.label ?? "";
+  const periodLabel = report.label;
   pdf.setTitle(safe(`Performance du comptoir - ${input.pharmacyName} - ${periodLabel}`));
   pdf.setAuthor("PharmaBoost");
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
@@ -83,7 +83,7 @@ export async function renderSalesReportPdf(input: { pharmacyName: string; report
   const tiles: [string, string][] = [
     ["Ventes terminées", String(report.sales)],
     ["Avec un conseil vendu", `${report.withAdvice} (${percent(report.attachRate)})`],
-    ["Conseils vendus", `${report.sold} / ${report.proposed} proposés`],
+    ["Conseils vendus / proposés", `${report.sold} / ${report.proposed} (${percent(report.proposed > 0 ? report.sold / report.proposed : null)})`],
     ["Chiffre d'affaires ajouté", euros(report.revenueCents)],
     ["Marge ajoutée (HT)", report.marginCents > 0 ? euros(report.marginCents) : "-"],
     ["CA ajouté par vente", report.revenuePerSaleCents === null ? "-" : euros(report.revenuePerSaleCents)],
@@ -99,7 +99,7 @@ export async function renderSalesReportPdf(input: { pharmacyName: string; report
   y -= 128;
 
   // Le graphique : chiffre d'affaires ajouté par jour (ou par heure)
-  text(report.period === "day" ? "Par heure" : "Par jour", M, y, 11, bold);
+  text(report.byHour ? "Par heure" : "Par jour", M, y, 11, bold);
   text("Barres : ventes terminées (gris) et ventes avec un conseil vendu (vert)", M + 70, y, 8, regular, GREY);
   y -= 12;
   const chartH = 110;
@@ -124,7 +124,7 @@ export async function renderSalesReportPdf(input: { pharmacyName: string; report
   y -= 16;
   const cols = [M, M + 120, M + 230, M + 340, M + width];
   const header = ["", "Ventes terminées", "Avec conseil vendu", "Conseils vendus", "CA ajouté"];
-  header.forEach((label, index) => (index === 0 ? text(report.period === "day" ? "Heure" : "Jour", cols[0], y, 8.5, bold, GREY) : right(label, index === 4 ? cols[4] : cols[index] + 90, y, 8.5, bold, GREY)));
+  header.forEach((label, index) => (index === 0 ? text(report.byHour ? "Heure" : "Jour", cols[0], y, 8.5, bold, GREY) : right(label, index === 4 ? cols[4] : cols[index] + 90, y, 8.5, bold, GREY)));
   y -= 6;
   page.drawLine({ start: { x: M, y }, end: { x: M + width, y }, thickness: 0.6, color: LINE });
   for (const bucket of report.buckets.filter((row) => row.sales > 0)) {
