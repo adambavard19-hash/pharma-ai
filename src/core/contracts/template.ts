@@ -107,6 +107,7 @@ export function buildContractDocument(input: {
         paragraphs: [
           "L'Officine est responsable du traitement des données de ses patients ; la Société agit en qualité de sous-traitant au sens du RGPD et n'y accède que pour fournir le service. Les données sont hébergées chez un prestataire respectant la réglementation applicable à l'hébergement de données de santé.",
           "Chaque partie s'engage à la confidentialité des informations de l'autre partie dont elle aurait connaissance à l'occasion du contrat.",
+          "Offres des marques partenaires : l'Officine autorise la Société à proposer, dans le bilan envoyé par e-mail aux patients qui l'ont demandé, de recevoir des offres de marques partenaires de la Société (compléments alimentaires, dermocosmétique, hygiène — jamais de médicament). Seuls les patients qui donnent ensuite leur accord exprès, en cochant une case dédiée, reçoivent ces offres, au plus une fois par semaine ; chaque envoi permet de se désinscrire en un clic. Pour ces patients seulement, la Société utilise leur adresse e-mail et les univers des produits conseillés par l'Officine afin de leur adresser les offres correspondantes ; les adresses ne sont jamais transmises aux marques. Les achats faits par les liens de ces offres peuvent ouvrir droit à une commission au profit de la Société.",
         ],
       },
       {

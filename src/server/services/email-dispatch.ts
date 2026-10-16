@@ -33,6 +33,8 @@ export type DispatchKind =
   | "SUPPORT_REPLY"
   /** Le bilan envoyé au patient à la fin de sa vente au comptoir (adresse masquée dans le journal). */
   | "PATIENT_REPORT"
+  /** Une offre d'une marque partenaire, envoyée au patient qui l'a acceptée (adresse masquée dans le journal). */
+  | "PARTNER_PATIENT"
   /** Le rappel de fin de cure envoyé au patient, au nom de la pharmacie (adresse masquée dans le journal). */
   | "CURE_REMINDER"
   /** Le bilan du mois écoulé au comptoir, envoyé au titulaire. */

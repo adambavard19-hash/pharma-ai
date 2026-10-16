@@ -52,7 +52,9 @@ export type EmailBlock =
   /** Deux à quatre chiffres clés côte à côte (« 12 conseils vendus »), avec, s'il y en a une, la comparaison. */
   | { kind: "stats"; items: Array<{ value: string; label: string; trend?: string | null; tone?: "up" | "down" | "flat" }> }
   /** Une courte liste à puces, avec son titre. */
-  | { kind: "list"; title?: string; items: string[] };
+  | { kind: "list"; title?: string; items: string[] }
+  /** Une image (https), pleine largeur de la carte : le visuel d'une offre partenaire. */
+  | { kind: "image"; url: string; alt: string };
 
 export type EmailContent = {
   subject: string;
@@ -115,6 +117,8 @@ function blockHtml(block: EmailBlock): string {
       const bg = block.tone === "warning" ? "#FFF8EB" : BRAND.tint;
       return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px"><tr><td style="background:${bg};border-left:3px solid ${color};border-radius:4px;padding:12px 16px;font-family:${FONT};font-size:14px;line-height:21px;color:${BRAND.ink}">${escapeHtml(block.text)}</td></tr></table>`;
     }
+    case "image":
+      return /^https:\/\//.test(block.url) ? `<img src="${escapeHtml(block.url)}" alt="${escapeHtml(block.alt)}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border:0;border-radius:12px;margin:0 0 20px">` : "";
     case "link":
       return `<p style="margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:20px;color:${BRAND.muted}">${escapeHtml(block.label)}<br><a href="${escapeHtml(block.url)}" style="color:${BRAND.primary};word-break:break-all">${escapeHtml(block.url)}</a></p>`;
     case "stats": {
@@ -147,6 +151,8 @@ function blockText(block: EmailBlock): string {
       return [block.title ? `${block.title} :` : null, ...block.rows.map(([l, v]) => `- ${l} : ${v}`)].filter(Boolean).join("\n");
     case "steps":
       return [block.title ? `${block.title} :` : null, ...block.items.map((item, i) => `${i + 1}. ${item}`)].filter(Boolean).join("\n");
+    case "image":
+      return "";
     case "link":
       return `${block.label}\n${block.url}`;
     case "stats":

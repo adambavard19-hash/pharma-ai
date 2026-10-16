@@ -43,6 +43,14 @@ export default async function PartnersPage() {
         Gammes proposées par des laboratoires partenaires de PharmaBoost. Elles ne modifient jamais les conseils du moteur : elles apparaissent à part, signalées comme telles.
       </Alert>
 
+      {/* Les offres partenaires aux patients (17 oct. 2026) : ce que la pharmacie doit savoir, puisque le bilan les propose. */}
+      <Card className="p-5" data-offres-patients="">
+        <p className="text-[15px] font-semibold text-text-primary">Les offres partenaires dans le bilan de vos patients</p>
+        <p className="mt-1.5 text-[13.5px] leading-5 text-text-secondary">
+          Le bilan envoyé par e-mail à vos patients leur propose, sans l&apos;imposer, de recevoir les offres des marques partenaires de PharmaBoost : compléments alimentaires, soins, hygiène — jamais de médicament. Seuls ceux qui cochent la case d&apos;accord les reçoivent, au plus une fois par semaine, avec un lien pour se désinscrire. Leurs adresses ne sont jamais transmises aux marques.
+        </p>
+      </Card>
+
       {nothingOffered ? (
         <Card>
           <EmptyState icon={<Handshake className="size-5" />} title="Aucune gamme partenaire n'est disponible pour votre officine pour l'instant." />

@@ -17,6 +17,7 @@ export function PartnerTabs() {
         { key: "commandes", label: "Commandes & leads", href: "/admin/partenaires/commandes" },
         { key: "nouveautes", label: "Nouveautés", href: "/admin/partenaires/nouveautes" },
         { key: "campagnes", label: "Campagnes", href: "/admin/partenaires/campagnes" },
+        { key: "emails-patients", label: "E-mails patients", href: "/admin/partenaires/emails-patients" },
         { key: "demandes", label: "Demandes d'info", href: "/admin/partenaires/demandes" },
         { key: "statistiques", label: "Statistiques", href: "/admin/partenaires/statistiques" },
       ]}

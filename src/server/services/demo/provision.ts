@@ -47,6 +47,8 @@ export const WIPED_MODELS = [
   "robotSuggestion",
   // Les rappels de fin de cure (la démonstration n'en programme pas ; s'il en existait, ils ne survivent pas).
   "cureReminder",
+  // Les accords pour les offres partenaires (la démonstration n'en propose pas ; s'il en existait, ils ne survivent pas).
+  "patientPartnerConsent",
 ] as const;
 
 /** Ce qui porte un `pharmacyId` et que la réinitialisation conserve : la structure de l'officine, jamais son activité. */

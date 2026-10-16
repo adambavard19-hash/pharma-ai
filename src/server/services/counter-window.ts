@@ -13,6 +13,7 @@ import type { Prisma } from "@/generated/prisma";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { customRulesFrom, overriddenRulesFrom } from "@/core/ai/central-advice";
 import { patientCardsFor } from "@/server/services/patient-cards";
+import { partnerConsentUrl, universesOf } from "@/server/services/partner-emails";
 import { planCureReminders, scheduleCureReminders, isOptedOut as isCureOptedOut } from "@/server/services/cure-reminders";
 import { reminderDay } from "@/core/cure/cure";
 import { buildPatientReport, maskEmail, parsePatientEmail, patientSafeLine, patientSafeReason, type ReportLeaflet } from "@/core/counter/patient-report";
@@ -374,6 +375,9 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
     assetBaseUrl: emailAssetBase(),
     date: new Date(),
     cures: input.cures,
+    // Les offres partenaires (17 oct. 2026) : le lien d'accord, adresse et univers des produits vendus chiffrés dedans. Rien n'est gardé
+    // tant que le patient ne l'a pas confirmé sur la page. Jamais pour la démonstration.
+    partnerConsentUrl: pharmacy?.isDemo ? null : partnerConsentUrl({ email: input.email, pharmacyId, universes: universesOf(recs.map((rec) => rec.product?.category)) }),
   });
   if (!mail) return "NONE";
   const messaging = getMessagingProvider({ demo: pharmacy?.isDemo === true });

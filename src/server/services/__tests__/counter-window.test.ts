@@ -44,6 +44,7 @@ vi.mock("@/server/db/client", () => ({
 vi.mock("@/server/audit/log", () => ({ recordAudit: m.audit }));
 vi.mock("@/server/security/encryption", () => ({ encryptField: (value: string) => `enc:${value}`, decryptField: (value: string | null) => (value ? value.replace(/^enc:/, "") : null) }));
 vi.mock("@/server/ai/registry", () => ({ getMessagingProvider: () => ({ info: { id: "test" }, sendEmail: m.sendEmail }) }));
+vi.mock("@/server/services/partner-emails", () => ({ partnerConsentUrl: () => "https://pharmaboost.app/offres-partenaires/t", universesOf: () => [] }));
 vi.mock("@/server/services/patient-cards", () => ({ patientCardsFor: async (_s: unknown, targets: unknown[]) => targets.map(() => null) }));
 vi.mock("@/server/services/email-dispatch", () => ({ traceDispatch: m.trace }));
 vi.mock("@/server/services/central-advice", () => ({ validatedRuleKeys: m.validated, loadCentralRuleRows: m.centralRows }));

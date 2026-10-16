@@ -43,7 +43,7 @@ const COMMITMENTS = [
   { title: "Aucune recommandation à vendre", line: "Un partenaire ne peut ni faire entrer un produit dans un conseil, ni le faire passer devant une référence mieux adaptée." },
   { title: "La sécurité d'abord", line: "Contre-indications, vigilances et validation du pharmacien passent toujours avant une gamme partenaire." },
   { title: "Un espace distinct, signalé", line: "Une gamme partenaire apparaît à part, sous les conseils, et elle est signalée comme telle." },
-  { title: "Aucune donnée patient", line: "Aucune information sur un patient ou une ordonnance n'est transmise à un partenaire." },
+  { title: "Aucune donnée patient", line: "Aucune information sur un patient ou une ordonnance n'est transmise à un partenaire : même pour les e-mails patients, les adresses restent chez PharmaBoost." },
   { title: "Des statistiques agrégées", line: "Un partenaire ne reçoit que des chiffres d'ensemble. Une commande ou une demande de contact ne lui parvient que si l'officine la passe." },
 ];
 
@@ -112,6 +112,30 @@ export default function PartnersPage() {
             <Audience icon={<Store className="size-5" />} kicker="Pour la pharmacie" title="Découvrir, se former, commander." points={FOR_PHARMACY} />
             <Audience icon={<UserRound className="size-5" />} kicker="Pour le patient" title="Un conseil qui reste guidé par sa situation." points={FOR_PATIENT} />
           </div>
+        </div>
+      </section>
+
+      {/* ---- Les e-mails patients (17 oct. 2026) ----------------------- */}
+      <section id="emails-patients" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 md:py-28">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+          <SectionHead kicker="E-mails patients" title="Vos gammes, dans la boîte e-mail des patients.">
+            Chaque jour, chaque pharmacie équipée voit passer des centaines de patients. Ceux qui reçoivent leur bilan conseil peuvent accepter, d&apos;un clic, les offres de nos marques partenaires. Ils reçoivent alors votre gamme quand elle correspond à ce que leur pharmacien leur a conseillé, avec votre lien d&apos;affiliation.
+          </SectionHead>
+          <ul className="grid gap-3">
+            {[
+              ["Un public qui a dit oui", "Seuls les patients qui ont coché la case d'accord reçoivent vos offres, au plus une fois par semaine."],
+              ["Au bon moment", "Votre gamme arrive quand elle correspond aux produits conseillés au comptoir : compléments, soins, hygiène."],
+              ["Mesurable", "Chaque clic passe par votre lien d'affiliation : vous ne payez une commission que sur les ventes réalisées."],
+              ["Jamais de médicament", "Les e-mails patients portent sur la parapharmacie et les compléments alimentaires uniquement."],
+            ].map(([title, line]) => (
+              <li key={title} className="rounded-2xl border border-border-subtle bg-surface-card p-5">
+                <p className="flex items-start gap-2.5 text-[16px] font-semibold text-text-primary">
+                  <Check className="mt-0.5 size-5 shrink-0 text-brand-600" aria-hidden="true" /> {title}
+                </p>
+                <p className="mt-1.5 pl-7 text-[14.5px] leading-6 text-text-secondary">{line}</p>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

@@ -232,7 +232,7 @@ export function postalAddress(pharmacy: ReportPharmacy): string | null {
 }
 
 /** `null` quand il n'y a rien à dire : sans produit retenu, aucun e-mail ne part. */
-export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: ReportPharmacy; products: ReportProduct[]; assetBaseUrl?: string | null; date?: Date; /** Les rappels de fin de cure programmés avec ce bilan (produit, jour du rappel). */ cures?: { name: string; day: string }[] }): PatientReport | null {
+export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: ReportPharmacy; products: ReportProduct[]; assetBaseUrl?: string | null; date?: Date; /** Les rappels de fin de cure programmés avec ce bilan (produit, jour du rappel). */ cures?: { name: string; day: string }[]; /** Le lien pour accepter les offres des marques partenaires (accord donné ensuite sur la page). */ partnerConsentUrl?: string | null }): PatientReport | null {
   const products = reportProducts(input.products);
   if (products.length === 0) return null;
   const details: ReportPharmacy = input.pharmacy ?? { name: input.pharmacyName ?? "" };
@@ -289,6 +289,7 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
       "",
     ]),
     ...(cureLine ? [cureLine, ""] : []),
+    ...(input.partnerConsentUrl ? ["Les offres de nos marques partenaires : recevez, si vous le souhaitez, des offres de compléments et de soins choisies d'après vos conseils du jour (jamais de médicament, au plus une fois par semaine).", `Je veux les recevoir : ${input.partnerConsentUrl}`, ""] : []),
     ...(address || phone ? [`${pharmacy}`, ...(address ? [address] : []), ...(phone ? [`Téléphone : ${phone}`] : []), ""] : []),
     closing,
     "",
@@ -427,6 +428,7 @@ ${day ? `<td class="stack" valign="middle" align="right" style="padding-top:6px"
 <tr><td class="pad" style="padding:4px 32px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${products.map(card).join("")}</table></td></tr>
 ${gesturesRow}
 ${cureLine ? `<tr><td class="pad" style="padding:4px 32px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF8F3;border:1px solid #CBE9DA;border-radius:14px"><tr><td style="padding:14px 16px"><div style="font-size:15px;line-height:21px;font-weight:800;color:${DARK}">Votre rappel de fin de cure</div><div style="margin-top:4px;font-size:14px;line-height:21px;color:#344054">${escape(cureLine)}</div></td></tr></table></td></tr>` : ""}
+${input.partnerConsentUrl ? `<tr><td class="pad" style="padding:4px 32px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border:1px dashed #9CC9B4;border-radius:14px"><tr><td style="padding:14px 16px"><div style="font-size:15px;line-height:21px;font-weight:800;color:${DARK}">Les offres de nos marques partenaires</div><div style="margin-top:4px;font-size:13.5px;line-height:20px;color:#475467">Si vous le souhaitez, recevez des offres de compléments et de soins choisies d'après vos conseils du jour. Jamais de médicament, au plus une fois par semaine, désinscription en un clic.</div><table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:10px"><tr><td style="border-radius:10px;background:#E3F4EC"><a href="${escape(input.partnerConsentUrl)}" style="display:inline-block;padding:10px 16px;font-size:14px;font-weight:700;color:#0B6B4F;text-decoration:none">Oui, je veux recevoir ces offres</a></td></tr></table></td></tr></table></td></tr>` : ""}
 ${address || phone ? contact : ""}
 
 <tr><td class="pad" style="padding:6px 32px 24px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #EAECF0"><tr>

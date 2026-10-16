@@ -4510,6 +4510,7 @@ model PartnerBrand {
   launches           PartnerLaunch[]
   sponsoredCampaigns SponsoredCampaign[]
   infoRequests       PartnerInfoRequest[]
+  patientCampaigns   PartnerEmailCampaign[]
 
   @@index([partnerId])
   @@index([status])
@@ -5957,4 +5958,68 @@ model PatientCardCache {
   createdAt  DateTime @default(now())
 
   @@map("patient_card_cache")
+}
+
+
+/// L'accord d'un patient pour recevoir des offres de marques partenaires (17 oct. 2026) : donné dans l'e-mail de son bilan, par un
+/// clic puis une case cochée sur la page de confirmation — jamais d'office. Adresse CHIFFRÉE ; `emailHash` (empreinte à clé) pour
+/// reconnaître la même adresse. `interests` : les univers des produits achetés (compléments, dermocosmétique…), jamais un médicament.
+model PatientPartnerConsent {
+  id             String    @id @default(cuid())
+  emailEncrypted String?
+  emailHash      String    @unique
+  pharmacyId     String?
+  interests      String[]  @default([])
+  consentText    String
+  consentAt      DateTime
+  unsubscribedAt DateTime?
+  lastSentAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sends PartnerEmailSend[]
+
+  @@index([unsubscribedAt])
+  @@map("patient_partner_consents")
+}
+
+/// Une campagne d'e-mail partenaire, écrite dans la console : une marque, un message, un lien d'affiliation, les univers visés.
+model PartnerEmailCampaign {
+  id            String    @id @default(cuid())
+  brandId       String
+  subject       String
+  body          String
+  imageUrl      String?
+  affiliateUrl  String
+  universes     String[]  @default([])
+  status        String    @default("DRAFT")
+  sentAt        DateTime?
+  recipients    Int       @default(0)
+  createdByName String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  brand PartnerBrand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  sends PartnerEmailSend[]
+
+  @@index([status])
+  @@map("partner_email_campaigns")
+}
+
+/// Un envoi d'une campagne à un patient, et son clic sur le lien d'affiliation (la commission se calcule avec la marque).
+model PartnerEmailSend {
+  id         String    @id @default(cuid())
+  campaignId String
+  consentId  String
+  status     String
+  sentAt     DateTime  @default(now())
+  clickedAt  DateTime?
+  clicks     Int       @default(0)
+
+  campaign PartnerEmailCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  consent  PatientPartnerConsent @relation(fields: [consentId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, consentId])
+  @@index([consentId, sentAt])
+  @@map("partner_email_sends")
 }
