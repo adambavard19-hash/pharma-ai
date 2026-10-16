@@ -10,29 +10,26 @@ import { publicUrl } from "@/server/public-url";
 import { signPayload, verifyPayload } from "@/server/security/tokens";
 import { zonedDateParts } from "@/core/performance/periods";
 import { resolveReportRange } from "@/core/counter/sales-report";
-import { buildWeeklyDigest, digestHasContent, type WeekMetric } from "@/core/notifications/weekly-digest";
+import { buildDailyDigest, digestHasContent } from "@/core/notifications/weekly-digest";
 import { TIME_ZONE } from "@/config/constants";
 
 /**
- * Le résumé hebdomadaire des titulaires : le lundi (rattrapage possible jusqu'au mercredi), la semaine écoulée de chaque officine
- * active, à chacun de ses titulaires qui ne s'en est pas désinscrit. Une fois par officine et par semaine (journal des e-mails relu
- * avant d'écrire) ; chaque officine ne voit que ses propres chiffres. Lancé par la tâche quotidienne (CRON_SECRET).
+ * Le bilan de chaque matin (fondateur, 16 oct. 2026 : « un mail par jour ») : la journée d'hier, à Paris.
+ * - chaque titulaire reçoit toute son officine, avec le PDF de la journée ;
+ * - chaque membre de l'équipe reçoit SEULEMENT ses propres ventes (celles qu'il a faites, ou de son comptoir attribué), avec son PDF.
+ * Une journée sans conseil proposé n'envoie rien. Une fois par jour et par destinataire (journal des e-mails relu avant d'écrire) ;
+ * chaque officine ne voit que ses propres chiffres. Désinscription par le lien de l'e-mail. Lancé par la tâche quotidienne (CRON_SECRET).
  */
 
 const DAY_MS = 86_400_000;
 const UNSUBSCRIBE_TTL_MS = 400 * DAY_MS;
 const UNSUBSCRIBE_KIND = "resume-hebdo";
 
-const iso = (date: Date) => date.toISOString().slice(0, 10);
-
-/** La semaine civile (lundi → dimanche) qui précède `now`, à Paris, et le jour de la semaine de `now` (0 = lundi). */
-export function previousWeek(now: Date, timeZone = TIME_ZONE): { from: string; to: string; weekday: number; label: string } {
+/** La veille de `now` à Paris : « 2026-10-15 » (la période des rapports et du PDF) et « jeudi 15 octobre ». */
+export function previousDay(now: Date, timeZone = TIME_ZONE): { day: string; label: string } {
   const today = zonedDateParts(now, timeZone);
-  const monday = new Date(Date.UTC(today.year, today.month - 1, today.day - today.weekday - 7));
-  const sunday = new Date(monday.getTime() + 6 * DAY_MS);
-  const day = (date: Date, withMonth: boolean) => new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC", day: "numeric", ...(withMonth ? { month: "long" } : {}) }).format(date);
-  const label = monday.getUTCMonth() === sunday.getUTCMonth() ? `du ${day(monday, false)} au ${day(sunday, true)}` : `du ${day(monday, true)} au ${day(sunday, true)}`;
-  return { from: iso(monday), to: iso(sunday), weekday: today.weekday, label };
+  const yesterday = new Date(Date.UTC(today.year, today.month - 1, today.day - 1, 12));
+  return { day: yesterday.toISOString().slice(0, 10), label: new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(yesterday) };
 }
 
 export function weeklyDigestUnsubscribeUrl(userId: string): string {
@@ -52,28 +49,21 @@ export async function setWeeklyDigestSubscription(userId: string, subscribed: bo
   return result.count > 0;
 }
 
-/** Une valeur de la semaine et son évolution par rapport à la semaine d'avant (pas de pourcentage sans base). */
-export function metric(value: number, previous: number): WeekMetric {
-  const deltaPct = previous > 0 ? Math.round(((value - previous) / previous) * 100) : null;
-  return { value, previous, deltaPct, trend: previous === 0 && value === 0 ? "none" : value > previous ? "up" : value < previous ? "down" : "flat" };
+type Person = { id: string; email: string; firstName: string; lastName: string | null };
+type OnlyFor = { userId: string; postIds: string[] };
+
+/** Les chiffres d'UNE officine (ou d'UN de ses membres) pour la journée : rien d'une autre (lecture filtrée sur son identifiant). */
+export async function dayFigures(pharmacyId: string, day: string, now: Date, onlyFor?: OnlyFor) {
+  const range = resolveReportRange(day, now, TIME_ZONE);
+  const report = await loadSalesReport({ pharmacyId, range, now, onlyFor });
+  return report.sales === 0 ? null : { sales: report.sales, proposed: report.proposed, sold: report.sold, revenueTtcCents: report.revenueCents };
 }
 
-/** La semaine civile précédente (lundi → dimanche, à Paris), au format des rapports du comptoir et de leur PDF. */
-export const WEEK_REPORT_PARAM = "semaine-derniere";
-
-/**
- * Les chiffres d'UNE officine pour la semaine : rien d'une autre (chaque lecture est filtrée sur son identifiant). Les conseils
- * viennent des ventes terminées au comptoir — les mêmes que la console, l'écran Résultats et le PDF (16 oct. 2026).
- */
-export async function weekFigures(pharmacyId: string, now: Date) {
-  const range = resolveReportRange(WEEK_REPORT_PARAM, now, TIME_ZONE);
-  // La semaine d'avant, pour l'évolution (« +20 % par rapport à la semaine précédente »).
-  const before = { ...range, from: new Date(range.from.getTime() - 7 * DAY_MS), to: new Date(range.to.getTime() - 7 * DAY_MS) };
+/** Ce que le titulaire voit en plus : le stock à surveiller et les challenges en cours. */
+async function ownerExtras(pharmacyId: string, now: Date) {
   const today = zonedDateParts(now, TIME_ZONE);
   const todayDate = new Date(Date.UTC(today.year, today.month - 1, today.day));
-  const [report, previous, challenges, out, low, outNames] = await Promise.all([
-    loadSalesReport({ pharmacyId, range, now }),
-    loadSalesReport({ pharmacyId, range: before, now }),
+  const [challenges, out, low, outNames] = await Promise.all([
     prisma.labChallenge.findMany({ where: { pharmacyId, status: "ACTIVE", startsAt: { lte: todayDate }, endsAt: { gte: todayDate } }, orderBy: { endsAt: "asc" }, take: 5, select: { title: true, endsAt: true } }),
     prisma.stockItem.count({ where: { pharmacyId, quantity: { lte: 0 }, product: { isActive: true, deletedAt: null } } }),
     prisma.stockItem.count({ where: { pharmacyId, quantity: { gt: 0, lte: prisma.stockItem.fields.alertThreshold }, product: { isActive: true, deletedAt: null } } }),
@@ -81,28 +71,39 @@ export async function weekFigures(pharmacyId: string, now: Date) {
   ]);
   const endsLabel = (date: Date) => `jusqu'au ${new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC", day: "numeric", month: "short" }).format(date)}`;
   return {
-    advice: report.sales === 0 ? null : { proposed: metric(report.proposed, previous.proposed), purchased: metric(report.sold, previous.sold), revenueTtcCents: metric(report.revenueCents, previous.revenueCents) },
     challenges: challenges.map((challenge) => ({ title: challenge.title, endsLabel: endsLabel(challenge.endsAt) })),
     stock: { out, low, outNames: outNames.map((row) => row.product.name.replace(/,.*$/, "").trim()) },
   };
 }
 
-export type WeeklyDigestRun = { week: string | null; pharmacies: number; sent: number; skipped: number; failed: number; stoppedEarly: boolean };
+const SENT_STATUSES = ["SENT", "DELIVERED", "DELAYED", "SIMULATED"] as const;
 
-export async function sendWeeklyOwnerDigests(now: Date = new Date(), options: { deadlineAt?: number } = {}): Promise<WeeklyDigestRun> {
-  const week = previousWeek(now);
-  const run: WeeklyDigestRun = { week: week.from, pharmacies: 0, sent: 0, skipped: 0, failed: 0, stoppedEarly: false };
-  // Lundi, avec rattrapage mardi et mercredi (une tâche manquée) ; jamais en fin de semaine, quand la semaine résumée est loin.
-  if (week.weekday > 2) return { ...run, week: null };
-  const templateKey = `owner-weekly:${week.from}`;
+export type DailyDigestRun = { day: string; pharmacies: number; sent: number; skipped: number; failed: number; stoppedEarly: boolean };
 
-  const pharmacies = await prisma.pharmacy.findMany({
-    where: { isActive: true, isDemo: false, memberships: { some: { role: "OWNER", isActive: true } } },
-    select: { id: true, name: true },
-    orderBy: { createdAt: "asc" },
-  });
+export async function sendDailyDigests(now: Date = new Date(), options: { deadlineAt?: number } = {}): Promise<DailyDigestRun> {
+  const { day, label } = previousDay(now);
+  const run: DailyDigestRun = { day, pharmacies: 0, sent: 0, skipped: 0, failed: 0, stoppedEarly: false };
+  const ownerKey = `owner-daily:${day}`;
+  const memberKey = `member-daily:${day}`;
+  const pharmacies = await prisma.pharmacy.findMany({ where: { isActive: true, isDemo: false }, select: { id: true, name: true }, orderBy: { createdAt: "asc" } });
   const ctx = await platformEmailContext();
   const messaging = getMessagingProvider({ demo: false });
+  const dayFile = (fileName: string, who: string) => fileName.replace(/-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}\.pdf$/, `-${who}-${day}.pdf`);
+
+  const send = async (input: { person: Person; pharmacyId: string; templateKey: string; mail: NonNullable<ReturnType<typeof buildDailyDigest>>; pdf: { bytes: Uint8Array; fileName: string } | null }) => {
+    const outcome = await messaging
+      .sendEmail({
+        to: input.person.email,
+        fromName: "PharmaBoost",
+        subject: input.mail.subject,
+        text: input.mail.text,
+        html: input.mail.html,
+        ...(input.pdf ? { attachments: [{ filename: input.pdf.fileName, content: input.pdf.bytes, contentType: "application/pdf" }] } : {}),
+      })
+      .catch((error: unknown) => ({ status: "FAILED" as const, provider: messaging.info.id, detail: error instanceof Error ? error.message : "Envoi impossible." }));
+    await traceDispatch({ kind: "OWNER_WEEKLY", recipient: input.person.email, outcome, subject: input.mail.subject, templateKey: input.templateKey, trigger: "AUTOMATIC", pharmacyId: input.pharmacyId, userId: input.person.id });
+    return outcome.status !== "FAILED";
+  };
 
   for (const pharmacy of pharmacies) {
     if (options.deadlineAt && Date.now() > options.deadlineAt) {
@@ -110,41 +111,60 @@ export async function sendWeeklyOwnerDigests(now: Date = new Date(), options: { 
       break;
     }
     run.pharmacies += 1;
-    const already = await prisma.emailDispatch.findFirst({ where: { pharmacyId: pharmacy.id, templateKey, status: { in: ["SENT", "DELIVERED", "DELAYED", "SIMULATED"] } }, select: { id: true } });
-    if (already) { run.skipped += 1; continue; }
-    const owners = await prisma.membership.findMany({
-      where: { pharmacyId: pharmacy.id, role: "OWNER", isActive: true, user: { deletedAt: null, status: "ACTIVE", weeklyDigestOptOutAt: null } },
-      select: { user: { select: { id: true, email: true, firstName: true } } },
+    const memberships = await prisma.membership.findMany({
+      where: { pharmacyId: pharmacy.id, isActive: true, user: { deletedAt: null, status: "ACTIVE", weeklyDigestOptOutAt: null } },
+      select: { role: true, user: { select: { id: true, email: true, firstName: true, lastName: true } } },
     });
-    if (owners.length === 0) { run.skipped += 1; continue; }
+    const owners = memberships.filter((membership) => membership.role === "OWNER").map((membership) => membership.user);
+    const ownerIds = new Set(owners.map((owner) => owner.id));
+    const members = memberships.filter((membership) => membership.role !== "OWNER" && !ownerIds.has(membership.user.id)).map((membership) => membership.user);
 
-    const figures = await weekFigures(pharmacy.id, now);
-    if (!digestHasContent(figures)) { run.skipped += 1; continue; }
-    // Le rapport PDF de la semaine, joint : le même que celui de la console. Sans lui (erreur de dessin), l'e-mail part quand même.
-    const pdf = figures.advice ? await salesReportPdfFile(pharmacy.id, { param: WEEK_REPORT_PARAM }, now).catch(() => null) : null;
+    // 1. Le titulaire : toute l'officine.
+    const pharmacyAdvice = owners.length ? await dayFigures(pharmacy.id, day, now) : null;
+    if (owners.length && pharmacyAdvice && digestHasContent({ advice: pharmacyAdvice })) {
+      const already = await prisma.emailDispatch.findFirst({ where: { pharmacyId: pharmacy.id, templateKey: ownerKey, status: { in: [...SENT_STATUSES] } }, select: { id: true } });
+      if (already) run.skipped += 1;
+      else {
+        const extras = await ownerExtras(pharmacy.id, now);
+        const pdf = await salesReportPdfFile(pharmacy.id, { param: day }, now).catch(() => null);
+        const file = pdf ? { bytes: pdf.bytes, fileName: dayFile(pdf.fileName, "officine") } : null;
+        let delivered = false;
+        for (const owner of owners) {
+          const mail = buildDailyDigest(
+            { audience: "owner", pharmacyName: pharmacy.name, firstName: owner.firstName, dayLabel: label, advice: pharmacyAdvice, pdfAttached: file !== null, ...extras, links: { results: publicUrl("/resultats"), stock: publicUrl("/stock"), unsubscribe: weeklyDigestUnsubscribeUrl(owner.id) } },
+            ctx,
+          );
+          if (mail && (await send({ person: owner, pharmacyId: pharmacy.id, templateKey: ownerKey, mail, pdf: file }))) delivered = true;
+        }
+        if (delivered) run.sent += 1;
+        else run.failed += 1;
+      }
+    }
 
-    let delivered = false;
-    for (const { user } of owners) {
-      const mail = buildWeeklyDigest(
-        {
-          pharmacyName: pharmacy.name,
-          firstName: user.firstName,
-          weekLabel: week.label,
-          ...figures,
-          pdfAttached: pdf !== null,
-          links: { results: publicUrl(`/resultats?periode=perso&du=${week.from}&au=${week.to}`), stock: publicUrl("/stock"), challenges: publicUrl("/pilotage"), unsubscribe: weeklyDigestUnsubscribeUrl(user.id) },
-        },
+    // 2. Chaque membre de l'équipe : SEULEMENT ses ventes (les siennes, ou celles du comptoir qui lui est attribué).
+    if (members.length === 0 || (owners.length > 0 && !pharmacyAdvice)) continue;
+    const posts = await prisma.counterPost.findMany({ where: { pharmacyId: pharmacy.id, revokedAt: null, assignedUserId: { in: members.map((member) => member.id) } }, select: { id: true, assignedUserId: true } });
+    for (const member of members) {
+      if (options.deadlineAt && Date.now() > options.deadlineAt) {
+        run.stoppedEarly = true;
+        break;
+      }
+      const onlyFor: OnlyFor = { userId: member.id, postIds: posts.filter((post) => post.assignedUserId === member.id).map((post) => post.id) };
+      const advice = await dayFigures(pharmacy.id, day, now, onlyFor);
+      if (!advice || !digestHasContent({ advice })) continue;
+      const already = await prisma.emailDispatch.findFirst({ where: { pharmacyId: pharmacy.id, userId: member.id, templateKey: memberKey, status: { in: [...SENT_STATUSES] } }, select: { id: true } });
+      if (already) { run.skipped += 1; continue; }
+      const person = [member.firstName, member.lastName].filter(Boolean).join(" ");
+      const pdf = await salesReportPdfFile(pharmacy.id, { param: day }, now, { onlyFor, person }).catch(() => null);
+      const file = pdf ? { bytes: pdf.bytes, fileName: dayFile(pdf.fileName, "mes-ventes") } : null;
+      const mail = buildDailyDigest(
+        { audience: "member", pharmacyName: pharmacy.name, firstName: member.firstName, dayLabel: label, advice, pdfAttached: file !== null, links: { results: publicUrl("/historique"), stock: publicUrl("/stock"), unsubscribe: weeklyDigestUnsubscribeUrl(member.id) } },
         ctx,
       );
       if (!mail) continue;
-      const outcome = await messaging
-        .sendEmail({ to: user.email, fromName: "PharmaBoost", subject: mail.subject, text: mail.text, html: mail.html, ...(pdf ? { attachments: [{ filename: pdf.fileName, content: pdf.bytes, contentType: "application/pdf" }] } : {}) })
-        .catch((error: unknown) => ({ status: "FAILED" as const, provider: messaging.info.id, detail: error instanceof Error ? error.message : "Envoi impossible." }));
-      await traceDispatch({ kind: "OWNER_WEEKLY", recipient: user.email, outcome, subject: mail.subject, templateKey, trigger: "AUTOMATIC", pharmacyId: pharmacy.id, userId: user.id });
-      if (outcome.status !== "FAILED") delivered = true;
+      if (await send({ person: member, pharmacyId: pharmacy.id, templateKey: memberKey, mail, pdf: file })) run.sent += 1;
+      else run.failed += 1;
     }
-    if (delivered) run.sent += 1;
-    else run.failed += 1;
   }
   return run;
 }

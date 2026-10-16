@@ -1,53 +1,59 @@
 import { describe, expect, it } from "vitest";
-import { buildWeeklyDigest, digestHasContent, trendLabel, type WeekMetric, type WeeklyDigestInput } from "../weekly-digest";
+import { buildDailyDigest, digestHasContent, type DailyDigestInput } from "../weekly-digest";
 
 const ctx = { baseUrl: "https://pharmaboost.app", company: { legalName: "PharmaBoost", contactEmail: "contact@pharmaboost.app" } };
-const metric = (value: number, previous: number, deltaPct: number | null, trend: WeekMetric["trend"]): WeekMetric => ({ value, previous, deltaPct, trend });
-const base = (over: Partial<WeeklyDigestInput> = {}): WeeklyDigestInput => ({
+const base = (over: Partial<DailyDigestInput> = {}): DailyDigestInput => ({
+  audience: "owner",
   pharmacyName: "Pharmacie du Port",
   firstName: "Anne",
-  weekLabel: "du 5 au 11 octobre",
-  advice: { proposed: metric(42, 30, 40, "up"), purchased: metric(11, 12, -8.3, "down"), revenueTtcCents: metric(18950, 0, null, "up") },
+  dayLabel: "jeudi 15 octobre",
+  advice: { sales: 30, proposed: 42, sold: 11, revenueTtcCents: 18950 },
+  pdfAttached: true,
   challenges: [{ title: "Challenge NATURÉO", endsLabel: "jusqu'au 31 oct." }],
   stock: { out: 2, low: 5, outNames: ["Échinacée", "Pastilles gorge"] },
-  links: { results: "https://pharmaboost.app/resultats", stock: "https://pharmaboost.app/stock", challenges: "https://pharmaboost.app/challenges", unsubscribe: "https://pharmaboost.app/resume-hebdo?t=abc" },
+  links: { results: "https://pharmaboost.app/resultats", stock: "https://pharmaboost.app/stock", unsubscribe: "https://pharmaboost.app/resume-hebdo/abc" },
   ...over,
 });
+const n = (text: string) => text.replace(/[  ]/g, " ");
 
-describe("le résumé de la semaine du titulaire", () => {
-  it("les chiffres de la semaine, leur évolution, les challenges et le stock à surveiller", () => {
-    const mail = buildWeeklyDigest(base(), ctx)!;
-    expect(mail.subject).toBe("Votre bilan de la semaine — Pharmacie du Port");
-    expect(mail.text).toContain("conseils proposés : 42 (+40 % vs semaine d'avant)");
-    expect(mail.text).toContain("conseils vendus : 11 (−8 % vs semaine d'avant)");
-    expect(mail.text).toContain("de chiffre d'affaires ajouté (TTC) : 190 € (nouveau cette semaine)");
+describe("le bilan d'hier du titulaire", () => {
+  it("toute l'officine : les chiffres de la journée, le taux, le PDF, les challenges et le stock à surveiller", () => {
+    const mail = buildDailyDigest(base(), ctx)!;
+    expect(mail.subject).toBe("Votre bilan d'hier — Pharmacie du Port");
+    expect(mail.text).toContain("conseils proposés : 42 (dans 30 ventes)");
+    expect(mail.text).toContain("conseils vendus : 11");
+    expect(n(mail.text)).toContain("de chiffre d'affaires ajouté (TTC) : 189,50 €");
+    expect(mail.text).toContain("Taux de vente : 26,2 %");
+    expect(mail.text).toContain("joint en PDF");
+    expect(mail.html).toContain("jeudi 15 octobre");
     expect(mail.text).toContain("Challenge NATURÉO — jusqu'au 31 oct.");
-    expect(mail.text).toContain("2 produits en rupture");
     expect(mail.text).toContain("En rupture : Échinacée, Pastilles gorge");
-    expect(mail.text).toContain("Ne plus recevoir ce résumé : https://pharmaboost.app/resume-hebdo?t=abc");
+    expect(mail.text).toContain("Ne plus recevoir ce bilan : https://pharmaboost.app/resume-hebdo/abc");
     expect(mail.html).toContain("Bonjour Anne,");
   });
 
-  it("une semaine sans rien à dire n'envoie rien", () => {
-    const empty = { advice: { proposed: metric(0, 0, null, "none"), purchased: metric(0, 0, null, "none"), revenueTtcCents: metric(0, 0, null, "none") }, challenges: [], stock: { out: 0, low: 0, outNames: [] } };
-    expect(digestHasContent(empty)).toBe(false);
-    expect(buildWeeklyDigest(base(empty), ctx)).toBeNull();
-  });
-
-  it("sans conseil mais avec du stock à surveiller : le dit, sans inventer de chiffre", () => {
-    const mail = buildWeeklyDigest(base({ advice: null, challenges: [] }), ctx)!;
-    expect(mail.text).toContain("Aucun conseil n'a été proposé cette semaine");
-    expect(mail.text).not.toContain("€");
+  it("une journée sans conseil proposé n'envoie rien", () => {
+    expect(digestHasContent({ advice: null })).toBe(false);
+    expect(digestHasContent({ advice: { sales: 4, proposed: 0, sold: 0, revenueTtcCents: 0 } })).toBe(false);
+    expect(buildDailyDigest(base({ advice: null }), ctx)).toBeNull();
   });
 
   it("protège le HTML", () => {
-    const mail = buildWeeklyDigest(base({ pharmacyName: "Pharmacie <script>", challenges: [{ title: "<img onerror=x>", endsLabel: "demain" }] }), ctx)!;
+    const mail = buildDailyDigest(base({ pharmacyName: "Pharmacie <script>", challenges: [{ title: "<img onerror=x>", endsLabel: "demain" }] }), ctx)!;
     expect(mail.html).not.toContain("<script>");
     expect(mail.html).not.toContain("<img onerror");
   });
+});
 
-  it("l'évolution dite simplement", () => {
-    expect(trendLabel(metric(0, 0, null, "none"))).toBeNull();
-    expect(trendLabel(metric(5, 5, 0, "flat"))?.text).toBe("stable");
+describe("le bilan d'hier d'un membre de l'équipe", () => {
+  it("seulement ses ventes : ni le stock, ni les challenges de l'officine, et il le dit", () => {
+    const mail = buildDailyDigest(base({ audience: "member", firstName: "Léa", advice: { sales: 6, proposed: 9, sold: 2, revenueTtcCents: 2380 }, links: { results: "https://pharmaboost.app/historique", stock: "x", unsubscribe: "u" } }), ctx)!;
+    expect(mail.subject).toBe("Votre performance d'hier — Pharmacie du Port");
+    expect(mail.text).toContain("seulement les vôtres");
+    expect(mail.text).toContain("Il ne contient que vos propres ventes");
+    expect(mail.text).toContain("conseils proposés : 9 (dans 6 ventes)");
+    expect(mail.text).not.toContain("Stock à surveiller");
+    expect(mail.text).not.toContain("NATURÉO");
+    expect(mail.text).toContain("https://pharmaboost.app/historique");
   });
 });

@@ -4,7 +4,7 @@ import { processDueCampaigns } from "@/server/services/admin/campaigns";
 import { purgeStalePatientNews, resumeStuckAnnouncements } from "@/server/services/patient-news";
 import { closeStalledDeposits, purgeExpiredDepositFiles } from "@/server/services/stock-deposits";
 import { sendMonthlyCounterReports } from "@/server/services/counter-results";
-import { sendWeeklyOwnerDigests } from "@/server/services/weekly-digest";
+import { sendDailyDigests } from "@/server/services/weekly-digest";
 import { purgeCounterEmails } from "@/server/services/counter-window";
 import { runStockLearningPass } from "@/server/services/stock-learning";
 import { scheduleLearningContinuation } from "@/server/services/stock-learning-chain";
@@ -68,8 +68,9 @@ export async function GET(request: Request) {
   const stalledDeposits = await attempt("dépôts de stock bloqués", () => closeStalledDeposits(now));
   const reachedLots = await attempt("dates courtes atteintes", () => import("@/server/services/stock-lots").then((lots) => lots.retireReachedLots(now)));
   const counterReports = await attempt("bilan mensuel du comptoir", () => sendMonthlyCounterReports(now));
-  // Le lundi (rattrapage jusqu'au mercredi) : une minute au plus ici, la suite reprend le lendemain sans double envoi.
-  const weeklyDigests = await attempt("résumé hebdomadaire des titulaires", () => sendWeeklyOwnerDigests(now, { deadlineAt: Date.now() + 60_000 }));
+  // Chaque matin, la journée d'hier : au titulaire toute l'officine, à chaque membre ses seules ventes. Deux minutes au plus ;
+  // une tâche relancée le même jour reprend sans double envoi.
+  const weeklyDigests = await attempt("bilan quotidien de l'équipe", () => sendDailyDigests(now, { deadlineAt: Date.now() + 120_000 }));
   const stockLearning = await attempt("connaissance du stock", () => runStockLearningPass({ deadlineAt: startedAt + LEARNING_BUDGET_MS }));
   if (stockLearning?.moreToDo) after(() => scheduleLearningContinuation({ depth: 1 }).then(() => undefined));
   if ("error" in automations) throw automations.error;

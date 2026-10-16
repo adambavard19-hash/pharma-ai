@@ -75,10 +75,10 @@ export async function loadClosedSales(input: { pharmacyId: string; from: Date; t
 }
 
 /** Le rapport d'une période (aujourd'hui, 7 jours, 30 jours) qui se termine maintenant. */
-export async function loadSalesReport(input: { pharmacyId: string; period?: SalesReportPeriod; range?: ReportRange; now?: Date }): Promise<SalesReport> {
+export async function loadSalesReport(input: { pharmacyId: string; period?: SalesReportPeriod; range?: ReportRange; now?: Date; /** Un membre de l'équipe : seulement SES ventes. */ onlyFor?: { userId: string; postIds: string[] } }): Promise<SalesReport> {
   const now = input.now ?? new Date();
   const { from, to } = input.range ?? reportWindow(input.period ?? "week", now, TIME_ZONE);
-  const sales = await loadClosedSales({ pharmacyId: input.pharmacyId, from, to });
+  const sales = await loadClosedSales({ pharmacyId: input.pharmacyId, from, to, onlyFor: input.onlyFor });
   return buildSalesReport({ period: input.period, range: input.range, sales, now, timeZone: TIME_ZONE });
 }
 

@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
   pharmacies: vi.fn(),
   dispatchFind: vi.fn(),
-  owners: vi.fn(),
+  memberships: vi.fn(),
+  posts: vi.fn(),
   challenges: vi.fn(),
   stockCount: vi.fn(),
   stockFind: vi.fn(),
@@ -20,7 +21,8 @@ vi.mock("@/server/db/client", () => ({
   prisma: {
     pharmacy: { findMany: m.pharmacies },
     emailDispatch: { findFirst: m.dispatchFind },
-    membership: { findMany: m.owners },
+    membership: { findMany: m.memberships },
+    counterPost: { findMany: m.posts },
     labChallenge: { findMany: m.challenges },
     stockItem: { count: m.stockCount, findMany: m.stockFind, fields: { alertThreshold: "alertThreshold" } },
     user: { updateMany: m.userUpdateMany, findFirst: m.userFindFirst },
@@ -35,86 +37,90 @@ vi.mock("@/server/services/counter-history", () => ({ loadSalesReport: m.report 
 vi.mock("@/server/services/sales-report-file", () => ({ salesReportPdfFile: m.pdf }));
 vi.mock("@/server/public-url", () => ({ publicUrl: (path: string) => `https://pharmaboost.app${path}` }));
 
-const { previousWeek, sendWeeklyOwnerDigests, userFromUnsubscribeToken, weeklyDigestUnsubscribeUrl } = await import("../weekly-digest");
+const { previousDay, sendDailyDigests, userFromUnsubscribeToken, weeklyDigestUnsubscribeUrl } = await import("../weekly-digest");
 
-const MONDAY = new Date("2026-10-12T06:00:00Z"); // lundi 12 octobre, 8 h à Paris
+const FRIDAY = new Date("2026-10-16T08:15:00Z"); // vendredi 16 octobre, 10 h 15 à Paris
 const report = (sales: number, proposed: number, sold: number, revenueCents: number) => ({ sales, proposed, sold, revenueCents });
+const user = (id: string, firstName: string) => ({ id, email: `${id}@example.fr`, firstName, lastName: "Martin" });
 
 beforeEach(() => {
   vi.clearAllMocks();
   m.pharmacies.mockResolvedValue([{ id: "ph1", name: "Pharmacie du Port" }, { id: "ph2", name: "Pharmacie des Halles" }]);
   m.dispatchFind.mockResolvedValue(null);
-  m.owners.mockImplementation(async ({ where }: { where: { pharmacyId: string } }) => [{ user: { id: `owner-${where.pharmacyId}`, email: `${where.pharmacyId}@example.fr`, firstName: "Anne" } }]);
+  m.memberships.mockImplementation(async ({ where }: { where: { pharmacyId: string } }) =>
+    where.pharmacyId === "ph1"
+      ? [
+          { role: "OWNER", user: user("owner-ph1", "Anne") },
+          { role: "PHARMACIST", user: user("lea", "Léa") },
+          { role: "PREPARER", user: user("tom", "Tom") },
+        ]
+      : [{ role: "OWNER", user: user("owner-ph2", "Paul") }],
+  );
+  m.posts.mockResolvedValue([{ id: "post-lea", assignedUserId: "lea" }]);
   m.challenges.mockResolvedValue([]);
   m.stockCount.mockResolvedValue(0);
   m.stockFind.mockResolvedValue([]);
-  // La semaine résumée (du lundi 5 au dimanche 11 octobre), puis la semaine d'avant pour l'évolution.
-  m.report.mockImplementation(async ({ pharmacyId, range }: { pharmacyId: string; range: { from: Date } }) =>
-    range.from.toISOString().startsWith("2026-10-04") ? report(20, pharmacyId === "ph1" ? 42 : 7, 3, 12000) : report(10, 20, 2, 6000),
-  );
-  m.pdf.mockImplementation(async (pharmacyId: string) => ({ bytes: new Uint8Array([37, 80, 68, 70]), fileName: `bilan-${pharmacyId}.pdf` }));
+  // Toute l'officine, ou un seul membre (onlyFor) : Léa a vendu, Tom n'a rien proposé hier.
+  m.report.mockImplementation(async ({ pharmacyId, onlyFor }: { pharmacyId: string; onlyFor?: { userId: string } }) => {
+    if (!onlyFor) return pharmacyId === "ph1" ? report(30, 42, 3, 12000) : report(5, 7, 1, 990);
+    return onlyFor.userId === "lea" ? report(8, 12, 2, 2380) : report(0, 0, 0, 0);
+  });
+  m.pdf.mockImplementation(async (pharmacyId: string, _p: unknown, _now: Date, options?: { person?: string }) => ({ bytes: new Uint8Array([37, 80, 68, 70]), fileName: `pharmaboost-performance-${pharmacyId}${options?.person ? "-x" : ""}-2026-10-15-2026-10-16.pdf` }));
   m.sendEmail.mockResolvedValue({ status: "SENT", provider: "test" });
 });
 
-describe("la semaine résumée", () => {
-  it("le lundi : la semaine du lundi au dimanche d'avant", () => {
-    expect(previousWeek(MONDAY)).toMatchObject({ from: "2026-10-05", to: "2026-10-11", weekday: 0, label: "du 5 au 11 octobre" });
-    expect(previousWeek(new Date("2026-11-02T08:00:00Z")).label).toBe("du 26 octobre au 1 novembre");
+describe("la journée résumée", () => {
+  it("la veille, à Paris", () => {
+    expect(previousDay(FRIDAY)).toEqual({ day: "2026-10-15", label: "jeudi 15 octobre" });
+    // Juste après minuit à Paris (22 h 30 UTC la veille) : la veille est bien le jour qui vient de finir.
+    expect(previousDay(new Date("2026-10-15T22:30:00Z")).day).toBe("2026-10-15");
   });
 });
 
-describe("l'envoi aux titulaires", () => {
-  it("chaque officine reçoit SES chiffres, une fois, avec un lien de désinscription personnel", async () => {
-    const run = await sendWeeklyOwnerDigests(MONDAY);
-    expect(run).toMatchObject({ week: "2026-10-05", pharmacies: 2, sent: 2, failed: 0 });
-    const [first, second] = m.sendEmail.mock.calls.map((call) => call[0]);
-    expect(first.to).toBe("ph1@example.fr");
-    expect(first.text).toContain("conseils proposés : 42 (+110 % vs semaine d'avant)");
-    expect(first.text).toContain("conseils vendus : 3 (+50 % vs semaine d'avant)");
-    expect(first.text).toContain("120 €");
-    // Le rapport PDF de la semaine (celui de la console) est joint, et l'e-mail le dit.
-    expect(first.attachments).toEqual([{ filename: "bilan-ph1.pdf", content: expect.any(Uint8Array), contentType: "application/pdf" }]);
-    expect(first.text).toContain("joint en PDF");
-    expect(m.pdf).toHaveBeenCalledWith("ph1", { param: "semaine-derniere" }, MONDAY);
-    expect(second.to).toBe("ph2@example.fr");
-    expect(second.text).toContain("conseils proposés : 7");
-    expect(second.text).not.toContain("Pharmacie du Port");
-    // Les chiffres de chaque officine sont lus avec SON identifiant.
-    expect(m.report.mock.calls.map((call) => call[0].pharmacyId)).toEqual(["ph1", "ph1", "ph2", "ph2"]);
-    // La semaine résumée va du lundi 5 (minuit à Paris) au dimanche 11 octobre inclus.
-    expect(m.report.mock.calls[0][0].range.from.toISOString()).toBe("2026-10-04T22:00:00.000Z");
-    expect(m.report.mock.calls[0][0].range.to.toISOString()).toBe("2026-10-11T21:59:59.999Z");
-    expect(m.challenges.mock.calls.every((call, i) => call[0].where.pharmacyId === ["ph1", "ph2"][i])).toBe(true);
-    expect(m.trace).toHaveBeenCalledWith(expect.objectContaining({ kind: "OWNER_WEEKLY", templateKey: "owner-weekly:2026-10-05", pharmacyId: "ph1" }));
-    const link = /Ne plus recevoir ce résumé : (\S+)/.exec(first.text)?.[1] ?? "";
-    expect(userFromUnsubscribeToken(decodeURIComponent(link.split("/resume-hebdo/")[1]))).toBe("owner-ph1");
+describe("l'envoi de chaque matin", () => {
+  it("le titulaire reçoit toute l'officine, chaque membre SEULEMENT ses ventes, chacun avec son PDF", async () => {
+    const run = await sendDailyDigests(FRIDAY);
+    expect(run).toMatchObject({ day: "2026-10-15", pharmacies: 2, sent: 3, failed: 0 });
+    const mails = Object.fromEntries(m.sendEmail.mock.calls.map((call) => [call[0].to, call[0]]));
+    expect(Object.keys(mails).sort()).toEqual(["lea@example.fr", "owner-ph1@example.fr", "owner-ph2@example.fr"]);
+    expect(mails["owner-ph1@example.fr"].text).toContain("conseils proposés : 42 (dans 30 ventes)");
+    expect(mails["owner-ph1@example.fr"].attachments[0]).toMatchObject({ filename: "pharmaboost-performance-ph1-officine-2026-10-15.pdf", contentType: "application/pdf" });
+    expect(mails["lea@example.fr"].subject).toBe("Votre performance d'hier — Pharmacie du Port");
+    expect(mails["lea@example.fr"].text).toContain("conseils proposés : 12 (dans 8 ventes)");
+    expect(mails["lea@example.fr"].text).not.toContain("42");
+    expect(mails["lea@example.fr"].attachments[0].filename).toBe("pharmaboost-performance-ph1-x-mes-ventes-2026-10-15.pdf");
+    // Les ventes de Léa : les siennes, ou celles de SON comptoir ; son PDF aussi, à son nom.
+    expect(m.report).toHaveBeenCalledWith(expect.objectContaining({ pharmacyId: "ph1", onlyFor: { userId: "lea", postIds: ["post-lea"] } }));
+    expect(m.report).toHaveBeenCalledWith(expect.objectContaining({ pharmacyId: "ph1", onlyFor: { userId: "tom", postIds: [] } }));
+    expect(m.pdf).toHaveBeenCalledWith("ph1", { param: "2026-10-15" }, FRIDAY, { onlyFor: { userId: "lea", postIds: ["post-lea"] }, person: "Léa Martin" });
+    // La période : le jeudi 15, de minuit à minuit à Paris.
+    const range = m.report.mock.calls[0][0].range;
+    expect([range.from.toISOString(), range.to.toISOString()]).toEqual(["2026-10-14T22:00:00.000Z", "2026-10-15T21:59:59.999Z"]);
+    expect(m.trace).toHaveBeenCalledWith(expect.objectContaining({ templateKey: "owner-daily:2026-10-15", pharmacyId: "ph1", userId: "owner-ph1" }));
+    expect(m.trace).toHaveBeenCalledWith(expect.objectContaining({ templateKey: "member-daily:2026-10-15", pharmacyId: "ph1", userId: "lea" }));
+    const link = /Ne plus recevoir ce bilan : (\S+)/.exec(mails["lea@example.fr"].text)?.[1] ?? "";
+    expect(userFromUnsubscribeToken(decodeURIComponent(link.split("/resume-hebdo/")[1]))).toBe("lea");
   });
 
-  it("ne renvoie pas une semaine déjà envoyée, n'écrit pas quand il n'y a rien à dire, ni aux désinscrits", async () => {
-    m.dispatchFind.mockImplementation(async ({ where }: { where: { pharmacyId: string } }) => (where.pharmacyId === "ph1" ? { id: "d1" } : null));
-    m.report.mockResolvedValue(report(0, 0, 0, 0));
-    const run = await sendWeeklyOwnerDigests(MONDAY);
-    expect(run).toMatchObject({ sent: 0, skipped: 2 });
+  it("jamais deux fois le même jour, rien sans conseil proposé, jamais aux désinscrits", async () => {
+    m.dispatchFind.mockImplementation(async ({ where }: { where: { pharmacyId: string; userId?: string } }) => (where.pharmacyId === "ph1" ? { id: "d1" } : null));
+    m.report.mockImplementation(async ({ pharmacyId, onlyFor }: { pharmacyId: string; onlyFor?: unknown }) => (pharmacyId === "ph1" && !onlyFor ? report(30, 42, 3, 12000) : pharmacyId === "ph1" ? report(3, 4, 1, 500) : report(2, 0, 0, 0)));
+    const run = await sendDailyDigests(FRIDAY);
     expect(m.sendEmail).not.toHaveBeenCalled();
-    expect(m.owners.mock.calls[0][0].where.user).toMatchObject({ weeklyDigestOptOutAt: null, deletedAt: null });
+    expect(run).toMatchObject({ sent: 0 });
+    expect(m.memberships.mock.calls[0][0].where.user).toMatchObject({ weeklyDigestOptOutAt: null, deletedAt: null });
   });
 
   it("sans PDF (erreur de dessin), l'e-mail part quand même, sans pièce jointe ni mention", async () => {
     m.pdf.mockRejectedValue(new Error("pdf"));
-    await sendWeeklyOwnerDigests(MONDAY);
-    const [first] = m.sendEmail.mock.calls.map((call) => call[0]);
+    await sendDailyDigests(FRIDAY);
+    const first = m.sendEmail.mock.calls[0][0];
     expect(first.attachments).toBeUndefined();
     expect(first.text).not.toContain("joint en PDF");
   });
 
-  it("le jeudi : rien (la semaine résumée est trop loin)", async () => {
-    const run = await sendWeeklyOwnerDigests(new Date("2026-10-15T08:00:00Z"));
-    expect(run.week).toBeNull();
-    expect(m.pharmacies).not.toHaveBeenCalled();
-  });
-
-  it("s'arrête à l'heure dite ; la tâche du lendemain reprend sans double envoi", async () => {
-    const run = await sendWeeklyOwnerDigests(MONDAY, { deadlineAt: Date.now() - 1 });
+  it("s'arrête à l'heure dite ; une tâche relancée le même jour reprend sans double envoi", async () => {
+    const run = await sendDailyDigests(FRIDAY, { deadlineAt: Date.now() - 1 });
     expect(run).toMatchObject({ stoppedEarly: true, sent: 0 });
   });
 });

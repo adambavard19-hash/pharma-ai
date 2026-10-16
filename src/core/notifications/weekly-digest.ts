@@ -1,99 +1,90 @@
 import { renderEmail, type EmailBlock, type EmailContext, type RenderedEmail } from "@/core/platform/email-layout";
 
 /**
- * Le résumé hebdomadaire du titulaire : chaque lundi, la semaine écoulée de son officine, en un coup d'œil. Seulement des chiffres
- * lus dans PharmaBoost (conseils proposés, conseils achetés, chiffre d'affaires des ventes confirmées, challenges, stock) ; jamais
- * de donnée de patient, jamais d'estimation. Une semaine où il n'y a rien à dire n'envoie rien.
+ * Le bilan de chaque matin (fondateur, 16 oct. 2026 : « un mail par jour ») : la journée d'hier au comptoir, en un coup d'œil.
+ * - au titulaire : toute son officine (conseils proposés, vendus, chiffre d'affaires ajouté), le stock à surveiller, les challenges ;
+ * - à chaque membre de l'équipe : SEULEMENT ses propres ventes (« seulement leur propre performance »).
+ * Seulement des chiffres lus dans PharmaBoost, sur les ventes terminées ; jamais de donnée de patient, jamais d'estimation.
+ * Une journée sans conseil proposé n'envoie rien. (Le fichier garde son nom : il portait le résumé hebdomadaire.)
  *
  * Module pur : les chiffres arrivent calculés (services), l'envoi est ailleurs.
  */
 
-export type WeekMetric = { value: number; previous: number; deltaPct: number | null; trend: "up" | "down" | "flat" | "none" };
+export type DigestAudience = "owner" | "member";
 
-export type WeeklyDigestInput = {
+export type DailyDigestInput = {
+  audience: DigestAudience;
   pharmacyName: string;
   firstName?: string | null;
-  /** « du lundi 5 au dimanche 11 octobre » */
-  weekLabel: string;
-  /** Les conseils de la semaine au comptoir (ventes terminées) : proposés, vendus, chiffre d'affaires ajouté. */
-  advice: { proposed: WeekMetric; purchased: WeekMetric; revenueTtcCents: WeekMetric } | null;
-  /** Le rapport PDF de la semaine est joint à l'e-mail. */
+  /** « jeudi 15 octobre » */
+  dayLabel: string;
+  /** Les conseils de la journée (ventes terminées) : proposés, vendus, chiffre d'affaires ajouté (centimes TTC). */
+  advice: { sales: number; proposed: number; sold: number; revenueTtcCents: number } | null;
+  /** Le rapport PDF de la journée est joint à l'e-mail. */
   pdfAttached?: boolean;
-  challenges: { title: string; endsLabel: string }[];
-  stock: { out: number; low: number; outNames: string[] };
-  links: { results: string; stock: string; challenges: string; unsubscribe: string };
+  /** Titulaire seulement. */
+  challenges?: { title: string; endsLabel: string }[];
+  /** Titulaire seulement. */
+  stock?: { out: number; low: number; outNames: string[] };
+  links: { results: string; stock: string; unsubscribe: string };
 };
 
-const euros = (cents: number) => `${Math.round(cents / 100).toLocaleString("fr-FR")} €`;
+const euros = (cents: number) => (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 const plural = (count: number, one: string, many: string) => (count > 1 ? many : one);
 
-/** « +12 % », « −8 % », « stable », « nouveau » : la comparaison avec la semaine d'avant, dite simplement. */
-export function trendLabel(metric: WeekMetric): { text: string; tone: "up" | "down" | "flat" } | null {
-  if (metric.trend === "none") return null;
-  if (metric.deltaPct === null) return { text: "nouveau cette semaine", tone: "up" };
-  if (metric.deltaPct === 0) return { text: "stable", tone: "flat" };
-  const sign = metric.deltaPct > 0 ? "+" : "−";
-  return { text: `${sign}${Math.abs(Math.round(metric.deltaPct))} % vs semaine d'avant`, tone: metric.deltaPct > 0 ? "up" : "down" };
+/** Y a-t-il quelque chose de vrai à dire ? Au moins un conseil proposé dans la journée. */
+export function digestHasContent(input: Pick<DailyDigestInput, "advice">): boolean {
+  return Boolean(input.advice && input.advice.proposed > 0);
 }
 
-/** Y a-t-il quelque chose de vrai à dire cette semaine ? */
-export function digestHasContent(input: Pick<WeeklyDigestInput, "advice" | "challenges" | "stock">): boolean {
+export function buildDailyDigest(input: DailyDigestInput, ctx: EmailContext): RenderedEmail | null {
   const advice = input.advice;
-  return Boolean(advice && (advice.proposed.value > 0 || advice.purchased.value > 0 || advice.revenueTtcCents.value > 0)) || input.challenges.length > 0 || input.stock.out > 0 || input.stock.low > 0;
-}
-
-export function buildWeeklyDigest(input: WeeklyDigestInput, ctx: EmailContext): RenderedEmail | null {
-  if (!digestHasContent(input)) return null;
+  if (!advice || !digestHasContent(input)) return null;
   const pharmacy = input.pharmacyName.trim() || "votre officine";
+  const owner = input.audience === "owner";
   const blocks: EmailBlock[] = [];
-  const advice = input.advice;
 
-  if (advice && (advice.proposed.value > 0 || advice.purchased.value > 0 || advice.revenueTtcCents.value > 0)) {
-    const stat = (value: string, label: string, metric: WeekMetric) => {
-      const trend = trendLabel(metric);
-      return { value, label, trend: trend?.text ?? null, tone: trend?.tone };
-    };
-    blocks.push({
-      kind: "stats",
-      items: [
-        stat(String(advice.proposed.value), plural(advice.proposed.value, "conseil proposé", "conseils proposés"), advice.proposed),
-        stat(String(advice.purchased.value), plural(advice.purchased.value, "conseil vendu", "conseils vendus"), advice.purchased),
-        stat(euros(advice.revenueTtcCents.value), "de chiffre d'affaires ajouté (TTC)", advice.revenueTtcCents),
-      ],
-    });
-    const rate = advice.proposed.value > 0 ? Math.round((advice.purchased.value / advice.proposed.value) * 1000) / 10 : null;
-    blocks.push({
-      kind: "note",
-      text: `${rate === null ? "" : `Taux de vente : ${rate.toLocaleString("fr-FR")} % des conseils proposés ont été vendus. `}Compté sur les ventes terminées au comptoir : un conseil bipé (ou déclaré vendu) est vendu, au prix de vente de votre officine.${input.pdfAttached ? " Le rapport complet de la semaine est joint en PDF." : ""}`,
-    });
-    blocks.push({ kind: "button", url: input.links.results, label: "Voir les résultats de la semaine" });
-  } else {
-    blocks.push({ kind: "paragraph", text: "Aucun conseil n'a été proposé cette semaine : aucune vente n'a été scannée avec PharmaBoost." });
+  if (!owner) blocks.push({ kind: "paragraph", text: "Voici vos ventes d'hier au comptoir avec PharmaBoost : seulement les vôtres." });
+  blocks.push({
+    kind: "stats",
+    items: [
+      { value: String(advice.proposed), label: plural(advice.proposed, "conseil proposé", "conseils proposés"), trend: `dans ${advice.sales} ${plural(advice.sales, "vente", "ventes")}` },
+      { value: String(advice.sold), label: plural(advice.sold, "conseil vendu", "conseils vendus"), trend: null },
+      { value: euros(advice.revenueTtcCents), label: "de chiffre d'affaires ajouté (TTC)", trend: null },
+    ],
+  });
+  const rate = Math.round((advice.sold / advice.proposed) * 1000) / 10;
+  blocks.push({
+    kind: "note",
+    text: `Taux de vente : ${rate.toLocaleString("fr-FR")} % des conseils proposés ont été vendus. Compté sur les ventes terminées au comptoir : un conseil bipé (ou déclaré vendu) est vendu, au prix de vente de l'officine.${input.pdfAttached ? " Le rapport complet de la journée est joint en PDF." : ""}`,
+  });
+  blocks.push({ kind: "button", url: input.links.results, label: owner ? "Voir les résultats de l'officine" : "Voir mes ventes" });
+
+  const challenges = owner ? (input.challenges ?? []) : [];
+  if (challenges.length > 0) {
+    blocks.push({ kind: "list", title: plural(challenges.length, "Challenge en cours", "Challenges en cours"), items: challenges.slice(0, 5).map((challenge) => `${challenge.title} — ${challenge.endsLabel}`) });
   }
-
-  if (input.challenges.length > 0) {
-    blocks.push({ kind: "list", title: plural(input.challenges.length, "Challenge en cours", "Challenges en cours"), items: input.challenges.slice(0, 5).map((challenge) => `${challenge.title} — ${challenge.endsLabel}`) });
-  }
-
-  if (input.stock.out > 0 || input.stock.low > 0) {
+  const stock = owner ? input.stock : undefined;
+  if (stock && (stock.out > 0 || stock.low > 0)) {
     const parts = [
-      input.stock.out > 0 ? `${input.stock.out} ${plural(input.stock.out, "produit en rupture (plus proposé en conseil)", "produits en rupture (plus proposés en conseil)")}` : null,
-      input.stock.low > 0 ? `${input.stock.low} ${plural(input.stock.low, "produit sous son seuil d'alerte", "produits sous leur seuil d'alerte")}` : null,
+      stock.out > 0 ? `${stock.out} ${plural(stock.out, "produit en rupture (plus proposé en conseil)", "produits en rupture (plus proposés en conseil)")}` : null,
+      stock.low > 0 ? `${stock.low} ${plural(stock.low, "produit sous son seuil d'alerte", "produits sous leur seuil d'alerte")}` : null,
     ].filter((part): part is string => part !== null);
-    blocks.push({ kind: "list", title: "Stock à surveiller", items: [...parts, ...(input.stock.outNames.length ? [`En rupture : ${input.stock.outNames.slice(0, 5).join(", ")}${input.stock.out > 5 ? "…" : ""}`] : [])] });
+    blocks.push({ kind: "list", title: "Stock à surveiller", items: [...parts, ...(stock.outNames.length ? [`En rupture : ${stock.outNames.slice(0, 5).join(", ")}${stock.out > 5 ? "…" : ""}`] : [])] });
     blocks.push({ kind: "link", label: "Le stock dans PharmaBoost :", url: input.links.stock });
   }
 
-  const purchased = advice?.purchased.value ?? 0;
   return renderEmail(ctx, {
-    subject: `Votre bilan de la semaine — ${pharmacy}`,
-    preheader: advice && advice.proposed.value > 0 ? `${advice.proposed.value} conseils proposés, ${purchased} vendus, ${euros(advice.revenueTtcCents.value)} de chiffre d'affaires ajouté.` : `Le point de la semaine de ${pharmacy}.`,
-    eyebrow: `Résumé de la semaine · ${input.weekLabel}`,
-    title: `La semaine de ${pharmacy}`,
+    subject: owner ? `Votre bilan d'hier — ${pharmacy}` : `Votre performance d'hier — ${pharmacy}`,
+    preheader: `${advice.proposed} ${plural(advice.proposed, "conseil proposé", "conseils proposés")}, ${advice.sold} ${plural(advice.sold, "vendu", "vendus")}, ${euros(advice.revenueTtcCents)} de chiffre d'affaires ajouté.`,
+    eyebrow: `Bilan d'hier · ${input.dayLabel}`,
+    title: owner ? `La journée de ${pharmacy}` : "Votre journée au comptoir",
     greeting: input.firstName ? `Bonjour ${input.firstName},` : "Bonjour,",
     blocks,
-    reason: `Vous recevez ce résumé chaque lundi, en tant que titulaire de ${pharmacy}.`,
+    reason: owner
+      ? `Vous recevez ce bilan chaque matin après une journée de ventes, en tant que titulaire de ${pharmacy}.`
+      : `Vous recevez ce bilan chaque matin après une journée de ventes à ${pharmacy}. Il ne contient que vos propres ventes.`,
     unsubscribeUrl: input.links.unsubscribe,
-    unsubscribeLabel: "Ne plus recevoir ce résumé",
+    unsubscribeLabel: "Ne plus recevoir ce bilan",
   });
 }
