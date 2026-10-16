@@ -150,10 +150,10 @@ function Scan() {
 
 function AdviceCard({ name, why, sold, compact }: { name: string; why: string; sold?: boolean; compact?: boolean }) {
   return (
-    <div style={{ borderRadius: 22, background: "#F5FAFC", color: "#10222F", padding: compact ? "16px 24px" : "20px 28px", display: "flex", alignItems: "center", gap: 22 }}>
+    <div style={{ borderRadius: 22, background: "#F5FAFC", color: "#10222F", padding: compact ? "13px 24px" : "20px 28px", display: "flex", alignItems: "center", gap: 22 }}>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: compact ? 28 : 30, fontWeight: 800, letterSpacing: "-0.01em" }}>{name}</div>
-        <div style={{ marginTop: 4, fontSize: compact ? 22 : 24, color: "#5A7280" }}>{why}</div>
+        <div style={{ fontSize: compact ? 27 : 30, fontWeight: 800, letterSpacing: "-0.01em" }}>{name}</div>
+        <div style={{ marginTop: compact ? 2 : 4, fontSize: compact ? 21 : 24, color: "#5A7280" }}>{why}</div>
         {!compact && <div style={{ marginTop: 10, fontSize: 22, fontWeight: 700, color: "#087443" }}>● En stock</div>}
       </div>
       {sold ? (
@@ -204,13 +204,14 @@ function Scanned({ name, family }: { name: string; family: string }) {
 function Advice() {
   return (
     <Frame index={3}>
-      <div style={{ position: "absolute", top: 160, left: 0, right: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+      <div style={{ position: "absolute", top: 156, left: 0, right: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
         <Scanned name="CÉTIRIZINE 10 mg" family="Allergie" />
-        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: A.mint }}>↓ 3 conseils dans votre rayon</div>
-        <Glow radius={34} style={{ width: 760, padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
-          <AdviceCard compact name="Collyre anti-allergique" why="Les yeux qui piquent et qui pleurent" />
-          <AdviceCard compact name="Eau de mer « nez allergique »" why="Rincer les pollens du nez" />
-          <AdviceCard compact name="Pastilles pour la gorge" why="La gorge sèche sous antihistaminique" />
+        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: A.mint }}>↓ 4 conseils dans votre rayon</div>
+        <Glow radius={34} style={{ width: 760, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          <AdviceCard compact name="AllergiFlash · collyre anti-allergique" why="Les yeux qui piquent et qui pleurent" />
+          <AdviceCard compact name="Stérimar Nez Allergique" why="Rincer les pollens du nez" />
+          <AdviceCard compact name="Pranarôm Allergoforce · spray nasal" why="Le nez bouché de la rhinite allergique" />
+          <AdviceCard compact name="Azéol Gorge · miel citron" why="La gorge sèche sous antihistaminique" />
         </Glow>
       </div>
       <div style={{ position: "absolute", left: 84, right: 84, bottom: 190 }}>
@@ -226,9 +227,9 @@ function Decide() {
   return (
     <Frame index={4}>
       <div style={{ position: "absolute", top: 200, left: 0, right: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 26 }}>
-        <Island sold count={3} />
+        <Island sold count={4} />
         <Glow radius={36} style={{ width: 760, padding: 26, display: "flex", flexDirection: "column", gap: 18 }}>
-          <AdviceCard name="Collyre anti-allergique" why="Les yeux qui piquent et qui pleurent" sold />
+          <AdviceCard name="AllergiFlash" why="Collyre anti-allergique" sold />
         </Glow>
       </div>
       <div style={{ position: "absolute", left: 84, right: 84, bottom: 190 }}>
