@@ -22,7 +22,7 @@ const ENTRY: HostEntry = {
   questions: [],
   guidance: [],
   // Le Doliprane est arrivé plus de 30 secondes après l'amoxicilline : la bannière demande « C'est un autre client ? ».
-  boxes: [{ id: "ligne-1", name: "AMOXICILLINE 1 g" }, { id: "ligne-2", name: "DOLIPRANE 1000 mg", late: true }],
+  boxes: [{ id: "ligne-1", name: "AMOXICILLINE 1 g", expiry: { on: "2026-09-30", state: "expired" } }, { id: "ligne-2", name: "DOLIPRANE 1000 mg", late: true }],
   items: [
     { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge Ultra-Levure", shortDate: "30/11/2026", outcome: "NONE", name: "ULTRA-LEVURE 200 mg 30 gélules", price: "8,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "",
       // La carte déployée d'exemple : sans contre-indication ni conseil d'utilisation écrits (aucun texte médical inventé) —

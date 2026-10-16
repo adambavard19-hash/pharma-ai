@@ -74,6 +74,7 @@ const AURORE_CSS = `
   background:linear-gradient(110deg,rgba(95,165,148,.55),rgba(116,214,160,.35) 35%,rgba(232,255,156,.85) 50%,rgba(116,214,160,.35) 65%,rgba(95,165,148,.55));background-size:250% 100%;
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:aur-sweep 6s linear infinite}
 [data-ile-style=aurore] section[data-tone=warning]::before{background:linear-gradient(110deg,rgba(245,166,35,.55),rgba(255,214,140,.9) 50%,rgba(245,166,35,.55));background-size:250% 100%}
+[data-ile-style=aurore] section[data-tone=danger]::before{background:linear-gradient(110deg,rgba(255,92,92,.6),rgba(255,180,170,.95) 50%,rgba(255,92,92,.6));background-size:250% 100%}
 [data-ile-style=aurore] section[data-tone=success]::before{background:linear-gradient(110deg,rgba(116,214,160,.6),rgba(232,255,156,.95) 50%,rgba(116,214,160,.6));background-size:250% 100%}
 @keyframes aur-sweep{from{background-position:100% 0}to{background-position:-150% 0}}
 @keyframes aur-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
@@ -92,6 +93,12 @@ const FOLD_DELAY_MS = 600;
 export function foldedLabel(count: number): string {
   if (count <= 0) return "Aucun conseil";
   return count === 1 ? "1 conseil suggéré" : `${count} conseils suggérés`;
+}
+
+/** « 2026-03-31 » → « 31/03/2026 ». */
+export function frenchDay(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
 }
 
 /** « Bonjour Léa, comment vas-tu ? … » → le titre doré « Bonjour Léa ! » et le reste en dessous (« Comment vas-tu ? … »). */
@@ -330,6 +337,11 @@ export function PosteIsland() {
   const lateBox = entry && island.stage === "advice" ? (entry.boxes ?? []).find((box) => box.late) ?? null : null;
   const askOtherClient = lateBox !== null && lateBox.id !== keptBox && (entry?.boxes ?? []).length > 1;
 
+  // La péremption lue dans le Datamatrix de la boîte bipée : une boîte périmée (à ne pas donner) ou qui périme dans le mois.
+  // « Compris » range l'avertissement pour cette boîte.
+  const [seenExpiry, setSeenExpiry] = useState<string[]>([]);
+  const expiryBox = entry && island.stage !== "idle" && island.stage !== "done" ? ((entry.boxes ?? []).filter((box) => box.expiry && !seenExpiry.includes(`${box.id}:${box.expiry.on}`)).sort((a, b) => Number(b.expiry?.state === "expired") - Number(a.expiry?.state === "expired"))[0] ?? null) : null;
+
   // Le bonjour ne se montre qu'au repos (le reducer l'efface déjà à chaque scan ou vente).
   const greeting = island.stage === "idle" && !entry ? view.greeting : null;
   const items = entry ? toAdvice(entry) : [];
@@ -508,6 +520,29 @@ export function PosteIsland() {
           </IslandShell>
         ) : (
           !questionsOnly && <CounterIsland {...islandProps} />
+        )}
+
+        {expiryBox?.expiry && (
+          <IslandShell width={view.side === "gauche" || view.side === "droite" ? 240 : FOLDED_WIDTH + 30} tone={expiryBox.expiry.state === "expired" ? "danger" : "warning"} contentKey={`peremption-${expiryBox.id}-${expiryBox.expiry.on}`} label={expiryBox.expiry.state === "expired" ? "Boîte périmée" : "Boîte qui périme bientôt"}>
+            <div data-ile-peremption={expiryBox.expiry.state} data-ile-sans-deploiement="" className="flex items-center gap-3 px-3.5 py-2.5 text-left">
+              <span className="min-w-0 flex-1">
+                <span className={`block text-[14px] leading-[18px] font-bold ${expiryBox.expiry.state === "expired" ? "text-[#FF8A80]" : "text-[#FFE2B0]"}`}>
+                  {expiryBox.expiry.state === "expired" ? "Boîte périmée" : `Périme le ${frenchDay(expiryBox.expiry.on)}`}
+                </span>
+                <span className="mt-0.5 block truncate text-[12px] leading-[16px] text-white/75">
+                  « {expiryBox.name} »{expiryBox.expiry.state === "expired" ? ` · depuis le ${frenchDay(expiryBox.expiry.on)}` : ""}
+                </span>
+                <span className="block text-[12px] leading-[16px] text-white/55">{expiryBox.expiry.state === "expired" ? "Prenez-en une autre en rayon." : "Vérifiez qu'elle couvre le traitement."}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setSeenExpiry((list) => [...list, `${expiryBox.id}:${expiryBox.expiry?.on}`])}
+                className={aurore ? "aur-btn h-8 shrink-0 rounded-full px-3 text-[12px] font-semibold" : "h-8 shrink-0 rounded-xl bg-white/10 px-3 text-[12px] font-semibold text-white hover:bg-white/15"}
+              >
+                Compris
+              </button>
+            </div>
+          </IslandShell>
         )}
 
         {askOtherClient && entry && lateBox && (

@@ -11,7 +11,7 @@
  * envoi, rejoint la vidange en cours au lieu d'en lancer une seconde qui
  * relirait la même tête de file.
  */
-export type PendingScan = { code: string; scannedAt: string };
+export type PendingScan = { code: string; scannedAt: string; expiresOn?: string | null };
 
 export type ScanQueue = {
   /** Met un bip en file. N'envoie rien : `flush` le fait. */

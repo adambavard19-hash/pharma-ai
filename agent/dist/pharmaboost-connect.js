@@ -63,7 +63,27 @@ var ScanDetector = class {
   }
 };
 function normalizeScannedCode(raw) {
+  return parseScannedCode(raw)?.code ?? null;
+}
+function datamatrixExpiry(text) {
+  const match = /^01\d{14}17(\d{2})(\d{2})(\d{2})/.exec(text);
+  if (!match) return null;
+  const year = 2e3 + Number(match[1]);
+  const month = Number(match[2]);
+  let day = Number(match[3]);
+  if (month < 1 || month > 12 || day > 31) return null;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day === 0) day = lastDay;
+  if (day > lastDay) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function parseScannedCode(raw) {
   const text = raw.replace(/^\](D2|C1|E0|Q3)/i, "").trim();
+  const code = baseCode(text);
+  if (!code) return null;
+  return { code, expiresOn: datamatrixExpiry(text) };
+}
+function baseCode(text) {
   if (/^\d{13}$/.test(text)) return text;
   if (/^\d{7,8}$/.test(text)) return text;
   const gs1 = /^01(\d{14})/.exec(text);
@@ -137,8 +157,8 @@ function startDouchette(configDir, handlers) {
   (0, import_node_fs.mkdirSync)((0, import_node_path.dirname)(scriptPath), { recursive: true });
   (0, import_node_fs.writeFileSync)(scriptPath, HOOK_SCRIPT, "utf8");
   const detector = new ScanDetector((raw, at) => {
-    const code = normalizeScannedCode(raw);
-    if (code) handlers.onScan(code, at);
+    const box = parseScannedCode(raw);
+    if (box) handlers.onScan(box.code, at, box.expiresOn);
   });
   let child = null;
   let stopped = false;
@@ -5623,7 +5643,7 @@ function buildHostEntry(input) {
     signature: body.signature,
     // Une question à poser n'est pas « rien à conseiller » : la fenêtre doit s'ouvrir.
     // Une boîte en challenge non plus : le pharmacien doit le savoir dès le scan.
-    quiet: finalItems.length === 0 && alerts.length === 0 && questions.length === 0 && !(body.boxes ?? []).some((box) => box?.challenge),
+    quiet: finalItems.length === 0 && alerts.length === 0 && questions.length === 0 && !(body.boxes ?? []).some((box) => box?.challenge || boxExpiryOf(box?.expiry).expiry),
     emailSaved: body.followUp?.emailSaved === true,
     emailError: oneLine(input.emailError ?? ""),
     alerts,
@@ -5631,8 +5651,12 @@ function buildHostEntry(input) {
     questions,
     guidance: (body.guidance ?? []).map(oneLine).filter(Boolean),
     items: finalItems,
-    boxes: (body.boxes ?? []).filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id)).map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {}, ...box.late === true ? { late: true } : {} })).filter((box) => box.name).slice(0, 20)
+    boxes: (body.boxes ?? []).filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id)).map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {}, ...box.late === true ? { late: true } : {}, ...boxExpiryOf(box.expiry) })).filter((box) => box.name).slice(0, 20)
   };
+}
+function boxExpiryOf(expiry) {
+  if (!expiry || typeof expiry.on !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiry.on)) return {};
+  return expiry.state === "expired" || expiry.state === "soon" ? { expiry: { on: expiry.on, state: expiry.state } } : {};
 }
 function ordinalFr(rank) {
   return rank === 1 ? "1er" : `${rank}e`;
@@ -6621,7 +6645,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.16";
+var VERSION = "0.10.17";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -6710,11 +6734,12 @@ async function installFromInstaller() {
     return error instanceof PairingError && error.kind === "unreachable" ? INSTALLER_EXIT.unreachable : INSTALLER_EXIT.refused;
   }
 }
-async function sendScan(config, code, scannedAt) {
+async function sendScan(config, code, scannedAt, expiresOn) {
   const response = await api(config, "/api/agent/scans", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, post: (0, import_node_os.hostname)(), scannedAt })
+    // La péremption de la boîte (Datamatrix) part avec le bip : le serveur prévient si la boîte est périmée.
+    body: JSON.stringify({ code, post: (0, import_node_os.hostname)(), scannedAt, ...expiresOn ? { expiresOn } : {} })
   });
   const body = await response.json().catch(() => ({}));
   if (response.status === 401) throw new Error("cl\xE9 du poste r\xE9voqu\xE9e");
@@ -6967,15 +6992,15 @@ async function runPost(config) {
   log(`PharmaBoost Connect ${VERSION} \u2014 poste de caisse ${(0, import_node_os.hostname)()} \u2014 journal : ${LOG_PATH}`);
   applyDisplayPreferences(config);
   notices.warmUp();
-  const scans = createScanQueue((scan) => sendScan(config, scan.code, scan.scannedAt));
+  const scans = createScanQueue((scan) => sendScan(config, scan.code, scan.scannedAt, scan.expiresOn));
   const dedupe = new CrossSourceDedupe();
-  const accept = (source) => (code, at) => {
+  const accept = (source) => (code, at, expiresOn) => {
     if (dedupe.isDuplicate(code, source, at)) {
       log(`${source === "robot" ? "Robot" : "Bip"} ${code} ignor\xE9 : d\xE9j\xE0 annonc\xE9 \xE0 l'instant par ${source === "robot" ? "la douchette" : "le robot"}.`);
       return;
     }
     notices.scanning();
-    scans.push({ code, scannedAt: new Date(at).toISOString() });
+    scans.push({ code, scannedAt: new Date(at).toISOString(), ...expiresOn ? { expiresOn } : {} });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
   startDouchette((0, import_node_path10.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
@@ -7202,7 +7227,7 @@ async function openSpaceFromCommand() {
 function testDouchette() {
   console.log("Passez une bo\xEEte \xE0 la douchette. Chaque code lu s'affiche ci-dessous. Ctrl+C pour arr\xEAter.");
   startDouchette((0, import_node_path10.dirname)(CONFIG_PATH), {
-    onScan: (code) => console.log(`${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR")}  BIP  ${code}`),
+    onScan: (code, _at, expiresOn) => console.log(`${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR")}  BIP  ${code}${expiresOn ? `  (p\xE9remption ${expiresOn.split("-").reverse().join("/")})` : ""}`),
     onStatus: (message) => console.log(`  ${message}`)
   });
 }

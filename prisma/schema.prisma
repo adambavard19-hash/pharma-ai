@@ -2024,6 +2024,9 @@ model PrescriptionLine {
   position       Int
   /// Texte brut tel que lu sur l'ordonnance — jamais réécrit par l'IA.
   rawText        String?
+  /// La péremption de la boîte bipée, lue dans son Datamatrix par la douchette du poste (la plus proche, si plusieurs boîtes
+  /// du même produit) : la bannière prévient d'une boîte périmée. Rien pour un code-barres simple ou une date incertaine.
+  expiresOn      DateTime? @db.Date
 
   drugName            String?
   /// Couche ÉDITORIALE : ce que Pharma.ai raconte du médicament (explication

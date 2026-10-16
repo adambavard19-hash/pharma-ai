@@ -12,13 +12,14 @@ import { cn } from "@/lib/utils";
  * Animations coupées si la personne a demandé de réduire les mouvements (`motion-reduce`).
  */
 
-export type IslandTone = "neutral" | "accent" | "warning" | "success";
+export type IslandTone = "neutral" | "accent" | "warning" | "success" | "danger";
 
 const TONE_RING: Record<IslandTone, string> = {
   neutral: "0 0 0 1px rgba(255,255,255,0.07)",
   accent: "0 0 0 1px rgba(54,232,200,0.35), 0 0 28px -6px rgba(54,232,200,0.45)",
   warning: "0 0 0 1.5px rgba(245,166,35,0.75), 0 0 32px -6px rgba(245,166,35,0.55)",
   success: "0 0 0 1px rgba(34,200,143,0.6), 0 0 30px -6px rgba(34,200,143,0.55)",
+  danger: "0 0 0 1.5px rgba(255,92,92,0.85), 0 0 32px -6px rgba(255,92,92,0.6)",
 };
 
 export function IslandShell({

@@ -47,7 +47,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.16";
+const VERSION = "0.10.17";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -189,11 +189,12 @@ async function installFromInstaller(): Promise<number> {
   }
 }
 
-async function sendScan(config: Config, code: string, scannedAt: string): Promise<void> {
+async function sendScan(config: Config, code: string, scannedAt: string, expiresOn?: string | null): Promise<void> {
   const response = await api(config, "/api/agent/scans", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, post: hostname(), scannedAt }),
+    // La péremption de la boîte (Datamatrix) part avec le bip : le serveur prévient si la boîte est périmée.
+    body: JSON.stringify({ code, post: hostname(), scannedAt, ...(expiresOn ? { expiresOn } : {}) }),
   });
   const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; drugName?: string; reference?: string; lineCount?: number; prescriptionId?: string };
   if (response.status === 401) throw new Error("clé du poste révoquée");
@@ -510,17 +511,17 @@ async function runPost(config: Config): Promise<void> {
   // vol, ou un tour de la boucle qui tombe pendant l'envoi, ne renvoie jamais la
   // même boîte deux fois — le serveur compterait « 2 × » et baisserait le stock
   // deux fois. `config` est relue à chaque envoi : le poste la met à jour.
-  const scans = createScanQueue((scan) => sendScan(config, scan.code, scan.scannedAt));
+  const scans = createScanQueue((scan) => sendScan(config, scan.code, scan.scannedAt, scan.expiresOn));
   // Douchette et robot annoncent parfois la même boîte : elle ne compte qu'une fois (voir robot.ts).
   const dedupe = new CrossSourceDedupe();
-  const accept = (source: "douchette" | "robot") => (code: string, at: number) => {
+  const accept = (source: "douchette" | "robot") => (code: string, at: number, expiresOn?: string | null) => {
     if (dedupe.isDuplicate(code, source, at)) {
       log(`${source === "robot" ? "Robot" : "Bip"} ${code} ignoré : déjà annoncé à l'instant par ${source === "robot" ? "la douchette" : "le robot"}.`);
       return;
     }
     // La bannière réagit au bip tout de suite : « Scan détecté ! Analyse en cours… », avant même la réponse du serveur.
     notices.scanning();
-    scans.push({ code, scannedAt: new Date(at).toISOString() });
+    scans.push({ code, scannedAt: new Date(at).toISOString(), ...(expiresOn ? { expiresOn } : {}) });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
   startDouchette(dirname(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
@@ -768,7 +769,7 @@ async function openSpaceFromCommand(): Promise<number> {
 function testDouchette(): void {
   console.log("Passez une boîte à la douchette. Chaque code lu s'affiche ci-dessous. Ctrl+C pour arrêter.");
   startDouchette(dirname(CONFIG_PATH), {
-    onScan: (code) => console.log(`${new Date().toLocaleTimeString("fr-FR")}  BIP  ${code}`),
+    onScan: (code, _at, expiresOn) => console.log(`${new Date().toLocaleTimeString("fr-FR")}  BIP  ${code}${expiresOn ? `  (péremption ${expiresOn.split("-").reverse().join("/")})` : ""}`),
     onStatus: (message) => console.log(`  ${message}`),
   });
 }

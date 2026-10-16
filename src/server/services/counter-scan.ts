@@ -137,7 +137,7 @@ export async function matchStockProductByName(pharmacyId: string, name: string):
   return null;
 }
 
-export async function recordCounterScan(agent: AgentContext, input: { code: string; post: string; scannedAt: Date | null }): Promise<CounterScanResult> {
+export async function recordCounterScan(agent: AgentContext, input: { code: string; post: string; scannedAt: Date | null; expiresOn?: Date | null }): Promise<CounterScanResult> {
   const item = await resolveScannedItem(agent.scope.pharmacyId, input.code, agent.pharmacyIsDemo);
   if (!item) return { ok: false, code: "UNKNOWN_CODE", error: "Ce code ne ressemble pas à un code-barres de produit." };
   // Ce qui distingue deux bips d'un même article : le CIP, l'EAN ou le code brut.
@@ -156,6 +156,8 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
     // Le code lu reste sur la ligne : il dit d'où elle vient, et permet de la reconnaître à l'écran.
     rawText: item.kind === "UNKNOWN" ? item.code : item.kind === "PRODUCT" ? item.ean : null,
     instructions: item.kind === "UNKNOWN" && item.hint ? `Douchette : ${item.hint}` : null,
+    // La péremption lue dans le Datamatrix de la boîte, quand l'agent l'a lue avec certitude.
+    expiresOn: input.expiresOn ?? null,
   };
 
   const now = new Date();
@@ -200,7 +202,7 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
     select: {
       id: true,
       reference: true,
-      lines: { select: { id: true, drugSpecialtyId: true, rawText: true, drugName: true, quantity: true, position: true } },
+      lines: { select: { id: true, drugSpecialtyId: true, rawText: true, drugName: true, quantity: true, position: true, expiresOn: true } },
       _count: { select: { recommendations: { where: { outcomeSource: COUNTER_ANSWERED, decidedAt: { not: null } } } } },
     },
   });
@@ -230,7 +232,9 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
     reference = open.reference;
     const same = open.lines.find((line) => (item.kind === "DRUG" ? line.drugSpecialtyId === itemKey : item.kind === "PRODUCT" ? line.rawText === item.ean || line.drugName === item.name : line.rawText === item.code));
     if (same) {
-      await prisma.prescriptionLine.update({ where: { id: same.id }, data: { quantity: (same.quantity ?? 1) + 1 } });
+      // Deux boîtes du même produit : la date la plus proche compte (c'est elle qui peut être périmée).
+      const expiresOn = input.expiresOn && (!same.expiresOn || input.expiresOn < same.expiresOn) ? input.expiresOn : same.expiresOn;
+      await prisma.prescriptionLine.update({ where: { id: same.id }, data: { quantity: (same.quantity ?? 1) + 1, expiresOn } });
     } else {
       // Après la position la plus haute, jamais « nombre de boîtes + 1 » : une boîte retirée laisse un trou, et le numéro serait déjà pris.
       const next = open.lines.reduce((max, line) => Math.max(max, line.position ?? 0), 0) + 1;

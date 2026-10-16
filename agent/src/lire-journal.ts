@@ -71,10 +71,10 @@ function shapeOf(word: string): string {
  * noms de champs suivis de « = » (ce sont des identifiants du code de LGPI : ils disent OÙ est le code produit). Tout le reste
  * est masqué (mots → a/A), et les chiffres deviennent « 9 » — on voit combien il y en a, jamais lesquels.
  */
-export function maskMessage(message: string): string {
+export function maskMessage(message: string, extra?: ReadonlySet<string>): string {
   const masked = message.replace(/[A-Za-zÀ-ÿ_][A-Za-zÀ-ÿ0-9_]{2,}/g, (word, offset: number) => {
     const next = message[offset + word.length];
-    if (VOCABULARY.has(word.toLowerCase())) return word;
+    if (VOCABULARY.has(word.toLowerCase()) || extra?.has(word.toLowerCase())) return word;
     if (next === "(" && CLASS_NAME.test(word)) return word;
     if (next === "=" && FIELD_NAME.test(word)) return word;
     return shapeOf(word);

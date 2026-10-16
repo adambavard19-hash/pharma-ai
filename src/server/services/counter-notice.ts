@@ -1,3 +1,4 @@
+import { boxExpiry } from "@/core/counter/box-expiry";
 import "server-only";
 import { studioPhotoUrl } from "@/core/catalog/studio-photo";
 import { prisma } from "@/server/db/client";
@@ -38,13 +39,14 @@ export const LATE_BOX_MS = 30 * 1000;
  * Les boîtes bipées, pour « Retirer » sur la bannière du poste : dès le bip, analyse finie ou non. La DERNIÈRE boîte, arrivée plus
  * de 30 secondes après la précédente, est marquée `late` : la bannière demande si c'est un autre client.
  */
-const boxesOf = (lines: { id: string; drugName: string | null; createdAt: Date }[], challenges: Map<string, { title: string; reward: string }> = new Map()) => {
+const boxesOf = (lines: { id: string; drugName: string | null; createdAt: Date; expiresOn?: Date | null }[], challenges: Map<string, { title: string; reward: string }> = new Map(), now = new Date()) => {
   const named = lines.filter((line) => line.drugName);
   const byTime = [...named].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   const last = byTime[byTime.length - 1];
   const before = byTime[byTime.length - 2];
   const lateId = last && before && last.createdAt.getTime() - before.createdAt.getTime() > LATE_BOX_MS ? last.id : null;
-  return named.map((line) => ({ id: line.id, name: line.drugName ?? "", challenge: challenges.get(line.id)?.title ?? null, reward: challenges.get(line.id)?.reward ?? null, late: line.id === lateId }));
+  // La péremption lue dans le Datamatrix : seulement une boîte périmée, ou qui périme dans le mois (voir box-expiry.ts).
+  return named.map((line) => ({ id: line.id, name: line.drugName ?? "", challenge: challenges.get(line.id)?.title ?? null, reward: challenges.get(line.id)?.reward ?? null, late: line.id === lateId, expiry: boxExpiry(line.expiresOn, now) }));
 };
 
 /** Les boîtes scannées qui sont en challenge (un produit du stock, retrouvé par son code-barres) : ligne → challenge. */
@@ -69,7 +71,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
       reference: true,
       status: true,
       counterFollowUp: { select: { emailEncrypted: true, consentAt: true, closedAt: true } },
-      lines: { orderBy: { position: "asc" }, select: { id: true, drugName: true, drugSpecialtyId: true, rawText: true, createdAt: true } },
+      lines: { orderBy: { position: "asc" }, select: { id: true, drugName: true, drugSpecialtyId: true, rawText: true, createdAt: true, expiresOn: true } },
       analysisRuns: {
         orderBy: { startedAt: "desc" },
         take: 1,
@@ -124,7 +126,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     return { status: prescription.status, followUp, notice: buildCounterNotice({ reference: prescription.reference, prescriptionStatus: "DELIVERED", lineNames: [], alerts: [], recommendations: [], outcome: null }) };
   }
   if (prescription.status === "NEEDS_VERIFICATION") {
-    return { status: prescription.status, followUp, notice: buildCounterNotice({ reference: prescription.reference, prescriptionStatus: "NEEDS_VERIFICATION", lineNames: [], lines: boxesOf(prescription.lines), alerts: [], recommendations: [], outcome: null }) };
+    return { status: prescription.status, followUp, notice: buildCounterNotice({ reference: prescription.reference, prescriptionStatus: "NEEDS_VERIFICATION", lineNames: [], lines: boxesOf(prescription.lines, new Map(), now), alerts: [], recommendations: [], outcome: null }) };
   }
 
   const run = prescription.analysisRuns[0];
@@ -154,7 +156,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     prescriptionStatus: prescription.status,
     lineNames: prescription.lines.map((line) => line.drugName ?? "").filter(Boolean),
     lineKinds: prescription.lines.filter((line) => line.drugName).map((line) => (line.drugSpecialtyId ? ("DRUG" as const) : ("PRODUCT" as const))),
-    lines: boxesOf(prescription.lines, await boxChallenges(pharmacyId, prescription.lines, now)),
+    lines: boxesOf(prescription.lines, await boxChallenges(pharmacyId, prescription.lines, now), now),
     alerts: (run?.safetyFindings ?? []).map((finding) => ({ severity: finding.severity, subjectType: finding.subjectType, code: finding.code, message: finding.message, acknowledged: finding.acknowledgedAt !== null })),
     questions: tree.view.questions,
     guidance: tree.view.guidance,

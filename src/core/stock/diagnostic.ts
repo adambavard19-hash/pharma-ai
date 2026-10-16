@@ -52,15 +52,23 @@ export const LIRE_JOURNAL_MARKER = "//<<JS>>";
  * Enveloppe en ASCII (cmd.exe ne lit pas l'UTF-8) ; le programme, lui, est lu en UTF-8 par Node.
  */
 export function buildLireJournalCmd(javascript: string): string {
+  return buildNodeProgramCmd(javascript, { title: "PharmaBoost - lecture du journal de LGPI", launchVar: "PB_LIRE_JOURNAL_LANCER" });
+}
+
+/**
+ * La même enveloppe pour les autres programmes de diagnostic en lecture seule (fin de vente, dates courtes) : le titre de la
+ * fenêtre et la variable qui lance le programme changent, rien d'autre.
+ */
+export function buildNodeProgramCmd(javascript: string, options: { title: string; launchVar: string }): string {
   const program = javascript.replace(/^\uFEFF/, "").replace(/\r?\n/g, CRLF);
   const bootstrap = `const t=require('fs').readFileSync(process.env.PB_FICHIER,'utf8');const i=t.lastIndexOf('${LIRE_JOURNAL_MARKER}');(0,eval)(t.slice(i+${LIRE_JOURNAL_MARKER.length}))`;
   return [
     "@echo off",
     "setlocal",
     "chcp 65001 >nul",
-    "title PharmaBoost - lecture du journal de LGPI",
+    `title ${options.title}`,
     'set "PB_FICHIER=%~f0"',
-    'set "PB_LIRE_JOURNAL_LANCER=1"',
+    `set "${options.launchVar}=1"`,
     'set "PB_NODE=%LOCALAPPDATA%\\PharmaBoost\\Poste\\node\\node.exe"',
     'if not exist "%PB_NODE%" set "PB_NODE=node"',
     `"%PB_NODE%" -e "${bootstrap}"`,

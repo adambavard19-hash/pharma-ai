@@ -280,10 +280,10 @@ var FIELD_NAME = /^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$/;
 function shapeOf(word) {
   return word.replace(/[a-zà-ÿ]/g, "a").replace(/[A-ZÀ-Ý]/g, "A");
 }
-function maskMessage(message) {
+function maskMessage(message, extra) {
   const masked = message.replace(/[A-Za-zÀ-ÿ_][A-Za-zÀ-ÿ0-9_]{2,}/g, (word, offset) => {
     const next = message[offset + word.length];
-    if (VOCABULARY.has(word.toLowerCase())) return word;
+    if (VOCABULARY.has(word.toLowerCase()) || extra?.has(word.toLowerCase())) return word;
     if (next === "(" && CLASS_NAME.test(word)) return word;
     if (next === "=" && FIELD_NAME.test(word)) return word;
     return shapeOf(word);

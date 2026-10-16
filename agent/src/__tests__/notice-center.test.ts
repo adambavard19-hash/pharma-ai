@@ -26,6 +26,14 @@ const body = (over: Partial<NoticeBody> = {}): NoticeBody => ({
 describe("ce que la fenêtre reçoit pour une vente", () => {
   const build = (over: Partial<NoticeBody> = {}, images?: Map<string, string>) => buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app/", body: body(over), images });
 
+  it("transmet la péremption d'une boîte (Datamatrix) et ouvre la bannière même sans conseil ; une valeur douteuse est ignorée", () => {
+    const entry = build({ advice: [], items: [], boxes: [{ id: "l1", name: "AMOXICILLINE", expiry: { on: "2026-09-30", state: "expired" } }, { id: "l2", name: "DOLIPRANE", expiry: { on: "hier", state: "expired" } }, { id: "l3", name: "SPASFON", expiry: { on: "2026-11-01", state: "peut-etre" } }] });
+    expect(entry.boxes?.[0]).toEqual({ id: "l1", name: "AMOXICILLINE", expiry: { on: "2026-09-30", state: "expired" } });
+    expect(entry.boxes?.[1]?.expiry).toBeUndefined();
+    expect(entry.boxes?.[2]?.expiry).toBeUndefined();
+    expect(entry.quiet).toBe(false);
+  });
+
   it("porte l'arbre de questions : une question à poser n'est pas « rien à conseiller », la fenêtre s'ouvre", () => {
     const withQuestion = build({
       items: [],

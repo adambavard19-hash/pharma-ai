@@ -92,7 +92,43 @@ export class ScanDetector {
  * pas un code-barres : c'est une frappe humaine, on l'oublie.
  */
 export function normalizeScannedCode(raw: string): string | null {
+  return parseScannedCode(raw)?.code ?? null;
+}
+
+export type ScannedBox = {
+  code: string;
+  /** La date de péremption lue dans le Datamatrix (« 2027-03-31 »), ou rien : un code-barres simple n'en porte pas. */
+  expiresOn: string | null;
+};
+
+/**
+ * La date de péremption d'un Datamatrix : l'identifiant 17 suivi de AAMMJJ, lu SEULEMENT quand il suit directement le
+ * GTIN (« 01 » + 14 chiffres + « 17 » + AAMMJJ) — l'ordre des boîtes françaises. Le séparateur GS ne nous parvient pas
+ * toujours : ailleurs dans le code, « 17 » peut être la fin d'un numéro de lot ou de série. Dans le doute, rien plutôt
+ * qu'une date fausse. Le jour « 00 » veut dire « fin du mois » (norme GS1).
+ */
+export function datamatrixExpiry(text: string): string | null {
+  const match = /^01\d{14}17(\d{2})(\d{2})(\d{2})/.exec(text);
+  if (!match) return null;
+  const year = 2000 + Number(match[1]);
+  const month = Number(match[2]);
+  let day = Number(match[3]);
+  if (month < 1 || month > 12 || day > 31) return null;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day === 0) day = lastDay;
+  if (day > lastDay) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Le code-barres d'une boîte et, pour un Datamatrix, sa date de péremption. */
+export function parseScannedCode(raw: string): ScannedBox | null {
   const text = raw.replace(/^\](D2|C1|E0|Q3)/i, "").trim();
+  const code = baseCode(text);
+  if (!code) return null;
+  return { code, expiresOn: datamatrixExpiry(text) };
+}
+
+function baseCode(text: string): string | null {
   if (/^\d{13}$/.test(text)) return text;
   if (/^\d{7,8}$/.test(text)) return text;
   const gs1 = /^01(\d{14})/.exec(text);

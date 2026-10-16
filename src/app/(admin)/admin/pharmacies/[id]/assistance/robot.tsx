@@ -111,6 +111,18 @@ export function AssistanceRobot({ pharmacyId, robot, lgo, postsOnline }: { pharm
         Télécharger la lecture du journal de LGPI (lecture seule)
       </a>
       <p className="text-text-secondary">À ouvrir sur un poste où PharmaBoost est installé, juste après une vente de test d&apos;une seule boîte : il lit la fin du journal de LGPI et montre où se trouve le code produit, sans aucune donnée patient.</p>
+
+      <a href="/api/agent/fichiers/diagnostic-fin-de-vente.cmd" data-diagnostic="fin-de-vente" className="inline-flex items-center gap-2 font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">
+        <FileText className="size-4" aria-hidden="true" />
+        Télécharger le diagnostic « fin de vente » (lecture seule)
+      </a>
+      <p className="text-text-secondary">À ouvrir sur un poste où PharmaBoost est installé : le pharmacien fait 2 ou 3 ventes normales (une validée au clavier, une à la souris), puis appuie sur Entrée. Le rapport dit comment LGPI montre qu&apos;une vente est validée — sans aucune lettre tapée, aucun nom, aucune valeur.</p>
+
+      <a href="/api/agent/fichiers/diagnostic-dates-courtes.cmd" data-diagnostic="dates-courtes" className="inline-flex items-center gap-2 font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">
+        <FileText className="size-4" aria-hidden="true" />
+        Télécharger le diagnostic « dates courtes » (lecture seule)
+      </a>
+      <p className="text-text-secondary">À ouvrir sur le poste où LGPI exporte le stock : il cherche où LGPI garde les dates de péremption (fichiers, réglages, journal) et n&apos;écrit que des noms de fichiers et de colonnes.</p>
     </div>
   );
 }

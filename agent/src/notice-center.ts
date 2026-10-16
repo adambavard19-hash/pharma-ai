@@ -51,7 +51,7 @@ export type NoticeBody = {
   questions?: { id: string; node: string; text: string; mode: string; choices: { key: string; label: string; selected: boolean }[]; answered: boolean }[];
   guidance?: string[];
   /** Les boîtes bipées de la vente, avec leur identifiant (« Retirer » sur la bannière). Absent chez un serveur plus ancien. */
-  boxes?: { id: string; name: string; challenge?: string; reward?: string; late?: boolean }[];
+  boxes?: { id: string; name: string; challenge?: string; reward?: string; late?: boolean; expiry?: { on?: string; state?: string } }[];
 };
 
 export type HostOutcome = "NONE" | "SOLD" | "NOT_SOLD";
@@ -88,8 +88,11 @@ export type HostEntry = {
   /** Les phrases d'orientation des réponses cochées. */
   guidance: string[];
   items: HostItem[];
-  /** Les boîtes bipées (identifiant de ligne, nom court) : chacune se retire de la bannière. Vide : rien à retirer (serveur ancien). */
-  boxes?: { id: string; name: string; challenge?: string; reward?: string; late?: boolean }[];
+  /**
+   * Les boîtes bipées (identifiant de ligne, nom court) : chacune se retire de la bannière. Vide : rien à retirer (serveur
+   * ancien). `expiry` : la péremption lue dans le Datamatrix — la boîte est périmée, ou périme dans le mois (« 2026-11-02 »).
+   */
+  boxes?: { id: string; name: string; challenge?: string; reward?: string; late?: boolean; expiry?: { on: string; state: "expired" | "soon" } }[];
 };
 
 /** Le message de fin de vente. */
@@ -190,7 +193,7 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     signature: body.signature,
     // Une question à poser n'est pas « rien à conseiller » : la fenêtre doit s'ouvrir.
     // Une boîte en challenge non plus : le pharmacien doit le savoir dès le scan.
-    quiet: finalItems.length === 0 && alerts.length === 0 && questions.length === 0 && !(body.boxes ?? []).some((box) => box?.challenge),
+    quiet: finalItems.length === 0 && alerts.length === 0 && questions.length === 0 && !(body.boxes ?? []).some((box) => box?.challenge || boxExpiryOf(box?.expiry).expiry),
     emailSaved: body.followUp?.emailSaved === true,
     emailError: oneLine(input.emailError ?? ""),
     alerts,
@@ -200,10 +203,16 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
     items: finalItems,
     boxes: (body.boxes ?? [])
       .filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id))
-      .map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...(box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {}), ...(box.late === true ? { late: true } : {}) }))
+      .map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...(box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {}), ...(box.late === true ? { late: true } : {}), ...boxExpiryOf(box.expiry) }))
       .filter((box) => box.name)
       .slice(0, 20),
   };
+}
+
+/** La péremption d'une boîte, vérifiée : une date « AAAA-MM-JJ » et un état connu, sinon rien. */
+function boxExpiryOf(expiry: { on?: string; state?: string } | undefined): { expiry?: { on: string; state: "expired" | "soon" } } {
+  if (!expiry || typeof expiry.on !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiry.on)) return {};
+  return expiry.state === "expired" || expiry.state === "soon" ? { expiry: { on: expiry.on, state: expiry.state } } : {};
 }
 
 /** « 1er », « 2e », « 18e » : le rang du conseil vendu aujourd'hui. */

@@ -1,3 +1,4 @@
+import type { BoxExpiry } from "./box-expiry";
 /**
  * L'avis de comptoir : ce que le poste de caisse affiche en coin d'écran,
  * par-dessus le LGO, quand l'analyse d'une vente bipée est prête.
@@ -130,7 +131,7 @@ export type CounterNoticeInput = {
   /** Ce que chaque ligne bipée est : un médicament du catalogue national, ou un produit de l'officine. */
   lineKinds?: ("DRUG" | "PRODUCT")[];
   /** Les boîtes bipées, avec leur identifiant : la bannière du poste peut en retirer une. Absent (appel ancien) : aucune. */
-  lines?: { id: string; name: string; challenge?: string | null; reward?: string | null; late?: boolean }[];
+  lines?: { id: string; name: string; challenge?: string | null; reward?: string | null; late?: boolean; expiry?: BoxExpiry | null }[];
   /**
    * Les questions ouvertes de l'arbre du comptoir (« pourquoi le patient prend-il son paracétamol ? », « où a-t-il mal ? »)
    * et les phrases d'orientation des réponses cochées. Les conseils qu'elles débloquent arrivent dans `recommendations` ;
@@ -158,7 +159,7 @@ export type CounterNotice = {
   /** Les médicaments ou produits bipés, un par élément, sans la forme galénique. */
   drugs: string[];
   /** Les mêmes boîtes, avec leur identifiant (pour « Retirer » sur la bannière du poste). */
-  boxes: { id: string; name: string; challenge?: string; reward?: string; late?: boolean }[];
+  boxes: { id: string; name: string; challenge?: string; reward?: string; late?: boolean; expiry?: BoxExpiry }[];
   /** « Médicament détecté », « Produit détecté » ou « Détecté » : le titre au-dessus de ce qui a été bipé. */
   detectedLabel: string;
   /** Une empreinte : si elle ne change pas, on ne réaffiche pas. */
@@ -215,7 +216,7 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
   const guidance = input.guidance ?? [];
   // La boîte scannée elle-même peut être en challenge (toute la gamme Olioseptil) : la bannière le dit dès le scan.
   const boxes = (input.lines ?? [])
-    .map((line) => ({ id: line.id, name: shortName(line.name), ...(line.challenge ? { challenge: line.challenge, reward: line.reward ?? "" } : {}), ...(line.late ? { late: true } : {}) }))
+    .map((line) => ({ id: line.id, name: shortName(line.name), ...(line.challenge ? { challenge: line.challenge, reward: line.reward ?? "" } : {}), ...(line.late ? { late: true } : {}), ...(line.expiry ? { expiry: line.expiry } : {}) }))
     .filter((box) => box.name);
   const base = { title: `PharmaBoost · ${saleTitle(input.reference)}`, subject, drugs, boxes, detectedLabel: detectedLabelOf(input.lineKinds), questions: [] as ViewQuestion[], guidance: [] as string[] };
   const reliable = input.stockReliable !== false;

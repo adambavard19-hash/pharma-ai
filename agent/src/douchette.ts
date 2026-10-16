@@ -17,7 +17,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { ScanDetector, normalizeScannedCode } from "./scan-detect";
+import { ScanDetector, parseScannedCode } from "./scan-detect";
 
 /**
  * Le hook clavier, en C# compilé à la volée par PowerShell (Add-Type).
@@ -83,7 +83,8 @@ Add-Type -TypeDefinition $code -ReferencedAssemblies System.Windows.Forms
 `;
 
 export type DouchetteHandlers = {
-  onScan: (code: string, at: number) => void;
+  /** `expiresOn` : la péremption lue dans le Datamatrix de la boîte (« 2027-03-31 »), quand elle est sûre. */
+  onScan: (code: string, at: number, expiresOn?: string | null) => void;
   onStatus: (message: string) => void;
 };
 
@@ -102,8 +103,8 @@ export function startDouchette(configDir: string, handlers: DouchetteHandlers): 
   writeFileSync(scriptPath, HOOK_SCRIPT, "utf8");
 
   const detector = new ScanDetector((raw, at) => {
-    const code = normalizeScannedCode(raw);
-    if (code) handlers.onScan(code, at);
+    const box = parseScannedCode(raw);
+    if (box) handlers.onScan(box.code, at, box.expiresOn);
   });
   let child: ChildProcess | null = null;
   let stopped = false;
