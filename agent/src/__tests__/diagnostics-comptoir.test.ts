@@ -87,3 +87,18 @@ describe.skipIf(process.env.PB_CSHARP_CHECK !== "1")("la compilation de l'observ
     }
   }, 240_000);
 });
+
+describe("diagnostic « suppression de ligne » : le journal fiscal décodé, les noms de champs lisibles", async () => {
+  const { maskJournalMessage } = await import("../diagnostic-fin-de-vente");
+  it("le message NF525 encodé : clés en clair, valeurs masquées sauf code produit et constantes ; jamais un nom", () => {
+    const out = maskJournalMessage("Message envoyé au jet : %7B%22typeOperation%22%3A%22LIGNE_VENTE%22%2C%22codeProduit%22%3A%223400935294227%22%2C%22quantite%22%3A-1%2C%22nomPatient%22%3A%22DUPONT+Jean%22%7D.");
+    expect(out).toContain("typeOperation=LIGNE_VENTE");
+    expect(out).toContain("codeProduit=3400935294227");
+    expect(out).toContain("quantite=-9");
+    expect(out).not.toMatch(/DUPONT|Jean/);
+  });
+  it("un nom de champ suivi de « = » reste lisible, sa valeur non", () => {
+    expect(maskJournalMessage("quantiteStock = -1 produit DUPONT")).toBe("quantiteStock = -9 produit AAAAAA");
+    expect(maskJournalMessage("DateDernierMouvement = Thu Oct 16")).toMatch(/^DateDernierMouvement = /);
+  });
+});

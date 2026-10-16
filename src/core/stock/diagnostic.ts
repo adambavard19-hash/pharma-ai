@@ -59,7 +59,7 @@ export function buildLireJournalCmd(javascript: string): string {
  * La même enveloppe pour les autres programmes de diagnostic en lecture seule (fin de vente, dates courtes) : le titre de la
  * fenêtre et la variable qui lance le programme changent, rien d'autre.
  */
-export function buildNodeProgramCmd(javascript: string, options: { title: string; launchVar: string }): string {
+export function buildNodeProgramCmd(javascript: string, options: { title: string; launchVar: string; env?: Record<string, string> }): string {
   const program = javascript.replace(/^\uFEFF/, "").replace(/\r?\n/g, CRLF);
   const bootstrap = `const t=require('fs').readFileSync(process.env.PB_FICHIER,'utf8');const i=t.lastIndexOf('${LIRE_JOURNAL_MARKER}');(0,eval)(t.slice(i+${LIRE_JOURNAL_MARKER.length}))`;
   return [
@@ -69,6 +69,7 @@ export function buildNodeProgramCmd(javascript: string, options: { title: string
     `title ${options.title}`,
     'set "PB_FICHIER=%~f0"',
     `set "${options.launchVar}=1"`,
+    ...Object.entries(options.env ?? {}).map(([key, value]) => `set "${key}=${value}"`),
     'set "PB_NODE=%LOCALAPPDATA%\\PharmaBoost\\Poste\\node\\node.exe"',
     'if not exist "%PB_NODE%" set "PB_NODE=node"',
     `"%PB_NODE%" -e "${bootstrap}"`,

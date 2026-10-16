@@ -27,6 +27,7 @@ __export(diagnostic_fin_de_vente_exports, {
   afterActions: () => afterActions,
   collapseScanner: () => collapseScanner,
   journalObserved: () => journalObserved,
+  maskJournalMessage: () => maskJournalMessage,
   parseHookLine: () => parseHookLine,
   renderSaleReport: () => renderSaleReport
 });
@@ -627,9 +628,36 @@ var SALE_VOCABULARY = new Set(
     "session",
     "utilisateur",
     "operateur",
-    "op\xE9rateur"
+    "op\xE9rateur",
+    "suppression",
+    "supprimer",
+    "supprime",
+    "supprim\xE9",
+    "supprimee",
+    "supprim\xE9e",
+    "retrait",
+    "retirer",
+    "retire",
+    "retir\xE9",
+    "retour",
+    "ajout",
+    "ajouter",
+    "modification",
+    "modifier",
+    "quantite",
+    "quantit\xE9",
+    "mouvement",
+    "operation",
+    "op\xE9ration",
+    "jet",
+    "envoye",
+    "envoy\xE9",
+    "message",
+    "stock",
+    "depot"
   ].map((word) => word.toLowerCase())
 );
+var SCENARIO = process.env.PB_DIAG_SCENARIO ?? "";
 var MAX_DURATION_MS = 20 * 6e4;
 var AFTER_ACTION_MS = 3e3;
 var KEY_FR = { Entree: "Entr\xE9e", Echap: "\xC9chap", "Retour arriere": "Retour arri\xE8re", "Page prec.": "Page pr\xE9c.", "Page suiv.": "Page suiv.", caractere: "caract\xE8re" };
@@ -647,7 +675,34 @@ function journalObserved(line) {
   if (!entry) return null;
   const at = Date.parse(`${entry.date}T${entry.time}`);
   if (!Number.isFinite(at)) return null;
-  return { at, kind: "journal", logger: entry.logger.slice(-60), level: entry.level, text: `[${maskThread(entry.thread)}] ${maskMessage(entry.message, SALE_VOCABULARY)}` };
+  return { at, kind: "journal", logger: entry.logger.slice(-60), level: entry.level, text: `[${maskThread(entry.thread)}] ${maskJournalMessage(entry.message)}` };
+}
+function keepsValue(value) {
+  return /^\d{7}$|^\d{13}$/.test(value) || /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(value);
+}
+var CODE_WORD = /^(?:[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+|[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)$/;
+function maskJournalMessage(message) {
+  const encoded = /^(.*?)((?:%7B|\{)[\s\S]*)$/i.exec(message);
+  if (encoded && /%7B|%22/i.test(encoded[2])) {
+    let decoded = encoded[2];
+    try {
+      decoded = decodeURIComponent(encoded[2].replace(/\+/g, " "));
+    } catch {
+    }
+    const pairs = [...decoded.matchAll(/"([^"]{1,60})"\s*:\s*("([^"]*)"|-?\d+(?:[.,]\d+)?|true|false|null)/g)];
+    if (pairs.length > 0) {
+      const shown = pairs.map((pair) => {
+        const raw = pair[3] ?? pair[2];
+        const value = keepsValue(raw) ? raw : maskMessage(raw, SALE_VOCABULARY);
+        return `${pair[1]}=${value}`;
+      });
+      return `${maskMessage(encoded[1], SALE_VOCABULARY)} {${shown.join(", ")}}`.slice(0, 600);
+    }
+  }
+  const fields = /* @__PURE__ */ new Set();
+  for (const match of message.matchAll(/([A-Za-z_][A-Za-z0-9_]{2,})\s*[=:]/g)) if (CODE_WORD.test(match[1])) fields.add(match[1].toLowerCase());
+  for (const match of message.matchAll(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g)) fields.add(match[0].toLowerCase());
+  return maskMessage(message, /* @__PURE__ */ new Set([...SALE_VOCABULARY, ...fields]));
 }
 function collapseScanner(events) {
   const out = [];
@@ -909,11 +964,22 @@ async function observe() {
   }
   console.log(journal ? `  \u2713 Journal de LGPI suivi : ${journal.path}` : "  \u2717 Aucun journal de LGPI trouv\xE9 : seuls le clavier, la souris et les fen\xEAtres seront not\xE9s.");
   console.log("");
-  console.log("MAINTENANT : faites 2 ou 3 ventes NORMALES dans LGPI, comme d'habitude.");
-  console.log("  - au moins une valid\xE9e au CLAVIER (touche de validation de LGPI) ;");
-  console.log("  - au moins une valid\xE9e \xE0 la SOURIS (bouton \xAB FIN Valider \xBB) ;");
-  console.log("  - si possible, un passage au client suivant sans rien vendre.");
-  console.log("Notez l'heure de chaque validation si vous le pouvez. Puis revenez ici et appuyez sur Entr\xE9e.");
+  if (SCENARIO === "suppression") {
+    console.log("MAINTENANT, dans LGPI (une vente d'essai, sans patient) :");
+    console.log("  1. Bipez une bo\xEEte de m\xE9dicament, puis un produit de parapharmacie (un produit conseil).");
+    console.log("  2. Attendez 10 secondes.");
+    console.log("  3. S\xE9lectionnez la ligne du produit de parapharmacie et SUPPRIMEZ-la (touche Suppr), comme d'habitude.");
+    console.log("  4. Attendez 10 secondes.");
+    console.log("  5. Supprimez aussi la bo\xEEte de m\xE9dicament, puis rebipez-la.");
+    console.log("  6. Validez la vente (FIN Valider), ou annulez-la si c'est un essai.");
+    console.log("Puis revenez ici et appuyez sur Entr\xE9e.");
+  } else {
+    console.log("MAINTENANT : faites 2 ou 3 ventes NORMALES dans LGPI, comme d'habitude.");
+    console.log("  - au moins une valid\xE9e au CLAVIER (touche de validation de LGPI) ;");
+    console.log("  - au moins une valid\xE9e \xE0 la SOURIS (bouton \xAB FIN Valider \xBB) ;");
+    console.log("  - si possible, un passage au client suivant sans rien vendre.");
+    console.log("Notez l'heure de chaque validation si vous le pouvez. Puis revenez ici et appuyez sur Entr\xE9e.");
+  }
   console.log("(Arr\xEAt automatique au bout de 20 minutes.)");
   await new Promise((resolve) => {
     const timer = setTimeout(resolve, Number(process.env.PB_DUREE_MS) || MAX_DURATION_MS);
@@ -930,7 +996,7 @@ async function observe() {
   const ended = /* @__PURE__ */ new Date();
   const computer = process.env.COMPUTERNAME ?? (0, import_node_os2.hostname)();
   const lines = renderSaleReport({ computer, started, ended, journal: journal?.path ?? null, events, hookOk, errors });
-  const file = (0, import_node_path2.join)(desktopDir(), `PharmaBoost-fin-de-vente-${computer}-${ended.getFullYear()}${two(ended.getMonth() + 1)}${two(ended.getDate())}-${two(ended.getHours())}${two(ended.getMinutes())}.txt`);
+  const file = (0, import_node_path2.join)(desktopDir(), `PharmaBoost-${SCENARIO === "suppression" ? "suppression" : "fin-de-vente"}-${computer}-${ended.getFullYear()}${two(ended.getMonth() + 1)}${two(ended.getDate())}-${two(ended.getHours())}${two(ended.getMinutes())}.txt`);
   (0, import_node_fs2.writeFileSync)(file, "\uFEFF" + lines.join("\r\n") + "\r\n", "utf8");
   console.log("");
   console.log("TERMIN\xC9. Rapport \xE9crit sur le Bureau :");
@@ -957,6 +1023,7 @@ if (process.env.PB_FIN_VENTE_LANCER === "1") {
   afterActions,
   collapseScanner,
   journalObserved,
+  maskJournalMessage,
   parseHookLine,
   renderSaleReport
 });

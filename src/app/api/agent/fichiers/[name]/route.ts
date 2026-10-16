@@ -18,7 +18,8 @@ export const dynamic = "force-dynamic";
  * se télécharge (`attachment`) au lieu de s'afficher. `lire-journal.cmd` est la lecture, en lecture seule aussi, du journal de LGPI
  * (agent/src/lire-journal.ts) : le programme est exécuté par le Node.js que le poste de caisse a déjà.
  */
-const FILES: Record<string, { path: string[]; type: string; bom?: boolean; diagnosticCmd?: boolean; lireJournalCmd?: boolean; nodeCmd?: { title: string; launchVar: string }; attachment?: string }> = {
+const FILES: Record<string, { path: string[]; type: string; bom?: boolean; diagnosticCmd?: boolean; lireJournalCmd?: boolean; nodeCmd?: { title: string; launchVar: string; env?: Record<string, string> }; attachment?: string }> = {
+  "diagnostic-suppression.cmd": { path: ["dist", "diagnostic-fin-de-vente.js"], type: "application/octet-stream", nodeCmd: { title: "PharmaBoost - diagnostic suppression de ligne", launchVar: "PB_FIN_VENTE_LANCER", env: { PB_DIAG_SCENARIO: "suppression" } }, attachment: "PharmaBoost-Diagnostic-Suppression.cmd" },
   // Les diagnostics du 16 oct. 2026, en lecture seule : comment LGPI termine une vente, et où il garde les péremptions.
   "diagnostic-fin-de-vente.cmd": { path: ["dist", "diagnostic-fin-de-vente.js"], type: "application/octet-stream", nodeCmd: { title: "PharmaBoost - diagnostic fin de vente", launchVar: "PB_FIN_VENTE_LANCER" }, attachment: "PharmaBoost-Diagnostic-Fin-de-vente.cmd" },
   "diagnostic-dates-courtes.cmd": { path: ["dist", "diagnostic-dates-courtes.js"], type: "application/octet-stream", nodeCmd: { title: "PharmaBoost - diagnostic dates courtes", launchVar: "PB_DATES_COURTES_LANCER" }, attachment: "PharmaBoost-Diagnostic-Dates-courtes.cmd" },

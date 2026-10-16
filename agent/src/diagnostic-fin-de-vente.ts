@@ -34,8 +34,13 @@ export const SALE_VOCABULARY = new Set(
     "sauvegarde", "enregistrement", "enregistrer", "fermeture", "ouverture", "ecran", "écran", "fenetre", "fenêtre", "menu", "accueil", "recherche",
     "remise", "honoraire", "honoraires", "posologie", "substitution", "commentaires", "lgpi", "pharmagest", "chrome", "edge", "explorer", "java",
     "javaw", "pharmaboost", "notepad", "cmd", "powershell", "transaction", "commit", "rollback", "session", "utilisateur", "operateur", "opérateur",
+    "suppression", "supprimer", "supprime", "supprimé", "supprimee", "supprimée", "retrait", "retirer", "retire", "retiré", "retour", "ajout", "ajouter",
+    "modification", "modifier", "quantite", "quantité", "mouvement", "operation", "opération", "jet", "envoye", "envoyé", "message", "stock", "depot",
   ].map((word) => word.toLowerCase()),
 );
+
+/** Le scénario demandé (posé par le fichier à double-cliquer) : « suppression » pour le retrait d'une ligne dans LGPI. */
+const SCENARIO = process.env.PB_DIAG_SCENARIO ?? "";
 
 /** La durée maximale d'une séance d'observation. */
 export const MAX_DURATION_MS = 20 * 60_000;
@@ -68,7 +73,47 @@ export function journalObserved(line: string): Observed | null {
   if (!entry) return null;
   const at = Date.parse(`${entry.date}T${entry.time}`);
   if (!Number.isFinite(at)) return null;
-  return { at, kind: "journal", logger: entry.logger.slice(-60), level: entry.level, text: `[${maskThread(entry.thread)}] ${maskMessage(entry.message, SALE_VOCABULARY)}` };
+  return { at, kind: "journal", logger: entry.logger.slice(-60), level: entry.level, text: `[${maskThread(entry.thread)}] ${maskJournalMessage(entry.message)}` };
+}
+
+/** Une valeur gardée en clair : un code produit (CIP7, CIP13, EAN13) ou une constante du code (« LIGNE_VENTE ») — jamais un nom. */
+function keepsValue(value: string): boolean {
+  return /^\d{7}$|^\d{13}$/.test(value) || /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(value);
+}
+
+/** Les mots du code de LGPI (noms de champs) : camelCase (« typeOperation ») ou constante à tiret bas (« LIGNE_VENTE »). */
+const CODE_WORD = /^(?:[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+|[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)$/;
+
+/**
+ * Le message d'une ligne du journal, masqué, avec deux lectures en plus (diagnostic « suppression de ligne », 16 oct. 2026) :
+ *  - les noms de champs du code (« quantiteStock = -1 », « typeOperation ») restent lisibles, leurs valeurs non ;
+ *  - le message envoyé au journal fiscal (NF525) est décodé (il est encodé pour l'adresse : « %7B%22… ») : ses CLÉS restent
+ *    lisibles, ses valeurs sont masquées, sauf un code produit ou une constante du code.
+ */
+export function maskJournalMessage(message: string): string {
+  const encoded = /^(.*?)((?:%7B|\{)[\s\S]*)$/i.exec(message);
+  if (encoded && /%7B|%22/i.test(encoded[2])) {
+    let decoded = encoded[2];
+    try {
+      decoded = decodeURIComponent(encoded[2].replace(/\+/g, " "));
+    } catch {
+      // Laissé encodé : le masquage ordinaire s'applique.
+    }
+    const pairs = [...decoded.matchAll(/"([^"]{1,60})"\s*:\s*("([^"]*)"|-?\d+(?:[.,]\d+)?|true|false|null)/g)];
+    if (pairs.length > 0) {
+      const shown = pairs.map((pair) => {
+        const raw = pair[3] ?? pair[2];
+        const value = keepsValue(raw) ? raw : maskMessage(raw, SALE_VOCABULARY);
+        return `${pair[1]}=${value}`;
+      });
+      return `${maskMessage(encoded[1], SALE_VOCABULARY)} {${shown.join(", ")}}`.slice(0, 600);
+    }
+  }
+  // Les noms de champs suivis de « = » (même avec des espaces) restent lisibles.
+  const fields = new Set<string>();
+  for (const match of message.matchAll(/([A-Za-z_][A-Za-z0-9_]{2,})\s*[=:]/g)) if (CODE_WORD.test(match[1]!)) fields.add(match[1]!.toLowerCase());
+  for (const match of message.matchAll(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g)) fields.add(match[0].toLowerCase());
+  return maskMessage(message, new Set([...SALE_VOCABULARY, ...fields]));
 }
 
 /**
@@ -362,11 +407,22 @@ async function observe(): Promise<void> {
 
   console.log(journal ? `  ✓ Journal de LGPI suivi : ${journal.path}` : "  ✗ Aucun journal de LGPI trouvé : seuls le clavier, la souris et les fenêtres seront notés.");
   console.log("");
-  console.log("MAINTENANT : faites 2 ou 3 ventes NORMALES dans LGPI, comme d'habitude.");
-  console.log("  - au moins une validée au CLAVIER (touche de validation de LGPI) ;");
-  console.log("  - au moins une validée à la SOURIS (bouton « FIN Valider ») ;");
-  console.log("  - si possible, un passage au client suivant sans rien vendre.");
-  console.log("Notez l'heure de chaque validation si vous le pouvez. Puis revenez ici et appuyez sur Entrée.");
+  if (SCENARIO === "suppression") {
+    console.log("MAINTENANT, dans LGPI (une vente d'essai, sans patient) :");
+    console.log("  1. Bipez une boîte de médicament, puis un produit de parapharmacie (un produit conseil).");
+    console.log("  2. Attendez 10 secondes.");
+    console.log("  3. Sélectionnez la ligne du produit de parapharmacie et SUPPRIMEZ-la (touche Suppr), comme d'habitude.");
+    console.log("  4. Attendez 10 secondes.");
+    console.log("  5. Supprimez aussi la boîte de médicament, puis rebipez-la.");
+    console.log("  6. Validez la vente (FIN Valider), ou annulez-la si c'est un essai.");
+    console.log("Puis revenez ici et appuyez sur Entrée.");
+  } else {
+    console.log("MAINTENANT : faites 2 ou 3 ventes NORMALES dans LGPI, comme d'habitude.");
+    console.log("  - au moins une validée au CLAVIER (touche de validation de LGPI) ;");
+    console.log("  - au moins une validée à la SOURIS (bouton « FIN Valider ») ;");
+    console.log("  - si possible, un passage au client suivant sans rien vendre.");
+    console.log("Notez l'heure de chaque validation si vous le pouvez. Puis revenez ici et appuyez sur Entrée.");
+  }
   console.log("(Arrêt automatique au bout de 20 minutes.)");
 
   await new Promise<void>((resolve) => {
@@ -385,7 +441,7 @@ async function observe(): Promise<void> {
   const ended = new Date();
   const computer = process.env.COMPUTERNAME ?? hostname();
   const lines = renderSaleReport({ computer, started, ended, journal: journal?.path ?? null, events, hookOk, errors });
-  const file = join(desktopDir(), `PharmaBoost-fin-de-vente-${computer}-${ended.getFullYear()}${two(ended.getMonth() + 1)}${two(ended.getDate())}-${two(ended.getHours())}${two(ended.getMinutes())}.txt`);
+  const file = join(desktopDir(), `PharmaBoost-${SCENARIO === "suppression" ? "suppression" : "fin-de-vente"}-${computer}-${ended.getFullYear()}${two(ended.getMonth() + 1)}${two(ended.getDate())}-${two(ended.getHours())}${two(ended.getMinutes())}.txt`);
   writeFileSync(file, "﻿" + lines.join("\r\n") + "\r\n", "utf8");
   console.log("");
   console.log("TERMINÉ. Rapport écrit sur le Bureau :");
