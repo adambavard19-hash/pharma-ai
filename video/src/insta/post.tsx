@@ -6,8 +6,8 @@ import { Mascot, type Track } from "../presentation/mascot";
 /* ==========================================================================
  * LA PUBLICATION INSTAGRAM « QU'EST-CE QUE PHARMABOOST ? » (carrousel 4:5, 1080 × 1350, 7 pages).
  *
- * La direction artistique de la première publication, « Aurore » (celle de la bannière du poste) : vert très profond,
- * lumières citron et menthe, liseré d'un pixel en dégradé de marque, le robot de PharmaBoost, beaucoup d'air. Une idée par
+ * La direction artistique de la première publication, recolorée en bleu nuit (fondateur, 16 oct. 2026 : rien qui rappelle
+ * le vert et le citron d'un concurrent) : lumières pervenche et menthe, liseré d'un pixel en dégradé de marque, le robot de PharmaBoost, beaucoup d'air. Une idée par
  * page : une étiquette, un titre, une phrase, une image.
  *
  * Les images de la bannière sont de VRAIES captures de la bannière du poste (public/insta : la page /poste/ile, jouée sur une
@@ -20,15 +20,16 @@ import { Mascot, type Track } from "../presentation/mascot";
 
 export type InstaPostProps = { slide: number };
 
+// Bleu nuit, menthe du robot et pervenche (fondateur, 16 oct. 2026 : rien qui rappelle le vert et le citron d'un concurrent).
 const A = {
-  deep: "#03171A",
-  green: "#072A25",
-  mint: "#58F2D8",
-  teal: "#5FA594",
-  leaf: "#74D6A0",
-  lemon: "#E8FF9C",
-  text: "#ECFFF6",
-  soft: "#9FCBBB",
+  deep: "#04061A",
+  green: "#0C1438",
+  mint: "#A5B4FF",
+  teal: "#6D7FD8",
+  leaf: "#5CF2D6",
+  lemon: "#5CF2D6",
+  text: "#EEF2FF",
+  soft: "#9AA6D6",
 };
 
 const TOTAL = 7;
@@ -40,14 +41,14 @@ const WAVE = still([{ t: 0, kind: "mood", mood: "happy" }, { t: 2.4, kind: "burs
 /** Le liseré d'un pixel en dégradé de marque, autour d'une forme arrondie. */
 function Glow({ children, radius = 36, style }: { children: ReactNode; radius?: number; style?: CSSProperties }) {
   return (
-    <div style={{ position: "relative", borderRadius: radius, background: "linear-gradient(180deg,#0A332D 0%,#04201D 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.08), 0 30px 80px -30px rgba(0,0,0,.7)", ...style }}>
+    <div style={{ position: "relative", borderRadius: radius, background: "linear-gradient(180deg,#141D4A 0%,#0A1030 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.08), 0 30px 80px -30px rgba(0,0,0,.7)", ...style }}>
       <div
         style={{
           position: "absolute",
           inset: 0,
           borderRadius: radius,
           padding: 2,
-          background: `linear-gradient(115deg, rgba(95,165,148,.65), rgba(116,214,160,.35) 38%, ${A.lemon} 52%, rgba(116,214,160,.35) 66%, rgba(95,165,148,.65))`,
+          background: `linear-gradient(115deg, rgba(109,127,216,.7), rgba(165,180,255,.35) 38%, ${A.lemon} 52%, rgba(165,180,255,.35) 66%, rgba(109,127,216,.7))`,
           WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
           WebkitMaskComposite: "xor",
           maskComposite: "exclude",
@@ -61,9 +62,9 @@ function Glow({ children, radius = 36, style }: { children: ReactNode; radius?: 
 
 function Frame({ index, children }: { index: number; children: ReactNode }) {
   return (
-    <AbsoluteFill style={{ fontFamily: FONT, color: A.text, background: `radial-gradient(1200px 900px at 85% -10%, rgba(232,255,156,.10), transparent 60%), radial-gradient(1000px 800px at -10% 110%, rgba(88,242,216,.12), transparent 60%), linear-gradient(180deg, ${A.green} 0%, ${A.deep} 100%)` }}>
+    <AbsoluteFill style={{ fontFamily: FONT, color: A.text, background: `radial-gradient(1200px 900px at 85% -10%, rgba(140,120,255,.22), transparent 60%), radial-gradient(1000px 800px at -10% 110%, rgba(92,242,214,.14), transparent 60%), linear-gradient(180deg, ${A.green} 0%, ${A.deep} 100%)` }}>
       {/* Une trame de points très discrète : la profondeur, sans bruit. */}
-      <AbsoluteFill style={{ backgroundImage: "radial-gradient(rgba(159,203,187,.10) 1.4px, transparent 1.4px)", backgroundSize: "36px 36px", maskImage: "linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,.2))" }} />
+      <AbsoluteFill style={{ backgroundImage: "radial-gradient(rgba(154,166,214,.12) 1.4px, transparent 1.4px)", backgroundSize: "36px 36px", maskImage: "linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,.2))" }} />
       <div style={{ position: "absolute", top: 72, left: 84, right: 84, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <Mascot track={HAPPY} t={3} size={46} />
@@ -99,7 +100,7 @@ const Lemon = ({ children, style }: { children: ReactNode; style?: CSSProperties
 function Stage({ top = 190, height = 560, glow = A.mint, children }: { top?: number; height?: number; glow?: string; children: ReactNode }) {
   return (
     <div style={{ position: "absolute", top, left: 0, right: 0, height, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ position: "absolute", width: 900, height: 620, borderRadius: "50%", background: `radial-gradient(closest-side, ${glow === A.lemon ? "rgba(232,255,156,.16)" : "rgba(88,242,216,.18)"}, transparent)` }} />
+      <div style={{ position: "absolute", width: 900, height: 620, borderRadius: "50%", background: `radial-gradient(closest-side, ${glow === A.lemon ? "rgba(92,242,214,.16)" : "rgba(140,120,255,.22)"}, transparent)` }} />
       <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>{children}</div>
     </div>
   );
@@ -134,7 +135,7 @@ function Problem() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22, width: 820 }}>
           {FOUR.map((word) => (
             <Glow key={word} radius={30} style={{ height: 150, display: "flex", alignItems: "center", gap: 22, padding: "0 30px" }}>
-              <span style={{ width: 56, height: 56, borderRadius: 999, border: "2px solid rgba(159,203,187,.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, fontWeight: 800, color: A.soft }}>?</span>
+              <span style={{ width: 56, height: 56, borderRadius: 999, border: "2px solid rgba(154,166,214,.45)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, fontWeight: 800, color: A.soft }}>?</span>
               <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: "-0.01em" }}>{word}</span>
             </Glow>
           ))}
@@ -169,7 +170,7 @@ function Advice() {
         <Banner src="2-replie.png" w={378} zoom={2.3} />
         <div style={{ marginTop: 28, display: "flex", gap: 12 }}>
           {FOUR.map((word) => (
-            <span key={word} style={{ display: "inline-flex", alignItems: "center", height: 50, padding: "0 20px", borderRadius: 999, background: "rgba(232,255,156,.1)", border: "1.5px solid rgba(232,255,156,.45)", color: A.lemon, fontSize: 22, fontWeight: 700, whiteSpace: "nowrap" }}>
+            <span key={word} style={{ display: "inline-flex", alignItems: "center", height: 50, padding: "0 20px", borderRadius: 999, background: "rgba(92,242,214,.1)", border: "1.5px solid rgba(92,242,214,.45)", color: A.lemon, fontSize: 22, fontWeight: 700, whiteSpace: "nowrap" }}>
               ✓ {word}
             </span>
           ))}
