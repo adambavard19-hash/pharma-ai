@@ -165,11 +165,66 @@ export function isSaleValidatedLine(line: string): boolean {
   return entry !== null && /FacturationProcessusImpl$/.test(entry.logger) && /lignes de vente par type de facturation\s*-\s*ok\b/i.test(entry.message);
 }
 
+/**
+ * Les LIGNES de la vente en cours dans LGPI, lues dans son journal (diagnostic « suppression de ligne » de POSTE5, 16 oct. 2026) :
+ *  - chaque produit ajouté à la vente écrit, dans la seconde, une ligne de `DpRuptureService` : « … Produit : '<code>'. » —
+ *    trois boîtes passées à la douchette, trois lignes, dans l'ordre ;
+ *  - une ligne supprimée (touche Suppr) écrit une ligne de `NFJetApplication` : « {codeEvenement=ABANDON_LIGNE, descriptif=Ligne N …} »,
+ *    N étant son rang dans la vente (les suivantes remontent d'un rang, comme à l'écran) ;
+ *  - la vente abandonnée écrit « codeEvenement=ABANDON_VENTE ».
+ * On garde donc la liste des codes, dans l'ordre, pour savoir QUELLE boîte la ligne N portait. Une ligne inconnue (vente commencée
+ * avant que l'agent ne démarre, rang hors liste) ne désigne rien : on ne devine jamais.
+ */
+export type LgpiLineEvent = { kind: "added"; code: string } | { kind: "removed"; line: number; code: string | null } | { kind: "abandoned" };
+
+const LINE_ADDED = /Produit\s*:\s*'(\d{7,14})'/;
+const LINE_REMOVED = /codeEvenement=ABANDON_LIGNE\b[^}]*?descriptif=Ligne\s+(\d{1,3})\b/;
+const SALE_ABANDONED = /codeEvenement=ABANDON_VENTE\b/;
+/** Une vente n'a jamais plus de lignes que cela : la liste ne grossit pas sans fin si la fin de vente n'est pas lue. */
+const MAX_SALE_LINES = 200;
+
+export class LgpiSaleLines {
+  private codes: string[] = [];
+
+  push(line: string): LgpiLineEvent | null {
+    const entry = parseEntry(line);
+    if (!entry) return null;
+    if (/DpRuptureService$/.test(entry.logger)) {
+      const code = LINE_ADDED.exec(entry.message)?.[1];
+      if (!code) return null;
+      if (this.codes.length >= MAX_SALE_LINES) this.codes.shift();
+      this.codes.push(code);
+      return { kind: "added", code };
+    }
+    if (/NFJetApplication$/.test(entry.logger)) {
+      if (SALE_ABANDONED.test(entry.message)) {
+        this.codes = [];
+        return { kind: "abandoned" };
+      }
+      const rank = Number(LINE_REMOVED.exec(entry.message)?.[1] ?? 0);
+      if (rank < 1) return null;
+      const code = rank <= this.codes.length ? this.codes.splice(rank - 1, 1)[0] : null;
+      return { kind: "removed", line: rank, code };
+    }
+    return null;
+  }
+
+  /** La vente est validée (ou finie autrement) : la suivante repart d'une liste vide. */
+  reset(): void {
+    this.codes = [];
+  }
+
+  get size(): number {
+    return this.codes.length;
+  }
+}
+
 /** Deux lignes de validation à moins de cinq secondes sont la même validation. */
 const VALIDATION_DEBOUNCE_MS = 5000;
 
 export function startLgpiJournal(config: LgpiRobotConfig, handlers: RobotHandlers, clock: () => number = Date.now): () => void {
   const reader = new LgpiRobotReader();
+  const saleLines = new LgpiSaleLines();
   let lastValidation = -Infinity;
   let lines = new LineBuffer();
   let current: { path: string; offset: number } | null = null;
@@ -195,6 +250,15 @@ export function startLgpiJournal(config: LgpiRobotConfig, handlers: RobotHandler
       // Les journaux Windows sont en ANSI : latin1 garde chaque octet, et les codes sont des chiffres.
       for (const line of lines.push(buffer.toString("latin1"))) {
         announce(reader.push(line, at), at);
+        const event = saleLines.push(line);
+        if (event?.kind === "removed") {
+          handlers.onStatus(event.code ? `LGPI : ligne ${event.line} supprimée (produit ${event.code}).` : `LGPI : ligne ${event.line} supprimée (produit inconnu de l'agent : rien n'est retiré).`);
+          if (event.code) handlers.onLineRemoved?.(event.code, at);
+        } else if (event?.kind === "abandoned") {
+          handlers.onStatus("LGPI : vente abandonnée sur ce poste.");
+          handlers.onSaleAbandoned?.(at);
+        }
+        if (isSaleValidatedLine(line)) saleLines.reset();
         if (handlers.onSaleValidated && isSaleValidatedLine(line) && at - lastValidation > VALIDATION_DEBOUNCE_MS) {
           lastValidation = at;
           handlers.onStatus("LGPI : vente validée sur ce poste.");

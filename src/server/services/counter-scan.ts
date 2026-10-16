@@ -554,3 +554,100 @@ export async function splitCounterLine(agent: AgentContext, input: { prescriptio
   await recordAudit({ action: "prescription.counter_line_split", entityType: "Prescription", entityId: created.id, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { from: sale.id, line: line.drugName, removedAdvice: onlyThisBox.length } });
   return { ok: true, prescriptionId: created.id, reference: created.reference };
 }
+
+export type RemoveCodeResult = { ok: true; action: "line_removed"; remaining: number } | { ok: true; action: "advice_undone" } | { ok: false; error: string };
+
+/**
+ * Une ligne SUPPRIMÉE dans LGPI (touche Suppr, journal « ABANDON_LIGNE », diagnostic de POSTE5 du 16 oct. 2026) : l'agent sait,
+ * par le journal, quel code portait cette ligne. PharmaBoost suit :
+ *  - c'était une boîte de la vente : elle la quitte, comme « Retirer » (ses conseils à elle seule avec, la vente est ré-analysée) ;
+ *  - c'était un conseil bipé (« ✓ Vendu ») : il repasse « À proposer », et son unité revient au stock ;
+ *  - rien ne correspond dans la vente : rien ne bouge (jamais une autre boîte à la place).
+ */
+export async function removeCounterCode(agent: AgentContext, input: { prescriptionId: string; code: string }): Promise<RemoveCodeResult> {
+  const code = input.code.replace(/\D/g, "").slice(0, 20);
+  if (code.length < 7) return { ok: false, error: "Code illisible." };
+  const sale = await prisma.prescription.findFirst({
+    where: {
+      id: input.prescriptionId,
+      pharmacyId: agent.scope.pharmacyId,
+      source: "COUNTER_SCAN",
+      ...(agent.postId ? { counterPostId: agent.postId } : {}),
+      status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
+      sales: { none: {} },
+      NOT: { counterFollowUp: { closedAt: { not: null } } },
+    },
+    select: { id: true, lines: { orderBy: { position: "desc" }, select: { id: true, drugSpecialtyId: true, rawText: true } } },
+  });
+  if (!sale) return { ok: false, error: "Cette vente n'est plus ouverte sur ce poste." };
+  const item = await resolveScannedItem(agent.scope.pharmacyId, code, agent.pharmacyIsDemo);
+  if (!item) return { ok: false, error: "Code inconnu." };
+
+  // 1. Une boîte de la vente (la dernière ajoutée d'abord, comme LGPI quand on supprime une ligne en double).
+  const line = sale.lines.find((candidate) => (item.kind === "DRUG" ? candidate.drugSpecialtyId === item.specialtyId : item.kind === "PRODUCT" ? candidate.rawText === item.ean : candidate.rawText === item.code));
+  if (line) {
+    const removed = await removeCounterLine(agent, { prescriptionId: sale.id, lineId: line.id });
+    return removed.ok ? { ok: true, action: "line_removed", remaining: removed.remaining } : removed;
+  }
+  if (item.kind === "UNKNOWN") return { ok: false, error: "Cette boîte n'est pas dans la vente." };
+
+  // 2. Un conseil vendu au comptoir par ce bip : il repasse « À proposer ».
+  let sold = await prisma.recommendation.findFirst({
+    where: {
+      prescriptionId: sale.id,
+      pharmacyId: agent.scope.pharmacyId,
+      status: "PURCHASED",
+      outcomeSource: COUNTER_ANSWERED,
+      OR: item.kind === "PRODUCT" ? [{ productId: item.productId }] : [{ presentationId: item.presentationId }, { presentation: { specialtyId: item.specialtyId } }],
+    },
+    orderBy: { decidedAt: "desc" },
+    select: { id: true },
+  });
+  // Le conseil avait été vendu par un produit de la même gamme (un autre parfum, un autre format) : c'est lui qui repasse.
+  if (!sold && item.kind === "PRODUCT") {
+    const scanned = await prisma.product.findFirst({ where: { id: item.productId, pharmacyId: agent.scope.pharmacyId }, select: { name: true, brand: true } });
+    if (scanned && rangeKey(scanned.name, scanned.brand)) {
+      const candidates = await prisma.recommendation.findMany({
+        where: { prescriptionId: sale.id, pharmacyId: agent.scope.pharmacyId, status: "PURCHASED", outcomeSource: COUNTER_ANSWERED, productId: { not: null } },
+        orderBy: { decidedAt: "desc" },
+        select: { id: true, product: { select: { name: true, brand: true } } },
+      });
+      sold = candidates.find((rec) => rec.product && sameRange(rec.product, scanned)) ?? null;
+    }
+  }
+  if (!sold) return { ok: false, error: "Cette boîte n'est pas dans la vente." };
+  const { decideCounterAdvice } = await import("@/server/services/counter-window");
+  const undone = await decideCounterAdvice(agent, { prescriptionId: sale.id, recommendationId: sold.id, outcome: "NONE" });
+  if (!undone.ok) return undone;
+  // Le bip avait sorti l'unité du stock : elle y revient.
+  if (item.kind === "DRUG") {
+    const stocks = await prisma.pharmacyDrugStock.findMany({ where: { pharmacyId: agent.scope.pharmacyId, presentationId: item.presentationId }, select: { id: true }, take: 1 });
+    if (stocks[0]) await prisma.pharmacyDrugStock.update({ where: { id: stocks[0].id }, data: { quantity: { increment: 1 } } });
+  } else {
+    await prisma.stockItem.updateMany({ where: { pharmacyId: agent.scope.pharmacyId, productId: item.productId }, data: { quantity: { increment: 1 } } });
+  }
+  await recordAudit({ action: "prescription.counter_advice_unscanned", entityType: "Prescription", entityId: sale.id, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { recommendationId: sold.id } });
+  return { ok: true, action: "advice_undone" };
+}
+
+/**
+ * La vente ABANDONNÉE dans LGPI (journal « ABANDON_VENTE ») : le client n'a rien pris. La vente PharmaBoost ouverte de ce poste
+ * est annulée — elle n'entre ni dans l'historique ni dans les résultats, aucun conseil n'y est compté « non vendu ».
+ */
+export async function abandonCounterSale(agent: AgentContext, input: { prescriptionId: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const result = await prisma.prescription.updateMany({
+    where: {
+      id: input.prescriptionId,
+      pharmacyId: agent.scope.pharmacyId,
+      source: "COUNTER_SCAN",
+      ...(agent.postId ? { counterPostId: agent.postId } : {}),
+      status: { in: ["DRAFT", "NEEDS_VERIFICATION", "VERIFIED", "ANALYZING", "ANALYZED"] },
+      sales: { none: {} },
+      NOT: { counterFollowUp: { closedAt: { not: null } } },
+    },
+    data: { status: "CANCELLED" },
+  });
+  if (result.count === 0) return { ok: false, error: "Cette vente n'est plus ouverte sur ce poste." };
+  await recordAudit({ action: "prescription.counter_sale_abandoned", entityType: "Prescription", entityId: input.prescriptionId, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { source: "LGPI" } });
+  return { ok: true };
+}

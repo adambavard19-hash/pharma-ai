@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LgpiRobotReader, findJournalDir, isSaleValidatedLine, journalName, startLgpiJournal } from "../robot-lgpi";
+import { LgpiRobotReader, LgpiSaleLines, findJournalDir, isSaleValidatedLine, journalName, startLgpiJournal } from "../robot-lgpi";
 import { analyse, matchDeliveries, renderReport } from "../lire-journal";
 
 /**
@@ -147,6 +147,84 @@ describe("la demande de sortie au robot", () => {
     const out = reader.push(ctl("10:00:01", "Fin de la demande à la caisse"), 0);
     expect(out).toEqual([]);
     expect(reader.flush(10_000)).toHaveLength(50);
+  });
+});
+
+/**
+ * Les lignes de la vente dans LGPI : la FORME des lignes du diagnostic « suppression de ligne » de POSTE5 (16 oct. 2026). Les
+ * codes et les mots masqués par le rapport (« Ligne 9 », « aaa Aaaaaaaa Produit ») sont ici INVENTÉS ; le suivi ne lit que les
+ * mots montrés en clair (« Produit : ' … ' », « codeEvenement=ABANDON_LIGNE », « descriptif=Ligne », « ABANDON_VENTE »).
+ */
+describe("les lignes de la vente dans LGPI (ajout, Suppr, abandon)", () => {
+  const ADDED = (time: string, code: string) => entry("2026-10-16", time, "com.pharmagest.dp.service.impl.DpRuptureService", `[AWT-EventQueue-0] [DP] Pas de rupture Produit : '${code}'.`);
+  const REMOVED = (time: string, line: number) => entry("2026-10-16", time, "fr.atiss.soft.application.nf525.NFJetApplication", `[AWT-EventQueue-0] Message envoyé au jet :  {codeEvenement=ABANDON_LIGNE, descriptif=Ligne ${line} , informations= annulée, codeOperateur=12, typeDonnees=, codeTerminal=poste5}`);
+  const ABANDONED = (time: string) => entry("2026-10-16", time, "fr.atiss.soft.application.nf525.NFJetApplication", "[AWT-EventQueue-0] Message envoyé au jet :  {codeEvenement=ABANDON_VENTE, descriptif=Abandon de la vente 1234567 , informations=, codeOperateur=12, typeDonnees=, codeTerminal=poste5}");
+  const DOLIPRANE = "3400935955838";
+  const PARA = "3401560301234";
+
+  it("le scénario de POSTE5 : médicament, parapharmacie, suppression de la parapharmacie, puis du médicament, nouveau scan, abandon", () => {
+    const lines = new LgpiSaleLines();
+    expect(lines.push(ADDED("18:10:48", DOLIPRANE))).toEqual({ kind: "added", code: DOLIPRANE });
+    expect(lines.push(ADDED("18:11:51", PARA))).toEqual({ kind: "added", code: PARA });
+    // Suppr sur la 2e ligne (la parapharmacie), puis sur la 1re (le médicament).
+    expect(lines.push(REMOVED("18:12:06", 2))).toEqual({ kind: "removed", line: 2, code: PARA });
+    expect(lines.push(REMOVED("18:12:28", 1))).toEqual({ kind: "removed", line: 1, code: DOLIPRANE });
+    expect(lines.size).toBe(0);
+    lines.push(ADDED("18:12:32", DOLIPRANE));
+    expect(lines.push(REMOVED("18:12:57", 1))).toEqual({ kind: "removed", line: 1, code: DOLIPRANE });
+    expect(lines.push(ABANDONED("18:12:57"))).toEqual({ kind: "abandoned" });
+  });
+
+  it("les lignes suivantes remontent d'un rang, comme à l'écran", () => {
+    const lines = new LgpiSaleLines();
+    for (const [i, code] of ["1111111111111", "2222222222222", "3333333333333"].entries()) lines.push(ADDED(`18:00:0${i}`, code));
+    expect(lines.push(REMOVED("18:00:05", 1))?.kind === "removed" && lines.size).toBe(2);
+    expect(lines.push(REMOVED("18:00:06", 2))).toEqual({ kind: "removed", line: 2, code: "3333333333333" });
+  });
+
+  it("une ligne que l'agent n'a pas vue naître (vente commencée avant lui, rang hors liste) ne désigne rien", () => {
+    const lines = new LgpiSaleLines();
+    expect(lines.push(REMOVED("18:00:05", 3))).toEqual({ kind: "removed", line: 3, code: null });
+    lines.push(ADDED("18:00:06", DOLIPRANE));
+    expect(lines.push(REMOVED("18:00:07", 2))).toEqual({ kind: "removed", line: 2, code: null });
+    expect(lines.size).toBe(1);
+  });
+
+  it("après une vente validée, la suivante repart d'une liste vide ; les autres lignes du journal ne comptent pas", () => {
+    const lines = new LgpiSaleLines();
+    lines.push(ADDED("18:00:01", DOLIPRANE));
+    lines.reset();
+    expect(lines.push(REMOVED("18:00:05", 1))).toEqual({ kind: "removed", line: 1, code: null });
+    expect(lines.push(entry("2026-10-16", "18:00:06", "f.a.s.m.p.stock.multidepot.StockProcessusImpl", "[AWT-EventQueue-0] DeltaQteHistoVente = -1"))).toBeNull();
+    expect(lines.push(entry("2026-10-16", "18:00:06", "f.a.s.metier.entite.clickadoc.DciSpecialiteEntite", "[AWT-EventQueue-0] Produit : '3400935955838'"))).toBeNull();
+  });
+
+  it("en direct : la ligne supprimée et l'abandon sont annoncés à l'agent, avec le code de la boîte", () => {
+    vi.useFakeTimers();
+    const dir = mkdtempSync(join(tmpdir(), "pb-lgpi-lignes-"));
+    let clock = new Date(2026, 9, 16, 18, 10, 0).getTime();
+    try {
+      writeFileSync(join(dir, "lgpi.2026-10-16.log"), "");
+      const removed: string[] = [];
+      let abandoned = 0;
+      const stop = startLgpiJournal({ kind: "lgpi", dir }, { onScan: () => undefined, onStatus: () => undefined, onLineRemoved: (code) => removed.push(code), onSaleAbandoned: () => (abandoned += 1) }, () => clock);
+      const tick = () => {
+        clock += 1000;
+        vi.advanceTimersByTime(1000);
+      };
+      tick();
+      appendFileSync(join(dir, "lgpi.2026-10-16.log"), [ADDED("18:10:48", DOLIPRANE), ADDED("18:11:51", PARA), REMOVED("18:12:06", 2)].join("\r\n") + "\r\n", "latin1");
+      tick();
+      expect(removed).toEqual([PARA]);
+      appendFileSync(join(dir, "lgpi.2026-10-16.log"), [REMOVED("18:12:57", 1), ABANDONED("18:12:57")].join("\r\n") + "\r\n", "latin1");
+      tick();
+      expect(removed).toEqual([PARA, DOLIPRANE]);
+      expect(abandoned).toBe(1);
+      stop();
+    } finally {
+      vi.useRealTimers();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -50,6 +50,8 @@ export type AuditAction =
   | "prescription.regulation_checked"
   | "prescription.counter_scan"
   | "prescription.counter_line_removed"
+  | "prescription.counter_advice_unscanned"
+  | "prescription.counter_sale_abandoned"
   | "prescription.counter_line_split"
   | "prescription.counter_reset"
   | "pharmacy.install_guide_sent"

@@ -48,7 +48,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.20";
+const VERSION = "0.10.21";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -249,6 +249,54 @@ function onSaleValidated(): void {
     return;
   }
   setTimeout(() => { if (validatedSale === saleId) void finishValidated(saleId); }, VALIDATED_FALLBACK_MS);
+}
+
+/**
+ * Une ligne supprimée dans LGPI (touche Suppr) : la boîte quitte aussi la vente PharmaBoost ouverte, ou le conseil bipé
+ * repasse « À proposer » (diagnostic de POSTE5, 16 oct. 2026). Le serveur ne retire que ce qui correspond à ce code.
+ */
+function onLgpiLineRemoved(code: string): void {
+  const saleId = watched?.prescriptionId;
+  const config = activeConfig;
+  if (!saleId || !config) return;
+  void (async () => {
+    try {
+      const result = await postJson<{ ok: boolean; action?: string; remaining?: number; error?: string }>(config, "/api/agent/conseil/retirer-code", { prescription: saleId, code });
+      log(
+        result.body?.ok
+          ? result.body.action === "advice_undone"
+            ? "Ligne supprimée dans LGPI : le conseil repasse « À proposer »."
+            : `Ligne supprimée dans LGPI : la boîte quitte la vente (${result.body.remaining ?? "?"} restante(s)).`
+          : `Ligne supprimée dans LGPI : rien à retirer (${result.body?.error ?? `HTTP ${result.status}`}).`,
+      );
+      if (result.body?.ok) {
+        if (watched) watched.lastChange = Date.now();
+        await refreshNow(config, {});
+      }
+    } catch (error) {
+      log(`Ligne supprimée dans LGPI : ${error instanceof Error ? error.message : String(error)}`);
+    }
+  })();
+}
+
+/** La vente abandonnée dans LGPI : la vente PharmaBoost ouverte est annulée, la bannière se ferme. */
+function onLgpiSaleAbandoned(): void {
+  const saleId = watched?.prescriptionId;
+  const config = activeConfig;
+  if (!saleId || !config) return;
+  void (async () => {
+    try {
+      const result = await postJson<{ ok: boolean; error?: string }>(config, "/api/agent/conseil/abandon", { prescription: saleId });
+      log(result.body?.ok ? `Vente abandonnée dans LGPI : la vente PharmaBoost ${saleId} est annulée.` : `Vente abandonnée dans LGPI : ${result.body?.error ?? `HTTP ${result.status}`}.`);
+      if (result.body?.ok) {
+        if (validatedSale === saleId) validatedSale = null;
+        notices.remove(saleId);
+        if (watched?.prescriptionId === saleId) watched = null;
+      }
+    } catch (error) {
+      log(`Vente abandonnée dans LGPI : ${error instanceof Error ? error.message : String(error)}`);
+    }
+  })();
 }
 
 /** Termine une vente validée dans LGPI, une seule fois. */
@@ -575,12 +623,13 @@ async function runPost(config: Config): Promise<void> {
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
   startDouchette(dirname(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message), onLgpiBilling });
-  const robotHandlers = { onScan: accept("robot"), onStatus: (message: string) => log(message), onSaleValidated: onValidationLine };
+  const lgpiSale = { onSaleValidated: onValidationLine, onLineRemoved: onLgpiLineRemoved, onSaleAbandoned: onLgpiSaleAbandoned };
+  const robotHandlers = { onScan: accept("robot"), onStatus: (message: string) => log(message), ...lgpiSale };
   const robot = config.robot ?? (process.platform === "win32" ? ({ kind: "lgpi" } as const) : undefined);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);
   else if (robot?.kind === "lgpi") startLgpiJournal(robot, robotHandlers);
   // La validation des ventes se lit dans le journal de LGPI même quand le robot est suivi autrement (ou pas du tout).
-  if (process.platform === "win32" && robot?.kind !== "lgpi") startLgpiJournal({ kind: "lgpi" }, { onScan: () => undefined, onStatus: () => undefined, onSaleValidated: onValidationLine });
+  if (process.platform === "win32" && robot?.kind !== "lgpi") startLgpiJournal({ kind: "lgpi" }, { onScan: () => undefined, onStatus: () => undefined, ...lgpiSale });
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let spaceAttempts = 0;
