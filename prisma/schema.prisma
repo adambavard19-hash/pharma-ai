@@ -5946,3 +5946,15 @@ model CureDuration {
 
   @@map("cure_durations")
 }
+
+
+/// La fiche patient d'un produit conseillé, rédigée par le modèle pour le bilan e-mail (17 oct. 2026) et gardée pour les ventes
+/// suivantes : `key` = produit (code-barres, sinon nom) + médicament qui l'a appelé. Aucune donnée patient.
+model PatientCardCache {
+  key        String   @id
+  content    Json
+  providerId String
+  createdAt  DateTime @default(now())
+
+  @@map("patient_card_cache")
+}

@@ -1,3 +1,5 @@
+import type { PatientCard } from "@/core/ai/patient-card";
+import { emailBannerUrls } from "@/core/platform/email-layout";
 /**
  * Le bilan que le patient reçoit par e-mail à la fin de sa vente, s'il a donné son accord.
  *
@@ -22,7 +24,7 @@
  * Un produit du bilan. `benefits` (« Pourquoi ce produit ? »), `usage` (« Comment l'utiliser ? ») et `precautions` ne viennent
  * que de sources relues ; une colonne sans contenu ne s'affiche pas.
  */
-export type ReportProduct = { name: string; reason: string | null; imageUrl?: string | null; benefits?: string[]; usage?: string[]; precautions?: string[]; leaflet?: ReportLeaflet | null };
+export type ReportProduct = { name: string; reason: string | null; imageUrl?: string | null; benefits?: string[]; usage?: string[]; precautions?: string[]; leaflet?: ReportLeaflet | null; /** La fiche patient rédigée pour ce produit et ce traitement (core/ai/patient-card.ts), déjà validée. */ card?: PatientCard | null };
 
 /**
  * Ce que dit la NOTICE OFFICIELLE du produit conseillé (jamais du médicament délivré) : indications, posologie, durée — chaque
@@ -172,6 +174,7 @@ export function reportProducts(products: ReportProduct[]): ReportProduct[] {
       usage: lines(product.usage, 2, 200),
       precautions: lines(product.precautions, 2, 160),
       leaflet: leafletOf(product.leaflet),
+      card: product.card ?? null,
     });
   }
   return kept.slice(0, 8);
@@ -239,6 +242,8 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
   const ink = inkOn(brand);
   const logo = emailImageUrl(details.logoUrl, base);
   const asset = (path: string) => `${base}${path}`;
+  // Le bandeau de l'hélice d'ADN, comme tous les e-mails PharmaBoost (demande du fondateur, 17 oct. 2026).
+  const banner = emailBannerUrls(base);
   const day = input.date ? reportDate(input.date) : null;
   const tel = telLink(details.phone);
   const phone = clean(details.phone);
@@ -267,7 +272,8 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
     "",
     ...products.flatMap((product) => [
       `• ${product.name}`,
-      ...(product.reason ? [`  ${product.reason}`] : []),
+      ...(product.card ? [`  Pourquoi avec votre traitement : ${product.card.link}`, ...product.card.keyPoints.map((point) => `  ✓ ${point.title} — ${point.text}`), ...product.card.usage.map((line, i) => `  ${i + 1}. ${line}`), ...(product.card.tip ? [`  Bon à savoir : ${product.card.tip}`] : [])] : []),
+      ...(product.reason && !product.card ? [`  ${product.reason}`] : []),
       ...(product.benefits?.length ? [`  Pourquoi ce produit : ${product.benefits.join(", ")}`] : []),
       ...(product.usage ?? []).map((line) => `  Comment l'utiliser : ${line}`),
       ...(product.precautions ?? []).map((line) => `  Précaution d'emploi : ${line}`),
@@ -315,6 +321,21 @@ ${body.map((line) => `<div style="margin-top:6px;font-size:13.5px;line-height:20
 </td></tr></table>`;
   };
 
+  // La fiche patient (17 oct. 2026) : le lien avec le traitement, trois points clés en icônes, les gestes numérotés, le bon à savoir.
+  const cardBlock = (fiche: PatientCard) => {
+    const point = (p: PatientCard["keyPoints"][number]) =>
+      `<td class="stack" valign="top" width="33%" style="padding:0 4px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5F9F7;border-radius:12px"><tr><td style="padding:12px 10px;text-align:center">${`<div style="display:inline-block">${icon(p.icon, 26)}</div>`}<div style="margin-top:6px;font-size:14px;line-height:18px;font-weight:800;color:${DARK}">${escape(p.title)}</div><div style="margin-top:3px;font-size:12.5px;line-height:17px;color:#475467">${escape(p.text)}</div></td></tr></table></td>`;
+    const steps = fiche.usage.map((line, i) => `<tr><td valign="top" style="padding:3px 10px 3px 0"><div style="width:22px;height:22px;border-radius:11px;background:${DARK};color:#ffffff;font-size:12px;line-height:22px;font-weight:800;text-align:center">${i + 1}</div></td><td valign="top" style="padding:3px 0;font-size:14px;line-height:21px;color:#344054">${escape(line)}</td></tr>`).join("");
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;background:#EAF5EF;border-left:4px solid #1D8174;border-radius:10px"><tr><td style="padding:12px 14px">
+<div style="font-size:12px;line-height:16px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#0B6B4F">Pourquoi avec votre traitement</div>
+<div style="margin-top:4px;font-size:15px;line-height:22px;font-weight:600;color:#101828">${escape(fiche.link)}</div>
+</td></tr></table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px"><tr>${fiche.keyPoints.map(point).join("")}</tr></table>
+<div style="margin-top:4px;font-size:14px;line-height:19px;font-weight:800;color:${DARK}">Comment l'utiliser</div>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:4px">${steps}</table>
+${fiche.tip ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:10px 0 8px;background:#FFF8E9;border-radius:10px"><tr><td valign="top" style="padding:10px 0 10px 12px;width:22px">${icon("astuce", 20)}</td><td valign="top" style="padding:10px 12px 10px 8px;font-size:13.5px;line-height:20px;color:#5B4300"><strong>Bon à savoir :</strong> ${escape(fiche.tip)}</td></tr></table>` : ""}`;
+  };
+
   const card = (product: ReportProduct) => {
     const image = emailImageUrl(product.imageUrl, base);
     const visual = image
@@ -332,8 +353,8 @@ ${body.map((line) => `<div style="margin-top:6px;font-size:13.5px;line-height:20
 <td valign="top" style="font-size:19px;line-height:25px;font-weight:800;color:#101828">${escape(product.name)}</td>
 <td class="hide-sm" valign="top" align="right" style="padding-left:10px;white-space:nowrap"><span style="display:inline-block;padding:4px 12px;border-radius:999px;background:#E3F4EC;color:#0B6B4F;font-size:12.5px;line-height:18px;font-weight:600">Conseillé aujourd'hui</span></td>
 </tr></table>
-${product.reason ? `<div style="margin-top:6px;font-size:14.5px;line-height:22px;color:#475467">${escape(product.reason)}</div>` : ""}
-${columns ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px"><tr>${columns}</tr></table>` : ""}
+${product.card ? cardBlock(product.card) : `${product.reason ? `<div style="margin-top:6px;font-size:14.5px;line-height:22px;color:#475467">${escape(product.reason)}</div>` : ""}
+${columns ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px"><tr>${columns}</tr></table>` : ""}`}
 ${leafletBlock(product.leaflet)}
 </td></tr></table></td></tr>`;
   };
@@ -376,6 +397,7 @@ ${buttons ? `<td class="stack" valign="middle" align="right" style="padding-bott
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">Votre bilan personnalisé : les produits conseillés aujourd'hui par ${escape(pharmacy)}.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF3F1"><tr><td align="center" style="padding:20px 10px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #DFE8E4">
+<tr><td style="padding:0;line-height:0;font-size:0"><!--[if mso]><img src="${escape(banner.png)}" width="680" alt="" style="display:block;width:680px;height:auto;border:0"><![endif]--><!--[if !mso]><!--><img src="${escape(banner.gif)}" width="680" alt="PharmaBoost" style="display:block;width:100%;max-width:680px;height:auto;border:0;background:#EFF4F2"><!--<![endif]--></td></tr>
 
 <tr><td class="pad" style="padding:22px 32px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td class="stack" valign="middle"><table role="presentation" cellpadding="0" cellspacing="0"><tr>

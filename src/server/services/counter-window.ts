@@ -12,6 +12,7 @@ import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import type { Prisma } from "@/generated/prisma";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { customRulesFrom, overriddenRulesFrom } from "@/core/ai/central-advice";
+import { patientCardsFor } from "@/server/services/patient-cards";
 import { planCureReminders, scheduleCureReminders, isOptedOut as isCureOptedOut } from "@/server/services/cure-reminders";
 import { reminderDay } from "@/core/cure/cure";
 import { buildPatientReport, maskEmail, parsePatientEmail, patientSafeLine, patientSafeReason, type ReportLeaflet } from "@/core/counter/patient-report";
@@ -304,15 +305,31 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
     prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { name: true, isDemo: true, brandColor: true, logoUrl: true, phone: true, addressLine1: true, addressLine2: true, postalCode: true, city: true } }),
     prisma.recommendation.findMany({
       where: { id: { in: input.soldIds }, pharmacyId },
-      select: { patientReason: true, opportunity: { select: { ruleKey: true } }, product: { select: { name: true, imageUrl: true, precautions: true, ean: true } }, presentation: { select: { specialty: { select: { name: true, cisCode: true } } } } },
+      select: { patientReason: true, shortReason: true, opportunity: { select: { ruleKey: true, triggeredLineIds: true } }, product: { select: { name: true, brand: true, category: true, matchingTags: true, description: true, commercialClaims: true, imageUrl: true, precautions: true, ean: true } }, presentation: { select: { specialty: { select: { name: true, cisCode: true } } } } },
     }),
     validatedRuleKeys(),
     // Ce que la vente a délivré, pour qu'aucune phrase du bilan ne le nomme : le nom lu au scan, la spécialité et ses substances.
     prisma.prescriptionLine.findMany({
       where: { prescriptionId: input.prescriptionId, prescription: { pharmacyId } },
-      select: { drugName: true, specialty: { select: { name: true, compositions: { select: { substanceLabel: true } } } } },
+      select: { id: true, drugName: true, specialty: { select: { name: true, compositions: { select: { substanceLabel: true } } } } },
     }),
   ]);
+  // La fiche patient de chaque produit (17 oct. 2026) : le lien avec le traitement, les points clés, les gestes — rédigée par le
+  // modèle pour ce produit et le médicament qui l'a appelé, en parallèle des notices, dans le même délai.
+  const forbidden = lines.flatMap((line) => [line.drugName, line.specialty?.name ?? "", ...(line.specialty?.compositions.map((composition) => composition.substanceLabel) ?? [])]).filter((text): text is string => Boolean(text));
+  const cardTargets = recs.map((rec) => {
+    const trigger = lines.find((line) => rec.opportunity?.triggeredLineIds?.includes(line.id)) ?? lines[0];
+    const name = rec.product?.name ?? rec.presentation?.specialty.name ?? "";
+    return {
+      ean: rec.product?.ean ?? null,
+      forbidden,
+      request: {
+        product: { name, brand: rec.product?.brand ?? null, category: rec.product?.category ?? null, tags: rec.product?.matchingTags ?? [], description: rec.product?.description ?? null, claims: rec.product?.commercialClaims ?? [], precautions: rec.product?.precautions ?? [] },
+        treatment: { drug: trigger?.drugName ?? "", family: null, reason: rec.shortReason ?? null },
+      },
+    };
+  });
+  const cardsJob = patientCardsFor({ organizationId: agent.scope.organizationId, pharmacyId }, cardTargets.filter((target) => target.request.treatment.drug), { demo: pharmacy?.isDemo === true, timeoutMs: 20_000 }).catch(() => []);
   const sale = lines.map((line) => ({ names: [line.drugName, line.specialty?.name], substances: line.specialty?.compositions.map((composition) => composition.substanceLabel) ?? [] }));
   const validatedKeys = new Set(recs.map((rec) => rec.opportunity?.ruleKey).filter((key): key is string => Boolean(key) && validated.has(key as string)));
   const templates = validatedKeys.size > 0 ? await patientReasonTemplates(validatedKeys) : new Map<string, { template: string; benefits: string[] }>();
@@ -330,6 +347,10 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
   } catch {
     // Une notice est un plus : le bilan part toujours, sans elle si besoin.
   }
+  const cardsDone = await cardsJob;
+  const withDrug = cardTargets.map((target) => Boolean(target.request.treatment.drug));
+  let cardCursor = 0;
+  const cards = withDrug.map((has) => (has ? (cardsDone[cardCursor++] ?? null) : null));
   const products = recs.map((rec, index) => {
     const fullName = rec.product?.name ?? rec.presentation?.specialty.name ?? "";
     const ruleKey = rec.opportunity?.ruleKey ?? null;
@@ -344,6 +365,7 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
       benefits: (rule?.benefits ?? []).map(safe).filter((line): line is string => line !== null),
       precautions: (rec.product?.precautions ?? []).map(safe).filter((line): line is string => line !== null),
       leaflet: leafletForReport(leaflets.get(leafletKey(leafletTargets[index]) ?? ""), safe),
+      card: cards[index] ?? null,
     };
   });
   const mail = buildPatientReport({
