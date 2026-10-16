@@ -310,3 +310,30 @@ describe("rien ne change hors du contexte allergique", () => {
     expect(result.opportunities.map((o) => o.key)).not.toContain("antihistamine-dry-throat");
   });
 });
+
+describe("jamais un produit de la gamme d'une boîte déjà dans la vente (essai du 16 oct. 2026)", () => {
+  it("une eau de mer STERIMAR déjà bipée : l'eau de mer STERIMAR du rayon n'est pas proposée, l'autre marque peut l'être", () => {
+    const who = patient();
+    const lines = [{ ...CETIRIZINE, lineIndex: 0 }];
+    const understanding = deriveUnderstanding({ drugs: lines, patient: { ageYears: who.ageYears, sex: who.sex, isPregnant: who.isPregnant, isBreastfeeding: who.isBreastfeeding }, providerId: "test", model: "test" });
+    const sterimar = para("sterimar-allergie", "EAU DE MER NEZ ALLERGIQUE SPRAY 50ML", { brand: "STERIMAR" });
+    const run = (saleLines: { lineIndex: number; drugName: string }[]) =>
+      runAnalysisPipeline({
+        maxRecommendations: MAX_RECOMMENDATIONS_COUNTER_SCAN,
+        lines: saleLines.map((line) => ({ ...line, posology: null, durationDays: null, confirmed: true })),
+        knowledge: new Map([[CETIRIZINE.substance!.toLowerCase(), classifiedDrugKnowledge({ key: CETIRIZINE.substance!.toLowerCase(), drugName: CETIRIZINE.substance!, form: null, classification: CETIRIZINE, publishedSubstance: CETIRIZINE.substance, model: "test" })]]),
+        patient: who,
+        catalog: [sterimar, collyreAntiAllergique, gorge],
+        rules: [],
+        history: {},
+        explanations: [],
+        extractionFindings: [],
+        understanding,
+        usedSimulatedProviders: false,
+      });
+    const without = run([{ lineIndex: 0, drugName: CETIRIZINE.substance! }]);
+    expect(without.recommendations.map((r) => r.productId)).toContain("sterimar-allergie");
+    const withSterimar = run([{ lineIndex: 0, drugName: CETIRIZINE.substance! }, { lineIndex: 1, drugName: "STERIMAR NEZ BOUCHÉ SPRAY 100ML" }]);
+    expect(withSterimar.recommendations.map((r) => r.productId)).not.toContain("sterimar-allergie");
+  });
+});

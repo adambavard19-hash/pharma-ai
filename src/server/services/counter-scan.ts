@@ -1,4 +1,5 @@
 import "server-only";
+import { rangeKey, sameRange } from "@/core/counter/same-range";
 import { prisma } from "@/server/db/client";
 import { readScannedCode } from "@/core/stock";
 import { createWithReference } from "@/server/services/references";
@@ -82,6 +83,37 @@ type ScannedItem =
   | { kind: "DRUG"; name: string; form: string | null; specialtyId: string; presentationId: string; cip13: string }
   | { kind: "PRODUCT"; name: string; productId: string; ean: string }
   | { kind: "UNKNOWN"; name: string; code: string; hint: string | null };
+
+const CONSEIL_STATUSES: ("PROPOSED" | "PRESENTED" | "ACCEPTED" | "MODIFIED" | "DECLINED" | "PURCHASED")[] = ["PROPOSED", "PRESENTED", "ACCEPTED", "MODIFIED", "DECLINED", "PURCHASED"];
+
+/**
+ * Le conseil de la vente ouverte que ce bip vend, s'il y en a un : le produit exact (ou le même médicament, quelle que soit sa
+ * présentation), sinon un produit de la même gamme — un autre parfum, un autre format (« NEOBIANACID MENTHE CROQ70 » pour le
+ * conseil « NEOBIANACID CITRON CPR 70 », essai de Donna du 16 oct. 2026). Un conseil encore sans réponse passe avant un
+ * conseil déjà vendu (qui absorbe alors une deuxième boîte).
+ */
+async function conseilForScan(pharmacyId: string, prescriptionId: string, item: Exclude<ScannedItem, { kind: "UNKNOWN" }>): Promise<{ id: string; status: string } | null> {
+  const exact = await prisma.recommendation.findFirst({
+    where: {
+      prescriptionId,
+      pharmacyId,
+      status: { in: CONSEIL_STATUSES },
+      OR: item.kind === "PRODUCT" ? [{ productId: item.productId }] : [{ presentationId: item.presentationId }, { presentation: { specialtyId: item.specialtyId } }],
+    },
+    orderBy: [{ decidedAt: { sort: "asc", nulls: "first" } }, { totalScore: "desc" }],
+    select: { id: true, status: true },
+  });
+  if (exact || item.kind !== "PRODUCT") return exact;
+  const scanned = await prisma.product.findFirst({ where: { id: item.productId, pharmacyId }, select: { name: true, brand: true } });
+  if (!scanned || !rangeKey(scanned.name, scanned.brand)) return null;
+  const candidates = await prisma.recommendation.findMany({
+    where: { prescriptionId, pharmacyId, status: { in: CONSEIL_STATUSES }, productId: { not: null } },
+    orderBy: [{ decidedAt: { sort: "asc", nulls: "first" } }, { totalScore: "desc" }],
+    select: { id: true, status: true, product: { select: { name: true, brand: true } } },
+  });
+  const match = candidates.find((rec) => rec.product && sameRange(rec.product, scanned));
+  return match ? { id: match.id, status: match.status } : null;
+}
 
 async function resolveScannedItem(pharmacyId: string, raw: string, demo = false): Promise<ScannedItem | null> {
   const scanned = readScannedCode(raw);
@@ -218,19 +250,7 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
   });
   // Le produit bipé est-il un des conseils proposés dans la vente ouverte ? Alors c'est le même client, quel que soit le temps
   // passé à aller le chercher en rayon : la vente ne se ferme pas d'elle-même.
-  const conseil = open && item.kind !== "UNKNOWN"
-    ? await prisma.recommendation.findFirst({
-        where: {
-          prescriptionId: open.id,
-          pharmacyId: agent.scope.pharmacyId,
-          status: { in: ["PROPOSED", "PRESENTED", "ACCEPTED", "MODIFIED", "DECLINED", "PURCHASED"] },
-          OR: item.kind === "PRODUCT" ? [{ productId: item.productId }] : [{ presentationId: item.presentationId }, { presentation: { specialtyId: item.specialtyId } }],
-        },
-        // Un conseil encore sans réponse d'abord ; un conseil déjà vendu absorbe une deuxième boîte du même produit.
-        orderBy: [{ decidedAt: { sort: "asc", nulls: "first" } }, { totalScore: "desc" }],
-        select: { id: true, status: true },
-      })
-    : null;
+  const conseil = open && item.kind !== "UNKNOWN" ? await conseilForScan(agent.scope.pharmacyId, open.id, item) : null;
   if (open && agent.postId && !conseil) {
     const answered = open._count.recommendations > 0;
     if (!answered && !withinWindow) {

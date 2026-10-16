@@ -21,7 +21,7 @@ type DateFilter = { gte?: Date; gt?: Date };
 type SaleWhere = { pharmacyId?: string; source?: string; counterPost?: string; counterPostId?: string; id?: string; status?: { in: string[] }; updatedAt?: DateFilter; sales?: { none?: Record<string, never> }; NOT?: { counterFollowUp?: { closedAt?: { not: null } } } };
 type OrderBy = { createdAt?: "asc" | "desc"; updatedAt?: "asc" | "desc" };
 
-type Conseil = { id: string; prescriptionId: string; productId?: string; presentationId?: string; specialtyId?: string; status: string };
+type Conseil = { id: string; prescriptionId: string; productId?: string; presentationId?: string; specialtyId?: string; status: string; productName?: string };
 const mem = vi.hoisted(() => ({ sales: [] as Sale[], posts: new Map<string, Post>(), next: 0, conseils: [] as Conseil[] }));
 
 const db = vi.hoisted(() => {
@@ -89,6 +89,12 @@ const db = vi.hoisted(() => {
         );
         return found.sort((a, b) => Number(a.status === "PURCHASED") - Number(b.status === "PURCHASED"))[0] ?? null;
       }),
+      findMany: vi.fn(async ({ where }: { where: { prescriptionId: string; status: { in: string[] } } }) =>
+        mem.conseils
+          .filter((c) => c.prescriptionId === where.prescriptionId && where.status.in.includes(c.status) && c.productId)
+          .sort((a, b) => Number(a.status === "PURCHASED") - Number(b.status === "PURCHASED"))
+          .map((c) => ({ id: c.id, status: c.status, product: { name: c.productName ?? "", brand: null } })),
+      ),
     },
     stockItem: { updateMany: vi.fn() },
     counterPost: {
@@ -198,6 +204,7 @@ const AGENT = agentOf("post_1");
 const CIP_DOLIPRANE = "3400930000014";
 const EAN_CREME = "3760001234565";
 const EAN_PROBIOTIQUE = "3760009876543";
+const EAN_NEO_MENTHE = "8032472023920";
 
 const scan = (code: string, post = "Comptoir 1", scannedAt: Date | null = null, agent = AGENT) => recordCounterScan(agent, { code, post, scannedAt });
 const wait = (seconds: number) => vi.advanceTimersByTime(seconds * 1000);
@@ -227,9 +234,12 @@ beforeEach(() => {
     where.cip13 === CIP_DOLIPRANE ? { id: "pres_1", cip13: CIP_DOLIPRANE, specialty: { id: "spec_doliprane", name: "DOLIPRANE 1000 mg", pharmaceuticalForm: "comprimé" } } : null,
   );
   db.productBarcode.findUnique.mockResolvedValue(null);
-  db.product.findFirst.mockImplementation(async ({ where }: { where: { ean: string } }) =>
-    where.ean === EAN_CREME ? { id: "p_creme", name: "Crème hydratante visage" } : where.ean === EAN_PROBIOTIQUE ? { id: "p_probio", name: "Probiotique 10 milliards" } : null,
-  );
+  const PRODUCTS = [
+    { id: "p_creme", ean: EAN_CREME, name: "Crème hydratante visage", brand: null },
+    { id: "p_probio", ean: EAN_PROBIOTIQUE, name: "Probiotique 10 milliards", brand: null },
+    { id: "p_neo_menthe", ean: EAN_NEO_MENTHE, name: "NEOBIANACID ACID REFLUX MENTHE CPR CROQ70", brand: null },
+  ];
+  db.product.findFirst.mockImplementation(async ({ where }: { where: { ean?: string; id?: string } }) => PRODUCTS.find((p) => (where.ean !== undefined && p.ean === where.ean) || (where.id !== undefined && p.id === where.id)) ?? null);
   db.pharmacyDrugStock.updateMany.mockResolvedValue({ count: 1 });
   db.stockItem.updateMany.mockResolvedValue({ count: 1 });
 });
@@ -753,5 +763,23 @@ describe("un conseil bipé passe en « Vendu » tout seul (fondateur, 16 oct. 20
     mem.sales[0].followUpClosed = true;
     const second = await scan(EAN_CREME);
     expect(second.ok && !second.adviceSold && second.created).toBe(true);
+  });
+
+  it("un autre parfum de la même gamme que le conseil (NEOBIANACID menthe pour NEOBIANACID citron) : « Vendu » aussi", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    if (!first.ok) throw new Error("bip refusé");
+    mem.conseils = [{ id: "rec_neo", prescriptionId: first.prescriptionId, productId: "p_neo_citron", productName: "NEOBIANACID CITRON CPR 70", status: "PROPOSED" }];
+    const second = await scan(EAN_NEO_MENTHE);
+    expect(second.ok && second.adviceSold).toBe(true);
+    expect(decide.decideCounterAdvice).toHaveBeenCalledWith(AGENT, expect.objectContaining({ recommendationId: "rec_neo", outcome: "SOLD" }));
+    expect(mem.sales[0].lines).toHaveLength(1);
+  });
+
+  it("un mot courant ne fait pas une gamme : une crème quelconque ne vend pas le conseil « Crème mains »", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    if (!first.ok) throw new Error("bip refusé");
+    mem.conseils = [{ id: "rec_mains", prescriptionId: first.prescriptionId, productId: "p_mains", productName: "Crème mains réparatrice", status: "PROPOSED" }];
+    const second = await scan(EAN_CREME);
+    expect(second.ok && second.adviceSold).toBeFalsy();
   });
 });

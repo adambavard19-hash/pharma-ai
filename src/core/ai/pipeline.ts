@@ -1,3 +1,4 @@
+import { rangeKey } from "@/core/counter/same-range";
 import {
   ENGINE_VERSION,
   MAX_ALTERNATIVES_PER_ADVICE,
@@ -520,7 +521,10 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     () => {
       const map = new Map<string, CatalogProduct[]>();
       const notes: string[] = [];
-      const safeCatalog = input.catalog.filter((p) => !productSafety.blockedProductIds.has(p.id));
+      // Jamais un produit de la gamme d'une boîte déjà dans la vente (essai de Donna, 16 oct. 2026 : un NEOBIANACID dans la
+      // vente faisait proposer un autre NEOBIANACID). La gamme : la marque, ou le premier mot du nom s'il en tient lieu.
+      const saleRanges = new Set(usableLines.map((line) => rangeKey(line.drugName)).filter((key): key is string => key !== null));
+      const safeCatalog = input.catalog.filter((p) => !productSafety.blockedProductIds.has(p.id) && !saleRanges.has(rangeKey(p.name, p.brand) ?? ""));
 
       for (const opportunity of eligibleOpportunities) {
         // Une règle qui ne propose que des médicaments vérifiés (advice.ts, `verifiedMedicinesOnly`) ne voit pas les
