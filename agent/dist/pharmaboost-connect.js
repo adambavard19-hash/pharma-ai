@@ -124,7 +124,32 @@ public static class PharmaBoostHook {
     if (_hookId == IntPtr.Zero) { Console.Out.WriteLine("ERROR hook"); Console.Out.Flush(); return; }
     Console.Out.WriteLine("READY");
     Console.Out.Flush();
+    // L'ecran de facturation de LGPI : le titre de sa fenetre principale porte "(Facturation" tant qu'une vente est ouverte.
+    // Seul ce oui / non sort d'ici (jamais le titre) : il confirme la validation d'une vente lue dans le journal.
+    Timer billing = new Timer();
+    billing.Interval = 500;
+    billing.Tick += delegate { WatchBilling(); };
+    billing.Start();
     Application.Run();
+  }
+  private static string _billing = "";
+  private static void WatchBilling() {
+    try {
+      string state = "?";
+      foreach (string name in new string[] { "java", "javaw" }) {
+        foreach (Process p in Process.GetProcessesByName(name)) {
+          string title = "";
+          try { title = p.MainWindowTitle ?? ""; } catch (Exception) { }
+          p.Dispose();
+          if (title.IndexOf("Pharmagest", StringComparison.OrdinalIgnoreCase) < 0) continue;
+          state = title.IndexOf("(Facturation", StringComparison.OrdinalIgnoreCase) >= 0 ? "1" : "0";
+        }
+      }
+      if (state == _billing) return;
+      _billing = state;
+      Console.Out.WriteLine("LGPI " + state + " " + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+      Console.Out.Flush();
+    } catch (Exception) { }
   }
   private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam) {
     if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN)) {
@@ -174,7 +199,10 @@ function startDouchette(configDir, handlers) {
       for (const line of lines) {
         if (line === "READY") handlers.onStatus("Douchette \xE9cout\xE9e.");
         else if (line.startsWith("ERROR")) handlers.onStatus(`Le hook clavier a \xE9chou\xE9 : ${line}`);
-        else if (line.startsWith("KEY ")) {
+        else if (line.startsWith("LGPI ")) {
+          const [, state, at] = line.split(" ");
+          handlers.onLgpiBilling?.(state === "1" ? true : state === "0" ? false : null, Number(at) || Date.now());
+        } else if (line.startsWith("KEY ")) {
           const [, key, at] = line.split(" ");
           if (key === "Shift") continue;
           detector.feed({ key: key ?? "Other", at: Number(at) || Date.now() });
@@ -195,6 +223,37 @@ function startDouchette(configDir, handlers) {
     child?.kill();
   };
 }
+
+// agent/src/sale-validation.ts
+var VALIDATION_CONFIRM_MS = 6e4;
+var BILLING_CLOSED_GRACE_MS = 1e4;
+var SaleValidationWatch = class {
+  constructor(onValidated) {
+    this.onValidated = onValidated;
+  }
+  onValidated;
+  lastLine = -Infinity;
+  lastClose = -Infinity;
+  billing = null;
+  /** La ligne de validation est lue dans le journal. */
+  line(at) {
+    this.lastLine = at;
+    if (this.billing === false && at - this.lastClose <= BILLING_CLOSED_GRACE_MS) this.confirm();
+  }
+  /** L'écran de facturation : ouvert (vrai), fermé (faux), introuvable (null). */
+  billingState(open, at) {
+    const wasOpen = this.billing === true;
+    this.billing = open;
+    if (!wasOpen || open !== false) return;
+    this.lastClose = at;
+    if (at - this.lastLine <= VALIDATION_CONFIRM_MS) this.confirm();
+  }
+  confirm() {
+    this.lastLine = -Infinity;
+    this.lastClose = -Infinity;
+    this.onValidated();
+  }
+};
 
 // agent/src/toast.ts
 var import_node_child_process2 = require("node:child_process");
@@ -6677,7 +6736,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.19";
+var VERSION = "0.10.20";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -6789,6 +6848,9 @@ async function sendScan(config, code, scannedAt, expiresOn) {
 }
 var validatedSale = null;
 var VALIDATED_FALLBACK_MS = 9e4;
+var validation = new SaleValidationWatch(() => onSaleValidated());
+var onValidationLine = (at) => validation.line(at);
+var onLgpiBilling = (open, at) => validation.billingState(open, at);
 function onSaleValidated() {
   const saleId = watched?.prescriptionId;
   const config = activeConfig;
@@ -7060,12 +7122,12 @@ async function runPost(config) {
     scans.push({ code, scannedAt: new Date(at).toISOString(), ...expiresOn ? { expiresOn } : {} });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
-  startDouchette((0, import_node_path10.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
-  const robotHandlers = { onScan: accept("robot"), onStatus: (message) => log(message), onSaleValidated };
+  startDouchette((0, import_node_path10.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message), onLgpiBilling });
+  const robotHandlers = { onScan: accept("robot"), onStatus: (message) => log(message), onSaleValidated: onValidationLine };
   const robot = config.robot ?? (process.platform === "win32" ? { kind: "lgpi" } : void 0);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);
   else if (robot?.kind === "lgpi") startLgpiJournal(robot, robotHandlers);
-  if (process.platform === "win32" && robot?.kind !== "lgpi") startLgpiJournal({ kind: "lgpi" }, { onScan: () => void 0, onStatus: () => void 0, onSaleValidated });
+  if (process.platform === "win32" && robot?.kind !== "lgpi") startLgpiJournal({ kind: "lgpi" }, { onScan: () => void 0, onStatus: () => void 0, onSaleValidated: onValidationLine });
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let spaceAttempts = 0;

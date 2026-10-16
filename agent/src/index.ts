@@ -32,6 +32,7 @@
  */
 import { createHash } from "node:crypto";
 import { startDouchette } from "./douchette";
+import { SaleValidationWatch } from "./sale-validation";
 import { showToast } from "./toast";
 import { UPDATE_CHECK_EVERY_MS, canUpdateNow, isInstalledAgent, selfUpdate } from "./self-update";
 import { DEFAULT_NOTICE_SECONDS, NoticeCenter, POSITIONS, buildDoneInfo, buildHostEntry, cachedImage, fetchImage, imageSource, type HostAction, type HostEntry, type NoticeBody, type NoticePosition } from "./notice-center";
@@ -47,7 +48,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.19";
+const VERSION = "0.10.20";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -219,6 +220,19 @@ async function sendScan(config: Config, code: string, scannedAt: string, expires
 let validatedSale: string | null = null;
 /** Au-delà, l'agent termine lui-même une vente validée que la bannière n'a pas terminée (île ancienne, plantage). */
 const VALIDATED_FALLBACK_MS = 90_000;
+
+/**
+ * La validation d'une vente se lit en DEUX signaux (vente coupée en cinq sur POSTE3 le 16 oct. 2026 : la ligne du journal
+ * revient aussi pendant une vente sur ordonnance) :
+ *  1. la ligne « … par type de facturation - ok » du journal de LGPI (robot-lgpi.ts, isSaleValidatedLine) ;
+ *  2. PUIS, dans la minute, l'écran de facturation de LGPI qui se ferme (le titre de sa fenêtre perd « (Facturation »,
+ *     lu par le crochet de la douchette).
+ * Un seul des deux ne termine rien. Sans titre lisible, la fin automatique ne se fait jamais : « Terminer la vente » et la
+ * minute sans bip restent.
+ */
+const validation = new SaleValidationWatch(() => onSaleValidated());
+const onValidationLine = (at: number) => validation.line(at);
+const onLgpiBilling = (open: boolean | null, at: number) => validation.billingState(open, at);
 
 /**
  * LGPI a validé une vente sur ce poste (« FIN Valider ») : c'est la fin de la vente PharmaBoost ouverte. La bannière propose
@@ -560,13 +574,13 @@ async function runPost(config: Config): Promise<void> {
     scans.push({ code, scannedAt: new Date(at).toISOString(), ...(expiresOn ? { expiresOn } : {}) });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
-  startDouchette(dirname(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message) });
-  const robotHandlers = { onScan: accept("robot"), onStatus: (message: string) => log(message), onSaleValidated };
+  startDouchette(dirname(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message), onLgpiBilling });
+  const robotHandlers = { onScan: accept("robot"), onStatus: (message: string) => log(message), onSaleValidated: onValidationLine };
   const robot = config.robot ?? (process.platform === "win32" ? ({ kind: "lgpi" } as const) : undefined);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);
   else if (robot?.kind === "lgpi") startLgpiJournal(robot, robotHandlers);
   // La validation des ventes se lit dans le journal de LGPI même quand le robot est suivi autrement (ou pas du tout).
-  if (process.platform === "win32" && robot?.kind !== "lgpi") startLgpiJournal({ kind: "lgpi" }, { onScan: () => undefined, onStatus: () => undefined, onSaleValidated });
+  if (process.platform === "win32" && robot?.kind !== "lgpi") startLgpiJournal({ kind: "lgpi" }, { onScan: () => undefined, onStatus: () => undefined, onSaleValidated: onValidationLine });
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let spaceAttempts = 0;

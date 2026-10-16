@@ -57,7 +57,32 @@ public static class PharmaBoostHook {
     if (_hookId == IntPtr.Zero) { Console.Out.WriteLine("ERROR hook"); Console.Out.Flush(); return; }
     Console.Out.WriteLine("READY");
     Console.Out.Flush();
+    // L'ecran de facturation de LGPI : le titre de sa fenetre principale porte "(Facturation" tant qu'une vente est ouverte.
+    // Seul ce oui / non sort d'ici (jamais le titre) : il confirme la validation d'une vente lue dans le journal.
+    Timer billing = new Timer();
+    billing.Interval = 500;
+    billing.Tick += delegate { WatchBilling(); };
+    billing.Start();
     Application.Run();
+  }
+  private static string _billing = "";
+  private static void WatchBilling() {
+    try {
+      string state = "?";
+      foreach (string name in new string[] { "java", "javaw" }) {
+        foreach (Process p in Process.GetProcessesByName(name)) {
+          string title = "";
+          try { title = p.MainWindowTitle ?? ""; } catch (Exception) { }
+          p.Dispose();
+          if (title.IndexOf("Pharmagest", StringComparison.OrdinalIgnoreCase) < 0) continue;
+          state = title.IndexOf("(Facturation", StringComparison.OrdinalIgnoreCase) >= 0 ? "1" : "0";
+        }
+      }
+      if (state == _billing) return;
+      _billing = state;
+      Console.Out.WriteLine("LGPI " + state + " " + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+      Console.Out.Flush();
+    } catch (Exception) { }
   }
   private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam) {
     if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN)) {
@@ -85,6 +110,8 @@ Add-Type -TypeDefinition $code -ReferencedAssemblies System.Windows.Forms
 export type DouchetteHandlers = {
   /** `expiresOn` : la péremption lue dans le Datamatrix de la boîte (« 2027-03-31 »), quand elle est sûre. */
   onScan: (code: string, at: number, expiresOn?: string | null) => void;
+  /** L'écran de facturation de LGPI est ouvert (vrai), fermé (faux) ou introuvable (null) — voir `lgpiBillingOf`. */
+  onLgpiBilling?: (open: boolean | null, at: number) => void;
   onStatus: (message: string) => void;
 };
 
@@ -121,7 +148,10 @@ export function startDouchette(configDir: string, handlers: DouchetteHandlers): 
       for (const line of lines) {
         if (line === "READY") handlers.onStatus("Douchette écoutée.");
         else if (line.startsWith("ERROR")) handlers.onStatus(`Le hook clavier a échoué : ${line}`);
-        else if (line.startsWith("KEY ")) {
+        else if (line.startsWith("LGPI ")) {
+          const [, state, at] = line.split(" ");
+          handlers.onLgpiBilling?.(state === "1" ? true : state === "0" ? false : null, Number(at) || Date.now());
+        } else if (line.startsWith("KEY ")) {
           const [, key, at] = line.split(" ");
           if (key === "Shift") continue;
           detector.feed({ key: key ?? "Other", at: Number(at) || Date.now() });
