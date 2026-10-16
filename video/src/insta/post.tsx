@@ -1,214 +1,183 @@
 import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, Img, staticFile } from "remotion";
+import { FONT } from "../theme";
 import { Mascot, type Track } from "../presentation/mascot";
-import { ACT1, Backdrop, DotGrid, INK, JAKARTA, MONO, PB, Spot, glowMint, hero, label, rgba, support, title } from "../presentation/motion/kit";
 
 /* ==========================================================================
  * LA PUBLICATION INSTAGRAM « QU'EST-CE QUE PHARMABOOST ? » (carrousel 4:5, 1080 × 1350, 7 pages).
  *
- * Le MÊME visuel que le film de présentation (fondateur, 16 oct. 2026) : son kit motion (src/presentation/motion/kit) —
- * l'encre #0B0F14 et ses deux halos sarcelle, la trame de points, le verre dépoli, Plus Jakarta Sans 800 et JetBrains Mono,
- * la menthe #36E8C8 des mots mis en valeur (soulignés), « Pharma » blanc et « Boost » menthe, le robot en blouse, les cartes
- * blanches et le bouton menthe « ✓ Vendu ». Comme le film : d'abord le problème, en gris (acte 1), puis la révélation.
- * Les étapes de la bannière sont de VRAIES captures de la bannière du poste (public/insta, la page /poste/ile jouée sur une vente
- * d'allergie : cétirizine → AllergiFlash, Stérimar Nez Allergique, Pranarôm Allergoforce, Azéol Gorge). Ni photo de boîte ni
- * prix (non vérifié), aucun chiffre promis, aucun prénom de robot.
+ * La direction artistique de la première publication, « Aurore » (celle de la bannière du poste) : vert très profond,
+ * lumières citron et menthe, liseré d'un pixel en dégradé de marque, le robot de PharmaBoost, beaucoup d'air. Une idée par
+ * page : une étiquette, un titre, une phrase, une image.
+ *
+ * Les images de la bannière sont de VRAIES captures de la bannière du poste (public/insta : la page /poste/ile, jouée sur une
+ * vente d'allergie — cétirizine → AllergiFlash, Stérimar Nez Allergique, Pranarôm Allergoforce, Azéol Gorge), posées seules,
+ * sans logiciel de gestion derrière (fondateur, 16 oct. 2026). Ni photo de boîte ni prix, aucun chiffre promis hormis « en une
+ * seconde » demandé par le fondateur, aucun prénom de robot, le mot « vente ».
  *
  * Rendu : npx remotion still src/index.ts InstaPost out/insta/pharmaboost-1.png --props='{"slide":1}' --frame=0
  * ======================================================================== */
 
 export type InstaPostProps = { slide: number };
 
+const A = {
+  deep: "#03171A",
+  green: "#072A25",
+  mint: "#58F2D8",
+  teal: "#5FA594",
+  leaf: "#74D6A0",
+  lemon: "#E8FF9C",
+  text: "#ECFFF6",
+  soft: "#9FCBBB",
+};
+
 const TOTAL = 7;
-const T = 2.4;
-const STOCK = PB.stock;
 
 const still = (events: Track["events"]): Track => ({ id: "insta", seed: 7, events, until: 4 });
 const HAPPY = still([{ t: 0, kind: "mood", mood: "happy" }]);
-const CURIOUS = still([{ t: 0, kind: "mood", mood: "curious" }]);
-const PROUD = still([{ t: 0, kind: "mood", mood: "celebrate" }]);
+const WAVE = still([{ t: 0, kind: "mood", mood: "happy" }, { t: 2.4, kind: "burst", burst: "wave" }]);
 
-/** Un mot mis en valeur, comme dans les sous-titres du film : menthe, souligné. */
-const M = ({ children }: { children: ReactNode }) => <span style={{ color: PB.mint, textDecoration: "underline", textDecorationThickness: "0.08em", textUnderlineOffset: "0.16em" }}>{children}</span>;
-
-/** « Pharma » blanc, « Boost » menthe : la signature du film. */
-function Wordmark({ size, glow = false }: { size: number; glow?: boolean }) {
+/** Le liseré d'un pixel en dégradé de marque, autour d'une forme arrondie. */
+function Glow({ children, radius = 36, style }: { children: ReactNode; radius?: number; style?: CSSProperties }) {
   return (
-    <span style={{ ...title(size), whiteSpace: "nowrap" }}>
-      <span style={{ color: PB.white }}>Pharma</span>
-      <span style={{ color: PB.mint, filter: glow ? glowMint(0.7) : undefined }}>Boost</span>
-    </span>
+    <div style={{ position: "relative", borderRadius: radius, background: "linear-gradient(180deg,#0A332D 0%,#04201D 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.08), 0 30px 80px -30px rgba(0,0,0,.7)", ...style }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: radius,
+          padding: 2,
+          background: `linear-gradient(115deg, rgba(95,165,148,.65), rgba(116,214,160,.35) 38%, ${A.lemon} 52%, rgba(116,214,160,.35) 66%, rgba(95,165,148,.65))`,
+          WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+          WebkitMaskComposite: "xor",
+          maskComposite: "exclude",
+          pointerEvents: "none",
+        }}
+      />
+      {children}
+    </div>
   );
 }
 
-/** La ligne de sous-titre du film : blanc 700, mots en menthe soulignés. */
-function Caption({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return <div style={{ ...support(40), color: PB.white, lineHeight: 1.3, textShadow: "0 2px 20px rgba(0,0,0,.6)", ...style }}>{children}</div>;
-}
-
-function Frame({ index, mention = false, rays = false, act1 = false, children }: { index: number; mention?: boolean; rays?: boolean; act1?: boolean; children: ReactNode }) {
+function Frame({ index, children }: { index: number; children: ReactNode }) {
   return (
-    <AbsoluteFill style={{ fontFamily: JAKARTA, color: PB.white, overflow: "hidden" }}>
-      <Backdrop t={T} kind={act1 ? "act1" : "brand"} halo={1.15} />
-      {rays && (
-        // Les rayons de la révélation « Voici PharmaBoost ».
-        <AbsoluteFill style={{ background: `repeating-conic-gradient(from 0deg at 50% 36%, ${rgba(PB.mint, 0.06)} 0deg 4deg, transparent 4deg 12deg)`, maskImage: "radial-gradient(circle at 50% 36%, #000 0%, transparent 62%)" }} />
-      )}
-      <DotGrid t={T} opacity={act1 ? 0.05 : 0.07} spacing={44} mask />
-      <div style={{ position: "absolute", top: 64, left: 72, right: 72, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Mascot track={HAPPY} t={3} size={44} />
-          <Wordmark size={36} />
+    <AbsoluteFill style={{ fontFamily: FONT, color: A.text, background: `radial-gradient(1200px 900px at 85% -10%, rgba(232,255,156,.10), transparent 60%), radial-gradient(1000px 800px at -10% 110%, rgba(88,242,216,.12), transparent 60%), linear-gradient(180deg, ${A.green} 0%, ${A.deep} 100%)` }}>
+      {/* Une trame de points très discrète : la profondeur, sans bruit. */}
+      <AbsoluteFill style={{ backgroundImage: "radial-gradient(rgba(159,203,187,.10) 1.4px, transparent 1.4px)", backgroundSize: "36px 36px", maskImage: "linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,.2))" }} />
+      <div style={{ position: "absolute", top: 72, left: 84, right: 84, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <Mascot track={HAPPY} t={3} size={46} />
+          <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: "-0.02em" }}>PharmaBoost</span>
         </div>
-        <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 24, color: "rgba(255,255,255,.55)" }}>
+        <span style={{ fontSize: 24, fontWeight: 600, letterSpacing: "0.18em", color: A.soft }}>
           {String(index).padStart(2, "0")} / {String(TOTAL).padStart(2, "0")}
         </span>
       </div>
-      {mention && <div style={{ position: "absolute", top: 128, right: 72, ...label(15), color: "rgba(255,255,255,.4)" }}>Illustration · exemples</div>}
       {children}
-      <div style={{ position: "absolute", bottom: 60, left: 72, right: 72, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ ...label(18), color: "rgba(255,255,255,.45)" }}>pharmaboost.app</span>
-        {index < TOTAL && <span style={{ ...label(18), color: PB.mint }}>Glissez →</span>}
+      <div style={{ position: "absolute", bottom: 72, left: 84, right: 84, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 24, color: A.soft, letterSpacing: "0.04em" }}>
+        <span>pharmaboost.app</span>
+        {index < TOTAL && <span style={{ color: A.lemon, fontWeight: 700 }}>Glissez →</span>}
       </div>
     </AbsoluteFill>
   );
 }
 
-// ---- 1. La couverture : la révélation ------------------------------------------------------------------------------
-function Cover() {
+/** Le bloc de texte, toujours au même endroit : étiquette, titre, phrase. */
+function Text({ kicker, children, body, size = 92 }: { kicker: string; children: ReactNode; body?: ReactNode; size?: number }) {
   return (
-    <Frame index={1} rays>
-      <Spot x={540} y={460} r={460} color={PB.mint} alpha={0.22} />
-      <div style={{ position: "absolute", top: 200, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-        <Mascot track={HAPPY} t={3} size={400} floating />
-      </div>
-      <div style={{ position: "absolute", left: 40, right: 40, top: 790, textAlign: "center" }}>
-        <div style={{ ...support(54), color: "rgba(255,255,255,.85)" }}>Qu&apos;est-ce que</div>
-        <div style={{ marginTop: 14, whiteSpace: "nowrap" }}>
-          <Wordmark size={128} glow />
-          <span style={{ ...title(128), color: PB.white }}>&nbsp;?</span>
-        </div>
-        <Caption style={{ marginTop: 34 }}>
-          Le <M>bon conseil</M>, à chaque vente.
-        </Caption>
-      </div>
-    </Frame>
-  );
-}
-
-// ---- 2. Le problème : au comptoir, impossible de penser à tout (acte 1 du film, gris sur encre) ----------------------
-const OUBLIS = [
-  { title: "Toutes les associations possibles", detail: "Pour chaque médicament, le produit qui l'accompagne." },
-  { title: "Les dates courtes", detail: "Les boîtes à écouler avant qu'elles ne périment." },
-  { title: "Les challenges du moment", detail: "Les produits que l'équipe met en avant." },
-  { title: "Ce qu'il reste en stock", detail: "Ce qui est vraiment en rayon, aujourd'hui." },
-];
-
-function Problem() {
-  return (
-    <Frame index={2} act1>
-      {/* La bulle « CONSEIL ? » du film. */}
-      <div style={{ position: "absolute", top: 170, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-        <div style={{ position: "relative", padding: "30px 64px", borderRadius: 999, background: ACT1.g2, boxShadow: "0 30px 80px rgba(0,0,0,.45)" }}>
-          <span style={{ ...hero(112), color: ACT1.g4 }}>
-            CONSEIL <span style={{ color: PB.mint }}>?</span>
-          </span>
-          <div style={{ position: "absolute", left: 120, bottom: -26, width: 52, height: 52, background: ACT1.g2, transform: "rotate(45deg)", borderRadius: 8 }} />
-        </div>
-      </div>
-      <div style={{ position: "absolute", left: 72, right: 72, top: 410 }}>
-        <div style={{ ...title(64), color: PB.white, lineHeight: 1.08 }}>
-          Au comptoir, personne ne peut <span style={{ color: PB.mint }}>penser à tout</span>.
-        </div>
-        <div style={{ marginTop: 40, display: "flex", flexDirection: "column", gap: 18 }}>
-          {OUBLIS.map((o) => (
-            <div key={o.title} style={{ display: "flex", alignItems: "center", gap: 24, padding: "22px 28px", borderRadius: 24, background: ACT1.g1, border: "1px solid rgba(255,255,255,.08)" }}>
-              <div style={{ width: 52, height: 52, borderRadius: 16, background: ACT1.g2, display: "flex", alignItems: "center", justifyContent: "center", color: ACT1.g3, fontFamily: MONO, fontWeight: 700, fontSize: 30 }}>?</div>
-              <div>
-                <div style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 32, letterSpacing: "-0.015em", color: ACT1.g4 }}>{o.title}</div>
-                <div style={{ marginTop: 4, fontFamily: JAKARTA, fontWeight: 600, fontSize: 22, color: ACT1.g3 }}>{o.detail}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ position: "absolute", left: 72, right: 72, bottom: 130, textAlign: "center" }}>
-        <Caption style={{ color: ACT1.g4 }}>
-          La file s&apos;allonge… et le <M>conseil</M> s&apos;oublie.
-        </Caption>
-      </div>
-    </Frame>
-  );
-}
-
-// ---- Les vraies captures de la bannière du poste (public/insta) : la même page que les postes, jouée sur une vente d'allergie.
-/** L'écran du logiciel de gestion, suggéré (lignes grises) ; la bannière flotte en haut, comme au comptoir. */
-function Screen({ top, height, children }: { top: number; height: number; children: ReactNode }) {
-  return (
-    <div style={{ position: "absolute", left: 60, top, width: 960, height, borderRadius: 26, background: "#E9EEF1", overflow: "hidden", boxShadow: "0 40px 90px rgba(0,0,0,.55)", border: "1px solid rgba(255,255,255,.14)" }}>
-      <div style={{ height: 52, background: "#1F4E79", display: "flex", alignItems: "center", gap: 22, padding: "0 26px", color: "rgba(255,255,255,.85)", fontFamily: JAKARTA, fontWeight: 700, fontSize: 18 }}>
-        <span style={{ fontWeight: 800 }}>Logiciel de gestion</span>
-        <span style={{ opacity: 0.7 }}>Vente</span>
-        <span style={{ opacity: 0.7 }}>Stock</span>
-        <span style={{ opacity: 0.7 }}>Patients</span>
-      </div>
-      <div style={{ position: "absolute", left: 30, right: 30, top: 80, display: "flex", flexDirection: "column", gap: 14 }}>
-        {Array.from({ length: 14 }, (_, i) => (
-          <div key={i} style={{ height: 34, borderRadius: 8, background: i === 2 ? "#CFEBD9" : "#FFFFFF", boxShadow: "0 1px 2px rgba(0,0,0,.06)" }} />
-        ))}
-      </div>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>{children}</div>
+    <div style={{ position: "absolute", left: 84, right: 84, bottom: 180 }}>
+      <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: A.mint }}>{kicker}</div>
+      <h1 style={{ margin: "22px 0 0", fontSize: size, lineHeight: 1.04, fontWeight: 800, letterSpacing: "-0.035em" }}>{children}</h1>
+      {body && <p style={{ margin: "28px 0 0", fontSize: 36, lineHeight: 1.38, color: "rgba(236,255,246,.76)", maxWidth: 860 }}>{body}</p>}
     </div>
   );
 }
 
-/** Une capture de la bannière (2× : sa largeur affichée vaut la moitié des pixels, fois `zoom`). */
-function Banner({ src, w, zoom = 1.8 }: { src: string; w: number; zoom?: number }) {
-  return <Img src={staticFile(`insta/${src}`)} style={{ width: w * zoom, filter: "drop-shadow(0 24px 40px rgba(0,0,0,.35))" }} />;
+const Lemon = ({ children, style }: { children: ReactNode; style?: CSSProperties }) => <span style={{ color: A.lemon, ...style }}>{children}</span>;
+
+/** La scène du haut : une lumière douce, et ce qu'on y pose au centre. */
+function Stage({ top = 190, height = 560, glow = A.mint, children }: { top?: number; height?: number; glow?: string; children: ReactNode }) {
+  return (
+    <div style={{ position: "absolute", top, left: 0, right: 0, height, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ position: "absolute", width: 900, height: 620, borderRadius: "50%", background: `radial-gradient(closest-side, ${glow === A.lemon ? "rgba(232,255,156,.16)" : "rgba(88,242,216,.18)"}, transparent)` }} />
+      <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>{children}</div>
+    </div>
+  );
 }
 
-// ---- 3. Vous bipez : la bannière analyse la boîte ---------------------------------------------------------------
-function Scan() {
+/** Une vraie capture de la bannière du poste (2× : sa largeur CSS fois `zoom`). */
+function Banner({ src, w, zoom = 2, style }: { src: string; w: number; zoom?: number; style?: CSSProperties }) {
+  return <Img src={staticFile(`insta/${src}`)} style={{ width: w * zoom, filter: "drop-shadow(0 30px 60px rgba(0,0,0,.45))", ...style }} />;
+}
+
+const FOUR = ["Associations", "Dates courtes", "Challenges", "Stock"];
+
+// ---- 1. Couverture -------------------------------------------------------------------------------------------------
+function Cover() {
   return (
-    <Frame index={3} mention>
-      <div style={{ position: "absolute", top: 170, left: 72, right: 72, textAlign: "center", ...title(76), color: PB.white }}>
-        Vous <span style={{ color: PB.mint }}>bipez</span>.
-      </div>
-      <Screen top={290} height={640}>
-        <Banner src="1-analyse.png" w={388} zoom={2.2} />
-      </Screen>
-      <div style={{ position: "absolute", left: 72, right: 72, bottom: 140, textAlign: "center" }}>
-        <Caption>
-          Comme d&apos;habitude, à la douchette.
-          <br />
-          La bannière <M>analyse</M> la boîte aussitôt.
-        </Caption>
-      </div>
+    <Frame index={1}>
+      <Stage top={170} height={600}>
+        <Mascot track={HAPPY} t={3} size={360} floating />
+      </Stage>
+      <Text kicker="Le copilote du comptoir" size={104} body="Le bon conseil, au bon moment, à chaque vente.">
+        Qu&apos;est-ce que <Lemon>PharmaBoost</Lemon> ?
+      </Text>
     </Frame>
   );
 }
 
-// ---- 4. PharmaBoost pense à tout ça, en 1 seconde ---------------------------------------------------------------
+// ---- 2. Le problème ------------------------------------------------------------------------------------------------
+function Problem() {
+  return (
+    <Frame index={2}>
+      <Stage top={190} height={540}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22, width: 820 }}>
+          {FOUR.map((word) => (
+            <Glow key={word} radius={30} style={{ height: 150, display: "flex", alignItems: "center", gap: 22, padding: "0 30px" }}>
+              <span style={{ width: 56, height: 56, borderRadius: 999, border: "2px solid rgba(159,203,187,.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, fontWeight: 800, color: A.soft }}>?</span>
+              <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: "-0.01em" }}>{word}</span>
+            </Glow>
+          ))}
+        </div>
+      </Stage>
+      <Text kicker="Le problème" body="Toutes les associations, les dates courtes, les challenges, le stock… et la file qui s'allonge.">
+        Au comptoir, impossible de <Lemon>penser à tout</Lemon>.
+      </Text>
+    </Frame>
+  );
+}
+
+// ---- 3. Vous bipez -------------------------------------------------------------------------------------------------
+function Scan() {
+  return (
+    <Frame index={3}>
+      <Stage>
+        <Banner src="1-analyse.png" w={388} zoom={2.15} />
+      </Stage>
+      <Text kicker="01 · Vous bipez" body="À la douchette, comme d'habitude. La bannière lit la boîte et vérifie votre stock.">
+        Rien ne change.
+      </Text>
+    </Frame>
+  );
+}
+
+// ---- 4. Tout ça, en une seconde ------------------------------------------------------------------------------------
 function Advice() {
   return (
-    <Frame index={4} mention>
-      <div style={{ position: "absolute", left: 60, right: 60, top: 170, display: "flex", gap: 12 }}>
-        {["Associations", "Dates courtes", "Challenges", "Stock"].map((chip) => (
-          <span key={chip} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", height: 58, borderRadius: 999, background: rgba(PB.mint, 0.12), border: `1px solid ${rgba(PB.mint, 0.45)}`, ...support(22), color: PB.mint2, whiteSpace: "nowrap" }}>
-            ✓ {chip}
-          </span>
-        ))}
-      </div>
-      <Screen top={262} height={680}>
-        <Banner src="2-replie.png" w={378} zoom={2.4} />
-      </Screen>
-      <div style={{ position: "absolute", left: 60, right: 60, bottom: 130, textAlign: "center" }}>
-        <Caption>
-          PharmaBoost pense à <M>tout ça</M>, <M>en 1 seconde</M>.
-          <br />
-          CÉTIRIZINE bipée : 4 conseils allergie, en stock.
-        </Caption>
-      </div>
+    <Frame index={4}>
+      <Stage top={180} height={580}>
+        <Banner src="2-replie.png" w={378} zoom={2.3} />
+        <div style={{ marginTop: 28, display: "flex", gap: 12 }}>
+          {FOUR.map((word) => (
+            <span key={word} style={{ display: "inline-flex", alignItems: "center", height: 50, padding: "0 20px", borderRadius: 999, background: "rgba(232,255,156,.1)", border: "1.5px solid rgba(232,255,156,.45)", color: A.lemon, fontSize: 22, fontWeight: 700, whiteSpace: "nowrap" }}>
+              ✓ {word}
+            </span>
+          ))}
+        </div>
+      </Stage>
+      <Text kicker="02 · PharmaBoost y pense" body="Cétirizine bipée : quatre conseils allergie, pris dans votre rayon.">
+        Tout ça, <Lemon style={{ whiteSpace: "nowrap" }}>en 1 seconde</Lemon>.
+      </Text>
     </Frame>
   );
 }
@@ -216,73 +185,50 @@ function Advice() {
 // ---- 5. Bipé, c'est vendu ------------------------------------------------------------------------------------------
 function Decide() {
   return (
-    <Frame index={5} mention>
-      <div style={{ position: "absolute", top: 170, left: 0, right: 0, textAlign: "center", ...hero(140), color: "transparent", WebkitTextStroke: `3px ${rgba(PB.mint, 0.85)}`, filter: glowMint(0.35) }}>VENDU !</div>
-      <Screen top={340} height={560}>
-        <Banner src="4-vendu.png" w={418} zoom={2.1} />
-        <div style={{ height: 18 }} />
-        <Banner src="5-vendu-deploye.png" w={378} zoom={1.7} />
-      </Screen>
-      <div style={{ position: "absolute", left: 60, right: 60, bottom: 140, textAlign: "center" }}>
-        <Caption>
-          Le client prend le conseil ? Vous le bipez :
-          <br />
-          il passe en <M>vendu</M>, tout seul.
-        </Caption>
-      </div>
+    <Frame index={5}>
+      <Stage glow={A.lemon}>
+        <Banner src="4-vendu.png" w={418} zoom={2.3} />
+      </Stage>
+      <Text kicker="03 · Vous décidez" body="Le client prend le conseil ? Vous le bipez : la bannière le passe en vendu, toute seule.">
+        Bipé, c&apos;est <Lemon>vendu</Lemon>.
+      </Text>
     </Frame>
   );
 }
 
-// ---- 6. Vous validez la vente : le bilan, puis le client suivant ----------------------------------------------------
+// ---- 6. Vous validez la vente --------------------------------------------------------------------------------------
 function Validate() {
   return (
-    <Frame index={6} mention>
-      <div style={{ position: "absolute", top: 170, left: 72, right: 72, textAlign: "center", ...title(70), color: PB.white }}>
-        Vous <span style={{ color: PB.mint }}>validez</span> la vente.
-      </div>
-      <Screen top={280} height={700}>
-        <Banner src="6-validee.png" w={448} zoom={1.62} />
-        <div style={{ height: 8 }} />
-        {/* Le « Bravo ! » seul : le résumé dessous se lit en page 6 par la légende. */}
-        <div style={{ height: 150, overflow: "hidden" }}>
-          <Banner src="7-terminee.png" w={388} zoom={1.45} />
-        </div>
-      </Screen>
-      <div style={{ position: "absolute", left: 60, right: 60, bottom: 140, textAlign: "center" }}>
-        <Caption>
-          Le <M>bilan</M> part au patient s&apos;il le souhaite,
-          <br />
-          et la bannière passe au client suivant.
-        </Caption>
-      </div>
+    <Frame index={6}>
+      <Stage top={170} height={600}>
+        <Banner src="6-validee.png" w={448} zoom={1.9} />
+      </Stage>
+      <Text kicker="04 · Vente validée" body="Le bilan part au patient s'il le souhaite. Sinon, la bannière passe seule au client suivant.">
+        Le <Lemon>bilan</Lemon>, puis
+        <br />
+        le client suivant.
+      </Text>
     </Frame>
   );
 }
 
-// ---- 6. La signature du film --------------------------------------------------------------------------------------
+// ---- 7. Fin --------------------------------------------------------------------------------------------------------
 function Outro() {
   return (
     <Frame index={7}>
-      <Spot x={540} y={430} r={420} color={PB.mint} alpha={0.2} />
-      {/* L'orbite pointillée de la signature. */}
-      <svg width={1080} height={1350} style={{ position: "absolute", inset: 0 }}>
-        <ellipse cx={540} cy={640} rx={470} ry={250} fill="none" stroke={rgba(PB.mint, 0.35)} strokeWidth={2} strokeDasharray="4 12" transform="rotate(-8 540 640)" />
-        <circle cx={130} cy={560} r={9} fill={PB.mint} opacity={0.8} />
-        <circle cx={960} cy={720} r={7} fill={PB.gold} opacity={0.9} />
-      </svg>
-      <div style={{ position: "absolute", top: 190, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-        <Mascot track={HAPPY} t={3} size={330} floating />
-      </div>
-      <div style={{ position: "absolute", left: 72, right: 72, top: 750, textAlign: "center" }}>
-        <Wordmark size={132} glow />
-        <Caption style={{ marginTop: 26, fontSize: 46 }}>
-          Le <M>bon conseil</M>, <M>à chaque vente</M>.
-        </Caption>
-        <div style={{ marginTop: 50, display: "inline-flex", alignItems: "center", height: 92, padding: "0 48px", borderRadius: 999, background: PB.mint, boxShadow: `0 0 40px ${rgba(PB.mint, 0.5)}`, color: INK, fontFamily: JAKARTA, fontWeight: 800, fontSize: 40 }}>
-          pharmaboost.app
+      <Stage top={170} height={600} glow={A.lemon}>
+        <Mascot track={WAVE} t={3} size={330} floating />
+      </Stage>
+      <div style={{ position: "absolute", left: 84, right: 84, bottom: 180 }}>
+        <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: A.mint }}>Scan · Conseil · Bilan</div>
+        <h1 style={{ margin: "22px 0 0", fontSize: 92, lineHeight: 1.04, fontWeight: 800, letterSpacing: "-0.035em" }}>
+          Le pharmacien décide.
+          <br />
+          <Lemon>PharmaBoost</Lemon> l&apos;aide.
+        </h1>
+        <div style={{ marginTop: 44, display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "22px 40px", background: A.lemon, color: A.deep, fontSize: 34, fontWeight: 800 }}>
+          Réservez une démo · pharmaboost.app
         </div>
-        <div style={{ marginTop: 22, ...support(28), color: "rgba(255,255,255,.7)" }}>Réservez une démo</div>
       </div>
     </Frame>
   );
