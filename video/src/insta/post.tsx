@@ -148,13 +148,13 @@ function Scan() {
   );
 }
 
-function AdviceCard({ name, why, sold }: { name: string; why: string; sold?: boolean }) {
+function AdviceCard({ name, why, sold, compact }: { name: string; why: string; sold?: boolean; compact?: boolean }) {
   return (
-    <div style={{ borderRadius: 24, background: "#F5FAFC", color: "#10222F", padding: "20px 28px", display: "flex", alignItems: "center", gap: 22 }}>
+    <div style={{ borderRadius: 22, background: "#F5FAFC", color: "#10222F", padding: compact ? "16px 24px" : "20px 28px", display: "flex", alignItems: "center", gap: 22 }}>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.01em" }}>{name}</div>
-        <div style={{ marginTop: 6, fontSize: 24, color: "#5A7280" }}>{why}</div>
-        <div style={{ marginTop: 10, fontSize: 22, fontWeight: 700, color: "#087443" }}>● En stock</div>
+        <div style={{ fontSize: compact ? 28 : 30, fontWeight: 800, letterSpacing: "-0.01em" }}>{name}</div>
+        <div style={{ marginTop: 4, fontSize: compact ? 22 : 24, color: "#5A7280" }}>{why}</div>
+        {!compact && <div style={{ marginTop: 10, fontSize: 22, fontWeight: 700, color: "#087443" }}>● En stock</div>}
       </div>
       {sold ? (
         <div style={{ borderRadius: 999, padding: "14px 24px", background: "#22C88F", color: "#04261A", fontSize: 24, fontWeight: 800 }}>✓ Vendu</div>
@@ -165,13 +165,13 @@ function AdviceCard({ name, why, sold }: { name: string; why: string; sold?: boo
   );
 }
 
-function Island({ sold }: { sold: boolean }) {
+function Island({ sold, count = 2 }: { sold: boolean; count?: number }) {
   return (
     <Glow radius={999} style={{ width: 760, padding: "22px 26px", display: "flex", alignItems: "center", gap: 20 }}>
       <Mascot track={sold ? HAPPY : CURIOUS} t={3} size={60} />
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 31, fontWeight: 700, whiteSpace: "nowrap" }}>
-          <span style={{ width: 12, height: 12, borderRadius: 99, background: A.lemon, boxShadow: `0 0 14px ${A.lemon}` }} />2 conseils suggérés
+          <span style={{ width: 12, height: 12, borderRadius: 99, background: A.lemon, boxShadow: `0 0 14px ${A.lemon}` }} />{count} conseils suggérés
         </div>
         <div style={{ marginTop: 4, fontSize: 22, fontWeight: 700, letterSpacing: sold ? 0 : "0.16em", textTransform: sold ? "none" : "uppercase", color: sold ? A.lemon : A.soft }}>
           {sold ? "✓ 1 vendu" : "Survolez pour voir"}
@@ -182,20 +182,41 @@ function Island({ sold }: { sold: boolean }) {
   );
 }
 
+/** Le médicament bipé, en tête : ce que la douchette a lu. */
+function Scanned({ name, family }: { name: string; family: string }) {
+  return (
+    <Glow radius={32} style={{ width: 760, padding: "22px 28px", display: "flex", alignItems: "center", gap: 22 }}>
+      <div style={{ width: 64, height: 64, borderRadius: 20, background: "rgba(88,242,216,.14)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={A.mint} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" />
+          <path d="m8.5 8.5 7 7" />
+        </svg>
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: A.soft }}>Médicament bipé</div>
+        <div style={{ marginTop: 4, fontSize: 36, fontWeight: 800, letterSpacing: "-0.015em" }}>{name}</div>
+      </div>
+      <div style={{ borderRadius: 999, padding: "10px 20px", background: "rgba(232,255,156,.14)", border: "1.5px solid rgba(232,255,156,.5)", color: A.lemon, fontSize: 22, fontWeight: 700 }}>{family}</div>
+    </Glow>
+  );
+}
+
 function Advice() {
   return (
     <Frame index={3}>
-      <div style={{ position: "absolute", top: 165, left: 0, right: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-        <Island sold={false} />
-        <Glow radius={36} style={{ width: 760, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-          <AdviceCard name="Probiotique" why="Protéger la flore pendant l'antibiotique" />
-          <AdviceCard name="Sérum physiologique" why="L'hygiène du nez pendant le rhume" />
+      <div style={{ position: "absolute", top: 160, left: 0, right: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+        <Scanned name="CÉTIRIZINE 10 mg" family="Allergie" />
+        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: A.mint }}>↓ 3 conseils dans votre rayon</div>
+        <Glow radius={34} style={{ width: 760, padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+          <AdviceCard compact name="Collyre anti-allergique" why="Les yeux qui piquent et qui pleurent" />
+          <AdviceCard compact name="Eau de mer « nez allergique »" why="Rincer les pollens du nez" />
+          <AdviceCard compact name="Pastilles pour la gorge" why="La gorge sèche sous antihistaminique" />
         </Glow>
       </div>
       <div style={{ position: "absolute", left: 84, right: 84, bottom: 190 }}>
         <Kicker>02 · Le robot cherche</Kicker>
         <Title size={84}>Le bon conseil, dans votre rayon.</Title>
-        <Body>Le produit utile qui accompagne la vente, pris dans votre stock.</Body>
+        <Body>Pour chaque médicament, les produits utiles qui l&apos;accompagnent, pris dans votre stock.</Body>
       </div>
     </Frame>
   );
@@ -205,9 +226,9 @@ function Decide() {
   return (
     <Frame index={4}>
       <div style={{ position: "absolute", top: 200, left: 0, right: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 26 }}>
-        <Island sold />
+        <Island sold count={3} />
         <Glow radius={36} style={{ width: 760, padding: 26, display: "flex", flexDirection: "column", gap: 18 }}>
-          <AdviceCard name="Probiotique" why="Protéger la flore pendant l'antibiotique" sold />
+          <AdviceCard name="Collyre anti-allergique" why="Les yeux qui piquent et qui pleurent" sold />
         </Glow>
       </div>
       <div style={{ position: "absolute", left: 84, right: 84, bottom: 190 }}>
