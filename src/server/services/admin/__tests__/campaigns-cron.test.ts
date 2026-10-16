@@ -34,6 +34,8 @@ vi.mock("@/server/services/stock-learning", () => ({ runStockLearningPass: mocks
 vi.mock("@/server/services/stock-learning-chain", () => ({ scheduleLearningContinuation: mocks.scheduleLearningContinuation }));
 vi.mock("next/server", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/server")>()), after: mocks.after }));
 vi.mock("@/server/services/stock-deposits", () => ({ purgeExpiredDepositFiles: mocks.purgeExpiredDepositFiles, closeStalledDeposits: mocks.closeStalledDeposits }));
+// Les dates courtes atteintes sortent du suivi chaque matin (16 oct. 2026).
+vi.mock("@/server/services/stock-lots", () => ({ retireReachedLots: async () => 0 }));
 
 const { GET } = await import("@/app/api/cron/automatisations/route");
 
@@ -93,6 +95,7 @@ describe("passage complet", () => {
       news: { resumed: 3, purged: 4 },
       stockFiles: { purged: 5 },
       stalledDeposits: { failed: 2, superseded: 1, jobsClosed: 3 },
+      reachedLots: 0,
       counterEmails: { erased: 2, moreToDo: false },
       counterReports: { month: "2026-09", pharmacies: 0, sent: 0, skipped: 0, failed: 0 },
       weeklyDigests: { week: null, pharmacies: 0, sent: 0, skipped: 0, failed: 0, stoppedEarly: false },

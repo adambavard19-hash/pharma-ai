@@ -66,6 +66,7 @@ export async function GET(request: Request) {
   const purged = await attempt("purge des abonnements aux nouveautés", () => purgeStalePatientNews(now));
   const stockFiles = await attempt("fichiers de stock", () => purgeExpiredDepositFiles(now));
   const stalledDeposits = await attempt("dépôts de stock bloqués", () => closeStalledDeposits(now));
+  const reachedLots = await attempt("dates courtes atteintes", () => import("@/server/services/stock-lots").then((lots) => lots.retireReachedLots(now)));
   const counterReports = await attempt("bilan mensuel du comptoir", () => sendMonthlyCounterReports(now));
   // Le lundi (rattrapage jusqu'au mercredi) : une minute au plus ici, la suite reprend le lendemain sans double envoi.
   const weeklyDigests = await attempt("résumé hebdomadaire des titulaires", () => sendWeeklyOwnerDigests(now, { deadlineAt: Date.now() + 60_000 }));
@@ -74,5 +75,5 @@ export async function GET(request: Request) {
   if ("error" in automations) throw automations.error;
   // Le détail par officine reste dans la console : la réponse ne porte que les compteurs.
   const { dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors } = automations.report;
-  return NextResponse.json({ dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors, campaigns, news: { resumed, purged }, stockFiles, stalledDeposits, counterEmails, counterReports, weeklyDigests, stockLearning });
+  return NextResponse.json({ dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors, campaigns, news: { resumed, purged }, stockFiles, stalledDeposits, reachedLots, counterEmails, counterReports, weeklyDigests, stockLearning });
 }

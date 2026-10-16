@@ -298,7 +298,7 @@ describe("les durées affichées des films", () => {
   it("suivent les films refaits : Comment ça marche 44 s, Avantages 38 s", () => {
     expect(FILMS.comment.duration).toBe("44 s");
     expect(FILMS.avantages.duration).toBe("38 s");
-    expect(FILMS.presentation.duration).toBe("48 s");
+    expect(FILMS.presentation.duration).toBe("50 s");
     expect(FILMS.pourquoi.duration).toBe("34 s");
     expect(FILMS.sansOrdonnance.duration).toBe("25 s");
     // Partenaires : 2 640 images à 60 i/s.

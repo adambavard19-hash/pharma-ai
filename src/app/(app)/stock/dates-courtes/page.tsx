@@ -22,7 +22,6 @@ export const metadata: Metadata = { title: "Dates courtes" };
 
 const FILTERS: { key: string; label: string; level: ExpiryLevel | null }[] = [
   { key: "tous", label: "Tous", level: null },
-  { key: "expire", label: "Expiré", level: "EXPIRED" },
   { key: "urgent", label: "Urgent", level: "URGENT" },
   { key: "bientot", label: "Bientôt", level: "SOON" },
 ];
@@ -45,6 +44,8 @@ export default async function ShortDatesPage({ searchParams }: { searchParams: P
   const query = first(params.q).trim().slice(0, 80);
   const canAdjust = session.permissions.has(PERMISSIONS.STOCK_ADJUST);
   const canSetThresholds = session.permissions.has(PERMISSIONS.SETTINGS_MANAGE);
+  // « Mon stock » est l'espace du titulaire : le reste de l'équipe arrive ici par son propre onglet « Dates courtes ».
+  const canSeeStock = session.permissions.has(PERMISSIONS.MANAGEMENT_MENU);
 
   const { lots, counts, thresholds, today, truncated } = await listLots(session.scope, { level: filter.level, query });
   const countOf = (level: ExpiryLevel | null) => (level ? counts[level] : counts.ALL);
@@ -61,23 +62,25 @@ export default async function ShortDatesPage({ searchParams }: { searchParams: P
 
   return (
     <div className="space-y-6">
-      <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
-        <Link href="/stock">Retour au stock</Link>
-      </Button>
+      {canSeeStock && (
+        <Button asChild variant="ghost" size="sm" leadingIcon={<ArrowLeft className="size-4" />}>
+          <Link href="/stock">Retour au stock</Link>
+        </Button>
+      )}
 
       <PageHeader
         title="Dates courtes"
-        description="Les boîtes qui approchent de leur date de péremption, lot par lot. Suivre un lot ne change jamais la quantité du stock : votre logiciel de gestion reste la référence."
-        actions={canAdjust ? <AddLotButton today={today} thresholds={thresholds} /> : undefined}
+        description="Les boîtes qui approchent de leur date de péremption. Scannez une boîte et dites combien il y en a : à la date, le produit sort de la liste tout seul. Le stock de votre logiciel de gestion n'est jamais modifié."
+        actions={canAdjust ? <AddLotButton today={today} thresholds={thresholds} label="Scanner un produit" /> : undefined}
       />
 
       {nothingTracked ? (
         <Card>
           <EmptyState
             icon={<Hourglass className="size-5" />}
-            title="Aucun lot suivi pour l'instant"
-            description="Repérez une boîte proche de sa date, en rayon ou à la réception, et saisissez sa date telle qu'elle est imprimée. Elle apparaîtra ici, classée par urgence."
-            action={canAdjust ? <AddLotButton today={today} thresholds={thresholds} label="Ajouter un premier lot" /> : undefined}
+            title="Aucune date courte pour l'instant"
+            description="Repérez une boîte proche de sa date, en rayon ou à la réception : scannez-la à la douchette et indiquez le nombre de boîtes. Elle apparaîtra ici, classée par urgence, et PharmaBoost la proposera en priorité au comptoir."
+            action={canAdjust ? <AddLotButton today={today} thresholds={thresholds} label="Scanner un premier produit" /> : undefined}
           />
         </Card>
       ) : (
@@ -111,7 +114,7 @@ export default async function ShortDatesPage({ searchParams }: { searchParams: P
             </div>
           </div>
           <p className="text-[12.5px] text-text-tertiary">
-            Urgent : à {thresholds.urgentDays} jours ou moins · Bientôt : à {thresholds.soonDays} jours ou moins · Expiré : date dépassée.
+            Urgent : à {thresholds.urgentDays} jours ou moins · Bientôt : à {thresholds.soonDays} jours ou moins · Le jour de la date, le produit sort de la liste tout seul.
           </p>
 
           {lots.length === 0 ? (

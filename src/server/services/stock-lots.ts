@@ -113,6 +113,27 @@ export async function updateThresholds(scope: LotScope, input: { soonDays: numbe
 
 const LIST_LIMIT = 1000;
 
+/** La sortie automatique d'un lot dont la date est atteinte (fondateur, 16 oct. 2026) : il quitte l'onglet de lui-même. */
+export const REACHED_RESOLUTION = "DATE_ATTEINTE";
+
+/**
+ * Les lots dont la date de péremption est atteinte (le jour même, ou passée) sortent du suivi d'eux-mêmes : « quand la date
+ * est atteinte, le produit se supprime de l'onglet Dates courtes ». Ils ne sont pas effacés (la trace reste), seulement
+ * sortis, comme un lot vendu ou détruit. Sans `pharmacyId` : toutes les officines (passage du matin).
+ */
+export async function retireReachedLots(now: Date, pharmacyId?: string): Promise<number> {
+  if (pharmacyId) {
+    const settings = await loadSettings(pharmacyId);
+    const today = officeDay(now, settings.timeZone);
+    const { count } = await prisma.stockLot.updateMany({ where: { pharmacyId, resolvedAt: null, expiresOn: { lte: today } }, data: { resolvedAt: now, resolution: REACHED_RESOLUTION } });
+    return count;
+  }
+  // Toutes les officines : le jour de Paris (fuseau par défaut) ; une officine d'un autre fuseau est rattrapée à l'ouverture de sa liste.
+  const today = officeDay(now, "Europe/Paris");
+  const { count } = await prisma.stockLot.updateMany({ where: { resolvedAt: null, expiresOn: { lte: today } }, data: { resolvedAt: now, resolution: REACHED_RESOLUTION } });
+  return count;
+}
+
 /**
  * Les lots encore suivis (non sortis), du plus urgent au plus lointain, avec
  * les compteurs par niveau. `level` filtre la liste, jamais les compteurs.
@@ -124,6 +145,8 @@ export async function listLots(
   const settings = await loadSettings(scope.pharmacyId);
   const today = officeDay(options.today, settings.timeZone);
   const query = options.query?.trim().slice(0, 80) ?? "";
+  // Une date atteinte sort de la liste dès son ouverture, sans attendre le passage du matin.
+  await retireReachedLots(options.today ?? new Date(), scope.pharmacyId);
 
   const rows = await prisma.stockLot.findMany({
     where: {
@@ -392,7 +415,8 @@ export async function nearestShortDatesFor(pharmacyId: string, todayOrNow: Date)
     where: {
       pharmacyId,
       resolvedAt: null,
-      expiresOn: { gte: today, lte: addDays(today, settings.thresholds.soonDays) },
+      // Le jour même, la date est atteinte : le lot n'est plus suivi (retireReachedLots), il ne se pousse plus au comptoir.
+      expiresOn: { gt: today, lte: addDays(today, settings.thresholds.soonDays) },
       OR: [{ quantity: null }, { quantity: { gt: 0 } }],
     },
     select: { productId: true, presentationId: true, expiresOn: true },

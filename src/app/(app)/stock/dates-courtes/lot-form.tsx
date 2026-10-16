@@ -13,6 +13,21 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { ExpiryLevelBadge } from "./level-badge";
+import { parseScannedCode } from "../../../../../agent/src/scan-detect";
+
+/**
+ * Un passage de douchette dans le champ de recherche : un CIP, un EAN, ou le Datamatrix d'un médicament (dont on lit aussi la
+ * péremption). Rend le code à chercher et, pour un Datamatrix, la date telle qu'imprimée (« 31/03/2027 »). Une saisie au
+ * clavier (un nom) n'est pas un scan : rien.
+ */
+export function scannedInput(raw: string): { code: string; expiry: string | null } | null {
+  const text = raw.replace(/[\s\u001d]/g, "");
+  if (!/^(\](d2|c1|e0|q3))?\d{7,}[0-9A-Za-z]*$/i.test(text)) return null;
+  const box = parseScannedCode(text);
+  if (!box) return null;
+  const expiry = box.expiresOn ? box.expiresOn.split("-").reverse().join("/") : null;
+  return { code: box.code, expiry };
+}
 
 /** La référence du stock à laquelle un lot se rattache. */
 export type LotTarget = { kind: "PRODUCT" | "DRUG"; id: string; label: string; detail: string | null };
@@ -53,22 +68,42 @@ export function LotFormModal({
   const { push } = useToast();
 
   const trimmedQuery = query.trim();
+
   const canChooseTarget = !editing && !fixedTarget;
 
   useEffect(() => {
     if (!canChooseTarget || target || trimmedQuery.length < 2) return;
     let cancelled = false;
+    // La douchette tape le code touche par touche : il n'est lu qu'une fois la saisie finie (le délai ci-dessous).
     const timer = setTimeout(async () => {
-      const result = await searchStockItemsAction(trimmedQuery);
+      const scanned = scannedInput(trimmedQuery);
+      const result = await searchStockItemsAction(scanned?.code ?? trimmedQuery);
       if (cancelled) return;
       setResults(result.ok ? result.data : []);
       setSearchedFor(trimmedQuery);
+      // Le Datamatrix porte la péremption : elle se remplit seule (on peut la corriger).
+      if (scanned?.expiry) setExpiry(scanned.expiry);
+      // Un code lu à la douchette : la seule référence du stock qui le porte est choisie d'office, et le curseur passe au
+      // nombre de boîtes.
+      if (scanned && result.ok && result.data.length === 1) {
+        const only = result.data[0]!;
+        setTarget({ kind: only.kind, id: only.id, label: only.label, detail: only.detail });
+        setErrors((current) => ({ ...current, targetId: "" }));
+        setTimeout(() => document.getElementById("lot-quantity")?.focus(), 50);
+      }
     }, 250);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
   }, [canChooseTarget, target, trimmedQuery]);
+
+  // La fenêtre s'ouvre prête pour la douchette : le curseur dans le champ de recherche (la fenêtre place d'abord le sien).
+  useEffect(() => {
+    if (!canChooseTarget) return;
+    const timer = setTimeout(() => document.getElementById("lot-target")?.focus(), 120);
+    return () => clearTimeout(timer);
+  }, [canChooseTarget]);
 
   const visibleResults = !target && trimmedQuery.length >= 2 ? results : [];
   const searching = !target && trimmedQuery.length >= 2 && searchedFor !== trimmedQuery;
@@ -110,8 +145,8 @@ export function LotFormModal({
     <Modal
       open
       onClose={onClose}
-      title={editing ? "Corriger le lot" : "Ajouter un lot"}
-      description="Une date courte ne change jamais la quantité du stock : votre logiciel de gestion reste la référence."
+      title={editing ? "Corriger la date courte" : "Ajouter une date courte"}
+      description="Scannez la boîte à la douchette : le produit (et, pour un médicament, sa date) se remplissent seuls. À la date, le produit sort de la liste tout seul."
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={pending}>
@@ -159,7 +194,11 @@ export function LotFormModal({
                 id="lot-target"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Nom, marque, EAN ou CIP…"
+                onKeyDown={(event) => {
+                  // La douchette finit par Entrée : elle ne doit pas enregistrer un lot incomplet.
+                  if (event.key === "Enter") event.preventDefault();
+                }}
+                placeholder="Scannez la boîte, ou tapez un nom, un EAN, un CIP…"
                 leadingIcon={<Search className="size-4" />}
                 autoComplete="off"
                 aria-invalid={Boolean(errors.targetId)}
@@ -231,7 +270,7 @@ export function LotFormModal({
           </Field>
         </div>
 
-        <Field label="Quantité" htmlFor="lot-quantity" hint="Facultatif : le nombre de boîtes de ce lot." error={errors.quantity || null}>
+        <Field label="Nombre de boîtes en date courte" htmlFor="lot-quantity" hint="Facultatif : combien de boîtes de ce produit ont cette date." error={errors.quantity || null}>
           <Input
             id="lot-quantity"
             type="number"

@@ -1,4 +1,4 @@
-import { BarChart3, Box, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
+import { BarChart3, Box, CalendarClock, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 
 /**
@@ -108,7 +108,20 @@ export const NAVIGATION: NavItem[] = [
     // (une carte du comptoir peut mener à la fiche d'un produit) ; l'ENTRÉE de menu, elle, est celle du titulaire.
     permission: PERMISSIONS.MANAGEMENT_MENU,
     match: ["/stock", "/stocks", "/produits"],
+    except: ["/stock/dates-courtes"],
     description: "Ce que vous avez en rayon, la mise à jour du stock, les dates courtes",
+    group: "pharmacie",
+  },
+  {
+    href: "/stock/dates-courtes",
+    label: "Dates courtes",
+    subtitle: "Les boîtes qui approchent de leur date",
+    icon: CalendarClock,
+    // Dans l'espace de chacun (fondateur, 16 oct. 2026) : toute l'équipe voit la liste (STOCK_VIEW) ; le pharmacien, le
+    // préparateur et le titulaire y scannent une boîte (STOCK_ADJUST). À la date, le produit en sort tout seul.
+    permission: PERMISSIONS.STOCK_VIEW,
+    match: ["/stock/dates-courtes"],
+    description: "Scannez une boîte proche de sa date et indiquez combien il y en a : PharmaBoost la propose en priorité au comptoir",
     group: "pharmacie",
   },
   {
@@ -237,7 +250,7 @@ export const NAVIGATION: NavItem[] = [
  * Le menu d'un collaborateur (tout rôle autre que le titulaire) : ces entrées, et rien d'autre — plus le lien
  * « Contact support », toujours en bas du menu. Consigne du fondateur du 13 oct. 2026.
  */
-export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/historique", "/associations", "/emails-patients", "/formation", "/nouveautes"];
+export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/historique", "/associations", "/stock/dates-courtes", "/emails-patients", "/formation", "/nouveautes"];
 
 /**
  * Les entrées que voit une personne : celles dont elle détient la permission, et, hors de l'espace du titulaire
