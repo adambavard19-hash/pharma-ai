@@ -220,6 +220,7 @@ export const RANGE_CHIPS: { param: string; label: string }[] = [
   { param: "jour", label: "Aujourd'hui" },
   { param: "hier", label: "Hier" },
   { param: "semaine-en-cours", label: "Cette semaine" },
+  { param: "semaine-derniere", label: "Semaine dernière" },
   { param: "mois-en-cours", label: "Ce mois-ci" },
   { param: "semaine", label: "7 derniers jours" },
   { param: "mois", label: "30 derniers jours" },
@@ -256,6 +257,12 @@ export function resolveReportRange(raw: string | string[] | undefined | null, no
       const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
       const monday = addDays(today, -((weekday + 6) % 7));
       return { param, label: chip(param), from: midnightOf(monday, timeZone), to: now, byHour: false };
+    }
+    case "semaine-derniere": {
+      // Du lundi au dimanche de la semaine civile précédente (à Paris) — celle du bilan hebdomadaire des titulaires.
+      const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
+      const monday = addDays(today, -((weekday + 6) % 7) - 7);
+      return { param, label: chip(param), from: midnightOf(monday, timeZone), to: new Date(midnightOf(addDays(monday, 7), timeZone).getTime() - 1), byHour: false };
     }
     case "mois-en-cours":
       return { param, label: chip(param), from: midnightOf(`${today.slice(0, 7)}-01`, timeZone), to: now, byHour: false };

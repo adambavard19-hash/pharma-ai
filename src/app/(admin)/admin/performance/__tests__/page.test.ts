@@ -73,6 +73,14 @@ describe("la page Performance de la console", () => {
     expect(html).toContain("/admin/pharmacies/ph_b?onglet=performance&amp;periode=2026-10");
   });
 
+  it("le PDF de toutes les pharmacies et celui de chaque pharmacie suivent la période choisie", async () => {
+    const html = await render({ periode: "semaine-derniere" });
+    expect(html).toContain("/api/admin/performance/pdf?periode=semaine-derniere");
+    expect(html).toContain("/api/admin/pharmacies/ph_a/comptoir-pdf?periode=semaine-derniere");
+    expect(html).toContain("/api/admin/pharmacies/ph_b/comptoir-pdf?periode=semaine-derniere");
+    expect(text(html)).toContain("Télécharger le PDF · Semaine dernière");
+  });
+
   it("les pharmacies de démonstration ne sont pas lues hors environnement démo", async () => {
     await render();
     expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { isActive: true, isDemo: false } }));

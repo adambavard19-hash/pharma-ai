@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight, Check, Euro, Percent, Sparkles } from "lucide-react";
-import { prisma } from "@/server/db/client";
+import { ArrowUpRight, Check, Download, Euro, FileText, Percent, Sparkles } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
-import { loadSalesReport } from "@/server/services/counter-history";
-import { euros, percent, RANGE_CHIPS, resolveReportRange, type SalesReport } from "@/core/counter/sales-report";
-import { isDemoMode } from "@/config/env";
+import { loadPharmaciesPerformance } from "@/server/services/pharmacies-performance";
+import { euros, percent, RANGE_CHIPS, resolveReportRange } from "@/core/counter/sales-report";
 import { TIME_ZONE } from "@/config/constants";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AutoRefresh } from "@/components/app/auto-refresh";
@@ -28,16 +26,8 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
   const now = new Date();
   const range = resolveReportRange(params.periode, now, TIME_ZONE);
 
-  const pharmacies = await prisma.pharmacy.findMany({
-    where: { isActive: true, ...(isDemoMode() ? {} : { isDemo: false }) },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, city: true },
-  });
-  const reports: { id: string; name: string; city: string | null; report: SalesReport }[] = await Promise.all(
-    pharmacies.map(async (pharmacy) => ({ ...pharmacy, report: await loadSalesReport({ pharmacyId: pharmacy.id, range, now }) })),
-  );
   // Les pharmacies actives d'abord (le plus de chiffre d'affaires ajouté), celles sans vente ensuite.
-  reports.sort((a, b) => b.report.revenueCents - a.report.revenueCents || b.report.sold - a.report.sold || b.report.sales - a.report.sales || a.name.localeCompare(b.name, "fr"));
+  const reports = await loadPharmaciesPerformance(range, now);
   const total = reports.reduce((sum, { report }) => ({ sales: sum.sales + report.sales, proposed: sum.proposed + report.proposed, sold: sum.sold + report.sold, revenue: sum.revenue + report.revenueCents }), { sales: 0, proposed: 0, sold: 0, revenue: 0 });
   const today = new Intl.DateTimeFormat("fr-CA", { timeZone: TIME_ZONE }).format(now);
   const time = new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" }).format(now);
@@ -55,7 +45,17 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
       <AutoRefresh intervalMs={60_000} />
       <AdminPageHeader space={{ label: "Officines", href: "/admin/pharmacies" }} title="Performance" description={`Ce que PharmaBoost rapporte à chaque pharmacie · ${range.label}. Mis à jour à ${time}, toutes les minutes.`} />
 
-      <PeriodPicker current={range.param} today={today} hrefFor={{ base: BASE_PATH, ...Object.fromEntries(RANGE_CHIPS.map((chip) => [chip.param, href(chip.param)])) }} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PeriodPicker current={range.param} today={today} hrefFor={{ base: BASE_PATH, ...Object.fromEntries(RANGE_CHIPS.map((chip) => [chip.param, href(chip.param)])) }} />
+        <a
+          href={`/api/admin/performance/pdf?periode=${encodeURIComponent(range.param)}`}
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-600 px-4 text-[13.5px] font-semibold text-white hover:bg-brand-700"
+          data-pdf-toutes=""
+        >
+          <Download className="size-4" aria-hidden="true" />
+          Télécharger le PDF · {range.label}
+        </a>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-totaux="">
         {figures.map((figure) => (
@@ -73,7 +73,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
       <section className="overflow-hidden rounded-2xl bg-surface-card ring-1 ring-border-subtle" aria-labelledby="pharmacies-perf">
         <div className="border-b border-border-subtle px-5 py-4">
           <h2 id="pharmacies-perf" className="text-[15px] font-semibold text-text-primary">Chaque pharmacie · {range.label}</h2>
-          <p className="text-[12.5px] text-text-tertiary">Cliquez sur une pharmacie pour voir ses conseils un par un et télécharger son PDF.</p>
+          <p className="text-[12.5px] text-text-tertiary">Cliquez sur une pharmacie pour voir ses conseils un par un ; l&apos;icône PDF télécharge son rapport de la période.</p>
         </div>
         {reports.length === 0 ? (
           <p className="px-5 py-10 text-center text-[13.5px] text-text-tertiary">Aucune pharmacie cliente pour l&apos;instant.</p>
@@ -87,7 +87,8 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
                   <th className="px-3 py-3 text-right">Proposés</th>
                   <th className="px-3 py-3 text-right">Vendus</th>
                   <th className="px-3 py-3">Taux de vente</th>
-                  <th className="px-5 py-3 text-right">CA ajouté</th>
+                  <th className="px-3 py-3 text-right">CA ajouté</th>
+                  <th className="px-5 py-3 text-right">PDF</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
@@ -114,7 +115,17 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
                           <span className="tabular-nums text-text-secondary">{percent(rate)}</span>
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right font-semibold text-text-primary tabular-nums">{euros(report.revenueCents)}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-text-primary tabular-nums">{euros(report.revenueCents)}</td>
+                      <td className="px-5 py-3 text-right">
+                        <a
+                          href={`/api/admin/pharmacies/${id}/comptoir-pdf?periode=${encodeURIComponent(range.param)}`}
+                          className="inline-grid size-8 place-items-center rounded-lg text-text-tertiary hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-950 dark:hover:text-brand-300"
+                          aria-label={`Télécharger le PDF de ${name}`}
+                          title="Télécharger le PDF"
+                        >
+                          <FileText className="size-4" aria-hidden="true" />
+                        </a>
+                      </td>
                     </tr>
                   );
                 })}

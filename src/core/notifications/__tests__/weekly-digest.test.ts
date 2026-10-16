@@ -17,10 +17,10 @@ const base = (over: Partial<WeeklyDigestInput> = {}): WeeklyDigestInput => ({
 describe("le résumé de la semaine du titulaire", () => {
   it("les chiffres de la semaine, leur évolution, les challenges et le stock à surveiller", () => {
     const mail = buildWeeklyDigest(base(), ctx)!;
-    expect(mail.subject).toBe("Votre semaine — Pharmacie du Port");
+    expect(mail.subject).toBe("Votre bilan de la semaine — Pharmacie du Port");
     expect(mail.text).toContain("conseils proposés : 42 (+40 % vs semaine d'avant)");
-    expect(mail.text).toContain("conseils achetés : 11 (−8 % vs semaine d'avant)");
-    expect(mail.text).toContain("de ventes confirmées (TTC) : 190 € (nouveau cette semaine)");
+    expect(mail.text).toContain("conseils vendus : 11 (−8 % vs semaine d'avant)");
+    expect(mail.text).toContain("de chiffre d'affaires ajouté (TTC) : 190 € (nouveau cette semaine)");
     expect(mail.text).toContain("Challenge NATURÉO — jusqu'au 31 oct.");
     expect(mail.text).toContain("2 produits en rupture");
     expect(mail.text).toContain("En rupture : Échinacée, Pastilles gorge");

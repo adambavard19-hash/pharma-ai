@@ -35,6 +35,7 @@ export type SmtpTransport = {
     text: string;
     html?: string;
     headers?: Record<string, string>;
+    attachments?: { filename: string; content: Buffer; contentType: string }[];
   }): Promise<{ messageId?: string; rejected?: unknown[] }>;
 };
 
@@ -83,6 +84,7 @@ export class SmtpMessagingProvider implements MessagingProvider {
         text: message.text,
         ...(message.html ? { html: message.html } : {}),
         ...(message.headers && Object.keys(message.headers).length > 0 ? { headers: message.headers } : {}),
+        ...(message.attachments && message.attachments.length > 0 ? { attachments: message.attachments.map((file) => ({ filename: file.filename, content: Buffer.from(file.content), contentType: file.contentType })) } : {}),
       });
 
       // Un serveur peut accepter la connexion et rejeter le destinataire : ce

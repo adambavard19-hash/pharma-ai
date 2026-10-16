@@ -67,6 +67,16 @@ describe("le PDF du rapport", () => {
     const empty = await renderSalesReportPdf({ pharmacyName: "Officine", report: buildSalesReport({ period: "day", sales: [], now: NOW, timeZone: TZ }), generatedAt: NOW, timeZone: TZ });
     expect(empty.length).toBeGreaterThan(1000);
   });
+
+  it("le PDF « toutes les pharmacies » de la console : un vrai PDF, avec ou sans pharmacie", async () => {
+    const { renderPharmaciesReportPdf } = await import("../pharmacies-report-pdf");
+    const report = buildSalesReport({ period: "month", sales: [sale({ at: "2026-10-15T07:30:00Z", sold: 1, soldItems: [{ name: "Flore", priceCents: 1490, marginCents: null }] })], now: NOW, timeZone: TZ });
+    const rows = Array.from({ length: 60 }, (_, index) => ({ name: `Pharmacie n° ${index} — Côte d'Azur`, city: index % 2 ? "Nice" : null, report }));
+    const bytes = await renderPharmaciesReportPdf({ label: "Ce mois-ci", from: report.from, to: report.to, rows, generatedAt: NOW, timeZone: TZ });
+    expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
+    const empty = await renderPharmaciesReportPdf({ label: "Hier", from: report.from, to: report.to, rows: [], generatedAt: NOW, timeZone: TZ });
+    expect(empty.length).toBeGreaterThan(1000);
+  });
 });
 
 describe("les périodes du rapport de performance (console)", async () => {
@@ -81,6 +91,14 @@ describe("les périodes du rapport de performance (console)", async () => {
   it("cette semaine commence le lundi ; ce mois-ci le 1er", () => {
     expect(resolveReportRange("semaine-en-cours", now, "Europe/Paris").from.toISOString()).toBe("2026-10-11T22:00:00.000Z");
     expect(resolveReportRange("mois-en-cours", now, "Europe/Paris").from.toISOString()).toBe("2026-09-30T22:00:00.000Z");
+  });
+  it("la semaine dernière : du lundi au dimanche précédents, entiers (celle du bilan hebdomadaire)", () => {
+    const range = resolveReportRange("semaine-derniere", now, "Europe/Paris");
+    expect(range.from.toISOString()).toBe("2026-10-04T22:00:00.000Z");
+    expect(range.to.toISOString()).toBe("2026-10-11T21:59:59.999Z");
+    expect(range.label).toBe("Semaine dernière");
+    // Un lundi matin : la semaine qui vient de finir la veille.
+    expect(resolveReportRange("semaine-derniere", new Date("2026-10-12T06:00:00Z"), "Europe/Paris").from.toISOString()).toBe("2026-10-04T22:00:00.000Z");
   });
   it("un jour ou un mois dans le futur, ou impossible, retombe sur les 7 derniers jours", () => {
     expect(resolveReportRange("2026-10-20", now, "Europe/Paris").param).toBe("semaine");

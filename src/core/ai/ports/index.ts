@@ -158,6 +158,8 @@ export type OutgoingEmail = {
    * de la messagerie du destinataire.
    */
   headers?: Record<string, string>;
+  /** Pièces jointes (le rapport PDF du bilan hebdomadaire) : le contenu brut, encodé par chaque prestataire. */
+  attachments?: { filename: string; content: Uint8Array; contentType: string }[];
 };
 
 export interface MessagingProvider {

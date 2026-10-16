@@ -15,7 +15,10 @@ export type WeeklyDigestInput = {
   firstName?: string | null;
   /** « du lundi 5 au dimanche 11 octobre » */
   weekLabel: string;
+  /** Les conseils de la semaine au comptoir (ventes terminées) : proposés, vendus, chiffre d'affaires ajouté. */
   advice: { proposed: WeekMetric; purchased: WeekMetric; revenueTtcCents: WeekMetric } | null;
+  /** Le rapport PDF de la semaine est joint à l'e-mail. */
+  pdfAttached?: boolean;
   challenges: { title: string; endsLabel: string }[];
   stock: { out: number; low: number; outNames: string[] };
   links: { results: string; stock: string; challenges: string; unsubscribe: string };
@@ -54,14 +57,18 @@ export function buildWeeklyDigest(input: WeeklyDigestInput, ctx: EmailContext): 
       kind: "stats",
       items: [
         stat(String(advice.proposed.value), plural(advice.proposed.value, "conseil proposé", "conseils proposés"), advice.proposed),
-        stat(String(advice.purchased.value), plural(advice.purchased.value, "conseil acheté", "conseils achetés"), advice.purchased),
-        stat(euros(advice.revenueTtcCents.value), "de ventes confirmées (TTC)", advice.revenueTtcCents),
+        stat(String(advice.purchased.value), plural(advice.purchased.value, "conseil vendu", "conseils vendus"), advice.purchased),
+        stat(euros(advice.revenueTtcCents.value), "de chiffre d'affaires ajouté (TTC)", advice.revenueTtcCents),
       ],
     });
-    blocks.push({ kind: "note", text: "Ventes confirmées : les lignes de vente nées d'un conseil PharmaBoost dont le prix est connu. Un conseil accepté sans vente n'y est pas compté." });
+    const rate = advice.proposed.value > 0 ? Math.round((advice.purchased.value / advice.proposed.value) * 1000) / 10 : null;
+    blocks.push({
+      kind: "note",
+      text: `${rate === null ? "" : `Taux de vente : ${rate.toLocaleString("fr-FR")} % des conseils proposés ont été vendus. `}Compté sur les ventes terminées au comptoir : un conseil bipé (ou déclaré vendu) est vendu, au prix de vente de votre officine.${input.pdfAttached ? " Le rapport complet de la semaine est joint en PDF." : ""}`,
+    });
     blocks.push({ kind: "button", url: input.links.results, label: "Voir les résultats de la semaine" });
   } else {
-    blocks.push({ kind: "paragraph", text: "Aucun conseil n'a été proposé cette semaine : aucune délivrance n'a été scannée avec PharmaBoost." });
+    blocks.push({ kind: "paragraph", text: "Aucun conseil n'a été proposé cette semaine : aucune vente n'a été scannée avec PharmaBoost." });
   }
 
   if (input.challenges.length > 0) {
@@ -79,8 +86,8 @@ export function buildWeeklyDigest(input: WeeklyDigestInput, ctx: EmailContext): 
 
   const purchased = advice?.purchased.value ?? 0;
   return renderEmail(ctx, {
-    subject: `Votre semaine — ${pharmacy}`,
-    preheader: advice && advice.proposed.value > 0 ? `${advice.proposed.value} conseils proposés, ${purchased} achetés, ${euros(advice.revenueTtcCents.value)} de ventes confirmées.` : `Le point de la semaine de ${pharmacy}.`,
+    subject: `Votre bilan de la semaine — ${pharmacy}`,
+    preheader: advice && advice.proposed.value > 0 ? `${advice.proposed.value} conseils proposés, ${purchased} vendus, ${euros(advice.revenueTtcCents.value)} de chiffre d'affaires ajouté.` : `Le point de la semaine de ${pharmacy}.`,
     eyebrow: `Résumé de la semaine · ${input.weekLabel}`,
     title: `La semaine de ${pharmacy}`,
     greeting: input.firstName ? `Bonjour ${input.firstName},` : "Bonjour,",

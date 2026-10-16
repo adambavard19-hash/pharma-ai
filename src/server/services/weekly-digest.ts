@@ -4,11 +4,13 @@ import { recordAudit } from "@/server/audit/log";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { traceDispatch } from "@/server/services/email-dispatch";
 import { platformEmailContext } from "@/server/services/email-context";
-import { loadPerformanceReport } from "@/server/services/performance";
+import { loadSalesReport } from "@/server/services/counter-history";
+import { salesReportPdfFile } from "@/server/services/sales-report-file";
 import { publicUrl } from "@/server/public-url";
 import { signPayload, verifyPayload } from "@/server/security/tokens";
-import { resolvePerformancePeriod, zonedDateParts } from "@/core/performance/periods";
-import { buildWeeklyDigest, digestHasContent } from "@/core/notifications/weekly-digest";
+import { zonedDateParts } from "@/core/performance/periods";
+import { resolveReportRange } from "@/core/counter/sales-report";
+import { buildWeeklyDigest, digestHasContent, type WeekMetric } from "@/core/notifications/weekly-digest";
 import { TIME_ZONE } from "@/config/constants";
 
 /**
@@ -50,13 +52,28 @@ export async function setWeeklyDigestSubscription(userId: string, subscribed: bo
   return result.count > 0;
 }
 
-/** Les chiffres d'UNE officine pour la semaine : rien d'une autre (chaque lecture est filtrée sur son identifiant). */
-export async function weekFigures(pharmacyId: string, week: { from: string; to: string }, now: Date) {
-  const period = resolvePerformancePeriod({ key: "custom", now, timeZone: TIME_ZONE, from: week.from, to: week.to });
+/** Une valeur de la semaine et son évolution par rapport à la semaine d'avant (pas de pourcentage sans base). */
+export function metric(value: number, previous: number): WeekMetric {
+  const deltaPct = previous > 0 ? Math.round(((value - previous) / previous) * 100) : null;
+  return { value, previous, deltaPct, trend: previous === 0 && value === 0 ? "none" : value > previous ? "up" : value < previous ? "down" : "flat" };
+}
+
+/** La semaine civile précédente (lundi → dimanche, à Paris), au format des rapports du comptoir et de leur PDF. */
+export const WEEK_REPORT_PARAM = "semaine-derniere";
+
+/**
+ * Les chiffres d'UNE officine pour la semaine : rien d'une autre (chaque lecture est filtrée sur son identifiant). Les conseils
+ * viennent des ventes terminées au comptoir — les mêmes que la console, l'écran Résultats et le PDF (16 oct. 2026).
+ */
+export async function weekFigures(pharmacyId: string, now: Date) {
+  const range = resolveReportRange(WEEK_REPORT_PARAM, now, TIME_ZONE);
+  // La semaine d'avant, pour l'évolution (« +20 % par rapport à la semaine précédente »).
+  const before = { ...range, from: new Date(range.from.getTime() - 7 * DAY_MS), to: new Date(range.to.getTime() - 7 * DAY_MS) };
   const today = zonedDateParts(now, TIME_ZONE);
   const todayDate = new Date(Date.UTC(today.year, today.month - 1, today.day));
-  const [report, challenges, out, low, outNames] = await Promise.all([
-    loadPerformanceReport({ pharmacyId, period, now }),
+  const [report, previous, challenges, out, low, outNames] = await Promise.all([
+    loadSalesReport({ pharmacyId, range, now }),
+    loadSalesReport({ pharmacyId, range: before, now }),
     prisma.labChallenge.findMany({ where: { pharmacyId, status: "ACTIVE", startsAt: { lte: todayDate }, endsAt: { gte: todayDate } }, orderBy: { endsAt: "asc" }, take: 5, select: { title: true, endsAt: true } }),
     prisma.stockItem.count({ where: { pharmacyId, quantity: { lte: 0 }, product: { isActive: true, deletedAt: null } } }),
     prisma.stockItem.count({ where: { pharmacyId, quantity: { gt: 0, lte: prisma.stockItem.fields.alertThreshold }, product: { isActive: true, deletedAt: null } } }),
@@ -64,7 +81,7 @@ export async function weekFigures(pharmacyId: string, week: { from: string; to: 
   ]);
   const endsLabel = (date: Date) => `jusqu'au ${new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC", day: "numeric", month: "short" }).format(date)}`;
   return {
-    advice: report.empty ? null : { proposed: report.funnel.proposed, purchased: report.funnel.purchased, revenueTtcCents: report.revenue.confirmedTtcCents },
+    advice: report.sales === 0 ? null : { proposed: metric(report.proposed, previous.proposed), purchased: metric(report.sold, previous.sold), revenueTtcCents: metric(report.revenueCents, previous.revenueCents) },
     challenges: challenges.map((challenge) => ({ title: challenge.title, endsLabel: endsLabel(challenge.endsAt) })),
     stock: { out, low, outNames: outNames.map((row) => row.product.name.replace(/,.*$/, "").trim()) },
   };
@@ -101,8 +118,10 @@ export async function sendWeeklyOwnerDigests(now: Date = new Date(), options: { 
     });
     if (owners.length === 0) { run.skipped += 1; continue; }
 
-    const figures = await weekFigures(pharmacy.id, week, now);
+    const figures = await weekFigures(pharmacy.id, now);
     if (!digestHasContent(figures)) { run.skipped += 1; continue; }
+    // Le rapport PDF de la semaine, joint : le même que celui de la console. Sans lui (erreur de dessin), l'e-mail part quand même.
+    const pdf = figures.advice ? await salesReportPdfFile(pharmacy.id, { param: WEEK_REPORT_PARAM }, now).catch(() => null) : null;
 
     let delivered = false;
     for (const { user } of owners) {
@@ -112,13 +131,14 @@ export async function sendWeeklyOwnerDigests(now: Date = new Date(), options: { 
           firstName: user.firstName,
           weekLabel: week.label,
           ...figures,
+          pdfAttached: pdf !== null,
           links: { results: publicUrl(`/resultats?periode=perso&du=${week.from}&au=${week.to}`), stock: publicUrl("/stock"), challenges: publicUrl("/pilotage"), unsubscribe: weeklyDigestUnsubscribeUrl(user.id) },
         },
         ctx,
       );
       if (!mail) continue;
       const outcome = await messaging
-        .sendEmail({ to: user.email, fromName: "PharmaBoost", subject: mail.subject, text: mail.text, html: mail.html })
+        .sendEmail({ to: user.email, fromName: "PharmaBoost", subject: mail.subject, text: mail.text, html: mail.html, ...(pdf ? { attachments: [{ filename: pdf.fileName, content: pdf.bytes, contentType: "application/pdf" }] } : {}) })
         .catch((error: unknown) => ({ status: "FAILED" as const, provider: messaging.info.id, detail: error instanceof Error ? error.message : "Envoi impossible." }));
       await traceDispatch({ kind: "OWNER_WEEKLY", recipient: user.email, outcome, subject: mail.subject, templateKey, trigger: "AUTOMATIC", pharmacyId: pharmacy.id, userId: user.id });
       if (outcome.status !== "FAILED") delivered = true;
