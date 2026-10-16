@@ -3,7 +3,7 @@ import { FileText } from "lucide-react";
 import { requireSalesSession } from "@/server/auth/sales-session";
 import { loadPublicPricing } from "@/server/services/public-pricing";
 import { Plaquette } from "@/components/plaquette/plaquette";
-import { PLAQUETTE_GENERIC_PDF } from "@/components/plaquette/contact";
+import { PLAQUETTE_GENERIC_PDF, PLAQUETTE_SALES_GUIDE_PDF } from "@/components/plaquette/contact";
 import { PrintButton } from "./print-button";
 
 /** Le titre de l'onglet est aussi le nom proposé pour le fichier PDF. */
@@ -38,7 +38,15 @@ export default async function SalesBrochurePage() {
             className="inline-flex h-10 items-center gap-2 rounded-md border border-border-default px-4 text-sm font-medium text-text-primary hover:bg-surface-sunken"
           >
             <FileText className="size-[18px]" aria-hidden="true" />
-            Version générique (PDF)
+            Plaquette de présentation (PDF)
+          </a>
+          <a
+            href={PLAQUETTE_SALES_GUIDE_PDF}
+            download
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-border-default px-4 text-sm font-medium text-text-primary hover:bg-surface-sunken"
+          >
+            <FileText className="size-[18px]" aria-hidden="true" />
+            Guide du commercial (PDF)
           </a>
         </div>
       </div>

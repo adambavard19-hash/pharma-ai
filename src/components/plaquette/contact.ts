@@ -13,6 +13,9 @@ export const PLAQUETTE_SITE = "pharmaboost.app";
 /** La version générique en PDF, produite par `npm run plaquette:pdf` dans `public/` et servie à cette adresse. */
 export const PLAQUETTE_GENERIC_PDF = "/plaquette/pharmaboost-plaquette.pdf";
 
+/** Le guide interne des commerciaux (produit, LGO, vocabulaire, objections, abonnement), produit par `scripts/plaquettes-pdf.mjs`. */
+export const PLAQUETTE_SALES_GUIDE_PDF = "/plaquette/pharmaboost-guide-commercial.pdf";
+
 /**
  * Un numéro français lisible : « 0612345678 » → « 06 12 34 56 78 », « +33612345678 » → « +33 6 12 34 56 78 ». Tout autre format
  * reste tel qu'il a été saisi : rien n'est deviné.

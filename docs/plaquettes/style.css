@@ -1,0 +1,77 @@
+/* Direction artistique PharmaBoost (vert profond, accent anis, menthe) — feuilles A4 imprimées en PDF. */
+@page { size: A4; margin: 0; }
+:root {
+  --deep: #03171a;
+  --green: #072a25;
+  --green-2: #0a332d;
+  --mint: #22c995;
+  --mint-soft: #58f2d8;
+  --lime: #e4f98a;
+  --ink: #0d1f1d;
+  --body: #3d4f4c;
+  --muted: #6b7c79;
+  --line: #e3ebe8;
+  --tint: #f2f8f5;
+  --tint-2: #e6f4ee;
+  --amber: #b26b00;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html, body { background: #fff; }
+body { font-family: "Plus Jakarta Sans", system-ui, sans-serif; color: var(--ink); font-size: 13px; line-height: 1.55; text-wrap: pretty; }
+.page { position: relative; width: 210mm; height: 297mm; overflow: hidden; break-after: page; padding: 56px 60px 44px; display: flex; flex-direction: column; }
+.page:last-child { break-after: auto; }
+.dark { background: radial-gradient(70% 45% at 75% 30%, #0e3b34 0%, transparent 70%), linear-gradient(170deg, var(--green) 0%, var(--deep) 75%); color: #eaf5f1; }
+.dark .muted { color: #9fb7b1; }
+
+/* En-tête et pied */
+.top { display: flex; align-items: center; justify-content: space-between; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -0.015em; }
+.brand img { width: 34px; height: 34px; }
+.brand b { color: var(--mint); font-weight: 700; }
+.dark .brand b { color: var(--mint-soft); }
+.folio { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.dark .folio { color: #8fb0a8; }
+.foot { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); }
+.dark .foot { border-color: rgba(255,255,255,.12); color: #8fb0a8; }
+
+/* Titres */
+.kicker { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 700; color: var(--mint); }
+.dark .kicker { color: var(--mint-soft); }
+h1 { font-size: 58px; line-height: 1.02; letter-spacing: -0.045em; font-weight: 800; }
+h2 { font-size: 36px; line-height: 1.08; letter-spacing: -0.035em; font-weight: 800; margin-top: 12px; }
+h3 { font-size: 17px; line-height: 1.25; letter-spacing: -0.02em; font-weight: 700; }
+.hl { color: var(--mint); }
+.dark .hl { color: var(--lime); }
+.lead { font-size: 15.5px; line-height: 1.6; color: var(--body); margin-top: 14px; max-width: 560px; }
+.dark .lead { color: #c4d8d2; }
+p + p { margin-top: 8px; }
+
+/* Blocs */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.card { border: 1px solid var(--line); border-radius: 18px; padding: 20px 20px 18px; background: #fff; }
+.card.tint { background: var(--tint); border-color: transparent; }
+.card p { color: var(--body); font-size: 12.5px; margin-top: 6px; }
+.num { display: inline-flex; width: 30px; height: 30px; border-radius: 999px; align-items: center; justify-content: center; background: var(--green); color: var(--lime); font-weight: 800; font-size: 13px; }
+.icon { width: 38px; height: 38px; border-radius: 12px; background: var(--tint-2); color: var(--green); display: inline-flex; align-items: center; justify-content: center; font-size: 19px; margin-bottom: 12px; }
+.band { border-radius: 22px; padding: 24px 28px; background: linear-gradient(160deg, var(--green-2), var(--deep)); color: #eaf5f1; }
+.band h3 { color: #fff; font-size: 21px; }
+.band p { color: #bcd3cc; }
+.shot { display: block; max-width: 100%; height: auto; }
+.caption { font-size: 10.5px; color: var(--muted); margin-top: 6px; }
+.dark .caption { color: #8fb0a8; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 12px; font-size: 11.5px; font-weight: 600; }
+.pill.mint { background: var(--tint-2); color: var(--green); }
+.pill.dark { background: rgba(255,255,255,.08); color: #d8ece6; border: 1px solid rgba(255,255,255,.12); }
+ul.check { list-style: none; }
+ul.check li { position: relative; padding-left: 22px; margin-top: 7px; color: var(--body); font-size: 12.5px; }
+ul.check li::before { content: ""; position: absolute; left: 0; top: 5px; width: 13px; height: 13px; border-radius: 50%; background: var(--mint) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M4 8.5l2.5 2.5L12 5.5' stroke='white' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") center/10px no-repeat; }
+.dark ul.check li { color: #c4d8d2; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 0 10px 8px 0; border-bottom: 1px solid var(--line); }
+td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--body); }
+td b { color: var(--ink); }
+.say { color: #0c7a55; font-weight: 600; }
+.nosay { color: #b4322a; font-weight: 600; text-decoration: line-through; text-decoration-thickness: 1px; }
+.big { font-size: 46px; line-height: 1; font-weight: 800; letter-spacing: -0.04em; }
+.small { font-size: 11px; color: var(--muted); }

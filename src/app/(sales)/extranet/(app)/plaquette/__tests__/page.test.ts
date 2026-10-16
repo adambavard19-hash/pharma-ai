@@ -47,7 +47,8 @@ describe("la plaquette de l'extranet", () => {
     expect(text).toContain("Votre plaquette, avec vos coordonnées");
     expect(text).toContain("Télécharger en PDF");
     expect(text).toContain("Enregistrer au format PDF");
-    expect(html).toMatch(/<a href="\/plaquette\/pharmaboost-plaquette\.pdf" download=""[^>]*>[\s\S]*?Version générique \(PDF\)/);
+    expect(html).toMatch(/<a href="\/plaquette\/pharmaboost-plaquette\.pdf" download=""[^>]*>[\s\S]*?Plaquette de présentation \(PDF\)/);
+    expect(html).toMatch(/<a href="\/plaquette\/pharmaboost-guide-commercial\.pdf" download=""[^>]*>[\s\S]*?Guide du commercial \(PDF\)/);
     // L'en-tête de la page ne part pas à l'impression : seules les feuilles A4.
     expect(html).toMatch(/class="[^"]*print:hidden[^"]*"[^>]*>\s*<div class="max-w-xl">/);
     expect(html.match(/class="plq-page"/g)).toHaveLength(6);

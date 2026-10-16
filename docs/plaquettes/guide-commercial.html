@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>PharmaBoost — Guide du commercial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .page { padding: 50px 56px 40px; }
+  h2 { font-size: 31px; }
+  .lead { font-size: 14px; margin-top: 10px; max-width: none; }
+  .toc { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 30px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,.12); }
+  .toc div { display: flex; gap: 12px; align-items: baseline; font-size: 13.5px; color: #e2f0eb; font-weight: 600; }
+  .toc span { color: var(--lime); font-size: 12px; font-weight: 700; min-width: 22px; }
+  .quote { border-left: 4px solid var(--mint); background: var(--tint); border-radius: 0 16px 16px 0; padding: 16px 20px; font-size: 15px; line-height: 1.55; font-weight: 600; color: var(--ink); }
+  .flow { display: grid; grid-template-columns: 1fr 34px 1fr 34px 1fr; align-items: stretch; margin-top: 16px; }
+  .flow .box { border-radius: 16px; padding: 16px; border: 1px solid var(--line); background: #fff; }
+  .flow .box.pb { background: linear-gradient(160deg, var(--green-2), var(--deep)); color: #eaf5f1; border: 0; }
+  .flow .box.pb p { color: #bcd3cc; }
+  .flow .box p { font-size: 11.5px; color: var(--body); margin-top: 5px; }
+  .flow .arrow { display: flex; align-items: center; justify-content: center; color: var(--mint); font-size: 22px; font-weight: 800; }
+  .anno { display: grid; grid-template-columns: 300px 1fr; gap: 24px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .anno:last-child { border-bottom: 0; }
+  .anno h3 { font-size: 15.5px; }
+  .anno p, .anno li { font-size: 12px; color: var(--body); }
+  .anno ul { margin-top: 6px; padding-left: 16px; }
+  .anno li { margin-top: 3px; }
+  .persona { border-radius: 18px; padding: 18px 20px; border: 1px solid var(--line); }
+  .persona h3 { font-size: 16px; }
+  .persona .who { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .persona ul.check li { font-size: 12px; margin-top: 5px; }
+  .obj { padding: 11px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 220px 1fr; gap: 20px; }
+  .obj:last-child { border-bottom: 0; }
+  .obj b { font-size: 13px; color: var(--ink); }
+  .obj p { font-size: 12px; color: var(--body); }
+  .calc td { font-size: 13px; padding: 9px 10px 9px 0; }
+  .calc td:last-child { text-align: right; font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .price { border-radius: 18px; padding: 18px 20px; background: var(--tint); }
+  .price .big { font-size: 38px; }
+  .gloss td:first-child { width: 150px; font-weight: 700; color: var(--ink); }
+  .tight td { padding: 6px 10px 6px 0; font-size: 11.5px; line-height: 1.45; }
+</style>
+</head>
+<body>
+
+<!-- 1 · Couverture -->
+<section class="page dark">
+  <div class="top">
+    <span class="brand"><img src="img/logo-robot.svg" alt=""><span>Pharma<b>Boost</b></span></span>
+    <span class="folio">Usage interne · commerciaux</span>
+  </div>
+  <div style="margin-top:70px">
+    <span class="pill dark">Guide du commercial</span>
+    <h1 style="margin-top:18px">Tout comprendre<br>pour bien <span class="hl">présenter<br>PharmaBoost.</span></h1>
+    <p class="lead" style="max-width:520px; font-size:15.5px">Le produit, le vocabulaire de l’officine, les arguments qui font mouche, les réponses aux objections et le calcul de l’abonnement. À lire avant votre premier rendez-vous.</p>
+  </div>
+  <div style="margin:36px 0 0; display:flex; justify-content:center">
+    <img src="img/3-vendu.png" alt="" style="width:440px; filter: drop-shadow(0 30px 50px rgba(0,0,0,.45))">
+  </div>
+  <div class="toc">
+    <div><span>01</span>PharmaBoost en une minute</div>
+    <div><span>05</span>Les mots justes</div>
+    <div><span>02</span>L’officine et ses logiciels (LGO)</div>
+    <div><span>06</span>Les arguments, par interlocuteur</div>
+    <div><span>03</span>Le comptoir, écran par écran</div>
+    <div><span>07</span>Les objections et vos réponses</div>
+    <div><span>04</span>Ce que PharmaBoost propose</div>
+    <div><span>08</span>L’abonnement et la démarche</div>
+  </div>
+</section>
+
+<!-- 2 · En une minute -->
+<section class="page">
+  <div class="top"><span class="brand"><img src="img/logo-robot.svg" alt=""><span>Pharma<b>Boost</b></span></span><span class="folio">01 · En une minute</span></div>
+  <div style="margin-top:34px">
+    <p class="kicker">01 · PharmaBoost en une minute</p>
+    <h2>Un copilote au comptoir,<br><span class="hl">qui pense au conseil à chaque vente.</span></h2>
+    <p class="lead">PharmaBoost s’installe sur les postes de comptoir de la pharmacie. Quand l’équipe scanne une boîte, une petite bannière s’affiche à l’écran et propose le produit conseil qui accompagne ce médicament, pris dans le stock de la pharmacie. Le pharmacien le propose au client. S’il l’achète, il le bipe : c’est compté comme vendu, automatiquement.</p>
+  </div>
+
+  <p class="kicker" style="margin-top:26px">Le pitch en 20 secondes</p>
+  <div class="quote" style="margin-top:10px">« Vos équipes connaissent les conseils, mais au comptoir elles n’y pensent pas à chaque vente, et n’osent pas toujours. PharmaBoost leur montre, au moment du scan, le bon produit conseil, en stock dans votre pharmacie. Elles n’ont plus qu’à le proposer : vous vendez plus de conseils, sans rien changer à votre logiciel. »</div>
+
+  <p class="kicker" style="margin-top:26px">Le problème que nous réglons</p>
+  <div class="grid3" style="margin-top:10px">
+    <div class="card tint"><h3>On n’y pense pas</h3><p>Le pharmacien connaît les associations, mais avec la file d’attente, il n’y pense pas à chaque vente.</p></div>
+    <div class="card tint"><h3>On n’ose pas</h3><p>Proposer un produit en plus peut sembler « vendeur ». Quand l’écran le suggère, ça devient naturel.</p></div>
+    <div class="card tint"><h3>On ne sait pas tout</h3><p>Personne ne connaît par cœur tout le stock, les dates courtes ou les challenges en cours avec les laboratoires.</p></div>
+  </div>
+
+  <div class="band" style="margin-top:auto">
+    <h3>Ce qu’il faut retenir</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 26px; margin-top:8px">
+      <ul class="check"><li style="color:#d6e8e2">PharmaBoost propose, le pharmacien décide</li><li style="color:#d6e8e2">Il propose des produits conseils, jamais à la place du traitement</li></ul>
+      <ul class="check"><li style="color:#d6e8e2">Rien à changer : logiciel, robot, habitudes</li><li style="color:#d6e8e2">Tout est automatique, même le « Vendu »</li></ul>
+    </div>
+  </div>
+  <div class="foot" style="margin-top:18px"><span>PharmaBoost · Guide du commercial</span><span>2 / 8</span></div>
+</section>
+
+<!-- 3 · LGO -->
+<section class="page">
+  <div class="top"><span class="brand"><img src="img/logo-robot.svg" alt=""><span>Pharma<b>Boost</b></span></span><span class="folio">02 · L’officine et ses logiciels</span></div>
+  <div style="margin-top:34px">
+    <p class="kicker">02 · L’officine et ses logiciels</p>
+    <h2>Le LGO, c’est le cœur de la pharmacie.<br><span class="hl">PharmaBoost ne le remplace pas.</span></h2>
+  </div>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="card">
+      <h3>Qu’est-ce qu’un LGO ?</h3>
+      <p><b>LGO = Logiciel de Gestion d’Officine.</b> Toutes les pharmacies en ont un. C’est leur logiciel de caisse et de gestion : il enregistre chaque vente, gère le stock, les commandes aux grossistes, la facturation à la Sécurité sociale et aux mutuelles.</p>
+      <p>Les plus courants : <b>LGPI</b> (Pharmagest), <b>Winpharma</b>, <b>Smart Rx</b>, <b>LEO</b>. Le pharmacien y passe toute sa journée : il n’en changera pas, et on ne le lui demande pas.</p>
+    </div>
+    <div class="card">
+      <h3>Et le robot ?</h3>
+      <p>Beaucoup de pharmacies ont un <b>robot</b> (un automate) : une grande armoire qui range les boîtes et les envoie au comptoir. Il est relié au LGO.</p>
+      <p><b>PharmaBoost n’y touche pas.</b> Le robot continue de fonctionner exactement comme avant. La <b>douchette</b>, c’est le lecteur de codes-barres du comptoir : l’équipe continue de scanner avec.</p>
+    </div>
+  </div>
+
+  <p class="kicker" style="margin-top:24px">Comment ça s’articule</p>
+  <div class="flow">
+    <div class="box"><h3 style="font-size:14.5px">1 · La douchette</h3><p>Le pharmacien scanne la boîte, comme d’habitude.</p></div>
+    <div class="arrow">→</div>
+    <div class="box"><h3 style="font-size:14.5px">2 · Le LGO (inchangé)</h3><p>La vente s’enregistre dans le logiciel de la pharmacie, comme avant.</p></div>
+    <div class="arrow">+</div>
+    <div class="box pb"><h3 style="font-size:14.5px; color:#fff">3 · PharmaBoost, à côté</h3><p>Il voit le même scan, cherche le conseil dans le stock et affiche la bannière.</p></div>
+  </div>
+
+  <div class="grid2" style="margin-top:22px">
+    <div class="card tint">
+      <h3>Tout fonctionne automatiquement</h3>
+      <ul class="check" style="margin-top:6px">
+        <li>Le scan déclenche le conseil, sans clic</li>
+        <li>Un conseil bipé passe en « Vendu » tout seul</li>
+        <li>Avec LGPI, la fin de la vente est détectée toute seule</li>
+        <li>Les mises à jour s’installent seules, jamais pendant une vente</li>
+      </ul>
+    </div>
+    <div class="card tint">
+      <h3>Rien à remplacer, rien à changer</h3>
+      <ul class="check" style="margin-top:6px">
+        <li>Le LGO reste, les données restent dedans</li>
+        <li>Le robot reste tel quel</li>
+        <li>La douchette et les postes restent les mêmes</li>
+        <li>L’installation : un fichier par poste, faite avec la pharmacie</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="small" style="margin-top:auto; padding-top:14px"><b>Compatibilité, à dire honnêtement :</b> PharmaBoost est en service avec LGPI. Pour un autre LGO, faites valider l’installation par l’équipe PharmaBoost avant de vous engager auprès de la pharmacie.</p>
+  <div class="foot" style="margin-top:12px"><span>PharmaBoost · Guide du commercial</span><span>3 / 8</span></div>
+</section>
+
+<!-- 4 · Le comptoir écran par écran -->
+<section class="page">
+  <div class="top"><span class="brand"><img src="img/logo-robot.svg" alt=""><span>Pharma<b>Boost</b></span></span><span class="folio">03 · Le comptoir</span></div>
+  <div style="margin-top:34px">
+    <p class="kicker">03 · Le comptoir, écran par écran</p>
+    <h2>Ce que voit l’équipe,<br><span class="hl">et ce que vous devez savoir expliquer.</span></h2>
+  </div>
+  <div style="margin-top:14px">
+    <div class="anno">
+      <img class="shot" src="img/1-analyse.png" alt="">
+      <div><h3>1 · L’analyse</h3><p>Dès le scan, PharmaBoost lit la boîte et vérifie le stock de la pharmacie. Quelques instants, sans rien bloquer : le pharmacien continue sa vente dans son LGO.</p></div>
+    </div>
+    <div class="anno">
+      <img class="shot" src="img/3-vendu-replie.png" alt="">
+      <div><h3>2 · La bannière discrète</h3><p>Repliée en haut de l’écran : « 2 conseils suggérés ». Elle ne gêne jamais le logiciel et ne prend jamais le clavier. On la survole pour voir les conseils.</p></div>
+    </div>
+    <div class="anno">
+      <img class="shot" src="img/3-vendu.png" alt="">
+      <div><h3>3 · Les conseils</h3>
+        <ul>
+          <li><b>Le produit et son prix</b>, avec la raison en une phrase (« Protéger la flore pendant l’antibiotique »)</li>
+          <li><b>En stock · 12</b> : la quantité en rayon, jamais un produit absent</li>
+          <li><b>Date courte</b> : un lot qui périme bientôt, à écouler en priorité</li>
+          <li><b>Challenge</b> : un objectif en cours avec le laboratoire</li>
+          <li><b>À proposer → ✓ Vendu</b> : le client accepte, on bipe le produit, c’est compté</li>
+        </ul>
+      </div>
+    </div>
+    <div class="anno">
+      <img class="shot" src="img/5-terminee.png" alt="">
+      <div><h3>4 · La fin de vente</h3><p>« Bravo ! 1 conseil vendu ». Le résumé de la vente et le compteur du jour motivent l’équipe. Le patient peut recevoir ses conseils par e-mail s’il le souhaite.</p></div>
+    </div>
+  </div>
+  <div class="foot" style="margin-top:auto"><span>Captures réelles du logiciel, sur une vente d’exemple.</span><span>4 / 8</span></div>
+</section>
+
+<!-- 5 · Ce que PharmaBoost propose + suivi -->
+<section class="page">
+  <div class="top"><span class="brand"><img src="img/logo-robot.svg" alt=""><span>Pharma<b>Boost</b></span></span><span class="folio">04 · Ce qui est proposé</span></div>
+  <div style="margin-top:34px">
+    <p class="kicker">04 · Ce que PharmaBoost propose</p>
+    <h2>On scanne un médicament.<br><span class="hl">PharmaBoost propose un produit conseil.</span></h2>
+    <p class="lead">C’est la nuance la plus importante. PharmaBoost ne propose jamais un autre médicament du traitement : il propose ce qui l’accompagne, en vente libre, dans le rayon de la pharmacie.</p>
+  </div>
+
+  <div class="grid3" style="margin-top:22px">
+    <div class="card tint"><h3>Médicaments conseils</h3><p>Les médicaments vendus sans ordonnance, conseillés par le pharmacien. Ex. : un spray nasal, une pastille pour la gorge.</p></div>
+    <div class="card tint"><h3>Parapharmacie</h3><p>Dermo-cosmétique, hygiène, solaire, soins. Ex. : une crème solaire avec un traitement qui rend la peau sensible au soleil.</p></div>
+    <div class="card tint"><h3>Compléments alimentaires</h3><p>Probiotiques, vitamines, minéraux. Ex. : un probiotique pendant un antibiotique.</p></div>
+  </div>
+
+  <div class="grid2" style="margin-top:22px">
+    <div class="card">
+      <h3>D’où viennent les conseils ?</h3>
+      <p>D’une bibliothèque commune à toutes les pharmacies, suivie par une pharmacienne de l’équipe PharmaBoost. La pharmacie n’a rien à paramétrer : PharmaBoost choisit dans <b>son</b> stock, en tenant compte des dates courtes et des challenges.</p>
+      <p>Les mises en garde aussi : PharmaBoost rappelle ce qu’il ne faut pas associer.</p>
+    </div>
+    <div class="card">
+      <h3>Ce que le titulaire suit</h3>
+      <ul class="check" style="margin-top:6px">
+        <li>Conseils proposés, conseils vendus, taux de vente, chiffre d’affaires ajouté</li>
+        <li>Les résultats de chaque collaborateur</li>
+        <li>Un bilan par e-mail chaque matin, avec le PDF de la veille</li>
+        <li>Chaque membre de l’équipe reçoit aussi ses propres résultats</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="band" style="margin-top:auto">
+    <h3>Les dates courtes et les challenges : un argument fort</h3>
+    <p style="margin-top:6px">Une <b style="color:#fff">date courte</b>, c’est un produit qui périme bientôt : s’il n’est pas vendu, il est perdu. Un <b style="color:#fff">challenge</b>, c’est un objectif de vente négocié avec un laboratoire, qui rapporte une remise s’il est atteint. Au comptoir, personne ne les a en tête : PharmaBoost les met en avant, au bon moment.</p>
+  </div>
+  <div class="foot" style="margin-top:18px"><span>PharmaBoost · Guide du commercial</span><span>5 / 8</span></div>
+</section>
+
+<!-- 6 · Les mots justes -->
+<section class="page">
+  <div class="top"><span class="brand"><img src="img/logo-robot.svg" alt=""><span>Pharma<b>Boost</b></span></span><span class="folio">05 · Les mots justes</span></div>
+  <div style="margin-top:34px">
+    <p class="kicker">05 · Les mots justes</p>
+    <h2>Parler comme un pharmacien,<br><span class="hl">c’est déjà être crédible.</span></h2>
+  </div>
+
+  <table class="tight" style="margin-top:16px">
+    <tr><th style="width:44%">À dire</th><th>À éviter</th><th style="width:26%">Pourquoi</th></tr>
+    <tr><td class="say">« PharmaBoost propose des produits conseils : médicaments conseils, parapharmacie, compléments »</td><td class="nosay">« Il propose des médicaments »</td><td>Le traitement est prescrit ; on ne propose que ce qui l’accompagne.</td></tr>
+    <tr><td class="say">« PharmaBoost propose, le pharmacien décide »</td><td class="nosay">« L’IA choisit pour vous »</td><td>Le pharmacien garde toujours la main.</td></tr>
+    <tr><td class="say">« À chaque vente »</td><td class="nosay">« À chaque ordonnance »</td><td>Ça marche aussi pour les ventes sans ordonnance.</td></tr>
+    <tr><td class="say">« Il s’installe à côté de votre LGO »</td><td class="nosay">« Il se branche dans / remplace votre logiciel »</td><td>Le LGO n’est jamais modifié.</td></tr>
+    <tr><td class="say">« Une estimation, avec vos chiffres »</td><td class="nosay">« Vous allez gagner 3 500 € par mois »</td><td>Jamais de promesse de résultat.</td></tr>
+    <tr><td class="say">« Le conseil qui accompagne le traitement »</td><td class="nosay">« Un diagnostic », « une prescription »</td><td>PharmaBoost ne diagnostique pas et ne prescrit pas.</td></tr>
+    <tr><td class="say">« Aucune donnée patient conservée »</td><td class="nosay">« On analyse vos patients »</td><td>Seules les boîtes et les conseils comptent.</td></tr>
+  </table>
+
+  <p class="kicker" style="margin-top:22px">Le petit lexique de l’officine</p>
+  <table class="gloss tight" style="margin-top:6px">
+    <tr><td>Titulaire</td><td>Le pharmacien propriétaire de la pharmacie. C’est lui qui signe.</td></tr>
+    <tr><td>Adjoint</td><td>Pharmacien salarié de la pharmacie.</td></tr>
+    <tr><td>Préparateur</td><td>Préparateur en pharmacie : il sert au comptoir, sans être pharmacien. C’est souvent lui qui hésite le plus sur les conseils.</td></tr>
+    <tr><td>Comptoir / poste</td><td>Chaque caisse de la pharmacie, avec son ordinateur et sa douchette.</td></tr>
+    <tr><td>LGO</td><td>Logiciel de Gestion d’Officine (LGPI, Winpharma, Smart Rx, LEO…).</td></tr>
+    <tr><td>Robot</td><td>L’automate qui range et sort les boîtes. PharmaBoost n’y touche pas.</td></tr>
+    <tr><td>Date courte</td><td>Produit qui périme bientôt, à vendre en priorité.</td></tr>
+    <tr><td>Challenge</td><td>Objectif de vente négocié avec un laboratoire, qui rapporte une remise.</td></tr>
+    <tr><td>Panier moyen</td><td>Le montant moyen d’une vente. Les conseils le font monter.</td></tr>
+  </table>
+  <div class="foot" style="margin-top:auto"><span>PharmaBoost · Guide du commercial</span><span>6 / 8</span></div>
+</section>
+
+<!-- 7 · Arguments et objections -->
+<section class="page">
+  <div class="top"><span class="brand"><img src="img/logo-robot.svg" alt=""><span>Pharma<b>Boost</b></span></span><span class="folio">06 · 07 · Arguments et objections</span></div>
+  <div style="margin-top:34px">
+    <p class="kicker">06 · Les arguments, par interlocuteur</p>
+    <h2>Le bon argument, <span class="hl">à la bonne personne.</span></h2>
+  </div>
+  <div class="grid3" style="margin-top:16px">
+    <div class="persona">
+      <h3>Le titulaire</h3><p class="who">Celui qui décide et qui paie</p>
+      <ul class="check"><li>Du chiffre d’affaires en plus, sur des produits à prix libres</li><li>Une équipe motivée, des résultats suivis</li><li>Dates courtes écoulées, challenges atteints</li><li>Un bilan chaque matin, sans rien faire</li></ul>
+    </div>
+    <div class="persona">
+      <h3>Le pharmacien adjoint</h3><p class="who">Celui qui conseille toute la journée</p>
+      <ul class="check"><li>Un rappel, pas une leçon : il connaît, PharmaBoost y pense</li><li>Proposer devient naturel</li><li>Aucune saisie : tout est automatique</li></ul>
+    </div>
+    <div class="persona">
+      <h3>Le préparateur</h3><p class="who">Celui qui hésite le plus</p>
+      <ul class="check"><li>Le bon conseil, avec sa raison</li><li>Il ose proposer, avec assurance</li><li>Il voit ses conseils vendus</li></ul>
+    </div>
+  </div>
+
+  <p class="kicker" style="margin-top:24px">07 · Les objections et vos réponses</p>
+  <div style="margin-top:6px">
+    <div class="obj"><b>« Mon équipe connaît déjà les conseils. »</b><p>Bien sûr, et c’est pour ça que ça marche : PharmaBoost ne leur apprend rien, il leur rappelle au bon moment. Connaître un conseil et y penser à la centième vente de la journée, ce n’est pas pareil.</p></div>
+    <div class="obj"><b>« On n’a pas le temps. »</b><p>Il n’y a rien à faire en plus : le conseil arrive au scan, le « Vendu » se compte tout seul quand on bipe le produit. Le conseil prend dix secondes.</p></div>
+    <div class="obj"><b>« Ça va changer mon logiciel ? »</b><p>Non. PharmaBoost s’installe à côté du LGO, sans le modifier. Le robot et la douchette restent les mêmes.</p></div>
+    <div class="obj"><b>« Et s’il propose n’importe quoi ? »</b><p>Les conseils viennent d’une bibliothèque suivie par une pharmacienne, choisis dans votre stock. Et c’est toujours le pharmacien qui décide de proposer ou non.</p></div>
+    <div class="obj"><b>« C’est encore un abonnement. »</b><p>Faites le calcul ensemble (page suivante) : à 7 € le conseil en moyenne, moins d’un conseil vendu par jour couvre l’abonnement.</p></div>
+    <div class="obj"><b>« Et les données de mes patients ? »</b><p>PharmaBoost ne garde aucune donnée patient : il travaille sur les boîtes scannées et les conseils.</p></div>
+  </div>
+  <div class="foot" style="margin-top:auto"><span>PharmaBoost · Guide du commercial</span><span>7 / 8</span></div>
+</section>
+
+<!-- 8 · Abonnement et démarche -->
+<section class="page">
+  <div class="top"><span class="brand"><img src="img/logo-robot.svg" alt=""><span>Pharma<b>Boost</b></span></span><span class="folio">08 · L’abonnement</span></div>
+  <div style="margin-top:34px">
+    <p class="kicker">08 · L’abonnement et la démarche</p>
+    <h2>Un abonnement <span class="hl">très vite remboursé.</span></h2>
+  </div>
+
+  <div class="grid3" style="margin-top:18px">
+    <div class="price"><p class="small">Abonnement</p><p class="big">126 €</p><p style="font-size:12px; color:var(--body)">HT par mois, par pharmacie, tous les postes compris</p></div>
+    <div class="price"><p class="small">Mise en service</p><p class="big">290 €</p><p style="font-size:12px; color:var(--body)">HT, une seule fois : installation, import du stock, formation</p></div>
+    <div class="price"><p class="small">Engagement</p><p class="big">12 mois</p><p style="font-size:12px; color:var(--body)">Parrainage : −20 % par mois pour la pharmacie qui parraine un confrère</p></div>
+  </div>
+
+  <div class="grid2" style="margin-top:20px; align-items:start">
+    <div class="card">
+      <h3>Le calcul qui convainc</h3>
+      <table class="calc" style="margin-top:8px">
+        <tr><td>Abonnement mensuel</td><td>126 € HT</td></tr>
+        <tr><td>Prix moyen d’un produit conseil</td><td>7 €</td></tr>
+        <tr><td>Conseils pour couvrir l’abonnement</td><td>18 par mois</td></tr>
+        <tr><td>Sur 25 jours d’ouverture</td><td>moins d’1 par jour</td></tr>
+      </table>
+      <p class="small" style="margin-top:8px">Une pharmacie voit passer des dizaines, souvent des centaines de clients par jour.</p>
+    </div>
+    <div class="card tint">
+      <h3>L’estimation du site</h3>
+      <table class="calc" style="margin-top:8px">
+        <tr><td>Clients par jour (exemple)</td><td>200</td></tr>
+        <tr><td>10 % prennent un conseil</td><td>20 par jour</td></tr>
+        <tr><td>× 7 € en moyenne</td><td>140 € par jour</td></tr>
+        <tr><td>× 25 jours d’ouverture</td><td>3 500 € par mois</td></tr>
+      </table>
+      <p class="small" style="margin-top:8px">C’est du chiffre d’affaires, pas de la marge, et une estimation, jamais une promesse. Refaites-la avec les chiffres de la pharmacie sur pharmaboost.app.</p>
+    </div>
+  </div>
+
+  <p class="kicker" style="margin-top:22px">La démarche</p>
+  <div class="grid3" style="margin-top:10px; grid-template-columns: repeat(4, 1fr); gap:12px">
+    <div class="card" style="padding:14px"><span class="num">1</span><h3 style="font-size:14px; margin-top:8px">Le premier contact</h3><p style="font-size:11.5px">Envoyez la vidéo et la plaquette de présentation.</p></div>
+    <div class="card" style="padding:14px"><span class="num">2</span><h3 style="font-size:14px; margin-top:8px">La démonstration</h3><p style="font-size:11.5px">Au comptoir ou en visio, sur des exemples concrets.</p></div>
+    <div class="card" style="padding:14px"><span class="num">3</span><h3 style="font-size:14px; margin-top:8px">L’abonnement</h3><p style="font-size:11.5px">Le contrat part de votre espace commercial ; le titulaire signe en ligne.</p></div>
+    <div class="card" style="padding:14px"><span class="num">4</span><h3 style="font-size:14px; margin-top:8px">La mise en service</h3><p style="font-size:11.5px">Installation sur les postes et formation de l’équipe.</p></div>
+  </div>
+
+  <div class="band" style="margin-top:auto; display:grid; grid-template-columns:1fr auto; gap:20px; align-items:center">
+    <div>
+      <h3>Une question sur le produit ?</h3>
+      <p style="margin-top:4px">L’équipe PharmaBoost vous répond : Contact@pharmaboost.app</p>
+    </div>
+    <span class="pill dark">pharmaboost.app</span>
+  </div>
+  <p class="caption" style="margin-top:10px">Tarifs hors taxes en vigueur au 16 octobre 2026. Document interne, à ne pas remettre aux pharmacies.</p>
+</section>
+
+</body>
+</html>

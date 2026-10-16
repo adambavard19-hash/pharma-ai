@@ -1,5 +1,5 @@
 /**
- * La plaquette GÉNÉRIQUE en PDF : public/plaquette/pharmaboost-plaquette.pdf (lien « Version générique (PDF) » de l'extranet).
+ * La plaquette GÉNÉRIQUE de l’ancienne mise en page (six feuilles). Depuis le 16 oct. 2026, public/plaquette/pharmaboost-plaquette.pdf vient de scripts/plaquettes-pdf.mjs (docs/plaquettes/presentation.html) ; ce script écrit ailleurs par défaut pour ne pas l’écraser.
  *
  *   npm run plaquette:pdf
  *
@@ -16,7 +16,7 @@ import { chromium } from "playwright";
 import { PDFDocument } from "pdf-lib";
 
 const BASE_URL = (process.env.PLAQUETTE_URL ?? "http://localhost:3000").replace(/\/$/, "");
-const OUT = resolve(process.cwd(), process.env.PLAQUETTE_OUT ?? "public/plaquette/pharmaboost-plaquette.pdf");
+const OUT = resolve(process.cwd(), process.env.PLAQUETTE_OUT ?? ".live/plaquette-ancienne.pdf");
 const EXPECTED_PAGES = 6;
 const MAX_BYTES = 5 * 1024 * 1024;
 /** A4 en points PDF (595,28 × 841,89), à un point près. */
