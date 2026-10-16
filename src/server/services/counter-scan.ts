@@ -59,7 +59,17 @@ export function scanInstant(scannedAt: Date | null, now: Date): Date {
 }
 
 export type CounterScanResult =
-  | { ok: true; prescriptionId: string; reference: string; lineCount: number; drugName: string; created: boolean; kind: "DRUG" | "PRODUCT" | "UNKNOWN" }
+  | {
+      ok: true;
+      prescriptionId: string;
+      reference: string;
+      lineCount: number;
+      drugName: string;
+      created: boolean;
+      kind: "DRUG" | "PRODUCT" | "UNKNOWN";
+      /** La boîte bipée est un conseil proposé dans cette vente : il passe en « Vendu », sans nouvelle ligne ni nouvelle analyse. */
+      adviceSold?: boolean;
+    }
   | { ok: false; error: string; code: "UNKNOWN_CODE" };
 
 /**
@@ -206,7 +216,22 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
       _count: { select: { recommendations: { where: { outcomeSource: COUNTER_ANSWERED, decidedAt: { not: null } } } } },
     },
   });
-  if (open && agent.postId) {
+  // Le produit bipé est-il un des conseils proposés dans la vente ouverte ? Alors c'est le même client, quel que soit le temps
+  // passé à aller le chercher en rayon : la vente ne se ferme pas d'elle-même.
+  const conseil = open && item.kind !== "UNKNOWN"
+    ? await prisma.recommendation.findFirst({
+        where: {
+          prescriptionId: open.id,
+          pharmacyId: agent.scope.pharmacyId,
+          status: { in: ["PROPOSED", "PRESENTED", "ACCEPTED", "MODIFIED", "DECLINED", "PURCHASED"] },
+          OR: item.kind === "PRODUCT" ? [{ productId: item.productId }] : [{ presentationId: item.presentationId }, { presentation: { specialtyId: item.specialtyId } }],
+        },
+        // Un conseil encore sans réponse d'abord ; un conseil déjà vendu absorbe une deuxième boîte du même produit.
+        orderBy: [{ decidedAt: { sort: "asc", nulls: "first" } }, { totalScore: "desc" }],
+        select: { id: true, status: true },
+      })
+    : null;
+  if (open && agent.postId && !conseil) {
     const answered = open._count.recommendations > 0;
     if (!answered && !withinWindow) {
       // Personne n'a répondu et le poste est resté une minute sans bip : la vente se termine toute seule (conseils « sans
@@ -224,6 +249,32 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
   let prescriptionId: string;
   let reference: string;
   let created = false;
+  // Le produit bipé est un des conseils proposés dans cette vente (fondateur, 16 oct. 2026) : le conseil passe en « Vendu » tout
+  // seul — le pharmacien n'a plus à cliquer —, la boîte n'est pas ajoutée comme un médicament de plus, et la vente n'est pas
+  // ré-analysée (un conseil bipé ne relance jamais un conseil). Les conseils jamais bipés passent en « Non vendu » à la fin de
+  // la vente (finishCounterSale).
+  if (open && conseil && item.kind !== "UNKNOWN") {
+    if (conseil.status !== "PURCHASED") {
+      const { decideCounterAdvice } = await import("@/server/services/counter-window");
+      await decideCounterAdvice(agent, { prescriptionId: open.id, recommendationId: conseil.id, outcome: "SOLD", via: "SCAN" });
+    }
+    // La boîte sort quand même du rayon : le stock baisse d'une unité, jamais sous zéro.
+    if (item.kind === "DRUG") {
+      await prisma.pharmacyDrugStock.updateMany({ where: { pharmacyId: agent.scope.pharmacyId, presentationId: item.presentationId, quantity: { gt: 0 } }, data: { quantity: { decrement: 1 } } });
+    } else {
+      await prisma.stockItem.updateMany({ where: { pharmacyId: agent.scope.pharmacyId, productId: item.productId, quantity: { gt: 0 } }, data: { quantity: { decrement: 1 } } });
+    }
+    if (agent.postId) {
+      const lastScanAt = previousScanAt && previousScanAt.getTime() > at.getTime() ? previousScanAt : at;
+      await prisma.counterPost.update({ where: { id: agent.postId }, data: { lastScanAt, lastSeenAt: now, scanCount: { increment: 1 } } });
+    }
+    // La vente reste « en cours » : son heure avance (elle n'est pas prise pour une vente oubliée).
+    await prisma.prescription.update({ where: { id: open.id }, data: { updatedAt: now } });
+    const lineCount = await prisma.prescriptionLine.count({ where: { prescriptionId: open.id } });
+    await recordAudit({ action: "prescription.counter_scan", entityType: "Prescription", entityId: open.id, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { code: input.code, kind: item.kind, post, adviceSold: conseil.id, scannedAt: input.scannedAt && !Number.isNaN(input.scannedAt.getTime()) ? input.scannedAt.toISOString() : null } });
+    return { ok: true, prescriptionId: open.id, reference: open.reference, lineCount, drugName: item.name, created: false, kind: item.kind, adviceSold: true };
+  }
+
   // Une vente qui a déjà beaucoup de boîtes n'est plus celle d'un seul client (les ventes géantes du 15 oct. 2026) :
   // le bip suivant en ouvre une nouvelle, et la vente géante n'est plus jamais reprise.
   if (open && open.lines.length >= MAX_BOXES_PER_SALE) open = null;

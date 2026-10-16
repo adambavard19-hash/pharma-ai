@@ -21,7 +21,8 @@ type DateFilter = { gte?: Date; gt?: Date };
 type SaleWhere = { pharmacyId?: string; source?: string; counterPost?: string; counterPostId?: string; id?: string; status?: { in: string[] }; updatedAt?: DateFilter; sales?: { none?: Record<string, never> }; NOT?: { counterFollowUp?: { closedAt?: { not: null } } } };
 type OrderBy = { createdAt?: "asc" | "desc"; updatedAt?: "asc" | "desc" };
 
-const mem = vi.hoisted(() => ({ sales: [] as Sale[], posts: new Map<string, Post>(), next: 0 }));
+type Conseil = { id: string; prescriptionId: string; productId?: string; presentationId?: string; specialtyId?: string; status: string };
+const mem = vi.hoisted(() => ({ sales: [] as Sale[], posts: new Map<string, Post>(), next: 0, conseils: [] as Conseil[] }));
 
 const db = vi.hoisted(() => {
   const KNOWN_KEYS = ["pharmacyId", "source", "counterPost", "counterPostId", "id", "status", "updatedAt", "sales", "NOT"];
@@ -77,6 +78,18 @@ const db = vi.hoisted(() => {
     productBarcode: { findUnique: vi.fn(), upsert: vi.fn() },
     product: { findFirst: vi.fn(), findMany: vi.fn() },
     pharmacyDrugStock: { updateMany: vi.fn() },
+    // Les conseils proposés dans une vente : un bip du même produit les fait passer en « Vendu ».
+    recommendation: {
+      findFirst: vi.fn(async ({ where }: { where: { prescriptionId: string; status: { in: string[] }; OR: { productId?: string; presentationId?: string; presentation?: { specialtyId: string } }[] } }) => {
+        const found = mem.conseils.filter(
+          (c) =>
+            c.prescriptionId === where.prescriptionId &&
+            where.status.in.includes(c.status) &&
+            where.OR.some((or) => (or.productId && or.productId === c.productId) || (or.presentationId && or.presentationId === c.presentationId) || (or.presentation && or.presentation.specialtyId === c.specialtyId)),
+        );
+        return found.sort((a, b) => Number(a.status === "PURCHASED") - Number(b.status === "PURCHASED"))[0] ?? null;
+      }),
+    },
     stockItem: { updateMany: vi.fn() },
     counterPost: {
       findUnique: vi.fn(async ({ where }: { where: { id: string }; select?: unknown }) => {
@@ -116,9 +129,9 @@ const db = vi.hoisted(() => {
         mem.sales.push(sale);
         return { id: sale.id };
       }),
-      update: vi.fn(async ({ where, data }: { where: { id: string }; data: { status: string } }) => {
+      update: vi.fn(async ({ where, data }: { where: { id: string }; data: { status?: string } }) => {
         const sale = mem.sales.find((candidate) => candidate.id === where.id)!;
-        sale.status = data.status;
+        if (data.status !== undefined) sale.status = data.status;
         touch(sale);
         return sale;
       }),
@@ -164,7 +177,14 @@ const finish = vi.hoisted(() => ({
     return { ok: true };
   }),
 }));
-vi.mock("@/server/services/counter-window", () => ({ finishCounterSale: finish.finishCounterSale }));
+const decide = vi.hoisted(() => ({
+  decideCounterAdvice: vi.fn(async (_agent: unknown, input: { recommendationId: string }) => {
+    const conseil = mem.conseils.find((c) => c.id === input.recommendationId);
+    if (conseil) conseil.status = "PURCHASED";
+    return { ok: true, outcome: "SOLD", changed: true };
+  }),
+}));
+vi.mock("@/server/services/counter-window", () => ({ finishCounterSale: finish.finishCounterSale, decideCounterAdvice: decide.decideCounterAdvice }));
 
 const { SAME_SALE_WINDOW_MS, recordCounterScan, closeLiveCounterSales, scanInstant } = await import("../counter-scan");
 /** La fenêtre, en secondes : une vente reste ouverte jusqu'à « Vente terminée », avec trente minutes sans bip pour garde-fou. */
@@ -202,6 +222,7 @@ beforeEach(() => {
     ["post_2", { lastScanAt: null, lastSeenAt: null, scanCount: 0, assignedUserId: "usr_marc" }],
   ]);
   mem.next = 0;
+  mem.conseils = [];
   db.drugPresentation.findUnique.mockImplementation(async ({ where }: { where: { cip13: string } }) =>
     where.cip13 === CIP_DOLIPRANE ? { id: "pres_1", cip13: CIP_DOLIPRANE, specialty: { id: "spec_doliprane", name: "DOLIPRANE 1000 mg", pharmaceuticalForm: "comprimé" } } : null,
   );
@@ -668,5 +689,69 @@ describe("la règle du fondateur (15 oct. 2026) : une réponse garde la vente ou
     const second = await scan(EAN_CREME);
     expect(first.ok && second.ok && second.prescriptionId === first.prescriptionId).toBe(true);
     expect(finish.finishCounterSale).not.toHaveBeenCalled();
+  });
+});
+
+describe("un conseil bipé passe en « Vendu » tout seul (fondateur, 16 oct. 2026)", () => {
+  it("le produit conseillé est bipé : « Vendu », pas de ligne en plus, pas de nouvelle analyse, le stock baisse", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    if (!first.ok) throw new Error("bip refusé");
+    mem.sales[0].status = "ANALYZED";
+    mem.conseils = [{ id: "rec_creme", prescriptionId: first.prescriptionId, productId: "p_creme", status: "PROPOSED" }];
+    wait(20);
+    const second = await scan(EAN_CREME);
+    expect(second.ok && second.adviceSold).toBe(true);
+    expect(decide.decideCounterAdvice).toHaveBeenCalledWith(AGENT, { prescriptionId: first.prescriptionId, recommendationId: "rec_creme", outcome: "SOLD", via: "SCAN" });
+    expect(mem.sales[0].lines).toHaveLength(1);
+    // La vente n'est pas renvoyée à l'analyse : aucun conseil n'est relancé.
+    expect(mem.sales[0].status).toBe("ANALYZED");
+    expect(db.stockItem.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ productId: "p_creme" }) }));
+    expect(post().scanCount).toBe(2);
+  });
+
+  it("le pharmacien est allé chercher le conseil en rayon (plus d'une minute) : c'est toujours le même client", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    if (!first.ok) throw new Error("bip refusé");
+    mem.conseils = [{ id: "rec_creme", prescriptionId: first.prescriptionId, productId: "p_creme", status: "PROPOSED" }];
+    wait(3 * 60);
+    const second = await scan(EAN_CREME);
+    expect(second.ok && second.adviceSold && second.prescriptionId === first.prescriptionId).toBe(true);
+    expect(finish.finishCounterSale).not.toHaveBeenCalled();
+  });
+
+  it("une deuxième boîte du conseil déjà vendu : absorbée aussi, sans nouvelle réponse", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    if (!first.ok) throw new Error("bip refusé");
+    mem.conseils = [{ id: "rec_creme", prescriptionId: first.prescriptionId, productId: "p_creme", status: "PURCHASED" }];
+    const second = await scan(EAN_CREME);
+    expect(second.ok && second.adviceSold).toBe(true);
+    expect(decide.decideCounterAdvice).not.toHaveBeenCalled();
+    expect(mem.sales[0].lines).toHaveLength(1);
+  });
+
+  it("un médicament conseillé se reconnaît à sa spécialité, même dans une autre présentation", async () => {
+    const first = await scan(EAN_CREME);
+    if (!first.ok) throw new Error("bip refusé");
+    mem.conseils = [{ id: "rec_doli", prescriptionId: first.prescriptionId, presentationId: "pres_autre", specialtyId: "spec_doliprane", status: "PROPOSED" }];
+    const second = await scan(CIP_DOLIPRANE);
+    expect(second.ok && second.adviceSold).toBe(true);
+  });
+
+  it("un produit qui n'est pas un conseil : une boîte de plus, comme avant", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    if (!first.ok) throw new Error("bip refusé");
+    mem.conseils = [{ id: "rec_creme", prescriptionId: first.prescriptionId, productId: "p_creme", status: "PROPOSED" }];
+    const second = await scan(EAN_PROBIOTIQUE);
+    expect(second.ok && second.adviceSold).toBeFalsy();
+    expect(mem.sales[0].lines).toHaveLength(2);
+  });
+
+  it("le conseil d'une vente terminée ne capte jamais le bip du client suivant", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    if (!first.ok) throw new Error("bip refusé");
+    mem.conseils = [{ id: "rec_creme", prescriptionId: first.prescriptionId, productId: "p_creme", status: "PROPOSED" }];
+    mem.sales[0].followUpClosed = true;
+    const second = await scan(EAN_CREME);
+    expect(second.ok && !second.adviceSold && second.created).toBe(true);
   });
 });

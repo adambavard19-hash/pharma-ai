@@ -47,7 +47,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.17";
+const VERSION = "0.10.18";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -196,15 +196,17 @@ async function sendScan(config: Config, code: string, scannedAt: string, expires
     // La péremption de la boîte (Datamatrix) part avec le bip : le serveur prévient si la boîte est périmée.
     body: JSON.stringify({ code, post: hostname(), scannedAt, ...(expiresOn ? { expiresOn } : {}) }),
   });
-  const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; drugName?: string; reference?: string; lineCount?: number; prescriptionId?: string };
+  const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; drugName?: string; reference?: string; lineCount?: number; prescriptionId?: string; adviceSold?: boolean };
   if (response.status === 401) throw new Error("clé du poste révoquée");
   if (response.status === 422) {
     log(`Bip ignoré (${code}) : ${body.error ?? "code inconnu"}`);
     return;
   }
   if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
-  log(`Bip ${code} → ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s)).`);
+  log(`Bip ${code} → ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s))${body.adviceSold ? " : conseil de la vente, passé en Vendu" : ""}.`);
   lastScanAt = Date.now();
+  // Un conseil bipé : la bannière revient à la vente, où il passe en « Vendu » ; aucune analyse n'est relancée.
+  if (body.adviceSold) notices.adviceScanned();
   // La fenêtre d'avis se prépare pendant que le serveur analyse : le conseil n'attend pas sa compilation.
   notices.warmUp();
   if (body.prescriptionId) watchPrescription(body.prescriptionId);

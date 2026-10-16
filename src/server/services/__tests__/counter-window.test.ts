@@ -216,13 +216,13 @@ describe("plusieurs pharmacies, plusieurs postes, des gestes simultanés", () =>
 describe("« Vente terminée »", () => {
   const read = (items: ReturnType<typeof item>[]) => ({ status: "ANALYZED", followUp: { emailSaved: false, closed: false }, notice: { items } });
 
-  it("enregistre vendu / non vendu / sans réponse et passe les conseils laissés sans réponse en « sans réponse »", async () => {
+  it("un conseil ni bipé ni marqué « Vendu » est « Non vendu » à la fin de la vente (fondateur, 16 oct. 2026)", async () => {
     m.readNotice.mockResolvedValue(read([item("a", "SOLD"), item("b", "NOT_SOLD"), item("c", "NONE")]));
     m.recommendationFindMany.mockResolvedValueOnce([{ id: "c" }]);
     const result = await finishCounterSale(agent, { prescriptionId: "sale1" });
-    expect(result).toMatchObject({ ok: true, alreadyClosed: false, proposed: 3, sold: 1, notSold: 1, unanswered: 1, soldToday: 18, report: "NONE" });
-    expect(m.recommendationUpdateMany).toHaveBeenCalledWith({ where: { id: { in: ["c"] } }, data: { status: "IGNORED" } });
-    expect(m.followUpTxUpdate).toHaveBeenCalledWith({ where: { prescriptionId: "sale1" }, data: expect.objectContaining({ proposedCount: 3, soldCount: 1, notSoldCount: 1, unansweredCount: 1 }) });
+    expect(result).toMatchObject({ ok: true, alreadyClosed: false, proposed: 3, sold: 1, notSold: 2, unanswered: 0, soldToday: 18, report: "NONE" });
+    expect(m.recommendationUpdateMany).toHaveBeenCalledWith({ where: { id: { in: ["c"] } }, data: expect.objectContaining({ status: "DECLINED", outcomeSource: "COUNTER_DECLARED" }) });
+    expect(m.followUpTxUpdate).toHaveBeenCalledWith({ where: { prescriptionId: "sale1" }, data: expect.objectContaining({ proposedCount: 3, soldCount: 1, notSoldCount: 2, unansweredCount: 0 }) });
   });
 
   it("n'annonce aucun « vendu aujourd'hui » quand rien n'a été vendu dans cette vente", async () => {

@@ -5878,6 +5878,15 @@ var NoticeCenter = class {
     if (!this.ensureHost()) return;
     this.send({ op: "scan" });
   }
+  /**
+   * Le bip était un conseil de la vente à l'écran : le serveur l'a passé en « Vendu ». La bannière revient à la vente (elle
+   * avait affiché « Scan détecté ») sans rejouer d'analyse ; la mise à jour suivante y coche « Vendu ».
+   */
+  adviceScanned() {
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy || !this.banner) return;
+    if (!this.ensureHost()) return;
+    this.send({ op: "keep" });
+  }
   /** Montre (ou met à jour) le conseil d'une vente. */
   show(entry) {
     this.lastEntry = entry;
@@ -6645,7 +6654,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.17";
+var VERSION = "0.10.18";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -6748,8 +6757,9 @@ async function sendScan(config, code, scannedAt, expiresOn) {
     return;
   }
   if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
-  log(`Bip ${code} \u2192 ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s)).`);
+  log(`Bip ${code} \u2192 ${body.drugName ?? "?"} (${body.reference ?? "?"}, ${body.lineCount ?? "?"} ligne(s))${body.adviceSold ? " : conseil de la vente, pass\xE9 en Vendu" : ""}.`);
   lastScanAt = Date.now();
+  if (body.adviceSold) notices.adviceScanned();
   notices.warmUp();
   if (body.prescriptionId) watchPrescription(body.prescriptionId);
 }

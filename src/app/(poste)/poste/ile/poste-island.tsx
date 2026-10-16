@@ -50,7 +50,7 @@ const T = BANNER.text;
 /** La largeur de l'île pendant le bonjour : assez pour trois lignes lisibles, sans masquer le logiciel de gestion. */
 const GREETING_WIDTH = 420;
 /** L'île repliée : le robot et « N conseils suggérés », rien d'autre. */
-const FOLDED_WIDTH = 340;
+const FOLDED_WIDTH = 370;
 /** L'île repliée debout, contre le bord gauche ou droit de l'écran : le robot, le nombre et le bouton, l'un sous l'autre. */
 const SIDE_FOLDED_WIDTH = 132;
 /** Où l'île se range dans la fenêtre Windows (600 × 760), selon la place choisie au poste : collée au bord de l'écran. */
@@ -93,6 +93,11 @@ const FOLD_DELAY_MS = 600;
 export function foldedLabel(count: number): string {
   if (count <= 0) return "Aucun conseil";
   return count === 1 ? "1 conseil suggéré" : `${count} conseils suggérés`;
+}
+
+/** « 1 vendu », « 2 vendus ». */
+export function soldLabel(count: number): string {
+  return count > 1 ? `${count} vendus` : "1 vendu";
 }
 
 /** « 2026-03-31 » → « 31/03/2026 ». */
@@ -345,6 +350,8 @@ export function PosteIsland() {
   // Le bonjour ne se montre qu'au repos (le reducer l'efface déjà à chaque scan ou vente).
   const greeting = island.stage === "idle" && !entry ? view.greeting : null;
   const items = entry ? toAdvice(entry) : [];
+  // Les conseils déjà vendus (bipés, ou marqués « Vendu ») : la bannière repliée le montre d'elle-même.
+  const soldCount = entry ? entry.items.filter((item) => item.outcome === "SOLD").length : 0;
   const questions = entry?.questions ?? [];
   const questionsOnly = Boolean(entry) && items.length === 0 && questions.length > 0 && island.stage === "advice";
   const showQuestions = !folded && Boolean(entry) && questions.length > 0 && (island.stage === "advice" || island.stage === "email");
@@ -410,7 +417,7 @@ export function PosteIsland() {
         }}
         onPointerMove={(event) => {
           // Sur l'île (une de ses capsules) : déployée ; à côté (le reste de la fenêtre, transparent) : repliée bientôt.
-          // Le bouton « Client suivant » et la question « C'est un autre client ? » ne déploient rien : la bannière ne bouge pas
+          // Le bouton « Terminer la vente » et la question « C'est un autre client ? » ne déploient rien : la bannière ne bouge pas
           // sous la souris au moment de cliquer.
           const target = event.target instanceof Element ? event.target : null;
           if (target?.closest("[data-ile-sans-deploiement]")) {
@@ -471,17 +478,21 @@ export function PosteIsland() {
                 <Robot size={aurore ? 36 : 40} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
                 {aurore && items.length > 0 && <span className="aur-dot" aria-hidden="true" />}
                 <span className={aurore ? "block text-[13.5px] leading-[17px] font-semibold text-[#ECFFF6]" : "block text-[14px] leading-[17px] font-bold"} style={aurore ? undefined : { color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
-                <span className={aurore ? "block text-[9.5px] leading-[13px] font-semibold tracking-[0.14em] text-[#9FCBBB]/70 uppercase" : "block text-[11px] leading-[14px] text-white/55"}>Survolez pour voir</span>
+                {soldCount > 0 ? (
+                  <span data-ile-vendus="" className="block text-[11.5px] leading-[14px] font-bold" style={{ color: aurore ? "#E8FF9C" : C.accent }}>✓ {soldLabel(soldCount)}</span>
+                ) : (
+                  <span className={aurore ? "block text-[9.5px] leading-[13px] font-semibold tracking-[0.14em] text-[#9FCBBB]/70 uppercase" : "block text-[11px] leading-[14px] text-white/55"}>Survolez pour voir</span>
+                )}
               </button>
               <button
                 type="button"
                 data-ile-client-suivant=""
                 data-ile-sans-deploiement=""
-                onClick={() => word(finishWord(entry.id))}
+                onClick={finish}
                 className={aurore ? "aur-btn mt-0.5 h-8 w-full rounded-full text-[12px] font-semibold" : "mt-0.5 h-8 w-full rounded-xl text-[12px] font-bold transition-[filter] hover:brightness-110"}
                 style={aurore ? undefined : { background: C.accent, color: "#04261A" }}
               >
-                Client suivant
+                Terminer la vente
               </button>
             </div>
           </IslandShell>
@@ -496,25 +507,30 @@ export function PosteIsland() {
                       {items.length > 0 && <span className="aur-dot shrink-0" aria-hidden="true" />}
                       {foldedLabel(items.length)}
                     </span>
-                    <span className="block whitespace-nowrap text-[9.5px] leading-[14px] font-semibold tracking-[0.16em] text-[#9FCBBB]/70 uppercase">Survolez pour voir</span>
+                    {soldCount > 0 ? (
+                      <span data-ile-vendus="" className="block whitespace-nowrap text-[11.5px] leading-[14px] font-bold text-[#E8FF9C]">✓ {soldLabel(soldCount)} · survolez pour voir</span>
+                    ) : (
+                      <span className="block whitespace-nowrap text-[9.5px] leading-[14px] font-semibold tracking-[0.16em] text-[#9FCBBB]/70 uppercase">Survolez pour voir</span>
+                    )}
                   </span>
                 ) : (
                   <span className="min-w-0 flex-1">
                     <span className="block whitespace-nowrap text-[14px] leading-[18px] font-bold" style={{ color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
-                    <span className="block whitespace-nowrap text-[11.5px] leading-[15px] text-white/55">Passez la souris pour voir</span>
+                    <span className="block whitespace-nowrap text-[11.5px] leading-[15px] text-white/55">{soldCount > 0 ? `✓ ${soldLabel(soldCount)} · passez la souris` : "Passez la souris pour voir"}</span>
                   </span>
                 )}
               </button>
-              {/* Le client est parti : la vente se termine d'un clic, sans la question de l'e-mail, et le prochain scan est un nouveau client. */}
+              {/* « Terminer la vente » (fondateur, 16 oct. 2026) : l'e-mail du bilan est proposé (facultatif), puis le client suivant. Les
+                  conseils non bipés y passent en « Non vendu ». */}
               <button
                 type="button"
                 data-ile-client-suivant=""
                 data-ile-sans-deploiement=""
-                onClick={() => word(finishWord(entry.id))}
+                onClick={finish}
                 className={aurore ? "aur-btn h-8 shrink-0 rounded-full px-3 text-[12px] font-semibold" : "h-8 shrink-0 rounded-xl px-2.5 text-[12px] font-bold transition-[filter] hover:brightness-110"}
                 style={aurore ? undefined : { background: C.accent, color: "#04261A" }}
               >
-                {aurore ? "Client suivant →" : "Client suivant"}
+                {aurore ? "Terminer la vente →" : "Terminer la vente"}
               </button>
             </div>
           </IslandShell>

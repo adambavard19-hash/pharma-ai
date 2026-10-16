@@ -519,6 +519,16 @@ export class NoticeCenter {
     this.send({ op: "scan" });
   }
 
+  /**
+   * Le bip était un conseil de la vente à l'écran : le serveur l'a passé en « Vendu ». La bannière revient à la vente (elle
+   * avait affiché « Scan détecté ») sans rejouer d'analyse ; la mise à jour suivante y coche « Vendu ».
+   */
+  adviceScanned(): void {
+    if (this.platform !== "win32" || this.broken || this.forcedLegacy || !this.banner) return;
+    if (!this.ensureHost()) return;
+    this.send({ op: "keep" });
+  }
+
   /** Montre (ou met à jour) le conseil d'une vente. */
   show(entry: HostEntry): void {
     this.lastEntry = entry;

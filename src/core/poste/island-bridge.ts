@@ -26,6 +26,8 @@ export type HostCommand =
   | { op: "greet"; text: string }
   /** La place de la bannière sur l'écran, choisie au poste (menu de l'icône PharmaBoost) : l'île s'y range et s'y adapte. */
   | { op: "place"; side: IslandSide }
+  /** Le bip était un conseil de la vente (il passe en « Vendu ») : la bannière revient à la vente, sans rejouer d'analyse. */
+  | { op: "keep" }
   | { op: "quit" };
 
 /** Les quatre places possibles : en haut (par défaut), en bas, ou debout contre le bord gauche ou droit de l'écran. */
@@ -53,6 +55,11 @@ export type PosteView = {
   greeting: string | null;
   /** La place de la bannière (en haut par défaut) : gardée d'une vente à l'autre. */
   side: IslandSide;
+  /**
+   * La vente à l'écran au moment du dernier bip : si ce bip était un de ses conseils (« keep »), la bannière y revient telle
+   * quelle — le conseil y passe en « Vendu » — au lieu de rejouer « Scan détecté, analyse en cours ».
+   */
+  kept?: { entry: HostEntry; island: IslandState; alertRead: boolean } | null;
 };
 
 export const INITIAL_POSTE: PosteView = { island: INITIAL_ISLAND, entry: null, alertRead: false, emailPending: false, done: null, look: null, postLabel: "", scanAt: 0, greeting: null, side: "haut" };
@@ -164,14 +171,20 @@ function onHost(view: PosteView, command: HostCommand, now: number): PosteView {
       // Jamais par-dessus une vente : seulement l'île au repos, sans vente à l'écran (sinon le bonjour est abandonné).
       if (view.island.stage !== "idle" || view.entry) return view;
       return { ...view, greeting: command.text };
-    case "scan":
-      // Un bip : nouvelle vente. L'ancienne (si elle était encore ouverte) laisse la place, comme sur la bannière.
-      return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel, side: view.side, scanAt: now, island: { ...INITIAL_ISLAND, stage: "scan" } };
+    case "scan": {
+      // Un bip : « Scan détecté », tout de suite. La vente à l'écran est gardée de côté : si le bip était un de ses conseils,
+      // l'agent dit « keep » et elle revient ; sinon, la réponse du serveur prend sa place.
+      const kept = view.entry && OPEN.includes(view.island.stage) ? { entry: view.entry, island: view.island, alertRead: view.alertRead } : (view.kept ?? null);
+      return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel, side: view.side, scanAt: now, island: { ...INITIAL_ISLAND, stage: "scan" }, kept };
+    }
+    case "keep":
+      if (!view.kept) return view;
+      return { ...view, entry: view.kept.entry, island: { ...view.kept.island, stage: view.kept.island.stage === "ready" ? "advice" : view.kept.island.stage }, alertRead: view.kept.alertRead, kept: null };
     case "show": {
       const entry = { ...command.entry, items: itemsOf(command.entry) };
       const sameSale = view.entry?.id === entry.id;
       const alertRead = sameSale ? view.alertRead : false;
-      const base: PosteView = { ...view, entry, alertRead, done: null, greeting: null };
+      const base: PosteView = { ...view, entry, alertRead, done: null, greeting: null, kept: null };
       const outcomes = outcomesOf(entry);
       // Le serveur a enregistré l'adresse : « E-mail envoyé », puis retour aux conseils.
       if (view.emailPending && entry.emailSaved) return { ...base, emailPending: false, island: { ...view.island, outcomes, stage: "emailSent" } };
@@ -298,6 +311,8 @@ export function parseCommand(raw: unknown): HostCommand | null {
       return command as HostCommand;
     case "place":
       return isIslandSide(command.side) ? { op: "place", side: command.side } : null;
+    case "keep":
+      return { op: "keep" };
     case "look":
       return { op: "look", look: typeof command.look === "number" ? command.look : -1 };
     case "greet": {

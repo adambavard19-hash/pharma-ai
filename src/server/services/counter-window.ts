@@ -83,7 +83,7 @@ export type DecisionResult = { ok: true; outcome: NoticeOutcome; changed: boolea
  * « Vendu » / « Non vendu » (ou le retour en arrière « Pas de réponse ») pour un conseil de la vente en cours.
  * Une vente lue dans PharmaBoost (Sale) n'est jamais réécrite d'ici.
  */
-export async function decideCounterAdvice(agent: AgentContext, input: { prescriptionId: string; recommendationId: string; outcome: NoticeOutcome }): Promise<DecisionResult> {
+export async function decideCounterAdvice(agent: AgentContext, input: { prescriptionId: string; recommendationId: string; outcome: NoticeOutcome; via?: "SCAN" }): Promise<DecisionResult> {
   const sale = await ownedSale(agent, input.prescriptionId);
   if (!sale) return { ok: false, error: "Vente inconnue pour ce poste." };
   if (sale.counterFollowUp?.closedAt) return { ok: false, error: "Cette vente est terminée." };
@@ -114,10 +114,10 @@ export async function decideCounterAdvice(agent: AgentContext, input: { prescrip
           ? { status, decidedByUserId: null, decidedAt: null, outcomeSource: null, outcomePost: null }
           : { status, decidedByUserId: sale.handledByUserId ?? null, decidedAt: now, outcomeSource: COUNTER_DECLARED, outcomePost: post },
     });
-    await tx.recommendationEvent.create({ data: { recommendationId: rec.id, type: eventType, userId: input.outcome === "NONE" ? null : (sale.handledByUserId ?? null), metadata: { source: COUNTER_DECLARED, post, previousStatus: rec.status, ...context } as never } });
+    await tx.recommendationEvent.create({ data: { recommendationId: rec.id, type: eventType, userId: input.outcome === "NONE" ? null : (sale.handledByUserId ?? null), metadata: { source: COUNTER_DECLARED, post, previousStatus: rec.status, ...(input.via ? { via: input.via } : {}), ...context } as never } });
   });
   await ensureFollowUp(agent.scope.pharmacyId, sale.id);
-  await recordAudit({ action: "counter_window.advice_decided", entityType: "Recommendation", entityId: rec.id, pharmacyId: agent.scope.pharmacyId, metadata: { outcome: input.outcome, source: COUNTER_DECLARED, post, previousStatus: rec.status, prescriptionId: sale.id } });
+  await recordAudit({ action: "counter_window.advice_decided", entityType: "Recommendation", entityId: rec.id, pharmacyId: agent.scope.pharmacyId, metadata: { outcome: input.outcome, source: COUNTER_DECLARED, post, previousStatus: rec.status, prescriptionId: sale.id, ...(input.via ? { via: input.via } : {}) } });
   return { ok: true, outcome: input.outcome, changed: true };
 }
 
@@ -188,8 +188,10 @@ export async function finishCounterSale(agent: AgentContext, input: { prescripti
   const items = read?.notice.items ?? [];
   const ids = items.map((item) => item.id).filter((value): value is string => Boolean(value));
   const sold = items.filter((item) => item.outcome === "SOLD");
-  const notSold = items.filter((item) => item.outcome === "NOT_SOLD");
-  const unanswered = items.filter((item) => item.outcome === "NONE");
+  // Un conseil que personne n'a bipé ni marqué « Vendu » n'a pas été vendu (fondateur, 16 oct. 2026 : « s'il ne le scanne pas,
+  // ça fait non vendu ») : il compte avec les refus, et rien ne reste « sans réponse ».
+  const notSold = items.filter((item) => item.outcome === "NOT_SOLD" || item.outcome === "NONE");
+  const unanswered: typeof items = [];
 
   // La vente se ferme UNE seule fois, même si « Vente terminée » arrive deux fois en même temps (double clic, nouvel essai après une
   // coupure, deux postes) : la fermeture est réservée d'un seul coup, et seul celui qui l'a obtenue enregistre et envoie le bilan.
@@ -202,11 +204,11 @@ export async function finishCounterSale(agent: AgentContext, input: { prescripti
   }
 
   await prisma.$transaction(async (tx) => {
-    // Sans réponse : comme à la fin d'une vente enregistrée, c'est un résultat à part entière, distinct d'un refus.
+    // Sans réponse : le conseil n'a été ni bipé ni marqué « Vendu » — il est « Non vendu », daté de la fin de la vente.
     const pending = ids.length ? await tx.recommendation.findMany({ where: { id: { in: ids }, pharmacyId, status: "PROPOSED" }, select: { id: true } }) : [];
     if (pending.length > 0) {
-      await tx.recommendation.updateMany({ where: { id: { in: pending.map((rec) => rec.id) } }, data: { status: "IGNORED" } });
-      await tx.recommendationEvent.createMany({ data: pending.map((rec) => ({ recommendationId: rec.id, type: "IGNORED" as const, userId: null, metadata: { source: COUNTER_DECLARED, post } as never })) });
+      await tx.recommendation.updateMany({ where: { id: { in: pending.map((rec) => rec.id) } }, data: { status: "DECLINED", decidedByUserId: sale.handledByUserId ?? null, decidedAt: now, outcomeSource: COUNTER_DECLARED, outcomePost: post } });
+      await tx.recommendationEvent.createMany({ data: pending.map((rec) => ({ recommendationId: rec.id, type: "DECLINED_BY_PATIENT" as const, userId: null, metadata: { source: COUNTER_DECLARED, post, via: "NOT_SCANNED", previousStatus: "PROPOSED" } as never })) });
     }
     await tx.counterSaleFollowUp.update({
       where: { prescriptionId: sale.id },

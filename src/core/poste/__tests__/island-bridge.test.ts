@@ -187,3 +187,20 @@ describe("la place de la bannière (menu de l'icône au poste)", () => {
     expect(posteReducer(scanned, { type: "host", command: { op: "remove", id: "x" }, now: 2 }).side).toBe("gauche");
   });
 });
+
+describe("un conseil bipé : la bannière revient à la vente (« keep »)", () => {
+  it("le bip garde la vente de côté ; « keep » la rend telle quelle, sans rejouer d'analyse", async () => {
+    const { INITIAL_POSTE, posteReducer, parseCommand } = await import("../island-bridge");
+    expect(parseCommand(JSON.stringify({ op: "keep" }))).toEqual({ op: "keep" });
+    const entry = { id: "rx", reference: "V-1", label: "", subject: "DOLIPRANE", url: "", signature: "s1", quiet: false, emailSaved: false, emailError: "", alerts: [], notes: [], questions: [], guidance: [], items: [{ id: "r1", drug: "", challenge: "", shortDate: "", outcome: "NONE" as const, name: "CRÈME", price: "", reason: "", availability: "UNKNOWN", quantity: "", image: "" }] };
+    const open = { ...INITIAL_POSTE, entry, island: { ...INITIAL_POSTE.island, stage: "advice" as const } };
+    const scanned = posteReducer(open, { type: "host", command: { op: "scan" }, now: 1 });
+    expect(scanned.island.stage).toBe("scan");
+    expect(scanned.entry).toBeNull();
+    const kept = posteReducer(scanned, { type: "host", command: { op: "keep" }, now: 2 });
+    expect(kept.island.stage).toBe("advice");
+    expect(kept.entry?.id).toBe("rx");
+    // Sans vente gardée, « keep » ne fait rien.
+    expect(posteReducer(INITIAL_POSTE, { type: "host", command: { op: "keep" }, now: 3 })).toEqual(INITIAL_POSTE);
+  });
+});
