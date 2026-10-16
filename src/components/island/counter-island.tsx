@@ -64,6 +64,12 @@ export type CounterIslandProps = {
   /** Survol de la capsule au repos : elle s'ouvre sur le résumé du comptoir. */
   hoverOpen?: boolean;
   onAnswer: (index: number, outcome: IslandOutcome) => void;
+  /**
+   * Le poste de caisse (fondateur, 16 oct. 2026) : Vendu / Non vendu se décident SANS clic — un conseil bipé passe en
+   * « Vendu », un conseil non bipé en « Non vendu » à la validation de la vente. Les cartes n'affichent que leur état
+   * (« À proposer », « ✓ Vendu ») ; la correction (« Vendu sans scan », « Annuler ») est dans la carte déployée.
+   */
+  autoOutcome?: boolean;
   onEmail: (value: string) => void;
   onSendEmail: () => void;
   onAddEmail: () => void;
@@ -560,6 +566,7 @@ export function CounterIsland(props: CounterIslandProps) {
                           readOnly={props.readOnly}
                           // Le détail de ce conseil, le temps de le lire ; « Réduire » revient aux colonnes.
                           onOpen={() => setUnfolded({ name: items[index].name, among })}
+                          auto={props.autoOutcome}
                           onAnswer={(outcome) => props.onAnswer(index, outcome)}
                         />
                       ))}
@@ -614,6 +621,7 @@ export function CounterIsland(props: CounterIslandProps) {
                       item={items[index]}
                       outcome={state.outcomes[index] ?? null}
                       readOnly={props.readOnly}
+                      auto={props.autoOutcome}
                       onOpen={() => {
                         setUnfolded({ name: items[index].name, among });
                         setExpanded(true);
@@ -676,6 +684,7 @@ export function CounterIsland(props: CounterIslandProps) {
                   open={openName === item.name}
                   onToggle={() => setUnfolded(toggleAdvice(unfolded, items, item.name))}
                   onOpen={() => props.onOpenAdvice?.(index)}
+                  auto={props.autoOutcome}
                   onAnswer={(outcome) => props.onAnswer(index, outcome)}
                 />,
               ])}
@@ -846,7 +855,7 @@ function Row({ robot, title, sub, trailing, icon, compact }: { robot: ReactNode;
  * Le conseil en mode compact : une ligne — photo studio, nom, prix, et dessous marge et stock en petit — et les deux
  * boutons ✓ / ✕. Un appui sur la carte agrandit la bannière, ce conseil déployé.
  */
-function CompactCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: IslandAdvice; outcome: IslandOutcome; readOnly?: boolean; onOpen: () => void; onAnswer: (outcome: IslandOutcome) => void }) {
+function CompactCard({ item, outcome, readOnly, auto, onOpen, onAnswer }: { item: IslandAdvice; outcome: IslandOutcome; readOnly?: boolean; auto?: boolean; onOpen: () => void; onAnswer: (outcome: IslandOutcome) => void }) {
   const stock = item.stock ? STOCK[item.stock] : null;
   const details = [
     item.margin ? `Marge ${item.margin} HT` : null,
@@ -873,7 +882,9 @@ function CompactCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: Isla
           )}
         </span>
       </button>
-      {readOnly && !outcome ? null : outcome ? (
+      {auto ? (
+        <AutoStatus outcome={outcome} />
+      ) : readOnly && !outcome ? null : outcome ? (
         <button type="button" onClick={() => !readOnly && onAnswer(null)} title={readOnly ? undefined : T.change} className="isl-pop inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] font-bold" style={outcome === "SOLD" ? { background: C.soldBg, color: C.soldFg } : { background: C.notSoldBg, color: C.notSoldFg }}>
           {outcome === "SOLD" && <Check className="size-3" strokeWidth={3} aria-hidden="true" />}
           {outcome === "SOLD" ? T.sold : T.notSold}
@@ -896,7 +907,7 @@ function CompactCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: Isla
  * Un conseil dans une colonne (plusieurs boîtes côte à côte) : le nom sur deux lignes, prix et stock en petit, puis ✓ / ✕
  * sur toute la largeur. Un appui sur la carte agrandit la bannière, ce conseil déployé.
  */
-function ColumnCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: IslandAdvice; outcome: IslandOutcome; readOnly?: boolean; onOpen: () => void; onAnswer: (outcome: IslandOutcome) => void }) {
+function ColumnCard({ item, outcome, readOnly, auto, onOpen, onAnswer }: { item: IslandAdvice; outcome: IslandOutcome; readOnly?: boolean; auto?: boolean; onOpen: () => void; onAnswer: (outcome: IslandOutcome) => void }) {
   const stock = item.stock ? STOCK[item.stock] : null;
   const details = [
     item.price && stock && item.stock !== "UNKNOWN" ? item.price : null,
@@ -917,7 +928,9 @@ function ColumnCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: Islan
         </span>
       </button>
       <div className="mt-1 flex gap-1">
-        {readOnly && !outcome ? null : outcome ? (
+        {auto ? (
+          <AutoStatus outcome={outcome} wide />
+        ) : readOnly && !outcome ? null : outcome ? (
           <button type="button" onClick={() => !readOnly && onAnswer(null)} title={readOnly ? undefined : T.change} className="isl-pop inline-flex h-6 flex-1 items-center justify-center gap-1 rounded-md text-[11px] font-bold" style={outcome === "SOLD" ? { background: C.soldBg, color: C.soldFg } : { background: C.notSoldBg, color: C.notSoldFg }}>
             {outcome === "SOLD" && <Check className="size-3" strokeWidth={3} aria-hidden="true" />}
             {outcome === "SOLD" ? T.sold : T.notSold}
@@ -939,13 +952,32 @@ function ColumnCard({ item, outcome, readOnly, onOpen, onAnswer }: { item: Islan
   );
 }
 
+/** L'état d'un conseil au poste, sans bouton : « À proposer » tant qu'il n'est pas bipé, puis « ✓ Vendu » (ou « Non vendu »). */
+function AutoStatus({ outcome, wide = false }: { outcome: IslandOutcome; wide?: boolean }) {
+  const base = cn("inline-flex h-6 shrink-0 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-bold", wide && "flex-1");
+  if (outcome === "SOLD") {
+    return (
+      <span data-auto-status="SOLD" className={cn(base, "isl-pop")} style={{ background: C.soldBg, color: C.soldFg }}>
+        <Check className="size-3" strokeWidth={3} aria-hidden="true" />
+        {T.sold}
+      </span>
+    );
+  }
+  if (outcome === "NOT_SOLD") return <span data-auto-status="NOT_SOLD" className={base} style={{ background: C.notSoldBg, color: C.notSoldFg }}>{T.notSold}</span>;
+  return (
+    <span data-auto-status="NONE" title="Bipez-le : il passe en vendu tout seul" className={cn(base, "font-semibold")} style={{ background: C.line, color: C.inkSoft }}>
+      À proposer
+    </span>
+  );
+}
+
 /** Ce que disent la carte repliée et la carte déployée (survol, lecteur d'écran). */
 const UNFOLD = "Appuyer pour déployer le conseil : contre-indications, conseils d'utilisation";
 const FOLD = "Appuyer pour replier le conseil";
 /** La carte déployée sans fiche (serveur plus ancien) : le détail se lit dans la fiche complète. */
 const IN_FULL_SHEET = "À lire dans la fiche complète.";
 
-export function AdviceCard({ item, outcome, onAnswer, readOnly, outside, open, onToggle, onOpen }: { item: IslandAdvice; outcome: IslandOutcome; onAnswer: (outcome: IslandOutcome) => void; readOnly?: boolean; outside?: boolean; open: boolean; onToggle: () => void; onOpen?: () => void }) {
+export function AdviceCard({ item, outcome, onAnswer, readOnly, auto, outside, open, onToggle, onOpen }: { item: IslandAdvice; outcome: IslandOutcome; onAnswer: (outcome: IslandOutcome) => void; readOnly?: boolean; auto?: boolean; outside?: boolean; open: boolean; onToggle: () => void; onOpen?: () => void }) {
   const stock = item.stock ? STOCK[item.stock] : null;
   const press = useRef<{ x: number; y: number } | null>(null);
   const detailsId = useId();
@@ -1010,7 +1042,9 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, outside, open, o
       </div>
       <div className="mt-1 flex items-end gap-1">
         <div className="flex min-w-0 flex-1 flex-wrap gap-1">{chips}</div>
-        {readOnly && !outcome ? (
+        {auto ? (
+          <AutoStatus outcome={outcome} />
+        ) : readOnly && !outcome ? (
           <span className="inline-flex h-6 items-center rounded-md px-2 text-[11px] font-medium" style={{ background: C.line, color: C.inkSoft }}>
             À proposer · le pharmacien valide
           </span>
@@ -1038,6 +1072,23 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, outside, open, o
           </>
         )}
       </div>
+      {/* La correction, seulement dans la carte déployée : un produit vendu sans être bipé (tapé à la main, sans code-barres),
+          ou un « Vendu » à retirer (le client a reposé la boîte). */}
+      {auto && open && !readOnly && (
+        <div data-auto-fix="" className="mt-1.5 flex items-center justify-end gap-1 border-t pt-1.5" style={{ borderColor: C.line }}>
+          <span className="mr-auto text-[10.5px]" style={{ color: C.inkSoft }}>{outcome === "SOLD" ? "Compté vendu." : "Bipé, il passe en vendu tout seul."}</span>
+          {outcome !== "SOLD" && (
+            <button type="button" onClick={() => onAnswer("SOLD")} className="h-6 rounded-md px-2 text-[11px] font-bold hover:brightness-105" style={{ background: C.soldBg, color: C.soldFg }}>
+              Vendu sans scan
+            </button>
+          )}
+          {outcome && (
+            <button type="button" onClick={() => onAnswer(null)} className="h-6 rounded-md px-2 text-[11px] font-semibold hover:bg-black/5" style={{ color: C.inkSoft }}>
+              Annuler
+            </button>
+          )}
+        </div>
+      )}
       {open && <AdviceDetails id={detailsId} item={item} outside={outside} onOpen={onOpen} />}
     </li>
   );
