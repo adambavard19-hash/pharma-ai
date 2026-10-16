@@ -706,7 +706,7 @@ export function CounterIsland(props: CounterIslandProps) {
             <Row
               robot={robot(30)}
               title={props.onFinishWithoutEmail ? "Avant de terminer : le bilan au patient ?" : "Bilan conseil par e-mail"}
-              sub="Le patient reçoit ses conseils et vos coordonnées."
+              sub="Le patient reçoit ses conseils, vos coordonnées et, pour une cure, un rappel avant la fin."
               compact
             />
             <form

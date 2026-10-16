@@ -185,3 +185,18 @@ describe("la notice officielle d'un produit conseillé dans le bilan", () => {
     expect(report?.html.match(/D'après la notice officielle/g)).toHaveLength(1);
   });
 });
+
+describe("le rappel de fin de cure annoncé dans le bilan (17 oct. 2026)", () => {
+  it("annonce le rappel et son jour, et dit que l'adresse sert aussi à ce rappel, puis est effacée", () => {
+    const mail = buildPatientReport({ pharmacyName: "Pharmacie du Port", products: [{ name: "Magnésium marin B6", reason: null }], cures: [{ name: "Magnésium marin B6", day: "9 novembre" }] })!;
+    expect(mail.text).toContain("Nous vous enverrons un rappel vers le 9 novembre, quelques jours avant la fin de votre cure de Magnésium marin B6");
+    expect(mail.text).toContain("n'est utilisée que pour ce bilan et ce rappel de fin de cure, puis effacée");
+    expect(mail.html).toContain("Votre rappel de fin de cure");
+  });
+
+  it("sans cure, rien ne change : l'adresse ne sert qu'à cet envoi", () => {
+    const mail = buildPatientReport({ pharmacyName: "Pharmacie du Port", products: [{ name: "Spray nasal", reason: null }] })!;
+    expect(mail.text).not.toContain("rappel");
+    expect(mail.text).toContain("Votre adresse n'est utilisée que pour cet envoi.");
+  });
+});

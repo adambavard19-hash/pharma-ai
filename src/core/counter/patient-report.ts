@@ -229,7 +229,7 @@ export function postalAddress(pharmacy: ReportPharmacy): string | null {
 }
 
 /** `null` quand il n'y a rien à dire : sans produit retenu, aucun e-mail ne part. */
-export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: ReportPharmacy; products: ReportProduct[]; assetBaseUrl?: string | null; date?: Date }): PatientReport | null {
+export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: ReportPharmacy; products: ReportProduct[]; assetBaseUrl?: string | null; date?: Date; /** Les rappels de fin de cure programmés avec ce bilan (produit, jour du rappel). */ cures?: { name: string; day: string }[] }): PatientReport | null {
   const products = reportProducts(input.products);
   if (products.length === 0) return null;
   const details: ReportPharmacy = input.pharmacy ?? { name: input.pharmacyName ?? "" };
@@ -247,7 +247,16 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
 
   const subject = `Votre bilan ${pharmacy}`;
   const closing = "Ce message ne remplace ni l'avis de votre pharmacien, ni celui de votre médecin. En cas de doute, demandez conseil à votre pharmacie.";
-  const consent = `Vous recevez ce message parce que vous avez donné votre accord au comptoir de ${pharmacy}. Votre adresse n'est utilisée que pour cet envoi.`;
+  const cures = (input.cures ?? []).map((cure) => ({ name: clean(cure.name), day: clean(cure.day) })).filter((cure) => cure.name && cure.day).slice(0, 8);
+  // Le rappel de fin de cure (17 oct. 2026) : annoncé dans le bilan, avec le jour où il partira ; l'adresse sert à ce rappel, puis est effacée.
+  const cureLine = cures.length
+    ? cures.length === 1
+      ? `Nous vous enverrons un rappel vers le ${cures[0].day}, quelques jours avant la fin de votre cure de ${cures[0].name}, pour penser à la renouveler.`
+      : `Nous vous enverrons un rappel quelques jours avant la fin de chacune de vos cures (${cures.map((cure) => `${cure.name}, vers le ${cure.day}`).join(" ; ")}), pour penser à les renouveler.`
+    : null;
+  const consent = cures.length
+    ? `Vous recevez ce message parce que vous avez donné votre accord au comptoir de ${pharmacy}. Votre adresse n'est utilisée que pour ce bilan et ${cures.length === 1 ? "ce rappel de fin de cure" : "ces rappels de fin de cure"}, puis effacée.`
+    : `Vous recevez ce message parce que vous avez donné votre accord au comptoir de ${pharmacy}. Votre adresse n'est utilisée que pour cet envoi.`;
 
   const text = [
     `Votre bilan personnalisé — ${pharmacy}${day ? ` — ${day}` : ""}`,
@@ -273,6 +282,7 @@ export function buildPatientReport(input: { pharmacyName?: string; pharmacy?: Re
         : []),
       "",
     ]),
+    ...(cureLine ? [cureLine, ""] : []),
     ...(address || phone ? [`${pharmacy}`, ...(address ? [address] : []), ...(phone ? [`Téléphone : ${phone}`] : []), ""] : []),
     closing,
     "",
@@ -394,6 +404,7 @@ ${day ? `<td class="stack" valign="middle" align="right" style="padding-top:6px"
 
 <tr><td class="pad" style="padding:4px 32px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${products.map(card).join("")}</table></td></tr>
 ${gesturesRow}
+${cureLine ? `<tr><td class="pad" style="padding:4px 32px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF8F3;border:1px solid #CBE9DA;border-radius:14px"><tr><td style="padding:14px 16px"><div style="font-size:15px;line-height:21px;font-weight:800;color:${DARK}">Votre rappel de fin de cure</div><div style="margin-top:4px;font-size:14px;line-height:21px;color:#344054">${escape(cureLine)}</div></td></tr></table></td></tr>` : ""}
 ${address || phone ? contact : ""}
 
 <tr><td class="pad" style="padding:6px 32px 24px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #EAECF0"><tr>

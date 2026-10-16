@@ -12,6 +12,8 @@ import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import type { Prisma } from "@/generated/prisma";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { customRulesFrom, overriddenRulesFrom } from "@/core/ai/central-advice";
+import { planCureReminders, scheduleCureReminders, isOptedOut as isCureOptedOut } from "@/server/services/cure-reminders";
+import { reminderDay } from "@/core/cure/cure";
 import { buildPatientReport, maskEmail, parsePatientEmail, patientSafeLine, patientSafeReason, type ReportLeaflet } from "@/core/counter/patient-report";
 import { ensureLeaflet, leafletsFor } from "@/server/services/product-leaflets";
 import { leafletKey } from "@/core/leaflet/leaflet";
@@ -220,9 +222,23 @@ export async function finishCounterSale(agent: AgentContext, input: { prescripti
   let report: "SENT" | "SIMULATED" | "FAILED" | "NONE" = "NONE";
   const followUp = await prisma.counterSaleFollowUp.findUnique({ where: { prescriptionId: sale.id }, select: { emailEncrypted: true, consentAt: true } });
   const email = followUp?.consentAt ? decryptField(followUp.emailEncrypted) : null;
+  let curesScheduled = 0;
   if (email && sold.length > 0) {
     try {
-      report = await sendPatientReport({ agent, prescriptionId: sale.id, email, soldIds: sold.map((item) => item.id).filter((value): value is string => Boolean(value)), fallbackNames: sold.map((item) => item.name) });
+      const soldIds = sold.map((item) => item.id).filter((value): value is string => Boolean(value));
+      // Les rappels de fin de cure (17 oct. 2026) : les compléments en cure vendus, annoncés dans le bilan, programmés s'il part.
+      // Un incident ici ne retient jamais le bilan : il part alors sans rappel.
+      const cures = await (async () => {
+        const pharmacyRow = await prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { isDemo: true } });
+        return pharmacyRow?.isDemo || (await isCureOptedOut(email)) ? [] : await planCureReminders(pharmacyId, soldIds, now);
+      })().catch(() => []);
+      report = await sendPatientReport({ agent, prescriptionId: sale.id, email, soldIds, fallbackNames: sold.map((item) => item.name), cures: cures.map((cure) => ({ name: cure.productName, day: reminderDay(cure.sendAt) })) });
+      if (cures.length > 0 && (report === "SENT" || report === "SIMULATED")) {
+        curesScheduled = await scheduleCureReminders({ pharmacyId, prescriptionId: sale.id, email, plans: cures, soldAt: now }).catch((error: unknown) => {
+          console.error("[rappels de cure] programmation", error);
+          return 0;
+        });
+      }
     } catch (error) {
       // Un envoi qui casse en route (base, journal) : la vente est déjà fermée et ne renverra jamais rien, l'adresse n'a plus
       // aucun usage. Elle est effacée quand même ; l'issue du bilan, elle, reste inconnue plutôt que devinée.
@@ -235,7 +251,7 @@ export async function finishCounterSale(agent: AgentContext, input: { prescripti
   await prisma.counterSaleFollowUp.update({ where: { prescriptionId: sale.id }, data: { reportStatus: report, reportSentAt: report === "NONE" ? null : now, emailEncrypted: null } });
 
   const soldToday = sold.length > 0 ? await soldTodayAtCounter(pharmacyId, now) : null;
-  await recordAudit({ action: "counter_window.sale_finished", entityType: "Prescription", entityId: sale.id, pharmacyId, metadata: { post, proposed: items.length, sold: sold.length, notSold: notSold.length, unanswered: unanswered.length, report, emailErased: Boolean(followUp?.emailEncrypted) } });
+  await recordAudit({ action: "counter_window.sale_finished", entityType: "Prescription", entityId: sale.id, pharmacyId, metadata: { post, proposed: items.length, sold: sold.length, notSold: notSold.length, unanswered: unanswered.length, report, emailErased: Boolean(followUp?.emailEncrypted), curesScheduled } });
   return { ok: true, alreadyClosed: false, proposed: items.length, sold: sold.length, notSold: notSold.length, unanswered: unanswered.length, soldToday, report };
 }
 
@@ -281,7 +297,7 @@ function leafletForReport(row: { indications: string | null; posology: string | 
  * la règle qui les a proposés est validée par le pharmacien de PharmaBoost ET qu'elle ne peut pas nommer ce qui a été délivré
  * (`patientSafeReason`) : sinon le produit part seul. Le journal des e-mails ne garde que l'adresse masquée.
  */
-async function sendPatientReport(input: { agent: AgentContext; prescriptionId: string; email: string; soldIds: string[]; fallbackNames: string[] }): Promise<"SENT" | "SIMULATED" | "FAILED" | "NONE"> {
+async function sendPatientReport(input: { agent: AgentContext; prescriptionId: string; email: string; soldIds: string[]; fallbackNames: string[]; cures?: { name: string; day: string }[] }): Promise<"SENT" | "SIMULATED" | "FAILED" | "NONE"> {
   const { agent } = input;
   const pharmacyId = agent.scope.pharmacyId;
   const [pharmacy, recs, validated, lines] = await Promise.all([
@@ -335,6 +351,7 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
     products: products.length ? products : input.fallbackNames.map((name) => ({ name, reason: null })),
     assetBaseUrl: emailAssetBase(),
     date: new Date(),
+    cures: input.cures,
   });
   if (!mail) return "NONE";
   const messaging = getMessagingProvider({ demo: pharmacy?.isDemo === true });

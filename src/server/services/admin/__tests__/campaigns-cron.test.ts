@@ -28,6 +28,7 @@ vi.mock("@/server/services/admin/automations", () => ({ runAutomations: mocks.ru
 vi.mock("@/server/services/admin/campaigns", () => ({ processDueCampaigns: mocks.processDueCampaigns }));
 vi.mock("@/server/services/patient-news", () => ({ resumeStuckAnnouncements: mocks.resumeStuckAnnouncements, purgeStalePatientNews: mocks.purgeStalePatientNews }));
 vi.mock("@/server/services/counter-results", () => ({ sendMonthlyCounterReports: mocks.sendMonthlyCounterReports }));
+vi.mock("@/server/services/cure-reminders", () => ({ sendDueCureReminders: async () => ({ due: 0, sent: 0, failed: 0, cancelled: 0, stoppedEarly: false }) }));
 vi.mock("@/server/services/weekly-digest", () => ({ sendDailyDigests: async () => ({ day: "2026-10-15", pharmacies: 0, sent: 0, skipped: 0, failed: 0, stoppedEarly: false }) }));
 vi.mock("@/server/services/counter-window", () => ({ purgeCounterEmails: mocks.purgeCounterEmails }));
 vi.mock("@/server/services/stock-learning", () => ({ runStockLearningPass: mocks.runStockLearningPass }));
@@ -98,6 +99,7 @@ describe("passage complet", () => {
       reachedLots: 0,
       counterEmails: { erased: 2, moreToDo: false },
       counterReports: { month: "2026-09", pharmacies: 0, sent: 0, skipped: 0, failed: 0 },
+      cureReminders: { due: 0, sent: 0, failed: 0, cancelled: 0, stoppedEarly: false },
       weeklyDigests: { day: "2026-10-15", pharmacies: 0, sent: 0, skipped: 0, failed: 0, stoppedEarly: false },
       stockLearning: { pharmacies: 3, processed: 3, skipped: 0, moreToDo: false },
     });

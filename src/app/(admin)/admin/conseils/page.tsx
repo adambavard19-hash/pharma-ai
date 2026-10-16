@@ -13,6 +13,8 @@ import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdviceHub, type HubItem } from "./advice-hub";
 import type { HistoryLine } from "./edit-forms";
 import { HowItWorks } from "./how-it-works";
+import { CureDurations } from "./cure-durations";
+import { listCureDurations } from "@/server/services/cure-reminders";
 
 export const metadata: Metadata = { title: "Conseils" };
 
@@ -28,7 +30,7 @@ const lines = (entries: EditHistoryEntry[] | undefined): HistoryLine[] => (entri
 export default async function AdminAdvicePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePlatformSession();
   const query = await searchParams;
-  const [rules, associations, robot, history, associationEdits, robotKeys, pharmacies, families] = await Promise.all([
+  const [rules, associations, robot, history, associationEdits, robotKeys, pharmacies, families, cureDurations] = await Promise.all([
     listCentralRules(PRODUCT_CATEGORY_LABELS),
     listCentralAssociations(),
     listRobotProposals(),
@@ -37,6 +39,7 @@ export default async function AdminAdvicePage({ searchParams }: { searchParams: 
     robotOriginKeys(),
     listPreviewPharmacies(),
     listTriggerFamilies(),
+    listCureDurations(),
   ]);
 
   const items: HubItem[] = [
@@ -86,6 +89,7 @@ export default async function AdminAdvicePage({ searchParams }: { searchParams: 
         initialFilter={filterFromParam(query.filtre)}
         initialQuery={typeof query.q === "string" ? query.q.slice(0, 120) : ""}
       />
+      <CureDurations families={cureDurations.families} products={cureDurations.products.map((row) => ({ key: row.key, label: row.label, days: row.days }))} />
       <details className="group rounded-xl border border-border-subtle bg-surface-card p-4">
         <summary className="cursor-pointer text-[14px] font-semibold text-text-primary">Comment le moteur décide</summary>
         <div className="mt-4">

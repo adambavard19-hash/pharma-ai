@@ -144,7 +144,7 @@ describe("les textes viennent du site, mot pour mot", () => {
 
   it("le pharmacien garde la décision ; aucune fiche patient, l'e-mail du bilan effacé après l'envoi", () => {
     expect(generic).toContain("Le pharmacien garde la décision.");
-    expect(generic).toContain("Aucune fiche patient. L'e-mail du bilan est effacé après l'envoi.");
+    expect(generic).toContain("Aucune fiche patient. L'e-mail du bilan est effacé après l'envoi (ou après le rappel de fin de cure).");
     expect(generic).toContain("3 g de paracétamol par jour au maximum");
   });
 

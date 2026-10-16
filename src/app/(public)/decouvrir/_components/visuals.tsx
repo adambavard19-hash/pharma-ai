@@ -1,4 +1,4 @@
-import { CalendarCheck, Mail, ScanLine } from "lucide-react";
+import { CalendarCheck, Check, Mail, ScanLine } from "lucide-react";
 import { BannerMock, type BannerMockItem } from "./banner-mock";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { ANALGESIC_TREE, evaluateTree } from "@/core/counter/question-tree";
@@ -398,6 +398,48 @@ export function RequestVisual() {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Le bilan conseil et le rappel de fin de cure                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Le bilan du jour, puis, trois semaines plus tard, le rappel de fin de cure (17 oct. 2026) : deux e-mails au nom de la pharmacie,
+ * dessinés pour le site (produit et pharmacie d'exemple).
+ */
+export function CureReminderVisual() {
+  return (
+    <div className="relative mx-auto w-full max-w-[460px]" aria-hidden="true">
+      <div className="rounded-2xl border border-border-subtle bg-surface-card p-4 shadow-sm">
+        <p className="flex items-center gap-2 font-mono text-[10.5px] tracking-[0.12em] text-text-tertiary uppercase">
+          <Mail className="size-3.5 text-brand-600" /> Aujourd&apos;hui · après la vente
+        </p>
+        <p className="mt-2 text-[15px] font-semibold text-text-primary">Votre bilan — Pharmacie du Centre</p>
+        <div className="mt-2 flex items-center gap-3 rounded-xl bg-surface-app px-3 py-2.5">
+          <span className="grid size-9 place-items-center rounded-lg bg-brand-50 text-brand-700">
+            <Check className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[13.5px] font-semibold text-text-primary">Magnésium marin B6 · 30 comprimés</p>
+            <p className="text-[12px] text-text-secondary">Conseillé aujourd&apos;hui par votre pharmacien</p>
+          </div>
+        </div>
+        <p className="mt-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-[12.5px] leading-5 text-brand-900">
+          Nous vous enverrons un rappel quelques jours avant la fin de votre cure, pour penser à la renouveler.
+        </p>
+      </div>
+      <div className="relative z-10 -mt-3 ml-8 rounded-2xl border border-brand-300 bg-surface-card p-4 shadow-[0_24px_60px_-28px_rgba(11,59,71,.45)]">
+        <p className="flex items-center gap-2 font-mono text-[10.5px] tracking-[0.12em] text-brand-700 uppercase">
+          <CalendarCheck className="size-3.5" /> 3 semaines plus tard · 7 jours avant la fin
+        </p>
+        <p className="mt-2 text-[15px] font-semibold text-text-primary">Votre cure de magnésium arrive à son terme</p>
+        <p className="mt-1 text-[13px] leading-5 text-text-secondary">Il vous en reste environ une semaine. Pensez à repasser à la pharmacie pour la renouveler.</p>
+        <span className="mt-3 inline-flex items-center rounded-lg bg-brand-600 px-3 py-1.5 text-[12.5px] font-semibold text-white">Voir l&apos;itinéraire</span>
+      </div>
     </div>
   );
 }

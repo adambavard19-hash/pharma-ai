@@ -150,6 +150,7 @@ model Pharmacy {
   pharmacyRules          PharmacyRule[]
   productAssociations    ProductAssociation[]
   counterSaleFollowUps   CounterSaleFollowUp[]
+  cureReminders          CureReminder[]
   counterQuestionAnswers CounterQuestionAnswer[]
   documents              PatientDocument[]
   sales                  Sale[]
@@ -5892,4 +5893,56 @@ model SiteVisitor {
   @@index([firstSeenAt])
   @@index([city])
   @@map("site_visitors")
+}
+
+
+/// Le rappel de fin de cure (17 oct. 2026) : un complément vendu au comptoir (magnésium, probiotiques, plantes…) à un patient qui
+/// a accepté le bilan par e-mail. Sept jours avant la fin de la cure, PharmaBoost lui écrit de penser à revenir la renouveler.
+/// L'adresse est gardée CHIFFRÉE jusqu'à cet envoi, puis effacée ; `emailHash` (empreinte à clé, irréversible) sert seulement à
+/// respecter une désinscription. Aucune fiche patient : le nom du produit, la date, l'officine.
+model CureReminder {
+  id             String    @id @default(cuid())
+  pharmacyId     String
+  prescriptionId String?
+  productId      String?
+  productName    String
+  durationDays   Int
+  /// D'où vient la durée : « PRODUCT » (réglée pour ce produit dans la console), « BOX » (lue sur la boîte), « FAMILY » (famille).
+  durationSource String
+  emailEncrypted String?
+  emailHash      String
+  soldAt         DateTime
+  sendAt         DateTime
+  /// PENDING → SENT | FAILED | CANCELLED (désinscription, rappel trop ancien).
+  status         String    @default("PENDING")
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([status, sendAt])
+  @@index([pharmacyId, createdAt])
+  @@index([emailHash])
+  @@map("cure_reminders")
+}
+
+/// Une adresse qui ne veut plus de rappels de cure (empreinte seulement, jamais l'adresse).
+model CureReminderOptOut {
+  emailHash String   @id
+  createdAt DateTime @default(now())
+
+  @@map("cure_reminder_opt_outs")
+}
+
+/// La durée d'une cure, réglée par l'équipe PharmaBoost dans la console (Console → Conseils → Durées de cure), valable pour
+/// toutes les pharmacies : `key` = « CATEGORY:MAGNESIUM » (une famille) ou « EAN:3401… » (un produit précis, qui passe avant).
+model CureDuration {
+  key           String   @id
+  label         String
+  days          Int
+  updatedByName String?
+  updatedAt     DateTime @updatedAt
+
+  @@map("cure_durations")
 }

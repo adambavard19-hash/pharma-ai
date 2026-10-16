@@ -62,7 +62,7 @@ describe("le site dit ce que fait l'application, et rien de plus", () => {
   });
 
   it("dit la vérité sur les données : aucune fiche patient, l'e-mail du bilan effacé après l'envoi", () => {
-    expect(homeText).toContain("Aucune fiche patient. L'e-mail du bilan est effacé après l'envoi.");
+    expect(homeText).toContain("Aucune fiche patient. L'e-mail du bilan est effacé après l'envoi (ou après le rappel de fin de cure).");
     expect(homeText).toContain("l'adresse e-mail donnée pour le bilan est effacée après l'envoi");
     expect(whyText).not.toContain("Aucune conservée");
     expect(whyText).toContain("Aucune fiche patient");
@@ -112,7 +112,9 @@ describe("l'en-tête mène d'abord à la bannière du comptoir", () => {
     const nav = header.match(/<nav[\s\S]*?<\/nav>/)?.[0] ?? "";
     const links = [...nav.matchAll(/href="([^"]+)"[^>]*>([^<]+)</g)].map((match) => [match[1], match[2]]);
     expect(links[0]).toEqual(["/decouvrir#banniere", "Au comptoir"]);
-    expect(links).toHaveLength(4);
+    expect(links).toHaveLength(5);
+    // Le bilan conseil et le rappel de fin de cure (17 oct. 2026) ont leur onglet, juste après le comptoir.
+    expect(links[1]).toEqual(["/decouvrir#bilan", "Bilan conseil"]);
     // La rubrique « Comment ça marche » a été retirée de la page (demande du fondateur, 11 oct. 2026) : plus de lien vers elle.
     expect(nav).not.toContain("#fonctionnement");
   });

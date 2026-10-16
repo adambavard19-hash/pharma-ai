@@ -55,7 +55,7 @@ export const SAFETY: { label: string; value: string }[] = [
   // Pas « relues » : toutes les règles attendent encore la relecture du pharmacien signataire (PENDING).
   { label: "Sources", value: "Règles écrites à partir de documents de pharmaciens et des sources officielles (RCP, HAS, ANSES)" },
   { label: "Décision", value: "Le pharmacien garde la validation finale" },
-  { label: "Données", value: "Aucune fiche patient. L'e-mail du bilan est effacé après l'envoi." },
+  { label: "Données", value: "Aucune fiche patient. L'e-mail du bilan est effacé après l'envoi (ou après le rappel de fin de cure)." },
 ];
 
 export const FAQ: { q: string; a: string }[] = [
@@ -65,7 +65,7 @@ export const FAQ: { q: string; a: string }[] = [
   { q: "Qui décide du conseil ?", a: "Le pharmacien. Au comptoir, il note Vendu ou Non vendu ; sur l'écran de vente, il propose, remplace ou ignore." },
   { q: "Une IA choisit-elle les produits ?", a: "Non. Les produits viennent de règles écrites à partir de documents de pharmaciens et des sources officielles (RCP, HAS, ANSES), et de votre stock. L'IA aide à lire l'ordonnance et à reconnaître les produits de votre stock." },
   { q: "Faut-il paramétrer les conseils ?", a: "Non. La bibliothèque de conseils est commune : une correction faite une fois vaut pour toutes les pharmacies. Vous gardez vos associations et vos laboratoires préférés." },
-  { q: "Quelles données sont conservées ?", a: "Aucune fiche patient. Le plan conseil est chiffré et remis au patient ; l'adresse e-mail donnée pour le bilan est effacée après l'envoi." },
+  { q: "Quelles données sont conservées ?", a: "Aucune fiche patient. Le plan conseil est chiffré et remis au patient ; l'adresse e-mail donnée pour le bilan est effacée après l'envoi — ou, pour une cure, après le rappel de fin de cure." },
   { q: "Est-ce un dispositif médical ?", a: "Non. C'est un outil d'aide au conseil : il ne diagnostique pas et ne prescrit pas." },
   { q: "Quel engagement ?", a: "Un seul abonnement, avec un engagement de 12 mois. La mise en service, installation, paramétrage et formation de l'équipe comprises, est facturée une seule fois." },
 ];
