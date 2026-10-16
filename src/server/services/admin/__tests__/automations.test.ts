@@ -309,8 +309,8 @@ describe("relances automatiques : cas particuliers", () => {
   });
 
   it("les candidats ne sont lus que dans la fenêtre utile", () => {
-    // Plus long délai (30 j) + rattrapage (2 j) + 1 jour de marge.
-    expect(anchorWindowStart(NOW).toISOString()).toBe(daysAgo(33).toISOString());
+    // Plus long délai (60 j : le dernier message aux prospects démo) + rattrapage (2 j) + 1 jour de marge.
+    expect(anchorWindowStart(NOW).toISOString()).toBe(daysAgo(63).toISOString());
   });
 });
 

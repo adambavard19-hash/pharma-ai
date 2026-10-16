@@ -27,7 +27,7 @@ import { addDays as addDayKey, calendarDay, daysBetween, zonedDayStart, type Day
 
 export const CATCH_UP_DAYS = 2;
 
-export type AutomationScenario = "TRIAL" | "PAYMENT" | "CANCELLATION" | "COMMERCIAL" | "REFERRAL" | "PARTNER";
+export type AutomationScenario = "TRIAL" | "PAYMENT" | "CANCELLATION" | "COMMERCIAL" | "PROSPECT" | "REFERRAL" | "PARTNER";
 export type AutomationChannel = "EMAIL" | "INTERNAL";
 
 export type AutomationRuleDefinition = {
@@ -45,7 +45,7 @@ export type AutomationRuleDefinition = {
   /** Le modèle d'e-mail envoyé (canal EMAIL). */
   templateKey?: string;
   /** À qui part l'e-mail : le titulaire d'une officine (par défaut) ou le contact d'un partenaire. */
-  audience?: "Titulaire" | "Partenaire";
+  audience?: "Titulaire" | "Partenaire" | "Prospect";
   /** Ce que la règle fait EN PLUS de l'e-mail, en clair : redit à l'activation. */
   alsoDoes?: string;
   /** Avertissement affiché : un autre envoi existe déjà pour le même moment. */
@@ -57,9 +57,27 @@ export const AUTOMATION_SCENARIOS: Record<AutomationScenario, { label: string; d
   PAYMENT: { label: "Paiement", description: "Après un paiement échoué resté impayé : relances au titulaire, puis alerte à l'équipe." },
   CANCELLATION: { label: "Résiliation", description: "Accusé de réception d'une demande, puis confirmation." },
   COMMERCIAL: { label: "Suivi commercial", description: "Alerte interne quand une relance prévue sur un dossier est dépassée." },
+  PROSPECT: {
+    label: "Prospects démo",
+    description: "Cinq e-mails, chacun sous un angle différent, aux pharmacies qui ont réservé une démonstration, pour leur donner envie de s'abonner. Jamais vers une pharmacie déjà inscrite ou abonnée, ni vers une adresse désinscrite.",
+  },
   REFERRAL: { label: "Parrainage", description: "Quand une officine parrainée s'inscrit : un e-mail et une notification dans l'application pour le titulaire qui l'a parrainée." },
   PARTNER: { label: "Partenaires", description: "Une invitation à déposer sa gamme, pour les fiches partenaires encore sans aucune marque référencée." },
 };
+
+/**
+ * Les relances des prospects qui ont réservé une démonstration (fondateur, 16 oct. 2026) : cinq messages, un angle chacun,
+ * comptés depuis la date de la démonstration. Désactivés tant qu'un administrateur ne les a pas activés.
+ */
+export const PROSPECT_NURTURE_STEPS = [
+  { key: "prospect.demo_thanks", label: "1. Merci pour la démonstration", template: "prospect.demo_thanks", offset: 1, min: 0, max: 3 },
+  { key: "prospect.demo_counter", label: "2. Au comptoir", template: "prospect.demo_counter", offset: 4, min: 2, max: 10 },
+  { key: "prospect.demo_team", label: "3. Toute l'équipe", template: "prospect.demo_team", offset: 8, min: 5, max: 20 },
+  { key: "prospect.demo_install", label: "4. Installation simple", template: "prospect.demo_install", offset: 15, min: 10, max: 35 },
+  { key: "prospect.demo_last", label: "5. Dernier message", template: "prospect.demo_last", offset: 30, min: 20, max: 60 },
+] as const;
+const PROSPECT_NURTURE_KEYS: ReadonlySet<string> = new Set(PROSPECT_NURTURE_STEPS.map((step) => step.key));
+export const isProspectNurtureRule = (key: string) => PROSPECT_NURTURE_KEYS.has(key);
 
 export const AUTOMATION_RULES: AutomationRuleDefinition[] = [
   { key: "trial.welcome", scenario: "TRIAL", label: "Bienvenue", trigger: "Jours après le début de l'essai", defaultOffsetDays: 1, minOffsetDays: 0, maxOffsetDays: 7, channel: "EMAIL", templateKey: "trial.welcome" },
@@ -94,6 +112,20 @@ export const AUTOMATION_RULES: AutomationRuleDefinition[] = [
   { key: "cancellation.acknowledgement", scenario: "CANCELLATION", label: "Accusé de réception", trigger: "Jours après l'enregistrement de la demande", defaultOffsetDays: 0, minOffsetDays: 0, maxOffsetDays: 3, channel: "EMAIL", templateKey: "cancellation.received" },
   { key: "cancellation.confirmation", scenario: "CANCELLATION", label: "Confirmation", trigger: "Jours après la confirmation de la résiliation", defaultOffsetDays: 0, minOffsetDays: 0, maxOffsetDays: 3, channel: "EMAIL", templateKey: "cancellation.confirmed" },
   { key: "prospect.followup_overdue", scenario: "COMMERCIAL", label: "Relance commerciale dépassée", trigger: "Jours après la date de relance prévue sur un dossier ouvert", defaultOffsetDays: 1, minOffsetDays: 0, maxOffsetDays: 14, channel: "INTERNAL" },
+  ...PROSPECT_NURTURE_STEPS.map(
+    (step): AutomationRuleDefinition => ({
+      key: step.key,
+      scenario: "PROSPECT",
+      label: step.label,
+      trigger: "Jours après la date de la démonstration réservée",
+      defaultOffsetDays: step.offset,
+      minOffsetDays: step.min,
+      maxOffsetDays: step.max,
+      channel: "EMAIL",
+      templateKey: step.template,
+      audience: "Prospect",
+    }),
+  ),
   {
     key: "referral.filleul_joined",
     scenario: "REFERRAL",
@@ -185,6 +217,20 @@ export type ProspectCandidate = {
   lastContactAt?: Date | null;
   blockedAt: Date | null;
   salesRepId: string | null;
+};
+
+/**
+ * Un prospect qui a réservé une démonstration, pour les relances « Prospects démo ». `excluded` : la pharmacie est déjà
+ * inscrite ou abonnée (son adresse est celle d'un compte PharmaBoost ou d'une officine, ou le dossier a une officine), ou
+ * l'adresse manque — rien ne lui est envoyé.
+ */
+export type DemoProspectCandidate = {
+  id: string;
+  status: string;
+  demoAt: Date;
+  blockedAt: Date | null;
+  subscriptionRequestedAt: Date | null;
+  excluded: boolean;
 };
 
 /** Une officine parrainée, avec son parrain : l'e-mail et la notification vont au parrain. */
@@ -309,6 +355,8 @@ export function paymentSequenceError(rules: ResolvedRule[], change: { key: strin
 const TRIAL_NOT_CONTINUED = new Set(["PAUSED", "CANCELED", "INCOMPLETE", "INCOMPLETE_EXPIRED"]);
 const OPEN_CANCELLATION = new Set(["RECEIVED", "IN_PROGRESS"]);
 const CLOSED_PROSPECT = new Set(["ACTIVATED", "LOST"]);
+/** Les dossiers qu'on ne relance plus : contrat envoyé ou signé, officine créée, activée, perdue. */
+const NURTURE_STOP_STATUS = new Set(["CONTRACT_SENT", "CONTRACT_SIGNED", "PHARMACY_CREATED", "ACTIVATED", "LOST"]);
 const PARTNER_NOT_INVITED = new Set(["SUSPENDED", "ARCHIVED"]);
 
 /**
@@ -320,7 +368,8 @@ export function planAutomations(input: {
   subscriptions: SubscriptionCandidate[];
   cancellations: CancellationCandidate[];
   prospects: ProspectCandidate[];
-  /** Facultatifs : sans eux, les règles de parrainage et de partenaires ne planifient rien. */
+  /** Facultatifs : sans eux, les règles de parrainage, de partenaires et de prospects démo ne planifient rien. */
+  demoProspects?: DemoProspectCandidate[];
   filleuls?: FilleulCandidate[];
   partners?: PartnerCandidate[];
   alreadyDone: Set<string>;
@@ -391,6 +440,19 @@ export function planAutomations(input: {
           push(rule, { type: "Prospect", id: p.id, pharmacyId: null }, p.nextActionAt);
         }
         break;
+      case "prospect.demo_thanks":
+      case "prospect.demo_counter":
+      case "prospect.demo_team":
+      case "prospect.demo_install":
+      case "prospect.demo_last":
+        for (const p of input.demoProspects ?? []) {
+          // Déjà inscrite ou abonnée, perdue, bloquée, ou qui a déjà demandé son abonnement : on ne la relance pas.
+          if (p.excluded || p.blockedAt || p.subscriptionRequestedAt || NURTURE_STOP_STATUS.has(p.status)) continue;
+          // Ancrée sur la démonstration : jamais avant qu'elle ait eu lieu.
+          if (p.demoAt.getTime() > now.getTime()) continue;
+          push(rule, { type: "Prospect", id: p.id, pharmacyId: null }, p.demoAt);
+        }
+        break;
       case "referral.filleul_joined":
         for (const filleul of input.filleuls ?? []) {
           // Une officine de démonstration, ou sans parrain, n'annonce rien à personne.
@@ -421,7 +483,8 @@ export function planAutomations(input: {
  * dossiers).
  */
 export function isContextBoundTemplate(key: string): boolean {
-  return key === "contract.reminder" || key.startsWith("cancellation.") || key === "referral.filleul_joined" || key === "partner.range_invitation";
+  // Les relances « Prospects démo » portent un lien de désinscription signé, propre à chaque envoi automatique.
+  return key === "contract.reminder" || key.startsWith("cancellation.") || key === "referral.filleul_joined" || key === "partner.range_invitation" || key.startsWith("prospect.demo_");
 }
 
 /**

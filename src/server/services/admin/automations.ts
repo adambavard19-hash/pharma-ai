@@ -6,7 +6,9 @@ import { hashEmail } from "@/server/security/tokens";
 import { notifyAdmins, notifySalesRep } from "@/server/services/sales/notifications";
 import { createNotification } from "@/server/services/notifications";
 import { contractCounters } from "@/server/services/admin/contracts-admin";
-import { partnerRecipient, pharmacyRecipient, sendTemplatedEmail, templateValuesFor, type Recipient } from "./outbound-email";
+import { partnerRecipient, pharmacyRecipient, prospectRecipient, sendTemplatedEmail, templateValuesFor, type Recipient } from "./outbound-email";
+import { optOutUrlFor } from "./campaigns";
+import { publicUrl } from "@/server/public-url";
 import { countCommunications, parseCommunicationFilters, shownCount } from "./communications";
 import {
   AUTOMATION_RULES,
@@ -17,10 +19,12 @@ import {
   clampOffset,
   dueDay,
   paymentSequenceError,
+  isProspectNurtureRule,
   planAutomations,
   resolveRules,
   unpaidSeriesStart,
   type CancellationCandidate,
+  type DemoProspectCandidate,
   type FilleulCandidate,
   type PartnerCandidate,
   type PlannedAutomation,
@@ -118,6 +122,7 @@ export type AutomationCandidates = {
   subscriptions: SubscriptionCandidate[];
   cancellations: CancellationCandidate[];
   prospects: ProspectCandidate[];
+  demoProspects: DemoProspectCandidate[];
   filleuls: FilleulCandidate[];
   partners: PartnerCandidate[];
   context: CandidateContext;
@@ -137,7 +142,8 @@ export async function loadCandidates(now: Date, enabledRuleKeys: ReadonlySet<str
   const since = anchorWindowStart(now);
   const wantsFilleuls = enabledRuleKeys.has("referral.filleul_joined");
   const wantsPartners = enabledRuleKeys.has("partner.range_invitation");
-  const [subscriptionRows, cancellationRows, prospectRows, filleulRows, partnerRows] = await Promise.all([
+  const wantsDemoProspects = [...enabledRuleKeys].some(isProspectNurtureRule);
+  const [subscriptionRows, cancellationRows, prospectRows, filleulRows, partnerRows, demoRows] = await Promise.all([
     prisma.subscription.findMany({
       where: { OR: [{ trialStartsAt: { gte: since } }, { trialEndsAt: { gte: since } }, { lastPaymentFailedAt: { gte: since } }] },
       select: {
@@ -173,6 +179,13 @@ export async function loadCandidates(now: Date, enabledRuleKeys: ReadonlySet<str
       ? prisma.partner.findMany({
           where: { status: { in: [...INVITABLE_PARTNER_STATUSES] }, createdAt: { gte: since } },
           select: { id: true, name: true, status: true, createdAt: true, _count: { select: { brands: true } } },
+        })
+      : Promise.resolve([]),
+    // Les prospects dont la démonstration est assez récente pour qu'un message soit encore dû.
+    wantsDemoProspects
+      ? prisma.prospect.findMany({
+          where: { demoAt: { gte: since, lte: now } },
+          select: { id: true, name: true, email: true, status: true, demoAt: true, blockedAt: true, subscriptionRequestedAt: true, pharmacyId: true },
         })
       : Promise.resolve([]),
   ]);
@@ -218,7 +231,36 @@ export async function loadCandidates(now: Date, enabledRuleKeys: ReadonlySet<str
     context.partners.set(row.id, { name: row.name });
     return { id: row.id, status: row.status, brandCount: row._count.brands, createdAt: row.createdAt };
   });
-  return { subscriptions, cancellations, prospects, filleuls, partners, context };
+  const demoProspects = await demoProspectCandidates(demoRows);
+  for (const row of demoRows) if (!context.prospects.has(row.id)) context.prospects.set(row.id, { name: row.name, nextActionAt: null, nextActionLabel: null, salesRepId: null });
+  return { subscriptions, cancellations, prospects, demoProspects, filleuls, partners, context };
+}
+
+/**
+ * Les prospects démo, et ceux qu'on ne relance JAMAIS (fondateur, 16 oct. 2026 : « ceux qui sont inscrits, abonnés, il ne
+ * faut pas leur faire de relance ») : un dossier qui a déjà son officine, une adresse qui est celle d'un compte PharmaBoost
+ * ou d'une officine inscrite, ou pas d'adresse du tout.
+ */
+async function demoProspectCandidates(rows: { id: string; email: string | null; status: string; demoAt: Date | null; blockedAt: Date | null; subscriptionRequestedAt: Date | null; pharmacyId: string | null }[]): Promise<DemoProspectCandidate[]> {
+  if (rows.length === 0) return [];
+  const emails = [...new Set(rows.map((row) => row.email?.trim().toLowerCase()).filter((email): email is string => Boolean(email)))];
+  const [users, pharmacies] = emails.length
+    ? await Promise.all([
+        prisma.user.findMany({ where: { email: { in: emails, mode: "insensitive" } }, select: { email: true } }),
+        prisma.pharmacy.findMany({ where: { email: { in: emails, mode: "insensitive" } }, select: { email: true } }),
+      ])
+    : [[], []];
+  const known = new Set([...users.map((user) => user.email), ...pharmacies.map((pharmacy) => pharmacy.email)].filter((email): email is string => Boolean(email)).map((email) => email.toLowerCase()));
+  return rows
+    .filter((row): row is typeof row & { demoAt: Date } => row.demoAt !== null)
+    .map((row) => ({
+      id: row.id,
+      status: row.status,
+      demoAt: row.demoAt,
+      blockedAt: row.blockedAt,
+      subscriptionRequestedAt: row.subscriptionRequestedAt,
+      excluded: Boolean(row.pharmacyId) || !row.email || known.has(row.email.trim().toLowerCase()),
+    }));
 }
 
 // ---------------------------------------------------------------- Plan
@@ -232,7 +274,7 @@ export type AutomationPlan = { rules: ResolvedRule[]; planned: PlannedAutomation
 async function planWith(rules: ResolvedRule[], now: Date): Promise<AutomationPlan> {
   if (!rules.some((r) => r.enabled)) return { rules, planned: [], alreadyDone: 0, candidates: null, now };
   const candidates = await loadCandidates(now, new Set(rules.filter((r) => r.enabled).map((r) => r.key)));
-  const input = { rules, subscriptions: candidates.subscriptions, cancellations: candidates.cancellations, prospects: candidates.prospects, filleuls: candidates.filleuls, partners: candidates.partners, now };
+  const input = { rules, subscriptions: candidates.subscriptions, cancellations: candidates.cancellations, prospects: candidates.prospects, demoProspects: candidates.demoProspects, filleuls: candidates.filleuls, partners: candidates.partners, now };
   const due = planAutomations({ ...input, alreadyDone: new Set() });
   if (due.length === 0) return { rules, planned: [], alreadyDone: 0, candidates, now };
   const existing = await prisma.automationDispatch.findMany({ where: { dedupeKey: { in: due.map((p) => p.dedupeKey) } }, select: { dedupeKey: true } });
@@ -342,6 +384,12 @@ function ruleValues(item: PlannedAutomation, context: CandidateContext, now: Dat
   return { date_demande: formatFrenchDate(request.requestedAt), date_fin_prevue: end ? formatFrenchDate(end) : null };
 }
 
+/** Les liens des relances « Prospects démo » : s'abonner, réserver un nouvel échange, ne plus rien recevoir (lien signé). */
+function nurtureLinks(item: PlannedAutomation, recipient: Recipient): Record<string, string> {
+  if (!isProspectNurtureRule(item.ruleKey)) return {};
+  return { lien_abonnement: publicUrl("/decouvrir/abonnement"), lien_demo: publicUrl("/decouvrir/demo"), lien_desinscription: optOutUrlFor(recipient.email) };
+}
+
 /** Une valeur indispensable au texte manque : mieux vaut ne pas envoyer qu'envoyer une phrase vide. */
 function missingValue(item: PlannedAutomation, values: Record<string, string | null>): string | null {
   if (item.ruleKey === "cancellation.confirmation" && !values.date_fin_prevue) return "Date de fin prévue inconnue : renseignez-la sur la demande de résiliation, puis écrivez au titulaire depuis sa fiche.";
@@ -388,13 +436,15 @@ function recipientCache() {
   const cache = new Map<string, Promise<Recipient | null>>();
   return (item: Pick<PlannedAutomation, "targetType" | "targetId" | "pharmacyId">) => {
     const partner = item.targetType === "Partner";
-    const id = partner ? item.targetId : item.pharmacyId;
+    // Un prospect (relances « Prospects démo ») : le contact de son dossier.
+    const prospect = item.targetType === "Prospect";
+    const id = partner || prospect ? item.targetId : item.pharmacyId;
     if (!id) return Promise.resolve(null);
-    const key = `${partner ? "partner" : "pharmacy"}:${id}`;
+    const key = `${partner ? "partner" : prospect ? "prospect" : "pharmacy"}:${id}`;
     if (!cache.has(key)) {
       cache.set(
         key,
-        (partner ? partnerRecipient(id) : pharmacyRecipient(id)).catch((error: unknown) => {
+        (partner ? partnerRecipient(id) : prospect ? prospectRecipient(id) : pharmacyRecipient(id)).catch((error: unknown) => {
           cache.delete(key);
           throw error;
         }),
@@ -406,7 +456,8 @@ function recipientCache() {
 
 /** Une invitation à un partenaire ne part jamais vers une adresse de la liste de désinscription des offres (on n'y garde que des empreintes). */
 async function isOptedOut(item: Pick<PlannedAutomation, "targetType">, recipient: Recipient): Promise<boolean> {
-  if (item.targetType !== "Partner") return false;
+  // Les invitations des partenaires et les relances des prospects démo : jamais vers une adresse désinscrite.
+  if (item.targetType !== "Partner" && item.targetType !== "Prospect") return false;
   const row = await prisma.marketingOptOut.findUnique({ where: { emailHash: hashEmail(recipient.email) }, select: { id: true } });
   return Boolean(row);
 }
@@ -614,7 +665,7 @@ export async function runAutomations(options: { now: Date; dryRun: boolean; admi
           continue;
         }
 
-        const values = await templateValuesFor(recipient, extra);
+        const values = await templateValuesFor(recipient, { ...extra, ...nurtureLinks(planned, recipient) });
         attempted = true;
         const sent = await sendTemplatedEmail({ templateKey: planned.templateKey, recipient, values, trigger: "AUTOMATIC", ruleKey: planned.ruleKey, adminId: adminId ?? null });
         const alsoDone = await afterEmail(planned, context, sent.outcome.status, adminId ?? null);

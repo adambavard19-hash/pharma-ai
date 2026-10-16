@@ -32,6 +32,7 @@ const SECTION_NAV: Record<AutomationScenario | "CONTRACT", { anchor: string; lab
   PAYMENT: { anchor: "paiement", label: "Paiement" },
   CANCELLATION: { anchor: "resiliation", label: "Résiliation" },
   COMMERCIAL: { anchor: "commercial", label: "Suivi commercial" },
+  PROSPECT: { anchor: "prospects-demo", label: "Prospects démo" },
   REFERRAL: { anchor: "parrainage", label: "Parrainage" },
   PARTNER: { anchor: "partenaires", label: "Partenaires" },
 };

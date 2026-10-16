@@ -60,9 +60,15 @@ const V = {
   montantRemise: { key: "montant_remise", label: "Remise de parrainage sur l'abonnement du parrain (en pourcentage)", sample: `${REFERRAL_DISCOUNT_PERCENT} %` },
   nomPartenaire: { key: "nom_partenaire", label: "Nom du partenaire", sample: "Laboratoires Exemple" },
   lienCandidature: { key: "lien_candidature", label: "Lien vers le formulaire de référencement des partenaires", sample: "https://pharmaboost.app/decouvrir/partenaires" },
+  lienAbonnement: { key: "lien_abonnement", label: "Lien pour s'abonner à PharmaBoost", sample: "https://pharmaboost.app/decouvrir/abonnement" },
+  lienDemo: { key: "lien_demo", label: "Lien pour réserver un nouvel échange", sample: "https://pharmaboost.app/decouvrir/demo" },
+  lienDesinscription: { key: "lien_desinscription", label: "Lien pour ne plus recevoir ces messages", sample: "https://pharmaboost.app/offres/desinscription/…" },
 } satisfies Record<string, TemplateVariable>;
 
 const COMMON = [V.prenom, V.titulaire, V.officine, V.contact];
+/** Un prospect qui a réservé une démonstration : pas encore d'abonnement, toujours un lien pour ne plus rien recevoir. */
+const PROSPECT_NURTURE = [V.prenom, V.titulaire, V.officine, V.contact, V.lienAbonnement, V.lienDemo, V.lienDesinscription];
+const STOP = "\n\nVous ne souhaitez plus recevoir ces messages ? Un clic suffit : {{lien_desinscription}}";
 /** Un partenaire n'a ni officine ni abonnement : seules les variables qui ont un sens pour lui. */
 const PARTNER_COMMON = [V.prenom, V.titulaire, V.nomPartenaire, V.contact];
 
@@ -271,6 +277,122 @@ export const EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
     button: { label: "Déposer ma gamme", urlVariable: "lien_candidature" },
     eyebrow: "Partenaires",
     reason: "Vous recevez ce message parce que votre société est enregistrée comme partenaire de PharmaBoost, sans marque référencée à ce jour.",
+  },
+  // --- Relances des prospects qui ont réservé une démonstration (fondateur, 16 oct. 2026) : un angle différent à chaque
+  // message, jamais un chiffre promis. Elles ne partent jamais vers une pharmacie déjà inscrite ou abonnée.
+  {
+    key: "prospect.demo_thanks",
+    label: "Prospect démo — 1. Merci pour la démonstration",
+    category: "Commercial",
+    usage: "Le lendemain de la démonstration réservée (règle « Prospects démo : 1. Merci »).",
+    audience: "Prospect",
+    variables: PROSPECT_NURTURE,
+    defaults: {
+      subject: "Merci pour votre démonstration, {{prenom}}",
+      title: "Merci pour votre démonstration",
+      body: `Bonjour {{prenom}},
+
+Merci pour le temps que vous nous avez accordé. En résumé, PharmaBoost, c'est :
+
+• vous bipez les boîtes comme d'habitude, rien ne change dans votre logiciel ;
+• en une seconde, la bannière propose le conseil utile qui accompagne la vente, pris dans votre propre stock ;
+• le client le prend ? Vous le bipez : il passe en « vendu » tout seul.
+
+Le pharmacien décide toujours, PharmaBoost l'aide à ne rien oublier.
+
+Une question ? Répondez simplement à cet e-mail.${STOP}`,
+    },
+    button: { label: "Démarrer avec PharmaBoost", urlVariable: "lien_abonnement" },
+    eyebrow: "Votre démonstration",
+    reason: "Vous recevez ce message parce que vous avez réservé une démonstration de PharmaBoost.",
+  },
+  {
+    key: "prospect.demo_counter",
+    label: "Prospect démo — 2. Au comptoir",
+    category: "Commercial",
+    usage: "Quelques jours après la démonstration (règle « Prospects démo : 2. Au comptoir »).",
+    audience: "Prospect",
+    variables: PROSPECT_NURTURE,
+    defaults: {
+      subject: "Au comptoir, impossible de penser à tout",
+      title: "PharmaBoost pense à tout, en une seconde",
+      body: `Bonjour {{prenom}},
+
+Au comptoir, la file s'allonge et personne ne peut avoir en tête toutes les associations possibles, les dates courtes à écouler, les challenges du moment et ce qu'il reste vraiment en rayon.
+
+C'est exactement ce que PharmaBoost vérifie à chaque boîte bipée, en une seconde. Votre équipe voit le bon conseil au bon moment, et la vente se termine toute seule quand vous la validez.
+
+Envie de le voir tourner chez vous ?${STOP}`,
+    },
+    button: { label: "Je veux PharmaBoost au comptoir", urlVariable: "lien_abonnement" },
+    eyebrow: "Au comptoir",
+    reason: "Vous recevez ce message parce que vous avez réservé une démonstration de PharmaBoost.",
+  },
+  {
+    key: "prospect.demo_team",
+    label: "Prospect démo — 3. Toute l'équipe",
+    category: "Commercial",
+    usage: "Une semaine après la démonstration (règle « Prospects démo : 3. Toute l'équipe »).",
+    audience: "Prospect",
+    variables: PROSPECT_NURTURE,
+    defaults: {
+      subject: "Toute votre équipe, au même niveau de conseil",
+      title: "Toute l'équipe, au même niveau de conseil",
+      body: `Bonjour {{prenom}},
+
+Avec PharmaBoost, chaque comptoir a son espace : pharmaciens comme préparateurs voient les mêmes conseils, au même moment.
+
+Vous suivez ce que cela donne, jour après jour : conseils proposés, conseils vendus, chiffre d'affaires ajouté, et un rapport à télécharger en un clic. Les challenges motivent l'équipe sur les produits que vous voulez mettre en avant.
+
+On en parle ? Répondez à cet e-mail, ou démarrez directement.${STOP}`,
+    },
+    button: { label: "Démarrer avec PharmaBoost", urlVariable: "lien_abonnement" },
+    eyebrow: "Votre équipe",
+    reason: "Vous recevez ce message parce que vous avez réservé une démonstration de PharmaBoost.",
+  },
+  {
+    key: "prospect.demo_install",
+    label: "Prospect démo — 4. Installation simple",
+    category: "Commercial",
+    usage: "Deux semaines après la démonstration (règle « Prospects démo : 4. Installation »).",
+    audience: "Prospect",
+    variables: PROSPECT_NURTURE,
+    defaults: {
+      subject: "Installé en quelques minutes, sans changer de logiciel",
+      title: "Installé en quelques minutes",
+      body: `Bonjour {{prenom}},
+
+Démarrer PharmaBoost ne demande ni nouveau matériel ni changement de logiciel : il s'installe sur vos postes en quelques minutes, à côté de votre logiciel de gestion, et fonctionne avec votre douchette.
+
+Nous vous accompagnons pour la mise en route, poste par poste, et votre stock est pris en compte dès le premier jour.
+
+Prêt à vous lancer ?${STOP}`,
+    },
+    button: { label: "Je me lance", urlVariable: "lien_abonnement" },
+    eyebrow: "Mise en route",
+    reason: "Vous recevez ce message parce que vous avez réservé une démonstration de PharmaBoost.",
+  },
+  {
+    key: "prospect.demo_last",
+    label: "Prospect démo — 5. Dernier message",
+    category: "Commercial",
+    usage: "Un mois après la démonstration (règle « Prospects démo : 5. Dernier message »).",
+    audience: "Prospect",
+    variables: PROSPECT_NURTURE,
+    defaults: {
+      subject: "On reste à votre disposition, {{prenom}}",
+      title: "On reste à votre disposition",
+      body: `Bonjour {{prenom}},
+
+C'est notre dernier message à ce sujet : nous ne voulons pas encombrer votre boîte.
+
+Si le moment n'était pas le bon, aucun souci. Quand vous voudrez en reparler, il suffit de répondre à cet e-mail ou de réserver un nouvel échange : {{lien_demo}}
+
+Belle journée à toute l'équipe de {{officine}}.${STOP}`,
+    },
+    button: { label: "Démarrer avec PharmaBoost", urlVariable: "lien_abonnement" },
+    eyebrow: "PharmaBoost",
+    reason: "Vous recevez ce message parce que vous avez réservé une démonstration de PharmaBoost.",
   },
   {
     key: "generic.message",

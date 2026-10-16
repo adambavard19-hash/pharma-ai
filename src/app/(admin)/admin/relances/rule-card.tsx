@@ -56,12 +56,17 @@ export function RuleCard({ rule, template, recent, messagingLive, schedulerActiv
   const phrase = delayPhrase(rule.trigger, draftOffset);
   const isEmail = rule.channel === "EMAIL";
   const toPartner = rule.audience === "Partenaire";
-  const recipientNoun = toPartner ? "partenaire" : "officine";
+  const toProspect = rule.audience === "Prospect";
+  const recipientNoun = toPartner ? "partenaire" : toProspect ? "prospect" : "officine";
 
   const schedule = schedulerActive ? "Passage automatique chaque jour à 8 h 15 (UTC), ou à la demande avec « Lancer maintenant »." : "La tâche planifiée n'est pas active sur ce serveur : les relances ne partent que par « Lancer maintenant ».";
   const activationConsequences = isEmail
     ? [
-        toPartner ? "Des e-mails partiront automatiquement aux partenaires concernés, sans autre validation." : "Des e-mails partiront automatiquement aux officines concernées, sans autre validation.",
+        toPartner
+          ? "Des e-mails partiront automatiquement aux partenaires concernés, sans autre validation."
+          : toProspect
+            ? "Des e-mails partiront automatiquement aux prospects qui ont réservé une démonstration — jamais à une pharmacie déjà inscrite ou abonnée, ni à une adresse désinscrite."
+            : "Des e-mails partiront automatiquement aux officines concernées, sans autre validation.",
         ...(rule.alsoDoes ? [rule.alsoDoes] : []),
         `Délai appliqué : ${phrase.toLowerCase()} (${describeOffset(draftOffset)}).`,
         schedule,
@@ -105,7 +110,7 @@ export function RuleCard({ rule, template, recent, messagingLive, schedulerActiv
             <h3 className="text-[14.5px] leading-5 font-semibold text-text-primary">{rule.label}</h3>
             <Badge tone={rule.enabled ? "success" : "neutral"}>{rule.enabled ? "Activée" : "Désactivée"}</Badge>
             <Badge tone={isEmail ? "info" : "brand"} icon={isEmail ? <Mail className="size-3" aria-hidden="true" /> : <BellRing className="size-3" aria-hidden="true" />}>
-              {isEmail ? `E-mail ${toPartner ? "au partenaire" : "à l'officine"}` : "Alerte interne"}
+              {isEmail ? `E-mail ${toPartner ? "au partenaire" : toProspect ? "au prospect" : "à l'officine"}` : "Alerte interne"}
             </Badge>
           </div>
           <p className="text-[12.5px] leading-5 text-text-secondary">
