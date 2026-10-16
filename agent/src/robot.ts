@@ -89,9 +89,11 @@ export type RobotHandlers = {
   /** LGPI vient de valider une vente sur ce poste (« FIN Valider ») : voir `isSaleValidatedLine` (robot-lgpi.ts). */
   onSaleValidated?: (at: number) => void;
   /** Une ligne de la vente supprimée dans LGPI (touche Suppr) : le code du produit qu'elle portait (robot-lgpi.ts, LgpiSaleLines). */
-  onLineRemoved?: (code: string, at: number) => void;
+  onLineRemoved?: (code: string, at: number, info?: { line: number; known: number }) => void;
   /** La vente abandonnée dans LGPI. */
   onSaleAbandoned?: (at: number) => void;
+  /** Rend la remise à zéro de la liste des lignes LGPI : appelée à la VRAIE fin de vente (validation confirmée, voir sale-validation.ts). */
+  onSaleLinesReady?: (reset: () => void) => void;
 };
 
 const POLL_MS = 1000;

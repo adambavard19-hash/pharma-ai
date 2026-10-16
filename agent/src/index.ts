@@ -48,7 +48,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.21";
+const VERSION = "0.10.22";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -239,6 +239,9 @@ const onLgpiBilling = (open: boolean | null, at: number) => validation.billingSt
  * l'e-mail du bilan avec un compte à rebours, puis la termine ; sans île, l'agent la termine tout de suite.
  */
 function onSaleValidated(): void {
+  // La vente LGPI est vraiment validée (journal PUIS écran de facturation fermé) : la suivante repart d'une liste vide. La seule
+  // ligne du journal ne suffit pas — elle revient pendant la saisie d'une ordonnance, et vidait la liste en pleine vente.
+  resetLgpiLines?.();
   const saleId = watched?.prescriptionId;
   const config = activeConfig;
   if (!saleId || !config) return;
@@ -255,13 +258,13 @@ function onSaleValidated(): void {
  * Une ligne supprimée dans LGPI (touche Suppr) : la boîte quitte aussi la vente PharmaBoost ouverte, ou le conseil bipé
  * repasse « À proposer » (diagnostic de POSTE5, 16 oct. 2026). Le serveur ne retire que ce qui correspond à ce code.
  */
-function onLgpiLineRemoved(code: string): void {
+function onLgpiLineRemoved(code: string, _at: number, info?: { line: number; known: number }): void {
   const saleId = watched?.prescriptionId;
   const config = activeConfig;
   if (!saleId || !config) return;
   void (async () => {
     try {
-      const result = await postJson<{ ok: boolean; action?: string; remaining?: number; error?: string }>(config, "/api/agent/conseil/retirer-code", { prescription: saleId, code });
+      const result = await postJson<{ ok: boolean; action?: string; remaining?: number; error?: string }>(config, "/api/agent/conseil/retirer-code", { prescription: saleId, code, line: info?.line ?? null, known: info?.known ?? null });
       log(
         result.body?.ok
           ? result.body.action === "advice_undone"
@@ -298,6 +301,9 @@ function onLgpiSaleAbandoned(): void {
     }
   })();
 }
+
+/** La remise à zéro de la liste des lignes de la vente LGPI (robot-lgpi.ts) : seulement à la vraie fin d'une vente. */
+let resetLgpiLines: (() => void) | null = null;
 
 /** Termine une vente validée dans LGPI, une seule fois. */
 async function finishValidated(saleId: string): Promise<void> {
@@ -623,7 +629,7 @@ async function runPost(config: Config): Promise<void> {
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
   startDouchette(dirname(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message), onLgpiBilling });
-  const lgpiSale = { onSaleValidated: onValidationLine, onLineRemoved: onLgpiLineRemoved, onSaleAbandoned: onLgpiSaleAbandoned };
+  const lgpiSale = { onSaleValidated: onValidationLine, onLineRemoved: onLgpiLineRemoved, onSaleAbandoned: onLgpiSaleAbandoned, onSaleLinesReady: (reset: () => void) => (resetLgpiLines = reset) };
   const robotHandlers = { onScan: accept("robot"), onStatus: (message: string) => log(message), ...lgpiSale };
   const robot = config.robot ?? (process.platform === "win32" ? ({ kind: "lgpi" } as const) : undefined);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);

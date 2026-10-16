@@ -6559,6 +6559,7 @@ var VALIDATION_DEBOUNCE_MS = 5e3;
 function startLgpiJournal(config, handlers, clock = Date.now) {
   const reader = new LgpiRobotReader();
   const saleLines = new LgpiSaleLines();
+  handlers.onSaleLinesReady?.(() => saleLines.reset());
   let lastValidation = -Infinity;
   let lines = new LineBuffer();
   let current2 = null;
@@ -6584,12 +6585,11 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
         const event = saleLines.push(line);
         if (event?.kind === "removed") {
           handlers.onStatus(event.code ? `LGPI : ligne ${event.line} supprim\xE9e (produit ${event.code}).` : `LGPI : ligne ${event.line} supprim\xE9e (produit inconnu de l'agent : rien n'est retir\xE9).`);
-          if (event.code) handlers.onLineRemoved?.(event.code, at);
+          handlers.onLineRemoved?.(event.code ?? "", at, { line: event.line, known: saleLines.size + (event.code ? 1 : 0) });
         } else if (event?.kind === "abandoned") {
           handlers.onStatus("LGPI : vente abandonn\xE9e sur ce poste.");
           handlers.onSaleAbandoned?.(at);
         }
-        if (isSaleValidatedLine(line)) saleLines.reset();
         if (handlers.onSaleValidated && isSaleValidatedLine(line) && at - lastValidation > VALIDATION_DEBOUNCE_MS) {
           lastValidation = at;
           handlers.onStatus("LGPI : vente valid\xE9e sur ce poste.");
@@ -6782,7 +6782,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.21";
+var VERSION = "0.10.22";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -6898,6 +6898,7 @@ var validation = new SaleValidationWatch(() => onSaleValidated());
 var onValidationLine = (at) => validation.line(at);
 var onLgpiBilling = (open, at) => validation.billingState(open, at);
 function onSaleValidated() {
+  resetLgpiLines?.();
   const saleId = watched?.prescriptionId;
   const config = activeConfig;
   if (!saleId || !config) return;
@@ -6911,13 +6912,13 @@ function onSaleValidated() {
     if (validatedSale === saleId) void finishValidated(saleId);
   }, VALIDATED_FALLBACK_MS);
 }
-function onLgpiLineRemoved(code) {
+function onLgpiLineRemoved(code, _at, info) {
   const saleId = watched?.prescriptionId;
   const config = activeConfig;
   if (!saleId || !config) return;
   void (async () => {
     try {
-      const result = await postJson(config, "/api/agent/conseil/retirer-code", { prescription: saleId, code });
+      const result = await postJson(config, "/api/agent/conseil/retirer-code", { prescription: saleId, code, line: info?.line ?? null, known: info?.known ?? null });
       log(
         result.body?.ok ? result.body.action === "advice_undone" ? "Ligne supprim\xE9e dans LGPI : le conseil repasse \xAB \xC0 proposer \xBB." : `Ligne supprim\xE9e dans LGPI : la bo\xEEte quitte la vente (${result.body.remaining ?? "?"} restante(s)).` : `Ligne supprim\xE9e dans LGPI : rien \xE0 retirer (${result.body?.error ?? `HTTP ${result.status}`}).`
       );
@@ -6948,6 +6949,7 @@ function onLgpiSaleAbandoned() {
     }
   })();
 }
+var resetLgpiLines = null;
 async function finishValidated(saleId) {
   if (validatedSale !== saleId) return;
   validatedSale = null;
@@ -7206,7 +7208,7 @@ async function runPost(config) {
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
   startDouchette((0, import_node_path10.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message), onLgpiBilling });
-  const lgpiSale = { onSaleValidated: onValidationLine, onLineRemoved: onLgpiLineRemoved, onSaleAbandoned: onLgpiSaleAbandoned };
+  const lgpiSale = { onSaleValidated: onValidationLine, onLineRemoved: onLgpiLineRemoved, onSaleAbandoned: onLgpiSaleAbandoned, onSaleLinesReady: (reset) => resetLgpiLines = reset };
   const robotHandlers = { onScan: accept("robot"), onStatus: (message) => log(message), ...lgpiSale };
   const robot = config.robot ?? (process.platform === "win32" ? { kind: "lgpi" } : void 0);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);

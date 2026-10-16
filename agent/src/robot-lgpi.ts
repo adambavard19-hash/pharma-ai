@@ -225,6 +225,7 @@ const VALIDATION_DEBOUNCE_MS = 5000;
 export function startLgpiJournal(config: LgpiRobotConfig, handlers: RobotHandlers, clock: () => number = Date.now): () => void {
   const reader = new LgpiRobotReader();
   const saleLines = new LgpiSaleLines();
+  handlers.onSaleLinesReady?.(() => saleLines.reset());
   let lastValidation = -Infinity;
   let lines = new LineBuffer();
   let current: { path: string; offset: number } | null = null;
@@ -253,12 +254,11 @@ export function startLgpiJournal(config: LgpiRobotConfig, handlers: RobotHandler
         const event = saleLines.push(line);
         if (event?.kind === "removed") {
           handlers.onStatus(event.code ? `LGPI : ligne ${event.line} supprimée (produit ${event.code}).` : `LGPI : ligne ${event.line} supprimée (produit inconnu de l'agent : rien n'est retiré).`);
-          if (event.code) handlers.onLineRemoved?.(event.code, at);
+          handlers.onLineRemoved?.(event.code ?? "", at, { line: event.line, known: saleLines.size + (event.code ? 1 : 0) });
         } else if (event?.kind === "abandoned") {
           handlers.onStatus("LGPI : vente abandonnée sur ce poste.");
           handlers.onSaleAbandoned?.(at);
         }
-        if (isSaleValidatedLine(line)) saleLines.reset();
         if (handlers.onSaleValidated && isSaleValidatedLine(line) && at - lastValidation > VALIDATION_DEBOUNCE_MS) {
           lastValidation = at;
           handlers.onStatus("LGPI : vente validée sur ce poste.");

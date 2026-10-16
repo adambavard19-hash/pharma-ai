@@ -226,6 +226,40 @@ describe("les lignes de la vente dans LGPI (ajout, Suppr, abandon)", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("la ligne « … par type de facturation - ok » en pleine vente sur ordonnance ne vide plus la liste ; seule la vraie fin de vente la vide", () => {
+    vi.useFakeTimers();
+    const dir = mkdtempSync(join(tmpdir(), "pb-lgpi-lignes-"));
+    let clock = new Date(2026, 9, 16, 18, 50, 0).getTime();
+    try {
+      writeFileSync(join(dir, "lgpi.2026-10-16.log"), "");
+      const removed: { code: string; line?: number; known?: number }[] = [];
+      let reset: (() => void) | null = null;
+      const stop = startLgpiJournal(
+        { kind: "lgpi", dir },
+        { onScan: () => undefined, onStatus: () => undefined, onSaleValidated: () => undefined, onLineRemoved: (code, _at, info) => removed.push({ code, line: info?.line, known: info?.known }), onSaleLinesReady: (fn) => (reset = fn) },
+        () => clock,
+      );
+      const tick = () => {
+        clock += 1000;
+        vi.advanceTimersByTime(1000);
+      };
+      const VALID = "2026-10-16 18:51:10,120 INFO [AWT-EventQueue-0] f.a.s.m.p.facturation.FacturationProcessusImpl - Tri des lignes de vente par type de facturation - ok";
+      tick();
+      appendFileSync(join(dir, "lgpi.2026-10-16.log"), [ADDED("18:51:00", DOLIPRANE), VALID, ADDED("18:51:20", PARA), REMOVED("18:51:30", 1)].join("\r\n") + "\r\n", "latin1");
+      tick();
+      expect(removed).toEqual([{ code: DOLIPRANE, line: 1, known: 2 }]);
+      // La vraie fin de vente (validation confirmée par l'agent) : la liste repart de zéro ; une ligne inconnue est quand même signalée.
+      (reset as unknown as () => void)();
+      appendFileSync(join(dir, "lgpi.2026-10-16.log"), [REMOVED("18:52:00", 1)].join("\r\n") + "\r\n", "latin1");
+      tick();
+      expect(removed[1]).toEqual({ code: "", line: 1, known: 0 });
+      stop();
+    } finally {
+      vi.useRealTimers();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("le journal du jour", () => {

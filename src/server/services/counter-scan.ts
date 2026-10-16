@@ -433,7 +433,8 @@ export type RemoveLineResult = { ok: true; remaining: number } | { ok: false; er
  *
  *  - La boîte quitte la vente ; son unité revient au stock quand on sait laquelle c'était (un produit, ou un médicament présent
  *    sous une seule présentation dans le stock de l'officine).
- *  - Les conseils qu'ELLE seule déclenchait disparaissent (retirés, jamais reproposés pour cette vente) ; ceux d'une autre boîte restent.
+ *  - Les conseils qu'ELLE seule déclenchait disparaissent (ceux d'une autre boîte restent) ; encore sans réponse, ils reviennent si
+ *    la boîte est rebipée.
  *  - La vente repart à l'analyse avec les boîtes qui restent, comme après un bip : la bannière se met à jour seule.
  *  - Plus aucune boîte : la vente est annulée, la bannière se ferme.
  *
@@ -460,12 +461,19 @@ export async function removeCounterLine(agent: AgentContext, input: { prescripti
   // Les conseils que cette boîte SEULE déclenchait : retirés (une autre boîte qui les déclenche aussi les garde).
   const linked = await prisma.recommendation.findMany({
     where: { prescriptionId: sale.id, opportunity: { triggeredLineIds: { has: line.id } } },
-    select: { id: true, opportunity: { select: { triggeredLineIds: true } } },
+    select: { id: true, status: true, opportunity: { select: { triggeredLineIds: true } } },
   });
-  const onlyThisBox = linked.filter((rec) => (rec.opportunity?.triggeredLineIds ?? []).every((id) => id === line.id)).map((rec) => rec.id);
+  const ownAdvice = linked.filter((rec) => (rec.opportunity?.triggeredLineIds ?? []).every((id) => id === line.id));
+  const onlyThisBox = ownAdvice.map((rec) => rec.id);
+  // Les conseils encore sans réponse partent avec la boîte, effacés — si la boîte est rebipée (supprimée puis reprise dans
+  // LGPI, POSTE5 le 16 oct. 2026), ils reviennent. Un conseil déjà tranché garde sa trace : vendu, il reste vendu (le
+  // produit est bien sorti) ; refusé, il passe « retiré ».
+  const undecided = ownAdvice.filter((rec) => rec.status === "PROPOSED" || rec.status === "PRESENTED").map((rec) => rec.id);
+  const decided = ownAdvice.filter((rec) => rec.status !== "PROPOSED" && rec.status !== "PRESENTED" && rec.status !== "PURCHASED").map((rec) => rec.id);
 
   await prisma.$transaction(async (tx) => {
-    if (onlyThisBox.length > 0) await tx.recommendation.updateMany({ where: { id: { in: onlyThisBox } }, data: { status: "REMOVED" } });
+    if (undecided.length > 0) await tx.recommendation.deleteMany({ where: { id: { in: undecided } } });
+    if (decided.length > 0) await tx.recommendation.updateMany({ where: { id: { in: decided } }, data: { status: "REMOVED" } });
     await tx.prescriptionLine.delete({ where: { id: line.id } });
     await tx.prescription.update({
       where: { id: sale.id },
@@ -564,9 +572,19 @@ export type RemoveCodeResult = { ok: true; action: "line_removed"; remaining: nu
  *  - c'était un conseil bipé (« ✓ Vendu ») : il repasse « À proposer », et son unité revient au stock ;
  *  - rien ne correspond dans la vente : rien ne bouge (jamais une autre boîte à la place).
  */
-export async function removeCounterCode(agent: AgentContext, input: { prescriptionId: string; code: string }): Promise<RemoveCodeResult> {
+export async function removeCounterCode(agent: AgentContext, input: { prescriptionId: string; code: string; lgpi?: { line: number | null; known: number | null } }): Promise<RemoveCodeResult> {
+  const result = await removeCounterCodeInner(agent, input);
+  // Chaque suppression lue dans LGPI laisse une trace, même quand rien n'est retiré : c'est ce qui permet de comprendre un
+  // essai au comptoir sans redemander de diagnostic (rang de la ligne, nombre de lignes connues de l'agent, raison).
+  if (!result.ok) {
+    await recordAudit({ action: "prescription.counter_lgpi_line_ignored", entityType: "Prescription", entityId: input.prescriptionId, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { code: input.code.replace(/\D/g, "").slice(0, 20) || null, line: input.lgpi?.line ?? null, known: input.lgpi?.known ?? null, reason: result.error } }).catch(() => undefined);
+  }
+  return result;
+}
+
+async function removeCounterCodeInner(agent: AgentContext, input: { prescriptionId: string; code: string }): Promise<RemoveCodeResult> {
   const code = input.code.replace(/\D/g, "").slice(0, 20);
-  if (code.length < 7) return { ok: false, error: "Code illisible." };
+  if (code.length < 7) return { ok: false, error: "L'agent ne sait pas quelle boîte portait cette ligne (vente commencée avant lui, ou ligne inconnue)." };
   const sale = await prisma.prescription.findFirst({
     where: {
       id: input.prescriptionId,
