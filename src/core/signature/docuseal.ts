@@ -18,7 +18,7 @@ const HOSTS = { eu: "https://api.docuseal.eu", global: "https://api.docuseal.com
 export const DOCUSEAL_SECRET_HEADER = "x-pharmaboost-secret";
 
 /** Les rôles des signataires chez DocuSeal ; l'ordre de signature suit celui de la liste. */
-export const DOCUSEAL_ROLES: Record<SignatureSigner["role"], string> = { PHARMACY: "Pharmacie", COMPANY: "PharmaBoost" };
+export const DOCUSEAL_ROLES: Record<SignatureSigner["role"], string> = { PHARMACY: "Pharmacie", AFFILIATE: "Affilié", COMPANY: "PharmaBoost" };
 
 type DocusealSubmitter = { role?: string; status?: string; embed_src?: string; submission_id?: number };
 
@@ -97,6 +97,16 @@ export class DocusealSignatureProvider implements SignatureProvider {
     return { envelopeId: String(id), signingUrls };
   }
 
+  async getSigningUrls(envelopeId: string): Promise<SignatureEnvelope["signingUrls"]> {
+    const submission = await this.call<{ submitters?: DocusealSubmitter[] }>(`/submissions/${encodeURIComponent(envelopeId)}`);
+    const urls: SignatureEnvelope["signingUrls"] = {};
+    for (const submitter of submission.submitters ?? []) {
+      const role = roleFromDocuseal(submitter.role);
+      if (role && submitter.embed_src) urls[role] = submitter.embed_src;
+    }
+    return urls;
+  }
+
   async getStatus(envelopeId: string): Promise<SignatureStatus> {
     const submission = await this.call<{ status?: string; submitters?: DocusealSubmitter[] }>(`/submissions/${encodeURIComponent(envelopeId)}`);
     return mapDocusealSubmission(submission.status ?? "", submission.submitters ?? []);
@@ -149,6 +159,7 @@ export class DocusealSignatureProvider implements SignatureProvider {
 
 function roleFromDocuseal(role?: string): SignatureSigner["role"] | undefined {
   if (role === DOCUSEAL_ROLES.PHARMACY) return "PHARMACY";
+  if (role === DOCUSEAL_ROLES.AFFILIATE) return "AFFILIATE";
   if (role === DOCUSEAL_ROLES.COMPANY) return "COMPANY";
   return undefined;
 }
@@ -164,7 +175,8 @@ export function mapDocusealSubmission(status: string, submitters: DocusealSubmit
       return "EXPIRED";
   }
   const byRole = (role: SignatureSigner["role"]) => submitters.find((s) => s.role === DOCUSEAL_ROLES[role])?.status;
-  if (byRole("PHARMACY") === "completed") return "SIGNED_PHARMACY";
+  // Le premier signataire (titulaire ou affilié) a signé : en attente de la contresignature de PharmaBoost.
+  if (byRole("PHARMACY") === "completed" || byRole("AFFILIATE") === "completed") return "SIGNED_PHARMACY";
   if (byRole("COMPANY") === "completed") return "SIGNED_COMPANY";
   if (submitters.some((s) => s.status === "opened")) return "OPENED";
   return "SENT";

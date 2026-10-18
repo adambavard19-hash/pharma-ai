@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * La navigation principale de la console : cinq rubriques, toujours visibles, un clic chacune.
  * Accueil · Officines · Commercial · Finances · Gestion.
  */
-export function AdminNav() {
+export function AdminNav({ badges = {} }: { badges?: Record<string, number> }) {
   const pathname = usePathname();
   const active = activeNavItem(pathname);
   return (
@@ -27,6 +27,11 @@ export function AdminNav() {
             )}
           >
             {space.label}
+            {(badges[space.key] ?? 0) > 0 && (
+              <span className="ml-1.5 rounded-full bg-warning-500 px-1.5 py-0.5 align-middle text-[10.5px] leading-none font-semibold text-ink-950 tabular-nums" title="Contrats à contresigner">
+                {badges[space.key]}
+              </span>
+            )}
           </Link>
         );
       })}

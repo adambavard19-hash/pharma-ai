@@ -118,7 +118,7 @@ describe("souscription depuis le site", () => {
   });
 });
 
-describe("modèle de contrat v2", () => {
+describe("modèle de contrat v3", () => {
   it("reprend raison sociale, qualité, SIRET lisible et premier mois offert", () => {
     const doc = buildContractDocument({
       reference: "PB-2026-PORT-V1",
@@ -127,7 +127,7 @@ describe("modèle de contrat v2", () => {
       terms: { monthlyPriceCents: 6900, durationMonths: 12, outletCount: 1, startDate: new Date("2026-10-02"), planName: "PharmaBoost Officine", trialDays: 30 },
     });
     const text = doc.sections.flatMap((s) => s.paragraphs).join("\n");
-    expect(doc.templateKey).toBe("abonnement-pharmaboost-v2");
+    expect(doc.templateKey).toBe("abonnement-pharmaboost-v3");
     expect(text).toContain("SELARL Pharmacie du Port, exploitant l'officine Pharmacie du Port");
     expect(text).toContain("SIRET 732 829 320 00074");
     expect(text).toContain("représentée par Marc Delaunay, Gérant");

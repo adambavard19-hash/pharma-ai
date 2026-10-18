@@ -121,6 +121,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
             <FactList
               items={[
                 { label: "Tarif mensuel", value: `${formatEuros(contract.monthlyPriceCents)} HT`, hint: `soit ${formatEuros(contract.monthlyPriceCents * 12)} HT par an` },
+                { label: "Mise en service", value: contract.setupFeeCents != null ? `${formatEuros(contract.setupFeeCents)} HT` : null, hint: contract.setupFeeCents != null ? "Unique, facturée avec la première échéance" : "Non imprimée (contrat antérieur au modèle v3)" },
                 { label: "Durée", value: `${contract.durationMonths} mois`, hint: "Renouvelable tacitement par périodes de douze mois" },
                 { label: "Période offerte", value: trialLabel(contract.trialDays) },
                 { label: "Offre", value: contract.plan?.name ?? null },
@@ -137,8 +138,20 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
               items={[
                 { label: "Envoyé le", value: dateTime(contract.sentAt) },
                 { label: "Consulté le", value: dateTime(contract.openedAt) },
-                { label: "Signé par l'officine", value: dateTime(contract.pharmacySignedAt) },
-                { label: "Signé par la société", value: dateTime(contract.companySignedAt) },
+                { label: "Signé par le titulaire", value: dateTime(contract.pharmacySignedAt), hint: "Signe en premier" },
+                {
+                  label: "Contresigné par PharmaBoost",
+                  value: contract.companySignedAt ? (
+                    dateTime(contract.companySignedAt)
+                  ) : contract.status === "SIGNED_PHARMACY" && contract.companySigningUrl ? (
+                    <a href={contract.companySigningUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-700 hover:underline dark:text-brand-300">
+                      Contresigner maintenant
+                    </a>
+                  ) : contract.status === "SIGNED_PHARMACY" ? (
+                    "À contresigner (lien dans l'e-mail du prestataire)"
+                  ) : null,
+                  hint: contract.companySignerEmail,
+                },
                 { label: "Finalisé le", value: dateTime(contract.finalizedAt) },
                 { label: "PDF signé archivé", value: contract.signedArchivedAt ? dateTime(contract.signedArchivedAt) : contract.finalizedAt ? "Pas encore" : null },
                 ...(contract.refusedAt ? [{ label: "Refusé le", value: dateTime(contract.refusedAt), hint: contract.refusalReason ?? undefined }] : []),

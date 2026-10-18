@@ -16,7 +16,7 @@ export const CONTRACT_FILTER_LABELS: Record<ContractFilterKey, string> = {
   brouillon: "Brouillons à envoyer",
   "a-signer": "À signer",
   consultes: "Consultés",
-  "a-contresigner": "À contresigner",
+  "a-contresigner": "À contresigner par moi",
   relance: "Relance nécessaire",
   signes: "Signés",
   expires: "Expirés ou refusés",
@@ -66,9 +66,13 @@ export function contractFilters(contract: ClassifiableContract, now: Date): Cont
     case "OPENED":
       out.push("a-signer", "consultes");
       break;
+    // Double signature : le premier signataire a signé, PharmaBoost contresigne.
     case "SIGNED_PHARMACY":
-    case "SIGNED_COMPANY":
       out.push("a-contresigner");
+      break;
+    // PharmaBoost a signé d'abord (signature papier enregistrée) : c'est encore au titulaire de signer.
+    case "SIGNED_COMPANY":
+      out.push("a-signer");
       break;
     case "FINALIZED":
       out.push("signes");
@@ -121,10 +125,11 @@ export function contractDisplayStatus(contract: ClassifiableContract, now: Date)
     case "OPENED":
       return { code: "OPENED", label: "Consulté", tone: "brand" };
     case "SIGNED_PHARMACY":
+      return { code: "COUNTERSIGN", label: "En attente de PharmaBoost", tone: "warning" };
     case "SIGNED_COMPANY":
-      return { code: "COUNTERSIGN", label: "À contresigner", tone: "warning" };
+      return { code: "SENT", label: "En attente du titulaire", tone: "info" };
     case "FINALIZED":
-      return { code: "FINALIZED", label: "Signé", tone: "success" };
+      return { code: "FINALIZED", label: "Signé par les deux", tone: "success" };
     case "EXPIRED":
       return { code: "EXPIRED", label: "Expiré", tone: "danger" };
     case "REFUSED":

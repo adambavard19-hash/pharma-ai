@@ -14,6 +14,8 @@ export type ContractEmailFacts = {
   legalName?: string | null;
   offerName?: string | null;
   monthlyPriceCents: number;
+  /** Mise en service unique imprimée au contrat (modèle v3) ; absente sur les contrats antérieurs. */
+  setupFeeCents?: number | null;
   durationMonths: number;
   trialDays: number;
   reference: string;
@@ -28,6 +30,7 @@ function summary(f: ContractEmailFacts): EmailBlock {
   if (f.legalName && f.legalName !== f.pharmacyName) rows.push(["Société", f.legalName]);
   rows.push(["Offre", f.offerName ?? "Abonnement PharmaBoost"]);
   rows.push(["Tarif", `${eurosHt(f.monthlyPriceCents)} par mois`]);
+  if (typeof f.setupFeeCents === "number" && f.setupFeeCents > 0) rows.push(["Mise en service", `${eurosHt(f.setupFeeCents)}, une seule fois`]);
   const trial = trialLabel(f.trialDays);
   if (trial) rows.push(["Démarrage", trial]);
   rows.push(["Engagement", `${f.durationMonths} mois`]);

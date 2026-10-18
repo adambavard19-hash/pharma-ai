@@ -4,7 +4,9 @@ import { withAdvisoryLock } from "@/server/db/advisory-lock";
 import { deriveToken, generateToken, hashToken } from "@/server/security/tokens";
 import { getMessagingProvider, getStorageProvider } from "@/server/ai/registry";
 import { getSignatureProvider } from "@/server/signature/registry";
-import { buildContractDocument, CONTRACT_TEMPLATE_KEY } from "@/core/contracts/template";
+import { ACTIVE_CONTRACT_TEMPLATE_KEYS, buildContractDocument, CONTRACT_TEMPLATE_KEY } from "@/core/contracts/template";
+import { resolveContractAmounts } from "@/core/contracts/amounts";
+import { nextSignatureState } from "@/core/contracts/countersignature";
 import { companyPartyOf, contractReference, contractSnapshot, diffCompanyProfile, pharmacyPartyOf, printedReference, type CompanyProfileChanges, type CompanyProfileInput } from "@/core/contracts/snapshot";
 import { renderContractPdf } from "@/core/contracts/pdf";
 import { signatureFieldPlacement } from "@/core/contracts/layout";
@@ -13,7 +15,7 @@ import { nextReminderAction, AWAITING_PHARMACY, type ReminderPolicy } from "@/co
 import { ORIGIN_LABELS } from "@/core/contracts/journey";
 import { PDFDocument } from "pdf-lib";
 import { buildContractFinalizedEmail, buildPharmacySignedEmail, buildSignatureReminderEmail, buildSignatureRequestEmail, type ContractEmailFacts } from "@/core/platform/contract-emails";
-import { SignatureNotConfiguredError, shouldApplySignatureStatus, signedContractKey, type SignatureEvent, type SignatureStatus } from "@/core/signature";
+import { SignatureNotConfiguredError, signedContractKey, type SignatureEvent, type SignatureSigner, type SignatureStatus } from "@/core/signature";
 import { CONTRACT_STATUS_LABELS, prospectStatusForContract, type ContractStatusCode } from "@/core/sales/pipeline";
 import { TIME_ZONE } from "@/config/constants";
 import { publicUrl } from "@/server/public-url";
@@ -28,6 +30,8 @@ import type { DeliveryOutcome } from "@/core/ai/ports";
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
 import { upsertCommissionForContract } from "./commissions";
+import { loadCountersigner } from "./countersigner";
+import { handleAffiliateSignatureEvent } from "./affiliate-contracts";
 
 const CONTRACT_LINK_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 /** Un envoi interrompu (instance arrêtée) libère son verrou au bout de ce délai. */
@@ -63,26 +67,28 @@ export async function upsertCompanyProfile(input: CompanyProfileInput, adminId: 
 // ---------------------------------------------------------------------------
 
 export type ContractTermsInput = { monthlyPriceCents?: number | null; durationMonths?: number | null; startDate?: Date | null; planId?: string | null };
-export type ResolvedTerms = { monthlyPriceCents: number; durationMonths: number; startDate: Date; planId: string | null; planName?: string; trialDays: number };
+export type ResolvedTerms = { monthlyPriceCents: number; setupFeeCents: number; durationMonths: number; startDate: Date; planId: string | null; planName?: string; trialDays: number };
 
 /**
  * Les conditions du contrat : l'offre choisie (ou l'offre par défaut de la
- * console), son tarif et ses jours offerts. Un commercial peut ajuster le
- * tarif ; le premier mois offert suit l'offre. Sans offre ni tarif : rien
- * n'est inventé, l'envoi est refusé.
+ * console), son tarif, sa mise en service et ses jours offerts ; à défaut
+ * d'offre, l'offre officielle (`resolveContractAmounts`). Un commercial peut
+ * ajuster le tarif ; le premier mois offert suit l'offre. Aucun montant n'est
+ * écrit en dur ici.
  */
 export async function resolveContractTerms(prospect: { planId: string | null; monthlyPriceCents: number | null }, input: ContractTermsInput = {}): Promise<{ ok: true; terms: ResolvedTerms } | { ok: false; error: string }> {
   const planId = input.planId ?? prospect.planId;
   const plan = planId
     ? await prisma.plan.findUnique({ where: { id: planId } })
     : await prisma.plan.findFirst({ where: { isActive: true, isDefault: true }, orderBy: { createdAt: "asc" } });
-  const monthlyPriceCents = input.monthlyPriceCents ?? prospect.monthlyPriceCents ?? plan?.monthlyPriceCents ?? null;
-  if (!monthlyPriceCents || monthlyPriceCents <= 0) return { ok: false, error: "Aucune offre active ni tarif n'est défini : créez une offre par défaut (Console → Abonnements → Offres) ou indiquez un tarif." };
+  if (planId && !plan) return { ok: false, error: "L'offre retenue pour ce dossier est introuvable : choisissez une offre (Console → Abonnements → Offres)." };
+  const amounts = resolveContractAmounts(plan, { monthlyPriceCents: input.monthlyPriceCents ?? prospect.monthlyPriceCents, durationMonths: input.durationMonths });
   return {
     ok: true,
     terms: {
-      monthlyPriceCents,
-      durationMonths: input.durationMonths ?? 12,
+      monthlyPriceCents: amounts.monthlyPriceCents,
+      setupFeeCents: amounts.setupFeeCents,
+      durationMonths: amounts.durationMonths,
       startDate: input.startDate ?? new Date(),
       planId: plan?.id ?? null,
       planName: plan?.name,
@@ -96,10 +102,11 @@ export async function resolveContractTerms(prospect: { planId: string | null; mo
 // ---------------------------------------------------------------------------
 
 /** Génère le PDF depuis le modèle et les données vérifiées ; le contrat naît en brouillon. */
-export async function generateContract(prospectId: string, terms: { monthlyPriceCents: number; durationMonths: number; startDate: Date; planId?: string | null; planName?: string; trialDays?: number }, actor: SalesActor): Promise<{ ok: true; contractId: string } | { ok: false; error: string; missing?: MissingField[] }> {
-  const [prospect, company] = await Promise.all([
+export async function generateContract(prospectId: string, terms: { monthlyPriceCents: number; setupFeeCents?: number | null; durationMonths: number; startDate: Date; planId?: string | null; planName?: string; trialDays?: number }, actor: SalesActor): Promise<{ ok: true; contractId: string } | { ok: false; error: string; missing?: MissingField[] }> {
+  const [prospect, company, countersigner] = await Promise.all([
     prisma.prospect.findUnique({ where: { id: prospectId }, include: { contracts: { orderBy: { version: "desc" }, take: 1, select: { version: true, status: true } }, pharmacy: { select: { id: true } } } }),
     getCompanyProfile(),
+    loadCountersigner(),
   ]);
   if (!prospect) return { ok: false, error: "Dossier introuvable." };
   if (prospect.blockedAt) return { ok: false, error: "Ce dossier est suspendu par l'administrateur." };
@@ -123,7 +130,8 @@ export async function generateContract(prospectId: string, terms: { monthlyPrice
     reference: ref,
     company: companyParty,
     pharmacy: pharmacyParty,
-    terms: { monthlyPriceCents: terms.monthlyPriceCents, durationMonths: terms.durationMonths, startDate: terms.startDate, planName: terms.planName, trialDays: terms.trialDays ?? 0, outletCount },
+    terms: { monthlyPriceCents: terms.monthlyPriceCents, setupFeeCents: terms.setupFeeCents ?? null, durationMonths: terms.durationMonths, startDate: terms.startDate, planName: terms.planName, trialDays: terms.trialDays ?? 0, outletCount },
+    countersigner,
   });
   const snapshot = contractSnapshot({ company: companyParty, pharmacy: pharmacyParty, outletCount });
   const pdf = await renderContractPdf(document);
@@ -143,6 +151,7 @@ export async function generateContract(prospectId: string, terms: { monthlyPrice
       pharmacySnapshot: snapshot.pharmacy,
       accessTokenHash: hashToken(token),
       monthlyPriceCents: terms.monthlyPriceCents,
+      setupFeeCents: terms.setupFeeCents ?? null,
       durationMonths: terms.durationMonths,
       startDate: terms.startDate,
       planId: terms.planId ?? null,
@@ -150,8 +159,9 @@ export async function generateContract(prospectId: string, terms: { monthlyPrice
       pharmacyId: prospect.pharmacy?.id ?? null,
       pharmacySignerName: prospect.ownerName!,
       pharmacySignerEmail: prospect.email!,
-      companySignerName: company.representativeName,
-      companySignerEmail: company.representativeEmail,
+      // Le signataire PharmaBoost : le réglage de la console (Console → Contrats), sinon la variable d'environnement, sinon contact@pharmaboost.app.
+      companySignerName: countersigner.name,
+      companySignerEmail: countersigner.email,
       expiresAt: new Date(Date.now() + CONTRACT_LINK_TTL_MS),
     },
   });
@@ -207,7 +217,7 @@ async function startContractingLocked(prospectId: string, actor: SalesActor, inp
   if (prospect.blockedAt) return { ok: false, error: "Ce dossier est suspendu par l'administrateur." };
   const last = prospect.contracts[0];
   if (last?.status === "FINALIZED") return { ok: true, outcome: "ALREADY_SIGNED", contractId: last.id, message: "Le contrat de ce dossier est déjà signé." };
-  if (last && IN_PROGRESS.includes(last.status)) return { ok: true, outcome: "ALREADY_IN_PROGRESS", contractId: last.id, message: `Un contrat est déjà en cours (${CONTRACT_STATUS_LABELS[last.status as ContractStatusCode].toLowerCase()}) : aucun nouvel envoi.` };
+  if (last && IN_PROGRESS.includes(last.status)) return { ok: true, outcome: "ALREADY_IN_PROGRESS", contractId: last.id, message: `Un contrat est déjà en cours (${CONTRACT_STATUS_LABELS[last.status as ContractStatusCode].replace(/^./, (c) => c.toLowerCase())}) : aucun nouvel envoi.` };
 
   const missing = missingContractFields(prospect);
   if (missing.length) return { ok: false, error: `Informations manquantes pour le contrat : ${describeMissing(missing)}.`, missing };
@@ -250,6 +260,7 @@ async function contractFacts(contractId: string): Promise<{ facts: ContractEmail
       legalName: contract.prospect.legalName,
       offerName: contract.plan?.name ?? null,
       monthlyPriceCents: contract.monthlyPriceCents,
+      setupFeeCents: contract.setupFeeCents,
       durationMonths: contract.durationMonths,
       trialDays: contract.trialDays,
       reference: printedReference(contract, contract.prospect.name),
@@ -300,6 +311,7 @@ async function sendContractLocked(contractId: string, actor: SalesActor): Promis
 
   // Signature électronique : réelle ou franchement absente. Une seule demande par contrat.
   let signingUrl = contract.pharmacySigningUrl;
+  let companySigningUrl = contract.companySigningUrl;
   let signatureNote = "";
   let providerEnvelopeId = contract.providerEnvelopeId;
   const signature = getSignatureProvider();
@@ -324,8 +336,9 @@ async function sendContractLocked(contractId: string, actor: SalesActor): Promis
       });
       providerEnvelopeId = envelope.envelopeId;
       signingUrl = envelope.signingUrls.PHARMACY ?? null;
+      companySigningUrl = envelope.signingUrls.COMPANY ?? null;
       // Enregistré aussitôt : si l'e-mail échoue, la demande n'est ni perdue ni recréée.
-      await prisma.contract.update({ where: { id: contract.id }, data: { providerEnvelopeId, pharmacySigningUrl: signingUrl, signatureProvider: signature.info.id, expiresAt } });
+      await prisma.contract.update({ where: { id: contract.id }, data: { providerEnvelopeId, pharmacySigningUrl: signingUrl, companySigningUrl, signatureProvider: signature.info.id, expiresAt } });
       signatureNote = `envoyé pour signature via ${signature.info.label}`;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Le prestataire de signature a refusé la demande.";
@@ -349,7 +362,7 @@ async function sendContractLocked(contractId: string, actor: SalesActor): Promis
 
   await prisma.contract.update({
     where: { id: contract.id },
-    data: { status: sent && firstSend ? "SENT" : contract.status, sentAt: sent ? (contract.sentAt ?? new Date()) : contract.sentAt, expiresAt, providerEnvelopeId, pharmacySigningUrl: signingUrl, signatureProvider: signature.info.id },
+    data: { status: sent && firstSend ? "SENT" : contract.status, sentAt: sent ? (contract.sentAt ?? new Date()) : contract.sentAt, expiresAt, providerEnvelopeId, pharmacySigningUrl: signingUrl, companySigningUrl, signatureProvider: signature.info.id },
   });
   if (sent && firstSend) {
     const next = prospectStatusForContract("SENT");
@@ -389,22 +402,22 @@ async function sendContractLocked(contractId: string, actor: SalesActor): Promis
 
 /**
  * Applique un statut de signature (webhook du prestataire, statut relu, ou
- * signature papier enregistrée par l'admin). La mise à jour est
- * conditionnelle : deux notifications simultanées pour le même fait n'en
- * appliquent qu'une, et chaque e-mail ne part qu'une fois.
+ * signature papier enregistrée par l'admin), selon la règle de la double
+ * signature (`nextSignatureState`) : le titulaire signe, puis PharmaBoost
+ * contresigne, et le contrat n'est « signé » (FINALIZED) qu'avec les deux. La
+ * mise à jour est conditionnelle : deux notifications simultanées pour le même
+ * fait n'en appliquent qu'une, un événement rejoué ne change rien, et chaque
+ * e-mail ne part qu'une fois.
  */
-export async function applySignatureStatus(contractId: string, status: SignatureStatus, actor: SalesActor, reason?: string | null): Promise<boolean> {
+export async function applySignatureStatus(contractId: string, announced: SignatureStatus, actor: SalesActor, reason?: string | null, role?: SignatureSigner["role"], occurredAt?: Date): Promise<boolean> {
   const contract = await prisma.contract.findUniqueOrThrow({ where: { id: contractId }, include: { prospect: { select: { id: true, name: true, salesRepId: true, status: true } } } });
   const now = new Date();
-  const data: Record<string, unknown> = { status };
+  const transition = nextSignatureState({ status: contract.status, firstPartySignedAt: contract.pharmacySignedAt, companySignedAt: contract.companySignedAt }, { status: announced, role, occurredAt: occurredAt ?? now });
+  if (!transition || transition.status === "DRAFT") return false;
+  const status: SignatureStatus = transition.status;
+  const data: Record<string, unknown> = { status, pharmacySignedAt: transition.firstPartySignedAt, companySignedAt: transition.companySignedAt };
   if (status === "OPENED") data.openedAt = contract.openedAt ?? now;
-  if (status === "SIGNED_PHARMACY") data.pharmacySignedAt = contract.pharmacySignedAt ?? now;
-  if (status === "SIGNED_COMPANY") data.companySignedAt = contract.companySignedAt ?? now;
-  if (status === "FINALIZED") {
-    data.finalizedAt = now;
-    data.pharmacySignedAt = contract.pharmacySignedAt ?? now;
-    data.companySignedAt = contract.companySignedAt ?? now;
-  }
+  if (status === "FINALIZED") data.finalizedAt = now;
   if (status === "REFUSED") {
     data.refusedAt = now;
     data.refusalReason = reason ?? null;
@@ -415,8 +428,8 @@ export async function applySignatureStatus(contractId: string, status: Signature
   const eventType = status === "FINALIZED" || status === "SIGNED_PHARMACY" || status === "SIGNED_COMPANY" ? "CONTRACT_SIGNED" : status === "OPENED" ? "CONTRACT_OPENED" : status === "REFUSED" ? "CONTRACT_REFUSED" : status === "EXPIRED" ? "CONTRACT_EXPIRED" : "CONTRACT_SENT";
   const summaries: Partial<Record<SignatureStatus, string>> = {
     OPENED: "Contrat consulté par le titulaire",
-    SIGNED_PHARMACY: "Signé par la pharmacie",
-    SIGNED_COMPANY: "Signé par PharmaBoost",
+    SIGNED_PHARMACY: "Signé par le titulaire — en attente de la contresignature de PharmaBoost",
+    SIGNED_COMPANY: "Contresigné par PharmaBoost — en attente du titulaire",
     FINALIZED: "Contrat finalisé : signé par les deux parties",
   };
   await recordProspectEvent({ prospectId: contract.prospect.id, type: eventType, summary: `Contrat v${contract.version} : ${summaries[status] ?? CONTRACT_STATUS_LABELS[status]}${reason ? ` — ${reason}` : ""}.`, actor, metadata: { contractId, status } });
@@ -434,7 +447,7 @@ export async function applySignatureStatus(contractId: string, status: Signature
     await notifySalesRep({ salesRepId: rep, type: "CONTRACT_OPENED", title: `${contract.prospect.name} a consulté son contrat`, body: "La signature est attendue.", linkUrl: repLink, severity: "INFO" });
   }
   if (status === "SIGNED_PHARMACY") {
-    await notifyAdmins({ type: "CONTRACT_SIGNED_PHARMACY", title: `Contrat signé par la pharmacie — ${contract.prospect.name}`, body: "À contresigner par PharmaBoost (invitation envoyée par le prestataire au signataire de la société).", linkUrl: adminLink, severity: "SUCCESS" });
+    await notifyAdmins({ type: "CONTRACT_SIGNED_PHARMACY", title: `Contrat signé par le titulaire — ${contract.prospect.name}`, body: `À contresigner par PharmaBoost (${contract.companySignerEmail}) : Console → Finances → Contrats → « À contresigner par moi ». Le contrat ne sera signé qu'après cette contresignature.`, linkUrl: "/admin/contrats?statut=a-contresigner", severity: "SUCCESS" });
     if (rep) await notifySalesRep({ salesRepId: rep, type: "CONTRACT_SIGNED_PHARMACY", title: `${contract.prospect.name} a signé son contrat`, body: "PharmaBoost contresigne.", linkUrl: repLink, severity: "SUCCESS" });
     await sendClientEmail(contractId, "PHARMACY_SIGNED");
   }
@@ -480,7 +493,7 @@ async function sendClientEmail(contractId: string, kind: "PHARMACY_SIGNED" | "FI
  * vérifier). N'applique un changement que si le statut a avancé.
  */
 export async function refreshContractSignatureStatus(contractId: string, actor: SalesActor): Promise<{ ok: true; status: SignatureStatus; changed: boolean } | { ok: false; error: string }> {
-  const contract = await prisma.contract.findUnique({ where: { id: contractId }, select: { status: true, providerEnvelopeId: true, signatureProvider: true } });
+  const contract = await prisma.contract.findUnique({ where: { id: contractId }, select: { status: true, providerEnvelopeId: true, signatureProvider: true, pharmacySignedAt: true, companySignedAt: true, companySigningUrl: true } });
   if (!contract) return { ok: false, error: "Contrat introuvable." };
   if (!contract.providerEnvelopeId) return { ok: false, error: "Ce contrat n'a pas été envoyé à un prestataire de signature." };
   const provider = getSignatureProvider();
@@ -491,7 +504,12 @@ export async function refreshContractSignatureStatus(contractId: string, actor: 
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Le prestataire n'a pas répondu." };
   }
-  if (!shouldApplySignatureStatus(contract.status, status)) {
+  // Contrat envoyé avant qu'on garde le lien de contresignature : on le relit chez le prestataire.
+  if (!contract.companySigningUrl && provider.getSigningUrls) {
+    const urls = await provider.getSigningUrls(contract.providerEnvelopeId).catch(() => null);
+    if (urls?.COMPANY) await prisma.contract.update({ where: { id: contractId }, data: { companySigningUrl: urls.COMPANY } });
+  }
+  if (!nextSignatureState({ status: contract.status, firstPartySignedAt: contract.pharmacySignedAt, companySignedAt: contract.companySignedAt }, { status, occurredAt: new Date() })) {
     // Déjà finalisé : on s'assure au passage que la version signée est archivée.
     if (contract.status === "FINALIZED") await archiveSignedPdf(contractId);
     return { ok: true, status, changed: false };
@@ -506,10 +524,13 @@ export async function refreshContractSignatureStatus(contractId: string, actor: 
  * n'est appliqué que s'il fait avancer le contrat. Chaque réception est tracée.
  */
 export async function handleSignatureEvent(event: SignatureEvent): Promise<boolean> {
-  const contract = await prisma.contract.findFirst({ where: { providerEnvelopeId: event.envelopeId }, select: { id: true, status: true } });
+  const contract = await prisma.contract.findFirst({ where: { providerEnvelopeId: event.envelopeId }, select: { id: true, status: true, pharmacySignedAt: true, companySignedAt: true } });
   const trace = (outcome: string, status?: string) =>
-    recordAudit({ action: "sales.signature_webhook", entityType: "Contract", entityId: contract?.id ?? event.envelopeId, metadata: { envelopeId: event.envelopeId, announced: event.status, applied: status ?? null, verified: event.verified, outcome } });
+    recordAudit({ action: "sales.signature_webhook", entityType: "Contract", entityId: contract?.id ?? event.envelopeId, metadata: { envelopeId: event.envelopeId, announced: event.status, role: event.role ?? null, applied: status ?? null, verified: event.verified, outcome } });
   if (!contract) {
+    // Pas un contrat de pharmacie : peut-être un contrat d'affiliation.
+    const affiliate = await handleAffiliateSignatureEvent(event);
+    if (affiliate !== null) return affiliate;
     await trace("unknown_envelope");
     return false;
   }
@@ -519,11 +540,12 @@ export async function handleSignatureEvent(event: SignatureEvent): Promise<boole
   }
   // Notification non authentifiée : seul l'état relu chez le prestataire fait foi.
   const status = event.verified ? event.status : await getSignatureProvider().getStatus(event.envelopeId);
-  if (!shouldApplySignatureStatus(contract.status, status)) {
+  const role = event.verified ? event.role : undefined;
+  if (!nextSignatureState({ status: contract.status, firstPartySignedAt: contract.pharmacySignedAt, companySignedAt: contract.companySignedAt }, { status, role, occurredAt: event.occurredAt })) {
     await trace("ignored_not_forward", status);
     return true;
   }
-  const applied = await applySignatureStatus(contract.id, status, { type: "SIGNER", label: event.verified ? "Prestataire de signature" : "Prestataire de signature (statut relu)" }, event.reason ?? null);
+  const applied = await applySignatureStatus(contract.id, status, { type: "SIGNER", label: event.verified ? "Prestataire de signature" : "Prestataire de signature (statut relu)" }, event.reason ?? null, role, event.occurredAt);
   await trace(applied ? "applied" : "concurrent_duplicate", status);
   return true;
 }
@@ -673,7 +695,7 @@ export async function runContractReminders(now = new Date(), policyOverride?: Re
   const policy = policyOverride ?? (await loadReminderPolicy());
   const report: ReminderRunReport = { checked: 0, reminded: 0, escalated: 0, expired: 0, errors: [] };
   // Seuls les contrats du moteur actuel sont relancés : les anciens (modèle v1, sans lien de signature conservé) ne le sont jamais.
-  const contracts = await prisma.contract.findMany({ where: { status: { in: AWAITING_PHARMACY as ContractStatusCode[] }, templateKey: CONTRACT_TEMPLATE_KEY }, include: { prospect: { select: { id: true, name: true, salesRepId: true, blockedAt: true } } } });
+  const contracts = await prisma.contract.findMany({ where: { status: { in: AWAITING_PHARMACY as ContractStatusCode[] }, templateKey: { in: ACTIVE_CONTRACT_TEMPLATE_KEYS } }, include: { prospect: { select: { id: true, name: true, salesRepId: true, blockedAt: true } } } });
   for (const contract of contracts) {
     report.checked += 1;
     if (contract.prospect.blockedAt) continue;

@@ -81,6 +81,12 @@ export type AdminContractRow = {
   blocked: boolean;
   /** Brouillon généré avant la dernière modification du dossier. */
   stale: boolean;
+  /** Le signataire PharmaBoost (contresignature) et son lien de signature chez le prestataire. */
+  companySignerName: string;
+  companySignerEmail: string;
+  companySigningUrl: string | null;
+  /** Le PDF signé par les deux parties est archivé. */
+  signedArchived: boolean;
 };
 
 const LIST_SELECT = {
@@ -104,6 +110,10 @@ const LIST_SELECT = {
   lastReminderAt: true,
   escalatedAt: true,
   createdAt: true,
+  companySignerName: true,
+  companySignerEmail: true,
+  companySigningUrl: true,
+  signedArchivedAt: true,
   prospect: { select: { name: true, legalName: true, blockedAt: true, updatedAt: true } },
   pharmacy: { select: { name: true } },
 } as const;
@@ -159,6 +169,10 @@ export async function listContractsForAdmin(params: { statut: ContractFilterKey 
       createdAt: c.createdAt,
       blocked: Boolean(c.prospect.blockedAt),
       stale: c.status === "DRAFT" && c.prospect.updatedAt.getTime() > c.createdAt.getTime() + STALE_MARGIN_MS,
+      companySignerName: c.companySignerName,
+      companySignerEmail: c.companySignerEmail,
+      companySigningUrl: c.companySigningUrl,
+      signedArchived: Boolean(c.signedArchivedAt),
     };
   });
 
@@ -247,7 +261,94 @@ export async function generatedContractCounts(): Promise<{ signed: number; total
 export async function loadSpecimenInputs() {
   const [company, plan] = await Promise.all([
     prisma.companyProfile.findUnique({ where: { id: "default" } }),
-    prisma.plan.findFirst({ where: { isActive: true, isDefault: true }, orderBy: { createdAt: "asc" }, select: { name: true, monthlyPriceCents: true, trialDays: true } }),
+    prisma.plan.findFirst({ where: { isActive: true, isDefault: true }, orderBy: { createdAt: "asc" }, select: { name: true, monthlyPriceCents: true, trialDays: true, setupFeeCents: true } }),
   ]);
   return { company, plan };
+}
+
+// ---------------------------------------------------------------------------
+// Contrats d'affiliation
+// ---------------------------------------------------------------------------
+
+export type AdminAffiliateContractRow = {
+  id: string;
+  salesRepId: string;
+  affiliateName: string;
+  affiliateEmail: string;
+  reference: string;
+  version: number;
+  status: string;
+  display: ContractDisplayStatus;
+  companySignerName: string;
+  companySignerEmail: string;
+  companySigningUrl: string | null;
+  sentAt: Date | null;
+  affiliateSignedAt: Date | null;
+  companySignedAt: Date | null;
+  finalizedAt: Date | null;
+  refusedAt: Date | null;
+  expiresAt: Date | null;
+  signedArchived: boolean;
+  createdAt: Date;
+};
+
+/**
+ * Les contrats d'affiliation : la dernière version de chaque affilié, filtrée
+ * comme les contrats des pharmacies (« À contresigner par moi » compris), et
+ * les affiliés actifs à qui un contrat peut être envoyé.
+ */
+export async function listAffiliateContractsForAdmin(params: { statut: ContractFilterKey | null; q?: string | null }, now = new Date()) {
+  const [contracts, reps] = await Promise.all([
+    prisma.affiliateContract.findMany({ orderBy: [{ createdAt: "desc" }, { version: "desc" }], take: CONTRACT_LIST_CAP, include: { salesRep: { select: { firstName: true, lastName: true, email: true } } } }),
+    prisma.salesRep.findMany({ where: { isActive: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }], select: { id: true, firstName: true, lastName: true, email: true } }),
+  ]);
+  const latest = markLatestVersions(contracts.map((c) => ({ ...c, prospectId: c.salesRepId }))).filter((c) => c.latest);
+  const rows: AdminAffiliateContractRow[] = latest.map((c) => ({
+    id: c.id,
+    salesRepId: c.salesRepId,
+    affiliateName: `${c.salesRep.firstName} ${c.salesRep.lastName}`.trim(),
+    affiliateEmail: c.affiliateSignerEmail,
+    reference: c.reference,
+    version: c.version,
+    status: c.status,
+    display: contractDisplayStatus({ status: c.status, escalatedAt: null, expiresAt: c.expiresAt }, now),
+    companySignerName: c.companySignerName,
+    companySignerEmail: c.companySignerEmail,
+    companySigningUrl: c.companySigningUrl,
+    sentAt: c.sentAt,
+    affiliateSignedAt: c.affiliateSignedAt,
+    companySignedAt: c.companySignedAt,
+    finalizedAt: c.finalizedAt,
+    refusedAt: c.refusedAt,
+    expiresAt: c.expiresAt,
+    signedArchived: Boolean(c.signedArchivedAt),
+    createdAt: c.createdAt,
+  }));
+  const classify = (r: AdminAffiliateContractRow) => ({ status: r.status, escalatedAt: null, expiresAt: r.expiresAt });
+  const searched = rows.filter((r) => matchesContractSearch({ reference: r.reference, pharmacyName: r.affiliateName, signerName: r.affiliateName, signerEmail: r.affiliateEmail }, params.q));
+  const byRep = new Map(rows.map((r) => [r.salesRepId, r.status]));
+  // Un contrat peut être envoyé à l'affilié qui n'en a pas, ou dont le dernier est un brouillon, refusé ou expiré.
+  const eligible = reps.filter((rep) => {
+    const status = byRep.get(rep.id);
+    return !status || status === "DRAFT" || status === "REFUSED" || status === "EXPIRED";
+  });
+  return {
+    rows: searched.filter((r) => inContractFilter(classify(r), params.statut, now)),
+    counters: countContractFilters(searched.map(classify), now),
+    totals: countContractFilters(rows.map(classify), now),
+    eligible: eligible.map((rep) => ({ id: rep.id, name: `${rep.firstName} ${rep.lastName}`.trim(), email: rep.email, hasDraft: byRep.get(rep.id) === "DRAFT" })),
+  };
+}
+
+/**
+ * Le nombre de contrats à contresigner par PharmaBoost (pharmacies, dernière
+ * version hors démonstration, et affiliés) : le badge du menu de la console.
+ */
+export async function countContractsToCountersign(): Promise<number> {
+  const [pharmacy, affiliate] = await Promise.all([
+    prisma.contract.findMany({ where: { AND: [REAL_CONTRACT, { status: "SIGNED_PHARMACY" }] }, select: { prospectId: true, version: true } }),
+    prisma.affiliateContract.count({ where: { status: "SIGNED_PHARMACY" } }),
+  ]);
+  // Un contrat signé par le titulaire est toujours la dernière version de son dossier (aucune nouvelle version n'est possible en cours de signature).
+  return pharmacy.length + affiliate;
 }

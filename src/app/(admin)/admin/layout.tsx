@@ -10,6 +10,7 @@ import { AdminIsland } from "./admin-island";
 import { QuickActions } from "./quick-actions";
 import { countUnreadAdminNotifications } from "@/server/services/sales/notifications";
 import { countSupportToAnswer } from "@/server/services/support";
+import { countContractsToCountersign } from "@/server/services/admin/contracts-admin";
 
 /**
  * La console éditeur : le centre de contrôle de PharmaBoost.
@@ -22,7 +23,7 @@ import { countSupportToAnswer } from "@/server/services/support";
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const session = await requirePlatformSession();
-  const [unread, supportOpen, gapsOpen] = await Promise.all([countUnreadAdminNotifications(), countSupportToAnswer(), countOpenGaps()]);
+  const [unread, supportOpen, gapsOpen, toCountersign] = await Promise.all([countUnreadAdminNotifications(), countSupportToAnswer(), countOpenGaps(), countContractsToCountersign()]);
 
   return (
     <div className="min-h-dvh bg-surface-app">
@@ -69,12 +70,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </div>
 
         <div className="mx-auto max-w-[1320px] px-6">
-          <AdminNav />
+          <AdminNav badges={{ finance: toCountersign }} />
         </div>
       </header>
 
       <main className="mx-auto max-w-[1320px] space-y-6 px-6 py-6">
-        <AdminSectionNav badges={{ support: supportOpen, conseils: gapsOpen }} />
+        <AdminSectionNav badges={{ support: supportOpen, conseils: gapsOpen, contrats: toCountersign }} />
         {children}
       </main>
     </div>

@@ -45,7 +45,8 @@ describe("classement d'un contrat dans les filtres", () => {
     expect(view.contractFilters({ ...base, status: "SENT" }, NOW)).toEqual(["a-signer"]);
     expect(view.contractFilters({ ...base, status: "OPENED" }, NOW)).toEqual(["a-signer", "consultes"]);
     expect(view.contractFilters({ ...base, status: "SIGNED_PHARMACY" }, NOW)).toEqual(["a-contresigner"]);
-    expect(view.contractFilters({ ...base, status: "SIGNED_COMPANY" }, NOW)).toEqual(["a-contresigner"]);
+    // PharmaBoost a signé avant le titulaire : c'est encore au titulaire de signer, rien à contresigner.
+    expect(view.contractFilters({ ...base, status: "SIGNED_COMPANY" }, NOW)).toEqual(["a-signer"]);
     expect(view.contractFilters({ ...base, status: "FINALIZED" }, NOW)).toEqual(["signes"]);
     expect(view.contractFilters({ ...base, status: "EXPIRED" }, NOW)).toEqual(["expires"]);
     expect(view.contractFilters({ ...base, status: "REFUSED" }, NOW)).toEqual(["expires"]);
@@ -69,8 +70,8 @@ describe("classement d'un contrat dans les filtres", () => {
     expect(label({ ...base, status: "DRAFT", superseded: true })).toBe("Brouillon remplacé");
     expect(label({ ...base, status: "SENT" })).toBe("Envoyé");
     expect(label({ ...base, status: "OPENED" })).toBe("Consulté");
-    expect(label({ ...base, status: "SIGNED_PHARMACY" })).toBe("À contresigner");
-    expect(label({ ...base, status: "FINALIZED" })).toBe("Signé");
+    expect(label({ ...base, status: "SIGNED_PHARMACY" })).toBe("En attente de PharmaBoost");
+    expect(label({ ...base, status: "FINALIZED" })).toBe("Signé par les deux");
     expect(label({ ...base, status: "EXPIRED" })).toBe("Expiré");
     expect(label({ ...base, status: "REFUSED" })).toBe("Refusé");
     expect(label({ status: "SENT", escalatedAt: inDays(-2), expiresAt: inDays(20) })).toBe("Relance nécessaire");

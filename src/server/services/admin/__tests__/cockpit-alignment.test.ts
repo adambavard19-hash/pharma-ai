@@ -285,10 +285,10 @@ describe("tuile « Contrats en attente » → /admin/contrats?statut=en-attente"
     expect(kpis.contracts).toEqual({ pending: 1, drafts: 0, toSign: 1, toCountersign: 0 });
   });
 
-  it("brouillons + à signer + à contresigner (signé société compris), et la liste montre exactement ces contrats", async () => {
+  it("brouillons + à signer (signé société d'abord compris : le titulaire doit encore signer) + à contresigner, et la liste montre exactement ces contrats", async () => {
     db.contract.findMany.mockResolvedValue(CONTRACTS);
     const kpis = await cockpit.loadKpis(PERIODS[0], NOW);
-    expect(kpis.contracts).toEqual({ pending: 5, drafts: 1, toSign: 2, toCountersign: 2 });
+    expect(kpis.contracts).toEqual({ pending: 5, drafts: 1, toSign: 3, toCountersign: 1 });
     expect(kpis.contracts.pending).toBe(kpis.contracts.drafts + kpis.contracts.toSign + kpis.contracts.toCountersign);
 
     const list = await contractListFor(COCKPIT_LINKS.pendingContracts);
@@ -304,9 +304,9 @@ describe("tuile « Contrats en attente » → /admin/contrats?statut=en-attente"
     const toSign = await contractListFor(COCKPIT_LINKS.contractsToSign);
     const toCountersign = await contractListFor(COCKPIT_LINKS.contractsToCountersign);
     const toRemind = await contractListFor(COCKPIT_LINKS.contractsToRemind);
-    expect(toSign.ids).toEqual(["p1v2", "p5v1"]);
+    expect(toSign.ids).toEqual(["p1v2", "p2v1", "p5v1"]);
     expect(attention.contractsToSign).toBe(toSign.ids.length);
-    expect(toCountersign.ids).toEqual(["p2v1", "p6v1"]);
+    expect(toCountersign.ids).toEqual(["p6v1"]);
     expect(attention.contractsToCountersign).toBe(toCountersign.ids.length);
     expect(toRemind.ids).toEqual(["p5v1"]);
     expect(attention.contractsToRemind).toBe(toRemind.ids.length);

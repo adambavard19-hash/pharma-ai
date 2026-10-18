@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Building2, Download, Eye, FileSignature, FolderOpen, History } from "lucide-react";
+import { Building2, Download, Eye, FileCheck2, FileSignature, FolderOpen, History } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
-import { CONTRACT_FILTER_KEYS, CONTRACT_FILTER_LABELS, listContractsForAdmin, resolveContractFilter, signatureProviderState, type AdminContractRow } from "@/server/services/admin/contracts-admin";
+import { CONTRACT_FILTER_KEYS, CONTRACT_FILTER_LABELS, listAffiliateContractsForAdmin, listContractsForAdmin, resolveContractFilter, signatureProviderState, type AdminAffiliateContractRow, type AdminContractRow } from "@/server/services/admin/contracts-admin";
+import { loadCountersigner } from "@/server/services/sales/countersigner";
 import { expiryHint } from "@/core/contracts/admin-view";
 import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
 import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
@@ -16,6 +17,8 @@ import { Alert, EmptyState } from "@/components/ui/feedback";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { SendDraftButton } from "./send-draft-button";
 import { SignatureBanner } from "./signature-banner";
+import { SignersCell } from "./signers-cell";
+import { CountersignerForm, RefreshAffiliateButton, SendAffiliateContractForm } from "./countersign-controls";
 
 export const metadata: Metadata = { title: "Contrats" };
 
@@ -41,7 +44,8 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
   const q = one(params.q);
   const versions = one(params.versions) === "toutes" ? "toutes" : "derniere";
   const now = new Date();
-  const [list, signature] = await Promise.all([listContractsForAdmin({ statut, q, versions }, now), Promise.resolve(signatureProviderState())]);
+  const [list, affiliates, countersigner, signature] = await Promise.all([listContractsForAdmin({ statut, q, versions }, now), listAffiliateContractsForAdmin({ statut, q }, now), loadCountersigner(), Promise.resolve(signatureProviderState())]);
+  const toCountersign = list.totals["a-contresigner"] + affiliates.totals["a-contresigner"];
 
   const keep = { q, versions: versions === "toutes" ? "toutes" : null, statut };
   const filtered = Boolean(statut || q);
@@ -51,7 +55,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
       <AdminPageHeader
         space={{ label: "Finances", href: "/admin/abonnements" }}
         title="Contrats"
-        description="Les contrats d'abonnement de chaque dossier : brouillons à envoyer, signatures attendues, relances, contrats signés. Le PDF, le dossier et l'historique sont à un clic."
+        description="Tous les contrats : abonnements des pharmacies et contrats d'affiliation. Chacun est signé d'abord par le titulaire (ou l'affilié), puis contresigné par PharmaBoost ; il n'est signé qu'avec les deux signatures. Le PDF signé, le dossier et l'historique sont à un clic."
         actions={
           <Button asChild variant="outline" size="sm" leadingIcon={<Building2 className="size-4" />}>
             <Link href="/admin/societe">Société exploitante</Link>
@@ -65,7 +69,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
         <KpiTile label="À envoyer" value={list.totals.brouillon} hint="Brouillons prêts" href={hrefWith("/admin/contrats", { versions: keep.versions }, { statut: "brouillon" })} />
         <KpiTile label="À signer" value={list.totals["a-signer"]} hint="Envoyés ou consultés" tone={list.totals["a-signer"] > 0 ? "info" : "default"} href={hrefWith("/admin/contrats", { versions: keep.versions }, { statut: "a-signer" })} />
         <KpiTile label="Relance nécessaire" value={list.totals.relance} hint="Signalés ou expirant sous 7 jours" tone={list.totals.relance > 0 ? "warning" : "default"} href={hrefWith("/admin/contrats", { versions: keep.versions }, { statut: "relance" })} />
-        <KpiTile label="À contresigner" value={list.totals["a-contresigner"]} hint="Signés par l'officine" tone={list.totals["a-contresigner"] > 0 ? "brand" : "default"} href={hrefWith("/admin/contrats", { versions: keep.versions }, { statut: "a-contresigner" })} />
+        <KpiTile label="À contresigner par moi" value={toCountersign} hint="Signés par le titulaire ou l'affilié" tone={toCountersign > 0 ? "brand" : "default"} href={hrefWith("/admin/contrats", { versions: keep.versions }, { statut: "a-contresigner" })} />
         <KpiTile label="Signés" value={list.totals.signes} hint="Finalisés par les deux parties" tone={list.totals.signes > 0 ? "success" : "default"} href={hrefWith("/admin/contrats", { versions: keep.versions }, { statut: "signes" })} />
       </div>
 
@@ -137,7 +141,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
                   <TH>Statut</TH>
                   <TH>Envoyé le</TH>
                   <TH>Consulté le</TH>
-                  <TH>Signé le</TH>
+                  <TH>Signatures</TH>
                   <TH>Relances</TH>
                   <TH>Expiration</TH>
                   <TH className="text-right">Actions</TH>
@@ -152,6 +156,43 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
           </div>
         )}
       </AdminSection>
+      <AdminSection
+        padded={false}
+        title="Contrats d'affiliation"
+        description="Signés par l'affilié, puis contresignés par PharmaBoost. Rémunération imprimée : commission mensuelle par paliers sur l'abonnement et prime d'apport, lues depuis les conditions de l'affiliation."
+      >
+        <div className="border-b border-border-subtle px-5 py-4">
+          <SendAffiliateContractForm affiliates={affiliates.eligible} signatureLive={signature.configured} />
+        </div>
+        {affiliates.rows.length === 0 ? (
+          <p className="px-5 py-6 text-[13px] text-text-tertiary">{statut || q ? "Aucun contrat d'affiliation dans ce filtre." : "Aucun contrat d'affiliation pour l'instant."}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Affilié</TH>
+                  <TH>Référence</TH>
+                  <TH>Statut</TH>
+                  <TH>Envoyé le</TH>
+                  <TH>Signatures</TH>
+                  <TH className="text-right">Actions</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {affiliates.rows.map((row) => (
+                  <AffiliateRow key={row.id} row={row} />
+                ))}
+              </TBody>
+            </Table>
+          </div>
+        )}
+      </AdminSection>
+
+      <AdminSection title="Signataire PharmaBoost" description="Qui contresigne les prochains contrats pour PharmaBoost. Un contrat déjà envoyé garde son signataire.">
+        <CountersignerForm initial={{ name: countersigner.name, email: countersigner.email }} source={countersigner.source} />
+      </AdminSection>
+
       <p className="text-[12.5px] text-text-tertiary">
         {list.rows.length} contrat{list.rows.length > 1 ? "s" : ""} affiché{list.rows.length > 1 ? "s" : ""}
         {versions === "toutes" ? ", toutes versions confondues" : ", dernière version de chaque dossier"}, hors officines de démonstration. La cadence des relances automatiques se règle dans le{" "}
@@ -170,8 +211,6 @@ function ContractRow({ row, now, signature, showAllVersions }: { row: AdminContr
   const awaiting = row.status === "SENT" || row.status === "OPENED";
   const canSend = row.status === "DRAFT" && row.latest && !row.blocked;
   const canRemind = awaiting && row.latest && !row.blocked && !expired;
-  const signedOn = row.finalizedAt ?? row.pharmacySignedAt ?? row.companySignedAt;
-  const signedCaption = row.finalizedAt ? "Par les deux parties" : row.pharmacySignedAt ? "Par l'officine" : row.companySignedAt ? "Par la société" : null;
   const iconLink = "inline-flex size-8 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500";
 
   return (
@@ -206,17 +245,16 @@ function ContractRow({ row, now, signature, showAllVersions }: { row: AdminContr
       </TD>
       <TD className="whitespace-nowrap text-text-secondary">{date(row.sentAt) ?? <Dash />}</TD>
       <TD className="whitespace-nowrap text-text-secondary">{date(row.openedAt) ?? <Dash />}</TD>
-      <TD className="whitespace-nowrap text-text-secondary">
-        {signedOn ? (
-          <>
-            {formatFrenchDate(signedOn)}
-            {signedCaption && <span className="block text-[12px] text-text-tertiary">{signedCaption}</span>}
-          </>
-        ) : row.refusedAt ? (
-          <span className="text-danger-700 dark:text-danger-500">Refusé le {formatFrenchDate(row.refusedAt)}</span>
-        ) : (
-          <Dash />
-        )}
+      <TD className="min-w-[220px]">
+        <SignersCell
+          status={row.status}
+          firstParty={{ role: "PHARMACY", name: row.signerName, email: row.signerEmail }}
+          firstPartySignedAt={row.pharmacySignedAt}
+          companySignedAt={row.companySignedAt}
+          company={{ name: row.companySignerName, email: row.companySignerEmail }}
+          companySigningUrl={row.companySigningUrl}
+        />
+        {row.refusedAt && <span className="mt-1 block text-[12px] text-danger-700 dark:text-danger-500">Refusé le {formatFrenchDate(row.refusedAt)}</span>}
       </TD>
       <TD className="whitespace-nowrap">
         <span className="tabular-nums">{row.reminderCount}</span>
@@ -259,12 +297,56 @@ function ContractRow({ row, now, signature, showAllVersions }: { row: AdminContr
           <a href={`/api/contrats/apercu/${row.id}`} target="_blank" rel="noopener noreferrer" className={iconLink} title="Prévisualiser le PDF" aria-label={`Prévisualiser le PDF du contrat ${row.reference}`}>
             <Eye className="size-4" aria-hidden="true" />
           </a>
-          <a href={`/api/contrats/apercu/${row.id}`} download={`${row.reference}.pdf`} className={iconLink} title="Télécharger le PDF" aria-label={`Télécharger le PDF du contrat ${row.reference}`}>
-            <Download className="size-4" aria-hidden="true" />
-          </a>
+          {row.finalizedAt && row.signedArchived ? (
+            <a href={`/api/contrats/apercu/${row.id}`} download={`${row.reference}-signe.pdf`} className={iconLink} title="Télécharger le PDF signé par les deux parties" aria-label={`Télécharger le PDF signé du contrat ${row.reference}`}>
+              <FileCheck2 className="size-4 text-success-600" aria-hidden="true" />
+            </a>
+          ) : (
+            <a href={`/api/contrats/apercu/${row.id}`} download={`${row.reference}.pdf`} className={iconLink} title="Télécharger le PDF" aria-label={`Télécharger le PDF du contrat ${row.reference}`}>
+              <Download className="size-4" aria-hidden="true" />
+            </a>
+          )}
           <Link href={`/admin/contrats/${row.id}`} className={iconLink} title="Historique du contrat" aria-label={`Historique du contrat ${row.reference}`}>
             <History className="size-4" aria-hidden="true" />
           </Link>
+        </div>
+      </TD>
+    </TR>
+  );
+}
+
+function AffiliateRow({ row }: { row: AdminAffiliateContractRow }) {
+  const iconLink = "inline-flex size-8 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500";
+  const signedPdf = Boolean(row.finalizedAt && row.signedArchived);
+  return (
+    <TR>
+      <TD className="max-w-[240px]">
+        <span className="block truncate font-medium text-text-primary">{row.affiliateName}</span>
+        <span className="block truncate text-[12.5px] text-text-tertiary">{row.affiliateEmail}</span>
+      </TD>
+      <TD>
+        <span className="font-mono text-[12.5px] text-text-secondary">{row.reference}</span>
+      </TD>
+      <TD>
+        <StatusBadge status={row.display} />
+      </TD>
+      <TD className="whitespace-nowrap text-text-secondary">{date(row.sentAt) ?? <Dash />}</TD>
+      <TD className="min-w-[220px]">
+        <SignersCell
+          status={row.status}
+          firstParty={{ role: "AFFILIATE", name: row.affiliateName, email: row.affiliateEmail }}
+          firstPartySignedAt={row.affiliateSignedAt}
+          companySignedAt={row.companySignedAt}
+          company={{ name: row.companySignerName, email: row.companySignerEmail }}
+          companySigningUrl={row.companySigningUrl}
+        />
+      </TD>
+      <TD>
+        <div className="flex items-center justify-end gap-1">
+          {row.status !== "DRAFT" && row.status !== "FINALIZED" && <RefreshAffiliateButton contractId={row.id} />}
+          <a href={`/api/contrats/affilies/${row.id}`} target="_blank" rel="noopener noreferrer" className={iconLink} title={signedPdf ? "PDF signé par les deux parties" : "Prévisualiser le PDF"} aria-label={`PDF du contrat ${row.reference}`}>
+            {signedPdf ? <FileCheck2 className="size-4 text-success-600" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+          </a>
         </div>
       </TD>
     </TR>

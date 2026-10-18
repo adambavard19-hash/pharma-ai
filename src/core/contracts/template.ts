@@ -40,6 +40,11 @@ export type ContractTerms = {
   planName?: string;
   /** Jours d'essai offerts à la souscription ; 0 ou absent : aucun. */
   trialDays?: number;
+  /**
+   * Mise en service unique, en centimes HT (offre de la console, sinon offre officielle :
+   * voir `resolveContractAmounts`). Absent : non imprimée (contrats antérieurs au modèle v3).
+   */
+  setupFeeCents?: number | null;
 };
 
 export type ContractDocument = {
@@ -47,14 +52,19 @@ export type ContractDocument = {
   title: string;
   reference: string;
   sections: { heading: string; paragraphs: string[] }[];
-  signatures: { role: "PHARMACY" | "COMPANY"; label: string; name: string; email: string }[];
+  signatures: { role: "PHARMACY" | "AFFILIATE" | "COMPANY"; label: string; name: string; email: string }[];
 };
 
 /**
  * v2 (oct. 2026) : raison sociale et qualité du signataire, SIRET lisible,
  * « premier mois offert » en toutes lettres, terme « l'Officine » partout.
+ * v3 (18 oct. 2026) : mise en service unique (150 € HT au catalogue) et
+ * engagement ferme, montants lus depuis l'offre ; signature du titulaire puis
+ * contresignature de PharmaBoost, contrat signé quand les deux ont signé.
  */
-export const CONTRACT_TEMPLATE_KEY = "abonnement-pharmaboost-v2";
+export const CONTRACT_TEMPLATE_KEY = "abonnement-pharmaboost-v3";
+/** Les modèles encore suivis par les relances : un contrat v2 envoyé avant le 18 oct. 2026 reste relancé. */
+export const ACTIVE_CONTRACT_TEMPLATE_KEYS = ["abonnement-pharmaboost-v2", CONTRACT_TEMPLATE_KEY];
 
 const euros = (cents: number) => `${(cents / 100).toFixed(2).replace(".", ",")} € HT`;
 const dateFr = (d: Date) => new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", year: "numeric" }).format(d);
@@ -64,6 +74,8 @@ export function buildContractDocument(input: {
   pharmacy: ContractPharmacy;
   terms: ContractTerms;
   reference: string;
+  /** Qui contresigne pour la Société (réglage de la console) ; par défaut, le représentant de la fiche Société. */
+  countersigner?: { name: string; email: string };
 }): ContractDocument {
   const { company, pharmacy, terms } = input;
   const yearly = terms.monthlyPriceCents * 12;
@@ -89,13 +101,16 @@ export function buildContractDocument(input: {
       {
         heading: "Article 2 — Durée",
         paragraphs: [
-          `Le présent contrat prend effet le ${dateFr(terms.startDate)} pour une durée de ${terms.durationMonths} mois. Il se renouvelle ensuite tacitement par périodes de douze mois, sauf dénonciation par l'une des parties trois mois avant l'échéance, par lettre recommandée ou courrier électronique avec accusé de réception.`,
+          `Le présent contrat prend effet le ${dateFr(terms.startDate)} pour une durée d'engagement ferme de ${terms.durationMonths} mois : l'abonnement est dû pour toute cette période. Il se renouvelle ensuite tacitement par périodes de douze mois, sauf dénonciation par l'une des parties trois mois avant l'échéance, par lettre recommandée ou courrier électronique avec accusé de réception.`,
         ],
       },
       {
         heading: "Article 3 — Conditions financières",
         paragraphs: [
           `L'abonnement${terms.planName ? ` « ${terms.planName} »` : ""} est facturé ${euros(terms.monthlyPriceCents)} par mois pour ${terms.outletCount} point${terms.outletCount > 1 ? "s" : ""} de vente, soit ${euros(yearly)} par an, payable mensuellement par prélèvement automatique sur le moyen de paiement enregistré par l'Officine. Les prix s'entendent hors taxes ; la TVA en vigueur s'applique.`,
+          ...(typeof terms.setupFeeCents === "number" && terms.setupFeeCents > 0
+            ? [`Une mise en service unique de ${euros(terms.setupFeeCents)} est due à la souscription et facturée avec la première échéance : installation et configuration de PharmaBoost sur les postes de comptoir, paramétrage de l'Officine et import de son stock, tests de fonctionnement et formation de l'équipe. Elle n'est due qu'une fois.`]
+            : []),
           ...(terms.trialDays && terms.trialDays > 0
             ? [`${terms.trialDays >= 28 && terms.trialDays <= 31 ? "Le premier mois d'abonnement est offert" : `Les ${terms.trialDays} premiers jours d'abonnement sont offerts`} : aucun prélèvement n'intervient pendant cette période, et l'Officine peut y mettre fin sans frais avant son terme. Le premier prélèvement intervient à l'issue de la période offerte.`]
             : []),
@@ -120,10 +135,16 @@ export function buildContractDocument(input: {
         heading: "Article 6 — Droit applicable",
         paragraphs: ["Le présent contrat est soumis au droit français. À défaut d'accord amiable, les tribunaux compétents sont ceux du siège de la Société."],
       },
+      {
+        heading: "Article 7 — Signature",
+        paragraphs: [
+          "Le présent contrat est signé électroniquement, d'abord par l'Officine, puis contresigné par la Société. Il n'est formé qu'une fois les deux signatures recueillies ; chaque partie en reçoit alors l'exemplaire signé.",
+        ],
+      },
     ],
     signatures: [
-      { role: "PHARMACY", label: "Pour l'Officine", name: pharmacy.ownerName, email: pharmacy.email },
-      { role: "COMPANY", label: "Pour la Société", name: company.representativeName, email: company.representativeEmail },
+      { role: "PHARMACY", label: "Pour l'Officine (signe en premier)", name: pharmacy.ownerName, email: pharmacy.email },
+      { role: "COMPANY", label: "Pour la Société (contresigne)", name: input.countersigner?.name ?? company.representativeName, email: input.countersigner?.email ?? company.representativeEmail },
     ],
   };
 }

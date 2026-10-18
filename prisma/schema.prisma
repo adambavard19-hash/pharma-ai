@@ -3294,6 +3294,8 @@ model SalesRep {
   notifications ExtranetNotification[]
   application   SalesApplication?
   invoices      SalesInvoice[]
+  /// Les contrats d'affiliation de l'affilié (une version par envoi), signés par lui puis contresignés par PharmaBoost.
+  affiliateContracts AffiliateContract[]
 
   @@map("sales_reps")
 }
@@ -3475,6 +3477,10 @@ model Contract {
   providerEnvelopeId String?
   /// Lien de signature du titulaire fourni par le prestataire : repris dans les renvois et les relances.
   pharmacySigningUrl String?
+  /// Lien de contresignature de PharmaBoost (le fondateur) fourni par le prestataire : affiché dans Console → Contrats.
+  companySigningUrl  String?
+  /// Mise en service unique, en centimes HT, telle qu'imprimée au contrat (offre de la console, sinon offre officielle).
+  setupFeeCents      Int?
   /// Verrou d'envoi : posé le temps de créer la demande de signature, il empêche un double envoi.
   sendLockedAt       DateTime?
   /// Date de prise d'effet inscrite au contrat.
@@ -3566,6 +3572,48 @@ model Commission {
 /// et des administrateurs. Il gère l'équipe commerciale (commerciaux, candidats,
 /// commissions, factures, challenges) depuis son propre espace, sans jamais
 /// avoir de portée sur une officine ni sur des données patients.
+/// Le contrat d'affiliation (18 oct. 2026) : signé d'abord par l'affilié, puis contresigné par PharmaBoost (le
+/// fondateur). Il n'est « signé » (FINALIZED) que quand les deux ont signé. Les statuts réutilisent ContractStatus :
+/// SIGNED_PHARMACY = signé par l'affilié (premier signataire), en attente de PharmaBoost.
+model AffiliateContract {
+  id                   String         @id @default(cuid())
+  salesRepId           String
+  version              Int
+  status               ContractStatus @default(DRAFT)
+  templateKey          String
+  fileKey              String
+  reference            String
+  /// Les conditions imprimées (paliers, prime, tarif d'exemple), figées à la génération.
+  termsSnapshot        Json
+  affiliateSignerName  String
+  affiliateSignerEmail String
+  companySignerName    String
+  companySignerEmail   String
+  signatureProvider    String         @default("none")
+  providerEnvelopeId   String?        @unique
+  affiliateSigningUrl  String?
+  companySigningUrl    String?
+  sendLockedAt         DateTime?
+  sentAt               DateTime?
+  openedAt             DateTime?
+  affiliateSignedAt    DateTime?
+  companySignedAt      DateTime?
+  finalizedAt          DateTime?
+  refusedAt            DateTime?
+  refusalReason        String?
+  expiresAt            DateTime?
+  signedArchivedAt     DateTime?
+  createdByAdminId     String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  salesRep SalesRep @relation(fields: [salesRepId], references: [id], onDelete: Cascade)
+
+  @@unique([salesRepId, version])
+  @@index([status])
+  @@map("affiliate_contracts")
+}
+
 model SalesDirector {
   id           String    @id @default(cuid())
   email        String    @unique

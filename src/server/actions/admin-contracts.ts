@@ -6,6 +6,8 @@ import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { remindContractNow, sendContract, upsertCompanyProfile } from "@/server/services/sales/contracts";
 import { normalizeEmail } from "@/core/contracts/identity";
+import { saveCountersigner } from "@/server/services/sales/countersigner";
+import { refreshAffiliateContract, sendAffiliateContract } from "@/server/services/sales/affiliate-contracts";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /**
@@ -103,4 +105,37 @@ export async function saveCompanyProfileAdminAction(payload: z.input<typeof comp
   const changed = Object.keys(result.changes).length;
   if (!result.created && changed === 0) return ok({ changed }, "Aucune modification : la fiche était déjà à jour.");
   return ok({ changed }, result.created ? "Fiche société enregistrée." : "Fiche société mise à jour. Elle s'appliquera aux prochains contrats.");
+}
+
+/** Le signataire PharmaBoost des prochains contrats (contresignature) : réglé ici, sans adresse dans le code. */
+export async function saveCountersignerAction(payload: { name?: string | null; email: string }): Promise<ActionResult<{ email: string }>> {
+  const session = await requirePlatformSession();
+  const parsed = z.object({ name: z.string().trim().max(120).optional().nullable(), email: z.string().trim().max(254) }).safeParse(payload);
+  if (!parsed.success) return fail("Demande invalide.");
+  const result = await saveCountersigner(parsed.data, session.admin.id);
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/contrats");
+  return ok({ email: result.countersigner.email }, `Les prochains contrats seront contresignés par ${result.countersigner.email}.`);
+}
+
+/** Préparer et envoyer le contrat d'affiliation d'un affilié : signé par lui, puis contresigné par PharmaBoost. */
+export async function sendAffiliateContractAction(payload: { salesRepId: string }): Promise<ActionResult<{ contractId: string }>> {
+  const session = await requirePlatformSession();
+  const parsed = z.object({ salesRepId: z.string().min(1).max(60) }).safeParse(payload);
+  if (!parsed.success) return fail("Demande invalide.");
+  const result = await sendAffiliateContract(parsed.data.salesRepId, { id: session.admin.id, label: session.admin.fullName });
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/contrats");
+  return ok({ contractId: result.contractId }, result.message);
+}
+
+/** Relire chez le prestataire l'état d'un contrat d'affiliation (webhook manqué) et son lien de contresignature. */
+export async function refreshAffiliateContractAction(payload: { contractId: string }): Promise<ActionResult<null>> {
+  await requirePlatformSession();
+  const parsed = z.object({ contractId: z.string().min(1).max(60) }).safeParse(payload);
+  if (!parsed.success) return fail("Demande invalide.");
+  const result = await refreshAffiliateContract(parsed.data.contractId);
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/contrats");
+  return ok(null, result.changed ? "Statut mis à jour." : "Statut inchangé chez le prestataire.");
 }

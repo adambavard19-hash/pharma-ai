@@ -140,6 +140,8 @@ const envSchema = z.object({
   DOCUSEAL_REGION: z.enum(["eu", "global"]).default("eu"),
   /** Valeur de l'en-tête x-pharmaboost-secret déclaré sur le webhook DocuSeal. */
   DOCUSEAL_WEBHOOK_SECRET: z.string().optional(),
+  /** Qui contresigne les contrats pour PharmaBoost quand la console n'a rien réglé (Console → Contrats). Par défaut : contact@pharmaboost.app. */
+  PHARMABOOST_COUNTERSIGNER_EMAIL: z.string().optional(),
 
   // Abonnements : Stripe. Les clés vivent dans l'environnement, jamais dans
   // le code. En mode « test », une clé de production est refusée au démarrage.

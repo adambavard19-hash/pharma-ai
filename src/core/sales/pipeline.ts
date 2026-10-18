@@ -74,9 +74,10 @@ export const CONTRACT_STATUS_LABELS = {
   DRAFT: "Brouillon",
   SENT: "Envoyé",
   OPENED: "Ouvert",
-  SIGNED_PHARMACY: "Signé pharmacie",
-  SIGNED_COMPANY: "Signé société",
-  FINALIZED: "Finalisé",
+  // Double signature : le titulaire signe, puis PharmaBoost contresigne ; le contrat n'est signé qu'avec les deux.
+  SIGNED_PHARMACY: "Signé par le titulaire, en attente de PharmaBoost",
+  SIGNED_COMPANY: "Signé par PharmaBoost, en attente du titulaire",
+  FINALIZED: "Signé par les deux",
   REFUSED: "Refusé",
   EXPIRED: "Expiré",
 } as const;

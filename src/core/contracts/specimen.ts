@@ -1,5 +1,6 @@
 import { buildContractDocument, type ContractDocument, type ContractParty, type ContractPharmacy } from "./template";
 import { printedAddress, type CompanyProfileInput } from "./snapshot";
+import { resolveContractAmounts } from "./amounts";
 
 /**
  * Aperçus du contrat pour la fiche société : le paragraphe des parties et le
@@ -75,31 +76,22 @@ export function partiesPreview(company: ContractParty, pharmacy: ContractPharmac
   return { heading: parties.heading, companyParagraph: parties.paragraphs[0] ?? "", pharmacyParagraph: parties.paragraphs[1] ?? "", signatures: doc.signatures };
 }
 
-export type SpecimenPlan = { name: string; monthlyPriceCents: number; trialDays: number } | null;
+export type SpecimenPlan = { name: string; monthlyPriceCents: number; trialDays: number; setupFeeCents?: number | null } | null;
 
 /**
  * Le contrat spécimen : le vrai modèle, la fiche société enregistrée, une
- * officine fictive. Sans offre par défaut au catalogue, le tarif n'est pas
- * inventé : l'article 3 l'indique entre crochets.
+ * officine fictive. Les montants sont ceux de l'offre par défaut du catalogue,
+ * sinon ceux de l'offre officielle (`resolveContractAmounts`) : jamais en dur.
  */
-export function specimenDocument(input: { company: ContractParty; plan: SpecimenPlan; startDate: Date }): ContractDocument {
+export function specimenDocument(input: { company: ContractParty; plan: SpecimenPlan; startDate: Date; countersigner?: { name: string; email: string } }): ContractDocument {
   const { company, plan, startDate } = input;
+  const amounts = resolveContractAmounts(plan ? { monthlyPriceCents: plan.monthlyPriceCents, setupFeeCents: plan.setupFeeCents ?? null } : null);
   const doc = buildContractDocument({
     company,
     pharmacy: SPECIMEN_PHARMACY,
-    terms: { monthlyPriceCents: plan?.monthlyPriceCents ?? 0, durationMonths: 12, outletCount: 1, startDate, planName: plan?.name, trialDays: plan?.trialDays ?? 0 },
+    terms: { monthlyPriceCents: amounts.monthlyPriceCents, setupFeeCents: amounts.setupFeeCents, durationMonths: amounts.durationMonths, outletCount: 1, startDate, planName: plan?.name, trialDays: plan?.trialDays ?? 0 },
     reference: "SPÉCIMEN",
-  });
-  const sections = doc.sections.map((section) => {
-    if (plan || !section.heading.startsWith("Article 3")) return section;
-    const [, ...rest] = section.paragraphs;
-    return {
-      ...section,
-      paragraphs: [
-        "L'abonnement est facturé [tarif mensuel de l'offre retenue] € HT par mois pour 1 point de vente, payable mensuellement par prélèvement automatique sur le moyen de paiement enregistré par l'Officine. Les prix s'entendent hors taxes ; la TVA en vigueur s'applique.",
-        ...rest,
-      ],
-    };
+    countersigner: input.countersigner,
   });
   return {
     ...doc,
@@ -111,7 +103,7 @@ export function specimenDocument(input: { company: ContractParty; plan: Specimen
           "Ce document est un aperçu généré à la demande depuis la console PharmaBoost. Il montre comment la fiche de la société exploitante s'imprime dans les contrats. L'officine qui y figure est fictive ; ce document n'engage personne, n'est pas enregistré et ne peut pas être signé.",
         ],
       },
-      ...sections,
+      ...doc.sections,
     ],
   };
 }

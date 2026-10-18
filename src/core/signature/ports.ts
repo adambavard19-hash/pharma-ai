@@ -8,7 +8,8 @@
  * électronique est refusé et le dit.
  */
 export type SignatureSigner = {
-  role: "PHARMACY" | "COMPANY";
+  /** PHARMACY (titulaire) ou AFFILIATE (affilié) signe en premier ; COMPANY (PharmaBoost) contresigne. */
+  role: "PHARMACY" | "AFFILIATE" | "COMPANY";
   firstName: string;
   lastName: string;
   email: string;
@@ -72,6 +73,8 @@ export interface SignatureProvider {
   parseWebhook(rawBody: string, headers: Record<string, string | null>): Promise<SignatureEvent | null>;
   /** Le PDF signé, quand le prestataire le fournit. */
   downloadSigned(envelopeId: string): Promise<Uint8Array | null>;
+  /** Les liens de signature de chaque signataire, relus chez le prestataire (contrats envoyés avant qu'on les garde). */
+  getSigningUrls?(envelopeId: string): Promise<SignatureEnvelope["signingUrls"]>;
 }
 
 export class SignatureNotConfiguredError extends Error {
