@@ -9,7 +9,7 @@ import { AddDirectorForm, DirectorActions } from "./director-admin";
 import { DirectorBonusActions } from "./director-bonus-actions";
 import type { DirectorBonusRow } from "@/server/services/sales/director-bonuses";
 import { CommissionStatusBadge } from "@/components/sales/status-badge";
-import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
+import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
 import { formatCents } from "@/lib/format";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;

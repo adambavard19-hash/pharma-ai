@@ -11,7 +11,7 @@ const NAV = [
   { href: "/decouvrir#stock-marge", label: "Stock et marge" },
   { href: "/decouvrir/pourquoi", label: "Pourquoi" },
   { href: "/decouvrir#tarif", label: "Tarif" },
-  // Le programme d'affiliation, dans le menu principal : 10 % de l'abonnement de chaque pharmacie apportée, chaque mois.
+  // Le programme d'affiliation, dans le menu principal : 10 à 20 % (paliers) de l'abonnement de chaque pharmacie apportée, chaque mois.
   { href: "/decouvrir/affiliation", label: "Affiliation" },
 ];
 

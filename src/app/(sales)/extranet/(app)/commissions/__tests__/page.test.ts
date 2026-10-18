@@ -226,9 +226,9 @@ describe("l'affilié (10 % chaque mois, à vie)", () => {
 
   it("la règle, les revenus récurrents actuels, les pharmacies, et les commissions mois par mois avec leur total", async () => {
     mocks.commissionOverviewFor.mockResolvedValue({ rule: AFFILIATE, activations: [], beforeGridTiers: [] });
-    mocks.affiliateOverviewFor.mockResolvedValue({ pharmacies, activeCount: 2, recurringCents: 2_268 });
+    mocks.affiliateOverviewFor.mockResolvedValue({ pharmacies, activeCount: 2, tierCount: 2, ratePercent: 10, recurringCents: 2_268 });
     const rows = [
-      row({ type: "AFFILIATE", periodMonth: "2026-10", amountCents: 1_260, prospect: { id: "p1", name: "Pharmacie du Port", activatedAt: null, contracts: [] } }),
+      row({ type: "AFFILIATE", periodMonth: "2026-10", amountCents: 1_260, ratePercent: 10, prospect: { id: "p1", name: "Pharmacie du Port", activatedAt: null, contracts: [] } }),
       row({ type: "AFFILIATE", periodMonth: "2026-10", amountCents: 1_008, prospect: { id: "p2", name: "Pharmacie des Halles", activatedAt: null, contracts: [] } }),
       row({ type: "AFFILIATE", periodMonth: "2026-09", amountCents: 1_260, status: "PAID", paidAt: new Date("2026-10-20T10:00:00Z"), prospect: { id: "p1", name: "Pharmacie du Port", activatedAt: null, contracts: [] } }),
     ];
@@ -237,7 +237,13 @@ describe("l'affilié (10 % chaque mois, à vie)", () => {
     const content = text(html);
 
     expect(mocks.affiliateOverviewFor).toHaveBeenCalledWith("rep_1");
-    expect(content).toContain("10 % de l'abonnement de chaque pharmacie, chaque mois, à vie");
+    expect(content).toContain("De 10 % à 20 % de l'abonnement de chaque pharmacie, chaque mois, à vie, selon le nombre de pharmacies apportées");
+    expect(content).toContain("10 % de 1 à 9 pharmacies, 12 % de 10 à 24, 15 % de 25 à 49, 20 % à partir de 50");
+    expect(content).toMatch(/Votre palier aujourd'hui : 10 % \(2 pharmacies abonnées, palier 1 à 9 pharmacies\) — 12 % à partir de 10 pharmacies/);
+    expect(content).toContain("taux 10 %");
+    // La prime du directeur n'est jamais montrée à un affilié.
+    expect(content).not.toMatch(/directeur/i);
+    expect(content).not.toMatch(/(?<![\d ])50 €/);
     // « Mes tarifs et ma rémunération » : les tarifs lus de la source des prix, la règle, la prime, le simulateur.
     const pay = text(section(html, "tarifs-remuneration"));
     expect(pay).toContain("Mes tarifs et ma rémunération");
@@ -245,8 +251,9 @@ describe("l'affilié (10 % chaque mois, à vie)", () => {
     expect(pay).toMatch(/Mise en service 150 € HT/);
     expect(pay).toMatch(/Prime d'arrivée 100 € HT/);
     expect(pay).toContain("Simulateur de revenus");
-    // 50 pharmacies par défaut : 50 × 12,60 € = 630 € par mois, et 50 × 100 € = 5 000 € de primes.
-    expect(pay).toMatch(/630 € par mois/);
+    // 50 pharmacies par défaut : palier à 20 %, 50 × 25,20 € = 1 260 € par mois, et 50 × 100 € = 5 000 € de primes.
+    expect(pay).toMatch(/20 % sur toutes vos pharmacies/);
+    expect(pay).toMatch(/1 260 € par mois/);
     expect(pay).toMatch(/\+ 5 000 € de primes d'arrivée/);
     expect(content).toMatch(/Revenus récurrents 22,68 € \/ mois 2 pharmacies abonnées × 10 %/);
     expect(content).toContain("Pharmacie Fermée");

@@ -1,7 +1,8 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/server/db/client";
-import { AFFILIATE_RATE_LABEL, AFFILIATE_SIGNUP_BONUS_CENTS, DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
+import { AFFILIATE_RECURRING_RATE, AFFILIATE_SIGNUP_BONUS_CENTS, affiliateRateFor, rateLabel } from "@/core/affiliation/terms";
+import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
 import { AFFILIATION_PROGRAM_START, ONE_OFF_COMMISSION_TYPES, SIGNUP_BONUS_KEY, affiliateCommissionForMonth, signupBonusDue, monthPeriodOf, monthlySubscriptionCents, previousMonthPeriod, subscribedAtMonthEnd, type MonthPeriod, type SubscriptionFacts } from "@/core/affiliation/monthly";
 import { formatCents } from "@/lib/format";
 import { recordProspectEvent, type SalesActor } from "./events";
@@ -11,8 +12,13 @@ import { notifySalesRep } from "./notifications";
  * Les commissions mensuelles d'affiliation (18 oct. 2026), sur les vraies données.
  *
  * Chaque mois écoulé, pour chaque pharmacie apportée par un affilié ACTIF (règle AFFILIATE) et abonnée à la fin de ce
- * mois, une commission de 10 % de son abonnement mensuel HT, au statut « Acquise » : elle suit ensuite le circuit
- * existant (Valider → à payer → Payée, ou facture de l'affilié).
+ * mois, une commission au taux du PALIER de l'affilié (10, 12, 15 ou 20 % de son abonnement mensuel HT, `terms.ts`), au
+ * statut « Acquise » : elle suit ensuite le circuit existant (Valider → à payer → Payée, ou facture de l'affilié).
+ *
+ * Le palier se lit sur le nombre de pharmacies ACTIVES apportées par l'affilié à la fin du mois commissionné : celles
+ * qui lui sont créditées, hors démonstration, abonnées à la fin du mois (y compris celles payées par l'ancienne règle,
+ * qui restent des pharmacies qu'il a apportées, sans commission mensuelle en plus). Le taux du palier vaut pour TOUTES
+ * ses pharmacies ce mois-là, et il est inscrit sur chaque ligne (`ratePercent`).
  *
  * « Apportée par l'affilié » : la pharmacie dont la première activation lui est créditée (`activationSalesRepId`), ou,
  * pas encore activée, celle dont il suit le dossier. Une réaffectation après l'activation ne déplace pas la commission.
@@ -81,7 +87,25 @@ export type MonthlyAffiliateRun = {
   alreadyThere: number;
   totalCreatedCents: number;
   skipped: { notSubscribed: number; oldRule: number; demo: number; otherRep: number };
+  /** Le taux appliqué à chaque affilié ce mois-là, en pourcentage entier (par identifiant d'affilié). */
+  ratePercentByRep: Record<string, number>;
 };
+
+/** Une pharmacie apportée compte-t-elle dans le palier de l'affilié : non démo, abonnée à la fin de la période ? */
+function countsForTier(prospect: Brought, period: Pick<MonthPeriod, "end">): boolean {
+  return Boolean(prospect.pharmacy && !prospect.pharmacy.isDemo && subscribedAtMonthEnd(prospect.pharmacy.organization.subscription, period));
+}
+
+/** Le nombre de pharmacies actives par affilié crédité, pour la période. */
+function activeCountByRep(prospects: Brought[], period: Pick<MonthPeriod, "end">): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const prospect of prospects) {
+    const salesRepId = creditedRep(prospect);
+    if (!salesRepId || !countsForTier(prospect, period)) continue;
+    counts.set(salesRepId, (counts.get(salesRepId) ?? 0) + 1);
+  }
+  return counts;
+}
 
 /**
  * Le passage mensuel : crée les commissions du mois écoulé (par rapport à `now`). Rejouable à volonté (chaque jour, la
@@ -91,13 +115,20 @@ export async function createMonthlyAffiliateCommissions(now: Date = new Date()):
   const period = previousMonthPeriod(now);
   const reps = await prisma.salesRep.findMany({ where: { commissionType: "AFFILIATE", isActive: true }, select: { id: true } });
   const repIds = new Set(reps.map((rep) => rep.id));
-  const run: MonthlyAffiliateRun = { month: period.key, affiliates: reps.length, pharmacies: 0, created: 0, alreadyThere: 0, totalCreatedCents: 0, skipped: { notSubscribed: 0, oldRule: 0, demo: 0, otherRep: 0 } };
-  const createdByRep = new Map<string, { count: number; cents: number }>();
+  const run: MonthlyAffiliateRun = { month: period.key, affiliates: reps.length, pharmacies: 0, created: 0, alreadyThere: 0, totalCreatedCents: 0, skipped: { notSubscribed: 0, oldRule: 0, demo: 0, otherRep: 0 }, ratePercentByRep: {} };
+  const createdByRep = new Map<string, { count: number; cents: number; rate: number }>();
   // Les pharmacies déjà commissionnées pour ce mois : le passage quotidien ne réécrit rien pour elles (l'index unique
   // reste le seul vrai verrou, pour deux passages simultanés).
   const done = new Set((await prisma.commission.findMany({ where: { periodMonth: period.key }, select: { prospectId: true } })).map((row) => row.prospectId));
 
-  for (const prospect of await broughtPharmacies([...repIds], prisma)) {
+  const prospects = await broughtPharmacies([...repIds], prisma);
+  // Le palier de chaque affilié, sur TOUTES ses pharmacies actives à la fin du mois (y compris celles déjà
+  // commissionnées par un passage précédent) : un passage rejoué retrouve le même taux.
+  const activeCounts = activeCountByRep(prospects, period);
+  const rateOf = (salesRepId: string) => affiliateRateFor(activeCounts.get(salesRepId) ?? 0);
+  for (const salesRepId of repIds) run.ratePercentByRep[salesRepId] = Math.round(rateOf(salesRepId) * 100);
+
+  for (const prospect of prospects) {
     const salesRepId = creditedRep(prospect);
     // Activé pour un autre (commercial à l'ancienne règle, affilié désactivé) : le suivi actuel ne compte pas.
     if (!salesRepId || !repIds.has(salesRepId)) { run.skipped.otherRep += 1; continue; }
@@ -106,25 +137,27 @@ export async function createMonthlyAffiliateCommissions(now: Date = new Date()):
     if (done.has(prospect.id)) { run.alreadyThere += 1; continue; }
     if (prospect.commissions.length > 0) { run.skipped.oldRule += 1; continue; }
     const subscription: SubscriptionFacts | null = prospect.pharmacy.organization.subscription;
-    const amountCents = affiliateCommissionForMonth(subscription, period);
+    const rate = rateOf(salesRepId);
+    const ratePercent = Math.round(rate * 100);
+    const amountCents = affiliateCommissionForMonth(subscription, period, rate);
     if (amountCents <= 0) { run.skipped.notSubscribed += 1; continue; }
 
     const created = await prisma.commission.createMany({
-      data: [{ prospectId: prospect.id, salesRepId, type: "AFFILIATE", periodMonth: period.key, amountCents, status: "EARNED", earnedAt: now, dueAt: dueAtFor(period), note: `Affiliation ${AFFILIATE_RATE_LABEL} — ${period.label}` }],
+      data: [{ prospectId: prospect.id, salesRepId, type: "AFFILIATE", periodMonth: period.key, amountCents, ratePercent, status: "EARNED", earnedAt: now, dueAt: dueAtFor(period), note: `Affiliation ${rateLabel(rate)} — ${period.label}` }],
       skipDuplicates: true,
     });
     if (created.count !== 1) { run.alreadyThere += 1; continue; }
     run.created += 1;
     run.totalCreatedCents += amountCents;
-    const total = createdByRep.get(salesRepId) ?? { count: 0, cents: 0 };
-    createdByRep.set(salesRepId, { count: total.count + 1, cents: total.cents + amountCents });
+    const total = createdByRep.get(salesRepId) ?? { count: 0, cents: 0, rate };
+    createdByRep.set(salesRepId, { count: total.count + 1, cents: total.cents + amountCents, rate });
     const monthly = monthlySubscriptionCents(subscription!);
     await recordProspectEvent({
       prospectId: prospect.id,
       type: "COMMISSION_CREATED",
-      summary: `Commission d'affiliation ${period.label} : ${formatCents(amountCents)} (${AFFILIATE_RATE_LABEL} de l'abonnement de ${formatCents(monthly)} HT).`,
+      summary: `Commission d'affiliation ${period.label} : ${formatCents(amountCents)} (${rateLabel(rate)} de l'abonnement de ${formatCents(monthly)} HT, palier de ${activeCounts.get(salesRepId) ?? 0} pharmacie${(activeCounts.get(salesRepId) ?? 0) > 1 ? "s" : ""} active${(activeCounts.get(salesRepId) ?? 0) > 1 ? "s" : ""}).`,
       actor: SYSTEM,
-      metadata: { periodMonth: period.key, amountCents, subscriptionCents: monthly, salesRepId },
+      metadata: { periodMonth: period.key, amountCents, ratePercent, activePharmacies: activeCounts.get(salesRepId) ?? 0, subscriptionCents: monthly, salesRepId },
     }).catch((error: unknown) => console.error("[affiliation] trace non écrite", error instanceof Error ? error.message : "erreur inconnue"));
   }
 
@@ -133,7 +166,7 @@ export async function createMonthlyAffiliateCommissions(now: Date = new Date()):
       salesRepId,
       type: "AFFILIATE_MONTH",
       title: `Commissions de ${period.label} : ${formatCents(total.cents)}`,
-      body: `${total.count} pharmacie${total.count > 1 ? "s" : ""} abonnée${total.count > 1 ? "s" : ""} : ${AFFILIATE_RATE_LABEL} de leur abonnement.`,
+      body: `${total.count} pharmacie${total.count > 1 ? "s" : ""} abonnée${total.count > 1 ? "s" : ""} : ${rateLabel(total.rate)} de leur abonnement.`,
       linkUrl: "/extranet/commissions",
       severity: "SUCCESS",
     }).catch((error: unknown) => console.error("[affiliation] notification non envoyée", error instanceof Error ? error.message : "erreur inconnue"));
@@ -144,24 +177,28 @@ export async function createMonthlyAffiliateCommissions(now: Date = new Date()):
 export type AffiliatePharmacy = { prospectId: string; name: string; active: boolean; subscriptionCents: number | null; monthlyCommissionCents: number; oldRule: boolean };
 
 /**
- * Ce que l'extranet d'un affilié montre de son affiliation : ses pharmacies apportées, celles abonnées aujourd'hui, et
- * ses revenus récurrents actuels (somme, sur les pharmacies abonnées, de 10 % de leur abonnement). Le périmètre est
- * l'identifiant de SA session, jamais un paramètre d'URL.
+ * Ce que l'extranet d'un affilié montre de son affiliation : ses pharmacies apportées, celles abonnées aujourd'hui, son
+ * palier actuel (sur ses pharmacies actives aujourd'hui, la même règle que le calcul mensuel) et ses revenus récurrents
+ * actuels (somme, sur les pharmacies abonnées, du taux du palier de leur abonnement). Le périmètre est l'identifiant de
+ * SA session, jamais un paramètre d'URL.
  */
-export async function affiliateOverviewFor(salesRepId: string, now: Date = new Date()): Promise<{ pharmacies: AffiliatePharmacy[]; activeCount: number; recurringCents: number }> {
+export async function affiliateOverviewFor(salesRepId: string, now: Date = new Date()): Promise<{ pharmacies: AffiliatePharmacy[]; activeCount: number; tierCount: number; ratePercent: number; recurringCents: number }> {
   const today = { end: now };
-  const pharmacies = (await broughtPharmacies([salesRepId], prisma))
-    .filter((prospect) => creditedRep(prospect) === salesRepId && prospect.pharmacy && !prospect.pharmacy.isDemo)
+  const brought = (await broughtPharmacies([salesRepId], prisma)).filter((prospect) => creditedRep(prospect) === salesRepId);
+  const tierCount = activeCountByRep(brought, today).get(salesRepId) ?? 0;
+  const rate = tierCount > 0 ? affiliateRateFor(tierCount) : AFFILIATE_RECURRING_RATE;
+  const pharmacies = brought
+    .filter((prospect) => prospect.pharmacy && !prospect.pharmacy.isDemo)
     .map((prospect): AffiliatePharmacy => {
       const subscription = prospect.pharmacy!.organization.subscription;
       const oldRule = prospect.commissions.length > 0;
       const active = subscribedAtMonthEnd(subscription, today);
-      const monthlyCommissionCents = active && !oldRule ? affiliateCommissionForMonth(subscription, today) : 0;
+      const monthlyCommissionCents = active && !oldRule ? affiliateCommissionForMonth(subscription, today, rate) : 0;
       return { prospectId: prospect.id, name: prospect.name, active, subscriptionCents: subscription ? monthlySubscriptionCents(subscription) : null, monthlyCommissionCents, oldRule };
     })
     .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, "fr"));
   const counted = pharmacies.filter((pharmacy) => pharmacy.monthlyCommissionCents > 0);
-  return { pharmacies, activeCount: counted.length, recurringCents: counted.reduce((total, pharmacy) => total + pharmacy.monthlyCommissionCents, 0) };
+  return { pharmacies, activeCount: counted.length, tierCount, ratePercent: Math.round(rate * 100), recurringCents: counted.reduce((total, pharmacy) => total + pharmacy.monthlyCommissionCents, 0) };
 }
 
 // ---------------------------------------------------------------- Primes uniques

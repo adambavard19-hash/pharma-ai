@@ -3175,8 +3175,8 @@ enum SalesCommissionType {
   /// Bonus de palier (10, 25, 50, 100 pharmacies activées), versé une seule fois :
   /// type d'une LIGNE de commission, jamais la règle d'un commercial.
   BONUS
-  /// Affiliation (18 oct. 2026) : 10 % de l'abonnement mensuel HT de chaque pharmacie apportée, chaque mois, aussi
-  /// longtemps qu'elle reste abonnée (src/core/affiliation/terms.ts). Règle d'un affilié ET type de ses lignes mensuelles.
+  /// Affiliation (18 oct. 2026) : de 10 % à 20 % (paliers) de l'abonnement mensuel HT de chaque pharmacie apportée,
+  /// chaque mois, aussi longtemps qu'elle reste abonnée (src/core/affiliation/terms.ts). Règle d'un affilié ET type de ses lignes mensuelles.
   AFFILIATE
   /// Prime unique de l'affilié (100 € HT) pour une pharmacie apportée, due une fois sa mise en service réellement réglée.
   /// Type d'une LIGNE, jamais une règle. Une seule par pharmacie : `periodMonth` vaut alors « PRIME » (index unique).
@@ -3545,6 +3545,11 @@ model Commission {
   /// Type AFFILIATE : le mois de l'abonnement commissionné (« 2026-11 », heure de Paris). Type AFFILIATE_SIGNUP : « PRIME ».
   /// Une seule commission par pharmacie (dossier) et par mois, une seule prime : l'index unique l'impose au niveau de la base.
   periodMonth String?
+
+  /// Type AFFILIATE : le taux du palier appliqué ce mois-là, en pourcentage entier (10, 12, 15 ou 20), selon le nombre
+  /// de pharmacies actives apportées par l'affilié à la fin du mois (src/core/affiliation/terms.ts). Vide ailleurs, et
+  /// sur les lignes créées avant les paliers (18 oct. 2026 : 10 %).
+  ratePercent Int?
 
   prospect Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
   salesRep SalesRep      @relation(fields: [salesRepId], references: [id])

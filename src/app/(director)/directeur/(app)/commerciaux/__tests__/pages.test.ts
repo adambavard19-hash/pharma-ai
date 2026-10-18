@@ -208,8 +208,8 @@ describe("l'ajout d'un commercial", () => {
     expect(content).toContain("Prénom");
     expect(content).toContain("Adresse e-mail");
     // L'affiliation (18 oct. 2026) est la règle par défaut des nouveaux affiliés : pas de montant à saisir.
-    expect(html).toMatch(/<option value="AFFILIATE" selected="">Affiliation : 10 % chaque mois \(recommandée\)<\/option>/);
-    expect(content).toContain("10 % de l'abonnement mensuel HT de chaque pharmacie apportée, chaque mois");
+    expect(html).toMatch(/<option value="AFFILIATE" selected="">Affiliation : 10 à 20 % chaque mois \(recommandée\)<\/option>/);
+    expect(content).toContain("De 10 % à 20 % de l'abonnement mensuel HT de chaque pharmacie apportée (10 % de 1 à 9 pharmacies, 12 % de 10 à 24, 15 % de 25 à 49, 20 % à partir de 50, sur toutes), chaque mois");
     // L'ancienne grille reste choisissable (commerciaux existants).
     expect(content).toContain("Ancienne grille progressive");
     expect(html).not.toContain('id="rep-value"');

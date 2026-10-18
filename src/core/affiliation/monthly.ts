@@ -1,11 +1,12 @@
 import { monthBoundsFor, zonedDateParts } from "@/core/performance/periods";
-import { AFFILIATE_RATE_LABEL, monthlyAffiliateCommissionCents } from "./terms";
+import { AFFILIATE_MAX_RATE_LABEL, AFFILIATE_RATE_LABEL, AFFILIATE_RECURRING_RATE, monthlyAffiliateCommissionCents } from "./terms";
 
 /**
  * La commission mensuelle d'affiliation, en règles pures et testées.
  *
  * Chaque mois civil (heure de Paris), pour chaque pharmacie apportée par un affilié et encore abonnée à la fin de ce
- * mois, l'affilié touche 10 % de son abonnement mensuel HT (`terms.ts`). Le mois commissionné est le mois ÉCOULÉ : le
+ * mois, l'affilié touche le taux de son palier (10 à 20 %, selon le nombre de ses pharmacies actives à la fin du mois,
+ * `terms.ts`) de son abonnement mensuel HT. Le mois commissionné est le mois ÉCOULÉ : le
  * passage du 1er novembre crée les commissions d'octobre, et un passage manqué est rattrapé les jours suivants, jamais
  * au-delà du mois écoulé (aucune rétroactivité).
  */
@@ -13,7 +14,7 @@ import { AFFILIATE_RATE_LABEL, monthlyAffiliateCommissionCents } from "./terms";
 export const AFFILIATION_TIME_ZONE = "Europe/Paris";
 
 /** La phrase de la règle, la même partout (extranet, console, espace du directeur). */
-export const AFFILIATE_RULE_SENTENCE = `${AFFILIATE_RATE_LABEL} de l'abonnement de chaque pharmacie, chaque mois, à vie`;
+export const AFFILIATE_RULE_SENTENCE = `de ${AFFILIATE_RATE_LABEL} à ${AFFILIATE_MAX_RATE_LABEL} de l'abonnement de chaque pharmacie, chaque mois, à vie, selon le nombre de pharmacies apportées`;
 
 export type MonthPeriod = { key: string; label: string; start: Date; end: Date };
 
@@ -79,10 +80,13 @@ export function monthlySubscriptionCents(subscription: Pick<SubscriptionFacts, "
   return Math.max(0, price - Math.max(0, subscription.referralDiscountCents ?? 0));
 }
 
-/** La commission du mois pour une pharmacie : 10 % de son abonnement mensuel HT, ou rien si elle n'était pas abonnée. */
-export function affiliateCommissionForMonth(subscription: SubscriptionFacts | null, period: Pick<MonthPeriod, "end">): number {
+/**
+ * La commission du mois pour une pharmacie : le taux du palier de l'affilié (`affiliateRateFor`, 10 % par défaut) de son
+ * abonnement mensuel HT, ou rien si elle n'était pas abonnée.
+ */
+export function affiliateCommissionForMonth(subscription: SubscriptionFacts | null, period: Pick<MonthPeriod, "end">, rate: number = AFFILIATE_RECURRING_RATE): number {
   if (!subscription || !subscribedAtMonthEnd(subscription, period)) return 0;
-  return monthlyAffiliateCommissionCents(monthlySubscriptionCents(subscription));
+  return monthlyAffiliateCommissionCents(monthlySubscriptionCents(subscription), rate);
 }
 
 /** Les règles de l'ancienne rémunération (une somme par pharmacie) : une pharmacie déjà payée ainsi n'ouvre pas, en plus, la commission mensuelle. */

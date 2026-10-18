@@ -4,7 +4,8 @@ import { Coins } from "lucide-react";
 import { requireDirectorSession } from "@/server/auth/director-session";
 import { listDirectorCommissions } from "@/server/services/sales/director-money";
 import { listDirectorBonuses } from "@/server/services/sales/director-bonuses";
-import { AFFILIATE_RATE_LABEL, AFFILIATE_SIGNUP_BONUS_CENTS, DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
+import { AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS_SENTENCE } from "@/core/affiliation/terms";
+import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
 import { COMMISSION_STATUS_LABELS, type CommissionStatusCode } from "@/core/sales/pipeline";
 import { COMMISSION_STATUSES, isCommissionStatus, monthLabel, parseMonthParam, recentMonths } from "@/core/sales/director/money";
 import { FilterChips, hrefWith } from "@/components/admin/filters";
@@ -287,7 +288,7 @@ export default async function DirectorCommissionsPage({ searchParams }: { search
       )}
 
       <p className="text-[12.5px] text-text-tertiary">
-        Affiliés : {AFFILIATE_RATE_LABEL} de l&apos;abonnement de chaque pharmacie apportée, chaque mois, à vie (une ligne par pharmacie et par mois), plus une prime d&apos;arrivée de {formatCents(AFFILIATE_SIGNUP_BONUS_CENTS)} une fois la mise en service réglée.
+        Affiliés : un pourcentage de l&apos;abonnement de chaque pharmacie apportée, chaque mois, à vie, selon le nombre de pharmacies abonnées de l&apos;affilié à la fin du mois ({AFFILIATE_TIERS_SENTENCE} ; une ligne par pharmacie et par mois), plus une prime d&apos;arrivée de {formatCents(AFFILIATE_SIGNUP_BONUS_CENTS)} une fois la mise en service réglée.
       </p>
 
       <section aria-labelledby="mes-primes" className="space-y-2">

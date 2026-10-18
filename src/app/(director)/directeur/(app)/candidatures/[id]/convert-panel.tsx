@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/field";
  * « Créer l'espace de l'affilié » : le secours, quand la création automatique à
  * l'acceptation n'a pas pu se faire (ou pour une candidature acceptée avant le
  * 18 oct. 2026). Crée le compte de l'extranet avec les données de la
- * candidature et l'affiliation (10 % chaque mois). L'invitation par e-mail est
+ * candidature et l'affiliation (10 à 20 % chaque mois, selon le palier). L'invitation par e-mail est
  * facultative.
  */
 export function ConvertPanel({ id, name, email, commissionLabel }: { id: string; name: string; email: string; commissionLabel: string }) {

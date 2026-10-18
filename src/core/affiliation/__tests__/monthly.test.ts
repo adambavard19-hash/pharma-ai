@@ -94,7 +94,12 @@ describe("le montant", () => {
   });
 
   it("la phrase de la règle", () => {
-    expect(AFFILIATE_RULE_SENTENCE.replace(/\s/g, " ")).toBe("10 % de l'abonnement de chaque pharmacie, chaque mois, à vie");
+    expect(AFFILIATE_RULE_SENTENCE.replace(/\s/g, " ")).toBe("de 10 % à 20 % de l'abonnement de chaque pharmacie, chaque mois, à vie, selon le nombre de pharmacies apportées");
+  });
+
+  it("le taux du palier, quand il est donné : 12 % de 126 € = 15,12 €, 20 % = 25,20 €", () => {
+    expect(affiliateCommissionForMonth(sub(), october, 0.12)).toBe(1_512);
+    expect(affiliateCommissionForMonth(sub(), october, 0.2)).toBe(2_520);
   });
 });
 
@@ -124,18 +129,19 @@ describe("la mise en service réellement réglée (primes uniques)", () => {
 });
 
 describe("les simulateurs avec primes", () => {
-  it("affilié : N × 100 € de primes d'arrivée, bornées au curseur", async () => {
+  it("affilié : N × 100 € de primes d'arrivée (en plus du mensuel), bornées au curseur", async () => {
     const { estimateAffiliateSignupBonuses } = await import("../simulator");
     expect(estimateAffiliateSignupBonuses(1)).toBe(10_000);
     expect(estimateAffiliateSignupBonuses(50)).toBe(500_000);
     expect(estimateAffiliateSignupBonuses(9999)).toBe(500 * 10_000);
   });
 
-  it("directeur : 1 → 50 €, 2 → 100 €… jusqu'à 500 ; l'équipe touche N × 12,60 € par mois", async () => {
-    const { estimateDirectorBonuses } = await import("../simulator");
-    expect(estimateDirectorBonuses(1, 12_600)).toEqual({ pharmacies: 1, bonusCents: 5_000, teamPerMonthCents: 1_260 });
+  it("directeur : 1 → 50 €, 2 → 100 €… jusqu'à 500 ; l'équipe touche N × abonnement × taux du palier", async () => {
+    const { estimateDirectorBonuses } = await import("../director-simulator");
+    expect(estimateDirectorBonuses(1, 12_600)).toEqual({ pharmacies: 1, bonusCents: 5_000, teamPerMonthCents: 1_260, teamRatePercent: 10 });
     expect(estimateDirectorBonuses(2, 12_600).bonusCents).toBe(10_000);
     expect(estimateDirectorBonuses(0, 12_600).pharmacies).toBe(1);
-    expect(estimateDirectorBonuses(800, 12_600)).toEqual({ pharmacies: 500, bonusCents: 2_500_000, teamPerMonthCents: 630_000 });
+    expect(estimateDirectorBonuses(10, 12_600)).toMatchObject({ teamPerMonthCents: 10 * 1_512, teamRatePercent: 12 });
+    expect(estimateDirectorBonuses(800, 12_600)).toEqual({ pharmacies: 500, bonusCents: 2_500_000, teamPerMonthCents: 500 * 2_520, teamRatePercent: 20 });
   });
 });

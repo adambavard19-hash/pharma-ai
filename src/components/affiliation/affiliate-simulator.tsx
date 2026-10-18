@@ -2,17 +2,20 @@
 
 import { useState } from "react";
 import { estimateAffiliateRevenue, estimateAffiliateSignupBonuses, SIMULATOR_DEFAULT_PHARMACIES, SIMULATOR_MAX_PHARMACIES, SIMULATOR_MIN_PHARMACIES, clampPharmacies } from "@/core/affiliation/simulator";
-import { AFFILIATE_RATE_LABEL, AFFILIATE_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
+import { AFFILIATE_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
 import { formatPriceEuros } from "@/core/pricing/official-offer";
 import { HAIRLINE, settle, useCountTo } from "./use-count-to";
+import { TierScale } from "./tier-scale";
 import { cn } from "@/lib/utils";
 
 /**
- * Le simulateur de revenus de l'affiliation : « combien de pharmacies apportez-vous ? » → vos revenus récurrents estimés,
- * par mois et par an. Le prix de l'abonnement vient du serveur (l'offre publiée dans la console, sinon l'offre officielle) et
- * le taux de `core/affiliation/terms` : rien n'est écrit ici. C'est une estimation avant impôts et charges, pas un revenu net.
+ * Le simulateur de revenus de l'affiliation : « combien de pharmacies apportez-vous ? » → le palier atteint (10, 12, 15 ou
+ * 20 %, appliqué à toutes), vos revenus récurrents estimés par mois et par an (N × abonnement × taux du palier), et les
+ * primes d'arrivée (N × 100 €, une fois chaque mise en service réglée). Le prix de l'abonnement vient du serveur (l'offre
+ * publiée dans la console, sinon l'offre officielle), les paliers et la prime de `core/affiliation/terms` : rien n'est
+ * écrit ici. C'est une estimation avant impôts et charges, pas un revenu net.
  */
-export function AffiliateSimulator({ monthlyPriceCents, withSignupBonus = false, inputId = "pharmacies-apportees" }: { monthlyPriceCents: number; /** Ajoute les primes d'arrivée (N × 100 €) : l'extranet de l'affilié. */ withSignupBonus?: boolean; inputId?: string }) {
+export function AffiliateSimulator({ monthlyPriceCents, inputId = "pharmacies-apportees" }: { monthlyPriceCents: number; inputId?: string }) {
   const [pharmacies, setPharmacies] = useState(SIMULATOR_DEFAULT_PHARMACIES);
   const estimate = estimateAffiliateRevenue(pharmacies, monthlyPriceCents);
   const bonusesCents = estimateAffiliateSignupBonuses(pharmacies);
@@ -53,6 +56,14 @@ export function AffiliateSimulator({ monthlyPriceCents, withSignupBonus = false,
           <span>{SIMULATOR_MAX_PHARMACIES}</span>
         </div>
 
+        <div className="mt-5 flex items-baseline justify-between gap-3">
+          <p className="text-[14px] font-medium text-text-secondary">Votre palier</p>
+          <p className="text-[14px] font-semibold text-brand-700 tabular-nums dark:text-brand-300" data-palier-atteint="">
+            {estimate.ratePercent} % sur toutes vos pharmacies
+          </p>
+        </div>
+        <TierScale tierIndex={estimate.tierIndex} count={pharmacies} className="mt-2" />
+
         <div className="mt-6 rounded-2xl bg-brand-50 px-5 py-6 sm:px-6 dark:bg-brand-950/40">
           <p className="text-[14px] font-medium text-brand-800 dark:text-brand-200">Vos revenus récurrents estimés</p>
           <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5">
@@ -62,22 +73,20 @@ export function AffiliateSimulator({ monthlyPriceCents, withSignupBonus = false,
             <span className="text-[17px] font-medium text-brand-800 dark:text-brand-200">par mois</span>
           </p>
           <p className="mt-2 text-[15px] font-medium text-brand-900/80 tabular-nums dark:text-brand-100/80">soit {formatPriceEuros(settle(perYear, estimate.perYearCents))} par an</p>
-          {withSignupBonus && (
-            <p className="mt-3 border-t border-brand-200/70 pt-3 text-[15px] font-semibold text-brand-900 tabular-nums dark:border-brand-800 dark:text-brand-100" data-montant-primes="">
-              + {formatPriceEuros(settle(bonuses, bonusesCents))} de primes d&apos;arrivée
-              <span className="block text-[12.5px] font-normal text-brand-900/70 dark:text-brand-100/70">
-                {pharmacies} × {formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)}, une fois chaque mise en service réglée
-              </span>
-            </p>
-          )}
+          <p className="mt-3 border-t border-brand-200/70 pt-3 text-[15px] font-semibold text-brand-900 tabular-nums dark:border-brand-800 dark:text-brand-100" data-montant-primes="">
+            + {formatPriceEuros(settle(bonuses, bonusesCents))} de primes d&apos;arrivée
+            <span className="block text-[12.5px] font-normal text-brand-900/70 dark:text-brand-100/70">
+              {pharmacies} × {formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)}, une fois chaque mise en service réglée
+            </span>
+          </p>
           {/* Le montant final, annoncé une fois, sans les valeurs intermédiaires de l'animation. */}
           <p className="sr-only" aria-live="polite">
-            {pharmacies} {plural(pharmacies)} : {formatPriceEuros(estimate.perMonthCents)} par mois, soit {formatPriceEuros(estimate.perYearCents)} par an{withSignupBonus ? `, plus ${formatPriceEuros(bonusesCents)} de primes d'arrivée` : ""}.
+            {pharmacies} {plural(pharmacies)}, palier à {estimate.ratePercent} % : {formatPriceEuros(estimate.perMonthCents)} par mois, soit {formatPriceEuros(estimate.perYearCents)} par an, plus {formatPriceEuros(bonusesCents)} de primes d&apos;arrivée.
           </p>
         </div>
 
         <p id={`${inputId}-formule`} className="mt-4 text-[13px] leading-5 text-text-secondary tabular-nums">
-          {pharmacies} {plural(pharmacies)} × {formatPriceEuros(monthlyPriceCents)} HT d&apos;abonnement mensuel × {AFFILIATE_RATE_LABEL}
+          {pharmacies} {plural(pharmacies)} × {formatPriceEuros(monthlyPriceCents)} HT d&apos;abonnement mensuel × {estimate.ratePercent} % (taux du palier)
         </p>
         <p className="mt-2 text-[12.5px] leading-5 text-text-tertiary">
           Estimation avant impôts et charges, à titre d&apos;illustration : vos revenus dépendent des pharmacies réellement abonnées.

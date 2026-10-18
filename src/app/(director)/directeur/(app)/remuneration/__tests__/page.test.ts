@@ -29,12 +29,13 @@ describe("la rémunération du directeur", () => {
     expect(mocks.listDirectorBonuses).toHaveBeenCalledWith({ salesDirectorId: "dir_1" });
     expect(content).toMatch(/Abonnement 126 € HT par mois/);
     expect(content).toMatch(/Mise en service 150 € HT/);
-    expect(content).toMatch(/Vos affiliés 10 % · 12,60 €/);
+    expect(content).toMatch(/Vos affiliés, chaque mois 10 % à 20 % de l'abonnement, selon leurs pharmacies abonnées \(10 % de 1 à 9 pharmacies, 12 % de 10 à 24, 15 % de 25 à 49, 20 % à partir de 50\), \+ 100 € de prime/);
     expect(content).toMatch(/Votre prime 50 € HT par pharmacie signée par l'équipe/);
     expect(content).toContain("Pharmacies signées par votre équipe");
-    // 10 pharmacies au départ : 500 € de primes, et l'équipe touche 126 € par mois.
+    // 10 pharmacies au départ : 500 € de primes, et l'équipe touche 10 × 126 € × 12 % (palier 10–24) = 151,20 € par mois.
     expect(content).toMatch(/Vos primes 500 €/);
-    expect(content).toMatch(/Votre équipe touche, elle, 126 € par mois/);
+    expect(content).toMatch(/Ce que touche l'équipe chaque mois : 151,20 € \(10 × 126 € HT × 12 %, taux du palier\)/);
+    expect(content).toMatch(/12 % 10–24/);
     expect(content).toMatch(/Primes acquises 100 €/);
   });
 

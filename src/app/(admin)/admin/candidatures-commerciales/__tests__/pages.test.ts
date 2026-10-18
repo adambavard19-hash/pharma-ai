@@ -231,13 +231,13 @@ describe("la fiche", () => {
     expect(html).not.toContain("/api/admin/candidatures-commerciales/app_1/cv");
   });
 
-  // Depuis l'affiliation (18 oct. 2026), l'affilié créé depuis une candidature touche 10 % chaque mois : plus de montant fixe.
+  // Depuis l'affiliation (18 oct. 2026), l'affilié créé depuis une candidature touche 10 à 20 % chaque mois (paliers) : plus de montant fixe.
   it("acceptée sans espace (création automatique manquée) : « Créer l'espace de l'affilié » avec l'affiliation", async () => {
     mocks.getSalesApplication.mockResolvedValue(detailOf({ status: "ACCEPTED" }));
     mocks.getStandardCommissionCents.mockResolvedValue(30000);
     const content = text(await renderDetail());
     expect(content).toContain("Créer l'espace de l'affilié");
-    expect(content).toMatch(/Sa rémunération : 10\s%\sde l'abonnement de chaque pharmacie, chaque mois, à vie/);
+    expect(content).toMatch(/Sa rémunération : de 10\s%\sà 20\s%\sde l'abonnement de chaque pharmacie, chaque mois, à vie, selon le nombre de pharmacies apportées/);
     expect(content).not.toContain("commission est fixe");
     expect(mocks.getStandardCommissionCents).not.toHaveBeenCalled();
     expect(content).toContain("Envoyer l'invitation par e-mail");

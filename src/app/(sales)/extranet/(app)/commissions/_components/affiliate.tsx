@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Building2, CalendarDays, Repeat, Wallet } from "lucide-react";
 import { AFFILIATE_RULE_SENTENCE, monthLabelOf } from "@/core/affiliation/monthly";
-import { AFFILIATE_RATE_LABEL, AFFILIATE_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
+import { AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS, AFFILIATE_TIERS_SENTENCE, tierRangeLabel } from "@/core/affiliation/terms";
 import { formatPriceEuros } from "@/core/pricing/official-offer";
 import type { AffiliatePharmacy } from "@/server/services/sales/affiliate-commissions";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { CommissionStatusBadge } from "@/components/sales/status-badge";
 import { formatDate } from "@/lib/format";
 
 /** Une commission mensuelle telle que la page la lit. */
-export type AffiliateRow = { id: string; periodMonth: string | null; amountCents: number; status: string; paidAt: Date | null; dueAt: Date | null; prospect: { id: string; name: string } };
+export type AffiliateRow = { id: string; periodMonth: string | null; amountCents: number; ratePercent?: number | null; status: string; paidAt: Date | null; dueAt: Date | null; prospect: { id: string; name: string } };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count > 1 ? many : one}`;
 
@@ -28,11 +28,14 @@ export function groupByMonth(rows: AffiliateRow[]): { month: string; totalCents:
 }
 
 /**
- * L'affiliation de l'affilié de la session : la règle (10 % chaque mois, à vie), ses revenus récurrents actuels, ses
- * pharmacies apportées, puis ses commissions mois par mois. Tout vient de ses vraies données.
+ * L'affiliation de l'affilié de la session : la règle (10 à 20 % selon le palier, chaque mois, à vie), son palier
+ * actuel, ses revenus récurrents actuels, ses pharmacies apportées, puis ses commissions mois par mois (avec le taux
+ * appliqué). Tout vient de ses vraies données.
  */
-export function AffiliateEarnings({ pharmacies, recurringCents, activeCount, rows, signupRows = [], thisMonthCents, earnedCents, paidCents }: { pharmacies: AffiliatePharmacy[]; recurringCents: number; activeCount: number; rows: AffiliateRow[]; signupRows?: AffiliateRow[]; thisMonthCents: number; earnedCents: number; paidCents: number }) {
+export function AffiliateEarnings({ pharmacies, recurringCents, activeCount, tierCount = activeCount, ratePercent = AFFILIATE_TIERS[0].ratePercent, rows, signupRows = [], thisMonthCents, earnedCents, paidCents }: { pharmacies: AffiliatePharmacy[]; recurringCents: number; activeCount: number; /** Les pharmacies actives qui comptent pour le palier. */ tierCount?: number; /** Le taux du palier actuel (10, 12, 15, 20). */ ratePercent?: number; rows: AffiliateRow[]; signupRows?: AffiliateRow[]; thisMonthCents: number; earnedCents: number; paidCents: number }) {
   const months = groupByMonth(rows);
+  const tierIndex = Math.max(0, AFFILIATE_TIERS.findIndex((tier) => tier.ratePercent === ratePercent));
+  const next = AFFILIATE_TIERS[tierIndex + 1];
   return (
     <>
       <Card>
@@ -40,13 +43,17 @@ export function AffiliateEarnings({ pharmacies, recurringCents, activeCount, row
           <p className="text-[12px] font-semibold tracking-wide text-brand-700 uppercase">Programme d&apos;affiliation</p>
           <h2 className="text-[18px] leading-7 font-bold text-text-primary">{AFFILIATE_RULE_SENTENCE.charAt(0).toUpperCase() + AFFILIATE_RULE_SENTENCE.slice(1)}</h2>
           <p className="text-[13.5px] text-text-secondary">
-            Pour chaque pharmacie que vous apportez, vous touchez {AFFILIATE_RATE_LABEL} de son abonnement mensuel HT, chaque mois, aussi longtemps qu&apos;elle reste abonnée, plus une prime d&apos;arrivée de {formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} HT une fois sa mise en service réglée. Les commissions d&apos;un mois sont calculées au début du mois suivant.
+            Pour chaque pharmacie que vous apportez, vous touchez un pourcentage de son abonnement mensuel HT, chaque mois, aussi longtemps qu&apos;elle reste abonnée. Ce pourcentage augmente avec le nombre de vos pharmacies abonnées à la fin du mois, et s&apos;applique à toutes : {AFFILIATE_TIERS_SENTENCE}. En plus, une prime d&apos;arrivée de {formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} HT par pharmacie, une fois sa mise en service réglée. Les commissions d&apos;un mois sont calculées au début du mois suivant.
+          </p>
+          <p className="pt-1 text-[13.5px] font-semibold text-brand-700 dark:text-brand-300" data-palier-actuel="">
+            Votre palier aujourd&apos;hui : {ratePercent} % ({tierCount > 0 ? plural(tierCount, "pharmacie abonnée", "pharmacies abonnées") : "aucune pharmacie abonnée"}, palier {tierRangeLabel(AFFILIATE_TIERS[tierIndex])})
+            {next ? ` — ${next.ratePercent} % à partir de ${next.min} pharmacies.` : " — le palier maximal."}
           </p>
         </CardContent>
       </Card>
 
       <section aria-label="Indicateurs" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Revenus récurrents" value={`${formatPriceEuros(recurringCents)} / mois`} sublabel={`${plural(activeCount, "pharmacie abonnée", "pharmacies abonnées")} × ${AFFILIATE_RATE_LABEL}`} icon={<Repeat className="size-4" aria-hidden="true" />} emphasis="brand" />
+        <StatCard label="Revenus récurrents" value={`${formatPriceEuros(recurringCents)} / mois`} sublabel={`${plural(activeCount, "pharmacie abonnée", "pharmacies abonnées")} × ${ratePercent} %`} icon={<Repeat className="size-4" aria-hidden="true" />} emphasis="brand" />
         <StatCard label="Ce mois-ci" value={formatPriceEuros(thisMonthCents)} sublabel="commissions acquises ce mois" icon={<CalendarDays className="size-4" aria-hidden="true" />} />
         <StatCard label="À recevoir" value={formatPriceEuros(earnedCents)} sublabel="acquises, pas encore payées" icon={<Wallet className="size-4" aria-hidden="true" />} />
         <StatCard label="Déjà payées" value={formatPriceEuros(paidCents)} sublabel="depuis le début" icon={<Building2 className="size-4" aria-hidden="true" />} />
@@ -123,7 +130,7 @@ export function AffiliateEarnings({ pharmacies, recurringCents, activeCount, row
                     <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-[13.5px]">
                       <div className="min-w-0">
                         <Link href={`/extranet/dossiers/${row.prospect.id}`} className="font-medium break-words text-text-primary hover:underline">{row.prospect.name}</Link>
-                        <p className="text-[12px] text-text-tertiary">{row.paidAt ? `payée le ${formatDate(row.paidAt)}` : row.dueAt ? `prévue le ${formatDate(row.dueAt)}` : ""}</p>
+                        <p className="text-[12px] text-text-tertiary">{[row.ratePercent ? `taux ${row.ratePercent} %` : "", row.paidAt ? `payée le ${formatDate(row.paidAt)}` : row.dueAt ? `prévue le ${formatDate(row.dueAt)}` : ""].filter(Boolean).join(" · ")}</p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="font-semibold tabular text-text-primary">{formatPriceEuros(row.amountCents)}</span>

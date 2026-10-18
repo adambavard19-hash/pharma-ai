@@ -20,7 +20,7 @@ type Created = { salesRepId: string; name: string; invitation: { status: string;
  */
 export function RepForm({ defaultCommissionCents }: { defaultCommissionCents: number }) {
   const [values, setValues] = useState({ firstName: "", lastName: "", email: "", phone: "", zone: "" });
-  // L'affiliation (10 % chaque mois) est la règle par défaut ; le montant standard reste proposé si l'on choisit un montant fixe.
+  // L'affiliation (10 à 20 % chaque mois, selon le palier) est la règle par défaut ; le montant standard reste proposé si l'on choisit un montant fixe.
   const [commissionType, setCommissionType] = useState<CommissionTypeKey>("AFFILIATE");
   const [commissionValue, setCommissionValue] = useState(commissionInputFromStored(defaultCommissionCents));
   const [invite, setInvite] = useState(true);

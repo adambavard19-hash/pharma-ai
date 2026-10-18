@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireDirectorSession } from "@/server/auth/director-session";
 import { loadPublicPricing } from "@/server/services/public-pricing";
 import { listDirectorBonuses } from "@/server/services/sales/director-bonuses";
-import { PricingAndPay } from "@/components/affiliation/pricing-and-pay";
+import { DirectorPricingAndPay } from "@/components/affiliation/director-pricing-and-pay";
 import { PageHeader } from "@/components/ui/page";
 import { StatCard } from "@/components/ui/stat-card";
 import { formatPriceEuros } from "@/core/pricing/official-offer";
@@ -24,7 +24,7 @@ export default async function DirectorPayPage() {
         <StatCard label="À payer" value={formatPriceEuros(bonuses.payableCents)} sublabel="validées" />
         <StatCard label="Payées" value={formatPriceEuros(bonuses.paidCents)} sublabel="depuis le début" emphasis="brand" />
       </section>
-      <PricingAndPay audience="director" pricing={pricing} />
+      <DirectorPricingAndPay pricing={pricing} />
     </>
   );
 }

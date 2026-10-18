@@ -341,7 +341,7 @@ function isUniqueViolation(error: unknown): boolean {
 /**
  * Crée l'affilié (compte de l'extranet commercial) d'une candidature ACCEPTÉE :
  * ses coordonnées et sa zone viennent de la candidature, sa rémunération est
- * l'AFFILIATION (18 oct. 2026) : 10 % de l'abonnement de chaque pharmacie
+ * l'AFFILIATION (18 oct. 2026) : 10 à 20 % (paliers) de l'abonnement de chaque pharmacie
  * apportée, chaque mois, à vie (`core/affiliation/terms.ts`). Le compte et l'invitation facultative passent par les fonctions
  * existantes (`createSalesRep`, `sendSalesInvitation`) : même mot de passe
  * aléatoire inconnu, même lien d'invitation.

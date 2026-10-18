@@ -16,7 +16,7 @@ import { AFFILIATE_RULE_SENTENCE } from "@/core/affiliation/monthly";
  *             relève de la comptabilité.
  * BONUS : le type d'une ligne de bonus de palier, jamais la règle d'un
  *         commercial ; aucun contrat ne le calcule (0).
- * AFFILIATE : l'affiliation (18 oct. 2026) — 10 % de l'abonnement mensuel de
+ * AFFILIATE : l'affiliation (18 oct. 2026) — 10 à 20 % (paliers) de l'abonnement mensuel de
  *         chaque pharmacie apportée, chaque mois, à vie. Rien n'est dû au
  *         contrat (0) : les commissions naissent chaque mois
  *         (`server/services/sales/affiliate-commissions.ts`).

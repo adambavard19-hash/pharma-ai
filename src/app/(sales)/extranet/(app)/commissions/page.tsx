@@ -38,7 +38,7 @@ export default async function SalesCommissionsPage() {
   const session = await requireSalesSession();
   const [data, invoices, overview] = await Promise.all([listCommissionsFor(session.rep.id), listInvoicesFor(session.rep.id), commissionOverviewFor(session.rep.id)]);
   const progressive = overview.rule.type === "PROGRESSIVE";
-  // L'affilié (18 oct. 2026) : 10 % de l'abonnement de chaque pharmacie, chaque mois, à vie. Ses anciennes commissions
+  // L'affilié (18 oct. 2026) : 10 à 20 % (paliers) de l'abonnement de chaque pharmacie, chaque mois, à vie. Ses anciennes commissions
   // (avant l'affiliation), s'il en a, restent listées plus bas, intactes.
   const affiliate = overview.rule.type === "AFFILIATE";
   const [affiliation, pricing] = affiliate ? await Promise.all([affiliateOverviewFor(session.rep.id), loadPublicPricing()]) : [null, null];
@@ -76,8 +76,8 @@ export default async function SalesCommissionsPage() {
             <h1 className="text-[22px] leading-7 font-bold tracking-[-0.025em] text-text-primary">Mes commissions</h1>
             <p className="mt-1 text-[13.5px] text-text-secondary">Vos vrais gains d&apos;affilié, calculés à partir de vos pharmacies et de leurs abonnements.</p>
           </div>
-          {pricing && <PricingAndPay audience="affiliate" pricing={pricing} />}
-          <AffiliateEarnings pharmacies={affiliation.pharmacies} recurringCents={affiliation.recurringCents} activeCount={affiliation.activeCount} rows={affiliateRows} signupRows={signupRows} thisMonthCents={data.thisMonthCents} earnedCents={data.earnedCents} paidCents={data.paidCents} />
+          {pricing && <PricingAndPay pricing={pricing} />}
+          <AffiliateEarnings pharmacies={affiliation.pharmacies} recurringCents={affiliation.recurringCents} activeCount={affiliation.activeCount} tierCount={affiliation.tierCount} ratePercent={affiliation.ratePercent} rows={affiliateRows} signupRows={signupRows} thisMonthCents={data.thisMonthCents} earnedCents={data.earnedCents} paidCents={data.paidCents} />
         </>
       ) : (
         <>

@@ -20,8 +20,9 @@ export const maxDuration = 60;
  *
  * Puis le rattrapage des remises de parrainage chez Stripe (webhook manqué).
  *
- * Enfin, l'affiliation mensuelle : les commissions du mois ÉCOULÉ (10 % de
- * l'abonnement de chaque pharmacie apportée et abonnée à la fin du mois). La
+ * Enfin, l'affiliation mensuelle : les commissions du mois ÉCOULÉ (10 à 20 %,
+ * selon le palier de l'affilié, de l'abonnement de chaque pharmacie apportée et
+ * abonnée à la fin du mois). La
  * tâche est quotidienne : le 1er, elle les crée ; les jours suivants, elle ne
  * crée que ce qui manque (passage interrompu), jamais un doublon — l'index
  * unique (pharmacie, mois) l'interdit — et jamais un mois plus ancien.

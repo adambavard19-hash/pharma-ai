@@ -1,15 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { DIRECTOR_SIMULATOR_DEFAULT, DIRECTOR_SIMULATOR_MIN, SIMULATOR_MAX_PHARMACIES, estimateDirectorBonuses } from "@/core/affiliation/simulator";
-import { AFFILIATE_RATE_LABEL, DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
+import { SIMULATOR_MAX_PHARMACIES } from "@/core/affiliation/simulator";
+import { DIRECTOR_SIMULATOR_DEFAULT, DIRECTOR_SIMULATOR_MIN, estimateDirectorBonuses } from "@/core/affiliation/director-simulator";
+import { AFFILIATE_TIERS } from "@/core/affiliation/terms";
+import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
 import { formatPriceEuros } from "@/core/pricing/official-offer";
 import { cn } from "@/lib/utils";
 import { HAIRLINE, settle, useCountTo } from "./use-count-to";
+import { TierScale } from "./tier-scale";
 
 /**
  * Le simulateur du directeur commercial : « pharmacies signées par votre équipe » → sa prime (N × 50 € HT, une fois
- * chaque mise en service réglée), qui compte en douceur, et, en petit, ce que l'équipe d'affiliés touche chaque mois.
+ * chaque mise en service réglée), qui compte en douceur, et, en petit, ce que l'équipe d'affiliés touche chaque mois
+ * (N × abonnement × taux du palier atteint par N, 10 à 20 %), avec l'échelle des paliers.
  * Le prix de l'abonnement vient du serveur, les montants de `core/affiliation/terms` : rien n'est écrit ici.
  */
 export function DirectorSimulator({ monthlyPriceCents }: { monthlyPriceCents: number }) {
@@ -55,11 +59,15 @@ export function DirectorSimulator({ monthlyPriceCents }: { monthlyPriceCents: nu
         <p className="mt-2 text-[13px] text-brand-900/80 tabular-nums dark:text-brand-100/80">
           {pharmacies} × {formatPriceEuros(DIRECTOR_SIGNUP_BONUS_CENTS)} HT, une fois chaque mise en service réglée
         </p>
-        <p className="mt-3 text-[12.5px] text-text-secondary tabular-nums">
-          Votre équipe touche, elle, {formatPriceEuros(settle(team, estimate.teamPerMonthCents))} par mois ({pharmacies} × {AFFILIATE_RATE_LABEL} de {formatPriceEuros(monthlyPriceCents)} HT).
-        </p>
+        <div className="mt-4 border-t border-brand-200/70 pt-3 dark:border-brand-800">
+          <p className="text-[12.5px] text-text-secondary tabular-nums" data-equipe-mensuel="">
+            Ce que touche l&apos;équipe chaque mois : <span className="font-semibold text-text-primary">{formatPriceEuros(settle(team, estimate.teamPerMonthCents))}</span> ({pharmacies} × {formatPriceEuros(monthlyPriceCents)} HT × {estimate.teamRatePercent} %, taux du palier).
+          </p>
+          <TierScale tierIndex={AFFILIATE_TIERS.findIndex((tier) => tier.ratePercent === estimate.teamRatePercent)} count={pharmacies} className="mt-2" />
+          <p className="mt-2 text-[11.5px] leading-4 text-text-tertiary">Le palier est propre à chaque affilié : ce montant suppose les pharmacies apportées par un même affilié.</p>
+        </div>
         <p className="sr-only" aria-live="polite">
-          {pharmacies} {plural(pharmacies)} : {formatPriceEuros(estimate.bonusCents)} de primes ; l&apos;équipe touche {formatPriceEuros(estimate.teamPerMonthCents)} par mois.
+          {pharmacies} {plural(pharmacies)} : {formatPriceEuros(estimate.bonusCents)} de primes ; l&apos;équipe touche {formatPriceEuros(estimate.teamPerMonthCents)} par mois, au palier de {estimate.teamRatePercent} %.
         </p>
       </div>
       <p className="mt-3 text-[12px] leading-5 text-text-tertiary">Estimation avant impôts et charges, à titre d&apos;illustration.</p>

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Le passage mensuel de l'affiliation sur des données simulées : qui est commissionné (affilié actif, pharmacie
- * apportée et abonnée à la fin du mois écoulé), combien (10 % de l'abonnement facturé), une seule fois par pharmacie
+ * apportée et abonnée à la fin du mois écoulé), combien (le taux du palier de l'affilié, 10 à 20 % de l'abonnement
+ * facturé, selon ses pharmacies actives à la fin du mois), une seule fois par pharmacie
  * et par mois (index unique + `skipDuplicates`), et jamais une ancienne commission touchée. L'essai sur la vraie base
  * locale (`.live/affiliation-essai.mts`) rejoue le tout, passages simultanés compris.
  */
@@ -69,7 +70,8 @@ describe("la règle", () => {
     // Seuls les affiliés ACTIFS à la règle d'affiliation sont lus.
     expect(db.salesRep.findMany).toHaveBeenCalledWith({ where: { commissionType: "AFFILIATE", isActive: true }, select: { id: true } });
     const first = db.commission.createMany.mock.calls[0][0].data[0];
-    expect(first).toMatchObject({ prospectId: "p1", salesRepId: "rep_a", type: "AFFILIATE", periodMonth: "2026-10", amountCents: 1_260, status: "EARNED", earnedAt: NOV_1 });
+    expect(first).toMatchObject({ prospectId: "p1", salesRepId: "rep_a", type: "AFFILIATE", periodMonth: "2026-10", amountCents: 1_260, ratePercent: 10, status: "EARNED", earnedAt: NOV_1 });
+    expect(run.ratePercentByRep).toEqual({ rep_a: 10 });
     // Échéance : fin novembre, le mois qui suit le mois commissionné.
     expect(first.dueAt.toISOString().slice(0, 10)).toBe("2026-11-30");
     expect(mocks.recordProspectEvent).toHaveBeenCalledWith(expect.objectContaining({ prospectId: "p1", type: "COMMISSION_CREATED", metadata: expect.objectContaining({ periodMonth: "2026-10", amountCents: 1_260 }) }));
@@ -113,6 +115,64 @@ describe("la règle", () => {
     db.prospect.findMany.mockResolvedValue([brought("p1", { activatedAt: new Date("2026-01-05T10:00:00Z") })]);
     await service.createMonthlyAffiliateCommissions(NOV_1);
     expect(stored.map((row) => row.periodMonth)).toEqual(["2026-10"]);
+  });
+});
+
+describe("les paliers", () => {
+  const many = (count: number, prefix = "p", overrides: Record<string, unknown> = {}) => Array.from({ length: count }, (_, index) => brought(`${prefix}${String(index).padStart(3, "0")}`, overrides));
+
+  it("9 pharmacies actives : 10 % ; la 10e fait passer TOUTES les pharmacies à 12 %", async () => {
+    db.prospect.findMany.mockResolvedValue(many(9));
+    const nine = await service.createMonthlyAffiliateCommissions(NOV_1);
+    expect(nine.ratePercentByRep).toEqual({ rep_a: 10 });
+    expect(nine.totalCreatedCents).toBe(9 * 1_260);
+
+    stored = [];
+    vi.clearAllMocks();
+    db.prospect.findMany.mockResolvedValue(many(10));
+    const ten = await service.createMonthlyAffiliateCommissions(NOV_1);
+    expect(ten.ratePercentByRep).toEqual({ rep_a: 12 });
+    // 12 % de 126 € = 15,12 €, sur chacune des 10.
+    expect(ten.totalCreatedCents).toBe(10 * 1_512);
+    for (const call of db.commission.createMany.mock.calls) expect(call[0].data[0]).toMatchObject({ amountCents: 1_512, ratePercent: 12, note: expect.stringContaining("12") });
+  });
+
+  it("25 → 15 %, 49 → 15 %, 50 → 20 %, et 20 % reste le plafond (200 pharmacies)", async () => {
+    for (const [count, rate] of [[24, 12], [25, 15], [49, 15], [50, 20], [200, 20]] as const) {
+      stored = [];
+      vi.clearAllMocks();
+      db.prospect.findMany.mockResolvedValue(many(count));
+      const run = await service.createMonthlyAffiliateCommissions(NOV_1);
+      expect(run.ratePercentByRep.rep_a).toBe(rate);
+      expect(run.totalCreatedCents).toBe(count * Math.round(12_600 * rate / 100));
+    }
+  });
+
+  it("le palier compte les pharmacies ACTIVES à la fin du mois : résiliées, en essai ou de démonstration ne comptent pas", async () => {
+    const inactive = { pharmacy: { isDemo: false, organization: { subscription: subscription({ status: "CANCELED", endedAt: new Date("2026-10-15T10:00:00Z") }) } } };
+    db.prospect.findMany.mockResolvedValue([...many(9), ...many(5, "r", inactive), brought("demo", { pharmacy: { isDemo: true, organization: { subscription: subscription() } } })]);
+    const run = await service.createMonthlyAffiliateCommissions(NOV_1);
+    expect(run.ratePercentByRep).toEqual({ rep_a: 10 });
+    expect(run.created).toBe(9);
+  });
+
+  it("chaque affilié a son propre palier", async () => {
+    db.salesRep.findMany.mockResolvedValue([{ id: "rep_a" }, { id: "rep_b" }]);
+    db.prospect.findMany.mockResolvedValue([...many(10), ...many(2, "b", { salesRepId: "rep_b", activationSalesRepId: "rep_b" })]);
+    const run = await service.createMonthlyAffiliateCommissions(NOV_1);
+    expect(run.ratePercentByRep).toEqual({ rep_a: 12, rep_b: 10 });
+    expect(run.totalCreatedCents).toBe(10 * 1_512 + 2 * 1_260);
+  });
+
+  it("idempotent avec palier : rejoué, le passage retrouve le même taux et ne crée rien", async () => {
+    db.prospect.findMany.mockResolvedValue(many(30));
+    const first = await service.createMonthlyAffiliateCommissions(NOV_1);
+    expect(first).toMatchObject({ created: 30, ratePercentByRep: { rep_a: 15 } });
+    vi.clearAllMocks();
+    const again = await service.createMonthlyAffiliateCommissions(new Date("2026-11-02T07:15:00Z"));
+    expect(again).toMatchObject({ created: 0, alreadyThere: 30, ratePercentByRep: { rep_a: 15 } });
+    expect(db.commission.createMany).not.toHaveBeenCalled();
+    expect(stored).toHaveLength(30);
   });
 });
 
@@ -190,9 +250,17 @@ describe("l'aperçu de l'extranet", () => {
     const overview = await service.affiliateOverviewFor("rep_a", new Date("2026-10-18T10:00:00Z"));
     expect(overview.recurringCents).toBe(1_260 + 1_000);
     expect(overview.activeCount).toBe(2);
+    // Le palier compte aussi la pharmacie payée par l'ancienne règle (3 actives) : 10 %.
+    expect(overview).toMatchObject({ tierCount: 3, ratePercent: 10 });
     expect(overview.pharmacies.map((pharmacy) => pharmacy.prospectId)).not.toContain("autre");
     expect(overview.pharmacies.find((pharmacy) => pharmacy.prospectId === "fermee")).toMatchObject({ active: false, monthlyCommissionCents: 0 });
     expect(overview.pharmacies.find((pharmacy) => pharmacy.prospectId === "ancienne")).toMatchObject({ active: true, oldRule: true, monthlyCommissionCents: 0 });
+  });
+
+  it("au-delà de 10 pharmacies actives, l'aperçu applique le taux du palier", async () => {
+    db.prospect.findMany.mockResolvedValue(Array.from({ length: 12 }, (_, index) => brought(`p${index}`)));
+    const overview = await service.affiliateOverviewFor("rep_a", new Date("2026-10-18T10:00:00Z"));
+    expect(overview).toMatchObject({ tierCount: 12, ratePercent: 12, activeCount: 12, recurringCents: 12 * 1_512 });
   });
 });
 

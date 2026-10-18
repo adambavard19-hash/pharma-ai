@@ -1,3 +1,4 @@
+import { AFFILIATE_TIERS_SENTENCE } from "@/core/affiliation/terms";
 import type { Prisma } from "@/generated/prisma";
 import type { TimelineEntry, TimelineKind } from "@/core/admin/timeline";
 import { parisDayInputToDate, parisDayKey } from "@/core/sales/board";
@@ -77,7 +78,7 @@ export function teamSearchWhere(q: string | null | undefined): Prisma.SalesRepWh
 export const COMMISSION_TYPES = ["AFFILIATE", "PROGRESSIVE", "FIXED", "PERCENT", "RECURRING"] as const;
 export type CommissionTypeKey = (typeof COMMISSION_TYPES)[number];
 
-/** Les règles sans montant à saisir : l'affiliation (10 % fixés dans le code) et la grille progressive. */
+/** Les règles sans montant à saisir : l'affiliation (paliers de 10 à 20 % fixés dans le code) et la grille progressive. */
 export const COMMISSION_TYPES_WITHOUT_AMOUNT: readonly CommissionTypeKey[] = ["AFFILIATE", "PROGRESSIVE"];
 
 /** La règle d'un commercial lue en base, ramenée aux règles possibles (une valeur inattendue retombe sur la grille). */
@@ -90,9 +91,9 @@ export const COMMISSION_MAX: Record<CommissionTypeKey, number> = { AFFILIATE: 0,
 
 export const COMMISSION_OPTIONS: Record<CommissionTypeKey, { label: string; unit: string; help: string }> = {
   AFFILIATE: {
-    label: "Affiliation : 10 % chaque mois (recommandée)",
+    label: "Affiliation : 10 à 20 % chaque mois (recommandée)",
     unit: "",
-    help: "10 % de l'abonnement mensuel HT de chaque pharmacie apportée, chaque mois, aussi longtemps qu'elle reste abonnée. Calculée automatiquement au début de chaque mois pour le mois écoulé.",
+    help: `De 10 % à 20 % de l'abonnement mensuel HT de chaque pharmacie apportée (${AFFILIATE_TIERS_SENTENCE}, sur toutes), chaque mois, aussi longtemps qu'elle reste abonnée, plus 100 € de prime par pharmacie une fois sa mise en service réglée. Calculée automatiquement au début de chaque mois pour le mois écoulé.`,
   },
   PROGRESSIVE: {
     label: "Ancienne grille progressive",

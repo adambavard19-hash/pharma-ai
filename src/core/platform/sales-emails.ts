@@ -1,4 +1,6 @@
 import { AFFILIATE_RULE_SENTENCE } from "@/core/affiliation/monthly";
+import { AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS_SENTENCE } from "@/core/affiliation/terms";
+import { formatPriceEuros } from "@/core/pricing/official-offer";
 import { escapeHtml } from "@/core/documents/email";
 import { TIME_ZONE } from "@/config/constants";
 import { DEFAULT_EMAIL_CONTEXT, emailButtonHtml, emailFrame } from "./email-layout";
@@ -29,7 +31,7 @@ export function buildSalesInvitationEmail(v: { firstName: string; url: string; e
   // L'affilié (programme d'affiliation, 18 oct. 2026) : son espace et sa règle, dits tels quels. Les commerciaux d'avant gardent leur texte.
   const space = v.affiliate ? "espace affilié" : "espace commercial";
   const intro = v.affiliate
-    ? `Bienvenue dans le programme d'affiliation PharmaBoost : votre ${space} est prêt. Vous y préparez les contrats des pharmacies que vous apportez et suivez vos commissions : ${AFFILIATE_RULE_SENTENCE}, aussi longtemps qu'elle reste abonnée. Définissez votre mot de passe pour y accéder :`
+    ? `Bienvenue dans le programme d'affiliation PharmaBoost : votre ${space} est prêt. Vous y préparez les contrats des pharmacies que vous apportez et suivez vos commissions : ${AFFILIATE_RULE_SENTENCE} (${AFFILIATE_TIERS_SENTENCE}), plus ${formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} de prime par pharmacie une fois sa mise en service réglée. Définissez votre mot de passe pour y accéder :`
     : `Votre ${space} PharmaBoost est prêt. Définissez votre mot de passe pour y accéder :`;
   const subject = v.affiliate ? "Votre espace affilié — PharmaBoost" : "Votre espace commercial — PharmaBoost";
   const text = [

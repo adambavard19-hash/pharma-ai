@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { publishOfficialOfferAction } from "@/server/actions/admin-pricing";
 import { ConfirmAction } from "@/components/admin/confirm-action";
 import { OFFICIAL_OFFER, formatPriceEuros } from "@/core/pricing/official-offer";
-import { AFFILIATE_RATE_LABEL, monthlyAffiliateCommissionCents } from "@/core/affiliation/terms";
+import { AFFILIATE_MAX_RATE_LABEL, AFFILIATE_RATE_LABEL, AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS_SENTENCE, affiliateRateFor, monthlyAffiliateCommissionCents } from "@/core/affiliation/terms";
 
 export type PublicOfferPanelData = {
   source: "PLAN" | "OFFICIAL_DEFAULT";
@@ -33,11 +33,13 @@ function Item({ label, value, hint }: { label: string; value: string; hint?: str
  * Ce que le site affiche, d'où cela vient, et la rémunération des affiliés : les
  * montants de l'offre au même endroit, avec le geste pour publier l'offre officielle.
  * Depuis le 18 oct. 2026, plus de « commission standard » par pharmacie : l'affilié
- * touche 10 % de l'abonnement chaque mois (taux fixé dans `core/affiliation/terms.ts`).
+ * touche de 10 à 20 % de l'abonnement chaque mois selon son palier, plus une prime
+ * d'arrivée par pharmacie (paliers et prime fixés dans `core/affiliation/terms.ts`).
  */
 export function PublicOfferPanel({ data }: { data: PublicOfferPanelData }) {
   const router = useRouter();
   const exampleCents = monthlyAffiliateCommissionCents(data.monthlyPriceCents);
+  const maxExampleCents = monthlyAffiliateCommissionCents(data.monthlyPriceCents, affiliateRateFor(Number.MAX_SAFE_INTEGER));
 
   return (
     <section className="space-y-4 rounded-2xl border border-border-subtle bg-surface-sunken/40 p-5" aria-labelledby="offre-publique">
@@ -74,7 +76,7 @@ export function PublicOfferPanel({ data }: { data: PublicOfferPanelData }) {
         <Item label="Abonnement mensuel" value={`${formatPriceEuros(data.monthlyPriceCents)} HT`} hint={`par mois, engagement de ${data.commitmentMonths} mois`} />
         <Item label="Mise en service" value={`${formatPriceEuros(data.setupFeeCents)} HT`} hint="une seule fois" />
         <Item label="Remise de parrainage" value={`${data.referralDiscountPercent} %`} hint="par mois, dès que la personne parrainée s'abonne" />
-        <Item label="Affiliation" value={`${AFFILIATE_RATE_LABEL} / mois`} hint={`de l'abonnement de chaque pharmacie apportée, à vie : ${formatPriceEuros(exampleCents)} par mois ici`} />
+        <Item label="Affiliation" value={`${AFFILIATE_RATE_LABEL} à ${AFFILIATE_MAX_RATE_LABEL} / mois`} hint={`de l'abonnement de chaque pharmacie apportée, à vie, selon le palier (${AFFILIATE_TIERS_SENTENCE}) : de ${formatPriceEuros(exampleCents)} à ${formatPriceEuros(maxExampleCents)} par mois ici, + ${formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} de prime par pharmacie`} />
       </div>
 
       {data.gaps.length > 0 && <p className="text-[12.5px] text-warning-700 dark:text-warning-400">{data.gaps.join(" ")}</p>}

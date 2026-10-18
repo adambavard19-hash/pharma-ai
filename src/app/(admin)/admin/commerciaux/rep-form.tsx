@@ -14,7 +14,7 @@ import { COMMISSION_OPTIONS } from "@/core/sales/director/team";
 
 export type RepFormValues = { firstName: string; lastName: string; email: string; phone: string; zone: string; commissionType: "AFFILIATE" | "PROGRESSIVE" | "FIXED" | "PERCENT" | "RECURRING"; commissionValue: string; isActive: boolean };
 
-// L'affiliation (10 % chaque mois) est la règle par défaut ; le montant reste prérempli si l'on choisit un montant fixe.
+// L'affiliation (10 à 20 % chaque mois, selon le palier) est la règle par défaut ; le montant reste prérempli si l'on choisit un montant fixe.
 const EMPTY: RepFormValues = { firstName: "", lastName: "", email: "", phone: "", zone: "", commissionType: "AFFILIATE", commissionValue: "250", isActive: true };
 
 /** La valeur saisie en euros ou en pour cent, convertie pour le stockage (centimes / centièmes de %). La grille progressive n'a pas de montant. */
