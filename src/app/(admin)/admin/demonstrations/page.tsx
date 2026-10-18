@@ -14,6 +14,7 @@ import { formatDate, formatTime } from "@/lib/format";
 import { TIME_ZONE } from "@/config/constants";
 import { CommercialFilterForm, param } from "../pipeline/filter-form";
 import { CommercialWorkspaceHeader } from "../_commercial/workspace-header";
+import { DEMO_OUTCOME_LABELS, demoOutcome } from "@/core/sales/demo-outcome";
 import { ScheduleDemoButton } from "./demo-dialog";
 import { DemoActions } from "./demo-actions";
 
@@ -110,7 +111,8 @@ export default async function DemonstrationsPage({ searchParams }: { searchParam
                   <TD className="text-text-secondary">{demo.salesRep ? `${demo.salesRep.firstName} ${demo.salesRep.lastName}` : <span className="text-text-tertiary">Console</span>}</TD>
                   <TD><ProspectStatusBadge status={demo.status} /></TD>
                   <TD>
-                    {demo.demoDoneAt ? <Badge tone="success">Réalisée le {formatDate(demo.demoDoneAt)}</Badge> : demo.bucket === "passees" ? <Badge tone="warning">À confirmer</Badge> : demo.bucket === "aujourdhui" ? <Badge tone="brand">Aujourd&apos;hui</Badge> : <Badge tone="info">Programmée</Badge>}
+                    {/* L'issue (17 oct. 2026) : abonnée, ou pas allée au bout — sinon l'état de la démo. */}
+                    {(() => { const outcome = demoOutcome(demo, new Date()); return outcome === "ABONNEE" || outcome === "PERDUE" ? <Badge tone={DEMO_OUTCOME_LABELS[outcome].tone}>{DEMO_OUTCOME_LABELS[outcome].label}</Badge> : null; })() ?? (demo.demoDoneAt ? <Badge tone="success">Réalisée le {formatDate(demo.demoDoneAt)}</Badge> : demo.bucket === "passees" ? <Badge tone="warning">À confirmer</Badge> : demo.bucket === "aujourdhui" ? <Badge tone="brand">Aujourd&apos;hui</Badge> : <Badge tone="info">Programmée</Badge>)}
                   </TD>
                   <TD className="text-right">
                     <DemoActions prospect={{ id: demo.id, name: demo.name }} demoAt={demo.demoAt.toISOString()} done={Boolean(demo.demoDoneAt)} defaultAt={defaultAt} />

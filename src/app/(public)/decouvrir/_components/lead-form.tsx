@@ -54,7 +54,7 @@ function composeMessage(v: Values): string {
   return [priorities, v.message.trim()].filter(Boolean).join("\n\n");
 }
 
-function toPayload(v: Values) {
+function toPayload(v: Values, salesRepCode = "") {
   const posts = Number(v.postCount);
   return {
     kind: "DEMO" as const,
@@ -69,6 +69,7 @@ function toPayload(v: Values) {
     preferredSlot: "",
     demoAt: v.demoAt === CALL_ME ? "" : v.demoAt,
     referralCode: "",
+    salesRepCode,
     website: v.website,
   };
 }
@@ -92,7 +93,7 @@ const firstName = (v: Values) => v.contactName.trim().split(/\s+/)[0] ?? "";
  * l'officine et ce qu'elle veut voir : aucune donnée de santé, aucune donnée
  * patient.
  */
-export function LeadForm({ days }: { days: DemoDay[] }) {
+export function LeadForm({ days, salesRepCode = "" }: { days: DemoDay[]; /** Le lien d'un commercial (17 oct. 2026) : la demande lui est attribuée. */ salesRepCode?: string }) {
   const router = useRouter();
   const initialValues = useMemo<Values>(() => ({ contactName: "", pharmacyName: "", city: "", lgo: "", postCount: "", interests: [], message: "", demoAt: "", email: "", phone: "", website: "" }), []);
 
@@ -215,7 +216,7 @@ export function LeadForm({ days }: { days: DemoDay[] }) {
       submitLabel="Réserver ma démo"
       submitHint="Le créneau vous est confirmé aussitôt par e-mail."
       onSubmit={async (v) => {
-        const result = await submitSiteLeadAction(toPayload(v));
+        const result = await submitSiteLeadAction(toPayload(v, salesRepCode));
         if (!result.ok) return { ok: false, error: result.error };
         router.push(v.demoAt && v.demoAt !== CALL_ME ? `/decouvrir/merci?type=demo&creneau=${encodeURIComponent(v.demoAt)}` : "/decouvrir/merci?type=demo");
         return { ok: true };

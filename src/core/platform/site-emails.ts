@@ -10,7 +10,7 @@ import { formatDemoSlot, googleCalendarLink } from "@/core/site/demo-slots";
 
 export type SiteLeadKind = "DEMO" | "SUBSCRIBE";
 
-export type SiteLeadSummary = {
+export type SiteLeadSummary = { /** Le commercial dont le lien a amené la demande (17 oct. 2026). */ salesRepName?: string | null;
   kind: SiteLeadKind;
   pharmacyName: string;
   contactName: string;
@@ -93,6 +93,7 @@ export function buildSiteLeadAlert(v: SiteLeadSummary & { adminUrl: string }): {
     ["Démo réservée", v.demoAt ? `${formatDemoSlot(v.demoAt)} (heure de Paris)` : null],
     ["Créneau souhaité", v.preferredSlot],
     ["Message", v.message],
+    ["Apporté par", v.salesRepName ?? null],
   ];
   const kept = rows.filter((row): row is [string, string] => Boolean(row[1]));
   const text = [`Nouvelle demande de ${KIND_LABEL[v.kind]} depuis le site.`, "", ...kept.map(([label, value]) => `${label} : ${value}`), "", `Dossier : ${v.adminUrl}`].join("\n");

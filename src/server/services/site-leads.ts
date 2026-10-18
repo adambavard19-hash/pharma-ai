@@ -24,6 +24,8 @@ export type SiteLeadInput = {
   message: string | null;
   preferredSlot: string | null;
   referralCode: string | null;
+  /** Le commercial dont le lien de démonstration a amené la pharmacie ; un identifiant inconnu ou inactif n'attribue rien. */
+  salesRepCode?: string | null;
   /** Le créneau de démonstration choisi sur le site ; `null` : « rappelez-moi ». */
   demoAt?: Date | null;
 };
@@ -69,6 +71,8 @@ async function recordSiteLead(input: SiteLeadInput & { demoAt: Date | null }): P
   const kindLabel = input.kind === "DEMO" ? "Démonstration demandée depuis le site" : "Abonnement demandé depuis le site";
   // Le code n'est gardé que s'il désigne une vraie officine : un code inventé ne parraine personne.
   const referrer = await resolveReferralCode(input.referralCode);
+  const rep = input.salesRepCode ? await prisma.salesRep.findFirst({ where: { id: input.salesRepCode, isActive: true }, select: { id: true, firstName: true, lastName: true, email: true } }) : null;
+  const repName = rep ? `${rep.firstName} ${rep.lastName}`.trim() : null;
   const notes = [
     kindLabel,
     input.lgo ? `Logiciel : ${input.lgo}` : null,
@@ -77,15 +81,16 @@ async function recordSiteLead(input: SiteLeadInput & { demoAt: Date | null }): P
     input.preferredSlot ? `Créneau souhaité : ${input.preferredSlot}` : null,
     input.message ? `Message : ${input.message}` : null,
     referrer ? `Parrainée par : ${referrer.name}` : input.referralCode ? `Code de parrainage inconnu : ${input.referralCode}` : null,
+    repName ? `Apportée par le commercial : ${repName} (lien de démonstration)` : null,
   ].filter(Boolean).join("\n");
 
   // Une officine qui redemande depuis le site retrouve son dossier : l'e-mail
   // fait foi, et on ne crée pas deux fiches pour une même pharmacie.
-  const existing = await prisma.prospect.findFirst({ where: { email: { equals: input.email, mode: "insensitive" }, pharmacyId: null }, select: { id: true, notes: true } });
+  const existing = await prisma.prospect.findFirst({ where: { email: { equals: input.email, mode: "insensitive" }, pharmacyId: null }, select: { id: true, notes: true, salesRepId: true } });
   const prospect = existing
     ? await prisma.prospect.update({
         where: { id: existing.id },
-        data: { status: input.kind === "SUBSCRIBE" ? "INTERESTED" : undefined, lastContactAt: new Date(), ...demoPlanning(input.demoAt), notes: [existing.notes, notes].filter(Boolean).join("\n\n"), ...(referrer ? { referralCode: input.referralCode!.trim().toUpperCase() } : {}) },
+        data: { status: input.kind === "SUBSCRIBE" ? "INTERESTED" : undefined, lastContactAt: new Date(), ...demoPlanning(input.demoAt), notes: [existing.notes, notes].filter(Boolean).join("\n\n"), ...(referrer ? { referralCode: input.referralCode!.trim().toUpperCase() } : {}), ...(rep && !existing.salesRepId ? { salesRepId: rep.id } : {}) },
         select: { id: true },
       })
     : await prisma.prospect.create({
@@ -106,6 +111,8 @@ async function recordSiteLead(input: SiteLeadInput & { demoAt: Date | null }): P
           ...demoPlanning(input.demoAt),
           notes,
           referralCode: referrer ? input.referralCode!.trim().toUpperCase() : null,
+          // Le lien d'un commercial : le dossier lui est attribué, il le voit dans son espace (et le directeur commercial aussi).
+          salesRepId: rep?.id ?? null,
         },
         select: { id: true },
       });
@@ -115,14 +122,29 @@ async function recordSiteLead(input: SiteLeadInput & { demoAt: Date | null }): P
   // Un NOUVEAU dossier dont l'e-mail est celui d'un confrère proposé au parrainage lui est rattaché (casse ignorée).
   if (!existing) await reconcileNewProspect({ id: prospect.id, email: input.email, name: input.pharmacyName }, siteActor);
   const adminUrl = publicUrl(`/admin/dossiers/${prospect.id}`);
-  await notifyAdmins({ type: "SITE_LEAD", title: `${input.demoAt ? `Démo réservée ${formatDemoSlot(input.demoAt)}` : kindLabel} — ${input.pharmacyName}`, body: `${input.contactName} · ${input.email}${input.phone ? ` · ${input.phone}` : ""}`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO" });
+  await notifyAdmins({ type: "SITE_LEAD", title: `${input.demoAt ? `Démo réservée ${formatDemoSlot(input.demoAt)}` : kindLabel} — ${input.pharmacyName}`, body: `${input.contactName} · ${input.email}${input.phone ? ` · ${input.phone}` : ""}${repName ? ` · apportée par ${repName}` : ""}`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO" });
 
   const company = await prisma.companyProfile.findUnique({ where: { id: "default" }, select: { representativeEmail: true } });
   const contactEmail = company?.representativeEmail ?? DEFAULT_CONTACT_EMAIL;
-  const summary: SiteLeadSummary = { ...input };
+  const summary: SiteLeadSummary = { ...input, salesRepName: repName };
   const messaging = getMessagingProvider();
   const alert = buildSiteLeadAlert({ ...summary, adminUrl });
   await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html });
+  // Chaque démonstration réservée est aussi annoncée par e-mail à chaque administrateur de la console (fondateur, 17 oct. 2026).
+  if (input.kind === "DEMO") {
+    const admins = await Promise.resolve()
+      .then(() => prisma.platformAdmin.findMany({ where: { isActive: true }, select: { email: true } }))
+      .catch(() => [] as { email: string }[]);
+    for (const admin of admins) {
+      if (admin.email.toLowerCase() === contactEmail.toLowerCase()) continue;
+      await messaging.sendEmail({ to: admin.email, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html }).catch(() => undefined);
+    }
+  }
+  // Le commercial qui a envoyé le lien est prévenu lui aussi, avec le lien vers le dossier dans son espace.
+  if (rep?.email) {
+    const repAlert = buildSiteLeadAlert({ ...summary, adminUrl: publicUrl(`/extranet/dossiers/${prospect.id}`) });
+    await messaging.sendEmail({ to: rep.email, fromName: "PharmaBoost", subject: `Votre lien a fonctionné : ${repAlert.subject}`, text: repAlert.text, html: repAlert.html }).catch(() => undefined);
+  }
   const ack = buildSiteLeadAcknowledgement({ ...summary, contactEmail });
   const outcome = await messaging.sendEmail({ to: input.email, fromName: "PharmaBoost", subject: ack.subject, text: ack.text, html: ack.html });
   // L'accusé au demandeur entre dans l'historique des communications, envoyé ou non (ne lève jamais).

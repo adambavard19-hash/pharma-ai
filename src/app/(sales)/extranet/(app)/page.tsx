@@ -8,12 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ProspectStatusBadge } from "@/components/sales/status-badge";
 import { formatCents, formatDate } from "@/lib/format";
+import { demoLinkFor, listDemosFor } from "@/server/services/sales/demo-tracking";
+import { demoCounts } from "@/core/sales/demo-outcome";
+import { DemoCounters, DemoList } from "@/components/sales/demo-board";
+import { DemoLink } from "./demo-link";
 
 export const metadata: Metadata = { title: { absolute: "Extranet commercial — PharmaBoost" } };
 
 export default async function SalesHomePage() {
   const session = await requireSalesSession();
-  const [stats, recent, tasks] = await Promise.all([salesRepStats(session.rep.id), listProspects({ salesRepId: session.rep.id }), listTasks(session.rep.id)]);
+  const [stats, recent, tasks, demos] = await Promise.all([salesRepStats(session.rep.id), listProspects({ salesRepId: session.rep.id }), listTasks(session.rep.id), listDemosFor({ salesRepId: session.rep.id, limit: 50 })]);
   const kpis = [
     { label: "Prospects en cours", value: String(stats.openProspects) },
     { label: "Contrats envoyés", value: String(stats.contractsSent) },
@@ -45,6 +49,16 @@ export default async function SalesHomePage() {
           </CardContent></Card>
         ))}
       </div>
+
+      {/* Les démonstrations (17 oct. 2026) : le lien à envoyer, et ce que chaque démo est devenue. */}
+      <Card>
+        <CardHeader title="Mes démonstrations" description="Envoyez votre lien : chaque pharmacie qui réserve une démo par ce lien vous est attribuée." />
+        <CardContent className="space-y-4 pt-0">
+          <DemoLink url={demoLinkFor(session.rep.id)} repName={`${session.rep.firstName} ${session.rep.lastName ?? ""}`.trim()} />
+          <DemoCounters counts={demoCounts(demos.map((demo) => demo.outcome))} />
+          <DemoList rows={demos.slice(0, 12)} href={(id) => `/extranet/dossiers/${id}`} empty="Aucune démonstration pour l'instant : envoyez votre lien à une pharmacie." />
+        </CardContent>
+      </Card>
 
       {toCall.length > 0 && (
         <Card>

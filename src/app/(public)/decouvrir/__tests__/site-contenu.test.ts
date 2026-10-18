@@ -14,6 +14,7 @@ vi.mock("server-only", () => ({}));
 // L'accueil lit le tarif et les chiffres publics en base : ici, l'offre officielle et aucun chiffre.
 vi.mock("@/server/services/public-pricing", () => ({ loadPublicPricing: async () => resolvePublicPricing(null) }));
 vi.mock("@/server/services/site-leads", () => ({ loadLiveProof: async () => null }));
+vi.mock("@/server/db/client", () => ({ prisma: { salesRep: { findFirst: async () => null } } }));
 // La page de démo importe le formulaire, donc son action serveur et la base : seules ses métadonnées sont lues ici.
 vi.mock("@/server/actions/site-leads", () => ({ submitSiteLeadAction: async () => ({ ok: true }) }));
 

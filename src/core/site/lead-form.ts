@@ -17,6 +17,8 @@ export const siteLeadSchema = z.object({
   message: z.string().trim().max(1000).optional().or(z.literal("")),
   preferredSlot: z.string().trim().max(120).optional().or(z.literal("")),
   referralCode: z.string().trim().max(20).optional().or(z.literal("")),
+  /** Le commercial dont le lien de démonstration a amené la pharmacie (identifiant du commercial, 17 oct. 2026). */
+  salesRepCode: z.string().trim().max(40).optional().or(z.literal("")),
   /** Le créneau de démonstration réservé (instant ISO) ; vide : « rappelez-moi pour fixer un créneau ». */
   demoAt: z.string().trim().datetime().optional().or(z.literal("")),
   /** Pot de miel : un humain ne le remplit pas. */

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({ requireDirectorSession: vi.fn(), getDirectorDa
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/auth/director-session", () => ({ requireDirectorSession: mocks.requireDirectorSession }));
 vi.mock("@/server/services/sales/director-dashboard", () => ({ getDirectorDashboard: mocks.getDirectorDashboard }));
+vi.mock("@/server/services/sales/demo-tracking", () => ({ demoBoard: async () => ({ rows: [], byRep: [], total: { total: 0, done: 0, subscribed: 0, lost: 0, upcoming: 0 } }) }));
 
 const page = await import("../page");
 const { resolveDirectorPeriod } = await import("@/core/sales/director/dashboard");

@@ -45,6 +45,7 @@ export async function submitSiteLeadAction(payload: SiteLeadPayload): Promise<Ac
       message: input.message || null,
       preferredSlot: input.preferredSlot || null,
       referralCode: input.referralCode || null,
+      salesRepCode: input.salesRepCode || null,
       demoAt: input.demoAt ? new Date(input.demoAt) : null,
     });
     return ok({ acknowledged: result.acknowledged });
