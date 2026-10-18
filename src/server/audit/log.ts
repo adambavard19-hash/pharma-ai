@@ -64,6 +64,7 @@ export type AuditAction =
   | "prescription.counter_line_split"
   | "prescription.counter_reset"
   | "pharmacy.install_guide_sent"
+  | "pharmacy.launch_day_email"
   | "prescription.file_erased"
   | "patient_data.purged"
   | "counter.request_advised"

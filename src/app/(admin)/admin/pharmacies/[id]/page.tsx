@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+import { launchDayState, nextMondayIso } from "@/server/services/launch-day";
+import { ROLE_LABELS } from "@/core/admin/clients";
+import { LaunchDayPanel } from "./launch-day-panel";
+import { AdminSection } from "@/components/admin/page-header";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
@@ -226,7 +230,12 @@ function TabContent({ group, base, now, templates, kind, query }: { group: TabGr
         </div>
       );
     default:
-      return <OverviewTab base={base} now={now} />;
+      return (
+        <div className="space-y-8">
+          <LaunchDaySection pharmacyId={base.pharmacy.id} demo={base.pharmacy.isDemo} now={now} />
+          <OverviewTab base={base} now={now} />
+        </div>
+      );
   }
 }
 
@@ -274,5 +283,21 @@ function QuickActions({ base, templates, suspended }: { base: Pharmacy360; templ
       <AddNoteButton pharmacyId={pharmacy.id} />
       <AccessToggle pharmacyId={pharmacy.id} pharmacyName={pharmacy.name} suspended={suspended} />
     </div>
+  );
+}
+
+/** L'e-mail du jour J (fondateur, 18 oct. 2026) : en tête de la fiche, là où l'on arrive en appuyant sur la pharmacie. */
+async function LaunchDaySection({ pharmacyId, demo, now }: { pharmacyId: string; demo: boolean; now: Date }) {
+  const state = await launchDayState(pharmacyId);
+  return (
+    <AdminSection id="jour-j" title="E-mail du jour J" description="Le jour où la pharmacie commence avec PharmaBoost : chaque personne reçoit sa vidéo de prise en main, ce que ça change pour elle chaque jour, et que chaque conseil est enregistré.">
+      <LaunchDayPanel
+        pharmacyId={pharmacyId}
+        demo={demo}
+        defaultDay={nextMondayIso(now)}
+        members={state.members.map((m) => ({ membershipId: m.membershipId, name: m.name, email: m.email, roleLabel: ROLE_LABELS[m.role] ?? m.role, owner: m.owner }))}
+        sent={state.sent}
+      />
+    </AdminSection>
   );
 }
