@@ -14,8 +14,8 @@ import { buildDailyDigest, digestHasContent } from "@/core/notifications/weekly-
 import { TIME_ZONE } from "@/config/constants";
 
 /**
- * Le bilan de la semaine (fondateur, 18 oct. 2026 : « seulement toutes les semaines le bilan de performance ») : chaque LUNDI, la semaine
- * civile écoulée (lundi → dimanche, à Paris). La tâche passe chaque jour ; les autres jours, rien ne part.
+ * Le bilan de la semaine (fondateur, 18 oct. 2026 : « toutes les semaines, le dimanche ») : chaque DIMANCHE matin, la semaine qui
+ * s'achève (du lundi à ce dimanche matin, à Paris). La tâche passe chaque jour ; les autres jours, rien ne part.
  * - chaque titulaire reçoit toute son officine, avec le PDF de la semaine ;
  * - chaque membre de l'équipe reçoit SEULEMENT ses propres ventes (celles qu'il a faites, ou de son comptoir attribué), avec son PDF.
  * Une semaine sans conseil proposé n'envoie rien. Une fois par semaine et par destinataire (journal des e-mails relu avant d'écrire) ;
@@ -26,16 +26,19 @@ const DAY_MS = 86_400_000;
 const UNSUBSCRIBE_TTL_MS = 400 * DAY_MS;
 const UNSUBSCRIBE_KIND = "resume-hebdo";
 
-/** La semaine civile écoulée (lundi → dimanche) vue de `now` à Paris : son lundi (« 2026-10-12 ») et « du lundi 12 au dimanche 18 octobre ». */
-export function previousWeek(now: Date, timeZone = TIME_ZONE): { monday: string; label: string; isMonday: boolean } {
+/**
+ * La semaine qui s'achève, vue de `now` à Paris : son lundi (« 2026-10-12 »), « du lundi 12 au dimanche 18 octobre », et si l'on est
+ * dimanche — le jour de l'envoi. Un autre jour, c'est la semaine en cours (son lundi), pour un essai.
+ */
+export function previousWeek(now: Date, timeZone = TIME_ZONE): { monday: string; label: string; isSunday: boolean } {
   const today = zonedDateParts(now, timeZone);
   const date = new Date(Date.UTC(today.year, today.month - 1, today.day, 12));
   const weekday = date.getUTCDay();
-  const monday = new Date(date.getTime() - (((weekday + 6) % 7) + 7) * DAY_MS);
+  const monday = new Date(date.getTime() - ((weekday + 6) % 7) * DAY_MS);
   const sunday = new Date(monday.getTime() + 6 * DAY_MS);
   const fmt = (d: Date, withMonth: boolean) => new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC", weekday: "long", day: "numeric", ...(withMonth ? { month: "long" } : {}) }).format(d);
   const sameMonth = monday.getUTCMonth() === sunday.getUTCMonth();
-  return { monday: monday.toISOString().slice(0, 10), label: `du ${fmt(monday, !sameMonth)} au ${fmt(sunday, true)}`, isMonday: weekday === 1 };
+  return { monday: monday.toISOString().slice(0, 10), label: `du ${fmt(monday, !sameMonth)} au ${fmt(sunday, true)}`, isSunday: weekday === 0 };
 }
 
 /** La veille de `now` à Paris : « 2026-10-15 » (la période des rapports et du PDF) et « jeudi 15 octobre ». */
@@ -91,15 +94,16 @@ async function ownerExtras(pharmacyId: string, now: Date) {
 
 const SENT_STATUSES = ["SENT", "DELIVERED", "DELAYED", "SIMULATED"] as const;
 
-export type DailyDigestRun = { day: string; pharmacies: number; sent: number; skipped: number; failed: number; stoppedEarly: boolean; notMonday?: boolean };
+export type DailyDigestRun = { day: string; pharmacies: number; sent: number; skipped: number; failed: number; stoppedEarly: boolean; notSunday?: boolean };
 
-/** Le bilan de la semaine, le lundi seulement (`force` : un autre jour, pour un essai). */
+/** Le bilan de la semaine, le dimanche seulement (`force` : un autre jour, pour un essai). */
 export async function sendDailyDigests(now: Date = new Date(), options: { deadlineAt?: number; force?: boolean } = {}): Promise<DailyDigestRun> {
-  const { monday, label, isMonday } = previousWeek(now);
+  const { monday, label, isSunday } = previousWeek(now);
   const day = monday;
-  const period = "semaine-derniere";
+  // Du lundi à ce dimanche matin : la semaine qui s'achève.
+  const period = "semaine-en-cours";
   const run: DailyDigestRun = { day, pharmacies: 0, sent: 0, skipped: 0, failed: 0, stoppedEarly: false };
-  if (!isMonday && !options.force) return { ...run, notMonday: true };
+  if (!isSunday && !options.force) return { ...run, notSunday: true };
   const ownerKey = `owner-weekly:${day}`;
   const memberKey = `member-weekly:${day}`;
   const pharmacies = await prisma.pharmacy.findMany({ where: { isActive: true, isDemo: false }, select: { id: true, name: true }, orderBy: { createdAt: "asc" } });

@@ -2,7 +2,7 @@ import { renderEmail, type EmailBlock, type EmailContext, type RenderedEmail } f
 
 /**
  * Le bilan de la semaine (fondateur, 18 oct. 2026 : « seulement toutes les semaines ») : la semaine écoulée au comptoir, en un coup d'œil,
- * chaque lundi matin.
+ * chaque dimanche matin.
  * - au titulaire : toute son officine (conseils proposés, vendus, chiffre d'affaires ajouté), le stock à surveiller, les challenges ;
  * - à chaque membre de l'équipe : SEULEMENT ses propres ventes (« seulement leur propre performance »).
  * Seulement des chiffres lus dans PharmaBoost, sur les ventes terminées ; jamais de donnée de patient, jamais d'estimation.
@@ -84,8 +84,8 @@ export function buildDailyDigest(input: DailyDigestInput, ctx: EmailContext): Re
     greeting: input.firstName ? `Bonjour ${input.firstName},` : "Bonjour,",
     blocks,
     reason: owner
-      ? `Vous recevez ce bilan chaque lundi après une semaine de ventes, en tant que titulaire de ${pharmacy}.`
-      : `Vous recevez ce bilan chaque lundi après une semaine de ventes à ${pharmacy}. Il ne contient que vos propres ventes.`,
+      ? `Vous recevez ce bilan chaque dimanche après une semaine de ventes, en tant que titulaire de ${pharmacy}.`
+      : `Vous recevez ce bilan chaque dimanche après une semaine de ventes à ${pharmacy}. Il ne contient que vos propres ventes.`,
     unsubscribeUrl: input.links.unsubscribe,
     unsubscribeLabel: "Ne plus recevoir ce bilan",
   });

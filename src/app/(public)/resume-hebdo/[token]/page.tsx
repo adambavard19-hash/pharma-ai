@@ -24,7 +24,7 @@ export default async function WeeklyDigestPage({ params }: { params: Promise<{ t
         <div className="space-y-2">
           <h1 className="text-xl leading-7 font-bold tracking-[-0.025em] text-text-primary">Le bilan de la semaine</h1>
           <p className="text-[13.5px] leading-5 text-text-secondary">
-            {state.firstName}, chaque lundi après une semaine de ventes, PharmaBoost vous envoie le bilan de la semaine : conseils proposés, vendus et chiffre d&apos;affaires ajouté, avec le PDF.
+            {state.firstName}, chaque dimanche après une semaine de ventes, PharmaBoost vous envoie le bilan de la semaine : conseils proposés, vendus et chiffre d&apos;affaires ajouté, avec le PDF.
           </p>
         </div>
         <DigestChoiceForm token={decodeURIComponent(token)} subscribed={state.subscribed} />

@@ -72,7 +72,7 @@ export async function GET(request: Request) {
   const counterReports = await attempt("bilan mensuel du comptoir", () => sendMonthlyCounterReports(now));
   // Chaque matin, la journée d'hier : au titulaire toute l'officine, à chaque membre ses seules ventes. Deux minutes au plus ;
   // une tâche relancée le même jour reprend sans double envoi.
-  const weeklyDigests = await attempt("bilan de la semaine (lundi)", () => sendDailyDigests(now, { deadlineAt: Date.now() + 120_000 }));
+  const weeklyDigests = await attempt("bilan de la semaine (dimanche)", () => sendDailyDigests(now, { deadlineAt: Date.now() + 120_000 }));
   // Les rappels de fin de cure du jour, au nom de chaque pharmacie ; l'adresse est effacée à l'envoi. Une minute au plus.
   const launchDays = await attempt("e-mail du jour J des nouvelles pharmacies", () => sendAutomaticLaunchDays(now, { deadlineAt: Date.now() + 30_000 }));
   const cureReminders = await attempt("rappels de fin de cure", () => sendDueCureReminders(now, { deadlineAt: Date.now() + 60_000 }));

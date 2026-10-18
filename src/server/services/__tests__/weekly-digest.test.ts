@@ -40,7 +40,7 @@ vi.mock("@/server/public-url", () => ({ publicUrl: (path: string) => `https://ph
 const { previousDay, previousWeek, sendDailyDigests, userFromUnsubscribeToken, weeklyDigestUnsubscribeUrl } = await import("../weekly-digest");
 
 const FRIDAY = new Date("2026-10-16T08:15:00Z"); // vendredi 16 octobre, 10 h 15 à Paris
-const MONDAY = new Date("2026-10-19T08:15:00Z"); // lundi 19 octobre, 10 h 15 à Paris
+const SUNDAY = new Date("2026-10-18T08:15:00Z"); // dimanche 18 octobre, 10 h 15 à Paris
 const report = (sales: number, proposed: number, sold: number, revenueCents: number) => ({ sales, proposed, sold, revenueCents });
 const user = (id: string, firstName: string) => ({ id, email: `${id}@example.fr`, firstName, lastName: "Martin" });
 
@@ -71,10 +71,10 @@ beforeEach(() => {
 });
 
 describe("la semaine résumée", () => {
-  it("la semaine civile écoulée, à Paris, le lundi seulement", () => {
-    expect(previousWeek(MONDAY)).toEqual({ monday: "2026-10-12", label: "du lundi 12 au dimanche 18 octobre", isMonday: true });
-    expect(previousWeek(FRIDAY).isMonday).toBe(false);
-    expect(previousWeek(new Date("2026-11-02T08:00:00Z")).label).toBe("du lundi 26 octobre au dimanche 1 novembre");
+  it("la semaine qui s'achève, à Paris, le dimanche seulement", () => {
+    expect(previousWeek(SUNDAY)).toEqual({ monday: "2026-10-12", label: "du lundi 12 au dimanche 18 octobre", isSunday: true });
+    expect(previousWeek(FRIDAY).isSunday).toBe(false);
+    expect(previousWeek(new Date("2026-11-01T08:00:00Z")).label).toBe("du lundi 26 octobre au dimanche 1 novembre");
   });
   it("la veille, à Paris", () => {
     expect(previousDay(FRIDAY)).toEqual({ day: "2026-10-15", label: "jeudi 15 octobre" });
@@ -83,9 +83,9 @@ describe("la semaine résumée", () => {
   });
 });
 
-describe("l'envoi du lundi", () => {
+describe("l'envoi du dimanche", () => {
   it("le titulaire reçoit toute l'officine, chaque membre SEULEMENT ses ventes, chacun avec son PDF", async () => {
-    const run = await sendDailyDigests(MONDAY);
+    const run = await sendDailyDigests(SUNDAY);
     expect(run).toMatchObject({ day: "2026-10-12", pharmacies: 2, sent: 3, failed: 0 });
     const mails = Object.fromEntries(m.sendEmail.mock.calls.map((call) => [call[0].to, call[0]]));
     expect(Object.keys(mails).sort()).toEqual(["lea@example.fr", "owner-ph1@example.fr", "owner-ph2@example.fr"]);
@@ -98,10 +98,10 @@ describe("l'envoi du lundi", () => {
     // Les ventes de Léa : les siennes, ou celles de SON comptoir ; son PDF aussi, à son nom.
     expect(m.report).toHaveBeenCalledWith(expect.objectContaining({ pharmacyId: "ph1", onlyFor: { userId: "lea", postIds: ["post-lea"] } }));
     expect(m.report).toHaveBeenCalledWith(expect.objectContaining({ pharmacyId: "ph1", onlyFor: { userId: "tom", postIds: [] } }));
-    expect(m.pdf).toHaveBeenCalledWith("ph1", { param: "semaine-derniere" }, MONDAY, { onlyFor: { userId: "lea", postIds: ["post-lea"] }, person: "Léa Martin" });
-    // La période : du lundi 12 au dimanche 18, de minuit à minuit à Paris.
+    expect(m.pdf).toHaveBeenCalledWith("ph1", { param: "semaine-en-cours" }, SUNDAY, { onlyFor: { userId: "lea", postIds: ["post-lea"] }, person: "Léa Martin" });
+    // La période : du lundi 12 à minuit (Paris) jusqu'à ce dimanche matin.
     const range = m.report.mock.calls[0][0].range;
-    expect([range.from.toISOString(), range.to.toISOString()]).toEqual(["2026-10-11T22:00:00.000Z", "2026-10-18T21:59:59.999Z"]);
+    expect([range.from.toISOString(), range.to.toISOString()]).toEqual(["2026-10-11T22:00:00.000Z", "2026-10-18T08:15:00.000Z"]);
     expect(m.trace).toHaveBeenCalledWith(expect.objectContaining({ templateKey: "owner-weekly:2026-10-12", pharmacyId: "ph1", userId: "owner-ph1" }));
     expect(m.trace).toHaveBeenCalledWith(expect.objectContaining({ templateKey: "member-weekly:2026-10-12", pharmacyId: "ph1", userId: "lea" }));
     const link = /Ne plus recevoir ce bilan : (\S+)/.exec(mails["lea@example.fr"].text)?.[1] ?? "";
@@ -111,28 +111,28 @@ describe("l'envoi du lundi", () => {
   it("jamais deux fois la même semaine, rien sans conseil proposé, jamais aux désinscrits", async () => {
     m.dispatchFind.mockImplementation(async ({ where }: { where: { pharmacyId: string; userId?: string } }) => (where.pharmacyId === "ph1" ? { id: "d1" } : null));
     m.report.mockImplementation(async ({ pharmacyId, onlyFor }: { pharmacyId: string; onlyFor?: unknown }) => (pharmacyId === "ph1" && !onlyFor ? report(30, 42, 3, 12000) : pharmacyId === "ph1" ? report(3, 4, 1, 500) : report(2, 0, 0, 0)));
-    const run = await sendDailyDigests(MONDAY);
+    const run = await sendDailyDigests(SUNDAY);
     expect(m.sendEmail).not.toHaveBeenCalled();
     expect(run).toMatchObject({ sent: 0 });
     expect(m.memberships.mock.calls[0][0].where.user).toMatchObject({ weeklyDigestOptOutAt: null, deletedAt: null });
   });
 
-  it("un autre jour que le lundi, rien ne part", async () => {
+  it("un autre jour que le dimanche, rien ne part", async () => {
     const run = await sendDailyDigests(FRIDAY);
-    expect(run).toMatchObject({ notMonday: true, sent: 0, pharmacies: 0 });
+    expect(run).toMatchObject({ notSunday: true, sent: 0, pharmacies: 0 });
     expect(m.sendEmail).not.toHaveBeenCalled();
   });
 
   it("sans PDF (erreur de dessin), l'e-mail part quand même, sans pièce jointe ni mention", async () => {
     m.pdf.mockRejectedValue(new Error("pdf"));
-    await sendDailyDigests(MONDAY);
+    await sendDailyDigests(SUNDAY);
     const first = m.sendEmail.mock.calls[0][0];
     expect(first.attachments).toBeUndefined();
     expect(first.text).not.toContain("joint en PDF");
   });
 
-  it("s'arrête à l'heure dite ; une tâche relancée le même lundi reprend sans double envoi", async () => {
-    const run = await sendDailyDigests(MONDAY, { deadlineAt: Date.now() - 1 });
+  it("s'arrête à l'heure dite ; une tâche relancée le même dimanche reprend sans double envoi", async () => {
+    const run = await sendDailyDigests(SUNDAY, { deadlineAt: Date.now() - 1 });
     expect(run).toMatchObject({ stoppedEarly: true, sent: 0 });
   });
 });
