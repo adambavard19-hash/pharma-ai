@@ -124,10 +124,12 @@ describe("l'en-tête mène d'abord à la bannière du comptoir", () => {
 
   it("le robot vivant se tient à côté du nom « PharmaBoost », même avec l'île ; le titre de l'accueil n'en a plus", () => {
     const header = renderToStaticMarkup(createElement(SiteHeader, { island: createElement("span", { "data-ile": "" }) }));
-    const brand = header.match(/<a[^>]*aria-label="PharmaBoost, accueil"[\s\S]*?<\/a>/)?.[0] ?? "";
-    expect(brand).toMatch(/class="rbt[^"]*"/);
-    expect(brand).toContain("data-interactive");
-    expect(brand).not.toMatch(/<img/);
+    // Depuis le 18 oct. 2026, le robot est un bouton à part (il ouvre la bannière de l'île), juste devant le lien du nom.
+    const robot = header.match(/<button[^>]*aria-label="Ouvrir la bannière PharmaBoost"[\s\S]*?<\/button>/)?.[0] ?? "";
+    expect(robot).toMatch(/class="rbt[^"]*"/);
+    expect(robot).toContain("data-interactive");
+    expect(robot).not.toMatch(/<img/);
+    expect(header).toMatch(/<a[^>]*aria-label="PharmaBoost, accueil"[^>]*>Pharma<span[^>]*>Boost<\/span><\/a>/);
     // Demande du fondateur (13 oct. 2026) : le grand robot n'est plus à côté de « Scan. Conseil. Bilan. ».
     expect(home).not.toContain("data-robot-hero");
   });

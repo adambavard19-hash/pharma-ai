@@ -101,6 +101,7 @@ export function PlatformIsland({
   restingText,
   robotless = false,
   dock = "top",
+  backdrop = false,
   className,
 }: {
   label: string;
@@ -136,6 +137,11 @@ export function PlatformIsland({
    * tête du robot du menu (`openIsland`), sous elle. Jamais au survol.
    */
   dock?: "top" | "bottom-right" | "logo";
+  /**
+   * « logo » seulement : la bannière ouverte se pose sur un voile blanc qui couvre la page (le site public, fondateur
+   * 18 oct. 2026 : elle ne doit jamais se déplier par-dessus un texte). Un clic sur le voile la referme.
+   */
+  backdrop?: boolean;
   className?: string;
 }) {
   const router = useRouter();
@@ -407,6 +413,9 @@ export function PlatformIsland({
           {(open || grumpy) && <div className="max-h-[calc(100vh-120px)] overflow-y-auto">{island}</div>}
           {!open && !grumpy && dockButton}
         </div>
+      )}
+      {!claimed && dock === "logo" && (open || grumpy) && backdrop && (
+        <div aria-hidden="true" data-ile-voile="" onClick={close} className="z-[59] bg-white/85 backdrop-blur-sm" style={{ position: "fixed", inset: 0 }} />
       )}
       {!claimed && dock === "logo" && (open || grumpy) && (
         // Sous la tête du robot du menu, en haut à gauche : la bannière qu'elle vient d'ouvrir.

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { FloatingRobot } from "./floating-robot";
+import { LogoRobotButton } from "./logo-robot-button";
 import { cn } from "@/lib/utils";
 import { MobileMenu } from "./mobile-menu";
 
@@ -28,20 +28,17 @@ export const HAIRLINE = "bg-gradient-to-r from-brand-500 via-[#0796b4] to-transp
 
 export function SiteWordmark({ className, robot = true }: { className?: string; robot?: boolean }) {
   return (
-    <Link href="/decouvrir" className={cn("flex items-center gap-2.5 rounded-md", className)} aria-label="PharmaBoost, accueil">
-      {/* Le robot du logo, sans son fond : il flotte, vivant, à côté du nom, salue une fois par visite et rit quand on le
-          touche (la réaction part du pointerdown : le lien vers l'accueil fonctionne toujours). Sur téléphone aussi : c'est lui,
-          transparent, qui se tient devant le nom (la capsule de l'île n'y est pas montrée). */}
+    <div className={cn("flex items-center gap-2.5", className)}>
+      {/* Le robot du logo, sans son fond : il flotte, vivant, salue une fois par visite, et c'est LUI qui ouvre la bannière
+          de l'île (un clic, jamais au survol ; fondateur 18 oct. 2026). Le nom « PharmaBoost » mène toujours à l'accueil. */}
       {robot && (
         // Le masquage sur une enveloppe : la feuille du robot (hors couches) fixe son `display` et l'emporterait sur `hidden`.
-        <span className="flex shrink-0">
-          <FloatingRobot className="h-[40px] w-[34px]" track greet="once" greetKey="site" />
-        </span>
+        <LogoRobotButton />
       )}
-      <span className="text-[17px] font-semibold tracking-[-0.01em] text-text-primary max-[419px]:text-[16px]">
+      <Link href="/decouvrir" className="rounded-md text-[17px] font-semibold tracking-[-0.01em] text-text-primary max-[419px]:text-[16px]" aria-label="PharmaBoost, accueil">
         Pharma<span className="text-brand-600">Boost</span>
-      </span>
-    </Link>
+      </Link>
+    </div>
   );
 }
 
@@ -60,7 +57,8 @@ export function SiteHeader({ island }: { island?: ReactNode }) {
         {/* Avec le menu complet (à partir de 1280 px), marque + six onglets + île + boutons ne tenaient plus dans 1 152 px :
             « Réserver une démo » sortait de l'écran (mesuré à 1440 px, 18 oct. 2026). L'île s'efface donc entre 1280 et 1599 px
             (l'en-tête passe à 1 280 px), puis revient au milieu à partir de 1600 px, où tout tient. Sous 1280 px (menu replié), rien ne change. */}
-        {island && <div className="flex max-md:hidden md:order-2 md:mx-auto xl:max-[1599px]:hidden">{island}</div>}
+        {/* Depuis le 18 oct. 2026, l'île n'a plus de capsule dans l'en-tête (largeur nulle) : elle s'ouvre d'un clic sur le robot du logo. */}
+        {island && <div className="flex md:order-2 md:mx-auto">{island}</div>}
         {/* Le robot vivant à côté du nom, comme le fondateur l'a demandé : la marque se lit « robot + PharmaBoost ». */}
         <SiteWordmark className="md:order-1" />
         <nav className="ml-6 hidden items-center gap-0.5 md:order-1 xl:flex" aria-label="Sections">

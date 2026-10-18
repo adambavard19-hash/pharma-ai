@@ -23,6 +23,10 @@ export function PublicIsland({ demo }: { demo: PublicIslandDemo }) {
   return (
     <PlatformIsland
       label="L'île PharmaBoost"
+      // Rien dans l'en-tête au repos : la bannière ne s'ouvre que d'un clic sur le robot du logo, sur un voile blanc,
+      // jamais par-dessus le texte de la page (fondateur, 18 oct. 2026).
+      dock="logo"
+      backdrop
       restingText="Demandez-moi comment ça marche"
       homeLead={
         <div className="space-y-2.5">
