@@ -11,7 +11,8 @@ import { Alert } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { RecentDeposits } from "./recent-deposits";
 import { UpdateFlow } from "./update-flow";
-import { HELD_NOTICE, LGPI_FILE_CONTENTS, REJECTED_NOTICE, describeReceived, linesOfLastStock, stockState } from "./view";
+import { StockFileGuide } from "./stock-file-guide";
+import { HELD_NOTICE, REJECTED_NOTICE, describeReceived, linesOfLastStock, stockState } from "./view";
 
 export const metadata: Metadata = { title: "Mettre à jour mon stock" };
 
@@ -88,23 +89,9 @@ export default async function StockUpdatePage() {
         </Alert>
       )}
 
-      {/* LGPI (ou logiciel pas encore renseigné, presque toujours LGPI) : ce que le fichier doit contenir, avant de le choisir. */}
-      {(!pharmacy?.stockConnection?.lgo || pharmacy.stockConnection.lgo === "lgpi") && (
-        <section aria-labelledby="contenu-fichier" data-lgpi-contenu="" className="rounded-2xl border border-border-subtle bg-surface-card p-4 sm:p-5">
-          <h2 id="contenu-fichier" className="text-[17px] leading-6 font-semibold text-text-primary">{LGPI_FILE_CONTENTS.title}</h2>
-          <ul className="mt-3 space-y-2">
-            {LGPI_FILE_CONTENTS.items.map((item) => (
-              <li key={item} className="flex gap-2.5 text-[14px] leading-5 text-text-secondary">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success-600" aria-hidden="true" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 rounded-lg bg-surface-sunken px-3 py-2 text-[13.5px] leading-5 text-text-primary">{LGPI_FILE_CONTENTS.how}</p>
-        </section>
-      )}
+      <StockFileGuide lgo={pharmacy?.stockConnection?.lgo ?? null} />
 
-      <UpdateFlow previous={previous} />
+      <UpdateFlow previous={previous} lgo={pharmacy?.stockConnection?.lgo ?? null} />
 
       <RecentDeposits deposits={deposits} />
     </div>

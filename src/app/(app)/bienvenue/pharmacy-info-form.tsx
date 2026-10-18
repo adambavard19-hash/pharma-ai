@@ -4,11 +4,12 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updatePharmacyInfoAction } from "@/server/actions/onboarding";
 import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/field";
+import { Field, Input, Select } from "@/components/ui/field";
+import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 
-type Info = { name: string; addressLine1: string; postalCode: string; city: string; phone: string; email: string; finessNumber: string };
+type Info = { name: string; addressLine1: string; postalCode: string; city: string; phone: string; email: string; finessNumber: string; lgo: string };
 
 export function PharmacyInfoForm({ initial }: { initial: Info }) {
   const [form, setForm] = useState<Info>(initial);
@@ -45,6 +46,14 @@ export function PharmacyInfoForm({ initial }: { initial: Info }) {
       <Field label="Téléphone" htmlFor="ob-phone" error={fieldErrors.phone}><Input id="ob-phone" type="tel" value={form.phone} onChange={set("phone")} /></Field>
       <Field label="E-mail de l'officine" htmlFor="ob-email" error={fieldErrors.email}><Input id="ob-email" type="email" value={form.email} onChange={set("email")} /></Field>
       <Field label="N° FINESS" htmlFor="ob-finess" error={fieldErrors.finessNumber}><Input id="ob-finess" value={form.finessNumber} onChange={set("finessNumber")} /></Field>
+      <Field label="Votre logiciel de gestion (LGO)" htmlFor="ob-lgo" required error={fieldErrors.lgo}>
+        <Select id="ob-lgo" value={form.lgo} onChange={(event) => setForm({ ...form, lgo: event.target.value })}>
+          <option value="">Choisissez…</option>
+          {LGO_DEFINITIONS.map((lgo) => (
+            <option key={lgo.id} value={lgo.id}>{lgo.label}</option>
+          ))}
+        </Select>
+      </Field>
       <div className="flex items-end sm:col-span-2">
         <Button type="submit" loading={pending}>Enregistrer et continuer</Button>
       </div>

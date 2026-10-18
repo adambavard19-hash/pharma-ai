@@ -121,8 +121,22 @@ describe("l'état du stock, en haut", () => {
   });
 });
 
+describe("ce que doit contenir le fichier, selon le logiciel", () => {
+  it("LGPI : la procédure LGPI ; un autre logiciel : son nom, sans étapes LGPI ; aucun : le lien pour le choisir", async () => {
+    mocks.findPharmacy.mockResolvedValue({ stockSyncedAt: null, stockConnection: { lgo: "lgpi" } });
+    expect(text(await render())).toContain("Ce que doit contenir votre fichier de stock LGPI");
+    mocks.findPharmacy.mockResolvedValue({ stockSyncedAt: null, stockConnection: { lgo: "winpharma" } });
+    const other = text(await render());
+    expect(other).toContain("Votre logiciel : Winpharma");
+    expect(other).not.toContain("LGPI");
+    mocks.findPharmacy.mockResolvedValue({ stockSyncedAt: null, stockConnection: null });
+    expect(text(await render())).toContain("Indiquez d'abord votre logiciel de gestion");
+  });
+});
+
 describe("le parcours en trois étapes", () => {
   it("annonce choisir, vérifier, confirmer, et ouvre sur le choix du fichier avec UN seul bouton vert", async () => {
+    mocks.findPharmacy.mockResolvedValue({ stockSyncedAt: new Date("2026-10-05T06:42:00Z"), stockConnection: { lgo: "lgpi" } });
     const html = await render();
     const t = text(html);
     expect(t).toContain("Choisir le fichier");

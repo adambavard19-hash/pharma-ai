@@ -57,6 +57,19 @@ export const LGPI_FILE_CONTENTS = {
   how: "Dans LGPI : module Inventaire → Édition → « Saisie des critères d'édition » : prix de référence « Prix de vente », sur l'ensemble du stock ; puis une seconde édition avec « PAMP Net ».",
 } as const;
 
+/** Un autre logiciel que LGPI : son nom, ce que le fichier doit contenir, et — honnêtement — pas d'étapes inventées. */
+export function OTHER_LGO_FILE_CONTENTS(name: string): { title: string; items: string[]; how: string } {
+  return {
+    title: `Ce que doit contenir votre fichier de stock ${name === "votre logiciel" ? "" : name}`.trim(),
+    items: [
+      "Tout votre stock, sur l'ensemble des produits — pas seulement les nouveautés : un produit absent du fichier passe à 0.",
+      "Pour chaque produit : le code produit (celui du code-barres de la boîte), la désignation, la quantité en stock, le prix de vente, et si possible le prix d'achat et le taux de TVA (pour la marge).",
+      "En CSV, Excel ou PDF, tel que votre logiciel l'exporte.",
+    ],
+    how: `Votre logiciel : ${name}. La façon exacte d'en sortir le stock vous sera montrée par votre conseiller PharmaBoost.`,
+  };
+}
+
 // --- Les trois étapes --------------------------------------------------------
 
 export type ExportGuide = {

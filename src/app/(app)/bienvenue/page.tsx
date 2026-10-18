@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { PharmacyInfoForm } from "./pharmacy-info-form";
 import { FinishButton, VerifyStockButton } from "./buttons";
 import { StockSendBody } from "../connexion/stock-step";
+import { StockFileGuide } from "../stock/mise-a-jour/stock-file-guide";
 import { loadConnectionOverview } from "@/server/services/connection-overview";
 import type { OverviewSnapshot } from "@/server/actions/stock-sync";
 
@@ -45,7 +46,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
   const connectionState = await loadConnectionOverview(session.scope.pharmacyId);
   const snapshot = JSON.parse(JSON.stringify({ overview: connectionState.overview, lgo: connectionState.lgo })) as OverviewSnapshot;
 
-  const infoDone = Boolean(pharmacy.addressLine1 && pharmacy.city && pharmacy.postalCode);
+  const infoDone = Boolean(pharmacy.addressLine1 && pharmacy.city && pharmacy.postalCode && connectionState.lgo);
   const stockDone = Boolean(pharmacy.stockSyncedAt);
   const references = productCount + drugCount;
   const verifyDone = stockDone && unclassified === 0;
@@ -102,6 +103,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
                 phone: pharmacy.phone ?? "",
                 email: pharmacy.email ?? "",
                 finessNumber: pharmacy.finessNumber ?? "",
+                lgo: connectionState.lgo ?? "",
               }}
             />
           </CardContent>
@@ -122,7 +124,8 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
                 )}
               </div>
             ) : null}
-            <StockSendBody stock={snapshot.overview.stock} />
+            <StockFileGuide lgo={connectionState.lgo} />
+            <StockSendBody stock={snapshot.overview.stock} lgo={connectionState.lgo} />
             <p className="text-[13.5px] text-text-secondary">
               Vos comptoirs, un par un : <Link href="/parametres/postes" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">Paramètres → Postes du comptoir</Link>.
             </p>

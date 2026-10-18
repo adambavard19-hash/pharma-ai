@@ -7,6 +7,7 @@ import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/session";
 import { recordAudit } from "@/server/audit/log";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
+import { LGO_DEFINITIONS } from "@/core/stock/connectors";
 
 /**
  * L'accueil du titulaire : renseigner l'officine, importer le stock, vérifier,
@@ -28,6 +29,8 @@ const infoSchema = z.object({
   phone: z.string().trim().optional().or(z.literal("")),
   email: z.string().trim().email("Adresse e-mail invalide.").optional().or(z.literal("")),
   finessNumber: z.string().trim().optional().or(z.literal("")),
+  /** Le logiciel de gestion (fondateur, 18 oct. 2026) : il décide ce que « Mon stock » explique pour sortir le fichier. */
+  lgo: z.string().refine((value) => LGO_DEFINITIONS.some((lgo) => lgo.id === value), "Choisissez votre logiciel de gestion."),
 });
 
 export async function updatePharmacyInfoAction(payload: z.input<typeof infoSchema>): Promise<ActionResult<null>> {
@@ -47,9 +50,11 @@ export async function updatePharmacyInfoAction(payload: z.input<typeof infoSchem
       finessNumber: data.finessNumber || null,
     },
   });
+  await prisma.stockConnection.upsert({ where: { pharmacyId: session.scope.pharmacyId }, create: { pharmacyId: session.scope.pharmacyId, lgo: data.lgo }, update: { lgo: data.lgo } });
   await recordAudit({ action: "pharmacy.updated", entityType: "Pharmacy", entityId: session.scope.pharmacyId, pharmacyId: session.scope.pharmacyId, userId: session.scope.userId, metadata: { fields: Object.keys(data) } });
   revalidatePath("/bienvenue");
   revalidatePath("/parametres");
+  revalidatePath("/stock/mise-a-jour");
   return ok(null, "Informations de l'officine enregistrées.");
 }
 

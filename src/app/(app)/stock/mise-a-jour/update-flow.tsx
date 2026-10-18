@@ -47,7 +47,7 @@ const formOf = (files: File[], pricesOnly: boolean) => {
 
 const stepOf = (phase: Phase): 1 | 2 | 3 => (phase.name === "choose" ? 1 : phase.name === "checking" || phase.name === "review" ? 2 : 3);
 
-export function UpdateFlow({ previous = null }: { previous?: { fileName: string; received: string } | null }) {
+export function UpdateFlow({ previous = null, lgo = null }: { previous?: { fileName: string; received: string } | null; /** La procédure LGPI, seulement pour une pharmacie sous LGPI. */ lgo?: string | null }) {
   const [phase, setPhase] = useState<Phase>({ name: "choose" });
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
@@ -174,7 +174,7 @@ export function UpdateFlow({ previous = null }: { previous?: { fileName: string;
             <h2 className="text-[20px] leading-7 font-semibold tracking-[-0.01em] text-text-primary">Choisissez le fichier de votre stock</h2>
             <p className="text-[14.5px] leading-6 text-text-secondary">Le fichier exporté de votre logiciel de pharmacie ({DEPOSIT_ACCEPTED_LABEL}, {DEPOSIT_MAX_BYTES / (1024 * 1024)} Mo au plus).</p>
             <p className="mt-1 text-[13.5px] leading-5 text-text-secondary">
-              Vous pouvez en choisir jusqu&apos;à {MERGE_MAX_FILES} (par exemple l&apos;édition « PAMP Net » et l&apos;édition « PV TTC ») : PharmaBoost les réunit pour connaître vos prix d&apos;achat et de vente.
+              Vous pouvez en choisir jusqu&apos;à {MERGE_MAX_FILES} {lgo === "lgpi" ? " (par exemple l'édition « PAMP Net » et l'édition « PV TTC »)" : ""} : PharmaBoost les réunit pour connaître vos prix d&apos;achat et de vente.
               {previous ? " Un nouveau fichier s'ajoute aux précédents : les prix qu'il ne contient pas sont conservés." : ""}
             </p>
           </div>
@@ -198,9 +198,11 @@ export function UpdateFlow({ previous = null }: { previous?: { fileName: string;
             </Button>
             <p className="text-[13px] text-text-tertiary">ou glissez-les ici</p>
           </div>
-          <Link href="/connexion/guide?logiciel=lgpi" className="inline-block text-[13.5px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-400">
-            Comment récupérer mon stock dans LGPI ?
-          </Link>
+          {lgo === "lgpi" && (
+            <Link href="/connexion/guide?logiciel=lgpi" className="inline-block text-[13.5px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-400">
+              Comment récupérer mon stock dans LGPI ?
+            </Link>
+          )}
         </div>
       )}
 

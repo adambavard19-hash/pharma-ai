@@ -26,7 +26,7 @@ export function StockStep({ stock }: { stock: Stock }) {
 }
 
 /** Le contenu de l'étape, sans son cadre : il sert aussi à l'accueil d'une nouvelle officine. */
-export function StockSendBody({ stock }: { stock: Stock }) {
+export function StockSendBody({ stock, lgo = null }: { stock: Stock; /** Le lien vers la procédure LGPI, seulement pour une pharmacie sous LGPI. */ lgo?: string | null }) {
   const aged = stock.state === "OLD";
   return (
     <>
@@ -57,9 +57,11 @@ export function StockSendBody({ stock }: { stock: Stock }) {
         <Link href="/stock/mise-a-jour">Envoyer mon stock</Link>
       </Button>
 
-      <Link href="/connexion/guide?logiciel=lgpi" className="inline-block text-[13.5px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-400">
-        Comment récupérer mon stock dans LGPI ?
-      </Link>
+      {lgo === "lgpi" && (
+        <Link href="/connexion/guide?logiciel=lgpi" className="inline-block text-[13.5px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-400">
+          Comment récupérer mon stock dans LGPI ?
+        </Link>
+      )}
     </>
   );
 }
