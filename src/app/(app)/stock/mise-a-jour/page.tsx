@@ -11,7 +11,7 @@ import { Alert } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { RecentDeposits } from "./recent-deposits";
 import { UpdateFlow } from "./update-flow";
-import { HELD_NOTICE, REJECTED_NOTICE, describeReceived, linesOfLastStock, stockState } from "./view";
+import { HELD_NOTICE, LGPI_FILE_CONTENTS, REJECTED_NOTICE, describeReceived, linesOfLastStock, stockState } from "./view";
 
 export const metadata: Metadata = { title: "Mettre à jour mon stock" };
 
@@ -36,7 +36,7 @@ export default async function StockUpdatePage() {
   const pharmacyId = session.scope.pharmacyId;
 
   const [pharmacy, deposits] = await Promise.all([
-    prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true } }),
+    prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true, stockConnection: { select: { lgo: true } } } }),
     listPharmacyDeposits(pharmacyId, 5),
   ]);
 
@@ -86,6 +86,22 @@ export default async function StockUpdatePage() {
         <Alert tone="warning" title="La lecture de votre dernier fichier s'est interrompue">
           Renvoyez votre fichier avec le parcours ci-dessous : votre stock n&apos;a pas changé.
         </Alert>
+      )}
+
+      {/* LGPI (ou logiciel pas encore renseigné, presque toujours LGPI) : ce que le fichier doit contenir, avant de le choisir. */}
+      {(!pharmacy?.stockConnection?.lgo || pharmacy.stockConnection.lgo === "lgpi") && (
+        <section aria-labelledby="contenu-fichier" data-lgpi-contenu="" className="rounded-2xl border border-border-subtle bg-surface-card p-4 sm:p-5">
+          <h2 id="contenu-fichier" className="text-[17px] leading-6 font-semibold text-text-primary">{LGPI_FILE_CONTENTS.title}</h2>
+          <ul className="mt-3 space-y-2">
+            {LGPI_FILE_CONTENTS.items.map((item) => (
+              <li key={item} className="flex gap-2.5 text-[14px] leading-5 text-text-secondary">
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success-600" aria-hidden="true" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 rounded-lg bg-surface-sunken px-3 py-2 text-[13.5px] leading-5 text-text-primary">{LGPI_FILE_CONTENTS.how}</p>
+        </section>
       )}
 
       <UpdateFlow previous={previous} />

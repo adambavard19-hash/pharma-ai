@@ -39,6 +39,24 @@ export const INTERRUPTED_LINE = "Lecture interrompue, renvoyez votre fichier.";
 
 export const SEND_FAILED = "L'envoi n'a pas abouti. Vérifiez votre connexion et réessayez.";
 
+// --- Ce que doit contenir le fichier (LGPI) ----------------------------------
+
+/**
+ * Ce que le fichier de stock LGPI doit contenir (fondateur, 18 oct. 2026 : « dans la partie stock du titulaire, pour LGPI, tu dois
+ * lui dire tout ce que doit contenir le fichier »). Repris de ce que l'import lit vraiment (core/stock-import/lgpi-inventory.ts et
+ * merge-files.ts) : rien de plus, rien de moins.
+ */
+export const LGPI_FILE_CONTENTS = {
+  title: "Ce que doit contenir votre fichier de stock LGPI",
+  items: [
+    "Tout votre stock, sur l'ensemble des produits — pas seulement les nouveautés : un produit absent du fichier passe à 0.",
+    "Pour chaque produit : le code produit (celui du code-barres de la boîte), la désignation, la quantité en stock, le prix et le taux de TVA. L'édition d'inventaire de LGPI les contient déjà, avec ses colonnes par défaut.",
+    "Deux éditions d'inventaire, envoyées ensemble : l'une valorisée au « Prix de vente » (votre prix TTC), l'autre au « PAMP Net » (votre prix d'achat). Avec les deux, PharmaBoost connaît la marge de chaque produit.",
+    "Au format PDF, tel que LGPI l'enregistre (F9). Aucune validation d'inventaire : rien n'est modifié dans LGPI.",
+  ],
+  how: "Dans LGPI : module Inventaire → Édition → « Saisie des critères d'édition » : prix de référence « Prix de vente », sur l'ensemble du stock ; puis une seconde édition avec « PAMP Net ».",
+} as const;
+
 // --- Les trois étapes --------------------------------------------------------
 
 export type ExportGuide = {

@@ -85,7 +85,7 @@ describe("l'accès", () => {
 
   it("ne lit que l'officine de la session : cinq derniers envois et date du stock", async () => {
     await render();
-    expect(mocks.findPharmacy).toHaveBeenCalledWith({ where: { id: "ph-1" }, select: { stockSyncedAt: true } });
+    expect(mocks.findPharmacy).toHaveBeenCalledWith({ where: { id: "ph-1" }, select: { stockSyncedAt: true, stockConnection: { select: { lgo: true } } } });
     expect(mocks.listPharmacyDeposits).toHaveBeenCalledWith("ph-1", 5);
   });
 });

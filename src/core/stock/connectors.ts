@@ -96,8 +96,8 @@ export const LGO_DEFINITIONS: LgoDefinition[] = [
     exportHint: "LGPI n'exporte pas son stock automatiquement : c'est l'édition d'inventaire, enregistrée en PDF dans le dossier surveillé, qui sert d'export. Aucune validation d'inventaire, rien n'est modifié dans LGPI.",
     exportSteps: [
       "Dans LGPI, ouvrez le module Inventaire, puis Édition.",
-      "Dans « Saisie des critères d'édition », choisissez « Prix de vente » comme prix de référence, sur l'ensemble du stock.",
-      "Enregistrez (F9) l'édition en PDF dans le dossier d'export indiqué dans PharmaBoost, sous le poste relié (un dossier partagé visible depuis ce poste) — le nom du fichier n'a pas d'importance.",
+      "Dans « Saisie des critères d'édition », choisissez « Prix de vente » comme prix de référence, sur l'ensemble du stock, puis refaites une seconde édition avec « PAMP Net » (votre prix d'achat) : les deux ensemble donnent la marge de chaque produit.",
+      "Enregistrez (F9) les éditions en PDF dans le dossier d'export indiqué dans PharmaBoost, sous le poste relié (un dossier partagé visible depuis ce poste) — le nom du fichier n'a pas d'importance.",
       "PharmaBoost relit le fichier dans la minute. Refaites cette édition quand le stock doit être rafraîchi, chaque matin par exemple ; les ventes, elles, se déduisent à chaque bip.",
     ],
   },
