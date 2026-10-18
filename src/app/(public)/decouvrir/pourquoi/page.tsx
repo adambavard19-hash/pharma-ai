@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, CalendarCheck, CheckCircle2, FileText, HelpCircle, Home, XCircle } from "lucide-react";
 import { fr, KeyCell, SectionHead } from "../_components/site-shell";
-import { ExampleTag } from "../_components/visuals";
+import { ExampleTag, HERO_ITEMS } from "../_components/visuals";
 import { CounterIslandStill } from "@/components/island/counter-island-still";
 import { VideoButton } from "../_components/video-dialog";
 import { pageShare } from "../_components/share-metadata";
@@ -82,7 +82,7 @@ export default function WhyPage() {
             <>
               {/* « propose », pas « affiche » : la bannière montre aussi ses mises en garde, que cette vignette ne reprend pas. */}
               <p className="text-[13.5px] text-text-secondary">Au scan, la bannière propose :</p>
-              <CounterIslandStill items={[{ name: SOLAIRE_NAME, price: "16,90 €", drug: DOXY, stock: "IN_STOCK", quantity: 18, image: SOLAIRE }]} drug={DOXY} className="mt-2.5 [&_section]:max-w-full" />
+              <CounterIslandStill items={[{ ...HERO_ITEMS[0], name: SOLAIRE_NAME, image: SOLAIRE }]} drug={DOXY} className="mt-2.5 [&_section]:max-w-full" />
               {/* La bannière ne dit pas de phrase : celle-ci est sur l'écran de vente (« À dire au patient »). */}
               {DOXY_COUNTER_SCRIPT && (
                 <>

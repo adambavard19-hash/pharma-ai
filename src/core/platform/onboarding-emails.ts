@@ -1,5 +1,6 @@
 import { escapeHtml } from "@/core/documents/email";
 import { button, shell } from "./sales-emails";
+import { websiteHtml } from "./email-layout";
 import { presentationVideoHtml, presentationVideoText, type PresentationVideoLinks } from "./presentation-video";
 
 /**
@@ -46,6 +47,7 @@ export function buildInstallationGuideEmail(v: { ownerName: string; pharmacyName
     ...(v.video ? ["", ...presentationVideoText(v.video)] : []),
     "",
     "PharmaBoost",
+    "Le site PharmaBoost : https://pharmaboost.app",
   ].join("\n");
   const html = shell(
     `Installer PharmaBoost sur vos postes — ${v.pharmacyName}`,
@@ -55,7 +57,7 @@ export function buildInstallationGuideEmail(v: { ownerName: string; pharmacyName
 <ol style="margin:18px 0 0;padding-left:22px;font-size:15px;line-height:23px;color:#374151">${INSTALLATION_STEPS.map((step) => `<li style="margin:0 0 12px"><strong style="color:#111827">${escapeHtml(step.title)}</strong><br>${escapeHtml(step.body)}</li>`).join("")}</ol>
 ${lgoHtml}
 ${button(v.appUrl, "Ouvrir PharmaBoost", "#0F766E")}
-<p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Une question, un blocage ? Répondez à ce message ou écrivez à ${escapeHtml(v.contactEmail)} : nous vous rappelons.</p>${v.video ? presentationVideoHtml(v.video) : ""}`,
+<p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Une question, un blocage ? Répondez à ce message ou écrivez à ${escapeHtml(v.contactEmail)} : nous vous rappelons.</p>${v.video ? presentationVideoHtml(v.video) : ""}${websiteHtml()}`,
     "#0F766E",
   );
   return { subject: `Installer PharmaBoost sur vos postes — ${v.pharmacyName}`, text, html };

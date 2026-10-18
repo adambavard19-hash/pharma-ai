@@ -86,7 +86,7 @@ export default async function SitePage() {
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
           <div>
             <SectionHead kicker="Suivi pharmaceutique · une première" title="Le premier logiciel de suivi pharmaceutique.">
-              Le conseil ne s'arrête plus au comptoir. Avec son accord, le patient reçoit par e-mail le bilan de ses conseils, au nom de votre pharmacie : pourquoi chaque produit accompagne son traitement, comment l'utiliser. Pour une cure — magnésium, probiotiques, plantes, vitamines —, PharmaBoost lui écrit sept jours avant la fin : sa cure se termine, il pense à revenir la renouveler chez vous.
+              Le conseil ne s&apos;arrête plus au comptoir. Avec son accord, le patient reçoit par e-mail le bilan de ses conseils, au nom de votre pharmacie : pourquoi chaque produit accompagne son traitement, comment l&apos;utiliser. Pour une cure — magnésium, probiotiques, plantes, vitamines —, PharmaBoost lui écrit sept jours avant la fin : sa cure se termine, il pense à revenir la renouveler chez vous.
             </SectionHead>
             <ul className="mt-8 flex flex-wrap gap-2">
               {["Bilan par e-mail, avec l'accord du patient", "Rappel 7 jours avant la fin de la cure", "Le patient revient à la pharmacie", "Adresse effacée après l'envoi"].map((t) => (

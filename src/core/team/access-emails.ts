@@ -20,6 +20,7 @@ export function buildTeamInvitationEmail(v: { firstName: string | null; pharmacy
   const intro = `${v.inviterName} vous a ouvert un accès à PharmaBoost pour ${v.pharmacyName}, en tant que ${v.roleLabel}. Créez votre compte en une minute :`;
   const text = [greet(v.firstName), "", intro, v.url, "", `Ce lien est personnel, à usage unique, et reste valable jusqu'au ${day(v.expiresAt)}. Vous choisirez votre mot de passe vous-même.`, "Si vous ne connaissez pas cette officine, ignorez ce message : rien ne sera créé.", ...(v.video ? ["", ...presentationVideoText(v.video)] : []), "", "L'équipe PharmaBoost"].join("\n");
   const html = emailFrame(DEFAULT_EMAIL_CONTEXT, {
+    website: true,
     subject,
     preheader: `Créez votre compte pour rejoindre ${v.pharmacyName}.`,
     eyebrow: v.pharmacyName,
@@ -37,6 +38,7 @@ export function buildJoinRequestAlertEmail(v: { ownerFirstName: string; pharmacy
   const intro = `${v.requesterName} (${v.requesterEmail}) demande à rejoindre ${v.pharmacyName} en tant que ${v.roleLabel}. Tant que vous n'avez pas approuvé, cette personne n'a accès à rien.`;
   const text = [greet(v.ownerFirstName), "", intro, "", `Approuver ou refuser : ${v.url}`, "", "Si vous ne connaissez pas cette personne, refusez la demande.", "", "L'équipe PharmaBoost"].join("\n");
   const html = emailFrame(DEFAULT_EMAIL_CONTEXT, {
+    website: true,
     subject,
     preheader: "Une demande de rattachement attend votre réponse.",
     eyebrow: v.pharmacyName,
@@ -55,6 +57,7 @@ export function buildJoinDecisionEmail(v: { firstName: string; pharmacyName: str
     : `Le titulaire de ${v.pharmacyName} n'a pas donné suite à votre demande de rattachement. Si c'est une erreur, adressez-vous directement à lui.`;
   const text = [greet(v.firstName), "", intro, ...(v.approved ? ["", v.loginUrl] : []), "", "L'équipe PharmaBoost"].join("\n");
   const html = emailFrame(DEFAULT_EMAIL_CONTEXT, {
+    website: true,
     subject,
     preheader: v.approved ? "Vous pouvez vous connecter." : "Réponse à votre demande.",
     eyebrow: v.pharmacyName,
@@ -71,6 +74,7 @@ export function buildAccountExistsEmail(v: { firstName: string; loginUrl: string
   const intro = "Vous venez de demander à rejoindre une officine, mais cette adresse e-mail a déjà un compte PharmaBoost. Connectez-vous avec ce compte ; si vous avez oublié votre mot de passe, vous pouvez en choisir un nouveau. Pour changer d'officine, demandez au titulaire de vous inviter.";
   const text = [greet(v.firstName), "", intro, "", `Se connecter : ${v.loginUrl}`, `Mot de passe oublié : ${v.resetUrl}`, "", "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.", "", "L'équipe PharmaBoost"].join("\n");
   const html = emailFrame(DEFAULT_EMAIL_CONTEXT, {
+    website: true,
     subject,
     preheader: "Cette adresse a déjà un compte.",
     title: "Vous avez déjà un compte",

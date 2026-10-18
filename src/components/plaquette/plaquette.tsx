@@ -1,8 +1,11 @@
 // Les aplats sombres prennent le bleu-vert de la bannière du comptoir (#0F3F54 → #082638), jamais un vert foncé uni.
 import type { ReactNode } from "react";
 import { Check, CheckCircle2, FileText, Globe, HelpCircle, Mail, Phone, Thermometer, TriangleAlert, XCircle } from "lucide-react";
-import { BannerMock, BannerPillsInline, type BannerMockItem } from "@/app/(public)/decouvrir/_components/banner-mock";
-import { ExampleTag, HeroVisual, StepScan, StepSuivi } from "@/app/(public)/decouvrir/_components/visuals";
+import { BannerPillsInline } from "@/app/(public)/decouvrir/_components/banner-mock";
+import { ExampleTag, HERO_ITEMS, HeroVisual, StepScan, StepSuivi } from "@/app/(public)/decouvrir/_components/visuals";
+import { CounterIslandStill } from "@/components/island/counter-island-still";
+import { IslandQuestions } from "@/components/island/island-questions";
+import type { IslandAdvice } from "@/components/island/counter-island";
 import { fr, HAIRLINE } from "@/app/(public)/decouvrir/_components/site-shell";
 import { EXAMPLES, FAQ, SAFETY, STOCK_POINTS, TEAM_POINTS } from "@/app/(public)/decouvrir/_components/site-content";
 import { SETUP_INCLUDES } from "@/app/(public)/decouvrir/_components/pricing-section";
@@ -335,7 +338,9 @@ function PotentialPage() {
           </Side>
           <Side tone="with" result="Le patient repart avec le bon conseil.">
             <p className="text-[12px] text-text-secondary">Au scan, la bannière propose :</p>
-            <BannerMock subject={DOXY} items={[{ ...SOLAIRE, drug: DOXY, stock: "IN_STOCK" }]} footer={false} width={440} className="mt-[8px]" />
+            <div role="group" aria-label="Bannière PharmaBoost, exemple : un conseil au scan" className="mt-[8px] [zoom:0.8]">
+              <CounterIslandStill items={[{ ...HERO_ITEMS[0], pitchOpen: false }]} drug={DOXY} className="flex justify-center [&_section]:max-w-full" />
+            </div>
             {DOXY_COUNTER_SCRIPT && (
               <div className="mt-[10px] rounded-[9px] bg-white px-[10px] py-[7px]">
                 {/* La bannière ne dit pas de phrase : celle-ci est sur l'écran de vente (« À dire au patient »). */}
@@ -387,7 +392,9 @@ function HowPage() {
     <div key="scan" className="w-full [zoom:0.92]">
       <StepScan />
     </div>,
-    <BannerMock key="banner" subject={DOXY} items={[{ ...SOLAIRE, drug: DOXY, stock: "IN_STOCK" }]} footer={false} width={420} align="center" />,
+    <div key="banner" className="[zoom:0.72]" role="group" aria-label="Bannière PharmaBoost, exemple : un conseil au scan">
+      <CounterIslandStill items={[{ ...HERO_ITEMS[0], pitchOpen: false }]} drug={DOXY} className="flex justify-center [&_section]:max-w-full" />
+    </div>,
     <div key="suivi" className="[zoom:0.74]">
       <StepSuivi />
     </div>,
@@ -450,7 +457,7 @@ const ANALGESIC = "DOLIPRANE 1000 mg";
 function QuestionBanner() {
   const view = evaluateTree(ANALGESIC_TREE, { why: ["PAIN"], where: ["BACK"] }, ANALGESIC);
   const questions = view.questions.map((question) => ({ text: question.text, choices: question.choices.map((choice) => ({ label: choice.label, selected: choice.selected })) }));
-  const items: BannerMockItem[] = view.unlocked.map((key) => ({
+  const items: IslandAdvice[] = view.unlocked.map((key) => ({
     name: "Poche chaud/froid dos",
     price: "12,90 €",
     drug: ANALGESIC,
@@ -458,7 +465,12 @@ function QuestionBanner() {
     stock: "IN_STOCK",
     quantity: 6,
   }));
-  return <BannerMock subject={ANALGESIC} questions={questions} items={items} footer={false} align="center" />;
+  return (
+    <div data-ile-style="aurore" className="flex flex-col items-center gap-2 [zoom:0.7] [&_section]:max-w-full">
+      <CounterIslandStill items={items} drug={ANALGESIC} className="flex justify-center" />
+      <IslandQuestions questions={questions.map((question, index) => ({ node: `q${index}`, text: question.text, choices: question.choices.map((choice, at) => ({ key: `c${at}`, label: choice.label, selected: choice.selected })) }))} contentKey="plaquette-dos" maxHeight={null} />
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */

@@ -115,6 +115,7 @@ export function buildMonthlyReport(input: { pharmacyName: string; monthLabel: st
   const note = "Ces chiffres sont les réponses « Vendu » / « Non vendu » données par l'équipe au comptoir : ce ne sont pas des ventes lues dans votre logiciel de gestion.";
   const plural = (count: number, word: string) => `${word}${count > 1 ? "s" : ""}`;
   return renderEmail(ctx, {
+    website: true,
     subject: `Votre bilan du comptoir — ${input.monthLabel}`,
     preheader: `${results.sold} ${plural(results.sold, "conseil")} ${plural(results.sold, "vendu")} en ${input.monthLabel} à ${pharmacy}.`,
     eyebrow: `Bilan du comptoir · ${pharmacy}`,

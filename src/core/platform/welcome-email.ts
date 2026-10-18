@@ -71,6 +71,7 @@ export function buildUserPasswordEmail(v: UserPasswordEmailVariables): { subject
     ...(welcome && v.video ? ["", ...presentationVideoText(v.video)] : []),
     "",
     "L'équipe PharmaBoost",
+    "Le site PharmaBoost : https://pharmaboost.app",
   ].join("\n");
 
   const onboardingHtml =
@@ -85,6 +86,7 @@ export function buildUserPasswordEmail(v: UserPasswordEmailVariables): { subject
       : "";
 
   const html = emailFrame(DEFAULT_EMAIL_CONTEXT, {
+    website: true,
     subject,
     preheader: welcome ? "Votre accès PharmaBoost est prêt : définissez votre mot de passe." : "Choisissez un nouveau mot de passe PharmaBoost.",
     eyebrow: v.pharmacyName ?? undefined,

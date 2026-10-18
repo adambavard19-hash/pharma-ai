@@ -4,6 +4,7 @@ import { renderEmail, type EmailContext, type RenderedEmail } from "@/core/platf
 export function buildPharmacyInvitationEmail(ctx: EmailContext, v: { url: string; expiresAt: Date }): RenderedEmail {
   const until = v.expiresAt.toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" });
   return renderEmail(ctx, {
+    website: true,
     subject: "Bienvenue chez PharmaBoost : configurez votre officine",
     preheader: "Votre espace PharmaBoost est prêt à être configuré.",
     eyebrow: "Invitation",
@@ -22,6 +23,7 @@ export function buildPharmacyInvitationEmail(ctx: EmailContext, v: { url: string
 /** Accusé : le dossier est complet, la suite est annoncée. */
 export function buildDossierReceivedEmail(ctx: EmailContext, v: { ownerName: string; pharmacyName: string }): RenderedEmail {
   return renderEmail(ctx, {
+    website: true,
     subject: `${v.pharmacyName} : votre dossier PharmaBoost est complet`,
     preheader: "Vos informations sont enregistrées. Votre contrat suit.",
     eyebrow: v.pharmacyName,

@@ -76,6 +76,7 @@ export function buildDailyDigest(input: DailyDigestInput, ctx: EmailContext): Re
   }
 
   return renderEmail(ctx, {
+    website: true,
     subject: owner ? `Votre bilan de la semaine — ${pharmacy}` : `Votre performance de la semaine — ${pharmacy}`,
     preheader: `${advice.proposed} ${plural(advice.proposed, "conseil proposé", "conseils proposés")}, ${advice.sold} ${plural(advice.sold, "vendu", "vendus")}, ${euros(advice.revenueTtcCents)} de chiffre d'affaires ajouté.`,
     eyebrow: `Bilan de la semaine · ${input.dayLabel}`,

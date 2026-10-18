@@ -6,6 +6,7 @@ import { BANNER } from "../../../agent/src/banner-design";
 import { cn } from "@/lib/utils";
 import { CounterIsland, type IslandAdvice, type IslandPill } from "./counter-island";
 import { ISLAND_CSS } from "./island-shell";
+import { AURORE_CSS } from "./island-aurore";
 import { useDemoScenario } from "./use-demo-scenario";
 
 const PILLS: IslandPill[] = [
@@ -41,6 +42,7 @@ export function CounterIslandScene({ items, drug, alert, framed = false }: { ite
       drug={drug}
       alert={alert}
       pills={PILLS}
+      listMaxHeight={380}
       onAnswer={(index, outcome) => manual({ type: "answer", index, outcome })}
       onEmail={(value) => manual({ type: "email", value })}
       onSendEmail={() => manual({ type: "go", stage: "emailSent" })}
@@ -52,7 +54,8 @@ export function CounterIslandScene({ items, drug, alert, framed = false }: { ite
 
   if (!framed)
     return (
-      <div ref={box} className="flex flex-col items-center gap-1.5 [&>div]:max-w-full [&_section]:max-w-full">
+      <div ref={box} data-ile-style="aurore" className="flex flex-col items-center gap-1.5 [&>div]:max-w-full [&_section]:max-w-full">
+        <style>{`${ISLAND_CSS}\n${AURORE_CSS}`}</style>
         {island}
         {!auto && (
           <button type="button" onClick={restart} className="inline-flex items-center gap-1.5 text-[11.5px] text-white/50 hover:text-white/80">
@@ -63,8 +66,8 @@ export function CounterIslandScene({ items, drug, alert, framed = false }: { ite
     );
 
   return (
-    <div ref={box} className="relative overflow-hidden rounded-[26px] border border-black/10 shadow-xl" style={{ background: "radial-gradient(120% 90% at 20% 10%, #2A2F4A 0%, #171A2B 45%, #0E1020 100%)" }}>
-      <style>{ISLAND_CSS}</style>
+    <div ref={box} data-ile-style="aurore" className="relative overflow-hidden rounded-[26px] border border-black/10 shadow-xl" style={{ background: "radial-gradient(120% 90% at 20% 10%, #2A2F4A 0%, #171A2B 45%, #0E1020 100%)" }}>
+      <style>{`${ISLAND_CSS}\n${AURORE_CSS}`}</style>
       <LgoBackdrop />
       <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center px-3 pt-4">
         <div className="pointer-events-auto flex max-w-full items-start gap-2.5">

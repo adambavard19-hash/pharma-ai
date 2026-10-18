@@ -78,6 +78,8 @@ export type EmailContent = {
   unsubscribeUrl?: string | null;
   /** Le libellé de ce lien (« Ne plus recevoir ce résumé ») ; par défaut « Ne plus recevoir ces offres ». */
   unsubscribeLabel?: string;
+  /** Montrer le site PharmaBoost en bas de la carte (e-mails du titulaire et de l'équipe). */
+  website?: boolean;
 };
 
 export type RenderedEmail = { subject: string; text: string; html: string };
@@ -207,7 +209,23 @@ function bannerHtml(baseUrl: string): string {
   return `<!--[if mso]>${img(png)}<![endif]--><!--[if !mso]><!-->${img(gif)}<!--<![endif]-->`;
 }
 
-export type FrameInput = { subject: string; preheader?: string; eyebrow?: string; title: string; bodyHtml: string; reason?: string; unsubscribeUrl?: string | null; unsubscribeLabel?: string };
+export type FrameInput = {
+  subject: string;
+  preheader?: string;
+  eyebrow?: string;
+  title: string;
+  bodyHtml: string;
+  reason?: string;
+  unsubscribeUrl?: string | null;
+  unsubscribeLabel?: string;
+  /** Le site PharmaBoost, montré en bas de la carte (fondateur, 18 oct. 2026 : sur tous les e-mails du titulaire et du pharmacien). */
+  website?: boolean;
+};
+
+/** La ligne du site, en bas de la carte des e-mails du titulaire et de l'équipe. */
+export function websiteHtml(): string {
+  return `<p style="margin:22px 0 0;padding-top:16px;border-top:1px solid #E2E8F0;font-family:${FONT};font-size:14px;line-height:22px;color:${BRAND.body}">Le site PharmaBoost : <a href="${PUBLIC_SITE}" style="color:${BRAND.primary};font-weight:600;text-decoration:none">pharmaboost.app</a></p>`;
+}
 
 /** L'enveloppe commune : en-tête, carte, pied de page légal. Le corps est déjà en HTML. */
 export function emailFrame(ctx: EmailContext, input: FrameInput): string {
@@ -240,7 +258,7 @@ ${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opaci
         <tr><td class="pb-pad" style="padding:34px 40px 22px">
           ${input.eyebrow ? `<p style="margin:0 0 8px;font-family:${FONT};font-size:12px;line-height:16px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:${BRAND.primary}">${escapeHtml(input.eyebrow)}</p>` : ""}
           <h1 class="pb-title" style="margin:0 0 22px;font-family:${FONT};font-size:24px;line-height:32px;font-weight:700;color:${BRAND.ink};letter-spacing:-.01em">${escapeHtml(input.title)}</h1>
-          ${input.bodyHtml}
+          ${input.bodyHtml}${input.website ? websiteHtml() : ""}
         </td></tr>
       </table>
     </td></tr>
@@ -266,7 +284,7 @@ export function renderEmail(ctx: EmailContext, content: EmailContent): RenderedE
     ...content.blocks.map(blockHtml),
     `<p style="margin:8px 0 8px;font-family:${FONT};font-size:16px;line-height:26px;color:${BRAND.body}">${escapeHtml(signature)}</p>`,
   ].join("\n");
-  const html = emailFrame(ctx, { subject: content.subject, preheader: content.preheader, eyebrow: content.eyebrow, title: content.title, bodyHtml, reason: content.reason, unsubscribeUrl: content.unsubscribeUrl, unsubscribeLabel: content.unsubscribeLabel });
+  const html = emailFrame(ctx, { subject: content.subject, preheader: content.preheader, eyebrow: content.eyebrow, title: content.title, bodyHtml, reason: content.reason, unsubscribeUrl: content.unsubscribeUrl, unsubscribeLabel: content.unsubscribeLabel, website: content.website });
 
   const text = [
     content.title,
@@ -274,6 +292,7 @@ export function renderEmail(ctx: EmailContext, content: EmailContent): RenderedE
     ...(content.greeting ? [content.greeting, ""] : []),
     ...content.blocks.flatMap((b) => [blockText(b), ""]),
     signature,
+    ...(content.website ? ["", "Le site PharmaBoost : https://pharmaboost.app"] : []),
     "",
     "—",
     ...(content.reason ? [content.reason] : []),

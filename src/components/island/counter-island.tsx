@@ -51,6 +51,8 @@ export type IslandAdvice = {
    * Absente (agent plus ancien) : la carte se déploie sur le nom et la raison complets, et la fiche complète.
    */
   sheet?: CounterSheet;
+  /** Le menu déroulant (prix, marge, stock, questions, conseil) déjà ouvert : les exemples du site le montrent sans survol. */
+  pitchOpen?: boolean;
 };
 
 export type IslandPill = { key: string; label: string; value: string; dot?: string };
@@ -942,8 +944,8 @@ function AnswerProduct({ product }: { product: NonNullable<NonNullable<CounterSh
 }
 
 /** Le survol d'un conseil, avec un court délai : passer la souris d'un bord à l'autre de l'île n'ouvre rien. */
-function useHoverOpen(delay = 180): [boolean, { onMouseEnter: () => void; onMouseLeave: () => void }] {
-  const [open, setOpen] = useState(false);
+function useHoverOpen(delay = 180, initial = false): [boolean, { onMouseEnter: () => void; onMouseLeave: () => void }] {
+  const [open, setOpen] = useState(initial);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   return [
@@ -989,7 +991,7 @@ function CompactCard({ item, outcome, readOnly, auto, onOpen, onAnswer }: { item
     item.challenge ? `★ ${T.challenge}` : null,
     item.shortDate ? `${T.shortDate} ${item.shortDate.replace(/\/\d{4}$/, "")}` : null,
   ].filter(Boolean);
-  const [hovered, hoverProps] = useHoverOpen();
+  const [hovered, hoverProps] = useHoverOpen(180, item.pitchOpen === true);
   return (
     <div data-advice-card="" className="isl-line mt-0.5 rounded-lg px-2 py-1.5" style={{ background: C.panel, color: C.ink }} {...hoverProps}>
     <div className="flex items-center gap-2">
@@ -1111,7 +1113,7 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, auto, outside, o
   const stock = item.stock ? STOCK[item.stock] : null;
   const press = useRef<{ x: number; y: number } | null>(null);
   const detailsId = useId();
-  const [hovered, hoverProps] = useHoverOpen();
+  const [hovered, hoverProps] = useHoverOpen(180, item.pitchOpen === true);
   // Repliée, la carte est COMPACTE (retour des pharmacies, 13 oct. 2026 : la bannière prenait trop de place pendant une
   // délivrance) : le nom et la raison sur UNE ligne chacun, puis les étiquettes et Vendu / Non vendu sur la même ligne.
   // Déployée, le nom COMPLET et la raison entière passent dans le détail.

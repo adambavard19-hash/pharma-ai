@@ -45,6 +45,7 @@ export type SupportReplyInput = {
 
 export function buildSupportReplyEmail(v: SupportReplyInput, ctx: EmailContext = DEFAULT_EMAIL_CONTEXT): { subject: string; text: string; html: string } {
   return renderEmail(ctx, {
+    website: true,
     subject: `PharmaBoost vous a répondu — ${v.subject}`,
     preheader: v.excerpt.slice(0, 120),
     eyebrow: "Contact support",

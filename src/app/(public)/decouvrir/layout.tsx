@@ -52,7 +52,7 @@ const DOXY = "DOXYCYCLINE 100 mg";
 function islandDemo() {
   const rule = VIGILANCE_RULES.find((r) => r.key === "cycline-quinolone-chelation");
   return {
-    items: HERO_ITEMS.map(({ name, price, drug, reason, challenge, shortDate, stock, quantity, image }) => ({ name, price, drug, reason, challenge, shortDate, stock, quantity, image })),
+    items: HERO_ITEMS.map(({ name, price, margin, drug, reason, challenge, shortDate, stock, quantity, image, sheet }) => ({ name, price, margin, drug, reason, challenge, shortDate, stock, quantity, image, sheet })),
     drug: DOXY,
     alert: rule ? { title: rule.title, text: rule.explanationTemplate.replaceAll("{drug}", DOXY) } : null,
   };

@@ -34,6 +34,7 @@ export function buildAdminPasswordEmail(v: AdminPasswordEmailVariables): { subje
   ].join("\n");
 
   const html = emailFrame(DEFAULT_EMAIL_CONTEXT, {
+    website: true,
     subject: "Définissez votre mot de passe — PharmaBoost",
     preheader: "Votre espace administrateur PharmaBoost est prêt.",
     eyebrow: "Espace administrateur",

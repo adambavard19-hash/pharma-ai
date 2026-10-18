@@ -28,6 +28,7 @@ function ownerEmail(input: LaunchDayInput, ctx: EmailContext): RenderedEmail {
   const base = ctx.baseUrl.replace(/\/+$/, "");
   const day = capital(input.dayLabel);
   return renderEmail(ctx, {
+    website: true,
     subject: `${day}, PharmaBoost démarre dans votre pharmacie`,
     preheader: "Votre stock, vos laboratoires et votre équipe, au service de chaque vente.",
     eyebrow: "Jour J",
@@ -66,6 +67,7 @@ function counterEmail(input: LaunchDayInput, ctx: EmailContext): RenderedEmail {
   const base = ctx.baseUrl.replace(/\/+$/, "");
   const day = capital(input.dayLabel);
   return renderEmail(ctx, {
+    website: true,
     subject: `${day} : le bon conseil en 1 seconde, sans y penser`,
     preheader: "Vous voyez beaucoup de patients : PharmaBoost vous soulage dès la première vente.",
     eyebrow: "Jour J",

@@ -1,11 +1,12 @@
 import { CalendarCheck, Check, Mail, ScanLine } from "lucide-react";
-import { BannerMock, type BannerMockItem } from "./banner-mock";
+import type { BannerMockItem } from "./banner-mock";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { ANALGESIC_TREE, evaluateTree } from "@/core/counter/question-tree";
 import { cn } from "@/lib/utils";
 import { CounterIslandStill } from "@/components/island/counter-island-still";
 import { IslandQuestions } from "@/components/island/island-questions";
 import type { IslandAdvice } from "@/components/island/counter-island";
+import type { CounterSheet } from "../../../../../agent/src/counter-sheet";
 
 /**
  * Les écrans de PharmaBoost redessinés pour le site : textes et structure
@@ -42,10 +43,55 @@ function ruleReason(key: string, drug: string): string | undefined {
   return ADVICE_RULES.find((rule) => rule.key === key)?.shortReasonTemplate.replaceAll("{drug}", drug);
 }
 
-/** Les deux conseils de l'accueil : ceux qu'un scan de doxycycline appelle, pris dans le rayon d'exemple. */
-export const HERO_ITEMS: BannerMockItem[] = [
-  { ...SOLAIRE, drug: DOXY, reason: ruleReason("skin-doxycycline-photoprotection", DOXY), stock: "IN_STOCK" },
-  { name: STOCK_EXAMPLE.product, price: STOCK_EXAMPLE.price, image: STOCK_EXAMPLE.tile, drug: DOXY, reason: ruleReason("digestive-tolerance-antibiotics", DOXY), challenge: true, shortDate: "30/11/26", stock: "IN_STOCK", quantity: STOCK_EXAMPLE.stock },
+/**
+ * Le menu déroulant de la nouvelle bannière, pour les exemples du site (fondateur, 18 oct. 2026) : deux questions à poser, les réponses
+ * possibles du patient (cliquables), le conseil en deux phrases. Au comptoir, le modèle les rédige ; ici, ils sont écrits d'exemple.
+ */
+type ExampleAnswer = { ask: 0 | 1; label: string; say: string; product?: { name: string; price: string; margin: string; quantity: number } };
+export function examplePitch(name: string, ask: [string, string], pitch: string, answers: ExampleAnswer[]): CounterSheet {
+  return {
+    name,
+    reasons: [],
+    script: "",
+    contraindications: [],
+    usage: [],
+    description: "",
+    more: { contraindications: 0, usage: 0 },
+    cut: false,
+    ask,
+    pitch,
+    answers: answers.map((answer) => ({ ask: answer.ask, label: answer.label, say: answer.say, ...(answer.product ? { product: { ...answer.product, stock: "IN_STOCK" } } : {}) })),
+  };
+}
+
+const SOLAIRE_PITCH = examplePitch(
+  SOLAIRE.name,
+  ["Allez-vous vous exposer au soleil pendant le traitement ?", "Votre peau rougit-elle facilement au soleil ?"],
+  "La doxycycline rend la peau plus sensible au soleil. Cette crème SPF 50+ la protège : à appliquer avant chaque sortie, et à renouveler souvent.",
+  [
+    { ask: 0, label: "Oui, en vacances", say: "Proposez plutôt le grand format en spray, plus pratique sur tout le corps.", product: { name: "Spray solaire SPF 50+ 200 ml", price: "19,90 €", margin: "7,10 €", quantity: 9 } },
+    { ask: 0, label: "Non, pas vraiment", say: "Gardez la crème : même par temps couvert, la peau peut réagir." },
+    { ask: 1, label: "Oui, très vite", say: "Insistez sur la protection pendant tout le traitement, et l'ombre aux heures chaudes." },
+    { ask: 1, label: "Non", say: "La protection reste conseillée tant que dure le traitement." },
+  ],
+);
+
+const LEVURE_PITCH = examplePitch(
+  STOCK_EXAMPLE.product,
+  ["Avez-vous déjà eu des troubles digestifs avec un antibiotique ?", "Êtes-vous allergique à la levure ?"],
+  "Un antibiotique fragilise la flore intestinale. Cette levure probiotique aide à la protéger, à prendre pendant toute la durée du traitement.",
+  [
+    { ask: 0, label: "Oui, déjà", say: "Proposez-la dès le premier jour du traitement." },
+    { ask: 0, label: "Non, jamais", say: "Elle reste utile en prévention, le temps du traitement." },
+    { ask: 1, label: "Oui", say: "Ne la proposez pas : orientez vers un probiotique sans levure." },
+    { ask: 1, label: "Non", say: "Vous pouvez la proposer sans réserve." },
+  ],
+);
+
+/** Les deux conseils de l'accueil : ceux qu'un scan de doxycycline appelle, pris dans le rayon d'exemple. Le premier montre son menu. */
+export const HERO_ITEMS: (BannerMockItem & Pick<IslandAdvice, "margin" | "sheet" | "pitchOpen">)[] = [
+  { ...SOLAIRE, drug: DOXY, reason: ruleReason("skin-doxycycline-photoprotection", DOXY), stock: "IN_STOCK", margin: "6,20 €", sheet: SOLAIRE_PITCH, pitchOpen: true },
+  { name: STOCK_EXAMPLE.product, price: STOCK_EXAMPLE.price, image: STOCK_EXAMPLE.tile, drug: DOXY, reason: ruleReason("digestive-tolerance-antibiotics", DOXY), challenge: true, shortDate: "30/11/26", stock: "IN_STOCK", quantity: STOCK_EXAMPLE.stock, margin: STOCK_EXAMPLE.margin, sheet: LEVURE_PITCH },
 ];
 
 /** La lueur de balayage : une bande qui descend, très discrète. Désactivée si l'utilisateur réduit les animations. */
@@ -121,7 +167,7 @@ export function HeroVisual({ glass = false }: { glass?: boolean }) {
 
       {/* La bannière PharmaBoost, en île, par-dessus le logiciel : notre robot dedans, les deux conseils du scan. */}
       <div className="relative -mt-12 flex justify-center sm:-mt-14 sm:justify-end [&_section]:max-w-full">
-        <CounterIslandStill items={HERO_ITEMS} drug={DOXY} className="w-full max-w-[500px] [&>div]:flex [&>div]:justify-center sm:[&>div]:justify-end" />
+        <CounterIslandStill items={HERO_ITEMS.map((item) => ({ ...item, pitchOpen: false }))} drug={DOXY} className="w-full max-w-[500px] [&>div]:flex [&>div]:justify-center sm:[&>div]:justify-end" />
       </div>
 
     </div>
@@ -177,11 +223,6 @@ export function StepScan() {
   );
 }
 
-/** L'étape 2 : la bannière, un conseil, Vendu / Non vendu. */
-export function StepBanner() {
-  return <BannerMock subject={DOXY} items={[{ ...SOLAIRE, drug: DOXY, stock: "IN_STOCK" }]} footer={false} width={430} align="center" className="max-w-[340px]" />;
-}
-
 export function StepSuivi() {
   return (
     <div className="flex w-full max-w-[210px] flex-col items-center" aria-hidden="true">
@@ -225,7 +266,27 @@ const ANALGESIC = "DOLIPRANE 1000 mg";
 export function QuestionVisual() {
   const view = evaluateTree(ANALGESIC_TREE, { why: ["PAIN"], where: ["BACK"] }, ANALGESIC);
   const questions = view.questions.map((question) => ({ node: question.node, text: question.text, choices: question.choices.map(({ key, label, selected }) => ({ key, label, selected })) }));
-  const items: IslandAdvice[] = view.unlocked.map((key) => ({ name: "Poche chaud/froid dos", price: "12,90 €", drug: ANALGESIC, reason: ruleReason(key, ANALGESIC), stock: "IN_STOCK", quantity: 6 }));
+  const items: IslandAdvice[] = view.unlocked.map((key) => ({
+    name: "Poche chaud/froid dos",
+    price: "12,90 €",
+    margin: "5,40 €",
+    drug: ANALGESIC,
+    reason: ruleReason(key, ANALGESIC),
+    stock: "IN_STOCK",
+    quantity: 6,
+    pitchOpen: true,
+    sheet: examplePitch(
+      "Poche chaud/froid dos",
+      ["Votre douleur est-elle récente ou dure-t-elle depuis longtemps ?", "Avez-vous une douleur qui descend dans la jambe ?"],
+      "En plus de l'antalgique, la chaleur détend les muscles du dos. Cette poche se chauffe au micro-ondes et se pose vingt minutes.",
+      [
+        { ask: 0, label: "Récente, un faux mouvement", say: "Proposez la poche, à utiliser froide les premiers jours." },
+        { ask: 0, label: "Depuis des semaines", say: "Proposez la poche chaude, et conseillez d'en parler au médecin." },
+        { ask: 1, label: "Oui", say: "Orientez vers le médecin avant tout conseil." },
+        { ask: 1, label: "Non", say: "Vous pouvez proposer la poche sans réserve." },
+      ],
+    ),
+  }));
   // La bannière ACTUELLE, avec ses vrais composants : l'île noire et notre robot (le conseil débloqué), puis la capsule des
   // questions, comme au poste de caisse. Les phrases d'orientation attendent la relecture de la pharmacienne : pas ici.
   return (
@@ -233,6 +294,7 @@ export function QuestionVisual() {
       className="relative flex flex-col items-center gap-2 overflow-hidden rounded-[26px] border border-black/10 px-3 py-6 shadow-xl sm:py-8 [&_section]:max-w-full"
       style={{ background: "radial-gradient(120% 90% at 20% 10%, #2A2F4A 0%, #171A2B 45%, #0E1020 100%)" }}
       aria-label="Bannière PharmaBoost, exemple : la question, puis le conseil"
+      data-ile-style="aurore"
       role="group"
     >
       <CounterIslandStill items={items} drug={ANALGESIC} className="flex w-full justify-center [&>div]:max-w-full" />
