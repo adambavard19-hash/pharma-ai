@@ -37,7 +37,7 @@ describe("le menu, en trois groupes", () => {
   it("chaque groupe contient les entrées prévues, dans cet ordre", () => {
     const labels = (key: string) => NAVIGATION.filter((item) => item.group === key).map((item) => item.label);
     expect(labels("pharmacie")).toEqual(["Mes associations", "Mon stock", "Dates courtes", "Performances", "Historique", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants"]);
-    expect(labels("decouvrir")).toEqual(["Formations", "Partenaires", "Actualités"]);
+    expect(labels("decouvrir")).toEqual(["Prise en main", "Formations", "Partenaires", "Actualités"]);
     expect(labels("configuration")).toEqual(["Paramètres"]);
   });
 
@@ -72,12 +72,12 @@ describe("le menu, en trois groupes", () => {
 
 /** Le menu d'un collaborateur, mot pour mot (consigne du fondateur du 13 oct. 2026) ; « Contact support » est le lien du bas, hors tableau. */
 // Historique pour toute l'équipe, Partenaires pour les titulaires seulement (fondateur, 15 oct. 2026).
-const COLLABORATOR_LABELS = ["Au comptoir", "Mes associations", "Dates courtes", "Historique", "E-mails aux patients", "Formations", "Actualités"];
+const COLLABORATOR_LABELS = ["Au comptoir", "Mes associations", "Dates courtes", "Historique", "E-mails aux patients", "Prise en main", "Formations", "Actualités"];
 
 describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas affiché", () => {
   it("le titulaire voit les trois groupes et tout son menu, inchangé", () => {
     expect(groupNavigation(visibleFor("OWNER")).map((group) => group.label)).toEqual(["Ma pharmacie", "Découvrir", "Configuration"]);
-    expect(menuOf("OWNER")).toEqual(["Au comptoir", "Mes associations", "Mon stock", "Dates courtes", "Performances", "Historique", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants", "Formations", "Partenaires", "Actualités", "Paramètres"]);
+    expect(menuOf("OWNER")).toEqual(["Au comptoir", "Mes associations", "Mon stock", "Dates courtes", "Performances", "Historique", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants", "Prise en main", "Formations", "Partenaires", "Actualités", "Paramètres"]);
     expect(navigationFor(resolvePermissions("OWNER")).map((item) => item.label)).toEqual(menuOf("OWNER"));
   });
 
@@ -89,7 +89,7 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
   });
 
   it("le rôle « Consultation » (lecture seule, il ne vend pas) n'a que la part lisible du même menu : ni comptoir ni bilans", () => {
-    expect(menuOf("VIEWER")).toEqual(["Mes associations", "Dates courtes", "Formations", "Actualités"]);
+    expect(menuOf("VIEWER")).toEqual(["Mes associations", "Dates courtes", "Prise en main", "Formations", "Actualités"]);
   });
 
   it("la liste blanche du collaborateur est explicite, et le filtre par permission du menu (barre latérale) y aboutit pour chaque rôle", () => {

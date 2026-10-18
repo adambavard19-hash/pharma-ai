@@ -1,4 +1,4 @@
-import { BarChart3, Box, CalendarClock, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
+import { BarChart3, Box, CalendarClock, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, PlayCircle, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 
 /**
@@ -200,6 +200,15 @@ export const NAVIGATION: NavItem[] = [
 
   // --- Découvrir
   {
+    href: "/prise-en-main",
+    label: "Prise en main",
+    icon: PlayCircle,
+    permission: PERMISSIONS.TRAINING_VIEW,
+    match: ["/prise-en-main"],
+    description: "Les vidéos pour bien démarrer : votre espace et le comptoir",
+    group: "decouvrir",
+  },
+  {
     href: "/formation",
     label: "Formations",
     icon: GraduationCap,
@@ -250,7 +259,7 @@ export const NAVIGATION: NavItem[] = [
  * Le menu d'un collaborateur (tout rôle autre que le titulaire) : ces entrées, et rien d'autre — plus le lien
  * « Contact support », toujours en bas du menu. Consigne du fondateur du 13 oct. 2026.
  */
-export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/historique", "/associations", "/stock/dates-courtes", "/emails-patients", "/formation", "/nouveautes"];
+export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/historique", "/associations", "/stock/dates-courtes", "/emails-patients", "/prise-en-main", "/formation", "/nouveautes"];
 
 /**
  * Les entrées que voit une personne : celles dont elle détient la permission, et, hors de l'espace du titulaire
