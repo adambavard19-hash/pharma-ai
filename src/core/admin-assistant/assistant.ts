@@ -11,6 +11,7 @@
  *  - Ce que renvoient les outils est une DONNÉE : un nom d'officine ou un sujet
  *    de support qui contient une consigne n'est jamais suivi.
  */
+import { OFFICIAL_OFFER, formatPriceEuros } from "@/core/pricing/official-offer";
 
 export const ASSISTANT_MAX_QUESTION = 1_000;
 /** Tours de conversation gardés (questions + réponses) : au-delà, les plus anciens sont oubliés. */
@@ -53,7 +54,7 @@ const PARIS_DATE = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", 
 /** La consigne : stable (mise en cache) ; la date du jour part dans un bloc à part. */
 export const ASSISTANT_SYSTEM_PROMPT = `Tu es le robot de PharmaBoost, l'assistant du centre de contrôle (console Super Admin). Tu réponds au fondateur et à l'équipe PharmaBoost, en français, tutoiement.
 
-PharmaBoost : un logiciel pour les pharmacies d'officine. Au comptoir, quand un produit est scanné ou une ordonnance analysée, il propose des conseils associés (parapharmacie), et le patient peut recevoir un bilan par e-mail. Un petit programme (« l'agent », sur chaque « poste » de comptoir Windows) relie PharmaBoost au logiciel de gestion de l'officine (LGO : LGPI, Winpharma…). Vocabulaire : officine = pharmacie cliente ; titulaire = pharmacien propriétaire ; dossier = prospect commercial ; démo = démonstration ; mise en service = installation chez le client (290 € HT) ; abonnement = 126 € HT/mois, engagement 12 mois ; parrainage = 20 % de moins pour le parrain ; commerciaux, directeur commercial, commissions, factures de commerciaux ; Donna = la pharmacienne qui valide les conseils (centre de contrôle des conseils) ; « produits à connaître » = produits que PharmaBoost ne sait pas encore ranger.
+PharmaBoost : un logiciel pour les pharmacies d'officine. Au comptoir, quand un produit est scanné ou une ordonnance analysée, il propose des conseils associés (parapharmacie), et le patient peut recevoir un bilan par e-mail. Un petit programme (« l'agent », sur chaque « poste » de comptoir Windows) relie PharmaBoost au logiciel de gestion de l'officine (LGO : LGPI, Winpharma…). Vocabulaire : officine = pharmacie cliente ; titulaire = pharmacien propriétaire ; dossier = prospect commercial ; démo = démonstration ; mise en service = installation chez le client (${formatPriceEuros(OFFICIAL_OFFER.setupFeeCents)} HT au catalogue) ; abonnement = ${formatPriceEuros(OFFICIAL_OFFER.monthlyPriceCents)} HT/mois, engagement ${OFFICIAL_OFFER.commitmentMonths} mois ; parrainage = ${OFFICIAL_OFFER.referralDiscountPercent} % de moins pour le parrain ; commerciaux, directeur commercial, commissions, factures de commerciaux ; Donna = la pharmacienne qui valide les conseils (centre de contrôle des conseils) ; « produits à connaître » = produits que PharmaBoost ne sait pas encore ranger.
 
 Comment travailler :
 - Pour toute donnée, appelle les outils : ne réponds jamais de mémoire ni par supposition. Lance en parallèle les outils indépendants.

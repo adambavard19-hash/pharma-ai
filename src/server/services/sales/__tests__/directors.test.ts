@@ -42,6 +42,7 @@ const prismaMock = vi.hoisted(() => ({
     delete: vi.fn(),
   },
   salesDirectorSession: { updateMany: vi.fn() },
+  directorBonus: { count: vi.fn() },
   salesRep: { count: vi.fn() },
 }));
 const auditMock = vi.hoisted(() => ({ recordAudit: vi.fn() }));

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Award, ChevronDown, Euro, FileText, Home, UserPlus, Users, type LucideIcon } from "lucide-react";
+import { Award, ChevronDown, Euro, FileText, Home, PiggyBank, UserPlus, Users, type LucideIcon } from "lucide-react";
 import { DIRECTOR_NAV, activeDirectorNavItem, type DirectorNavKey } from "@/core/sales/director/nav";
 import { cn } from "@/lib/utils";
 
@@ -14,10 +14,11 @@ const ICONS: Record<DirectorNavKey, LucideIcon> = {
   commissions: Euro,
   factures: FileText,
   challenges: Award,
+  remuneration: PiggyBank,
 };
 
 /**
- * Le menu du directeur. Sur grand écran : six onglets, la page courante
+ * Le menu du directeur. Sur grand écran : sept onglets, la page courante
  * soulignée. Sur téléphone : un seul bouton qui nomme la page courante et
  * déplie la liste ; changer de page la referme.
  */

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Coins } from "lucide-react";
 import { requireDirectorSession } from "@/server/auth/director-session";
 import { listDirectorCommissions } from "@/server/services/sales/director-money";
+import { listDirectorBonuses } from "@/server/services/sales/director-bonuses";
+import { AFFILIATE_RATE_LABEL, AFFILIATE_SIGNUP_BONUS_CENTS, DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
 import { COMMISSION_STATUS_LABELS, type CommissionStatusCode } from "@/core/sales/pipeline";
 import { COMMISSION_STATUSES, isCommissionStatus, monthLabel, parseMonthParam, recentMonths } from "@/core/sales/director/money";
 import { FilterChips, hrefWith } from "@/components/admin/filters";
@@ -50,7 +52,7 @@ const CARD_TITLES: Record<CommissionStatusCode, string> = {
  * facture.
  */
 export default async function DirectorCommissionsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireDirectorSession();
+  const session = await requireDirectorSession();
   const params = await searchParams;
 
   const salesRepId = (first(params.commercial) ?? "").trim().slice(0, 64) || null;
@@ -59,7 +61,7 @@ export default async function DirectorCommissionsPage({ searchParams }: { search
   const month = parseMonthParam(first(params.mois));
   const requestedPage = Number.parseInt(first(params.page) ?? "1", 10);
 
-  const data = await listDirectorCommissions({ salesRepId, status, month, page: Number.isFinite(requestedPage) ? requestedPage : 1 });
+  const [data, bonuses] = await Promise.all([listDirectorCommissions({ salesRepId, status, month, page: Number.isFinite(requestedPage) ? requestedPage : 1 }), listDirectorBonuses({ salesDirectorId: session.director.id })]);
 
   const keep = { commercial: salesRepId, statut: status, mois: month };
   const totalAll = COMMISSION_STATUSES.reduce((sum, key) => sum + data.byStatus[key].count, 0);
@@ -283,6 +285,34 @@ export default async function DirectorCommissionsPage({ searchParams }: { search
           <Pager basePath={BASE_PATH} keep={keep} page={data.page} pageCount={data.pageCount} total={data.filteredTotal} noun="commission" />
         </>
       )}
+
+      <p className="text-[12.5px] text-text-tertiary">
+        Affiliés : {AFFILIATE_RATE_LABEL} de l&apos;abonnement de chaque pharmacie apportée, chaque mois, à vie (une ligne par pharmacie et par mois), plus une prime d&apos;arrivée de {formatCents(AFFILIATE_SIGNUP_BONUS_CENTS)} une fois la mise en service réglée.
+      </p>
+
+      <section aria-labelledby="mes-primes" className="space-y-2">
+        <h2 id="mes-primes" className="text-[16px] font-semibold text-text-primary">Mes primes</h2>
+        <p className="text-[13px] text-text-secondary">
+          {formatCents(DIRECTOR_SIGNUP_BONUS_CENTS)} HT par pharmacie signée par l&apos;équipe, une fois sa mise en service réglée. Validées et payées par PharmaBoost. Acquises : {formatCents(bonuses.earnedCents)} · à payer : {formatCents(bonuses.payableCents)} · payées : {formatCents(bonuses.paidCents)}.
+        </p>
+        <Card>
+          {bonuses.rows.length === 0 ? (
+            <p className="px-4 py-5 text-[13.5px] text-text-secondary">Aucune prime pour l&apos;instant.</p>
+          ) : (
+            <ul className="divide-y divide-border-subtle">
+              {bonuses.rows.map((bonus) => (
+                <li key={bonus.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-[13.5px]">
+                  <span className="font-medium text-text-primary">{bonus.prospect.name}{bonus.prospect.city ? <span className="font-normal text-text-tertiary"> · {bonus.prospect.city}</span> : null}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-semibold tabular text-text-primary">{formatCents(bonus.amountCents)}</span>
+                    <CommissionStatusBadge status={bonus.status} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </section>
     </div>
   );
 }

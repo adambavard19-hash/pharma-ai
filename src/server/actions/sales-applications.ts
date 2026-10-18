@@ -14,7 +14,7 @@ const MAX_PAYLOAD_CHARS = 20_000;
 const CV_REFUSED = "Votre CV n'a pas pu être pris en compte.";
 
 /**
- * Une candidature « Devenir commercial », depuis le site public. Les réponses
+ * Une candidature au programme d'affiliation (page « Affiliation »), depuis le site public. Les réponses
  * arrivent en JSON (`payload`), le CV éventuel en fichier (`cv`) : le serveur
  * relit tout, y compris la signature du PDF. Aucune activation : l'équipe
  * étudie la candidature.

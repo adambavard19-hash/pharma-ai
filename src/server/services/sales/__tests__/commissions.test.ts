@@ -190,6 +190,26 @@ describe("upsertCommissionForContract", () => {
 
   const forecastRow = (overrides: Record<string, unknown> = {}) => ({ id: "com_old", type: "PROGRESSIVE", status: "FORECAST", amountCents: 25_000, invoiceId: null, dueAt: null, earnedAt: null, ...overrides });
 
+  const affiliateRep = { id: "rep_2", firstName: "Alex", lastName: "Affilié", commissionType: "AFFILIATE", commissionValue: 0 };
+
+  it("affilié : rien n'est créé au contrat (ses commissions naissent chaque mois), aucune trace, aucun recalcul de grille", async () => {
+    db.contract.findUniqueOrThrow.mockResolvedValue(contractOf(affiliateRep));
+    db.commission.findFirst.mockResolvedValue(null);
+    await commissions.upsertCommissionForContract({ prospectId: "pro_1", contractId: "ctr_1", status: "EARNED", actor: { type: "SYSTEM", label: "PharmaBoost" } });
+    expect(db.commission.create).not.toHaveBeenCalled();
+    expect(db.commission.update).not.toHaveBeenCalled();
+    expect(mocks.recordProspectEvent).not.toHaveBeenCalled();
+    expect(mocks.syncSafely).not.toHaveBeenCalled();
+  });
+
+  it("affilié avec une commission d'avant l'affiliation : son montant et sa règle restent, seul le statut avance", async () => {
+    db.contract.findUniqueOrThrow.mockResolvedValue(contractOf(affiliateRep));
+    db.commission.findFirst.mockResolvedValue(forecastRow({ type: "PROGRESSIVE", amountCents: 20_000 }));
+    await commissions.upsertCommissionForContract({ prospectId: "pro_1", contractId: "ctr_1", status: "EARNED", actor: { type: "SYSTEM", label: "PharmaBoost" } });
+    expect(db.commission.create).not.toHaveBeenCalled();
+    expect(db.commission.update.mock.calls[0][0].data).toMatchObject({ amountCents: 20_000, type: "PROGRESSIVE", status: "EARNED" });
+  });
+
   it("la commission du dossier est cherchée hors bonus de palier : un bonus rattaché au même dossier n'est jamais écrasé", async () => {
     db.contract.findUniqueOrThrow.mockResolvedValue(contractOf(progressiveRep));
     db.commission.findFirst.mockResolvedValue(forecastRow());

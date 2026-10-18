@@ -174,6 +174,8 @@ export async function resendDirectorInvitation(id: string, adminId: string): Pro
 export async function deleteSalesDirector(id: string, adminId: string): Promise<void> {
   const director = await prisma.salesDirector.findUnique({ where: { id }, select: { id: true, email: true, firstName: true, lastName: true, isActive: true } });
   if (!director) throw NOT_FOUND();
+  // Ses primes (50 € par pharmacie signée) sont de l'argent dû ou versé : on ne les efface pas avec le compte.
+  if ((await prisma.directorBonus.count({ where: { salesDirectorId: id } })) > 0) throw new SalesDirectorError("INACTIVE", "Ce directeur a des primes : désactivez-le plutôt que de le supprimer.");
   try {
     await prisma.salesDirector.delete({ where: { id } });
   } catch (error) {

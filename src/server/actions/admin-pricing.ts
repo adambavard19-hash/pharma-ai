@@ -12,7 +12,7 @@ import { fail, ok, type ActionResult } from "./types";
 
 /**
  * Le tarif du site, depuis la console : publier l'offre officielle (un seul
- * abonnement, 126 € HT par mois, engagement 12 mois, mise en service 290 € HT)
+ * abonnement, 126 € HT par mois, engagement 12 mois, mise en service 150 € HT, montants lus dans OFFICIAL_OFFER)
  * comme offre par défaut, et régler la commission standard d'un commercial.
  *
  * Ce sont des tarifs de CATALOGUE : aucun abonnement existant n'est modifié, le
@@ -84,6 +84,6 @@ export async function saveStandardCommissionAction(payload: z.input<typeof commi
   if (!saved.ok) return fail(saved.error);
   revalidatePath("/admin/abonnements/offres");
   revalidatePath("/admin/commerciaux");
-  revalidatePath("/decouvrir/commercial");
+  revalidatePath("/decouvrir/affiliation");
   return ok({ amountCents: saved.amountCents }, "Commission standard enregistrée. Les commerciaux existants gardent leur commission.");
 }

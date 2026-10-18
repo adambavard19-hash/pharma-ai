@@ -255,7 +255,7 @@ describe("journal d'audit : regroupement et pagination", () => {
 });
 
 describe("journal d'audit : le directeur commercial", () => {
-  const DIRECTOR_ACTIONS = ["sales.director_created", "sales.director_updated", "sales.director_invited", "sales.director_deleted"];
+  const DIRECTOR_ACTIONS = ["sales.director_created", "sales.director_updated", "sales.director_invited", "sales.director_deleted", "sales.director_bonus_updated"];
 
   it("les gestes sur le directeur sont visibles dans la famille Commercial, avec ou sans administrateur", () => {
     for (const action of DIRECTOR_ACTIONS) {
@@ -270,6 +270,7 @@ describe("journal d'audit : le directeur commercial", () => {
     expect(actionLabel("sales.director_updated")).toBe("Directeur commercial modifié");
     expect(actionLabel("sales.director_invited")).toBe("Directeur commercial invité");
     expect(actionLabel("sales.director_deleted")).toBe("Directeur commercial supprimé");
+    expect(actionLabel("sales.director_bonus_updated")).toBe("Prime du directeur commercial modifiée");
     for (const action of ["sales.rep_deleted", "sales.invoice_created", "sales.invoice_updated", "sales.invoice_deleted", "sales.challenge_saved", "sales.challenge_deleted"]) {
       expect(actionLabel(action), action).not.toBe(action);
       expect(isBusinessAction(action, { platformAdminId: "adm_1" }), action).toBe(true);

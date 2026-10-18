@@ -1,13 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { saveStandardCommissionAction, publishOfficialOfferAction } from "@/server/actions/admin-pricing";
+import { publishOfficialOfferAction } from "@/server/actions/admin-pricing";
 import { ConfirmAction } from "@/components/admin/confirm-action";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/field";
-import { useToast } from "@/components/ui/toast";
-import { formatPriceEuros } from "@/core/pricing/official-offer";
+import { OFFICIAL_OFFER, formatPriceEuros } from "@/core/pricing/official-offer";
+import { AFFILIATE_RATE_LABEL, monthlyAffiliateCommissionCents } from "@/core/affiliation/terms";
 
 export type PublicOfferPanelData = {
   source: "PLAN" | "OFFICIAL_DEFAULT";
@@ -16,7 +13,6 @@ export type PublicOfferPanelData = {
   setupFeeCents: number;
   commitmentMonths: number;
   referralDiscountPercent: number;
-  commissionCents: number;
   gaps: string[];
   /** L'offre officielle est déjà celle du site (rien à publier). */
   officialIsLive: boolean;
@@ -34,21 +30,14 @@ function Item({ label, value, hint }: { label: string; value: string; hint?: str
 }
 
 /**
- * Ce que le site affiche, d'où cela vient, et la commission standard : les cinq
+ * Ce que le site affiche, d'où cela vient, et la rémunération des affiliés : les
  * montants de l'offre au même endroit, avec le geste pour publier l'offre officielle.
+ * Depuis le 18 oct. 2026, plus de « commission standard » par pharmacie : l'affilié
+ * touche 10 % de l'abonnement chaque mois (taux fixé dans `core/affiliation/terms.ts`).
  */
 export function PublicOfferPanel({ data }: { data: PublicOfferPanelData }) {
   const router = useRouter();
-  const { push } = useToast();
-  const [pending, start] = useTransition();
-  const [commission, setCommission] = useState(String(data.commissionCents / 100).replace(".", ","));
-
-  const saveCommission = () =>
-    start(async () => {
-      const result = await saveStandardCommissionAction({ amountEuros: commission });
-      push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Enregistré.") : result.error });
-      if (result.ok) router.refresh();
-    });
+  const exampleCents = monthlyAffiliateCommissionCents(data.monthlyPriceCents);
 
   return (
     <section className="space-y-4 rounded-2xl border border-border-subtle bg-surface-sunken/40 p-5" aria-labelledby="offre-publique">
@@ -66,7 +55,7 @@ export function PublicOfferPanel({ data }: { data: PublicOfferPanelData }) {
             title="Publier l'offre officielle ?"
             description="L'offre « PharmaBoost Officine » devient l'offre par défaut : le site et les nouveaux contrats l'utilisent."
             consequences={[
-              "Un seul abonnement : 126 € HT par mois, engagement de 12 mois, mise en service 290 € HT, aucun essai.",
+              `Un seul abonnement : ${formatPriceEuros(OFFICIAL_OFFER.monthlyPriceCents)} HT par mois, engagement de ${OFFICIAL_OFFER.commitmentMonths} mois, mise en service ${formatPriceEuros(OFFICIAL_OFFER.setupFeeCents)} HT, aucun essai.`,
               data.previousDefaultName ? `« ${data.previousDefaultName} » n'est plus l'offre par défaut.` : "Aucune autre offre par défaut n'est remplacée.",
               "Aucun abonnement existant n'est modifié : chaque officine garde le tarif de son contrat.",
             ]}
@@ -85,19 +74,12 @@ export function PublicOfferPanel({ data }: { data: PublicOfferPanelData }) {
         <Item label="Abonnement mensuel" value={`${formatPriceEuros(data.monthlyPriceCents)} HT`} hint={`par mois, engagement de ${data.commitmentMonths} mois`} />
         <Item label="Mise en service" value={`${formatPriceEuros(data.setupFeeCents)} HT`} hint="une seule fois" />
         <Item label="Remise de parrainage" value={`${data.referralDiscountPercent} %`} hint="par mois, dès que la personne parrainée s'abonne" />
-        <Item label="Commission standard" value={formatPriceEuros(data.commissionCents)} hint="par pharmacie activée" />
+        <Item label="Affiliation" value={`${AFFILIATE_RATE_LABEL} / mois`} hint={`de l'abonnement de chaque pharmacie apportée, à vie : ${formatPriceEuros(exampleCents)} par mois ici`} />
       </div>
 
       {data.gaps.length > 0 && <p className="text-[12.5px] text-warning-700 dark:text-warning-400">{data.gaps.join(" ")}</p>}
 
-      <div className="flex flex-wrap items-end gap-2 border-t border-border-subtle pt-4">
-        <label className="space-y-1" htmlFor="commission-standard">
-          <span className="block text-[12px] font-medium text-text-secondary">Commission standard (€ par pharmacie activée)</span>
-          <Input id="commission-standard" inputMode="decimal" value={commission} onChange={(e) => setCommission(e.target.value)} className="w-40" />
-        </label>
-        <Button variant="outline" size="sm" loading={pending} onClick={saveCommission}>Enregistrer la commission</Button>
-        <p className="basis-full text-[12px] text-text-tertiary">Ces tarifs sont ceux du catalogue : ils ne s&apos;appliquent qu&apos;aux nouveaux abonnements et aux nouveaux commerciaux. Le prix d&apos;une officine cliente et la commission d&apos;un commercial existant ne changent jamais.</p>
-      </div>
+      <p className="border-t border-border-subtle pt-4 text-[12px] text-text-tertiary">Ces tarifs sont ceux du catalogue : ils ne s&apos;appliquent qu&apos;aux nouveaux abonnements. Le prix d&apos;une officine cliente ne change jamais. La commission des affiliés se calcule chaque mois sur l&apos;abonnement réellement facturé à chaque pharmacie (tarif de son contrat, remise de parrainage déduite).</p>
     </section>
   );
 }

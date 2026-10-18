@@ -128,8 +128,8 @@ describe("extranet commercial (/extranet/connexion)", () => {
   it("connexion : présentation de l'extranet, champs, lien d'oubli", async () => {
     const page = html(await salesLogin.default(noParams));
     expectHelixLayout(page);
-    expect(page).toContain("Extranet commercial");
-    expect(page).toContain("PharmaBoost — vos dossiers, vos contrats, vos commissions.");
+    expect(page).toContain("Espace affilié");
+    expect(page).toContain("PharmaBoost — vos pharmacies, vos contrats, vos commissions.");
     expect(page).toContain('name="email"');
     expect(page).toContain('autoComplete="current-password"');
     expect(page).toContain('href="/extranet/oubli"');

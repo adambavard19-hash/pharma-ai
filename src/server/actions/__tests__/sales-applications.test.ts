@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * L'action publique « Devenir commercial » : le consentement, le pot de miel,
+ * L'action publique de candidature à l'affiliation : le consentement, le pot de miel,
  * le CV relu par le serveur, la limite de débit. Le service d'arrivée est
  * simulé : ni base, ni e-mail.
  */

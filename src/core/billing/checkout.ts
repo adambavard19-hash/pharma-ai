@@ -8,8 +8,8 @@ import { formatEuros, formatFrenchDate } from "./subscription";
  *
  * Règles du fondateur (11 oct. 2026) :
  *   - prélèvement SEPA ou carte, au choix du titulaire ;
- *   - la mise en service (290 € HT) est payée AVEC le premier mois : première
- *     facture 290 + 126 € HT, puis 126 € HT par mois ;
+ *   - la mise en service (150 € HT) est payée AVEC le premier mois : première
+ *     facture 150 + 126 € HT, puis 126 € HT par mois ;
  *   - montants HT, TVA 20 % ajoutée (taux exclusif) ;
  *   - engagement de 12 mois : une résiliation demandée avant prend effet à la fin
  *     de l'engagement, jamais avant.
@@ -111,8 +111,8 @@ export function firstInvoice(input: { monthlyCents: number; setupFeeCents: numbe
 
 /**
  * La phrase dite avant le paiement (Checkout, page du lien, formulaire) :
- * « Aujourd'hui : 290 € de mise en service + 126 € pour le premier mois, soit
- * 416 € HT (499,20 € TTC). Puis 126 € HT par mois. Engagement de 12 mois. »
+ * « Aujourd'hui : 150 € de mise en service + 126 € pour le premier mois, soit
+ * 276 € HT (331,20 € TTC). Puis 126 € HT par mois. Engagement de 12 mois. »
  */
 export function firstInvoiceSentence(input: { monthlyCents: number; setupFeeCents: number; trialDays: number; trialEndsAt?: Date | null; commitmentMonths: number | null }): string {
   const invoice = firstInvoice(input);
@@ -163,7 +163,7 @@ export function commitmentMonthsFromMetadata(metadata: Record<string, string>): 
   return Number.isInteger(months) && months > 0 && months <= 60 ? months : null;
 }
 
-/** La mise en service portée par les métadonnées (« 29000 »), ou `null`. */
+/** La mise en service portée par les métadonnées (« 15000 »), ou `null`. */
 export function setupFeeFromMetadata(metadata: Record<string, string>): number | null {
   if (metadata.setupFeeCents === undefined || metadata.setupFeeCents === "") return null;
   const cents = Number(metadata.setupFeeCents);

@@ -28,11 +28,11 @@ beforeEach(() => {
 });
 
 describe("publier l'offre officielle", () => {
-  it("l'enregistre en offre par défaut : un seul abonnement, 126 € HT par mois, mise en service 290 € HT, aucun essai, aucun prix annuel", async () => {
+  it("l'enregistre en offre par défaut : un seul abonnement, 126 € HT par mois, mise en service 150 € HT, aucun essai, aucun prix annuel", async () => {
     const result = await publishOfficialOfferAction();
 
     expect(result.ok).toBe(true);
-    expect(billing.savePlanAction).toHaveBeenCalledWith(expect.objectContaining({ code: "PHARMABOOST_OFFICINE", monthlyPriceCents: 12_600, setupFeeCents: 29_000, annualPriceCents: null, annualSetupFeeCents: null, trialDays: 0, isDefault: true, isActive: true }));
+    expect(billing.savePlanAction).toHaveBeenCalledWith(expect.objectContaining({ code: "PHARMABOOST_OFFICINE", monthlyPriceCents: 12_600, setupFeeCents: 15_000, annualPriceCents: null, annualSetupFeeCents: null, trialDays: 0, isDefault: true, isActive: true }));
   });
 
   it("trace l'avant et l'après, l'offre remplacée, et le rappel qu'aucun abonnement n'est touché", async () => {

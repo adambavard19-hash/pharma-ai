@@ -87,7 +87,7 @@ describe("transformer en commercial", () => {
   it("le directeur : le commercial est créé et invité sous son nom, l'événement et l'audit sont les siens", async () => {
     const result = await admin.convertSalesApplication("app_1", DIRECTOR, { invite: true });
     expect(result).toMatchObject({ ok: true, salesRepId: "rep_1" });
-    expect(mocks.createSalesRep).toHaveBeenCalledWith(expect.objectContaining({ commissionType: "PROGRESSIVE", commissionValue: 0 }), DIRECTOR);
+    expect(mocks.createSalesRep).toHaveBeenCalledWith(expect.objectContaining({ commissionType: "AFFILIATE", commissionValue: 0 }), DIRECTOR);
     expect(mocks.sendSalesInvitation).toHaveBeenCalledWith("rep_1", DIRECTOR);
     expect(db.salesApplicationEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ kind: "CONVERTED", platformAdminId: "director:dir_1" }) });
     expect(mocks.recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "sales_application.converted", entityId: "app_1", salesDirectorId: "dir_1" }));

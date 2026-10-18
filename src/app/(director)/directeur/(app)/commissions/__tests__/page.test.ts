@@ -19,6 +19,7 @@ vi.mock("@/components/ui/toast", () => ({ useToast: () => ({ push: vi.fn() }) })
 vi.mock("@/server/actions/director-money", () => ({ commissionGestureAction: vi.fn(), commissionNoteAction: vi.fn() }));
 vi.mock("@/server/auth/director-session", () => ({ requireDirectorSession: mocks.requireDirectorSession }));
 vi.mock("@/server/services/sales/director-money", () => ({ listDirectorCommissions: mocks.listDirectorCommissions }));
+vi.mock("@/server/services/sales/director-bonuses", () => ({ listDirectorBonuses: async () => ({ rows: [], earnedCents: 0, payableCents: 0, paidCents: 0 }) }));
 
 const page = await import("../page");
 

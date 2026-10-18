@@ -66,7 +66,8 @@ function validate(v: Values, fields: string[]): FlowErrors {
 }
 
 /**
- * La candidature d'un futur commercial, une question à la fois. Des
+ * La candidature au programme d'affiliation, une question à la fois. Les réponses
+ * arrivent au même endroit : console Super Admin (Candidatures commerciales) et directeur commercial (Candidatures). Des
  * coordonnées et un parcours professionnel, rien d'autre : aucune donnée de
  * santé. Le consentement est obligatoire, et l'envoi n'active rien : l'équipe
  * étudie la candidature. Le CV (PDF, facultatif) n'est proposé que si le
@@ -116,17 +117,17 @@ export function SalesApplicationForm({ cvEnabled }: { cvEnabled: boolean }) {
       {
         id: "zone",
         section: "Votre secteur",
-        question: "Où vous situez-vous, et où souhaitez-vous travailler ?",
+        question: "Où vous situez-vous, et où recommanderez-vous PharmaBoost ?",
         fields: ["city", "zone"],
         seconds: 12,
         validate: (v) => validate(v, ["city", "zone"]),
         render: ({ values, errors, set }) => (
           <div className="grid gap-4 sm:grid-cols-2">
             <TextAnswer label="Votre ville ou secteur" value={values.city} onValueChange={(v) => set("city", v)} error={errors.city} autoComplete="address-level2" placeholder="Lyon" />
-            <TextAnswer label="Zone souhaitée" value={values.zone} onValueChange={(v) => set("zone", v)} error={errors.zone} autoComplete="off" placeholder="Rhône-Alpes" />
+            <TextAnswer label="Zone où vous recommanderez PharmaBoost" value={values.zone} onValueChange={(v) => set("zone", v)} error={errors.zone} autoComplete="off" placeholder="Rhône-Alpes" />
           </div>
         ),
-        recap: { label: "Secteur", value: (v) => [v.city.trim() && `Ville : ${v.city.trim()}`, v.zone.trim() && `Zone souhaitée : ${v.zone.trim()}`].filter(Boolean).join(" · ") || null },
+        recap: { label: "Secteur", value: (v) => [v.city.trim() && `Ville : ${v.city.trim()}`, v.zone.trim() && `Zone : ${v.zone.trim()}`].filter(Boolean).join(" · ") || null },
       },
       {
         id: "statut",
@@ -144,13 +145,13 @@ export function SalesApplicationForm({ cvEnabled }: { cvEnabled: boolean }) {
       {
         id: "experience-commerciale",
         section: "Votre parcours",
-        question: "Quelle est votre expérience commerciale ?",
-        help: "Postes, secteurs, type de clients : quelques lignes suffisent.",
+        question: "Quel est votre profil, et votre expérience ?",
+        help: "Délégué pharmaceutique, consultant, groupement, pharmacien, expert-comptable, commercial… Postes, secteurs, réseau : quelques lignes suffisent.",
         fields: ["salesExperience"],
         seconds: 40,
         validate: (v) => validate(v, ["salesExperience"]),
-        render: ({ values, errors, set }) => <LongTextAnswer srLabel="Expérience commerciale" value={values.salesExperience} onValueChange={(v) => set("salesExperience", v)} error={errors.salesExperience} rows={5} maxLength={2000} />,
-        recap: { label: "Expérience commerciale", value: (v) => v.salesExperience.trim() || null },
+        render: ({ values, errors, set }) => <LongTextAnswer srLabel="Profil et expérience" value={values.salesExperience} onValueChange={(v) => set("salesExperience", v)} error={errors.salesExperience} rows={5} maxLength={2000} />,
+        recap: { label: "Profil et expérience", value: (v) => v.salesExperience.trim() || null },
       },
       {
         id: "experience-sante",
@@ -167,8 +168,8 @@ export function SalesApplicationForm({ cvEnabled }: { cvEnabled: boolean }) {
       {
         id: "motivation",
         section: "Votre projet",
-        question: "Pourquoi souhaitez-vous rejoindre l'équipe ?",
-        help: "Un mot sur ce qui vous motive.",
+        question: "Pourquoi souhaitez-vous devenir affilié PharmaBoost ?",
+        help: "Un mot sur ce qui vous motive, et les pharmacies que vous connaissez.",
         fields: ["message"],
         seconds: 30,
         validate: (v) => validate(v, ["message"]),
@@ -223,7 +224,7 @@ export function SalesApplicationForm({ cvEnabled }: { cvEnabled: boolean }) {
         </div>
       )}
       canSubmit={(v) => v.consent}
-      submitLabel="Envoyer ma candidature"
+      submitLabel="Postuler maintenant"
       submitHint="Aucune activation automatique : notre équipe étudie chaque candidature."
       onSubmit={async (v) => {
         const body = new FormData();
@@ -245,7 +246,7 @@ function SalesAside({ values }: { values: Values }) {
       <div className="divide-y divide-border-subtle/70">
         <LiveRow label="Nom" value={name} />
         <LiveRow label="Ville ou secteur" value={values.city.trim()} />
-        <LiveRow label="Zone souhaitée" value={values.zone.trim()} />
+        <LiveRow label="Zone" value={values.zone.trim()} />
         <LiveRow label="Situation" value={values.currentStatus ? currentStatusLabel(values.currentStatus) : null} />
       </div>
     </LiveCard>

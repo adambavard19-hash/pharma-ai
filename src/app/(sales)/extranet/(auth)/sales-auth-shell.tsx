@@ -28,7 +28,7 @@ const HIGHLIGHTS = [
 export function SalesAuthShell({ title, intro, children }: { title: ReactNode; intro?: ReactNode; children: ReactNode }) {
   return (
     <HelixAuthLayout
-      space="Extranet commercial"
+      space="Espace affilié"
       headline="L'espace des commerciaux PharmaBoost."
       lead="Tout ce qu'il faut pour accompagner les pharmacies : vos dossiers, vos contrats, vos commissions — depuis l'ordinateur ou le téléphone."
       highlights={HIGHLIGHTS}

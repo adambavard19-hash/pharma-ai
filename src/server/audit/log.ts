@@ -340,6 +340,7 @@ export type AuditAction =
   | "stock.deposit_downloaded"
   | "sales.director_created"
   | "sales.director_updated"
+  | "sales.director_bonus_updated"
   | "sales.director_invited"
   | "sales.director_deleted"
   | "sales.rep_deleted"

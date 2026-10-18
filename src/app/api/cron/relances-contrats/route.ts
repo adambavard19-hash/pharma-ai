@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { runContractReminders } from "@/server/services/sales/contracts";
 import { syncAllProgressiveCommissions } from "@/server/services/sales/progressive-commissions";
 import { syncAllReferralDiscounts } from "@/server/billing/referral-discount";
+import { createMonthlyAffiliateCommissions, createSignupBonuses } from "@/server/services/sales/affiliate-commissions";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +18,15 @@ export const maxDuration = 60;
  * tâches planifiées : celle-ci porte donc aussi ce passage. Une erreur de
  * l'étape est journalisée, sans faire échouer les relances.
  *
- * Enfin, le rattrapage des remises de parrainage chez Stripe (webhook manqué).
+ * Puis le rattrapage des remises de parrainage chez Stripe (webhook manqué).
+ *
+ * Enfin, l'affiliation mensuelle : les commissions du mois ÉCOULÉ (10 % de
+ * l'abonnement de chaque pharmacie apportée et abonnée à la fin du mois). La
+ * tâche est quotidienne : le 1er, elle les crée ; les jours suivants, elle ne
+ * crée que ce qui manque (passage interrompu), jamais un doublon — l'index
+ * unique (pharmacie, mois) l'interdit — et jamais un mois plus ancien.
+ * Et les primes uniques (100 € à l'affilié, 50 € au directeur commercial) des
+ * pharmacies dont la mise en service vient d'être réglée : une par pharmacie.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -33,5 +42,13 @@ export async function GET(request: Request) {
     console.error("[cron] remises de parrainage : passage quotidien en échec", error instanceof Error ? error.message : "erreur inconnue");
     return null;
   });
-  return NextResponse.json({ ...report, commissions, referrals });
+  const affiliation = await createMonthlyAffiliateCommissions().catch((error: unknown) => {
+    console.error("[cron] affiliation mensuelle : passage en échec", error instanceof Error ? error.message : "erreur inconnue");
+    return null;
+  });
+  const signupBonuses = await createSignupBonuses().catch((error: unknown) => {
+    console.error("[cron] primes d'affiliation : passage en échec", error instanceof Error ? error.message : "erreur inconnue");
+    return null;
+  });
+  return NextResponse.json({ ...report, commissions, referrals, affiliation, signupBonuses });
 }

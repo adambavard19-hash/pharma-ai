@@ -1,3 +1,4 @@
+import { AFFILIATE_RULE_SENTENCE } from "@/core/affiliation/monthly";
 import { escapeHtml } from "@/core/documents/email";
 import { TIME_ZONE } from "@/config/constants";
 import { DEFAULT_EMAIL_CONTEXT, emailButtonHtml, emailFrame } from "./email-layout";
@@ -24,11 +25,17 @@ export const button = (url: string, label: string, _color = "#111827") => {
 
 export const dateTime = (d: Date) => new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(d);
 
-export function buildSalesInvitationEmail(v: { firstName: string; url: string; expiresAt: Date }): { subject: string; text: string; html: string } {
+export function buildSalesInvitationEmail(v: { firstName: string; url: string; expiresAt: Date; affiliate?: boolean }): { subject: string; text: string; html: string } {
+  // L'affilié (programme d'affiliation, 18 oct. 2026) : son espace et sa règle, dits tels quels. Les commerciaux d'avant gardent leur texte.
+  const space = v.affiliate ? "espace affilié" : "espace commercial";
+  const intro = v.affiliate
+    ? `Bienvenue dans le programme d'affiliation PharmaBoost : votre ${space} est prêt. Vous y préparez les contrats des pharmacies que vous apportez et suivez vos commissions : ${AFFILIATE_RULE_SENTENCE}, aussi longtemps qu'elle reste abonnée. Définissez votre mot de passe pour y accéder :`
+    : `Votre ${space} PharmaBoost est prêt. Définissez votre mot de passe pour y accéder :`;
+  const subject = v.affiliate ? "Votre espace affilié — PharmaBoost" : "Votre espace commercial — PharmaBoost";
   const text = [
     `Bonjour ${v.firstName},`,
     "",
-    "Votre espace commercial PharmaBoost est prêt. Définissez votre mot de passe pour y accéder :",
+    intro,
     v.url,
     "",
     `Ce lien est personnel, à usage unique, et reste valable jusqu'au ${dateTime(v.expiresAt)}.`,
@@ -36,11 +43,11 @@ export function buildSalesInvitationEmail(v: { firstName: string; url: string; e
     "L'équipe PharmaBoost",
   ].join("\n");
   const html = shell(
-    "Votre espace commercial — PharmaBoost",
-    "Votre espace commercial",
-    `<p style="margin:0;font-size:18px;line-height:26px;font-weight:600">Bonjour ${escapeHtml(v.firstName)},</p><p style="margin:12px 0 0;font-size:16px;line-height:25px;color:#374151">Votre espace commercial PharmaBoost est prêt. Définissez votre mot de passe pour y accéder.</p>${button(v.url, "Définir mon mot de passe")}<p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Ce lien est personnel, à usage unique, et reste valable jusqu'au ${escapeHtml(dateTime(v.expiresAt))}.</p>`,
+    subject,
+    v.affiliate ? "Votre espace affilié" : "Votre espace commercial",
+    `<p style="margin:0;font-size:18px;line-height:26px;font-weight:600">Bonjour ${escapeHtml(v.firstName)},</p><p style="margin:12px 0 0;font-size:16px;line-height:25px;color:#374151">${escapeHtml(intro.replace(/ :$/, "."))}</p>${button(v.url, "Définir mon mot de passe")}<p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Ce lien est personnel, à usage unique, et reste valable jusqu'au ${escapeHtml(dateTime(v.expiresAt))}.</p>`,
   );
-  return { subject: "Votre espace commercial — PharmaBoost", text, html };
+  return { subject, text, html };
 }
 
 /**

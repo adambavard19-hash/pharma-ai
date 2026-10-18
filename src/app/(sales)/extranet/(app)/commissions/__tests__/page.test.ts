@@ -8,11 +8,13 @@ import { renderToStaticMarkup } from "react-dom/server";
  * commercial de la session, et personne d'autre.
  */
 
-const mocks = vi.hoisted(() => ({ requireSalesSession: vi.fn(), listCommissionsFor: vi.fn(), listInvoicesFor: vi.fn(), commissionOverviewFor: vi.fn() }));
+const mocks = vi.hoisted(() => ({ requireSalesSession: vi.fn(), listCommissionsFor: vi.fn(), listInvoicesFor: vi.fn(), commissionOverviewFor: vi.fn(), affiliateOverviewFor: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/auth/sales-session", () => ({ requireSalesSession: mocks.requireSalesSession }));
 vi.mock("@/server/services/sales/commissions", () => ({ listCommissionsFor: mocks.listCommissionsFor, listInvoicesFor: mocks.listInvoicesFor, commissionOverviewFor: mocks.commissionOverviewFor }));
+vi.mock("@/server/services/sales/affiliate-commissions", () => ({ affiliateOverviewFor: mocks.affiliateOverviewFor }));
+vi.mock("@/server/services/public-pricing", () => ({ loadPublicPricing: async () => ({ name: "PharmaBoost Officine", source: "PLAN", monthlyPriceCents: 12_600, setupFeeCents: 15_000, commitmentMonths: 12, referralDiscountPercent: 20, planId: "plan_1" }) }));
 
 const page = await import("../page");
 
@@ -211,6 +213,67 @@ describe("le tableau de bord de la grille progressive", () => {
     expect(content).toContain("12,5 % de la première année");
     expect(content).not.toContain("Simulateur de gains");
     expect(content).not.toContain("Mes récompenses");
+  });
+});
+
+describe("l'affilié (10 % chaque mois, à vie)", () => {
+  const AFFILIATE = { type: "AFFILIATE", value: 0 };
+  const pharmacies = [
+    { prospectId: "p1", name: "Pharmacie du Port", active: true, subscriptionCents: 12_600, monthlyCommissionCents: 1_260, oldRule: false },
+    { prospectId: "p2", name: "Pharmacie des Halles", active: true, subscriptionCents: 10_080, monthlyCommissionCents: 1_008, oldRule: false },
+    { prospectId: "p3", name: "Pharmacie Fermée", active: false, subscriptionCents: 12_600, monthlyCommissionCents: 0, oldRule: false },
+  ];
+
+  it("la règle, les revenus récurrents actuels, les pharmacies, et les commissions mois par mois avec leur total", async () => {
+    mocks.commissionOverviewFor.mockResolvedValue({ rule: AFFILIATE, activations: [], beforeGridTiers: [] });
+    mocks.affiliateOverviewFor.mockResolvedValue({ pharmacies, activeCount: 2, recurringCents: 2_268 });
+    const rows = [
+      row({ type: "AFFILIATE", periodMonth: "2026-10", amountCents: 1_260, prospect: { id: "p1", name: "Pharmacie du Port", activatedAt: null, contracts: [] } }),
+      row({ type: "AFFILIATE", periodMonth: "2026-10", amountCents: 1_008, prospect: { id: "p2", name: "Pharmacie des Halles", activatedAt: null, contracts: [] } }),
+      row({ type: "AFFILIATE", periodMonth: "2026-09", amountCents: 1_260, status: "PAID", paidAt: new Date("2026-10-20T10:00:00Z"), prospect: { id: "p1", name: "Pharmacie du Port", activatedAt: null, contracts: [] } }),
+    ];
+    mocks.listCommissionsFor.mockResolvedValue({ ...NO_COMMISSIONS, rows, earnedCents: 2_268, paidCents: 1_260 });
+    const html = await render();
+    const content = text(html);
+
+    expect(mocks.affiliateOverviewFor).toHaveBeenCalledWith("rep_1");
+    expect(content).toContain("10 % de l'abonnement de chaque pharmacie, chaque mois, à vie");
+    // « Mes tarifs et ma rémunération » : les tarifs lus de la source des prix, la règle, la prime, le simulateur.
+    const pay = text(section(html, "tarifs-remuneration"));
+    expect(pay).toContain("Mes tarifs et ma rémunération");
+    expect(pay).toMatch(/Abonnement 126 € HT par mois/);
+    expect(pay).toMatch(/Mise en service 150 € HT/);
+    expect(pay).toMatch(/Prime d'arrivée 100 € HT/);
+    expect(pay).toContain("Simulateur de revenus");
+    // 50 pharmacies par défaut : 50 × 12,60 € = 630 € par mois, et 50 × 100 € = 5 000 € de primes.
+    expect(pay).toMatch(/630 € par mois/);
+    expect(pay).toMatch(/\+ 5 000 € de primes d'arrivée/);
+    expect(content).toMatch(/Revenus récurrents 22,68 € \/ mois 2 pharmacies abonnées × 10 %/);
+    expect(content).toContain("Pharmacie Fermée");
+    expect(content).toContain("Non abonnée");
+    const months = section(html, "par-mois");
+    // Le mois le plus récent d'abord, avec son total.
+    expect(text(months)).toMatch(/Octobre 2026 22,68 €.*Septembre 2026 12,60 €/i);
+    // Ni grille, ni bonus, ni simulateur : ce n'est pas sa règle.
+    expect(content).not.toContain("Simulateur de gains");
+    expect(content).not.toContain("Bonus débloqués");
+    expect(html).not.toContain('aria-labelledby="detail-commissions"');
+  });
+
+  it("ses commissions d'avant l'affiliation restent listées, intactes", async () => {
+    mocks.commissionOverviewFor.mockResolvedValue({ rule: AFFILIATE, activations: [], beforeGridTiers: [] });
+    mocks.affiliateOverviewFor.mockResolvedValue({ pharmacies: [], activeCount: 0, recurringCents: 0 });
+    mocks.listCommissionsFor.mockResolvedValue({ ...NO_COMMISSIONS, rows: [row({ type: "PROGRESSIVE", amountCents: 20_000, prospect: { id: "old", name: "Pharmacie Ancienne", activatedAt: null, contracts: [] } })] });
+    const html = await render();
+    const detail = text(section(html, "detail-commissions"));
+    expect(detail).toContain("Mes commissions d'avant l'affiliation");
+    expect(detail).toContain("Pharmacie Ancienne");
+    expect(text(html)).toContain("Aucune commission mensuelle pour l'instant");
+  });
+
+  it("un commercial à l'ancienne règle ne lit pas l'affiliation", async () => {
+    await render();
+    expect(mocks.affiliateOverviewFor).not.toHaveBeenCalled();
   });
 });
 

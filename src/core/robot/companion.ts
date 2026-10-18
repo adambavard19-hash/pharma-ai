@@ -59,9 +59,9 @@ export function isDemoLink(href: string | null | undefined): boolean {
 
 /**
  * Le compagnon du site ne gêne jamais : il disparaît là où un formulaire se remplit (réserver une démo, s'abonner,
- * devenir partenaire ou commercial) — sur téléphone, il couvrirait les champs et le bouton d'envoi.
+ * devenir partenaire, postuler à l'affiliation) — sur téléphone, il couvrirait les champs et le bouton d'envoi.
  */
-const SITE_FORM_PAGES = ["/decouvrir/demo", "/decouvrir/abonnement", "/decouvrir/partenaires", "/decouvrir/commercial"];
+const SITE_FORM_PAGES = ["/decouvrir/demo", "/decouvrir/abonnement", "/decouvrir/partenaires", "/decouvrir/affiliation"];
 
 export function siteCompanionAllowed(pathname: string, narrow: boolean): boolean {
   if (!narrow) return true;

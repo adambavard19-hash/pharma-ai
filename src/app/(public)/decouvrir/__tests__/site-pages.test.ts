@@ -33,3 +33,18 @@ describe("la section « Stock et marge »", () => {
     expect(html).not.toContain("creme-solaire");
   });
 });
+
+describe("l'onglet « Affiliation » remplace « Devenir commercial »", () => {
+  it("est dans le menu principal de l'en-tête (et donc le menu mobile) et dans le pied de page", () => {
+    const header = renderToStaticMarkup(createElement(SiteHeader));
+    const footer = renderToStaticMarkup(createElement(SiteFooter, { contactEmail: "contact@exemple.fr" }));
+    const nav = header.match(/<nav[^>]*aria-label="Sections"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? "";
+    expect(nav).toContain('href="/decouvrir/affiliation"');
+    expect(text(nav)).toContain("Affiliation");
+    expect(footer).toContain('href="/decouvrir/affiliation"');
+    for (const html of [header, footer]) {
+      expect(html).not.toContain("/decouvrir/commercial");
+      expect(text(html)).not.toContain("Devenir commercial");
+    }
+  });
+});

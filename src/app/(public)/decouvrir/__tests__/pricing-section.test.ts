@@ -14,11 +14,11 @@ describe("la section tarif du site : un seul abonnement", () => {
   const html = renderToStaticMarkup(createElement(PricingSection, { pricing: resolvePublicPricing(null) }));
   const t = text(html);
 
-  it("dit un seul abonnement : 126 € HT par mois, engagement de 12 mois, mise en service de 290 € HT une seule fois", () => {
+  it("dit un seul abonnement : 126 € HT par mois, engagement de 12 mois, mise en service de 150 € HT une seule fois", () => {
     expect(t).toContain("Un seul abonnement. Tout est inclus.");
     expect(t).toContain("126 € HT / mois");
     expect(t).toContain("Engagement de 12 mois");
-    expect(t).toContain("290 € HT, une seule fois");
+    expect(t).toContain("150 € HT, une seule fois");
   });
 
   it("dit ce que comprend l'abonnement, mois après mois", () => {

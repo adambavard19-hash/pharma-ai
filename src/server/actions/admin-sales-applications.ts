@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { SALES_APPLICATION_STATUSES, SALES_APPLICATION_STATUS_LABELS } from "@/core/sales-applications/status";
 import { addSalesApplicationNote, convertSalesApplication, moveSalesApplication } from "@/server/services/sales-applications/admin";
+import { describeAccountOutcome } from "@/core/sales-applications/account-outcome";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /**
@@ -39,7 +40,7 @@ export async function moveSalesApplicationAction(payload: z.input<typeof moveSch
     return fail(messages[result.reason]);
   }
   revalidateApplication(parsed.data.id);
-  return ok(null, `Candidature passée en « ${SALES_APPLICATION_STATUS_LABELS[result.to]} ».`);
+  return ok(null, `Candidature passée en « ${SALES_APPLICATION_STATUS_LABELS[result.to]} ».${describeAccountOutcome(result.account)}`);
 }
 
 const noteSchema = z.object({ id, note: z.string().trim().min(1, "Écrivez la note.").max(4000, "4 000 caractères au plus.") });
@@ -79,5 +80,5 @@ export async function convertSalesApplicationAction(payload: z.input<typeof conv
   revalidateApplication(parsed.data.id);
   revalidatePath("/admin/commerciaux");
   const invitation = result.invitation === null ? "Aucune invitation envoyée." : result.invitation.status === "SENT" ? "Invitation envoyée." : `Invitation NON envoyée : ${result.invitation.detail}`;
-  return ok({ salesRepId: result.salesRepId }, `${result.name} est maintenant commercial(e). ${invitation}`);
+  return ok({ salesRepId: result.salesRepId }, `${result.name} a maintenant son espace d'affilié. ${invitation}`);
 }

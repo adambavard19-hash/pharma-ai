@@ -2,7 +2,7 @@
 
 Règles du fondateur (11 oct. 2026) :
 - paiement par **prélèvement SEPA ou carte** ;
-- **mise en service (290 € HT) payée avec le premier mois** : première facture 290 + 126 € HT (499,20 € TTC), puis 126 € HT par mois ;
+- **mise en service (150 € HT) payée avec le premier mois** : première facture 150 + 126 € HT (331,20 € TTC), puis 126 € HT par mois ;
 - TVA 20 % ajoutée aux montants HT ;
 - souscription par le **lien envoyé par l'équipe** (console › Abonnements › officine › « Envoyer le lien ») et en **libre-service** sur le site (`/decouvrir/abonnement`).
 

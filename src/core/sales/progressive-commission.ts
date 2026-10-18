@@ -17,6 +17,8 @@
  * Tous les montants sont en centimes HT.
  */
 
+import { monthLabelOf } from "@/core/affiliation/monthly";
+
 export type CommissionTier = { from: number; to: number | null; rateCents: number };
 export type BonusTier = { at: number; cents: number; name: string };
 
@@ -189,8 +191,13 @@ export function bonusLabel(row: { type: string; bonusTier?: number | null }): st
   return bonus ? `Bonus ${bonus.name}` : "Bonus de palier";
 }
 
-/** Le libellé d'une ligne de commission dans une liste : la pharmacie, ou « Bonus Bronze — Pharmacie… ». */
-export function commissionSubject(row: { type: string; bonusTier?: number | null }, prospectName: string): string {
+/**
+ * Le libellé d'une ligne de commission dans une liste : la pharmacie, « Bonus Bronze — Pharmacie… », ou, pour une
+ * commission mensuelle d'affiliation, « Pharmacie… — octobre 2026 » (le mois de l'abonnement commissionné).
+ */
+export function commissionSubject(row: { type: string; bonusTier?: number | null; periodMonth?: string | null }, prospectName: string): string {
+  if (row.type === "AFFILIATE" && row.periodMonth) return `${prospectName} — ${monthLabelOf(row.periodMonth)}`;
+  if (row.type === "AFFILIATE_SIGNUP") return `Prime d'arrivée — ${prospectName}`;
   const label = bonusLabel(row);
   return label ? `${label} — ${prospectName}` : prospectName;
 }

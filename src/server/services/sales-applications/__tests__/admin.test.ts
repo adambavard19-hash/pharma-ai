@@ -30,7 +30,7 @@ vi.mock("@/server/services/sales/reps", () => ({ createSalesRep: mocks.createSal
 vi.mock("@/server/services/standard-commission", () => ({ getStandardCommissionCents: mocks.getStandardCommissionCents }));
 
 const admin = await import("../admin");
-const { formatPriceEuros } = await import("@/core/pricing/official-offer");
+const { AFFILIATE_RULE_SENTENCE } = await import("@/core/affiliation/monthly");
 
 const ADMIN_ID = "adm_1";
 
@@ -307,6 +307,42 @@ describe("ajouter une note", () => {
   });
 });
 
+// ---------------------------------------------------------------- Accepter = ouvrir l'espace de l'affilié
+
+describe("accepter une candidature", () => {
+  beforeEach(() => {
+    db.salesApplication.findUnique
+      .mockResolvedValueOnce({ status: "INTERVIEW", salesRepId: null })
+      .mockResolvedValueOnce({ status: "ACCEPTED", salesRepId: null, firstName: "Marie", lastName: "Dupont", email: "marie@exemple.fr", phone: "06", zone: "Rhône" });
+    db.salesApplication.updateMany.mockResolvedValue({ count: 1 });
+    db.salesRep.findUnique.mockResolvedValue(null);
+    mocks.createSalesRep.mockResolvedValue({ id: "rep_7" });
+    mocks.sendSalesInvitation.mockResolvedValue({ status: "SENT", detail: "envoyé" });
+  });
+
+  it("crée aussitôt l'espace de l'affilié et lui envoie son invitation", async () => {
+    const result = await admin.moveSalesApplication("app_1", "ACCEPTED", ADMIN_ID);
+    expect(result).toMatchObject({ ok: true, from: "INTERVIEW", to: "ACCEPTED", account: { ok: true, salesRepId: "rep_7", commissionType: "AFFILIATE", invitation: { status: "SENT" } } });
+    expect(mocks.createSalesRep).toHaveBeenCalledWith(expect.objectContaining({ email: "marie@exemple.fr", commissionType: "AFFILIATE", commissionValue: 0 }), ADMIN_ID);
+    expect(mocks.sendSalesInvitation).toHaveBeenCalledWith("rep_7", ADMIN_ID);
+  });
+
+  it("un échec de création n'annule pas l'acceptation : il est rendu pour être dit à l'écran", async () => {
+    db.salesRep.findUnique.mockResolvedValue({ id: "rep_existant" });
+    const result = await admin.moveSalesApplication("app_1", "ACCEPTED", ADMIN_ID);
+    expect(result).toMatchObject({ ok: true, to: "ACCEPTED", account: { ok: false, reason: "EMAIL_TAKEN" } });
+    expect(mocks.createSalesRep).not.toHaveBeenCalled();
+    expect(mocks.sendSalesInvitation).not.toHaveBeenCalled();
+  });
+
+  it("un autre statut ne crée rien", async () => {
+    db.salesApplication.findUnique.mockReset().mockResolvedValueOnce({ status: "NEW", salesRepId: null });
+    const result = await admin.moveSalesApplication("app_1", "INTERVIEW", ADMIN_ID);
+    expect(result).toEqual({ ok: true, from: "NEW", to: "INTERVIEW" });
+    expect(mocks.createSalesRep).not.toHaveBeenCalled();
+  });
+});
+
 // ---------------------------------------------------------------- Transformer en commercial
 
 describe("transformer en commercial", () => {
@@ -320,17 +356,17 @@ describe("transformer en commercial", () => {
     mocks.sendSalesInvitation.mockResolvedValue({ status: "SENT", detail: "envoyé" });
   });
 
-  // Depuis la grille progressive (octobre 2026), un commercial créé depuis une candidature suit la grille de tous les
-  // commerciaux, comme les nouveaux commerciaux créés à la main : plus de montant fixe tiré du réglage de la console.
-  it("crée le commercial avec les données de la candidature et la grille progressive, le lie, écrit l'événement et l'audit", async () => {
+  // Depuis l'affiliation (18 oct. 2026), une candidature acceptée devient un AFFILIÉ : 10 % de l'abonnement de chaque
+  // pharmacie apportée, chaque mois, à vie. Plus de montant fixe tiré du réglage de la console, plus de grille.
+  it("crée l'affilié avec les données de la candidature et l'affiliation, le lie, écrit l'événement et l'audit", async () => {
     const result = await admin.convertSalesApplication("app_1", ADMIN_ID, { invite: true });
 
-    expect(result).toEqual({ ok: true, salesRepId: "rep_1", name: "Marie Dupont", commissionType: "PROGRESSIVE", invitation: { status: "SENT", detail: "envoyé" } });
+    expect(result).toEqual({ ok: true, salesRepId: "rep_1", name: "Marie Dupont", commissionType: "AFFILIATE", invitation: { status: "SENT", detail: "envoyé" } });
     expect(mocks.createSalesRep).toHaveBeenCalledTimes(1);
-    expect(mocks.createSalesRep).toHaveBeenCalledWith({ firstName: "Marie", lastName: "Dupont", email: "marie@exemple.fr", phone: "06 12 34 56 78", zone: "Rhône et Isère", commissionType: "PROGRESSIVE", commissionValue: 0 }, ADMIN_ID);
+    expect(mocks.createSalesRep).toHaveBeenCalledWith({ firstName: "Marie", lastName: "Dupont", email: "marie@exemple.fr", phone: "06 12 34 56 78", zone: "Rhône et Isère", commissionType: "AFFILIATE", commissionValue: 0 }, ADMIN_ID);
     expect(db.salesApplication.updateMany).toHaveBeenCalledWith({ where: { id: "app_1", status: "ACCEPTED", salesRepId: null }, data: { salesRepId: "rep_1" } });
     expect(db.salesApplicationEvent.create).toHaveBeenCalledWith({
-      data: { applicationId: "app_1", kind: "CONVERTED", note: `Commercial créé : Marie Dupont. Grille progressive : ${formatPriceEuros(20000)} à ${formatPriceEuros(30000)} par pharmacie activée, + bonus de palier (10, 25, 50, 100).`, platformAdminId: ADMIN_ID },
+      data: { applicationId: "app_1", kind: "CONVERTED", note: `Affilié créé : Marie Dupont. Affiliation : ${AFFILIATE_RULE_SENTENCE}.`, platformAdminId: ADMIN_ID },
     });
     expect(mocks.sendSalesInvitation).toHaveBeenCalledWith("rep_1", ADMIN_ID);
     const audit = mocks.recordAudit.mock.calls[0][0];
@@ -339,15 +375,15 @@ describe("transformer en commercial", () => {
       entityType: "SalesApplication",
       entityId: "app_1",
       platformAdminId: ADMIN_ID,
-      metadata: { salesRepId: "rep_1", commissionType: "PROGRESSIVE", invitation: "SENT" },
+      metadata: { salesRepId: "rep_1", commissionType: "AFFILIATE", invitation: "SENT" },
     });
     expect(JSON.stringify(audit)).not.toContain("exemple.fr");
   });
 
-  it("la commission standard de la console n'entre plus en jeu : la grille est la même pour tous", async () => {
+  it("la commission standard de la console n'entre plus en jeu : l'affiliation est la même pour tous", async () => {
     mocks.getStandardCommissionCents.mockResolvedValue(30000);
     await admin.convertSalesApplication("app_1", ADMIN_ID, { invite: false });
-    expect(mocks.createSalesRep).toHaveBeenCalledWith(expect.objectContaining({ commissionType: "PROGRESSIVE", commissionValue: 0 }), ADMIN_ID);
+    expect(mocks.createSalesRep).toHaveBeenCalledWith(expect.objectContaining({ commissionType: "AFFILIATE", commissionValue: 0 }), ADMIN_ID);
     expect(mocks.getStandardCommissionCents).not.toHaveBeenCalled();
   });
 

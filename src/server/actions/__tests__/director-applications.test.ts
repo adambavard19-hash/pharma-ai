@@ -99,7 +99,7 @@ describe("transformer en commercial", () => {
     mocks.service.convertSalesApplication.mockResolvedValue({ ok: true, salesRepId: "rep_9", name: "Marie Dupont", commissionCents: 25000, invitation: { status: "SENT", detail: "ok" } });
     const result = await actions.convertApplicationAction({ id: "app_1", invite: true });
     expect(mocks.service.convertSalesApplication).toHaveBeenCalledWith("app_1", ACTOR, { invite: true });
-    expect(result).toEqual({ ok: true, data: { salesRepId: "rep_9" }, message: "Marie Dupont est maintenant commercial(e). Invitation envoyée." });
+    expect(result).toEqual({ ok: true, data: { salesRepId: "rep_9" }, message: "Marie Dupont a maintenant son espace d'affilié. Invitation envoyée." });
     expect(mocks.forgetUnsentInvitation).not.toHaveBeenCalled();
     for (const path of ["/directeur/candidatures/app_1", "/directeur/commerciaux", "/admin/commerciaux"]) expect(mocks.revalidatePath).toHaveBeenCalledWith(path);
   });
@@ -107,13 +107,13 @@ describe("transformer en commercial", () => {
   it("une invitation qui ne part pas est dite NON envoyée, et la fiche ne dit pas « invité le »", async () => {
     mocks.service.convertSalesApplication.mockResolvedValue({ ok: true, salesRepId: "rep_9", name: "Marie Dupont", commissionCents: 25000, invitation: { status: "FAILED", detail: "l'envoi a échoué" } });
     const result = await actions.convertApplicationAction({ id: "app_1" });
-    expect(result).toMatchObject({ ok: true, message: "Marie Dupont est maintenant commercial(e). Invitation NON envoyée : l'envoi a échoué" });
+    expect(result).toMatchObject({ ok: true, message: "Marie Dupont a maintenant son espace d'affilié. Invitation NON envoyée : l'envoi a échoué" });
     expect(mocks.forgetUnsentInvitation).toHaveBeenCalledWith("rep_9");
   });
 
   it("sans invitation demandée : dit qu'aucune invitation n'est partie", async () => {
     mocks.service.convertSalesApplication.mockResolvedValue({ ok: true, salesRepId: "rep_9", name: "Marie Dupont", commissionCents: 25000, invitation: null });
-    expect(await actions.convertApplicationAction({ id: "app_1", invite: false })).toMatchObject({ message: "Marie Dupont est maintenant commercial(e). Aucune invitation envoyée." });
+    expect(await actions.convertApplicationAction({ id: "app_1", invite: false })).toMatchObject({ message: "Marie Dupont a maintenant son espace d'affilié. Aucune invitation envoyée." });
     expect(mocks.forgetUnsentInvitation).not.toHaveBeenCalled();
   });
 

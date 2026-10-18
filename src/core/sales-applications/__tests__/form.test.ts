@@ -62,7 +62,7 @@ describe("candidature commerciale : règles de saisie", () => {
       email: "Adresse e-mail invalide.",
       phone: "Votre numéro de téléphone est requis.",
       city: "Indiquez votre ville ou votre secteur.",
-      zone: "Indiquez la zone où vous souhaitez travailler.",
+      zone: "Indiquez la zone où vous recommanderez PharmaBoost.",
       currentStatus: "Choisissez la situation qui vous correspond.",
     });
     expect(errors.salesExperience).toMatch(/10 caractères au moins/);

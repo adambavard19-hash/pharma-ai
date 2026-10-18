@@ -7,6 +7,7 @@ import { SALES_APPLICATION_STATUSES, SALES_APPLICATION_STATUS_LABELS } from "@/c
 import { addSalesApplicationNote, convertSalesApplication, moveSalesApplication } from "@/server/services/sales-applications/admin";
 import { forgetUnsentInvitation } from "@/server/services/sales/director-team";
 import type { RepActor } from "@/server/services/sales/rep-actor";
+import { describeAccountOutcome } from "@/core/sales-applications/account-outcome";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /**
@@ -44,8 +45,9 @@ export async function moveApplicationAction(payload: z.input<typeof moveSchema>)
     } as const;
     return fail(messages[result.reason]);
   }
+  if (result.account?.ok && result.account.invitation !== null && result.account.invitation.status !== "SENT") await forgetUnsentInvitation(result.account.salesRepId);
   revalidateApplication(parsed.data.id);
-  return ok(null, `Candidature passée en « ${SALES_APPLICATION_STATUS_LABELS[result.to]} ».`);
+  return ok(null, `Candidature passée en « ${SALES_APPLICATION_STATUS_LABELS[result.to]} ».${describeAccountOutcome(result.account)}`);
 }
 
 const noteSchema = z.object({ id, note: z.string().trim().min(1, "Écrivez la note.").max(4000, "4 000 caractères au plus.") });
@@ -88,5 +90,5 @@ export async function convertApplicationAction(payload: z.input<typeof convertSc
   revalidateApplication(parsed.data.id);
   for (const path of ["/directeur", "/directeur/commerciaux", "/admin/commerciaux"]) revalidatePath(path);
   const invitation = result.invitation === null ? "Aucune invitation envoyée." : result.invitation.status === "SENT" ? "Invitation envoyée." : `Invitation NON envoyée : ${result.invitation.detail}`;
-  return ok({ salesRepId: result.salesRepId }, `${result.name} est maintenant commercial(e). ${invitation}`);
+  return ok({ salesRepId: result.salesRepId }, `${result.name} a maintenant son espace d'affilié. ${invitation}`);
 }

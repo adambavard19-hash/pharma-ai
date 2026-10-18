@@ -20,8 +20,8 @@ type Created = { salesRepId: string; name: string; invitation: { status: string;
  */
 export function RepForm({ defaultCommissionCents }: { defaultCommissionCents: number }) {
   const [values, setValues] = useState({ firstName: "", lastName: "", email: "", phone: "", zone: "" });
-  // La grille progressive est la règle par défaut ; le montant standard reste proposé si l'on choisit un montant fixe.
-  const [commissionType, setCommissionType] = useState<CommissionTypeKey>("PROGRESSIVE");
+  // L'affiliation (10 % chaque mois) est la règle par défaut ; le montant standard reste proposé si l'on choisit un montant fixe.
+  const [commissionType, setCommissionType] = useState<CommissionTypeKey>("AFFILIATE");
   const [commissionValue, setCommissionValue] = useState(commissionInputFromStored(defaultCommissionCents));
   const [invite, setInvite] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -33,7 +33,7 @@ export function RepForm({ defaultCommissionCents }: { defaultCommissionCents: nu
 
   const reset = () => {
     setValues({ firstName: "", lastName: "", email: "", phone: "", zone: "" });
-    setCommissionType("PROGRESSIVE");
+    setCommissionType("AFFILIATE");
     setCommissionValue(commissionInputFromStored(defaultCommissionCents));
     setInvite(true);
     setErrors({});

@@ -613,7 +613,7 @@ export async function repPortfolio(repId: string) {
         },
       },
     }),
-    prisma.commission.findMany({ where: { salesRepId: repId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, type: true, amountCents: true, status: true, dueAt: true, paidAt: true, note: true, createdAt: true, prospect: { select: { id: true, name: true } } } }),
+    prisma.commission.findMany({ where: { salesRepId: repId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, type: true, periodMonth: true, amountCents: true, status: true, dueAt: true, paidAt: true, note: true, createdAt: true, prospect: { select: { id: true, name: true } } } }),
     prisma.prospectEvent.findMany({ where: { prospect: { salesRepId: repId } }, orderBy: { createdAt: "desc" }, take: 40, select: { id: true, type: true, summary: true, actorLabel: true, createdAt: true, prospect: { select: { id: true, name: true } } } }),
   ]);
   return { prospects, commissions, events };

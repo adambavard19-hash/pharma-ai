@@ -5,7 +5,7 @@ import { Download, FileText } from "lucide-react";
 import { requireDirectorSession } from "@/server/auth/director-session";
 import { getSalesApplication } from "@/server/services/sales-applications/admin";
 import { currentStatusLabel } from "@/core/sales-applications/status";
-import { describeProgressiveGrid } from "@/core/sales/commission";
+import { AFFILIATE_RULE_SENTENCE } from "@/core/affiliation/monthly";
 import { AdminPageHeader, AdminSection, FactList } from "@/components/admin/page-header";
 import { Timeline } from "@/components/admin/timeline";
 import { Button } from "@/components/ui/button";
@@ -39,8 +39,8 @@ export default async function SalesApplicationPage({ params }: { params: Promise
 
   const name = `${application.firstName} ${application.lastName}`.trim();
   const canConvert = application.status === "ACCEPTED" && !application.salesRep;
-  // La règle d'un commercial créé depuis une candidature : la grille progressive, la même pour tous.
-  const commissionLabel = canConvert ? describeProgressiveGrid() : null;
+  // La règle d'un affilié créé depuis une candidature : l'affiliation, la même pour tous.
+  const commissionLabel = canConvert ? AFFILIATE_RULE_SENTENCE : null;
   const cvSize = application.cv ? formatFileSize(application.cv.sizeBytes) : null;
 
   return (
@@ -58,10 +58,10 @@ export default async function SalesApplicationPage({ params }: { params: Promise
             <StatusActions id={application.id} status={application.status} locked={application.salesRep !== null} />
           </AdminSection>
 
-          <AdminSection title="Commercial">
+          <AdminSection title="Espace de l'affilié">
             {application.salesRep ? (
               <div className="space-y-2">
-                <p className="text-[13px] text-text-secondary">Cette candidature est devenue un commercial.</p>
+                <p className="text-[13px] text-text-secondary">Candidature acceptée : l&apos;affilié a son espace (extranet).</p>
                 <p className="flex flex-wrap items-center gap-2">
                   <Link href={`/directeur/commerciaux/${application.salesRep.id}`} className="text-[14px] font-medium text-text-primary hover:underline">
                     {application.salesRep.name}
@@ -72,7 +72,7 @@ export default async function SalesApplicationPage({ params }: { params: Promise
             ) : canConvert && commissionLabel ? (
               <ConvertPanel id={application.id} name={name} email={application.email} commissionLabel={commissionLabel} />
             ) : (
-              <p className="text-[13px] leading-5 text-text-secondary">La transformation en commercial est proposée une fois la candidature acceptée.</p>
+              <p className="text-[13px] leading-5 text-text-secondary">Accepter la candidature crée l&apos;espace de l&apos;affilié et lui envoie son invitation.</p>
             )}
           </AdminSection>
 

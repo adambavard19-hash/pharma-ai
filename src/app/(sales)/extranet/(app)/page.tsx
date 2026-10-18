@@ -13,7 +13,7 @@ import { demoCounts } from "@/core/sales/demo-outcome";
 import { DemoCounters, DemoList } from "@/components/sales/demo-board";
 import { DemoLink } from "./demo-link";
 
-export const metadata: Metadata = { title: { absolute: "Extranet commercial — PharmaBoost" } };
+export const metadata: Metadata = { title: { absolute: "Espace affilié — PharmaBoost" } };
 
 export default async function SalesHomePage() {
   const session = await requireSalesSession();

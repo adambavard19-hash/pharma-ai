@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { listSalesDirectors, salesTeamCounts } from "@/server/services/sales/directors";
+import { listDirectorBonuses } from "@/server/services/sales/director-bonuses";
 import { DirectorsView } from "./directors-view";
 
 export const metadata: Metadata = { title: "Directeur commercial" };
@@ -13,6 +14,6 @@ export const metadata: Metadata = { title: "Directeur commercial" };
  */
 export default async function SalesDirectorPage() {
   await requirePlatformSession();
-  const [directors, team] = await Promise.all([listSalesDirectors(), salesTeamCounts()]);
-  return <DirectorsView directors={directors} team={team} now={new Date()} />;
+  const [directors, team, bonuses] = await Promise.all([listSalesDirectors(), salesTeamCounts(), listDirectorBonuses()]);
+  return <DirectorsView directors={directors} team={team} bonuses={bonuses} now={new Date()} />;
 }

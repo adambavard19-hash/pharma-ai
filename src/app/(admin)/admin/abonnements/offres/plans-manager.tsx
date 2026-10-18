@@ -12,6 +12,7 @@ import { Alert, EmptyState } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { formatEuros } from "@/core/billing/subscription";
 import { parseAmountToCents } from "@/lib/format";
+import { OFFICIAL_OFFER } from "@/core/pricing/official-offer";
 import type { ActionResult } from "@/server/actions/types";
 
 export type PlanRow = {
@@ -303,7 +304,7 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="Mise en service HT (€)" htmlFor="pl-setup" error={fieldErrors.setupFeeCents} hint="Facturée une seule fois à la souscription. 0 = offerte.">
-              <Input id="pl-setup" inputMode="decimal" value={setupFee} onChange={(e) => setSetupFee(e.target.value)} placeholder="ex. 290" />
+              <Input id="pl-setup" inputMode="decimal" value={setupFee} onChange={(e) => setSetupFee(e.target.value)} placeholder={`ex. ${OFFICIAL_OFFER.setupFeeCents / 100}`} />
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

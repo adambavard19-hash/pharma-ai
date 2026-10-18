@@ -1,9 +1,9 @@
 /**
- * Le menu de l'espace du directeur commercial : six rubriques, toujours les
+ * Le menu de l'espace du directeur commercial : sept rubriques, toujours les
  * mêmes. Pur et sans icône (celles-ci vivent dans le composant), pour que la
  * liste serve aussi aux tests et aux autres écrans.
  */
-export type DirectorNavKey = "tableau-de-bord" | "commerciaux" | "candidatures" | "commissions" | "factures" | "challenges";
+export type DirectorNavKey = "tableau-de-bord" | "commerciaux" | "candidatures" | "commissions" | "factures" | "challenges" | "remuneration";
 
 export type DirectorNavItem = {
   key: DirectorNavKey;
@@ -25,6 +25,7 @@ export const DIRECTOR_NAV: readonly DirectorNavItem[] = [
   { key: "commissions", href: "/directeur/commissions", label: "Commissions", description: "Valider et payer les commissions." },
   { key: "factures", href: "/directeur/factures", label: "Factures", description: "Les factures reçues des commerciaux." },
   { key: "challenges", href: "/directeur/challenges", label: "Challenges", description: "Les objectifs de l'équipe sur une période." },
+  { key: "remuneration", href: "/directeur/remuneration", label: "Rémunération", description: "Les tarifs, ce que touchent vos affiliés, vos primes." },
 ];
 
 /** `/directeur/commerciaux/?q=a#b` → `/directeur/commerciaux` : seule la partie « chemin » compte. */

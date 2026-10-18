@@ -1,7 +1,7 @@
 import { renderEmail, type EmailContext, type RenderedEmail } from "@/core/platform/email-layout";
 
 /**
- * L'accusé de réception d'une candidature commerciale : sobre, sans promesse.
+ * L'accusé de réception d'une candidature au programme d'affiliation : sobre, sans promesse.
  * Il dit ce qui a été reçu et ce qu'il advient des informations ; il ne
  * promet ni réponse, ni délai, ni conditions. Rédigé ici, jamais par un
  * prestataire.
@@ -9,13 +9,13 @@ import { renderEmail, type EmailContext, type RenderedEmail } from "@/core/platf
 export function buildSalesApplicationAcknowledgement(ctx: EmailContext, applicant: { firstName: string; hasCv: boolean }): RenderedEmail {
   const contact = ctx.company.contactEmail;
   return renderEmail(ctx, {
-    subject: "Votre candidature à l'équipe commerciale PharmaBoost est bien reçue",
+    subject: "Votre candidature au programme d'affiliation PharmaBoost est bien reçue",
     preheader: "Notre équipe étudie votre candidature.",
     eyebrow: "PharmaBoost",
     title: "Votre candidature est bien reçue",
     greeting: `Bonjour ${applicant.firstName},`,
     blocks: [
-      { kind: "paragraph", text: "Nous avons bien reçu votre candidature pour rejoindre l'équipe commerciale de PharmaBoost. Merci de l'intérêt que vous portez à notre projet." },
+      { kind: "paragraph", text: "Nous avons bien reçu votre candidature au programme d'affiliation de PharmaBoost. Merci de l'intérêt que vous portez à notre projet." },
       { kind: "notice", text: "Notre équipe étudie chaque candidature. Si votre profil est retenu, nous vous contacterons pour un premier échange." },
       { kind: "note", text: `Vos informations${applicant.hasCv ? " et votre CV" : ""} servent uniquement à étudier votre candidature et à vous recontacter. Pour les faire supprimer, écrivez-nous à ${contact}.` },
     ],

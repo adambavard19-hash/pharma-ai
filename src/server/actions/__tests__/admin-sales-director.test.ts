@@ -28,6 +28,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/server/auth/platform-session", () => ({ requirePlatformSession: mocks.requirePlatformSession }));
 vi.mock("@/server/services/sales/directors", () => ({ SalesDirectorError: mocks.SalesDirectorError, ...mocks.service }));
+vi.mock("@/server/services/sales/director-bonuses", () => ({ moveDirectorBonus: vi.fn() }));
 
 const actions = await import("../admin-sales-director");
 
@@ -46,7 +47,7 @@ describe("la session administrateur", () => {
     const redirected = new Error("NEXT_REDIRECT /admin-connexion");
     mocks.requirePlatformSession.mockRejectedValue(redirected);
     const names = Object.keys(actions).sort();
-    expect(names).toEqual(["createSalesDirectorAction", "deleteSalesDirectorAction", "resendDirectorInvitationAction", "setSalesDirectorActiveAction", "updateSalesDirectorAction"]);
+    expect(names).toEqual(["createSalesDirectorAction", "deleteSalesDirectorAction", "moveDirectorBonusAction", "resendDirectorInvitationAction", "setSalesDirectorActiveAction", "updateSalesDirectorAction"]);
     for (const name of names) {
       const action = actions[name as keyof typeof actions] as (payload: unknown) => Promise<unknown>;
       await expect(action({ salesDirectorId: "dir_1", firstName: "Camille", lastName: "Durand", email: "camille@exemple.test", isActive: false })).rejects.toBe(redirected);

@@ -27,7 +27,7 @@ export { normalizeSubscriptionRequest, type SubscriptionRequestInput };
  *    prévenue ; aucun contrat ne part. Le SIRET est public, il ne prouve rien.
  *  - Le CONTRAT ne part jamais tout seul pour une demande du site : l'abonnement
  *    unique (126 € HT par mois, engagement de 12 mois) s'accompagne d'une mise en
- *    service de 290 € HT qui n'existe pas dans le contrat automatique. L'équipe
+ *    service (OFFICIAL_OFFER.setupFeeCents) qui n'existe pas dans le contrat automatique. L'équipe
  *    fixe les conditions puis « Envoyer le contrat » depuis la console.
  *  - Le prix figé au dossier est celui que le visiteur a VU (offre de la console
  *    ou offre officielle), pas celui d'un tarif plus ancien.

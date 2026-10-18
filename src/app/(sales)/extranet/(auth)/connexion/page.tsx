@@ -7,13 +7,13 @@ import { AUTH_LINK } from "@/components/app/helix/helix-auth-layout";
 import { SalesAuthShell } from "../sales-auth-shell";
 import { SalesLoginForm } from "./form";
 
-export const metadata: Metadata = { title: { absolute: "Extranet commercial — PharmaBoost" } };
+export const metadata: Metadata = { title: { absolute: "Espace affilié — PharmaBoost" } };
 
 export default async function SalesLoginPage({ searchParams }: { searchParams: Promise<{ defini?: string }> }) {
   const [session, { defini }] = await Promise.all([getSalesSession(), searchParams]);
   if (session) redirect("/extranet");
   return (
-    <SalesAuthShell title="Extranet commercial" intro="PharmaBoost — vos dossiers, vos contrats, vos commissions.">
+    <SalesAuthShell title="Espace affilié" intro="PharmaBoost — vos pharmacies, vos contrats, vos commissions.">
       {defini === "1" && <Alert tone="success">Mot de passe enregistré. Connectez-vous.</Alert>}
       <SalesLoginForm />
       <p className="text-center text-[13px]">

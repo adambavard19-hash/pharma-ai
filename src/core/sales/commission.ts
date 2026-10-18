@@ -1,5 +1,6 @@
 import { BONUS_TIERS, COMMISSION_TIERS, rateForRank } from "./progressive-commission";
 import { formatPriceEuros } from "@/core/pricing/official-offer";
+import { AFFILIATE_RULE_SENTENCE } from "@/core/affiliation/monthly";
 
 /**
  * Le calcul d'une commission, pur et testé.
@@ -15,8 +16,12 @@ import { formatPriceEuros } from "@/core/pricing/official-offer";
  *             relève de la comptabilité.
  * BONUS : le type d'une ligne de bonus de palier, jamais la règle d'un
  *         commercial ; aucun contrat ne le calcule (0).
+ * AFFILIATE : l'affiliation (18 oct. 2026) — 10 % de l'abonnement mensuel de
+ *         chaque pharmacie apportée, chaque mois, à vie. Rien n'est dû au
+ *         contrat (0) : les commissions naissent chaque mois
+ *         (`server/services/sales/affiliate-commissions.ts`).
  */
-export type CommissionRule = { type: "FIXED" | "PERCENT" | "RECURRING" | "PROGRESSIVE" | "BONUS"; value: number };
+export type CommissionRule = { type: "FIXED" | "PERCENT" | "RECURRING" | "PROGRESSIVE" | "BONUS" | "AFFILIATE" | "AFFILIATE_SIGNUP"; value: number };
 
 export function computeCommissionCents(rule: CommissionRule, contract: { monthlyPriceCents: number; durationMonths: number }, context?: { rank?: number }): number {
   const months = Math.min(12, Math.max(1, contract.durationMonths || 12));
@@ -30,6 +35,8 @@ export function computeCommissionCents(rule: CommissionRule, contract: { monthly
     case "RECURRING":
       return Math.max(0, Math.round(rule.value * months));
     case "BONUS":
+    case "AFFILIATE":
+    case "AFFILIATE_SIGNUP":
       return 0;
   }
 }
@@ -55,5 +62,9 @@ export function describeCommissionRule(rule: CommissionRule): string {
       return `${euros(rule.value)} par mois, 12 mois`;
     case "BONUS":
       return "Bonus de palier";
+    case "AFFILIATE_SIGNUP":
+      return "Prime d'arrivée";
+    case "AFFILIATE":
+      return AFFILIATE_RULE_SENTENCE.charAt(0).toUpperCase() + AFFILIATE_RULE_SENTENCE.slice(1);
   }
 }

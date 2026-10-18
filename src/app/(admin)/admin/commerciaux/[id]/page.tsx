@@ -7,6 +7,7 @@ import { requirePlatformSession } from "@/server/auth/platform-session";
 import { prisma } from "@/server/db/client";
 import { COMMERCIAL_PERIODS, repMetrics, repPortfolio, resolveCommercialPeriod } from "@/server/services/admin/commercial";
 import { describeCommissionRule } from "@/core/sales/commission";
+import { commissionSubject } from "@/core/sales/progressive-commission";
 import { PROSPECT_STATUSES, PROSPECT_STATUS_LABELS } from "@/core/sales/pipeline";
 import { contractualPrice } from "@/core/billing/contract-price";
 import { formatEuros } from "@/core/billing/subscription";
@@ -38,7 +39,7 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-const COMMISSION_TYPE_LABELS: Record<string, string> = { PROGRESSIVE: "Grille progressive", BONUS: "Bonus de palier", FIXED: "Fixe", PERCENT: "Pourcentage", RECURRING: "Récurrente" };
+const COMMISSION_TYPE_LABELS: Record<string, string> = { AFFILIATE: "Affiliation (mensuelle)", AFFILIATE_SIGNUP: "Prime d'arrivée", PROGRESSIVE: "Grille progressive", BONUS: "Bonus de palier", FIXED: "Fixe", PERCENT: "Pourcentage", RECURRING: "Récurrente" };
 
 /** Nature d'un événement de dossier, pour l'icône de la frise. */
 function timelineKind(type: string): TimelineKind {
@@ -190,7 +191,7 @@ export default async function SalesRepPage({ params, searchParams }: { params: P
                 {portfolio.commissions.map((c) => (
                   <TR key={c.id} interactive>
                     <TD className="max-w-[260px]">
-                      <Link href={`/admin/dossiers/${c.prospect.id}`} className="block truncate font-medium text-text-primary hover:text-brand-700 hover:underline dark:hover:text-brand-400">{c.prospect.name}</Link>
+                      <Link href={`/admin/dossiers/${c.prospect.id}`} className="block truncate font-medium text-text-primary hover:text-brand-700 hover:underline dark:hover:text-brand-400">{commissionSubject(c, c.prospect.name)}</Link>
                       <span className="block truncate text-[12px] text-text-tertiary">créée le {formatDate(c.createdAt)}{c.note ? ` · ${c.note}` : ""}</span>
                     </TD>
                     <TD className="text-text-secondary">{COMMISSION_TYPE_LABELS[c.type] ?? c.type}</TD>

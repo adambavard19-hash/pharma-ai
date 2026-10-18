@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { DIRECTOR_HOME, DIRECTOR_LOGIN, DIRECTOR_NAV, activeDirectorNavItem, isDirectorNavActive } from "../nav";
 
 describe("le menu du directeur", () => {
-  it("compte six rubriques, dans l'ordre promis à toute l'équipe", () => {
-    expect(DIRECTOR_NAV.map((item) => item.label)).toEqual(["Tableau de bord", "Commerciaux", "Candidatures", "Commissions", "Factures", "Challenges"]);
-    expect(DIRECTOR_NAV.map((item) => item.href)).toEqual(["/directeur", "/directeur/commerciaux", "/directeur/candidatures", "/directeur/commissions", "/directeur/factures", "/directeur/challenges"]);
+  it("compte sept rubriques, dans l'ordre promis à toute l'équipe", () => {
+    expect(DIRECTOR_NAV.map((item) => item.label)).toEqual(["Tableau de bord", "Commerciaux", "Candidatures", "Commissions", "Factures", "Challenges", "Rémunération"]);
+    expect(DIRECTOR_NAV.map((item) => item.href)).toEqual(["/directeur", "/directeur/commerciaux", "/directeur/candidatures", "/directeur/commissions", "/directeur/factures", "/directeur/challenges", "/directeur/remuneration"]);
   });
 
   it("ne renvoie que dans l'espace du directeur : aucun lien vers la console ni vers l'extranet", () => {

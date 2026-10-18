@@ -96,10 +96,10 @@ describe("l'estimation : calculée par la fonction du simulateur, jamais recopi�
 });
 
 describe("le tarif : celui de l'offre publique, et ce que comprend la mise en service", () => {
-  it("126 € HT par mois, engagement de 12 mois, mise en service de 290 € HT une seule fois", () => {
+  it("126 € HT par mois, engagement de 12 mois, mise en service de 150 € HT une seule fois", () => {
     expect(generic).toContain("126 € HT / mois");
     expect(generic).toContain("Engagement de 12 mois");
-    expect(generic).toContain("290 € HT, une seule fois");
+    expect(generic).toContain("150 € HT, une seule fois");
     for (const item of SETUP_INCLUDES) expect(generic).toContain(item);
   });
 

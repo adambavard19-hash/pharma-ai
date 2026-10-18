@@ -9,7 +9,6 @@ import { StripeNotConfigured } from "../billing-ui";
 import { PlansManager } from "./plans-manager";
 import { PublicOfferPanel } from "./public-offer-panel";
 import { describePublicPricing } from "@/server/services/public-pricing";
-import { getStandardCommissionCents } from "@/server/services/standard-commission";
 import { OFFICIAL_OFFER } from "@/core/pricing/official-offer";
 
 export const metadata: Metadata = { title: "Offres & tarifs" };
@@ -22,11 +21,10 @@ export const metadata: Metadata = { title: "Offres & tarifs" };
  */
 export default async function PlansPage() {
   await requirePlatformSession();
-  const [plans, stats, offer, commissionCents] = await Promise.all([
+  const [plans, stats, offer] = await Promise.all([
     prisma.plan.findMany({ orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }, { name: "asc" }] }),
     planSubscriptionStats(),
     describePublicPricing(),
-    getStandardCommissionCents(),
   ]);
   const defaultPlan = plans.find((plan) => plan.isDefault && plan.isActive) ?? null;
   const stripe = stripeConfigState();
@@ -53,9 +51,14 @@ export default async function PlansPage() {
           setupFeeCents: offer.pricing.setupFeeCents,
           commitmentMonths: offer.pricing.commitmentMonths,
           referralDiscountPercent: offer.pricing.referralDiscountPercent,
-          commissionCents,
           gaps: offer.gaps,
-          officialIsLive: offer.pricing.source === "PLAN" && defaultPlan?.code === OFFICIAL_OFFER.code,
+          // « Déjà en ligne » seulement si la console porte AUSSI les montants officiels du code : après un changement
+          // de tarif (mise en service 290 → 150 € le 18 oct. 2026), le bouton « Publier l'offre officielle » réapparaît.
+          officialIsLive:
+            offer.pricing.source === "PLAN" &&
+            defaultPlan?.code === OFFICIAL_OFFER.code &&
+            defaultPlan.monthlyPriceCents === OFFICIAL_OFFER.monthlyPriceCents &&
+            defaultPlan.setupFeeCents === OFFICIAL_OFFER.setupFeeCents,
           previousDefaultName: defaultPlan && defaultPlan.code !== OFFICIAL_OFFER.code ? defaultPlan.name : null,
         }}
       />

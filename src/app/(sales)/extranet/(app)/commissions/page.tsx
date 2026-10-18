@@ -13,8 +13,12 @@ import { InvoiceStatusBadge } from "@/components/sales/invoice-status-badge";
 import { formatCents, formatDate } from "@/lib/format";
 import { BonusProgress, EarningsHero, Rewards, TierGrid } from "./_components/dashboard";
 import { EarningsSimulator } from "./_components/earnings-simulator";
+import { AffiliateEarnings } from "./_components/affiliate";
+import { affiliateOverviewFor } from "@/server/services/sales/affiliate-commissions";
+import { loadPublicPricing } from "@/server/services/public-pricing";
+import { PricingAndPay } from "@/components/affiliation/pricing-and-pay";
 
-export const metadata: Metadata = { title: { absolute: "Mes commissions & bonus — PharmaBoost" } };
+export const metadata: Metadata = { title: { absolute: "Mes commissions — PharmaBoost" } };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count > 1 ? many : one}`;
 
@@ -34,10 +38,16 @@ export default async function SalesCommissionsPage() {
   const session = await requireSalesSession();
   const [data, invoices, overview] = await Promise.all([listCommissionsFor(session.rep.id), listInvoicesFor(session.rep.id), commissionOverviewFor(session.rep.id)]);
   const progressive = overview.rule.type === "PROGRESSIVE";
+  // L'affilié (18 oct. 2026) : 10 % de l'abonnement de chaque pharmacie, chaque mois, à vie. Ses anciennes commissions
+  // (avant l'affiliation), s'il en a, restent listées plus bas, intactes.
+  const affiliate = overview.rule.type === "AFFILIATE";
+  const [affiliation, pricing] = affiliate ? await Promise.all([affiliateOverviewFor(session.rep.id), loadPublicPricing()]) : [null, null];
   const activated = overview.activations.length;
   const summary = summarizeEarnings(data.rows);
   const bonusRows = data.rows.filter((row) => row.type === "BONUS").sort((a, b) => (a.bonusTier ?? 0) - (b.bonusTier ?? 0));
-  const ordinaryRows = data.rows.filter((row) => row.type !== "BONUS");
+  const affiliateRows = data.rows.filter((row) => row.type === "AFFILIATE");
+  const signupRows = data.rows.filter((row) => row.type === "AFFILIATE_SIGNUP");
+  const ordinaryRows = data.rows.filter((row) => row.type !== "BONUS" && row.type !== "AFFILIATE" && row.type !== "AFFILIATE_SIGNUP");
   const rewards = rewardsFor(activated, bonusRows, overview.beforeGridTiers ?? []);
   const simulation = simulate(activated);
   const rankOf = new Map(overview.activations.map((activation) => [activation.prospectId, activation.rank]));
@@ -60,64 +70,78 @@ export default async function SalesCommissionsPage() {
 
   return (
     <>
-      <div>
-        <h1 className="text-[22px] leading-7 font-bold tracking-[-0.025em] text-text-primary">Mes commissions &amp; bonus</h1>
-        <p className="mt-1 text-[13.5px] text-text-secondary">Vos vrais gains, vos paliers et vos prochains objectifs. Tout se calcule à partir de vos dossiers.</p>
-      </div>
-
-      <EarningsHero summary={summary} thisMonthCents={data.thisMonthCents} firstSteps={firstSteps} />
-
-      <section aria-label="Indicateurs" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Commissions" value={formatPriceEuros(summary.commissionsCents)} sublabel={summary.commissionsUpcomingCents > 0 ? `+${formatPriceEuros(summary.commissionsUpcomingCents)} prévues` : "acquises"} icon={<Wallet className="size-4" aria-hidden="true" />} />
-        {progressive ? (
-          <StatCard label="Bonus débloqués" value={formatPriceEuros(summary.bonusesCents)} sublabel={bonusStatusLine(rewards, formatPriceEuros)} icon={<Gift className="size-4" aria-hidden="true" />} />
-        ) : (
-          <StatCard label="Votre règle" value={<span className="text-[17px] leading-6">{describeCommissionRule(overview.rule)}</span>} sublabel="accord particulier" icon={<BadgePercent className="size-4" aria-hidden="true" />} />
-        )}
-        <StatCard label="Pharmacies activées" value={activated} sublabel="total historique" icon={<Building2 className="size-4" aria-hidden="true" />} emphasis="brand" />
-        {progressive && (
-          <StatCard
-            label="Commission actuelle"
-            value={formatPriceEuros(simulation.rateCents)}
-            sublabel={`par pharmacie · ${simulation.nextTier ? `${formatPriceEuros(simulation.nextTier.rateCents)} dès la ${rankLabel(simulation.nextTier.from)}` : "palier maximal atteint"}`}
-            icon={<BadgePercent className="size-4" aria-hidden="true" />}
-          />
-        )}
-      </section>
-
-      {progressive ? (
+      {affiliation ? (
         <>
-          <BonusProgress simulation={simulation} />
-          <Rewards rewards={rewards} />
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-            <TierGrid count={activated} />
-            {/* Sur un téléphone, le simulateur passe avant la grille : c'est le bloc qu'on manipule. */}
-            <Card className="order-first lg:order-none">
-              <CardContent className="space-y-4 py-5">
-                <div>
-                  <h2 className="text-[16px] leading-6 font-semibold text-text-primary">Simulateur de gains</h2>
-                  <p className="mt-0.5 text-[13px] text-text-secondary">Combien rapporterait votre total d&apos;activations ? Le calcul suit exactement la grille.</p>
-                </div>
-                <EarningsSimulator realCount={activated} realTotalCents={summary.totalCents} pendingBonusCents={summary.bonusesUpcomingCents} />
-              </CardContent>
-            </Card>
+          <div>
+            <h1 className="text-[22px] leading-7 font-bold tracking-[-0.025em] text-text-primary">Mes commissions</h1>
+            <p className="mt-1 text-[13.5px] text-text-secondary">Vos vrais gains d&apos;affilié, calculés à partir de vos pharmacies et de leurs abonnements.</p>
           </div>
+          {pricing && <PricingAndPay audience="affiliate" pricing={pricing} />}
+          <AffiliateEarnings pharmacies={affiliation.pharmacies} recurringCents={affiliation.recurringCents} activeCount={affiliation.activeCount} rows={affiliateRows} signupRows={signupRows} thisMonthCents={data.thisMonthCents} earnedCents={data.earnedCents} paidCents={data.paidCents} />
         </>
       ) : (
-        <Card>
-          <CardContent className="py-5">
-            <h2 className="text-[16px] leading-6 font-semibold text-text-primary">Votre rémunération</h2>
-            <p className="mt-1 text-[13.5px] text-text-secondary">
-              Votre contrat prévoit un accord particulier : {describeCommissionRule(overview.rule).toLowerCase()}. La grille progressive et ses bonus de palier ne s&apos;appliquent pas à votre contrat ; parlez-en à la direction commerciale si vous souhaitez y passer.
-            </p>
-          </CardContent>
-        </Card>
+        <>
+        <div>
+          <h1 className="text-[22px] leading-7 font-bold tracking-[-0.025em] text-text-primary">Mes commissions &amp; bonus</h1>
+          <p className="mt-1 text-[13.5px] text-text-secondary">Vos vrais gains, vos paliers et vos prochains objectifs. Tout se calcule à partir de vos dossiers.</p>
+        </div>
+
+        <EarningsHero summary={summary} thisMonthCents={data.thisMonthCents} firstSteps={firstSteps} />
+
+        <section aria-label="Indicateurs" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label="Commissions" value={formatPriceEuros(summary.commissionsCents)} sublabel={summary.commissionsUpcomingCents > 0 ? `+${formatPriceEuros(summary.commissionsUpcomingCents)} prévues` : "acquises"} icon={<Wallet className="size-4" aria-hidden="true" />} />
+          {progressive ? (
+            <StatCard label="Bonus débloqués" value={formatPriceEuros(summary.bonusesCents)} sublabel={bonusStatusLine(rewards, formatPriceEuros)} icon={<Gift className="size-4" aria-hidden="true" />} />
+          ) : (
+            <StatCard label="Votre règle" value={<span className="text-[17px] leading-6">{describeCommissionRule(overview.rule)}</span>} sublabel="accord particulier" icon={<BadgePercent className="size-4" aria-hidden="true" />} />
+          )}
+          <StatCard label="Pharmacies activées" value={activated} sublabel="total historique" icon={<Building2 className="size-4" aria-hidden="true" />} emphasis="brand" />
+          {progressive && (
+            <StatCard
+              label="Commission actuelle"
+              value={formatPriceEuros(simulation.rateCents)}
+              sublabel={`par pharmacie · ${simulation.nextTier ? `${formatPriceEuros(simulation.nextTier.rateCents)} dès la ${rankLabel(simulation.nextTier.from)}` : "palier maximal atteint"}`}
+              icon={<BadgePercent className="size-4" aria-hidden="true" />}
+            />
+          )}
+        </section>
+
+        {progressive ? (
+          <>
+            <BonusProgress simulation={simulation} />
+            <Rewards rewards={rewards} />
+            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+              <TierGrid count={activated} />
+              {/* Sur un téléphone, le simulateur passe avant la grille : c'est le bloc qu'on manipule. */}
+              <Card className="order-first lg:order-none">
+                <CardContent className="space-y-4 py-5">
+                  <div>
+                    <h2 className="text-[16px] leading-6 font-semibold text-text-primary">Simulateur de gains</h2>
+                    <p className="mt-0.5 text-[13px] text-text-secondary">Combien rapporterait votre total d&apos;activations ? Le calcul suit exactement la grille.</p>
+                  </div>
+                  <EarningsSimulator realCount={activated} realTotalCents={summary.totalCents} pendingBonusCents={summary.bonusesUpcomingCents} />
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        ) : (
+          <Card>
+            <CardContent className="py-5">
+              <h2 className="text-[16px] leading-6 font-semibold text-text-primary">Votre rémunération</h2>
+              <p className="mt-1 text-[13.5px] text-text-secondary">
+                Votre contrat prévoit un accord particulier : {describeCommissionRule(overview.rule).toLowerCase()}. La grille progressive et ses bonus de palier ne s&apos;appliquent pas à votre contrat ; parlez-en à la direction commerciale si vous souhaitez y passer.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        </>
       )}
 
+      {(!affiliate || visible.length > 0) && (
       <section aria-labelledby="detail-commissions" className="space-y-3">
         <div>
-          <h2 id="detail-commissions" className="text-[16px] leading-6 font-semibold text-text-primary">Détail de mes commissions</h2>
-          <p className="text-[13px] text-text-secondary">Les bonus de palier d&apos;abord, puis une ligne par pharmacie, la plus récente en premier.</p>
+          <h2 id="detail-commissions" className="text-[16px] leading-6 font-semibold text-text-primary">{affiliate ? "Mes commissions d'avant l'affiliation" : "Détail de mes commissions"}</h2>
+          <p className="text-[13px] text-text-secondary">{affiliate ? "Les commissions uniques acquises avant votre passage à l'affiliation : elles restent les vôtres, inchangées." : "Les bonus de palier d'abord, puis une ligne par pharmacie, la plus récente en premier."}</p>
         </div>
         <Card><CardContent className="pt-0">
           {data.rows.length === 0 ? <p className="py-6 text-[13.5px] text-text-secondary">Aucune commission pour l&apos;instant : elle apparaît à l&apos;envoi d&apos;un contrat.</p> : (
@@ -135,11 +159,12 @@ export default async function SalesCommissionsPage() {
           )}
         </CardContent></Card>
       </section>
+      )}
 
       <section aria-labelledby="mes-factures" className="space-y-3">
         <div>
           <h2 id="mes-factures" className="text-[16px] leading-6 font-semibold text-text-primary">Mes factures</h2>
-          <p className="text-[13px] text-text-secondary">Les factures que vous avez envoyées à la direction commerciale, une fois enregistrées.</p>
+          <p className="text-[13px] text-text-secondary">Les factures que vous avez envoyées à PharmaBoost, une fois enregistrées.</p>
         </div>
         <Card><CardContent className="pt-0">
           {invoices.length === 0 ? <p className="py-6 text-[13.5px] text-text-secondary">Aucune facture enregistrée pour l&apos;instant.</p> : (

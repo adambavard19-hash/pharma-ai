@@ -2,7 +2,7 @@ import { z } from "zod";
 import { CURRENT_STATUSES } from "./status";
 
 /**
- * La candidature « Devenir commercial » : les règles de saisie, partagées par
+ * La candidature au programme d'affiliation : les règles de saisie, partagées par
  * le formulaire (validation question par question) et par l'action serveur,
  * qui reste seule juge. Des coordonnées et un parcours professionnel : aucune
  * donnée de santé, aucune donnée patient.
@@ -33,9 +33,9 @@ export const salesApplicationSchema = z.object({
     .max(30, "30 caractères au plus.")
     .refine(isPlausiblePhone, "Numéro de téléphone invalide (exemple : 06 12 34 56 78)."),
   city: z.string().trim().min(2, "Indiquez votre ville ou votre secteur.").max(120, "120 caractères au plus."),
-  zone: z.string().trim().min(2, "Indiquez la zone où vous souhaitez travailler.").max(120, "120 caractères au plus."),
+  zone: z.string().trim().min(2, "Indiquez la zone où vous recommanderez PharmaBoost.").max(120, "120 caractères au plus."),
   currentStatus: z.string().refine((value) => CURRENT_STATUSES.some((status) => status.value === value), "Choisissez la situation qui vous correspond."),
-  salesExperience: z.string().trim().min(10, "Décrivez en quelques mots votre expérience commerciale (10 caractères au moins).").max(2000, "2 000 caractères au plus."),
+  salesExperience: z.string().trim().min(10, "Décrivez en quelques mots votre profil et votre expérience (10 caractères au moins).").max(2000, "2 000 caractères au plus."),
   /** Facultatif : une expérience avec les pharmacies ou la santé. */
   healthExperience: optionalText(2000),
   message: z.string().trim().min(10, "Dites-nous en quelques mots ce qui vous motive (10 caractères au moins).").max(2000, "2 000 caractères au plus."),

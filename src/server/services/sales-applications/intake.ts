@@ -27,7 +27,7 @@ export function cvUploadAvailable(): boolean {
 }
 
 /**
- * Une candidature « Devenir commercial » venue du site public.
+ * Une candidature au programme d'affiliation (page « Affiliation ») venue du site public.
  *
  * Elle devient une candidature « Nouvelle » dans la console, l'équipe est
  * prévenue, le candidat reçoit un accusé de réception. RIEN d'autre n'est

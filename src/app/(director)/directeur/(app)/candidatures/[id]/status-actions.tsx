@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ban } from "lucide-react";
+import { Ban, UserCheck } from "lucide-react";
 import { moveApplicationAction } from "@/server/actions/director-applications";
 import { SALES_APPLICATION_STATUSES, SALES_APPLICATION_STATUS_LABELS, type SalesApplicationStatusKey } from "@/core/sales-applications/status";
 import { ConfirmAction } from "@/components/admin/confirm-action";
@@ -39,7 +39,7 @@ export function StatusActions({ id, status, locked }: { id: string; status: Sale
   const [error, setError] = useState<string | null>(null);
 
   if (locked) {
-    return <p className="text-[13px] text-text-secondary">Cette candidature est devenue un commercial : son statut ne change plus.</p>;
+    return <p className="text-[13px] text-text-secondary">Candidature acceptée, espace de l&apos;affilié créé : son statut ne change plus.</p>;
   }
 
   const move = (to: SalesApplicationStatusKey) => {
@@ -77,8 +77,20 @@ export function StatusActions({ id, status, locked }: { id: string; status: Sale
               disabled={pending}
               onConfirm={() => moveApplicationAction({ id, to })}
             />
+          ) : to === "ACCEPTED" ? (
+            <ConfirmAction
+              key={to}
+              label={moveLabel(to)}
+              icon={<UserCheck className="size-3.5" />}
+              variant="primary"
+              title="Accepter cette candidature ?"
+              description="Accepter, c'est ouvrir l'espace de l'affilié : son compte de l'extranet est créé et il reçoit aussitôt par e-mail le lien pour choisir son mot de passe. Sa rémunération : 10 % de l'abonnement de chaque pharmacie qu'il apporte, chaque mois, à vie."
+              confirmLabel="Accepter et créer son espace"
+              disabled={pending}
+              onConfirm={() => moveApplicationAction({ id, to })}
+            />
           ) : (
-            <Button key={to} size="sm" variant={to === "ACCEPTED" ? "success" : "outline"} loading={pending && busy === to} disabled={pending} onClick={() => move(to)}>
+            <Button key={to} size="sm" variant="outline" loading={pending && busy === to} disabled={pending} onClick={() => move(to)}>
               {moveLabel(to)}
             </Button>
           ),

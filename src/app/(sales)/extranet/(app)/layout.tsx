@@ -20,10 +20,10 @@ export default async function SalesLayout({ children }: { children: ReactNode })
       <header className="sticky top-0 z-30 border-b border-border-subtle bg-surface-card/95 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/extranet" className="rounded-lg">
-            <span className="block text-[14px] leading-4 font-semibold text-text-primary">PharmaBoost</span><span className="block text-[11.5px] text-text-tertiary">Extranet commercial</span>
+            <span className="block text-[14px] leading-4 font-semibold text-text-primary">PharmaBoost</span><span className="block text-[11.5px] text-text-tertiary">Espace affilié</span>
           </Link>
           {/* L'île PharmaBoost : les tâches du jour, les démos à venir, les commissions du commercial. */}
-          <PlatformIsland label="L'île du commercial" homeEndpoint="/api/ile/extranet" />
+          <PlatformIsland label="L'île de l'affilié" homeEndpoint="/api/ile/extranet" />
           <div className="flex items-center gap-2">
             <span className="hidden text-[13px] text-text-secondary sm:block">{session.rep.fullName}</span>
             <form action={salesLogoutAction}><Button type="submit" variant="ghost" size="sm">Déconnexion</Button></form>

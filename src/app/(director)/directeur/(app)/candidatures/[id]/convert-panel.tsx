@@ -7,9 +7,11 @@ import { ConfirmAction } from "@/components/admin/confirm-action";
 import { Checkbox } from "@/components/ui/field";
 
 /**
- * « Transformer en commercial » : crée le compte avec les données de la
- * candidature et la grille progressive des commerciaux. L'invitation par e-mail (lien pour
- * choisir un mot de passe) est facultative.
+ * « Créer l'espace de l'affilié » : le secours, quand la création automatique à
+ * l'acceptation n'a pas pu se faire (ou pour une candidature acceptée avant le
+ * 18 oct. 2026). Crée le compte de l'extranet avec les données de la
+ * candidature et l'affiliation (10 % chaque mois). L'invitation par e-mail est
+ * facultative.
  */
 export function ConvertPanel({ id, name, email, commissionLabel }: { id: string; name: string; email: string; commissionLabel: string }) {
   const [invite, setInvite] = useState(true);
@@ -17,17 +19,17 @@ export function ConvertPanel({ id, name, email, commissionLabel }: { id: string;
   return (
     <div className="space-y-3">
       <p className="text-[13px] leading-5 text-text-secondary">
-        Crée le compte commercial de {name} avec les informations de la candidature (prénom, nom, e-mail, téléphone, zone). Sa rémunération suit la grille de tous les commerciaux — {commissionLabel}. Vous pourrez la modifier depuis sa fiche.
+        Crée l&apos;espace d&apos;affilié de {name} (son accès à l&apos;extranet) avec les informations de la candidature (prénom, nom, e-mail, téléphone, zone). Sa rémunération : {commissionLabel}. Vous pourrez la modifier depuis sa fiche.
       </p>
       <Checkbox id="sales-application-invite" checked={invite} onChange={(event) => setInvite(event.target.checked)} label="Envoyer l'invitation par e-mail" description="Un lien lui permet de choisir son mot de passe. Sans invitation, vous pourrez l'envoyer plus tard depuis sa fiche." />
       <ConfirmAction
-        label="Transformer en commercial"
+        label="Créer l'espace de l'affilié"
         icon={<UserPlus className="size-3.5" />}
         variant="primary"
-        title="Transformer en commercial ?"
-        confirmLabel="Créer le commercial"
+        title="Créer l'espace de l'affilié ?"
+        confirmLabel="Créer l'espace"
         consequences={[
-          `Un compte commercial est créé pour ${email}.`,
+          `Un espace d'affilié est créé pour ${email}.`,
           `${commissionLabel}.`,
           invite ? "Une invitation est envoyée à cette adresse." : "Aucune invitation n'est envoyée.",
           "Le statut de la candidature ne pourra plus changer.",

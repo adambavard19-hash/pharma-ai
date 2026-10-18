@@ -6,6 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { formatDate, formatDateTime, formatRelative } from "@/lib/format";
 import { AddDirectorForm, DirectorActions } from "./director-admin";
+import { DirectorBonusActions } from "./director-bonus-actions";
+import type { DirectorBonusRow } from "@/server/services/sales/director-bonuses";
+import { CommissionStatusBadge } from "@/components/sales/status-badge";
+import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
+import { formatCents } from "@/lib/format";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
 
@@ -14,7 +19,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
  * qu'il affiche. La page lit la base derrière la session de la console ; cette
  * séparation permet de relire l'écran sans compte.
  */
-export function DirectorsView({ directors, team, now }: { directors: SalesDirectorRow[]; team: { active: number; total: number }; now: Date }) {
+export function DirectorsView({ directors, team, bonuses, now }: { directors: SalesDirectorRow[]; team: { active: number; total: number }; bonuses?: { rows: DirectorBonusRow[]; earnedCents: number; payableCents: number; paidCents: number }; now: Date }) {
   const active = directors.filter((director) => director.isActive).length;
 
   return (
@@ -32,6 +37,34 @@ export function DirectorsView({ directors, team, now }: { directors: SalesDirect
           Voir les commerciaux <ArrowRight className="size-3.5" aria-hidden="true" />
         </Link>
       </Alert>
+
+      {bonuses && (
+        <AdminSection
+          id="primes"
+          title="Primes du directeur commercial"
+          description={`${formatCents(DIRECTOR_SIGNUP_BONUS_CENTS)} HT par pharmacie signée par l'équipe, une fois sa mise en service réglée. Acquises : ${formatCents(bonuses.earnedCents)} · à payer : ${formatCents(bonuses.payableCents)} · payées : ${formatCents(bonuses.paidCents)}.`}
+        >
+          {bonuses.rows.length === 0 ? (
+            <p className="text-[13px] text-text-secondary">Aucune prime pour l&apos;instant : la première naît quand une pharmacie signée par l&apos;équipe règle sa mise en service.</p>
+          ) : (
+            <ul className="divide-y divide-border-subtle">
+              {bonuses.rows.map((bonus) => (
+                <li key={bonus.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-[13.5px]">
+                  <div className="min-w-0">
+                    <Link href={`/admin/dossiers/${bonus.prospect.id}`} className="font-medium text-text-primary hover:underline">{bonus.prospect.name}</Link>
+                    <p className="text-[12px] text-text-tertiary">{bonus.director.name}{bonus.earnedAt ? ` · acquise le ${formatDate(bonus.earnedAt)}` : ""}{bonus.paidAt ? ` · payée le ${formatDate(bonus.paidAt)}` : ""}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold tabular text-text-primary">{formatCents(bonus.amountCents)}</span>
+                    <CommissionStatusBadge status={bonus.status} />
+                    <DirectorBonusActions id={bonus.id} status={bonus.status} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AdminSection>
+      )}
 
       <AdminSection id="ajouter" title="Ajouter un directeur commercial" description="Il reçoit un lien personnel pour choisir son mot de passe, puis se connecte à son espace.">
         <AddDirectorForm />

@@ -72,14 +72,14 @@ describe("la session Checkout de l'abonnement", () => {
 });
 
 describe("la première facture", () => {
-  it("290 € + 126 € HT = 416 € HT, soit 499,20 € TTC ; puis 126 € HT", () => {
-    expect(firstInvoice({ monthlyCents: 12_600, setupFeeCents: 29_000, trialDays: 0 })).toEqual({ monthlyCents: 12_600, setupFeeCents: 29_000, todayCents: 41_600, todayWithVatCents: 49_920 });
+  it("150 € + 126 € HT = 276 € HT, soit 331,20 € TTC ; puis 126 € HT", () => {
+    expect(firstInvoice({ monthlyCents: 12_600, setupFeeCents: 15_000, trialDays: 0 })).toEqual({ monthlyCents: 12_600, setupFeeCents: 15_000, todayCents: 27_600, todayWithVatCents: 33_120 });
     expect(withVat(12_600)).toBe(15_120);
   });
 
   it("la phrase dit le détail, le TTC, la suite et l'engagement", () => {
-    const sentence = firstInvoiceSentence({ monthlyCents: 12_600, setupFeeCents: 29_000, trialDays: 0, commitmentMonths: 12 });
-    expect(sentence).toBe("Aujourd'hui : 290 € de mise en service + 126 € pour le premier mois, soit 416 € HT (499,20 € TTC). Puis 126 € HT par mois. Engagement de 12 mois.");
+    const sentence = firstInvoiceSentence({ monthlyCents: 12_600, setupFeeCents: 15_000, trialDays: 0, commitmentMonths: 12 });
+    expect(sentence).toBe("Aujourd'hui : 150 € de mise en service + 126 € pour le premier mois, soit 276 € HT (331,20 € TTC). Puis 126 € HT par mois. Engagement de 12 mois.");
   });
 
   it("mise en service offerte : seulement le premier mois", () => {
@@ -87,8 +87,8 @@ describe("la première facture", () => {
   });
 
   it("avec un essai (contrat signé) : la mise en service aujourd'hui, l'abonnement après l'essai", () => {
-    const sentence = firstInvoiceSentence({ monthlyCents: 12_600, setupFeeCents: 29_000, trialDays: 30, trialEndsAt: new Date("2026-11-11T10:00:00Z"), commitmentMonths: 12 });
-    expect(sentence).toBe("Aujourd'hui : 290 € HT de mise en service (348 € TTC). Premier mois offert, puis 126 € HT par mois à partir du 11/11/2026. Engagement de 12 mois.");
+    const sentence = firstInvoiceSentence({ monthlyCents: 12_600, setupFeeCents: 15_000, trialDays: 30, trialEndsAt: new Date("2026-11-11T10:00:00Z"), commitmentMonths: 12 });
+    expect(sentence).toBe("Aujourd'hui : 150 € HT de mise en service (180 € TTC). Premier mois offert, puis 126 € HT par mois à partir du 11/11/2026. Engagement de 12 mois.");
   });
 });
 
@@ -114,7 +114,7 @@ describe("l'engagement", () => {
     expect(commitmentMonthsFromMetadata({ commitmentMonths: "12" })).toBe(12);
     expect(commitmentMonthsFromMetadata({ commitmentMonths: "douze" })).toBeNull();
     expect(commitmentMonthsFromMetadata({})).toBeNull();
-    expect(setupFeeFromMetadata({ setupFeeCents: "29000" })).toBe(29_000);
+    expect(setupFeeFromMetadata({ setupFeeCents: "15000" })).toBe(15_000);
     expect(setupFeeFromMetadata({ setupFeeCents: "0" })).toBe(0);
     expect(setupFeeFromMetadata({ setupFeeCents: "-5" })).toBeNull();
     expect(setupFeeFromMetadata({})).toBeNull();

@@ -3175,6 +3175,12 @@ enum SalesCommissionType {
   /// Bonus de palier (10, 25, 50, 100 pharmacies activées), versé une seule fois :
   /// type d'une LIGNE de commission, jamais la règle d'un commercial.
   BONUS
+  /// Affiliation (18 oct. 2026) : 10 % de l'abonnement mensuel HT de chaque pharmacie apportée, chaque mois, aussi
+  /// longtemps qu'elle reste abonnée (src/core/affiliation/terms.ts). Règle d'un affilié ET type de ses lignes mensuelles.
+  AFFILIATE
+  /// Prime unique de l'affilié (100 € HT) pour une pharmacie apportée, due une fois sa mise en service réellement réglée.
+  /// Type d'une LIGNE, jamais une règle. Une seule par pharmacie : `periodMonth` vaut alors « PRIME » (index unique).
+  AFFILIATE_SIGNUP
 }
 
 enum ProspectStatus {
@@ -3393,6 +3399,7 @@ model Prospect {
   adminNotes       AdminNote[]
   referralLeads    ReferralLead[]       @relation("ReferrerLeads")
   referredFromLead ReferralLead?        @relation("ReferredLead")
+  directorBonus    DirectorBonus?
 
   @@index([salesRepId, status])
   @@index([status])
@@ -3535,11 +3542,16 @@ model Commission {
   /// (`prospectId`) est la pharmacie dont l'activation a atteint le palier.
   bonusTier Int?
 
+  /// Type AFFILIATE : le mois de l'abonnement commissionné (« 2026-11 », heure de Paris). Type AFFILIATE_SIGNUP : « PRIME ».
+  /// Une seule commission par pharmacie (dossier) et par mois, une seule prime : l'index unique l'impose au niveau de la base.
+  periodMonth String?
+
   prospect Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
   salesRep SalesRep      @relation(fields: [salesRepId], references: [id])
   invoice  SalesInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@unique([salesRepId, bonusTier])
+  @@unique([prospectId, periodMonth])
   @@index([salesRepId, status])
   @@index([invoiceId])
   @@map("commissions")
@@ -3570,8 +3582,32 @@ model SalesDirector {
   updatedAt        DateTime @updatedAt
 
   sessions SalesDirectorSession[]
+  bonuses  DirectorBonus[]
 
   @@map("sales_directors")
+}
+
+/// La prime unique du directeur commercial (50 € HT, `core/affiliation/terms.ts`) pour une pharmacie signée par son
+/// équipe, due une fois la mise en service réellement réglée. Une seule par pharmacie (dossier) : index unique. Même
+/// circuit de statuts que les commissions (Acquise → À payer → Payée, ou Annulée), géré depuis la console.
+model DirectorBonus {
+  id              String           @id @default(cuid())
+  salesDirectorId String
+  prospectId      String           @unique
+  amountCents     Int
+  status          CommissionStatus @default(EARNED)
+  earnedAt        DateTime?
+  dueAt           DateTime?
+  paidAt          DateTime?
+  note            String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  salesDirector SalesDirector @relation(fields: [salesDirectorId], references: [id], onDelete: Restrict)
+  prospect      Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([salesDirectorId, status])
+  @@map("director_bonuses")
 }
 
 model SalesDirectorSession {

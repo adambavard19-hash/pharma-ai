@@ -15,7 +15,7 @@ import { formatDate } from "@/lib/format";
 import { param } from "../pipeline/filter-form";
 import { CreateSalesRepButton } from "./rep-form";
 import { getStandardCommissionCents } from "@/server/services/standard-commission";
-import { formatPriceEuros } from "@/core/pricing/official-offer";
+import { AFFILIATE_RULE_SENTENCE } from "@/core/affiliation/monthly";
 
 export const metadata: Metadata = { title: "Commerciaux" };
 
@@ -40,7 +40,7 @@ export default async function SalesRepsPage({ searchParams }: { searchParams: Pr
       <AdminPageHeader
         space={{ label: "Commercial", href: "/admin/pipeline" }}
         title="Commerciaux"
-        description={`${activeCount} commercial${activeCount > 1 ? "aux" : ""} actif${activeCount > 1 ? "s" : ""} sur ${reps.length}. Portefeuilles, résultats et commissions. Commission standard : ${formatPriceEuros(standardCommissionCents)} par pharmacie activée (réglage dans Offres & tarifs).`}
+        description={`${activeCount} commercial${activeCount > 1 ? "aux" : ""} actif${activeCount > 1 ? "s" : ""} sur ${reps.length}. Portefeuilles, résultats et commissions. Rémunération des nouveaux affiliés : ${AFFILIATE_RULE_SENTENCE}.`}
         // La clé suit `?nouveau=` : la fenêtre s'ouvre aussi quand on est déjà sur la page, et à chaque nouvel usage.
         actions={<CreateSalesRepButton key={param(params.nouveau) ?? "aucun"} defaultOpen={param(params.nouveau) === "commercial"} defaultCommissionEuros={defaultCommissionEuros} />}
       />

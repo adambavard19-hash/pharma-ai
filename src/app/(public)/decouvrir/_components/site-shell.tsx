@@ -11,6 +11,8 @@ const NAV = [
   { href: "/decouvrir#stock-marge", label: "Stock et marge" },
   { href: "/decouvrir/pourquoi", label: "Pourquoi" },
   { href: "/decouvrir#tarif", label: "Tarif" },
+  // Le programme d'affiliation, dans le menu principal : 10 % de l'abonnement de chaque pharmacie apportée, chaque mois.
+  { href: "/decouvrir/affiliation", label: "Affiliation" },
 ];
 
 /**
@@ -52,10 +54,13 @@ export function SiteWordmark({ className, robot = true }: { className?: string; 
 export function SiteHeader({ island }: { island?: ReactNode }) {
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-border-subtle bg-surface-app/70 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-5 max-[419px]:px-3">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-5 max-[419px]:px-3 xl:max-[1599px]:max-w-[1280px] min-[1600px]:max-w-[1520px]">
         {/* L'île PharmaBoost : au milieu de l'en-tête sur tablette et ordinateur. Sur téléphone, sa capsule noire n'est pas
             montrée (retour du fondateur, 13 oct. 2026) : seul le robot vivant, transparent, se tient devant le nom. */}
-        {island && <div className="flex max-md:hidden md:order-2 md:mx-auto">{island}</div>}
+        {/* Avec le menu complet (à partir de 1280 px), marque + six onglets + île + boutons ne tenaient plus dans 1 152 px :
+            « Réserver une démo » sortait de l'écran (mesuré à 1440 px, 18 oct. 2026). L'île s'efface donc entre 1280 et 1599 px
+            (l'en-tête passe à 1 280 px), puis revient au milieu à partir de 1600 px, où tout tient. Sous 1280 px (menu replié), rien ne change. */}
+        {island && <div className="flex max-md:hidden md:order-2 md:mx-auto xl:max-[1599px]:hidden">{island}</div>}
         {/* Le robot vivant à côté du nom, comme le fondateur l'a demandé : la marque se lit « robot + PharmaBoost ». */}
         <SiteWordmark className="md:order-1" />
         <nav className="ml-6 hidden items-center gap-0.5 md:order-1 xl:flex" aria-label="Sections">
@@ -65,7 +70,7 @@ export function SiteHeader({ island }: { island?: ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-1.5 md:order-3 md:ml-0 max-[419px]:gap-1">
+        <div className="ml-auto flex items-center gap-1.5 md:order-3 md:ml-0 max-[419px]:gap-1 xl:max-[1599px]:ml-auto">
           <Link href="/login" className="hidden rounded-full px-3 py-2 text-[13.5px] font-medium whitespace-nowrap text-text-secondary hover:bg-surface-sunken hover:text-text-primary xl:inline-block">
             Se connecter
           </Link>
@@ -86,7 +91,6 @@ export function SiteHeader({ island }: { island?: ReactNode }) {
             <Link href="/decouvrir/abonnement" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-sunken">S&apos;abonner</Link>
             <Link href="/login" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-secondary hover:bg-surface-sunken">Se connecter</Link>
             <Link href="/decouvrir/partenaires" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-secondary hover:bg-surface-sunken">Devenir partenaire</Link>
-            <Link href="/decouvrir/commercial" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-secondary hover:bg-surface-sunken">Devenir commercial</Link>
           </MobileMenu>
         </div>
       </div>
@@ -107,7 +111,7 @@ export function SiteFooter({ contactEmail }: { contactEmail: string }) {
           {[
             { href: "/decouvrir/pourquoi", label: "Pourquoi PharmaBoost" },
             { href: "/decouvrir/partenaires", label: "Devenir partenaire" },
-            { href: "/decouvrir/commercial", label: "Devenir commercial" },
+            { href: "/decouvrir/affiliation", label: "Affiliation" },
             { href: "/decouvrir/mentions-legales", label: "Mentions légales" },
             { href: "/decouvrir/confidentialite", label: "Confidentialité et données" },
           ].map((link) => (

@@ -194,13 +194,13 @@ describe("la fiche", () => {
     expect(html).not.toContain("/cv");
   });
 
-  // Depuis la grille progressive, le commercial créé depuis une candidature suit la grille de tous : plus de montant fixe.
-  it("acceptée et pas encore convertie : « Transformer en commercial » avec la grille progressive", async () => {
+  // Depuis l'affiliation (18 oct. 2026), l'affilié créé depuis une candidature touche 10 % chaque mois : plus de montant fixe.
+  it("acceptée sans espace (création automatique manquée) : « Créer l'espace de l'affilié » avec l'affiliation", async () => {
     mocks.getSalesApplication.mockResolvedValue(detailOf({ status: "ACCEPTED" }));
     mocks.getStandardCommissionCents.mockResolvedValue(30000);
     const content = text(await renderDetail());
-    expect(content).toContain("Transformer en commercial");
-    expect(content).toMatch(/grille de tous les commerciaux — Grille progressive : 200 € à 300 € par pharmacie activée, \+ bonus de palier \(10, 25, 50, 100\)/);
+    expect(content).toContain("Créer l'espace de l'affilié");
+    expect(content).toMatch(/Sa rémunération : 10\s%\sde l'abonnement de chaque pharmacie, chaque mois, à vie/);
     expect(content).not.toContain("commission est fixe");
     expect(mocks.getStandardCommissionCents).not.toHaveBeenCalled();
     expect(content).toContain("Vous pourrez la modifier depuis sa fiche");
@@ -212,7 +212,7 @@ describe("la fiche", () => {
       mocks.getSalesApplication.mockResolvedValue(detailOf({ status: statusKey }));
       const content = text(await renderDetail());
       expect(content).not.toContain("Créer le commercial");
-      expect(content).toContain("proposée une fois la candidature acceptée");
+      expect(content).toContain("Accepter la candidature crée l'espace de l'affilié");
     }
     expect(mocks.getStandardCommissionCents).not.toHaveBeenCalled();
   });
@@ -222,7 +222,7 @@ describe("la fiche", () => {
     const html = await renderDetail();
     const content = text(html);
     expect(hrefs(html)).toContain("/directeur/commerciaux/rep_1");
-    expect(content).toContain("est devenue un commercial");
+    expect(content).toContain("l'affilié a son espace");
     expect(content).toContain("son statut ne change plus");
     expect(content).not.toContain("Envoyer l'invitation par e-mail");
     expect(mocks.getStandardCommissionCents).not.toHaveBeenCalled();

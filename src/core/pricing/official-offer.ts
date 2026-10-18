@@ -4,7 +4,7 @@
  *
  * Un seul abonnement par officine, engagement de 12 mois :
  *   - 126 € HT par mois ;
- *   - une mise en service unique de 290 € HT : installation et configuration sur
+ *   - une mise en service unique de 150 € HT (290 € HT jusqu'au 18 oct. 2026) : installation et configuration sur
  *     tous les postes de comptoir, paramétrage de l'officine et import du stock,
  *     tests de fonctionnement, formation de l'équipe ;
  *   - parrainage : dès que la personne parrainée s'abonne, l'abonnement de
@@ -19,7 +19,7 @@ export const OFFICIAL_OFFER = {
   code: "PHARMABOOST_OFFICINE",
   name: "PharmaBoost Officine",
   monthlyPriceCents: 12_600,
-  setupFeeCents: 29_000,
+  setupFeeCents: 15_000,
   commitmentMonths: 12,
   referralDiscountPercent: 20,
   /** Commission standard d'un commercial, par nouvelle pharmacie activée, quelle que soit sa taille. */

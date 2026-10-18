@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { SalesDirectorError, createSalesDirector, deleteSalesDirector, resendDirectorInvitation, setSalesDirectorActive, updateSalesDirector } from "@/server/services/sales/directors";
+import { moveDirectorBonus } from "@/server/services/sales/director-bonuses";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
 /**
@@ -111,4 +112,17 @@ export async function deleteSalesDirectorAction(payload: z.input<typeof idSchema
   } catch (error) {
     return refusal(error);
   }
+}
+
+const bonusSchema = z.object({ id, gesture: z.enum(["VALIDATE", "PAY", "CANCEL"]) });
+
+/** Prime du directeur (50 € par pharmacie signée par l'équipe) : la valider, la marquer payée ou l'annuler. */
+export async function moveDirectorBonusAction(payload: z.input<typeof bonusSchema>): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const parsed = bonusSchema.safeParse(payload);
+  if (!parsed.success) return fail("Demande invalide.");
+  const result = await moveDirectorBonus(parsed.data.id, parsed.data.gesture, session.admin.id);
+  if (!result.ok) return fail(result.error);
+  revalidatePath(PAGE);
+  return ok(null, result.status === "PAID" ? "Prime marquée payée." : result.status === "PAYABLE" ? "Prime validée : elle est à payer." : "Prime annulée.");
 }

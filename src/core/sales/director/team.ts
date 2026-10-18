@@ -74,8 +74,11 @@ export function teamSearchWhere(q: string | null | undefined): Prisma.SalesRepWh
 // ---- Commission : saisie et aide ------------------------------------------------
 
 /** Les règles qu'on peut donner à un commercial, la grille progressive (règle par défaut) d'abord. BONUS n'en est pas une. */
-export const COMMISSION_TYPES = ["PROGRESSIVE", "FIXED", "PERCENT", "RECURRING"] as const;
+export const COMMISSION_TYPES = ["AFFILIATE", "PROGRESSIVE", "FIXED", "PERCENT", "RECURRING"] as const;
 export type CommissionTypeKey = (typeof COMMISSION_TYPES)[number];
+
+/** Les règles sans montant à saisir : l'affiliation (10 % fixés dans le code) et la grille progressive. */
+export const COMMISSION_TYPES_WITHOUT_AMOUNT: readonly CommissionTypeKey[] = ["AFFILIATE", "PROGRESSIVE"];
 
 /** La règle d'un commercial lue en base, ramenée aux règles possibles (une valeur inattendue retombe sur la grille). */
 export function toCommissionTypeKey(type: string): CommissionTypeKey {
@@ -83,11 +86,16 @@ export function toCommissionTypeKey(type: string): CommissionTypeKey {
 }
 
 /** Les plafonds stockés : centimes (FIXED, RECURRING) ou centièmes de pour cent (PERCENT). PROGRESSIVE : toujours 0, la grille est dans le code. */
-export const COMMISSION_MAX: Record<CommissionTypeKey, number> = { PROGRESSIVE: 0, FIXED: 10_000_000, RECURRING: 10_000_000, PERCENT: 10_000 };
+export const COMMISSION_MAX: Record<CommissionTypeKey, number> = { AFFILIATE: 0, PROGRESSIVE: 0, FIXED: 10_000_000, RECURRING: 10_000_000, PERCENT: 10_000 };
 
 export const COMMISSION_OPTIONS: Record<CommissionTypeKey, { label: string; unit: string; help: string }> = {
+  AFFILIATE: {
+    label: "Affiliation : 10 % chaque mois (recommandée)",
+    unit: "",
+    help: "10 % de l'abonnement mensuel HT de chaque pharmacie apportée, chaque mois, aussi longtemps qu'elle reste abonnée. Calculée automatiquement au début de chaque mois pour le mois écoulé.",
+  },
   PROGRESSIVE: {
-    label: "Grille progressive (recommandée)",
+    label: "Ancienne grille progressive",
     unit: "",
     help: "200 € par pharmacie activée de la 1re à la 9e, 250 € de la 10e à la 19e, 300 € dès la 20e, plus les bonus de palier (10, 25, 50 et 100 pharmacies). Calculée sur le total historique, sans remise à zéro.",
   },
@@ -102,8 +110,8 @@ export const COMMISSION_OPTIONS: Record<CommissionTypeKey, { label: string; unit
  * saisie est illisible, négative ou au-dessus du plafond.
  */
 export function parseCommissionInput(type: CommissionTypeKey, text: string): number | null {
-  // La grille progressive n'a pas de montant à saisir.
-  if (type === "PROGRESSIVE") return 0;
+  // L'affiliation et la grille progressive n'ont pas de montant à saisir.
+  if (COMMISSION_TYPES_WITHOUT_AMOUNT.includes(type)) return 0;
   const clean = text.trim().replace(/\s/g, "").replace(",", ".");
   if (!/^\d+(\.\d{1,2})?$/.test(clean)) return null;
   const stored = Math.round(Number(clean) * 100);

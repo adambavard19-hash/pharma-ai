@@ -223,6 +223,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "sales.rep_deleted": "Commercial supprimé",
   "sales.director_created": "Directeur commercial ajouté",
   "sales.director_updated": "Directeur commercial modifié",
+  "sales.director_bonus_updated": "Prime du directeur commercial modifiée",
   "sales.director_invited": "Directeur commercial invité",
   "sales.director_deleted": "Directeur commercial supprimé",
   "sales.invoice_created": "Facture de commercial enregistrée",

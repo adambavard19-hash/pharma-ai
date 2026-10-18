@@ -78,7 +78,7 @@ export async function issueSalesPasswordLink(salesRepId: string): Promise<{ url:
 export async function sendSalesInvitation(salesRepId: string, actor: RepActorInput): Promise<{ status: string; detail: string }> {
   const rep = await prisma.salesRep.findUniqueOrThrow({ where: { id: salesRepId } });
   const { url, expiresAt } = await issueSalesPasswordLink(rep.id);
-  const message = buildSalesInvitationEmail({ firstName: rep.firstName, url, expiresAt });
+  const message = buildSalesInvitationEmail({ firstName: rep.firstName, url, expiresAt, affiliate: rep.commissionType === "AFFILIATE" });
   const outcome = await getMessagingProvider().sendEmail({ to: rep.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html });
   await prisma.salesRep.update({ where: { id: rep.id }, data: { invitedAt: new Date() } });
   await recordAudit({ action: "sales.rep_invited", entityType: "SalesRep", entityId: rep.id, ...auditIdentity(actor), metadata: { status: outcome.status } });

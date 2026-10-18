@@ -201,15 +201,17 @@ describe("l'ajout d'un commercial", () => {
     expect(mocks.getStandardCommissionCents).not.toHaveBeenCalled();
   });
 
-  it("propose la grille progressive par défaut, son aide, et l'invitation cochée par défaut", async () => {
+  it("propose l'affiliation par défaut, son aide, et l'invitation cochée par défaut", async () => {
     const html = await renderCreate();
     const content = text(html);
     expect(content).toContain("Ajouter un commercial");
     expect(content).toContain("Prénom");
     expect(content).toContain("Adresse e-mail");
-    // La grille progressive est la règle par défaut des nouveaux commerciaux : pas de montant à saisir.
-    expect(html).toMatch(/<option value="PROGRESSIVE" selected="">Grille progressive \(recommandée\)<\/option>/);
-    expect(content).toContain("200 € par pharmacie activée de la 1re à la 9e, 250 € de la 10e à la 19e, 300 € dès la 20e");
+    // L'affiliation (18 oct. 2026) est la règle par défaut des nouveaux affiliés : pas de montant à saisir.
+    expect(html).toMatch(/<option value="AFFILIATE" selected="">Affiliation : 10 % chaque mois \(recommandée\)<\/option>/);
+    expect(content).toContain("10 % de l'abonnement mensuel HT de chaque pharmacie apportée, chaque mois");
+    // L'ancienne grille reste choisissable (commerciaux existants).
+    expect(content).toContain("Ancienne grille progressive");
     expect(html).not.toContain('id="rep-value"');
     // Le montant fixe reste proposé, prérempli avec la commission standard quand on le choisit.
     expect(content).toContain("Montant fixe par officine");

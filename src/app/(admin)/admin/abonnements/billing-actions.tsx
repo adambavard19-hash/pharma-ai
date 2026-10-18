@@ -41,7 +41,7 @@ export function SubscriptionAdminActions({
   isActive: boolean;
   /** Ce que proposera le lien d'activation (offre, tarif) ; nul : rien à proposer. */
   inviteSummary: string | null;
-  /** La mise en service que le lien ajoutera à la première facture (« 290 € HT ») ; nul : aucune. */
+  /** La mise en service que le lien ajoutera à la première facture (« 150 € HT ») ; nul : aucune. */
   inviteSetupLabel?: string | null;
 }) {
   const stripeHint = !stripeConfigured ? "Stripe non configuré." : !hasStripeSubscription ? "Aucun abonnement Stripe rattaché." : null;

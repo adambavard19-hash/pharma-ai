@@ -19,7 +19,7 @@ const BASE_PATH = "/admin/candidatures-commerciales";
 const first = (value: string | string[] | undefined): string | null => (Array.isArray(value) ? (value[0] ?? null) : (value ?? null));
 
 /**
- * Les candidatures déposées sur la page « Devenir commercial » du site, de la
+ * Les candidatures déposées sur la page « Affiliation » du site, de la
  * plus récente à la plus ancienne : filtre par statut (`?statut=`), recherche
  * par nom, e-mail ou ville (`?q=`), pagination (`?page=`). Aucune ne devient un
  * commercial toute seule : chacune avance à la main, depuis sa fiche.
@@ -40,7 +40,7 @@ export default async function SalesApplicationsPage({ searchParams }: { searchPa
       <AdminPageHeader
         space={{ label: "Commercial", href: "/admin/pipeline" }}
         title="Candidatures commerciales"
-        description="Les personnes qui ont demandé à rejoindre l'équipe commerciale depuis le site. Chaque candidature avance à la main ; un commercial n'est créé que lorsque vous le décidez, depuis une candidature acceptée."
+        description="Les personnes qui ont postulé au programme d'affiliation depuis le site (page « Affiliation »). Chaque candidature avance à la main ; un commercial n'est créé que lorsque vous le décidez, depuis une candidature acceptée."
       />
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -58,7 +58,7 @@ export default async function SalesApplicationsPage({ searchParams }: { searchPa
       {rows.length === 0 ? (
         <div className="rounded-2xl border border-border-subtle bg-surface-card">
           {grandTotal === 0 ? (
-            <EmptyState icon={<Inbox className="size-5" />} title="Aucune candidature reçue" description="Les candidatures envoyées depuis la page « Devenir commercial » du site apparaîtront ici." />
+            <EmptyState icon={<Inbox className="size-5" />} title="Aucune candidature reçue" description="Les candidatures envoyées depuis la page « Affiliation » du site apparaîtront ici." />
           ) : (
             <EmptyState
               icon={<Inbox className="size-5" />}

@@ -102,7 +102,7 @@ describe("transformer en commercial", () => {
     mocks.service.convertSalesApplication.mockResolvedValue({ ok: true, salesRepId: "rep_1", name: "Marie Dupont", commissionCents: 25000, invitation: { status: "SENT", detail: "ok" } });
     const result = await actions.convertSalesApplicationAction({ id: "app_1", invite: true });
     expect(mocks.service.convertSalesApplication).toHaveBeenCalledWith("app_1", "adm_1", { invite: true });
-    expect(result).toEqual({ ok: true, data: { salesRepId: "rep_1" }, message: "Marie Dupont est maintenant commercial(e). Invitation envoyée." });
+    expect(result).toEqual({ ok: true, data: { salesRepId: "rep_1" }, message: "Marie Dupont a maintenant son espace d'affilié. Invitation envoyée." });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/admin/commerciaux");
   });
 

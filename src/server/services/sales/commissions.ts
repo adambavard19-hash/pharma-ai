@@ -41,6 +41,9 @@ export async function upsertCommissionForContract(params: { prospectId: string; 
   const progressive = rep.commissionType === "PROGRESSIVE";
   // La commission du dossier, jamais un bonus de palier rattaché au même dossier.
   const existing = await prisma.commission.findFirst({ where: { prospectId: params.prospectId, status: { in: ["FORECAST", "EARNED", "PAYABLE"] }, type: { not: "BONUS" } } });
+  // Un affilié n'a rien à toucher au contrat : ses commissions naissent chaque mois, tant que la pharmacie reste abonnée
+  // (`affiliate-commissions.ts`). Une commission d'avant son passage à l'affiliation garde, elle, son montant ; seul son statut avance.
+  if (rep.commissionType === "AFFILIATE" && !existing) return;
   // Réclamée par une facture : elle se règle par la facture, jamais par un contrat.
   if (existing?.invoiceId) {
     if (progressive) await syncProgressiveCommissionsSafely(rep.id, "contrat");

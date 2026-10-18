@@ -6,7 +6,7 @@ import { recordAudit } from "@/server/audit/log";
 import { getStorageProvider } from "@/server/ai/registry";
 import { createSalesRep, sendSalesInvitation } from "@/server/services/sales/reps";
 import { applicationEventActorId, auditIdentity, splitEventActors, type RepActorInput } from "@/server/services/sales/rep-actor";
-import { describeProgressiveGrid } from "@/core/sales/commission";
+import { AFFILIATE_RULE_SENTENCE } from "@/core/affiliation/monthly";
 import { SALES_APPLICATION_STATUSES, SALES_APPLICATION_STATUS_LABELS, SALES_APPLICATION_STATUS_TONES, type SalesApplicationStatusKey } from "@/core/sales-applications/status";
 import type { TimelineEntry } from "@/core/admin/timeline";
 
@@ -258,7 +258,7 @@ export async function getSalesApplication(id: string, options: { repBasePath?: s
 // ---------------------------------------------------------------------------
 
 export type MoveResult =
-  | { ok: true; from: SalesApplicationStatusKey; to: SalesApplicationStatusKey }
+  | { ok: true; from: SalesApplicationStatusKey; to: SalesApplicationStatusKey; account?: ConvertResult }
   | { ok: false; reason: "NOT_FOUND" | "SAME_STATUS" | "CONVERTED" | "CONFLICT" };
 
 /**
@@ -289,6 +289,16 @@ export async function moveSalesApplication(id: string, to: SalesApplicationStatu
     ...auditIdentity(actor),
     metadata: { before: { status: from }, after: { status: to } },
   });
+  // Accepter, c'est ouvrir l'espace de l'affilié : son compte de l'extranet est créé et l'invitation (lien pour choisir
+  // son mot de passe) lui part aussitôt. Un échec (adresse déjà prise…) n'annule pas l'acceptation : la fiche le dit et
+  // le bouton « Créer l'espace de l'affilié » reste là pour réessayer.
+  if (to === "ACCEPTED") {
+    const account = await convertSalesApplication(id, actor, { invite: true }).catch((error: unknown): ConvertResult => {
+      console.error("[candidatures] espace de l'affilié non créé à l'acceptation", error instanceof Error ? error.message : "erreur inconnue");
+      return { ok: false, reason: "CONFLICT", detail: "création impossible pour l'instant" };
+    });
+    return { ok: true, from, to, account };
+  }
   return { ok: true, from, to };
 }
 
@@ -321,7 +331,7 @@ const repIdentity = z.object({
 });
 
 export type ConvertResult =
-  | { ok: true; salesRepId: string; name: string; commissionType: "PROGRESSIVE"; invitation: { status: string; detail: string } | null }
+  | { ok: true; salesRepId: string; name: string; commissionType: "AFFILIATE"; invitation: { status: string; detail: string } | null }
   | { ok: false; reason: "NOT_FOUND" | "NOT_ACCEPTED" | "ALREADY_CONVERTED" | "EMAIL_TAKEN" | "INVALID" | "CONFLICT"; salesRepId?: string; detail?: string };
 
 function isUniqueViolation(error: unknown): boolean {
@@ -329,10 +339,10 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
- * Crée le commercial d'une candidature ACCEPTÉE : ses coordonnées et sa zone
- * viennent de la candidature, sa commission suit la GRILLE PROGRESSIVE, la règle
- * de tous les commerciaux (200 € à 300 € par pharmacie activée, plus les bonus
- * de palier : `core/sales/progressive-commission.ts`). Le compte et l'invitation facultative passent par les fonctions
+ * Crée l'affilié (compte de l'extranet commercial) d'une candidature ACCEPTÉE :
+ * ses coordonnées et sa zone viennent de la candidature, sa rémunération est
+ * l'AFFILIATION (18 oct. 2026) : 10 % de l'abonnement de chaque pharmacie
+ * apportée, chaque mois, à vie (`core/affiliation/terms.ts`). Le compte et l'invitation facultative passent par les fonctions
  * existantes (`createSalesRep`, `sendSalesInvitation`) : même mot de passe
  * aléatoire inconnu, même lien d'invitation.
  *
@@ -360,7 +370,7 @@ export async function convertSalesApplication(id: string, actor: RepActorInput, 
 
   let created: { id: string };
   try {
-    created = await createSalesRep({ ...identity, commissionType: "PROGRESSIVE", commissionValue: 0 }, actor);
+    created = await createSalesRep({ ...identity, commissionType: "AFFILIATE", commissionValue: 0 }, actor);
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
     // Deux gestes simultanés : l'adresse est le verrou. Le perdant lit ce que le gagnant a fait.
@@ -376,7 +386,7 @@ export async function convertSalesApplication(id: string, actor: RepActorInput, 
       data: {
         applicationId: id,
         kind: SALES_APPLICATION_EVENT_KINDS.CONVERTED,
-        note: `Commercial créé : ${name}. ${describeProgressiveGrid()}.`,
+        note: `Affilié créé : ${name}. Affiliation : ${AFFILIATE_RULE_SENTENCE}.`,
         platformAdminId: applicationEventActorId(actor),
       },
     });
@@ -403,9 +413,9 @@ export async function convertSalesApplication(id: string, actor: RepActorInput, 
     entityType: "SalesApplication",
     entityId: id,
     ...auditIdentity(actor),
-    metadata: { salesRepId: created.id, commissionType: "PROGRESSIVE", invitation: invitation?.status ?? "NOT_REQUESTED" },
+    metadata: { salesRepId: created.id, commissionType: "AFFILIATE", invitation: invitation?.status ?? "NOT_REQUESTED" },
   });
-  return { ok: true, salesRepId: created.id, name, commissionType: "PROGRESSIVE", invitation };
+  return { ok: true, salesRepId: created.id, name, commissionType: "AFFILIATE", invitation };
 }
 
 // ---------------------------------------------------------------------------
