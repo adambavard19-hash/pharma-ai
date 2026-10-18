@@ -6043,3 +6043,23 @@ model PartnerEarning {
   @@index([partnerId, receivedOn])
   @@map("partner_earnings")
 }
+
+
+/// Le conseil prêt à dire au comptoir (18 oct. 2026) : deux questions à poser, puis le conseil en deux phrases, pour un conseil
+/// donné (règle ou association + produit). Rédigé par le modèle, ou corrigé par la pharmacienne (`source` = « PHARMACIST »).
+model CounterPitch {
+  key           String   @id
+  ruleKey       String
+  productLabel  String
+  ask           String[]
+  pitch         String
+  /// Les réponses possibles du patient à chaque question : [{ ask, label, say, ean }] (core/ai/counter-pitch.ts).
+  answers       Json?
+  source        String   @default("AI")
+  updatedByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([ruleKey])
+  @@map("counter_pitches")
+}

@@ -835,6 +835,132 @@ export function CounterIsland(props: CounterIslandProps) {
   );
 }
 
+/**
+ * LE MENU DÉROULANT DU CONSEIL (18 oct. 2026, d'après Kontoir) : au survol d'un conseil, sans cliquer — le nom du produit, puis
+ * Prix / Marge / Stock en trois cases, deux questions à poser au patient et le conseil en deux phrases. Le pharmacien garde son
+ * déroulé à lui : ce sont des appuis, pas un script. Sans questions ni conseil (pas encore rédigés), seulement les chiffres.
+ */
+export function PitchPanel({ item }: { item: IslandAdvice }) {
+  const stock = item.stock ? STOCK[item.stock] : null;
+  const ask = item.sheet?.ask ?? [];
+  const pitch = item.sheet?.pitch;
+  const answers = item.sheet?.answers ?? [];
+  const [picked, setPicked] = useState<Record<number, number>>({});
+  const cells: { label: string; value: string; color?: string }[] = [
+    { label: "Prix", value: item.price && item.stock !== "UNKNOWN" ? item.price : "—" },
+    { label: "Marge HT", value: item.margin ?? "—" },
+    { label: "Stock", value: !stock || item.stock === "UNKNOWN" ? "—" : item.stock === "OUT_OF_STOCK" ? "Rupture" : item.quantity !== undefined ? String(item.quantity) : stock.label, color: item.stock === "OUT_OF_STOCK" ? C.outFg : item.stock === "LOW_STOCK" ? C.lowFg : undefined },
+  ];
+  return (
+    <div data-pitch-panel="" className="isl-pop mt-1.5 space-y-2 border-t pt-2 text-[11.5px] leading-4" style={{ borderColor: C.line, color: C.ink }}>
+      <p className="text-[12px] leading-4 font-bold break-words">{item.sheet?.name || item.name}</p>
+      <div className="grid grid-cols-3 gap-1">
+        {cells.map((cell) => (
+          <div key={cell.label} className="rounded-md px-1.5 py-1 text-center" style={{ background: "#F1F5F7" }}>
+            <p className="text-[9.5px] font-bold tracking-[0.04em] uppercase" style={{ color: C.inkSoft }}>{cell.label}</p>
+            <p className="truncate text-[12.5px] leading-4 font-bold tabular-nums" style={{ color: cell.color ?? C.ink }}>{cell.value}</p>
+          </div>
+        ))}
+      </div>
+      {(item.challenge || item.shortDate) && (
+        <div className="flex flex-wrap gap-1">
+          {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</Chip>}
+          {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}
+        </div>
+      )}
+      {ask.length > 0 && (
+        <div>
+          <p className="text-[9.5px] font-bold tracking-[0.04em] uppercase" style={{ color: C.inkSoft }}>À demander{answers.length > 0 ? " · touchez la réponse du patient" : ""}</p>
+          <ol className="mt-0.5 space-y-1">
+            {ask.map((question, index) => {
+              const choices = answers.filter((answer) => answer.ask === index);
+              const chosen = picked[index] !== undefined ? choices[picked[index]] : undefined;
+              return (
+                <li key={question} data-pitch-question="" className="break-words">
+                  <span className="flex gap-1.5">
+                    <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold" style={{ background: "rgba(54,232,200,0.18)", color: "#0B6B57" }}>{index + 1}</span>
+                    <span className="font-semibold">{question}</span>
+                  </span>
+                  {choices.length > 0 && (
+                    <span className="mt-1 ml-5.5 flex flex-wrap gap-1">
+                      {choices.map((choice, at) => (
+                        <button
+                          key={choice.label}
+                          type="button"
+                          data-pitch-answer=""
+                          aria-pressed={picked[index] === at}
+                          onClick={() => setPicked((current) => {
+                            const next = { ...current };
+                            if (next[index] === at) delete next[index];
+                            else next[index] = at;
+                            return next;
+                          })}
+                          className="h-6 rounded-full border px-2 text-[11px] font-semibold transition-colors"
+                          style={picked[index] === at ? { background: "#0B6B57", borderColor: "#0B6B57", color: "#FFFFFF" } : { background: "#FFFFFF", borderColor: "#C9D5DC", color: C.ink }}
+                        >
+                          {choice.label}
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                  {chosen && (
+                    <span data-pitch-then="" className="isl-pop mt-1 ml-5.5 block rounded-md px-2 py-1.5" style={{ background: "rgba(54,232,200,0.10)" }}>
+                      <span className="block">{chosen.say}</span>
+                      {chosen.product && <AnswerProduct product={chosen.product} />}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
+      {pitch && (
+        <div>
+          <p className="text-[9.5px] font-bold tracking-[0.04em] uppercase" style={{ color: C.inkSoft }}>Le conseil</p>
+          <p className="mt-0.5 break-words">{pitch}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Le produit plus précis d'une réponse : son nom, puis prix, marge et stock de la pharmacie (le prix seulement avec un stock fiable). */
+function AnswerProduct({ product }: { product: NonNullable<NonNullable<CounterSheet["answers"]>[number]["product"]> }) {
+  const stock = product.stock && product.stock in STOCK ? STOCK[product.stock as keyof typeof STOCK] : null;
+  return (
+    <span data-pitch-product="" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md bg-white px-1.5 py-1">
+      <span className="w-full text-[10px] font-bold tracking-[0.04em] uppercase" style={{ color: "#0B6B57" }}>Proposer plutôt</span>
+      <span className="min-w-0 flex-1 truncate font-bold">{product.name}</span>
+      {product.price && <span className="shrink-0 font-bold tabular-nums">{product.price}</span>}
+      <span className="flex w-full flex-wrap gap-x-2 text-[10.5px] font-semibold">
+        {product.margin && <span style={{ color: "#4B5F6C" }}>Marge {product.margin} HT</span>}
+        {stock && <span style={{ color: product.stock === "IN_STOCK" ? "#0B6B57" : stock.fg }}>{stock.label}{product.quantity !== undefined && product.stock !== "OUT_OF_STOCK" ? ` · ${product.quantity}` : ""}</span>}
+      </span>
+    </span>
+  );
+}
+
+/** Le survol d'un conseil, avec un court délai : passer la souris d'un bord à l'autre de l'île n'ouvre rien. */
+function useHoverOpen(delay = 180): [boolean, { onMouseEnter: () => void; onMouseLeave: () => void }] {
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  return [
+    open,
+    {
+      onMouseEnter: () => {
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => setOpen(true), delay);
+      },
+      onMouseLeave: () => {
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => setOpen(false), 250);
+      },
+    },
+  ];
+}
+
 function Row({ robot, title, sub, trailing, icon, compact }: { robot: ReactNode; title: string; sub?: string; trailing?: ReactNode; icon?: ReactNode; compact?: boolean }) {
   return (
     <div className={cn("flex items-center gap-2.5", compact ? "" : "px-2.5 py-2")}>
@@ -863,8 +989,10 @@ function CompactCard({ item, outcome, readOnly, auto, onOpen, onAnswer }: { item
     item.challenge ? `★ ${T.challenge}` : null,
     item.shortDate ? `${T.shortDate} ${item.shortDate.replace(/\/\d{4}$/, "")}` : null,
   ].filter(Boolean);
+  const [hovered, hoverProps] = useHoverOpen();
   return (
-    <div data-advice-card="" className="isl-line mt-0.5 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: C.panel, color: C.ink }}>
+    <div data-advice-card="" className="isl-line mt-0.5 rounded-lg px-2 py-1.5" style={{ background: C.panel, color: C.ink }} {...hoverProps}>
+    <div className="flex items-center gap-2">
       <button type="button" onClick={onOpen} title={UNFOLD} className="flex min-w-0 flex-1 items-center gap-2 text-left">
         {item.image && (
           // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
@@ -899,6 +1027,8 @@ function CompactCard({ item, outcome, readOnly, auto, onOpen, onAnswer }: { item
           </button>
         </span>
       )}
+    </div>
+      {hovered && <PitchPanel item={item} />}
     </div>
   );
 }
@@ -981,6 +1111,7 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, auto, outside, o
   const stock = item.stock ? STOCK[item.stock] : null;
   const press = useRef<{ x: number; y: number } | null>(null);
   const detailsId = useId();
+  const [hovered, hoverProps] = useHoverOpen();
   // Repliée, la carte est COMPACTE (retour des pharmacies, 13 oct. 2026 : la bannière prenait trop de place pendant une
   // délivrance) : le nom et la raison sur UNE ligne chacun, puis les étiquettes et Vendu / Non vendu sur la même ligne.
   // Déployée, le nom COMPLET et la raison entière passent dans le détail.
@@ -1014,7 +1145,7 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, auto, outside, o
     </>
   );
   return (
-    <li data-advice-card="" data-open={open ? "" : undefined} className="isl-line snap-start rounded-xl px-2 py-1.5" style={{ background: C.panel, color: C.ink }}>
+    <li data-advice-card="" data-open={open ? "" : undefined} className="isl-line snap-start rounded-xl px-2 py-1.5" style={{ background: C.panel, color: C.ink }} {...hoverProps}>
       {/* Toute la carte, hors boutons : un appui la DÉPLOIE sur place (un second la replie). Un appui suivi d'un mouvement
           (défilement de la liste) ne déploie rien. Elle est dans la liste qui défile : jamais une prise pour déplacer l'île. */}
       <div
@@ -1089,6 +1220,7 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, auto, outside, o
           )}
         </div>
       )}
+      {!open && hovered && <PitchPanel item={item} />}
       {open && <AdviceDetails id={detailsId} item={item} outside={outside} onOpen={onOpen} />}
     </li>
   );
@@ -1108,6 +1240,7 @@ function AdviceDetails({ id, item, outside, onOpen }: { id: string; item: Island
   const usageEmpty = !sheet || (sheet.usage.length === 0 && !sheet.description);
   return (
     <div id={id} data-advice-details="" className="mt-2 space-y-2 border-t pt-2 text-[12px] leading-[17px]" style={{ borderColor: C.line }}>
+      {(sheet?.ask?.length || sheet?.pitch) && <PitchPanel item={item} />}
       <SheetPart title="Pourquoi ce conseil">
         {reasons.length > 0 ? reasons.map((reason) => <p key={reason} className="break-words">{reason}</p>) : <Missing>{SHEET_MISSING.reasons}</Missing>}
       </SheetPart>
@@ -1156,10 +1289,10 @@ function AdviceDetails({ id, item, outside, onOpen }: { id: string; item: Island
 
 function SheetPart({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section>
+    <div>
       <p className="text-[10.5px] font-bold tracking-[0.04em] uppercase" style={{ color: C.inkSoft }}>{title}</p>
       <div className="mt-0.5 space-y-1">{children}</div>
-    </section>
+    </div>
   );
 }
 

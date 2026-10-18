@@ -5592,7 +5592,14 @@ var COUNTER_SHEET_LIMITS = {
   lines: 6,
   lineText: 140,
   lineDetail: 240,
-  description: 360
+  description: 360,
+  ask: 2,
+  askText: 140,
+  pitch: 320,
+  answers: 6,
+  answerLabel: 40,
+  answerSay: 200,
+  answerProduct: 120
 };
 var PATIENTS = /* @__PURE__ */ new Set(["CONCERNED", "NOT_CONCERNED", "UNKNOWN"]);
 function boundText(raw, max) {
@@ -5639,8 +5646,38 @@ function readCounterSheet(raw) {
     usage: usage.lines,
     description: take(value.description, L.description),
     more: { contraindications: contraindications.more, usage: usage.more },
-    cut
+    cut,
+    ...askAndPitch(value)
   };
+}
+var STOCKS = /* @__PURE__ */ new Set(["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK", "UNKNOWN"]);
+function readAnswers(input, questions) {
+  const out = [];
+  for (const item of Array.isArray(input) ? input : []) {
+    if (out.length >= COUNTER_SHEET_LIMITS.answers || typeof item !== "object" || item === null) continue;
+    const a = item;
+    const ask = a.ask === 0 || a.ask === 1 ? a.ask : -1;
+    const label = boundText(a.label, COUNTER_SHEET_LIMITS.answerLabel).text;
+    const say = boundText(a.say, COUNTER_SHEET_LIMITS.answerSay).text;
+    if (ask < 0 || ask >= questions || !label || !say) continue;
+    const p = typeof a.product === "object" && a.product !== null ? a.product : null;
+    const name = p ? boundText(p.name, COUNTER_SHEET_LIMITS.answerProduct).text : "";
+    const product = name && p ? {
+      name,
+      ...boundText(p.price, 16).text ? { price: boundText(p.price, 16).text } : {},
+      ...boundText(p.margin, 16).text ? { margin: boundText(p.margin, 16).text } : {},
+      ...typeof p.stock === "string" && STOCKS.has(p.stock) ? { stock: p.stock } : {},
+      ...Number.isInteger(p.quantity) && p.quantity >= 0 ? { quantity: p.quantity } : {}
+    } : void 0;
+    out.push({ ask, label, say, ...product ? { product } : {} });
+  }
+  return out;
+}
+function askAndPitch(value) {
+  const ask = (Array.isArray(value.ask) ? value.ask : []).map((q) => boundText(q, COUNTER_SHEET_LIMITS.askText).text).filter(Boolean).slice(0, COUNTER_SHEET_LIMITS.ask);
+  const pitch = boundText(value.pitch, COUNTER_SHEET_LIMITS.pitch).text;
+  const answers = ask.length ? readAnswers(value.answers, ask.length) : [];
+  return { ...ask.length ? { ask } : {}, ...pitch ? { pitch } : {}, ...answers.length ? { answers } : {} };
 }
 
 // agent/src/notice-center.ts
@@ -6782,7 +6819,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.22";
+var VERSION = "0.10.23";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;

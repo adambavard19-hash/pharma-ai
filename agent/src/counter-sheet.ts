@@ -36,6 +36,26 @@ export type CounterSheet = {
   more: { contraindications: number; usage: number };
   /** Un texte a été abrégé (ou une raison écartée) : la suite se lit dans la fiche complète. */
   cut: boolean;
+  /**
+   * Les deux questions à poser au patient avant de proposer le produit (fondateur, 18 oct. 2026, d'après Kontoir : « deux
+   * questions, ça suffit »). Absent : rien de prêt pour ce conseil.
+   */
+  ask?: string[];
+  /** Le conseil en deux phrases, à dire au patient. Absent : rien de prêt. */
+  pitch?: string;
+  /**
+   * Les réponses possibles du patient à chaque question (fondateur, 18 oct. 2026 : questions cliquables) : ce que le pharmacien
+   * fait alors, et parfois un produit plus précis de SON stock, avec prix, marge et stock. Absent : questions sans réponses.
+   */
+  answers?: CounterSheetAnswer[];
+};
+
+export type CounterSheetAnswer = {
+  /** La question (0 ou 1). */
+  ask: number;
+  label: string;
+  say: string;
+  product?: { name: string; price?: string; margin?: string; stock?: string; quantity?: number };
 };
 
 /** Les bornes : de quoi lire au comptoir sans alourdir la commande envoyée à la fenêtre (quelques kilo-octets par conseil). */
@@ -48,6 +68,13 @@ export const COUNTER_SHEET_LIMITS = {
   lineText: 140,
   lineDetail: 240,
   description: 360,
+  ask: 2,
+  askText: 140,
+  pitch: 320,
+  answers: 6,
+  answerLabel: 40,
+  answerSay: 200,
+  answerProduct: 120,
 } as const;
 
 /** Ce que disent les rubriques vides, mot pour mot sur la page de vente et dans la bannière : jamais « rien à savoir ». */
@@ -117,7 +144,43 @@ export function readCounterSheet(raw: unknown): CounterSheet | null {
     description: take(value.description, L.description),
     more: { contraindications: contraindications.more, usage: usage.more },
     cut,
+    ...askAndPitch(value),
   };
+}
+
+/** Les deux questions et le conseil en deux phrases, bornés ; pas de clé quand il n'y a rien (la commande reste courte). */
+const STOCKS = new Set(["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK", "UNKNOWN"]);
+
+function readAnswers(input: unknown, questions: number): CounterSheetAnswer[] {
+  const out: CounterSheetAnswer[] = [];
+  for (const item of Array.isArray(input) ? input : []) {
+    if (out.length >= COUNTER_SHEET_LIMITS.answers || typeof item !== "object" || item === null) continue;
+    const a = item as Record<string, unknown>;
+    const ask = a.ask === 0 || a.ask === 1 ? a.ask : -1;
+    const label = boundText(a.label, COUNTER_SHEET_LIMITS.answerLabel).text;
+    const say = boundText(a.say, COUNTER_SHEET_LIMITS.answerSay).text;
+    if (ask < 0 || ask >= questions || !label || !say) continue;
+    const p = typeof a.product === "object" && a.product !== null ? (a.product as Record<string, unknown>) : null;
+    const name = p ? boundText(p.name, COUNTER_SHEET_LIMITS.answerProduct).text : "";
+    const product = name && p
+      ? {
+          name,
+          ...(boundText(p.price, 16).text ? { price: boundText(p.price, 16).text } : {}),
+          ...(boundText(p.margin, 16).text ? { margin: boundText(p.margin, 16).text } : {}),
+          ...(typeof p.stock === "string" && STOCKS.has(p.stock) ? { stock: p.stock } : {}),
+          ...(Number.isInteger(p.quantity) && (p.quantity as number) >= 0 ? { quantity: p.quantity as number } : {}),
+        }
+      : undefined;
+    out.push({ ask, label, say, ...(product ? { product } : {}) });
+  }
+  return out;
+}
+
+function askAndPitch(value: Record<string, unknown>): { ask?: string[]; pitch?: string; answers?: CounterSheetAnswer[] } {
+  const ask = (Array.isArray(value.ask) ? value.ask : []).map((q) => boundText(q, COUNTER_SHEET_LIMITS.askText).text).filter(Boolean).slice(0, COUNTER_SHEET_LIMITS.ask);
+  const pitch = boundText(value.pitch, COUNTER_SHEET_LIMITS.pitch).text;
+  const answers = ask.length ? readAnswers(value.answers, ask.length) : [];
+  return { ...(ask.length ? { ask } : {}), ...(pitch ? { pitch } : {}), ...(answers.length ? { answers } : {}) };
 }
 
 /**

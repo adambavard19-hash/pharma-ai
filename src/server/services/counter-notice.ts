@@ -14,6 +14,8 @@ import { activeChallengeTitlesFor, activeChallengesFor } from "@/server/services
 import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import { trustedRobotRuleKeys } from "@/server/services/robot-trust";
 import { unitMarginHt } from "@/core/catalog/margin";
+import { answersForSheet, pitchesFor, pitchKey, stockCandidates } from "@/server/services/counter-pitches";
+import type { CounterSheetAnswer } from "../../../agent/src/counter-sheet";
 
 /** Vrai quand le prix de vente HT est sous le prix d'achat HT : le fichier de stock a été mal lu, pas une vraie vente à perte. */
 function salePriceLooksWrong(product: { salePriceCents: number; purchasePriceCents: number; vatRate: number | null }): boolean {
@@ -101,7 +103,11 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
           routine: true,
           product: {
             select: {
+              id: true,
               name: true,
+              brand: true,
+              category: true,
+              matchingTags: true,
               salePriceCents: true,
               purchasePriceCents: true,
               vatRate: true,
@@ -131,7 +137,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
 
   const run = prescription.analysisRuns[0];
   // Prix et « En stock » viennent du même export : un stock ancien ne s'affiche pas comme un fait.
-  const pharmacy = await prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true } });
+  const pharmacy = await prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { stockSyncedAt: true, isDemo: true } });
   const stockReliable = stockReminderLevel(pharmacy?.stockSyncedAt ?? null, now) === "none";
   // Dans la fenêtre du poste comme sur l'écran de la vente, une règle supprimée dans la console de PharmaBoost n'existe plus :
   // un conseil resté dans une analyse ancienne ne s'affiche pas. Les règles en ligne parlent, validées ou non.
@@ -150,6 +156,37 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
   // L'arbre de questions : pourquoi le patient prend son antalgique, où il a mal… Un conseil du bout d'une branche (la poche du dos,
   // le thermomètre) ne se montre qu'une fois la question répondue : jamais un Thérapearl « dos » sur la foi d'un Fervex.
   const tree = treeState({ opportunities: run?.opportunities ?? [], lineNames: lineName, answers: answersFromRows(prescription.questionAnswers) });
+
+  // Les deux questions et le conseil en deux phrases de chaque conseil (18 oct. 2026) : gardés, ou rédigés en arrière-plan.
+  const pitchTargets = prescription.recommendations
+    .filter((rec) => rec.product && rec.opportunity?.ruleKey)
+    .map((rec) => ({
+      recId: rec.id,
+      target: {
+        ruleKey: rec.opportunity!.ruleKey!,
+        productEan: rec.product!.ean ?? null,
+        productName: rec.product!.name,
+        request: {
+          trigger: rec.opportunity?.triggeredLineIds.map((lineId) => lineName.get(lineId) ?? "").find(Boolean) ?? prescription.lines.map((line) => line.drugName ?? "").find(Boolean) ?? "",
+          product: { name: rec.product!.name, brand: rec.product!.brand ?? null, category: rec.product!.category ?? null, tags: rec.product!.matchingTags ?? [] },
+          reason: withoutOriginLabel(rec.shortReason ?? rec.justification) || null,
+        },
+        loadCandidates: () => stockCandidates(pharmacyId, { id: rec.productId ?? rec.product!.id, category: rec.product!.category, brand: rec.product!.brand ?? null, matchingTags: rec.product!.matchingTags ?? [] }),
+      },
+    }));
+  const pitches = await pitchesFor(pitchTargets.map((entry) => entry.target), { demo: pharmacy?.isDemo === true }).catch(() => new Map<string, Awaited<ReturnType<typeof pitchesFor>> extends Map<string, infer V> ? V : never>());
+  // Les réponses cliquables : leur produit plus précis relu dans le stock de la pharmacie (prix, marge, stock du jour).
+  const answerCache = new Map<string, CounterSheetAnswer["product"] | null>();
+  const answersByRec = new Map<string, CounterSheetAnswer[]>();
+  for (const entry of pitchTargets) {
+    const found = pitches.get(pitchKey(entry.target));
+    if (found?.answers.length) answersByRec.set(entry.recId, await answersForSheet(pharmacyId, found.answers, stockReliable, answerCache));
+  }
+  const pitchOf = (recId: string) => {
+    const entry = pitchTargets.find((candidate) => candidate.recId === recId);
+    const found = entry ? pitches.get(pitchKey(entry.target)) : undefined;
+    return found ? { ask: found.ask, pitch: found.pitch, ...(answersByRec.get(recId)?.length ? { answers: answersByRec.get(recId) } : {}) } : {};
+  };
 
   const notice = buildCounterNotice({
     reference: prescription.reference,
@@ -187,7 +224,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
           imageUrl: studioPhotoUrl(rec.product?.ean),
           quantity: rec.product ? (rec.product.stockItem?.quantity ?? null) : (rec.presentation?.pharmacyStocks[0]?.quantity ?? null),
           alertThreshold: rec.product?.stockItem?.alertThreshold ?? null,
-          sheet: counterSheetOf(
+          sheet: { ...counterSheetOf(
             {
               shortReason: rec.shortReason,
               counterScript: rec.counterScript,
@@ -201,7 +238,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
                 : null,
             },
             rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
-          ),
+          ), ...pitchOf(rec.id) },
         };
       }),
     outcome: run?.outcome ?? null,
