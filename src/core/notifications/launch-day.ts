@@ -25,6 +25,20 @@ export function buildLaunchDayEmail(input: LaunchDayInput, ctx: EmailContext): R
         ? { kind: "paragraph", text: "Chaque conseil fait au comptoir est enregistré : vendu ou non, il compte dans les résultats de la pharmacie et dans ceux de chaque collaborateur. Vous les retrouvez dans Performances, et chaque matin dans votre bilan par e-mail.", strong: ["Chaque conseil fait au comptoir est enregistré"] }
         : { kind: "paragraph", text: "Chaque conseil que vous faites est enregistré : vendu ou non, il compte dans vos résultats. Vous les retrouvez chaque matin dans votre bilan par e-mail.", strong: ["Chaque conseil que vous faites est enregistré"] },
       input.owner
+        ? { kind: "list", title: "Ce que ça change pour vous, chaque jour", items: [
+            "Toute l'équipe conseille au même niveau, même un remplaçant ou un étudiant : le bon conseil s'affiche à chaque vente.",
+            "Votre stock travaille : les produits en date courte et les challenges des laboratoires remontent au bon moment, au bon patient.",
+            "Vous voyez enfin ce que le conseil rapporte : qui propose, ce qui se vend, jour après jour.",
+            "Vos patients repartent mieux accompagnés, avec un bilan par e-mail au nom de la pharmacie : ils reviennent.",
+          ] }
+        : { kind: "list", title: "Ce que ça change pour vous, chaque jour", items: [
+            "Plus besoin d'y penser : le bon conseil s'affiche tout seul à chaque boîte scannée, même en plein rush.",
+            "Vous osez proposer plus facilement : deux questions simples ouvrent la discussion, et la réponse du patient vous guide vers le produit le plus adapté.",
+            "Vous savez tout d'un coup d'œil : prix, stock, et les précautions à vérifier, sans chercher dans le logiciel.",
+            "Vos conseils se voient enfin : chacun est compté, et vos résultats vous attendent chaque matin.",
+            "Vos patients vous remercient : ils repartent mieux accompagnés, avec leur bilan par e-mail.",
+          ] },
+      input.owner
         ? { kind: "steps", title: "Pour bien démarrer lundi", items: ["Regardez votre vidéo de prise en main (2 minutes 40).", "Vérifiez que chaque poste du comptoir affiche « Connecté ».", "Montrez la vidéo du comptoir à votre équipe et encouragez chacun à proposer un conseil à chaque vente.", "En fin de journée, regardez les premiers résultats dans Performances."] }
         : { kind: "steps", title: "Pour bien démarrer lundi", items: ["Regardez la vidéo de prise en main (2 minutes).", "Au comptoir, scannez comme d'habitude : la bannière s'ouvre toute seule.", "Passez la souris sur un conseil, posez les deux questions, puis proposez.", "Le patient le prend ? Scannez le produit : il compte en vendu."] },
       { kind: "button", url: `${base}/prise-en-main`, label: "Voir la vidéo de prise en main" },
