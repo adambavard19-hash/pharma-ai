@@ -8,7 +8,7 @@ import { PRESENTATION_VIDEO_PAGE, PRESENTATION_VIDEO_POSTER } from "@/core/platf
  *  - le pharmacien (et toute l'équipe du comptoir) : son intérêt à lui — il est soulagé, le bon conseil en une seconde, sans y réfléchir.
  * Les deux disent : un nouveau logiciel qui communique avec le LGO, le bilan conseil par e-mail, les deux vidéos.
  */
-export type LaunchDayInput = { firstName: string; pharmacyName: string; owner: boolean; dayLabel: string };
+export type LaunchDayInput = { firstName: string; pharmacyName: string; owner: boolean; dayLabel: string; /** Son adresse de connexion, rappelée dans l'e-mail du pharmacien. */ email?: string | null };
 
 const capital = (text: string) => `${text[0]?.toUpperCase() ?? ""}${text.slice(1)}`;
 
@@ -46,7 +46,7 @@ function ownerEmail(input: LaunchDayInput, ctx: EmailContext): RenderedEmail {
           "Vous pilotez le conseil : les laboratoires que vous choisissez passent en premier, au comptoir.",
           "Votre stock tourne : les dates courtes et les challenges remontent au bon patient, au bon moment.",
           "Une équipe homogène : remplaçants et étudiants compris, chacun propose le bon conseil, sans y réfléchir.",
-          "Vous voyez tout : chaque conseil est enregistré — qui propose, ce qui se vend — dans Performances et dans votre bilan du matin.",
+          "Vous voyez tout : chaque conseil est enregistré — qui propose, ce qui se vend — dans Performances et dans votre bilan de chaque lundi.",
           "Des patients fidèles : ils repartent conseillés, suivis par e-mail, et reviennent chez vous.",
         ],
       },
@@ -89,7 +89,7 @@ function counterEmail(input: LaunchDayInput, ctx: EmailContext): RenderedEmail {
           "Plus besoin d'y penser : le conseil vient tout seul, même en plein rush.",
           "Plus besoin de tout connaître : le produit, son prix, son stock et les précautions sont sous vos yeux.",
           "Vous osez proposer : deux questions simples lancent la discussion, la réponse du patient vous guide.",
-          "Votre travail se voit : chaque conseil est enregistré et compte dans vos résultats, que vous recevez chaque matin.",
+          "Votre travail se voit : chaque conseil est enregistré et compte dans vos résultats, que vous recevez chaque lundi.",
           "Vos patients vous remercient : ils repartent mieux accompagnés.",
         ],
       },
@@ -97,6 +97,16 @@ function counterEmail(input: LaunchDayInput, ctx: EmailContext): RenderedEmail {
         kind: "notice",
         text: "Le bilan conseil par e-mail : avec son accord, le patient reçoit après la vente un bilan au nom de la pharmacie (ce qu'il a pris, pourquoi, comment l'utiliser). S'il commence une cure, un rappel lui arrive avant la fin : il revient vous voir. Pensez à le proposer à chaque patient.",
       },
+      {
+        kind: "steps",
+        title: "Pour vous connecter, depuis votre poste",
+        items: [
+          "Ouvrez pharmaboost.app dans votre navigateur internet.",
+          input.email ? `Saisissez votre adresse e-mail : ${input.email}` : "Saisissez votre adresse e-mail (celle de cet e-mail).",
+          "Puis le mot de passe de la pharmacie, donné par votre titulaire.",
+        ],
+      },
+      { kind: "button", url: `${base}/login`, label: "Ouvrir pharmaboost.app" },
       ...videos(base, false),
       { kind: "paragraph", text: "Au comptoir, scannez comme d'habitude : la bannière fait le reste. Bon démarrage !" },
     ],

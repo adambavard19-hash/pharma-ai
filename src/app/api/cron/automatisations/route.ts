@@ -6,6 +6,7 @@ import { closeStalledDeposits, purgeExpiredDepositFiles } from "@/server/service
 import { sendMonthlyCounterReports } from "@/server/services/counter-results";
 import { sendDailyDigests } from "@/server/services/weekly-digest";
 import { sendDueCureReminders } from "@/server/services/cure-reminders";
+import { sendAutomaticLaunchDays } from "@/server/services/launch-day";
 import { purgeCounterEmails } from "@/server/services/counter-window";
 import { runStockLearningPass } from "@/server/services/stock-learning";
 import { scheduleLearningContinuation } from "@/server/services/stock-learning-chain";
@@ -71,13 +72,14 @@ export async function GET(request: Request) {
   const counterReports = await attempt("bilan mensuel du comptoir", () => sendMonthlyCounterReports(now));
   // Chaque matin, la journée d'hier : au titulaire toute l'officine, à chaque membre ses seules ventes. Deux minutes au plus ;
   // une tâche relancée le même jour reprend sans double envoi.
-  const weeklyDigests = await attempt("bilan quotidien de l'équipe", () => sendDailyDigests(now, { deadlineAt: Date.now() + 120_000 }));
+  const weeklyDigests = await attempt("bilan de la semaine (lundi)", () => sendDailyDigests(now, { deadlineAt: Date.now() + 120_000 }));
   // Les rappels de fin de cure du jour, au nom de chaque pharmacie ; l'adresse est effacée à l'envoi. Une minute au plus.
+  const launchDays = await attempt("e-mail du jour J des nouvelles pharmacies", () => sendAutomaticLaunchDays(now, { deadlineAt: Date.now() + 30_000 }));
   const cureReminders = await attempt("rappels de fin de cure", () => sendDueCureReminders(now, { deadlineAt: Date.now() + 60_000 }));
   const stockLearning = await attempt("connaissance du stock", () => runStockLearningPass({ deadlineAt: startedAt + LEARNING_BUDGET_MS }));
   if (stockLearning?.moreToDo) after(() => scheduleLearningContinuation({ depth: 1 }).then(() => undefined));
   if ("error" in automations) throw automations.error;
   // Le détail par officine reste dans la console : la réponse ne porte que les compteurs.
   const { dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors } = automations.report;
-  return NextResponse.json({ dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors, campaigns, news: { resumed, purged }, stockFiles, stalledDeposits, reachedLots, counterEmails, counterReports, weeklyDigests, cureReminders, stockLearning });
+  return NextResponse.json({ dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors, campaigns, news: { resumed, purged }, stockFiles, stalledDeposits, reachedLots, counterEmails, counterReports, weeklyDigests, launchDays, cureReminders, stockLearning });
 }

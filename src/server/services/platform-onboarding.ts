@@ -13,12 +13,17 @@ import { LGO_DEFINITIONS } from "@/core/stock/connectors";
  * abonnement démarre, et à la demande depuis la console. C'est ce qui remplace
  * la visite d'un commercial : cinq étapes, faites par le titulaire lui-même.
  */
-export async function sendInstallationGuide(pharmacyId: string, actor: { adminId?: string | null; reason: "SUBSCRIPTION_STARTED" | "ADMIN" }): Promise<{ status: string; detail: string; sentTo: string | null }> {
+export async function sendInstallationGuide(pharmacyId: string, actor: { adminId?: string | null; reason: "SUBSCRIPTION_STARTED" | "OWNER_CREATED" | "ADMIN" }): Promise<{ status: string; detail: string; sentTo: string | null }> {
   const pharmacy = await prisma.pharmacy.findUnique({
     where: { id: pharmacyId },
     select: { id: true, name: true, email: true, organizationId: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
   });
   if (!pharmacy) return { status: "FAILED", detail: "Officine introuvable.", sentTo: null };
+  // Envoyé tout seul (titulaire créé, abonnement démarré) : une seule fois — le bouton de la console, lui, renvoie toujours.
+  if (actor.reason !== "ADMIN") {
+    const already = await prisma.emailDispatch.findFirst({ where: { pharmacyId, kind: "INSTALL_GUIDE", status: { not: "FAILED" } }, select: { id: true } });
+    if (already) return { status: "SKIPPED", detail: "Guide déjà envoyé.", sentTo: null };
+  }
   const owner = pharmacy.memberships[0]?.user;
   const to = owner?.email ?? pharmacy.email;
   if (!to) return { status: "FAILED", detail: "Aucune adresse e-mail pour le titulaire.", sentTo: null };

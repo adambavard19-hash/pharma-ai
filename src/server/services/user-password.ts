@@ -42,19 +42,14 @@ export async function sendUserPasswordLink(
       id: true,
       email: true,
       firstName: true,
-      memberships: { where: { isActive: true }, take: 1, select: { pharmacy: { select: { id: true, name: true, isDemo: true } } } },
+      memberships: { where: { isActive: true }, take: 1, select: { role: true, pharmacy: { select: { id: true, name: true, isDemo: true } } } },
     },
   });
   const { url, expiresAt } = await issueUserPasswordLink(user.id);
-  // Au premier accès, le message porte aussi la mise en service, avec les
-  // étapes d'export propres au logiciel de l'officine quand il est connu.
-  let onboarding: { lgoLabel: string | null; exportSteps: string[]; contactEmail: string } | null = null;
-  if (kind === "welcome") {
-    const pharmacyId = user.memberships[0]?.pharmacy.id ?? null;
-    const connection = pharmacyId ? await prisma.stockConnection.findUnique({ where: { pharmacyId }, select: { lgo: true } }) : null;
-    const lgo = connection ? LGO_DEFINITIONS.find((item) => item.id === connection.lgo) ?? null : null;
-    onboarding = { lgoLabel: lgo && lgo.id !== "autre" ? lgo.label : null, exportSteps: lgo?.exportSteps ?? [], contactEmail: PUBLIC_CONTACT_EMAIL };
-  }
+  // L'e-mail de création de l'espace reste court (fondateur, 18 oct. 2026) : l'installation des postes arrive dans un SECOND e-mail, au
+  // titulaire (services/platform-onboarding.ts, sendInstallationGuide) — celui-ci le lui annonce.
+  const onboarding = null;
+  const installGuideFollows = kind === "welcome" && user.memberships[0]?.role === "OWNER";
   const message = buildUserPasswordEmail({
     firstName: user.firstName,
     pharmacyName: user.memberships[0]?.pharmacy.name ?? null,
@@ -63,6 +58,7 @@ export async function sendUserPasswordLink(
     expiresAt,
     kind,
     onboarding,
+    installGuideFollows,
     video: kind === "welcome" ? presentationVideoLinks(publicUrl) : null,
   });
   const messaging = deps?.messaging ?? getMessagingProvider({ demo: user.memberships[0]?.pharmacy.isDemo === true });
@@ -70,6 +66,14 @@ export async function sendUserPasswordLink(
     .sendEmail({ to: user.email, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html })
     .catch((error: unknown) => ({ status: "FAILED" as const, provider: messaging.info.id, detail: error instanceof Error ? error.message : "Envoi impossible." }));
   await recordDispatch({ kind: kind === "welcome" ? "WELCOME" : "ACCESS_LINK", recipient: user.email, outcome, userId: user.id, pharmacyId: user.memberships[0]?.pharmacy.id ?? null });
+  // Le titulaire reçoit, juste après l'e-mail de création de son espace, le second : installer PharmaBoost sur chaque poste (une seule
+  // fois par pharmacie, d'où qu'elle ait été créée : console, directeur commercial, extranet des commerciaux).
+  const ownerPharmacyId = installGuideFollows && outcome.status !== "FAILED" ? (user.memberships[0]?.pharmacy.id ?? null) : null;
+  if (ownerPharmacyId && !user.memberships[0]?.pharmacy.isDemo) {
+    await import("@/server/services/platform-onboarding")
+      .then(({ sendInstallationGuide }) => sendInstallationGuide(ownerPharmacyId, { reason: "OWNER_CREATED" }))
+      .catch((error: unknown) => console.error("[accueil] guide d'installation non envoyé", error));
+  }
   await recordAudit({
     action: "auth.password_link_sent",
     entityType: "User",

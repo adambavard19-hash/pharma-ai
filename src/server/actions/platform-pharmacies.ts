@@ -292,7 +292,7 @@ export async function createPharmacyOwnerAction(
   return ok(
     null,
     welcome.status === "SENT"
-      ? `${input.firstName} ${input.lastName} est titulaire de ${pharmacy.name}. E-mail d'accueil envoyé à ${input.email}.`
+      ? `${input.firstName} ${input.lastName} est titulaire de ${pharmacy.name}. E-mail de création de l'espace et guide d'installation envoyés à ${input.email}.`
       : `${input.firstName} ${input.lastName} est titulaire de ${pharmacy.name}, mais l'e-mail d'accueil n'est pas parti (${welcome.detail}).`,
   );
 }

@@ -10,7 +10,8 @@ describe("le guide d'installation envoyé au titulaire", () => {
       expect(message.text).toContain(`${index + 1}. ${step.title}`);
       expect(message.html).toContain(step.title);
     }
-    expect(message.text).toContain("Postes du comptoir");
+    expect(message.text).toContain("Télécharger PharmaBoost pour mon ordinateur");
+    expect(message.text).toContain("mot de passe unique est attribué à toute la pharmacie");
     expect(message.text).toContain("https://pharmaboost.app/");
     expect(message.text).toContain("contact@pharmaboost.app");
     expect(message.html).not.toContain("<script");

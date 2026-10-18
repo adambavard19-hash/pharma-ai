@@ -9,24 +9,24 @@ import { presentationVideoHtml, presentationVideoText, type PresentationVideoLin
  */
 export const INSTALLATION_STEPS: { title: string; body: string }[] = [
   {
-    title: "Ouvrez PharmaBoost et complétez votre officine",
-    body: "Connectez-vous avec votre adresse e-mail. Dans Paramètres → « Postes du comptoir », installez PharmaBoost sur vos ordinateurs ; votre stock s'envoie depuis « Mon stock » → « Mettre à jour mon stock ».",
+    title: "Ouvrez votre espace",
+    body: "Connectez-vous sur pharmaboost.app avec votre adresse e-mail et le mot de passe choisi grâce au lien de l'e-mail de création de votre espace.",
   },
   {
-    title: "Importez votre stock",
-    body: "Dans votre logiciel de gestion, faites l'édition de l'inventaire (PDF, Excel ou CSV) et déposez le fichier dans PharmaBoost → Stock. C'est ce qui permet au comptoir de proposer ce qui est réellement en rayon.",
+    title: "Ajoutez votre équipe",
+    body: "Dans le menu, « Mon équipe » → « Ajouter un membre » : saisissez l'adresse e-mail de chaque pharmacien et préparateur.",
   },
   {
-    title: "Reliez chaque poste de comptoir, en un double-clic",
-    body: "Sur l'ordinateur où la douchette est branchée : PharmaBoost → Paramètres → Postes du comptoir → « Télécharger PharmaBoost ». Faites-le sur le poste lui-même, puis ouvrez (double-clic) le fichier téléchargé : rien à taper, aucun mot de passe administrateur, et vous voyez le poste apparaître en direct. Une minute par poste. Dès lors, chaque boîte bipée dans votre logiciel ouvre le conseil sur l'écran.",
+    title: "Donnez le mot de passe de la pharmacie",
+    body: "Toujours dans « Mon équipe », un mot de passe unique est attribué à toute la pharmacie (par exemple « Menthe-4827 »). Donnez-le à l'équipe : chacun se connecte avec SON adresse e-mail et CE mot de passe. Vous, titulaire, gardez votre mot de passe personnel.",
   },
   {
-    title: "Faites suivre l'inventaire automatiquement",
-    body: "Sous le poste relié, indiquez le dossier où votre logiciel enregistre son édition de stock (un dossier partagé, visible depuis ce poste). PharmaBoost le relit à chaque nouvel export : les livraisons sont comptées, les ventes se déduisent au bip.",
+    title: "Installez PharmaBoost sur chaque poste",
+    body: "Sur chaque ordinateur du comptoir (celui où la douchette est branchée) : connectez-vous sur pharmaboost.app, ouvrez « Au comptoir », cliquez « Télécharger PharmaBoost pour mon ordinateur », puis ouvrez le fichier téléchargé (double-clic). Si Windows affiche un avertissement, cliquez « Informations complémentaires » puis « Exécuter quand même ». Une minute par poste : la pastille passe à « Connecté ».",
   },
   {
-    title: "Invitez votre équipe",
-    body: "PharmaBoost → Équipe : un compte par collaborateur, chacun reçoit son lien par e-mail. Vous suivez ensuite les conseils proposés, acceptés et vendus par chacun dans Performance.",
+    title: "Envoyez votre stock",
+    body: "Dans « Mon stock » → « Mettre à jour mon stock », déposez l'édition d'inventaire de votre logiciel de gestion : c'est ce qui permet au comptoir de proposer ce qui est vraiment en rayon.",
   },
 ];
 
@@ -36,7 +36,7 @@ export function buildInstallationGuideEmail(v: { ownerName: string; pharmacyName
   const text = [
     `Bonjour ${v.ownerName},`,
     "",
-    `Votre espace PharmaBoost pour ${v.pharmacyName} est prêt. Voici les cinq étapes pour le mettre en service, sans intervention sur votre serveur et sans visite : une trentaine de minutes en tout.`,
+    `Votre espace PharmaBoost pour ${v.pharmacyName} est prêt. Voici comment installer PharmaBoost sur chaque poste de votre comptoir, en cinq étapes, sans visite et sans toucher à votre serveur.`,
     "",
     ...INSTALLATION_STEPS.flatMap((step, index) => [`${index + 1}. ${step.title}`, `   ${step.body}`, ""]),
     ...lgoText,
@@ -48,15 +48,15 @@ export function buildInstallationGuideEmail(v: { ownerName: string; pharmacyName
     "PharmaBoost",
   ].join("\n");
   const html = shell(
-    `Mettre PharmaBoost en service — ${v.pharmacyName}`,
-    "Mettre PharmaBoost en service",
+    `Installer PharmaBoost sur vos postes — ${v.pharmacyName}`,
+    "Installer PharmaBoost sur vos postes",
     `<p style="margin:0;font-size:18px;line-height:26px;font-weight:600">Bonjour ${escapeHtml(v.ownerName)},</p>
-<p style="margin:12px 0 0;font-size:16px;line-height:25px;color:#374151">Votre espace PharmaBoost pour <strong>${escapeHtml(v.pharmacyName)}</strong> est prêt. Voici les cinq étapes pour le mettre en service, sans intervention sur votre serveur et sans visite : une trentaine de minutes en tout.</p>
+<p style="margin:12px 0 0;font-size:16px;line-height:25px;color:#374151">Votre espace PharmaBoost pour <strong>${escapeHtml(v.pharmacyName)}</strong> est prêt. Voici comment installer PharmaBoost sur chaque poste de votre comptoir, en cinq étapes, sans visite et sans toucher à votre serveur.</p>
 <ol style="margin:18px 0 0;padding-left:22px;font-size:15px;line-height:23px;color:#374151">${INSTALLATION_STEPS.map((step) => `<li style="margin:0 0 12px"><strong style="color:#111827">${escapeHtml(step.title)}</strong><br>${escapeHtml(step.body)}</li>`).join("")}</ol>
 ${lgoHtml}
 ${button(v.appUrl, "Ouvrir PharmaBoost", "#0F766E")}
 <p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Une question, un blocage ? Répondez à ce message ou écrivez à ${escapeHtml(v.contactEmail)} : nous vous rappelons.</p>${v.video ? presentationVideoHtml(v.video) : ""}`,
     "#0F766E",
   );
-  return { subject: `Mettre PharmaBoost en service — ${v.pharmacyName}`, text, html };
+  return { subject: `Installer PharmaBoost sur vos postes — ${v.pharmacyName}`, text, html };
 }

@@ -18,7 +18,7 @@ export function DigestChoiceForm({ token, subscribed: initial }: { token: string
       {state?.ok === false && <Alert tone="danger">{state.error}</Alert>}
       {state?.ok && (
         <Alert tone="success" title="C'est fait" icon={<CheckCircle2 className="size-[18px]" />}>
-          {state.data.subscribed ? "Vous recevrez de nouveau le bilan chaque matin." : "Vous ne recevrez plus le bilan quotidien."}
+          {state.data.subscribed ? "Vous recevrez de nouveau le bilan chaque lundi." : "Vous ne recevrez plus le bilan de la semaine."}
         </Alert>
       )}
       {!state?.ok && !subscribed && <p className="text-[13.5px] text-text-secondary">Vous ne recevez plus ce bilan.</p>}

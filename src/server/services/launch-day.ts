@@ -65,7 +65,7 @@ export async function sendLaunchDayTrial(input: { pharmacyId: string; day: strin
   const ctx = { ...(await platformEmailContext()), baseUrl: PUBLIC_BASE };
   const results = [];
   for (const owner of [true, false]) {
-    const mail = buildLaunchDayEmail({ firstName: input.adminFirstName, pharmacyName: pharmacy.name, owner, dayLabel: launchDayLabel(input.day) }, ctx);
+    const mail = buildLaunchDayEmail({ firstName: input.adminFirstName, pharmacyName: pharmacy.name, owner, dayLabel: launchDayLabel(input.day), email: input.to }, ctx);
     results.push(await deliver(input.to, { ...mail, subject: `[Essai — version ${owner ? "titulaire" : "comptoir"}] ${mail.subject}` }, { pharmacyId: input.pharmacyId, adminId: input.adminId, trial: true }));
   }
   return { sent: results.filter((r) => r.status !== "FAILED").length, failed: results.filter((r) => r.status === "FAILED").map((r) => r.detail) };
@@ -81,11 +81,55 @@ export async function sendLaunchDay(input: { pharmacyId: string; day: string; me
   let sent = 0;
   const failed: string[] = [];
   for (const m of chosen) {
-    const mail = buildLaunchDayEmail({ firstName: m.name.split(" ")[0] || m.name, pharmacyName: pharmacy.name, owner: m.owner, dayLabel: launchDayLabel(input.day) }, ctx);
+    const mail = buildLaunchDayEmail({ firstName: m.name.split(" ")[0] || m.name, pharmacyName: pharmacy.name, owner: m.owner, dayLabel: launchDayLabel(input.day), email: m.email }, ctx);
     const outcome = await deliver(m.email, mail, { pharmacyId: input.pharmacyId, userId: m.userId, adminId: input.adminId, trial: false });
     if (outcome.status === "FAILED") failed.push(`${m.name} : ${outcome.detail}`);
     else sent += 1;
   }
   await recordAudit({ action: "pharmacy.launch_day_email", entityType: "Pharmacy", entityId: input.pharmacyId, pharmacyId: input.pharmacyId, metadata: { day: input.day, sent, failed: failed.length, adminId: input.adminId } });
   return { sent, total: chosen.length, failed };
+}
+
+/**
+ * L'envoi AUTOMATIQUE (fondateur, 18 oct. 2026 : « chaque nouvelle pharmacie doit recevoir le mail de bienvenue automatiquement avec
+ * la date du lendemain ») : chaque jour, chaque membre actif d'une pharmacie créée depuis la mise en place (jamais une pharmacie de
+ * démonstration, jamais les pharmacies d'avant) qui ne l'a pas encore reçu le reçoit, avec la date de DEMAIN. Un membre ajouté plus
+ * tard le reçoit au passage suivant. Une seule fois par personne (journal des e-mails relu avant d'écrire).
+ */
+export const AUTO_LAUNCH_SINCE = new Date("2026-10-18T00:00:00Z");
+
+export function tomorrowIso(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: TIME_ZONE }).formatToParts(now);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  const today = new Date(`${get("year")}-${get("month")}-${get("day")}T12:00:00Z`);
+  today.setUTCDate(today.getUTCDate() + 1);
+  return today.toISOString().slice(0, 10);
+}
+
+export async function sendAutomaticLaunchDays(now: Date = new Date(), options: { deadlineAt?: number } = {}) {
+  const day = tomorrowIso(now);
+  const run = { day, pharmacies: 0, sent: 0, failed: 0 };
+  const pharmacies = await prisma.pharmacy.findMany({ where: { isActive: true, isDemo: false, createdAt: { gte: AUTO_LAUNCH_SINCE } }, select: { id: true, name: true } });
+  if (pharmacies.length === 0) return run;
+  const ctx = { ...(await platformEmailContext()), baseUrl: PUBLIC_BASE };
+  for (const pharmacy of pharmacies) {
+    if (options.deadlineAt && Date.now() > options.deadlineAt) break;
+    const { members } = await launchDayState(pharmacy.id);
+    const done = await prisma.emailDispatch.findMany({ where: { pharmacyId: pharmacy.id, templateKey: LAUNCH_DAY_TEMPLATE, trigger: { in: ["MANUAL", "AUTOMATIC"] }, status: { not: "FAILED" } }, select: { userId: true } });
+    const received = new Set(done.map((row) => row.userId));
+    const waiting = members.filter((m) => !received.has(m.userId));
+    if (waiting.length === 0) continue;
+    run.pharmacies += 1;
+    for (const m of waiting) {
+      const mail = buildLaunchDayEmail({ firstName: m.name.split(" ")[0] || m.name, pharmacyName: pharmacy.name, owner: m.owner, dayLabel: launchDayLabel(day), email: m.email }, ctx);
+      const messaging = getMessagingProvider({ demo: false });
+      const outcome = await messaging
+        .sendEmail({ to: m.email, fromName: "PharmaBoost", subject: mail.subject, text: mail.text, html: mail.html })
+        .catch((error: unknown) => ({ status: "FAILED" as const, provider: messaging.info.id, detail: error instanceof Error ? error.message : "Envoi impossible." }));
+      await traceDispatch({ kind: "CAMPAIGN", recipient: m.email, outcome, subject: mail.subject, templateKey: LAUNCH_DAY_TEMPLATE, trigger: "AUTOMATIC", pharmacyId: pharmacy.id, userId: m.userId });
+      if (outcome.status === "FAILED") run.failed += 1;
+      else run.sent += 1;
+    }
+  }
+  return run;
 }

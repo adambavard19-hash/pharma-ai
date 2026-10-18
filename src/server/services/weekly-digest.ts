@@ -14,16 +14,29 @@ import { buildDailyDigest, digestHasContent } from "@/core/notifications/weekly-
 import { TIME_ZONE } from "@/config/constants";
 
 /**
- * Le bilan de chaque matin (fondateur, 16 oct. 2026 : « un mail par jour ») : la journée d'hier, à Paris.
- * - chaque titulaire reçoit toute son officine, avec le PDF de la journée ;
+ * Le bilan de la semaine (fondateur, 18 oct. 2026 : « seulement toutes les semaines le bilan de performance ») : chaque LUNDI, la semaine
+ * civile écoulée (lundi → dimanche, à Paris). La tâche passe chaque jour ; les autres jours, rien ne part.
+ * - chaque titulaire reçoit toute son officine, avec le PDF de la semaine ;
  * - chaque membre de l'équipe reçoit SEULEMENT ses propres ventes (celles qu'il a faites, ou de son comptoir attribué), avec son PDF.
- * Une journée sans conseil proposé n'envoie rien. Une fois par jour et par destinataire (journal des e-mails relu avant d'écrire) ;
+ * Une semaine sans conseil proposé n'envoie rien. Une fois par semaine et par destinataire (journal des e-mails relu avant d'écrire) ;
  * chaque officine ne voit que ses propres chiffres. Désinscription par le lien de l'e-mail. Lancé par la tâche quotidienne (CRON_SECRET).
  */
 
 const DAY_MS = 86_400_000;
 const UNSUBSCRIBE_TTL_MS = 400 * DAY_MS;
 const UNSUBSCRIBE_KIND = "resume-hebdo";
+
+/** La semaine civile écoulée (lundi → dimanche) vue de `now` à Paris : son lundi (« 2026-10-12 ») et « du lundi 12 au dimanche 18 octobre ». */
+export function previousWeek(now: Date, timeZone = TIME_ZONE): { monday: string; label: string; isMonday: boolean } {
+  const today = zonedDateParts(now, timeZone);
+  const date = new Date(Date.UTC(today.year, today.month - 1, today.day, 12));
+  const weekday = date.getUTCDay();
+  const monday = new Date(date.getTime() - (((weekday + 6) % 7) + 7) * DAY_MS);
+  const sunday = new Date(monday.getTime() + 6 * DAY_MS);
+  const fmt = (d: Date, withMonth: boolean) => new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC", weekday: "long", day: "numeric", ...(withMonth ? { month: "long" } : {}) }).format(d);
+  const sameMonth = monday.getUTCMonth() === sunday.getUTCMonth();
+  return { monday: monday.toISOString().slice(0, 10), label: `du ${fmt(monday, !sameMonth)} au ${fmt(sunday, true)}`, isMonday: weekday === 1 };
+}
 
 /** La veille de `now` à Paris : « 2026-10-15 » (la période des rapports et du PDF) et « jeudi 15 octobre ». */
 export function previousDay(now: Date, timeZone = TIME_ZONE): { day: string; label: string } {
@@ -52,7 +65,7 @@ export async function setWeeklyDigestSubscription(userId: string, subscribed: bo
 type Person = { id: string; email: string; firstName: string; lastName: string | null };
 type OnlyFor = { userId: string; postIds: string[] };
 
-/** Les chiffres d'UNE officine (ou d'UN de ses membres) pour la journée : rien d'une autre (lecture filtrée sur son identifiant). */
+/** Les chiffres d'UNE officine (ou d'UN de ses membres) pour la période (« semaine-derniere ») : rien d'une autre (lecture filtrée sur son identifiant). */
 export async function dayFigures(pharmacyId: string, day: string, now: Date, onlyFor?: OnlyFor) {
   const range = resolveReportRange(day, now, TIME_ZONE);
   const report = await loadSalesReport({ pharmacyId, range, now, onlyFor });
@@ -78,13 +91,17 @@ async function ownerExtras(pharmacyId: string, now: Date) {
 
 const SENT_STATUSES = ["SENT", "DELIVERED", "DELAYED", "SIMULATED"] as const;
 
-export type DailyDigestRun = { day: string; pharmacies: number; sent: number; skipped: number; failed: number; stoppedEarly: boolean };
+export type DailyDigestRun = { day: string; pharmacies: number; sent: number; skipped: number; failed: number; stoppedEarly: boolean; notMonday?: boolean };
 
-export async function sendDailyDigests(now: Date = new Date(), options: { deadlineAt?: number } = {}): Promise<DailyDigestRun> {
-  const { day, label } = previousDay(now);
+/** Le bilan de la semaine, le lundi seulement (`force` : un autre jour, pour un essai). */
+export async function sendDailyDigests(now: Date = new Date(), options: { deadlineAt?: number; force?: boolean } = {}): Promise<DailyDigestRun> {
+  const { monday, label, isMonday } = previousWeek(now);
+  const day = monday;
+  const period = "semaine-derniere";
   const run: DailyDigestRun = { day, pharmacies: 0, sent: 0, skipped: 0, failed: 0, stoppedEarly: false };
-  const ownerKey = `owner-daily:${day}`;
-  const memberKey = `member-daily:${day}`;
+  if (!isMonday && !options.force) return { ...run, notMonday: true };
+  const ownerKey = `owner-weekly:${day}`;
+  const memberKey = `member-weekly:${day}`;
   const pharmacies = await prisma.pharmacy.findMany({ where: { isActive: true, isDemo: false }, select: { id: true, name: true }, orderBy: { createdAt: "asc" } });
   const ctx = await platformEmailContext();
   const messaging = getMessagingProvider({ demo: false });
@@ -120,13 +137,13 @@ export async function sendDailyDigests(now: Date = new Date(), options: { deadli
     const members = memberships.filter((membership) => membership.role !== "OWNER" && !ownerIds.has(membership.user.id)).map((membership) => membership.user);
 
     // 1. Le titulaire : toute l'officine.
-    const pharmacyAdvice = owners.length ? await dayFigures(pharmacy.id, day, now) : null;
+    const pharmacyAdvice = owners.length ? await dayFigures(pharmacy.id, period, now) : null;
     if (owners.length && pharmacyAdvice && digestHasContent({ advice: pharmacyAdvice })) {
       const already = await prisma.emailDispatch.findFirst({ where: { pharmacyId: pharmacy.id, templateKey: ownerKey, status: { in: [...SENT_STATUSES] } }, select: { id: true } });
       if (already) run.skipped += 1;
       else {
         const extras = await ownerExtras(pharmacy.id, now);
-        const pdf = await salesReportPdfFile(pharmacy.id, { param: day }, now).catch(() => null);
+        const pdf = await salesReportPdfFile(pharmacy.id, { param: period }, now).catch(() => null);
         const file = pdf ? { bytes: pdf.bytes, fileName: dayFile(pdf.fileName, "officine") } : null;
         let delivered = false;
         for (const owner of owners) {
@@ -150,12 +167,12 @@ export async function sendDailyDigests(now: Date = new Date(), options: { deadli
         break;
       }
       const onlyFor: OnlyFor = { userId: member.id, postIds: posts.filter((post) => post.assignedUserId === member.id).map((post) => post.id) };
-      const advice = await dayFigures(pharmacy.id, day, now, onlyFor);
+      const advice = await dayFigures(pharmacy.id, period, now, onlyFor);
       if (!advice || !digestHasContent({ advice })) continue;
       const already = await prisma.emailDispatch.findFirst({ where: { pharmacyId: pharmacy.id, userId: member.id, templateKey: memberKey, status: { in: [...SENT_STATUSES] } }, select: { id: true } });
       if (already) { run.skipped += 1; continue; }
       const person = [member.firstName, member.lastName].filter(Boolean).join(" ");
-      const pdf = await salesReportPdfFile(pharmacy.id, { param: day }, now, { onlyFor, person }).catch(() => null);
+      const pdf = await salesReportPdfFile(pharmacy.id, { param: period }, now, { onlyFor, person }).catch(() => null);
       const file = pdf ? { bytes: pdf.bytes, fileName: dayFile(pdf.fileName, "mes-ventes") } : null;
       const mail = buildDailyDigest(
         { audience: "member", pharmacyName: pharmacy.name, firstName: member.firstName, dayLabel: label, advice, pdfAttached: file !== null, links: { results: publicUrl("/historique"), stock: publicUrl("/stock"), unsubscribe: weeklyDigestUnsubscribeUrl(member.id) } },
