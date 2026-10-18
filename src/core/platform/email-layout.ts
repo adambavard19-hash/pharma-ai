@@ -54,7 +54,9 @@ export type EmailBlock =
   /** Une courte liste à puces, avec son titre. */
   | { kind: "list"; title?: string; items: string[] }
   /** Une image (https), pleine largeur de la carte : le visuel d'une offre partenaire. */
-  | { kind: "image"; url: string; alt: string };
+  | { kind: "image"; url: string; alt: string }
+  /** Une vidéo : sa vignette cliquable (https) et un bouton « ▶ » vers la page qui la lit — une vidéo ne se lit pas dans un e-mail. */
+  | { kind: "video"; url: string; imageUrl: string; title: string; label: string };
 
 export type EmailContent = {
   subject: string;
@@ -119,6 +121,10 @@ function blockHtml(block: EmailBlock): string {
     }
     case "image":
       return /^https:\/\//.test(block.url) ? `<img src="${escapeHtml(block.url)}" alt="${escapeHtml(block.alt)}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border:0;border-radius:12px;margin:0 0 20px">` : "";
+    case "video": {
+      const href = escapeHtml(block.url);
+      return `<div style="margin:0 0 24px"><p style="margin:0 0 10px;font-family:${FONT};font-size:15px;line-height:22px;font-weight:600;color:${BRAND.ink}">${escapeHtml(block.title)}</p>${/^https:\/\//.test(block.imageUrl) ? `<a href="${href}" style="display:block;text-decoration:none"><img src="${escapeHtml(block.imageUrl)}" width="536" alt="${escapeHtml(block.title)}" style="display:block;width:100%;max-width:536px;height:auto;border:0;border-radius:12px"></a>` : ""}<p style="margin:10px 0 0"><a href="${href}" style="display:inline-block;padding:9px 16px;border:1px solid ${BRAND.primary};border-radius:999px;color:${BRAND.primary};font-family:${FONT};font-size:14px;line-height:20px;font-weight:600;text-decoration:none">&#9654;&nbsp; ${escapeHtml(block.label)}</a></p></div>`;
+    }
     case "link":
       return `<p style="margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:20px;color:${BRAND.muted}">${escapeHtml(block.label)}<br><a href="${escapeHtml(block.url)}" style="color:${BRAND.primary};word-break:break-all">${escapeHtml(block.url)}</a></p>`;
     case "stats": {
@@ -153,6 +159,8 @@ function blockText(block: EmailBlock): string {
       return [block.title ? `${block.title} :` : null, ...block.items.map((item, i) => `${i + 1}. ${item}`)].filter(Boolean).join("\n");
     case "image":
       return "";
+    case "video":
+      return `${block.title} — ${block.label} :\n${block.url}`;
     case "link":
       return `${block.label}\n${block.url}`;
     case "stats":
