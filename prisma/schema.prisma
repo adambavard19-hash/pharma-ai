@@ -4454,6 +4454,7 @@ model Partner {
   launches           PartnerLaunch[]
   sponsoredCampaigns SponsoredCampaign[]
   infoRequests       PartnerInfoRequest[]
+  earnings           PartnerEarning[]
 
   @@index([status])
   @@map("partners")
@@ -6022,4 +6023,23 @@ model PartnerEmailSend {
   @@unique([campaignId, consentId])
   @@index([consentId, sentAt])
   @@map("partner_email_sends")
+}
+
+
+/// Ce que PharmaBoost a reçu d'un partenaire (17 oct. 2026) : commission d'affiliation (e-mails patients), forfait, ou autre —
+/// saisi dans la console à réception du relevé ou du virement. La rémunération du partenaire = la somme de ces lignes.
+model PartnerEarning {
+  id            String   @id @default(cuid())
+  partnerId     String
+  kind          String
+  amountCents   Int
+  receivedOn    DateTime
+  note          String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, receivedOn])
+  @@map("partner_earnings")
 }

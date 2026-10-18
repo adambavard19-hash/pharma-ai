@@ -114,7 +114,7 @@ describe("l'en-tête mène d'abord à la bannière du comptoir", () => {
     expect(links[0]).toEqual(["/decouvrir#banniere", "Au comptoir"]);
     expect(links).toHaveLength(5);
     // Le bilan conseil et le rappel de fin de cure (17 oct. 2026) ont leur onglet, juste après le comptoir.
-    expect(links[1]).toEqual(["/decouvrir#bilan", "Bilan conseil"]);
+    expect(links[1]).toEqual(["/decouvrir#suivi", "Suivi pharmaceutique"]);
     // La rubrique « Comment ça marche » a été retirée de la page (demande du fondateur, 11 oct. 2026) : plus de lien vers elle.
     expect(nav).not.toContain("#fonctionnement");
   });

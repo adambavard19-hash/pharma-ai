@@ -11,10 +11,10 @@ type Campaign = { id: string; brandId: string; brand: string; subject: string; b
 
 const EMPTY = { id: null as string | null, brandId: "", subject: "", body: "", imageUrl: "", affiliateUrl: "", universes: [] as string[] };
 
-export function PartnerEmailsPanel({ consents, brands, universes, campaigns }: { consents: number; brands: { id: string; name: string }[]; universes: { key: string; label: string }[]; campaigns: Campaign[] }) {
+export function PartnerEmailsPanel({ initialBrandId = "", consents, brands, universes, campaigns }: { initialBrandId?: string; consents: number; brands: { id: string; name: string }[]; universes: { key: string; label: string }[]; campaigns: Campaign[] }) {
   const { push } = useToast();
   const [pending, start] = useTransition();
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState({ ...EMPTY, brandId: brands.some((brand) => brand.id === initialBrandId) ? initialBrandId : "" });
   const [audience, setAudience] = useState<number | null>(null);
   const label = (key: string) => universes.find((u) => u.key === key)?.label ?? key;
 

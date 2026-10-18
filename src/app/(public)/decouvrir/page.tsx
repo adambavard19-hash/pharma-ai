@@ -56,6 +56,10 @@ export default async function SitePage() {
             <p className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-3 py-1.5 text-[13px] font-medium text-text-secondary backdrop-blur-md dark:border-border-subtle dark:bg-surface-card">
               <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
             </p>
+            {/* Le fondateur, 17 oct. 2026 : « le premier logiciel à créer un suivi pharmaceutique — ce n'est pas assez visible ». */}
+            <a href="#suivi" className="mt-3 flex w-fit items-center gap-2 rounded-full bg-gradient-to-r from-brand-700 to-[#0796b4] px-4 py-2 text-[14px] font-semibold text-white shadow-sm hover:opacity-95" data-badge-suivi="">
+              <span aria-hidden="true">★</span> Le premier logiciel de suivi pharmaceutique
+            </a>
             {/* Le robot vit désormais à côté du nom « PharmaBoost », dans l'en-tête : le titre se lit seul. */}
             <h1 className="mt-5 pb-1 text-[50px] leading-[0.98] font-bold tracking-[-0.04em] text-text-primary min-[390px]:text-[54px] md:text-[80px] lg:mt-4">
               Scan.
@@ -65,7 +69,7 @@ export default async function SitePage() {
               <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Bilan.</span>
             </h1>
             <p className="mt-7 max-w-xl text-[17px] leading-7 text-text-secondary">
-              Au comptoir, vous scannez les boîtes comme d&apos;habitude. La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller en plus, pris dans votre rayon. Et le patient repart avec ses conseils.
+              Au comptoir, vous scannez les boîtes comme d&apos;habitude. La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller en plus, pris dans votre rayon. Et le patient repart avec ses conseils — puis PharmaBoost assure son suivi pharmaceutique : bilan par e-mail, rappel avant la fin de sa cure.
             </p>
             {/* « Réserver une démo » est déjà en haut de page : ici, la présentation seule, en vert, comme bouton principal. */}
             <div className="mt-9">
@@ -73,6 +77,32 @@ export default async function SitePage() {
             </div>
           </div>
           <HeroVisual glass />
+        </div>
+      </section>
+
+      {/* ---- Le bilan conseil, et le rappel de fin de cure ------------- */}
+      {/* Le fondateur, 17 oct. 2026 : « ça donne envie aux patients de revenir », et la pharmacie a tout intérêt à ce qu'ils reviennent. */}
+      <section id="suivi" className="scroll-mt-20 border-t border-border-subtle">
+        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
+          <div>
+            <SectionHead kicker="Suivi pharmaceutique · une première" title="Le premier logiciel de suivi pharmaceutique.">
+              Le conseil ne s'arrête plus au comptoir. Avec son accord, le patient reçoit par e-mail le bilan de ses conseils, au nom de votre pharmacie : pourquoi chaque produit accompagne son traitement, comment l'utiliser. Pour une cure — magnésium, probiotiques, plantes, vitamines —, PharmaBoost lui écrit sept jours avant la fin : sa cure se termine, il pense à revenir la renouveler chez vous.
+            </SectionHead>
+            <ul className="mt-8 flex flex-wrap gap-2">
+              {["Bilan par e-mail, avec l'accord du patient", "Rappel 7 jours avant la fin de la cure", "Le patient revient à la pharmacie", "Adresse effacée après l'envoi"].map((t) => (
+                <li key={t} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-4 py-2 text-[14px] font-medium text-text-primary">
+                  <Check className="size-4 text-brand-600" /> {fr(t)}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 text-[14.5px] leading-6 text-text-secondary">{fr("Un patient qui revient, c'est une cure renouvelée au comptoir — et l'occasion d'un nouveau conseil. Le pharmacien garde la main : le rappel invite à repasser, c'est lui qui dit s'il faut poursuivre.")}</p>
+          </div>
+          <div>
+            <CureReminderVisual />
+            <p className="mt-4 text-center text-[12.5px] text-text-tertiary">
+              Le bilan et le rappel, envoyés au nom de la pharmacie · <ExampleTag className="text-[10.5px]" />
+            </p>
+          </div>
         </div>
       </section>
 
@@ -113,32 +143,6 @@ export default async function SitePage() {
             <QuestionVisual />
             <p className="mt-3 text-center text-[12.5px] text-text-tertiary">
               La bannière, telle qu&apos;elle pose la question · <ExampleTag className="text-[10.5px]" />
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ---- Le bilan conseil, et le rappel de fin de cure ------------- */}
-      {/* Le fondateur, 17 oct. 2026 : « ça donne envie aux patients de revenir », et la pharmacie a tout intérêt à ce qu'ils reviennent. */}
-      <section id="bilan" className="scroll-mt-20">
-        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
-          <div>
-            <SectionHead kicker="Bilan conseil" title="Le patient repart avec son bilan. Et revient pour sa cure.">
-              Avec son accord, le patient reçoit par e-mail le bilan de ses conseils, au nom de votre pharmacie. Pour une cure — magnésium, probiotiques, plantes, vitamines —, PharmaBoost lui écrit sept jours avant la fin : sa cure se termine, il pense à revenir la renouveler chez vous.
-            </SectionHead>
-            <ul className="mt-8 flex flex-wrap gap-2">
-              {["Bilan par e-mail, avec l'accord du patient", "Rappel 7 jours avant la fin de la cure", "Le patient revient à la pharmacie", "Adresse effacée après l'envoi"].map((t) => (
-                <li key={t} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-4 py-2 text-[14px] font-medium text-text-primary">
-                  <Check className="size-4 text-brand-600" /> {fr(t)}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-6 text-[14.5px] leading-6 text-text-secondary">{fr("Un patient qui revient, c'est une cure renouvelée au comptoir — et l'occasion d'un nouveau conseil. Le pharmacien garde la main : le rappel invite à repasser, c'est lui qui dit s'il faut poursuivre.")}</p>
-          </div>
-          <div>
-            <CureReminderVisual />
-            <p className="mt-4 text-center text-[12.5px] text-text-tertiary">
-              Le bilan et le rappel, envoyés au nom de la pharmacie · <ExampleTag className="text-[10.5px]" />
             </p>
           </div>
         </div>

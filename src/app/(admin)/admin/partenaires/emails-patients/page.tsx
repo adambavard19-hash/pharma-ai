@@ -13,11 +13,13 @@ export const dynamic = "force-dynamic";
  * partenaires correspondant à leurs achats, avec un lien d'affiliation (PharmaBoost touche une commission). Au plus un par semaine
  * et par patient ; jamais de médicament.
  */
-export default async function PartnerEmailsPage() {
+export default async function PartnerEmailsPage({ searchParams }: { searchParams: Promise<{ marque?: string }> }) {
+  const { marque } = await searchParams;
   await requirePlatformSession();
   const data = await listCampaigns();
   return (
     <PartnerEmailsPanel
+      initialBrandId={typeof marque === "string" ? marque.slice(0, 40) : ""}
       consents={data.consents}
       brands={data.brands.map((brand) => ({ id: brand.id, name: brand.name }))}
       universes={UNIVERSES.filter((universe) => universe.key !== "VETERINAIRE").map((universe) => ({ key: universe.key, label: universe.label }))}

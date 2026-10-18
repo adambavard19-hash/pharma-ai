@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Briefcase, Building2, Eye, Megaphone, ShieldOff, Sparkles, Store } from "lucide-react";
+import { Briefcase, Building2, Eye, Handshake, Megaphone, ShieldOff, Sparkles, Store } from "lucide-react";
+import { partnersOverview } from "@/server/services/partners/partner-earnings";
 import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { loadCockpit } from "@/server/services/admin/cockpit";
@@ -38,12 +39,13 @@ export default async function AdminCockpitPage({ searchParams }: { searchParams:
   const params = await searchParams;
   const period = resolvePeriod(typeof params.periode === "string" ? params.periode : null);
 
-  const [admin, cockpit, supportToAnswer, stockToDecide, visitors] = await Promise.all([
+  const [admin, cockpit, supportToAnswer, stockToDecide, visitors, partners] = await Promise.all([
     prisma.platformAdmin.findUnique({ where: { id: session.admin.id }, select: { firstName: true } }),
     loadCockpit(period),
     countSupportToAnswer(),
     countDepositsNeedingAttention(),
     countSiteVisitors(),
+    partnersOverview(),
   ]);
 
   const firstName = admin?.firstName.trim() || session.admin.fullName.split(" ")[0];
@@ -55,7 +57,12 @@ export default async function AdminCockpitPage({ searchParams }: { searchParams:
     <>
       <AdminPageHeader
         title={`Bonjour ${firstName}`}
-        actions={<SiteVisitorsCounter counts={visitors} />}
+        actions={
+          <div className="flex flex-wrap gap-3">
+            <PartnersCounter overview={partners} />
+            <SiteVisitorsCounter counts={visitors} />
+          </div>
+        }
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span>{formatLongDate(cockpit.now)}</span>
@@ -106,6 +113,24 @@ export default async function AdminCockpitPage({ searchParams }: { searchParams:
 }
 
 const NUMBER = new Intl.NumberFormat("fr-FR");
+
+/** Le compteur des partenaires (17 oct. 2026) : les partenaires actifs, ce qu'ils ont rapporté cette année ; un clic ouvre la liste. */
+function PartnersCounter({ overview }: { overview: { active: number; total: number; yearCents: number } }) {
+  return (
+    <Link href="/admin/partenaires/liste" data-compteur-partenaires="" title="Voir les partenaires et leur rémunération" className="flex items-center gap-3 rounded-2xl bg-surface-card px-4 py-2.5 shadow-xs ring-1 ring-border-subtle transition-all hover:-translate-y-px hover:ring-brand-300 motion-reduce:transform-none">
+      <span className="grid size-9 place-items-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+        <Handshake className="size-4" aria-hidden="true" />
+      </span>
+      <div>
+        <p className="text-[24px] leading-7 font-bold tabular-nums text-text-primary">{NUMBER.format(overview.active)}</p>
+        <p className="text-[12px] leading-4 text-text-secondary">
+          {overview.active > 1 ? "partenaires actifs" : "partenaire actif"}
+          {overview.total > overview.active ? ` sur ${NUMBER.format(overview.total)}` : ""} · {(overview.yearCents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })} cette année
+        </p>
+      </div>
+    </Link>
+  );
+}
 
 /** Le compteur des visiteurs du site public : une personne par adresse IP, les visites répétées ne comptent pas deux fois. */
 function SiteVisitorsCounter({ counts }: { counts: SiteVisitorCounts }) {

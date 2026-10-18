@@ -14,6 +14,8 @@ import { PartnerStatusPanel } from "./partner-status-panel";
 import { PartnerContacts } from "./partner-contacts";
 import { PartnerContracts } from "./partner-contracts";
 import { PartnerIntegrations } from "./partner-integrations";
+import { PartnerMoney } from "./partner-money";
+import { EARNING_KINDS, partnerMoney } from "@/server/services/partners/partner-earnings";
 
 export const metadata: Metadata = { title: "Fiche partenaire" };
 
@@ -26,7 +28,7 @@ export const metadata: Metadata = { title: "Fiche partenaire" };
 export default async function PartnerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requirePlatformSession();
-  const partner = await getPartner(id);
+  const [partner, money] = await Promise.all([getPartner(id), partnerMoney(id)]);
   if (!partner) notFound();
 
   return (
@@ -152,6 +154,18 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
                   endsAt: dateInputOf(partner.endsAt),
                   notes: partner.notes ?? "",
                 }}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="Notre rémunération" description="Ce que ce partenaire rapporte à PharmaBoost, et ses e-mails aux patients. Saisissez chaque versement à réception du relevé." />
+            <CardContent>
+              <PartnerMoney
+                partnerId={partner.id}
+                brands={partner.brands.map((brand) => ({ id: brand.id, name: brand.name }))}
+                kinds={EARNING_KINDS.map((k) => ({ key: k.key, label: k.label }))}
+                money={{ ...money, earnings: money.earnings.map((e) => ({ ...e, receivedOn: e.receivedOn.toISOString() })), campaigns: money.campaigns.map((c) => ({ id: c.id, subject: c.subject, status: c.status, sentAt: c.sentAt ? c.sentAt.toISOString() : null, recipients: c.recipients, clicks: c.clicks, brand: c.brand.name })) }}
               />
             </CardContent>
           </Card>
