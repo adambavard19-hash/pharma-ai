@@ -7,6 +7,7 @@ import { recordIsDemo } from "@/server/db/demo-scope";
 import { recordAudit } from "@/server/audit/log";
 import type { AgentContext } from "@/server/services/stock-sync";
 import { findOpenFactsName } from "@/server/services/product-images";
+import { pitchKey } from "@/server/services/counter-pitches";
 
 /**
  * Un bip de douchette au comptoir, capté par l'agent du poste de caisse.
@@ -92,7 +93,7 @@ const CONSEIL_STATUSES: ("PROPOSED" | "PRESENTED" | "ACCEPTED" | "MODIFIED" | "D
  * conseil « NEOBIANACID CITRON CPR 70 », essai de Donna du 16 oct. 2026). Un conseil encore sans réponse passe avant un
  * conseil déjà vendu (qui absorbe alors une deuxième boîte).
  */
-async function conseilForScan(pharmacyId: string, prescriptionId: string, item: Exclude<ScannedItem, { kind: "UNKNOWN" }>): Promise<{ id: string; status: string } | null> {
+async function conseilForScan(pharmacyId: string, prescriptionId: string, item: Exclude<ScannedItem, { kind: "UNKNOWN" }>): Promise<{ id: string; status: string; replaces?: { productId: string; previousProductId: string | null; priceCents: number } } | null> {
   const exact = await prisma.recommendation.findFirst({
     where: {
       prescriptionId,
@@ -104,6 +105,8 @@ async function conseilForScan(pharmacyId: string, prescriptionId: string, item: 
     select: { id: true, status: true },
   });
   if (exact || item.kind !== "PRODUCT") return exact;
+  const answered = await answerConseilForScan(pharmacyId, prescriptionId, item);
+  if (answered) return answered;
   const scanned = await prisma.product.findFirst({ where: { id: item.productId, pharmacyId }, select: { name: true, brand: true } });
   if (!scanned || !rangeKey(scanned.name, scanned.brand)) return null;
   const candidates = await prisma.recommendation.findMany({
@@ -113,6 +116,27 @@ async function conseilForScan(pharmacyId: string, prescriptionId: string, item: 
   });
   const match = candidates.find((rec) => rec.product && sameRange(rec.product, scanned));
   return match ? { id: match.id, status: match.status } : null;
+}
+
+/**
+ * Le produit PLUS PRÉCIS qu'une réponse du patient a fait proposer (questions cliquables de la bannière, 18 oct. 2026) : bipé, il
+ * remplace le produit du conseil (comme « Remplacer » sur l'écran de la vente : le produit d'origine est gardé dans
+ * `replacedProductId`) et le conseil passe en « Vendu », à son prix. Seulement pour un conseil pas encore vendu.
+ */
+async function answerConseilForScan(pharmacyId: string, prescriptionId: string, item: Extract<ScannedItem, { kind: "PRODUCT" }>): Promise<{ id: string; status: string; replaces: { productId: string; previousProductId: string | null; priceCents: number } } | null> {
+  const recs = await prisma.recommendation.findMany({
+    where: { prescriptionId, pharmacyId, status: { in: CONSEIL_STATUSES.filter((status) => status !== "PURCHASED") }, productId: { not: null }, opportunity: { ruleKey: { not: null } } },
+    orderBy: [{ decidedAt: { sort: "asc", nulls: "first" } }, { totalScore: "desc" }],
+    select: { id: true, status: true, productId: true, product: { select: { ean: true, name: true } }, opportunity: { select: { ruleKey: true } } },
+  });
+  const keyed = recs.filter((rec) => rec.product && rec.opportunity?.ruleKey).map((rec) => ({ rec, key: pitchKey({ ruleKey: rec.opportunity!.ruleKey!, productEan: rec.product!.ean, productName: rec.product!.name }) }));
+  if (keyed.length === 0) return null;
+  const pitches = await prisma.counterPitch.findMany({ where: { key: { in: keyed.map((entry) => entry.key) } }, select: { key: true, answers: true } }).catch(() => []);
+  const proposes = new Set(pitches.filter((pitch) => Array.isArray(pitch.answers) && (pitch.answers as { ean?: unknown }[]).some((answer) => answer?.ean === item.ean)).map((pitch) => pitch.key));
+  const match = keyed.find((entry) => proposes.has(entry.key));
+  if (!match) return null;
+  const product = await prisma.product.findFirst({ where: { id: item.productId, pharmacyId }, select: { salePriceCents: true } });
+  return { id: match.rec.id, status: match.rec.status, replaces: { productId: item.productId, previousProductId: match.rec.productId, priceCents: product?.salePriceCents ?? 0 } };
 }
 
 async function resolveScannedItem(pharmacyId: string, raw: string, demo = false): Promise<ScannedItem | null> {
@@ -275,6 +299,10 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
   // la vente (finishCounterSale).
   if (open && conseil && item.kind !== "UNKNOWN") {
     if (conseil.status !== "PURCHASED") {
+      if (conseil.replaces) {
+        await prisma.recommendation.update({ where: { id: conseil.id }, data: { productId: conseil.replaces.productId, replacedProductId: conseil.replaces.previousProductId, ...(conseil.replaces.priceCents > 0 ? { unitPriceCents: conseil.replaces.priceCents } : {}) } });
+        await prisma.recommendationEvent.create({ data: { recommendationId: conseil.id, type: "REPLACED", metadata: { via: "ANSWER_SCAN", previousProductId: conseil.replaces.previousProductId, productId: conseil.replaces.productId } as never } });
+      }
       const { decideCounterAdvice } = await import("@/server/services/counter-window");
       await decideCounterAdvice(agent, { prescriptionId: open.id, recommendationId: conseil.id, outcome: "SOLD", via: "SCAN" });
     }
