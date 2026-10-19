@@ -62,3 +62,25 @@ describe("l'origine du conseil ne se dit pas", () => {
     expect(withoutOriginLabel(null)).toBeNull();
   });
 });
+
+describe("les effets indésirables et l'équipe, de la réponse du serveur à l'île", () => {
+  it("garde les effets indésirables officiels, bornés en nombre et en longueur", () => {
+    const sheet = readCounterSheet({ ...SHEET, sideEffects: ["Nausées", "", "x".repeat(200), "a", "b", "c", "d", "e"] });
+    expect(sheet?.sideEffects?.length).toBe(COUNTER_SHEET_LIMITS.sideEffects);
+    expect(sheet?.sideEffects?.[0]).toBe("Nausées");
+    expect(sheet?.sideEffects?.[1].length).toBeLessThanOrEqual(COUNTER_SHEET_LIMITS.sideEffect);
+    expect(readCounterSheet(SHEET)?.sideEffects).toBeUndefined();
+  });
+
+  it("passe l'équipe relue à l'île : identifiants sûrs, douze au plus, personne du comptoir seulement si elle en est", () => {
+    const team = [{ id: "u1", name: "Donna B." }, { id: "../x", name: "Pirate" }, { id: "u2", name: "" }, ...Array.from({ length: 20 }, (_, i) => ({ id: `m${i}`, name: `Membre ${i}` }))];
+    const entry = buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app", body: { ...body(SHEET), team, servedBy: "u1" } });
+    expect(entry.team?.[0]).toEqual({ id: "u1", name: "Donna B." });
+    expect(entry.team?.some((member) => member.id === "../x" || member.id === "u2")).toBe(false);
+    expect(entry.team?.length).toBe(12);
+    expect(entry.servedBy).toBe("u1");
+    expect(buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app", body: { ...body(SHEET), team, servedBy: "inconnu" } }).servedBy).toBeUndefined();
+    expect(buildHostEntry({ prescriptionId: "rx_1", serverUrl: "https://pharmaboost.app", body: body(SHEET) }).team).toBeUndefined();
+  });
+});
+

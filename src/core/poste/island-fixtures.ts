@@ -23,6 +23,9 @@ const ENTRY: HostEntry = {
   guidance: [],
   // Le Doliprane est arrivé plus de 30 secondes après l'amoxicilline : la bannière demande « C'est un autre client ? ».
   boxes: [{ id: "ligne-1", name: "AMOXICILLINE 1 g", expiry: { on: "2026-09-30", state: "expired" } }, { id: "ligne-2", name: "DOLIPRANE 1000 mg", late: true }],
+  // Une équipe d'exemple (prénoms inventés) : « Qui a servi ce patient ? » en fin de vente, Léa choisie d'avance.
+  team: [{ id: "essai-lea", name: "Léa M." }, { id: "essai-thomas", name: "Thomas D." }, { id: "essai-elodie", name: "Élodie R." }],
+  servedBy: "essai-lea",
   items: [
     { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge Ultra-Levure", shortDate: "30/11/2026", outcome: "NONE", name: "ULTRA-LEVURE 200 mg 30 gélules", price: "8,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "",
       // La carte déployée d'exemple : sans contre-indication ni conseil d'utilisation écrits (aucun texte médical inventé) —
@@ -57,9 +60,10 @@ export const ESSAI_SEQUENCE: TimedCommand[] = [
   { at: 14200, command: { op: "show", entry: ENTRY } },
   { at: 19000, command: { op: "show", entry: { ...ENTRY, signature: "essai-2", items: [{ ...ENTRY.items[0], outcome: "SOLD" }, ENTRY.items[1]] } } },
   { at: 24000, command: { op: "done", info: { id: "essai", title: "Vente terminée — résultats enregistrés", lines: ["1 vendu · 0 non vendu · 1 sans réponse", "✓ Bilan envoyé au patient."], badge: "3e conseil vendu aujourd'hui", warning: false } } },
-  { at: 33000, command: { op: "scan" } },
-  { at: 34500, command: { op: "show", entry: ALERT_ENTRY } },
-  { at: 41000, command: { op: "remove", id: "essai-garde" } },
+  // « Qui a servi ce patient ? » tient l'écran de fin jusqu'à 8 s, puis la confirmation : la vente suivante vient après.
+  { at: 36000, command: { op: "scan" } },
+  { at: 37500, command: { op: "show", entry: ALERT_ENTRY } },
+  { at: 44000, command: { op: "remove", id: "essai-garde" } },
 ];
 
-export const ESSAI_LENGTH_MS = 44000;
+export const ESSAI_LENGTH_MS = 47000;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HostEntry } from "../../../../agent/src/notice-center";
-import { answerWord, canReloadNow, emailWord, finishWord, INITIAL_POSTE, parseCommand, posteReducer, questionWord, readResume, RESUME_MAX_MS, resumeSnapshot, regionRects, sameRegion, stageForEntry, type PosteEvent, type PosteView } from "../island-bridge";
+import { answerWord, canReloadNow, servedWord, shouldAskServed, emailWord, finishWord, INITIAL_POSTE, parseCommand, posteReducer, questionWord, readResume, RESUME_MAX_MS, resumeSnapshot, regionRects, sameRegion, stageForEntry, type PosteEvent, type PosteView } from "../island-bridge";
 import { ESSAI_SEQUENCE } from "../island-fixtures";
 import { encodeCommand } from "../../../../agent/src/notice-center";
 import { greetingText } from "../../../../agent/src/greeting-text";
@@ -250,3 +250,24 @@ describe("rechargement sur une nouvelle version pendant une vente (19 oct. 2026)
     expect(posteReducer(selling, { type: "restore", view: other })).toBe(selling);
   });
 });
+
+describe("qui a servi ce patient", () => {
+  const sale = (outcome: "SOLD" | "NONE", team = [{ id: "u1", name: "Donna B." }, { id: "u2", name: "Thomas D." }]) =>
+    ({ id: "rx_1", items: [{ id: "rec_1", outcome }], team, alerts: [], questions: [], notes: [] }) as unknown as HostEntry;
+  const done = (entry: HostEntry, outcomes: ("SOLD" | null)[] = []) => ({ entry, island: { ...INITIAL_POSTE.island, stage: "done" as const, outcomes } });
+
+  it("ne demande qu'à la fin d'une vente où un conseil a été vendu, et s'il y a un collègue à choisir", () => {
+    expect(shouldAskServed(done(sale("SOLD")))).toBe(true);
+    expect(shouldAskServed(done(sale("NONE"), ["SOLD"]))).toBe(true);
+    expect(shouldAskServed(done(sale("NONE")))).toBe(false);
+    expect(shouldAskServed(done(sale("SOLD", [{ id: "u1", name: "Donna B." }])))).toBe(false);
+    expect(shouldAskServed({ ...done(sale("SOLD")), island: { ...INITIAL_POSTE.island, stage: "advice" } })).toBe(false);
+  });
+
+  it("le mot SERVI, seulement avec des identifiants sûrs", () => {
+    expect(servedWord("rx_1", "u2")).toBe("SERVI rx_1 u2");
+    expect(servedWord("rx_1", "a b")).toBeNull();
+    expect(servedWord("../x", "u2")).toBeNull();
+  });
+});
+

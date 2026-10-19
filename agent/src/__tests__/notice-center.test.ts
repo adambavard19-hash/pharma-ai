@@ -280,6 +280,13 @@ describe("la fenêtre et son processus", () => {
     ]);
   });
 
+  it("transmet « Qui a servi ce patient ? » : « SERVI vente personne », et ignore un identifiant douteux", () => {
+    const notices = center();
+    notices.show(entry());
+    hosts[0].stdout.emit("data", "PRET\nSERVI rx_1 user_2\nSERVI rx_1\nSERVI rx_1 ../x\nSERVI rx_1 a;b\n");
+    expect(actions).toEqual([{ kind: "served", saleId: "rx_1", userId: "user_2" }]);
+  });
+
   it("ignore une réponse mal formée ou piégée : sans choix, sans deux-points, avec autre chose que des lettres", () => {
     const notices = center();
     notices.show(entry());

@@ -321,6 +321,22 @@ export function splitBoxWord(saleId: string, lineId: string): string | null {
   return ID.test(saleId) && ID.test(lineId) ? `SEPARER ${saleId} ${lineId}` : null;
 }
 
+/** « SERVI <vente> <personne> » : « Qui a servi ce patient ? » — la vente passe aux résultats de ce collègue (agent 0.10.24). */
+export function servedWord(saleId: string, userId: string): string | null {
+  return ID.test(saleId) && ID.test(userId) ? `SERVI ${saleId} ${userId}` : null;
+}
+
+/**
+ * Faut-il demander qui a servi ? Seulement à la fin d'une vente où au moins un conseil a été vendu (fondateur, 19 oct. 2026 :
+ * « pas la peine de cliquer s'il n'y a pas eu de conseil vendu »), et seulement s'il y a un collègue à choisir.
+ */
+export function shouldAskServed(view: Pick<PosteView, "island" | "entry">): boolean {
+  const entry = view.entry;
+  if (view.island.stage !== "done" || !entry) return false;
+  const soldOnScreen = entry.items.some((item, index) => item.outcome === "SOLD" || view.island.outcomes[index] === "SOLD");
+  return soldOnScreen && (entry.team?.length ?? 0) >= 2;
+}
+
 export function finishWord(saleId: string): string | null {
   return ID.test(saleId) ? `TERMINER ${saleId}` : null;
 }

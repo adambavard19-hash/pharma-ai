@@ -32,6 +32,11 @@ export type CounterSheet = {
   usage: CounterSheetLine[];
   /** La description de la fiche produit de l'officine. */
   description: string;
+  /**
+   * Les effets indésirables fréquents lus dans le RCP officiel (BDPM) d'un médicament conseillé (19 oct. 2026 : la fiche de la
+   * bannière montre posologie, contre-indications et effets indésirables). Absent : rien d'officiel — la bannière renvoie à la notice.
+   */
+  sideEffects?: string[];
   /** Les lignes écartées pour garder la bannière légère : « + 2 dans la fiche complète ». */
   more: { contraindications: number; usage: number };
   /** Un texte a été abrégé (ou une raison écartée) : la suite se lit dans la fiche complète. */
@@ -75,6 +80,8 @@ export const COUNTER_SHEET_LIMITS = {
   answerLabel: 40,
   answerSay: 200,
   answerProduct: 120,
+  sideEffects: 6,
+  sideEffect: 80,
 } as const;
 
 /** Ce que disent les rubriques vides, mot pour mot sur la page de vente et dans la bannière : jamais « rien à savoir ». */
@@ -82,6 +89,7 @@ export const SHEET_MISSING = {
   reasons: "La raison de ce conseil n'est pas renseignée.",
   contraindications: "Aucune contre-indication n'est renseignée dans PharmaBoost pour ce produit : reportez-vous à sa notice.",
   usage: "Aucun conseil d'utilisation n'est renseigné dans PharmaBoost pour ce produit : reportez-vous à sa notice.",
+  sideEffects: "Aucun effet indésirable officiel n'est connu de PharmaBoost pour ce produit : reportez-vous à sa notice.",
 } as const;
 
 /** Les mots du patient, tels que l'écran les dit à côté d'une vigilance calculée pour la vente. */
@@ -144,8 +152,14 @@ export function readCounterSheet(raw: unknown): CounterSheet | null {
     description: take(value.description, L.description),
     more: { contraindications: contraindications.more, usage: usage.more },
     cut,
+    ...sideEffectsOf(value.sideEffects),
     ...askAndPitch(value),
   };
+}
+
+function sideEffectsOf(input: unknown): { sideEffects?: string[] } {
+  const effects = (Array.isArray(input) ? input : []).map((effect) => boundText(effect, COUNTER_SHEET_LIMITS.sideEffect).text).filter(Boolean).slice(0, COUNTER_SHEET_LIMITS.sideEffects);
+  return effects.length ? { sideEffects: effects } : {};
 }
 
 /** Les deux questions et le conseil en deux phrases, bornés ; pas de clé quand il n'y a rien (la commande reste courte). */

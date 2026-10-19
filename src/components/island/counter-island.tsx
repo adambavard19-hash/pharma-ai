@@ -934,7 +934,7 @@ export function PitchPanel({ item }: { item: IslandAdvice }) {
 }
 
 /** Le produit plus précis d'une réponse : son nom, puis prix, marge et stock de la pharmacie (le prix seulement avec un stock fiable). */
-function AnswerProduct({ product }: { product: NonNullable<NonNullable<CounterSheet["answers"]>[number]["product"]> }) {
+export function AnswerProduct({ product }: { product: NonNullable<NonNullable<CounterSheet["answers"]>[number]["product"]> }) {
   const stock = product.stock && product.stock in STOCK ? STOCK[product.stock as keyof typeof STOCK] : null;
   return (
     <span data-pitch-product="" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md bg-white px-1.5 py-1">

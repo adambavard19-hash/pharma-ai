@@ -6,6 +6,7 @@ import { analysePrescription } from "@/server/services/analysis";
 import { recordAudit } from "@/server/audit/log";
 import { getEnv } from "@/config/env";
 import { readCounterNotice } from "@/server/services/counter-notice";
+import { counterTeamFor } from "@/server/services/counter-served";
 
 export const dynamic = "force-dynamic";
 // L'analyse peut dépasser dix secondes : on le déclare à l'hébergeur.
@@ -74,5 +75,7 @@ export async function GET(request: Request) {
       console.error("[conseil] analyse depuis le poste de caisse", error);
     }
   }
-  return NextResponse.json({ ok: true, ...read.notice, followUp: read.followUp, url: `${getEnv().APP_URL}/vente/${id}` });
+  // L'équipe, pour « Qui a servi ce patient ? » en fin de vente : prénoms et identifiants, rien d'autre.
+  const served = await counterTeamFor(agent.scope.pharmacyId, id).catch(() => ({ team: [], servedBy: null }));
+  return NextResponse.json({ ok: true, ...read.notice, followUp: read.followUp, ...served, url: `${getEnv().APP_URL}/vente/${id}` });
 }

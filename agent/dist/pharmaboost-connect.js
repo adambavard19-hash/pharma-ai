@@ -5599,7 +5599,9 @@ var COUNTER_SHEET_LIMITS = {
   answers: 6,
   answerLabel: 40,
   answerSay: 200,
-  answerProduct: 120
+  answerProduct: 120,
+  sideEffects: 6,
+  sideEffect: 80
 };
 var PATIENTS = /* @__PURE__ */ new Set(["CONCERNED", "NOT_CONCERNED", "UNKNOWN"]);
 function boundText(raw, max) {
@@ -5647,8 +5649,13 @@ function readCounterSheet(raw) {
     description: take(value.description, L.description),
     more: { contraindications: contraindications.more, usage: usage.more },
     cut,
+    ...sideEffectsOf(value.sideEffects),
     ...askAndPitch(value)
   };
+}
+function sideEffectsOf(input) {
+  const effects = (Array.isArray(input) ? input : []).map((effect) => boundText(effect, COUNTER_SHEET_LIMITS.sideEffect).text).filter(Boolean).slice(0, COUNTER_SHEET_LIMITS.sideEffects);
+  return effects.length ? { sideEffects: effects } : {};
 }
 var STOCKS = /* @__PURE__ */ new Set(["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK", "UNKNOWN"]);
 function readAnswers(input, questions) {
@@ -5747,8 +5754,15 @@ function buildHostEntry(input) {
     questions,
     guidance: (body.guidance ?? []).map(oneLine).filter(Boolean),
     items: finalItems,
-    boxes: (body.boxes ?? []).filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id)).map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {}, ...box.late === true ? { late: true } : {}, ...boxExpiryOf(box.expiry) })).filter((box) => box.name).slice(0, 20)
+    boxes: (body.boxes ?? []).filter((box) => typeof box?.id === "string" && /^[\w-]{1,80}$/.test(box.id)).map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {}, ...box.late === true ? { late: true } : {}, ...boxExpiryOf(box.expiry) })).filter((box) => box.name).slice(0, 20),
+    ...teamOf(body)
   };
+}
+function teamOf(body) {
+  const team = (Array.isArray(body.team) ? body.team : []).flatMap((member) => member && typeof member.id === "string" && /^[\w-]{1,80}$/.test(member.id) && typeof member.name === "string" && oneLine(member.name) ? [{ id: member.id, name: oneLine(member.name).slice(0, 40) }] : []).slice(0, 12);
+  if (team.length === 0) return {};
+  const servedBy = typeof body.servedBy === "string" && team.some((member) => member.id === body.servedBy) ? body.servedBy : void 0;
+  return { team, ...servedBy ? { servedBy } : {} };
 }
 function boxExpiryOf(expiry) {
   if (!expiry || typeof expiry.on !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiry.on)) return {};
@@ -6152,7 +6166,8 @@ var NoticeCenter = class {
     else if (word === "REPONSE" && argument) {
       const [node, choice] = argument.split(":");
       if (node && choice && /^[\w-]+$/.test(node) && /^[\w-]+$/.test(choice)) act({ kind: "answer", saleId, node, choice });
-    } else if (word === "VOIR") act({ kind: "view", saleId });
+    } else if (word === "SERVI" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "served", saleId, userId: argument });
+    else if (word === "VOIR") act({ kind: "view", saleId });
     else if (word === "FERMEE") this.held.delete(saleId);
     else if (word === "ERREUR") this.options.log(`Avis : ${line}`);
   }
@@ -6819,7 +6834,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.23";
+var VERSION = "0.10.24";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -7148,6 +7163,9 @@ async function handleAction(action) {
       const result = await postJson(config, "/api/agent/conseil/email", { prescription: action.saleId, email, consent: email !== null });
       log(email ? `E-mail du patient : ${result.body?.ok ? "enregistr\xE9 (avec son accord)" : result.body?.error ?? `HTTP ${result.status}`}.` : "E-mail du patient retir\xE9.");
       await refreshNow(config, result.body?.ok ? {} : { emailError: result.body?.error ?? "L'adresse n'a pas pu \xEAtre enregistr\xE9e." });
+    } else if (action.kind === "served") {
+      const result = await postJson(config, "/api/agent/conseil/servi", { prescription: action.saleId, user: action.userId });
+      log(`Vente attribu\xE9e (qui a servi) : ${result.body?.ok ? "enregistr\xE9" : result.body?.error ?? `HTTP ${result.status}`}.`);
     } else if (action.kind === "remove_line") {
       const result = await postJson(config, "/api/agent/conseil/retirer", { prescription: action.saleId, line: action.lineId });
       log(`Bo\xEEte retir\xE9e de la vente : ${result.body?.ok ? `${result.body.remaining ?? "?"} restante(s)` : result.body?.error ?? `HTTP ${result.status}`}.`);

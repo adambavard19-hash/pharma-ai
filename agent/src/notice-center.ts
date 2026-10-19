@@ -52,6 +52,9 @@ export type NoticeBody = {
   guidance?: string[];
   /** Les boîtes bipées de la vente, avec leur identifiant (« Retirer » sur la bannière). Absent chez un serveur plus ancien. */
   boxes?: { id: string; name: string; challenge?: string; reward?: string; late?: boolean; expiry?: { on?: string; state?: string } }[];
+  /** L'équipe de l'officine et qui servait la vente au bip : « Qui a servi ce patient ? » en fin de vente (serveur du 19 oct. 2026). */
+  team?: { id?: unknown; name?: unknown }[];
+  servedBy?: string | null;
 };
 
 export type HostOutcome = "NONE" | "SOLD" | "NOT_SOLD";
@@ -93,6 +96,9 @@ export type HostEntry = {
    * ancien). `expiry` : la péremption lue dans le Datamatrix — la boîte est périmée, ou périme dans le mois (« 2026-11-02 »).
    */
   boxes?: { id: string; name: string; challenge?: string; reward?: string; late?: boolean; expiry?: { on: string; state: "expired" | "soon" } }[];
+  /** L'équipe (prénom et initiale) pour « Qui a servi ce patient ? », et la personne choisie d'avance. Absent : serveur ancien. */
+  team?: { id: string; name: string }[];
+  servedBy?: string;
 };
 
 /** Le message de fin de vente. */
@@ -109,6 +115,8 @@ export type HostAction =
   /** « SEPARER <vente> <boîte> » : cette boîte est celle du client suivant ; elle ouvre une nouvelle vente, la précédente se termine. */
   | { kind: "split_line"; saleId: string; lineId: string }
   | { kind: "answer"; saleId: string; node: string; choice: string }
+  /** « SERVI <vente> <personne> » : un collègue a servi ce patient ; la vente passe à ses résultats. */
+  | { kind: "served"; saleId: string; userId: string }
   | { kind: "view"; saleId: string }
   /** L'icône près de l'horloge → « Ouvrir mon espace PharmaBoost » (le mot ESPACE, sans vente) : l'agent lie le navigateur du PC. */
   | { kind: "open_space" }
@@ -206,7 +214,18 @@ export function buildHostEntry(input: { prescriptionId: string; serverUrl: strin
       .map((box) => ({ id: box.id, name: oneLine(box.name ?? ""), ...(box.challenge ? { challenge: oneLine(box.challenge), reward: oneLine(box.reward ?? "") } : {}), ...(box.late === true ? { late: true } : {}), ...boxExpiryOf(box.expiry) }))
       .filter((box) => box.name)
       .slice(0, 20),
+    ...teamOf(body),
   };
+}
+
+/** L'équipe relue : identifiants sûrs, prénoms sur une ligne, douze au plus ; la personne choisie d'avance seulement si elle en est. */
+function teamOf(body: NoticeBody): { team?: { id: string; name: string }[]; servedBy?: string } {
+  const team = (Array.isArray(body.team) ? body.team : [])
+    .flatMap((member) => (member && typeof member.id === "string" && /^[\w-]{1,80}$/.test(member.id) && typeof member.name === "string" && oneLine(member.name) ? [{ id: member.id, name: oneLine(member.name).slice(0, 40) }] : []))
+    .slice(0, 12);
+  if (team.length === 0) return {};
+  const servedBy = typeof body.servedBy === "string" && team.some((member) => member.id === body.servedBy) ? body.servedBy : undefined;
+  return { team, ...(servedBy ? { servedBy } : {}) };
 }
 
 /** La péremption d'une boîte, vérifiée : une date « AAAA-MM-JJ » et un état connu, sinon rien. */
@@ -709,7 +728,8 @@ export class NoticeCenter {
       // « question:choix » : deux mots d'identifiant, sans espace (la ligne de la fenêtre se coupe aux espaces).
       const [node, choice] = argument.split(":");
       if (node && choice && /^[\w-]+$/.test(node) && /^[\w-]+$/.test(choice)) act({ kind: "answer", saleId, node, choice });
-    } else if (word === "VOIR") act({ kind: "view", saleId });
+    } else if (word === "SERVI" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "served", saleId, userId: argument });
+    else if (word === "VOIR") act({ kind: "view", saleId });
     else if (word === "FERMEE") this.held.delete(saleId);
     else if (word === "ERREUR") this.options.log(`Avis : ${line}`);
   }

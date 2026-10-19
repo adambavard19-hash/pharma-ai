@@ -62,6 +62,7 @@ export type AuditAction =
   | "partner_earning.added"
   | "partner_earning.removed"
   | "prescription.counter_line_split"
+  | "prescription.counter_served_by"
   | "prescription.counter_reset"
   | "pharmacy.install_guide_sent"
   | "pharmacy.launch_day_email"

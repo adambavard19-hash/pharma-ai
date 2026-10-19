@@ -7,6 +7,7 @@ import { BURST_PIECES, CounterIsland, type IslandAdvice } from "@/components/isl
 import { STAGE_WIDTH } from "@/core/island/banner-flow";
 import { IslandShell, ISLAND_CSS } from "@/components/island/island-shell";
 import { IslandQuestions } from "@/components/island/island-questions";
+import { MixIsland } from "@/components/island/mix-island";
 import { Robot } from "@/components/robot";
 import {
   adviceLink,
@@ -15,6 +16,8 @@ import {
   emailWord,
   finishWord,
   removeBoxWord,
+  servedWord,
+  shouldAskServed,
   splitBoxWord,
   INITIAL_POSTE,
   parseCommand,
@@ -70,8 +73,16 @@ const ROOT_LAYOUT: Record<IslandSide, string> = {
 
 const noSubscribe = () => () => {};
 
+/** Les pastilles de l'équipe dans « Qui a servi ce patient ? » : une couleur par personne, dans l'ordre de l'équipe. */
+const TEAM_COLORS = ["#247061", "#7A4DB8", "#C2410C", "#0369A1", "#B42318", "#4D7C0F", "#A16207", "#BE185D"];
+
 /** Le temps laissé au pharmacien pour donner l'e-mail du bilan après la validation dans LGPI. */
 const VALIDATED_EMAIL_MS = 12_000;
+
+/** « Qui a servi ce patient ? » : sans geste, la personne du comptoir est gardée au bout de ce délai. */
+const SERVED_AUTO_MS = 8_000;
+/** Après le choix, la confirmation reste ce temps-là avant que l'île revienne au repos. */
+const SERVED_THANKS_MS = 1_800;
 
 /** La souris sortie de l'île, elle se replie après ce délai (un aller-retour rapide ne la fait pas clignoter). */
 const FOLD_DELAY_MS = 600;
@@ -193,6 +204,17 @@ export function PosteIsland() {
   const word = useCallback((text: string | null) => { if (text) send({ type: "word", word: text }); }, [send]);
   const { island, entry } = view;
 
+  // « Qui a servi ce patient ? » (fondateur, 19 oct. 2026) : à la fin d'une vente avec au moins un conseil vendu, l'île demande
+  // qui a servi — la personne du comptoir est choisie d'avance et gardée sans geste ; un collègue d'un clic. Personne ne change
+  // d'espace. Tant que la question est là, l'île ne revient pas au repos et la page ne se recharge pas.
+  const [served, setServed] = useState<{ id: string; chosen: string | null; until: number; done: boolean } | null>(null);
+  const askServed = shouldAskServed(view);
+  const servedOpen = askServed && served?.id === entry?.id && !served?.done;
+  const servedRef = useRef(false);
+  useEffect(() => {
+    servedRef.current = askServed && !(served?.id === entry?.id && served?.done);
+  }, [askServed, served, entry?.id]);
+
   // La bannière du poste est une page chargée une fois, au démarrage de PharmaBoost Connect : sans cela, elle gardait
   // l'ancienne version jusqu'au redémarrage du poste (13 oct. 2026). Une nouvelle version en ligne la recharge, au repos
   // comme pendant une vente restée ouverte (19 oct. 2026) : la vente à l'écran est gardée et revient aussitôt rechargée.
@@ -231,7 +253,7 @@ export function PosteIsland() {
   useEffect(() => {
     const id = setInterval(() => {
       const current = viewRef.current;
-      if (!newRelease.current || !canReloadNow(current, lastPointer.current !== null)) return;
+      if (!newRelease.current || servedRef.current || !canReloadNow(current, lastPointer.current !== null)) return;
       try {
         if (current.island.stage !== "idle" || current.entry) window.sessionStorage.setItem(RESUME_KEY, resumeSnapshot(current, Date.now()));
       } catch {
@@ -243,7 +265,10 @@ export function PosteIsland() {
   }, []);
 
   // Le temps qui passe : scan → analyse, lignes cochées, pause « N conseils », fin de « Rien à ajouter » et de « Vente terminée ».
+  const holdDone = island.stage === "done" && askServed && !(served?.id === entry?.id && served?.done);
   useEffect(() => {
+    // La question « Qui a servi ? » tient l'écran de fin : il revient au repos après la réponse (voir plus bas).
+    if (holdDone) return;
     const delay = stageDelay(island.stage, Boolean(entry));
     if (delay === null) return;
     const id = setTimeout(() => {
@@ -252,7 +277,36 @@ export function PosteIsland() {
       else dispatch({ type: "settle" });
     }, delay);
     return () => clearTimeout(id);
-  }, [island.stage, island.stepsDone, entry]);
+  }, [island.stage, island.stepsDone, entry, holdDone]);
+
+  // La question s'ouvre une fois par vente, avec la personne du comptoir choisie d'avance (quand le serveur la connaît).
+  useEffect(() => {
+    if (!askServed || !entry || served?.id === entry.id) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- ouverture de la question, une fois par vente
+    setServed({ id: entry.id, chosen: entry.servedBy ?? null, until: Date.now() + SERVED_AUTO_MS, done: false });
+  }, [askServed, entry, served?.id]);
+  const [servedClock, setServedClock] = useState(0);
+  const answerServed = useCallback((userId: string | null) => {
+    if (!served || served.done || !entry || served.id !== entry.id) return;
+    // Seul un changement part au serveur : la personne du comptoir est déjà celle de la vente.
+    if (userId && userId !== entry.servedBy) word(servedWord(entry.id, userId));
+    setServed({ ...served, chosen: userId ?? served.chosen, done: true });
+  }, [served, entry, word]);
+  useEffect(() => {
+    if (!servedOpen || !served) return;
+    const tick = setInterval(() => {
+      const now = Date.now();
+      setServedClock(now);
+      // Sans geste : la personne du comptoir est gardée. Sans personne connue, la question attend un clic.
+      if (served.chosen && now >= served.until) answerServed(null);
+    }, 250);
+    return () => clearInterval(tick);
+  }, [servedOpen, served, answerServed]);
+  useEffect(() => {
+    if (island.stage !== "done" || !served?.done || served.id !== entry?.id) return;
+    const id = setTimeout(() => dispatch({ type: "settle" }), SERVED_THANKS_MS);
+    return () => clearTimeout(id);
+  }, [island.stage, served, entry?.id]);
 
   // Le bonjour du robot reste jusqu'à « OK » (fondateur, 15 oct. 2026) ; un scan le remplace (le reducer l'efface), il ne bloque jamais une vente.
 
@@ -385,6 +439,8 @@ export function PosteIsland() {
   }, []);
   useEffect(() => () => { if (foldTimer.current) clearTimeout(foldTimer.current); }, []);
   const folded = Boolean(entry) && island.stage === "advice" && !hovered && !finishAfterEmail;
+  // La bannière « mix » (fondateur, 19 oct. 2026) ; l'ancienne reste joignable pour revenir en arrière : `?banniere=ancienne`.
+  const mix = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get("banniere") !== "ancienne", () => true);
 
   // « C'est un autre client ? » : la dernière boîte est arrivée plus de 30 secondes après la précédente (le serveur la marque).
   // « Non » range la question pour cette boîte ; « Oui » la sépare : elle ouvre une nouvelle vente, la précédente se termine.
@@ -404,7 +460,8 @@ export function PosteIsland() {
   const soldCount = entry ? entry.items.filter((item) => item.outcome === "SOLD").length : 0;
   const questions = entry?.questions ?? [];
   const questionsOnly = Boolean(entry) && items.length === 0 && questions.length > 0 && island.stage === "advice";
-  const showQuestions = !folded && Boolean(entry) && questions.length > 0 && (island.stage === "advice" || island.stage === "email");
+  const mixOn = mix && Boolean(entry) && island.stage === "advice" && items.length > 0 && !finishAfterEmail;
+  const showQuestions = (mixOn ? hovered : !folded) && Boolean(entry) && questions.length > 0 && (island.stage === "advice" || island.stage === "email");
   // Avant la réponse du serveur, la boîte est « en cours de lecture » : jamais un nom deviné.
   const drug = entry ? entry.items[0]?.drug || entry.subject : "lecture en cours…";
   const alert = entry && entry.alerts.length > 0 ? { title: T.readFirst, text: entry.alerts.join(" ") } : null;
@@ -529,6 +586,19 @@ export function PosteIsland() {
               </button>
             </div>
           </IslandShell>
+        ) : mixOn && entry ? (
+          <MixIsland
+            key={entry.id}
+            items={items}
+            outcomes={island.outcomes}
+            open={hovered}
+            narrow={view.side === "gauche" || view.side === "droite"}
+            look={view.look}
+            aurore={aurore}
+            onOpen={openIsland}
+            onFinish={finish}
+            onAnswer={islandProps.onAnswer}
+          />
         ) : folded && entry && (view.side === "gauche" || view.side === "droite") ? (
           <IslandShell width={SIDE_FOLDED_WIDTH} tone="accent" contentKey="replie-cote" label="Conseils de la vente (survolez pour les voir)">
             {/* Debout contre le bord de l'écran : tout est empilé, rien n'est coupé. */}
@@ -678,6 +748,57 @@ export function PosteIsland() {
         {island.stage === "email" && entry?.emailError && (
           <IslandShell width={STAGE_WIDTH.email} tone="warning" contentKey={`err-${entry.emailError}`} label="Adresse refusée">
             <p className="px-4 py-2.5 text-[12.5px] leading-[18px] text-[#FFE2B0]">{entry.emailError}</p>
+          </IslandShell>
+        )}
+
+        {askServed && served && served.id === entry?.id && entry.team && (
+          <IslandShell width={view.side === "gauche" || view.side === "droite" ? 300 : 400} tone="success" contentKey={`servi-${entry.id}-${served.done ? "ok" : "q"}`} label="Qui a servi ce patient ?">
+            {served.done ? (
+              <p data-ile-servi-ok="" className="flex items-center gap-2 px-4 py-3 text-[13px] font-semibold text-white">
+                <span className="inline-flex size-6 items-center justify-center rounded-full text-[12px] font-extrabold" style={{ background: "#E8FF9C", color: "#0F2F2A" }}>✓</span>
+                {`Vente comptée pour ${entry.team.find((member) => member.id === served.chosen)?.name ?? "le comptoir"}`.replace(/\.?$/, ".")}
+              </p>
+            ) : (
+              <div data-ile-servi="" data-ile-sans-deploiement="" className="px-3.5 pt-3 pb-3 text-left">
+                <p className="text-[14.5px] leading-[18px] font-bold text-white">Qui a servi ce patient ?</p>
+                <p className="mt-0.5 text-[11.5px] leading-[15px] text-[#9FCBBB]">Les conseils vendus iront dans ses résultats. Personne n&apos;a à changer d&apos;espace.</p>
+                <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                  {entry.team.map((member, n) => {
+                    const chosen = served.chosen === member.id;
+                    const color = TEAM_COLORS[n % TEAM_COLORS.length];
+                    return (
+                      <button
+                        key={member.id}
+                        type="button"
+                        data-ile-servi-personne={member.id}
+                        aria-pressed={chosen}
+                        onClick={() => answerServed(member.id)}
+                        className="flex min-w-0 items-center gap-2 rounded-xl border-2 px-2 py-1.5 text-left transition-colors"
+                        style={{ background: chosen ? "rgba(232,255,156,0.12)" : "rgba(255,255,255,0.05)", borderColor: chosen ? "#E8FF9C" : "transparent" }}
+                      >
+                        <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[12px] font-extrabold text-white" style={{ background: color }}>{member.name.charAt(0).toUpperCase()}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-[12.5px] leading-[16px] font-bold text-white">{member.name}</span>
+                          <span className="block text-[10.5px] leading-[13px] text-[#9FCBBB]">{member.id === entry.servedBy ? "Ce comptoir" : "Remplace ici"}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {served.chosen ? (
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <span className="min-w-0 flex-1 text-[11.5px] leading-[15px] text-white/75">
+                      Rien à toucher si c&apos;est {entry.team.find((member) => member.id === served.chosen)?.name ?? "la bonne personne"} : gardé dans {Math.max(0, Math.ceil((served.until - (servedClock || served.until - SERVED_AUTO_MS)) / 1000))} s
+                    </span>
+                    <span className="h-1 w-16 overflow-hidden rounded-full bg-white/10">
+                      <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, ((served.until - (servedClock || served.until - SERVED_AUTO_MS)) / SERVED_AUTO_MS) * 100))}%`, background: "#E8FF9C", transition: "width 250ms linear" }} />
+                    </span>
+                  </div>
+                ) : (
+                  <p className="mt-2.5 text-[11.5px] leading-[15px] text-white/75">Touchez la personne qui a servi.</p>
+                )}
+              </div>
+            )}
           </IslandShell>
         )}
 

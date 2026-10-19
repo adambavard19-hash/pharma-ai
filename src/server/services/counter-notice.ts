@@ -7,6 +7,7 @@ import { stockReminderLevel } from "@/core/stock-deposit/rules";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { answersFromRows, treeState } from "@/core/counter/tree-state";
 import { TREE_RULE_KEYS } from "@/core/counter/question-tree";
+import { loadOfficialSideEffects } from "@/server/services/official-side-effects";
 import { counterSheetOf, routineStepOf, withoutOriginLabel } from "@/core/counter/advice-sheet";
 import { parseSuggestionVigilances } from "@/config/vigilances";
 import { loadCentralAdvice } from "@/server/services/central-advice";
@@ -120,7 +121,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
               vigilances: { where: { pharmacyId }, select: { population: true, level: true, note: true }, orderBy: { population: "asc" } },
             },
           },
-          presentation: { select: { priceCents: true, specialty: { select: { name: true } }, pharmacyStocks: { where: { pharmacyId }, select: { priceCents: true, quantity: true } } } },
+          presentation: { select: { priceCents: true, specialty: { select: { name: true, cisCode: true } }, pharmacyStocks: { where: { pharmacyId }, select: { priceCents: true, quantity: true } } } },
         },
       },
     },
@@ -188,6 +189,10 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     return found ? { ask: found.ask, pitch: found.pitch, ...(answersByRec.get(recId)?.length ? { answers: answersByRec.get(recId) } : {}) } : {};
   };
 
+  // Les effets indésirables officiels (RCP lus dans la BDPM) des médicaments conseillés : la fiche de la bannière.
+  const sideEffects = await loadOfficialSideEffects(prescription.recommendations.map((rec) => rec.presentation?.specialty.cisCode));
+  const sideEffectsOf = (cis: string | undefined) => (cis && sideEffects.get(cis)?.effects.length ? { sideEffects: sideEffects.get(cis)!.effects } : {});
+
   const notice = buildCounterNotice({
     reference: prescription.reference,
     prescriptionStatus: prescription.status,
@@ -238,7 +243,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
                 : null,
             },
             rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
-          ), ...pitchOf(rec.id) },
+          ), ...sideEffectsOf(rec.presentation?.specialty.cisCode), ...pitchOf(rec.id) },
         };
       }),
     outcome: run?.outcome ?? null,

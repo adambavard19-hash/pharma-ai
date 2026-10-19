@@ -48,7 +48,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.23";
+const VERSION = "0.10.24";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -501,6 +501,10 @@ async function handleAction(action: HostAction): Promise<void> {
       const result = await postJson<{ ok: boolean; error?: string }>(config, "/api/agent/conseil/email", { prescription: action.saleId, email, consent: email !== null });
       log(email ? `E-mail du patient : ${result.body?.ok ? "enregistré (avec son accord)" : (result.body?.error ?? `HTTP ${result.status}`)}.` : "E-mail du patient retiré.");
       await refreshNow(config, result.body?.ok ? {} : { emailError: result.body?.error ?? "L'adresse n'a pas pu être enregistrée." });
+    } else if (action.kind === "served") {
+      // La vente est peut-être déjà terminée : l'attribution vaut quand même, et la fenêtre n'a rien à redessiner.
+      const result = await postJson<{ ok: boolean; error?: string }>(config, "/api/agent/conseil/servi", { prescription: action.saleId, user: action.userId });
+      log(`Vente attribuée (qui a servi) : ${result.body?.ok ? "enregistré" : (result.body?.error ?? `HTTP ${result.status}`)}.`);
     } else if (action.kind === "remove_line") {
       const result = await postJson<{ ok: boolean; remaining?: number; error?: string }>(config, "/api/agent/conseil/retirer", { prescription: action.saleId, line: action.lineId });
       log(`Boîte retirée de la vente : ${result.body?.ok ? `${result.body.remaining ?? "?"} restante(s)` : (result.body?.error ?? `HTTP ${result.status}`)}.`);
