@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Mail, Maximize2, Minimize2, PartyPopper, Pill, ScanLine, Send, TriangleAlert, X } from "lucide-react";
-import { islandTheme } from "./island-theme";
+import { islandTheme, PHARMABOOST_GREEN } from "./island-theme";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
@@ -22,7 +22,7 @@ import { IslandShell } from "./island-shell";
  * Les couleurs de la bannière, chacune réglable par une variable CSS (« --isl-panel »…) : sans variable, ce sont celles d'aujourd'hui.
  * Les essais de couleurs et de polices (fondateur, 19 oct. 2026) les changent sur un parent, sans toucher au code de la bannière.
  */
-const C = islandTheme({ ...BANNER.colors, bg: "#0B0F14", cell: "#F1F5F7", pick: "#0B6B57", pickLine: "#C9D5DC", number: "rgba(54,232,200,0.18)", numberFg: "#0B6B57", then: "rgba(54,232,200,0.10)" });
+const C = islandTheme({ ...BANNER.colors, ...PHARMABOOST_GREEN });
 
 /** Les confettis de la fête d'une vente avec conseil vendu : dix éclats autour du robot, chacun sa direction. */
 export const BURST_PIECES = [0, 36, 72, 108, 144, 180, 216, 252, 288, 324].map((angle, index) => ({
@@ -362,7 +362,7 @@ export function CounterIsland(props: CounterIslandProps) {
     if (!adviceKey || hover || props.keepAwake) return;
     const id = setTimeout(() => setAsleep(adviceKey), COMPACT_SLEEP_MS);
     return () => clearTimeout(id);
-  }, [adviceKey, hover]);
+  }, [adviceKey, hover, props.keepAwake]);
   const sleeping = compact && !hover && asleep === adviceKey;
   const width = grumpy ? 340 : peek ? 400 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 280 : sleeping ? COMPACT_SLEEP_WIDTH : compact ? (columns > 1 ? MULTI_CAPSULE_WIDTH : COMPACT_WIDTH) : STAGE_WIDTH[state.stage];
   const title = stageTitle(state, count);
@@ -809,6 +809,7 @@ export function CounterIsland(props: CounterIslandProps) {
 
   return (
     <div
+      data-isl=""
       className={columnsBlock ? "flex flex-col items-center gap-2" : undefined}
       onClick={(event) => {
         // Appuyer sur une carte de conseil la déploie : ce n'est pas taquiner le robot.

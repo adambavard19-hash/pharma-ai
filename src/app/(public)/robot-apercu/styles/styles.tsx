@@ -42,7 +42,14 @@ const BOXES = [
 type Variant = { id: string; name: string; font: string; note: string; vars: Record<string, string>; css?: string; zoom?: number };
 
 const VARIANTS: Variant[] = [
-  { id: "A", name: "Actuelle", font: "Plus Jakarta Sans", note: "La bannière d'aujourd'hui, pour comparer.", vars: {} },
+  {
+    id: "A",
+    name: "Ancienne",
+    font: "Plus Jakarta Sans",
+    note: "La bannière d'avant le 19 oct. 2026, pour comparer.",
+    vars: { bg: "#0B0F14", accent: "#22C88F", glow: "#36E8C8", panel: "#F5FAFC", ink: "#10222F", inkSoft: "#5A7280", line: "#DCE8EE", cell: "#F1F5F7", pick: "#0B6B57", pickLine: "#C9D5DC", number: "rgba(54,232,200,0.18)", numberFg: "#0B6B57", then: "rgba(54,232,200,0.10)", soldBg: "#22C88F", soldFg: "#FFFFFF", challengeBg: "#FFF0C7", challengeFg: "#8A5A00" },
+    css: ".font-bold{font-weight:700}",
+  },
   {
     id: "B",
     name: "Ardoise & menthe",
@@ -53,7 +60,7 @@ const VARIANTS: Variant[] = [
   },
   {
     id: "C",
-    name: "Vert PharmaBoost",
+    name: "Vert PharmaBoost (en ligne)",
     font: "Plus Jakarta Sans",
     note: "Les couleurs du site et d'Instagram : vert profond et jaune citron.",
     vars: { bg: "#0F2F2A", accent: "#E8FF9C", glow: "#E8FF9C", panel: "#F4F8F6", ink: "#0F2F2A", inkSoft: "#4D6B64", line: "#DCE7E2", cell: "#E9F1EE", pick: "#247061", pickLine: "#B9CFC6", number: "rgba(36,112,97,0.14)", numberFg: "#247061", then: "rgba(232,255,156,0.55)", soldBg: "#247061", soldFg: "#FFFFFF", challengeBg: "#E8FF9C", challengeFg: "#3D4F00" },
