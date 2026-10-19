@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HostEntry } from "../../../../agent/src/notice-center";
-import { answerWord, emailWord, finishWord, INITIAL_POSTE, parseCommand, posteReducer, questionWord, regionRects, sameRegion, stageForEntry, type PosteEvent, type PosteView } from "../island-bridge";
+import { answerWord, canReloadNow, emailWord, finishWord, INITIAL_POSTE, parseCommand, posteReducer, questionWord, readResume, RESUME_MAX_MS, resumeSnapshot, regionRects, sameRegion, stageForEntry, type PosteEvent, type PosteView } from "../island-bridge";
 import { ESSAI_SEQUENCE } from "../island-fixtures";
 import { encodeCommand } from "../../../../agent/src/notice-center";
 import { greetingText } from "../../../../agent/src/greeting-text";
@@ -214,5 +214,39 @@ describe("la vente validée dans LGPI (« validated »)", () => {
     const open = { ...INITIAL_POSTE, entry, island: { ...INITIAL_POSTE.island, stage: "advice" as const } };
     expect(posteReducer(open, { type: "host", command: { op: "validated", id: "rx_1" }, now: 5 }).validated).toEqual({ id: "rx_1", at: 5 });
     expect(posteReducer(open, { type: "host", command: { op: "validated", id: "rx_2" }, now: 5 }).validated).toBeUndefined();
+  });
+});
+
+describe("rechargement sur une nouvelle version pendant une vente (19 oct. 2026)", () => {
+  const selling: PosteView = { ...INITIAL_POSTE, island: { ...INITIAL_POSTE.island, stage: "advice" } };
+
+  it("recharge au repos et pendant une vente ouverte, jamais sous la souris ni pendant un scan, une analyse ou un e-mail", () => {
+    expect(canReloadNow(INITIAL_POSTE, false)).toBe(true);
+    expect(canReloadNow(selling, false)).toBe(true);
+    expect(canReloadNow(selling, true)).toBe(false);
+    for (const stage of ["scan", "analyzing", "ready", "email", "emailSent"] as const) {
+      expect(canReloadNow({ ...selling, island: { ...selling.island, stage } }, false)).toBe(false);
+    }
+    expect(canReloadNow({ ...selling, emailPending: true }, false)).toBe(false);
+  });
+
+  it("la vente gardée revient telle quelle après le rechargement, si elle est récente", () => {
+    const raw = resumeSnapshot(selling, 1_000);
+    const back = readResume(raw, 1_000 + 5_000);
+    expect(back).toEqual(selling);
+    expect(posteReducer(INITIAL_POSTE, { type: "restore", view: back! })).toEqual(selling);
+  });
+
+  it("une sauvegarde trop vieille, venue du futur ou abîmée est ignorée", () => {
+    expect(readResume(resumeSnapshot(selling, 1_000), 1_000 + RESUME_MAX_MS + 1)).toBeNull();
+    expect(readResume(resumeSnapshot(selling, 9_000), 1_000)).toBeNull();
+    expect(readResume("{pas du json", 1_000)).toBeNull();
+    expect(readResume(JSON.stringify({ at: 1_000, view: { island: {} } }), 1_000)).toBeNull();
+    expect(readResume(null, 1_000)).toBeNull();
+  });
+
+  it("une commande de l'agent arrivée avant la reprise l'emporte", () => {
+    const other: PosteView = { ...selling, postLabel: "autre" };
+    expect(posteReducer(selling, { type: "restore", view: other })).toBe(selling);
   });
 });

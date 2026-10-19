@@ -10,6 +10,7 @@ import { IslandQuestions } from "@/components/island/island-questions";
 import { Robot } from "@/components/robot";
 import {
   adviceLink,
+  canReloadNow,
   answerWord,
   emailWord,
   finishWord,
@@ -19,12 +20,15 @@ import {
   parseCommand,
   posteReducer,
   questionWord,
+  readResume,
+  resumeSnapshot,
   regionRects,
   sameRegion,
   SCAN_TIMEOUT_MS,
   stageDelay,
   type HostCommand,
   type IslandSide,
+  type PosteView,
   type RegionRect,
 } from "@/core/poste/island-bridge";
 import { AURORE_CSS } from "@/components/island/island-aurore";
@@ -180,6 +184,8 @@ function isDragHandle(target: EventTarget | null): boolean {
 const PAGE_RELEASE = process.env.NEXT_PUBLIC_PB_RELEASE || null;
 /** Toutes les 2 minutes, la bannière regarde si une nouvelle version est en ligne. */
 const RELEASE_CHECK_MS = 2 * 60 * 1000;
+/** La vente à l'écran, gardée le temps d'un rechargement sur une nouvelle version. */
+const RESUME_KEY = "pb-ile-reprise";
 
 export function PosteIsland() {
   const [view, dispatch] = useReducer(posteReducer, INITIAL_POSTE);
@@ -188,10 +194,26 @@ export function PosteIsland() {
   const { island, entry } = view;
 
   // La bannière du poste est une page chargée une fois, au démarrage de PharmaBoost Connect : sans cela, elle gardait
-  // l'ancienne version jusqu'au redémarrage du poste (13 oct. 2026). Une nouvelle version en ligne la recharge — seulement
-  // au repos, jamais pendant une vente.
-  const resting = island.stage === "idle" && !entry;
+  // l'ancienne version jusqu'au redémarrage du poste (13 oct. 2026). Une nouvelle version en ligne la recharge, au repos
+  // comme pendant une vente restée ouverte (19 oct. 2026) : la vente à l'écran est gardée et revient aussitôt rechargée.
+  // La fenêtre Windows ne reçoit rien hors des capsules : une capsule qui grandit sous une souris immobile n'envoie aucun
+  // mouvement, et l'île se repliait alors sous le curseur (POSTE de Docteur Nicolas, 19 oct. 2026).
+  const lastPointer = useRef<{ x: number; y: number } | null>(null);
   const newRelease = useRef(false);
+  const viewRef = useRef(view);
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+  useEffect(() => {
+    let saved: PosteView | null = null;
+    try {
+      saved = readResume(window.sessionStorage.getItem(RESUME_KEY), Date.now());
+      window.sessionStorage.removeItem(RESUME_KEY);
+    } catch {
+      // Stockage indisponible : la bannière repart au repos, l'agent renverra la prochaine vente.
+    }
+    if (saved) dispatch({ type: "restore", view: saved });
+  }, []);
   useEffect(() => {
     if (!PAGE_RELEASE) return;
     const check = async () => {
@@ -207,12 +229,18 @@ export function PosteIsland() {
     return () => clearInterval(id);
   }, []);
   useEffect(() => {
-    if (!resting) return;
     const id = setInterval(() => {
-      if (newRelease.current) window.location.reload();
+      const current = viewRef.current;
+      if (!newRelease.current || !canReloadNow(current, lastPointer.current !== null)) return;
+      try {
+        if (current.island.stage !== "idle" || current.entry) window.sessionStorage.setItem(RESUME_KEY, resumeSnapshot(current, Date.now()));
+      } catch {
+        // Stockage indisponible : on recharge quand même, la version à jour compte plus que la vente à l'écran.
+      }
+      window.location.reload();
     }, 5000);
     return () => clearInterval(id);
-  }, [resting]);
+  }, []);
 
   // Le temps qui passe : scan → analyse, lignes cochées, pause « N conseils », fin de « Rien à ajouter » et de « Vente terminée ».
   useEffect(() => {
@@ -346,9 +374,6 @@ export function PosteIsland() {
     setHovered(true);
   }, []);
   // La dernière position connue de la souris : au moment de replier, si l'île est (de nouveau) sous elle, on ne replie pas.
-  // La fenêtre Windows ne reçoit rien hors des capsules : une capsule qui grandit sous une souris immobile n'envoie aucun
-  // mouvement, et l'île se repliait alors sous le curseur (POSTE de Docteur Nicolas, 19 oct. 2026).
-  const lastPointer = useRef<{ x: number; y: number } | null>(null);
   const foldSoon = useCallback(() => {
     if (foldTimer.current) return;
     foldTimer.current = setTimeout(() => {

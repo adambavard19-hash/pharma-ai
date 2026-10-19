@@ -88,7 +88,9 @@ export type PosteEvent =
   | { type: "sendEmail" }
   | { type: "readAlert" }
   /** Le bonjour a assez duré, ou la personne l'a fermé d'un clic : l'île revient au repos. */
-  | { type: "dismissGreeting" };
+  | { type: "dismissGreeting" }
+  /** La page vient de se recharger sur une nouvelle version : la vente qui était à l'écran revient telle quelle. */
+  | { type: "restore"; view: PosteView };
 
 const lookOf = (value: unknown): number | null => (typeof value === "number" && Number.isInteger(value) && value >= 0 && value < 20 ? value : null);
 
@@ -156,6 +158,42 @@ export function posteReducer(view: PosteView, event: PosteEvent): PosteView {
       return { ...view, alertRead: true, island: { ...view.island, stage: stageForEntry(view.entry, true) } };
     case "dismissGreeting":
       return view.greeting === null ? view : { ...view, greeting: null };
+    case "restore":
+      // Une commande de l'agent arrivée entre-temps l'emporte : on ne reprend que sur une île encore au repos.
+      return view.island.stage === "idle" && !view.entry ? event.view : view;
+  }
+}
+
+/** Combien de temps une vente gardée avant un rechargement peut être reprise. */
+export const RESUME_MAX_MS = 60_000;
+/** Les étapes où la page peut se recharger sans gêner : jamais pendant un scan, une analyse ou la saisie d'un e-mail. */
+const RELOADABLE: IslandStage[] = ["idle", "advice", "alert", "quiet", "done"];
+
+/**
+ * Une nouvelle version en ligne peut-elle recharger la page maintenant ? Oui au repos, et aussi pendant une vente restée
+ * ouverte (POSTE de Docteur Nicolas, 19 oct. 2026 : une vente jamais terminée gardait l'ancienne bannière) — mais jamais
+ * sous la souris, ni pendant un scan, une analyse ou un e-mail.
+ */
+export function canReloadNow(view: PosteView, pointerOver: boolean): boolean {
+  return !pointerOver && !view.emailPending && !view.validated && RELOADABLE.includes(view.island.stage);
+}
+
+/** La vente à l'écran, gardée juste avant le rechargement. */
+export function resumeSnapshot(view: PosteView, now: number): string {
+  return JSON.stringify({ at: now, view });
+}
+
+/** La vente gardée avant le rechargement, si elle est récente et bien formée ; sinon rien. */
+export function readResume(raw: string | null, now: number): PosteView | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { at?: unknown; view?: PosteView };
+    if (typeof parsed.at !== "number" || parsed.at > now || now - parsed.at > RESUME_MAX_MS) return null;
+    const view = parsed.view;
+    if (!view || typeof view !== "object" || !view.island || typeof view.island.stage !== "string" || !isIslandSide(view.side)) return null;
+    return view;
+  } catch {
+    return null;
   }
 }
 
