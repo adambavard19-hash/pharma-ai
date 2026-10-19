@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Mail, Maximize2, Minimize2, PartyPopper, Pill, ScanLine, Send, TriangleAlert, X } from "lucide-react";
+import { islandTheme } from "./island-theme";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
@@ -17,7 +18,11 @@ import { IslandShell } from "./island-shell";
  * Composant d'affichage : l'état vient de l'extérieur (aperçu, ou plus tard la vraie vente), les gestes remontent.
  */
 
-const C = BANNER.colors;
+/**
+ * Les couleurs de la bannière, chacune réglable par une variable CSS (« --isl-panel »…) : sans variable, ce sont celles d'aujourd'hui.
+ * Les essais de couleurs et de polices (fondateur, 19 oct. 2026) les changent sur un parent, sans toucher au code de la bannière.
+ */
+const C = islandTheme({ ...BANNER.colors, bg: "#0B0F14", cell: "#F1F5F7", pick: "#0B6B57", pickLine: "#C9D5DC", number: "rgba(54,232,200,0.18)", numberFg: "#0B6B57", then: "rgba(54,232,200,0.10)" });
 
 /** Les confettis de la fête d'une vente avec conseil vendu : dix éclats autour du robot, chacun sa direction. */
 export const BURST_PIECES = [0, 36, 72, 108, 144, 180, 216, 252, 288, 324].map((angle, index) => ({
@@ -112,6 +117,8 @@ export type CounterIslandProps = {
    * suivant une fois tranché ; un bouton agrandit la bannière (la liste complète) ou la réduit, et le choix est retenu.
    */
   compactAdvice?: boolean;
+  /** Les essais de couleurs : l'île compacte ne se replie jamais en capsule faute de survol. */
+  keepAwake?: boolean;
 };
 
 /** Le choix « bannière agrandie » du pharmacien, retenu sur ce poste. */
@@ -215,7 +222,7 @@ function AdviceMeta({ item, small }: { item: IslandAdvice; small?: boolean }) {
     <span className={cn("flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap font-semibold", small ? "text-[10.5px] leading-[14px]" : "text-[11px] leading-4")}>
       {showPrice && <span className="shrink-0 font-bold tabular-nums" style={{ color: C.ink }}>{item.price}</span>}
       {stock && (
-        <span className="inline-flex min-w-0 items-center gap-1 truncate" style={{ color: item.stock === "IN_STOCK" ? "#0B6B57" : stock.fg }}>
+        <span className="inline-flex min-w-0 items-center gap-1 truncate" style={{ color: item.stock === "IN_STOCK" ? C.numberFg : stock.fg }}>
           <span className="size-1.5 shrink-0 rounded-full" style={{ background: dot }} aria-hidden="true" />
           {stock.label}
           {item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}
@@ -352,7 +359,7 @@ export function CounterIsland(props: CounterIslandProps) {
   // Sans geste pendant 25 s, l'île compacte se replie en capsule (« 2 conseils ») ; le survol la rouvre.
   const adviceKey = compact ? amongOf(items) : "";
   useEffect(() => {
-    if (!adviceKey || hover) return;
+    if (!adviceKey || hover || props.keepAwake) return;
     const id = setTimeout(() => setAsleep(adviceKey), COMPACT_SLEEP_MS);
     return () => clearTimeout(id);
   }, [adviceKey, hover]);
@@ -542,11 +549,11 @@ export function CounterIsland(props: CounterIslandProps) {
                     key={group.drug || "-"}
                     data-advice-group=""
                     aria-label={`Conseils pour ${group.drug || props.drug}`}
-                    className="isl-in min-w-0 flex-1 overflow-hidden rounded-[20px] bg-[#0B0F14] p-2 text-white"
-                    style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.08), 0 18px 40px -14px rgba(0,0,0,0.55)" }}
+                    className="isl-in min-w-0 flex-1 overflow-hidden rounded-[20px] p-2 text-white"
+                    style={{ background: C.bg, boxShadow: "0 0 0 1px rgba(255,255,255,0.08), 0 18px 40px -14px rgba(0,0,0,0.55)" }}
                   >
                     <div className="flex items-start gap-2 px-1 pt-0.5 pb-1.5">
-                      <span className="mt-px inline-flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(54,232,200,0.16)", color: C.accent }}>
+                      <span className="mt-px inline-flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: C.number, color: C.accent }}>
                         <Pill className="size-3.5" aria-hidden="true" />
                       </span>
                       <span className="min-w-0 flex-1">
@@ -856,7 +863,7 @@ export function PitchPanel({ item }: { item: IslandAdvice }) {
       <p className="text-[12px] leading-4 font-bold break-words">{item.sheet?.name || item.name}</p>
       <div className="grid grid-cols-3 gap-1">
         {cells.map((cell) => (
-          <div key={cell.label} className="rounded-md px-1.5 py-1 text-center" style={{ background: "#F1F5F7" }}>
+          <div key={cell.label} className="rounded-md px-1.5 py-1 text-center" style={{ background: C.cell }}>
             <p className="text-[9.5px] font-bold tracking-[0.04em] uppercase" style={{ color: C.inkSoft }}>{cell.label}</p>
             <p className="truncate text-[12.5px] leading-4 font-bold tabular-nums" style={{ color: cell.color ?? C.ink }}>{cell.value}</p>
           </div>
@@ -878,7 +885,7 @@ export function PitchPanel({ item }: { item: IslandAdvice }) {
               return (
                 <li key={question} data-pitch-question="" className="break-words">
                   <span className="flex gap-1.5">
-                    <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold" style={{ background: "rgba(54,232,200,0.18)", color: "#0B6B57" }}>{index + 1}</span>
+                    <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold" style={{ background: C.number, color: C.numberFg }}>{index + 1}</span>
                     <span className="font-semibold">{question}</span>
                   </span>
                   {choices.length > 0 && (
@@ -896,7 +903,7 @@ export function PitchPanel({ item }: { item: IslandAdvice }) {
                             return next;
                           })}
                           className="h-6 rounded-full border px-2 text-[11px] font-semibold transition-colors"
-                          style={picked[index] === at ? { background: "#0B6B57", borderColor: "#0B6B57", color: "#FFFFFF" } : { background: "#FFFFFF", borderColor: "#C9D5DC", color: C.ink }}
+                          style={picked[index] === at ? { background: C.pick, borderColor: C.pick, color: "#FFFFFF" } : { background: "#FFFFFF", borderColor: C.pickLine, color: C.ink }}
                         >
                           {choice.label}
                         </button>
@@ -904,7 +911,7 @@ export function PitchPanel({ item }: { item: IslandAdvice }) {
                     </span>
                   )}
                   {chosen && (
-                    <span data-pitch-then="" className="isl-pop mt-1 ml-5.5 block rounded-md px-2 py-1.5" style={{ background: "rgba(54,232,200,0.10)" }}>
+                    <span data-pitch-then="" className="isl-pop mt-1 ml-5.5 block rounded-md px-2 py-1.5" style={{ background: C.then }}>
                       <span className="block">{chosen.say}</span>
                       {chosen.product && <AnswerProduct product={chosen.product} />}
                     </span>
@@ -930,12 +937,12 @@ function AnswerProduct({ product }: { product: NonNullable<NonNullable<CounterSh
   const stock = product.stock && product.stock in STOCK ? STOCK[product.stock as keyof typeof STOCK] : null;
   return (
     <span data-pitch-product="" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md bg-white px-1.5 py-1">
-      <span className="w-full text-[10px] font-bold tracking-[0.04em] uppercase" style={{ color: "#0B6B57" }}>Proposer plutôt</span>
+      <span className="w-full text-[10px] font-bold tracking-[0.04em] uppercase" style={{ color: C.numberFg }}>Proposer plutôt</span>
       <span className="min-w-0 flex-1 truncate font-bold">{product.name}</span>
       {product.price && <span className="shrink-0 font-bold tabular-nums">{product.price}</span>}
       <span className="flex w-full flex-wrap gap-x-2 text-[10.5px] font-semibold">
         {product.margin && <span style={{ color: "#4B5F6C" }}>Marge {product.margin} HT</span>}
-        {stock && <span style={{ color: product.stock === "IN_STOCK" ? "#0B6B57" : stock.fg }}>{stock.label}{product.quantity !== undefined && product.stock !== "OUT_OF_STOCK" ? ` · ${product.quantity}` : ""}</span>}
+        {stock && <span style={{ color: product.stock === "IN_STOCK" ? C.numberFg : stock.fg }}>{stock.label}{product.quantity !== undefined && product.stock !== "OUT_OF_STOCK" ? ` · ${product.quantity}` : ""}</span>}
       </span>
     </span>
   );
@@ -1146,7 +1153,7 @@ export function AdviceCard({ item, outcome, onAnswer, readOnly, auto, outside, o
       {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</Chip>}
       {/* La date sans l'année : la carte compacte garde ses étiquettes sur la ligne des boutons. */}
       {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate.replace(/\/\d{4}$/, "")}</Chip>}
-      {item.margin && <Chip bg="rgba(54,232,200,0.14)" fg="#0B6B57">Marge {item.margin} HT</Chip>}
+      {item.margin && <Chip bg={C.then} fg={C.numberFg}>Marge {item.margin} HT</Chip>}
       {stock && <Chip bg={stock.bg} fg={stock.fg}>{stock.label}{item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}</Chip>}
     </>
   );

@@ -69,7 +69,7 @@ export function IslandShell({
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       className={cn(
-        "relative overflow-hidden bg-[#0B0F14] text-white",
+        "relative overflow-hidden bg-[var(--isl-bg,#0B0F14)] text-white",
         "transition-[width,height,border-radius,box-shadow] duration-[560ms] ease-[cubic-bezier(.3,1.45,.5,1)] motion-reduce:transition-none",
         className,
       )}
