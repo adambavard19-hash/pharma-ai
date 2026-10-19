@@ -7,9 +7,9 @@ import { INITIAL_ISLAND } from "@/core/island/banner-flow";
 
 /** Une vente de deux boîtes, comme sur la vidéo du POSTE de Docteur Nicolas (19 oct. 2026). Chiffres d'exemple. */
 const PHLORO = "PHLOROGLUCINOL VIATRIS 80 mg";
-const GAVISCON = "GAVISCONELL MENTHE SANS SUCRE";
+export const GAVISCON = "GAVISCONELL MENTHE SANS SUCRE";
 const sheet = (name: string) => ({ name, reasons: [], script: "", contraindications: [], usage: [], description: "", more: { contraindications: 0, usage: 0 }, cut: false });
-const ITEMS: IslandAdvice[] = [
+export const ITEMS: IslandAdvice[] = [
   { name: "MACROGOL 4000 ARROW 4 g", drug: PHLORO, price: "5,20 €", margin: "1,85 €", stock: "IN_STOCK", quantity: 14 },
   {
     name: "NEOBIANACID CITRON CPR 70",
@@ -34,7 +34,7 @@ const ITEMS: IslandAdvice[] = [
   },
   { name: "NEOBIANACID Cpr suc B/45 MENTHE", drug: GAVISCON, price: "15,50 €", margin: "4,79 €", stock: "LOW_STOCK", quantity: 3 },
 ];
-const BOXES = [
+export const BOXES = [
   { id: "b1", name: PHLORO },
   { id: "b2", name: GAVISCON },
 ];

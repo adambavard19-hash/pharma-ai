@@ -2,6 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Pill, ScanLine, Sparkles, Star, Timer, X } from "lucide-react";
+import { CounterIsland } from "@/components/island/counter-island";
+import { ISLAND_CSS } from "@/components/island/island-shell";
+import { INITIAL_ISLAND } from "@/core/island/banner-flow";
+import { BOXES, GAVISCON, ITEMS } from "../styles/styles";
 
 /* Les couleurs de la bannière en ligne (« C — Vert PharmaBoost »). */
 const G = { bg: "#0F2F2A", deep: "#0A221E", lemon: "#E8FF9C", teal: "#247061", paper: "#F4F8F6", ink: "#0F2F2A", soft: "#4D6B64", line: "#DCE7E2", cell: "#E9F1EE", warn: "#B54708", red: "#B42318" };
@@ -359,9 +363,41 @@ function Best() {
   );
 }
 
+/* ------------------------------------------------------------------------------- 0. la bannière en ligne, pour comparer */
+
+const noop = () => {};
+
+function Current() {
+  return (
+    <FakeLgpi>
+      <div className="absolute inset-x-0 top-11 flex justify-center">
+        <CounterIsland
+          state={{ ...INITIAL_ISLAND, stage: "advice", outcomes: [null, null, null] }}
+          items={ITEMS}
+          drug={GAVISCON}
+          alert={null}
+          pills={[]}
+          boxes={BOXES}
+          compactAdvice
+          keepAwake
+          autoOutcome
+          onAnswer={noop}
+          onEmail={noop}
+          onSendEmail={noop}
+          onAddEmail={noop}
+          onFinish={noop}
+          onDismissAlert={noop}
+          finishLabel="Terminer la vente"
+        />
+      </div>
+    </FakeLgpi>
+  );
+}
+
 /* ------------------------------------------------------------------------------------------------------- la page */
 
 const CONCEPTS = [
+  { id: "0", name: "Ta bannière actuelle (en ligne)", pitch: "Celle qui tourne aujourd'hui dans les pharmacies, avec la même vente, pour comparer. Passez la souris dessus pour dérouler le menu.", view: <Current /> },
   { id: "1", name: "Le guide pas à pas", pitch: "Une seule carte, en trois temps : demandez → dites → bipez. On passe d'un conseil à l'autre avec les flèches. Le plus simple pour un pharmacien qui débute.", view: <Guided /> },
   { id: "2", name: "Le bandeau fin", pitch: "Une barre fine en haut de l'écran : tous les conseils d'un coup d'œil avec prix et marge. Un clic déroule les questions. Ne cache presque rien de LGPI.", view: <Strip /> },
   { id: "3", name: "Le volet de côté", pitch: "Un panneau contre le bord droit, rangé boîte par boîte, avec la marge possible de la vente en haut. Tout est lisible sans survol, rien ne bouge.", view: <Side /> },
@@ -371,9 +407,10 @@ const CONCEPTS = [
 export function NewBanners() {
   return (
     <main className="min-h-dvh bg-[#E9EDF1] px-4 py-6 sm:px-6">
+      <style>{ISLAND_CSS}</style>
       <div className="mx-auto max-w-[1500px]">
         <p className="font-mono text-[11.5px] tracking-[0.14em] text-brand-700 uppercase">Aperçu de développement</p>
-        <h1 className="mt-1 text-[26px] leading-tight font-bold tracking-[-0.02em] text-text-primary">Quatre nouvelles bannières</h1>
+        <h1 className="mt-1 text-[26px] leading-tight font-bold tracking-[-0.02em] text-text-primary">Quatre nouvelles bannières, et l&apos;actuelle</h1>
         <p className="mt-1 max-w-3xl text-[14px] text-text-secondary">
           La même vente (PHLOROGLUCINOL + GAVISCONELL), posée sur un faux écran de LGPI pour juger ce qu&apos;elle cache. Tout est cliquable : réponses du patient, flèches, onglets. Dites-moi le numéro que vous voulez, ou ce que vous prenez dans chacune.
         </p>
