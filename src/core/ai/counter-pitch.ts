@@ -33,7 +33,7 @@ export const PITCH_SCHEMA = {
   additionalProperties: false,
   required: ["ask", "pitch", "answers"],
   properties: {
-    ask: { type: "array", description: "Exactement deux questions courtes à poser au patient avant de proposer le produit (14 mots au plus chacune), qui vérifient le besoin ou une précaution.", items: { type: "string" } },
+    ask: { type: "array", description: "Exactement deux questions de comptoir, propres à ce déclencheur et à ce produit (14 mots au plus chacune) : la 1re cerne le besoin concret, la 2e change la conduite (signe d'alerte, précaution réelle du produit, ou choix d'un produit plus précis).", items: { type: "string" } },
     pitch: { type: "string", description: "Le conseil en deux phrases (40 mots au plus en tout), à dire au patient : pourquoi ce produit avec son traitement, et comment l'utiliser." },
     answers: {
       type: "array",
@@ -44,7 +44,7 @@ export const PITCH_SCHEMA = {
         required: ["question", "label", "say", "ean"],
         properties: {
           question: { type: "integer", enum: [1, 2], description: "La question à laquelle cette réponse se rapporte." },
-          label: { type: "string", description: "La réponse du patient, 1 à 4 mots (« Oui, ça tire », « Non », « Peau très sèche »)." },
+          label: { type: "string", description: "La réponse du patient, 1 à 4 mots, qui répond DIRECTEMENT à sa question (« Oui, ça tire », « Non », « Surtout la nuit »)." },
           say: { type: "string", description: "Ce que le pharmacien fait ou dit alors, une phrase de 22 mots au plus." },
           ean: { type: ["string", "null"], description: "Le code d'un produit de la liste « Autres produits en stock » qui REMPLACE le produit conseillé parce qu'il répond mieux au MÊME besoin pour cette réponse (version enfant, formule plus riche, sans conservateur…), ou null. Jamais un produit pour un autre besoin, jamais un produit « en plus »." },
         },
@@ -54,10 +54,24 @@ export const PITCH_SCHEMA = {
 } as const;
 
 export const PITCH_SYSTEM_PROMPT = [
-  "Tu aides un pharmacien français au comptoir. Pour un produit conseillé en accompagnement d'un traitement, tu écris :",
-  "1) deux questions courtes à poser au patient AVANT de proposer le produit — elles vérifient que le besoin existe (« Votre peau tire-t-elle depuis le début du traitement ? ») ou une précaution (« Êtes-vous enceinte ou allaitez-vous ? ») ;",
-  "2) le conseil en deux phrases, au « vous », à dire au patient : pourquoi ce produit avec son traitement, puis comment l'utiliser.",
-  "3) pour chaque question, deux ou trois réponses possibles du patient : ce que le pharmacien fait alors (garder le produit, en proposer un plus précis, ou ne rien proposer et orienter vers le médecin si c'est le cas). Un produit plus précis se choisit SEULEMENT dans la liste « Autres produits en stock », par son code, et seulement s'il REMPLACE le produit conseillé pour le même besoin (jamais un produit en plus, jamais un autre besoin) ; sinon null.",
+  "Tu aides un pharmacien d'officine français au comptoir. Un patient vient d'acheter un médicament (le déclencheur) ; le pharmacien veut lui proposer un produit en accompagnement. Tu écris ce qu'il a sous les yeux pendant les trente secondes de l'échange.",
+  "",
+  "1) DEUX questions à poser au patient AVANT de proposer le produit. Ce sont de vraies questions de comptoir, propres à CE déclencheur et à CE produit, jamais génériques :",
+  "   - la question 1 cerne le BESOIN concret : le symptôme, depuis quand, à quel moment, à quelle fréquence, chez qui (« Les brûlures arrivent-elles surtout après les repas ou en position allongée ? ») ;",
+  "   - la question 2 change la CONDUITE : un signe d'alerte qui impose d'orienter vers le médecin, OU une précaution réelle de ce produit (grossesse, enfant, interaction, régime sans sel…), OU un choix qui oriente vers un produit plus précis de la liste (forme, goût, âge, peau). Ne pose « Êtes-vous enceinte ? » que si ce produit a vraiment une précaution pendant la grossesse.",
+  "   Chaque question tient en 14 mots au plus et se comprend sans contexte.",
+  "",
+  "2) Pour CHAQUE question, deux ou trois réponses du patient. RÈGLE ABSOLUE : chaque réponse répond directement et naturellement à SA question (à une question oui/non, on répond oui ou non, éventuellement nuancé ; à une question « quand ? », un moment). Jamais une préférence ou une remarque sans rapport avec la question posée. Pour chaque réponse, ce que fait le pharmacien :",
+  "   - confirmer et proposer le produit conseillé ;",
+  "   - ou proposer un produit PLUS PRÉCIS choisi SEULEMENT dans la liste « Autres produits en stock », par son code, s'il REMPLACE le produit conseillé pour le même besoin (jamais un produit en plus, jamais un autre besoin) — sinon ean null ;",
+  "   - ou ne rien proposer et orienter vers le médecin quand la réponse est un signe d'alerte.",
+  "",
+  "3) Le conseil en deux phrases, au « vous », à dire au patient : pourquoi ce produit avec son traitement, puis comment l'utiliser concrètement (moment, durée, geste).",
+  "",
+  "Exemple pour le déclencheur GAVISCON et le produit NEOBIANACID :",
+  "   Q1 « Les brûlures reviennent-elles surtout après les repas ou la nuit ? » → « Après les repas » : le pharmacien propose le produit, à prendre après le repas ; « Surtout la nuit » : il le propose au coucher et conseille de surélever la tête du lit ; « Presque tout le temps » : il conseille d'en parler au médecin.",
+  "   Q2 « Avez-vous du mal à avaler, ou maigrissez-vous sans raison ? » → « Non » : il propose le produit ; « Oui » : il ne propose rien et oriente vers le médecin sans attendre.",
+  "",
   "Style : oral, simple, chaleureux, professionnel. Français impeccable. Pas de jargon.",
   "Interdit : promesse de guérison, chiffre de résultat, posologie du médicament prescrit, diagnostic. Le pharmacien garde la décision.",
   `Réponds uniquement en appelant l'outil « ${PITCH_TOOL_NAME} ».`,

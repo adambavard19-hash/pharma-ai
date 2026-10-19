@@ -15,6 +15,8 @@ import type { HistoryLine } from "./edit-forms";
 import { HowItWorks } from "./how-it-works";
 import { CureDurations } from "./cure-durations";
 import { listCureDurations } from "@/server/services/cure-reminders";
+import { listAdminPitches } from "@/server/services/counter-pitches";
+import { CounterPitches } from "./counter-pitches";
 
 export const metadata: Metadata = { title: "Conseils" };
 
@@ -30,7 +32,7 @@ const lines = (entries: EditHistoryEntry[] | undefined): HistoryLine[] => (entri
 export default async function AdminAdvicePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePlatformSession();
   const query = await searchParams;
-  const [rules, associations, robot, history, associationEdits, robotKeys, pharmacies, families, cureDurations] = await Promise.all([
+  const [rules, associations, robot, history, associationEdits, robotKeys, pharmacies, families, cureDurations, pitches] = await Promise.all([
     listCentralRules(PRODUCT_CATEGORY_LABELS),
     listCentralAssociations(),
     listRobotProposals(),
@@ -40,7 +42,9 @@ export default async function AdminAdvicePage({ searchParams }: { searchParams: 
     listPreviewPharmacies(),
     listTriggerFamilies(),
     listCureDurations(),
+    listAdminPitches(),
   ]);
+  const ruleTitles = new Map(rules.map((rule) => [rule.ruleKey, rule.title]));
 
   const items: HubItem[] = [
     ...robot.pending.map((proposal) => ({ type: "robot" as const, facets: robotFacets(proposal), proposal: { ...proposal, decidedAt: proposal.decidedAt ? proposal.decidedAt.toISOString() : null, createdAt: proposal.createdAt.toISOString() } })),
@@ -88,6 +92,9 @@ export default async function AdminAdvicePage({ searchParams }: { searchParams: 
         families={families}
         initialFilter={filterFromParam(query.filtre)}
         initialQuery={typeof query.q === "string" ? query.q.slice(0, 120) : ""}
+      />
+      <CounterPitches
+        rows={pitches.map((pitch) => ({ ...pitch, ruleTitle: ruleTitles.get(pitch.ruleKey) ?? (pitch.ruleKey.startsWith("association:") ? "Association de produits" : "Suggestion du robot"), updatedAt: pitch.updatedAt.toISOString() }))}
       />
       <CureDurations families={cureDurations.families} products={cureDurations.products.map((row) => ({ key: row.key, label: row.label, days: row.days }))} />
       <details className="group rounded-xl border border-border-subtle bg-surface-card p-4">
