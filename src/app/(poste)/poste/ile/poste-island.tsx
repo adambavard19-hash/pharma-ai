@@ -345,10 +345,16 @@ export function PosteIsland() {
     foldTimer.current = null;
     setHovered(true);
   }, []);
+  // La dernière position connue de la souris : au moment de replier, si l'île est (de nouveau) sous elle, on ne replie pas.
+  // La fenêtre Windows ne reçoit rien hors des capsules : une capsule qui grandit sous une souris immobile n'envoie aucun
+  // mouvement, et l'île se repliait alors sous le curseur (POSTE de Docteur Nicolas, 19 oct. 2026).
+  const lastPointer = useRef<{ x: number; y: number } | null>(null);
   const foldSoon = useCallback(() => {
     if (foldTimer.current) return;
     foldTimer.current = setTimeout(() => {
       foldTimer.current = null;
+      const at = lastPointer.current;
+      if (at && document.elementFromPoint(at.x, at.y)?.closest("[data-ile-root] section")) return;
       setHovered(false);
     }, FOLD_DELAY_MS);
   }, []);
@@ -442,6 +448,7 @@ export function PosteIsland() {
           // Sur l'île (une de ses capsules) : déployée ; à côté (le reste de la fenêtre, transparent) : repliée bientôt.
           // Le bouton « Terminer la vente » et la question « C'est un autre client ? » ne déploient rien : la bannière ne bouge pas
           // sous la souris au moment de cliquer.
+          lastPointer.current = { x: event.clientX, y: event.clientY };
           const target = event.target instanceof Element ? event.target : null;
           if (target?.closest("[data-ile-sans-deploiement]")) {
             if (foldTimer.current) clearTimeout(foldTimer.current);
@@ -455,7 +462,11 @@ export function PosteIsland() {
           const start = drag.current;
           if (start && !start.moved && Math.hypot(event.screenX - start.x, event.screenY - start.y) > 4) start.moved = true;
         }}
-        onPointerLeave={foldSoon}
+        onPointerLeave={() => {
+          // Sortie réelle de la fenêtre : la souris n'est plus sur l'île, on replie.
+          lastPointer.current = null;
+          foldSoon();
+        }}
         onClickCapture={(event) => {
           // Un déplacement n'est pas un clic : le robot ne rit pas, aucune carte ne s'ouvre.
           if (drag.current?.moved) {

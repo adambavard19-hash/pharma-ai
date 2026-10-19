@@ -566,8 +566,6 @@ export function CounterIsland(props: CounterIslandProps) {
                           item={items[index]}
                           outcome={state.outcomes[index] ?? null}
                           readOnly={props.readOnly}
-                          // Le détail de ce conseil, le temps de le lire ; « Réduire » revient aux colonnes.
-                          onOpen={() => setUnfolded({ name: items[index].name, among })}
                           auto={props.autoOutcome}
                           onAnswer={(outcome) => props.onAnswer(index, outcome)}
                         />
@@ -1037,9 +1035,9 @@ function CompactCard({ item, outcome, readOnly, auto, onOpen, onAnswer }: { item
 
 /**
  * Un conseil dans une colonne (plusieurs boîtes côte à côte) : le nom sur deux lignes, prix et stock en petit, puis ✓ / ✕
- * sur toute la largeur. Un appui sur la carte agrandit la bannière, ce conseil déployé.
+ * sur toute la largeur. Au survol, le menu du conseil se déroule dans la carte.
  */
-function ColumnCard({ item, outcome, readOnly, auto, onOpen, onAnswer }: { item: IslandAdvice; outcome: IslandOutcome; readOnly?: boolean; auto?: boolean; onOpen: () => void; onAnswer: (outcome: IslandOutcome) => void }) {
+function ColumnCard({ item, outcome, readOnly, auto, onAnswer }: { item: IslandAdvice; outcome: IslandOutcome; readOnly?: boolean; auto?: boolean; onAnswer: (outcome: IslandOutcome) => void }) {
   const stock = item.stock ? STOCK[item.stock] : null;
   const details = [
     item.price && stock && item.stock !== "UNKNOWN" ? item.price : null,
@@ -1047,9 +1045,14 @@ function ColumnCard({ item, outcome, readOnly, auto, onOpen, onAnswer }: { item:
     stock ? `${stock.label}${item.quantity !== undefined && item.stock !== "OUT_OF_STOCK" ? ` · ${item.quantity}` : ""}` : null,
     item.challenge ? `★ ${T.challenge}` : null,
   ].filter(Boolean);
+  // Le menu déroulant (prix, marge, stock, questions, conseil) au survol, DANS la carte, comme une seule boîte : la bannière
+  // ne change jamais de forme sous la souris (POSTE de Docteur Nicolas, 19 oct. 2026 : un appui basculait vers une autre vue,
+  // qui se repliait aussitôt). Un appui garde le menu ouvert, un second le referme.
+  const [hovered, hoverProps] = useHoverOpen(180, item.pitchOpen === true);
+  const [pinned, setPinned] = useState(false);
   return (
-    <div data-advice-card="" className="isl-line rounded-lg px-1.5 py-1.5" style={{ background: C.panel, color: C.ink }}>
-      <button type="button" onClick={onOpen} title={UNFOLD} className="flex w-full min-w-0 items-start gap-1.5 text-left">
+    <div data-advice-card="" className="isl-line rounded-lg px-1.5 py-1.5" style={{ background: C.panel, color: C.ink }} {...hoverProps}>
+      <button type="button" onClick={() => setPinned((value) => !value)} aria-expanded={hovered || pinned} title={UNFOLD} className="flex w-full min-w-0 items-start gap-1.5 text-left">
         {item.image && (
           // eslint-disable-next-line @next/next/no-img-element -- vignette locale déjà à la bonne taille
           <img src={item.image} alt="" width={26} height={26} draggable={false} className="size-[26px] shrink-0 rounded-md bg-white object-contain" />
@@ -1080,6 +1083,7 @@ function ColumnCard({ item, outcome, readOnly, auto, onOpen, onAnswer }: { item:
           </>
         )}
       </div>
+      {(hovered || pinned) && <PitchPanel item={item} />}
     </div>
   );
 }
