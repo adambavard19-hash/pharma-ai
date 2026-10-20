@@ -462,6 +462,47 @@ export function TagPicker({ tags, picked, onChange, max = CUSTOM_LIMITS.tags, la
   );
 }
 
+type AtcCover = { code: string; therapeuticClass: string | null; count: number; names: string[] };
+
+/** Sous le code ATC tapé : les médicaments qu'il couvre, pour voir aussitôt qu'un chiffre est faux (A07DA53 au lieu de A07DA03). */
+function AtcCoverage({ code }: { code: string }) {
+  const wanted = code.replace(/\s+/g, "").toUpperCase();
+  const [cover, setCover] = useState<AtcCover | null>(null);
+  useEffect(() => {
+    if (wanted.length < 3) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(`/api/admin/conseils/atc?code=${encodeURIComponent(wanted)}`, { signal: controller.signal })
+        .then((response) => (response.ok ? (response.json() as Promise<AtcCover>) : null))
+        .then((data) => setCover(data))
+        .catch(() => undefined);
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [wanted]);
+  if (wanted.length < 3 || !cover || cover.code !== wanted) return null;
+  if (cover.count === 0)
+    return (
+      <p className="rounded-lg bg-warning-50 px-3 py-2 text-[13px] text-warning-800" data-atc-couverture="0">
+        Aucun médicament commercialisé ne porte ce code dans le catalogue officiel : l&apos;association risque de ne jamais se déclencher. Vérifiez le code.
+      </p>
+    );
+  return (
+    <div className="rounded-lg bg-surface-sunken px-3 py-2 text-[13px] text-text-secondary" data-atc-couverture={cover.count}>
+      <p className="font-semibold text-text-primary">
+        {cover.code} → {cover.count} médicament{cover.count > 1 ? "s" : ""}
+        {cover.therapeuticClass ? <span className="font-normal text-text-tertiary"> · {cover.therapeuticClass}</span> : null}
+      </p>
+      <p className="mt-0.5">
+        {cover.names.join(", ")}
+        {cover.count > cover.names.length ? ` et ${cover.count - cover.names.length} autre${cover.count - cover.names.length > 1 ? "s" : ""}` : ""}
+      </p>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Ajouter une association
 // ---------------------------------------------------------------------------------------------------------------
@@ -549,6 +590,7 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
               <Field label="Quand un médicament de ce code ATC est dans la vente" htmlFor="central-atc" hint="Le code officiel (« D10BA01 »), ou son début pour toute une classe (« D10AD »).">
                 <Input id="central-atc" value={atcCode} maxLength={10} onChange={(event) => setAtcCode(event.target.value.toUpperCase())} placeholder="D10BA01" />
               </Field>
+              <AtcCoverage code={atcCode} />
               <Field label="Nom de la classe (facultatif)" htmlFor="central-atc-label">
                 <Input id="central-atc-label" value={atcLabel} maxLength={120} onChange={(event) => setAtcLabel(event.target.value)} placeholder="Isotrétinoïne orale" />
               </Field>

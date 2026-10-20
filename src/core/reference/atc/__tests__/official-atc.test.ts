@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OFFICIAL_ATC_ATTRIBUTION, OFFICIAL_ATC_SOURCE, officialAtcForCis, officialTherapeuticClass } from "../official-atc";
+import { OFFICIAL_ATC_ATTRIBUTION, OFFICIAL_ATC_SOURCE, officialAtcForCis, officialCisForAtcPrefix, officialTherapeuticClass } from "../official-atc";
 import { OFFICIAL_ATC_BY_CIS } from "../official-atc-data";
 
 /**
@@ -62,5 +62,26 @@ describe("la table et sa source", () => {
     expect(OFFICIAL_ATC_ATTRIBUTION).toContain("Open Medic (Assurance Maladie), base complète 2025, publiée le 7 juillet 2026");
     expect(OFFICIAL_ATC_ATTRIBUTION).toContain("Licence Ouverte");
     expect(OFFICIAL_ATC_ATTRIBUTION).toContain("Base de données publique des médicaments");
+  });
+});
+
+describe("ce que couvre un code ATC tapé dans la console", () => {
+  it("le code exact et son début couvrent la cétirizine ; un chiffre faux ne la couvre pas", () => {
+    expect(officialCisForAtcPrefix("R06AE07")).toContain("61665908");
+    expect(officialCisForAtcPrefix("r06ae")).toContain("61665908");
+    expect(officialCisForAtcPrefix("R06AE57")).not.toContain("61665908");
+  });
+
+  it("le lopéramide seul (A07DA03) n'est pas couvert par A07DA53, mais l'est par A07DA", () => {
+    const alone = officialCisForAtcPrefix("A07DA03");
+    expect(alone.length).toBeGreaterThan(0);
+    expect(officialCisForAtcPrefix("A07DA53").some((cis) => alone.includes(cis))).toBe(false);
+    expect(officialCisForAtcPrefix("A07DA")).toEqual(expect.arrayContaining(alone));
+  });
+
+  it("un code mal formé ne couvre rien", () => {
+    expect(officialCisForAtcPrefix("")).toEqual([]);
+    expect(officialCisForAtcPrefix("A0")).toEqual([]);
+    expect(officialCisForAtcPrefix("lopéramide")).toEqual([]);
   });
 });

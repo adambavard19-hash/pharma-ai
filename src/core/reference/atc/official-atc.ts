@@ -77,3 +77,15 @@ export function officialAtcForCis(cisCode: string | null | undefined): OfficialA
   if (!entry) return null;
   return { atcCode: entry.atcCode, therapeuticClass: officialTherapeuticClass(entry.atcCode), basis: entry.basis };
 }
+
+/**
+ * Les spécialités que couvre un code ATC tapé dans la console (19 oct. 2026 : « A07DA53 » saisi pour le lopéramide, qui est
+ * « A07DA03 » — l'association ne se déclenchait jamais). Le comptoir compare par le DÉBUT du code : on fait de même.
+ */
+export function officialCisForAtcPrefix(prefix: string): string[] {
+  const code = prefix.replace(/\s+/g, "").toUpperCase();
+  if (!/^[A-Z]\d{2}[A-Z0-9]{0,4}$/.test(code)) return [];
+  const found: string[] = [];
+  for (const [cis, entry] of load().byCis) if (entry.atcCode.startsWith(code)) found.push(cis);
+  return found;
+}
