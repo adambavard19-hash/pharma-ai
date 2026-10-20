@@ -72,10 +72,7 @@ export default async function SitePage() {
             <p className="mt-7 max-w-xl text-[17px] leading-7 text-text-secondary">
               Au comptoir, vous scannez les boîtes comme d&apos;habitude. La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller en plus, pris dans votre rayon. Et le patient repart avec ses conseils — puis PharmaBoost assure son suivi pharmaceutique : bilan par e-mail, rappel avant la fin de sa cure.
             </p>
-            {/* « Réserver une démo » est déjà en haut de page : ici, la présentation seule, en vert, comme bouton principal. */}
-            <div className="mt-9">
-              <VideoButton tone="brand" />
-            </div>
+            {/* Plus de bouton « Voir la présentation » ici : elle se lance seule juste en dessous (fondateur, 20 oct. 2026). */}
           </div>
           <HeroVisual glass />
         </div>
