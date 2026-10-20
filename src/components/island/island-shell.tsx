@@ -122,5 +122,8 @@ export const ISLAND_CSS = `
 .isl-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
 .isl-scroll::-webkit-scrollbar { width: 5px; }
 .isl-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 99px; }
-@media (prefers-reduced-motion: reduce) { .isl-in, .isl-line, .isl-pop, .isl-cheer { animation: none; } .isl-burst { display: none; } .isl-spin, .isl-scanbar, .isl-barcode b, .isl-progress span::after, .isl-shimmer, .isl-pulse::after { animation: none; } .isl-shimmer { -webkit-text-fill-color: currentColor; } }
+/* La photo du produit conseil flotte doucement (fondateur, 19 oct. 2026 : effet « 1 · Flottement » de /robot-apercu/animations). */
+@keyframes isl-float { 0%,100% { transform: translateY(2px); } 50% { transform: translateY(-4px); } }
+.isl-float { animation: isl-float 2.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .isl-float { animation: none; } .isl-in, .isl-line, .isl-pop, .isl-cheer { animation: none; } .isl-burst { display: none; } .isl-spin, .isl-scanbar, .isl-barcode b, .isl-progress span::after, .isl-shimmer, .isl-pulse::after { animation: none; } .isl-shimmer { -webkit-text-fill-color: currentColor; } }
 `;

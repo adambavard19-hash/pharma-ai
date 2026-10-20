@@ -166,8 +166,10 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
               <div className="flex items-start gap-3">
                 {/* La photo studio du produit, sur fond blanc ; sans photo studio, rien (jamais une photo amateur). */}
                 {item.image && (
-                  // eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée
-                  <img data-ile-mix-photo="" src={item.image} alt="" width={56} height={56} draggable={false} className="size-14 shrink-0 rounded-xl bg-white object-contain p-1" />
+                  <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-xl bg-white p-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée */}
+                    <img data-ile-mix-photo="" src={item.image} alt="" width={48} height={48} draggable={false} className="isl-float size-full object-contain" />
+                  </span>
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="text-[15.5px] leading-[19px] font-extrabold break-words">{item.sheet?.name || item.name}</p>
