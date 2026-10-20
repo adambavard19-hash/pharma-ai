@@ -6,7 +6,7 @@
  * `?style=actuel` remet l'ancien (comparaison dans l'aperçu).
  */
 export const AURORE_CSS = `
-[data-ile-style=aurore] section{background:linear-gradient(180deg,#0E3B33 0%,#062019 100%)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 14px 34px -14px rgba(0,0,0,.65)!important;isolation:isolate}
+[data-ile-style=aurore] section{background:linear-gradient(180deg,#072A25 0%,#03171A 100%)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 14px 34px -14px rgba(0,0,0,.65)!important;isolation:isolate}
 [data-ile-style=aurore] section::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;
   background:linear-gradient(110deg,rgba(95,165,148,.55),rgba(116,214,160,.35) 35%,rgba(232,255,156,.85) 50%,rgba(116,214,160,.35) 65%,rgba(95,165,148,.55));background-size:250% 100%;
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:aur-sweep 6s linear infinite}

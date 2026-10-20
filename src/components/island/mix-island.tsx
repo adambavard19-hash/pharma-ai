@@ -8,7 +8,7 @@ import type { IslandOutcome } from "@/core/island/banner-flow";
 import { Robot } from "@/components/robot";
 import { AnswerProduct, type IslandAdvice } from "./counter-island";
 import { IslandShell } from "./island-shell";
-import { islandTheme, PHARMABOOST_GREEN } from "./island-theme";
+import { islandTheme, MIX_DARK, PHARMABOOST_GREEN } from "./island-theme";
 
 /**
  * La bannière « mix » du poste (fondateur, 19 oct. 2026, maquette 5 choisie) : le haut reste toujours à l'écran — le meilleur
@@ -20,7 +20,7 @@ import { islandTheme, PHARMABOOST_GREEN } from "./island-theme";
  * L'ancienne bannière (`CounterIsland` compacte) reste joignable : `?banniere=ancienne` (voir poste-island.tsx).
  */
 
-const C = islandTheme({ ...BANNER.colors, ...PHARMABOOST_GREEN });
+const C = islandTheme({ ...BANNER.colors, ...PHARMABOOST_GREEN, ...MIX_DARK });
 const T = BANNER.text;
 
 /** « 4,79 € » → 479 ; rien de lisible → 0. */
@@ -210,7 +210,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                         data-ile-mix-etape={id}
                         onClick={() => setStep(id)}
                         className="inline-flex h-7 items-center justify-center gap-1 rounded-lg text-[11.5px] font-bold"
-                        style={step === id ? { background: "#FFFFFF", color: C.ink, boxShadow: "0 1px 3px rgba(0,0,0,.12)" } : { color: C.inkSoft }}
+                        style={step === id ? { background: C.raised, color: C.accent, boxShadow: "0 1px 3px rgba(0,0,0,.25)" } : { color: C.inkSoft }}
                       >
                         <Icon className="size-3.5" aria-hidden="true" /> {n + 1}. {label}
                       </button>
@@ -238,7 +238,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                     <div className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
                       <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre possibilité en stock</p>
                       {alternatives.slice(0, 2).map(({ i, pos }) => (
-                        <button key={i} type="button" onClick={() => go(pos)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-white">
+                        <button key={i} type="button" onClick={() => go(pos)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-white/10">
                           <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{items[i].name}</span>
                           {items[i].price && items[i].stock !== "UNKNOWN" && <span className="shrink-0 text-[11.5px] font-bold tabular-nums" style={{ color: C.numberFg }}>{items[i].price}</span>}
                           <ChevronRight className="size-3.5 shrink-0" style={{ color: C.inkSoft }} aria-hidden="true" />
@@ -315,7 +315,7 @@ function Ask({ item }: { item: IslandAdvice }) {
                       return next;
                     })}
                     className="h-7 rounded-full border px-2.5 text-[11.5px] font-semibold"
-                    style={picked[q] === n ? { background: C.pick, borderColor: C.pick, color: "#FFFFFF" } : { background: "#FFFFFF", borderColor: C.pickLine, color: C.ink }}
+                    style={picked[q] === n ? { background: C.pick, borderColor: C.pick, color: "#FFFFFF" } : { background: C.raised, borderColor: C.pickLine, color: C.ink }}
                   >
                     {choice.label}
                   </button>
@@ -338,7 +338,7 @@ function Ask({ item }: { item: IslandAdvice }) {
 /** 2. Discours : le conseil en deux phrases, sinon la phrase du comptoir de la règle. */
 function Say({ item }: { item: IslandAdvice }) {
   const text = item.sheet?.pitch || item.sheet?.script;
-  return text ? <p className="rounded-lg bg-white px-2.5 py-2 text-[12.5px] leading-[18px]">« {text} »</p> : <p style={{ color: C.inkSoft }}>Rien d&apos;écrit pour ce conseil : voyez la fiche.</p>;
+  return text ? <p className="rounded-lg px-2.5 py-2 text-[12.5px] leading-[18px]" style={{ background: C.raised }}>« {text} »</p> : <p style={{ color: C.inkSoft }}>Rien d&apos;écrit pour ce conseil : voyez la fiche.</p>;
 }
 
 /** 3. Fiche : posologie, contre-indications, effets indésirables — ce que PharmaBoost sait ; une rubrique vide renvoie à la notice. */

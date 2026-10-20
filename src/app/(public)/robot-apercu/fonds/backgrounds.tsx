@@ -9,19 +9,19 @@ import { ITEMS } from "../styles/styles";
 
 /**
  * Les fonds à comparer : celui de la capsule ET celui de la carte où se lit le texte (fondateur, 19 oct. 2026 : « le fond où il y a
- * le texte, pas que la bande »). Le 2 est la bannière en ligne depuis le 19 oct. au soir. `dark` : carte sombre, texte blanc.
+ * le texte, pas que la bande »). Le 9 est la bannière en ligne depuis le 19 oct. au soir. `dark` : carte sombre, texte blanc.
  */
 const BACKGROUNDS = [
   { id: "actuel", label: "0 · Ancien : vert profond, carte vert très pâle", outer: "linear-gradient(180deg,#072A25 0%,#03171A 100%)", panel: "#F4F8F6", cell: "#E9F1EE", dark: false },
   { id: "blanc", label: "1 · Carte blanc pur", outer: "linear-gradient(180deg,#072A25 0%,#03171A 100%)", panel: "#FFFFFF", cell: "#F1F4F3", dark: false },
-  { id: "creme", label: "2 · Carte crème (en ligne)", outer: "linear-gradient(180deg,#0E3B33 0%,#062019 100%)", panel: "#FFF8EC", cell: "#F6EBD6", dark: false },
+  { id: "creme", label: "2 · Carte crème", outer: "linear-gradient(180deg,#0E3B33 0%,#062019 100%)", panel: "#FFF8EC", cell: "#F6EBD6", dark: false },
   { id: "menthe", label: "3 · Carte vert menthe", outer: "linear-gradient(180deg,#0E6B55 0%,#06392E 100%)", panel: "#E3F7EE", cell: "#CDEEDF", dark: false },
   { id: "glacier", label: "4 · Carte bleu glacier, capsule bleu nuit", outer: "linear-gradient(180deg,#13254A 0%,#070F24 100%)", panel: "#EAF3FB", cell: "#D7E6F4", dark: false },
   { id: "citron", label: "5 · Carte jaune citron pâle", outer: "linear-gradient(180deg,#072A25 0%,#03171A 100%)", panel: "#FAFDE2", cell: "#EFF6C4", dark: false },
   { id: "lavande", label: "6 · Carte lavande, capsule violette", outer: "linear-gradient(180deg,#3B2266 0%,#1A0E33 100%)", panel: "#F2EEFC", cell: "#E3DAF7", dark: false },
   { id: "peche", label: "7 · Carte pêche, capsule bordeaux", outer: "linear-gradient(180deg,#5E1A2B 0%,#2A0912 100%)", panel: "#FFF0E8", cell: "#FADDCD", dark: false },
   { id: "perle", label: "8 · Carte gris perle, capsule anthracite", outer: "linear-gradient(180deg,#3A4246 0%,#1C2124 100%)", panel: "#EEF1F3", cell: "#DEE3E7", dark: false },
-  { id: "sombre", label: "9 · Tout sombre : carte vert foncé, texte blanc", outer: "linear-gradient(180deg,#072A25 0%,#03171A 100%)", panel: "#12403A", cell: "#1B5249", dark: true },
+  { id: "sombre", label: "9 · Tout sombre : carte vert foncé, texte blanc (en ligne)", outer: "linear-gradient(180deg,#072A25 0%,#03171A 100%)", panel: "#12403A", cell: "#1B5249", dark: true },
   { id: "nuit", label: "10 · Tout sombre : carte noire, texte blanc", outer: "linear-gradient(180deg,#1A1D1F 0%,#050607 100%)", panel: "#23292C", cell: "#30383C", dark: true },
 ] as const;
 
