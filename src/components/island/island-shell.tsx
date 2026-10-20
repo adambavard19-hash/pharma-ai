@@ -125,5 +125,10 @@ export const ISLAND_CSS = `
 /* La photo du produit conseil flotte doucement (fondateur, 19 oct. 2026 : effet « 1 · Flottement » de /robot-apercu/animations). */
 @keyframes isl-float { 0%,100% { transform: translateY(2px); } 50% { transform: translateY(-4px); } }
 .isl-float { animation: isl-float 2.8s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .isl-float { animation: none; } .isl-in, .isl-line, .isl-pop, .isl-cheer { animation: none; } .isl-burst { display: none; } .isl-spin, .isl-scanbar, .isl-barcode b, .isl-progress span::after, .isl-shimmer, .isl-pulse::after { animation: none; } .isl-shimmer { -webkit-text-fill-color: currentColor; } }
+/* Le nom du conseil se souligne d'un trait citron qui se dessine, une fois, à l'arrivée du conseil et à chaque conseil suivant
+   (fondateur, 19 oct. 2026 : essai « 5 · Soulignement qui se dessine » de /robot-apercu/titres). */
+[data-ile-mix-titre] { display: inline-block; position: relative; }
+[data-ile-mix-titre]::after { content: ""; position: absolute; left: 0; bottom: -3px; height: 2.5px; width: 100%; border-radius: 2px; background: #E8FF9C; transform-origin: left; animation: isl-souligne 1.1s cubic-bezier(.6,0,.2,1) .25s both; }
+@keyframes isl-souligne { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { [data-ile-mix-titre]::after { animation: none; } .isl-float { animation: none; } .isl-in, .isl-line, .isl-pop, .isl-cheer { animation: none; } .isl-burst { display: none; } .isl-spin, .isl-scanbar, .isl-barcode b, .isl-progress span::after, .isl-shimmer, .isl-pulse::after { animation: none; } .isl-shimmer { -webkit-text-fill-color: currentColor; } }
 `;
