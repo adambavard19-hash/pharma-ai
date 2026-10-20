@@ -21,7 +21,8 @@ const PILLS: IslandPill[] = [
  * écran de comptoir (le logiciel de gestion derrière), pour la section « Au comptoir » du site ; sinon l'île seule (dans
  * l'île du site). Ne joue que lorsqu'elle est à l'écran ; un geste du visiteur lui rend la main.
  */
-export function CounterIslandScene({ items, drug, alert, framed = false }: { items: IslandAdvice[]; drug: string; alert: { title: string; text: string } | null; framed?: boolean }) {
+/** `mixOnly` : toujours la bannière d'aujourd'hui (la « mix », papier ADN), le scénario n'y joue que les réponses (fondateur, 20 oct. 2026). */
+export function CounterIslandScene({ items, drug, alert, framed = false, mixOnly = false }: { items: IslandAdvice[]; drug: string; alert: { title: string; text: string } | null; framed?: boolean; mixOnly?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -37,7 +38,7 @@ export function CounterIslandScene({ items, drug, alert, framed = false }: { ite
   const { state, auto, manual, restart } = useDemoScenario(items.length, visible);
 
   // Aux conseils, la bannière du comptoir telle qu'elle est aujourd'hui (la « mix », papier ADN ; fondateur, 20 oct. 2026).
-  const island = state.stage === "advice" ? (
+  const island = mixOnly || state.stage === "advice" ? (
     <MixIsland items={items} outcomes={state.outcomes} open onOpen={() => undefined} onFinish={() => manual({ type: "go", stage: "done" })} onAnswer={(index, outcome) => manual({ type: "answer", index, outcome })} />
   ) : (
     <CounterIsland

@@ -102,10 +102,10 @@ export default async function SitePage() {
           <FlowSteps />
           {/* Réduite de près de moitié à partir de la tablette (`zoom` : tout rétrécit ensemble, rien n'est coupé), centrée. */}
           <div className="mx-auto mt-12 max-w-[1100px] md:[zoom:0.6]">
-            <CounterIslandScene framed items={HERO_ITEMS} drug={HERO_DRUG} alert={heroAlert()} />
+            <CounterIslandScene framed mixOnly items={HERO_ITEMS} drug={HERO_DRUG} alert={heroAlert()} />
           </div>
           {/* Pas « fidèle » : l'île n'a pas encore été vue dessinée sur un poste Windows. */}
-          <p className="mt-4 text-center text-[13px] text-text-tertiary">Animation de la bannière PharmaBoost, reproduite pour le site. Touchez Vendu, Non vendu ou Vente terminée pour l&apos;essayer. Médicaments, produits et prix : exemples.</p>
+          <p className="mt-4 text-center text-[13px] text-text-tertiary">Animation de la bannière PharmaBoost, reproduite pour le site. Touchez les réponses, les onglets ou les flèches pour l&apos;essayer. Médicaments, produits et prix : exemples.</p>
         </div>
       </section>
 
