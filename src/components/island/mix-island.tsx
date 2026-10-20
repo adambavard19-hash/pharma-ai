@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, ExternalLink, FileText, MessageCircle, Pill, ScanLine, Sparkles } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ExternalLink, FileText, MessageCircle, Pill, Sparkles } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import type { IslandOutcome } from "@/core/island/banner-flow";
@@ -244,13 +244,6 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                       ))}
                     </div>
                   )}
-                  <div className="mt-2 flex items-center gap-2 rounded-xl px-2.5 py-1.5" style={{ background: "#0F2F2A" }}>
-                    <ScanLine className="size-4 shrink-0" style={{ color: C.challengeBg }} aria-hidden="true" />
-                    <span className="min-w-0 flex-1 text-[11.5px] font-bold text-white">Bipez-le : il passe en vendu tout seul</span>
-                    <button type="button" onClick={() => onAnswer(index, "SOLD")} className="shrink-0 rounded-md px-2 py-1 text-[10.5px] font-semibold text-white/75 hover:bg-white/10 hover:text-white">
-                      Vendu sans bip
-                    </button>
-                  </div>
                 </>
               )}
             </div>
