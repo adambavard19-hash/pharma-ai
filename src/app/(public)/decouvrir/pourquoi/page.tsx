@@ -6,6 +6,7 @@ import { fr, KeyCell, SectionHead } from "../_components/site-shell";
 import { ExampleTag, HERO_ITEMS } from "../_components/visuals";
 import { CounterIslandStill } from "@/components/island/counter-island-still";
 import { VideoButton } from "../_components/video-dialog";
+import { Reveal } from "../_components/story";
 import { pageShare } from "../_components/share-metadata";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { cn } from "@/lib/utils";
@@ -51,7 +52,7 @@ export default function WhyPage() {
     <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
       <div className="max-w-3xl">
         <SectionHead as="h1" kicker="Pourquoi PharmaBoost" title="Et si chaque délivrance révélait tout son potentiel de conseil ?">
-          Comment ne manquer aucune opportunité de conseil au comptoir ? Votre équipe officinale peut-elle penser à tout le potentiel de conseil, à chaque délivrance ? <span className="font-semibold text-text-primary">PharmaBoost, oui.</span> Au comptoir pour l&apos;équipe, à la maison pour le patient.
+          Votre équipe peut-elle penser à tout, à chaque délivrance ? <span className="font-semibold text-text-primary">PharmaBoost, oui.</span> Au comptoir pour l&apos;équipe, à la maison pour le patient.
         </SectionHead>
         <VideoButton film="pourquoi" label="Voir en vidéo" className="mt-8" />
       </div>
@@ -60,14 +61,10 @@ export default function WhyPage() {
       <section className="mt-20 md:mt-28">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-14">
           <SectionHead n="01" kicker="Au comptoir" title="Des milliers de produits. Un patient à la fois." />
-          <div className="space-y-4 text-[17px] leading-7 lg:pt-10">
-            <p className="text-text-secondary">
-              En rayon, des milliers de références. Sur chaque ordonnance, des médicaments qui appellent un conseil ou une précaution. Avec la file qui attend, impossible de tout avoir en tête : le bon conseil passe parfois à la trappe.
-            </p>
-            <p className="font-medium text-text-primary">
-              PharmaBoost y pense avec vous. Au moment du scan, il propose les meilleures références de votre officine pour ce patient, cette ordonnance et ces médicaments. Vous décidez.
-            </p>
-          </div>
+          <Reveal className="text-[18px] leading-7 lg:pt-10">
+            <p className="text-text-secondary">Avec la file qui attend, impossible de tout avoir en tête.</p>
+            <p className="mt-2 font-semibold text-text-primary">Au scan, PharmaBoost propose le bon conseil, pris dans votre rayon. Vous décidez.</p>
+          </Reveal>
         </div>
 
         <Compare
@@ -75,14 +72,14 @@ export default function WhyPage() {
           without={
             <>
               <p className="text-[13.5px] text-text-tertiary">Ce que le pharmacien doit se rappeler, seul :</p>
-              <Questions items={["Cet antibiotique rend-il la peau sensible au soleil ?", "Une protection solaire en rayon ? Laquelle ?", "Une précaution à rappeler ?", "Trois patients attendent…"]} />
+              <Questions items={["Cet antibiotique rend-il la peau sensible au soleil ?", "Laquelle ai-je en rayon ?", "Trois patients attendent…"]} />
             </>
           }
           withPb={
             <>
               {/* « propose », pas « affiche » : la bannière montre aussi ses mises en garde, que cette vignette ne reprend pas. */}
               <p className="text-[13.5px] text-text-secondary">Au scan, la bannière propose :</p>
-              <CounterIslandStill items={[{ ...HERO_ITEMS[0], name: SOLAIRE_NAME, image: SOLAIRE }]} drug={DOXY} className="mt-2.5 [&_section]:max-w-full" />
+              <CounterIslandStill mix items={[{ ...HERO_ITEMS[0], name: SOLAIRE_NAME, image: SOLAIRE, pitchOpen: false }]} drug={DOXY} className="mt-2.5 flex justify-center [&_section]:max-w-full" />
               {/* La bannière ne dit pas de phrase : celle-ci est sur l'écran de vente (« À dire au patient »). */}
               {DOXY_COUNTER_SCRIPT && (
                 <>
@@ -107,14 +104,10 @@ export default function WhyPage() {
       <section className="mt-24 md:mt-32">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-14">
           <SectionHead n="02" kicker="À la maison" title="Plusieurs boîtes. Et beaucoup de questions." />
-          <div className="space-y-4 text-[17px] leading-7 lg:pt-10">
-            <p className="text-text-secondary">
-              Une fois rentré, le patient ne se souvient plus de tout : quel médicament le matin, lequel le soir, pendant combien de jours, et à quoi sert chacun. Il hésite, oublie une prise ou arrête trop tôt.
-            </p>
-            <p className="font-medium text-text-primary">
-              Avec PharmaBoost, il repart avec son plan conseil : la posologie, l&apos;indication de chaque médicament et vos conseils. Sur son téléphone via un QR code, par e-mail ou en version imprimée, avec des rappels.
-            </p>
-          </div>
+          <Reveal className="text-[18px] leading-7 lg:pt-10">
+            <p className="text-text-secondary">Rentré chez lui, le patient ne se souvient plus de tout.</p>
+            <p className="mt-2 font-semibold text-text-primary">Avec PharmaBoost, il repart avec son plan conseil : quoi prendre, quand, et pourquoi.</p>
+          </Reveal>
         </div>
 
         <Compare
@@ -127,7 +120,7 @@ export default function WhyPage() {
                 ))}
               </div>
               <p className="mt-4 text-[13.5px] text-text-tertiary">Les questions du patient, seul :</p>
-              <Questions items={["C'est le matin ou le soir ?", "Pendant combien de jours ?", "Celui-là, il sert à quoi ?"]} />
+              <Questions items={["Le matin ou le soir ?", "Combien de jours ?", "Celui-là, il sert à quoi ?"]} />
             </>
           }
           withPb={
@@ -171,13 +164,13 @@ export default function WhyPage() {
 /** La même situation, sans puis avec PharmaBoost, côte à côte, avec ce qu'il en résulte pour le patient. */
 function Compare({ context, without, withPb, withoutResult, withResult }: { context: ReactNode; without: ReactNode; withPb: ReactNode; withoutResult: string; withResult: string }) {
   return (
-    <div className="mt-10 rounded-[28px] border border-border-subtle bg-surface-card p-4 sm:p-6">
+    <Reveal className="mt-10 rounded-[28px] border border-border-subtle bg-surface-card p-4 sm:p-6">
       {context}
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         <Side tone="without" result={withoutResult}>{without}</Side>
         <Side tone="with" result={withResult}>{withPb}</Side>
       </div>
-    </div>
+    </Reveal>
   );
 }
 
