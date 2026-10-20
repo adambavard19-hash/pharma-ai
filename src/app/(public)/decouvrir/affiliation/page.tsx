@@ -33,15 +33,6 @@ async function loadMonthlyPriceCents(): Promise<number> {
   }
 }
 
-const AUDIENCE = [
-  { title: "Délégués et visiteurs pharmaceutiques", line: "Vous voyez des titulaires chaque semaine : PharmaBoost se présente en quelques minutes." },
-  { title: "Consultants en officine", line: "Vous aidez les pharmacies à mieux conseiller et à vendre : PharmaBoost s'inscrit dans vos recommandations." },
-  { title: "Groupements et réseaux", line: "Vous fédérez des officines : recommandez un outil commun à vos adhérents." },
-  { title: "Pharmaciens et préparateurs", line: "Vous connaissez le comptoir et vos confrères : parlez-leur de ce que vous utilisez." },
-  { title: "Experts-comptables d'officines", line: "Vous suivez la marge de vos clients pharmaciens : PharmaBoost en parle aussi." },
-  { title: "Commerciaux indépendants", line: "Vous prospectez déjà les pharmacies : ajoutez un logiciel récurrent à votre offre." },
-];
-
 const STEPS = [
   { title: "Vous postulez", line: "Quelques questions, quelques minutes : qui vous êtes, où vous êtes, votre profil." },
   { title: "Étude et accès", line: "Notre équipe étudie votre candidature. Si elle est acceptée, vous recevez votre espace affilié : votre lien personnel, votre plaquette, vos pharmacies et vos commissions." },
@@ -116,23 +107,6 @@ export default async function AffiliationPage() {
                 <span className="flex size-10 items-center justify-center rounded-xl bg-brand-100 text-brand-800" aria-hidden="true">{benefit.icon}</span>
                 <h3 className="mt-4 text-[17px] leading-snug font-semibold text-text-primary">{benefit.title}</h3>
                 <p className="mt-2 text-[14.5px] leading-6 text-text-secondary">{fr(benefit.line)}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* ---- À qui s'adresse le programme -------------------------------- */}
-      <section id="profils" className="scroll-mt-20">
-        <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-          <SectionHead kicker="Profils" title="À qui s'adresse le programme ?">
-            À celles et ceux qui côtoient des pharmacies et veulent leur recommander un outil utile.
-          </SectionHead>
-          <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {AUDIENCE.map((profile) => (
-              <li key={profile.title} className="rounded-2xl border border-border-subtle bg-surface-card p-5 sm:p-6">
-                <h3 className="text-[16.5px] leading-snug font-semibold text-text-primary">{profile.title}</h3>
-                <p className="mt-2 text-[14.5px] leading-6 text-text-secondary">{fr(profile.line)}</p>
               </li>
             ))}
           </ul>
