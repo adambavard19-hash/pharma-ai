@@ -172,7 +172,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   </span>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15.5px] leading-[19px] font-extrabold break-words">{item.sheet?.name || item.name}</p>
+                  <p key={index} data-ile-mix-titre="" className="text-[15.5px] leading-[19px] font-extrabold break-words">{item.sheet?.name || item.name}</p>
                   {(item.sheet?.reasons[0] || item.reason) && <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-[15px]" style={{ color: C.inkSoft }}>{item.sheet?.reasons[0] || item.reason}</p>}
                 </div>
                 <div className="shrink-0 text-right">
