@@ -13,7 +13,7 @@ import { islandTheme, PHARMABOOST_GREEN } from "./island-theme";
 /**
  * La bannière « mix » du poste (fondateur, 19 oct. 2026, maquette 5 choisie) : le haut reste toujours à l'écran — le meilleur
  * conseil, le challenge, la marge possible de la vente — et, à la souris, elle se déploie sur ce meilleur conseil en trois
- * temps : 1. Demandez (les deux questions, réponses cliquables), 2. Dites (le conseil à dire), 3. Fiche (posologie,
+ * temps : 1. Questions (les deux questions, réponses cliquables), 2. Discours (le conseil à dire), 3. Fiche (posologie,
  * contre-indications, effets indésirables). Les autres conseils se parcourent avec les flèches ; l'autre possibilité en
  * stock pour la même boîte est à un clic. Vendu / Non vendu restent sans clic : un conseil bipé passe en vendu.
  *
@@ -51,8 +51,8 @@ export function possibleMargin(items: readonly Pick<IslandAdvice, "margin">[]): 
 
 type Step = "ask" | "say" | "sheet";
 const STEPS: { id: Step; label: string; Icon: typeof Pill }[] = [
-  { id: "ask", label: "Demandez", Icon: MessageCircle },
-  { id: "say", label: "Dites", Icon: Sparkles },
+  { id: "ask", label: "Questions", Icon: MessageCircle },
+  { id: "say", label: "Discours", Icon: Sparkles },
   { id: "sheet", label: "Fiche", Icon: Pill },
 ];
 
@@ -251,12 +251,12 @@ function Chip({ bg, fg, children }: { bg: string; fg: string; children: ReactNod
   return <span className="inline-flex h-5 items-center rounded-full px-2 text-[10.5px] font-bold" style={{ background: bg, color: fg }}>{children}</span>;
 }
 
-/** 1. Demandez : les deux questions ; la réponse touchée dit quoi faire, et parfois un produit plus précis du stock. */
+/** 1. Questions : les deux questions ; la réponse touchée dit quoi faire, et parfois un produit plus précis du stock. */
 function Ask({ item }: { item: IslandAdvice }) {
   const ask = item.sheet?.ask ?? [];
   const answers = item.sheet?.answers ?? [];
   const [picked, setPicked] = useState<Record<number, number>>({});
-  if (ask.length === 0) return <p style={{ color: C.inkSoft }}>Les questions de ce conseil sont en cours de rédaction : passez à « Dites ».</p>;
+  if (ask.length === 0) return <p style={{ color: C.inkSoft }}>Les questions de ce conseil sont en cours de rédaction : passez à « Discours ».</p>;
   return (
     <ol className="space-y-2">
       {ask.map((question, q) => {
@@ -303,7 +303,7 @@ function Ask({ item }: { item: IslandAdvice }) {
   );
 }
 
-/** 2. Dites : le conseil en deux phrases, sinon la phrase du comptoir de la règle. */
+/** 2. Discours : le conseil en deux phrases, sinon la phrase du comptoir de la règle. */
 function Say({ item }: { item: IslandAdvice }) {
   const text = item.sheet?.pitch || item.sheet?.script;
   return text ? <p className="rounded-lg bg-white px-2.5 py-2 text-[12.5px] leading-[18px]">« {text} »</p> : <p style={{ color: C.inkSoft }}>Rien d&apos;écrit pour ce conseil : voyez la fiche.</p>;
