@@ -6,6 +6,7 @@ import { AURORE_CSS } from "@/components/island/island-aurore";
 import { MixIsland } from "@/components/island/mix-island";
 import type { IslandOutcome } from "@/core/island/banner-flow";
 import { ITEMS } from "../styles/styles";
+import type { IslandAdvice } from "@/components/island/counter-island";
 
 /**
  * L'encre ADN est celle du site (la même scène que le héros de pharmaboost.app) : elle se mélange au papier clair, elle ne se
@@ -39,11 +40,29 @@ const CSS = `
 .adn-cote { background: url(/poste/adn-helice.png) 108% 35% / 95% auto no-repeat, #EFF3F1; }
 `;
 
+/** Le conseil mis en avant porte une vraie photo studio (fond blanc) du dossier public/produits-studio : on voit la bannière telle qu'au comptoir. */
+const ARTICHAUT = "NAT&FORM ARTICHAUT BIO 800 mg 90 gélules";
+const PHOTO_ITEMS: IslandAdvice[] = ITEMS.map((item, index) => index !== 1 ? item : {
+  ...item,
+  name: ARTICHAUT,
+  image: "/produits-studio/3535400008556.jpg",
+  sheet: item.sheet && {
+    ...item.sheet,
+    name: ARTICHAUT,
+    ask: ["Est-ce pour une digestion lourde après les repas ?"],
+    answers: [
+      { ask: 0, label: "Oui", say: "Je vous propose ce complément à base d'artichaut." },
+      { ask: 0, label: "Non", say: "Je ne propose rien." },
+    ],
+    pitch: "Un complément alimentaire à base d'artichaut bio, en gélules végétales.",
+  },
+});
+
 function Banner() {
   const [outcomes, setOutcomes] = useState<(IslandOutcome | undefined)[]>([]);
   return (
     <div data-ile-style="aurore" data-isl="" className="relative z-10 flex justify-center">
-      <MixIsland items={ITEMS} outcomes={outcomes} open onOpen={() => undefined} onFinish={() => setOutcomes([])} onAnswer={(index, outcome) => setOutcomes((list) => { const next = [...list]; next[index] = outcome; return next; })} />
+      <MixIsland items={PHOTO_ITEMS} outcomes={outcomes} open onOpen={() => undefined} onFinish={() => setOutcomes([])} onAnswer={(index, outcome) => setOutcomes((list) => { const next = [...list]; next[index] = outcome; return next; })} />
     </div>
   );
 }
