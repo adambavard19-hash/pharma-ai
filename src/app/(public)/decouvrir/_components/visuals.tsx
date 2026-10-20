@@ -167,7 +167,7 @@ export function HeroVisual({ glass = false }: { glass?: boolean }) {
 
       {/* La bannière PharmaBoost, en île, par-dessus le logiciel : notre robot dedans, les deux conseils du scan. */}
       <div className="relative -mt-12 flex justify-center sm:-mt-14 sm:justify-end [&_section]:max-w-full">
-        <CounterIslandStill items={HERO_ITEMS.map((item) => ({ ...item, pitchOpen: false }))} drug={DOXY} className="w-full max-w-[500px] [&>div]:flex [&>div]:justify-center sm:[&>div]:justify-end" />
+        <CounterIslandStill mix items={HERO_ITEMS.map((item) => ({ ...item, pitchOpen: false }))} drug={DOXY} className="w-full max-w-[500px] [&>div]:flex [&>div]:justify-center sm:[&>div]:justify-end" />
       </div>
 
     </div>

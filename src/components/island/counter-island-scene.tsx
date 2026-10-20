@@ -5,6 +5,7 @@ import { RotateCcw } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { cn } from "@/lib/utils";
 import { CounterIsland, type IslandAdvice, type IslandPill } from "./counter-island";
+import { MixIsland } from "./mix-island";
 import { ISLAND_CSS } from "./island-shell";
 import { AURORE_CSS } from "./island-aurore";
 import { useDemoScenario } from "./use-demo-scenario";
@@ -35,7 +36,10 @@ export function CounterIslandScene({ items, drug, alert, framed = false }: { ite
   }, []);
   const { state, auto, manual, restart } = useDemoScenario(items.length, visible);
 
-  const island = (
+  // Aux conseils, la bannière du comptoir telle qu'elle est aujourd'hui (la « mix », papier ADN ; fondateur, 20 oct. 2026).
+  const island = state.stage === "advice" ? (
+    <MixIsland items={items} outcomes={state.outcomes} open onOpen={() => undefined} onFinish={() => manual({ type: "go", stage: "done" })} onAnswer={(index, outcome) => manual({ type: "answer", index, outcome })} />
+  ) : (
     <CounterIsland
       state={state}
       items={items}
