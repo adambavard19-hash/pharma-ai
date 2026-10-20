@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, Thermometer, TriangleAlert } from "lucide-react";
 import { fr, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
-import { HERO_ITEMS, HeroVisual, QuestionVisual, RequestVisual, StockMarginVisual, TeamVisual, ExampleTag, CureReminderVisual } from "./_components/visuals";
-import { BannerPillsInline } from "./_components/banner-mock";
+import { HERO_ITEMS, HeroVisual, QuestionVisual, RequestVisual, TeamVisual, ExampleTag, CureReminderVisual } from "./_components/visuals";
 import { VideoButton } from "./_components/video-dialog";
 import { AutoVideo } from "./_components/auto-video";
 import { CounterIslandScene } from "@/components/island/counter-island-scene";
@@ -12,6 +11,8 @@ import { loadLiveProof } from "@/server/services/site-leads";
 import { loadPublicPricing } from "@/server/services/public-pricing";
 import { formatEuros } from "@/core/billing/subscription";
 import { PricingSection } from "./_components/pricing-section";
+import { BannerPillsInline } from "./_components/banner-mock";
+import { ChoiceVisual, FlowSteps, LoadVisual, Reveal } from "./_components/story";
 import { EXAMPLES, FAQ, SAFETY, STOCK_POINTS, TEAM_POINTS } from "./_components/site-content";
 import { cn } from "@/lib/utils";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
@@ -23,12 +24,6 @@ import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
  * Les ventes au comptoir sont DÉCLARÉES (Vendu / Non vendu) : jamais présentées
  * comme lues dans le logiciel de gestion.
  */
-
-/**
- * Une ligne « libellé · valeur » des sections Stock et Équipe. Sous 360 px, la colonne de la valeur ne gardait que 110 px
- * (deux mots par ligne) : le libellé passe au-dessus. À 360 px et au-delà, rien ne change.
- */
-const POINT_ROW = "grid grid-cols-[8.5rem_1fr] items-baseline gap-4 py-4 max-[359px]:grid-cols-1 max-[359px]:gap-1.5";
 
 /**
  * L'adresse de référence de l'accueil. Posée ici et non dans le layout : le layout la transmettrait à chaque page du site,
@@ -69,8 +64,8 @@ export default async function SitePage() {
               <br />
               <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Bilan.</span>
             </h1>
-            <p className="mt-7 max-w-xl text-[17px] leading-7 text-text-secondary">
-              Au comptoir, vous scannez les boîtes comme d&apos;habitude. La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller en plus, pris dans votre rayon. Et le patient repart avec ses conseils — puis PharmaBoost assure son suivi pharmaceutique : bilan par e-mail, rappel avant la fin de sa cure.
+            <p className="mt-7 max-w-xl text-[18px] leading-7 text-text-secondary">
+              Au comptoir, vous scannez les boîtes comme d&apos;habitude. PharmaBoost vous souffle le bon conseil, pris dans votre rayon — et le patient repart avec son bilan.
             </p>
             {/* Plus de bouton « Voir la présentation » ici : elle se lance seule juste en dessous (fondateur, 20 oct. 2026). */}
           </div>
@@ -82,44 +77,119 @@ export default async function SitePage() {
         </div>
       </section>
 
-      {/* ---- Le bilan conseil, et le rappel de fin de cure ------------- */}
-      {/* Le fondateur, 17 oct. 2026 : « ça donne envie aux patients de revenir », et la pharmacie a tout intérêt à ce qu'ils reviennent. */}
-      <section id="suivi" className="scroll-mt-20 border-t border-border-subtle">
+      {/* ---- Le fil de l'accueil (fondateur, 20 oct. 2026) : le problème, ce qu'est PharmaBoost, ce que le pharmacien y gagne,
+           le bilan du patient. Peu de texte, une animation par idée. ---- */}
+
+      {/* ---- 1. Le problème ------------------------------------------ */}
+      <section id="probleme" className="scroll-mt-20 border-t border-border-subtle">
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
-          <div>
-            <SectionHead kicker="Suivi pharmaceutique · une première" title="Le premier logiciel de suivi pharmaceutique.">
-              Le conseil ne s&apos;arrête plus au comptoir. Avec son accord, le patient reçoit par e-mail le bilan de ses conseils, au nom de votre pharmacie : pourquoi chaque produit accompagne son traitement, comment l&apos;utiliser. Pour une cure — magnésium, probiotiques, plantes, vitamines —, PharmaBoost lui écrit sept jours avant la fin : sa cure se termine, il pense à revenir la renouveler chez vous.
+          <Reveal>
+            <SectionHead kicker="Le constat" title="Au comptoir, on ne peut pas penser à tout.">
+              Une ordonnance chargée, un patient pressé, la file qui s&apos;allonge : le pharmacien est vite débordé. Le conseil qui accompagnerait le traitement passe à la trappe. PharmaBoost est là pour l&apos;accompagner et le soulager.
             </SectionHead>
-            <ul className="mt-8 flex flex-wrap gap-2">
-              {["Bilan par e-mail, avec l'accord du patient", "Rappel 7 jours avant la fin de la cure", "Le patient revient à la pharmacie", "Adresse effacée après l'envoi"].map((t) => (
-                <li key={t} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-4 py-2 text-[14px] font-medium text-text-primary">
-                  <Check className="size-4 text-brand-600" /> {fr(t)}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-6 text-[14.5px] leading-6 text-text-secondary">{fr("Un patient qui revient, c'est une cure renouvelée au comptoir — et l'occasion d'un nouveau conseil. Le pharmacien garde la main : le rappel invite à repasser, c'est lui qui dit s'il faut poursuivre.")}</p>
-          </div>
-          <div>
-            <CureReminderVisual />
-            <p className="mt-4 text-center text-[12.5px] text-text-tertiary">
-              Le bilan et le rappel, envoyés au nom de la pharmacie · <ExampleTag className="text-[10.5px]" />
-            </p>
-          </div>
+          </Reveal>
+          <LoadVisual />
         </div>
       </section>
 
-      {/* ---- La bannière du comptoir, vivante -------------------------- */}
-      <section id="banniere" className="scroll-mt-20 border-t border-border-subtle">
+      {/* ---- 2. Qu'est-ce que PharmaBoost ? ---------------------------- */}
+      <section id="banniere" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-          <SectionHead kicker="Au comptoir" title="Une petite île, à côté de votre logiciel.">
-            Notre robot y vit : il attend votre prochain scan, coche son analyse, montre les conseils pris dans votre rayon, rappelle les mises en garde — comme les minéraux à prendre à distance d&apos;une cycline — et reste là jusqu&apos;à la fin de la vente. Elle ne prend jamais la main sur votre logiciel de gestion.
-          </SectionHead>
+          <Reveal>
+            <SectionHead kicker="Qu'est-ce que PharmaBoost ?" title="Un scan. Le bon conseil. Tout de suite." center>
+              La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller en plus, pris dans votre rayon. Chaque médicament est suivi d&apos;un ou plusieurs conseils, et de vos associations.
+            </SectionHead>
+          </Reveal>
+          <FlowSteps />
           {/* Réduite de près de moitié à partir de la tablette (`zoom` : tout rétrécit ensemble, rien n'est coupé), centrée. */}
-          <div className="mx-auto mt-10 max-w-[1100px] md:[zoom:0.6]">
+          <div className="mx-auto mt-12 max-w-[1100px] md:[zoom:0.6]">
             <CounterIslandScene framed items={HERO_ITEMS} drug={HERO_DRUG} alert={heroAlert()} />
           </div>
           {/* Pas « fidèle » : l'île n'a pas encore été vue dessinée sur un poste Windows. */}
           <p className="mt-4 text-center text-[13px] text-text-tertiary">Animation de la bannière PharmaBoost, reproduite pour le site. Touchez Vendu, Non vendu ou Vente terminée pour l&apos;essayer. Médicaments, produits et prix : exemples.</p>
+        </div>
+      </section>
+
+      {/* ---- 3. Pour le pharmacien ------------------------------------- */}
+      <section id="stock-marge" className="scroll-mt-20 border-t border-border-subtle">
+        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
+          <div className="order-last lg:order-none">
+            <ChoiceVisual />
+            {/* Ce que la bannière montre du même produit, au comptoir : les pastilles, dans leur ordre. */}
+            <div className="mx-auto mt-4 flex max-w-[520px] flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border-subtle bg-surface-card px-5 py-3.5">
+              <span className="text-[13px] text-text-secondary">Au comptoir, sur la bannière :</span>
+              <BannerPillsInline item={{ challenge: true, shortDate: "30/11/26", stock: "IN_STOCK", quantity: 29 }} />
+            </div>
+          </div>
+          <Reveal>
+            <SectionHead kicker="Pour le pharmacien" title="Le produit conseil parfait, directement au scan.">
+              Parmi les produits qui répondent au besoin du patient, PharmaBoost met en premier celui qui arrange votre pharmacie.
+            </SectionHead>
+            <ul className="mt-8 grid gap-2.5 sm:grid-cols-2">
+              {["En stock, avec la quantité", "Vos laboratoires préférés", "Vos dates courtes", "Vos challenges en cours"].map((t) => (
+                <li key={t} className="flex items-center gap-2.5 rounded-2xl border border-border-subtle bg-surface-card px-4 py-3 text-[15px] font-semibold text-text-primary">
+                  <Check className="size-4 shrink-0 text-brand-600" /> {t}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-5 text-[14px] leading-6 text-text-secondary">
+              {fr(STOCK_POINTS[0].value)}. {fr(STOCK_POINTS[2].value)}. {fr(STOCK_POINTS[2].hint ?? "")}
+            </p>
+            {live && (
+              <div className="mt-8 grid grid-cols-3 gap-4">
+                <Figure label="Officines" value={String(live.pharmacies)} />
+                <Figure label="Conseils acceptés" value={live.acceptedAdvices.toLocaleString("fr-FR")} />
+                <Figure label="Ventes additionnelles" value={formatEuros(live.attributedCents)} />
+              </div>
+            )}
+            <VideoButton film="avantages" label="Voir les avantages" className="mt-8" />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ---- 4. Le suivi : le bilan du patient, une première ----------- */}
+      <section id="suivi" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
+        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
+          <Reveal>
+            <SectionHead kicker="Suivi pharmaceutique · une première" title="Pour la première fois, le patient repart avec un vrai bilan.">
+              Ses médicaments, les conseils qui les accompagnent, comment les prendre : tout est dans son bilan, envoyé par e-mail au nom de votre pharmacie. Et pour une cure, il sait quand revenir : PharmaBoost lui écrit sept jours avant la fin.
+            </SectionHead>
+            <ul className="mt-8 flex flex-wrap gap-2">
+              {["Bilan par e-mail, avec l'accord du patient", "Rappel 7 jours avant la fin de la cure", "Le patient revient à la pharmacie"].map((t) => (
+                <li key={t} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-app px-4 py-2 text-[14px] font-medium text-text-primary">
+                  <Check className="size-4 text-brand-600" /> {fr(t)}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+          <Reveal delay={2}>
+            <CureReminderVisual />
+            <p className="mt-4 text-center text-[12.5px] text-text-tertiary">
+              Le bilan et le rappel, envoyés au nom de la pharmacie · <ExampleTag className="text-[10.5px]" />
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ---- 5. L'équipe : les résultats de chacun, pour motiver (fondateur, 20 oct. 2026) ---- */}
+      <section id="equipe" className="scroll-mt-20 border-t border-border-subtle">
+        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:gap-16">
+          <Reveal>
+            <SectionHead kicker="Votre équipe" title="Les résultats de chacun. Toute l'équipe motivée.">
+              Chaque comptoir est attribué à un collaborateur : chacun voit ses conseils proposés et validés, sa place au classement et sa progression dans les challenges. De quoi donner envie de conseiller.
+            </SectionHead>
+            <ul className="mt-8 grid gap-2.5 sm:grid-cols-2">
+              {TEAM_POINTS.map((p) => (
+                <li key={p.label} className="flex items-start gap-2.5 rounded-2xl border border-border-subtle bg-surface-card px-4 py-3 text-[14.5px] font-semibold text-text-primary">
+                  <Check className="mt-0.5 size-4 shrink-0 text-brand-600" /> {fr(p.value)}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-5 text-[13.5px] leading-6 text-text-tertiary">Au comptoir, les ventes sont déclarées : Vendu ou Non vendu, en un clic sur la bannière.</p>
+          </Reveal>
+          <Reveal delay={2}>
+            <TeamVisual />
+          </Reveal>
         </div>
       </section>
 
@@ -188,65 +258,6 @@ export default async function SitePage() {
             </ul>
             <p className="border-t border-border-subtle px-6 py-3.5 text-[13px] text-text-tertiary">Au comptoir, vous notez Vendu ou Non vendu. Le conseil reste votre décision.</p>
           </div>
-        </div>
-      </section>
-
-      {/* ---- Stock et marge ----------------------------------------- */}
-      <section id="stock-marge" className="scroll-mt-20">
-        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1.05fr_0.95fr]">
-          {/* Le texte est bien plus haut que le visuel : centré, le visuel flottait au milieu d'un grand vide. Il accompagne
-              désormais la lecture (collant) ; sur téléphone, il vient après le titre de la section, comme partout ailleurs. */}
-          <div className="order-last lg:order-none">
-            <div className="lg:sticky lg:top-28">
-              <StockMarginVisual />
-              {/* Ce que la bannière montre du même produit, au comptoir : les pastilles, dans leur ordre. */}
-              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border-subtle bg-surface-card px-5 py-3.5">
-                <span className="text-[13px] text-text-secondary">Au comptoir, sur la bannière :</span>
-                <BannerPillsInline item={{ challenge: true, shortDate: "30/11/26", stock: "IN_STOCK", quantity: 29 }} />
-              </div>
-            </div>
-          </div>
-          <div>
-            <SectionHead kicker="Stock et marge" title="Votre rayon. Votre marge. Sous les yeux." />
-            <dl className="mt-8 divide-y divide-border-subtle border-y border-border-subtle">
-              {STOCK_POINTS.map((p) => (
-                <div key={p.label} className={POINT_ROW}>
-                  <dt className="font-mono text-[11.5px] tracking-[0.14em] text-text-tertiary uppercase">{p.label}</dt>
-                  <dd>
-                    <span className="block text-[16px] font-semibold text-text-primary">{fr(p.value)}</span>
-                    {p.hint && <span className="mt-1.5 block text-[14px] leading-6 font-normal text-text-secondary">{fr(p.hint)}</span>}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            {live && (
-              <div className="mt-8 grid grid-cols-3 gap-4">
-                <Figure label="Officines" value={String(live.pharmacies)} />
-                <Figure label="Conseils acceptés" value={live.acceptedAdvices.toLocaleString("fr-FR")} />
-                <Figure label="Ventes additionnelles" value={formatEuros(live.attributedCents)} />
-              </div>
-            )}
-            <VideoButton film="avantages" label="Voir les avantages" className="mt-8" />
-          </div>
-        </div>
-      </section>
-
-      {/* ---- Votre équipe ------------------------------------------- */}
-      <section id="equipe" className="scroll-mt-20 border-y border-border-subtle bg-surface-card">
-        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-          <div>
-            <SectionHead kicker="Votre équipe" title="Un comptoir, une personne. Les résultats de chacun." />
-            <dl className="mt-8 divide-y divide-border-subtle border-y border-border-subtle">
-              {TEAM_POINTS.map((p) => (
-                <div key={p.label} className={POINT_ROW}>
-                  <dt className="font-mono text-[11.5px] tracking-[0.14em] text-text-tertiary uppercase">{p.label}</dt>
-                  <dd className="text-[16px] font-semibold text-text-primary">{fr(p.value)}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-5 text-[13.5px] leading-6 text-text-tertiary">Au comptoir, les ventes sont déclarées : Vendu ou Non vendu, en un clic sur la bannière.</p>
-          </div>
-          <TeamVisual />
         </div>
       </section>
 
