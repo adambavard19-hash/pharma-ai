@@ -28,6 +28,15 @@ const CSS = `
 .adn-clair [data-ile-mix-carte] { background: rgba(255,255,255,.42) !important; }
 .adn-clair [data-ile-mix-carte] [role=tab] { color: #4D6B64 !important; }
 .adn-clair [data-ile-mix-carte] [role=tab][aria-selected=true] { color: #E8FF9C !important; }
+/* B amélioré : la carte devient du verre givré (l'ADN reste visible mais flouté derrière le texte), le texte du haut gagne un halo
+   blanc, le soulignement passe en vert foncé (le citron disparaît sur le papier clair). */
+.adn-net [data-ile-mix-carte] { background: rgba(255,255,255,.84) !important; backdrop-filter: blur(5px) saturate(1.1); -webkit-backdrop-filter: blur(5px); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 8px 24px -14px rgba(15,47,42,.35) !important; }
+.adn-net [data-ile-mix] :not([data-ile-mix-carte]):not([data-ile-mix-carte] *):not(.aur-btn):not([class*=rounded-full]) { text-shadow: 0 0 6px #fff, 0 0 2px #fff; font-weight: 700; }
+.adn-net [data-ile-mix] .aur-btn { background: rgba(255,255,255,.75) !important; }
+.adn-net [data-ile-mix-titre]::after { background: #1F8A5B !important; }
+.adn-net [data-ile-mix-carte] p, .adn-net [data-ile-mix-carte] li { color: #0A2622 !important; }
+.adn-net [data-ile-mix] [class*=rounded], .adn-net [data-ile-mix] [class*=rounded] * { text-shadow: none !important; }
+.adn-cote { background: url(/poste/adn-helice.png) 108% 35% / 95% auto no-repeat, #EFF3F1; }
 `;
 
 function Banner() {
@@ -72,6 +81,20 @@ export function DnaBanners() {
           <Sample className="adn-papier adn-clair" label="B · Tout en papier ADN, texte foncé" hint="Toute la bannière comme le site : papier clair, encre ADN visible à travers une carte voilée, texte vert foncé.">
             <div className="flex justify-center rounded-xl bg-[#F3F5F7] p-4">
               <div className="adn-fond-papier relative isolate overflow-hidden rounded-[22px] shadow-[0_18px_40px_-14px_rgba(0,0,0,0.35)]">
+                <Banner />
+              </div>
+            </div>
+          </Sample>
+          <Sample className="adn-papier adn-clair adn-net" label="B+ · Papier ADN, carte en verre givré" hint="Comme la B, mais l'ADN est flouté derrière la carte et le texte est plus foncé : il se lit d'un coup d'œil. Le nom est souligné en vert.">
+            <div className="flex justify-center rounded-xl bg-[#F3F5F7] p-4">
+              <div className="adn-fond-papier relative isolate overflow-hidden rounded-[22px] shadow-[0_18px_40px_-14px_rgba(0,0,0,0.35)]">
+                <Banner />
+              </div>
+            </div>
+          </Sample>
+          <Sample className="adn-papier adn-clair adn-net" label="B++ · Comme B+, l'hélice sur le côté" hint="L'hélice passe sur le bord droit : elle ne croise plus le texte du haut, la carte reste givrée.">
+            <div className="flex justify-center rounded-xl bg-[#F3F5F7] p-4">
+              <div className="adn-cote relative isolate overflow-hidden rounded-[22px] shadow-[0_18px_40px_-14px_rgba(0,0,0,0.35)]">
                 <Banner />
               </div>
             </div>
