@@ -8,7 +8,7 @@ const NAV = [
   // La bannière du poste de caisse d'abord : c'est ce que l'équipe voit au comptoir.
   { href: "/decouvrir#banniere", label: "Au comptoir" },
   { href: "/decouvrir#suivi", label: "Suivi pharmaceutique" },
-  { href: "/decouvrir#stock-marge", label: "Stock et marge" },
+  // « Stock et marge » retiré du menu (fondateur, 20 oct. 2026) : la section reste sur l'accueil.
   { href: "/decouvrir/pourquoi", label: "Pourquoi" },
   { href: "/decouvrir#tarif", label: "Tarif" },
   // Le programme d'affiliation, dans le menu principal : 10 à 20 % (paliers) de l'abonnement de chaque pharmacie apportée, chaque mois.
