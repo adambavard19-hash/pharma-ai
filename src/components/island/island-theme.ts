@@ -44,4 +44,26 @@ export const MIX_DARK = {
   dateFg: "#FFB4AC",
   lowFg: "#FFC46B",
   outFg: "#FF9A9A",
+  raisedInk: "#F2FFF9",
+};
+
+/**
+ * La carte de la bannière « mix » sur le papier ADN (essai « B+ · Papier ADN, carte en verre givré » de /robot-apercu/adn,
+ * choisi par le fondateur le 20 oct. 2026) : verre blanc givré, texte vert foncé ; les surfaces qui ressortent (onglet choisi,
+ * réponses, phrase à dire) restent vert profond, texte clair.
+ */
+export const MIX_PAPER = {
+  panel: "rgba(255,255,255,0.84)",
+  cell: "rgba(15,47,42,0.08)",
+  raised: "#0F2F2A",
+  raisedInk: "#F2FFF9",
+  ink: "#0A2622",
+  inkSoft: "#3F5E57",
+  line: "rgba(15,47,42,0.14)",
+  pickLine: "rgba(15,47,42,0.28)",
+  numberFg: "#247061",
+  dateBg: "rgba(200,50,40,0.12)",
+  dateFg: "#A3241B",
+  lowFg: "#9A5600",
+  outFg: "#A3241B",
 };

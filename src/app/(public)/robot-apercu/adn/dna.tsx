@@ -85,7 +85,7 @@ export function DnaBanners() {
         <h1 className="text-[24px] font-bold text-[#0F2F2A]">La bannière avec l&apos;ADN du site</h1>
         <p className="mt-1 text-[14px] text-[#4B6A62]">L&apos;hélice d&apos;ADN de la page d&apos;accueil de pharmaboost.app, en image fixe (l&apos;hélice animée du site serait trop lourde pour un poste de comptoir). En premier, la bannière que vous avez aujourd&apos;hui, pour comparer.</p>
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <Sample label="0 · Votre bannière actuelle" hint="Sans ADN : carte vert foncé, texte blanc, nom souligné en citron.">
+          <Sample label="0 · Votre bannière en ligne" hint="La B+ choisie le 20 oct. 2026 : papier ADN, carte en verre givré.">
             <div className="rounded-xl bg-[#F3F5F7] p-4">
               <Banner />
             </div>

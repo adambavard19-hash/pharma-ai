@@ -8,7 +8,7 @@ import type { IslandOutcome } from "@/core/island/banner-flow";
 import { Robot } from "@/components/robot";
 import { AnswerProduct, type IslandAdvice } from "./counter-island";
 import { IslandShell } from "./island-shell";
-import { islandTheme, MIX_DARK, PHARMABOOST_GREEN } from "./island-theme";
+import { islandTheme, MIX_PAPER, PHARMABOOST_GREEN } from "./island-theme";
 
 /**
  * La bannière « mix » du poste (fondateur, 19 oct. 2026, maquette 5 choisie) : le haut reste toujours à l'écran — le meilleur
@@ -20,7 +20,7 @@ import { islandTheme, MIX_DARK, PHARMABOOST_GREEN } from "./island-theme";
  * L'ancienne bannière (`CounterIsland` compacte) reste joignable : `?banniere=ancienne` (voir poste-island.tsx).
  */
 
-const C = islandTheme({ ...BANNER.colors, ...PHARMABOOST_GREEN, ...MIX_DARK });
+const C = islandTheme({ ...BANNER.colors, ...PHARMABOOST_GREEN, ...MIX_PAPER });
 const T = BANNER.text;
 
 /** « 4,79 € » → 479 ; rien de lisible → 0. */
@@ -101,11 +101,11 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
           <button type="button" data-ile-replie="" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
             <Robot size={30} mood="happy" look={look} label="Le robot PharmaBoost" />
             <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2 text-[13.5px] leading-[18px] font-semibold tracking-[-0.01em] text-[#ECFFF6]">
+              <span className="flex items-center gap-2 text-[13.5px] leading-[18px] font-semibold tracking-[-0.01em] text-[#0F2F2A]">
                 {aurore && <span className="aur-dot shrink-0" aria-hidden="true" />}
                 <span className="truncate">{soldIndexes.length > 0 ? `✓ ${soldIndexes.length} vendu${soldIndexes.length > 1 ? "s" : ""}${soldMargin > 0 ? ` · +${eurosOf(soldMargin)} de marge` : ""}` : best.name}</span>
               </span>
-              <span className="block truncate text-[11px] leading-[15px] text-[#9FCBBB]">
+              <span className="block truncate text-[11px] leading-[15px] text-[#3F5E57]">
                 {items.length} conseil{items.length > 1 ? "s" : ""}
                 {total > 0 ? ` · jusqu'à ${eurosOf(total)} de marge` : ""}
                 {!open ? " · survolez" : ""}
@@ -136,7 +136,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
               {challengedBoxes.map((box) => (
                 <span key={box.id} className="block">
                   {/^challenge\b/i.test(box.challenge ?? "") ? box.challenge : `Challenge ${box.challenge}`} : {box.name}
-                  {box.reward ? <span className="font-medium text-white/80"> · {box.reward}</span> : null}
+                  {box.reward ? <span className="font-medium text-[#0F2F2A]/80"> · {box.reward}</span> : null}
                 </span>
               ))}
             </span>
@@ -146,13 +146,13 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
         {open && (
           <div className="px-2 pb-2">
             <div className="flex items-center gap-2 px-1 pb-1.5">
-              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[#9FCBBB]">
+              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[#3F5E57]">
                 {position === 0 ? "À proposer en premier" : `Conseil ${position + 1} sur ${order.length}`}
                 {item.drug ? ` · pour ${item.drug}` : ""}
               </span>
               {order.length > 1 && (
                 <>
-                  <button type="button" aria-label="Conseil précédent" onClick={() => go(position - 1)} className="inline-flex size-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20">
+                  <button type="button" aria-label="Conseil précédent" onClick={() => go(position - 1)} className="inline-flex size-7 items-center justify-center rounded-full bg-[#0F2F2A]/10 text-[#0F2F2A] hover:bg-[#0F2F2A]/20">
                     <ChevronLeft className="size-4" aria-hidden="true" />
                   </button>
                   <button type="button" aria-label="Conseil suivant" onClick={() => go(position + 1)} className="inline-flex size-7 items-center justify-center rounded-full" style={{ background: C.accent, color: "#04261A" }}>
@@ -238,7 +238,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                     <div className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
                       <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre possibilité en stock</p>
                       {alternatives.slice(0, 2).map(({ i, pos }) => (
-                        <button key={i} type="button" onClick={() => go(pos)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-white/10">
+                        <button key={i} type="button" onClick={() => go(pos)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-[#0F2F2A]/5">
                           <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{items[i].name}</span>
                           {items[i].price && items[i].stock !== "UNKNOWN" && <span className="shrink-0 text-[11.5px] font-bold tabular-nums" style={{ color: C.numberFg }}>{items[i].price}</span>}
                           <ChevronRight className="size-3.5 shrink-0" style={{ color: C.inkSoft }} aria-hidden="true" />
@@ -315,7 +315,7 @@ function Ask({ item }: { item: IslandAdvice }) {
                       return next;
                     })}
                     className="h-7 rounded-full border px-2.5 text-[11.5px] font-semibold"
-                    style={picked[q] === n ? { background: C.pick, borderColor: C.pick, color: "#FFFFFF" } : { background: C.raised, borderColor: C.pickLine, color: C.ink }}
+                    style={picked[q] === n ? { background: C.pick, borderColor: C.pick, color: "#FFFFFF" } : { background: C.raised, borderColor: C.pickLine, color: C.raisedInk }}
                   >
                     {choice.label}
                   </button>
@@ -338,7 +338,7 @@ function Ask({ item }: { item: IslandAdvice }) {
 /** 2. Discours : le conseil en deux phrases, sinon la phrase du comptoir de la règle. */
 function Say({ item }: { item: IslandAdvice }) {
   const text = item.sheet?.pitch || item.sheet?.script;
-  return text ? <p className="rounded-lg px-2.5 py-2 text-[12.5px] leading-[18px]" style={{ background: C.raised }}>« {text} »</p> : <p style={{ color: C.inkSoft }}>Rien d&apos;écrit pour ce conseil : voyez la fiche.</p>;
+  return text ? <p className="rounded-lg px-2.5 py-2 text-[12.5px] leading-[18px]" style={{ background: C.raised, color: C.raisedInk }}>« {text} »</p> : <p style={{ color: C.inkSoft }}>Rien d&apos;écrit pour ce conseil : voyez la fiche.</p>;
 }
 
 /** 3. Fiche : posologie, contre-indications, effets indésirables — ce que PharmaBoost sait ; une rubrique vide renvoie à la notice. */
