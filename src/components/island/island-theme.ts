@@ -5,17 +5,18 @@ export function islandTheme<T extends Record<string, string | number>>(colors: T
 
 /**
  * L'habit de la bannière choisi par le fondateur le 19 oct. 2026 (essai « C — Vert PharmaBoost » de /robot-apercu/styles) : vert
- * profond et jaune citron, comme le site et Instagram, texte plus gras.
+ * profond et jaune citron, comme le site et Instagram, texte plus gras. Le soir même, la carte où se lit le texte passe en crème
+ * (essai « 2 · Carte crème » de /robot-apercu/fonds).
  */
 export const PHARMABOOST_GREEN = {
-  bg: "#0F2F2A",
+  bg: "#0E3B33",
   accent: "#E8FF9C",
   glow: "#E8FF9C",
-  panel: "#F4F8F6",
+  panel: "#FFF8EC",
   ink: "#0F2F2A",
   inkSoft: "#4D6B64",
-  line: "#DCE7E2",
-  cell: "#E9F1EE",
+  line: "#EEDFC4",
+  cell: "#F6EBD6",
   pick: "#247061",
   pickLine: "#B9CFC6",
   number: "rgba(36,112,97,0.14)",
