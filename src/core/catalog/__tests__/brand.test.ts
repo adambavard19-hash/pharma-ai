@@ -90,3 +90,11 @@ describe("productMatchesBrand — ce produit est-il de cette marque ?", () => {
     }
   });
 });
+
+describe("un laboratoire dont le nom n'est pas sur les boîtes (19 oct. 2026)", () => {
+  it("un challenge « Pileje » (ou « Pilège ») couvre Lactibiane et Babybiane, pas Ergyphilus", () => {
+    expect(productMatchesBrand({ name: "LACTIBIANE IMEDIA Pdr orod 4St", brand: null }, brandKey("PiLeJe"))).toBe(true);
+    expect(productMatchesBrand({ name: "BABYBIANE IMEDIA Pdr 7Sach/1,5g", brand: null }, brandKey("Pilège"))).toBe(true);
+    expect(productMatchesBrand({ name: "ERGYPHILUS CONF GELU BT 60", brand: null }, brandKey("Pileje"))).toBe(false);
+  });
+});

@@ -176,6 +176,7 @@ const toAdvice = (entry: HostEntry): IslandAdvice[] =>
     drug: item.drug || undefined,
     reason: item.reason || undefined,
     challenge: Boolean(item.challenge),
+    challengeLabel: item.challenge || undefined,
     shortDate: item.shortDate || undefined,
     stock: item.availability as IslandAdvice["stock"],
     quantity: item.quantity !== "" && Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : undefined,
@@ -598,6 +599,7 @@ export function PosteIsland() {
             onOpen={openIsland}
             onFinish={finish}
             onAnswer={islandProps.onAnswer}
+            boxes={entry.boxes ?? []}
           />
         ) : folded && entry && (view.side === "gauche" || view.side === "droite") ? (
           <IslandShell width={SIDE_FOLDED_WIDTH} tone="accent" contentKey="replie-cote" label="Conseils de la vente (survolez pour les voir)">

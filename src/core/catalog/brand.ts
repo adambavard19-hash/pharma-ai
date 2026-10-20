@@ -37,5 +37,17 @@ export function brandKey(label: string): string {
 export function productMatchesBrand(product: { name: string; brand?: string | null }, key: string): boolean {
   if (!key) return false;
   if (product.brand && brandKey(product.brand) === key) return true;
-  return nameCarriesBrand(product.name, key, product.brand ?? null);
+  if (nameCarriesBrand(product.name, key, product.brand ?? null)) return true;
+  // Un laboratoire dont le nom n'est pas sur ses boîtes : ses gammes le représentent.
+  return (LABORATORY_RANGES[key] ?? []).some((range) => (product.brand && brandKey(product.brand) === range) || nameCarriesBrand(product.name, range, product.brand ?? null));
 }
+
+/**
+ * Les gammes d'un laboratoire dont le nom n'apparaît pas sur les produits (fondateur, 19 oct. 2026 : un challenge « Pileje » doit
+ * couvrir Lactibiane Imedia, dont l'export du LGPI ne donne ni la marque ni le laboratoire). Clé : le nom du laboratoire comme
+ * `brandKey` le lit, avec ses graphies courantes ; valeurs : les gammes, en `brandKey`. Seulement des gammes certaines.
+ */
+export const LABORATORY_RANGES: Record<string, string[]> = {
+  pileje: ["lactibiane", "babybiane", "phytostandard"],
+  pilege: ["lactibiane", "babybiane", "phytostandard"],
+};

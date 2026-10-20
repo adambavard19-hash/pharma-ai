@@ -1,5 +1,6 @@
 import { normalizeSearchText } from "@/core/reference/search";
-import type { AdviceOpportunityResult, CatalogProduct, PatientContext, ScoredRecommendation } from "../types";
+import { unitMarginHt } from "@/core/catalog/margin";
+import type { AdviceOpportunityResult, CatalogProduct, PatientContext, ScoredAlternative, ScoredRecommendation } from "../types";
 import { suggestionVigilances } from "./population-vigilance";
 
 /**
@@ -84,6 +85,77 @@ export const ASSOCIATION_SKIP_LABELS: Record<AssociationSkipReason, string> = {
   ALREADY_PROPOSED: "le produit conseillé est déjà proposé pour un autre conseil",
   LIMIT: `limite de ${MAX_ASSOCIATION_PER_LINE} associations par boîte scannée (${MAX_ASSOCIATION_ADVICE} par vente)`,
 };
+
+/** Combien d'autres produits du stock une association garde en réserve, si le patient ne veut pas du produit conseillé. */
+/** Minuscules, sans accents : les mots se comparent ainsi. */
+const fold = (value: string): string => normalizeSearchText(value).toLowerCase();
+
+export const MAX_ASSOCIATION_ALTERNATIVES = 2;
+
+/**
+ * Les mots qui changent l'USAGE d'un produit d'une même catégorie : la voie (une crème n'est pas une gélule) et la personne (un
+ * produit pour enfant n'est pas celui de l'adulte). Un mot présent dans un nom et pas dans l'autre écarte le candidat.
+ */
+const USAGE_WORDS: [string, RegExp][] = [
+  ["peau", /\b(topic|topique|creme|baume|lotion|pommade|onguent|gel douche|lait corps|serum)\b/],
+  ["bouche", /\b(bucco|buccodental|dentifrice|bain de bouche|gingival)\b/],
+  ["nez", /\b(nasal|narine|spray nez)\b/],
+  ["yeux", /\b(collyre|oculaire|yeux)\b/],
+  ["intime", /\b(intime|vaginal|ovule|gyneco)\b/],
+  ["cheveux", /\b(shampo\w*|capillaire|cheveux)\b/],
+  ["enfant", /\b(enfant|enfants|junior|kids?|bebe|baby\w*|nourrisson|pediatrique)\b/],
+];
+const usageOf = (name: string): Set<string> => {
+  const text = fold(name);
+  return new Set(USAGE_WORDS.filter(([, pattern]) => pattern.test(text)).map(([usage]) => usage));
+};
+
+/** Les étiquettes d'usage d'un produit : celles qui ne sont pas tirées de son propre nom ou de sa marque (« lactibiane », « 4st »). */
+const needTagsOf = (product: CatalogProduct): Set<string> => {
+  const words = new Set(fold(`${product.name} ${product.brand ?? ""}`).split(/[^a-z0-9]+/).filter(Boolean));
+  return new Set(product.matchingTags.map((tag) => fold(tag)).filter((tag) => tag && !tag.split(/[^a-z0-9]+/).every((word) => !word || words.has(word))));
+};
+
+/**
+ * Si le patient ne veut pas du produit conseillé (fondateur, 19 oct. 2026 : « il ne veut pas prendre le Lactibiane Imedia : trouve
+ * dans le stock de chaque pharmacie une alternative ») : d'autres produits de SON stock qui servent au même usage — même
+ * catégorie, TOUTES les étiquettes d'usage du produit conseillé, même voie, même public — remis sans ordonnance et sûrs pour ce
+ * patient. Un produit sans étiquette d'usage n'a pas d'alternative : rien plutôt qu'un produit au hasard.
+ *
+ * Deux au plus : le plus proche du produit conseillé (même gamme, même forme), puis le plus proche d'une AUTRE marque — le patient
+ * qui refuse une marque n'attend pas sa sœur. À proximité égale, la meilleure marge HT, puis le stock.
+ */
+export function associationAlternatives(args: {
+  advice: CatalogProduct;
+  catalog: CatalogProduct[];
+  excluded: ReadonlySet<string>;
+  blockedProductIds: ReadonlySet<string>;
+}): CatalogProduct[] {
+  const need = needTagsOf(args.advice);
+  if (need.size === 0) return [];
+  const usage = usageOf(args.advice.name);
+  const tags = new Set(args.advice.matchingTags.map((tag) => fold(tag)));
+  const brandOf = (product: CatalogProduct) => fold(product.brand ?? product.name.split(/\s+/)[0] ?? "");
+  const margin = (product: CatalogProduct) => unitMarginHt(product)?.marginCents ?? 0;
+  const candidates = args.catalog
+    .filter((candidate) => {
+      if (candidate.id === args.advice.id || args.excluded.has(candidate.id) || args.blockedProductIds.has(candidate.id)) return false;
+      if (!candidate.isActive || candidate.stockQuantity <= 0 || candidate.prescriptionConditions.length > 0 || candidate.salePriceCents <= 0) return false;
+      if (candidate.category !== args.advice.category) return false;
+      const theirs = needTagsOf(candidate);
+      if (![...need].every((tag) => theirs.has(tag))) return false;
+      const their = usageOf(candidate.name);
+      return their.size === usage.size && [...usage].every((word) => their.has(word));
+    })
+    .map((candidate) => ({ candidate, close: candidate.matchingTags.filter((tag) => tags.has(fold(tag))).length }))
+    .sort((a, b) => b.close - a.close || margin(b.candidate) - margin(a.candidate) || b.candidate.stockQuantity - a.candidate.stockQuantity || a.candidate.name.localeCompare(b.candidate.name, "fr"));
+  const first = candidates[0]?.candidate;
+  if (!first) return [];
+  const other = candidates.find(({ candidate }) => candidate !== first && brandOf(candidate) !== brandOf(args.advice) && brandOf(candidate) !== brandOf(first))?.candidate
+    ?? candidates.find(({ candidate }) => candidate !== first && brandOf(candidate) !== brandOf(args.advice))?.candidate
+    ?? candidates[1]?.candidate;
+  return [first, ...(other ? [other] : [])].slice(0, MAX_ASSOCIATION_ALTERNATIVES);
+}
 
 export type AssociationSkip = { ruleId: string; reason: AssociationSkipReason };
 
@@ -188,12 +260,16 @@ export function buildAssociationAdvice(args: {
 
   const opportunities: AdviceOpportunityResult[] = [];
   const recommendations: ScoredRecommendation[] = [];
+  // Une alternative n'est jamais ce qui est déjà dans la vente ou déjà proposé (par le moteur ou par une autre association).
+  const taken = new Set<string>([...inSale, ...args.alreadyProposedProductIds, ...retained.map((group) => group.advice.id)]);
   retained.forEach((group, index) => {
     const { advice, rules: groupRules, triggers } = group;
     const names = listNames(triggers.map((trigger) => trigger.name));
     // La phrase du pharmacien qui prime : la première association (dans l'ordre choisi) qui en porte une.
     const sentence = groupRules.map((rule) => rule.sentence?.trim()).find((text): text is string => Boolean(text)) ?? null;
     const key = `association:${groupRules[0].id}`;
+    const reserve = associationAlternatives({ advice, catalog: args.catalog, excluded: taken, blockedProductIds: args.blockedProductIds });
+    for (const other of reserve) taken.add(other.id);
     // Une association commune à toutes les officines (écrite dans la console de PharmaBoost) le dit ; celle de l'officine passe avant.
     const common = groupRules[0].id.startsWith("central:");
     const shortReason = common ? `Association PharmaBoost avec ${names}` : `Association de votre officine avec ${names}`;
@@ -246,6 +322,21 @@ export function buildAssociationAdvice(args: {
       vigilances: suggestionVigilances([], advice, args.patient),
       shortDate: advice.shortDate ?? null,
       tiebreak: null,
+      alternatives: reserve.map(
+        (other): ScoredAlternative => ({
+          productId: other.id,
+          totalScore: Math.max(0.4, 0.6 - index * 0.02),
+          breakdown: { relevance: 0.9, safety: 1, availability: 1, patientFit: 1, pharmacistPreference: 0.5, validationHistory: 0, commercial: 0 },
+          justification: `Si le patient ne veut pas de « ${advice.name} » : « ${other.name} », en stock, sert au même usage (même catégorie, mêmes indications d'usage, même voie).`,
+          shortReason: `Autre choix que « ${advice.name} »`,
+          patientReason: "",
+          counterScript: `Si vous préférez, je peux aussi vous proposer « ${other.name} ».`,
+          precautions: [...other.precautions],
+          explanation: [{ dimension: "relevance", label: "Même usage", value: 0.9, weight: 1, detail: `Même catégorie et mêmes indications d'usage que « ${advice.name} ».`, role: "SCORE" }],
+          vigilances: suggestionVigilances([], other, args.patient),
+          shortDate: other.shortDate ?? null,
+        }),
+      ),
     });
     notes.push(`Association ${names} → « ${advice.name} » proposée.`);
   });

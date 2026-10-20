@@ -9,7 +9,7 @@ const m = vi.hoisted(() => ({ prescription: { findFirst: vi.fn() }, pharmacy: { 
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/db/client", () => ({ prisma: { prescription: m.prescription, pharmacy: m.pharmacy } }));
 vi.mock("@/server/services/central-advice", () => ({ loadCentralAdvice: async () => ({ removed: [], custom: [] }) }));
-vi.mock("@/server/services/challenges", () => ({ activeChallengeTitlesFor: async () => new Map() }));
+vi.mock("@/server/services/challenges", () => ({ activeChallengesFor: async () => new Map() }));
 vi.mock("@/server/services/stock-lots", () => ({ nearestShortDatesFor: async () => new Map() }));
 
 const { readCounterNotice } = await import("../counter-notice");

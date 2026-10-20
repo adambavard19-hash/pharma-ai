@@ -337,3 +337,31 @@ describe("un médicament SANS ordonnance du stock comme produit proposé (« Mes
     expect(stage?.notes.join(" ")).toContain("soumis à prescription");
   });
 });
+
+describe("si le patient ne veut pas du produit conseillé : une autre possibilité de SON stock (19 oct. 2026)", () => {
+  const imedia = product({ id: "imedia", name: "LACTIBIANE IMEDIA Pdr orod 4St", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive", "lactibiane", "imedia", "pdr", "orod", "4st"], stockQuantity: 6, salePriceCents: 990, purchasePriceCents: 500 });
+  const reference = product({ id: "ref", name: "LACTIBIANE REFERENCE STICK 20", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive", "lactibiane", "reference", "stick"], stockQuantity: 4, salePriceCents: 1890, purchasePriceCents: 1000 });
+  const bion = product({ id: "bion", name: "BION 3 AD DEFENSE CPR BT 30", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive", "bion", "defense", "cpr"], stockQuantity: 3, salePriceCents: 1590, purchasePriceCents: 800 });
+  const topic = product({ id: "topic", name: "LACTIBIANE TOPIC AD 125ML", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive", "lactibiane", "topic", "125ml"], stockQuantity: 9 });
+  const enfant = product({ id: "enfant", name: "LACTIBIANE IMEDIA ENFANT STICK 4", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive", "lactibiane", "imedia", "enfant", "stick"], stockQuantity: 9 });
+  const baby = product({ id: "baby", name: "BABYBIANE IMEDIA Pdr 7Sach", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "babybiane", "imedia"], stockQuantity: 9 });
+  const rupture = product({ id: "rupture", name: "ERGYPHILUS CONF GELU BT 60", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive", "ergyphilus"], stockQuantity: 0 });
+  const loperamide = { lineIndex: 0, keys: ["drug:LOPERAMIDE VIATRIS 2 MG"], productId: null };
+  const run = (over: { blocked?: string[]; catalog?: CatalogProduct[] } = {}) =>
+    build({ rules: [rule("central:ca1", "drug:LOPERAMIDE VIATRIS 2 MG", "imedia")], lines: [loperamide], lineNames: [{ lineIndex: 0, drugName: "LOPERAMIDE VIATRIS 2 mg" }], catalog: over.catalog ?? [imedia, reference, bion, topic, enfant, baby, rupture], blocked: over.blocked });
+
+  it("le plus proche du produit conseillé, puis le plus proche d'une autre marque ; ni crème, ni produit enfant, ni rupture", () => {
+    const [rec] = run().recommendations;
+    expect(rec.productId).toBe("imedia");
+    expect(rec.alternatives?.map((alt) => alt.productId)).toEqual(["ref", "bion"]);
+    expect(rec.alternatives?.[0].counterScript).toBe("Si vous préférez, je peux aussi vous proposer « LACTIBIANE REFERENCE STICK 20 ».");
+  });
+
+  it("jamais un produit écarté par la sécurité pour ce patient", () => {
+    expect(run({ blocked: ["ref"] }).recommendations[0].alternatives?.map((alt) => alt.productId)).toEqual(["bion"]);
+  });
+
+  it("rien plutôt qu'un produit au hasard : aucune autre possibilité du même usage, aucune alternative", () => {
+    expect(run({ catalog: [imedia, topic, enfant, baby, rupture] }).recommendations[0].alternatives).toEqual([]);
+  });
+});

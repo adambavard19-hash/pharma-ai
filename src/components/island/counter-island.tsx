@@ -41,6 +41,8 @@ export type IslandAdvice = {
   drug?: string;
   reason?: string;
   challenge?: boolean;
+  /** Le challenge et son gain (« Pileje · 1 € par boîte »), quand on le connaît. */
+  challengeLabel?: string;
   shortDate?: string;
   stock?: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
   quantity?: number;

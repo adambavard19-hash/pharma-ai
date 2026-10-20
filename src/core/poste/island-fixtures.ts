@@ -27,10 +27,11 @@ const ENTRY: HostEntry = {
   team: [{ id: "essai-lea", name: "Léa M." }, { id: "essai-thomas", name: "Thomas D." }, { id: "essai-elodie", name: "Élodie R." }],
   servedBy: "essai-lea",
   items: [
-    { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Challenge Ultra-Levure", shortDate: "30/11/2026", outcome: "NONE", name: "ULTRA-LEVURE 200 mg 30 gélules", price: "8,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "",
+    { id: "essai-1", drug: "AMOXICILLINE 1 g", challenge: "Ultra-Levure · 1 € par boîte", shortDate: "30/11/2026", outcome: "NONE", name: "ULTRA-LEVURE 200 mg 30 gélules", price: "8,90 €", reason: "Protéger la flore pendant l'antibiotique", availability: "IN_STOCK", quantity: "12", image: "",
       // La carte déployée d'exemple : sans contre-indication ni conseil d'utilisation écrits (aucun texte médical inventé) —
       // l'île dit alors qu'ils ne sont pas renseignés et renvoie à la notice.
-      sheet: { name: "ULTRA-LEVURE 200 mg 30 gélules", reasons: ["Protéger la flore pendant l'antibiotique"], script: "", contraindications: [], usage: [], description: "", more: { contraindications: 0, usage: 0 }, cut: false } },
+      sheet: { name: "ULTRA-LEVURE 200 mg 30 gélules", reasons: ["Protéger la flore pendant l'antibiotique"], script: "", contraindications: [], usage: [], description: "", more: { contraindications: 0, usage: 0 }, cut: false,
+        alternatives: [{ name: "LACTIBIANE ATB Gél B/10", price: "12,90 €", margin: "5,10 €", stock: "IN_STOCK", quantity: 5 }, { name: "BION 3 AD DEFENSE CPR BT 30", price: "15,90 €", margin: "6,40 €", stock: "IN_STOCK", quantity: 3 }] } },
     { id: "essai-2", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "SÉRUM PHYSIOLOGIQUE 30 unidoses", price: "5,90 €", reason: "Hygiène du nez pendant le rhume", availability: "LOW_STOCK", quantity: "3", image: "" },
     { id: "essai-3", drug: "DOLIPRANE 1000 mg", challenge: "", shortDate: "", outcome: "NONE", name: "MOUCHOIRS DOUX x 10", price: "2,50 €", reason: "Pour le rhume", availability: "IN_STOCK", quantity: "40", image: "" },
   ],

@@ -68,9 +68,12 @@ export type MixIslandProps = {
   onOpen: () => void;
   onFinish: () => void;
   onAnswer: (index: number, outcome: IslandOutcome) => void;
+  /** Les boîtes scannées : celle qui est en challenge (toute la gamme d'un laboratoire) le dit en haut, avec son gain. */
+  boxes?: { id: string; name: string; challenge?: string; reward?: string }[];
 };
 
-export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onFinish, onAnswer }: MixIslandProps) {
+export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onFinish, onAnswer, boxes = [] }: MixIslandProps) {
+  const challengedBoxes = boxes.filter((box) => box.challenge);
   const order = bestOrder(items);
   const sold = (index: number) => outcomes[index] === "SOLD";
   const soldIndexes = order.filter(sold);
@@ -124,6 +127,22 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
           </button>
         </div>
 
+        {/* La boîte scannée est en challenge (fondateur, 19 oct. 2026 : Lactibiane Imedia, laboratoire Pileje, 1 € par boîte) :
+            toujours visible, repliée ou non. */}
+        {challengedBoxes.length > 0 && (
+          <div data-ile-challenge="" className="mx-2 mb-1.5 flex items-start gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] leading-[15px] font-semibold" style={{ background: "rgba(242,165,22,0.14)", color: C.challengeIcon }}>
+            <span aria-hidden="true">★</span>
+            <span className="min-w-0 flex-1">
+              {challengedBoxes.map((box) => (
+                <span key={box.id} className="block">
+                  {/^challenge\b/i.test(box.challenge ?? "") ? box.challenge : `Challenge ${box.challenge}`} : {box.name}
+                  {box.reward ? <span className="font-medium text-white/80"> · {box.reward}</span> : null}
+                </span>
+              ))}
+            </span>
+          </div>
+        )}
+
         {open && (
           <div className="px-2 pb-2">
             <div className="flex items-center gap-2 px-1 pb-1.5">
@@ -145,6 +164,11 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
 
             <div data-ile-mix-carte="" className="rounded-[16px] p-3 text-left" style={{ background: C.panel, color: C.ink }}>
               <div className="flex items-start gap-3">
+                {/* La photo studio du produit, sur fond blanc ; sans photo studio, rien (jamais une photo amateur). */}
+                {item.image && (
+                  // eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée
+                  <img data-ile-mix-photo="" src={item.image} alt="" width={56} height={56} draggable={false} className="size-14 shrink-0 rounded-xl bg-white object-contain p-1" />
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="text-[15.5px] leading-[19px] font-extrabold break-words">{item.sheet?.name || item.name}</p>
                   {(item.sheet?.reasons[0] || item.reason) && <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-[15px]" style={{ color: C.inkSoft }}>{item.sheet?.reasons[0] || item.reason}</p>}
@@ -195,6 +219,19 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                     {step === "say" && <Say item={item} />}
                     {step === "sheet" && <Sheet item={item} />}
                   </div>
+                  {item.sheet?.alternatives && item.sheet.alternatives.length > 0 && (
+                    <div data-ile-mix-alternative="" className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
+                      <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Le patient n&apos;en veut pas ? En stock aussi</p>
+                      {item.sheet.alternatives.map((other) => (
+                        <div key={other.name} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1">
+                          <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{other.name}</span>
+                          {other.price && <span className="shrink-0 text-[11.5px] font-bold tabular-nums">{other.price}</span>}
+                          {other.margin && <span className="shrink-0 text-[11px] font-bold tabular-nums" style={{ color: C.numberFg }}>marge {other.margin}</span>}
+                        </div>
+                      ))}
+                      <p className="px-1.5 text-[10.5px]" style={{ color: C.inkSoft }}>Bipez celui qu&apos;il choisit : le conseil passe en vendu avec ce produit.</p>
+                    </div>
+                  )}
                   {alternatives.length > 0 && (
                     <div className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
                       <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre possibilité en stock</p>
@@ -240,7 +277,7 @@ function Tags({ item }: { item: IslandAdvice }) {
     : { label: "Stock à vérifier", fg: C.inkSoft };
   return (
     <div className="mt-1.5 flex flex-wrap gap-1">
-      {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</Chip>}
+      {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {item.challengeLabel ? (/^challenge\b/i.test(item.challengeLabel) ? item.challengeLabel : `${T.challenge} ${item.challengeLabel}`) : T.challenge}</Chip>}
       {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}
       <Chip bg={C.cell} fg={stock.fg}>{stock.label}</Chip>
     </div>

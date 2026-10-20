@@ -84,3 +84,22 @@ describe("les effets indésirables et l'équipe, de la réponse du serveur à l'
   });
 });
 
+
+describe("les autres possibilités en stock (19 oct. 2026)", () => {
+  it("deux au plus, nom borné, prix, marge et stock vérifiés ; une entrée sans nom est écartée", () => {
+    const sheet = readCounterSheet({
+      name: "LACTIBIANE IMEDIA",
+      alternatives: [
+        { name: "LACTIBIANE REFERENCE STICK 20", price: "18,90 €", margin: "7,90 €", stock: "IN_STOCK", quantity: 4 },
+        { name: "", price: "1 €" },
+        { name: "BION 3 AD DEFENSE", stock: "PAS UN STOCK", quantity: -1 },
+        { name: "TROISIÈME" },
+      ],
+    });
+    expect(sheet?.alternatives).toEqual([
+      { name: "LACTIBIANE REFERENCE STICK 20", price: "18,90 €", margin: "7,90 €", stock: "IN_STOCK", quantity: 4 },
+      { name: "BION 3 AD DEFENSE" },
+    ]);
+    expect(readCounterSheet({ name: "X" })).not.toHaveProperty("alternatives");
+  });
+});

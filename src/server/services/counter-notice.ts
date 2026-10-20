@@ -11,12 +11,14 @@ import { loadOfficialSideEffects } from "@/server/services/official-side-effects
 import { counterSheetOf, routineStepOf, withoutOriginLabel } from "@/core/counter/advice-sheet";
 import { parseSuggestionVigilances } from "@/config/vigilances";
 import { loadCentralAdvice } from "@/server/services/central-advice";
-import { activeChallengeTitlesFor, activeChallengesFor } from "@/server/services/challenges";
+import { activeChallengesFor } from "@/server/services/challenges";
 import { nearestShortDatesFor } from "@/server/services/stock-lots";
 import { trustedRobotRuleKeys } from "@/server/services/robot-trust";
 import { unitMarginHt } from "@/core/catalog/margin";
 import { answersForSheet, pitchesFor, pitchKey, stockCandidates } from "@/server/services/counter-pitches";
-import type { CounterSheetAnswer } from "../../../agent/src/counter-sheet";
+import type { CounterSheetAlternative, CounterSheetAnswer } from "../../../agent/src/counter-sheet";
+import { parseStoredAlternatives } from "@/core/ai/alternatives";
+import { availabilityOf } from "@/core/counter/notice";
 
 /** Vrai quand le prix de vente HT est sous le prix d'achat HT : le fichier de stock a été mal lu, pas une vraie vente à perte. */
 function salePriceLooksWrong(product: { salePriceCents: number; purchasePriceCents: number; vatRate: number | null }): boolean {
@@ -102,6 +104,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
           precautions: true,
           vigilances: true,
           routine: true,
+          alternatives: true,
           product: {
             select: {
               id: true,
@@ -150,7 +153,10 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
 
   const productIds = prescription.recommendations.map((rec) => rec.productId).filter((value): value is string => Boolean(value));
   const [challenges, shortDates] = await Promise.all([
-    activeChallengeTitlesFor(pharmacyId, productIds, now).catch(() => new Map<string, string>()),
+    // Le titre ET le gain (« Pileje · 1 € par boîte ») : le pharmacien doit savoir ce que la vente lui rapporte.
+    activeChallengesFor(pharmacyId, productIds, now)
+      .then((found) => new Map([...found].map(([id, challenge]) => [id, `${challenge.title}${challenge.reward ? ` · ${challenge.reward}` : ""}`])))
+      .catch(() => new Map<string, string>()),
     nearestShortDatesFor(pharmacyId, now).catch(() => new Map<string, { expiresOn: string }>()),
   ]);
   const lineName = new Map(prescription.lines.map((line) => [line.id, line.drugName ?? ""]));
@@ -192,6 +198,30 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
   // Les effets indésirables officiels (RCP lus dans la BDPM) des médicaments conseillés : la fiche de la bannière.
   const sideEffects = await loadOfficialSideEffects(prescription.recommendations.map((rec) => rec.presentation?.specialty.cisCode));
   const sideEffectsOf = (cis: string | undefined) => (cis && sideEffects.get(cis)?.effects.length ? { sideEffects: sideEffects.get(cis)!.effects } : {});
+
+  // Si le patient ne veut pas du produit conseillé : les autres produits retenus par l'analyse, relus dans le stock du jour.
+  const alternativeIds = [...new Set(prescription.recommendations.flatMap((rec) => parseStoredAlternatives(rec.alternatives).map((alt) => alt.productId)))];
+  const alternativeRows = alternativeIds.length === 0 ? [] : await prisma.product.findMany({
+    where: { pharmacyId, id: { in: alternativeIds }, isActive: true, deletedAt: null },
+    select: { id: true, name: true, salePriceCents: true, purchasePriceCents: true, vatRate: true, stockItem: { select: { quantity: true, alertThreshold: true } } },
+  }).catch(() => []);
+  const alternativesOf = (stored: unknown): { alternatives?: CounterSheetAlternative[] } => {
+    const list = parseStoredAlternatives(stored).flatMap((alt): CounterSheetAlternative[] => {
+      const row = alternativeRows.find((candidate) => candidate.id === alt.productId);
+      if (!row || (row.stockItem?.quantity ?? 0) <= 0) return [];
+      const stock = availabilityOf(row.stockItem?.quantity ?? null, row.stockItem?.alertThreshold ?? null, stockReliable);
+      const margin = salePriceLooksWrong(row) ? null : unitMarginHt(row);
+      const euros = (cents: number) => `${(cents / 100).toFixed(2).replace(".", ",")} €`;
+      return [{
+        name: row.name,
+        ...(stock !== "UNKNOWN" && row.salePriceCents > 0 && !salePriceLooksWrong(row) ? { price: euros(row.salePriceCents) } : {}),
+        ...(margin && margin.marginCents > 0 ? { margin: euros(margin.marginCents) } : {}),
+        stock,
+        ...(stock !== "UNKNOWN" && typeof row.stockItem?.quantity === "number" ? { quantity: row.stockItem.quantity } : {}),
+      }];
+    });
+    return list.length ? { alternatives: list.slice(0, 2) } : {};
+  };
 
   const notice = buildCounterNotice({
     reference: prescription.reference,
@@ -243,7 +273,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
                 : null,
             },
             rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
-          ), ...sideEffectsOf(rec.presentation?.specialty.cisCode), ...pitchOf(rec.id) },
+          ), ...sideEffectsOf(rec.presentation?.specialty.cisCode), ...pitchOf(rec.id), ...alternativesOf(rec.alternatives) },
         };
       }),
     outcome: run?.outcome ?? null,

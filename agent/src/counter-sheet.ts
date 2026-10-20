@@ -53,7 +53,14 @@ export type CounterSheet = {
    * fait alors, et parfois un produit plus précis de SON stock, avec prix, marge et stock. Absent : questions sans réponses.
    */
   answers?: CounterSheetAnswer[];
+  /**
+   * Si le patient ne veut pas du produit conseillé (fondateur, 19 oct. 2026) : d'autres produits du stock de la pharmacie qui servent
+   * au même usage, avec prix, marge et stock du jour. Absent : aucune autre possibilité en stock.
+   */
+  alternatives?: CounterSheetAlternative[];
 };
+
+export type CounterSheetAlternative = { name: string; price?: string; margin?: string; stock?: string; quantity?: number };
 
 export type CounterSheetAnswer = {
   /** La question (0 ou 1). */
@@ -82,6 +89,7 @@ export const COUNTER_SHEET_LIMITS = {
   answerProduct: 120,
   sideEffects: 6,
   sideEffect: 80,
+  alternatives: 2,
 } as const;
 
 /** Ce que disent les rubriques vides, mot pour mot sur la page de vente et dans la bannière : jamais « rien à savoir ». */
@@ -154,12 +162,34 @@ export function readCounterSheet(raw: unknown): CounterSheet | null {
     cut,
     ...sideEffectsOf(value.sideEffects),
     ...askAndPitch(value),
+    ...alternativesOf(value.alternatives),
   };
 }
 
 function sideEffectsOf(input: unknown): { sideEffects?: string[] } {
   const effects = (Array.isArray(input) ? input : []).map((effect) => boundText(effect, COUNTER_SHEET_LIMITS.sideEffect).text).filter(Boolean).slice(0, COUNTER_SHEET_LIMITS.sideEffects);
   return effects.length ? { sideEffects: effects } : {};
+}
+
+/** Un produit du stock tel que la bannière le montre : nom, prix, marge, stock — bornés, la forme vérifiée. */
+function readStockProduct(p: Record<string, unknown>): CounterSheetAlternative | null {
+  const name = boundText(p.name, COUNTER_SHEET_LIMITS.answerProduct).text;
+  if (!name) return null;
+  return {
+    name,
+    ...(boundText(p.price, 16).text ? { price: boundText(p.price, 16).text } : {}),
+    ...(boundText(p.margin, 16).text ? { margin: boundText(p.margin, 16).text } : {}),
+    ...(typeof p.stock === "string" && STOCKS.has(p.stock) ? { stock: p.stock } : {}),
+    ...(Number.isInteger(p.quantity) && (p.quantity as number) >= 0 ? { quantity: p.quantity as number } : {}),
+  };
+}
+
+function alternativesOf(input: unknown): { alternatives?: CounterSheetAlternative[] } {
+  const list = (Array.isArray(input) ? input : [])
+    .flatMap((entry) => (entry && typeof entry === "object" && !Array.isArray(entry) ? [readStockProduct(entry as Record<string, unknown>)] : []))
+    .filter((entry): entry is CounterSheetAlternative => entry !== null)
+    .slice(0, COUNTER_SHEET_LIMITS.alternatives);
+  return list.length ? { alternatives: list } : {};
 }
 
 /** Les deux questions et le conseil en deux phrases, bornés ; pas de clé quand il n'y a rien (la commande reste courte). */
@@ -175,16 +205,7 @@ function readAnswers(input: unknown, questions: number): CounterSheetAnswer[] {
     const say = boundText(a.say, COUNTER_SHEET_LIMITS.answerSay).text;
     if (ask < 0 || ask >= questions || !label || !say) continue;
     const p = typeof a.product === "object" && a.product !== null ? (a.product as Record<string, unknown>) : null;
-    const name = p ? boundText(p.name, COUNTER_SHEET_LIMITS.answerProduct).text : "";
-    const product = name && p
-      ? {
-          name,
-          ...(boundText(p.price, 16).text ? { price: boundText(p.price, 16).text } : {}),
-          ...(boundText(p.margin, 16).text ? { margin: boundText(p.margin, 16).text } : {}),
-          ...(typeof p.stock === "string" && STOCKS.has(p.stock) ? { stock: p.stock } : {}),
-          ...(Number.isInteger(p.quantity) && (p.quantity as number) >= 0 ? { quantity: p.quantity as number } : {}),
-        }
-      : undefined;
+    const product = (p && readStockProduct(p)) || undefined;
     out.push({ ask, label, say, ...(product ? { product } : {}) });
   }
   return out;

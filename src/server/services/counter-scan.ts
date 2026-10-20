@@ -1,4 +1,5 @@
 import "server-only";
+import { parseStoredAlternatives } from "@/core/ai/alternatives";
 import { rangeKey, sameRange } from "@/core/counter/same-range";
 import { prisma } from "@/server/db/client";
 import { readScannedCode } from "@/core/stock";
@@ -107,6 +108,18 @@ async function conseilForScan(pharmacyId: string, prescriptionId: string, item: 
   if (exact || item.kind !== "PRODUCT") return exact;
   const answered = await answerConseilForScan(pharmacyId, prescriptionId, item);
   if (answered) return answered;
+  // Une des autres possibilités en stock de la bannière (le patient ne voulait pas du produit conseillé, 19 oct. 2026) : elle
+  // remplace le produit du conseil, qui passe en « Vendu » à son prix.
+  const withAlternatives = await prisma.recommendation.findMany({
+    where: { prescriptionId, pharmacyId, status: { in: CONSEIL_STATUSES.filter((status) => status !== "PURCHASED") }, productId: { not: null } },
+    orderBy: [{ decidedAt: { sort: "asc", nulls: "first" } }, { totalScore: "desc" }],
+    select: { id: true, status: true, productId: true, alternatives: true },
+  });
+  const replaced = withAlternatives.find((rec) => parseStoredAlternatives(rec.alternatives).some((alt) => alt.productId === item.productId));
+  if (replaced) {
+    const product = await prisma.product.findFirst({ where: { id: item.productId, pharmacyId }, select: { salePriceCents: true } });
+    return { id: replaced.id, status: replaced.status, replaces: { productId: item.productId, previousProductId: replaced.productId, priceCents: product?.salePriceCents ?? 0 } };
+  }
   const scanned = await prisma.product.findFirst({ where: { id: item.productId, pharmacyId }, select: { name: true, brand: true } });
   if (!scanned || !rangeKey(scanned.name, scanned.brand)) return null;
   const candidates = await prisma.recommendation.findMany({
