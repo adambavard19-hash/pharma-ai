@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, Thermometer, TriangleAlert } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { fr, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
-import { HERO_ITEMS, HeroVisual, QuestionVisual, RequestVisual, TeamVisual, ExampleTag, CureReminderVisual } from "./_components/visuals";
+import { HERO_ITEMS, HeroVisual, RequestVisual, TeamVisual, ExampleTag, CureReminderVisual } from "./_components/visuals";
 import { VideoButton } from "./_components/video-dialog";
 import { AutoVideo } from "./_components/auto-video";
 import { CounterIslandScene } from "@/components/island/counter-island-scene";
@@ -13,8 +13,7 @@ import { formatEuros } from "@/core/billing/subscription";
 import { PricingSection } from "./_components/pricing-section";
 import { BannerPillsInline } from "./_components/banner-mock";
 import { ChoiceVisual, FlowSteps, LoadVisual, Reveal } from "./_components/story";
-import { EXAMPLES, FAQ, SAFETY, STOCK_POINTS, TEAM_POINTS } from "./_components/site-content";
-import { cn } from "@/lib/utils";
+import { FAQ, SAFETY, STOCK_POINTS } from "./_components/site-content";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 
 /**
@@ -175,89 +174,11 @@ export default async function SitePage() {
       <section id="equipe" className="scroll-mt-20 border-t border-border-subtle">
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:gap-16">
           <Reveal>
-            <SectionHead kicker="Votre équipe" title="Les résultats de chacun. Toute l'équipe motivée.">
-              Chaque comptoir est attribué à un collaborateur : chacun voit ses conseils proposés et validés, sa place au classement et sa progression dans les challenges. De quoi donner envie de conseiller.
-            </SectionHead>
-            <ul className="mt-8 grid gap-2.5 sm:grid-cols-2">
-              {TEAM_POINTS.map((p) => (
-                <li key={p.label} className="flex items-start gap-2.5 rounded-2xl border border-border-subtle bg-surface-card px-4 py-3 text-[14.5px] font-semibold text-text-primary">
-                  <Check className="mt-0.5 size-4 shrink-0 text-brand-600" /> {fr(p.value)}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-5 text-[13.5px] leading-6 text-text-tertiary">Au comptoir, les ventes sont déclarées : Vendu ou Non vendu, en un clic sur la bannière.</p>
+            <SectionHead kicker="Votre équipe" title="Les résultats de chacun. Toute l'équipe motivée." />
           </Reveal>
           <Reveal delay={2}>
             <TeamVisual />
           </Reveal>
-        </div>
-      </section>
-
-      {/* ---- La bonne question --------------------------------------- */}
-      <section id="questions" className="scroll-mt-20 border-y border-border-subtle bg-surface-card">
-        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-16">
-          <div>
-            <SectionHead kicker="Une question, puis le conseil" title="Le bon conseil commence par la bonne question.">
-              Un paracétamol ne dit pas pourquoi le patient le prend. PharmaBoost vous fait poser la question : fièvre, mal de tête, douleur ? Où a-t-il mal ? Le produit vient ensuite : la poche chaud/froid pour le dos, pas un produit au hasard.
-            </SectionHead>
-            <ul className="mt-8 flex flex-wrap gap-2">
-              {["Pourquoi ?", "Où ?", "Puis le produit"].map((t) => (
-                <li key={t} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-app px-4 py-2 text-[14px] font-medium text-text-primary">
-                  <Check className="size-4 text-brand-600" /> {t}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-6 flex items-center gap-2.5 text-[15px] text-text-secondary">
-              <Thermometer className="size-4 shrink-0 text-brand-600" aria-hidden="true" /> Fièvre ? Un thermomètre, s&apos;il n&apos;en a pas à la maison.
-            </p>
-          </div>
-          <div>
-            <QuestionVisual />
-            <p className="mt-3 text-center text-[12.5px] text-text-tertiary">
-              La bannière, telle qu&apos;elle pose la question · <ExampleTag className="text-[10.5px]" />
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ---- Le conseil qui va avec le traitement --------------------- */}
-      <section>
-        <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-          <div className="flex flex-wrap items-end justify-between gap-6">
-            <SectionHead kicker="Exemples" title="Le conseil qui va avec le traitement.">
-              Le médecin prescrit. PharmaBoost vous rappelle ce qui accompagne le traitement, et ce qu&apos;il ne faut pas y ajouter.
-            </SectionHead>
-            <Link href="/decouvrir/pourquoi" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-brand-700 hover:text-brand-800">
-              Pourquoi PharmaBoost <ArrowRight className="size-4" />
-            </Link>
-          </div>
-          <div className="mt-10 overflow-hidden rounded-3xl border border-border-subtle bg-surface-card">
-            <div className="hidden grid-cols-[0.85fr_1.15fr_1.2fr] gap-6 border-b border-border-subtle px-6 py-3 md:grid">
-              {["Au scan", "PharmaBoost vous montre", "Pourquoi"].map((h) => (
-                <span key={h} className="font-mono text-[11px] tracking-[0.14em] text-text-tertiary uppercase">{h}</span>
-              ))}
-            </div>
-            <ul className="divide-y divide-border-subtle">
-              {EXAMPLES.map((e) => (
-                <li key={e.scan} className="grid gap-1.5 px-6 py-5 md:grid-cols-[0.85fr_1.15fr_1.2fr] md:items-baseline md:gap-6">
-                  <p className="font-mono text-[13px] tracking-[0.02em] text-text-secondary">
-                    {e.scan}
-                    {e.context && <span className="mt-0.5 block font-sans text-[13.5px] tracking-normal text-text-tertiary">{fr(e.context)}</span>}
-                  </p>
-                  <div>
-                    <p className={cn("flex items-baseline gap-2 text-[16px] leading-snug font-semibold", e.warning ? "text-warning-800" : "text-text-primary")}>
-                      {e.warning ? <TriangleAlert className="size-4 shrink-0 translate-y-0.5 text-warning-600" aria-hidden="true" /> : <span className="text-brand-600" aria-hidden="true">+</span>}
-                      {e.warning && <span className="sr-only">Mise en garde :</span>}
-                      <span>{fr(e.shows)}</span>
-                    </p>
-                    {e.note && <p className="mt-0.5 pl-5 text-[13.5px] text-text-tertiary">{fr(e.note)}</p>}
-                  </div>
-                  <p className="text-[14.5px] leading-6 text-text-secondary">{fr(e.why)}</p>
-                </li>
-              ))}
-            </ul>
-            <p className="border-t border-border-subtle px-6 py-3.5 text-[13px] text-text-tertiary">Au comptoir, vous notez Vendu ou Non vendu. Le conseil reste votre décision.</p>
-          </div>
         </div>
       </section>
 

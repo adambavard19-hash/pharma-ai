@@ -69,36 +69,22 @@ describe("le site dit ce que fait l'application, et rien de plus", () => {
     expect(whyText).toContain("Aucune fiche patient");
   });
 
-  it("montre la bonne question avec les mots de l'arbre du comptoir, pas un texte recopié", () => {
-    expect(home).toContain('id="questions"');
-    const view = evaluateTree(ANALGESIC_TREE, { why: ["PAIN"], where: ["BACK"] }, "DOLIPRANE 1000 mg");
-    expect(view.questions.map((question) => question.node)).toEqual(["why", "where"]);
-    for (const question of view.questions) {
-      expect(homeText).toContain(question.text);
-      for (const choice of question.choices) expect(homeText).toContain(choice.label);
-    }
-    expect(homeText).toContain("Poche chaud/froid dos");
-    // La bannière ACTUELLE (l'île noire, notre robot, la capsule des questions), plus l'ancienne maquette.
-    const questions = home.slice(home.indexOf('id="questions"'));
-    expect(questions).toContain('aria-label="Une question à poser"');
-    expect(questions).toContain('aria-label="Bannière PharmaBoost du comptoir"');
-    expect(questions.slice(0, questions.indexOf("</section>"))).not.toContain("pbm-fit");
-    // Les phrases d'orientation (mal de tête, fièvre) attendent la relecture de la pharmacienne : elles ne sont pas sur le site.
-    for (const choice of Object.values(ANALGESIC_TREE.nodes).flatMap((node) => node.choices)) {
-      if (choice.note) expect(homeText).not.toContain(choice.note);
-    }
+  it("n'a plus la rubrique « La bonne question » ni le tableau d'exemples (retirés par le fondateur, 20 oct. 2026)", () => {
+    expect(home).not.toContain('id="questions"');
+    expect(homeText).not.toContain("Le bon conseil commence par la bonne question.");
+    expect(homeText).not.toContain("Le conseil qui va avec le traitement.");
   });
 
-  it("présente l'équipe : un comptoir par personne, des ventes déclarées au comptoir", () => {
+  it("présente l'équipe et ses résultats", () => {
     expect(home).toContain('id="equipe"');
-    expect(homeText).toContain("Chaque comptoir est attribué à un collaborateur");
-    expect(homeText).toContain("les ventes sont déclarées");
+    expect(homeText).toContain("Les résultats de chacun.");
   });
 
   it("marque « exemple » chaque visuel qui montre des produits ou des prix", () => {
     // Accueil, étape 2, bonne question, stock, équipe, sans ordonnance.
     expect(homeText.match(/exemple/gi)?.length ?? 0).toBeGreaterThanOrEqual(5);
-    expect(home).toMatch(/aria-label="Bannière PharmaBoost, exemple/);
+    // La bannière de l'accueil est la « mix » d'aujourd'hui (20 oct. 2026) : l'« exemple » est écrit sur le cadre du logiciel qui la porte.
+    expect(homeText).toContain("Logiciel de gestion · Vente exemple");
   });
 
   it("adosse les conseils de l'accueil à de vraies règles du moteur", () => {
@@ -222,10 +208,6 @@ describe("les mots du site suivent le code, sans promesse", () => {
   it("parle de la quantité en stock, jamais d'un « stock exact » (le stock vient du dernier envoi)", () => {
     expect(homeText.toLowerCase()).not.toContain("stock exact");
     expect(homeText).toContain("Uniquement des produits en rayon, avec la quantité en stock sous chaque conseil");
-  });
-
-  it("distingue les deux arrivées dans l'équipe : l'invitation, ou la demande que le titulaire approuve", () => {
-    expect(homeText).toContain("Invitée par e-mail, ou demande à rejoindre : vous approuvez");
   });
 
   it("tient la typographie française : ni « ? » ni « : » seuls en début de ligne sur un petit téléphone", () => {
