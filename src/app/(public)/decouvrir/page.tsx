@@ -5,6 +5,7 @@ import { fr, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
 import { HERO_ITEMS, HeroVisual, QuestionVisual, RequestVisual, StockMarginVisual, TeamVisual, ExampleTag, CureReminderVisual } from "./_components/visuals";
 import { BannerPillsInline } from "./_components/banner-mock";
 import { VideoButton } from "./_components/video-dialog";
+import { AutoVideo } from "./_components/auto-video";
 import { CounterIslandScene } from "@/components/island/counter-island-scene";
 import { VIGILANCE_RULES } from "@/core/ai/engines/vigilance";
 import { loadLiveProof } from "@/server/services/site-leads";
@@ -77,6 +78,10 @@ export default async function SitePage() {
             </div>
           </div>
           <HeroVisual glass />
+        </div>
+        {/* La présentation se lance seule sous le héros, sans le son (fondateur, 20 oct. 2026, d'après limova.ai). */}
+        <div className="px-5 pb-16 md:pb-24">
+          <AutoVideo src="/video/pharmaboost-presentation.mp4" poster="/video/pharmaboost-presentation.jpg" />
         </div>
       </section>
 

@@ -10,7 +10,8 @@ import { CureReminderVisual, ExampleTag, HeroVisual, QuestionVisual, RequestVisu
 import { VideoButton } from "../_components/video-dialog";
 import { EXAMPLES, FAQ, SAFETY, STOCK_POINTS, TEAM_POINTS } from "../_components/site-content";
 import { fr } from "../_components/site-shell";
-import { AutoVideo, FaqTabs, FeatureTabs, ScanPrompt, Steps, type FeatureTab } from "./limova";
+import { AutoVideo } from "../_components/auto-video";
+import { FaqTabs, FeatureTabs, ScanPrompt, Steps, type FeatureTab } from "./limova";
 
 export const metadata: Metadata = { title: "Essai d'accueil", robots: { index: false, follow: false } };
 
