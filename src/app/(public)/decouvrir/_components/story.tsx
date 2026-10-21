@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, ScanLine, Sparkles } from "lucide-react";
+import { Check, Mail, ScanLine, Sparkles } from "lucide-react";
 import { Robot } from "@/components/robot/robot";
 import { cn } from "@/lib/utils";
 
@@ -75,13 +75,13 @@ export function LoadVisual() {
   );
 }
 
-/** Scan → conseils → associations, en trois cartes qui s'allument l'une après l'autre. */
+/** Scan → conseils → bilan par e-mail, en trois cartes qui s'allument l'une après l'autre. */
 export function FlowSteps() {
   const [ref, seen] = useSeen<HTMLDivElement>();
   const steps = [
     { icon: <ScanLine className="size-5" />, title: "Le scan", text: "Vous scannez la boîte, comme d'habitude." },
     { icon: <Sparkles className="size-5" />, title: "Un ou plusieurs conseils", text: "Chaque médicament appelle le conseil qui l'accompagne." },
-    { icon: <Check className="size-5" />, title: "Les associations", text: "Un conseil en appelle un autre, même sans ordonnance." },
+    { icon: <Mail className="size-5" />, title: "Le bilan par e-mail", text: "Le patient reçoit par e-mail le bilan de ses conseils." },
   ];
   return (
     <div ref={ref} className="mt-10 grid gap-4 md:grid-cols-3">
