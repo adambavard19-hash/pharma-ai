@@ -231,7 +231,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   </div>
                   {item.sheet?.alternatives && item.sheet.alternatives.length > 0 && (
                     <div data-ile-mix-alternative="" className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
-                      <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Le patient n&apos;en veut pas ? En stock aussi</p>
+                      <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre alternative en stock</p>
                       {item.sheet.alternatives.map((other) => (
                         <div key={other.name} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1">
                           <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{other.name}</span>
@@ -384,7 +384,8 @@ function Sheet({ item }: { item: IslandAdvice }) {
 function Part({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>{title}</p>
+      {/* Les sous-titres de la fiche se voient d'un coup d'œil (fondateur, 21 oct. 2026) : plus grands, de l'encre du texte. */}
+      <p className="text-[11px] font-extrabold tracking-[0.05em] uppercase" style={{ color: C.ink }}>{title}</p>
       <div className="mt-0.5 space-y-0.5">{children}</div>
     </div>
   );
