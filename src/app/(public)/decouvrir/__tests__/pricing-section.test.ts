@@ -29,10 +29,10 @@ describe("la section tarif du site : un seul abonnement", () => {
   });
 
   it("montre ce que comprend la mise en service, pour que le visiteur voie ce qu'il paie", () => {
-    expect(SETUP_INCLUDES).toHaveLength(4);
-    for (const item of ["Installation et configuration de PharmaBoost sur tous les postes de comptoir", "Paramétrage de l'officine et import du stock", "Tests de fonctionnement", "Formation de l'équipe"]) {
-      expect(t).toContain(item);
-    }
+    // Une seule ligne depuis le 21 oct. 2026 (fondateur) : paramétrage, tests et formation retirés de l'Offre.
+    expect(SETUP_INCLUDES).toEqual(["Installation et configuration de PharmaBoost sur tous les postes de comptoir"]);
+    expect(t).toContain("Installation et configuration de PharmaBoost sur tous les postes de comptoir");
+    expect(t).not.toContain("Tests de fonctionnement");
   });
 
   it("n'a plus de formule annuelle, ni de choix entre deux formules, ni d'ancien tarif", () => {

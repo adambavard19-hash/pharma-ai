@@ -9,9 +9,6 @@ import { cn } from "@/lib/utils";
 /** Ce que comprend la mise en service : écrit ici, une fois, pour que le visiteur voie ce qu'il paie. */
 export const SETUP_INCLUDES = [
   "Installation et configuration de PharmaBoost sur tous les postes de comptoir",
-  "Paramétrage de l'officine et import du stock",
-  "Tests de fonctionnement",
-  "Formation de l'équipe",
 ];
 
 /** Ce que paie l'abonnement, mois après mois : tout ceci existe dans l'application, pour chaque officine. */
