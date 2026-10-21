@@ -113,7 +113,7 @@ type CandidateContext = {
   trialEnds: Map<string, Date>;
   cancellations: Map<string, { requestedAt: Date; plannedEndAt: Date | null; subscriptionEndAt: Date | null }>;
   prospects: Map<string, { name: string; nextActionAt: Date | null; nextActionLabel: string | null; salesRepId: string | null }>;
-  /** Pour chaque filleul : son nom. La remise annoncée à son parrain est celle de la règle (20 % de moins), la même pour tous. */
+  /** Pour chaque filleul : son nom. La remise annoncée à son parrain est celle de la règle (10 % de moins), la même pour tous. */
   filleuls: Map<string, { name: string }>;
   partners: Map<string, { name: string }>;
 };
@@ -365,7 +365,7 @@ function targetLabel(item: PlannedAutomation, context: CandidateContext): string
  */
 function ruleValues(item: PlannedAutomation, context: CandidateContext, now: Date): Record<string, string | null> {
   if (item.targetType === "Pharmacy") {
-    // Le nom de l'officine du filleul et la remise du parrain (20 % de moins, une seule fois) : rien d'autre sur elle, ni sur la personne qui l'a inscrite.
+    // Le nom de l'officine du filleul et la remise du parrain (10 % de moins, une seule fois) : rien d'autre sur elle, ni sur la personne qui l'a inscrite.
     const filleul = context.filleuls.get(item.targetId);
     return filleul ? { filleul: filleul.name, montant_remise: `${REFERRAL_DISCOUNT_PERCENT} %` } : {};
   }

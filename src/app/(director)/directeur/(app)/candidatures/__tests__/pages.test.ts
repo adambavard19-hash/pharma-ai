@@ -200,7 +200,7 @@ describe("la fiche", () => {
     mocks.getStandardCommissionCents.mockResolvedValue(30000);
     const content = text(await renderDetail());
     expect(content).toContain("Créer l'espace de l'affilié");
-    expect(content).toMatch(/Sa rémunération : de 10\s%\sà 20\s%\sde l'abonnement de chaque pharmacie, chaque mois, à vie, selon le nombre de pharmacies apportées/);
+    expect(content).toMatch(/Sa rémunération : 100\s€ HT par pharmacie apportée et signée, versés une fois sa mise en service réglée/);
     expect(content).not.toContain("commission est fixe");
     expect(mocks.getStandardCommissionCents).not.toHaveBeenCalled();
     expect(content).toContain("Vous pourrez la modifier depuis sa fiche");

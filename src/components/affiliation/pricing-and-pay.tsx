@@ -1,4 +1,4 @@
-import { AFFILIATE_MAX_RATE_LABEL, AFFILIATE_RATE_LABEL, AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS_SENTENCE } from "@/core/affiliation/terms";
+import { AFFILIATE_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
 import { formatPriceEuros } from "@/core/pricing/official-offer";
 import { AffiliateSimulator } from "./affiliate-simulator";
 
@@ -16,8 +16,7 @@ export function Fact({ label, value, hint }: { label: string; value: string; hin
 
 /**
  * « Mes tarifs et ma rémunération » de l'affilié (extranet) : les tarifs du moment (l'offre publiée dans la console, sinon
- * l'offre officielle, lus par la page avec `loadPublicPricing`), ce qu'il touche (taux du palier, 10 à 20 %, et prime
- * d'arrivée), avec le simulateur animé. Aucun montant n'est écrit ici : tout vient de `core/affiliation/terms` et de la
+ * l'offre officielle, lus par la page avec `loadPublicPricing`), ce qu'il touche (100 € par pharmacie signée, depuis le 20 oct. 2026), avec le simulateur animé. Aucun montant n'est écrit ici : tout vient de `core/affiliation/terms` et de la
  * source des prix. La rémunération du directeur n'apparaît JAMAIS ici (elle a son propre bloc, dans son espace).
  */
 export function PricingAndPay({ pricing }: { pricing: Pricing }) {
@@ -27,11 +26,10 @@ export function PricingAndPay({ pricing }: { pricing: Pricing }) {
         <h2 id="tarifs-remuneration" className="text-[16px] leading-6 font-semibold text-text-primary">Mes tarifs et ma rémunération</h2>
         <p className="text-[13px] text-text-secondary">Les tarifs proposés aujourd&apos;hui aux pharmacies, et ce que vous touchez pour chacune.</p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Fact label="Abonnement" value={`${formatPriceEuros(pricing.monthlyPriceCents)} HT`} hint="par mois et par pharmacie" />
         <Fact label="Mise en service" value={`${formatPriceEuros(pricing.setupFeeCents)} HT`} hint="une seule fois" />
-        <Fact label="Chaque mois, à vie" value={`${AFFILIATE_RATE_LABEL} à ${AFFILIATE_MAX_RATE_LABEL}`} hint={`de l'abonnement de chaque pharmacie, selon vos pharmacies abonnées : ${AFFILIATE_TIERS_SENTENCE}`} />
-        <Fact label="Prime d'arrivée" value={`${formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} HT`} hint="par pharmacie, une fois sa mise en service réglée" />
+        <Fact label="Votre prime" value={`${formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} HT`} hint="par pharmacie signée, une fois sa mise en service réglée" />
       </div>
       <div className="max-w-[640px]">
         <AffiliateSimulator monthlyPriceCents={pricing.monthlyPriceCents} inputId="simulateur-extranet" />

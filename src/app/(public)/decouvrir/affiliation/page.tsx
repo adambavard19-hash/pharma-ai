@@ -2,67 +2,52 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { connection } from "next/server";
-import { ArrowRight, BookOpen, Infinity as InfinityIcon, LayoutDashboard, TrendingUp } from "lucide-react";
+import { ArrowRight, BookOpen, Handshake, LayoutDashboard, PenLine } from "lucide-react";
 import { HAIRLINE, Kicker, SectionHead, fr } from "../_components/site-shell";
 import { AffiliateSimulator } from "@/components/affiliation/affiliate-simulator";
 import { SalesApplicationForm } from "./sales-application-form";
+import { RecommendationForm } from "./recommendation-form";
 import { cvUploadAvailable } from "@/server/services/sales-applications/intake";
-import { loadPublicPricing } from "@/server/services/public-pricing";
-import { formatPriceEuros, resolvePublicPricing } from "@/core/pricing/official-offer";
-import { AFFILIATE_MAX_RATE_LABEL, AFFILIATE_RATE_LABEL, AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS, AFFILIATE_TIERS_SENTENCE, monthlyAffiliateCommissionCents } from "@/core/affiliation/terms";
+import { formatPriceEuros } from "@/core/pricing/official-offer";
+import { AFFILIATE_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
 
 export const metadata: Metadata = {
   title: "Affiliation",
-  description: `Programme d'affiliation PharmaBoost : recommandez PharmaBoost aux pharmacies et touchez jusqu'à ${AFFILIATE_MAX_RATE_LABEL} de l'abonnement de chaque pharmacie, chaque mois, aussi longtemps qu'elle reste abonnée, plus ${formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} de prime par pharmacie.`,
+  description: `Programme d'affiliation PharmaBoost : indiquez-nous une pharmacie que vous connaissez ; si elle signe, vous touchez ${formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)}.`,
   alternates: { canonical: "/decouvrir/affiliation" },
 };
 
 /**
  * Le programme d'affiliation (18 oct. 2026, à la place de « Devenir commercial ») : la structure de la page partenaires de
- * Limova, pour PharmaBoost. Les paliers (10 à 20 %) et la prime d'arrivée viennent de `core/affiliation/terms`, le prix de l'abonnement de l'offre publiée dans la
- * console (sinon l'offre officielle) : aucun montant n'est écrit ici. Rien d'inventé : ni avis, ni logo, ni témoignage, ni
+ * Limova, pour PharmaBoost. Depuis le 20 oct. 2026 (fondateur) : 100 € par pharmacie apportée et signée, plus de
+ * pourcentage mensuel, et un formulaire « Recommander une pharmacie ». La prime vient de `core/affiliation/terms` :
+ * aucun montant n'est écrit ici. Rien d'inventé : ni avis, ni logo, ni témoignage, ni
  * montant déjà versé. Les ressources citées existent dans l'extranet commercial (plaquette personnalisée, lien de
  * démonstration, pipeline, commissions). Les candidatures arrivent au même endroit qu'avant : console et directeur.
  */
-async function loadMonthlyPriceCents(): Promise<number> {
-  try {
-    return (await loadPublicPricing()).monthlyPriceCents;
-  } catch {
-    // La base ne répond pas : la page reste lisible avec l'offre officielle.
-    return resolvePublicPricing(null).monthlyPriceCents;
-  }
-}
-
 const STEPS = [
-  { title: "Vous postulez", line: "Quelques questions, quelques minutes : qui vous êtes, où vous êtes, votre profil." },
-  { title: "Étude et accès", line: "Notre équipe étudie votre candidature. Si elle est acceptée, vous recevez votre espace affilié : votre lien personnel, votre plaquette, vos pharmacies et vos commissions." },
-  { title: "Commissions récurrentes", line: `Vous recommandez PharmaBoost aux pharmacies et vous touchez de ${AFFILIATE_RATE_LABEL} à ${AFFILIATE_MAX_RATE_LABEL} de leur abonnement, chaque mois, tant qu'elles restent abonnées, plus ${formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} de prime par pharmacie.` },
+  { title: "Vous nous écrivez la pharmacie", line: "Son nom, sa ville, et vos coordonnées : une minute, avec le formulaire ci-dessous." },
+  { title: "Nous la contactons", line: "Notre équipe appelle la pharmacie et lui fait la démonstration de PharmaBoost. Vous n'avez rien à vendre." },
+  { title: "Elle signe : vous êtes payé", line: `Dès que la pharmacie a signé et réglé sa mise en service, vos ${formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} vous sont versés.` },
 ];
 
 export default async function AffiliationPage() {
-  // Le prix vient de la console : la page est rendue à chaque visite, pas figée à la construction.
   await connection();
-  const monthlyPriceCents = await loadMonthlyPriceCents();
-  const price = formatPriceEuros(monthlyPriceCents);
   const bonus = formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS);
-  // « 12,60 € par pharmacie à 10 %, 15,12 € à 12 %… » : ce que rapporte une pharmacie chaque mois, palier par palier.
-  const perPharmacyByTier = AFFILIATE_TIERS.map((tier) => `${formatPriceEuros(monthlyAffiliateCommissionCents(monthlyPriceCents, tier.ratePercent / 100))} à ${tier.ratePercent} %`).join(", ");
   const cvEnabled = cvUploadAvailable();
 
   const benefits: { icon: ReactNode; title: string; line: string }[] = [
-    { icon: <InfinityIcon className="size-5" />, title: "Récurrent à vie", line: `Un pourcentage de l'abonnement de chaque pharmacie que vous apportez, aussi longtemps qu'elle reste abonnée : un revenu qui dure, plus ${bonus} de prime par pharmacie une fois sa mise en service réglée.` },
-    { icon: <TrendingUp className="size-5" />, title: `Jusqu'à ${AFFILIATE_MAX_RATE_LABEL}, payé chaque mois`, line: `Plus vous apportez de pharmacies, plus votre taux monte, sur toutes : ${AFFILIATE_TIERS_SENTENCE}. Pour un abonnement à ${price} HT, une pharmacie vous rapporte chaque mois ${perPharmacyByTier}.` },
-    { icon: <LayoutDashboard className="size-5" />, title: "Un espace affilié", line: "Votre lien personnel à partager, les pharmacies que vous avez apportées, votre palier et vos commissions, au même endroit." },
-    { icon: <BookOpen className="size-5" />, title: "Des ressources prêtes à l'emploi", line: "La plaquette de présentation à vos coordonnées, à envoyer ou imprimer, et votre lien de démonstration : la pharmacie choisit son créneau." },
+    { icon: <PenLine className="size-5" />, title: "Une minute suffit", line: "Vous nous écrivez le nom et la ville de la pharmacie : c'est tout ce qu'on vous demande." },
+    { icon: <Handshake className="size-5" />, title: "Nous faisons la vente", line: "La démonstration, la signature et la mise en service sont assurées par notre équipe." },
+    { icon: <LayoutDashboard className="size-5" />, title: `${bonus} par pharmacie signée`, line: `Pas de plafond : chaque pharmacie apportée qui signe vous rapporte ${bonus}, versés dès sa mise en service réglée.` },
+    { icon: <BookOpen className="size-5" />, title: "Un espace pour les plus actifs", line: "Vous apportez souvent des pharmacies ? Demandez votre espace affilié : votre lien de démonstration, votre plaquette et le suivi de vos primes." },
   ];
 
   const faq: { q: string; a: string }[] = [
-    { q: "Comment rejoindre le programme ?", a: "Remplissez la candidature en bas de cette page. Notre équipe étudie chaque candidature ; si elle est acceptée, vous recevez votre accès à l'espace affilié." },
-    { q: "Combien puis-je gagner ?", a: `Un pourcentage de l'abonnement mensuel HT de chaque pharmacie apportée, chaque mois, tant qu'elle reste abonnée. Ce pourcentage dépend du nombre de vos pharmacies abonnées à la fin du mois et s'applique à toutes : ${AFFILIATE_TIERS_SENTENCE}. Pour un abonnement à ${price} HT, une pharmacie vous rapporte chaque mois ${perPharmacyByTier}. En plus, ${bonus} de prime par pharmacie, une fois sa mise en service réglée. Le simulateur donne une estimation, avant impôts et charges.` },
-    { q: "Comment suivre mes commissions ?", a: "Dans votre espace affilié : votre lien personnel, les pharmacies que vous avez apportées et vos commissions, mois par mois." },
-    { q: "Quels outils sont fournis ?", a: "Une plaquette de présentation à vos coordonnées, à envoyer en PDF ou à imprimer, et un lien de démonstration personnel : une pharmacie qui réserve par ce lien vous est attribuée." },
-    { q: "Faut-il être expert en pharmacie ?", a: "Non. Il suffit de connaître des pharmacies et de leur présenter PharmaBoost ; la démonstration et la mise en service sont assurées par notre équipe." },
-    { q: "À qui s'adresse le programme ?", a: "À celles et ceux qui côtoient des pharmacies : délégués et visiteurs pharmaceutiques, consultants en officine, groupements et réseaux, pharmaciens et préparateurs, experts-comptables d'officines, commerciaux indépendants." },
+    { q: "Combien puis-je gagner ?", a: `${bonus} HT pour chaque pharmacie que vous nous apportez et qui signe, sans plafond. La prime est versée une seule fois par pharmacie, dès que sa mise en service est réglée.` },
+    { q: "Comment vous indiquer une pharmacie ?", a: "Avec le formulaire « Recommander une pharmacie » de cette page : le nom de la pharmacie, sa ville, et vos coordonnées pour vous verser la prime." },
+    { q: "Faut-il être expert en pharmacie ?", a: "Non. Il suffit de connaître des pharmacies ; la démonstration, la signature et la mise en service sont assurées par notre équipe." },
+    { q: "Et si la pharmacie ne signe pas ?", a: "Rien ne vous est demandé : la prime n'est due que pour une pharmacie qui signe et règle sa mise en service." },
   ];
 
   return (
@@ -78,22 +63,22 @@ export default async function AffiliationPage() {
             <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-3 py-1.5 text-[13px] font-medium text-text-secondary">
               <span className="size-1.5 rounded-full bg-brand-500" /> Programme d&apos;affiliation
             </p>
-            <h1 className="mt-7 text-[44px] leading-[1.02] font-bold tracking-[-0.04em] text-text-primary text-balance md:text-[68px]">
-              Jusqu&apos;à <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">{AFFILIATE_MAX_RATE_LABEL}</span> de revenus récurrents à vie.
+            <h1 className="mt-7 text-[40px] leading-[1.04] font-bold tracking-[-0.04em] text-text-primary text-balance md:text-[56px]">
+              <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">{bonus}</span> pour chaque pharmacie que vous nous apportez.
             </h1>
             <p className="mt-7 max-w-xl text-[17px] leading-7 text-text-secondary">
-              {fr(`Recommandez PharmaBoost aux pharmacies : vous touchez de ${AFFILIATE_RATE_LABEL} à ${AFFILIATE_MAX_RATE_LABEL} de l'abonnement de chaque pharmacie, chaque mois, aussi longtemps qu'elle reste abonnée, plus ${bonus} de prime par pharmacie. Plus vous en apportez, plus votre taux monte.`)}
+              {fr(`Vous connaissez une pharmacie ? Écrivez-nous son nom : notre équipe s'occupe de tout. Si elle signe, vous touchez ${bonus}.`)}
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link href="#candidature" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white shadow-sm hover:bg-brand-700">
-                Postuler maintenant <ArrowRight className="size-4" />
+              <Link href="#recommander" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white shadow-sm hover:bg-brand-700">
+                Recommander une pharmacie <ArrowRight className="size-4" />
               </Link>
               <Link href="#comment" className="inline-flex h-12 items-center justify-center rounded-full border border-border-default px-7 text-[15px] font-semibold text-text-primary hover:border-brand-400">
                 Comment ça marche
               </Link>
             </div>
           </div>
-          <AffiliateSimulator monthlyPriceCents={monthlyPriceCents} />
+          <AffiliateSimulator />
         </div>
       </section>
 
@@ -129,6 +114,18 @@ export default async function AffiliationPage() {
         </div>
       </section>
 
+      {/* ---- Recommander une pharmacie ------------------------------------ */}
+      <section id="recommander" className="scroll-mt-20">
+        <div className="mx-auto max-w-4xl px-5 py-20 md:py-28">
+          <SectionHead kicker="Recommander" title="Recommander une pharmacie.">
+            {fr(`Écrivez-nous la pharmacie que vous connaissez. Si elle signe, ${bonus} pour vous.`)}
+          </SectionHead>
+          <div className="mt-10">
+            <RecommendationForm bonus={bonus} />
+          </div>
+        </div>
+      </section>
+
       {/* ---- Questions -------------------------------------------------- */}
       <section id="faq" className="scroll-mt-20">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
@@ -147,8 +144,8 @@ export default async function AffiliationPage() {
       {/* ---- Candidature ------------------------------------------------ */}
       <section id="candidature" className="scroll-mt-20 border-y border-border-subtle bg-surface-card">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-          <SectionHead kicker="Candidature" title="Postuler au programme d'affiliation.">
-            Une question à la fois, quelques minutes. Notre équipe étudie chaque candidature.
+          <SectionHead kicker="Espace affilié" title="Vous apportez souvent des pharmacies ?">
+            Demandez votre espace affilié : votre lien de démonstration, votre plaquette et le suivi de vos primes. Une question à la fois, quelques minutes.
           </SectionHead>
           <div className="mt-10">
             <SalesApplicationForm cvEnabled={cvEnabled} />
@@ -166,10 +163,10 @@ export default async function AffiliationPage() {
             <h2 className="mx-auto mt-4 max-w-2xl text-[34px] leading-[1.05] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[48px]">
               Vous connaissez des pharmacies ? Recommandez PharmaBoost.
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-[16px] leading-7 text-text-secondary">{fr(`Jusqu'à ${AFFILIATE_MAX_RATE_LABEL} de leur abonnement, chaque mois, tant qu'elles restent abonnées, et ${bonus} de prime par pharmacie.`)}</p>
+            <p className="mx-auto mt-4 max-w-xl text-[16px] leading-7 text-text-secondary">{fr(`${bonus} pour chaque pharmacie apportée qui signe.`)}</p>
             <div className="mt-9 flex justify-center">
-              <Link href="#candidature" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white hover:bg-brand-700">
-                Postuler maintenant <ArrowRight className="size-4" />
+              <Link href="#recommander" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white hover:bg-brand-700">
+                Recommander une pharmacie <ArrowRight className="size-4" />
               </Link>
             </div>
           </div>

@@ -128,11 +128,11 @@ describe("onglet Communication : campagnes reçues", () => {
 describe("onglet Commercial : la remise de parrainage", () => {
   const now = new Date("2026-10-10T08:00:00Z");
 
-  it("pour une filleule hors offre : 20 % de moins pour son parrain, non cumulable, plus aucun montant fixe par filleul", async () => {
+  it("pour une filleule hors offre : 10 % de moins pour son parrain, non cumulable, plus aucun montant fixe par filleul", async () => {
     for (const referralAmountCents of [null, 0]) {
       const html = text(await render(CommercialTab, { base: baseFor({ referredBy: { id: "ph_0", name: "Pharmacie Parrain" }, referralAmountCents }), now }));
-      expect(html).toContain("Remise apportée à son parrain 20 % de moins par mois sur l'abonnement de son parrain");
-      expect(html).toContain("Non cumulable : dès un filleul actif le parrain paie 20 % de moins, jamais davantage.");
+      expect(html).toContain("Remise apportée à son parrain 10 % de moins par mois sur l'abonnement de son parrain");
+      expect(html).toContain("Non cumulable : dès un filleul actif le parrain paie 10 % de moins, jamais davantage.");
       expect(html).toContain("Aucune offre de parrainage n'était en cours à son inscription.");
       expect(html).not.toMatch(/10 €|Montant apporté|montant standard/i);
     }
@@ -141,9 +141,9 @@ describe("onglet Commercial : la remise de parrainage", () => {
   it("pour une filleule inscrite pendant une offre : le montant figé est dit, et le plus avantageux des deux s'applique", async () => {
     const base = baseFor({ referredBy: { id: "ph_0", name: "Pharmacie Parrain" }, referralAmountCents: 2000 });
     const html = text(await render(CommercialTab, { base, now }));
-    expect(html).toContain("20 % de moins par mois sur l'abonnement de son parrain, ou 20 € par mois (offre à son inscription)");
+    expect(html).toContain("10 % de moins par mois sur l'abonnement de son parrain, ou 20 € par mois (offre à son inscription)");
     expect(html).toContain("Montant d'une offre de parrainage en cours à son inscription : figé, il ne change plus.");
-    expect(html).toContain("plus avantageux entre les 20 % et la somme des montants d'offre de ses filleuls");
+    expect(html).toContain("plus avantageux entre les 10 % et la somme des montants d'offre de ses filleuls");
   });
 
   it("une officine qui n'est la filleule de personne n'a pas de ligne « remise apportée »", async () => {

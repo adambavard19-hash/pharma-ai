@@ -171,9 +171,9 @@ describe("le montant, en toutes lettres", () => {
     expect(offerSendLines("PARTNER_INVITATION", null, false, "send")).toEqual([]);
   });
 
-  it("un parrainage dit qu'il est une exception à la remise de 20 % (le parrain a le plus avantageux des deux)", () => {
+  it("un parrainage dit qu'il est une exception à la remise de 10 % (le parrain a le plus avantageux des deux)", () => {
     const line = offerSendLines("REFERRAL_OFFER", 3000, true, "send")[0];
-    expect(line).toContain("exception à la remise de 20 % du parrainage");
+    expect(line).toContain("exception à la remise de 10 % du parrainage");
     expect(line).toContain("plus avantageux des deux");
   });
 

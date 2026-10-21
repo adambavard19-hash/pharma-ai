@@ -6,6 +6,19 @@
  * Une seule source pour le site, l'extranet, la console et le calcul des commissions.
  */
 
+/**
+ * Fin du pourcentage mensuel (fondateur, 20 oct. 2026) : l'apporteur d'affaires touche désormais 100 € HT par pharmacie
+ * signée, une seule fois (`AFFILIATE_SIGNUP_BONUS_CENTS`), et plus aucun pourcentage de l'abonnement. Seules les
+ * pharmacies dont la première activation est ANTÉRIEURE à cette date gardent la commission mensuelle promise à leur
+ * arrivée (aucune rétroactivité) ; les paliers ci-dessous ne servent plus qu'à elles.
+ */
+export const AFFILIATE_MONTHLY_END = new Date("2026-10-20T22:00:00.000Z");
+
+/** La pharmacie ouvre-t-elle encore la commission mensuelle : activée avant la fin du pourcentage mensuel. */
+export function monthlyCommissionApplies(activatedAt: Date | null): boolean {
+  return activatedAt !== null && activatedAt.getTime() < AFFILIATE_MONTHLY_END.getTime();
+}
+
 /** Le taux de départ (premier palier). */
 export const AFFILIATE_RECURRING_RATE = 0.1;
 
@@ -76,9 +89,9 @@ export function monthlyAffiliateCommissionCents(monthlySubscriptionCents: number
 }
 
 /**
- * La prime unique de l'affilié (précision du fondateur, 18 oct. 2026, confirmée avec les paliers) : 100 € HT par pharmacie
- * apportée, due seulement une fois sa mise en service RÉELLEMENT réglée, une seule fois par pharmacie, EN PLUS de la
- * commission mensuelle. En centimes HT.
+ * La prime de l'apporteur d'affaires : 100 € HT par pharmacie apportée et signée, due une fois sa mise en service
+ * RÉELLEMENT réglée (PharmaBoost n'avance jamais d'argent), une seule fois par pharmacie. Depuis le 20 oct. 2026, c'est
+ * toute sa rémunération (plus de pourcentage mensuel, `AFFILIATE_MONTHLY_END`). En centimes HT.
  *
  * La prime du directeur commercial vit à part (`director-terms.ts`) : ce fichier est lu par le site public et l'extranet
  * des affiliés, qui ne doivent jamais la voir.

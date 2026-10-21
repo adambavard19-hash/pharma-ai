@@ -105,3 +105,55 @@ export function buildSiteLeadAlert(v: SiteLeadSummary & { adminUrl: string }): {
   );
   return { subject: `Nouvelle demande de ${KIND_LABEL[v.kind]} — ${v.pharmacyName}`, text, html };
 }
+
+/** Une pharmacie recommandée par un apporteur d'affaires (page Affiliation, 20 oct. 2026). */
+export type RecommendationSummary = {
+  referrerName: string;
+  referrerEmail: string;
+  referrerPhone: string;
+  pharmacyName: string;
+  city: string;
+  contactName: string | null;
+  contactPhone: string | null;
+  message: string | null;
+  bonus: string;
+  /** L'apporteur est un affilié inscrit : sa prime sera calculée toute seule. */
+  affiliateName: string | null;
+};
+
+/** L'accusé à l'apporteur : la pharmacie est bien reçue, et ce qui se passe si elle signe. */
+export function buildRecommendationAcknowledgement(v: RecommendationSummary & { contactEmail: string }): { subject: string; text: string; html: string } {
+  const next = `Notre équipe contacte la pharmacie et lui présente PharmaBoost. Si elle signe, votre prime de ${v.bonus} HT vous est versée dès que sa mise en service est réglée.`;
+  const subject = `Merci pour ${v.pharmacyName} — PharmaBoost`;
+  const text = [`Bonjour ${v.referrerName},`, "", `Nous avons bien reçu votre recommandation : ${v.pharmacyName} (${v.city}).`, next, "", `Une question ? ${v.contactEmail}`, "", "PharmaBoost"].join("\n");
+  const html = shell(
+    subject,
+    "Recommandation bien reçue",
+    `<p style="margin:0;font-size:18px;line-height:26px;font-weight:600">Bonjour ${escapeHtml(v.referrerName)},</p><p style="margin:12px 0 0;font-size:16px;line-height:25px;color:#374151">Nous avons bien reçu votre recommandation : <strong>${escapeHtml(v.pharmacyName)}</strong> (${escapeHtml(v.city)}).</p><p style="margin:10px 0 0;font-size:15px;line-height:23px;color:#374151">${escapeHtml(next)}</p><p style="margin:18px 0 0;font-size:13px;line-height:19px;color:#6b7280">Une question ? ${escapeHtml(v.contactEmail)}</p>`,
+    "#0F766E",
+  );
+  return { subject, text, html };
+}
+
+/** L'alerte à l'équipe : la pharmacie à contacter, et qui l'a apportée (la prime à verser si elle signe). */
+export function buildRecommendationAlert(v: RecommendationSummary & { adminUrl: string }): { subject: string; text: string; html: string } {
+  const rows: [string, string | null][] = [
+    ["Pharmacie", v.pharmacyName],
+    ["Ville", v.city],
+    ["Contact", v.contactName],
+    ["Téléphone", v.contactPhone],
+    ["Message", v.message],
+    ["Apportée par", `${v.referrerName} · ${v.referrerEmail} · ${v.referrerPhone}${v.affiliateName ? " (affilié inscrit : prime calculée automatiquement)" : ""}`],
+    ["Prime", `${v.bonus} HT à l'apporteur si la pharmacie signe et règle sa mise en service`],
+  ];
+  const kept = rows.filter((row): row is [string, string] => Boolean(row[1]));
+  const subject = `Pharmacie recommandée — ${v.pharmacyName}`;
+  const text = ["Une pharmacie vient d'être recommandée depuis la page Affiliation.", "", ...kept.map(([label, value]) => `${label} : ${value}`), "", `Dossier : ${v.adminUrl}`].join("\n");
+  const html = shell(
+    subject,
+    "Pharmacie recommandée",
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="font-size:15px;line-height:23px;color:#374151">${kept.map(([label, value]) => `<tr><td style="padding:2px 14px 2px 0;color:#6b7280;vertical-align:top">${escapeHtml(label)}</td><td style="padding:2px 0">${escapeHtml(value)}</td></tr>`).join("")}</table><p style="margin:18px 0 0;font-size:14px"><a href="${escapeHtml(v.adminUrl)}" style="color:#0F766E">Ouvrir le dossier dans la console</a></p>`,
+    "#0F766E",
+  );
+  return { subject, text, html };
+}

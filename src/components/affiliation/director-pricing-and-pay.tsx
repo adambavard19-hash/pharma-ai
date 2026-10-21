@@ -1,4 +1,4 @@
-import { AFFILIATE_MAX_RATE_LABEL, AFFILIATE_RATE_LABEL, AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS_SENTENCE } from "@/core/affiliation/terms";
+import { AFFILIATE_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
 import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
 import { formatPriceEuros } from "@/core/pricing/official-offer";
 import { DirectorSimulator } from "./director-simulator";
@@ -6,7 +6,7 @@ import { Fact, type Pricing } from "./pricing-and-pay";
 
 /**
  * « Les tarifs et votre rémunération » du directeur commercial (son espace SEULEMENT) : les tarifs du moment, ce que
- * touchent ses affiliés (paliers de 10 à 20 % et prime d'arrivée), sa prime par pharmacie signée par l'équipe, avec son
+ * touchent ses affiliés (100 € par pharmacie signée), sa prime par pharmacie signée par l'équipe, avec son
  * simulateur. Aucun montant n'est écrit ici.
  */
 export function DirectorPricingAndPay({ pricing }: { pricing: Pricing }) {
@@ -19,7 +19,7 @@ export function DirectorPricingAndPay({ pricing }: { pricing: Pricing }) {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Fact label="Abonnement" value={`${formatPriceEuros(pricing.monthlyPriceCents)} HT`} hint="par mois et par pharmacie" />
         <Fact label="Mise en service" value={`${formatPriceEuros(pricing.setupFeeCents)} HT`} hint="une seule fois" />
-        <Fact label="Vos affiliés, chaque mois" value={`${AFFILIATE_RATE_LABEL} à ${AFFILIATE_MAX_RATE_LABEL}`} hint={`de l'abonnement, selon leurs pharmacies abonnées (${AFFILIATE_TIERS_SENTENCE}), + ${formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} de prime`} />
+        <Fact label="Vos affiliés" value={`${formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} HT`} hint="par pharmacie apportée et signée, une seule fois" />
         <Fact label="Votre prime" value={`${formatPriceEuros(DIRECTOR_SIGNUP_BONUS_CENTS)} HT`} hint="par pharmacie signée par l'équipe, mise en service réglée" />
       </div>
       <div className="max-w-[640px]">

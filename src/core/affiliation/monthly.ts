@@ -1,8 +1,9 @@
 import { monthBoundsFor, zonedDateParts } from "@/core/performance/periods";
-import { AFFILIATE_MAX_RATE_LABEL, AFFILIATE_RATE_LABEL, AFFILIATE_RECURRING_RATE, monthlyAffiliateCommissionCents } from "./terms";
+import { AFFILIATE_RECURRING_RATE, AFFILIATE_SIGNUP_BONUS_CENTS, monthlyAffiliateCommissionCents } from "./terms";
 
 /**
- * La commission mensuelle d'affiliation, en règles pures et testées.
+ * La commission mensuelle d'affiliation, en règles pures et testées. Depuis le 20 oct. 2026, elle ne vaut plus que pour
+ * les pharmacies activées avant cette date (`AFFILIATE_MONTHLY_END`) : l'apporteur touche 100 € par pharmacie signée.
  *
  * Chaque mois civil (heure de Paris), pour chaque pharmacie apportée par un affilié et encore abonnée à la fin de ce
  * mois, l'affilié touche le taux de son palier (10 à 20 %, selon le nombre de ses pharmacies actives à la fin du mois,
@@ -13,8 +14,8 @@ import { AFFILIATE_MAX_RATE_LABEL, AFFILIATE_RATE_LABEL, AFFILIATE_RECURRING_RAT
 
 export const AFFILIATION_TIME_ZONE = "Europe/Paris";
 
-/** La phrase de la règle, la même partout (extranet, console, espace du directeur). */
-export const AFFILIATE_RULE_SENTENCE = `de ${AFFILIATE_RATE_LABEL} à ${AFFILIATE_MAX_RATE_LABEL} de l'abonnement de chaque pharmacie, chaque mois, à vie, selon le nombre de pharmacies apportées`;
+/** La phrase de la règle, la même partout (extranet, console, espace du directeur) : 100 € par pharmacie signée depuis le 20 oct. 2026. */
+export const AFFILIATE_RULE_SENTENCE = `${AFFILIATE_SIGNUP_BONUS_CENTS / 100} € HT par pharmacie apportée et signée, versés une fois sa mise en service réglée`;
 
 export type MonthPeriod = { key: string; label: string; start: Date; end: Date };
 

@@ -93,7 +93,7 @@ export function referralOfferState(offer: OfferWindow, now: Date): StatusLabel {
 
 /**
  * Ce qu'il faut dire d'une campagne de parrainage qui n'a pas (ou pas encore) d'offre liée. Toute offre de
- * parrainage est une vraie offre : il n'y a plus de montant « standard » par filleul (la règle est de 20 % de moins,
+ * parrainage est une vraie offre : il n'y a plus de montant « standard » par filleul (la règle est de 10 % de moins,
  * en pourcentage), donc plus de campagne qui ne ferait que rappeler un montant sans rien appliquer.
  */
 export function referralOfferExpectation(campaign: { kind: string; status: string; referralOffer: unknown }): string | null {

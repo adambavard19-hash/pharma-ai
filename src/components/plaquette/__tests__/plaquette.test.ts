@@ -96,10 +96,10 @@ describe("l'estimation : calculée par la fonction du simulateur, jamais recopi�
 });
 
 describe("le tarif : celui de l'offre publique, et ce que comprend la mise en service", () => {
-  it("126 € HT par mois, engagement de 12 mois, mise en service de 150 € HT une seule fois", () => {
+  it("126 € HT par mois, engagement de 12 mois, mise en service de 200 € HT une seule fois", () => {
     expect(generic).toContain("126 € HT / mois");
     expect(generic).toContain("Engagement de 12 mois");
-    expect(generic).toContain("150 € HT, une seule fois");
+    expect(generic).toContain("200 € HT, une seule fois");
     for (const item of SETUP_INCLUDES) expect(generic).toContain(item);
   });
 
@@ -111,17 +111,17 @@ describe("le tarif : celui de l'offre publique, et ce que comprend la mise en se
     }
   });
 
-  it("parrainage : 20 % de moins, 126 € deviennent 100,80 € HT", () => {
-    expect(generic).toContain("Parrainez un confrère : 20 % de moins par mois");
-    expect(generic).toContain("vous ne payez plus 126 € mais 100,80 € HT par mois");
+  it("parrainage : 10 % de moins, 126 € deviennent 113,40 € HT", () => {
+    expect(generic).toContain("Parrainez un confrère : 10 % de moins par mois");
+    expect(generic).toContain("vous ne payez plus 126 € mais 113,40 € HT par mois");
   });
 
   it("suit l'offre de la console quand elle est publiée : aucun montant n'est écrit dans la plaquette", () => {
-    const plan = resolvePublicPricing({ name: "Offre Test", monthlyPriceCents: 15_000, setupFeeCents: 39_000 });
+    const plan = resolvePublicPricing({ name: "Offre Test", monthlyPriceCents: 20_000, setupFeeCents: 39_000 });
     const text = visible(renderToStaticMarkup(createElement(Plaquette, { pricing: plan })));
-    expect(text).toContain("150 € HT / mois");
+    expect(text).toContain("200 € HT / mois");
     expect(text).toContain("390 € HT, une seule fois");
-    expect(text).toContain("Pour un abonnement de 150 € HT par mois.");
+    expect(text).toContain("Pour un abonnement de 200 € HT par mois.");
     expect(text).toContain("Offre Test");
     expect(text).not.toContain("126 €");
   });

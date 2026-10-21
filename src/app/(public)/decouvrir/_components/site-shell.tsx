@@ -11,7 +11,7 @@ const NAV = [
   // « Stock et marge » retiré du menu (fondateur, 20 oct. 2026) : la section reste sur l'accueil.
   { href: "/decouvrir/pourquoi", label: "Pourquoi" },
   { href: "/decouvrir#tarif", label: "Tarif" },
-  // Le programme d'affiliation, dans le menu principal : 10 à 20 % (paliers) de l'abonnement de chaque pharmacie apportée, chaque mois.
+  // Le programme d'affiliation, dans le menu principal : 100 € par pharmacie apportée et signée (20 oct. 2026).
   { href: "/decouvrir/affiliation", label: "Affiliation" },
 ];
 

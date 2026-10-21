@@ -14,11 +14,11 @@ describe("la section tarif du site : un seul abonnement", () => {
   const html = renderToStaticMarkup(createElement(PricingSection, { pricing: resolvePublicPricing(null) }));
   const t = text(html);
 
-  it("dit un seul abonnement : 126 € HT par mois, engagement de 12 mois, mise en service de 150 € HT une seule fois", () => {
+  it("dit un seul abonnement : 126 € HT par mois, engagement de 12 mois, mise en service de 200 € HT une seule fois", () => {
     expect(t).toContain("Un seul abonnement. Tout est inclus.");
     expect(t).toContain("126 € HT / mois");
     expect(t).toContain("Engagement de 12 mois");
-    expect(t).toContain("150 € HT, une seule fois");
+    expect(t).toContain("200 € HT, une seule fois");
   });
 
   it("dit ce que comprend l'abonnement, mois après mois", () => {
@@ -42,10 +42,10 @@ describe("la section tarif du site : un seul abonnement", () => {
     expect(html.match(/<article/g)).toHaveLength(1);
   });
 
-  it("annonce le parrainage : 20 % de moins par mois, 126 € deviennent 100,80 € HT, saisi à l'inscription", () => {
-    expect(t).toContain("Parrainez un confrère : 20 % de moins par mois");
+  it("annonce le parrainage : 10 % de moins par mois, 126 € deviennent 113,40 € HT, saisi à l'inscription", () => {
+    expect(t).toContain("Parrainez un confrère : 10 % de moins par mois");
     expect(t).toContain("Au moment de votre inscription, indiquez la personne que vous parrainez");
-    expect(t).toContain("vous ne payez plus 126 € mais 100,80 € HT par mois");
+    expect(t).toContain("vous ne payez plus 126 € mais 113,40 € HT par mois");
   });
 
   it("propose le simulateur, ouvert sur l'exemple de 200 clients par jour : 20 conseillés, 140 € par jour, 3 500 € par mois", () => {
@@ -97,7 +97,7 @@ describe("la section tarif du site : un seul abonnement", () => {
     expect(custom).toContain("Offre console");
     expect(custom).toContain("150 € HT / mois");
     expect(custom).toContain("310 € HT, une seule fois");
-    expect(custom).toContain("vous ne payez plus 150 € mais 120 € HT par mois");
+    expect(custom).toContain("vous ne payez plus 150 € mais 135 € HT par mois");
     expect(custom).toContain("Pour un abonnement de 150 € HT par mois.");
   });
 });

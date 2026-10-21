@@ -4,11 +4,11 @@
  *
  * Un seul abonnement par officine, engagement de 12 mois :
  *   - 126 € HT par mois ;
- *   - une mise en service unique de 150 € HT (290 € HT jusqu'au 18 oct. 2026) : installation et configuration sur
+ *   - une mise en service unique de 200 € HT (290 € HT jusqu'au 18 oct., 150 € HT jusqu'au 20 oct. 2026) : installation et configuration sur
  *     tous les postes de comptoir, paramétrage de l'officine et import du stock,
  *     tests de fonctionnement, formation de l'équipe ;
  *   - parrainage : dès que la personne parrainée s'abonne, l'abonnement de
- *     l'officine qui parraine passe à 20 % de moins par mois.
+ *     l'officine qui parraine passe à 10 % de moins par mois (20 % jusqu'au 20 oct. 2026).
  * Et la commission standard d'un commercial : 250 € par nouvelle pharmacie activée.
  *
  * Ce sont des tarifs de CATALOGUE. Le prix qu'une officine paie est celui de son
@@ -19,9 +19,9 @@ export const OFFICIAL_OFFER = {
   code: "PHARMABOOST_OFFICINE",
   name: "PharmaBoost Officine",
   monthlyPriceCents: 12_600,
-  setupFeeCents: 15_000,
+  setupFeeCents: 20_000,
   commitmentMonths: 12,
-  referralDiscountPercent: 20,
+  referralDiscountPercent: 10,
   /** Commission standard d'un commercial, par nouvelle pharmacie activée, quelle que soit sa taille. */
   standardCommissionCents: 25_000,
 } as const;
@@ -71,7 +71,7 @@ export function pricingPlanGaps(plan: PricingPlanInput | null | undefined): stri
   return gaps.length ? [`L'offre par défaut « ${plan.name} » est incomplète (${gaps.join(", ")}) : le site affiche l'offre officielle.`] : [];
 }
 
-/** Le prix mensuel d'une officine qui parraine, une fois la personne parrainée abonnée : 126 € moins 20 % = 100,80 €. */
+/** Le prix mensuel d'une officine qui parraine, une fois la personne parrainée abonnée : 126 € moins 10 % = 113,40 €. */
 export function referrerPriceCents(monthlyPriceCents: number, discountPercent: number = OFFICIAL_OFFER.referralDiscountPercent): number {
   return Math.round((monthlyPriceCents * (100 - discountPercent)) / 100);
 }

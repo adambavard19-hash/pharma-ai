@@ -8,6 +8,7 @@ import { PUBLIC_CONTACT_EMAIL } from "@/config/contact";
 import { SELF_SERVICE_TERMS_VERSION, selfServiceAvailability, startSelfServiceCheckout } from "@/server/billing/self-service";
 import { notifyAdmins } from "@/server/services/sales/notifications";
 import { siteLeadSchema, type SiteLeadPayload } from "@/core/site/lead-form";
+import { recommendationSchema, type RecommendationPayload } from "@/core/site/recommendation-form";
 import { fail, ok, type ActionResult } from "./types";
 
 // Une même adresse ne peut pas inonder la boîte : trois demandes par heure.
@@ -15,10 +16,10 @@ const recent = new Map<string, number[]>();
 const WINDOW_MS = 60 * 60 * 1000;
 const MAX_PER_WINDOW = 3;
 
-function throttled(key: string): boolean {
+function throttled(key: string, max: number = MAX_PER_WINDOW): boolean {
   const now = Date.now();
   const stamps = (recent.get(key) ?? []).filter((at) => now - at < WINDOW_MS);
-  if (stamps.length >= MAX_PER_WINDOW) return true;
+  if (stamps.length >= max) return true;
   stamps.push(now);
   recent.set(key, stamps);
   return false;
@@ -53,6 +54,25 @@ export async function submitSiteLeadAction(payload: SiteLeadPayload): Promise<Ac
     if (error instanceof DemoSlotUnavailableError) return fail(error.message);
     console.error("[site] demande impossible", error);
     return fail(`Votre demande n'a pas pu être enregistrée. Écrivez-nous à ${PUBLIC_CONTACT_EMAIL}.`);
+  }
+}
+
+/** Une pharmacie recommandée par un apporteur d'affaires, depuis la page Affiliation (20 oct. 2026). */
+export async function submitRecommendationAction(payload: RecommendationPayload): Promise<ActionResult<{ acknowledged: boolean }>> {
+  const parsed = recommendationSchema.safeParse(payload);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Vérifiez le formulaire.");
+  const input = parsed.data;
+  if (input.website) return ok({ acknowledged: false });
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "inconnue";
+  if (throttled(`reco:${ip}:${input.referrerEmail.toLowerCase()}`, 10)) return fail("Nous avons déjà reçu dix pharmacies de votre part cette heure-ci : réessayez plus tard, ou écrivez-nous la liste.");
+  try {
+    // Chargé à la demande : les autres formulaires du site n'embarquent pas ce service.
+    const { receivePharmacyRecommendation } = await import("@/server/services/pharmacy-recommendations");
+    const result = await receivePharmacyRecommendation(input);
+    return ok({ acknowledged: result.acknowledged });
+  } catch (error) {
+    console.error("[site] recommandation impossible", error);
+    return fail(`Votre recommandation n'a pas pu être enregistrée. Écrivez-nous à ${PUBLIC_CONTACT_EMAIL}.`);
   }
 }
 

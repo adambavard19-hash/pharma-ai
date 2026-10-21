@@ -129,9 +129,9 @@ describe("aperçus de la fiche société", () => {
     expect(doc.title).toContain("SPÉCIMEN");
     expect(doc.signatures.find((s) => s.role === "PHARMACY")?.name).toContain("spécimen");
     const article3 = doc.sections.find((s) => s.heading.startsWith("Article 3"));
-    // Sans offre au catalogue : l'offre officielle (126 € HT par mois, mise en service 150 € HT), jamais un montant inventé.
+    // Sans offre au catalogue : l'offre officielle (126 € HT par mois, mise en service 200 € HT), jamais un montant inventé.
     expect(article3?.paragraphs[0]).toContain("126,00 € HT");
-    expect(article3?.paragraphs.join(" ")).toContain("mise en service unique de 150,00 € HT");
+    expect(article3?.paragraphs.join(" ")).toContain("mise en service unique de 200,00 € HT");
     const priced = specimenDocument({ company: companyPartyOf(profile), plan: { name: "PharmaBoost", monthlyPriceCents: 12900, trialDays: 30 }, startDate: new Date("2026-10-03T08:00:00Z") });
     expect(priced.sections.find((s) => s.heading.startsWith("Article 3"))?.paragraphs[0]).toContain("129,00 € HT");
   });

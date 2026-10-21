@@ -1,5 +1,5 @@
 import { TIME_ZONE } from "@/config/constants";
-import { AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS, monthlyAffiliateCommissionCents, type AffiliateTier } from "@/core/affiliation/terms";
+import { AFFILIATE_SIGNUP_BONUS_CENTS, type AffiliateTier } from "@/core/affiliation/terms";
 import type { ContractDocument, ContractParty } from "./template";
 
 /**
@@ -12,8 +12,12 @@ import type { ContractDocument, ContractParty } from "./template";
  * commercial n'y figure jamais (elle vit à part, dans `director-terms.ts`).
  *
  * Ordre de signature : l'affilié, puis PharmaBoost (contresignature).
+ *
+ * v2 (fondateur, 20 oct. 2026) : l'apporteur d'affaires touche 100 € HT par pharmacie apportée et signée, une seule
+ * fois, une fois sa mise en service réglée ; plus de commission mensuelle. Les contrats v1 signés restent tels quels
+ * (texte figé avec eux).
  */
-export const AFFILIATE_CONTRACT_TEMPLATE_KEY = "affiliation-pharmaboost-v1";
+export const AFFILIATE_CONTRACT_TEMPLATE_KEY = "affiliation-pharmaboost-v2";
 
 export type AffiliateParty = {
   firstName: string;
@@ -25,6 +29,7 @@ export type AffiliateParty = {
 
 /** Les conditions imprimées, figées avec le contrat (colonne `termsSnapshot`). */
 export type AffiliateContractTerms = {
+  /** Paliers du pourcentage mensuel : contrats v1 seulement, vide depuis la v2. */
   tiers: AffiliateTier[];
   signupBonusCents: number;
   /** Le tarif mensuel HT qui sert d'exemple chiffré (offre de la console, sinon offre officielle). */
@@ -34,16 +39,11 @@ export type AffiliateContractTerms = {
 
 /** Les conditions du jour, lues depuis la source unique de l'affiliation. */
 export function currentAffiliateTerms(exampleMonthlyPriceCents: number, startDate: Date): AffiliateContractTerms {
-  return { tiers: AFFILIATE_TIERS.map((tier) => ({ ...tier })), signupBonusCents: AFFILIATE_SIGNUP_BONUS_CENTS, exampleMonthlyPriceCents, startDate: startDate.toISOString() };
+  return { tiers: [], signupBonusCents: AFFILIATE_SIGNUP_BONUS_CENTS, exampleMonthlyPriceCents, startDate: startDate.toISOString() };
 }
 
 const euros = (cents: number) => `${(cents / 100).toFixed(2).replace(".", ",")} € HT`;
 const dateFr = (d: Date) => new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "numeric", month: "long", year: "numeric" }).format(d);
-
-function tierLine(tier: AffiliateTier): string {
-  const range = tier.max === null ? `à partir de ${tier.min} pharmacies abonnées` : `de ${tier.min} à ${tier.max} pharmacie${tier.max > 1 ? "s" : ""} abonnée${tier.max > 1 ? "s" : ""}`;
-  return `${tier.ratePercent} % ${range}`;
-}
 
 export function buildAffiliateContractDocument(input: {
   reference: string;
@@ -54,9 +54,6 @@ export function buildAffiliateContractDocument(input: {
 }): ContractDocument {
   const { company, affiliate, terms } = input;
   const fullName = `${affiliate.firstName} ${affiliate.lastName}`.trim();
-  const first = terms.tiers[0];
-  const last = terms.tiers[terms.tiers.length - 1];
-  const example = terms.exampleMonthlyPriceCents;
   return {
     templateKey: AFFILIATE_CONTRACT_TEMPLATE_KEY,
     title: "Contrat d'affiliation PharmaBoost",
@@ -79,23 +76,20 @@ export function buildAffiliateContractDocument(input: {
       {
         heading: "Article 2 — Pharmacie apportée",
         paragraphs: [
-          "Est une pharmacie apportée par l'Affilié celle dont le dossier est rattaché à l'Affilié dans PharmaBoost (lien d'affiliation, dossier créé depuis son espace) et qui souscrit un abonnement PharmaBoost. Le rattachement enregistré dans PharmaBoost fait foi.",
+          "Est une pharmacie apportée par l'Affilié celle dont le dossier est rattaché à l'Affilié dans PharmaBoost (lien d'affiliation, dossier créé depuis son espace, pharmacie indiquée par l'Affilié sur le site de la Société) et qui souscrit un abonnement PharmaBoost. Le rattachement enregistré dans PharmaBoost fait foi.",
         ],
       },
       {
         heading: "Article 3 — Rémunération",
         paragraphs: [
-          `Commission mensuelle : pour chaque mois au cours duquel une pharmacie apportée est abonnée au dernier jour du mois, l'Affilié perçoit un pourcentage de l'abonnement mensuel hors taxes de cette pharmacie. Ce pourcentage dépend du nombre de pharmacies apportées par l'Affilié et abonnées à la fin du mois : ${terms.tiers.map(tierLine).join(" ; ")}.`,
-          "Le taux du palier atteint s'applique à toutes les pharmacies apportées de l'Affilié pour le mois considéré. Il est recalculé chaque mois et inscrit sur chaque ligne de commission.",
-          `Prime d'apport : l'Affilié perçoit en outre une prime unique de ${euros(terms.signupBonusCents)} par pharmacie apportée, due une seule fois, lorsque la mise en service de cette pharmacie a été effectivement réglée.`,
-          "Durée : la commission mensuelle est due à vie, pour chaque mois où la pharmacie apportée reste abonnée. Elle cesse dès que la pharmacie n'est plus abonnée à la fin d'un mois, et reprend si elle se réabonne.",
-          `Exemple : pour un abonnement de ${euros(example)} par mois, la commission mensuelle est de ${euros(monthlyAffiliateCommissionCents(example, first.ratePercent / 100))} par pharmacie au premier palier (${first.ratePercent} %) et de ${euros(monthlyAffiliateCommissionCents(example, last.ratePercent / 100))} par pharmacie au dernier palier (${last.ratePercent} %).`,
+          `Prime d'apport : pour chaque pharmacie apportée qui signe son abonnement PharmaBoost, l'Affilié perçoit une prime unique de ${euros(terms.signupBonusCents)}, due une seule fois par pharmacie, dès que la mise en service de cette pharmacie a été effectivement réglée à la Société.`,
+          "Cette prime constitue l'intégralité de la rémunération de l'Affilié : aucune commission mensuelle ni aucun pourcentage de l'abonnement n'est dû.",
         ],
       },
       {
         heading: "Article 4 — Facturation et paiement",
         paragraphs: [
-          "Les commissions acquises apparaissent chaque mois dans l'espace de l'Affilié. L'Affilié adresse sa facture à la Société depuis cet espace ; la Société la règle par virement dans les trente jours de sa réception. Les montants s'entendent hors taxes ; l'Affilié est seul responsable de ses obligations fiscales et sociales.",
+          "Les primes acquises apparaissent dans l'espace de l'Affilié. L'Affilié adresse sa facture à la Société depuis cet espace ; la Société la règle par virement dans les trente jours de sa réception. Les montants s'entendent hors taxes ; l'Affilié est seul responsable de ses obligations fiscales et sociales.",
         ],
       },
       {
@@ -108,7 +102,7 @@ export function buildAffiliateContractDocument(input: {
         heading: "Article 6 — Durée et résiliation",
         paragraphs: [
           `Le présent contrat prend effet le ${dateFr(new Date(terms.startDate))} pour une durée indéterminée. Chaque partie peut y mettre fin à tout moment par écrit, avec un préavis d'un mois.`,
-          "Après la fin du contrat, les commissions mensuelles des pharmacies apportées restent dues dans les conditions de l'article 3, sauf résiliation pour manquement grave de l'Affilié.",
+          "Après la fin du contrat, les primes des pharmacies apportées avant cette date restent dues dans les conditions de l'article 3, sauf résiliation pour manquement grave de l'Affilié.",
         ],
       },
       {

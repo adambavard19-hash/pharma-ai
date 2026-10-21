@@ -4,14 +4,14 @@ import { OFFICIAL_OFFER } from "@/core/pricing/official-offer";
  * Le parrainage, côté règles pures : la forme d'un code et la remise.
  *
  * Chaque officine a un code « PB-XXXXXX ». Dès qu'au moins UNE officine qu'elle
- * parraine est abonnée (un filleul actif), son abonnement passe à 20 % de moins
- * par mois : 20 % de son prix CONTRACTUEL, arrondi au centime. La remise ne se
- * cumule pas : deux filleuls, c'est toujours 20 %, jamais 40 %.
+ * parraine est abonnée (un filleul actif), son abonnement passe à 10 % de moins
+ * par mois : 10 % de son prix CONTRACTUEL, arrondi au centime. La remise ne se
+ * cumule pas : deux filleuls, c'est toujours 10 %, jamais 20 %.
  *
  * Exception explicite : une OFFRE de parrainage de la console fait apporter à
  * chaque nouveau filleul, pendant sa durée, un montant fixe par mois. Ce montant
  * est figé sur la fiche du filleul à son inscription (`Pharmacy.referralAmountCents`,
- * `null` hors offre). Le parrain bénéficie alors du plus avantageux entre les 20 %
+ * `null` hors offre). Le parrain bénéficie alors du plus avantageux entre les 10 %
  * et la somme des montants d'offre de ses filleuls actifs, jamais plus que son prix.
  *
  * La remise est CALCULÉE ici, une seule fois pour tous : l'écran du titulaire, la
@@ -50,17 +50,17 @@ export function normalizeReferralCode(value: string | null | undefined): string 
 
 const isPrice = (value: number | null | undefined): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
 
-/** 20 % du prix contractuel, arrondi au centime ; 0 sans prix connu (pas d'abonnement) ou à prix nul. */
+/** 10 % du prix contractuel, arrondi au centime ; 0 sans prix connu (pas d'abonnement) ou à prix nul. */
 export function referralPercentDiscountCents(monthlyPriceCents: number | null): number {
   return isPrice(monthlyPriceCents) ? Math.round((monthlyPriceCents * REFERRAL_DISCOUNT_PERCENT) / 100) : 0;
 }
 
-/** La remise mensuelle des 20 % : dès UN filleul actif, jamais davantage quel que soit leur nombre ; 0 sans filleul actif. */
+/** La remise mensuelle des 10 % : dès UN filleul actif, jamais davantage quel que soit leur nombre ; 0 sans filleul actif. */
 export function referralDiscountCents(activeReferrals: number, monthlyPriceCents: number | null): number {
   return activeReferrals >= 1 ? referralPercentDiscountCents(monthlyPriceCents) : 0;
 }
 
-/** Le montant d'offre figé sur ce filleul à son inscription, ou `null` : hors offre, c'est la règle des 20 % qui s'applique. */
+/** Le montant d'offre figé sur ce filleul à son inscription, ou `null` : hors offre, c'est la règle des 10 % qui s'applique. */
 export function referralOfferAmountFor(filleul: { referralAmountCents: number | null }): number | null {
   const amount = filleul.referralAmountCents;
   return typeof amount === "number" && Number.isFinite(amount) && amount > 0 ? amount : null;
@@ -76,14 +76,14 @@ export function referralDiscountForAmounts(amountsCents: number[], monthlyPriceC
 export type ReferralBenefit = {
   /** La remise mensuelle HT, en centimes. */
   discountCents: number;
-  /** D'où elle vient : les 20 %, ou la somme des montants d'offre (quand elle est plus avantageuse) ; `null` sans remise. */
+  /** D'où elle vient : les 10 %, ou la somme des montants d'offre (quand elle est plus avantageuse) ; `null` sans remise. */
   basis: "PERCENT" | "OFFERS" | null;
 };
 
 /**
- * La remise d'un parrain : le plus avantageux entre les 20 % (dès un filleul
+ * La remise d'un parrain : le plus avantageux entre les 10 % (dès un filleul
  * actif) et la somme des montants d'offre de ses filleuls actifs, bornée par son
- * prix contractuel. À égalité, les 20 % (la règle, pas l'exception).
+ * prix contractuel. À égalité, les 10 % (la règle, pas l'exception).
  */
 export function referralBenefit(filleuls: { active: boolean; offerAmountCents: number | null }[], monthlyPriceCents: number | null): ReferralBenefit {
   const active = filleuls.filter((f) => f.active);

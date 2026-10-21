@@ -19,7 +19,7 @@ import { When } from "../client-ui";
 import { EmptyLine } from "./shared";
 
 /**
- * Ce que sa filleule apporte à son parrain : 20 % de moins par mois, une seule fois (jamais cumulé entre filleuls),
+ * Ce que sa filleule apporte à son parrain : 10 % de moins par mois, une seule fois (jamais cumulé entre filleuls),
  * appliqués à l'abonnement par l'équipe. Seule exception : le montant d'une offre de parrainage en cours à son
  * inscription, figé sur sa fiche (`null` hors offre).
  */
@@ -43,7 +43,7 @@ export async function CommercialTab({ base, now }: { base: Pharmacy360; now: Dat
         items={[
           { label: "Code de parrainage", value: pharmacy.referralCode ?? "Attribué à la première ouverture de l'onglet Mon abonnement" },
           { label: "Parrainée par", value: pharmacy.referredBy ? <Link href={`/admin/pharmacies/${pharmacy.referredBy.id}`} className="text-brand-700 hover:underline dark:text-brand-400">{pharmacy.referredBy.name}</Link> : "—" },
-          // Pour un filleul : ce qu'il apporte à son parrain, les 20 % ou le montant d'offre figé à son inscription.
+          // Pour un filleul : ce qu'il apporte à son parrain, les 10 % ou le montant d'offre figé à son inscription.
           ...(pharmacy.referredBy ? [{ label: "Remise apportée à son parrain", ...referralEffect(referralOfferAmountFor(pharmacy)) }] : []),
           {
             label: `Filleules (${pharmacy.referrals.length})`,
@@ -58,7 +58,7 @@ export async function CommercialTab({ base, now }: { base: Pharmacy360; now: Dat
                         {r.name}
                       </Link>
                       {r.city ? ` · ${r.city}` : ""}
-                      {/* Le montant figé n'est dit que pour une offre à son inscription : hors offre, c'est la règle des 20 %. */}
+                      {/* Le montant figé n'est dit que pour une offre à son inscription : hors offre, c'est la règle des 10 %. */}
                       {referralOfferAmountFor(r) !== null ? ` · ${formatEuros(r.referralAmountCents!)} par mois (offre à son inscription)` : ""}
                       {r.isActive ? "" : " · suspendue"}
                     </li>

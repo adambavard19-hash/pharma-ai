@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Souscription depuis le site avec l'abonnement unique : le prix figé est celui que
- * le visiteur a VU, le contrat ne part JAMAIS tout seul (la mise en service de 150 €
+ * le visiteur a VU, le contrat ne part JAMAIS tout seul (la mise en service de 200 €
  * n'existe pas dans le contrat automatique), et le confrère à parrainer est enregistré
  * sans qu'aucun message ne lui soit envoyé. Ni base, ni envoi réel : le fournisseur de
  * messagerie est simulé.
@@ -71,7 +71,7 @@ describe("souscription depuis le site : un seul abonnement, le contrat ne part j
     expect(result).toMatchObject({ ok: true, outcome: { status: "RECEIVED", prospectId: "p-new" } });
     expect(createdData()).toMatchObject({ monthlyPriceCents: 12_600, origin: "SELF_SERVICE_SITE" });
     expect(createdData()).not.toHaveProperty("subscriptionFormula");
-    expect(summaries().join(" ")).toContain("abonnement à 126 € HT / mois, engagement 12 mois, mise en service 150 € HT");
+    expect(summaries().join(" ")).toContain("abonnement à 126 € HT / mois, engagement 12 mois, mise en service 200 € HT");
   });
 
   it("le contrat est RETENU : aucun lien de confirmation, aucun contrat lancé, l'équipe est invitée à fixer les conditions", async () => {
@@ -81,7 +81,7 @@ describe("souscription depuis le site : un seul abonnement, le contrat ne part j
     expect(contracts.startContracting).not.toHaveBeenCalled();
     const blocked = adminNotices().find((n) => n.type === "DOSSIER_BLOCKED");
     expect(blocked).toMatchObject({ title: "Contrat retenu — Pharmacie du Port", linkUrl: "/admin/dossiers/p-new" });
-    expect(blocked?.body).toContain("la mise en service de 150 € HT n'est pas prévue au contrat automatique");
+    expect(blocked?.body).toContain("la mise en service de 200 € HT n'est pas prévue au contrat automatique");
     expect(blocked?.body).toContain("« Envoyer le contrat »");
     expect(blocked?.body).toContain("engagement de 12 mois");
   });

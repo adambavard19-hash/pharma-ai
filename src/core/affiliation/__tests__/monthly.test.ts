@@ -94,7 +94,7 @@ describe("le montant", () => {
   });
 
   it("la phrase de la règle", () => {
-    expect(AFFILIATE_RULE_SENTENCE.replace(/\s/g, " ")).toBe("de 10 % à 20 % de l'abonnement de chaque pharmacie, chaque mois, à vie, selon le nombre de pharmacies apportées");
+    expect(AFFILIATE_RULE_SENTENCE.replace(/\s/g, " ")).toBe("100 € HT par pharmacie apportée et signée, versés une fois sa mise en service réglée");
   });
 
   it("le taux du palier, quand il est donné : 12 % de 126 € = 15,12 €, 20 % = 25,20 €", () => {

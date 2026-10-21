@@ -167,12 +167,12 @@ describe("règle « filleul inscrit »", () => {
     db.state.filleuls = [filleulRow()];
   });
 
-  it("l'e-mail part au titulaire du PARRAIN, avec le nom de l'officine du filleul et la remise : 20 % de moins", async () => {
+  it("l'e-mail part au titulaire du PARRAIN, avec le nom de l'officine du filleul et la remise : 10 % de moins", async () => {
     const report = await runAutomations({ now: NOW, dryRun: false });
     expect(report).toMatchObject({ planned: 1, sent: 1, errors: [] });
     expect(mocks.pharmacyRecipient).toHaveBeenCalledWith("ph_parrain");
     expect(mocks.pharmacyRecipient).not.toHaveBeenCalledWith("ph_filleul");
-    expect(mocks.templateValuesFor).toHaveBeenCalledWith(PARRAIN, { filleul: "Pharmacie du Marché", montant_remise: "20 %" });
+    expect(mocks.templateValuesFor).toHaveBeenCalledWith(PARRAIN, { filleul: "Pharmacie du Marché", montant_remise: "10 %" });
     expect(mocks.sendTemplatedEmail).toHaveBeenCalledTimes(1);
     expect(mocks.sendTemplatedEmail.mock.calls[0][0]).toMatchObject({ templateKey: "referral.filleul_joined", recipient: PARRAIN, trigger: "AUTOMATIC", ruleKey: "referral.filleul_joined" });
   });
@@ -190,7 +190,7 @@ describe("règle « filleul inscrit »", () => {
     expect(notification).toMatchObject({ pharmacyId: "ph_parrain", type: "SYSTEM", linkUrl: "/parametres?onglet=abonnement" });
     expect(notification.title).toBe("Nouveau filleul : Pharmacie du Marché");
     expect(notification.body).toContain("Pharmacie du Marché");
-    expect(notification.body).toContain("Votre abonnement passe à 20 % de moins par mois");
+    expect(notification.body).toContain("Votre abonnement passe à 10 % de moins par mois");
     expect(notification.body).toContain("s'applique d'elle-même à vos factures suivantes");
     // Plus aucun montant fixe par filleul.
     expect(notification.body).not.toMatch(/10\s?€/);
@@ -206,10 +206,10 @@ describe("règle « filleul inscrit »", () => {
     ];
     await runAutomations({ now: NOW, dryRun: false });
     const extras = mocks.templateValuesFor.mock.calls.map((c) => c[1]);
-    expect(extras).toEqual(expect.arrayContaining([{ filleul: "Pharmacie d'Avant", montant_remise: "20 %" }, { filleul: "Pharmacie de l'Offre", montant_remise: "20 %" }]));
+    expect(extras).toEqual(expect.arrayContaining([{ filleul: "Pharmacie d'Avant", montant_remise: "10 %" }, { filleul: "Pharmacie de l'Offre", montant_remise: "10 %" }]));
     const bodies = mocks.createNotification.mock.calls.map((c) => (c[0] as { body: string }).body);
-    expect(bodies.some((b) => b.includes("Pharmacie d'Avant") && b.includes("20 % de moins"))).toBe(true);
-    expect(bodies.some((b) => b.includes("Pharmacie de l'Offre") && b.includes("20 % de moins"))).toBe(true);
+    expect(bodies.some((b) => b.includes("Pharmacie d'Avant") && b.includes("10 % de moins"))).toBe(true);
+    expect(bodies.some((b) => b.includes("Pharmacie de l'Offre") && b.includes("10 % de moins"))).toBe(true);
     // Le montant d'une offre n'est jamais annoncé : il sort de l'écran du titulaire, calculé avec le plus avantageux.
     expect(JSON.stringify([extras, bodies])).not.toContain("25,50");
   });
@@ -325,7 +325,7 @@ describe("règle « filleul inscrit »", () => {
 
   it("l'envoi est tracé au journal d'audit sans adresse ni nom de personne", async () => {
     await runAutomations({ now: NOW, dryRun: false, adminId: "adm_1" });
-    expect(mocks.recordAudit).toHaveBeenCalledWith({ action: "referral.filleul_notified", entityType: "Pharmacy", entityId: "ph_filleul", pharmacyId: "ph_parrain", platformAdminId: "adm_1", metadata: { ruleKey: "referral.filleul_joined", discountPercent: 20, emailStatus: "SENT", inApp: true } });
+    expect(mocks.recordAudit).toHaveBeenCalledWith({ action: "referral.filleul_notified", entityType: "Pharmacy", entityId: "ph_filleul", pharmacyId: "ph_parrain", platformAdminId: "adm_1", metadata: { ruleKey: "referral.filleul_joined", discountPercent: 10, emailStatus: "SENT", inApp: true } });
   });
 });
 

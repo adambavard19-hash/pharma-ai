@@ -237,9 +237,8 @@ describe("l'affilié (10 % chaque mois, à vie)", () => {
     const content = text(html);
 
     expect(mocks.affiliateOverviewFor).toHaveBeenCalledWith("rep_1");
-    expect(content).toContain("De 10 % à 20 % de l'abonnement de chaque pharmacie, chaque mois, à vie, selon le nombre de pharmacies apportées");
-    expect(content).toContain("10 % de 1 à 9 pharmacies, 12 % de 10 à 24, 15 % de 25 à 49, 20 % à partir de 50");
-    expect(content).toMatch(/Votre palier aujourd'hui : 10 % \(2 pharmacies abonnées, palier 1 à 9 pharmacies\) — 12 % à partir de 10 pharmacies/);
+    expect(content).toContain("100 € HT par pharmacie apportée et signée, versés une fois sa mise en service réglée");
+    expect(content).toContain("Les pharmacies activées avant le 21 octobre 2026 gardent leur commission mensuelle.");
     expect(content).toContain("taux 10 %");
     // La prime du directeur n'est jamais montrée à un affilié.
     expect(content).not.toMatch(/directeur/i);
@@ -249,12 +248,11 @@ describe("l'affilié (10 % chaque mois, à vie)", () => {
     expect(pay).toContain("Mes tarifs et ma rémunération");
     expect(pay).toMatch(/Abonnement 126 € HT par mois/);
     expect(pay).toMatch(/Mise en service 150 € HT/);
-    expect(pay).toMatch(/Prime d'arrivée 100 € HT/);
+    expect(pay).toMatch(/Votre prime 100 € HT par pharmacie signée/);
     expect(pay).toContain("Simulateur de revenus");
-    // 50 pharmacies par défaut : palier à 20 %, 50 × 25,20 € = 1 260 € par mois, et 50 × 100 € = 5 000 € de primes.
-    expect(pay).toMatch(/20 % sur toutes vos pharmacies/);
-    expect(pay).toMatch(/1 260 € par mois/);
-    expect(pay).toMatch(/\+ 5 000 € de primes d'arrivée/);
+    // 10 pharmacies par défaut : 10 × 100 € = 1 000 € de primes, plus aucun pourcentage mensuel.
+    expect(pay).toMatch(/Vos primes estimées 1 000 €/);
+    expect(pay).not.toMatch(/sur toutes vos pharmacies/);
     expect(content).toMatch(/Revenus récurrents 22,68 € \/ mois 2 pharmacies abonnées × 10 %/);
     expect(content).toContain("Pharmacie Fermée");
     expect(content).toContain("Non abonnée");

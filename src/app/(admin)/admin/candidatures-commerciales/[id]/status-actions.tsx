@@ -84,7 +84,7 @@ export function StatusActions({ id, status, locked }: { id: string; status: Sale
               icon={<UserCheck className="size-3.5" />}
               variant="primary"
               title="Accepter cette candidature ?"
-              description="Accepter, c'est ouvrir l'espace de l'affilié : son compte de l'extranet est créé et il reçoit aussitôt par e-mail le lien pour choisir son mot de passe. Sa rémunération : de 10 % à 20 % de l'abonnement de chaque pharmacie qu'il apporte, selon le nombre de pharmacies apportées, chaque mois, à vie, plus 100 € de prime par pharmacie une fois sa mise en service réglée."
+              description="Accepter, c'est ouvrir l'espace de l'affilié : son compte de l'extranet est créé et il reçoit aussitôt par e-mail le lien pour choisir son mot de passe. Sa rémunération : 100 € HT par pharmacie qu'il apporte et qui signe, une seule fois, dès que sa mise en service est réglée."
               confirmLabel="Accepter et créer son espace"
               disabled={pending}
               onConfirm={() => moveSalesApplicationAction({ id, to })}

@@ -243,13 +243,13 @@ describe("la page « Pourquoi » : ce que propose la bannière, la phrase de l'�
   });
 });
 
-describe("le simulateur : les barres sont un dessin, pas une liste de définitions", () => {
-  it("n'emploie plus dl/dt/dd, et garde ses deux libellés", () => {
+describe("le simulateur : plus de barres de comparaison (fondateur, 20 oct. 2026)", () => {
+  it("n'emploie pas dl/dt/dd, et ne montre plus la barre « Abonnement »", () => {
     const html = renderToStaticMarkup(createElement(RevenueCalculator, { monthlyPriceCents: 12_600 }));
     expect(html).not.toMatch(/<d[ltd][\s>]/);
     const shown = visible(html);
-    expect(shown).toContain("Chiffre d'affaires estimé");
-    expect(shown).toContain("Abonnement 126 €");
+    expect(shown).toContain("Chiffre d'affaires supplémentaire estimé");
+    expect(shown).not.toContain("Abonnement 126 €");
   });
 });
 

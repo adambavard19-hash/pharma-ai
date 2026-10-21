@@ -10,8 +10,8 @@ export { normalizeReferralCode };
 /**
  * Le parrainage : chaque officine a un code. Une officine qui s'abonne avec
  * ce code (ou que l'équipe a rattachée à son parrain) est son filleul. Dès
- * qu'un filleul est actif, l'abonnement du parrain passe à 20 % de moins par
- * mois, une seule fois : deux filleuls ne font pas 40 %.
+ * qu'un filleul est actif, l'abonnement du parrain passe à 10 % de moins par
+ * mois, une seule fois : deux filleuls ne font pas 20 %.
  *
  * La règle vit dans core/billing/referral. Seule exception : le montant par
  * filleul d'une offre de parrainage de la console, figé sur la fiche du filleul
@@ -51,7 +51,7 @@ export async function resolveReferralCode(value: string | null | undefined): Pro
 export type ReferralSummary = {
   code: string;
   link: string;
-  /** L'offre de parrainage en cours : un montant par filleul inscrit pendant sa durée, exception aux 20 %. */
+  /** L'offre de parrainage en cours : un montant par filleul inscrit pendant sa durée, exception aux 10 %. */
   currentOffer: { amountCents: number; endsAt: Date | null; label: string } | null;
   /** Le tarif contractuel de l'officine, ou `null` sans abonnement suivi. */
   monthlyPriceCents: number | null;
@@ -60,7 +60,7 @@ export type ReferralSummary = {
   activeCount: number;
   /** La remise mensuelle appliquée aujourd'hui : 0 sans filleul actif ou sans abonnement. */
   discountCents: number;
-  /** D'où vient la remise : les 20 %, ou les montants d'offre quand ils sont plus avantageux. */
+  /** D'où vient la remise : les 10 %, ou les montants d'offre quand ils sont plus avantageux. */
   discountBasis: ReferralBenefit["basis"];
   referredBy: string | null;
 };
@@ -100,7 +100,7 @@ export async function referralState(pharmacyId: string) {
   });
   const subscription = pharmacy.organization.subscription;
   const monthlyPriceCents = subscription ? contractualPrice(subscription, subscription.plan).cents : null;
-  // 20 % dès un filleul actif, ou la somme des montants d'offre si elle est plus avantageuse.
+  // 10 % dès un filleul actif, ou la somme des montants d'offre si elle est plus avantageuse.
   const benefit = referralBenefit(referrals, monthlyPriceCents);
   return { referrals, monthlyPriceCents, benefit, referredBy: pharmacy.referredBy?.name ?? null };
 }

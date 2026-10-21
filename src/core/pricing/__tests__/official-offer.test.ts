@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { OFFICIAL_OFFER, formatPriceEuros, pricingPlanGaps, referrerPriceCents, resolvePublicPricing, resolveStandardCommissionCents, STANDARD_COMMISSION_MAX_CENTS } from "../official-offer";
 
 describe("l'offre officielle", () => {
-  it("dit un seul abonnement : 126 € HT par mois, engagement 12 mois, mise en service unique de 150 € HT, parrainage à 20 %", () => {
-    expect(OFFICIAL_OFFER).toMatchObject({ monthlyPriceCents: 12_600, setupFeeCents: 15_000, commitmentMonths: 12, referralDiscountPercent: 20, standardCommissionCents: 25_000 });
+  it("dit un seul abonnement : 126 € HT par mois, engagement 12 mois, mise en service unique de 200 € HT, parrainage à 10 %", () => {
+    expect(OFFICIAL_OFFER).toMatchObject({ monthlyPriceCents: 12_600, setupFeeCents: 20_000, commitmentMonths: 12, referralDiscountPercent: 10, standardCommissionCents: 25_000 });
   });
 
   it("n'a plus de formule annuelle", () => {
@@ -16,7 +16,7 @@ describe("resolvePublicPricing", () => {
   const plan = { name: "Offre console", monthlyPriceCents: 13_900, setupFeeCents: 31_000 };
 
   it("sans offre publiée : l'offre officielle", () => {
-    expect(resolvePublicPricing(null)).toEqual({ name: "PharmaBoost Officine", source: "OFFICIAL_DEFAULT", monthlyPriceCents: 12_600, setupFeeCents: 15_000, commitmentMonths: 12, referralDiscountPercent: 20 });
+    expect(resolvePublicPricing(null)).toEqual({ name: "PharmaBoost Officine", source: "OFFICIAL_DEFAULT", monthlyPriceCents: 12_600, setupFeeCents: 20_000, commitmentMonths: 12, referralDiscountPercent: 10 });
   });
 
   it("une offre COMPLÈTE de la console prime", () => {
@@ -25,7 +25,7 @@ describe("resolvePublicPricing", () => {
 
   it("une offre incomplète ne se mélange jamais à l'officielle : l'officielle d'un bloc", () => {
     for (const partial of [{ ...plan, setupFeeCents: null }, { ...plan, monthlyPriceCents: 0 }]) {
-      expect(resolvePublicPricing(partial)).toMatchObject({ source: "OFFICIAL_DEFAULT", monthlyPriceCents: 12_600, setupFeeCents: 15_000 });
+      expect(resolvePublicPricing(partial)).toMatchObject({ source: "OFFICIAL_DEFAULT", monthlyPriceCents: 12_600, setupFeeCents: 20_000 });
     }
   });
 
@@ -40,13 +40,13 @@ describe("resolvePublicPricing", () => {
   });
 });
 
-describe("le parrainage : 20 % de moins par mois", () => {
-  it("126 € deviennent 100,80 € HT", () => {
-    expect(referrerPriceCents(12_600)).toBe(10_080);
-    expect(referrerPriceCents(12_600, 20)).toBe(10_080);
+describe("le parrainage : 10 % de moins par mois", () => {
+  it("126 € deviennent 113,40 € HT", () => {
+    expect(referrerPriceCents(12_600)).toBe(11_340);
+    expect(referrerPriceCents(12_600, 10)).toBe(11_340);
   });
   it("arrondit au centime", () => {
-    expect(referrerPriceCents(9_999)).toBe(7_999);
+    expect(referrerPriceCents(9_999)).toBe(8_999);
   });
 });
 
@@ -63,8 +63,8 @@ describe("la commission standard", () => {
 describe("formatPriceEuros", () => {
   it("espaces insécables, virgule française, pas de décimales inutiles", () => {
     expect(formatPriceEuros(12_600)).toBe("126\u00a0€");
-    expect(formatPriceEuros(15_000)).toBe("150\u00a0€");
-    expect(formatPriceEuros(10_080)).toBe("100,80\u00a0€");
+    expect(formatPriceEuros(20_000)).toBe("200\u00a0€");
+    expect(formatPriceEuros(11_340)).toBe("113,40\u00a0€");
     expect(formatPriceEuros(500_000)).toBe("5\u00a0000\u00a0€");
   });
 });

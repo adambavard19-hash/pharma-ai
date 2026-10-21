@@ -15,7 +15,7 @@ import type { NormalizedReferee } from "@/core/contracts/subscription-request";
  * parrainer. Rien n'est envoyé à cette personne, ni e-mail ni SMS : l'équipe la
  * contacte. Si elle ouvre ensuite son propre dossier avec la même adresse e-mail,
  * le dossier lui est rattaché ; et si son officine est créée, elle devient la
- * filleule de l'officine qui l'a proposée : son parrain passe à 20 % de moins par
+ * filleule de l'officine qui l'a proposée : son parrain passe à 10 % de moins par
  * mois (la remise est calculée dans core/billing/referral, appliquée par l'équipe).
  *
  * Statuts : NEW (à contacter) · CONTACTED · LINKED (la personne a ouvert son

@@ -82,12 +82,21 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
             </ul>
           </div>
 
-          {/* Le parrainage : ce que ça change sur la facture mensuelle, chiffré. */}
-          <div className="mt-4 rounded-2xl bg-brand-50 px-5 py-4">
-            <p className="text-[15px] font-semibold text-brand-900">Parrainez un confrère : {referralDiscountPercent} % de moins par mois</p>
-            <p className="mt-1 text-[13.5px] leading-5 text-brand-900/85">
-              Au moment de votre inscription, indiquez la personne que vous parrainez. Dès qu&apos;elle s&apos;abonne, vous ne payez plus {formatPriceEuros(monthlyPriceCents)} mais {formatPriceEuros(referrerPrice)} HT par mois.
-            </p>
+          {/* Le parrainage, bien en vue (fondateur, 20 oct. 2026) : la remise en grand, puis le prix barré. */}
+          <div className="mt-4 flex items-center gap-4 rounded-2xl border-2 border-brand-500 bg-brand-50 px-5 py-4" data-parrainage="">
+            <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-[#0796b4] text-[16px] font-bold text-white tabular">
+              −{referralDiscountPercent}&nbsp;%
+            </span>
+            <div className="min-w-0">
+              <p className="text-[15.5px] font-semibold text-brand-900">Parrainez un confrère : {referralDiscountPercent} % de moins par mois</p>
+              <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[14px] text-brand-900/85">
+                <s className="tabular text-brand-900/60">{formatPriceEuros(monthlyPriceCents)}</s>
+                <span className="text-[17px] font-bold text-brand-700 tabular">{formatPriceEuros(referrerPrice)} HT / mois</span>
+              </p>
+              <p className="mt-1 text-[13px] leading-5 text-brand-900/80">
+                Au moment de votre inscription, indiquez la personne que vous parrainez. Dès qu&apos;elle s&apos;abonne, vous ne payez plus {formatPriceEuros(monthlyPriceCents)} mais {formatPriceEuros(referrerPrice)} HT par mois.
+              </p>
+            </div>
           </div>
 
           <div className="mt-6">

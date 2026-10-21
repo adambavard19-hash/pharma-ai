@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/server/db/client";
-import { AFFILIATE_RECURRING_RATE, AFFILIATE_SIGNUP_BONUS_CENTS, affiliateRateFor, rateLabel } from "@/core/affiliation/terms";
+import { AFFILIATE_RECURRING_RATE, AFFILIATE_SIGNUP_BONUS_CENTS, affiliateRateFor, monthlyCommissionApplies, rateLabel } from "@/core/affiliation/terms";
 import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
 import { AFFILIATION_PROGRAM_START, ONE_OFF_COMMISSION_TYPES, SIGNUP_BONUS_KEY, affiliateCommissionForMonth, signupBonusDue, monthPeriodOf, monthlySubscriptionCents, previousMonthPeriod, subscribedAtMonthEnd, type MonthPeriod, type SubscriptionFacts } from "@/core/affiliation/monthly";
 import { formatCents } from "@/lib/format";
@@ -86,7 +86,8 @@ export type MonthlyAffiliateRun = {
   created: number;
   alreadyThere: number;
   totalCreatedCents: number;
-  skipped: { notSubscribed: number; oldRule: number; demo: number; otherRep: number };
+  /** `newRule` : pharmacie activée depuis la fin du pourcentage mensuel (20 oct. 2026), payée par la seule prime de 100 €. */
+  skipped: { notSubscribed: number; oldRule: number; demo: number; otherRep: number; newRule: number };
   /** Le taux appliqué à chaque affilié ce mois-là, en pourcentage entier (par identifiant d'affilié). */
   ratePercentByRep: Record<string, number>;
 };
@@ -115,7 +116,7 @@ export async function createMonthlyAffiliateCommissions(now: Date = new Date()):
   const period = previousMonthPeriod(now);
   const reps = await prisma.salesRep.findMany({ where: { commissionType: "AFFILIATE", isActive: true }, select: { id: true } });
   const repIds = new Set(reps.map((rep) => rep.id));
-  const run: MonthlyAffiliateRun = { month: period.key, affiliates: reps.length, pharmacies: 0, created: 0, alreadyThere: 0, totalCreatedCents: 0, skipped: { notSubscribed: 0, oldRule: 0, demo: 0, otherRep: 0 }, ratePercentByRep: {} };
+  const run: MonthlyAffiliateRun = { month: period.key, affiliates: reps.length, pharmacies: 0, created: 0, alreadyThere: 0, totalCreatedCents: 0, skipped: { notSubscribed: 0, oldRule: 0, demo: 0, otherRep: 0, newRule: 0 }, ratePercentByRep: {} };
   const createdByRep = new Map<string, { count: number; cents: number; rate: number }>();
   // Les pharmacies déjà commissionnées pour ce mois : le passage quotidien ne réécrit rien pour elles (l'index unique
   // reste le seul vrai verrou, pour deux passages simultanés).
@@ -136,6 +137,7 @@ export async function createMonthlyAffiliateCommissions(now: Date = new Date()):
     if (!prospect.pharmacy || prospect.pharmacy.isDemo) { run.skipped.demo += 1; continue; }
     if (done.has(prospect.id)) { run.alreadyThere += 1; continue; }
     if (prospect.commissions.length > 0) { run.skipped.oldRule += 1; continue; }
+    if (!monthlyCommissionApplies(prospect.activatedAt)) { run.skipped.newRule += 1; continue; }
     const subscription: SubscriptionFacts | null = prospect.pharmacy.organization.subscription;
     const rate = rateOf(salesRepId);
     const ratePercent = Math.round(rate * 100);
@@ -193,7 +195,7 @@ export async function affiliateOverviewFor(salesRepId: string, now: Date = new D
       const subscription = prospect.pharmacy!.organization.subscription;
       const oldRule = prospect.commissions.length > 0;
       const active = subscribedAtMonthEnd(subscription, today);
-      const monthlyCommissionCents = active && !oldRule ? affiliateCommissionForMonth(subscription, today, rate) : 0;
+      const monthlyCommissionCents = active && !oldRule && monthlyCommissionApplies(prospect.activatedAt) ? affiliateCommissionForMonth(subscription, today, rate) : 0;
       return { prospectId: prospect.id, name: prospect.name, active, subscriptionCents: subscription ? monthlySubscriptionCents(subscription) : null, monthlyCommissionCents, oldRule };
     })
     .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, "fr"));

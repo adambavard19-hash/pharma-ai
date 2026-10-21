@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Ce que le titulaire voit de son parrainage : 20 % de moins par mois dès UN
- * filleul actif (jamais cumulé : deux filleuls, toujours 20 %), calculés sur son
+ * Ce que le titulaire voit de son parrainage : 10 % de moins par mois dès UN
+ * filleul actif (jamais cumulé : deux filleuls, toujours 10 %), calculés sur son
  * tarif contractuel. Exception : le montant d'une offre de la console, figé sur
  * la fiche du filleul à son inscription ; le parrain a alors le plus avantageux
- * entre les 20 % et la somme de ces montants, borné par son tarif. Une offre qui
+ * entre les 10 % et la somme de ces montants, borné par son tarif. Une offre qui
  * change ne touche jamais un filleul déjà inscrit. Base simulée, lecture seule.
  */
 
@@ -59,25 +59,25 @@ beforeEach(() => {
 });
 
 describe("parrainage vu du titulaire : sans offre", () => {
-  it("dès un filleul actif, 20 % de moins : 126 € deviennent 100,80 €, et le lien partagé porte le code", async () => {
+  it("dès un filleul actif, 10 % de moins : 126 € deviennent 113,40 €, et le lien partagé porte le code", async () => {
     db.state.filleuls = [filleul("Pharmacie A")];
     const summary = await referralSummary("ph_1");
-    expect(summary).toMatchObject({ code: "PB-ABC234", currentOffer: null, activeCount: 1, discountCents: 2520, discountBasis: "PERCENT", monthlyPriceCents: 12600, link: "https://pharmaboost.test/decouvrir/abonnement?parrain=PB-ABC234" });
-    expect(summary.monthlyPriceCents! - summary.discountCents).toBe(10080);
+    expect(summary).toMatchObject({ code: "PB-ABC234", currentOffer: null, activeCount: 1, discountCents: 1260, discountBasis: "PERCENT", monthlyPriceCents: 12600, link: "https://pharmaboost.test/decouvrir/abonnement?parrain=PB-ABC234" });
+    expect(summary.monthlyPriceCents! - summary.discountCents).toBe(11340);
     expect(summary.referrals.map((r) => r.offerAmountCents)).toEqual([null]);
   });
 
-  it("NON CUMULABLE : deux, trois filleuls actifs donnent la même remise de 20 %, jamais 40 %", async () => {
+  it("NON CUMULABLE : deux, trois filleuls actifs donnent la même remise de 10 %, jamais 20 %", async () => {
     db.state.filleuls = [filleul("Pharmacie A"), filleul("Pharmacie B"), filleul("Pharmacie C")];
     const summary = await referralSummary("ph_1");
-    expect(summary).toMatchObject({ activeCount: 3, discountCents: 2520, discountBasis: "PERCENT" });
+    expect(summary).toMatchObject({ activeCount: 3, discountCents: 1260, discountBasis: "PERCENT" });
     expect(summary.referrals.map((r) => r.offerAmountCents)).toEqual([null, null, null]);
   });
 
-  it("la remise suit le tarif CONTRACTUEL de l'officine : 20 % de 99 €, pas de 126 €", async () => {
+  it("la remise suit le tarif CONTRACTUEL de l'officine : 10 % de 99 €, pas de 126 €", async () => {
     db.state.subscription = { contractPriceCents: 9900, plan: { monthlyPriceCents: 12600 } };
     db.state.filleuls = [filleul("Pharmacie A")];
-    expect((await referralSummary("ph_1")).discountCents).toBe(1980);
+    expect((await referralSummary("ph_1")).discountCents).toBe(990);
   });
 
   it("aucun filleul : aucune remise", async () => {
@@ -98,19 +98,19 @@ describe("parrainage vu du titulaire : sans offre", () => {
 });
 
 describe("parrainage vu du titulaire : avec une offre", () => {
-  it("l'écran annonce l'offre en cours ; la remise est le plus avantageux entre les 20 % et le montant d'offre figé du filleul", async () => {
+  it("l'écran annonce l'offre en cours ; la remise est le plus avantageux entre les 10 % et le montant d'offre figé du filleul", async () => {
     db.state.offers = [offer("a", 4000, { endsAt: day("2026-11-01") })];
     db.state.filleuls = [filleul("Avant l'offre"), filleul("Pendant l'offre", { referralAmountCents: 4000 })];
     const summary = await referralSummary("ph_1");
     expect(summary.currentOffer).toEqual({ amountCents: 4000, endsAt: day("2026-11-01"), label: "Offre a" });
     expect(summary.referrals.map((r) => r.offerAmountCents)).toEqual([null, 4000]);
-    // 40 € (le seul filleul d'offre) contre 25,20 € (20 %) : l'offre est prioritaire, sans s'ajouter aux 20 %.
+    // 40 € (le seul filleul d'offre) contre 12,60 € (10 %) : l'offre est prioritaire, sans s'ajouter aux 10 %.
     expect(summary).toMatchObject({ discountCents: 4000, discountBasis: "OFFERS" });
   });
 
-  it("une offre moins avantageuse que les 20 % ne change rien : les 20 % s'appliquent", async () => {
+  it("une offre moins avantageuse que les 10 % ne change rien : les 10 % s'appliquent", async () => {
     db.state.filleuls = [filleul("Pendant l'offre", { referralAmountCents: 1000 })];
-    expect(await referralSummary("ph_1")).toMatchObject({ discountCents: 2520, discountBasis: "PERCENT" });
+    expect(await referralSummary("ph_1")).toMatchObject({ discountCents: 1260, discountBasis: "PERCENT" });
   });
 
   it("une offre qui change, se termine ou est annulée ne modifie JAMAIS le montant d'un filleul déjà inscrit", async () => {
@@ -174,13 +174,13 @@ describe("parrainage vu du titulaire : ce qui compte, et le plafond", () => {
       ["En essai", true, 2500],
     ]);
     expect(summary.activeCount).toBe(2);
-    // Deux filleuls d'offre actifs : 2 × 25 € = 50 €, plus avantageux que 25,20 € ; les deux inactifs n'y ajoutent rien.
+    // Deux filleuls d'offre actifs : 2 × 25 € = 50 €, plus avantageux que 12,60 € ; les deux inactifs n'y ajoutent rien.
     expect(summary).toMatchObject({ discountCents: 5000, discountBasis: "OFFERS" });
   });
 
-  it("un seul filleul actif, des inactifs autour : 20 %, comme pour un seul filleul", async () => {
+  it("un seul filleul actif, des inactifs autour : 10 %, comme pour un seul filleul", async () => {
     db.state.filleuls = [filleul("Active"), filleul("Résiliée", { organization: { subscription: { status: "CANCELED" } } }), filleul("Désactivée", { isActive: false })];
-    expect(await referralSummary("ph_1")).toMatchObject({ activeCount: 1, discountCents: 2520, discountBasis: "PERCENT" });
+    expect(await referralSummary("ph_1")).toMatchObject({ activeCount: 1, discountCents: 1260, discountBasis: "PERCENT" });
   });
 
   it("tous les filleuls sont inactifs : aucune remise", async () => {

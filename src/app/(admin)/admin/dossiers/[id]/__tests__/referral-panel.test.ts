@@ -99,8 +99,8 @@ describe("panneau « Parrainage » d'un dossier", () => {
     expect(html).toContain('href="/admin/pharmacies/ph_7"');
   });
 
-  it("la règle est rappelée : 20 % de moins par mois, une seule fois", async () => {
+  it("la règle est rappelée : 10 % de moins par mois, une seule fois", async () => {
     mocks.loadReferralPanel.mockResolvedValue(panel({ proposed: [lead()] }));
-    expect((await render()).text).toContain("fait passer son parrain à 20 % de moins par mois, une seule fois");
+    expect((await render()).text).toContain("fait passer son parrain à 10 % de moins par mois, une seule fois");
   });
 });

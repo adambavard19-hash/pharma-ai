@@ -170,7 +170,7 @@ describe("espace pharmacie né d'un dossier signé : le parrain vient du confrè
     expect(db.created.pharmacy[0]).toMatchObject({ referredById: "ph_parrain", referralAmountCents: 3000 });
   });
 
-  it("hors offre, rien n'est figé : c'est la règle des 20 %", async () => {
+  it("hors offre, rien n'est figé : c'est la règle des 10 %", async () => {
     noCode();
     db.prisma.referralLead.findUnique.mockResolvedValue(leadFrom({ id: "ph_parrain", name: "Pharmacie Marraine" }));
     await createPharmacyFromProspect("pr_1", ADMIN);
@@ -182,7 +182,7 @@ describe("espace pharmacie né d'un dossier signé : le parrain vient du confrè
     db.prisma.referralLead.findUnique.mockResolvedValue(leadFrom({ id: "ph_parrain", name: "Pharmacie Marraine" }));
     await createPharmacyFromProspect("pr_1", ADMIN);
     expect(written().find((e) => e.prospectId === "pr_1" && e.summary.startsWith("Parrainage rattaché"))?.summary).toContain("« Pharmacie Marraine »");
-    expect(written().find((e) => e.prospectId === "pr_parrain")?.summary).toContain("20 % de moins");
+    expect(written().find((e) => e.prospectId === "pr_parrain")?.summary).toContain("10 % de moins");
   });
 
   it("un code de parrainage déjà renseigné l'emporte : le confrère proposé n'est même pas consulté, rien n'est changé", async () => {

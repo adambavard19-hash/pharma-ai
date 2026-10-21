@@ -271,10 +271,10 @@ describe("rattachement de l'officine à son parrain", () => {
     expect(db.state.pharmacies[0]).toMatchObject({ referredById: "ph_parrain", referralAmountCents: 2500 });
     const written = events();
     expect(written.find((e) => e.prospectId === "p_filleul")?.summary).toContain("filleule de « Officine de Pharmacie du Port »");
-    expect(written.find((e) => e.prospectId === "p_parrain")?.summary).toContain("20 % de moins");
+    expect(written.find((e) => e.prospectId === "p_parrain")?.summary).toContain("10 % de moins");
   });
 
-  it("hors offre, le montant figé reste vide : c'est la règle des 20 %", async () => {
+  it("hors offre, le montant figé reste vide : c'est la règle des 10 %", async () => {
     await linked();
     await svc.attachReferrerFromLead({ prospectId: "p_filleul", pharmacyId: "ph_filleul", pharmacyName: "Pharmacie Durand", actor: ADMIN });
     expect(db.state.pharmacies[0]).toMatchObject({ referredById: "ph_parrain", referralAmountCents: null });

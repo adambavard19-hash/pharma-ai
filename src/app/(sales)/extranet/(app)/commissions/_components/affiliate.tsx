@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Building2, CalendarDays, Repeat, Wallet } from "lucide-react";
 import { AFFILIATE_RULE_SENTENCE, monthLabelOf } from "@/core/affiliation/monthly";
-import { AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS, AFFILIATE_TIERS_SENTENCE, tierRangeLabel } from "@/core/affiliation/terms";
+import { AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS } from "@/core/affiliation/terms";
 import { formatPriceEuros } from "@/core/pricing/official-offer";
 import type { AffiliatePharmacy } from "@/server/services/sales/affiliate-commissions";
 import { Badge } from "@/components/ui/badge";
@@ -28,14 +28,12 @@ export function groupByMonth(rows: AffiliateRow[]): { month: string; totalCents:
 }
 
 /**
- * L'affiliation de l'affilié de la session : la règle (10 à 20 % selon le palier, chaque mois, à vie), son palier
+ * L'affiliation de l'affilié de la session : la règle (100 € par pharmacie signée ; pourcentage mensuel pour les plus anciennes), son palier
  * actuel, ses revenus récurrents actuels, ses pharmacies apportées, puis ses commissions mois par mois (avec le taux
  * appliqué). Tout vient de ses vraies données.
  */
-export function AffiliateEarnings({ pharmacies, recurringCents, activeCount, tierCount = activeCount, ratePercent = AFFILIATE_TIERS[0].ratePercent, rows, signupRows = [], thisMonthCents, earnedCents, paidCents }: { pharmacies: AffiliatePharmacy[]; recurringCents: number; activeCount: number; /** Les pharmacies actives qui comptent pour le palier. */ tierCount?: number; /** Le taux du palier actuel (10, 12, 15, 20). */ ratePercent?: number; rows: AffiliateRow[]; signupRows?: AffiliateRow[]; thisMonthCents: number; earnedCents: number; paidCents: number }) {
+export function AffiliateEarnings({ pharmacies, recurringCents, activeCount, ratePercent = AFFILIATE_TIERS[0].ratePercent, rows, signupRows = [], thisMonthCents, earnedCents, paidCents }: { pharmacies: AffiliatePharmacy[]; recurringCents: number; activeCount: number; /** Les pharmacies actives qui comptent pour le palier. */ tierCount?: number; /** Le taux du palier actuel (10, 12, 15, 20). */ ratePercent?: number; rows: AffiliateRow[]; signupRows?: AffiliateRow[]; thisMonthCents: number; earnedCents: number; paidCents: number }) {
   const months = groupByMonth(rows);
-  const tierIndex = Math.max(0, AFFILIATE_TIERS.findIndex((tier) => tier.ratePercent === ratePercent));
-  const next = AFFILIATE_TIERS[tierIndex + 1];
   return (
     <>
       <Card>
@@ -43,11 +41,7 @@ export function AffiliateEarnings({ pharmacies, recurringCents, activeCount, tie
           <p className="text-[12px] font-semibold tracking-wide text-brand-700 uppercase">Programme d&apos;affiliation</p>
           <h2 className="text-[18px] leading-7 font-bold text-text-primary">{AFFILIATE_RULE_SENTENCE.charAt(0).toUpperCase() + AFFILIATE_RULE_SENTENCE.slice(1)}</h2>
           <p className="text-[13.5px] text-text-secondary">
-            Pour chaque pharmacie que vous apportez, vous touchez un pourcentage de son abonnement mensuel HT, chaque mois, aussi longtemps qu&apos;elle reste abonnée. Ce pourcentage augmente avec le nombre de vos pharmacies abonnées à la fin du mois, et s&apos;applique à toutes : {AFFILIATE_TIERS_SENTENCE}. En plus, une prime d&apos;arrivée de {formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} HT par pharmacie, une fois sa mise en service réglée. Les commissions d&apos;un mois sont calculées au début du mois suivant.
-          </p>
-          <p className="pt-1 text-[13.5px] font-semibold text-brand-700 dark:text-brand-300" data-palier-actuel="">
-            Votre palier aujourd&apos;hui : {ratePercent} % ({tierCount > 0 ? plural(tierCount, "pharmacie abonnée", "pharmacies abonnées") : "aucune pharmacie abonnée"}, palier {tierRangeLabel(AFFILIATE_TIERS[tierIndex])})
-            {next ? ` — ${next.ratePercent} % à partir de ${next.min} pharmacies.` : " — le palier maximal."}
+            Indiquez-nous les pharmacies que vous connaissez. Dès qu&apos;une pharmacie que vous avez apportée signe et règle sa mise en service, votre prime de {formatPriceEuros(AFFILIATE_SIGNUP_BONUS_CENTS)} HT est acquise. Les pharmacies activées avant le 21 octobre 2026 gardent leur commission mensuelle.
           </p>
         </CardContent>
       </Card>

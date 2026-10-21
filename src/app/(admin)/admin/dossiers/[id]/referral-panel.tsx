@@ -12,7 +12,7 @@ const STATUS_TONES: Record<ReferralLeadStatus, "neutral" | "info" | "success" | 
  * Le parrainage, sur la fiche du dossier : les confrères que ce dossier a proposé de
  * parrainer (l'équipe les contacte, rien ne leur est envoyé), et, pour un dossier
  * parrainé, par qui. Si la personne ouvre son dossier avec la même adresse e-mail, il
- * est rapproché ici ; une fois son officine créée, le parrain passe à 20 % de moins.
+ * est rapproché ici ; une fois son officine créée, le parrain passe à 10 % de moins.
  */
 export async function ReferralPanel({ prospectId }: { prospectId: string }) {
   const { proposed, referredBy } = await loadReferralPanel(prospectId);

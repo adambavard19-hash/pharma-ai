@@ -5,7 +5,7 @@ import { buildContractDocument } from "../template";
 import { buildAffiliateContractDocument, currentAffiliateTerms, affiliateContractReference } from "../affiliate-template";
 import { renderContractPdf } from "../pdf";
 import { OFFICIAL_OFFER } from "@/core/pricing/official-offer";
-import { AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS } from "@/core/affiliation/terms";
+import { AFFILIATE_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
 import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
 import { mapDocusealEvent, mapDocusealSubmission } from "@/core/signature/docuseal";
 
@@ -140,12 +140,12 @@ describe("contrat d'abonnement : montants lus depuis la source", () => {
       .sections.flatMap((s) => s.paragraphs)
       .join("\n");
 
-  it("sans offre de la console : l'offre officielle (126 € HT par mois, mise en service 150 € HT, engagement 12 mois)", () => {
+  it("sans offre de la console : l'offre officielle (126 € HT par mois, mise en service 200 € HT, engagement 12 mois)", () => {
     const amounts = resolveContractAmounts(null);
     expect(amounts).toEqual({ monthlyPriceCents: OFFICIAL_OFFER.monthlyPriceCents, setupFeeCents: OFFICIAL_OFFER.setupFeeCents, durationMonths: OFFICIAL_OFFER.commitmentMonths, source: "OFFICIAL" });
     const printed = text(amounts);
     expect(printed).toContain("126,00 € HT par mois");
-    expect(printed).toContain("mise en service unique de 150,00 € HT");
+    expect(printed).toContain("mise en service unique de 200,00 € HT");
     expect(printed).toContain("durée d'engagement ferme de 12 mois");
     expect(printed).not.toContain("290");
   });
@@ -181,21 +181,18 @@ describe("contrat d'affiliation", () => {
   });
   const printed = doc.sections.flatMap((s) => s.paragraphs).join("\n");
 
-  it("les paliers, le taux appliqué à toutes les pharmacies, le mois abonné à la fin du mois, la prime de 100 € HT, à vie", () => {
+  it("v2 : 100 € HT par pharmacie apportée et signée, une fois la mise en service réglée, plus aucun pourcentage mensuel", () => {
     expect(doc.reference).toBe("PB-AFF-2026-LEFEVRE-V1");
-    expect(printed).toContain("10 % de 1 à 9 pharmacies abonnées ; 12 % de 10 à 24 pharmacies abonnées ; 15 % de 25 à 49 pharmacies abonnées ; 20 % à partir de 50 pharmacies abonnées");
-    expect(printed).toContain("s'applique à toutes les pharmacies apportées");
-    expect(printed).toContain("abonnée au dernier jour du mois");
-    expect(printed).toContain("prime unique de 100,00 € HT par pharmacie apportée");
+    expect(printed).toContain("prime unique de 100,00 € HT, due une seule fois par pharmacie");
     expect(printed).toContain("mise en service de cette pharmacie a été effectivement réglée");
-    expect(printed).toContain("due à vie, pour chaque mois où la pharmacie apportée reste abonnée");
-    expect(printed).toContain("12,60 € HT par pharmacie au premier palier (10 %)");
-    expect(printed).toContain("25,20 € HT par pharmacie au dernier palier (20 %)");
+    expect(printed).toContain("aucune commission mensuelle ni aucun pourcentage de l'abonnement n'est dû");
+    expect(printed).not.toContain("à vie");
+    expect(printed).not.toContain("palier");
   });
 
   it("les montants viennent de la source unique de l'affiliation", () => {
     const terms = currentAffiliateTerms(12600, T1);
-    expect(terms.tiers).toEqual(AFFILIATE_TIERS.map((t) => ({ ...t })));
+    expect(terms.tiers).toEqual([]);
     expect(terms.signupBonusCents).toBe(AFFILIATE_SIGNUP_BONUS_CENTS);
   });
 

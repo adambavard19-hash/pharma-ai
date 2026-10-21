@@ -13,8 +13,8 @@ type CurrentOffer = { amountCents: number; endsAt: Date | string | null };
 /**
  * Parrainage, vu du titulaire : son code, son lien à partager, ses filleuls et ce
  * que ça change sur son abonnement. Dès qu'une officine qu'il parraine s'abonne, son
- * abonnement passe à 20 % de moins par mois, une seule fois (deux filleuls ne font
- * pas 40 %). Seule exception : une offre de parrainage en cours à l'inscription d'un
+ * abonnement passe à 10 % de moins par mois, une seule fois (deux filleuls ne font
+ * pas 20 %). Seule exception : une offre de parrainage en cours à l'inscription d'un
  * filleul lui fait apporter un montant fixe, et le titulaire a le plus avantageux.
  * La remise est appliquée d'elle-même à l'abonnement payé en ligne (Stripe), sinon par l'équipe PharmaBoost.
  */

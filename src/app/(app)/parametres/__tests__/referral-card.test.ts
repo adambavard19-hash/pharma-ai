@@ -5,7 +5,7 @@ import { ReferralCard } from "../referral-card";
 
 /**
  * La carte « Parrainage » du titulaire : « Dès qu'une officine que vous parrainez
- * s'abonne, votre abonnement passe à 20 % de moins : X € HT au lieu de Y € HT par
+ * s'abonne, votre abonnement passe à 10 % de moins : X € HT au lieu de Y € HT par
  * mois », avec les vrais montants. Une seule remise, jamais cumulée ; aucun montant
  * fixe de 10 € par filleul ; l'offre de la console reste une exception dite telle.
  * Rendu côté serveur, sans base ni réseau.
@@ -36,19 +36,19 @@ const render = (referral: Props) =>
     .replace(/[\s  ]+/g, " ");
 
 describe("carte du titulaire : sans filleul actif", () => {
-  it("annonce la règle avec les vrais montants : 100,80 € HT au lieu de 126 € HT par mois", () => {
+  it("annonce la règle avec les vrais montants : 113,40 € HT au lieu de 126 € HT par mois", () => {
     const html = render(base());
-    expect(html).toContain("Dès qu'une officine que vous parrainez s'abonne, votre abonnement passe à 20 % de moins : 100,80 € HT au lieu de 126,00 € HT par mois.");
-    expect(html).toContain("Parrainage : parrainez un confrère, payez 20 % de moins");
+    expect(html).toContain("Dès qu'une officine que vous parrainez s'abonne, votre abonnement passe à 10 % de moins : 113,40 € HT au lieu de 126,00 € HT par mois.");
+    expect(html).toContain("Parrainage : parrainez un confrère, payez 10 % de moins");
   });
 
-  it("les montants suivent le tarif contractuel du titulaire : 99 € donnent 79,20 €", () => {
-    expect(render(base({ monthlyPriceCents: 9_900 }))).toContain("79,20 € HT au lieu de 99,00 € HT par mois");
+  it("les montants suivent le tarif contractuel du titulaire : 99 € donnent 89,10 €", () => {
+    expect(render(base({ monthlyPriceCents: 9_900 }))).toContain("89,10 € HT au lieu de 99,00 € HT par mois");
   });
 
   it("sans abonnement suivi : la règle sans montant inventé", () => {
     const html = render(base({ monthlyPriceCents: null }));
-    expect(html).toContain("Dès qu'une officine que vous parrainez s'abonne, votre abonnement passe à 20 % de moins par mois.");
+    expect(html).toContain("Dès qu'une officine que vous parrainez s'abonne, votre abonnement passe à 10 % de moins par mois.");
     expect(html).not.toContain("au lieu de");
   });
 
@@ -61,7 +61,7 @@ describe("carte du titulaire : sans filleul actif", () => {
   it("dit que la remise s'applique d'elle-même dès le premier paiement du filleul, une seule fois, quel que soit le nombre de filleuls", () => {
     const html = render(base());
     expect(html).toContain("Dès son premier paiement, la remise s'applique d'elle-même à vos factures suivantes");
-    expect(html).toContain("une seule fois : 20 % de moins, que vous ayez un ou plusieurs filleuls");
+    expect(html).toContain("une seule fois : 10 % de moins, que vous ayez un ou plusieurs filleuls");
     expect(html).not.toContain("apparaît sur votre facture");
   });
 
@@ -75,23 +75,23 @@ describe("carte du titulaire : sans filleul actif", () => {
 });
 
 describe("carte du titulaire : avec des filleuls actifs", () => {
-  it("un filleul actif : 20 % de moins, 100,80 € HT au lieu de 126 € HT, et la remise du mois est dite", () => {
-    const html = render(base({ referrals: [filleul("Pharmacie A")], activeCount: 1, discountCents: 2_520, discountBasis: "PERCENT" }));
-    expect(html).toContain("Une officine que vous parrainez est abonnée : votre abonnement est à 20 % de moins, 100,80 € HT au lieu de 126,00 € HT par mois.");
+  it("un filleul actif : 10 % de moins, 113,40 € HT au lieu de 126 € HT, et la remise du mois est dite", () => {
+    const html = render(base({ referrals: [filleul("Pharmacie A")], activeCount: 1, discountCents: 1_260, discountBasis: "PERCENT" }));
+    expect(html).toContain("Une officine que vous parrainez est abonnée : votre abonnement est à 10 % de moins, 113,40 € HT au lieu de 126,00 € HT par mois.");
     expect(html).toContain("Filleuls actifs 1");
-    expect(html).toContain("Remise par mois − 25,20 €");
-    expect(html).toContain("Votre abonnement 100,80 € HT");
+    expect(html).toContain("Remise par mois − 12,60 €");
+    expect(html).toContain("Votre abonnement 113,40 € HT");
   });
 
-  it("deux filleuls actifs : la MÊME remise, jamais 40 %", () => {
-    const one = render(base({ referrals: [filleul("A")], activeCount: 1, discountCents: 2_520, discountBasis: "PERCENT" }));
-    const two = render(base({ referrals: [filleul("A"), filleul("B")], activeCount: 2, discountCents: 2_520, discountBasis: "PERCENT" }));
+  it("deux filleuls actifs : la MÊME remise, jamais 20 %", () => {
+    const one = render(base({ referrals: [filleul("A")], activeCount: 1, discountCents: 1_260, discountBasis: "PERCENT" }));
+    const two = render(base({ referrals: [filleul("A"), filleul("B")], activeCount: 2, discountCents: 1_260, discountBasis: "PERCENT" }));
     expect(two).toContain("Filleuls actifs 2");
-    expect(two).toContain("Remise par mois − 25,20 €");
-    expect(two).toContain("Votre abonnement 100,80 € HT");
+    expect(two).toContain("Remise par mois − 12,60 €");
+    expect(two).toContain("Votre abonnement 113,40 € HT");
     expect(two).not.toContain("50,40");
     expect(two).not.toContain("40 %");
-    expect(one).toContain("Votre abonnement 100,80 € HT");
+    expect(one).toContain("Votre abonnement 113,40 € HT");
   });
 
   it("un filleul inactif est listé mais ne compte pas : pas de remise", () => {
@@ -114,9 +114,9 @@ describe("carte du titulaire : l'offre de parrainage de la console, exception ex
   it("annonce l'offre en cours, sa date limite (jour d'inscription inclus) et le plus avantageux des deux", () => {
     const html = render(base({ currentOffer: offer }));
     expect(html).toContain("Offre de parrainage en cours : chaque officine que vous parrainez et qui s'inscrit jusqu'au 31/10/2026 inclus retire 40,00 € HT par mois de votre abonnement, tant qu'elle est abonnée.");
-    expect(html).toContain("plus avantageux entre la somme de ces montants et les 20 % de moins");
-    // La règle des 20 % reste annoncée en tête.
-    expect(html).toContain("passe à 20 % de moins : 100,80 € HT au lieu de 126,00 € HT par mois.");
+    expect(html).toContain("plus avantageux entre la somme de ces montants et les 10 % de moins");
+    // La règle des 10 % reste annoncée en tête.
+    expect(html).toContain("passe à 10 % de moins : 113,40 € HT au lieu de 126,00 € HT par mois.");
   });
 
   it("sans offre, aucune mention d'offre", () => {
@@ -125,13 +125,13 @@ describe("carte du titulaire : l'offre de parrainage de la console, exception ex
 
   it("quand l'offre est plus avantageuse, la remise appliquée l'est avec le bon libellé", () => {
     const html = render(base({ currentOffer: offer, referrals: [filleul("Pendant l'offre", { offerAmountCents: 4_000 })], activeCount: 1, discountCents: 4_000, discountBasis: "OFFERS" }));
-    expect(html).toContain("Une offre de parrainage vous est plus favorable que les 20 % : votre abonnement est à 86,00 € HT au lieu de 126,00 € HT par mois.");
+    expect(html).toContain("Une offre de parrainage vous est plus favorable que les 10 % : votre abonnement est à 86,00 € HT au lieu de 126,00 € HT par mois.");
     expect(html).toContain("Remise par mois − 40,00 €");
     expect(html).toContain("offre 40,00 € HT/mois");
   });
 
   it("un filleul hors offre n'affiche aucun montant", () => {
-    const html = render(base({ referrals: [filleul("Hors offre")], activeCount: 1, discountCents: 2_520, discountBasis: "PERCENT" }));
+    const html = render(base({ referrals: [filleul("Hors offre")], activeCount: 1, discountCents: 1_260, discountBasis: "PERCENT" }));
     expect(html).toContain("Hors offre");
     expect(html).not.toContain("HT/mois");
   });

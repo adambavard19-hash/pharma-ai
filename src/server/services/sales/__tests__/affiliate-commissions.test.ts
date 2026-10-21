@@ -199,6 +199,11 @@ describe("qui n'est pas commissionné", () => {
     expect(stored.map((row) => row.periodMonth)).toEqual(["2026-10"]);
   });
 
+  it("activée après la fin du pourcentage mensuel (21 oct. 2026) : aucune commission mensuelle, seulement la prime de 100 €", async () => {
+    db.prospect.findMany.mockResolvedValue([brought("apres", { activatedAt: new Date("2026-10-25T10:00:00Z") })]);
+    expect(await service.createMonthlyAffiliateCommissions(NOV_1)).toMatchObject({ created: 0, skipped: expect.objectContaining({ newRule: 1 }) });
+  });
+
   it("affilié désactivé (ou commercial resté à l'ancienne règle) : ses pharmacies ne sont même pas lues", async () => {
     db.salesRep.findMany.mockResolvedValue([]);
     const run = await service.createMonthlyAffiliateCommissions(NOV_1);
@@ -231,9 +236,9 @@ describe("qui n'est pas commissionné", () => {
     expect(run).toMatchObject({ created: 0, skipped: expect.objectContaining({ otherRep: 1 }) });
   });
 
-  it("pas encore activée : créditée à l'affilié qui suit le dossier", async () => {
+  it("pas encore activée : lue pour l'affilié qui suit le dossier, mais plus de commission mensuelle (100 € par pharmacie signée depuis le 20 oct. 2026)", async () => {
     db.prospect.findMany.mockResolvedValue([brought("neuve", { activatedAt: null, activationSalesRepId: null, salesRepId: "rep_a" })]);
-    expect((await service.createMonthlyAffiliateCommissions(NOV_1)).created).toBe(1);
+    expect(await service.createMonthlyAffiliateCommissions(NOV_1)).toMatchObject({ created: 0, skipped: expect.objectContaining({ newRule: 1 }) });
     expect(db.prospect.findMany.mock.calls[0][0].where).toEqual({ pharmacyId: { not: null }, OR: [{ activationSalesRepId: { in: ["rep_a"] } }, { activatedAt: null, salesRepId: { in: ["rep_a"] } }] });
   });
 });

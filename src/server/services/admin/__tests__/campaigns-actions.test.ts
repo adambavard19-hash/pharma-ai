@@ -120,10 +120,10 @@ describe("enregistrer", () => {
     mocks.service.createCampaign.mockResolvedValue({ id: "camp_9" });
     const result = await actions.saveCampaignAction(draft({ kind: "REFERRAL_OFFER", subject: "Parrainage", title: "Parrainage", body: "Bonjour {{prenom}}, parrainez des officines.", offerAmountCents: 3000 }));
     expect(result).toMatchObject({ ok: true, data: { id: "camp_9", warnings: ["Le message ne mentionne pas le montant de l'offre : écrivez {{montant_offre}}."] } });
-    // Un montant inférieur à la remise de 20 % du parrainage (25,20 € pour 126 € HT) est signalé aussi.
+    // Un montant inférieur à la remise de 10 % du parrainage (12,60 € pour 126 € HT) est signalé aussi.
     mocks.service.createCampaign.mockResolvedValue({ id: "camp_10" });
-    const low = await actions.saveCampaignAction(draft({ kind: "REFERRAL_OFFER", subject: "Parrainage {{montant_offre}}", title: "Parrainage", body: "Bonjour {{prenom}}, {{montant_offre}} par filleul.", offerAmountCents: 2000 }));
-    expect(low).toMatchObject({ ok: true, data: { warnings: [expect.stringContaining("inférieur à la remise de 20 % du parrainage")] } });
+    const low = await actions.saveCampaignAction(draft({ kind: "REFERRAL_OFFER", subject: "Parrainage {{montant_offre}}", title: "Parrainage", body: "Bonjour {{prenom}}, {{montant_offre}} par filleul.", offerAmountCents: 1000 }));
+    expect(low).toMatchObject({ ok: true, data: { warnings: [expect.stringContaining("inférieur à la remise de 10 % du parrainage")] } });
   });
 });
 

@@ -1,9 +1,9 @@
 import { AFFILIATE_SIGNUP_BONUS_CENTS, AFFILIATE_TIERS, affiliateRateFor, affiliateTierFor, monthlyAffiliateCommissionCents } from "./terms";
 
-/** Le curseur du simulateur de la page Affiliation : de 0 à 500 pharmacies, 50 au départ. */
+/** Le curseur du simulateur de la page Affiliation : de 0 à 500 pharmacies, 10 au départ. */
 export const SIMULATOR_MIN_PHARMACIES = 0;
 export const SIMULATOR_MAX_PHARMACIES = 500;
-export const SIMULATOR_DEFAULT_PHARMACIES = 50;
+export const SIMULATOR_DEFAULT_PHARMACIES = 10;
 
 /** Un nombre de pharmacies lisible : entier, borné au curseur. */
 export function clampPharmacies(value: number): number {

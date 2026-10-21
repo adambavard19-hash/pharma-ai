@@ -66,7 +66,6 @@ export function RevenueCalculator({ monthlyPriceCents }: { monthlyPriceCents: nu
           <span className="text-[17px] font-medium text-brand-800">par mois</span>
         </p>
         <p className="mt-2 text-[13.5px] text-brand-900/80">Pour un abonnement de {formatPriceEuros(monthlyPriceCents)} HT par mois.</p>
-        <Comparison revenueCents={estimate?.perMonthCents ?? 0} priceCents={monthlyPriceCents} />
       </div>
 
       {/* Les étapes du calcul : chacune se refait à la calculette. */}
@@ -79,38 +78,6 @@ export function RevenueCalculator({ monthlyPriceCents }: { monthlyPriceCents: nu
       <p className="mt-auto pt-5 text-[12.5px] leading-5 text-text-tertiary">
         Estimation indicative : {ratePercent} % de vos clients prennent un produit conseillé, à {formatPriceEuros(ESTIMATE_ASSUMPTIONS.averageProductCents)} en moyenne, sur {openDays} jours d&apos;ouverture par mois. Ce n&apos;est pas une promesse de résultat.
       </p>
-    </div>
-  );
-}
-
-/**
- * Deux barres à la même échelle : le chiffre d'affaires estimé et le prix de l'abonnement. La plus longue des deux prend toute la
- * largeur ; l'autre garde au moins un trait visible.
- *
- * Purement visuel (aria-hidden : les montants sont déjà lus juste au-dessus) : de simples div et span. Une liste de définitions
- * (dl/dt/dd) n'admettait pas la barre en dd isolé, hors de son couple dt/dd.
- */
-function Comparison({ revenueCents, priceCents }: { revenueCents: number; priceCents: number }) {
-  const scale = Math.max(revenueCents, priceCents, 1);
-  const width = (cents: number) => `${Math.max(1.5, (cents / scale) * 100)}%`;
-  return (
-    <div className="mt-5 space-y-3 text-[12.5px]" aria-hidden="true">
-      <Bar label="Chiffre d'affaires estimé" value={formatPriceEuros(revenueCents)} width={width(revenueCents)} tone="bg-brand-600" />
-      <Bar label="Abonnement" value={formatPriceEuros(priceCents)} width={width(priceCents)} tone="bg-ink-400" />
-    </div>
-  );
-}
-
-function Bar({ label, value, width, tone }: { label: string; value: string; width: string; tone: string }) {
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-brand-900/75">{label}</span>
-        <span className="font-semibold text-brand-900 tabular-nums">{value}</span>
-      </div>
-      <div className="mt-1 h-2.5 rounded-full bg-white/70">
-        <span className={cn("block h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none", tone)} style={{ width }} />
-      </div>
     </div>
   );
 }

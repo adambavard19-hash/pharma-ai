@@ -10,10 +10,10 @@ import { getStripe, stripeConfigState } from "./stripe-client";
 /**
  * La remise de parrainage, appliquée chez Stripe.
  *
- * Le calcul est celui de `referralState` (20 % dès un filleul actif, ou les
+ * Le calcul est celui de `referralState` (10 % dès un filleul actif, ou les
  * montants d'offre s'ils sont plus avantageux, plafonnés par le tarif
  * contractuel). Il devient un coupon permanent `amount_off` en euros posé sur
- * l'abonnement Stripe du parrain : `pb-parrainage-2520` pour 25,20 € de moins
+ * l'abonnement Stripe du parrain : `pb-parrainage-1260` pour 12,60 € de moins
  * par mois. Un coupon par montant, partagé par tous les parrains au même montant.
  *
  * Idempotent : rejouée par chaque webhook qui peut changer la remise (un filleul
