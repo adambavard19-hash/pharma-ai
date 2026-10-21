@@ -23,7 +23,7 @@ describe("la section tarif du site : un seul abonnement", () => {
 
   it("dit ce que comprend l'abonnement, mois après mois", () => {
     expect(t).toContain("Compris dans l'abonnement");
-    for (const item of ["Tous vos postes de comptoir", "Les mises à jour automatiques des postes", "La bibliothèque de conseils commune", "Le support, depuis PharmaBoost"]) {
+    for (const item of ["Tous vos postes de comptoir", "Les mises à jour automatiques des postes", "La bibliothèque de conseils commune", "Le support, depuis PharmaBoost", "L'application mobile, avec la formation sur les futures gammes"]) {
       expect(t).toContain(item);
     }
   });

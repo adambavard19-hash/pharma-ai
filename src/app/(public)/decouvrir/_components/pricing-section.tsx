@@ -17,6 +17,8 @@ const SUBSCRIPTION_INCLUDES = [
   "Les mises à jour automatiques des postes",
   "La bibliothèque de conseils commune",
   "Le support, depuis PharmaBoost",
+  // Fondateur, 21 oct. 2026 (« gratuite » écarté : jamais ce mot devant le public, l'application est comprise dans l'abonnement).
+  "L'application mobile, avec la formation sur les futures gammes",
 ];
 
 /**
