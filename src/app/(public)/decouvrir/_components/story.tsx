@@ -48,29 +48,30 @@ export function Reveal({ children, className, delay = 0 }: { children: ReactNode
 /** Ce que le pharmacien doit avoir en tête à chaque patient : les pensées s'empilent, puis le robot les prend en charge. */
 const LOAD = ["Ordonnance de 6 lignes", "Patient pressé", "File d'attente", "Posologie à rappeler", "Date courte en réserve", "Challenge du laboratoire", "Le bon conseil ?", "Quel produit en stock ?"];
 
+/**
+ * Le constat en un coup d'œil (fondateur, 21 oct. 2026 : version « D · Le bandeau qui défile » de /robot-apercu/constat) :
+ * ce que le pharmacien doit avoir en tête défile en continu, puis le robot répond. Le titre seul, sans paragraphe.
+ */
 export function LoadVisual() {
-  const [ref, seen] = useSeen<HTMLDivElement>();
-  const relief = LOAD.length;
   return (
-    <div ref={ref} className="relative mx-auto w-full max-w-[520px] rounded-[28px] border border-border-subtle bg-surface-card p-6 shadow-[0_40px_90px_-50px_rgba(15,23,42,0.45)] sm:p-8" aria-hidden="true">
-      <div className="flex flex-wrap gap-2">
-        {LOAD.map((label, index) => (
-          <span
-            key={label}
-            {...step(seen, index, 220)}
-            className={cn(step(seen, index, 220).className, "rounded-full border border-warning-200 bg-warning-50 px-3.5 py-2 text-[13.5px] font-semibold text-warning-900")}
-          >
-            {label}
-          </span>
-        ))}
+    <div aria-hidden="true">
+      <div className="relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_10%,#000_90%,transparent)]">
+        <div className="load-defile flex w-max gap-2">
+          {[...LOAD, ...LOAD].map((label, index) => (
+            <span key={index} className="rounded-full border border-warning-200 bg-warning-50 px-3.5 py-2 text-[13.5px] font-semibold whitespace-nowrap text-warning-900">
+              {label}
+            </span>
+          ))}
+        </div>
       </div>
-      <div {...step(seen, relief + 1, 220)} className={cn(step(seen, relief + 1, 220).className, "mt-6 flex items-center gap-4 rounded-2xl bg-[#0F2F2A] p-4 text-white")}>
+      <div className="mx-auto mt-6 flex max-w-xl items-center gap-4 rounded-2xl bg-[#0F2F2A] p-4 text-left text-white">
         <Robot size={52} mood="happy" label="Le robot PharmaBoost" />
         <div>
           <p className="text-[16px] font-bold">PharmaBoost y pense pour vous.</p>
           <p className="mt-0.5 text-[13.5px] text-[#BFD9D0]">Au scan, le bon conseil, pris dans votre rayon.</p>
         </div>
       </div>
+      <style>{`@keyframes load-defile { from { transform: translateX(0); } to { transform: translateX(-50%); } } .load-defile { animation: load-defile 28s linear infinite; } @media (prefers-reduced-motion: reduce) { .load-defile { animation: none; } }`}</style>
     </div>
   );
 }

@@ -77,13 +77,13 @@ export default async function SitePage() {
 
       {/* ---- 1. Le problème ------------------------------------------ */}
       <section id="probleme" className="scroll-mt-20 border-t border-border-subtle">
-        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
+        <div className="mx-auto max-w-6xl px-5 py-20 text-center md:py-28">
           <Reveal>
-            <SectionHead title="Le pharmacien ne peut pas penser à tout." bodyClassName="text-[20px] leading-8 font-medium text-text-primary sm:text-[22px] sm:leading-9">
-              Une ordonnance chargée, un patient pressé, la file qui s&apos;allonge : le pharmacien est vite débordé. Le conseil qui accompagnerait le traitement passe à la trappe. PharmaBoost est là pour l&apos;accompagner et le soulager.
-            </SectionHead>
+            <h2 className="text-[34px] leading-[1.05] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[48px]">Le pharmacien ne peut pas penser à tout.</h2>
           </Reveal>
-          <LoadVisual />
+          <div className="mt-8">
+            <LoadVisual />
+          </div>
         </div>
       </section>
 
