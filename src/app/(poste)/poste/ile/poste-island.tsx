@@ -406,7 +406,7 @@ export function PosteIsland() {
 
   // L'île repliée (fondateur, 15 oct. 2026 : « la bannière prend beaucoup trop de place quand il y a beaucoup de scans ») :
   // pendant la vente, seuls le robot et « N conseils suggérés » restent à l'écran ; les conseils se déploient d'un clic sur l'île
-  // (plus au survol depuis le 21 oct. 2026) et se replient quand la souris en sort.
+  // (plus au survol depuis le 21 oct. 2026) ; la bannière « mix » se replie d'un clic sur son haut, les anciennes quand la souris en sort.
   const [hovered, setHovered] = useState(false);
   // Le nouveau style par défaut ; l'ancien reste joignable pour comparer (aperçu).
   const aurore = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get("style") !== "actuel", () => true);
@@ -427,6 +427,19 @@ export function PosteIsland() {
     }, FOLD_DELAY_MS);
   }, []);
   useEffect(() => () => { if (foldTimer.current) clearTimeout(foldTimer.current); }, []);
+  // La bannière « mix » se referme d'un clic sur son haut, et seulement ainsi (fondateur, 21 oct. 2026) : ni en sortant la souris,
+  // ni en cliquant ailleurs. Une nouvelle vente arrive repliée.
+  const closeIsland = useCallback(() => {
+    if (foldTimer.current) clearTimeout(foldTimer.current);
+    foldTimer.current = null;
+    setHovered(false);
+  }, []);
+  const entryId = entry?.id ?? null;
+  const [openedFor, setOpenedFor] = useState<string | null>(entryId);
+  if (openedFor !== entryId) {
+    setOpenedFor(entryId);
+    setHovered(false);
+  }
   const folded = Boolean(entry) && island.stage === "advice" && !hovered && !finishAfterEmail;
   // La bannière « mix » (fondateur, 19 oct. 2026) ; l'ancienne reste joignable pour revenir en arrière : `?banniere=ancienne`.
   const mix = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get("banniere") !== "ancienne", () => true);
@@ -530,7 +543,7 @@ export function PosteIsland() {
             // Sur l'île : elle ne se déploie plus au survol, seulement au clic (fondateur, 21 oct. 2026) ; elle reste ouverte tant que la souris y est.
             if (foldTimer.current) clearTimeout(foldTimer.current);
             foldTimer.current = null;
-          } else foldSoon();
+          } else if (!mixOn) foldSoon();
           const start = drag.current;
           if (start && !start.moved && Math.hypot(event.screenX - start.x, event.screenY - start.y) > 4) start.moved = true;
         }}
@@ -541,7 +554,7 @@ export function PosteIsland() {
         onPointerLeave={() => {
           // Sortie réelle de la fenêtre : la souris n'est plus sur l'île, on replie.
           lastPointer.current = null;
-          foldSoon();
+          if (!mixOn) foldSoon();
         }}
         onClickCapture={(event) => {
           // Un déplacement n'est pas un clic : le robot ne rit pas, aucune carte ne s'ouvre.
@@ -590,6 +603,7 @@ export function PosteIsland() {
             look={null}
             aurore={aurore}
             onOpen={openIsland}
+            onClose={closeIsland}
             onFinish={finish}
             onAnswer={islandProps.onAnswer}
             boxes={entry.boxes ?? []}

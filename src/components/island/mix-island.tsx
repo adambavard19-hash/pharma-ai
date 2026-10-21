@@ -67,13 +67,15 @@ export type MixIslandProps = {
   look?: number | null;
   aurore?: boolean;
   onOpen: () => void;
+  /** Un clic sur le haut de la bannière ouverte la referme (fondateur, 21 oct. 2026). */
+  onClose?: () => void;
   onFinish: () => void;
   onAnswer: (index: number, outcome: IslandOutcome) => void;
   /** Les boîtes scannées : celle qui est en challenge (toute la gamme d'un laboratoire) le dit en haut, avec son gain. */
   boxes?: { id: string; name: string; challenge?: string; reward?: string }[];
 };
 
-export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onFinish, onAnswer, boxes = [] }: MixIslandProps) {
+export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [] }: MixIslandProps) {
   const challengedBoxes = boxes.filter((box) => box.challenge);
   const order = bestOrder(items);
   const sold = (index: number) => outcomes[index] === "SOLD";
@@ -106,7 +108,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
       <div data-ile-mix={open ? "ouvert" : "replie"}>
         {/* Le haut, toujours là : le meilleur conseil à proposer, ou ce qui est déjà vendu. */}
         <div className="flex w-full items-center gap-2 py-1.5 pr-1.5 pl-2">
-          <button type="button" data-ile-replie="" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+          <button type="button" data-ile-replie="" aria-expanded={open} onClick={open && onClose ? onClose : onOpen} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
             <Robot size={30} mood="happy" look={look} label="Le robot PharmaBoost" />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-2 text-[13.5px] leading-[18px] font-semibold tracking-[-0.01em] text-[#0F2F2A]">
@@ -116,7 +118,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
               <span className="block truncate text-[11px] leading-[15px] text-[#3F5E57]">
                 {items.length} conseil{items.length > 1 ? "s" : ""}
                 {total > 0 ? ` · jusqu'à ${eurosOf(total)} de marge` : ""}
-                {!open ? " · cliquez" : ""}
+                {!open ? " · cliquez" : onClose ? " · cliquez pour fermer" : ""}
               </span>
             </span>
             {best.challenge && soldIndexes.length === 0 && (
