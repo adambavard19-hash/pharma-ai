@@ -2,18 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   notificationCreate: vi.fn(),
+  notificationDeleteMany: vi.fn(),
   adminFindMany: vi.fn(),
   sendEmail: vi.fn(),
   traceDispatch: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/server/db/client", () => ({ prisma: { extranetNotification: { create: mocks.notificationCreate }, platformAdmin: { findMany: mocks.adminFindMany } } }));
+vi.mock("@/server/db/client", () => ({ prisma: { extranetNotification: { create: mocks.notificationCreate, deleteMany: mocks.notificationDeleteMany }, platformAdmin: { findMany: mocks.adminFindMany } } }));
 vi.mock("@/server/ai/registry", () => ({ getMessagingProvider: () => ({ sendEmail: mocks.sendEmail }) }));
 vi.mock("@/server/public-url", () => ({ publicUrl: (path: string) => `https://pharmaboost.test${path}` }));
 vi.mock("@/server/services/email-dispatch", () => ({ traceDispatch: mocks.traceDispatch }));
 
-const { notifyAdmins } = await import("../notifications");
+const { dismissFormSubmission, notifyAdmins } = await import("../notifications");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -46,5 +47,18 @@ describe("chaque notification de l'équipe part aussi par e-mail à chaque admin
     mocks.adminFindMany.mockRejectedValue(new Error("base indisponible"));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     await expect(notifyAdmins({ type: "SITE_LEAD", title: "t", body: "b" })).resolves.toBeUndefined();
+  });
+});
+
+describe("la croix de « Formulaires reçus » (fondateur, 21 oct. 2026)", () => {
+  it("n'efface que la notification d'un formulaire, pour l'équipe : jamais une autre alerte, jamais le dossier", async () => {
+    mocks.notificationDeleteMany.mockResolvedValue({ count: 1 });
+    expect(await dismissFormSubmission("n1")).toBe(true);
+    const where = mocks.notificationDeleteMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ id: "n1", audience: "ADMIN" });
+    expect(where.type.in).toEqual(expect.arrayContaining(["SITE_LEAD", "PARTNER_APPLICATION", "SALES_APPLICATION"]));
+    expect(where.type.in).not.toContain("PAYMENT_FAILED");
+    mocks.notificationDeleteMany.mockResolvedValue({ count: 0 });
+    expect(await dismissFormSubmission("autre")).toBe(false);
   });
 });

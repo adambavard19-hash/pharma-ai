@@ -81,3 +81,10 @@ export async function listRecentFormSubmissions(limit = 8) {
     select: { id: true, type: true, title: true, body: true, linkUrl: true, readAt: true, createdAt: true },
   });
 }
+
+/** Retire un formulaire de l'accueil de la console (la croix) : seule la notification est effacée, le dossier ou la candidature reste. */
+export async function dismissFormSubmission(id: string): Promise<boolean> {
+  const { FORM_NOTIFICATION_TYPES } = await import("@/core/admin/form-submissions");
+  const done = await prisma.extranetNotification.deleteMany({ where: { id, audience: "ADMIN", type: { in: [...FORM_NOTIFICATION_TYPES] } } });
+  return done.count === 1;
+}

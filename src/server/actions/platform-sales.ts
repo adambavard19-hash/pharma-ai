@@ -10,7 +10,7 @@ import { applySignatureStatus, refreshContractSignatureStatus, runContractRemind
 import { loadReminderPolicy } from "@/server/services/platform-settings";
 import { recordAudit } from "@/server/audit/log";
 import { REMINDER_SETTING_KEY, sanitizePolicy, type ReminderPolicy } from "@/core/contracts/reminders";
-import { markAdminNotificationsRead } from "@/server/services/sales/notifications";
+import { dismissFormSubmission, markAdminNotificationsRead } from "@/server/services/sales/notifications";
 import { shouldApplySignatureStatus } from "@/core/signature";
 import { CONTRACT_STATUS_LABELS } from "@/core/sales/pipeline";
 import { CommissionChangedError, CommissionInvoicedError, updateCommission } from "@/server/services/sales/commissions";
@@ -296,4 +296,13 @@ export async function markAdminNotificationsReadAction(): Promise<ActionResult<n
   await markAdminNotificationsRead();
   revalidatePath("/admin/notifications");
   return ok(null, "Notifications marquées comme lues.");
+}
+
+/** La croix d'une ligne de « Formulaires reçus » : la notification disparaît de l'accueil, le dossier reste dans la console. */
+export async function dismissFormSubmissionAction(id: string): Promise<ActionResult<null>> {
+  await requirePlatformSession();
+  if (typeof id !== "string" || id.length === 0 || id.length > 64) return fail("Formulaire introuvable.");
+  if (!(await dismissFormSubmission(id))) return fail("Ce formulaire n'est plus dans la liste.");
+  revalidatePath("/admin");
+  return ok(null, "Retiré de l'accueil. Le dossier reste dans la console.");
 }

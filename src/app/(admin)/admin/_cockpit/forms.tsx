@@ -3,6 +3,7 @@ import { ChevronRight, Inbox } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formKind } from "@/core/admin/form-submissions";
 import { formatDayShort, formatTime } from "@/core/admin/metrics";
+import { DismissFormButton } from "./dismiss-form";
 
 export type FormSubmission = { id: string; type: string; title: string; body: string; linkUrl: string | null; readAt: Date | null; createdAt: Date };
 
@@ -47,14 +48,15 @@ export function FormsBlock({ items, now }: { items: FormSubmission[]; now: Date 
               </>
             );
             return (
-              <li key={item.id}>
+              <li key={item.id} className="flex items-center gap-1 pr-2">
                 {item.linkUrl ? (
-                  <Link href={item.linkUrl} className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-sunken/60 focus-visible:bg-surface-sunken/60 focus-visible:outline-none">
+                  <Link href={item.linkUrl} className="group flex min-w-0 flex-1 items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-sunken/60 focus-visible:bg-surface-sunken/60 focus-visible:outline-none">
                     {row}
                   </Link>
                 ) : (
-                  <div className="flex items-start gap-3 px-4 py-3">{row}</div>
+                  <div className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3">{row}</div>
                 )}
+                <DismissFormButton id={item.id} title={item.title} />
               </li>
             );
           })}

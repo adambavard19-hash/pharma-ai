@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FormsBlock } from "../_cockpit/forms";
+vi.mock("../_cockpit/dismiss-form", () => ({ DismissFormButton: ({ id }: { id: string }) => createElement("button", { "data-croix": id }, "×") }));
+const { FormsBlock } = await import("../_cockpit/forms");
 import { formKind } from "@/core/admin/form-submissions";
 
 const now = new Date("2026-10-21T10:00:00");
@@ -23,6 +24,9 @@ describe("accueil de la console : chaque formulaire rempli est visible et cliqua
     expect(html).toContain("Pharmacie du Port");
     expect(html.match(/Nouveau</g)).toHaveLength(1);
     expect(html).toContain("1 nouveau");
+    // Chaque ligne a sa croix, hors du lien : la retirer n'ouvre pas le dossier.
+    expect(html).toContain('data-croix="n1"');
+    expect(html).toContain('data-croix="n2"');
   });
 
   it("aucun formulaire : une phrase, pas un bloc vide", () => {

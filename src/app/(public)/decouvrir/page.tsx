@@ -51,10 +51,6 @@ export default async function SitePage() {
             <p className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-3 py-1.5 text-[13px] font-medium text-text-secondary backdrop-blur-md dark:border-border-subtle dark:bg-surface-card">
               <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
             </p>
-            {/* Le fondateur, 17 oct. 2026 : « le premier logiciel à créer un suivi pharmaceutique — ce n'est pas assez visible ». */}
-            <a href="#suivi" className="mt-3 flex w-fit items-center gap-2 rounded-full bg-gradient-to-r from-brand-700 to-[#0796b4] px-4 py-2 text-[14px] font-semibold text-white shadow-sm hover:opacity-95" data-badge-suivi="">
-              <span aria-hidden="true">★</span> Le premier logiciel de suivi pharmaceutique
-            </a>
             {/* Le robot vit désormais à côté du nom « PharmaBoost », dans l'en-tête : le titre se lit seul. */}
             <h1 className="mt-5 pb-1 text-[50px] leading-[0.98] font-bold tracking-[-0.04em] text-text-primary min-[390px]:text-[54px] md:text-[80px] lg:mt-4">
               Scan.
