@@ -1,8 +1,8 @@
 "use client";
 
-import { useTransition } from "react";
-import { Check, Loader2, X } from "lucide-react";
-import { refuseRobotProposalAction, validateRobotProposalAction } from "@/server/actions/admin-robot-proposals";
+import { useState, useTransition } from "react";
+import { Check, Loader2, Pencil, Save, X } from "lucide-react";
+import { modifyRobotProposalAction, refuseRobotProposalAction, validateRobotProposalAction } from "@/server/actions/admin-robot-proposals";
 import type { RobotProposalView } from "@/server/services/robot-proposals";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/format";
+import { Field, Textarea } from "@/components/ui/field";
+import { SearchField } from "../conseils/advice-control";
 
 export type RobotProposalCard = Omit<RobotProposalView, "decidedAt" | "createdAt"> & { decidedAt: string | null; createdAt: string };
 
@@ -44,7 +46,7 @@ export function RobotProposalsBoard({ pending, recent }: { pending: RobotProposa
           <ul className="mt-3 space-y-1.5 text-[13px] text-text-secondary">
             {recent.map((proposal) => (
               <li key={proposal.id} className="flex flex-wrap items-center gap-2">
-                <Badge tone={proposal.status === "VALIDATED" ? "success" : "neutral"}>{proposal.status === "VALIDATED" ? "Validée" : "Refusée"}</Badge>
+                <Badge tone={proposal.status === "VALIDATED" || proposal.replaced ? "success" : "neutral"}>{proposal.status === "VALIDATED" ? "Validée" : proposal.replaced ? "Modifiée" : "Refusée"}</Badge>
                 <span className="text-text-primary">
                   {proposal.drugLabel.replace(/,.*$/, "")} → {proposal.productName}
                 </span>
@@ -70,6 +72,7 @@ export function ProposalCard({ proposal }: { proposal: RobotProposalCard }) {
       const result = await action();
       push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Enregistré") : (result.error ?? "Erreur") });
     });
+  const [editing, setEditing] = useState(false);
   const manual = proposal.central.kind === "MANUAL";
   const feedback = proposal.feedback;
   return (
@@ -110,8 +113,78 @@ export function ProposalCard({ proposal }: { proposal: RobotProposalCard }) {
             <X className="size-3.5" aria-hidden />
             Refuser — ne plus le proposer
           </Button>
+          <Button variant="outline" size="sm" disabled={pending} aria-expanded={editing} onClick={() => setEditing((open) => !open)}>
+            <Pencil className="size-3.5" aria-hidden />
+            Modifier
+          </Button>
         </div>
+        {editing && <ModifyForm proposal={proposal} onDone={() => setEditing(false)} />}
       </CardContent>
     </Card>
+  );
+}
+
+type KnownProduct = { ean: string; name: string; brand: string | null };
+
+/**
+ * « Modifier » (fondateur, 21 oct. 2026) : la base du robot reste — le médicament, la phrase du comptoir —, seul le produit
+ * conseil change. Enregistré, il vaut pour toutes les pharmacies, et le produit du robot n'est plus proposé pour ce médicament.
+ */
+function ModifyForm({ proposal, onDone }: { proposal: RobotProposalCard; onDone: () => void }) {
+  const [product, setProduct] = useState<KnownProduct | null>(null);
+  const [sentence, setSentence] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const { push } = useToast();
+  const drug = proposal.drugLabel.replace(/,.*$/, "");
+  const submit = () => {
+    setError(null);
+    if (!product) {
+      setError("Choisissez le produit à proposer.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await modifyRobotProposalAction({ id: proposal.id, product: { ean: product.ean, name: product.name }, sentence: sentence.trim() || null });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      push({ tone: "success", title: result.message ?? "Enregistré" });
+      onDone();
+    });
+  };
+  return (
+    <div data-robot-modifier="" className="space-y-3 rounded-xl border border-border-subtle bg-surface-sunken p-3">
+      <p className="text-[13px] text-text-secondary">
+        Pour <span className="font-medium text-text-primary">{drug}</span>, à la place de <span className="font-medium text-text-primary">{proposal.productName}</span> :
+      </p>
+      <SearchField<KnownProduct>
+        label="Le produit conseil"
+        endpoint="/api/admin/conseils/produits"
+        minLength={2}
+        placeholder="Nom, marque ou code-barres…"
+        value={product}
+        onChange={setProduct}
+        keyOf={(item) => item.ean}
+        title={(item) => item.name}
+        subtitle={(item) => [item.brand, item.ean].filter(Boolean).join(" · ")}
+      />
+      <Field label="Ce que dit le pharmacien (facultatif)" htmlFor={`robot-modifier-${proposal.id}`} hint="Vide : la phrase du robot, avec le nom du produit choisi.">
+        <Textarea id={`robot-modifier-${proposal.id}`} value={sentence} maxLength={280} placeholder={proposal.script} onChange={(event) => setSentence(event.target.value)} />
+      </Field>
+      {error && (
+        <p role="alert" className="text-[13px] text-danger-600">
+          {error}
+        </p>
+      )}
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onDone} disabled={pending}>
+          Annuler
+        </Button>
+        <Button size="sm" onClick={submit} loading={pending} leadingIcon={<Save className="size-4" />}>
+          Enregistrer pour toutes les pharmacies
+        </Button>
+      </div>
+    </div>
   );
 }

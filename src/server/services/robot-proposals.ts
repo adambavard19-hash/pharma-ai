@@ -33,6 +33,8 @@ export type RobotProposalView = {
   script: string;
   pharmacies: string[];
   occurrences: number;
+  /** Modifiée dans la console : un autre produit conseil a pris sa place (le produit du robot ne revient plus). */
+  replaced: boolean;
   /** Ce qu'elle deviendra (ou est devenue) pour toutes les pharmacies. */
   central: { kind: "CUSTOM_RULE" | "ASSOCIATION" | "MANUAL"; summary: string };
   decidedBy: string | null;
@@ -85,6 +87,7 @@ export async function listRobotProposals(): Promise<{ pending: RobotProposalView
       script: row.counterScript.replaceAll("{product}", row.productName.replace(/,.*$/, "").trim()).replaceAll("{drug}", row.drugLabel.replace(/,.*$/, "").trim()),
       pharmacies: row.pharmacyIds.map((id) => names.get(id)).filter((name): name is string => Boolean(name)),
       occurrences: row.occurrences,
+      replaced: row.status === "REFUSED" && row.centralKind === "ASSOCIATION",
       central: row.status === "VALIDATED" && row.centralKind ? { kind: row.centralKind as "CUSTOM_RULE" | "ASSOCIATION", summary: draft.summary } : { kind: draft.kind, summary: draft.summary },
       decidedBy: row.decidedByName,
       decidedAt: row.decidedAt,
@@ -131,6 +134,35 @@ export async function validateRobotProposal(admin: Admin, id: string): Promise<{
   await prisma.robotRuleProposal.update({ where: { id }, data: { centralKind: draft.kind, centralRef } });
   await recordAudit({ action: "knowledge.proposal_decided", entityType: "RobotRuleProposal", entityId: id, platformAdminId: admin.id, metadata: { decision: "VALIDATE", drugKey: row.drugKey, productKey: row.productKey, central: draft.kind, centralRef } });
   return { ok: true, label: `${row.drugLabel.replace(/,.*$/, "").trim()} → ${row.productName}`, summary: draft.summary };
+}
+
+/**
+ * « Modifier » (fondateur, 21 oct. 2026) : on garde la base du robot — le médicament, la phrase du comptoir — mais avec un AUTRE
+ * produit conseil. Le produit du robot est écarté pour ce médicament (il ne revient plus) et le produit choisi devient une
+ * association commune validée, pour toutes les pharmacies. Réservée avant d'écrire : deux clics ne font pas deux associations.
+ */
+export async function modifyRobotProposal(admin: Admin, id: string, input: { product: { ean: string; name: string }; sentence: string | null }): Promise<{ ok: true; label: string } | Failure> {
+  const ean = input.product.ean.replace(/\D/g, "");
+  const name = input.product.name.trim();
+  if (!/^\d{7,14}$/.test(ean) || !name) return { ok: false, error: "Choisissez le produit à proposer." };
+  const row = await prisma.robotRuleProposal.findUnique({ where: { id } });
+  if (!row) return { ok: false, error: "Proposition introuvable." };
+  if (row.status !== "PENDING") return { ok: false, error: "Cette proposition a déjà été tranchée." };
+  const drugShort = row.drugLabel.replace(/,.*$/, "").trim();
+  const sentence = (input.sentence?.trim() || row.counterScript.replaceAll("{product}", name.replace(/,.*$/, "").trim()).replaceAll("{drug}", drugShort)).slice(0, 280);
+
+  const won = await prisma.robotRuleProposal.updateMany({ where: { id, status: "PENDING" }, data: { status: "REFUSED", decidedAt: new Date(), decidedByAdminId: admin.id, decidedByName: admin.fullName } });
+  if (won.count === 0) return { ok: false, error: "Cette proposition a déjà été tranchée." };
+  const created = await addCentralAssociation(admin, { trigger: { kind: "MEDICINE", name: row.drugLabel }, advice: { ean, name }, sentence });
+  if (!created.ok) {
+    await prisma.robotRuleProposal.update({ where: { id }, data: { status: "PENDING", decidedAt: null, decidedByAdminId: null, decidedByName: null } });
+    return { ok: false, error: created.error };
+  }
+  await decideCentralAssociation(admin, created.id, "VALIDATE");
+  const centralRef = `association:${created.id}`;
+  await prisma.robotRuleProposal.update({ where: { id }, data: { centralKind: "ASSOCIATION", centralRef } });
+  await recordAudit({ action: "knowledge.proposal_decided", entityType: "RobotRuleProposal", entityId: id, platformAdminId: admin.id, metadata: { decision: "MODIFY", drugKey: row.drugKey, productKey: row.productKey, central: "ASSOCIATION", centralRef, ean } });
+  return { ok: true, label: `${drugShort} → ${name}` };
 }
 
 /** Refuse une proposition : ce produit n'est plus jamais suggéré pour ce médicament, dans aucune pharmacie. */

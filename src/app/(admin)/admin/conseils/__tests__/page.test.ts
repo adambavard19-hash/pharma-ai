@@ -110,6 +110,17 @@ describe("la page « Conseils »", () => {
     expect(html).toContain("Historique des modifications (1)");
   });
 
+  it("une suggestion du robot : Valider, Refuser, et Modifier pour changer le produit conseil (fondateur, 21 oct. 2026)", async () => {
+    mocks.listRobotProposals.mockResolvedValue({
+      pending: [{ id: "rp_1", status: "PENDING", drugLabel: "MAALOX, suspension", atcCode: "A02AD01", substance: null, productName: "Tisane digestive", productBrand: null, categoryLabel: "Phytothérapie", productTags: [], needLabel: "Digestion", reason: "Confort digestif.", script: "Une tisane digestive.", pharmacies: [], occurrences: 1, replaced: false, central: { kind: "ASSOCIATION", summary: "" }, decidedBy: null, decidedAt: null, createdAt: new Date(), feedback: null }],
+      recent: [],
+    });
+    const html = text(await render());
+    expect(html).toContain("Valider pour toutes les pharmacies");
+    expect(html).toContain("Refuser — ne plus le proposer");
+    expect(html).toMatch(/Refuser — ne plus le proposer\s*Modifier/);
+  });
+
   it("le filtre de l'adresse est appliqué (« ?filtre=produit » : seulement les conseils déclenchés par un produit)", async () => {
     const html = text(await render({ filtre: "produit" }));
     expect(html).toContain("Crème solaire");

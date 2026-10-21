@@ -191,7 +191,7 @@ describe("les autres conseils dans la même liste", () => {
     expect(matchesFilter(association, "PRODUCT")).toBe(true);
     expect(matchesFilter(association, "MEDICINE")).toBe(false);
     expect(matchesHubQuery(association, parseHubQuery("apaisez solaire"))).toBe(true);
-    const robot = robotFacets({ id: "rp_1", status: "PENDING", drugLabel: "MAALOX, suspension buvable", atcCode: "A02AD01", substance: "HYDROXYDE D'ALUMINIUM", productName: "Tisane digestive", productBrand: null, categoryLabel: "Phytothérapie", productTags: ["digestion"], needLabel: "Digestion", reason: "Pour le confort digestif.", script: "Une tisane digestive.", pharmacies: ["Pharmacie du Parc"], occurrences: 2, central: { kind: "CUSTOM_RULE", summary: "" }, decidedBy: null, decidedAt: null, createdAt: new Date(), feedback: null });
+    const robot = robotFacets({ id: "rp_1", status: "PENDING", drugLabel: "MAALOX, suspension buvable", atcCode: "A02AD01", substance: "HYDROXYDE D'ALUMINIUM", productName: "Tisane digestive", productBrand: null, categoryLabel: "Phytothérapie", productTags: ["digestion"], needLabel: "Digestion", reason: "Pour le confort digestif.", script: "Une tisane digestive.", pharmacies: ["Pharmacie du Parc"], occurrences: 2, replaced: false, central: { kind: "CUSTOM_RULE", summary: "" }, decidedBy: null, decidedAt: null, createdAt: new Date(), feedback: null });
     expect(matchesFilter(robot, "ROBOT")).toBe(true);
     expect(matchesFilter(robot, "REVIEW")).toBe(true);
     expect(matchesHubQuery(robot, parseHubQuery("maalox"))).toBe(true);

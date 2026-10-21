@@ -44,7 +44,7 @@ vi.mock("../central-advice", () => ({
   loadRuleFeedback: vi.fn(async () => new Map()),
 }));
 
-const { validateRobotProposal, refuseRobotProposal } = await import("../robot-proposals");
+const { validateRobotProposal, refuseRobotProposal, modifyRobotProposal } = await import("../robot-proposals");
 const admin = { id: "adm-donna", fullName: "Donna" };
 
 const proposal = (overrides: Record<string, unknown> = {}) => ({
@@ -123,5 +123,42 @@ describe("refuser", () => {
     expect(m.rows[0]).toMatchObject({ status: "REFUSED", decidedByName: "Donna" });
     expect(await refuseRobotProposal(admin, "prop-1")).toMatchObject({ ok: false });
     expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ entityType: "RobotRuleProposal", metadata: expect.objectContaining({ decision: "REFUSE" }) }));
+  });
+});
+
+describe("modifier : la base du robot, un autre produit conseil (fondateur, 21 oct. 2026)", () => {
+  const ERGYPHILUS = { ean: "3401560000123", name: "ERGYPHILUS Confort gélules" };
+
+  it("le produit choisi devient l'association validée pour le médicament, avec la phrase du robot ; le produit du robot ne revient plus", async () => {
+    m.rows.push(proposal());
+    expect(await modifyRobotProposal(admin, "prop-1", { product: ERGYPHILUS, sentence: null })).toMatchObject({ ok: true });
+    expect(m.addCentralAssociation).toHaveBeenCalledWith(admin, {
+      trigger: { kind: "MEDICINE", name: "MAALOX MAUX D'ESTOMAC, suspension buvable en sachet" },
+      advice: ERGYPHILUS,
+      sentence: "Pour votre confort digestif, je peux vous proposer ERGYPHILUS Confort gélules.",
+    });
+    expect(m.decideCentralAssociation).toHaveBeenCalledWith(admin, "assoc-1", "VALIDATE");
+    expect(m.addCustomRule).not.toHaveBeenCalled();
+    expect(m.rows[0]).toMatchObject({ status: "REFUSED", centralKind: "ASSOCIATION", centralRef: "association:assoc-1", decidedByName: "Donna" });
+  });
+
+  it("la phrase réécrite remplace celle du robot ; deux clics, une seule association ; un échec rend la proposition", async () => {
+    m.rows.push(proposal());
+    await modifyRobotProposal(admin, "prop-1", { product: ERGYPHILUS, sentence: "  Avec votre antiacide, un probiotique.  " });
+    expect(m.addCentralAssociation.mock.calls[0][1].sentence).toBe("Avec votre antiacide, un probiotique.");
+    expect(await modifyRobotProposal(admin, "prop-1", { product: ERGYPHILUS, sentence: null })).toMatchObject({ ok: false });
+    expect(m.addCentralAssociation).toHaveBeenCalledTimes(1);
+
+    m.rows.length = 0;
+    m.rows.push(proposal({ id: "prop-2" }));
+    m.addCentralAssociation.mockResolvedValueOnce({ ok: false, error: "Produit inconnu." });
+    expect(await modifyRobotProposal(admin, "prop-2", { product: ERGYPHILUS, sentence: null })).toMatchObject({ ok: false, error: "Produit inconnu." });
+    expect(m.rows[0].status).toBe("PENDING");
+  });
+
+  it("sans produit choisi : rien ne change", async () => {
+    m.rows.push(proposal());
+    expect(await modifyRobotProposal(admin, "prop-1", { product: { ean: "", name: "" }, sentence: null })).toMatchObject({ ok: false });
+    expect(m.rows[0].status).toBe("PENDING");
   });
 });

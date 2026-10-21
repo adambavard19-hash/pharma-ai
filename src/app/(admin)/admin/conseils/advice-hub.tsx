@@ -211,7 +211,7 @@ function DecidedProposal({ proposal }: { proposal: RobotProposalCard }) {
   return (
     <Card className="opacity-75">
       <CardContent className="flex flex-wrap items-center gap-2 py-3 text-[13px]">
-        <Badge tone={proposal.status === "VALIDATED" ? "success" : "neutral"}>{proposal.status === "VALIDATED" ? "Suggestion validée" : "Suggestion refusée"}</Badge>
+        <Badge tone={proposal.status === "VALIDATED" || proposal.replaced ? "success" : "neutral"}>{proposal.status === "VALIDATED" ? "Suggestion validée" : proposal.replaced ? "Suggestion modifiée (autre produit)" : "Suggestion refusée"}</Badge>
         <span className="font-medium text-text-primary">
           {proposal.drugLabel.replace(/,.*$/, "")} → {proposal.productName}
         </span>
