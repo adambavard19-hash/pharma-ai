@@ -7,10 +7,10 @@ import { MobileMenu } from "./mobile-menu";
 const NAV = [
   // La bannière du poste de caisse d'abord : c'est ce que l'équipe voit au comptoir.
   { href: "/decouvrir#banniere", label: "Au comptoir" },
-  { href: "/decouvrir#suivi", label: "Suivi pharmaceutique" },
+  // « Suivi pharmaceutique » retiré du menu (fondateur, 21 oct. 2026) : la section reste sur l'accueil.
   // « Stock et marge » retiré du menu (fondateur, 20 oct. 2026) : la section reste sur l'accueil.
   { href: "/decouvrir/pourquoi", label: "Pourquoi" },
-  { href: "/decouvrir#tarif", label: "Tarif" },
+  { href: "/decouvrir#tarif", label: "Offre" },
   // Le programme d'affiliation, dans le menu principal : 100 € par pharmacie apportée et signée (20 oct. 2026).
   { href: "/decouvrir/affiliation", label: "Affiliation" },
 ];

@@ -12,7 +12,7 @@ export type PublicIslandDemo = { items: IslandAdvice[]; drug: string; alert: { t
 const SHORTCUTS = [
   { href: "/decouvrir/demo", label: "Réserver une démo", icon: CalendarCheck, primary: true },
   { href: "/decouvrir/abonnement", label: "S'abonner", icon: Sparkles },
-  { href: "/decouvrir#tarif", label: "Tarif", icon: Receipt },
+  { href: "/decouvrir#tarif", label: "Offre", icon: Receipt },
 ];
 
 /**

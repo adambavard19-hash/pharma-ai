@@ -100,11 +100,12 @@ describe("l'en-tête mène d'abord à la bannière du comptoir", () => {
     expect(links[0]).toEqual(["/decouvrir#banniere", "Au comptoir"]);
     // L'onglet « Affiliation » (18 oct. 2026) ferme le menu principal.
     // « Stock et marge » n'est plus dans le menu (fondateur, 20 oct. 2026).
-    expect(links).toHaveLength(5);
-    expect(links[4]).toEqual(["/decouvrir/affiliation", "Affiliation"]);
+    expect(links).toHaveLength(4);
+    expect(links[3]).toEqual(["/decouvrir/affiliation", "Affiliation"]);
     expect(nav).not.toContain("#stock-marge");
-    // Le bilan conseil et le rappel de fin de cure (17 oct. 2026) ont leur onglet, juste après le comptoir.
-    expect(links[1]).toEqual(["/decouvrir#suivi", "Suivi pharmaceutique"]);
+    // « Suivi pharmaceutique » n'est plus dans le menu, « Tarif » s'appelle « Offre » (fondateur, 21 oct. 2026).
+    expect(nav).not.toContain("#suivi");
+    expect(links[2]).toEqual(["/decouvrir#tarif", "Offre"]);
     // La rubrique « Comment ça marche » a été retirée de la page (demande du fondateur, 11 oct. 2026) : plus de lien vers elle.
     expect(nav).not.toContain("#fonctionnement");
   });
