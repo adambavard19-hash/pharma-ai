@@ -467,7 +467,9 @@ export function PosteIsland() {
     // Vendu / Non vendu sans clic : un conseil bipé est vendu, un conseil non bipé est « non vendu » à la validation.
     autoOutcome: true,
     pills: [{ key: "poste", label: view.postLabel || "Comptoir", value: "Connecté", dot: C.accent }],
-    look: view.look,
+    // Le robot de la marque, à jour, sur tous les postes (fondateur, 21 oct. 2026) ; la capsule au repos s'ouvre au clic.
+    look: null,
+    peekOnClick: true,
     onAnswer: (index, outcome) => {
       dispatch({ type: "answer", index, outcome });
       if (entry?.items[index]) word(answerWord(entry.id, entry.items[index], outcome));
@@ -556,7 +558,7 @@ export function PosteIsland() {
                 Seul « OK » ferme le message. Jamais de champ, jamais de focus demandé : le clavier reste au logiciel de gestion. */}
             <div data-ile-bonjour="" className="flex w-full items-center gap-3 px-3 py-2.5 text-left">
               <span className="isl-cheer relative shrink-0">
-                <Robot size={60} mood="happy" look={view.look} label="Le robot PharmaBoost" />
+                <Robot size={60} mood="happy" look={null} label="Le robot PharmaBoost" />
                 <span className="isl-burst" aria-hidden="true">
                   {BURST_PIECES.map((piece, index) => (
                     <i key={index} style={{ "--a": `${piece.angle}deg`, "--d": `${piece.distance}px`, "--c": piece.color, animationDelay: `${piece.delay}ms` } as CSSProperties} />
@@ -585,7 +587,7 @@ export function PosteIsland() {
             outcomes={island.outcomes}
             open={hovered}
             narrow={view.side === "gauche" || view.side === "droite"}
-            look={view.look}
+            look={null}
             aurore={aurore}
             onOpen={openIsland}
             onFinish={finish}
@@ -597,7 +599,7 @@ export function PosteIsland() {
             {/* Debout contre le bord de l'écran : tout est empilé, rien n'est coupé. */}
             <div className="flex w-full flex-col items-center gap-1.5 px-2 pt-2.5 pb-2 text-center">
               <button type="button" data-ile-replie="" onClick={openIsland} className="flex flex-col items-center gap-1">
-                <Robot size={aurore ? 36 : 40} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
+                <Robot size={aurore ? 36 : 40} mood={items.length > 0 ? "happy" : "idle"} look={null} label="Le robot PharmaBoost" />
                 {aurore && items.length > 0 && <span className="aur-dot" aria-hidden="true" />}
                 <span className={aurore ? "block text-[13.5px] leading-[17px] font-semibold text-[#ECFFF6]" : "block text-[14px] leading-[17px] font-bold"} style={aurore ? undefined : { color: items.length > 0 ? C.accent : "#FFFFFF" }}>{foldedLabel(items.length)}</span>
                 {soldCount > 0 ? (
@@ -622,7 +624,7 @@ export function PosteIsland() {
           <IslandShell width={FOLDED_WIDTH} tone="accent" contentKey="replie" label="Conseils de la vente (cliquez pour les voir)">
             <div className="flex w-full items-center gap-2 py-1.5 pr-1.5 pl-2">
               <button type="button" data-ile-replie="" onClick={openIsland} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                <Robot size={aurore ? 30 : 34} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
+                <Robot size={aurore ? 30 : 34} mood={items.length > 0 ? "happy" : "idle"} look={null} label="Le robot PharmaBoost" />
                 {aurore ? (
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 whitespace-nowrap text-[13.5px] leading-[18px] font-semibold tracking-[-0.01em] text-[#ECFFF6]">
@@ -725,7 +727,7 @@ export function PosteIsland() {
           <IslandQuestions
             questions={questions}
             contentKey={`q-${entry.signature}`}
-            robot={questionsOnly ? <Robot size={30} mood="curious" look={view.look} label="Le robot PharmaBoost" /> : undefined}
+            robot={questionsOnly ? <Robot size={30} mood="curious" look={null} label="Le robot PharmaBoost" /> : undefined}
             guidance={entry.guidance}
             onChoose={(node, choice) => word(questionWord(entry.id, node, choice))}
             footer={

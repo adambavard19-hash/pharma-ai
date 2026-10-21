@@ -72,6 +72,8 @@ export type CounterIslandProps = {
   pills: IslandPill[];
   /** Survol de la capsule au repos : elle s'ouvre sur le résumé du comptoir. */
   hoverOpen?: boolean;
+  /** Au poste (fondateur, 21 oct. 2026) : la capsule au repos s'ouvre d'un CLIC, plus au survol ; elle se referme quand la souris sort. */
+  peekOnClick?: boolean;
   onAnswer: (index: number, outcome: IslandOutcome) => void;
   /**
    * Le poste de caisse (fondateur, 16 oct. 2026) : Vendu / Non vendu se décident SANS clic — un conseil bipé passe en
@@ -348,7 +350,8 @@ export function CounterIsland(props: CounterIslandProps) {
   }, [grumpy]);
 
   const resting = state.stage === "idle";
-  const peek = resting && hover && props.hoverOpen !== false && !grumpy;
+  const [clicked, setClicked] = useState(false);
+  const peek = resting && (props.peekOnClick ? clicked && hover : hover && props.hoverOpen !== false) && !grumpy;
   // Une vente terminée sans conseil vendu : un robot content, sans fête.
   const mood = grumpy ? "concerned" : state.stage === "done" && !soldAtEnd ? "happy" : STAGE_MOOD[state.stage];
   const tone = grumpy ? "warning" : stageTone(state.stage);
@@ -414,7 +417,7 @@ export function CounterIsland(props: CounterIslandProps) {
     );
   } else if (peek) {
     body = (
-      <div className="px-3 pt-2.5 pb-3">
+      <div data-ile-repos="" className="px-3 pt-2.5 pb-3">
         <Row robot={robot(30)} title={title} sub={props.movable ? "Je surveille le comptoir. Glissez-moi pour me déplacer." : "Je surveille le comptoir. Scannez une boîte pour commencer."} compact />
         <div className="mt-2.5 grid grid-cols-3 gap-1.5">
           {pills.map((pill) => (
@@ -433,7 +436,7 @@ export function CounterIsland(props: CounterIslandProps) {
     switch (state.stage) {
       case "idle":
         body = (
-          <div className="flex h-10 items-center gap-2 pr-3.5 pl-1.5">
+          <div data-ile-repos="" className="flex h-10 items-center gap-2 pr-3.5 pl-1.5">
             {robot(28)}
             <span className="min-w-0 flex-1 truncate text-[13px] text-white/80">{title}</span>
             <span className="size-2 shrink-0 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} aria-label="Poste connecté" />
@@ -815,7 +818,10 @@ export function CounterIsland(props: CounterIslandProps) {
       className={columnsBlock ? "flex flex-col items-center gap-2" : undefined}
       onClick={(event) => {
         // Appuyer sur une carte de conseil la déploie : ce n'est pas taquiner le robot.
-        if (!(event.target as Element).closest("button, input, form, a, [data-advice-card]")) onTap();
+        if (!(event.target as Element).closest("button, input, form, a, [data-advice-card]")) {
+          if (props.peekOnClick && resting) setClicked((open) => !open);
+          onTap();
+        }
       }}
     >
       <IslandShell
@@ -828,7 +834,10 @@ export function CounterIsland(props: CounterIslandProps) {
           setHover(true);
         }}
         onPointerLeave={() => {
-          leaveTimer.current = setTimeout(() => setHover(false), 350);
+          leaveTimer.current = setTimeout(() => {
+            setHover(false);
+            setClicked(false);
+          }, 350);
         }}
       >
         {toggle && !collapsed ? (

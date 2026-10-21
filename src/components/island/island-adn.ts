@@ -7,6 +7,10 @@
 const P = "[data-ile-style=aurore]";
 
 export const MIX_ADN_CSS = `
+${P} section:has([data-ile-repos]){background:url(/poste/adn-helice.jpg) 62% 40%/cover no-repeat,#EFF3F1!important}
+${P} section:has([data-ile-repos])::before{display:none}
+${P} [data-ile-repos],${P} [data-ile-repos] *{color:#0F2F2A!important;text-shadow:0 0 6px #fff,0 0 2px #fff}
+${P} [data-ile-repos] .rounded-2xl{background:rgba(255,255,255,.7)!important;text-shadow:none}
 ${P} [data-ile-helice]{background:#EFF3F1}
 ${P} section:has([data-ile-helice]) [data-ile-mix-carte]{background:rgba(255,255,255,.5)!important}
 ${P} section:has([data-ile-mix]){background:url(/poste/adn-helice.jpg) 62% 40%/cover no-repeat,#EFF3F1!important;box-shadow:0 18px 40px -14px rgba(0,0,0,.35)!important}
