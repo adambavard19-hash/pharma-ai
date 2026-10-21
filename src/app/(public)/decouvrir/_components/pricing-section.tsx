@@ -33,6 +33,9 @@ const SUBSCRIPTION_INCLUDES = [
 export function PricingSection({ pricing }: { pricing: PublicPricing }) {
   const { monthlyPriceCents, setupFeeCents, commitmentMonths, referralDiscountPercent } = pricing;
   const referrerPrice = referrerPriceCents(monthlyPriceCents, referralDiscountPercent);
+  // Deux confrères parrainés : deux fois la remise (fondateur, 21 oct. 2026), le même calcul que la facture.
+  const doublePercent = referralDiscountPercent * 2;
+  const doubleReferrerPrice = referrerPriceCents(monthlyPriceCents, doublePercent);
 
   return (
     <section id="tarif" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 md:py-28">
@@ -95,6 +98,13 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
               </p>
               <p className="mt-1 text-[13px] leading-5 text-brand-900/80">
                 Au moment de votre inscription, indiquez la personne que vous parrainez. Dès qu&apos;elle s&apos;abonne, vous ne payez plus {formatPriceEuros(monthlyPriceCents)} mais {formatPriceEuros(referrerPrice)} HT par mois.
+              </p>
+              <p className="mt-3 border-t border-brand-200 pt-3 text-[15.5px] font-semibold text-brand-900" data-parrainage-double="">
+                Parrainez 2 confrères : {doublePercent} % de moins par mois
+              </p>
+              <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[14px] text-brand-900/85">
+                <s className="tabular text-brand-900/60">{formatPriceEuros(monthlyPriceCents)}</s>
+                <span className="text-[17px] font-bold text-brand-700 tabular">{formatPriceEuros(doubleReferrerPrice)} HT / mois</span>
               </p>
             </div>
           </div>

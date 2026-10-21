@@ -16,9 +16,10 @@ describe("les conditions d'abonnement acceptées en ligne", () => {
     expect(text).toContain("TVA");
   });
 
-  it("disent l'engagement, le paiement SEPA ou carte, et le parrainage sans cumul (100,80 € HT)", () => {
+  it("disent l'engagement, le paiement SEPA ou carte, et le parrainage : un filleul, puis deux (plafond)", () => {
     expect(text).toContain("durée minimale de 12 mois");
     expect(text).toContain("prélèvement SEPA ou par carte bancaire");
-    expect(text).toContain("100,80 € HT par mois (20 % de moins), sans cumul");
+    expect(text).toContain("100,80 € HT par mois (20 % de moins)");
+    expect(text).toContain("(40 % de moins), jamais davantage");
   });
 });

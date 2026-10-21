@@ -53,7 +53,7 @@ TARIF (hors taxes) :
 - ${k.pricing.name} : ${k.pricing.monthly} HT par mois, engagement ${k.pricing.commitmentMonths} mois.
 - Mise en service : ${k.pricing.setup} HT, une seule fois, payée avec le premier mois. Elle comprend : ${k.setupIncludes.join(" ; ")}.
 - Paiement par prélèvement SEPA ou par carte.
-- Parrainage : quand une officine parrainée s'abonne, l'abonnement de l'officine qui parraine baisse de ${k.pricing.referralPercent} % par mois (non cumulable).
+- Parrainage : quand une officine parrainée s'abonne, l'abonnement de l'officine qui parraine baisse de ${k.pricing.referralPercent} % par mois ; avec deux officines parrainées abonnées, de ${k.pricing.referralPercent * 2} % (jamais plus).
 
 QUESTIONS FRÉQUENTES :
 ${k.faq.map((f) => `- ${f.q} ${f.a}`).join("\n")}`;

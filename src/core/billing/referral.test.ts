@@ -8,6 +8,7 @@ import {
   referralDiscountForAmounts,
   referralOfferAmountFor,
   referralPercentDiscountCents,
+  referralPercentFor,
   REFERRAL_DISCOUNT_PERCENT,
   type ReferralOfferWindow,
 } from "./referral";
@@ -24,7 +25,7 @@ describe("parrainage", () => {
   });
 });
 
-describe("parrainage : 10 % de moins par mois, une seule fois", () => {
+describe("parrainage : 10 % de moins par mois, 20 % dès deux filleuls", () => {
   it("le pourcentage est celui de l'offre officielle : une seule source, 10 %", () => {
     expect(REFERRAL_DISCOUNT_PERCENT).toBe(OFFICIAL_OFFER.referralDiscountPercent);
     expect(REFERRAL_DISCOUNT_PERCENT).toBe(10);
@@ -48,12 +49,15 @@ describe("parrainage : 10 % de moins par mois, une seule fois", () => {
     expect(referralPercentDiscountCents(Number.NaN)).toBe(0);
   });
 
-  it("NON CUMULABLE : deux, trois ou douze filleuls donnent toujours 10 %, jamais 20 %", () => {
-    const one = referralDiscountCents(1, 12_600);
-    expect(referralDiscountCents(2, 12_600)).toBe(one);
-    expect(referralDiscountCents(3, 12_600)).toBe(one);
-    expect(referralDiscountCents(12, 12_600)).toBe(one);
-    expect(referralDiscountCents(2, 12_600)).not.toBe(5_040);
+  it("deux filleuls : 20 % (126 € → 100,80 €) ; trois ou douze : toujours 20 %, jamais plus (fondateur, 21 oct. 2026)", () => {
+    expect(referralDiscountCents(2, 12_600)).toBe(2_520);
+    expect(12_600 - referralDiscountCents(2, 12_600)).toBe(10_080);
+    expect(referralDiscountCents(3, 12_600)).toBe(2_520);
+    expect(referralDiscountCents(12, 12_600)).toBe(2_520);
+    expect(referralPercentFor(0)).toBe(0);
+    expect(referralPercentFor(1)).toBe(10);
+    expect(referralPercentFor(2)).toBe(20);
+    expect(referralPercentFor(5)).toBe(20);
   });
 
   it("10 % du prix CONTRACTUEL de l'officine, pas du prix catalogue : un contrat à 99 € donne 9,90 €", () => {
@@ -108,9 +112,10 @@ describe("parrainage : le plus avantageux entre les 10 % et les montants d'offre
     expect(referralBenefit([active(), active(4000)], null)).toEqual({ discountCents: 0, basis: null });
   });
 
-  it("un ou plusieurs filleuls hors offre : 10 %, jamais plus", () => {
+  it("filleuls hors offre : 10 % pour un, 20 % dès deux, jamais plus", () => {
     expect(referralBenefit([active()], 12_600)).toEqual({ discountCents: 1_260, basis: "PERCENT" });
-    expect(referralBenefit([active(), active(), active()], 12_600)).toEqual({ discountCents: 1_260, basis: "PERCENT" });
+    expect(referralBenefit([active(), active()], 12_600)).toEqual({ discountCents: 2_520, basis: "PERCENT" });
+    expect(referralBenefit([active(), active(), active()], 12_600)).toEqual({ discountCents: 2_520, basis: "PERCENT" });
   });
 
   it("un filleul inactif ne compte pas, qu'il porte ou non un montant d'offre", () => {

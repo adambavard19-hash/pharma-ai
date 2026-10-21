@@ -601,7 +601,7 @@ describe("modèles d'e-mails : parrainage et partenaires", () => {
     expect(rendered.subject).toBe("Pharmacie du Marché a rejoint PharmaBoost avec votre code de parrainage");
     expect(rendered.text).toContain("votre abonnement passe à 10 % de moins par mois");
     expect(rendered.text).toContain("La remise s'applique d'elle-même à vos factures suivantes");
-    expect(rendered.text).toContain("elle ne se cumule pas");
+    expect(rendered.text).toContain("avec deux filleuls abonnés, elle passe à 20 % de moins par mois");
     expect(rendered.text).toContain("Voir mon parrainage : https://pharmaboost.app/parametres?onglet=abonnement");
     expect(rendered.text).not.toContain("{{");
     // Plus aucun montant fixe par filleul.

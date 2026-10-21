@@ -11,7 +11,7 @@ import { referrerPriceCents } from "@/core/pricing/official-offer";
  * recopié ici. Le reste reprend le contrat d'abonnement (objet, données de santé,
  * droit applicable).
  */
-export const SUBSCRIPTION_TERMS_VERSION = "conditions-abonnement-v1-2026-10";
+export const SUBSCRIPTION_TERMS_VERSION = "conditions-abonnement-v2-2026-10";
 
 export type TermsInput = {
   companyName: string;
@@ -62,7 +62,7 @@ export function buildSubscriptionTerms(v: TermsInput): { title: string; version:
       {
         heading: "5. Parrainage",
         paragraphs: [
-          `Chaque officine abonnée dispose d'un code de parrainage. Tant qu'au moins une officine qu'elle a parrainée est abonnée et à jour de ses paiements, son abonnement passe à ${formatEuros(referrerPriceCents(v.monthlyPriceCents, v.referralDiscountPercent))} HT par mois (${v.referralDiscountPercent} % de moins), sans cumul. La remise s'applique aux factures suivantes ; elle cesse quand plus aucune officine parrainée n'est abonnée. L'officine parrainée paie le tarif normal.`,
+          `Chaque officine abonnée dispose d'un code de parrainage. Tant qu'au moins une officine qu'elle a parrainée est abonnée et à jour de ses paiements, son abonnement passe à ${formatEuros(referrerPriceCents(v.monthlyPriceCents, v.referralDiscountPercent))} HT par mois (${v.referralDiscountPercent} % de moins) ; tant qu'au moins deux officines qu'elle a parrainées le sont, à ${formatEuros(referrerPriceCents(v.monthlyPriceCents, v.referralDiscountPercent * 2))} HT par mois (${v.referralDiscountPercent * 2} % de moins), jamais davantage. La remise s'applique aux factures suivantes ; elle cesse quand plus aucune officine parrainée n'est abonnée. L'officine parrainée paie le tarif normal.`,
         ],
       },
       {

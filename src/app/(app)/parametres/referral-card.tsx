@@ -5,7 +5,7 @@ import { Copy, Check, Gift, Users } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatCents, formatDate } from "@/lib/format";
-import { REFERRAL_DISCOUNT_PERCENT, referralPercentDiscountCents } from "@/core/billing/referral";
+import { REFERRAL_DISCOUNT_PERCENT, referralPercentDiscountCents, referralPercentFor } from "@/core/billing/referral";
 
 type Referral = { name: string; city: string | null; active: boolean; since: string; offerAmountCents: number | null };
 type CurrentOffer = { amountCents: number; endsAt: Date | string | null };
@@ -13,8 +13,7 @@ type CurrentOffer = { amountCents: number; endsAt: Date | string | null };
 /**
  * Parrainage, vu du titulaire : son code, son lien à partager, ses filleuls et ce
  * que ça change sur son abonnement. Dès qu'une officine qu'il parraine s'abonne, son
- * abonnement passe à 10 % de moins par mois, une seule fois (deux filleuls ne font
- * pas 20 %). Seule exception : une offre de parrainage en cours à l'inscription d'un
+ * abonnement passe à 10 % de moins par mois, 20 % dès deux filleuls (jamais plus). Seule exception : une offre de parrainage en cours à l'inscription d'un
  * filleul lui fait apporter un montant fixe, et le titulaire a le plus avantageux.
  * La remise est appliquée d'elle-même à l'abonnement payé en ligne (Stripe), sinon par l'équipe PharmaBoost.
  */
@@ -39,7 +38,9 @@ export function ReferralCard({ referral }: { referral: { code: string; link: str
   const description = covered
     ? referral.discountBasis === "OFFERS"
       ? `Une offre de parrainage vous est plus favorable que les ${percent} % : votre abonnement est à ${formatCents(after!)} HT au lieu de ${formatCents(price!)} HT par mois.`
-      : `Une officine que vous parrainez est abonnée : votre abonnement est à ${percent} % de moins, ${formatCents(after!)} HT au lieu de ${formatCents(price!)} HT par mois.`
+      : referral.activeCount >= 2
+        ? `Deux officines que vous parrainez sont abonnées : votre abonnement est à ${referralPercentFor(referral.activeCount)} % de moins, ${formatCents(after!)} HT au lieu de ${formatCents(price!)} HT par mois.`
+        : `Une officine que vous parrainez est abonnée : votre abonnement est à ${percent} % de moins, ${formatCents(after!)} HT au lieu de ${formatCents(price!)} HT par mois. Avec un deuxième filleul abonné, ${percent * 2} %.`
     : price !== null
       ? `Dès qu'une officine que vous parrainez s'abonne, votre abonnement passe à ${percent} % de moins : ${formatCents(Math.max(0, price - referralPercentDiscountCents(price)))} HT au lieu de ${formatCents(price)} HT par mois.`
       : `Dès qu'une officine que vous parrainez s'abonne, votre abonnement passe à ${percent} % de moins par mois.`;
@@ -50,7 +51,7 @@ export function ReferralCard({ referral }: { referral: { code: string; link: str
         title={
           <span className="flex items-center gap-2">
             <Gift className="size-4 text-brand-600 dark:text-brand-400" />
-            Parrainage : parrainez un confrère, payez {percent} % de moins
+            Parrainage : un confrère, {percent} % de moins ; deux confrères, {percent * 2} %
           </span>
         }
         description={description}
@@ -73,7 +74,7 @@ export function ReferralCard({ referral }: { referral: { code: string; link: str
               </button>
             </div>
           </div>
-          <p className="text-[13px] leading-5 text-text-secondary">Un confrère s&apos;abonne avec votre code ou votre lien : il devient votre filleul dès que son espace est créé. Dès son premier paiement, la remise s&apos;applique d&apos;elle-même à vos factures suivantes, une seule fois : {percent} % de moins, que vous ayez un ou plusieurs filleuls. Elle cesse si plus aucun filleul n&apos;est abonné.</p>
+          <p className="text-[13px] leading-5 text-text-secondary">Un confrère s&apos;abonne avec votre code ou votre lien : il devient votre filleul dès que son espace est créé. Dès son premier paiement, la remise s&apos;applique d&apos;elle-même à vos factures suivantes, {percent} % de moins avec un filleul, {percent * 2} % dès deux. Elle cesse si plus aucun filleul n&apos;est abonné.</p>
           {offer && (
             <p className="rounded-xl border border-border-subtle bg-surface-sunken p-3 text-[13px] leading-5 text-text-secondary">
               Offre de parrainage en cours : chaque officine que vous parrainez et qui s&apos;inscrit{lastOfferDay ? ` jusqu'au ${formatDate(lastOfferDay)} inclus` : ""} retire {formatCents(offer.amountCents)} HT par mois de votre abonnement, tant qu&apos;elle est abonnée. Vous bénéficiez du plus avantageux entre la somme de ces montants et les {percent} % de moins.

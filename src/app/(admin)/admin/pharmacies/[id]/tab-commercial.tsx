@@ -19,13 +19,13 @@ import { When } from "../client-ui";
 import { EmptyLine } from "./shared";
 
 /**
- * Ce que sa filleule apporte à son parrain : 10 % de moins par mois, une seule fois (jamais cumulé entre filleuls),
+ * Ce que sa filleule apporte à son parrain : 10 % de moins par mois, 20 % dès deux filleuls actifs (jamais plus),
  * appliqués à l'abonnement par l'équipe. Seule exception : le montant d'une offre de parrainage en cours à son
  * inscription, figé sur sa fiche (`null` hors offre).
  */
 function referralEffect(amountCents: number | null): { value: string; hint: string } {
   const percent = `${REFERRAL_DISCOUNT_PERCENT} % de moins par mois sur l'abonnement de son parrain`;
-  if (amountCents === null) return { value: percent, hint: `Non cumulable : dès un filleul actif le parrain paie ${REFERRAL_DISCOUNT_PERCENT} % de moins, jamais davantage. Aucune offre de parrainage n'était en cours à son inscription.` };
+  if (amountCents === null) return { value: percent, hint: `Dès un filleul actif le parrain paie ${REFERRAL_DISCOUNT_PERCENT} % de moins, ${REFERRAL_DISCOUNT_PERCENT * 2} % dès deux, jamais davantage. Aucune offre de parrainage n'était en cours à son inscription.` };
   return {
     value: `${percent}, ou ${formatEuros(amountCents)} par mois (offre à son inscription)`,
     hint: `Montant d'une offre de parrainage en cours à son inscription : figé, il ne change plus. Le parrain bénéficie du plus avantageux entre les ${REFERRAL_DISCOUNT_PERCENT} % et la somme des montants d'offre de ses filleuls.`,

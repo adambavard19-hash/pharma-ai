@@ -67,10 +67,12 @@ describe("parrainage vu du titulaire : sans offre", () => {
     expect(summary.referrals.map((r) => r.offerAmountCents)).toEqual([null]);
   });
 
-  it("NON CUMULABLE : deux, trois filleuls actifs donnent la même remise de 10 %, jamais 20 %", async () => {
+  it("deux filleuls actifs ou plus : 20 % (25,20 €), jamais davantage même avec trois (fondateur, 21 oct. 2026)", async () => {
+    db.state.filleuls = [filleul("Pharmacie A"), filleul("Pharmacie B")];
+    expect(await referralSummary("ph_1")).toMatchObject({ activeCount: 2, discountCents: 2520, discountBasis: "PERCENT" });
     db.state.filleuls = [filleul("Pharmacie A"), filleul("Pharmacie B"), filleul("Pharmacie C")];
     const summary = await referralSummary("ph_1");
-    expect(summary).toMatchObject({ activeCount: 3, discountCents: 1260, discountBasis: "PERCENT" });
+    expect(summary).toMatchObject({ activeCount: 3, discountCents: 2520, discountBasis: "PERCENT" });
     expect(summary.referrals.map((r) => r.offerAmountCents)).toEqual([null, null, null]);
   });
 

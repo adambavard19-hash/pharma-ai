@@ -5,8 +5,9 @@ import { OFFICIAL_OFFER } from "@/core/pricing/official-offer";
  *
  * Chaque officine a un code « PB-XXXXXX ». Dès qu'au moins UNE officine qu'elle
  * parraine est abonnée (un filleul actif), son abonnement passe à 10 % de moins
- * par mois : 10 % de son prix CONTRACTUEL, arrondi au centime. La remise ne se
- * cumule pas : deux filleuls, c'est toujours 10 %, jamais 20 %.
+ * par mois : 10 % de son prix CONTRACTUEL, arrondi au centime. Deux filleuls actifs
+ * ou plus : 20 % (fondateur, 21 oct. 2026 : « parrainez 2 confrères, 20 % »). Jamais
+ * plus de 20 %, quel que soit le nombre de filleuls.
  *
  * Exception explicite : une OFFRE de parrainage de la console fait apporter à
  * chaque nouveau filleul, pendant sa durée, un montant fixe par mois. Ce montant
@@ -50,14 +51,22 @@ export function normalizeReferralCode(value: string | null | undefined): string 
 
 const isPrice = (value: number | null | undefined): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
 
-/** 10 % du prix contractuel, arrondi au centime ; 0 sans prix connu (pas d'abonnement) ou à prix nul. */
-export function referralPercentDiscountCents(monthlyPriceCents: number | null): number {
-  return isPrice(monthlyPriceCents) ? Math.round((monthlyPriceCents * REFERRAL_DISCOUNT_PERCENT) / 100) : 0;
+/** Le nombre de filleuls actifs à partir duquel la remise est la plus forte (deux confrères : deux fois 10 %). */
+export const REFERRAL_MAX_COUNTED = 2;
+
+/** Le pourcentage pour ce nombre de filleuls actifs : 0, 10 % pour un, 20 % pour deux ou plus. */
+export function referralPercentFor(activeReferrals: number, basePercent: number = REFERRAL_DISCOUNT_PERCENT): number {
+  return Math.max(0, Math.min(Math.floor(activeReferrals), REFERRAL_MAX_COUNTED)) * basePercent;
 }
 
-/** La remise mensuelle des 10 % : dès UN filleul actif, jamais davantage quel que soit leur nombre ; 0 sans filleul actif. */
+/** Ce pourcentage (10 % par défaut) du prix contractuel, arrondi au centime ; 0 sans prix connu (pas d'abonnement) ou à prix nul. */
+export function referralPercentDiscountCents(monthlyPriceCents: number | null, percent: number = REFERRAL_DISCOUNT_PERCENT): number {
+  return isPrice(monthlyPriceCents) ? Math.round((monthlyPriceCents * percent) / 100) : 0;
+}
+
+/** La remise mensuelle : 10 % dès UN filleul actif, 20 % dès deux, jamais davantage ; 0 sans filleul actif. */
 export function referralDiscountCents(activeReferrals: number, monthlyPriceCents: number | null): number {
-  return activeReferrals >= 1 ? referralPercentDiscountCents(monthlyPriceCents) : 0;
+  return referralPercentDiscountCents(monthlyPriceCents, referralPercentFor(activeReferrals));
 }
 
 /** Le montant d'offre figé sur ce filleul à son inscription, ou `null` : hors offre, c'est la règle des 10 % qui s'applique. */

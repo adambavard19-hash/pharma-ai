@@ -39,7 +39,7 @@ describe("carte du titulaire : sans filleul actif", () => {
   it("annonce la règle avec les vrais montants : 113,40 € HT au lieu de 126 € HT par mois", () => {
     const html = render(base());
     expect(html).toContain("Dès qu'une officine que vous parrainez s'abonne, votre abonnement passe à 10 % de moins : 113,40 € HT au lieu de 126,00 € HT par mois.");
-    expect(html).toContain("Parrainage : parrainez un confrère, payez 10 % de moins");
+    expect(html).toContain("Parrainage : un confrère, 10 % de moins ; deux confrères, 20 %");
   });
 
   it("les montants suivent le tarif contractuel du titulaire : 99 € donnent 89,10 €", () => {
@@ -58,10 +58,10 @@ describe("carte du titulaire : sans filleul actif", () => {
     expect(html).not.toMatch(/gratuit|Encore \d|retire .* par mois de votre abonnement, tant qu'elle est abonnée\. Jusqu'à/);
   });
 
-  it("dit que la remise s'applique d'elle-même dès le premier paiement du filleul, une seule fois, quel que soit le nombre de filleuls", () => {
+  it("dit que la remise s'applique d'elle-même dès le premier paiement du filleul : 10 % avec un, 20 % dès deux", () => {
     const html = render(base());
     expect(html).toContain("Dès son premier paiement, la remise s'applique d'elle-même à vos factures suivantes");
-    expect(html).toContain("une seule fois : 10 % de moins, que vous ayez un ou plusieurs filleuls");
+    expect(html).toContain("10 % de moins avec un filleul, 20 % dès deux");
     expect(html).not.toContain("apparaît sur votre facture");
   });
 
