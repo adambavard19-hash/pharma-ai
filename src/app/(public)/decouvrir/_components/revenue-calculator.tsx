@@ -71,7 +71,7 @@ export function RevenueCalculator({ monthlyPriceCents }: { monthlyPriceCents: nu
       {/* Les étapes du calcul : chacune se refait à la calculette. */}
       <ol className="mt-6 divide-y divide-border-subtle border-y border-border-subtle text-[14.5px]" aria-label="Le calcul, étape par étape">
         <Step label={`Clients repartis avec un produit conseillé (${ratePercent} %)`} value={estimate ? `${estimate.advisedClientsPerDay} par jour` : "—"} />
-        <Step label={`× ${formatPriceEuros(ESTIMATE_ASSUMPTIONS.averageProductCents)} par produit en moyenne`} value={estimate ? `${formatPriceEuros(estimate.perDayCents)} par jour` : "—"} />
+        <Step label={`× ${formatPriceEuros(ESTIMATE_ASSUMPTIONS.averageProductCents)} par produit en moyenne`} hint="Compléments alimentaires, médicaments sans ordonnance" value={estimate ? `${formatPriceEuros(estimate.perDayCents)} par jour` : "—"} />
         <Step label={`× ${openDays} jours d'ouverture`} value={estimate ? `${formatPriceEuros(estimate.perMonthCents)} par mois` : "—"} strong />
       </ol>
 
@@ -82,10 +82,13 @@ export function RevenueCalculator({ monthlyPriceCents }: { monthlyPriceCents: nu
   );
 }
 
-function Step({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+function Step({ label, hint, value, strong = false }: { label: string; hint?: string; value: string; strong?: boolean }) {
   return (
     <li className="flex items-baseline justify-between gap-4 py-3">
-      <span className="text-text-secondary">{label}</span>
+      <span className="text-text-secondary">
+        {label}
+        {hint && <span className="mt-0.5 block text-[12px] leading-4 text-text-tertiary">({hint})</span>}
+      </span>
       <span className={cn("text-right font-medium whitespace-nowrap text-text-primary tabular-nums", strong && "font-semibold text-brand-700")}>{value}</span>
     </li>
   );

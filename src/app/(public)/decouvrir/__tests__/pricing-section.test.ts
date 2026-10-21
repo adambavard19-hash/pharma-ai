@@ -53,7 +53,7 @@ describe("la section tarif du site : un seul abonnement", () => {
     expect(t).not.toContain("Combien de clients passent chez vous");
     expect(html).toContain('value="200"');
     expect(t).toContain("Clients repartis avec un produit conseillé (10 %) 20 par jour");
-    expect(t).toContain("× 7 € par produit en moyenne 140 € par jour");
+    expect(t).toContain("× 7 € par produit en moyenne (Compléments alimentaires, médicaments sans ordonnance) 140 € par jour");
     expect(t).toContain("× 25 jours d'ouverture 3 500 € par mois");
     expect(t).toContain("Chiffre d'affaires supplémentaire estimé 3 500 € par mois");
   });
