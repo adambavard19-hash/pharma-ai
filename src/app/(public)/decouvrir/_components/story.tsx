@@ -58,7 +58,7 @@ export function LoadVisual() {
           <span
             key={label}
             {...step(seen, index, 220)}
-            className={cn(step(seen, index, 220).className, "rounded-full border px-3.5 py-2 text-[13.5px] font-semibold", index % 3 === 0 ? "border-danger-200 bg-danger-50 text-danger-800" : "border-warning-200 bg-warning-50 text-warning-900")}
+            className={cn(step(seen, index, 220).className, "rounded-full border border-warning-200 bg-warning-50 px-3.5 py-2 text-[13.5px] font-semibold text-warning-900")}
           >
             {label}
           </span>
