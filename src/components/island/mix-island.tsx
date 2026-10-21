@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, ExternalLink, FileText, MessageCircle, Pill, Sparkles } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, MessageCircle, Pill, Sparkles } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import type { IslandOutcome } from "@/core/island/banner-flow";
@@ -14,8 +14,8 @@ import { islandTheme, MIX_PAPER, PHARMABOOST_GREEN } from "./island-theme";
 /**
  * La bannière « mix » du poste (fondateur, 19 oct. 2026, maquette 5 choisie) : le haut reste toujours à l'écran — le meilleur
  * conseil, le challenge, la marge possible de la vente — et, à la souris, elle se déploie sur ce meilleur conseil en trois
- * temps : 1. Questions (les deux questions, réponses cliquables), 2. Discours (le conseil à dire), 3. Fiche (posologie,
- * contre-indications, effets indésirables). Les autres conseils se parcourent avec les flèches ; l'autre possibilité en
+ * temps (fondateur, 21 oct. 2026 : cet ordre) : 1. Fiche (posologie, contre-indications, effets indésirables), 2. Discours
+ * (le conseil à dire), 3. Questions (les deux questions, réponses cliquables). Plus de lien « Fiche complète ». Les autres conseils se parcourent avec les flèches ; l'autre possibilité en
  * stock pour la même boîte est à un clic. Vendu / Non vendu restent sans clic : un conseil bipé passe en vendu.
  *
  * L'ancienne bannière (`CounterIsland` compacte) reste joignable : `?banniere=ancienne` (voir poste-island.tsx).
@@ -52,9 +52,9 @@ export function possibleMargin(items: readonly Pick<IslandAdvice, "margin">[]): 
 
 type Step = "ask" | "say" | "sheet";
 const STEPS: { id: Step; label: string; Icon: typeof Pill }[] = [
-  { id: "ask", label: "Questions", Icon: MessageCircle },
-  { id: "say", label: "Discours", Icon: Sparkles },
   { id: "sheet", label: "Fiche", Icon: Pill },
+  { id: "say", label: "Discours", Icon: Sparkles },
+  { id: "ask", label: "Questions", Icon: MessageCircle },
 ];
 
 export type MixIslandProps = {
@@ -80,7 +80,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   const soldIndexes = order.filter(sold);
   const firstOpen = order.find((index) => !sold(index)) ?? order[0];
   const [at, setAt] = useState(() => Math.max(0, order.indexOf(firstOpen)));
-  const [step, setStep] = useState<Step>("ask");
+  const [step, setStep] = useState<Step>("sheet");
   const position = Math.min(at, order.length - 1);
   const index = order[position];
   const item = items[index];
@@ -89,7 +89,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   const soldMargin = possibleMargin(soldIndexes.map((i) => items[i]));
   const go = (next: number) => {
     setAt((next + order.length) % order.length);
-    setStep("ask");
+    setStep("sheet");
   };
   const alternatives = order.map((i, pos) => ({ i, pos })).filter(({ i }) => i !== index && item.drug && items[i].drug === item.drug);
   const width = narrow ? (open ? 340 : 300) : open ? 430 : 400;
@@ -291,12 +291,12 @@ function Chip({ bg, fg, children }: { bg: string; fg: string; children: ReactNod
   return <span className="inline-flex h-5 items-center rounded-full px-2 text-[10.5px] font-bold" style={{ background: bg, color: fg }}>{children}</span>;
 }
 
-/** 1. Questions : les deux questions ; la réponse touchée dit quoi faire, et parfois un produit plus précis du stock. */
+/** 3. Questions : les deux questions ; la réponse touchée dit quoi faire, et parfois un produit plus précis du stock. */
 function Ask({ item }: { item: IslandAdvice }) {
   const ask = item.sheet?.ask ?? [];
   const answers = item.sheet?.answers ?? [];
   const [picked, setPicked] = useState<Record<number, number>>({});
-  if (ask.length === 0) return <p style={{ color: C.inkSoft }}>Les questions de ce conseil sont en cours de rédaction : passez à « Discours ».</p>;
+  if (ask.length === 0) return <p style={{ color: C.inkSoft }}>Les questions de ce conseil sont en cours de rédaction : appuyez-vous sur le « Discours ».</p>;
   return (
     <ol className="space-y-2">
       {ask.map((question, q) => {
@@ -349,7 +349,7 @@ function Say({ item }: { item: IslandAdvice }) {
   return text ? <p className="rounded-lg px-2.5 py-2 text-[12.5px] leading-[18px]" style={{ background: C.raised, color: C.raisedInk }}>« {text} »</p> : <p style={{ color: C.inkSoft }}>Rien d&apos;écrit pour ce conseil : voyez la fiche.</p>;
 }
 
-/** 3. Fiche : posologie, contre-indications, effets indésirables — ce que PharmaBoost sait ; une rubrique vide renvoie à la notice. */
+/** 1. Fiche : posologie, contre-indications, effets indésirables — ce que PharmaBoost sait ; une rubrique vide renvoie à la notice. */
 function Sheet({ item }: { item: IslandAdvice }) {
   const sheet = item.sheet;
   const usage = sheet?.usage ?? [];
@@ -377,11 +377,6 @@ function Sheet({ item }: { item: IslandAdvice }) {
           <Missing>{SHEET_MISSING.sideEffects}</Missing>
         )}
       </Part>
-      {item.href && (
-        <a href={item.href} target="_blank" rel="noopener" draggable={false} data-advice-link="" className="inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg text-[11.5px] font-semibold hover:brightness-95" style={{ background: C.line, color: C.ink }}>
-          <FileText className="size-3.5" aria-hidden="true" /> Fiche complète <ExternalLink className="size-3" aria-hidden="true" />
-        </a>
-      )}
     </div>
   );
 }
