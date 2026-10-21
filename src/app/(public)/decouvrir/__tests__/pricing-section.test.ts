@@ -74,7 +74,7 @@ describe("la section tarif du site : un seul abonnement", () => {
   });
 
   it("propose le film du calcul, au-dessus du simulateur (il finit sur « juste en dessous »)", () => {
-    expect(t).toContain("Voir le calcul en vidéo 39 s");
+    expect(t).toContain("Voir le calcul en vidéo 45 s");
     expect(t.indexOf("Voir le calcul en vidéo")).toBeLessThan(t.indexOf("À combien estimez-vous"));
     expect(FILMS.tarif.src).toBe("/video/pharmaboost-tarif.mp4");
     expect(FILMS.tarif.poster).toBe("/video/pharmaboost-tarif.jpg");

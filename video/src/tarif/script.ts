@@ -16,7 +16,7 @@
  * Ce fichier est lu par Node sans compilation (types effacés) : imports avec leur extension, pas d'enum.
  */
 import { ESTIMATE_ASSUMPTIONS, estimateAdditionalRevenue } from "../../../src/core/pricing/revenue-estimate.ts";
-import { OFFICIAL_OFFER, formatPriceEuros } from "../../../src/core/pricing/official-offer.ts";
+import { OFFICIAL_OFFER, formatPriceEuros, referrerPriceCents } from "../../../src/core/pricing/official-offer.ts";
 
 // ---- Les nombres en toutes lettres (orthographe traditionnelle) -------------------------------------------------
 
@@ -74,6 +74,16 @@ export const ESTIMATE = estimateAdditionalRevenue(EXAMPLE_CLIENTS);
 export const RATE_PERCENT = Math.round(A.adviceRate * 100);
 export const MONTHLY_PRICE_CENTS = OFFICIAL_OFFER.monthlyPriceCents;
 
+/**
+ * Le parrainage (fondateur, 21 oct. 2026), la règle de src/core/billing/referral.ts (`referralPercentFor`) : un filleul actif,
+ * 10 % de moins par mois ; deux ou plus, deux fois 10 % (REFERRAL_MAX_COUNTED = 2), jamais davantage. Lu ici sans passer par
+ * referral.ts (ses imports « @/… » ne se lisent pas sans compilation) : même pourcentage de l'offre officielle, mêmes prix.
+ */
+export const REFERRAL_PERCENT_ONE = OFFICIAL_OFFER.referralDiscountPercent;
+export const REFERRAL_PERCENT_TWO = OFFICIAL_OFFER.referralDiscountPercent * 2;
+export const REFERRER_PRICE_ONE_CENTS = referrerPriceCents(MONTHLY_PRICE_CENTS, REFERRAL_PERCENT_ONE);
+export const REFERRER_PRICE_TWO_CENTS = referrerPriceCents(MONTHLY_PRICE_CENTS, REFERRAL_PERCENT_TWO);
+
 /** Les montants tels que le site les écrit : « 7 € », « 3 500 € » (espaces insécables). */
 export const money = formatPriceEuros;
 const NB = " ";
@@ -89,6 +99,8 @@ const T = {
   days: num(A.openDaysPerMonth),
   perMonth: money(ESTIMATE.perMonthCents),
   price: money(MONTHLY_PRICE_CENTS),
+  ref1: `${REFERRAL_PERCENT_ONE}${NB}%`,
+  ref2: `${REFERRAL_PERCENT_TWO}${NB}%`,
 };
 
 const V = {
@@ -100,6 +112,8 @@ const V = {
   days: frenchNumber(A.openDaysPerMonth),
   perMonth: frenchEuros(ESTIMATE.perMonthCents),
   price: frenchEuros(MONTHLY_PRICE_CENTS),
+  ref1: `${frenchNumber(REFERRAL_PERCENT_ONE)} pour cent`,
+  ref2: `${frenchNumber(REFERRAL_PERCENT_TWO)} pour cent`,
 };
 
 // ---- Le script --------------------------------------------------------------------------------------------------
@@ -170,7 +184,19 @@ export const SCRIPT: TarifLine[] = [
     // Le simulateur reste un instant, avec le nombre choisi et son résultat, avant la carte de fin.
     gapAfter: 0.9,
   },
+  // Le parrainage (21 oct. 2026) : ajouté EN FIN de liste pour que les fichiers T1 … T7 gardent leur rang ; le film
+  // « TarifV2 » le dit entre T6 et T7 (TARIF_V2_ORDER).
+  {
+    id: "T8",
+    text: `Et si vous parrainez un confrère, votre abonnement baisse de ${T.ref1}. Avec deux confrères, de ${T.ref2}.`,
+    say: `Et si vous parrainez un confrère, votre abonnement baisse de ${V.ref1}. Avec deux confrères, de ${V.ref2}.`,
+    chunks: ["Et si vous *parrainez*", `un${NB}confrère,`, `votre abonnement baisse de *${T.ref1}*.`, `Avec *deux${NB}confrères*,`, `de *${T.ref2}*.`],
+    gapAfter: 0.5,
+  },
 ];
+
+/** L'ordre des phrases dans le film « TarifV2 » : le parrainage après l'abonnement, avant « Faites le calcul ». */
+export const TARIF_V2_ORDER = ["T1", "T2", "T3", "T4", "T5", "T6", "T8", "T7"] as const;
 
 /**
  * Les mêmes sous-titres, comme la voix les prononce : sert à répartir leur temps au prorata des syllabes (« 3 500 € »
@@ -195,4 +221,4 @@ export const VOICE_DIR = "voix/tarif";
 export const VOICE = { name: "Yann", id: "nr2EGJNe96rzn9FRlTId", model: "eleven_multilingual_v2" };
 
 /** Les durées de la voix « Yann » du 10 octobre 2026, si un fichier manque : le film reste calculable. */
-export const FALLBACK_DURATIONS = [3.62, 2.8, 5.17, 4.18, 6.13, 3.31, 3.66];
+export const FALLBACK_DURATIONS = [3.62, 2.8, 5.17, 4.18, 6.13, 3.31, 3.66, 6.2];

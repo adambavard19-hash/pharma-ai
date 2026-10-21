@@ -12,6 +12,7 @@ import { SANS_ORDONNANCE } from "./films/sans-ordonnance";
 import { PARTENAIRES } from "./films/partenaires";
 import { Reel, calculateReelMetadata } from "./films/reel";
 import { Tarif, calculateTarifMetadata } from "./films/tarif";
+import { TarifV2, calculateTarifV2Metadata } from "./films/tarif-v2";
 import { RobotFilm, RobotVertical, calculateRobotMetadata } from "./films/robot";
 import { PriseEnMainTitulaire, PriseEnMainPharmacien, PEM_FPS } from "./films/prise-en-main";
 import { frames as guideFrames } from "./prise-en-main/timeline";
@@ -49,6 +50,8 @@ export function Root() {
       <Composition id="Reel" component={Reel} calculateMetadata={calculateReelMetadata} defaultProps={{ voices: null }} durationInFrames={1700} fps={60} width={1080} height={1920} />
       {/* Le film de la section tarif, 16:9, avec la voix : sa durée vient elle aussi des fichiers de voix (public/voix/tarif). */}
       <Composition id="Tarif" component={Tarif} calculateMetadata={calculateTarifMetadata} defaultProps={{ voices: null, stale: [] }} durationInFrames={2400} fps={OUT_FPS} width={1920} height={1080} />
+      {/* Le film tarif refait le 21 oct. 2026 : style de la présentation, et le parrainage (rendu 4K, site). */}
+      <Composition id="TarifV2" component={TarifV2} calculateMetadata={calculateTarifV2Metadata} defaultProps={{ voices: null, stale: [] }} durationInFrames={2700} fps={OUT_FPS} width={1920} height={1080} />
       {/* Le film « Robot », façon Coucou, avec la voix (public/voix/robot) ; sa déclinaison verticale pour Instagram (scripts/robot.mjs). */}
       <Composition id="Robot" component={RobotFilm} calculateMetadata={calculateRobotMetadata} defaultProps={{ voices: null, stale: [] }} durationInFrames={3360} fps={OUT_FPS} width={1920} height={1080} />
       {/* La publication Instagram « Qu'est-ce que PharmaBoost ? », carrousel 4:5 : une image par page (--props='{"slide":1}'). */}
