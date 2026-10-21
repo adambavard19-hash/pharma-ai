@@ -480,7 +480,7 @@ export type RemoveLineResult = { ok: true; remaining: number } | { ok: false; er
  *  - Les conseils qu'ELLE seule déclenchait disparaissent (ceux d'une autre boîte restent) ; encore sans réponse, ils reviennent si
  *    la boîte est rebipée.
  *  - La vente repart à l'analyse avec les boîtes qui restent, comme après un bip : la bannière se met à jour seule.
- *  - Plus aucune boîte : la vente est annulée, la bannière se ferme.
+ *  - Plus aucune boîte : la vente reste ouverte et vide — c'est le même patient jusqu'à FIN Valider (fondateur, 21 oct. 2026).
  *
  * Seulement sur une vente de CE poste (ou de cette pharmacie pour une clé de serveur), encore ouverte : jamais une vente terminée ou encaissée.
  */
@@ -510,21 +510,22 @@ export async function removeCounterLine(agent: AgentContext, input: { prescripti
   const ownAdvice = linked.filter((rec) => (rec.opportunity?.triggeredLineIds ?? []).every((id) => id === line.id));
   const onlyThisBox = ownAdvice.map((rec) => rec.id);
   // Les conseils encore sans réponse partent avec la boîte, effacés — si la boîte est rebipée (supprimée puis reprise dans
-  // LGPI, POSTE5 le 16 oct. 2026), ils reviennent. Un conseil déjà tranché garde sa trace : vendu, il reste vendu (le
-  // produit est bien sorti) ; refusé, il passe « retiré ».
+  // LGPI, POSTE5 le 16 oct. 2026), ils reviennent. Un conseil déjà tranché passe « retiré » et ne s'affiche plus, même bipé : il
+  // ne comptait vendu qu'à la validation (fondateur, 21 oct. 2026 : « les médicaments et conseils ne doivent plus se voir »).
   const undecided = ownAdvice.filter((rec) => rec.status === "PROPOSED" || rec.status === "PRESENTED").map((rec) => rec.id);
-  const decided = ownAdvice.filter((rec) => rec.status !== "PROPOSED" && rec.status !== "PRESENTED" && rec.status !== "PURCHASED").map((rec) => rec.id);
+  const decided = ownAdvice.filter((rec) => rec.status !== "PROPOSED" && rec.status !== "PRESENTED").map((rec) => rec.id);
 
   await prisma.$transaction(async (tx) => {
     if (undecided.length > 0) await tx.recommendation.deleteMany({ where: { id: { in: undecided } } });
     if (decided.length > 0) await tx.recommendation.updateMany({ where: { id: { in: decided } }, data: { status: "REMOVED" } });
     await tx.prescriptionLine.delete({ where: { id: line.id } });
-    // Plus aucune boîte : rien n'a été vendu, pas même un conseil bipé — il ne comptait vendu qu'à la validation (21 oct. 2026).
-    if (remaining === 0) await tx.recommendation.updateMany({ where: { prescriptionId: sale.id, status: "PURCHASED", outcomeSource: COUNTER_ANSWERED }, data: { status: "DECLINED" } });
+    // Plus aucune boîte : aucun conseil ne reste à l'écran, pas même un conseil bipé — il ne comptait vendu qu'à la validation.
+    if (remaining === 0) await tx.recommendation.updateMany({ where: { prescriptionId: sale.id, status: { in: ["PROPOSED", "PRESENTED", "ACCEPTED", "MODIFIED", "PURCHASED", "DECLINED"] } }, data: { status: "REMOVED" } });
     await tx.prescription.update({
       where: { id: sale.id },
-      // Plus de boîte : la vente est annulée (la bannière se ferme). Sinon, elle repart à l'analyse avec ce qui reste.
-      data: remaining === 0 ? { status: "CANCELLED" } : { status: "NEEDS_VERIFICATION", verifiedAt: null },
+      // Plus de boîte : c'est TOUJOURS le même patient (fondateur, 21 oct. 2026 : « on passe au nouveau patient seulement quand
+      // c'est FIN Valider ») — la vente reste ouverte, vide ; la boîte suivante s'y ajoute. Sinon, elle repart à l'analyse.
+      data: remaining === 0 ? { status: "ANALYZED" } : { status: "NEEDS_VERIFICATION", verifiedAt: null },
     });
   });
 

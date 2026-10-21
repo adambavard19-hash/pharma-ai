@@ -817,13 +817,13 @@ describe("une ligne supprimée dans LGPI quitte la bannière, quel que soit le c
     });
   };
 
-  it("la boîte bipée par son EAN, supprimée dans LGPI sous son ACL : elle quitte la vente, la vente seule se ferme", async () => {
+  it("la boîte bipée par son EAN, supprimée dans LGPI sous son ACL : elle quitte la vente, qui reste ouverte (même patient jusqu'à FIN Valider)", async () => {
     await scan(EAN_CREME);
     removal();
     const sale = mem.sales[0];
     expect(await removeCounterCode(AGENT, { prescriptionId: sale.id, code: ACL_CREME })).toEqual({ ok: true, action: "line_removed", remaining: 0 });
     expect(sale.lines).toHaveLength(0);
-    expect(sale.status).toBe("CANCELLED");
+    expect(sale.status).toBe("ANALYZED");
   });
 
   it("un autre produit supprimé dans LGPI ne retire jamais cette boîte", async () => {
