@@ -31,6 +31,7 @@ export function IslandShell({
   onPointerEnter,
   onPointerLeave,
   label,
+  backdrop,
 }: {
   width: number;
   tone?: IslandTone;
@@ -41,6 +42,8 @@ export function IslandShell({
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
   label: string;
+  /** Un fond vivant posé derrière le contenu, coupé à la forme de l'île (l'hélice d'ADN de la bannière « mix »). */
+  backdrop?: ReactNode;
 }) {
   const inner = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | null>(null);
@@ -75,7 +78,8 @@ export function IslandShell({
       )}
       style={style}
     >
-      <div ref={inner}>
+      {backdrop && <div className="pointer-events-none absolute inset-0">{backdrop}</div>}
+      <div ref={inner} className="relative">
         <div key={contentKey} className="isl-in">
           {children}
         </div>

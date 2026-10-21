@@ -79,8 +79,6 @@ const TEAM_COLORS = ["#247061", "#7A4DB8", "#C2410C", "#0369A1", "#B42318", "#4D
 /** Le temps laissé au pharmacien pour donner l'e-mail du bilan après la validation dans LGPI. */
 const VALIDATED_EMAIL_MS = 12_000;
 
-/** « Qui a servi ce patient ? » : sans geste, la personne du comptoir est gardée au bout de ce délai. */
-const SERVED_AUTO_MS = 8_000;
 /** Après le choix, la confirmation reste ce temps-là avant que l'île revienne au repos. */
 const SERVED_THANKS_MS = 1_800;
 
@@ -208,9 +206,8 @@ export function PosteIsland() {
   // « Qui a servi ce patient ? » (fondateur, 19 oct. 2026) : à la fin d'une vente avec au moins un conseil vendu, l'île demande
   // qui a servi — la personne du comptoir est choisie d'avance et gardée sans geste ; un collègue d'un clic. Personne ne change
   // d'espace. Tant que la question est là, l'île ne revient pas au repos et la page ne se recharge pas.
-  const [served, setServed] = useState<{ id: string; chosen: string | null; until: number; done: boolean } | null>(null);
+  const [served, setServed] = useState<{ id: string; chosen: string | null; done: boolean } | null>(null);
   const askServed = shouldAskServed(view);
-  const servedOpen = askServed && served?.id === entry?.id && !served?.done;
   const servedRef = useRef(false);
   useEffect(() => {
     servedRef.current = askServed && !(served?.id === entry?.id && served?.done);
@@ -284,25 +281,16 @@ export function PosteIsland() {
   useEffect(() => {
     if (!askServed || !entry || served?.id === entry.id) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- ouverture de la question, une fois par vente
-    setServed({ id: entry.id, chosen: entry.servedBy ?? null, until: Date.now() + SERVED_AUTO_MS, done: false });
+    setServed({ id: entry.id, chosen: entry.servedBy ?? null, done: false });
   }, [askServed, entry, served?.id]);
-  const [servedClock, setServedClock] = useState(0);
   const answerServed = useCallback((userId: string | null) => {
     if (!served || served.done || !entry || served.id !== entry.id) return;
     // Seul un changement part au serveur : la personne du comptoir est déjà celle de la vente.
     if (userId && userId !== entry.servedBy) word(servedWord(entry.id, userId));
     setServed({ ...served, chosen: userId ?? served.chosen, done: true });
   }, [served, entry, word]);
-  useEffect(() => {
-    if (!servedOpen || !served) return;
-    const tick = setInterval(() => {
-      const now = Date.now();
-      setServedClock(now);
-      // Sans geste : la personne du comptoir est gardée. Sans personne connue, la question attend un clic.
-      if (served.chosen && now >= served.until) answerServed(null);
-    }, 250);
-    return () => clearInterval(tick);
-  }, [servedOpen, served, answerServed]);
+  // La question attend toujours un clic (fondateur, 21 oct. 2026 : elle se fermait seule au bout de 8 s, avant qu'on ait touché
+  // son prénom). La vente suivante la remplace : elle ne bloque jamais le comptoir.
   useEffect(() => {
     if (island.stage !== "done" || !served?.done || served.id !== entry?.id) return;
     const id = setTimeout(() => dispatch({ type: "settle" }), SERVED_THANKS_MS);
@@ -417,8 +405,8 @@ export function PosteIsland() {
   }, [send]);
 
   // L'île repliée (fondateur, 15 oct. 2026 : « la bannière prend beaucoup trop de place quand il y a beaucoup de scans ») :
-  // pendant la vente, seuls le robot et « N conseils suggérés » restent à l'écran ; les conseils se déploient quand la souris
-  // passe sur l'île (ou d'un appui, sur un écran tactile) et se replient quand elle en sort.
+  // pendant la vente, seuls le robot et « N conseils suggérés » restent à l'écran ; les conseils se déploient d'un clic sur l'île
+  // (plus au survol depuis le 21 oct. 2026) et se replient quand la souris en sort.
   const [hovered, setHovered] = useState(false);
   // Le nouveau style par défaut ; l'ancien reste joignable pour comparer (aperçu).
   const aurore = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get("style") !== "actuel", () => true);
@@ -536,8 +524,11 @@ export function PosteIsland() {
           if (target?.closest("[data-ile-sans-deploiement]")) {
             if (foldTimer.current) clearTimeout(foldTimer.current);
             foldTimer.current = null;
-          } else if (target?.closest("section")) openIsland();
-          else foldSoon();
+          } else if (target?.closest("section")) {
+            // Sur l'île : elle ne se déploie plus au survol, seulement au clic (fondateur, 21 oct. 2026) ; elle reste ouverte tant que la souris y est.
+            if (foldTimer.current) clearTimeout(foldTimer.current);
+            foldTimer.current = null;
+          } else foldSoon();
           const start = drag.current;
           if (start && !start.moved && Math.hypot(event.screenX - start.x, event.screenY - start.y) > 4) start.moved = true;
         }}
@@ -602,7 +593,7 @@ export function PosteIsland() {
             boxes={entry.boxes ?? []}
           />
         ) : folded && entry && (view.side === "gauche" || view.side === "droite") ? (
-          <IslandShell width={SIDE_FOLDED_WIDTH} tone="accent" contentKey="replie-cote" label="Conseils de la vente (survolez pour les voir)">
+          <IslandShell width={SIDE_FOLDED_WIDTH} tone="accent" contentKey="replie-cote" label="Conseils de la vente (cliquez pour les voir)">
             {/* Debout contre le bord de l'écran : tout est empilé, rien n'est coupé. */}
             <div className="flex w-full flex-col items-center gap-1.5 px-2 pt-2.5 pb-2 text-center">
               <button type="button" data-ile-replie="" onClick={openIsland} className="flex flex-col items-center gap-1">
@@ -628,7 +619,7 @@ export function PosteIsland() {
             </div>
           </IslandShell>
         ) : folded && entry ? (
-          <IslandShell width={FOLDED_WIDTH} tone="accent" contentKey="replie" label="Conseils de la vente (survolez pour les voir)">
+          <IslandShell width={FOLDED_WIDTH} tone="accent" contentKey="replie" label="Conseils de la vente (cliquez pour les voir)">
             <div className="flex w-full items-center gap-2 py-1.5 pr-1.5 pl-2">
               <button type="button" data-ile-replie="" onClick={openIsland} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
                 <Robot size={aurore ? 30 : 34} mood={items.length > 0 ? "happy" : "idle"} look={view.look} label="Le robot PharmaBoost" />
@@ -639,7 +630,7 @@ export function PosteIsland() {
                       {foldedLabel(items.length)}
                     </span>
                     {soldCount > 0 ? (
-                      <span data-ile-vendus="" className="block whitespace-nowrap text-[11.5px] leading-[14px] font-bold text-[#E8FF9C]">✓ {soldLabel(soldCount)} · survolez pour voir</span>
+                      <span data-ile-vendus="" className="block whitespace-nowrap text-[11.5px] leading-[14px] font-bold text-[#E8FF9C]">✓ {soldLabel(soldCount)} · cliquez pour voir</span>
                     ) : (
                       <span className="block whitespace-nowrap text-[9.5px] leading-[14px] font-semibold tracking-[0.16em] text-[#9FCBBB]/70 uppercase">Survolez pour voir</span>
                     )}
@@ -787,18 +778,7 @@ export function PosteIsland() {
                     );
                   })}
                 </div>
-                {served.chosen ? (
-                  <div className="mt-2.5 flex items-center gap-2">
-                    <span className="min-w-0 flex-1 text-[11.5px] leading-[15px] text-white/75">
-                      Rien à toucher si c&apos;est {entry.team.find((member) => member.id === served.chosen)?.name ?? "la bonne personne"} : gardé dans {Math.max(0, Math.ceil((served.until - (servedClock || served.until - SERVED_AUTO_MS)) / 1000))} s
-                    </span>
-                    <span className="h-1 w-16 overflow-hidden rounded-full bg-white/10">
-                      <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, ((served.until - (servedClock || served.until - SERVED_AUTO_MS)) / SERVED_AUTO_MS) * 100))}%`, background: "#E8FF9C", transition: "width 250ms linear" }} />
-                    </span>
-                  </div>
-                ) : (
-                  <p className="mt-2.5 text-[11.5px] leading-[15px] text-white/75">Touchez la personne qui a servi.</p>
-                )}
+                <p className="mt-2.5 text-[11.5px] leading-[15px] text-white/75">Touchez la personne qui a servi : la fenêtre attend votre choix.</p>
               </div>
             )}
           </IslandShell>

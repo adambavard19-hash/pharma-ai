@@ -8,6 +8,7 @@ import type { IslandOutcome } from "@/core/island/banner-flow";
 import { Robot } from "@/components/robot";
 import { AnswerProduct, type IslandAdvice } from "./counter-island";
 import { IslandShell } from "./island-shell";
+import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { islandTheme, MIX_PAPER, PHARMABOOST_GREEN } from "./island-theme";
 
 /**
@@ -94,7 +95,14 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   const width = narrow ? (open ? 340 : 300) : open ? 430 : 400;
 
   return (
-    <IslandShell width={width} tone="accent" contentKey={open ? "mix-ouvert" : "mix-replie"} label="Conseils de la vente (survolez pour les voir)">
+    <IslandShell
+      width={width}
+      tone="accent"
+      contentKey={open ? "mix-ouvert" : "mix-replie"}
+      label="Conseils de la vente (cliquez pour les voir)"
+      // L'hélice d'ADN vivante du site derrière la bannière (fondateur, 21 oct. 2026 : essai « 1 » de /robot-apercu/adn-vivant).
+      backdrop={aurore ? <div data-ile-helice="" className="absolute inset-0 isolate"><HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" /></div> : undefined}
+    >
       <div data-ile-mix={open ? "ouvert" : "replie"}>
         {/* Le haut, toujours là : le meilleur conseil à proposer, ou ce qui est déjà vendu. */}
         <div className="flex w-full items-center gap-2 py-1.5 pr-1.5 pl-2">
@@ -108,7 +116,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
               <span className="block truncate text-[11px] leading-[15px] text-[#3F5E57]">
                 {items.length} conseil{items.length > 1 ? "s" : ""}
                 {total > 0 ? ` · jusqu'à ${eurosOf(total)} de marge` : ""}
-                {!open ? " · survolez" : ""}
+                {!open ? " · cliquez" : ""}
               </span>
             </span>
             {best.challenge && soldIndexes.length === 0 && (
