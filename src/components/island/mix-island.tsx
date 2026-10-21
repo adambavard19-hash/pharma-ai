@@ -146,7 +146,8 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
               {challengedBoxes.map((box) => (
                 <span key={box.id} className="block">
                   {/^challenge\b/i.test(box.challenge ?? "") ? box.challenge : `Challenge ${box.challenge}`} : {box.name}
-                  {box.reward ? <span className="font-medium text-[#0F2F2A]/80"> · {box.reward}</span> : null}
+                  {/* Le gain, de la couleur du challenge : sur le fond noir de la bannière, l'encre foncée d'avant ne se voyait plus (21 oct. 2026). */}
+                  {box.reward ? <span data-ile-challenge-gain=""> · {box.reward}</span> : null}
                 </span>
               ))}
             </span>
