@@ -49,9 +49,6 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
         <p className="text-[20px] leading-[1.35] font-semibold tracking-[-0.015em] text-text-primary text-balance md:text-[26px]">
           Rassurez-vous, l’objectif est simple : que PharmaBoost vous rapporte bien plus qu’il ne vous coûte.
         </p>
-        <p className="mx-auto mt-3 max-w-2xl text-[14px] leading-6 text-text-tertiary text-balance md:text-[14.5px]">
-          Plus de conseils pertinents, plus d’opportunités au comptoir, sans changer vos habitudes.
-        </p>
         {/* Le film du calcul, au-dessus du simulateur : il finit sur « juste en dessous ». */}
         <div className="mt-6 flex justify-center">
           <VideoButton film="tarif" label="Voir le calcul en vidéo" />

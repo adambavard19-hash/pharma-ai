@@ -1,8 +1,7 @@
 import type { Metadata, ResolvingMetadata } from "next";
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, CalendarCheck, CheckCircle2, FileText, HelpCircle, Home, XCircle } from "lucide-react";
-import { fr, KeyCell, SectionHead } from "../_components/site-shell";
+import { CalendarCheck, CheckCircle2, FileText, HelpCircle, Home, XCircle } from "lucide-react";
+import { fr, SectionHead } from "../_components/site-shell";
 import { ExampleTag, HERO_ITEMS } from "../_components/visuals";
 import { CounterIslandStill } from "@/components/island/counter-island-still";
 import { VideoButton } from "../_components/video-dialog";
@@ -59,13 +58,7 @@ export default function WhyPage() {
 
       {/* ---- 01 · Au comptoir ------------------------------------------ */}
       <section className="mt-20 md:mt-28">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-14">
-          <SectionHead n="01" kicker="Au comptoir" title="Des milliers de produits. Un patient à la fois." />
-          <Reveal className="text-[18px] leading-7 lg:pt-10">
-            <p className="text-text-secondary">Avec la file qui attend, impossible de tout avoir en tête.</p>
-            <p className="mt-2 font-semibold text-text-primary">Au scan, PharmaBoost propose le bon conseil, pris dans votre rayon. Vous décidez.</p>
-          </Reveal>
-        </div>
+        <SectionHead title="Des milliers de produits. Un patient à la fois." />
 
         <Compare
           context={<Context icon={<FileText className="size-4" />} label="Ordonnance du patient" value="DOXYCYCLINE 100 mg · PARACÉTAMOL 1000 mg" />}
@@ -92,23 +85,11 @@ export default function WhyPage() {
           withoutResult="Le patient repart sans conseil."
           withResult="Le patient repart avec le bon conseil."
         />
-
-        <dl className="mt-6 grid gap-px overflow-hidden rounded-3xl border border-border-subtle bg-border-subtle sm:grid-cols-3">
-          <KeyCell label="Chaque patient" value="Les précautions à vérifier" className="bg-surface-card" />
-          <KeyCell label="Chaque ordonnance" value="Le traitement lu en entier" className="bg-surface-card" />
-          <KeyCell label="Chaque médicament" value="Le conseil qui l'accompagne" className="bg-surface-card" />
-        </dl>
       </section>
 
       {/* ---- 02 · À la maison ------------------------------------------ */}
       <section className="mt-24 md:mt-32">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-14">
-          <SectionHead n="02" kicker="À la maison" title="Plusieurs boîtes. Et beaucoup de questions." />
-          <Reveal className="text-[18px] leading-7 lg:pt-10">
-            <p className="text-text-secondary">Rentré chez lui, le patient ne se souvient plus de tout.</p>
-            <p className="mt-2 font-semibold text-text-primary">Avec PharmaBoost, il repart avec son plan conseil : quoi prendre, quand, et pourquoi.</p>
-          </Reveal>
-        </div>
+        <SectionHead title="Plusieurs boîtes. Et beaucoup de questions." />
 
         <Compare
           context={<Context icon={<Home className="size-4" />} label="De retour à la maison" value="3 boîtes sur la table" />}
@@ -140,23 +121,8 @@ export default function WhyPage() {
           withResult="Il sait quoi prendre, quand, et pourquoi."
         />
 
-        <dl className="mt-6 grid gap-px overflow-hidden rounded-3xl border border-border-subtle bg-border-subtle sm:grid-cols-2 lg:grid-cols-4">
-          <KeyCell label="Posologie" value="Matin, midi, soir et durée" className="bg-surface-card" />
-          <KeyCell label="Explication" value="À quoi sert chaque médicament" className="bg-surface-card" />
-          <KeyCell label="Rappels" value="Dans l'agenda du téléphone" className="bg-surface-card" />
-          <KeyCell label="Données" value="Aucune fiche patient" className="bg-surface-card" />
-        </dl>
       </section>
 
-      {/* ---- Appel ----------------------------------------------------- */}
-      <section className="mt-24 rounded-[32px] border border-border-subtle bg-surface-card px-7 py-12 sm:px-12">
-        <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-[30px] leading-[1.08] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[40px]">L&apos;information utile, au bon moment.</h2>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link href="/decouvrir/demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white hover:bg-brand-700">Réserver une démo <ArrowRight className="size-4" /></Link>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

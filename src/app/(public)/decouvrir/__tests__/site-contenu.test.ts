@@ -65,7 +65,6 @@ describe("le site dit ce que fait l'application, et rien de plus", () => {
   it("dit la vérité sur les données : aucune fiche patient, l'e-mail du bilan effacé après l'envoi", () => {
     expect(homeText).toContain("l'adresse e-mail donnée pour le bilan est effacée après l'envoi");
     expect(whyText).not.toContain("Aucune conservée");
-    expect(whyText).toContain("Aucune fiche patient");
   });
 
   it("n'a plus la rubrique « La bonne question » ni le tableau d'exemples (retirés par le fondateur, 20 oct. 2026)", () => {

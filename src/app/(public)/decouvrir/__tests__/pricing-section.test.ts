@@ -63,18 +63,14 @@ describe("la section tarif du site : un seul abonnement", () => {
     expect(t).toContain("Pour un abonnement de 126 € HT par mois.");
   });
 
-  it("pose le mot de réassurance au-dessus : la promesse d'abord, plus grande et plus foncée que la précision", () => {
+  it("pose le mot de réassurance au-dessus du simulateur, seul (la précision retirée par le fondateur, 21 oct. 2026)", () => {
     const promise = "Rassurez-vous, l’objectif est simple : que PharmaBoost vous rapporte bien plus qu’il ne vous coûte.";
-    const detail = "Plus de conseils pertinents, plus d’opportunités au comptoir, sans changer vos habitudes.";
     expect(t.indexOf(promise)).toBeGreaterThan(-1);
-    expect(t.indexOf(promise)).toBeLessThan(t.indexOf(detail));
-    expect(t.indexOf(detail)).toBeLessThan(t.indexOf("À combien estimez-vous"));
+    expect(t.indexOf(promise)).toBeLessThan(t.indexOf("À combien estimez-vous"));
+    expect(t).not.toContain("Plus de conseils pertinents");
     const promiseTag = html.slice(html.lastIndexOf("<p", html.indexOf("Rassurez-vous")), html.indexOf("Rassurez-vous"));
-    const detailTag = html.slice(html.lastIndexOf("<p", html.indexOf("Plus de conseils")), html.indexOf("Plus de conseils"));
     expect(promiseTag).toContain("font-semibold");
     expect(promiseTag).toContain("md:text-[26px]");
-    expect(detailTag).toContain("text-text-tertiary");
-    expect(detailTag).not.toContain("font-semibold");
   });
 
   it("propose le film du calcul, au-dessus du simulateur (il finit sur « juste en dessous »)", () => {
