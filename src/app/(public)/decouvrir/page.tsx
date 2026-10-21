@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
-import { fr, KeyCell, Kicker, SectionHead } from "./_components/site-shell";
+import { fr, Kicker, SectionHead } from "./_components/site-shell";
 import { HERO_ITEMS, HeroVisual, RequestVisual, TeamVisual, ExampleTag, CureReminderVisual } from "./_components/visuals";
 import { VideoButton } from "./_components/video-dialog";
 import { AutoVideo } from "./_components/auto-video";
@@ -13,7 +13,7 @@ import { formatEuros } from "@/core/billing/subscription";
 import { PricingSection } from "./_components/pricing-section";
 import { BannerPillsInline } from "./_components/banner-mock";
 import { ChoiceVisual, FlowSteps, LoadVisual, Reveal } from "./_components/story";
-import { FAQ, SAFETY } from "./_components/site-content";
+import { FAQ } from "./_components/site-content";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 
 /**
@@ -181,28 +181,9 @@ export default async function SitePage() {
       <section className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
         <div>
           <SectionHead title="Le client décrit. Vous conseillez." />
-          <ul className="mt-8 flex flex-wrap gap-2">
-            {["Besoin reconnu", "Questions à poser", "Produits en rayon", "Orientation médecin si nécessaire"].map((t) => (
-              <li key={t} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-4 py-2 text-[14px] font-medium text-text-primary">
-                <Check className="size-4 text-brand-600" /> {t}
-              </li>
-            ))}
-          </ul>
           <VideoButton film="sansOrdonnance" label="Voir en vidéo" className="mt-8" />
         </div>
         <RequestVisual />
-      </section>
-
-      {/* ---- Sécurité ------------------------------------------------- */}
-      <section id="securite" className="scroll-mt-20 border-y border-border-subtle bg-surface-card">
-        <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-          <SectionHead title="La sécurité avant la suggestion." />
-          <dl className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-border-subtle bg-border-subtle sm:grid-cols-2 lg:grid-cols-3">
-            {SAFETY.map((s) => (
-              <KeyCell key={s.label} label={s.label} value={s.value} className="bg-surface-app" />
-            ))}
-          </dl>
-        </div>
       </section>
 
       {/* ---- Tarif : deux formules, une source (console ou offre officielle) ---- */}

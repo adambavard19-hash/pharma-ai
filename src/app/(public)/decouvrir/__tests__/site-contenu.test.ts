@@ -63,7 +63,6 @@ describe("le site dit ce que fait l'application, et rien de plus", () => {
   });
 
   it("dit la vérité sur les données : aucune fiche patient, l'e-mail du bilan effacé après l'envoi", () => {
-    expect(homeText).toContain("Aucune fiche patient. L'e-mail du bilan est effacé après l'envoi (ou après le rappel de fin de cure).");
     expect(homeText).toContain("l'adresse e-mail donnée pour le bilan est effacée après l'envoi");
     expect(whyText).not.toContain("Aucune conservée");
     expect(whyText).toContain("Aucune fiche patient");
@@ -187,7 +186,6 @@ describe("les mots du site suivent le code, sans promesse", () => {
 
   it("dit d'où viennent les règles, sans laisser croire qu'elles ont été relues", () => {
     const sources = "à partir de documents de pharmaciens et des sources officielles (RCP, HAS, ANSES)";
-    expect(homeText).toContain(`Règles écrites ${sources}`);
     expect(homeText).toContain(`Les produits viennent de règles écrites ${sources}`);
     const lower = homeText.toLowerCase();
     for (const forbidden of ["relues par", "relue par", "validées par", "vérifiées par"]) expect(lower).not.toContain(forbidden);
