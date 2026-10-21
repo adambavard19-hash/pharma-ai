@@ -26,6 +26,8 @@ export type DispatchKind =
   | "EMAIL_CONFIRMATION"
   | "SUBSCRIPTION_RECEIVED"
   | "SITE_LEAD_ACK"
+  /** Une pharmacie recommandée depuis la page Affiliation : l'alerte à l'équipe. */
+  | "RECOMMENDATION_ALERT"
   | "INSTALL_GUIDE"
   /** Une officine a écrit au support : l'alerte à l'équipe. */
   | "SUPPORT_ALERT"

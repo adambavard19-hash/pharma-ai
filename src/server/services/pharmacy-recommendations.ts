@@ -66,7 +66,18 @@ export async function receivePharmacyRecommendation(input: Recommendation): Prom
   const summary: RecommendationSummary = { ...input, contactName, contactPhone, message, bonus, affiliateName };
   const messaging = getMessagingProvider();
   const alert = buildRecommendationAlert({ ...summary, adminUrl });
-  await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html });
+  const alertOutcome = await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html });
+  await traceDispatch({ kind: "RECOMMENDATION_ALERT", recipient: contactEmail, outcome: alertOutcome, subject: alert.subject, trigger: "SYSTEM", prospectId: prospect.id });
+  // Chaque pharmacie recommandée est aussi annoncée par e-mail à chaque administrateur de la console, comme une démo réservée
+  // (fondateur, 21 oct. 2026 : l'alerte n'arrivait qu'à l'adresse de contact).
+  const admins = await Promise.resolve()
+    .then(() => prisma.platformAdmin.findMany({ where: { isActive: true }, select: { email: true } }))
+    .catch(() => [] as { email: string }[]);
+  for (const admin of admins) {
+    if (admin.email.toLowerCase() === contactEmail.toLowerCase()) continue;
+    const adminOutcome = await messaging.sendEmail({ to: admin.email, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html }).catch(() => null);
+    if (adminOutcome) await traceDispatch({ kind: "RECOMMENDATION_ALERT", recipient: admin.email, outcome: adminOutcome, subject: alert.subject, trigger: "SYSTEM", prospectId: prospect.id });
+  }
   const ack = buildRecommendationAcknowledgement({ ...summary, contactEmail });
   const outcome = await messaging.sendEmail({ to: input.referrerEmail, fromName: "PharmaBoost", subject: ack.subject, text: ack.text, html: ack.html });
   await traceDispatch({ kind: "SITE_LEAD_ACK", recipient: input.referrerEmail, outcome, subject: ack.subject, trigger: "SYSTEM", prospectId: prospect.id });

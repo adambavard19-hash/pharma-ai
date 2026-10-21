@@ -10,10 +10,11 @@ const mocks = vi.hoisted(() => ({
   notifySalesRep: vi.fn(),
   recordProspectEvent: vi.fn(),
   traceDispatch: vi.fn(),
+  adminFindMany: vi.fn(),
 }));
 
 vi.mock("@/server/db/client", () => ({
-  prisma: { salesRep: { findFirst: mocks.salesRepFindFirst }, prospect: { create: mocks.prospectCreate }, companyProfile: { findUnique: mocks.companyFindUnique } },
+  prisma: { salesRep: { findFirst: mocks.salesRepFindFirst }, prospect: { create: mocks.prospectCreate }, companyProfile: { findUnique: mocks.companyFindUnique }, platformAdmin: { findMany: mocks.adminFindMany } },
 }));
 vi.mock("@/server/ai/registry", () => ({ getMessagingProvider: () => ({ sendEmail: mocks.sendEmail }) }));
 vi.mock("@/server/public-url", () => ({ publicUrl: (path: string) => `https://pharmaboost.test${path}` }));
@@ -33,6 +34,7 @@ beforeEach(() => {
   mocks.sendEmail.mockResolvedValue({ status: "SENT" });
   mocks.salesRepFindFirst.mockResolvedValue(null);
   mocks.notifySalesRep.mockResolvedValue(undefined);
+  mocks.adminFindMany.mockResolvedValue([]);
 });
 
 describe("« Recommander une pharmacie » : 100 € pour l'apporteur si elle signe", () => {
@@ -46,6 +48,13 @@ describe("« Recommander une pharmacie » : 100 € pour l'apporteur si elle sig
     expect(mocks.notifyAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: "Pharmacie recommandée — Pharmacie du Port" }));
     expect(mocks.sendEmail.mock.calls.map(([mail]) => mail.to)).toEqual(["contact@pharmaboost.test", "julie@exemple.test"]);
     expect(mocks.sendEmail.mock.calls[1][0].text).toMatch(/votre prime de 100\s€ HT vous est versée dès que sa mise en service est réglée/);
+  });
+
+  it("chaque administrateur de la console reçoit aussi l'alerte par e-mail (sans doublon avec l'adresse de contact)", async () => {
+    mocks.adminFindMany.mockResolvedValue([{ email: "fondateur@exemple.test" }, { email: "Contact@pharmaboost.test" }]);
+    await receivePharmacyRecommendation(input);
+    expect(mocks.sendEmail.mock.calls.map(([mail]) => mail.to)).toEqual(["contact@pharmaboost.test", "fondateur@exemple.test", "julie@exemple.test"]);
+    expect(mocks.sendEmail.mock.calls[1][0].subject).toBe(mocks.sendEmail.mock.calls[0][0].subject);
   });
 
   it("un affilié inscrit (même e-mail, actif) se voit attribuer le dossier : sa prime sera calculée toute seule", async () => {
