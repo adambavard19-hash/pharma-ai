@@ -500,7 +500,6 @@ export function CureReminderVisual() {
         </p>
         <p className="mt-2 text-[15px] font-semibold text-text-primary">Votre cure de magnésium arrive à son terme</p>
         <p className="mt-1 text-[13px] leading-5 text-text-secondary">Il vous en reste environ une semaine. Pensez à repasser à la pharmacie pour la renouveler.</p>
-        <span className="mt-3 inline-flex items-center rounded-lg bg-brand-600 px-3 py-1.5 text-[12.5px] font-semibold text-white">Voir l&apos;itinéraire</span>
       </div>
     </div>
   );

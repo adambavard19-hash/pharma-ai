@@ -161,8 +161,7 @@ describe("les mots du site suivent le code, sans promesse", () => {
     expect(homeText).toContain("Médicaments, produits et prix : exemples.");
   });
 
-  it("dit l'ordre du départage du moteur : les laboratoires préférés, puis la date courte, puis le challenge", () => {
-    expect(homeText).toContain("À conseil égal, après vos laboratoires préférés : la date courte, puis le challenge en cours");
+  it("départage dans l'ordre : les laboratoires préférés, puis la date courte, puis le challenge (phrase retirée de l'accueil par le fondateur le 21 oct. 2026)", () => {
     expect(homeText).not.toContain("la date courte d'abord");
     // Le moteur, lui : trois références cliniquement équivalentes, chacune n'ayant qu'un seul atout.
     const item = (productId: string, pharmacistPreference = 0): ScoredRecommendation =>
@@ -209,12 +208,11 @@ describe("les mots du site suivent le code, sans promesse", () => {
 
   it("parle de la quantité en stock, jamais d'un « stock exact » (le stock vient du dernier envoi)", () => {
     expect(homeText.toLowerCase()).not.toContain("stock exact");
-    expect(homeText).toContain("Uniquement des produits en rayon, avec la quantité en stock sous chaque conseil");
+    expect(homeText).toContain("En stock, avec la quantité");
   });
 
   it("tient la typographie française : ni « ? » ni « : » seuls en début de ligne sur un petit téléphone", () => {
     expect(home).toContain("PharmaBoost\u00a0?</dt>");
-    expect(home).toContain("après vos laboratoires préférés\u00a0: la date courte");
     expect(why).toContain("«\u00a0Avec DOXYCYCLINE 100 mg");
   });
 
