@@ -95,7 +95,7 @@ export default async function SitePage() {
       <section id="banniere" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
           <Reveal>
-            <SectionHead title="Un scan. Le bon conseil. Tout de suite." center bodyClassName="text-[20px] leading-8 font-medium text-text-primary sm:text-[22px] sm:leading-9">
+            <SectionHead title="PharmaBoost en trois étapes." center bodyClassName="text-[20px] leading-8 font-medium text-text-primary sm:text-[22px] sm:leading-9">
               La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller. Chaque médicament est suivi d&apos;un ou plusieurs conseils.
             </SectionHead>
           </Reveal>
@@ -121,7 +121,7 @@ export default async function SitePage() {
             </div>
           </div>
           <Reveal>
-            <SectionHead title="Le produit conseil parfait, directement au scan.">
+            <SectionHead title={<span className="sm:whitespace-nowrap lg:text-[42px] xl:text-[48px]">Le produit conseil parfait.</span>}>
               Parmi les produits qui répondent au besoin du patient, PharmaBoost met en premier celui qui arrange votre pharmacie.
             </SectionHead>
             <ul className="mt-8 grid gap-2.5 sm:grid-cols-2">
@@ -147,9 +147,7 @@ export default async function SitePage() {
       <section id="suivi" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
           <Reveal>
-            <SectionHead title="Pour la première fois, le patient repart avec un vrai bilan.">
-              Ses médicaments, les conseils qui les accompagnent, comment les prendre : tout est dans son bilan, envoyé par e-mail au nom de votre pharmacie. Et pour une cure, il sait quand revenir : PharmaBoost lui écrit sept jours avant la fin.
-            </SectionHead>
+            <SectionHead title="Pour la première fois, le patient repart avec un vrai bilan." />
             <ul className="mt-8 flex flex-wrap gap-2">
               {["Bilan par e-mail, avec l'accord du patient", "Rappel 7 jours avant la fin de la cure", "Le patient revient à la pharmacie"].map((t) => (
                 <li key={t} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-app px-4 py-2 text-[14px] font-medium text-text-primary">
