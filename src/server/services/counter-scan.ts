@@ -287,7 +287,10 @@ export async function recordCounterScan(agent: AgentContext, input: { code: stri
   });
   // Le produit bipé est-il un des conseils proposés dans la vente ouverte ? Alors c'est le même client, quel que soit le temps
   // passé à aller le chercher en rayon : la vente ne se ferme pas d'elle-même.
-  const conseil = open && item.kind !== "UNKNOWN" ? await conseilForScan(agent.scope.pharmacyId, open.id, item) : null;
+  // Jamais la boîte du patient elle-même : bipée une seconde fois (ou annoncée par le robot de la pharmacie), une boîte déjà dans
+  // la vente reste une boîte de plus, jamais un conseil « Vendu » (fondateur, 21 oct. 2026 : ADIARIL bipé, « Vendu » sans vente).
+  const alreadyInSale = Boolean(open?.lines.some((line) => (item.kind === "DRUG" ? line.drugSpecialtyId === item.specialtyId : item.kind === "PRODUCT" ? !line.drugSpecialtyId && line.rawText === item.ean : false)));
+  const conseil = open && item.kind !== "UNKNOWN" && !alreadyInSale ? await conseilForScan(agent.scope.pharmacyId, open.id, item) : null;
   if (open && agent.postId && !conseil) {
     const answered = open._count.recommendations > 0;
     if (!answered && !withinWindow) {

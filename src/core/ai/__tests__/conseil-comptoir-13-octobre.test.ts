@@ -291,3 +291,20 @@ describe("l'arbre de questions : chaque réponse qui débloque un conseil en mon
     expect(shownAfter(result, { why: ["PAIN"], where: ["SHOULDER"] })).toEqual([]);
   });
 });
+
+describe("jamais la boîte déjà dans la vente (fondateur, 21 oct. 2026 : ADIARIL bipé, ADIARIL proposé puis « Vendu »)", () => {
+  // La boîte n'est lue que par son nom ; le produit du stock porte sa marque, le laboratoire.
+  const SALT = cls(1, "électrolytes", "A07CA", "Soluté de réhydratation orale");
+  const WITH_ADIARIL = ["METOPIMAZINE VIATRIS CONSEIL 7,5 mg", "ADIARIL Pdr sbuv réhydrat 10Sach/7g"];
+  const adiarilBranded = { ...adiaril, brand: "GILBERT" };
+
+  it("l'ADIARIL de la vente n'est jamais proposé, même quand le stock lui donne sa marque", () => {
+    const result = analyse([METOPIMAZINE, SALT], WITH_ADIARIL, [adiarilBranded, tisane], patient({ ageYears: 4 }));
+    expect(result.recommendations.map((r) => r.productId)).not.toContain("adiaril");
+  });
+
+  it("sans ADIARIL dans la vente, il reste proposable", () => {
+    const result = analyse([METOPIMAZINE], NAMES, [adiarilBranded], patient({ ageYears: 4 }));
+    expect(byKey(result, "rehydration-digestive")?.productId).toBe("adiaril");
+  });
+});

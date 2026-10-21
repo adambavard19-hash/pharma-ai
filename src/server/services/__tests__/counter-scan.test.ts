@@ -747,6 +747,18 @@ describe("un conseil bipé passe en « Vendu » tout seul (fondateur, 16 oct. 20
     expect(second.ok && second.adviceSold).toBe(true);
   });
 
+  it("la boîte du patient, bipée une seconde fois, ne vend jamais un conseil du même produit (fondateur, 21 oct. 2026 : ADIARIL)", async () => {
+    const first = await scan(EAN_CREME);
+    if (!first.ok) throw new Error("bip refusé");
+    mem.sales[0].status = "ANALYZED";
+    mem.conseils = [{ id: "rec_creme", prescriptionId: first.prescriptionId, productId: "p_creme", status: "PROPOSED" }];
+    wait(5);
+    const second = await scan(EAN_CREME);
+    expect(second.ok && second.adviceSold).toBeFalsy();
+    expect(decide.decideCounterAdvice).not.toHaveBeenCalled();
+    expect(mem.conseils[0].status).toBe("PROPOSED");
+  });
+
   it("un produit qui n'est pas un conseil : une boîte de plus, comme avant", async () => {
     const first = await scan(CIP_DOLIPRANE);
     if (!first.ok) throw new Error("bip refusé");

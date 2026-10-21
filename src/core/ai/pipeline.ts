@@ -523,8 +523,12 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       const notes: string[] = [];
       // Jamais un produit de la gamme d'une boîte déjà dans la vente (essai de Donna, 16 oct. 2026 : un NEOBIANACID dans la
       // vente faisait proposer un autre NEOBIANACID). La gamme : la marque, ou le premier mot du nom s'il en tient lieu.
+      // Une boîte n'est lue que par son nom (« ADIARIL Pdr sbuv… ») quand le produit du stock a aussi sa marque (le
+      // laboratoire) : on compare donc la gamme par la marque ET par le premier mot du nom — sinon l'ADIARIL bipé se
+      // proposait lui-même, puis passait « Vendu » au bip suivant (fondateur, 21 oct. 2026).
       const saleRanges = new Set(usableLines.map((line) => rangeKey(line.drugName)).filter((key): key is string => key !== null));
-      const safeCatalog = input.catalog.filter((p) => !productSafety.blockedProductIds.has(p.id) && !saleRanges.has(rangeKey(p.name, p.brand) ?? ""));
+      const inSaleRange = (p: CatalogProduct) => [rangeKey(p.name, p.brand), rangeKey(p.name)].some((key) => key !== null && saleRanges.has(key));
+      const safeCatalog = input.catalog.filter((p) => !productSafety.blockedProductIds.has(p.id) && !inSaleRange(p));
 
       for (const opportunity of eligibleOpportunities) {
         // Une règle qui ne propose que des médicaments vérifiés (advice.ts, `verifiedMedicinesOnly`) ne voit pas les
