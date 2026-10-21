@@ -14,5 +14,4 @@ ${P} [data-ile-mix] [class*=rounded],${P} [data-ile-mix] [class*=rounded] *{text
 ${P} [data-ile-mix] .aur-btn{color:#0F2F2A;border-color:rgba(15,47,42,.35);background:rgba(255,255,255,.75)}
 ${P} [data-ile-mix] .aur-btn:hover{background:#fff;border-color:#0F2F2A;color:#0F2F2A}
 ${P} [data-ile-mix-carte]{-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px) saturate(1.1);box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 8px 24px -14px rgba(15,47,42,.35)}
-${P} [data-ile-mix-titre]::after{background:#1F8A5B}
 `;
