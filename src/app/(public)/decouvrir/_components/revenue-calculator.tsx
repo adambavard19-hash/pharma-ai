@@ -70,7 +70,7 @@ export function RevenueCalculator({ monthlyPriceCents }: { monthlyPriceCents: nu
 
       {/* Les étapes du calcul : chacune se refait à la calculette. */}
       <ol className="mt-6 divide-y divide-border-subtle border-y border-border-subtle text-[14.5px]" aria-label="Le calcul, étape par étape">
-        <Step label={`Clients conseillés (${ratePercent} %)`} value={estimate ? `${estimate.advisedClientsPerDay} par jour` : "—"} />
+        <Step label={`Clients repartis avec un produit conseillé (${ratePercent} %)`} value={estimate ? `${estimate.advisedClientsPerDay} par jour` : "—"} />
         <Step label={`× ${formatPriceEuros(ESTIMATE_ASSUMPTIONS.averageProductCents)} par produit en moyenne`} value={estimate ? `${formatPriceEuros(estimate.perDayCents)} par jour` : "—"} />
         <Step label={`× ${openDays} jours d'ouverture`} value={estimate ? `${formatPriceEuros(estimate.perMonthCents)} par mois` : "—"} strong />
       </ol>

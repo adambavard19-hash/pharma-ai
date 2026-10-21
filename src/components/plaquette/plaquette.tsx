@@ -499,7 +499,7 @@ function GainsPage({ monthlyPriceCents }: { monthlyPriceCents: number }) {
               Exemple : {estimate.clientsPerDay.toLocaleString("fr-FR")} clients par jour
             </p>
             <ol className="mt-[10px] divide-y divide-border-subtle border-y border-border-subtle text-[12.5px]" aria-label="Le calcul, étape par étape">
-              <Step label={`Clients conseillés (${ratePercent} %)`} value={`${estimate.advisedClientsPerDay} par jour`} />
+              <Step label={`Clients repartis avec un produit conseillé (${ratePercent} %)`} value={`${estimate.advisedClientsPerDay} par jour`} />
               <Step label={`× ${product} par produit en moyenne`} value={`${formatPriceEuros(estimate.perDayCents)} par jour`} />
               <Step label={`× ${days} jours d'ouverture`} value={`${perMonth} par mois`} strong />
             </ol>

@@ -84,7 +84,7 @@ describe("l'estimation : calculée par la fonction du simulateur, jamais recopi�
     expect(perMonth).toBe("3 500 €");
     expect(generic).toContain(`${perMonth} par mois`);
     expect(generic).toContain("200 clients × 10 % × 7 € × 25 jours = 3 500 €");
-    expect(generic).toContain("Clients conseillés (10 %) 20 par jour");
+    expect(generic).toContain("Clients repartis avec un produit conseillé (10 %) 20 par jour");
     expect(generic).toContain("× 7 € par produit en moyenne 140 € par jour");
   });
 
