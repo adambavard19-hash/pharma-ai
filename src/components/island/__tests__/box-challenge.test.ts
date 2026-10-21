@@ -39,8 +39,10 @@ describe("une boîte scannée en challenge", () => {
   });
 
   it("la récompense dite en quelques mots", () => {
-    expect(rewardShortLabel({ bonusPerUnitCents: 100, targetUnits: 200, tiers: null })).toBe("1 € par boîte dès 200 boîtes vendues");
+    // L'objectif de boîtes ne regarde que le titulaire et son commercial (fondateur, 21 oct. 2026).
+    expect(rewardShortLabel({ bonusPerUnitCents: 100, targetUnits: 200, tiers: null })).toBe("1 € par boîte");
     expect(rewardShortLabel({ bonusPerUnitCents: 150, targetUnits: null, tiers: null })).toBe("1,50 € par boîte");
-    expect(rewardShortLabel({ bonusPerUnitCents: null, targetUnits: 50, tiers: null })).toBe("Objectif 50 boîtes");
+    expect(rewardShortLabel({ bonusPerUnitCents: null, targetUnits: 50, tiers: null })).toBe("");
+    expect(rewardShortLabel({ bonusPerUnitCents: null, targetUnits: null, tiers: [{ units: 100, bonusCents: 5000 }] })).toBe("Prime à la clé");
   });
 });

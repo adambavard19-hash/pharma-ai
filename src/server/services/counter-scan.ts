@@ -623,6 +623,15 @@ export async function removeCounterCode(agent: AgentContext, input: { prescripti
   return result;
 }
 
+/** Tous les codes qui désignent ce produit dans cette pharmacie : celui de l'export du LGO et ceux appris au comptoir. */
+async function codesOfProduct(pharmacyId: string, productId: string, known: string): Promise<Set<string>> {
+  const [product, learned] = await Promise.all([
+    prisma.product.findFirst({ where: { id: productId, pharmacyId }, select: { ean: true } }),
+    prisma.productBarcode.findMany({ where: { pharmacyId, productId }, select: { code: true } }),
+  ]);
+  return new Set([known, ...(product?.ean ? [product.ean] : []), ...learned.map((row) => row.code)]);
+}
+
 async function removeCounterCodeInner(agent: AgentContext, input: { prescriptionId: string; code: string }): Promise<RemoveCodeResult> {
   const code = input.code.replace(/\D/g, "").slice(0, 20);
   if (code.length < 7) return { ok: false, error: "L'agent ne sait pas quelle boîte portait cette ligne (vente commencée avant lui, ou ligne inconnue)." };
@@ -642,8 +651,11 @@ async function removeCounterCodeInner(agent: AgentContext, input: { prescription
   const item = await resolveScannedItem(agent.scope.pharmacyId, code, agent.pharmacyIsDemo);
   if (!item) return { ok: false, error: "Code inconnu." };
 
-  // 1. Une boîte de la vente (la dernière ajoutée d'abord, comme LGPI quand on supprime une ligne en double).
-  const line = sale.lines.find((candidate) => (item.kind === "DRUG" ? candidate.drugSpecialtyId === item.specialtyId : item.kind === "PRODUCT" ? candidate.rawText === item.ean : candidate.rawText === item.code));
+  // 1. Une boîte de la vente (la dernière ajoutée d'abord, comme LGPI quand on supprime une ligne en double). Un produit se
+  // reconnaît à TOUS ses codes : LGPI écrit dans son journal son propre code (souvent l'ACL), la douchette a lu celui de la
+  // boîte (souvent l'EAN) — un Hydratis supprimé dans LGPI restait sur la bannière (fondateur, 21 oct. 2026).
+  const productCodes = item.kind === "PRODUCT" ? await codesOfProduct(agent.scope.pharmacyId, item.productId, item.ean) : null;
+  const line = sale.lines.find((candidate) => (item.kind === "DRUG" ? candidate.drugSpecialtyId === item.specialtyId : item.kind === "PRODUCT" ? !candidate.drugSpecialtyId && !!productCodes?.has(candidate.rawText ?? "") : candidate.rawText === item.code));
   if (line) {
     const removed = await removeCounterLine(agent, { prescriptionId: sale.id, lineId: line.id });
     return removed.ok ? { ok: true, action: "line_removed", remaining: removed.remaining } : removed;

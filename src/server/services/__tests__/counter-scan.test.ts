@@ -75,7 +75,7 @@ const db = vi.hoisted(() => {
 
   return {
     drugPresentation: { findUnique: vi.fn() },
-    productBarcode: { findUnique: vi.fn(), upsert: vi.fn() },
+    productBarcode: { findUnique: vi.fn(), upsert: vi.fn(), findMany: vi.fn() },
     product: { findFirst: vi.fn(), findMany: vi.fn() },
     pharmacyDrugStock: { updateMany: vi.fn() },
     // Les conseils proposés dans une vente : un bip du même produit les fait passer en « Vendu ».
@@ -192,7 +192,7 @@ const decide = vi.hoisted(() => ({
 }));
 vi.mock("@/server/services/counter-window", () => ({ finishCounterSale: finish.finishCounterSale, decideCounterAdvice: decide.decideCounterAdvice }));
 
-const { SAME_SALE_WINDOW_MS, recordCounterScan, closeLiveCounterSales, scanInstant } = await import("../counter-scan");
+const { SAME_SALE_WINDOW_MS, recordCounterScan, closeLiveCounterSales, scanInstant, removeCounterCode } = await import("../counter-scan");
 /** La fenêtre, en secondes : une vente reste ouverte jusqu'à « Vente terminée », avec trente minutes sans bip pour garde-fou. */
 const W = SAME_SALE_WINDOW_MS / 1000;
 
@@ -781,5 +781,45 @@ describe("un conseil bipé passe en « Vendu » tout seul (fondateur, 16 oct. 20
     mem.conseils = [{ id: "rec_mains", prescriptionId: first.prescriptionId, productId: "p_mains", productName: "Crème mains réparatrice", status: "PROPOSED" }];
     const second = await scan(EAN_CREME);
     expect(second.ok && second.adviceSold).toBeFalsy();
+  });
+});
+
+describe("une ligne supprimée dans LGPI quitte la bannière, quel que soit le code du produit (fondateur, 21 oct. 2026 : Hydratis)", () => {
+  // LGPI écrit dans son journal SON code du produit (ici un ACL), la douchette a lu celui de la boîte (l'EAN).
+  const ACL_CREME = "3401560301234";
+  const removal = () => {
+    db.productBarcode.findUnique.mockImplementation(async ({ where }: { where: { pharmacyId_code: { code: string } } }) =>
+      where.pharmacyId_code.code === ACL_CREME ? { product: { id: "p_creme", name: "Crème hydratante visage", deletedAt: null } } : null,
+    );
+    db.productBarcode.findMany.mockResolvedValue([{ code: ACL_CREME }]);
+    audit.recordAudit.mockResolvedValue(undefined);
+    (db.recommendation.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (db.recommendation.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    Object.assign(db, {
+      $transaction: async (run: (tx: unknown) => Promise<void>) =>
+        run({
+          recommendation: { deleteMany: vi.fn(), updateMany: vi.fn() },
+          prescriptionLine: { delete: async ({ where }: { where: { id: string } }) => mem.sales.forEach((sale) => (sale.lines = sale.lines.filter((line) => line.id !== where.id))) },
+          prescription: { update: async ({ where, data }: { where: { id: string }; data: { status: string } }) => (mem.sales.find((sale) => sale.id === where.id)!.status = data.status) },
+        }),
+    });
+  };
+
+  it("la boîte bipée par son EAN, supprimée dans LGPI sous son ACL : elle quitte la vente, la vente seule se ferme", async () => {
+    await scan(EAN_CREME);
+    removal();
+    const sale = mem.sales[0];
+    expect(await removeCounterCode(AGENT, { prescriptionId: sale.id, code: ACL_CREME })).toEqual({ ok: true, action: "line_removed", remaining: 0 });
+    expect(sale.lines).toHaveLength(0);
+    expect(sale.status).toBe("CANCELLED");
+  });
+
+  it("un autre produit supprimé dans LGPI ne retire jamais cette boîte", async () => {
+    await scan(EAN_CREME);
+    removal();
+    const sale = mem.sales[0];
+    const result = await removeCounterCode(AGENT, { prescriptionId: sale.id, code: EAN_PROBIOTIQUE });
+    expect(result.ok).toBe(false);
+    expect(sale.lines).toHaveLength(1);
   });
 });

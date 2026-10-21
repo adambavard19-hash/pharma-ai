@@ -328,13 +328,15 @@ export function servedWord(saleId: string, userId: string): string | null {
 
 /**
  * Faut-il demander qui a servi ? Seulement à la fin d'une vente où au moins un conseil a été vendu (fondateur, 19 oct. 2026 :
- * « pas la peine de cliquer s'il n'y a pas eu de conseil vendu »), et seulement s'il y a un collègue à choisir.
+ * « pas la peine de cliquer s'il n'y a pas eu de conseil vendu »), ou d'une vente d'une boîte en challenge — le gain du challenge
+ * revient à qui l'a vendue (fondateur, 21 oct. 2026 : le zinc NHCO) —, et seulement s'il y a un collègue à choisir.
  */
 export function shouldAskServed(view: Pick<PosteView, "island" | "entry">): boolean {
   const entry = view.entry;
   if (view.island.stage !== "done" || !entry) return false;
   const soldOnScreen = entry.items.some((item, index) => item.outcome === "SOLD" || view.island.outcomes[index] === "SOLD");
-  return soldOnScreen && (entry.team?.length ?? 0) >= 2;
+  const challengeBox = (entry.boxes ?? []).some((box) => box.challenge);
+  return (soldOnScreen || challengeBox) && (entry.team?.length ?? 0) >= 2;
 }
 
 export function finishWord(saleId: string): string | null {

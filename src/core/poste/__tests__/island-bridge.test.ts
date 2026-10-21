@@ -264,6 +264,13 @@ describe("qui a servi ce patient", () => {
     expect(shouldAskServed({ ...done(sale("SOLD")), island: { ...INITIAL_POSTE.island, stage: "advice" } })).toBe(false);
   });
 
+  it("une boîte en challenge dans la vente : la question vient aussi, sans conseil vendu (fondateur, 21 oct. 2026 : zinc NHCO)", () => {
+    const zinc = { ...sale("NONE"), boxes: [{ id: "l1", name: "ZINC NHCO", challenge: "NHCO", reward: "1 € par boîte" }] } as unknown as HostEntry;
+    expect(shouldAskServed(done(zinc))).toBe(true);
+    const plain = { ...sale("NONE"), boxes: [{ id: "l1", name: "DOLIPRANE" }] } as unknown as HostEntry;
+    expect(shouldAskServed(done(plain))).toBe(false);
+  });
+
   it("le mot SERVI, seulement avec des identifiants sûrs", () => {
     expect(servedWord("rx_1", "u2")).toBe("SERVI rx_1 u2");
     expect(servedWord("rx_1", "a b")).toBeNull();
