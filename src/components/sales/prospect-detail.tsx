@@ -140,7 +140,7 @@ export function ProspectDetail({ prospect, actions, mode, pharmacyHref }: { pros
             <Row label="Dernier contact" value={prospect.lastContactAt ? formatDateTime(prospect.lastContactAt) : null} />
             <Row label="Prochaine action" value={prospect.nextActionAt ? `${prospect.nextActionLabel ?? "Relancer"} · ${formatDate(prospect.nextActionAt)}` : null} />
             {(prospect.demoAt || prospect.demoDoneAt) && <Row label="Démonstration" value={demoSummary(prospect.demoAt, prospect.demoDoneAt)} />}
-            {prospect.notes && <p className="mt-2 rounded-lg bg-surface-sunken/70 px-3 py-2 text-[13px] leading-5 text-text-secondary">{prospect.notes}</p>}
+            {prospect.notes && <p className="mt-2 rounded-lg bg-surface-sunken/70 px-3 py-2 whitespace-pre-line text-[13px] leading-5 text-text-secondary">{prospect.notes}</p>}
           </CardContent>
         </Card>
         {openTasks.length > 0 && (

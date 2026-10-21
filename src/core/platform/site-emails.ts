@@ -157,3 +157,16 @@ export function buildRecommendationAlert(v: RecommendationSummary & { adminUrl: 
   );
   return { subject, text, html };
 }
+
+/** Une notification de la console, envoyée telle quelle par e-mail aux administrateurs. */
+export function buildTeamNotificationEmail(v: { title: string; body: string; url: string | null }): { subject: string; text: string; html: string } {
+  const subject = v.title;
+  const text = [v.body, v.url ? `\nOuvrir dans la console : ${v.url}` : null].filter(Boolean).join("\n");
+  const html = shell(
+    subject,
+    v.title,
+    `${v.body ? `<p style="margin:0;font-size:15px;line-height:23px;color:#374151">${escapeHtml(v.body)}</p>` : ""}${v.url ? `<p style="margin:18px 0 0;font-size:14px"><a href="${escapeHtml(v.url)}" style="color:#0F766E">Ouvrir dans la console</a></p>` : ""}`,
+    "#0F766E",
+  );
+  return { subject, text, html };
+}

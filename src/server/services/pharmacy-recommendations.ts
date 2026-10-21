@@ -56,7 +56,6 @@ export async function receivePharmacyRecommendation(input: Recommendation): Prom
   const actor = { type: "SYSTEM" as const, label: "Site public" };
   await recordProspectEvent({ prospectId: prospect.id, type: "CREATED", summary: `Pharmacie recommandée par ${input.referrerName}`, actor, metadata: { kind: "RECOMMENDATION", affiliate: Boolean(affiliate) } });
   const adminUrl = publicUrl(`/admin/dossiers/${prospect.id}`);
-  await notifyAdmins({ type: "SITE_LEAD", title: `Pharmacie recommandée — ${input.pharmacyName}`, body: `${input.city} · apportée par ${input.referrerName} (${input.referrerEmail})`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO" });
   if (affiliate) {
     await notifySalesRep({ salesRepId: affiliate.id, type: "SITE_LEAD", title: `Pharmacie reçue : ${input.pharmacyName}`, body: `Si elle signe, votre prime de ${bonus} HT est acquise dès sa mise en service réglée.`, linkUrl: `/extranet/dossiers/${prospect.id}`, severity: "INFO" }).catch(() => undefined);
   }
@@ -66,18 +65,9 @@ export async function receivePharmacyRecommendation(input: Recommendation): Prom
   const summary: RecommendationSummary = { ...input, contactName, contactPhone, message, bonus, affiliateName };
   const messaging = getMessagingProvider();
   const alert = buildRecommendationAlert({ ...summary, adminUrl });
-  const alertOutcome = await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html });
-  await traceDispatch({ kind: "RECOMMENDATION_ALERT", recipient: contactEmail, outcome: alertOutcome, subject: alert.subject, trigger: "SYSTEM", prospectId: prospect.id });
-  // Chaque pharmacie recommandée est aussi annoncée par e-mail à chaque administrateur de la console, comme une démo réservée
-  // (fondateur, 21 oct. 2026 : l'alerte n'arrivait qu'à l'adresse de contact).
-  const admins = await Promise.resolve()
-    .then(() => prisma.platformAdmin.findMany({ where: { isActive: true }, select: { email: true } }))
-    .catch(() => [] as { email: string }[]);
-  for (const admin of admins) {
-    if (admin.email.toLowerCase() === contactEmail.toLowerCase()) continue;
-    const adminOutcome = await messaging.sendEmail({ to: admin.email, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html }).catch(() => null);
-    if (adminOutcome) await traceDispatch({ kind: "RECOMMENDATION_ALERT", recipient: admin.email, outcome: adminOutcome, subject: alert.subject, trigger: "SYSTEM", prospectId: prospect.id });
-  }
+  const alertOutcome = await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html }).catch(() => null);
+  if (alertOutcome) await traceDispatch({ kind: "RECOMMENDATION_ALERT", recipient: contactEmail, outcome: alertOutcome, subject: alert.subject, trigger: "SYSTEM", prospectId: prospect.id });
+  await notifyAdmins({ type: "SITE_LEAD", title: `Pharmacie recommandée — ${input.pharmacyName}`, body: `${input.city} · apportée par ${input.referrerName} (${input.referrerEmail})`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO", email: alert, alreadySentTo: [contactEmail] });
   const ack = buildRecommendationAcknowledgement({ ...summary, contactEmail });
   const outcome = await messaging.sendEmail({ to: input.referrerEmail, fromName: "PharmaBoost", subject: ack.subject, text: ack.text, html: ack.html });
   await traceDispatch({ kind: "SITE_LEAD_ACK", recipient: input.referrerEmail, outcome, subject: ack.subject, trigger: "SYSTEM", prospectId: prospect.id });

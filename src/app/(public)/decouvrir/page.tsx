@@ -63,7 +63,7 @@ export default async function SitePage() {
               <br />
               <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Bilan.</span>
             </h1>
-            <p className="mt-7 max-w-xl text-[18px] leading-7 text-text-secondary">
+            <p className="mt-7 max-w-2xl text-[20px] leading-8 font-medium text-text-primary sm:text-[23px] sm:leading-9">
               Au comptoir, vous <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text font-semibold text-transparent">scannez</span> les boîtes comme d&apos;habitude. PharmaBoost vous souffle les <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text font-semibold text-transparent">conseils</span> parfaits, et le patient repart avec son <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text font-semibold text-transparent">bilan</span>.
             </p>
             {/* Plus de bouton « Voir la présentation » ici : elle se lance seule juste en dessous (fondateur, 20 oct. 2026). */}

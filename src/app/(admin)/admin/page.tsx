@@ -14,6 +14,8 @@ import { attentionHeadline, attentionTotal, formatLongDate } from "@/core/admin/
 import { cn } from "@/lib/utils";
 import { AttentionBlock, attentionCards } from "./_cockpit/attention";
 import { TodayBlock } from "./_cockpit/today";
+import { FormsBlock } from "./_cockpit/forms";
+import { listRecentFormSubmissions } from "@/server/services/sales/notifications";
 import { FleetKpis, PeriodBlock, hasTrend } from "./_cockpit/indicators";
 
 export const metadata: Metadata = { title: "Accueil" };
@@ -39,13 +41,14 @@ export default async function AdminCockpitPage({ searchParams }: { searchParams:
   const params = await searchParams;
   const period = resolvePeriod(typeof params.periode === "string" ? params.periode : null);
 
-  const [admin, cockpit, supportToAnswer, stockToDecide, visitors, partners] = await Promise.all([
+  const [admin, cockpit, supportToAnswer, stockToDecide, visitors, partners, forms] = await Promise.all([
     prisma.platformAdmin.findUnique({ where: { id: session.admin.id }, select: { firstName: true } }),
     loadCockpit(period),
     countSupportToAnswer(),
     countDepositsNeedingAttention(),
     countSiteVisitors(),
     partnersOverview(),
+    listRecentFormSubmissions(8),
   ]);
 
   const firstName = admin?.firstName.trim() || session.admin.fullName.split(" ")[0];
@@ -76,6 +79,8 @@ export default async function AdminCockpitPage({ searchParams }: { searchParams:
           </span>
         }
       />
+
+      <FormsBlock items={forms} now={cockpit.now} />
 
       <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
         <AttentionBlock cards={cards} />

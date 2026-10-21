@@ -122,24 +122,15 @@ async function recordSiteLead(input: SiteLeadInput & { demoAt: Date | null }): P
   // Un NOUVEAU dossier dont l'e-mail est celui d'un confrère proposé au parrainage lui est rattaché (casse ignorée).
   if (!existing) await reconcileNewProspect({ id: prospect.id, email: input.email, name: input.pharmacyName }, siteActor);
   const adminUrl = publicUrl(`/admin/dossiers/${prospect.id}`);
-  await notifyAdmins({ type: "SITE_LEAD", title: `${input.demoAt ? `Démo réservée ${formatDemoSlot(input.demoAt)}` : kindLabel} — ${input.pharmacyName}`, body: `${input.contactName} · ${input.email}${input.phone ? ` · ${input.phone}` : ""}${repName ? ` · apportée par ${repName}` : ""}`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO" });
 
   const company = await prisma.companyProfile.findUnique({ where: { id: "default" }, select: { representativeEmail: true } });
   const contactEmail = company?.representativeEmail ?? DEFAULT_CONTACT_EMAIL;
   const summary: SiteLeadSummary = { ...input, salesRepName: repName };
   const messaging = getMessagingProvider();
   const alert = buildSiteLeadAlert({ ...summary, adminUrl });
-  await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html });
-  // Chaque démonstration réservée est aussi annoncée par e-mail à chaque administrateur de la console (fondateur, 17 oct. 2026).
-  if (input.kind === "DEMO") {
-    const admins = await Promise.resolve()
-      .then(() => prisma.platformAdmin.findMany({ where: { isActive: true }, select: { email: true } }))
-      .catch(() => [] as { email: string }[]);
-    for (const admin of admins) {
-      if (admin.email.toLowerCase() === contactEmail.toLowerCase()) continue;
-      await messaging.sendEmail({ to: admin.email, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html }).catch(() => undefined);
-    }
-  }
+  await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html }).catch(() => undefined);
+  // Chaque administrateur reçoit l'alerte détaillée par e-mail, démo ou non (fondateur, 17 puis 21 oct. 2026).
+  await notifyAdmins({ type: "SITE_LEAD", title: `${input.demoAt ? `Démo réservée ${formatDemoSlot(input.demoAt)}` : kindLabel} — ${input.pharmacyName}`, body: `${input.contactName} · ${input.email}${input.phone ? ` · ${input.phone}` : ""}${repName ? ` · apportée par ${repName}` : ""}`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO", email: alert, alreadySentTo: [contactEmail] });
   // Le commercial qui a envoyé le lien est prévenu lui aussi, avec le lien vers le dossier dans son espace.
   if (rep?.email) {
     const repAlert = buildSiteLeadAlert({ ...summary, adminUrl: publicUrl(`/extranet/dossiers/${prospect.id}`) });
