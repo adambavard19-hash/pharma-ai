@@ -95,8 +95,8 @@ export default async function SitePage() {
       <section id="banniere" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
           <Reveal>
-            <SectionHead kicker="Qu'est-ce que PharmaBoost ?" title="Un scan. Le bon conseil. Tout de suite." center>
-              La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller en plus, pris dans votre rayon. Chaque médicament est suivi d&apos;un ou plusieurs conseils, et de vos associations.
+            <SectionHead kicker="Qu'est-ce que PharmaBoost ?" title="Un scan. Le bon conseil. Tout de suite." center bodyClassName="text-[20px] leading-8 font-medium text-text-primary sm:text-[22px] sm:leading-9">
+              La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller. Chaque médicament est suivi d&apos;un ou plusieurs conseils.
             </SectionHead>
           </Reveal>
           <FlowSteps />

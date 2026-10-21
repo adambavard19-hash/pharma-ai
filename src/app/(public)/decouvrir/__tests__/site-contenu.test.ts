@@ -155,7 +155,7 @@ describe("les métadonnées : un titre sans doublon, l'image de partage", () => 
 describe("les mots du site suivent le code, sans promesse", () => {
   it("ne promet aucune vitesse : la bannière montre le conseil dans la foulée du scan, l'animation est une reproduction", () => {
     expect(homeText).not.toContain("aussitôt");
-    expect(homeText).toContain("La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu'il est utile de conseiller en plus, pris dans votre rayon.");
+    expect(homeText).toContain("La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu'il est utile de conseiller. Chaque médicament est suivi d'un ou plusieurs conseils.");
     expect(homeText).not.toContain("fidèle");
     expect(homeText).toContain("Animation de la bannière PharmaBoost, reproduite pour le site.");
     expect(homeText).toContain("Médicaments, produits et prix : exemples.");
