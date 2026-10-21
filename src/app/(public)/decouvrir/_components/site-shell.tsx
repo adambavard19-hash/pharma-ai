@@ -140,12 +140,12 @@ export function Kicker({ n, children, className }: { n?: string; children: React
   );
 }
 
-export function SectionHead({ n, kicker, title, children, center = false, as: Heading = "h2" }: { n?: string; kicker: string; title: ReactNode; children?: ReactNode; center?: boolean; as?: "h1" | "h2" }) {
+export function SectionHead({ n, kicker, title, children, center = false, as: Heading = "h2", bodyClassName }: { n?: string; kicker: string; title: ReactNode; children?: ReactNode; center?: boolean; as?: "h1" | "h2"; bodyClassName?: string }) {
   return (
     <div className={cn("max-w-2xl", center && "mx-auto text-center")}>
       <Kicker n={n} className={center ? "justify-center" : undefined}>{kicker}</Kicker>
       <Heading className="mt-4 text-[34px] leading-[1.05] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[48px]">{title}</Heading>
-      {children && <p className="mt-4 text-[17px] leading-7 text-text-secondary">{children}</p>}
+      {children && <p className={cn("mt-4 text-[17px] leading-7 text-text-secondary", bodyClassName)}>{children}</p>}
     </div>
   );
 }

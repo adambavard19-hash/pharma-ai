@@ -83,7 +83,7 @@ export default async function SitePage() {
       <section id="probleme" className="scroll-mt-20 border-t border-border-subtle">
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
           <Reveal>
-            <SectionHead kicker="Le constat" title="Au comptoir, on ne peut pas penser à tout.">
+            <SectionHead kicker="Le constat" title="Le pharmacien ne peut pas penser à tout." bodyClassName="text-[20px] leading-8 font-medium text-text-primary sm:text-[22px] sm:leading-9">
               Une ordonnance chargée, un patient pressé, la file qui s&apos;allonge : le pharmacien est vite débordé. Le conseil qui accompagnerait le traitement passe à la trappe. PharmaBoost est là pour l&apos;accompagner et le soulager.
             </SectionHead>
           </Reveal>
