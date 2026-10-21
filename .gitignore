@@ -58,3 +58,4 @@ yarn-error.log*
 
 # Pages RCP de la BDPM mises en cache par `npm run effets:sync`
 /.cache
+/public/apercu-sections/
