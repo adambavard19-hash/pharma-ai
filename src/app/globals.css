@@ -721,3 +721,23 @@ body {
 }
 
 .print-only { display: none; }
+
+/*
+ * Le site public : chaque bouton cliquable se soulève au survol, son ombre grandit (fondateur, 21 oct. 2026 : essai
+ * « 3 · Se soulève » de /robot-apercu/boutons). Les boutons du site sont des pastilles arrondies ; la bannière de démonstration
+ * (île) garde ses propres gestes.
+ */
+.site-public :is(a, button):is([class*="rounded-full"], [class*="rounded-xl"], [class*="rounded-2xl"]):not([data-isl] *, [data-ile-style] *, :disabled) {
+  transition-property: transform, box-shadow, background-color, color, border-color, opacity, filter;
+  transition-duration: 0.35s;
+  transition-timing-function: cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.site-public :is(a, button):is([class*="rounded-full"], [class*="rounded-xl"], [class*="rounded-2xl"]):not([data-isl] *, [data-ile-style] *, :disabled):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px -12px rgb(15 47 42 / 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-public :is(a, button):hover {
+    transform: none !important;
+  }
+}
