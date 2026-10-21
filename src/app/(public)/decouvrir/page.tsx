@@ -83,7 +83,7 @@ export default async function SitePage() {
       <section id="probleme" className="scroll-mt-20 border-t border-border-subtle">
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
           <Reveal>
-            <SectionHead kicker="Le constat" title="Le pharmacien ne peut pas penser à tout." bodyClassName="text-[20px] leading-8 font-medium text-text-primary sm:text-[22px] sm:leading-9">
+            <SectionHead title="Le pharmacien ne peut pas penser à tout." bodyClassName="text-[20px] leading-8 font-medium text-text-primary sm:text-[22px] sm:leading-9">
               Une ordonnance chargée, un patient pressé, la file qui s&apos;allonge : le pharmacien est vite débordé. Le conseil qui accompagnerait le traitement passe à la trappe. PharmaBoost est là pour l&apos;accompagner et le soulager.
             </SectionHead>
           </Reveal>
@@ -95,7 +95,7 @@ export default async function SitePage() {
       <section id="banniere" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
           <Reveal>
-            <SectionHead kicker="Qu'est-ce que PharmaBoost ?" title="Un scan. Le bon conseil. Tout de suite." center bodyClassName="text-[20px] leading-8 font-medium text-text-primary sm:text-[22px] sm:leading-9">
+            <SectionHead title="Un scan. Le bon conseil. Tout de suite." center bodyClassName="text-[20px] leading-8 font-medium text-text-primary sm:text-[22px] sm:leading-9">
               La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller. Chaque médicament est suivi d&apos;un ou plusieurs conseils.
             </SectionHead>
           </Reveal>
@@ -121,7 +121,7 @@ export default async function SitePage() {
             </div>
           </div>
           <Reveal>
-            <SectionHead kicker="Pour le pharmacien" title="Le produit conseil parfait, directement au scan.">
+            <SectionHead title="Le produit conseil parfait, directement au scan.">
               Parmi les produits qui répondent au besoin du patient, PharmaBoost met en premier celui qui arrange votre pharmacie.
             </SectionHead>
             <ul className="mt-8 grid gap-2.5 sm:grid-cols-2">
@@ -147,7 +147,7 @@ export default async function SitePage() {
       <section id="suivi" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
           <Reveal>
-            <SectionHead kicker="Suivi pharmaceutique · une première" title="Pour la première fois, le patient repart avec un vrai bilan.">
+            <SectionHead title="Pour la première fois, le patient repart avec un vrai bilan.">
               Ses médicaments, les conseils qui les accompagnent, comment les prendre : tout est dans son bilan, envoyé par e-mail au nom de votre pharmacie. Et pour une cure, il sait quand revenir : PharmaBoost lui écrit sept jours avant la fin.
             </SectionHead>
             <ul className="mt-8 flex flex-wrap gap-2">
@@ -171,7 +171,7 @@ export default async function SitePage() {
       <section id="equipe" className="scroll-mt-20 border-t border-border-subtle">
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:gap-16">
           <Reveal>
-            <SectionHead kicker="Votre équipe" title="Les résultats de chacun. Toute l'équipe motivée." />
+            <SectionHead title="Les résultats de chacun. Toute l'équipe motivée." />
           </Reveal>
           <Reveal delay={2}>
             <TeamVisual />
@@ -182,7 +182,7 @@ export default async function SitePage() {
       {/* ---- Sans ordonnance ----------------------------------------- */}
       <section className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
         <div>
-          <SectionHead kicker="Sans ordonnance" title="Le client décrit. Vous conseillez." />
+          <SectionHead title="Le client décrit. Vous conseillez." />
           <ul className="mt-8 flex flex-wrap gap-2">
             {["Besoin reconnu", "Questions à poser", "Produits en rayon", "Orientation médecin si nécessaire"].map((t) => (
               <li key={t} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-card px-4 py-2 text-[14px] font-medium text-text-primary">
@@ -198,7 +198,7 @@ export default async function SitePage() {
       {/* ---- Sécurité ------------------------------------------------- */}
       <section id="securite" className="scroll-mt-20 border-y border-border-subtle bg-surface-card">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-          <SectionHead kicker="Sécurité" title="La sécurité avant la suggestion." />
+          <SectionHead title="La sécurité avant la suggestion." />
           <dl className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-border-subtle bg-border-subtle sm:grid-cols-2 lg:grid-cols-3">
             {SAFETY.map((s) => (
               <KeyCell key={s.label} label={s.label} value={s.value} className="bg-surface-app" />

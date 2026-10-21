@@ -36,7 +36,7 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
 
   return (
     <section id="tarif" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 md:py-28">
-      <SectionHead kicker="Tarif" title="Un seul abonnement. Tout est inclus." center>
+      <SectionHead title="Un seul abonnement. Tout est inclus." center>
         Un abonnement par officine, quel que soit le nombre de postes de comptoir.
       </SectionHead>
 
