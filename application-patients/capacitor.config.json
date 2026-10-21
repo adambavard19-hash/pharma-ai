@@ -1,0 +1,35 @@
+{
+  "appId": "app.pharmaboost.patients",
+  "appName": "PharmaBoost",
+  "webDir": "www",
+  "server": {
+    "url": "https://pharmaboost.app/app",
+    "errorPath": "hors-ligne.html"
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#F3F8F6",
+    "limitsNavigationsToAppBoundDomains": false,
+    "appendUserAgent": "PharmaBoostPatients"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 900,
+      "backgroundColor": "#F3F8F6",
+      "showSpinner": false,
+      "launchAutoHide": true
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#F3F8F6",
+      "overlaysWebView": true
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    }
+  }
+}
