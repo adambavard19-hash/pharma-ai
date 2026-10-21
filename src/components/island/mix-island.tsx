@@ -400,7 +400,9 @@ function Lines({ lines }: { lines: CounterSheetLine[] }) {
   return (
     <ul className="space-y-0.5">
       {lines.map((line) => (
-        <li key={line.text} className="break-words">
+        // En italique et sans gras, comme les autres textes de la fiche (fondateur, 21 oct. 2026) : en ligne, pour passer devant le
+        // gras que le fond noir donne au texte de la bannière.
+        <li key={line.text} className="break-words" style={{ fontStyle: "italic", fontWeight: 400 }}>
           • {line.text}
           {line.detail ? <span style={{ color: C.inkSoft }}> — {line.detail}</span> : null}
         </li>
