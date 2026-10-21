@@ -16,7 +16,8 @@ import { islandTheme, MIX_PAPER, PHARMABOOST_GREEN } from "./island-theme";
  * conseil, le challenge, la marge possible de la vente — et, à la souris, elle se déploie sur ce meilleur conseil en trois
  * temps (fondateur, 21 oct. 2026 : cet ordre) : 1. Fiche (posologie, contre-indications, effets indésirables), 2. Discours
  * (le conseil à dire), 3. Questions (les deux questions, réponses cliquables). Plus de lien « Fiche complète ». Les autres conseils se parcourent avec les flèches ; l'autre possibilité en
- * stock pour la même boîte est à un clic. Vendu / Non vendu restent sans clic : un conseil bipé passe en vendu.
+ * stock pour la même boîte est à un clic. Vendu / Non vendu restent sans clic : un conseil bipé est « Bipé », et ne compte vendu
+ * qu'à la validation de la vente (fondateur, 21 oct. 2026 : « vendu seulement si le pharmacien a cliqué sur FIN Valider »).
  *
  * L'ancienne bannière (`CounterIsland` compacte) reste joignable : `?banniere=ancienne` (voir poste-island.tsx).
  */
@@ -113,7 +114,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-2 text-[13.5px] leading-[18px] font-semibold tracking-[-0.01em] text-[#0F2F2A]">
                 {aurore && <span className="aur-dot shrink-0" aria-hidden="true" />}
-                <span className="truncate">{soldIndexes.length > 0 ? `✓ ${soldIndexes.length} vendu${soldIndexes.length > 1 ? "s" : ""}${soldMargin > 0 ? ` · +${eurosOf(soldMargin)} de marge` : ""}` : best.name}</span>
+                <span className="truncate">{soldIndexes.length > 0 ? `✓ ${soldIndexes.length} bipé${soldIndexes.length > 1 ? "s" : ""}${soldMargin > 0 ? ` · +${eurosOf(soldMargin)} à la validation` : " · vendu à la validation"}` : best.name}</span>
               </span>
               <span className="block truncate text-[11px] leading-[15px] text-[#3F5E57]">
                 {items.length} conseil{items.length > 1 ? "s" : ""}
@@ -199,14 +200,15 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   <span className="inline-flex size-10 items-center justify-center rounded-full" style={{ background: "#0F2F2A", color: C.challengeBg }}>
                     <Check className="size-5" strokeWidth={3} aria-hidden="true" />
                   </span>
-                  <p className="text-[14px] font-extrabold">Vendu{item.margin ? ` · +${item.margin} de marge` : ""}</p>
+                  <p className="text-[14px] font-extrabold">Bipé{item.margin ? ` · +${item.margin} de marge` : ""}</p>
+                  <p className="-mt-1.5 text-[11.5px] font-semibold" style={{ color: "#3D4F00" }}>Vendu à la validation de la vente</p>
                   {soldIndexes.length < order.length && (
                     <button type="button" onClick={() => go(order.findIndex((i) => !sold(i)))} className="h-8 rounded-lg px-3 text-[12px] font-bold" style={{ background: "#0F2F2A", color: C.challengeBg }}>
                       Conseil suivant
                     </button>
                   )}
                   <button type="button" onClick={() => onAnswer(index, null)} className="text-[11px] font-semibold underline-offset-2 hover:underline" style={{ color: "#3D4F00" }}>
-                    Annuler « Vendu »
+                    Annuler « Bipé »
                   </button>
                 </div>
               ) : (
@@ -242,7 +244,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                           {other.margin && <span className="shrink-0 text-[11px] font-bold tabular-nums" style={{ color: C.numberFg }}>marge {other.margin}</span>}
                         </div>
                       ))}
-                      <p className="px-1.5 text-[10.5px]" style={{ color: C.inkSoft }}>Bipez celui qu&apos;il choisit : le conseil passe en vendu avec ce produit.</p>
+                      <p className="px-1.5 text-[10.5px]" style={{ color: C.inkSoft }}>Bipez celui qu&apos;il choisit : le conseil passe « Bipé » avec ce produit.</p>
                     </div>
                   )}
                   {alternatives.length > 0 && (

@@ -192,7 +192,7 @@ const decide = vi.hoisted(() => ({
 }));
 vi.mock("@/server/services/counter-window", () => ({ finishCounterSale: finish.finishCounterSale, decideCounterAdvice: decide.decideCounterAdvice }));
 
-const { SAME_SALE_WINDOW_MS, recordCounterScan, closeLiveCounterSales, scanInstant, removeCounterCode } = await import("../counter-scan");
+const { SAME_SALE_WINDOW_MS, recordCounterScan, closeLiveCounterSales, scanInstant, removeCounterCode, abandonCounterSale } = await import("../counter-scan");
 /** La fenêtre, en secondes : une vente reste ouverte jusqu'à « Vente terminée », avec trente minutes sans bip pour garde-fou. */
 const W = SAME_SALE_WINDOW_MS / 1000;
 
@@ -833,5 +833,18 @@ describe("une ligne supprimée dans LGPI quitte la bannière, quel que soit le c
     const result = await removeCounterCode(AGENT, { prescriptionId: sale.id, code: EAN_PROBIOTIQUE });
     expect(result.ok).toBe(false);
     expect(sale.lines).toHaveLength(1);
+  });
+});
+
+describe("un conseil bipé ne compte vendu qu'à la validation (fondateur, 21 oct. 2026)", () => {
+  it("vente abandonnée dans LGPI : annulée, et ses conseils bipés redeviennent « Non vendu »", async () => {
+    const first = await scan(CIP_DOLIPRANE);
+    if (!first.ok) throw new Error("bip refusé");
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    Object.assign(db.recommendation, { updateMany });
+    audit.recordAudit.mockResolvedValue(undefined);
+    expect(await abandonCounterSale(AGENT, { prescriptionId: first.prescriptionId })).toEqual({ ok: true });
+    expect(mem.sales[0].status).toBe("CANCELLED");
+    expect(updateMany).toHaveBeenCalledWith({ where: { prescriptionId: first.prescriptionId, pharmacyId: "ph_1", status: "PURCHASED", outcomeSource: "COUNTER_DECLARED" }, data: { status: "DECLINED" } });
   });
 });

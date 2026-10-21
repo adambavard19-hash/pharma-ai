@@ -93,7 +93,8 @@ export function foldedLabel(count: number): string {
 
 /** « 1 vendu », « 2 vendus ». */
 export function soldLabel(count: number): string {
-  return count > 1 ? `${count} vendus` : "1 vendu";
+  // Bipé, pas encore vendu : un conseil ne compte vendu qu'à la validation de la vente (fondateur, 21 oct. 2026).
+  return count > 1 ? `${count} bipés` : "1 bipé";
 }
 
 /** « 2026-03-31 » → « 31/03/2026 ». */

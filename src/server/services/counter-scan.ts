@@ -519,6 +519,8 @@ export async function removeCounterLine(agent: AgentContext, input: { prescripti
     if (undecided.length > 0) await tx.recommendation.deleteMany({ where: { id: { in: undecided } } });
     if (decided.length > 0) await tx.recommendation.updateMany({ where: { id: { in: decided } }, data: { status: "REMOVED" } });
     await tx.prescriptionLine.delete({ where: { id: line.id } });
+    // Plus aucune boîte : rien n'a été vendu, pas même un conseil bipé — il ne comptait vendu qu'à la validation (21 oct. 2026).
+    if (remaining === 0) await tx.recommendation.updateMany({ where: { prescriptionId: sale.id, status: "PURCHASED", outcomeSource: COUNTER_ANSWERED }, data: { status: "DECLINED" } });
     await tx.prescription.update({
       where: { id: sale.id },
       // Plus de boîte : la vente est annulée (la bannière se ferme). Sinon, elle repart à l'analyse avec ce qui reste.
@@ -722,6 +724,9 @@ export async function abandonCounterSale(agent: AgentContext, input: { prescript
     data: { status: "CANCELLED" },
   });
   if (result.count === 0) return { ok: false, error: "Cette vente n'est plus ouverte sur ce poste." };
+  // Vente abandonnée : le client n'a rien pris. Un conseil bipé ne comptait vendu qu'à la validation (fondateur, 21 oct. 2026) :
+  // il redevient « Non vendu ».
+  await prisma.recommendation.updateMany({ where: { prescriptionId: input.prescriptionId, pharmacyId: agent.scope.pharmacyId, status: "PURCHASED", outcomeSource: COUNTER_ANSWERED }, data: { status: "DECLINED" } });
   await recordAudit({ action: "prescription.counter_sale_abandoned", entityType: "Prescription", entityId: input.prescriptionId, pharmacyId: agent.scope.pharmacyId, userId: agent.scope.userId, metadata: { source: "LGPI" } });
   return { ok: true };
 }
