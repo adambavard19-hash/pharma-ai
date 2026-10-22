@@ -78,6 +78,8 @@ const TEAM_COLORS = ["#247061", "#7A4DB8", "#C2410C", "#0369A1", "#B42318", "#4D
 
 /** Le temps laissé au pharmacien pour donner l'e-mail du bilan après la validation dans LGPI. */
 const VALIDATED_EMAIL_MS = 12_000;
+/** Au-delà, une fin de vente sans réponse du serveur rend la bannière des conseils. */
+const FINISH_WAIT_MS = 10_000;
 
 /** Après le choix, la confirmation reste ce temps-là avant que l'île revienne au repos. */
 const SERVED_THANKS_MS = 1_800;
@@ -264,10 +266,12 @@ export function PosteIsland() {
   }, []);
 
   // Le temps qui passe : scan → analyse, lignes cochées, pause « N conseils », fin de « Rien à ajouter » et de « Vente terminée ».
+  // La fin demandée au serveur (voir finishNow plus bas).
+  const [finishing, setFinishing] = useState<string | null>(null);
   const holdDone = island.stage === "done" && askServed && !(served?.id === entry?.id && served?.done);
   useEffect(() => {
     // La question « Qui a servi ? » tient l'écran de fin : il revient au repos après la réponse (voir plus bas).
-    if (holdDone) return;
+    if (holdDone || (finishing && island.stage === "emailSent")) return;
     const delay = stageDelay(island.stage, Boolean(entry));
     if (delay === null) return;
     const id = setTimeout(() => {
@@ -276,7 +280,7 @@ export function PosteIsland() {
       else dispatch({ type: "settle" });
     }, delay);
     return () => clearTimeout(id);
-  }, [island.stage, island.stepsDone, entry, holdDone]);
+  }, [island.stage, island.stepsDone, entry, holdDone, finishing]);
 
   // La question s'ouvre une fois par vente, avec la personne du comptoir choisie d'avance (quand le serveur la connaît).
   useEffect(() => {
@@ -307,6 +311,27 @@ export function PosteIsland() {
     return () => clearTimeout(id);
   }, [view.scanAt]);
 
+  // La fin demandée au serveur : la carte de l'e-mail reste à l'écran jusqu'à « Bravo ! ». Elle se refermait avant, et la
+  // bannière des conseils revenait une à deux secondes, le temps que le serveur termine la vente (POSTE5, 22 oct. 2026).
+  const finishNow = useCallback((id: string) => {
+    setFinishing(id);
+    word(finishWord(id));
+  }, [word]);
+  useEffect(() => {
+    if (!finishing) return;
+    if (island.stage === "done" || entry?.id !== finishing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- la fin est arrivée (ou une autre vente) : plus rien à tenir
+      setFinishing(null);
+      return;
+    }
+    // Le serveur n'a pas terminé la vente (réseau, refus) : on revient aux conseils, où « Terminer la vente » reste possible.
+    const id = setTimeout(() => {
+      setFinishing(null);
+      dispatch({ type: "closeEmail" });
+    }, FINISH_WAIT_MS);
+    return () => clearTimeout(id);
+  }, [finishing, island.stage, entry?.id]);
+
   // « Vente terminée » demande d'abord l'e-mail du bilan (s'il n'est pas déjà enregistré) ; envoyé, la vente se termine seule.
   const [finishAfterEmail, setFinishAfterEmail] = useState(false);
   const finish = () => {
@@ -323,8 +348,8 @@ export function PosteIsland() {
     if (!finishAfterEmail || !entry?.emailSaved) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- l'adresse est enregistrée : la vente se termine, une fois
     setFinishAfterEmail(false);
-    word(finishWord(entry.id));
-  }, [finishAfterEmail, entry?.emailSaved, entry?.id, word]);
+    finishNow(entry.id);
+  }, [finishAfterEmail, entry?.emailSaved, entry?.id, finishNow]);
   // LGPI a validé la vente (« FIN Valider ») : l'e-mail du bilan est proposé, avec un compte à rebours ; sans réponse, la vente
   // se termine d'elle-même (fondateur, 16 oct. 2026). Le clavier N'EST PAS pris : le pharmacien confirme encore le règlement
   // dans LGPI avec Entrée. Il ne l'est qu'au clic dans l'île, qui arrête aussi le compte à rebours.
@@ -353,11 +378,10 @@ export function PosteIsland() {
       if (now < autoClose.until) return;
       setAutoClose(null);
       setFinishAfterEmail(false);
-      dispatch({ type: "closeEmail" });
-      word(finishWord(autoClose.id));
+      finishNow(autoClose.id);
     }, 250);
     return () => clearInterval(tick);
-  }, [autoClose, word]);
+  }, [autoClose, finishNow]);
   const stopAutoClose = useCallback(() => setAutoClose(null), []);
   useEffect(() => {
     // Une autre vente (nouveau bip) : la demande de fin de la précédente est oubliée.
@@ -368,7 +392,7 @@ export function PosteIsland() {
 
   // Le clavier n'est demandé que pour l'e-mail du patient ; il est rendu au logiciel de gestion dès qu'on en sort.
   // Pendant le compte à rebours d'une vente validée dans LGPI, le clavier reste au logiciel de gestion.
-  const emailOpen = island.stage === "email" && !autoClose;
+  const emailOpen = island.stage === "email" && !autoClose && !finishing;
   useEffect(() => {
     send({ type: "keyboard", on: emailOpen });
     if (!emailOpen) return;
@@ -496,8 +520,7 @@ export function PosteIsland() {
     onFinishWithoutEmail: finishAfterEmail
       ? () => {
           setFinishAfterEmail(false);
-          dispatch({ type: "closeEmail" });
-          if (entry) word(finishWord(entry.id));
+          if (entry) finishNow(entry.id);
         }
       : undefined,
     onSendEmail: () => {
