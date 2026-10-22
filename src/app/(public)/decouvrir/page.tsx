@@ -125,7 +125,6 @@ export default async function SitePage() {
                 <Figure label="Ventes additionnelles" value={formatEuros(live.attributedCents)} />
               </div>
             )}
-            <VideoButton film="avantages" label="Voir les avantages" className="mt-8" />
           </Reveal>
         </div>
       </section>
