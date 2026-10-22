@@ -2,17 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ScanLine, Store, User } from "lucide-react";
+import { Home, ScanLine, Store, Tag, User } from "lucide-react";
 import { ACCENT } from "./ui";
 
 const TABS = [
   { href: "/app", label: "Accueil", Icon: Home, match: (p: string) => p === "/app" },
   { href: "/app/scanner", label: "Scanner", Icon: ScanLine, match: (p: string) => p.startsWith("/app/scanner") || p.startsWith("/app/fiche") || p.startsWith("/app/recherche") },
+  { href: "/app/offres", label: "Offres", Icon: Tag, match: (p: string) => p.startsWith("/app/offres") || p.startsWith("/app/abonnement") },
   { href: "/app/pharmacies", label: "Pharmacies", Icon: Store, match: (p: string) => p.startsWith("/app/pharmacies") },
-  { href: "/app/ma-pharmacie", label: "Mon espace", Icon: User, match: (p: string) => p.startsWith("/app/ma-pharmacie") },
+  { href: "/app/ma-pharmacie", label: "Mon espace", Icon: User, match: (p: string) => p.startsWith("/app/ma-pharmacie") || p.startsWith("/app/connexion") || p.startsWith("/app/armoire") },
 ];
 
-/** Les quatre onglets du bas, au-dessus de la zone sûre de l'iPhone. */
+/** Les cinq onglets du bas, au-dessus de la zone sûre de l'iPhone. */
 export function PatientTabs() {
   const path = usePathname() ?? "/app";
   return (

@@ -1,5 +1,6 @@
-import { BarChart3, Box, CalendarClock, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, PlayCircle, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
+import { BadgePercent, BarChart3, Box, CalendarClock, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, PlayCircle, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
+import { PATIENT_APP_LIVE } from "@/core/patient-app/offers";
 
 /**
  * La navigation de PharmaBoost.
@@ -227,6 +228,21 @@ export const NAVIGATION: NavItem[] = [
     description: "Les gammes des laboratoires partenaires : présentation, conditions, contact",
     group: "decouvrir",
   },
+  // L'appli des patients reste dans l'aperçu (fondateur, 21 oct. 2026) : ses offres aussi, absentes de pharmaboost.app.
+  ...(PATIENT_APP_LIVE
+    ? [
+        {
+          href: "/offres-patients",
+          label: "Offres patients",
+          icon: BadgePercent,
+          // Un acte du titulaire : publier une remise pour sa pharmacie (NEWS_MANAGE, rejoué par le serveur). L'équipe n'a pas l'entrée.
+          permission: PERMISSIONS.NEWS_MANAGE,
+          match: ["/offres-patients"],
+          description: "Les remises de votre pharmacie dans l'appli PharmaBoost : vos patients abonnés reviennent en profiter",
+          group: "decouvrir" as const,
+        },
+      ]
+    : []),
   {
     href: "/nouveautes",
     label: "Actualités",

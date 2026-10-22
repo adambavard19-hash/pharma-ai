@@ -1,4 +1,5 @@
 import "server-only";
+import { redeemOfferCodeAtCounter } from "@/server/services/app-members";
 import { parseStoredAlternatives } from "@/core/ai/alternatives";
 import { rangeKey, sameRange } from "@/core/counter/same-range";
 import { prisma } from "@/server/db/client";
@@ -73,7 +74,9 @@ export type CounterScanResult =
       /** La boîte bipée est un conseil proposé dans cette vente : il passe en « Vendu », sans nouvelle ligne ni nouvelle analyse. */
       adviceSold?: boolean;
     }
-  | { ok: false; error: string; code: "UNKNOWN_CODE" };
+  | { ok: false; error: string; code: "UNKNOWN_CODE" }
+  /** Un code d'offre de l'appli des patients : utilisé (ou refusé, avec la raison), jamais une ligne de vente. */
+  | { ok: false; error: string; code: "OFFER_CODE"; redeemed: boolean };
 
 /**
  * Ce qu'un bip désigne : une boîte de médicament (CIP, catalogue national),
@@ -217,6 +220,14 @@ export async function matchStockProductByName(pharmacyId: string, name: string):
 }
 
 export async function recordCounterScan(agent: AgentContext, input: { code: string; post: string; scannedAt: Date | null; expiresOn?: Date | null }): Promise<CounterScanResult> {
+  // Le code d'une offre de l'appli des patients (fondateur, 22 oct. 2026) : il est utilisé ici, une fois, et n'ajoute aucune
+  // ligne à la vente. L'appli du patient passe d'elle-même à « Offre utilisée ».
+  // Une panne de cette lecture ne bloque jamais un bip : le code suit alors son chemin habituel.
+  const offer = await redeemOfferCodeAtCounter(agent.scope.pharmacyId, input.code, input.post).catch((error: unknown) => {
+    console.error("[scan] code d'offre illisible", error);
+    return { kind: "not-offer" as const };
+  });
+  if (offer.kind !== "not-offer") return { ok: false, code: "OFFER_CODE", error: offer.message, redeemed: offer.kind === "redeemed" };
   const item = await resolveScannedItem(agent.scope.pharmacyId, input.code, agent.pharmacyIsDemo);
   if (!item) return { ok: false, code: "UNKNOWN_CODE", error: "Ce code ne ressemble pas à un code-barres de produit." };
   // Ce qui distingue deux bips d'un même article : le CIP, l'EAN ou le code brut.

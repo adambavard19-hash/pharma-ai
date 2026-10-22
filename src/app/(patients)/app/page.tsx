@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Mail, MapPin, ScanLine, Search } from "lucide-react";
+import { ChevronRight, Mail, MapPin, Pill, ScanLine, Search, Tag } from "lucide-react";
 import { Robot } from "@/components/robot";
 import { ACCENT, Card, Dna, GRAD, SectionTitle } from "./_components/ui";
 
@@ -43,6 +43,23 @@ export default function PatientHome() {
           <ChevronRight className="size-5" aria-hidden="true" />
         </Link>
 
+        <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+          <Link href="/app/offres">
+            <Card className="h-full">
+              <Tag className="size-5" style={{ color: ACCENT }} aria-hidden="true" />
+              <p className="mt-2 text-[14.5px] font-bold">Mes offres</p>
+              <p className="text-[12px] text-[#4B6A62]">Les remises de ma pharmacie</p>
+            </Card>
+          </Link>
+          <Link href="/app/armoire">
+            <Card className="h-full">
+              <Pill className="size-5" style={{ color: ACCENT }} aria-hidden="true" />
+              <p className="mt-2 text-[14.5px] font-bold">Mon armoire</p>
+              <p className="text-[12px] text-[#4B6A62]">Ce qui périme bientôt</p>
+            </Card>
+          </Link>
+        </div>
+
         <SectionTitle>Près de chez vous</SectionTitle>
         <Link href="/app/pharmacies">
           <Card className="flex items-center gap-3">
@@ -56,7 +73,7 @@ export default function PatientHome() {
             <ChevronRight className="size-5 text-[#94A3A0]" aria-hidden="true" />
           </Card>
         </Link>
-        <p className="mt-6 pb-2 text-center text-[11.5px] leading-4 text-[#94A3A0]">Rien n&apos;est enregistré quand vous scannez : PharmaBoost ne garde aucune donnée de santé.</p>
+        <p className="mt-6 pb-2 text-center text-[11.5px] leading-4 text-[#94A3A0]">Rien n&apos;est enregistré quand vous scannez, et votre armoire reste sur votre téléphone : PharmaBoost ne garde aucune donnée de santé.</p>
       </div>
     </div>
   );

@@ -37,7 +37,7 @@ describe("le menu, en trois groupes", () => {
   it("chaque groupe contient les entrées prévues, dans cet ordre", () => {
     const labels = (key: string) => NAVIGATION.filter((item) => item.group === key).map((item) => item.label);
     expect(labels("pharmacie")).toEqual(["Mes associations", "Mon stock", "Dates courtes", "Performances", "Historique", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants"]);
-    expect(labels("decouvrir")).toEqual(["Prise en main", "Formations", "Partenaires", "Actualités"]);
+    expect(labels("decouvrir")).toEqual(["Prise en main", "Formations", "Partenaires", "Offres patients", "Actualités"]);
     expect(labels("configuration")).toEqual(["Paramètres"]);
   });
 
@@ -77,7 +77,7 @@ const COLLABORATOR_LABELS = ["Au comptoir", "Mes associations", "Dates courtes",
 describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas affiché", () => {
   it("le titulaire voit les trois groupes et tout son menu, inchangé", () => {
     expect(groupNavigation(visibleFor("OWNER")).map((group) => group.label)).toEqual(["Ma pharmacie", "Découvrir", "Configuration"]);
-    expect(menuOf("OWNER")).toEqual(["Au comptoir", "Mes associations", "Mon stock", "Dates courtes", "Performances", "Historique", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants", "Prise en main", "Formations", "Partenaires", "Actualités", "Paramètres"]);
+    expect(menuOf("OWNER")).toEqual(["Au comptoir", "Mes associations", "Mon stock", "Dates courtes", "Performances", "Historique", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants", "Prise en main", "Formations", "Partenaires", "Offres patients", "Actualités", "Paramètres"]);
     expect(navigationFor(resolvePermissions("OWNER")).map((item) => item.label)).toEqual(menuOf("OWNER"));
   });
 

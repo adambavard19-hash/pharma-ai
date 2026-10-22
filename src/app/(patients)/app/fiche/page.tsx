@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, ShoppingBag, Store } from "lucide-react";
 import { adviceForSpecialty, lookupProductByCode, lookupSpecialty } from "@/server/services/patient-app";
 import type { DrugSheet, ParaSheet, PatientAdvice } from "@/core/patient-app/sheet";
 import { ACCENT, Card, Dna, GRAD, NotAdvice, SectionTitle } from "../_components/ui";
+import { AddToCabinet } from "../_components/add-to-cabinet";
 
 export const metadata: Metadata = { title: "Fiche" };
 
@@ -85,6 +86,7 @@ export default async function FichePage({ searchParams }: { searchParams: Promis
           <a href={sheet.sourceUrl} target="_blank" rel="noopener" className="mt-3 flex items-center justify-center gap-2 rounded-full border border-[#D5E3DF] bg-white py-3 text-[14px] font-bold">
             Notice et fiche officielles <ExternalLink className="size-4" aria-hidden="true" />
           </a>
+          <AddToCabinet name={sheet.name} code={typeof params.code === "string" ? params.code.slice(0, 40) : null} />
           <Advice advice={advice} />
           <NotAdvice />
         </div>
@@ -92,6 +94,7 @@ export default async function FichePage({ searchParams }: { searchParams: Promis
       {sheet?.kind === "PARA" && (
         <div className="px-5">
           <Card className="mt-3 text-[14px] leading-6 text-[#23413B]">Demandez conseil à votre pharmacien pour savoir si ce produit vous convient.</Card>
+          <AddToCabinet name={sheet.name} code={typeof params.code === "string" ? params.code.slice(0, 40) : null} />
           <FindButtons />
           <NotAdvice />
         </div>

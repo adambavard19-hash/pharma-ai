@@ -428,7 +428,7 @@ describe("navigation de la console", () => {
 
   it("les onglets réunissent les vues liées : suivi commercial, paiements et impayés, communication, performance", () => {
     const groups = (space: string) => ADMIN_NAV.find((entry) => entry.key === space)!.groups;
-    expect(groups("commercial")[0].items.map((item) => item.label)).toEqual(["Pipeline", "Liste", "Démonstrations", "Relances"]);
+    expect(groups("commercial")[0].items.map((item) => item.label)).toEqual(["Pipeline", "Liste", "Démonstrations", "Relances", "Pharmacies réclamées"]);
     // Paiements et impayés : une seule page (les impayés en sont une vue), l'ancienne adresse y mène.
     expect(groups("finance").find((group) => group.key === "paiements")!.items.map((item) => item.label)).toEqual(["Paiements"]);
     expect(groups("management").find((group) => group.key === "communication")!.items.map((item) => item.label)).toEqual(["Campagnes", "Historique", "Modèles d'e-mails", "Relances automatiques"]);

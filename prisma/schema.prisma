@@ -204,6 +204,10 @@ model Pharmacy {
   /// Suggestions du robot (secours sans règle), mises en cache par médicament.
   robotSuggestions        RobotSuggestion[]
 
+  // L'appli des patients (22 oct. 2026)
+  appMembers    AppMember[]
+  patientOffers PatientOffer[]
+
   @@index([organizationId])
   @@map("pharmacies")
 }
@@ -402,52 +406,52 @@ enum SubscriptionStatus {
 }
 
 model Subscription {
-  id                   String             @id @default(cuid())
-  organizationId       String             @unique
-  planId               String
-  status               SubscriptionStatus @default(TRIALING)
-  seats                Int                @default(5)
-  trialStartsAt        DateTime?
-  trialEndsAt          DateTime?
-  currentPeriodStart   DateTime           @default(now())
-  currentPeriodEnd     DateTime?
+  id                    String             @id @default(cuid())
+  organizationId        String             @unique
+  planId                String
+  status                SubscriptionStatus @default(TRIALING)
+  seats                 Int                @default(5)
+  trialStartsAt         DateTime?
+  trialEndsAt           DateTime?
+  currentPeriodStart    DateTime           @default(now())
+  currentPeriodEnd      DateTime?
   /// Résiliation programmée à la fin de la période en cours.
-  cancelAtPeriodEnd    Boolean            @default(false)
-  cancelAt             DateTime?
-  canceledAt           DateTime?
-  endedAt              DateTime?
+  cancelAtPeriodEnd     Boolean            @default(false)
+  cancelAt              DateTime?
+  canceledAt            DateTime?
+  endedAt               DateTime?
   /// Le client Stripe (`cus_…`). Un identifiant, jamais une autorisation :
   /// la portée vient toujours de la session.
-  externalCustomerId   String?            @unique
-  stripeSubscriptionId String?            @unique
-  stripePriceId        String?
+  externalCustomerId    String?            @unique
+  stripeSubscriptionId  String?            @unique
+  stripePriceId         String?
   /// Prochaine facture annoncée par Stripe, et dernier paiement.
-  nextInvoiceAt        DateTime?
-  lastPaymentAt        DateTime?
-  lastPaymentCents     Int?
-  lastPaymentFailedAt  DateTime?
+  nextInvoiceAt         DateTime?
+  lastPaymentAt         DateTime?
+  lastPaymentCents      Int?
+  lastPaymentFailedAt   DateTime?
   /// Suspension d'accès décidée par l'administrateur.
-  suspendedAt          DateTime?
-  suspendedReason      String?
+  suspendedAt           DateTime?
+  suspendedReason       String?
   /// Le contrat qui fonde cet abonnement, s'il y en a un.
-  contractId           String?
+  contractId            String?
   /// Tarif contractuel mensuel HT de CETTE officine, en centimes. Figé à la
   /// souscription (contrat signé, sinon offre du moment) : une modification du
   /// catalogue ne le change jamais. Seule une modification explicite, tracée
   /// dans `SubscriptionPriceChange`, le fait évoluer.
-  contractPriceCents   Int?
+  contractPriceCents    Int?
   /// Engagement : durée en mois et date de fin, fixées à la naissance de l'abonnement Stripe. Une résiliation demandée
   /// avant cette date prend effet à cette date, jamais avant.
-  commitmentMonths     Int?
-  commitmentEndsAt     DateTime?
+  commitmentMonths      Int?
+  commitmentEndsAt      DateTime?
   /// Mise en service facturée sur la première facture, en centimes HT (0 : offerte ; vide : aucune).
-  setupFeeCents        Int?
+  setupFeeCents         Int?
   /// Remise de parrainage appliquée chez Stripe (coupon `pb-parrainage-<centimes>`), en centimes HT par mois.
   referralDiscountCents Int?
-  referralCouponId     String?
-  referralSyncedAt     DateTime?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  referralCouponId      String?
+  referralSyncedAt      DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   organization         Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   plan                 Plan                      @relation(fields: [planId], references: [id])
@@ -1050,10 +1054,10 @@ model Product {
   /// Contre-indications simples déclarées par l'officine (grossesse, enfant...).
   contraindications String[] @default([])
 
-  purchasePriceCents Int   @default(0)
-  salePriceCents     Int   @default(0)
+  purchasePriceCents  Int      @default(0)
+  salePriceCents      Int      @default(0)
   /// Taux de TVA en points de pourcentage (ex. 5.5, 10, 20).
-  vatRate            Float @default(20)
+  vatRate             Float    @default(20)
   /// Référence remboursable (médicament remboursable, dispositif inscrit à la LPP) ; vide : on ne sait pas. Lu sur
   /// l'export (taux, code prestation PH7/PHN/AAD, code LPP) ou déduit d'une TVA à 2,1 % — jamais deviné au nom. Une
   /// référence remboursée ne passe jamais devant une équivalente non remboursée au départage du moteur.
@@ -1769,19 +1773,19 @@ model PharmacyDrugStock {
   pharmacyId     String
   presentationId String
 
-  quantity       Int             @default(0)
+  quantity           Int             @default(0)
   /// Seuil déclenchant l'alerte « stock faible ». 0 = pas d'alerte.
-  alertThreshold Int             @default(0)
+  alertThreshold     Int             @default(0)
   /// Prix de vente TTC pratiqué par CETTE officine, en centimes. Absent = le
   /// prix public du catalogue national fait foi.
-  priceCents     Int?
+  priceCents         Int?
   /// Prix d'achat HT de CETTE officine, en centimes, lu sur l'export de stock (« PA HT »). Absent : marge inconnue.
   purchasePriceCents Int?
   /// Taux de TVA lu sur l'export, en points (2,1 : remboursable ; 10 : non remboursable).
   vatRate            Float?
-  location       String?
-  source         DrugStockSource @default(MANUAL)
-  lastCountedAt  DateTime?
+  location           String?
+  source             DrugStockSource @default(MANUAL)
+  lastCountedAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2020,7 +2024,7 @@ enum LineStatus {
 }
 
 model PrescriptionLine {
-  id             String  @id @default(cuid())
+  id             String    @id @default(cuid())
   prescriptionId String
   position       Int
   /// Texte brut tel que lu sur l'ordonnance — jamais réécrit par l'IA.
@@ -2529,19 +2533,19 @@ enum CentralRuleSource {
 }
 
 model CentralAdviceRule {
-  id               String            @id @default(cuid())
+  id                  String            @id @default(cuid())
   /// La clé de la règle : celle du code (« opioid-transit »), ou « custom-<id> » pour une règle ajoutée.
-  ruleKey          String            @unique
-  source           CentralRuleSource
-  status           CentralStatus     @default(ACTIVE)
+  ruleKey             String            @unique
+  source              CentralRuleSource
+  status              CentralStatus     @default(ACTIVE)
   /// La version de la règle au moment de la validation : une règle réécrite depuis redevient « à relire ».
-  ruleVersion      String?
+  ruleVersion         String?
   /// Règle ajoutée : sa définition (voir core/ai/central-advice.ts). Vide pour une règle du code.
-  definition       Json?
-  decidedAt        DateTime?
-  decidedByAdminId String?
+  definition          Json?
+  decidedAt           DateTime?
+  decidedByAdminId    String?
   /// Le nom de la personne qui a décidé, tel qu'il était à ce moment-là.
-  decidedByName    String?
+  decidedByName       String?
   /// Règle du code MODIFIÉE depuis la console : ce qui remplace ses textes, déclencheurs, produits et exclusions (voir
   /// core/ai/central-advice.ts, `RuleEditValues`). Vide : la règle du code telle qu'écrite. Les exclusions du code restent toujours.
   override            Json?
@@ -2551,8 +2555,8 @@ model CentralAdviceRule {
   overrideBaseVersion String?
   overriddenAt        DateTime?
   overriddenByName    String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   @@index([status])
   @@map("central_advice_rules")
@@ -3287,13 +3291,13 @@ model SalesRep {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sessions      SalesRepSession[]
-  prospects     Prospect[]
-  commissions   Commission[]
-  tasks         SalesTask[]
-  notifications ExtranetNotification[]
-  application   SalesApplication?
-  invoices      SalesInvoice[]
+  sessions           SalesRepSession[]
+  prospects          Prospect[]
+  commissions        Commission[]
+  tasks              SalesTask[]
+  notifications      ExtranetNotification[]
+  application        SalesApplication?
+  invoices           SalesInvoice[]
   /// Les contrats d'affiliation de l'affilié (une version par envoi), signés par lui puis contresignés par PharmaBoost.
   affiliateContracts AffiliateContract[]
 
@@ -4132,39 +4136,39 @@ model TrainingContent {
 
   // --- PharmaBoost Mobile : l'Académie ------------------------------------------------------------
   /// Sens de la vidéo (MICRO_VIDEO, VIDEO). Vide : sans objet.
-  orientation     VideoOrientation?
+  orientation          VideoOrientation?
   /// Clé de la vidéo dans le port de stockage (S3 / local / base, servie par /api/files). Vide : `url` fait foi.
-  videoAssetKey   String?
+  videoAssetKey        String?
   /// Image d'attente de la vidéo (première image, vignette).
-  posterUrl       String?
+  posterUrl            String?
   /// Durée exacte d'une vidéo, en secondes (`durationMinutes` reste l'estimation de lecture des autres formats).
-  durationSeconds Int?
+  durationSeconds      Int?
   /// Qui parle ou qui a écrit : « Dr Claire Martin », et sa qualité : « Pharmacienne, formatrice ».
-  authorName      String?
-  authorRole      String?
+  authorName           String?
+  authorRole           String?
   /// Partenaire qui parraine le contenu. Toujours affiché « Contenu sponsorisé par … » quand `isSponsored`.
-  partnerId       String?
-  isSponsored     Boolean               @default(false)
+  partnerId            String?
+  isSponsored          Boolean               @default(false)
   /// Ouvert aux comptes gratuits (sinon réservé aux équipes des officines clientes).
-  isFreeAccess    Boolean               @default(false)
+  isFreeAccess         Boolean               @default(false)
   /// Relecture scientifique : un contenu n'est montré dans l'application mobile qu'en APPROVED.
   /// Les contenus d'avant PharmaBoost Mobile ont été passés à APPROVED par la migration (ils étaient déjà publiés).
-  reviewStatus    EditorialReviewStatus @default(DRAFT)
+  reviewStatus         EditorialReviewStatus @default(DRAFT)
   /// Nom et qualité du relecteur (« Dr Donna X, pharmacienne »), et la date de sa relecture.
-  reviewedBy      String?
-  reviewedAt      DateTime?
+  reviewedBy           String?
+  reviewedAt           DateTime?
   /// Mise en ligne, et date au-delà de laquelle le contenu doit être relu ou retiré (réglementation, RCP…).
-  publishedAt     DateTime?
-  validUntil      DateTime?
+  publishedAt          DateTime?
+  validUntil           DateTime?
   /// Étape Formations (migration 20261028100000_mobile_academie) : le thème du catalogue (filtres de l'onglet).
   /// MEDICINES = contenu sur le médicament : sa relecture doit être faite par un pharmacien (`reviewerIsPharmacist`).
   academyTopic         AcademyTopic?
   /// Le relecteur a déclaré relire en qualité de pharmacien (case « Relu par un pharmacien » de la console).
-  reviewerIsPharmacist Boolean       @default(false)
+  reviewerIsPharmacist Boolean               @default(false)
   /// Le motif d'un refus de relecture, montré à l'auteur dans la console.
   reviewNote           String?
   /// Le seuil de réussite du quiz du contenu, en pourcentage.
-  quizPassPercent      Int           @default(70)
+  quizPassPercent      Int                   @default(70)
 
   pharmacy        Pharmacy?                @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   partner         Partner?                 @relation(fields: [partnerId], references: [id], onDelete: SetNull)
@@ -4544,6 +4548,7 @@ model Partner {
   sponsoredCampaigns SponsoredCampaign[]
   infoRequests       PartnerInfoRequest[]
   earnings           PartnerEarning[]
+  patientOffers      PatientOffer[]
 
   @@index([status])
   @@map("partners")
@@ -5986,7 +5991,6 @@ model SiteVisitor {
   @@map("site_visitors")
 }
 
-
 /// Le rappel de fin de cure (17 oct. 2026) : un complément vendu au comptoir (magnésium, probiotiques, plantes…) à un patient qui
 /// a accepté le bilan par e-mail. Sept jours avant la fin de la cure, PharmaBoost lui écrit de penser à revenir la renouveler.
 /// L'adresse est gardée CHIFFRÉE jusqu'à cet envoi, puis effacée ; `emailHash` (empreinte à clé, irréversible) sert seulement à
@@ -6038,7 +6042,6 @@ model CureDuration {
   @@map("cure_durations")
 }
 
-
 /// La fiche patient d'un produit conseillé, rédigée par le modèle pour le bilan e-mail (17 oct. 2026) et gardée pour les ventes
 /// suivantes : `key` = produit (code-barres, sinon nom) + médicament qui l'a appelé. Aucune donnée patient.
 model PatientCardCache {
@@ -6049,7 +6052,6 @@ model PatientCardCache {
 
   @@map("patient_card_cache")
 }
-
 
 /// L'accord d'un patient pour recevoir des offres de marques partenaires (17 oct. 2026) : donné dans l'e-mail de son bilan, par un
 /// clic puis une case cochée sur la page de confirmation — jamais d'office. Adresse CHIFFRÉE ; `emailHash` (empreinte à clé) pour
@@ -6114,7 +6116,6 @@ model PartnerEmailSend {
   @@map("partner_email_sends")
 }
 
-
 /// Ce que PharmaBoost a reçu d'un partenaire (17 oct. 2026) : commission d'affiliation (e-mails patients), forfait, ou autre —
 /// saisi dans la console à réception du relevé ou du virement. La rémunération du partenaire = la somme de ces lignes.
 model PartnerEarning {
@@ -6133,7 +6134,6 @@ model PartnerEarning {
   @@map("partner_earnings")
 }
 
-
 /// Le conseil prêt à dire au comptoir (18 oct. 2026) : deux questions à poser, puis le conseil en deux phrases, pour un conseil
 /// donné (règle ou association + produit). Rédigé par le modèle, ou corrigé par la pharmacienne (`source` = « PHARMACIST »).
 model CounterPitch {
@@ -6151,4 +6151,128 @@ model CounterPitch {
 
   @@index([ruleKey])
   @@map("counter_pitches")
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// L'appli des patients — offres, abonnement, pharmacies réclamées (fondateur, 22 oct. 2026)
+// ---------------------------------------------------------------------------------------------------------------------------
+
+enum AppMemberPlan {
+  FREE
+  PLUS
+}
+
+enum PatientOfferAudience {
+  /// Tous les inscrits de l'appli (l'offre de bienvenue).
+  ALL
+  /// Les abonnés PharmaBoost+ seulement.
+  SUBSCRIBERS
+}
+
+enum PatientOfferStatus {
+  ACTIVE
+  CANCELED
+}
+
+enum PatientOfferFunding {
+  /// La remise est faite par la pharmacie, pour ses patients.
+  PHARMACY
+  /// La remise est payée par un laboratoire partenaire, dans tout le réseau PharmaBoost ; il paie PharmaBoost à la boîte.
+  LAB
+}
+
+/// Un inscrit de l'appli des patients : son adresse e-mail (chiffrée, retrouvée par son empreinte), sa pharmacie PharmaBoost, ou
+/// celle qu'il a déclarée hors réseau, et son abonnement. Aucune donnée de santé : l'armoire à pharmacie reste sur son téléphone.
+model AppMember {
+  id              String        @id @default(cuid())
+  emailHash       String        @unique
+  emailCipher     String
+  emailMasked     String
+  homePharmacyId  String?
+  plan            AppMemberPlan @default(FREE)
+  plusSince       DateTime?
+  /// L'accord pour recevoir les offres, donné dans l'appli.
+  offersConsentAt DateTime?
+  lastSeenAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  homePharmacy Pharmacy?            @relation(fields: [homePharmacyId], references: [id], onDelete: SetNull)
+  codes        PatientOfferCode[]
+  joinRequest  PharmacyJoinRequest?
+
+  @@index([homePharmacyId])
+  @@map("app_members")
+}
+
+/// Une offre de l'appli : une campagne d'une pharmacie (ses patients), ou d'un laboratoire (tout le réseau). Parapharmacie et
+/// produits conseil seulement, jamais un médicament.
+model PatientOffer {
+  id              String               @id @default(cuid())
+  funding         PatientOfferFunding  @default(PHARMACY)
+  /// La pharmacie de l'offre ; vide pour une offre de laboratoire (valable dans toutes les pharmacies PharmaBoost).
+  pharmacyId      String?
+  partnerId       String?
+  title           String
+  rangeLabel      String
+  discountPercent Int
+  details         String?
+  audience        PatientOfferAudience @default(SUBSCRIBERS)
+  status          PatientOfferStatus   @default(ACTIVE)
+  startsAt        DateTime
+  endsAt          DateTime
+  /// Offre de laboratoire : ce que le laboratoire paie à PharmaBoost par boîte vendue avec l'offre.
+  labFeeCents     Int?
+  createdByName   String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  pharmacy Pharmacy?          @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  partner  Partner?           @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  codes    PatientOfferCode[]
+
+  @@index([pharmacyId, status, endsAt])
+  @@index([funding, status, endsAt])
+  @@map("patient_offers")
+}
+
+/// Le code d'une offre pour un inscrit : 13 chiffres (préfixe 2990, réservé à l'usage interne), montré en code-barres dans
+/// l'appli, bipé une fois au comptoir.
+model PatientOfferCode {
+  id                 String    @id @default(cuid())
+  offerId            String
+  memberId           String
+  code               String    @unique
+  issuedAt           DateTime  @default(now())
+  redeemedAt         DateTime?
+  redeemedPharmacyId String?
+  redeemedPost       String?
+
+  offer  PatientOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  member AppMember    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, memberId])
+  @@index([redeemedPharmacyId, redeemedAt])
+  @@map("patient_offer_codes")
+}
+
+/// « Ma pharmacie n'est pas PharmaBoost » : la pharmacie habituelle d'un inscrit, et s'il veut qu'elle rejoigne PharmaBoost.
+/// Regroupées par `key` (nom + code postal normalisés) dans la console : « 47 patients la réclament ».
+model PharmacyJoinRequest {
+  id           String    @id @default(cuid())
+  memberId     String    @unique
+  pharmacyName String
+  city         String
+  postalCode   String
+  key          String
+  wantsJoin    Boolean   @default(true)
+  handledAt    DateTime?
+  handledNote  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  member AppMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([key])
+  @@map("pharmacy_join_requests")
 }

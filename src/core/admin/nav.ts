@@ -1,3 +1,5 @@
+import { PATIENT_APP_LIVE } from "@/core/patient-app/offers";
+
 /**
  * La navigation de la console, en CINQ rubriques.
  *
@@ -82,6 +84,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
           { href: "/admin/prospects", label: "Liste", description: "Tous les dossiers, filtrables et cherchables.", matches: ["/admin/dossiers"] },
           { href: "/admin/demonstrations", label: "Démonstrations", description: "Démos programmées et réalisées." },
           { href: "/admin/relances-commerciales", label: "Relances", description: "Les relances prévues, en retard et du jour." },
+          ...(PATIENT_APP_LIVE ? [{ href: "/admin/pharmacies-reclamees", label: "Pharmacies réclamées", description: "Les pharmacies hors réseau que les patients de l'appli veulent voir rejoindre PharmaBoost : les plus réclamées d'abord." }] : []),
         ],
       },
       {
@@ -151,7 +154,14 @@ export const ADMIN_NAV: AdminNavSpace[] = [
           { href: "/admin/relances", label: "Relances automatiques", description: "Scénarios d'essai, de contrat, de paiement, de résiliation." },
         ],
       },
-      { key: "partenaires", label: "Partenaires", items: [{ href: "/admin/partenaires", label: "Partenaires", description: "Candidatures, marques, catalogues, commandes." }] },
+      {
+        key: "partenaires",
+        label: "Partenaires",
+        items: [
+          { href: "/admin/partenaires", label: "Partenaires", description: "Candidatures, marques, catalogues, commandes." },
+          ...(PATIENT_APP_LIVE ? [{ href: "/admin/offres-laboratoires", label: "Offres laboratoires", description: "Les offres de l'appli des patients payées par les laboratoires, dans tout le réseau : boîtes vendues et montant à facturer." }] : []),
+        ],
+      },
       {
         key: "formations",
         label: "Formations & challenges",

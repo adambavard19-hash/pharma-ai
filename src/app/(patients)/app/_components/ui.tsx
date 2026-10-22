@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 /** Les couleurs de l'appli des patients : la sarcelle de PharmaBoost, en dégradé vers le bleu. */
 export const ACCENT = "#0E8A7B";
@@ -9,8 +9,12 @@ export function Dna({ className = "" }: { className?: string }) {
   return <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 top-0 h-64 bg-[url(/poste/adn-helice.jpg)] bg-cover bg-[62%_40%] opacity-40 [mask-image:linear-gradient(180deg,#000_30%,transparent)] ${className}`} />;
 }
 
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-[22px] bg-white p-4 shadow-[0_8px_24px_-16px_rgba(15,47,42,.35)] ${className}`}>{children}</div>;
+export function Card({ children, className = "", ...rest }: { children: ReactNode; className?: string } & Omit<HTMLAttributes<HTMLDivElement>, "className" | "children">) {
+  return (
+    <div {...rest} className={`rounded-[22px] bg-white p-4 shadow-[0_8px_24px_-16px_rgba(15,47,42,.35)] ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {
