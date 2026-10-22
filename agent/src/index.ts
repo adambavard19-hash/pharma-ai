@@ -48,7 +48,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.25";
+const VERSION = "0.10.26";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -304,6 +304,8 @@ function onLgpiSaleAbandoned(): void {
 
 /** La remise à zéro de la liste des lignes de la vente LGPI (robot-lgpi.ts) : seulement à la vraie fin d'une vente. */
 let resetLgpiLines: (() => void) | null = null;
+/** Un passage de douchette : la ligne qu'il ajoute à la vente LGPI (pour savoir quelle boîte une suppression désigne). */
+let noteLgpiScan: ((code: string, at: number) => void) | null = null;
 
 /** Termine une vente validée dans LGPI, une seule fois. */
 async function finishValidated(saleId: string): Promise<void> {
@@ -627,13 +629,18 @@ async function runPost(config: Config): Promise<void> {
       log(`${source === "robot" ? "Robot" : "Bip"} ${code} ignoré : déjà annoncé à l'instant par ${source === "robot" ? "la douchette" : "le robot"}.`);
       return;
     }
+    // Un passage de douchette ajoute une ligne à la vente LGPI : l'agent la note, pour qu'une suppression sache quelle boîte elle retire.
+    if (source === "douchette") noteLgpiScan?.(code, at);
     // La bannière réagit au bip tout de suite : « Scan détecté ! Analyse en cours… », avant même la réponse du serveur.
     notices.scanning();
     scans.push({ code, scannedAt: new Date(at).toISOString(), ...(expiresOn ? { expiresOn } : {}) });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
   startDouchette(dirname(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message), onLgpiBilling });
-  const lgpiSale = { onSaleValidated: onValidationLine, onLineRemoved: onLgpiLineRemoved, onSaleAbandoned: onLgpiSaleAbandoned, onSaleLinesReady: (reset: () => void) => (resetLgpiLines = reset) };
+  const lgpiSale = { onSaleValidated: onValidationLine, onLineRemoved: onLgpiLineRemoved, onSaleAbandoned: onLgpiSaleAbandoned, onSaleLinesReady: (lines: { reset: () => void; scanned: (code: string, at: number) => void }) => {
+    resetLgpiLines = lines.reset;
+    noteLgpiScan = lines.scanned;
+  } };
   const robotHandlers = { onScan: accept("robot"), onStatus: (message: string) => log(message), ...lgpiSale };
   const robot = config.robot ?? (process.platform === "win32" ? ({ kind: "lgpi" } as const) : undefined);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);

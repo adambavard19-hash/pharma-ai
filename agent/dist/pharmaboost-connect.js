@@ -6585,43 +6585,58 @@ var LINE_ADDED = /Produit\s*:\s*'(\d{7,14})'/;
 var LINE_REMOVED = /codeEvenement=ABANDON_LIGNE\b[^}]*?descriptif=Ligne\s+(\d{1,3})\b/;
 var SALE_ABANDONED = /codeEvenement=ABANDON_VENTE\b/;
 var MAX_SALE_LINES = 200;
+var SAME_LINE_MS = 8e3;
 var LgpiSaleLines = class {
-  codes = [];
-  push(line) {
+  lines = [];
+  add(code, at, from) {
+    const twin = [...this.lines].reverse().find((line) => !line.paired && line.from !== from && line.code === code && Math.abs(at - line.at) <= SAME_LINE_MS);
+    if (twin) {
+      twin.paired = true;
+      return false;
+    }
+    if (this.lines.length >= MAX_SALE_LINES) this.lines.shift();
+    this.lines.push({ code, at, from, paired: false });
+    return true;
+  }
+  /** Un passage de douchette vu par l'agent : LGPI ajoute une ligne à la vente. */
+  scanned(code, at) {
+    const digits = code.replace(/\D/g, "");
+    if (/^\d{7,14}$/.test(digits)) this.add(digits, at, "douchette");
+  }
+  push(line, at = Date.now()) {
     const entry = parseEntry(line);
     if (!entry) return null;
     if (/DpRuptureService$/.test(entry.logger)) {
       const code = LINE_ADDED.exec(entry.message)?.[1];
       if (!code) return null;
-      if (this.codes.length >= MAX_SALE_LINES) this.codes.shift();
-      this.codes.push(code);
+      this.add(code, at, "journal");
       return { kind: "added", code };
     }
     if (/NFJetApplication$/.test(entry.logger)) {
       if (SALE_ABANDONED.test(entry.message)) {
-        this.codes = [];
+        this.lines = [];
         return { kind: "abandoned" };
       }
       const rank = Number(LINE_REMOVED.exec(entry.message)?.[1] ?? 0);
       if (rank < 1) return null;
-      const code = rank <= this.codes.length ? this.codes.splice(rank - 1, 1)[0] : null;
+      const code = rank <= this.lines.length ? this.lines.splice(rank - 1, 1)[0].code : null;
       return { kind: "removed", line: rank, code };
     }
     return null;
   }
   /** La vente est validée (ou finie autrement) : la suivante repart d'une liste vide. */
   reset() {
-    this.codes = [];
+    this.lines = [];
   }
   get size() {
-    return this.codes.length;
+    return this.lines.length;
   }
 };
 var VALIDATION_DEBOUNCE_MS = 5e3;
 function startLgpiJournal(config, handlers, clock = Date.now) {
   const reader = new LgpiRobotReader();
   const saleLines = new LgpiSaleLines();
-  handlers.onSaleLinesReady?.(() => saleLines.reset());
+  handlers.onSaleLinesReady?.({ reset: () => saleLines.reset(), scanned: (code, at) => saleLines.scanned(code, at) });
   let lastValidation = -Infinity;
   let lines = new LineBuffer();
   let current2 = null;
@@ -6644,7 +6659,7 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
       const at = clock();
       for (const line of lines.push(buffer.toString("latin1"))) {
         announce(reader.push(line, at), at);
-        const event = saleLines.push(line);
+        const event = saleLines.push(line, at);
         if (event?.kind === "removed") {
           handlers.onStatus(event.code ? `LGPI : ligne ${event.line} supprim\xE9e (produit ${event.code}).` : `LGPI : ligne ${event.line} supprim\xE9e (produit inconnu de l'agent : rien n'est retir\xE9).`);
           handlers.onLineRemoved?.(event.code ?? "", at, { line: event.line, known: saleLines.size + (event.code ? 1 : 0) });
@@ -6844,7 +6859,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.25";
+var VERSION = "0.10.26";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -7012,6 +7027,7 @@ function onLgpiSaleAbandoned() {
   })();
 }
 var resetLgpiLines = null;
+var noteLgpiScan = null;
 async function finishValidated(saleId) {
   if (validatedSale !== saleId) return;
   validatedSale = null;
@@ -7268,12 +7284,16 @@ async function runPost(config) {
       log(`${source === "robot" ? "Robot" : "Bip"} ${code} ignor\xE9 : d\xE9j\xE0 annonc\xE9 \xE0 l'instant par ${source === "robot" ? "la douchette" : "le robot"}.`);
       return;
     }
+    if (source === "douchette") noteLgpiScan?.(code, at);
     notices.scanning();
     scans.push({ code, scannedAt: new Date(at).toISOString(), ...expiresOn ? { expiresOn } : {} });
     scans.flush().catch((error) => log(`Bip en attente : ${error instanceof Error ? error.message : String(error)}`));
   };
   startDouchette((0, import_node_path10.dirname)(CONFIG_PATH), { onScan: accept("douchette"), onStatus: (message) => log(message), onLgpiBilling });
-  const lgpiSale = { onSaleValidated: onValidationLine, onLineRemoved: onLgpiLineRemoved, onSaleAbandoned: onLgpiSaleAbandoned, onSaleLinesReady: (reset) => resetLgpiLines = reset };
+  const lgpiSale = { onSaleValidated: onValidationLine, onLineRemoved: onLgpiLineRemoved, onSaleAbandoned: onLgpiSaleAbandoned, onSaleLinesReady: (lines) => {
+    resetLgpiLines = lines.reset;
+    noteLgpiScan = lines.scanned;
+  } };
   const robotHandlers = { onScan: accept("robot"), onStatus: (message) => log(message), ...lgpiSale };
   const robot = config.robot ?? (process.platform === "win32" ? { kind: "lgpi" } : void 0);
   if (robot?.kind === "journal") startRobotJournal(robot, robotHandlers);

@@ -92,8 +92,11 @@ export type RobotHandlers = {
   onLineRemoved?: (code: string, at: number, info?: { line: number; known: number }) => void;
   /** La vente abandonnée dans LGPI. */
   onSaleAbandoned?: (at: number) => void;
-  /** Rend la remise à zéro de la liste des lignes LGPI : appelée à la VRAIE fin de vente (validation confirmée, voir sale-validation.ts). */
-  onSaleLinesReady?: (reset: () => void) => void;
+  /**
+   * Rend la liste des lignes LGPI : `reset` à la VRAIE fin de vente (validation confirmée, voir sale-validation.ts), `scanned` à
+   * chaque passage de douchette (LGPI n'écrit pas le code de toutes les boîtes dans son journal : diagnostic de POSTE5, 22 oct. 2026).
+   */
+  onSaleLinesReady?: (lines: { reset: () => void; scanned: (code: string, at: number) => void }) => void;
 };
 
 const POLL_MS = 1000;

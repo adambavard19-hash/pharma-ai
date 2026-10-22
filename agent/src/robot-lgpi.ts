@@ -174,6 +174,11 @@ export function isSaleValidatedLine(line: string): boolean {
  *  - la vente abandonnée écrit « codeEvenement=ABANDON_VENTE ».
  * On garde donc la liste des codes, dans l'ordre, pour savoir QUELLE boîte la ligne N portait. Une ligne inconnue (vente commencée
  * avant que l'agent ne démarre, rang hors liste) ne désigne rien : on ne devine jamais.
+ *
+ * Diagnostic de POSTE5 du 22 oct. 2026 : LGPI n'écrit « Produit : '<code>' » que pour CERTAINS produits (deux passages de douchette,
+ * une seule ligne au journal) — une parapharmacie (Hydratis, ADIARIL, Lactibiane) n'y était jamais, les rangs se décalaient et la
+ * suppression ne désignait rien. Chaque passage de la douchette vu par l'agent (`scanned`) ajoute donc aussi sa ligne ; la ligne du
+ * journal du même code, dans les secondes qui suivent (ou qui précèdent), est la même ligne et ne compte pas deux fois.
  */
 export type LgpiLineEvent = { kind: "added"; code: string } | { kind: "removed"; line: number; code: string | null } | { kind: "abandoned" };
 
@@ -182,28 +187,49 @@ const LINE_REMOVED = /codeEvenement=ABANDON_LIGNE\b[^}]*?descriptif=Ligne\s+(\d{
 const SALE_ABANDONED = /codeEvenement=ABANDON_VENTE\b/;
 /** Une vente n'a jamais plus de lignes que cela : la liste ne grossit pas sans fin si la fin de vente n'est pas lue. */
 const MAX_SALE_LINES = 200;
+/** Le passage de douchette et la ligne « Produit : » de LGPI pour la même boîte arrivent à quelques secondes l'un de l'autre. */
+const SAME_LINE_MS = 8000;
+
+type SaleLine = { code: string; at: number; from: "douchette" | "journal"; paired: boolean };
 
 export class LgpiSaleLines {
-  private codes: string[] = [];
+  private lines: SaleLine[] = [];
 
-  push(line: string): LgpiLineEvent | null {
+  private add(code: string, at: number, from: SaleLine["from"]): boolean {
+    // La même boîte vue par l'autre source juste avant : c'est la même ligne de LGPI.
+    const twin = [...this.lines].reverse().find((line) => !line.paired && line.from !== from && line.code === code && Math.abs(at - line.at) <= SAME_LINE_MS);
+    if (twin) {
+      twin.paired = true;
+      return false;
+    }
+    if (this.lines.length >= MAX_SALE_LINES) this.lines.shift();
+    this.lines.push({ code, at, from, paired: false });
+    return true;
+  }
+
+  /** Un passage de douchette vu par l'agent : LGPI ajoute une ligne à la vente. */
+  scanned(code: string, at: number): void {
+    const digits = code.replace(/\D/g, "");
+    if (/^\d{7,14}$/.test(digits)) this.add(digits, at, "douchette");
+  }
+
+  push(line: string, at: number = Date.now()): LgpiLineEvent | null {
     const entry = parseEntry(line);
     if (!entry) return null;
     if (/DpRuptureService$/.test(entry.logger)) {
       const code = LINE_ADDED.exec(entry.message)?.[1];
       if (!code) return null;
-      if (this.codes.length >= MAX_SALE_LINES) this.codes.shift();
-      this.codes.push(code);
+      this.add(code, at, "journal");
       return { kind: "added", code };
     }
     if (/NFJetApplication$/.test(entry.logger)) {
       if (SALE_ABANDONED.test(entry.message)) {
-        this.codes = [];
+        this.lines = [];
         return { kind: "abandoned" };
       }
       const rank = Number(LINE_REMOVED.exec(entry.message)?.[1] ?? 0);
       if (rank < 1) return null;
-      const code = rank <= this.codes.length ? this.codes.splice(rank - 1, 1)[0] : null;
+      const code = rank <= this.lines.length ? this.lines.splice(rank - 1, 1)[0].code : null;
       return { kind: "removed", line: rank, code };
     }
     return null;
@@ -211,11 +237,11 @@ export class LgpiSaleLines {
 
   /** La vente est validée (ou finie autrement) : la suivante repart d'une liste vide. */
   reset(): void {
-    this.codes = [];
+    this.lines = [];
   }
 
   get size(): number {
-    return this.codes.length;
+    return this.lines.length;
   }
 }
 
@@ -225,7 +251,7 @@ const VALIDATION_DEBOUNCE_MS = 5000;
 export function startLgpiJournal(config: LgpiRobotConfig, handlers: RobotHandlers, clock: () => number = Date.now): () => void {
   const reader = new LgpiRobotReader();
   const saleLines = new LgpiSaleLines();
-  handlers.onSaleLinesReady?.(() => saleLines.reset());
+  handlers.onSaleLinesReady?.({ reset: () => saleLines.reset(), scanned: (code, at) => saleLines.scanned(code, at) });
   let lastValidation = -Infinity;
   let lines = new LineBuffer();
   let current: { path: string; offset: number } | null = null;
@@ -251,7 +277,7 @@ export function startLgpiJournal(config: LgpiRobotConfig, handlers: RobotHandler
       // Les journaux Windows sont en ANSI : latin1 garde chaque octet, et les codes sont des chiffres.
       for (const line of lines.push(buffer.toString("latin1"))) {
         announce(reader.push(line, at), at);
-        const event = saleLines.push(line);
+        const event = saleLines.push(line, at);
         if (event?.kind === "removed") {
           handlers.onStatus(event.code ? `LGPI : ligne ${event.line} supprimée (produit ${event.code}).` : `LGPI : ligne ${event.line} supprimée (produit inconnu de l'agent : rien n'est retiré).`);
           handlers.onLineRemoved?.(event.code ?? "", at, { line: event.line, known: saleLines.size + (event.code ? 1 : 0) });

@@ -182,6 +182,34 @@ describe("les lignes de la vente dans LGPI (ajout, Suppr, abandon)", () => {
     expect(lines.push(REMOVED("18:00:06", 2))).toEqual({ kind: "removed", line: 2, code: "3333333333333" });
   });
 
+  it("diagnostic de POSTE5 du 22 oct. 2026 : une parapharmacie sans ligne « Produit : » au journal est connue par son passage de douchette", () => {
+    const LACTIBIANE = "3760001234565";
+    const IMODIUM = "3400930000014";
+    const lines = new LgpiSaleLines();
+    const t = (seconds: number) => 1_000_000 + seconds * 1000;
+    // Lactibiane à la douchette : LGPI n'écrit rien de son code. Imodium à la douchette, puis « Produit : » une seconde plus tard.
+    lines.scanned(LACTIBIANE, t(0));
+    lines.scanned(IMODIUM, t(3));
+    lines.push(ADDED("01:59:41", IMODIUM), t(4));
+    expect(lines.size).toBe(2);
+    // Suppr sur la 2e ligne : c'est bien l'Imodium.
+    expect(lines.push(REMOVED("01:59:57", 2), t(20))).toEqual({ kind: "removed", line: 2, code: IMODIUM });
+    expect(lines.push(REMOVED("02:00:00", 1), t(23))).toEqual({ kind: "removed", line: 1, code: LACTIBIANE });
+  });
+
+  it("la ligne du journal et le passage de douchette de la même boîte, dans n'importe quel ordre, ne font qu'une ligne ; deux boîtes bipées, deux lignes", () => {
+    const CODE = "3400930000014";
+    const lines = new LgpiSaleLines();
+    lines.push(ADDED("10:00:00", CODE), 5_000);
+    lines.scanned(CODE, 6_000);
+    expect(lines.size).toBe(1);
+    lines.scanned(CODE, 7_000);
+    expect(lines.size).toBe(2);
+    // Un produit saisi au clavier dans LGPI, sans douchette : la ligne du journal suffit.
+    lines.push(ADDED("10:01:00", "3401560301234"), 60_000);
+    expect(lines.size).toBe(3);
+  });
+
   it("une ligne que l'agent n'a pas vue naître (vente commencée avant lui, rang hors liste) ne désigne rien", () => {
     const lines = new LgpiSaleLines();
     expect(lines.push(REMOVED("18:00:05", 3))).toEqual({ kind: "removed", line: 3, code: null });
@@ -237,7 +265,7 @@ describe("les lignes de la vente dans LGPI (ajout, Suppr, abandon)", () => {
       let reset: (() => void) | null = null;
       const stop = startLgpiJournal(
         { kind: "lgpi", dir },
-        { onScan: () => undefined, onStatus: () => undefined, onSaleValidated: () => undefined, onLineRemoved: (code, _at, info) => removed.push({ code, line: info?.line, known: info?.known }), onSaleLinesReady: (fn) => (reset = fn) },
+        { onScan: () => undefined, onStatus: () => undefined, onSaleValidated: () => undefined, onLineRemoved: (code, _at, info) => removed.push({ code, line: info?.line, known: info?.known }), onSaleLinesReady: (lines) => (reset = lines.reset) },
         () => clock,
       );
       const tick = () => {
