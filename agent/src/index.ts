@@ -48,7 +48,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.27";
+const VERSION = "0.10.28";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -404,19 +404,23 @@ function watchPrescription(prescriptionId: string): void {
  */
 async function pollNotice(config: Config): Promise<void> {
   await dropClosedNotices(config);
-  if (!watched) return;
-  if (Date.now() - watched.since > SESSION_MAX_MS) { notices.remove(watched.prescriptionId); watched = null; return; }
-  const response = await api(config, `/api/agent/conseil?prescription=${encodeURIComponent(watched.prescriptionId)}`, { method: "GET" });
-  if (response.status === 404) { watched = null; return; }
+  // La vente suivie, tenue en local : « Vente terminée » peut l'effacer pendant qu'on attend le serveur (l'erreur « Cannot read
+  // properties of null » du fichier de suivi de POSTE5, 22 oct. 2026).
+  const current = watched;
+  if (!current) return;
+  const saleId = current.prescriptionId;
+  if (Date.now() - current.since > SESSION_MAX_MS) { notices.remove(saleId); if (watched === current) watched = null; return; }
+  const response = await api(config, `/api/agent/conseil?prescription=${encodeURIComponent(saleId)}`, { method: "GET" });
+  if (response.status === 404) { if (watched === current) watched = null; return; }
   if (!response.ok) return;
   const body = (await response.json()) as NoticeBody;
-  if (!body.ok) return;
-  if (body.state === "CLOSED") { notices.remove(watched.prescriptionId); watched = null; return; }
-  if (body.state !== "READY" || body.signature === watched.shownSignature) return;
-  watched.shownSignature = body.signature;
-  watched.lastChange = Date.now();
+  if (!body.ok || watched !== current) return;
+  if (body.state === "CLOSED") { notices.remove(saleId); watched = null; return; }
+  if (body.state !== "READY" || body.signature === current.shownSignature) return;
+  current.shownSignature = body.signature;
+  current.lastChange = Date.now();
   applyDisplayPreferences(config);
-  await showBody(config, watched.prescriptionId, body, {});
+  await showBody(config, saleId, body, {});
   log(`Avis affiché : ${body.subject} — ${body.alerts.length} alerte(s), ${(body.items ?? []).length || body.advice.length} conseil(s).`);
 }
 

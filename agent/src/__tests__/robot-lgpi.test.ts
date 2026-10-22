@@ -219,6 +219,15 @@ describe("les lignes de la vente dans LGPI (ajout, Suppr, abandon)", () => {
     expect(lines.push("bruit {codeEvenement=ABANDON_VENTE, descriptif=Abandon de la vente 1}", 4_000)).toEqual({ kind: "abandoned" });
   });
 
+  it("la suppression écrite ENCODÉE par LGPI (fichier de suivi de POSTE5, 22 oct. 2026) est reconnue, comme l'abandon", () => {
+    const lines = new LgpiSaleLines();
+    lines.scanned("3400937882248", 1_000);
+    lines.scanned("3401528534805", 3_000);
+    const jet = (json: string) => entry("2026-10-22", "02:24:39", "fr.atiss.soft.application.nf525.NFJetApplication", `[AWT-EventQueue-0] Message envoyé au jet : ${encodeURIComponent(json)}`);
+    expect(lines.push(jet('{"codeEvenement":"ABANDON_LIGNE","descriptif":"Ligne 1 ","informations":" annulée","codeOperateur":"12","typeDonnees":"","codeTerminal":"poste5"}'), 5_000)).toEqual({ kind: "removed", line: 1, code: "3400937882248" });
+    expect(lines.push(jet('{"codeEvenement":"ABANDON_VENTE","descriptif":"Abandon de la vente 1234567"}'), 6_000)).toEqual({ kind: "abandoned" });
+  });
+
   it("une ligne que l'agent n'a pas vue naître (vente commencée avant lui, rang hors liste) ne désigne rien", () => {
     const lines = new LgpiSaleLines();
     expect(lines.push(REMOVED("18:00:05", 3))).toEqual({ kind: "removed", line: 3, code: null });

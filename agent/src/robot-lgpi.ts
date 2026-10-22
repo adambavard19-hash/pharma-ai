@@ -183,8 +183,23 @@ export function isSaleValidatedLine(line: string): boolean {
 export type LgpiLineEvent = { kind: "added"; code: string } | { kind: "removed"; line: number; code: string | null } | { kind: "abandoned" };
 
 const LINE_ADDED = /Produit\s*:\s*'(\d{7,14})'/;
-const LINE_REMOVED = /codeEvenement\s*=\s*ABANDON_LIGNE\b[^}]*?descriptif\s*=\s*Ligne\D{0,4}?(\d{1,3})\b/i;
-const SALE_ABANDONED = /codeEvenement\s*=\s*ABANDON_VENTE\b/i;
+// « codeEvenement=ABANDON_LIGNE, descriptif=Ligne 2 » ou, en JSON, « "codeEvenement":"ABANDON_LIGNE","descriptif":"Ligne 2 " ».
+const LINE_REMOVED = /"?codeEvenement"?\s*[=:]\s*"?ABANDON_LIGNE\b[^}]*?"?descriptif"?\s*[=:]\s*"?Ligne\D{0,4}?(\d{1,3})\b/i;
+const SALE_ABANDONED = /"?codeEvenement"?\s*[=:]\s*"?ABANDON_VENTE\b/i;
+
+/**
+ * LGPI écrit le message fiscal ENCODÉ comme une adresse web (fichier de suivi de POSTE5, 22 oct. 2026) :
+ * « Message envoyé au jet : %7B%22codeEvenement%22%3A%22ABANDON_LIGNE%22… ». Décodé, c'est du JSON. Une ligne qui ne se décode
+ * pas reste telle quelle.
+ */
+export function decodeJournalLine(line: string): string {
+  if (!/%7B|%22/i.test(line)) return line;
+  try {
+    return decodeURIComponent(line.replace(/\+/g, " "));
+  } catch {
+    return line.replace(/%7B/gi, "{").replace(/%7D/gi, "}").replace(/%22/gi, '"').replace(/%3A/gi, ":").replace(/%2C/gi, ",").replace(/%20/gi, " ");
+  }
+}
 /** Une vente n'a jamais plus de lignes que cela : la liste ne grossit pas sans fin si la fin de vente n'est pas lue. */
 const MAX_SALE_LINES = 200;
 /** Le passage de douchette et la ligne « Produit : » de LGPI pour la même boîte arrivent à quelques secondes l'un de l'autre. */
@@ -217,11 +232,12 @@ export class LgpiSaleLines {
     // La suppression et l'abandon se lisent sur la ligne BRUTE, sans exiger la forme d'une entrée du journal ni le nom du
     // programme qui l'écrit : sur POSTE5, l'agent n'en a vu AUCUNE depuis le 8 oct. alors que le diagnostic les montre
     // (fondateur, 22 oct. 2026). « codeEvenement=… » n'apparaît que dans les messages du journal fiscal (NF525).
-    if (SALE_ABANDONED.test(line)) {
+    const text = decodeJournalLine(line);
+    if (SALE_ABANDONED.test(text)) {
       this.lines = [];
       return { kind: "abandoned" };
     }
-    const removed = LINE_REMOVED.exec(line);
+    const removed = LINE_REMOVED.exec(text);
     if (removed) {
       const rank = Number(removed[1]);
       if (rank < 1) return null;

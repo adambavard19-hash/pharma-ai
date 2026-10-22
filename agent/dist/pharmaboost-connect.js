@@ -6582,8 +6582,16 @@ function isSaleValidatedLine(line) {
   return entry !== null && /FacturationProcessusImpl$/.test(entry.logger) && /lignes de vente par type de facturation\s*-\s*ok\b/i.test(entry.message);
 }
 var LINE_ADDED = /Produit\s*:\s*'(\d{7,14})'/;
-var LINE_REMOVED = /codeEvenement\s*=\s*ABANDON_LIGNE\b[^}]*?descriptif\s*=\s*Ligne\D{0,4}?(\d{1,3})\b/i;
-var SALE_ABANDONED = /codeEvenement\s*=\s*ABANDON_VENTE\b/i;
+var LINE_REMOVED = /"?codeEvenement"?\s*[=:]\s*"?ABANDON_LIGNE\b[^}]*?"?descriptif"?\s*[=:]\s*"?Ligne\D{0,4}?(\d{1,3})\b/i;
+var SALE_ABANDONED = /"?codeEvenement"?\s*[=:]\s*"?ABANDON_VENTE\b/i;
+function decodeJournalLine(line) {
+  if (!/%7B|%22/i.test(line)) return line;
+  try {
+    return decodeURIComponent(line.replace(/\+/g, " "));
+  } catch {
+    return line.replace(/%7B/gi, "{").replace(/%7D/gi, "}").replace(/%22/gi, '"').replace(/%3A/gi, ":").replace(/%2C/gi, ",").replace(/%20/gi, " ");
+  }
+}
 var MAX_SALE_LINES = 200;
 var SAME_LINE_MS = 8e3;
 var LgpiSaleLines = class {
@@ -6604,11 +6612,12 @@ var LgpiSaleLines = class {
     if (/^\d{7,14}$/.test(digits)) this.add(digits, at, "douchette");
   }
   push(line, at = Date.now()) {
-    if (SALE_ABANDONED.test(line)) {
+    const text = decodeJournalLine(line);
+    if (SALE_ABANDONED.test(text)) {
       this.lines = [];
       return { kind: "abandoned" };
     }
-    const removed = LINE_REMOVED.exec(line);
+    const removed = LINE_REMOVED.exec(text);
     if (removed) {
       const rank = Number(removed[1]);
       if (rank < 1) return null;
@@ -6861,7 +6870,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.27";
+var VERSION = "0.10.28";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -7095,30 +7104,32 @@ function watchPrescription(prescriptionId) {
 }
 async function pollNotice(config) {
   await dropClosedNotices(config);
-  if (!watched) return;
-  if (Date.now() - watched.since > SESSION_MAX_MS) {
-    notices.remove(watched.prescriptionId);
-    watched = null;
+  const current2 = watched;
+  if (!current2) return;
+  const saleId = current2.prescriptionId;
+  if (Date.now() - current2.since > SESSION_MAX_MS) {
+    notices.remove(saleId);
+    if (watched === current2) watched = null;
     return;
   }
-  const response = await api(config, `/api/agent/conseil?prescription=${encodeURIComponent(watched.prescriptionId)}`, { method: "GET" });
+  const response = await api(config, `/api/agent/conseil?prescription=${encodeURIComponent(saleId)}`, { method: "GET" });
   if (response.status === 404) {
-    watched = null;
+    if (watched === current2) watched = null;
     return;
   }
   if (!response.ok) return;
   const body = await response.json();
-  if (!body.ok) return;
+  if (!body.ok || watched !== current2) return;
   if (body.state === "CLOSED") {
-    notices.remove(watched.prescriptionId);
+    notices.remove(saleId);
     watched = null;
     return;
   }
-  if (body.state !== "READY" || body.signature === watched.shownSignature) return;
-  watched.shownSignature = body.signature;
-  watched.lastChange = Date.now();
+  if (body.state !== "READY" || body.signature === current2.shownSignature) return;
+  current2.shownSignature = body.signature;
+  current2.lastChange = Date.now();
   applyDisplayPreferences(config);
-  await showBody(config, watched.prescriptionId, body, {});
+  await showBody(config, saleId, body, {});
   log(`Avis affich\xE9 : ${body.subject} \u2014 ${body.alerts.length} alerte(s), ${(body.items ?? []).length || body.advice.length} conseil(s).`);
 }
 async function showBody(config, prescriptionId, body, extras) {
