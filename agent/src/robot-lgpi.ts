@@ -204,6 +204,8 @@ export function decodeJournalLine(line: string): string {
 const MAX_SALE_LINES = 200;
 /** Le passage de douchette et la ligne « Produit : » de LGPI pour la même boîte arrivent à quelques secondes l'un de l'autre. */
 const SAME_LINE_MS = 8000;
+/** Sans le même code, la ligne du journal qui suit (ou précède) de très près le DERNIER passage de douchette est la même boîte. */
+const NEXT_LINE_MS = 4000;
 
 type SaleLine = { code: string; at: number; from: "douchette" | "journal"; paired: boolean };
 
@@ -211,8 +213,13 @@ export class LgpiSaleLines {
   private lines: SaleLine[] = [];
 
   private add(code: string, at: number, from: SaleLine["from"]): boolean {
-    // La même boîte vue par l'autre source juste avant : c'est la même ligne de LGPI.
-    const twin = [...this.lines].reverse().find((line) => !line.paired && line.from !== from && line.code === code && Math.abs(at - line.at) <= SAME_LINE_MS);
+    // La même boîte vue par l'autre source juste avant : c'est la même ligne de LGPI. D'abord par le code ; sinon, la dernière
+    // ligne seule, de l'autre source, à quelques secondes — le code du journal n'est pas toujours celui de la boîte (Phloroglucinol
+    // compté deux fois, la mauvaise ligne retirée : POSTE5, 22 oct. 2026).
+    const last = this.lines[this.lines.length - 1];
+    const twin =
+      [...this.lines].reverse().find((line) => !line.paired && line.from !== from && line.code === code && Math.abs(at - line.at) <= SAME_LINE_MS) ??
+      (last && !last.paired && last.from !== from && Math.abs(at - last.at) <= NEXT_LINE_MS ? last : undefined);
     if (twin) {
       twin.paired = true;
       return false;
@@ -263,6 +270,11 @@ export class LgpiSaleLines {
   get size(): number {
     return this.lines.length;
   }
+
+  /** Les codes des lignes connues, dans l'ordre : pour le fichier de suivi. */
+  get codes(): string[] {
+    return this.lines.map((line) => line.code);
+  }
 }
 
 /** Deux lignes de validation à moins de cinq secondes sont la même validation. */
@@ -301,7 +313,7 @@ export function startLgpiJournal(config: LgpiRobotConfig, handlers: RobotHandler
         // Toute ligne qui parle d'un abandon et que l'agent ne comprend pas laisse une trace (masquée : chiffres → 9).
         if (!event && /ABANDON_/i.test(line)) handlers.onStatus(`LGPI : ligne d'abandon non reconnue : ${line.replace(/\d/g, "9").slice(0, 240)}`);
         if (event?.kind === "removed") {
-          handlers.onStatus(event.code ? `LGPI : ligne ${event.line} supprimée (produit ${event.code}).` : `LGPI : ligne ${event.line} supprimée (produit inconnu de l'agent : rien n'est retiré).`);
+          handlers.onStatus(`${event.code ? `LGPI : ligne ${event.line} supprimée (produit ${event.code}).` : `LGPI : ligne ${event.line} supprimée (produit inconnu de l'agent : rien n'est retiré).`} Lignes restantes connues : ${saleLines.codes.join(", ") || "aucune"}.`);
           handlers.onLineRemoved?.(event.code ?? "", at, { line: event.line, known: saleLines.size + (event.code ? 1 : 0) });
         } else if (event?.kind === "abandoned") {
           handlers.onStatus("LGPI : vente abandonnée sur ce poste.");

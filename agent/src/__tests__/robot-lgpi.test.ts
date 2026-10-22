@@ -228,6 +228,19 @@ describe("les lignes de la vente dans LGPI (ajout, Suppr, abandon)", () => {
     expect(lines.push(jet('{"codeEvenement":"ABANDON_VENTE","descriptif":"Abandon de la vente 1234567"}'), 6_000)).toEqual({ kind: "abandoned" });
   });
 
+  it("le code du journal n'est pas celui lu par la douchette : la même boîte, une seule ligne ; la 2e ligne supprimée est la bonne (Phloroglucinol / Smectalia, 22 oct. 2026)", () => {
+    const PHLORO = "3400936970946";
+    const SMECTALIA = "3400930007877";
+    const lines = new LgpiSaleLines();
+    lines.scanned(PHLORO, 10_000);
+    lines.push(ADDED("02:40:31", "3400936970953"), 11_200);
+    lines.scanned(SMECTALIA, 14_000);
+    lines.push(ADDED("02:40:35", "3400930007884"), 15_100);
+    expect(lines.codes).toEqual([PHLORO, SMECTALIA]);
+    expect(lines.push(REMOVED("02:40:52", 2), 30_000)).toEqual({ kind: "removed", line: 2, code: SMECTALIA });
+    expect(lines.codes).toEqual([PHLORO]);
+  });
+
   it("une ligne que l'agent n'a pas vue naître (vente commencée avant lui, rang hors liste) ne désigne rien", () => {
     const lines = new LgpiSaleLines();
     expect(lines.push(REMOVED("18:00:05", 3))).toEqual({ kind: "removed", line: 3, code: null });

@@ -6594,10 +6594,12 @@ function decodeJournalLine(line) {
 }
 var MAX_SALE_LINES = 200;
 var SAME_LINE_MS = 8e3;
+var NEXT_LINE_MS = 4e3;
 var LgpiSaleLines = class {
   lines = [];
   add(code, at, from) {
-    const twin = [...this.lines].reverse().find((line) => !line.paired && line.from !== from && line.code === code && Math.abs(at - line.at) <= SAME_LINE_MS);
+    const last = this.lines[this.lines.length - 1];
+    const twin = [...this.lines].reverse().find((line) => !line.paired && line.from !== from && line.code === code && Math.abs(at - line.at) <= SAME_LINE_MS) ?? (last && !last.paired && last.from !== from && Math.abs(at - last.at) <= NEXT_LINE_MS ? last : void 0);
     if (twin) {
       twin.paired = true;
       return false;
@@ -6641,6 +6643,10 @@ var LgpiSaleLines = class {
   get size() {
     return this.lines.length;
   }
+  /** Les codes des lignes connues, dans l'ordre : pour le fichier de suivi. */
+  get codes() {
+    return this.lines.map((line) => line.code);
+  }
 };
 var VALIDATION_DEBOUNCE_MS = 5e3;
 function startLgpiJournal(config, handlers, clock = Date.now) {
@@ -6672,7 +6678,7 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
         const event = saleLines.push(line, at);
         if (!event && /ABANDON_/i.test(line)) handlers.onStatus(`LGPI : ligne d'abandon non reconnue : ${line.replace(/\d/g, "9").slice(0, 240)}`);
         if (event?.kind === "removed") {
-          handlers.onStatus(event.code ? `LGPI : ligne ${event.line} supprim\xE9e (produit ${event.code}).` : `LGPI : ligne ${event.line} supprim\xE9e (produit inconnu de l'agent : rien n'est retir\xE9).`);
+          handlers.onStatus(`${event.code ? `LGPI : ligne ${event.line} supprim\xE9e (produit ${event.code}).` : `LGPI : ligne ${event.line} supprim\xE9e (produit inconnu de l'agent : rien n'est retir\xE9).`} Lignes restantes connues : ${saleLines.codes.join(", ") || "aucune"}.`);
           handlers.onLineRemoved?.(event.code ?? "", at, { line: event.line, known: saleLines.size + (event.code ? 1 : 0) });
         } else if (event?.kind === "abandoned") {
           handlers.onStatus("LGPI : vente abandonn\xE9e sur ce poste.");
@@ -6870,7 +6876,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.28";
+var VERSION = "0.10.29";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
