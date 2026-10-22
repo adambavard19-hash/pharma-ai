@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
+import { announceDueOffers } from "@/server/services/app-members";
 import { cancelLabOffer, cancelPharmacyOffer, createLabOffer, createPharmacyOffer, markClaimedPharmacy } from "@/server/services/patient-offers";
 import { fail, ok, type ActionResult } from "./types";
 
@@ -36,6 +38,7 @@ export async function createPharmacyOfferAction(payload: z.input<typeof offerSch
   const result = await createPharmacyOffer(session.scope, session.user.fullName, { ...rest, ...dates(startsOn, endsOn) });
   if (!result.ok) return fail(result.error);
   revalidatePath("/offres-patients");
+  after(() => announceDueOffers().catch((error: unknown) => console.error("[offres patients] annonce", error)));
   return ok(null, "Offre publiée : vos patients la voient dans l'appli PharmaBoost.");
 }
 
@@ -57,6 +60,7 @@ export async function createLabOfferAction(payload: z.input<typeof labSchema>): 
   const result = await createLabOffer({ id: session.admin.id, name: session.admin.fullName }, { ...rest, labFeeCents: Math.round(labFeeEuros * 100), ...dates(startsOn, endsOn) });
   if (!result.ok) return fail(result.error);
   revalidatePath("/admin/offres-laboratoires");
+  after(() => announceDueOffers().catch((error: unknown) => console.error("[offres patients] annonce", error)));
   return ok(null, "Offre publiée dans toutes les pharmacies PharmaBoost.");
 }
 

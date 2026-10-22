@@ -5,7 +5,10 @@ import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
 import { encryptField, decryptField } from "@/server/security/encryption";
 import { hashEmail, maskEmail, openToken, sealToken } from "@/server/security/tokens";
+import { buildOfferAlertEmail } from "@/core/patient-app/offer-alert-email";
+import { newsUnsubscribeHeaders } from "@/core/patient-news/email";
 import {
+  PATIENT_APP_LIVE,
   codeValidAt,
   isOfferCode,
   joinRequestKey,
@@ -285,4 +288,88 @@ export async function redeemOfferCodeAtCounter(pharmacyId: string, code: string,
   const won = await prisma.patientOfferCode.updateMany({ where: { id: row.id, redeemedAt: null }, data: { redeemedAt: now, redeemedPharmacyId: pharmacyId, redeemedPost: post.slice(0, 60) } });
   if (won.count === 0) return { kind: "refused", message: `Offre PharmaBoost déjà utilisée (${label}).` };
   return { kind: "redeemed", message: `Offre PharmaBoost validée : ${label} — faites la remise en caisse.` };
+}
+
+// ---------------------------------------------------------------- Annonce des nouvelles offres
+
+const ALERT_OFF_PURPOSE = "app-offers-off";
+const ALERT_OFF_TTL_MS = 2 * 365 * 24 * 60 * 60 * 1000;
+const ALERT_PAGE = 200;
+
+/** Le lien « Ne plus recevoir ces e-mails » d'un inscrit. */
+export function offerAlertsOffUrl(memberId: string): string {
+  return publicUrl(`/app/alertes/desinscription/${sealToken(ALERT_OFF_PURPOSE, { m: memberId }, ALERT_OFF_TTL_MS)}`);
+}
+
+/** Retire l'accord depuis le lien de l'e-mail. Vrai si le lien est valide (même déjà utilisé : le geste est idempotent). */
+export async function turnOffOfferAlerts(token: string): Promise<boolean> {
+  const payload = openToken<{ m?: unknown }>(ALERT_OFF_PURPOSE, token);
+  if (typeof payload?.m !== "string") return false;
+  await prisma.appMember.updateMany({ where: { id: payload.m }, data: { offersConsentAt: null } });
+  return true;
+}
+
+/**
+ * Prévient par e-mail, une seule fois, les inscrits qui l'ont accepté qu'une offre vient d'ouvrir : ceux de la pharmacie pour
+ * son offre, tous pour une offre de laboratoire. Chaque offre est d'abord réservée (`announcedAt`) : deux passages en même
+ * temps n'envoient jamais deux fois. Appelé à la publication (offre ouverte tout de suite) et chaque jour (offre qui
+ * commence plus tard). L'appli n'étant pas ouverte en production, rien ne part de là-bas.
+ */
+export async function announceDueOffers(now = new Date()): Promise<{ offers: number; sent: number; failed: number }> {
+  const result = { offers: 0, sent: 0, failed: 0 };
+  if (!PATIENT_APP_LIVE) return result;
+  const due = await prisma.patientOffer.findMany({
+    where: { status: "ACTIVE", announcedAt: null, startsAt: { lte: now }, endsAt: { gt: now } },
+    orderBy: { startsAt: "asc" },
+    take: 20,
+    select: {
+      id: true, funding: true, pharmacyId: true, title: true, rangeLabel: true, discountPercent: true, audience: true, endsAt: true,
+      pharmacy: { select: { name: true, isActive: true, isDemo: true } },
+      partner: { select: { name: true } },
+    },
+  });
+  for (const offer of due) {
+    const claimed = await prisma.patientOffer.updateMany({ where: { id: offer.id, announcedAt: null }, data: { announcedAt: now } });
+    if (claimed.count === 0) continue;
+    result.offers += 1;
+    if (offer.funding === "PHARMACY" && (!offer.pharmacy?.isActive || offer.pharmacy.isDemo)) continue;
+    const from = offer.funding === "LAB" ? (offer.partner?.name ?? "PharmaBoost") : (offer.pharmacy?.name ?? "Votre pharmacie");
+    let cursor: string | undefined;
+    for (;;) {
+      const members = await prisma.appMember.findMany({
+        where: { offersConsentAt: { not: null }, ...(offer.funding === "PHARMACY" ? { homePharmacyId: offer.pharmacyId } : {}) },
+        orderBy: { id: "asc" },
+        take: ALERT_PAGE,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        select: { id: true, emailCipher: true, plan: true },
+      });
+      if (members.length === 0) break;
+      cursor = members[members.length - 1].id;
+      for (const member of members) {
+        const to = decryptField(member.emailCipher);
+        if (!to) continue;
+        const unsubscribeUrl = offerAlertsOffUrl(member.id);
+        const message = buildOfferAlertEmail({
+          from,
+          funding: offer.funding,
+          title: offer.title,
+          rangeLabel: offer.rangeLabel,
+          discountPercent: offer.discountPercent,
+          endsAt: offer.endsAt,
+          locked: offer.audience === "SUBSCRIBERS" && member.plan !== "PLUS",
+          offerUrl: publicUrl(`/app/offres/${offer.id}`),
+          unsubscribeUrl,
+        });
+        try {
+          await getMessagingProvider().sendEmail({ to, fromName: from, subject: message.subject, text: message.text, html: message.html, headers: newsUnsubscribeHeaders(unsubscribeUrl) });
+          result.sent += 1;
+        } catch (error) {
+          result.failed += 1;
+          console.error("[appli patients] annonce d'offre", error);
+        }
+      }
+      if (members.length < ALERT_PAGE) break;
+    }
+  }
+  return result;
 }

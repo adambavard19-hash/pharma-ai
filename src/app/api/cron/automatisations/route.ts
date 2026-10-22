@@ -1,4 +1,5 @@
 import { NextResponse, after } from "next/server";
+import { announceDueOffers } from "@/server/services/app-members";
 import { runAutomations } from "@/server/services/admin/automations";
 import { processDueCampaigns } from "@/server/services/admin/campaigns";
 import { purgeStalePatientNews, resumeStuckAnnouncements } from "@/server/services/patient-news";
@@ -76,10 +77,11 @@ export async function GET(request: Request) {
   // Les rappels de fin de cure du jour, au nom de chaque pharmacie ; l'adresse est effacée à l'envoi. Une minute au plus.
   const launchDays = await attempt("e-mail du jour J des nouvelles pharmacies", () => sendAutomaticLaunchDays(now, { deadlineAt: Date.now() + 30_000 }));
   const cureReminders = await attempt("rappels de fin de cure", () => sendDueCureReminders(now, { deadlineAt: Date.now() + 60_000 }));
+  const offerAlerts = await attempt("offres de l'appli des patients", () => announceDueOffers(now));
   const stockLearning = await attempt("connaissance du stock", () => runStockLearningPass({ deadlineAt: startedAt + LEARNING_BUDGET_MS }));
   if (stockLearning?.moreToDo) after(() => scheduleLearningContinuation({ depth: 1 }).then(() => undefined));
   if ("error" in automations) throw automations.error;
   // Le détail par officine reste dans la console : la réponse ne porte que les compteurs.
   const { dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors } = automations.report;
-  return NextResponse.json({ dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors, campaigns, news: { resumed, purged }, stockFiles, stalledDeposits, reachedLots, counterEmails, counterReports, weeklyDigests, launchDays, cureReminders, stockLearning });
+  return NextResponse.json({ dryRun, enabledRules, planned, sent, failed, simulated, skipped, internal, alreadyDone, errors, campaigns, news: { resumed, purged }, stockFiles, stalledDeposits, reachedLots, counterEmails, counterReports, weeklyDigests, launchDays, cureReminders, offerAlerts, stockLearning });
 }

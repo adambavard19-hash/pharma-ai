@@ -6224,6 +6224,8 @@ model PatientOffer {
   /// Offre de laboratoire : ce que le laboratoire paie à PharmaBoost par boîte vendue avec l'offre.
   labFeeCents     Int?
   createdByName   String?
+  /// Le jour où les inscrits qui l'ont accepté ont été prévenus par e-mail (une seule fois, à l'ouverture de l'offre).
+  announcedAt     DateTime?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
