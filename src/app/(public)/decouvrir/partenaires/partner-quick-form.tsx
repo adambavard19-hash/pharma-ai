@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 type Kind = "Laboratoire" | "Marque";
 
-const WISHES = ["Une offre dans l'appli", "Plus de visibilité pour ma marque", "Présenter mes gammes aux pharmacies", "Autre"];
+const WISHES = ["Une offre dans l'appli", "De la visibilité", "Être en pharmacie", "Autre"];
 
 const FIELD = "h-12 w-full rounded-xl border border-border-default bg-surface-app px-4 text-[15px] text-text-primary outline-none placeholder:text-text-tertiary focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 
@@ -22,7 +22,6 @@ export function PartnerQuickForm() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [wishes, setWishes] = useState<string[]>([]);
-  const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(false);
@@ -47,7 +46,7 @@ export function PartnerQuickForm() {
     if (!firstName.trim() || !lastName.trim()) return setError("Indiquez votre prénom et votre nom.");
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError("Indiquez une adresse e-mail valide pour que nous puissions vous répondre.");
     if (!consent) return setError("Cochez la case pour que nous puissions traiter votre demande.");
-    const text = [`Vous êtes : ${kind}`, wishes.length ? `Demande : ${wishes.join(", ")}` : null, message.trim() || null].filter(Boolean).join("\n");
+    const text = [`Vous êtes : ${kind}`, wishes.length ? `Demande : ${wishes.join(", ")}` : null].filter(Boolean).join("\n");
     start(async () => {
       const result = await submitPartnerApplicationAction({
         company: company.trim(),
@@ -115,7 +114,6 @@ export function PartnerQuickForm() {
           );
         })}
       </div>
-      <textarea className={cn(FIELD, "mt-3 h-28 resize-none py-3")} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Quelques mots sur votre gamme ou votre projet (facultatif)" maxLength={1500} />
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <label className="block">
@@ -134,7 +132,7 @@ export function PartnerQuickForm() {
 
       <label className="mt-5 flex cursor-pointer items-start gap-3 text-[13.5px] leading-5 text-text-secondary">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 size-4 accent-[var(--color-brand-600)]" />
-        J&apos;accepte que PharmaBoost utilise ces informations pour me recontacter au sujet de ma demande.
+        J&apos;accepte d&apos;être recontacté par PharmaBoost.
       </label>
 
       {error && <p role="alert" className="mt-4 rounded-xl bg-danger-50 px-4 py-3 text-[14px] text-danger-700">{error}</p>}
