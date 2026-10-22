@@ -11,6 +11,9 @@ const NAV = [
   // « Stock et marge » retiré du menu (fondateur, 20 oct. 2026) : la section reste sur l'accueil.
   { href: "/decouvrir/pourquoi", label: "Pourquoi" },
   { href: "/decouvrir#tarif", label: "Offre" },
+  // L'appli des patients et les partenaires (laboratoires, marques), dans le menu principal (fondateur, 22 oct. 2026).
+  { href: "/decouvrir/application", label: "Appli" },
+  { href: "/decouvrir/partenaires", label: "Partenaires" },
   // Le programme d'affiliation, dans le menu principal : 100 € par pharmacie apportée et signée (20 oct. 2026).
   { href: "/decouvrir/affiliation", label: "Affiliation" },
 ];
@@ -88,7 +91,6 @@ export function SiteHeader({ island }: { island?: ReactNode }) {
             <div className="my-1.5 h-px bg-border-subtle" />
             <Link href="/decouvrir/abonnement" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-sunken">S&apos;abonner</Link>
             <Link href="/login" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-secondary hover:bg-surface-sunken">Se connecter</Link>
-            <Link href="/decouvrir/partenaires" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-secondary hover:bg-surface-sunken">Devenir partenaire</Link>
           </MobileMenu>
         </div>
       </div>
@@ -108,7 +110,8 @@ export function SiteFooter({ contactEmail }: { contactEmail: string }) {
         <ul className="space-y-2 text-[13.5px]">
           {[
             { href: "/decouvrir/pourquoi", label: "Pourquoi PharmaBoost" },
-            { href: "/decouvrir/partenaires", label: "Devenir partenaire" },
+            { href: "/decouvrir/application", label: "L'appli PharmaBoost" },
+            { href: "/decouvrir/partenaires", label: "Partenaires" },
             { href: "/decouvrir/affiliation", label: "Affiliation" },
             { href: "/decouvrir/mentions-legales", label: "Mentions légales" },
             { href: "/decouvrir/confidentialite", label: "Confidentialité et données" },

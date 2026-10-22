@@ -5,6 +5,7 @@ import { fr, Kicker, SectionHead } from "./_components/site-shell";
 import { HERO_ITEMS, HeroVisual, RequestVisual, TeamVisual, ExampleTag, CureReminderVisual } from "./_components/visuals";
 import { VideoButton } from "./_components/video-dialog";
 import { AutoVideo } from "./_components/auto-video";
+import { AppPhoneVisual } from "./_components/app-visual";
 import { CounterIslandScene } from "@/components/island/counter-island-scene";
 import { VIGILANCE_RULES } from "@/core/ai/engines/vigilance";
 import { loadLiveProof } from "@/server/services/site-leads";
@@ -159,6 +160,30 @@ export default async function SitePage() {
           </Reveal>
           <Reveal delay={2}>
             <TeamVisual />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ---- 6. L'appli PharmaBoost : des patients qui choisissent une pharmacie PharmaBoost (fondateur, 22 oct. 2026) ---- */}
+      <section id="appli" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
+        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16">
+          <Reveal>
+            <SectionHead kicker="Bientôt · l'appli PharmaBoost" title="Des patients qui choisissent votre pharmacie.">
+              {fr("Dans l'appli PharmaBoost, vos patients reçoivent vos offres et celles des laboratoires partenaires. Ces offres ne sont valables que dans les pharmacies PharmaBoost : pour en profiter, ils viennent chez vous.")}
+            </SectionHead>
+            <ul className="mt-8 grid gap-2.5">
+              {["Vos campagnes : une nouvelle gamme à -20 % pour vos patients", "Les offres des laboratoires, seulement en pharmacie PharmaBoost", "Le code de l'offre scanné à votre comptoir, une seule fois", "Parapharmacie et compléments, jamais un médicament"].map((t) => (
+                <li key={t} className="flex items-center gap-2.5 rounded-2xl border border-border-subtle bg-surface-app px-4 py-3 text-[15px] font-semibold text-text-primary">
+                  <Check className="size-4 shrink-0 text-brand-600" /> {t}
+                </li>
+              ))}
+            </ul>
+            <Link href="/decouvrir/application" className="mt-8 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-600 px-7 text-[15px] font-semibold text-white hover:bg-brand-700">
+              Découvrir l&apos;appli <ArrowRight className="size-4" />
+            </Link>
+          </Reveal>
+          <Reveal delay={2}>
+            <AppPhoneVisual />
           </Reveal>
         </div>
       </section>

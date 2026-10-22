@@ -5,6 +5,7 @@ import { ArrowRight, Building2, Check, Store, UserRound, X } from "lucide-react"
 import { HAIRLINE, Kicker, SectionHead } from "../_components/site-shell";
 import { VideoButton } from "../_components/video-dialog";
 import { PartnerApplicationForm } from "./partner-application-form";
+import { AppPhoneVisual } from "../_components/app-visual";
 import { PharmaLogo } from "@/components/app/logo";
 import { INTEGRATION_MODE_LABELS, type IntegrationMode } from "@/core/partners/status";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,7 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = {
   title: "Devenir partenaire",
   description:
-    "Laboratoires et marques : présentez vos gammes aux officines qui utilisent PharmaBoost, dans un espace distinct et signalé comme tel. Le conseil au patient reste indépendant.",
+    "Laboratoires et marques : vos offres dans l'appli PharmaBoost, valables seulement dans les pharmacies PharmaBoost et payées à l'utilisation ; vos gammes présentées aux officines. Le conseil au patient reste indépendant.",
 };
 
 /**
@@ -53,6 +54,15 @@ const STEPS = [
   { n: "03", title: "Échange", line: "Nous convenons ensemble des gammes, des conditions et de la façon de travailler." },
   { n: "04", title: "Diffusion aux officines", line: "Les gammes retenues sont présentées aux officines, dans leur espace partenaire." },
 ];
+
+/** Les offres des laboratoires dans l'appli des patients : ce que le laboratoire y gagne, sans chiffre promis. */
+const APP_OFFER_POINTS = [
+  ["Seulement dans les pharmacies PharmaBoost", "Le patient montre son code au comptoir d'une pharmacie PharmaBoost : votre offre y fait venir les clients."],
+  ["Vous payez à l'utilisation", "Un prix convenu par utilisation de l'offre, rien si personne ne vient. Aucun frais de mise en ligne."],
+  ["Une preuve au comptoir", "Chaque code est personnel et scanné une seule fois au comptoir du pharmacien."],
+  ["Un compte clair chaque mois", "Le nombre d'utilisations, par pharmacie et par jour. Aucune donnée sur les patients."],
+  ["Jamais de médicament", "Parapharmacie, soins et compléments alimentaires uniquement."],
+] as const;
 
 const MODES: { mode: IntegrationMode; line: string }[] = [
   { mode: "API", line: "Si vous publiez une API : catalogue, disponibilités ou commandes, selon ce qu'elle permet." },
@@ -99,6 +109,31 @@ export default function PartnersPage() {
             </div>
           </div>
           <PartnerFlowVisual />
+        </div>
+      </section>
+
+      {/* ---- L'appli PharmaBoost : les offres des laboratoires (fondateur, 22 oct. 2026) ---- */}
+      <section id="appli" className="scroll-mt-20 border-t border-border-subtle">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div>
+            <SectionHead kicker="L'appli PharmaBoost" title="Votre offre dans la poche des patients.">
+              Publiez une offre sur votre gamme dans l&apos;appli PharmaBoost. Ses utilisateurs la voient, et elle n&apos;est valable que dans les pharmacies PharmaBoost : vous amenez des clients aux officines qui vous mettent en avant.
+            </SectionHead>
+            <ul className="mt-8 grid gap-3">
+              {APP_OFFER_POINTS.map(([title, line]) => (
+                <li key={title} className="rounded-2xl border border-border-subtle bg-surface-card p-5">
+                  <p className="flex items-start gap-2.5 text-[16px] font-semibold text-text-primary">
+                    <Check className="mt-0.5 size-5 shrink-0 text-brand-600" aria-hidden="true" /> {title}
+                  </p>
+                  <p className="mt-1.5 pl-7 text-[14.5px] leading-6 text-text-secondary">{line}</p>
+                </li>
+              ))}
+            </ul>
+            <Link href="/decouvrir/application" className="mt-8 inline-flex items-center gap-2 text-[15px] font-semibold text-brand-700 hover:text-brand-800">
+              Découvrir l&apos;appli PharmaBoost <ArrowRight className="size-4" />
+            </Link>
+          </div>
+          <AppPhoneVisual />
         </div>
       </section>
 
