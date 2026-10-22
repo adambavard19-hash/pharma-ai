@@ -210,6 +210,15 @@ describe("les lignes de la vente dans LGPI (ajout, Suppr, abandon)", () => {
     expect(lines.size).toBe(3);
   });
 
+  it("la suppression se lit sur la ligne brute, quelle que soit la forme de l'entrée ou le programme qui l'écrit (POSTE5, 22 oct. 2026)", () => {
+    const lines = new LgpiSaleLines();
+    lines.scanned("3400930000014", 1_000);
+    lines.scanned("3401528534805", 2_000);
+    const odd = "22/10/2026 02:00:00 INFO NFJet - Message envoyé au jet :  {codeEvenement=ABANDON_LIGNE, descriptif=Ligne 1 , informations= annulée, codeOperateur=12, typeDonnees=, codeTerminal=poste5}";
+    expect(lines.push(odd, 3_000)).toEqual({ kind: "removed", line: 1, code: "3400930000014" });
+    expect(lines.push("bruit {codeEvenement=ABANDON_VENTE, descriptif=Abandon de la vente 1}", 4_000)).toEqual({ kind: "abandoned" });
+  });
+
   it("une ligne que l'agent n'a pas vue naître (vente commencée avant lui, rang hors liste) ne désigne rien", () => {
     const lines = new LgpiSaleLines();
     expect(lines.push(REMOVED("18:00:05", 3))).toEqual({ kind: "removed", line: 3, code: null });

@@ -183,8 +183,8 @@ export function isSaleValidatedLine(line: string): boolean {
 export type LgpiLineEvent = { kind: "added"; code: string } | { kind: "removed"; line: number; code: string | null } | { kind: "abandoned" };
 
 const LINE_ADDED = /Produit\s*:\s*'(\d{7,14})'/;
-const LINE_REMOVED = /codeEvenement=ABANDON_LIGNE\b[^}]*?descriptif=Ligne\s+(\d{1,3})\b/;
-const SALE_ABANDONED = /codeEvenement=ABANDON_VENTE\b/;
+const LINE_REMOVED = /codeEvenement\s*=\s*ABANDON_LIGNE\b[^}]*?descriptif\s*=\s*Ligne\D{0,4}?(\d{1,3})\b/i;
+const SALE_ABANDONED = /codeEvenement\s*=\s*ABANDON_VENTE\b/i;
 /** Une vente n'a jamais plus de lignes que cela : la liste ne grossit pas sans fin si la fin de vente n'est pas lue. */
 const MAX_SALE_LINES = 200;
 /** Le passage de douchette et la ligne « Produit : » de LGPI pour la même boîte arrivent à quelques secondes l'un de l'autre. */
@@ -214,6 +214,20 @@ export class LgpiSaleLines {
   }
 
   push(line: string, at: number = Date.now()): LgpiLineEvent | null {
+    // La suppression et l'abandon se lisent sur la ligne BRUTE, sans exiger la forme d'une entrée du journal ni le nom du
+    // programme qui l'écrit : sur POSTE5, l'agent n'en a vu AUCUNE depuis le 8 oct. alors que le diagnostic les montre
+    // (fondateur, 22 oct. 2026). « codeEvenement=… » n'apparaît que dans les messages du journal fiscal (NF525).
+    if (SALE_ABANDONED.test(line)) {
+      this.lines = [];
+      return { kind: "abandoned" };
+    }
+    const removed = LINE_REMOVED.exec(line);
+    if (removed) {
+      const rank = Number(removed[1]);
+      if (rank < 1) return null;
+      const code = rank <= this.lines.length ? this.lines.splice(rank - 1, 1)[0].code : null;
+      return { kind: "removed", line: rank, code };
+    }
     const entry = parseEntry(line);
     if (!entry) return null;
     if (/DpRuptureService$/.test(entry.logger)) {
@@ -221,16 +235,6 @@ export class LgpiSaleLines {
       if (!code) return null;
       this.add(code, at, "journal");
       return { kind: "added", code };
-    }
-    if (/NFJetApplication$/.test(entry.logger)) {
-      if (SALE_ABANDONED.test(entry.message)) {
-        this.lines = [];
-        return { kind: "abandoned" };
-      }
-      const rank = Number(LINE_REMOVED.exec(entry.message)?.[1] ?? 0);
-      if (rank < 1) return null;
-      const code = rank <= this.lines.length ? this.lines.splice(rank - 1, 1)[0].code : null;
-      return { kind: "removed", line: rank, code };
     }
     return null;
   }
@@ -278,6 +282,8 @@ export function startLgpiJournal(config: LgpiRobotConfig, handlers: RobotHandler
       for (const line of lines.push(buffer.toString("latin1"))) {
         announce(reader.push(line, at), at);
         const event = saleLines.push(line, at);
+        // Toute ligne qui parle d'un abandon et que l'agent ne comprend pas laisse une trace (masquée : chiffres → 9).
+        if (!event && /ABANDON_/i.test(line)) handlers.onStatus(`LGPI : ligne d'abandon non reconnue : ${line.replace(/\d/g, "9").slice(0, 240)}`);
         if (event?.kind === "removed") {
           handlers.onStatus(event.code ? `LGPI : ligne ${event.line} supprimée (produit ${event.code}).` : `LGPI : ligne ${event.line} supprimée (produit inconnu de l'agent : rien n'est retiré).`);
           handlers.onLineRemoved?.(event.code ?? "", at, { line: event.line, known: saleLines.size + (event.code ? 1 : 0) });

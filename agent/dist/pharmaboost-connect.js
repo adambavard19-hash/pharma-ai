@@ -6582,8 +6582,8 @@ function isSaleValidatedLine(line) {
   return entry !== null && /FacturationProcessusImpl$/.test(entry.logger) && /lignes de vente par type de facturation\s*-\s*ok\b/i.test(entry.message);
 }
 var LINE_ADDED = /Produit\s*:\s*'(\d{7,14})'/;
-var LINE_REMOVED = /codeEvenement=ABANDON_LIGNE\b[^}]*?descriptif=Ligne\s+(\d{1,3})\b/;
-var SALE_ABANDONED = /codeEvenement=ABANDON_VENTE\b/;
+var LINE_REMOVED = /codeEvenement\s*=\s*ABANDON_LIGNE\b[^}]*?descriptif\s*=\s*Ligne\D{0,4}?(\d{1,3})\b/i;
+var SALE_ABANDONED = /codeEvenement\s*=\s*ABANDON_VENTE\b/i;
 var MAX_SALE_LINES = 200;
 var SAME_LINE_MS = 8e3;
 var LgpiSaleLines = class {
@@ -6604,6 +6604,17 @@ var LgpiSaleLines = class {
     if (/^\d{7,14}$/.test(digits)) this.add(digits, at, "douchette");
   }
   push(line, at = Date.now()) {
+    if (SALE_ABANDONED.test(line)) {
+      this.lines = [];
+      return { kind: "abandoned" };
+    }
+    const removed = LINE_REMOVED.exec(line);
+    if (removed) {
+      const rank = Number(removed[1]);
+      if (rank < 1) return null;
+      const code = rank <= this.lines.length ? this.lines.splice(rank - 1, 1)[0].code : null;
+      return { kind: "removed", line: rank, code };
+    }
     const entry = parseEntry(line);
     if (!entry) return null;
     if (/DpRuptureService$/.test(entry.logger)) {
@@ -6611,16 +6622,6 @@ var LgpiSaleLines = class {
       if (!code) return null;
       this.add(code, at, "journal");
       return { kind: "added", code };
-    }
-    if (/NFJetApplication$/.test(entry.logger)) {
-      if (SALE_ABANDONED.test(entry.message)) {
-        this.lines = [];
-        return { kind: "abandoned" };
-      }
-      const rank = Number(LINE_REMOVED.exec(entry.message)?.[1] ?? 0);
-      if (rank < 1) return null;
-      const code = rank <= this.lines.length ? this.lines.splice(rank - 1, 1)[0].code : null;
-      return { kind: "removed", line: rank, code };
     }
     return null;
   }
@@ -6660,6 +6661,7 @@ function startLgpiJournal(config, handlers, clock = Date.now) {
       for (const line of lines.push(buffer.toString("latin1"))) {
         announce(reader.push(line, at), at);
         const event = saleLines.push(line, at);
+        if (!event && /ABANDON_/i.test(line)) handlers.onStatus(`LGPI : ligne d'abandon non reconnue : ${line.replace(/\d/g, "9").slice(0, 240)}`);
         if (event?.kind === "removed") {
           handlers.onStatus(event.code ? `LGPI : ligne ${event.line} supprim\xE9e (produit ${event.code}).` : `LGPI : ligne ${event.line} supprim\xE9e (produit inconnu de l'agent : rien n'est retir\xE9).`);
           handlers.onLineRemoved?.(event.code ?? "", at, { line: event.line, known: saleLines.size + (event.code ? 1 : 0) });
@@ -6859,7 +6861,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.26";
+var VERSION = "0.10.27";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
