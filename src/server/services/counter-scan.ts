@@ -480,7 +480,7 @@ export type RemoveLineResult = { ok: true; remaining: number } | { ok: false; er
  *  - Les conseils qu'ELLE seule déclenchait disparaissent (ceux d'une autre boîte restent) ; encore sans réponse, ils reviennent si
  *    la boîte est rebipée.
  *  - La vente repart à l'analyse avec les boîtes qui restent, comme après un bip : la bannière se met à jour seule.
- *  - Plus aucune boîte : la vente reste ouverte et vide — c'est le même patient jusqu'à FIN Valider (fondateur, 21 oct. 2026).
+ *  - Plus aucune boîte : la vente est annulée, ses conseils retirés, la bannière se referme (fondateur, 22 oct. 2026).
  *
  * Seulement sur une vente de CE poste (ou de cette pharmacie pour une clé de serveur), encore ouverte : jamais une vente terminée ou encaissée.
  */
@@ -523,9 +523,10 @@ export async function removeCounterLine(agent: AgentContext, input: { prescripti
     if (remaining === 0) await tx.recommendation.updateMany({ where: { prescriptionId: sale.id, status: { in: ["PROPOSED", "PRESENTED", "ACCEPTED", "MODIFIED", "PURCHASED", "DECLINED"] } }, data: { status: "REMOVED" } });
     await tx.prescription.update({
       where: { id: sale.id },
-      // Plus de boîte : c'est TOUJOURS le même patient (fondateur, 21 oct. 2026 : « on passe au nouveau patient seulement quand
-      // c'est FIN Valider ») — la vente reste ouverte, vide ; la boîte suivante s'y ajoute. Sinon, elle repart à l'analyse.
-      data: remaining === 0 ? { status: "ANALYZED" } : { status: "NEEDS_VERIFICATION", verifiedAt: null },
+      // Plus aucune boîte : rien à conseiller, la vente est annulée — la bannière se vide et se referme, au repos (fondateur, 22 oct.
+      // 2026 : « tu enlèves tout, tu refermes la fenêtre et tu dors »). Le bip suivant ouvre une vente neuve. Sinon, elle repart à
+      // l'analyse avec ce qui reste.
+      data: remaining === 0 ? { status: "CANCELLED" } : { status: "NEEDS_VERIFICATION", verifiedAt: null },
     });
   });
 
