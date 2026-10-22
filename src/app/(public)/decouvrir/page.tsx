@@ -11,8 +11,7 @@ import { loadLiveProof } from "@/server/services/site-leads";
 import { loadPublicPricing } from "@/server/services/public-pricing";
 import { formatEuros } from "@/core/billing/subscription";
 import { PricingSection } from "./_components/pricing-section";
-import { BannerPillsInline } from "./_components/banner-mock";
-import { ChoiceVisual, FlowSteps, LoadVisual, Reveal } from "./_components/story";
+import { FlowSteps, LoadVisual, Reveal } from "./_components/story";
 import { FAQ } from "./_components/site-content";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 
@@ -107,15 +106,7 @@ export default async function SitePage() {
 
       {/* ---- 3. Pour le pharmacien ------------------------------------- */}
       <section id="stock-marge" className="scroll-mt-20 border-t border-border-subtle">
-        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
-          <div className="order-last lg:order-last">
-            <ChoiceVisual />
-            {/* Ce que la bannière montre du même produit, au comptoir : les pastilles, dans leur ordre. */}
-            <div className="mx-auto mt-4 flex max-w-[520px] flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border-subtle bg-surface-card px-5 py-3.5">
-              <span className="text-[13px] text-text-secondary">Au comptoir, sur la bannière :</span>
-              <BannerPillsInline item={{ challenge: true, shortDate: "30/11/26", stock: "IN_STOCK", quantity: 29 }} />
-            </div>
-          </div>
+        <div className="mx-auto max-w-3xl px-5 py-20 md:py-28">
           <Reveal>
             <SectionHead title={<span className="sm:whitespace-nowrap lg:text-[42px] xl:text-[48px]">Le produit conseil parfait.</span>}>
               Parmi les produits qui répondent au besoin du patient, PharmaBoost met en premier celui qui arrange votre pharmacie.
