@@ -101,6 +101,7 @@ describe("passage complet", () => {
       counterEmails: { erased: 2, moreToDo: false },
       counterReports: { month: "2026-09", pharmacies: 0, sent: 0, skipped: 0, failed: 0 },
       cureReminders: { due: 0, sent: 0, failed: 0, cancelled: 0, stoppedEarly: false },
+      offerAlerts: null,
       weeklyDigests: { day: "2026-10-15", pharmacies: 0, sent: 0, skipped: 0, failed: 0, stoppedEarly: false },
       launchDays: { day: "", pharmacies: 0, sent: 0, failed: 0 },
       stockLearning: { pharmacies: 3, processed: 3, skipped: 0, moreToDo: false },

@@ -214,9 +214,9 @@ describe("les mots du site suivent le code, sans promesse", () => {
     expect(why).toContain("«\u00a0Avec DOXYCYCLINE 100 mg");
   });
 
-  it("ne nomme pas un simple bloc : plus d'aria-label sur la bande des pastilles", () => {
-    expect(home).not.toContain('aria-label="Au comptoir, sur la bannière');
-    expect(homeText).toContain("Au comptoir, sur la bannière :");
+  it("n'affiche plus l'exemple Laboratoire A / B ni la bande des pastilles (fondateur, 22 oct. 2026)", () => {
+    expect(homeText).not.toContain("Au comptoir, sur la bannière");
+    expect(homeText).not.toContain("Proposé en premier");
   });
 });
 

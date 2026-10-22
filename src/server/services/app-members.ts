@@ -275,7 +275,7 @@ export type OfferRedemption =
  * peut porter le même préfixe.
  */
 export async function redeemOfferCodeAtCounter(pharmacyId: string, code: string, post: string, now = new Date()): Promise<OfferRedemption> {
-  if (!isOfferCode(code)) return { kind: "not-offer" };
+  if (!PATIENT_APP_LIVE || !isOfferCode(code)) return { kind: "not-offer" };
   const row = await prisma.patientOfferCode.findUnique({
     where: { code },
     select: { id: true, redeemedAt: true, offer: { select: { funding: true, pharmacyId: true, status: true, startsAt: true, endsAt: true, discountPercent: true, rangeLabel: true } } },

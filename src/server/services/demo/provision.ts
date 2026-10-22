@@ -1,4 +1,5 @@
 import "server-only";
+import { PATIENT_APP_LIVE } from "@/core/patient-app/offers";
 import { randomBytes, randomUUID } from "node:crypto";
 import { prisma } from "@/server/db/client";
 import { hashPassword } from "@/server/security/password";
@@ -125,6 +126,8 @@ export async function resolveDemoDrugs(): Promise<{ found: ResolvedDrug[]; missi
 /** Efface l'activité de l'officine de démonstration, et d'elle seule. */
 async function wipeActivity(pharmacyId: string): Promise<void> {
   for (const model of WIPED_MODELS) {
+    // L'appli des patients n'est pas ouverte en production : ses tables n'y existent pas encore.
+    if (model === "patientOffer" && !PATIENT_APP_LIVE) continue;
     const delegate = (prisma as unknown as Record<string, { deleteMany: (args: { where: { pharmacyId: string } }) => Promise<unknown> }>)[model];
     await delegate.deleteMany({ where: { pharmacyId } });
   }
