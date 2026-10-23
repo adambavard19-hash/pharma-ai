@@ -33,5 +33,6 @@ ${ON_HEAD("button.rounded-full:not(.aur-btn):not([style*=background])")}{backgro
 ${P} [data-ile-mix] .aur-btn{color:#F2FFF9;border-color:rgba(242,255,249,.45);background:rgba(255,255,255,.08)}
 ${P} [data-ile-mix] .aur-btn:hover{background:rgba(255,255,255,.18);border-color:#F2FFF9;color:#fff}
 ${P} [data-ile-mix-carte]{background:rgba(255,255,255,.94)!important;box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 8px 24px -14px rgba(0,0,0,.6)}
+${P} [data-ile-mix-l] [data-ile-mix-carte]{background:#FFFFFF!important}
 @media (prefers-reduced-motion: reduce){${P} section:has([data-ile-repos])::after{animation:none}}
 `;

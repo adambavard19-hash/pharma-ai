@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, LifeBuoy, MessageCircle, Pill } from "lucide-react";
 import type { HelpAdvice } from "@/core/poste/island-bridge";
 import { BANNER } from "../../../agent/src/banner-design";
-import { SHEET_MISSING, type CounterSheetLine } from "../../../agent/src/counter-sheet";
+import type { CounterSheetLine } from "../../../agent/src/counter-sheet";
 import type { IslandOutcome } from "@/core/island/banner-flow";
 import { Robot } from "@/components/robot";
 import { AnswerProduct, type IslandAdvice } from "./counter-island";
@@ -101,7 +101,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
     setStep("sheet");
   };
   const alternatives = order.map((i, pos) => ({ i, pos })).filter(({ i }) => i !== index && item.drug && items[i].drug === item.drug);
-  const width = narrow ? (open ? 350 : 300) : open ? 440 : 400;
+  const width = narrow ? (open ? 330 : 300) : open ? 400 : 400;
 
   return (
     <IslandShell
@@ -181,54 +181,57 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
               )}
             </div>
 
-            {/* La carte ouverte, façon Kontoir sur l'ADN blanc (fondateur, 22 oct. 2026 : essai « L » de /robot-apercu/carte-conseil) :
-                l'hélice du site en bandeau, la grande carte blanche par-dessus, la photo qui en dépasse, le nom et le prix en grand. */}
-            <div data-ile-mix-l="" className="relative overflow-hidden rounded-[20px] bg-[#EFF3F1]">
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-[130px] isolate" aria-hidden="true">
+            {/* La carte ouverte, comme l'essai « L » de /robot-apercu/carte-conseil (fondateur, 22 oct. 2026 : « je veux vraiment que
+                ça ressemble au L ») : l'hélice du site sur papier clair tout autour, une grande carte blanche pleine, la photo qui
+                en dépasse, le nom et le prix en grand, la raison encadrée, les onglets à droite, des rubriques légères. */}
+            <div data-ile-mix-l="" className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
+              <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
                 <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
               </div>
-              <div className={`relative px-2.5 pb-2.5 ${item.image ? "pt-[74px]" : "pt-[44px]"}`}>
-                <div data-ile-mix-carte="" className="rounded-[18px] p-3.5 text-left shadow-[0_10px_30px_-18px_rgba(15,43,38,0.6)]" style={{ background: "#FFFFFF", color: "#0F2B26" }}>
-                  <div className={`flex items-end gap-3 ${item.image ? "-mt-[66px]" : ""}`}>
+              <div className={`relative px-2.5 pb-2.5 ${item.image ? "pt-[60px]" : "pt-[36px]"}`}>
+                <div data-ile-mix-carte="" className="rounded-[18px] p-3 text-left shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]" style={{ background: "#FFFFFF", color: L.ink }}>
+                  <div className={`flex items-end gap-3 ${item.image ? "-mt-[52px]" : ""}`}>
                     {/* La photo studio du produit ; sans photo studio, rien (jamais une photo amateur). */}
                     {item.image && (
-                      <span className="inline-flex size-[88px] shrink-0 items-center justify-center rounded-2xl bg-white p-1.5 shadow-md">
+                      <span className="inline-flex size-[70px] shrink-0 items-center justify-center rounded-2xl bg-white p-1.5 shadow-[0_6px_18px_-8px_rgba(15,43,38,0.45)]">
                         {/* eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée */}
-                        <img data-ile-mix-photo="" src={item.image} alt="" width={76} height={76} draggable={false} className="isl-float size-full object-contain" />
+                        <img data-ile-mix-photo="" src={item.image} alt="" width={58} height={58} draggable={false} className="isl-float size-full object-contain" />
                       </span>
                     )}
                     <div className="min-w-0 flex-1 pb-0.5">
-                      <p key={index} data-ile-mix-titre="" className="text-[19px] leading-[22px] font-extrabold tracking-[-0.02em] break-words">{item.sheet?.name || item.name}</p>
+                      {item.drug && <p className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.green }}>pour {item.drug}</p>}
+                      <p key={index} data-ile-mix-titre="" className="mt-0.5 text-[17px] leading-[20px] font-bold tracking-[-0.025em] break-words">{item.sheet?.name || item.name}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux) ; la marge, pour le pharmacien seul. */}
+                        <span className="text-[19px] leading-none font-bold tracking-[-0.02em] tabular-nums" style={{ color: L.green }}>{item.price && item.stock !== "UNKNOWN" ? item.price : "—"}</span>
+                        {item.margin && <span className="rounded-md border px-1.5 py-0.5 text-[10px] font-bold tracking-wide tabular-nums" style={{ borderColor: "#F2D27A", background: "#FFF5D6", color: "#9A6400" }}>MARGE {item.margin}</span>}
+                      </div>
                     </div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux) ; la marge, pour le pharmacien seul. */}
-                    <span className="text-[22px] leading-none font-extrabold tracking-[-0.02em] tabular-nums" style={{ color: "#0E8A7B" }}>{item.price && item.stock !== "UNKNOWN" ? item.price : "—"}</span>
-                    {item.margin && <span className="rounded-md border px-1.5 py-0.5 text-[10.5px] font-bold tracking-wide tabular-nums" style={{ borderColor: "#F2D27A", background: "#FFF5D6", color: "#9A6400" }}>MARGE {item.margin}</span>}
                   </div>
                   <Tags item={item} />
                   {(item.sheet?.reasons[0] || item.reason) && (
-                    <p className="mt-2.5 rounded-xl border-2 px-3 py-2 text-[13px] leading-[18px]" style={{ borderColor: "#5E9C8C" }}>{item.sheet?.reasons[0] || item.reason}</p>
+                    <p className="mt-2 rounded-xl border-2 px-3 py-1.5 text-[12.5px] leading-[17px]" style={{ borderColor: "#5E9C8C", color: L.ink, fontWeight: 400 }}>{item.sheet?.reasons[0] || item.reason}</p>
                   )}
 
-                    {sold(index) ? (
-                      // Un conseil bipé : une ligne discrète, pas un grand panneau (fondateur, 22 oct. 2026).
-                      <div data-ile-mix-vendu="" className="mt-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] font-bold" style={{ background: C.cell, color: C.ink }}>
-                        <Check className="size-4 shrink-0" strokeWidth={3} style={{ color: "#0E8A7B" }} aria-hidden="true" />
-                        <span className="flex-1">Vendu</span>
-                        {soldIndexes.length < order.length && (
-                          <button type="button" onClick={() => go(order.findIndex((i) => !sold(i)))} className="h-7 rounded-md px-2.5 text-[11.5px] font-bold" style={{ background: C.raised, color: C.accent }}>
-                            Conseil suivant
-                          </button>
-                        )}
-                        <button type="button" onClick={() => onAnswer(index, null)} className="text-[11px] font-semibold underline-offset-2 hover:underline" style={{ color: C.inkSoft }}>
-                          Annuler
+                  {sold(index) ? (
+                    // Un conseil bipé : une ligne discrète, pas un grand panneau (fondateur, 22 oct. 2026).
+                    <div data-ile-mix-vendu="" className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] font-bold" style={{ background: L.soft, color: L.ink }}>
+                      <Check className="size-4 shrink-0" strokeWidth={3} style={{ color: L.green }} aria-hidden="true" />
+                      <span className="flex-1">Vendu</span>
+                      {soldIndexes.length < order.length && (
+                        <button type="button" onClick={() => go(order.findIndex((i) => !sold(i)))} className="h-7 rounded-lg px-2.5 text-[11.5px] font-bold text-white" style={{ background: L.green }}>
+                          Conseil suivant
                         </button>
-                      </div>
-                    ) : (
-                      <>
-                        <div role="tablist" className={`mt-2.5 grid ${help ? "grid-cols-3" : "grid-cols-2"} gap-1 rounded-xl border p-1`} style={{ background: "#F3F7F5", borderColor: "#B9D8CE" }}>
-                          {STEPS.filter((entry) => entry.id !== "help" || help).map(({ id, label, Icon }, n) => (
+                      )}
+                      <button type="button" onClick={() => onAnswer(index, null)} className="text-[11px] font-semibold underline-offset-2 hover:underline" style={{ color: L.muted }}>
+                        Annuler
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-2 flex justify-end">
+                        <div role="tablist" className="inline-flex rounded-xl border p-1" style={{ background: L.soft, borderColor: "#B9D8CE" }}>
+                          {STEPS.filter((entry) => entry.id !== "help" || help).map(({ id, label }) => (
                             <button
                               key={id}
                               type="button"
@@ -236,45 +239,42 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                               aria-selected={step === id}
                               data-ile-mix-etape={id}
                               onClick={() => setStep(id)}
-                              className="inline-flex h-7 items-center justify-center gap-1 rounded-lg text-[11.5px] font-bold"
-                              style={step === id ? { background: C.raised, color: C.accent, boxShadow: "0 1px 3px rgba(0,0,0,.25)" } : { color: C.inkSoft }}
+                              className="h-6 rounded-md px-2.5 text-[11.5px] font-semibold"
+                              style={step === id ? { background: "#FFFFFF", color: L.ink, boxShadow: "0 1px 3px rgba(15,43,38,.18)" } : { color: L.muted }}
                             >
-                              <Icon className="size-3.5" aria-hidden="true" /> {n + 1}. {label}
+                              {label}
                             </button>
                           ))}
                         </div>
-                        <div className="isl-scroll mt-2 max-h-[230px] min-h-[150px] overflow-y-auto pr-1 text-[12px] leading-[16px]">
-                          {step === "ask" && <Ask key={index} item={item} />}
-                          {step === "sheet" && <Sheet item={item} />}
-                          {step === "help" && help && <Help item={item} help={help} />}
-                        </div>
-                        {item.sheet?.alternatives && item.sheet.alternatives.length > 0 && (
-                          <div data-ile-mix-alternative="" className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
-                            <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre alternative en stock</p>
-                            {item.sheet.alternatives.map((other) => (
-                              <div key={other.name} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1">
-                                <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{other.name}</span>
-                                {other.price && <span className="shrink-0 text-[11.5px] font-bold tabular-nums">{other.price}</span>}
-                                {other.margin && <span className="shrink-0 text-[11px] font-bold tabular-nums" style={{ color: C.numberFg }}>marge {other.margin}</span>}
+                      </div>
+                      <div data-ile-mix-l-corps="" className="isl-scroll mt-2 max-h-[150px] overflow-y-auto pr-1 text-[12px] leading-[17px]">
+                        {step === "ask" && <Ask key={index} item={item} />}
+                        {step === "sheet" && <Sheet item={item} />}
+                        {step === "help" && help && <Help item={item} help={help} />}
+                      </div>
+                      {((item.sheet?.alternatives?.length ?? 0) > 0 || alternatives.length > 0) && (
+                        <div data-ile-mix-alternative="" className="mt-2">
+                          <p className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.muted }}>Autre alternative en stock</p>
+                          <div className="mt-1 space-y-1">
+                            {(item.sheet?.alternatives ?? []).map((other) => (
+                              <div key={other.name} className="flex items-center gap-2 rounded-xl border px-2.5 py-1.5" style={{ borderColor: "#E3EBE8" }}>
+                                <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{other.name}</span>
+                                {other.price && <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: L.green }}>{other.price}</span>}
+                                {other.margin && <span className="shrink-0 rounded-md border px-1.5 py-0.5 text-[9.5px] font-bold tabular-nums" style={{ borderColor: "#BDE5CF", background: "#EAF8F0", color: "#0E7A4E" }}>MARGE {other.margin}</span>}
                               </div>
                             ))}
-                            <p className="px-1.5 text-[10.5px]" style={{ color: C.inkSoft }}>Bipez celui qu&apos;il choisit : le conseil passe « Bipé » avec ce produit.</p>
-                          </div>
-                        )}
-                        {alternatives.length > 0 && (
-                          <div className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
-                            <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre alternative en stock</p>
                             {alternatives.slice(0, 2).map(({ i, pos }) => (
-                              <button key={i} type="button" onClick={() => go(pos)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-[#0F2F2A]/5">
-                                <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{items[i].name}</span>
-                                {items[i].price && items[i].stock !== "UNKNOWN" && <span className="shrink-0 text-[11.5px] font-bold tabular-nums" style={{ color: C.numberFg }}>{items[i].price}</span>}
-                                <ChevronRight className="size-3.5 shrink-0" style={{ color: C.inkSoft }} aria-hidden="true" />
+                              <button key={i} type="button" onClick={() => go(pos)} className="flex w-full items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left hover:bg-[#F6F9F8]" style={{ borderColor: "#E3EBE8" }}>
+                                <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{items[i].name}</span>
+                                {items[i].price && items[i].stock !== "UNKNOWN" && <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: L.green }}>{items[i].price}</span>}
+                                <ChevronRight className="size-3.5 shrink-0" style={{ color: L.muted }} aria-hidden="true" />
                               </button>
                             ))}
                           </div>
-                        )}
-                      </>
-                    )}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -373,30 +373,34 @@ function Sheet({ item }: { item: IslandAdvice }) {
   const sheet = item.sheet;
   const usage = sheet?.usage ?? [];
   const effects = sheet?.sideEffects ?? [];
+  const contraindications = sheet?.contraindications ?? [];
+  // Compacte (fondateur, 22 oct. 2026 : « ça prend trop d'espace ») : les rubriques vides tiennent en une seule ligne.
+  const unknown = [contraindications.length === 0 ? "contre-indications" : null, effects.length === 0 ? "effets indésirables" : null].filter(Boolean);
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       <Part title="Posologie">{sheet?.description ? <p className="break-words">{sheet.description}</p> : <Missing>{POSOLOGY_MISSING}</Missing>}</Part>
       {usage.length > 0 && (
         <Part title="À dire au patient">
-          <Lines lines={usage} />
+          <Lines lines={usage.slice(0, TELL_MAX)} />
         </Part>
       )}
-      <Part title="Contre-indications">{sheet && sheet.contraindications.length > 0 ? <Lines lines={sheet.contraindications} /> : <Missing>{SHEET_MISSING.contraindications}</Missing>}</Part>
-      <Part title="Effets indésirables">
-        {effects.length > 0 ? (
-          <>
-            <p className="break-words">{effects.join(" · ")}</p>
-            <p className="text-[10.5px]" style={{ color: C.inkSoft }}>Fréquents, d&apos;après le RCP officiel (BDPM).</p>
-          </>
-        ) : (
-          <Missing>{SHEET_MISSING.sideEffects}</Missing>
-        )}
-      </Part>
+      {contraindications.length > 0 && (
+        <Part title="Contre-indications">
+          <Lines lines={contraindications} />
+        </Part>
+      )}
+      {effects.length > 0 && (
+        <Part title="Effets indésirables">
+          <p className="break-words">{effects.join(" · ")}</p>
+          <p className="text-[10.5px]" style={{ color: L.muted }}>Fréquents, d&apos;après le RCP officiel (BDPM).</p>
+        </Part>
+      )}
+      {unknown.length > 0 && <Missing>{`${unknown.join(" et ").replace(/^./, (c) => c.toUpperCase())} : non renseignés dans PharmaBoost, voir la notice.`}</Missing>}
     </div>
   );
 }
 
-const POSOLOGY_MISSING = "La posologie n'est pas renseignée dans PharmaBoost pour ce produit : reportez-vous à sa notice.";
+const POSOLOGY_MISSING = "Non renseignée dans PharmaBoost : voir la notice.";
 
 /**
  * 3. Aide : le pharmacien qui ne sait pas répondre au patient pose sa question sur CE conseil ; la réponse arrive dessous
@@ -451,9 +455,9 @@ function Help({ item, help }: { item: IslandAdvice; help: NonNullable<MixIslandP
 function Part({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      {/* Les sous-titres de la fiche se voient d'un coup d'œil (fondateur, 21 oct. 2026) : plus grands, de l'encre du texte. */}
-      <p className="text-[11px] font-extrabold tracking-[0.05em] uppercase" style={{ color: C.ink }}>{title}</p>
-      <div className="mt-0.5 space-y-0.5">{children}</div>
+      {/* Les sous-titres légers de l'essai « L » (22 oct. 2026) : petites capitales espacées, gris doux ; le texte dessous, foncé. */}
+      <p className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.muted }}>{title}</p>
+      <div className="mt-1 space-y-1" style={{ color: L.ink, fontWeight: 400 }}>{children}</div>
     </div>
   );
 }
@@ -462,11 +466,10 @@ function Lines({ lines }: { lines: CounterSheetLine[] }) {
   return (
     <ul className="space-y-0.5">
       {lines.map((line) => (
-        // En italique et sans gras, comme les autres textes de la fiche (fondateur, 21 oct. 2026) : en ligne, pour passer devant le
-        // gras que le fond noir donne au texte de la bannière.
-        <li key={line.text} className="break-words" style={{ fontStyle: "italic", fontWeight: 400 }}>
-          • {line.text}
-          {line.detail ? <span style={{ color: C.inkSoft }}> — {line.detail}</span> : null}
+        // Droit et sans gras, comme l'essai « L » (22 oct. 2026) ; en ligne, pour passer devant le gras du fond noir.
+        <li key={line.text} className="break-words" style={{ fontStyle: "normal", fontWeight: 400 }}>
+          · {line.text}
+          {line.detail ? <span style={{ color: L.muted }}> — {line.detail}</span> : null}
         </li>
       ))}
     </ul>
@@ -474,5 +477,11 @@ function Lines({ lines }: { lines: CounterSheetLine[] }) {
 }
 
 function Missing({ children }: { children: ReactNode }) {
-  return <p className="italic" style={{ color: C.inkSoft }}>{children}</p>;
+  return <p style={{ color: L.muted, fontWeight: 400 }}>{children}</p>;
 }
+
+/** Les couleurs de la carte ouverte (essai « L ») : encre foncée sur blanc, vert de la marque, gris doux. */
+const L = { ink: "#0F2B26", green: "#0E8A7B", muted: "#5B6B66", soft: "#F3F7F5" } as const;
+
+/** « À dire au patient » : deux phrases au plus (fondateur, 22 oct. 2026 : « trop d'info, limite à 2 phrases »). */
+const TELL_MAX = 2;
