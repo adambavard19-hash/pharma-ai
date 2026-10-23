@@ -201,15 +201,15 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                     )}
                     <div className="min-w-0 flex-1 pb-0.5">
                       {item.drug && <p className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.green }}>pour {item.drug}</p>}
-                      <p key={index} data-ile-mix-titre="" className="mt-0.5 text-[17px] leading-[20px] font-bold tracking-[-0.025em] break-words">{item.sheet?.name || item.name}</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux) ; la marge, pour le pharmacien seul. */}
-                        <span className="text-[19px] leading-none font-bold tracking-[-0.02em] tabular-nums" style={{ color: L.green }}>{item.price && item.stock !== "UNKNOWN" ? item.price : "—"}</span>
-                        {item.margin && <span className="rounded-md border px-1.5 py-0.5 text-[10px] font-bold tracking-wide tabular-nums" style={{ borderColor: "#F2D27A", background: "#FFF5D6", color: "#9A6400" }}>MARGE {item.margin}</span>}
-                      </div>
+                      {/* Le prix collé au nom du conseil, puis la marge et le stock sur une même ligne (fondateur, 22 oct. 2026). */}
+                      <p key={index} data-ile-mix-titre="" className="mt-0.5 text-[17px] leading-[21px] font-bold tracking-[-0.025em] break-words">
+                        {item.sheet?.name || item.name}
+                        {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux). */}
+                        <span className="ml-2 whitespace-nowrap tabular-nums" style={{ color: L.green }}>{item.price && item.stock !== "UNKNOWN" ? item.price : "—"}</span>
+                      </p>
                     </div>
                   </div>
-                  <Tags item={item} />
+                  <Tags item={item} margin={item.margin} />
                   {(item.sheet?.reasons[0] || item.reason) && (
                     <p className="mt-2 rounded-xl border-2 px-3 py-1.5 text-[12.5px] leading-[17px]" style={{ borderColor: "#5E9C8C", color: L.ink, fontWeight: 400 }}>{item.sheet?.reasons[0] || item.reason}</p>
                   )}
@@ -294,7 +294,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   );
 }
 
-function Tags({ item }: { item: IslandAdvice }) {
+function Tags({ item, margin }: { item: IslandAdvice; /** La marge, pour le pharmacien seul : sur la même ligne que le stock. */ margin?: string }) {
   const stock =
     item.stock === "IN_STOCK" ? { label: `${T.inStock}${item.quantity !== undefined ? ` · ${item.quantity}` : ""}`, fg: C.numberFg }
     : item.stock === "LOW_STOCK" ? { label: `${T.lowStock}${item.quantity !== undefined ? ` · ${item.quantity}` : ""}`, fg: C.lowFg }
@@ -302,6 +302,7 @@ function Tags({ item }: { item: IslandAdvice }) {
     : { label: "Stock à vérifier", fg: C.inkSoft };
   return (
     <div className="mt-1.5 flex flex-wrap gap-1">
+      {margin && <Chip bg="#FFF5D6" fg="#9A6400">Marge {margin}</Chip>}
       {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {item.challengeLabel ? (/^challenge\b/i.test(item.challengeLabel) ? item.challengeLabel : `${T.challenge} ${item.challengeLabel}`) : T.challenge}</Chip>}
       {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}
       <Chip bg={C.cell} fg={stock.fg}>{stock.label}</Chip>
