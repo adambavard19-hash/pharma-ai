@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, MessageCircle, Pill, Sparkles } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, MessageCircle, Pill } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import type { IslandOutcome } from "@/core/island/banner-flow";
@@ -13,9 +13,9 @@ import { islandTheme, MIX_PAPER, PHARMABOOST_GREEN } from "./island-theme";
 
 /**
  * La bannière « mix » du poste (fondateur, 19 oct. 2026, maquette 5 choisie) : le haut reste toujours à l'écran — le meilleur
- * conseil, le challenge, la marge possible de la vente — et, à la souris, elle se déploie sur ce meilleur conseil en trois
- * temps (fondateur, 21 oct. 2026 : cet ordre) : 1. Fiche (posologie, contre-indications, effets indésirables), 2. Discours
- * (le conseil à dire), 3. Questions (les deux questions, réponses cliquables). Plus de lien « Fiche complète ». Les autres conseils se parcourent avec les flèches ; l'autre possibilité en
+ * conseil, le challenge, la marge possible de la vente — et, à la souris, elle se déploie sur ce meilleur conseil en deux
+ * temps (fondateur, 22 oct. 2026 : « Discours » retiré) : 1. Fiche (posologie, à dire au patient, contre-indications, effets
+ * indésirables), 2. Questions (les deux questions, réponses cliquables). Plus de lien « Fiche complète ». Les autres conseils se parcourent avec les flèches ; l'autre possibilité en
  * stock pour la même boîte est à un clic. Vendu / Non vendu restent sans clic : un conseil bipé est « Bipé », et ne compte vendu
  * qu'à la validation de la vente (fondateur, 21 oct. 2026 : « vendu seulement si le pharmacien a cliqué sur FIN Valider »).
  *
@@ -51,10 +51,10 @@ export function possibleMargin(items: readonly Pick<IslandAdvice, "margin">[]): 
   return items.reduce((sum, item) => sum + centsOf(item.margin), 0);
 }
 
-type Step = "ask" | "say" | "sheet";
+// « Discours » retiré (fondateur, 22 oct. 2026) : la fiche et les questions suffisent.
+type Step = "ask" | "sheet";
 const STEPS: { id: Step; label: string; Icon: typeof Pill }[] = [
   { id: "sheet", label: "Fiche", Icon: Pill },
-  { id: "say", label: "Discours", Icon: Sparkles },
   { id: "ask", label: "Questions", Icon: MessageCircle },
 ];
 
@@ -211,7 +211,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                 </div>
               ) : (
                 <>
-                  <div role="tablist" className="mt-2.5 grid grid-cols-3 gap-1 rounded-xl p-1" style={{ background: C.cell }}>
+                  <div role="tablist" className="mt-2.5 grid grid-cols-2 gap-1 rounded-xl p-1" style={{ background: C.cell }}>
                     {STEPS.map(({ id, label, Icon }, n) => (
                       <button
                         key={id}
@@ -229,7 +229,6 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   </div>
                   <div className="isl-scroll mt-2 max-h-[230px] min-h-[150px] overflow-y-auto pr-1 text-[12px] leading-[16px]">
                     {step === "ask" && <Ask key={index} item={item} />}
-                    {step === "say" && <Say item={item} />}
                     {step === "sheet" && <Sheet item={item} />}
                   </div>
                   {item.sheet?.alternatives && item.sheet.alternatives.length > 0 && (
@@ -299,7 +298,7 @@ function Ask({ item }: { item: IslandAdvice }) {
   const ask = item.sheet?.ask ?? [];
   const answers = item.sheet?.answers ?? [];
   const [picked, setPicked] = useState<Record<number, number>>({});
-  if (ask.length === 0) return <p style={{ color: C.inkSoft }}>Les questions de ce conseil sont en cours de rédaction : appuyez-vous sur le « Discours ».</p>;
+  if (ask.length === 0) return <p style={{ color: C.inkSoft }}>Les questions de ce conseil sont en cours de rédaction : appuyez-vous sur la fiche.</p>;
   return (
     <ol className="space-y-2">
       {ask.map((question, q) => {
@@ -344,12 +343,6 @@ function Ask({ item }: { item: IslandAdvice }) {
       })}
     </ol>
   );
-}
-
-/** 2. Discours : le conseil en deux phrases, sinon la phrase du comptoir de la règle. */
-function Say({ item }: { item: IslandAdvice }) {
-  const text = item.sheet?.pitch || item.sheet?.script;
-  return text ? <p className="rounded-lg px-2.5 py-2 text-[12.5px] leading-[18px]" style={{ background: C.raised, color: C.raisedInk }}>« {text} »</p> : <p style={{ color: C.inkSoft }}>Rien d&apos;écrit pour ce conseil : voyez la fiche.</p>;
 }
 
 /**
