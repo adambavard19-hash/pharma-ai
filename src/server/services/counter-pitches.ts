@@ -28,11 +28,13 @@ export type PitchTarget = {
 export type StoredPitch = { ask: string[]; pitch: string; answers: PitchAnswer[] };
 
 /**
- * D'où vient un conseil gardé. « MANUAL » : corrigé dans Console → Conseils, l'IA n'y touche plus jamais. « AI-v3 » : écrit avec la
+ * D'où vient un conseil gardé. « MANUAL » : corrigé dans Console → Conseils, l'IA n'y touche plus jamais. « AI-v4 » : écrit avec la
  * consigne actuelle. Tout autre « AI… » vient d'une consigne plus ancienne (questions trop vagues, réponses sans rapport avec leur
  * question — fondateur, 19 oct. 2026) : il reste affiché, et il est réécrit en arrière-plan.
  */
-export const PITCH_SOURCE_AI = "AI-v3";
+// « AI-v4 » (22 oct. 2026) : chaque réponse mène à un produit, jamais « voyez le médecin ». Les questions écrites par l'IA avant
+// sont réécrites à la prochaine lecture ; celles corrigées à la main (MANUAL) restent telles quelles.
+export const PITCH_SOURCE_AI = "AI-v4";
 export const PITCH_SOURCE_MANUAL = "MANUAL";
 const outdated = (source: string) => source !== PITCH_SOURCE_AI && source !== PITCH_SOURCE_MANUAL;
 
@@ -50,7 +52,7 @@ const fold = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, 
 
 export function pitchKey(target: Pick<PitchTarget, "ruleKey" | "productEan" | "productName">): string {
   const product = target.productEan?.replace(/\D/g, "") || fold(target.productName);
-  return createHash("sha256").update(`v3|${target.ruleKey}|${product}`).digest("hex");
+  return createHash("sha256").update(`v2|${target.ruleKey}|${product}`).digest("hex");
 }
 
 function getWriter(): AnthropicCounterPitchWriter | null {
