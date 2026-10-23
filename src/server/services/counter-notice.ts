@@ -9,6 +9,7 @@ import { answersFromRows, treeState } from "@/core/counter/tree-state";
 import { TREE_RULE_KEYS } from "@/core/counter/question-tree";
 import { loadOfficialSideEffects } from "@/server/services/official-side-effects";
 import { counterSheetOf, routineStepOf, withoutOriginLabel } from "@/core/counter/advice-sheet";
+import { rangeOf } from "@/core/catalog/product-ranges";
 import { parseSuggestionVigilances } from "@/config/vigilances";
 import { loadCentralAdvice } from "@/server/services/central-advice";
 import { activeChallengesFor } from "@/server/services/challenges";
@@ -205,10 +206,13 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     where: { pharmacyId, id: { in: alternativeIds }, isActive: true, deletedAt: null },
     select: { id: true, name: true, salePriceCents: true, purchasePriceCents: true, vatRate: true, stockItem: { select: { quantity: true, alertThreshold: true } } },
   }).catch(() => []);
-  const alternativesOf = (stored: unknown): { alternatives?: CounterSheetAlternative[] } => {
+  const alternativesOf = (stored: unknown, chosenName?: string | null): { alternatives?: CounterSheetAlternative[] } => {
+    const range = rangeOf(chosenName);
     const list = parseStoredAlternatives(stored).flatMap((alt): CounterSheetAlternative[] => {
       const row = alternativeRows.find((candidate) => candidate.id === alt.productId);
       if (!row || (row.stockItem?.quantity ?? 0) <= 0) return [];
+      // Un autre parfum de la même gamme n'est pas une autre possibilité : c'est le même conseil.
+      if (range && range.test.test(row.name)) return [];
       const stock = availabilityOf(row.stockItem?.quantity ?? null, row.stockItem?.alertThreshold ?? null, stockReliable);
       const margin = salePriceLooksWrong(row) ? null : unitMarginHt(row);
       const euros = (cents: number) => `${(cents / 100).toFixed(2).replace(".", ",")} €`;
@@ -221,6 +225,20 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
       }];
     });
     return list.length ? { alternatives: list.slice(0, 2) } : {};
+  };
+
+  // La fiche d'une gamme : son nom et sa posologie relue à la source, à la place de la description de la référence de stock.
+  const rangeSheetOf = (productName: string | null | undefined): { name?: string; description?: string } => {
+    const range = rangeOf(productName);
+    return range ? { name: range.name, description: range.posology.join(" ") } : {};
+  };
+
+  // Le discours d'une gamme ne nomme pas le parfum de la référence retenue : « Hydratis », le patient choisit le goût.
+  const rangePitch = <T extends { pitch?: string }>(found: T, productName: string | null | undefined): T => {
+    const range = rangeOf(productName);
+    if (!range || !productName || !found.pitch) return found;
+    const exact = new RegExp(productName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    return { ...found, pitch: found.pitch.replace(exact, range.short) };
   };
 
   const notice = buildCounterNotice({
@@ -242,7 +260,8 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
         const shortDate = rec.productId ? shortDates.get(`p:${rec.productId}`) : rec.presentationId ? shortDates.get(`d:${rec.presentationId}`) : undefined;
         return {
           id: rec.id,
-          name: rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
+          // Une gamme à parfums (Hydratis) se propose par son nom de gamme : le patient choisit le goût (core/catalog/product-ranges.ts).
+          name: rangeOf(rec.product?.name)?.name ?? rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
           forDrug: triggered,
           challengeTitle: rec.productId ? (challenges.get(rec.productId) ?? null) : null,
           shortDateOn: shortDate?.expiresOn ?? null,
@@ -273,7 +292,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
                 : null,
             },
             rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
-          ), ...sideEffectsOf(rec.presentation?.specialty.cisCode), ...pitchOf(rec.id), ...alternativesOf(rec.alternatives) },
+          ), ...rangeSheetOf(rec.product?.name), ...sideEffectsOf(rec.presentation?.specialty.cisCode), ...rangePitch(pitchOf(rec.id), rec.product?.name), ...alternativesOf(rec.alternatives, rec.product?.name) },
         };
       }),
     outcome: run?.outcome ?? null,

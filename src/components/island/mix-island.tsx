@@ -354,23 +354,23 @@ function Say({ item }: { item: IslandAdvice }) {
   return text ? <p className="rounded-lg px-2.5 py-2 text-[12.5px] leading-[18px]" style={{ background: C.raised, color: C.raisedInk }}>« {text} »</p> : <p style={{ color: C.inkSoft }}>Rien d&apos;écrit pour ce conseil : voyez la fiche.</p>;
 }
 
-/** 1. Fiche : posologie, contre-indications, effets indésirables — ce que PharmaBoost sait ; une rubrique vide renvoie à la notice. */
+/**
+ * 1. Fiche : posologie, conseils au patient, contre-indications, effets indésirables — ce que PharmaBoost sait ; une rubrique
+ * vide renvoie à la notice. La posologie, c'est combien et combien de fois par jour (fondateur, 22 oct. 2026) : les mises en
+ * garde à dire au patient (« diarrhée au-delà de 48 h : consultez ») ont leur rubrique, jamais sous « Posologie ».
+ */
 function Sheet({ item }: { item: IslandAdvice }) {
   const sheet = item.sheet;
   const usage = sheet?.usage ?? [];
   const effects = sheet?.sideEffects ?? [];
   return (
     <div className="space-y-2">
-      <Part title="Posologie">
-        {usage.length > 0 || sheet?.description ? (
-          <>
-            <Lines lines={usage} />
-            {sheet?.description && <p className="break-words">{sheet.description}</p>}
-          </>
-        ) : (
-          <Missing>{SHEET_MISSING.usage}</Missing>
-        )}
-      </Part>
+      <Part title="Posologie">{sheet?.description ? <p className="break-words">{sheet.description}</p> : <Missing>{POSOLOGY_MISSING}</Missing>}</Part>
+      {usage.length > 0 && (
+        <Part title="À dire au patient">
+          <Lines lines={usage} />
+        </Part>
+      )}
       <Part title="Contre-indications">{sheet && sheet.contraindications.length > 0 ? <Lines lines={sheet.contraindications} /> : <Missing>{SHEET_MISSING.contraindications}</Missing>}</Part>
       <Part title="Effets indésirables">
         {effects.length > 0 ? (
@@ -385,6 +385,8 @@ function Sheet({ item }: { item: IslandAdvice }) {
     </div>
   );
 }
+
+const POSOLOGY_MISSING = "La posologie n'est pas renseignée dans PharmaBoost pour ce produit : reportez-vous à sa notice.";
 
 function Part({ title, children }: { title: string; children: ReactNode }) {
   return (
