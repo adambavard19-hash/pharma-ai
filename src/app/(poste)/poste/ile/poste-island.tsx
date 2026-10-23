@@ -818,7 +818,9 @@ export function PosteIsland() {
           </IslandShell>
         )}
 
-        {island.stage === "done" && view.done && (view.done.lines.length > 0 || view.done.badge) && (
+        {/* Le décompte « 1 vendu · 0 non vendu · 0 sans réponse » n'est plus montré (fondateur, 22 oct. 2026 : « Bravo ! » suffit) ;
+            seul un vrai problème (bilan non envoyé…) garde sa capsule. */}
+        {island.stage === "done" && view.done?.warning && (view.done.lines.length > 0 || view.done.badge) && (
           <IslandShell width={STAGE_WIDTH.done} tone={view.done.warning ? "warning" : "success"} contentKey={`done-${view.done.id}`} label="Résultat de la vente">
             <div className="space-y-0.5 px-4 py-2.5 text-[12.5px] leading-[18px] text-white/80">
               {view.done.lines.map((line) => <p key={line}>{line}</p>)}
