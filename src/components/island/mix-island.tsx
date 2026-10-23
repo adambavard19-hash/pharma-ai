@@ -7,7 +7,8 @@ import { BANNER } from "../../../agent/src/banner-design";
 import type { CounterSheetLine } from "../../../agent/src/counter-sheet";
 import type { IslandOutcome } from "@/core/island/banner-flow";
 import { Robot } from "@/components/robot";
-import { AnswerProduct, type IslandAdvice } from "./counter-island";
+import type { IslandAdvice } from "./counter-island";
+import { sendsToDoctor } from "@/core/counter/answer-filter";
 import { IslandShell } from "./island-shell";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { islandTheme, MIX_PAPER, PHARMABOOST_GREEN } from "./island-theme";
@@ -371,24 +372,25 @@ function Chip({ bg, fg, children }: { bg: string; fg: string; children: ReactNod
 }
 
 /** 3. Questions : les deux questions ; la réponse touchée dit quoi faire, et parfois un produit plus précis du stock. */
+/** 2. Questions : deux questions, des réponses en pastilles ; la réponse touchée dit quoi proposer, parfois un produit plus précis. */
 function Ask({ item }: { item: IslandAdvice }) {
   const ask = item.sheet?.ask ?? [];
-  const answers = item.sheet?.answers ?? [];
+  const answers = (item.sheet?.answers ?? []).filter((answer) => !sendsToDoctor(answer));
   const [picked, setPicked] = useState<Record<number, number>>({});
-  if (ask.length === 0) return <p style={{ color: C.inkSoft }}>Les questions de ce conseil sont en cours de rédaction : appuyez-vous sur la fiche.</p>;
+  if (ask.length === 0) return <p style={{ color: L.muted, fontWeight: 400 }}>Les questions de ce conseil sont en cours de rédaction : appuyez-vous sur la fiche.</p>;
   return (
-    <ol className="space-y-2">
+    <ol className="space-y-2.5" style={{ color: L.ink }}>
       {ask.map((question, q) => {
         const choices = answers.filter((answer) => answer.ask === q);
         const chosen = picked[q] !== undefined ? choices[picked[q]] : undefined;
         return (
           <li key={question} data-pitch-question="">
-            <span className="flex gap-1.5 font-bold">
-              <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[9.5px]" style={{ background: C.number, color: C.numberFg }}>{q + 1}</span>
+            <p className="flex gap-2 text-[12.5px] leading-[17px] font-semibold">
+              <span className="mt-px inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold text-white" style={{ background: L.green }}>{q + 1}</span>
               {question}
-            </span>
+            </p>
             {choices.length > 0 && (
-              <span className="mt-1 ml-5.5 flex flex-wrap gap-1">
+              <div className="mt-1 ml-6 flex flex-wrap gap-1">
                 {choices.map((choice, n) => (
                   <button
                     key={choice.label}
@@ -401,19 +403,25 @@ function Ask({ item }: { item: IslandAdvice }) {
                       else next[q] = n;
                       return next;
                     })}
-                    className="h-7 rounded-full border px-2.5 text-[11.5px] font-semibold"
-                    style={picked[q] === n ? { background: C.pick, borderColor: C.pick, color: "#FFFFFF" } : { background: C.raised, borderColor: C.pickLine, color: C.raisedInk }}
+                    className="h-6 rounded-full border px-2.5 text-[11.5px] font-semibold transition-colors"
+                    style={picked[q] === n ? { background: L.green, borderColor: L.green, color: "#FFFFFF" } : { background: "#FFFFFF", borderColor: "#B9D8CE", color: L.ink }}
                   >
                     {choice.label}
                   </button>
                 ))}
-              </span>
+              </div>
             )}
             {chosen && (
-              <span data-pitch-then="" className="isl-pop mt-1 ml-5.5 block rounded-md px-2 py-1.5" style={{ background: C.then }}>
-                <span className="block">{chosen.say}</span>
-                {chosen.product && <AnswerProduct product={chosen.product} />}
-              </span>
+              <div data-pitch-then="" className="isl-pop mt-1 ml-6 rounded-lg px-2.5 py-1.5 text-[12px] leading-[16px]" style={{ background: L.soft, fontWeight: 400 }}>
+                <p>→ {chosen.say}</p>
+                {chosen.product && (
+                  <p data-pitch-product="" className="mt-1 flex flex-wrap items-center gap-x-2 font-semibold">
+                    <span className="min-w-0 flex-1 truncate">{chosen.product.name}</span>
+                    {chosen.product.price && <span className="tabular-nums" style={{ color: L.green }}>{chosen.product.price}</span>}
+                    {chosen.product.margin && <span className="rounded px-1 text-[10px] font-bold tabular-nums" style={{ background: "#FFF5D6", color: "#9A6400" }}>Marge {chosen.product.margin}</span>}
+                  </p>
+                )}
+              </div>
             )}
           </li>
         );

@@ -10,6 +10,7 @@ import { TREE_RULE_KEYS } from "@/core/counter/question-tree";
 import { loadOfficialSideEffects } from "@/server/services/official-side-effects";
 import { counterSheetOf, routineStepOf, withoutOriginLabel } from "@/core/counter/advice-sheet";
 import { rangeOf } from "@/core/catalog/product-ranges";
+import { sendsToDoctor } from "@/core/counter/answer-filter";
 import { parseSuggestionVigilances } from "@/config/vigilances";
 import { loadCentralAdvice } from "@/server/services/central-advice";
 import { activeChallengesFor } from "@/server/services/challenges";
@@ -188,7 +189,8 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
   const answersByRec = new Map<string, CounterSheetAnswer[]>();
   for (const entry of pitchTargets) {
     const found = pitches.get(pitchKey(entry.target));
-    if (found?.answers.length) answersByRec.set(entry.recId, await answersForSheet(pharmacyId, found.answers, stockReliable, answerCache));
+    // Jamais une réponse qui renvoie au médecin sans produit : la bannière propose des conseils (fondateur, 22 oct. 2026).
+    if (found?.answers.length) answersByRec.set(entry.recId, (await answersForSheet(pharmacyId, found.answers, stockReliable, answerCache)).filter((answer) => !sendsToDoctor(answer)));
   }
   const pitchOf = (recId: string) => {
     const entry = pitchTargets.find((candidate) => candidate.recId === recId);

@@ -50,7 +50,7 @@ const fold = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, 
 
 export function pitchKey(target: Pick<PitchTarget, "ruleKey" | "productEan" | "productName">): string {
   const product = target.productEan?.replace(/\D/g, "") || fold(target.productName);
-  return createHash("sha256").update(`v2|${target.ruleKey}|${product}`).digest("hex");
+  return createHash("sha256").update(`v3|${target.ruleKey}|${product}`).digest("hex");
 }
 
 function getWriter(): AnthropicCounterPitchWriter | null {
