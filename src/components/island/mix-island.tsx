@@ -95,7 +95,6 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   const index = order[position];
   const item = items[index];
   const best = items[firstOpen];
-  const total = possibleMargin(items);
   const go = (next: number) => {
     setAt((next + order.length) % order.length);
     setStep("sheet");
@@ -114,7 +113,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
     >
       <div data-ile-mix={open ? "ouvert" : "replie"}>
         {/* Le haut, toujours là : le meilleur conseil à proposer, ou ce qui est déjà vendu. */}
-        <div className="flex w-full items-center gap-2 py-1.5 pr-1.5 pl-2">
+        <div className="flex w-full items-center gap-2 px-2 py-1.5">
           <button type="button" data-ile-replie="" aria-expanded={open} onClick={open && onClose ? onClose : onOpen} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
             <Robot size={30} mood="happy" look={look} label="Le robot PharmaBoost" />
             <span className="min-w-0 flex-1">
@@ -123,15 +122,15 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                 {/* Jamais « 1 bipé · +3,28 € à la validation » (fondateur, 22 oct. 2026 : « je ne veux pas voir ça ») : le nom du conseil. */}
                 <span className="truncate">{best.name}</span>
               </span>
-              <span className="block truncate text-[11px] leading-[15px] text-[#3F5E57]">
-                {items.length} conseil{items.length > 1 ? "s" : ""}
-                {total > 0 ? ` · jusqu'à ${eurosOf(total)} de marge` : ""}
-                {!open ? " · cliquez" : onClose ? " · cliquez pour fermer" : ""}
+              {/* Sous le nom, avant tout clic (fondateur, 22 oct. 2026) : le stock et son nombre, la marge et son montant, le
+                  challenge et la date courte quand il y en a. */}
+              <span data-ile-mix-repere="" className="mt-0.5 flex flex-wrap items-center gap-1">
+                <HeadChip>{stockLabel(best)}</HeadChip>
+                {best.margin && <HeadChip>Marge {best.margin}</HeadChip>}
+                {best.challenge && <HeadChip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</HeadChip>}
+                {best.shortDate && <HeadChip bg="rgba(255,120,120,0.2)" fg="#FFD1D1">{T.shortDate} {best.shortDate}</HeadChip>}
               </span>
             </span>
-            {best.challenge && soldIndexes.length === 0 && (
-              <span className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.challengeBg, color: C.challengeFg }}>★ {T.challenge}</span>
-            )}
           </button>
           <button
             type="button"
@@ -164,7 +163,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
 
         {open && (
           <div className="px-2 pb-2">
-            <div className="flex items-center gap-2 px-1 pb-1.5">
+            <div className="flex items-center gap-2 px-1 pb-1">
               <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[#3F5E57]">
                 {position === 0 ? "À proposer en premier" : `Conseil ${position + 1} sur ${order.length}`}
                 {item.drug ? ` · pour ${item.drug}` : ""}
@@ -188,7 +187,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
               <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
                 <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
               </div>
-              <div className={`relative px-2.5 pb-2.5 ${item.image ? "pt-[60px]" : "pt-[36px]"}`}>
+              <div className={`relative px-2.5 pb-2.5 ${item.image ? "pt-[56px]" : "pt-2.5"}`}>
                 <div data-ile-mix-carte="" className="rounded-[18px] p-3 text-left shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]" style={{ background: "#FFFFFF", color: L.ink }}>
                   <div className={`flex items-end gap-3 ${item.image ? "-mt-[52px]" : ""}`}>
                     {/* La photo studio du produit ; sans photo studio, rien (jamais une photo amateur). */}
@@ -306,6 +305,17 @@ function Tags({ item }: { item: IslandAdvice }) {
       <Chip bg={C.cell} fg={stock.fg}>{stock.label}</Chip>
     </div>
   );
+}
+
+/** Le stock d'un conseil, en clair : « En stock · 29 », « Stock faible · 3 », « Rupture », « Stock à vérifier ». */
+function stockLabel(item: IslandAdvice): string {
+  const count = item.quantity !== undefined ? ` · ${item.quantity}` : "";
+  return item.stock === "IN_STOCK" ? `${T.inStock}${count}` : item.stock === "LOW_STOCK" ? `${T.lowStock}${count}` : item.stock === "OUT_OF_STOCK" ? "Rupture" : "Stock à vérifier";
+}
+
+/** Un repère de la petite bannière du haut, lisible sur le fond noir. */
+function HeadChip({ bg = "rgba(255,255,255,0.14)", fg = "#F2FFF9", children }: { bg?: string; fg?: string; children: ReactNode }) {
+  return <span className="inline-flex h-[18px] items-center rounded-full px-1.5 text-[10.5px] font-bold whitespace-nowrap [text-shadow:none]" style={{ background: bg, color: fg }}>{children}</span>;
 }
 
 function Chip({ bg, fg, children }: { bg: string; fg: string; children: ReactNode }) {
