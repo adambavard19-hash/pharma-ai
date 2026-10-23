@@ -47,8 +47,25 @@ const ALERT_ENTRY: HostEntry = {
   items: [],
 };
 
+/**
+ * La vente d'exemple ouverte par une QUESTION du patient, sans scan (`/poste/ile?essai=question`, fondateur, 23 oct. 2026) :
+ * la demande écrite est le sujet, le conseil du stock arrive comme après un bip. Mêmes textes que la vente d'exemple (aucun
+ * texte médical inventé).
+ */
+export const QUESTION_TEXT = "Diarrhée depuis hier, adulte";
+export const QUESTION_ENTRY: HostEntry = {
+  ...ENTRY,
+  id: "essai-question",
+  reference: "ESSAI-3",
+  label: "Demande",
+  subject: QUESTION_TEXT,
+  signature: "essai-question-1",
+  boxes: [],
+  items: [{ ...ENTRY.items[0], id: "essai-q1", drug: "", reason: "Diarrhée passagère de l'adulte", ...(ENTRY.items[0].sheet ? { sheet: { ...ENTRY.items[0].sheet, reasons: ["Diarrhée passagère de l'adulte"] } } : {}) }],
+};
+
 /** Une vente d'exemple n'a pas de page dans PharmaBoost : ses cartes se lisent sans s'ouvrir. */
-export const isEssaiSale = (id: string) => id === ENTRY.id || id === ALERT_ENTRY.id;
+export const isEssaiSale = (id: string) => id === ENTRY.id || id === ALERT_ENTRY.id || id === QUESTION_ENTRY.id;
 
 export type TimedCommand = { at: number; command: HostCommand };
 
@@ -68,3 +85,15 @@ export const ESSAI_SEQUENCE: TimedCommand[] = [
 ];
 
 export const ESSAI_LENGTH_MS = 47000;
+
+/**
+ * Le scénario de la question, de A à Z (les instants comptent depuis l'envoi de la question) : analyse, conseil, produit bipé
+ * (« Vendu »), vente validée dans LGPI (compte à rebours de l'e-mail du bilan), fin de vente et « Qui a servi ce patient ? ».
+ */
+export const QUESTION_SEQUENCE: TimedCommand[] = [
+  { at: 0, command: { op: "scan" } },
+  { at: 1700, command: { op: "show", entry: QUESTION_ENTRY } },
+  { at: 9000, command: { op: "show", entry: { ...QUESTION_ENTRY, signature: "essai-question-2", items: [{ ...QUESTION_ENTRY.items[0], outcome: "SOLD" }] } } },
+  { at: 14000, command: { op: "validated", id: QUESTION_ENTRY.id } },
+  { at: 27000, command: { op: "done", info: { id: QUESTION_ENTRY.id, title: "Vente terminée — résultats enregistrés", lines: ["1 vendu", "✓ Bilan envoyé au patient."], badge: "1er conseil vendu aujourd'hui", warning: false } } },
+];

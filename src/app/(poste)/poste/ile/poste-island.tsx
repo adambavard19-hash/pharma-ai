@@ -39,7 +39,7 @@ import {
   type RegionRect,
 } from "@/core/poste/island-bridge";
 import { AURORE_CSS } from "@/components/island/island-aurore";
-import { ESSAI_LENGTH_MS, ESSAI_SEQUENCE, isEssaiSale } from "@/core/poste/island-fixtures";
+import { ESSAI_LENGTH_MS, ESSAI_SEQUENCE, isEssaiSale, QUESTION_SEQUENCE, QUESTION_TEXT } from "@/core/poste/island-fixtures";
 import { readCounterSheet } from "../../../../../agent/src/counter-sheet";
 
 /**
@@ -154,7 +154,8 @@ function useBridge(onCommand: (command: HostCommand) => void): { send: (message:
     }
     // Seule dans un navigateur : la vente d'exemple, en boucle, si on la demande.
     // `?essai=demande` : la bannière au repos, pour essayer « Demander un conseil » sans vente d'exemple qui passe par-dessus.
-    if (!new URLSearchParams(window.location.search).has("essai") || new URLSearchParams(window.location.search).get("essai") === "demande") return;
+    // `?essai=question` : l'exemple de la question écrite, joué par la bannière elle-même (voir plus bas).
+    if (!new URLSearchParams(window.location.search).has("essai") || ["demande", "question"].includes(new URLSearchParams(window.location.search).get("essai") ?? "")) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const play = () => {
       for (const step of ESSAI_SEQUENCE) timers.push(setTimeout(() => receive(step.command), step.at));
@@ -360,6 +361,35 @@ export function PosteIsland() {
   const [finishAfterEmail, setFinishAfterEmail] = useState(false);
   // Le champ « Que demande le patient ? » ouvert dans la capsule au repos : elle reste ouverte tant qu'il l'est.
   const [asking, setAsking] = useState(false);
+  // `?essai=question` (fondateur, 23 oct. 2026) : l'exemple de A à Z — la capsule s'ouvre, la question s'écrit lettre par
+  // lettre, part, puis la vente suit comme au poste (conseil, Vendu au bip, LGPI, e-mail, « Qui a servi ? »). En boucle.
+  const [demoTyped, setDemoTyped] = useState<string | undefined>(undefined);
+  const [demoPeek, setDemoPeek] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("essai") !== "question") return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const at = (ms: number, run: () => void) => timers.push(setTimeout(run, ms));
+    const play = () => {
+      at(0, () => dispatch({ type: "host", command: { op: "init", look: 3, position: "haut-centre", postLabel: "Comptoir 6" }, now: wallClock() }));
+      // La capsule ouverte, avec « Votre patient vous pose une question ? », puis le clic sur ce bouton.
+      at(1200, () => setDemoPeek(true));
+      at(3200, () => {
+        setDemoTyped("");
+        setAsking(true);
+      });
+      [...QUESTION_TEXT].forEach((_, index) => at(3800 + index * 70, () => setDemoTyped(QUESTION_TEXT.slice(0, index + 1))));
+      const sent = 3800 + QUESTION_TEXT.length * 70 + 900;
+      at(sent, () => {
+        setDemoPeek(false);
+        setAsking(false);
+        setDemoTyped(undefined);
+      });
+      for (const step of QUESTION_SEQUENCE) at(sent + step.at, () => dispatch({ type: "host", command: step.command, now: wallClock() }));
+      at(sent + 45000, play);
+    };
+    play();
+    return () => timers.forEach(clearTimeout);
+  }, []);
   const finish = () => {
     if (!entry) return;
     if (isAskEntry(entry.id)) {
@@ -539,6 +569,7 @@ export function PosteIsland() {
     // question part vers l'agent (ou, dans l'aperçu `?essai=demande`, vers le serveur local) et les conseils arrivent comme après un bip.
     ask: !greeting ? (
       <AskBox
+        typed={demoTyped}
         open={asking}
         onOpen={() => setAsking(true)}
         onClose={() => setAsking(false)}
@@ -554,7 +585,7 @@ export function PosteIsland() {
         }}
       />
     ) : undefined,
-    holdPeek: asking && island.stage === "idle" && !entry,
+    holdPeek: (asking || demoPeek) && island.stage === "idle" && !entry,
     // Le robot de la marque, à jour, sur tous les postes (fondateur, 21 oct. 2026) ; la capsule au repos s'ouvre au clic.
     look: null,
     peekOnClick: true,
@@ -930,7 +961,7 @@ const ASK_EXAMPLES = ["Mal de gorge, adulte", "Diarrhée depuis hier", "Peau sè
  * Dans la capsule au repos (fondateur, 23 oct. 2026, essai A) : « Votre patient vous pose une question ? », puis un champ pour
  * écrire ce que le patient demande. Le clavier n'est pris qu'au clic.
  */
-function AskBox({ open, onOpen, onClose, onAsk }: { open: boolean; onOpen: () => void; onClose: () => void; onAsk: (text: string) => void }) {
+function AskBox({ open, onOpen, onClose, onAsk, typed }: { open: boolean; onOpen: () => void; onClose: () => void; onAsk: (text: string) => void; typed?: string }) {
   const [text, setText] = useState("");
   const submit = (value: string) => {
     const clean = value.replace(/\s+/g, " ").trim();
@@ -958,7 +989,7 @@ function AskBox({ open, onOpen, onClose, onAsk }: { open: boolean; onOpen: () =>
       <p className="text-[13px] font-bold text-white">Que demande le patient ?</p>
       <div className="mt-2 flex gap-1.5">
         {/* Le champ prend le clavier seulement parce que le pharmacien vient de cliquer pour écrire. */}
-        <input autoFocus value={text} onChange={(event) => setText(event.target.value)} maxLength={300} placeholder="Ex. : mal de gorge, adulte" className="h-9 min-w-0 flex-1 rounded-lg bg-white px-3 text-[13px] text-[#0F2F2A] outline-none" />
+        <input autoFocus={typed === undefined} value={typed ?? text} onChange={(event) => setText(event.target.value)} maxLength={300} placeholder="Ex. : mal de gorge, adulte" className="h-9 min-w-0 flex-1 rounded-lg bg-white px-3 text-[13px] text-[#0F2F2A] outline-none" />
         <button type="submit" className="h-9 shrink-0 rounded-lg px-3 text-[12.5px] font-bold" style={{ background: "#E8FF9C", color: "#04261A" }}>
           Chercher
         </button>
