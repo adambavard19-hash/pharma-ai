@@ -3,32 +3,38 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePlatformSession } from "@/server/auth/platform-session";
-import { sendLaunchDay, sendLaunchDayTrial } from "@/server/services/launch-day";
+import { sendLaunchDay, sendLaunchDayTrial, type TeamEmailKind } from "@/server/services/launch-day";
 import { fail, ok, type ActionResult } from "./types";
 
 const DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choisissez la date du jour J.");
 
 /** M'envoyer les deux versions de l'e-mail du jour J (titulaire, comptoir), avec le nom de cette pharmacie. */
-export async function sendLaunchDayTrialAction(payload: { pharmacyId: string; day: string }): Promise<ActionResult<null>> {
+export async function sendLaunchDayTrialAction(payload: { pharmacyId: string; day: string; kind?: TeamEmailKind; to?: string }): Promise<ActionResult<null>> {
   const session = await requirePlatformSession();
   const day = DAY.safeParse(payload.day);
   if (!day.success) return fail(day.error.issues[0]?.message ?? "Date invalide.");
-  const result = await sendLaunchDayTrial({ pharmacyId: payload.pharmacyId, day: day.data, to: session.admin.email, adminId: session.admin.id, adminFirstName: session.admin.fullName.split(" ")[0] || session.admin.fullName });
+  // L'essai part à l'adresse donnée (fondateur, 23 oct. 2026 : « envoie-le moi avant sur … »), sinon à celle de l'administrateur.
+  const typed = payload.to?.trim() ?? "";
+  if (typed && !z.string().email().safeParse(typed).success) return fail("Adresse de l'essai invalide.");
+  const to = typed || session.admin.email;
+  const kind = payload.kind === "test" ? "test" : "launch";
+  const result = await sendLaunchDayTrial({ pharmacyId: payload.pharmacyId, day: day.data, to, adminId: session.admin.id, adminFirstName: session.admin.fullName.split(" ")[0] || session.admin.fullName, kind });
   if (result.sent === 0) return fail(`Essai non envoyé : ${result.failed.join(" · ")}`);
-  return ok(null, `Essai envoyé à ${session.admin.email} : version titulaire et version comptoir.`);
+  return ok(null, kind === "test" ? `Essai de l'e-mail de la journée test envoyé à ${to}.` : `Essai envoyé à ${to} : version titulaire et version comptoir.`);
 }
 
 /** L'e-mail du jour J à l'équipe cochée. */
-export async function sendLaunchDayAction(payload: { pharmacyId: string; day: string; membershipIds: string[] }): Promise<ActionResult<{ sent: number }>> {
+export async function sendLaunchDayAction(payload: { pharmacyId: string; day: string; membershipIds: string[]; kind?: TeamEmailKind }): Promise<ActionResult<{ sent: number }>> {
   const session = await requirePlatformSession();
   const day = DAY.safeParse(payload.day);
   if (!day.success) return fail(day.error.issues[0]?.message ?? "Date invalide.");
   if (payload.membershipIds.length === 0) return fail("Cochez au moins une personne.");
   try {
-    const result = await sendLaunchDay({ pharmacyId: payload.pharmacyId, day: day.data, membershipIds: payload.membershipIds, adminId: session.admin.id });
+    const kind = payload.kind === "test" ? "test" : "launch";
+    const result = await sendLaunchDay({ pharmacyId: payload.pharmacyId, day: day.data, membershipIds: payload.membershipIds, adminId: session.admin.id, kind });
     revalidatePath(`/admin/pharmacies/${payload.pharmacyId}`);
     if (result.sent === 0) return fail(`Rien n'est parti : ${result.failed.join(" · ")}`);
-    return ok({ sent: result.sent }, `E-mail du jour J envoyé à ${result.sent} personne${result.sent > 1 ? "s" : ""} sur ${result.total}.${result.failed.length ? ` Échec : ${result.failed.join(" · ")}` : ""}`);
+    return ok({ sent: result.sent }, `${kind === "test" ? "E-mail de la journée test" : "E-mail du jour J"} envoyé à ${result.sent} personne${result.sent > 1 ? "s" : ""} sur ${result.total}.${result.failed.length ? ` Échec : ${result.failed.join(" · ")}` : ""}`);
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Envoi impossible.");
   }

@@ -119,6 +119,8 @@ describe("les collaborateurs : un clic, tous ses conseils vendus", () => {
     expect(page).toContain("Les conseils de Evelyne B.");
     expect(page).toMatch(/Tous 2 Vendus 2 Non vendus 0/);
     expect(page).toContain("Toute l'équipe");
+    expect(html).toContain("/api/admin/pharmacies/ph_1/conseils-export?periode=jour&amp;qui=Evelyne%20B.");
+    expect(page).toContain("Télécharger les conseils de Evelyne B. (Excel) · 2");
     expect(page).not.toContain("AllergiFlash Vendu");
   });
 

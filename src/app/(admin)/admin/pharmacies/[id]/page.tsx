@@ -290,7 +290,7 @@ function QuickActions({ base, templates, suspended }: { base: Pharmacy360; templ
 async function LaunchDaySection({ pharmacyId, demo, now }: { pharmacyId: string; demo: boolean; now: Date }) {
   const state = await launchDayState(pharmacyId);
   return (
-    <AdminSection id="jour-j" title="E-mail du jour J" description="Le jour où la pharmacie commence avec PharmaBoost : chaque personne reçoit sa vidéo de prise en main, ce que ça change pour elle chaque jour, et que chaque conseil est enregistré.">
+    <AdminSection id="jour-j" title="E-mails à l'équipe : jour J, journée test" description="Le jour où la pharmacie commence avec PharmaBoost (sa vidéo de prise en main, ce que ça change pour chacun), ou la journée où l'équipe teste tout le logiciel. Un essai d'abord, puis l'équipe.">
       <LaunchDayPanel
         pharmacyId={pharmacyId}
         demo={demo}

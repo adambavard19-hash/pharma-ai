@@ -65,6 +65,7 @@ export function PharmacyReport({
   person = null,
   personHref,
   pdfHref,
+  exportHref,
   figures = true,
   updatedAt,
 }: {
@@ -79,6 +80,8 @@ export function PharmacyReport({
   personHref: (who: string | null) => string;
   /** Absent : pas de bouton PDF. */
   pdfHref?: string;
+  /** Le fichier Excel de tous les conseils proposés (ceux du collaborateur choisi, s'il y en a un) ; absent : pas de bouton. */
+  exportHref?: string;
   /** Faux : seulement les collaborateurs et la liste (la page a déjà ses chiffres). */
   figures?: boolean;
   updatedAt: Date;
@@ -179,6 +182,12 @@ export function PharmacyReport({
               )}
             </h2>
             <p className="text-[12.5px] text-text-tertiary">Cliquez sur un conseil pour voir la vente. Mis à jour à {time.format(updatedAt)}, toutes les minutes.</p>
+            {exportHref && mine.length > 0 && (
+              <a href={exportHref} data-export-conseils="" className="mt-2 inline-flex h-9 items-center gap-2 rounded-xl border border-brand-600 px-3 text-[13px] font-semibold text-brand-700 hover:bg-brand-50 dark:text-brand-300">
+                <Download className="size-4" aria-hidden="true" />
+                Télécharger {person ? `les conseils de ${person}` : "tous les conseils proposés"} (Excel) · {mine.length}
+              </a>
+            )}
           </div>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer les conseils">
             {ADVICE_FILTERS.map((entry) => {

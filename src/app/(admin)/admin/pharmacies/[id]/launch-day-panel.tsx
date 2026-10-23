@@ -16,6 +16,9 @@ type Sent = { recipient: string; status: string; at: string };
  */
 export function LaunchDayPanel({ pharmacyId, defaultDay, members, sent, demo }: { pharmacyId: string; defaultDay: string; members: Member[]; sent: Sent[]; demo: boolean }) {
   const [day, setDay] = useState(defaultDay);
+  // Le jour J (démarrage) ou la journée test (23 oct. 2026), et l'adresse de l'essai (vide : celle de l'administrateur).
+  const [kind, setKind] = useState<"launch" | "test">("launch");
+  const [trialTo, setTrialTo] = useState("");
   const [chosen, setChosen] = useState<string[]>(members.map((m) => m.membershipId));
   const [confirm, setConfirm] = useState(false);
   const [pending, start] = useTransition();
@@ -25,12 +28,12 @@ export function LaunchDayPanel({ pharmacyId, defaultDay, members, sent, demo }: 
 
   const trial = () =>
     start(async () => {
-      const result = await sendLaunchDayTrialAction({ pharmacyId, day });
+      const result = await sendLaunchDayTrialAction({ pharmacyId, day, kind, to: trialTo });
       push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Essai envoyé.") : result.error });
     });
   const send = () =>
     start(async () => {
-      const result = await sendLaunchDayAction({ pharmacyId, day, membershipIds: chosen });
+      const result = await sendLaunchDayAction({ pharmacyId, day, membershipIds: chosen, kind });
       push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Envoyé.") : result.error });
       setConfirm(false);
       router.refresh();
@@ -38,12 +41,21 @@ export function LaunchDayPanel({ pharmacyId, defaultDay, members, sent, demo }: 
 
   return (
     <div className="space-y-4" data-launch-day="">
+      <div className="inline-flex rounded-xl border border-border-subtle bg-surface-sunken p-1" role="group" aria-label="Quel e-mail">
+        {([["launch", "Jour J (démarrage)"], ["test", "Journée test"]] as const).map(([value, text]) => (
+          <button key={value} type="button" aria-pressed={kind === value} onClick={() => { setKind(value); setConfirm(false); }} className={`h-8 rounded-lg px-3 text-[13px] font-semibold ${kind === value ? "bg-surface-card text-text-primary shadow-xs" : "text-text-secondary"}`}>
+            {text}
+          </button>
+        ))}
+      </div>
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-[13px] font-medium text-text-secondary">
-          Jour J
+          {kind === "test" ? "Jour du test" : "Jour J"}
           <input type="date" value={day} onChange={(event) => { setDay(event.target.value); setConfirm(false); }} className="mt-1 block h-10 rounded-lg border border-border-subtle bg-surface-card px-3 text-[14px] text-text-primary" />
         </label>
-        <p className="pb-2 text-[13px] text-text-secondary">L&apos;e-mail dira : « {label[0]?.toUpperCase()}{label.slice(1)}, on démarre ! »</p>
+        <p className="pb-2 text-[13px] text-text-secondary">
+          L&apos;e-mail dira : « {label[0]?.toUpperCase()}{label.slice(1)}{kind === "test" ? " : on teste PharmaBoost" : ", on démarre !"} »
+        </p>
       </div>
       {members.length === 0 ? (
         <p className="text-[13px] text-text-secondary">Aucun compte actif dans cette pharmacie : créez d&apos;abord le titulaire et l&apos;équipe.</p>
@@ -57,13 +69,14 @@ export function LaunchDayPanel({ pharmacyId, defaultDay, members, sent, demo }: 
                   <span className="font-semibold text-text-primary">{m.name}</span>
                   <span className="text-text-secondary"> · {m.roleLabel} · {m.email}</span>
                 </span>
-                <span className="shrink-0 text-[12px] text-text-secondary">{m.owner ? "version titulaire" : "version comptoir"}</span>
+                <span className="shrink-0 text-[12px] text-text-secondary">{kind === "test" ? "journée test" : m.owner ? "version titulaire" : "version comptoir"}</span>
               </label>
             </li>
           ))}
         </ul>
       )}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="email" value={trialTo} onChange={(event) => setTrialTo(event.target.value)} placeholder="Adresse de l'essai (sinon la vôtre)" className="h-9 w-64 rounded-lg border border-border-subtle bg-surface-card px-3 text-[13px] text-text-primary" />
         <Button size="sm" variant="outline" loading={pending && !confirm} leadingIcon={<Mail className="size-3.5" />} onClick={trial}>
           M&apos;envoyer un essai
         </Button>

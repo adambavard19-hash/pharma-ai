@@ -54,6 +54,7 @@ export async function PerformanceTab({ pharmacyId, query, now }: { pharmacyId: s
           person={person}
           personHref={(who) => href({ periode: range.param, ...(who ? { qui: who, statut: "vendus" } : {}) })}
           pdfHref={`/api/admin/pharmacies/${pharmacy.id}/comptoir-pdf?periode=${encodeURIComponent(range.param)}`}
+          exportHref={`/api/admin/pharmacies/${pharmacy.id}/conseils-export?periode=${encodeURIComponent(range.param)}${person ? `&qui=${encodeURIComponent(person)}` : ""}`}
           updatedAt={now}
         />
       )}
