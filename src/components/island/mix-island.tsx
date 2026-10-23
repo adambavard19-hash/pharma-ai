@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, LifeBuoy, MessageCircle, Pill } from "lucide-react";
 import type { HelpAdvice } from "@/core/poste/island-bridge";
 import { BANNER } from "../../../agent/src/banner-design";
@@ -246,11 +246,11 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                           ))}
                         </div>
                       </div>
-                      <div data-ile-mix-l-corps="" className="isl-scroll mt-2 max-h-[150px] overflow-y-auto pr-1 text-[12px] leading-[17px]">
+                      <ScrollBody key={`${index}-${step}`}>
                         {step === "ask" && <Ask key={index} item={item} />}
                         {step === "sheet" && <Sheet item={item} />}
                         {step === "help" && help && <Help item={item} help={help} />}
-                      </div>
+                      </ScrollBody>
                       {((item.sheet?.alternatives?.length ?? 0) > 0 || alternatives.length > 0) && (
                         <div data-ile-mix-alternative="" className="mt-2">
                           <p className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.muted }}>Autre alternative en stock</p>
@@ -303,6 +303,46 @@ function Tags({ item }: { item: IslandAdvice }) {
       {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {item.challengeLabel ? (/^challenge\b/i.test(item.challengeLabel) ? item.challengeLabel : `${T.challenge} ${item.challengeLabel}`) : T.challenge}</Chip>}
       {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}
       <Chip bg={C.cell} fg={stock.fg}>{stock.label}</Chip>
+    </div>
+  );
+}
+
+/**
+ * Le texte de l'onglet, à hauteur fixe : ce qui dépasse (« À dire au patient » sous la posologie) se lit en faisant défiler,
+ * la bannière ne grandit pas. Un repère « ▾ suite » le dit tant qu'il reste du texte plus bas.
+ */
+function ScrollBody({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    el.addEventListener("scroll", check, { passive: true });
+    return () => {
+      observer.disconnect();
+      el.removeEventListener("scroll", check);
+    };
+  }, []);
+  return (
+    <div className="relative">
+      <div ref={ref} data-ile-mix-l-corps="" className="mt-2 max-h-[150px] pr-1.5 text-[12px] leading-[17px]">
+        <div>{children}</div>
+      </div>
+      {more && (
+        <button
+          type="button"
+          onClick={() => ref.current?.scrollBy({ top: 90, behavior: "smooth" })}
+          className="absolute right-3 bottom-0 left-0 flex h-7 items-end justify-center bg-gradient-to-t from-white via-white/90 to-transparent pb-0.5 text-[10.5px] font-bold"
+          style={{ color: L.green }}
+        >
+          ▾ suite
+        </button>
+      )}
     </div>
   );
 }

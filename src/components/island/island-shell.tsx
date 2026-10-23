@@ -126,6 +126,11 @@ export const ISLAND_CSS = `
 .isl-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
 .isl-scroll::-webkit-scrollbar { width: 5px; }
 .isl-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 99px; }
+/* La carte blanche ouverte (essai « L ») : la barre de défilement se voit, en vert (fondateur, 22 oct. 2026). */
+[data-ile-mix-l-corps] { scrollbar-color: rgba(14,138,123,0.6) rgba(14,138,123,0.08); overflow-y: scroll; }
+[data-ile-mix-l-corps]::-webkit-scrollbar { width: 6px; }
+[data-ile-mix-l-corps]::-webkit-scrollbar-track { background: rgba(14,138,123,0.08); border-radius: 99px; }
+[data-ile-mix-l-corps]::-webkit-scrollbar-thumb { background: rgba(14,138,123,0.6); border-radius: 99px; }
 /* La photo du produit conseil flotte doucement (fondateur, 19 oct. 2026 : effet « 1 · Flottement » de /robot-apercu/animations). */
 @keyframes isl-float { 0%,100% { transform: translateY(2px); } 50% { transform: translateY(-4px); } }
 .isl-float { animation: isl-float 2.8s ease-in-out infinite; }
