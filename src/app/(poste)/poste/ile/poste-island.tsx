@@ -73,8 +73,6 @@ const ROOT_LAYOUT: Record<IslandSide, string> = {
 
 const noSubscribe = () => () => {};
 
-/** Les pastilles de l'équipe dans « Qui a servi ce patient ? » : une couleur par personne, dans l'ordre de l'équipe. */
-const TEAM_COLORS = ["#247061", "#7A4DB8", "#C2410C", "#0369A1", "#B42318", "#4D7C0F", "#A16207", "#BE185D"];
 
 /** Le temps laissé au pharmacien pour donner l'e-mail du bilan après la validation dans LGPI. */
 const VALIDATED_EMAIL_MS = 12_000;
@@ -797,9 +795,8 @@ export function PosteIsland() {
               <div data-ile-servi="" data-ile-sans-deploiement="" className="px-3 pt-2 pb-2.5 text-left">
                 <p className="text-[13px] leading-[17px] font-bold text-white">Qui a servi ce patient ?</p>
                 <div className={`mt-1.5 grid gap-1 ${view.side === "gauche" || view.side === "droite" ? "grid-cols-2" : "grid-cols-3"}`}>
-                  {entry.team.map((member, n) => {
+                  {entry.team.map((member) => {
                     const chosen = served.chosen === member.id;
-                    const color = TEAM_COLORS[n % TEAM_COLORS.length];
                     return (
                       <button
                         key={member.id}
@@ -808,10 +805,9 @@ export function PosteIsland() {
                         aria-pressed={chosen}
                         onClick={() => answerServed(member.id)}
                         title={member.id === entry.servedBy ? "Ce comptoir" : undefined}
-                        className="flex min-w-0 items-center gap-1.5 rounded-lg border px-1.5 py-1 text-left transition-colors"
+                        className="flex min-w-0 items-center rounded-lg border px-2 py-1 text-left transition-colors"
                         style={{ background: chosen ? "rgba(232,255,156,0.12)" : "rgba(255,255,255,0.05)", borderColor: chosen ? "#E8FF9C" : member.id === entry.servedBy ? "rgba(159,203,187,0.45)" : "transparent" }}
                       >
-                        <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold text-white" style={{ background: color }}>{member.name.charAt(0).toUpperCase()}</span>
                         <span className="min-w-0 truncate text-[11.5px] leading-[15px] font-bold text-white">{member.name}</span>
                       </button>
                     );
