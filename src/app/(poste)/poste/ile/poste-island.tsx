@@ -785,17 +785,18 @@ export function PosteIsland() {
         )}
 
         {askServed && served && served.id === entry?.id && entry.team && (
-          <IslandShell width={view.side === "gauche" || view.side === "droite" ? 300 : 400} tone="success" contentKey={`servi-${entry.id}-${served.done ? "ok" : "q"}`} label="Qui a servi ce patient ?">
+          <IslandShell width={view.side === "gauche" || view.side === "droite" ? 280 : 380} tone="success" contentKey={`servi-${entry.id}-${served.done ? "ok" : "q"}`} label="Qui a servi ce patient ?">
             {served.done ? (
               <p data-ile-servi-ok="" className="flex items-center gap-2 px-4 py-3 text-[13px] font-semibold text-white">
                 <span className="inline-flex size-6 items-center justify-center rounded-full text-[12px] font-extrabold" style={{ background: "#E8FF9C", color: "#0F2F2A" }}>✓</span>
                 {`Vente comptée pour ${entry.team.find((member) => member.id === served.chosen)?.name ?? "le comptoir"}`.replace(/\.?$/, ".")}
               </p>
             ) : (
-              <div data-ile-servi="" data-ile-sans-deploiement="" className="px-3.5 pt-3 pb-3 text-left">
-                <p className="text-[14.5px] leading-[18px] font-bold text-white">Qui a servi ce patient ?</p>
-                <p className="mt-0.5 text-[11.5px] leading-[15px] text-[#9FCBBB]">Les conseils vendus iront dans ses résultats. Personne n&apos;a à changer d&apos;espace.</p>
-                <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+              // Compacte (fondateur, 22 oct. 2026 : « la bannière prend beaucoup trop de place ») : une ligne de titre, des pastilles
+              // serrées sur trois colonnes (deux sur le côté), aucune phrase d'explication.
+              <div data-ile-servi="" data-ile-sans-deploiement="" className="px-3 pt-2 pb-2.5 text-left">
+                <p className="text-[13px] leading-[17px] font-bold text-white">Qui a servi ce patient ?</p>
+                <div className={`mt-1.5 grid gap-1 ${view.side === "gauche" || view.side === "droite" ? "grid-cols-2" : "grid-cols-3"}`}>
                   {entry.team.map((member, n) => {
                     const chosen = served.chosen === member.id;
                     const color = TEAM_COLORS[n % TEAM_COLORS.length];
@@ -806,19 +807,16 @@ export function PosteIsland() {
                         data-ile-servi-personne={member.id}
                         aria-pressed={chosen}
                         onClick={() => answerServed(member.id)}
-                        className="flex min-w-0 items-center gap-2 rounded-xl border-2 px-2 py-1.5 text-left transition-colors"
-                        style={{ background: chosen ? "rgba(232,255,156,0.12)" : "rgba(255,255,255,0.05)", borderColor: chosen ? "#E8FF9C" : "transparent" }}
+                        title={member.id === entry.servedBy ? "Ce comptoir" : undefined}
+                        className="flex min-w-0 items-center gap-1.5 rounded-lg border px-1.5 py-1 text-left transition-colors"
+                        style={{ background: chosen ? "rgba(232,255,156,0.12)" : "rgba(255,255,255,0.05)", borderColor: chosen ? "#E8FF9C" : member.id === entry.servedBy ? "rgba(159,203,187,0.45)" : "transparent" }}
                       >
-                        <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[12px] font-extrabold text-white" style={{ background: color }}>{member.name.charAt(0).toUpperCase()}</span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-[12.5px] leading-[16px] font-bold text-white">{member.name}</span>
-                          <span className="block text-[10.5px] leading-[13px] text-[#9FCBBB]">{member.id === entry.servedBy ? "Ce comptoir" : "Remplace ici"}</span>
-                        </span>
+                        <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold text-white" style={{ background: color }}>{member.name.charAt(0).toUpperCase()}</span>
+                        <span className="min-w-0 truncate text-[11.5px] leading-[15px] font-bold text-white">{member.name}</span>
                       </button>
                     );
                   })}
                 </div>
-                <p className="mt-2.5 text-[11.5px] leading-[15px] text-white/75">Touchez la personne qui a servi : la fenêtre attend votre choix.</p>
               </div>
             )}
           </IslandShell>

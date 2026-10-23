@@ -566,7 +566,7 @@ function Mix() {
                         <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold text-white" style={{ background: person.color }}>{person.name[0]}</span>
                         <span className="min-w-0">
                           <span className="block text-[13px] font-bold" style={{ color: G.ink }}>{person.name}</span>
-                          <span className="block text-[11px]" style={{ color: G.soft }}>{person.here ? "Ce comptoir" : "Remplace ici"}</span>
+                          {person.here && <span className="block text-[11px]" style={{ color: G.soft }}>Ce comptoir</span>}
                         </span>
                       </button>
                     );

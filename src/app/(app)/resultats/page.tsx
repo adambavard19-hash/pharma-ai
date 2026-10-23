@@ -9,9 +9,10 @@ import { PageHeader } from "@/components/ui/page";
 import { PerformanceDashboard } from "@/components/performance/performance-dashboard";
 import { CounterResultsCard } from "@/components/performance/counter-results-card";
 import { loadCounterResults } from "@/server/services/counter-results";
-import { loadSalesReport } from "@/server/services/counter-history";
+import { loadAdviceRows, loadSalesReport } from "@/server/services/counter-history";
+import { ADVICE_FILTERS, PharmacyReport, type AdviceFilter } from "@/components/admin/performance/pharmacy-report";
 import { CounterSalesReport } from "@/components/performance/counter-sales-report";
-import { periodFromParam, SALES_REPORT_PERIODS, toSalesReportView, type SalesReportPeriod } from "@/core/counter/sales-report";
+import { periodFromParam, reportWindow, SALES_REPORT_PERIODS, toSalesReportView, type SalesReportPeriod } from "@/core/counter/sales-report";
 
 export const metadata: Metadata = { title: "Performances — ce que PharmaBoost rapporte" };
 
@@ -31,7 +32,7 @@ export const metadata: Metadata = { title: "Performances — ce que PharmaBoost 
 export default async function ResultatsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periode?: string | string[]; du?: string | string[]; au?: string | string[]; comptoir?: string | string[] }>;
+  searchParams: Promise<{ periode?: string | string[]; du?: string | string[]; au?: string | string[]; comptoir?: string | string[]; statut?: string | string[]; qui?: string | string[] }>;
 }) {
   const session = await requirePermission(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
   const now = new Date();
@@ -43,12 +44,21 @@ export default async function ResultatsPage({
   // L'officine de démonstration commerciale lit sa propre activité marquée démo ; une vraie officine, jamais.
   const demo = session.scope.isDemo ? { pharmacyIsDemo: true } : {};
 
-  const [sales, report, roi, counter] = await Promise.all([
+  const counterWindow = reportWindow(counterPeriod, now, TIME_ZONE);
+  const [sales, adviceRows, report, roi, counter] = await Promise.all([
     loadSalesReport({ pharmacyId, period: counterPeriod, now }),
+    loadAdviceRows({ pharmacyId, from: counterWindow.from, to: counterWindow.to }),
     loadPerformanceReport({ pharmacyId, period, now, ...demo }),
     loadSubscriptionReturn({ pharmacyId, now, ...demo }),
     loadCounterResults({ pharmacyId, since: period.start, until: period.end }),
   ]);
+
+  // Les conseils du comptoir, par collaborateur : un clic sur une personne montre tous ses conseils vendus, à l'écran.
+  const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? "";
+  const counterParam = SALES_REPORT_PERIODS.find((entry) => entry.key === counterPeriod)?.param ?? "semaine";
+  const filter: AdviceFilter = ADVICE_FILTERS.some((entry) => entry.value === one(query.statut)) ? (one(query.statut) as AdviceFilter) : "tous";
+  const person = adviceRows.some((row) => row.who === one(query.qui)) ? one(query.qui) : null;
+  const adviceHref = (params: Record<string, string>) => `/resultats?${new URLSearchParams({ comptoir: counterParam, ...params }).toString()}#par-collaborateur`;
 
   return (
     <div className="space-y-6">
@@ -62,6 +72,17 @@ export default async function ResultatsPage({
         report={toSalesReportView(sales)}
         hrefs={Object.fromEntries(SALES_REPORT_PERIODS.map((entry) => [entry.key, `/resultats?comptoir=${entry.param}`])) as Record<SalesReportPeriod, string>}
         pdfHref={`/api/performance/comptoir-pdf?periode=${SALES_REPORT_PERIODS.find((entry) => entry.key === counterPeriod)?.param ?? "semaine"}`}
+      />
+
+      <PharmacyReport
+        report={sales}
+        rows={adviceRows}
+        filter={filter}
+        filterHref={(next) => adviceHref({ ...(next === "tous" ? {} : { statut: next }), ...(person ? { qui: person } : {}) })}
+        person={person}
+        personHref={(who) => adviceHref(who ? { qui: who, statut: "vendus" } : {})}
+        figures={false}
+        updatedAt={now}
       />
 
       <PerformanceDashboard report={report} roi={roi} basePath="/resultats" audience="owner" now={now} />

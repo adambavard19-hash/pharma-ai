@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, ChevronDown, Download, Euro, Percent, ScanLine, Sparkles, Store } from "lucide-react";
+import { Check, ChevronDown, Download, Euro, Percent, ScanLine, Sparkles, Store, UserRound, X } from "lucide-react";
 import type { AdviceRow } from "@/server/services/counter-history";
 import { ATTACH_TARGET, euros, percent, type SalesReport } from "@/core/counter/sales-report";
 import { TIME_ZONE } from "@/config/constants";
@@ -42,31 +42,63 @@ function Figure({ label, value, hint, icon, tone = "default" }: { label: string;
   );
 }
 
+/** Les conseils d'une période, regroupés par collaborateur (celui qui a fait la vente), le plus de conseils vendus d'abord. */
+export function adviceByPerson(rows: AdviceRow[]): { who: string; proposed: number; sold: number; revenueCents: number }[] {
+  const people = new Map<string, { who: string; proposed: number; sold: number; revenueCents: number }>();
+  for (const row of rows) {
+    const person = people.get(row.who) ?? { who: row.who, proposed: 0, sold: 0, revenueCents: 0 };
+    person.proposed += 1;
+    if (row.status === "SOLD") {
+      person.sold += 1;
+      person.revenueCents += row.priceCents ?? 0;
+    }
+    people.set(row.who, person);
+  }
+  return [...people.values()].sort((a, b) => b.sold - a.sold || b.revenueCents - a.revenueCents || a.who.localeCompare(b.who, "fr"));
+}
+
 export function PharmacyReport({
   report,
   rows,
   filter,
   filterHref,
+  person = null,
+  personHref,
   pdfHref,
+  figures = true,
   updatedAt,
 }: {
   report: SalesReport;
   rows: AdviceRow[];
   filter: AdviceFilter;
+  /** L'adresse d'un filtre, en gardant le collaborateur choisi. */
   filterHref: (filter: AdviceFilter) => string;
-  pdfHref: string;
+  /** Le collaborateur choisi : la liste ne montre que SES conseils. */
+  person?: string | null;
+  /** L'adresse qui choisit un collaborateur (ses conseils vendus), ou qui revient à toute l'équipe (`null`). */
+  personHref: (who: string | null) => string;
+  /** Absent : pas de bouton PDF. */
+  pdfHref?: string;
+  /** Faux : seulement les collaborateurs et la liste (la page a déjà ses chiffres). */
+  figures?: boolean;
   updatedAt: Date;
 }) {
   const rate = report.proposed > 0 ? report.sold / report.proposed : null;
+  const people = adviceByPerson(rows);
+  const mine = person ? rows.filter((row) => row.who === person) : rows;
   const counts = { SOLD: 0, NOT_SOLD: 0, NONE: 0 } as Record<AdviceRow["status"], number>;
-  for (const row of rows) counts[row.status] += 1;
+  for (const row of mine) counts[row.status] += 1;
   const wanted = ADVICE_FILTERS.find((entry) => entry.value === filter)?.status ?? null;
-  const shown = wanted ? rows.filter((row) => row.status === wanted) : rows;
+  const shown = wanted ? mine.filter((row) => row.status === wanted) : mine;
   const byScan = rows.filter((row) => row.soldByScan).length;
   const sameDay = report.byHour;
+  // Sans ses chiffres (page du titulaire), un rapport vide ne montre rien : l'écran du comptoir le dit déjà.
+  if (!figures && rows.length === 0) return null;
 
   return (
     <div className="space-y-6" data-rapport-performance="">
+      {figures && (
+      <>
       {/* Les quatre chiffres. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Figure label="Conseils proposés" value={String(report.proposed)} hint={`dans ${report.sales} vente${report.sales > 1 ? "s" : ""} terminée${report.sales > 1 ? "s" : ""}`} icon={<Sparkles className="size-4" />} />
@@ -90,22 +122,67 @@ export function PharmacyReport({
             </span>
           )}
         </p>
-        <a href={pdfHref} data-pdf="" className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-700 px-4 text-[13.5px] font-semibold text-white shadow-xs transition-colors hover:bg-brand-800">
-          <Download className="size-4" aria-hidden="true" />
-          Télécharger le PDF · {report.label}
-        </a>
+        {pdfHref && (
+          <a href={pdfHref} data-pdf="" className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-700 px-4 text-[13.5px] font-semibold text-white shadow-xs transition-colors hover:bg-brand-800">
+            <Download className="size-4" aria-hidden="true" />
+            Télécharger le PDF · {report.label}
+          </a>
+        )}
       </div>
+      </>
+      )}
+
+      {/* Les collaborateurs : un clic montre tous les conseils vendus de la personne. */}
+      {people.length > 0 && (
+        <section className="rounded-2xl bg-surface-card p-5 ring-1 ring-border-subtle" aria-labelledby="par-collaborateur" data-par-collaborateur="">
+          <h2 id="par-collaborateur" className="text-[15px] font-semibold text-text-primary">Par collaborateur · {report.label}</h2>
+          <p className="text-[12.5px] text-text-tertiary">Cliquez sur une personne pour voir tous ses conseils vendus.</p>
+          <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+            {people.map((entry) => {
+              const active = entry.who === person;
+              return (
+                <Link
+                  key={entry.who}
+                  href={active ? personHref(null) : personHref(entry.who)}
+                  scroll={false}
+                  aria-current={active ? "true" : undefined}
+                  data-collaborateur={entry.who}
+                  className={cn("flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors", active ? "border-brand-600 bg-brand-50 ring-2 ring-brand-100 dark:bg-brand-950" : "border-border-subtle hover:border-brand-300 hover:bg-surface-sunken/60")}
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-600 text-white" aria-hidden="true">
+                    <UserRound className="size-4.5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold text-text-primary">{entry.who}</span>
+                    <span className="block text-[12.5px] text-text-secondary tabular-nums">
+                      {entry.sold} vendu{entry.sold > 1 ? "s" : ""} sur {entry.proposed} proposé{entry.proposed > 1 ? "s" : ""}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[14px] font-bold text-success-700 tabular-nums dark:text-success-400">{euros(entry.revenueCents)}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* La liste des conseils : chacun se déplie. */}
       <section className="overflow-hidden rounded-2xl bg-surface-card ring-1 ring-border-subtle" aria-labelledby="liste-conseils">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-5 py-4">
           <div>
-            <h2 id="liste-conseils" className="text-[15px] font-semibold text-text-primary">Les conseils · {report.label}</h2>
+            <h2 id="liste-conseils" className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-text-primary">
+              {person ? `Les conseils de ${person}` : "Les conseils"} · {report.label}
+              {person && (
+                <Link href={personHref(null)} scroll={false} className="inline-flex h-7 items-center gap-1 rounded-full border border-border-default px-2.5 text-[12px] font-medium text-text-secondary hover:border-brand-300">
+                  <X className="size-3.5" aria-hidden="true" /> Toute l&apos;équipe
+                </Link>
+              )}
+            </h2>
             <p className="text-[12.5px] text-text-tertiary">Cliquez sur un conseil pour voir la vente. Mis à jour à {time.format(updatedAt)}, toutes les minutes.</p>
           </div>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer les conseils">
             {ADVICE_FILTERS.map((entry) => {
-              const count = entry.status ? counts[entry.status] : rows.length;
+              const count = entry.status ? counts[entry.status] : mine.length;
               const active = entry.value === filter;
               return (
                 <Link

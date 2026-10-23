@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/components/performance/counter-sales-report", () => ({ CounterSalesReport: () => null }));
 vi.mock("@/server/services/counter-history", async () => {
   const { buildSalesReport } = await import("@/core/counter/sales-report");
-  return { loadSalesReport: async () => buildSalesReport({ period: "week", sales: [], now: new Date("2026-10-15T10:00:00Z"), timeZone: "Europe/Paris" }) };
+  return { loadSalesReport: async () => buildSalesReport({ period: "week", sales: [], now: new Date("2026-10-15T10:00:00Z"), timeZone: "Europe/Paris" }), loadAdviceRows: async () => [] };
 });
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/auth/session", () => ({ requirePermission: mocks.requirePermission }));

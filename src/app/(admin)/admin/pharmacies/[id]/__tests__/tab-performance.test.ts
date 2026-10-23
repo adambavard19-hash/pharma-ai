@@ -39,6 +39,11 @@ const ROWS: AdviceRow[] = [
   { id: "r2", at: SALE.closedAt, saleId: "rx_1", saleReference: "V-0024", who: "Donna", product: "Stérimar Nez Allergique", forDrug: "CÉTIRIZINE 10 mg", status: "NOT_SOLD", priceCents: null, reason: "Rincer les pollens", soldByScan: false, boxes: ["CÉTIRIZINE 10 mg"] },
   { id: "r3", at: SALE.closedAt, saleId: "rx_1", saleReference: "V-0024", who: "Donna", product: "Azéol Gorge", forDrug: null, status: "NOT_SOLD", priceCents: null, reason: null, soldByScan: false, boxes: ["CÉTIRIZINE 10 mg"] },
 ];
+/** Une vente d'Evelyne, pour les collaborateurs (n'entre pas dans les chiffres : seulement dans la liste). */
+const EVELYNE: AdviceRow[] = [
+  { id: "e1", at: SALE.closedAt, saleId: "rx_2", saleReference: "V-0025", who: "Evelyne B.", product: "Arkogélules Magnésium", forDrug: null, status: "SOLD", priceCents: 1290, reason: null, soldByScan: false, boxes: [] },
+  { id: "e2", at: SALE.closedAt, saleId: "rx_2", saleReference: "V-0025", who: "Evelyne B.", product: "Ultra-Levure", forDrug: null, status: "SOLD", priceCents: 750, reason: null, soldByScan: false, boxes: [] },
+];
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
@@ -51,7 +56,7 @@ vi.mock("@/server/services/counter-history", async () => {
       mocks.rangeSeen.push(range);
       return buildSalesReport({ range, sales: [SALE], now, timeZone: "Europe/Paris" });
     },
-    loadAdviceRows: async () => ROWS,
+    loadAdviceRows: async () => [...ROWS, ...EVELYNE],
   };
 });
 
@@ -79,7 +84,7 @@ describe("les quatre chiffres, la liste et le PDF", () => {
 
   it("chaque conseil se déplie : pourquoi, la vente, le résultat (vendu par le scan)", async () => {
     const html = await render({ periode: "jour" });
-    expect(html.match(/<details/g)).toHaveLength(3);
+    expect(html.match(/<details/g)).toHaveLength(5);
     const page = text(html);
     expect(page).toContain("AllergiFlash");
     expect(page).toContain("pour CÉTIRIZINE 10 mg");
@@ -90,12 +95,37 @@ describe("les quatre chiffres, la liste et le PDF", () => {
   it("le filtre « Non vendus » ne garde qu'eux, avec les bons compteurs", async () => {
     const html = await render({ periode: "jour", statut: "non-vendus" });
     expect(html.match(/<details/g)).toHaveLength(2);
-    expect(text(html)).toMatch(/Tous 3 Vendus 1 Non vendus 2 Sans réponse 0/);
+    expect(text(html)).toMatch(/Tous 5 Vendus 3 Non vendus 2 Sans réponse 0/);
   });
 
   it("le PDF suit la période choisie, jour précis compris", async () => {
     expect(await render({ periode: "2026-10-14" })).toContain("/api/admin/pharmacies/ph_1/comptoir-pdf?periode=2026-10-14");
     expect(text(await render({ periode: "2026-10-14" }))).toContain("Télécharger le PDF · Le 14 octobre 2026");
+  });
+});
+
+describe("les collaborateurs : un clic, tous ses conseils vendus", () => {
+  it("chaque personne, ses conseils vendus et son chiffre d'affaires, le plus de ventes d'abord ; le lien choisit ses conseils vendus", async () => {
+    const html = await render({ periode: "jour" });
+    const page = text(html);
+    expect(page).toMatch(/Evelyne B\. 2 vendus sur 2 proposés 20,40 €.*Donna 1 vendu sur 3 proposés 8,90 €/);
+    expect(html).toContain("/admin/pharmacies/ph_1?onglet=performance&amp;periode=jour&amp;qui=Evelyne%20B.&amp;statut=vendus");
+  });
+
+  it("une personne choisie : seulement SES conseils, avec un retour à toute l'équipe", async () => {
+    const html = await render({ periode: "jour", qui: "Evelyne B.", statut: "vendus" });
+    expect(html.match(/<details/g)).toHaveLength(2);
+    const page = text(html);
+    expect(page).toContain("Les conseils de Evelyne B.");
+    expect(page).toMatch(/Tous 2 Vendus 2 Non vendus 0/);
+    expect(page).toContain("Toute l'équipe");
+    expect(page).not.toContain("AllergiFlash Vendu");
+  });
+
+  it("un nom inconnu dans l'adresse est ignoré : toute l'équipe", async () => {
+    const page = text(await render({ periode: "jour", qui: "<script>" }));
+    expect(page).not.toContain("Les conseils de");
+    expect(page).not.toContain("<script>");
   });
 });
 

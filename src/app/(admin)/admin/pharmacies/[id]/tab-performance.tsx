@@ -14,7 +14,7 @@ import { ADVICE_FILTERS, PharmacyReport, type AdviceFilter } from "@/components/
 /**
  * La performance de cette officine, vue de la console (fondateur, 16 oct. 2026) : la période se choisit (aujourd'hui,
  * hier, cette semaine, ce mois-ci, 7 / 30 jours, un jour ou un mois précis), puis quatre chiffres, la liste des conseils
- * et le PDF de la même période. Tout passe par l'adresse (`?onglet=performance&periode=…&statut=…`) et se rafraîchit
+ * les collaborateurs (un clic : tous les conseils vendus de la personne) et le PDF de la même période. Tout passe par l'adresse (`?onglet=performance&periode=…&statut=…&qui=…`) et se rafraîchit
  * toutes les minutes. Les ventes terminées au comptoir et leurs conseils — aucune donnée patient.
  */
 export async function PerformanceTab({ pharmacyId, query, now }: { pharmacyId: string; query: Record<string, string | string[] | undefined>; now: Date }) {
@@ -23,8 +23,11 @@ export async function PerformanceTab({ pharmacyId, query, now }: { pharmacyId: s
   const range = resolveReportRange(query.periode, now, TIME_ZONE);
   const rawFilter = Array.isArray(query.statut) ? query.statut[0] : query.statut;
   const filter: AdviceFilter = ADVICE_FILTERS.some((entry) => entry.value === rawFilter) ? (rawFilter as AdviceFilter) : "tous";
+  const rawPerson = (Array.isArray(query.qui) ? query.qui[0] : query.qui)?.slice(0, 120) || null;
   const [report, rows] = await Promise.all([loadSalesReport({ pharmacyId, range, now }), loadAdviceRows({ pharmacyId, from: range.from, to: range.to })]);
 
+  // Le collaborateur choisi n'est gardé que s'il a des conseils sur la période.
+  const person = rawPerson && rows.some((row) => row.who === rawPerson) ? rawPerson : null;
   const base = `/admin/pharmacies/${pharmacy.id}?onglet=performance`;
   const href = (params: Record<string, string>) => `${base}${Object.entries(params).map(([key, value]) => `&${key}=${encodeURIComponent(value)}`).join("")}`;
   const today = new Intl.DateTimeFormat("fr-CA", { timeZone: TIME_ZONE }).format(now);
@@ -47,7 +50,9 @@ export async function PerformanceTab({ pharmacyId, query, now }: { pharmacyId: s
           report={report}
           rows={rows}
           filter={filter}
-          filterHref={(next) => href({ periode: range.param, ...(next === "tous" ? {} : { statut: next }) })}
+          filterHref={(next) => href({ periode: range.param, ...(next === "tous" ? {} : { statut: next }), ...(person ? { qui: person } : {}) })}
+          person={person}
+          personHref={(who) => href({ periode: range.param, ...(who ? { qui: who, statut: "vendus" } : {}) })}
           pdfHref={`/api/admin/pharmacies/${pharmacy.id}/comptoir-pdf?periode=${encodeURIComponent(range.param)}`}
           updatedAt={now}
         />
