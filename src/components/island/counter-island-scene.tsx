@@ -5,10 +5,20 @@ import { RotateCcw } from "lucide-react";
 import { BANNER } from "../../../agent/src/banner-design";
 import { cn } from "@/lib/utils";
 import { CounterIsland, type IslandAdvice, type IslandPill } from "./counter-island";
-import { MixIsland } from "./mix-island";
+import { MixIsland, type HelpExchange } from "./mix-island";
+import type { HelpAdvice } from "@/core/poste/island-bridge";
 import { ISLAND_CSS } from "./island-shell";
 import { AURORE_CSS } from "./island-aurore";
 import { useDemoScenario } from "./use-demo-scenario";
+
+/**
+ * L'exemple d'« Aide » du site, sur l'Ultra-Levure des conseils d'exemple : ce que dit son RCP (BDPM, rubrique 4.5 — une levure,
+ * que l'antibiotique n'atteint pas ; les antifongiques, eux, la rendent inefficace).
+ */
+const DEMO_HELP = {
+  question: "Peut-on la prendre en même temps que l'antibiotique ?",
+  answer: "Oui : Ultra-Levure est une levure, l'antibiotique ne l'atteint pas. Elle se prend pendant la cure. Seuls les antifongiques la rendent inefficace.",
+};
 
 const PILLS: IslandPill[] = [
   { key: "ventes", label: "Ventes du jour", value: "7 · 182 €" },
@@ -36,10 +46,20 @@ export function CounterIslandScene({ items, drug, alert, framed = false, mixOnly
     return () => observer.disconnect();
   }, []);
   const { state, auto, manual, restart } = useDemoScenario(items.length, visible);
+  // L'onglet « Aide », en exemple sur le site : une question déjà posée sur le premier conseil ; une nouvelle question dit
+  // seulement où la réponse apparaît (aucune réponse inventée).
+  const [helpLog, setHelpLog] = useState<HelpExchange[]>(() => {
+    const levure = items.find((item) => /ultra-?levure/i.test(item.sheet?.name || item.name));
+    return levure ? [{ advice: levure.sheet?.name || levure.name, question: DEMO_HELP.question, answer: DEMO_HELP.answer }] : [];
+  });
+  const help = {
+    log: helpLog,
+    onAsk: (question: string, advice: HelpAdvice) => setHelpLog((log) => [...log, { advice: advice.name, question, answer: "Au comptoir, la réponse de l'aide s'affiche ici, en quelques phrases." }].slice(-4)),
+  };
 
   // Aux conseils, la bannière du comptoir telle qu'elle est aujourd'hui (la « mix », papier ADN ; fondateur, 20 oct. 2026).
   const island = mixOnly || state.stage === "advice" ? (
-    <MixIsland items={items} outcomes={state.outcomes} open onOpen={() => undefined} onFinish={() => manual({ type: "go", stage: "done" })} onAnswer={(index, outcome) => manual({ type: "answer", index, outcome })} />
+    <MixIsland items={items} outcomes={state.outcomes} open onOpen={() => undefined} onFinish={() => manual({ type: "go", stage: "done" })} onAnswer={(index, outcome) => manual({ type: "answer", index, outcome })} help={help} />
   ) : (
     <CounterIsland
       state={state}

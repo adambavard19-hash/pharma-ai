@@ -102,6 +102,24 @@ export default async function SitePage() {
           </div>
           {/* Pas « fidèle » : l'île n'a pas encore été vue dessinée sur un poste Windows. */}
           <p className="mt-4 text-center text-[13px] text-text-tertiary">Animation de la bannière PharmaBoost, reproduite pour le site. Touchez les réponses, les onglets ou les flèches pour l&apos;essayer. Médicaments, produits et prix : exemples.</p>
+          {/* Les nouveautés de la bannière (fondateur, 22 oct. 2026). */}
+          <div className="mx-auto mt-10 grid max-w-5xl gap-3 sm:grid-cols-3" data-nouveautes-banniere="">
+            {[
+              { title: "Stock, marge, challenge", line: "Visibles avant même d'ouvrir le conseil, en couleurs." },
+              { title: "Demander un conseil", line: "Sans scan : écrivez la demande du patient, les conseils de votre stock arrivent." },
+              { title: "Aide", line: "Une question du patient sur le conseil ? Posez-la, l'aide répond en quelques phrases." },
+            ].map((feature) => (
+              <Reveal key={feature.title}>
+                <div className="h-full rounded-2xl border border-border-subtle bg-surface-app p-5">
+                  <p className="inline-flex items-center gap-2 text-[16px] font-semibold text-text-primary">
+                    <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[10.5px] font-bold tracking-wide text-white uppercase">Nouveau</span>
+                    {feature.title}
+                  </p>
+                  <p className="mt-2 text-[14.5px] leading-6 text-text-secondary">{feature.line}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </section>
 
