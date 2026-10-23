@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 /**
  * « Demander un conseil » depuis la bannière du poste, sans scan (fondateur, 22 oct. 2026) : le poste, authentifié par SA
  * clé, envoie ce que le patient demande ; la réponse a la forme d'une vente bipée (l'agent la montre comme après un bip).
- * La demande est comptée pour la personne attribuée au comptoir, sinon pour le titulaire.
+ * La demande est comptée pour la personne attribuée au comptoir, sinon pour le titulaire. Des conseils trouvés ouvrent une vraie
+ * vente sur ce comptoir (son identifiant revient à la place de `demande-…`) : Vendu au bip, LGPI, « Qui a servi », e-mail.
  */
 export async function POST(request: Request) {
   const agent = await authenticateAgent(request.headers.get("authorization"));
@@ -17,10 +18,11 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { texte?: unknown };
   const text = typeof body.texte === "string" ? body.texte.replace(/\s+/g, " ").trim() : "";
   if (text.length < 2 || text.length > ASK_MAX_CHARS) return NextResponse.json({ ok: false, error: "Demande vide ou trop longue." }, { status: 400 });
-  const post = await prisma.counterPost.findUnique({ where: { id: agent.postId }, select: { assignedUserId: true } });
+  const post = await prisma.counterPost.findUnique({ where: { id: agent.postId }, select: { assignedUserId: true, label: true, hostname: true } });
   const scope = post?.assignedUserId ? { ...agent.scope, userId: post.assignedUserId } : agent.scope;
   try {
-    const { id, body: notice } = await askAtCounter({ scope, pharmacyIsDemo: agent.pharmacyIsDemo, text });
+    // Des conseils trouvés : une vraie vente s'ouvre sur ce comptoir, suivie ensuite comme une vente bipée (23 oct. 2026).
+    const { id, body: notice } = await askAtCounter({ scope, pharmacyIsDemo: agent.pharmacyIsDemo, text, post: { id: agent.postId, label: post?.hostname ?? post?.label ?? "poste", ownerId: post?.assignedUserId ?? null } });
     return NextResponse.json({ ok: true, id, notice }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("[poste] demande du comptoir impossible", error);

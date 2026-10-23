@@ -74,6 +74,13 @@ export type CounterIslandProps = {
   hoverOpen?: boolean;
   /** Au poste (fondateur, 21 oct. 2026) : la capsule au repos s'ouvre d'un CLIC, plus au survol ; elle se referme quand la souris sort. */
   peekOnClick?: boolean;
+  /**
+   * « Votre patient vous pose une question ? » (fondateur, 23 oct. 2026, essai A) : à la place de la case « Comptoir · Connecté »
+   * de la capsule ouverte au repos ; le comptoir connecté passe en petit en haut à droite.
+   */
+  ask?: ReactNode;
+  /** La capsule reste ouverte même souris dehors : le pharmacien écrit la demande du patient. */
+  holdPeek?: boolean;
   onAnswer: (index: number, outcome: IslandOutcome) => void;
   /**
    * Le poste de caisse (fondateur, 16 oct. 2026) : Vendu / Non vendu se décident SANS clic — un conseil bipé passe en
@@ -351,7 +358,7 @@ export function CounterIsland(props: CounterIslandProps) {
 
   const resting = state.stage === "idle";
   const [clicked, setClicked] = useState(false);
-  const peek = resting && (props.peekOnClick ? clicked && hover : hover && props.hoverOpen !== false) && !grumpy;
+  const peek = resting && (props.holdPeek || (props.peekOnClick ? clicked && hover : hover && props.hoverOpen !== false)) && !grumpy;
   // Une vente terminée sans conseil vendu : un robot content, sans fête.
   const mood = grumpy ? "concerned" : state.stage === "done" && !soldAtEnd ? "happy" : STAGE_MOOD[state.stage];
   const tone = grumpy ? "warning" : stageTone(state.stage);
@@ -418,8 +425,21 @@ export function CounterIsland(props: CounterIslandProps) {
   } else if (peek) {
     body = (
       <div data-ile-repos="" className="px-3 pt-2.5 pb-3">
-        <Row robot={robot(30)} title={title} sub={props.movable ? "Je surveille le comptoir. Glissez-moi pour me déplacer." : "Je surveille le comptoir. Scannez une boîte pour commencer."} compact />
-        <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+        <Row
+          robot={robot(30)}
+          title={title}
+          sub={props.movable ? "Je surveille le comptoir. Glissez-moi pour me déplacer." : "Je surveille le comptoir. Scannez une boîte pour commencer."}
+          compact
+          trailing={
+            props.ask && pills[0] ? (
+              <span data-ile-poste-connecte="" className="flex shrink-0 items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10.5px] font-semibold text-white/70" title={`${pills[0].label} : ${pills[0].value}`}>
+                {pills[0].dot && <span className="size-1.5 rounded-full" style={{ background: pills[0].dot, boxShadow: `0 0 6px ${pills[0].dot}` }} />}
+                {pills[0].label}
+              </span>
+            ) : undefined
+          }
+        />
+        {props.ask ? <div className="mt-2.5">{props.ask}</div> : <div className="mt-2.5 grid grid-cols-3 gap-1.5">
           {pills.map((pill) => (
             <div key={pill.key} className="rounded-2xl bg-white/[0.06] px-2.5 py-2">
               <p className="text-[10.5px] font-medium tracking-[0.04em] text-white/55 uppercase">{pill.label}</p>
@@ -429,7 +449,7 @@ export function CounterIsland(props: CounterIslandProps) {
               </p>
             </div>
           ))}
-        </div>
+        </div>}
       </div>
     );
   } else {

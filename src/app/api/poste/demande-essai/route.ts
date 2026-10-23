@@ -19,6 +19,13 @@ export async function POST(request: Request) {
     select: { userId: true, pharmacy: { select: { id: true, organizationId: true, isDemo: true } } },
   });
   if (!membership) return NextResponse.json({ ok: false, error: "Compte titulaire@pharma.ai introuvable dans la base locale." }, { status: 404 });
-  const { id, body: notice } = await askAtCounter({ scope: { pharmacyId: membership.pharmacy.id, organizationId: membership.pharmacy.organizationId, userId: membership.userId }, pharmacyIsDemo: membership.pharmacy.isDemo, text });
+  // Un comptoir de cette pharmacie, s'il y en a un : la demande y ouvre une vraie vente, comme au poste (23 oct. 2026).
+  const post = await prisma.counterPost.findFirst({ where: { pharmacyId: membership.pharmacy.id }, orderBy: { createdAt: "asc" }, select: { id: true, hostname: true, assignedUserId: true } });
+  const { id, body: notice } = await askAtCounter({
+    scope: { pharmacyId: membership.pharmacy.id, organizationId: membership.pharmacy.organizationId, userId: membership.userId },
+    pharmacyIsDemo: membership.pharmacy.isDemo,
+    text,
+    ...(post ? { post: { id: post.id, label: post.hostname, ownerId: post.assignedUserId } } : {}),
+  });
   return NextResponse.json({ ok: true, entry: buildHostEntry({ prescriptionId: id, serverUrl: new URL(request.url).origin, body: notice }) });
 }

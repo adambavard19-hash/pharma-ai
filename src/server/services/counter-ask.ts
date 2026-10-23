@@ -8,6 +8,12 @@ import { unitMarginHt } from "@/core/catalog/margin";
 import { studioPhotoUrl } from "@/core/catalog/studio-photo";
 import { availabilityOf } from "@/core/counter/notice";
 import type { NoticeBody } from "../../../agent/src/notice-center";
+import { readCounterNotice } from "@/server/services/counter-notice";
+import { counterTeamFor } from "@/server/services/counter-served";
+import { getEnv } from "@/config/env";
+import { ASK_JUSTIFICATION } from "@/core/counter/ask-sale";
+import { createWithReference } from "@/server/services/references";
+import { recordIsDemo } from "@/server/db/demo-scope";
 
 /**
  * « Demander un conseil » sur la bannière du poste, sans scan (fondateur, 22 oct. 2026) : le pharmacien écrit ce que le
@@ -15,23 +21,74 @@ import type { NoticeBody } from "../../../agent/src/notice-center";
  * spontanée de « Nouvelle vente » (compréhension, règles, stock du jour, sécurité) ; ce module ne fait que présenter sa
  * réponse dans la forme qu'attend la bannière (la même que celle d'une vente bipée, relue par l'agent).
  *
- * La vente n'existe pas encore : l'identifiant est celui de la demande (`demande-…`). La bannière n'envoie ni Vendu ni
- * Non vendu pour elle ; le produit choisi, une fois bipé, ouvre une vraie vente comme d'habitude.
+ * Depuis le 23 oct. 2026 (fondateur : « c'est exactement comme le scan »), une demande qui trouve des conseils ouvre une VRAIE
+ * vente sur le comptoir (`openAskSale`) : les conseils y sont enregistrés, le produit bipé ensuite passe en « Vendu », la vente
+ * validée dans LGPI, « Qui a servi ce patient ? » et l'e-mail du bilan suivent comme après un scan. Sans conseil (ou hors d'un
+ * poste de caisse), la réponse reste une simple demande (`demande-…`), sans vente.
  */
 
 export const ASK_PREFIX = "demande-";
 export const ASK_MAX_CHARS = 300;
+export type AskPost = { id: string; label: string; ownerId: string | null };
 
-export async function askAtCounter(params: { scope: TenantScope; pharmacyIsDemo: boolean; text: string }): Promise<{ id: string; body: NoticeBody }> {
+/**
+ * La vente du comptoir ouverte par une demande : sans boîte, déjà analysée, ses conseils enregistrés comme ceux d'une vente
+ * bipée (origine MANUAL : une nouvelle analyse, après une boîte bipée, ne les efface pas). La personne attribuée au comptoir
+ * la reçoit, comme une vente bipée.
+ */
+export async function openAskSale(params: { scope: TenantScope; pharmacyIsDemo: boolean; post: AskPost; text: string; answer: CounterRequestAnswer }): Promise<string> {
+  const { scope, post, text, answer } = params;
+  const proposals = answer.proposals.slice(0, 3);
+  const sale = await createWithReference("prescription", scope.pharmacyId, (candidate) =>
+    prisma.prescription.create({
+      data: {
+        pharmacyId: scope.pharmacyId,
+        reference: candidate,
+        status: "ANALYZED",
+        source: "COUNTER_SCAN",
+        counterPost: post.label.slice(0, 60) || "poste",
+        counterPostId: post.id,
+        handledByUserId: post.ownerId,
+        createdByUserId: scope.userId,
+        isDemo: recordIsDemo(params.pharmacyIsDemo),
+        recommendations: {
+          create: proposals.map((proposal, index) => ({
+            pharmacyId: scope.pharmacyId,
+            productId: proposal.productId,
+            origin: "MANUAL" as const,
+            status: "PROPOSED" as const,
+            totalScore: proposals.length - index,
+            justification: `${ASK_JUSTIFICATION}${text}`,
+            shortReason: proposal.shortReason || null,
+            patientReason: proposal.patientReason || null,
+            counterScript: proposal.counterScript || null,
+            precautions: proposal.precautions,
+            vigilances: (proposal.vigilances ?? []) as never,
+            unitPriceCents: Math.max(0, proposal.salePriceCents),
+          })),
+        },
+      },
+      select: { id: true },
+    }),
+  );
+  return sale.id;
+}
+
+export async function askAtCounter(params: { scope: TenantScope; pharmacyIsDemo: boolean; text: string; post?: AskPost }): Promise<{ id: string; body: NoticeBody; sale: boolean }> {
   const text = params.text.replace(/\s+/g, " ").trim().slice(0, ASK_MAX_CHARS);
   const answer = await adviseCounterRequest({ scope: params.scope, pharmacyIsDemo: params.pharmacyIsDemo, input: { text, ageYears: null, isPregnant: false, isBreastfeeding: false, treatments: [] } });
+  if (params.post && answer.proposals.length > 0) {
+    const id = await openAskSale({ scope: params.scope, pharmacyIsDemo: params.pharmacyIsDemo, post: params.post, text, answer });
+    const body = await counterSaleBody(params.scope.pharmacyId, id);
+    if (body) return { id, body, sale: true };
+  }
   const products = answer.proposals.length
     ? await prisma.product.findMany({
         where: { pharmacyId: params.scope.pharmacyId, id: { in: answer.proposals.map((proposal) => proposal.productId) } },
         select: { id: true, ean: true, salePriceCents: true, purchasePriceCents: true, vatRate: true, stockItem: { select: { quantity: true, alertThreshold: true } } },
       })
     : [];
-  return { id: `${ASK_PREFIX}${answer.id}`, body: askNoticeBody(text, answer, products) };
+  return { id: `${ASK_PREFIX}${answer.id}`, body: askNoticeBody(text, answer, products), sale: false };
 }
 
 type ProductRow = { id: string; ean: string | null; salePriceCents: number; purchasePriceCents: number; vatRate: number | null; stockItem: { quantity: number; alertThreshold: number | null } | null };
@@ -79,4 +136,12 @@ export function askNoticeBody(text: string, answer: CounterRequestAnswer, produc
     detectedLabel: "Demande",
     items,
   };
+}
+
+/** La vente telle que le poste la lit après un bip (`/api/agent/conseil`) : l'avis, l'e-mail, l'équipe pour « Qui a servi ». */
+export async function counterSaleBody(pharmacyId: string, id: string): Promise<NoticeBody | null> {
+  const read = await readCounterNotice(pharmacyId, id);
+  if (!read || read.notice.state !== "READY") return null;
+  const served = await counterTeamFor(pharmacyId, id).catch(() => ({ team: [], servedBy: null }));
+  return { ok: true, ...read.notice, followUp: read.followUp, ...served, url: `${getEnv().APP_URL}/vente/${id}` } as unknown as NoticeBody;
 }

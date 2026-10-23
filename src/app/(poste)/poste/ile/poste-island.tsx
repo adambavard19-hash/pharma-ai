@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ComponentProps, type CSSProperties } from "react";
+import { ArrowRight } from "lucide-react";
 import { BANNER } from "../../../../../agent/src/banner-design";
 import type { HostEntry } from "../../../../../agent/src/notice-center";
 import { BURST_PIECES, CounterIsland, type IslandAdvice } from "@/components/island/counter-island";
@@ -357,6 +358,8 @@ export function PosteIsland() {
 
   // « Vente terminée » demande d'abord l'e-mail du bilan (s'il n'est pas déjà enregistré) ; envoyé, la vente se termine seule.
   const [finishAfterEmail, setFinishAfterEmail] = useState(false);
+  // Le champ « Que demande le patient ? » ouvert dans la capsule au repos : elle reste ouverte tant qu'il l'est.
+  const [asking, setAsking] = useState(false);
   const finish = () => {
     if (!entry) return;
     if (isAskEntry(entry.id)) {
@@ -532,6 +535,26 @@ export function PosteIsland() {
     // Vendu / Non vendu sans clic : un conseil bipé est vendu, un conseil non bipé est « non vendu » à la validation.
     autoOutcome: true,
     pills: [{ key: "poste", label: view.postLabel || "Comptoir", value: "Connecté", dot: C.accent }],
+    // « Demander un conseil » sans scan (fondateur, 22 oct. 2026), DANS la capsule au repos depuis le 23 oct. (essai A) : la
+    // question part vers l'agent (ou, dans l'aperçu `?essai=demande`, vers le serveur local) et les conseils arrivent comme après un bip.
+    ask: !greeting ? (
+      <AskBox
+        open={asking}
+        onOpen={() => setAsking(true)}
+        onClose={() => setAsking(false)}
+        onAsk={(text) => {
+          setAsking(false);
+          dispatch({ type: "host", command: { op: "scan" }, now: Date.now() });
+          if (new URLSearchParams(window.location.search).get("essai") === "demande") {
+            void askLocally(text).then((shown) => {
+              if (shown) dispatch({ type: "host", command: { op: "show", entry: shown }, now: Date.now() });
+              else dispatch({ type: "timeout" });
+            });
+          } else word(askWord(text));
+        }}
+      />
+    ) : undefined,
+    holdPeek: asking && island.stage === "idle" && !entry,
     // Le robot de la marque, à jour, sur tous les postes (fondateur, 21 oct. 2026) ; la capsule au repos s'ouvre au clic.
     look: null,
     peekOnClick: true,
@@ -741,22 +764,6 @@ export function PosteIsland() {
           !questionsOnly && <CounterIsland {...islandProps} />
         )}
 
-        {/* « Demander un conseil » sans scan (fondateur, 22 oct. 2026) : au repos seulement, la question part vers l'agent (ou,
-            dans l'aperçu `?essai=demande`, vers le serveur local) et les conseils arrivent comme après un bip. */}
-        {island.stage === "idle" && !entry && !greeting && (
-          <AskBox
-            onAsk={(text) => {
-              dispatch({ type: "host", command: { op: "scan" }, now: Date.now() });
-              if (new URLSearchParams(window.location.search).get("essai") === "demande") {
-                void askLocally(text).then((shown) => {
-                  if (shown) dispatch({ type: "host", command: { op: "show", entry: shown }, now: Date.now() });
-                  else dispatch({ type: "timeout" });
-                });
-              } else word(askWord(text));
-            }}
-          />
-        )}
-
         {autoClose && autoClose.id === entry?.id && (
           <IslandShell width={STAGE_WIDTH.email} tone="success" contentKey={`valide-${autoClose.id}`} label="Vente validée dans LGPI">
             {/* LGPI a validé la vente : la bannière se termine seule à la fin du compte à rebours, sauf si le pharmacien clique. */}
@@ -919,53 +926,53 @@ async function askLocally(text: string): Promise<HostEntry | null> {
 
 const ASK_EXAMPLES = ["Mal de gorge, adulte", "Diarrhée depuis hier", "Peau sèche, enfant 6 ans", "Fatigue, examens"];
 
-/** La bannière au repos : un bouton, puis un champ pour écrire ce que le patient demande. Le clavier n'est pris qu'au clic. */
-function AskBox({ onAsk }: { onAsk: (text: string) => void }) {
-  const [open, setOpen] = useState(false);
+/**
+ * Dans la capsule au repos (fondateur, 23 oct. 2026, essai A) : « Votre patient vous pose une question ? », puis un champ pour
+ * écrire ce que le patient demande. Le clavier n'est pris qu'au clic.
+ */
+function AskBox({ open, onOpen, onClose, onAsk }: { open: boolean; onOpen: () => void; onClose: () => void; onAsk: (text: string) => void }) {
   const [text, setText] = useState("");
   const submit = (value: string) => {
     const clean = value.replace(/\s+/g, " ").trim();
     if (clean.length < 2) return;
-    setOpen(false);
     setText("");
     onAsk(clean.slice(0, 300));
   };
   if (!open)
     return (
-      <button type="button" data-ile-demander="" data-ile-sans-deploiement="" onClick={() => setOpen(true)} className="rounded-full px-4 py-2 text-[12.5px] font-bold shadow-lg transition-[filter] hover:brightness-110" style={{ background: "#0F2F2A", color: "#E8FF9C" }}>
-        ✎ Demander un conseil
+      <button type="button" data-ile-demander="" data-ile-sans-deploiement="" onClick={onOpen} className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left transition-[filter] hover:brightness-105" style={{ background: "#E8FF9C", color: "#04261A" }}>
+        <span className="text-[14px] font-bold">Votre patient vous pose une question ?</span>
+        <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
       </button>
     );
   return (
-    <IslandShell width={400} tone="success" contentKey="demander" label="Demander un conseil">
-      <form
-        data-ile-demande=""
-        data-ile-sans-deploiement=""
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit(text);
-        }}
-        className="w-full px-3 pt-2.5 pb-3 text-left"
-      >
-        <p className="text-[13px] font-bold text-white">Que demande le patient ?</p>
-        <div className="mt-2 flex gap-1.5">
-          {/* Le champ prend le clavier seulement parce que le pharmacien vient de cliquer pour écrire. */}
-          <input autoFocus value={text} onChange={(event) => setText(event.target.value)} maxLength={300} placeholder="Ex. : mal de gorge, adulte" className="h-9 min-w-0 flex-1 rounded-lg bg-white px-3 text-[13px] text-[#0F2F2A] outline-none" />
-          <button type="submit" className="h-9 shrink-0 rounded-lg px-3 text-[12.5px] font-bold" style={{ background: "#E8FF9C", color: "#04261A" }}>
-            Chercher
+    <form
+      data-ile-demande=""
+      data-ile-sans-deploiement=""
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit(text);
+      }}
+      className="w-full rounded-2xl bg-white/[0.07] p-2.5 text-left"
+    >
+      <p className="text-[13px] font-bold text-white">Que demande le patient ?</p>
+      <div className="mt-2 flex gap-1.5">
+        {/* Le champ prend le clavier seulement parce que le pharmacien vient de cliquer pour écrire. */}
+        <input autoFocus value={text} onChange={(event) => setText(event.target.value)} maxLength={300} placeholder="Ex. : mal de gorge, adulte" className="h-9 min-w-0 flex-1 rounded-lg bg-white px-3 text-[13px] text-[#0F2F2A] outline-none" />
+        <button type="submit" className="h-9 shrink-0 rounded-lg px-3 text-[12.5px] font-bold" style={{ background: "#E8FF9C", color: "#04261A" }}>
+          Chercher
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {ASK_EXAMPLES.map((example) => (
+          <button key={example} type="button" onClick={() => submit(example)} className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/85 hover:bg-white/20">
+            {example}
           </button>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1">
-          {ASK_EXAMPLES.map((example) => (
-            <button key={example} type="button" onClick={() => submit(example)} className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/85 hover:bg-white/20">
-              {example}
-            </button>
-          ))}
-          <button type="button" onClick={() => setOpen(false)} className="ml-auto px-1 text-[11px] font-semibold text-white/60 hover:text-white">
-            Fermer
-          </button>
-        </div>
-      </form>
-    </IslandShell>
+        ))}
+        <button type="button" onClick={onClose} className="ml-auto px-1 text-[11px] font-semibold text-white/60 hover:text-white">
+          Fermer
+        </button>
+      </div>
+    </form>
   );
 }

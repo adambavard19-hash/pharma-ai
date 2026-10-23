@@ -21,6 +21,7 @@ import { answersForSheet, pitchesFor, pitchKey, stockCandidates } from "@/server
 import type { CounterSheetAlternative, CounterSheetAnswer } from "../../../agent/src/counter-sheet";
 import { parseStoredAlternatives } from "@/core/ai/alternatives";
 import { availabilityOf } from "@/core/counter/notice";
+import { askTextOf } from "@/core/counter/ask-sale";
 
 /** Vrai quand le prix de vente HT est sous le prix d'achat HT : le fichier de stock a été mal lu, pas une vraie vente à perte. */
 function salePriceLooksWrong(product: { salePriceCents: number; purchasePriceCents: number; vatRate: number | null }): boolean {
@@ -300,5 +301,8 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     outcome: run?.outcome ?? null,
     stockReliable,
   });
+  // Une vente ouverte sans scan, par la demande écrite du patient (23 oct. 2026) : sans boîte, la demande est le sujet de la bannière.
+  const asked = prescription.lines.length === 0 ? askTextOf(prescription.recommendations) : null;
+  if (asked) return { status: prescription.status, notice: { ...notice, subject: asked, detectedLabel: "Demande" }, followUp };
   return { status: prescription.status, notice, followUp };
 }

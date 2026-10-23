@@ -22,6 +22,8 @@ ${P} section:has([data-ile-repos])::after{content:"";position:absolute;inset:-20
 @keyframes adn-vit{from{transform:translate3d(-6%,-3%,0) scale(1.05) rotate(-2deg)}to{transform:translate3d(6%,3%,0) scale(1.15) rotate(2deg)}}
 ${P} [data-ile-repos],${P} [data-ile-repos] *{color:#F2FFF9!important;text-shadow:0 1px 6px rgba(0,0,0,.7)}
 ${P} [data-ile-repos] .rounded-2xl{background:rgba(255,255,255,.1)!important}
+${P} [data-ile-repos] [data-ile-demander]{background:#E8FF9C!important}
+${P} [data-ile-repos] [data-ile-demander] *,${P} [data-ile-repos] input,${P} [data-ile-repos] button[type=submit]{color:#04261A!important;text-shadow:none}
 ${P} [data-ile-helice]{background:#EFF3F1;filter:${GLOW};opacity:.5}
 /* L'ADN atténué derrière le haut de la bannière : il gênait la lecture du titre du conseil (fondateur, 22 oct. 2026). */
 ${P} section:has([data-ile-mix]){background:${INK}!important;box-shadow:0 18px 40px -14px rgba(0,0,0,.55),0 0 0 1px rgba(232,255,156,.18)!important}
