@@ -128,12 +128,13 @@ export const NAVIGATION: NavItem[] = [
   {
     href: "/pilotage",
     label: "Performances",
-    subtitle: "Résultats et chiffre d'affaires",
+    subtitle: "Conseils vendus et résultats",
     icon: BarChart3,
-    // Même permission que le pilotage par collaborateur : la valeur chiffrée reste une vue de titulaire.
-    // L'équipe au comptoir ne voit ni l'entrée ni la page. Deux pages, une entrée : on arrive sur « Mon équipe » (le classement de
-    // chacun et les challenges, simple), qui mène à « Ce que PharmaBoost vous rapporte » (les ventes confirmées), qui y renvoie.
-    permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE,
+    // Le titulaire y voit toute l'officine ; le pharmacien adjoint (ANALYTICS_VIEW, fondateur, 23 oct. 2026) seulement SES
+    // conseils vendus et sa place dans l'équipe. Le préparateur et l'étudiant ne voient ni l'entrée ni la page. Pour le titulaire,
+    // deux pages, une entrée : on arrive sur « Mon équipe » (les compteurs, le classement de chacun et les challenges), qui mène à
+    // « Ce que PharmaBoost vous rapporte » (les ventes confirmées), qui y renvoie.
+    permission: PERMISSIONS.ANALYTICS_VIEW,
     match: ["/resultats", "/pilotage", "/performance", "/analytics", "/ventes"],
     description: "Le classement de l'équipe, les challenges, et ce que les conseils PharmaBoost ont rapporté",
     group: "pharmacie",
@@ -275,7 +276,7 @@ export const NAVIGATION: NavItem[] = [
  * Le menu d'un collaborateur (tout rôle autre que le titulaire) : ces entrées, et rien d'autre — plus le lien
  * « Contact support », toujours en bas du menu. Consigne du fondateur du 13 oct. 2026.
  */
-export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/historique", "/associations", "/stock/dates-courtes", "/emails-patients", "/prise-en-main", "/formation", "/nouveautes"];
+export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/pilotage", "/historique", "/associations", "/stock/dates-courtes", "/emails-patients", "/prise-en-main", "/formation", "/nouveautes"];
 
 /**
  * Les entrées que voit une personne : celles dont elle détient la permission, et, hors de l'espace du titulaire

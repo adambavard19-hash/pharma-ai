@@ -72,7 +72,9 @@ describe("le menu, en trois groupes", () => {
 
 /** Le menu d'un collaborateur, mot pour mot (consigne du fondateur du 13 oct. 2026) ; « Contact support » est le lien du bas, hors tableau. */
 // Historique pour toute l'équipe, Partenaires pour les titulaires seulement (fondateur, 15 oct. 2026).
-const COLLABORATOR_LABELS = ["Au comptoir", "Mes associations", "Dates courtes", "Historique", "E-mails aux patients", "Prise en main", "Formations", "Actualités"];
+const COLLABORATOR_LABELS = ["Au comptoir", "Mes associations", "Dates courtes", "Performances", "Historique", "E-mails aux patients", "Prise en main", "Formations", "Actualités"];
+/** Performances (SES conseils vendus) est au pharmacien adjoint et au remplaçant, pas au préparateur ni à l'étudiant (23 oct. 2026). */
+const WITHOUT_PERFORMANCES = COLLABORATOR_LABELS.filter((label) => label !== "Performances");
 
 describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas affiché", () => {
   it("le titulaire voit les trois groupes et tout son menu, inchangé", () => {
@@ -81,9 +83,9 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
     expect(navigationFor(resolvePermissions("OWNER")).map((item) => item.label)).toEqual(menuOf("OWNER"));
   });
 
-  it("pharmacien adjoint, préparateur, étudiant et remplaçant : exactement Au comptoir, Mes associations, Dates courtes, Historique, E-mails aux patients et Découvrir (Formations, Actualités)", () => {
+  it("pharmacien adjoint et remplaçant : Au comptoir, Mes associations, Dates courtes, Performances, Historique, E-mails aux patients et Découvrir ; préparateur et étudiant : la même chose sans Performances", () => {
     for (const role of ["PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE"] as const) {
-      expect(menuOf(role), role).toEqual(COLLABORATOR_LABELS);
+      expect(menuOf(role), role).toEqual(role === "PHARMACIST" || role === "SUBSTITUTE" ? COLLABORATOR_LABELS : WITHOUT_PERFORMANCES);
       expect(groupNavigation(visibleFor(role)).map((group) => group.label), role).toEqual(["Ma pharmacie", "Découvrir"]);
     }
   });
@@ -103,7 +105,7 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
 
   it("une permission de gestion accordée individuellement n'ajoute pas d'entrée hors de la liste blanche", () => {
     const granted = resolvePermissions("TECHNICIAN", [PERMISSIONS.LAB_PROGRAMS_MANAGE, PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.TEAM_MANAGE]);
-    expect(navigationFor(granted).map((item) => item.label)).toEqual(COLLABORATOR_LABELS);
+    expect(navigationFor(granted).map((item) => item.label)).toEqual(WITHOUT_PERFORMANCES);
   });
 
   it("toute entrée hors du menu collaborateur est gardée par une permission qu'aucun rôle de l'équipe ne détient", () => {
@@ -112,10 +114,11 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
     }
   });
 
-  it("l'équipe au comptoir ne voit aucune entrée de gestion : ni Mon stock, ni Performances, ni Partenaires, ni Mon équipe, ni Laboratoires & gammes, ni Produits manquants, ni Paramètres", () => {
+  it("l'équipe au comptoir ne voit aucune entrée de gestion : ni Mon stock, ni Partenaires, ni Mon équipe, ni Laboratoires & gammes, ni Produits manquants, ni Paramètres (Performances : seulement le pharmacien)", () => {
     for (const role of TEAM_ROLES) {
       const menu = menuOf(role);
-      for (const gone of ["Mon stock", "Performances", "Partenaires", "Produits manquants", "Mon équipe", "Laboratoires & gammes", "Paramètres"]) {
+      if (role !== "PHARMACIST") expect(menu, `${role} : Performances`).not.toContain("Performances");
+      for (const gone of ["Mon stock", "Partenaires", "Produits manquants", "Mon équipe", "Laboratoires & gammes", "Paramètres"]) {
         expect(menu, `${role} : ${gone}`).not.toContain(gone);
       }
     }
@@ -165,9 +168,11 @@ describe("les intitulés", () => {
 describe("l'entrée « Performances » (ex « Ce que ça rapporte » et « Pilotage »)", () => {
   const entry = NAVIGATION.find((item) => item.href === "/pilotage");
 
-  it("garde la permission de titulaire des deux anciennes entrées", () => {
-    expect(entry?.permission).toBe(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
+  it("est ouverte au titulaire et au pharmacien adjoint (ANALYTICS_VIEW) ; la page ne montre toute l'équipe qu'au titulaire", () => {
+    expect(entry?.permission).toBe(PERMISSIONS.ANALYTICS_VIEW);
     expect(menuOf("OWNER")).toContain("Performances");
+    expect(menuOf("PHARMACIST")).toContain("Performances");
+    expect(menuOf("TECHNICIAN")).not.toContain("Performances");
   });
 
   it("s'allume sur les deux pages, et sur les adresses du pilotage", () => {

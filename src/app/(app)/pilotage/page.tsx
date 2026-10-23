@@ -11,6 +11,10 @@ import { EmptyState } from "@/components/ui/feedback";
 import { formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PerformanceTabs } from "./performance-tabs";
+import { myComptoirs } from "@/server/services/comptoirs";
+import { loadSoldCounter } from "@/server/services/sold-counter";
+import { SoldCounter } from "@/components/performance/sold-counter";
+import { MyPlaceAndProducts, TeamSoldBoard } from "@/components/performance/sold-blocks";
 
 export const metadata: Metadata = { title: "Performances" };
 
@@ -27,22 +31,50 @@ const PERIODS: { key: FixedPeriodKey; label: string; param: string }[] = [
  * Pour chaque collaborateur : combien de conseils lui ont été proposés, combien ont été validés, son rang — pour aujourd'hui, la
  * semaine, le mois ou l'année — et où il en est dans les challenges en cours. Les chiffres viennent de la base : ils s'accumulent
  * tout seuls, sans rien à saisir. Le détail des ventes et du chiffre d'affaires est dans « Ce que PharmaBoost vous rapporte ».
- * Réservé au titulaire : ces chiffres n'ont rien à faire sous les yeux du comptoir.
+ * En tête (fondateur, 23 oct. 2026) : le compteur des conseils vendus de toute l'officine, celui de ses propres ventes (lui et
+ * ses comptoirs), qui vend le plus et ce qui part le mieux. Le pharmacien adjoint arrive ici aussi, mais ne voit que SES
+ * conseils vendus et sa place dans l'équipe : le classement détaillé et les challenges restent au titulaire.
  */
 export default async function PilotagePage({ searchParams }: { searchParams: Promise<{ periode?: string }> }) {
-  const session = await requirePermission(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
+  // Le pharmacien adjoint (ANALYTICS_VIEW) voit SES conseils vendus ; le titulaire, toute l'officine en plus (fondateur, 23 oct. 2026).
+  const session = await requirePermission(PERMISSIONS.ANALYTICS_VIEW);
+  const now = new Date();
+  const { pharmacyId, userId } = session.scope;
+  const onlyMe = { userId, postIds: (await myComptoirs(session.scope)).postIds };
+  const owner = session.permissions.has(PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE);
+
+  if (!owner) {
+    const [mine, team] = await Promise.all([loadSoldCounter({ pharmacyId, now, onlyFor: onlyMe }), loadSoldCounter({ pharmacyId, now })]);
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Mes performances" description={`${session.user.firstName}, voici les conseils que vous avez vendus au comptoir.`} />
+        <SoldCounter periods={mine.periods} title="Mes conseils vendus" subtitle="Vos ventes terminées, déclarées « Vendu »" initial={2} />
+        <MyPlaceAndProducts me={session.user.fullName} ranking={team.reports[2].byPerson} products={mine.reports[2].topProducts} />
+      </div>
+    );
+  }
+
   const { periode } = await searchParams;
   const chosen = PERIODS.find((period) => period.param === periode) ?? PERIODS[0];
   const range = resolvePeriod(chosen.key);
 
-  const [ranking, challenges] = await Promise.all([loadTeamRanking(session.scope, range), loadTeamChallenges(session.scope)]);
+  const [ranking, challenges, officine, mine] = await Promise.all([
+    loadTeamRanking(session.scope, range),
+    loadTeamChallenges(session.scope),
+    loadSoldCounter({ pharmacyId, now }),
+    loadSoldCounter({ pharmacyId, now, onlyFor: onlyMe }),
+  ]);
   const { rows, totals } = ranking;
   const nobody = totals.proposed === 0;
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Performances" description="Les conseils proposés et validés par chacun, et où il en est dans les challenges. Ces chiffres ne sont visibles que de vous." />
+      <PageHeader title="Performances" description="Les conseils vendus par toute l'officine et par vous, le classement de chacun et les challenges. Ces chiffres ne sont visibles que de vous." />
       <PerformanceTabs active="equipe" />
+
+      <SoldCounter periods={officine.periods} title="Toute l'officine" subtitle="Conseils vendus au comptoir, déclarés « Vendu »" initial={2} />
+      <SoldCounter periods={mine.periods} title="Mes ventes et mon poste" subtitle={`${session.user.firstName}, vos ventes et celles de vos comptoirs`} initial={2} />
+      <TeamSoldBoard people={officine.reports[2].byPerson} products={officine.reports[2].topProducts} />
 
       <nav aria-label="Période" className="flex flex-wrap gap-1.5">
         {PERIODS.map((period) => (

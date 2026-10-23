@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 /**
  * Le compteur des conseils vendus, en grand : il défile jusqu'au nombre à chaque période choisie. Les chiffres sont ceux
  * des ventes terminées (« Vendu » déclaré au comptoir), calculés côté serveur pour les quatre périodes ; le client ne fait
- * que choisir laquelle montrer. Essai du fondateur (23 oct. 2026) pour l'onglet Performances, titulaire et pharmacien.
+ * que choisir laquelle montrer. L'onglet Performances du titulaire et du pharmacien (fondateur, 23 oct. 2026).
  */
 
 export type CounterPeriod = {
