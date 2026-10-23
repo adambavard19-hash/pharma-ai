@@ -48,6 +48,24 @@ export function bestOrder(items: readonly Pick<IslandAdvice, "challenge" | "shor
   return items.map((_, index) => index).sort((a, b) => score(items[b]) - score(items[a]) || centsOf(items[b].margin) - centsOf(items[a].margin) || a - b);
 }
 
+/**
+ * Les lignes du haut de la bannière repliée (fondateur, 23 oct. 2026 : « conseil 1 en lien avec le produit 1 dans LGPI, conseil
+ * 2 avec le produit 2 ») : pour chaque boîte scannée, dans l'ordre où elle est arrivée, son meilleur conseil pas encore vendu
+ * (challenge, date courte, puis marge : `bestOrder`), ou son conseil vendu s'ils le sont tous. Un conseil sans boîte connue fait
+ * sa propre ligne. Rend des index dans `items`.
+ */
+export function headsByBox(items: readonly Pick<IslandAdvice, "drug">[], order: readonly number[], sold: (index: number) => boolean): number[] {
+  const boxes: (string | number)[] = [];
+  items.forEach((item, index) => {
+    const key = item.drug || index;
+    if (!boxes.includes(key)) boxes.push(key);
+  });
+  return boxes.map((key) => {
+    const mine = order.filter((index) => (items[index].drug || index) === key);
+    return mine.find((index) => !sold(index)) ?? mine[0];
+  });
+}
+
 /** Ce que la vente peut rapporter : la somme des marges connues des conseils (« jusqu'à 11,43 € »). */
 export function possibleMargin(items: readonly Pick<IslandAdvice, "margin">[]): number {
   return items.reduce((sum, item) => sum + centsOf(item.margin), 0);
@@ -95,12 +113,18 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   const position = Math.min(at, order.length - 1);
   const index = order[position];
   const item = items[index];
-  const best = items[firstOpen];
   const go = (next: number) => {
     setAt((next + order.length) % order.length);
     setStep("sheet");
   };
   const alternatives = order.map((i, pos) => ({ i, pos })).filter(({ i }) => i !== index && item.drug && items[i].drug === item.drug);
+  const heads = headsByBox(items, order, sold);
+  // Une ligne du haut : la grande bannière s'ouvre (ou reste ouverte) sur ce conseil.
+  const show = (head: number) => {
+    setAt(Math.max(0, order.indexOf(head)));
+    setStep("sheet");
+    if (!open) onOpen();
+  };
   const width = narrow ? (open ? 330 : 300) : open ? 400 : 400;
 
   return (
@@ -113,28 +137,49 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
       backdrop={aurore ? <div data-ile-helice="" className="absolute inset-0 isolate"><HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" /></div> : undefined}
     >
       <div data-ile-mix={open ? "ouvert" : "replie"}>
-        {/* Le haut, toujours là : le meilleur conseil à proposer, ou ce qui est déjà vendu. */}
-        <div className="flex w-full items-center gap-2 px-2 py-1.5">
-          <button type="button" data-ile-replie="" aria-expanded={open} onClick={open && onClose ? onClose : onOpen} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-            <Robot size={30} mood="happy" look={look} label="Le robot PharmaBoost" />
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2 text-[13.5px] leading-[18px] font-semibold tracking-[-0.01em] text-[#0F2F2A]">
-                {aurore && <span className="aur-dot shrink-0" aria-hidden="true" />}
-                {/* Jamais « 1 bipé · +3,28 € à la validation » (fondateur, 22 oct. 2026 : « je ne veux pas voir ça ») : le nom du conseil. */}
-                <span className="truncate">{best.name}</span>
-              </span>
-              {/* Sous le nom, avant tout clic (fondateur, 22 oct. 2026) : le stock et son nombre, la marge et son montant, le
-                  challenge et la date courte quand il y en a. */}
-              <span data-ile-mix-repere="" className="mt-0.5 flex flex-wrap items-center gap-1">
-                {/* En couleurs (fondateur, 22 oct. 2026) : stock vert (orange s'il est faible, rouge en rupture), marge jaune, challenge
-                    vert citron, date courte rouge. */}
-                <HeadChip {...stockColors(best)}>{stockLabel(best)}</HeadChip>
-                {best.margin && <HeadChip bg="#FFE58A" fg="#4A3500">Marge {best.margin}</HeadChip>}
-                {best.challenge && <HeadChip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</HeadChip>}
-                {best.shortDate && <HeadChip bg="#FF8A80" fg="#4A0B07">{T.shortDate} {best.shortDate}</HeadChip>}
-              </span>
-            </span>
-          </button>
+        {/* Le haut, toujours là (fondateur, 23 oct. 2026) : une ligne par boîte scannée dans LGPI, dans l'ordre du scan — le
+            meilleur conseil pour le produit 1, puis pour le produit 2… (stock, marge, challenge, date courte, comme avant). Un clic
+            sur une ligne déploie la grande bannière sur CE conseil. */}
+        <div className="flex w-full items-start gap-2 px-2 py-1.5">
+          <Robot size={30} mood="happy" look={look} label="Le robot PharmaBoost" />
+          <div className="min-w-0 flex-1 space-y-1">
+            {heads.map((head, row) => {
+              const advice = items[head];
+              const active = open && head === index;
+              return (
+                <button
+                  key={head}
+                  type="button"
+                  data-ile-replie={row === 0 ? "" : undefined}
+                  data-ile-mix-ligne={row + 1}
+                  aria-expanded={open}
+                  onClick={() => (active && onClose ? onClose() : show(head))}
+                  className={`flex w-full min-w-0 flex-col rounded-lg px-1 py-0.5 text-left${heads.length > 1 && row > 0 ? " border-t border-[#0F2F2A]/10 pt-1" : ""}`}
+                >
+                  <span className="flex items-center gap-2 text-[13.5px] leading-[18px] font-semibold tracking-[-0.01em] text-[#0F2F2A]">
+                    {aurore && row === 0 && <span className="aur-dot shrink-0" aria-hidden="true" />}
+                    {heads.length > 1 && (
+                      <span className="inline-flex size-[18px] shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold text-white" style={{ background: L.green }}>
+                        {row + 1}
+                      </span>
+                    )}
+                    {/* Jamais « 1 bipé · +3,28 € à la validation » (fondateur, 22 oct. 2026 : « je ne veux pas voir ça ») : le nom du conseil. */}
+                    <span className="truncate">{advice.name}</span>
+                    {sold(head) && <Check className="size-3.5 shrink-0" strokeWidth={3} style={{ color: L.green }} aria-label="Vendu" />}
+                  </span>
+                  {heads.length > 1 && advice.drug && <span className="truncate text-[10.5px] leading-[14px] font-semibold text-[#3F5E57]">pour {advice.drug}</span>}
+                  {/* Sous le nom, avant tout clic (fondateur, 22 oct. 2026), en couleurs : stock vert (orange s'il est faible, rouge en
+                      rupture), marge jaune, challenge vert citron, date courte rouge. */}
+                  <span data-ile-mix-repere="" className="mt-0.5 flex flex-wrap items-center gap-1">
+                    <HeadChip {...stockColors(advice)}>{stockLabel(advice)}</HeadChip>
+                    {advice.margin && <HeadChip bg="#FFE58A" fg="#4A3500">Marge {advice.margin}</HeadChip>}
+                    {advice.challenge && <HeadChip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</HeadChip>}
+                    {advice.shortDate && <HeadChip bg="#FF8A80" fg="#4A0B07">{T.shortDate} {advice.shortDate}</HeadChip>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
           <button
             type="button"
             data-ile-client-suivant=""
