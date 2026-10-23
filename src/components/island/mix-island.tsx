@@ -184,20 +184,20 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
             </div>
 
             {/* La carte ouverte, comme l'essai « L » de /robot-apercu/carte-conseil (fondateur, 22 oct. 2026 : « je veux vraiment que
-                ça ressemble au L ») : l'hélice du site sur papier clair tout autour, une grande carte blanche pleine, la photo qui
-                en dépasse, le nom et le prix en grand, la raison encadrée, les onglets à droite, des rubriques légères. */}
+                ça ressemble au L ») : l'hélice du site sur papier clair tout autour, une grande carte blanche pleine, la photo et le titre
+                dedans (le petit titre vert ne passe plus sur l'ADN, 22 oct. 2026), le nom et le prix en grand, la raison encadrée, les onglets à droite, des rubriques légères. */}
             <div data-ile-mix-l="" className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
               <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
                 <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
               </div>
-              <div className={`relative px-2.5 pb-2.5 ${item.image ? "pt-[56px]" : "pt-2.5"}`}>
+              <div className="relative p-2.5">
                 <div data-ile-mix-carte="" className="rounded-[18px] p-3 text-left shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]" style={{ background: "#FFFFFF", color: L.ink }}>
-                  <div className={`flex items-end gap-3 ${item.image ? "-mt-[52px]" : ""}`}>
+                  <div className="flex items-center gap-3">
                     {/* La photo studio du produit ; sans photo studio, rien (jamais une photo amateur). */}
                     {item.image && (
-                      <span className="inline-flex size-[70px] shrink-0 items-center justify-center rounded-2xl bg-white p-1.5 shadow-[0_6px_18px_-8px_rgba(15,43,38,0.45)]">
+                      <span className="inline-flex size-[60px] shrink-0 items-center justify-center rounded-xl bg-white p-1 ring-1 ring-[#E3EBE8]">
                         {/* eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée */}
-                        <img data-ile-mix-photo="" src={item.image} alt="" width={58} height={58} draggable={false} className="isl-float size-full object-contain" />
+                        <img data-ile-mix-photo="" src={item.image} alt="" width={52} height={52} draggable={false} className="isl-float size-full object-contain" />
                       </span>
                     )}
                     <div className="min-w-0 flex-1 pb-0.5">

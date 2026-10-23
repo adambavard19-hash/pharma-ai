@@ -4,6 +4,7 @@ import { useCallback, useReducer } from "react";
 import { INITIAL_ISLAND, islandReducer, type IslandAction, type IslandStage, type IslandState } from "@/core/island/banner-flow";
 import { CounterIsland, type IslandAdvice } from "./counter-island";
 import { MixIsland } from "./mix-island";
+import { useDemoHelp } from "./use-demo-help";
 import { ISLAND_CSS } from "./island-shell";
 import { AURORE_CSS } from "./island-aurore";
 
@@ -17,11 +18,12 @@ export function CounterIslandStill({ items, drug, alert = null, stage = "advice"
   const count = items.length;
   const reducer = useCallback((state: IslandState, action: IslandAction) => islandReducer(state, action, count), [count]);
   const [state, dispatch] = useReducer(reducer, null, () => islandReducer(INITIAL_ISLAND, { type: "go", stage }, count));
+  const help = useDemoHelp(items);
   return (
     <div className={className} data-ile-style="aurore">
       <style>{`${ISLAND_CSS}\n${AURORE_CSS}`}</style>
       {mix && state.stage === "advice" ? (
-        <MixIsland items={items} outcomes={state.outcomes} open onOpen={() => undefined} onFinish={() => dispatch({ type: "go", stage: "done" })} onAnswer={(index, outcome) => dispatch({ type: "answer", index, outcome })} />
+        <MixIsland items={items} outcomes={state.outcomes} open onOpen={() => undefined} onFinish={() => dispatch({ type: "go", stage: "done" })} onAnswer={(index, outcome) => dispatch({ type: "answer", index, outcome })} help={help} />
       ) : (
         <CounterIsland
           state={state}
