@@ -89,7 +89,6 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   const item = items[index];
   const best = items[firstOpen];
   const total = possibleMargin(items);
-  const soldMargin = possibleMargin(soldIndexes.map((i) => items[i]));
   const go = (next: number) => {
     setAt((next + order.length) % order.length);
     setStep("sheet");
@@ -114,7 +113,8 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-2 text-[13.5px] leading-[18px] font-semibold tracking-[-0.01em] text-[#0F2F2A]">
                 {aurore && <span className="aur-dot shrink-0" aria-hidden="true" />}
-                <span className="truncate">{soldIndexes.length > 0 ? `✓ ${soldIndexes.length} bipé${soldIndexes.length > 1 ? "s" : ""}${soldMargin > 0 ? ` · +${eurosOf(soldMargin)} à la validation` : " · vendu à la validation"}` : best.name}</span>
+                {/* Jamais « 1 bipé · +3,28 € à la validation » (fondateur, 22 oct. 2026 : « je ne veux pas voir ça ») : le nom du conseil. */}
+                <span className="truncate">{best.name}</span>
               </span>
               <span className="block truncate text-[11px] leading-[15px] text-[#3F5E57]">
                 {items.length} conseil{items.length > 1 ? "s" : ""}
@@ -196,19 +196,17 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
               <Tags item={item} />
 
               {sold(index) ? (
-                <div data-ile-mix-vendu="" className="isl-pop mt-2.5 flex min-h-[210px] flex-col items-center justify-center gap-2.5 rounded-xl px-3 text-center" style={{ background: C.challengeBg, color: "#0F2F2A" }}>
-                  <span className="inline-flex size-10 items-center justify-center rounded-full" style={{ background: "#0F2F2A", color: C.challengeBg }}>
-                    <Check className="size-5" strokeWidth={3} aria-hidden="true" />
-                  </span>
-                  <p className="text-[14px] font-extrabold">Bipé{item.margin ? ` · +${item.margin} de marge` : ""}</p>
-                  <p className="-mt-1.5 text-[11.5px] font-semibold" style={{ color: "#3D4F00" }}>Vendu à la validation de la vente</p>
+                // Un conseil bipé : une ligne discrète, pas un grand panneau (fondateur, 22 oct. 2026).
+                <div data-ile-mix-vendu="" className="mt-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] font-bold" style={{ background: C.cell, color: C.ink }}>
+                  <Check className="size-4 shrink-0" strokeWidth={3} style={{ color: C.accent }} aria-hidden="true" />
+                  <span className="flex-1">Vendu</span>
                   {soldIndexes.length < order.length && (
-                    <button type="button" onClick={() => go(order.findIndex((i) => !sold(i)))} className="h-8 rounded-lg px-3 text-[12px] font-bold" style={{ background: "#0F2F2A", color: C.challengeBg }}>
+                    <button type="button" onClick={() => go(order.findIndex((i) => !sold(i)))} className="h-7 rounded-md px-2.5 text-[11.5px] font-bold" style={{ background: C.raised, color: C.accent }}>
                       Conseil suivant
                     </button>
                   )}
-                  <button type="button" onClick={() => onAnswer(index, null)} className="text-[11px] font-semibold underline-offset-2 hover:underline" style={{ color: "#3D4F00" }}>
-                    Annuler « Bipé »
+                  <button type="button" onClick={() => onAnswer(index, null)} className="text-[11px] font-semibold underline-offset-2 hover:underline" style={{ color: C.inkSoft }}>
+                    Annuler
                   </button>
                 </div>
               ) : (
