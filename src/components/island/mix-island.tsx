@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, MessageCircle, Pill } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, LifeBuoy, MessageCircle, Pill } from "lucide-react";
+import type { HelpAdvice } from "@/core/poste/island-bridge";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import type { IslandOutcome } from "@/core/island/banner-flow";
@@ -51,11 +52,12 @@ export function possibleMargin(items: readonly Pick<IslandAdvice, "margin">[]): 
   return items.reduce((sum, item) => sum + centsOf(item.margin), 0);
 }
 
-// « Discours » retiré (fondateur, 22 oct. 2026) : la fiche et les questions suffisent.
-type Step = "ask" | "sheet";
+// « Discours » retiré, « Aide » ajoutée (fondateur, 22 oct. 2026) : la fiche, les questions, et l'aide quand on ne sait pas répondre.
+type Step = "ask" | "sheet" | "help";
 const STEPS: { id: Step; label: string; Icon: typeof Pill }[] = [
   { id: "sheet", label: "Fiche", Icon: Pill },
   { id: "ask", label: "Questions", Icon: MessageCircle },
+  { id: "help", label: "Aide", Icon: LifeBuoy },
 ];
 
 export type MixIslandProps = {
@@ -74,9 +76,14 @@ export type MixIslandProps = {
   onAnswer: (index: number, outcome: IslandOutcome) => void;
   /** Les boîtes scannées : celle qui est en challenge (toute la gamme d'un laboratoire) le dit en haut, avec son gain. */
   boxes?: { id: string; name: string; challenge?: string; reward?: string }[];
+  /** L'onglet « Aide » : les questions déjà posées sur cette vente et leurs réponses ; absent, pas d'onglet Aide. */
+  help?: { log: HelpExchange[]; onAsk: (question: string, advice: HelpAdvice) => void };
 };
 
-export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [] }: MixIslandProps) {
+/** Une question à l'aide et sa réponse (vide tant qu'elle n'est pas arrivée). */
+export type HelpExchange = { advice: string; question: string; answer: string; error?: string };
+
+export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help }: MixIslandProps) {
   const challengedBoxes = boxes.filter((box) => box.challenge);
   const order = bestOrder(items);
   const sold = (index: number) => outcomes[index] === "SOLD";
@@ -211,8 +218,8 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                 </div>
               ) : (
                 <>
-                  <div role="tablist" className="mt-2.5 grid grid-cols-2 gap-1 rounded-xl p-1" style={{ background: C.cell }}>
-                    {STEPS.map(({ id, label, Icon }, n) => (
+                  <div role="tablist" className={`mt-2.5 grid ${help ? "grid-cols-3" : "grid-cols-2"} gap-1 rounded-xl p-1`} style={{ background: C.cell }}>
+                    {STEPS.filter((entry) => entry.id !== "help" || help).map(({ id, label, Icon }, n) => (
                       <button
                         key={id}
                         type="button"
@@ -230,6 +237,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   <div className="isl-scroll mt-2 max-h-[230px] min-h-[150px] overflow-y-auto pr-1 text-[12px] leading-[16px]">
                     {step === "ask" && <Ask key={index} item={item} />}
                     {step === "sheet" && <Sheet item={item} />}
+                    {step === "help" && help && <Help item={item} help={help} />}
                   </div>
                   {item.sheet?.alternatives && item.sheet.alternatives.length > 0 && (
                     <div data-ile-mix-alternative="" className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
@@ -378,6 +386,56 @@ function Sheet({ item }: { item: IslandAdvice }) {
 }
 
 const POSOLOGY_MISSING = "La posologie n'est pas renseignée dans PharmaBoost pour ce produit : reportez-vous à sa notice.";
+
+/**
+ * 3. Aide : le pharmacien qui ne sait pas répondre au patient pose sa question sur CE conseil ; la réponse arrive dessous
+ * (agent du poste → serveur → modèle). Rien du patient ne part : la question et la fiche du conseil.
+ */
+function Help({ item, help }: { item: IslandAdvice; help: NonNullable<MixIslandProps["help"]> }) {
+  const [draft, setDraft] = useState("");
+  const name = item.sheet?.name || item.name;
+  const log = help.log.filter((entry) => entry.advice === name).slice(-3);
+  const ask = () => {
+    const question = draft.replace(/\s+/g, " ").trim();
+    if (question.length < 2) return;
+    help.onAsk(question.slice(0, 400), {
+      name,
+      ...(item.sheet?.reasons[0] || item.reason ? { reason: item.sheet?.reasons[0] || item.reason } : {}),
+      ...(item.sheet?.description ? { posology: item.sheet.description } : {}),
+      ...(item.sheet?.usage.length ? { tell: item.sheet.usage.map((line) => line.text) } : {}),
+    });
+    setDraft("");
+  };
+  return (
+    <div className="space-y-2" data-ile-aide="">
+      {log.length === 0 && <p style={{ color: C.inkSoft }}>Le patient pose une question à laquelle vous ne savez pas répondre ? Demandez à l&apos;aide, sur ce conseil.</p>}
+      {log.map((entry, index) => (
+        <div key={index} className="space-y-1">
+          <p className="ml-6 rounded-xl rounded-br-sm px-2.5 py-1.5 text-white" style={{ background: C.pick }}>{entry.question}</p>
+          <p className="mr-6 rounded-xl rounded-bl-sm px-2.5 py-1.5" style={{ background: C.raised, color: C.raisedInk }}>
+            {entry.answer || entry.error || "L'aide réfléchit…"}
+          </p>
+        </div>
+      ))}
+      <div className="flex gap-1.5" data-ile-sans-deploiement="">
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") ask();
+          }}
+          maxLength={400}
+          placeholder="Ex. : peut-on le prendre enceinte ?"
+          className="h-8 min-w-0 flex-1 rounded-lg bg-white px-2.5 text-[12px] text-[#0F2F2A] outline-none"
+        />
+        <button type="button" onClick={ask} className="h-8 shrink-0 rounded-lg px-2.5 text-[11.5px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
+          Demander
+        </button>
+      </div>
+      <p className="text-[10px]" style={{ color: C.inkSoft }}>Aide du modèle : vérifiez sur la notice ou le RCP avant de conseiller.</p>
+    </div>
+  );
+}
 
 function Part({ title, children }: { title: string; children: ReactNode }) {
   return (

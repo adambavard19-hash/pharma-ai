@@ -30,6 +30,8 @@ export type HostCommand =
   | { op: "keep" }
   /** LGPI a validé cette vente (« FIN Valider ») : la bannière propose l'e-mail du bilan, puis la termine d'elle-même. */
   | { op: "validated"; id: string }
+  /** La réponse de l'« Aide » à une question du pharmacien sur un conseil (agent 0.10.30 et suivants). Vide : l'aide n'a pas pu répondre. */
+  | { op: "help"; id: string; question: string; answer: string; error?: string }
   | { op: "quit" };
 
 /** Les quatre places possibles : en haut (par défaut), en bas, ou debout contre le bord gauche ou droit de l'écran. */
@@ -249,6 +251,9 @@ function onHost(view: PosteView, command: HostCommand, now: number): PosteView {
     }
     case "done":
       return { ...view, done: command.info, emailPending: false, greeting: null, island: { ...view.island, stage: "done" } };
+    case "help":
+      // Les réponses de l'Aide vivent dans la page (poste-island), pas dans l'état de la vente.
+      return view;
     case "remove":
       if (view.entry && view.entry.id !== command.id) return view;
       return { ...INITIAL_POSTE, look: view.look, postLabel: view.postLabel, side: view.side };
@@ -323,6 +328,20 @@ export function askWord(value: string): string | null {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return `DEMANDE ${btoa(binary)}`;
+}
+
+/** Ce que l'« Aide » sait du conseil affiché : son nom, pourquoi, la posologie connue, ce qu'il faut dire au patient. */
+export type HelpAdvice = { name: string; reason?: string; posology?: string; tell?: string[] };
+
+/** « AIDE <vente> <question et conseil en base64> » : la question du pharmacien sur le conseil affiché (agent 0.10.30). */
+export function helpWord(saleId: string, question: string, advice: HelpAdvice): string | null {
+  const text = question.replace(/\s+/g, " ").trim().slice(0, 400);
+  if (!ID.test(saleId) || text.length < 2 || !advice.name) return null;
+  const payload = JSON.stringify({ q: text, c: { name: advice.name.slice(0, 160), reason: advice.reason?.slice(0, 300), posology: advice.posology?.slice(0, 400), tell: advice.tell?.slice(0, 4).map((line) => line.slice(0, 200)) } });
+  const bytes = new TextEncoder().encode(payload);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return `AIDE ${saleId} ${btoa(binary)}`;
 }
 
 export function removeBoxWord(saleId: string, lineId: string): string | null {
@@ -401,6 +420,14 @@ export function parseCommand(raw: unknown): HostCommand | null {
       return typeof command.id === "string" ? { op: "remove", id: command.id } : null;
     case "show":
       return isEntry(command.entry) ? { op: "show", entry: command.entry } : null;
+    case "help": {
+      const text = (value: unknown, max: number) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "");
+      if (typeof command.id !== "string" || !ID.test(command.id)) return null;
+      const question = text(command.question, 400);
+      const answer = text(command.answer, 1400);
+      const error = text(command.error, 200);
+      return question && (answer || error) ? { op: "help", id: command.id, question, answer, ...(error ? { error } : {}) } : null;
+    }
     case "done":
       return isDone(command.info) ? { op: "done", info: command.info } : null;
     default:

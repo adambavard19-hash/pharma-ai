@@ -74,6 +74,7 @@ export type AuditAction =
   | "prescription.file_erased"
   | "patient_data.purged"
   | "counter.request_advised"
+  | "counter.help_answered"
   | "stock.post_export_path_set"
   | "stock.post_sync_requested"
   | "prescription.barcode_learned"

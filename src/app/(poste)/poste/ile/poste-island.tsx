@@ -7,7 +7,7 @@ import { BURST_PIECES, CounterIsland, type IslandAdvice } from "@/components/isl
 import { STAGE_WIDTH } from "@/core/island/banner-flow";
 import { IslandShell, ISLAND_CSS } from "@/components/island/island-shell";
 import { IslandQuestions } from "@/components/island/island-questions";
-import { MixIsland } from "@/components/island/mix-island";
+import { MixIsland, type HelpExchange } from "@/components/island/mix-island";
 import { Robot } from "@/components/robot";
 import {
   adviceLink,
@@ -17,6 +17,8 @@ import {
   finishWord,
   removeBoxWord,
   askWord,
+  helpWord,
+  type HelpAdvice,
   servedWord,
   shouldAskServed,
   splitBoxWord,
@@ -202,9 +204,29 @@ const RESUME_KEY = "pb-ile-reprise";
 
 export function PosteIsland() {
   const [view, dispatch] = useReducer(posteReducer, INITIAL_POSTE);
-  const { send } = useBridge(useCallback((command: HostCommand) => dispatch({ type: "host", command, now: Date.now() }), []));
+  // Les questions à l'« Aide » et leurs réponses, pour la vente à l'écran (la réponse arrive de l'agent : commande « help »).
+  const [helpLog, setHelpLog] = useState<{ sale: string; log: HelpExchange[] }>({ sale: "", log: [] });
+  const receiveHelp = useCallback((sale: string, question: string, answer: string, error?: string) => {
+    setHelpLog((current) => {
+      if (current.sale !== sale) return current;
+      const at = current.log.findLastIndex((entry) => entry.question === question && !entry.answer && !entry.error);
+      if (at < 0) return current;
+      const log = current.log.slice();
+      log[at] = { ...log[at], answer, ...(error ? { error } : {}) };
+      return { sale, log };
+    });
+  }, []);
+  const { send } = useBridge(
+    useCallback(
+      (command: HostCommand) => {
+        if (command.op === "help") receiveHelp(command.id, command.question, command.answer, command.error);
+        else dispatch({ type: "host", command, now: Date.now() });
+      },
+      [receiveHelp],
+    ),
+  );
   // Une demande du comptoir (`demande-…`) n'est pas une vente : aucun Vendu, e-mail ni « Terminer » ne part vers l'agent pour elle.
-  const word = useCallback((text: string | null) => { if (text && !/^\S+ demande-/.test(text)) send({ type: "word", word: text }); }, [send]);
+  const word = useCallback((text: string | null) => { if (text && !/^(?!AIDE )\S+ demande-/.test(text)) send({ type: "word", word: text }); }, [send]);
   const { island, entry } = view;
 
   // « Qui a servi ce patient ? » (fondateur, 19 oct. 2026) : à la fin d'une vente avec au moins un conseil vendu, l'île demande
@@ -636,6 +658,20 @@ export function PosteIsland() {
             onFinish={finish}
             onAnswer={islandProps.onAnswer}
             boxes={entry.boxes ?? []}
+            help={{
+              log: helpLog.sale === entry.id ? helpLog.log : [],
+              onAsk: (question, advice) => {
+                const sale = entry.id;
+                setHelpLog((current) => ({ sale, log: [...(current.sale === sale ? current.log : []), { advice: advice.name, question, answer: "" }].slice(-8) }));
+                if (new URLSearchParams(window.location.search).has("essai")) {
+                  void helpLocally(question, advice).then((result) => receiveHelp(sale, question, result.answer, result.error));
+                } else {
+                  const text = helpWord(sale, question, advice);
+                  if (text) send({ type: "word", word: text });
+                  else receiveHelp(sale, question, "", "Question illisible.");
+                }
+              },
+            }}
           />
         ) : folded && entry && (view.side === "gauche" || view.side === "droite") ? (
           <IslandShell width={SIDE_FOLDED_WIDTH} tone="accent" contentKey="replie-cote" label="Conseils de la vente (cliquez pour les voir)">
@@ -857,6 +893,17 @@ export function PosteIsland() {
 }
 
 const isAskEntry = (id: string) => id.startsWith("demande-");
+
+/** L'essai de l'Aide dans l'aperçu : la question part au serveur local (jamais en production). */
+async function helpLocally(question: string, advice: HelpAdvice): Promise<{ answer: string; error?: string }> {
+  try {
+    const response = await fetch("/api/poste/aide-essai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, conseil: advice }) });
+    const body = (await response.json().catch(() => null)) as { ok?: boolean; answer?: string; error?: string } | null;
+    return body?.ok && body.answer ? { answer: body.answer } : { answer: "", error: body?.error ?? "L'aide n'a pas pu répondre." };
+  } catch {
+    return { answer: "", error: "L'aide n'a pas pu répondre (réseau)." };
+  }
+}
 const wallClock = () => Date.now();
 
 /** L'essai dans l'aperçu : la demande part au serveur local (jamais en production), qui répond avec la vente toute prête. */

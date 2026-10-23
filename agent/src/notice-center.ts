@@ -122,6 +122,8 @@ export type HostAction =
   | { kind: "open_space" }
   /** « Demander un conseil » sur la bannière, sans scan : le texte écrit par le pharmacien. */
   | { kind: "ask"; text: string }
+  /** « Aide » : la question du pharmacien sur le conseil affiché, et ce conseil (nom, raison, posologie…). */
+  | { kind: "help"; saleId: string; question: string; advice: Record<string, unknown> }
   /** Clic sur la carte d'un conseil de l'île (« OUVRIR <adresse> ») : la page de la vente, dans le navigateur du PC — adresse revérifiée par l'agent (sale-link.ts). */
   | { kind: "open_sale"; url: string };
 
@@ -498,6 +500,11 @@ export class NoticeCenter {
     this.ensureHost();
   }
 
+  /** La réponse de l'« Aide » : seulement l'île la sait montrer (l'ancienne bannière n'a pas d'onglet Aide). */
+  help(saleId: string, question: string, answer: string, error = ""): void {
+    if (this.host && this.banner && this.window === "ile") this.send({ op: "help", id: saleId, question, answer, ...(error ? { error } : {}) });
+  }
+
   /** Le robot de ce comptoir : la bannière en change aussitôt (couleur, accessoire), sans redémarrer. */
   /** Le nom du poste a changé dans PharmaBoost : la bannière (l'île) l'affiche aussitôt. */
   setPostLabel(label: string): void {
@@ -737,7 +744,15 @@ export class NoticeCenter {
       const [node, choice] = argument.split(":");
       if (node && choice && /^[\w-]+$/.test(node) && /^[\w-]+$/.test(choice)) act({ kind: "answer", saleId, node, choice });
     } else if (word === "SERVI" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "served", saleId, userId: argument });
-    else if (word === "VOIR") act({ kind: "view", saleId });
+    else if (word === "AIDE" && argument && argument.length <= 4000) {
+      try {
+        const payload = JSON.parse(Buffer.from(argument, "base64").toString("utf8")) as { q?: unknown; c?: unknown };
+        const question = typeof payload.q === "string" ? payload.q.replace(/\s+/g, " ").trim() : "";
+        if (question.length >= 2 && question.length <= 400 && payload.c && typeof payload.c === "object") act({ kind: "help", saleId, question, advice: payload.c as Record<string, unknown> });
+      } catch {
+        this.options.log("Avis : question d'aide illisible.");
+      }
+    } else if (word === "VOIR") act({ kind: "view", saleId });
     else if (word === "FERMEE") this.held.delete(saleId);
     else if (word === "ERREUR") this.options.log(`Avis : ${line}`);
   }

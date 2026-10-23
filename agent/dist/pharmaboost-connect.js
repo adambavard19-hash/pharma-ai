@@ -5961,6 +5961,10 @@ var NoticeCenter = class {
     if (!this.prepare()) return;
     this.ensureHost();
   }
+  /** La réponse de l'« Aide » : seulement l'île la sait montrer (l'ancienne bannière n'a pas d'onglet Aide). */
+  help(saleId, question, answer, error = "") {
+    if (this.host && this.banner && this.window === "ile") this.send({ op: "help", id: saleId, question, answer, ...error ? { error } : {} });
+  }
   /** Le robot de ce comptoir : la bannière en change aussitôt (couleur, accessoire), sans redémarrer. */
   /** Le nom du poste a changé dans PharmaBoost : la bannière (l'île) l'affiche aussitôt. */
   setPostLabel(label) {
@@ -6182,7 +6186,15 @@ var NoticeCenter = class {
       const [node, choice] = argument.split(":");
       if (node && choice && /^[\w-]+$/.test(node) && /^[\w-]+$/.test(choice)) act({ kind: "answer", saleId, node, choice });
     } else if (word === "SERVI" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "served", saleId, userId: argument });
-    else if (word === "VOIR") act({ kind: "view", saleId });
+    else if (word === "AIDE" && argument && argument.length <= 4e3) {
+      try {
+        const payload = JSON.parse(Buffer.from(argument, "base64").toString("utf8"));
+        const question = typeof payload.q === "string" ? payload.q.replace(/\s+/g, " ").trim() : "";
+        if (question.length >= 2 && question.length <= 400 && payload.c && typeof payload.c === "object") act({ kind: "help", saleId, question, advice: payload.c });
+      } catch {
+        this.options.log("Avis : question d'aide illisible.");
+      }
+    } else if (word === "VOIR") act({ kind: "view", saleId });
     else if (word === "FERMEE") this.held.delete(saleId);
     else if (word === "ERREUR") this.options.log(`Avis : ${line}`);
   }
@@ -7208,7 +7220,18 @@ async function handleAction(action) {
     }
     return;
   }
-  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale" || action.kind === "ask") return;
+  if (config && action.kind === "help") {
+    try {
+      const result = await postJson(config, "/api/agent/aide", { question: action.question, conseil: action.advice, vente: action.saleId });
+      if (result.body?.ok && result.body.answer) notices.help(action.saleId, action.question, result.body.answer);
+      else notices.help(action.saleId, action.question, "", result.body?.error ?? "L'aide n'a pas pu r\xE9pondre.");
+    } catch (error) {
+      notices.help(action.saleId, action.question, "", "L'aide n'a pas pu r\xE9pondre (r\xE9seau).");
+      log(`Aide impossible : ${error instanceof Error ? error.message : String(error)}.`);
+    }
+    return;
+  }
+  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale" || action.kind === "ask" || action.kind === "help") return;
   if (watched) watched.lastChange = Date.now();
   try {
     if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {

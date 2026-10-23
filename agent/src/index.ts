@@ -503,7 +503,19 @@ async function handleAction(action: HostAction): Promise<void> {
     }
     return;
   }
-  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale" || action.kind === "ask") return;
+  if (config && action.kind === "help") {
+    // « Aide » : la question part au serveur, la réponse revient dans l'onglet Aide de l'île.
+    try {
+      const result = await postJson<{ ok: boolean; answer?: string; error?: string }>(config, "/api/agent/aide", { question: action.question, conseil: action.advice, vente: action.saleId });
+      if (result.body?.ok && result.body.answer) notices.help(action.saleId, action.question, result.body.answer);
+      else notices.help(action.saleId, action.question, "", result.body?.error ?? "L'aide n'a pas pu répondre.");
+    } catch (error) {
+      notices.help(action.saleId, action.question, "", "L'aide n'a pas pu répondre (réseau).");
+      log(`Aide impossible : ${error instanceof Error ? error.message : String(error)}.`);
+    }
+    return;
+  }
+  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale" || action.kind === "ask" || action.kind === "help") return;
   if (watched) watched.lastChange = Date.now();
   try {
     if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {
