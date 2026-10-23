@@ -54,7 +54,7 @@ export const LGPI_FILE_CONTENTS = {
     "Deux éditions d'inventaire, envoyées ensemble : l'une valorisée au « Prix de vente » (votre prix TTC), l'autre au « PAMP Net » (votre prix d'achat). Avec les deux, PharmaBoost connaît la marge de chaque produit.",
     "Au format PDF, tel que LGPI l'enregistre (F9). Aucune validation d'inventaire : rien n'est modifié dans LGPI.",
   ],
-  how: "Dans LGPI : module Inventaire → Édition → « Saisie des critères d'édition » : prix de référence « Prix de vente », sur l'ensemble du stock ; puis une seconde édition avec « PAMP Net ».",
+  how: "Dans LGPI : B. Gestion Stock → S. Édition de l'inventaire → votre code → F5 Imprimer → « Oui » (tout le stock) → F9 Enregistrer ; puis une seconde édition avec le prix de référence « Prix de vente ».",
 } as const;
 
 /** Un autre logiciel que LGPI : son nom, ce que le fichier doit contenir, et — honnêtement — pas d'étapes inventées. */

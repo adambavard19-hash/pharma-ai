@@ -43,7 +43,7 @@ describe("procédure d'export par logiciel", () => {
       expect(lgo.exportSteps.length).toBeGreaterThanOrEqual(3);
     }
     const lgpi = LGO_DEFINITIONS.find((l) => l.id === "lgpi");
-    expect(lgpi?.exportSteps.join(" ")).toMatch(/Inventaire.*Édition.*Prix de vente.*PDF/s);
+    expect(lgpi?.exportSteps.join(" ")).toMatch(/Gestion Stock.*Édition de l.inventaire.*F5.*Prix de vente.*PDF/s);
     expect(lgpi?.exportHint).not.toMatch(/export planifié/);
   });
 });

@@ -1,7 +1,7 @@
 import { PageTitle } from "@/components/ui/page-title";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, Plus, RefreshCw } from "lucide-react";
+import { BookOpen, ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { prisma } from "@/server/db/client";
 import { countLotsNeedingAction } from "@/server/services/stock-lots";
 import { loadConnectionOverview } from "@/server/services/connection-overview";
@@ -149,6 +149,12 @@ export default async function StockPage({
             <Button asChild size="xl" className="w-full rounded-full" leadingIcon={<RefreshCw className="size-5" />}>
               <Link href="/stock/mise-a-jour">{syncedAt ? "Mettre à jour mon stock" : "Envoyer mon stock"}</Link>
             </Button>
+          )}
+          {canImport && (
+            <Link href="/stock/guide-lgpi" className="flex items-center justify-center gap-2 text-[14px] font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
+              <BookOpen className="size-4" aria-hidden="true" />
+              Comment envoyer mon inventaire LGPI
+            </Link>
           )}
         </div>
 

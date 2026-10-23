@@ -199,8 +199,8 @@ export function UpdateFlow({ previous = null, lgo = null }: { previous?: { fileN
             <p className="text-[13px] text-text-tertiary">ou glissez-les ici</p>
           </div>
           {lgo === "lgpi" && (
-            <Link href="/connexion/guide?logiciel=lgpi" className="inline-block text-[13.5px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-400">
-              Comment récupérer mon stock dans LGPI ?
+            <Link href="/stock/guide-lgpi" className="inline-block text-[13.5px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-400">
+              Comment envoyer mon inventaire LGPI ?
             </Link>
           )}
         </div>

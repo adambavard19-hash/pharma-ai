@@ -56,7 +56,7 @@ describe("les étapes selon le logiciel", () => {
     expect(guide.verified).toBe(true);
     expect(guide.notice).toBeNull();
     expect(guide.menuSteps).toHaveLength(2);
-    expect(guide.menuSteps[0]).toContain("module Inventaire");
+    expect(guide.menuSteps[0]).toContain("Édition de l'inventaire");
     expect(guide.menuSteps[1]).toContain("Prix de vente");
     expect(guide.saveHint).toContain("(F9)");
   });

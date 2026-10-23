@@ -31,7 +31,7 @@ const TROUBLES: [string, string][] = [
 
 /** Le chemin dans le logiciel, en quelques mots, pour le schéma (les phrases complètes sont à côté). */
 const MENU_PATH: Record<string, string[]> = {
-  lgpi: ["Module Inventaire", "Édition", "Prix de vente", "Enregistrer en PDF"],
+  lgpi: ["B. Gestion Stock", "S. Édition de l'inventaire", "F5 Imprimer, puis « Oui »", "F9 Enregistrer"],
 };
 const GENERIC_MENU_PATH = ["Export ou édition du stock", "CSV, Excel ou PDF", "Enregistrer le fichier"];
 
