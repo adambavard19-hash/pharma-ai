@@ -312,6 +312,19 @@ export function emailWord(saleId: string, value: string): string | null {
 }
 
 /** « RETIRER <vente> <boîte> » : le patient a reposé cette boîte, elle quitte la vente. */
+/**
+ * « DEMANDE <texte en base64> » : ce que le patient demande, écrit sur la bannière sans scan (agent 0.10.30 et suivants). Le
+ * texte voyage en base64 (UTF-8) : la ligne de la fenêtre se coupe aux espaces.
+ */
+export function askWord(value: string): string | null {
+  const text = value.replace(/\s+/g, " ").trim().slice(0, 300);
+  if (text.length < 2) return null;
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return `DEMANDE ${btoa(binary)}`;
+}
+
 export function removeBoxWord(saleId: string, lineId: string): string | null {
   return ID.test(saleId) && ID.test(lineId) ? `RETIRER ${saleId} ${lineId}` : null;
 }

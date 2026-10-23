@@ -48,7 +48,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.29";
+const VERSION = "0.10.30";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -490,7 +490,20 @@ async function handleAction(action: HostAction): Promise<void> {
     else log(openInBrowser(url) ? "Conseil : page de la vente ouverte dans le navigateur de ce PC." : "Conseil : le navigateur n'a pas pu être lancé.");
     return;
   }
-  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale") return;
+  if (config && action.kind === "ask") {
+    // « Demander un conseil » sur la bannière, sans scan : le serveur répond comme pour une vente bipée, montrée telle quelle.
+    try {
+      const result = await postJson<{ ok: boolean; id?: string; notice?: NoticeBody; error?: string }>(config, "/api/agent/demande", { texte: action.text });
+      if (result.body?.ok && result.body.id && result.body.notice) {
+        log(`Demande du comptoir : ${result.body.notice.items?.length ?? 0} conseil(s).`);
+        await showBody(config, result.body.id, result.body.notice, {});
+      } else log(`Demande du comptoir refusée : ${result.body?.error ?? `HTTP ${result.status}`}.`);
+    } catch (error) {
+      log(`Demande du comptoir impossible : ${error instanceof Error ? error.message : String(error)}.`);
+    }
+    return;
+  }
+  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale" || action.kind === "ask") return;
   if (watched) watched.lastChange = Date.now();
   try {
     if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {

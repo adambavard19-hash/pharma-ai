@@ -120,6 +120,8 @@ export type HostAction =
   | { kind: "view"; saleId: string }
   /** L'icône près de l'horloge → « Ouvrir mon espace PharmaBoost » (le mot ESPACE, sans vente) : l'agent lie le navigateur du PC. */
   | { kind: "open_space" }
+  /** « Demander un conseil » sur la bannière, sans scan : le texte écrit par le pharmacien. */
+  | { kind: "ask"; text: string }
   /** Clic sur la carte d'un conseil de l'île (« OUVRIR <adresse> ») : la page de la vente, dans le navigateur du PC — adresse revérifiée par l'agent (sale-link.ts). */
   | { kind: "open_sale"; url: string };
 
@@ -704,6 +706,12 @@ export class NoticeCenter {
         this.options.log(`Avis : action ${word} impossible (${error instanceof Error ? error.message : String(error)}).`);
       }
     };
+    if (word === "DEMANDE") {
+      // Le texte est en base64 (UTF-8) : un mot, sans espace. Borné, sur une ligne.
+      const text = saleId && !argument && saleId.length <= 600 ? Buffer.from(saleId, "base64").toString("utf8").replace(/\s+/g, " ").trim() : "";
+      if (text.length >= 2 && text.length <= 300) act({ kind: "ask", text });
+      return;
+    }
     if (word === "ESPACE" && !saleId) {
       act({ kind: "open_space" });
       return;

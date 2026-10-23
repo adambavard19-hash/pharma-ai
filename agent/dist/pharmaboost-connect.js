@@ -6154,6 +6154,11 @@ var NoticeCenter = class {
         this.options.log(`Avis : action ${word} impossible (${error instanceof Error ? error.message : String(error)}).`);
       }
     };
+    if (word === "DEMANDE") {
+      const text = saleId && !argument && saleId.length <= 600 ? Buffer.from(saleId, "base64").toString("utf8").replace(/\s+/g, " ").trim() : "";
+      if (text.length >= 2 && text.length <= 300) act({ kind: "ask", text });
+      return;
+    }
     if (word === "ESPACE" && !saleId) {
       act({ kind: "open_space" });
       return;
@@ -6876,7 +6881,7 @@ function shouldGreet(state) {
 var import_node_fs11 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path10 = require("node:path");
-var VERSION = "0.10.29";
+var VERSION = "0.10.30";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path10.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path10.join)((0, import_node_path10.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -7191,7 +7196,19 @@ async function handleAction(action) {
     else log(openInBrowser(url) ? "Conseil : page de la vente ouverte dans le navigateur de ce PC." : "Conseil : le navigateur n'a pas pu \xEAtre lanc\xE9.");
     return;
   }
-  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale") return;
+  if (config && action.kind === "ask") {
+    try {
+      const result = await postJson(config, "/api/agent/demande", { texte: action.text });
+      if (result.body?.ok && result.body.id && result.body.notice) {
+        log(`Demande du comptoir : ${result.body.notice.items?.length ?? 0} conseil(s).`);
+        await showBody(config, result.body.id, result.body.notice, {});
+      } else log(`Demande du comptoir refus\xE9e : ${result.body?.error ?? `HTTP ${result.status}`}.`);
+    } catch (error) {
+      log(`Demande du comptoir impossible : ${error instanceof Error ? error.message : String(error)}.`);
+    }
+    return;
+  }
+  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale" || action.kind === "ask") return;
   if (watched) watched.lastChange = Date.now();
   try {
     if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {

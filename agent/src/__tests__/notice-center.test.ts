@@ -269,6 +269,14 @@ describe("la fenêtre et son processus", () => {
     ]);
   });
 
+  it("transmet « Demander un conseil » : le texte en base64, accents compris ; vide ou trop long, rien", () => {
+    const notices = center();
+    notices.show(entry());
+    const ask = Buffer.from("Mal de gorge, adulte · fièvre", "utf8").toString("base64");
+    hosts[0].stdout.emit("data", `PRET\nDEMANDE ${ask}\nDEMANDE\nDEMANDE ${Buffer.from("x".repeat(400)).toString("base64")}\n`);
+    expect(actions).toEqual([{ kind: "ask", text: "Mal de gorge, adulte · fièvre" }]);
+  });
+
   it("transmet une réponse à l'arbre de questions : « REPONSE vente question:choix »", () => {
     const notices = center();
     notices.show(entry());

@@ -16,6 +16,7 @@ import {
   emailWord,
   finishWord,
   removeBoxWord,
+  askWord,
   servedWord,
   shouldAskServed,
   splitBoxWord,
@@ -149,7 +150,8 @@ function useBridge(onCommand: (command: HostCommand) => void): { send: (message:
       return () => window.removeEventListener("message", listener);
     }
     // Seule dans un navigateur : la vente d'exemple, en boucle, si on la demande.
-    if (!new URLSearchParams(window.location.search).has("essai")) return;
+    // `?essai=demande` : la bannière au repos, pour essayer « Demander un conseil » sans vente d'exemple qui passe par-dessus.
+    if (!new URLSearchParams(window.location.search).has("essai") || new URLSearchParams(window.location.search).get("essai") === "demande") return;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const play = () => {
       for (const step of ESSAI_SEQUENCE) timers.push(setTimeout(() => receive(step.command), step.at));
@@ -201,7 +203,8 @@ const RESUME_KEY = "pb-ile-reprise";
 export function PosteIsland() {
   const [view, dispatch] = useReducer(posteReducer, INITIAL_POSTE);
   const { send } = useBridge(useCallback((command: HostCommand) => dispatch({ type: "host", command, now: Date.now() }), []));
-  const word = useCallback((text: string | null) => { if (text) send({ type: "word", word: text }); }, [send]);
+  // Une demande du comptoir (`demande-…`) n'est pas une vente : aucun Vendu, e-mail ni « Terminer » ne part vers l'agent pour elle.
+  const word = useCallback((text: string | null) => { if (text && !/^\S+ demande-/.test(text)) send({ type: "word", word: text }); }, [send]);
   const { island, entry } = view;
 
   // « Qui a servi ce patient ? » (fondateur, 19 oct. 2026) : à la fin d'une vente avec au moins un conseil vendu, l'île demande
@@ -334,6 +337,10 @@ export function PosteIsland() {
   const [finishAfterEmail, setFinishAfterEmail] = useState(false);
   const finish = () => {
     if (!entry) return;
+    if (isAskEntry(entry.id)) {
+      dispatch({ type: "host", command: { op: "remove", id: entry.id }, now: wallClock() });
+      return;
+    }
     if (!entry.emailSaved && !finishAfterEmail) {
       setFinishAfterEmail(true);
       dispatch({ type: "openEmail" });
@@ -698,6 +705,22 @@ export function PosteIsland() {
           !questionsOnly && <CounterIsland {...islandProps} />
         )}
 
+        {/* « Demander un conseil » sans scan (fondateur, 22 oct. 2026) : au repos seulement, la question part vers l'agent (ou,
+            dans l'aperçu `?essai=demande`, vers le serveur local) et les conseils arrivent comme après un bip. */}
+        {island.stage === "idle" && !entry && !greeting && (
+          <AskBox
+            onAsk={(text) => {
+              dispatch({ type: "host", command: { op: "scan" }, now: Date.now() });
+              if (new URLSearchParams(window.location.search).get("essai") === "demande") {
+                void askLocally(text).then((shown) => {
+                  if (shown) dispatch({ type: "host", command: { op: "show", entry: shown }, now: Date.now() });
+                  else dispatch({ type: "timeout" });
+                });
+              } else word(askWord(text));
+            }}
+          />
+        )}
+
         {autoClose && autoClose.id === entry?.id && (
           <IslandShell width={STAGE_WIDTH.email} tone="success" contentKey={`valide-${autoClose.id}`} label="Vente validée dans LGPI">
             {/* LGPI a validé la vente : la bannière se termine seule à la fin du compte à rebours, sauf si le pharmacien clique. */}
@@ -830,5 +853,72 @@ export function PosteIsland() {
         )}
       </div>
     </>
+  );
+}
+
+const isAskEntry = (id: string) => id.startsWith("demande-");
+const wallClock = () => Date.now();
+
+/** L'essai dans l'aperçu : la demande part au serveur local (jamais en production), qui répond avec la vente toute prête. */
+async function askLocally(text: string): Promise<HostEntry | null> {
+  try {
+    const response = await fetch("/api/poste/demande-essai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texte: text }) });
+    const body = (await response.json().catch(() => null)) as { ok?: boolean; entry?: HostEntry } | null;
+    return body?.ok && body.entry ? body.entry : null;
+  } catch {
+    return null;
+  }
+}
+
+const ASK_EXAMPLES = ["Mal de gorge, adulte", "Diarrhée depuis hier", "Peau sèche, enfant 6 ans", "Fatigue, examens"];
+
+/** La bannière au repos : un bouton, puis un champ pour écrire ce que le patient demande. Le clavier n'est pris qu'au clic. */
+function AskBox({ onAsk }: { onAsk: (text: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const submit = (value: string) => {
+    const clean = value.replace(/\s+/g, " ").trim();
+    if (clean.length < 2) return;
+    setOpen(false);
+    setText("");
+    onAsk(clean.slice(0, 300));
+  };
+  if (!open)
+    return (
+      <button type="button" data-ile-demander="" data-ile-sans-deploiement="" onClick={() => setOpen(true)} className="rounded-full px-4 py-2 text-[12.5px] font-bold shadow-lg transition-[filter] hover:brightness-110" style={{ background: "#0F2F2A", color: "#E8FF9C" }}>
+        ✎ Demander un conseil
+      </button>
+    );
+  return (
+    <IslandShell width={400} tone="success" contentKey="demander" label="Demander un conseil">
+      <form
+        data-ile-demande=""
+        data-ile-sans-deploiement=""
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit(text);
+        }}
+        className="w-full px-3 pt-2.5 pb-3 text-left"
+      >
+        <p className="text-[13px] font-bold text-white">Que demande le patient ?</p>
+        <div className="mt-2 flex gap-1.5">
+          {/* Le champ prend le clavier seulement parce que le pharmacien vient de cliquer pour écrire. */}
+          <input autoFocus value={text} onChange={(event) => setText(event.target.value)} maxLength={300} placeholder="Ex. : mal de gorge, adulte" className="h-9 min-w-0 flex-1 rounded-lg bg-white px-3 text-[13px] text-[#0F2F2A] outline-none" />
+          <button type="submit" className="h-9 shrink-0 rounded-lg px-3 text-[12.5px] font-bold" style={{ background: "#E8FF9C", color: "#04261A" }}>
+            Chercher
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {ASK_EXAMPLES.map((example) => (
+            <button key={example} type="button" onClick={() => submit(example)} className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/85 hover:bg-white/20">
+              {example}
+            </button>
+          ))}
+          <button type="button" onClick={() => setOpen(false)} className="ml-auto px-1 text-[11px] font-semibold text-white/60 hover:text-white">
+            Fermer
+          </button>
+        </div>
+      </form>
+    </IslandShell>
   );
 }
