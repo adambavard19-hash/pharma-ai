@@ -101,7 +101,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
     setStep("sheet");
   };
   const alternatives = order.map((i, pos) => ({ i, pos })).filter(({ i }) => i !== index && item.drug && items[i].drug === item.drug);
-  const width = narrow ? (open ? 340 : 300) : open ? 430 : 400;
+  const width = narrow ? (open ? 350 : 300) : open ? 440 : 400;
 
   return (
     <IslandShell
@@ -181,91 +181,102 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
               )}
             </div>
 
-            <div data-ile-mix-carte="" className="rounded-[16px] p-3 text-left" style={{ background: C.panel, color: C.ink }}>
-              <div className="flex items-start gap-3">
-                {/* La photo studio du produit, sur fond blanc ; sans photo studio, rien (jamais une photo amateur). */}
-                {item.image && (
-                  <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-xl bg-white p-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée */}
-                    <img data-ile-mix-photo="" src={item.image} alt="" width={48} height={48} draggable={false} className="isl-float size-full object-contain" />
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p key={index} data-ile-mix-titre="" className="text-[15.5px] leading-[19px] font-extrabold break-words">{item.sheet?.name || item.name}</p>
-                  {(item.sheet?.reasons[0] || item.reason) && <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-[15px]" style={{ color: C.inkSoft }}>{item.sheet?.reasons[0] || item.reason}</p>}
-                </div>
-                <div className="shrink-0 text-right">
-                  {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux) ; la marge, pour le pharmacien seul. */}
-                  <p className="text-[17px] leading-none font-extrabold whitespace-nowrap tabular-nums">{item.price && item.stock !== "UNKNOWN" ? item.price : "—"}</p>
-                  <p className="mt-1 text-[11.5px] font-bold whitespace-nowrap tabular-nums" style={{ color: C.numberFg }}>{item.margin ? `marge ${item.margin}` : "marge —"}</p>
+            {/* La carte ouverte, façon Kontoir sur l'ADN blanc (fondateur, 22 oct. 2026 : essai « L » de /robot-apercu/carte-conseil) :
+                l'hélice du site en bandeau, la grande carte blanche par-dessus, la photo qui en dépasse, le nom et le prix en grand. */}
+            <div data-ile-mix-l="" className="relative overflow-hidden rounded-[20px] bg-[#EFF3F1]">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-[130px] isolate" aria-hidden="true">
+                <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
+              </div>
+              <div className={`relative px-2.5 pb-2.5 ${item.image ? "pt-[74px]" : "pt-[44px]"}`}>
+                <div data-ile-mix-carte="" className="rounded-[18px] p-3.5 text-left shadow-[0_10px_30px_-18px_rgba(15,43,38,0.6)]" style={{ background: "#FFFFFF", color: "#0F2B26" }}>
+                  <div className={`flex items-end gap-3 ${item.image ? "-mt-[66px]" : ""}`}>
+                    {/* La photo studio du produit ; sans photo studio, rien (jamais une photo amateur). */}
+                    {item.image && (
+                      <span className="inline-flex size-[88px] shrink-0 items-center justify-center rounded-2xl bg-white p-1.5 shadow-md">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée */}
+                        <img data-ile-mix-photo="" src={item.image} alt="" width={76} height={76} draggable={false} className="isl-float size-full object-contain" />
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1 pb-0.5">
+                      <p key={index} data-ile-mix-titre="" className="text-[19px] leading-[22px] font-extrabold tracking-[-0.02em] break-words">{item.sheet?.name || item.name}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux) ; la marge, pour le pharmacien seul. */}
+                    <span className="text-[22px] leading-none font-extrabold tracking-[-0.02em] tabular-nums" style={{ color: "#0E8A7B" }}>{item.price && item.stock !== "UNKNOWN" ? item.price : "—"}</span>
+                    {item.margin && <span className="rounded-md border px-1.5 py-0.5 text-[10.5px] font-bold tracking-wide tabular-nums" style={{ borderColor: "#F2D27A", background: "#FFF5D6", color: "#9A6400" }}>MARGE {item.margin}</span>}
+                  </div>
+                  <Tags item={item} />
+                  {(item.sheet?.reasons[0] || item.reason) && (
+                    <p className="mt-2.5 rounded-xl border-2 px-3 py-2 text-[13px] leading-[18px]" style={{ borderColor: "#5E9C8C" }}>{item.sheet?.reasons[0] || item.reason}</p>
+                  )}
+
+                    {sold(index) ? (
+                      // Un conseil bipé : une ligne discrète, pas un grand panneau (fondateur, 22 oct. 2026).
+                      <div data-ile-mix-vendu="" className="mt-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] font-bold" style={{ background: C.cell, color: C.ink }}>
+                        <Check className="size-4 shrink-0" strokeWidth={3} style={{ color: "#0E8A7B" }} aria-hidden="true" />
+                        <span className="flex-1">Vendu</span>
+                        {soldIndexes.length < order.length && (
+                          <button type="button" onClick={() => go(order.findIndex((i) => !sold(i)))} className="h-7 rounded-md px-2.5 text-[11.5px] font-bold" style={{ background: C.raised, color: C.accent }}>
+                            Conseil suivant
+                          </button>
+                        )}
+                        <button type="button" onClick={() => onAnswer(index, null)} className="text-[11px] font-semibold underline-offset-2 hover:underline" style={{ color: C.inkSoft }}>
+                          Annuler
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div role="tablist" className={`mt-2.5 grid ${help ? "grid-cols-3" : "grid-cols-2"} gap-1 rounded-xl border p-1`} style={{ background: "#F3F7F5", borderColor: "#B9D8CE" }}>
+                          {STEPS.filter((entry) => entry.id !== "help" || help).map(({ id, label, Icon }, n) => (
+                            <button
+                              key={id}
+                              type="button"
+                              role="tab"
+                              aria-selected={step === id}
+                              data-ile-mix-etape={id}
+                              onClick={() => setStep(id)}
+                              className="inline-flex h-7 items-center justify-center gap-1 rounded-lg text-[11.5px] font-bold"
+                              style={step === id ? { background: C.raised, color: C.accent, boxShadow: "0 1px 3px rgba(0,0,0,.25)" } : { color: C.inkSoft }}
+                            >
+                              <Icon className="size-3.5" aria-hidden="true" /> {n + 1}. {label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="isl-scroll mt-2 max-h-[230px] min-h-[150px] overflow-y-auto pr-1 text-[12px] leading-[16px]">
+                          {step === "ask" && <Ask key={index} item={item} />}
+                          {step === "sheet" && <Sheet item={item} />}
+                          {step === "help" && help && <Help item={item} help={help} />}
+                        </div>
+                        {item.sheet?.alternatives && item.sheet.alternatives.length > 0 && (
+                          <div data-ile-mix-alternative="" className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
+                            <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre alternative en stock</p>
+                            {item.sheet.alternatives.map((other) => (
+                              <div key={other.name} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1">
+                                <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{other.name}</span>
+                                {other.price && <span className="shrink-0 text-[11.5px] font-bold tabular-nums">{other.price}</span>}
+                                {other.margin && <span className="shrink-0 text-[11px] font-bold tabular-nums" style={{ color: C.numberFg }}>marge {other.margin}</span>}
+                              </div>
+                            ))}
+                            <p className="px-1.5 text-[10.5px]" style={{ color: C.inkSoft }}>Bipez celui qu&apos;il choisit : le conseil passe « Bipé » avec ce produit.</p>
+                          </div>
+                        )}
+                        {alternatives.length > 0 && (
+                          <div className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
+                            <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre possibilité en stock</p>
+                            {alternatives.slice(0, 2).map(({ i, pos }) => (
+                              <button key={i} type="button" onClick={() => go(pos)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-[#0F2F2A]/5">
+                                <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{items[i].name}</span>
+                                {items[i].price && items[i].stock !== "UNKNOWN" && <span className="shrink-0 text-[11.5px] font-bold tabular-nums" style={{ color: C.numberFg }}>{items[i].price}</span>}
+                                <ChevronRight className="size-3.5 shrink-0" style={{ color: C.inkSoft }} aria-hidden="true" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
                 </div>
               </div>
-              <Tags item={item} />
-
-              {sold(index) ? (
-                // Un conseil bipé : une ligne discrète, pas un grand panneau (fondateur, 22 oct. 2026).
-                <div data-ile-mix-vendu="" className="mt-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] font-bold" style={{ background: C.cell, color: C.ink }}>
-                  <Check className="size-4 shrink-0" strokeWidth={3} style={{ color: C.accent }} aria-hidden="true" />
-                  <span className="flex-1">Vendu</span>
-                  {soldIndexes.length < order.length && (
-                    <button type="button" onClick={() => go(order.findIndex((i) => !sold(i)))} className="h-7 rounded-md px-2.5 text-[11.5px] font-bold" style={{ background: C.raised, color: C.accent }}>
-                      Conseil suivant
-                    </button>
-                  )}
-                  <button type="button" onClick={() => onAnswer(index, null)} className="text-[11px] font-semibold underline-offset-2 hover:underline" style={{ color: C.inkSoft }}>
-                    Annuler
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div role="tablist" className={`mt-2.5 grid ${help ? "grid-cols-3" : "grid-cols-2"} gap-1 rounded-xl p-1`} style={{ background: C.cell }}>
-                    {STEPS.filter((entry) => entry.id !== "help" || help).map(({ id, label, Icon }, n) => (
-                      <button
-                        key={id}
-                        type="button"
-                        role="tab"
-                        aria-selected={step === id}
-                        data-ile-mix-etape={id}
-                        onClick={() => setStep(id)}
-                        className="inline-flex h-7 items-center justify-center gap-1 rounded-lg text-[11.5px] font-bold"
-                        style={step === id ? { background: C.raised, color: C.accent, boxShadow: "0 1px 3px rgba(0,0,0,.25)" } : { color: C.inkSoft }}
-                      >
-                        <Icon className="size-3.5" aria-hidden="true" /> {n + 1}. {label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="isl-scroll mt-2 max-h-[230px] min-h-[150px] overflow-y-auto pr-1 text-[12px] leading-[16px]">
-                    {step === "ask" && <Ask key={index} item={item} />}
-                    {step === "sheet" && <Sheet item={item} />}
-                    {step === "help" && help && <Help item={item} help={help} />}
-                  </div>
-                  {item.sheet?.alternatives && item.sheet.alternatives.length > 0 && (
-                    <div data-ile-mix-alternative="" className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
-                      <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre alternative en stock</p>
-                      {item.sheet.alternatives.map((other) => (
-                        <div key={other.name} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1">
-                          <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{other.name}</span>
-                          {other.price && <span className="shrink-0 text-[11.5px] font-bold tabular-nums">{other.price}</span>}
-                          {other.margin && <span className="shrink-0 text-[11px] font-bold tabular-nums" style={{ color: C.numberFg }}>marge {other.margin}</span>}
-                        </div>
-                      ))}
-                      <p className="px-1.5 text-[10.5px]" style={{ color: C.inkSoft }}>Bipez celui qu&apos;il choisit : le conseil passe « Bipé » avec ce produit.</p>
-                    </div>
-                  )}
-                  {alternatives.length > 0 && (
-                    <div className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
-                      <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre possibilité en stock</p>
-                      {alternatives.slice(0, 2).map(({ i, pos }) => (
-                        <button key={i} type="button" onClick={() => go(pos)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-[#0F2F2A]/5">
-                          <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{items[i].name}</span>
-                          {items[i].price && items[i].stock !== "UNKNOWN" && <span className="shrink-0 text-[11.5px] font-bold tabular-nums" style={{ color: C.numberFg }}>{items[i].price}</span>}
-                          <ChevronRight className="size-3.5 shrink-0" style={{ color: C.inkSoft }} aria-hidden="true" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
             </div>
 
             {order.length > 1 && (
