@@ -130,7 +130,9 @@ export const CONTEXT_RULES: ContextRule[] = [
   },
   {
     need: "CONSTIPATION",
-    triggers: ["B03A", "N02A", "A03"],
+    // Les antispasmodiques atropiniques (A03B) constipent ; pas le phloroglucinol ni les musculotropes (A03A) : un
+    // Phloroglucinol recevait un laxatif « parce qu'il constipe » (fondateur, 22 oct. 2026).
+    triggers: ["B03A", "N02A", "A03B"],
     coveredBy: ["A06"],
     confidence: 0.7,
     justification: "Traitement dont la constipation est un effet fréquent, sans laxatif prescrit.",

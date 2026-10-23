@@ -263,7 +263,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                         )}
                         {alternatives.length > 0 && (
                           <div className="mt-2 border-t pt-1.5" style={{ borderColor: C.line }}>
-                            <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre possibilité en stock</p>
+                            <p className="text-[9.5px] font-bold tracking-[0.06em] uppercase" style={{ color: C.inkSoft }}>Autre alternative en stock</p>
                             {alternatives.slice(0, 2).map(({ i, pos }) => (
                               <button key={i} type="button" onClick={() => go(pos)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-[#0F2F2A]/5">
                                 <span className="min-w-0 flex-1 truncate text-[12px] font-bold">{items[i].name}</span>

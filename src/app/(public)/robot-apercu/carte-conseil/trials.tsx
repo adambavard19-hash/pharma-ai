@@ -125,7 +125,7 @@ function HelpDemo({ tone }: { tone: "light" | "dark" }) {
 function Alternatives({ tone }: { tone: "light" | "dark" }) {
   return (
     <div>
-      <p className={`text-[11.5px] font-bold tracking-[0.14em] uppercase ${tone === "light" ? "text-[#8A9A95]" : "text-white/50"}`}>S&apos;il n&apos;en veut pas</p>
+      <p className={`text-[11.5px] font-bold tracking-[0.14em] uppercase ${tone === "light" ? "text-[#8A9A95]" : "text-white/50"}`}>Autre alternative en stock</p>
       <div className="mt-2 space-y-2">
         {ADVICE.alternatives.map((alt) => (
           <div key={alt.name} className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 ${tone === "light" ? "border border-[#E3EBE8] bg-white" : "bg-white/[0.06]"}`}>

@@ -144,6 +144,12 @@ export type AdviceRule = {
    */
   needTriggers?: NeedKey[];
   /**
+   * Le texte de la règle NOMME la classe du médicament (« Opioïde ({drug}) », « Antibiothérapie ({drug}) ») : un besoin compris
+   * ne l'ouvre jamais sur un médicament dont le code ATC est connu et n'est pas celui de la règle. Sans cela, un Phloroglucinol
+   * (antispasmodique) a été présenté comme un « opioïde » sur le besoin « constipation » (fondateur, 22 oct. 2026).
+   */
+  namesDrugClass?: boolean;
+  /**
    * La question à poser au patient AVANT de proposer quoi que ce soit.
    *
    * Écrite ici, relue, versionnée : jamais formulée par le modèle. Dès qu'une
@@ -423,6 +429,7 @@ const THROAT_NOT_FOR_MOUTH = String.raw`(?:\bsav\b|savon|\bbain\b|douche|shampo|
 const CORE_ADVICE_RULES: AdviceRule[] = [
   {
     key: "digestive-tolerance-antibiotics",
+    namesDrugClass: true,
     // Première série du document de la pharmacienne (7 octobre 2026), ligne 6 : voir conseil-peau-serie-1.ts.
     documentRows: { document: "peau-serie-1", rows: [6] },
     sourceRules: [1, 2],
@@ -465,6 +472,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "gastric-protection-nsaid",
+    namesDrugClass: true,
     title: "Confort gastrique sous anti-inflammatoire",
     kind: "TOLERANCE",
     version: "1.0",
@@ -498,6 +506,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "hydration-dermato-topical",
+    namesDrugClass: true,
     benefits: ["Peau moins sèche, moins irritée", "Application quotidienne", "Sans parfum à privilégier"],
     title: "Accompagnement cutané d'un traitement dermatologique",
     kind: "TOLERANCE",
@@ -1243,6 +1252,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "herpes-zona-antiseptic",
+    namesDrugClass: true,
     title: "Soin des lésions d'herpès ou de zona",
     kind: "TOLERANCE",
     version: "1.0",
@@ -1402,6 +1412,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
   },
   {
     key: "opioid-transit",
+    namesDrugClass: true,
     title: "Transit sous antalgique opioïde",
     kind: "TOLERANCE",
     version: "1.0",
@@ -2233,6 +2244,8 @@ export function detectAdviceOpportunities(params: {
         (drug) =>
           !isTooShortForRule(rule, drug.knowledge?.atcCode ?? "", drug.durationDays) &&
           !rule.excludeAtcPrefixes?.some((prefix) => (drug.knowledge?.atcCode ?? "").startsWith(prefix)) &&
+          // Le texte nomme la classe : un médicament dont la classe est connue et n'est pas la sienne n'y entre jamais.
+          !(rule.namesDrugClass && drug.knowledge?.atcCode && !rule.atcPrefixes.some((prefix) => drug.knowledge!.atcCode!.startsWith(prefix))) &&
           !silenced(rule, drug.lineIndex),
       );
       for (const drug of pool) {
