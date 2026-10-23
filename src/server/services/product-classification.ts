@@ -273,7 +273,7 @@ export async function countUnclassifiedProducts(pharmacyId: string): Promise<num
 const REFRESHABLE_TAGS = new Set(["nettoyant", "visage", "lèvres", "baume", "fer", "calcium", "zinc", "potassium", "vitamine a", "millepertuis", "antiseptique", "cutané", "herpès", "bouton de fièvre", "cicatrisant", "hygiène des mains", "tensiomètre", "pieds", "lysine", "huiles essentielles", "bronches", "vitamines", "immunité", "sécheresse oculaire", "paupières", "chaud froid", "douleur musculaire", "hygiène intime", "flore vaginale", "tisane", "vitamine k", "vitamine b12", "acide folique", "vitamine d", "vitamine e", "vitamine c", "vitamine b6", "biotine", "iode", "chrome", "niacine", "coenzyme q10", "levure de riz rouge", "ail", "ginkgo", "oméga-3", "ginseng", "échinacée", "kava", "thé vert", "curcuma", "réglisse", "hydraste", "antiacide", "multivitamines", "antioxydant", "chambre d'inhalation", "peigne anti-poux", "collecteur d'aiguilles", "resucrage"]);
 
 export async function refreshDictionaryTags(params: { pharmacyId: string }): Promise<{ considered: number; updated: number; retagged: string[] }> {
-  const { classifyProductByName } = await import("@/core/catalog/product-vocabulary");
+  const { classifyProductByName, dictionaryTagsOfCategory } = await import("@/core/catalog/product-vocabulary");
   const products = await prisma.product.findMany({
     where: { pharmacyId: params.pharmacyId, deletedAt: null },
     select: { id: true, name: true, description: true, category: true, matchingTags: true },
@@ -284,9 +284,11 @@ export async function refreshDictionaryTags(params: { pharmacyId: string }): Pro
     const match = classifyProductByName(product.name, { description: product.description });
     // Les étiquettes que seul le dictionnaire pose sont recalculées : une
     // correction du dictionnaire retire ce qu'il avait posé à tort.
-    const kept = product.matchingTags.filter((tag) => !REFRESHABLE_TAGS.has(tag));
-    const tags = [...new Set([...kept, ...(match?.tags ?? []), ...tagsFromName(product.name)])];
     const category = match && match.confidence >= 0.85 && match.category !== product.category ? match.category : product.category;
+    // Un produit qui change de catégorie perd les étiquettes de l'ancienne (« probiotique » sur un émollient, 22 oct. 2026).
+    const leftBehind = category !== product.category ? new Set(dictionaryTagsOfCategory(product.category).filter((tag) => !(match?.tags ?? []).includes(tag))) : new Set<string>();
+    const kept = product.matchingTags.filter((tag) => !REFRESHABLE_TAGS.has(tag) && !leftBehind.has(tag));
+    const tags = [...new Set([...kept, ...(match?.tags ?? []), ...tagsFromName(product.name)])];
     const added = tags.filter((tag) => !product.matchingTags.includes(tag));
     const removed = product.matchingTags.filter((tag) => !tags.includes(tag));
     if (added.length === 0 && removed.length === 0 && category === product.category) continue;

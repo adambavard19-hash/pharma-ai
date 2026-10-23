@@ -73,10 +73,21 @@ type Pattern = {
  */
 const PATTERNS: Pattern[] = [
   {
-    test: /\b(probioti|prebioti|levure(?! de riz)|ultra ?levure|lactobacil|bifidobact|saccharomyces|flore intestinale|ferments? lactiques?|lactibiane|ergyphilus|smebiocta|bion ?3|probiolog|lactéol|lacteol|enterogermina|alflorex|imgalt)/,
+    // Jamais un soin de la peau d'une marque de probiotiques : « LACTIBIANE TOPIC AD » (émollient de la peau atopique) était
+    // rangé ici et proposé avec un laxatif (fondateur, 22 oct. 2026). Il va aux émollients.
+    test: /^(?!.*\b(topic|creme|baume|emollient|lait corps|gel douche|huile lavante|stick levres)\b).*\b(probioti|prebioti|levure(?! de riz)|ultra ?levure|lactobacil|bifidobact|saccharomyces|flore intestinale|ferments? lactiques?|lactibiane|ergyphilus|smebiocta|bion ?3|probiolog|lactéol|lacteol|enterogermina|alflorex|imgalt)/,
     category: "PROBIOTIQUES",
     tags: ["probiotique", "flore intestinale", "tolérance digestive"],
     ruleKeys: ["digestive-tolerance-antibiotics"],
+    confidence: 0.9,
+  },
+  {
+    // Les soins de la peau atopique d'une marque de probiotiques (Lactibiane Topic AD) : émollients, sûrs de leur rang
+    // (assez confiants pour corriger une catégorie « probiotiques » posée à tort au rafraîchissement des étiquettes).
+    test: /\b(lactibiane topic|topic ad)\b/,
+    category: "DERMOCOSMETIQUE",
+    tags: ["hydratation", "peau sensible", "émollient", "apaisant"],
+    ruleKeys: ["hydration-dermato-topical"],
     confidence: 0.9,
   },
   {
@@ -524,6 +535,11 @@ const SUBSTANCE_PATTERNS: (Pattern & { requires?: RegExp })[] = [
   { test: /alginate|hydroxyde d aluminium|hydroxyde de magnesium|carbonate de calcium|magaldrate|diosmectite|hydrotalcite/, category: "SOINS", tags: ["confort gastrique", "estomac", "digestion"], ruleKeys: ["gastric-protection-nsaid"], confidence: 0.85 },
   { test: /macrogol|lactulose|ispaghul|psyllium|sorbitol|lactitol|son de ble/, category: "NUTRITION", tags: ["transit", "fibres", "confort digestif"], ruleKeys: ["iron-absorption-support"], confidence: 0.85 },
 ];
+
+/** Les étiquettes que le dictionnaire pose pour une catégorie : un produit qui en sort (rangé à tort) les perd. */
+export function dictionaryTagsOfCategory(category: ProductCategoryCode): string[] {
+  return [...new Set(PATTERNS.filter((pattern) => pattern.category === category).flatMap((pattern) => pattern.tags))];
+}
 
 /** Le meilleur motif du dictionnaire pour un nom de produit, ou `null`. */
 export function classifyProductByName(

@@ -144,3 +144,18 @@ describe("pièges du dictionnaire", () => {
     expect(honey?.ruleKeys.some((key) => ["sore-throat-orl", "cough-throat-comfort"].includes(key))).toBe(true);
   });
 });
+
+describe("une marque de probiotiques qui fait aussi des soins de peau (fondateur, 22 oct. 2026)", () => {
+  it("LACTIBIANE TOPIC AD est un émollient, jamais un probiotique ; les autres Lactibiane restent des probiotiques", async () => {
+    const { classifyProductByName, dictionaryTagsOfCategory } = await import("../product-vocabulary");
+    const topic = classifyProductByName("LACTIBIANE TOPIC AD 125ML");
+    expect(topic?.category).toBe("DERMOCOSMETIQUE");
+    expect(topic?.tags).not.toContain("probiotique");
+    expect(topic?.confidence).toBeGreaterThanOrEqual(0.85);
+    for (const name of ["LACTIBIANE REFERENCE GELU BT30", "LACTIBIANE IMEDIA Pdr orod 4St", "LACTIBIANE REFERENCE STICK 20"]) {
+      expect(classifyProductByName(name)?.category).toBe("PROBIOTIQUES");
+    }
+    expect(classifyProductByName("CREME LACTOBACILLUS VISAGE")?.category).not.toBe("PROBIOTIQUES");
+    expect(dictionaryTagsOfCategory("PROBIOTIQUES")).toEqual(expect.arrayContaining(["probiotique", "flore intestinale"]));
+  });
+});
