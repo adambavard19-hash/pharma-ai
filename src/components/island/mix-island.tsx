@@ -125,10 +125,12 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
               {/* Sous le nom, avant tout clic (fondateur, 22 oct. 2026) : le stock et son nombre, la marge et son montant, le
                   challenge et la date courte quand il y en a. */}
               <span data-ile-mix-repere="" className="mt-0.5 flex flex-wrap items-center gap-1">
-                <HeadChip>{stockLabel(best)}</HeadChip>
-                {best.margin && <HeadChip>Marge {best.margin}</HeadChip>}
+                {/* En couleurs (fondateur, 22 oct. 2026) : stock vert (orange s'il est faible, rouge en rupture), marge jaune, challenge
+                    vert citron, date courte rouge. */}
+                <HeadChip {...stockColors(best)}>{stockLabel(best)}</HeadChip>
+                {best.margin && <HeadChip bg="#FFE58A" fg="#4A3500">Marge {best.margin}</HeadChip>}
                 {best.challenge && <HeadChip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</HeadChip>}
-                {best.shortDate && <HeadChip bg="rgba(255,120,120,0.2)" fg="#FFD1D1">{T.shortDate} {best.shortDate}</HeadChip>}
+                {best.shortDate && <HeadChip bg="#FF8A80" fg="#4A0B07">{T.shortDate} {best.shortDate}</HeadChip>}
               </span>
             </span>
           </button>
@@ -351,6 +353,11 @@ function ScrollBody({ children }: { children: ReactNode }) {
 function stockLabel(item: IslandAdvice): string {
   const count = item.quantity !== undefined ? ` · ${item.quantity}` : "";
   return item.stock === "IN_STOCK" ? `${T.inStock}${count}` : item.stock === "LOW_STOCK" ? `${T.lowStock}${count}` : item.stock === "OUT_OF_STOCK" ? "Rupture" : "Stock à vérifier";
+}
+
+/** Les couleurs du stock dans la petite bannière : vert, orange s'il est faible, rouge en rupture, gris s'il est à vérifier. */
+function stockColors(item: IslandAdvice): { bg: string; fg: string } {
+  return item.stock === "IN_STOCK" ? { bg: "#7BE0B0", fg: "#063B26" } : item.stock === "LOW_STOCK" ? { bg: "#FFB86B", fg: "#4A2600" } : item.stock === "OUT_OF_STOCK" ? { bg: "#FF8A80", fg: "#4A0B07" } : { bg: "rgba(255,255,255,0.14)", fg: "#F2FFF9" };
 }
 
 /** Un repère de la petite bannière du haut, lisible sur le fond noir. */
