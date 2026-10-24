@@ -45,9 +45,10 @@ const whyText = visible(why);
 
 describe("le site dit ce que fait l'application, et rien de plus", () => {
   it("garde la promesse validée et l'appel principal", () => {
-    expect(homeText).toContain("Scan. Conseil. Bilan.");
+    // Le premier écran façon limova.ai (fondateur, 24 oct. 2026).
+    expect(homeText).toContain("Le copilote IA du comptoir de votre pharmacie.");
     expect(homeText).toContain("Réserver une démo");
-    expect(homeText).toContain("Au comptoir, vous scannez les boîtes comme d'habitude.");
+    expect(homeText).toContain("À chaque boîte scannée, PharmaBoost montre à votre équipe le bon produit à conseiller, pris dans votre stock.");
   });
 
   it("n'emploie aucun mot interdit ni aucune promesse", () => {
@@ -79,10 +80,8 @@ describe("le site dit ce que fait l'application, et rien de plus", () => {
   });
 
   it("marque « exemple » chaque visuel qui montre des produits ou des prix", () => {
-    // Accueil, étape 2, bonne question, stock, équipe, sans ordonnance.
+    // Étape 2, bonne question, stock, équipe, sans ordonnance (le premier écran n'a plus de visuel depuis le 24 oct. 2026).
     expect(homeText.match(/exemple/gi)?.length ?? 0).toBeGreaterThanOrEqual(5);
-    // La bannière de l'accueil est la « mix » d'aujourd'hui (20 oct. 2026) : l'« exemple » est écrit sur le cadre du logiciel qui la porte.
-    expect(homeText).toContain("Logiciel de gestion · Vente exemple");
   });
 
   it("adosse les conseils de l'accueil à de vraies règles du moteur", () => {

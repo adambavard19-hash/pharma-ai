@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { fr, Kicker, SectionHead } from "./_components/site-shell";
-import { HERO_ITEMS, HeroVisual, RequestVisual, TeamVisual, ExampleTag, CureReminderVisual } from "./_components/visuals";
+import { HERO_ITEMS, RequestVisual, TeamVisual, ExampleTag, CureReminderVisual } from "./_components/visuals";
 import { VideoButton } from "./_components/video-dialog";
 import { AutoVideo } from "./_components/auto-video";
 import { AppPhoneVisual } from "./_components/app-visual";
@@ -15,6 +15,7 @@ import { PricingSection } from "./_components/pricing-section";
 import { FlowSteps, LoadVisual, Reveal } from "./_components/story";
 import { FAQ } from "./_components/site-content";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
+import { Robot } from "@/components/robot";
 
 /**
  * Le site public. Peu de texte : des mots-clés, les vrais écrans, de l’air.
@@ -45,26 +46,32 @@ export default async function SitePage() {
       <section id="accueil" className="relative -mt-16 overflow-hidden pt-16 lg:flex lg:min-h-[min(100dvh,1000px)] lg:flex-col lg:justify-center dark:bg-transparent">
         {/* Une seule encre pour tout le site (consigne du fondateur, 13 oct. 2026) : fixe sous la page, elle reste derrière chaque section jusqu'au bas ; globals.css rend les sections translucides. */}
         <HelixBackdrop framing="hero" lightWhenStill className="max-lg:opacity-70" />
-        {/* Le bas du héros se fond dans la page (pas de coupure nette de l'encre sur la section suivante). */}
-        <div className="mx-auto grid w-full grid-cols-1 max-w-6xl items-center gap-14 px-5 pt-14 pb-16 md:pt-24 md:pb-24 lg:grid-cols-[1fr_1.05fr]">
-          <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-3 py-1.5 text-[13px] font-medium text-text-secondary backdrop-blur-md dark:border-border-subtle dark:bg-surface-card">
-              <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
-            </p>
-            {/* Le robot vit désormais à côté du nom « PharmaBoost », dans l'en-tête : le titre se lit seul. */}
-            <h1 className="mt-5 pb-1 text-[50px] leading-[0.98] font-bold tracking-[-0.04em] text-text-primary min-[390px]:text-[54px] md:text-[80px] lg:mt-4">
-              Scan.
-              <br />
-              Conseil.
-              <br />
-              <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">Bilan.</span>
-            </h1>
-            <p className="mt-7 max-w-2xl text-[20px] leading-8 font-medium text-text-primary sm:text-[23px] sm:leading-9">
-              Au comptoir, vous <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text font-semibold text-transparent">scannez</span> les boîtes comme d&apos;habitude. PharmaBoost vous souffle les <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text font-semibold text-transparent">conseils</span> parfaits, et le patient repart avec son <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text font-semibold text-transparent">bilan</span>.
-            </p>
-            {/* Plus de bouton « Voir la présentation » ici : elle se lance seule juste en dessous (fondateur, 20 oct. 2026). */}
+        {/* Le premier écran façon limova.ai (fondateur, 24 oct. 2026, version 1 de /decouvrir/apercu-titre) : un grand titre
+            centré qui dit tout de suite ce qu'est PharmaBoost, le robot dans le titre, une phrase qui l'explique, deux boutons. */}
+        <div className="mx-auto flex w-full max-w-5xl flex-col items-center px-5 pt-16 pb-12 text-center md:pt-24">
+          <p className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-3.5 py-1.5 text-[13px] font-medium text-text-secondary backdrop-blur-md dark:border-border-subtle dark:bg-surface-card">
+            <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion · le pharmacien décide
+          </p>
+          <h1 className="mt-6 text-[42px] leading-[1.02] font-bold tracking-[-0.045em] text-text-primary min-[390px]:text-[46px] md:text-[76px]">
+            Le copilote IA{" "}
+            <span className="mx-2 inline-flex size-[0.95em] translate-y-[0.08em] items-center justify-center rounded-full bg-white/80 align-baseline shadow-[0_10px_30px_-12px_rgba(15,47,42,0.45)] ring-1 ring-white">
+              <Robot size={56} mood="happy" />
+            </span>{" "}
+            du comptoir
+            <br />
+            <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">de votre pharmacie.</span>
+          </h1>
+          <p className="mt-6 max-w-2xl text-[18px] leading-7 text-text-secondary md:text-[21px] md:leading-8">
+            À chaque boîte scannée, PharmaBoost montre à votre équipe le bon produit à conseiller, pris dans votre stock. Plus de conseils vendus, sans changer votre logiciel.
+          </p>
+          <div className="mt-9 flex flex-wrap justify-center gap-3">
+            <Link href="/decouvrir/demo" className="inline-flex h-12 items-center gap-2 rounded-full bg-brand-600 px-6 text-[15px] font-semibold text-white shadow-[0_14px_30px_-12px_rgba(14,138,123,0.7)] hover:bg-brand-700">
+              Réserver une démo <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+            <Link href="#tarif" className="inline-flex h-12 items-center rounded-full border border-border-default bg-white/70 px-6 text-[15px] font-semibold text-text-primary backdrop-blur hover:bg-white">
+              Voir le tarif
+            </Link>
           </div>
-          <HeroVisual glass />
         </div>
         {/* La présentation se lance seule sous le héros, sans le son (fondateur, 20 oct. 2026, d'après limova.ai). */}
         <div className="px-5 pb-16 md:pb-24">
