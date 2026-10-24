@@ -1,18 +1,55 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 
 /**
  * La présentation de PharmaBoost, lancée d'elle-même sous le héros de l'accueil, comme sur limova.ai (fondateur, 20 oct. 2026).
- * Sans le son au départ (tout navigateur l'exige pour une lecture automatique).
+ *
+ * Avec le son dès que possible (fondateur, 23 oct. 2026) : elle essaie d'abord de démarrer avec le son (certains navigateurs
+ * l'acceptent, pour un visiteur qui revient souvent). Refusé — le cas le plus courant, aucun navigateur ne laisse une page
+ * jouer du son avant un geste du visiteur —, elle tourne sans le son, et le son s'active au premier clic, toucher ou touche du
+ * clavier n'importe où sur la page, la vidéo repartant du début. Le défilement seul ne compte pas comme un geste pour le
+ * navigateur. Un visiteur qui a coupé le son lui-même n'est jamais contredit.
  */
 export function AutoVideo({ src, poster }: { src: string; poster: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(true);
+  // Le visiteur a choisi lui-même (bouton) : on ne touche plus au son.
+  const chosen = useRef(false);
+
+  useEffect(() => {
+    const video = ref.current;
+    if (!video) return;
+    const events = ["pointerdown", "keydown", "touchstart"] as const;
+    const unmuteOnGesture = () => {
+      events.forEach((name) => window.removeEventListener(name, unmuteOnGesture, true));
+      if (chosen.current || !video.muted) return;
+      video.currentTime = 0;
+      video.muted = false;
+      setMuted(false);
+      void video.play().catch(() => {
+        video.muted = true;
+        setMuted(true);
+      });
+    };
+    video.muted = false;
+    video
+      .play()
+      .then(() => setMuted(false))
+      .catch(() => {
+        video.muted = true;
+        setMuted(true);
+        void video.play().catch(() => undefined);
+        events.forEach((name) => window.addEventListener(name, unmuteOnGesture, { capture: true, passive: true }));
+      });
+    return () => events.forEach((name) => window.removeEventListener(name, unmuteOnGesture, true));
+  }, []);
+
   const toggle = () => {
     const video = ref.current;
     if (!video) return;
+    chosen.current = true;
     if (muted) video.currentTime = 0;
     video.muted = !muted;
     setMuted(!muted);
