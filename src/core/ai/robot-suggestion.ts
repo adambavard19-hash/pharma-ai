@@ -537,7 +537,7 @@ export function robotSlots(result: Pick<AnalysisResult, "recommendations" | "opp
   const ruleKeyOf = new Map(result.opportunities.map((opportunity) => [opportunity.key, opportunity.ruleKey]));
   const robot = result.recommendations.filter((item) => isRobotRuleKey(ruleKeyOf.get(item.opportunityKey))).length;
   const others = result.recommendations.length - robot;
-  const engine = result.recommendations.filter((item) => item.source !== "ASSOCIATION").length;
+  const engine = result.recommendations.filter((item) => item.source === undefined).length;
   return Math.max(0, Math.min((others > 0 ? 1 : ROBOT_MAX_ITEMS) - robot, maxRecommendations - engine));
 }
 

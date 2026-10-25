@@ -419,8 +419,9 @@ export type ScoredRecommendation = {
   /**
    * D'où vient la proposition. Absent : les règles du moteur (un médicament déclenche un produit conseil).
    * `ASSOCIATION` : une association écrite par le pharmacien (un produit conseil en appelle un autre).
+   * `OVERSTOCK` : un produit de la campagne de surstock de l'officine (engines/overstock.ts).
    */
-  source?: "ASSOCIATION";
+  source?: "ASSOCIATION" | "OVERSTOCK";
   totalScore: number;
   breakdown: ScoreBreakdown;
   /** Explication technique destinée au pharmacien. */
@@ -528,7 +529,8 @@ export type PipelineStageName =
   | "CATALOG_MATCHING"
   | "SCORING"
   | "COMMERCIAL_OPTIMIZATION"
-  | "PRODUCT_ASSOCIATIONS";
+  | "PRODUCT_ASSOCIATIONS"
+  | "OVERSTOCK_CAMPAIGNS";
 
 export type PipelineStageTrace = {
   stage: PipelineStageName;

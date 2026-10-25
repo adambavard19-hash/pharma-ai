@@ -33,6 +33,7 @@ import { chooseAmongEquivalents, clinicalSignature, commercialJustification, TIE
 import { formatCents } from "@/lib/format";
 import { declaredContraindicationFor, suggestionVigilances } from "./engines/population-vigilance";
 import { buildAssociationAdvice, type AssociationInput } from "./engines/associations";
+import { applyOverstockCampaigns, type OverstockInput } from "./engines/overstock";
 import { rangeRankFor, type PreferredRangeInput } from "../catalog/preferred-ranges";
 import type {
   AnalysisResult,
@@ -132,6 +133,8 @@ export type PipelineInput = {
    * lignes de la vente qui SONT un produit du stock. Absent : aucune association à appliquer.
    */
   associations?: AssociationInput;
+  /** Les campagnes de surstock de l'officine (engines/overstock.ts) : leur produit passe en premier, sous les mêmes garde-fous. */
+  overstock?: OverstockInput;
   /** Les règles de conseil supprimées par l'équipe PharmaBoost, pour toutes les officines : elles ne se déclenchent pas (central-advice.ts). */
   disabledRuleKeys?: string[];
   /** Les conseils ajoutés depuis la console de PharmaBoost : ils s'ajoutent aux règles du code. */
@@ -1077,7 +1080,27 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
           return { output: advice, count: advice.recommendations.length, notes: advice.notes };
         })
       : { opportunities: [], recommendations: [], skipped: [], notes: [] };
-  const allRecommendations = [...recommendations, ...associationAdvice.recommendations];
+  // ---------------------------------------------------------------- ÉTAPE 9
+  // CAMPAGNES DE SURSTOCK — le produit que l'officine veut écouler passe en premier, à la place d'un conseil de la même
+  // famille, avec les mêmes garde-fous (stock, prescription, sécurité du patient, déjà dans la vente).
+  const withoutOverstock = [...recommendations, ...associationAdvice.recommendations];
+  const overstockAdvice =
+    input.overstock && input.overstock.campaigns.length > 0
+      ? recorder.run("OVERSTOCK_CAMPAIGNS", "Campagnes de surstock", input.overstock.campaigns.length, () => {
+          const triggeredBy = new Map([...opportunities, ...associationAdvice.opportunities].map((opportunity) => [opportunity.key, opportunity.triggeredBy]));
+          const result = applyOverstockCampaigns({
+            overstock: input.overstock as OverstockInput,
+            lines: usableLines.map((line) => ({ lineIndex: line.lineIndex, drugName: line.drugName })),
+            catalog: input.catalog,
+            blockedProductIds: productSafety.blockedProductIds,
+            recommendations: withoutOverstock,
+            patient: input.patient,
+            triggeredBy,
+          });
+          return { output: result, count: result.opportunities.length, notes: result.notes };
+        })
+      : { recommendations: withoutOverstock, opportunities: [], notes: [] };
+  const allRecommendations = overstockAdvice.recommendations;
 
   // Ce que le stock a répondu à chaque besoin non bloqué : c'est ce qui permet au titulaire de voir les
   // besoins réels que son assortiment ne couvre pas. N'influence aucun conseil.
@@ -1119,7 +1142,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
     outcome,
     safetyFindings: allSafetyFindings,
     explanations,
-    opportunities: [...opportunitiesWithCoverage, ...associationAdvice.opportunities],
+    opportunities: [...opportunitiesWithCoverage, ...associationAdvice.opportunities, ...overstockAdvice.opportunities],
     recommendations: allRecommendations,
     trace: recorder.trace,
     blockedReasons,

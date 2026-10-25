@@ -159,6 +159,8 @@ export type AuditAction =
   | "platform.admin_deleted"
   | "rule.created"
   | "association.created"
+  | "overstock.campaign_created"
+  | "overstock.campaign_stopped"
   | "association.updated"
   | "association.deleted"
   | "counter_post.assigned"

@@ -1,5 +1,6 @@
 "use client";
 
+import { readOverstockLabel } from "@/core/overstock/campaign";
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ComponentProps, type CSSProperties } from "react";
 import { ArrowRight } from "lucide-react";
 import { BANNER } from "../../../../../agent/src/banner-design";
@@ -173,6 +174,12 @@ function useBridge(onCommand: (command: HostCommand) => void): { send: (message:
  * ce conseil (agent/src/sale-link.ts) : un lien relatif, donc toujours vers le serveur qui sert cette page. Au poste,
  * l'hôte Windows l'envoie au navigateur par défaut du PC ; ailleurs, c'est un lien normal (nouvel onglet).
  */
+/** « Surstock » arrive dans le libellé du challenge (core/overstock/campaign.ts) : relu ici, il a sa propre pastille. */
+function challengeOf(raw: string): Pick<IslandAdvice, "overstock" | "challenge" | "challengeLabel"> {
+  const { overstock, challenge } = readOverstockLabel(raw);
+  return { overstock, challenge: Boolean(challenge), challengeLabel: challenge ?? undefined };
+}
+
 const toAdvice = (entry: HostEntry): IslandAdvice[] =>
   entry.items.map((item) => ({
     name: item.name,
@@ -180,8 +187,7 @@ const toAdvice = (entry: HostEntry): IslandAdvice[] =>
     margin: item.margin || undefined,
     drug: item.drug || undefined,
     reason: item.reason || undefined,
-    challenge: Boolean(item.challenge),
-    challengeLabel: item.challenge || undefined,
+    ...challengeOf(item.challenge),
     shortDate: item.shortDate || undefined,
     stock: item.availability as IslandAdvice["stock"],
     quantity: item.quantity !== "" && Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : undefined,

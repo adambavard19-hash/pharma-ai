@@ -1,5 +1,6 @@
 "use client";
 
+import { OVERSTOCK_LABEL } from "@/core/overstock/campaign";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, LifeBuoy, MessageCircle, Pill } from "lucide-react";
 import type { HelpAdvice } from "@/core/poste/island-bridge";
@@ -27,6 +28,10 @@ import { islandTheme, MIX_PAPER, PHARMABOOST_GREEN } from "./island-theme";
 const C = islandTheme({ ...BANNER.colors, ...PHARMABOOST_GREEN, ...MIX_PAPER });
 const T = BANNER.text;
 
+/** La pastille « Surstock » : orange, à part du challenge (vert citron) et de la date courte (rouge). */
+const OVERSTOCK_BG = "#FFB547";
+const OVERSTOCK_FG = "#3D2300";
+
 /** « 4,79 € » → 479 ; rien de lisible → 0. */
 export function centsOf(price: string | undefined): number {
   const match = /(\d+)(?:[,.](\d{1,2}))?/.exec((price ?? "").replace(/\s/g, ""));
@@ -43,8 +48,9 @@ export function eurosOf(cents: number): string {
  * L'ordre de présentation : d'abord ce qui coche le plus (challenge, date courte), puis la meilleure marge ; à égalité, l'ordre
  * du serveur. Rend les index dans `items` (la réponse part toujours avec l'index d'origine).
  */
-export function bestOrder(items: readonly Pick<IslandAdvice, "challenge" | "shortDate" | "margin">[]): number[] {
-  const score = (item: (typeof items)[number]) => Number(Boolean(item.challenge)) + Number(Boolean(item.shortDate));
+export function bestOrder(items: readonly Pick<IslandAdvice, "challenge" | "shortDate" | "margin" | "overstock">[]): number[] {
+  // Un produit en campagne de surstock passe devant tout (fondateur, 25 oct. 2026) : l'officine veut d'abord l'écouler.
+  const score = (item: (typeof items)[number]) => Number(Boolean(item.overstock)) * 10 + Number(Boolean(item.challenge)) + Number(Boolean(item.shortDate));
   return items.map((_, index) => index).sort((a, b) => score(items[b]) - score(items[a]) || centsOf(items[b].margin) - centsOf(items[a].margin) || a - b);
 }
 
@@ -171,6 +177,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   {/* Sous le nom, avant tout clic (fondateur, 22 oct. 2026), en couleurs : stock vert (orange s'il est faible, rouge en
                       rupture), marge jaune, challenge vert citron, date courte rouge. */}
                   <span data-ile-mix-repere="" className="mt-0.5 flex flex-wrap items-center gap-1">
+                    {advice.overstock && <HeadChip bg={OVERSTOCK_BG} fg={OVERSTOCK_FG}>{OVERSTOCK_LABEL}</HeadChip>}
                     <HeadChip {...stockColors(advice)}>{stockLabel(advice)}</HeadChip>
                     {advice.margin && <HeadChip bg="#FFE58A" fg="#4A3500">Marge {advice.margin}</HeadChip>}
                     {advice.challenge && <HeadChip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</HeadChip>}
@@ -348,6 +355,7 @@ function Tags({ item, margin }: { item: IslandAdvice; /** La marge, pour le phar
     : { label: "Stock à vérifier", fg: C.inkSoft };
   return (
     <div className="mt-1.5 flex flex-wrap gap-1">
+      {item.overstock && <Chip bg={OVERSTOCK_BG} fg={OVERSTOCK_FG}>{OVERSTOCK_LABEL} · à proposer en priorité</Chip>}
       {margin && <Chip bg="#FFF5D6" fg="#9A6400">Marge {margin}</Chip>}
       {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {item.challengeLabel ? (/^challenge\b/i.test(item.challengeLabel) ? item.challengeLabel : `${T.challenge} ${item.challengeLabel}`) : T.challenge}</Chip>}
       {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}

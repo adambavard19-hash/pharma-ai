@@ -43,6 +43,8 @@ export type IslandAdvice = {
   challenge?: boolean;
   /** Le challenge et son gain (« Pileje · 1 € par boîte »), quand on le connaît. */
   challengeLabel?: string;
+  /** Un produit de la campagne de surstock de l'officine : il passe en premier, pastille « Surstock ». */
+  overstock?: boolean;
   shortDate?: string;
   stock?: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
   quantity?: number;

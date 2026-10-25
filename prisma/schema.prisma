@@ -149,6 +149,7 @@ model Pharmacy {
   recommendations        Recommendation[]
   pharmacyRules          PharmacyRule[]
   productAssociations    ProductAssociation[]
+  overstockCampaigns     OverstockCampaign[]
   counterSaleFollowUps   CounterSaleFollowUp[]
   cureReminders          CureReminder[]
   counterQuestionAnswers CounterQuestionAnswer[]
@@ -616,6 +617,7 @@ model User {
   pushDevices             PushDevice[]
   pharmacyRules           PharmacyRule[]
   createdAssociations     ProductAssociation[]
+  createdOverstockCampaigns OverstockCampaign[]
   imports                 ImportJob[]
   stockDeposits           StockDeposit[]
 
@@ -1088,6 +1090,7 @@ model Product {
   /// Les associations où ce produit est le déclencheur, ou le produit conseillé.
   triggerAssociations ProductAssociation[] @relation("AssociationTrigger")
   adviceAssociations  ProductAssociation[] @relation("AssociationAdvice")
+  overstockCampaigns  OverstockCampaign[]
 
   barcodes ProductBarcode[]
 
@@ -2511,6 +2514,43 @@ model ProductAssociation {
   @@index([pharmacyId, triggerProductId])
   @@index([pharmacyId, triggerSpecialtyId])
   @@map("product_associations")
+}
+
+/// Une campagne de surstock (fondateur, 25 oct. 2026) : un produit conseil acheté en trop (par 12, 24, 48…) qui doit sortir
+/// avant l'échéance de la facture. Le pharmacien choisit QUAND le proposer — classes de médicaments de la vente (codes ATC),
+/// familles de produits — et le produit passe en premier au comptoir, à la place d'un conseil de la même famille, toujours
+/// derrière les contrôles de sécurité (stock, prescription, patient). La campagne s'arrête seule quand le stock atteint
+/// l'objectif ou à sa date de fin.
+model OverstockCampaign {
+  id                String    @id @default(cuid())
+  pharmacyId        String
+  productId         String
+  /// Classes de médicaments qui déclenchent la proposition : préfixes ATC (« J01 » = antibiotiques).
+  triggerAtcCodes   String[]  @default([])
+  /// Familles de produits (`TriggerFamily`) : le patient en prend un, ou PharmaBoost en conseille un → le produit en surstock
+  /// passe en premier, à la place du conseil de la même famille.
+  familyIds         String[]  @default([])
+  /// Ce que le pharmacien dit au patient, écrit par lui. Vide : une phrase neutre, sans allégation.
+  sentence          String?
+  /// Le stock au lancement, et le stock visé : à ce niveau, la campagne s'arrête.
+  startQuantity     Int
+  targetQuantity    Int       @default(0)
+  endsOn            DateTime? @db.Date
+  isActive          Boolean   @default(true)
+  /// Fin : « OBJECTIF » (stock atteint), « DATE », « MANUEL ».
+  endedAt           DateTime?
+  endedReason       String?
+  createdByUserId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  pharmacy  Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([pharmacyId, isActive])
+  @@index([productId])
+  @@map("overstock_campaigns")
 }
 
 /// Le centre de contrôle des conseils : ce que l'équipe PharmaBoost (la pharmacienne qui relit) décide des conseils, UNE FOIS,

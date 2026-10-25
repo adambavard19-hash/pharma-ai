@@ -52,6 +52,7 @@ import {
 import { ensureClassifications } from "./classification";
 import { classifiedDrugKnowledge } from "@/core/ai/classified-knowledge";
 import { loadAssociationInput } from "./product-associations";
+import { loadOverstockInput } from "./overstock";
 import { prefetchLeafletsForRun } from "./product-leaflets";
 import { loadCentralAdvice } from "./central-advice";
 import { withRobotSuggestions } from "./robot-suggestions";
@@ -392,6 +393,12 @@ export async function analysePrescription(params: {
     const known = new Set(catalog.map((product) => product.id));
     for (const product of associations.products) if (!known.has(product.id)) catalog.push(product);
   }
+  // Les campagnes de surstock de l'officine : leur produit passe en premier, à la place d'un conseil de la même famille.
+  const overstock = await loadOverstockInput(
+    params.scope,
+    prescription.lines.map((line) => ({ ...line, atcCode: line.drugName ? (knowledge.get(line.drugName.toLowerCase())?.atcCode ?? null) : null })),
+    catalog,
+  );
   // Le centre de contrôle de PharmaBoost, commun à toutes les officines : les règles supprimées ne se déclenchent nulle
   // part, les conseils ajoutés depuis la console s'ajoutent à ceux du code.
   const central = await loadCentralAdvice();
@@ -418,6 +425,7 @@ export async function analysePrescription(params: {
     explanations,
     extractionFindings,
     preferredRanges,
+    ...(overstock ? { overstock } : {}),
     interactions: {
       substancesByLine,
       rules: interactionData.rules,
@@ -630,7 +638,7 @@ export async function analysePrescription(params: {
           presentationId: isNationalDrug ? (product?.presentationId ?? null) : null,
           // Une association écrite par le pharmacien est une règle de l'officine, pas une proposition du moteur ; le
           // suivi de performance compte les deux comme des conseils PharmaBoost.
-          origin: recommendation.source === "ASSOCIATION" ? "RULE" : "AI",
+          origin: recommendation.source === "ASSOCIATION" || recommendation.source === "OVERSTOCK" ? "RULE" : "AI",
           status: "PROPOSED",
           scoreBreakdown: {
             ...recommendation.breakdown,

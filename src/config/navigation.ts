@@ -1,4 +1,4 @@
-import { BadgePercent, BarChart3, Box, CalendarClock, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, PlayCircle, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
+import { BadgePercent, BarChart3, Box, CalendarClock, Flame, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, PlayCircle, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 import { PATIENT_APP_LIVE } from "@/core/patient-app/offers";
 
@@ -123,6 +123,18 @@ export const NAVIGATION: NavItem[] = [
     permission: PERMISSIONS.STOCK_VIEW,
     match: ["/stock/dates-courtes"],
     description: "Scannez une boîte proche de sa date et indiquez combien il y en a : PharmaBoost la propose en priorité au comptoir",
+    group: "pharmacie",
+  },
+  {
+    href: "/surstock",
+    label: "Surstock",
+    subtitle: "Écouler les produits achetés en trop",
+    icon: Flame,
+    // Toute l'équipe voit les produits à pousser (STOCK_VIEW) ; le titulaire et le pharmacien lancent les campagnes
+    // (RECOMMENDATION_RULES_MANAGE, vérifié par l'écran et le serveur). Fondateur, 25 oct. 2026.
+    permission: PERMISSIONS.STOCK_VIEW,
+    match: ["/surstock"],
+    description: "Les produits en surstock passent en premier au comptoir, jusqu'à ce que le stock redescende",
     group: "pharmacie",
   },
   {
@@ -276,7 +288,7 @@ export const NAVIGATION: NavItem[] = [
  * Le menu d'un collaborateur (tout rôle autre que le titulaire) : ces entrées, et rien d'autre — plus le lien
  * « Contact support », toujours en bas du menu. Consigne du fondateur du 13 oct. 2026.
  */
-export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/pilotage", "/historique", "/associations", "/stock/dates-courtes", "/emails-patients", "/prise-en-main", "/formation", "/nouveautes"];
+export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/pilotage", "/historique", "/associations", "/stock/dates-courtes", "/surstock", "/emails-patients", "/prise-en-main", "/formation", "/nouveautes"];
 
 /**
  * Les entrées que voit une personne : celles dont elle détient la permission, et, hors de l'espace du titulaire

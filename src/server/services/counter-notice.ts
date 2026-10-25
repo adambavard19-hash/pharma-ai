@@ -2,6 +2,8 @@ import { boxExpiry } from "@/core/counter/box-expiry";
 import "server-only";
 import { studioPhotoUrl } from "@/core/catalog/studio-photo";
 import { prisma } from "@/server/db/client";
+import { activeOverstockProductIds } from "@/server/services/overstock";
+import { withOverstockLabel } from "@/core/overstock/campaign";
 import { buildCounterNotice, type CounterNotice } from "@/core/counter/notice";
 import { stockReminderLevel } from "@/core/stock-deposit/rules";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
@@ -155,12 +157,14 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
   for (const key of await trustedRobotRuleKeys(prescription.recommendations.map((rec) => rec.opportunity?.ruleKey))) known.add(key);
 
   const productIds = prescription.recommendations.map((rec) => rec.productId).filter((value): value is string => Boolean(value));
-  const [challenges, shortDates] = await Promise.all([
+  const [challenges, shortDates, overstock] = await Promise.all([
     // Le titre ET le gain (« Pileje · 1 € par boîte ») : le pharmacien doit savoir ce que la vente lui rapporte.
     activeChallengesFor(pharmacyId, productIds, now)
       .then((found) => new Map([...found].map(([id, challenge]) => [id, `${challenge.title}${challenge.reward ? ` · ${challenge.reward}` : ""}`])))
       .catch(() => new Map<string, string>()),
     nearestShortDatesFor(pharmacyId, now).catch(() => new Map<string, { expiresOn: string }>()),
+    // Les produits en campagne de surstock : signalés et mis en tête sur la bannière.
+    productIds.length ? activeOverstockProductIds(pharmacyId).catch(() => new Set<string>()) : Promise.resolve(new Set<string>()),
   ]);
   const lineName = new Map(prescription.lines.map((line) => [line.id, line.drugName ?? ""]));
   // L'arbre de questions : pourquoi le patient prend son antalgique, où il a mal… Un conseil du bout d'une branche (la poche du dos,
@@ -258,6 +262,8 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
     recommendations: prescription.recommendations
       .filter((rec) => tree.isVisible(rec.opportunity?.ruleKey))
       .sort((a, b) => Number(TREE_RULE_KEYS.has(b.opportunity?.ruleKey ?? "")) - Number(TREE_RULE_KEYS.has(a.opportunity?.ruleKey ?? "")))
+      // Un produit en campagne de surstock passe en tête (fondateur, 25 oct. 2026) : c'est lui que l'officine veut écouler.
+      .sort((a, b) => Number(Boolean(b.productId && overstock.has(b.productId))) - Number(Boolean(a.productId && overstock.has(a.productId))))
       .map((rec) => {
         const triggered = rec.opportunity?.triggeredLineIds.map((lineId) => lineName.get(lineId) ?? "").find(Boolean) ?? null;
         const shortDate = rec.productId ? shortDates.get(`p:${rec.productId}`) : rec.presentationId ? shortDates.get(`d:${rec.presentationId}`) : undefined;
@@ -266,7 +272,8 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
           // Une gamme à parfums (Hydratis) se propose par son nom de gamme : le patient choisit le goût (core/catalog/product-ranges.ts).
           name: rangeOf(rec.product?.name)?.name ?? rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
           forDrug: triggered,
-          challengeTitle: rec.productId ? (challenges.get(rec.productId) ?? null) : null,
+          // « Surstock » voyage dans le libellé du challenge : les postes déjà installés le transmettent tel quel à l'île.
+          challengeTitle: rec.productId && overstock.has(rec.productId) ? withOverstockLabel(challenges.get(rec.productId) ?? null) : rec.productId ? (challenges.get(rec.productId) ?? null) : null,
           shortDateOn: shortDate?.expiresOn ?? null,
           // Un prix de vente sous le prix d'achat est un prix mal reçu : il n'est pas affiché (rien plutôt qu'un chiffre faux).
           priceCents: rec.product && salePriceLooksWrong(rec.product) ? null : (rec.product?.salePriceCents ?? rec.presentation?.pharmacyStocks[0]?.priceCents ?? rec.presentation?.priceCents ?? null),
