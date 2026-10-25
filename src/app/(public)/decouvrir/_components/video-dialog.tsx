@@ -14,6 +14,9 @@ import { cn } from "@/lib/utils";
  */
 export const FILMS = {
   presentation: { src: "/video/pharmaboost-presentation.mp4", poster: "/video/pharmaboost-presentation.jpg", duration: "1 min 15", title: "Présentation de PharmaBoost" },
+  // L'ancienne présentation (le robot pharmacien, voix « Yann », 15 oct. 2026), gardée à la demande du fondateur quand
+  // « Rembobinons » l'a remplacée (25 oct. 2026) : section « PharmaBoost en trois étapes » de l'accueil. 50,2 s.
+  enBref: { src: "/video/pharmaboost-en-bref.mp4", poster: "/video/pharmaboost-en-bref.jpg", duration: "50 s", title: "PharmaBoost en bref" },
   comment: { src: "/video/pharmaboost-comment-ca-marche.mp4", poster: "/video/pharmaboost-comment-ca-marche.jpg", duration: "44 s", title: "Comment ça marche" },
   pourquoi: { src: "/video/pharmaboost-pourquoi.mp4", poster: "/video/pharmaboost-pourquoi.jpg", duration: "34 s", title: "Pourquoi PharmaBoost" },
   avantages: { src: "/video/pharmaboost-avantages.mp4", poster: "/video/pharmaboost-avantages.jpg", duration: "38 s", title: "Les avantages" },

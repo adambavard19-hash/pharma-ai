@@ -102,6 +102,9 @@ export default async function SitePage() {
               La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller. Chaque médicament est suivi d&apos;un ou plusieurs conseils.
             </SectionHead>
           </Reveal>
+          <div className="mt-8 flex justify-center">
+            <VideoButton film="enBref" label="Voir PharmaBoost en vidéo" />
+          </div>
           <FlowSteps />
           {/* Réduite de près de moitié à partir de la tablette (`zoom` : tout rétrécit ensemble, rien n'est coupé), centrée. */}
           <div className="mx-auto mt-12 max-w-[1100px] md:[zoom:0.6]">
