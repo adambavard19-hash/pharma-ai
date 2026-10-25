@@ -4,7 +4,6 @@ import { CalendarCheck, CheckCircle2, FileText, HelpCircle, Home, XCircle } from
 import { fr, SectionHead } from "../_components/site-shell";
 import { ExampleTag, HERO_ITEMS } from "../_components/visuals";
 import { CounterIslandStill } from "@/components/island/counter-island-still";
-import { VideoButton } from "../_components/video-dialog";
 import { AutoVideo } from "../_components/auto-video";
 import { Reveal } from "../_components/story";
 import { pageShare } from "../_components/share-metadata";
@@ -53,13 +52,14 @@ export default function WhyPage() {
       {/* Le Reel « Le Cercle » (9:16, 52 s), lancé de lui-même à côté du titre (fondateur, 25 oct. 2026) : la pharmacie avec
           PharmaBoost et celle d'en face, le patient qui revient. */}
       <div className="grid items-center gap-10 lg:grid-cols-[1fr_380px] lg:gap-16">
+        {/* Le titre suit le film (fondateur, 25 oct. 2026) ; le bouton « Voir en vidéo » (film « Pourquoi ») est retiré. */}
         <div className="max-w-3xl">
-          <SectionHead as="h1" kicker="Pourquoi PharmaBoost" title="Et si chaque délivrance révélait tout son potentiel de conseil ?">
-            Votre équipe peut-elle penser à tout, à chaque délivrance ? <span className="font-semibold text-text-primary">PharmaBoost, oui.</span> Au comptoir pour l&apos;équipe, à la maison pour le patient.
+          <SectionHead as="h1" kicker="Pourquoi PharmaBoost" title="Même rue. Deux pharmacies. Une seule où les patients reviennent.">
+            Mêmes boîtes, mêmes ordonnances. Mais dans l&apos;une, l&apos;équipe a un copilote : à chaque boîte scannée, le bon conseil s&apos;affiche. Le patient repart avec le vrai complément de son traitement et son bilan conseil, puis il revient.{" "}
+            <span className="font-semibold text-text-primary">C&apos;est un cercle.</span>
           </SectionHead>
-          <VideoButton film="pourquoi" label="Voir en vidéo" className="mt-8" />
         </div>
-        <AutoVideo src="/video/pharmaboost-le-cercle.mp4" poster="/video/pharmaboost-le-cercle.jpg" vertical />
+        <AutoVideo src="/video/pharmaboost-le-cercle.mp4" poster="/video/pharmaboost-le-cercle.jpg" vertical className="max-lg:order-first max-lg:max-w-[320px]" />
       </div>
 
       {/* ---- 01 · Au comptoir ------------------------------------------ */}

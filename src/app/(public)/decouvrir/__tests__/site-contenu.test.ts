@@ -229,9 +229,10 @@ describe("les mots du site suivent le code, sans promesse", () => {
 });
 
 describe("la page « Pourquoi » : ce que propose la bannière, la phrase de l'écran de vente", () => {
-  it("garde le texte du fondateur", () => {
-    expect(whyText).toContain("Et si chaque délivrance révélait tout son potentiel de conseil ?");
-    expect(whyText).toContain("PharmaBoost, oui.");
+  it("garde le texte du fondateur, accordé au film « Le Cercle » (25 oct. 2026)", () => {
+    expect(whyText).toContain("Même rue. Deux pharmacies. Une seule où les patients reviennent.");
+    expect(whyText).toContain("C'est un cercle.");
+    expect(whyText).not.toContain("Voir en vidéo");
   });
 
   it("la bannière « propose » ; la phrase vient de la règle de la doxycycline, remplie comme le fait le moteur", () => {
