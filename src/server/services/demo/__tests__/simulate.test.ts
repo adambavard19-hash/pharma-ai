@@ -5,10 +5,11 @@ const mocks = vi.hoisted(() => ({
   closeLiveCounterSales: vi.fn(),
   resolveDemoDrugsByKey: vi.fn(),
   counterPost: { findFirst: vi.fn(), update: vi.fn() },
+  pharmacy: { update: vi.fn() },
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/server/db/client", () => ({ prisma: { counterPost: mocks.counterPost } }));
+vi.mock("@/server/db/client", () => ({ prisma: { counterPost: mocks.counterPost, pharmacy: mocks.pharmacy } }));
 vi.mock("@/server/services/counter-scan", () => ({ recordCounterScan: mocks.recordCounterScan, closeLiveCounterSales: mocks.closeLiveCounterSales }));
 vi.mock("../resolve", () => ({ resolveDemoDrugsByKey: mocks.resolveDemoDrugsByKey }));
 
@@ -50,6 +51,8 @@ describe("les bips d'un scénario", () => {
     await simulateScan({ scope, scenarioId: "angine", step: 0 });
     expect(mocks.closeLiveCounterSales).toHaveBeenCalledWith(scope);
     expect(mocks.counterPost.update).toHaveBeenCalledWith({ where: { id: "post_1" }, data: { lastScanAt: null } });
+    // Le stock du logiciel simulé est toujours à jour : jamais « Stock à vérifier » sur la bannière de démonstration.
+    expect(mocks.pharmacy.update).toHaveBeenCalledWith({ where: { id: "ph_demo" }, data: { stockSyncedAt: expect.any(Date) } });
   });
 
   it("les bips suivants ne vident rien : ils complètent la même délivrance", async () => {

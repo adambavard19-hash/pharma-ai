@@ -299,7 +299,28 @@ function leafletForReport(row: { indications: string | null; posology: string | 
  * la règle qui les a proposés est validée par le pharmacien de PharmaBoost ET qu'elle ne peut pas nommer ce qui a été délivré
  * (`patientSafeReason`) : sinon le produit part seul. Le journal des e-mails ne garde que l'adresse masquée.
  */
-async function sendPatientReport(input: { agent: AgentContext; prescriptionId: string; email: string; soldIds: string[]; fallbackNames: string[]; cures?: { name: string; day: string }[] }): Promise<"SENT" | "SIMULATED" | "FAILED" | "NONE"> {
+type ReportInput = { agent: AgentContext; prescriptionId: string; email: string; soldIds: string[]; fallbackNames: string[]; cures?: { name: string; day: string }[] };
+
+async function sendPatientReport(input: ReportInput): Promise<"SENT" | "SIMULATED" | "FAILED" | "NONE"> {
+  const composed = await composePatientReport(input);
+  if (!composed) return "NONE";
+  const { mail, pharmacy } = composed;
+  const pharmacyId = input.agent.scope.pharmacyId;
+  const messaging = getMessagingProvider({ demo: pharmacy?.isDemo === true });
+  const outcome = await messaging
+    .sendEmail({ to: input.email, fromName: pharmacy?.name || "PharmaBoost", subject: mail.subject, text: mail.text, html: mail.html })
+    .catch((error: unknown) => ({ status: "FAILED" as const, provider: messaging.info.id, detail: error instanceof Error ? error.message : "Envoi impossible." }));
+  await traceDispatch({ kind: "PATIENT_REPORT", recipient: maskEmail(input.email), outcome, subject: mail.subject, trigger: "SYSTEM", pharmacyId });
+  await recordAudit({ action: "counter_window.patient_report_sent", entityType: "Prescription", entityId: input.prescriptionId, pharmacyId, metadata: { kind: "patient_report", to: maskEmail(input.email), status: outcome.status, provider: outcome.provider } });
+  return outcome.status === "SENT" ? "SENT" : outcome.status === "SIMULATED" ? "SIMULATED" : "FAILED";
+}
+
+/**
+ * Le bilan du patient tel qu'il part, sans l'envoyer : l'envoi ci-dessus, et la démonstration au comptoir, qui le montre à
+ * l'écran (l'officine de démonstration n'envoie rien). Pour elle, aucune notice n'est cherchée sur Internet : seules celles
+ * déjà lues servent.
+ */
+export async function composePatientReport(input: ReportInput) {
   const { agent } = input;
   const pharmacyId = agent.scope.pharmacyId;
   const [pharmacy, recs, validated, lines] = await Promise.all([
@@ -341,7 +362,7 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
   try {
     leaflets = await leafletsFor(leafletTargets);
     const missing = leafletTargets.filter((target) => { const key = leafletKey(target); return key && !leaflets.has(key); });
-    if (missing.length > 0) {
+    if (missing.length > 0 && !pharmacy?.isDemo) {
       await Promise.race([Promise.all(missing.map((target) => ensureLeaflet(target).catch(() => undefined))), new Promise((resolve) => setTimeout(resolve, 20_000))]);
       leaflets = await leafletsFor(leafletTargets);
     }
@@ -379,14 +400,7 @@ async function sendPatientReport(input: { agent: AgentContext; prescriptionId: s
     // tant que le patient ne l'a pas confirmé sur la page. Jamais pour la démonstration.
     partnerConsentUrl: pharmacy?.isDemo ? null : partnerConsentUrl({ email: input.email, pharmacyId, universes: universesOf(recs.map((rec) => rec.product?.category)) }),
   });
-  if (!mail) return "NONE";
-  const messaging = getMessagingProvider({ demo: pharmacy?.isDemo === true });
-  const outcome = await messaging
-    .sendEmail({ to: input.email, fromName: pharmacy?.name || "PharmaBoost", subject: mail.subject, text: mail.text, html: mail.html })
-    .catch((error: unknown) => ({ status: "FAILED" as const, provider: messaging.info.id, detail: error instanceof Error ? error.message : "Envoi impossible." }));
-  await traceDispatch({ kind: "PATIENT_REPORT", recipient: maskEmail(input.email), outcome, subject: mail.subject, trigger: "SYSTEM", pharmacyId });
-  await recordAudit({ action: "counter_window.patient_report_sent", entityType: "Prescription", entityId: input.prescriptionId, pharmacyId, metadata: { kind: "patient_report", to: maskEmail(input.email), status: outcome.status, provider: outcome.provider } });
-  return outcome.status === "SENT" ? "SENT" : outcome.status === "SIMULATED" ? "SIMULATED" : "FAILED";
+  return mail ? { mail, pharmacy } : null;
 }
 
 /**

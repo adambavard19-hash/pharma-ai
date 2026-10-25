@@ -65,6 +65,9 @@ export async function simulateScan(params: { scope: { pharmacyId: string; organi
     await closeLiveCounterSales(params.scope);
     // Le dernier bip du poste est effacé : la première boîte ouvre toujours une nouvelle délivrance.
     await prisma.counterPost.update({ where: { id: post.id }, data: { lastScanAt: null } });
+    // Le stock de démonstration est celui du logiciel de gestion simulé : toujours à jour. Sans cela, quelques jours après la
+    // dernière réinitialisation, l'île affichait « Stock à vérifier » sur chaque conseil.
+    await prisma.pharmacy.update({ where: { id: params.scope.pharmacyId }, data: { stockSyncedAt: new Date() } });
   }
 
   const agent: AgentContext = { connectionId: null, postId: post.id, scope: params.scope, pharmacyIsDemo: true, intervalSeconds: 300, exportPath: null, scansPath: null };
