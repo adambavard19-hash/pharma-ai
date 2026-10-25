@@ -1,0 +1,1874 @@
+import { useId, type CSSProperties, type ReactNode } from "react";
+import { Img, staticFile } from "remotion";
+import { ArrowUp, BellRing, CalendarCheck, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Home, Hourglass, Mail, Pill, Quote, ScanLine, Search, Star, Store, Trophy, User, Users } from "lucide-react";
+import { EXIT, F, IN_OUT, LINEAR, POP, SNAP, WHIP, clamp01, keys, lerp, prog, pulse, ressort, squash, wobble } from "../../presentation/motion/kit/ease";
+import { Odometer } from "../../presentation/motion/kit/odometer";
+import { Sparkle } from "./fx";
+import { JAKARTA, MONO, PB, rgba } from "./brand";
+
+/* ==========================================================================
+ * LES ÉCRANS PHARMABOOST DU FILM — fidèles au VRAI logiciel, redessinés en fonctions du temps du film `t` (secondes) :
+ * aucun état, aucune animation CSS. Les chiffres montrés sont des EXEMPLES (la scène pose « Illustration · exemples »).
+ * Sources : src/components/island/mix-island.tsx (bannière), island-theme.ts / island-adn.ts (couleurs, ADN « noir
+ * vivant »), src/components/performance/sold-counter.tsx (compteur), robot-apercu/appli-patient/patient-app.tsx (appli),
+ * src/core/counter/patient-report.ts (e-mail du bilan), src/components/app/logo.tsx (le robot + « Pharma·Boost »).
+ *
+ * PLACEMENT (commun) : les cartes prennent `x y` = CENTRE dans le cadre 1920 × 1080 (sinon elles restent dans le flux du
+ * parent), `scale` (1 = taille film, déjà lisible), `rot` (degrés), `style`. Dimensions à scale 1 entre crochets.
+ *
+ * FONDS ET MARQUE
+ *   <AdnBackdrop t tone="paper"|"night" width=1500 focus=[.6,.48] drift=1 opacity=1 wash=0 />   remplit son parent
+ *        l'hélice d'ADN (images/adn-helice.jpg, ≤ 1920 px de large) qui dérive ; "night" = le noir vivant de la bannière
+ *   <PBLogo t at? size=120 variant="full"|"icon"|"wordmark" tone="dark"|"light" boost? grad? />  le robot + « PharmaBoost »
+ *        `at` : il CLAQUE (robot qui jaillit en tournant, mot en coup de poing, reflet à at+0,35) ; sinon déjà là, il cligne
+ *   <LogoRobot t size=64 winkAt? seed? />   la tête du robot (logo-robot.svg) qui cligne, antenne et étoile vivantes
+ *
+ * LA BANNIÈRE DU COMPTOIR (mix-island.tsx)
+ *   <Chip t kind="stock"|"marge"|"challenge"|"date"|"plain" text at? size=24 onDark? />   POP à `at`, reflet à at+0,12
+ *        stock vert (point qui bat) · marge citron · challenge OR (★, reflet toutes les 2,2 s) · date courte ROUGE BRIQUE (⧗)
+ *   <BannerHead t lines={[{ n, drug, product, chips?, at }]} highlight?={{ n, at }} pressed?={{ n, at }} width=920 />
+ *        [920 × 100 → 36 + 140/ligne] capsule noire à l'hélice verte. Avant la 1re ligne : « En attente de scan… ».
+ *        Chaque ligne glisse à son `at` (la capsule grandit en ressort) : pastille n, produit en gras, « pour {drug} »,
+ *        pastilles (à line.at + 0,22 + 0,1·k si leur `at` manque). highlight : surlignage citron + étincelle ;
+ *        pressed : la ligne s'enfonce (−3,5 %) et une onde part. Le centre de la ligne n : bannerRowCenter(lines, n, t).
+ *   <BannerCard t product for tab={(t) => "questions"|"discours"|"fiche"} questions={[{ text, at? }]}
+ *        discours={{ text, at?, dur? }} chips={[…]} sold?={at} at? price? fiche? count=2 />   [920 × 860]
+ *        la grande carte dépliée (essai « L ») : `at` = elle se DÉPLIE (ressort), onglet qui glisse et s'allume au
+ *        changement de `tab`, questions qui arrivent, discours qui s'écrit (curseur citron), bouton « Vendu » enfoncé à
+ *        `sold` puis la ligne « ✓ Vendu ». Les pastilles passent sur deux rangées si besoin (le corps rétrécit). Repères
+ *        (px depuis le coin haut gauche, scale 1) : BANNER_CARD.vendu, BANNER_CARD.tab("discours", chips).
+ *
+ * LES PERFORMANCES (sold-counter.tsx)
+ *   <SoldCounterCard t value={(t) => n} at? periods period={i | (t) => i} revenue withAdvice? goal={0..1 | (t) => …}
+ *        title subtitle />   [1200 × 560] carte sarcelle, grand nombre qui DÉFILE (rouleaux), « +1 » citron à chaque
+ *        nouvel entier, onglets de période, CA ajouté, barre « Objectif : 10 % des ventes » (goal = part de l'objectif).
+ *   <TeamRank t at rows? climber=2 />   [600 × 330] 3 avatars à initiales ; à `at` le 3e prend +1 et passe 2e (+1 place)
+ *   <LiveDot t at? label="EN DIRECT" />   pastille au point rouge qui pulse
+ *
+ * LE TÉLÉPHONE ET L'APPLI (patient-app.tsx) — tous les écrans « App… » et MailBilan remplissent l'écran du <Phone>
+ *   <Phone t x y scale tilt? pitch? rot? buzz? statusTone="dark"|"light" float? screen? >{écran}</Phone>
+ *        [375 × 812] générique, aucun logo, barre d'état 9:41 ; tilt = rotation 3D (Y) ; buzz = il VIBRE à ce temps (0,6 s)
+ *   <Notification t at title body icon="mail"|"bell"|"calendar"|"robot" app? until? />   descend en ressort ; sans x/y,
+ *        elle se pose en haut de l'écran du téléphone
+ *   <MailBilan t at />   l'e-mail « Votre bilan conseil » (aucun nom de patient) : fiche Probiotique, « Pourquoi avec votre
+ *        traitement », 3 points clés (arrivées de at à at + 1,1)
+ *   <CalendarCure t at days=7 step=.11 />   [360 × 400] les jours se cochent (cureTicks(at, days, step) → { ticks, end }),
+ *        les deux derniers restent : la fin de cure s'allume (cloche) à `end`
+ *   <AppWelcome t at? />  bienvenue (robot, « Votre pharmacie, dans la poche. »)  ·  <AppHome t at? />  accueil
+ *   <AppScan t at box? />  viseur, laser, verrouillage à at + 0,9 (APP_SCAN_LOCK), fiche
+ *   <AppCures t at />  « Mes cures », anneaux qui se remplissent (at + 0,2 → at + 1,5)
+ *   <AppOffer t at />  « Mes offres » : <OfferCard t at /> « Offre partenaire · −2 € sur votre prochaine cure » qui jaillit
+ *   <SoonBadge t at text="BIENTÔT" />   la pastille citron (obligatoire en S11), qui respire
+ *
+ * CHAPITRES ET GESTES
+ *   <ChapterTitle t at n="1/3" text="POUR *L'ÉQUIPE*" exitAt? bg? tag? />   plein cadre : le vert profond balaie, « 1/3 »
+ *        en pastille citron, le titre monte (mots entre *…* en citron) ; à `exitAt` le panneau file à gauche, le titre
+ *        rétrécit vers le coin et reste en petite étiquette en haut à gauche (si tag). Même gabarit pour S9, S10, S12.
+ *   <Cursor t x y clickAt? />   pointeur (pointe en x, y), enfoncé et onde citron à chaque clic (nombre ou liste)
+ * ======================================================================== */
+
+/** Les couleurs du vrai logiciel, en un endroit. */
+export const SCREEN_UI = {
+  night: "#07090A", // le « noir vivant » de la bannière (island-adn.ts)
+  paper: "#EFF3F2", // le papier de l'hélice d'ADN
+  ink: "#0F2B26", // carte ouverte (mix-island.tsx : L.ink)
+  head: "#F2FFF9", // texte clair de la bannière
+  green: "#0E8A7B", // L.green
+  pick: "#247061", // « Vendu », choisi
+  muted: "#5B6B66",
+  soft: "#F3F7F5",
+  tabLine: "#B9D8CE",
+  reason: "#5E9C8C",
+  raised: "#0F2F2A",
+  brand600: "#297669",
+  brand700: "#246F65",
+  brandDeep: "#0B5560",
+  brand800: "#054038",
+  appBg: "#F3F8F6",
+  appInk: "#0F2F2A",
+  appSoft: "#4B6A62",
+  appMute: "#94A3A0",
+  appLine: "#E3ECE9",
+  appTint: "#E8F3EF",
+  grad: "linear-gradient(135deg, #0E8A7B 0%, #0796B4 100%)",
+  bezel: "#0B1513",
+  live: "#FF4D5E",
+} as const;
+const U = SCREEN_UI;
+
+// ---- Petits outils ----------------------------------------------------------------------------------------------------
+
+type Place = { x?: number; y?: number; scale?: number; rot?: number; style?: CSSProperties };
+
+/** Centre en (x, y) si donnés, sinon dans le flux. */
+function Placed({ x, y, scale = 1, rot = 0, style, children }: Place & { children: ReactNode }) {
+  const abs = x !== undefined && y !== undefined;
+  return (
+    <div
+      style={{
+        position: abs ? "absolute" : "relative",
+        left: abs ? x : undefined,
+        top: abs ? y : undefined,
+        width: "max-content",
+        transform: `${abs ? "translate(-50%, -50%) " : ""}scale(${scale}) rotate(${rot}deg)`,
+        transformOrigin: "50% 50%",
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+type Timed<T> = T | ((t: number) => T);
+const asFn = <T,>(v: Timed<T>): ((t: number) => T) => (typeof v === "function" ? (v as (t: number) => T) : () => v);
+
+/** Depuis quand la valeur a changé (recherche image par image, jusqu'à `max` s) ; Infinity si rien n'a changé. */
+function sinceChange<T>(t: number, f: (tt: number) => T, max = 0.6): { since: number; prev: T } {
+  const now = f(t);
+  for (let k = 1; k * F <= max + 1e-9; k++) {
+    const p = f(t - k * F);
+    if (p !== now) return { since: (k - 1) * F, prev: p };
+  }
+  return { since: Infinity, prev: now };
+}
+
+/** Entrée commune : 0 → 1 (SNAP) ; toujours 1 sans `at`. */
+const enter = (t: number, at: number | undefined, dur = 0.38) => (at === undefined ? 1 : prog(t, at, dur, SNAP));
+
+/** Un reflet qui traverse (bande blanche inclinée), k de 0 à 1. */
+function Sheen({ k, alpha = 0.7, width = "38%" }: { k: number; alpha?: number; width?: string }) {
+  if (k <= 0 || k >= 1) return null;
+  return <span style={{ position: "absolute", top: "-20%", bottom: "-20%", left: `${-45 + k * 160}%`, width, background: `linear-gradient(100deg, transparent, rgba(255,255,255,${alpha}), transparent)`, transform: "skewX(-18deg)", pointerEvents: "none" }} />;
+}
+
+// ---- La boîte générique (photo de la carte, e-mail, viseur) ------------------------------------------------------------
+
+const BOX_TONES: [RegExp, string, string][] = [
+  [/probio/i, "#22C88F", "#0E8A7B"],
+  [/amoxi/i, "#5B8DEF", "#2F5FC4"],
+  [/parac/i, "#F29A4A", "#C9661F"],
+  [/pastill|gorge/i, "#9B7BF2", "#6A4BC9"],
+];
+
+/** Une boîte de médicament GÉNÉRIQUE (aucune marque) : face, dessus, côté, bandeau de couleur, nom en deux lignes. */
+function MiniBox({ name, w = 100 }: { name: string; w?: number }) {
+  const tone = BOX_TONES.find(([re]) => re.test(name));
+  const [a, b] = tone ? [tone[1], tone[2]] : ["#36E8C8", "#0E8A7B"];
+  const [first, ...rest] = name.split(" ");
+  const second = rest.join(" ");
+  return (
+    <svg width={w} height={w * 1.1} viewBox="0 0 100 110" style={{ display: "block", overflow: "visible" }}>
+      <path d="M8 22 L20 10 L92 10 L80 22 Z" fill="#E4ECE9" />
+      <path d="M80 22 L92 10 L92 92 L80 104 Z" fill="#C3D2CD" />
+      <rect x="8" y="22" width="72" height="82" rx="2.5" fill="#FFFFFF" stroke="#D3DFDA" strokeWidth="1" />
+      <rect x="8" y="64" width="72" height="20" fill={a} />
+      <rect x="8" y="84" width="72" height="5" fill={b} />
+      <circle cx="71" cy="56" r="3.6" fill={a} opacity=".9" />
+      <text x="14" y="42" fontFamily={JAKARTA} fontWeight={800} fontSize="12" fill="#0F2F2A" textLength={first.length > 8 ? 58 : undefined} lengthAdjust="spacingAndGlyphs">
+        {first}
+      </text>
+      {second && (
+        <text x="14" y="56" fontFamily={JAKARTA} fontWeight={700} fontSize="10" fill="#3F5E57">
+          {second}
+        </text>
+      )}
+      <rect x="14" y="94" width="30" height="2" rx="1" fill="#C3D2CD" />
+    </svg>
+  );
+}
+
+// ---- L'hélice d'ADN --------------------------------------------------------------------------------------------------
+
+/** Le noir vivant de la bannière : l'encre du papier retournée en lumière (island-adn.ts). */
+const GLOW = "invert(1) hue-rotate(180deg) brightness(1.15) contrast(1.25) saturate(1.3)";
+
+export function AdnBackdrop({
+  t,
+  tone = "paper",
+  width = 1500,
+  focus = [0.6, 0.48],
+  drift = 1,
+  opacity = 1,
+  wash = 0,
+  style,
+}: {
+  t: number;
+  tone?: "paper" | "night";
+  /** Largeur de l'image en px (bornée : jamais plus de 1920 px affichés). */
+  width?: number;
+  /** Où tombe le centre de l'image dans le parent (fractions). */
+  focus?: [number, number];
+  drift?: number;
+  opacity?: number;
+  /** Voile blanc (papier) ou noir (night) pour la lisibilité, 0..1. */
+  wash?: number;
+  style?: CSSProperties;
+}) {
+  const w = Math.min(1800, width);
+  const s = Math.min(1920 / w, 1 + 0.035 * drift * (0.5 + 0.5 * Math.sin(t * 0.23)));
+  const dx = drift * 46 * Math.sin(t * 0.21 + 0.6);
+  const dy = drift * 26 * Math.sin(t * 0.17 + 1.9);
+  const r = drift * 2.4 * Math.sin(t * 0.13 + 0.4);
+  const night = tone === "night";
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: night ? U.night : U.paper, pointerEvents: "none", ...style }}>
+      <Img
+        src={staticFile("rembobine/images/adn-helice.jpg")}
+        style={{
+          position: "absolute",
+          left: `${focus[0] * 100}%`,
+          top: `${focus[1] * 100}%`,
+          width: w,
+          height: (w * 750) / 900,
+          transform: `translate(-50%, -50%) translate(${dx}px, ${dy}px) rotate(${r}deg) scale(${s})`,
+          filter: night ? GLOW : undefined,
+          mixBlendMode: night ? "screen" : undefined,
+          opacity: (night ? 0.85 : 1) * opacity,
+        }}
+      />
+      {wash > 0 && <div style={{ position: "absolute", inset: 0, background: night ? `rgba(7,9,10,${wash})` : `rgba(255,255,255,${wash})` }} />}
+    </div>
+  );
+}
+
+// ---- Le robot, le logo -----------------------------------------------------------------------------------------------
+
+/** La tête du robot (public/rembobine/images/logo-robot.svg), vivante : clignement, antenne, étoile, clin d'œil. */
+export function LogoRobot({ t, size = 64, winkAt, seed = 0, style }: { t: number; size?: number; winkAt?: number; seed?: number; style?: CSSProperties }) {
+  const id = `lr${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const ph = (((t + seed * 0.83) % 3.1) + 3.1) % 3.1;
+  const blink = ph < 0.14 ? Math.sin((ph / 0.14) * Math.PI) : 0;
+  const wink = winkAt === undefined ? 0 : pulse(t, winkAt, 0.07, 0.32, 0.12);
+  const ant = 0.5 + 0.5 * Math.sin((t * 2 * Math.PI) / 2.2);
+  const star = 0.82 + 0.22 * Math.sin((t * 2 * Math.PI) / 1.8 + seed);
+  const eye = (cx: number, closed: number) => (
+    <g>
+      <ellipse cx={cx} cy={42} rx={4.8} ry={6.4 * (1 - 0.88 * closed)} fill="#58F2D8" />
+      {closed < 0.4 && <circle cx={cx - 1.5} cy={39.4} r={1.7} fill="#fff" fillOpacity=".85" />}
+    </g>
+  );
+  return (
+    <svg viewBox="-6 -15 112 112" width={size} height={size} style={{ display: "block", overflow: "visible", ...style }}>
+      <defs>
+        <linearGradient id={`${id}s`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#C4E1EC" />
+        </linearGradient>
+        <linearGradient id={`${id}c`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#0A2234" />
+          <stop offset="1" stopColor="#0E3550" />
+        </linearGradient>
+        <linearGradient id={`${id}e`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#27C9B0" />
+          <stop offset="1" stopColor="#12968C" />
+        </linearGradient>
+        <linearGradient id={`${id}b`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#22C88F" />
+          <stop offset="1" stopColor="#14A06F" />
+        </linearGradient>
+      </defs>
+      <line x1="50" y1="17" x2="50" y2="8" stroke="#8FBCD0" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="50" cy="6" r={6 + 3 * ant} fill="#58F2D8" fillOpacity={0.18 + 0.18 * ant} />
+      <circle cx="50" cy="6" r="3.8" fill="#58F2D8" />
+      <path d="M 9.90 36.72 A 41 35 0 0 1 90.10 36.72" fill="none" stroke="#27C9B0" strokeWidth="5" strokeLinecap="round" />
+      <rect x="3" y="36" width="15" height="28" rx="7" fill={`url(#${id}e)`} />
+      <rect x="82" y="36" width="15" height="28" rx="7" fill={`url(#${id}e)`} />
+      <rect x="14" y="16" width="72" height="58" rx="24" fill={`url(#${id}s)`} stroke="#8FBCD0" strokeWidth="1.6" />
+      <rect x="22" y="25" width="56" height="40" rx="17" fill={`url(#${id}c)`} />
+      {eye(38, blink)}
+      {eye(62, Math.max(blink, wink))}
+      <path d="M 41 52.5 A 9 7 0 0 0 59 52.5 Z" fill="#58F2D8" />
+      <circle cx="74" cy="69" r="15" fill="#fff" fillOpacity=".95" />
+      <circle cx="74" cy="69" r="13.5" fill={`url(#${id}b)`} />
+      <rect x="72.2" y="61" width="3.6" height="16" rx="1" fill="#fff" />
+      <rect x="66" y="67.2" width="16" height="3.6" rx="1" fill="#fff" />
+      <g transform={`translate(80 14) scale(${star}) rotate(${12 * Math.sin(t * 1.7)}) translate(-80 -14)`}>
+        <path d="M 80 7 L 82 12.5 L 87.5 14 L 82 15.5 L 80 21 L 78 15.5 L 72.5 14 L 78 12.5 Z" fill="#FFD65A" />
+      </g>
+    </svg>
+  );
+}
+
+/** Le texte avec un reflet qui le traverse (k de 0 à 1) ; hors du passage, couleur pleine. */
+function shine(color: string, k: number): CSSProperties {
+  if (k <= 0 || k >= 1) return { color };
+  const p = -20 + k * 140;
+  return { color: "transparent", backgroundImage: `linear-gradient(100deg, ${color} ${p - 14}%, #FFFFFF ${p}%, ${color} ${p + 14}%)`, WebkitBackgroundClip: "text", backgroundClip: "text" };
+}
+
+export function PBLogo({
+  t,
+  at,
+  size = 120,
+  variant = "full",
+  tone = "dark",
+  boost,
+  grad = false,
+  x,
+  y,
+  scale = 1,
+  rot,
+  style,
+}: Place & {
+  t: number;
+  /** Il claque à ce temps (sinon déjà là). */
+  at?: number;
+  /** Hauteur des lettres (px) ; le robot fait 1,3 × size. */
+  size?: number;
+  variant?: "full" | "icon" | "wordmark";
+  /** Le fond SOUS le logo : "dark" (vert profond) → Pharma blanc, Boost citron ; "light" → encre, Boost sarcelle. */
+  tone?: "dark" | "light";
+  boost?: string;
+  /** Boost au dégradé du titre du site (sarcelle → cyan), pour fond clair. */
+  grad?: boolean;
+}) {
+  const ink = tone === "dark" ? "#FFFFFF" : PB.green;
+  const boostColor = boost ?? (tone === "dark" ? PB.citron : PB.brand);
+  const a = at ?? -100;
+  const robotS = at === undefined ? 1 : keys(t, [[a, 0], [a + 0.17, 1.2, POP], [a + 0.36, 1, IN_OUT]]);
+  const robotR = at === undefined ? 0 : -28 * (1 - prog(t, a, 0.32, SNAP));
+  const wp = at === undefined ? 1 : prog(t, a + 0.05, 0.22, SNAP);
+  const sq = squash(t, a + 0.22, 6 * F);
+  const sh = prog(t, a + 0.36, 0.55, IN_OUT);
+  const bob = wobble(t, 3, size * 0.03, 1.1);
+  if (at !== undefined && t < a) return null;
+  const robot = (
+    <div style={{ transform: `translateY(${bob}px) scale(${robotS}) rotate(${robotR}deg)`, transformOrigin: "50% 60%", filter: tone === "dark" ? `drop-shadow(0 ${size * 0.08}px ${size * 0.2}px rgba(0,0,0,.35))` : `drop-shadow(0 ${size * 0.08}px ${size * 0.16}px rgba(15,47,42,.22))` }}>
+      <LogoRobot t={t} size={size * (variant === "icon" ? 1.6 : 1.32)} winkAt={at === undefined ? undefined : a + 0.55} />
+    </div>
+  );
+  const boostStyle: CSSProperties = grad ? { color: "transparent", backgroundImage: `linear-gradient(90deg, ${PB.brand} 0%, ${PB.cyan} 100%)`, WebkitBackgroundClip: "text", backgroundClip: "text" } : shine(boostColor, sh);
+  const word = (
+    <div
+      style={{
+        fontFamily: JAKARTA,
+        fontWeight: 800,
+        fontSize: size,
+        letterSpacing: "-0.035em",
+        lineHeight: 1.08,
+        whiteSpace: "nowrap",
+        paddingBottom: size * 0.04,
+        opacity: clamp01(wp * 2),
+        transform: `scale(${lerp(1.9, 1, wp) * sq.sx}, ${lerp(1.9, 1, wp) * sq.sy})`,
+        transformOrigin: "30% 60%",
+        filter: wp < 1 ? `blur(${(1 - wp) * 14}px)` : undefined,
+      }}
+    >
+      <span style={{ display: "inline-block", transform: `translateX(${(1 - wp) * -size * 0.6}px)`, ...shine(ink, sh) }}>Pharma</span>
+      <span style={{ display: "inline-block", transform: `translateX(${(1 - wp) * size * 0.6}px)`, ...boostStyle }}>Boost</span>
+    </div>
+  );
+  return (
+    <Placed x={x} y={y} scale={scale} rot={rot} style={style}>
+      <div style={{ display: "flex", alignItems: "center", gap: size * 0.24 }}>
+        {variant !== "wordmark" && robot}
+        {variant !== "icon" && word}
+      </div>
+    </Placed>
+  );
+}
+
+// ---- Les pastilles ---------------------------------------------------------------------------------------------------
+
+export type ChipKind = "stock" | "marge" | "challenge" | "date" | "plain";
+export type ChipSpec = { kind: ChipKind; text: string; at?: number };
+
+/**
+ * Couleurs : le stock vert de la petite bannière (#7BE0B0) ; la marge prend le CITRON de la bannière (la direction réserve
+ * l'or au challenge) ; le challenge en OR métal avec ★ ; la date courte en ROUGE BRIQUE.
+ */
+function chipLook(kind: ChipKind, onDark: boolean): { bg: string; fg: string; ring: string } {
+  switch (kind) {
+    case "stock":
+      return { bg: "#7BE0B0", fg: "#063B26", ring: onDark ? "none" : "inset 0 0 0 2px rgba(6,59,38,.12)" };
+    case "marge":
+      return { bg: PB.citron, fg: "#3D4F00", ring: onDark ? `0 0 18px ${rgba(PB.citron, 0.25)}` : "inset 0 0 0 2px rgba(61,79,0,.2)" };
+    case "challenge":
+      return { bg: `linear-gradient(180deg, ${PB.goldHi} 0%, ${PB.gold} 100%)`, fg: "#3A2600", ring: `inset 0 0 0 2px rgba(255,236,190,.6), 0 6px 18px ${rgba(PB.gold, 0.42)}` };
+    case "date":
+      return { bg: PB.date, fg: "#FFFFFF", ring: `inset 0 0 0 2px rgba(255,255,255,.14), 0 6px 16px ${rgba(PB.date, 0.35)}` };
+    default:
+      return onDark ? { bg: "rgba(255,255,255,0.14)", fg: U.head, ring: "none" } : { bg: "rgba(15,47,42,0.08)", fg: PB.ink, ring: "none" };
+  }
+}
+
+export function Chip({ t, kind, text, at, size = 24, onDark = false, x, y, scale, rot, style }: Place & { t: number; kind: ChipKind; text: string; at?: number; size?: number; onDark?: boolean }) {
+  const r = at === undefined ? 1 : ressort(t, at, { damping: 10, stiffness: 300, mass: 0.5 });
+  const since = at === undefined ? 10 + t : t - at;
+  const look = chipLook(kind, onDark);
+  const sweepAt = kind === "challenge" && since > 1.2 ? 0.12 + Math.floor((since - 0.12) / 2.2) * 2.2 : 0.12;
+  const sw = clamp01((since - sweepAt) / 0.55);
+  const beat = ((since % 1.3) + 1.3) % 1.3 / 1.3;
+  const icon =
+    kind === "stock" ? (
+      <span style={{ width: size * 0.42, height: size * 0.42, borderRadius: 99, background: "#0E8A55", boxShadow: `0 0 0 ${size * 0.28 * beat}px rgba(14,138,85,${0.35 * (1 - beat)})`, flexShrink: 0 }} />
+    ) : kind === "challenge" ? (
+      <Star size={size * 0.9} fill={look.fg} strokeWidth={0} style={{ flexShrink: 0, transform: `rotate(${wobble(t, 8, 10, 1.4)}deg)` }} />
+    ) : kind === "date" ? (
+      <Hourglass size={size * 0.82} strokeWidth={2.6} style={{ flexShrink: 0, transform: `rotate(${180 * prog(since % 2.4, 1.6, 0.5, IN_OUT)}deg)` }} />
+    ) : null;
+  return (
+    <Placed x={x} y={y} scale={scale} rot={rot} style={style}>
+      <span
+        style={{
+          position: "relative",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: size * 0.32,
+          height: Math.round(size * 1.72),
+          padding: `0 ${size * 0.62}px`,
+          borderRadius: 999,
+          background: look.bg,
+          color: look.fg,
+          boxShadow: look.ring,
+          fontFamily: JAKARTA,
+          fontWeight: 700,
+          fontSize: size,
+          letterSpacing: "-0.005em",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textShadow: "none",
+          opacity: at !== undefined && t < at ? 0 : clamp01(r * 4),
+          transform: `scale(${Math.max(0, r)}) rotate(${(1 - clamp01(r)) * -10}deg)`,
+          transformOrigin: "30% 50%",
+        }}
+      >
+        {icon}
+        <span style={{ position: "relative" }}>{text}</span>
+        <Sheen k={sw} alpha={kind === "challenge" ? 0.85 : 0.6} />
+      </span>
+    </Placed>
+  );
+}
+
+// ---- La bannière repliée ---------------------------------------------------------------------------------------------
+
+export type BannerLine = { n: number; drug: string; product: string; chips?: ChipSpec[]; at: number };
+
+const HEAD = { padX: 22, padY: 18, robot: 72, row: 140, idle: 100 } as const;
+const headSpring = (t: number, at: number) => ressort(t, at, { damping: 13, stiffness: 190, mass: 0.7 });
+
+/** Le centre (px, relatif au coin haut gauche de la capsule, scale 1) de la ligne n à l'instant t — pour y poser un curseur. */
+export function bannerRowCenter(lines: BannerLine[], n: number, t: number, width = 920): { x: number; y: number } {
+  let top = HEAD.padY;
+  for (const l of lines) {
+    if (l.n === n) return { x: HEAD.padX + HEAD.robot + 18 + (width - HEAD.padX * 2 - HEAD.robot - 18 - 210) / 2, y: top + HEAD.row / 2 };
+    top += HEAD.row * headSpring(t, l.at);
+  }
+  return { x: width / 2, y: top };
+}
+
+export function BannerHead({
+  t,
+  lines,
+  highlight,
+  pressed,
+  width = 920,
+  idle = "En attente de scan…",
+  x,
+  y,
+  scale,
+  rot,
+  style,
+}: Place & { t: number; lines: BannerLine[]; highlight?: { n: number; at: number }; pressed?: { n: number; at: number }; width?: number; idle?: string }) {
+  const rs = lines.map((l) => headSpring(t, l.at));
+  const H = Math.max(HEAD.idle, HEAD.padY * 2 + rs.reduce((s, r) => s + HEAD.row * r, 0));
+  const k0 = lines.length ? prog(t, lines[0].at, 0.25, SNAP) : 0;
+  const left = HEAD.padX + HEAD.robot + 18;
+  const btnW = 196;
+  const rowW = width - left - HEAD.padX - btnW - 6;
+  const shimmer = ((t * 0.7) % 1) * 1.4 - 0.2;
+  let top = HEAD.padY;
+  // La boîte garde la hauteur FINALE (toutes les lignes arrivées) : la capsule part du haut et grandit vers le bas.
+  const boxH = Math.max(HEAD.idle, HEAD.padY * 2 + HEAD.row * lines.length);
+  return (
+    <Placed x={x} y={y} scale={scale} rot={rot} style={style}>
+      <div style={{ position: "relative", width, height: boxH }}>
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width,
+          height: H,
+          borderRadius: lerp(HEAD.idle / 2, 46, k0),
+          overflow: "hidden",
+          background: U.night,
+          boxShadow: `0 0 0 2px ${rgba(PB.citron, 0.2)}, 0 0 70px -14px ${rgba(PB.mint, 0.45)}, 0 44px 90px -34px rgba(0,0,0,.7)`,
+        }}
+      >
+        <AdnBackdrop t={t} tone="night" width={1150} focus={[0.62, 0.5]} opacity={0.62} />
+        {/* Le robot (mix-island : Robot 30 px, humeur heureuse). */}
+        <div style={{ position: "absolute", left: HEAD.padX - 4, top: lerp((HEAD.idle - HEAD.robot) / 2, HEAD.padY - 4, k0) }}>
+          <LogoRobot t={t} size={HEAD.robot} seed={2} />
+        </div>
+        {/* Au repos : « En attente de scan… ». */}
+        {k0 < 1 && (
+          <div style={{ position: "absolute", left, top: 0, height: HEAD.idle, display: "flex", alignItems: "center", gap: 14, opacity: 1 - k0, fontFamily: JAKARTA, fontWeight: 700, fontSize: 30, letterSpacing: "-0.01em" }}>
+            <ScanLine size={32} color={PB.citron} strokeWidth={2.4} />
+            <span style={{ color: "transparent", backgroundImage: `linear-gradient(90deg, rgba(242,255,249,.5) ${shimmer * 100 - 20}%, #FFFFFF ${shimmer * 100}%, rgba(242,255,249,.5) ${shimmer * 100 + 20}%)`, WebkitBackgroundClip: "text", backgroundClip: "text" }}>{idle}</span>
+          </div>
+        )}
+        {lines.map((l, i) => {
+          const rowTop = top;
+          top += HEAD.row * rs[i];
+          if (t < l.at) return null;
+          const p = prog(t, l.at, 0.34, SNAP);
+          const hl = highlight && highlight.n === l.n ? prog(t, highlight.at, 0.22, SNAP) : 0;
+          const breath = hl * (0.5 + 0.5 * Math.sin((t - (highlight?.at ?? 0)) * 5));
+          const pr = pressed && pressed.n === l.n ? keys(t, [[pressed.at - 0.06, 1], [pressed.at + 0.03, 0.965, SNAP], [pressed.at + 0.17, 1.012, SNAP], [pressed.at + 0.36, 1, IN_OUT]]) : 1;
+          const rip = pressed && pressed.n === l.n ? prog(t, pressed.at, 0.5, SNAP) : 0;
+          const num = ressort(t, l.at + 0.04, { damping: 9, stiffness: 320, mass: 0.5 });
+          const nameColor = hl > 0 ? `color-mix(in srgb, ${PB.citron} ${Math.round(hl * 100)}%, ${U.head})` : U.head;
+          return (
+            <div
+              key={l.n}
+              style={{
+                position: "absolute",
+                left: left - 14,
+                top: rowTop,
+                width: rowW + 28,
+                height: HEAD.row - 4,
+                opacity: clamp01(p * 1.6),
+                transform: `translateX(${(1 - p) * -56}px) scale(${pr})`,
+                transformOrigin: "40% 50%",
+                filter: p < 1 ? `blur(${(1 - p) * 5}px)` : undefined,
+              }}
+            >
+              {i > 0 && <div style={{ position: "absolute", left: 14, right: 14, top: -2, height: 2, background: "rgba(242,255,249,.12)" }} />}
+              {(hl > 0 || rip > 0) && (
+                <div style={{ position: "absolute", inset: "6px 0 4px 0", borderRadius: 22, overflow: "hidden", background: rgba(PB.citron, 0.1 * hl + 0.06 * breath), boxShadow: `inset 0 0 0 2px ${rgba(PB.citron, 0.55 * hl)}, 0 0 ${30 * hl}px ${rgba(PB.citron, 0.18 * hl)}` }}>
+                  <div style={{ position: "absolute", left: 0, top: 10, bottom: 10, width: 7, borderRadius: 4, background: PB.citron, transform: `scaleY(${hl})` }} />
+                  <Sheen k={prog(t, (highlight?.at ?? 0) + 0.04, 0.6, IN_OUT)} alpha={0.28} width="30%" />
+                  {rip > 0 && rip < 1 && <div style={{ position: "absolute", left: "50%", top: "50%", width: 900 * rip, height: 900 * rip, marginLeft: -450 * rip, marginTop: -450 * rip, borderRadius: "50%", background: `rgba(255,255,255,${0.22 * (1 - rip)})` }} />}
+                </div>
+              )}
+              <div style={{ position: "relative", padding: "12px 14px 0 14px", textShadow: "0 2px 10px rgba(0,0,0,.75)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, height: 42 }}>
+                  {i === 0 && <span style={{ width: 12, height: 12, borderRadius: 99, flexShrink: 0, background: PB.citron, boxShadow: `0 0 ${8 + 8 * (0.5 + 0.5 * Math.sin(t * 6))}px ${PB.citron}` }} />}
+                  <span style={{ display: "inline-flex", width: 40, height: 40, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 99, background: U.green, color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 23, textShadow: "none", transform: `scale(${Math.max(0, num)})` }}>{l.n}</span>
+                  <span style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 33, letterSpacing: "-0.015em", color: nameColor, whiteSpace: "nowrap" }}>{l.product}</span>
+                </div>
+                <div style={{ marginTop: 2, fontFamily: JAKARTA, fontWeight: 700, fontSize: 24, lineHeight: "30px", color: "rgba(242,255,249,.84)", whiteSpace: "nowrap" }}>pour {l.drug}</div>
+                <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center" }}>
+                  {(l.chips ?? []).map((c, k) => (
+                    <Chip key={k} t={t} kind={c.kind} text={c.text} at={c.at ?? l.at + 0.22 + 0.1 * k} size={22} onDark />
+                  ))}
+                </div>
+              </div>
+              {hl > 0 && <Sparkle t={t} at={(highlight?.at ?? 0) + 0.05} x={rowW - 10} y={34} size={64} color={PB.citron} />}
+            </div>
+          );
+        })}
+        {/* « Terminer → » (aur-btn). */}
+        <div style={{ position: "absolute", right: HEAD.padX, top: HEAD.padY + 2, height: 64, width: btnW, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 999, border: "2px solid rgba(242,255,249,.45)", background: "rgba(255,255,255,.08)", color: U.head, fontFamily: JAKARTA, fontWeight: 700, fontSize: 25, opacity: k0, boxSizing: "border-box" }}>
+          Terminer →
+        </div>
+      </div>
+      </div>
+    </Placed>
+  );
+}
+
+// ---- La grande carte dépliée -------------------------------------------------------------------------------------------
+
+export type BannerTab = "questions" | "discours" | "fiche";
+export type BannerQuestion = { text: string; at?: number };
+
+const TABS: { id: BannerTab; label: string; w: number }[] = [
+  { id: "questions", label: "Questions", w: 170 },
+  { id: "discours", label: "Discours", w: 154 },
+  { id: "fiche", label: "Fiche", w: 110 },
+];
+const tabX = (id: BannerTab) => TABS.slice(0, TABS.findIndex((x) => x.id === id)).reduce((s, x) => s + x.w, 0);
+const tabW = (id: BannerTab) => TABS.find((x) => x.id === id)?.w ?? 120;
+
+const CARD = { W: 920, H: 860, pad: 18, top: 62, gap: 12, lPad: 18, padX: 30, padY: 26, photo: 112, sp: 14, chip: 22, chipRow: 38, chipGap: 10, tabs: 60, act: 66, dots: 28 } as const;
+/** La carte blanche : coin haut gauche et taille, dans la grande carte. */
+const WHITE = { x: CARD.pad + CARD.lPad, y: CARD.pad + CARD.top + CARD.gap + CARD.lPad, w: CARD.W - 2 * CARD.pad - 2 * CARD.lPad, h: CARD.H - 2 * CARD.pad - CARD.top - CARD.gap - CARD.dots - 2 * CARD.lPad } as const;
+const WHITE_IN = WHITE.w - 2 * CARD.padX;
+
+/** Largeur estimée d'une pastille (Jakarta 700), un peu large exprès : la rangée passe à la ligne plutôt que de déborder. */
+function chipWidth(c: ChipSpec, size: number) {
+  return Array.from(c.text).length * size * 0.56 + 2 * 0.62 * size + (c.kind === "marge" || c.kind === "plain" ? 0 : size * 1.15);
+}
+/** Les rangées de pastilles de la carte (1 ou 2), toutes les pastilles comptées même avant leur arrivée. */
+function chipRows(chips: ChipSpec[]) {
+  let rows = chips.length ? 1 : 0;
+  let w = 0;
+  for (const c of chips) {
+    const cw = chipWidth(c, CARD.chip);
+    if (w > 0 && w + CARD.chipGap + cw > WHITE_IN) {
+      rows++;
+      w = cw;
+    } else w += (w > 0 ? CARD.chipGap : 0) + cw;
+  }
+  return Math.min(2, Math.max(1, rows));
+}
+
+/** Repères de la grande carte (px, relatifs à son coin haut gauche, scale 1). */
+export const BANNER_CARD = {
+  W: CARD.W,
+  H: CARD.H,
+  /** Le centre du bouton « Vendu » (ancré au bas de la carte). */
+  vendu: { x: WHITE.x + CARD.padX + ((WHITE_IN - 14) * 1.3) / 2.3 / 2, y: WHITE.y + WHITE.h - CARD.padY - CARD.act / 2 },
+  /** Le centre d'un onglet (les pastilles peuvent tenir sur deux rangées : passer les mêmes `chips`). */
+  tab: (id: BannerTab, chips: ChipSpec[] = []) => {
+    const rows = chipRows(chips);
+    const y = WHITE.y + CARD.padY + CARD.photo + CARD.sp + rows * CARD.chipRow + (rows - 1) * 8 + CARD.sp + CARD.tabs / 2;
+    return { x: WHITE.x + CARD.padX + WHITE_IN - 7 - (TABS.reduce((s, x) => s + x.w, 0) - tabX(id) - tabW(id) / 2), y };
+  },
+};
+
+const DEFAULT_QUESTIONS: BannerQuestion[] = [{ text: "Avez-vous déjà eu des troubles digestifs avec un antibiotique ?" }, { text: "Prenez-vous déjà un probiotique ?" }];
+const DEFAULT_DISCOURS = { text: "Avec un antibiotique, la flore intestinale peut être perturbée. Je vous conseille un probiotique pendant le traitement." };
+const DEFAULT_FICHE = { reason: "Avec un antibiotique, la flore intestinale peut être perturbée.", posology: "1 gélule par jour, pendant toute la durée du traitement.", tell: ["À prendre à distance de l'antibiotique."] };
+
+function Label({ children, color = U.muted, size = 18 }: { children: ReactNode; color?: string; size?: number }) {
+  return <div style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: size, letterSpacing: "0.14em", textTransform: "uppercase", color, lineHeight: 1 }}>{children}</div>;
+}
+
+function QuestionsBody({ t, questions }: { t: number; questions: BannerQuestion[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {questions.slice(0, 2).map((q, i) => {
+        const p = enter(t, q.at, 0.36);
+        const num = q.at === undefined ? 1 : ressort(t, q.at + 0.03, { damping: 9, stiffness: 320, mass: 0.5 });
+        return (
+          <div key={i} style={{ opacity: q.at !== undefined && t < q.at ? 0 : clamp01(p * 1.8), transform: `translateX(${(1 - p) * 46}px)` }}>
+            <div style={{ display: "flex", gap: 14, fontFamily: JAKARTA, fontWeight: 600, fontSize: 25, lineHeight: "33px", color: U.ink }}>
+              <span style={{ display: "inline-flex", width: 32, height: 32, flexShrink: 0, marginTop: 1, alignItems: "center", justifyContent: "center", borderRadius: 99, background: U.green, color: "#FFF", fontWeight: 800, fontSize: 18, transform: `scale(${Math.max(0, num)})` }}>{i + 1}</span>
+              <span>{q.text}</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, marginLeft: 46 }}>
+              {["Oui", "Non"].map((a, k) => {
+                const pk = q.at === undefined ? 1 : ressort(t, q.at + 0.22 + 0.06 * k, { damping: 11, stiffness: 300, mass: 0.5 });
+                return (
+                  <span key={a} style={{ display: "inline-flex", alignItems: "center", height: 38, padding: "0 18px", borderRadius: 99, border: `2px solid ${U.tabLine}`, background: "#FFF", color: U.ink, fontFamily: JAKARTA, fontWeight: 600, fontSize: 20, transform: `scale(${Math.max(0, pk)})`, transformOrigin: "0 50%" }}>
+                    {a}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DiscoursBody({ t, discours }: { t: number; discours: { text: string; at?: number; dur?: number } }) {
+  const chars = Array.from(discours.text);
+  const dur = discours.dur ?? chars.length * 0.028;
+  const n = discours.at === undefined ? chars.length : Math.floor(chars.length * clamp01((t - discours.at) / dur));
+  const typing = n < chars.length;
+  const caretOn = typing || Math.floor(t * 2.4) % 2 === 0;
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Quote size={20} color={U.green} strokeWidth={2.6} />
+        <Label>À dire au patient</Label>
+      </div>
+      <div style={{ marginTop: 12, minHeight: 196, boxSizing: "border-box", borderRadius: 24, padding: "20px 26px", background: U.raised, color: U.head, fontFamily: JAKARTA, fontWeight: 600, fontSize: 27, lineHeight: "37px", letterSpacing: "-0.01em", boxShadow: `0 14px 30px -18px ${rgba(U.raised, 0.8)}` }}>
+        {chars.slice(0, n).join("")}
+        <span style={{ display: "inline-block", width: 3, height: 30, marginLeft: 3, verticalAlign: "-5px", borderRadius: 2, background: PB.citron, opacity: caretOn ? 1 : 0, boxShadow: `0 0 10px ${PB.citron}` }} />
+      </div>
+    </div>
+  );
+}
+
+function FicheBody({ fiche }: { fiche: { reason?: string; posology?: string; tell?: string[] } }) {
+  const txt: CSSProperties = { fontFamily: JAKARTA, fontWeight: 500, fontSize: 23, lineHeight: "31px", color: U.ink };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {fiche.reason && <div style={{ ...txt, border: `3px solid ${U.reason}`, borderRadius: 22, padding: "10px 20px" }}>{fiche.reason}</div>}
+      {fiche.posology && (
+        <div>
+          <Label size={17}>Posologie</Label>
+          <div style={{ ...txt, marginTop: 6 }}>{fiche.posology}</div>
+        </div>
+      )}
+      {fiche.tell && fiche.tell.length > 0 && (
+        <div>
+          <Label size={17}>À dire au patient</Label>
+          {fiche.tell.slice(0, 2).map((l) => (
+            <div key={l} style={{ ...txt, marginTop: 6 }}>· {l}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function BannerCard({
+  t,
+  product = "Probiotique",
+  for: drug = "Amoxicilline 1 g",
+  tab = "questions",
+  questions = DEFAULT_QUESTIONS,
+  discours = DEFAULT_DISCOURS,
+  chips = [],
+  sold,
+  at,
+  price,
+  rank = "À proposer en premier",
+  fiche = DEFAULT_FICHE,
+  count = 2,
+  x,
+  y,
+  scale,
+  rot,
+  style,
+}: Place & {
+  t: number;
+  product?: string;
+  for?: string;
+  tab?: Timed<BannerTab>;
+  questions?: BannerQuestion[];
+  discours?: { text: string; at?: number; dur?: number };
+  chips?: ChipSpec[];
+  /** Le pharmacien clique « Vendu » à ce temps. */
+  sold?: number;
+  /** La carte se DÉPLIE à ce temps (sinon déjà ouverte ; rien avant `at`). */
+  at?: number;
+  price?: string;
+  rank?: string;
+  fiche?: { reason?: string; posology?: string; tell?: string[] };
+  /** Nombre de conseils de la vente (points sous la carte). */
+  count?: number;
+}) {
+  if (at !== undefined && t < at - F) return null;
+  const unfold = at === undefined ? 1 : clamp01(ressort(t, at, { damping: 15, stiffness: 170, mass: 0.75 }));
+  const st = (d: number, dur = 0.34) => (at === undefined ? 1 : prog(t, at + d, dur, SNAP));
+  const tabFn = asFn(tab);
+  const cur = tabFn(t);
+  const { since, prev } = sinceChange(t, tabFn, 0.5);
+  const sw = since === Infinity ? 1 : SNAP(clamp01(since / 0.3));
+  const flash = since === Infinity ? 0 : pulse(since, 0, 0.05, 0.06, 0.4);
+  const indX = lerp(tabX(prev), tabX(cur), sw);
+  const indW = lerp(tabW(prev), tabW(cur), sw);
+  const soldK = sold === undefined ? 0 : prog(t, sold + 0.16, 0.3, SNAP);
+  const press = sold === undefined ? 1 : keys(t, [[sold - 0.08, 1], [sold + 0.02, 0.92, SNAP], [sold + 0.14, 1.06, SNAP], [sold + 0.32, 1, IN_OUT]]);
+  const soldGlow = sold === undefined ? 0 : pulse(t, sold, 0.08, 0.12, 0.7);
+  const tick = sold === undefined ? 0 : ressort(t, sold + 0.2, { damping: 10, stiffness: 300, mass: 0.5 });
+  const draw = sold === undefined ? 0 : prog(t, sold + 0.28, 0.22, SNAP);
+  const rows = chipRows(chips);
+  const bodyFor = (id: BannerTab) => (id === "questions" ? <QuestionsBody t={t} questions={questions} /> : id === "discours" ? <DiscoursBody t={t} discours={discours} /> : <FicheBody fiche={fiche} />);
+  return (
+    <Placed x={x} y={y} scale={scale} rot={rot} style={style}>
+      <div
+        style={{
+          position: "relative",
+          width: CARD.W,
+          height: CARD.H,
+          borderRadius: 46,
+          overflow: "hidden",
+          background: U.night,
+          clipPath: unfold < 1 ? `inset(0 0 ${(1 - unfold) * 86}% 0 round 46px)` : undefined,
+          boxShadow: `0 0 0 2px ${rgba(PB.citron, 0.2 + 0.6 * soldGlow)}, 0 0 ${70 + 60 * soldGlow}px -14px ${rgba(soldGlow > 0 ? PB.citron : PB.mint, 0.45)}, 0 50px 100px -40px rgba(0,0,0,.75)`,
+        }}
+      >
+        <AdnBackdrop t={t} tone="night" width={1250} focus={[0.6, 0.3]} opacity={0.55} />
+        {/* La ligne du haut : « À proposer en premier · pour … » et les flèches. */}
+        <div style={{ position: "absolute", left: CARD.pad, right: CARD.pad, top: CARD.pad, height: CARD.top, display: "flex", alignItems: "center", gap: 14, opacity: st(0) }}>
+          <LogoRobot t={t} size={56} seed={2} />
+          <span style={{ flex: 1, minWidth: 0, fontFamily: JAKARTA, fontWeight: 700, fontSize: 24, color: U.head, textShadow: "0 2px 8px rgba(0,0,0,.7)", whiteSpace: "nowrap", overflow: "hidden" }}>
+            {rank} · pour {drug}
+          </span>
+          <span style={{ display: "inline-flex", width: 50, height: 50, borderRadius: 99, alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,.14)" }}>
+            <ChevronLeft size={28} color={U.head} strokeWidth={2.6} />
+          </span>
+          <span style={{ display: "inline-flex", width: 50, height: 50, borderRadius: 99, alignItems: "center", justifyContent: "center", background: PB.citron }}>
+            <ChevronRight size={28} color="#04261A" strokeWidth={2.6} />
+          </span>
+        </div>
+        {/* Le papier de l'hélice, la carte blanche dedans (essai « L »). */}
+        <div style={{ position: "absolute", left: CARD.pad, top: WHITE.y - CARD.lPad, width: WHITE.w + 2 * CARD.lPad, height: WHITE.h + 2 * CARD.lPad, borderRadius: 44, overflow: "hidden", background: U.paper }}>
+          <AdnBackdrop t={t + 3} tone="paper" width={1100} focus={[0.72, 0.42]} />
+          <div
+            style={{
+              position: "absolute",
+              left: CARD.lPad,
+              top: CARD.lPad,
+              width: WHITE.w,
+              height: WHITE.h,
+              boxSizing: "border-box",
+              padding: `${CARD.padY}px ${CARD.padX}px`,
+              display: "flex",
+              flexDirection: "column",
+              borderRadius: 36,
+              background: "#FFFFFF",
+              boxShadow: "0 24px 60px -34px rgba(15,43,38,.6)",
+              color: U.ink,
+            }}
+          >
+            {/* Photo + « pour … » + titre. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 24, height: CARD.photo, flexShrink: 0, opacity: st(0.08), transform: `translateY(${(1 - st(0.08)) * 24}px)` }}>
+              <div style={{ width: CARD.photo, height: CARD.photo, flexShrink: 0, borderRadius: 26, background: "#FFF", boxShadow: "inset 0 0 0 2px #E3EBE8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ transform: `translateY(${wobble(t, 4, 3, 1.2)}px) rotate(${wobble(t, 6, 2, 0.9)}deg)` }}>
+                  <MiniBox name={product} w={78} />
+                </div>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 19, letterSpacing: "0.14em", textTransform: "uppercase", color: U.green }}>pour {drug}</div>
+                <div style={{ marginTop: 8, fontFamily: JAKARTA, fontWeight: 700, fontSize: 46, lineHeight: 1.05, letterSpacing: "-0.025em", whiteSpace: "nowrap" }}>
+                  {product}
+                  {price && <span style={{ marginLeft: 18, color: U.green, fontVariantNumeric: "tabular-nums" }}>{price}</span>}
+                </div>
+              </div>
+            </div>
+            {/* Les pastilles (une ou deux rangées). */}
+            <div style={{ display: "flex", flexWrap: "wrap", columnGap: CARD.chipGap, rowGap: 8, marginTop: CARD.sp, height: rows * CARD.chipRow + (rows - 1) * 8, flexShrink: 0, alignContent: "flex-start", alignItems: "center" }}>
+              {chips.map((c, k) => (
+                <Chip key={k} t={t} kind={c.kind} text={c.text} at={c.at ?? (at === undefined ? undefined : at + 0.2 + 0.08 * k)} size={CARD.chip} />
+              ))}
+            </div>
+            {/* Les onglets, à droite. */}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: CARD.sp, height: CARD.tabs, flexShrink: 0, opacity: st(0.18) }}>
+              <div style={{ position: "relative", display: "flex", padding: 5, borderRadius: 20, border: `2px solid ${U.tabLine}`, background: U.soft, boxSizing: "border-box" }}>
+                <div style={{ position: "absolute", left: 5 + indX, top: 5, width: indW, height: 46, borderRadius: 14, background: "#FFFFFF", boxShadow: `0 2px 8px rgba(15,43,38,.2), 0 0 0 ${3 * flash}px ${rgba(PB.citron, 0.9 * flash)}, 0 0 ${24 * flash}px ${rgba(PB.citron, flash)}` }} />
+                {TABS.map((x) => (
+                  <span key={x.id} style={{ position: "relative", width: x.w, height: 46, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: JAKARTA, fontWeight: x.id === cur ? 700 : 600, fontSize: 23, color: x.id === cur ? U.ink : U.muted }}>
+                    {x.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {/* Le corps de l'onglet : la place qui reste. */}
+            <div style={{ position: "relative", marginTop: CARD.sp, flex: 1, minHeight: 0, overflow: "hidden", opacity: st(0.26) }}>
+              {sw < 1 && prev !== cur && <div style={{ position: "absolute", inset: 0, opacity: 1 - clamp01(sw * 2.2), transform: `translateX(${-40 * sw}px)` }}>{bodyFor(prev)}</div>}
+              <div style={{ position: "absolute", inset: 0, opacity: clamp01(sw * 1.4), transform: `translateX(${(1 - sw) * 44}px)` }}>{bodyFor(cur)}</div>
+            </div>
+            {/* Vendu / Non vendu, puis la ligne « ✓ Vendu » — ancrés en bas. */}
+            <div style={{ position: "relative", marginTop: CARD.sp, height: CARD.act, flexShrink: 0, opacity: st(0.32) }}>
+              {soldK < 1 && (
+                <div style={{ position: "absolute", inset: 0, display: "flex", gap: 14, opacity: 1 - soldK, transform: `scaleY(${1 - 0.3 * soldK})` }}>
+                  <div style={{ flex: 1.3, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, borderRadius: 20, background: U.pick, color: "#FFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 27, transform: `scale(${press})`, boxShadow: `0 10px 24px -12px ${rgba(U.pick, 0.9)}` }}>
+                    <Check size={30} strokeWidth={3.2} />
+                    Vendu
+                  </div>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 20, background: "#E6EDF1", color: "#4B5F6C", fontFamily: JAKARTA, fontWeight: 700, fontSize: 25 }}>Non vendu</div>
+                </div>
+              )}
+              {soldK > 0 && (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", gap: 14, padding: "0 10px 0 16px", borderRadius: 20, background: U.soft, boxShadow: `inset 0 0 0 2px ${rgba(U.pick, 0.25)}`, opacity: soldK, transform: `translateY(${(1 - soldK) * 18}px)` }}>
+                  <span style={{ display: "inline-flex", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 99, background: U.green, transform: `scale(${Math.max(0, tick)})` }}>
+                    <svg width={26} height={26} viewBox="0 0 26 26">
+                      <path d="M6 13.5 L11 18.5 L20.5 8" fill="none" stroke="#FFF" strokeWidth={3.6} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={24} strokeDashoffset={24 * (1 - draw)} />
+                    </svg>
+                  </span>
+                  <span style={{ flex: 1, fontFamily: JAKARTA, fontWeight: 800, fontSize: 28, color: U.ink }}>Vendu</span>
+                  <span style={{ height: 48, display: "inline-flex", alignItems: "center", padding: "0 20px", borderRadius: 14, background: U.green, color: "#FFF", fontFamily: JAKARTA, fontWeight: 700, fontSize: 21 }}>Conseil suivant</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* Les points des conseils (le vendu passe en citron). */}
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 9, display: "flex", justifyContent: "center", gap: 10 }}>
+          {Array.from({ length: Math.max(1, count) }, (_, i) => (
+            <span key={i} style={{ width: i === 0 ? 32 : 12, height: 12, borderRadius: 99, background: i === 0 ? (soldK > 0.5 ? PB.citron : "#FFFFFF") : "rgba(255,255,255,.3)" }} />
+          ))}
+        </div>
+      </div>
+    </Placed>
+  );
+}
+
+// ---- Le compteur des conseils vendus ---------------------------------------------------------------------------------
+
+export function SoldCounterCard({
+  t,
+  value,
+  at,
+  periods = ["Aujourd'hui", "Cette semaine", "Ce mois-ci"],
+  period = 0,
+  revenue = "+ 1 254 €",
+  withAdvice,
+  goal = 0.8,
+  title = "Toute l'officine",
+  subtitle = "Conseils vendus au comptoir, déclarés « Vendu »",
+  x,
+  y,
+  scale,
+  rot,
+  style,
+}: Place & {
+  t: number;
+  value: Timed<number>;
+  at?: number;
+  periods?: string[];
+  period?: Timed<number>;
+  revenue?: Timed<string>;
+  /** La 3e tuile « Ventes avec un conseil vendu » (absente sans valeur). */
+  withAdvice?: string;
+  /** Part de l'objectif atteinte (1 = 10 % des ventes). */
+  goal?: Timed<number>;
+  title?: string;
+  subtitle?: string;
+}) {
+  if (at !== undefined && t < at - F) return null;
+  const e = enter(t, at, 0.5);
+  const r = at === undefined ? 1 : ressort(t, at, { damping: 14, stiffness: 180, mass: 0.7 });
+  const st = (d: number) => (at === undefined ? 1 : prog(t, at + d, 0.4, SNAP));
+  const vf = asFn(value);
+  const intOf = (tt: number) => Math.floor(vf(tt) + 1e-4);
+  const ch = sinceChange(t, intOf, 0.9);
+  const bump = ch.since === Infinity ? 0 : pulse(ch.since, 0, 0.05, 0.08, 0.5);
+  const plus = ch.since === Infinity ? -1 : ch.since;
+  const pf = asFn(period);
+  const pi = pf(t);
+  const pc = sinceChange(t, pf, 0.4);
+  const pk = pc.since === Infinity ? 1 : SNAP(clamp01(pc.since / 0.25));
+  const g = asFn(goal)(t) * (at === undefined ? 1 : prog(t, at + 0.35, 1.0, IN_OUT));
+  const share = g * 0.1;
+  const reached = g >= 1;
+  const tiles: { dt: string; dd: ReactNode }[] = [{ dt: "Chiffre d'affaires ajouté", dd: <span style={{ fontVariantNumeric: "tabular-nums" }}>{asFn(revenue)(t)}</span> }];
+  if (withAdvice) tiles.push({ dt: "Ventes avec un conseil vendu", dd: withAdvice });
+  const n = vf(t);
+  const plural = Math.floor(n + 1e-4) > 1;
+  return (
+    <Placed x={x} y={y} scale={scale} rot={rot} style={style}>
+      <div
+        style={{
+          position: "relative",
+          width: 1200,
+          boxSizing: "border-box",
+          padding: 46,
+          borderRadius: 48,
+          overflow: "hidden",
+          color: "#FFFFFF",
+          background: `linear-gradient(135deg, ${U.brand600} 0%, ${U.brand700} 50%, ${U.brandDeep} 100%)`,
+          boxShadow: `inset 0 0 0 2px rgba(205,228,220,.35), 0 50px 100px -40px rgba(0,0,0,.6)`,
+          opacity: clamp01(e * 1.6),
+          transform: `translateY(${(1 - e) * 70}px) scale(${lerp(0.9, 1, r)})`,
+        }}
+      >
+        <Sheen k={((t * 0.18) % 1.6) / 1.2} alpha={0.07} width="30%" />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, opacity: st(0.05) }}>
+          <div>
+            <div style={{ fontFamily: JAKARTA, fontWeight: 600, fontSize: 22, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,.7)" }}>{title}</div>
+            <div style={{ marginTop: 8, fontFamily: JAKARTA, fontWeight: 500, fontSize: 22, color: "rgba(255,255,255,.82)", whiteSpace: "nowrap" }}>{subtitle}</div>
+          </div>
+          <div style={{ display: "flex", gap: 4, padding: 6, borderRadius: 999, background: "rgba(255,255,255,.1)" }}>
+            {periods.map((label, i) => {
+              const on = i === pi ? pk : i === pc.prev && pc.since !== Infinity ? 1 - pk : 0;
+              return (
+                <span key={label} style={{ position: "relative", height: 50, padding: "0 19px", display: "inline-flex", alignItems: "center", borderRadius: 999, fontFamily: JAKARTA, fontWeight: 600, fontSize: 22, whiteSpace: "nowrap", background: `rgba(255,255,255,${on})`, color: on > 0.5 ? U.brand800 : "rgba(255,255,255,.8)" }}>
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ position: "relative", marginTop: 26, display: "flex", alignItems: "flex-end", justifyContent: "space-between", opacity: st(0.1) }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 22 }}>
+            <span style={{ position: "relative", display: "inline-block", transform: `scale(${1 + 0.08 * bump})`, transformOrigin: "0 80%", filter: bump > 0 ? `drop-shadow(0 0 ${22 * bump}px ${rgba(PB.citron, 0.8)})` : undefined }}>
+              <Odometer t={t} value={vf} size={156} color={bump > 0.15 ? PB.citron : "#FFFFFF"} style={{ fontFamily: JAKARTA, fontWeight: 700, letterSpacing: "-0.04em" }} />
+              {plus >= 0 && plus < 0.9 && (
+                <span style={{ position: "absolute", right: -78, top: 34 - 34 * SNAP(clamp01(plus / 0.6)), fontFamily: JAKARTA, fontWeight: 800, fontSize: 52, color: PB.citron, opacity: 1 - clamp01((plus - 0.45) / 0.4), transform: `scale(${keys(plus, [[0, 0.4], [0.12, 1.25, POP], [0.3, 1, IN_OUT]])})`, textShadow: `0 0 18px ${rgba(PB.citron, 0.8)}` }}>+1</span>
+              )}
+            </span>
+            <span style={{ fontFamily: JAKARTA, fontWeight: 600, fontSize: 32, color: "rgba(255,255,255,.86)" }}>conseil{plural ? "s" : ""} vendu{plural ? "s" : ""}</span>
+          </div>
+          <Trophy size={70} color="#FCD34D" strokeWidth={2} style={{ marginBottom: 18, transform: `rotate(${wobble(t, 2, 4, 1)}deg) scale(${1 + 0.15 * bump})` }} />
+        </div>
+        <div style={{ marginTop: 30, display: "grid", gridTemplateColumns: `repeat(${tiles.length + 1}, 1fr)`, gap: 22 }}>
+          {tiles.map((tile, i) => (
+            <div key={tile.dt} style={{ borderRadius: 30, padding: 26, background: "rgba(255,255,255,.1)", opacity: st(0.18 + 0.08 * i), transform: `translateY(${(1 - st(0.18 + 0.08 * i)) * 30}px)` }}>
+              <div style={{ fontFamily: JAKARTA, fontWeight: 500, fontSize: 22, color: "rgba(255,255,255,.72)" }}>{tile.dt}</div>
+              <div style={{ marginTop: 6, fontFamily: JAKARTA, fontWeight: 600, fontSize: 40, letterSpacing: "-0.01em" }}>{tile.dd}</div>
+            </div>
+          ))}
+          <div style={{ borderRadius: 30, padding: 26, background: "rgba(255,255,255,.1)", opacity: st(0.34), transform: `translateY(${(1 - st(0.34)) * 30}px)` }}>
+            <div style={{ fontFamily: JAKARTA, fontWeight: 500, fontSize: 22, color: "rgba(255,255,255,.72)" }}>Objectif : 10 % des ventes</div>
+            <div style={{ marginTop: 16, height: 18, borderRadius: 99, overflow: "hidden", background: "rgba(255,255,255,.15)" }}>
+              <div style={{ position: "relative", width: `${Math.min(100, g * 100)}%`, height: "100%", borderRadius: 99, overflow: "hidden", background: reached ? "#6EE7B7" : "#FCD34D" }}>
+                <Sheen k={((t * 0.6) % 1.4) / 1.1} alpha={0.6} />
+              </div>
+            </div>
+            <div style={{ marginTop: 10, fontFamily: JAKARTA, fontWeight: 500, fontSize: 22, color: "rgba(255,255,255,.82)" }}>{reached ? "Objectif atteint" : `${Math.round(share * 100)} % sur 10 %`}</div>
+          </div>
+        </div>
+      </div>
+    </Placed>
+  );
+}
+
+// ---- Le classement de l'équipe, le direct ----------------------------------------------------------------------------
+
+export type TeamRow = { initials: string; value: number; color?: string };
+const DEFAULT_TEAM: TeamRow[] = [
+  { initials: "SB", value: 36, color: "#0E8A7B" },
+  { initials: "ML", value: 31, color: "#0796B4" },
+  { initials: "JD", value: 31, color: "#22C88F" },
+];
+
+export function TeamRank({ t, at, rows = DEFAULT_TEAM, climber = 2, title = "Mon équipe", x, y, scale, rot, style }: Place & { t: number; at: number; rows?: TeamRow[]; climber?: number; title?: string }) {
+  const ROW = 76;
+  const W = 600;
+  const e = prog(t, at - 0.6, 0.45, SNAP);
+  const sw = prog(t, at + 0.12, 0.5, IN_OUT);
+  const lift = Math.sin(Math.PI * sw);
+  const max = Math.max(...rows.map((r) => r.value)) + 1;
+  const badge = ressort(t, at + 0.45, { damping: 9, stiffness: 260, mass: 0.5 });
+  const glow = prog(t, at, 0.3, SNAP);
+  return (
+    <Placed x={x} y={y} scale={scale} rot={rot} style={style}>
+      <div style={{ position: "relative", width: W, boxSizing: "border-box", padding: "24px 26px 26px", borderRadius: 34, background: "#FFFFFF", boxShadow: "0 40px 80px -36px rgba(0,0,0,.55)", opacity: clamp01(e * 1.5), transform: `translateY(${(1 - e) * 40}px)` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Users size={26} color={U.green} strokeWidth={2.4} />
+          <span style={{ flex: 1, fontFamily: JAKARTA, fontWeight: 800, fontSize: 21, letterSpacing: "0.1em", textTransform: "uppercase", color: U.ink }}>{title}</span>
+          <span style={{ fontFamily: JAKARTA, fontWeight: 600, fontSize: 18, color: U.muted }}>Conseils vendus</span>
+        </div>
+        <div style={{ position: "relative", marginTop: 14, height: rows.length * ROW }}>
+          {rows.map((_, i) => (
+            <div key={`n${i}`} style={{ position: "absolute", left: 0, top: i * ROW, height: ROW, display: "flex", alignItems: "center", fontFamily: MONO, fontWeight: 700, fontSize: 26, color: U.muted }}>{i + 1}</div>
+          ))}
+          {rows.map((r, i) => {
+            const isC = i === climber;
+            const isUp = i === climber - 1;
+            const yy = isC ? lerp(i, i - 1, sw) * ROW : isUp ? lerp(i, i + 1, sw) * ROW : i * ROW;
+            const v = isC ? (tt: number) => r.value + prog(tt, at, 0.3, SNAP) : r.value;
+            const val = isC ? r.value + prog(t, at, 0.3, SNAP) : r.value;
+            return (
+              <div key={r.initials} style={{ position: "absolute", left: 36, right: 0, top: yy, height: ROW, display: "flex", alignItems: "center", gap: 16, zIndex: isC ? 2 : 1, transform: isC ? `translateX(${22 * lift}px) scale(${1 + 0.05 * lift})` : undefined }}>
+                {isC && <div style={{ position: "absolute", inset: "6px -10px 6px -12px", borderRadius: 20, background: rgba(PB.citron, 0.5 * glow), boxShadow: lift > 0 ? `0 18px 30px -16px rgba(0,0,0,${0.5 * lift})` : undefined }} />}
+                <span style={{ position: "relative", display: "inline-flex", width: 54, height: 54, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 99, background: `linear-gradient(135deg, ${r.color ?? U.green}, ${PB.green})`, color: "#FFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 21 }}>{r.initials}</span>
+                <div style={{ position: "relative", flex: 1, height: 14, borderRadius: 99, background: U.appTint, overflow: "hidden" }}>
+                  <div style={{ width: `${(val / max) * 100 * prog(t, at - 0.45 + 0.08 * i, 0.7, SNAP)}%`, height: "100%", borderRadius: 99, background: U.grad }} />
+                </div>
+                <span style={{ position: "relative", width: 56, textAlign: "right" }}>
+                  <Odometer t={t} value={v} size={30} color={U.ink} />
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {badge > 0.01 && (
+          <div style={{ position: "absolute", left: W - 22, top: 24 + 14 + (climber - 1) * ROW + 8, display: "inline-flex", alignItems: "center", gap: 6, height: 44, padding: "0 16px", borderRadius: 99, background: PB.citron, color: PB.green, fontFamily: JAKARTA, fontWeight: 800, fontSize: 21, whiteSpace: "nowrap", boxShadow: `0 10px 24px -10px ${rgba(PB.green, 0.6)}`, transform: `scale(${badge}) rotate(${(1 - clamp01(badge)) * 14 - 4}deg)` }}>
+            <ArrowUp size={22} strokeWidth={3} />
+            +1 place
+          </div>
+        )}
+      </div>
+    </Placed>
+  );
+}
+
+export function LiveDot({ t, at, label = "EN DIRECT", x, y, scale, rot, style }: Place & { t: number; at?: number; label?: string }) {
+  const r = at === undefined ? 1 : ressort(t, at, { damping: 10, stiffness: 280, mass: 0.5 });
+  if (at !== undefined && t < at) return null;
+  const u = (t % 1.1) / 1.1;
+  const glow = 0.6 + 0.4 * Math.sin(t * 2 * Math.PI / 1.1);
+  return (
+    <Placed x={x} y={y} scale={scale} rot={rot} style={style}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 14, height: 54, padding: "0 22px 0 18px", borderRadius: 99, background: "rgba(7,9,10,.62)", boxShadow: "inset 0 0 0 2px rgba(255,255,255,.14), 0 12px 30px -14px rgba(0,0,0,.6)", transform: `scale(${r})`, transformOrigin: "20% 50%" }}>
+        <span style={{ position: "relative", width: 18, height: 18 }}>
+          <span style={{ position: "absolute", inset: 0, borderRadius: 99, border: `2px solid ${U.live}`, transform: `scale(${1 + 1.6 * u})`, opacity: 1 - u }} />
+          <span style={{ position: "absolute", inset: 0, borderRadius: 99, background: U.live, boxShadow: `0 0 ${10 + 10 * glow}px ${U.live}` }} />
+        </span>
+        <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 22, letterSpacing: "0.16em", color: "#FFF" }}>{label}</span>
+      </div>
+    </Placed>
+  );
+}
+
+// ---- Le téléphone ----------------------------------------------------------------------------------------------------
+
+export const PHONE_SIZE = { W: 375, H: 812, bezel: 10, radius: 52, status: 44 } as const;
+
+function StatusIcons({ color }: { color: string }) {
+  return (
+    <svg width={68} height={13} viewBox="0 0 68 13">
+      {[0, 1, 2, 3].map((i) => (
+        <rect key={i} x={i * 4.6} y={9.5 - i * 2.6} width={3.2} height={3 + i * 2.6} rx={0.8} fill={color} />
+      ))}
+      <path d="M25.5 4.6a8.4 8.4 0 0 1 11.6 0M27.9 7.1a5 5 0 0 1 6.8 0" stroke={color} strokeWidth={1.7} fill="none" strokeLinecap="round" />
+      <circle cx={31.3} cy={10} r={1.4} fill={color} />
+      <rect x={42.5} y={1.5} width={21} height={10} rx={2.6} stroke={color} strokeOpacity={0.45} fill="none" />
+      <rect x={44.2} y={3.2} width={15.5} height={6.6} rx={1.4} fill={color} />
+      <rect x={64.4} y={4.8} width={1.7} height={3.4} rx={0.8} fill={color} fillOpacity={0.45} />
+    </svg>
+  );
+}
+
+export function Phone({
+  t,
+  x,
+  y,
+  scale = 1,
+  tilt = 0,
+  pitch = 0,
+  rot = 0,
+  buzz,
+  statusTone = "dark",
+  float = true,
+  screen = U.appBg,
+  children,
+  style,
+}: {
+  t: number;
+  x: number;
+  y: number;
+  scale?: number;
+  /** Rotation 3D autour de l'axe vertical (degrés). */
+  tilt?: number;
+  pitch?: number;
+  rot?: number;
+  /** Il vibre à ce temps (deux secousses, 0,6 s). */
+  buzz?: number;
+  /** "light" : barre d'état blanche (écran sombre, AppScan). */
+  statusTone?: "dark" | "light";
+  float?: boolean;
+  screen?: string;
+  children?: ReactNode;
+  style?: CSSProperties;
+}) {
+  const { W, H, bezel, radius } = PHONE_SIZE;
+  const u = buzz === undefined ? -1 : t - buzz;
+  const env = u < 0 || u > 0.62 ? 0 : (u < 0.26 ? 1 : u > 0.34 ? 1 : 0) * Math.exp(-2.2 * u);
+  const bx = 6 * env * Math.sin(2 * Math.PI * 34 * u);
+  const br = 1.4 * env * Math.sin(2 * Math.PI * 34 * u + 1.3);
+  const fy = float ? wobble(t, 7, 7, 0.75) : 0;
+  const fr = float ? wobble(t, 11, 0.8, 0.6) : 0;
+  const ink = statusTone === "light" ? "#FFFFFF" : U.bezel;
+  const glare = 32 + tilt * 0.9;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: x,
+        top: y,
+        width: W,
+        height: H,
+        transform: `translate(-50%, -50%) translate(${bx}px, ${fy}px) perspective(2400px) rotateY(${tilt}deg) rotateX(${pitch}deg) rotate(${rot + br + fr}deg) scale(${scale})`,
+        transformOrigin: "50% 50%",
+        ...style,
+      }}
+    >
+      {/* Boutons latéraux. */}
+      <div style={{ position: "absolute", left: -4, top: 150, width: 5, height: 36, borderRadius: 3, background: "#1B2725" }} />
+      <div style={{ position: "absolute", left: -4, top: 200, width: 5, height: 60, borderRadius: 3, background: "#1B2725" }} />
+      <div style={{ position: "absolute", left: -4, top: 272, width: 5, height: 60, borderRadius: 3, background: "#1B2725" }} />
+      <div style={{ position: "absolute", right: -4, top: 220, width: 5, height: 96, borderRadius: 3, background: "#1B2725" }} />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: radius,
+          background: U.bezel,
+          boxShadow: `0 60px 110px -46px rgba(11,21,19,.75), 0 24px 44px -24px rgba(0,0,0,.45), inset 0 0 0 2px #26302E, inset 0 0 0 4px #0B1513`,
+        }}
+      >
+        <div style={{ position: "absolute", inset: bezel, borderRadius: radius - bezel, overflow: "hidden", background: screen }}>
+          {children}
+          {/* Barre d'état, île noire, barre d'accueil. */}
+          <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: PHONE_SIZE.status, display: "flex", alignItems: "flex-end", justifyContent: "space-between", padding: "0 26px 7px 30px", boxSizing: "border-box", fontFamily: JAKARTA, fontWeight: 700, fontSize: 15, color: ink, zIndex: 20 }}>
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>9:41</span>
+            <StatusIcons color={ink} />
+          </div>
+          <div style={{ position: "absolute", left: "50%", top: 9, width: 116, height: 32, marginLeft: -58, borderRadius: 99, background: "#000", zIndex: 21 }} />
+          <div style={{ position: "absolute", left: "50%", bottom: 8, width: 128, height: 5, marginLeft: -64, borderRadius: 99, background: ink, opacity: 0.85, zIndex: 21 }} />
+          <div style={{ position: "absolute", inset: 0, zIndex: 22, pointerEvents: "none", background: `linear-gradient(115deg, transparent ${glare}%, rgba(255,255,255,.16) ${glare + 9}%, transparent ${glare + 22}%)` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Les petites pièces de l'appli -----------------------------------------------------------------------------------
+
+const appText = (size: number, weight = 600, color: string = U.appInk): CSSProperties => ({ fontFamily: JAKARTA, fontWeight: weight, fontSize: size, color, letterSpacing: size >= 24 ? "-0.03em" : "-0.005em" });
+
+function Screen({ children, bg = U.appBg, style }: { children: ReactNode; bg?: string; style?: CSSProperties }) {
+  return <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: bg, ...style }}>{children}</div>;
+}
+
+/** L'hélice en filigrane en haut des écrans (patient-app.tsx : Dna). */
+function DnaTop({ t, h = 260, opacity = 0.4 }: { t: number; h?: number; opacity?: number }) {
+  return (
+    <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: h, overflow: "hidden", opacity, WebkitMaskImage: "linear-gradient(180deg, #000 30%, transparent)", maskImage: "linear-gradient(180deg, #000 30%, transparent)" }}>
+      <Img src={staticFile("rembobine/images/adn-helice.jpg")} style={{ position: "absolute", left: -40 + wobble(t, 5, 8, 0.3), top: -120 + wobble(t, 9, 6, 0.25), width: 460, height: 383 }} />
+    </div>
+  );
+}
+
+function AppCard({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+  return <div style={{ borderRadius: 22, background: "#FFF", padding: 16, boxShadow: "0 8px 24px -16px rgba(15,47,42,.35)", ...style }}>{children}</div>;
+}
+
+function AppSection({ children }: { children: ReactNode }) {
+  return <div style={{ margin: "18px 0 9px", fontFamily: JAKARTA, fontWeight: 800, fontSize: 12.5, letterSpacing: "0.08em", textTransform: "uppercase", color: U.appInk }}>{children}</div>;
+}
+
+function Example() {
+  return <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 99, background: U.appTint, color: "#3F5E57", fontFamily: JAKARTA, fontWeight: 700, fontSize: 10, letterSpacing: "0.04em", textTransform: "uppercase" }}>Exemple</span>;
+}
+
+function AppTabs({ active = "accueil" }: { active?: "accueil" | "scan" | "pharmacie" | "profil" }) {
+  const tabs = [
+    { id: "accueil", label: "Accueil", Icon: Home },
+    { id: "scan", label: "Scanner", Icon: ScanLine },
+    { id: "pharmacie", label: "Ma pharmacie", Icon: Store },
+    { id: "profil", label: "Profil", Icon: User },
+  ] as const;
+  return (
+    <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", padding: "9px 12px 26px", background: "rgba(255,255,255,.94)", borderTop: `1px solid ${U.appLine}`, zIndex: 5 }}>
+      {tabs.map(({ id, label, Icon }) => (
+        <div key={id} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: id === active ? U.green : U.appMute, fontFamily: JAKARTA, fontWeight: 600, fontSize: 11 }}>
+          <Icon size={21} strokeWidth={2.1} />
+          {label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Une entrée échelonnée (montée + fondu). */
+function stag(t: number, at: number | undefined, i: number, step = 0.07): CSSProperties {
+  const e = at === undefined ? 1 : prog(t, at + i * step, 0.42, SNAP);
+  return { opacity: clamp01(e * 1.5), transform: `translateY(${(1 - e) * 26}px)` };
+}
+
+// ---- Les écrans de l'appli -------------------------------------------------------------------------------------------
+
+export function AppHome({ t, at }: { t: number; at?: number }) {
+  const bar = at === undefined ? 0.71 : 0.71 * prog(t, at + 0.45, 0.9, SNAP);
+  return (
+    <Screen>
+      <DnaTop t={t} />
+      <div style={{ position: "absolute", inset: 0, padding: "56px 20px 0" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", ...stag(t, at, 0) }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px", borderRadius: 99, background: "#FFF", boxShadow: "0 1px 3px rgba(15,47,42,.12)", ...appText(13.5, 700) }}>
+            <Users size={16} color={U.green} />
+            Moi
+            <ChevronDown size={16} color={U.appMute} />
+          </span>
+          <span style={{ position: "relative", display: "inline-flex", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 99, background: "#FFF", boxShadow: "0 1px 3px rgba(15,47,42,.12)" }}>
+            <BellRing size={19} color={U.appInk} style={{ transform: `rotate(${12 * Math.sin(t * 9) * pulse((t % 2.4) / 2.4, 0.7, 0.04, 0.15, 0.1)}deg)` }} />
+            <span style={{ position: "absolute", top: 8, right: 10, width: 8, height: 8, borderRadius: 99, background: PB.cyan }} />
+          </span>
+        </div>
+        <div style={{ marginTop: 18, lineHeight: 1.08, ...appText(30, 800), ...stag(t, at, 1) }}>Bonjour !</div>
+        <div style={{ marginTop: 4, ...appText(14.5, 500, U.appSoft), ...stag(t, at, 1) }}>Besoin d'une info sur un médicament ?</div>
+        <div style={{ marginTop: 14, display: "flex", gap: 10, ...stag(t, at, 2) }}>
+          <div style={{ flex: 1, height: 48, display: "flex", alignItems: "center", gap: 8, padding: "0 14px", borderRadius: 16, background: "#FFF", boxShadow: "0 1px 3px rgba(15,47,42,.1)", ...appText(14, 500, U.appMute) }}>
+            <Search size={16} />
+            Paracétamol, crème…
+          </div>
+          <div style={{ width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 16, background: U.grad, boxShadow: "0 6px 14px -6px rgba(14,138,123,.8)" }}>
+            <ScanLine size={24} color="#FFF" />
+          </div>
+        </div>
+        <div style={stag(t, at, 3)}>
+          <AppSection>Ma pharmacie</AppSection>
+          <AppCard style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ display: "inline-flex", width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 16, background: U.grad }}>
+              <Store size={20} color="#FFF" />
+            </span>
+            <div style={{ flex: 1 }}>
+              <div style={appText(15, 700)}>Pharmacie du Centre</div>
+              <div style={appText(12.5, 600, U.green)}>● Ouverte jusqu'à 19 h 30</div>
+            </div>
+            <ChevronRight size={20} color={U.appMute} />
+          </AppCard>
+        </div>
+        <div style={stag(t, at, 4)}>
+          <AppSection>Ma cure</AppSection>
+          <AppCard>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={appText(15, 700)}>Probiotique</span>
+              <span style={{ padding: "4px 10px", borderRadius: 99, background: "#FFF4E5", ...appText(11.5, 700, "#B45309") }}>2 jours restants</span>
+            </div>
+            <div style={{ position: "relative", marginTop: 12, height: 8, borderRadius: 99, background: U.appTint, overflow: "hidden" }}>
+              <div style={{ position: "relative", width: `${bar * 100}%`, height: "100%", borderRadius: 99, background: U.grad, overflow: "hidden" }}>
+                <Sheen k={((t * 0.5) % 1.3) / 1} alpha={0.7} />
+              </div>
+            </div>
+            <div style={{ marginTop: 8, ...appText(12.5, 500, U.appSoft) }}>Pensez à repasser à votre pharmacie pour la renouveler.</div>
+          </AppCard>
+        </div>
+        <div style={stag(t, at, 5)}>
+          <AppSection>Mes médicaments en cours</AppSection>
+          <AppCard style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
+            <span style={{ display: "inline-flex", width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 12, background: U.appTint }}>
+              <Pill size={17} color={U.green} />
+            </span>
+            <div style={{ flex: 1 }}>
+              <div style={appText(14, 700)}>AMOXICILLINE 1 g</div>
+              <div style={appText(12, 500, "#64748B")}>Matin et soir · 7 jours</div>
+            </div>
+            <ChevronRight size={17} color={U.appMute} />
+          </AppCard>
+        </div>
+        <div style={stag(t, at, 6)}>
+          <AppSection>De la part de votre pharmacie</AppSection>
+          <AppCard style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: U.grad }}>
+            <span style={{ ...appText(24, 800, "#FFF"), letterSpacing: "-0.04em" }}>−2 €</span>
+            <span style={{ flex: 1, lineHeight: 1.25, ...appText(12.5, 600, "rgba(255,255,255,.9)") }}>Offre partenaire sur votre prochaine cure</span>
+            <ChevronRight size={17} color="#FFF" />
+          </AppCard>
+        </div>
+      </div>
+      <AppTabs active="accueil" />
+    </Screen>
+  );
+}
+
+/** L'écran de bienvenue de l'appli (patient-app.tsx : Welcome) : le robot, PharmaBoost, « Votre pharmacie, dans la poche. ». */
+export function AppWelcome({ t, at }: { t: number; at?: number }) {
+  const r = at === undefined ? 1 : ressort(t, at, { damping: 10, stiffness: 220, mass: 0.6 });
+  return (
+    <Screen>
+      <DnaTop t={t} h={420} opacity={0.6} />
+      <div style={{ position: "absolute", inset: 0, padding: "92px 24px 0", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+        <div style={{ transform: `scale(${Math.max(0, r)}) translateY(${wobble(t, 3, 4, 1)}px)` }}>
+          <LogoRobot t={t} size={120} winkAt={at === undefined ? undefined : at + 0.7} />
+        </div>
+        <div style={{ marginTop: 10, ...appText(16, 800), ...stag(t, at, 2) }}>
+          Pharma<span style={{ color: U.green }}>Boost</span>
+        </div>
+        <div style={{ marginTop: 22, lineHeight: 1.08, ...appText(32, 800), ...stag(t, at, 3) }}>
+          Votre pharmacie,
+          <br />
+          <span style={{ color: "transparent", backgroundImage: U.grad, WebkitBackgroundClip: "text", backgroundClip: "text" }}>dans la poche.</span>
+        </div>
+        <div style={{ marginTop: 12, lineHeight: 1.45, ...appText(15, 500, U.appSoft), ...stag(t, at, 4) }}>Scannez un médicament, retrouvez vos conseils et vos cures.</div>
+      </div>
+      <div style={{ position: "absolute", left: 24, right: 24, bottom: 44, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 16, borderRadius: 20, background: U.grad, color: "#FFF", boxShadow: "0 12px 24px -12px rgba(14,138,123,.8)", ...stag(t, at, 5) }}>
+          <Mail size={24} />
+          <span style={{ flex: 1, textAlign: "left" }}>
+            <span style={{ display: "block", ...appText(16, 700, "#FFF") }}>Je viens de ma pharmacie</span>
+            <span style={{ display: "block", ...appText(12.5, 500, "rgba(255,255,255,.82)") }}>J'ai reçu mon bilan par e-mail</span>
+          </span>
+          <ChevronRight size={20} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 16, borderRadius: 20, background: "#FFF", boxShadow: "0 8px 24px -16px rgba(15,47,42,.35)", ...stag(t, at, 6) }}>
+          <ScanLine size={24} color={U.green} />
+          <span style={{ flex: 1, textAlign: "left" }}>
+            <span style={{ display: "block", ...appText(16, 700) }}>Découvrir l'appli</span>
+            <span style={{ display: "block", ...appText(12.5, 500, U.appSoft) }}>Scanner un produit, trouver une pharmacie</span>
+          </span>
+          <ChevronRight size={20} color={U.appMute} />
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+/** Le verrouillage du viseur, après `at`. */
+export const APP_SCAN_LOCK = 0.9;
+
+export function AppScan({ t, at = 0, box = "Amoxicilline 1 g", kind = "Antibiotique · sur ordonnance" }: { t: number; at?: number; box?: string; kind?: string }) {
+  const lockAt = at + APP_SCAN_LOCK;
+  const lock = prog(t, lockAt, 0.22, SNAP);
+  const flash = pulse(t, lockAt, 0.03, 0.02, 0.25);
+  const sheet = ressort(t, lockAt + 0.2, { damping: 14, stiffness: 190, mass: 0.7 });
+  const laserY = 12 + 72 * (0.5 - 0.5 * Math.cos(((t - at) * 2 * Math.PI) / 1.3));
+  const shake = 1 - lock;
+  const ok = ressort(t, lockAt + 0.05, { damping: 9, stiffness: 300, mass: 0.5 });
+  const corner = lerp(0, 16, lock);
+  const cc = lock > 0.5 ? PB.citron : "#5EEAD4";
+  const corners: CSSProperties[] = [
+    { top: corner, left: corner, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 28 },
+    { top: corner, right: corner, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 28 },
+    { bottom: corner, left: corner, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 28 },
+    { bottom: corner, right: corner, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 28 },
+  ];
+  return (
+    <Screen bg="#0B1513">
+      <div style={{ position: "absolute", left: 0, right: 0, top: 130, textAlign: "center", ...appText(15.5, 600, "#FFF") }}>Placez le code-barres dans le cadre</div>
+      <div style={{ position: "absolute", left: "50%", top: 196, width: 290, height: 226, marginLeft: -145, borderRadius: 28, border: "2px solid rgba(255,255,255,.28)", boxSizing: "border-box", background: "radial-gradient(circle at 50% 45%, #22302D, #0E1816 75%)" }}>
+        <div style={{ position: "absolute", left: "50%", top: "50%", transform: `translate(-50%, -50%) translate(${shake * wobble(t, 3, 7, 2.2)}px, ${shake * wobble(t, 5, 5, 2.6)}px) rotate(${-6 + shake * wobble(t, 7, 3, 1.8)}deg)` }}>
+          <MiniBox name={box} w={132} />
+        </div>
+        {lock < 1 && <div style={{ position: "absolute", left: 22, right: 22, top: `${laserY}%`, height: 3, borderRadius: 99, background: "#5EEAD4", boxShadow: "0 0 18px #5EEAD4", opacity: 1 - lock }} />}
+        {corners.map((c, i) => (
+          <span key={i} style={{ position: "absolute", width: 40, height: 40, borderColor: cc, borderStyle: "solid", borderWidth: 0, boxShadow: lock > 0.5 ? `0 0 14px ${rgba(PB.citron, 0.6)}` : undefined, ...c }} />
+        ))}
+        {flash > 0 && <div style={{ position: "absolute", inset: 0, borderRadius: 26, background: `rgba(255,255,255,${0.55 * flash})` }} />}
+        {ok > 0.01 && (
+          <span style={{ position: "absolute", right: -14, top: -14, display: "inline-flex", width: 46, height: 46, alignItems: "center", justifyContent: "center", borderRadius: 99, background: PB.citron, transform: `scale(${ok})`, boxShadow: `0 0 20px ${rgba(PB.citron, 0.7)}` }}>
+            <Check size={26} color={PB.green} strokeWidth={3.4} />
+          </span>
+        )}
+      </div>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 446, textAlign: "center", ...appText(13.5, 600, lock > 0.5 ? PB.citron : "rgba(255,255,255,.6)") }}>{lock > 0.5 ? "Boîte reconnue" : "Lecture du code…"}</div>
+      {/* La fiche qui monte. */}
+      <div style={{ position: "absolute", left: 14, right: 14, bottom: 30, borderRadius: 26, background: "#FFF", padding: 16, transform: `translateY(${(1 - sheet) * 300}px)`, boxShadow: "0 -10px 40px rgba(0,0,0,.4)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ width: 64, height: 64, borderRadius: 16, background: U.appTint, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <MiniBox name={box} w={44} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={appText(17, 800)}>{box}</div>
+            <div style={appText(12.5, 500, U.appSoft)}>{kind}</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 14, height: 46, borderRadius: 99, background: U.grad, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, ...appText(14.5, 700, "#FFF") }}>
+          Voir la fiche
+          <ChevronRight size={18} />
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+function Ring({ frac, size = 64, stroke = 7, id }: { frac: number; size?: number; stroke?: number; id: string }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg width={size} height={size} style={{ transform: "rotate(-90deg)", display: "block" }}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#0E8A7B" />
+          <stop offset="1" stopColor="#0796B4" />
+        </linearGradient>
+      </defs>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={U.appTint} strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`url(#${id})`} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - clamp01(frac))} />
+    </svg>
+  );
+}
+
+export function AppCures({ t, at = 0 }: { t: number; at?: number }) {
+  const uid = `ac${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const cures = [
+    { name: "Probiotique", day: 5, of: 7, left: "2 jours restants" },
+    { name: "Vitamine D", day: 18, of: 30, left: "12 jours restants" },
+    { name: "Magnésium", day: 9, of: 30, left: "21 jours restants" },
+  ];
+  const toggle = prog(t, at + 1.2, 0.25, SNAP);
+  return (
+    <Screen>
+      <DnaTop t={t} />
+      <div style={{ position: "absolute", inset: 0, padding: "60px 20px 0" }}>
+        <div style={{ lineHeight: 1.08, ...appText(30, 800), ...stag(t, at, 0) }}>Mes cures</div>
+        <div style={{ marginTop: 4, ...appText(14.5, 500, U.appSoft), ...stag(t, at, 0) }}>Votre pharmacie vous prévient avant la fin.</div>
+        <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+          {cures.map((c, i) => {
+            const f = (c.day / c.of) * prog(t, at + 0.2 + i * 0.18, 0.95, SNAP);
+            return (
+              <AppCard key={c.name} style={{ display: "flex", alignItems: "center", gap: 14, ...stag(t, at, i + 1, 0.1) }}>
+                <div style={{ position: "relative", width: 64, height: 64 }}>
+                  <Ring frac={f} id={`${uid}${i}`} />
+                  <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", ...appText(13, 800) }}>
+                    {Math.round(f * c.of)}/{c.of}
+                  </span>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={appText(16, 800)}>{c.name}</div>
+                  <div style={{ marginTop: 2, ...appText(12.5, 500, "#64748B") }}>
+                    Jour {c.day} sur {c.of}
+                  </div>
+                </div>
+                <span style={{ padding: "4px 9px", borderRadius: 99, background: i === 0 ? "#FFF4E5" : U.appTint, ...appText(11, 700, i === 0 ? "#B45309" : "#3F5E57") }}>{c.left}</span>
+              </AppCard>
+            );
+          })}
+        </div>
+        <AppCard style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12, ...stag(t, at, 4, 0.1) }}>
+          <span style={{ display: "inline-flex", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 14, background: U.grad }}>
+            <BellRing size={19} color="#FFF" style={{ transform: `rotate(${14 * Math.sin(t * 10) * pulse(t, at + 1.3, 0.05, 0.3, 0.2)}deg)` }} />
+          </span>
+          <span style={{ flex: 1, ...appText(13.5, 700) }}>Rappel avant la fin de la cure</span>
+          <span style={{ position: "relative", width: 46, height: 28, borderRadius: 99, background: toggle > 0.5 ? U.green : "#D5E3DF" }}>
+            <span style={{ position: "absolute", top: 3, left: 3 + 18 * toggle, width: 22, height: 22, borderRadius: 99, background: "#FFF", boxShadow: "0 1px 3px rgba(0,0,0,.25)" }} />
+          </span>
+        </AppCard>
+      </div>
+      <AppTabs active="accueil" />
+    </Screen>
+  );
+}
+
+export function OfferCard({ t, at, width = 323, notch = U.appBg, x, y, scale = 1, rot = 0, style }: Place & { t: number; at?: number; width?: number; notch?: string }) {
+  const r = at === undefined ? 1 : ressort(t, at, { damping: 9, stiffness: 230, mass: 0.6 });
+  if (at !== undefined && t < at) return null;
+  const since = at === undefined ? 10 + t : t - at;
+  const sh = ((since - 0.25) % 2.2) / 0.7;
+  return (
+    <Placed x={x} y={y} scale={scale * lerp(0.3, 1, r)} rot={rot + (1 - clamp01(r)) * -16 + wobble(t, 4, 0.8, 0.9)} style={{ opacity: clamp01(r * 3), ...style }}>
+      <div style={{ position: "relative", width, boxSizing: "border-box", borderRadius: 26, padding: "18px 20px 16px", background: U.grad, color: "#FFF", overflow: "hidden", boxShadow: "0 24px 50px -20px rgba(7,150,180,.6)" }}>
+        <Sheen k={sh} alpha={0.35} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ padding: "4px 10px", borderRadius: 99, background: "rgba(255,255,255,.2)", fontFamily: JAKARTA, fontWeight: 800, fontSize: 11.5, letterSpacing: "0.1em" }}>OFFRE PARTENAIRE</span>
+          <span style={{ padding: "3px 8px", borderRadius: 99, background: "rgba(255,255,255,.2)", fontFamily: JAKARTA, fontWeight: 700, fontSize: 10, letterSpacing: "0.06em" }}>EXEMPLE</span>
+        </div>
+        <div style={{ marginTop: 8, fontFamily: JAKARTA, fontWeight: 800, fontSize: 66, lineHeight: 1, letterSpacing: "-0.045em" }}>−2 €</div>
+        <div style={{ marginTop: 4, fontFamily: JAKARTA, fontWeight: 700, fontSize: 19 }}>sur votre prochaine cure</div>
+        <div style={{ position: "relative", margin: "16px -20px 12px", borderTop: "2px dashed rgba(255,255,255,.45)" }}>
+          <span style={{ position: "absolute", left: -12, top: -13, width: 24, height: 24, borderRadius: 99, background: notch }} />
+          <span style={{ position: "absolute", right: -12, top: -13, width: 24, height: 24, borderRadius: 99, background: notch }} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span style={{ fontFamily: JAKARTA, fontWeight: 600, fontSize: 12.5, color: "rgba(255,255,255,.88)" }}>À utiliser dans votre pharmacie</span>
+          <span style={{ padding: "8px 14px", borderRadius: 99, background: "#FFF", color: U.green, fontFamily: JAKARTA, fontWeight: 800, fontSize: 13 }}>Ajouter</span>
+        </div>
+      </div>
+      {at !== undefined && (
+        <>
+          <Sparkle t={t} at={at + 0.08} x={-6} y={10} size={44} color={PB.citron} />
+          <Sparkle t={t} at={at + 0.16} x={width + 4} y={60} size={34} color="#FFFFFF" />
+          <Sparkle t={t} at={at + 0.24} x={width - 40} y={-10} size={28} color={PB.citron} />
+        </>
+      )}
+    </Placed>
+  );
+}
+
+export function AppOffer({ t, at = 0 }: { t: number; at?: number }) {
+  return (
+    <Screen>
+      <DnaTop t={t} />
+      <div style={{ position: "absolute", inset: 0, padding: "60px 20px 0" }}>
+        <div style={{ lineHeight: 1.08, ...appText(30, 800), ...stag(t, at - 0.4, 0) }}>Mes offres</div>
+        <div style={{ marginTop: 4, ...appText(14.5, 500, U.appSoft), ...stag(t, at - 0.4, 0) }}>De la part de votre pharmacie</div>
+        <div style={{ marginTop: 22, display: "flex", justifyContent: "center" }}>
+          <OfferCard t={t} at={at} />
+        </div>
+        <AppCard style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 12, ...stag(t, at + 0.3, 0) }}>
+          <span style={{ display: "inline-flex", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 14, background: U.appTint }}>
+            <Store size={19} color={U.green} />
+          </span>
+          <span style={{ flex: 1, ...appText(13, 600, U.appSoft) }}>À présenter au comptoir de votre pharmacie, avec votre bilan.</span>
+        </AppCard>
+        <div style={{ marginTop: 12, display: "flex", justifyContent: "center", ...stag(t, at + 0.4, 0) }}>
+          <Example />
+        </div>
+      </div>
+      <AppTabs active="accueil" />
+    </Screen>
+  );
+}
+
+// ---- L'e-mail du bilan, la notification, le calendrier ----------------------------------------------------------------
+
+export function MailBilan({ t, at = 0, pharmacy = "Pharmacie du Centre", product = "Probiotique" }: { t: number; at?: number; pharmacy?: string; product?: string }) {
+  const DARK = "#0B3B47";
+  const points = [
+    { Icon: Clock, title: "Pendant", text: "toute la durée de l'antibiotique" },
+    { Icon: Pill, title: "À distance", text: "de la prise de l'antibiotique" },
+    { Icon: CalendarCheck, title: "Chaque jour", text: "jusqu'à la fin de la cure" },
+  ];
+  return (
+    <Screen bg="#EEF3F1">
+      <div style={{ position: "absolute", inset: 0, padding: "56px 14px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, ...appText(15, 600, U.green), ...stag(t, at, 0) }}>
+          <ChevronLeft size={20} />
+          Boîte de réception
+          <span style={{ marginLeft: "auto" }}>
+            <Example />
+          </span>
+        </div>
+        <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, padding: "0 4px", ...stag(t, at, 1) }}>
+          <span style={{ display: "inline-flex", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 99, background: U.grad, ...appText(13, 800, "#FFF") }}>PC</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={appText(15, 700)}>{pharmacy}</div>
+            <div style={appText(12, 500, "#64748B")}>à moi · maintenant</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 12, padding: "0 4px", lineHeight: 1.1, ...appText(25, 800, DARK), ...stag(t, at, 2) }}>Votre bilan conseil</div>
+        <div style={{ marginTop: 4, padding: "0 4px", ...appText(13, 500, "#475467"), ...stag(t, at, 2) }}>Bonjour, voici le conseil de votre pharmacien.</div>
+        <div style={{ marginTop: 12, borderRadius: 18, background: "#FFF", border: "1px solid #E4ECE9", padding: 14, ...stag(t, at, 3, 0.1) }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 64, height: 64, borderRadius: 14, background: "#F4F8F7", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <MiniBox name={product} w={46} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={appText(18, 800, "#101828")}>{product}</div>
+              <span style={{ display: "inline-block", marginTop: 4, padding: "3px 10px", borderRadius: 99, background: "#E3F4EC", ...appText(11.5, 600, "#0B6B4F") }}>Conseillé aujourd'hui</span>
+            </div>
+          </div>
+          <div style={{ marginTop: 12, borderRadius: 10, background: "#EAF5EF", borderLeft: "4px solid #1D8174", padding: "10px 12px", ...stag(t, at, 5, 0.1) }}>
+            <div style={{ ...appText(10.5, 800, "#0B6B4F"), letterSpacing: "0.05em", textTransform: "uppercase" }}>Pourquoi avec votre traitement</div>
+            <div style={{ marginTop: 4, lineHeight: 1.35, ...appText(13.5, 600, "#101828") }}>Avec un antibiotique, la flore intestinale peut être perturbée.</div>
+          </div>
+          <div style={{ marginTop: 10, ...appText(10.5, 800, DARK), letterSpacing: "0.05em", textTransform: "uppercase", ...stag(t, at, 6, 0.1) }}>3 points clés</div>
+          <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
+            {points.map(({ Icon, title, text }, i) => {
+              const p = at === undefined ? 1 : ressort(t, at + 0.75 + 0.1 * i, { damping: 11, stiffness: 260, mass: 0.5 });
+              return (
+                <div key={title} style={{ flex: 1, borderRadius: 12, background: "#F5F9F7", padding: "10px 6px", textAlign: "center", opacity: clamp01(p * 3), transform: `scale(${lerp(0.6, 1, p)})` }}>
+                  <span style={{ display: "inline-flex", width: 30, height: 30, alignItems: "center", justifyContent: "center", borderRadius: 99, background: "#E3F4EC", transform: `translateY(${wobble(t, i + 2, 1.5, 1.6)}px)` }}>
+                    <Icon size={16} color="#1D8174" strokeWidth={2.4} />
+                  </span>
+                  <div style={{ marginTop: 5, ...appText(12, 800, DARK) }}>{title}</div>
+                  <div style={{ marginTop: 2, lineHeight: 1.25, ...appText(10.5, 500, "#475467") }}>{text}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ marginTop: 10, borderRadius: 16, background: "#E9F4EF", padding: "12px 14px", ...stag(t, at, 10, 0.1) }}>
+          <div style={appText(14, 800, DARK)}>Les bons gestes à retenir</div>
+          {["Suivez les conseils de votre pharmacien.", "Une question ? Votre pharmacie reste à votre écoute."].map((line) => (
+            <div key={line} style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "flex-start", lineHeight: 1.3, ...appText(12, 500, "#344054") }}>
+              <Check size={15} color="#1D8174" strokeWidth={3} style={{ flexShrink: 0, marginTop: 1 }} />
+              {line}
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, borderRadius: 16, background: "#FFF", border: "1px solid #E4ECE9", padding: "10px 12px", ...stag(t, at, 11, 0.1) }}>
+          <Store size={20} color={U.green} />
+          <span style={{ flex: 1, ...appText(13, 700) }}>{pharmacy}</span>
+          <span style={{ padding: "7px 12px", borderRadius: 10, background: U.green, ...appText(12, 700, "#FFF") }}>Appeler</span>
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+const NOTIF_ICONS = {
+  mail: { bg: "linear-gradient(180deg, #4C9BF5, #2167D8)", node: <Mail size={21} color="#FFF" strokeWidth={2.2} /> },
+  bell: { bg: "linear-gradient(180deg, #F7A54B, #E07A12)", node: <BellRing size={20} color="#FFF" strokeWidth={2.2} /> },
+  calendar: { bg: "#FFFFFF", node: <CalendarCheck size={21} color={U.green} strokeWidth={2.2} /> },
+} as const;
+
+export function Notification({
+  t,
+  at,
+  title,
+  body,
+  icon = "mail",
+  app,
+  when = "maintenant",
+  until,
+  width = 335,
+  x,
+  y,
+  scale = 1,
+  rot,
+  style,
+}: Place & { t: number; at: number; title: string; body: string; icon?: "mail" | "bell" | "calendar" | "robot"; app?: string; when?: string; until?: number; width?: number }) {
+  if (t < at) return null;
+  const r = ressort(t, at, { damping: 13, stiffness: 210, mass: 0.7 });
+  const out = until === undefined ? 0 : prog(t, until, 0.32, EXIT);
+  if (out >= 1) return null;
+  const appName = app ?? (icon === "mail" ? "Mail" : icon === "robot" ? "PharmaBoost" : icon === "calendar" ? "Calendrier" : "Rappel");
+  const tile =
+    icon === "robot" ? (
+      <span style={{ display: "inline-flex", width: 38, height: 38, alignItems: "center", justifyContent: "center", borderRadius: 10, background: PB.green }}>
+        <LogoRobot t={t} size={34} />
+      </span>
+    ) : (
+      <span style={{ display: "inline-flex", width: 38, height: 38, alignItems: "center", justifyContent: "center", borderRadius: 10, background: NOTIF_ICONS[icon].bg, boxShadow: icon === "calendar" ? "inset 0 0 0 1px #DDE5E2" : undefined }}>{NOTIF_ICONS[icon].node}</span>
+    );
+  const card = (
+    <div style={{ width, boxSizing: "border-box", display: "flex", gap: 11, padding: "12px 14px", borderRadius: 24, background: "rgba(246,248,247,.92)", backdropFilter: "blur(18px) saturate(1.6)", boxShadow: "0 18px 40px -14px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.6)" }}>
+      {tile}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", ...appText(11.5, 600, "#6B7280"), textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          <span>{appName}</span>
+          <span style={{ textTransform: "none", letterSpacing: 0 }}>{when}</span>
+        </div>
+        <div style={{ marginTop: 2, ...appText(15, 700, "#111827") }}>{title}</div>
+        <div style={{ marginTop: 1, lineHeight: 1.3, ...appText(13.5, 500, "#374151") }}>{body}</div>
+      </div>
+    </div>
+  );
+  const drop = `translateY(${(1 - r) * -150 - out * 160}px) scale(${lerp(0.9, 1, clamp01(r))})`;
+  if (x === undefined || y === undefined) {
+    return <div style={{ position: "absolute", left: (PHONE_SIZE.W - 2 * PHONE_SIZE.bezel - width) / 2, top: 50, zIndex: 15, opacity: clamp01(r * 3) * (1 - out), transform: drop, ...style }}>{card}</div>;
+  }
+  return (
+    <Placed x={x} y={y} scale={scale} rot={rot} style={{ opacity: clamp01(r * 3) * (1 - out), ...style }}>
+      <div style={{ transform: drop }}>{card}</div>
+    </Placed>
+  );
+}
+
+/** Les temps de la cure : la case i se coche à ticks[i] ; la fin de cure s'allume à `end`. */
+export function cureTicks(at: number, days = 7, step = 0.11): { ticks: number[]; end: number } {
+  const ticks = Array.from({ length: Math.max(0, days - 2) }, (_, i) => at + 0.25 + i * step);
+  return { ticks, end: at + 0.25 + Math.max(0, days - 2) * step + 0.15 };
+}
+
+export function CalendarCure({ t, at = 0, days = 7, step = 0.11, product = "Probiotique", start = 20, x, y, scale, rot, style }: Place & { t: number; at?: number; days?: number; step?: number; product?: string; start?: number }) {
+  const { ticks, end } = cureTicks(at, days, step);
+  const e = prog(t, at, 0.4, SNAP);
+  const endK = ressort(t, end, { damping: 9, stiffness: 260, mass: 0.5 });
+  const ring = t >= end ? ((t - end) % 1) : -1;
+  const cells = 14;
+  return (
+    <Placed x={x} y={y} scale={scale} rot={rot} style={style}>
+      <div style={{ width: 360, boxSizing: "border-box", padding: 20, borderRadius: 28, background: "#FFF", boxShadow: "0 30px 60px -30px rgba(0,0,0,.5)", opacity: clamp01(e * 1.6), transform: `translateY(${(1 - e) * 30}px)` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ display: "inline-flex", width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14, background: U.grad }}>
+            <CalendarCheck size={22} color="#FFF" />
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ ...appText(11.5, 800, U.green), letterSpacing: "0.08em", textTransform: "uppercase" }}>Ma cure</div>
+            <div style={appText(19, 800)}>{product}</div>
+          </div>
+          <span style={{ padding: "5px 11px", borderRadius: 99, background: U.appTint, ...appText(12.5, 700, "#3F5E57") }}>{days} jours</span>
+        </div>
+        <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5 }}>
+          {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
+            <div key={i} style={{ textAlign: "center", ...appText(12, 700, U.appMute) }}>{d}</div>
+          ))}
+          {Array.from({ length: cells }, (_, i) => {
+            const n = ((start - 1 + i) % 31) + 1;
+            const inCure = i < days;
+            const tk = i < ticks.length ? ressort(t, ticks[i], { damping: 10, stiffness: 320, mass: 0.45 }) : 0;
+            const isEnd = i === days - 1;
+            const soon = i >= ticks.length && inCure;
+            return (
+              <div key={i} style={{ position: "relative", height: 42, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 13, background: inCure ? (soon ? rgba(PB.citron, 0.55 * clamp01(endK)) : U.appTint) : "transparent", ...appText(14, 700, inCure ? U.appInk : "#B7C3C0") }}>
+                <span style={{ opacity: 1 - clamp01(tk) }}>{n}</span>
+                {tk > 0.01 && (
+                  <span style={{ position: "absolute", inset: 3, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 11, background: U.grad, transform: `scale(${tk})` }}>
+                    <Check size={20} color="#FFF" strokeWidth={3.2} />
+                  </span>
+                )}
+                {isEnd && endK > 0.01 && (
+                  <>
+                    {ring >= 0 && <span style={{ position: "absolute", inset: 0, borderRadius: 13, border: `2px solid ${PB.green}`, transform: `scale(${1 + 0.5 * ring})`, opacity: 1 - ring }} />}
+                    <span style={{ position: "absolute", right: -8, top: -10, display: "inline-flex", width: 26, height: 26, alignItems: "center", justifyContent: "center", borderRadius: 99, background: PB.green, transform: `scale(${endK}) rotate(${14 * Math.sin(t * 12) * pulse(t, end, 0.05, 0.4, 0.2)}deg)` }}>
+                      <BellRing size={14} color={PB.citron} strokeWidth={2.6} />
+                    </span>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: 12, height: 22, display: "flex", alignItems: "center", gap: 8, opacity: clamp01(endK), ...appText(13.5, 700, PB.green) }}>
+          <span style={{ width: 8, height: 8, borderRadius: 99, background: PB.green }} />
+          Votre cure se termine bientôt
+        </div>
+      </div>
+    </Placed>
+  );
+}
+
+// ---- BIENTÔT ----------------------------------------------------------------------------------------------------------
+
+export function SoonBadge({ t, at, text = "BIENTÔT", x, y, scale = 1, rot = -4, style }: Place & { t: number; at?: number; text?: string }) {
+  const r = at === undefined ? 1 : ressort(t, at, { damping: 9, stiffness: 260, mass: 0.55 });
+  if (at !== undefined && t < at) return null;
+  const since = at === undefined ? 10 + t : t - at;
+  const breathe = 1 + 0.025 * Math.sin(t * 2 * Math.PI / 1.2);
+  const sh = ((since - 0.2) % 1.8) / 0.6;
+  const dot = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI / 0.9);
+  return (
+    <Placed x={x} y={y} scale={scale * Math.max(0, r) * breathe} rot={rot + (1 - clamp01(r)) * 18} style={style}>
+      <div style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 14, height: 66, padding: "0 30px 0 24px", borderRadius: 99, overflow: "hidden", background: PB.citron, boxShadow: `inset 0 0 0 3px ${PB.green}, 0 0 ${30 + 16 * dot}px ${rgba(PB.citron, 0.55)}, 0 14px 30px -14px rgba(0,0,0,.5)` }}>
+        <span style={{ width: 14, height: 14, borderRadius: 99, background: PB.green, boxShadow: `0 0 0 ${5 * dot}px ${rgba(PB.green, 0.25)}` }} />
+        <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 31, letterSpacing: "0.16em", color: PB.green }}>{text}</span>
+        <Sheen k={sh} alpha={0.75} />
+      </div>
+    </Placed>
+  );
+}
+
+// ---- Le titre de chapitre ----------------------------------------------------------------------------------------------
+
+/** « POUR *L'ÉQUIPE* » → mots, avec l'accent sur ceux entre astérisques. */
+function accentWords(text: string) {
+  let on = false;
+  return text.split(/\s+/).filter(Boolean).map((raw) => {
+    let w = "";
+    let accent = false;
+    for (const ch of raw) {
+      if (ch === "*") {
+        on = !on;
+        continue;
+      }
+      w += ch;
+      if (on) accent = true;
+    }
+    return { w, accent };
+  });
+}
+
+export function ChapterTitle({ t, at, n, text, exitAt, bg = true, tag = true }: { t: number; at: number; n: string; text: string; exitAt?: number; bg?: boolean; tag?: boolean }) {
+  if (t < at - 0.05) return null;
+  const words = accentWords(text);
+  const plain = words.map((w) => w.w).join(" ");
+  const kIn = prog(t, at - 0.05, 0.34, WHIP);
+  const kOut = exitAt === undefined ? 0 : prog(t, exitAt, 0.42, WHIP);
+  const fly = exitAt === undefined ? 0 : prog(t, exitAt - 0.02, 0.36, SNAP);
+  const push = 1 + 0.035 * prog(t, at, 1.6, LINEAR);
+  const L = lerp(2400, -320, kIn);
+  const R = lerp(2400, -340, kOut); // le bord droit du panneau (bas) : il file vers la gauche à la sortie
+  const showPanel = bg && kOut < 1;
+  // Le titre rétrécit vers le coin (110, 72).
+  const size = 150;
+  const estW = plain.length * size * 0.66;
+  const cx = lerp(960, 110 + estW * 0.19 * 0.5 + 64, fly);
+  const cy = lerp(560, 74, fly);
+  const s = lerp(push, 0.19, fly);
+  const tagK = exitAt === undefined || !tag ? 0 : prog(t, exitAt + 0.26, 0.3, SNAP);
+  const ghost = 0.12 * (1 - kOut);
+  const ul = prog(t, at + 0.4, 0.45, SNAP) * (1 - fly);
+  const pill = ressort(t, at + 0.12, { damping: 10, stiffness: 260, mass: 0.5 });
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+      {showPanel && (
+        <>
+          <div style={{ position: "absolute", inset: 0, background: `radial-gradient(70% 80% at 50% 50%, ${PB.green2} 0%, ${PB.green} 70%)`, clipPath: `polygon(${L}px 0, ${R + 260}px 0, ${R}px 1080px, ${L - 260}px 1080px)` }}>
+            <div style={{ position: "absolute", left: "50%", top: "50%", transform: `translate(-50%, -50%) translateX(${wobble(t, 3, 30, 0.4)}px) scale(${push})`, fontFamily: MONO, fontWeight: 700, fontSize: 620, lineHeight: 1, color: "transparent", WebkitTextStroke: `3px ${rgba(PB.citron, ghost * 2)}`, whiteSpace: "nowrap", letterSpacing: "-0.04em" }}>{n}</div>
+          </div>
+          {/* La bande citron qui mène le balayage (entrée) puis le referme (sortie). */}
+          {kIn < 1 && <div style={{ position: "absolute", inset: 0, background: PB.citron, clipPath: `polygon(${L - 70}px 0, ${L}px 0, ${L - 260}px 1080px, ${L - 330}px 1080px)` }} />}
+          {kOut > 0 && <div style={{ position: "absolute", inset: 0, background: PB.citron, clipPath: `polygon(${R + 260}px 0, ${R + 330}px 0, ${R + 70}px 1080px, ${R}px 1080px)` }} />}
+        </>
+      )}
+      {fly < 1 && (
+        <div style={{ position: "absolute", left: cx, top: cy, transform: `translate(-50%, -50%) scale(${s})`, display: "flex", flexDirection: "column", alignItems: "center", opacity: 1 - clamp01((fly - 0.75) / 0.25) }}>
+          <div style={{ display: "inline-flex", alignItems: "center", height: 70, padding: "0 28px", borderRadius: 99, background: PB.citron, fontFamily: MONO, fontWeight: 700, fontSize: 40, color: PB.green, transform: `scale(${Math.max(0, pill)}) rotate(${(1 - clamp01(pill)) * -12}deg)` }}>{n}</div>
+          <div style={{ marginTop: 34, display: "flex", gap: size * 0.26, fontFamily: JAKARTA, fontWeight: 800, fontSize: size, letterSpacing: "-0.04em", lineHeight: 1, whiteSpace: "nowrap" }}>
+            {words.map((w, i) => {
+              const k = prog(t, at + 0.16 + i * 0.08, 0.42, SNAP);
+              return (
+                <span key={i} style={{ display: "inline-block", overflow: "hidden", padding: "0.06em 0.02em 0.1em" }}>
+                  <span style={{ display: "inline-block", transform: `translateY(${(1 - k) * 115}%) rotate(${(1 - k) * 6}deg)`, color: w.accent ? PB.citron : "#FFFFFF", textShadow: w.accent ? `0 0 40px ${rgba(PB.citron, 0.35)}` : undefined }}>{w.w}</span>
+                </span>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 22, width: 560, height: 10, borderRadius: 99, background: PB.citron, transform: `scaleX(${ul})` }} />
+        </div>
+      )}
+      {tagK > 0 && (
+        <div style={{ position: "absolute", left: 110, top: 46, display: "inline-flex", alignItems: "center", gap: 14, height: 56, padding: "0 22px 0 8px", borderRadius: 99, background: "rgba(15,47,42,.82)", boxShadow: `inset 0 0 0 2px ${rgba(PB.citron, 0.3)}, 0 12px 30px -14px rgba(0,0,0,.6)`, opacity: tagK, transform: `translateX(${(1 - tagK) * -40}px)` }}>
+          <span style={{ display: "inline-flex", alignItems: "center", height: 40, padding: "0 14px", borderRadius: 99, background: PB.citron, fontFamily: MONO, fontWeight: 700, fontSize: 21, color: PB.green }}>{n}</span>
+          <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 24, letterSpacing: "0.06em", color: "#FFF", whiteSpace: "nowrap" }}>
+            {words.map((w, i) => (
+              <span key={i} style={{ color: w.accent ? PB.citron : "#FFF" }}>
+                {i > 0 ? " " : ""}
+                {w.w}
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Le curseur -------------------------------------------------------------------------------------------------------
+
+export function Cursor({ t, x, y, clickAt, opacity = 1, size = 1 }: { t: number; x: number; y: number; clickAt?: number | number[]; opacity?: number; size?: number }) {
+  const clicks = clickAt === undefined ? [] : Array.isArray(clickAt) ? clickAt : [clickAt];
+  const press = 1 - 0.16 * Math.max(0, ...clicks.map((c) => pulse(t, c - 2 * F, 2 * F, 2 * F, 6 * F)));
+  return (
+    <>
+      {clicks.map((c, i) => {
+        const p = prog(t, c, 0.45, SNAP);
+        if (t < c || p >= 1) return null;
+        const r = (14 + 80 * p) * size;
+        return (
+          <div key={i} style={{ position: "absolute", left: x - r, top: y - r, width: r * 2, height: r * 2, borderRadius: "50%", border: `${5 * (1 - p) * size}px solid ${PB.citron}`, background: rgba(PB.citron, 0.25 * (1 - p)), opacity: (1 - p) * opacity, pointerEvents: "none" }} />
+        );
+      })}
+      <svg width={64 * size} height={64 * size} viewBox="0 0 32 32" style={{ position: "absolute", left: x - 12 * size, top: y - 8 * size, overflow: "visible", opacity, transform: `scale(${press})`, transformOrigin: `${12 * size}px ${8 * size}px`, filter: "drop-shadow(0 8px 12px rgba(0,0,0,.45))", pointerEvents: "none" }}>
+        <path d="M 6 4 L 6 26 Q 6 28.2 7.7 26.8 L 12.4 22.6 L 16.4 30.6 Q 17.2 31.9 18.6 31.2 L 21.1 30 Q 22.4 29.2 21.7 27.9 L 17.8 20.3 L 24.4 19.9 Q 26.6 19.7 25 18.2 Z" fill="#FFFFFF" stroke={PB.green} strokeWidth={1.5} strokeLinejoin="round" />
+      </svg>
+    </>
+  );
+}

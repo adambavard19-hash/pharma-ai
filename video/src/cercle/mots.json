@@ -1,0 +1,721 @@
+{
+ "V1": {
+  "at": 0.5,
+  "end": 2.467,
+  "say": "Même rue. Deux pharmacies.",
+  "caption": "Même rue. *Deux* *pharmacies.*",
+  "words": [
+   {
+    "w": "Même",
+    "at": 0.5,
+    "end": 0.837
+   },
+   {
+    "w": "rue.",
+    "at": 0.883,
+    "end": 1.162
+   },
+   {
+    "w": "Deux",
+    "at": 1.406,
+    "end": 1.661
+   },
+   {
+    "w": "pharmacies.",
+    "at": 1.684,
+    "end": 2.381
+   }
+  ]
+ },
+ "V2": {
+  "at": 2.7,
+  "end": 5.065,
+  "say": "Mêmes boîtes. Mêmes ordonnances.",
+  "caption": "Mêmes boîtes. Mêmes ordonnances.",
+  "words": [
+   {
+    "w": "Mêmes",
+    "at": 2.75,
+    "end": 3.063
+   },
+   {
+    "w": "boîtes.",
+    "at": 3.086,
+    "end": 3.551
+   },
+   {
+    "w": "Mêmes",
+    "at": 3.795,
+    "end": 4.108
+   },
+   {
+    "w": "ordonnances.",
+    "at": 4.178,
+    "end": 4.828
+   }
+  ]
+ },
+ "V3": {
+  "at": 5.3,
+  "end": 7.897,
+  "say": "Mais dans l'une, les patients reviennent.",
+  "caption": "Mais dans l'une, les patients *reviennent.*",
+  "words": [
+   {
+    "w": "Mais",
+    "at": 5.35,
+    "end": 5.559
+   },
+   {
+    "w": "dans",
+    "at": 5.594,
+    "end": 5.78
+   },
+   {
+    "w": "l'une,",
+    "at": 5.803,
+    "end": 6.151
+   },
+   {
+    "w": "les",
+    "at": 6.325,
+    "end": 6.534
+   },
+   {
+    "w": "patients",
+    "at": 6.581,
+    "end": 7.045
+   },
+   {
+    "w": "reviennent.",
+    "at": 7.196,
+    "end": 7.846
+   }
+  ]
+ },
+ "V4": {
+  "at": 8.15,
+  "end": 9.149,
+  "say": "Vous savez pourquoi ?",
+  "caption": "Vous savez pourquoi ?",
+  "words": [
+   {
+    "w": "Vous",
+    "at": 8.192,
+    "end": 8.378
+   },
+   {
+    "w": "savez",
+    "at": 8.401,
+    "end": 8.622
+   },
+   {
+    "w": "pourquoi ?",
+    "at": 8.656,
+    "end": 9.063
+   }
+  ]
+ },
+ "V5": {
+  "at": 9.3,
+  "end": 10.588,
+  "say": "Elle a un copilote.",
+  "caption": "Elle a *un* *copilote.*",
+  "words": [
+   {
+    "w": "Elle",
+    "at": 9.295,
+    "end": 9.574
+   },
+   {
+    "w": "a",
+    "at": 9.597,
+    "end": 9.632
+   },
+   {
+    "w": "un",
+    "at": 9.725,
+    "end": 9.771
+   },
+   {
+    "w": "copilote.",
+    "at": 9.841,
+    "end": 10.537
+   }
+  ]
+ },
+ "V6": {
+  "at": 10.95,
+  "end": 14.682,
+  "say": "Une boîte scannée… et le bon conseil s'affiche au comptoir.",
+  "caption": "Une boîte scannée… et le *bon* *conseil* s'affiche au comptoir.",
+  "words": [
+   {
+    "w": "Une",
+    "at": 10.934,
+    "end": 11.19
+   },
+   {
+    "w": "boîte",
+    "at": 11.236,
+    "end": 11.515
+   },
+   {
+    "w": "scannée…",
+    "at": 11.538,
+    "end": 12.165
+   },
+   {
+    "w": "et",
+    "at": 12.2,
+    "end": 12.56
+   },
+   {
+    "w": "le",
+    "at": 12.618,
+    "end": 12.711
+   },
+   {
+    "w": "bon",
+    "at": 12.792,
+    "end": 12.978
+   },
+   {
+    "w": "conseil",
+    "at": 13.024,
+    "end": 13.43
+   },
+   {
+    "w": "s'affiche",
+    "at": 13.488,
+    "end": 13.906
+   },
+   {
+    "w": "au",
+    "at": 13.93,
+    "end": 14.046
+   },
+   {
+    "w": "comptoir.",
+    "at": 14.104,
+    "end": 14.719
+   }
+  ]
+ },
+ "V7": {
+  "at": 14.95,
+  "end": 18.161,
+  "say": "Le pharmacien est guidé. Il conseille plus, et mieux.",
+  "caption": "Le pharmacien est guidé. Il conseille *plus,* et *mieux.*",
+  "words": [
+   {
+    "w": "Le",
+    "at": 15,
+    "end": 15.22
+   },
+   {
+    "w": "pharmacien",
+    "at": 15.244,
+    "end": 15.836
+   },
+   {
+    "w": "est",
+    "at": 15.952,
+    "end": 16.08
+   },
+   {
+    "w": "guidé.",
+    "at": 16.103,
+    "end": 16.498
+   },
+   {
+    "w": "Il",
+    "at": 16.544,
+    "end": 16.684
+   },
+   {
+    "w": "conseille",
+    "at": 16.73,
+    "end": 17.078
+   },
+   {
+    "w": "plus,",
+    "at": 17.102,
+    "end": 17.496
+   },
+   {
+    "w": "et",
+    "at": 17.531,
+    "end": 17.659
+   },
+   {
+    "w": "mieux.",
+    "at": 17.705,
+    "end": 18.065
+   }
+  ]
+ },
+ "V8": {
+  "at": 18.45,
+  "end": 22.419,
+  "say": "Le patient repart avec le vrai complément de son traitement. Ça fait pro.",
+  "caption": "Le patient repart avec le *vrai* *complément* de son traitement. Ça fait *pro.*",
+  "words": [
+   {
+    "w": "Le",
+    "at": 18.5,
+    "end": 18.686
+   },
+   {
+    "w": "patient",
+    "at": 18.744,
+    "end": 19.115
+   },
+   {
+    "w": "repart",
+    "at": 19.162,
+    "end": 19.533
+   },
+   {
+    "w": "avec",
+    "at": 19.556,
+    "end": 19.789
+   },
+   {
+    "w": "le",
+    "at": 19.858,
+    "end": 19.928
+   },
+   {
+    "w": "vrai",
+    "at": 19.986,
+    "end": 20.195
+   },
+   {
+    "w": "complément",
+    "at": 20.241,
+    "end": 20.683
+   },
+   {
+    "w": "de",
+    "at": 20.717,
+    "end": 20.81
+   },
+   {
+    "w": "son",
+    "at": 20.868,
+    "end": 21.008
+   },
+   {
+    "w": "traitement.",
+    "at": 21.043,
+    "end": 21.449
+   },
+   {
+    "w": "Ça",
+    "at": 21.472,
+    "end": 21.565
+   },
+   {
+    "w": "fait",
+    "at": 21.635,
+    "end": 21.762
+   },
+   {
+    "w": "pro.",
+    "at": 21.797,
+    "end": 22.169
+   }
+  ]
+ },
+ "V9": {
+  "at": 22.65,
+  "end": 24.914,
+  "say": "Son bilan conseil l'attend dans son téléphone.",
+  "caption": "Son *bilan* *conseil* l'attend dans son téléphone.",
+  "words": [
+   {
+    "w": "Son",
+    "at": 22.7,
+    "end": 22.897
+   },
+   {
+    "w": "bilan",
+    "at": 22.944,
+    "end": 23.141
+   },
+   {
+    "w": "conseil",
+    "at": 23.187,
+    "end": 23.513
+   },
+   {
+    "w": "l'attend",
+    "at": 23.571,
+    "end": 23.884
+   },
+   {
+    "w": "dans",
+    "at": 23.919,
+    "end": 24.047
+   },
+   {
+    "w": "son",
+    "at": 24.07,
+    "end": 24.198
+   },
+   {
+    "w": "téléphone.",
+    "at": 24.232,
+    "end": 24.848
+   }
+  ]
+ },
+ "V10": {
+  "at": 25.15,
+  "end": 30.291,
+  "say": "Et bientôt, dans l'appli : les offres de sa pharmacie, sur ses gammes préférées.",
+  "caption": "Et bientôt, dans l'appli : les *offres* de *sa* *pharmacie,* sur ses gammes préférées.",
+  "words": [
+   {
+    "w": "Et",
+    "at": 25.2,
+    "end": 25.339
+   },
+   {
+    "w": "bientôt,",
+    "at": 25.362,
+    "end": 25.85
+   },
+   {
+    "w": "dans",
+    "at": 25.966,
+    "end": 26.105
+   },
+   {
+    "w": "l'appli :",
+    "at": 26.129,
+    "end": 26.616
+   },
+   {
+    "w": "les",
+    "at": 26.999,
+    "end": 27.197
+   },
+   {
+    "w": "offres",
+    "at": 27.29,
+    "end": 27.533
+   },
+   {
+    "w": "de",
+    "at": 27.557,
+    "end": 27.65
+   },
+   {
+    "w": "sa",
+    "at": 27.708,
+    "end": 27.835
+   },
+   {
+    "w": "pharmacie,",
+    "at": 27.858,
+    "end": 28.509
+   },
+   {
+    "w": "sur",
+    "at": 28.543,
+    "end": 28.752
+   },
+   {
+    "w": "ses",
+    "at": 28.799,
+    "end": 28.927
+   },
+   {
+    "w": "gammes",
+    "at": 28.961,
+    "end": 29.24
+   },
+   {
+    "w": "préférées.",
+    "at": 29.286,
+    "end": 30.041
+   }
+  ]
+ },
+ "V11": {
+  "at": 30.6,
+  "end": 33.68,
+  "say": "Alors il revient. Nouveau passage, nouveau conseil.",
+  "caption": "Alors il *revient.* Nouveau passage, nouveau conseil.",
+  "words": [
+   {
+    "w": "Alors",
+    "at": 30.593,
+    "end": 30.895
+   },
+   {
+    "w": "il",
+    "at": 30.918,
+    "end": 30.976
+   },
+   {
+    "w": "revient.",
+    "at": 31.034,
+    "end": 31.429
+   },
+   {
+    "w": "Nouveau",
+    "at": 31.812,
+    "end": 32.114
+   },
+   {
+    "w": "passage,",
+    "at": 32.149,
+    "end": 32.602
+   },
+   {
+    "w": "nouveau",
+    "at": 32.637,
+    "end": 32.857
+   },
+   {
+    "w": "conseil.",
+    "at": 32.892,
+    "end": 33.438
+   }
+  ]
+ },
+ "V12": {
+  "at": 33.85,
+  "end": 35.1,
+  "say": "C'est un cercle.",
+  "caption": "C'est un *cercle.*",
+  "words": [
+   {
+    "w": "C'est",
+    "at": 33.886,
+    "end": 34.2
+   },
+   {
+    "w": "un",
+    "at": 34.269,
+    "end": 34.316
+   },
+   {
+    "w": "cercle.",
+    "at": 34.386,
+    "end": 34.85
+   }
+  ]
+ },
+ "V13": {
+  "at": 35.55,
+  "end": 37.271,
+  "say": "Pendant ce temps, à côté…",
+  "caption": "Pendant ce temps, à côté…",
+  "words": [
+   {
+    "w": "Pendant",
+    "at": 35.6,
+    "end": 35.879
+   },
+   {
+    "w": "ce",
+    "at": 35.913,
+    "end": 36.03
+   },
+   {
+    "w": "temps,",
+    "at": 36.099,
+    "end": 36.389
+   },
+   {
+    "w": "à",
+    "at": 36.506,
+    "end": 36.575
+   },
+   {
+    "w": "côté…",
+    "at": 36.691,
+    "end": 37.446
+   }
+  ]
+ },
+ "D1": {
+  "at": 37.45,
+  "end": 39.828,
+  "say": "Et avec ceci, il vous fallait autre chose ?",
+  "caption": "« Et avec ceci, il vous fallait autre chose ? »",
+  "words": [
+   {
+    "w": "Et",
+    "at": 37.45,
+    "end": 37.589
+   },
+   {
+    "w": "avec",
+    "at": 37.624,
+    "end": 37.798
+   },
+   {
+    "w": "ceci,",
+    "at": 37.856,
+    "end": 38.228
+   },
+   {
+    "w": "il",
+    "at": 38.274,
+    "end": 38.367
+   },
+   {
+    "w": "vous",
+    "at": 38.414,
+    "end": 38.518
+   },
+   {
+    "w": "fallait",
+    "at": 38.541,
+    "end": 38.785
+   },
+   {
+    "w": "autre",
+    "at": 38.832,
+    "end": 39.099
+   },
+   {
+    "w": "chose ?",
+    "at": 39.145,
+    "end": 39.609
+   }
+  ]
+ },
+ "D2": {
+  "at": 40.05,
+  "end": 40.79,
+  "say": "Non merci.",
+  "caption": "« Non *merci.* »",
+  "words": [
+   {
+    "w": "Non",
+    "at": 40.05,
+    "end": 40.247
+   },
+   {
+    "w": "merci.",
+    "at": 40.271,
+    "end": 40.712
+   }
+  ]
+ },
+ "V14": {
+  "at": 41.2,
+  "end": 44.116,
+  "say": "Ce copilote s'appelle… PharmaBoost.",
+  "caption": "Ce copilote s'appelle… *PharmaBoost.*",
+  "words": [
+   {
+    "w": "Ce",
+    "at": 41.25,
+    "end": 41.54
+   },
+   {
+    "w": "copilote",
+    "at": 41.61,
+    "end": 42.063
+   },
+   {
+    "w": "s'appelle…",
+    "at": 42.086,
+    "end": 42.794
+   },
+   {
+    "w": "PharmaBoost.",
+    "at": 43.003,
+    "end": 43.897
+   }
+  ]
+ },
+ "V15": {
+  "at": 44.4,
+  "end": 46.676,
+  "say": "Et vous, quelle pharmacie voulez-vous être ?",
+  "caption": "Et vous, quelle pharmacie *voulez-vous* *être* ?",
+  "words": [
+   {
+    "w": "Et",
+    "at": 44.45,
+    "end": 44.59
+   },
+   {
+    "w": "vous,",
+    "at": 44.636,
+    "end": 44.915
+   },
+   {
+    "w": "quelle",
+    "at": 45.089,
+    "end": 45.333
+   },
+   {
+    "w": "pharmacie",
+    "at": 45.356,
+    "end": 45.797
+   },
+   {
+    "w": "voulez-vous",
+    "at": 45.832,
+    "end": 46.169
+   },
+   {
+    "w": "être ?",
+    "at": 46.25,
+    "end": 46.575
+   }
+  ]
+ },
+ "V16": {
+  "at": 47,
+  "end": 50.08,
+  "say": "Réservez votre démo sur pharmaboost point app.",
+  "caption": "Réservez votre démo sur *pharmaboost.app*",
+  "words": [
+   {
+    "w": "Réservez",
+    "at": 47.05,
+    "end": 47.526
+   },
+   {
+    "w": "votre",
+    "at": 47.573,
+    "end": 47.863
+   },
+   {
+    "w": "démo",
+    "at": 47.909,
+    "end": 48.258
+   },
+   {
+    "w": "sur",
+    "at": 48.339,
+    "end": 48.548
+   },
+   {
+    "w": "pharmaboost",
+    "at": 48.583,
+    "end": 49.198
+   },
+   {
+    "w": "point",
+    "at": 49.244,
+    "end": 49.488
+   },
+   {
+    "w": "app.",
+    "at": 49.546,
+    "end": 50.08
+   }
+  ]
+ }
+}

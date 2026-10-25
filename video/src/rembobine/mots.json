@@ -1,0 +1,950 @@
+{
+ "D1": {
+  "who": "clemence",
+  "at": 1.4,
+  "end": 3.778,
+  "say": "Et avec ceci, il vous fallait autre chose ?",
+  "caption": "« Et avec ceci, il vous fallait autre chose ? »",
+  "words": [
+   {
+    "w": "Et",
+    "at": 1.4,
+    "end": 1.539
+   },
+   {
+    "w": "avec",
+    "at": 1.574,
+    "end": 1.748
+   },
+   {
+    "w": "ceci,",
+    "at": 1.806,
+    "end": 2.178
+   },
+   {
+    "w": "il",
+    "at": 2.224,
+    "end": 2.317
+   },
+   {
+    "w": "vous",
+    "at": 2.364,
+    "end": 2.468
+   },
+   {
+    "w": "fallait",
+    "at": 2.491,
+    "end": 2.735
+   },
+   {
+    "w": "autre",
+    "at": 2.782,
+    "end": 3.049
+   },
+   {
+    "w": "chose ?",
+    "at": 3.095,
+    "end": 3.559
+   }
+  ]
+ },
+ "D2": {
+  "who": "eric",
+  "at": 4.3,
+  "end": 5.04,
+  "say": "Non merci.",
+  "caption": "« Non merci. »",
+  "words": [
+   {
+    "w": "Non",
+    "at": 4.3,
+    "end": 4.497
+   },
+   {
+    "w": "merci.",
+    "at": 4.521,
+    "end": 4.962
+   }
+  ]
+ },
+ "N1": {
+  "who": "yann",
+  "at": 6,
+  "end": 12.38,
+  "say": "Il repart avec son antibiotique… et rien pour sa flore intestinale.",
+  "caption": "Il repart avec son antibiotique… et *rien* pour sa flore intestinale.",
+  "words": [
+   {
+    "w": "Il",
+    "at": 6,
+    "end": 6.186
+   },
+   {
+    "w": "repart",
+    "at": 6.267,
+    "end": 6.778
+   },
+   {
+    "w": "avec",
+    "at": 6.836,
+    "end": 7.382
+   },
+   {
+    "w": "son",
+    "at": 7.625,
+    "end": 7.95
+   },
+   {
+    "w": "antibiotique…",
+    "at": 8.02,
+    "end": 8.961
+   },
+   {
+    "w": "et",
+    "at": 9.286,
+    "end": 9.611
+   },
+   {
+    "w": "rien",
+    "at": 9.727,
+    "end": 10.122
+   },
+   {
+    "w": "pour",
+    "at": 10.203,
+    "end": 10.4
+   },
+   {
+    "w": "sa",
+    "at": 10.47,
+    "end": 10.598
+   },
+   {
+    "w": "flore",
+    "at": 10.667,
+    "end": 11.039
+   },
+   {
+    "w": "intestinale.",
+    "at": 11.074,
+    "end": 12.13
+   }
+  ]
+ },
+ "N2": {
+  "who": "yann",
+  "at": 12.7,
+  "end": 16.342,
+  "say": "Cette scène se répète chaque jour, dans toute la France.",
+  "caption": "Cette scène se répète *chaque jour*, dans toute la France.",
+  "words": [
+   {
+    "w": "Cette",
+    "at": 12.748,
+    "end": 13.015
+   },
+   {
+    "w": "scène",
+    "at": 13.038,
+    "end": 13.34
+   },
+   {
+    "w": "se",
+    "at": 13.387,
+    "end": 13.514
+   },
+   {
+    "w": "répète",
+    "at": 13.561,
+    "end": 13.967
+   },
+   {
+    "w": "chaque",
+    "at": 14.002,
+    "end": 14.304
+   },
+   {
+    "w": "jour,",
+    "at": 14.327,
+    "end": 14.687
+   },
+   {
+    "w": "dans",
+    "at": 14.722,
+    "end": 14.942
+   },
+   {
+    "w": "toute",
+    "at": 15.024,
+    "end": 15.36
+   },
+   {
+    "w": "la",
+    "at": 15.395,
+    "end": 15.465
+   },
+   {
+    "w": "France.",
+    "at": 15.535,
+    "end": 16.092
+   }
+  ]
+ },
+ "N3": {
+  "who": "yann",
+  "at": 16.8,
+  "end": 18.816,
+  "say": "Alors… rembobinons.",
+  "caption": "Alors… *rembobinons*.",
+  "words": [
+   {
+    "w": "Alors…",
+    "at": 16.825,
+    "end": 17.556
+   },
+   {
+    "w": "rembobinons.",
+    "at": 17.8,
+    "end": 18.566
+   }
+  ]
+ },
+ "N4": {
+  "who": "yann",
+  "at": 20.4,
+  "end": 25.593,
+  "say": "Même patient. Même ordonnance. Mais cette fois, PharmaBoost est au comptoir.",
+  "caption": "Même patient. Même ordonnance. Mais cette fois, *PharmaBoost* est au comptoir.",
+  "words": [
+   {
+    "w": "Même",
+    "at": 20.45,
+    "end": 20.74
+   },
+   {
+    "w": "patient.",
+    "at": 20.763,
+    "end": 21.355
+   },
+   {
+    "w": "Même",
+    "at": 21.529,
+    "end": 21.866
+   },
+   {
+    "w": "ordonnance.",
+    "at": 21.947,
+    "end": 22.702
+   },
+   {
+    "w": "Mais",
+    "at": 22.853,
+    "end": 23.062
+   },
+   {
+    "w": "cette",
+    "at": 23.097,
+    "end": 23.294
+   },
+   {
+    "w": "fois,",
+    "at": 23.317,
+    "end": 23.607
+   },
+   {
+    "w": "PharmaBoost",
+    "at": 23.758,
+    "end": 24.455
+   },
+   {
+    "w": "est",
+    "at": 24.548,
+    "end": 24.722
+   },
+   {
+    "w": "au",
+    "at": 24.792,
+    "end": 24.838
+   },
+   {
+    "w": "comptoir.",
+    "at": 24.885,
+    "end": 25.535
+   }
+  ]
+ },
+ "N5": {
+  "who": "yann",
+  "at": 26,
+  "end": 29.757,
+  "say": "À chaque boîte scannée, le bon conseil s'affiche, pris dans votre stock.",
+  "caption": "À chaque boîte scannée, le *bon conseil* s'affiche, pris dans votre stock.",
+  "words": [
+   {
+    "w": "À",
+    "at": 26,
+    "end": 26.081
+   },
+   {
+    "w": "chaque",
+    "at": 26.174,
+    "end": 26.43
+   },
+   {
+    "w": "boîte",
+    "at": 26.453,
+    "end": 26.639
+   },
+   {
+    "w": "scannée,",
+    "at": 26.662,
+    "end": 27.022
+   },
+   {
+    "w": "le",
+    "at": 27.045,
+    "end": 27.149
+   },
+   {
+    "w": "bon",
+    "at": 27.219,
+    "end": 27.393
+   },
+   {
+    "w": "conseil",
+    "at": 27.44,
+    "end": 27.811
+   },
+   {
+    "w": "s'affiche,",
+    "at": 27.869,
+    "end": 28.38
+   },
+   {
+    "w": "pris",
+    "at": 28.403,
+    "end": 28.682
+   },
+   {
+    "w": "dans",
+    "at": 28.717,
+    "end": 28.868
+   },
+   {
+    "w": "votre",
+    "at": 28.902,
+    "end": 29.193
+   },
+   {
+    "w": "stock.",
+    "at": 29.216,
+    "end": 29.727
+   }
+  ]
+ },
+ "N6": {
+  "who": "yann",
+  "at": 30.1,
+  "end": 35.066,
+  "say": "Les questions à poser. Les mots à dire. La marge, le challenge, la date courte.",
+  "caption": "Les *questions* à poser. Les *mots* à dire. La marge, le challenge, la date courte.",
+  "words": [
+   {
+    "w": "Les",
+    "at": 30.15,
+    "end": 30.324
+   },
+   {
+    "w": "questions",
+    "at": 30.359,
+    "end": 30.742
+   },
+   {
+    "w": "à",
+    "at": 30.765,
+    "end": 30.789
+   },
+   {
+    "w": "poser.",
+    "at": 30.847,
+    "end": 31.253
+   },
+   {
+    "w": "Les",
+    "at": 31.299,
+    "end": 31.427
+   },
+   {
+    "w": "mots",
+    "at": 31.462,
+    "end": 31.625
+   },
+   {
+    "w": "à",
+    "at": 31.659,
+    "end": 31.683
+   },
+   {
+    "w": "dire.",
+    "at": 31.729,
+    "end": 32.182
+   },
+   {
+    "w": "La",
+    "at": 32.565,
+    "end": 32.704
+   },
+   {
+    "w": "marge,",
+    "at": 32.774,
+    "end": 33.238
+   },
+   {
+    "w": "le",
+    "at": 33.354,
+    "end": 33.494
+   },
+   {
+    "w": "challenge,",
+    "at": 33.54,
+    "end": 34.156
+   },
+   {
+    "w": "la",
+    "at": 34.272,
+    "end": 34.364
+   },
+   {
+    "w": "date",
+    "at": 34.423,
+    "end": 34.585
+   },
+   {
+    "w": "courte.",
+    "at": 34.608,
+    "end": 35.026
+   }
+  ]
+ },
+ "D3": {
+  "who": "clemence",
+  "at": 35.5,
+  "end": 38.482,
+  "say": "Avec votre antibiotique, je vous conseille un probiotique.",
+  "caption": "« Avec votre antibiotique, je vous conseille un *probiotique*. »",
+  "words": [
+   {
+    "w": "Avec",
+    "at": 35.49,
+    "end": 35.723
+   },
+   {
+    "w": "votre",
+    "at": 35.769,
+    "end": 35.99
+   },
+   {
+    "w": "antibiotique,",
+    "at": 36.013,
+    "end": 36.721
+   },
+   {
+    "w": "je",
+    "at": 36.802,
+    "end": 36.884
+   },
+   {
+    "w": "vous",
+    "at": 36.93,
+    "end": 37.035
+   },
+   {
+    "w": "conseille",
+    "at": 37.058,
+    "end": 37.418
+   },
+   {
+    "w": "un",
+    "at": 37.464,
+    "end": 37.545
+   },
+   {
+    "w": "probiotique.",
+    "at": 37.603,
+    "end": 38.288
+   }
+  ]
+ },
+ "D4": {
+  "who": "eric",
+  "at": 38.8,
+  "end": 40.01,
+  "say": "Ah oui, je veux bien !",
+  "caption": "« Ah oui, *je veux bien* ! »",
+  "words": [
+   {
+    "w": "Ah",
+    "at": 38.791,
+    "end": 38.931
+   },
+   {
+    "w": "oui,",
+    "at": 38.954,
+    "end": 39.198
+   },
+   {
+    "w": "je",
+    "at": 39.221,
+    "end": 39.302
+   },
+   {
+    "w": "veux",
+    "at": 39.349,
+    "end": 39.453
+   },
+   {
+    "w": "bien !",
+    "at": 39.476,
+    "end": 40.01
+   }
+  ]
+ },
+ "N7": {
+  "who": "yann",
+  "at": 40.5,
+  "end": 44.529,
+  "say": "Le pharmacien décide. Le patient repart mieux conseillé.",
+  "caption": "Le pharmacien *décide*. Le patient repart *mieux conseillé*.",
+  "words": [
+   {
+    "w": "Le",
+    "at": 40.55,
+    "end": 40.759
+   },
+   {
+    "w": "pharmacien",
+    "at": 40.782,
+    "end": 41.316
+   },
+   {
+    "w": "décide.",
+    "at": 41.363,
+    "end": 41.92
+   },
+   {
+    "w": "Le",
+    "at": 42.303,
+    "end": 42.477
+   },
+   {
+    "w": "patient",
+    "at": 42.524,
+    "end": 42.93
+   },
+   {
+    "w": "repart",
+    "at": 43.011,
+    "end": 43.488
+   },
+   {
+    "w": "mieux",
+    "at": 43.534,
+    "end": 43.778
+   },
+   {
+    "w": "conseillé.",
+    "at": 43.813,
+    "end": 44.405
+   }
+  ]
+ },
+ "N8": {
+  "who": "yann",
+  "at": 45,
+  "end": 48.322,
+  "say": "Pour l'équipe : chaque conseil vendu se compte, en direct.",
+  "caption": "Pour l'équipe : chaque *conseil vendu* se compte, en direct.",
+  "words": [
+   {
+    "w": "Pour",
+    "at": 44.992,
+    "end": 45.189
+   },
+   {
+    "w": "l'équipe :",
+    "at": 45.224,
+    "end": 45.816
+   },
+   {
+    "w": "chaque",
+    "at": 46.025,
+    "end": 46.292
+   },
+   {
+    "w": "conseil",
+    "at": 46.315,
+    "end": 46.652
+   },
+   {
+    "w": "vendu",
+    "at": 46.698,
+    "end": 46.942
+   },
+   {
+    "w": "se",
+    "at": 47,
+    "end": 47.093
+   },
+   {
+    "w": "compte,",
+    "at": 47.151,
+    "end": 47.476
+   },
+   {
+    "w": "en",
+    "at": 47.499,
+    "end": 47.685
+   },
+   {
+    "w": "direct.",
+    "at": 47.743,
+    "end": 48.231
+   }
+  ]
+ },
+ "N9": {
+  "who": "yann",
+  "at": 48.7,
+  "end": 53.12,
+  "say": "Pour le patient : son bilan par e-mail, et un rappel avant la fin de sa cure.",
+  "caption": "Pour le patient : son *bilan* par e-mail, et un *rappel* avant la fin de sa cure.",
+  "words": [
+   {
+    "w": "Pour",
+    "at": 48.69,
+    "end": 48.83
+   },
+   {
+    "w": "le",
+    "at": 48.864,
+    "end": 48.922
+   },
+   {
+    "w": "patient :",
+    "at": 48.969,
+    "end": 49.445
+   },
+   {
+    "w": "son",
+    "at": 49.619,
+    "end": 49.851
+   },
+   {
+    "w": "bilan",
+    "at": 49.909,
+    "end": 50.153
+   },
+   {
+    "w": "par",
+    "at": 50.199,
+    "end": 50.35
+   },
+   {
+    "w": "e-mail,",
+    "at": 50.397,
+    "end": 50.826
+   },
+   {
+    "w": "et",
+    "at": 50.861,
+    "end": 51.001
+   },
+   {
+    "w": "un",
+    "at": 51.152,
+    "end": 51.221
+   },
+   {
+    "w": "rappel",
+    "at": 51.268,
+    "end": 51.604
+   },
+   {
+    "w": "avant",
+    "at": 51.662,
+    "end": 51.86
+   },
+   {
+    "w": "la",
+    "at": 51.883,
+    "end": 51.941
+   },
+   {
+    "w": "fin",
+    "at": 52.011,
+    "end": 52.138
+   },
+   {
+    "w": "de",
+    "at": 52.185,
+    "end": 52.254
+   },
+   {
+    "w": "sa",
+    "at": 52.313,
+    "end": 52.405
+   },
+   {
+    "w": "cure.",
+    "at": 52.452,
+    "end": 52.87
+   }
+  ]
+ },
+ "N10": {
+  "who": "yann",
+  "at": 53.45,
+  "end": 59.574,
+  "say": "Et bientôt, l'application PharmaBoost : scanner ses boîtes, suivre ses cures, profiter d'offres.",
+  "caption": "Et bientôt, l'*application PharmaBoost* : scanner ses boîtes, suivre ses cures, profiter d'offres.",
+  "words": [
+   {
+    "w": "Et",
+    "at": 53.45,
+    "end": 53.618
+   },
+   {
+    "w": "bientôt,",
+    "at": 53.641,
+    "end": 54.146
+   },
+   {
+    "w": "l'application",
+    "at": 54.315,
+    "end": 54.999
+   },
+   {
+    "w": "PharmaBoost :",
+    "at": 55.067,
+    "end": 55.774
+   },
+   {
+    "w": "scanné",
+    "at": 56.088,
+    "end": 56.436
+   },
+   {
+    "w": "ses",
+    "at": 56.493,
+    "end": 56.616
+   },
+   {
+    "w": "boîtes,",
+    "at": 56.65,
+    "end": 57.021
+   },
+   {
+    "w": "suivre",
+    "at": 57.133,
+    "end": 57.549
+   },
+   {
+    "w": "ses",
+    "at": 57.593,
+    "end": 57.728
+   },
+   {
+    "w": "cures,",
+    "at": 57.761,
+    "end": 58.177
+   },
+   {
+    "w": "profiter",
+    "at": 58.267,
+    "end": 58.772
+   },
+   {
+    "w": "d'offres.",
+    "at": 58.806,
+    "end": 59.558
+   }
+  ]
+ },
+ "N11": {
+  "who": "yann",
+  "at": 59.8,
+  "end": 65.126,
+  "say": "Pour les marques : leurs challenges sur l'écran du comptoir, au bon moment. Et chaque vente, comptée.",
+  "caption": "Pour les marques : leurs *challenges* sur l'écran du comptoir, au bon moment. Et chaque vente, *comptée*.",
+  "words": [
+   {
+    "w": "Pour",
+    "at": 59.802,
+    "end": 59.987
+   },
+   {
+    "w": "les",
+    "at": 60.022,
+    "end": 60.116
+   },
+   {
+    "w": "marques :",
+    "at": 60.15,
+    "end": 60.568
+   },
+   {
+    "w": "leurs",
+    "at": 60.743,
+    "end": 60.917
+   },
+   {
+    "w": "challenges",
+    "at": 60.952,
+    "end": 61.393
+   },
+   {
+    "w": "sur",
+    "at": 61.416,
+    "end": 61.52
+   },
+   {
+    "w": "l'écran",
+    "at": 61.555,
+    "end": 61.834
+   },
+   {
+    "w": "du",
+    "at": 61.88,
+    "end": 61.962
+   },
+   {
+    "w": "comptoir,",
+    "at": 62.02,
+    "end": 62.519
+   },
+   {
+    "w": "au",
+    "at": 62.554,
+    "end": 62.763
+   },
+   {
+    "w": "bon",
+    "at": 62.821,
+    "end": 62.972
+   },
+   {
+    "w": "moment.",
+    "at": 63.007,
+    "end": 63.378
+   },
+   {
+    "w": "Et",
+    "at": 63.471,
+    "end": 63.622
+   },
+   {
+    "w": "chaque",
+    "at": 63.668,
+    "end": 63.912
+   },
+   {
+    "w": "vente,",
+    "at": 63.935,
+    "end": 64.307
+   },
+   {
+    "w": "comptée.",
+    "at": 64.4,
+    "end": 64.876
+   }
+  ]
+ },
+ "N12": {
+  "who": "yann",
+  "at": 65.7,
+  "end": 69.441,
+  "say": "PharmaBoost. Le copilote IA du comptoir de votre pharmacie.",
+  "caption": "*PharmaBoost*. Le copilote IA du comptoir de votre pharmacie.",
+  "words": [
+   {
+    "w": "PharmaBoost.",
+    "at": 65.75,
+    "end": 66.516
+   },
+   {
+    "w": "Le",
+    "at": 66.597,
+    "end": 66.725
+   },
+   {
+    "w": "copilote",
+    "at": 66.795,
+    "end": 67.329
+   },
+   {
+    "w": "IA",
+    "at": 67.387,
+    "end": 67.619
+   },
+   {
+    "w": "du",
+    "at": 67.677,
+    "end": 67.793
+   },
+   {
+    "w": "comptoir",
+    "at": 67.84,
+    "end": 68.223
+   },
+   {
+    "w": "de",
+    "at": 68.281,
+    "end": 68.351
+   },
+   {
+    "w": "votre",
+    "at": 68.385,
+    "end": 68.629
+   },
+   {
+    "w": "pharmacie.",
+    "at": 68.652,
+    "end": 69.442
+   }
+  ]
+ },
+ "D5": {
+  "who": "clemence",
+  "at": 70,
+  "end": 71.513,
+  "say": "Il vous fallait autre chose ?",
+  "caption": "« Il vous fallait *autre chose* ? »",
+  "words": [
+   {
+    "w": "Il",
+    "at": 69.981,
+    "end": 70.073
+   },
+   {
+    "w": "vous",
+    "at": 70.12,
+    "end": 70.224
+   },
+   {
+    "w": "fallait",
+    "at": 70.248,
+    "end": 70.48
+   },
+   {
+    "w": "autre",
+    "at": 70.549,
+    "end": 70.863
+   },
+   {
+    "w": "chose ?",
+    "at": 70.909,
+    "end": 71.513
+   }
+  ]
+ }
+}
