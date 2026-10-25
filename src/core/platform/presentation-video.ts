@@ -13,7 +13,7 @@ export const PRESENTATION_VIDEO_PAGE = "/decouvrir/video";
 /** Le film et sa vignette, exportés dans public/video (fabriqués dans video/, Remotion). */
 export const PRESENTATION_VIDEO_SRC = "/video/pharmaboost-presentation.mp4";
 export const PRESENTATION_VIDEO_POSTER = "/video/pharmaboost-presentation.jpg";
-export const PRESENTATION_VIDEO_LABEL = "Voir la vidéo de présentation (1 min)";
+export const PRESENTATION_VIDEO_LABEL = "Voir la vidéo de présentation (1 min 15)";
 
 export type PresentationVideoLinks = { pageUrl: string; imageUrl: string };
 
@@ -24,15 +24,15 @@ export function presentationVideoLinks(publicUrl: (path: string) => string): Pre
 
 /** Les lignes du texte brut. */
 export function presentationVideoText(video: PresentationVideoLinks): string[] {
-  return [`En une minute, ce que PharmaBoost fait au comptoir — ${PRESENTATION_VIDEO_LABEL.toLowerCase()} :`, video.pageUrl];
+  return [`Ce que PharmaBoost change au comptoir — ${PRESENTATION_VIDEO_LABEL.toLowerCase()} :`, video.pageUrl];
 }
 
 /** La vignette cliquable et son bouton, discrets : l'action principale de l'e-mail reste au-dessus. */
 export function presentationVideoHtml(video: PresentationVideoLinks): string {
   const href = escapeHtml(video.pageUrl);
   return `<div style="margin:24px 0 0;border-top:1px solid #E2E8F0;padding-top:22px">
-    <p style="margin:0 0 12px;font-size:15px;line-height:22px;font-weight:600;color:#0F172A">En une minute, ce que PharmaBoost fait au comptoir</p>
-    <a href="${href}" style="display:block;text-decoration:none"><img src="${escapeHtml(video.imageUrl)}" width="520" alt="Vidéo de présentation de PharmaBoost (1 min)" style="display:block;width:100%;max-width:520px;height:auto;border:0;border-radius:12px"></a>
+    <p style="margin:0 0 12px;font-size:15px;line-height:22px;font-weight:600;color:#0F172A">Ce que PharmaBoost change au comptoir</p>
+    <a href="${href}" style="display:block;text-decoration:none"><img src="${escapeHtml(video.imageUrl)}" width="520" alt="Vidéo de présentation de PharmaBoost (1 min 15)" style="display:block;width:100%;max-width:520px;height:auto;border:0;border-radius:12px"></a>
     <p style="margin:12px 0 0"><a href="${href}" style="display:inline-block;padding:10px 18px;border:1px solid #0F766E;border-radius:999px;color:#0F766E;font-size:14px;line-height:20px;font-weight:600;text-decoration:none">&#9654;&nbsp; ${escapeHtml(PRESENTATION_VIDEO_LABEL)}</a></p>
   </div>`;
 }

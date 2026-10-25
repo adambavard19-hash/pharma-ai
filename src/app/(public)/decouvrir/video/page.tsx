@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PRESENTATION_VIDEO_POSTER, PRESENTATION_VIDEO_SRC } from "@/core/platform/presentation-video";
 
-export const metadata: Metadata = { title: "Vidéo de présentation", description: "En une minute, ce que PharmaBoost fait au comptoir de l'officine." };
+export const metadata: Metadata = { title: "Vidéo de présentation", description: "La scène de tous les jours au comptoir, puis la même avec PharmaBoost." };
 
 /**
  * La page qui lit le film de présentation : celle où mènent la vignette et le bouton des e-mails (invitation d'un collaborateur,
@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Vidéo de présentation", descriptio
  * doit lancer la vidéo tout de suite, sans connexion).
  */
 const FILMS = {
-  presentation: { src: PRESENTATION_VIDEO_SRC, poster: PRESENTATION_VIDEO_POSTER, eyebrow: "Vidéo de présentation · 1 min", title: "PharmaBoost, en une minute", text: "Au comptoir, vous scannez les boîtes comme d'habitude : PharmaBoost montre ce qu'il est utile de conseiller en plus, pris dans le stock de l'officine. Le pharmacien décide." },
+  presentation: { src: PRESENTATION_VIDEO_SRC, poster: PRESENTATION_VIDEO_POSTER, eyebrow: "Vidéo de présentation · 1 min 15", title: "« Il vous fallait autre chose ? »", text: "La scène de tous les jours au comptoir, puis la même avec PharmaBoost : à chaque boîte scannée, le bon conseil, pris dans le stock de l'officine. Le pharmacien décide." },
   pharmacien: { src: "/video/prise-en-main-pharmacien.mp4", poster: "/video/prise-en-main-pharmacien.jpg", eyebrow: "Utilisation du logiciel · 2 min", title: "PharmaBoost au comptoir", text: "Scanner, lire le conseil, poser les deux questions, proposer, puis le bilan par e-mail au patient." },
   titulaire: { src: "/video/prise-en-main-titulaire.mp4", poster: "/video/prise-en-main-titulaire.jpg", eyebrow: "Utilisation du logiciel · 2 min 40", title: "PharmaBoost pour le titulaire", text: "Les postes, l'équipe, les résultats et les conseils de la pharmacie." },
 } as const;
