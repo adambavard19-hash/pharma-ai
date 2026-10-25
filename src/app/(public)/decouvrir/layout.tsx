@@ -11,25 +11,24 @@ import { VisitBeacon } from "./_components/visit-beacon";
 /**
  * Le titre de l'accueil est ABSOLU : sans cela, le modèle « %s · PharmaBoost » de la racine s'y ajoutait et l'onglet affichait
  * « PharmaBoost — … · PharmaBoost ». Les pages du site gardent le leur (« Réserver une démo · PharmaBoost »).
- * L'image de partage est `opengraph-image.tsx`, à côté : Next.js l'ajoute seul, à l'accueil comme aux pages du site.
+ * L'image de partage est `opengraph-image.jpg`, à côté : Next.js l'ajoute seul, à l'accueil comme aux pages du site.
  * Titre et phrase de partage : ceux de l'accueil, sauf pour les pages qui déclarent les leurs (`pageShare`). Pas d'adresse de
  * référence ici : héritée, elle ferait de chaque page une copie de l'accueil.
+ *
+ * L'aperçu reprend le premier écran de l'accueil (fondateur, 25 oct. 2026 : WhatsApp montrait encore « Scan. Conseil.
+ * Bilan. » et l'ancienne bannière). L'image est une composition fixe (le titre, le robot du titre et l'hélice capturés sur
+ * l'accueil) en JPEG d'environ 110 Ko : WhatsApp n'affiche pas une image de partage trop lourde (au-delà de ~300 Ko), et la
+ * version générée par code, en PNG, pesait 470 Ko avec l'hélice. À refaire si le premier écran change.
  */
+const SHARE_TITLE = "PharmaBoost — Le copilote IA du comptoir de votre pharmacie.";
+const SHARE_TEXT = "À chaque boîte scannée, PharmaBoost montre à votre équipe le bon produit à conseiller, pris dans votre stock. Plus de conseils vendus, sans changer votre logiciel.";
+
 export const metadata: Metadata = {
-  title: { absolute: "PharmaBoost — Le copilote de comptoir de l'officine", template: "%s · PharmaBoost" },
-  description:
-    "Au comptoir, vous scannez les boîtes comme d'habitude : PharmaBoost montre ce qu'il est utile de conseiller en plus, pris dans le stock de l'officine. Le pharmacien décide.",
+  title: { absolute: "PharmaBoost — Le copilote IA du comptoir de votre pharmacie", template: "%s · PharmaBoost" },
+  description: SHARE_TEXT,
   robots: { index: true, follow: true },
-  openGraph: {
-    title: "PharmaBoost — Scan. Conseil. Bilan.",
-    description: "Scan. Conseil. Bilan. Le copilote du comptoir officinal : au scan, le conseil qui accompagne le traitement, pris dans votre rayon.",
-    ...SHARE_BASE,
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "PharmaBoost — Scan. Conseil. Bilan.",
-    description: "Le copilote du comptoir officinal : au scan, le conseil qui accompagne le traitement, pris dans votre rayon.",
-  },
+  openGraph: { title: SHARE_TITLE, description: SHARE_TEXT, ...SHARE_BASE },
+  twitter: { card: "summary_large_image", title: SHARE_TITLE, description: SHARE_TEXT },
 };
 
 /** Le site public : aucune session, aucune donnée d'officine, aucun compteur. */

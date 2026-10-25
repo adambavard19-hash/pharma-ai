@@ -26,7 +26,6 @@ const { SiteHeader } = await import("../_components/site-shell");
 const { HERO_ITEMS } = await import("../_components/visuals");
 const { RevenueCalculator } = await import("../_components/revenue-calculator");
 const { FILMS } = await import("../_components/video-dialog");
-const og = await import("../opengraph-image");
 
 /** Les métadonnées du layout telles que Next.js les passe à une page : ici, seulement l'image de partage déjà résolue. */
 const SHARE_IMAGE = { url: "https://pharmaboost.app/decouvrir/opengraph-image-test", width: 1200, height: 630, alt: "PharmaBoost" };
@@ -127,21 +126,28 @@ describe("l'en-tête mène d'abord à la bannière du comptoir", () => {
 describe("les métadonnées : un titre sans doublon, l'image de partage", () => {
   it("le titre de l'accueil est absolu : le modèle « · PharmaBoost » ne s'y ajoute plus", () => {
     const title = siteMetadata.title as { absolute?: string; default?: string; template?: string };
-    expect(title.absolute).toBe("PharmaBoost — Le copilote de comptoir de l'officine");
+    expect(title.absolute).toBe("PharmaBoost — Le copilote IA du comptoir de votre pharmacie");
     expect(title.default).toBeUndefined();
     expect(title.template).toBe("%s · PharmaBoost");
     expect(whyMetadata.title).toEqual({ absolute: "Pourquoi PharmaBoost" });
   });
 
-  it("le partage dit « Scan. Conseil. Bilan. », en grande image", () => {
-    expect(siteMetadata.openGraph?.description).toContain("Scan. Conseil. Bilan.");
-    expect(JSON.stringify(siteMetadata)).not.toContain("Analyse. Conseil. Suivi.");
-    // L'image vient du fichier opengraph-image.tsx, plus d'un logo carré déclaré à la main.
+  it("le partage reprend le premier écran de l'accueil, en grande image légère", () => {
+    // Fondateur, 25 oct. 2026 : l'aperçu WhatsApp montrait encore « Scan. Conseil. Bilan. » et l'ancienne bannière.
+    expect(siteMetadata.openGraph).toMatchObject({ title: "PharmaBoost — Le copilote IA du comptoir de votre pharmacie." });
+    expect(siteMetadata.openGraph?.description).toContain("À chaque boîte scannée");
+    expect(JSON.stringify(siteMetadata)).not.toContain("Scan. Conseil. Bilan.");
+    // L'image vient du fichier opengraph-image.jpg, plus d'un logo carré déclaré à la main.
     expect(JSON.stringify(siteMetadata)).not.toContain("logo-1200");
     expect(siteMetadata.twitter).toMatchObject({ card: "summary_large_image" });
-    expect(og.size).toEqual({ width: 1200, height: 630 });
-    expect(og.contentType).toBe("image/png");
-    expect(og.alt).toContain("Scan. Conseil. Bilan.");
+    const dir = join(process.cwd(), "src/app/(public)/decouvrir");
+    const jpeg = readFileSync(join(dir, "opengraph-image.jpg"));
+    // Un JPEG de 1200 × 630 (marqueur SOF0 : hauteur puis largeur), sous les ~300 Ko au-delà desquels WhatsApp n'affiche rien.
+    expect(jpeg.subarray(0, 2).toString("hex")).toBe("ffd8");
+    const sof = jpeg.indexOf(Buffer.from([0xff, 0xc0]));
+    expect([jpeg.readUInt16BE(sof + 5), jpeg.readUInt16BE(sof + 7)]).toEqual([630, 1200]);
+    expect(jpeg.length).toBeLessThan(250_000);
+    expect(readFileSync(join(dir, "opengraph-image.alt.txt"), "utf8")).toBe("PharmaBoost — Le copilote IA du comptoir de votre pharmacie.");
   });
 
   it("la racine a son adresse publique et ne parle plus de fiche patient", () => {

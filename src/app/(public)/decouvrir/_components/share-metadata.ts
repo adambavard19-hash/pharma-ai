@@ -4,7 +4,7 @@ import type { Metadata, ResolvingMetadata } from "next";
  * Ce qu'affiche un lien du site collé dans une messagerie, LinkedIn ou un e-mail.
  *
  * Next.js fusionne les métadonnées en SURFACE : une page qui déclare son `openGraph` remplace tout celui du layout — nom du
- * site, langue, type, et même l'image de `opengraph-image.tsx`, qui n'est rattachée qu'au dossier du site. Vérifié : déclarés
+ * site, langue, type, et même l'image de `opengraph-image.jpg`, qui n'est rattachée qu'au dossier du site. Vérifié : déclarés
  * seuls, le titre et la phrase de la page faisaient disparaître og:image. Chaque page reprend donc ici le nom du site, la
  * langue et le type, et l'image déjà résolue par le layout.
  */
