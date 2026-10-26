@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { fr, Kicker, SectionHead } from "./_components/site-shell";
-import { HERO_ITEMS, RequestVisual, TeamVisual, ExampleTag, CureReminderVisual } from "./_components/visuals";
+import { HERO_ITEMS } from "./_components/visuals";
 import { VideoButton } from "./_components/video-dialog";
 import { AutoVideo } from "./_components/auto-video";
 import { AppPhoneVisual } from "./_components/app-visual";
@@ -12,6 +12,7 @@ import { loadLiveProof } from "@/server/services/site-leads";
 import { loadPublicPricing } from "@/server/services/public-pricing";
 import { formatEuros } from "@/core/billing/subscription";
 import { PricingSection } from "./_components/pricing-section";
+import { FeatureCarousel, type FeatureSlide } from "./_components/feature-carousel";
 import { FlowSteps, LoadVisual, Reveal } from "./_components/story";
 import { FAQ } from "./_components/site-content";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
@@ -30,6 +31,56 @@ import { Robot } from "@/components/robot";
  * qui se déclarerait alors copie de l'accueil. Titre, description et image de partage viennent du layout.
  */
 export const metadata: Metadata = { alternates: { canonical: "/decouvrir" } };
+
+/** Les cartes des fonctions. Les points reprennent ce que le site disait déjà ; les échanges sont des exemples. */
+const FEATURE_SLIDES: FeatureSlide[] = [
+  {
+    tab: "Le conseil parfait",
+    name: "le conseil parfait",
+    tagline: "Parmi les produits qui répondent au besoin du patient, je mets en premier celui qui arrange votre pharmacie.",
+    mood: "happy",
+    ask: "Augmentin et Doliprane pour ce patient : je lui propose quoi ?",
+    answers: ["Un probiotique pendant l'antibiotique : vous en avez en stock, de votre laboratoire préféré.", "Il est en premier dans la bannière. Bipez-le s'il le prend : je le compte comme vendu."],
+    points: ["En stock, avec la quantité", "Vos laboratoires préférés", "Vos dates courtes et vos challenges en cours"],
+  },
+  {
+    tab: "Le bilan patient",
+    name: "le bilan patient",
+    tagline: "Pour la première fois, le patient repart avec un vrai bilan, au nom de votre pharmacie.",
+    mood: "celebrate",
+    ask: "La patiente veut garder les conseils, elle me donne son e-mail.",
+    answers: ["C'est noté. À « Vente terminée », elle reçoit son bilan : ses produits, comment les prendre, les précautions.", "Et 7 jours avant la fin de sa cure, je lui envoie un rappel."],
+    points: ["Bilan par e-mail, avec l'accord du patient", "Rappel 7 jours avant la fin de la cure", "Le patient revient à la pharmacie"],
+  },
+  {
+    tab: "L'équipe",
+    name: "l'équipe",
+    tagline: "Les résultats de chacun. Toute l'équipe motivée.",
+    mood: "celebrate",
+    ask: "Comment s'en sort l'équipe cette semaine ?",
+    answers: ["Les conseils vendus de chacun sont dans « Mon équipe », avec le classement et le challenge en cours.", "Le bilan de la semaine arrive dimanche par e-mail, avec le PDF."],
+    points: ["Classement et challenges", "Bilan chaque dimanche par e-mail", "Chacun voit ses propres résultats"],
+  },
+  {
+    tab: "Sans ordonnance",
+    name: "le conseil sans ordonnance",
+    tagline: "Le client décrit. Vous conseillez.",
+    mood: "curious",
+    ask: "Une cliente tousse depuis trois jours, toux sèche, pas de fièvre.",
+    answers: ["Écrivez sa demande dans la bannière, sans scan : les conseils de votre stock arrivent.", "Une question de la cliente sur le produit ? Demandez à l'aide, elle répond en quelques phrases."],
+    points: ["Sans scan : écrivez la demande du patient", "Les conseils de votre stock arrivent", "L'aide répond aux questions sur le conseil"],
+    action: <VideoButton film="sansOrdonnance" label="Voir en vidéo" />,
+  },
+  {
+    tab: "Surstock",
+    name: "le surstock",
+    tagline: "Les produits achetés en trop sortent en priorité, avant l'échéance de la facture.",
+    mood: "thinking",
+    ask: "J'ai trop de vitamines immunité en stock, il faut les écouler.",
+    answers: ["Je les mets en campagne : proposées en premier sur les ordonnances que vous choisissez, comme les antibiotiques.", "Je vous montre le stock qui baisse et l'argent encore immobilisé, jusqu'à l'objectif."],
+    points: ["Le produit passe en premier au comptoir", "Toujours derrière les contrôles de sécurité", "Arrêt automatique à l'objectif ou à la date"],
+  },
+];
 
 export default async function SitePage() {
   const [pricing, live] = await Promise.all([loadPublicPricing(), loadLiveProof()]);
@@ -133,62 +184,26 @@ export default async function SitePage() {
         </div>
       </section>
 
-      {/* ---- 3. Pour le pharmacien ------------------------------------- */}
+      {/* ---- 3. Les fonctions, en cartes qui défilent (fondateur, 26 oct. 2026 : la présentation de limova.ai, aux couleurs
+           de PharmaBoost) : le produit conseil parfait, le bilan du patient, l'équipe, la demande sans ordonnance, le surstock. ---- */}
       <section id="stock-marge" className="scroll-mt-20 border-t border-border-subtle">
-        <div className="mx-auto max-w-3xl px-5 py-20 md:py-28">
+        <div className="py-20 md:py-28">
           <Reveal>
-            <SectionHead title={<span className="sm:whitespace-nowrap lg:text-[42px] xl:text-[48px]">Le produit conseil parfait.</span>}>
-              Parmi les produits qui répondent au besoin du patient, PharmaBoost met en premier celui qui arrange votre pharmacie.
-            </SectionHead>
-            <ul className="mt-8 grid gap-2.5 sm:grid-cols-2">
-              {["En stock, avec la quantité", "Vos laboratoires préférés", "Vos dates courtes", "Vos challenges en cours"].map((t) => (
-                <li key={t} className="flex items-center gap-2.5 rounded-2xl border border-border-subtle bg-surface-card px-4 py-3 text-[15px] font-semibold text-text-primary">
-                  <Check className="size-4 shrink-0 text-brand-600" /> {t}
-                </li>
-              ))}
-            </ul>
-            {live && (
-              <div className="mt-8 grid grid-cols-3 gap-4">
-                <Figure label="Officines" value={String(live.pharmacies)} />
-                <Figure label="Conseils acceptés" value={live.acceptedAdvices.toLocaleString("fr-FR")} />
-                <Figure label="Ventes additionnelles" value={formatEuros(live.attributedCents)} />
-              </div>
-            )}
+            <div className="mx-auto mb-10 max-w-3xl px-5 text-center">
+              <h2 className="text-[34px] leading-[1.05] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[48px]">Un copilote pour tout le comptoir.</h2>
+              <p className="mt-4 text-[17px] leading-7 text-text-secondary">Ce que PharmaBoost fait pour votre pharmacie, une fonction à la fois.</p>
+            </div>
           </Reveal>
-        </div>
-      </section>
-
-      {/* ---- 4. Le suivi : le bilan du patient, une première ----------- */}
-      <section id="suivi" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
-        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
-          <Reveal>
-            <SectionHead title="Pour la première fois, le patient repart avec un vrai bilan." />
-            <ul className="mt-8 flex flex-wrap gap-2">
-              {["Bilan par e-mail, avec l'accord du patient", "Rappel 7 jours avant la fin de la cure", "Le patient revient à la pharmacie"].map((t) => (
-                <li key={t} className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-app px-4 py-2 text-[14px] font-medium text-text-primary">
-                  <Check className="size-4 text-brand-600" /> {fr(t)}
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-          <Reveal delay={2}>
-            <CureReminderVisual />
-            <p className="mt-4 text-center text-[12.5px] text-text-tertiary">
-              Le bilan et le rappel, envoyés au nom de la pharmacie · <ExampleTag className="text-[10.5px]" />
-            </p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ---- 5. L'équipe : les résultats de chacun, pour motiver (fondateur, 20 oct. 2026) ---- */}
-      <section id="equipe" className="scroll-mt-20 border-t border-border-subtle">
-        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:gap-16">
-          <Reveal>
-            <SectionHead title="Les résultats de chacun. Toute l'équipe motivée." />
-          </Reveal>
-          <Reveal delay={2}>
-            <TeamVisual />
-          </Reveal>
+          <span id="suivi" className="block scroll-mt-20" />
+          <span id="equipe" className="block scroll-mt-20" />
+          <FeatureCarousel slides={FEATURE_SLIDES} />
+          {live && (
+            <div className="mx-auto mt-12 grid max-w-3xl grid-cols-3 gap-4 px-5">
+              <Figure label="Officines" value={String(live.pharmacies)} />
+              <Figure label="Conseils acceptés" value={live.acceptedAdvices.toLocaleString("fr-FR")} />
+              <Figure label="Ventes additionnelles" value={formatEuros(live.attributedCents)} />
+            </div>
+          )}
         </div>
       </section>
 
@@ -214,15 +229,6 @@ export default async function SitePage() {
             <AppPhoneVisual />
           </Reveal>
         </div>
-      </section>
-
-      {/* ---- Sans ordonnance ----------------------------------------- */}
-      <section className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-        <div>
-          <SectionHead title="Le client décrit. Vous conseillez." />
-          <VideoButton film="sansOrdonnance" label="Voir en vidéo" className="mt-8" />
-        </div>
-        <RequestVisual />
       </section>
 
       {/* ---- Tarif : deux formules, une source (console ou offre officielle) ---- */}
