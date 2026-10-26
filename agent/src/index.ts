@@ -35,6 +35,7 @@ import { startDouchette } from "./douchette";
 import { SaleValidationWatch } from "./sale-validation";
 import { showToast } from "./toast";
 import { UPDATE_CHECK_EVERY_MS, canUpdateNow, isInstalledAgent, selfUpdate } from "./self-update";
+import { refreshAppIcon } from "./app-icon";
 import { DEFAULT_NOTICE_SECONDS, NoticeCenter, POSITIONS, buildDoneInfo, buildHostEntry, cachedImage, fetchImage, imageSource, type HostAction, type HostEntry, type NoticeBody, type NoticePosition } from "./notice-center";
 import { createScanQueue } from "./scan-queue";
 import { INSTALLER_EXIT, resolveInstallCode } from "./installer";
@@ -48,7 +49,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.30";
+const VERSION = "0.10.31";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -676,6 +677,8 @@ async function runPost(config: Config): Promise<void> {
   else if (robot?.kind === "lgpi") startLgpiJournal(robot, robotHandlers);
   // La validation des ventes se lit dans le journal de LGPI même quand le robot est suivi autrement (ou pas du tout).
   if (process.platform === "win32" && robot?.kind !== "lgpi") startLgpiJournal({ kind: "lgpi" }, { onScan: () => undefined, onStatus: () => undefined, ...lgpiSale });
+  // Le nouveau logo sur l'icône du logiciel, une fois, pour les postes installés avant lui.
+  if (process.platform === "win32" && isInstalledAgent(process.argv[1], CONFIG_PATH)) void refreshAppIcon({ serverUrl: config.serverUrl, installDir: dirname(CONFIG_PATH), log });
   let lastHeartbeat = 0;
   let lastStockCheck = 0;
   let spaceAttempts = 0;

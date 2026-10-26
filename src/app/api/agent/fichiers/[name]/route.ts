@@ -25,6 +25,8 @@ const FILES: Record<string, { path: string[]; type: string; bom?: boolean; diagn
   "diagnostic-dates-courtes.cmd": { path: ["dist", "diagnostic-dates-courtes.js"], type: "application/octet-stream", nodeCmd: { title: "PharmaBoost - diagnostic dates courtes", launchVar: "PB_DATES_COURTES_LANCER" }, attachment: "PharmaBoost-Diagnostic-Dates-courtes.cmd" },
   "diagnostic-robot.cmd": { path: ["diagnostic-robot.ps1"], type: "application/octet-stream", diagnosticCmd: true, attachment: "PharmaBoost-Diagnostic-Robot.cmd" },
   "lire-journal.cmd": { path: ["dist", "lire-journal.js"], type: "application/octet-stream", lireJournalCmd: true, attachment: "PharmaBoost-Lecture-Journal.cmd" },
+  // Le logo du logiciel : les postes déjà installés le reprennent pour leurs raccourcis (agent/src/app-icon.ts).
+  "pharmaboost.ico": { path: ["..", "installateur", "assets", "pharmaboost.ico"], type: "image/x-icon" },
   "pharmaboost-connect.js": { path: ["dist", "pharmaboost-connect.js"], type: "application/javascript; charset=utf-8" },
   "install-windows.ps1": { path: ["install-windows.ps1"], type: "text/plain; charset=utf-8", bom: true },
   "install-poste-windows.ps1": { path: ["install-poste-windows.ps1"], type: "text/plain; charset=utf-8", bom: true },

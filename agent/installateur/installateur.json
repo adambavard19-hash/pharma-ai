@@ -1,9 +1,9 @@
 {
   "version": "1.0.0",
   "node": "v24.21.0",
-  "agent": "0.5.1",
-  "sha256": "4c406486fbd37be1300137b09fa0f68169b4d41c9d911ddd2b8eb934ed115c82",
-  "taille": 327835,
+  "agent": "0.10.31",
+  "sha256": "36a983f57902939958ba3b0d581b71d231d0f75ae91452c01ba59ba9d4509ae6",
+  "taille": 399615,
   "signe": false,
-  "construitLe": "2026-10-07T23:20:22.773Z"
+  "construitLe": "2026-10-26T04:58:36.239Z"
 }
