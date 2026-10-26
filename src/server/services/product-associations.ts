@@ -3,7 +3,8 @@ import { prisma } from "@/server/db/client";
 import { recordAudit } from "@/server/audit/log";
 import { normalizeSearchText } from "@/core/reference/search";
 import { associationError, cleanSentence, MAX_ADVICE_PER_SAVE, MAX_TRIGGERS_PER_SAVE, sentenceError } from "@/core/associations/rules";
-import { drugKey, productKey, type AssociationInput } from "@/core/ai/engines/associations";
+import { atcKey, drugKey, productKey, type AssociationInput } from "@/core/ai/engines/associations";
+import { drugClassOf } from "@/core/associations/drug-classes";
 export { atcKey } from "@/core/ai/engines/associations";
 import { belongsToFamily, familyKey, type FamilyDefinition } from "@/core/associations/families";
 import type { CatalogProduct } from "@/core/ai/types";
@@ -173,19 +174,19 @@ export async function loadAssociationInput(scope: TenantScope, lines: LineForAss
         pharmacyId: scope.pharmacyId,
         isActive: true,
         AND: [
-          { OR: [{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }] },
+          { OR: [{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }, { triggerAtcCode: { not: null } }] },
           { OR: [{ adviceProductId: { not: null }, adviceProduct: { deletedAt: null } }, { adviceSpecialtyId: { not: null } }] },
         ],
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-      select: { id: true, triggerProductId: true, triggerSpecialty: { select: { name: true } }, adviceProductId: true, adviceSpecialtyId: true, sentence: true, sortOrder: true },
+      select: { id: true, triggerProductId: true, triggerSpecialty: { select: { name: true } }, triggerAtcCode: true, adviceProductId: true, adviceSpecialtyId: true, sentence: true, sortOrder: true },
     }),
     loadCentralRules(scope.pharmacyId),
   ]);
   const drugSpecialtyIds = [...new Set(rows.map((row) => row.adviceSpecialtyId).filter((id): id is string => id !== null))];
   const drugProducts = await loadAssociationDrugProducts(scope, drugSpecialtyIds);
   const own = rows.flatMap((row) => {
-    const triggerKey = row.triggerProductId ? productKey(row.triggerProductId) : row.triggerSpecialty ? drugKey(row.triggerSpecialty.name) : null;
+    const triggerKey = row.triggerProductId ? productKey(row.triggerProductId) : row.triggerSpecialty ? drugKey(row.triggerSpecialty.name) : row.triggerAtcCode ? atcKey(row.triggerAtcCode) : null;
     const adviceProductId = row.adviceProductId ?? (row.adviceSpecialtyId ? (drugProducts.get(row.adviceSpecialtyId)?.id ?? missingDrugAdvice(row.adviceSpecialtyId)) : null);
     return triggerKey && adviceProductId ? [{ id: row.id, triggerKey, adviceProductId, sentence: row.sentence, sortOrder: row.sortOrder }] : [];
   });
@@ -208,8 +209,9 @@ export async function loadAssociationInput(scope: TenantScope, lines: LineForAss
 /** Ce qui est proposé : un produit de l'officine, ou un médicament sans ordonnance de son stock (toutes ses boîtes). */
 export type ProductBrief = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number; deleted: boolean };
 
-/** Ce qui déclenche une association, tel que l'écran le montre. `quantity` n'existe que pour un produit du stock. */
-export type TriggerView = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number | null; deleted: boolean };
+/** Ce qui déclenche une association, tel que l'écran le montre. `quantity` n'existe que pour un produit du stock. Pour une
+ *  famille de médicaments (CLASS), `id` est son préfixe ATC et `brand` ce qu'elle contient. */
+export type TriggerView = { kind: "PRODUCT" | "DRUG" | "CLASS"; id: string; name: string; brand: string | null; quantity: number | null; deleted: boolean };
 
 export type AssociationView = {
   id: string;
@@ -256,6 +258,7 @@ export async function listAssociations(scope: TenantScope): Promise<AssociationV
       createdAt: true,
       triggerProduct: { select: productSelect },
       triggerSpecialty: { select: { id: true, name: true } },
+      triggerAtcCode: true,
       adviceProduct: { select: productSelect },
       adviceSpecialty: { select: { id: true, name: true } },
       createdBy: { select: { firstName: true, lastName: true } },
@@ -267,7 +270,9 @@ export async function listAssociations(scope: TenantScope): Promise<AssociationV
       ? { kind: "PRODUCT", id: row.triggerProduct.id, name: row.triggerProduct.name, brand: row.triggerProduct.brand, quantity: row.triggerProduct.stockItem?.quantity ?? 0, deleted: row.triggerProduct.deletedAt !== null }
       : row.triggerSpecialty
         ? { kind: "DRUG", id: row.triggerSpecialty.id, name: row.triggerSpecialty.name, brand: null, quantity: null, deleted: false }
-        : null;
+        : row.triggerAtcCode
+          ? { kind: "CLASS", id: row.triggerAtcCode, name: drugClassOf(row.triggerAtcCode)?.label ?? row.triggerAtcCode, brand: drugClassOf(row.triggerAtcCode)?.detail ?? null, quantity: null, deleted: false }
+          : null;
     const advice: ProductBrief | null = row.adviceProduct
       ? briefOf(row.adviceProduct)
       : row.adviceSpecialty
@@ -319,7 +324,7 @@ const refField = (ref: AdviceRef): { adviceProductId: string } | { adviceSpecial
  */
 export async function createAssociations(
   scope: TenantScope,
-  input: { triggerProductId?: string | null; triggerSpecialtyId?: string | null; adviceProductIds?: string[]; adviceSpecialtyIds?: string[]; sentence?: string | null },
+  input: { triggerProductId?: string | null; triggerSpecialtyId?: string | null; triggerAtcCode?: string | null; adviceProductIds?: string[]; adviceSpecialtyIds?: string[]; sentence?: string | null },
 ): Promise<{ ok: true; triggerName: string; created: BatchCreated[]; skipped: BatchSkip[] } | Failure> {
   const sentence = cleanSentence(input.sentence);
   const refs: AdviceRef[] = [];
@@ -334,7 +339,7 @@ export async function createAssociations(
   // Le déclencheur et la phrase se vérifient une fois : seul le produit proposé change d'une association à l'autre (le
   // produit associé à lui-même est écarté plus bas, sans bloquer les autres — sauf s'il est le seul).
   const firstOther = refs.find((ref) => !(ref.kind === "PRODUCT" && ref.id === input.triggerProductId)) ?? refs[0];
-  const invalid = associationError({ triggerProductId: input.triggerProductId, triggerSpecialtyId: input.triggerSpecialtyId, adviceProductId: firstOther.id, sentence });
+  const invalid = associationError({ triggerProductId: input.triggerProductId, triggerSpecialtyId: input.triggerSpecialtyId, triggerAtcCode: input.triggerAtcCode, adviceProductId: firstOther.id, sentence });
   if (invalid) return { ok: false, error: invalid };
 
   const productIds = refs.filter((ref) => ref.kind === "PRODUCT").map((ref) => ref.id);
@@ -342,7 +347,7 @@ export async function createAssociations(
 
   let triggerName: string;
   let triggerDrugKey: string | null = null;
-  let trigger: { triggerProductId: string } | { triggerSpecialtyId: string };
+  let trigger: { triggerProductId: string } | { triggerSpecialtyId: string } | { triggerAtcCode: string };
   const existing = new Set<string>();
   if (input.triggerProductId) {
     const product = await ownProduct(scope, input.triggerProductId);
@@ -351,6 +356,17 @@ export async function createAssociations(
     trigger = { triggerProductId: product.id };
     const rows = await prisma.productAssociation.findMany({
       where: { pharmacyId: scope.pharmacyId, triggerProductId: product.id, OR: [...(productIds.length ? [{ adviceProductId: { in: productIds } }] : []), ...(specialtyIds.length ? [{ adviceSpecialtyId: { in: specialtyIds } }] : [])] },
+      select: { adviceProductId: true, adviceSpecialtyId: true },
+    });
+    for (const row of rows) existing.add(row.adviceProductId ? `PRODUCT:${row.adviceProductId}` : `DRUG:${row.adviceSpecialtyId}`);
+  } else if (input.triggerAtcCode) {
+    // Une famille de médicaments : seulement celles que l'écran propose, jamais un code ATC libre.
+    const family = drugClassOf(input.triggerAtcCode);
+    if (!family) return { ok: false, error: "Famille de médicaments inconnue." };
+    triggerName = family.label;
+    trigger = { triggerAtcCode: family.code };
+    const rows = await prisma.productAssociation.findMany({
+      where: { pharmacyId: scope.pharmacyId, triggerAtcCode: family.code, OR: [...(productIds.length ? [{ adviceProductId: { in: productIds } }] : []), ...(specialtyIds.length ? [{ adviceSpecialtyId: { in: specialtyIds } }] : [])] },
       select: { adviceProductId: true, adviceSpecialtyId: true },
     });
     for (const row of rows) existing.add(row.adviceProductId ? `PRODUCT:${row.adviceProductId}` : `DRUG:${row.adviceSpecialtyId}`);
@@ -424,7 +440,7 @@ export async function createAssociations(
       entityId: row.id,
       pharmacyId: scope.pharmacyId,
       userId: scope.userId,
-      metadata: { ...trigger, ...(row.adviceProductId ? { adviceProductId: row.adviceProductId } : { adviceSpecialtyId: row.adviceSpecialtyId }), trigger: "triggerProductId" in trigger ? "PRODUCT" : "DRUG", withSentence: sentence !== null, batch: created.length },
+      metadata: { ...trigger, ...(row.adviceProductId ? { adviceProductId: row.adviceProductId } : { adviceSpecialtyId: row.adviceSpecialtyId }), trigger: "triggerProductId" in trigger ? "PRODUCT" : "triggerAtcCode" in trigger ? "CLASS" : "DRUG", withSentence: sentence !== null, batch: created.length },
     });
   }
   return { ok: true, triggerName, created, skipped };
@@ -443,7 +459,7 @@ export type GridSaveResult = {
  */
 export async function createAssociationGrid(
   scope: TenantScope,
-  input: { triggers: { kind: "PRODUCT" | "DRUG"; id: string }[]; advice: { kind: "PRODUCT" | "DRUG"; id: string }[]; sentence?: string | null },
+  input: { triggers: { kind: "PRODUCT" | "DRUG" | "CLASS"; id: string }[]; advice: { kind: "PRODUCT" | "DRUG"; id: string }[]; sentence?: string | null },
 ): Promise<{ ok: true; result: GridSaveResult } | Failure> {
   const triggers = [...new Map(input.triggers.filter((trigger) => trigger.id).map((trigger) => [`${trigger.kind}:${trigger.id}`, trigger])).values()];
   if (triggers.length === 0) return { ok: false, error: "Choisissez au moins un produit ou un médicament déclencheur." };
@@ -455,7 +471,7 @@ export async function createAssociationGrid(
   const result: GridSaveResult = { created: [], skipped: [] };
   for (const trigger of triggers) {
     const saved = await createAssociations(scope, {
-      ...(trigger.kind === "PRODUCT" ? { triggerProductId: trigger.id } : { triggerSpecialtyId: trigger.id }),
+      ...(trigger.kind === "PRODUCT" ? { triggerProductId: trigger.id } : trigger.kind === "CLASS" ? { triggerAtcCode: trigger.id } : { triggerSpecialtyId: trigger.id }),
       adviceProductIds,
       adviceSpecialtyIds,
       sentence: input.sentence,
@@ -493,7 +509,7 @@ export async function updateAssociation(scope: TenantScope, associationId: strin
 }
 
 export async function deleteAssociation(scope: TenantScope, associationId: string): Promise<{ ok: true } | Failure> {
-  const current = await prisma.productAssociation.findFirst({ where: { id: associationId, pharmacyId: scope.pharmacyId }, select: { id: true, triggerProductId: true, triggerSpecialtyId: true, adviceProductId: true } });
+  const current = await prisma.productAssociation.findFirst({ where: { id: associationId, pharmacyId: scope.pharmacyId }, select: { id: true, triggerProductId: true, triggerSpecialtyId: true, triggerAtcCode: true, adviceProductId: true } });
   if (!current) return { ok: false, error: "Association introuvable." };
   await prisma.productAssociation.delete({ where: { id: current.id } });
   await recordAudit({
@@ -502,7 +518,7 @@ export async function deleteAssociation(scope: TenantScope, associationId: strin
     entityId: current.id,
     pharmacyId: scope.pharmacyId,
     userId: scope.userId,
-    metadata: { triggerProductId: current.triggerProductId, triggerSpecialtyId: current.triggerSpecialtyId, adviceProductId: current.adviceProductId },
+    metadata: { triggerProductId: current.triggerProductId, triggerSpecialtyId: current.triggerSpecialtyId, triggerAtcCode: current.triggerAtcCode, adviceProductId: current.adviceProductId },
   });
   return { ok: true };
 }

@@ -39,7 +39,7 @@ describe("ce qu'une association refuse", () => {
     expect(associationError({ ...byProduct, adviceProductId: "a" })).toBe("Un produit ne peut pas être associé à lui-même.");
     expect(associationError({ ...byProduct, adviceProductId: "" })).toBe("Choisissez le produit à conseiller.");
     expect(associationError({ adviceProductId: "b", sentence: null })).toBe("Choisissez le produit ou le médicament déclencheur.");
-    expect(associationError({ triggerProductId: "a", triggerSpecialtyId: "s1", adviceProductId: "b", sentence: null })).toBe("Choisissez un seul déclencheur : un produit ou un médicament.");
+    expect(associationError({ triggerProductId: "a", triggerSpecialtyId: "s1", adviceProductId: "b", sentence: null })).toBe("Choisissez un seul déclencheur : un produit, un médicament ou une famille.");
     expect(associationError({ ...byDrug, sentence: "x".repeat(MAX_SENTENCE_LENGTH + 1) })).toContain("trop longue");
   });
 

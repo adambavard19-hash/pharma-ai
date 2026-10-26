@@ -112,7 +112,7 @@ describe("ce que le moteur reçoit", () => {
     const where = mocks.prisma.productAssociation.findMany.mock.calls[0][0].where;
     expect(where).toMatchObject({ pharmacyId: "ph_1", isActive: true });
     expect(where.AND).toEqual([
-      { OR: [{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }] },
+      { OR: [{ triggerProductId: { not: null }, triggerProduct: { deletedAt: null } }, { triggerSpecialtyId: { not: null } }, { triggerAtcCode: { not: null } }] },
       { OR: [{ adviceProductId: { not: null }, adviceProduct: { deletedAt: null } }, { adviceSpecialtyId: { not: null } }] },
     ]);
   });
