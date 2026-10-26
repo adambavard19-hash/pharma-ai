@@ -69,7 +69,6 @@ const FEATURE_SLIDES: FeatureSlide[] = [
     ask: "Une cliente tousse depuis trois jours, toux sèche, pas de fièvre.",
     answers: ["Écrivez sa demande dans la bannière, sans scan : les conseils de votre stock arrivent.", "Une question de la cliente sur le produit ? Demandez à l'aide, elle répond en quelques phrases."],
     points: ["Sans scan : écrivez la demande du patient", "Les conseils de votre stock arrivent", "L'aide répond aux questions sur le conseil"],
-    action: <VideoButton film="sansOrdonnance" label="Voir en vidéo" />,
   },
   {
     tab: "Surstock",
