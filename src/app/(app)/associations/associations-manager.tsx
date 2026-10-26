@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { ArrowRight, Check, Loader2, Package, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowRight, Bell, BellOff, Check, Loader2, Package, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { createAssociationsAction, deleteAssociationAction, updateAssociationAction } from "@/server/actions/associations";
 import { MAX_ADVICE_PER_SAVE, MAX_SENTENCE_LENGTH, MAX_TRIGGERS_PER_SAVE } from "@/core/associations/rules";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Field, Input, Switch, Textarea } from "@/components/ui/field";
+import { Field, Input, Textarea } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 import { Alert, EmptyState, Skeleton } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/format";
@@ -15,7 +16,7 @@ import type { DrugClassOption, TriggerOption, TriggerSearch } from "@/app/api/as
 import type { AdviceOption, AdviceSearch } from "@/app/api/associations/conseils/route";
 
 /** Ce qui est proposé : un produit de l'officine, ou un médicament sans ordonnance de son stock (toutes ses boîtes). */
-type ProductBrief = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number; deleted: boolean };
+type ProductBrief = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number; deleted: boolean; imageUrl?: string | null };
 /** Ce qui déclenche : un produit du stock, ou un médicament du catalogue national (sans stock connu). */
 type TriggerBrief = { kind: "PRODUCT" | "DRUG" | "CLASS"; id: string; name: string; brand: string | null; quantity: number | null; deleted: boolean };
 type AssociationRow = { id: string; trigger: TriggerBrief; advice: ProductBrief; sentence: string | null; isActive: boolean; createdBy: string | null; createdAt: string };
@@ -32,27 +33,22 @@ type PickedTrigger = TriggerOption | ({ kind: "CLASS" } & DrugClassOption);
  * dit, pour que personne ne s'étonne d'une carte qui ne s'affiche pas.
  */
 export function AssociationsManager({ associations, canEdit = true }: { associations: AssociationRow[]; /** Faux : lecture seule (le serveur refuse de toute façon). */ canEdit?: boolean }) {
-  // Les associations groupées par déclencheur, dans l'ordre d'arrivée.
-  const groups: { trigger: TriggerBrief; items: AssociationRow[] }[] = [];
-  for (const association of associations) {
-    const group = groups.find((candidate) => candidate.trigger.kind === association.trigger.kind && candidate.trigger.id === association.trigger.id);
-    if (group) group.items.push(association);
-    else groups.push({ trigger: association.trigger, items: [association] });
-  }
+  const [filter, setFilter] = useState<Filter>("ALL");
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(associations.length === 0);
+  const needle = fold(search.trim());
+  const counts: Record<Filter, number> = {
+    ALL: associations.length,
+    ACTIVE: associations.filter((row) => row.isActive).length,
+    OUT: associations.filter(isOut).length,
+    PAUSED: associations.filter((row) => !row.isActive).length,
+  };
+  const shown = associations.filter((row) => FILTERS[filter].keep(row) && (!needle || fold(`${row.trigger.name} ${row.advice.name} ${row.advice.brand ?? ""} ${row.sentence ?? ""}`).includes(needle)));
 
   return (
-    <div className="space-y-6">
-      <Alert tone="info" title="Deux façons de conseiller, qui se complètent">
-        <span className="block">
-          <strong>Un médicament déclenche un produit conseil</strong> — un antibiotique appelle un spray pour laver le nez : c&apos;est le moteur de PharmaBoost, rien à régler ici.
-        </span>
-        <span className="mt-1 block">
-          <strong>Vos associations</strong> — un produit ou un médicament en appelle d&apos;autres, que vous choisissez dans votre stock, même sur une vente spontanée : c&apos;est cette page.
-        </span>
-      </Alert>
-
+    <div className="space-y-5">
       {canEdit ? (
-        <NewAssociation />
+        creating && <NewAssociation onClose={associations.length > 0 ? () => setCreating(false) : undefined} />
       ) : (
         <Alert tone="neutral" title="Lecture seule">
           Vous voyez les associations de votre pharmacie ; les créer ou les modifier est réservé au titulaire, au pharmacien et au préparateur.
@@ -60,110 +56,94 @@ export function AssociationsManager({ associations, canEdit = true }: { associat
       )}
 
       <section aria-labelledby="mes-associations" className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 id="mes-associations" className="text-[18px] font-semibold text-text-primary">
-            Mes associations
-          </h2>
-          {groups.length > 0 && (
-            <p className="text-[13px] text-text-tertiary">
-              {groups.length} déclencheur{groups.length > 1 ? "s" : ""} · {associations.length} association{associations.length > 1 ? "s" : ""}
-            </p>
-          )}
+        <h2 id="mes-associations" className="sr-only">
+          Mes associations
+        </h2>
+        {/* La barre : les onglets, la recherche, « Créer une association ». */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div role="tablist" aria-label="Filtrer les associations" className="flex flex-wrap gap-1 rounded-xl border border-border-subtle bg-surface-card p-1">
+            {(Object.keys(FILTERS) as Filter[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={filter === key}
+                onClick={() => setFilter(key)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
+                  filter === key ? "bg-brand-600 text-white shadow-sm" : "text-text-secondary hover:bg-surface-sunken hover:text-text-primary",
+                )}
+              >
+                {FILTERS[key].label}
+                <span className={cn("rounded-full px-1.5 text-[11px] tabular-nums", filter === key ? "bg-white/20" : "bg-surface-sunken text-text-tertiary")}>{counts[key]}</span>
+              </button>
+            ))}
+          </div>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher une association" leadingIcon={<Search className="size-4" />} aria-label="Rechercher une association" className="w-64" />
+            {canEdit && !creating && (
+              <Button leadingIcon={<Plus className="size-[18px]" />} onClick={() => setCreating(true)}>
+                Créer une association
+              </Button>
+            )}
+          </div>
         </div>
-        {groups.length === 0 ? (
+
+        {associations.length === 0 ? (
           <Card>
             <EmptyState
               icon={<Package className="size-5" />}
               title="Aucune association pour l'instant"
               description={
                 canEdit
-                  ? "Tapez la première lettre d'un produit ou d'un médicament à gauche, puis celle du produit à proposer à droite. L'association s'appliquera dès la prochaine vente où le premier est scanné."
+                  ? "Tapez la première lettre d'un produit, d'un médicament ou d'une famille (Pénicillines…) à gauche, puis celle du produit à proposer à droite. L'association s'appliquera dès la prochaine vente."
                   : "Votre pharmacie n'a pas encore d'association : elles apparaîtront ici dès qu'elles seront créées."
               }
             />
           </Card>
         ) : (
-          <div className="space-y-4">
-            {groups.map((group) => (
-              <TriggerGroupCard key={`${group.trigger.kind}:${group.trigger.id}`} trigger={group.trigger} items={group.items} canEdit={canEdit} />
-            ))}
+          <div className="space-y-2.5">
+            {/* L'en-tête du tableau, en paysage : les trois colonnes. */}
+            <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.15fr)_44px] gap-6 rounded-xl border border-border-subtle bg-surface-card px-5 py-3 text-[11.5px] font-semibold tracking-[0.08em] text-text-tertiary uppercase shadow-xs lg:grid">
+              <span>Élément déclencheur</span>
+              <span>Produit conseillé</span>
+              <span>Conseil associé</span>
+              <span />
+            </div>
+            {shown.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-border-subtle px-4 py-8 text-center text-[13.5px] text-text-tertiary">Aucune association ne correspond.</p>
+            ) : (
+              <ul className="space-y-2.5">
+                {shown.map((association) => (
+                  <AssociationRowCard key={association.id} association={association} canEdit={canEdit} />
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </section>
+
+      <Alert tone="info" title="Deux façons de conseiller, qui se complètent">
+        <span className="block">
+          <strong>Un médicament déclenche un produit conseil</strong> — un antibiotique appelle un spray pour laver le nez : c&apos;est le moteur de PharmaBoost, rien à régler ici.
+        </span>
+        <span className="mt-1 block">
+          <strong>Vos associations</strong> — un produit, un médicament ou une famille de médicaments en appelle d&apos;autres, que vous choisissez dans votre stock, même sur une vente spontanée : c&apos;est cette page.
+        </span>
+      </Alert>
     </div>
   );
 }
 
-/** Un déclencheur et tout ce qu'il appelle ; « Ajouter un produit » en ajoute d'autres sans repasser par le formulaire. */
-function TriggerGroupCard({ trigger, items, canEdit }: { trigger: TriggerBrief; items: AssociationRow[]; canEdit: boolean }) {
-  const [adding, setAdding] = useState(false);
-  const [advice, setAdvice] = useState<AdviceOption[]>([]);
-  const [pending, startTransition] = useTransition();
-  const { push } = useToast();
-  const name = trigger.kind === "DRUG" ? drugTitle(trigger.name) : trigger.name;
-  const already = new Set(items.map((item) => `${item.advice.kind}:${item.advice.id}`));
-
-  const save = () => {
-    startTransition(async () => {
-      const result = await saveGrid([{ kind: trigger.kind, id: trigger.id }], advice, null, push);
-      if (result) {
-        setAdvice([]);
-        setAdding(false);
-      }
-    });
-  };
-
-  return (
-    <Card>
-      <CardHeader
-        title={
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span>Quand « {name} » est dans la vente</span>
-            {trigger.kind === "DRUG" && <Badge tone="info">Médicament</Badge>}
-            {trigger.kind === "CLASS" && <Badge tone="info">Famille</Badge>}
-            {trigger.deleted && <Badge tone="danger">Produit supprimé</Badge>}
-          </span>
-        }
-        description={`${trigger.kind === "DRUG" ? "Toutes les formes de ce médicament" : trigger.kind === "CLASS" ? `Tous les médicaments de la famille — ${trigger.brand ?? ""}` : (trigger.brand ?? "Produit de l'officine")} · ${items.length} produit${items.length > 1 ? "s" : ""} proposé${items.length > 1 ? "s" : ""}`}
-        action={
-          canEdit &&
-          !adding && (
-            <Button size="sm" variant="secondary" leadingIcon={<Plus className="size-4" />} onClick={() => setAdding(true)}>
-              Ajouter un produit
-            </Button>
-          )
-        }
-      />
-      <CardContent className="pt-0">
-        {adding && (
-          <div className="mb-3 space-y-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3 dark:border-brand-800 dark:bg-brand-950/20">
-            <AdviceField values={advice} onChange={setAdvice} exclude={already} excludeTrigger={trigger.kind === "PRODUCT" ? trigger.id : undefined} label={`Ajouter à « ${name} »`} />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={save} loading={pending} disabled={advice.length === 0}>
-                {advice.length > 1 ? `Ajouter les ${advice.length} produits` : "Ajouter"}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setAdvice([]);
-                  setAdding(false);
-                }}
-              >
-                Annuler
-              </Button>
-            </div>
-          </div>
-        )}
-        <ul className="divide-y divide-border-subtle">
-          {items.map((association) => (
-            <AssociationItem key={association.id} association={association} canEdit={canEdit} />
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
-}
+type Filter = "ALL" | "ACTIVE" | "OUT" | "PAUSED";
+const isOut = (row: AssociationRow) => row.isActive && (row.advice.deleted || row.advice.quantity <= 0);
+const FILTERS: Record<Filter, { label: string; keep: (row: AssociationRow) => boolean }> = {
+  ALL: { label: "Toutes", keep: () => true },
+  ACTIVE: { label: "Actives", keep: (row) => row.isActive },
+  OUT: { label: "En rupture", keep: isOut },
+  PAUSED: { label: "Désactivées", keep: (row) => !row.isActive },
+};
+const fold = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 type Push = ReturnType<typeof useToast>["push"];
 
@@ -180,7 +160,7 @@ async function saveGrid(triggers: Ref[], advice: AdviceOption[], sentence: strin
   return true;
 }
 
-function NewAssociation() {
+function NewAssociation({ onClose }: { onClose?: () => void }) {
   const [triggers, setTriggers] = useState<PickedTrigger[]>([]);
   const [advice, setAdvice] = useState<AdviceOption[]>([]);
   const [sentence, setSentence] = useState("");
@@ -201,13 +181,24 @@ function NewAssociation() {
         setTriggers([]);
         setAdvice([]);
         setSentence("");
+        onClose?.();
       }
     });
   };
 
   return (
     <Card>
-      <CardHeader title="Nouvelle association" description="Tapez une lettre : PharmaBoost propose ce qui est dans votre stock. Choisissez-en autant que vous voulez de chaque côté — chaque produit de gauche appellera chaque produit de droite." />
+      <CardHeader
+        title="Nouvelle association"
+        description="Tapez une lettre : PharmaBoost propose ce qui est dans votre stock, et les familles de médicaments. Choisissez-en autant que vous voulez de chaque côté — chaque élément de gauche appellera chaque produit de droite."
+        action={
+          onClose && (
+            <Button size="sm" variant="ghost" leadingIcon={<X className="size-4" />} onClick={onClose}>
+              Fermer
+            </Button>
+          )
+        }
+      />
       <CardContent className="space-y-4">
         <div className="grid items-start gap-4 md:grid-cols-[1fr_auto_1fr]">
           <TriggerField values={triggers} onChange={setTriggers} />
@@ -503,7 +494,8 @@ function AdviceField({ values, onChange, label, exclude, excludeTrigger }: { val
   );
 }
 
-function AssociationItem({ association, canEdit }: { association: AssociationRow; canEdit: boolean }) {
+/** Une association, une ligne du tableau : ce qui déclenche, ce qui est proposé, ce qu'on dit — et les actions à droite. */
+function AssociationRowCard({ association, canEdit }: { association: AssociationRow; canEdit: boolean }) {
   const [editing, setEditing] = useState(false);
   const [sentence, setSentence] = useState(association.sentence ?? "");
   const [confirming, setConfirming] = useState(false);
@@ -518,33 +510,99 @@ function AssociationItem({ association, canEdit }: { association: AssociationRow
     });
   };
 
-  const unavailable = association.advice.deleted ? "Produit supprimé" : association.advice.quantity <= 0 ? "En rupture : non proposé tant qu'il n'y en a pas" : null;
+  const { trigger, advice } = association;
+  const triggerName = trigger.kind === "DRUG" ? drugTitle(trigger.name) : trigger.name;
+  const triggerDetail = trigger.kind === "DRUG" ? "Toutes les formes de ce médicament" : trigger.kind === "CLASS" ? (trigger.brand ?? "Toute la famille") : (trigger.brand ?? "Produit de l'officine");
+  const adviceName = advice.kind === "DRUG" ? drugTitle(advice.name) : advice.name;
 
   return (
-    <li className="space-y-2.5 py-3.5">
-      <div className="flex flex-wrap items-start gap-3">
-        <ArrowRight className="mt-1 size-4 shrink-0 text-text-tertiary" aria-hidden />
-        <div className="min-w-0 flex-1 space-y-1">
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] font-medium text-text-primary">
-            <span>{association.advice.kind === "DRUG" ? drugTitle(association.advice.name) : association.advice.name}</span>
-            {association.advice.kind === "DRUG" && <Badge tone="info">Médicament</Badge>}
-            {!association.isActive && <Badge tone="neutral">Suspendue</Badge>}
-            {unavailable && <Badge tone="warning">{unavailable}</Badge>}
-          </p>
-          <p className="text-[12px] text-text-tertiary">
-            {association.advice.kind === "DRUG" ? "Sans ordonnance, toutes boîtes confondues · " : association.advice.brand ? `${association.advice.brand} · ` : ""}
-            {association.advice.quantity > 0 ? `${association.advice.quantity} en stock` : "0 en stock"}
-            {" · "}
-            {formatDate(association.createdAt)}
-            {association.createdBy ? ` · ${association.createdBy}` : ""}
-          </p>
+    <li
+      className={cn(
+        "grid gap-4 rounded-2xl border border-border-subtle bg-surface-card px-5 py-4 shadow-xs transition-shadow hover:shadow-sm lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.15fr)_44px] lg:items-center lg:gap-6",
+        !association.isActive && "opacity-60",
+      )}
+    >
+      {/* Élément déclencheur */}
+      <div className="min-w-0 space-y-1">
+        <p className="text-[11.5px] text-text-tertiary">Élément déclencheur</p>
+        <p className="text-[14.5px] leading-5 font-semibold text-text-primary">{triggerName}</p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge tone={trigger.kind === "PRODUCT" ? "neutral" : "info"}>{trigger.kind === "CLASS" ? "Famille" : trigger.kind === "DRUG" ? "Médicament" : "Produit"}</Badge>
+          {trigger.deleted && <Badge tone="danger">Produit supprimé</Badge>}
         </div>
+        <p className="line-clamp-2 text-[12px] leading-4 text-text-tertiary">{triggerDetail}</p>
+      </div>
 
-        {canEdit && (
-        <div className="flex shrink-0 items-center gap-3">
-          <Switch checked={association.isActive} disabled={pending} aria-label={association.isActive ? "Suspendre l'association" : "Réactiver l'association"} onChange={(event) => run(() => updateAssociationAction({ associationId: association.id, isActive: event.target.checked }))} />
+      {/* Produit conseillé */}
+      <div className="flex min-w-0 items-center gap-3">
+        {advice.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- la photo studio, petite, servie telle quelle.
+          <img src={advice.imageUrl} alt="" className="size-12 shrink-0 rounded-lg border border-border-subtle bg-white object-contain p-0.5" />
+        ) : (
+          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300">
+            <Package className="size-5" aria-hidden />
+          </span>
+        )}
+        <div className="min-w-0 space-y-1">
+          <p className="text-[11.5px] text-text-tertiary">Produit conseillé</p>
+          <p className="text-[14px] leading-5 font-semibold text-text-primary">{adviceName}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {advice.kind === "DRUG" && <Badge tone="info">Médicament</Badge>}
+            {advice.deleted ? <Badge tone="danger">Produit supprimé</Badge> : advice.quantity > 0 ? <Badge tone="success">{`${advice.quantity} en stock`}</Badge> : <Badge tone="warning">Rupture</Badge>}
+            {!association.isActive && <Badge tone="neutral">Désactivée</Badge>}
+          </div>
+        </div>
+      </div>
+
+      {/* Conseil associé */}
+      <div className="min-w-0 space-y-1">
+        <p className="text-[11.5px] text-text-tertiary">Conseil associé</p>
+        {editing ? (
+          <div className="space-y-2">
+            <Textarea value={sentence} maxLength={MAX_SENTENCE_LENGTH} onChange={(event) => setSentence(event.target.value)} aria-label="Ce que vous dites au patient" className="min-h-16" autoFocus />
+            <div className="flex items-center gap-2">
+              <Button size="sm" loading={pending} onClick={() => run(() => updateAssociationAction({ associationId: association.id, sentence: sentence.trim() || null }), () => setEditing(false))}>
+                Enregistrer
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setSentence(association.sentence ?? "");
+                  setEditing(false);
+                }}
+              >
+                Annuler
+              </Button>
+            </div>
+          </div>
+        ) : association.sentence ? (
+          <p className="text-[13.5px] leading-5 text-text-primary">{association.sentence}</p>
+        ) : (
+          <p className="text-[13px] leading-5 text-text-tertiary">Pas de phrase : la carte du comptoir affiche une formule neutre.</p>
+        )}
+        <p className="text-[11.5px] text-text-tertiary">
+          {formatDate(association.createdAt)}
+          {association.createdBy ? ` · ${association.createdBy}` : ""}
+        </p>
+      </div>
+
+      {/* Les actions : modifier le conseil, désactiver, supprimer. */}
+      {canEdit && (
+        <div className="flex items-center gap-2 lg:flex-col">
+          <RoundAction label={association.sentence ? "Modifier le conseil associé" : "Ajouter un conseil associé"} tone="brand" disabled={pending} onClick={() => setEditing(true)}>
+            <Pencil className="size-4" />
+          </RoundAction>
+          <RoundAction
+            label={association.isActive ? "Désactiver l'association" : "Réactiver l'association"}
+            tone="neutral"
+            disabled={pending}
+            onClick={() => run(() => updateAssociationAction({ associationId: association.id, isActive: !association.isActive }))}
+          >
+            {association.isActive ? <BellOff className="size-4" /> : <Bell className="size-4" />}
+          </RoundAction>
           {confirming ? (
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1 lg:flex-col">
               <Button size="sm" variant="danger" disabled={pending} onClick={() => run(() => deleteAssociationAction(association.id))}>
                 Supprimer
               </Button>
@@ -553,53 +611,32 @@ function AssociationItem({ association, canEdit }: { association: AssociationRow
               </Button>
             </span>
           ) : (
-            <button type="button" disabled={pending} onClick={() => setConfirming(true)} className="rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-danger-50 hover:text-danger-600 disabled:opacity-50 dark:hover:bg-danger-700/15" aria-label={`Supprimer l'association vers ${association.advice.name}`}>
+            <RoundAction label={`Supprimer l'association vers ${advice.name}`} tone="danger" disabled={pending} onClick={() => setConfirming(true)}>
               <Trash2 className="size-4" />
-            </button>
-          )}
-        </div>
-        )}
-      </div>
-
-      {editing ? (
-        <div className="space-y-2 pl-7">
-          <Textarea value={sentence} maxLength={MAX_SENTENCE_LENGTH} onChange={(event) => setSentence(event.target.value)} aria-label="Ce que vous dites au patient" className="min-h-16" />
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              loading={pending}
-              onClick={() =>
-                run(
-                  () => updateAssociationAction({ associationId: association.id, sentence: sentence.trim() || null }),
-                  () => setEditing(false),
-                )
-              }
-            >
-              Enregistrer la phrase
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setSentence(association.sentence ?? "");
-                setEditing(false);
-              }}
-            >
-              Annuler
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-start gap-2 pl-7">
-          <p className="min-w-0 flex-1 text-[13px] leading-5 text-text-secondary">{association.sentence ? <>« {association.sentence} »</> : <span className="text-text-tertiary">Pas de phrase : la carte affichera une formule neutre.</span>}</p>
-          {canEdit && (
-          <button type="button" onClick={() => setEditing(true)} className="flex shrink-0 items-center gap-1 text-[12.5px] text-text-tertiary underline-offset-2 hover:text-text-secondary hover:underline">
-            <Pencil className="size-3.5" aria-hidden />
-            {association.sentence ? "Modifier" : "Ajouter une phrase"}
-          </button>
+            </RoundAction>
           )}
         </div>
       )}
     </li>
+  );
+}
+
+function RoundAction({ label, tone, disabled, onClick, children }: { label: string; tone: "brand" | "neutral" | "danger"; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "inline-flex size-9 items-center justify-center rounded-full border transition-colors disabled:opacity-50",
+        tone === "brand" && "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-300",
+        tone === "neutral" && "border-border-subtle bg-surface-card text-text-tertiary hover:bg-surface-sunken hover:text-text-primary",
+        tone === "danger" && "border-border-subtle bg-surface-card text-text-tertiary hover:border-danger-200 hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-700/15",
+      )}
+    >
+      {children}
+    </button>
   );
 }
