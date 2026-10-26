@@ -47,7 +47,8 @@ export const STAGE_WIDTH: Record<IslandStage, number> = {
   ready: 320,
   // 360 : la bannière masquait trop le logiciel pendant une délivrance (retour des pharmacies, 13 oct. 2026).
   advice: 360,
-  email: 400,
+  // 310 : à 400, la question du bilan masquait trop LGPI en fin de vente (retour du fondateur, 26 oct. 2026).
+  email: 310,
   emailSent: 320,
   done: 340,
   alert: 400,
