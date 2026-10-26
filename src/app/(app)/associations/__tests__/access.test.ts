@@ -51,7 +51,7 @@ describe("la page", () => {
     expect(mocks.listAssociations).toHaveBeenCalledWith(scope);
     expect(html).toContain("Olioseptil Bronche");
     expect(html).toContain("Supprimer l&#x27;association");
-    expect(html).toContain("Ajouter un produit");
+    expect(html).toContain("Créer une association");
     expect(html).not.toContain("Lecture seule");
   });
 
@@ -61,7 +61,7 @@ describe("la page", () => {
     expect(html).toContain("Olioseptil Bronche");
     expect(html).toContain("Lecture seule");
     expect(html).not.toContain("Supprimer l&#x27;association");
-    expect(html).not.toContain("Ajouter un produit");
+    expect(html).not.toContain("Créer une association");
     expect(html).not.toContain("Modifier");
   });
 });
