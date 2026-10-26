@@ -5,6 +5,7 @@ import { normalizeSearchText } from "@/core/reference/search";
 import { associationError, cleanSentence, MAX_ADVICE_PER_SAVE, MAX_TRIGGERS_PER_SAVE, sentenceError } from "@/core/associations/rules";
 import { atcKey, drugKey, productKey, type AssociationInput } from "@/core/ai/engines/associations";
 import { drugClassOf } from "@/core/associations/drug-classes";
+import { studioPhotoUrl } from "@/core/catalog/studio-photo";
 export { atcKey } from "@/core/ai/engines/associations";
 import { belongsToFamily, familyKey, type FamilyDefinition } from "@/core/associations/families";
 import type { CatalogProduct } from "@/core/ai/types";
@@ -207,7 +208,7 @@ export async function loadAssociationInput(scope: TenantScope, lines: LineForAss
 // ---------------------------------------------------------------------------------------------------------------
 
 /** Ce qui est proposé : un produit de l'officine, ou un médicament sans ordonnance de son stock (toutes ses boîtes). */
-export type ProductBrief = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number; deleted: boolean };
+export type ProductBrief = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number; deleted: boolean; /** Sa photo studio, s'il en a une. */ imageUrl?: string | null };
 
 /** Ce qui déclenche une association, tel que l'écran le montre. `quantity` n'existe que pour un produit du stock. Pour une
  *  famille de médicaments (CLASS), `id` est son préfixe ATC et `brand` ce qu'elle contient. */
@@ -223,16 +224,17 @@ export type AssociationView = {
   createdBy: string | null;
 };
 
-const briefOf = (product: { id: string; name: string; brand: string | null; deletedAt: Date | null; stockItem: { quantity: number } | null }): ProductBrief => ({
+const briefOf = (product: { id: string; name: string; brand: string | null; ean: string | null; deletedAt: Date | null; stockItem: { quantity: number } | null }): ProductBrief => ({
   kind: "PRODUCT",
   id: product.id,
   name: product.name,
   brand: product.brand,
   quantity: product.stockItem?.quantity ?? 0,
   deleted: product.deletedAt !== null,
+  imageUrl: studioPhotoUrl(product.ean),
 });
 
-const productSelect = { id: true, name: true, brand: true, deletedAt: true, stockItem: { select: { quantity: true } } } as const;
+const productSelect = { id: true, name: true, brand: true, ean: true, deletedAt: true, stockItem: { select: { quantity: true } } } as const;
 
 /** Le nombre de boîtes que l'officine détient de chaque spécialité (toutes présentations confondues). */
 async function heldQuantities(pharmacyId: string, specialtyIds: string[]): Promise<Map<string, number>> {
