@@ -804,12 +804,12 @@ export function PosteIsland() {
         {autoClose && autoClose.id === entry?.id && (
           <IslandShell width={STAGE_WIDTH.email} tone="success" contentKey={`valide-${autoClose.id}`} label="Vente validée dans LGPI">
             {/* LGPI a validé la vente : la bannière se termine seule à la fin du compte à rebours, sauf si le pharmacien clique. */}
-            <div data-ile-validee="" className="px-4 py-2.5 text-left">
-              <p className="text-[13.5px] leading-[18px] font-bold" style={{ color: aurore ? "#E8FF9C" : C.accent }}>✓ Vente validée dans LGPI</p>
-              <p className="mt-0.5 text-[12px] leading-[16px] text-white/70">
-                Le bilan au patient ? Cliquez dans le champ e-mail. Sinon, la vente se termine dans {Math.max(0, Math.ceil((autoClose.until - clock) / 1000))} s.
+            <div data-ile-validee="" className="px-3 py-1.5 text-left">
+              <p className="flex items-baseline justify-between gap-2 text-[12px] leading-[16px]">
+                <span className="font-bold" style={{ color: aurore ? "#E8FF9C" : C.accent }}>✓ Vente validée</span>
+                <span className="text-white/60">fin dans {Math.max(0, Math.ceil((autoClose.until - clock) / 1000))} s</span>
               </p>
-              <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/10">
+              <span className="mt-1 block h-1 overflow-hidden rounded-full bg-white/10">
                 <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, ((autoClose.until - clock) / VALIDATED_EMAIL_MS) * 100))}%`, background: aurore ? "#E8FF9C" : C.accent, transition: "width 250ms linear" }} />
               </span>
             </div>

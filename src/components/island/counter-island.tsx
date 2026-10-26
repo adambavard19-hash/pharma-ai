@@ -735,16 +735,17 @@ export function CounterIsland(props: CounterIslandProps) {
         );
         break;
       case "email":
+        // Compacte (fondateur, 26 oct. 2026) : une ligne de titre, le champ, « Terminer sans e-mail » en petit — LGPI reste visible.
         body = (
-          <div className="px-3 pt-2.5 pb-3">
-            <Row
-              robot={robot(30)}
-              title={props.onFinishWithoutEmail ? "Avant de terminer : le bilan au patient ?" : "Bilan conseil par e-mail"}
-              sub="Le patient reçoit ses conseils, vos coordonnées et, pour une cure, un rappel avant la fin."
-              compact
-            />
+          <div className="px-2.5 pt-2 pb-2">
+            <div className="flex items-center gap-2">
+              {robot(22)}
+              <p className="min-w-0 flex-1 truncate text-[12.5px] leading-[16px] font-bold text-white" title="Le patient reçoit ses conseils, vos coordonnées et, pour une cure, un rappel avant la fin.">
+                {props.onFinishWithoutEmail ? "Le bilan au patient ?" : "Bilan conseil par e-mail"}
+              </p>
+            </div>
             <form
-              className="mt-3 flex items-center gap-2"
+              className="mt-1.5 flex items-center gap-1.5"
               onSubmit={(event) => {
                 event.preventDefault();
                 props.onSendEmail();
@@ -756,21 +757,21 @@ export function CounterIsland(props: CounterIslandProps) {
                 type="email"
                 value={state.email}
                 onChange={(event) => props.onEmail(event.target.value)}
-                placeholder="patient@exemple.fr"
-                className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-[13.5px] text-white placeholder:text-white/35 focus:border-[#36E8C8] focus:outline-none"
+                placeholder="e-mail du patient"
+                className="h-8 min-w-0 flex-1 rounded-lg border border-white/10 bg-white/[0.06] px-2.5 text-[12.5px] text-white placeholder:text-white/35 focus:border-[#36E8C8] focus:outline-none"
               />
-              <button type="submit" className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-[13px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
-                <Send className="size-3.5" aria-hidden="true" /> {props.onFinishWithoutEmail ? "Envoyer et terminer" : "Envoyer"}
+              <button type="submit" aria-label={props.onFinishWithoutEmail ? "Envoyer et terminer" : "Envoyer"} className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
+                <Send className="size-3.5" aria-hidden="true" /> Envoyer
               </button>
               {props.onCloseEmail && (
-                <button type="button" onClick={props.onCloseEmail} aria-label="Annuler l'e-mail" title="Annuler" className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-white/80 hover:bg-white/[0.14] hover:text-white">
-                  <X className="size-4" aria-hidden="true" />
+                <button type="button" onClick={props.onCloseEmail} aria-label="Annuler l'e-mail" title="Annuler" className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.08] text-white/80 hover:bg-white/[0.14] hover:text-white">
+                  <X className="size-3.5" aria-hidden="true" />
                 </button>
               )}
             </form>
             {props.onFinishWithoutEmail && (
-              <button type="button" onClick={props.onFinishWithoutEmail} data-ile-sans-email="" className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-white/[0.08] text-[12.5px] font-semibold text-white/85 transition-colors hover:bg-white/[0.14] hover:text-white">
-                <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> Terminer sans e-mail
+              <button type="button" onClick={props.onFinishWithoutEmail} data-ile-sans-email="" className="mt-1.5 inline-flex h-6 w-full items-center justify-center gap-1 rounded-md text-[11.5px] font-semibold text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white">
+                <Check className="size-3" strokeWidth={3} aria-hidden="true" /> Terminer sans e-mail
               </button>
             )}
           </div>
