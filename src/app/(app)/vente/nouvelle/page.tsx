@@ -1,6 +1,5 @@
 import { activityScope } from "@/server/db/demo-scope";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
@@ -12,7 +11,7 @@ import { loadCounterDashboard, startOfParisDay } from "@/server/services/counter
 import { NOT_LINKED, thisPcComptoir } from "@/server/services/post-link";
 import { countCounterRequestsToday } from "@/server/services/counter-request";
 import { isCommercialDemoPharmacy } from "@/core/demo/identity";
-import { findDemoScenario } from "@/core/demo/scenarios";
+import { CounterDemoCard } from "../../demo/counter-demo-card";
 import { CounterDashboard } from "./counter-dashboard";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { NewPrescriptionForm } from "./new-prescription-form";
@@ -32,6 +31,14 @@ export default async function NewPrescriptionPage({
   searchParams: Promise<{ patient?: string; demande?: string; lien?: string }>;
 }) {
   const session = await requirePermission(PERMISSIONS.PRESCRIPTION_CREATE);
+  // Le compte de démonstration : au comptoir, seulement la démo plein écran (fondateur, 26 oct. 2026).
+  if (isCommercialDemoPharmacy(session.pharmacy)) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        <CounterDemoCard />
+      </div>
+    );
+  }
   const params = await searchParams;
   const now = new Date();
 
@@ -45,9 +52,6 @@ export default async function NewPrescriptionPage({
   // L'écran ne promet une lecture automatique que si un lecteur est réellement
   // branché. Sinon il propose la saisie, sans expliquer pourquoi.
   const canReadPrescriptions = getOCRProvider().info.capability === "LIVE";
-
-  // Un scénario de démonstration « sans ordonnance » arrive avec sa demande déjà saisie (jamais lancée toute seule).
-  const demoRequest = isCommercialDemoPharmacy(session.pharmacy) && params.demande ? (findDemoScenario(params.demande)?.request ?? null) : null;
 
   // Chaque comptoir est un espace à part : cet écran ne montre que les délivrances des comptoirs de cette personne. Sur le
   // PC d'un comptoir, le comptoir lui revient d'abord tout seul (la même vérification que la coquille, faite une fois), et
@@ -68,15 +72,6 @@ export default async function NewPrescriptionPage({
     // L'hélice d'ADN en fond de toute la fenêtre (fixe, z-index négatif) : ce conteneur ne doit pas l'isoler.
     <div className="mx-auto max-w-3xl space-y-4">
       <HelixBackdrop />
-      {isCommercialDemoPharmacy(session.pharmacy) && (
-        <p className="rounded-xl border border-dashed border-brand-300 bg-brand-50/50 px-4 py-3 text-[13.5px] text-text-secondary dark:border-brand-800 dark:bg-brand-950/20">
-          Pas de douchette dans cette démonstration.{" "}
-          <Link href="/demo" className="font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">
-            Simuler une vente
-          </Link>{" "}
-          : les boîtes arrivent comme si elles étaient passées à la caisse.
-        </p>
-      )}
 
       {params.lien === "perime" && (
         <p role="status" className="rounded-xl border border-border-subtle bg-surface-card px-4 py-3 text-[13.5px] leading-5 text-text-secondary">
@@ -100,7 +95,7 @@ export default async function NewPrescriptionPage({
           preselectedPatientId={patientDataEnabled() ? (params.patient ?? null) : null}
           canReadPrescriptions={canReadPrescriptions}
         />
-        <CounterRequestCard today={requestsToday} prefill={demoRequest} />
+        <CounterRequestCard today={requestsToday} />
       </CounterDashboard>
     </div>
   );
