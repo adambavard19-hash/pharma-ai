@@ -11,15 +11,17 @@ import { Field, Input, Switch, Textarea } from "@/components/ui/field";
 import { Alert, EmptyState, Skeleton } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/format";
-import type { TriggerOption, TriggerSearch } from "@/app/api/associations/declencheurs/route";
+import type { DrugClassOption, TriggerOption, TriggerSearch } from "@/app/api/associations/declencheurs/route";
 import type { AdviceOption, AdviceSearch } from "@/app/api/associations/conseils/route";
 
 /** Ce qui est proposé : un produit de l'officine, ou un médicament sans ordonnance de son stock (toutes ses boîtes). */
 type ProductBrief = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number; deleted: boolean };
 /** Ce qui déclenche : un produit du stock, ou un médicament du catalogue national (sans stock connu). */
-type TriggerBrief = { kind: "PRODUCT" | "DRUG"; id: string; name: string; brand: string | null; quantity: number | null; deleted: boolean };
+type TriggerBrief = { kind: "PRODUCT" | "DRUG" | "CLASS"; id: string; name: string; brand: string | null; quantity: number | null; deleted: boolean };
 type AssociationRow = { id: string; trigger: TriggerBrief; advice: ProductBrief; sentence: string | null; isActive: boolean; createdBy: string | null; createdAt: string };
-type Ref = { kind: "PRODUCT" | "DRUG"; id: string };
+type Ref = { kind: "PRODUCT" | "DRUG" | "CLASS"; id: string };
+/** Un déclencheur choisi : un produit, un médicament, ou une famille de médicaments (toutes les amoxicillines d'un coup). */
+type PickedTrigger = TriggerOption | ({ kind: "CLASS" } & DrugClassOption);
 
 /**
  * Les associations de produits : à gauche ce qui déclenche (un ou plusieurs produits ou médicaments), à droite ce qu'on
@@ -118,10 +120,11 @@ function TriggerGroupCard({ trigger, items, canEdit }: { trigger: TriggerBrief; 
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span>Quand « {name} » est dans la vente</span>
             {trigger.kind === "DRUG" && <Badge tone="info">Médicament</Badge>}
+            {trigger.kind === "CLASS" && <Badge tone="info">Famille</Badge>}
             {trigger.deleted && <Badge tone="danger">Produit supprimé</Badge>}
           </span>
         }
-        description={`${trigger.kind === "DRUG" ? "Toutes les formes de ce médicament" : (trigger.brand ?? "Produit de l'officine")} · ${items.length} produit${items.length > 1 ? "s" : ""} proposé${items.length > 1 ? "s" : ""}`}
+        description={`${trigger.kind === "DRUG" ? "Toutes les formes de ce médicament" : trigger.kind === "CLASS" ? `Tous les médicaments de la famille — ${trigger.brand ?? ""}` : (trigger.brand ?? "Produit de l'officine")} · ${items.length} produit${items.length > 1 ? "s" : ""} proposé${items.length > 1 ? "s" : ""}`}
         action={
           canEdit &&
           !adding && (
@@ -178,7 +181,7 @@ async function saveGrid(triggers: Ref[], advice: AdviceOption[], sentence: strin
 }
 
 function NewAssociation() {
-  const [triggers, setTriggers] = useState<TriggerOption[]>([]);
+  const [triggers, setTriggers] = useState<PickedTrigger[]>([]);
   const [advice, setAdvice] = useState<AdviceOption[]>([]);
   const [sentence, setSentence] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -193,7 +196,7 @@ function NewAssociation() {
       return;
     }
     startTransition(async () => {
-      const refs = triggers.map((option): Ref => (option.kind === "PRODUCT" ? { kind: "PRODUCT", id: option.productId } : { kind: "DRUG", id: option.specialtyId }));
+      const refs = triggers.map((option): Ref => (option.kind === "PRODUCT" ? { kind: "PRODUCT", id: option.productId } : option.kind === "CLASS" ? { kind: "CLASS", id: option.code } : { kind: "DRUG", id: option.specialtyId }));
       if (await saveGrid(refs, advice, sentence.trim() || null, push)) {
         setTriggers([]);
         setAdvice([]);
@@ -324,43 +327,53 @@ function SearchSkeleton() {
   );
 }
 
-const triggerKey = (option: TriggerOption) => (option.kind === "DRUG" ? `d:${option.specialtyId}` : `p:${option.productId}`);
+const triggerKey = (option: PickedTrigger) => (option.kind === "DRUG" ? `d:${option.specialtyId}` : option.kind === "CLASS" ? `c:${option.code}` : `p:${option.productId}`);
 
 /**
  * Les déclencheurs, en UN champ : dès la première lettre, ce que l'officine détient (médicaments et produits, en stock
  * d'abord), puis le reste du catalogue national. On en choisit autant qu'on veut : la liste reste ouverte.
  */
-function TriggerField({ values, onChange }: { values: TriggerOption[]; onChange: (options: TriggerOption[]) => void }) {
+function TriggerField({ values, onChange }: { values: PickedTrigger[]; onChange: (options: PickedTrigger[]) => void }) {
   const label = "Quand ce produit ou ce médicament est dans la vente";
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const { results, loading } = useLiveSearch<TriggerSearch>("/api/associations/declencheurs", query, { stock: [], catalogue: [] });
+  const { results, loading } = useLiveSearch<TriggerSearch>("/api/associations/declencheurs", query, { stock: [], catalogue: [], classes: [] });
   const needle = query.trim();
   const full = values.length >= MAX_TRIGGERS_PER_SAVE;
   const chosen = new Set(values.map(triggerKey));
   const stock = results.stock.filter((option) => !chosen.has(triggerKey(option)));
   const catalogue = results.catalogue.filter((option) => !chosen.has(triggerKey(option)));
-  const pick = (option: TriggerOption) => {
+  const classes = results.classes.map((item) => ({ kind: "CLASS" as const, ...item })).filter((option) => !chosen.has(triggerKey(option)));
+  const pick = (option: PickedTrigger) => {
     if (!full && !chosen.has(triggerKey(option))) onChange([...values, option]);
   };
 
   return (
-    <Field label={label} hint={full ? `${MAX_TRIGGERS_PER_SAVE} au plus en une fois : enregistrez, puis continuez.` : values.length > 0 ? "Ajoutez-en d'autres si vous voulez : chacun appellera les produits de droite." : "Un médicament vaut pour toutes ses formes (comprimé, sirop…)."}>
+    <Field label={label} hint={full ? `${MAX_TRIGGERS_PER_SAVE} au plus en une fois : enregistrez, puis continuez.` : values.length > 0 ? "Ajoutez-en d'autres si vous voulez : chacun appellera les produits de droite." : "Un médicament vaut pour toutes ses formes (comprimé, sirop…). Une famille (Pénicillines, Macrolides…) vaut pour tous ses médicaments."}>
       <div className="space-y-2">
         <Chips
           values={values}
           label="Déclencheurs choisis"
           keyOf={triggerKey}
-          render={(option) => ({ title: option.kind === "DRUG" ? drugTitle(option.name) : option.name, detail: option.quantity === null ? "catalogue" : option.quantity > 0 ? `${option.quantity} en stock` : "rupture", drug: option.kind === "DRUG" })}
+          render={(option) =>
+            option.kind === "CLASS"
+              ? { title: option.label, detail: "famille", drug: false }
+              : { title: option.kind === "DRUG" ? drugTitle(option.name) : option.name, detail: option.quantity === null ? "catalogue" : option.quantity > 0 ? `${option.quantity} en stock` : "rupture", drug: option.kind === "DRUG" }
+          }
           onRemove={(option) => onChange(values.filter((value) => triggerKey(value) !== triggerKey(option)))}
         />
         <Input type="search" value={query} disabled={full} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onKeyDown={(event) => event.key === "Escape" && setOpen(false)} onChange={(event) => { setQuery(event.target.value); setOpen(true); }} placeholder={values.length > 0 ? "Ajouter un autre produit ou médicament…" : "Tapez une lettre : D, DO, DOLI…"} leadingIcon={loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />} aria-label={label} />
         {open && needle.length > 0 && !full && (
           <div className="max-h-80 space-y-2 overflow-y-auto rounded-lg border border-border-subtle bg-surface-card p-1.5">
-            {stock.length === 0 && catalogue.length === 0 ? (
+            {stock.length === 0 && catalogue.length === 0 && classes.length === 0 ? (
               loading ? <SearchSkeleton /> : <p className="px-2 py-3 text-center text-[12.5px] text-text-tertiary">Rien trouvé, ni dans votre stock ni au catalogue national.</p>
             ) : (
               <>
+                <OptionGroup title="Familles de médicaments — tout d'un coup">
+                  {classes.map((option) => (
+                    <OptionRow key={triggerKey(option)} onPick={() => pick(option)} title={option.label} detail={option.detail} badges={<Badge tone="info">Famille</Badge>} />
+                  ))}
+                </OptionGroup>
                 <OptionGroup title="Dans mon stock">
                   {stock.map((option) => (
                     <OptionRow

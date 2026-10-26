@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { searchAssociationTriggers, type TriggerOption, type TriggerSearch } from "@/server/services/stock-search";
+import { searchAssociationTriggers, type TriggerOption, type TriggerSearch as StockTriggers } from "@/server/services/stock-search";
+import { searchDrugClasses } from "@/core/associations/drug-classes";
 
-export type { TriggerOption, TriggerSearch };
+export type { TriggerOption };
+/** En plus du stock et du catalogue : les familles de médicaments (« amox » → Pénicillines), à choisir d'un coup. */
+export type DrugClassOption = { code: string; label: string; detail: string };
+export type TriggerSearch = StockTriggers & { classes: DrugClassOption[] };
 
 /**
  * « Quand ce produit ou ce médicament est dans la vente » (écran « Mes associations ») : un seul champ, qui cherche d'un
@@ -16,6 +20,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
   const query = (new URL(request.url).searchParams.get("q") ?? "").trim().slice(0, 120);
-  const result: TriggerSearch = query.length === 0 ? { stock: [], catalogue: [] } : await searchAssociationTriggers(session.scope.pharmacyId, query);
+  const found = query.length === 0 ? { stock: [], catalogue: [] } : await searchAssociationTriggers(session.scope.pharmacyId, query);
+  const classes = searchDrugClasses(query).map(({ code, label, detail }) => ({ code, label, detail }));
+  const result: TriggerSearch = { ...found, classes };
   return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
 }

@@ -17,6 +17,8 @@ export type AssociationDraft = {
   triggerProductId?: string | null;
   /** …ou un médicament du catalogue national : jamais les deux, jamais aucun. */
   triggerSpecialtyId?: string | null;
+  /** …ou une famille de médicaments (préfixe ATC, `ASSOCIATION_DRUG_CLASSES`). */
+  triggerAtcCode?: string | null;
   adviceProductId: string;
   sentence: string | null;
 };
@@ -36,8 +38,9 @@ export function sentenceError(sentence: string | null): string | null {
 export function associationError(draft: AssociationDraft): string | null {
   const byProduct = Boolean(draft.triggerProductId);
   const byDrug = Boolean(draft.triggerSpecialtyId);
-  if (byProduct && byDrug) return "Choisissez un seul déclencheur : un produit ou un médicament.";
-  if (!byProduct && !byDrug) return "Choisissez le produit ou le médicament déclencheur.";
+  const byClass = Boolean(draft.triggerAtcCode);
+  if (Number(byProduct) + Number(byDrug) + Number(byClass) > 1) return "Choisissez un seul déclencheur : un produit, un médicament ou une famille.";
+  if (!byProduct && !byDrug && !byClass) return "Choisissez le produit ou le médicament déclencheur.";
   if (!draft.adviceProductId) return "Choisissez le produit à conseiller.";
   if (byProduct && draft.triggerProductId === draft.adviceProductId) return "Un produit ne peut pas être associé à lui-même.";
   return sentenceError(draft.sentence);

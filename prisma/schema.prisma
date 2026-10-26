@@ -2485,6 +2485,9 @@ model ProductAssociation {
   /// Un médicament conseil comme Coryzalia se lit par son code CIP : il est au catalogue national, pas dans le stock.
   triggerProductId   String?
   triggerSpecialtyId String?
+  /// …ou une FAMILLE de médicaments, par son préfixe ATC (« J01C » = pénicillines) : toutes les amoxicillines d'un coup
+  /// (fondateur, 26 oct. 2026). Un seul des trois (contrainte en base : product_associations_one_trigger).
+  triggerAtcCode     String?
   /// Le produit proposé est SOIT un produit de l'officine (adviceProductId), SOIT un médicament SANS ordonnance de son stock
   /// (adviceSpecialtyId : la spécialité, retrouvée dans le stock de l'officine à chaque vente) — jamais les deux, jamais aucun
   /// (contrainte en base : product_associations_one_advice). Un médicament soumis à prescription n'est jamais proposé.
@@ -2510,6 +2513,8 @@ model ProductAssociation {
   @@unique([pharmacyId, triggerSpecialtyId, adviceProductId])
   @@unique([pharmacyId, triggerProductId, adviceSpecialtyId], map: "product_associations_trigger_product_advice_specialty_key")
   @@unique([pharmacyId, triggerSpecialtyId, adviceSpecialtyId], map: "product_associations_trigger_specialty_advice_specialty_key")
+  @@unique([pharmacyId, triggerAtcCode, adviceProductId], map: "product_associations_trigger_atc_advice_product_key")
+  @@unique([pharmacyId, triggerAtcCode, adviceSpecialtyId], map: "product_associations_trigger_atc_advice_specialty_key")
   @@index([pharmacyId, isActive])
   @@index([pharmacyId, triggerProductId])
   @@index([pharmacyId, triggerSpecialtyId])

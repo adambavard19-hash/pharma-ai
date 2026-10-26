@@ -22,10 +22,12 @@ const quoted = (names: string[]): string => {
 };
 
 const refSchema = z.object({ kind: z.enum(["PRODUCT", "DRUG"]), id: z.string().min(1) });
+/** Un déclencheur peut aussi être une famille de médicaments (CLASS : son préfixe ATC). */
+const triggerRefSchema = z.object({ kind: z.enum(["PRODUCT", "DRUG", "CLASS"]), id: z.string().min(1) });
 
 const gridSchema = z.object({
   /** Les déclencheurs : des produits du stock et/ou des médicaments (du stock ou du catalogue national). */
-  triggers: z.array(refSchema).min(1, "Choisissez au moins un produit ou un médicament déclencheur.").max(MAX_TRIGGERS_PER_SAVE, `${MAX_TRIGGERS_PER_SAVE} déclencheurs au plus en une fois.`),
+  triggers: z.array(triggerRefSchema).min(1, "Choisissez au moins un produit ou un médicament déclencheur.").max(MAX_TRIGGERS_PER_SAVE, `${MAX_TRIGGERS_PER_SAVE} déclencheurs au plus en une fois.`),
   /** Les produits proposés, dans l'ordre choisi : des produits de l'officine et/ou des médicaments sans ordonnance de son stock. */
   advice: z.array(refSchema).min(1, "Choisissez au moins un produit à conseiller.").max(MAX_ADVICE_PER_SAVE, `${MAX_ADVICE_PER_SAVE} produits au plus en une fois.`),
   sentence: z.string().max(MAX_SENTENCE_LENGTH + 200, "La phrase est trop longue.").optional().nullable(),
