@@ -8,8 +8,9 @@ import type {
   UnderstandingLine,
 } from "@/core/understanding";
 import type { TenantScope } from "@/server/db/tenant";
-import { drugClassificationIsUncertain } from "@/core/knowledge/gaps";
+import { LOW_CONFIDENCE, drugClassificationIsUncertain } from "@/core/knowledge/gaps";
 import { officialAtcForCis } from "@/core/reference/atc/official-atc";
+import { officialFamilyByName } from "@/server/services/official-family";
 import { recordGaps } from "@/server/services/knowledge-gap-store";
 import { applyOfficialSideEffects } from "@/core/understanding/official-side-effects";
 import { loadOfficialSideEffects } from "@/server/services/official-side-effects";
@@ -167,15 +168,21 @@ export async function ensureClassifications(params: {
 
   // Le secours : une ligne sans réponse utile du modèle (échec, fournisseur sans modèle, ligne omise, ni ATC ni
   // classe) prend la famille officielle de sa spécialité. La réponse vide du modèle est remplacée, pas doublée.
+  // Un modèle qui hésite (confiance basse) cède aussi la place à la famille officielle. Sans code CIS, la famille se cherche par le
+  // nom dans le catalogue national (27 oct. 2026 : « désogestrel, oméprazole… tu sais forcément les classer »).
   const official = new Set<number>();
-  for (const line of missing) {
+  // Une réponse en mémoire où le modèle hésitait est reprise de même ; une réponse confirmée par la pharmacienne, jamais.
+  const confirmed = new Set(cached.filter((row) => row.validatedAt !== null).map((row) => row.key));
+  for (const line of params.lines) {
+    if (confirmed.has(classificationKey(line.drugName))) continue;
     const at = drugs.findIndex((drug) => drug.lineIndex === line.lineIndex);
-    if (at >= 0 && (drugs[at].atcCode || drugs[at].therapeuticClass)) continue;
-    const family = officialAtcForCis(line.officialCisCode);
+    if (at < 0 && !missing.includes(line)) continue;
+    if (at >= 0 && (drugs[at].atcCode || drugs[at].therapeuticClass) && drugs[at].confidence >= LOW_CONFIDENCE) continue;
+    const family = officialAtcForCis(line.officialCisCode) ?? (await officialFamilyByName(line.officialName ?? line.drugName).catch(() => null));
     if (!family) continue;
     const drug: DrugClassification = {
       lineIndex: line.lineIndex,
-      substance: line.officialSubstances[0] ?? null,
+      substance: line.officialSubstances[0] ?? ("substance" in family ? family.substance : null),
       atcCode: family.atcCode,
       therapeuticClass: family.therapeuticClass,
       commonSideEffects: [],
