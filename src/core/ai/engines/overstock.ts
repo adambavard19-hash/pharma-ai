@@ -72,6 +72,8 @@ export function applyOverstockCampaigns(args: {
   patient: PatientContext;
   /** Les boîtes qui ont déclenché chaque conseil (par clé de conseil). */
   triggeredBy?: ReadonlyMap<string, AdviceOpportunityResult["triggeredBy"]>;
+  /** La priorité de chaque conseil (par clé) : le plus prioritaire des conseils remplacés reste en tête du repli. */
+  priorityByKey?: ReadonlyMap<string, number>;
 }): OverstockResult {
   const catalogById = new Map(args.catalog.map((product) => [product.id, product]));
   const lineName = (lineIndex: number) => args.lines.find((line) => line.lineIndex === lineIndex)?.drugName ?? null;
@@ -99,10 +101,14 @@ export function applyOverstockCampaigns(args: {
     if (product.stockQuantity <= 0) { skip("OUT_OF_STOCK"); continue; }
     if (promoted.length >= MAX_OVERSTOCK_ADVICE) { skip("LIMIT"); continue; }
 
-    // Les produits d'origine cèdent leur place ; ils restent en repli, le patient garde le choix.
-    const kept = replaced.slice(0, MAX_REPLACED_KEPT);
-    const keptAlternatives = kept.map(
-      (rec): ScoredAlternative => ({
+    // Les produits d'origine cèdent leur place ; ils restent en repli, le patient garde le choix. Le conseil le plus
+    // prioritaire d'abord, avec ses propres équivalents : sous amoxicilline, Lactibiane ATB puis Ultra-Levure, avant le
+    // confort intime ou les vitamines (fondateur, 26 oct. 2026).
+    const priority = (rec: ScoredRecommendation) => args.priorityByKey?.get(rec.opportunityKey) ?? 0;
+    const ranked = [...replaced].sort((a, b) => priority(b) - priority(a));
+    const kept = ranked.slice(0, MAX_REPLACED_KEPT);
+    const keptAlternatives = kept.flatMap((rec): ScoredAlternative[] => [
+      {
         productId: rec.productId,
         totalScore: rec.totalScore,
         breakdown: rec.breakdown,
@@ -114,8 +120,10 @@ export function applyOverstockCampaigns(args: {
         explanation: rec.explanation,
         vigilances: rec.vigilances,
         shortDate: rec.shortDate ?? null,
-      }),
-    );
+      },
+      // Son premier équivalent seulement : le repli reste court, et chaque conseil remplacé garde sa place.
+      ...(rec.alternatives ?? []).slice(0, 1),
+    ]).filter((item, index, list) => item.productId !== product.id && list.findIndex((other) => other.productId === item.productId) === index);
     rest = rest.filter((rec) => !replaced.includes(rec));
 
     if (existing) {

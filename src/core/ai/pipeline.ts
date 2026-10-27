@@ -1096,6 +1096,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
             recommendations: withoutOverstock,
             patient: input.patient,
             triggeredBy,
+            priorityByKey: new Map([...opportunities, ...associationAdvice.opportunities].map((opportunity) => [opportunity.key, opportunity.priority])),
           });
           return { output: result, count: result.opportunities.length, notes: result.notes };
         })

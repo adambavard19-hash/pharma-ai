@@ -118,3 +118,23 @@ describe("une campagne de surstock", () => {
     expect(result.notes.some((note) => note.includes("limite"))).toBe(true);
   });
 });
+
+describe("surstock sous antibiotique (fondateur, 26 oct. 2026)", () => {
+  it("garde en repli la flore intestinale d'abord, avec son équivalent, avant le confort intime et les vitamines", () => {
+    const lactibiane = product({ id: "lactibiane", name: "LACTIBIANE ATB Gél B/10", category: "PROBIOTIQUES", stockQuantity: 8 });
+    const feminadiane = product({ id: "feminadiane", name: "FEMINABIANE INTIMA", category: "HYGIENE", stockQuantity: 8 });
+    const endomune = product({ id: "endomune", name: "ENDOMUNE IMMUNITE", category: "VITAMINES", stockQuantity: 8 });
+    const flore = { ...rec("lactibiane", "flore"), alternatives: [{ ...rec("levure", "flore") }] };
+    const result = applyOverstockCampaigns({
+      overstock: { campaigns: [campaign({ replaceProductIds: new Set(["lactibiane", "feminadiane", "endomune"]) })], lines: [antibiotic] },
+      lines: [{ lineIndex: 0, drugName: "AMOXICILLINE 1 g" }],
+      catalog: [...catalog, lactibiane, feminadiane, endomune],
+      blockedProductIds: new Set(),
+      recommendations: [rec("endomune", "vitamines"), rec("feminadiane", "intime"), flore],
+      patient: patient(),
+      priorityByKey: new Map([["flore", 90], ["intime", 46], ["vitamines", 46]]),
+    });
+    expect(result.recommendations[0].productId).toBe("immuno");
+    expect(result.recommendations[0].alternatives?.map((item) => item.productId)).toEqual(["lactibiane", "levure", "endomune"]);
+  });
+});

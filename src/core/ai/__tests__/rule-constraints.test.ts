@@ -72,17 +72,17 @@ describe("produit associé", () => {
 });
 
 describe("laboratoires mis en avant par l'officine", () => {
-  const a = product({ id: "a", name: "LACTIBIANE ATB Gél B/10", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive"], stockQuantity: 8, salePriceCents: 1200, purchasePriceCents: 600 });
-  const b = product({ id: "b", name: "ULTRA-LEVURE 200 mg gélule", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive"], stockQuantity: 8, salePriceCents: 1200, purchasePriceCents: 600 });
+  const a = product({ id: "a", name: "PROBIOLOG FLORE Gél B/10", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive"], stockQuantity: 8, salePriceCents: 1200, purchasePriceCents: 600 });
+  const b = product({ id: "b", name: "ERGYPHILUS PLUS gélule", brand: null, category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive"], stockQuantity: 8, salePriceCents: 1200, purchasePriceCents: 600 });
 
   it("fait remonter le laboratoire préféré entre deux références équivalentes", () => {
-    const rules: PipelineInput["rules"] = [{ id: "r1", type: "PREFER_BRAND", productId: null, category: null, brand: "Ultra-Levure", context: {}, weight: 1 }];
+    const rules: PipelineInput["rules"] = [{ id: "r1", type: "PREFER_BRAND", productId: null, category: null, brand: "Ergyphilus", context: {}, weight: 1 }];
     const result = analyse(antibiotic, [a, b], rules);
     expect(result.recommendations[0]?.productId).toBe("b");
   });
 
   it("écarte un laboratoire exclu, même pertinent", () => {
-    const rules: PipelineInput["rules"] = [{ id: "r2", type: "EXCLUDE_BRAND", productId: null, category: null, brand: "Lactibiane", context: {}, weight: 1 }];
+    const rules: PipelineInput["rules"] = [{ id: "r2", type: "EXCLUDE_BRAND", productId: null, category: null, brand: "Probiolog", context: {}, weight: 1 }];
     const result = analyse(antibiotic, [a, b], rules);
     expect(result.recommendations.map((r) => r.productId)).toEqual(["b"]);
   });
@@ -145,3 +145,34 @@ describe("lubrifiant oculaire sous substitut lacrymal", () => {
   });
 });
 
+
+describe("antibiotique local (fondateur, 26 oct. 2026)", () => {
+  const mupirocine: DrugClassification = { lineIndex: 0, substance: "MUPIROCINE", atcCode: "D06AX09", therapeuticClass: "Antibiotique", commonSideEffects: [], confidence: 0.95, source: "MODEL" };
+  const probio = product({ id: "probio", name: "LACTIBIANE ATB Gél B/10", category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive"], stockQuantity: 8 });
+  const endomune = product({ id: "endomune", name: "ENDOMUNE IMMUNITE Gél B/30", category: "VITAMINES", matchingTags: ["vitamines", "immunité"], stockQuantity: 8 });
+  const savon = product({ id: "savon", name: "PAIN SURGRAS DERMATOLOGIQUE 150 g", category: "DERMOCOSMETIQUE", matchingTags: ["nettoyant"], stockQuantity: 8 });
+  const creme = product({ id: "creme", name: "CREME HYDRATANTE VISAGE 50 ml", category: "DERMOCOSMETIQUE", matchingTags: ["hydratation"], stockQuantity: 8 });
+
+  it("une crème à la mupirocine n'appelle ni probiotique ni vitamines, mais le nettoyage au savon", () => {
+    const ids = analyse(mupirocine, [probio, endomune, savon, creme]).recommendations.map((r) => r.productId);
+    expect(ids).not.toContain("probio");
+    expect(ids).not.toContain("endomune");
+    expect(ids).not.toContain("creme");
+    expect(ids).toContain("savon");
+  });
+
+  it("sans code ATC, le mot « crème » suffit à écarter les probiotiques", () => {
+    const ids = analyse({ ...mupirocine, substance: "MUPIROCINE CREME", atcCode: null }, [probio]).recommendations.map((r) => r.productId);
+    expect(ids).not.toContain("probio");
+  });
+
+  it("l'amoxicilline garde Lactibiane ATB devant Ultra-Levure", () => {
+    const amox: DrugClassification = { lineIndex: 0, substance: "AMOXICILLINE", atcCode: "J01CA04", therapeuticClass: "Antibiotique", commonSideEffects: [], confidence: 0.95, source: "MODEL" };
+    const other = product({ id: "other", name: "PROBIOLOG FLORE Gél B/10", category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive"], stockQuantity: 30 });
+    const levure = product({ id: "levure", name: "ULTRA-LEVURE 200 mg gélule", category: "PROBIOTIQUES", matchingTags: ["probiotique", "flore intestinale", "tolérance digestive"], stockQuantity: 20 });
+    const result = analyse(amox, [other, levure, probio]);
+    const card = result.recommendations.find((r) => ["probio", "levure", "other"].includes(r.productId));
+    expect(card?.productId).toBe("probio");
+    expect(card?.alternatives?.[0]?.productId).toBe("levure");
+  });
+});
