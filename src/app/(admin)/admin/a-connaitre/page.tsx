@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { requirePlatformSession } from "@/server/auth/platform-session";
-import { autoResolveMedicineGaps, listGaps } from "@/server/services/knowledge-gaps";
+import { autoResolveMedicineGapsOnce, listGaps } from "@/server/services/knowledge-gaps";
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
 import { ADVICE_VOCABULARY } from "@/core/catalog/product-vocabulary";
 import { AdminPageHeader } from "@/components/admin/page-header";
@@ -15,10 +15,9 @@ export const metadata: Metadata = { title: "Produits à connaître" };
  */
 export default async function GapsPage() {
   await requirePlatformSession();
-  // Ce que PharmaBoost sait classer seul ne reste pas dans la liste : le catalogue officiel tout de suite, le modèle juste après
-  // (la page suivante ne montre plus que les vrais doutes).
-  await autoResolveMedicineGaps({ useModel: false }).catch((error) => console.error("[produits à connaître] classement automatique", error));
-  after(() => autoResolveMedicineGaps().then(() => undefined).catch((error) => console.error("[produits à connaître] modèle", error)));
+  // Ce que PharmaBoost sait classer seul sort de la liste, en arrière-plan : la page s'ouvre tout de suite, la suivante ne montre
+  // plus que les vrais doutes.
+  after(() => autoResolveMedicineGapsOnce());
   const { open, recent } = await listGaps();
   const card = (gap: (typeof open)[number]): GapCard => ({ ...gap, answeredAt: gap.answeredAt ? gap.answeredAt.toISOString() : null, createdAt: gap.createdAt.toISOString() });
   return (
