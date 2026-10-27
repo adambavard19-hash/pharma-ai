@@ -1,9 +1,11 @@
 import { rangeKey } from "@/core/counter/same-range";
+import { capShownAdvice } from "./advice-cap";
 import type { PriorityRankings } from "./priority-ranking";
 import {
   ENGINE_VERSION,
   MAX_ALTERNATIVES_PER_ADVICE,
   MAX_RECOMMENDATIONS_PER_PRESCRIPTION,
+  MAX_ADVICE_SHOWN,
   RECOMMENDATION_MIN_RELEVANCE,
   RECOMMENDATION_MIN_SCORE,
 } from "@/config/constants";
@@ -115,6 +117,8 @@ export type PipelineInput = {
   understanding?: TreatmentUnderstanding | null;
   usedSimulatedProviders: boolean;
   maxRecommendations?: number;
+  /** Ce que le comptoir montre au plus, tout compris (MAX_ADVICE_SHOWN, advice-cap.ts). */
+  maxShown?: number;
   /**
    * L'état du stock de l'officine, indépendamment des candidats chargés :
    * `configured` est vrai dès qu'une référence existe, même à zéro. Absent, on
@@ -1105,7 +1109,24 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
           return { output: result, count: result.opportunities.length, notes: result.notes };
         })
       : { recommendations: withoutOverstock, opportunities: [], notes: [] };
-  const allRecommendations = overstockAdvice.recommendations;
+  // ---------------------------------------------------------------- ÉTAPE 10
+  // TROIS CONSEILS AU PLUS au comptoir, tout compris (fondateur, 27 oct. 2026) : surstock, règle n° 1, sécurité, date courte,
+  // challenge, puis la meilleure marge (advice-cap.ts). Les autres ne sont pas montrés ; les alternatives restent.
+  const shownOpportunities = new Map([...opportunities, ...associationAdvice.opportunities, ...overstockAdvice.opportunities].map((opportunity) => [opportunity.key, opportunity]));
+  const maxShown = input.maxShown ?? MAX_ADVICE_SHOWN;
+  const isHiddenTree = (item: ScoredRecommendation) => TREE_RULE_KEYS.has(shownOpportunities.get(item.opportunityKey)?.ruleKey ?? item.opportunityKey);
+  const overCap = overstockAdvice.recommendations.filter((item) => !isHiddenTree(item)).length > maxShown;
+  const capped = !overCap ? { kept: overstockAdvice.recommendations, dropped: [] } : recorder.run("ADVICE_CAP", "Trois conseils au plus", overstockAdvice.recommendations.length, () => {
+    const result = capShownAdvice({
+      recommendations: overstockAdvice.recommendations,
+      max: maxShown,
+      catalogById,
+      isHidden: isHiddenTree,
+      isSafety: (item) => shownOpportunities.get(item.opportunityKey)?.kind === "SAFETY",
+    });
+    return { output: result, count: result.kept.length, notes: result.dropped.map((item) => `« ${item.opportunityKey} » non montré : trois conseils au plus (surstock, règle n° 1, sécurité, date courte, challenge, puis la marge).`) };
+  });
+  const allRecommendations = capped.kept;
 
   // Ce que le stock a répondu à chaque besoin non bloqué : c'est ce qui permet au titulaire de voir les
   // besoins réels que son assortiment ne couvre pas. N'influence aucun conseil.

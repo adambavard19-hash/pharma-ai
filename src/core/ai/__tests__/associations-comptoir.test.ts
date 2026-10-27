@@ -59,16 +59,18 @@ describe("au comptoir, plusieurs associations s'affichent vraiment", () => {
       outcome: result.outcome,
       recommendations: byScore.map((rec) => ({ id: rec.productId, name: name(rec.productId), priceCents: 990, reason: rec.shortReason, status: "PROPOSED", association: rec.source === "ASSOCIATION" })),
     });
-    expect(notice.items).toHaveLength(5);
-    expect(notice.items.slice(3).map((item) => item.name)).toEqual(["Brosse à dents souple", "Mouchoirs doux"]);
+    // Trois cartes au plus, tout compris (fondateur, 27 oct. 2026) : le choix des trois est fait par l'analyse (advice-cap).
+    expect(notice.items).toHaveLength(3);
   });
 
-  it("le total reste raisonnable : neuf cartes au plus, six associations au plus (deux par boîte)", () => {
+  it("trois cartes au plus à la fenêtre du poste, associations comprises (fondateur, 27 oct. 2026)", () => {
     expect(MAX_ASSOCIATION_ADVICE).toBe(6);
-    expect(MAX_COUNTER_CARDS).toBe(MAX_RECOMMENDATIONS_COUNTER_SCAN + MAX_ASSOCIATION_ADVICE);
+    expect(MAX_COUNTER_CARDS).toBe(MAX_RECOMMENDATIONS_COUNTER_SCAN);
     const many = Array.from({ length: 5 }, (_, index) => ({ id: `e${index}`, name: `Conseil ${index}`, priceCents: null, reason: null, status: "PROPOSED" }));
     const assoc = Array.from({ length: 8 }, (_, index) => ({ id: `a${index}`, name: `Association ${index}`, priceCents: null, reason: null, status: "PROPOSED", association: true }));
     const notice = buildCounterNotice({ reference: "ORD-1", prescriptionStatus: "ANALYZED", lineNames: ["X"], alerts: [], outcome: "PROPOSALS", recommendations: [...assoc, ...many] });
-    expect(notice.items.map((item) => item.name)).toEqual(["Conseil 0", "Conseil 1", "Conseil 2", "Association 0", "Association 1", "Association 2", "Association 3", "Association 4", "Association 5"]);
+    expect(notice.items.map((item) => item.name)).toEqual(["Conseil 0", "Conseil 1", "Conseil 2"]);
+    const fewer = buildCounterNotice({ reference: "ORD-1", prescriptionStatus: "ANALYZED", lineNames: ["X"], alerts: [], outcome: "PROPOSALS", recommendations: [...assoc.slice(0, 2), many[0]] });
+    expect(fewer.items.map((item) => item.name)).toEqual(["Conseil 0", "Association 0", "Association 1"]);
   });
 });

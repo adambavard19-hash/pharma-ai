@@ -37,7 +37,7 @@ beforeEach(() => {
 });
 
 describe("la fenêtre du poste et les associations du pharmacien", () => {
-  it("trois conseils du moteur mieux notés, deux associations : les cinq s'affichent, les associations après", async () => {
+  it("trois cartes au plus (fondateur, 27 oct. 2026) : les conseils du moteur d'abord, puis les associations", async () => {
     const [k1, k2, k3] = ADVICE_RULES.filter((rule) => !rule.key.startsWith("association:")).map((rule) => rule.key);
     m.prescription.findFirst.mockResolvedValue({
       reference: "ORD-0042",
@@ -56,7 +56,7 @@ describe("la fenêtre du poste et les associations du pharmacien", () => {
       ],
     });
     const read = await readCounterNotice("ph_1", "rx_1", NOW);
-    expect(read?.notice.items.map((item) => item.name)).toEqual(["Probiotique", "Spray nasal", "Pastilles", "Brosse à dents", "Mouchoirs"]);
+    expect(read?.notice.items.map((item) => item.name)).toEqual(["Probiotique", "Spray nasal", "Pastilles"]);
     expect(m.prescription.findFirst.mock.calls[0][0].where).toEqual({ id: "rx_1", pharmacyId: "ph_1", source: "COUNTER_SCAN" });
   });
 });

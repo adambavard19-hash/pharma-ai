@@ -1,4 +1,5 @@
-import { MAX_RECOMMENDATIONS_PER_PRESCRIPTION } from "@/config/constants";
+import { MAX_ADVICE_SHOWN, MAX_RECOMMENDATIONS_PER_PRESCRIPTION } from "@/config/constants";
+import { TREE_RULE_KEYS } from "@/core/counter/question-tree";
 import { PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
 import { ADVICE_VOCABULARY, normalizeProductText } from "@/core/catalog/product-vocabulary";
 import { REIMBURSABLE_DRUG_VAT } from "@/core/catalog/margin";
@@ -532,13 +533,15 @@ export function robotRule(drug: RobotDrug, item: RobotItem, product: CatalogProd
   };
 }
 
-/** Combien de suggestions du robot la vente peut encore recevoir : une seule s'il y a déjà d'autres conseils, deux sinon, jamais au-delà du plafond. */
+/** Combien de suggestions du robot la vente peut encore recevoir : une seule s'il y a déjà d'autres conseils, deux sinon, jamais au-delà des trois conseils montrés. */
 export function robotSlots(result: Pick<AnalysisResult, "recommendations" | "opportunities">, maxRecommendations: number = MAX_RECOMMENDATIONS_PER_PRESCRIPTION): number {
   const ruleKeyOf = new Map(result.opportunities.map((opportunity) => [opportunity.key, opportunity.ruleKey]));
   const robot = result.recommendations.filter((item) => isRobotRuleKey(ruleKeyOf.get(item.opportunityKey))).length;
   const others = result.recommendations.length - robot;
   const engine = result.recommendations.filter((item) => item.source === undefined).length;
-  return Math.max(0, Math.min((others > 0 ? 1 : ROBOT_MAX_ITEMS) - robot, maxRecommendations - engine));
+  // Trois conseils au plus au comptoir, tout compris (MAX_ADVICE_SHOWN) : le robot ne dépasse jamais ce plafond.
+  const shown = result.recommendations.filter((item) => !TREE_RULE_KEYS.has(ruleKeyOf.get(item.opportunityKey) ?? item.opportunityKey)).length;
+  return Math.max(0, Math.min((others > 0 ? 1 : ROBOT_MAX_ITEMS) - robot, maxRecommendations - engine, MAX_ADVICE_SHOWN - shown));
 }
 
 export type RobotMerge = {

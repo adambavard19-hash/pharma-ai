@@ -177,7 +177,7 @@ const MAX_ADVICE = 3;
  * du moteur. Neuf cartes au plus, que l'île fait défiler, rangées par boîte scannée.
  */
 const MAX_ASSOCIATION_CARDS = 6;
-export const MAX_COUNTER_CARDS = MAX_ADVICE + MAX_ASSOCIATION_CARDS;
+export const MAX_COUNTER_CARDS = MAX_ADVICE;
 /** Un conseil reste sous les yeux du pharmacien après sa réponse : « Vendu » et « Non vendu » le marquent, ils ne le font pas disparaître. */
 const SHOWN_STATUSES = new Set(["PROPOSED", "ACCEPTED", "MODIFIED", "PURCHASED", "DECLINED"]);
 
@@ -244,11 +244,12 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
       seenProducts.add(key);
       return true;
     });
-  // Deux files, deux plafonds : les conseils du moteur d'abord (la priorité clinique), puis les associations du pharmacien.
+  // Trois cartes au plus, tout compris (fondateur, 27 oct. 2026) : l'analyse a déjà choisi les trois (core/ai/advice-cap.ts) ;
+  // les conseils du moteur d'abord, puis les associations du pharmacien, sans jamais dépasser trois.
   const shown = [
     ...shownable.filter((rec) => !rec.association).slice(0, MAX_ADVICE),
     ...shownable.filter((rec) => rec.association).slice(0, MAX_ASSOCIATION_CARDS),
-  ];
+  ].slice(0, MAX_ADVICE);
   // Le prix ne s'affiche que si le stock est fiable : les deux viennent du même export du logiciel de gestion.
   const items: NoticeItem[] = shown.map((rec) => ({
     id: rec.id ?? null,

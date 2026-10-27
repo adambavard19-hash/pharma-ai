@@ -422,6 +422,8 @@ export type ScoredRecommendation = {
    * `OVERSTOCK` : un produit de la campagne de surstock de l'officine (engines/overstock.ts).
    */
   source?: "ASSOCIATION" | "OVERSTOCK";
+  /** Le produit est en campagne de surstock de la pharmacie, y compris quand PharmaBoost le conseillait déjà (sa source reste alors celle du moteur). */
+  overstock?: boolean;
   totalScore: number;
   breakdown: ScoreBreakdown;
   /** Explication technique destinée au pharmacien. */
@@ -530,7 +532,8 @@ export type PipelineStageName =
   | "SCORING"
   | "COMMERCIAL_OPTIMIZATION"
   | "PRODUCT_ASSOCIATIONS"
-  | "OVERSTOCK_CAMPAIGNS";
+  | "OVERSTOCK_CAMPAIGNS"
+  | "ADVICE_CAP";
 
 export type PipelineStageTrace = {
   stage: PipelineStageName;
