@@ -55,6 +55,7 @@ import { loadAssociationInput } from "./product-associations";
 import { loadOverstockInput } from "./overstock";
 import { prefetchLeafletsForRun } from "./product-leaflets";
 import { loadCentralAdvice } from "./central-advice";
+import { loadPriorityRankings } from "./advice-priorities";
 import { withRobotSuggestions } from "./robot-suggestions";
 
 /**
@@ -401,7 +402,7 @@ export async function analysePrescription(params: {
   );
   // Le centre de contrôle de PharmaBoost, commun à toutes les officines : les règles supprimées ne se déclenchent nulle
   // part, les conseils ajoutés depuis la console s'ajoutent à ceux du code.
-  const central = await loadCentralAdvice();
+  const [central, priorityRankings] = await Promise.all([loadCentralAdvice(), loadPriorityRankings()]);
   // Signaux issus de l'extraction, reconstruits depuis les champs persistés.
   const extractionFindings = evaluateExtractionSafety(
     prescription.lines.map((line) => rebuildExtractedLine(line)),
@@ -444,6 +445,7 @@ export async function analysePrescription(params: {
     associations,
     disabledRuleKeys: central.removed,
     customRules: central.custom,
+    priorityRankings,
     // La compréhension a manqué si aucun modèle n'est branché, ou si l'appel a
     // échoué : le moteur a tourné sur les seules règles, et l'issue le dira.
     aiUnavailable:

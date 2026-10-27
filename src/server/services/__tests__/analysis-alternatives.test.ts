@@ -63,6 +63,7 @@ vi.mock("../product-associations", () => ({ loadAssociationInput: async () => un
 vi.mock("../overstock", () => ({ loadOverstockInput: async () => undefined }));
 // La relecture des règles a ses propres tests : ici, la pharmacienne n'en a refusé aucune.
 vi.mock("../central-advice", () => ({ loadCentralAdvice: async () => ({ removed: [], custom: [] }) }));
+vi.mock("../advice-priorities", () => ({ loadPriorityRankings: async () => ({}) }));
 vi.mock("../classification", () => ({
   ensureClassifications: async () => ({ drugs: [], providerId: "test", model: "m", warnings: [], usage: null, cachedCount: 0, durationMs: 0 }),
 }));

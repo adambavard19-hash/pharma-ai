@@ -182,6 +182,7 @@ export type AuditAction =
   | "counter_window.patient_report_sent"
   | "counter_window.monthly_report_sent"
   | "central_advice.rule_decided"
+  | "central_advice.priorities_saved"
   | "central_advice.rule_created"
   | "central_advice.family_created"
   | "central_advice.family_edited"
