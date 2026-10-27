@@ -1,4 +1,5 @@
 import type { PopulationVigilanceRule } from "./population-vigilance";
+import { applyPriorityRankings, type PriorityRankings } from "../priority-ranking";
 import { SKIN_SERIES_2_ADVICE_RULES } from "./conseil-peau-serie-2";
 import { SKIN_SERIES_3_ADVICE_RULES } from "./conseil-peau-serie-3";
 import { SKIN_SERIES_4_ADVICE_RULES } from "./conseil-peau-serie-4";
@@ -2209,8 +2210,10 @@ export function detectAdviceOpportunities(params: {
    * code MODIFIÉE (même clé) remplace la règle d'origine, garde-fous du code compris (central-advice-edit.ts).
    */
   extraRules?: AdviceRule[];
+  /** L'ordre des conseils choisi par famille de médicaments dans la console (priority-ranking.ts). */
+  priorityRankings?: PriorityRankings;
 }): AdviceOpportunityResult[] {
-  const { drugs, patient, needs = [], disabledRuleKeys, extraRules = [] } = params;
+  const { drugs, patient, needs = [], disabledRuleKeys, extraRules = [], priorityRankings = {} } = params;
   const byKey = new Map<string, AdviceOpportunityResult>();
   const edited = new Map(extraRules.map((rule) => [rule.key, rule]));
   const codeKeys = new Set(ADVICE_RULES.map((rule) => rule.key));
@@ -2418,5 +2421,6 @@ export function detectAdviceOpportunities(params: {
     });
   }
 
-  return [...byKey.values()].sort((a, b) => b.priority - a.priority);
+  const sorted = [...byKey.values()].sort((a, b) => b.priority - a.priority);
+  return applyPriorityRankings(sorted, drugs.map((drug) => ({ lineIndex: drug.lineIndex, atcCode: drug.knowledge?.atcCode ?? null })), priorityRankings);
 }

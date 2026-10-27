@@ -1,4 +1,5 @@
 import { rangeKey } from "@/core/counter/same-range";
+import type { PriorityRankings } from "./priority-ranking";
 import {
   ENGINE_VERSION,
   MAX_ALTERNATIVES_PER_ADVICE,
@@ -137,6 +138,8 @@ export type PipelineInput = {
   overstock?: OverstockInput;
   /** Les règles de conseil supprimées par l'équipe PharmaBoost, pour toutes les officines : elles ne se déclenchent pas (central-advice.ts). */
   disabledRuleKeys?: string[];
+  /** L'ordre des conseils par famille de médicaments, choisi dans la console (priority-ranking.ts). */
+  priorityRankings?: PriorityRankings;
   /** Les conseils ajoutés depuis la console de PharmaBoost : ils s'ajoutent aux règles du code. */
   customRules?: AdviceRule[];
 };
@@ -368,6 +371,7 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         needs: input.understanding?.needs ?? [],
         disabledRuleKeys: input.disabledRuleKeys && input.disabledRuleKeys.length > 0 ? new Set(input.disabledRuleKeys) : undefined,
         extraRules: input.customRules,
+        priorityRankings: input.priorityRankings,
       });
       const refused = input.disabledRuleKeys?.length ?? 0;
       return {

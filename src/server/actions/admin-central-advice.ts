@@ -6,6 +6,7 @@ import { requirePlatformSession } from "@/server/auth/platform-session";
 import { addCentralAssociation, addCustomRule, decideCentralAssociation, decideRule, editCentralAssociation, editRule, revertCentralAssociation, revertRule } from "@/server/services/central-advice";
 import { previewMedicineAdvice, resolveMedicineSearch, type AdvicePreview, type MedicineSearch } from "@/server/services/advice-hub";
 import { createTriggerFamily, previewFamilyTerms, setTriggerFamilyMember, setTriggerFamilyRemoved, updateTriggerFamily, type FamilyProduct } from "@/server/services/trigger-families";
+import { saveFamilyRanking } from "@/server/services/advice-priorities";
 import { fail, ok, type ActionResult } from "./types";
 
 /**
@@ -185,4 +186,14 @@ export async function setTriggerFamilyRemovedAction(payload: { id: string; remov
   if (!result.ok) return fail(result.error);
   revalidatePath("/admin/conseils");
   return ok(null, parsed.data.removed ? `« ${result.name} » est supprimée : ses associations ne se déclenchent plus.` : `« ${result.name} » est rétablie.`);
+}
+
+export async function saveAdvicePrioritiesAction(payload: { code: string; ruleKeys: string[] }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const parsed = z.object({ code: z.string().trim().min(1).max(10), ruleKeys: z.array(z.string().min(1).max(120)).max(50) }).safeParse(payload);
+  if (!parsed.success) return fail("Classement invalide.");
+  const result = await saveFamilyRanking({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.code, parsed.data.ruleKeys);
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/conseils/priorites");
+  return ok(null, parsed.data.ruleKeys.length === 0 ? `${result.label} : retour à l'ordre de PharmaBoost.` : `${result.label} : votre ordre est enregistré, pour toutes les pharmacies, dès la prochaine vente.`);
 }
