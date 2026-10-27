@@ -177,3 +177,14 @@ export async function autoResolveMedicineGaps(options: { useModel?: boolean; lim
   result.left = result.open - result.official - result.model;
   return result;
 }
+
+let running: Promise<void> | null = null;
+
+/** Un seul classement automatique à la fois par serveur : ouvrir l'écran dix fois n'en lance qu'un. */
+export function autoResolveMedicineGapsOnce(): Promise<void> {
+  running ??= autoResolveMedicineGaps()
+    .then(() => undefined)
+    .catch((error) => console.error("[produits à connaître] classement automatique", error))
+    .finally(() => { running = null; });
+  return running;
+}
