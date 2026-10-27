@@ -102,6 +102,12 @@ export type AdviceRule = {
    */
   excludeAtcPrefixes?: string[];
   /**
+   * La règle parle d'un traitement par voie générale (flore intestinale ou vaginale, convalescence) : un médicament local —
+   * crème, pommade, collyre, gouttes auriculaires, ovule — ne l'ouvre jamais (fondateur, 26 oct. 2026 : la mupirocine crème
+   * proposait des probiotiques). Voir `isLocalDrug`.
+   */
+  systemicOnly?: boolean;
+  /**
    * Les règles dont ce conseil n'est que le REPLI : il s'efface dès que l'une d'elles a retenu une référence pour la même
    * vente (pipeline, étape 7). Sans elle — rien en rayon, règle bloquée pour ce patient, supprimée depuis la console —, le
    * repli reste proposé : c'est sa raison d'être. Le lavage oculaire ne s'affiche pas à côté du collyre anti-allergique ; il
@@ -439,14 +445,19 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     version: "1.0",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_ONLY",
+    systemicOnly: true,
     needTriggers: ["ANTIBIOTIC_DIGESTIVE_TOLERANCE"],
     category: "PROBIOTIQUES",
     atcPrefixes: ["J01"],
     therapeuticClasses: ["Antibiotique", "Antibactérien"],
     sideEffectTriggers: ["diarrhée", "troubles digestifs"],
-    basePriority: 72,
+    // LA règle prioritaire sous antibiotique (fondateur, 26 oct. 2026) : devant tous les autres conseils, photoprotection de
+    // la doxycycline comprise. Seule une campagne de surstock passe avant elle.
+    basePriority: 90,
     matchingTags: ["probiotique", "flore intestinale", "tolérance digestive"],
     excludeTags: ["immunodépression"],
+    // Les références du fondateur sous antibiotique (26 oct. 2026) : Lactibiane ATB puis Ultra-Levure, avant les autres.
+    productPrefer: [String.raw`lactibiane\W*atb`, String.raw`ultra\W*levure`],
     shortReasonTemplate:
       "Antibiothérapie ({drug}) : la flore intestinale peut être perturbée pendant la cure.",
     rationaleTemplate:
@@ -1410,6 +1421,42 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     clinicalContext: "Prévention de l'auto-inoculation et de la transmission (Cespharm — herpès et zona).",
     safetyNotes: [],
   },
+  // Antibiotique local (mupirocine, acide fusidique) : nettoyer la lésion au savon doux ou antiseptique, jamais un probiotique
+  // ni un pansement d'office (fondateur, 26 oct. 2026).
+  {
+    key: "topical-antibiotic-gentle-wash",
+    namesDrugClass: true,
+    title: "Nettoyage de la lésion sous antibiotique local",
+    kind: "TOLERANCE",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "DERMOCOSMETIQUE",
+    atcPrefixes: ["D06A"],
+    therapeuticClasses: ["Antibiotique local", "Antibiotique à usage topique"],
+    sideEffectTriggers: [],
+    basePriority: 70,
+    matchingTags: ["nettoyant", "lavant", "surgras", "sans savon", "savon antiseptique"],
+    excludeTags: ["parfum"],
+    productPrefer: [String.raw`surgras`, String.raw`pain dermatologique`, String.raw`syndet`, String.raw`sans savon`, String.raw`antisept`],
+    // Un savon doux ou un savon antiseptique (fondateur, 26 oct. 2026), rien d'autre : la catégorie seule couvrirait toute la dermocosmétique.
+    productExclude: [String.raw`^(?!.*(surgras|pain derm|syndet|sans savon|gel lavant|creme lavante|crème lavante|huile lavante|savon|antisept.*(moussant|lavant|savon)|(moussant|lavant|savon).*antisept))`, String.raw`intime`, String.raw`shampo`, String.raw`gommage`, String.raw`exfoli`, String.raw`purifiant`, String.raw`anti.?imperfection`, String.raw`demaquill`],
+    benefits: ["Nettoyer avant chaque application", "Savon doux ou antiseptique", "Sécher en tamponnant"],
+    shortReasonTemplate:
+      "Antibiotique local ({drug}) : la lésion se nettoie à l'eau et au savon, doux ou antiseptique, avant chaque application.",
+    rationaleTemplate:
+      "{drug} s'applique sur une peau propre et sèche. Pour une infection cutanée superficielle comme l'impétigo, la HAS recommande une toilette quotidienne à l'eau et au savon avant le soin local.",
+    counterScriptTemplate:
+      "« Avant de mettre {drug}, lavez la zone avec {product} et de l'eau, puis séchez en tamponnant : la crème s'applique sur une peau propre. »",
+    patientReasonTemplate:
+      "Avant chaque application de {drug}, lavez la zone avec {product} et de l'eau, puis séchez en tamponnant.",
+    clinicalContext:
+      "Infections cutanées bactériennes superficielles (impétigo) : soins de toilette à l'eau et au savon (HAS, infections cutanées bactériennes courantes, 2019 ; RCP mupirocine et acide fusidique, BDPM).",
+    safetyNotes: [
+      "Lésions étendues, fièvre ou aggravation après quelques jours : avis médical.",
+      "Lavage des mains après chaque application ; linge et serviettes à ne pas partager.",
+    ],
+  },
   {
     key: "opioid-transit",
     namesDrugClass: true,
@@ -1594,6 +1641,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     version: "1.0",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_ONLY",
+    systemicOnly: true,
     question: "Le patient se sent-il fatigué par cette infection ?",
     confirmedReasonTemplate: "Infection traitée ({drug}) et fatigue confirmée : une cure de vitamines accompagne la convalescence.",
     category: "VITAMINES",
@@ -1694,6 +1742,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     version: "1.0",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_ONLY",
+    systemicOnly: true,
     question: "La patiente est-elle sujette aux mycoses ou aux irritations intimes après un antibiotique ?",
     confirmedReasonTemplate: "Antibiothérapie ({drug}) chez une patiente sujette aux mycoses : préserver la flore vaginale se prépare dès la cure.",
     category: "HYGIENE",
@@ -2044,6 +2093,18 @@ export function acceptsProductForRule(ruleKey: string, product: Pick<CatalogProd
 
 const norm = (value: string) => value.toLowerCase().trim();
 
+/** Les familles ATC d'usage local : peau, œil, oreille, voie vaginale, bouche, nez, gorge. */
+const LOCAL_ATC_PREFIXES = ["D", "S01", "S02", "S03", "G01", "A01", "R01", "R02"];
+/** Ce que porte le nom d'une forme locale quand le code ATC manque (classification sans code). */
+const LOCAL_FORM = /\b(cr[eè]me|pommade|gel|collyre|auriculaire|ovule|nasal|lotion|cutan[ée]e?|topique|bain de bouche|gingival)\b/i;
+
+/** Un médicament appliqué sur place : il n'agit pas sur la flore intestinale ou vaginale. */
+function isLocalDrug(drug: { drugName: string; officialName?: string | null; knowledge?: { atcCode?: string | null; form?: string | null } | null }): boolean {
+  const atc = drug.knowledge?.atcCode ?? "";
+  if (atc) return LOCAL_ATC_PREFIXES.some((prefix) => atc.startsWith(prefix));
+  return LOCAL_FORM.test(`${drug.drugName} ${drug.officialName ?? ""} ${drug.knowledge?.form ?? ""}`);
+}
+
 /**
  * La classe d'un médicament (écrite par le catalogue ou par le modèle) contient-elle ce terme — et non sa négation ?
  * « Antalgique antipyrétique non opioïde » nomme un opioïde dans le texte, mais dit le contraire : le Doliprane ne doit
@@ -2184,6 +2245,7 @@ export function detectAdviceOpportunities(params: {
       const atc = knowledge.atcCode ?? "";
       // Une règle plus précise s'en charge (voir `excludeAtcPrefixes`).
       if (rule.excludeAtcPrefixes?.some((prefix) => atc.startsWith(prefix))) continue;
+      if (rule.systemicOnly && isLocalDrug(drug)) continue;
       const therapeuticClass = norm(knowledge.therapeuticClass ?? "");
       const sideEffects = knowledge.commonSideEffects.map(norm);
 
@@ -2244,6 +2306,7 @@ export function detectAdviceOpportunities(params: {
         (drug) =>
           !isTooShortForRule(rule, drug.knowledge?.atcCode ?? "", drug.durationDays) &&
           !rule.excludeAtcPrefixes?.some((prefix) => (drug.knowledge?.atcCode ?? "").startsWith(prefix)) &&
+          !(rule.systemicOnly && isLocalDrug(drug)) &&
           // Le texte nomme la classe : un médicament dont la classe est connue et n'est pas la sienne n'y entre jamais.
           !(rule.namesDrugClass && drug.knowledge?.atcCode && !rule.atcPrefixes.some((prefix) => drug.knowledge!.atcCode!.startsWith(prefix))) &&
           !silenced(rule, drug.lineIndex),
