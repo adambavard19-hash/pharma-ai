@@ -82,9 +82,9 @@ export const MAX_RECOMMENDATIONS_PER_PRESCRIPTION = 8;
  * Une vente de la douchette : trois conseils au plus, ceux que le pharmacien voit dans la fenêtre du poste. Les chiffres du classement
  * de l'équipe (« proposés ») comptent ce qui lui a été montré, pas des conseils gardés en réserve qu'il n'a jamais lus.
  *
- * Les associations écrites par le pharmacien (« Mes associations ») ne comptent pas dans ces trois : le moteur d'associations
- * en ajoute jusqu'à trois de plus (`MAX_ASSOCIATION_ADVICE`), et la fenêtre du poste leur garde leurs propres places
- * (core/counter/notice.ts) — six cartes au plus. Un conseil du moteur n'évince jamais une association du pharmacien.
+ * Depuis le 27 oct. 2026 (fondateur), associations, surstock et robot COMPRIS : le moteur retient jusqu'à
+ * `MAX_RECOMMENDATIONS_PER_PRESCRIPTION` conseils, puis les trois montrés sont choisis à la fin (`MAX_ADVICE_SHOWN`,
+ * core/ai/advice-cap.ts) — surstock, règle n° 1, sécurité, date courte, challenge, puis la marge.
  */
 export const MAX_RECOMMENDATIONS_COUNTER_SCAN = 3;
 
@@ -106,3 +106,10 @@ export const LOCALE = "fr-FR";
  * le navigateur — sinon les deux divergent et React refait la page au chargement.
  */
 export const TIME_ZONE = "Europe/Paris";
+
+/**
+ * Ce que le comptoir montre, tout compris (règles, associations, surstock, robot) : trois conseils au plus, chacun avec ses
+ * alternatives (fondateur, 27 oct. 2026). Le moteur en retient jusqu'à `MAX_RECOMMENDATIONS_PER_PRESCRIPTION` ; le choix des
+ * trois se fait à la fin (core/ai/advice-cap.ts) : surstock, règle n° 1, sécurité, date courte, challenge, puis la marge.
+ */
+export const MAX_ADVICE_SHOWN = 3;

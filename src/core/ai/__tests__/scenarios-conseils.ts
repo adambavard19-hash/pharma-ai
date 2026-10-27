@@ -56,6 +56,8 @@ export function analyse(
     extractionFindings: [],
     understanding: understandingFor(treatments, who),
     usedSimulatedProviders: false,
+    // Ces scénarios portent sur ce que le MOTEUR retient ; les trois conseils montrés au comptoir ont leurs tests (advice-cap).
+    maxShown: 1000,
     ...options,
   });
 }

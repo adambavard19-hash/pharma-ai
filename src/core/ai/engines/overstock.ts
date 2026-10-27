@@ -129,7 +129,7 @@ export function applyOverstockCampaigns(args: {
     if (existing) {
       // Déjà conseillé par PharmaBoost : il passe en tête, avec les produits qu'il remplace en repli.
       rest = rest.filter((rec) => rec !== existing);
-      promoted.push({ ...existing, alternatives: [...keptAlternatives, ...(existing.alternatives ?? [])].slice(0, 3) });
+      promoted.push({ ...existing, overstock: true, alternatives: [...keptAlternatives, ...(existing.alternatives ?? [])].slice(0, 3) });
       continue;
     }
 
@@ -177,6 +177,7 @@ export function applyOverstockCampaigns(args: {
       opportunityKey: key,
       productId: product.id,
       source: "OVERSTOCK",
+      overstock: true,
       totalScore: 1,
       breakdown: { relevance: 1, safety: 1, availability: 1, patientFit: 1, pharmacistPreference: 1, validationHistory: 0, commercial: 0 },
       justification: `Campagne de surstock de votre officine : « ${product.name} » passe en premier ${why}. Mêmes contrôles que tout conseil : stock, prescription, sécurité du patient.`,

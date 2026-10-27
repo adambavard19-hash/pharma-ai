@@ -1,7 +1,6 @@
 import "server-only";
 import { prisma } from "@/server/db/client";
 import { PRODUCT_CATEGORY_LABELS } from "@/config/catalog";
-import { MAX_RECOMMENDATIONS_COUNTER_SCAN } from "@/config/constants";
 import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { runAnalysisPipeline } from "@/core/ai/pipeline";
 import { classifiedDrugKnowledge } from "@/core/ai/classified-knowledge";
@@ -221,7 +220,6 @@ export async function previewMedicineAdvice(pharmacyId: string, specialtyId: str
   const classification = { lineIndex: 0, substance, atcCode: official.atcCode, therapeuticClass: official.therapeuticClass, commonSideEffects: [], confidence: 1, source: "OFFICIAL" as const };
   const understanding = deriveUnderstanding({ drugs: [classification], patient: { ageYears: null, sex: "UNSPECIFIED", isPregnant: null, isBreastfeeding: null }, providerId: "console-preview", model: "aucun" });
   const result = runAnalysisPipeline({
-    maxRecommendations: MAX_RECOMMENDATIONS_COUNTER_SCAN,
     lines: [{ lineIndex: 0, drugName: name, posology: null, durationDays: null, confirmed: true }],
     knowledge: new Map([[key, classifiedDrugKnowledge({ key, drugName: name, form: specialty.pharmaceuticalForm, classification, publishedSubstance: substance, model: "aucun" })]]),
     patient: PREVIEW_PATIENT,
