@@ -102,7 +102,7 @@ export async function runStockLearningPass(options: { deadlineAt: number; pharma
     }
   }
   // Ce qui reste dans « Produits à connaître » et que le catalogue officiel ou le modèle savent classer en sort (27 oct. 2026).
-  if (!options.pharmacyId && Date.now() < options.deadlineAt) await autoResolveMedicineGaps().catch((error) => console.error("[stock-learning] classement automatique", error));
+  if (!options.pharmacyId && Date.now() < options.deadlineAt) await autoResolveMedicineGaps({ deadlineAt: options.deadlineAt }).catch((error) => console.error("[stock-learning] classement automatique", error));
   return pass;
 }
 
