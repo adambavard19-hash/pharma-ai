@@ -123,6 +123,7 @@ export async function dismissGap(admin: Admin, id: string): Promise<{ ok: true; 
 
 const AUTO_NAME = "PharmaBoost (classement automatique)";
 const MODEL_BATCH = 25;
+const AUTO_BUDGET_MS = 200_000;
 
 export type AutoResolution = { open: number; official: number; model: number; left: number };
 
@@ -133,7 +134,9 @@ export type AutoResolution = { open: number; official: number; model: number; le
  * Chaque médicament classé entre dans la mémoire commune et sort de la liste ; il ne reste à la pharmacienne que les vrais doutes.
  * Une réponse déjà confirmée par la pharmacienne n'est jamais remplacée.
  */
-export async function autoResolveMedicineGaps(options: { useModel?: boolean; limit?: number } = {}): Promise<AutoResolution> {
+export async function autoResolveMedicineGaps(options: { useModel?: boolean; limit?: number; deadlineAt?: number } = {}): Promise<AutoResolution> {
+  // On s'arrête avant la limite du serveur : le passage suivant reprend la suite, rien n'est perdu.
+  const deadlineAt = options.deadlineAt ?? Date.now() + AUTO_BUDGET_MS;
   const gaps = await prisma.knowledgeGap.findMany({ where: { status: "OPEN", kind: "MEDICINE" }, orderBy: { occurrences: "desc" }, take: options.limit ?? 500, select: { id: true, key: true, label: true } });
   const result: AutoResolution = { open: gaps.length, official: 0, model: 0, left: 0 };
   if (gaps.length === 0) return result;
@@ -154,6 +157,7 @@ export async function autoResolveMedicineGaps(options: { useModel?: boolean; lim
 
   const leftovers: typeof gaps = [];
   for (const gap of gaps) {
+    if (Date.now() >= deadlineAt) break;
     const family = await officialFamilyByName(gap.label).catch(() => null);
     if (!family) { leftovers.push(gap); continue; }
     if (await settle(gap, { substance: family.substance, atcCode: family.atcCode, therapeuticClass: family.therapeuticClass, confidence: 1, source: "official" })) result.official += 1;
@@ -162,6 +166,7 @@ export async function autoResolveMedicineGaps(options: { useModel?: boolean; lim
   if (options.useModel !== false && leftovers.length > 0) {
     const provider = getAIProvider({ demo: false });
     for (let i = 0; i < leftovers.length; i += MODEL_BATCH) {
+      if (Date.now() >= deadlineAt - 30_000) break;
       const batch = leftovers.slice(i, i + MODEL_BATCH);
       const substances = await Promise.all(batch.map((gap) => officialSubstancesByName(gap.label).catch(() => [] as string[])));
       const lines: UnderstandingLine[] = batch.map((gap, index) => ({ lineIndex: index, drugName: gap.label, dosage: null, form: null, posology: null, durationDays: null, officialName: null, officialSubstances: substances[index], officialCisCode: null }));
