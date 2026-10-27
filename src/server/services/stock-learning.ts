@@ -4,6 +4,7 @@ import type { TenantScope } from "@/server/db/tenant";
 import type { UnderstandingLine } from "@/core/understanding";
 import { classifyPharmacyProducts, type ClassificationRunSummary } from "@/server/services/product-classification";
 import { classificationKey, ensureClassifications } from "@/server/services/classification";
+import { autoResolveMedicineGaps } from "@/server/services/knowledge-gaps";
 
 /**
  * « Connaître le stock par cœur » : dès qu'une pharmacie envoie son stock, et chaque nuit pour ce qui reste, PharmaBoost range chaque
@@ -100,6 +101,8 @@ export async function runStockLearningPass(options: { deadlineAt: number; pharma
       pass.skipped += 1;
     }
   }
+  // Ce qui reste dans « Produits à connaître » et que le catalogue officiel ou le modèle savent classer en sort (27 oct. 2026).
+  if (!options.pharmacyId && Date.now() < options.deadlineAt) await autoResolveMedicineGaps().catch((error) => console.error("[stock-learning] classement automatique", error));
   return pass;
 }
 
