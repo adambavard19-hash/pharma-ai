@@ -81,7 +81,10 @@ function Moment({ n, title, text, chips, children }: { n: number; title: string;
         <div className="pointer-events-none absolute inset-0 opacity-40" aria-hidden="true">
           <HelixBackdrop position="contained" framing="app" lazy />
         </div>
-        <div className="relative flex flex-col items-center gap-2 [&_section]:max-w-full">{children}</div>
+        <div className="relative flex flex-col items-center gap-2 [&_section]:max-w-full">
+          {children}
+          <p className="mt-1 text-[11px] font-semibold tracking-[0.12em] text-text-tertiary uppercase">Exemple d&apos;écran</p>
+        </div>
       </div>
     </div>
   );
