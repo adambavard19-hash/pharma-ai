@@ -38,6 +38,7 @@ import { declaredContraindicationFor, suggestionVigilances } from "./engines/pop
 import { buildAssociationAdvice, type AssociationInput } from "./engines/associations";
 import { applyOverstockCampaigns, type OverstockInput } from "./engines/overstock";
 import { rangeRankFor, type PreferredRangeInput } from "../catalog/preferred-ranges";
+import { productMatchesBrand } from "../catalog/brand";
 import type {
   AnalysisResult,
   CatalogProduct,
@@ -679,7 +680,8 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       const routineGroups = new Map<string, string[]>();
       for (const key of byOpportunity.keys()) {
         const routine = opportunityByKey.get(key)?.routine;
-        if (routine) routineGroups.set(routine.key, [...(routineGroups.get(routine.key) ?? []), key]);
+        // Une routine de la console a une gamme par étape : on ne lui cherche pas de gamme commune.
+        if (routine && !routine.perStepBrands) routineGroups.set(routine.key, [...(routineGroups.get(routine.key) ?? []), key]);
       }
       const routineBrand = new Map<string, string>();
       for (const [routineKey, keys] of routineGroups) {
@@ -712,6 +714,27 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
       const tiebreakContextFor = (key: string): TiebreakContext => {
         const preferPatterns = opportunityByKey.get(key)?.productPrefer ?? [];
         const opportunityCategory = opportunityByKey.get(key)?.category ?? null;
+        const step = opportunityByKey.get(key)?.routine;
+        // L'étape d'une routine de la console (fondateur, 28 oct. 2026) : d'abord une gamme prioritaire du titulaire, puis le produit
+        // choisi dans la console, puis sa gamme ; ensuite le départage habituel (date courte, challenge, marge).
+        if (step?.perStepBrands) {
+          return {
+            formulaRank: (item) => {
+              const product = catalogById.get(item.productId);
+              if (!product) return 3;
+              if (rangeRankFor(product, opportunityCategory, input.preferredRanges ?? []) !== null) return 0;
+              if (step.ean && product.ean === step.ean) return 1;
+              if (step.brand && productMatchesBrand(product, step.brand)) return 2;
+              return 3;
+            },
+            rangeRank: (item) => {
+              const product = catalogById.get(item.productId);
+              return product ? rangeRankFor(product, opportunityCategory, input.preferredRanges ?? []) : null;
+            },
+            shortDate: (item) => catalogById.get(item.productId)?.shortDate ?? null,
+            hasChallenge: (item) => Boolean(catalogById.get(item.productId)?.activeChallenge),
+          };
+        }
         return {
           // L'ordre des formules préférées par la règle : le premier motif qui
           // reconnaît la référence l'emporte (« écran » avant « acide

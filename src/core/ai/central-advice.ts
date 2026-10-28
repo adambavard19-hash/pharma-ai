@@ -4,6 +4,7 @@ import { NO_EXCLUSIONS, type RuleEditValues, type RuleExclusions } from "./centr
 import type { ProductCategoryCode } from "./types";
 import { PRODUCT_CATEGORIES } from "@/config/catalog";
 import { ADVICE_VOCABULARY } from "@/core/catalog/product-vocabulary";
+import { brandKey } from "@/core/catalog/brand";
 import {
   CENTRAL_SENTENCE_MAX,
   CUSTOM_KINDS,
@@ -92,7 +93,43 @@ export type CustomRuleDefinition = {
   preferWords?: string[];
   exclusions?: RuleExclusions;
   priority?: number;
+  /** Le thème sous lequel la console range le conseil (« Acné », « Allergie »…). */
+  theme?: string | null;
+  /** Les médicaments choisis dans la console pour déclencher le conseil (leurs codes ATC sont dans `atcPrefixes`) : pour l'affichage. */
+  medicines?: string[];
+  /** Une routine en plusieurs étapes, une gamme par étape (fondateur, 28 oct. 2026). Absente : un conseil d'un seul produit. */
+  routine?: { steps: CustomRoutineStep[] };
 };
+
+/**
+ * Une étape d'une routine de la console : son nom (« Nettoyer »), le type de produit (catégorie et étiquettes, prises sur le
+ * produit de référence choisi) et la gamme voulue (« cerave »), avec son produit de référence. Chaque pharmacie prend le
+ * produit de son stock : une gamme prioritaire du titulaire d'abord, puis le produit et la gamme choisis ici.
+ */
+export type CustomRoutineStep = { label: string; category: ProductCategoryCode; tags: string[]; brand: string | null; ean: string | null; productName: string | null };
+
+export const ROUTINE_LIMITS = { steps: { min: 2, max: 5 }, label: 30, theme: 40 } as const;
+
+function parseRoutine(raw: unknown): { ok: true; value: { steps: CustomRoutineStep[] } } | { ok: false; error: string } {
+  const list = Array.isArray((raw as { steps?: unknown } | null)?.steps) ? ((raw as { steps: unknown[] }).steps) : [];
+  if (list.length < ROUTINE_LIMITS.steps.min || list.length > ROUTINE_LIMITS.steps.max) return { ok: false, error: `Une routine compte de ${ROUTINE_LIMITS.steps.min} à ${ROUTINE_LIMITS.steps.max} étapes.` };
+  const steps: CustomRoutineStep[] = [];
+  for (const [index, item] of list.entries()) {
+    const input = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+    const label = clean(input.label);
+    if (label.length < 2 || label.length > ROUTINE_LIMITS.label) return { ok: false, error: `Étape ${index + 1} : donnez-lui un nom court (« Nettoyer », « Hydrater »…).` };
+    const category = clean(input.category) as ProductCategoryCode;
+    if (!PRODUCT_CATEGORIES.includes(category)) return { ok: false, error: `Étape ${index + 1} : choisissez le produit de référence.` };
+    const tags = [...new Set(cleanList(input.tags).map((tag) => tag.toLowerCase()))].filter((tag) => ADVICE_VOCABULARY.includes(tag));
+    if (tags.length === 0) return { ok: false, error: `Étape ${index + 1} : choisissez au moins un type de produit (« nettoyant », « hydratation »…).` };
+    if (tags.length > CUSTOM_LIMITS.tags) return { ok: false, error: `Étape ${index + 1} : six types de produit au plus.` };
+    const brand = clean(input.brand).slice(0, 60) || null;
+    const ean = /^\d{7,14}$/.test(clean(input.ean)) ? clean(input.ean) : null;
+    const productName = clean(input.productName).slice(0, 160) || null;
+    steps.push({ label, category, tags, brand, ean, productName });
+  }
+  return { ok: true, value: { steps } };
+}
 
 
 const ATC_PATTERN = /^[A-Z](?:\d{2}(?:[A-Z](?:[A-Z](?:\d{2})?)?)?)?$/;
@@ -128,11 +165,18 @@ export function parseCustomRuleDefinition(raw: unknown): { ok: true; value: Cust
   if (atcPrefixes.length > CUSTOM_LIMITS.atc || therapeuticClasses.length > CUSTOM_LIMITS.classes) return { ok: false, error: "Trop de déclencheurs : restez précis." };
   if (therapeuticClasses.some((label) => label.length < 4 || label.length > 60)) return { ok: false, error: "Une classe thérapeutique s'écrit en 4 à 60 caractères." };
 
-  const category = clean(input.category) as ProductCategoryCode;
+  // Une routine porte ses produits dans ses étapes : la catégorie et les étiquettes du conseil sont celles de la première.
+  let routine: { steps: CustomRoutineStep[] } | undefined;
+  if (input.routine !== undefined && input.routine !== null) {
+    const parsedRoutine = parseRoutine(input.routine);
+    if (!parsedRoutine.ok) return parsedRoutine;
+    routine = parsedRoutine.value;
+  }
+  const category = (routine ? routine.steps[0].category : clean(input.category)) as ProductCategoryCode;
   if (!PRODUCT_CATEGORIES.includes(category)) return { ok: false, error: "Choisissez la catégorie du produit à conseiller." };
-  const matchingTags = [...new Set(cleanList(input.matchingTags).map((tag) => tag.toLowerCase()))];
+  const matchingTags = routine ? [...new Set(routine.steps.flatMap((step) => step.tags))].slice(0, CUSTOM_LIMITS.tags) : [...new Set(cleanList(input.matchingTags).map((tag) => tag.toLowerCase()))];
   if (matchingTags.length === 0) return { ok: false, error: "Choisissez au moins une étiquette de produit." };
-  if (matchingTags.length > CUSTOM_LIMITS.tags) return { ok: false, error: `Six étiquettes au plus (${matchingTags.length} choisies).` };
+  if (!routine && matchingTags.length > CUSTOM_LIMITS.tags) return { ok: false, error: `Six étiquettes au plus (${matchingTags.length} choisies).` };
   const unknown = matchingTags.find((tag) => !ADVICE_VOCABULARY.includes(tag));
   if (unknown) return { ok: false, error: `L'étiquette « ${unknown} » n'existe pas : choisissez dans la liste.` };
 
@@ -176,7 +220,10 @@ export function parseCustomRuleDefinition(raw: unknown): { ok: true; value: Cust
     if (input.priority !== undefined) extras.priority = checked.value.priority;
   }
 
-  return { ok: true, value: { title, kind, atcPrefixes, therapeuticClasses, category, matchingTags, question, shortReason, counterScript, patientReason, source, safetyNotes, ...extras } };
+  const theme = clean(input.theme).slice(0, ROUTINE_LIMITS.theme) || null;
+  const medicines = [...new Set(cleanList(input.medicines).map((name) => name.slice(0, 120)))].slice(0, 30);
+
+  return { ok: true, value: { title, kind, atcPrefixes, therapeuticClasses, category, matchingTags, question, shortReason, counterScript, patientReason, source, safetyNotes, ...extras, ...(theme ? { theme } : {}), ...(medicines.length ? { medicines } : {}), ...(routine ? { routine } : {}) } };
 }
 
 export const customRuleKey = (id: string): string => `custom-${id}`;
@@ -201,7 +248,24 @@ export function buildCustomRule(row: Pick<CentralRuleRow, "ruleKey" | "status" |
     sideEffectTriggers: [],
     ...(definition.question ? { question: definition.question } : {}),
     basePriority: definition.priority ?? CUSTOM_PRIORITY[definition.kind],
-    matchingTags: definition.matchingTags,
+    matchingTags: definition.routine ? [] : definition.matchingTags,
+    ...(definition.routine
+      ? {
+          routine: {
+            title: definition.title,
+            perStepBrands: true,
+            steps: definition.routine.steps.map((step, index) => ({
+              key: `etape-${index + 1}`,
+              label: step.label,
+              matchingTags: step.tags,
+              category: step.category,
+              brand: step.brand ? brandKey(step.brand) : null,
+              ean: step.ean,
+              benefit: step.label,
+            })),
+          },
+        }
+      : {}),
     ...(definition.preferWords?.length ? { productPrefer: definition.preferWords.map(escapeWord) } : {}),
     ...(definition.exclusions ? { blockedFor: (patient) => exclusionReason(definition.exclusions!, patient) } : {}),
     excludeTags: [],

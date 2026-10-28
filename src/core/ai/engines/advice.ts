@@ -209,7 +209,25 @@ export type AdviceRule = {
    */
   routine?: {
     title: string;
-    steps: { key: string; label: string; matchingTags: string[]; productExclude?: string[]; productPrefer?: string[]; benefit: string }[];
+    /**
+     * Une routine composée dans la console (fondateur, 28 oct. 2026) : chaque étape a SA gamme (lavant CeraVe, crème Eucerin,
+     * soin La Roche-Posay) — le moteur ne cherche pas une gamme commune ; et les gammes prioritaires du titulaire passent
+     * devant la gamme choisie dans la console.
+     */
+    perStepBrands?: boolean;
+    steps: {
+      key: string;
+      label: string;
+      matchingTags: string[];
+      productExclude?: string[];
+      productPrefer?: string[];
+      benefit: string;
+      /** La catégorie du produit de cette étape (une routine de la console mêle lavant, crème, soin) ; absente : celle de la règle. */
+      category?: ProductCategoryCode;
+      /** La gamme choisie dans la console pour cette étape, et son produit de référence. */
+      brand?: string | null;
+      ean?: string | null;
+    }[];
   };
   /** Explication en langage pharmacien. `{drug}` est remplacé. */
   rationaleTemplate: string;
@@ -2362,20 +2380,30 @@ export function detectAdviceOpportunities(params: {
     // chez un enfant de 2 ans malgré ses huiles essentielles.
     const guarded = (patterns: string[]) =>
       patientExclude.length === 0 ? patterns : patterns.map((pattern) => String.raw`^(?!.*(?:${patientExclude.join("|")}))(?=.*?(?:${pattern}))`);
-    const variants: { suffix: string; tags: string[]; exclude: string[]; prefer: string[]; routine: AdviceOpportunityResult["routine"] }[] = rule.routine
+    const variants: { suffix: string; tags: string[]; exclude: string[]; prefer: string[]; routine: AdviceOpportunityResult["routine"]; category?: ProductCategoryCode }[] = rule.routine
       ? rule.routine.steps.map((step, index) => ({
           suffix: `:${step.key}`,
           tags: step.matchingTags,
           exclude: [...(rule.productExclude ?? []), ...(step.productExclude ?? []), ...patientExclude],
           prefer: guarded([...contextGuarded(contextPrefer, [...(rule.productExclude ?? []), ...(step.productExclude ?? [])]), ...(step.productPrefer ?? rule.productPrefer ?? []), ...patientPrefer]),
-          routine: { key: rule.key, title: rule.routine!.title, stepKey: step.key, stepLabel: step.label, stepIndex: index, stepCount: rule.routine!.steps.length, benefit: step.benefit },
+          routine: {
+            key: rule.key,
+            title: rule.routine!.title,
+            stepKey: step.key,
+            stepLabel: step.label,
+            stepIndex: index,
+            stepCount: rule.routine!.steps.length,
+            benefit: step.benefit,
+            ...(rule.routine!.perStepBrands ? { perStepBrands: true, brand: step.brand ?? null, ean: step.ean ?? null } : {}),
+          },
+          category: step.category,
         }))
       : [{ suffix: "", tags: rule.matchingTags, exclude: [...(rule.productExclude ?? []), ...patientExclude], prefer: guarded([...contextGuarded(contextPrefer, rule.productExclude ?? []), ...(rule.productPrefer ?? []), ...patientPrefer]), routine: null }];
 
     for (const variant of variants) byKey.set(rule.key + variant.suffix, {
       key: rule.key + variant.suffix,
       kind: rule.kind,
-      category: rule.category,
+      category: variant.category ?? rule.category,
       title: rule.title,
       benefits: rule.benefits ?? [],
       routine: variant.routine,

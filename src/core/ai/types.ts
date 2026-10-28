@@ -310,6 +310,10 @@ export type RoutineStepInfo = {
   stepIndex: number;
   stepCount: number;
   benefit: string;
+  /** Routine de la console : une gamme par étape, les gammes prioritaires du titulaire d'abord (advice.ts, `perStepBrands`). */
+  perStepBrands?: boolean;
+  brand?: string | null;
+  ean?: string | null;
 };
 
 // --- Explication du traitement (étape C) ----------------------------------

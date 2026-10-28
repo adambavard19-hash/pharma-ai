@@ -20,6 +20,6 @@ export const CUSTOM_KIND_LABELS: Record<CustomKind, string> = {
   COMFORT: "Confort — un inconfort possible",
 };
 
-export const CUSTOM_LIMITS = { title: 80, reason: 160, script: 420, question: 200, source: 200, note: 200, notes: 5, tags: 6, atc: 8, classes: 5 } as const;
+export const CUSTOM_LIMITS = { title: 80, reason: 160, script: 420, question: 200, source: 200, note: 200, notes: 5, tags: 6, atc: 20, classes: 5 } as const;
 
 export const CENTRAL_SENTENCE_MAX = 280;

@@ -209,8 +209,12 @@ describe("chercher un produit à conseiller", () => {
   it("ne cherche qu'à partir de deux lettres, parmi les vraies officines, un résultat par code-barres", async () => {
     expect(await searchKnownProducts("a")).toEqual([]);
     expect(mocks.prisma.product.findMany).not.toHaveBeenCalled();
-    mocks.prisma.product.findMany.mockResolvedValue([{ ean: "3401", name: "Spray", brand: null }, { ean: null, name: "Sans code", brand: null }]);
-    expect(await searchKnownProducts("spray")).toEqual([{ ean: "3401", name: "Spray", brand: null }]);
+    mocks.prisma.product.findMany.mockResolvedValue([
+      { ean: "3401", name: "Spray", brand: null, category: "SOINS", matchingTags: ["Nasal", "étiquette inconnue"] },
+      { ean: null, name: "Sans code", brand: null, category: "AUTRE", matchingTags: [] },
+    ]);
+    // Le type du produit (catégorie, étiquettes connues des règles) sert à définir une étape de routine.
+    expect(await searchKnownProducts("spray")).toEqual([{ ean: "3401", name: "Spray", brand: null, category: "SOINS", tags: ["nasal"] }]);
     const where = mocks.prisma.product.findMany.mock.calls[0][0];
     expect(where.where).toMatchObject({ deletedAt: null, ean: { not: null }, pharmacy: { isDemo: false } });
     expect(where.distinct).toEqual(["ean"]);

@@ -737,12 +737,12 @@ export function medicineTitle(name: string): string {
 }
 
 /** « A10BJ06, a10bx16 » → les codes, en capitales, sans espaces. */
-function splitAtcCodes(text: string): string[] {
+export function splitAtcCodes(text: string): string[] {
   return [...new Set(text.toUpperCase().split(/[\s,;]+/).filter((code) => code.length >= 3))];
 }
 
 /** Les déclencheurs choisis, chacun retirable. */
-function ChosenList({ items, onRemove, label }: { items: { key: string; title: string; subtitle: string | null }[]; onRemove: (key: string) => void; label: string }) {
+export function ChosenList({ items, onRemove, label }: { items: { key: string; title: string; subtitle: string | null }[]; onRemove: (key: string) => void; label: string }) {
   if (items.length === 0) return null;
   return (
     <ul className="mt-2 space-y-1.5" aria-label={label}>
