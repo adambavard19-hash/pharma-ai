@@ -343,7 +343,7 @@ export async function addCentralAssociation(admin: Admin, draft: AssociationDraf
   if (problem) return { ok: false, error: problem };
   const triggerLabel =
     draft.trigger.kind === "MEDICINE"
-      ? draft.trigger.name.split(",")[0].trim()
+      ? draft.trigger.name.split(/,\s/)[0].trim()
       : draft.trigger.kind === "FAMILY"
         ? (familyName as string)
         : draft.trigger.kind === "ATC"

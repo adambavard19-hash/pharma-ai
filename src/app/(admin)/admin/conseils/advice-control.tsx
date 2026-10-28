@@ -514,10 +514,13 @@ export type FamilyChoice = { id: string; name: string; count: number };
 
 export function NewAssociationForm({ onDone, families = [], initialFamilyId = null }: { onDone: () => void; families?: FamilyChoice[]; initialFamilyId?: string | null }) {
   const [mode, setMode] = useState<"MEDICINE" | "PRODUCT" | "FAMILY" | "ATC">(initialFamilyId ? "FAMILY" : "MEDICINE");
+  // Plusieurs médicaments (tous les dosages de Mounjaro) ou plusieurs codes ATC pour une même famille (fondateur, 28 oct. 2026) :
+  // une association par déclencheur et par produit conseillé.
   const [atcCode, setAtcCode] = useState("");
+  const [atcCodes, setAtcCodes] = useState<string[]>([]);
   const [atcLabel, setAtcLabel] = useState("");
   const [familyId, setFamilyId] = useState<string>(initialFamilyId ?? "");
-  const [medicine, setMedicine] = useState<Medicine | null>(null);
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [product, setProduct] = useState<KnownProduct | null>(null);
   // Plusieurs produits conseillés pour le même déclencheur : une association par produit, la même phrase pour tous.
   const [advices, setAdvices] = useState<KnownProduct[]>([]);
@@ -526,35 +529,42 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
 
+  const addAtc = () => {
+    const codes = splitAtcCodes(atcCode);
+    if (codes.length === 0) return;
+    setAtcCodes((list) => [...new Set([...list, ...codes])]);
+    setAtcCode("");
+  };
+
   const submit = () => {
     setError(null);
-    const trigger =
+    // Un code tapé mais pas encore ajouté compte aussi.
+    const codes = [...new Set([...atcCodes, ...splitAtcCodes(atcCode)])];
+    const triggers =
       mode === "MEDICINE"
-        ? medicine
-          ? ({ kind: "MEDICINE", name: medicine.name } as const)
-          : null
+        ? medicines.map((medicine) => ({ kind: "MEDICINE", name: medicine.name }) as const)
         : mode === "FAMILY"
           ? familyId
-            ? ({ kind: "FAMILY", familyId } as const)
-            : null
+            ? [{ kind: "FAMILY", familyId } as const]
+            : []
           : mode === "ATC"
-            ? atcCode.trim()
-              ? ({ kind: "ATC", code: atcCode.trim(), label: atcLabel.trim() || null } as const)
-              : null
+            ? codes.map((code) => ({ kind: "ATC", code, label: atcLabel.trim() || null }) as const)
           : product
-            ? ({ kind: "PRODUCT", ean: product.ean, name: product.name } as const)
-            : null;
-    if (!trigger || advices.length === 0) {
+            ? [{ kind: "PRODUCT", ean: product.ean, name: product.name } as const]
+            : [];
+    if (triggers.length === 0 || advices.length === 0) {
       setError("Choisissez ce qui déclenche l'association et au moins un produit à conseiller.");
       return;
     }
     startTransition(async () => {
       const failed: string[] = [];
       let created = 0;
-      for (const advice of advices) {
-        const result = await addCentralAssociationAction({ trigger, advice: { ean: advice.ean, name: advice.name }, sentence: sentence.trim() || null });
-        if (result.ok) created += 1;
-        else failed.push(`${advice.name} : ${result.error}`);
+      for (const trigger of triggers) {
+        for (const advice of advices) {
+          const result = await addCentralAssociationAction({ trigger, advice: { ean: advice.ean, name: advice.name }, sentence: sentence.trim() || null });
+          if (result.ok) created += 1;
+          else failed.push(`${advice.name} : ${result.error}`);
+        }
       }
       if (failed.length > 0) {
         // Ceux qui sont passés restent en ligne ; on ne garde dans la liste que ceux à corriger.
@@ -567,12 +577,15 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
     });
   };
 
+  const triggerCount = mode === "MEDICINE" ? medicines.length : mode === "ATC" ? new Set([...atcCodes, ...splitAtcCodes(atcCode)]).size : 1;
+  const total = Math.max(1, triggerCount) * advices.length;
+
   return (
     <div className="space-y-4">
       <div className="grid items-start gap-4 md:grid-cols-[1fr_auto_1fr]">
         <div className="space-y-3">
           <div role="tablist" aria-label="Ce qui déclenche l'association" className="inline-flex rounded-lg bg-surface-sunken p-1 text-[13px] font-medium">
-            {([["MEDICINE", "Un médicament"], ["ATC", "Un code ATC"], ["PRODUCT", "Un produit"], ["FAMILY", "Une famille"]] as const).map(([key, label]) => (
+            {([["MEDICINE", "Des médicaments"], ["ATC", "Des codes ATC"], ["PRODUCT", "Un produit"], ["FAMILY", "Une famille"]] as const).map(([key, label]) => (
               <button
                 key={key}
                 type="button"
@@ -587,10 +600,28 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
           </div>
           {mode === "ATC" ? (
             <div className="space-y-3">
-              <Field label="Quand un médicament de ce code ATC est dans la vente" htmlFor="central-atc" hint="Le code officiel (« D10BA01 »), ou son début pour toute une classe (« D10AD »).">
-                <Input id="central-atc" value={atcCode} maxLength={10} onChange={(event) => setAtcCode(event.target.value.toUpperCase())} placeholder="D10BA01" />
+              <Field label="Quand un médicament de ces codes ATC est dans la vente" htmlFor="central-atc" hint="Le code officiel (« D10BA01 »), ou son début pour toute une classe (« D10AD »). Entrée ou virgule pour en ajouter un autre.">
+                <div className="flex gap-2">
+                  <Input
+                    id="central-atc"
+                    value={atcCode}
+                    maxLength={80}
+                    onChange={(event) => setAtcCode(event.target.value.toUpperCase())}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === ",") {
+                        event.preventDefault();
+                        addAtc();
+                      }
+                    }}
+                    placeholder="D10BA01"
+                  />
+                  <Button variant="outline" onClick={addAtc} disabled={splitAtcCodes(atcCode).length === 0} leadingIcon={<Plus className="size-4" />}>
+                    Ajouter
+                  </Button>
+                </div>
               </Field>
-              <AtcCoverage code={atcCode} />
+              <AtcCoverage code={splitAtcCodes(atcCode)[0] ?? ""} />
+              <ChosenList items={atcCodes.map((code) => ({ key: code, title: code, subtitle: null }))} onRemove={(key) => setAtcCodes((list) => list.filter((code) => code !== key))} label="Codes ATC choisis" />
               <Field label="Nom de la classe (facultatif)" htmlFor="central-atc-label">
                 <Input id="central-atc-label" value={atcLabel} maxLength={120} onChange={(event) => setAtcLabel(event.target.value)} placeholder="Isotrétinoïne orale" />
               </Field>
@@ -607,18 +638,26 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
               </Select>
             </Field>
           ) : mode === "MEDICINE" ? (
-            <SearchField<Medicine>
-              label="Quand ce médicament est dans la vente"
-              endpoint="/api/admin/conseils/medicaments"
-              minLength={3}
-              placeholder="Nom du médicament (3 lettres au moins)…"
-              value={medicine}
-              onChange={setMedicine}
-              keyOf={(item) => item.id}
-              title={(item) => item.name.split(",")[0].trim()}
-              subtitle={(item) => item.substances.join(", ") || "—"}
-              flag={(item) => (item.marketed ? null : "Non commercialisé")}
-            />
+            <div>
+              <SearchField<Medicine>
+                label={medicines.length === 0 ? "Quand un de ces médicaments est dans la vente" : "Ajouter un autre médicament (un autre dosage…)"}
+                endpoint="/api/admin/conseils/medicaments"
+                minLength={3}
+                placeholder="Nom du médicament (3 lettres au moins)…"
+                value={null}
+                onChange={(item) => item && setMedicines((list) => (list.some((known) => known.id === item.id) ? list : [...list, item]))}
+                keyOf={(item) => item.id}
+                title={(item) => medicineTitle(item.name)}
+                subtitle={(item) => item.substances.join(", ") || "—"}
+                flag={(item) => (item.marketed ? null : "Non commercialisé")}
+                onPickAll={(items) => setMedicines((list) => [...list, ...items.filter((item) => !list.some((known) => known.id === item.id))])}
+              />
+              <ChosenList
+                items={medicines.map((item) => ({ key: item.id, title: medicineTitle(item.name), subtitle: item.substances.join(", ") || null }))}
+                onRemove={(key) => setMedicines((list) => list.filter((item) => item.id !== key))}
+                label="Médicaments choisis"
+              />
+            </div>
           ) : (
             <SearchField<KnownProduct>
               label="Quand ce produit est dans la vente"
@@ -685,10 +724,41 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
           Annuler
         </Button>
         <Button onClick={submit} loading={pending} leadingIcon={<Plus className="size-4" />}>
-          {advices.length > 1 ? `Mettre en ligne (${advices.length})` : "Mettre en ligne"}
+          {total > 1 ? `Mettre en ligne (${total})` : "Mettre en ligne"}
         </Button>
       </div>
     </div>
+  );
+}
+
+/** Le nom sans la forme galénique, dosage entier : « MOUNJARO 12,5 mg/dose KwikPen » (la virgule du dosage n'est pas une coupure). */
+export function medicineTitle(name: string): string {
+  return name.split(/,\s/)[0].trim();
+}
+
+/** « A10BJ06, a10bx16 » → les codes, en capitales, sans espaces. */
+function splitAtcCodes(text: string): string[] {
+  return [...new Set(text.toUpperCase().split(/[\s,;]+/).filter((code) => code.length >= 3))];
+}
+
+/** Les déclencheurs choisis, chacun retirable. */
+function ChosenList({ items, onRemove, label }: { items: { key: string; title: string; subtitle: string | null }[]; onRemove: (key: string) => void; label: string }) {
+  if (items.length === 0) return null;
+  return (
+    <ul className="mt-2 space-y-1.5" aria-label={label}>
+      {items.map((item) => (
+        <li key={item.key} className="flex items-center gap-3 rounded-lg border border-brand-300 bg-brand-50/60 p-2.5 dark:border-brand-700 dark:bg-brand-950/30">
+          <Check className="size-4 shrink-0 text-brand-700 dark:text-brand-300" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13.5px] font-medium text-text-primary">{item.title}</span>
+            {item.subtitle && <span className="block truncate text-[12px] text-text-tertiary">{item.subtitle}</span>}
+          </span>
+          <button type="button" onClick={() => onRemove(item.key)} className="shrink-0 rounded-md p-1.5 text-text-tertiary hover:bg-surface-sunken hover:text-text-primary" aria-label={`Retirer ${item.title}`}>
+            <X className="size-4" />
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -703,6 +773,7 @@ export function SearchField<T>({
   title,
   subtitle,
   flag,
+  onPickAll,
 }: {
   label: string;
   endpoint: string;
@@ -714,6 +785,8 @@ export function SearchField<T>({
   title: (item: T) => string;
   subtitle: (item: T) => string;
   flag?: (item: T) => string | null;
+  /** Présent : un bouton « Tout ajouter » prend tous les résultats (tous les dosages d'un médicament). */
+  onPickAll?: (items: T[]) => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<T[]>([]);
@@ -769,6 +842,11 @@ export function SearchField<T>({
     <Field label={label}>
       <div className="space-y-2">
         <Input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholder} leadingIcon={loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />} aria-label={label} />
+        {onPickAll && query.trim().length >= minLength && results.length > 1 && (
+          <Button variant="outline" size="sm" onClick={() => onPickAll(results)} leadingIcon={<Plus className="size-3.5" />}>
+            Tout ajouter ({results.length})
+          </Button>
+        )}
         {query.trim().length >= minLength && (
           <ul className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-border-subtle bg-surface-card p-1.5">
             {results.length === 0 && !loading ? (

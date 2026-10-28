@@ -37,7 +37,7 @@ export function MedicineTriggerPicker({ onAdd }: { onAdd: (code: string) => void
         value={medicine}
         onChange={setMedicine}
         keyOf={(item) => item.id}
-        title={(item) => item.name.split(",")[0].trim()}
+        title={(item) => item.name.split(/,\s/)[0].trim()}
         subtitle={(item) => [item.substances.join(", "), item.atcCode ? `famille ${item.atcCode}` : "famille inconnue"].filter(Boolean).join(" · ")}
         flag={(item) => (item.atcCode ? null : "Famille inconnue")}
       />
