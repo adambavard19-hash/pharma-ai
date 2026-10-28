@@ -242,3 +242,14 @@ export function routineStepOf(value: unknown): { stepLabel: string; benefit: str
   const { stepLabel, benefit } = value as { stepLabel?: unknown; benefit?: unknown };
   return typeof stepLabel === "string" && typeof benefit === "string" ? { stepLabel, benefit } : null;
 }
+
+/**
+ * L'étape de routine, telle que la bannière la regroupe (fondateur, 28 oct. 2026) : la routine (clé, titre), l'étape et sa place.
+ * Pas de clé quand le conseil n'appartient à aucune routine.
+ */
+export function routineSheetOf(value: unknown): { routine?: { key: string; title: string; step: string; index: number; count: number } } {
+  if (!value || typeof value !== "object") return {};
+  const { key, title, stepLabel, stepIndex, stepCount } = value as Record<string, unknown>;
+  if (typeof key !== "string" || typeof title !== "string" || typeof stepLabel !== "string" || typeof stepIndex !== "number" || typeof stepCount !== "number") return {};
+  return { routine: { key, title, step: stepLabel, index: stepIndex, count: stepCount } };
+}

@@ -10,7 +10,7 @@ import { ADVICE_RULES } from "@/core/ai/engines/advice";
 import { answersFromRows, treeState } from "@/core/counter/tree-state";
 import { TREE_RULE_KEYS } from "@/core/counter/question-tree";
 import { loadOfficialSideEffects } from "@/server/services/official-side-effects";
-import { counterSheetOf, routineStepOf, withoutOriginLabel } from "@/core/counter/advice-sheet";
+import { counterSheetOf, routineSheetOf, routineStepOf, withoutOriginLabel } from "@/core/counter/advice-sheet";
 import { rangeOf } from "@/core/catalog/product-ranges";
 import { sendsToDoctor } from "@/core/counter/answer-filter";
 import { parseSuggestionVigilances } from "@/config/vigilances";
@@ -302,7 +302,7 @@ export async function readCounterNotice(pharmacyId: string, id: string, now: Dat
                 : null,
             },
             rec.product?.name ?? rec.presentation?.specialty.name ?? "Produit",
-          ), ...rangeSheetOf(rec.product?.name), ...sideEffectsOf(rec.presentation?.specialty.cisCode), ...rangePitch(pitchOf(rec.id), rec.product?.name), ...alternativesOf(rec.alternatives, rec.product?.name) },
+          ), ...rangeSheetOf(rec.product?.name), ...sideEffectsOf(rec.presentation?.specialty.cisCode), ...rangePitch(pitchOf(rec.id), rec.product?.name), ...alternativesOf(rec.alternatives, rec.product?.name), ...routineSheetOf(rec.routine) },
         };
       }),
     outcome: run?.outcome ?? null,
