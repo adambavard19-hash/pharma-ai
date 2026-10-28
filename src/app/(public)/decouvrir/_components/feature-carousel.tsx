@@ -8,8 +8,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Les fonctions en grandes cartes qui défilent, la présentation de limova.ai (fondateur, 26 oct. 2026) aux couleurs de
- * PharmaBoost : la conversation à gauche (le pharmacien demande, PharmaBoost répond), « Découvrez … » et ce que la fonction
- * fait à droite ; les cartes voisines dépassent sur les côtés, estompées ; les pastilles du haut ; le défilement seul, mis en
+ * PharmaBoost : « Découvrez … » et ce que la fonction fait (la conversation d'exemple a été retirée le 28 oct. 2026) ; les cartes voisines dépassent sur les côtés, estompées ; les pastilles du haut ; le défilement seul, mis en
  * pause au survol. Cartes en verre clair : l'encre ADN du site reste visible derrière. Les échanges sont des EXEMPLES.
  */
 export type FeatureSlide = {
@@ -24,7 +23,8 @@ export type FeatureSlide = {
 };
 
 const AUTO_MS = 8000;
-const CARD = "min(1100px, 88vw)";
+/** Une carte, la fonction seule (fondateur, 28 oct. 2026 : « laisse la partie de droite seulement, enlève l'exemple »). */
+const CARD = "min(720px, 88vw)";
 
 export function FeatureCarousel({ slides }: { slides: FeatureSlide[] }) {
   const [at, setAt] = useState(0);
@@ -73,26 +73,10 @@ export function FeatureCarousel({ slides }: { slides: FeatureSlide[] }) {
               aria-hidden={index !== at}
               inert={index !== at}
               className={cn(
-                "mr-7 grid w-[min(1100px,88vw)] shrink-0 overflow-hidden rounded-[32px] border border-white/80 bg-white/75 shadow-[0_30px_80px_-40px_rgba(15,47,42,0.45)] backdrop-blur-xl transition-[opacity,filter] duration-700 md:grid-cols-[0.92fr_1.08fr] dark:border-border-subtle dark:bg-surface-card/85",
+                "mr-7 w-[min(720px,88vw)] shrink-0 overflow-hidden rounded-[32px] border border-white/80 bg-white/75 shadow-[0_30px_80px_-40px_rgba(15,47,42,0.45)] backdrop-blur-xl transition-[opacity,filter] duration-700 dark:border-border-subtle dark:bg-surface-card/85",
                 index === at ? "opacity-100" : "opacity-40 blur-[3px]",
               )}
             >
-              {/* La conversation. */}
-              <div className="flex flex-col justify-center gap-4 border-b border-border-subtle p-6 md:border-r md:border-b-0 md:p-10">
-                <p className="max-w-[92%] rounded-2xl border border-border-subtle bg-surface-app/80 px-5 py-4 text-[15px] leading-6 text-text-primary">{slide.ask}</p>
-                <div className="flex items-end gap-3 pt-4">
-                  <span className="mb-1 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-50 ring-1 ring-brand-200 dark:bg-brand-950/40 dark:ring-brand-800">
-                    <Robot size={26} mood={slide.mood} />
-                  </span>
-                  <div className="space-y-2.5">
-                    {slide.answers.map((answer) => (
-                      <p key={answer} className="rounded-2xl bg-brand-50 px-5 py-4 text-[15px] leading-6 text-text-primary dark:bg-brand-950/30">{answer}</p>
-                    ))}
-                  </div>
-                </div>
-                <p className="pt-1 text-[11px] font-semibold tracking-[0.12em] text-text-tertiary uppercase">Exemple</p>
-              </div>
-
               {/* La fonction. */}
               <div className="flex flex-col p-6 md:p-10">
                 <div className="flex items-center gap-5">
