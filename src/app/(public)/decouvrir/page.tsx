@@ -160,7 +160,7 @@ export default async function SitePage() {
           <div className="mx-auto mt-12 max-w-[1100px]">
             <BannerTwoStates />
           </div>
-          <p className="mt-4 text-center text-[13px] text-text-tertiary">La bannière PharmaBoost, reproduite pour le site : au scan, puis ouverte. Passez la souris sur les photos de la routine. Médicaments, produits et prix : exemples.</p>
+          <p className="mt-8 text-center text-[13px] text-text-tertiary">La bannière PharmaBoost, reproduite pour le site : au scan, puis ouverte. Médicaments, produits et prix : exemples.</p>
           {/* Les nouveautés de la bannière (fondateur, 22 oct. 2026). */}
           <div className="mx-auto mt-10 grid max-w-5xl gap-3 sm:grid-cols-3" data-nouveautes-banniere="">
             {[
