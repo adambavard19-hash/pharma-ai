@@ -810,6 +810,16 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         selected.push({ ...(sameBrand ?? chosen), routine });
       }
 
+      // Une routine qui demande au moins N étapes (advice.ts, `minSteps`) et n'en trouve pas assez en rayon s'efface : ses
+      // conseils seuls reprennent (une « prise en charge globale » d'une seule étape n'en est pas une).
+      const stepsFound = new Map<string, number>();
+      for (const item of selected) if (item.routine) stepsFound.set(item.routine.key, (stepsFound.get(item.routine.key) ?? 0) + 1);
+      const tooShort = (item: ScoredRecommendation) => Boolean(item.routine?.minSteps && (stepsFound.get(item.routine.key) ?? 0) < item.routine.minSteps);
+      for (const item of selected.filter(tooShort)) notes.push(`« ${item.opportunityKey} » : routine incomplète en rayon, ses conseils seuls la remplacent.`);
+      const complete = selected.filter((item) => !tooShort(item));
+      selected.length = 0;
+      selected.push(...complete);
+
       // Une référence déjà retenue dans une routine ne se propose pas une
       // seconde fois seule : la protection solaire du traitement par
       // isotrétinoïne est l'étape « protéger », pas un conseil à part.

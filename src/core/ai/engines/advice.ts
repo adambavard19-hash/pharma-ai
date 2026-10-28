@@ -215,6 +215,8 @@ export type AdviceRule = {
      * devant la gamme choisie dans la console.
      */
     perStepBrands?: boolean;
+    /** Le nombre d'étapes en rayon sous lequel la routine s'efface au profit de ses conseils seuls. */
+    minSteps?: number;
     steps: {
       key: string;
       label: string;
@@ -1117,6 +1119,88 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
         : null,
   },
   {
+    // La prise en charge globale de l'allergie (fondateur, 28 oct. 2026 : « un collyre anti-allergique, un complément
+    // Ergyaller, un spray traitant anti-allergique pour le nez »). Sous antihistaminique, une routine plutôt qu'un seul
+    // produit ; chaque étape garde les garde-fous de son conseil seul (collyre vérifié, nez sans actif, huiles essentielles).
+    key: "allergy-global-routine",
+    title: "Prise en charge globale de l'allergie",
+    kind: "COMFORT",
+    version: "1.0",
+    validation: { status: "PENDING" },
+    triggerMode: "CLASS_ONLY",
+    category: "SOINS",
+    atcPrefixes: ALLERGY_ANTIHISTAMINES,
+    therapeuticClasses: [],
+    sideEffectTriggers: [],
+    basePriority: 64,
+    matchingTags: [],
+    excludeTags: [],
+    // Un collyre sur liste rangé parmi les produits de l'officine n'a pas ses conditions de délivrance lues : seule une boîte du
+    // catalogue national, vérifiée, est proposée (comme le collyre seul). Le spray et le complément n'ont pas de code CIP.
+    verifiedMedicinesOnly: true,
+    routine: {
+      title: "Prise en charge globale de l'allergie",
+      minSteps: 2,
+      steps: [
+        {
+          key: "eyes",
+          label: "Yeux",
+          // « anti-allergique » seul : un gel lubrifiant ou des larmes sont des collyres, pas des anti-allergiques.
+          matchingTags: ["anti-allergique"],
+          productExclude: [String.raw`^(?:(?!${EYE_DROP_WORDS}).)*$`, NOT_EYE_DROP_WORDS],
+          productPrefer: [String.raw`^(?=.*${EYE_DROP_WORDS})(?!.*${NOT_EYE_DROP_WORDS}).*(?:allerg|unidose|sans conservateur)`],
+          benefit: "Yeux qui piquent ou qui pleurent",
+        },
+        {
+          key: "nose",
+          label: "Nez",
+          matchingTags: ["nez", "nasal", "spray nasal", "eau de mer"],
+          productExclude: [String.raw`collyre`, String.raw`oculaire`, String.raw`ophtalm`, String.raw`\byeux\b`, String.raw`auriculaire`, String.raw`oreille`, NASAL_ACTIVE, LOZENGE_WORDS],
+          productPrefer: [String.raw`^(?!.*(?:${NASAL_ACTIVE}|${LOZENGE_WORDS})).*(?:allerg|rhinite)`],
+          benefit: "Lave le nez des pollens",
+        },
+        {
+          // Ergyaller (Nutergia) d'abord, nommé par le fondateur ; sinon un autre complément « allergie » du stock.
+          key: "supplement",
+          label: "Complément",
+          // Ergyaller seul : un autre complément « allergie » n'a pas été choisi par le fondateur, et « allergie » seul ramènerait
+          // sprays et collyres. Sans Ergyaller en rayon, l'étape n'apparaît pas.
+          matchingTags: ["ergyaller"],
+          productExclude: [EYE_DROP_WORDS, String.raw`nasal`, String.raw`\bnez\b`, String.raw`spray`, String.raw`\bspr\b`, String.raw`rhin`, String.raw`pulv`, String.raw`creme`, String.raw`\bcr\b`],
+          productPrefer: [String.raw`ergyaller`],
+          benefit: "En cure pendant la saison des allergies",
+        },
+      ],
+    },
+    // Avant 12 ans, le collyre médicamenteux revient au pharmacien (RCP : lévocabastine à partir de 6 ans, cromoglicate sur avis
+    // médical) : pas de routine, les conseils seuls et leurs garde-fous reprennent. Un âge inconnu n'écarte rien.
+    blockedFor: (patient) => (patient.ageYears !== null && patient.ageYears < 12 ? "Avant 12 ans : pas de prise en charge globale, les conseils seuls (sans collyre médicamenteux) restent proposés." : null),
+    // Un collyre anti-allergique déjà sur la vente : pas de routine (elle en proposerait un second) — les conseils seuls reprennent.
+    blockedWhenSaleHas: { atcPrefixes: ["S01GX"], reason: "Un collyre anti-allergique est déjà sur la vente : pas de prise en charge globale, les conseils seuls restent proposés." },
+    // Les huiles essentielles, comme pour le nez seul.
+    productExcludeFor: essentialOilExcludeFor,
+    populations: [
+      ...ESSENTIAL_OIL_POPULATIONS_BY_NAME,
+      { population: "BREASTFEEDING", level: "CAUTION", text: "Lévocabastine : non recommandée pendant l'allaitement ; le cromoglicate peut être utilisé (RCP).", sources: ["RCP Allergiflash 0,05 % (BDPM, CIS 69456091)", "RCP Cromabak 20 mg/ml (BDPM, CIS 67898381)"] },
+      { population: "PREGNANCY", level: "CAUTION", text: "Lévocabastine : envisageable avec précaution pendant la grossesse ; le cromoglicate peut être utilisé (RCP).", sources: ["RCP Allergiflash 0,05 % (BDPM, CIS 69456091)", "RCP Cromabak 20 mg/ml (BDPM, CIS 67898381)"] },
+    ],
+    benefits: ["Yeux soulagés", "Nez lavé des pollens", "Cure pendant la saison"],
+    shortReasonTemplate: "Allergie ({drug}) : les yeux et le nez restent gênés malgré le comprimé.",
+    rationaleTemplate:
+      "Le traitement ({drug}) s'inscrit dans un contexte allergique. Une prise en charge globale complète le comprimé : un collyre anti-allergique sans ordonnance pour les yeux (lévocabastine, cromoglicate), un lavage ou un spray nasal sans principe actif pour chasser les pollens, et un complément en cure pendant la saison.",
+    counterScriptTemplate:
+      "« En plus de {drug}, je vous propose une prise en charge complète de l'allergie, pour les yeux, le nez et en cure : {product} pour cette étape. »",
+    patientReasonTemplate:
+      "Votre traitement ({drug}) agit contre l'allergie ; {product} complète la prise en charge, pour les yeux, le nez ou en cure pendant la saison.",
+    clinicalContext:
+      "Consigne du pharmacien fondateur, 28 octobre 2026 : sous antihistaminique, une prise en charge globale (collyre anti-allergique, spray nasal anti-allergique, complément Ergyaller de Nutergia). Collyre : RCP Allergiflash (lévocabastine, CIS 69456091) et Cromabak (cromoglicate, CIS 67898381). Œil rouge et douloureux, baisse de vision, gêne respiratoire : orienter vers le médecin.",
+    safetyNotes: [
+      "Lentilles de contact : port déconseillé sous lévocabastine (RCP).",
+      "Lévocabastine : pas plus de 5 jours sans avis médical (RCP).",
+      "Gêne respiratoire, sifflements : orienter vers le médecin.",
+    ],
+  },
+  {
     key: "eye-irritation-allergy",
     benefits: ["Apaise et lubrifie l'œil", "Sans principe actif", "Unidoses à privilégier"],
     title: "Yeux irrités en contexte allergique",
@@ -1216,10 +1300,22 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
           productExclude: [String.raw`\bcorps\b`, String.raw`\blait\b`, String.raw`pieds`, String.raw`mains`, String.raw`anti ?age`, String.raw`anti ?rides`, String.raw`solaire`, String.raw`\bspf`, String.raw`levres`, String.raw`lèvres`],
           // Un motif préféré lève une exclusion (matching.ts) : « cicaplast » ne doit pas sauver « CICAPLAST MAINS » ni
           // « CICAPLAST LEVRES », que l'étape écarte. Chaque préférence refuse donc d'abord ce que l'étape exclut.
-          productPrefer: ["visag", "reparat", "repair", "apais", "ceramide", "hydra", "relipid", "cicalfate", "cicaplast"].map(
+          // La crème des peaux acnéiques d'abord (fondateur, 28 oct. 2026 : « une crème hydratante adaptée aux peaux acnéiques »).
+          productPrefer: ["effaclar h", "cleanance hydra", "hydrance", "sebium hydra", "keracnyl repair", "hyseac", "non comedog", "peaux? (?:grasses?|acneiques?|a imperfections)", "visag", "reparat", "repair", "apais", "ceramide", "hydra", "relipid", "cicalfate", "cicaplast"].map(
             (pattern) => String.raw`^(?!.*(?:\bcorps\b|\blait\b|pieds|mains|anti ?age|anti ?rides|solaire|\bspf|levres|lèvres)).*${pattern}`,
           ),
           benefit: "Répare la barrière cutanée fragilisée",
+        },
+        {
+          // Le soin local des boutons (fondateur, 28 oct. 2026). Sous isotrétinoïne, rien d'exfoliant ni d'asséchant : la règle
+          // écarte déjà gommages, peelings, acides et rétinol ; l'étape écarte aussi le peroxyde de benzoyle et les nettoyants.
+          key: "spots",
+          label: "Traiter les boutons",
+          // Les soins locaux se reconnaissent à leur nom : « imperfections », « boutons », ou la ligne du soin (Duo, Comedomed, AKN, SOS).
+          matchingTags: ["imperfections", "boutons", "duo", "comedomed", "akn", "sos"],
+          productExclude: [String.raw`nettoy`, String.raw`moussant`, String.raw`lavant`, String.raw`micell`, String.raw`solaire`, String.raw`\bspf`, String.raw`peroxyde`, String.raw`benzoyl`, String.raw`\bcorps\b`, String.raw`shamp`, String.raw`\blot\b`, String.raw`coffret`, String.raw`\bpack\b`],
+          productPrefer: [String.raw`\bduo\b`, String.raw`\bsos\b`, String.raw`spot`, String.raw`localis`, String.raw`patch`, String.raw`\ba\.?i\b`, String.raw`\bk\+`],
+          benefit: "Soin local des boutons, sans dessécher",
         },
         {
           key: "protect",
@@ -1232,13 +1328,13 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
         },
       ],
     },
-    benefits: ["Peau moins sèche et moins irritée", "Barrière cutanée renforcée", "Protection solaire quotidienne"],
+    benefits: ["Peau moins sèche et moins irritée", "Boutons soignés en douceur", "Protection solaire quotidienne"],
     shortReasonTemplate:
       "Isotrétinoïne ({drug}) : sécheresse de la peau et des muqueuses quasi constante pendant le traitement.",
     rationaleTemplate:
-      "L'isotrétinoïne ({drug}) entraîne une sécheresse cutanée et muqueuse importante, et une photosensibilité. Une routine dermocosmétique adaptée — nettoyant doux, crème réparatrice, protection solaire — améliore le confort et la tolérance du traitement.",
+      "L'isotrétinoïne ({drug}) entraîne une sécheresse cutanée et muqueuse importante, et une photosensibilité. Une routine dermocosmétique adaptée — nettoyant doux, crème hydratante pour peau acnéique, soin local des boutons non irritant, protection solaire — améliore le confort et la tolérance du traitement.",
     counterScriptTemplate:
-      "« {drug} dessèche beaucoup la peau : un nettoyant doux, une crème réparatrice et une protection solaire chaque jour changent vraiment le confort. {product} est adapté à cette étape. »",
+      "« {drug} dessèche beaucoup la peau : un nettoyant doux, une crème hydratante, un soin local pour les boutons et une protection solaire chaque jour changent vraiment le confort. {product} est adapté à cette étape. »",
     patientReasonTemplate:
       "Votre traitement ({drug}) rend la peau sèche et fragile. {product} fait partie de la routine quotidienne qui la protège pendant la cure.",
     clinicalContext:
@@ -2395,6 +2491,7 @@ export function detectAdviceOpportunities(params: {
             stepCount: rule.routine!.steps.length,
             benefit: step.benefit,
             ...(rule.routine!.perStepBrands ? { perStepBrands: true, brand: step.brand ?? null, ean: step.ean ?? null } : {}),
+            ...(rule.routine!.minSteps ? { minSteps: rule.routine!.minSteps } : {}),
           },
           category: step.category,
         }))

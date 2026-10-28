@@ -312,6 +312,8 @@ export type RoutineStepInfo = {
   benefit: string;
   /** Routine de la console : une gamme par étape, les gammes prioritaires du titulaire d'abord (advice.ts, `perStepBrands`). */
   perStepBrands?: boolean;
+  /** Moins d'étapes trouvées en rayon : la routine s'efface (advice.ts, `minSteps`). */
+  minSteps?: number;
   brand?: string | null;
   ean?: string | null;
 };

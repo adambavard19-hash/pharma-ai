@@ -119,21 +119,26 @@ describe("le dictionnaire d'usage reconnaît le produit de l'allergie, sans marq
   });
 });
 
+// La prise en charge globale (fondateur, 28 oct. 2026) : sous antihistaminique, le collyre et le nez forment une routine.
+const EYES = "allergy-global-routine:eyes";
+const NOSE = "allergy-global-routine:nose";
+
 describe("CÉTIRIZINE seule, adulte : le conseil du fondateur", () => {
-  it("au comptoir (3 conseils) : collyre anti-allergique, eau de mer « nez allergique », comprimé à sucer — ni gel lubrifiant, ni substitut salivaire", () => {
+  it("au comptoir : la routine de l'allergie (collyre anti-allergique, eau de mer « nez allergique ») et le comprimé à sucer — ni gel lubrifiant, ni substitut salivaire", () => {
     const result = analyse([CETIRIZINE], RAYON_COMPLET);
     expect(cards(result)).toEqual({
-      "nasal-hygiene-orl": "nez-allergique",
-      "eye-allergy-antiallergic-drops": "presentation:levo",
+      [NOSE]: "nez-allergique",
+      [EYES]: "presentation:levo",
       "antihistamine-dry-throat": "gorge",
     });
+    expect(result.recommendations.filter((r) => r.routine).map((r) => r.routine?.stepLabel)).toEqual(["Yeux", "Nez"]);
     const proposed = result.recommendations.map((r) => r.productId);
     expect(proposed).not.toContain("presentation:gel");
     expect(proposed).not.toContain("salivaire");
   });
 
   it("le spray « rhinite allergique » aux huiles essentielles reste en alternative du nez, avec sa vigilance à valider", () => {
-    const nose = analyse([CETIRIZINE], RAYON_COMPLET).recommendations.find((r) => r.opportunityKey === "nasal-hygiene-orl");
+    const nose = analyse([CETIRIZINE], RAYON_COMPLET).recommendations.find((r) => r.opportunityKey === NOSE);
     const spray = nose?.alternatives?.find((a) => a.productId === "spray-rhinite-he");
     expect(spray).toBeDefined();
     expect(spray?.vigilances?.map((v) => v.population)).toEqual(expect.arrayContaining(["ASTHMA", "EPILEPSY"]));
@@ -154,8 +159,8 @@ describe("CÉTIRIZINE seule, adulte : le conseil du fondateur", () => {
 
   it("analyse complète (8 conseils) : le gel et le substitut salivaire ne s'ajoutent pas en cartes à côté — ils ne sont que des replis", () => {
     const result = analyse([CETIRIZINE], RAYON_COMPLET, { max: 8 });
-    expect(Object.keys(cards(result)).sort()).toEqual(["antihistamine-dry-throat", "eye-allergy-antiallergic-drops", "nasal-hygiene-orl"]);
-    expect(notes(result)).toContain("« eye-irritation-allergy » : repli non proposé, « eye-allergy-antiallergic-drops » a sa référence en rayon.");
+    expect(Object.keys(cards(result)).sort()).toEqual([EYES, NOSE, "antihistamine-dry-throat"]);
+    expect(notes(result)).toContain("« eye-allergy-antiallergic-drops » : besoin déjà couvert par une étape de routine, non répété.");
     expect(notes(result)).toContain("« dry-mouth-hygiene » : repli non proposé, « antihistamine-dry-throat » a sa référence en rayon.");
   });
 
@@ -173,8 +178,8 @@ describe("CÉTIRIZINE seule, adulte : le conseil du fondateur", () => {
   });
 
   it("la carte du collyre dit ce qu'il est, et porte les faits du RCP — pas « sans principe actif »", () => {
-    const eye = analyse([CETIRIZINE], RAYON_COMPLET).recommendations.find((r) => r.opportunityKey === "eye-allergy-antiallergic-drops");
-    expect(eye?.counterScript).toContain("collyre contre l'allergie des yeux");
+    const eye = analyse([CETIRIZINE], RAYON_COMPLET).recommendations.find((r) => r.opportunityKey === EYES);
+    expect(eye?.routine?.stepLabel).toBe("Yeux");
     expect(eye?.precautions.join(" ")).toContain("pas plus de 5 jours sans avis médical");
     expect(eye?.counterScript).not.toMatch(/sans principe actif|lave l'œil/);
   });
@@ -215,7 +220,7 @@ describe("les garde-fous du patient restent", () => {
     for (const who of [patient({ isPregnant: true }), patient({ isBreastfeeding: true }), patient({ chronicConditions: ["asthme"] })]) {
       expect(everyProposed(analyse([CETIRIZINE], RAYON_COMPLET.filter((p) => p.id !== "nez-allergique"), { patient: who }))).not.toContain("spray-rhinite-he");
     }
-    const eye = analyse([CETIRIZINE], RAYON_COMPLET, { patient: patient({ isBreastfeeding: true }) }).recommendations.find((r) => r.opportunityKey === "eye-allergy-antiallergic-drops");
+    const eye = analyse([CETIRIZINE], RAYON_COMPLET, { patient: patient({ isBreastfeeding: true }) }).recommendations.find((r) => r.opportunityKey === EYES);
     expect(eye?.vigilances?.find((v) => v.population === "BREASTFEEDING")).toMatchObject({ level: "CAUTION", status: true });
   });
 
@@ -237,7 +242,8 @@ describe("sans produit de l'allergie en rayon : repli sur les produits d'avant",
   });
 
   it("la règle du collyre anti-allergique supprimée depuis la console : le lavage revient, sans jamais présenter le collyre comme un lavage", () => {
-    const result = analyse([CETIRIZINE], RAYON_COMPLET, { disabled: ["eye-allergy-antiallergic-drops"] });
+    // La routine aussi supprimée : sinon le collyre reste proposé dans son étape « Yeux », pour ce qu'il est.
+    const result = analyse([CETIRIZINE], RAYON_COMPLET, { disabled: ["eye-allergy-antiallergic-drops", "allergy-global-routine"] });
     expect(cards(result)["eye-irritation-allergy"]).toBe("presentation:gel");
     expect(everyProposed(result)).not.toContain("presentation:levo");
   });
