@@ -7,6 +7,8 @@ import { ADVICE_RULES, type AdviceRule } from "@/core/ai/engines/advice";
 import { atcKey, drugKey } from "@/core/ai/engines/associations";
 import { summariseRuleFeedback, type RuleFeedback } from "@/core/ai/rule-feedback";
 import { cleanSentence } from "@/core/associations/rules";
+import { officialTherapeuticClass } from "@/core/reference/atc/official-atc";
+import { ADVICE_VOCABULARY } from "@/core/catalog/product-vocabulary";
 import {
   centralAssociationError,
   centralState,
@@ -387,7 +389,8 @@ export async function decideCentralAssociation(admin: Admin, id: string, decisio
 // Les recherches de la console
 // ---------------------------------------------------------------------------------------------------------------
 
-export type ProductHit = { ean: string; name: string; brand: string | null };
+/** `category` et `tags` : le type du produit, qui définit une étape de routine (Gestion → Routines). */
+export type ProductHit = { ean: string; name: string; brand: string | null; category: string; tags: string[] };
 
 /**
  * Les produits connus des officines clientes (hors démonstration), un par code-barres : c'est dans cette liste que la
@@ -404,11 +407,14 @@ export async function searchKnownProducts(query: string): Promise<ProductHit[]> 
       OR: [{ name: { contains: text, mode: "insensitive" } }, { brand: { contains: text, mode: "insensitive" } }, { ean: { contains: text } }],
     },
     distinct: ["ean"],
-    select: { ean: true, name: true, brand: true },
+    select: { ean: true, name: true, brand: true, category: true, matchingTags: true },
     orderBy: { name: "asc" },
     take: 20,
   });
-  return found.flatMap((product) => (product.ean ? [{ ean: product.ean, name: product.name, brand: product.brand }] : []));
+  const vocabulary = new Set(ADVICE_VOCABULARY);
+  return found.flatMap((product) =>
+    product.ean ? [{ ean: product.ean, name: product.name, brand: product.brand, category: product.category, tags: product.matchingTags.filter((tag) => vocabulary.has(tag.toLowerCase())).map((tag) => tag.toLowerCase()) }] : [],
+  );
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -488,11 +494,12 @@ export async function editRule(admin: Admin, ruleKey: string, raw: unknown): Pro
   const current = parseCustomRuleDefinition(existing?.definition);
   if (!current.ok) return { ok: false, error: "Ce conseil est illisible : il ne peut pas être modifié." };
   const previous = customEditValues(current.value);
-  const parsed = parseRuleEdit(raw, { requiresProduct: true, hasRoutine: false, previousExclusions: previous.exclusions });
+  const parsed = parseRuleEdit(raw, { requiresProduct: true, hasRoutine: Boolean(current.value.routine), previousExclusions: previous.exclusions });
   if (!parsed.ok) return parsed;
   const changed = changedEditFields(previous, parsed.value, EDIT_FIELD_LABELS);
   if (changed.length === 0) return { ok: false, error: "Rien n'a changé." };
-  const next = parseCustomRuleDefinition({ ...parsed.value, kind: current.value.kind, patientReason: parsed.value.patientReason });
+  // Une routine garde ses étapes, son thème et ses médicaments : « Modifier » ne touche que les textes et les réglages.
+  const next = parseCustomRuleDefinition({ ...parsed.value, kind: current.value.kind, patientReason: parsed.value.patientReason, theme: current.value.theme, medicines: current.value.medicines, routine: current.value.routine });
   if (!next.ok) return next;
   await prisma.centralAdviceRule.update({ where: { ruleKey }, data: { definition: next.value as never, ...(existing?.status === "REMOVED" ? {} : { status: "ACTIVE" as const }), decidedAt: null, decidedByAdminId: null, decidedByName: null } });
   await prisma.centralAdviceEdit.create({ data: { targetKind: "RULE", targetKey: ruleKey, action: "EDIT", changed, before: current.value as never, after: next.value as never, adminId: admin.id, adminName: admin.fullName } });
@@ -566,3 +573,56 @@ export async function modifiedAssociations(): Promise<Map<string, { by: string |
 }
 
 export { hasExclusions };
+
+// ---------------------------------------------------------------------------------------------------------------
+// Les routines (fondateur, 28 oct. 2026)
+// ---------------------------------------------------------------------------------------------------------------
+
+export type RoutineView = {
+  ruleKey: string;
+  title: string;
+  theme: string;
+  /** « PharmaBoost » : une routine écrite dans le moteur, non modifiable ici ; « Console » : composée dans la console. */
+  origin: "PharmaBoost" | "Console";
+  medicines: string[];
+  atcCodes: { code: string; family: string | null }[];
+  steps: { label: string; brand: string | null; productName: string | null; tags: string[] }[];
+  status: CentralStatus | "BUILT_IN";
+  createdBy: string | null;
+};
+
+/** Les routines en ligne : celles de la console et celles du moteur, pour la page Gestion → Routines. */
+export async function listRoutines(): Promise<RoutineView[]> {
+  const rows = await loadCentralRuleRows();
+  const removed = new Set(removedRuleKeys(rows));
+  const family = (code: string) => ({ code, family: officialTherapeuticClass(code) });
+  const fromConsole = rows.flatMap((row): RoutineView[] => {
+    if (row.source !== "CUSTOM" || row.status === "REMOVED") return [];
+    const parsed = parseCustomRuleDefinition(row.definition);
+    if (!parsed.ok || !parsed.value.routine) return [];
+    const definition = parsed.value;
+    return [{
+      ruleKey: row.ruleKey,
+      title: definition.title,
+      theme: definition.theme ?? "Sans thème",
+      origin: "Console",
+      medicines: definition.medicines ?? [],
+      atcCodes: definition.atcPrefixes.map(family),
+      steps: definition.routine!.steps.map((step) => ({ label: step.label, brand: step.brand, productName: step.productName, tags: step.tags })),
+      status: row.status,
+      createdBy: row.decidedByName ?? null,
+    }];
+  });
+  const builtIn = ADVICE_RULES.filter((rule) => rule.routine && !removed.has(rule.key)).map((rule): RoutineView => ({
+    ruleKey: rule.key,
+    title: rule.routine!.title,
+    theme: "Routines PharmaBoost",
+    origin: "PharmaBoost",
+    medicines: [],
+    atcCodes: rule.atcPrefixes.map(family),
+    steps: rule.routine!.steps.map((step) => ({ label: step.label, brand: null, productName: null, tags: step.matchingTags })),
+    status: "BUILT_IN",
+    createdBy: null,
+  }));
+  return [...fromConsole, ...builtIn];
+}

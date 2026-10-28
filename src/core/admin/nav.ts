@@ -137,6 +137,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
             // « Suggestions du robot » a rejoint « Conseils » : l'ancienne adresse y redirige (filtre « Proposés par le robot »).
             matches: ["/admin/suggestions-robot"],
           },
+          { href: "/admin/conseils/routines", label: "Routines", description: "Plusieurs produits proposés ensemble au comptoir (nettoyer, hydrater, traiter…), par médicament et par thème, une gamme par étape." },
           { href: "/admin/conseils/priorites", label: "Priorités", description: "Pour chaque famille de médicaments, l'ordre des conseils au comptoir — règle 1, règle 2, règle 3 — choisi par vous, pour toutes les pharmacies." },
           { href: "/admin/conseils/questions", label: "Questions du comptoir", description: "Les questions, les réponses du patient et le conseil à dire, sous chaque produit conseil de la bannière : modifier pour toutes les pharmacies." },
           { href: "/admin/connaissances", label: "Base de connaissances", description: "Déposer des documents et des notes : le modèle les lit et propose des conseils, vous acceptez ou refusez." },
