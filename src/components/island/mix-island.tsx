@@ -109,6 +109,8 @@ export type MixIslandProps = {
    * petite bannière (`headAside`), ou sur une ligne à part sous elle (`belowHead`). La routine elle-même s'ouvre dans une
    * deuxième bannière (routine-island.tsx).
    */
+  /** Le conseil sur lequel la grande bannière s'ouvre d'abord (index dans `items`) ; absent : le meilleur pas encore vendu. */
+  startAt?: number;
   /** Une ligne par conseil dans la petite bannière, et non une par boîte (la démo au comptoir). */
   everyAdvice?: boolean;
   routineChip?: ReactNode;
@@ -121,7 +123,7 @@ export type MixIslandProps = {
 /** Une question à l'aide et sa réponse (vide tant qu'elle n'est pas arrivée). */
 export type HelpExchange = { advice: string; question: string; answer: string; error?: string };
 
-export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, everyAdvice = false, routineChip, routineBeside, headAside, belowHead }: MixIslandProps) {
+export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead }: MixIslandProps) {
   const challengedBoxes = boxes.filter((box) => box.challenge);
   // La routine (fondateur, 28 oct. 2026, essai « C » qui clignote) : ses étapes quittent la liste des conseils ; leurs photos
   // clignotent à droite de la petite bannière et, au survol, la routine s'ouvre dans une deuxième bannière.
@@ -132,7 +134,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   const sold = (index: number) => outcomes[index] === "SOLD";
   const soldIndexes = order.filter(sold);
   const firstOpen = order.find((index) => !sold(index)) ?? order[0];
-  const [at, setAt] = useState(() => Math.max(0, order.indexOf(firstOpen)));
+  const [at, setAt] = useState(() => Math.max(0, order.indexOf(startAt !== undefined && order.includes(startAt) ? startAt : firstOpen)));
   const [step, setStep] = useState<Step>("sheet");
   const position = Math.min(at, order.length - 1);
   const index = order[position];

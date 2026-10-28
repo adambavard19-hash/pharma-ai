@@ -2,18 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { fr, Kicker, SectionHead } from "./_components/site-shell";
-import { HERO_ITEMS } from "./_components/visuals";
 import { VideoButton } from "./_components/video-dialog";
 import { AutoVideo } from "./_components/auto-video";
 import { AppPhoneVisual } from "./_components/app-visual";
-import { CounterIslandScene } from "@/components/island/counter-island-scene";
-import { VIGILANCE_RULES } from "@/core/ai/engines/vigilance";
 import { loadLiveProof } from "@/server/services/site-leads";
 import { loadPublicPricing } from "@/server/services/public-pricing";
 import { formatEuros } from "@/core/billing/subscription";
 import { PricingSection } from "./_components/pricing-section";
 import { FeatureCarousel, type FeatureSlide } from "./_components/feature-carousel";
 import { RoutineShowcase } from "./_components/routine-showcase";
+import { BannerTwoStates } from "./_components/banner-two-states";
 import { FlowSteps, LoadVisual, Reveal } from "./_components/story";
 import { FAQ } from "./_components/site-content";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
@@ -157,12 +155,12 @@ export default async function SitePage() {
             <VideoButton film="enBref" label="Voir PharmaBoost en vidéo" />
           </div>
           <FlowSteps />
-          {/* Réduite de près de moitié à partir de la tablette (`zoom` : tout rétrécit ensemble, rien n'est coupé), centrée. */}
-          <div className="mx-auto mt-12 max-w-[1100px] md:[zoom:0.6]">
-            <CounterIslandScene framed items={HERO_ITEMS} drug={HERO_DRUG} alert={heroAlert()} />
+          {/* La bannière d'aujourd'hui, deux conseils, la routine, le challenge et la date courte : petite, puis ouverte, sur un
+              fond noir d'écran Windows (fondateur, 28 oct. 2026). */}
+          <div className="mx-auto mt-12 max-w-[1100px]">
+            <BannerTwoStates />
           </div>
-          {/* Pas « fidèle » : l'île n'a pas encore été vue dessinée sur un poste Windows. */}
-          <p className="mt-4 text-center text-[13px] text-text-tertiary">Animation de la bannière PharmaBoost, reproduite pour le site. Touchez les réponses, les onglets ou les flèches pour l&apos;essayer. Médicaments, produits et prix : exemples.</p>
+          <p className="mt-4 text-center text-[13px] text-text-tertiary">La bannière PharmaBoost, reproduite pour le site : au scan, puis ouverte. Passez la souris sur les photos de la routine. Médicaments, produits et prix : exemples.</p>
           {/* Les nouveautés de la bannière (fondateur, 22 oct. 2026). */}
           <div className="mx-auto mt-10 grid max-w-5xl gap-3 sm:grid-cols-3" data-nouveautes-banniere="">
             {[
@@ -298,10 +296,3 @@ function Figure({ label, value }: { label: string; value: string }) {
   );
 }
 
-const HERO_DRUG = "DOXYCYCLINE 100 mg";
-
-/** La mise en garde jouée dans l'île : une vraie règle de vigilance du moteur (cyclines et minéraux). */
-function heroAlert(): { title: string; text: string } | null {
-  const rule = VIGILANCE_RULES.find((r) => r.key === "cycline-quinolone-chelation");
-  return rule ? { title: rule.title, text: rule.explanationTemplate.replaceAll("{drug}", HERO_DRUG) } : null;
-}
