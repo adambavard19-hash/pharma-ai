@@ -258,6 +258,18 @@ export function CounterDemo({ scenarios, initial, pharmacyName, firstName }: { s
             <p className="text-[10.5px] tracking-wide text-[#6B7C8B] uppercase">Lignes</p>
             <p className="mt-1 text-[26px] leading-none font-bold tabular-nums">{scanned.length + sold.length}</p>
           </div>
+          {/* Le bouton de fin de vente du logiciel (fondateur, 28 oct. 2026) : comme au comptoir, valider la vente dans le
+              logiciel termine la vente PharmaBoost, sans appuyer sur « Terminer » dans la bannière. */}
+          <button
+            type="button"
+            data-demo-fin=""
+            onClick={() => saleId && !closed && void finish(saleId)}
+            disabled={!saleId || closed || busy}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-md border-2 border-[#1F7A4D] bg-[#2E9B5F] text-[15px] font-bold tracking-wide text-white shadow-sm transition-[filter] hover:brightness-110 disabled:cursor-not-allowed disabled:border-[#B9C6D2] disabled:bg-[#DCE4EA] disabled:text-[#8797A5]"
+          >
+            <Check className="size-5" strokeWidth={3} aria-hidden="true" />
+            FIN · Valider
+          </button>
           <div className="space-y-1.5 rounded-md border border-[#C5D0DA] bg-white p-3">
             {["Facturer", "Mettre en attente", "Imprimer"].map((label) => (
               <div key={label} className="rounded border border-[#C5D0DA] bg-[#F7F9FB] px-2.5 py-1.5 text-[#4A5A68]">{label}</div>
@@ -344,7 +356,7 @@ export function CounterDemo({ scenarios, initial, pharmacyName, firstName }: { s
 
       {/* La vraie île du poste de caisse, à la taille de sa fenêtre Windows, posée en haut au centre. */}
       <div className="pointer-events-none absolute left-1/2 -translate-x-1/2" style={{ top: ISLAND_WINDOW.top, width: ISLAND_WINDOW.width, height: ISLAND_WINDOW.height }}>
-        <iframe ref={frame} src="/poste/ile" title="PharmaBoost au comptoir" className="pointer-events-auto absolute inset-0 size-full border-0" style={{ background: "transparent", colorScheme: "normal", clipPath: clipOf(rects) }} />
+        <iframe ref={frame} src="/poste/ile?tous-les-conseils=1" title="PharmaBoost au comptoir" className="pointer-events-auto absolute inset-0 size-full border-0" style={{ background: "transparent", colorScheme: "normal", clipPath: clipOf(rects) }} />
       </div>
 
       {/* Pendant ce temps, chez le patient : le bilan arrive dans sa boîte mail. */}

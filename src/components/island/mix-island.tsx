@@ -103,12 +103,24 @@ export type MixIslandProps = {
   boxes?: { id: string; name: string; challenge?: string; reward?: string }[];
   /** L'onglet « Aide » : les questions déjà posées sur cette vente et leurs réponses ; absent, pas d'onglet Aide. */
   help?: { log: HelpExchange[]; onAsk: (question: string, advice: HelpAdvice) => void };
+  /**
+   * La routine (fondateur, 28 oct. 2026), en essai : un repère parmi ceux du premier conseil (`routineChip`), à droite de la
+   * petite bannière (`headAside`), ou sur une ligne à part sous elle (`belowHead`). La routine elle-même s'ouvre dans une
+   * deuxième bannière (routine-island.tsx).
+   */
+  /** Une ligne par conseil dans la petite bannière, et non une par boîte (la démo au comptoir). */
+  everyAdvice?: boolean;
+  routineChip?: ReactNode;
+  /** Juste à côté du nom du premier conseil (le mot « Routine » qui clignote). */
+  routineBeside?: ReactNode;
+  headAside?: ReactNode;
+  belowHead?: ReactNode;
 };
 
 /** Une question à l'aide et sa réponse (vide tant qu'elle n'est pas arrivée). */
 export type HelpExchange = { advice: string; question: string; answer: string; error?: string };
 
-export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help }: MixIslandProps) {
+export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, everyAdvice = false, routineChip, routineBeside, headAside, belowHead }: MixIslandProps) {
   const challengedBoxes = boxes.filter((box) => box.challenge);
   const order = bestOrder(items);
   const sold = (index: number) => outcomes[index] === "SOLD";
@@ -124,7 +136,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
     setStep("sheet");
   };
   const alternatives = order.map((i, pos) => ({ i, pos })).filter(({ i }) => i !== index && item.drug && items[i].drug === item.drug);
-  const heads = headsByBox(items, order, sold);
+  const heads = everyAdvice ? order : headsByBox(items, order, sold);
   // Une ligne du haut : la grande bannière s'ouvre (ou reste ouverte) sur ce conseil.
   const show = (head: number) => {
     setAt(Math.max(0, order.indexOf(head)));
@@ -171,6 +183,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                     )}
                     {/* Jamais « 1 bipé · +3,28 € à la validation » (fondateur, 22 oct. 2026 : « je ne veux pas voir ça ») : le nom du conseil. */}
                     <span className="truncate">{advice.name}</span>
+                    {row === 0 && routineBeside}
                     {sold(head) && <Check className="size-3.5 shrink-0" strokeWidth={3} style={{ color: L.green }} aria-label="Vendu" />}
                   </span>
                   {heads.length > 1 && advice.drug && <span className="truncate text-[10.5px] leading-[14px] font-semibold text-[#3F5E57]">pour {advice.drug}</span>}
@@ -182,11 +195,13 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                     {advice.margin && <HeadChip bg="#FFE58A" fg="#4A3500">Marge {advice.margin}</HeadChip>}
                     {advice.challenge && <HeadChip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</HeadChip>}
                     {advice.shortDate && <HeadChip bg="#FF8A80" fg="#4A0B07">{T.shortDate} {advice.shortDate}</HeadChip>}
+                    {row === 0 && routineChip}
                   </span>
                 </button>
               );
             })}
           </div>
+          {headAside}
           <button
             type="button"
             data-ile-client-suivant=""
@@ -215,6 +230,8 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
             </span>
           </div>
         )}
+
+        {belowHead}
 
         {open && (
           <div className="px-2 pb-2">

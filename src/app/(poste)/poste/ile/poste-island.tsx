@@ -534,6 +534,8 @@ export function PosteIsland() {
   const folded = Boolean(entry) && island.stage === "advice" && !hovered && !finishAfterEmail;
   // La bannière « mix » (fondateur, 19 oct. 2026) ; l'ancienne reste joignable pour revenir en arrière : `?banniere=ancienne`.
   const mix = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get("banniere") !== "ancienne", () => true);
+  // La démo au comptoir montre chaque conseil sur sa ligne de la petite bannière, même pour une seule boîte (fondateur, 28 oct. 2026).
+  const everyAdvice = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).has("tous-les-conseils"), () => false);
 
   // « C'est un autre client ? » : la dernière boîte est arrivée plus de 30 secondes après la précédente (le serveur la marque).
   // « Non » range la question pour cette boîte ; « Oui » la sépare : elle ouvre une nouvelle vente, la précédente se termine.
@@ -718,6 +720,7 @@ export function PosteIsland() {
             onFinish={finish}
             onAnswer={islandProps.onAnswer}
             boxes={entry.boxes ?? []}
+            everyAdvice={everyAdvice}
             help={{
               log: helpLog.sale === entry.id ? helpLog.log : [],
               onAsk: (question, advice) => {
